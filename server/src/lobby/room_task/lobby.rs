@@ -14,9 +14,30 @@ use super::super::{
 use super::helpers::DRAINING_NEW_MATCHES_DISABLED_MSG;
 use super::types::{AiSlot, Phase, RoomPlayer, MAX_LOBBY_TEAMS};
 use super::RoomTask;
-use crate::protocol::{LobbyPlayer, ServerMessage, TeamId};
+use crate::protocol::{LobbyKind, LobbyPlayer, ServerMessage, TeamId};
 
 impl RoomTask {
+    pub(super) fn is_replay_staging_lobby(&self) -> bool {
+        matches!(self.mode, super::RoomMode::Replay { .. }) && matches!(self.phase, Phase::Lobby)
+    }
+
+    fn lobby_kind(&self) -> LobbyKind {
+        if matches!(self.mode, super::RoomMode::Replay { .. }) {
+            LobbyKind::Replay
+        } else {
+            LobbyKind::Normal
+        }
+    }
+
+    fn lobby_map_name(&self) -> String {
+        match &self.mode {
+            super::RoomMode::Replay { artifact } if matches!(self.phase, Phase::Lobby) => {
+                artifact.map_name.clone()
+            }
+            _ => self.selected_map.clone(),
+        }
+    }
+
     pub(super) fn lobby_summary(&self) -> Option<LobbySummary> {
         let policy = self.session_policy();
         if !policy.is_public_lobby_browser_room() {
@@ -27,6 +48,7 @@ impl RoomTask {
             .players
             .get(&host_id)
             .map(|player| player.name.clone())?;
+        let kind = self.lobby_kind();
         let (phase, join_state, map) = if self.match_countdown_deadline.is_some() {
             (
                 LobbySummaryPhase::Countdown,
@@ -36,16 +58,13 @@ impl RoomTask {
         } else {
             match &self.phase {
                 Phase::Lobby => {
-                    let join_state = if self.total_player_count() >= MAX_PLAYERS {
-                        LobbyJoinState::FullSpectatorOnly
-                    } else {
-                        LobbyJoinState::Open
-                    };
-                    (
-                        LobbySummaryPhase::Lobby,
-                        join_state,
-                        self.selected_map.clone(),
-                    )
+                    let join_state =
+                        if kind == LobbyKind::Replay || self.total_player_count() >= MAX_PLAYERS {
+                            LobbyJoinState::FullSpectatorOnly
+                        } else {
+                            LobbyJoinState::Open
+                        };
+                    (LobbySummaryPhase::Lobby, join_state, self.lobby_map_name())
                 }
                 Phase::InGame(_) => (
                     LobbySummaryPhase::InGame,
@@ -57,11 +76,20 @@ impl RoomTask {
         };
         Some(LobbySummary {
             room: self.room.clone(),
+            kind,
             host_name: Some(host_name),
             map,
             created_at_unix_ms: self.created_at_unix_ms,
-            occupied_slots: self.total_player_count(),
-            max_slots: MAX_PLAYERS,
+            occupied_slots: if kind == LobbyKind::Replay {
+                0
+            } else {
+                self.total_player_count()
+            },
+            max_slots: if kind == LobbyKind::Replay {
+                0
+            } else {
+                MAX_PLAYERS
+            },
             spectator_count: self
                 .players
                 .values()
@@ -84,6 +112,10 @@ impl RoomTask {
         let policy = self.session_policy();
         if policy.is_dev_watch() {
             self.on_join_dev_watch(player_id, name, msg_tx, ack);
+            return;
+        }
+        if policy.uses_replay_lobby_join() {
+            self.on_join_replay_lobby(player_id, name, msg_tx, ack);
             return;
         }
         if policy.uses_replay_room_join() {
@@ -280,6 +312,10 @@ impl RoomTask {
         if self.match_countdown_deadline.is_some() {
             return;
         }
+        if self.is_replay_staging_lobby() {
+            self.on_start_replay_lobby_request(player_id);
+            return;
+        }
         if self.new_live_session_blocked_by_drain() {
             if let Some(player) = self.players.get(&player_id) {
                 send_or_log(
@@ -330,6 +366,9 @@ impl RoomTask {
             return;
         }
         if !matches!(self.phase, Phase::Lobby) || self.host_id != Some(player_id) {
+            return;
+        }
+        if self.is_replay_staging_lobby() {
             return;
         }
         if team_id == 0 {
@@ -420,6 +459,9 @@ impl RoomTask {
         if !matches!(self.phase, Phase::Lobby) || self.host_id != Some(player_id) {
             return;
         }
+        if self.is_replay_staging_lobby() {
+            return;
+        }
         if self.total_player_count() >= MAX_PLAYERS {
             crate::log_debug!(room = %self.room, "ignoring add-ai; room full");
             return;
@@ -465,6 +507,9 @@ impl RoomTask {
         if !matches!(self.phase, Phase::Lobby) || self.host_id != Some(player_id) {
             return;
         }
+        if self.is_replay_staging_lobby() {
+            return;
+        }
         let Some(profile_id) = rts_ai::canonical_live_profile_id(&requested_profile_id) else {
             crate::log_debug!(
                 room = %self.room,
@@ -502,6 +547,9 @@ impl RoomTask {
         if !matches!(self.phase, Phase::Lobby) || self.host_id != Some(player_id) {
             return;
         }
+        if self.is_replay_staging_lobby() {
+            return;
+        }
         let before = self.ai_players.len();
         self.ai_players.retain(|a| a.id != target);
         if self.ai_players.len() != before {
@@ -521,6 +569,9 @@ impl RoomTask {
         if !matches!(self.phase, Phase::Lobby) || self.host_id != Some(player_id) {
             return;
         }
+        if self.is_replay_staging_lobby() {
+            return;
+        }
         if self.selected_map != map {
             self.selected_map = map;
             crate::log_debug!(room = %self.room, map = %self.selected_map, "map selected");
@@ -536,6 +587,9 @@ impl RoomTask {
             return;
         }
         if !matches!(self.phase, Phase::Lobby) {
+            return;
+        }
+        if self.is_replay_staging_lobby() {
             return;
         }
         if target != player_id && self.host_id != Some(player_id) {
@@ -757,6 +811,9 @@ impl RoomTask {
     }
 
     pub(super) fn can_start_now(&self) -> bool {
+        if self.is_replay_staging_lobby() {
+            return !self.drain.is_draining() && self.host_id.is_some() && !self.players.is_empty();
+        }
         if let Phase::BranchStaging(staging) = &self.phase {
             return !self.new_live_session_blocked_by_drain() && staging.can_start();
         }
@@ -777,6 +834,7 @@ impl RoomTask {
     /// Build and broadcast the current `lobby` message to everyone in the room.
     pub(super) fn broadcast_lobby(&mut self) {
         let host_id = self.host_id.unwrap_or(0);
+        let kind = self.lobby_kind();
         // Humans first (in join order), then AI opponents. AIs always read as ready.
         let mut players: Vec<LobbyPlayer> = self
             .order
@@ -818,12 +876,17 @@ impl RoomTask {
         }
         let msg = ServerMessage::Lobby {
             room: self.room.clone(),
+            kind,
             host_id,
             players,
             can_start: self.can_start(),
             team_preset: "custom".to_string(),
-            map: self.selected_map.clone(),
-            maps: Map::list_available(),
+            map: self.lobby_map_name(),
+            maps: if kind == LobbyKind::Replay {
+                Vec::new()
+            } else {
+                Map::list_available()
+            },
         };
         self.broadcast(&msg);
     }

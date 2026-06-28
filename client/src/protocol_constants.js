@@ -22,6 +22,11 @@ export const S = Object.freeze({
   ERROR: "error",
 });
 
+export const LOBBY_KIND = Object.freeze({
+  NORMAL: "normal",
+  REPLAY: "replay",
+});
+
 // --- Client -> Server message tags ---
 export const C = Object.freeze({
   JOIN: "join",

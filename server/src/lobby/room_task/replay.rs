@@ -13,6 +13,7 @@ use super::super::session_policy::{RoomTimeOperation, RoomTimeSource, SessionPha
 use super::super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::super::tick_control::{RoomTimeSpeed, TickControl};
 use super::super::ReplayBranchSeed;
+use super::helpers::DRAINING_NEW_MATCHES_DISABLED_MSG;
 use super::types::{
     LabSeekTarget, Phase, ReplayStartPayloadStamp, ReplayTickContext, RoomMode, RoomPlayer,
 };
@@ -70,6 +71,38 @@ impl RoomTask {
         self.send_observer_analysis_to(player_id);
     }
 
+    pub(super) fn on_join_replay_lobby(
+        &mut self,
+        player_id: u32,
+        name: String,
+        msg_tx: ConnectionSink,
+        ack: tokio::sync::oneshot::Sender<bool>,
+    ) {
+        if self.players.contains_key(&player_id) || !self.is_replay_staging_lobby() {
+            let _ = ack.send(false);
+            return;
+        }
+        self.order.push(player_id);
+        self.players.insert(
+            player_id,
+            RoomPlayer {
+                name,
+                color: "#6f8fa8".to_string(),
+                ready: true,
+                spectator: true,
+                msg_tx,
+                head_of_line_count: 0,
+                last_received_client_seq: 0,
+                last_sim_consumed_client_seq: 0,
+                last_sim_consumed_client_tick: None,
+            },
+        );
+        self.reassign_host_if_needed();
+        let _ = ack.send(true);
+        self.send_current_shutdown_warning_to(player_id);
+        self.broadcast_lobby();
+    }
+
     pub(super) fn on_join_replay_room(
         &mut self,
         player_id: u32,
@@ -120,6 +153,49 @@ impl RoomTask {
             },
             Phase::InGame(_) => {}
             Phase::BranchStaging(_) => {}
+        }
+    }
+
+    pub(super) fn on_start_replay_lobby_request(&mut self, player_id: u32) {
+        if !self.is_replay_staging_lobby() {
+            return;
+        }
+        if self.host_id != Some(player_id) {
+            crate::log_debug!(room = %self.room, player_id, "ignoring replay start from non-host");
+            return;
+        }
+        if self.drain.is_draining() {
+            if let Some(player) = self.players.get(&player_id) {
+                send_or_log(
+                    &self.room,
+                    player_id,
+                    &player.msg_tx,
+                    ServerMessage::Error {
+                        msg: DRAINING_NEW_MATCHES_DISABLED_MSG.to_string(),
+                    },
+                );
+            }
+            crate::log_debug!(room = %self.room, player_id, "ignoring replay start while server is draining");
+            self.broadcast_lobby();
+            return;
+        }
+        if self.players.is_empty() {
+            crate::log_debug!(room = %self.room, "ignoring replay start; no spectators present");
+            return;
+        }
+        match self.replay_session_for_mode() {
+            Ok(session) => self.transition_to_replay_viewer(session),
+            Err(err) => {
+                crate::log_warn!(room = %self.room, error = %err, "replay setup failed");
+                if let Some(player) = self.players.get(&player_id) {
+                    send_or_log(
+                        &self.room,
+                        player_id,
+                        &player.msg_tx,
+                        ServerMessage::Error { msg: err },
+                    );
+                }
+            }
         }
     }
 

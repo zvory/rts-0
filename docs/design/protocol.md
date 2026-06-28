@@ -61,9 +61,9 @@ lobby/config dump replaces the source scrape.
 
 | `t`        | Fields | Meaning |
 |------------|--------|---------|
-| `join`     | `name: string`, `room?: string`, `spectator?: bool`, `replayOk?: bool` | Join (or create) a room as an active lobby player or, when `spectator` is true, as an observer. `room` defaults to `"main"`. Normal live matches accept `spectator: true` after match start and attach the connection as a gameplay-read-only live spectator with shared live pause controls; active late joins and countdown joins are rejected. Lobby role switches are observer-only and must happen before match start. If the target room is replay playback, the first join is rejected with `joinReplayPrompt`; retry with `replayOk: true` only after user confirmation. If the same WebSocket is already in a different room and the new room accepts the join, the connection transfers to the new room and leaves the previous room. |
+| `join`     | `name: string`, `room?: string`, `spectator?: bool`, `replayOk?: bool` | Join (or create) a room as an active lobby player or, when `spectator` is true, as an observer. `room` defaults to `"main"`. Normal live matches accept `spectator: true` after match start and attach the connection as a gameplay-read-only live spectator with shared live pause controls; active late joins and countdown joins are rejected. Lobby role switches are observer-only and must happen before match start. Persisted match-history replay rooms start as `kind: "replay"` staging lobbies; joins there are accepted as spectators only and do not require `replayOk`. If the target room is already replay playback, the first join is rejected with `joinReplayPrompt`; retry with `replayOk: true` only after user confirmation. If the same WebSocket is already in a different room and the new room accepts the join, the connection transfers to the new room and leaves the previous room. |
 | `ready`    | `ready: bool` | Toggle ready state in the lobby. |
-| `start`    | — | Host asks to start the match (only honored from the room host). |
+| `start`    | — | Host asks to start the match (only honored from the room host). In a persisted replay staging lobby, host `start` begins replay playback immediately when at least one spectator is present and deploy drain is not blocking new sessions; ready/team/map/AI checks do not apply. |
 | `setTeamPreset` | `preset: string` | Deprecated compatibility command. The server ignores it; lobby teams are host-managed slots. |
 | `setTeam` | `id: u32`, `teamId: u32` | Host assigns an active human or AI lobby seat to team `1..=4` (lobby phase only, host-only). Unknown ids, spectators, team id `0`, and team ids outside the supported range are ignored. |
 | `setFaction` | `factionId: string` | Active human players select their own playable lobby faction (lobby phase only). Unknown ids, fixture ids, spectators, countdown, and in-game requests are ignored. The normal client only exposes this during the beta UI rollout. |
@@ -88,7 +88,7 @@ lobby/config dump replaces the source scrape.
 | `claimBranchSeat` | `playerId: u32` | Claim one original replay player seat in a replay branch staging room. Ignored outside branch staging. Rejected with `error` if the seat is unknown, already claimed, or this occupant already claimed another seat. |
 | `releaseBranchSeat` | `playerId: u32` | Release one original replay player seat currently claimed by this occupant in branch staging. Ignored outside branch staging or when the occupant does not own that claim. |
 | `startBranch` | — | Host asks to launch the staged replay branch. Ignored outside branch staging and from non-hosts. The server rejects launch until every original active seat is claimed; live promotion is handled by the branch promotion phase. |
-| `selectMap` | `map: string` | Host selects the lobby map by its stable map name. Ignored outside the lobby, from non-hosts, during match countdown, or in dev-watch rooms. The server broadcasts the selected value as lobby `map` and the available catalog as `maps[]`. |
+| `selectMap` | `map: string` | Host selects the lobby map by its stable map name. Ignored outside the lobby, from non-hosts, during match countdown, in dev-watch rooms, or in replay staging lobbies. The server broadcasts the selected value as lobby `map` and the available catalog as `maps[]`. |
 
 Live player `command` messages MUST include `clientSeq`; unsequenced live commands are
 protocol-invalid and are not executed. The browser resets allocation to `1` on every `start`
@@ -291,7 +291,7 @@ transport/browser/prediction/render behavior, not as gameplay authority.
 | `t`        | Fields |
 |------------|--------|
 | `welcome`  | `playerId: u32` — assigned on connect. |
-| `lobby`    | `room: string`, `hostId: u32`, `players: LobbyPlayer[]`, `canStart: bool`, `teamPreset: string`, `map: string`, `maps: AvailableMap[]` |
+| `lobby`    | `room: string`, `kind: LobbyKind`, `hostId: u32`, `players: LobbyPlayer[]`, `canStart: bool`, `teamPreset: string`, `map: string`, `maps: AvailableMap[]` |
 | `matchCountdown` | `durationMs: u32`, `words: string[]` — reliable pre-match countdown sent to every lobby participant after the host starts and before `start`. During this interval the server keeps the room in lobby setup, disables `canStart`, freezes lobby edits, rejects new joins, and sends `start` only after the countdown duration elapses. |
 | `start`    | `Game start payload` (see 2.3). |
 | `snapshot` | `Per-player snapshot` (see 2.4). |
@@ -318,6 +318,13 @@ block readiness, or count toward win/loss.
 `selectMap`; `description` is display text for the lobby selector. Lobby `map` is the current
 selected map name and is distinct from replay start metadata `mapName`.
 
+`LobbyKind`: `"normal"` for ordinary public lobbies/live rooms, `"replay"` for persisted
+match-history replay staging lobbies. Replay lobbies carry only spectator `LobbyPlayer` rows,
+report `canStart` when the host may begin playback, send the replay artifact map name as `map`,
+and send an empty `maps[]` because map selection is disabled. The HTTP `GET /api/lobbies` row
+uses the same `kind` values and includes only safe room metadata: room, kind, host name, map,
+creation time, active-slot counts, spectator count, phase, and join state.
+
 `GET /api/lab-scenarios` returns a bounded catalog of bundled lab scenario metadata:
 `[{ id, title, description, tags, map, playerCount, filename }]`. `id` is the stable safe token used
 in direct lab room URLs as `scenario=<id>`, `map` and `playerCount` mirror the listed
@@ -330,9 +337,11 @@ opponents are assigned to the next empty team after the currently occupied teams
 falling back to the first empty team in `1..=4`; the host may move active human or AI seats between
 those team slots. The normal lobby UI shows occupied teams plus one "New team" drop target while
 fewer than four teams are occupied, plus a bottom spectator drop target for host-managed observer
-moves. Spectator lobby rows carry `teamId: 0` because they are not match players. `canStart` is false until there is at least one active seat, every
-active human is ready, every active seat has a team in `1..=4`, and the active seat count is at or
-below the four-player map-start cap.
+moves. Spectator lobby rows carry `teamId: 0` because they are not match players. In normal
+lobbies, `canStart` is false until there is at least one active seat, every active human is ready,
+every active seat has a team in `1..=4`, and the active seat count is at or below the four-player
+map-start cap. In replay staging lobbies, `canStart` is true when a host spectator is present and
+the server is not blocking new sessions for deploy drain.
 
 `PlayerScore`: `{ id: u32, teamId: u32, name: string, color: string, unitScore: u32, structureScore: u32,
 unitsKilled: u32, unitsLost: u32, buildingsKilled: u32, buildingsLost: u32 }`. `scores` is a
@@ -499,6 +508,12 @@ schema-2 fixtures defaults through the documented singleton team behavior; new c
 include explicit nonzero player and score team ids, required player faction ids, required player
 loadout records, and `winnerTeamId` when there is a winning team.
 
+Persisted match-history replay launch creates a replay staging lobby rather than starting playback
+on the first join. The first spectator becomes host, additional viewers may gather from the lobby
+browser, and the host's `start` transitions the shared room into the same replay playback runtime
+used after post-match replay. Replay staging ignores ready toggles, active-seat role changes, team
+or faction edits, AI changes, and map selection.
+
 When a real multi-player match ends, the server sends the normal `gameOver` score payload, clears
 pending latest-only live snapshots for connected humans, and then sends a replay `start` payload
 at tick 0 plus `roomTimeState`. Post-match replay defaults every viewer to all active players'
@@ -506,8 +521,8 @@ combined authoritative vision and starts at `2.0x` speed. `returnToLobby` detach
 requesting replay viewer; the shared replay session remains alive for everyone else. The room drops
 the replay simulation after the last viewer leaves; for normal public rooms, that empty room then
 asks the lobby registry to dispose the public name rather than holding it for reconnect. Dedicated
-replay rooms created for match-history or dev replay viewing follow the same per-viewer detach rule;
-they keep the shared replay session alive until the room empties.
+replay rooms created for match-history or dev replay viewing follow the same per-viewer detach rule
+after playback has started; they keep the shared replay session alive until the room empties.
 
 ### 2.4 `snapshot` payload (per-player, fog-filtered)
 `Snapshot` remains the semantic shape used by server game code and by client modules after

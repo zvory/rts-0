@@ -17,8 +17,8 @@ mod messagepack_frame;
 use contract_metadata::{ability_code, kind_code};
 
 pub use contract_metadata::{
-    abilities, ability_object_kinds, kinds, protocol_contract, states, terrain, upgrades,
-    CompactSlotSchemas, ProtocolCompactCodes, ProtocolContract, ProtocolMessageTags,
+    abilities, ability_object_kinds, kinds, lobby_kinds, protocol_contract, states, terrain,
+    upgrades, CompactSlotSchemas, ProtocolCompactCodes, ProtocolContract, ProtocolMessageTags,
     ProtocolVocabularies, SlotField, SnapshotCodecContract, COMPACT_SNAPSHOT_VERSION,
     COMPACT_UNKNOWN_CODE, PREDICTION_PROTOCOL_VERSION, SNAPSHOT_CODEC_COMPACT_JSON,
     SNAPSHOT_CODEC_MESSAGEPACK_COMPACT, SNAPSHOT_CODEC_VERSION, SNAPSHOT_FRAME_KIND_BINARY,
@@ -658,6 +658,13 @@ pub struct AvailableMap {
     pub description: String,
 }
 
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum LobbyKind {
+    Normal,
+    Replay,
+}
+
 /// Original replay seat announced when a practice branch room is created.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -701,6 +708,7 @@ pub enum ServerMessage {
     },
     Lobby {
         room: String,
+        kind: LobbyKind,
         host_id: u32,
         players: Vec<LobbyPlayer>,
         can_start: bool,

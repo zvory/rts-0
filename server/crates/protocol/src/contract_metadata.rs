@@ -75,6 +75,12 @@ pub mod ability_object_kinds {
     pub const LINE_PROJECTILE: &str = "lineProjectile";
 }
 
+/// Lobby room kinds surfaced in WebSocket lobby state and HTTP lobby-browser rows.
+pub mod lobby_kinds {
+    pub const NORMAL: &str = "normal";
+    pub const REPLAY: &str = "replay";
+}
+
 /// Permanent upgrade ids used by production/research and snapshot projection.
 pub mod upgrades {
     pub const METHAMPHETAMINES: &str = "methamphetamines";
@@ -143,6 +149,7 @@ pub struct ProtocolVocabularies {
     events: BTreeMap<&'static str, &'static str>,
     abilities: BTreeMap<&'static str, &'static str>,
     ability_object_kinds: BTreeMap<&'static str, &'static str>,
+    lobby_kinds: BTreeMap<&'static str, &'static str>,
     upgrades: BTreeMap<&'static str, &'static str>,
     notice_severities: BTreeMap<&'static str, &'static str>,
     order_stages: BTreeMap<&'static str, &'static str>,
@@ -465,6 +472,7 @@ pub fn protocol_contract() -> ProtocolContract {
             events: event_vocabulary(),
             abilities: ability_vocabulary(),
             ability_object_kinds: ability_object_kind_vocabulary(),
+            lobby_kinds: lobby_kind_vocabulary(),
             upgrades: upgrade_vocabulary(),
             notice_severities: notice_severity_vocabulary(),
             order_stages: order_stage_vocabulary(),
@@ -569,6 +577,13 @@ fn ability_object_kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("RETURN_MARKER", ability_object_kinds::RETURN_MARKER),
         ("MAGIC_ANCHOR", ability_object_kinds::MAGIC_ANCHOR),
         ("LINE_PROJECTILE", ability_object_kinds::LINE_PROJECTILE),
+    ])
+}
+
+fn lobby_kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
+    string_map(&[
+        ("NORMAL", lobby_kinds::NORMAL),
+        ("REPLAY", lobby_kinds::REPLAY),
     ])
 }
 

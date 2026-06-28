@@ -34,8 +34,8 @@ use crate::config;
 use crate::db::Db;
 use crate::lab_scenario_submission::LabScenarioSubmissionService;
 use crate::protocol::{
-    Event, LabClientOp, ReplayBranchSeat, ReplayStartMetadata, ResourceDelta, ServerMessage,
-    Snapshot, TeamId, VisionSelectionRequest,
+    Event, LabClientOp, LobbyKind, ReplayBranchSeat, ReplayStartMetadata, ResourceDelta,
+    ServerMessage, Snapshot, TeamId, VisionSelectionRequest,
 };
 use rts_ai::selfplay::is_safe_artifact_name;
 use rts_sim::game::command::SimCommand;
@@ -141,6 +141,7 @@ pub struct ReplayBranchSeed {
 #[serde(rename_all = "camelCase")]
 pub struct LobbySummary {
     pub room: String,
+    pub kind: LobbyKind,
     pub host_name: Option<String>,
     pub map: String,
     pub created_at_unix_ms: u64,

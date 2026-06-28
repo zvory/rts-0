@@ -1,6 +1,6 @@
 # Phase 1 - Server Replay Lobby Contract
 
-Status: Not started.
+Status: Done.
 
 ## Goal
 

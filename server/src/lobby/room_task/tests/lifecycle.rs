@@ -193,6 +193,7 @@ fn dedicated_replay_room_return_to_lobby_does_not_stop_other_viewers() {
 
     assert_eq!(ack_rx_a.try_recv(), Ok(true));
     assert_eq!(ack_rx_b.try_recv(), Ok(true));
+    task.on_start_request(99);
     assert!(matches!(task.phase, Phase::ReplayViewer(_)));
 
     task.on_return_to_lobby(99);

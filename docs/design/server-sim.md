@@ -286,12 +286,13 @@ alive.
   invulnerable, applies across lab mutations, owner changes, spawned assets, and timeline replay
   state, and is mirrored in start/labState metadata.
 - The public lobby browser asks room tasks for bounded summaries over `RoomEvent::Summary` instead
-  of reading room internals. Only normal lobby/countdown/live-match rooms are summarized; dev,
-  replay, replay-artifact, replay-branch, and lab modes stay hidden. `GET /api/lobbies` collects
-  those summaries with a short timeout and returns browser-safe DTOs sorted by joinability then age;
-  the client polls that route every 1.5 seconds and preflights a clicked row against the latest
-  route response before sending `join`. No WebSocket push message currently exists for the browser
-  list; the HTTP poll cadence is the accepted freshness target.
+  of reading room internals. Normal lobby/countdown/live-match rooms and persisted match-history
+  replay staging lobbies are summarized; dev, replay-artifact, replay playback, replay-branch, and
+  lab modes stay hidden. `GET /api/lobbies` collects those summaries with a short timeout and
+  returns browser-safe DTOs sorted by joinability then age; the client polls that route every 1.5
+  seconds and preflights a clicked row against the latest route response before sending `join`. No
+  WebSocket push message currently exists for the browser list; the HTTP poll cadence is the
+  accepted freshness target.
 - The room task, each tick: enqueue live AI commands for AI players → `game.tick()` → build
   per-audience snapshots through the lobby-owned `ProjectionPolicy` → send through
   `SnapshotFanout`. `ProjectionPolicy` names live player fog, spectator union vision, selected
