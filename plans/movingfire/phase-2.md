@@ -10,7 +10,9 @@ Make movement-order target selection respect what the unit can actually fire at 
 continuing its current path. Moving-fire `Move` and `AttackMove` orders should choose and retain only
 currently fireable targets, while non-moving-fire attack-move units should keep their normal
 engagement semantics but must not hold an unreachable target while walking past a valid in-range
-fallback.
+fallback. For this phase, "currently fireable" means in current weapon range and passing the
+normal legal-shot checks from the unit's current position, including line of sight and blocker
+legality.
 
 ## Scope
 
@@ -20,6 +22,8 @@ fallback.
   is currently fireable, continue the commanded path rather than chasing a visible enemy.
 - Treat player-issued `Move` and `AttackMove` consistently while a moving-fire unit is still
   pathing.
+- Do not alter what `AttackMove` does after the command destination is reached; target filtering in
+  this phase is scoped to units still following or resuming the movement path.
 - Preserve the intended difference for units that cannot fire while moving: they may stop or engage
   under normal attack-move rules, but should not prefer unreachable targets while continuing past a
   valid in-range target.

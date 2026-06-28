@@ -19,13 +19,17 @@ destination should not replace that path merely because combat auto-acquisition 
   vehicle standoff points, and must not replace the path goal with an enemy-directed goal.
 - Make active moving-fire `Move` and `AttackMove` paths stay pointed at their commanded
   destinations for all affected units, including current moving-fire vehicles.
+- Do not redefine post-arrival `AttackMove` semantics. Once the commanded destination has been
+  reached, preserve the current idle/aggressive behavior exactly as it exists before this phase.
 - Preserve normal non-moving-fire attack-move engagement semantics unless a later phase makes a
   targeted target-filtering change.
 - Keep explicit `Attack` command pursuit and idle-aggressive behavior separate from movement-order
   drive-by fire.
 - Keep vehicle-only aiming, turret facing, standoff, and projection logic tied to vehicle policy
   rather than shared moving-fire policy.
-- Update design docs where they currently say attack-moving vehicles can chase out-of-range targets.
+- Update contradictory design-doc passages where they currently say attack-moving vehicles can
+  chase out-of-range targets or use standoff paths during player-issued movement orders, especially
+  `docs/design/balance.md`, `docs/design/server-sim.md`, and `docs/design/hardening.md`.
 
 ## Expected Touch Points
 
@@ -42,6 +46,8 @@ destination should not replace that path merely because combat auto-acquisition 
 - Focused Rust tests covering moving-fire `Move` and `AttackMove` path preservation.
 - Focused Rust tests proving visible out-of-range enemies do not change moving-fire `Move` or
   `AttackMove` path goals.
+- Focused Rust tests should cover active movement-order path preservation without asserting a new
+  post-arrival `AttackMove` behavior.
 - Focused Rust tests proving normal non-moving-fire attack-move behavior is not accidentally
   disabled.
 - Focused Rust tests showing explicit `Attack` still pursues as intended.
