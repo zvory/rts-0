@@ -686,6 +686,12 @@ General rules:
   survival. Infantry Move steering treats Tank Traps as passable but applies a small local avoidance
   bias when open space exists; vehicles remain hard-blocked by Tank Traps. Attack-move target
   acquisition remains stricter and prefers targets that are currently fireable.
+- Active moving-fire `Move` and `AttackMove` orders preserve the player-issued destination while
+  they are still in `MovePhase::AwaitingPath`, `Moving`, or `PathFailed`. Their auto-acquisition is
+  opportunistic: it may retain, aim at, expose, and fire on currently fireable targets, but it must
+  not request chase paths, vehicle standoff paths, or enemy-directed replacements for `path_goal`.
+  Once an `AttackMove` reaches `MovePhase::Arrived`, its existing aggressive post-arrival behavior
+  applies. Direct `Attack` orders and idle-aggressive behavior remain separate and may still pursue.
 - Normal combat auto-acquisition first filters already-legal hostile candidates in
   `services::combat::acquisition`, then chooses between them through the sim-local
   `services::combat::priority` ranker. The ranker owns priority terms such as default-weapon fit,

@@ -1300,26 +1300,31 @@ fn tank_move_order_fires_without_leaving_move_path() {
 }
 
 #[test]
-fn tank_move_order_does_not_chase_targets_outside_weapon_range() {
-    let mut entities = EntityStore::new();
-    let tank_id = entities
-        .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
-        .expect("tank should spawn");
-    entities
-        .spawn_unit(2, EntityKind::Rifleman, 300.0, 100.0)
-        .expect("enemy should spawn");
-    if let Some(tank) = entities.get_mut(tank_id) {
-        tank.set_order(Order::move_to(300.0, 100.0));
-        tank.set_path(vec![(300.0, 100.0)]);
-        tank.set_path_goal(Some((300.0, 100.0)));
+fn moving_fire_move_orders_do_not_chase_targets_outside_weapon_range() {
+    for kind in [EntityKind::Tank, EntityKind::ScoutCar] {
+        let mut entities = EntityStore::new();
+        let unit_id = entities
+            .spawn_unit(1, kind, 100.0, 100.0)
+            .expect("moving-fire unit should spawn");
+        entities
+            .spawn_unit(2, EntityKind::Rifleman, 288.0, 100.0)
+            .expect("enemy should spawn");
+        if let Some(unit) = entities.get_mut(unit_id) {
+            unit.set_order(Order::move_to(300.0, 100.0));
+            unit.set_path(vec![(300.0, 100.0)]);
+            unit.set_path_goal(Some((300.0, 100.0)));
+            unit.mark_move_phase(MovePhase::Moving);
+        }
+
+        run_combat_tick(&mut entities);
+
+        let unit = entities
+            .get(unit_id)
+            .expect("moving-fire unit should exist");
+        assert_eq!(unit.target_id(), None, "{kind:?} should not acquire");
+        assert_eq!(unit.path_goal(), Some((300.0, 100.0)), "{kind:?}");
+        assert_eq!(unit.next_waypoint(), Some((300.0, 100.0)), "{kind:?}");
     }
-
-    run_combat_tick(&mut entities);
-
-    let tank = entities.get(tank_id).expect("tank should exist");
-    assert_eq!(tank.target_id(), None);
-    assert_eq!(tank.path_goal(), Some((300.0, 100.0)));
-    assert_eq!(tank.next_waypoint(), Some((300.0, 100.0)));
 }
 
 #[test]
@@ -1427,18 +1432,52 @@ fn shoot_while_moving_units_reacquire_when_existing_target_is_dead() {
 }
 
 #[test]
-fn tank_chases_to_standoff_range_instead_of_target_center() {
+fn moving_fire_attack_move_keeps_commanded_goal_when_enemy_out_of_range() {
+    for kind in [EntityKind::Tank, EntityKind::ScoutCar] {
+        let mut entities = EntityStore::new();
+        let unit_id = entities
+            .spawn_unit(1, kind, 100.0, 100.0)
+            .expect("moving-fire unit should spawn");
+        entities
+            .spawn_unit(2, EntityKind::Rifleman, 288.0, 100.0)
+            .expect("enemy should spawn");
+        if let Some(unit) = entities.get_mut(unit_id) {
+            unit.set_order(Order::attack_move_to(400.0, 100.0));
+            unit.set_path(vec![(400.0, 100.0)]);
+            unit.set_path_goal(Some((400.0, 100.0)));
+            unit.mark_move_phase(MovePhase::Moving);
+        }
+
+        let map = open_map(20);
+        run_combat_tick_on_map(
+            &mut entities,
+            &[player_state(1, false), player_state(2, false)],
+            &map,
+        );
+
+        let unit = entities
+            .get(unit_id)
+            .expect("moving-fire unit should exist");
+        assert_eq!(unit.target_id(), None, "{kind:?} should not acquire");
+        assert_eq!(unit.path_goal(), Some((400.0, 100.0)), "{kind:?}");
+        assert_eq!(unit.next_waypoint(), Some((400.0, 100.0)), "{kind:?}");
+    }
+}
+
+#[test]
+fn non_moving_fire_attack_move_still_chases_out_of_range_targets() {
     let mut entities = EntityStore::new();
-    let tank_id = entities
-        .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
-        .expect("tank should spawn");
+    let rifleman_id = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("rifleman should spawn");
     let enemy_id = entities
-        .spawn_unit(2, EntityKind::Rifleman, 280.0, 100.0)
+        .spawn_unit(2, EntityKind::Rifleman, 260.0, 100.0)
         .expect("enemy should spawn");
-    if let Some(tank) = entities.get_mut(tank_id) {
-        tank.set_order(Order::attack_move_to(400.0, 100.0));
-        tank.set_path(Vec::new());
-        tank.set_path_goal(Some((400.0, 100.0)));
+    if let Some(rifleman) = entities.get_mut(rifleman_id) {
+        rifleman.set_order(Order::attack_move_to(400.0, 100.0));
+        rifleman.set_path(Vec::new());
+        rifleman.set_path_goal(Some((400.0, 100.0)));
+        rifleman.mark_move_phase(MovePhase::Moving);
     }
 
     let map = open_map(20);
@@ -1448,23 +1487,14 @@ fn tank_chases_to_standoff_range_instead_of_target_center() {
         &map,
     );
 
-    let tank = entities.get(tank_id).expect("tank should exist");
+    let rifleman = entities.get(rifleman_id).expect("rifleman should exist");
     let enemy = entities.get(enemy_id).expect("enemy should exist");
-    let goal = tank.path_goal().expect("tank should request a chase path");
-    let profile = combat_rules::attack_profile(EntityKind::Tank);
-    let range_px =
-        profile.range_tiles as f32 * config::TILE_SIZE as f32 + tank.radius() + RANGE_SLACK;
-    let goal_to_enemy = dist2(goal.0, goal.1, enemy.pos_x, enemy.pos_y).sqrt();
-
-    assert_ne!(goal, (enemy.pos_x, enemy.pos_y));
-    assert!(
-        goal_to_enemy < range_px,
-        "standoff goal should be comfortably inside weapon range"
-    );
+    assert_eq!(rifleman.target_id(), Some(enemy_id));
+    assert_eq!(rifleman.path_goal(), Some((enemy.pos_x, enemy.pos_y)));
 }
 
 #[test]
-fn tank_chase_refreshes_stale_standoff_goal() {
+fn direct_tank_attack_chases_to_standoff_range_instead_of_target_center() {
     let mut entities = EntityStore::new();
     let tank_id = entities
         .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
@@ -1473,7 +1503,7 @@ fn tank_chase_refreshes_stale_standoff_goal() {
         .spawn_unit(2, EntityKind::Rifleman, 288.0, 100.0)
         .expect("enemy should spawn");
     if let Some(tank) = entities.get_mut(tank_id) {
-        tank.set_order(Order::attack_move_to(500.0, 100.0));
+        tank.set_order(Order::attack(enemy_id));
         tank.set_path(vec![(96.0, 100.0)]);
         tank.set_path_goal(Some((96.0, 100.0)));
         tank.set_last_repath_tick(10);
@@ -1495,11 +1525,16 @@ fn tank_chase_refreshes_stale_standoff_goal() {
     let tank = entities.get(tank_id).expect("tank should exist");
     let enemy = entities.get(enemy_id).expect("enemy should exist");
     let goal = tank.path_goal().expect("tank should keep a chase goal");
+    let profile = combat_rules::attack_profile(EntityKind::Tank);
+    let range_px =
+        profile.range_tiles as f32 * config::TILE_SIZE as f32 + tank.radius() + RANGE_SLACK;
+    let goal_to_enemy = dist2(goal.0, goal.1, enemy.pos_x, enemy.pos_y).sqrt();
 
     assert_ne!(goal, old_goal);
+    assert_ne!(goal, (enemy.pos_x, enemy.pos_y));
     assert!(
-        goal.0 < enemy.pos_x,
-        "tank should route to the near side of the target, not the target center"
+        goal_to_enemy < range_px,
+        "standoff goal should be comfortably inside weapon range"
     );
 }
 
