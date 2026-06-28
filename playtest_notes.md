@@ -4,24 +4,24 @@ jeffrey playtest
 - [ ] observer unit  (sensor tower for commands?)
 - [ ] haraass unit for gun works
 - [ ] camoflauge for AT guns (probably not)
-- [ ] pause doens't work
-- [ ] increase AT gun damage and range
-- [ ] when clicking inside of a cluster, they should group and ignore formations, i guess this is hard because sometimes we need to retain formation, so instead we should do it like the closer the move command is i think, the smaller the size of the resultant formation, like sc2 behaviour
-- [ ] riflemen need some kind of anti tank behaviour, not very strong, but enough to at least hold off an emergency situation under some situations
-- [ ] meth should increase machine gunner move speed to rifleman speed without meth (1.6px/tick)
+- [x] pause doens't work (done: live pause controls)
+- [x] increase AT gun damage and range (done: PR #489)
+- [x] when clicking inside of a cluster, they should group and ignore formations, i guess this is hard because sometimes we need to retain formation, so instead we should do it like the closer the move command is i think, the smaller the size of the resultant formation, like sc2 behaviour (done: distance-scaled formation goals)
+- [x] riflemen need some kind of anti tank behaviour, not very strong, but enough to at least hold off an emergency situation under some situations (done: in-range armored fallback targeting)
+- [x] meth should increase machine gunner move speed to rifleman speed without meth (1.6px/tick) (done: PR #467)
 - [ ] maybe we should return to the old charge behaviour so that riflemen with melee attack on tanks aren't chasing down tanks
-- [ ] watch replays as a group, hitting watch replay should create a lobby with all spectators
+- [x] watch replays as a group, hitting watch replay should create a lobby with all spectators (done: replay staging lobbies)
 - [ ] proxy mortars, maybe like two mortars should be able to one shot a huge clump of workers
 - [ ] increase the vision range of all units, or make that a training centre upgrade (binoculars)
 - [ ] stationary tanks should have more range (hmm, should i add attack range indicators to all units?)
-- [ ] if a worker arrives an'd there's not enough resources to build the building, it should continuously stand there trying to build the building when resources are availeble.
+- [x] if a worker arrives an'd there's not enough resources to build the building, it should continuously stand there trying to build the building when resources are availeble. (done: build-wait retry)
 
-- [ ] MORTAR ANIMATION
+- [x] MORTAR ANIMATION (done: mortar launch/shell/impact visuals)
 - [ ] artillery does not requir AT guns
-- [ ] pause button broken
+- [x] pause button broken (done: live pause UI)
 - [ ]
 - [ ] side paths slowing field that A* is aware of, they are muddy/rocky or something
-- [ ] anti tank atack for riflement
+- [x] anti tank atack for riflement (done: in-range armored fallback targeting)
 - [ ] machine gunners dig in and attacks get change to miss OR increased machine gunner range so one can deter a scout car
 - [ ] remove the R&D structure, instead split it into two. steel press is a new building tthat unlocks building anti tank guns, and has an upgrade for artillery production and mortar auto cast. engine industry (name to be workshopped, ask user before implementing) unlocks tank and has a research for command cars
 - [ ] oh actually better than above player sbuild factories, instead of gunworks or vehicle works. this produces mortar and scout car by default. player can then conver the factory into either a vehicle works or a gun works
