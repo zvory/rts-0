@@ -23,6 +23,7 @@ pub struct MatchRecord {
     pub duration_ms: i32,
     pub map_name: String,
     pub winner_name: Option<String>,
+    pub outcome: MatchOutcome,
     pub participants: Vec<String>,
     /// Full PlayerScore[] from `Game::scores()`, opaque JSON to the DB.
     pub score_screen: serde_json::Value,
@@ -36,12 +37,27 @@ pub struct MatchRecord {
     pub replay: Option<MatchReplayRecord>,
 }
 
-impl MatchRecord {
-    pub fn outcome(&self) -> &'static str {
-        if self.winner_name.is_some() {
-            "win"
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MatchOutcome {
+    Win,
+    Draw,
+    Aborted,
+}
+
+impl MatchOutcome {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Win => "win",
+            Self::Draw => "draw",
+            Self::Aborted => "aborted",
+        }
+    }
+
+    pub fn from_winner_name(winner_name: Option<&str>) -> Self {
+        if winner_name.is_some() {
+            Self::Win
         } else {
-            "draw"
+            Self::Draw
         }
     }
 }
@@ -137,7 +153,7 @@ impl Db {
 
     /// Insert one match-history row. Logs on error and swallows it — the caller never blocks.
     pub async fn record_match(&self, rec: MatchRecord) {
-        let outcome = rec.outcome();
+        let outcome = rec.outcome.as_str();
         let result: Result<(), sqlx::Error> = async {
             let mut tx = self.pool.begin().await?;
             let match_id: i64 = sqlx::query_scalar(
@@ -193,7 +209,7 @@ impl Db {
             Ok(_) => {
                 crate::log_info!(
                     map = %rec.map_name,
-                    outcome,
+                    outcome = outcome,
                     local_only = rec.local_only,
                     replay = rec.replay.is_some(),
                     "match recorded"
@@ -357,5 +373,72 @@ pub async fn try_connect_from_env() -> Option<Arc<Db>> {
             crate::log_error!(%err, "failed to connect to database; match history disabled");
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{MatchOutcome, MatchRecord, MatchSummary};
+
+    fn record_with_outcome(outcome: MatchOutcome) -> MatchRecord {
+        MatchRecord {
+            started_at: chrono::Utc::now(),
+            ended_at: chrono::Utc::now(),
+            duration_ms: 1_000,
+            map_name: "Default".to_string(),
+            winner_name: None,
+            outcome,
+            participants: vec!["Alpha".to_string(), "Bravo".to_string()],
+            score_screen: serde_json::Value::Array(Vec::new()),
+            human_count: 2,
+            debug_mode: false,
+            local_only: false,
+            replay: None,
+        }
+    }
+
+    #[test]
+    fn match_record_outcome_is_explicit() {
+        let draw = record_with_outcome(MatchOutcome::Draw);
+        let aborted = record_with_outcome(MatchOutcome::Aborted);
+
+        assert_eq!(draw.winner_name, None);
+        assert_eq!(draw.outcome.as_str(), "draw");
+        assert_eq!(aborted.winner_name, None);
+        assert_eq!(aborted.outcome.as_str(), "aborted");
+    }
+
+    #[test]
+    fn normal_match_outcome_can_be_derived_before_recording() {
+        assert_eq!(
+            MatchOutcome::from_winner_name(Some("Alpha")),
+            MatchOutcome::Win
+        );
+        assert_eq!(MatchOutcome::from_winner_name(None), MatchOutcome::Draw);
+    }
+
+    #[test]
+    fn match_summary_serializes_aborted_outcome() {
+        let summary = MatchSummary {
+            id: 1,
+            started_at: chrono::Utc::now(),
+            ended_at: chrono::Utc::now(),
+            duration_ms: 1_000,
+            map_name: "Default".to_string(),
+            winner_name: None,
+            outcome: "aborted".to_string(),
+            participants: vec!["Alpha".to_string(), "Bravo".to_string()],
+            score_screen: serde_json::Value::Array(Vec::new()),
+            human_count: 2,
+            debug_mode: false,
+            local_only: false,
+            replay_available: true,
+            replay_unavailable_reason: None,
+            replay_metadata: None,
+        };
+
+        let value = serde_json::to_value(summary).expect("summary serializes");
+        assert_eq!(value["winnerName"], serde_json::Value::Null);
+        assert_eq!(value["outcome"], "aborted");
     }
 }

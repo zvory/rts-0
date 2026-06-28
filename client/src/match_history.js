@@ -124,7 +124,7 @@ export class MatchHistory {
       tr.appendChild(td(formatRelative(row.startedAt)));
       tr.appendChild(td(row.mapName || "—"));
       tr.appendChild(td((row.participants || []).join(", ")));
-      tr.appendChild(td(row.winnerName ? row.winnerName : row.outcome === "draw" ? "Draw" : "—"));
+      tr.appendChild(td(matchHistoryWinnerLabel(row)));
       tr.appendChild(td(formatDuration(row.durationMs)));
       tr.addEventListener("click", () => this._toggleRow(row.id));
       tr.addEventListener("keydown", (ev) => {
@@ -221,6 +221,13 @@ export class MatchHistory {
       this._renderRows();
     }
   }
+}
+
+export function matchHistoryWinnerLabel(row) {
+  if (row?.outcome === "aborted") return "Aborted";
+  if (row?.winnerName) return row.winnerName;
+  if (row?.outcome === "draw") return "Draw";
+  return "—";
 }
 
 function td(text) {
