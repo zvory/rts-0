@@ -369,16 +369,16 @@ fn in_range_smoke_launches_from_furthest_selected_carrier() {
         entities
             .get(far)
             .unwrap()
-            .ability_cooldown_ticks(AbilityKind::Smoke),
-        config::SMOKE_ABILITY_COOLDOWN_TICKS,
+            .ability_uses_remaining(AbilityKind::Smoke),
+        Some(1),
         "furthest in-range selected carrier should launch"
     );
     assert_eq!(
         entities
             .get(near)
             .unwrap()
-            .ability_cooldown_ticks(AbilityKind::Smoke),
-        0
+            .ability_uses_remaining(AbilityKind::Smoke),
+        Some(config::SCOUT_CAR_SMOKE_USES)
     );
     assert!(matches!(entities.get(far).unwrap().order(), Order::Idle));
     // Smoke launch emits local canister feedback plus a positioned info notice; no warn/alert events.
@@ -542,7 +542,7 @@ fn mortar_fire_replaces_active_move_order() {
 }
 
 #[test]
-fn queued_smoke_appends_to_eligible_carriers_until_cap() {
+fn queued_smoke_appends_to_eligible_carriers_until_charges_reserved() {
     let map = flat_map(32);
     let mut entities = EntityStore::new();
     let target = map.tile_center(12, 8);
@@ -576,7 +576,11 @@ fn queued_smoke_appends_to_eligible_carriers_until_cap() {
             .collect(),
     );
 
-    assert_eq!(entities.get(scout).unwrap().queued_orders().len(), 8);
+    assert_eq!(
+        entities.get(scout).unwrap().queued_orders().len(),
+        config::SCOUT_CAR_SMOKE_USES as usize,
+        "queued Smoke should reserve finite Scout Car uses instead of filling the generic queue cap"
+    );
     assert!(entities
         .get(scout)
         .unwrap()
@@ -622,7 +626,7 @@ fn queued_smoke_distributes_one_click_per_ready_scout_by_queue_length() {
     apply(
         &map,
         &mut entities,
-        (0..4)
+        (0..5)
             .map(|i| {
                 (
                     1,

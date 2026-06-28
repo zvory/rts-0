@@ -1266,7 +1266,7 @@ fn scout_car_smoke_has_two_free_uses_then_depletes() {
     game.players[0].steel = 0;
     game.players[0].oil = 0;
 
-    for expected_remaining in [1, 0] {
+    for _ in 0..3 {
         game.enqueue(
             1,
             Command::UseAbility {
@@ -1277,15 +1277,20 @@ fn scout_car_smoke_has_two_free_uses_then_depletes() {
                 queued: false,
             },
         );
-        game.tick();
-
-        let scout_entity = game.entities.get_mut(scout).expect("scout should exist");
-        assert_eq!(
-            scout_entity.ability_uses_remaining(ability::AbilityKind::Smoke),
-            Some(expected_remaining)
-        );
-        scout_entity.start_ability_cooldown(ability::AbilityKind::Smoke, 0);
     }
+    game.tick();
+
+    let scout_entity = game.entities.get(scout).expect("scout should exist");
+    assert_eq!(
+        scout_entity.ability_uses_remaining(ability::AbilityKind::Smoke),
+        Some(0),
+        "three same-tick smoke commands should only spend the two Scout Car uses"
+    );
+    assert_eq!(
+        scout_entity.ability_cooldown_ticks(ability::AbilityKind::Smoke),
+        0,
+        "Smoke should not start a cooldown between uses"
+    );
 
     for _ in 0..config::SMOKE_LAUNCH_MAX_DELAY_TICKS {
         game.tick();

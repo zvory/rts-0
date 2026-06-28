@@ -342,7 +342,8 @@ folded into default targeting.
   no completed Gun Works is required. Each scout car spawns with 2 smoke uses; once those uses are
   depleted, that car cannot use Smoke again. Smoke has no steel or oil cost. Target range: 9 tiles
   from the caster. Launch delay: up to 100 ms at max range, scaling down for closer targets. Cloud
-  radius: 2 tiles. Cloud duration: 5 seconds. Cooldown: 20 seconds per caster.
+  radius: 2 tiles. Cloud duration: 5 seconds. No cooldown; one Scout Car can spend both smoke uses
+  back-to-back immediately.
   Expected role: an offensive tool for closing on long-range defenses; push a scout car forward,
   place smoke between the advance and the anti-tank gun / machine-gun nest, then move mobile units through
   the resulting dead zone. Active smoke is neutral world state: it blocks authoritative fog and
@@ -350,8 +351,7 @@ folded into default targeting.
   does not participate in pathing, collision, scoring, supply, or targeting as an entity. Units
   inside a cloud still receive that cloud in their own snapshot so the obscuring effect remains
   visible to the player occupying it.
-  Cooldown duration (20s) exceeds cloud duration (5s), so each scout car has at most one active
-  cloud at a time.
+  Finite uses are the per-car limit, so each Scout Car can create exactly two smoke clouds total.
 - **Command Car Breakthrough!** (hotkey `E`): Command Cars have a self-targeted instant area speed
   boost. It affects owned units within 9 tiles of the Command Car, lasts 180 ticks (~6s), has a
   750-tick (~25s) per-caster cooldown, has no resource cost, can be queued, and can be cast while

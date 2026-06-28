@@ -1,5 +1,5 @@
 use crate::game::ability::AbilityKind;
-use crate::game::entity::{EntityKind, EntityStore, Order, OrderIntent, MAX_QUEUED_ORDERS};
+use crate::game::entity::{Entity, EntityKind, EntityStore, Order, OrderIntent, MAX_QUEUED_ORDERS};
 use crate::game::map::Map;
 use crate::game::services::ability_orders;
 use crate::game::services::order_planner as planner;
@@ -59,6 +59,7 @@ pub(super) fn planner_facts(
                         ability.kind,
                     )
                     && ability.tech_ready
+                    && has_unreserved_ability_use(e, ability.kind)
                 {
                     facts.abilities.push(planner::AbilityFacts {
                         ability: ability.id,
@@ -87,9 +88,34 @@ pub(super) fn planner_facts(
                     });
                 }
             }
+
             Some(facts)
         })
         .collect()
+}
+
+fn has_unreserved_ability_use(entity: &Entity, ability: AbilityKind) -> bool {
+    match entity.ability_uses_remaining(ability) {
+        Some(remaining) => remaining as usize > reserved_ability_uses(entity, ability),
+        None => true,
+    }
+}
+
+fn reserved_ability_uses(entity: &Entity, ability: AbilityKind) -> usize {
+    let active = matches!(
+        entity.order(),
+        Order::Ability(order) if order.intent.ability == ability
+    ) as usize;
+    let queued = entity
+        .queued_orders()
+        .iter()
+        .filter(|intent| match intent {
+            OrderIntent::WorldAbility(intent) => intent.ability == ability,
+            OrderIntent::SelfAbility(intent) => intent.ability == ability,
+            _ => false,
+        })
+        .count();
+    active.saturating_add(queued)
 }
 
 #[derive(Clone, Copy)]

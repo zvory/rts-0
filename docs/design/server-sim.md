@@ -754,6 +754,8 @@ General rules:
   skipped at promotion time rather than retried forever.
 - Queue planning is issue-time only. A unit with an ability on cooldown is not eligible for a
   queued ability intent just because the cooldown might expire before the intent promotes.
+  Finite-use abilities also reserve already-active and already-queued same-ability intents at
+  issue time, so queued Smoke clicks cannot exceed the scout car's remaining smoke uses.
 - Later orders still apply to every compatible selected unit. Earlier specialized stages do not
   remove non-carriers from the plan; for example, a queued smoke applies to one scout car, while the
   following queued attack-move applies to all selected units that can receive attack-move.
