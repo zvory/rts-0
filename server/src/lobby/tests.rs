@@ -84,6 +84,19 @@ async fn wait_for_lobby_room_count(lobby: &Lobby, expected: usize) {
     .expect("lobby room count did not settle");
 }
 
+async fn wait_for_active_match_count(lobby: &Lobby, expected: usize) {
+    tokio::time::timeout(Duration::from_secs(1), async {
+        loop {
+            if lobby.active_match_count() == expected {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("active match count did not settle");
+}
+
 fn test_drain() -> DrainHandle {
     DrainHandle::default()
 }
@@ -450,6 +463,66 @@ async fn draining_rejects_new_rooms_but_keeps_existing_rooms_joinable() {
             ..
         })
     ));
+}
+
+#[tokio::test]
+async fn shutdown_finalization_acks_rooms_and_clears_active_match_count() {
+    let lobby = Lobby::new();
+    let handle = lobby.get_or_create("shutdown-finalize-room").await;
+    let _writer = join_room_handle(&handle, 1, "Player 1", false).await;
+    handle
+        .event_tx
+        .send(RoomEvent::Ready {
+            player_id: 1,
+            ready: true,
+        })
+        .await
+        .expect("room task should accept ready");
+    handle
+        .event_tx
+        .send(RoomEvent::StartRequest { player_id: 1 })
+        .await
+        .expect("room task should accept start");
+    wait_for_active_match_count(&lobby, 1).await;
+
+    let summary = lobby
+        .finalize_active_matches_for_shutdown(Duration::from_secs(1))
+        .await;
+
+    assert_eq!(summary.active_matches_before, 1);
+    assert_eq!(summary.active_matches_after, 0);
+    assert_eq!(summary.rooms_requested, 1);
+    assert_eq!(summary.rooms_acked, 1);
+    assert_eq!(summary.rooms_unacked, 0);
+    assert_eq!(summary.finalized_matches, 1);
+    assert_eq!(summary.history_allowed_matches, 1);
+    assert_eq!(summary.records_queued, 0);
+    assert!(!summary.timed_out);
+}
+
+#[tokio::test]
+async fn deploy_drain_write_wait_is_bounded_when_tracked_write_hangs() {
+    let lobby = Lobby::new();
+    lobby
+        .drain
+        .track_match_history_write(std::future::pending::<()>());
+
+    let started = std::time::Instant::now();
+    lobby
+        .run_deploy_drain_with_budget(DeployDrainBudget {
+            natural_match_drain: Duration::ZERO,
+            forced_finalization: Duration::ZERO,
+            match_history_write_wait: Duration::from_millis(25),
+            shutdown_slack: Duration::ZERO,
+        })
+        .await;
+
+    assert!(
+        started.elapsed() < Duration::from_secs(1),
+        "write wait should honor its bounded budget"
+    );
+    assert_eq!(lobby.pending_match_history_write_count(), 1);
+    assert!(*lobby.subscribe_connection_shutdown().borrow());
 }
 
 #[tokio::test]

@@ -64,10 +64,15 @@ Beta deploys set the machine size to `shared-cpu-4x@1024MB`, matching the mainli
 override the app name for a different beta app, `./deploy.sh beta` still applies that VM size.
 Deploy shutdown is configured with Fly's top-level `kill_signal = "SIGINT"` and
 `kill_timeout = 300`, the maximum graceful-stop window for shared-CPU Machines. The server drains
-active matches for up to 295 seconds after the deploy signal, then closes connections and exits
-before Fly's final stop signal. New matches are rejected while a drain is in progress. `deploy.sh`
-runs `flyctl config validate --strict` before deploying so misplaced Fly config keys fail early
-instead of being silently ignored by the platform.
+active matches inside a 295 second application budget after the deploy signal, then closes
+connections and exits before Fly's final stop signal. That budget is split into 260 seconds for
+matches to end naturally, 10 seconds for forced shutdown finalization of any still-active tracked
+rooms, 20 seconds to wait for queued match-history/replay writes, and 5 seconds of final
+WebSocket/Axum slack. Forced finalization records eligible normal live matches as replay-backed
+`outcome = aborted` rows with no winner; non-eligible active rooms ack without public
+match-history writes. New matches are rejected while a drain is in progress. `deploy.sh` runs
+`flyctl config validate --strict` before deploying so misplaced Fly config keys fail early instead
+of being silently ignored by the platform.
 
 ## Automated beta deploys
 

@@ -426,6 +426,9 @@ impl RoomTask {
             RoomEvent::SelectMap { player_id, map } => self.on_select_map(player_id, map),
             RoomEvent::ReportDisposableIfEmpty => self.report_disposable_if_empty(),
             RoomEvent::DrainStarted(notice) => self.on_drain_started(notice),
+            RoomEvent::FinalizeForShutdown { ack } => {
+                let _ = ack.send(self.finalize_for_shutdown());
+            }
         }
     }
 

@@ -837,22 +837,27 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn deploy_drain_deadline_closes_connections_with_match_still_active() {
+    async fn deploy_drain_deadline_forces_active_match_before_closing_connections() {
         let lobby = Lobby::new();
         let handle = start_one_player_test_match(&lobby, "unit-drain-timeout").await;
         let mut shutdown_rx = lobby.subscribe_connection_shutdown();
 
         tokio::time::timeout(
             Duration::from_secs(1),
-            lobby.run_deploy_drain(Duration::from_millis(25)),
+            lobby.run_deploy_drain_with_budget(lobby::DeployDrainBudget {
+                natural_match_drain: Duration::from_millis(25),
+                forced_finalization: Duration::from_millis(500),
+                match_history_write_wait: Duration::from_millis(10),
+                shutdown_slack: Duration::ZERO,
+            }),
         )
         .await
         .expect("deploy drain should honor the short deadline");
 
         assert_eq!(
             lobby.active_match_count(),
-            1,
-            "the short deadline should not require the match to have ended"
+            0,
+            "the short natural-drain deadline should force-finalize the active match"
         );
         assert!(
             *shutdown_rx.borrow_and_update(),

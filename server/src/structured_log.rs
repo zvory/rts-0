@@ -605,6 +605,7 @@ pub struct MatchEndedLog<'a> {
     pub score_count: usize,
     pub replay_captured: bool,
     pub will_record_history: bool,
+    pub outcome: &'a str,
 }
 
 pub fn log_match_ended(ctx: MatchEndedLog<'_>) {
@@ -624,6 +625,7 @@ pub fn log_match_ended(ctx: MatchEndedLog<'_>) {
         score_count = ctx.score_count,
         replay_captured = ctx.replay_captured,
         will_record_history = ctx.will_record_history,
+        outcome = ctx.outcome,
         "match ended"
     );
 }
