@@ -7,6 +7,7 @@ use crate::rules;
 
 #[cfg(test)]
 use super::EntityStateGroups;
+use super::order::BUILD_UNIT_BLOCK_GRACE_TICKS;
 use super::{
     AttackPhase, BuildPhase, CombatState, ConstructionState, DeconstructPhase, EntityKind,
     GatherPhase, MovePhase, MovementState, Order, OrderIntent, ProdItem, ProductionState,
@@ -413,35 +414,30 @@ impl Entity {
     pub fn mark_build_phase(&mut self, phase: BuildPhase) {
         if let Some(m) = self.movement.as_mut() {
             if let Order::Build(order) = &mut m.order {
-                order.execution.mark_phase(phase);
+                if order.execution.phase != phase {
+                    order.execution.phase = phase;
+                    order.execution.unit_blocked_ticks = 0;
+                }
             }
         }
     }
 
-    pub fn build_unit_blocked_ticks(&self) -> u32 {
-        self.movement
-            .as_ref()
-            .and_then(|m| match &m.order {
-                Order::Build(order) => Some(order.execution.unit_blocked_ticks),
-                _ => None,
-            })
-            .unwrap_or(0)
-    }
-
-    pub fn reset_build_unit_blocked_ticks(&mut self) {
-        if let Some(m) = self.movement.as_mut() {
-            if let Order::Build(order) = &mut m.order {
-                order.execution.reset_unit_blocked_ticks();
-            }
-        }
-    }
-
-    pub fn tick_build_unit_blocked(&mut self) -> Option<u32> {
+    pub fn update_build_unit_blocked(&mut self, blocked: bool) -> Option<bool> {
         let m = self.movement.as_mut()?;
         let Order::Build(order) = &mut m.order else {
             return None;
         };
-        order.execution.tick_unit_blocked()
+        if order.execution.phase != BuildPhase::WaitingAtSite {
+            order.execution.unit_blocked_ticks = 0;
+            return None;
+        }
+        if !blocked {
+            order.execution.unit_blocked_ticks = 0;
+            return Some(false);
+        }
+        order.execution.unit_blocked_ticks =
+            order.execution.unit_blocked_ticks.saturating_add(1);
+        Some(order.execution.unit_blocked_ticks >= BUILD_UNIT_BLOCK_GRACE_TICKS)
     }
 
     pub fn deconstruct_phase(&self) -> Option<DeconstructPhase> {

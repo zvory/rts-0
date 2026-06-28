@@ -6,7 +6,7 @@ use super::EntityKind;
 /// Maximum number of queued command intents stored on one mobile unit.
 pub const MAX_QUEUED_ORDERS: usize = 8;
 /// Number of simulation ticks a waiting build order may tolerate a relevant unit blocker.
-pub const BUILD_UNIT_BLOCK_GRACE_TICKS: u32 = config::TICK_HZ * 3;
+pub(super) const BUILD_UNIT_BLOCK_GRACE_TICKS: u32 = config::TICK_HZ * 3;
 
 /// The high-level order a unit/building is currently executing.
 ///
@@ -387,29 +387,6 @@ impl BuildExecution {
             phase: BuildPhase::ToSite,
             unit_blocked_ticks: 0,
         }
-    }
-
-    pub fn mark_phase(&mut self, phase: BuildPhase) {
-        if self.phase != phase {
-            self.phase = phase;
-            self.unit_blocked_ticks = 0;
-        }
-    }
-
-    pub fn reset_unit_blocked_ticks(&mut self) {
-        self.unit_blocked_ticks = 0;
-    }
-
-    pub fn tick_unit_blocked(&mut self) -> Option<u32> {
-        if self.phase != BuildPhase::WaitingAtSite {
-            return None;
-        }
-        self.unit_blocked_ticks = self.unit_blocked_ticks.saturating_add(1);
-        Some(self.unit_blocked_ticks)
-    }
-
-    pub fn unit_block_grace_reached(&self) -> bool {
-        self.unit_blocked_ticks >= BUILD_UNIT_BLOCK_GRACE_TICKS
     }
 }
 
