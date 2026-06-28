@@ -470,10 +470,10 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
       JSON.stringify({ c: "move", units: [1], x: 100, y: 200, queued: true }),
     "queued move command builder emits the queued flag only when requested",
   );
-  assert(ANTI_TANK_GUN_DEPLOYED_RANGE_TILES === 14, "client mirrors deployed anti-tank gun range");
+  assert(ANTI_TANK_GUN_DEPLOYED_RANGE_TILES === 28, "client mirrors deployed anti-tank gun range");
   assertApprox(
     ANTI_TANK_GUN_FIELD_OF_FIRE_RAD,
-    45 * Math.PI / 180,
+    35 * Math.PI / 180,
     0.000001,
     "client mirrors anti-tank gun field of fire",
   );
