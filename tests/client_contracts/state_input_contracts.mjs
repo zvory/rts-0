@@ -16,6 +16,7 @@ import {
   COLORS,
   ABILITIES,
   BASE_COMMAND_SUPPLY_CAP,
+  RESOURCE_AMOUNTS,
   STATS,
 } from "../../client/src/config.js";
 import { commandWithinBudget } from "../../client/src/command_budget.js";
@@ -146,7 +147,7 @@ function buttonByLabel(card, label) {
   assert(state.map.width === 4, "GameState.map");
   assert(state.map.resources.length === 2, "GameState keeps start payload resources");
   assert(state.resourceById.get(200).kind === KIND.STEEL, "GameState indexes resources by id");
-  assert(state.resourceById.get(200).remaining === 1000, "steel defaults to full known amount");
+  assert(state.resourceById.get(200).remaining === RESOURCE_AMOUNTS[KIND.STEEL], "steel defaults to full known amount");
   assert(state.resourceById.get(201).remaining === 3333, "oil defaults to full known amount");
   assert(Array.isArray(state.players), "GameState.players");
   assert(state.playerById(1)?.teamId === 1, "GameState defaults missing teamId to singleton FFA");
