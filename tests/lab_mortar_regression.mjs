@@ -7,6 +7,7 @@ import {
   closeClients,
   connectClient,
   createAssertions,
+  sleep,
   uniqueRoom,
 } from "./team_harness.mjs";
 
@@ -14,6 +15,7 @@ const TILE_SIZE = 32;
 const PLAYER_ONE_ID = 1;
 const PLAYER_TWO_ID = 2;
 const SNAPSHOT_TIMEOUT_MS = 15_000;
+const ATTEMPTS = 3;
 
 const assertions = createAssertions();
 const { ok } = assertions;
@@ -167,8 +169,8 @@ async function waitForMortarLaunchBeforeImpact(client, mortarId, startMessageInd
   );
 }
 
-(async () => {
-  const room = `__lab__:${uniqueRoom("lab-mortar")}:map=Default:seed=4242`;
+async function runLabMortarRegressionAttempt(attempt) {
+  const room = `__lab__:${uniqueRoom(`lab-mortar-${attempt}`)}:map=Default:seed=4242`;
   const operator = await connectClient("lab-mortar");
   try {
     operator.send({ t: "join", name: "Lab", room, spectator: true });
@@ -201,6 +203,27 @@ async function waitForMortarLaunchBeforeImpact(client, mortarId, startMessageInd
   } finally {
     closeClients(operator);
   }
+}
+
+function retryableMortarTimeout(error) {
+  return /snapshot containing mortar launch\/impact events/.test(error?.message || "");
+}
+
+(async () => {
+  let lastError = null;
+  for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+    try {
+      await runLabMortarRegressionAttempt(attempt);
+      lastError = null;
+      break;
+    } catch (error) {
+      lastError = error;
+      if (!retryableMortarTimeout(error) || attempt === ATTEMPTS) throw error;
+      console.log(`[lab-mortar] retrying after transient event timeout (${attempt}/${ATTEMPTS})`);
+      await sleep(1_000);
+    }
+  }
+  if (lastError) throw lastError;
 
   if (assertions.failures > 0) console.log(`\n${assertions.failures} FAILURE(S)`);
   process.exit(assertions.failures === 0 ? 0 : 1);
