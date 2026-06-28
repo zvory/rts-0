@@ -21,7 +21,9 @@ export function _drawSelectedMortarRanges(state) {
 
 export function _drawSelectedUnitRanges(state) {
   if (!state || typeof state.selectedEntities !== "function") return;
-  if (!state.showUnitRangesEnabled) return;
+  const drawAllRanges = !!state.showUnitRangesEnabled;
+  const drawSelectedFieldOfFire = !!state.showSelectedFieldOfFireEnabled;
+  if (!drawAllRanges && !drawSelectedFieldOfFire) return;
   const g = this._feedbackGfx;
   const tileSize = (this._map && this._map.tileSize) || 32;
 
@@ -30,6 +32,7 @@ export function _drawSelectedUnitRanges(state) {
     if (!feedbackOwner(state, e.owner) || !isUnit(e.kind)) continue;
     const profile = selectedUnitRangeProfile(e, tileSize);
     if (!profile) continue;
+    if (!drawAllRanges && profile.kind !== "fieldOfFire") continue;
     if (profile.kind === "fieldOfFire") {
       drawFacingWedge(
         g,

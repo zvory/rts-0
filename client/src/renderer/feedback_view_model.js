@@ -44,6 +44,7 @@ export function buildRendererFeedbackView(
     commandFeedback,
     selectedEntities: () => selected,
     showUnitRangesEnabled: !!state?.showUnitRangesEnabled,
+    showSelectedFieldOfFireEnabled: controlOwner.showSelectedFieldOfFireEnabled,
     debugPathOverlaysEnabled: !!state?.debugPathOverlaysEnabled,
     showAllDebugPathOverlays: !!state?.showAllDebugPathOverlays,
     antiTankGunSetupPreview: intent?.antiTankGunSetupPreview || null,
@@ -94,6 +95,7 @@ export function buildRendererFeedbackView(
 
 function buildControlOwnerReadModel(state, selected) {
   const policy = state?.controlPolicy || null;
+  const isLabPolicy = policy?.kind === "lab";
   const issueAsOwnerId = typeof policy?.issueAsOwnerForSelection === "function"
     ? normalizeOwner(policy.issueAsOwnerForSelection(selected))
     : null;
@@ -108,6 +110,7 @@ function buildControlOwnerReadModel(state, selected) {
   return {
     feedbackOwnerId,
     issueAsOwnerId,
+    showSelectedFieldOfFireEnabled: isLabPolicy && policyFeedbackOwner != null,
     canControlOwner(owner) {
       if (typeof policy?.canControlOwner === "function") return !!policy.canControlOwner(owner, state);
       return feedbackOwnerId != null && Number(owner) === feedbackOwnerId;
