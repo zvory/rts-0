@@ -1,3 +1,4 @@
+use super::super::match_history::MatchHistoryRecordInput;
 use super::support::*;
 
 #[test]
@@ -204,15 +205,15 @@ fn aborted_match_history_record_is_winnerless_and_replay_backed() {
     task.match_participants = players.iter().map(|player| player.name.clone()).collect();
 
     let ended_at = chrono::Utc::now();
-    let record = task.build_match_history_record(
-        task.match_started_at.expect("match start should be set"),
+    let record = task.build_match_history_record(MatchHistoryRecordInput {
+        started_at: task.match_started_at.expect("match start should be set"),
         ended_at,
-        1_500,
-        &game.scores(),
-        Some(&artifact),
-        crate::db::MatchOutcome::Aborted,
-        None,
-    );
+        duration_ms: 1_500,
+        scores: &game.scores(),
+        replay_artifact: Some(&artifact),
+        outcome: crate::db::MatchOutcome::Aborted,
+        winner_name: None,
+    });
 
     assert_eq!(record.winner_name, None);
     assert_eq!(record.outcome, crate::db::MatchOutcome::Aborted);

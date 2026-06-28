@@ -24,6 +24,7 @@ mod lab;
 mod lifecycle;
 mod live;
 mod lobby;
+mod match_history;
 mod replay;
 mod types;
 
