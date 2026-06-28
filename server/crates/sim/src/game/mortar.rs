@@ -182,14 +182,6 @@ fn resolve_shell(
     let inner_radius = config::MORTAR_INNER_RADIUS_TILES * config::TILE_SIZE as f32;
     let outer2 = outer_radius * outer_radius;
     let inner2 = inner_radius * inner_radius;
-    let attacker_alive = matches!(
-        entities.get(shell.attacker),
-        Some(e) if e.owner == shell.owner && e.kind == EntityKind::MortarTeam && e.hp > 0
-    );
-    if !attacker_alive {
-        return;
-    }
-
     let mut hits = Vec::new();
     for id in entities.ids() {
         let Some(target) = entities.get(id) else {
@@ -210,7 +202,7 @@ fn resolve_shell(
         }
     }
     hits.sort_by_key(|(id, _, _, _, _, _)| *id);
-    let reveal = mortar_reveal_for(entities.get(shell.attacker));
+    let reveal = mortar_reveal_for(entities.get(shell.attacker), shell.owner);
     let mut reveal_recipients = Vec::new();
     for (id, base, inner_hit, victim_owner, tx, ty) in hits {
         let effective = entities
@@ -250,8 +242,11 @@ fn resolve_shell(
     );
 }
 
-fn mortar_reveal_for(attacker: Option<&Entity>) -> Option<AttackReveal> {
+fn mortar_reveal_for(attacker: Option<&Entity>, owner: u32) -> Option<AttackReveal> {
     let attacker = attacker?;
+    if attacker.owner != owner || attacker.kind != EntityKind::MortarTeam || attacker.hp == 0 {
+        return None;
+    }
     Some(AttackReveal {
         owner: attacker.owner,
         kind: protocol::kind_to_wire(attacker.kind).to_string(),
