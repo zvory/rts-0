@@ -3,6 +3,8 @@
 Status: Draft requirements. This document describes the target AI development platform and
 feedback loop, not an approved implementation plan or phase scope.
 
+Human has reviewed this document and deemed it not ready for implementation and needing editing.
+
 ## Purpose
 
 The goal of AI 2.0 is to create a strong RTS opponent and the development harness needed to keep
