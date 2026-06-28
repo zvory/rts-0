@@ -68,12 +68,16 @@ The server treats every client as potentially hostile. Limits live next to the c
   instead of falling back to browser credentials.
 - **Deploy drain**: SIGTERM/Ctrl-C starts a server drain instead of immediately shutting down.
   The lobby flips into a draining state, existing room tasks continue ticking active normal
-  matches, and new match starts are rejected while lobby clients see `can_start: false`. The
-  process waits until all tracked normal matches finish or `DEPLOY_DRAIN_TIMEOUT` (10 minutes)
-  elapses, whichever comes first, then asks all WebSocket connection tasks to close so Axum
-  graceful shutdown can complete; Fly's `kill_timeout` is set to the same 10-minute ceiling. Dev
-  self-play/replay/scenario rooms are not tracked as deploy blockers because they can intentionally
-  run or auto-restart forever.
+  matches, and new match starts are rejected while lobby clients see `can_start: false`. Fly's
+  `kill_timeout` is 300 seconds; the server uses a 295 second application budget split into
+  260 seconds of natural match drain, 10 seconds to ask active rooms to finalize for shutdown,
+  20 seconds to wait for tracked match-history/replay writes, and 5 seconds of final
+  WebSocket/Axum slack. If the natural phase expires, each active authoritative room receives a
+  `FinalizeForShutdown` event before connection shutdown. Eligible normal live matches capture the
+  current scores and replay artifact, queue a match-history row with `outcome = aborted` and no
+  winner, and only then drop their active-match drain tracking. Non-eligible authoritative rooms
+  ack without writing public history rows. Dev self-play/replay/scenario rooms are not tracked as
+  deploy blockers because they can intentionally run or auto-restart forever.
 - **Deploy asset hermeticity**: release Docker builds generate browser-loadable prediction WASM
   assets with `scripts/build-sim-wasm.sh` inside the builder image, then fail if
   `client/vendor/sim-wasm/rts_sim_wasm.js` or `rts_sim_wasm_bg.wasm` is missing or empty. These

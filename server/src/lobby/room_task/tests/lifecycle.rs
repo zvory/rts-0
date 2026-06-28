@@ -1,3 +1,4 @@
+use super::super::match_history::MatchHistoryRecordInput;
 use super::support::*;
 
 #[test]
@@ -109,6 +110,132 @@ fn empty_live_room_clears_lifecycle_bookkeeping_and_drain_tracking() {
     assert!(task.match_run_id.is_none());
     assert!(task.match_map_name.is_empty());
     assert!(task.match_participants.is_empty());
+}
+
+#[test]
+fn shutdown_finalize_active_match_marks_drain_finished_before_leave_cleanup() {
+    let drain = DrainHandle::default();
+    let mut task = RoomTask::new(
+        "shutdown-finalize-test".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        drain.clone(),
+    );
+    let (msg_tx, _writer) = ConnectionSink::new();
+    let (ack_tx, mut ack_rx) = tokio::sync::oneshot::channel();
+
+    task.on_join(1, "Player 1".to_string(), false, false, msg_tx, ack_tx);
+    assert_eq!(ack_rx.try_recv(), Ok(true));
+    task.on_ready(1, true);
+    task.on_start_request(1);
+
+    assert!(matches!(task.phase, Phase::InGame(_)));
+    assert_eq!(drain.active_matches(), 1);
+
+    let result = task.finalize_for_shutdown();
+
+    assert_eq!(
+        result,
+        ShutdownFinalizeResult {
+            had_active_match: true,
+            finalized_match: true,
+            match_history_allowed: true,
+            record_queued: false,
+            replay_captured: false,
+        }
+    );
+    assert!(matches!(task.phase, Phase::Lobby));
+    assert_eq!(drain.active_matches(), 0);
+    assert!(!task.match_tracked_for_drain);
+    assert_eq!(task.match_player_count, 0);
+    assert_eq!(task.match_human_count, 0);
+    assert!(task.match_started_at.is_none());
+    assert!(task.match_run_id.is_none());
+    assert!(task.match_map_name.is_empty());
+    assert!(task.match_participants.is_empty());
+
+    task.on_leave(1);
+    assert_eq!(drain.active_matches(), 0);
+}
+
+#[test]
+fn shutdown_finalize_noneligible_active_match_skips_match_history() {
+    let drain = DrainHandle::default();
+    let mut task = RoomTask::new(
+        "itest-history-test".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        drain.clone(),
+    );
+    let (msg_tx, _writer) = ConnectionSink::new();
+    let (ack_tx, mut ack_rx) = tokio::sync::oneshot::channel();
+
+    task.on_join(1, "Player 1".to_string(), false, false, msg_tx, ack_tx);
+    assert_eq!(ack_rx.try_recv(), Ok(true));
+    task.on_ready(1, true);
+    task.on_start_request(1);
+
+    let result = task.finalize_for_shutdown();
+
+    assert!(result.had_active_match);
+    assert!(result.finalized_match);
+    assert!(!result.match_history_allowed);
+    assert!(!result.record_queued);
+    assert!(!result.replay_captured);
+    assert_eq!(drain.active_matches(), 0);
+}
+
+#[test]
+fn aborted_match_history_record_is_winnerless_and_replay_backed() {
+    let players = replay_test_players(2);
+    let (game, artifact) = replay_test_artifact(&players, 4);
+    let mut task = RoomTask::new(
+        "aborted-history-record-test".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    task.match_player_count = 2;
+    task.match_human_count = 2;
+    task.match_started_at = Some(chrono::Utc::now() - chrono::Duration::milliseconds(1_500));
+    task.match_map_name = "Default".to_string();
+    task.match_participants = players.iter().map(|player| player.name.clone()).collect();
+
+    let ended_at = chrono::Utc::now();
+    let record = task.build_match_history_record(MatchHistoryRecordInput {
+        started_at: task.match_started_at.expect("match start should be set"),
+        ended_at,
+        duration_ms: 1_500,
+        scores: &game.scores(),
+        replay_artifact: Some(&artifact),
+        outcome: crate::db::MatchOutcome::Aborted,
+        winner_name: None,
+    });
+
+    assert_eq!(record.winner_name, None);
+    assert_eq!(record.outcome, crate::db::MatchOutcome::Aborted);
+    assert_eq!(record.duration_ms, 1_500);
+    assert_eq!(record.map_name, "Default");
+    assert_eq!(
+        record.participants,
+        vec!["Player 1".to_string(), "Player 2".to_string()]
+    );
+    assert_eq!(record.human_count, 2);
+    assert!(!record.debug_mode);
+    assert!(record.score_screen.as_array().is_some());
+    let replay = record.replay.expect("aborted record should include replay");
+    assert_eq!(
+        replay.duration_ticks,
+        i32::try_from(artifact.duration_ticks).unwrap()
+    );
+    assert_eq!(replay.map_name, artifact.map_name);
+    assert_eq!(
+        replay.artifact_schema_version,
+        i32::try_from(artifact.artifact_schema_version).unwrap()
+    );
 }
 
 #[test]

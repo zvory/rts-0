@@ -6,10 +6,11 @@ use super::super::connection::send_or_log;
 use super::super::replay_session::ReplaySession;
 use super::super::session_policy::RoomTimeSource;
 use super::super::tick_control::ScheduledTickAction;
-use super::super::{current_unix_ms, DrainNotice, RoomMode};
+use super::super::{current_unix_ms, DrainNotice, RoomMode, ShutdownFinalizeResult};
 use super::helpers::{match_countdown_duration, server_build_sha, MATCH_COUNTDOWN_WORDS};
+use super::match_history::MatchHistoryRecordInput;
 use super::types::Phase;
-use super::{is_automated_match_history_room, match_history_participants_are_automated, RoomTask};
+use super::RoomTask;
 use crate::protocol::{PlayerScore, ServerMessage};
 use crate::structured_log::{self, MatchEndedLog};
 use rts_sim::game::replay::ReplayArtifactV1;
@@ -21,29 +22,6 @@ impl RoomTask {
             && !self
                 .live_session_policy()
                 .allows_new_session_while_draining()
-    }
-
-    pub(super) fn should_persist_match_history(&self) -> bool {
-        let match_policy = self.live_session_policy();
-        self.match_player_count >= 1
-            && match_policy.has_authoritative_mutation()
-            && match_policy.allows_match_history()
-            && !is_automated_match_history_room(&self.room)
-            && !match_history_participants_are_automated(&self.match_participants)
-    }
-
-    pub(super) fn match_history_debug_mode(&self) -> bool {
-        self.match_player_count == 1 && self.match_human_count == 1
-    }
-
-    fn should_capture_post_match_replay(&self) -> bool {
-        let match_policy = self.live_session_policy();
-        match_policy.captures_post_match_replay()
-    }
-
-    fn should_attach_match_history_replay_artifact(&self) -> bool {
-        let match_policy = self.live_session_policy();
-        match_policy.attaches_match_history_replay_artifact()
     }
 
     pub(super) fn on_drain_started(&mut self, notice: DrainNotice) {
@@ -155,12 +133,7 @@ impl RoomTask {
         let winner_team_id =
             winner_id.and_then(|id| Self::team_id_for_score_seat(game, &scores, id));
         let ended_at = chrono::Utc::now();
-        let duration_ms = self.match_started_at.map(|started_at| {
-            ended_at
-                .signed_duration_since(started_at)
-                .num_milliseconds()
-                .clamp(0, i32::MAX as i64)
-        });
+        let duration_ms = self.match_duration_ms_for(ended_at);
         let duration_ticks = game.map(Game::tick_count);
         let max_head_of_line_count = self
             .players
@@ -178,9 +151,10 @@ impl RoomTask {
                     scores.clone(),
                 )
             });
-        let will_record_history = self.db.is_some()
-            && self.match_started_at.is_some()
-            && self.should_persist_match_history();
+        let winner_name =
+            winner_id.and_then(|wid| scores.iter().find(|s| s.id == wid).map(|s| s.name.clone()));
+        let outcome = crate::db::MatchOutcome::from_winner_name(winner_name.as_deref());
+        let will_record_history = self.will_record_match_history();
         structured_log::log_match_ended(MatchEndedLog {
             room: &self.room,
             match_run_id: self.match_run_id.as_deref(),
@@ -195,54 +169,25 @@ impl RoomTask {
             score_count: scores.len(),
             replay_captured: replay_artifact.is_some(),
             will_record_history,
+            outcome: outcome.as_str(),
         });
 
         // Persist replay-backed history for deploy-recorded matches. The Recent Matches endpoint
         // filters debug, solo, and AI-only rows; persistence keeps their replay artifacts
         // available for follow-up diagnostics without exposing them on the lobby front page.
-        if let (Some(db), Some(started_at)) = (self.db.clone(), self.match_started_at) {
-            if self.should_persist_match_history() {
-                let duration_ms = ended_at
-                    .signed_duration_since(started_at)
-                    .num_milliseconds()
-                    .clamp(0, i32::MAX as i64) as i32;
-                let winner_name = winner_id
-                    .and_then(|wid| scores.iter().find(|s| s.id == wid).map(|s| s.name.clone()));
-                let outcome = crate::db::MatchOutcome::from_winner_name(winner_name.as_deref());
-                let score_json = serde_json::to_value(&scores).unwrap_or(serde_json::Value::Null);
-                let replay = if self.should_attach_match_history_replay_artifact() {
-                    replay_artifact.as_ref().and_then(|artifact| {
-                        match crate::db::MatchReplayRecord::from_artifact(artifact) {
-                            Ok(replay) => Some(replay),
-                            Err(err) => {
-                                crate::log_warn!(room = %self.room, error = %err, "failed to serialize replay artifact for match history");
-                                None
-                            }
-                        }
-                    })
-                } else {
-                    None
-                };
-                let rec = crate::db::MatchRecord {
-                    started_at,
-                    ended_at,
-                    duration_ms,
-                    map_name: self.match_map_name.clone(),
-                    winner_name,
-                    outcome,
-                    participants: self.match_participants.clone(),
-                    score_screen: score_json,
-                    human_count: i32::try_from(self.match_human_count).unwrap_or(i32::MAX),
-                    debug_mode: self.match_history_debug_mode(),
-                    local_only: self.match_history_local_only,
-                    replay,
-                };
-                // Detached: a slow Supabase write must never stall the room transitioning back to
-                // lobby. The drain-level tracker lets shutdown wait on the task later; errors are
-                // logged inside `record_match`.
-                self.drain
-                    .track_match_history_write(async move { db.record_match(rec).await });
-            }
+        if let (true, Some(started_at), Some(duration_ms)) =
+            (will_record_history, self.match_started_at, duration_ms)
+        {
+            let rec = self.build_match_history_record(MatchHistoryRecordInput {
+                started_at,
+                ended_at,
+                duration_ms: duration_ms as i32,
+                scores: &scores,
+                replay_artifact: replay_artifact.as_ref(),
+                outcome,
+                winner_name,
+            });
+            self.queue_match_history_write(rec);
         }
         self.clear_finished_match_identity();
 
@@ -298,6 +243,98 @@ impl RoomTask {
             }
         }
         self.return_to_lobby();
+    }
+
+    pub(super) fn finalize_for_shutdown(&mut self) -> ShutdownFinalizeResult {
+        let game = match std::mem::replace(&mut self.phase, Phase::Lobby) {
+            Phase::InGame(game) => game,
+            Phase::Lobby => {
+                self.phase = Phase::Lobby;
+                return ShutdownFinalizeResult::default();
+            }
+            Phase::ReplayViewer(session) => {
+                self.phase = Phase::ReplayViewer(session);
+                return ShutdownFinalizeResult::default();
+            }
+            Phase::BranchStaging(staging) => {
+                self.phase = Phase::BranchStaging(staging);
+                return ShutdownFinalizeResult::default();
+            }
+        };
+
+        let ended_at = chrono::Utc::now();
+        let duration_ms = self.match_duration_ms_for(ended_at);
+        let duration_ticks = Some(game.tick_count());
+        let scores = game.scores();
+        let max_head_of_line_count = self
+            .players
+            .values()
+            .map(|player| player.head_of_line_count)
+            .max()
+            .unwrap_or(0);
+        let match_history_allowed = self.should_persist_match_history();
+        let will_record_history =
+            self.db.is_some() && self.match_started_at.is_some() && match_history_allowed;
+        let replay_artifact = (will_record_history
+            && self.should_attach_match_history_replay_artifact())
+        .then(|| {
+            ReplayArtifactV1::capture_from_game(&game, server_build_sha(), None, scores.clone())
+        });
+        structured_log::log_match_ended(MatchEndedLog {
+            room: &self.room,
+            match_run_id: self.match_run_id.as_deref(),
+            map: &self.match_map_name,
+            participants: &self.match_participants,
+            winner_id: None,
+            winner_team_id: None,
+            duration_ms,
+            duration_ticks,
+            slow_tick_count: self.slow_tick_count,
+            max_head_of_line_count,
+            score_count: scores.len(),
+            replay_captured: replay_artifact.is_some(),
+            will_record_history,
+            outcome: crate::db::MatchOutcome::Aborted.as_str(),
+        });
+
+        let record_queued = if let (true, Some(started_at), Some(duration_ms)) =
+            (will_record_history, self.match_started_at, duration_ms)
+        {
+            let rec = self.build_match_history_record(MatchHistoryRecordInput {
+                started_at,
+                ended_at,
+                duration_ms: duration_ms as i32,
+                scores: &scores,
+                replay_artifact: replay_artifact.as_ref(),
+                outcome: crate::db::MatchOutcome::Aborted,
+                winner_name: None,
+            });
+            self.queue_match_history_write(rec)
+        } else {
+            false
+        };
+
+        crate::log_info!(
+            room = %self.room,
+            match_run_id = self.match_run_id.as_deref().unwrap_or(""),
+            map = %self.match_map_name,
+            match_history_allowed,
+            record_queued,
+            replay_captured = replay_artifact.is_some(),
+            "shutdown finalized active match as aborted"
+        );
+
+        self.clear_finished_match_identity();
+        self.reset_after_live_match_for_room_phase();
+        self.mark_match_finished_for_drain();
+
+        ShutdownFinalizeResult {
+            had_active_match: true,
+            finalized_match: true,
+            match_history_allowed,
+            record_queued,
+            replay_captured: replay_artifact.is_some(),
+        }
     }
 
     pub(super) fn return_to_lobby(&mut self) {

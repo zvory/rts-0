@@ -99,15 +99,18 @@ Migrations are versioned SQL files run by `sqlx::migrate!` at server boot. Never
   `RTS_RECORD_MATCHES` gate.
 - `server/src/lobby/mod.rs` — `Lobby::with_match_history()` injects an `Option<Arc<Db>>` into
   spawned rooms and can create persisted replay rooms from launch-approved artifacts. The
-  lobby/drain state also owns the bounded match-history write tracker and exposes the shutdown
-  wait primitive for pending replay/history writes.
+  lobby/drain state also owns the bounded match-history write tracker, exposes the shutdown
+  wait primitive for pending replay/history writes, and sends `FinalizeForShutdown` requests to
+  room tasks after the natural deploy-drain window expires.
 - `server/src/lobby/room_task.rs` — captures `match_started_at`, `match_map_name`,
   `match_participants` at `start_match`; captures `ReplayArtifactV1` from the ending `Game`;
   writes the match row and optional replay row in `end_match` via a tracked **detached** task.
   Normal match completion writes explicit `win` or `draw` outcomes; deploy-drain abort
-  finalization writes `aborted`. Detachment is load-bearing: a slow Supabase write must never
-  stall the room transitioning back to lobby. The tracker snapshots pending writes at shutdown
-  wait start, so writes started later do not extend that wait forever.
+  finalization captures the current active `Game`, writes `aborted`, marks the room's drain
+  tracking finished, and does not transition clients into post-match replay playback because the
+  process is exiting. Detachment is load-bearing: a slow Supabase write must never stall the room
+  transitioning back to lobby. The tracker snapshots pending writes at shutdown wait start, so
+  writes started later do not extend that wait forever.
 - `client/src/match_history.js` — fetches and renders the lobby table; row click expands the
   score screen and, when compatible, exposes a replay launch action.
 - `client/src/app.js` — mounts `MatchHistory` when the lobby shows; `refresh()` is called from
@@ -183,9 +186,15 @@ include historical local-only rows from the request peer address. Only loopback 
 - **Migration fails at boot**: `Db::connect` returns `Err`, server runs without history. Check
   `migrations/` filenames are timestamp-prefixed and sequential.
 - **Slow write**: tracked detached task means the room is unblocked. Worst case the row appears
-  seconds later in `/api/matches`. During graceful shutdown, the drain path can spend remaining
-  drain budget waiting for writes that were pending when the wait began; logs distinguish all
-  writes completing from timeout with the remaining pending count.
+  seconds later in `/api/matches`. During graceful shutdown, the 295 second drain budget reserves
+  20 seconds for writes after the forced-abort phase. Logs distinguish all writes completing from
+  timeout with the remaining pending count.
+- **Deploy drain overran natural completion**: after 260 seconds of natural drain, the lobby asks
+  active room tasks to finalize for shutdown. Eligible normal live rooms queue an `aborted`
+  replay-backed match row before the server closes WebSocket connections. Operator logs include
+  `shutdown natural drain timeout reached; forcing remaining matches`, per-room
+  `shutdown finalized active match as aborted`, aggregate `shutdown forced finalization complete`
+  or `shutdown forced finalization incomplete`, and then the match-history write wait result.
 - **Replay incompatible with current schema/map/faction/loadout**: summaries show
   `replayAvailable: false` with a reason, and launch returns `409` with the same class of
   explanation. Build-SHA drift is warning-compatible (`replayAvailable: true` with a warning);

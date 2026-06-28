@@ -26,9 +26,10 @@ use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use futures_util::stream::{FuturesUnordered, StreamExt};
 use serde::Serialize;
 use tokio::sync::{mpsc, watch, Mutex, Notify};
-use tokio::time::{interval, MissedTickBehavior};
+use tokio::time::{interval, sleep_until, Instant as TokioInstant, MissedTickBehavior};
 
 use crate::config;
 use crate::db::Db;
@@ -87,6 +88,9 @@ const PLAYER_RELIABLE_CHANNEL_CAP: usize = 64;
 const ROOM_EVENT_CHANNEL_CAP: usize = 1024;
 const LOBBY_SUMMARY_TIMEOUT: Duration = Duration::from_millis(75);
 const PUBLIC_LOBBY_NAME_MAX_BYTES: usize = 64;
+const DEFAULT_DEPLOY_SHUTDOWN_ABORT_TIMEOUT: Duration = Duration::from_secs(10);
+const DEFAULT_DEPLOY_WRITE_WAIT_TIMEOUT: Duration = Duration::from_secs(20);
+const DEFAULT_DEPLOY_SHUTDOWN_SLACK: Duration = Duration::from_secs(5);
 const DEV_SCENARIO_ROOM_PREFIX: &str = "__dev_scenario__:";
 const REPLAY_ARTIFACT_ROOM_PREFIX: &str = "__replay_artifact__:";
 const MATCH_REPLAY_ROOM_PREFIX: &str = "__match_replay__";
@@ -170,6 +174,98 @@ pub enum LobbyJoinState {
     Starting,
     InGame,
     Stale,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DeployDrainBudget {
+    pub natural_match_drain: Duration,
+    pub forced_finalization: Duration,
+    pub match_history_write_wait: Duration,
+    pub shutdown_slack: Duration,
+}
+
+impl DeployDrainBudget {
+    pub fn from_total(total: Duration) -> Self {
+        let default_reserved = DEFAULT_DEPLOY_SHUTDOWN_ABORT_TIMEOUT
+            .saturating_add(DEFAULT_DEPLOY_WRITE_WAIT_TIMEOUT)
+            .saturating_add(DEFAULT_DEPLOY_SHUTDOWN_SLACK);
+        if total > default_reserved {
+            return Self {
+                natural_match_drain: total.saturating_sub(default_reserved),
+                forced_finalization: DEFAULT_DEPLOY_SHUTDOWN_ABORT_TIMEOUT,
+                match_history_write_wait: DEFAULT_DEPLOY_WRITE_WAIT_TIMEOUT,
+                shutdown_slack: DEFAULT_DEPLOY_SHUTDOWN_SLACK,
+            };
+        }
+
+        let unit = total / 5;
+        let natural_match_drain = unit * 3;
+        let forced_finalization = unit;
+        let match_history_write_wait =
+            total.saturating_sub(natural_match_drain + forced_finalization);
+        Self {
+            natural_match_drain,
+            forced_finalization,
+            match_history_write_wait,
+            shutdown_slack: Duration::ZERO,
+        }
+    }
+
+    pub fn total(self) -> Duration {
+        self.natural_match_drain
+            .saturating_add(self.forced_finalization)
+            .saturating_add(self.match_history_write_wait)
+            .saturating_add(self.shutdown_slack)
+    }
+
+    fn write_wait_after_elapsed(self, elapsed: Duration) -> Duration {
+        let remaining_before_slack = self
+            .total()
+            .saturating_sub(elapsed)
+            .saturating_sub(self.shutdown_slack);
+        self.match_history_write_wait.min(remaining_before_slack)
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ShutdownFinalizeResult {
+    pub had_active_match: bool,
+    pub finalized_match: bool,
+    pub match_history_allowed: bool,
+    pub record_queued: bool,
+    pub replay_captured: bool,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ShutdownFinalizeSummary {
+    pub active_matches_before: usize,
+    pub active_matches_after: usize,
+    pub rooms_requested: usize,
+    pub rooms_acked: usize,
+    pub rooms_unacked: usize,
+    pub send_failed: usize,
+    pub finalized_matches: usize,
+    pub history_allowed_matches: usize,
+    pub records_queued: usize,
+    pub replays_captured: usize,
+    pub timed_out: bool,
+}
+
+impl ShutdownFinalizeSummary {
+    fn record(&mut self, result: ShutdownFinalizeResult) {
+        if result.finalized_match {
+            self.finalized_matches += 1;
+        }
+        if result.match_history_allowed {
+            self.history_allowed_matches += 1;
+        }
+        if result.record_queued {
+            self.records_queued += 1;
+        }
+        if result.replay_captured {
+            self.replays_captured += 1;
+        }
+    }
 }
 
 /// Internal message from a connection (or the lobby) to a room task. The room task is the
@@ -286,6 +382,11 @@ pub enum RoomEvent {
     /// Process shutdown has begun. Rooms stay alive, but lobby clients should see that starting
     /// another match is disabled while currently-running matches drain.
     DrainStarted(DrainNotice),
+    /// Process shutdown is past the natural-drain window. Active authoritative rooms must
+    /// finalize their current state for shutdown before WebSocket connections close.
+    FinalizeForShutdown {
+        ack: tokio::sync::oneshot::Sender<ShutdownFinalizeResult>,
+    },
 }
 
 #[derive(Clone)]
@@ -738,13 +839,19 @@ impl Lobby {
     }
 
     pub async fn run_deploy_drain(&self, timeout: Duration) {
+        self.run_deploy_drain_with_budget(DeployDrainBudget::from_total(timeout))
+            .await;
+    }
+
+    pub async fn run_deploy_drain_with_budget(&self, budget: DeployDrainBudget) {
         let drain_started = Instant::now();
+        let timeout = budget.total();
         self.begin_draining(timeout).await;
         let active_matches = self.active_match_count();
         if active_matches == 0 {
             crate::log_info!("shutdown drain complete; no active matches");
             self.wait_for_match_history_writes_during_shutdown(
-                timeout.saturating_sub(drain_started.elapsed()),
+                budget.write_wait_after_elapsed(drain_started.elapsed()),
             )
             .await;
             self.request_connection_shutdown();
@@ -754,25 +861,156 @@ impl Lobby {
         crate::log_info!(
             active_matches,
             timeout_secs = timeout.as_secs(),
+            natural_drain_secs = budget.natural_match_drain.as_secs(),
+            forced_finalize_secs = budget.forced_finalization.as_secs(),
+            write_wait_secs = budget.match_history_write_wait.as_secs(),
+            shutdown_slack_secs = budget.shutdown_slack.as_secs(),
             "shutdown drain started; waiting for active matches"
         );
-        tokio::select! {
-            _ = self.wait_for_matches_to_drain() => {
-                crate::log_info!("shutdown drain complete; all matches finished");
+        if budget.natural_match_drain.is_zero() {
+            crate::log_warn!(
+                active_matches = self.active_match_count(),
+                "shutdown natural drain skipped; no natural-drain budget"
+            );
+        } else {
+            tokio::select! {
+                _ = self.wait_for_matches_to_drain() => {
+                    crate::log_info!("shutdown drain natural phase complete; all matches finished");
+                }
+                _ = tokio::time::sleep(budget.natural_match_drain) => {
+                    crate::log_warn!(
+                        active_matches = self.active_match_count(),
+                        timeout_secs = budget.natural_match_drain.as_secs(),
+                        "shutdown natural drain timeout reached; forcing remaining matches"
+                    );
+                }
             }
-            _ = tokio::time::sleep(timeout) => {
+        }
+
+        if self.active_match_count() > 0 {
+            let summary = self
+                .finalize_active_matches_for_shutdown(budget.forced_finalization)
+                .await;
+            if summary.timed_out || summary.send_failed > 0 || summary.rooms_unacked > 0 {
                 crate::log_warn!(
-                    active_matches = self.active_match_count(),
-                    timeout_secs = timeout.as_secs(),
-                    "shutdown drain deadline reached; continuing shutdown"
+                    active_matches_before = summary.active_matches_before,
+                    active_matches_after = summary.active_matches_after,
+                    rooms_requested = summary.rooms_requested,
+                    rooms_acked = summary.rooms_acked,
+                    rooms_unacked = summary.rooms_unacked,
+                    send_failed = summary.send_failed,
+                    finalized_matches = summary.finalized_matches,
+                    records_queued = summary.records_queued,
+                    replays_captured = summary.replays_captured,
+                    timed_out = summary.timed_out,
+                    "shutdown forced finalization incomplete"
+                );
+            } else {
+                crate::log_info!(
+                    active_matches_before = summary.active_matches_before,
+                    active_matches_after = summary.active_matches_after,
+                    rooms_requested = summary.rooms_requested,
+                    rooms_acked = summary.rooms_acked,
+                    finalized_matches = summary.finalized_matches,
+                    history_allowed_matches = summary.history_allowed_matches,
+                    records_queued = summary.records_queued,
+                    replays_captured = summary.replays_captured,
+                    "shutdown forced finalization complete"
                 );
             }
         }
+
+        if self.active_match_count() > 0 {
+            crate::log_warn!(
+                active_matches = self.active_match_count(),
+                "shutdown continuing with active matches still tracked after finalization"
+            );
+        }
+
         self.wait_for_match_history_writes_during_shutdown(
-            timeout.saturating_sub(drain_started.elapsed()),
+            budget.write_wait_after_elapsed(drain_started.elapsed()),
         )
         .await;
         self.request_connection_shutdown();
+    }
+
+    pub async fn finalize_active_matches_for_shutdown(
+        &self,
+        timeout: Duration,
+    ) -> ShutdownFinalizeSummary {
+        let handles: Vec<RoomHandle> = {
+            let rooms = self.rooms.lock().await;
+            rooms.values().cloned().collect()
+        };
+        let mut summary = ShutdownFinalizeSummary {
+            active_matches_before: self.active_match_count(),
+            ..ShutdownFinalizeSummary::default()
+        };
+        if handles.is_empty() || summary.active_matches_before == 0 {
+            summary.active_matches_after = self.active_match_count();
+            return summary;
+        }
+
+        let mut responses = FuturesUnordered::new();
+        for handle in handles {
+            let (ack, response) = tokio::sync::oneshot::channel();
+            match handle
+                .event_tx
+                .try_send(RoomEvent::FinalizeForShutdown { ack })
+            {
+                Ok(()) => {
+                    summary.rooms_requested += 1;
+                    responses.push(response);
+                }
+                Err(err) => {
+                    summary.send_failed += 1;
+                    crate::log_warn!(
+                        error = %err,
+                        "shutdown forced finalization request could not be queued"
+                    );
+                }
+            }
+        }
+
+        if responses.is_empty() {
+            summary.active_matches_after = self.active_match_count();
+            return summary;
+        }
+
+        let deadline = TokioInstant::now() + timeout;
+        loop {
+            if responses.is_empty() {
+                break;
+            }
+            if timeout.is_zero() {
+                summary.timed_out = true;
+                break;
+            }
+            tokio::select! {
+                maybe_result = responses.next() => {
+                    let Some(result) = maybe_result else {
+                        break;
+                    };
+                    match result {
+                        Ok(result) => {
+                            summary.rooms_acked += 1;
+                            summary.record(result);
+                        }
+                        Err(_) => {
+                            summary.rooms_unacked += 1;
+                        }
+                    }
+                }
+                _ = sleep_until(deadline) => {
+                    summary.timed_out = true;
+                    break;
+                }
+            }
+        }
+
+        summary.rooms_unacked += responses.len();
+        summary.active_matches_after = self.active_match_count();
+        summary
     }
 
     pub fn pending_match_history_write_count(&self) -> usize {
