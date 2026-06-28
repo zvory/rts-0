@@ -171,6 +171,7 @@ fn building_site_status(
     building_site_status_with_ignored_unit(map, entities, building, tile_x, tile_y, None)
 }
 
+#[cfg(test)]
 pub(crate) fn building_site_clear_for_build_intent(
     map: &Map,
     entities: &EntityStore,

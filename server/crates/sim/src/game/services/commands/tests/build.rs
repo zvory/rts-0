@@ -296,6 +296,54 @@ fn build_order_accepts_resuming_owned_scaffold_without_resources() {
 }
 
 #[test]
+fn build_order_accepts_new_build_without_current_resources() {
+    let map = flat_map(16);
+    let mut entities = EntityStore::new();
+    let worker = entities
+        .spawn_unit(1, EntityKind::Worker, 64.0, 64.0)
+        .expect("worker should spawn");
+    let mut players = vec![player_state(1)];
+    players[0].steel = 0;
+    players[0].oil = 0;
+
+    let events = apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(
+            1,
+            SimCommand::Build {
+                units: vec![worker],
+                building: EntityKind::Depot,
+                tile_x: 4,
+                tile_y: 4,
+                queued: false,
+            },
+        )],
+    );
+
+    let worker = entities.get(worker).expect("worker should remain alive");
+    assert!(
+        matches!(worker.order(), Order::Build(_)),
+        "worker should keep an otherwise valid build order while broke"
+    );
+    assert!(
+        worker.path_goal().is_some(),
+        "accepted broke build order should send the worker toward the build site"
+    );
+    assert!(
+        entities
+            .iter()
+            .all(|entity| entity.kind != EntityKind::Depot),
+        "build command admission must not spawn a scaffold"
+    );
+    assert!(
+        events.get(&1).is_none_or(Vec::is_empty),
+        "resource shortage should be reported on arrival, not at command issue"
+    );
+}
+
+#[test]
 fn build_with_multiple_selected_workers_uses_idle_closest_worker() {
     let map = flat_map(32);
     let mut entities = EntityStore::new();

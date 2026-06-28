@@ -1,7 +1,7 @@
 use std::collections::{BTreeSet, HashMap};
 
 use crate::config;
-use crate::game::entity::{BuildPhase, DeconstructPhase, EntityKind, EntityStore};
+use crate::game::entity::{BuildPhase, DeconstructPhase, EntityKind, EntityStore, Order};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::occupancy::{footprint_center, Occupancy};
@@ -13,11 +13,11 @@ use crate::protocol::{Event, NoticeSeverity};
 use crate::rules;
 use crate::rules::projection;
 
-/// Advance build orders. Workers in `ToSite` that have walked into arrival range of their
-/// intended footprint re-validate placement and affordability, spawn the building, deduct
-/// cost, and transition to `Constructing`. Workers in `Constructing` accumulate one tick
-/// of progress per tick; on completion the building leaves CONSTRUCT, the worker is
-/// freed, and a `Build` event fires to the owner.
+/// Advance build orders. Workers in `ToSite` or `WaitingAtSite` that are in arrival range of
+/// their intended footprint re-validate placement and affordability, spawn the building, deduct
+/// cost, or keep waiting for resources / short-lived unit blockers. Workers in `Constructing`
+/// accumulate one tick of progress per tick; on completion the building leaves CONSTRUCT, the
+/// worker is freed, and a `Build` event fires to the owner.
 pub(crate) fn construction_system(
     map: &Map,
     entities: &mut EntityStore,
@@ -27,28 +27,29 @@ pub(crate) fn construction_system(
     active_construction_sites: &mut BTreeSet<u32>,
 ) {
     let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
-    // ----- Arrival pass: ToSite workers that have reached their target -----
-    let arrivals: Vec<(u32, EntityKind, u32, u32)> = entities
+    // ----- Arrival pass: workers that have reached and may be waiting at their target -----
+    let arrivals: Vec<(u32, EntityKind, u32, u32, BuildPhase)> = entities
         .iter()
         .filter_map(|e| {
             if e.hp == 0 || !e.is_unit() {
                 return None;
             }
-            if e.build_phase() != Some(BuildPhase::ToSite) {
+            let phase = e.build_phase()?;
+            if !matches!(phase, BuildPhase::ToSite | BuildPhase::WaitingAtSite) {
                 return None;
             }
             let (kind, tx, ty) = e.order().build_intent_tile()?;
             let (cx, cy) = footprint_center(map, kind, tx, ty);
             let arrive = interact_range_for_kind(kind);
             if dist2(e.pos_x, e.pos_y, cx, cy).sqrt() <= arrive {
-                Some((e.id, kind, tx, ty))
+                Some((e.id, kind, tx, ty, phase))
             } else {
                 None
             }
         })
         .collect();
 
-    for (worker, kind, tx, ty) in arrivals {
+    for (worker, kind, tx, ty, phase) in arrivals {
         let owner = match entities.get(worker) {
             Some(w) => w.owner,
             None => continue,
@@ -63,9 +64,6 @@ pub(crate) fn construction_system(
             continue;
         }
 
-        // Re-validate placement against the live entity set.
-        let placeable =
-            standability::building_site_clear_for_build_intent(map, entities, kind, tx, ty, worker);
         let owner_faction = players
             .iter()
             .find(|p| p.id == owner)
@@ -83,61 +81,74 @@ pub(crate) fn construction_system(
             }
             continue;
         }
-        let cost = rules::economy::resource_cost(kind);
-        let resource_notice = match players.iter().find(|p| p.id == owner) {
-            Some(p) => {
-                if p.can_afford(cost.steel, cost.oil) {
-                    None
-                } else {
-                    Some(rules::economy::resource_shortage_notice_for_cost(
-                        p.steel, p.oil, cost,
-                    ))
+
+        let was_unit_blocked_wait = build_wait_unit_blocked_ticks(entities, worker) > 0;
+
+        // Re-validate placement against the live entity set.
+        match standability::building_site_status_for_build_intent(
+            map, entities, kind, tx, ty, worker,
+        ) {
+            standability::BuildSiteStatus::Clear => {
+                reset_build_unit_blocked_timer(entities, worker);
+            }
+            standability::BuildSiteStatus::BlockedByUnit => {
+                let timed_out = mark_build_waiting_on_unit_blocker(entities, worker);
+                if timed_out {
+                    notice_build_failure(events, owner, "Cannot build there");
+                    if let Some(w) = entities.get_mut(worker) {
+                        w.clear_active_order();
+                    }
                 }
+                continue;
             }
-            None => Some("Not enough resources"),
-        };
-
-        if !placeable {
-            events.entry(owner).or_default().push(Event::Notice {
-                msg: "Cannot build there".to_string(),
-                x: None,
-                y: None,
-                severity: NoticeSeverity::Info,
-            });
-            if let Some(w) = entities.get_mut(worker) {
-                w.clear_active_order();
+            standability::BuildSiteStatus::BlockedByBuilding
+            | standability::BuildSiteStatus::BlockedByResourceNode
+            | standability::BuildSiteStatus::InvalidFootprint => {
+                notice_build_failure(events, owner, "Cannot build there");
+                if let Some(w) = entities.get_mut(worker) {
+                    w.clear_active_order();
+                }
+                continue;
             }
-            continue;
-        }
-        if let Some(msg) = resource_notice {
-            events.entry(owner).or_default().push(Event::Notice {
-                msg: msg.to_string(),
-                x: None,
-                y: None,
-                severity: NoticeSeverity::Info,
-            });
-            if let Some(w) = entities.get_mut(worker) {
-                w.clear_active_order();
-            }
-            continue;
         }
 
-        let ps = match players.iter_mut().find(|p| p.id == owner) {
-            Some(p) => p,
-            None => continue,
+        let cost = rules::economy::resource_cost(kind);
+        let player_index = players.iter().position(|p| p.id == owner);
+        let Some(player_index) = player_index else {
+            mark_build_waiting_for_resources(entities, worker);
+            continue;
         };
-        if !ps.spend_cost(cost) {
+        if !players[player_index].can_afford(cost.steel, cost.oil) {
+            if phase == BuildPhase::ToSite || was_unit_blocked_wait {
+                notice_build_failure(
+                    events,
+                    owner,
+                    rules::economy::resource_shortage_notice_for_cost(
+                        players[player_index].steel,
+                        players[player_index].oil,
+                        cost,
+                    ),
+                );
+            }
+            mark_build_waiting_for_resources(entities, worker);
+            continue;
+        }
+
+        if !players[player_index].spend_cost(cost) {
+            mark_build_waiting_for_resources(entities, worker);
             continue;
         }
 
         let (cx, cy) = footprint_center(map, kind, tx, ty);
         let site = match entities.spawn_building(owner, kind, cx, cy, false) {
             Some(id) => id,
-            None => continue,
+            None => {
+                players[player_index].refund_cost(cost);
+                mark_build_waiting_for_resources(entities, worker);
+                continue;
+            }
         };
-        if let Some(player) = players.iter_mut().find(|p| p.id == owner) {
-            player.record_entity_created(kind);
-        }
+        players[player_index].record_entity_created(kind);
         if let Some(w) = entities.get_mut(worker) {
             w.clear_path();
             w.set_target_id(Some(site));
@@ -198,6 +209,52 @@ pub(crate) fn construction_system(
     }
 }
 
+fn notice_build_failure(events: &mut HashMap<u32, Vec<Event>>, owner: u32, msg: impl Into<String>) {
+    events.entry(owner).or_default().push(Event::Notice {
+        msg: msg.into(),
+        x: None,
+        y: None,
+        severity: NoticeSeverity::Info,
+    });
+}
+
+fn mark_build_waiting_for_resources(entities: &mut EntityStore, worker: u32) {
+    if let Some(w) = entities.get_mut(worker) {
+        w.clear_path();
+        w.set_target_id(None);
+        w.mark_build_phase(BuildPhase::WaitingAtSite);
+        w.update_build_unit_blocked(false);
+    }
+}
+
+fn mark_build_waiting_on_unit_blocker(entities: &mut EntityStore, worker: u32) -> bool {
+    let Some(w) = entities.get_mut(worker) else {
+        return false;
+    };
+    w.clear_path();
+    w.set_target_id(None);
+    w.mark_build_phase(BuildPhase::WaitingAtSite);
+    w.update_build_unit_blocked(true).unwrap_or(false)
+}
+
+fn reset_build_unit_blocked_timer(entities: &mut EntityStore, worker: u32) {
+    if let Some(w) = entities.get_mut(worker) {
+        w.update_build_unit_blocked(false);
+    }
+}
+
+fn build_wait_unit_blocked_ticks(entities: &EntityStore, worker: u32) -> u32 {
+    let Some(entity) = entities.get(worker) else {
+        return 0;
+    };
+    match entity.order() {
+        Order::Build(order) if order.execution.phase == BuildPhase::WaitingAtSite => {
+            order.execution.unit_blocked_ticks
+        }
+        _ => 0,
+    }
+}
+
 /// Advance Tank Trap deconstruction orders. A worker must first reach the target trap, then spends
 /// the trap's normal build time dismantling it. Completion refunds the trap cost to the worker's
 /// owner and leaves removal/event fanout to the ordinary death system.
@@ -208,7 +265,9 @@ pub(crate) fn deconstruction_system(
     let arrivals: Vec<(u32, Option<u32>)> = entities
         .iter()
         .filter_map(|e| {
-            if e.hp == 0 || !e.is_unit() || e.deconstruct_phase() != Some(DeconstructPhase::ToTarget)
+            if e.hp == 0
+                || !e.is_unit()
+                || e.deconstruct_phase() != Some(DeconstructPhase::ToTarget)
             {
                 return None;
             }
@@ -426,7 +485,7 @@ mod tests {
     }
 
     #[test]
-    fn construction_rejects_other_unit_body_intersecting_footprint() {
+    fn construction_waits_on_other_unit_body_intersecting_footprint() {
         let map = flat_map(16);
         let mut entities = EntityStore::new();
         let rect = building_rect_for_footprint(EntityKind::Depot, 4, 4).expect("depot rect");
@@ -471,15 +530,237 @@ mod tests {
             entities
                 .iter()
                 .all(|entity| entity.kind != EntityKind::Depot),
-            "another living unit body intersecting the footprint must prevent scaffold creation"
+            "another living unit body intersecting the footprint must delay scaffold creation"
         );
         assert!(
             matches!(
-                entities.get(worker).expect("worker should survive").order(),
-                Order::Idle
+                entities
+                    .get(worker)
+                    .expect("worker should survive")
+                    .build_phase(),
+                Some(BuildPhase::WaitingAtSite)
             ),
-            "blocked final placement should clear the worker order"
+            "blocked final placement should hold the build order during the grace window"
         );
+        assert!(
+            events.get(&1).is_none_or(Vec::is_empty),
+            "unit-blocked wait should not emit a failure notice before timeout"
+        );
+    }
+
+    #[test]
+    fn arrived_build_waits_without_spawning_when_resources_missing() {
+        let map = flat_map(16);
+        let mut entities = EntityStore::new();
+        let (sx, sy) = footprint_center(&map, EntityKind::Depot, 4, 4);
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, sx, sy)
+            .expect("worker should spawn");
+        entities
+            .get_mut(worker)
+            .expect("worker should exist")
+            .set_order(Order::build(EntityKind::Depot, 4, 4));
+        let mut players = vec![player_state(1)];
+        players[0].steel = 0;
+        players[0].oil = 0;
+        let mut events = HashMap::new();
+
+        run_construction_tick(&map, &mut entities, &mut players, &mut events);
+
+        let worker = entities.get(worker).expect("worker should survive");
+        assert_eq!(worker.build_phase(), Some(BuildPhase::WaitingAtSite));
+        assert!(
+            worker.path_is_empty(),
+            "worker should stand at the site while waiting for resources"
+        );
+        assert!(
+            entities
+                .iter()
+                .all(|entity| entity.kind != EntityKind::Depot),
+            "resource wait must not spawn a scaffold"
+        );
+        assert!(matches!(
+            events.get(&1).and_then(|events| events.first()),
+            Some(Event::Notice { msg, .. }) if msg == "Not enough steel"
+        ));
+
+        run_construction_tick(&map, &mut entities, &mut players, &mut events);
+
+        assert_eq!(
+            events.get(&1).map_or(0, Vec::len),
+            1,
+            "continuing to wait for the same shortage should not spam notices"
+        );
+    }
+
+    #[test]
+    fn waiting_build_starts_when_resources_become_available() {
+        let map = flat_map(16);
+        let mut entities = EntityStore::new();
+        let (sx, sy) = footprint_center(&map, EntityKind::Depot, 4, 4);
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, sx, sy)
+            .expect("worker should spawn");
+        entities
+            .get_mut(worker)
+            .expect("worker should exist")
+            .set_order(Order::build(EntityKind::Depot, 4, 4));
+        let mut players = vec![player_state(1)];
+        players[0].steel = 0;
+        players[0].oil = 0;
+        let mut events = HashMap::new();
+
+        run_construction_tick(&map, &mut entities, &mut players, &mut events);
+        let cost = rules::economy::resource_cost(EntityKind::Depot);
+        players[0].steel = cost.steel;
+        players[0].oil = cost.oil;
+        run_construction_tick(&map, &mut entities, &mut players, &mut events);
+
+        let scaffold = entities
+            .iter()
+            .find(|entity| entity.kind == EntityKind::Depot && entity.under_construction())
+            .expect("waiting build should spawn a scaffold once resources are available");
+        assert_eq!(
+            entities
+                .get(worker)
+                .expect("worker should survive")
+                .build_phase(),
+            Some(BuildPhase::Constructing { site: scaffold.id })
+        );
+        assert_eq!(players[0].steel, 0);
+        assert_eq!(players[0].oil, 0);
+    }
+
+    #[test]
+    fn waiting_build_cancels_when_building_claims_footprint() {
+        let map = flat_map(16);
+        let mut entities = EntityStore::new();
+        let (sx, sy) = footprint_center(&map, EntityKind::Depot, 4, 4);
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, sx, sy)
+            .expect("worker should spawn");
+        entities
+            .get_mut(worker)
+            .expect("worker should exist")
+            .set_order(Order::build(EntityKind::Depot, 4, 4));
+        let mut players = vec![player_state(1), player_state(2)];
+        players[0].steel = 0;
+        players[0].oil = 0;
+        let mut events = HashMap::new();
+
+        run_construction_tick(&map, &mut entities, &mut players, &mut events);
+        entities
+            .spawn_building(2, EntityKind::Depot, sx, sy, true)
+            .expect("competing building should spawn");
+        run_construction_tick(&map, &mut entities, &mut players, &mut events);
+
+        assert!(matches!(
+            entities.get(worker).expect("worker should survive").order(),
+            Order::Idle
+        ));
+        assert!(events.get(&1).is_some_and(|events| events.iter().any(
+            |event| matches!(event, Event::Notice { msg, .. } if msg == "Cannot build there")
+        )));
+    }
+
+    #[test]
+    fn unit_blocked_build_starts_when_blocker_clears_before_timeout() {
+        let map = flat_map(16);
+        let mut entities = EntityStore::new();
+        let (sx, sy) = footprint_center(&map, EntityKind::Depot, 4, 4);
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, sx, sy)
+            .expect("worker should spawn");
+        entities
+            .get_mut(worker)
+            .expect("worker should exist")
+            .set_order(Order::build(EntityKind::Depot, 4, 4));
+        let blocker = entities
+            .spawn_unit(1, EntityKind::Tank, sx, sy)
+            .expect("blocker should spawn");
+        let mut players = vec![player_state(1)];
+        let mut events = HashMap::new();
+
+        for _ in 0..10 {
+            run_construction_tick(&map, &mut entities, &mut players, &mut events);
+        }
+        assert_eq!(
+            entities
+                .get(worker)
+                .expect("worker should survive")
+                .build_phase(),
+            Some(BuildPhase::WaitingAtSite)
+        );
+        entities.remove(blocker);
+        run_construction_tick(&map, &mut entities, &mut players, &mut events);
+
+        let scaffold = entities
+            .iter()
+            .find(|entity| entity.kind == EntityKind::Depot && entity.under_construction())
+            .expect("cleared blocker should allow construction to start");
+        assert_eq!(
+            entities
+                .get(worker)
+                .expect("worker should survive")
+                .build_phase(),
+            Some(BuildPhase::Constructing { site: scaffold.id })
+        );
+        assert!(
+            events.get(&1).is_none_or(Vec::is_empty),
+            "clearing before timeout should not emit a blocker failure notice"
+        );
+    }
+
+    #[test]
+    fn unit_blocked_build_clears_after_three_second_timeout() {
+        let map = flat_map(16);
+        let mut entities = EntityStore::new();
+        let (sx, sy) = footprint_center(&map, EntityKind::Depot, 4, 4);
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, sx, sy)
+            .expect("worker should spawn");
+        entities
+            .get_mut(worker)
+            .expect("worker should exist")
+            .set_order(Order::build(EntityKind::Depot, 4, 4));
+        entities
+            .spawn_unit(1, EntityKind::Tank, sx, sy)
+            .expect("blocker should spawn");
+        let mut players = vec![player_state(1)];
+        let mut events = HashMap::new();
+        let grace_ticks = config::TICK_HZ * 3;
+
+        for _ in 0..grace_ticks.saturating_sub(1) {
+            run_construction_tick(&map, &mut entities, &mut players, &mut events);
+            assert!(
+                matches!(
+                    entities.get(worker).expect("worker should survive").order(),
+                    Order::Build(_)
+                ),
+                "unit-blocked build should remain active before the grace timeout"
+            );
+        }
+        assert!(
+            events.get(&1).is_none_or(Vec::is_empty),
+            "unit-blocked build should stay quiet before timeout"
+        );
+
+        run_construction_tick(&map, &mut entities, &mut players, &mut events);
+
+        assert!(matches!(
+            entities.get(worker).expect("worker should survive").order(),
+            Order::Idle
+        ));
+        assert!(
+            entities
+                .iter()
+                .all(|entity| entity.kind != EntityKind::Depot),
+            "timed-out blocker should not spawn a scaffold"
+        );
+        assert!(matches!(
+            events.get(&1).and_then(|events| events.first()),
+            Some(Event::Notice { msg, .. }) if msg == "Cannot build there"
+        ));
     }
 
     #[test]
@@ -786,6 +1067,17 @@ mod tests {
             1,
             "deconstruction completion must leave queued handoff orders intact for promotion"
         );
+    }
+
+    fn run_construction_tick(
+        map: &Map,
+        entities: &mut EntityStore,
+        players: &mut [PlayerState],
+        events: &mut HashMap<u32, Vec<Event>>,
+    ) {
+        let fog = Fog::new(map.size);
+        let mut active_sites = BTreeSet::new();
+        construction_system(map, entities, players, events, &fog, &mut active_sites);
     }
 
     fn flat_map(size: u32) -> Map {

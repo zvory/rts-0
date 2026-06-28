@@ -675,23 +675,18 @@ fn build_intent_promotion_error(
     }
     let can_resume =
         resumable_site_for_build_intent(map, entities, owner, kind, tile_x, tile_y).is_some();
-    if !can_resume
-        && !standability::building_site_clear_for_build_intent(
+    if !can_resume {
+        match standability::building_site_status_for_build_intent(
             map, entities, kind, tile_x, tile_y, worker,
-        )
-    {
-        return Some("Cannot build there".to_string());
-    }
-    let ps = match players.iter().find(|p| p.id == owner) {
-        Some(p) => p,
-        None => return Some("Not enough resources".to_string()),
-    };
-    let (cost_steel, cost_oil) = rules::economy::cost(kind);
-    if !can_resume && (ps.steel < cost_steel || ps.oil < cost_oil) {
-        return Some(
-            rules::economy::resource_shortage_notice(ps.steel, ps.oil, cost_steel, cost_oil)
-                .to_string(),
-        );
+        ) {
+            standability::BuildSiteStatus::Clear | standability::BuildSiteStatus::BlockedByUnit => {
+            }
+            standability::BuildSiteStatus::BlockedByBuilding
+            | standability::BuildSiteStatus::BlockedByResourceNode
+            | standability::BuildSiteStatus::InvalidFootprint => {
+                return Some("Cannot build there".to_string());
+            }
+        }
     }
     None
 }
@@ -987,7 +982,7 @@ mod tests {
     }
 
     #[test]
-    fn queued_build_skips_when_player_cannot_afford() {
+    fn queued_build_promotes_when_player_cannot_afford() {
         let map = flat_map(32);
         let mut entities = EntityStore::new();
         let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
@@ -1011,14 +1006,18 @@ mod tests {
 
         let entity = entities.get(worker).expect("worker should exist");
         assert!(
-            matches!(entity.order(), Order::Move(_)),
-            "unaffordable build should be skipped and the next move intent should promote"
+            matches!(entity.order(), Order::Build(_)),
+            "unaffordable build should promote and wait at the site instead of being skipped"
         );
-        assert!(entity.queued_orders().is_empty());
+        assert_eq!(
+            entity.queued_orders(),
+            &[OrderIntent::move_to(fallback.0, fallback.1)],
+            "fallback queued orders should remain available after the active build order finishes"
+        );
     }
 
     #[test]
-    fn queued_build_skip_emits_resource_notice() {
+    fn queued_build_promotion_defers_resource_notice_until_arrival() {
         let map = flat_map(32);
         let mut entities = EntityStore::new();
         let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
@@ -1038,9 +1037,13 @@ mod tests {
 
         let events = promote_with_players_events(&map, &mut entities, &players);
 
+        assert!(
+            events.get(&1).is_none_or(Vec::is_empty),
+            "promotion should not spam resource notices before the worker reaches the build site"
+        );
         assert!(matches!(
-            events.get(&1).and_then(|events| events.first()),
-            Some(Event::Notice { msg, .. }) if msg == "Not enough steel"
+            entities.get(worker).expect("worker should exist").order(),
+            Order::Build(_)
         ));
     }
 
