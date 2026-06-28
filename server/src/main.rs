@@ -264,10 +264,16 @@ async fn shutdown_signal(lobby: Lobby) {
 }
 
 async fn run_deploy_drain(lobby: Lobby, timeout: Duration) {
+    let drain_started = Instant::now();
     lobby.begin_draining(timeout).await;
     let active_matches = lobby.active_match_count();
     if active_matches == 0 {
         rts_server::log_info!("shutdown drain complete; no active matches");
+        wait_for_match_history_writes_during_shutdown(
+            &lobby,
+            drain_timeout_remaining(drain_started, timeout),
+        )
+        .await;
         lobby.request_connection_shutdown();
         return;
     }
@@ -289,7 +295,31 @@ async fn run_deploy_drain(lobby: Lobby, timeout: Duration) {
             );
         }
     }
+    wait_for_match_history_writes_during_shutdown(
+        &lobby,
+        drain_timeout_remaining(drain_started, timeout),
+    )
+    .await;
     lobby.request_connection_shutdown();
+}
+
+fn drain_timeout_remaining(started: Instant, timeout: Duration) -> Duration {
+    timeout.saturating_sub(started.elapsed())
+}
+
+async fn wait_for_match_history_writes_during_shutdown(lobby: &Lobby, timeout: Duration) {
+    let pending_writes = lobby.pending_match_history_write_count();
+    if pending_writes == 0 {
+        return;
+    }
+    if timeout.is_zero() {
+        rts_server::log_warn!(
+            pending_writes,
+            "shutdown match-history write wait skipped; drain deadline exhausted"
+        );
+        return;
+    }
+    let _ = lobby.wait_for_match_history_writes(timeout).await;
 }
 
 /// Axum handler for `GET /ws`: perform the WebSocket upgrade and hand the socket to a task.

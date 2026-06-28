@@ -1,6 +1,6 @@
 # Phase 2 - Bounded Match-History Write Tracking
 
-Status: Not started.
+Status: Done.
 
 ## Goal
 

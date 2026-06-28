@@ -49,6 +49,7 @@ mod faction_validation;
 mod lab_timeline;
 mod launch;
 mod live_tick;
+mod match_history_writes;
 mod participants;
 mod projection;
 mod replay_branch;
@@ -62,6 +63,7 @@ mod tick_control;
 
 pub use connection::{ConnectionReportStats, ConnectionSink, ConnectionWriter};
 use dev_replay::room_mode_for;
+pub use match_history_writes::MatchHistoryWriteWaitResult;
 pub use replay_validation::faction_loadout_incompatibility_reason as replay_faction_loadout_incompatibility_reason;
 use room_task::{RoomMode, RoomTask};
 pub(crate) use snapshots::compact_snapshot_for_wire;
@@ -301,6 +303,7 @@ struct DrainState {
     notice: StdMutex<Option<DrainNotice>>,
     active_matches: AtomicUsize,
     active_matches_tx: watch::Sender<usize>,
+    match_history_writes: match_history_writes::MatchHistoryWriteTracker,
     connection_shutdown_tx: watch::Sender<bool>,
 }
 
@@ -314,6 +317,7 @@ impl Default for DrainHandle {
                 notice: StdMutex::new(None),
                 active_matches: AtomicUsize::new(0),
                 active_matches_tx,
+                match_history_writes: match_history_writes::MatchHistoryWriteTracker::default(),
                 connection_shutdown_tx,
             }),
         }
@@ -377,6 +381,27 @@ impl DrainHandle {
                 return;
             }
         }
+    }
+
+    pub(super) fn track_match_history_write<F>(&self, future: F)
+    where
+        F: std::future::Future<Output = ()> + Send + 'static,
+    {
+        self.inner.match_history_writes.spawn(future);
+    }
+
+    fn pending_match_history_writes(&self) -> usize {
+        self.inner.match_history_writes.pending_count()
+    }
+
+    async fn wait_for_match_history_writes(
+        &self,
+        timeout: Duration,
+    ) -> MatchHistoryWriteWaitResult {
+        self.inner
+            .match_history_writes
+            .wait_for_pending_at_start(timeout)
+            .await
     }
 
     fn request_connection_shutdown(&self) {
@@ -709,6 +734,31 @@ impl Lobby {
 
     pub async fn wait_for_matches_to_drain(&self) {
         self.drain.wait_for_matches_to_drain().await;
+    }
+
+    pub fn pending_match_history_write_count(&self) -> usize {
+        self.drain.pending_match_history_writes()
+    }
+
+    pub async fn wait_for_match_history_writes(
+        &self,
+        timeout: Duration,
+    ) -> MatchHistoryWriteWaitResult {
+        let result = self.drain.wait_for_match_history_writes(timeout).await;
+        if result.timed_out {
+            crate::log_warn!(
+                initial_pending_writes = result.initial_pending,
+                remaining_pending_writes = result.remaining_pending,
+                timeout_ms = timeout.as_millis().min(u128::from(u64::MAX)) as u64,
+                "shutdown match-history write wait timed out"
+            );
+        } else if result.initial_pending > 0 {
+            crate::log_info!(
+                completed_writes = result.initial_pending,
+                "all match-history writes completed during shutdown"
+            );
+        }
+        result
     }
 
     pub fn request_connection_shutdown(&self) {

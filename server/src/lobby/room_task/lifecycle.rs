@@ -238,8 +238,10 @@ impl RoomTask {
                     replay,
                 };
                 // Detached: a slow Supabase write must never stall the room transitioning back to
-                // lobby. Errors are logged inside `record_match`.
-                tokio::spawn(async move { db.record_match(rec).await });
+                // lobby. The drain-level tracker lets shutdown wait on the task later; errors are
+                // logged inside `record_match`.
+                self.drain
+                    .track_match_history_write(async move { db.record_match(rec).await });
             }
         }
         self.clear_finished_match_identity();
