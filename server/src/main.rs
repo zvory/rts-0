@@ -260,66 +260,7 @@ async fn shutdown_signal(lobby: Lobby) {
         _ = terminate => rts_server::log_info!("shutdown requested by SIGTERM"),
     }
 
-    run_deploy_drain(lobby, DEPLOY_DRAIN_TIMEOUT).await;
-}
-
-async fn run_deploy_drain(lobby: Lobby, timeout: Duration) {
-    let drain_started = Instant::now();
-    lobby.begin_draining(timeout).await;
-    let active_matches = lobby.active_match_count();
-    if active_matches == 0 {
-        rts_server::log_info!("shutdown drain complete; no active matches");
-        wait_for_match_history_writes_during_shutdown(
-            &lobby,
-            drain_timeout_remaining(drain_started, timeout),
-        )
-        .await;
-        lobby.request_connection_shutdown();
-        return;
-    }
-
-    rts_server::log_info!(
-        active_matches,
-        timeout_secs = timeout.as_secs(),
-        "shutdown drain started; waiting for active matches"
-    );
-    tokio::select! {
-        _ = lobby.wait_for_matches_to_drain() => {
-            rts_server::log_info!("shutdown drain complete; all matches finished");
-        }
-        _ = tokio::time::sleep(timeout) => {
-            rts_server::log_warn!(
-                active_matches = lobby.active_match_count(),
-                timeout_secs = timeout.as_secs(),
-                "shutdown drain deadline reached; continuing shutdown"
-            );
-        }
-    }
-    wait_for_match_history_writes_during_shutdown(
-        &lobby,
-        drain_timeout_remaining(drain_started, timeout),
-    )
-    .await;
-    lobby.request_connection_shutdown();
-}
-
-fn drain_timeout_remaining(started: Instant, timeout: Duration) -> Duration {
-    timeout.saturating_sub(started.elapsed())
-}
-
-async fn wait_for_match_history_writes_during_shutdown(lobby: &Lobby, timeout: Duration) {
-    let pending_writes = lobby.pending_match_history_write_count();
-    if pending_writes == 0 {
-        return;
-    }
-    if timeout.is_zero() {
-        rts_server::log_warn!(
-            pending_writes,
-            "shutdown match-history write wait skipped; drain deadline exhausted"
-        );
-        return;
-    }
-    let _ = lobby.wait_for_match_history_writes(timeout).await;
+    lobby.run_deploy_drain(DEPLOY_DRAIN_TIMEOUT).await;
 }
 
 /// Axum handler for `GET /ws`: perform the WebSocket upgrade and hand the socket to a task.
@@ -867,7 +808,9 @@ mod tests {
         let lobby = Lobby::new();
         let handle = start_one_player_test_match(&lobby, "unit-drain-finish").await;
         let mut shutdown_rx = lobby.subscribe_connection_shutdown();
-        let drain = tokio::spawn(run_deploy_drain(lobby.clone(), Duration::from_secs(5)));
+        let drain_lobby = lobby.clone();
+        let drain =
+            tokio::spawn(async move { drain_lobby.run_deploy_drain(Duration::from_secs(5)).await });
 
         tokio::time::sleep(Duration::from_millis(25)).await;
         assert!(
@@ -901,7 +844,7 @@ mod tests {
 
         tokio::time::timeout(
             Duration::from_secs(1),
-            run_deploy_drain(lobby.clone(), Duration::from_millis(25)),
+            lobby.run_deploy_drain(Duration::from_millis(25)),
         )
         .await
         .expect("deploy drain should honor the short deadline");

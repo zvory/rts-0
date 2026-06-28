@@ -24,7 +24,7 @@ use std::fs;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
 use tokio::sync::{mpsc, watch, Mutex, Notify};
@@ -736,6 +736,44 @@ impl Lobby {
         self.drain.wait_for_matches_to_drain().await;
     }
 
+    pub async fn run_deploy_drain(&self, timeout: Duration) {
+        let drain_started = Instant::now();
+        self.begin_draining(timeout).await;
+        let active_matches = self.active_match_count();
+        if active_matches == 0 {
+            crate::log_info!("shutdown drain complete; no active matches");
+            self.wait_for_match_history_writes_during_shutdown(
+                timeout.saturating_sub(drain_started.elapsed()),
+            )
+            .await;
+            self.request_connection_shutdown();
+            return;
+        }
+
+        crate::log_info!(
+            active_matches,
+            timeout_secs = timeout.as_secs(),
+            "shutdown drain started; waiting for active matches"
+        );
+        tokio::select! {
+            _ = self.wait_for_matches_to_drain() => {
+                crate::log_info!("shutdown drain complete; all matches finished");
+            }
+            _ = tokio::time::sleep(timeout) => {
+                crate::log_warn!(
+                    active_matches = self.active_match_count(),
+                    timeout_secs = timeout.as_secs(),
+                    "shutdown drain deadline reached; continuing shutdown"
+                );
+            }
+        }
+        self.wait_for_match_history_writes_during_shutdown(
+            timeout.saturating_sub(drain_started.elapsed()),
+        )
+        .await;
+        self.request_connection_shutdown();
+    }
+
     pub fn pending_match_history_write_count(&self) -> usize {
         self.drain.pending_match_history_writes()
     }
@@ -759,6 +797,21 @@ impl Lobby {
             );
         }
         result
+    }
+
+    pub async fn wait_for_match_history_writes_during_shutdown(&self, timeout: Duration) {
+        let pending_writes = self.pending_match_history_write_count();
+        if pending_writes == 0 {
+            return;
+        }
+        if timeout.is_zero() {
+            crate::log_warn!(
+                pending_writes,
+                "shutdown match-history write wait skipped; drain deadline exhausted"
+            );
+            return;
+        }
+        let _ = self.wait_for_match_history_writes(timeout).await;
     }
 
     pub fn request_connection_shutdown(&self) {
