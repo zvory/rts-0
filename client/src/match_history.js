@@ -9,12 +9,13 @@ const DEFAULT_LIMIT = 20;
 export class MatchHistory {
   /**
    * @param {HTMLElement} hostEl container element (kept; this module owns its inner DOM).
-   * @param {{limit?: number, fetchImpl?: typeof fetch}} [opts]
+   * @param {{limit?: number, fetchImpl?: typeof fetch, onReplayRoom?: Function}} [opts]
    */
   constructor(hostEl, opts = {}) {
     this.host = hostEl;
     this.limit = opts.limit ?? DEFAULT_LIMIT;
     this.fetchImpl = opts.fetchImpl ?? window.fetch.bind(window);
+    this.onReplayRoom = typeof opts.onReplayRoom === "function" ? opts.onReplayRoom : null;
     /** Currently-expanded row id (number) or null. */
     this._expandedId = null;
     /** Latest fetched rows kept for re-render on row expansion. */
@@ -209,6 +210,13 @@ export class MatchHistory {
       const payload = await res.json();
       const room = typeof payload?.room === "string" ? payload.room : "";
       if (!room) throw new Error("Replay launch did not return a room.");
+      if (this.onReplayRoom) {
+        const handled = this.onReplayRoom(room);
+        if (handled === false) throw new Error("Replay lobby could not be joined.");
+        this._launchingId = null;
+        this._renderRows();
+        return;
+      }
       const url = new URL("/", window.location.href);
       url.searchParams.set("replayRoom", room);
       window.location.assign(url.toString());

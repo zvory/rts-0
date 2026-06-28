@@ -66,6 +66,7 @@ export class LobbyRosterView {
     hostId,
     isHost,
     countdownActive,
+    spectatorOnly = false,
     playerCount,
     maxPlayers,
     betaFactionSelect,
@@ -78,31 +79,34 @@ export class LobbyRosterView {
   }) {
     if (!this.root) return;
     this.root.innerHTML = "";
+    this.root.classList?.toggle("is-spectator-only", !!spectatorOnly);
 
     const { seatedPlayers, spectatorPlayers } = splitLobbyPlayers(players);
-    const slots = teamSlotsForLobby(seatedPlayers);
-    const occupiedSlotCount = slots.filter((slot) => !slot.isNew).length;
-    for (const slot of slots) {
-      const teamPlayers = seatedPlayers.filter((player) => Number(player.teamId) === Number(slot.id));
-      this.root.appendChild(this._buildTeamColumn({
-        slot,
-        occupiedSlotCount,
-        players: teamPlayers,
-        allPlayers: players,
-        myId,
-        hostId,
-        isHost,
-        countdownActive,
-        playerCount,
-        maxPlayers,
-        betaFactionSelect,
-        onAddAi,
-        onRemoveAi,
-        onSetTeam,
-        onSetSpectator,
-        onSetFaction,
-        onSetAiProfile,
-      }));
+    if (!spectatorOnly) {
+      const slots = teamSlotsForLobby(seatedPlayers);
+      const occupiedSlotCount = slots.filter((slot) => !slot.isNew).length;
+      for (const slot of slots) {
+        const teamPlayers = seatedPlayers.filter((player) => Number(player.teamId) === Number(slot.id));
+        this.root.appendChild(this._buildTeamColumn({
+          slot,
+          occupiedSlotCount,
+          players: teamPlayers,
+          allPlayers: players,
+          myId,
+          hostId,
+          isHost,
+          countdownActive,
+          playerCount,
+          maxPlayers,
+          betaFactionSelect,
+          onAddAi,
+          onRemoveAi,
+          onSetTeam,
+          onSetSpectator,
+          onSetFaction,
+          onSetAiProfile,
+        }));
+      }
     }
 
     this.root.appendChild(this._buildSpectatorSection({
@@ -112,6 +116,7 @@ export class LobbyRosterView {
       hostId,
       isHost,
       countdownActive,
+      spectatorOnly,
       onSetSpectator,
     }));
   }
@@ -369,12 +374,14 @@ export class LobbyRosterView {
     hostId,
     isHost,
     countdownActive,
+    spectatorOnly = false,
     onSetSpectator,
   }) {
     const section = document.createElement("section");
     section.className = "lobby-spectator-card";
-    section.setAttribute("aria-label", "Spectators");
-    if (isHost && !countdownActive) {
+    if (spectatorOnly) section.classList.add("is-replay-lobby");
+    section.setAttribute("aria-label", spectatorOnly ? "Replay spectators" : "Spectators");
+    if (!spectatorOnly && isHost && !countdownActive) {
       section.addEventListener("dragover", (ev) => {
         ev.preventDefault();
         section.classList.add("is-drop-target");
@@ -398,9 +405,11 @@ export class LobbyRosterView {
     const title = document.createElement("div");
     const kicker = document.createElement("span");
     kicker.className = "lobby-kicker";
-    kicker.textContent = "Observers";
+    kicker.textContent = spectatorOnly ? "Replay lobby" : "Observers";
     const count = document.createElement("h2");
-    count.textContent = `${players.length} spectator${players.length === 1 ? "" : "s"}`;
+    count.textContent = spectatorOnly
+      ? `${players.length} viewer${players.length === 1 ? "" : "s"}`
+      : `${players.length} spectator${players.length === 1 ? "" : "s"}`;
     title.append(kicker, count);
     header.append(eye, title);
 
@@ -411,14 +420,15 @@ export class LobbyRosterView {
         player,
         myId,
         hostId,
-        isHost,
+        isHost: !spectatorOnly && isHost,
         countdownActive,
+        spectatorOnly,
       }));
     }
     if (players.length === 0) {
       const empty = document.createElement("div");
       empty.className = "lobby-empty-spectators";
-      empty.textContent = isHost ? "Drop a player here" : "No observers";
+      empty.textContent = spectatorOnly ? "Waiting for viewers" : (isHost ? "Drop a player here" : "No observers");
       list.appendChild(empty);
     }
 
@@ -426,7 +436,7 @@ export class LobbyRosterView {
     return section;
   }
 
-  _buildSpectatorRow({ player, myId, hostId, isHost, countdownActive }) {
+  _buildSpectatorRow({ player, myId, hostId, isHost, countdownActive, spectatorOnly = false }) {
     const row = document.createElement("div");
     row.className = "player-row lobby-observer-row is-spectator";
     if (player.id === myId) row.classList.add("is-you");
@@ -460,7 +470,7 @@ export class LobbyRosterView {
     nameLine.appendChild(tags);
     const meta = document.createElement("div");
     meta.className = "lobby-seat-meta";
-    meta.textContent = "No command seat";
+    meta.textContent = spectatorOnly ? "Replay viewer" : "No command seat";
     body.append(nameLine, meta);
 
     const state = document.createElement("span");

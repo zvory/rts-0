@@ -208,7 +208,7 @@ export function replayLaunchConfig() {
   const room = (params.get("replayRoom") || "").trim();
   if (!room) return null;
   if (!/^__match_replay__:[A-Za-z0-9_-]+$/.test(room)) return null;
-  return { room };
+  return { room, staging: true };
 }
 
 

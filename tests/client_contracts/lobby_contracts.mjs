@@ -33,6 +33,7 @@ import {
   suggestLobbyName,
   validateLobbyName,
 } from "../../client/src/lobby_browser_view.js";
+import { LobbyRosterView } from "../../client/src/lobby_view.js";
 
 import { textWithin } from "./dom_text.mjs";
 
@@ -228,6 +229,89 @@ import { textWithin } from "./dom_text.mjs";
   assert(renderedBrowser?.error === "" && statusText === "", "lobby reset redraws browser without stale errors");
 }
 
+{
+  let rosterArgs = null;
+  let stoppedPolling = 0;
+  let statusText = "old";
+  const root = { hidden: false, classList: fakeClassList() };
+  const seatsCell = { hidden: false };
+  const lobby = Object.assign(Object.create(Lobby.prototype), {
+    root,
+    net: { playerId: 7 },
+    roomBlock: { hidden: true },
+    elSetupKicker: { textContent: "" },
+    elSetupTitle: { textContent: "" },
+    elPlayers: { innerHTML: "" },
+    elRoomDisplay: { textContent: "" },
+    elMapSummary: { textContent: "", hidden: true },
+    elSeatsSummary: { textContent: "" },
+    elSeatsSummaryCell: seatsCell,
+    elObserversSummary: { textContent: "" },
+    btnReady: {
+      hidden: false,
+      textContent: "",
+      disabled: false,
+      classList: fakeClassList(),
+      setAttribute(name, value) {
+        this[name] = String(value);
+      },
+    },
+    btnStart: { disabled: true, textContent: "", classList: fakeClassList() },
+    selMap: { disabled: false, hidden: false, options: [], value: "" },
+    rosterView: {
+      render(args) {
+        rosterArgs = args;
+      },
+    },
+    browserView: null,
+    _joined: false,
+    _ready: false,
+    _spectator: false,
+    _countdownActive: false,
+    _browserActionPending: true,
+    _pendingBrowserJoinRoom: "old",
+    _stopLobbyBrowserPolling() {
+      stoppedPolling += 1;
+    },
+    _reflectTeamPreset() {},
+    _reflectCreateButton() {},
+    _betaFactionSelectEnabled() {
+      return false;
+    },
+    setStatus(text) {
+      statusText = text;
+    },
+  });
+
+  lobby._renderLobby({
+    room: "__match_replay__:00000001",
+    kind: "replay",
+    hostId: 7,
+    players: [
+      { id: 7, name: "Replay Host", isSpectator: true },
+      { id: 8, name: "Hidden Active Seat", isSpectator: false },
+    ],
+    canStart: true,
+    teamPreset: "custom",
+    map: "Lowlands",
+    maps: [],
+  });
+
+  assert(root.classList.contains("is-replay-lobby"), "joined replay lobbies set a replay UI state class");
+  assert(!lobby.roomBlock.hidden, "joined replay lobbies show the joined-room block");
+  assert(lobby.elSetupKicker.textContent === "Group replay" && lobby.elSetupTitle.textContent === "Replay lobby",
+    "joined replay lobbies switch the setup panel copy");
+  assert(lobby.btnReady.hidden, "joined replay lobbies hide the Ready button");
+  assert(!lobby.btnStart.disabled && lobby.btnStart.textContent === "Start replay",
+    "replay lobby hosts can start whenever the server says canStart");
+  assert(lobby.selMap.hidden && lobby.selMap.disabled, "joined replay lobbies hide map selection");
+  assert(seatsCell.hidden && lobby.elSeatsSummary.textContent === "",
+    "joined replay lobbies hide active-seat counts");
+  assert(lobby.elObserversSummary.textContent === "1", "joined replay lobbies count spectator occupants only");
+  assert(rosterArgs?.spectatorOnly === true, "joined replay lobbies render the roster in spectator-only mode");
+  assert(stoppedPolling === 1 && statusText === "", "joined replay lobby render clears pending browser state");
+}
+
 // ---------------------------------------------------------------------------
 // Lobby browser UI helpers
 // ---------------------------------------------------------------------------
@@ -242,6 +326,10 @@ import { textWithin } from "./dom_text.mjs";
     "full lobby rows advertise spectator joining");
   assert(lobbyActionLabel("inGame") === "Spectate",
     "in-progress lobby rows advertise live spectating");
+  assert(lobbyStatusLabel({ joinState: "fullSpectatorOnly", kind: "replay" }) === "Replay",
+    "replay lobby rows get a replay status label");
+  assert(lobbyActionLabel({ joinState: "fullSpectatorOnly", kind: "replay" }) === "Join replay",
+    "replay lobby rows advertise replay joining");
   assertDeepEqual(lobbyJoinIntent({ joinState: "open" }), { state: "open", joinable: true, spectator: false },
     "open lobby rows join as active players");
   assertDeepEqual(lobbyJoinIntent({ joinState: "fullSpectatorOnly" }),
@@ -250,6 +338,9 @@ import { textWithin } from "./dom_text.mjs";
   assertDeepEqual(lobbyJoinIntent({ joinState: "inGame" }),
     { state: "inGame", joinable: true, spectator: true },
     "in-progress lobby rows join as spectators");
+  assertDeepEqual(lobbyJoinIntent({ joinState: "fullSpectatorOnly", kind: "replay" }),
+    { state: "fullSpectatorOnly", joinable: true, spectator: true },
+    "replay lobby rows always join as spectators");
   assert(validateLobbyName(" Alpha ").ok, "lobby create accepts trimmed plain names");
   assert(!validateLobbyName("   ").ok, "lobby create rejects empty names");
   assert(!validateLobbyName("__lab__:sandbox").ok, "lobby create rejects reserved internal prefixes");
@@ -343,6 +434,17 @@ import { textWithin } from "./dom_text.mjs";
           joinState: "fullSpectatorOnly",
         },
         {
+          room: "Replay Room",
+          kind: "replay",
+          hostName: "Archivist",
+          map: "Lowlands",
+          createdAtUnixMs: now - 20_000,
+          occupiedSlots: 0,
+          maxSlots: 0,
+          spectatorCount: 2,
+          joinState: "fullSpectatorOnly",
+        },
+        {
           room: "Locked Match",
           hostName: "Host C",
           map: "Default",
@@ -378,26 +480,34 @@ import { textWithin } from "./dom_text.mjs";
     assert(textWithin(rowsRoot).includes("Alpha Long Lobby"), "lobby browser renders lobby names");
     assert(textWithin(rowsRoot).includes("No Terrain"), "lobby browser renders map names");
     assert(textWithin(rowsRoot).includes("4 / 4 +1 obs"), "lobby browser renders active slots and spectators");
+    assert(textWithin(rowsRoot).includes("2 spectators"), "lobby browser renders replay spectator counts");
     assert(textWithin(rowsRoot).includes("Join as spectator"), "lobby browser renders row action state");
+    assert(textWithin(rowsRoot).includes("Join replay"), "lobby browser renders replay row actions");
     const row = rowsRoot.children.find((child) => child.dataset.joinState === "fullSpectatorOnly");
     assert(row.dataset.joinState === "fullSpectatorOnly", "lobby browser pins row join-state data");
+    const replayRow = rowsRoot.children.find((child) => child.dataset.kind === "replay");
+    assert(replayRow?.dataset.kind === "replay", "lobby browser pins replay row kind data");
     const buttons = findFakes(rowsRoot, (el) => el.tagName === "BUTTON");
     const openButton = buttons.find((button) => button.textContent === "Join lobby");
     const spectatorButton = buttons.find((button) => button.textContent === "Join as spectator");
+    const replayButton = buttons.find((button) => button.textContent === "Join replay");
     const inGameButton = buttons.find((button) => button.textContent === "Spectate");
     const startingButton = buttons.find((button) => button.textContent === "Starting");
     const staleButton = buttons.find((button) => button.textContent === "Stale");
     assert(!openButton?.disabled, "open lobby row action is enabled");
     assert(!spectatorButton?.disabled, "full lobby row action joins as spectator");
+    assert(!replayButton?.disabled, "replay lobby row action joins as spectator");
     assert(!inGameButton?.disabled, "in-game lobby row action joins as spectator");
     assert(startingButton?.disabled, "countdown lobby row action stays disabled");
     assert(staleButton?.disabled, "unknown lobby row action stays disabled as stale");
     openButton.click();
     spectatorButton.click();
+    replayButton.click();
     inGameButton.click();
     assertDeepEqual(joins, [
       { room: "Open Lobby", spectator: false },
       { room: "Alpha Long Lobby", spectator: true },
+      { room: "Replay Room", spectator: true },
       { room: "Locked Match", spectator: true },
     ], "lobby browser row actions carry active vs spectator join intent");
     view.render({
@@ -418,6 +528,29 @@ import { textWithin } from "./dom_text.mjs";
     const disabledAfterError = findFakes(rowsRoot,
       (el) => el.tagName === "BUTTON" && el.textContent === "Join lobby")[0];
     assert(disabledAfterError?.disabled, "failed lobby-list refresh disables stale row actions");
+  });
+
+  withFakeDocument(() => {
+    const root = document.createElement("div");
+    const view = new LobbyRosterView(root);
+    view.render({
+      players: [
+        { id: 7, name: "Replay Host", color: "#7aa0b5", isSpectator: true },
+        { id: 8, name: "Hidden Active Seat", color: "#b57a7a", isSpectator: false },
+      ],
+      myId: 7,
+      hostId: 7,
+      isHost: true,
+      countdownActive: false,
+      spectatorOnly: true,
+    });
+    const text = textWithin(root);
+    assert(text.includes("Replay lobby") && text.includes("1 viewer"),
+      "replay lobby roster renders a replay spectator-only section");
+    assert(text.includes("Replay Host") && !text.includes("Hidden Active Seat"),
+      "replay lobby roster renders only spectator occupants");
+    assert(!text.includes("Add AI") && !text.includes("Human player"),
+      "replay lobby roster omits AI and active-seat controls");
   });
 
   await withFakeDocument(async () => {

@@ -1,6 +1,8 @@
 // Lobby browser view helpers for the pre-join lobby screen.
 // The Lobby controller owns networking and polling; this module owns row state and DOM rendering.
 
+import { LOBBY_KIND } from "./protocol.js";
+
 const JOIN_STATE_RANK = Object.freeze({
   open: 0,
   fullSpectatorOnly: 1,
@@ -40,10 +42,12 @@ export const LOBBY_BROWSER_POLL_MS = 1500;
 
 export function normalizeLobbySummary(row = {}) {
   const joinState = normalizedJoinState(row.joinState);
+  const kind = normalizedLobbyKind(row.kind);
   const room = boundedText(row.room, "Unnamed lobby");
   const maxSlots = Math.max(0, integerOr(row.maxSlots, 0));
   return {
     room,
+    kind,
     hostName: boundedText(row.hostName, "No host"),
     map: boundedText(row.map, "Default"),
     createdAtUnixMs: Math.max(0, integerOr(row.createdAtUnixMs, 0)),
@@ -68,15 +72,30 @@ export function sortLobbySummaries(rows = []) {
 }
 
 export function lobbyStatusLabel(joinState) {
-  return JOIN_STATE_LABEL[normalizedJoinState(joinState)] || JOIN_STATE_LABEL.stale;
+  const { state, kind } = normalizeStateAndKind(joinState);
+  if (kind === LOBBY_KIND.REPLAY && (state === "open" || state === "fullSpectatorOnly" || state === "inGame")) {
+    return "Replay";
+  }
+  return JOIN_STATE_LABEL[state] || JOIN_STATE_LABEL.stale;
 }
 
 export function lobbyActionLabel(joinState) {
-  return JOIN_STATE_ACTION[normalizedJoinState(joinState)] || JOIN_STATE_ACTION.stale;
+  const { state, kind } = normalizeStateAndKind(joinState);
+  if (kind === LOBBY_KIND.REPLAY && (state === "open" || state === "fullSpectatorOnly" || state === "inGame")) {
+    return "Join replay";
+  }
+  return JOIN_STATE_ACTION[state] || JOIN_STATE_ACTION.stale;
 }
 
 export function lobbyJoinIntent(row = {}) {
   const state = normalizedJoinState(row?.joinState);
+  const kind = normalizedLobbyKind(row?.kind);
+  if (kind === LOBBY_KIND.REPLAY) {
+    if (state === "open" || state === "fullSpectatorOnly" || state === "inGame") {
+      return { state, joinable: true, spectator: true };
+    }
+    return { state, joinable: false, spectator: true };
+  }
   if (state === "open") return { state, joinable: true, spectator: false };
   if (state === "fullSpectatorOnly") return { state, joinable: true, spectator: true };
   if (state === "inGame") return { state, joinable: true, spectator: true };
@@ -204,7 +223,9 @@ export class LobbyBrowserView {
     const disabled = !canJoin || !this.onJoinLobby;
     const el = document.createElement("article");
     el.className = `lobby-browser-row is-${state}`;
+    if (row.kind === LOBBY_KIND.REPLAY) el.classList.add("is-replay");
     el.dataset.joinState = state;
+    el.dataset.kind = row.kind;
     if (!connected || state === "starting" || state === "stale") {
       el.classList.add("is-muted");
     }
@@ -216,7 +237,8 @@ export class LobbyBrowserView {
     name.title = row.room;
     const status = document.createElement("span");
     status.className = `lobby-browser-status-chip is-${state}`;
-    status.textContent = lobbyStatusLabel(state);
+    if (row.kind === LOBBY_KIND.REPLAY) status.classList.add("is-replay");
+    status.textContent = lobbyStatusLabel({ joinState: state, kind: row.kind });
     lobby.append(name, status);
 
     const host = this._buildMetaCell("Host", row.hostName, "host");
@@ -230,7 +252,7 @@ export class LobbyBrowserView {
     button.type = "button";
     button.className = "btn";
     button.disabled = disabled;
-    button.textContent = lobbyActionLabel(state);
+    button.textContent = lobbyActionLabel({ joinState: state, kind: row.kind });
     button.dataset.room = row.room;
     if (!button.disabled) {
       button.addEventListener("click", () => this.onJoinLobby?.(row, { spectator: intent.spectator }));
@@ -457,13 +479,34 @@ function statusText({ loading, connected, error }) {
 }
 
 function slotsLabel(row) {
+  if (row.kind === LOBBY_KIND.REPLAY) {
+    const count = Number(row.spectatorCount) || 0;
+    return `${count} spectator${count === 1 ? "" : "s"}`;
+  }
   const base = `${row.occupiedSlots} / ${row.maxSlots}`;
   return row.spectatorCount > 0 ? `${base} +${row.spectatorCount} obs` : base;
+}
+
+function normalizeStateAndKind(joinState) {
+  if (joinState && typeof joinState === "object") {
+    return {
+      state: normalizedJoinState(joinState.joinState),
+      kind: normalizedLobbyKind(joinState.kind),
+    };
+  }
+  return {
+    state: normalizedJoinState(joinState),
+    kind: LOBBY_KIND.NORMAL,
+  };
 }
 
 function normalizedJoinState(joinState) {
   const value = String(joinState || "").trim();
   return Object.prototype.hasOwnProperty.call(JOIN_STATE_RANK, value) ? value : "stale";
+}
+
+function normalizedLobbyKind(kind) {
+  return kind === LOBBY_KIND.REPLAY ? LOBBY_KIND.REPLAY : LOBBY_KIND.NORMAL;
 }
 
 function joinStateRank(joinState) {

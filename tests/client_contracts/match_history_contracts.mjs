@@ -2,7 +2,7 @@
 // Match-history lobby table contracts imported by ../client_contracts.mjs.
 
 import { assert } from "./assertions.mjs";
-import { matchHistoryWinnerLabel } from "../../client/src/match_history.js";
+import { MatchHistory, matchHistoryWinnerLabel } from "../../client/src/match_history.js";
 
 const FALLBACK_LABEL = "\u2014";
 
@@ -30,3 +30,35 @@ assert(
   matchHistoryWinnerLabel({}) === FALLBACK_LABEL,
   "match history winner label falls back for empty rows",
 );
+
+{
+  let joinedRoom = "";
+  let renderedRows = 0;
+  const history = Object.assign(Object.create(MatchHistory.prototype), {
+    fetchImpl: async (url, init) => {
+      assert(
+        url === "/api/matches/42/replay" && init?.method === "POST",
+        "watch replay posts to the replay launch endpoint",
+      );
+      return {
+        ok: true,
+        json: async () => ({ room: "__match_replay__:abc123" }),
+      };
+    },
+    onReplayRoom(room) {
+      joinedRoom = room;
+      return true;
+    },
+    _launchingId: null,
+    _launchErrors: new Map(),
+    _renderRows() {
+      renderedRows += 1;
+    },
+  });
+
+  await history._launchReplay(42);
+  assert(joinedRoom === "__match_replay__:abc123",
+    "watch replay hands the created replay room back to the lobby flow");
+  assert(history._launchingId === null && renderedRows >= 2,
+    "watch replay clears launching state after lobby handoff");
+}

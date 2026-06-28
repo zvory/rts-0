@@ -198,6 +198,10 @@ export class App {
     const name = "Spectator";
     if (this.lobby?.elName) this.lobby.elName.value = name;
     if (this.lobby?.elRoom) this.lobby.elRoom.value = this.replayLaunch.room;
+    if (this.replayLaunch?.staging) {
+      this.lobby?.joinReplayLobby(this.replayLaunch.room);
+      return;
+    }
     this.net.join(name, this.replayLaunch.room, true, true);
     if (this.lobby?.roomBlock) this.lobby.roomBlock.hidden = true;
     this.lobby.setStatus("Starting replay...");
@@ -632,7 +636,16 @@ export class App {
     const host = document.getElementById("match-history-host");
     if (!host) return;
     if (this.matchHistory) return;
-    this.matchHistory = new MatchHistory(host);
+    this.matchHistory = new MatchHistory(host, {
+      onReplayRoom: (room) => this.joinReplayLobby(room),
+    });
+  }
+
+  joinReplayLobby(room) {
+    if (!this.lobby) return false;
+    dom.lobbyScreen.hidden = false;
+    this.lobby.show();
+    return this.lobby.joinReplayLobby(room);
   }
 
   /**
