@@ -367,7 +367,7 @@ folded into default targeting.
   Its JSON uses row strings (`.` grass, `#` rock, `~` water), named `sites`, and authored
   player-count-specific spawn `layouts`.
 - Start: `STARTING_STEEL = 75`, `STARTING_OIL = 0`, `STARTING_WORKERS = 4`,
-  one City Centre at the player's start tile, 12 steel patches with 1,000 steel each + 3 oil
+  one City Centre at the player's start tile, 12 steel patches with 1,250 steel each + 3 oil
   patches with 3,333 oil each nearby.
 - Supply: City Centre and Zamok each give `+10`; Depots give `+8`; hard cap `200`.
 - Attached mining: gatherers walk to a patch, latch onto it, and mine in place.
