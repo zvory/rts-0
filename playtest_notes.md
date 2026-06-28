@@ -32,7 +32,6 @@ jeffrey playtest
 
 - [ ] crazy idea: riflemen and machine gunners can climb on top of buildings, friendly or enemy, and have increased vision range, attacks on them have cahnge to miss?
 
-
 oti vs matthew
 
 - [ ] smoke doens't always go off
@@ -45,9 +44,9 @@ oti vs matthew
 
 - [x] spectator should not get alerts that play sound or at all (done: PRs #97/#183)
 
-- [ ] a moving a unit that sees an enemy but can't attack it beause ther'es a building in the way, player reports that their unit just stands there
+- [x] a moving a unit that sees an enemy but can't attack it beause ther'es a building in the way, player reports that their unit just stands there
 
-- [ ] riflemen an infantry and cout cars just do too little damage to buidlings. maybe we should bump the HP of all armoed units by like 25% and then make armor block 50% of damage instead of 75% (partial: scout HP changed)
+- [ ] riflemen an infantry and scout cars just do too little damage to buidlings. maybe we should bump the HP of all armoed units by like 25% and then make armor block 50% of damage instead of 75% (partial: scout HP changed)
 
 - [ ] buildings should block line of sight
 
@@ -59,7 +58,7 @@ oti vs matthew
 
 luke playtest
 
-- [ ] make the debug mdoe more obvious (unsure: FPS badge exists)
+- [ ] make the debug mdoe more obvious
 
 - [ ] shift right clicking on windows opens the context menu (firefox only) (unsure: fullscreen control-group fix only)
 
@@ -69,7 +68,7 @@ luke playtest
 
 - [ ] AI is not sending riflemen in waves properly
 
-- [ ] rally should be attack move
+- [x] rally should be attack move
 
 - [ ] should allow attacking through buildings because it's causing confusing behaviour where units don't attack the enemy
 
@@ -89,7 +88,7 @@ luke playtest
 
 - [x] need to make it so that it's not two tanks per selection (done: PR #181, now four)
 
-- [ ] audio attenuation needs work, player looking at base, and has some machine gunners all teh way on the other end of the map, and it sounds like the machine gunners are halfway across the map, not the other end. we need to increase the attenuation
+- [ ] audio attenuation needs work, player looking at own base, and has some machine gunners all teh way on the other end of the map, and it sounds like the machine gunners are halfway across the map, not the other end. we need to increase the attenuation
 
 - [ ] AI should always build vehicle works and gun works towards the enem,y never behind itself
 
