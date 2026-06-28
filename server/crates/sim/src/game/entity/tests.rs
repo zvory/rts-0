@@ -332,7 +332,8 @@ fn attack_and_build_orders_have_explicit_execution_phases() {
         worker.order(),
         Order::Build(BuildOrder {
             execution: BuildExecution {
-                phase: BuildPhase::ToSite
+                phase: BuildPhase::ToSite,
+                unit_blocked_ticks: 0,
             },
             ..
         })
@@ -343,9 +344,49 @@ fn attack_and_build_orders_have_explicit_execution_phases() {
         worker.order(),
         Order::Build(BuildOrder {
             execution: BuildExecution {
-                phase: BuildPhase::Constructing { site: 7 }
+                phase: BuildPhase::Constructing { site: 7 },
+                unit_blocked_ticks: 0,
             },
             ..
         })
     ));
+}
+
+#[test]
+fn build_wait_state_tracks_unit_block_ticks_and_resets() {
+    let mut worker =
+        Entity::new_unit(1, EntityKind::Worker, 10.0, 20.0).expect("worker should spawn");
+    worker.set_order(Order::build(EntityKind::Depot, 4, 5));
+
+    assert_eq!(worker.build_phase(), Some(BuildPhase::ToSite));
+    assert_eq!(worker.build_unit_blocked_ticks(), 0);
+    assert_eq!(
+        worker.tick_build_unit_blocked(),
+        None,
+        "unit-block ticks are only meaningful while waiting at the site"
+    );
+
+    worker.mark_build_phase(BuildPhase::WaitingAtSite);
+    assert_eq!(worker.tick_build_unit_blocked(), Some(1));
+    assert_eq!(worker.tick_build_unit_blocked(), Some(2));
+    assert_eq!(worker.build_unit_blocked_ticks(), 2);
+
+    worker.reset_build_unit_blocked_ticks();
+    assert_eq!(worker.build_unit_blocked_ticks(), 0);
+
+    let mut last_tick = 0;
+    for _ in 0..BUILD_UNIT_BLOCK_GRACE_TICKS {
+        last_tick = worker
+            .tick_build_unit_blocked()
+            .expect("waiting build order should count unit-blocked ticks");
+    }
+    assert_eq!(last_tick, BUILD_UNIT_BLOCK_GRACE_TICKS);
+    match worker.order() {
+        Order::Build(order) => assert!(order.execution.unit_block_grace_reached()),
+        other => panic!("expected build order, got {other:?}"),
+    }
+
+    worker.mark_build_phase(BuildPhase::Constructing { site: 7 });
+    assert_eq!(worker.build_unit_blocked_ticks(), 0);
+    assert_eq!(worker.tick_build_unit_blocked(), None);
 }

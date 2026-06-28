@@ -1,6 +1,6 @@
 # Phase 1 - Placement Classification And Build-Wait State
 
-Status: planned.
+Status: done.
 
 ## Goal
 

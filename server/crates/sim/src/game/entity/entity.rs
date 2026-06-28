@@ -413,9 +413,35 @@ impl Entity {
     pub fn mark_build_phase(&mut self, phase: BuildPhase) {
         if let Some(m) = self.movement.as_mut() {
             if let Order::Build(order) = &mut m.order {
-                order.execution.phase = phase;
+                order.execution.mark_phase(phase);
             }
         }
+    }
+
+    pub fn build_unit_blocked_ticks(&self) -> u32 {
+        self.movement
+            .as_ref()
+            .and_then(|m| match &m.order {
+                Order::Build(order) => Some(order.execution.unit_blocked_ticks),
+                _ => None,
+            })
+            .unwrap_or(0)
+    }
+
+    pub fn reset_build_unit_blocked_ticks(&mut self) {
+        if let Some(m) = self.movement.as_mut() {
+            if let Order::Build(order) = &mut m.order {
+                order.execution.reset_unit_blocked_ticks();
+            }
+        }
+    }
+
+    pub fn tick_build_unit_blocked(&mut self) -> Option<u32> {
+        let m = self.movement.as_mut()?;
+        let Order::Build(order) = &mut m.order else {
+            return None;
+        };
+        order.execution.tick_unit_blocked()
     }
 
     pub fn deconstruct_phase(&self) -> Option<DeconstructPhase> {

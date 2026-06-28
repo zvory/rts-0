@@ -30,7 +30,7 @@ pub use order::{
     BuildExecution, BuildIntent, BuildOrder, BuildPhase, DeconstructExecution, DeconstructOrder,
     DeconstructPhase, GatherExecution, GatherIntent, GatherOrder, GatherPhase, MoveExecution,
     MoveOrder, MovePhase, Order, OrderIntent, PointIntent, RallyIntent, RallyKind, TargetIntent,
-    MAX_QUEUED_ORDERS,
+    BUILD_UNIT_BLOCK_GRACE_TICKS, MAX_QUEUED_ORDERS,
 };
 #[cfg(test)]
 pub use state::EntityStateGroups;
