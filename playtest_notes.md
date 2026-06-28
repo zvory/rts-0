@@ -1,5 +1,6 @@
 jeffrey playtest
 
+- [ ] tanks should maintain their existing range while moving, but if they stop moving over the course of three seconds, their range should expand to the existing anti-tank gun range
 - [ ] observer unit  (sensor tower for commands?)
 - [ ] haraass unit for gun works
 - [ ] camoflauge for AT guns (probably not)
