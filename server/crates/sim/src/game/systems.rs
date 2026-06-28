@@ -4,19 +4,20 @@
 //!   1. rebuild pre-command occupancy/spatial indexes
 //!   2. drain + apply queued commands
 //!   3. movement
-//!   4. rebuild post-movement occupancy/spatial indexes
-//!   5. combat
-//!   6. gather progression
-//!   7. production progression + spawning
-//!   8. construction progression
-//!   9. deconstruction progression
-//!   10. ability projectile/runtime progression
-//!   11. deaths
-//!   12. rebuild pre-collision occupancy/spatial indexes
-//!   13. unit-unit collision resolution (hard non-stacking; runs after spawning so newly
+//!   4. promote queued orders made ready by movement or previous-tick active-order cleanup
+//!   5. rebuild post-movement occupancy/spatial indexes
+//!   6. combat
+//!   7. gather progression
+//!   8. production progression + spawning
+//!   9. construction progression
+//!   10. deconstruction progression
+//!   11. ability projectile/runtime progression
+//!   12. deaths
+//!   13. rebuild pre-collision occupancy/spatial indexes
+//!   14. unit-unit collision resolution (hard non-stacking; runs after spawning so newly
 //!       produced units that land on the same spawn point are unstacked in the same tick)
-//!   14. recompute supply cap
-//!   15. rebuild final spatial index for snapshot interest filtering
+//!   15. recompute supply cap
+//!   16. rebuild final spatial index for snapshot interest filtering
 
 use std::collections::{BTreeSet, HashMap};
 
