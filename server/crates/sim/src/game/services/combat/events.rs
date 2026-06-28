@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 
+use crate::config;
 use crate::game::entity::{Entity, EntityKind};
 use crate::game::fog::Fog;
 use crate::game::teams::TeamRelations;
+use crate::game::FiringRevealSource;
 use crate::protocol::{self, AttackReveal, Event, NoticeSeverity};
 use crate::rules::projection;
 
@@ -40,7 +42,8 @@ pub(super) fn emit_attack_event(
     vx: f32,
     vy: f32,
     reveal: Option<AttackReveal>,
-) {
+) -> Vec<u32> {
+    let mut recipients = Vec::new();
     let player_ids: Vec<u32> = events.keys().copied().collect();
     for pid in player_ids {
         if !projection::attack_event_visible_to_team(
@@ -61,6 +64,34 @@ pub(super) fn emit_attack_event(
             reveal: reveal.clone(),
             to_pos: Some([vx, vy]),
         });
+        recipients.push(pid);
+    }
+    recipients
+}
+
+pub(super) fn record_anti_tank_firing_reveals(
+    firing_reveals: &mut Vec<FiringRevealSource>,
+    recipients: &[u32],
+    entity_id: u32,
+    fired_at_tick: u32,
+    firing_cycle_ticks: u32,
+) {
+    let expires_at_tick = fired_at_tick
+        .saturating_add(firing_cycle_ticks)
+        .saturating_add(config::TICK_HZ / 2);
+    for &viewer in recipients {
+        let Some(source) = FiringRevealSource::new(viewer, entity_id, expires_at_tick) else {
+            continue;
+        };
+        match firing_reveals.iter_mut().find(|existing| {
+            existing.viewer() == source.viewer() && existing.entity_id() == source.entity_id()
+        }) {
+            Some(existing) if source.expires_at_tick() > existing.expires_at_tick() => {
+                *existing = source;
+            }
+            Some(_) => {}
+            None => firing_reveals.push(source),
+        }
     }
 }
 

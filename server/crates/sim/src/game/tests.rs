@@ -9,6 +9,7 @@ use crate::rules::{combat, terrain::TerrainKind};
 
 mod ability_runtime_tests;
 mod ai_identity_tests;
+mod at_gun_firing_reveal_tests;
 mod artillery_tests;
 mod build_wait_tests;
 mod determinism_tests;

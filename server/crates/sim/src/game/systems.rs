@@ -25,6 +25,7 @@ use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::artillery::ArtilleryShellStore;
 use crate::game::entity::EntityStore;
 use crate::game::fog::{Fog, LingeringSightSource};
+use crate::game::FiringRevealSource;
 use crate::game::map::Map;
 use crate::game::mortar::MortarShellStore;
 use crate::game::services;
@@ -115,6 +116,7 @@ pub(crate) fn run_tick(
     pathing: &mut PathingService,
     rng: &mut SmallRng,
     lingering_sight: &mut Vec<LingeringSightSource>,
+    firing_reveals: &mut Vec<FiringRevealSource>,
     smokes: &mut SmokeCloudStore,
     ability_runtime: &mut AbilityRuntime,
     mortar_shells: &mut MortarShellStore,
@@ -233,6 +235,7 @@ pub(crate) fn run_tick(
             mortar_shells,
             rng,
             events,
+            firing_reveals,
             tick,
         );
     });
@@ -370,6 +373,7 @@ mod tests {
         let mut pathing = PathingService::new(1024, 16);
         let mut events: HashMap<u32, Vec<Event>> = HashMap::new();
         let mut lingering_sight = Vec::new();
+        let mut firing_reveals = Vec::new();
         let mut smokes = SmokeCloudStore::new();
         let mut ability_runtime = AbilityRuntime::new();
         let mut mortar_shells = MortarShellStore::default();
@@ -400,6 +404,7 @@ mod tests {
             &mut pathing,
             &mut SmallRng::seed_from_u64(0),
             &mut lingering_sight,
+            &mut firing_reveals,
             &mut smokes,
             &mut ability_runtime,
             &mut mortar_shells,

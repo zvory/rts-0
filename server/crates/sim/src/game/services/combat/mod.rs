@@ -19,6 +19,7 @@ use crate::game::services::occupancy::{Occupancy, StaticPathingRelation};
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
+use crate::game::FiringRevealSource;
 use crate::protocol::Event;
 use rand::rngs::SmallRng;
 
@@ -40,6 +41,7 @@ use acquisition::{
 };
 use chase::{chase_goal_for_target, chase_path_needs_refresh};
 use damage::apply_damage;
+use events::record_anti_tank_firing_reveals;
 use projection::{friendly_hard_blocker_between, shot_hits_intended_target};
 use weapons::{
     anti_tank_gun_can_chase, begin_idle_deployed_weapon_setup, can_fire_while_moving,
@@ -123,6 +125,7 @@ pub(crate) fn combat_system(
     mortar_shells: &mut MortarShellStore,
     rng: &mut SmallRng,
     events: &mut HashMap<u32, Vec<Event>>,
+    firing_reveals: &mut Vec<FiringRevealSource>,
     tick: u32,
 ) {
     let los = LineOfSight::with_smoke(map, smokes);
@@ -374,7 +377,7 @@ pub(crate) fn combat_system(
                 }
                 let extra_miss_chance =
                     entities.get(id).map(moving_fire_miss_chance).unwrap_or(0.0);
-                apply_damage(
+                let attack_recipients = apply_damage(
                     map,
                     entities,
                     teams,
@@ -394,6 +397,15 @@ pub(crate) fn combat_system(
                     extra_miss_chance,
                     tick,
                 );
+                if matches!(entities.get(id).map(|e| e.kind), Some(EntityKind::AntiTankGun)) {
+                    record_anti_tank_firing_reveals(
+                        firing_reveals,
+                        &attack_recipients,
+                        id,
+                        tick,
+                        cd_reset,
+                    );
+                }
                 if let Some(e) = entities.get_mut(id) {
                     e.set_attack_cd(cd_reset);
                 }

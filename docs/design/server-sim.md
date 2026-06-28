@@ -851,6 +851,10 @@ and this service instead of adding ad hoc checks to fog or combat.
 combat targeting depend on owner-local current vision. Event visibility and building-memory
 refreshes use team-current views derived from those raw live grids. Normal player snapshots then
 build a temporary team-current fog by unioning the raw live grids of living teammates only.
+Anti-Tank Gun shots add temporary firing-reveal sources to live fog for each recipient of the attack
+event. These sources reveal only the firing gun's current tile, are actionable for command
+validation and combat targeting, and expire at `fired_at_tick + firing_cycle_cooldown + TICK_HZ / 2`
+so the duration tracks the weapon's firing cycle plus 0.5 seconds.
 Snapshot-only lingering death sight is layered after live fog and then unioned for projection, so
 lingering views remain non-actionable (`visionOnly`) and cannot validate commands or refresh
 remembered buildings. Unit live fog stamps a center-origin sight circle. Building live fog stamps

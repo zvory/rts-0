@@ -142,6 +142,45 @@ pub(crate) struct ScoreState {
     units_lost_by_kind: BTreeMap<EntityKind, u32>,
 }
 
+/// Temporary actionable sight granted to a recipient when an Anti-Tank Gun fires from fog.
+/// Unlike lingering death sight, this is stamped into live fog so command validation, combat
+/// targeting, and snapshot projection all treat the firing gun as currently visible.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct FiringRevealSource {
+    viewer: u32,
+    entity_id: u32,
+    expires_at_tick: u32,
+}
+
+impl FiringRevealSource {
+    fn new(viewer: u32, entity_id: u32, expires_at_tick: u32) -> Option<Self> {
+        if viewer == 0 || entity_id == 0 {
+            return None;
+        }
+        Some(Self {
+            viewer,
+            entity_id,
+            expires_at_tick,
+        })
+    }
+
+    fn is_active_at(self, tick: u32) -> bool {
+        self.expires_at_tick > tick
+    }
+
+    fn viewer(self) -> u32 {
+        self.viewer
+    }
+
+    fn entity_id(self) -> u32 {
+        self.entity_id
+    }
+
+    fn expires_at_tick(self) -> u32 {
+        self.expires_at_tick
+    }
+}
+
 /// The authoritative match state.
 #[derive(Clone)]
 pub struct Game {
@@ -164,6 +203,8 @@ pub struct Game {
     pathing: services::pathing::PathingService,
     /// Five-second death-vision sources used only when building fog-filtered snapshots.
     lingering_sight: Vec<LingeringSightSource>,
+    /// Actionable temporary sight from Anti-Tank Guns that fired from fog.
+    firing_reveals: Vec<FiringRevealSource>,
     /// Neutral smoke clouds that block authoritative fog and combat LOS without being entities.
     smokes: SmokeCloudStore,
     /// Persistent ability runtime state that is not a normal entity or one-off projectile event.
@@ -249,6 +290,7 @@ impl Game {
             &mut self.pathing,
             &mut self.rng,
             &mut self.lingering_sight,
+            &mut self.firing_reveals,
             &mut self.smokes,
             &mut self.ability_runtime,
             &mut self.mortar_shells,
@@ -264,10 +306,11 @@ impl Game {
         // only when snapshots are projected so it cannot validate commands or combat targeting.
         self.lingering_sight
             .retain(|source| source.is_active_at(self.tick));
+        self.firing_reveals
+            .retain(|source| source.is_active_at(self.tick));
         let ids: Vec<u32> = self.players.iter().map(|p| p.id).collect();
         crate::perf::timed(perf.as_deref_mut(), "fog_recompute", || {
-            self.fog
-                .recompute_with_smoke(&ids, &self.entities, &self.map, &self.smokes);
+            self.recompute_live_fog(&ids);
         });
         self.refresh_building_memory(&ids);
 
@@ -391,11 +434,12 @@ impl Game {
         }
         self.lingering_sight
             .retain(|source| source.owner() != player);
+        self.firing_reveals
+            .retain(|source| source.viewer() != player);
         // Recompute fog so the now-entity-less player's visibility goes dark immediately;
         // otherwise a stale grid would keep leaking neutral/enemy entities into their snapshots.
         let ids: Vec<u32> = self.players.iter().map(|p| p.id).collect();
-        self.fog
-            .recompute_with_smoke(&ids, &self.entities, &self.map, &self.smokes);
+        self.recompute_live_fog(&ids);
         self.refresh_building_memory(&ids);
     }
 
@@ -415,8 +459,7 @@ impl Game {
             self.tick,
         )?;
         let ids: Vec<u32> = self.players.iter().map(|p| p.id).collect();
-        self.fog
-            .recompute_with_smoke(&ids, &self.entities, &self.map, &self.smokes);
+        self.recompute_live_fog(&ids);
         self.refresh_building_memory(&ids);
         Some(id)
     }
@@ -463,6 +506,16 @@ impl Game {
             &self.smokes,
             &teams,
             self.tick,
+        );
+    }
+
+    fn recompute_live_fog(&mut self, player_ids: &[u32]) {
+        self.fog
+            .recompute_with_smoke(player_ids, &self.entities, &self.map, &self.smokes);
+        self.fog.stamp_firing_reveal_sources_with_smoke(
+            &self.firing_reveals,
+            &self.entities,
+            &self.smokes,
         );
     }
 

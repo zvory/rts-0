@@ -533,7 +533,7 @@ transport decode:
   tick: u32,
   steel: u32, oil: u32,       // your resources
   supplyUsed: u32, supplyCap: u32,
-  entities: Entity[],            // your non-resource entities (always) + entities visible to living-team current/death vision
+  entities: Entity[],            // your non-resource entities (always) + entities visible to living-team current/firing/death vision
   resourceDeltas?: ResourceDelta[], // visible resource remaining updates; omitted when empty
   smokes?: SmokeCloud[],         // active smoke clouds visible to this recipient; omitted when empty
   abilityObjects?: AbilityObject[], // active ability world objects visible to this recipient; omitted when empty
@@ -576,6 +576,11 @@ the recipient's team-current actionable fog, so allied units attacking hidden en
 hidden target ids or target directions. `steel`, `oil`, supply, `upgrades`, rallies, order plans,
 construction activity hints, ability controls/autocast toggles, debug paths, and command authority
 remain exact-owner-only.
+Anti-Tank Guns that fire from fog create actionable temporary live fog for the recipients that see
+the attack event. The revealed gun is projected as a normal non-`visionOnly` snapshot entity and
+can validate direct attack commands or combat target acquisition until the firing reveal expires.
+The expiration is calculated from the firing tick plus that gun's firing-cycle cooldown plus
+0.5 seconds (`TICK_HZ / 2`), not from a hardcoded wall-clock duration.
 Snapshot-only lingering death sight may make non-owned units/buildings visible as `visionOnly`;
 those views are visual intel only and do not refresh remembered buildings or validate targeted
 commands. Ability world objects are projected separately in `abilityObjects`: normal players
@@ -830,7 +835,8 @@ shared vision, but they do not receive teammate under-attack alerts. Same-team f
 does not emit under-attack alerts. Unit attack events are sent to the attacker's team and to enemy
 recipients whose team can currently see the shooter or target point. They include `reveal` so a shooter
 that fires from fog can be rendered briefly as a semi-transparent, non-interactive silhouette above
-the fog overlay; `toPos` lets tracers draw even when the hit target is no longer in the snapshot.
+the fog overlay; Anti-Tank Gun reveals additionally become the actionable snapshot visibility
+described in §2.4. `toPos` lets tracers draw even when the hit target is no longer in the snapshot.
 Overpenetration events are sent for secondary entities damaged behind the primary target. They carry
 only the damaged entity id and do not imply a separate fired shot, muzzle flash, tracer, shooter
 reveal, weapon recoil, or attack sound.
