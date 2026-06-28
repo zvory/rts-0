@@ -1,3 +1,6 @@
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::{Arc, Mutex as StdMutex};
 use std::time::Duration;
 
 use super::connection::SnapshotSendStatus;
@@ -71,6 +74,35 @@ async fn join_room_handle_with_replay_ok(
     writer
 }
 
+async fn start_two_player_match(lobby: &Lobby, room: &str) -> RoomHandle {
+    let handle = lobby.get_or_create(room).await;
+    let _player_one = join_room_handle(&handle, 1, "Drain Alice", false).await;
+    let _player_two = join_room_handle(&handle, 2, "Drain Bruno", false).await;
+    handle
+        .event_tx
+        .send(RoomEvent::Ready {
+            player_id: 1,
+            ready: true,
+        })
+        .await
+        .expect("room task should accept player one ready");
+    handle
+        .event_tx
+        .send(RoomEvent::Ready {
+            player_id: 2,
+            ready: true,
+        })
+        .await
+        .expect("room task should accept player two ready");
+    handle
+        .event_tx
+        .send(RoomEvent::StartRequest { player_id: 1 })
+        .await
+        .expect("room task should accept start request");
+    wait_for_active_match_count(lobby, 1).await;
+    handle
+}
+
 async fn wait_for_lobby_room_count(lobby: &Lobby, expected: usize) {
     tokio::time::timeout(Duration::from_secs(1), async {
         loop {
@@ -112,6 +144,50 @@ fn registry_test_replay_artifact() -> ReplayArtifactV1 {
     }];
     let game = Game::new(&players, 0x5150_3003);
     ReplayArtifactV1::capture_from_game(&game, crate::build_info::build_id(), None, game.scores())
+}
+
+#[derive(Default)]
+struct RecordingMatchHistoryWriter {
+    records: Arc<StdMutex<Vec<crate::db::MatchRecord>>>,
+    notify: Arc<tokio::sync::Notify>,
+}
+
+impl RecordingMatchHistoryWriter {
+    async fn next_record(&self) -> crate::db::MatchRecord {
+        tokio::time::timeout(Duration::from_secs(1), async {
+            loop {
+                if let Some(record) = self
+                    .records
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                    .first()
+                    .cloned()
+                {
+                    return record;
+                }
+                self.notify.notified().await;
+            }
+        })
+        .await
+        .expect("recorded match write did not arrive")
+    }
+}
+
+impl match_history_writes::MatchHistoryWriter for RecordingMatchHistoryWriter {
+    fn record_match(
+        &self,
+        rec: crate::db::MatchRecord,
+    ) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>> {
+        let records = Arc::clone(&self.records);
+        let notify = Arc::clone(&self.notify);
+        Box::pin(async move {
+            records
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .push(rec);
+            notify.notify_waiters();
+        })
+    }
 }
 
 fn test_snapshot(tick: u32, resource_deltas: Vec<ResourceDelta>) -> Snapshot {
@@ -498,6 +574,78 @@ async fn shutdown_finalization_acks_rooms_and_clears_active_match_count() {
     assert_eq!(summary.history_allowed_matches, 1);
     assert_eq!(summary.records_queued, 0);
     assert!(!summary.timed_out);
+}
+
+#[tokio::test]
+async fn deploy_drain_records_aborted_replay_backed_match_before_connection_shutdown() {
+    let writer = Arc::new(RecordingMatchHistoryWriter::default());
+    let lobby = Lobby::new().with_match_history_writer_for_test(Some(writer.clone()), false);
+    let handle = start_two_player_match(&lobby, "shutdown-abort-record-room").await;
+    let mut shutdown_rx = lobby.subscribe_connection_shutdown();
+
+    tokio::time::timeout(
+        Duration::from_secs(1),
+        lobby.run_deploy_drain_with_budget(DeployDrainBudget {
+            natural_match_drain: Duration::from_millis(5),
+            forced_finalization: Duration::from_millis(500),
+            match_history_write_wait: Duration::from_millis(500),
+            shutdown_slack: Duration::ZERO,
+        }),
+    )
+    .await
+    .expect("deploy drain should complete with the local recording sink");
+
+    let record = writer.next_record().await;
+    assert_eq!(lobby.active_match_count(), 0);
+    assert!(
+        *shutdown_rx.borrow_and_update(),
+        "connection shutdown should be requested after the aborted record is queued and awaited"
+    );
+    assert_eq!(record.outcome, crate::db::MatchOutcome::Aborted);
+    assert_eq!(record.winner_name, None);
+    assert_eq!(
+        record.participants,
+        vec!["Drain Alice".to_string(), "Drain Bruno".to_string()]
+    );
+    assert_eq!(record.human_count, 2);
+    assert!(!record.debug_mode);
+    assert!(!record.local_only);
+    assert_eq!(
+        record
+            .score_screen
+            .as_array()
+            .expect("score screen should serialize as an array")
+            .len(),
+        2
+    );
+
+    let replay = record
+        .replay
+        .expect("aborted match should include a replay row");
+    assert_eq!(replay.map_name, "Default");
+    assert!(replay.artifact_schema_version > 0);
+    assert!(replay.artifact_json["winnerId"].is_null());
+    assert!(replay.artifact_json["winnerTeamId"].is_null());
+    assert_eq!(
+        replay
+            .artifact_json
+            .get("finalScores")
+            .and_then(|scores| scores.as_array())
+            .map(Vec::len),
+        Some(2)
+    );
+
+    handle
+        .event_tx
+        .send(RoomEvent::Leave { player_id: 1 })
+        .await
+        .expect("room task should accept player one cleanup leave");
+    handle
+        .event_tx
+        .send(RoomEvent::Leave { player_id: 2 })
+        .await
+        .expect("room task should accept player two cleanup leave");
+    wait_for_active_match_count(&lobby, 0).await;
 }
 
 #[tokio::test]

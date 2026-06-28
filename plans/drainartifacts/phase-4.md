@@ -1,6 +1,6 @@
 # Phase 4 - End-to-End Coverage and Deploy Docs
 
-Status: Not started.
+Status: Done.
 
 ## Goal
 

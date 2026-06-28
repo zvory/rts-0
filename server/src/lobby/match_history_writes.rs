@@ -1,9 +1,30 @@
 use std::collections::HashSet;
 use std::future::Future;
+use std::pin::Pin;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 
+use crate::db::{Db, MatchRecord};
 use tokio::sync::watch;
+
+pub(in crate::lobby) type SharedMatchHistoryWriter = Arc<dyn MatchHistoryWriter>;
+
+pub(in crate::lobby) trait MatchHistoryWriter: Send + Sync {
+    fn record_match(&self, rec: MatchRecord) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
+}
+
+impl MatchHistoryWriter for Db {
+    fn record_match(&self, rec: MatchRecord) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>> {
+        let db = self.clone();
+        Box::pin(async move {
+            db.record_match(rec).await;
+        })
+    }
+}
+
+pub(in crate::lobby) fn writer_from_db(db: Option<Arc<Db>>) -> Option<SharedMatchHistoryWriter> {
+    db.map(|db| db as SharedMatchHistoryWriter)
+}
 
 #[derive(Clone)]
 pub(super) struct MatchHistoryWriteTracker {

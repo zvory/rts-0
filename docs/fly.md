@@ -133,6 +133,21 @@ INFO rts_server::db: database connected and migrations applied
 finished deployed match logs `match recorded` with map, outcome, replay status, and local-only
 scope.
 
+To validate an interrupted deploy-drain match, keep a live match in progress during the deploy and
+check the recent logs for the whole forced-abort chain:
+
+```bash
+scripts/fly-logs.sh beta recent | rg 'shutdown natural drain timeout reached|shutdown finalized active match as aborted|shutdown forced finalization|all match-history writes completed|shutdown match-history write wait timed out|match recorded'
+```
+
+Expected successful drain-abort evidence is a natural-drain timeout, one per-room
+`shutdown finalized active match as aborted` line for each eligible live match, an aggregate
+`shutdown forced finalization complete`, a `match recorded` line with `outcome=aborted` and
+`replay=true`, and either `all match-history writes completed during shutdown` or no pending-write
+line when the local write completed before the wait began. Treat `shutdown forced finalization
+incomplete`, `shutdown match-history write wait timed out`, or `failed to record match` as deploy
+validation blockers for that interrupted match until Recent Matches confirms the row and replay.
+
 If public reads return `[]` after a match: check `RTS_RECORD_MATCHES` is set and not `0`/`false`,
 and that the match involved at least one human player with legacy quickstart/debug mode off. See
 [docs/design/match-history.md](design/match-history.md) for the full scope table.

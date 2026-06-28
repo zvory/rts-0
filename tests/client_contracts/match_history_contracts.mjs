@@ -2,6 +2,7 @@
 // Match-history lobby table contracts imported by ../client_contracts.mjs.
 
 import { assert } from "./assertions.mjs";
+import { withFakeHudDocument } from "./fakes.mjs";
 import { MatchHistory, matchHistoryWinnerLabel } from "../../client/src/match_history.js";
 
 const FALLBACK_LABEL = "\u2014";
@@ -61,4 +62,55 @@ assert(
     "watch replay hands the created replay room back to the lobby flow");
   assert(history._launchingId === null && renderedRows >= 2,
     "watch replay clears launching state after lobby handoff");
+}
+
+withFakeHudDocument(() => {
+  let launchedId = null;
+  const row = {
+    id: 7,
+    startedAt: new Date().toISOString(),
+    mapName: "Default",
+    participants: ["Alice", "Bravo"],
+    winnerName: null,
+    outcome: "aborted",
+    durationMs: 12_000,
+    replayAvailable: true,
+    replayUnavailableReason: null,
+    scoreScreen: [
+      { name: "Alice", unitScore: 10, structureScore: 0 },
+      { name: "Bravo", unitScore: 9, structureScore: 0 },
+    ],
+  };
+  const history = Object.assign(Object.create(MatchHistory.prototype), {
+    _tableHost: document.createElement("div"),
+    _rows: [row],
+    _expandedId: row.id,
+    _launchingId: null,
+    _launchErrors: new Map(),
+    _toggleRow() {},
+    _launchReplay(id) {
+      launchedId = id;
+    },
+  });
+
+  history._renderRows();
+
+  const renderedText = collectText(history._tableHost).join(" ");
+  assert(renderedText.includes("Aborted"), "expanded aborted match row renders Aborted as the result");
+  assert(renderedText.includes("Watch replay"), "expanded aborted match row exposes replay launch");
+  assert(renderedText.includes("Alice") && renderedText.includes("Bravo"),
+    "expanded aborted match row keeps score-screen player detail");
+
+  const buttons = history._tableHost.querySelectorAll("button");
+  assert(buttons.length === 1, "expanded aborted match row renders one replay button");
+  buttons[0].listeners.click({ stopPropagation() {} });
+  assert(launchedId === row.id, "aborted replay button launches the aborted match replay");
+});
+
+function collectText(node, out = []) {
+  if (typeof node?.textContent === "string" && node.textContent.length > 0) {
+    out.push(node.textContent);
+  }
+  for (const child of node?.children || []) collectText(child, out);
+  return out;
 }

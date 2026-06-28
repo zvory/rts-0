@@ -35,6 +35,11 @@ builder image and fail if `client/vendor/sim-wasm/rts_sim_wasm.js` or
 - Missing static asset URLs must not fall back to the SPA shell. App routes may fall back to
   `index.html`, but `/vendor`, `/src`, `/assets`, and root asset files should return 404 when the
   requested file is absent.
+- **Deploy drain is bounded.** SIGTERM/Ctrl-C starts the 295s app drain inside Fly's 300s stop
+  window: natural match drain, forced aborted finalization for eligible live matches, tracked
+  match-history/replay write wait, then WebSocket/Axum slack. Beta/mainline validation should check
+  logs for forced-finalization success/failure, `match recorded outcome=aborted replay=true`, and
+  any write-wait timeout before treating an interrupted deploy as healthy.
 - `/wiki` is server-rendered and read-only. It may serve only allowlisted Markdown from
   `docs/context` and `docs/design`; `/wiki/stats` must be generated from `rts-rules` definitions
   and faction catalogs, not scraped from client config or rendered docs.

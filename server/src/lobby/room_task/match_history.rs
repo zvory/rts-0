@@ -49,7 +49,9 @@ impl RoomTask {
     }
 
     pub(super) fn will_record_match_history(&self) -> bool {
-        self.db.is_some() && self.match_started_at.is_some() && self.should_persist_match_history()
+        self.match_history_writer.is_some()
+            && self.match_started_at.is_some()
+            && self.should_persist_match_history()
     }
 
     pub(super) fn build_match_history_record(
@@ -91,13 +93,13 @@ impl RoomTask {
     }
 
     pub(super) fn queue_match_history_write(&self, rec: crate::db::MatchRecord) -> bool {
-        let Some(db) = self.db.clone() else {
+        let Some(writer) = self.match_history_writer.clone() else {
             return false;
         };
         // Detached: a slow Supabase write must never stall room transitions. The drain-level
         // tracker lets shutdown wait on the task later; errors are logged inside `record_match`.
         self.drain
-            .track_match_history_write(async move { db.record_match(rec).await });
+            .track_match_history_write(writer.record_match(rec));
         true
     }
 }

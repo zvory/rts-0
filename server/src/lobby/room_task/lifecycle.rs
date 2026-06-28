@@ -273,8 +273,9 @@ impl RoomTask {
             .max()
             .unwrap_or(0);
         let match_history_allowed = self.should_persist_match_history();
-        let will_record_history =
-            self.db.is_some() && self.match_started_at.is_some() && match_history_allowed;
+        let will_record_history = self.match_history_writer.is_some()
+            && self.match_started_at.is_some()
+            && match_history_allowed;
         let replay_artifact = (will_record_history
             && self.should_attach_match_history_replay_artifact())
         .then(|| {
