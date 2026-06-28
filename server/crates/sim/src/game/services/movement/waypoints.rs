@@ -13,6 +13,7 @@ use crate::game::services::geometry::{
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::standability as static_standability;
+use crate::game::upgrade::UpgradeKind;
 use crate::game::PlayerState;
 use crate::protocol::Event;
 
@@ -65,6 +66,12 @@ pub(super) fn advance_moving_units(
                 } else {
                     config::BREAKTHROUGH_BASE_SPEED_MULTIPLIER
                 }
+            } else if e.kind == EntityKind::MachineGunner
+                && players
+                    .iter()
+                    .any(|p| p.id == e.owner && p.upgrades.contains(&UpgradeKind::Methamphetamines))
+            {
+                config::RIFLEMAN_CHARGE_SPEED_MULTIPLIER
             } else {
                 1.0
             };

@@ -211,7 +211,8 @@ shared attack model plus the support-weapon setup/teardown state, tank turret ai
 tank hull-facing damage modifiers for anti-tank hits against tank victims. Tanks keep their active
 movement path while firing on either `Move` or `AttackMove` orders; riflemen upgraded with
 Methamphetamines are permanently charging, keep advancing while firing with normal accuracy, and
-move at tank speed; other mobile combat units
+move at tank speed. Machine Gunners upgraded with Methamphetamines move at unupgraded Rifleman speed
+and use half-length setup/teardown timers; other mobile combat units
 still hold position once a target is in weapon range. Scout cars also fire while moving using an
 independent rear machine-gun facing. They are unarmored light vehicles and do not receive
 armored damage reduction, but anti-tank guns do not roll their infantry miss chance against them.
@@ -241,7 +242,8 @@ attacks; future grenades, satchels, or demolition attacks need separate attack p
 activation/autocast policy instead of being folded into default targeting.
 
 - `TICK_HZ = 30`, `SNAPSHOT_EVERY_N_TICKS = 1`.
-- `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown for support weapons).
+- `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown for support weapons), halved to
+  `METHAMPHETAMINES_MACHINE_GUNNER_SETUP_TICKS = 15` after Methamphetamines research.
 - Mortar Teams use `MORTAR_TEAM_SETUP_TICKS = 0` (no setup or teardown), `MORTAR_RANGE_TILES = 12`,
   `MORTAR_SHELL_DELAY_TICKS = 68` (~2.27s travel), `MORTAR_OUTER_RADIUS_TILES = 1.5`,
   `MORTAR_INNER_RADIUS_TILES = 0.5`,
@@ -283,7 +285,9 @@ activation/autocast policy instead of being folded into default targeting.
 - **Methamphetamines** (Training Centre research): costs 100 steel / 100 oil and takes 600 ticks
   (~20s). Once complete, all current and future riflemen for that player are permanently charging:
   1.25x movement speed (matching tank speed at 2.0 px/tick), fire while moving without an extra
-  miss chance, and 25% faster attacks (16 tick cooldown becomes 12).
+  miss chance, and 25% faster attacks (16 tick cooldown becomes 12). It also increases that
+  player's Machine Gunners from 1.28 px/tick to unupgraded Rifleman speed (1.6 px/tick) and halves
+  their setup and teardown timers from 30 ticks to 15.
 - **Anti-Tank Gun Crews** (R&D Complex research, protocol id `anti_tank_gun_unlock`): costs 200 steel / 75 oil
   and takes 600 ticks (~20s). Once complete, that player can train Anti-Tank Guns from Gun Works.
 - **Unlock Artillery** (R&D Complex research, protocol id `artillery_unlock`): costs 300 steel /

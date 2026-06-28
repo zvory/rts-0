@@ -9,12 +9,13 @@ use std::collections::HashMap;
 
 use crate::config;
 use crate::game::ability_runtime::AbilityRuntime;
-use crate::game::entity::EntityKind;
+use crate::game::entity::{EntityKind, WeaponSetup};
 use crate::game::entity::EntityStore;
 use crate::game::map::Map;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::smoke::SmokeCloudStore;
+use crate::game::upgrade::UpgradeKind;
 use crate::game::PlayerState;
 use crate::protocol::Event;
 
@@ -92,27 +93,23 @@ pub(crate) fn movement_system_with_events(
         }
     }
     for id in entities.ids() {
-        let Some(has_meth) = entities
-            .get(id)
-            .filter(|e| e.kind == EntityKind::Rifleman)
-            .and_then(|e| {
-                players
-                    .iter()
-                    .find(|p| p.id == e.owner)
-                    .map(|p| {
-                        p.upgrades
-                            .contains(&crate::game::upgrade::UpgradeKind::Methamphetamines)
-                    })
-            })
-        else {
+        let Some((kind, owner)) = entities.get(id).map(|e| (e.kind, e.owner)) else {
             continue;
         };
-        if let Some(e) = entities.get_mut(id) {
+        let has_meth = players
+            .iter()
+            .any(|p| p.id == owner && p.upgrades.contains(&UpgradeKind::Methamphetamines));
+        if kind == EntityKind::Rifleman {
+            let Some(e) = entities.get_mut(id) else {
+                continue;
+            };
             if has_meth {
                 e.start_charge(u16::MAX);
             } else if e.charge_ticks() > config::RIFLEMAN_CHARGE_TICKS {
                 e.clear_charge();
             }
+        } else if kind == EntityKind::MachineGunner && has_meth {
+            clamp_meth_machine_gunner_setup(entities, id);
         }
     }
     for id in entities.ids() {
@@ -142,6 +139,34 @@ pub(crate) fn movement_system_with_events(
             e.tick_breakthrough_status();
             e.tick_ability_cooldowns();
         }
+    }
+}
+
+fn clamp_meth_machine_gunner_setup(entities: &mut EntityStore, id: u32) {
+    let Some(e) = entities.get_mut(id) else {
+        return;
+    };
+    let boosted_ticks = config::METHAMPHETAMINES_MACHINE_GUNNER_SETUP_TICKS;
+    let boosted_setup = match e.weapon_setup() {
+        WeaponSetup::SettingUp { ticks } if ticks > boosted_ticks => {
+            Some(WeaponSetup::SettingUp {
+                ticks: boosted_ticks,
+            })
+        }
+        WeaponSetup::TearingDown { ticks } if ticks > boosted_ticks => {
+            Some(WeaponSetup::TearingDown {
+                ticks: boosted_ticks,
+            })
+        }
+        WeaponSetup::TearingDownToRedeploy { ticks } if ticks > boosted_ticks => {
+            Some(WeaponSetup::TearingDownToRedeploy {
+                ticks: boosted_ticks,
+            })
+        }
+        _ => None,
+    };
+    if let Some(setup) = boosted_setup {
+        e.set_weapon_setup(setup);
     }
 }
 
