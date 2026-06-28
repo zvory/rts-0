@@ -8,7 +8,6 @@ import {
   ARTILLERY_MIN_RANGE_TILES,
   ARTILLERY_SHELL_DELAY_TICKS,
   MINING_CC_RANGE_TILES,
-  RIFLEMAN_CHARGE_COOLDOWN_TICKS,
   SMOKE_ABILITY_COST,
   ABILITIES,
   STATS,
@@ -91,7 +90,6 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "MORTAR_SHELL_DELAY_TICKS",
   "PLAYER_PALETTE",
   "RESOURCE_AMOUNTS",
-  "RIFLEMAN_CHARGE_COOLDOWN_TICKS",
   "SCOUT_CAR_BODY",
   "SCOUT_CAR_SMOKE_USES",
   "SMOKE_ABILITY_COOLDOWN_TICKS",
@@ -358,13 +356,14 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   assert(formatTankOilUsed(10.4) === "10", "tank oil panel rounds whole values above ten oil");
   assert(formatTankOilUsed(-2) === "0.0", "tank oil panel clamps negative values");
   assert(formatTankOilUsed(Number.NaN) === "0.0", "tank oil panel tolerates missing oilUsed");
-  const groupedNearlySameCooldowns = groupCooldownClocks([150, 149, 146], RIFLEMAN_CHARGE_COOLDOWN_TICKS);
-  assert(groupedNearlySameCooldowns.length === 1, "nearby rifleman cooldowns share one clock arm");
+  const genericCooldownTicks = TICK_HZ * 5;
+  const groupedNearlySameCooldowns = groupCooldownClocks([150, 149, 146], genericCooldownTicks);
+  assert(groupedNearlySameCooldowns.length === 1, "nearby cooldowns share one clock arm");
   assert(groupedNearlySameCooldowns[0].count === 3, "clock grouping keeps the grouped unit count");
-  const groupedDistinctCooldowns = groupCooldownClocks([150, 120, 60], RIFLEMAN_CHARGE_COOLDOWN_TICKS);
-  assert(groupedDistinctCooldowns.length === 3, "visibly different rifleman cooldowns get separate clock arms");
-  const groupedIgnoringReady = groupCooldownClocks([0, 0, 30, 31], RIFLEMAN_CHARGE_COOLDOWN_TICKS);
-  assert(groupedIgnoringReady.length === 1 && groupedIgnoringReady[0].count === 2, "ready riflemen do not create cooldown clocks");
+  const groupedDistinctCooldowns = groupCooldownClocks([150, 120, 60], genericCooldownTicks);
+  assert(groupedDistinctCooldowns.length === 3, "visibly different cooldowns get separate clock arms");
+  const groupedIgnoringReady = groupCooldownClocks([0, 0, 30, 31], genericCooldownTicks);
+  assert(groupedIgnoringReady.length === 1 && groupedIgnoringReady[0].count === 2, "ready entries do not create cooldown clocks");
 
   const trained = [];
   let selectedProductionBuildings = [

@@ -303,10 +303,6 @@ fn print_client_constants(indent: &str) {
         balance::ARTILLERY_AMMO_COST_STEEL
     );
     println!(
-        "{indent}    \"riflemanChargeCooldownTicks\": {},",
-        balance::RIFLEMAN_CHARGE_COOLDOWN_TICKS
-    );
-    println!(
         "{indent}    \"smokeAbilityRangeTiles\": {},",
         balance::SMOKE_ABILITY_RANGE_TILES
     );

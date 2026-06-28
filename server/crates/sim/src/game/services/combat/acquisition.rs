@@ -46,13 +46,7 @@ pub(super) fn combat_mode_with_moving_fire(e: &Entity, can_fire_while_moving: bo
 
 #[cfg(test)]
 pub(super) fn combat_mode(e: &Entity) -> CombatMode {
-    combat_mode_with_moving_fire(
-        e,
-        super::weapons::can_fire_while_moving(
-            e,
-            super::weapons::legacy_charge_grants_moving_fire_for_tests(e),
-        ),
-    )
+    combat_mode_with_moving_fire(e, super::weapons::can_fire_while_moving(e, false))
 }
 
 fn is_passive_idle_unit(kind: EntityKind) -> bool {

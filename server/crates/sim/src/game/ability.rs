@@ -61,7 +61,7 @@ pub enum AbilityTargetMode {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AbilityEffectHook {
-    SelfStatus,
+    LegacyNoop,
     OwnedAreaStatus,
     DelayedWorld,
     ArtilleryPointFire,
@@ -117,7 +117,7 @@ pub fn carried_by(kind: AbilityKind, entity_kind: EntityKind) -> bool {
 
 pub fn effect_hook(kind: AbilityKind) -> AbilityEffectHook {
     match kind {
-        AbilityKind::Charge => AbilityEffectHook::SelfStatus,
+        AbilityKind::Charge => AbilityEffectHook::LegacyNoop,
         AbilityKind::Smoke | AbilityKind::MortarFire => AbilityEffectHook::DelayedWorld,
         AbilityKind::PointFire => AbilityEffectHook::ArtilleryPointFire,
         AbilityKind::Breakthrough => AbilityEffectHook::OwnedAreaStatus,
@@ -136,7 +136,7 @@ mod tests {
     fn existing_abilities_are_classified_by_effect_hook() {
         assert_eq!(
             definition(AbilityKind::Charge).effect_hook,
-            AbilityEffectHook::SelfStatus
+            AbilityEffectHook::LegacyNoop
         );
         assert_eq!(
             definition(AbilityKind::Smoke).effect_hook,

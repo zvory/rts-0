@@ -80,7 +80,6 @@ fn meth_rifleman_movement_orders_do_not_chase_targets_outside_weapon_range() {
             rifleman.set_path(vec![(400.0, 100.0)]);
             rifleman.set_path_goal(Some((400.0, 100.0)));
             rifleman.mark_move_phase(MovePhase::Moving);
-            assert_eq!(rifleman.charge_ticks(), 0);
         }
 
         let map = open_map(20);

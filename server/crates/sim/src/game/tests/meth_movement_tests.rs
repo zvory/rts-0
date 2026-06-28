@@ -73,7 +73,7 @@ fn next_moving_step(game: &mut Game, id: u32) -> f32 {
 }
 
 #[test]
-fn removed_methamphetamines_clears_persistent_rifleman_speed() {
+fn removed_methamphetamines_immediately_clears_rifleman_speed_boost() {
     let (mut game, rifleman, _goal) = meth_movement_fixture(EntityKind::Rifleman);
     let base_speed = config::unit_stats(EntityKind::Rifleman)
         .expect("rifleman stats")
@@ -82,16 +82,8 @@ fn removed_methamphetamines_clears_persistent_rifleman_speed() {
     game.players[0].upgrades.insert(UpgradeKind::Methamphetamines);
     let boosted_step = next_moving_step(&mut game, rifleman);
     assert!(
-        (boosted_step - base_speed * config::RIFLEMAN_CHARGE_SPEED_MULTIPLIER).abs() < 0.01,
+        (boosted_step - base_speed * config::METHAMPHETAMINES_SPEED_MULTIPLIER).abs() < 0.01,
         "researched Methamphetamines should boost rifleman speed, moved {boosted_step:.3}px"
-    );
-    assert!(
-        game.entities
-            .get(rifleman)
-            .expect("rifleman should exist")
-            .charge_ticks()
-            > config::RIFLEMAN_CHARGE_TICKS,
-        "Methamphetamines should seed the persistent charge state"
     );
 
     game.players[0]
@@ -101,14 +93,6 @@ fn removed_methamphetamines_clears_persistent_rifleman_speed() {
     assert!(
         (normal_step - base_speed).abs() < 0.01,
         "removed Methamphetamines should immediately return riflemen to base speed, moved {normal_step:.3}px"
-    );
-    assert_eq!(
-        game.entities
-            .get(rifleman)
-            .expect("rifleman should exist")
-            .charge_ticks(),
-        0,
-        "removed Methamphetamines should clear the persistent charge state"
     );
 }
 

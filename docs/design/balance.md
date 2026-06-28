@@ -316,9 +316,10 @@ folded into default targeting.
   catalog records carriers, target mode, ranges, cooldowns, charges, Steel/Oil cost, queueability,
   autocast support, and command-card affordances; `client/src/config.js` is mechanically checked
   against that registry for client-visible ability descriptors. Server execution maps those
-  registry rows to a small set of sim-local effect hooks: self status, owned area status, delayed
+  registry rows to a small set of sim-local effect hooks: legacy no-op, owned area status, delayed
   world effect, dash return, line projectile, Magic Anchor placement, Golem consumption, and the
-  one-off artillery point-fire path.
+  one-off artillery point-fire path. The legacy `charge` ability id remains registry-backed only for
+  old command/replay decoding and has no carriers, cooldown, command-card entry, or runtime status.
 - **Ekat** is the first playable one-hero faction unit. The `ekat` catalog starts with
   one Ekat and one Zamok, no workers, no buildable menu, no research, and no other
   controllable combat units besides Golems produced from Zamok. Ekat has 150 HP, no passive
