@@ -168,12 +168,17 @@ function hotkeyService() {
 
   withFakeSettingsDocument(() => {
     let predictionToggled = false;
+    let unitRangeToggled = false;
     const [gameTab] = buildSettingsTabs({
       game: {
         kind: "match",
         prediction: {
           state: () => ({ enabled: true, active: true, available: true }),
           onToggle: () => { predictionToggled = true; },
+        },
+        unitRanges: {
+          state: () => ({ enabled: false, available: true }),
+          onToggle: () => { unitRangeToggled = true; },
         },
       },
     }).filter((tab) => tab.id === "game");
@@ -184,6 +189,11 @@ function hotkeyService() {
     assert(toggle.getAttribute("aria-checked") === "true", "settings: prediction toggle reflects enabled state");
     toggle.listeners.click();
     assert(predictionToggled, "settings: prediction control calls injected toggle");
+    const rangeToggle = findFakeById(root, "unit-range-toggle");
+    assert(rangeToggle, "settings: game tab renders unit range control with pinned id");
+    assert(rangeToggle.textContent === "Show Unit Ranges: off", "settings: unit range toggle uses expected label");
+    rangeToggle.listeners.click();
+    assert(unitRangeToggled, "settings: unit range control calls injected toggle");
   });
 
   withFakeSettingsDocument(() => {

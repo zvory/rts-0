@@ -19,6 +19,7 @@ export function buildMatchSettingsContext({
   onPredictionEnabledChange,
   onPointerLockToggle,
   onDebugPathToggle,
+  onUnitRangeToggle,
   livePauseActionLabel,
   livePauseActionTitle,
 }) {
@@ -74,6 +75,14 @@ export function buildMatchSettingsContext({
           }),
           onToggle: onPointerLockToggle,
         },
+        unitRanges: state ? {
+          state: () => ({
+            hidden: false,
+            available: true,
+            enabled: !!state.showUnitRangesEnabled,
+          }),
+          onToggle: onUnitRangeToggle,
+        } : null,
       },
       debug: {
         available: movementPathsAvailable,

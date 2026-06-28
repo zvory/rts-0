@@ -286,6 +286,7 @@ export class Match {
     this.onUnpauseGame = this.requestUnpauseGame.bind(this);
     this.onPointerLockToggle = this.togglePointerLock.bind(this);
     this.onDebugPathToggle = this.toggleDebugPathOverlays.bind(this);
+    this.onUnitRangeToggle = this.toggleUnitRangeOverlays.bind(this);
     this.onPointerLockChange = this.handlePointerLockChange.bind(this);
     this.onPointerLockError = this.handlePointerLockError.bind(this);
     if (!this.replayViewer) {
@@ -806,6 +807,11 @@ export class Match {
     this.syncDebugPathUi();
   }
 
+  toggleUnitRangeOverlays() {
+    this.state.showUnitRangesEnabled = !this.state.showUnitRangesEnabled;
+    this.syncUnitRangeUi();
+  }
+
   handlePointerLockChange(locked) {
     if (locked) {
       this.closeSettingsMenu();
@@ -912,6 +918,10 @@ export class Match {
     if (this.settings?.isOpen()) this.mountSettings({ keepOpen: true });
   }
 
+  syncUnitRangeUi() {
+    if (this.settings?.isOpen()) this.mountSettings({ keepOpen: true });
+  }
+
   syncLivePauseUi() {
     this.mountSettings({ keepOpen: true });
   }
@@ -937,6 +947,7 @@ export class Match {
       onPredictionEnabledChange: this.onPredictionEnabledChange,
       onPointerLockToggle: this.onPointerLockToggle,
       onDebugPathToggle: this.onDebugPathToggle,
+      onUnitRangeToggle: this.onUnitRangeToggle,
       livePauseActionLabel: () => this.livePauseActionLabel(),
       livePauseActionTitle: () => this.livePauseActionTitle(),
     }));

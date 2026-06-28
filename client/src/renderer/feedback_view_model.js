@@ -43,6 +43,7 @@ export function buildRendererFeedbackView(
     placement: intent?.placement || null,
     commandFeedback,
     selectedEntities: () => selected,
+    showUnitRangesEnabled: !!state?.showUnitRangesEnabled,
     debugPathOverlaysEnabled: !!state?.debugPathOverlaysEnabled,
     showAllDebugPathOverlays: !!state?.showAllDebugPathOverlays,
     antiTankGunSetupPreview: intent?.antiTankGunSetupPreview || null,

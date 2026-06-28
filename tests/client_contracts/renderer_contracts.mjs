@@ -57,6 +57,7 @@ import { installFakePixi } from "./pixi_fakes.mjs";
       "_drawArtilleryLaunches",
       "_drawArtilleryTargets",
       "_drawArtilleryImpacts",
+      "_drawSelectedUnitRanges",
       "_drawSelectedMortarRanges",
       "_drawBreakthroughAuras",
       "_drawAbilityTargetPreview",

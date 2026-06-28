@@ -272,9 +272,10 @@ withFakeSettingsDocument(() => {
   let predictionToggled = false;
   let pointerLockToggled = 0;
   let debugToggled = 0;
+  let unitRangeToggled = 0;
   const context = buildMatchSettingsContext({
     replayViewer: false,
-    state: { spectator: false, debugPathOverlaysEnabled: true },
+    state: { spectator: false, debugPathOverlaysEnabled: true, showUnitRangesEnabled: false },
     capabilities: {
       matchControls: { pause: true },
       diagnostics: { movementPaths: MOVEMENT_PATH_DIAGNOSTICS.ALL },
@@ -291,6 +292,7 @@ withFakeSettingsDocument(() => {
     onPredictionEnabledChange: (enabled) => { predictionToggled = enabled; },
     onPointerLockToggle: () => { pointerLockToggled += 1; },
     onDebugPathToggle: () => { debugToggled += 1; },
+    onUnitRangeToggle: () => { unitRangeToggled += 1; },
     livePauseActionLabel: () => "Pause (2)",
     livePauseActionTitle: () => "2 pauses remaining.",
   });
@@ -309,10 +311,12 @@ withFakeSettingsDocument(() => {
   gameTab.render(root, context);
   root.children.find((child) => child.id === "prediction-toggle").listeners.click();
   root.children.find((child) => child.id === "pointer-lock-toggle").listeners.click();
+  root.children.find((child) => child.id === "unit-range-toggle").listeners.click();
   debugTab.render(root, context);
   root.children.find((child) => child.id === "debug-path-toggle").listeners.click();
   assert(predictionToggled === false, "match settings context toggles prediction through the injected callback");
   assert(pointerLockToggled === 1, "match settings context toggles pointer lock through the injected callback");
+  assert(unitRangeToggled === 1, "match settings context toggles unit ranges through the injected callback");
   assert(debugToggled === 1, "match settings context toggles debug paths through the injected callback");
 });
 

@@ -27,8 +27,8 @@ import {
   _drawPlacement,
   _drawRallyPoints,
   _drawResourceMiningPreview,
-  _drawSelectedMortarRanges,
 } from "../../client/src/renderer/feedback.js";
+import { _drawSelectedUnitRanges } from "../../client/src/renderer/unit_ranges.js";
 
 import { RecordingGraphics } from "./pixi_fakes.mjs";
 
@@ -139,6 +139,7 @@ function polygonCenter(points) {
   assert(commandFeedbackNow === 1500, "feedback view samples live feedback at the requested frame time");
   assert(feedbackView.liveCommandFeedback(999) === feedbackView.commandFeedback, "feedback view returns stable command feedback for the frame");
   assert(feedbackView.selectedEntities() === selected, "feedback view exposes stable selected entities for the frame");
+  assert(!feedbackView.showUnitRangesEnabled, "feedback view exposes unit range preference as off by default");
   assert(selectedReads === 1, "feedback view snapshots selected entities once per frame");
   assert(feedbackView.entityById(7) === selected[0], "feedback view exposes renderer entity lookup");
   assert(feedbackView.abilityTargetPreview?.ability === ABILITY.SMOKE, "feedback view exposes ability target preview");
@@ -209,6 +210,16 @@ function polygonCenter(points) {
       maxHp: 500,
       rallyPlan: [{ kind: "move", x: 190, y: 180 }],
     },
+    {
+      id: 74,
+      owner: 2,
+      kind: KIND.TANK,
+      x: 224,
+      y: 96,
+      hp: 300,
+      maxHp: 300,
+      weaponRangeTiles: 7,
+    },
   ];
   const feedbackState = {
     playerId: 1,
@@ -218,6 +229,7 @@ function polygonCenter(points) {
       { id: 2, teamId: 2 },
     ],
     controlPolicy: createLabControlPolicy({ metadata: { role: LAB_ROLE.OPERATOR } }),
+    showUnitRangesEnabled: true,
     debugPathOverlaysEnabled: true,
     showAllDebugPathOverlays: false,
     selectedEntities() {
@@ -264,12 +276,34 @@ function polygonCenter(points) {
   );
 
   const rangeGfx = new RecordingGraphics();
-  _drawSelectedMortarRanges.call({ _feedbackGfx: rangeGfx, _map: { tileSize: 32 } }, feedbackView);
-  assert(rangeGfx.calls.some((call) => call[0] === "lineTo"), "lab P2 mortar selection draws range rings");
+  _drawSelectedUnitRanges.call({ _feedbackGfx: rangeGfx, _map: { tileSize: 32 } }, feedbackView);
+  assert(rangeGfx.calls.some((call) => call[0] === "lineTo"), "lab P2 selected units draw range rings");
+  assert(rangeGfx.calls.some((call) => call[0] === "arc"), "lab P2 deployed support weapons draw field-of-fire ranges");
+  assert(
+    rangeGfx.calls.some((call) => call[0] === "lineTo" && call[1] > 446 && Math.abs(call[2] - 96) < 8),
+    "unit range overlay can read per-entity dynamic range fields",
+  );
+
+  const disabledRangeGfx = new RecordingGraphics();
+  _drawSelectedUnitRanges.call(
+    { _feedbackGfx: disabledRangeGfx, _map: { tileSize: 32 } },
+    { ...feedbackView, showUnitRangesEnabled: false },
+  );
+  assert(disabledRangeGfx.calls.length === 0, "unit range overlay stays hidden when disabled");
 
   const setupGfx = new RecordingGraphics();
-  _drawAntiTankGunSetupPreview.call({ _feedbackGfx: setupGfx, _map: { tileSize: 32 } }, feedbackView);
-  assert(setupGfx.calls.some((call) => call[0] === "arc"), "lab P2 support weapons draw setup wedges");
+  _drawAntiTankGunSetupPreview.call(
+    { _feedbackGfx: setupGfx, _map: { tileSize: 32 } },
+    {
+      ...feedbackView,
+      antiTankGunSetupPreview: {
+        mouseX: 200,
+        mouseY: 96,
+        guns: [{ kind: KIND.ANTI_TANK_GUN, x: 160, y: 96 }],
+      },
+    },
+  );
+  assert(setupGfx.calls.some((call) => call[0] === "arc"), "lab P2 support weapons still draw setup-preview wedges");
 
   const orderGfx = new RecordingGraphics();
   _drawOrderPlan.call({ _feedbackGfx: orderGfx }, feedbackView);
