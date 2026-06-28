@@ -303,8 +303,7 @@ fn build_order_accepts_new_build_without_current_resources() {
         .spawn_unit(1, EntityKind::Worker, 64.0, 64.0)
         .expect("worker should spawn");
     let mut players = vec![player_state(1)];
-    players[0].steel = 0;
-    players[0].oil = 0;
+    players[0].set_resources(0, 0);
 
     let events = apply_with_players(
         &map,
