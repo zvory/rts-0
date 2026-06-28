@@ -140,6 +140,7 @@ function polygonCenter(points) {
   assert(feedbackView.liveCommandFeedback(999) === feedbackView.commandFeedback, "feedback view returns stable command feedback for the frame");
   assert(feedbackView.selectedEntities() === selected, "feedback view exposes stable selected entities for the frame");
   assert(!feedbackView.showUnitRangesEnabled, "feedback view exposes unit range preference as off by default");
+  assert(!feedbackView.showSelectedFieldOfFireEnabled, "feedback view leaves selected field-of-fire inspection off outside lab");
   assert(selectedReads === 1, "feedback view snapshots selected entities once per frame");
   assert(feedbackView.entityById(7) === selected[0], "feedback view exposes renderer entity lookup");
   assert(feedbackView.abilityTargetPreview?.ability === ABILITY.SMOKE, "feedback view exposes ability target preview");
@@ -267,6 +268,7 @@ function polygonCenter(points) {
   assert(feedbackView.feedbackOwnerId === 2, "lab renderer feedback resolves the current feedback owner");
   assert(feedbackView.isFeedbackOwner(2), "lab renderer feedback treats selected P2 as feedback owner");
   assert(!feedbackView.isFeedbackOwner(1), "lab renderer feedback does not treat raw playerId as feedback owner");
+  assert(feedbackView.showSelectedFieldOfFireEnabled, "lab renderer feedback enables selected support-weapon field-of-fire inspection");
 
   const commandGfx = new RecordingGraphics();
   _drawCommandFeedback.call({ _feedbackGfx: commandGfx }, feedbackView);
@@ -289,7 +291,14 @@ function polygonCenter(points) {
     { _feedbackGfx: disabledRangeGfx, _map: { tileSize: 32 } },
     { ...feedbackView, showUnitRangesEnabled: false },
   );
-  assert(disabledRangeGfx.calls.length === 0, "unit range overlay stays hidden when disabled");
+  assert(
+    disabledRangeGfx.calls.some((call) => call[0] === "arc"),
+    "lab selected deployed support weapons keep field-of-fire cones when unit ranges are disabled",
+  );
+  assert(
+    !disabledRangeGfx.calls.some((call) => call[0] === "lineTo" && call[1] > 446 && Math.abs(call[2] - 96) < 8),
+    "lab selected non-support unit ranges stay hidden when unit ranges are disabled",
+  );
 
   const setupGfx = new RecordingGraphics();
   _drawAntiTankGunSetupPreview.call(
