@@ -82,6 +82,11 @@ async function testReplayArtifactLaunchConfig() {
     globalThis.window.location = new URL("http://localhost/?replayArtifact=bad/artifact");
     config = replayLaunchConfig();
     assert(config === null, "replay artifact launch rejects unsafe artifact names");
+
+    globalThis.window.location = new URL("http://localhost/?replayRoom=__match_replay__:abc123");
+    config = replayLaunchConfig();
+    assert(config?.room === "__match_replay__:abc123" && config.staging === true,
+      "match-history replay room links join the replay staging lobby instead of auto-confirming playback");
   } finally {
     if (priorDocument === undefined) delete globalThis.document;
     else globalThis.document = priorDocument;

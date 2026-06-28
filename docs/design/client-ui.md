@@ -957,8 +957,12 @@ export class Lobby {
   // joined-roster DOM to lobby_view.js.
   // Host lobby controls expose grouped team cards, per-seat team assignment, team-scoped AI add
   // buttons, and a map selector in the lobby summary row through Net setTeam/addAi/selectMap.
+  // Replay lobbies are keyed by explicit `kind: "replay"` metadata: the joined view hides
+  // Ready, team, faction, AI, map-selection, and active-seat controls, then shows only
+  // spectator occupants plus the host start control while the server reports canStart.
   // The normal product lobby exposes an Open Lab route affordance instead of a debug setup toggle.
   // Teams are layout groups only; player colors come from each player record.
+  joinReplayLobby(room)                  // join a persisted replay staging lobby as spectator
   onGameStart(cb)                        // main.js subscribes to transition to game screen
 }
 ```
@@ -989,7 +993,15 @@ export class LobbyCreateModal {
 ```
 The pre-join lobby browser keeps in-progress rows labeled `In match` and exposes a spectator
 action for `joinState: "inGame"`; clicks still preflight against `GET /api/lobbies` before sending
-`join` with `spectator: true`. Countdown, stale, and unknown rows remain disabled.
+`join` with `spectator: true`. Replay rows are detected from explicit `kind: "replay"` metadata,
+labelled `Replay`, and joined as spectators without setting `replayOk`, so rooms that race into
+playback still use the normal replay join confirmation. Countdown, stale, and unknown rows remain
+disabled.
+
+`match_history.js` launches persisted match replays by POSTing `/api/matches/{id}/replay`, then
+hands the returned `__match_replay__:*` room to `App`/`Lobby.joinReplayLobby` instead of redirecting
+the page into replay playback. Direct `replayArtifact` URLs still auto-join the saved artifact
+playback path; `replayRoom` URLs represent replay staging lobbies.
 
 `main.js` starts `App`; `app.js` owns the persistent `Net` and `Audio`, derives the ws url from
 `window.location`, and shows `Lobby`; on `start` it creates `Match` or `ReplayViewer`. `match.js` builds

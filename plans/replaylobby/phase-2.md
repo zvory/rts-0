@@ -1,6 +1,6 @@
 # Phase 2 - Client Replay Lobby UI
 
-Status: Not started.
+Status: Done.
 
 ## Goal
 

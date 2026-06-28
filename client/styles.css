@@ -728,6 +728,10 @@ input[type="text"]:focus {
   background: rgba(39, 37, 31, 0.76);
 }
 
+.lobby-browser-row.is-replay {
+  background: rgba(34, 42, 42, 0.82);
+}
+
 .lobby-browser-row:last-child {
   border-bottom: 0;
 }
@@ -792,6 +796,11 @@ input[type="text"]:focus {
   color: var(--ink-faint);
 }
 
+.lobby-browser-status-chip.is-replay {
+  border-color: rgba(111, 143, 168, 0.68);
+  color: #a8c8d6;
+}
+
 .lobby-browser-action {
   justify-self: end;
 }
@@ -841,6 +850,10 @@ input[type="text"]:focus {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   border-bottom: 1px solid rgba(91, 83, 65, 0.58);
+}
+
+#lobby-screen.is-replay-lobby .lobby-status-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .lobby-status-grid > div {
@@ -1164,6 +1177,12 @@ input[type="text"]:focus {
   background: rgba(17, 17, 15, 0.48);
 }
 
+.lobby-spectator-card.is-replay-lobby {
+  border-style: solid;
+  border-color: rgba(111, 143, 168, 0.55);
+  background: rgba(24, 31, 32, 0.62);
+}
+
 .lobby-spectator-card.is-drop-target {
   border-color: var(--accent);
   background: rgba(54, 57, 35, 0.48);
@@ -1282,6 +1301,14 @@ input[type="text"]:focus {
   justify-self: stretch;
   width: 100%;
   height: 100%;
+}
+
+#lobby-screen.is-replay-lobby .lobby-actions {
+  grid-template-rows: minmax(72px, 1fr);
+}
+
+#lobby-screen.is-replay-lobby #lobby-ready {
+  display: none;
 }
 
 .lobby-actions .btn {

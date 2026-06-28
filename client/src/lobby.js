@@ -7,7 +7,7 @@
 // show()/hide(). main.js owns the lobby↔game switch and subscribes via `onGameStart(cb)`
 // (fired when the server sends `start`). The entered name is persisted in localStorage.
 
-import { S } from "./protocol.js";
+import { LOBBY_KIND, S } from "./protocol.js";
 import {
   LOBBY_BROWSER_POLL_MS,
   LobbyBrowserView,
@@ -109,6 +109,7 @@ export class Lobby {
     this.elRoomDisplay = rootEl.querySelector("#lobby-room-display");
     this.elMapSummary = rootEl.querySelector("#lobby-map-summary");
     this.elSeatsSummary = rootEl.querySelector("#lobby-seats-summary");
+    this.elSeatsSummaryCell = this.elSeatsSummary?.parentElement || null;
     this.elObserversSummary = rootEl.querySelector("#lobby-observers-summary");
     this.btnReady = rootEl.querySelector("#lobby-ready");
     this.btnStart = rootEl.querySelector("#lobby-start");
@@ -126,6 +127,7 @@ export class Lobby {
     this._spectator = false;
     this._hostId = null;
     this._canStart = false;
+    this._roomKind = LOBBY_KIND.NORMAL;
     this._teamPreset = "custom";
     this._selectedMap = "";
     this._availableMaps = [];
@@ -209,6 +211,7 @@ export class Lobby {
     this._spectator = false;
     this._hostId = null;
     this._canStart = false;
+    this._roomKind = LOBBY_KIND.NORMAL;
     this._teamPreset = "custom";
     this._selectedMap = "";
     this._availableMaps = [];
@@ -243,6 +246,16 @@ export class Lobby {
     if (typeof cb === "function") this._startCbs.push(cb);
   }
 
+  joinReplayLobby(room) {
+    const replayRoom = String(room || "").trim();
+    if (!replayRoom || this._browserActionPending) return false;
+    this._beginBrowserJoin(
+      { room: replayRoom, kind: LOBBY_KIND.REPLAY },
+      { spectator: true, replayLobby: true },
+    );
+    return true;
+  }
+
   // --- DOM wiring ------------------------------------------------------------
 
   _wireDom() {
@@ -263,7 +276,7 @@ export class Lobby {
 
     // Ready: toggle local ready and tell the server.
     this.btnReady.addEventListener("click", () => {
-      if (this._spectator) return;
+      if (this._spectator || this._isReplayLobby()) return;
       this._ready = !this._ready;
       this.net.ready(this._ready);
       this._reflectReadyButton();
@@ -337,7 +350,7 @@ export class Lobby {
     this._beginBrowserJoin(latestRow, { spectator: latestIntent.spectator });
   }
 
-  _beginBrowserJoin(row, { spectator = false } = {}) {
+  _beginBrowserJoin(row, { spectator = false, replayLobby = false } = {}) {
     const room = String(row?.room || "").trim();
     if (!room) return;
     const name = (this.elName && this.elName.value.trim()) || "Commander";
@@ -346,7 +359,10 @@ export class Lobby {
     this._spectator = !!spectator;
     if (this.elRoom) this.elRoom.value = room;
     this._sendJoin({ name, room, spectator: !!spectator });
-    this.setStatus(`Joining "${room}"${spectator ? " as spectator" : ""}...`);
+    const isReplay = replayLobby || row?.kind === LOBBY_KIND.REPLAY;
+    this.setStatus(isReplay
+      ? `Joining replay lobby "${room}"...`
+      : `Joining "${room}"${spectator ? " as spectator" : ""}...`);
     this._renderLobbyBrowser();
     this._reflectReadyButton();
     this._reflectCreateButton();
@@ -445,6 +461,7 @@ export class Lobby {
     if (!m) return;
     this._hostId = m.hostId;
     this._canStart = !!m.canStart;
+    this._roomKind = normalizeLobbyKind(m.kind);
     this._teamPreset = m.teamPreset || "custom";
     this._selectedMap = m.map || "";
     this._availableMaps = Array.isArray(m.maps) ? m.maps : [];
@@ -487,6 +504,7 @@ export class Lobby {
       hostId: this._hostId,
       isHost,
       countdownActive: this._countdownActive,
+      spectatorOnly: this._isReplayLobby(),
       playerCount: this._playerCount,
       maxPlayers: MAX_PLAYERS,
       betaFactionSelect: this._betaFactionSelectEnabled(),
@@ -508,6 +526,17 @@ export class Lobby {
     const isHost = this.net.playerId != null && this.net.playerId === this._hostId;
     const entry = this._availableMaps.find((e) => e.name === this._selectedMap);
     const label = entry ? entry.name : (this._selectedMap || "Default");
+    if (this._isReplayLobby()) {
+      if (this.selMap) {
+        this.selMap.disabled = true;
+        this.selMap.hidden = true;
+      }
+      if (this.elMapSummary) {
+        this.elMapSummary.textContent = label;
+        this.elMapSummary.hidden = false;
+      }
+      return;
+    }
     if (this.selMap) {
       // Rebuild the option list only when the available maps have changed.
       // Each entry is {name, description}; name is the stable key, description is display text.
@@ -540,11 +569,13 @@ export class Lobby {
     const isHost = this.net.playerId != null && this.net.playerId === this._hostId;
     this.btnStart.disabled = this._countdownActive || !(isHost && this._canStart);
     this.btnStart.classList.toggle("host-only", isHost);
+    this.btnStart.textContent = this._isReplayLobby() ? "Start replay" : "Start match";
   }
 
   /** Reflect the local ready state on the Ready button (label + pressed style). */
   _reflectReadyButton() {
     if (!this.btnReady) return;
+    this.btnReady.hidden = this._isReplayLobby();
     this.btnReady.textContent = this._ready ? "Unready" : "Ready";
     if (this._spectator) this.btnReady.textContent = "Observing";
     this.btnReady.disabled = this._countdownActive || this._spectator;
@@ -670,7 +701,10 @@ export class Lobby {
     const mapLabel = mapEntry ? mapEntry.name : (this._selectedMap || "Default");
     if (this.elRoomDisplay) this.elRoomDisplay.textContent = room || "main";
     if (this.elMapSummary) this.elMapSummary.textContent = mapLabel;
-    if (this.elSeatsSummary) this.elSeatsSummary.textContent = `${seatedPlayers.length} / ${MAX_PLAYERS}`;
+    if (this.elSeatsSummary) this.elSeatsSummary.textContent = this._isReplayLobby()
+      ? ""
+      : `${seatedPlayers.length} / ${MAX_PLAYERS}`;
+    if (this.elSeatsSummaryCell) this.elSeatsSummaryCell.hidden = this._isReplayLobby();
     if (this.elObserversSummary) this.elObserversSummary.textContent = String(spectatorPlayers.length);
   }
 
@@ -905,13 +939,30 @@ export class Lobby {
   _reflectJoinedState(hasLobby = this._joined && this._hostId != null) {
     this.root.classList.toggle("is-joined", !!hasLobby);
     this.root.classList.toggle("is-joining", this._joined && !hasLobby);
+    this.root.classList.toggle("is-replay-lobby", !!hasLobby && this._isReplayLobby());
     if (this.roomBlock) this.roomBlock.hidden = !hasLobby;
-    if (this.elSetupKicker) this.elSetupKicker.textContent = hasLobby ? "Host controls" : "Commander";
-    if (this.elSetupTitle) this.elSetupTitle.textContent = hasLobby ? "Match setup" : "Lobby browser";
+    if (this.elSetupKicker) {
+      this.elSetupKicker.textContent = hasLobby
+        ? (this._isReplayLobby() ? "Group replay" : "Host controls")
+        : "Commander";
+    }
+    if (this.elSetupTitle) {
+      this.elSetupTitle.textContent = hasLobby
+        ? (this._isReplayLobby() ? "Replay lobby" : "Match setup")
+        : "Lobby browser";
+    }
     if (this.btnJoin) this.btnJoin.textContent = hasLobby ? "Switch room" : "Join room";
     this._reflectCreateButton();
     if (!hasLobby && !this._joined) this._startLobbyBrowserPolling();
   }
+
+  _isReplayLobby() {
+    return this._roomKind === LOBBY_KIND.REPLAY;
+  }
+}
+
+function normalizeLobbyKind(kind) {
+  return kind === LOBBY_KIND.REPLAY ? LOBBY_KIND.REPLAY : LOBBY_KIND.NORMAL;
 }
 
 async function readLobbyApiError(response) {
