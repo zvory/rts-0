@@ -626,6 +626,107 @@ fn hidden_mortar_launch_is_not_sent_but_impact_reveals_attacker_to_victim() {
 }
 
 #[test]
+fn manual_mortar_fire_impacts_after_shooter_dies_before_impact() {
+    let players = [
+        PlayerInit {
+            id: 1,
+            team_id: 1,
+            faction_id: "kriegsia".to_string(),
+            name: "One".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            team_id: 2,
+            faction_id: "kriegsia".to_string(),
+            name: "Two".into(),
+            color: "#000".into(),
+            is_ai: false,
+        },
+    ];
+    let mut game = empty_flat_game(&players);
+    let mortar_pos = game.map.tile_center(8, 8);
+    let target_pos = game.map.tile_center(12, 8);
+    let mortar = game
+        .entities
+        .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
+        .expect("mortar should spawn");
+    game.entities
+        .get_mut(mortar)
+        .expect("mortar should exist")
+        .set_weapon_setup(WeaponSetup::Deployed);
+    let target = game
+        .entities
+        .spawn_unit(2, EntityKind::Tank, target_pos.0, target_pos.1)
+        .expect("target should spawn");
+    systems::recompute_supply(&mut game.players, &game.entities);
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+    game.fog.recompute(&ids, &game.entities, &game.map);
+
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::MortarFire,
+            units: vec![mortar],
+            x: Some(target_pos.0),
+            y: Some(target_pos.1),
+            queued: false,
+        },
+    );
+    let launch_events = game.tick();
+    assert!(
+        launch_events.iter().any(|(player_id, events)| {
+            *player_id == 1
+                && events
+                    .iter()
+                    .any(|event| matches!(event, Event::MortarLaunch { from, .. } if *from == mortar))
+        }),
+        "accepted mortar command should emit a launch before shooter death: {launch_events:?}"
+    );
+
+    let hp_before_impact = game
+        .entities
+        .get(target)
+        .expect("target should still exist")
+        .hp;
+    game.entities
+        .get_mut(mortar)
+        .expect("mortar should still exist after launch")
+        .apply_damage(u32::MAX, None);
+    game.tick();
+    assert!(
+        !game.entities.contains(mortar),
+        "mortar should be removed before the delayed shell impact"
+    );
+
+    let mut impact_seen = false;
+    for _ in 0..config::MORTAR_SHELL_DELAY_TICKS {
+        let events = game.tick();
+        impact_seen |= events.iter().any(|(player_id, events)| {
+            *player_id == 1
+                && events.iter().any(|event| matches!(
+                    event,
+                    Event::MortarImpact { x, y, .. }
+                        if (*x - target_pos.0).abs() < 0.001
+                            && (*y - target_pos.1).abs() < 0.001
+                ))
+        });
+    }
+
+    let hp_after_impact = game.entities.get(target).expect("tank should survive").hp;
+    assert!(
+        hp_after_impact < hp_before_impact,
+        "mortar shell should still damage after shooter death, before={hp_before_impact}, after={hp_after_impact}"
+    );
+    assert!(
+        impact_seen,
+        "mortar shell should emit an impact marker even after shooter death"
+    );
+}
+
+#[test]
 fn manual_mortar_fire_turns_briefly_before_launching() {
     let players = [
         PlayerInit {
