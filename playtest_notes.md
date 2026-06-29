@@ -119,7 +119,7 @@ luke playtest
 
 - [ ] reduce artillery range by 5 and, and put little artillery icons ont he minimap when yhey're firing, like use the ltieral exact artillery thing
 
-- [ ] make tanks eight supply and doule comand car bonus (partial: tanks now 8 supply; bonus unchanged)
+- [ ] make tanks eight supply and doule comand car bonus (partial: tanks now 8 supply; command car bonus increased from 12 to 20, not doubled to 24)
 
 - [ ] pathing is still fucked, units getting suck
 
