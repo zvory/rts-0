@@ -101,11 +101,38 @@ fi
 NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
 
 alloc_port() {
-  node -e 'const net = require("node:net"); const s = net.createServer(); s.listen(0, "127.0.0.1", () => { console.log(s.address().port); s.close(); });'
+  node <<'EOF'
+const net = require("node:net");
+const s = net.createServer();
+
+s.on("error", (err) => {
+  console.error(`could not allocate a free localhost port: ${err.message}`);
+  process.exit(1);
+});
+
+s.listen(0, "127.0.0.1", () => {
+  const address = s.address();
+  if (!address || typeof address.port !== "number") {
+    console.error("could not allocate a free localhost port: no port assigned");
+    process.exitCode = 1;
+    s.close();
+    return;
+  }
+  console.log(address.port);
+  s.close();
+});
+EOF
 }
 
 if [ -z "$PORT" ]; then
-  PORT="$(alloc_port)"
+  if ! PORT="$(alloc_port)"; then
+    echo "could not allocate a free localhost port; set PORT=<port> and retry" >&2
+    exit 2
+  fi
+fi
+if [ -z "$PORT" ]; then
+  echo "could not allocate a free localhost port; set PORT=<port> and retry" >&2
+  exit 2
 fi
 
 HEALTH_URL="http://127.0.0.1:${PORT}/"
