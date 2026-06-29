@@ -12,6 +12,11 @@ use crate::game::services::geometry::{
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
 
+mod placement_policy;
+mod pump_jack;
+
+use placement_policy::{build_placement_policy, BuildPlacementPolicy};
+
 #[allow(dead_code)]
 const BUILD_SITE_SPATIAL_PADDING_TILES: i32 = 8;
 
@@ -207,20 +212,6 @@ impl BuildSiteStatus {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum BuildPlacementPolicy {
-    AllGround,
-    VehicleBodyOnly,
-}
-
-pub(crate) fn build_placement_policy(building: EntityKind) -> BuildPlacementPolicy {
-    if building == EntityKind::TankTrap {
-        BuildPlacementPolicy::VehicleBodyOnly
-    } else {
-        BuildPlacementPolicy::AllGround
-    }
-}
-
 fn building_site_status_with_ignored_unit(
     map: &Map,
     entities: &EntityStore,
@@ -235,14 +226,17 @@ fn building_site_status_with_ignored_unit(
     if !footprint_in_bounds_and_passable(map, building, tile_x, tile_y) {
         return BuildSiteStatus::InvalidFootprint;
     }
+    let policy = build_placement_policy(building);
+    if policy == BuildPlacementPolicy::PumpJackOilOnly {
+        let Some(oil_id) = pump_jack::live_oil_node_intersecting_rect(entities.iter(), rect) else {
+            return BuildSiteStatus::InvalidFootprint;
+        };
+        if pump_jack::oil_node_has_pump_jack(map, entities, oil_id) {
+            return BuildSiteStatus::BlockedByBuilding;
+        }
+    }
 
-    classify_entity_blockers(
-        entities.iter(),
-        map,
-        rect,
-        ignored_unit,
-        build_placement_policy(building),
-    )
+    classify_entity_blockers(entities.iter(), map, rect, ignored_unit, policy)
 }
 
 fn classify_entity_blockers<'a>(
@@ -300,11 +294,16 @@ fn entity_build_site_status(
         };
     }
     if e.is_node() {
-        return if circle_intersects_rect(entity_circle_body(e), rect) {
-            BuildSiteStatus::BlockedByResourceNode
-        } else {
-            BuildSiteStatus::Clear
-        };
+        if !circle_intersects_rect(entity_circle_body(e), rect) {
+            return BuildSiteStatus::Clear;
+        }
+        if policy == BuildPlacementPolicy::PumpJackOilOnly
+            && e.kind == EntityKind::Oil
+            && e.remaining().unwrap_or(0) > 0
+        {
+            return BuildSiteStatus::Clear;
+        }
+        return BuildSiteStatus::BlockedByResourceNode;
     }
     if e.is_unit() {
         if policy == BuildPlacementPolicy::VehicleBodyOnly

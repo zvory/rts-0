@@ -48,8 +48,8 @@ Lifecycle status is explicit and separate from catalog existence:
 
 ## Current Entity Identity
 
-Runtime identity is still global `EntityKind`. The current roster has 22 global kinds: 11 units,
-9 buildings, and 2 resource nodes. Server rules own the stable ids in
+Runtime identity is still global `EntityKind`. The current roster has 23 global kinds: 11 units,
+10 buildings, and 2 resource nodes. Server rules own the stable ids in
 `server/crates/rules/src/kind.rs`; protocol mirrors expose the same string ids in
 `server/crates/protocol/src/lib.rs` and `client/src/protocol.js`.
 
@@ -58,8 +58,9 @@ The current production catalog is in `server/crates/rules/src/defs.rs`:
 - Units: Worker, Golem, Rifleman, Machine Gunner, Anti-Tank Gun, Mortar Team, Artillery, Scout Car,
   Tank, Command Car, and Ekat.
 - Buildings: City Centre, Zamok, Depot, Barracks, Training Centre, R&D Complex, Factory, Gun
-  Works, and Tank Trap. Tank Trap construction is server-authoritative after Training Centre
-  eligibility and is exposed through the mirrored worker build menu.
+  Works, Tank Trap, and Pump Jack. Tank Trap construction is server-authoritative after Training
+  Centre eligibility and is exposed through the mirrored worker build menu; Pump Jack construction
+  is a contextual worker build on live oil patches and is not exposed through the generic build menu.
 - Resource nodes: Steel and Oil.
 
 Temporary compatibility shim policy: direct global kind checks are approved in the current rules
@@ -108,10 +109,11 @@ APIs.
 
 ## Current Tech Tree
 
-Workers can place City Centre and Supply Depot immediately. Barracks requires a completed City
-Centre; Training Centre requires a completed City Centre and Barracks; R&D Complex, Factory, and
-Gun Works require a completed City Centre and Training Centre; Tank Trap requires a completed
-Training Centre. City Centre trains Workers. Barracks trains Riflemen immediately and Machine
+Workers can place City Centre and Supply Depot immediately, and can place Pump Jacks contextually on
+live oil patches with no tech requirement. Barracks requires a completed City Centre; Training
+Centre requires a completed City Centre and Barracks; R&D Complex, Factory, and Gun Works require a
+completed City Centre and Training Centre; Tank Trap requires a completed Training Centre. City
+Centre trains Workers. Barracks trains Riflemen immediately and Machine
 Gunners after the Training Centre requirement is met. Factory trains Scout Cars immediately, Tanks
 after Tank Production research, and Command Cars after Command Car research. Gun Works trains
 Mortar Teams immediately, Anti-Tank Guns after Anti-Tank Gun Crews research, and Artillery after
@@ -149,8 +151,9 @@ client-exposed descriptor data against the Rust catalog dump.
 ## Current AI Coupling
 
 AI is Kriegsia-only through the public lobby seat flow. The AI decision layer assumes Workers gather
-Steel/Oil, City Centres anchor bases and expansions, Barracks/Factory/Gun Works drive production,
-Tanks influence oil demand, and Steel/Oil/Supply budgets are fixed fields. Public `addAi` requests
+Steel directly and build Pump Jacks for Oil, City Centres anchor bases and expansions,
+Barracks/Factory/Gun Works drive production, Tanks influence oil demand, and Steel/Oil/Supply
+budgets are fixed fields. Public `addAi` requests
 do not accept a faction id and always create Kriegsia AI seats; non-Kriegsia AI support needs an
 explicit AI phase.
 

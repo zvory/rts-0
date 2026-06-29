@@ -58,7 +58,11 @@ pub(super) fn plan_economy(
     } else {
         0
     };
-    let resource_counts = resource_worker_counts(observation);
+    let mut resource_counts = resource_worker_counts(observation);
+    let oil_extractors = availability.extractor_count(EntityKind::Oil);
+    if oil_extractors > 0 {
+        *resource_counts.entry(EntityKind::Oil).or_default() += oil_extractors;
+    }
     let current_steel_workers = resource_counts
         .get(&EntityKind::Steel)
         .copied()
@@ -77,7 +81,7 @@ pub(super) fn plan_economy(
         current_steel_workers,
         current_oil_workers,
         resource_counts,
-        occupied_nodes: occupied_resource_nodes(observation),
+        occupied_nodes: availability.occupied_node_ids(),
         mineable_steel_nodes: availability.free_mineable_node_ids(EntityKind::Steel),
         mineable_oil_nodes: availability.free_mineable_node_ids(EntityKind::Oil),
         max_worker_resource_distance_px,
@@ -259,10 +263,5 @@ pub(super) fn resource_worker_counts(observation: &AiObservation) -> BTreeMap<En
 }
 
 pub(super) fn occupied_resource_nodes(observation: &AiObservation) -> BTreeSet<u32> {
-    observation
-        .owned
-        .iter()
-        .filter(|entity| entity.kind == EntityKind::Worker)
-        .filter_map(|worker| worker.latched_node)
-        .collect()
+    ResourceAvailability::from_observation(observation, &BTreeSet::new()).occupied_node_ids()
 }

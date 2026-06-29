@@ -21,8 +21,9 @@ mod tests;
 pub use entity::Entity;
 pub use kind::EntityKind;
 pub(crate) use kind::{
-    fires_while_moving, movement_body_class, static_blocker_class, uses_car_movement_semantics,
-    uses_oriented_vehicle_body, uses_pivot_vehicle_movement, MovementBodyClass, StaticBlockerClass,
+    blocks_line_of_sight, fires_while_moving, movement_body_class, static_blocker_class,
+    uses_car_movement_semantics, uses_oriented_vehicle_body, uses_pivot_vehicle_movement,
+    MovementBodyClass, StaticBlockerClass,
 };
 #[allow(unused_imports)]
 pub use order::{
@@ -37,7 +38,7 @@ pub use state::EntityStateGroups;
 #[allow(unused_imports)]
 pub use state::{
     CarryState, CombatState, ConstructionState, MovementState, ProdItem, ProductionState,
-    ResearchItem, ResourceNodeState, WeaponSetup, WorkerState,
+    ResearchItem, ResourceExtractorState, ResourceNodeState, WeaponSetup, WorkerState,
 };
 pub use store::EntityStore;
 

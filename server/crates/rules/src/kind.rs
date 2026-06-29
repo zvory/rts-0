@@ -23,12 +23,13 @@ pub enum EntityKind {
     Factory,
     Steelworks,
     TankTrap,
+    PumpJack,
     Steel,
     Oil,
 }
 
 impl EntityKind {
-    pub const ALL: [EntityKind; 22] = [
+    pub const ALL: [EntityKind; 23] = [
         EntityKind::Worker,
         EntityKind::Golem,
         EntityKind::Rifleman,
@@ -49,6 +50,7 @@ impl EntityKind {
         EntityKind::Factory,
         EntityKind::Steelworks,
         EntityKind::TankTrap,
+        EntityKind::PumpJack,
         EntityKind::Steel,
         EntityKind::Oil,
     ];
@@ -87,6 +89,7 @@ impl EntityKind {
             EntityKind::Factory => "factory",
             EntityKind::Steelworks => "steelworks",
             EntityKind::TankTrap => "tank_trap",
+            EntityKind::PumpJack => "pump_jack",
             EntityKind::Steel => "steel",
             EntityKind::Oil => "oil",
         }
@@ -118,6 +121,7 @@ impl FromStr for EntityKind {
             "factory" => Ok(EntityKind::Factory),
             "steelworks" => Ok(EntityKind::Steelworks),
             "tank_trap" => Ok(EntityKind::TankTrap),
+            "pump_jack" => Ok(EntityKind::PumpJack),
             "steel" => Ok(EntityKind::Steel),
             "oil" => Ok(EntityKind::Oil),
             _ => Err(()),
@@ -174,6 +178,10 @@ pub fn static_blocker_class(kind: EntityKind) -> StaticBlockerClass {
     }
 }
 
+pub fn blocks_line_of_sight(kind: EntityKind) -> bool {
+    kind.is_building() && !matches!(kind, EntityKind::TankTrap | EntityKind::PumpJack)
+}
+
 pub fn uses_pivot_vehicle_movement(kind: EntityKind) -> bool {
     matches!(
         kind,
@@ -222,7 +230,7 @@ mod tests {
     }
 
     #[test]
-    fn tank_trap_is_vehicle_only_static_blocker() {
+    fn special_field_buildings_keep_static_and_los_blocking_explicit() {
         assert_eq!(
             static_blocker_class(EntityKind::TankTrap),
             StaticBlockerClass::VehicleBodyOnly
@@ -232,8 +240,15 @@ mod tests {
             StaticBlockerClass::AllGround
         );
         assert_eq!(
+            static_blocker_class(EntityKind::PumpJack),
+            StaticBlockerClass::AllGround
+        );
+        assert_eq!(
             static_blocker_class(EntityKind::Worker),
             StaticBlockerClass::None
         );
+        assert!(!blocks_line_of_sight(EntityKind::TankTrap));
+        assert!(!blocks_line_of_sight(EntityKind::PumpJack));
+        assert!(blocks_line_of_sight(EntityKind::Depot));
     }
 }

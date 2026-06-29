@@ -15,7 +15,7 @@
 use std::collections::HashMap;
 
 use crate::config;
-use crate::game::entity::{static_blocker_class, Entity, EntityStore, StaticBlockerClass};
+use crate::game::entity::{blocks_line_of_sight, Entity, EntityStore};
 use crate::game::map::Map;
 use crate::game::services::line_of_sight::LineOfSight;
 use crate::game::services::occupancy::building_footprint;
@@ -371,9 +371,7 @@ impl BuildingLosMask {
         let mut blockers = vec![false; cells];
         let mut footprints = Vec::new();
         for entity in store.iter() {
-            if entity.hp == 0
-                || static_blocker_class(entity.kind) != StaticBlockerClass::AllGround
-            {
+            if entity.hp == 0 || !blocks_line_of_sight(entity.kind) {
                 continue;
             }
             let footprint = building_footprint(map, entity)

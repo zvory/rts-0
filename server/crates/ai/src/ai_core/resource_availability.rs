@@ -2,7 +2,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::ai_core::observation::{AiEntityState, AiObservation};
+use crate::ai_core::observation::{
+    AiEntityState, AiEntitySummary, AiObservation, AiResourceSummary,
+};
 use crate::config;
 use rts_sim::game::entity::EntityKind;
 
@@ -17,6 +19,7 @@ pub(crate) struct ResourceNodeAvailability {
     pub(crate) mineable_now: bool,
     pub(crate) nearest_completed_mining_city_centre: Option<u32>,
     pub(crate) latched_worker_count: usize,
+    pub(crate) extractor_count: usize,
     pub(crate) occupied: bool,
     pub(crate) pre_reserved: bool,
     pub(crate) future_expansion_candidate: bool,
@@ -28,6 +31,7 @@ pub(crate) struct ResourceAvailability {
     by_id: BTreeMap<u32, usize>,
     occupied_by_kind: BTreeMap<EntityKind, usize>,
     latched_by_kind: BTreeMap<EntityKind, usize>,
+    extractors_by_kind: BTreeMap<EntityKind, usize>,
 }
 
 impl ResourceAvailability {
@@ -37,8 +41,10 @@ impl ResourceAvailability {
     ) -> Self {
         let completed_city_centres = completed_city_centres(observation);
         let latched_workers_by_node = latched_workers_by_node(observation);
+        let pump_jacks = active_pump_jacks(observation);
         let mut occupied_by_kind = BTreeMap::new();
         let mut latched_by_kind = BTreeMap::new();
+        let mut extractors_by_kind = BTreeMap::new();
 
         let mut nodes: Vec<ResourceNodeAvailability> = observation
             .resources
@@ -55,12 +61,20 @@ impl ResourceAvailability {
                     .unwrap_or(0);
                 let has_remaining = resource.remaining > 0;
                 let mineable_now = has_remaining && nearest_completed_mining_city_centre.is_some();
-                let occupied = latched_worker_count > 0;
+                let extractor_count = (resource.kind == EntityKind::Oil
+                    && pump_jacks
+                        .iter()
+                        .any(|pump| pump_jack_overlaps_resource(pump, resource)))
+                    as usize;
+                let occupied = latched_worker_count > 0 || extractor_count > 0;
                 if occupied {
                     *occupied_by_kind.entry(resource.kind).or_default() += 1;
                 }
                 if latched_worker_count > 0 {
                     *latched_by_kind.entry(resource.kind).or_default() += latched_worker_count;
+                }
+                if extractor_count > 0 {
+                    *extractors_by_kind.entry(resource.kind).or_default() += extractor_count;
                 }
                 ResourceNodeAvailability {
                     id: resource.id,
@@ -72,6 +86,7 @@ impl ResourceAvailability {
                     mineable_now,
                     nearest_completed_mining_city_centre,
                     latched_worker_count,
+                    extractor_count,
                     occupied,
                     pre_reserved: pre_reserved_nodes.contains(&resource.id),
                     future_expansion_candidate: resource.kind.is_node()
@@ -92,6 +107,7 @@ impl ResourceAvailability {
             by_id,
             occupied_by_kind,
             latched_by_kind,
+            extractors_by_kind,
         }
     }
 
@@ -122,6 +138,18 @@ impl ResourceAvailability {
 
     pub(crate) fn latched_worker_count(&self, kind: EntityKind) -> usize {
         self.latched_by_kind.get(&kind).copied().unwrap_or(0)
+    }
+
+    pub(crate) fn extractor_count(&self, kind: EntityKind) -> usize {
+        self.extractors_by_kind.get(&kind).copied().unwrap_or(0)
+    }
+
+    pub(crate) fn occupied_node_ids(&self) -> BTreeSet<u32> {
+        self.nodes
+            .iter()
+            .filter(|node| node.occupied)
+            .map(|node| node.id)
+            .collect()
     }
 
     pub(crate) fn current_steel_saturation_target(&self) -> usize {
@@ -177,6 +205,22 @@ fn latched_workers_by_node(observation: &AiObservation) -> BTreeMap<u32, usize> 
         }
     }
     counts
+}
+
+fn active_pump_jacks(observation: &AiObservation) -> Vec<&AiEntitySummary> {
+    observation
+        .owned
+        .iter()
+        .filter(|entity| entity.kind == EntityKind::PumpJack && entity.state != AiEntityState::Dead)
+        .collect()
+}
+
+fn pump_jack_overlaps_resource(
+    pump: &AiEntitySummary,
+    resource: &AiResourceSummary,
+) -> bool {
+    let tolerance = config::TILE_SIZE as f32;
+    (pump.x - resource.x).abs() <= tolerance && (pump.y - resource.y).abs() <= tolerance
 }
 
 fn nearest_completed_mining_city_centre(
@@ -261,6 +305,17 @@ mod tests {
     fn city_centre(id: u32, x: f32, y: f32, complete: bool) -> AiEntitySummary {
         let mut entity = entity(id, EntityKind::CityCentre, x, y);
         entity.is_complete = complete;
+        entity
+    }
+
+    fn pump_jack(id: u32, x: f32, y: f32, complete: bool) -> AiEntitySummary {
+        let mut entity = entity(id, EntityKind::PumpJack, x, y);
+        entity.is_complete = complete;
+        entity.state = if complete {
+            AiEntityState::Idle
+        } else {
+            AiEntityState::Construct
+        };
         entity
     }
 
@@ -388,6 +443,29 @@ mod tests {
             0
         );
         assert!(availability.has_free_mineable_oil());
+    }
+
+    #[test]
+    fn pump_jack_counts_oil_as_occupied_extractor() {
+        let mut observation = observation();
+        observation.owned = vec![
+            city_centre(10, 100.0, 100.0, true),
+            pump_jack(20, 100.0, 100.0, false),
+        ];
+        observation.resources = vec![resource(3, EntityKind::Oil, 100.0, 100.0, 100)];
+
+        let availability = ResourceAvailability::from_observation(&observation, &BTreeSet::new());
+
+        let oil = availability.node(3).unwrap();
+        assert_eq!(oil.extractor_count, 1);
+        assert!(oil.occupied);
+        assert_eq!(availability.extractor_count(EntityKind::Oil), 1);
+        assert_eq!(availability.occupied_node_count(EntityKind::Oil), 1);
+        assert_eq!(availability.occupied_node_ids(), BTreeSet::from([3]));
+        assert!(
+            !availability.has_free_mineable_oil(),
+            "AI should not queue duplicate Pump Jacks on oil that already has one building"
+        );
     }
 
     #[test]

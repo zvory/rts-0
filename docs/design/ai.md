@@ -61,16 +61,17 @@ fog-filtered observation, public start-payload resource positions, completed own
 visible resource deltas, current worker latches, and AI-owned reservations. The model keeps
 known resources separate from resources that are mineable now: a steel or oil node is assignable
 only when it has remaining resources, is in range of a completed own City Centre, is not occupied by
-a latched worker, and is not already reserved by the current think. Known but non-mineable nodes
-remain visible to expansion planning as future candidates, but economy worker assignment suppresses
-oil demand when there is no free mineable oil and passes only free mineable node ids to
-`assign_workers_to_resource`. The action layer also requires callers to provide that assignable set,
-so an upstream economy mistake cannot knowingly emit a `Gather` command to non-mineable oil while
-free mineable steel exists. Post-expansion assignment prefers workers near the expansion resource
-line, and profiles that opt into remote fallback can still send a main-base idle worker to the
-expansion once the main line is saturated instead of leaving it idle. Self-play regression coverage
-preserves the pre-expansion case where oil is known but outside completed-City-Centre mining range,
-and the post-expansion case where oil assignment begins after the expansion City Centre completes.
+a latched worker or owned Pump Jack extractor, and is not already reserved by the current think.
+Known but non-mineable nodes remain visible to expansion planning as future candidates, but economy
+worker assignment suppresses oil demand when there is no free mineable oil and passes only free
+mineable node ids to `assign_workers_to_resource`. The action layer also requires callers to provide
+that assignable set; steel assignments emit `Gather`, while oil assignments emit contextual
+`Build pump_jack` commands instead of direct oil gather commands. Post-expansion assignment prefers
+workers near the expansion resource line, and profiles that opt into remote fallback can still send
+a main-base idle worker to the expansion once the main line is saturated instead of leaving it idle.
+Self-play regression coverage preserves the pre-expansion case where oil is known but outside
+completed-City-Centre mining range, and the post-expansion case where oil assignment begins after the
+expansion City Centre completes.
 The AI 1.0 profile is `ai_1_0_tech`; it parameterizes worker targets,
 supply buffers, building/tech goals, production priorities, resource timing, expansion timing, and
 attack thresholds without providing its own `think()` function. It opens with
@@ -92,7 +93,7 @@ the AI classifies the visible local threat by weapon DPS: tank-dominated pressur
 local DPS) prioritizes Anti-Tank Guns, infantry-dominated pressure prioritizes Machine Gunners, mixed
 pressure asks for a support mix, and no-DPS pressure falls back to Riflemen. Support panic only uses
 already-completed support tech: Machine Gunners need a Training Centre and Anti-Tank Guns need a
-Gun Works plus Anti-Tank Gun Crews research. It may pull workers onto oil for those support counters; if
+Gun Works plus Anti-Tank Gun Crews research. It may build Pump Jacks for those support counters; if
 the relevant support tech is absent, production falls back to Riflemen and panic mode does not
 create tech buildings.
 If the pressure persists through the panic window, the AI asks for an additional Barracks before

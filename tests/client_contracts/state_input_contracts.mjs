@@ -1143,6 +1143,26 @@ function buttonByLabel(card, label) {
     "worker right-click should prioritize an overlapped resource patch over the worker body",
   );
 
+  const overlappingOil = { id: 32, owner: 0, kind: KIND.OIL, x: 112, y: 112, remaining: 1000 };
+  input.state = {
+    playerId: 1,
+    map: { tileSize: 32 },
+    entitiesInterpolated: () => [overlappingWorker, overlappingOil],
+    selectedEntities: () => [overlappingWorker],
+    addCommandFeedback() {},
+  };
+  rightClickCommands.length = 0;
+  input._onRightClick({ x: 112, y: 112 }, { shiftKey: true });
+  assert(
+    rightClickCommands.length === 1 &&
+      rightClickCommands[0].c === "build" &&
+      rightClickCommands[0].building === KIND.PUMP_JACK &&
+      rightClickCommands[0].tileX === 3 &&
+      rightClickCommands[0].tileY === 3 &&
+      rightClickCommands[0].queued === true,
+    "worker shift-right-click on oil should queue a Pump Jack build instead of direct gather",
+  );
+
   const moveUnit = { id: 40, owner: 1, kind: KIND.RIFLEMAN, x: 120, y: 120 };
   input.state = {
     playerId: 1,

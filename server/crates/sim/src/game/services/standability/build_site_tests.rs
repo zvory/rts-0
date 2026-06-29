@@ -85,6 +85,87 @@ fn build_site_status_classifies_resource_node_blockers() {
 }
 
 #[test]
+fn pump_jack_build_site_requires_live_oil_patch() {
+    let map = flat_map(12);
+    let (x, y) = footprint_center(&map, EntityKind::PumpJack, 4, 4);
+
+    let empty = EntityStore::new();
+    assert_eq!(
+        building_site_status_for_build_intent(
+            &map,
+            &empty,
+            EntityKind::PumpJack,
+            4,
+            4,
+            u32::MAX,
+        ),
+        BuildSiteStatus::InvalidFootprint
+    );
+
+    let mut steel = EntityStore::new();
+    steel
+        .spawn_node(EntityKind::Steel, x, y)
+        .expect("steel node should spawn");
+    assert_eq!(
+        building_site_status_for_build_intent(
+            &map,
+            &steel,
+            EntityKind::PumpJack,
+            4,
+            4,
+            u32::MAX,
+        ),
+        BuildSiteStatus::InvalidFootprint
+    );
+
+    let mut oil = EntityStore::new();
+    let oil_id = oil
+        .spawn_node(EntityKind::Oil, x, y)
+        .expect("oil node should spawn");
+    assert_eq!(
+        building_site_status_for_build_intent(
+            &map,
+            &oil,
+            EntityKind::PumpJack,
+            4,
+            4,
+            u32::MAX,
+        ),
+        BuildSiteStatus::Clear
+    );
+
+    let (adjacent_x, adjacent_y) = footprint_center(&map, EntityKind::PumpJack, 5, 4);
+    oil.spawn_building(1, EntityKind::PumpJack, adjacent_x, adjacent_y, false)
+        .expect("pump jack scaffold should spawn");
+    assert_eq!(
+        building_site_status_for_build_intent(
+            &map,
+            &oil,
+            EntityKind::PumpJack,
+            4,
+            4,
+            u32::MAX,
+        ),
+        BuildSiteStatus::BlockedByBuilding
+    );
+
+    oil.get_mut(oil_id)
+        .expect("oil node should exist")
+        .harvest_resources(u32::MAX);
+    assert_eq!(
+        building_site_status_for_build_intent(
+            &map,
+            &oil,
+            EntityKind::PumpJack,
+            4,
+            4,
+            u32::MAX,
+        ),
+        BuildSiteStatus::InvalidFootprint
+    );
+}
+
+#[test]
 fn build_site_status_classifies_relevant_unit_blockers() {
     let map = flat_map(12);
     let mut entities = EntityStore::new();

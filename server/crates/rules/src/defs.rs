@@ -474,6 +474,26 @@ pub const BUILDINGS: &[BuildingDef] = &[
         trains: &[],
         build_requires: TRAINING_CENTRE_REQUIRED,
     },
+    BuildingDef {
+        kind: EntityKind::PumpJack,
+        stats: balance::BuildingStats {
+            hp: 50,
+            sight_tiles: 1,
+            cost_steel: 0,
+            cost_oil: 0,
+            foot_w: 1,
+            foot_h: 1,
+            build_ticks: balance::TICK_HZ * 10,
+            provides_supply: 0,
+            dmg: 0,
+            range_tiles: 0,
+            cooldown: 0,
+        },
+        armor_class: ArmorClass::Small,
+        weapon: WeaponClass::None,
+        trains: &[],
+        build_requires: &[],
+    },
 ];
 
 pub const NODES: &[NodeDef] = &[
@@ -579,6 +599,7 @@ mod tests {
                 EntityKind::ResearchComplex,
                 EntityKind::Steelworks,
                 EntityKind::TankTrap,
+                EntityKind::PumpJack,
             ]
         );
 
@@ -677,6 +698,22 @@ mod tests {
         assert_eq!(def.weapon, WeaponClass::None);
         assert!(def.trains.is_empty());
         assert_eq!(def.build_requires, TRAINING_CENTRE_REQUIRED);
+    }
+
+    #[test]
+    fn pump_jack_uses_contextual_oil_extractor_stats() {
+        let def = building_def(EntityKind::PumpJack).expect("pump jack def");
+
+        assert_eq!(def.stats.hp, 50);
+        assert_eq!(def.stats.sight_tiles, 1);
+        assert_eq!((def.stats.cost_steel, def.stats.cost_oil), (0, 0));
+        assert_eq!((def.stats.foot_w, def.stats.foot_h), (1, 1));
+        assert_eq!(def.stats.build_ticks, balance::TICK_HZ * 10);
+        assert_eq!(def.stats.provides_supply, 0);
+        assert_eq!(def.armor_class, ArmorClass::Small);
+        assert_eq!(def.weapon, WeaponClass::None);
+        assert!(def.trains.is_empty());
+        assert!(def.build_requires.is_empty());
     }
 
     #[test]
