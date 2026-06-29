@@ -96,7 +96,7 @@ fn unupgraded_artillery_fire_does_not_bank_ballistic_tables_accuracy() {
             .expect("artillery should exist")
             .artillery_shots_fired(),
         0,
-        "unupgraded artillery shots should not pre-charge Ballistic Tables accuracy"
+        "unupgraded artillery shots should not pre-charge Artillery Fire Control accuracy"
     );
 }
 

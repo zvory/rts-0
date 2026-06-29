@@ -311,7 +311,7 @@ const approvedSpecialCaseBudgets = new Map([
   // those helpers shrink or move behind catalog APIs.
   // Tank Trap phases add current-catalog construction eligibility and gameplay command handling
   // for a default-faction obstacle before a broader catalog API can absorb obstacle placement.
-  // Ballistic Tables adds one R&D catalog entry for the current Kriegsia tech tree.
+  // Artillery Fire Control adds one R&D catalog entry for the current Kriegsia tech tree.
   ["server/crates/rules/src/faction.rs", 91],
   ["server/crates/rules/src/economy.rs", 109],
   ["server/crates/sim/src/game/setup.rs", 30],

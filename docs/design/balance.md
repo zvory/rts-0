@@ -283,7 +283,7 @@ folded into default targeting.
   `ARTILLERY_AMMO_COST_STEEL = 10`.
   Unupgraded artillery error scales by shot range, from `ARTILLERY_MIN_RANGE_ERROR_TILES = 3.0`
   at minimum range to `ARTILLERY_MAX_RANGE_ERROR_TILES = 15.0` at maximum range, and does not
-  tighten over repeated fire. Ballistic Tables restores repeated-fire tightening for the same
+  tighten over repeated fire. Artillery Fire Control restores repeated-fire tightening for the same
   deployed gun: starting error is still range-scaled, then tightens to
   `ARTILLERY_MIN_ERROR_TILES = 3.0` over 5 shots. Moving resets that accuracy ramp.
   Its body length, width, clearance, and selection radius match the Tank; its exposed carriage,
@@ -315,7 +315,7 @@ folded into default targeting.
   and takes 600 ticks (~20s). Once complete, that player can train Anti-Tank Guns and Artillery
   from Gun Works. The legacy protocol id `artillery_unlock` remains decodable for old compact
   snapshot/replay data but is no longer current-faction research.
-- **Ballistic Tables** (R&D Complex research, protocol id `ballistic_tables`): costs 150 steel /
+- **Artillery Fire Control** (R&D Complex research, protocol id `ballistic_tables`): costs 150 steel /
   100 oil and takes 600 ticks (~20s). It requires completed Field Ordnance research. Once
   complete, that player's deployed Artillery tightens repeated point-fire shots from the
   range-scaled starting error down to three tiles over the existing five-shot accuracy period.
@@ -446,7 +446,7 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 | depot                      | Supply Depot       | 110 | 1     | 100 | 2x2  | 300       | +8 supply |
 | barracks                   | Barracks           | 165 | 1     | 150 | 3x2  | 200       | trains rifleman and machine_gunner; requires a City Centre |
 | training_centre            | Training Centre    | 300 | 1     | 100 steel + 50 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner training at barracks and researches Methamphetamines; requires a City Centre and Barracks |
-| research_complex           | R&D Complex        | 165 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Field Ordnance, Ballistic Tables, Tank Production, Command Car, and Mortar Autocast; requires a City Centre and Training Centre |
+| research_complex           | R&D Complex        | 165 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Field Ordnance, Artillery Fire Control, Tank Production, Command Car, and Mortar Autocast; requires a City Centre and Training Centre |
 | factory                    | Vehicle Works      | 360 | 1     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, trains tank after Tank Production research, and trains command_car after Command Car research; requires a City Centre and Training Centre |
 | steelworks                 | Gun Works          | 300 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately and trains Anti-Tank Guns/Artillery after R&D Complex research; requires a City Centre and Training Centre |
 | tank_trap                  | Tank Trap          | 150 | 0     | 15 steel + 0 oil | 1x1  | 300       | engineer-built vehicle obstacle; workers deconstruct completed traps in 150 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building; requires a completed Training Centre |

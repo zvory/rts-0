@@ -69,6 +69,8 @@ function buttonSlots(card) {
   ]);
   assert.equal(rAndDCard().slots[1].enabled, false);
   assert.equal(rAndDCard().slots[1].title, "Requires Field Ordnance");
+  assert.equal(rAndDCard().slots[1].label, "Artillery Fire Control");
+  assert.equal(rAndDCard().slots[1].icon, "AFC");
 }
 
 {
