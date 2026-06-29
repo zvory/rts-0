@@ -294,6 +294,15 @@ fn manual_mortar_launch_and_impact_markers_are_visible_to_allies() {
     assert!(ally_launch
         .iter()
         .any(|event| matches!(event, Event::MortarLaunch { from, .. } if *from == mortar)));
+    let launch_impact = ally_launch
+        .iter()
+        .find_map(|event| match event {
+            Event::MortarLaunch {
+                from, to_x, to_y, ..
+            } if *from == mortar => Some((*to_x, *to_y)),
+            _ => None,
+        })
+        .expect("ally should receive mortar launch impact");
     assert!(enemy_launch
         .iter()
         .all(|event| !matches!(event, Event::MortarLaunch { .. })));
@@ -310,5 +319,5 @@ fn manual_mortar_launch_and_impact_markers_are_visible_to_allies() {
     assert!(ally_impact
         .iter()
         .any(|event| matches!(event, Event::MortarImpact { x, y, .. }
-            if (*x - target_pos.0).abs() < 0.001 && (*y - target_pos.1).abs() < 0.001)));
+            if (*x - launch_impact.0).abs() < 0.001 && (*y - launch_impact.1).abs() < 0.001)));
 }

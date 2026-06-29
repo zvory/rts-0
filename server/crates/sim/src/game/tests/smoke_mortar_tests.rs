@@ -1,6 +1,24 @@
 use super::fixtures::*;
 use super::*;
 
+fn mortar_launch_impact(
+    events: &[(u32, Vec<Event>)],
+    player_id: u32,
+    mortar: u32,
+) -> Option<(f32, f32)> {
+    events
+        .iter()
+        .find(|(id, _)| *id == player_id)
+        .and_then(|(_, player_events)| {
+            player_events.iter().find_map(|event| match event {
+                Event::MortarLaunch {
+                    from, to_x, to_y, ..
+                } if *from == mortar => Some((*to_x, *to_y)),
+                _ => None,
+            })
+        })
+}
+
 fn smoke_projection_fixture() -> (Game, u32, u32, u32, (f32, f32)) {
     let players = [
         PlayerInit {
@@ -330,6 +348,8 @@ fn manual_mortar_fire_impacts_without_toast_notice() {
         },
     );
     let accepted_events = game.tick();
+    let impact_pos = mortar_launch_impact(&accepted_events, 1, mortar)
+        .expect("owner should receive mortar launch impact");
     let owner_events = accepted_events
         .iter()
         .find(|(player_id, _)| *player_id == 1)
@@ -340,8 +360,8 @@ fn manual_mortar_fire_impacts_without_toast_notice() {
             event,
             Event::MortarLaunch { from, to_x, to_y, delay_ticks, .. }
                 if *from == mortar
-                    && (*to_x - target_pos.0).abs() < 0.001
-                    && (*to_y - target_pos.1).abs() < 0.001
+                    && (*to_x - impact_pos.0).abs() < 0.001
+                    && (*to_y - impact_pos.1).abs() < 0.001
                     && *delay_ticks == config::MORTAR_SHELL_DELAY_TICKS
         )),
         "accepted mortar command should emit a launch marker with impact timing: {owner_events:?}"
@@ -363,6 +383,10 @@ fn manual_mortar_fire_impacts_without_toast_notice() {
             .all(|event| !matches!(event, Event::Notice { msg, .. } if msg == "Mortar fire")),
         "accepted mortar command should use impact feedback instead of a toast notice: {owner_events:?}"
     );
+    game.entities
+        .get_mut(target)
+        .expect("target should still exist")
+        .set_position(impact_pos.0, impact_pos.1);
     let hp_before_impact = game
         .entities
         .get(target)
@@ -389,7 +413,7 @@ fn manual_mortar_fire_impacts_without_toast_notice() {
         owner_events
             .iter()
             .any(|event| matches!(event, Event::MortarImpact { x, y, .. }
-                if (*x - target_pos.0).abs() < 0.001 && (*y - target_pos.1).abs() < 0.001)),
+                if (*x - impact_pos.0).abs() < 0.001 && (*y - impact_pos.1).abs() < 0.001)),
         "delayed mortar impact should emit a visible impact marker: {owner_events:?}"
     );
 }
@@ -584,6 +608,8 @@ fn hidden_mortar_launch_is_not_sent_but_impact_reveals_attacker_to_victim() {
         },
     );
     let accepted_events = game.tick();
+    let impact_pos = mortar_launch_impact(&accepted_events, 1, mortar)
+        .expect("owner should receive hidden mortar launch impact");
     let enemy_events = accepted_events
         .iter()
         .find(|(player_id, _)| *player_id == 2)
@@ -596,6 +622,10 @@ fn hidden_mortar_launch_is_not_sent_but_impact_reveals_attacker_to_victim() {
         "hidden mortar launch should not leak dust/recoil/shell data: {enemy_events:?}"
     );
 
+    game.entities
+        .get_mut(target)
+        .expect("target should still exist")
+        .set_position(impact_pos.0, impact_pos.1);
     let hp_before_impact = game
         .entities
         .get(target)
@@ -627,8 +657,8 @@ fn hidden_mortar_launch_is_not_sent_but_impact_reveals_attacker_to_victim() {
                 ..
             } if *from == mortar
                 && reveal.kind == kinds::MORTAR_TEAM
-                && (*x - target_pos.0).abs() < 0.001
-                && (*y - target_pos.1).abs() < 0.001
+                && (*x - impact_pos.0).abs() < 0.001
+                && (*y - impact_pos.1).abs() < 0.001
         )),
         "victim should receive a mortar impact reveal after being hit: {enemy_events:?}"
     );
@@ -715,6 +745,8 @@ fn manual_mortar_fire_impacts_after_shooter_dies_before_impact() {
         },
     );
     let launch_events = game.tick();
+    let impact_pos = mortar_launch_impact(&launch_events, 1, mortar)
+        .expect("owner should receive mortar launch impact");
     assert!(
         launch_events.iter().any(|(player_id, events)| {
             *player_id == 1
@@ -725,6 +757,10 @@ fn manual_mortar_fire_impacts_after_shooter_dies_before_impact() {
         "accepted mortar command should emit a launch before shooter death: {launch_events:?}"
     );
 
+    game.entities
+        .get_mut(target)
+        .expect("target should still exist")
+        .set_position(impact_pos.0, impact_pos.1);
     let hp_before_impact = game
         .entities
         .get(target)
@@ -748,8 +784,8 @@ fn manual_mortar_fire_impacts_after_shooter_dies_before_impact() {
                 && events.iter().any(|event| matches!(
                     event,
                     Event::MortarImpact { x, y, .. }
-                        if (*x - target_pos.0).abs() < 0.001
-                            && (*y - target_pos.1).abs() < 0.001
+                        if (*x - impact_pos.0).abs() < 0.001
+                            && (*y - impact_pos.1).abs() < 0.001
                 ))
         });
     }
@@ -915,7 +951,17 @@ fn manual_mortar_fire_damages_friendly_units_at_enemy_rate() {
             queued: false,
         },
     );
-    game.tick();
+    let launch_events = game.tick();
+    let impact_pos = mortar_launch_impact(&launch_events, 1, mortar)
+        .expect("owner should receive mortar launch impact");
+    game.entities
+        .get_mut(friendly)
+        .expect("friendly should still exist")
+        .set_position(impact_pos.0, impact_pos.1);
+    game.entities
+        .get_mut(enemy)
+        .expect("enemy should still exist")
+        .set_position(impact_pos.0, impact_pos.1);
     for _ in 0..config::MORTAR_SHELL_DELAY_TICKS {
         game.tick();
     }
@@ -994,7 +1040,17 @@ fn manual_mortar_fire_inner_splash_pierces_armor_and_outer_splash_hits_for_outer
             queued: false,
         },
     );
-    game.tick();
+    let launch_events = game.tick();
+    let impact_pos = mortar_launch_impact(&launch_events, 1, mortar)
+        .expect("owner should receive mortar launch impact");
+    game.entities
+        .get_mut(armored_inner)
+        .expect("armored target should exist")
+        .set_position(impact_pos.0, impact_pos.1);
+    game.entities
+        .get_mut(outer_target)
+        .expect("outer target should exist")
+        .set_position(impact_pos.0 + config::TILE_SIZE as f32, impact_pos.1);
     for _ in 0..config::MORTAR_SHELL_DELAY_TICKS {
         game.tick();
     }
@@ -1082,7 +1138,13 @@ fn manual_mortar_fire_damages_allied_units_without_kill_credit() {
             queued: false,
         },
     );
-    game.tick();
+    let launch_events = game.tick();
+    let impact_pos = mortar_launch_impact(&launch_events, 1, mortar)
+        .expect("owner should receive mortar launch impact");
+    game.entities
+        .get_mut(ally)
+        .expect("ally should still exist")
+        .set_position(impact_pos.0, impact_pos.1);
     for _ in 0..config::MORTAR_SHELL_DELAY_TICKS {
         game.tick();
     }

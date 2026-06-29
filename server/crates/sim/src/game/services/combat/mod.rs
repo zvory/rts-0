@@ -15,6 +15,7 @@ use crate::game::firing_reveal::{
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::mortar::{rotate_mortar_for_fire, MortarShellStore};
+use crate::game::mortar_scatter::predicted_mortar_impact;
 use crate::game::services::dist2;
 use crate::game::services::line_of_sight::LineOfSight;
 use crate::game::services::move_coordinator::MoveCoordinator;
@@ -251,7 +252,9 @@ pub(in crate::game) fn combat_system(
             can_move_fire,
             &|target_id| {
                 !require_safe_mortar_autocast_target
-                    || mortar_autocast_target_safe(entities, teams, spatial, owner, target_id, tick)
+                    || mortar_autocast_target_safe(
+                        entities, teams, fog, spatial, owner, id, target_id, tick,
+                    )
             },
         );
         let Some(tid) = target else {
@@ -374,8 +377,10 @@ pub(in crate::game) fn combat_system(
                         continue;
                     }
                     let (mx, my) = mortar_aim_point(entities, tid, tick);
+                    let (impact_x, impact_y) =
+                        predicted_mortar_impact(fog, teams, owner, id, mx, my, tick);
                     if mortar_autocast_would_hit_same_team_entity(
-                        entities, teams, spatial, owner, mx, my,
+                        entities, teams, spatial, owner, impact_x, impact_y,
                     ) {
                         continue;
                     }
@@ -467,19 +472,23 @@ pub(in crate::game) fn combat_system(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn mortar_autocast_target_safe(
     entities: &EntityStore,
     teams: &TeamRelations,
+    fog: &Fog,
     spatial: &SpatialIndex,
     owner: u32,
+    attacker: u32,
     target: u32,
     tick: u32,
 ) -> bool {
     let (x, y) = mortar_aim_point(entities, target, tick);
-    !mortar_autocast_would_hit_same_team_entity(entities, teams, spatial, owner, x, y)
+    let (impact_x, impact_y) = predicted_mortar_impact(fog, teams, owner, attacker, x, y, tick);
+    !mortar_autocast_would_hit_same_team_entity(entities, teams, spatial, owner, impact_x, impact_y)
 }
 
-fn mortar_aim_point(entities: &EntityStore, target: u32, tick: u32) -> (f32, f32) {
+fn mortar_aim_point(entities: &EntityStore, target: u32, _tick: u32) -> (f32, f32) {
     let Some(t) = entities.get(target) else {
         return (0.0, 0.0);
     };
@@ -488,15 +497,6 @@ fn mortar_aim_point(entities: &EntityStore, target: u32, tick: u32) -> (f32, f32
     if let Some((dx, dy)) = mortar_lead_delta(t) {
         x += dx;
         y += dy;
-    }
-    let error = config::MORTAR_AUTOFIRE_ERROR_TILES * config::TILE_SIZE as f32;
-    if error > 0.0 {
-        let angle = ((target ^ tick) as f32 * 1.618_034).rem_euclid(std::f32::consts::TAU);
-        let radius = ((((target.wrapping_mul(1103515245).wrapping_add(tick)) >> 8) & 1023) as f32
-            / 1023.0)
-            * error;
-        x += angle.cos() * radius;
-        y += angle.sin() * radius;
     }
     (x, y)
 }
