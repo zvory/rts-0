@@ -6,10 +6,13 @@ The normal agent lifecycle is:
 2. Run focused local verification for the files or contracts changed.
 3. Commit with the normal hook.
 4. Open or update the owned PR with `scripts/agent-pr.sh --verification "..."`.
-   The helper first runs `scripts/adversarial-quality-pass.mjs` in the branch worktree, allowing a
-   fresh Codex CLI pass to improve or rewrite the branch, commit the final state, push the final
-   head, post the `adversarial-quality-pass` status, and write the full quality-pass report into
-   the PR body.
+   The helper first classifies the branch diff against `origin/main`. If every changed file ends in
+   `.md`, it skips Codex adversarial review, pushes the branch, posts a successful
+   `adversarial-quality-pass` status with a docs-only skip description, and writes the skip report
+   into the PR body. Otherwise it runs `scripts/adversarial-quality-pass.mjs` in the branch worktree,
+   allowing a fresh Codex CLI pass to improve or rewrite the branch, commit the final state, push
+   the final head, post the `adversarial-quality-pass` status, and write the full quality-pass
+   report into the PR body.
 5. Run `scripts/wait-pr.sh <pr>` and do not claim completion until it reports the PR merged and the
    head SHA reachable from `origin/main`.
 
@@ -21,8 +24,9 @@ required coverage job fails. The Rust/architecture job installs `cargo-nextest` 
 are intentionally cheap; they catch staged whitespace errors outside the human-owned
 `playtest_notes.md`, run `node scripts/check-docs-health.mjs`, and run opportunistic cleanup on
 `main`. Branch protection requires the `adversarial-quality-pass` status alongside
-`./tests/run-all.sh`; this status means the autonomous quality pass ran on the final PR head, not
-that it is a substitute for the full test gate. The owned PR body keeps the pass summary, issues
+`./tests/run-all.sh`; this status means either the autonomous quality pass ran on the final PR head
+or the PR helper classified the branch as pure Markdown (`.md`) and intentionally skipped it. It is
+not a substitute for the full test gate. The owned PR body keeps the pass or skip summary, issues
 found, changes made, verification, and remaining concerns for post-merge audit.
 
 When the Rust job is slow, use the ordinary job log first: the Rust context lines show
@@ -86,8 +90,9 @@ only a bounded number of stale Cargo target directories per run.
 
 Before relying on a changed workflow broadly, run three canaries:
 
-- A docs-only branch that opens with `scripts/agent-pr.sh`, runs the quality pass, has auto-merge
-  armed, passes the aggregate `./tests/run-all.sh` check, and merges.
+- A pure Markdown branch that opens with `scripts/agent-pr.sh`, skips Codex adversarial review,
+  posts the `adversarial-quality-pass` status, has auto-merge armed, passes the aggregate
+  `./tests/run-all.sh` check, and merges.
 - A representative implementation branch with focused local verification in the
   PR body, auto-merge armed, and a successful merge through the same required
   gate.
@@ -110,8 +115,9 @@ The durable contract is:
 - PRs target `main`.
 - The required check remains a stable full-gate signal named `./tests/run-all.sh`.
 - The required status `adversarial-quality-pass` records that the final autonomous quality pass ran
-  on the PR head.
-- The PR body records the full quality-pass report, including remaining concerns.
+  on the PR head, except for pure Markdown PRs where it records the intentional docs-only skip.
+- The PR body records the full quality-pass report, or the docs-only skip report, including
+  remaining concerns.
 - Auto-merge is armed only after ownership metadata and focused verification are
   recorded.
 - Serial automation waits for a definite merge and verifies the phase head is
