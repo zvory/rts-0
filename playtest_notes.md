@@ -1,6 +1,6 @@
 jeffrey playtest
 
-- [ ] tanks should maintain their existing range while moving, but if they stop moving over the course of three seconds, their range should expand to the existing anti-tank gun range
+- [x] tanks should maintain their existing range while moving, but if they stop moving over the course of three seconds, their range should expand to the existing anti-tank gun range (done: PR #507, stationary tank range ramps from 5 to 14 tiles after 3s)
 - [ ] observer unit  (sensor tower for commands?)
 - [ ] haraass unit for gun works
 - [ ] camoflauge for AT guns (probably not)
@@ -13,11 +13,11 @@ jeffrey playtest
 - [x] watch replays as a group, hitting watch replay should create a lobby with all spectators (done: replay staging lobbies)
 - [ ] proxy mortars, maybe like two mortars should be able to one shot a huge clump of workers
 - [ ] increase the vision range of all units, or make that a training centre upgrade (binoculars)
-- [ ] stationary tanks should have more range (hmm, should i add attack range indicators to all units?)
+- [x] stationary tanks should have more range (hmm, should i add attack range indicators to all units?) (done: PR #507 stationary range, PR #520 selected-unit range overlays)
 - [x] if a worker arrives an'd there's not enough resources to build the building, it should continuously stand there trying to build the building when resources are availeble. (done: build-wait retry)
 
 - [x] MORTAR ANIMATION (done: mortar launch/shell/impact visuals)
-- [ ] artillery does not requir AT guns
+- [x] artillery does not requir AT guns (done: PR #521, Heavy Guns unlocks Artillery alongside AT Guns with no second artillery research)
 - [x] pause button broken (done: live pause UI)
 - [ ]
 - [ ] side paths slowing field that A* is aware of, they are muddy/rocky or something
@@ -25,7 +25,7 @@ jeffrey playtest
 - [ ] machine gunners dig in and attacks get change to miss OR increased machine gunner range so one can deter a scout car
 - [ ] remove the R&D structure, instead split it into two. steel press is a new building tthat unlocks building anti tank guns, and has an upgrade for artillery production and mortar auto cast. engine industry (name to be workshopped, ask user before implementing) unlocks tank and has a research for command cars
 - [ ] oh actually better than above player sbuild factories, instead of gunworks or vehicle works. this produces mortar and scout car by default. player can then conver the factory into either a vehicle works or a gun works
-- [ ] workers should not mine oil directly, instead right clicking a worker onto a oil patch will have it build an pump jack for ten seconds. pump jack has 50 hp, cannot move, mines oil at the same rate as a worker, is NOT ARMORED, does not block shooting, requires no tech
+- [x] workers should not mine oil directly, instead right clicking a worker onto a oil patch will have it build an pump jack for ten seconds. pump jack has 50 hp, cannot move, mines oil at the same rate as a worker, is NOT ARMORED, does not block shooting, requires no tech (done: PR #510, contextual Pump Jacks mine oil at the old worker rate)
 - [ ] maybe move to having two oil patches per base instead of three
 - [ ] new building: intelligence. building it allows riflemen to transform into observation posts (provides maybe, 17 tile radius vision which sees through buildings), rifleman gets consumed. costs 25 steel. engineer can build listening post, which listens for commands within a thirty tile radius. basically, enemy units that recieve commands get revealed on the minimap and in the world map as like question marks or X marks, so they can't be targetted, but it's like a sensor tower in
   sc2
@@ -63,7 +63,7 @@ luke playtest
 
 - [ ] selection box doesn't show the production queue (like the +2) obviously enough
 
-- [ ] would be good to see the ranges of units, either in the description, or when they're selected?
+- [x] would be good to see the ranges of units, either in the description, or when they're selected? (done: PR #520, selected-unit range overlays)
 
 - [ ] AI is not sending riflemen in waves properly
 
@@ -113,13 +113,13 @@ luke playtest
 
 - [ ] should be able to attack own buildings
 
-- [ ] cant deconstruct your own tank traps
+- [x] cant deconstruct your own tank traps (done: PR #509, workers can deconstruct completed tank traps)
 
-- [ ] tanks should prioritize shooting anti tank guns
+- [x] tanks should prioritize shooting anti tank guns (done: current targeting priority checks in-range AT guns first)
 
 - [ ] reduce artillery range by 5 and, and put little artillery icons ont he minimap when yhey're firing, like use the ltieral exact artillery thing
 
-- [ ] make tanks eight supply and doule comand car bonus (partial: tanks now 6 supply; bonus unchanged)
+- [ ] make tanks eight supply and doule comand car bonus (partial: tanks now 8 supply; bonus unchanged)
 
 - [ ] pathing is still fucked, units getting suck
 
@@ -174,7 +174,7 @@ luke playtest
 
 - [ ] ekat line shot and dash, if targetted outside of max range, should just do a max range use of the ability, and they should not have ekat walk towards a position wher ehtey can use the ability. you should be able to shift queue a dash also. also you should be able to dash over walla nd buildings.
 
-- [ ] when a mortar is autocasting on a unit that is attack moved but stantionary, it keeps predicted their attack will not be at their location
+- [x] when a mortar is autocasting on a unit that is attack moved but stantionary, it keeps predicted their attack will not be at their location (done: mortar autocast no longer leads stationary attack-move targets)
 
 - [x] make it so tanks take up more selection slots (done: PR #181)
 
@@ -186,7 +186,7 @@ luke playtest
 
 - [ ] when one player leaves the match it should watch the replay
 
-- [ ] mortar teams shoudl should even if they don't hav eline of sight
+- [x] mortar teams shoudl should even if they don't hav eline of sight (done: PR #512, mortars can fire indirectly at owner-visible targets behind LOS blockers)
 
 - [ ] when resuming from replay, the top bar hud which displayes resources and supply does not work, it's frozen at the dol values
 
