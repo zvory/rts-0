@@ -346,8 +346,11 @@ impl Serialize for CompactEntity<'_> {
         if entity.build_active {
             len = 30;
         }
-        if entity.weapon_range_tiles.is_some() {
+        if entity.deconstruct_progress.is_some() {
             len = 31;
+        }
+        if entity.weapon_range_tiles.is_some() {
+            len = 32;
         }
 
         let mut seq = serializer.serialize_seq(Some(len))?;
@@ -444,6 +447,9 @@ impl Serialize for CompactEntity<'_> {
             seq.serialize_element(&entity.build_active)?;
         }
         if len > 30 {
+            seq.serialize_element(&entity.deconstruct_progress)?;
+        }
+        if len > 31 {
             seq.serialize_element(&entity.weapon_range_tiles)?;
         }
         seq.end()

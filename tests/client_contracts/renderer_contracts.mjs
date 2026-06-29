@@ -256,6 +256,51 @@ import { installFakePixi } from "./pixi_fakes.mjs";
 }
 
 {
+  const restorePixi = installFakePixi();
+  try {
+    const parent = {
+      clientWidth: 640,
+      clientHeight: 480,
+      appendChild(view) {
+        view.parentNode = this;
+      },
+      removeChild(view) {
+        view.parentNode = null;
+      },
+    };
+    const renderer = new Renderer(parent);
+    renderer._map = { tileSize: 32 };
+    const entity = {
+      id: 502,
+      owner: 2,
+      kind: KIND.TANK_TRAP,
+      x: 160,
+      y: 160,
+      hp: 150,
+      maxHp: 150,
+      state: "idle",
+      deconstructProgress: 0.35,
+    };
+
+    renderer._drawBuilding(entity, new Map([[2, 0xc85050]]), {
+      playerId: 99,
+      players: [{ id: 2, color: "#c85050" }],
+      spectator: true,
+    });
+
+    const overlay = renderer._pools.buildingOverlays.get(entity.id);
+    const overlayRects = overlay?.calls.filter((call) => call[0] === "drawRect") || [];
+    assert(overlayRects.length === 2, "deconstructing Tank Trap draws reverse progress bar rectangles");
+    assert(
+      overlayRects[1][3] < overlayRects[0][3],
+      "deconstructing Tank Trap fill should be smaller than the full bar background",
+    );
+  } finally {
+    restorePixi();
+  }
+}
+
+{
   const priorWindow = globalThis.window;
   const priorDocument = globalThis.document;
   const priorRequestAnimationFrame = globalThis.requestAnimationFrame;

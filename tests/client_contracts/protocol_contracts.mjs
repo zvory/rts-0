@@ -143,6 +143,20 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
         null,
         true,
       ],
+      [
+        4,
+        2,
+        KIND_CODE[KIND.TANK_TRAP],
+        140,
+        150,
+        150,
+        150,
+        STATE_CODE[STATE.IDLE],
+        ...Array(21).fill(null),
+        false,
+        0.4,
+        9.5,
+      ],
     ],
     r: [[200, 1498]],
     sm: [[50, 320, 352, 2, 120]],
@@ -182,7 +196,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   assert(decoded.netStatus.predictionVersion === PREDICTION_PROTOCOL_VERSION, "compact prediction version decodes");
   assert(decoded.netStatus.lastSimConsumedClientSeq === 7, "compact consumed client sequence decodes");
   assert(decoded.netStatus.lastSimConsumedClientTick === 42, "compact consumed client tick decodes");
-  assert(decoded.entities.length === 3, "compact entities decode");
+  assert(decoded.entities.length === 4, "compact entities decode");
   assert(decoded.entities[0].kind === KIND.WORKER, "entity kind code decodes");
   assert(decoded.entities[0].state === STATE.GATHER, "entity state code decodes");
   assert(decoded.entities[0].weaponFacing === 1.75, "entity optional weaponFacing decodes");
@@ -243,6 +257,8 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
     decoded.entities[2].orderPlan === undefined,
     "compact snapshot tolerates missing order plan fields",
   );
+  assert(decoded.entities[3].deconstructProgress === 0.4, "entity deconstructProgress decodes");
+  assert(decoded.entities[3].weaponRangeTiles === 9.5, "entity weaponRangeTiles decodes");
   assert(decoded.resourceDeltas[0].remaining === 1498, "resource deltas decode");
   assert(
     decoded.smokes[0].id === 50 &&

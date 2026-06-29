@@ -16,6 +16,8 @@ const suiteOrder = [
   "nextest-ai",
   "nextest-server",
   "cargo-clippy",
+  "agent-workflow-phase-runner",
+  "agent-workflow-quality-pass",
   "client-architecture",
   "faction-assumptions",
   "faction-catalog-parity",
@@ -101,6 +103,26 @@ function isSourceFileSizePath(pathname) {
         pathname.endsWith(".mjs")
       )
     )
+  );
+}
+
+function isPhaseRunnerWorkflowPath(pathname) {
+  return (
+    pathname === "scripts/phase-runner.sh" ||
+    pathname === "scripts/phase-runner-agents.mjs" ||
+    pathname === "scripts/phase-runner-result.schema.json" ||
+    pathname === "tests/phase_runner_agents.mjs" ||
+    pathname === "tests/run-all.sh"
+  );
+}
+
+function isQualityPassWorkflowPath(pathname) {
+  return (
+    pathname === "scripts/adversarial-quality-pass.mjs" ||
+    pathname === "scripts/adversarial-quality-pass.schema.json" ||
+    pathname === "scripts/agent-pr.sh" ||
+    pathname === "tests/adversarial_quality_pass.mjs" ||
+    pathname === "tests/run-all.sh"
   );
 }
 
@@ -277,6 +299,14 @@ export function selectSuites(files) {
       addAll(suites, ["crate-boundaries", "cargo-fmt", "nextest-server", "cargo-clippy", "node-regression"]);
     }
 
+    if (isPhaseRunnerWorkflowPath(normalized)) {
+      suites.add("agent-workflow-phase-runner");
+    }
+
+    if (isQualityPassWorkflowPath(normalized)) {
+      suites.add("agent-workflow-quality-pass");
+    }
+
     if (clientArchitecturePolicy) {
       suites.add("client-architecture");
     }
@@ -423,6 +453,12 @@ function verify() {
     [["plans/archive/client-arch/phase-1.md"], ["client-architecture"]],
     [["plans/teams/phase-1.md"], ["node-team-integration"]],
     [["tests/team_harness.mjs"], ["node-server-integration", "node-regression", "node-ai-integration", "node-team-integration"]],
+    [["scripts/phase-runner-agents.mjs"], ["agent-workflow-phase-runner"]],
+    [["scripts/phase-runner-result.schema.json"], ["agent-workflow-phase-runner"]],
+    [["scripts/adversarial-quality-pass.mjs"], ["agent-workflow-quality-pass"]],
+    [["scripts/adversarial-quality-pass.schema.json"], ["agent-workflow-quality-pass"]],
+    [["scripts/agent-pr.sh"], ["agent-workflow-quality-pass"]],
+    [["tests/run-all.sh"], ["agent-workflow-phase-runner", "agent-workflow-quality-pass"]],
     [["server/crates/rules/src/faction.rs"], ["nextest-rules", "nextest-sim", "faction-assumptions", "faction-catalog-parity"]],
     [["client/src/lobby_view.js"], ["client-architecture", "faction-assumptions", "faction-catalog-parity", "js-protocol-contracts"]],
     [["server/src/lobby/faction_validation.rs"], ["nextest-server", "faction-assumptions", "node-server-integration", "node-regression", "node-ai-integration"]],

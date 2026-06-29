@@ -97,7 +97,7 @@ pub mod upgrades {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 25;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 26;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -703,7 +703,8 @@ fn compact_slot_schemas() -> CompactSlotSchemas {
             optional_field(27, "rallyPlan"),
             optional_code_field(28, "prodUpgrade", "upgrade"),
             optional_field(29, "buildActive"),
-            optional_field(30, "weaponRangeTiles"),
+            optional_field(30, "deconstructProgress"),
+            optional_field(31, "weaponRangeTiles"),
         ],
         event: event_slot_schemas(),
         ability_object: vec![

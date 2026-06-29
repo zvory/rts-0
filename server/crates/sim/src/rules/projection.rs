@@ -9,7 +9,8 @@ use crate::config;
 use crate::game::ability;
 use crate::game::ability_runtime::{AbilityObjectPayload, AbilityRuntime};
 use crate::game::entity::{
-    fires_while_moving, Entity, EntityKind, EntityStore, GatherPhase, Order, OrderIntent,
+    fires_while_moving, tank_trap_deconstruction_ticks, Entity, EntityKind, EntityStore,
+    GatherPhase, Order, OrderIntent,
 };
 use crate::game::fog::Fog;
 use crate::game::smoke::SmokeCloudStore;
@@ -401,6 +402,9 @@ pub fn project_entity(
                 .active_construction_sites
                 .is_some_and(|sites| sites.contains(&entity.id));
     }
+    if entity.kind == EntityKind::TankTrap && !entity.under_construction() && !vision_only {
+        view.deconstruct_progress = deconstruct_progress_for_target(entity.id, context.entities);
+    }
 
     // Current behavior exposes static resource amount even through fog.
     if entity.is_node() {
@@ -429,6 +433,18 @@ pub fn project_entity(
     }
 
     Some(view)
+}
+
+fn deconstruct_progress_for_target(target: u32, entities: &EntityStore) -> Option<f32> {
+    let required_ticks = tank_trap_deconstruction_ticks();
+    let progress = entities
+        .iter()
+        .filter(|worker| worker.hp > 0 && worker.is_unit())
+        .filter(|worker| worker.order().deconstruct_target() == Some(target))
+        .filter_map(|worker| worker.deconstruction_progress())
+        .max()?;
+    let dismantled = (progress as f32 / required_ticks as f32).clamp(0.0, 1.0);
+    Some(1.0 - dismantled)
 }
 
 fn order_plan(
@@ -667,7 +683,10 @@ fn active_ability_object_expires_in(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::entity::{EntityKind, EntityStore, Order, OrderIntent};
+    use crate::game::entity::{
+        tank_trap_deconstruction_ticks, DeconstructPhase, EntityKind, EntityStore, Order,
+        OrderIntent,
+    };
     use crate::game::map::Map;
     use crate::protocol::terrain;
 
@@ -1146,5 +1165,36 @@ mod tests {
         .expect("non-owner visible scaffold should project");
         assert_eq!(enemy_view.build_progress, Some(0.0));
         assert!(!enemy_view.build_active);
+    }
+
+    #[test]
+    fn tank_trap_deconstruction_projects_reverse_progress() {
+        let mut entities = EntityStore::new();
+        let trap_id = entities
+            .spawn_building(2, EntityKind::TankTrap, 160.0, 160.0, true)
+            .expect("tank trap should spawn");
+        let worker_id = entities
+            .spawn_unit(1, EntityKind::Worker, 192.0, 160.0)
+            .expect("worker should spawn");
+        {
+            let worker = entities.get_mut(worker_id).expect("worker should exist");
+            worker.set_order(Order::deconstruct(trap_id));
+            worker.mark_deconstruct_phase(DeconstructPhase::Deconstructing);
+            for _ in 0..(tank_trap_deconstruction_ticks() / 2) {
+                worker.tick_deconstruction();
+            }
+        }
+
+        let fog = Fog::new(16);
+        let trap = entities.get(trap_id).expect("trap should exist");
+        let view = project_for_test(1, trap, &fog, false, &entities, None, false)
+            .expect("viewer should see trap");
+
+        assert_eq!(view.build_progress, None);
+        assert!(
+            (view.deconstruct_progress.expect("deconstruct progress should project") - 0.5).abs()
+                < 0.001,
+            "deconstruction progress should be the remaining reverse fraction"
+        );
     }
 }

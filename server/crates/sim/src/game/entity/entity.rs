@@ -472,6 +472,15 @@ impl Entity {
         Some(order.execution.progress)
     }
 
+    pub fn deconstruction_progress(&self) -> Option<u32> {
+        let m = self.movement.as_ref()?;
+        let Order::Deconstruct(order) = &m.order else {
+            return None;
+        };
+        (order.execution.phase == DeconstructPhase::Deconstructing)
+            .then_some(order.execution.progress)
+    }
+
     pub fn path_is_empty(&self) -> bool {
         self.movement
             .as_ref()

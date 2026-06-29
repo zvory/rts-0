@@ -5,8 +5,10 @@ The normal agent lifecycle is:
 1. Work on one `zvorygin/*` branch in one `/tmp/rts-worktrees/*` worktree.
 2. Run focused local verification for the files or contracts changed.
 3. Commit with the normal hook.
-4. Open or update the owned PR with `scripts/agent-pr.sh --verification "..."`
-   and leave auto-merge armed.
+4. Open or update the owned PR with `scripts/agent-pr.sh --verification "..."`.
+   The helper first runs `scripts/adversarial-quality-pass.mjs` in the branch worktree, allowing a
+   fresh Codex CLI pass to improve or rewrite the branch, commit the final state, push the final
+   head, and post the `adversarial-quality-pass` status.
 5. Run `scripts/wait-pr.sh <pr>` and do not claim completion until it reports the PR merged and the
    head SHA reachable from `origin/main`.
 
@@ -17,7 +19,9 @@ required coverage job fails. The Rust/architecture job installs `cargo-nextest` 
 `./tests/run-all.sh --only-rust`, matching the local nextest-backed Rust command path. Local hooks
 are intentionally cheap; they catch staged whitespace errors outside the human-owned
 `playtest_notes.md`, run `node scripts/check-docs-health.mjs`, and run opportunistic cleanup on
-`main`.
+`main`. After quality-pass rollout, branch protection should require the
+`adversarial-quality-pass` status alongside `./tests/run-all.sh`; this status means the autonomous
+quality pass ran on the final PR head, not that it is a substitute for the full test gate.
 
 When the Rust job is slow, use the ordinary job log first: the Rust context lines show
 `CARGO_TARGET_DIR`, Rust/cargo/nextest versions, and the Actions Cargo cache exact-hit result,
@@ -35,8 +39,9 @@ compiling or running specific tests. Do not add a separate diagnostic workflow f
   Do not claim completion or start follow-up work until `scripts/wait-pr.sh <pr>`
   reports the PR merged and its head reachable from `origin/main`.
 - Auto-merge not armed: rerun `scripts/agent-pr.sh --verification "..."` from
-  the branch, or run `gh pr merge <pr> --auto --merge` after confirming the PR
-  is still agent-owned and should merge when green.
+  the branch so the quality pass and status are refreshed, or run
+  `gh pr merge <pr> --auto --merge` after confirming the PR is still agent-owned
+  and should merge when green.
 - PR closed unmerged: do not let cleanup remove the worktree unless the head is
   reachable from `main` or `origin/main`. Reopen the PR if the branch is still
   valid, or create a replacement branch and PR from the useful commits.
@@ -79,7 +84,7 @@ only a bounded number of stale Cargo target directories per run.
 
 Before relying on a changed workflow broadly, run three canaries:
 
-- A docs-only branch that opens with `scripts/agent-pr.sh`, has auto-merge
+- A docs-only branch that opens with `scripts/agent-pr.sh`, runs the quality pass, has auto-merge
   armed, passes the aggregate `./tests/run-all.sh` check, and merges.
 - A representative implementation branch with focused local verification in the
   PR body, auto-merge armed, and a successful merge through the same required
@@ -102,6 +107,8 @@ The durable contract is:
 
 - PRs target `main`.
 - The required check remains a stable full-gate signal named `./tests/run-all.sh`.
+- The required status `adversarial-quality-pass` records that the final autonomous quality pass ran
+  on the PR head.
 - Auto-merge is armed only after ownership metadata and focused verification are
   recorded.
 - Serial automation waits for a definite merge and verifies the phase head is
