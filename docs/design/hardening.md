@@ -288,8 +288,9 @@ The server treats every client as potentially hostile. Limits live next to the c
   behavior, but candidate tiles are accepted only when the specific unit kind can stand there under
   `standability::unit_static_standable`. This prevents large units from being assigned a center tile
   whose body would clip terrain or a building footprint; dynamic unit traffic is still handled by
-  steering and collision after movement. Anti-Tank Gun group moves use the same deterministic candidate
-  search but first prefer goal tiles with one open tile between assigned Anti-Tank Guns, falling back to
+  steering and collision after movement. Vehicle-body group moves use the same deterministic candidate
+  search but first prefer goal tiles with one open tile between any vehicle-body unit and any other
+  assigned unit, while infantry can still pack into adjacent infantry slots. The search falls back to
   ordinary unique tiles when terrain or buildings leave no spaced slot.
 - **Local steering**: before taking a partial path step for a plain `Move` order, non-vehicle movement
   computes a short-range separation proposal away from nearby firm/braced/heavy mobile units.
