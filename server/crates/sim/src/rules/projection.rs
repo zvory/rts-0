@@ -13,6 +13,7 @@ use crate::game::entity::{
 };
 use crate::game::fog::Fog;
 use crate::game::smoke::SmokeCloudStore;
+use crate::game::tank_range;
 use crate::game::teams::TeamRelations;
 use crate::protocol;
 use crate::protocol::{AbilityCooldownView, DebugPathPoint, DebugPathView};
@@ -228,6 +229,12 @@ pub fn project_entity(
     }
     if let Some(oil_used) = entity.lifetime_oil_used() {
         view.oil_used = Some(oil_used);
+    }
+    if entity.kind == EntityKind::Tank && owner_or_ally {
+        if let Some(stats) = config::unit_stats(entity.kind) {
+            view.weapon_range_tiles =
+                Some(tank_range::effective_range_tiles(entity, stats.range_tiles as f32));
+        }
     }
     let active_combat_target = matches!(entity.order(), Order::Attack(_) | Order::AttackMove(_))
         || (fires_while_moving(entity.kind) && entity.target_id().is_some())
@@ -854,6 +861,40 @@ mod tests {
         let view = project_for_test(1, tank, &fog, true, &entities, None, false)
             .expect("tank should be visible");
         assert_eq!(view.oil_used, Some(3.25));
+    }
+
+    #[test]
+    fn tank_weapon_range_tiles_are_owner_only() {
+        let mut entities = EntityStore::new();
+        let tank_id = entities
+            .spawn_unit(1, EntityKind::Tank, 120.0, 100.0)
+            .expect("tank should spawn");
+        entities
+            .spawn_unit(2, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("enemy spotter should spawn");
+        {
+            let tank = entities.get_mut(tank_id).expect("tank should exist");
+            for _ in 0..(crate::game::tank_range::STATIONARY_RANGE_RAMP_TICKS / 2) {
+                tank.tick_tank_stationary_range(crate::game::tank_range::STATIONARY_RANGE_RAMP_TICKS);
+            }
+        }
+        let map = Map {
+            size: 64,
+            terrain: vec![terrain::GRASS; 64 * 64],
+            starts: vec![(1, 1)],
+            expansion_sites: Vec::new(),
+        };
+        let mut fog = Fog::new(map.size);
+        fog.recompute(&[1, 2], &entities, &map);
+        let tank = entities.get(tank_id).expect("tank should exist");
+
+        let owner_view = project_for_test(1, tank, &fog, true, &entities, None, false)
+            .expect("owner should see tank");
+        assert_eq!(owner_view.weapon_range_tiles, Some(9.5));
+
+        let enemy_view = project_for_test(2, tank, &fog, true, &entities, None, false)
+            .expect("enemy should see nearby tank");
+        assert_eq!(enemy_view.weapon_range_tiles, None);
     }
 
     #[test]

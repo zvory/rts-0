@@ -592,7 +592,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 24. `client/src/net.js` calls
+`messagepack-compact`, codec version 1, compact snapshot version 25. `client/src/net.js` calls
 `parseServerFrame`; the binary frame parser in `client/src/protocol_frame.js` returns the raw
 compact snapshot object, then `decodeCompactSnapshot` expands it back into the semantic object above
 before dispatching `S.SNAPSHOT`.
@@ -618,7 +618,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 24,
+  "v": 25,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
@@ -626,7 +626,7 @@ adds an explicit application compression envelope.
       facing?, weaponFacing?, prodKind?, prodProgress?, prodQueue?,
       buildProgress?, latchedNode?, targetId?, setupState?, remaining?, rally?, oilUsed?,
       setupFacing?, orderPlan?, chargeCooldownLeft?, abilities?, breakthroughTicks?,
-      visionOnly?, debugPath?, rallyPlan?, prodUpgrade?, buildActive?
+      visionOnly?, debugPath?, rallyPlan?, prodUpgrade?, buildActive?, weaponRangeTiles?
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
@@ -705,6 +705,9 @@ anchor is not attackable.
 status; it is not caster identity. Owner snapshots also expose the Command Car's `breakthrough`
 ability cooldown and, while the caster's aura is active, its caster-only `expiresIn` through
 `abilities`.
+`weaponRangeTiles` is present for owner/allied Tank views and carries the current authoritative
+default-weapon range, including the stationary range ramp. Enemy views omit it; static unit catalog
+range remains the fallback for render-only range overlays.
 `visionOnly` is true only for non-owned units/buildings visible through lingering death vision;
 clients render them below the fog overlay and must not select or issue targeted commands against
 them. In `n.flags`, bit 0 = `slowTick` and bit 1 = `headOfLine`.
@@ -777,6 +780,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   latchedNode?: u32,             // node id the Worker/Golem is currently harvesting (attached mining)
   // combat feedback:
   targetId?: u32,                // current attack target, for drawing tracers
+  weaponRangeTiles?: f32,        // owner/allied Tanks only; current authoritative weapon range
   setupState?: string,           // machine_gunner/anti_tank_gun/mortar_team/artillery only:
                                   // "packed","setting_up","deployed","tearing_down"
   // unit-producing buildings:

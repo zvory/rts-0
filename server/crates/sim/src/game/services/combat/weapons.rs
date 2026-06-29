@@ -1,6 +1,7 @@
 use crate::config;
 use crate::game::entity::{Entity, EntityKind, EntityStore, MovePhase, Order, WeaponSetup};
 use crate::game::services::movement::{angle_delta, rotate_toward};
+use crate::game::tank_range;
 use crate::rules::combat as combat_rules;
 
 use super::{
@@ -194,24 +195,36 @@ pub(super) fn anti_tank_gun_can_chase(e: &Entity) -> bool {
         || matches!(e.weapon_setup(), WeaponSetup::Packed)
 }
 
-pub(super) fn effective_attack_profile(e: &Entity) -> combat_rules::AttackProfile {
-    let mut profile = combat_rules::attack_profile(e.kind);
+#[derive(Clone, Copy, Debug)]
+pub(super) struct EffectiveAttackProfile {
+    pub range_tiles: f32,
+    pub dmg: u32,
+    pub cooldown: u32,
+}
+
+pub(super) fn effective_attack_profile(e: &Entity) -> EffectiveAttackProfile {
+    let base = combat_rules::attack_profile(e.kind);
+    let mut profile = EffectiveAttackProfile {
+        range_tiles: tank_range::effective_range_tiles(e, base.range_tiles as f32),
+        dmg: base.dmg,
+        cooldown: base.cooldown,
+    };
     if e.kind != EntityKind::AntiTankGun {
         return profile;
     }
     match e.weapon_setup() {
         WeaponSetup::Packed => {
-            profile.range_tiles = config::ANTI_TANK_GUN_PACKED_RANGE_TILES;
+            profile.range_tiles = config::ANTI_TANK_GUN_PACKED_RANGE_TILES as f32;
             profile.dmg = ((profile.dmg as f32) * config::ANTI_TANK_GUN_PACKED_DAMAGE_MULTIPLIER)
                 .round() as u32;
         }
         WeaponSetup::Deployed => {
-            profile.range_tiles = config::ANTI_TANK_GUN_DEPLOYED_RANGE_TILES;
+            profile.range_tiles = config::ANTI_TANK_GUN_DEPLOYED_RANGE_TILES as f32;
         }
         WeaponSetup::SettingUp { .. }
         | WeaponSetup::TearingDown { .. }
         | WeaponSetup::TearingDownToRedeploy { .. } => {
-            profile.range_tiles = config::ANTI_TANK_GUN_PACKED_RANGE_TILES;
+            profile.range_tiles = config::ANTI_TANK_GUN_PACKED_RANGE_TILES as f32;
             profile.dmg = 0;
         }
     }

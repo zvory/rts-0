@@ -240,3 +240,171 @@ fn direct_tank_attack_chases_to_standoff_range_instead_of_target_center() {
         "standoff goal should be comfortably inside weapon range"
     );
 }
+
+#[test]
+fn stationary_tank_range_linearly_ramps_to_fourteen_tiles() {
+    let mut entities = EntityStore::new();
+    let tank_id = entities
+        .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+        .expect("tank should spawn");
+    let base_range = combat_rules::attack_profile(EntityKind::Tank).range_tiles as f32;
+
+    assert_range_near(tank_range_tiles(&entities, tank_id), base_range);
+
+    for _ in 0..(crate::game::tank_range::STATIONARY_RANGE_RAMP_TICKS / 2) {
+        run_combat_tick(&mut entities);
+    }
+    assert_range_near(tank_range_tiles(&entities, tank_id), (base_range + 14.0) * 0.5);
+
+    for _ in 0..(crate::game::tank_range::STATIONARY_RANGE_RAMP_TICKS / 2) {
+        run_combat_tick(&mut entities);
+    }
+    assert_range_near(tank_range_tiles(&entities, tank_id), 14.0);
+
+    for _ in 0..10 {
+        run_combat_tick(&mut entities);
+    }
+    assert_range_near(tank_range_tiles(&entities, tank_id), 14.0);
+}
+
+#[test]
+fn tank_path_translation_resets_stationary_range_to_base() {
+    let mut entities = EntityStore::new();
+    let tank_id = entities
+        .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+        .expect("tank should spawn");
+    fully_charge_tank_range(&mut entities);
+    assert_range_near(tank_range_tiles(&entities, tank_id), 14.0);
+
+    if let Some(tank) = entities.get_mut(tank_id) {
+        tank.set_order(Order::move_to(180.0, 100.0));
+        tank.set_path(vec![(180.0, 100.0)]);
+        tank.set_path_goal(Some((180.0, 100.0)));
+        tank.mark_move_phase(MovePhase::Moving);
+    }
+    run_open_movement_tick(&mut entities);
+
+    assert_range_near(
+        tank_range_tiles(&entities, tank_id),
+        combat_rules::attack_profile(EntityKind::Tank).range_tiles as f32,
+    );
+}
+
+#[test]
+fn tank_path_pivot_without_translation_resets_stationary_range_to_base() {
+    let mut entities = EntityStore::new();
+    let tank_id = entities
+        .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+        .expect("tank should spawn");
+    fully_charge_tank_range(&mut entities);
+    assert_range_near(tank_range_tiles(&entities, tank_id), 14.0);
+
+    if let Some(tank) = entities.get_mut(tank_id) {
+        tank.set_facing(std::f32::consts::PI);
+        tank.set_order(Order::move_to(300.0, 100.0));
+        tank.set_path(vec![(300.0, 100.0)]);
+        tank.set_path_goal(Some((300.0, 100.0)));
+        tank.mark_move_phase(MovePhase::Moving);
+    }
+    run_open_movement_tick(&mut entities);
+
+    let tank = entities.get(tank_id).expect("tank should exist");
+    assert_eq!(
+        tank.movement_delta(),
+        (0.0, 0.0),
+        "high-error tank pivot should not translate on the reset tick"
+    );
+    assert_range_near(
+        tank_range_tiles(&entities, tank_id),
+        combat_rules::attack_profile(EntityKind::Tank).range_tiles as f32,
+    );
+}
+
+#[test]
+fn fully_stationary_tank_can_fire_at_extended_range() {
+    let map = open_map(24);
+    let mut entities = EntityStore::new();
+    let tank_id = entities
+        .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+        .expect("tank should spawn");
+    fully_charge_tank_range(&mut entities);
+
+    let target_id = entities
+        .spawn_unit(2, EntityKind::Rifleman, 484.0, 100.0)
+        .expect("target should spawn");
+    entities
+        .spawn_unit(1, EntityKind::Worker, 460.0, 100.0)
+        .expect("spotter should spawn");
+    if let Some(tank) = entities.get_mut(tank_id) {
+        tank.set_order(Order::attack(target_id));
+        tank.set_weapon_facing(0.0);
+    }
+
+    run_combat_tick_on_map(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false)],
+        &map,
+    );
+
+    let target = entities.get(target_id).expect("target should still exist");
+    assert_eq!(
+        target.hp, 0,
+        "stationary tank should fire at a target inside the 14-tile ramped range"
+    );
+}
+
+#[test]
+fn moving_range_tank_does_not_fire_at_extended_range_before_ramp() {
+    let map = open_map(24);
+    let mut entities = EntityStore::new();
+    let tank_id = entities
+        .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+        .expect("tank should spawn");
+    let target_id = entities
+        .spawn_unit(2, EntityKind::Rifleman, 484.0, 100.0)
+        .expect("target should spawn");
+    entities
+        .spawn_unit(1, EntityKind::Worker, 460.0, 100.0)
+        .expect("spotter should spawn");
+    if let Some(tank) = entities.get_mut(tank_id) {
+        tank.set_order(Order::attack(target_id));
+        tank.set_weapon_facing(0.0);
+    }
+
+    run_combat_tick_on_map(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false)],
+        &map,
+    );
+
+    let target = entities.get(target_id).expect("target should exist");
+    assert_eq!(
+        target.hp, 45,
+        "base-range tank should not fire at a target that only the stationary ramp can reach"
+    );
+}
+
+fn fully_charge_tank_range(entities: &mut EntityStore) {
+    for _ in 0..crate::game::tank_range::STATIONARY_RANGE_RAMP_TICKS {
+        run_combat_tick(entities);
+    }
+}
+
+fn tank_range_tiles(entities: &EntityStore, tank_id: u32) -> f32 {
+    let tank = entities.get(tank_id).expect("tank should exist");
+    effective_attack_profile(tank).range_tiles
+}
+
+fn run_open_movement_tick(entities: &mut EntityStore) {
+    let map = open_map(24);
+    let occ = Occupancy::build(&map, entities);
+    let spatial = SpatialIndex::build(entities, map.size);
+    movement_system(&map, entities, &mut [], &occ, &spatial, 0);
+}
+
+fn assert_range_near(actual: f32, expected: f32) {
+    assert!(
+        (actual - expected).abs() <= 0.001,
+        "expected range {expected}, got {actual}"
+    );
+}

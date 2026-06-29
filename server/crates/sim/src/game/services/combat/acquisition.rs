@@ -172,7 +172,7 @@ fn target_relevant_for_auto_acquisition(attacker: EntityKind, target: &Entity) -
 
 fn weapon_range_px(attacker: &Entity) -> f32 {
     let profile = effective_attack_profile(attacker);
-    profile.range_tiles as f32 * config::TILE_SIZE as f32 + attacker.radius() + super::RANGE_SLACK
+    profile.range_tiles * config::TILE_SIZE as f32 + attacker.radius() + super::RANGE_SLACK
 }
 
 #[allow(clippy::too_many_arguments)]

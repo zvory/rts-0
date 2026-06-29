@@ -18,6 +18,7 @@ use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::occupancy::{Occupancy, StaticPathingRelation};
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::smoke::SmokeCloudStore;
+use crate::game::tank_range;
 use crate::game::teams::TeamRelations;
 use crate::game::FiringRevealSource;
 use crate::protocol::Event;
@@ -134,6 +135,7 @@ pub(crate) fn combat_system(
         if let Some(e) = entities.get_mut(id) {
             e.tick_attack_cd();
             tick_deployed_weapon_setup(e);
+            e.tick_tank_stationary_range(tank_range::STATIONARY_RANGE_RAMP_TICKS);
         }
     }
 
@@ -178,7 +180,7 @@ pub(crate) fn combat_system(
             } else {
                 cd
             };
-            let range_px = range_tiles as f32 * config::TILE_SIZE as f32 + e.radius() + RANGE_SLACK;
+            let range_px = range_tiles * config::TILE_SIZE as f32 + e.radius() + RANGE_SLACK;
             // Aggro radius: mobile units detect and chase enemies out to their sight radius so
             // attack-move / auto-defend actually close the gap. Idle deployed weapons are the
             // exception: they hold position and only auto-acquire enemies already in weapon

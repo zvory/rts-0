@@ -1046,7 +1046,7 @@ mod tests {
                 .unwrap()
                 .last()
                 .unwrap()["name"],
-            serde_json::json!("buildActive")
+            serde_json::json!("weaponRangeTiles")
         );
     }
 

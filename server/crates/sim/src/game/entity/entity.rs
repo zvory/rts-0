@@ -677,6 +677,40 @@ impl Entity {
         }
     }
 
+    pub(crate) fn tank_stationary_range_ticks(&self) -> u16 {
+        if self.kind != EntityKind::Tank {
+            return 0;
+        }
+        self.combat
+            .as_ref()
+            .map(|c| c.tank_stationary_range_ticks)
+            .unwrap_or(0)
+    }
+
+    pub(crate) fn tick_tank_stationary_range(&mut self, max_ticks: u16) {
+        if self.kind != EntityKind::Tank || self.hp == 0 {
+            return;
+        }
+        if let Some(c) = self.combat.as_mut() {
+            if c.tank_stationary_range_reset_this_tick {
+                c.tank_stationary_range_reset_this_tick = false;
+                return;
+            }
+            c.tank_stationary_range_ticks = c.tank_stationary_range_ticks.saturating_add(1);
+            c.tank_stationary_range_ticks = c.tank_stationary_range_ticks.min(max_ticks);
+        }
+    }
+
+    pub(crate) fn reset_tank_stationary_range(&mut self) {
+        if self.kind != EntityKind::Tank {
+            return;
+        }
+        if let Some(c) = self.combat.as_mut() {
+            c.tank_stationary_range_ticks = 0;
+            c.tank_stationary_range_reset_this_tick = true;
+        }
+    }
+
     pub fn weapon_facing(&self) -> Option<f32> {
         self.combat.as_ref().map(|c| c.weapon_facing)
     }
