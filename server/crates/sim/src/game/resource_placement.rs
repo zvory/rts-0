@@ -127,8 +127,17 @@ pub(crate) fn resource_blocked_building_tiles(
     excluded_resource_kind: Option<EntityKind>,
 ) -> BTreeSet<ResourceTile> {
     let mut blocked = BTreeSet::new();
+    let Some(stats) = config::building_stats(building_kind) else {
+        return blocked;
+    };
+    if stats.foot_w == 0 || stats.foot_h == 0 {
+        return blocked;
+    }
+
     let ts = config::TILE_SIZE as f32;
     let max_tile = map.size.saturating_sub(1) as i32;
+    let foot_w = stats.foot_w as i32;
+    let foot_h = stats.foot_h as i32;
 
     for entity in entities.iter().filter(|entity| entity.is_node()) {
         if Some(entity.kind) == excluded_resource_kind {
@@ -138,8 +147,8 @@ pub(crate) fn resource_blocked_building_tiles(
             continue;
         }
         let radius = entity.radius();
-        let min_tx = (((entity.pos_x - radius) / ts).floor() as i32 - 1).clamp(0, max_tile);
-        let min_ty = (((entity.pos_y - radius) / ts).floor() as i32 - 1).clamp(0, max_tile);
+        let min_tx = (((entity.pos_x - radius) / ts).floor() as i32 - foot_w).clamp(0, max_tile);
+        let min_ty = (((entity.pos_y - radius) / ts).floor() as i32 - foot_h).clamp(0, max_tile);
         let max_tx = (((entity.pos_x + radius) / ts).floor() as i32).clamp(0, max_tile);
         let max_ty = (((entity.pos_y + radius) / ts).floor() as i32).clamp(0, max_tile);
         let circle = CircleBody {
@@ -161,4 +170,37 @@ pub(crate) fn resource_blocked_building_tiles(
     }
 
     blocked
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::protocol::terrain;
+
+    fn flat_map(size: u32) -> Map {
+        Map {
+            size,
+            terrain: vec![terrain::GRASS; (size * size) as usize],
+            starts: vec![],
+            expansion_sites: vec![],
+        }
+    }
+
+    #[test]
+    fn resource_blocked_building_tiles_accounts_for_wide_footprints() {
+        let map = flat_map(12);
+        let mut entities = EntityStore::new();
+        let (node_x, node_y) = map.tile_center(5, 5);
+        entities
+            .spawn_node(EntityKind::Steel, node_x, node_y)
+            .expect("steel node should spawn");
+
+        let blocked =
+            resource_blocked_building_tiles(&map, &entities, EntityKind::Depot, None);
+
+        assert!(
+            blocked.contains(&(3, 5)),
+            "3x3 depot footprint at (3, 5) intersects the steel node centered on (5, 5)"
+        );
+    }
 }

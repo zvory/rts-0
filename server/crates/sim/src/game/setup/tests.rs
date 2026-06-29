@@ -254,12 +254,7 @@ fn standard_starting_loadout_matches_phase0_inventory() {
         .all(|player| player.faction_id == DEFAULT_FACTION_ID));
 }
 
-#[test]
-fn default_right_natural_oil_patches_have_buildable_pump_jack_sites() {
-    let player_count = 1;
-    // Selects the default-right natural, which previously placed oil under adjacent steel.
-    let seed = 2;
-    let map = Map::generate(player_count, seed);
+fn spawned_resource_sites(map: &Map) -> EntityStore {
     let mut entities = EntityStore::new();
     for &start in &map.starts {
         spawn_base_resources(&mut entities, &map, start);
@@ -269,22 +264,33 @@ fn default_right_natural_oil_patches_have_buildable_pump_jack_sites() {
             spawn_base_resources(&mut entities, &map, site);
         }
     }
+    entities
+}
 
-    for oil in entities
-        .iter()
-        .filter(|entity| entity.kind == EntityKind::Oil)
-    {
-        let (tile_x, tile_y) = map.tile_of(oil.pos_x, oil.pos_y);
-        assert!(
-            services::standability::building_site_clear(
-                &map,
-                &entities,
-                EntityKind::PumpJack,
-                tile_x,
-                tile_y,
-            ),
-            "oil node {} at tile ({tile_x}, {tile_y}) should leave a buildable Pump Jack site for player_count={player_count} seed={seed}",
-            oil.id
-        );
+#[test]
+fn generated_default_oil_patches_have_buildable_pump_jack_sites() {
+    for player_count in 1..=4 {
+        for seed in 0..32 {
+            let map = Map::generate(player_count, seed);
+            let entities = spawned_resource_sites(&map);
+
+            for oil in entities
+                .iter()
+                .filter(|entity| entity.kind == EntityKind::Oil)
+            {
+                let (tile_x, tile_y) = map.tile_of(oil.pos_x, oil.pos_y);
+                assert!(
+                    services::standability::building_site_clear(
+                        &map,
+                        &entities,
+                        EntityKind::PumpJack,
+                        tile_x,
+                        tile_y,
+                    ),
+                    "oil node {} at tile ({tile_x}, {tile_y}) should leave a buildable Pump Jack site for player_count={player_count} seed={seed}",
+                    oil.id
+                );
+            }
+        }
     }
 }
