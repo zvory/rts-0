@@ -283,7 +283,7 @@ impl CombatGoal {
 pub(super) struct PlayerMilestoneGoal {
     pub(super) require_gathering: bool,
     pub(super) require_oil: bool,
-    pub(super) require_oil_worker_assignment: bool,
+    pub(super) require_oil_extractor_assignment: bool,
     pub(super) require_depot_supply: bool,
     pub(super) require_barracks_complete: bool,
     pub(super) require_rifleman: bool,
@@ -356,7 +356,7 @@ pub(super) struct PlayerMilestones {
     pub(super) eliminated: bool,
     saw_gathering: bool,
     oil_gathered: bool,
-    pub(super) oil_worker_assigned: bool,
+    pub(super) oil_extractor_started: bool,
     depot_started: bool,
     barracks_started: bool,
     barracks_complete: bool,
@@ -383,7 +383,7 @@ impl PlayerMilestones {
         tick: u32,
         player_id: u32,
         snapshot: &Snapshot,
-        resource_kinds: &BTreeMap<u32, EntityKind>,
+        _resource_kinds: &BTreeMap<u32, EntityKind>,
     ) -> bool {
         let before = self.clone();
         let mut workers = 0;
@@ -409,15 +409,10 @@ impl PlayerMilestones {
                     if e.state == states::GATHER || e.latched_node.is_some() {
                         self.saw_gathering = true;
                     }
-                    if e.latched_node
-                        .and_then(|node| resource_kinds.get(&node).copied())
-                        == Some(EntityKind::Oil)
-                    {
-                        self.oil_worker_assigned = true;
-                    }
                 }
                 EntityKind::Rifleman => riflemen += 1,
                 EntityKind::Tank => tanks += 1,
+                EntityKind::PumpJack => self.oil_extractor_started = true,
                 EntityKind::Depot => self.depot_started = true,
                 EntityKind::Barracks => {
                     self.barracks_started = true;
@@ -519,8 +514,8 @@ impl PlayerMilestones {
         if goal.require_oil && !self.oil_gathered {
             out.push("oil-gather".to_string());
         }
-        if goal.require_oil_worker_assignment && !self.oil_worker_assigned {
-            out.push("oil-worker".to_string());
+        if goal.require_oil_extractor_assignment && !self.oil_extractor_started {
+            out.push("oil-extractor".to_string());
         }
         if goal.require_depot_supply
             && (!self.depot_started || self.max_supply_cap <= config::CITY_CENTRE_SUPPLY)

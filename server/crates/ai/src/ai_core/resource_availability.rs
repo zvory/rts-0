@@ -34,6 +34,7 @@ pub(crate) struct ResourceAvailability {
     occupied_by_kind: BTreeMap<EntityKind, usize>,
     latched_by_kind: BTreeMap<EntityKind, usize>,
     extractors_by_kind: BTreeMap<EntityKind, usize>,
+    live_completed_extractors_by_kind: BTreeMap<EntityKind, usize>,
 }
 
 impl ResourceAvailability {
@@ -47,6 +48,7 @@ impl ResourceAvailability {
         let mut occupied_by_kind = BTreeMap::new();
         let mut latched_by_kind = BTreeMap::new();
         let mut extractors_by_kind = BTreeMap::new();
+        let mut live_completed_extractors_by_kind = BTreeMap::new();
 
         let mut nodes: Vec<ResourceNodeAvailability> = observation
             .resources
@@ -63,11 +65,25 @@ impl ResourceAvailability {
                     .unwrap_or(0);
                 let has_remaining = resource.remaining > 0;
                 let mineable_now = has_remaining && nearest_completed_mining_city_centre.is_some();
-                let extractor_count = (resource.kind == EntityKind::Oil
-                    && pump_jacks
+                let extractor_count = if resource.kind == EntityKind::Oil {
+                    pump_jacks
                         .iter()
-                        .any(|pump| pump_jack_overlaps_resource(pump, resource)))
-                    as usize;
+                        .filter(|pump| pump_jack_overlaps_resource(pump, resource))
+                        .count()
+                } else {
+                    0
+                };
+                let live_completed_extractor_count = if resource.kind == EntityKind::Oil
+                    && has_remaining
+                {
+                    pump_jacks
+                        .iter()
+                        .filter(|pump| pump.is_complete)
+                        .filter(|pump| pump_jack_overlaps_resource(pump, resource))
+                        .count()
+                } else {
+                    0
+                };
                 let occupied = latched_worker_count > 0 || extractor_count > 0;
                 if occupied {
                     *occupied_by_kind.entry(resource.kind).or_default() += 1;
@@ -77,6 +93,11 @@ impl ResourceAvailability {
                 }
                 if extractor_count > 0 {
                     *extractors_by_kind.entry(resource.kind).or_default() += extractor_count;
+                }
+                if live_completed_extractor_count > 0 {
+                    *live_completed_extractors_by_kind
+                        .entry(resource.kind)
+                        .or_default() += live_completed_extractor_count;
                 }
                 ResourceNodeAvailability {
                     id: resource.id,
@@ -110,6 +131,7 @@ impl ResourceAvailability {
             occupied_by_kind,
             latched_by_kind,
             extractors_by_kind,
+            live_completed_extractors_by_kind,
         }
     }
 
@@ -144,6 +166,13 @@ impl ResourceAvailability {
 
     pub(crate) fn extractor_count(&self, kind: EntityKind) -> usize {
         self.extractors_by_kind.get(&kind).copied().unwrap_or(0)
+    }
+
+    pub(crate) fn live_completed_extractor_count(&self, kind: EntityKind) -> usize {
+        self.live_completed_extractors_by_kind
+            .get(&kind)
+            .copied()
+            .unwrap_or(0)
     }
 
     pub(crate) fn occupied_node_ids(&self) -> BTreeSet<u32> {
@@ -482,9 +511,36 @@ mod tests {
         assert_eq!(adjacent_oil.extractor_count, 0);
         assert!(!adjacent_oil.occupied);
         assert_eq!(availability.extractor_count(EntityKind::Oil), 1);
+        assert_eq!(availability.live_completed_extractor_count(EntityKind::Oil), 0);
         assert_eq!(availability.occupied_node_count(EntityKind::Oil), 1);
         assert_eq!(availability.occupied_node_ids(), BTreeSet::from([3]));
         assert!(availability.has_free_mineable_oil());
+    }
+
+    #[test]
+    fn completed_pump_jack_counts_as_live_extractor_only_with_remaining_oil() {
+        let mut observation = observation();
+        observation.owned = vec![
+            city_centre(10, 100.0, 100.0, true),
+            pump_jack(20, 100.0, 100.0, true),
+            pump_jack(21, 132.0, 100.0, true),
+        ];
+        observation.resources = vec![
+            resource(3, EntityKind::Oil, 100.0, 100.0, 100),
+            resource(4, EntityKind::Oil, 132.0, 100.0, 0),
+            resource(5, EntityKind::Oil, 164.0, 100.0, 100),
+        ];
+
+        let availability = ResourceAvailability::from_observation(&observation, &BTreeSet::new());
+
+        assert_eq!(availability.extractor_count(EntityKind::Oil), 2);
+        assert_eq!(availability.live_completed_extractor_count(EntityKind::Oil), 1);
+        assert_eq!(availability.occupied_node_ids(), BTreeSet::from([3, 4]));
+        assert_eq!(
+            availability.free_mineable_node_ids(EntityKind::Oil),
+            BTreeSet::from([5]),
+            "depleted Pump Jacks should not satisfy current oil income or block live free oil elsewhere"
+        );
     }
 
     #[test]
