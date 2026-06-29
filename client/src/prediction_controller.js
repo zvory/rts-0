@@ -156,6 +156,7 @@ export class PredictionController {
     };
     this.pending.push(pending);
     this.pendingBySeq.set(clientSeq, pending);
+    const predictMovement = options?.predictMovement !== false;
     const optimistic = buildOptimisticUiCommand(
       cmd,
       clientSeq,
@@ -167,10 +168,12 @@ export class PredictionController {
     );
     if (optimistic) this.optimisticUi.push(optimistic);
     let predicted = false;
-    try {
-      predicted = !!this.predictor?.enqueueCommand(clientSeq, cmd);
-    } catch (err) {
-      this.lastCorrection = { error: errorMessage(err), phase: "enqueue" };
+    if (predictMovement) {
+      try {
+        predicted = !!this.predictor?.enqueueCommand(clientSeq, cmd);
+      } catch (err) {
+        this.lastCorrection = { error: errorMessage(err), phase: "enqueue" };
+      }
     }
     if (predicted) this.enterPredicting();
     const sent = this.sendCommand ? this.sendCommand(cmd, clientSeq) : false;
