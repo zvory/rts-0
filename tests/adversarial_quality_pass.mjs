@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -153,5 +155,152 @@ const nestedAgentPr = spawnSync("bash", ["scripts/agent-pr.sh", "--dry-run"], {
 });
 assert.equal(nestedAgentPr.status, 2);
 assert.match(nestedAgentPr.stderr, /outer helper owns PR lifecycle/);
+
+function run(command, args, options = {}) {
+  const result = spawnSync(command, args, {
+    encoding: "utf8",
+    ...options,
+    env: { ...process.env, ...(options.env || {}) },
+  });
+  assert.equal(
+    result.status,
+    0,
+    `${command} ${args.join(" ")} failed\nstdout:\n${result.stdout || ""}\nstderr:\n${result.stderr || ""}`,
+  );
+  return result;
+}
+
+function writeExecutable(file, contents) {
+  fs.writeFileSync(file, contents, { mode: 0o755 });
+}
+
+function copyWorkflowScripts(targetRepo) {
+  const targetScripts = path.join(targetRepo, "scripts");
+  fs.mkdirSync(targetScripts, { recursive: true });
+  for (const script of [
+    "agent-pr.sh",
+    "adversarial-quality-pass.mjs",
+    "adversarial-quality-pass.schema.json",
+  ]) {
+    fs.copyFileSync(path.join(repoRoot, "scripts", script), path.join(targetScripts, script));
+  }
+  fs.chmodSync(path.join(targetScripts, "agent-pr.sh"), 0o755);
+  fs.chmodSync(path.join(targetScripts, "adversarial-quality-pass.mjs"), 0o755);
+}
+
+const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "rts-agent-pr-quality-report-"));
+try {
+  const originPath = path.join(tempRoot, "origin.git");
+  const workPath = path.join(tempRoot, "work");
+  const binPath = path.join(tempRoot, "bin");
+  const capturedBody = path.join(tempRoot, "pr-body.md");
+  fs.mkdirSync(binPath, { recursive: true });
+
+  writeExecutable(
+    path.join(binPath, "codex"),
+    `#!/usr/bin/env bash
+set -euo pipefail
+if [ "\${RTS_ADVERSARIAL_QUALITY_PASS:-}" != "1" ]; then
+  echo "missing quality pass environment" >&2
+  exit 1
+fi
+report_file=""
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--output-last-message" ]; then
+    report_file="$2"
+    shift
+  fi
+  shift
+done
+if [ -z "$report_file" ]; then
+  echo "missing report file" >&2
+  exit 1
+fi
+cat >"$report_file" <<'JSON'
+{
+  "verdict": "improved",
+  "summary": "Captured report body.",
+  "issues_found": ["PR body lacked a durable audit trail"],
+  "changes_made": ["embedded the quality-pass report"],
+  "verification": ["fake codex verification"],
+  "remaining_concerns": []
+}
+JSON
+`,
+  );
+  writeExecutable(
+    path.join(binPath, "gh"),
+    `#!/usr/bin/env bash
+set -euo pipefail
+if [ "$1" = "api" ]; then
+  exit 0
+fi
+if [ "$1" = "label" ] && [ "\${2:-}" = "create" ]; then
+  exit 0
+fi
+if [ "$1" = "pr" ] && [ "\${2:-}" = "list" ]; then
+  exit 0
+fi
+if [ "$1" = "pr" ] && [ "\${2:-}" = "create" ]; then
+  body_file=""
+  while [ "$#" -gt 0 ]; do
+    if [ "$1" = "--body-file" ]; then
+      body_file="$2"
+      shift
+    fi
+    shift
+  done
+  if [ -z "$body_file" ]; then
+    echo "missing PR body file" >&2
+    exit 1
+  fi
+  cat "$body_file" >"$AGENT_PR_BODY_CAPTURE"
+  printf 'https://github.example/zvory/rts-0/pull/123\\n'
+  exit 0
+fi
+if [ "$1" = "pr" ] && [ "\${2:-}" = "merge" ]; then
+  exit 0
+fi
+echo "unexpected gh invocation: $*" >&2
+exit 1
+`,
+  );
+
+  run("git", ["init", "--bare", originPath]);
+  fs.mkdirSync(workPath);
+  run("git", ["init"], { cwd: workPath });
+  run("git", ["checkout", "-b", "main"], { cwd: workPath });
+  run("git", ["config", "user.email", "qa@example.invalid"], { cwd: workPath });
+  run("git", ["config", "user.name", "Quality Pass Test"], { cwd: workPath });
+  copyWorkflowScripts(workPath);
+  fs.writeFileSync(path.join(workPath, "README.md"), "initial\n");
+  run("git", ["add", "-A"], { cwd: workPath });
+  run("git", ["commit", "-m", "Initial"], { cwd: workPath });
+  run("git", ["remote", "add", "origin", originPath], { cwd: workPath });
+  run("git", ["push", "-u", "origin", "main"], { cwd: workPath });
+  run("git", ["checkout", "-b", "zvorygin/quality-report-body"], { cwd: workPath });
+  fs.appendFileSync(path.join(workPath, "README.md"), "branch change\n");
+  run("git", ["add", "README.md"], { cwd: workPath });
+  run("git", ["commit", "-m", "Change branch"], { cwd: workPath });
+
+  run("scripts/agent-pr.sh", ["--owner", "tester", "--title", "Quality report body", "--verification", "workflow fixture"], {
+    cwd: workPath,
+    env: {
+      AGENT_PR_BODY_CAPTURE: capturedBody,
+      GH_BIN: path.join(binPath, "gh"),
+      PATH: `${binPath}:${process.env.PATH}`,
+    },
+  });
+
+  const body = fs.readFileSync(capturedBody, "utf8");
+  assert.match(body, /<!-- rts-agent-pr:v1 -->/);
+  assert.match(body, /^Focused-Verification: workflow fixture$/m);
+  assert.match(body, /## Adversarial quality pass/);
+  assert.match(body, /Verdict: improved/);
+  assert.match(body, /Captured report body\./);
+  assert.match(body, /- embedded the quality-pass report/);
+} finally {
+  fs.rmSync(tempRoot, { recursive: true, force: true });
+}
 
 console.log("adversarial quality pass tests passed");
