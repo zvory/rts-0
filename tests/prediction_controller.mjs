@@ -242,6 +242,25 @@ function sentSeqs(sent) {
 }
 
 {
+  const calls = [];
+  const controller = new PredictionController({
+    predictor: {
+      enqueueCommand(clientSeq, command) {
+        calls.push([clientSeq, command.c]);
+        return true;
+      },
+    },
+    sendCommand: () => true,
+  });
+  const issued = controller.issueCommand({ c: "move", units: [1], x: 120, y: 100 }, {
+    predictMovement: false,
+  });
+  assert(issued.sent === true && issued.predicted === false, "paused movement prediction still sends commands without a local tick");
+  assert(calls.length === 0, "paused movement prediction skips the WASM predictor enqueue");
+  assert(controller.debugSummary().pendingClientSeqs.join(",") === "1", "paused movement prediction still tracks the pending command");
+}
+
+{
   const state = new GameState({
     playerId: 1,
     spectator: false,

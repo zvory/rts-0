@@ -123,6 +123,9 @@ pub struct CombatState {
     pub target_id: Option<u32>,
     /// Target id this combatant has already spent its firing-reveal reaction delay on.
     pub firing_reveal_response_target: Option<u32>,
+    /// Consecutive no-target ticks while a deployed/setup support weapon is trying to resume an
+    /// unfinished attack-move order.
+    pub attack_move_no_target_ticks: u16,
     /// Setup state for support weapons that must deploy before firing. Other combatants leave
     /// this packed and ignore it.
     pub setup: WeaponSetup,
@@ -145,6 +148,7 @@ impl Default for CombatState {
             artillery_shots_fired: 0,
             target_id: None,
             firing_reveal_response_target: None,
+            attack_move_no_target_ticks: 0,
             setup: WeaponSetup::Packed,
             weapon_facing: 0.0,
             desired_weapon_facing: 0.0,

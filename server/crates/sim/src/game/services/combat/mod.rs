@@ -49,8 +49,8 @@ use weapons::{
     deployed_weapon_ready_to_fire, deployed_weapon_ready_to_move, effective_attack_profile,
     mirror_weapon_to_body, moving_fire_miss_chance, moving_fire_movement_order_holds_path,
     relax_vehicle_weapon_toward_body, rotate_anti_tank_gun_for_combat,
-    rotate_vehicle_weapon_for_combat, tick_deployed_weapon_setup, uses_stationary_weapon_aggro,
-    uses_vehicle_weapon_policy,
+    rotate_vehicle_weapon_for_combat, tick_deployed_weapon_setup,
+    update_attack_move_no_target_teardown, uses_stationary_weapon_aggro, uses_vehicle_weapon_policy,
 };
 
 #[cfg(test)]
@@ -272,6 +272,7 @@ pub(in crate::game) fn combat_system(
                     relax_vehicle_weapon_toward_body(e);
                 }
             }
+            update_attack_move_no_target_teardown(entities, id);
             if matches!(mode, CombatMode::Aggressive) {
                 if let Some(goal) = entities.get(id).and_then(|e| e.move_intent()) {
                     let needs_resume = entities

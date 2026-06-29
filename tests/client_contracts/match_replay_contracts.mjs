@@ -1223,6 +1223,70 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   assert(!mismatchMatch.prediction.enabled, "stale cached state module disables prediction instead of crashing");
   assert(mismatchStatus === "disabled-state-mismatch", "state mismatch is logged for diagnostics");
 
+  const pausePredictionMatch = Object.create(Match.prototype);
+  const pausePredictionOverlays = [];
+  let pauseVisualClockCalls = 0;
+  let advanceVisualCalls = 0;
+  pausePredictionMatch.livePauseState = { paused: true };
+  pausePredictionMatch.predictionVisualSuspended = false;
+  pausePredictionMatch.prediction = { enabled: true };
+  pausePredictionMatch.predictionAdapter = {
+    ready: true,
+    pauseVisualClock() {
+      pauseVisualClockCalls += 1;
+    },
+    advanceVisual() {
+      advanceVisualCalls += 1;
+      return { tick: 2, entities: [] };
+    },
+    diagnostics: () => ({}),
+  };
+  pausePredictionMatch.state = {
+    applyPredictionDisplayOverlay(overlay) {
+      pausePredictionOverlays.push(overlay);
+    },
+  };
+  pausePredictionMatch.predictionStateCompatible = () => true;
+  pausePredictionMatch.applyPredictionDisplayOverlay = Match.prototype.applyPredictionDisplayOverlay;
+  pausePredictionMatch.publishPredictionDebug = () => {};
+  pausePredictionMatch.advancePredictionVisual();
+  assert(advanceVisualCalls === 0, "live pause stops per-frame movement prediction ticks");
+  assert(pauseVisualClockCalls === 1, "live pause keeps the prediction visual clock synced to wall time");
+  assert(
+    pausePredictionOverlays.at(-1)?.predictedSnapshot === null,
+    "live pause clears the predicted movement overlay",
+  );
+
+  pausePredictionMatch.livePauseState = { paused: false };
+  pausePredictionMatch.predictionVisualSuspended = true;
+  pausePredictionMatch.advancePredictionVisual();
+  assert(advanceVisualCalls === 0, "prediction stays suspended until a post-unpause snapshot is applied");
+  pausePredictionMatch.predictionVisualSuspended = false;
+  pausePredictionMatch.advancePredictionVisual();
+  assert(advanceVisualCalls === 1, "prediction resumes after the snapshot gate clears");
+
+  const livePauseStateMatch = Object.create(Match.prototype);
+  const livePauseOverlays = [];
+  livePauseStateMatch.livePauseState = { paused: false };
+  livePauseStateMatch.predictionVisualSuspended = false;
+  livePauseStateMatch.predictionAdapter = { pauseVisualClock() {} };
+  livePauseStateMatch.state = {
+    applyPredictionDisplayOverlay(overlay) {
+      livePauseOverlays.push(overlay);
+    },
+  };
+  livePauseStateMatch.publishPredictionDebug = () => {};
+  livePauseStateMatch.livePauseOverlay = { applyLivePauseState() {} };
+  livePauseStateMatch.syncLivePauseUi = () => {};
+  livePauseStateMatch.applyLivePauseState({ paused: true, canPause: false, canUnpause: true });
+  assert(livePauseStateMatch.predictionVisualSuspended, "entering live pause suspends prediction visuals");
+  assert(livePauseOverlays.at(-1)?.predictedSnapshot === null, "entering live pause drops any predicted movement frame");
+  livePauseStateMatch.applyLivePauseState({ paused: false, canPause: true, canUnpause: false });
+  assert(
+    livePauseStateMatch.predictionVisualSuspended,
+    "leaving live pause keeps prediction suspended until the next authoritative snapshot",
+  );
+
   const manualPointerLockMatch = Object.create(Match.prototype);
   let toggledPointerLock = 0;
   let closedSettings = 0;
