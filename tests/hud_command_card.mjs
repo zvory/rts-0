@@ -68,7 +68,7 @@ function buttonSlots(card) {
     kriegsiaCommandId("research", UPGRADE.MORTAR_AUTOCAST),
   ]);
   assert.equal(rAndDCard().slots[1].enabled, false);
-  assert.equal(rAndDCard().slots[1].title, "Requires Field Ordnance");
+  assert.equal(rAndDCard().slots[1].title, "Requires Heavy Guns");
 }
 
 {
