@@ -424,11 +424,12 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
     let oil_step_y = tile_step(oil_angle.sin());
     let mut oil_tiles =
         resource_placement::occupied_resource_tiles(map, entities, EntityKind::Oil);
-    let blocked_pump_jack_tiles = non_oil_resource_blocked_pump_jack_tiles(map, entities);
+    let blocked_pump_jack_tiles =
+        resource_placement::non_oil_resource_blocked_pump_jack_tiles(map, entities);
     for i in 0..config::OIL_PATCHES_PER_BASE {
         let (tile_dx, tile_dy) = oil_patch_tile_offset(i, oil_step_x, oil_step_y);
         let (desired_x, desired_y) = offset_tile_center(map, tx, ty, tile_dx, tile_dy);
-        let (px, py, tile) = oil_patch_tile_center(
+        let (px, py, tile) = resource_placement::nearest_oil_patch_tile_center(
             map,
             desired_x,
             desired_y,
@@ -468,92 +469,6 @@ fn offset_tile_center(map: &Map, tx: u32, ty: u32, dx: i32, dy: i32) -> (f32, f3
     let desired_tx = (tx as i32 + dx).clamp(0, max_tile) as u32;
     let desired_ty = (ty as i32 + dy).clamp(0, max_tile) as u32;
     map.tile_center(desired_tx, desired_ty)
-}
-
-fn oil_patch_tile_center(
-    map: &Map,
-    x: f32,
-    y: f32,
-    anchor_x: f32,
-    anchor_y: f32,
-    occupied_tiles: &BTreeSet<(u32, u32)>,
-    blocked_pump_jack_tiles: &BTreeSet<(u32, u32)>,
-) -> (f32, f32, (u32, u32)) {
-    let accepts = |tile: (u32, u32),
-                   center_x: f32,
-                   center_y: f32,
-                   enforce_cc_distance: bool| {
-        if !resource_placement::tile_has_one_tile_resource_gap(tile, occupied_tiles) {
-            return false;
-        }
-        if blocked_pump_jack_tiles.contains(&tile) {
-            return false;
-        }
-        if !enforce_cc_distance {
-            return true;
-        }
-
-        let ts = config::TILE_SIZE as f32;
-        let dist_tiles =
-            ((center_x - anchor_x).powi(2) + (center_y - anchor_y).powi(2)).sqrt() / ts;
-        (config::CC_RESOURCE_MIN_DIST_TILES..=config::CC_RESOURCE_MAX_DIST_TILES)
-            .contains(&dist_tiles)
-    };
-
-    resource_placement::nearest_resource_tile_center(map, x, y, |tile, cx, cy| {
-        accepts(tile, cx, cy, true)
-    })
-    .or_else(|| {
-        resource_placement::nearest_resource_tile_center(map, x, y, |tile, cx, cy| {
-            accepts(tile, cx, cy, false)
-        })
-    })
-    .unwrap_or_else(|| resource_placement::nearest_tile_center(map, x, y))
-}
-
-fn non_oil_resource_blocked_pump_jack_tiles(
-    map: &Map,
-    entities: &EntityStore,
-) -> BTreeSet<(u32, u32)> {
-    let mut blocked = BTreeSet::new();
-    let ts = config::TILE_SIZE as f32;
-    let max_tile = map.size.saturating_sub(1) as i32;
-
-    for entity in entities
-        .iter()
-        .filter(|entity| entity.is_node() && entity.kind != EntityKind::Oil)
-    {
-        if !entity.pos_x.is_finite() || !entity.pos_y.is_finite() {
-            continue;
-        }
-        let radius = entity.radius();
-        let min_tx = (((entity.pos_x - radius) / ts).floor() as i32 - 1).clamp(0, max_tile);
-        let min_ty = (((entity.pos_y - radius) / ts).floor() as i32 - 1).clamp(0, max_tile);
-        let max_tx = (((entity.pos_x + radius) / ts).floor() as i32).clamp(0, max_tile);
-        let max_ty = (((entity.pos_y + radius) / ts).floor() as i32).clamp(0, max_tile);
-        let circle = services::geometry::CircleBody {
-            x: entity.pos_x,
-            y: entity.pos_y,
-            radius,
-        };
-
-        for ty in min_ty..=max_ty {
-            for tx in min_tx..=max_tx {
-                let tile = (tx as u32, ty as u32);
-                if services::geometry::building_rect_for_footprint(
-                    EntityKind::PumpJack,
-                    tile.0,
-                    tile.1,
-                )
-                .is_some_and(|rect| services::geometry::circle_intersects_rect(circle, rect))
-                {
-                    blocked.insert(tile);
-                }
-            }
-        }
-    }
-
-    blocked
 }
 
 /// Spawn a City Centre, starting workers, and resource clusters for one player.
