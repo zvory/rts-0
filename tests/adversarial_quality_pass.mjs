@@ -301,8 +301,9 @@ exit 1
   run("git", ["remote", "add", "origin", originPath], { cwd: workPath });
   run("git", ["push", "-u", "origin", "main"], { cwd: workPath });
   run("git", ["checkout", "-b", "zvorygin/quality-report-body"], { cwd: workPath });
-  fs.writeFileSync(path.join(workPath, "implementation.txt"), "branch change\n");
-  run("git", ["add", "implementation.txt"], { cwd: workPath });
+  fs.appendFileSync(path.join(workPath, "README.md"), "implementation branch docs change\n");
+  fs.writeFileSync(path.join(workPath, "--implementation.rs"), "branch change\n");
+  run("git", ["add", "--", "README.md", "--implementation.rs"], { cwd: workPath });
   run("git", ["commit", "-m", "Change branch"], { cwd: workPath });
 
   run("scripts/agent-pr.sh", ["--owner", "tester", "--title", "Quality report body", "--verification", "workflow fixture"], {
