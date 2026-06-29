@@ -6,7 +6,7 @@ use crate::game::map::Map;
 
 pub(crate) type ResourceTile = (u32, u32);
 
-pub(crate) fn nearest_oil_tile_center<F>(
+pub(crate) fn nearest_resource_tile_center<F>(
     map: &Map,
     x: f32,
     y: f32,
@@ -54,23 +54,27 @@ pub(crate) fn nearest_tile_center(map: &Map, x: f32, y: f32) -> (f32, f32, Resou
     (cx, cy, (tx, ty))
 }
 
-pub(crate) fn occupied_oil_tiles(map: &Map, entities: &EntityStore) -> BTreeSet<ResourceTile> {
+pub(crate) fn occupied_resource_tiles(
+    map: &Map,
+    entities: &EntityStore,
+    kind: EntityKind,
+) -> BTreeSet<ResourceTile> {
     entities
         .iter()
-        .filter(|entity| entity.kind == EntityKind::Oil && entity.is_node())
+        .filter(|entity| entity.kind == kind && entity.is_node())
         .map(|entity| map.tile_of(entity.pos_x, entity.pos_y))
         .collect()
 }
 
-pub(crate) fn tile_has_one_tile_oil_gap(
+pub(crate) fn tile_has_one_tile_resource_gap(
     tile: ResourceTile,
     occupied_tiles: &BTreeSet<ResourceTile>,
 ) -> bool {
     occupied_tiles
         .iter()
-        .all(|&other| oil_tiles_have_one_tile_gap(tile, other))
+        .all(|&other| resource_tiles_have_one_tile_gap(tile, other))
 }
 
-pub(crate) fn oil_tiles_have_one_tile_gap(a: ResourceTile, b: ResourceTile) -> bool {
+pub(crate) fn resource_tiles_have_one_tile_gap(a: ResourceTile, b: ResourceTile) -> bool {
     a.0.abs_diff(b.0) > 1 || a.1.abs_diff(b.1) > 1
 }

@@ -1,8 +1,7 @@
 //! Authoritative lab mutation API.
 //!
-//! Lab callers get typed operations with validation at the `Game` seam. This module owns the
-//! repair pass after accepted mutations so room/client code never reaches into entity stores,
-//! player state, fog, spatial indexes, or derived economy state directly.
+//! Lab callers get typed operations with validation at the `Game` seam. This module owns the repair
+//! pass so room/client code never reaches into stores, fog, spatial indexes, or economy state.
 
 use std::collections::HashSet;
 use std::str::FromStr;
@@ -672,6 +671,7 @@ impl Game {
                 kind,
                 entity.x,
                 entity.y,
+                kind == EntityKind::Oil,
             )?;
             let id = self
                 .entities
