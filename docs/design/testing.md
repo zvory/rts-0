@@ -156,7 +156,8 @@ suites.
   Codex quality-pass coverage should verify access to linked worktree git common directories while
   marking the environment so `scripts/agent-pr.sh` refuses recursive PR lifecycle calls.
   Branch-handling changes should also include a dry-run `--head-branch` mismatch check that fails
-  before Codex, push, or status work runs. Include
+  before Codex, push, or status work runs. PR-helper changes should preserve the Markdown
+  quality-pass report in the owned PR body so the status has a durable audit trail. Include
   `bash -n scripts/agent-pr.sh tests/run-all.sh && node --check scripts/adversarial-quality-pass.mjs`
   for shell and JS syntax coverage.
 - `rts-contract` or `rts-protocol`: run Rust contract/protocol tests, compact snapshot tests, JS

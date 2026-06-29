@@ -139,8 +139,7 @@ Current GitHub repository settings for `zvory/rts-0`:
 - delete-branch-on-merge is enabled;
 - `main` is protected and requires pull requests before normal merges;
 - `main` requires branches to be up to date and requires
-  `./tests/run-all.sh`; after adversarial quality-pass rollout, also require
-  `adversarial-quality-pass`;
+  `./tests/run-all.sh` and `adversarial-quality-pass`;
 - force pushes and branch deletion are disabled;
 - admins may bypass protection only for emergency repair and the active CI migration phases.
 
@@ -161,10 +160,10 @@ scripts/pr-sweep.sh
 Agent-owned PRs use the `rts-agent-pr:v1` body block and the labels `agent-owned`, `automerge`,
 `ci-failed`, and `needs-human`. `scripts/agent-pr.sh` first runs
 `scripts/adversarial-quality-pass.mjs`, which lets a fresh Codex CLI pass improve or rewrite the
-branch before posting the `adversarial-quality-pass` status on the final head. A lightweight PR
-ownership workflow validates that `zvorygin/*` PRs carry the metadata needed for another agent to
-tell who owns the PR, whether auto-merge should be armed, what focused verification ran, and whether
-a human decision is needed.
+branch before posting the `adversarial-quality-pass` status on the final head and embedding the
+full quality-pass report in the PR body. A lightweight PR ownership workflow validates that
+`zvorygin/*` PRs carry the metadata needed for another agent to tell who owns the PR, whether
+auto-merge should be armed, what focused verification ran, and whether a human decision is needed.
 
 The full test runner uses a per-worktree Cargo target directory under `/tmp/rts-cargo-target/` so
 parallel agents do not share final binaries or test artifacts.

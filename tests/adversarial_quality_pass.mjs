@@ -29,12 +29,15 @@ const options = parseArgs([
   "adversarial-quality-pass",
   "--post-status",
   "--push",
+  "--markdown-report-file",
+  "/tmp/adversarial-quality-pass.md",
 ]);
 assert.equal(options.baseRef, "origin/main");
 assert.equal(options.headBranch, "zvorygin/example");
 assert.equal(options.context, "adversarial-quality-pass");
 assert.equal(options.postStatus, true);
 assert.equal(options.push, true);
+assert.equal(options.markdownReportFile, "/tmp/adversarial-quality-pass.md");
 
 assert.throws(() => parseArgs(["--unknown"]), /unknown argument/);
 

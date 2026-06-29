@@ -33,6 +33,7 @@ Options:
   --repo DIR                  Repository root. Default: current RTS checkout.
   --schema FILE               JSON schema passed to Codex.
   --report-file FILE          JSON report output path. Default: temp file.
+  --markdown-report-file FILE Optional Markdown report output path for PR audit trails.
   --codex-command COMMAND     Codex CLI command. Default: codex.
   --codex-model MODEL         Optional model passed to Codex CLI.
   --gh-bin COMMAND            GitHub CLI command. Default: gh.
@@ -56,6 +57,7 @@ export function parseArgs(argv) {
     ghBin: DEFAULT_GH_BIN,
     headBranch: "",
     help: false,
+    markdownReportFile: "",
     postStatus: false,
     push: false,
     remote: DEFAULT_REMOTE,
@@ -90,6 +92,8 @@ export function parseArgs(argv) {
       options.schemaFile = path.resolve(value("--schema"));
     } else if (arg === "--report-file" || arg.startsWith("--report-file=")) {
       options.reportFile = path.resolve(value("--report-file"));
+    } else if (arg === "--markdown-report-file" || arg.startsWith("--markdown-report-file=")) {
+      options.markdownReportFile = path.resolve(value("--markdown-report-file"));
     } else if (arg === "--codex-command" || arg.startsWith("--codex-command=")) {
       options.codexCommand = value("--codex-command");
     } else if (arg === "--codex-model" || arg.startsWith("--codex-model=")) {
@@ -436,6 +440,9 @@ class Runner {
       if (options.postStatus) {
         this.log(`quality-pass: would post ${options.context} status on final HEAD`);
       }
+      if (options.markdownReportFile) {
+        this.log(`quality-pass: would write Markdown report to ${options.markdownReportFile}`);
+      }
       this.stdout.write(prompt);
       return;
     }
@@ -460,6 +467,9 @@ class Runner {
       this.log(`quality-pass: Codex committed final state at ${finalHead}`);
     } else {
       this.log("quality-pass: final state unchanged");
+    }
+    if (options.markdownReportFile) {
+      fs.writeFileSync(options.markdownReportFile, markdownReport(report));
     }
 
     if (options.push) {
