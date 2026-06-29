@@ -10,7 +10,7 @@ import {
   isProducerBuilding,
 } from "../config.js";
 import { KIND, SETUP, STATE, isBuilding, isResource } from "../protocol.js";
-import { isConstructionScaffold } from "./entity_state.js";
+import { buildingProgressStatus } from "./entity_state.js";
 import {
   DEPLOYED_WEAPON_ANIM_MS,
   SWEEP_EVICT_FRAMES,
@@ -109,7 +109,7 @@ export function _vehicleShadow(g, cx, cy, body, facing) {
 export function _drawSelectionAndHp(e, selection, state) {
   const selected = selection.has(e.id);
   const damaged = e.maxHp && e.hp < e.maxHp;
-  const underConstruction = isConstructionScaffold(e);
+  const progressStatus = buildingProgressStatus(e);
 
   if (selected) {
     const g = this._slot("selectionRings", e.id);
@@ -127,10 +127,10 @@ export function _drawSelectionAndHp(e, selection, state) {
     g.drawEllipse(0, ring.cy, ring.rx, ring.ry);
   }
 
-  if (!underConstruction && (damaged || selected)) {
+  if (progressStatus || damaged || selected) {
     const g = this._slot("hpBars", e.id);
     g.position.set(0, 0);
-    this._hpBar(g, e);
+    this._hpBar(g, e, progressStatus);
   }
 }
 
@@ -175,9 +175,9 @@ export function _ringRadius(e) {
   return { rx: r, ry: r * 0.7, cy: r * 0.35 };
 }
 
-export function _hpBar(g, e) {
-  if (!e.maxHp) return;
-  const frac = clamp01(e.hp / e.maxHp);
+export function _hpBar(g, e, status = null) {
+  if (!e.maxHp && !status) return;
+  const frac = clamp01(status ? status.fraction : e.hp / e.maxHp);
   const stat = STATS[e.kind] || {};
   let halfW;
   let topY;
@@ -207,8 +207,12 @@ export function _hpBar(g, e) {
   g.endFill();
 
   let color = COLORS.hpGood;
-  if (frac <= 0.33) color = COLORS.hpLow;
-  else if (frac <= 0.66) color = COLORS.hpMid;
+  if (status?.kind === "deconstruction") {
+    color = COLORS.hpMid;
+  } else if (status?.kind !== "construction") {
+    if (frac <= 0.33) color = COLORS.hpLow;
+    else if (frac <= 0.66) color = COLORS.hpMid;
+  }
   g.beginFill(color);
   g.drawRect(x0, topY, barW * frac, barH);
   g.endFill();

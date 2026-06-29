@@ -506,8 +506,9 @@ export class Renderer {
    */
   /**
    * Blocky footprint tinted by owner, with a plain two-letter stencil. Under
-   * construction (`buildProgress < 1`) → translucent with a horizontal progress bar.
-   * Producing (`prodProgress`) → a top-edge progress bar.
+   * construction (`buildProgress < 1`) → translucent body; construction and
+   * deconstruction status use the HP bar layer. Producing (`prodProgress`) →
+   * a top-edge progress bar.
    * @private
    */
   /**
@@ -518,7 +519,8 @@ export class Renderer {
    */
   /**
    * Selection ring (own=green, enemy=red, neutral=yellow) for selected entities, and
-   * an HP bar above any entity that is damaged or selected.
+   * one status bar above any entity that is damaged, selected, constructing, or
+   * deconstructing.
    * @private
    */
   // --- Geometry helpers for rings / hp bars --------------------------------
@@ -530,7 +532,8 @@ export class Renderer {
    * @returns {{rx:number, ry:number, cy:number}}
    */
   /**
-   * Draw an HP bar centered above the entity. Color steps from good→mid→low.
+   * Draw a status bar centered above the entity. HP color steps from good→mid→low;
+   * construction/deconstruction can supply their own progress fraction.
    * @private
    */
   // --- Icon glyphs (pooled Text) -------------------------------------------
