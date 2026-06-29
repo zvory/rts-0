@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use crate::config;
 use crate::protocol::{AttackReveal, Event};
 
-use super::entity::EntityKind;
 use super::fog::Fog;
 use super::teams::TeamRelations;
 
@@ -137,12 +136,12 @@ pub(in crate::game) fn record_mortar_impact_firing_reveals(
     attacker: u32,
     reveal: Option<&AttackReveal>,
     tick: u32,
+    firing_cycle_ticks: u32,
 ) {
     let Some(reveal) = reveal else {
         return;
     };
     let player_ids = events.keys().copied().collect::<Vec<_>>();
-    let cooldown = config::unit_stats(EntityKind::MortarTeam).map_or(0, |stats| stats.cooldown);
     record_firing_reveals_for_victim_teams(
         firing_reveals,
         &player_ids,
@@ -153,7 +152,7 @@ pub(in crate::game) fn record_mortar_impact_firing_reveals(
         attacker,
         (reveal.x, reveal.y),
         tick,
-        cooldown,
+        firing_cycle_ticks,
     );
 }
 

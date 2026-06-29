@@ -229,6 +229,8 @@ fn resolve(
     }
     reveal_recipients.sort_unstable();
     reveal_recipients.dedup();
+    let firing_cycle_ticks =
+        config::unit_stats(EntityKind::MortarTeam).map_or(0, |stats| stats.cooldown);
     record_mortar_impact_firing_reveals(
         firing_reveals,
         events,
@@ -239,6 +241,7 @@ fn resolve(
         shell.attacker,
         reveal.as_ref(),
         tick,
+        firing_cycle_ticks,
     );
     emit_impact(
         events,
