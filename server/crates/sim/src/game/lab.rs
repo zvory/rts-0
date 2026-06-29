@@ -4,7 +4,7 @@
 //! repair pass after accepted mutations so room/client code never reaches into entity stores,
 //! player state, fog, spatial indexes, or derived economy state directly.
 
-use std::collections::{BTreeSet, HashSet};
+use std::collections::HashSet;
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
@@ -22,9 +22,10 @@ use crate::game::upgrade::UpgradeKind;
 use crate::protocol::Command;
 use crate::rules;
 
-use super::{resource_placement, systems, Game, MapMetadata, PlayerInit};
+use super::{systems, Game, MapMetadata, PlayerInit};
 
 mod orientation;
+mod resource_nodes;
 mod scenario;
 
 use orientation::{
@@ -665,8 +666,13 @@ impl Game {
                     owner: entity.owner,
                 });
             }
-            let (x, y) =
-                restore_resource_node_position(&self.map, &self.entities, kind, entity.x, entity.y)?;
+            let (x, y) = resource_nodes::restore_resource_node_position(
+                &self.map,
+                &self.entities,
+                kind,
+                entity.x,
+                entity.y,
+            )?;
             let id = self
                 .entities
                 .spawn_node(kind, x, y)
@@ -874,44 +880,6 @@ fn building_top_left_for_center(
     };
     let (center_x, center_y) = footprint_center(map, kind, tile_x, tile_y);
     Ok((tile_x, tile_y, center_x, center_y))
-}
-
-fn restore_resource_node_position(
-    map: &Map,
-    entities: &EntityStore,
-    kind: EntityKind,
-    x: f32,
-    y: f32,
-) -> Result<(f32, f32), LabError> {
-    if kind != EntityKind::Oil {
-        validate_resource_node_position(map, entities, x, y)?;
-        return Ok((x, y));
-    }
-
-    validate_world_position(map, x, y)?;
-    let occupied_tiles = existing_oil_tiles(map, entities);
-    let Some((center_x, center_y, _tile)) =
-        resource_placement::nearest_oil_tile_center(map, x, y, |tile, center_x, center_y| {
-            resource_placement::tile_has_one_tile_oil_gap(tile, &occupied_tiles)
-                && validate_resource_node_position(map, entities, center_x, center_y).is_ok()
-        })
-    else {
-        return Err(LabError::InvalidPosition {
-            x,
-            y,
-            reason: "oil node must have a passable tile center with one tile of spacing",
-        });
-    };
-
-    Ok((center_x, center_y))
-}
-
-fn existing_oil_tiles(map: &Map, entities: &EntityStore) -> BTreeSet<(u32, u32)> {
-    entities
-        .iter()
-        .filter(|entity| entity.kind == EntityKind::Oil && entity.is_node())
-        .map(|entity| map.tile_of(entity.pos_x, entity.pos_y))
-        .collect()
 }
 
 fn validate_resource_node_position(
@@ -1489,51 +1457,6 @@ mod tests {
     }
 
     #[test]
-    fn lab_scenario_restore_centers_and_spaces_oil_nodes() {
-        let source = default_map_game();
-        let mut scenario = source.export_lab_scenario();
-        let (tile_x, tile_y) = first_passable_tile(&source);
-        let (center_x, center_y) = source.map.tile_center(tile_x, tile_y);
-        scenario.entities = vec![
-            lab_oil_entity(101, center_x - 12.0, center_y - 12.0),
-            lab_oil_entity(102, center_x + 10.0, center_y + 10.0),
-            lab_oil_entity(103, center_x + 12.0, center_y - 8.0),
-        ];
-
-        let mut restored = default_map_game();
-        restored
-            .apply_lab_op(LabOp::RestoreScenario(Box::new(scenario)))
-            .expect("scenario restore should normalize oil nodes");
-
-        let oils: Vec<_> = restored
-            .entities
-            .iter()
-            .filter(|entity| entity.kind == EntityKind::Oil)
-            .collect();
-        assert_eq!(oils.len(), 3);
-        let mut oil_tiles = Vec::new();
-        for oil in oils {
-            let (oil_tile_x, oil_tile_y) = restored.map.tile_of(oil.pos_x, oil.pos_y);
-            let (expected_x, expected_y) = restored.map.tile_center(oil_tile_x, oil_tile_y);
-            assert!(
-                (oil.pos_x - expected_x).abs() < 0.001
-                    && (oil.pos_y - expected_y).abs() < 0.001,
-                "restored oil node {} should be centered on tile ({oil_tile_x}, {oil_tile_y})",
-                oil.id
-            );
-            oil_tiles.push((oil.id, oil_tile_x, oil_tile_y));
-        }
-        for (index, &(a_id, a_x, a_y)) in oil_tiles.iter().enumerate() {
-            for &(b_id, b_x, b_y) in oil_tiles.iter().skip(index + 1) {
-                assert!(
-                    a_x.abs_diff(b_x) > 1 || a_y.abs_diff(b_y) > 1,
-                    "restored oil nodes {a_id} and {b_id} should have one free tile between them, got tiles ({a_x}, {a_y}) and ({b_x}, {b_y})"
-                );
-            }
-        }
-    }
-
-    #[test]
     fn lab_scenario_restore_rejects_invalid_upgrade_string() {
         let mut game = default_map_game();
         let mut scenario = game.export_lab_scenario();
@@ -1574,34 +1497,4 @@ mod tests {
         ));
     }
 
-    fn first_passable_tile(game: &Game) -> (u32, u32) {
-        for ty in 8..game.map.size.saturating_sub(8) {
-            for tx in 8..game.map.size.saturating_sub(8) {
-                if game.map.is_passable(tx as i32, ty as i32) {
-                    return (tx, ty);
-                }
-            }
-        }
-        panic!("no passable tile found");
-    }
-
-    fn lab_oil_entity(id: u32, x: f32, y: f32) -> LabScenarioEntity {
-        LabScenarioEntity {
-            id,
-            owner: NEUTRAL,
-            kind: EntityKind::Oil.to_string(),
-            x,
-            y,
-            hp: 1,
-            completed: true,
-            construction_progress: None,
-            construction_total: None,
-            resource_remaining: Some(config::OIL_GEYSER_AMOUNT),
-            facing: None,
-            weapon_facing: None,
-            set_up: false,
-            setup_facing: None,
-            setup_target: None,
-        }
-    }
 }

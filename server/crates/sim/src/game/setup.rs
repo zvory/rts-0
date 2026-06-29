@@ -422,7 +422,7 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
     let oil_angle = base_angle + std::f32::consts::FRAC_PI_2;
     let oil_step_x = tile_step(oil_angle.cos());
     let oil_step_y = tile_step(oil_angle.sin());
-    let mut oil_tiles = existing_oil_tiles(map, entities);
+    let mut oil_tiles = resource_placement::occupied_oil_tiles(map, entities);
     for i in 0..config::OIL_PATCHES_PER_BASE {
         let (tile_dx, tile_dy) = oil_patch_tile_offset(i, oil_step_x, oil_step_y);
         let (desired_x, desired_y) = offset_tile_center(map, tx, ty, tile_dx, tile_dy);
@@ -438,14 +438,6 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
         );
         entities.spawn_node(EntityKind::Oil, px, py);
     }
-}
-
-fn existing_oil_tiles(map: &Map, entities: &EntityStore) -> BTreeSet<(u32, u32)> {
-    entities
-        .iter()
-        .filter(|entity| entity.kind == EntityKind::Oil && entity.is_node())
-        .map(|entity| map.tile_of(entity.pos_x, entity.pos_y))
-        .collect()
 }
 
 fn tile_step(value: f32) -> i32 {

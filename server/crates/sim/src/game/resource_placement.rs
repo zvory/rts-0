@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 
 use crate::config;
+use crate::game::entity::{EntityKind, EntityStore};
 use crate::game::map::Map;
 
 pub(crate) type ResourceTile = (u32, u32);
@@ -51,6 +52,14 @@ pub(crate) fn nearest_tile_center(map: &Map, x: f32, y: f32) -> (f32, f32, Resou
     let ty = (y / ts - 0.5).round().clamp(0.0, max_tile) as u32;
     let (cx, cy) = map.tile_center(tx, ty);
     (cx, cy, (tx, ty))
+}
+
+pub(crate) fn occupied_oil_tiles(map: &Map, entities: &EntityStore) -> BTreeSet<ResourceTile> {
+    entities
+        .iter()
+        .filter(|entity| entity.kind == EntityKind::Oil && entity.is_node())
+        .map(|entity| map.tile_of(entity.pos_x, entity.pos_y))
+        .collect()
 }
 
 pub(crate) fn tile_has_one_tile_oil_gap(
