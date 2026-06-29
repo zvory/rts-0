@@ -35,6 +35,18 @@ import {
 import { dom, isTextEntry } from "./bootstrap.js";
 import { COMMAND_BUDGET_OVERFLOW_NOTICE, commandWithinBudget } from "./command_budget.js";
 import { MatchCombatAudio } from "./match_combat_audio.js";
+import {
+  applyLivePauseState as applyLivePauseStateModel,
+  clearPredictedMovementOverlay,
+  livePauseActionLabel as livePauseActionLabelModel,
+  livePauseActionTitle as livePauseActionTitleModel,
+  notePredictionAuthoritativeSnapshot,
+  pausePredictionVisualClock as pausePredictionVisualClockModel,
+  predictionVisualsPaused as predictionVisualsPausedModel,
+  requestPauseGame as requestPauseGameModel,
+  requestUnpauseGame as requestUnpauseGameModel,
+  suspendPredictionVisuals as suspendPredictionVisualsModel,
+} from "./match_live_pause.js";
 import { MatchNetReporter, predictionReportFields as buildPredictionReportFields } from "./match_net_reporter.js";
 import { buildMatchSettingsContext } from "./match_settings_context.js";
 
@@ -103,6 +115,7 @@ export class Match {
       canPause: false,
       canUnpause: false,
     };
+    this.predictionVisualSuspended = false;
     this.giveUpSent = false;
     this.skipFinalNetReport = false;
     this.lastSnapshotTick = 0;
@@ -148,7 +161,10 @@ export class Match {
           this.toast?.(COMMAND_BUDGET_OVERFLOW_NOTICE);
           return { clientSeq: null, sent: false, predicted: false, blocked: "commandBudget", budget };
         }
-        const issued = this.prediction.issueCommand(command, options);
+        const predictionOptions = this.predictionVisualsPaused()
+          ? { ...options, predictMovement: false }
+          : options;
+        const issued = this.prediction.issueCommand(command, predictionOptions);
         if (issued?.sent) {
           const issuedAt = this.frameProfiler?.now?.() ?? performance.now();
           this.health.noteCommandIssued(issuedAt);
@@ -261,6 +277,7 @@ export class Match {
         () => this.prediction.applyAuthoritativeSnapshot(m),
         () => this.state.applySnapshot(m),
         () => {
+          notePredictionAuthoritativeSnapshot(this);
           this.applyPredictionDisplayOverlay(this.prediction.predictionDisplayOverlay());
           this.applyPredictedSnapshot();
         },
@@ -373,6 +390,12 @@ export class Match {
       this.disablePredictionForStateMismatch();
       return;
     }
+    if (this.predictionVisualsPaused()) {
+      this.pausePredictionVisualClock();
+      clearPredictedMovementOverlay(this);
+      this.publishPredictionDebug();
+      return;
+    }
     if (!this.prediction.enabled || !this.predictionAdapter.ready) {
       this.applyPredictionDisplayOverlay({ predictedSnapshot: null });
       this.publishPredictionDebug();
@@ -393,6 +416,11 @@ export class Match {
   advancePredictionVisual() {
     if (!this.predictionStateCompatible()) {
       this.disablePredictionForStateMismatch();
+      return;
+    }
+    if (this.predictionVisualsPaused()) {
+      this.pausePredictionVisualClock();
+      clearPredictedMovementOverlay(this);
       return;
     }
     if (!this.prediction.enabled || !this.predictionAdapter.ready) return;
@@ -441,6 +469,18 @@ export class Match {
 
   predictionStateCompatible() {
     return typeof this.state?.applyPredictionDisplayOverlay === "function";
+  }
+
+  predictionVisualsPaused() {
+    return predictionVisualsPausedModel(this);
+  }
+
+  pausePredictionVisualClock() {
+    pausePredictionVisualClockModel(this);
+  }
+
+  suspendPredictionVisuals() {
+    suspendPredictionVisualsModel(this);
   }
 
   disablePredictionForStateMismatch() {
@@ -662,36 +702,15 @@ export class Match {
   }
 
   requestPauseGame() {
-    if (!this.capabilities.matchControls?.pause) return;
-    if (this.livePauseState.paused || !this.livePauseState.canPause) {
-      this.syncLivePauseUi();
-      return;
-    }
-    this.closeSettingsMenu();
-    this.net.pauseGame();
-    this.livePauseState = { ...this.livePauseState, canPause: false };
-    this.syncLivePauseUi();
+    requestPauseGameModel(this);
   }
 
   requestUnpauseGame() {
-    if (!this.capabilities.matchControls?.pause) return;
-    if (!this.livePauseState.paused || !this.livePauseState.canUnpause) return;
-    this.net.unpauseGame();
-    this.livePauseState = { ...this.livePauseState, canUnpause: false };
-    this.syncLivePauseUi();
+    requestUnpauseGameModel(this);
   }
 
   applyLivePauseState(state) {
-    this.livePauseState = {
-      paused: state?.paused === true,
-      pausedBy: Number.isInteger(state?.pausedBy) ? state.pausedBy : null,
-      pausesRemaining: Number.isInteger(state?.pausesRemaining) ? state.pausesRemaining : null,
-      pauseLimit: Number.isInteger(state?.pauseLimit) ? state.pauseLimit : null,
-      canPause: state?.canPause === true,
-      canUnpause: state?.canUnpause === true,
-    };
-    this.livePauseOverlay?.applyLivePauseState(this.livePauseState);
-    this.syncLivePauseUi();
+    applyLivePauseStateModel(this, state);
   }
 
   shouldUseDesktopCursorAutoLock() {
@@ -955,16 +974,11 @@ export class Match {
   }
 
   livePauseActionLabel() {
-    const remaining = this.livePauseState.pausesRemaining;
-    if (Number.isInteger(remaining)) return `Pause (${remaining})`;
-    return "Pause";
+    return livePauseActionLabelModel(this);
   }
 
   livePauseActionTitle() {
-    const remaining = this.livePauseState.pausesRemaining;
-    if (!Number.isInteger(remaining)) return "Pause the live match.";
-    if (remaining <= 0) return "No pauses remaining.";
-    return `${remaining} pause${remaining === 1 ? "" : "s"} remaining.`;
+    return livePauseActionTitleModel(this);
   }
 
   /** Compute world/viewport sizes and push them into the camera. */

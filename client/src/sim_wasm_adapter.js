@@ -123,6 +123,11 @@ export class SimWasmPredictionAdapter {
     return snapshot;
   }
 
+  pauseVisualClock() {
+    const now = this.now();
+    if (Number.isFinite(now)) this.lastAdvanceAt = now;
+  }
+
   renderSnapshot() {
     if (!this.ready || !this.predictor) return null;
     return JSON.parse(this.predictor.renderSnapshotJson());

@@ -48,7 +48,7 @@ const MATERIAL_GOAL_DELTA_PX: f32 = config::TILE_SIZE as f32;
 const FORMATION_NEAR_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 4.0;
 const FORMATION_FAR_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 18.0;
 const FORMATION_MAX_OFFSET_PX: f32 = config::TILE_SIZE as f32 * 4.0;
-const ANTI_TANK_GUN_FORMATION_GAP_TILES: u32 = 1;
+const VEHICLE_BODY_FORMATION_GAP_TILES: u32 = 1;
 const SPAWN_PREFERRED_GAP_UNIT_FRACTION: f32 = 0.10;
 const SCOUT_CAR_ROUTE_SIMPLIFY_MAX_SEGMENT_PX: f32 = config::TILE_SIZE as f32 * 3.0;
 
@@ -1085,20 +1085,17 @@ fn preferred_goal_spacing_clear(
     tile: (u32, u32),
     assigned: &[FormationAssignment],
 ) -> bool {
-    let gap_tiles = preferred_gap_tiles(unit.kind);
-    if gap_tiles == 0 {
-        return true;
-    }
     assigned.iter().all(|assignment| {
-        preferred_gap_tiles(assignment.kind) == 0
-            || tile_chebyshev_distance(tile, assignment.tile) > gap_tiles
+        let gap_tiles = preferred_gap_tiles(unit.kind).max(preferred_gap_tiles(assignment.kind));
+        gap_tiles == 0 || tile_chebyshev_distance(tile, assignment.tile) > gap_tiles
     })
 }
 
 fn preferred_gap_tiles(kind: EntityKind) -> u32 {
-    match kind {
-        EntityKind::AntiTankGun => ANTI_TANK_GUN_FORMATION_GAP_TILES,
-        _ => 0,
+    if uses_oriented_vehicle_body(kind) {
+        VEHICLE_BODY_FORMATION_GAP_TILES
+    } else {
+        0
     }
 }
 
@@ -1398,14 +1395,14 @@ mod tests {
     }
 
     #[test]
-    fn anti_tank_gun_group_move_prefers_one_tile_gap_between_final_goals() {
+    fn vehicle_body_group_move_prefers_one_tile_gap_between_final_goals() {
         let map = flat_map(40);
         let entities = EntityStore::new();
         let occ = Occupancy::build(&map, &entities);
         let units = vec![
             formation_unit_kind(1, EntityKind::AntiTankGun, &map, (10, 10)),
-            formation_unit_kind(2, EntityKind::AntiTankGun, &map, (11, 10)),
-            formation_unit_kind(3, EntityKind::AntiTankGun, &map, (10, 11)),
+            formation_unit_kind(2, EntityKind::ScoutCar, &map, (11, 10)),
+            formation_unit_kind(3, EntityKind::Tank, &map, (10, 11)),
         ];
         let click = map.tile_center(20, 20);
 
@@ -1416,33 +1413,28 @@ mod tests {
                 let a = map.tile_of(goals[i].0, goals[i].1);
                 let b = map.tile_of(goals[j].0, goals[j].1);
                 assert!(
-                    tile_chebyshev_distance(a, b) > ANTI_TANK_GUN_FORMATION_GAP_TILES,
-                    "anti-tank gun final goals should leave one open tile between them, got {a:?} and {b:?}"
+                    tile_chebyshev_distance(a, b) > VEHICLE_BODY_FORMATION_GAP_TILES,
+                    "vehicle-body final goals should leave one open tile between them, got {a:?} and {b:?}"
                 );
             }
         }
     }
 
     #[test]
-    fn anti_tank_gun_goal_spacing_is_preferred_but_relaxable() {
+    fn vehicle_body_goal_spacing_applies_to_mixed_units_but_not_dense_infantry() {
         let map = flat_map(40);
         let entities = EntityStore::new();
         let occ = Occupancy::build(&map, &entities);
-        let unit = formation_unit_kind(2, EntityKind::AntiTankGun, &map, (10, 10));
-        let assigned = vec![FormationAssignment {
-            kind: EntityKind::AntiTankGun,
-            tile: (20, 20),
-        }];
+        let rifle = formation_unit_kind(2, EntityKind::Rifleman, &map, (10, 10));
+        let tank = formation_unit_kind(3, EntityKind::Tank, &map, (10, 10));
+        let infantry = [FormationAssignment { kind: EntityKind::Rifleman, tile: (20, 20) }];
+        let vehicle = [FormationAssignment { kind: EntityKind::AntiTankGun, tile: (20, 20) }];
         let adjacent = (21, 20);
 
-        assert!(
-            !is_free_goal(&map, &occ, &unit, adjacent, &assigned, true),
-            "preferred spacing should reject adjacent anti-tank gun goals"
-        );
-        assert!(
-            is_free_goal(&map, &occ, &unit, adjacent, &assigned, false),
-            "relaxed fallback should still accept an otherwise legal adjacent anti-tank gun goal"
-        );
+        assert!(is_free_goal(&map, &occ, &rifle, adjacent, &infantry, true));
+        assert!(!is_free_goal(&map, &occ, &tank, adjacent, &infantry, true));
+        assert!(!is_free_goal(&map, &occ, &rifle, adjacent, &vehicle, true));
+        assert!(is_free_goal(&map, &occ, &tank, adjacent, &infantry, false));
     }
 
     #[test]

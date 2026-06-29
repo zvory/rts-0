@@ -687,7 +687,9 @@ General rules:
   bias when open space exists; vehicles remain hard-blocked by Tank Traps. Attack-move target
   acquisition remains stricter while the movement path is active: it chooses currently fireable
   targets first, and only uses out-of-range acquisition/chase targets when no current target is
-  fireable.
+  fireable. Setup weapons that stopped to engage during an unfinished attack-move keep their
+  emplacement for a one-second no-target grace period; if the attack-move order still exists after
+  that grace, they tear down and continue toward the original attack-move destination.
 - Active moving-fire `Move` and `AttackMove` orders preserve the player-issued destination while
   they are still in `MovePhase::AwaitingPath`, `Moving`, or `PathFailed`. Their auto-acquisition is
   opportunistic: it may retain, aim at, expose, and fire on targets that are currently inside

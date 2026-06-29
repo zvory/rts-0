@@ -69,6 +69,7 @@ src/
   app.js          # Lobby/app shell lifecycle and persistent Net/Audio ownership
   match.js        # Match lifecycle, module dependency wiring, render loop, transient events
   match_combat_audio.js # Match-owned combat sound routing and machine-gunner sound cleanup
+  match_live_pause.js # live pause state actions and prediction visual suspension
   match_net_reporter.js # Match ping cadence and client net-report upload collaborator
   match_settings_context.js # Match settings action/tab context builder
   frame_recovery.js # Frame-loop soft-failure logging and rescheduling diagnostics

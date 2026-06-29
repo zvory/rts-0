@@ -121,6 +121,9 @@ pub struct CombatState {
     /// Current attack/interaction target id. Combat uses enemy ids; gather/build commands use
     /// this for client feedback while the order executes.
     pub target_id: Option<u32>,
+    /// Consecutive no-target ticks while a deployed/setup support weapon is trying to resume an
+    /// unfinished attack-move order.
+    pub attack_move_no_target_ticks: u16,
     /// Setup state for support weapons that must deploy before firing. Other combatants leave
     /// this packed and ignore it.
     pub setup: WeaponSetup,
@@ -147,6 +150,7 @@ impl Default for CombatState {
             attack_cd: 0,
             artillery_shots_fired: 0,
             target_id: None,
+            attack_move_no_target_ticks: 0,
             setup: WeaponSetup::Packed,
             weapon_facing: 0.0,
             desired_weapon_facing: 0.0,
