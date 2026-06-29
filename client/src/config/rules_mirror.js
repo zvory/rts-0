@@ -334,6 +334,8 @@ export const UPGRADES = Object.freeze({
     researchTicks: BALLISTIC_TABLES_RESEARCH_TICKS,
     description: "Artillery fire tightens over repeated shots",
     researchedAt: KIND.RESEARCH_COMPLEX,
+    requiresUpgrade: UPGRADE.ARTILLERY_UNLOCK,
+    requiresText: "Requires Artillery Unlock",
   }),
   [UPGRADE.COMMAND_CAR_UNLOCK]: Object.freeze({
     upgrade: UPGRADE.COMMAND_CAR_UNLOCK,

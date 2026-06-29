@@ -1,28 +1,20 @@
 use crate::config;
 use crate::game::services::dist2;
 
-#[allow(clippy::too_many_arguments)]
+type WorldPoint = (f32, f32);
+
 pub(super) fn artillery_scattered_point(
     unit: u32,
     tick: u32,
-    origin_x: f32,
-    origin_y: f32,
-    x: f32,
-    y: f32,
+    origin: WorldPoint,
+    target: WorldPoint,
     shot_number: u16,
     ballistic_tables_researched: bool,
 ) -> (f32, f32) {
-    let error_tiles = artillery_error_tiles(
-        origin_x,
-        origin_y,
-        x,
-        y,
-        shot_number,
-        ballistic_tables_researched,
-    );
+    let error_tiles = artillery_error_tiles(origin, target, shot_number, ballistic_tables_researched);
     let radius_px = error_tiles.max(0.0) * config::TILE_SIZE as f32;
     if radius_px <= f32::EPSILON {
-        return (x, y);
+        return target;
     }
     let seed = unit
         .wrapping_mul(1_103_515_245)
@@ -30,17 +22,18 @@ pub(super) fn artillery_scattered_point(
         .wrapping_add((shot_number as u32).wrapping_mul(97_531));
     let angle = (seed as f32 * 1.618_034).rem_euclid(std::f32::consts::TAU);
     let radial = (((seed.rotate_left(13) >> 8) & 1023) as f32 / 1023.0).sqrt() * radius_px;
+    let (x, y) = target;
     (x + angle.cos() * radial, y + angle.sin() * radial)
 }
 
 pub(super) fn artillery_error_tiles(
-    origin_x: f32,
-    origin_y: f32,
-    x: f32,
-    y: f32,
+    origin: WorldPoint,
+    target: WorldPoint,
     shot_number: u16,
     ballistic_tables_researched: bool,
 ) -> f32 {
+    let (origin_x, origin_y) = origin;
+    let (x, y) = target;
     let distance_tiles = dist2(origin_x, origin_y, x, y).sqrt() / config::TILE_SIZE as f32;
     let range_span = (config::ARTILLERY_MAX_RANGE_TILES - config::ARTILLERY_MIN_RANGE_TILES)
         .max(1) as f32;

@@ -313,6 +313,11 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     "Ballistic Tables research cost and time mirror server",
   );
   assert(
+    UPGRADES[UPGRADE.BALLISTIC_TABLES].requiresUpgrade === UPGRADE.ARTILLERY_UNLOCK &&
+      UPGRADES[UPGRADE.BALLISTIC_TABLES].requiresText === "Requires Artillery Unlock",
+    "Ballistic Tables research should mirror its Artillery prerequisite",
+  );
+  assert(
     STATS[KIND.ANTI_TANK_GUN].upgradeRequiresText === "Requires research in R&D Complex",
     "Anti-Tank Gun training should explain the R&D Complex research requirement",
   );
@@ -819,6 +824,8 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     assert(rdCommandCarResearchButton?.dataset.hotkey === "D", "Command Car research should appear in R&D Complex");
     assert(rdCommandCarResearchButton?.disabled, "Command Car research should be disabled before Tank Production");
     assert(rdCommandCarResearchButton?.title === "Requires Tank Production", "Command Car research should name Tank prerequisite");
+    assert(rdBallisticTablesButton?.disabled, "Ballistic Tables research should be disabled before Artillery research");
+    assert(rdBallisticTablesButton?.title === "Requires Artillery Unlock", "Ballistic Tables research should name Artillery prerequisite");
     assert(rdArtilleryResearchButton?.dataset.hotkey === "W", "Unlock Artillery research should appear in R&D Complex");
     assert(rdArtilleryResearchButton?.disabled, "Artillery research should be disabled before Anti-Tank Gun research");
     assert(rdArtilleryResearchButton?.title === "Requires Anti-Tank Gun Research", "Artillery research should name Anti-Tank Gun prerequisite");
@@ -828,7 +835,16 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     rdHud._cardSig = null;
     renderCommandCard(rdHud);
     const unlockedArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
+    const lockedBallisticTablesButton = renderedButtons.find((button) => button.innerHTML.includes("BT+"));
     assert(unlockedArtilleryResearchButton && !unlockedArtilleryResearchButton.disabled, "Artillery research should enable after Anti-Tank Gun research");
+    assert(lockedBallisticTablesButton?.disabled, "Ballistic Tables should stay disabled until Artillery research completes");
+
+    renderedButtons.length = 0;
+    rdHud.state.upgrades = [UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.ARTILLERY_UNLOCK];
+    rdHud._cardSig = null;
+    renderCommandCard(rdHud);
+    const unlockedBallisticTablesButton = renderedButtons.find((button) => button.innerHTML.includes("BT+"));
+    assert(unlockedBallisticTablesButton && !unlockedBallisticTablesButton.disabled, "Ballistic Tables should enable after Artillery research");
 
     renderedButtons.length = 0;
     rdHud.state.upgrades = [UPGRADE.TANK_UNLOCK];

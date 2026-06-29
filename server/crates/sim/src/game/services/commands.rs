@@ -1400,10 +1400,8 @@ fn try_fire_artillery(
         artillery_scattered_point(
             unit,
             tick,
-            e.pos_x,
-            e.pos_y,
-            x,
-            y,
+            (e.pos_x, e.pos_y),
+            (x, y),
             shot_number,
             ballistic_tables_researched,
         )

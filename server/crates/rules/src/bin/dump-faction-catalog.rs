@@ -449,7 +449,7 @@ fn print_upgrades(indent: &str) {
         balance::BALLISTIC_TABLES_COST_STEEL,
         balance::BALLISTIC_TABLES_COST_OIL,
         balance::BALLISTIC_TABLES_RESEARCH_TICKS,
-        None,
+        Some(faction::ARTILLERY_UNLOCK_UPGRADE),
         true,
     );
     print_upgrade(

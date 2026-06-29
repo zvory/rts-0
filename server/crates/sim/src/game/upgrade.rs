@@ -108,7 +108,7 @@ pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
         UpgradeKind::BallisticTables => UpgradeDefinition {
             kind,
             researched_at: EntityKind::ResearchComplex,
-            requires_upgrade: None,
+            requires_upgrade: Some(UpgradeKind::ArtilleryUnlock),
             cost_steel: crate::config::BALLISTIC_TABLES_COST_STEEL,
             cost_oil: crate::config::BALLISTIC_TABLES_COST_OIL,
             research_ticks: crate::config::BALLISTIC_TABLES_RESEARCH_TICKS,

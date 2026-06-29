@@ -317,9 +317,9 @@ folded into default targeting.
   200 oil and takes 900 ticks (~30s). It requires completed Anti-Tank Gun Crews research. Once complete,
   that player can train Artillery from Gun Works.
 - **Ballistic Tables** (R&D Complex research, protocol id `ballistic_tables`): costs 150 steel /
-  100 oil and takes 600 ticks (~20s). Once complete, that player's deployed Artillery tightens
-  repeated point-fire shots from the range-scaled starting error down to three tiles over the
-  existing five-shot accuracy period.
+  100 oil and takes 600 ticks (~20s). It requires completed Unlock Artillery research. Once
+  complete, that player's deployed Artillery tightens repeated point-fire shots from the
+  range-scaled starting error down to three tiles over the existing five-shot accuracy period.
 - **Tank Production** (R&D Complex research, protocol id `tank_unlock`): costs 150 steel /
   100 oil and takes 600 ticks (~20s). Once complete, that player can train Tanks from Vehicle
   Works. Scout Cars remain immediately trainable from Vehicle Works.

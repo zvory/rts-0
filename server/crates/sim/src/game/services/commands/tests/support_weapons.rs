@@ -21,15 +21,15 @@ fn artillery_error_scales_by_range_without_ballistic_tables() {
     );
 
     assert_error_tiles(
-        artillery_error_tiles(origin.0, origin.1, min_target.0, min_target.1, 1, false),
+        artillery_error_tiles(origin, min_target, 1, false),
         config::ARTILLERY_MIN_RANGE_ERROR_TILES,
     );
     assert_error_tiles(
-        artillery_error_tiles(origin.0, origin.1, max_target.0, max_target.1, 1, false),
+        artillery_error_tiles(origin, max_target, 1, false),
         config::ARTILLERY_MAX_RANGE_ERROR_TILES,
     );
     assert_error_tiles(
-        artillery_error_tiles(origin.0, origin.1, max_target.0, max_target.1, 5, false),
+        artillery_error_tiles(origin, max_target, 5, false),
         config::ARTILLERY_MAX_RANGE_ERROR_TILES,
     );
 }
@@ -44,15 +44,12 @@ fn ballistic_tables_tighten_range_scaled_artillery_error_to_three_tiles() {
     );
 
     assert_error_tiles(
-        artillery_error_tiles(origin.0, origin.1, max_target.0, max_target.1, 1, true),
+        artillery_error_tiles(origin, max_target, 1, true),
         config::ARTILLERY_MAX_RANGE_ERROR_TILES,
     );
+    assert_error_tiles(artillery_error_tiles(origin, max_target, 3, true), 9.0);
     assert_error_tiles(
-        artillery_error_tiles(origin.0, origin.1, max_target.0, max_target.1, 3, true),
-        9.0,
-    );
-    assert_error_tiles(
-        artillery_error_tiles(origin.0, origin.1, max_target.0, max_target.1, 5, true),
+        artillery_error_tiles(origin, max_target, 5, true),
         config::ARTILLERY_MIN_ERROR_TILES,
     );
 }
