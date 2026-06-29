@@ -44,6 +44,10 @@ import {
   slugifyLabScenario,
   validateLabScenarioAuthoringState,
 } from "../../client/src/lab_scenario_authoring.js";
+import {
+  LAB_SCENARIO_SUBMISSION_CAPABILITY_PATH,
+  fetchLabScenarioSubmissionCapability,
+} from "../../client/src/lab_scenario_submission_capability.js";
 import { LabPanelWindowChrome } from "../../client/src/lab_panel_window.js";
 
 import { textWithin } from "./dom_text.mjs";
@@ -89,6 +93,63 @@ import { textWithin } from "./dom_text.mjs";
       invalid.errors.some((error) => error.includes("Name")) &&
       invalid.errors.some((error) => error.includes("Tag")),
     "lab scenario authoring reports blocking metadata errors before server validation",
+  );
+}
+
+{
+  const requests = [];
+  const sleeps = [];
+  const result = await fetchLabScenarioSubmissionCapability({
+    retryDelaysMs: [7, 11],
+    sleep: async (ms) => { sleeps.push(ms); },
+    fetchImpl: async (url, options) => {
+      requests.push({ url, options });
+      if (requests.length < 3) return { ok: false, status: 502 };
+      return {
+        ok: true,
+        async json() {
+          return {
+            available: true,
+            branchPrefix: "zvorygin/lab-scenario-",
+            scenarioPathPrefix: "server/assets/lab-scenarios/",
+            manifestPath: "server/assets/lab-scenarios/manifest.json",
+          };
+        },
+      };
+    },
+  });
+  assert(
+    result.available &&
+      requests.length === 3 &&
+      requests.every((request) => (
+        request.url === LAB_SCENARIO_SUBMISSION_CAPABILITY_PATH &&
+        request.options.cache === "no-store"
+      )),
+    "lab scenario submission capability probe retries transient 502s before disabling PR submission",
+  );
+  assertDeepEqual(
+    sleeps,
+    [7, 11],
+    "lab scenario submission capability probe uses configured retry delays",
+  );
+}
+
+{
+  let requests = 0;
+  const result = await fetchLabScenarioSubmissionCapability({
+    retryDelaysMs: [7, 11],
+    sleep: async () => { throw new Error("404 must not be retried"); },
+    fetchImpl: async () => {
+      requests += 1;
+      return { ok: false, status: 404 };
+    },
+  });
+  assert(
+    requests === 1 &&
+      !result.available &&
+      result.unavailableCode === "capabilityCheckFailed" &&
+      result.unavailableReason.includes("(404)"),
+    "lab scenario submission capability probe does not retry permanent HTTP failures",
   );
 }
 
