@@ -57,10 +57,18 @@ leave persistent trench ground that either side can later use.
 An eligible infantry unit receives these benefits only while it is stationary in an active trench:
 
 - Its weapon range is increased by 1 tile.
+- Its ordinary idle target acquisition behaves like hold position: it may fire at legal enemies
+  already in weapon range, but it must not chase or leave the trench through idle aggressive
+  pursuit.
 - Direct shots against it have a 70% chance to miss.
 - Area-of-effect damage against it is reduced by 70%.
 - Projectiles do not over-penetrate through it.
 - It does not take secondary over-penetration damage.
+
+Entrenchment research alone must not make every eligible idle unit passive. Eligible infantry that
+is not currently occupying an active trench keeps the existing idle aggressive behavior. Explicit
+player commands such as Move, Attack, and AttackMove may still make a unit leave the trench; moving
+out removes active occupation and its benefits.
 
 Entrenchment does not suppress other researched upgrade effects unless explicitly stated.
 Methamphetamines-upgraded Riflemen keep their faster attack cadence while entrenched, but their

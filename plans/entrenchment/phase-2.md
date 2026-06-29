@@ -22,8 +22,7 @@ the client.
 - Project trenches through snapshots using the Phase 1 contract.
 - Gate trench projection by recipient visibility in the same spirit as smoke, remembered buildings,
   and ability objects. Do not reveal hidden enemy units occupying or creating trenches.
-- Decide and document whether trenches remain visible after discovery while fogged, or only while
-  currently visible. If the implementation chooses remembered trench terrain, keep that memory
+- Decide and document whether trenches remain visible after discovery while fogged (answer: yes). If the implementation chooses remembered trench terrain, keep that memory
   terrain-only and do not expose current occupancy.
 - Ensure replay, spectator, and dev full-world snapshots preserve the same authority model.
 - Add client state storage for received trench snapshots, but keep final brown trench rendering for

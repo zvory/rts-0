@@ -23,6 +23,11 @@ whether benefits apply.
   requirements explicitly override it.
 - Prevent projectiles from over-penetrating through an entrenched primary victim.
 - Prevent entrenched units from taking secondary over-penetration damage.
+- Suppress idle aggressive pursuit for units that are actively occupying a trench. Their idle
+  acquisition should behave like hold position: acquire and fire only at legal targets inside
+  current weapon range, never request chase paths or leave the trench through idle aggro.
+- Preserve existing idle aggressive pursuit for eligible units that have Entrenchment research but
+  are not actively occupying a trench.
 - Do not apply benefits to units still digging in, units merely moving through a trench, units
   displaced out of occupation, or excluded unit kinds.
 - Preserve other researched upgrade effects unless the requirements say otherwise.
@@ -31,7 +36,8 @@ whether benefits apply.
   Gunners keep faster setup/teardown and speed rules, but only stationary occupation grants
   entrenchment benefits.
 - Keep direct attack, attack-move, target acquisition, fog, and projectile events consistent with
-  existing combat authority.
+  existing combat authority. Explicit player orders may move a unit out of a trench; ordinary idle
+  acquisition may not.
 - Update `docs/design/balance.md` and `docs/design/server-sim.md` for entrenched combat behavior.
 
 ## Expected Touch Points
@@ -54,6 +60,9 @@ whether benefits apply.
 
 - Focused Rust combat tests proving entrenched range is base range plus 1 tile and non-entrenched
   range is unchanged.
+- Combat acquisition tests proving an entrenched idle unit fires at in-range targets without
+  chasing out-of-range targets, while an otherwise identical non-entrenched idle unit keeps normal
+  aggressive pursuit.
 - Deterministic or seeded tests proving direct shots against entrenched infantry miss according to
   the new 70% policy without making invulnerable units or buildings affected.
 - Mortar and Artillery tests proving AoE damage is reduced by 70% for entrenched infantry and not
@@ -69,11 +78,11 @@ whether benefits apply.
 ## Manual Test Focus
 
 Pit entrenched Riflemen and Machine Gunners against direct-fire attackers, Mortars, Artillery, and
-over-penetrating shots. Confirm entrenched units are tougher while stationary in trenches and lose
-the benefits as soon as they move out.
+over-penetrating shots. Confirm entrenched idle units shoot enemies that enter range but do not
+chase enemies outside range, and confirm they lose the benefits as soon as they move out.
 
 ## Handoff Expectations
 
-Name the combat helper that decides whether benefits apply, the miss-probability composition rule,
-and the shared AoE reduction helper. Provide factual patch-note bullets for changed combat behavior
-and any cases that should be watched in playtests.
+Name the combat helper that decides whether benefits apply, the idle acquisition/chase gate, the
+miss-probability composition rule, and the shared AoE reduction helper. Provide factual patch-note
+bullets for changed combat behavior and any cases that should be watched in playtests.
