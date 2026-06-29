@@ -230,7 +230,7 @@ import { installFakePixi } from "./pixi_fakes.mjs";
       kind: KIND.BARRACKS,
       x: 160,
       y: 160,
-      hp: 42,
+      hp: 10,
       maxHp: 100,
       state: "construct",
       buildProgress: 0.42,
@@ -249,13 +249,19 @@ import { installFakePixi } from "./pixi_fakes.mjs";
     renderer._drawSelectionAndHp(scaffold, new Set([scaffold.id]), { playerId: 1 });
     renderer._drawSelectionAndHp(completed, new Set(), { playerId: 1 });
 
+    const scaffoldHpRects = renderer._pools.hpBars.get(scaffold.id)?.calls.filter((call) => call[0] === "drawRect") || [];
+    const scaffoldBarW = scaffoldHpRects[0]?.[3] - 2;
     assert(
       renderer._pools.selectionRings.has(scaffold.id),
       "selected under-construction building still draws a selection ring",
     );
     assert(
-      !renderer._pools.hpBars.has(scaffold.id),
-      "under-construction building should not draw a second normal HP bar",
+      scaffoldHpRects.length === 2,
+      "under-construction building draws construction status on the HP bar layer",
+    );
+    assert(
+      Math.abs(scaffoldHpRects[1][3] - scaffoldBarW * scaffold.buildProgress) < 0.001,
+      "under-construction HP-layer status bar uses buildProgress instead of current HP",
     );
     assert(
       renderer._pools.hpBars.has(completed.id),
@@ -298,15 +304,19 @@ import { installFakePixi } from "./pixi_fakes.mjs";
       players: [{ id: 2, color: "#c85050" }],
       spectator: true,
     });
+    renderer._drawSelectionAndHp(entity, new Set(), { playerId: 99 });
 
     const rig = renderer._liveRigPools.buildingRigs.get(entity.id)?.container;
-    const overlay = renderer._pools.buildingOverlays.get(entity.id);
-    const overlayRects = overlay?.calls.filter((call) => call[0] === "drawRect") || [];
+    const hpRects = renderer._pools.hpBars.get(entity.id)?.calls.filter((call) => call[0] === "drawRect") || [];
     const buildingsIndex = renderer.world.children.indexOf(renderer.layers.buildings);
-    const overlaysIndex = renderer.world.children.indexOf(renderer.layers.buildingOverlays);
+    const hpIndex = renderer.world.children.indexOf(renderer.layers.hpBars);
     assert(rig && renderer.layers.buildings.children.includes(rig), "SVG building rig renders on the buildings layer");
-    assert(overlayRects.length === 2, "under-construction building draws progress bar rectangles");
-    assert(overlaysIndex > buildingsIndex, "building progress overlay layer renders above SVG building bodies");
+    assert(
+      !renderer._pools.buildingOverlays.has(entity.id),
+      "under-construction building does not draw a separate building overlay progress bar",
+    );
+    assert(hpRects.length === 2, "under-construction building draws construction status on the HP bar layer");
+    assert(hpIndex > buildingsIndex, "HP-layer construction status renders above SVG building bodies");
   } finally {
     restorePixi();
   }
@@ -344,13 +354,18 @@ import { installFakePixi } from "./pixi_fakes.mjs";
       players: [{ id: 2, color: "#c85050" }],
       spectator: true,
     });
+    renderer._drawSelectionAndHp(entity, new Set(), { playerId: 99 });
 
-    const overlay = renderer._pools.buildingOverlays.get(entity.id);
-    const overlayRects = overlay?.calls.filter((call) => call[0] === "drawRect") || [];
-    assert(overlayRects.length === 2, "deconstructing Tank Trap draws reverse progress bar rectangles");
+    const hpRects = renderer._pools.hpBars.get(entity.id)?.calls.filter((call) => call[0] === "drawRect") || [];
+    const hpBarW = hpRects[0]?.[3] - 2;
     assert(
-      overlayRects[1][3] < overlayRects[0][3],
-      "deconstructing Tank Trap fill should be smaller than the full bar background",
+      !renderer._pools.buildingOverlays.has(entity.id),
+      "deconstructing Tank Trap does not draw a separate building overlay progress bar",
+    );
+    assert(hpRects.length === 2, "deconstructing Tank Trap draws reverse status on the HP bar layer");
+    assert(
+      Math.abs(hpRects[1][3] - hpBarW * entity.deconstructProgress) < 0.001,
+      "deconstructing Tank Trap HP-layer status drains according to deconstructProgress",
     );
   } finally {
     restorePixi();

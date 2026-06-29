@@ -1127,8 +1127,9 @@ selection rings):
 - Spatial combat audio keeps full volume for nearby emitters, uses stronger attenuation after the
   listener reference distance for distant emitters, and keeps the same hard drop distance.
 - Buildings: SVG-authored rig definitions are compiled at Renderer startup and rendered on the
-  buildings layer; shadows remain imperative draws, and progress bars, queue labels, and icons remain
-  imperative draws on the building overlays layer.
+  buildings layer; shadows remain imperative draws, production progress bars, queue labels, and
+  icons remain imperative draws on the building overlays layer, and construction/deconstruction
+  status uses the shared HP bar layer.
 - Units: SVG-authored rig parts rendered into Pixi containers, with low-detail hard-edged
   silhouettes tinted by player color, a dark drop shadow, dark outline, HP bar above when
   damaged/selected, and glowing selection ring when selected. When the in-match Game settings
@@ -1163,14 +1164,14 @@ selection rings):
   the fog overlay, excluded from local fog-source computation and hit-testing, and treated as
   visual intel only.
 - Buildings: footprint-sized blocky field structures with neutral geometry and plain
-  two-letter stencils; under construction → translucent with a progress bar; production →
-  small progress arc. Tank Trap deconstruction uses the same base progress-bar placement but drains
-  from full to empty via `deconstructProgress`. Tank Traps render as neutral steel I-beam hedgehogs
-  with deterministic per-id rotation. Owned scaffolds may locally extrapolate `buildProgress` only
-  while the latest authoritative snapshot marks them `buildActive`; the display clamps below
-  completion and never unlocks supply, tech, production, pathing, or command behavior before the
-  server snapshot. Under-construction buildings do not also draw the normal HP bar because their
-  single construction bar already communicates scaffold progress.
+  two-letter stencils; under construction → translucent with a single HP-layer status bar;
+  production → small top-edge progress bar. Tank Trap deconstruction uses that same HP-layer status
+  bar and drains from full to empty via `deconstructProgress`. Tank Traps render as neutral steel I-beam
+  hedgehogs with deterministic per-id rotation. Owned scaffolds may locally extrapolate
+  `buildProgress` only while the latest authoritative snapshot marks them `buildActive`; the display
+  clamps below completion and never unlocks supply, tech, production, pathing, or command behavior
+  before the server snapshot. Completed damaged/selected buildings use the same HP-layer bar for
+  normal health.
 - Resource nodes: steel = tan supply crates; oil = olive fuel drums; show last-known remaining
   from `resourceDeltas` via size/opacity. When a worker is selected and the cursor hovers a
   resource, draw a blue circle on the resource when the nearest completed own City Centre
