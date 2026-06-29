@@ -60,6 +60,7 @@ src/
   lab_catalog.js # LabCatalogScreen: app-owned `/lab` scenario/blank selector
   lab_client.js  # LabClient: lab request ids, pending results, state/result subscriptions
   lab_scenario_authoring.js # pure lab scenario metadata defaults, slugging, and local validation
+  lab_scenario_submission_capability.js # HTTP capability probe with transient-failure retry
   lab_scenario_submission_flow.js # LabPanel scenario validation/submission orchestration
   lab_panel.js   # LabPanel: app-owned lab controls/status UI mounted around Match
   lab_panel_window.js # draggable/resizable chrome helper for the app-owned LabPanel
@@ -455,6 +456,15 @@ export function labScenarioPreviewLabel(preview)
 authoring field values, slug generation, client-side metadata limits that mirror the server catalog
 limits, comma-separated tag parsing, and local blocking errors before the panel sends a server
 dry-run validation request.
+
+`lab_scenario_submission_capability.js`
+```js
+export const LAB_SCENARIO_SUBMISSION_CAPABILITY_PATH
+export function fetchLabScenarioSubmissionCapability({ fetchImpl?, retryDelaysMs?, sleep? })
+```
+`lab_scenario_submission_capability.js` is the app-owned HTTP probe for
+`/api/lab-scenarios/submission`. It returns the server capability JSON when available and retries
+transient network/proxy failures before reporting `capabilityCheckFailed` to the lab panel.
 
 `lab_scenario_submission_flow.js`
 ```js

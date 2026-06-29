@@ -46,6 +46,9 @@ import { LabClient } from "./lab_client.js";
 import { LabCatalogScreen } from "./lab_catalog.js";
 import { createDefaultControlPolicy, createLabControlPolicy } from "./lab_control_policy.js";
 import { LabPanel } from "./lab_panel.js";
+import {
+  fetchLabScenarioSubmissionCapability as fetchLabScenarioSubmissionCapabilityRequest,
+} from "./lab_scenario_submission_capability.js";
 import { SettingsContainer } from "./settings_container.js";
 import { buildSettingsTabs } from "./settings_panels.js";
 
@@ -54,7 +57,6 @@ import { buildSettingsTabs } from "./settings_panels.js";
  * so we ping well inside that window to keep a healthy connection alive.
  */
 const HEARTBEAT_MS = 15000;
-const LAB_SCENARIO_SUBMISSION_CAPABILITY_PATH = "/api/lab-scenarios/submission";
 
 export function isLivePlayerMatch(match) {
   return !!match &&
@@ -380,23 +382,7 @@ export class App {
   }
 
   async fetchLabScenarioSubmissionCapability() {
-    try {
-      const response = await fetch(LAB_SCENARIO_SUBMISSION_CAPABILITY_PATH, { cache: "no-store" });
-      if (!response.ok) {
-        return {
-          available: false,
-          unavailableCode: "capabilityCheckFailed",
-          unavailableReason: `Scenario PR submission capability check failed (${response.status}).`,
-        };
-      }
-      return await response.json();
-    } catch (err) {
-      return {
-        available: false,
-        unavailableCode: "capabilityCheckFailed",
-        unavailableReason: `Scenario PR submission capability check failed: ${err?.message || err}`,
-      };
-    }
+    return fetchLabScenarioSubmissionCapabilityRequest();
   }
 
   onBranchFromTickCreated(m) {
