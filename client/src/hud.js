@@ -720,6 +720,7 @@ export class HUD {
         `<span class="cmd-tooltip-cost">${this._resourceIcon("oil")}<span>${cost.oil ?? 0}</span></span>` +
         `<span class="cmd-tooltip-cost">${this._resourceIcon("supply")}<span>${st.supply ?? 0}</span></span>` +
       `</span>` +
+      (st.description ? `<span class="cmd-tooltip-desc">${st.description}</span>` : "") +
       `<span class="cmd-tooltip-row"><span>Requires</span><strong>${requirementLabels}</strong></span>` +
       `<span class="cmd-tooltip-row"><span>Build time</span><strong>${buildTime}</strong></span>`
     );
