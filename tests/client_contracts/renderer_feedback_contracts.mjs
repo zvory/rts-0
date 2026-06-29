@@ -282,8 +282,42 @@ function polygonCenter(points) {
   assert(rangeGfx.calls.some((call) => call[0] === "lineTo"), "lab P2 selected units draw range rings");
   assert(rangeGfx.calls.some((call) => call[0] === "arc"), "lab P2 deployed support weapons draw field-of-fire ranges");
   assert(
+    rangeGfx.calls.some((call) => call[0] === "lineStyle" && call[1] === 1 && call[3] === 0.68),
+    "selected unit range rings draw at doubled opacity",
+  );
+  assert(
+    rangeGfx.calls.some((call) => call[0] === "lineStyle" && call[1] === 1.5 && call[3] === 0.36),
+    "selected support-weapon field-of-fire outlines draw at doubled opacity",
+  );
+  assert(
+    rangeGfx.calls.some((call) => call[0] === "beginFill" && call[2] === 0.07),
+    "selected support-weapon field-of-fire fill draws at doubled opacity",
+  );
+  assert(
     rangeGfx.calls.some((call) => call[0] === "lineTo" && call[1] > 446 && Math.abs(call[2] - 96) < 8),
     "unit range overlay can read per-entity dynamic range fields",
+  );
+
+  const minRangeGfx = new RecordingGraphics();
+  _drawSelectedUnitRanges.call(
+    { _feedbackGfx: minRangeGfx, _map: { tileSize: 32 } },
+    {
+      playerId: 2,
+      showUnitRangesEnabled: true,
+      selectedEntities: () => [{
+        id: 75,
+        owner: 2,
+        kind: KIND.TANK,
+        x: 224,
+        y: 96,
+        weaponRangePx: 240,
+        weaponMinRangePx: 96,
+      }],
+    },
+  );
+  assert(
+    minRangeGfx.calls.some((call) => call[0] === "lineStyle" && call[1] === 1 && call[3] === 0.56),
+    "selected unit minimum-range rings draw at doubled opacity",
   );
 
   const disabledRangeGfx = new RecordingGraphics();
