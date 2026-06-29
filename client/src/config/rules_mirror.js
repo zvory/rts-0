@@ -316,8 +316,8 @@ export const UPGRADES = Object.freeze({
   }),
   [UPGRADE.BALLISTIC_TABLES]: Object.freeze({
     upgrade: UPGRADE.BALLISTIC_TABLES,
-    label: "Ballistic Tables",
-    icon: "BT+",
+    label: "Artillery Fire Control",
+    icon: "AFC",
     cost: Object.freeze({ steel: 150, oil: 100 }),
     researchTicks: BALLISTIC_TABLES_RESEARCH_TICKS,
     description: "Artillery fire tightens over repeated shots",

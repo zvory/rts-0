@@ -121,8 +121,8 @@ Guns research.
 
 Research unlocks live in `server/crates/sim/src/game/upgrade.rs` and client descriptors in
 `client/src/config.js`. Training Centre researches Methamphetamines. R&D Complex researches
-Heavy Guns, Ballistic Tables, Tank Production, Command Car, and Mortar Autocast; Ballistic
-Tables requires completed Heavy Guns research, and Command Car requires completed Tank
+Heavy Guns, Artillery Fire Control, Tank Production, Command Car, and Mortar Autocast; Artillery
+Fire Control requires completed Heavy Guns research, and Command Car requires completed Tank
 Production research. The current Ekat tech tree starts with Zamok training Golems;
 Golem-converted tech buildings are still planned work.
 
