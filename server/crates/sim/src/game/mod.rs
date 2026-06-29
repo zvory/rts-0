@@ -28,6 +28,7 @@ mod mortar;
 mod mortar_scatter;
 mod pathfinding;
 mod player_state;
+mod resource_placement;
 pub mod replay;
 mod scoring;
 pub(crate) mod services;

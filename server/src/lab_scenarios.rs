@@ -542,6 +542,33 @@ mod tests {
         assert_eq!(scenario.seed, 3_566_641_871);
         assert_eq!(scenario.players.len(), 2);
         assert_eq!(scenario.entities.len(), 227);
+        let tile_size = rts_rules::balance::TILE_SIZE as f32;
+        let mut oil_tiles = Vec::new();
+        for entity in scenario
+            .entities
+            .iter()
+            .filter(|entity| entity.kind == "oil")
+        {
+            let tile_x = (entity.x / tile_size).floor() as u32;
+            let tile_y = (entity.y / tile_size).floor() as u32;
+            let center_x = tile_x as f32 * tile_size + tile_size * 0.5;
+            let center_y = tile_y as f32 * tile_size + tile_size * 0.5;
+            assert!(
+                (entity.x - center_x).abs() < 0.001 && (entity.y - center_y).abs() < 0.001,
+                "lategame oil node {} should restore at tile center ({tile_x}, {tile_y})",
+                entity.id
+            );
+            oil_tiles.push((entity.id, tile_x, tile_y));
+        }
+        assert_eq!(oil_tiles.len(), 18);
+        for (index, &(a_id, a_x, a_y)) in oil_tiles.iter().enumerate() {
+            for &(b_id, b_x, b_y) in oil_tiles.iter().skip(index + 1) {
+                assert!(
+                    a_x.abs_diff(b_x) > 1 || a_y.abs_diff(b_y) > 1,
+                    "lategame oil nodes {a_id} and {b_id} should have one free tile between them, got tiles ({a_x}, {a_y}) and ({b_x}, {b_y})"
+                );
+            }
+        }
     }
 
     #[test]

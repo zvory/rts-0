@@ -1,8 +1,7 @@
 //! Authoritative lab mutation API.
 //!
-//! Lab callers get typed operations with validation at the `Game` seam. This module owns the
-//! repair pass after accepted mutations so room/client code never reaches into entity stores,
-//! player state, fog, spatial indexes, or derived economy state directly.
+//! Lab callers get typed operations with validation at the `Game` seam. This module owns the repair
+//! pass so room/client code never reaches into stores, fog, spatial indexes, or economy state.
 
 use std::collections::HashSet;
 use std::str::FromStr;
@@ -25,6 +24,7 @@ use crate::rules;
 use super::{systems, Game, MapMetadata, PlayerInit};
 
 mod orientation;
+mod resource_nodes;
 mod scenario;
 
 use orientation::{
@@ -665,10 +665,17 @@ impl Game {
                     owner: entity.owner,
                 });
             }
-            validate_resource_node_position(&self.map, &self.entities, entity.x, entity.y)?;
+            let (x, y) = resource_nodes::restore_resource_node_position(
+                &self.map,
+                &self.entities,
+                kind,
+                entity.x,
+                entity.y,
+                kind == EntityKind::Oil,
+            )?;
             let id = self
                 .entities
-                .spawn_node(kind, entity.x, entity.y)
+                .spawn_node(kind, x, y)
                 .ok_or_else(|| invalid_kind(kind, "restoreScenario"))?;
             if let Some(restored) = self.entities.get_mut(id) {
                 if let Some(remaining) = entity.resource_remaining {
@@ -1489,4 +1496,5 @@ mod tests {
             Err(LabError::InvalidScenario { .. })
         ));
     }
+
 }

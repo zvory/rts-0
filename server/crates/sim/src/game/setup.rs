@@ -1,3 +1,4 @@
+use super::resource_placement;
 use super::*;
 use crate::rules::faction::{catalog_for_or_default_empty, FactionLoadout, StartingFormation};
 use std::str::FromStr;
@@ -419,20 +420,13 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
     }
 
     let oil_angle = base_angle + std::f32::consts::FRAC_PI_2;
-    let oil_perp_x = -oil_angle.sin();
-    let oil_perp_y = oil_angle.cos();
-    let oil_dist = config::OIL_DIST_TILES * ts;
-    let oil_cx = hx + oil_dist * oil_angle.cos();
-    let oil_cy = hy + oil_dist * oil_angle.sin();
-    let mut oil_tiles = BTreeSet::new();
+    let oil_step_x = tile_step(oil_angle.cos());
+    let oil_step_y = tile_step(oil_angle.sin());
+    let mut oil_tiles =
+        resource_placement::occupied_resource_tiles(map, entities, EntityKind::Oil);
     for i in 0..config::OIL_PATCHES_PER_BASE {
-        let (off_x, off_y) = match i {
-            0 => (-0.5 * ts, -0.5 * ts),
-            1 => (0.5 * ts, -0.5 * ts),
-            _ => (0.0, 0.5 * ts),
-        };
-        let desired_x = oil_cx + off_x * oil_perp_x + off_y * oil_angle.cos();
-        let desired_y = oil_cy + off_x * oil_perp_y + off_y * oil_angle.sin();
+        let (tile_dx, tile_dy) = oil_patch_tile_offset(i, oil_step_x, oil_step_y);
+        let (desired_x, desired_y) = offset_tile_center(map, tx, ty, tile_dx, tile_dy);
         let (px, py, tile) = oil_patch_tile_center(map, desired_x, desired_y, hx, hy, &oil_tiles);
         oil_tiles.insert(tile);
         let dist_tiles = ((px - hx).powi(2) + (py - hy).powi(2)).sqrt() / ts;
@@ -447,6 +441,26 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
     }
 }
 
+fn tile_step(value: f32) -> i32 {
+    if value < 0.0 { -1 } else { 1 }
+}
+
+fn oil_patch_tile_offset(index: u32, step_x: i32, step_y: i32) -> (i32, i32) {
+    // Integer offsets keep mirrored starts at identical CC distances after tile snapping.
+    match index {
+        0 => (4 * step_x, 4 * step_y),
+        1 => (4 * step_x, 2 * step_y),
+        _ => (6 * step_x, 3 * step_y),
+    }
+}
+
+fn offset_tile_center(map: &Map, tx: u32, ty: u32, dx: i32, dy: i32) -> (f32, f32) {
+    let max_tile = map.size.saturating_sub(1) as i32;
+    let desired_tx = (tx as i32 + dx).clamp(0, max_tile) as u32;
+    let desired_ty = (ty as i32 + dy).clamp(0, max_tile) as u32;
+    map.tile_center(desired_tx, desired_ty)
+}
+
 fn oil_patch_tile_center(
     map: &Map,
     x: f32,
@@ -456,51 +470,15 @@ fn oil_patch_tile_center(
     occupied_tiles: &BTreeSet<(u32, u32)>,
 ) -> (f32, f32, (u32, u32)) {
     let ts = config::TILE_SIZE as f32;
-    let max_search_tiles = config::CC_RESOURCE_MAX_DIST_TILES.ceil() as i32 + 1;
-    let (anchor_tx, anchor_ty) = map.tile_of(anchor_x, anchor_y);
-    let min_tx = (anchor_tx as i32 - max_search_tiles).max(0);
-    let min_ty = (anchor_ty as i32 - max_search_tiles).max(0);
-    let max_tx = (anchor_tx as i32 + max_search_tiles).min(map.size.saturating_sub(1) as i32);
-    let max_ty = (anchor_ty as i32 + max_search_tiles).min(map.size.saturating_sub(1) as i32);
-
-    let mut best: Option<(f32, u32, u32, f32, f32)> = None;
-    for ty in min_ty..=max_ty {
-        for tx in min_tx..=max_tx {
-            let tile = (tx as u32, ty as u32);
-            if occupied_tiles.contains(&tile) || !map.is_passable(tx, ty) {
-                continue;
-            }
-            let (cx, cy) = map.tile_center(tile.0, tile.1);
-            let dist_tiles = ((cx - anchor_x).powi(2) + (cy - anchor_y).powi(2)).sqrt() / ts;
-            if !(config::CC_RESOURCE_MIN_DIST_TILES..=config::CC_RESOURCE_MAX_DIST_TILES)
-                .contains(&dist_tiles)
-            {
-                continue;
-            }
-            let score = (cx - x).powi(2) + (cy - y).powi(2);
-            let replace = match best {
-                Some((best_score, best_tx, best_ty, _, _)) => {
-                    score < best_score - 0.001
-                        || ((score - best_score).abs() <= 0.001
-                            && (tile.1, tile.0) < (best_ty, best_tx))
-                }
-                None => true,
-            };
-            if replace {
-                best = Some((score, tile.0, tile.1, cx, cy));
-            }
+    resource_placement::nearest_resource_tile_center(map, x, y, |tile, cx, cy| {
+        if !resource_placement::tile_has_one_tile_resource_gap(tile, occupied_tiles) {
+            return false;
         }
-    }
-
-    if let Some((_, tx, ty, cx, cy)) = best {
-        return (cx, cy, (tx, ty));
-    }
-
-    let max_tile = map.size.saturating_sub(1) as f32;
-    let tx = (x / ts - 0.5).round().clamp(0.0, max_tile) as u32;
-    let ty = (y / ts - 0.5).round().clamp(0.0, max_tile) as u32;
-    let (cx, cy) = map.tile_center(tx, ty);
-    (cx, cy, (tx, ty))
+        let dist_tiles = ((cx - anchor_x).powi(2) + (cy - anchor_y).powi(2)).sqrt() / ts;
+        (config::CC_RESOURCE_MIN_DIST_TILES..=config::CC_RESOURCE_MAX_DIST_TILES)
+            .contains(&dist_tiles)
+    })
+    .unwrap_or_else(|| resource_placement::nearest_tile_center(map, x, y))
 }
 
 /// Spawn a City Centre, starting workers, and resource clusters for one player.
