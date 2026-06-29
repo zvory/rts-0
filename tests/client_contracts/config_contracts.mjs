@@ -768,10 +768,8 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     const artilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
     assert(mortarButton?.dataset.hotkey === "Q", "Mortar Team training should occupy the top-left Q slot");
     assert(
-      mortarButton?.innerHTML.includes(
-        "Indirect fire. Shots scatter heavily without team vision. Research Mortar Autocast in R&D.",
-      ),
-      "Mortar Team tooltip should explain indirect fire scatter and R&D autocast",
+      mortarButton?.innerHTML.includes("Indirect fire, extremely inaccurate without vision. Upgrade auto cast in R&D."),
+      "Mortar Team tooltip should explain indirect fire inaccuracy and R&D autocast",
     );
     assert(antiTankGunButton?.dataset.hotkey === "W", "Anti-Tank Gun training should occupy the top-middle W slot");
     assert(artilleryButton?.dataset.hotkey === "E", "Artillery training should occupy the top-right E slot");

@@ -100,7 +100,7 @@ export const STATS = Object.freeze({
   [KIND.MORTAR_TEAM]: { label: "Mortar Team", icon: "MT", size: 18, sight: 7,
     rangeTiles: MORTAR_RANGE_TILES, cost: { steel: 100, oil: 50 }, supply: 3, buildTicks: 460,
     requires: KIND.STEELWORKS,
-    description: "Indirect fire. Shots scatter heavily without team vision. Research Mortar Autocast in R&D." },
+    description: "Indirect fire, extremely inaccurate without vision. Upgrade auto cast in R&D." },
   [KIND.ARTILLERY]: { label: "Artillery", icon: "AR", size: 18, sight: 4, body: ARTILLERY_BODY,
     rangeTiles: ARTILLERY_MAX_RANGE_TILES, minRangeTiles: ARTILLERY_MIN_RANGE_TILES,
     cost: { steel: 300, oil: 100 }, supply: 5, buildTicks: 750,

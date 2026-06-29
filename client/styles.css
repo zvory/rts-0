@@ -3280,9 +3280,6 @@ input[type="text"]:focus {
   gap: 5px;
   font-weight: 800;
 }
-.cmd-btn .cmd-tooltip-desc {
-  color: var(--ink-dim);
-}
 .cmd-btn .cmd-tooltip .res-icon {
   font-size: 13px;
   line-height: 1;
