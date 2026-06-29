@@ -320,6 +320,30 @@ function polygonCenter(points) {
     "selected unit minimum-range rings draw at doubled opacity",
   );
 
+  const workerRangeGfx = new RecordingGraphics();
+  _drawSelectedUnitRanges.call(
+    { _feedbackGfx: workerRangeGfx, _map: { tileSize: 32 } },
+    {
+      playerId: 2,
+      showUnitRangesEnabled: true,
+      selectedEntities: () => [
+        { id: 76, owner: 2, kind: KIND.WORKER, x: 256, y: 96 },
+        {
+          id: 77,
+          owner: 2,
+          kind: KIND.WORKER,
+          x: 288,
+          y: 96,
+          weaponRangePx: 192,
+          weaponMinRangePx: 64,
+          weaponArcRad: Math.PI / 3,
+          weaponFacing: 0,
+        },
+      ],
+    },
+  );
+  assert(workerRangeGfx.calls.length === 0, "selected workers never draw unit range indicators");
+
   const disabledRangeGfx = new RecordingGraphics();
   _drawSelectedUnitRanges.call(
     { _feedbackGfx: disabledRangeGfx, _map: { tileSize: 32 } },
