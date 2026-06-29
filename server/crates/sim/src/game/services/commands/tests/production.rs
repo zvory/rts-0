@@ -63,6 +63,7 @@ fn advanced_unlocks_research_only_at_research_complex() {
     for (wrong_building_kind, upgrade) in [
         (EntityKind::Steelworks, UpgradeKind::AntiTankGunUnlock),
         (EntityKind::Steelworks, UpgradeKind::ArtilleryUnlock),
+        (EntityKind::Steelworks, UpgradeKind::BallisticTables),
         (EntityKind::Factory, UpgradeKind::TankUnlock),
         (EntityKind::Steelworks, UpgradeKind::MortarAutocast),
     ] {

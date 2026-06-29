@@ -1380,14 +1380,29 @@ fn try_fire_artillery(
         notice(events, player, "Not enough steel");
         return false;
     }
+    let ballistic_tables_researched = ps.has_upgrade(UpgradeKind::BallisticTables);
     let (target_x, target_y) = {
         let Some(e) = entities.get_mut(unit) else {
             ps.refund_cost(ammo_cost);
             return false;
         };
-        let shot_number = e.increment_artillery_shots_fired();
+        let shot_number = if ballistic_tables_researched {
+            e.increment_artillery_shots_fired()
+        } else {
+            e.reset_artillery_accuracy();
+            1
+        };
         e.set_attack_cd(config::ARTILLERY_RELOAD_TICKS);
-        artillery_scattered_point(unit, tick, x, y, shot_number)
+        artillery_scattered_point(
+            unit,
+            tick,
+            e.pos_x,
+            e.pos_y,
+            x,
+            y,
+            shot_number,
+            ballistic_tables_researched,
+        )
     };
     let reveal = entities.get(unit).map(|attacker| AttackReveal {
         owner: attacker.owner,
@@ -1442,13 +1457,25 @@ fn try_fire_artillery(
     true
 }
 
-fn artillery_scattered_point(unit: u32, tick: u32, x: f32, y: f32, shot_number: u16) -> (f32, f32) {
-    let max_step = config::ARTILLERY_ACCURACY_SHOTS_TO_MIN
-        .saturating_sub(1)
-        .max(1) as f32;
-    let progress = (shot_number.saturating_sub(1) as f32 / max_step).clamp(0.0, 1.0);
-    let error_tiles = config::ARTILLERY_INITIAL_ERROR_TILES
-        + (config::ARTILLERY_MIN_ERROR_TILES - config::ARTILLERY_INITIAL_ERROR_TILES) * progress;
+#[allow(clippy::too_many_arguments)]
+fn artillery_scattered_point(
+    unit: u32,
+    tick: u32,
+    origin_x: f32,
+    origin_y: f32,
+    x: f32,
+    y: f32,
+    shot_number: u16,
+    ballistic_tables_researched: bool,
+) -> (f32, f32) {
+    let error_tiles = artillery_error_tiles(
+        origin_x,
+        origin_y,
+        x,
+        y,
+        shot_number,
+        ballistic_tables_researched,
+    );
     let radius_px = error_tiles.max(0.0) * config::TILE_SIZE as f32;
     if radius_px <= f32::EPSILON {
         return (x, y);
@@ -1460,6 +1487,35 @@ fn artillery_scattered_point(unit: u32, tick: u32, x: f32, y: f32, shot_number: 
     let angle = (seed as f32 * 1.618_034).rem_euclid(std::f32::consts::TAU);
     let radial = (((seed.rotate_left(13) >> 8) & 1023) as f32 / 1023.0).sqrt() * radius_px;
     (x + angle.cos() * radial, y + angle.sin() * radial)
+}
+
+fn artillery_error_tiles(
+    origin_x: f32,
+    origin_y: f32,
+    x: f32,
+    y: f32,
+    shot_number: u16,
+    ballistic_tables_researched: bool,
+) -> f32 {
+    let distance_tiles = dist2(origin_x, origin_y, x, y).sqrt() / config::TILE_SIZE as f32;
+    let range_span = (config::ARTILLERY_MAX_RANGE_TILES - config::ARTILLERY_MIN_RANGE_TILES)
+        .max(1) as f32;
+    let range_progress = if distance_tiles.is_finite() {
+        ((distance_tiles - config::ARTILLERY_MIN_RANGE_TILES as f32) / range_span).clamp(0.0, 1.0)
+    } else {
+        1.0
+    };
+    let starting_error = config::ARTILLERY_MIN_RANGE_ERROR_TILES
+        + (config::ARTILLERY_MAX_RANGE_ERROR_TILES - config::ARTILLERY_MIN_RANGE_ERROR_TILES)
+            * range_progress;
+    if !ballistic_tables_researched {
+        return starting_error;
+    }
+    let max_step = config::ARTILLERY_ACCURACY_SHOTS_TO_MIN
+        .saturating_sub(1)
+        .max(1) as f32;
+    let progress = (shot_number.saturating_sub(1) as f32 / max_step).clamp(0.0, 1.0);
+    starting_error + (config::ARTILLERY_MIN_ERROR_TILES - starting_error) * progress
 }
 
 pub(crate) fn artillery_point_fire_system(

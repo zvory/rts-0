@@ -14,6 +14,7 @@ pub const EMPTY_FIXTURE_FACTION_ID: &str = "phase2_empty_fixture";
 pub const METHAMPHETAMINES_UPGRADE: &str = "methamphetamines";
 pub const ANTI_TANK_GUN_UNLOCK_UPGRADE: &str = "anti_tank_gun_unlock";
 pub const ARTILLERY_UNLOCK_UPGRADE: &str = "artillery_unlock";
+pub const BALLISTIC_TABLES_UPGRADE: &str = "ballistic_tables";
 pub const TANK_UNLOCK_UPGRADE: &str = "tank_unlock";
 pub const COMMAND_CAR_UNLOCK_UPGRADE: &str = "command_car_unlock";
 pub const MORTAR_AUTOCAST_UPGRADE: &str = "mortar_autocast";
@@ -149,6 +150,10 @@ const DEFAULT_UPGRADES: &[UpgradeCatalogEntry] = &[
     },
     UpgradeCatalogEntry {
         id: ARTILLERY_UNLOCK_UPGRADE,
+        researched_at: EntityKind::ResearchComplex,
+    },
+    UpgradeCatalogEntry {
+        id: BALLISTIC_TABLES_UPGRADE,
         researched_at: EntityKind::ResearchComplex,
     },
     UpgradeCatalogEntry {
