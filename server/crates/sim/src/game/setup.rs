@@ -424,14 +424,17 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
     let oil_dist = config::OIL_DIST_TILES * ts;
     let oil_cx = hx + oil_dist * oil_angle.cos();
     let oil_cy = hy + oil_dist * oil_angle.sin();
+    let mut oil_tiles = BTreeSet::new();
     for i in 0..config::OIL_PATCHES_PER_BASE {
         let (off_x, off_y) = match i {
             0 => (-0.5 * ts, -0.5 * ts),
             1 => (0.5 * ts, -0.5 * ts),
             _ => (0.0, 0.5 * ts),
         };
-        let px = oil_cx + off_x * oil_perp_x + off_y * oil_angle.cos();
-        let py = oil_cy + off_x * oil_perp_y + off_y * oil_angle.sin();
+        let desired_x = oil_cx + off_x * oil_perp_x + off_y * oil_angle.cos();
+        let desired_y = oil_cy + off_x * oil_perp_y + off_y * oil_angle.sin();
+        let (px, py, tile) = oil_patch_tile_center(map, desired_x, desired_y, hx, hy, &oil_tiles);
+        oil_tiles.insert(tile);
         let dist_tiles = ((px - hx).powi(2) + (py - hy).powi(2)).sqrt() / ts;
         debug_assert!(
             (config::CC_RESOURCE_MIN_DIST_TILES..=config::CC_RESOURCE_MAX_DIST_TILES)
@@ -442,6 +445,62 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
         );
         entities.spawn_node(EntityKind::Oil, px, py);
     }
+}
+
+fn oil_patch_tile_center(
+    map: &Map,
+    x: f32,
+    y: f32,
+    anchor_x: f32,
+    anchor_y: f32,
+    occupied_tiles: &BTreeSet<(u32, u32)>,
+) -> (f32, f32, (u32, u32)) {
+    let ts = config::TILE_SIZE as f32;
+    let max_search_tiles = config::CC_RESOURCE_MAX_DIST_TILES.ceil() as i32 + 1;
+    let (anchor_tx, anchor_ty) = map.tile_of(anchor_x, anchor_y);
+    let min_tx = (anchor_tx as i32 - max_search_tiles).max(0);
+    let min_ty = (anchor_ty as i32 - max_search_tiles).max(0);
+    let max_tx = (anchor_tx as i32 + max_search_tiles).min(map.size.saturating_sub(1) as i32);
+    let max_ty = (anchor_ty as i32 + max_search_tiles).min(map.size.saturating_sub(1) as i32);
+
+    let mut best: Option<(f32, u32, u32, f32, f32)> = None;
+    for ty in min_ty..=max_ty {
+        for tx in min_tx..=max_tx {
+            let tile = (tx as u32, ty as u32);
+            if occupied_tiles.contains(&tile) || !map.is_passable(tx, ty) {
+                continue;
+            }
+            let (cx, cy) = map.tile_center(tile.0, tile.1);
+            let dist_tiles = ((cx - anchor_x).powi(2) + (cy - anchor_y).powi(2)).sqrt() / ts;
+            if !(config::CC_RESOURCE_MIN_DIST_TILES..=config::CC_RESOURCE_MAX_DIST_TILES)
+                .contains(&dist_tiles)
+            {
+                continue;
+            }
+            let score = (cx - x).powi(2) + (cy - y).powi(2);
+            let replace = match best {
+                Some((best_score, best_tx, best_ty, _, _)) => {
+                    score < best_score - 0.001
+                        || ((score - best_score).abs() <= 0.001
+                            && (tile.1, tile.0) < (best_ty, best_tx))
+                }
+                None => true,
+            };
+            if replace {
+                best = Some((score, tile.0, tile.1, cx, cy));
+            }
+        }
+    }
+
+    if let Some((_, tx, ty, cx, cy)) = best {
+        return (cx, cy, (tx, ty));
+    }
+
+    let max_tile = map.size.saturating_sub(1) as f32;
+    let tx = (x / ts - 0.5).round().clamp(0.0, max_tile) as u32;
+    let ty = (y / ts - 0.5).round().clamp(0.0, max_tile) as u32;
+    let (cx, cy) = map.tile_center(tx, ty);
+    (cx, cy, (tx, ty))
 }
 
 /// Spawn a City Centre, starting workers, and resource clusters for one player.
