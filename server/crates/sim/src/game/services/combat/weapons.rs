@@ -8,6 +8,8 @@ use super::{
     TANK_TURRET_FIRE_TOLERANCE_RAD, TANK_TURRET_TURN_RATE_RAD_PER_TICK,
 };
 
+const SUPPORT_WEAPON_ATTACK_MOVE_NO_TARGET_TICKS: u16 = config::TICK_HZ as u16;
+
 pub(super) fn rotate_vehicle_weapon_for_combat(e: &mut Entity, target_angle: f32) -> bool {
     if !target_angle.is_finite() {
         return false;
@@ -98,6 +100,9 @@ pub(super) fn begin_idle_deployed_weapon_setup(e: &mut Entity) {
     ) {
         return;
     }
+    if matches!(e.order(), Order::AttackMove(_)) && e.move_phase() != Some(MovePhase::Arrived) {
+        return;
+    }
     if matches!(e.weapon_setup(), WeaponSetup::Packed) {
         e.set_weapon_setup(WeaponSetup::SettingUp {
             ticks: config::MACHINE_GUNNER_SETUP_TICKS,
@@ -145,6 +150,24 @@ pub(super) fn deployed_weapon_ready_to_move(entities: &mut EntityStore, id: u32)
     }
 }
 
+pub(super) fn update_attack_move_no_target_teardown(entities: &mut EntityStore, id: u32) {
+    let teardown_due = entities
+        .get_mut(id)
+        .map(|e| {
+            if support_weapon_attack_move_waiting_without_target(e) {
+                e.increment_attack_move_no_target_ticks()
+                    >= SUPPORT_WEAPON_ATTACK_MOVE_NO_TARGET_TICKS
+            } else {
+                e.reset_attack_move_no_target_ticks();
+                false
+            }
+        })
+        .unwrap_or(false);
+    if teardown_due {
+        deployed_weapon_ready_to_move(entities, id);
+    }
+}
+
 pub(super) fn setup_ticks_for(kind: EntityKind) -> u16 {
     match kind {
         EntityKind::AntiTankGun => config::ANTI_TANK_GUN_SETUP_TICKS,
@@ -187,6 +210,16 @@ pub(super) fn moving_fire_movement_order_holds_path(
 
 pub(super) fn moving_fire_miss_chance(_e: &Entity) -> f32 {
     0.0
+}
+
+fn support_weapon_attack_move_waiting_without_target(e: &Entity) -> bool {
+    matches!(e.kind, EntityKind::MachineGunner | EntityKind::AntiTankGun)
+        && matches!(e.order(), Order::AttackMove(_))
+        && e.move_phase() != Some(MovePhase::Arrived)
+        && matches!(
+            e.weapon_setup(),
+            WeaponSetup::SettingUp { .. } | WeaponSetup::Deployed
+        )
 }
 
 pub(super) fn anti_tank_gun_can_chase(e: &Entity) -> bool {
