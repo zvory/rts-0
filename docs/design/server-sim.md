@@ -667,6 +667,23 @@ setup, artillery point-fire targeting, and artillery teardown before movement. I
 new validation policy or tick orchestration; those responsibilities remain with command admission,
 queued promotion, or the owning tick system.
 
+Tank weapon range is dynamic in the simulation: tanks keep their base 5-tile range while moving,
+then linearly ramp to 14 tiles after three stationary seconds. Path-driven translation or hull
+rotation resets the ramp to base range; turret aiming and external pushes do not.
+
+Construction build-site checks classify the current site state before deciding whether work can
+start or continue. The status distinguishes invalid terrain, existing buildings or scaffolds,
+resource nodes, and relevant unit bodies, while preserving Tank Trap placement rules. Pump Jack
+placement is the resource-node exception: it is only valid when the Pump Jack footprint center is
+associated with non-depleted oil without another extractor on that same patch, and completed Pump
+Jacks, not workers, extract oil. Pump Jacks count as
+field infrastructure for defeat checks, so a player with only Pump Jacks remaining is eliminated. Build orders can
+enter a `WaitingAtSite` phase and track unit-blocked ticks with a grace period derived from
+`TICK_HZ`. Otherwise-valid build orders may be issued and promoted while the player is short on
+resources; once the worker arrives, construction waits and retries until resources are available.
+Workers also wait through temporary unit blockers for that grace period, but cancel if permanent
+blockers claim the footprint. Existing owned scaffolds can be resumed without charging again.
+
 General rules:
 
 - Commands must be valid at issue time. The server checks ownership, unit capability, target
