@@ -18,6 +18,7 @@ mod building_memory;
 pub mod command;
 mod commands;
 pub mod entity;
+mod firing_reveal;
 pub(crate) mod fog;
 mod hero_abilities;
 mod invariants;
@@ -50,6 +51,7 @@ use serde::{Deserialize, Serialize};
 use artillery::ArtilleryShellStore;
 use building_memory::{BuildingMemory, BuildingMemoryEntry};
 use entity::{BuildPhase, EntityKind, EntityStore};
+use firing_reveal::FiringRevealSource;
 use fog::{Fog, LingeringSightSource};
 use map::Map;
 pub use map::MapMetadata;
@@ -140,45 +142,6 @@ pub(crate) struct ScoreState {
     buildings_killed: u32,
     buildings_lost: u32,
     units_lost_by_kind: BTreeMap<EntityKind, u32>,
-}
-
-/// Temporary actionable sight granted to a recipient when an Anti-Tank Gun fires from fog.
-/// Unlike lingering death sight, this is stamped into live fog so command validation, combat
-/// targeting, and snapshot projection all treat the firing gun as currently visible.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct FiringRevealSource {
-    viewer: u32,
-    entity_id: u32,
-    expires_at_tick: u32,
-}
-
-impl FiringRevealSource {
-    fn new(viewer: u32, entity_id: u32, expires_at_tick: u32) -> Option<Self> {
-        if viewer == 0 || entity_id == 0 {
-            return None;
-        }
-        Some(Self {
-            viewer,
-            entity_id,
-            expires_at_tick,
-        })
-    }
-
-    fn is_active_at(self, tick: u32) -> bool {
-        self.expires_at_tick > tick
-    }
-
-    fn viewer(self) -> u32 {
-        self.viewer
-    }
-
-    fn entity_id(self) -> u32 {
-        self.entity_id
-    }
-
-    fn expires_at_tick(self) -> u32 {
-        self.expires_at_tick
-    }
 }
 
 /// The authoritative match state.

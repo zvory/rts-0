@@ -555,6 +555,15 @@ fn hidden_mortar_launch_is_not_sent_but_impact_reveals_attacker_to_victim() {
         .entities
         .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
         .expect("target should spawn");
+    let counter = game
+        .entities
+        .spawn_unit(
+            2,
+            EntityKind::Tank,
+            target_pos.0,
+            target_pos.1 + config::TILE_SIZE as f32 * 8.0,
+        )
+        .expect("counter tank should spawn");
     systems::recompute_supply(&mut game.players, &game.entities);
     game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
@@ -622,6 +631,36 @@ fn hidden_mortar_launch_is_not_sent_but_impact_reveals_attacker_to_victim() {
                 && (*y - target_pos.1).abs() < 0.001
         )),
         "victim should receive a mortar impact reveal after being hit: {enemy_events:?}"
+    );
+    let snapshot = game.snapshot_for(2);
+    let view = snapshot
+        .entities
+        .iter()
+        .find(|entity| entity.id == mortar)
+        .expect("impact-revealed mortar should be projected to the victim");
+    assert!(
+        !view.vision_only,
+        "mortar firing reveal should be actionable live fog"
+    );
+
+    game.enqueue(
+        2,
+        Command::Attack {
+            units: vec![counter],
+            target: mortar,
+            queued: false,
+        },
+    );
+    game.tick();
+
+    assert_eq!(
+        game.entities
+            .get(counter)
+            .expect("counter tank should exist")
+            .order()
+            .attack_target(),
+        Some(mortar),
+        "victim should be able to target the impact-revealed mortar"
     );
 }
 

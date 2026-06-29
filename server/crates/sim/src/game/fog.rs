@@ -16,11 +16,11 @@ use std::collections::HashMap;
 
 use crate::config;
 use crate::game::entity::{static_blocker_class, Entity, EntityStore, StaticBlockerClass};
+use crate::game::firing_reveal::FiringRevealSource;
 use crate::game::map::Map;
 use crate::game::services::line_of_sight::LineOfSight;
 use crate::game::services::occupancy::building_footprint;
 use crate::game::smoke::SmokeCloudStore;
-use crate::game::FiringRevealSource;
 
 /// Temporary sight left behind by an owned unit/building after it dies. This is used only by
 /// snapshot projection; command validation and combat still use live fog.
@@ -192,7 +192,7 @@ impl Fog {
         reveal_visible_building_footprints(&mut self.grids, &building_mask);
     }
 
-    pub(crate) fn stamp_firing_reveal_sources_with_smoke(
+    pub(in crate::game) fn stamp_firing_reveal_sources_with_smoke(
         &mut self,
         sources: &[FiringRevealSource],
         store: &EntityStore,
