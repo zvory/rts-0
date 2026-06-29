@@ -238,6 +238,9 @@ impl Game {
             !matches!(player_resource_projection, PlayerResourceProjection::None),
         );
         ability_objects.sort_by_key(|object| object.id);
+        let trenches = self
+            .trenches
+            .views_for(player, fog, fogged, remembered_building_players);
 
         let player_resources = self.player_resource_snapshots(player_resource_projection);
 
@@ -251,7 +254,7 @@ impl Game {
             resource_deltas,
             smokes,
             ability_objects,
-            trenches: Vec::new(),
+            trenches,
             visible_tiles: if fogged {
                 fog.visible_tiles_for(player)
             } else {
@@ -364,7 +367,7 @@ impl Game {
             .collect()
     }
 
-    fn team_current_fog_for(&self, player: u32, fog: &Fog) -> Fog {
+    pub(in crate::game) fn team_current_fog_for(&self, player: u32, fog: &Fog) -> Fog {
         let mut visible_players = self.living_team_player_ids_for_vision(player);
         if visible_players.is_empty() {
             visible_players.push(player);

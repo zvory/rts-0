@@ -299,6 +299,7 @@ impl Game {
             lingering_sight: Vec::new(),
             firing_reveals: Vec::new(),
             smokes: SmokeCloudStore::new(),
+            trenches: TrenchStore::new(),
             ability_runtime: crate::game::ability_runtime::AbilityRuntime::new(),
             mortar_shells: crate::game::mortar::MortarShellStore::default(),
             artillery_shells: crate::game::artillery::ArtilleryShellStore::default(),
@@ -315,6 +316,7 @@ impl Game {
         let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
         game.recompute_live_fog(&ids);
         game.refresh_building_memory(&ids);
+        game.refresh_trench_memory(&ids);
         game
     }
 

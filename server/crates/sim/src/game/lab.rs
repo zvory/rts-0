@@ -779,6 +779,7 @@ impl Game {
         self.fog
             .recompute_with_smoke(&ids, &self.entities, &self.map, &self.smokes);
         self.refresh_building_memory(&ids);
+        self.refresh_trench_memory(&ids);
         #[cfg(debug_assertions)]
         self.assert_invariants();
     }

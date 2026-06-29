@@ -39,6 +39,7 @@ pub(crate) mod smoke;
 mod snapshot;
 mod systems;
 pub mod teams;
+pub(crate) mod trench;
 pub mod upgrade;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -65,6 +66,7 @@ use rand::SeedableRng;
 use replay::CommandLogEntry;
 pub(crate) use setup::StartingLoadout;
 use smoke::SmokeCloudStore;
+use trench::TrenchStore;
 
 pub use crate::game::command::SimCommand;
 pub use teams::TeamId;
@@ -174,6 +176,8 @@ pub struct Game {
     firing_reveals: Vec<FiringRevealSource>,
     /// Neutral smoke clouds that block authoritative fog and combat LOS without being entities.
     smokes: SmokeCloudStore,
+    /// Neutral persistent trench terrain. Trenches do not participate in entity lifecycle systems.
+    trenches: TrenchStore,
     /// Persistent ability runtime state that is not a normal entity or one-off projectile event.
     ability_runtime: AbilityRuntime,
     /// Delayed mortar shell impacts waiting to resolve area damage.
@@ -280,6 +284,7 @@ impl Game {
             self.recompute_live_fog(&ids);
         });
         self.refresh_building_memory(&ids);
+        self.refresh_trench_memory(&ids);
 
         // In debug builds, assert that the world state is internally consistent.
         // Panics here mean a system violated a documented invariant.
@@ -408,6 +413,7 @@ impl Game {
         let ids: Vec<u32> = self.players.iter().map(|p| p.id).collect();
         self.recompute_live_fog(&ids);
         self.refresh_building_memory(&ids);
+        self.refresh_trench_memory(&ids);
     }
 
     pub fn tick_count(&self) -> u32 {
@@ -428,6 +434,18 @@ impl Game {
         let ids: Vec<u32> = self.players.iter().map(|p| p.id).collect();
         self.recompute_live_fog(&ids);
         self.refresh_building_memory(&ids);
+        self.refresh_trench_memory(&ids);
+        Some(id)
+    }
+
+    #[allow(dead_code)]
+    #[cfg(any(test, debug_assertions))]
+    pub(crate) fn spawn_trench_for_test(&mut self, x: f32, y: f32) -> Option<u32> {
+        let id = self
+            .trenches
+            .create(&self.map, x, y, config::ENTRENCHMENT_TRENCH_RADIUS_TILES)?;
+        let ids: Vec<u32> = self.players.iter().map(|p| p.id).collect();
+        self.refresh_trench_memory(&ids);
         Some(id)
     }
 
@@ -476,6 +494,13 @@ impl Game {
         );
     }
 
+    pub(in crate::game) fn refresh_trench_memory(&mut self, player_ids: &[u32]) {
+        for &player in player_ids {
+            let fog = self.team_current_fog_for(player, &self.fog);
+            self.trenches.refresh_memory_for_player(player, &fog);
+        }
+    }
+
     fn recompute_live_fog(&mut self, player_ids: &[u32]) {
         self.fog
             .recompute_with_smoke(player_ids, &self.entities, &self.map, &self.smokes);
@@ -510,3 +535,5 @@ mod phase7_privacy_tests;
 mod snapshot_memory_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod trench_tests;
