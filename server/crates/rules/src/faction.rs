@@ -592,6 +592,7 @@ mod tests {
     #[test]
     fn default_catalog_routes_current_tech_tree() {
         let catalog = CURRENT_CATALOG;
+        let research_complex = EntityKind::ResearchComplex;
 
         assert_eq!(
             catalog.trainable_units(EntityKind::CityCentre),
@@ -618,15 +619,9 @@ mod tests {
             ]
         );
         assert!(catalog.allows_research(METHAMPHETAMINES_UPGRADE, EntityKind::TrainingCentre));
-        assert!(catalog.allows_research(
-            ANTI_TANK_GUN_UNLOCK_UPGRADE,
-            EntityKind::ResearchComplex
-        ));
-        assert!(!catalog.allows_research(
-            ARTILLERY_UNLOCK_UPGRADE,
-            EntityKind::ResearchComplex
-        ));
-        assert!(catalog.allows_research(TANK_UNLOCK_UPGRADE, EntityKind::ResearchComplex));
+        assert!(catalog.allows_research(ANTI_TANK_GUN_UNLOCK_UPGRADE, research_complex));
+        assert!(!catalog.allows_research(ARTILLERY_UNLOCK_UPGRADE, research_complex));
+        assert!(catalog.allows_research(TANK_UNLOCK_UPGRADE, research_complex));
         assert!(!catalog.allows_research(TANK_UNLOCK_UPGRADE, EntityKind::TrainingCentre));
         assert!(catalog.allows_building(EntityKind::TankTrap));
         assert!(catalog.can_build(EntityKind::Worker, EntityKind::TankTrap));
