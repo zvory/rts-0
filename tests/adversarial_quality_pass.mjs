@@ -151,16 +151,22 @@ assert.deepEqual(buildFetchArgs({ remote: "origin", baseRef: "upstream/main" }),
 const nestedAgentPr = spawnSync("bash", ["scripts/agent-pr.sh", "--dry-run"], {
   cwd: repoRoot,
   encoding: "utf8",
-  env: { ...process.env, [QUALITY_PASS_ENV]: "1" },
+  env: testEnv({ [QUALITY_PASS_ENV]: "1" }),
 });
 assert.equal(nestedAgentPr.status, 2);
 assert.match(nestedAgentPr.stderr, /outer helper owns PR lifecycle/);
+
+function testEnv(extra = {}) {
+  const env = { ...process.env };
+  delete env[QUALITY_PASS_ENV];
+  return { ...env, ...extra };
+}
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
     encoding: "utf8",
     ...options,
-    env: { ...process.env, ...(options.env || {}) },
+    env: testEnv(options.env || {}),
   });
   assert.equal(
     result.status,
@@ -176,7 +182,9 @@ function writeExecutable(file, contents) {
 
 function copyWorkflowScripts(targetRepo) {
   const targetScripts = path.join(targetRepo, "scripts");
+  const targetTests = path.join(targetRepo, "tests");
   fs.mkdirSync(targetScripts, { recursive: true });
+  fs.mkdirSync(targetTests, { recursive: true });
   for (const script of [
     "agent-pr.sh",
     "adversarial-quality-pass.mjs",
@@ -184,6 +192,7 @@ function copyWorkflowScripts(targetRepo) {
   ]) {
     fs.copyFileSync(path.join(repoRoot, "scripts", script), path.join(targetScripts, script));
   }
+  fs.copyFileSync(path.join(repoRoot, "tests", "select-suites.mjs"), path.join(targetTests, "select-suites.mjs"));
   fs.chmodSync(path.join(targetScripts, "agent-pr.sh"), 0o755);
   fs.chmodSync(path.join(targetScripts, "adversarial-quality-pass.mjs"), 0o755);
 }
@@ -194,15 +203,25 @@ try {
   const workPath = path.join(tempRoot, "work");
   const binPath = path.join(tempRoot, "bin");
   const capturedBody = path.join(tempRoot, "pr-body.md");
+  const docsOnlyBody = path.join(tempRoot, "docs-only-pr-body.md");
+  const codexCalledMarker = path.join(tempRoot, "codex-called.txt");
+  const docsOnlyCodexCalledMarker = path.join(tempRoot, "docs-only-codex-called.txt");
+  const docsOnlyStatusCapture = path.join(tempRoot, "docs-only-gh-api.txt");
   fs.mkdirSync(binPath, { recursive: true });
 
   writeExecutable(
     path.join(binPath, "codex"),
     `#!/usr/bin/env bash
 set -euo pipefail
+if [ -n "\${CODEX_CALLED_MARKER:-}" ]; then
+  printf 'codex called\\n' >>"$CODEX_CALLED_MARKER"
+fi
 if [ "\${RTS_ADVERSARIAL_QUALITY_PASS:-}" != "1" ]; then
   echo "missing quality pass environment" >&2
   exit 1
+fi
+if [ "\${CODEX_MUTATE_AGENT_PR:-}" = "1" ]; then
+  printf '\\n# fixture codex mutation\\n' >> scripts/agent-pr.sh
 fi
 report_file=""
 while [ "$#" -gt 0 ]; do
@@ -233,6 +252,9 @@ JSON
     `#!/usr/bin/env bash
 set -euo pipefail
 if [ "$1" = "api" ]; then
+  if [ -n "\${AGENT_GH_API_CAPTURE:-}" ]; then
+    printf '%s\\n' "$*" >>"$AGENT_GH_API_CAPTURE"
+  fi
   exit 0
 fi
 if [ "$1" = "label" ] && [ "\${2:-}" = "create" ]; then
@@ -279,14 +301,17 @@ exit 1
   run("git", ["remote", "add", "origin", originPath], { cwd: workPath });
   run("git", ["push", "-u", "origin", "main"], { cwd: workPath });
   run("git", ["checkout", "-b", "zvorygin/quality-report-body"], { cwd: workPath });
-  fs.appendFileSync(path.join(workPath, "README.md"), "branch change\n");
-  run("git", ["add", "README.md"], { cwd: workPath });
+  fs.appendFileSync(path.join(workPath, "README.md"), "implementation branch docs change\n");
+  fs.writeFileSync(path.join(workPath, "--implementation.rs"), "branch change\n");
+  run("git", ["add", "--", "README.md", "--implementation.rs"], { cwd: workPath });
   run("git", ["commit", "-m", "Change branch"], { cwd: workPath });
 
   run("scripts/agent-pr.sh", ["--owner", "tester", "--title", "Quality report body", "--verification", "workflow fixture"], {
     cwd: workPath,
     env: {
       AGENT_PR_BODY_CAPTURE: capturedBody,
+      CODEX_CALLED_MARKER: codexCalledMarker,
+      CODEX_MUTATE_AGENT_PR: "1",
       GH_BIN: path.join(binPath, "gh"),
       PATH: `${binPath}:${process.env.PATH}`,
     },
@@ -299,6 +324,55 @@ exit 1
   assert.match(body, /Verdict: improved/);
   assert.match(body, /Captured report body\./);
   assert.match(body, /- embedded the quality-pass report/);
+  assert.match(fs.readFileSync(codexCalledMarker, "utf8"), /codex called/);
+
+  run("git", ["checkout", "main"], { cwd: workPath });
+  run("git", ["checkout", "-b", "zvorygin/docs-only-quality-skip"], { cwd: workPath });
+  fs.appendFileSync(path.join(workPath, "README.md"), "docs-only branch change\n");
+  run("git", ["add", "README.md"], { cwd: workPath });
+  run("git", ["commit", "-m", "Document branch"], { cwd: workPath });
+
+  const docsOnlyHeadMismatch = spawnSync(
+    "scripts/agent-pr.sh",
+    ["--owner", "tester", "--head", "zvorygin/other", "--verification", "mismatch fixture"],
+    {
+      cwd: workPath,
+      encoding: "utf8",
+      env: testEnv({
+        AGENT_GH_API_CAPTURE: docsOnlyStatusCapture,
+        CODEX_CALLED_MARKER: docsOnlyCodexCalledMarker,
+        GH_BIN: path.join(binPath, "gh"),
+        PATH: `${binPath}:${process.env.PATH}`,
+      }),
+    },
+  );
+  assert.equal(docsOnlyHeadMismatch.status, 2);
+  assert.match(docsOnlyHeadMismatch.stderr, /head branch mismatch/);
+  assert.equal(fs.existsSync(docsOnlyCodexCalledMarker), false, "mismatched --head should not invoke Codex");
+  assert.equal(fs.existsSync(docsOnlyStatusCapture), false, "mismatched --head should not post status");
+
+  run("scripts/agent-pr.sh", ["--owner", "tester", "--title", "Docs-only quality skip", "--verification", "docs fixture"], {
+    cwd: workPath,
+    env: {
+      AGENT_GH_API_CAPTURE: docsOnlyStatusCapture,
+      AGENT_PR_BODY_CAPTURE: docsOnlyBody,
+      CODEX_CALLED_MARKER: docsOnlyCodexCalledMarker,
+      GH_BIN: path.join(binPath, "gh"),
+      PATH: `${binPath}:${process.env.PATH}`,
+    },
+  });
+
+  assert.equal(fs.existsSync(docsOnlyCodexCalledMarker), false, "docs-only PR should not invoke Codex");
+  const docsBody = fs.readFileSync(docsOnlyBody, "utf8");
+  assert.match(docsBody, /<!-- rts-agent-pr:v1 -->/);
+  assert.match(docsBody, /^Focused-Verification: docs fixture$/m);
+  assert.match(docsBody, /## Adversarial quality pass/);
+  assert.match(docsBody, /Verdict: skipped_docs_only/);
+  assert.match(docsBody, /changes only Markdown documentation files/);
+  assert.match(docsBody, /classified this branch as `docs_only=true`/);
+  const docsOnlyStatus = fs.readFileSync(docsOnlyStatusCapture, "utf8");
+  assert.match(docsOnlyStatus, /statuses\//);
+  assert.match(docsOnlyStatus, /description=skipped for docs-only changes/);
 } finally {
   fs.rmSync(tempRoot, { recursive: true, force: true });
 }

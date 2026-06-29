@@ -1,6 +1,6 @@
 # Capsule: testing
 
-Use when writing/debugging tests, CI/hooks, or focused verification.
+Use for tests, CI/hooks, or focused verification.
 
 ## Read first
 - [docs/design/testing.md](../design/testing.md) §9 — self-play harness
@@ -11,24 +11,23 @@ Use when writing/debugging tests, CI/hooks, or focused verification.
 - [docs/design/testing.md](../design/testing.md) §13 — doc drift sweeper
 
 ## Suites
-- `node tests/server_integration.mjs` — dep-free full server pipeline; needs a running server.
-- `node tests/regression.mjs` — dep-free hardening/DoS/robustness guards; needs a running server.
+- `node tests/server_integration.mjs` — full server pipeline; needs a running server.
+- `node tests/regression.mjs` — hardening/DoS/robustness guards; needs a running server.
 - `node tests/ai_integration.mjs` — dep-free AI opponent lobby flow; needs a running server.
 - `node tests/lab_mortar_regression.mjs` — lab P2 mortar event regression; needs a server.
 - `node tests/minimap_input_contracts.mjs` — dep-free minimap/router pointer-lock contracts.
 - `tests/run-all.sh --no-rust` — live Node suites plus browser smoke with shared dependencies.
-- `tests/run-all.sh --with-tri-state-browser --no-rust` — opt into latency-sensitive tri-state
-  browser scenarios locally; CI includes them automatically.
+- `tests/run-all.sh --with-tri-state-browser --no-rust` — opt into tri-state browser scenarios.
 - `tests/run-all.sh --only-rust` — architecture policy plus Rust format, nextest, and lint only.
 - `tests/run-all.sh --only-live-node` — JS contracts plus live Node API suites only.
 - `tests/run-all.sh --only-browser` — browser smoke plus configured tri-state browser suites only.
 - `cargo nextest run --config-file .config/nextest.toml --manifest-path server/Cargo.toml --profile
-  default` — simulation behavior plus fast scripted self-play; no running server needed.
+  default` — sim behavior plus fast scripted self-play; no server needed.
 - `RTS_FULL_AI_TESTS=1 cargo nextest run --config-file .config/nextest.toml --manifest-path
   server/Cargo.toml --profile default` — long AI self-play/simulation coverage.
-- `tests/run-all.sh --full-ai` — full orchestrator plus long AI self-play/simulation coverage.
+- `tests/run-all.sh --full-ai` — full orchestrator plus long AI coverage.
 - `node tests/select-suites.mjs --from=<base-ref>` — list expected suites for changed files.
-- `node scripts/check-docs-health.mjs` — docs map, capsule size, and local Markdown link hygiene.
+- `node scripts/check-docs-health.mjs` — docs map, capsule cap, and Markdown links.
 - `node scripts/check-wiki.mjs` — wiki route hardening, generated stats, and faction catalog
   parity.
 - Render perf: `node scripts/client-perf-harness.mjs --render-lag-suite --seconds 10`; add `--stress-matrix`.
@@ -44,9 +43,9 @@ Use when writing/debugging tests, CI/hooks, or focused verification.
   local gate failure with an install hint.
 - Live Node suites need a running server. Use `tests/run-all.sh` to boot a private one, or start
   `cd server && cargo run` first for individual Node suites.
-- Installed hooks run staged whitespace checks, excluding the human-owned `playtest_notes.md`, plus
-  `node scripts/check-docs-health.mjs` before commits and merges. They do not run `tests/run-all.sh`;
-  GitHub Actions owns the full-suite gate.
+- Installed hooks run staged whitespace checks, excluding `playtest_notes.md`, plus docs health.
+  They do not run `tests/run-all.sh`; GitHub Actions owns the full-suite gate.
+- `scripts/agent-pr.sh` skips Codex only for pure `.md` diffs; status/body skip report still posts.
 - Browser smoke dependencies are cached under `${RTS_NODE_DEPS_CACHE_DIR:-/tmp/rts-node-deps}`.
 - Local `tests/run-all.sh` uses per-worktree Cargo target dirs under `/tmp/rts-cargo-target/`.
   Override with `CARGO_TARGET_DIR` only when a task needs a specific target location.

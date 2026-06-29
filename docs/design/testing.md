@@ -157,7 +157,10 @@ suites.
   marking the environment so `scripts/agent-pr.sh` refuses recursive PR lifecycle calls.
   Branch-handling changes should also include a dry-run `--head-branch` mismatch check that fails
   before Codex, push, or status work runs. PR-helper changes should preserve the Markdown
-  quality-pass report in the owned PR body so the status has a durable audit trail. Include
+  quality-pass report in the owned PR body so the status has a durable audit trail. Pure Markdown
+  branches, defined as every changed file ending in `.md` regardless of directory, must skip Codex
+  adversarial review while still pushing the branch, posting the `adversarial-quality-pass` success
+  status, and recording a docs-only skip report in the PR body. Include
   `bash -n scripts/agent-pr.sh tests/run-all.sh && node --check scripts/adversarial-quality-pass.mjs`
   for shell and JS syntax coverage.
 - `rts-contract` or `rts-protocol`: run Rust contract/protocol tests, compact snapshot tests, JS
@@ -272,6 +275,12 @@ checks local Markdown links in `docs/` and `plans/`.
 
 The `PR ownership` workflow validates owned agent PR metadata for `zvorygin/*` branches with
 `scripts/check-pr-ownership.sh`.
+
+`scripts/agent-pr.sh` reuses the changed-file policy before opening or updating an owned PR. When
+the branch diff against `origin/main` contains only `.md` files, including Markdown files outside
+`docs/`, it skips the Codex adversarial quality pass but still pushes the branch, posts a successful
+`adversarial-quality-pass` status, and writes a docs-only skip report into the PR body. Any
+non-Markdown changed file keeps the normal adversarial quality pass requirement.
 
 The old standalone `Rust` and `Integration` workflows are retired. Their package, architecture,
 live Node, and browser coverage is owned by the split `Main test gate` jobs under the required

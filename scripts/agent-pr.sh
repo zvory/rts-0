@@ -2,6 +2,19 @@
 # Run the final quality pass, then open or update an agent-owned PR and arm auto-merge.
 set -euo pipefail
 
+if [ "${RTS_ADVERSARIAL_QUALITY_PASS:-}" = "1" ]; then
+  echo "agent-pr: refusing to run inside adversarial quality pass; the outer helper owns PR lifecycle" >&2
+  exit 2
+fi
+
+if [ "${RTS_AGENT_PR_STABLE_COPY:-0}" != "1" ]; then
+  stable_copy="$(mktemp -t rts-agent-pr-stable.XXXXXX)"
+  cp "${BASH_SOURCE[0]}" "$stable_copy"
+  chmod +x "$stable_copy"
+  RTS_AGENT_PR_STABLE_COPY=1 RTS_AGENT_PR_STABLE_COPY_PATH="$stable_copy" exec bash "$stable_copy" "$@"
+fi
+
+STABLE_COPY_PATH="${RTS_AGENT_PR_STABLE_COPY_PATH:-}"
 GH_BIN="${GH_BIN:-gh}"
 BASE_BRANCH="main"
 HEAD_BRANCH=""
@@ -15,6 +28,8 @@ EXTRA_LABELS=()
 AUTO_MERGE=1
 DRY_RUN=0
 DRAFT_FLAG=0
+QUALITY_CONTEXT="adversarial-quality-pass"
+CHANGED_FILES=()
 
 usage() {
   cat <<'EOF'
@@ -62,19 +77,18 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
-if [ "${RTS_ADVERSARIAL_QUALITY_PASS:-}" = "1" ]; then
-  echo "agent-pr: refusing to run inside adversarial quality pass; the outer helper owns PR lifecycle" >&2
-  exit 2
-fi
-
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
-if [ -z "$HEAD_BRANCH" ]; then
-  HEAD_BRANCH="$(git branch --show-current)"
+CURRENT_BRANCH="$(git branch --show-current)"
+if [ -z "$CURRENT_BRANCH" ]; then
+  echo "agent-pr: could not determine current branch; detached HEAD is not supported" >&2
+  exit 2
 fi
 if [ -z "$HEAD_BRANCH" ]; then
-  echo "agent-pr: could not determine head branch" >&2
+  HEAD_BRANCH="$CURRENT_BRANCH"
+elif [ "$HEAD_BRANCH" != "$CURRENT_BRANCH" ]; then
+  echo "agent-pr: head branch mismatch: current branch is '$CURRENT_BRANCH', but --head was '$HEAD_BRANCH'" >&2
   exit 2
 fi
 case "$HEAD_BRANCH" in
@@ -107,13 +121,108 @@ fi
 quality_report_json="$(mktemp -t rts-adversarial-quality-pass.XXXXXX.json)"
 quality_report_md="$(mktemp -t rts-adversarial-quality-pass.XXXXXX.md)"
 tmp_body="$(mktemp -t rts-agent-pr.XXXXXX)"
-trap 'rm -f "$quality_report_json" "$quality_report_md" "$tmp_body"' EXIT
+
+cleanup() {
+  rm -f "$quality_report_json" "$quality_report_md" "$tmp_body"
+  if [ -n "$STABLE_COPY_PATH" ]; then
+    rm -f "$STABLE_COPY_PATH"
+  fi
+}
+trap cleanup EXIT
+
+collect_changed_files() {
+  CHANGED_FILES=()
+  while IFS= read -r path; do
+    [ -n "$path" ] && CHANGED_FILES+=("$path")
+  done < <(git diff --name-only --no-renames "origin/$BASE_BRANCH...HEAD")
+}
+
+is_docs_only_change() {
+  collect_changed_files
+  if [ "${#CHANGED_FILES[@]}" -eq 0 ]; then
+    return 1
+  fi
+
+  local policy_output
+  local docs_only
+  policy_output="$(node tests/select-suites.mjs --ci-policy "${CHANGED_FILES[@]}")"
+  docs_only="false"
+  while IFS='=' read -r key value; do
+    if [ "$key" = "docs_only" ]; then
+      docs_only="$value"
+    fi
+  done <<<"$policy_output"
+
+  [ "$docs_only" = "true" ]
+}
+
+write_docs_only_quality_report() {
+  cat >"$quality_report_md" <<'EOF'
+## Adversarial quality pass
+
+Verdict: skipped_docs_only
+
+### Summary
+
+Skipped Codex adversarial review because this branch changes only Markdown documentation files.
+
+### Issues found
+
+- None. Review was intentionally skipped for docs-only changes.
+
+### Changes made
+
+- None.
+
+### Verification
+
+- `tests/select-suites.mjs --ci-policy` classified this branch as `docs_only=true`.
+
+### Remaining concerns
+
+- None.
+
+EOF
+}
+
+post_docs_only_status() {
+  local final_head
+  final_head="$(git rev-parse HEAD)"
+  "$GH_BIN" api \
+    -X POST \
+    "repos/:owner/:repo/statuses/$final_head" \
+    -f state=success \
+    -f "context=$QUALITY_CONTEXT" \
+    -f "description=skipped for docs-only changes"
+}
 
 run_quality_pass() {
   if [ "$DRY_RUN" = "1" ]; then
-    echo "agent-pr: would run scripts/adversarial-quality-pass.mjs for $HEAD_BRANCH"
+    if git rev-parse --verify "origin/$BASE_BRANCH" >/dev/null 2>&1 && is_docs_only_change; then
+      echo "agent-pr: would skip scripts/adversarial-quality-pass.mjs for docs-only branch $HEAD_BRANCH"
+    else
+      echo "agent-pr: would run scripts/adversarial-quality-pass.mjs for $HEAD_BRANCH"
+    fi
     return
   fi
+
+  local status
+  status="$(git status --porcelain=v1)"
+  if [ -n "$status" ]; then
+    echo "agent-pr: quality pass requires a clean worktree before starting:" >&2
+    printf '%s\n' "$status" >&2
+    exit 1
+  fi
+
+  git fetch origin "+refs/heads/$BASE_BRANCH:refs/remotes/origin/$BASE_BRANCH"
+  if is_docs_only_change; then
+    echo "agent-pr: skipping adversarial quality pass for docs-only branch $HEAD_BRANCH"
+    write_docs_only_quality_report
+    git push -u origin "HEAD:refs/heads/$HEAD_BRANCH"
+    post_docs_only_status
+    return
+  fi
+
   scripts/adversarial-quality-pass.mjs \
     --base "origin/$BASE_BRANCH" \
     --head-branch "$HEAD_BRANCH" \

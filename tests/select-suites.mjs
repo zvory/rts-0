@@ -499,6 +499,7 @@ function verify() {
   const policyCases = [
     [[], { ci_class: "full", run_rust: true }],
     [["docs/design/architecture.md"], { ci_class: "docs_only", run_rust: false, run_server_build: false }],
+    [["README.md", "--not-markdown.rs"], { ci_class: "full", run_rust: true }],
     [["client/src/match.js"], { ci_class: "client_only", run_rust: false, run_server_build: true }],
     [["client/src/renderer/units.js", "client/assets/sound/ui/ui_victory_01.mp3"], { ci_class: "client_only", run_rust: false }],
     [["client/src/config.js"], { ci_class: "full", run_rust: true }],
@@ -533,6 +534,12 @@ function verify() {
 const args = process.argv.slice(2);
 let files = [];
 
+const ciPolicyIndex = args.indexOf("--ci-policy");
+if (ciPolicyIndex >= 0) {
+  printCiPolicy(ciPolicy(args.slice(ciPolicyIndex + 1)));
+  process.exit(0);
+}
+
 if (args.includes("--help") || args.includes("-h")) {
   usage();
   process.exit(0);
@@ -540,11 +547,6 @@ if (args.includes("--help") || args.includes("-h")) {
 
 if (args.includes("--verify")) {
   verify();
-  process.exit(0);
-}
-
-if (args.includes("--ci-policy")) {
-  printCiPolicy(ciPolicy(args.filter((arg) => !arg.startsWith("--"))));
   process.exit(0);
 }
 
