@@ -151,16 +151,22 @@ assert.deepEqual(buildFetchArgs({ remote: "origin", baseRef: "upstream/main" }),
 const nestedAgentPr = spawnSync("bash", ["scripts/agent-pr.sh", "--dry-run"], {
   cwd: repoRoot,
   encoding: "utf8",
-  env: { ...process.env, [QUALITY_PASS_ENV]: "1" },
+  env: testEnv({ [QUALITY_PASS_ENV]: "1" }),
 });
 assert.equal(nestedAgentPr.status, 2);
 assert.match(nestedAgentPr.stderr, /outer helper owns PR lifecycle/);
+
+function testEnv(extra = {}) {
+  const env = { ...process.env };
+  delete env[QUALITY_PASS_ENV];
+  return { ...env, ...extra };
+}
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
     encoding: "utf8",
     ...options,
-    env: { ...process.env, ...(options.env || {}) },
+    env: testEnv(options.env || {}),
   });
   assert.equal(
     result.status,
@@ -320,6 +326,25 @@ exit 1
   fs.appendFileSync(path.join(workPath, "README.md"), "docs-only branch change\n");
   run("git", ["add", "README.md"], { cwd: workPath });
   run("git", ["commit", "-m", "Document branch"], { cwd: workPath });
+
+  const docsOnlyHeadMismatch = spawnSync(
+    "scripts/agent-pr.sh",
+    ["--owner", "tester", "--head", "zvorygin/other", "--verification", "mismatch fixture"],
+    {
+      cwd: workPath,
+      encoding: "utf8",
+      env: testEnv({
+        AGENT_GH_API_CAPTURE: docsOnlyStatusCapture,
+        CODEX_CALLED_MARKER: docsOnlyCodexCalledMarker,
+        GH_BIN: path.join(binPath, "gh"),
+        PATH: `${binPath}:${process.env.PATH}`,
+      }),
+    },
+  );
+  assert.equal(docsOnlyHeadMismatch.status, 2);
+  assert.match(docsOnlyHeadMismatch.stderr, /head branch mismatch/);
+  assert.equal(fs.existsSync(docsOnlyCodexCalledMarker), false, "mismatched --head should not invoke Codex");
+  assert.equal(fs.existsSync(docsOnlyStatusCapture), false, "mismatched --head should not post status");
 
   run("scripts/agent-pr.sh", ["--owner", "tester", "--title", "Docs-only quality skip", "--verification", "docs fixture"], {
     cwd: workPath,

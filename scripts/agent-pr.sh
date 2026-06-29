@@ -72,11 +72,15 @@ fi
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
-if [ -z "$HEAD_BRANCH" ]; then
-  HEAD_BRANCH="$(git branch --show-current)"
+CURRENT_BRANCH="$(git branch --show-current)"
+if [ -z "$CURRENT_BRANCH" ]; then
+  echo "agent-pr: could not determine current branch; detached HEAD is not supported" >&2
+  exit 2
 fi
 if [ -z "$HEAD_BRANCH" ]; then
-  echo "agent-pr: could not determine head branch" >&2
+  HEAD_BRANCH="$CURRENT_BRANCH"
+elif [ "$HEAD_BRANCH" != "$CURRENT_BRANCH" ]; then
+  echo "agent-pr: head branch mismatch: current branch is '$CURRENT_BRANCH', but --head was '$HEAD_BRANCH'" >&2
   exit 2
 fi
 case "$HEAD_BRANCH" in
