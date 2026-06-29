@@ -323,7 +323,7 @@ export function buildUnitCard(ctx, selection) {
             type: "setAutocast",
             ability: definition.ability,
             unitIds: affordance.carrierIds,
-            enabled: false,
+            enabled: affordance.autocastEnabledIds.length === 0,
           }
         : null,
     };

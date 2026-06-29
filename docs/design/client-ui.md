@@ -1054,8 +1054,9 @@ the input module enters targeted cursor mode:
 - Minimap right-click also fires an ability command if in targeted mode.
 Selected owned Mortar Teams also draw dotted firing-range circles even when the Fire command is not
 armed. The Mortar Team Fire command-card button shows an autocast swirl while any selected mortar's
-owner-only `mortarFire` affordance has `autocastEnabled`; right-clicking that button sends
-`setAutocast(mortarFire, enabled=false)` and does not arm manual targeting.
+owner-only `mortarFire` affordance has `autocastEnabled`; right-clicking that button or pressing
+Alt plus its resolved command-card hotkey sends `setAutocast(mortarFire, enabled=<toggle>)` and
+does not arm manual targeting.
 
 `client_intent.js` holds `commandTarget` (null or `{ kind, ability }`) and `abilityTargetPreview`
 (null or `{ ability, mouseX, mouseY, carriers, rangeOrigins, pathOrigins, returnMarkers,

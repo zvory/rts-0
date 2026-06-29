@@ -601,8 +601,8 @@ target acquisition uses the same safety check, so Mortar Teams face the nearest 
 autocast safely instead of tracking an unsafe closer enemy. Manual mortar fire is intentionally
 allowed onto same-team positions, so players can still take risky shots deliberately. Mortar
 autocast is stored on the authoritative combat state, is enabled for current and future Mortar Teams
-when research completes, and can be disabled through
-`SetAutocast(mortarFire, enabled=false)`; disabled mortars still accept manual `mortarFire` commands.
+when research completes, and can be toggled through `SetAutocast(mortarFire, enabled=<bool>)`;
+disabled mortars still accept manual `mortarFire` commands.
 
 Artillery point-fire shells follow the same support-weapon friendly-fire contract: blast damage can
 hit owned and allied entities in the radius, but same-team damage is unattributed and cannot award
