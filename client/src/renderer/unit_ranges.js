@@ -62,6 +62,7 @@ export function _drawSelectedUnitRanges(state) {
 }
 
 function selectedUnitRangeProfile(e, tileSize) {
+  if (e?.kind === KIND.WORKER) return null;
   const dynamic = dynamicUnitRangeProfile(e, tileSize);
   if (dynamic !== undefined) return dynamic;
   return staticUnitRangeProfile(e, tileSize);
