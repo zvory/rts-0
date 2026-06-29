@@ -407,7 +407,10 @@ pub(super) fn advance_moving_units(
                 .map(|facing| angle_delta(original_facing, facing).abs() > 1.0e-4)
                 .unwrap_or(false);
             if kind == EntityKind::Tank && (moved_by_path || rotated_by_path) {
-                e.reset_tank_stationary_range();
+                if let Some(combat) = e.combat.as_mut() {
+                    combat.tank_stationary_range_ticks = 0;
+                    combat.tank_stationary_range_reset_this_tick = true;
+                }
             }
             if let Some(f) = new_facing {
                 e.set_facing(f);

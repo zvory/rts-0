@@ -14,13 +14,14 @@ use crate::game::entity::{
 };
 use crate::game::fog::Fog;
 use crate::game::smoke::SmokeCloudStore;
-use crate::game::tank_range;
 use crate::game::teams::TeamRelations;
 use crate::protocol;
 use crate::protocol::{AbilityCooldownView, DebugPathPoint, DebugPathView};
 use crate::protocol::{EntityView, OrderPlanMarker};
 
 const MAX_DEBUG_PATH_WAYPOINTS: usize = 128;
+const TANK_STATIONARY_RANGE_MAX_TILES: f32 = 14.0;
+const TANK_STATIONARY_RANGE_RAMP_TICKS: u16 = config::TICK_HZ as u16 * 3;
 
 pub struct EntityProjectionContext<'a> {
     pub fog: &'a Fog,
@@ -233,8 +234,7 @@ pub fn project_entity(
     }
     if entity.kind == EntityKind::Tank && owner_or_ally {
         if let Some(stats) = config::unit_stats(entity.kind) {
-            view.weapon_range_tiles =
-                Some(tank_range::effective_range_tiles(entity, stats.range_tiles as f32));
+            view.weapon_range_tiles = Some(tank_weapon_range_tiles(entity, stats.range_tiles as f32));
         }
     }
     let active_combat_target = matches!(entity.order(), Order::Attack(_) | Order::AttackMove(_))
@@ -433,6 +433,21 @@ pub fn project_entity(
     }
 
     Some(view)
+}
+
+fn tank_weapon_range_tiles(entity: &Entity, base_range_tiles: f32) -> f32 {
+    let ramp_ticks = TANK_STATIONARY_RANGE_RAMP_TICKS.max(1);
+    let ticks = entity
+        .combat
+        .as_ref()
+        .map(|combat| combat.tank_stationary_range_ticks)
+        .unwrap_or(0)
+        .min(ramp_ticks);
+    if ticks == 0 {
+        return base_range_tiles;
+    }
+    let progress = ticks as f32 / ramp_ticks as f32;
+    base_range_tiles + (TANK_STATIONARY_RANGE_MAX_TILES - base_range_tiles) * progress
 }
 
 fn deconstruct_progress_for_target(target: u32, entities: &EntityStore) -> Option<f32> {
@@ -893,8 +908,8 @@ mod tests {
             .expect("enemy spotter should spawn");
         {
             let tank = entities.get_mut(tank_id).expect("tank should exist");
-            for _ in 0..(crate::game::tank_range::STATIONARY_RANGE_RAMP_TICKS / 2) {
-                tank.tick_tank_stationary_range(crate::game::tank_range::STATIONARY_RANGE_RAMP_TICKS);
+            if let Some(combat) = tank.combat.as_mut() {
+                combat.tank_stationary_range_ticks = TANK_STATIONARY_RANGE_RAMP_TICKS / 2;
             }
         }
         let map = Map {

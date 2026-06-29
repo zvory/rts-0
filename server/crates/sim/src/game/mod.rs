@@ -33,7 +33,6 @@ mod setup;
 pub(crate) mod smoke;
 mod snapshot;
 mod systems;
-pub(crate) mod tank_range;
 pub mod teams;
 pub mod upgrade;
 

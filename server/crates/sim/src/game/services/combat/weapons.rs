@@ -1,11 +1,11 @@
 use crate::config;
 use crate::game::entity::{Entity, EntityKind, EntityStore, MovePhase, Order, WeaponSetup};
 use crate::game::services::movement::{angle_delta, rotate_toward};
-use crate::game::tank_range;
 use crate::rules::combat as combat_rules;
 
 use super::{
     ANTI_TANK_GUN_FIRE_TOLERANCE_RAD, ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK,
+    TANK_STATIONARY_RANGE_MAX_TILES, TANK_STATIONARY_RANGE_RAMP_TICKS,
     TANK_TURRET_FIRE_TOLERANCE_RAD, TANK_TURRET_TURN_RATE_RAD_PER_TICK,
 };
 
@@ -238,7 +238,7 @@ pub(super) struct EffectiveAttackProfile {
 pub(super) fn effective_attack_profile(e: &Entity) -> EffectiveAttackProfile {
     let base = combat_rules::attack_profile(e.kind);
     let mut profile = EffectiveAttackProfile {
-        range_tiles: tank_range::effective_range_tiles(e, base.range_tiles as f32),
+        range_tiles: tank_effective_range_tiles(e, base.range_tiles as f32),
         dmg: base.dmg,
         cooldown: base.cooldown,
     };
@@ -262,6 +262,24 @@ pub(super) fn effective_attack_profile(e: &Entity) -> EffectiveAttackProfile {
         }
     }
     profile
+}
+
+fn tank_effective_range_tiles(e: &Entity, base_range_tiles: f32) -> f32 {
+    if e.kind != EntityKind::Tank {
+        return base_range_tiles;
+    }
+    let ramp_ticks = TANK_STATIONARY_RANGE_RAMP_TICKS.max(1);
+    let ticks = e
+        .combat
+        .as_ref()
+        .map(|c| c.tank_stationary_range_ticks)
+        .unwrap_or(0)
+        .min(ramp_ticks);
+    if ticks == 0 {
+        return base_range_tiles;
+    }
+    let progress = ticks as f32 / ramp_ticks as f32;
+    base_range_tiles + (TANK_STATIONARY_RANGE_MAX_TILES - base_range_tiles) * progress
 }
 
 fn deployed_anti_tank_gun_desired_facing(e: &Entity, target_angle: f32) -> f32 {

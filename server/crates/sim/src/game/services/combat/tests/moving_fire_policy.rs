@@ -251,12 +251,12 @@ fn stationary_tank_range_linearly_ramps_to_fourteen_tiles() {
 
     assert_range_near(tank_range_tiles(&entities, tank_id), base_range);
 
-    for _ in 0..(crate::game::tank_range::STATIONARY_RANGE_RAMP_TICKS / 2) {
+    for _ in 0..(TANK_STATIONARY_RANGE_RAMP_TICKS / 2) {
         run_combat_tick(&mut entities);
     }
     assert_range_near(tank_range_tiles(&entities, tank_id), (base_range + 14.0) * 0.5);
 
-    for _ in 0..(crate::game::tank_range::STATIONARY_RANGE_RAMP_TICKS / 2) {
+    for _ in 0..(TANK_STATIONARY_RANGE_RAMP_TICKS / 2) {
         run_combat_tick(&mut entities);
     }
     assert_range_near(tank_range_tiles(&entities, tank_id), 14.0);
@@ -385,7 +385,7 @@ fn moving_range_tank_does_not_fire_at_extended_range_before_ramp() {
 }
 
 fn fully_charge_tank_range(entities: &mut EntityStore) {
-    for _ in 0..crate::game::tank_range::STATIONARY_RANGE_RAMP_TICKS {
+    for _ in 0..TANK_STATIONARY_RANGE_RAMP_TICKS {
         run_combat_tick(entities);
     }
 }

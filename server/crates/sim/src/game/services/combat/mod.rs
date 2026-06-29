@@ -18,7 +18,6 @@ use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::occupancy::{Occupancy, StaticPathingRelation};
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::smoke::SmokeCloudStore;
-use crate::game::tank_range;
 use crate::game::teams::TeamRelations;
 use crate::game::FiringRevealSource;
 use crate::protocol::Event;
@@ -107,6 +106,8 @@ pub(super) const ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK: f32 = 0.035;
 pub(super) const ANTI_TANK_GUN_FIRE_TOLERANCE_RAD: f32 = 0.12;
 pub(super) const TANK_STANDOFF_BUFFER_PX: f32 = config::TILE_SIZE as f32;
 pub(super) const TANK_STANDOFF_REPATH_DELTA_PX: f32 = config::TILE_SIZE as f32;
+pub(super) const TANK_STATIONARY_RANGE_MAX_TILES: f32 = 14.0;
+pub(super) const TANK_STATIONARY_RANGE_RAMP_TICKS: u16 = config::TICK_HZ as u16 * 3;
 
 /// Combat: acquire targets for aggressive / attack-move units, let eligible idle units
 /// auto-acquire enemies, and deal damage when off cooldown. Damage is applied immediately and
@@ -135,7 +136,7 @@ pub(crate) fn combat_system(
         if let Some(e) = entities.get_mut(id) {
             e.tick_attack_cd();
             tick_deployed_weapon_setup(e);
-            e.tick_tank_stationary_range(tank_range::STATIONARY_RANGE_RAMP_TICKS);
+            tick_tank_stationary_range(e);
         }
     }
 
@@ -448,6 +449,20 @@ pub(crate) fn combat_system(
                 coordinator.request_chase_path(entities, id, chase_goal);
             }
         }
+    }
+}
+
+fn tick_tank_stationary_range(e: &mut Entity) {
+    if e.kind != EntityKind::Tank || e.hp == 0 {
+        return;
+    }
+    if let Some(c) = e.combat.as_mut() {
+        if c.tank_stationary_range_reset_this_tick {
+            c.tank_stationary_range_reset_this_tick = false;
+            return;
+        }
+        let next = c.tank_stationary_range_ticks.saturating_add(1);
+        c.tank_stationary_range_ticks = next.min(TANK_STATIONARY_RANGE_RAMP_TICKS);
     }
 }
 
