@@ -1,37 +1,37 @@
-use super::{
-    building_rect_for_entity, circle_intersects_rect, CircleBody, Entity, EntityKind, EntityStore,
-    Map, RectBody,
-};
+use super::{building_rect_for_entity, Entity, EntityKind, EntityStore, Map, RectBody};
 
-pub(super) fn live_oil_node_intersecting_rect<'a>(
+const POINT_IN_RECT_EPS_PX: f32 = 0.001;
+
+pub(super) fn live_oil_node_centers_in_rect<'a>(
     entities: impl Iterator<Item = &'a Entity>,
     rect: RectBody,
-) -> Option<u32> {
-    entities.into_iter().find_map(|entity| {
-        (entity.kind == EntityKind::Oil
-            && entity.remaining().unwrap_or(0) > 0
-            && circle_intersects_rect(entity_circle_body(entity), rect))
-        .then_some(entity.id)
-    })
+) -> Vec<u32> {
+    entities
+        .into_iter()
+        .filter_map(|entity| {
+            (entity.kind == EntityKind::Oil
+                && entity.remaining().unwrap_or(0) > 0
+                && point_inside_rect((entity.pos_x, entity.pos_y), rect))
+            .then_some(entity.id)
+        })
+        .collect()
 }
 
 pub(super) fn oil_node_has_pump_jack(map: &Map, entities: &EntityStore, oil_id: u32) -> bool {
     let Some(oil) = entities.get(oil_id) else {
         return false;
     };
-    let oil_body = entity_circle_body(oil);
     entities.iter().any(|entity| {
         entity.kind == EntityKind::PumpJack
             && entity.hp > 0
             && building_rect_for_entity(map, entity)
-                .is_some_and(|rect| circle_intersects_rect(oil_body, rect))
+                .is_some_and(|rect| point_inside_rect((oil.pos_x, oil.pos_y), rect))
     })
 }
 
-fn entity_circle_body(e: &Entity) -> CircleBody {
-    CircleBody {
-        x: e.pos_x,
-        y: e.pos_y,
-        radius: e.radius(),
-    }
+fn point_inside_rect(point: (f32, f32), rect: RectBody) -> bool {
+    point.0 >= rect.min_x - POINT_IN_RECT_EPS_PX
+        && point.0 <= rect.max_x + POINT_IN_RECT_EPS_PX
+        && point.1 >= rect.min_y - POINT_IN_RECT_EPS_PX
+        && point.1 <= rect.max_y + POINT_IN_RECT_EPS_PX
 }

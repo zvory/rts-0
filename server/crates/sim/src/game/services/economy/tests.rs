@@ -153,6 +153,48 @@ fn completed_pump_jack_mines_overlapping_oil_at_worker_rate() {
 }
 
 #[test]
+fn pump_jack_mines_only_oil_centered_in_its_footprint() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let (pump_x, pump_y) = footprint_center(&map, EntityKind::PumpJack, 4, 4);
+    let (adjacent_x, adjacent_y) = footprint_center(&map, EntityKind::PumpJack, 5, 4);
+    let adjacent_oil = entities
+        .spawn_node(EntityKind::Oil, adjacent_x, adjacent_y)
+        .expect("adjacent oil node should spawn");
+    let centered_oil = entities
+        .spawn_node(EntityKind::Oil, pump_x, pump_y)
+        .expect("centered oil node should spawn");
+    entities
+        .spawn_building(1, EntityKind::PumpJack, pump_x, pump_y, true)
+        .expect("pump jack should spawn");
+    let adjacent_before = entities
+        .get(adjacent_oil)
+        .and_then(|node| node.remaining())
+        .expect("adjacent oil remaining");
+    let centered_before = entities
+        .get(centered_oil)
+        .and_then(|node| node.remaining())
+        .expect("centered oil remaining");
+
+    let mut payouts = Vec::new();
+    for _ in 0..config::HARVEST_TICKS {
+        payouts.extend(pump_jack::tick(&mut entities));
+    }
+
+    assert_eq!(payouts.len(), 1);
+    assert_eq!(
+        entities.get(adjacent_oil).and_then(|node| node.remaining()),
+        Some(adjacent_before),
+        "edge-touching adjacent oil must not be depleted by this Pump Jack"
+    );
+    assert_eq!(
+        entities.get(centered_oil).and_then(|node| node.remaining()),
+        Some(centered_before - config::OIL_LOAD),
+        "Pump Jack should extract from the oil whose center lies inside its footprint"
+    );
+}
+
+#[test]
 fn occupied_resource_arrival_redirects_to_nearest_same_resource_node() {
     let map = flat_map(32);
     let mut entities = EntityStore::new();

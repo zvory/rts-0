@@ -134,8 +134,7 @@ fn pump_jack_build_site_requires_live_oil_patch() {
         BuildSiteStatus::Clear
     );
 
-    let (adjacent_x, adjacent_y) = footprint_center(&map, EntityKind::PumpJack, 5, 4);
-    oil.spawn_building(1, EntityKind::PumpJack, adjacent_x, adjacent_y, false)
+    oil.spawn_building(1, EntityKind::PumpJack, x, y, false)
         .expect("pump jack scaffold should spawn");
     assert_eq!(
         building_site_status_for_build_intent(
@@ -162,6 +161,49 @@ fn pump_jack_build_site_requires_live_oil_patch() {
             u32::MAX,
         ),
         BuildSiteStatus::InvalidFootprint
+    );
+}
+
+#[test]
+fn adjacent_oil_patch_edges_do_not_block_pump_jack_sites() {
+    let map = flat_map(12);
+    let (first_x, first_y) = footprint_center(&map, EntityKind::PumpJack, 4, 4);
+    let (second_x, second_y) = footprint_center(&map, EntityKind::PumpJack, 5, 4);
+    let mut entities = EntityStore::new();
+    entities
+        .spawn_node(EntityKind::Oil, first_x, first_y)
+        .expect("first oil node should spawn");
+    entities
+        .spawn_node(EntityKind::Oil, second_x, second_y)
+        .expect("second oil node should spawn");
+
+    assert_eq!(
+        building_site_status_for_build_intent(
+            &map,
+            &entities,
+            EntityKind::PumpJack,
+            4,
+            4,
+            u32::MAX,
+        ),
+        BuildSiteStatus::Clear,
+        "neighboring oil circles may touch the footprint without invalidating the selected oil site"
+    );
+
+    entities
+        .spawn_building(1, EntityKind::PumpJack, first_x, first_y, false)
+        .expect("first pump jack should spawn");
+    assert_eq!(
+        building_site_status_for_build_intent(
+            &map,
+            &entities,
+            EntityKind::PumpJack,
+            5,
+            4,
+            u32::MAX,
+        ),
+        BuildSiteStatus::Clear,
+        "a Pump Jack on one oil patch must not reserve an adjacent patch by edge contact"
     );
 }
 

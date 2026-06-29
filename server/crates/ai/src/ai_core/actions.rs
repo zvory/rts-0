@@ -1380,7 +1380,7 @@ mod tests {
             [Command::Build {
                 units,
                 building: EntityKind::PumpJack,
-                tile_x: 0,
+                tile_x: 3,
                 tile_y: 0,
                 queued: false
             }] if units == &vec![10]

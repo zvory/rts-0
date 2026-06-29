@@ -8,6 +8,8 @@ use crate::ai_core::observation::{
 use crate::config;
 use rts_sim::game::entity::EntityKind;
 
+const POINT_IN_RECT_EPS_PX: f32 = 0.001;
+
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct ResourceNodeAvailability {
     pub(crate) id: u32,
@@ -219,8 +221,16 @@ fn pump_jack_overlaps_resource(
     pump: &AiEntitySummary,
     resource: &AiResourceSummary,
 ) -> bool {
-    let tolerance = config::TILE_SIZE as f32;
-    (pump.x - resource.x).abs() <= tolerance && (pump.y - resource.y).abs() <= tolerance
+    let Some(stats) = config::building_stats(EntityKind::PumpJack) else {
+        return false;
+    };
+    let tile_size = config::TILE_SIZE as f32;
+    let half_w = stats.foot_w as f32 * tile_size * 0.5;
+    let half_h = stats.foot_h as f32 * tile_size * 0.5;
+    resource.x >= pump.x - half_w - POINT_IN_RECT_EPS_PX
+        && resource.x <= pump.x + half_w + POINT_IN_RECT_EPS_PX
+        && resource.y >= pump.y - half_h - POINT_IN_RECT_EPS_PX
+        && resource.y <= pump.y + half_h + POINT_IN_RECT_EPS_PX
 }
 
 fn nearest_completed_mining_city_centre(
@@ -452,20 +462,29 @@ mod tests {
             city_centre(10, 100.0, 100.0, true),
             pump_jack(20, 100.0, 100.0, false),
         ];
-        observation.resources = vec![resource(3, EntityKind::Oil, 100.0, 100.0, 100)];
+        observation.resources = vec![
+            resource(3, EntityKind::Oil, 100.0, 100.0, 100),
+            resource(
+                4,
+                EntityKind::Oil,
+                100.0 + config::TILE_SIZE as f32,
+                100.0,
+                100,
+            ),
+        ];
 
         let availability = ResourceAvailability::from_observation(&observation, &BTreeSet::new());
 
         let oil = availability.node(3).unwrap();
         assert_eq!(oil.extractor_count, 1);
         assert!(oil.occupied);
+        let adjacent_oil = availability.node(4).unwrap();
+        assert_eq!(adjacent_oil.extractor_count, 0);
+        assert!(!adjacent_oil.occupied);
         assert_eq!(availability.extractor_count(EntityKind::Oil), 1);
         assert_eq!(availability.occupied_node_count(EntityKind::Oil), 1);
         assert_eq!(availability.occupied_node_ids(), BTreeSet::from([3]));
-        assert!(
-            !availability.has_free_mineable_oil(),
-            "AI should not queue duplicate Pump Jacks on oil that already has one building"
-        );
+        assert!(availability.has_free_mineable_oil());
     }
 
     #[test]

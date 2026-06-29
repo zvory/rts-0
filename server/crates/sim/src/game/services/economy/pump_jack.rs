@@ -1,6 +1,8 @@
 use crate::config;
 use crate::game::entity::{Entity, EntityKind, EntityStore};
 
+const POINT_IN_RECT_EPS_PX: f32 = 0.001;
+
 pub(super) struct PumpJackPayout {
     pub(super) owner: u32,
     pub(super) oil: u32,
@@ -76,16 +78,7 @@ fn pump_jack_oil_node(entities: &EntityStore, pump_id: u32) -> Option<u32> {
         .filter(|node| {
             node.kind == EntityKind::Oil && node.is_node() && node.remaining().unwrap_or(0) > 0
         })
-        .find(|node| {
-            circle_intersects_rect(
-                Circle {
-                    x: node.pos_x,
-                    y: node.pos_y,
-                    radius: config::TILE_SIZE as f32 * 0.5,
-                },
-                rect,
-            )
-        })
+        .find(|node| point_inside_rect((node.pos_x, node.pos_y), rect))
         .map(|node| node.id)
 }
 
@@ -95,13 +88,6 @@ struct Rect {
     min_y: f32,
     max_x: f32,
     max_y: f32,
-}
-
-#[derive(Clone, Copy)]
-struct Circle {
-    x: f32,
-    y: f32,
-    radius: f32,
 }
 
 fn building_rect(entity: &Entity) -> Option<Rect> {
@@ -117,10 +103,9 @@ fn building_rect(entity: &Entity) -> Option<Rect> {
     })
 }
 
-fn circle_intersects_rect(circle: Circle, rect: Rect) -> bool {
-    let closest_x = circle.x.clamp(rect.min_x, rect.max_x);
-    let closest_y = circle.y.clamp(rect.min_y, rect.max_y);
-    let dx = circle.x - closest_x;
-    let dy = circle.y - closest_y;
-    dx * dx + dy * dy <= circle.radius * circle.radius
+fn point_inside_rect(point: (f32, f32), rect: Rect) -> bool {
+    point.0 >= rect.min_x - POINT_IN_RECT_EPS_PX
+        && point.0 <= rect.max_x + POINT_IN_RECT_EPS_PX
+        && point.1 >= rect.min_y - POINT_IN_RECT_EPS_PX
+        && point.1 <= rect.max_y + POINT_IN_RECT_EPS_PX
 }

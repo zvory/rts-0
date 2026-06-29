@@ -249,10 +249,14 @@ fn contextual_placement_status(
     if policy != BuildPlacementPolicy::PumpJackOilOnly {
         return BuildSiteStatus::Clear;
     }
-    let Some(oil_id) = pump_jack::live_oil_node_intersecting_rect(entities.iter(), rect) else {
+    let oil_ids = pump_jack::live_oil_node_centers_in_rect(entities.iter(), rect);
+    if oil_ids.is_empty() {
         return BuildSiteStatus::InvalidFootprint;
-    };
-    if pump_jack::oil_node_has_pump_jack(map, entities, oil_id) {
+    }
+    if oil_ids
+        .iter()
+        .all(|oil_id| pump_jack::oil_node_has_pump_jack(map, entities, *oil_id))
+    {
         return BuildSiteStatus::BlockedByBuilding;
     }
     BuildSiteStatus::Clear
@@ -316,10 +320,7 @@ fn entity_build_site_status(
         if !circle_intersects_rect(entity_circle_body(e), rect) {
             return BuildSiteStatus::Clear;
         }
-        if policy == BuildPlacementPolicy::PumpJackOilOnly
-            && e.kind == EntityKind::Oil
-            && e.remaining().unwrap_or(0) > 0
-        {
+        if policy == BuildPlacementPolicy::PumpJackOilOnly && e.kind == EntityKind::Oil {
             return BuildSiteStatus::Clear;
         }
         return BuildSiteStatus::BlockedByResourceNode;
