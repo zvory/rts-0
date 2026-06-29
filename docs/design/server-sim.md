@@ -558,6 +558,15 @@ queries unless a later phase explicitly adds such behavior. `Game::snapshot_for`
 mode used by other snapshot data. Enemy-visible objects expose only public render fields; owner-only
 payload state and safe caster ids are withheld from enemies.
 
+Neutral trench terrain lives in `game::trench::TrenchStore`, owned by `Game` rather than the entity
+store. Trenches have deterministic ids, stable world-pixel centers, and a radius from the
+Entrenchment rules, but they do not consume supply, block construction/pathing, take damage, count
+for scoring, or participate in entity death cleanup. Snapshot projection sends currently visible
+trench terrain through the same active-player, selected-player, and full-world policies as other
+world objects, and records per-player discovered terrain so a scouted trench remains visible after
+it becomes fogged. That remembered trench record is terrain-only; it does not expose creator,
+owner, current occupants, or hidden unit state.
+
 Per-caster recast state is exposed to the owner through `EntityView.abilities`: active return marker
 id, availability tick, and remaining lifetime are projected only for the owning player's command
 card. Ekat's `ekatTeleport` world-point activation is a dash: it validates static standability,

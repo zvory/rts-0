@@ -182,10 +182,7 @@ function buttonByLabel(card, label) {
   assert(!("antiTankGunSetupPreview" in state), "GameState no longer exposes support preview shims");
   assert(!("updateResourceMiningPreview" in state), "GameState no longer exposes preview update shims");
   assert(state.selection instanceof Set, "GameState.selection");
-  assert(
-    state.diagnostics.movementPaths === MOVEMENT_PATH_DIAGNOSTICS.NONE,
-    "GameState defaults movement path diagnostics to none",
-  );
+  assert(state.diagnostics.movementPaths === MOVEMENT_PATH_DIAGNOSTICS.NONE, "GameState defaults movement path diagnostics to none");
   assert(state.debugPathOverlaysAvailable === false, "GameState hides waypoint diagnostics by default");
   assert(state.debugPathOverlaysEnabled === false, "GameState leaves waypoint diagnostics off by default");
   assertHasMethod(state, "setSelection", "GameState");
@@ -230,11 +227,13 @@ function buttonByLabel(card, label) {
     supplyCap: 10,
     entities: [{ id: 1, owner: 1, kind: "worker", x: 10, y: 20, hp: 40, maxHp: 40, state: "idle" }],
     resourceDeltas: [{ id: 200, remaining: 1498 }],
+    trenches: [{ id: 300, x: 96, y: 128, radiusTiles: 0.75 }],
     events: [],
   });
   assert(state.currRecvTime !== null, "currRecvTime set after first snapshot");
   assert(state.prevRecvTime === null, "prevRecvTime still null after one snapshot");
   assert(state.resources.steel === 10, "resources updated");
+  assert(state.trenches[0]?.id === 300, "trenches updated");
   assert(state.entityById(200).kind === KIND.STEEL, "static resources are available as local entities");
   assert(state.entityById(200).remaining === 1498, "resourceDeltas update known resource state");
 

@@ -737,8 +737,12 @@ position.
 `Trench`: `{ id, x, y, radiusTiles }`. Trenches are neutral persistent battlefield terrain, not
 buildable entities, and do not carry an owner field. The `id` is stable for the trench lifetime,
 `x`/`y` are the world-pixel center, and `radiusTiles` is the footprint/render radius used by later
-slotting and rendering code. Phase 1 only defines this snapshot boundary; normal snapshots omit
-`trenches` until the server-owned trench store and projection policy are implemented.
+slotting and rendering code. Normal active-player snapshots include trenches whose footprint is in
+that recipient's current living-team fog, plus trench terrain the recipient has already discovered.
+Spectator, replay, and lab selected-perspective snapshots use the selected real players' current
+fog and discovered terrain memory; full-world dev/lab snapshots include every trench. Remembered
+trench terrain is terrain-only: it exposes no creator, owner, occupant, or current hidden unit
+state.
 
 `RememberedBuilding`: `{ id, owner, kind, x, y, footprint, observedTick }`. These records are
 recipient-only last-seen enemy building memory, refreshed from team-current actionable observations

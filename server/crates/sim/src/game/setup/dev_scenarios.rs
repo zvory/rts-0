@@ -481,6 +481,7 @@ fn build_dev_scenario_game_with_teams<const N: usize>(
     game.fog = Fog::new(game.map.size);
     game.fog
         .recompute_with_smoke(&ids, &game.entities, &game.map, &game.smokes);
+    game.refresh_trench_memory(&ids);
     game
 }
 

@@ -10,7 +10,7 @@ enum PlayerResourceProjection<'a> {
 #[derive(Clone, Copy)]
 struct SnapshotMode<'a> {
     player: u32,
-    remembered_building_players: &'a [u32],
+    memory_players: &'a [u32],
     fog: &'a Fog,
     actionable_fog: Option<&'a Fog>,
     fogged: bool,
@@ -32,7 +32,7 @@ impl Game {
             return self.snapshot_for_mode(
                 SnapshotMode {
                     player,
-                    remembered_building_players: &[player],
+                    memory_players: &[player],
                     fog: &live_fog,
                     actionable_fog: Some(&live_fog),
                     fogged: true,
@@ -46,7 +46,7 @@ impl Game {
         self.snapshot_for_mode(
             SnapshotMode {
                 player,
-                remembered_building_players: &[player],
+                memory_players: &[player],
                 fog: &team_snapshot_fog,
                 actionable_fog: Some(&live_fog),
                 fogged: true,
@@ -70,7 +70,7 @@ impl Game {
         self.snapshot_for_mode(
             SnapshotMode {
                 player,
-                remembered_building_players: &[],
+                memory_players: &[],
                 fog: &self.fog,
                 actionable_fog: None,
                 fogged: false,
@@ -97,7 +97,7 @@ impl Game {
             return self.snapshot_for_mode(
                 SnapshotMode {
                     player: Self::SPECTATOR_VIEWER_ID,
-                    remembered_building_players: visible_players,
+                    memory_players: visible_players,
                     fog: &actionable_fog,
                     actionable_fog: Some(&actionable_fog),
                     fogged: true,
@@ -114,7 +114,7 @@ impl Game {
         self.snapshot_for_mode(
             SnapshotMode {
                 player: Self::SPECTATOR_VIEWER_ID,
-                remembered_building_players: visible_players,
+                memory_players: visible_players,
                 fog: &snapshot_fog,
                 actionable_fog: Some(&actionable_fog),
                 fogged: true,
@@ -141,7 +141,7 @@ impl Game {
     fn snapshot_for_mode(&self, mode: SnapshotMode<'_>, options: SnapshotOptions) -> Snapshot {
         let SnapshotMode {
             player,
-            remembered_building_players,
+            memory_players,
             fog,
             actionable_fog,
             fogged,
@@ -197,7 +197,7 @@ impl Game {
         entities.sort_by_key(|v| v.id);
         resource_deltas.sort_by_key(|d| d.id);
         let remembered_buildings = if fogged {
-            self.remembered_building_views_for(player, remembered_building_players, fog, &teams)
+            self.remembered_building_views_for(player, memory_players, fog, &teams)
         } else {
             Vec::new()
         };
@@ -238,6 +238,7 @@ impl Game {
             !matches!(player_resource_projection, PlayerResourceProjection::None),
         );
         ability_objects.sort_by_key(|object| object.id);
+        let trenches = self.trenches.views_for(player, fog, fogged, memory_players);
 
         let player_resources = self.player_resource_snapshots(player_resource_projection);
 
@@ -251,7 +252,7 @@ impl Game {
             resource_deltas,
             smokes,
             ability_objects,
-            trenches: Vec::new(),
+            trenches,
             visible_tiles: if fogged {
                 fog.visible_tiles_for(player)
             } else {
@@ -280,12 +281,12 @@ impl Game {
     fn remembered_building_views_for(
         &self,
         player: u32,
-        remembered_building_players: &[u32],
+        memory_players: &[u32],
         fog: &Fog,
         teams: &crate::game::teams::TeamRelations,
     ) -> Vec<RememberedBuildingView> {
         let mut views: Vec<RememberedBuildingView> = Vec::new();
-        for &memory_player in remembered_building_players {
+        for &memory_player in memory_players {
             for entry in self.building_memory.entries_for_player(memory_player) {
                 if self.live_entity_projects_for_remembered_building(player, entry.id, fog, teams) {
                     continue;
@@ -364,7 +365,7 @@ impl Game {
             .collect()
     }
 
-    fn team_current_fog_for(&self, player: u32, fog: &Fog) -> Fog {
+    pub(in crate::game) fn team_current_fog_for(&self, player: u32, fog: &Fog) -> Fog {
         let mut visible_players = self.living_team_player_ids_for_vision(player);
         if visible_players.is_empty() {
             visible_players.push(player);
