@@ -120,18 +120,20 @@ pub(crate) fn resource_tiles_have_one_tile_gap(a: ResourceTile, b: ResourceTile)
     a.0.abs_diff(b.0) > 1 || a.1.abs_diff(b.1) > 1
 }
 
-pub(crate) fn non_oil_resource_blocked_pump_jack_tiles(
+pub(crate) fn resource_blocked_building_tiles(
     map: &Map,
     entities: &EntityStore,
+    building_kind: EntityKind,
+    excluded_resource_kind: Option<EntityKind>,
 ) -> BTreeSet<ResourceTile> {
     let mut blocked = BTreeSet::new();
     let ts = config::TILE_SIZE as f32;
     let max_tile = map.size.saturating_sub(1) as i32;
 
-    for entity in entities
-        .iter()
-        .filter(|entity| entity.is_node() && entity.kind != EntityKind::Oil)
-    {
+    for entity in entities.iter().filter(|entity| entity.is_node()) {
+        if Some(entity.kind) == excluded_resource_kind {
+            continue;
+        }
         if !entity.pos_x.is_finite() || !entity.pos_y.is_finite() {
             continue;
         }
@@ -149,7 +151,7 @@ pub(crate) fn non_oil_resource_blocked_pump_jack_tiles(
         for ty in min_ty..=max_ty {
             for tx in min_tx..=max_tx {
                 let tile = (tx as u32, ty as u32);
-                if building_rect_for_footprint(EntityKind::PumpJack, tile.0, tile.1)
+                if building_rect_for_footprint(building_kind, tile.0, tile.1)
                     .is_some_and(|rect| circle_intersects_rect(circle, rect))
                 {
                     blocked.insert(tile);

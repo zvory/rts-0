@@ -425,7 +425,12 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
     let mut oil_tiles =
         resource_placement::occupied_resource_tiles(map, entities, EntityKind::Oil);
     let blocked_pump_jack_tiles =
-        resource_placement::non_oil_resource_blocked_pump_jack_tiles(map, entities);
+        resource_placement::resource_blocked_building_tiles(
+            map,
+            entities,
+            EntityKind::PumpJack,
+            Some(EntityKind::Oil),
+        );
     for i in 0..config::OIL_PATCHES_PER_BASE {
         let (tile_dx, tile_dy) = oil_patch_tile_offset(i, oil_step_x, oil_step_y);
         let (desired_x, desired_y) = offset_tile_center(map, tx, ty, tile_dx, tile_dy);
