@@ -10,6 +10,7 @@ import {
   isProducerBuilding,
 } from "../config.js";
 import { buildingRigDefinitionFor } from "./rigs/building_routing.js";
+import { isConstructionScaffold } from "./entity_state.js";
 import { renderLiveUnitRig } from "./rigs/runtime.js";
 import { KIND, SETUP, STATE, isBuilding, isResource } from "../protocol.js";
 import {
@@ -58,7 +59,7 @@ export function _drawBuilding(e, colorByOwner, state) {
   const x0 = e.x - w / 2;
   const y0 = e.y - h / 2;
 
-  const underConstruction = typeof e.buildProgress === "number" && e.buildProgress < 1;
+  const underConstruction = isConstructionScaffold(e);
   const bodyAlpha = underConstruction ? 0.45 : 1;
 
   // Shadow (slightly offset, under buildings).

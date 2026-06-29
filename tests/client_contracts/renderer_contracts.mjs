@@ -224,6 +224,63 @@ import { installFakePixi } from "./pixi_fakes.mjs";
     };
     const renderer = new Renderer(parent);
     renderer._map = { tileSize: 32 };
+    const scaffold = {
+      id: 503,
+      owner: 1,
+      kind: KIND.BARRACKS,
+      x: 160,
+      y: 160,
+      hp: 42,
+      maxHp: 100,
+      state: "construct",
+      buildProgress: 0.42,
+    };
+    const completed = {
+      id: 504,
+      owner: 1,
+      kind: KIND.BARRACKS,
+      x: 220,
+      y: 160,
+      hp: 42,
+      maxHp: 100,
+      state: "idle",
+    };
+
+    renderer._drawSelectionAndHp(scaffold, new Set([scaffold.id]), { playerId: 1 });
+    renderer._drawSelectionAndHp(completed, new Set(), { playerId: 1 });
+
+    assert(
+      renderer._pools.selectionRings.has(scaffold.id),
+      "selected under-construction building still draws a selection ring",
+    );
+    assert(
+      !renderer._pools.hpBars.has(scaffold.id),
+      "under-construction building should not draw a second normal HP bar",
+    );
+    assert(
+      renderer._pools.hpBars.has(completed.id),
+      "completed damaged building still draws a normal HP bar",
+    );
+  } finally {
+    restorePixi();
+  }
+}
+
+{
+  const restorePixi = installFakePixi();
+  try {
+    const parent = {
+      clientWidth: 640,
+      clientHeight: 480,
+      appendChild(view) {
+        view.parentNode = this;
+      },
+      removeChild(view) {
+        view.parentNode = null;
+      },
+    };
+    const renderer = new Renderer(parent);
+    renderer._map = { tileSize: 32 };
     const entity = {
       id: 501,
       owner: 2,
