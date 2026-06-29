@@ -586,13 +586,16 @@ removes the Golem permanently, restores Ekat to max HP, and emits an owner-visib
 notice. If no Golem is in range, the command is a no-op. Ekat has no passive regeneration.
 
 Mortar shells are delayed AOE effects resolved by `game::mortar` after their flight timer expires.
+Every manual and autocast shell scatters from its intended impact point when scheduled: targets
+visible to the firing team use a one-tile median miss radius, while blind target points use a
+four-tile median miss radius.
 They damage owned, allied, and enemy units/buildings with the same falloff and armor rules; resource
 nodes are ignored. Same-team mortar damage is intentionally real friendly fire, but it is
 unattributed: it does not update `last_damage_owner`/position/tick, does not trigger AI worker
 retreat, does not emit enemy under-attack notices, and does not award kill credit or combat score.
 Idle/attack-move autocast is conservative and requires completed `mortar_autocast` research: before
-scheduling a shell, combat checks the predicted impact point against owned and allied units/buildings
-at their current positions and holds fire if any would be inside the damaging radius. Autocast
+scheduling a shell, combat checks the scattered predicted impact point against owned and allied
+units/buildings at their current positions and holds fire if any would be inside the damaging radius. Autocast
 target acquisition uses the same safety check, so Mortar Teams face the nearest target that can be
 autocast safely instead of tracking an unsafe closer enemy. Manual mortar fire is intentionally
 allowed onto same-team positions, so players can still take risky shots deliberately. Mortar
