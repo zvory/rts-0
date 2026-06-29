@@ -591,6 +591,10 @@ run_rust_suites_bg() {
       node "$REPO_ROOT/scripts/check-deploy-assets.mjs"
     run_suite_bg "Architecture: test selection policy" \
       node "$SCRIPT_DIR/select-suites.mjs" --verify
+    run_suite_bg "Agent workflow: phase runner helper" \
+      node "$SCRIPT_DIR/phase_runner_agents.mjs"
+    run_suite_bg "Agent workflow: quality pass helper" \
+      node "$SCRIPT_DIR/adversarial_quality_pass.mjs"
     run_suite_bg "Rust format (cargo fmt --check)" \
       cargo fmt --manifest-path "$SERVER_DIR/Cargo.toml" --check
     run_nextest_tests_bg
