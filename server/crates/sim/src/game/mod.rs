@@ -29,6 +29,8 @@ mod mortar_scatter;
 mod pathfinding;
 mod player_state;
 mod resource_placement;
+#[cfg(test)]
+mod resource_placement_tests;
 pub mod replay;
 mod scoring;
 pub(crate) mod services;

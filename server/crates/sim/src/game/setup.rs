@@ -424,10 +424,25 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
     let oil_step_y = tile_step(oil_angle.sin());
     let mut oil_tiles =
         resource_placement::occupied_resource_tiles(map, entities, EntityKind::Oil);
+    let blocked_pump_jack_tiles =
+        resource_placement::resource_blocked_building_tiles(
+            map,
+            entities,
+            EntityKind::PumpJack,
+            Some(EntityKind::Oil),
+        );
     for i in 0..config::OIL_PATCHES_PER_BASE {
         let (tile_dx, tile_dy) = oil_patch_tile_offset(i, oil_step_x, oil_step_y);
         let (desired_x, desired_y) = offset_tile_center(map, tx, ty, tile_dx, tile_dy);
-        let (px, py, tile) = oil_patch_tile_center(map, desired_x, desired_y, hx, hy, &oil_tiles);
+        let (px, py, tile) = resource_placement::nearest_oil_patch_tile_center(
+            map,
+            desired_x,
+            desired_y,
+            hx,
+            hy,
+            &oil_tiles,
+            &blocked_pump_jack_tiles,
+        );
         oil_tiles.insert(tile);
         let dist_tiles = ((px - hx).powi(2) + (py - hy).powi(2)).sqrt() / ts;
         debug_assert!(
@@ -459,26 +474,6 @@ fn offset_tile_center(map: &Map, tx: u32, ty: u32, dx: i32, dy: i32) -> (f32, f3
     let desired_tx = (tx as i32 + dx).clamp(0, max_tile) as u32;
     let desired_ty = (ty as i32 + dy).clamp(0, max_tile) as u32;
     map.tile_center(desired_tx, desired_ty)
-}
-
-fn oil_patch_tile_center(
-    map: &Map,
-    x: f32,
-    y: f32,
-    anchor_x: f32,
-    anchor_y: f32,
-    occupied_tiles: &BTreeSet<(u32, u32)>,
-) -> (f32, f32, (u32, u32)) {
-    let ts = config::TILE_SIZE as f32;
-    resource_placement::nearest_resource_tile_center(map, x, y, |tile, cx, cy| {
-        if !resource_placement::tile_has_one_tile_resource_gap(tile, occupied_tiles) {
-            return false;
-        }
-        let dist_tiles = ((cx - anchor_x).powi(2) + (cy - anchor_y).powi(2)).sqrt() / ts;
-        (config::CC_RESOURCE_MIN_DIST_TILES..=config::CC_RESOURCE_MAX_DIST_TILES)
-            .contains(&dist_tiles)
-    })
-    .unwrap_or_else(|| resource_placement::nearest_tile_center(map, x, y))
 }
 
 /// Spawn a City Centre, starting workers, and resource clusters for one player.
