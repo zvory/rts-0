@@ -68,7 +68,8 @@ impl Game {
     /// exposure imbalance, and finally a deterministic seed-influenced tie break. Each selected
     /// slot keeps its authored main/naturals grouping, so maps can define different fair naturals
     /// for adjacent, cross, safe-base, or other spawn layouts and can grant more than one neutral
-    /// expansion per player.
+    /// expansion per player. Generated oil clusters place each oil patch on a unique passable tile
+    /// center near the intended layout while preserving City Centre resource-distance bounds.
     /// AI players are spawned as normal match participants; external AI orchestration owns any
     /// controller/profile selection.
     pub fn new(players: &[PlayerInit], seed: u32) -> Game;
