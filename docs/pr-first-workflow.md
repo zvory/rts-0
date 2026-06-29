@@ -8,7 +8,8 @@ The normal agent lifecycle is:
 4. Open or update the owned PR with `scripts/agent-pr.sh --verification "..."`.
    The helper first runs `scripts/adversarial-quality-pass.mjs` in the branch worktree, allowing a
    fresh Codex CLI pass to improve or rewrite the branch, commit the final state, push the final
-   head, and post the `adversarial-quality-pass` status.
+   head, post the `adversarial-quality-pass` status, and write the full quality-pass report into
+   the PR body.
 5. Run `scripts/wait-pr.sh <pr>` and do not claim completion until it reports the PR merged and the
    head SHA reachable from `origin/main`.
 
@@ -19,9 +20,10 @@ required coverage job fails. The Rust/architecture job installs `cargo-nextest` 
 `./tests/run-all.sh --only-rust`, matching the local nextest-backed Rust command path. Local hooks
 are intentionally cheap; they catch staged whitespace errors outside the human-owned
 `playtest_notes.md`, run `node scripts/check-docs-health.mjs`, and run opportunistic cleanup on
-`main`. After quality-pass rollout, branch protection should require the
-`adversarial-quality-pass` status alongside `./tests/run-all.sh`; this status means the autonomous
-quality pass ran on the final PR head, not that it is a substitute for the full test gate.
+`main`. Branch protection requires the `adversarial-quality-pass` status alongside
+`./tests/run-all.sh`; this status means the autonomous quality pass ran on the final PR head, not
+that it is a substitute for the full test gate. The owned PR body keeps the pass summary, issues
+found, changes made, verification, and remaining concerns for post-merge audit.
 
 When the Rust job is slow, use the ordinary job log first: the Rust context lines show
 `CARGO_TARGET_DIR`, Rust/cargo/nextest versions, and the Actions Cargo cache exact-hit result,
@@ -109,6 +111,7 @@ The durable contract is:
 - The required check remains a stable full-gate signal named `./tests/run-all.sh`.
 - The required status `adversarial-quality-pass` records that the final autonomous quality pass ran
   on the PR head.
+- The PR body records the full quality-pass report, including remaining concerns.
 - Auto-merge is armed only after ownership metadata and focused verification are
   recorded.
 - Serial automation waits for a definite merge and verifies the phase head is

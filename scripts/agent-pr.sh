@@ -104,6 +104,11 @@ if [ -n "$BODY_FILE" ]; then
   EXTRA_BODY="$(cat "$BODY_FILE")"
 fi
 
+quality_report_json="$(mktemp -t rts-adversarial-quality-pass.XXXXXX.json)"
+quality_report_md="$(mktemp -t rts-adversarial-quality-pass.XXXXXX.md)"
+tmp_body="$(mktemp -t rts-agent-pr.XXXXXX)"
+trap 'rm -f "$quality_report_json" "$quality_report_md" "$tmp_body"' EXIT
+
 run_quality_pass() {
   if [ "$DRY_RUN" = "1" ]; then
     echo "agent-pr: would run scripts/adversarial-quality-pass.mjs for $HEAD_BRANCH"
@@ -112,6 +117,8 @@ run_quality_pass() {
   scripts/adversarial-quality-pass.mjs \
     --base "origin/$BASE_BRANCH" \
     --head-branch "$HEAD_BRANCH" \
+    --report-file "$quality_report_json" \
+    --markdown-report-file "$quality_report_md" \
     --gh-bin "$GH_BIN" \
     --push \
     --post-status
@@ -126,9 +133,6 @@ run_quality_pass() {
 
 run_quality_pass
 
-tmp_body="$(mktemp -t rts-agent-pr.XXXXXX)"
-trap 'rm -f "$tmp_body"' EXIT
-
 needs_human="false"
 auto_merge_text="requested"
 if [ "$AUTO_MERGE" = "0" ]; then
@@ -136,7 +140,8 @@ if [ "$AUTO_MERGE" = "0" ]; then
   auto_merge_text="disabled-needs-human"
 fi
 
-cat >"$tmp_body" <<EOF
+{
+  cat <<EOF
 <!-- rts-agent-pr:v1 -->
 Agent-Owner: $OWNER
 Lifecycle-Mode: $LIFECYCLE_MODE
@@ -146,8 +151,17 @@ Focused-Verification: $FOCUSED_VERIFICATION
 Needs-Human: $needs_human
 <!-- /rts-agent-pr -->
 
-$EXTRA_BODY
 EOF
+
+  if [ -s "$quality_report_md" ]; then
+    cat "$quality_report_md"
+    printf '\n'
+  fi
+
+  if [ -n "$EXTRA_BODY" ]; then
+    printf '%s\n' "$EXTRA_BODY"
+  fi
+} >"$tmp_body"
 
 run() {
   if [ "$DRY_RUN" = "1" ]; then
