@@ -1169,7 +1169,8 @@ selection rings):
   with deterministic per-id rotation. Owned scaffolds may locally extrapolate `buildProgress` only
   while the latest authoritative snapshot marks them `buildActive`; the display clamps below
   completion and never unlocks supply, tech, production, pathing, or command behavior before the
-  server snapshot.
+  server snapshot. Under-construction buildings do not also draw the normal HP bar because their
+  single construction bar already communicates scaffold progress.
 - Resource nodes: steel = tan supply crates; oil = olive fuel drums; show last-known remaining
   from `resourceDeltas` via size/opacity. When a worker is selected and the cursor hovers a
   resource, draw a blue circle on the resource when the nearest completed own City Centre

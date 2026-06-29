@@ -10,6 +10,7 @@ import {
   isProducerBuilding,
 } from "../config.js";
 import { KIND, SETUP, STATE, isBuilding, isResource } from "../protocol.js";
+import { isConstructionScaffold } from "./entity_state.js";
 import {
   DEPLOYED_WEAPON_ANIM_MS,
   SWEEP_EVICT_FRAMES,
@@ -108,6 +109,7 @@ export function _vehicleShadow(g, cx, cy, body, facing) {
 export function _drawSelectionAndHp(e, selection, state) {
   const selected = selection.has(e.id);
   const damaged = e.maxHp && e.hp < e.maxHp;
+  const underConstruction = isConstructionScaffold(e);
 
   if (selected) {
     const g = this._slot("selectionRings", e.id);
@@ -125,7 +127,7 @@ export function _drawSelectionAndHp(e, selection, state) {
     g.drawEllipse(0, ring.cy, ring.rx, ring.ry);
   }
 
-  if (damaged || selected) {
+  if (!underConstruction && (damaged || selected)) {
     const g = this._slot("hpBars", e.id);
     g.position.set(0, 0);
     this._hpBar(g, e);
