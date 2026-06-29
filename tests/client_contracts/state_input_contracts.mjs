@@ -858,8 +858,9 @@ function buttonByLabel(card, label) {
   );
   assert(
     placementPolicyForBuilding(KIND.TANK_TRAP).unitOverlap === "infantryAllowed" &&
-      placementPolicyForBuilding(KIND.DEPOT).unitOverlap === "none",
-    "Tank Trap placement policy allows infantry overlap without changing ordinary buildings",
+      placementPolicyForBuilding(KIND.DEPOT).unitOverlap === "none" &&
+      placementPolicyForBuilding(KIND.PUMP_JACK).resourceOverlap === "oilCenterRequired",
+    "special placement policies mirror server Tank Trap and Pump Jack rules",
   );
   assert(
     footprintValidAgainstEntities(
@@ -892,6 +893,26 @@ function buttonByLabel(card, label) {
       placementPolicyForBuilding(KIND.TANK_TRAP),
     ) === false,
     "Tank Trap advisory preview still rejects vehicle-body overlap",
+  );
+  const pumpJackPolicy = placementPolicyForBuilding(KIND.PUMP_JACK);
+  const liveOil = { id: 94, owner: 0, kind: KIND.OIL, x: 48, y: 48, remaining: 1000 };
+  const depletedOil = { id: 95, owner: 0, kind: KIND.OIL, x: 48, y: 48, remaining: 0 };
+  const steelPatch = { id: 96, owner: 0, kind: KIND.STEEL, x: 48, y: 48, remaining: 1000 };
+  assert(
+    footprintValidAgainstEntities([liveOil], new Set(), 1, 1, 1, 1, map, pumpJackPolicy) === true,
+    "Pump Jack placement preview allows overlap with a live oil center",
+  );
+  assert(
+    footprintPlacementBlocker([], new Set(), 1, 1, 1, 1, map, pumpJackPolicy) === "terrain",
+    "Pump Jack placement preview requires an oil center inside the footprint",
+  );
+  assert(
+    footprintPlacementBlocker([depletedOil], new Set(), 1, 1, 1, 1, map, pumpJackPolicy) === "structure",
+    "Pump Jack placement preview rejects depleted oil nodes as ordinary resource blockers",
+  );
+  assert(
+    footprintPlacementBlocker([steelPatch], new Set(), 1, 1, 1, 1, map, pumpJackPolicy) === "structure",
+    "Pump Jack placement preview does not treat steel patches as valid oil sites",
   );
   assert(STATS[KIND.TANK].body.length === 50.4, "tank client body length mirrors server");
   assert(STATS[KIND.TANK].body.width === 28.8, "tank client body width mirrors server");

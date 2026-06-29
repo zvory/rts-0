@@ -70,8 +70,8 @@
     },
     {
       "path": "tests/client_contracts/state_input_contracts.mjs",
-      "lines": 2167,
-      "reason": "Pump Jack right-click input coverage extended the existing oversized client contract suite; keep ratcheting until state/input fixtures are split."
+      "lines": 2188,
+      "reason": "Pump Jack right-click and contextual placement coverage extended the existing oversized client contract suite; keep ratcheting until state/input fixtures are split."
     }
   ]
 }
