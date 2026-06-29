@@ -1984,6 +1984,30 @@ fn mortar_turns_fast_before_auto_firing() {
 }
 
 #[test]
+fn mortar_autocast_scatter_stays_within_one_tile_of_predicted_target() {
+    let mut entities = EntityStore::new();
+    let target_id = entities
+        .spawn_unit(2, EntityKind::Rifleman, 220.0, 100.0)
+        .expect("target should spawn");
+    if let Some(target) = entities.get_mut(target_id) {
+        target.set_path(vec![(500.0, 100.0)]);
+        target.mark_move_phase(MovePhase::Moving);
+        target.set_movement_delta(1.0, 0.0);
+    }
+
+    let predicted_x = 220.0 + config::MORTAR_SHELL_DELAY_TICKS as f32;
+    let predicted_y = 100.0;
+    let (aim_x, aim_y) = mortar_aim_point(&entities, target_id, 10);
+    let scatter_px = dist2(aim_x, aim_y, predicted_x, predicted_y).sqrt();
+
+    assert_eq!(config::MORTAR_AUTOFIRE_ERROR_TILES, 1.0);
+    assert!(
+        scatter_px <= config::TILE_SIZE as f32 + 0.001,
+        "autocast mortar scatter should stay within one tile of predicted target, got {scatter_px:.2}px"
+    );
+}
+
+#[test]
 fn mortar_autocast_does_not_lead_stationary_attack_move_targets() {
     let error_px = config::MORTAR_AUTOFIRE_ERROR_TILES * config::TILE_SIZE as f32;
     let target_kinds = [

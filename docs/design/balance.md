@@ -254,7 +254,7 @@ folded into default targeting.
 - Mortar Teams use `MORTAR_TEAM_SETUP_TICKS = 0` (no setup or teardown), `MORTAR_RANGE_TILES = 12`,
   `MORTAR_SHELL_DELAY_TICKS = 68` (~2.27s travel), `MORTAR_OUTER_RADIUS_TILES = 1.5`,
   `MORTAR_INNER_RADIUS_TILES = 0.5`,
-  `MORTAR_OUTER_DAMAGE = 40`, `MORTAR_INNER_DAMAGE = 100`, and `MORTAR_AUTOFIRE_ERROR_TILES = 0.35`.
+  `MORTAR_OUTER_DAMAGE = 40`, `MORTAR_INNER_DAMAGE = 100`, and `MORTAR_AUTOFIRE_ERROR_TILES = 1.0`.
   Mortar facing uses sim-local `mortar::TURN_RATE_RAD_PER_TICK = PI / 6`, so a 180-degree turn
   takes 6 ticks (~200ms at 30 Hz) instead of snapping instantly.
   The inner radius is fully armor-piercing against armored targets; the outer radius keeps
