@@ -412,6 +412,7 @@ fn generated_oil_nodes_spawn_at_tile_centers() {
         for seed in [0, 1, 0x1234_5678] {
             let game = Game::new_for_replay(&players, seed);
             let mut oil_count = 0;
+            let mut oil_tiles = Vec::new();
             for oil in game.entities.iter().filter(|entity| entity.kind == EntityKind::Oil) {
                 oil_count += 1;
                 let (tile_x, tile_y) = game.map.tile_of(oil.pos_x, oil.pos_y);
@@ -426,6 +427,15 @@ fn generated_oil_nodes_spawn_at_tile_centers() {
                     center_x,
                     center_y
                 );
+                oil_tiles.push((oil.id, tile_x, tile_y));
+            }
+            for (index, &(a_id, a_x, a_y)) in oil_tiles.iter().enumerate() {
+                for &(b_id, b_x, b_y) in oil_tiles.iter().skip(index + 1) {
+                    assert!(
+                        a_x.abs_diff(b_x) > 1 || a_y.abs_diff(b_y) > 1,
+                        "oil nodes {a_id} and {b_id} should have one free tile between them, got tiles ({a_x}, {a_y}) and ({b_x}, {b_y})"
+                    );
+                }
             }
             assert!(
                 oil_count > 0,
