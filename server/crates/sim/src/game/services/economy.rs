@@ -9,6 +9,8 @@ use crate::game::services::world_query;
 use crate::game::PlayerState;
 use crate::protocol::terrain;
 
+mod pump_jack;
+
 const SCATTER_RESOURCE_RANGE_TILES: f32 = 10.0;
 
 /// Gatherer harvest loop: walk to node -> latch onto one free patch -> mine in place.
@@ -45,6 +47,11 @@ pub(crate) fn gather_system(
             }
         }
     }
+    for payout in pump_jack::tick(entities) {
+        if let Some(ps) = players.iter_mut().find(|p| p.id == payout.owner) {
+            ps.add_gathered_resources(EntityKind::Oil, payout.oil);
+        }
+    }
 }
 
 fn gather_to_node(
@@ -56,7 +63,9 @@ fn gather_to_node(
     node: u32,
 ) {
     let node_pos = match entities.get(node) {
-        Some(n) if n.is_node() && n.remaining().unwrap_or(0) > 0 => (n.pos_x, n.pos_y),
+        Some(n) if direct_gather_node_mineable(n.kind) && n.remaining().unwrap_or(0) > 0 => {
+            (n.pos_x, n.pos_y)
+        }
         _ => {
             idle_gatherer(entities, id);
             return;
@@ -142,7 +151,7 @@ fn closest_unoccupied_same_resource_node(
         .filter(|candidate| {
             candidate.id != node
                 && candidate.kind == target_kind
-                && candidate.is_node()
+                && direct_gather_node_mineable(candidate.kind)
                 && candidate.remaining().unwrap_or(0) > 0
                 && world_query::resource_has_completed_mining_cc(entities, owner, candidate.id)
                 && entities.node_slot_holder(candidate.id).is_none()
@@ -253,7 +262,7 @@ fn gather_harvesting(
     }
 
     let node_kind_amount = match entities.get(node) {
-        Some(n) if n.is_node() && n.remaining().unwrap_or(0) > 0 => {
+        Some(n) if direct_gather_node_mineable(n.kind) && n.remaining().unwrap_or(0) > 0 => {
             (n.kind, n.remaining().unwrap_or(0))
         }
         _ => {
@@ -314,6 +323,10 @@ fn gather_harvesting(
 
 fn is_gatherer_kind(kind: EntityKind) -> bool {
     matches!(kind, EntityKind::Worker | EntityKind::Golem)
+}
+
+fn direct_gather_node_mineable(kind: EntityKind) -> bool {
+    kind.is_node() && kind != EntityKind::Oil
 }
 
 fn gather_load_cap(gatherer_kind: EntityKind, node_kind: EntityKind) -> u32 {

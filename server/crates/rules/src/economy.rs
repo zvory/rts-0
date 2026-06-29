@@ -91,7 +91,12 @@ pub fn can_build_for_faction(
     builder_kind: EntityKind,
     building_kind: EntityKind,
 ) -> bool {
-    catalog_for(faction_id).is_some_and(|catalog| catalog.can_build(builder_kind, building_kind))
+    catalog_for(faction_id).is_some_and(|catalog| {
+        catalog.can_build(builder_kind, building_kind)
+            || (builder_kind == EntityKind::Worker
+                && building_kind == EntityKind::PumpJack
+                && catalog.allows_building(EntityKind::PumpJack))
+    })
 }
 
 /// Whether `unit_kind` can gather resources for this faction.
@@ -344,6 +349,14 @@ mod tests {
         assert!(
             can_build_for_faction(DEFAULT_FACTION_ID, EntityKind::Worker, EntityKind::TankTrap),
             "default workers can build Tank Traps after client build-card exposure"
+        );
+        assert!(
+            can_build_for_faction(DEFAULT_FACTION_ID, EntityKind::Worker, EntityKind::PumpJack),
+            "default workers can build contextual Pump Jacks on oil nodes"
+        );
+        assert!(
+            !can_build_for_faction(DEFAULT_FACTION_ID, EntityKind::Rifleman, EntityKind::PumpJack),
+            "non-workers cannot build contextual Pump Jacks"
         );
         assert!(build_requirement_met_for_faction(
             DEFAULT_FACTION_ID,

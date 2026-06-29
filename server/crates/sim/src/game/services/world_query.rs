@@ -56,7 +56,11 @@ pub(crate) fn owned_survival_buildings(
     entities: &EntityStore,
     player: u32,
 ) -> impl Iterator<Item = &Entity> + '_ {
-    owned_buildings(entities, player).filter(|e| e.kind != EntityKind::TankTrap)
+    owned_buildings(entities, player).filter(|e| survival_building_kind(e.kind))
+}
+
+fn survival_building_kind(kind: EntityKind) -> bool {
+    kind.is_building() && !matches!(kind, EntityKind::TankTrap | EntityKind::PumpJack)
 }
 
 /// Kinds of all owned buildings (any state).
@@ -303,9 +307,18 @@ mod tests {
         let mut s = EntityStore::default();
         s.spawn_building(1, EntityKind::TankTrap, 100.0, 100.0, true)
             .unwrap();
+        s.spawn_building(1, EntityKind::PumpJack, 132.0, 100.0, true)
+            .unwrap();
+        s.spawn_building(1, EntityKind::Depot, 164.0, 100.0, true)
+            .unwrap();
 
-        assert_eq!(owned_buildings(&s, 1).count(), 1);
-        assert_eq!(owned_survival_buildings(&s, 1).count(), 0);
+        assert_eq!(owned_buildings(&s, 1).count(), 3);
+        assert_eq!(
+            owned_survival_buildings(&s, 1)
+                .map(|entity| entity.kind)
+                .collect::<Vec<_>>(),
+            vec![EntityKind::Depot]
+        );
     }
 
     #[test]

@@ -124,6 +124,7 @@ const DEFAULT_BUILDINGS: &[EntityKind] = &[
     EntityKind::ResearchComplex,
     EntityKind::Steelworks,
     EntityKind::TankTrap,
+    EntityKind::PumpJack,
 ];
 
 const DEFAULT_WORKER_BUILDABLES: &[EntityKind] = &[
@@ -625,7 +626,13 @@ mod tests {
         assert!(!catalog.allows_research(TANK_UNLOCK_UPGRADE, EntityKind::TrainingCentre));
         assert!(catalog.allows_building(EntityKind::TankTrap));
         assert!(catalog.can_build(EntityKind::Worker, EntityKind::TankTrap));
+        assert!(catalog.allows_building(EntityKind::PumpJack));
+        assert!(
+            !catalog.can_build(EntityKind::Worker, EntityKind::PumpJack),
+            "Pump Jacks are contextual oil-node builds, not generic worker build-card entries"
+        );
         assert!(!catalog.can_act_as_production_anchor(EntityKind::TankTrap));
+        assert!(!catalog.can_act_as_production_anchor(EntityKind::PumpJack));
         assert!(catalog.allows_ability(SMOKE_ABILITY, EntityKind::ScoutCar));
         assert!(catalog.allows_ability(POINT_FIRE_ABILITY, EntityKind::Artillery));
         assert!(!catalog.allows_ability(CHARGE_ABILITY, EntityKind::Rifleman));

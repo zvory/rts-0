@@ -3302,6 +3302,57 @@ fn tank_trap_between_attacker_and_target_does_not_block_the_shot() {
 }
 
 #[test]
+fn pump_jack_between_attacker_and_target_does_not_block_the_shot() {
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("attacker should spawn");
+    let blocker = entities
+        .spawn_building(2, EntityKind::PumpJack, 160.0, 100.0, true)
+        .expect("pump jack should spawn");
+    let intended = entities
+        .spawn_unit(2, EntityKind::Worker, 230.0, 100.0)
+        .expect("intended target should spawn");
+    let blocker_hp_before = entities.get(blocker).expect("blocker should exist").hp;
+    let intended_hp_before = entities.get(intended).expect("intended should exist").hp;
+    let mut events: HashMap<u32, Vec<Event>> = HashMap::new();
+    events.insert(1, Vec::new());
+    events.insert(2, Vec::new());
+
+    apply_test_damage(
+        &mut entities,
+        &mut events,
+        attacker,
+        intended,
+        20,
+        1,
+        100.0,
+        100.0,
+        230.0,
+        100.0,
+        128.0,
+    );
+
+    assert_eq!(
+        entities.get(blocker).expect("blocker should exist").hp,
+        blocker_hp_before,
+        "Pump Jacks should not take damage while a unit behind them is targeted"
+    );
+    assert!(
+        entities.get(intended).expect("intended should exist").hp < intended_hp_before,
+        "target behind the Pump Jack should take the shot damage"
+    );
+    assert!(
+        events
+            .get(&1)
+            .expect("attacker owner events should exist")
+            .iter()
+            .any(|event| matches!(event, Event::Attack { from, to, .. } if *from == attacker && *to == intended)),
+        "attack event should point at the intended target"
+    );
+}
+
+#[test]
 fn infantry_like_auto_acquisition_ignores_enemy_tank_traps() {
     for kind in [
         EntityKind::Worker,

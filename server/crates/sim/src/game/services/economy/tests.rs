@@ -70,6 +70,131 @@ fn entering_harvesting_clears_pending_queued_orders() {
 }
 
 #[test]
+fn worker_direct_oil_gather_order_is_idled() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let (ccx, ccy) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+    entities
+        .spawn_building(1, EntityKind::CityCentre, ccx, ccy, true)
+        .expect("city centre should spawn");
+    let oil = entities
+        .spawn_node(EntityKind::Oil, ccx + 48.0, ccy)
+        .expect("oil node should spawn");
+    let worker = entities
+        .spawn_unit(1, EntityKind::Worker, ccx + 48.0, ccy)
+        .expect("worker should spawn");
+    {
+        let w = entities.get_mut(worker).expect("worker should exist");
+        w.set_order(Order::gather(oil));
+        w.set_target_id(Some(oil));
+    }
+
+    let occ = Occupancy::build(&map, &entities);
+    let spatial = SpatialIndex::build(&entities, map.size);
+    let mut pathing = PathingService::new(1024, 32);
+    pathing.advance_tick(1);
+    let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+    let mut players = Vec::new();
+
+    gather_system(
+        &map,
+        &mut entities,
+        &mut players,
+        &occ,
+        &spatial,
+        &mut coordinator,
+    );
+
+    let w = entities.get(worker).expect("worker should exist");
+    assert!(
+        !matches!(w.order(), Order::Gather(_)),
+        "workers must not direct-mine oil patches"
+    );
+    assert_eq!(
+        entities.node_slot_holder(oil),
+        None,
+        "oil patches should not reserve worker mining slots"
+    );
+}
+
+#[test]
+fn completed_pump_jack_mines_overlapping_oil_at_worker_rate() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let (pump_x, pump_y) = footprint_center(&map, EntityKind::PumpJack, 4, 4);
+    let oil = entities
+        .spawn_node(EntityKind::Oil, pump_x, pump_y)
+        .expect("oil node should spawn");
+    entities
+        .spawn_building(1, EntityKind::PumpJack, pump_x, pump_y, true)
+        .expect("pump jack should spawn");
+    let oil_before = entities
+        .get(oil)
+        .and_then(|node| node.remaining())
+        .expect("oil node remaining");
+    let mut payouts = Vec::new();
+
+    for _ in 0..config::HARVEST_TICKS {
+        payouts.extend(pump_jack::tick(&mut entities));
+    }
+
+    assert_eq!(payouts.len(), 1);
+    assert_eq!(payouts[0].owner, 1);
+    assert_eq!(
+        payouts[0].oil,
+        config::OIL_LOAD,
+        "Pump Jack should pay the same oil load as one worker harvest"
+    );
+    assert_eq!(
+        entities.get(oil).and_then(|node| node.remaining()),
+        Some(oil_before - config::OIL_LOAD),
+        "Pump Jack income should deplete the oil node by the paid amount"
+    );
+}
+
+#[test]
+fn pump_jack_mines_only_oil_centered_in_its_footprint() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let (pump_x, pump_y) = footprint_center(&map, EntityKind::PumpJack, 4, 4);
+    let (adjacent_x, adjacent_y) = footprint_center(&map, EntityKind::PumpJack, 5, 4);
+    let adjacent_oil = entities
+        .spawn_node(EntityKind::Oil, adjacent_x, adjacent_y)
+        .expect("adjacent oil node should spawn");
+    let centered_oil = entities
+        .spawn_node(EntityKind::Oil, pump_x, pump_y)
+        .expect("centered oil node should spawn");
+    entities
+        .spawn_building(1, EntityKind::PumpJack, pump_x, pump_y, true)
+        .expect("pump jack should spawn");
+    let adjacent_before = entities
+        .get(adjacent_oil)
+        .and_then(|node| node.remaining())
+        .expect("adjacent oil remaining");
+    let centered_before = entities
+        .get(centered_oil)
+        .and_then(|node| node.remaining())
+        .expect("centered oil remaining");
+
+    let mut payouts = Vec::new();
+    for _ in 0..config::HARVEST_TICKS {
+        payouts.extend(pump_jack::tick(&mut entities));
+    }
+
+    assert_eq!(payouts.len(), 1);
+    assert_eq!(
+        entities.get(adjacent_oil).and_then(|node| node.remaining()),
+        Some(adjacent_before),
+        "edge-touching adjacent oil must not be depleted by this Pump Jack"
+    );
+    assert_eq!(
+        entities.get(centered_oil).and_then(|node| node.remaining()),
+        Some(centered_before - config::OIL_LOAD),
+        "Pump Jack should extract from the oil whose center lies inside its footprint"
+    );
+}
+
+#[test]
 fn occupied_resource_arrival_redirects_to_nearest_same_resource_node() {
     let map = flat_map(32);
     let mut entities = EntityStore::new();

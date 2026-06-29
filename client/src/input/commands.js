@@ -52,9 +52,15 @@ export function _onRightClick(p, ev = {}) {
   const world = this._worldAt(p.x, p.y);
   const gatherers = this._selectedGathererIds();
   const workers = this._selectedWorkerIds();
-  if (gatherers.length > 0) {
-    const resource = this._resourceAtWorld(world.x, world.y);
-    if (resource && resource.remaining !== 0) {
+  const resource = this._resourceAtWorld(world.x, world.y);
+  if (resource && resource.remaining !== 0) {
+    const pumpJack = _pumpJackBuildIntentForResource(resource, this.state.map);
+    if (resource.kind === KIND.OIL && workers.length > 0 && pumpJack) {
+      this._issueCommand(cmd.build(workers, KIND.PUMP_JACK, pumpJack.tileX, pumpJack.tileY, queued));
+      this._addCommandFeedback("move", resource.x, resource.y, queued);
+      return;
+    }
+    if (gatherers.length > 0 && resource.kind !== KIND.OIL) {
       this._issueCommand(cmd.gather(gatherers, resource.id, queued));
       this._addCommandFeedback("move", world.x, world.y, queued);
       return;
@@ -82,8 +88,14 @@ export function _onRightClick(p, ev = {}) {
     return;
   }
   if (target && isResource(target.kind) && target.remaining !== 0) {
-    // Resource node -> gather, but only with the gatherers in the selection.
-    if (gatherers.length > 0) {
+    const pumpJack = _pumpJackBuildIntentForResource(target, this.state.map);
+    if (target.kind === KIND.OIL && workers.length > 0 && pumpJack) {
+      this._issueCommand(cmd.build(workers, KIND.PUMP_JACK, pumpJack.tileX, pumpJack.tileY, queued));
+      this._addCommandFeedback("move", target.x, target.y, queued);
+      return;
+    }
+    // Non-oil resource node -> gather, but only with the gatherers in the selection.
+    if (gatherers.length > 0 && target.kind !== KIND.OIL) {
       this._issueCommand(cmd.gather(gatherers, target.id, queued));
       this._addCommandFeedback("move", world.x, world.y, queued);
       return;
@@ -224,6 +236,17 @@ function _resumeConstructionIntent(target, map) {
   const tileY = Math.round(target.y / tileSize - stat.footH * 0.5);
   if (!Number.isFinite(tileX) || !Number.isFinite(tileY)) return null;
   return { building: target.kind, tileX, tileY };
+}
+
+export function _pumpJackBuildIntentForResource(resource, map) {
+  if (!resource || resource.kind !== KIND.OIL || !map) return null;
+  const stat = STATS[KIND.PUMP_JACK];
+  if (!stat?.footW || !stat?.footH) return null;
+  const tileSize = map.tileSize || DEFAULT_TILE_SIZE;
+  const tileX = Math.round(resource.x / tileSize - stat.footW * 0.5);
+  const tileY = Math.round(resource.y / tileSize - stat.footH * 0.5);
+  if (!Number.isFinite(tileX) || !Number.isFinite(tileY)) return null;
+  return { building: KIND.PUMP_JACK, tileX, tileY };
 }
 
 export function _refreshAbilityTargetPreview() {

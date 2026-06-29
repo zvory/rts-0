@@ -280,6 +280,43 @@ fn gather_command_accepts_occupied_but_mineable_resource_node() {
 }
 
 #[test]
+fn gather_command_rejects_oil_resource_nodes() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+    entities
+        .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
+        .expect("city centre should spawn");
+    let node = entities
+        .spawn_node(EntityKind::Oil, cc_x + 64.0, cc_y)
+        .expect("oil node should spawn");
+    let worker = entities
+        .spawn_unit(1, EntityKind::Worker, cc_x + 32.0, cc_y)
+        .expect("worker should spawn");
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::Gather {
+                units: vec![worker],
+                node,
+                queued: false,
+            },
+        )],
+    );
+
+    assert!(
+        !matches!(
+            entities.get(worker).expect("worker should exist").order(),
+            Order::Gather(_)
+        ),
+        "workers must build Pump Jacks on oil instead of direct gather orders"
+    );
+}
+
+#[test]
 fn planner_backed_valid_queued_commands_emit_queue_full_notices() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();

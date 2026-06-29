@@ -343,6 +343,92 @@ fn build_order_accepts_new_build_without_current_resources() {
 }
 
 #[test]
+fn build_order_accepts_contextual_pump_jack_on_oil() {
+    let map = flat_map(16);
+    let mut entities = EntityStore::new();
+    let (site_x, site_y) = footprint_center(&map, EntityKind::PumpJack, 4, 4);
+    entities
+        .spawn_node(EntityKind::Oil, site_x, site_y)
+        .expect("oil node should spawn");
+    let worker = entities
+        .spawn_unit(1, EntityKind::Worker, 64.0, 64.0)
+        .expect("worker should spawn");
+    let mut players = vec![player_state(1)];
+
+    let events = apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(
+            1,
+            SimCommand::Build {
+                units: vec![worker],
+                building: EntityKind::PumpJack,
+                tile_x: 4,
+                tile_y: 4,
+                queued: false,
+            },
+        )],
+    );
+
+    let worker = entities.get(worker).expect("worker should remain alive");
+    assert_eq!(
+        worker.order().build_intent_tile(),
+        Some((EntityKind::PumpJack, 4, 4)),
+        "Pump Jacks should be valid contextual worker builds on live oil patches"
+    );
+    assert!(
+        worker.path_goal().is_some(),
+        "accepted Pump Jack build order should send the worker toward the site"
+    );
+    assert!(
+        entities
+            .iter()
+            .all(|entity| entity.kind != EntityKind::PumpJack),
+        "build command admission must not spawn a Pump Jack scaffold"
+    );
+    assert!(
+        events.get(&1).is_none_or(Vec::is_empty),
+        "valid Pump Jack build admission should not emit a placement notice"
+    );
+}
+
+#[test]
+fn build_order_rejects_pump_jack_off_oil() {
+    let map = flat_map(16);
+    let mut entities = EntityStore::new();
+    let worker = entities
+        .spawn_unit(1, EntityKind::Worker, 64.0, 64.0)
+        .expect("worker should spawn");
+    let mut players = vec![player_state(1)];
+
+    let events = apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(
+            1,
+            SimCommand::Build {
+                units: vec![worker],
+                building: EntityKind::PumpJack,
+                tile_x: 4,
+                tile_y: 4,
+                queued: false,
+            },
+        )],
+    );
+
+    assert!(
+        !matches!(
+            entities.get(worker).expect("worker should remain alive").order(),
+            Order::Build(_)
+        ),
+        "Pump Jack build orders must be rejected away from live oil patches"
+    );
+    assert_notice(&events, 1, "Cannot build there");
+}
+
+#[test]
 fn build_with_multiple_selected_workers_uses_idle_closest_worker() {
     let map = flat_map(32);
     let mut entities = EntityStore::new();

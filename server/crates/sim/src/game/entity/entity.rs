@@ -12,7 +12,7 @@ use super::{
     AttackPhase, BuildPhase, CombatState, ConstructionState, DeconstructPhase, EntityKind,
     GatherPhase, MovePhase, MovementState, Order, OrderIntent, ProdItem, ProductionState,
     RallyIntent, ResearchItem, ResourceNodeState, WeaponSetup, WorkerState, MAX_QUEUED_ORDERS,
-    NEUTRAL,
+    NEUTRAL, ResourceExtractorState,
 };
 
 const BUILDING_START_HP_NUMERATOR: u32 = 1;
@@ -53,6 +53,7 @@ pub struct Entity {
     pub construction: Option<ConstructionState>,
     pub worker: Option<WorkerState>,
     pub resource_node: Option<ResourceNodeState>,
+    pub resource_extractor: Option<ResourceExtractorState>,
     pub ability_cooldowns: BTreeMap<AbilityKind, u16>,
     pub ability_lockouts_until_tick: BTreeMap<AbilityKind, u32>,
     pub ability_uses_remaining: BTreeMap<AbilityKind, u16>,
@@ -84,6 +85,7 @@ impl Entity {
             worker: matches!(kind, EntityKind::Worker | EntityKind::Golem)
                 .then(WorkerState::default),
             resource_node: None,
+            resource_extractor: None,
             ability_cooldowns: BTreeMap::new(),
             ability_lockouts_until_tick: BTreeMap::new(),
             ability_uses_remaining: initial_ability_uses(kind),
@@ -133,6 +135,7 @@ impl Entity {
             }),
             worker: None,
             resource_node: None,
+            resource_extractor: (kind == EntityKind::PumpJack).then(ResourceExtractorState::default),
             ability_cooldowns: BTreeMap::new(),
             ability_lockouts_until_tick: BTreeMap::new(),
             ability_uses_remaining: BTreeMap::new(),
@@ -165,6 +168,7 @@ impl Entity {
                 remaining: amount,
                 miner: None,
             }),
+            resource_extractor: None,
             ability_cooldowns: BTreeMap::new(),
             ability_lockouts_until_tick: BTreeMap::new(),
             ability_uses_remaining: BTreeMap::new(),
@@ -180,6 +184,7 @@ impl Entity {
             construction: self.construction.is_some(),
             worker: self.worker.is_some(),
             resource_node: self.resource_node.is_some(),
+            resource_extractor: self.resource_extractor.is_some(),
         }
     }
 

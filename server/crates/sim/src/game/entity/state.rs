@@ -241,6 +241,13 @@ pub struct ResourceNodeState {
     pub miner: Option<u32>,
 }
 
+/// Static resource extractor state. Present only on completed-capable extractor buildings.
+#[derive(Debug, Clone, Default)]
+pub struct ResourceExtractorState {
+    /// Ticks accumulated toward the next attached harvest payout.
+    pub progress: u32,
+}
+
 /// Compact classification of which optional state groups an entity kind owns.
 #[cfg(test)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -251,4 +258,5 @@ pub struct EntityStateGroups {
     pub construction: bool,
     pub worker: bool,
     pub resource_node: bool,
+    pub resource_extractor: bool,
 }

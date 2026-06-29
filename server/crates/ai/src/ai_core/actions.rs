@@ -649,13 +649,31 @@ pub(crate) fn assign_workers_to_resource(
         let Some(node) = nearest_unreserved_node(worker, &policy, ctx.reservations()) else {
             continue;
         };
+        let pump_jack_site = if policy.resource_kind == EntityKind::Oil {
+            let Some(resource) = resource_by_id(policy.resources, node) else {
+                continue;
+            };
+            Some(pump_jack_tile_for_resource(resource))
+        } else {
+            None
+        };
         ctx.reservations.reserve_worker(worker.id);
         ctx.reservations.reserve_resource_node(node);
-        ctx.emit_command(Command::Gather {
-            units: vec![worker.id],
-            node,
-            queued: false,
-        });
+        if let Some((tile_x, tile_y)) = pump_jack_site {
+            ctx.emit_command(Command::Build {
+                units: vec![worker.id],
+                building: EntityKind::PumpJack,
+                tile_x,
+                tile_y,
+                queued: false,
+            });
+        } else {
+            ctx.emit_command(Command::Gather {
+                units: vec![worker.id],
+                node,
+                queued: false,
+            });
+        }
         assignments.push(ResourceAssignment {
             worker: worker.id,
             node,
@@ -790,6 +808,17 @@ fn candidate_worker_ids(workers: &[AiEntitySummary], explicit_ids: Option<&[u32]
         .unwrap_or_else(|| workers.iter().map(|worker| worker.id).collect());
     let mut seen = BTreeSet::new();
     ids.into_iter().filter(|id| seen.insert(*id)).collect()
+}
+
+fn resource_by_id(resources: &[AiResourceSummary], id: u32) -> Option<&AiResourceSummary> {
+    resources.iter().find(|resource| resource.id == id)
+}
+
+fn pump_jack_tile_for_resource(resource: &AiResourceSummary) -> (u32, u32) {
+    let tile_size = config::TILE_SIZE as f32;
+    let tile_x = ((resource.x / tile_size) - 0.5).round().max(0.0) as u32;
+    let tile_y = ((resource.y / tile_size) - 0.5).round().max(0.0) as u32;
+    (tile_x, tile_y)
 }
 
 fn nearest_unreserved_node(
@@ -1346,6 +1375,16 @@ mod tests {
                 node: 31
             }]
         );
+        assert!(matches!(
+            ctx.into_commands().as_slice(),
+            [Command::Build {
+                units,
+                building: EntityKind::PumpJack,
+                tile_x: 3,
+                tile_y: 0,
+                queued: false
+            }] if units == &vec![10]
+        ));
     }
 
     #[test]

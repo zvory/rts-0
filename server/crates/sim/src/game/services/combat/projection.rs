@@ -1,5 +1,5 @@
 use crate::config;
-use crate::game::entity::{Entity, EntityKind, EntityStore};
+use crate::game::entity::{blocks_line_of_sight, Entity, EntityKind, EntityStore};
 use crate::game::map::Map;
 use crate::game::services::geometry::{
     building_rect_for_entity, segment_intersects_rect, segment_intersects_unit_body,
@@ -120,7 +120,7 @@ pub(super) fn shot_blocker_intersection(
         return unit_body_for_entity(entity)
             .and_then(|body| segment_intersects_unit_body(start, end, body));
     }
-    if entity.is_building() && entity.kind != EntityKind::TankTrap {
+    if entity.is_building() && blocks_line_of_sight(entity.kind) {
         return building_rect_for_entity(map, entity)
             .and_then(|rect| segment_intersects_rect(start, end, rect));
     }

@@ -89,7 +89,7 @@ fn ai_1_0_tech_goal() -> PlayerMilestoneGoal {
     PlayerMilestoneGoal {
         require_gathering: true,
         require_oil: true,
-        require_oil_worker_assignment: true,
+        require_oil_extractor_assignment: true,
         require_depot_supply: true,
         require_barracks_complete: true,
         require_rifleman: true,

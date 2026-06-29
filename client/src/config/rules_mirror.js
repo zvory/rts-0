@@ -152,6 +152,8 @@ export const STATS = Object.freeze({
     cost: { steel: 15, oil: 0 }, buildTicks: TICK_HZ * 10, trains: [],
     requires: KIND.TRAINING_CENTRE,
     requiresText: "Requires Training Centre" },
+  [KIND.PUMP_JACK]: { label: "Pump Jack", icon: "PJ", footW: 1, footH: 1, sight: 1,
+    cost: { steel: 0, oil: 0 }, buildTicks: TICK_HZ * 10, trains: [] },
 
   [KIND.STEEL]: { label: "Steel", size: 22 },
   [KIND.OIL]: { label: "Oil", size: 14 },

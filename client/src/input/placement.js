@@ -3,6 +3,8 @@ import { MINING_CC_RANGE_TILES, STATS, TANK_BODY, isProducerBuilding } from "../
 import { DEFAULT_HIT_RADIUS, DEFAULT_TILE_SIZE, HIT_PAD_PX, OWN_HIT_BONUS, ZOOM_STEP } from "./constants.js";
 import { buildTankTrapLineSites, tankTrapBuildCommands } from "./tank_trap_line.js";
 
+const POINT_IN_RECT_EPS_PX = 0.001;
+
 export function footprintValidAgainstEntities(
   entities,
   allowedOverlapIds,
@@ -48,20 +50,27 @@ export function footprintPlacementBlocker(
   const minY = tileY * ts;
   const maxX = (tileX + footW) * ts;
   const maxY = (tileY + footH) * ts;
+  let contextualOilCenter = false;
   for (const e of entities) {
     if (e.shotReveal || e.visionOnly) continue;
     if (allowedOverlapIds?.has(e.id)) continue;
+    if (resourceAllowedForPlacement(e, policy, minX, minY, maxX, maxY)) {
+      contextualOilCenter = true;
+      continue;
+    }
     if (!entityBlocksPlacement(e, policy)) continue;
     if (entityIntersectsRect(e, minX, minY, maxX, maxY, ts)) {
       return isBuilding(e.kind) || isResource(e.kind) ? "structure" : "unit";
     }
   }
+  if (policy?.resourceOverlap === "oilCenterRequired" && !contextualOilCenter) return "terrain";
   return null;
 }
 
 export function placementPolicyForBuilding(kind) {
   return Object.freeze({
     unitOverlap: kind === KIND.TANK_TRAP ? "infantryAllowed" : "none",
+    resourceOverlap: kind === KIND.PUMP_JACK ? "oilCenterRequired" : "none",
   });
 }
 
@@ -76,6 +85,21 @@ function entityBlocksPlacement(e, policy) {
     return movementBodyClass(e.kind) === "vehicleBody";
   }
   return true;
+}
+
+function resourceAllowedForPlacement(e, policy, minX, minY, maxX, maxY) {
+  if (policy?.resourceOverlap !== "oilCenterRequired") return false;
+  if (e.kind !== KIND.OIL || e.remaining === 0) return false;
+  return pointInsideRect(e.x, e.y, minX, minY, maxX, maxY);
+}
+
+function pointInsideRect(x, y, minX, minY, maxX, maxY) {
+  return (
+    x >= minX - POINT_IN_RECT_EPS_PX &&
+    x <= maxX + POINT_IN_RECT_EPS_PX &&
+    y >= minY - POINT_IN_RECT_EPS_PX &&
+    y <= maxY + POINT_IN_RECT_EPS_PX
+  );
 }
 
 export function entityIntersectsRect(e, minX, minY, maxX, maxY, tileSize) {

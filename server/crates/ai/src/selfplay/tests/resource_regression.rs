@@ -11,10 +11,12 @@ use rts_sim::protocol::{EntityView, Snapshot, StartPayload};
 #[derive(Default)]
 struct ResourceRegressionEvidence {
     pre_expansion_steel_gather_tick: Option<u32>,
-    first_oil_gather_tick: Option<u32>,
+    first_pump_jack_build_tick: Option<u32>,
     first_mineable_oil_tick: Option<u32>,
     first_second_completed_city_centre_tick: Option<u32>,
 }
+
+const POINT_IN_RECT_EPS_PX: f32 = 0.001;
 
 fn profile_players() -> Vec<PlayerInit> {
     vec![
@@ -107,18 +109,82 @@ fn has_free_mineable_resource(
     player_id: u32,
     kind: EntityKind,
 ) -> bool {
-    let occupied_nodes: BTreeSet<u32> = snapshot
+    let mut occupied_nodes: BTreeSet<u32> = snapshot
         .entities
         .iter()
         .filter(|entity| entity.owner == player_id)
         .filter(|entity| kind_of(entity) == Some(EntityKind::Worker))
         .filter_map(|entity| entity.latched_node)
         .collect();
+    for pump_jack in snapshot
+        .entities
+        .iter()
+        .filter(|entity| entity.owner == player_id)
+        .filter(|entity| kind_of(entity) == Some(EntityKind::PumpJack))
+    {
+        occupied_nodes.extend(oil_nodes_overlapping_pump_jack_entity(
+            start, snapshot, pump_jack,
+        ));
+    }
     start.map.resources.iter().any(|resource| {
         resource.kind.parse::<EntityKind>().ok() == Some(kind)
             && !occupied_nodes.contains(&resource.id)
             && resource_mineable_by_completed_city_centre(start, snapshot, player_id, resource.id)
     })
+}
+
+fn oil_nodes_overlapping_pump_jack_entity(
+    start: &StartPayload,
+    snapshot: &Snapshot,
+    pump_jack: &EntityView,
+) -> Vec<u32> {
+    let Some(stats) = config::building_stats(EntityKind::PumpJack) else {
+        return Vec::new();
+    };
+    let tile_size = start.map.tile_size as f32;
+    let half_w = stats.foot_w as f32 * tile_size * 0.5;
+    let half_h = stats.foot_h as f32 * tile_size * 0.5;
+    start
+        .map
+        .resources
+        .iter()
+        .filter(|resource| resource.kind.parse::<EntityKind>().ok() == Some(EntityKind::Oil))
+        .filter(|resource| resource_remaining(start, snapshot, resource.id) > 0)
+        .filter(|resource| {
+            resource.x >= pump_jack.x - half_w - POINT_IN_RECT_EPS_PX
+                && resource.x <= pump_jack.x + half_w + POINT_IN_RECT_EPS_PX
+                && resource.y >= pump_jack.y - half_h - POINT_IN_RECT_EPS_PX
+                && resource.y <= pump_jack.y + half_h + POINT_IN_RECT_EPS_PX
+        })
+        .map(|resource| resource.id)
+        .collect()
+}
+
+fn pump_jack_build_target_oil_node(
+    start: &StartPayload,
+    snapshot: &Snapshot,
+    tile_x: u32,
+    tile_y: u32,
+) -> Option<u32> {
+    let stats = config::building_stats(EntityKind::PumpJack)?;
+    let tile_size = start.map.tile_size as f32;
+    let min_x = tile_x as f32 * tile_size;
+    let min_y = tile_y as f32 * tile_size;
+    let max_x = tile_x.saturating_add(stats.foot_w) as f32 * tile_size;
+    let max_y = tile_y.saturating_add(stats.foot_h) as f32 * tile_size;
+    start
+        .map
+        .resources
+        .iter()
+        .filter(|resource| resource.kind.parse::<EntityKind>().ok() == Some(EntityKind::Oil))
+        .filter(|resource| resource_remaining(start, snapshot, resource.id) > 0)
+        .find(|resource| {
+            resource.x >= min_x - POINT_IN_RECT_EPS_PX
+                && resource.x <= max_x + POINT_IN_RECT_EPS_PX
+                && resource.y >= min_y - POINT_IN_RECT_EPS_PX
+                && resource.y <= max_y + POINT_IN_RECT_EPS_PX
+        })
+        .map(|resource| resource.id)
 }
 
 fn run_resource_regression_profile(max_ticks: u32) -> ResourceRegressionEvidence {
@@ -194,18 +260,36 @@ fn run_resource_regression_profile(max_ticks: u32) -> ResourceRegressionEvidence
                         );
                         evidence.pre_expansion_steel_gather_tick.get_or_insert(tick);
                     }
-                    if kind == Some(EntityKind::Oil) {
-                        assert!(
-                            resource_mineable_by_completed_city_centre(
-                                &start,
-                                player_one_snapshot,
-                                1,
-                                *node
-                            ),
-                            "oil gather at tick {tick} targeted a known but non-mineable node"
+                    assert_ne!(
+                        kind,
+                        Some(EntityKind::Oil),
+                        "oil at tick {tick} should use Pump Jack construction, not direct gather"
+                    );
+                }
+                if let Command::Build {
+                    building: EntityKind::PumpJack,
+                    tile_x,
+                    tile_y,
+                    ..
+                } = &command
+                {
+                    let Some(node) =
+                        pump_jack_build_target_oil_node(&start, player_one_snapshot, *tile_x, *tile_y)
+                    else {
+                        panic!(
+                            "Pump Jack build at tick {tick} did not overlap a live oil patch"
                         );
-                        evidence.first_oil_gather_tick.get_or_insert(tick);
-                    }
+                    };
+                    assert!(
+                        resource_mineable_by_completed_city_centre(
+                            &start,
+                            player_one_snapshot,
+                            1,
+                            node
+                        ),
+                        "Pump Jack build at tick {tick} targeted a known but non-mineable oil node"
+                    );
+                    evidence.first_pump_jack_build_tick.get_or_insert(tick);
                 }
             }
             game.enqueue(player_id, command);
@@ -250,11 +334,11 @@ fn profile_backed_ai_assigns_oil_after_expansion_city_centre_completes() {
         "expected expansion completion to make at least one oil node mineable"
     );
     assert!(
-        evidence.first_oil_gather_tick.is_some(),
-        "expected profile-backed economy to assign a worker to oil after expansion"
+        evidence.first_pump_jack_build_tick.is_some(),
+        "expected profile-backed economy to assign a worker to build a Pump Jack after expansion"
     );
     assert!(
-        evidence.first_oil_gather_tick >= evidence.first_mineable_oil_tick,
-        "oil gather should not precede the first mineable-oil tick"
+        evidence.first_pump_jack_build_tick >= evidence.first_mineable_oil_tick,
+        "Pump Jack build should not precede the first mineable-oil tick"
     );
 }

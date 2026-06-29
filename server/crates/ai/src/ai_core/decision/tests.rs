@@ -3481,7 +3481,7 @@ fn sustained_support_panic_falls_back_to_riflemen_without_training_centre() {
                 ..
             }
         )),
-        "support fallback should not pull workers onto oil"
+        "support fallback should not build Pump Jacks"
     );
 
     let started_tick = observation.tick;

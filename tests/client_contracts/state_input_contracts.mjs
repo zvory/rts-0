@@ -858,8 +858,9 @@ function buttonByLabel(card, label) {
   );
   assert(
     placementPolicyForBuilding(KIND.TANK_TRAP).unitOverlap === "infantryAllowed" &&
-      placementPolicyForBuilding(KIND.DEPOT).unitOverlap === "none",
-    "Tank Trap placement policy allows infantry overlap without changing ordinary buildings",
+      placementPolicyForBuilding(KIND.DEPOT).unitOverlap === "none" &&
+      placementPolicyForBuilding(KIND.PUMP_JACK).resourceOverlap === "oilCenterRequired",
+    "special placement policies mirror server Tank Trap and Pump Jack rules",
   );
   assert(
     footprintValidAgainstEntities(
@@ -892,6 +893,26 @@ function buttonByLabel(card, label) {
       placementPolicyForBuilding(KIND.TANK_TRAP),
     ) === false,
     "Tank Trap advisory preview still rejects vehicle-body overlap",
+  );
+  const pumpJackPolicy = placementPolicyForBuilding(KIND.PUMP_JACK);
+  const liveOil = { id: 94, owner: 0, kind: KIND.OIL, x: 48, y: 48, remaining: 1000 };
+  const depletedOil = { id: 95, owner: 0, kind: KIND.OIL, x: 48, y: 48, remaining: 0 };
+  const steelPatch = { id: 96, owner: 0, kind: KIND.STEEL, x: 48, y: 48, remaining: 1000 };
+  assert(
+    footprintValidAgainstEntities([liveOil], new Set(), 1, 1, 1, 1, map, pumpJackPolicy) === true,
+    "Pump Jack placement preview allows overlap with a live oil center",
+  );
+  assert(
+    footprintPlacementBlocker([], new Set(), 1, 1, 1, 1, map, pumpJackPolicy) === "terrain",
+    "Pump Jack placement preview requires an oil center inside the footprint",
+  );
+  assert(
+    footprintPlacementBlocker([depletedOil], new Set(), 1, 1, 1, 1, map, pumpJackPolicy) === "structure",
+    "Pump Jack placement preview rejects depleted oil nodes as ordinary resource blockers",
+  );
+  assert(
+    footprintPlacementBlocker([steelPatch], new Set(), 1, 1, 1, 1, map, pumpJackPolicy) === "structure",
+    "Pump Jack placement preview does not treat steel patches as valid oil sites",
   );
   assert(STATS[KIND.TANK].body.length === 50.4, "tank client body length mirrors server");
   assert(STATS[KIND.TANK].body.width === 28.8, "tank client body width mirrors server");
@@ -1141,6 +1162,26 @@ function buttonByLabel(card, label) {
       rightClickCommands[0].c === "gather" &&
       rightClickCommands[0].node === overlappingSteel.id,
     "worker right-click should prioritize an overlapped resource patch over the worker body",
+  );
+
+  const overlappingOil = { id: 32, owner: 0, kind: KIND.OIL, x: 112, y: 112, remaining: 1000 };
+  input.state = {
+    playerId: 1,
+    map: { tileSize: 32 },
+    entitiesInterpolated: () => [overlappingWorker, overlappingOil],
+    selectedEntities: () => [overlappingWorker],
+    addCommandFeedback() {},
+  };
+  rightClickCommands.length = 0;
+  input._onRightClick({ x: 112, y: 112 }, { shiftKey: true });
+  assert(
+    rightClickCommands.length === 1 &&
+      rightClickCommands[0].c === "build" &&
+      rightClickCommands[0].building === KIND.PUMP_JACK &&
+      rightClickCommands[0].tileX === 3 &&
+      rightClickCommands[0].tileY === 3 &&
+      rightClickCommands[0].queued === true,
+    "worker shift-right-click on oil should queue a Pump Jack build instead of direct gather",
   );
 
   const moveUnit = { id: 40, owner: 1, kind: KIND.RIFLEMAN, x: 120, y: 120 };

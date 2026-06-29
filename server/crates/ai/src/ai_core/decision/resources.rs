@@ -58,7 +58,11 @@ pub(super) fn plan_economy(
     } else {
         0
     };
-    let resource_counts = resource_worker_counts(observation);
+    let mut resource_counts = resource_worker_counts(observation);
+    let oil_extractors = availability.live_completed_extractor_count(EntityKind::Oil);
+    if oil_extractors > 0 {
+        *resource_counts.entry(EntityKind::Oil).or_default() += oil_extractors;
+    }
     let current_steel_workers = resource_counts
         .get(&EntityKind::Steel)
         .copied()
@@ -77,7 +81,7 @@ pub(super) fn plan_economy(
         current_steel_workers,
         current_oil_workers,
         resource_counts,
-        occupied_nodes: occupied_resource_nodes(observation),
+        occupied_nodes: availability.occupied_node_ids(),
         mineable_steel_nodes: availability.free_mineable_node_ids(EntityKind::Steel),
         mineable_oil_nodes: availability.free_mineable_node_ids(EntityKind::Oil),
         max_worker_resource_distance_px,
@@ -259,10 +263,146 @@ pub(super) fn resource_worker_counts(observation: &AiObservation) -> BTreeMap<En
 }
 
 pub(super) fn occupied_resource_nodes(observation: &AiObservation) -> BTreeSet<u32> {
-    observation
-        .owned
-        .iter()
-        .filter(|entity| entity.kind == EntityKind::Worker)
-        .filter_map(|worker| worker.latched_node)
-        .collect()
+    ResourceAvailability::from_observation(observation, &BTreeSet::new()).occupied_node_ids()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ai_core::facts::AiFacts;
+    use crate::ai_core::observation::{
+        AiEconomy, AiEntityState, AiEntitySummary, AiMapSummary, AiObservation, AiPlayerSummary,
+        AiResourceSummary,
+    };
+    use crate::ai_core::profiles::TECH_TO_TANKS;
+
+    fn entity(id: u32, kind: EntityKind, x: f32, y: f32) -> AiEntitySummary {
+        AiEntitySummary {
+            id,
+            owner: 1,
+            kind,
+            x,
+            y,
+            state: AiEntityState::Idle,
+            is_complete: true,
+            production_queue_len: None,
+            production_kind: None,
+            latched_node: None,
+            target_id: None,
+            free_for_combat: false,
+        }
+    }
+
+    fn pump_jack_at(id: u32, x: f32, y: f32, complete: bool) -> AiEntitySummary {
+        let mut entity = entity(id, EntityKind::PumpJack, x, y);
+        entity.is_complete = complete;
+        entity.state = if complete {
+            AiEntityState::Idle
+        } else {
+            AiEntityState::Construct
+        };
+        entity
+    }
+
+    fn oil(id: u32, x: f32, y: f32) -> AiResourceSummary {
+        AiResourceSummary {
+            id,
+            kind: EntityKind::Oil,
+            x,
+            y,
+            remaining: 1_000,
+        }
+    }
+
+    fn observation(owned: Vec<AiEntitySummary>, resources: Vec<AiResourceSummary>) -> AiObservation {
+        let tile_size = config::TILE_SIZE;
+        AiObservation {
+            player_id: 1,
+            tick: 90,
+            map: AiMapSummary {
+                width: 64,
+                height: 64,
+                tile_size,
+            },
+            economy: AiEconomy {
+                steel: 1_000,
+                oil: 1_000,
+                supply_used: 11,
+                supply_cap: 20,
+            },
+            own_start_tile: (8, 8),
+            players: vec![
+                AiPlayerSummary {
+                    id: 1,
+                    team_id: 1,
+                    start_tile: (8, 8),
+                    is_ai: true,
+                    is_alive: true,
+                },
+                AiPlayerSummary {
+                    id: 2,
+                    team_id: 2,
+                    start_tile: (48, 48),
+                    is_ai: false,
+                    is_alive: true,
+                },
+            ],
+            owned,
+            resources,
+            visible_allies: Vec::new(),
+            visible_enemies: Vec::new(),
+            pending_builds: Vec::new(),
+            upgrades: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn plan_counts_only_live_completed_pump_jacks_as_current_oil_workers() {
+        let ts = config::TILE_SIZE as f32;
+        let mut observation = observation(
+            vec![
+                entity(10, EntityKind::CityCentre, 8.5 * ts, 8.5 * ts),
+                pump_jack_at(60, 10.5 * ts, 12.5 * ts, false),
+            ],
+            vec![
+                oil(200, 10.5 * ts, 12.5 * ts),
+                oil(201, 11.5 * ts, 12.5 * ts),
+            ],
+        );
+        let facts = AiFacts::from_observation(&observation);
+
+        let plan = plan_economy(&observation, &facts, &TECH_TO_TANKS, false, Some(3));
+
+        assert_eq!(plan.desired_oil_workers, 3);
+        assert_eq!(
+            plan.current_oil_workers, 0,
+            "in-progress Pump Jacks reserve oil patches but are not current oil income"
+        );
+        assert_eq!(plan.mineable_oil_nodes, BTreeSet::from([201]));
+
+        let pump_jack = observation
+            .owned
+            .iter_mut()
+            .find(|entity| entity.id == 60)
+            .expect("pump jack should exist");
+        pump_jack.is_complete = true;
+        pump_jack.state = AiEntityState::Idle;
+        let facts = AiFacts::from_observation(&observation);
+        let plan = plan_economy(&observation, &facts, &TECH_TO_TANKS, false, Some(3));
+        assert_eq!(plan.current_oil_workers, 1);
+
+        observation
+            .resources
+            .iter_mut()
+            .find(|resource| resource.id == 200)
+            .expect("first oil should exist")
+            .remaining = 0;
+        let facts = AiFacts::from_observation(&observation);
+        let plan = plan_economy(&observation, &facts, &TECH_TO_TANKS, false, Some(3));
+        assert_eq!(
+            plan.current_oil_workers, 0,
+            "completed Pump Jacks on depleted oil must not satisfy current oil demand"
+        );
+        assert_eq!(plan.mineable_oil_nodes, BTreeSet::from([201]));
+    }
 }

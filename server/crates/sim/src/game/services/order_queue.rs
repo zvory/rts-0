@@ -604,7 +604,7 @@ fn gather_intent_valid(entities: &EntityStore, owner: u32, worker: u32, node: u3
         return false;
     }
     let node_ok = matches!(entities.get(node), Some(n)
-        if n.is_node() && n.remaining().unwrap_or(0) > 0);
+        if n.is_node() && n.kind != EntityKind::Oil && n.remaining().unwrap_or(0) > 0);
     if !node_ok {
         return false;
     }
@@ -953,6 +953,37 @@ mod tests {
         assert!(
             matches!(entity.order(), Order::Move(_)),
             "depleted gather should be skipped and the next move intent should promote"
+        );
+        assert!(entity.queued_orders().is_empty());
+    }
+
+    #[test]
+    fn queued_gather_on_oil_node_is_skipped() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let (cx, cy) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+        entities
+            .spawn_building(1, EntityKind::CityCentre, cx, cy, true)
+            .expect("city centre should spawn");
+        let node = entities
+            .spawn_node(EntityKind::Oil, cx + 64.0, cy)
+            .expect("oil node should spawn");
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, cx, cy + 16.0)
+            .expect("worker should spawn");
+        let fallback = (cx + 96.0, cy);
+        {
+            let w = entities.get_mut(worker).expect("worker should exist");
+            w.append_queued_order(OrderIntent::gather(node));
+            w.append_queued_order(OrderIntent::move_to(fallback.0, fallback.1));
+        }
+
+        promote(&map, &mut entities);
+
+        let entity = entities.get(worker).expect("worker should exist");
+        assert!(
+            matches!(entity.order(), Order::Move(_)),
+            "queued direct oil gather should be skipped and the next intent should promote"
         );
         assert!(entity.queued_orders().is_empty());
     }
