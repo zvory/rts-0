@@ -263,6 +263,9 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/services/commands/planner_facts.rs",
   "server/crates/sim/src/game/services/construction.rs",
   "server/crates/sim/src/game/services/economy.rs",
+  // Pump Jack extraction is a deliberate current-catalog oil special case until generic resource
+  // extractors exist in catalog data.
+  "server/crates/sim/src/game/services/economy/pump_jack.rs",
   "server/crates/sim/src/game/services/geometry.rs",
   "server/crates/sim/src/game/services/move_coordinator.rs",
   "server/crates/sim/src/game/services/movement/mod.rs",
@@ -277,6 +280,8 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/services/pathing.rs",
   "server/crates/sim/src/game/services/production.rs",
   "server/crates/sim/src/game/services/standability.rs",
+  // Pump Jack placement is deliberately constrained to current oil resource nodes.
+  "server/crates/sim/src/game/services/standability/pump_jack.rs",
   "server/crates/sim/src/game/services/world_query.rs",
   "server/crates/sim/src/game/setup.rs",
   "server/crates/sim/src/game/setup/dev_scenarios.rs",
@@ -306,8 +311,8 @@ const approvedSpecialCaseBudgets = new Map([
   // those helpers shrink or move behind catalog APIs.
   // Tank Trap phases add current-catalog construction eligibility and gameplay command handling
   // for a default-faction obstacle before a broader catalog API can absorb obstacle placement.
-  ["server/crates/rules/src/faction.rs", 89],
-  ["server/crates/rules/src/economy.rs", 106],
+  ["server/crates/rules/src/faction.rs", 90],
+  ["server/crates/rules/src/economy.rs", 109],
   ["server/crates/sim/src/game/setup.rs", 30],
   ["server/crates/sim/src/game/services/ability_orders.rs", 18],
   // Tank Trap deconstruction adds worker-only command validation and trap target admission.
