@@ -1,8 +1,7 @@
 //! Combat service.
 //!
-//! This module owns target acquisition, chase orders, weapon facing/setup, damage application,
-//! and combat events for a tick. It depends on read-only rules and derived spatial/LOS helpers,
-//! but all entity mutation for attacks flows through this service.
+//! This module owns target acquisition, chase orders, weapon facing/setup, damage, and combat
+//! events for a tick. It depends on read-only rules and derived spatial/LOS helpers.
 
 use std::collections::HashMap;
 
@@ -137,6 +136,7 @@ pub(in crate::game) fn combat_system(
         if let Some(e) = entities.get_mut(id) {
             e.tick_attack_cd();
             tick_deployed_weapon_setup(e);
+            weapons::tick_tank_stationary_range(e);
         }
     }
 
@@ -181,7 +181,7 @@ pub(in crate::game) fn combat_system(
             } else {
                 cd
             };
-            let range_px = range_tiles as f32 * config::TILE_SIZE as f32 + e.radius() + RANGE_SLACK;
+            let range_px = range_tiles * config::TILE_SIZE as f32 + e.radius() + RANGE_SLACK;
             // Aggro radius: mobile units detect and chase enemies out to their sight radius so
             // attack-move / auto-defend actually close the gap. Idle deployed weapons are the
             // exception: they hold position and only auto-acquire enemies already in weapon

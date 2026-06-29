@@ -3,12 +3,31 @@ use crate::game::entity::{Entity, EntityKind, EntityStore, MovePhase, Order, Wea
 use crate::game::services::movement::{angle_delta, rotate_toward};
 use crate::rules::combat as combat_rules;
 
+use super::projection::tank_effective_range_tiles;
 use super::{
     ANTI_TANK_GUN_FIRE_TOLERANCE_RAD, ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK,
     TANK_TURRET_FIRE_TOLERANCE_RAD, TANK_TURRET_TURN_RATE_RAD_PER_TICK,
 };
 
 const SUPPORT_WEAPON_ATTACK_MOVE_NO_TARGET_TICKS: u16 = config::TICK_HZ as u16;
+const TANK_STATIONARY_RANGE_RAMP_TICKS: u16 = config::TICK_HZ as u16 * 3;
+
+pub(super) fn tick_tank_stationary_range(e: &mut Entity) {
+    if e.kind != EntityKind::Tank || e.hp == 0 {
+        return;
+    }
+    let Some(c) = e.combat.as_mut() else {
+        return;
+    };
+    if c.tank_stationary_range_reset_this_tick {
+        c.tank_stationary_range_reset_this_tick = false;
+    } else {
+        c.tank_stationary_range_ticks = c
+            .tank_stationary_range_ticks
+            .saturating_add(1)
+            .min(TANK_STATIONARY_RANGE_RAMP_TICKS);
+    }
+}
 
 pub(super) fn rotate_vehicle_weapon_for_combat(e: &mut Entity, target_angle: f32) -> bool {
     if !target_angle.is_finite() {
@@ -227,24 +246,36 @@ pub(super) fn anti_tank_gun_can_chase(e: &Entity) -> bool {
         || matches!(e.weapon_setup(), WeaponSetup::Packed)
 }
 
-pub(super) fn effective_attack_profile(e: &Entity) -> combat_rules::AttackProfile {
-    let mut profile = combat_rules::attack_profile(e.kind);
+#[derive(Clone, Copy, Debug)]
+pub(super) struct EffectiveAttackProfile {
+    pub range_tiles: f32,
+    pub dmg: u32,
+    pub cooldown: u32,
+}
+
+pub(super) fn effective_attack_profile(e: &Entity) -> EffectiveAttackProfile {
+    let base = combat_rules::attack_profile(e.kind);
+    let mut profile = EffectiveAttackProfile {
+        range_tiles: tank_effective_range_tiles(e, base.range_tiles as f32),
+        dmg: base.dmg,
+        cooldown: base.cooldown,
+    };
     if e.kind != EntityKind::AntiTankGun {
         return profile;
     }
     match e.weapon_setup() {
         WeaponSetup::Packed => {
-            profile.range_tiles = config::ANTI_TANK_GUN_PACKED_RANGE_TILES;
+            profile.range_tiles = config::ANTI_TANK_GUN_PACKED_RANGE_TILES as f32;
             profile.dmg = ((profile.dmg as f32) * config::ANTI_TANK_GUN_PACKED_DAMAGE_MULTIPLIER)
                 .round() as u32;
         }
         WeaponSetup::Deployed => {
-            profile.range_tiles = config::ANTI_TANK_GUN_DEPLOYED_RANGE_TILES;
+            profile.range_tiles = config::ANTI_TANK_GUN_DEPLOYED_RANGE_TILES as f32;
         }
         WeaponSetup::SettingUp { .. }
         | WeaponSetup::TearingDown { .. }
         | WeaponSetup::TearingDownToRedeploy { .. } => {
-            profile.range_tiles = config::ANTI_TANK_GUN_PACKED_RANGE_TILES;
+            profile.range_tiles = config::ANTI_TANK_GUN_PACKED_RANGE_TILES as f32;
             profile.dmg = 0;
         }
     }

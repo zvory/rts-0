@@ -1,3 +1,4 @@
+use crate::config;
 use crate::game::entity::{Entity, EntityKind, EntityStore};
 use crate::game::map::Map;
 use crate::game::services::geometry::{
@@ -5,6 +6,23 @@ use crate::game::services::geometry::{
     unit_body_for_entity,
 };
 use crate::game::teams::TeamRelations;
+
+const TANK_STATIONARY_RANGE_MAX_TILES: f32 = 14.0;
+const TANK_STATIONARY_RANGE_RAMP_TICKS: u16 = config::TICK_HZ as u16 * 3;
+
+pub(super) fn tank_effective_range_tiles(e: &Entity, base_range_tiles: f32) -> f32 {
+    if e.kind != EntityKind::Tank {
+        return base_range_tiles;
+    }
+    let ramp_ticks = TANK_STATIONARY_RANGE_RAMP_TICKS.max(1);
+    let ticks = e
+        .combat
+        .as_ref()
+        .map_or(0, |c| c.tank_stationary_range_ticks)
+        .min(ramp_ticks);
+    let progress = ticks as f32 / ramp_ticks as f32;
+    base_range_tiles + (TANK_STATIONARY_RANGE_MAX_TILES - base_range_tiles) * progress
+}
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn resolve_shot_victim(

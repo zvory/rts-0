@@ -1046,7 +1046,7 @@ mod tests {
                 .unwrap()
                 .last()
                 .unwrap()["name"],
-            serde_json::json!("deconstructProgress")
+            serde_json::json!("weaponRangeTiles")
         );
     }
 

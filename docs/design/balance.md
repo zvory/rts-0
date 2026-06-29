@@ -209,10 +209,13 @@ Intended progression:
 The current implementation uses the themed unit/building names below. Combat is handled by the
 shared attack model plus the support-weapon setup/teardown state, tank turret aim gates, and
 tank hull-facing damage modifiers for anti-tank hits against tank victims. Tanks keep their active
-movement path while firing on either `Move` or `AttackMove` orders; riflemen upgraded with
-Methamphetamines gain permanent moving fire, keep advancing while firing with normal accuracy, and
-move at tank speed. Machine Gunners upgraded with Methamphetamines move at unupgraded Rifleman speed
-and use half-length setup/teardown timers; other mobile combat units
+movement path while firing on either `Move` or `AttackMove` orders and keep their base 5-tile
+weapon range while moving. After a tank has spent three seconds (90 ticks) without path-driven
+translation or hull rotation, its range has linearly expanded to 14 tiles; any later path-driven
+movement or hull rotation resets it to the base range. Riflemen upgraded with Methamphetamines gain
+permanent moving fire, keep advancing while firing with normal accuracy, and move at tank speed.
+Machine Gunners upgraded with Methamphetamines move at unupgraded Rifleman speed and use half-length
+setup/teardown timers; other mobile combat units
 still hold position once a target is in weapon range. Scout cars also fire while moving using an
 independent rear machine-gun facing. They are unarmored light vehicles and do not receive
 armored damage reduction, but anti-tank guns do not roll their infantry miss chance against them.
@@ -291,6 +294,9 @@ folded into default targeting.
 - `SCOUT_CAR_OIL_COST_PER_PX = 5 / (96 * TILE_SIZE)`: scout cars burn oil for movement at
   half the previous tank movement rate. Command Cars use this same movement-oil cost. Tanks, scout
   cars, and command cars cannot advance while their owner has zero oil.
+- Tank stationary range ramps from the base 5-tile weapon range to 14 tiles over
+  `TICK_HZ * 3` ticks. Movement-path translation or hull rotation resets the ramp; turret aiming,
+  collision shoves, and external pulls do not.
 - Human selection and command bandwidth is supply-based: `BASE_COMMAND_SUPPLY_CAP = 24` command
   supply plus `COMMAND_CAR_SUPPLY_CAP_BONUS = 20` and the Command Car's own command weight for each
   selected/commanded Command Car. Units use their mirrored supply as command weight, so current Tanks
@@ -414,7 +420,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 72 | 1.6 | 6     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and Anti-Tank Gun Crews (`anti_tank_gun_unlock`) researched in R&D Complex |
 | artillery       | 150 | 150 AP inner / 150-10 outer AOE | 15-55 point fire | 90 | 1.3 | 4 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind), Anti-Tank Gun Crews (`anti_tank_gun_unlock`), and Unlock Artillery (`artillery_unlock`) researched in R&D Complex; tank-sized footprint |
 | scout_car       | 100 | 6   | 5     | 6  | 2.35  | 10    | 125 | 50  | 3   | 480 (~16s) |
-| tank            | 292 | 60  | 5     | 72 | 2.0   | 6     | 425 | 150 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex |
+| tank            | 292 | 60  | 5 moving / 14 fully stationary | 72 | 2.0   | 6     | 425 | 150 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex |
 | command_car     | 225 | 0   | 0     | 0  | 2.35  | 10    | 150 | 75  | 4   | 450 (~15s); requires Vehicle Works (`factory` kind) and Command Car (`command_car_unlock`) researched in R&D Complex; no weapon; Scout Car-style movement with a smaller jeep-sized body |
 | ekat       | 150 | 0   | 0     | 0  | 1.6   | 9     | 0   | 0   | 0   | 0; Ekat faction hero; no default attack; no passive regeneration; consumes nearby Golems for recovery |
 

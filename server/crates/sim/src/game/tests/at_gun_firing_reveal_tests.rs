@@ -406,7 +406,7 @@ fn counterfire_against_firing_revealed_target_waits_one_second() {
 
 #[test]
 fn anti_tank_gun_firing_reveal_lasts_for_firing_cycle_plus_half_second() {
-    let (mut game, enemy_at, _tank) = hidden_enemy_at_gun_fixture();
+    let (mut game, enemy_at, tank) = hidden_enemy_at_gun_fixture();
     game.tick();
     let fired_at_tick = game.tick_count();
     let reveal_ticks = config::unit_stats(EntityKind::AntiTankGun)
@@ -417,6 +417,10 @@ fn anti_tank_gun_firing_reveal_lasts_for_firing_cycle_plus_half_second() {
     game.entities
         .get_mut(enemy_at)
         .expect("anti-tank gun should exist")
+        .set_attack_cd(u32::MAX);
+    game.entities
+        .get_mut(tank)
+        .expect("tank should exist")
         .set_attack_cd(u32::MAX);
 
     for _ in 1..reveal_ticks {
