@@ -402,6 +402,7 @@ export class HUD {
       countBadge: descriptor.countBadge,
       cooldownClocks: descriptor.cooldownClocks,
       repeatable: descriptor.repeatable,
+      autocastToggle: descriptor.contextIntent?.type === "setAutocast",
       onMouseEnter: descriptor.intent?.type === "ability"
         ? () => this._showAbilityHoverPreview(descriptor.intent.ability, descriptor.intent.readyIds || [])
         : null,

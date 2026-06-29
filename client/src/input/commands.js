@@ -480,29 +480,51 @@ export function _activateCommandHotkey(ev) {
     if ((btn.dataset.hotkey || "").toUpperCase() !== key) continue;
     if (ev.repeat && btn.dataset.repeatable !== "true") return false;
     ev.preventDefault();
-    if (!btn.disabled) {
-      if (typeof MouseEvent === "function" && typeof btn.dispatchEvent === "function") {
-        btn.dispatchEvent(new MouseEvent("click", {
-          bubbles: true,
-          cancelable: true,
-          altKey: !!ev.altKey,
-          ctrlKey: !!ev.ctrlKey,
-          metaKey: !!ev.metaKey,
-          shiftKey: !!ev.shiftKey,
-        }));
-      } else {
-        btn.click();
-      }
+    const autocastToggle = ev.altKey && btn.dataset.autocastToggle === "true";
+    if (autocastToggle) {
+      dispatchCommandButtonMouseEvent(btn, "contextmenu", ev);
+    } else if (!btn.disabled) {
+      dispatchCommandButtonMouseEvent(btn, "click", ev);
     }
     return {
       handled: true,
       commandId: btn.dataset.commandId || null,
       hotkey: btn.dataset.hotkey || null,
       slotIndex: btn.dataset.slotIndex != null ? Number(btn.dataset.slotIndex) : null,
+      autocastToggle,
       armed: clientIntent(this)?.lastCommandTargetArm || null,
     };
   }
   return false;
+}
+
+function dispatchCommandButtonMouseEvent(btn, type, ev) {
+  if (typeof MouseEvent === "function" && typeof btn.dispatchEvent === "function") {
+    btn.dispatchEvent(new MouseEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      altKey: !!ev.altKey,
+      ctrlKey: !!ev.ctrlKey,
+      metaKey: !!ev.metaKey,
+      shiftKey: !!ev.shiftKey,
+    }));
+    return;
+  }
+  if (typeof btn.dispatchEvent === "function") {
+    btn.dispatchEvent({
+      type,
+      bubbles: true,
+      cancelable: true,
+      altKey: !!ev.altKey,
+      ctrlKey: !!ev.ctrlKey,
+      metaKey: !!ev.metaKey,
+      shiftKey: !!ev.shiftKey,
+      preventDefault() {},
+      stopPropagation() {},
+    });
+    return;
+  }
+  if (type === "click" && typeof btn.click === "function") btn.click();
 }
 
 export function _quickCastCommandTarget(ev = {}) {

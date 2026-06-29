@@ -594,11 +594,78 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       mortarButtonCount > mortarButtonsBefore,
       "selected Mortar Team should render an ability command button",
     );
+    const coolingMortarButton = renderedButtons.find((button) => button.innerHTML.includes("Fire"));
+    assert(coolingMortarButton?.dataset.autocastToggle === "true", "Mortar Fire button exposes the autocast toggle hotkey action");
+    assert(coolingMortarButton?.disabled, "cooling-down Mortar Fire remains unavailable for manual fire");
+    globalThis.document.getElementById = (id) => {
+      assert(id === "command-card", "Mortar autocast hotkey should query the command card");
+      return {
+        querySelectorAll(selector) {
+          assert(selector === "button[data-hotkey]", "Mortar autocast hotkey should query hotkey buttons");
+          return [coolingMortarButton];
+        },
+      };
+    };
+    const disableAutocastEv = {
+      code: `Key${coolingMortarButton.dataset.hotkey}`,
+      altKey: true,
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      repeat: false,
+      preventDefault() { this.prevented = true; },
+    };
+    const input = Object.create(Input.prototype);
+    input.state = mortarHud.state;
+    const disableAutocastResult = input._activateCommandHotkey(disableAutocastEv);
+    const disableAutocastCommand = sent[sent.length - 1];
+    assert(disableAutocastResult?.autocastToggle === true, "Alt+Mortar Fire hotkey should take the autocast path");
+    assert(disableAutocastEv.prevented, "Alt+Mortar Fire hotkey should prevent browser handling");
+    assert(
+      disableAutocastCommand?.c === "setAutocast" &&
+        disableAutocastCommand.ability === ABILITY.MORTAR_FIRE &&
+        disableAutocastCommand.enabled === false &&
+        disableAutocastCommand.units[0] === selectedMortar.id,
+      "Alt+Mortar Fire hotkey should disable selected mortar autocast even while manual fire is cooling down",
+    );
+
     selectedMortar.abilities[0].cooldownLeft = 29;
     renderCommandCard(mortarHud);
     assert(
       renderedButtons.length === mortarButtonCount,
       "Mortar Fire cooldown ticks should update in place without rebuilding the command button",
+    );
+    selectedMortar.abilities[0].cooldownLeft = 0;
+    selectedMortar.abilities[0].autocastEnabled = false;
+    mortarHud._cardSig = null;
+    renderedButtons.length = 0;
+    renderCommandCard(mortarHud);
+    const readyMortarButton = renderedButtons.find((button) => button.innerHTML.includes("Fire"));
+    globalThis.document.getElementById = (id) => {
+      assert(id === "command-card", "Mortar autocast enable hotkey should query the command card");
+      return {
+        querySelectorAll(selector) {
+          assert(selector === "button[data-hotkey]", "Mortar autocast enable hotkey should query hotkey buttons");
+          return [readyMortarButton];
+        },
+      };
+    };
+    input._activateCommandHotkey({
+      code: `Key${readyMortarButton.dataset.hotkey}`,
+      altKey: true,
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      repeat: false,
+      preventDefault() {},
+    });
+    const enableAutocastCommand = sent[sent.length - 1];
+    assert(
+      enableAutocastCommand?.c === "setAutocast" &&
+        enableAutocastCommand.ability === ABILITY.MORTAR_FIRE &&
+        enableAutocastCommand.enabled === true &&
+        enableAutocastCommand.units[0] === selectedMortar.id,
+      "Alt+Mortar Fire hotkey should enable selected mortar autocast when it is currently off",
     );
 
     renderedButtons.length = 0;
@@ -706,7 +773,6 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
         },
       };
     };
-    const input = Object.create(Input.prototype);
     input.state = researchHud.state;
     const hotkeyEv = {
       code: "KeyQ",
