@@ -3,7 +3,7 @@
 //! The server is authoritative about visibility: each tick we recompute, for every player, a
 //! boolean grid of which tiles that player can currently see. A tile is visible if it falls
 //! within the sight area of any of that player's entities (`sight_tiles`) and the line from
-//! the entity to that tile is not blocked by stone, smoke, or non-Tank-Trap building footprints.
+//! the entity to that tile is not blocked by stone, smoke, or sight-blocking building footprints.
 //! Units stamp a circle from their body center; buildings stamp their full footprint plus
 //! `sight_tiles` around the footprint edge. The snapshot layer uses this to withhold neutral/enemy
 //! entities standing on non-visible tiles, making the fog cheat-proof.
@@ -16,11 +16,11 @@ use std::collections::HashMap;
 
 use crate::config;
 use crate::game::entity::{blocks_line_of_sight, Entity, EntityStore};
+use crate::game::firing_reveal::FiringRevealSource;
 use crate::game::map::Map;
 use crate::game::services::line_of_sight::LineOfSight;
 use crate::game::services::occupancy::building_footprint;
 use crate::game::smoke::SmokeCloudStore;
-use crate::game::FiringRevealSource;
 
 /// Temporary sight left behind by an owned unit/building after it dies. This is used only by
 /// snapshot projection; command validation and combat still use live fog.
@@ -192,7 +192,7 @@ impl Fog {
         reveal_visible_building_footprints(&mut self.grids, &building_mask);
     }
 
-    pub(crate) fn stamp_firing_reveal_sources_with_smoke(
+    pub(in crate::game) fn stamp_firing_reveal_sources_with_smoke(
         &mut self,
         sources: &[FiringRevealSource],
         store: &EntityStore,

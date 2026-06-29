@@ -689,11 +689,26 @@ impl Entity {
 
     pub fn set_target_id(&mut self, target_id: Option<u32>) {
         if let Some(c) = self.combat.as_mut() {
+            if c.target_id != target_id {
+                c.firing_reveal_response_target = None;
+            }
             c.target_id = target_id;
             if target_id.is_some() {
                 c.attack_move_no_target_ticks = 0;
             }
         }
+    }
+
+    pub fn start_firing_reveal_response_delay(&mut self, target_id: u32, ticks: u32) -> bool {
+        let Some(c) = self.combat.as_mut() else {
+            return false;
+        };
+        if ticks == 0 || c.firing_reveal_response_target == Some(target_id) {
+            return false;
+        }
+        c.firing_reveal_response_target = Some(target_id);
+        c.attack_cd = c.attack_cd.saturating_add(ticks);
+        true
     }
 
     pub fn reset_attack_move_no_target_ticks(&mut self) {
