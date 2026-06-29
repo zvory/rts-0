@@ -394,3 +394,43 @@ fn spawn_resource_distances_are_fair_and_symmetric() {
         }
     }
 }
+
+#[test]
+fn generated_oil_nodes_spawn_at_tile_centers() {
+    for player_count in 1..=4 {
+        let players: Vec<PlayerInit> = (1..=player_count)
+            .map(|id| PlayerInit {
+                id,
+                team_id: id,
+                faction_id: "kriegsia".to_string(),
+                name: format!("P{id}"),
+                color: "#fff".into(),
+                is_ai: false,
+            })
+            .collect();
+
+        for seed in [0, 1, 0x1234_5678] {
+            let game = Game::new_for_replay(&players, seed);
+            let mut oil_count = 0;
+            for oil in game.entities.iter().filter(|entity| entity.kind == EntityKind::Oil) {
+                oil_count += 1;
+                let (tile_x, tile_y) = game.map.tile_of(oil.pos_x, oil.pos_y);
+                let (center_x, center_y) = game.map.tile_center(tile_x, tile_y);
+                assert!(
+                    (oil.pos_x - center_x).abs() < 0.001
+                        && (oil.pos_y - center_y).abs() < 0.001,
+                    "oil node {} should be centered on tile ({tile_x}, {tile_y}), got ({:.3}, {:.3}) vs center ({:.3}, {:.3})",
+                    oil.id,
+                    oil.pos_x,
+                    oil.pos_y,
+                    center_x,
+                    center_y
+                );
+            }
+            assert!(
+                oil_count > 0,
+                "generated games should include oil nodes for player count {player_count}"
+            );
+        }
+    }
+}
