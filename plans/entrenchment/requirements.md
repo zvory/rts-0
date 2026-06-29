@@ -15,8 +15,9 @@ leave persistent trench ground that either side can later use.
 - Entrenchment costs 100 steel and 0 oil.
 - Entrenchment takes 10 seconds to research.
 - Once researched, that player's eligible infantry can create new trenches by staying stationary.
-- Existing trenches are neutral battlefield terrain. Eligible infantry from any player or allied
-  team can use an existing trench even if that player has not researched Entrenchment.
+- Existing trenches are neutral battlefield terrain. Eligible infantry from any player, including
+  enemies and allies, can use an existing trench even if that player's team has not researched
+  Entrenchment.
 
 ## Eligible Units
 
@@ -24,7 +25,8 @@ leave persistent trench ground that either side can later use.
 - Machine Gunners are eligible.
 - Workers/Engineers are eligible.
 - Mortar Teams are not eligible.
-- Ekat, Golems, and the Ekat faction are ignored for this feature.
+- Ekat, Golems, and the Ekat faction are ignored for this feature. No Ekat unit can create or
+  benefit from trenches in this feature pass unless a later Ekat requirement explicitly changes it.
 - Vehicles, buildings, support weapons other than Machine Gunners, and non-infantry entities are
   not eligible.
 
@@ -44,6 +46,8 @@ leave persistent trench ground that either side can later use.
 - Eligible infantry stopped slightly offset from an existing trench should slot into the trench.
 - Slotting movement is a small positional correction toward the trench and does not count as
   movement for entrenchment purposes.
+- Slotting must preserve normal unit collision and spacing. It should not stack multiple units on
+  one exact point or pull a unit through blockers.
 - A unit being slotted into a trench can still shoot.
 - A unit moving normally through or past a trench does not receive entrenchment benefits until it
   stops and occupies the trench.
@@ -58,9 +62,11 @@ An eligible infantry unit receives these benefits only while it is stationary in
 - Projectiles do not over-penetrate through it.
 - It does not take secondary over-penetration damage.
 
-Methamphetamines and Entrenchment can both affect the same Rifleman. A Rifleman keeps the
-Methamphetamines fire-rate benefit while entrenched, but Entrenchment benefits apply only while the
-unit is stationary in a trench.
+Entrenchment does not suppress other researched upgrade effects unless explicitly stated.
+Methamphetamines-upgraded Riflemen keep their faster attack cadence while entrenched, but their
+moving-fire and movement-speed benefits do not make a moving Rifleman entrenched. Machine Gunners
+upgraded by Methamphetamines keep their faster setup/teardown and movement-speed rules, but
+Entrenchment benefits apply only while the unit is stationary in a trench.
 
 ## Area Damage
 
