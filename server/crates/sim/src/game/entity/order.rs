@@ -8,6 +8,13 @@ pub const MAX_QUEUED_ORDERS: usize = 8;
 /// Number of simulation ticks a waiting build order may tolerate a relevant unit blocker.
 pub(super) const BUILD_UNIT_BLOCK_GRACE_TICKS: u32 = config::TICK_HZ * 3;
 
+pub(crate) fn tank_trap_deconstruction_ticks() -> u32 {
+    config::building_stats(EntityKind::TankTrap)
+        .map(|stats| stats.build_ticks.saturating_add(1) / 2)
+        .filter(|ticks| *ticks > 0)
+        .unwrap_or(config::TICK_HZ * 5)
+}
+
 /// The high-level order a unit/building is currently executing.
 ///
 /// Orders drive the per-tick systems. Buildings only ever sit in [`Order::Idle`]; their

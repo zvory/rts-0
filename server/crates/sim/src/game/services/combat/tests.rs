@@ -19,6 +19,7 @@ use rand::SeedableRng;
 mod mortar_autocast;
 mod moving_fire_policy;
 mod retention;
+mod support_weapon_attack_move;
 mod tank_traps;
 fn rifleman_with_enemy() -> (EntityStore, u32, u32) {
     let mut entities = EntityStore::new();
@@ -234,9 +235,13 @@ fn run_combat_tick_on_map_with_seed_and_smokes(
 
 fn run_movement_tick(entities: &mut EntityStore) {
     let map = Map::generate(2, 0x00C0_FFEE);
-    let occ = Occupancy::build(&map, entities);
+    run_movement_tick_on_map(entities, &map, 0);
+}
+
+fn run_movement_tick_on_map(entities: &mut EntityStore, map: &Map, tick: u32) {
+    let occ = Occupancy::build(map, entities);
     let spatial = SpatialIndex::build(entities, map.size);
-    movement_system(&map, entities, &mut [], &occ, &spatial, 0);
+    movement_system(map, entities, &mut [], &occ, &spatial, tick);
 }
 
 #[allow(clippy::too_many_arguments)]

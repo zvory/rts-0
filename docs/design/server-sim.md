@@ -687,7 +687,9 @@ General rules:
   bias when open space exists; vehicles remain hard-blocked by Tank Traps. Attack-move target
   acquisition remains stricter while the movement path is active: it chooses currently fireable
   targets first, and only uses out-of-range acquisition/chase targets when no current target is
-  fireable.
+  fireable. Setup weapons that stopped to engage during an unfinished attack-move keep their
+  emplacement for a one-second no-target grace period; if the attack-move order still exists after
+  that grace, they tear down and continue toward the original attack-move destination.
 - Active moving-fire `Move` and `AttackMove` orders preserve the player-issued destination while
   they are still in `MovePhase::AwaitingPath`, `Moving`, or `PathFailed`. Their auto-acquisition is
   opportunistic: it may retain, aim at, expose, and fire on targets that are currently inside
@@ -773,9 +775,9 @@ Allocation rules:
   closest worker. Work assignment load is the worker's current queued-order count plus one when its
   active order is already a build or deconstruct intent. Deconstruct targets must be completed Tank
   Traps; friendly/allied traps are always legal targets for their team's workers, while enemy traps
-  must be visible when accepted or promoted. Deconstruction takes the Tank Trap's build time, is not
-  accelerated by assigning multiple workers to the same trap, and refunds the Tank Trap cost to the
-  deconstructing player.
+  must be visible when accepted or promoted. Deconstruction takes half of the Tank Trap's build
+  time, is not accelerated by assigning multiple workers to the same trap, and refunds the Tank Trap
+  cost to the deconstructing player.
 - Legacy Charge has no eligible carriers after the Methamphetamines research conversion. It remains
   decodable for old command logs but does not create queued/immediate ability work, cooldowns, or
   runtime status.

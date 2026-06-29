@@ -309,6 +309,8 @@
         "scripts/phase-runner*.mjs",
         "scripts/phase-runner.sh",
         "scripts/agent-pr.sh",
+        "scripts/adversarial-quality-pass.mjs",
+        "scripts/adversarial-quality-pass.schema.json",
         "scripts/wait-pr.sh",
         "scripts/pr-sweep.sh",
         "docs/pr-first-workflow.md"

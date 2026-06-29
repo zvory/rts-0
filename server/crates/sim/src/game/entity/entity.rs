@@ -199,6 +199,7 @@ impl Entity {
         if let Some(m) = self.movement.as_mut() {
             m.order = order;
         }
+        self.reset_attack_move_no_target_ticks();
     }
 
     /// Replace only the active order. Future queued intents remain intact.
@@ -214,6 +215,7 @@ impl Entity {
             m.scout_car_reverse_waypoint = None;
         }
         self.set_target_id(None);
+        self.reset_attack_move_no_target_ticks();
     }
 
     #[allow(dead_code)]
@@ -475,6 +477,15 @@ impl Entity {
         Some(order.execution.progress)
     }
 
+    pub fn deconstruction_progress(&self) -> Option<u32> {
+        let m = self.movement.as_ref()?;
+        let Order::Deconstruct(order) = &m.order else {
+            return None;
+        };
+        (order.execution.phase == DeconstructPhase::Deconstructing)
+            .then_some(order.execution.progress)
+    }
+
     pub fn path_is_empty(&self) -> bool {
         self.movement
             .as_ref()
@@ -679,7 +690,24 @@ impl Entity {
     pub fn set_target_id(&mut self, target_id: Option<u32>) {
         if let Some(c) = self.combat.as_mut() {
             c.target_id = target_id;
+            if target_id.is_some() {
+                c.attack_move_no_target_ticks = 0;
+            }
         }
+    }
+
+    pub fn reset_attack_move_no_target_ticks(&mut self) {
+        if let Some(c) = self.combat.as_mut() {
+            c.attack_move_no_target_ticks = 0;
+        }
+    }
+
+    pub fn increment_attack_move_no_target_ticks(&mut self) -> u16 {
+        let Some(c) = self.combat.as_mut() else {
+            return 0;
+        };
+        c.attack_move_no_target_ticks = c.attack_move_no_target_ticks.saturating_add(1);
+        c.attack_move_no_target_ticks
     }
 
     pub fn weapon_facing(&self) -> Option<f32> {
@@ -1165,6 +1193,7 @@ impl Entity {
         }
         self.set_target_id(None);
         self.reset_artillery_accuracy();
+        self.reset_attack_move_no_target_ticks();
     }
 
     /// Clear active/queued movement and enter a no-chase hold-position stance.
@@ -1179,6 +1208,7 @@ impl Entity {
         }
         self.set_target_id(None);
         self.reset_artillery_accuracy();
+        self.reset_attack_move_no_target_ticks();
     }
 
     /// Reset only the active order (idle + clear path + drop target latch). Leaves any
@@ -1192,6 +1222,7 @@ impl Entity {
             m.last_move_delta = (0.0, 0.0);
         }
         self.set_target_id(None);
+        self.reset_attack_move_no_target_ticks();
     }
 }
 

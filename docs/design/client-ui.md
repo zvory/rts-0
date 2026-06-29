@@ -69,6 +69,7 @@ src/
   app.js          # Lobby/app shell lifecycle and persistent Net/Audio ownership
   match.js        # Match lifecycle, module dependency wiring, render loop, transient events
   match_combat_audio.js # Match-owned combat sound routing and machine-gunner sound cleanup
+  match_live_pause.js # live pause state actions and prediction visual suspension
   match_net_reporter.js # Match ping cadence and client net-report upload collaborator
   match_settings_context.js # Match settings action/tab context builder
   frame_recovery.js # Frame-loop soft-failure logging and rescheduling diagnostics
@@ -1155,10 +1156,12 @@ selection rings):
   visual intel only.
 - Buildings: footprint-sized blocky field structures with neutral geometry and plain
   two-letter stencils; under construction → translucent with a progress bar; production →
-  small progress arc. Tank Traps render as neutral steel I-beam hedgehogs with deterministic per-id
-  rotation. Owned scaffolds may locally extrapolate `buildProgress` only while the latest
-  authoritative snapshot marks them `buildActive`; the display clamps below completion and never
-  unlocks supply, tech, production, pathing, or command behavior before the server snapshot.
+  small progress arc. Tank Trap deconstruction uses the same base progress-bar placement but drains
+  from full to empty via `deconstructProgress`. Tank Traps render as neutral steel I-beam hedgehogs
+  with deterministic per-id rotation. Owned scaffolds may locally extrapolate `buildProgress` only
+  while the latest authoritative snapshot marks them `buildActive`; the display clamps below
+  completion and never unlocks supply, tech, production, pathing, or command behavior before the
+  server snapshot.
 - Resource nodes: steel = tan supply crates; oil = olive fuel drums; show last-known remaining
   from `resourceDeltas` via size/opacity. When a worker is selected and the cursor hovers a
   resource, draw a blue circle on the resource when the nearest completed own City Centre

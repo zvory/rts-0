@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "verdict",
+    "summary",
+    "issues_found",
+    "changes_made",
+    "verification",
+    "remaining_concerns"
+  ],
+  "properties": {
+    "verdict": {
+      "type": "string",
+      "enum": [
+        "passed_unchanged",
+        "improved",
+        "improved_with_concerns"
+      ]
+    },
+    "summary": {
+      "type": "string"
+    },
+    "issues_found": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "changes_made": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "verification": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "remaining_concerns": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

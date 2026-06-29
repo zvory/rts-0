@@ -160,6 +160,10 @@ export function validateOptions(options) {
   }
 }
 
+export function phaseBaseRefForRun({ dryRun, baseBranch, baseBranchAvailable }) {
+  return dryRun && !baseBranchAvailable ? "HEAD" : baseBranch;
+}
+
 export function parsePhase(raw) {
   const label = String(raw || "").replace(/^phase-/, "");
   const match = /^([0-9]+)(?:\.([0-9]+))?([a-z])?$/.exec(label);
@@ -578,6 +582,20 @@ export class Runner {
     this.gitInherit(["merge", "--ff-only", `origin/${baseBranch}`], { cwd: repoRoot });
   }
 
+  resolvePhaseBaseRef(options, repoRoot) {
+    const baseBranchAvailable =
+      this.runStatus("git", ["rev-parse", "--verify", "--quiet", options.baseBranch], { cwd: repoRoot }) === 0;
+    const phaseBaseRef = phaseBaseRefForRun({
+      dryRun: options.dryRun,
+      baseBranch: options.baseBranch,
+      baseBranchAvailable,
+    });
+    if (phaseBaseRef !== options.baseBranch) {
+      this.log(`phase-runner: dry run base ${options.baseBranch} is unavailable; previewing from HEAD`);
+    }
+    return phaseBaseRef;
+  }
+
   getPrJson(branch, options, cwd) {
     return this.runCapture(
       options.ghBin,
@@ -695,7 +713,7 @@ export class Runner {
         this.log(`phase-runner: syncing local ${options.baseBranch} from origin/${options.baseBranch} before ${phaseId}`);
         this.syncMain(options.baseBranch, repoRoot);
       }
-      const phaseBaseRef = options.baseBranch;
+      const phaseBaseRef = this.resolvePhaseBaseRef(options, repoRoot);
       const phaseBaseCommit = this.git(["rev-parse", phaseBaseRef], { cwd: repoRoot });
       const prompt = renderPrompt({ planName: options.planName, phaseId, branch });
       const phaseStart = Date.now();
@@ -780,7 +798,7 @@ export class Runner {
         throw new Error(`phase-runner: ${phaseId} reported completed but did not mark the phase document done`);
       }
 
-      const phaseHead = this.git(["-C", layout.worktreePath, "rev-parse", "HEAD"], { cwd: repoRoot });
+      let phaseHead = this.git(["-C", layout.worktreePath, "rev-parse", "HEAD"], { cwd: repoRoot });
       this.log(`phase-runner: executor committed ${branch} at ${phaseHead}`);
       this.log(`phase-runner: pushing ${branch} to origin`);
       this.gitInherit(["-C", layout.worktreePath, "push", "-u", "origin", branch], { cwd: repoRoot });
@@ -801,6 +819,11 @@ export class Runner {
         ],
         { cwd: layout.worktreePath, env: { GH_BIN: options.ghBin } },
       );
+      const postQualityHead = this.git(["-C", layout.worktreePath, "rev-parse", "HEAD"], { cwd: repoRoot });
+      if (postQualityHead !== phaseHead) {
+        this.log(`phase-runner: quality pass updated ${branch} from ${phaseHead} to ${postQualityHead}`);
+        phaseHead = postQualityHead;
+      }
 
       const prJson = this.getPrJson(branch, options, layout.worktreePath);
       let pr;

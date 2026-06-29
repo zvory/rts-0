@@ -33,6 +33,7 @@ pub use order::{
     MoveOrder, MovePhase, Order, OrderIntent, PointIntent, RallyIntent, RallyKind, TargetIntent,
     MAX_QUEUED_ORDERS,
 };
+pub(crate) use order::tank_trap_deconstruction_ticks;
 #[cfg(test)]
 pub use state::EntityStateGroups;
 #[allow(unused_imports)]

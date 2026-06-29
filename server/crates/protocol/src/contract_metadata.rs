@@ -706,6 +706,7 @@ fn compact_slot_schemas() -> CompactSlotSchemas {
             optional_field(27, "rallyPlan"),
             optional_code_field(28, "prodUpgrade", "upgrade"),
             optional_field(29, "buildActive"),
+            optional_field(30, "deconstructProgress"),
         ],
         event: event_slot_schemas(),
         ability_object: vec![
