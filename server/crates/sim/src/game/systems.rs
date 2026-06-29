@@ -24,8 +24,8 @@ use std::collections::{BTreeSet, HashMap};
 use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::artillery::ArtilleryShellStore;
 use crate::game::entity::EntityStore;
+use crate::game::firing_reveal::FiringRevealSource;
 use crate::game::fog::{Fog, LingeringSightSource};
-use crate::game::FiringRevealSource;
 use crate::game::map::Map;
 use crate::game::mortar::MortarShellStore;
 use crate::game::services;
@@ -278,7 +278,7 @@ pub(crate) fn run_tick(
     });
     crate::perf::timed(perf.as_deref_mut(), "mortar_impacts", || {
         let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
-        mortar_shells.resolve_due(map, entities, &teams, fog, events, tick);
+        mortar_shells.resolve_due(map, entities, &teams, fog, events, firing_reveals, tick);
     });
     crate::perf::timed(perf.as_deref_mut(), "artillery_impacts", || {
         let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));

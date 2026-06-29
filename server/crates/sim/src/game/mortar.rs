@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::config;
 use crate::game::entity::{Entity, EntityKind, EntityStore};
+use crate::game::firing_reveal::{record_mortar_impact_firing_reveals, FiringRevealSource};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::dist2;
@@ -113,20 +114,21 @@ impl MortarShellStore {
         );
     }
 
-    pub(crate) fn resolve_due(
+    pub(in crate::game) fn resolve_due(
         &mut self,
         map: &Map,
         entities: &mut EntityStore,
         teams: &TeamRelations,
         fog: &Fog,
         events: &mut HashMap<u32, Vec<Event>>,
+        firing_reveals: &mut Vec<FiringRevealSource>,
         tick: u32,
     ) {
         let mut pending = Vec::new();
         let due = std::mem::take(&mut self.shells);
         for shell in due {
             if shell.impact_tick <= tick {
-                resolve_shell(map, entities, teams, fog, events, &shell, tick);
+                resolve(map, entities, teams, fog, events, firing_reveals, &shell, tick);
             } else {
                 pending.push(shell);
             }
@@ -169,12 +171,13 @@ fn emit_launch(
     }
 }
 
-fn resolve_shell(
+fn resolve(
     _map: &Map,
     entities: &mut EntityStore,
     teams: &TeamRelations,
     fog: &Fog,
     events: &mut HashMap<u32, Vec<Event>>,
+    firing_reveals: &mut Vec<FiringRevealSource>,
     shell: &MortarShell,
     tick: u32,
 ) {
@@ -229,6 +232,17 @@ fn resolve_shell(
     }
     reveal_recipients.sort_unstable();
     reveal_recipients.dedup();
+    record_mortar_impact_firing_reveals(
+        firing_reveals,
+        events,
+        fog,
+        teams,
+        &reveal_recipients,
+        shell.owner,
+        shell.attacker,
+        reveal.as_ref(),
+        tick,
+    );
     emit_impact(
         events,
         fog,
