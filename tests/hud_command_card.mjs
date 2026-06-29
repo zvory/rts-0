@@ -56,13 +56,13 @@ function buttonSlots(card) {
 {
   const ids = slotIds(rAndDCard());
   assert.equal(ids[0], `research:${UPGRADE.ANTI_TANK_GUN_UNLOCK}`);
-  assert.equal(ids[1], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
-  assert.equal(ids[2], `research:${UPGRADE.TANK_UNLOCK}`);
+  assert.equal(ids[1], `research:${UPGRADE.TANK_UNLOCK}`);
+  assert.equal(ids[2], `research:${UPGRADE.COMMAND_CAR_UNLOCK}`);
   assert.equal(ids[3], `research:${UPGRADE.MORTAR_AUTOCAST}`);
   assert.deepEqual(slotCommandIds(rAndDCard()).slice(0, 4), [
     kriegsiaCommandId("research", UPGRADE.ANTI_TANK_GUN_UNLOCK),
-    kriegsiaCommandId("research", UPGRADE.ARTILLERY_UNLOCK),
     kriegsiaCommandId("research", UPGRADE.TANK_UNLOCK),
+    kriegsiaCommandId("research", UPGRADE.COMMAND_CAR_UNLOCK),
     kriegsiaCommandId("research", UPGRADE.MORTAR_AUTOCAST),
   ]);
 }
@@ -70,16 +70,16 @@ function buttonSlots(card) {
 {
   const ids = slotIds(rAndDCard([UPGRADE.ANTI_TANK_GUN_UNLOCK]));
   assert.equal(ids[0], null);
-  assert.equal(ids[1], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
-  assert.equal(ids[2], `research:${UPGRADE.TANK_UNLOCK}`);
+  assert.equal(ids[1], `research:${UPGRADE.TANK_UNLOCK}`);
+  assert.equal(ids[2], `research:${UPGRADE.COMMAND_CAR_UNLOCK}`);
   assert.equal(ids[3], `research:${UPGRADE.MORTAR_AUTOCAST}`);
 }
 
 {
-  const ids = slotIds(rAndDCard([UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.ARTILLERY_UNLOCK]));
+  const ids = slotIds(rAndDCard([UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.TANK_UNLOCK]));
   assert.equal(ids[0], null);
   assert.equal(ids[1], null);
-  assert.equal(ids[2], `research:${UPGRADE.TANK_UNLOCK}`);
+  assert.equal(ids[2], `research:${UPGRADE.COMMAND_CAR_UNLOCK}`);
   assert.equal(ids[3], `research:${UPGRADE.MORTAR_AUTOCAST}`);
 }
 

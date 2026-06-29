@@ -130,7 +130,7 @@ pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
 pub fn required_for_unit(unit: EntityKind) -> Option<UpgradeKind> {
     match unit {
         EntityKind::AntiTankGun => Some(UpgradeKind::AntiTankGunUnlock),
-        EntityKind::Artillery => Some(UpgradeKind::ArtilleryUnlock),
+        EntityKind::Artillery => Some(UpgradeKind::AntiTankGunUnlock),
         EntityKind::Tank => Some(UpgradeKind::TankUnlock),
         EntityKind::CommandCar => Some(UpgradeKind::CommandCarUnlock),
         _ => None,

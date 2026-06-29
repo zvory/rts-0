@@ -148,10 +148,6 @@ const DEFAULT_UPGRADES: &[UpgradeCatalogEntry] = &[
         researched_at: EntityKind::ResearchComplex,
     },
     UpgradeCatalogEntry {
-        id: ARTILLERY_UNLOCK_UPGRADE,
-        researched_at: EntityKind::ResearchComplex,
-    },
-    UpgradeCatalogEntry {
         id: TANK_UNLOCK_UPGRADE,
         researched_at: EntityKind::ResearchComplex,
     },
@@ -622,6 +618,14 @@ mod tests {
             ]
         );
         assert!(catalog.allows_research(METHAMPHETAMINES_UPGRADE, EntityKind::TrainingCentre));
+        assert!(catalog.allows_research(
+            ANTI_TANK_GUN_UNLOCK_UPGRADE,
+            EntityKind::ResearchComplex
+        ));
+        assert!(!catalog.allows_research(
+            ARTILLERY_UNLOCK_UPGRADE,
+            EntityKind::ResearchComplex
+        ));
         assert!(catalog.allows_research(TANK_UNLOCK_UPGRADE, EntityKind::ResearchComplex));
         assert!(!catalog.allows_research(TANK_UNLOCK_UPGRADE, EntityKind::TrainingCentre));
         assert!(catalog.allows_building(EntityKind::TankTrap));
