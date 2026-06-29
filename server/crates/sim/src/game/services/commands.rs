@@ -42,9 +42,13 @@ const MAX_UNITS_PER_COMMAND: usize = 256;
 const LAB_MAX_UNITS_PER_COMMAND: usize = 4096;
 const MAX_RALLY_STAGES: usize = 4;
 
+mod artillery_scatter;
 mod guards;
 mod planner_facts;
 
+#[cfg(test)]
+use self::artillery_scatter::artillery_error_tiles;
+use self::artillery_scatter::artillery_scattered_point;
 use self::guards::{
     dedupe_cap_units, is_constructing, player_is_ai, rally_intent_for_map,
     unit_can_accept_player_command,
@@ -1455,67 +1459,6 @@ fn try_fire_artillery(
         }
     }
     true
-}
-
-#[allow(clippy::too_many_arguments)]
-fn artillery_scattered_point(
-    unit: u32,
-    tick: u32,
-    origin_x: f32,
-    origin_y: f32,
-    x: f32,
-    y: f32,
-    shot_number: u16,
-    ballistic_tables_researched: bool,
-) -> (f32, f32) {
-    let error_tiles = artillery_error_tiles(
-        origin_x,
-        origin_y,
-        x,
-        y,
-        shot_number,
-        ballistic_tables_researched,
-    );
-    let radius_px = error_tiles.max(0.0) * config::TILE_SIZE as f32;
-    if radius_px <= f32::EPSILON {
-        return (x, y);
-    }
-    let seed = unit
-        .wrapping_mul(1_103_515_245)
-        .wrapping_add(tick)
-        .wrapping_add((shot_number as u32).wrapping_mul(97_531));
-    let angle = (seed as f32 * 1.618_034).rem_euclid(std::f32::consts::TAU);
-    let radial = (((seed.rotate_left(13) >> 8) & 1023) as f32 / 1023.0).sqrt() * radius_px;
-    (x + angle.cos() * radial, y + angle.sin() * radial)
-}
-
-fn artillery_error_tiles(
-    origin_x: f32,
-    origin_y: f32,
-    x: f32,
-    y: f32,
-    shot_number: u16,
-    ballistic_tables_researched: bool,
-) -> f32 {
-    let distance_tiles = dist2(origin_x, origin_y, x, y).sqrt() / config::TILE_SIZE as f32;
-    let range_span = (config::ARTILLERY_MAX_RANGE_TILES - config::ARTILLERY_MIN_RANGE_TILES)
-        .max(1) as f32;
-    let range_progress = if distance_tiles.is_finite() {
-        ((distance_tiles - config::ARTILLERY_MIN_RANGE_TILES as f32) / range_span).clamp(0.0, 1.0)
-    } else {
-        1.0
-    };
-    let starting_error = config::ARTILLERY_MIN_RANGE_ERROR_TILES
-        + (config::ARTILLERY_MAX_RANGE_ERROR_TILES - config::ARTILLERY_MIN_RANGE_ERROR_TILES)
-            * range_progress;
-    if !ballistic_tables_researched {
-        return starting_error;
-    }
-    let max_step = config::ARTILLERY_ACCURACY_SHOTS_TO_MIN
-        .saturating_sub(1)
-        .max(1) as f32;
-    let progress = (shot_number.saturating_sub(1) as f32 / max_step).clamp(0.0, 1.0);
-    starting_error + (config::ARTILLERY_MIN_ERROR_TILES - starting_error) * progress
 }
 
 pub(crate) fn artillery_point_fire_system(
