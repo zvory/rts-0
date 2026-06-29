@@ -79,47 +79,36 @@ import {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
+const cargoTargetDir = path.resolve(repoRoot, process.env.CARGO_TARGET_DIR ?? path.join("server", "target"));
+const executableSuffix = process.platform === "win32" ? ".exe" : "";
+const dumpFactionCatalogBin = path.join(cargoTargetDir, "debug", `dump-faction-catalog${executableSuffix}`);
+const dumpCommandBudgetBin = path.join(cargoTargetDir, "debug", `dump-command-budget${executableSuffix}`);
 
-const rustCatalog = JSON.parse(execFileSync("cargo", [
-  "run",
+execFileSync("cargo", [
+  "build",
   "--manifest-path",
   "server/Cargo.toml",
   "-p",
   "rts-rules",
-  "--bin",
-  "dump-faction-catalog",
+  "-p",
+  "rts-sim",
+  "--bins",
   "--quiet",
-], {
+], { cwd: repoRoot, stdio: "inherit" });
+
+const rustCatalog = JSON.parse(execFileSync(dumpFactionCatalogBin, [], {
   cwd: repoRoot,
   encoding: "utf8",
 }));
 
-const allRustCatalogs = JSON.parse(execFileSync("cargo", [
-  "run",
-  "--manifest-path",
-  "server/Cargo.toml",
-  "-p",
-  "rts-rules",
-  "--bin",
-  "dump-faction-catalog",
-  "--quiet",
-  "--",
+const allRustCatalogs = JSON.parse(execFileSync(dumpFactionCatalogBin, [
   "--all",
 ], {
   cwd: repoRoot,
   encoding: "utf8",
 }));
 
-const rustCommandBudget = JSON.parse(execFileSync("cargo", [
-  "run",
-  "--manifest-path",
-  "server/Cargo.toml",
-  "-p",
-  "rts-sim",
-  "--bin",
-  "dump-command-budget",
-  "--quiet",
-], {
+const rustCommandBudget = JSON.parse(execFileSync(dumpCommandBudgetBin, [], {
   cwd: repoRoot,
   encoding: "utf8",
 }));
