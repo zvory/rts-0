@@ -150,6 +150,15 @@ suites.
   `scripts/phase-runner*.mjs` or phased plan path handling, including slash-separated nested plan
   names, sanitized worktree/log slugs, executor model inheritance, and generated `codex exec`
   arguments.
+- Adversarial quality pass / agent PR workflow: run `node tests/adversarial_quality_pass.mjs` when
+  changing `scripts/adversarial-quality-pass.mjs`, its schema, or agent PR quality-pass wiring.
+  Dry-run coverage should keep preview generation non-mutating before clean/fetch checks, and nested
+  Codex quality-pass coverage should verify access to linked worktree git common directories while
+  marking the environment so `scripts/agent-pr.sh` refuses recursive PR lifecycle calls.
+  Branch-handling changes should also include a dry-run `--head-branch` mismatch check that fails
+  before Codex, push, or status work runs. Include
+  `bash -n scripts/agent-pr.sh tests/run-all.sh && node --check scripts/adversarial-quality-pass.mjs`
+  for shell and JS syntax coverage.
 - `rts-contract` or `rts-protocol`: run Rust contract/protocol tests, compact snapshot tests, JS
   protocol mirror/decode tests, and Node integration when a top-level message or compact shape
   changed.

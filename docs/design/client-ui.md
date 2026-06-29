@@ -684,10 +684,12 @@ for explicitly documented architecture-check exceptions.
 `GameState` is the authoritative browser view of server snapshots, interpolation, selected ids,
 control groups, relationship helpers, fog-facing visibility data, and display overlays derived from
 authoritative snapshots. `ClientIntent` owns placement intent, command-card submenu state,
-command-target arming, hover previews, command feedback, and ability previews. `GameState` must not
-grow compatibility accessors for those intent fields; HUD, input, minimap, and renderer feedback
-use the injected facade or a narrow read model. Lab Unit Spawn and Building Spawn panels expose the
-target player's color through DOM data/style hooks before map placement. In Lab, visual and audio
+command-target arming, hover previews, command feedback, and ability previews. Contextual oil
+right-clicks compose the free Pump Jack build intent on the clicked oil patch rather than a gather
+command. `GameState` must not grow compatibility accessors for those intent fields; HUD, input,
+minimap, and renderer feedback use the injected facade or a narrow read model. Lab Unit Spawn and
+Building Spawn panels expose the target player's color through DOM data/style hooks before map
+placement. In Lab, visual and audio
 feedback for controlled-side selections and commands is issued as the selected controlled player
 instead of the raw local player id. Lab command-card and targeted-command policy resolves resources,
 faction catalogs, per-owner upgrades when present, prerequisites, production helpers, self-ability
@@ -1117,7 +1119,8 @@ selection rings):
 - Layers (back→front): terrain → ground decals → resource nodes → building shadows → buildings →
   building overlays → unit shadows → units → smoke/ability ground effects → selection rings →
   health bars → fog overlay → shot-revealed units → command/hover feedback → placement ghost →
-  selection drag-box → (HUD is DOM, not Pixi).
+  selection drag-box → (HUD is DOM, not Pixi). Selected unit range rings, minimum-range rings, and
+  support-weapon field-of-fire overlays use higher-opacity rendering for readability.
 - `/renderer_preview.html` is a standalone dev entry point linked from the index Dev links menu; it
   mounts the real Renderer on a synthetic grass map to preview all unit and building visuals with
   zoom, team color, and animation controls outside a full match.
@@ -1128,7 +1131,12 @@ selection rings):
   imperative draws on the building overlays layer.
 - Units: SVG-authored rig parts rendered into Pixi containers, with low-detail hard-edged
   silhouettes tinted by player color, a dark drop shadow, dark outline, HP bar above when
-  damaged/selected, and glowing selection ring when selected.
+  damaged/selected, and glowing selection ring when selected. When the in-match Game settings
+  tab enables unit ranges, selected ordinary units draw dotted firing-range circles, deployed
+  Anti-Tank Guns and artillery draw field-of-fire wedges, and their packed states do not draw
+  field-of-fire overlays. In Lab scenario authoring, deployed Anti-Tank Gun and artillery
+  field-of-fire wedges remain visible for the currently selected owner even when the broad unit
+  range overlay is off.
   Distinct silhouette per kind (engineer: compact block; rifleman / machine gunner: shared
   infantry body with oversized role weapons; Anti-Tank Gun: wheeled gun; mortar team: crewless
   M1938-inspired small wheeled mortar that travels low and deploys upright; scout car: boxy
