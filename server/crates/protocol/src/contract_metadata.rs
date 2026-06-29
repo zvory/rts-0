@@ -88,6 +88,7 @@ pub mod upgrades {
     pub const ANTI_TANK_GUN_UNLOCK: &str = "anti_tank_gun_unlock";
     pub const TANK_UNLOCK: &str = "tank_unlock";
     pub const ARTILLERY_UNLOCK: &str = "artillery_unlock";
+    pub const BALLISTIC_TABLES: &str = "ballistic_tables";
     pub const COMMAND_CAR_UNLOCK: &str = "command_car_unlock";
     pub const MORTAR_AUTOCAST: &str = "mortar_autocast";
 }
@@ -359,6 +360,7 @@ const UPGRADE_CODES: &[(&str, u8)] = &[
     (upgrades::ARTILLERY_UNLOCK, 4),
     (upgrades::MORTAR_AUTOCAST, 5),
     (upgrades::COMMAND_CAR_UNLOCK, 6),
+    (upgrades::BALLISTIC_TABLES, 7),
 ];
 
 fn lookup_code(entries: &[(&str, u8)], value: &str) -> u8 {
@@ -596,6 +598,7 @@ fn upgrade_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("ANTI_TANK_GUN_UNLOCK", upgrades::ANTI_TANK_GUN_UNLOCK),
         ("TANK_UNLOCK", upgrades::TANK_UNLOCK),
         ("ARTILLERY_UNLOCK", upgrades::ARTILLERY_UNLOCK),
+        ("BALLISTIC_TABLES", upgrades::BALLISTIC_TABLES),
         ("COMMAND_CAR_UNLOCK", upgrades::COMMAND_CAR_UNLOCK),
         ("MORTAR_AUTOCAST", upgrades::MORTAR_AUTOCAST),
     ])

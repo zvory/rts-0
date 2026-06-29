@@ -57,30 +57,43 @@ function buttonSlots(card) {
   const ids = slotIds(rAndDCard());
   assert.equal(ids[0], `research:${UPGRADE.ANTI_TANK_GUN_UNLOCK}`);
   assert.equal(ids[1], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
-  assert.equal(ids[2], `research:${UPGRADE.TANK_UNLOCK}`);
-  assert.equal(ids[3], `research:${UPGRADE.MORTAR_AUTOCAST}`);
-  assert.deepEqual(slotCommandIds(rAndDCard()).slice(0, 4), [
+  assert.equal(ids[2], `research:${UPGRADE.BALLISTIC_TABLES}`);
+  assert.equal(ids[3], `research:${UPGRADE.TANK_UNLOCK}`);
+  assert.equal(ids[4], `research:${UPGRADE.MORTAR_AUTOCAST}`);
+  assert.equal(ids[5], `research:${UPGRADE.COMMAND_CAR_UNLOCK}`);
+  assert.deepEqual(slotCommandIds(rAndDCard()).slice(0, 6), [
     kriegsiaCommandId("research", UPGRADE.ANTI_TANK_GUN_UNLOCK),
     kriegsiaCommandId("research", UPGRADE.ARTILLERY_UNLOCK),
+    kriegsiaCommandId("research", UPGRADE.BALLISTIC_TABLES),
     kriegsiaCommandId("research", UPGRADE.TANK_UNLOCK),
     kriegsiaCommandId("research", UPGRADE.MORTAR_AUTOCAST),
+    kriegsiaCommandId("research", UPGRADE.COMMAND_CAR_UNLOCK),
   ]);
 }
 
 {
-  const ids = slotIds(rAndDCard([UPGRADE.ANTI_TANK_GUN_UNLOCK]));
+  const card = rAndDCard([UPGRADE.ANTI_TANK_GUN_UNLOCK]);
+  const ids = slotIds(card);
   assert.equal(ids[0], null);
   assert.equal(ids[1], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
-  assert.equal(ids[2], `research:${UPGRADE.TANK_UNLOCK}`);
-  assert.equal(ids[3], `research:${UPGRADE.MORTAR_AUTOCAST}`);
+  assert.equal(ids[2], `research:${UPGRADE.BALLISTIC_TABLES}`);
+  assert.equal(ids[3], `research:${UPGRADE.TANK_UNLOCK}`);
+  assert.equal(ids[4], `research:${UPGRADE.MORTAR_AUTOCAST}`);
+  assert.equal(ids[5], `research:${UPGRADE.COMMAND_CAR_UNLOCK}`);
+  assert.equal(card.slots[2].enabled, false);
+  assert.equal(card.slots[2].title, "Requires Artillery Unlock");
 }
 
 {
-  const ids = slotIds(rAndDCard([UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.ARTILLERY_UNLOCK]));
+  const card = rAndDCard([UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.ARTILLERY_UNLOCK]);
+  const ids = slotIds(card);
   assert.equal(ids[0], null);
   assert.equal(ids[1], null);
-  assert.equal(ids[2], `research:${UPGRADE.TANK_UNLOCK}`);
-  assert.equal(ids[3], `research:${UPGRADE.MORTAR_AUTOCAST}`);
+  assert.equal(ids[2], `research:${UPGRADE.BALLISTIC_TABLES}`);
+  assert.equal(ids[3], `research:${UPGRADE.TANK_UNLOCK}`);
+  assert.equal(ids[4], `research:${UPGRADE.MORTAR_AUTOCAST}`);
+  assert.equal(ids[5], `research:${UPGRADE.COMMAND_CAR_UNLOCK}`);
+  assert.equal(card.slots[2].enabled, true);
 }
 
 {

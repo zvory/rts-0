@@ -52,6 +52,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "ARTILLERY_SETUP_TICKS",
   "ARTILLERY_SHELL_DELAY_TICKS",
   "ARTILLERY_UNLOCK_RESEARCH_TICKS",
+  "BALLISTIC_TABLES_RESEARCH_TICKS",
   "BASE_COMMAND_SUPPLY_CAP",
   "BREAKTHROUGH_COOLDOWN_TICKS",
   "BREAKTHROUGH_DURATION_TICKS",
@@ -202,6 +203,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   assert(EVENT_CODE[EVENT.ARTILLERY_FIRING] === 11, "Artillery firing compact event code should be reserved");
   assert(UPGRADE_CODE[UPGRADE.MORTAR_AUTOCAST] === 5, "Mortar Autocast compact upgrade code should be reserved");
   assert(UPGRADE_CODE[UPGRADE.COMMAND_CAR_UNLOCK] === 6, "Command Car unlock compact upgrade code should be reserved");
+  assert(UPGRADE_CODE[UPGRADE.BALLISTIC_TABLES] === 7, "Ballistic Tables compact upgrade code should be reserved");
   assert(
     STATS[KIND.COMMAND_CAR].cost.steel === 150 &&
       STATS[KIND.COMMAND_CAR].cost.oil === 75 &&
@@ -281,10 +283,11 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   assert(
     STATS[KIND.RESEARCH_COMPLEX].researches.includes(UPGRADE.ANTI_TANK_GUN_UNLOCK) &&
       STATS[KIND.RESEARCH_COMPLEX].researches.includes(UPGRADE.ARTILLERY_UNLOCK) &&
+      STATS[KIND.RESEARCH_COMPLEX].researches.includes(UPGRADE.BALLISTIC_TABLES) &&
       STATS[KIND.RESEARCH_COMPLEX].researches.includes(UPGRADE.TANK_UNLOCK) &&
       STATS[KIND.RESEARCH_COMPLEX].researches.includes(UPGRADE.COMMAND_CAR_UNLOCK) &&
       STATS[KIND.RESEARCH_COMPLEX].researches.includes(UPGRADE.MORTAR_AUTOCAST),
-    "R&D Complex should expose Anti-Tank Gun, Artillery, Tank, Command Car, and Mortar Autocast research",
+    "R&D Complex should expose Anti-Tank Gun, Artillery, Ballistic Tables, Tank, Command Car, and Mortar Autocast research",
   );
   assert(!ABILITIES[ABILITY.CHARGE], "client no longer exposes Rifleman Charge as a command-card ability");
   assert(
@@ -302,6 +305,17 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       UPGRADES[UPGRADE.MORTAR_AUTOCAST].cost.oil === 150 &&
       UPGRADES[UPGRADE.MORTAR_AUTOCAST].researchTicks === 600,
     "Mortar Autocast research cost and time mirror server",
+  );
+  assert(
+    UPGRADES[UPGRADE.BALLISTIC_TABLES].cost.steel === 150 &&
+      UPGRADES[UPGRADE.BALLISTIC_TABLES].cost.oil === 100 &&
+      UPGRADES[UPGRADE.BALLISTIC_TABLES].researchTicks === 600,
+    "Ballistic Tables research cost and time mirror server",
+  );
+  assert(
+    UPGRADES[UPGRADE.BALLISTIC_TABLES].requiresUpgrade === UPGRADE.ARTILLERY_UNLOCK &&
+      UPGRADES[UPGRADE.BALLISTIC_TABLES].requiresText === "Requires Artillery Unlock",
+    "Ballistic Tables research should mirror its Artillery prerequisite",
   );
   assert(
     STATS[KIND.ANTI_TANK_GUN].upgradeRequiresText === "Requires research in R&D Complex",
@@ -799,15 +813,19 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     renderCommandCard(rdHud);
     const rdAntiTankResearchButton = renderedButtons.find((button) => button.innerHTML.includes("ATG+"));
     const rdArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
+    const rdBallisticTablesButton = renderedButtons.find((button) => button.innerHTML.includes("BT+"));
     const rdTankResearchButton = renderedButtons.find((button) => button.innerHTML.includes("TK+"));
     const rdCommandCarResearchButton = renderedButtons.find((button) => button.innerHTML.includes("CC+"));
     const rdMortarAutocastButton = renderedButtons.find((button) => button.innerHTML.includes("MT+"));
     assert(rdAntiTankResearchButton?.dataset.hotkey === "Q", "Anti-Tank Gun Crews research should appear in R&D Complex");
-    assert(rdTankResearchButton?.dataset.hotkey === "E", "Tank Production research should appear in R&D Complex");
-    assert(rdMortarAutocastButton?.dataset.hotkey === "A", "Mortar Autocast research should appear in R&D Complex");
-    assert(rdCommandCarResearchButton?.dataset.hotkey === "S", "Command Car research should appear in R&D Complex");
+    assert(rdBallisticTablesButton?.dataset.hotkey === "E", "Ballistic Tables research should appear in R&D Complex");
+    assert(rdTankResearchButton?.dataset.hotkey === "A", "Tank Production research should appear in R&D Complex");
+    assert(rdMortarAutocastButton?.dataset.hotkey === "S", "Mortar Autocast research should appear in R&D Complex");
+    assert(rdCommandCarResearchButton?.dataset.hotkey === "D", "Command Car research should appear in R&D Complex");
     assert(rdCommandCarResearchButton?.disabled, "Command Car research should be disabled before Tank Production");
     assert(rdCommandCarResearchButton?.title === "Requires Tank Production", "Command Car research should name Tank prerequisite");
+    assert(rdBallisticTablesButton?.disabled, "Ballistic Tables research should be disabled before Artillery research");
+    assert(rdBallisticTablesButton?.title === "Requires Artillery Unlock", "Ballistic Tables research should name Artillery prerequisite");
     assert(rdArtilleryResearchButton?.dataset.hotkey === "W", "Unlock Artillery research should appear in R&D Complex");
     assert(rdArtilleryResearchButton?.disabled, "Artillery research should be disabled before Anti-Tank Gun research");
     assert(rdArtilleryResearchButton?.title === "Requires Anti-Tank Gun Research", "Artillery research should name Anti-Tank Gun prerequisite");
@@ -817,7 +835,16 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     rdHud._cardSig = null;
     renderCommandCard(rdHud);
     const unlockedArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
+    const lockedBallisticTablesButton = renderedButtons.find((button) => button.innerHTML.includes("BT+"));
     assert(unlockedArtilleryResearchButton && !unlockedArtilleryResearchButton.disabled, "Artillery research should enable after Anti-Tank Gun research");
+    assert(lockedBallisticTablesButton?.disabled, "Ballistic Tables should stay disabled until Artillery research completes");
+
+    renderedButtons.length = 0;
+    rdHud.state.upgrades = [UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.ARTILLERY_UNLOCK];
+    rdHud._cardSig = null;
+    renderCommandCard(rdHud);
+    const unlockedBallisticTablesButton = renderedButtons.find((button) => button.innerHTML.includes("BT+"));
+    assert(unlockedBallisticTablesButton && !unlockedBallisticTablesButton.disabled, "Ballistic Tables should enable after Artillery research");
 
     renderedButtons.length = 0;
     rdHud.state.upgrades = [UPGRADE.TANK_UNLOCK];
