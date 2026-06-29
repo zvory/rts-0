@@ -221,6 +221,9 @@ const approvedCurrentFactionFiles = new Set([
   // Balance Phase 4 split: these modules contain constants/helpers moved from balance.rs without
   // changing current-faction ownership.
   "server/crates/rules/src/balance/economy.rs",
+  // Entrenchment Phase 1 names the current eligible infantry set for the first feature pass; the
+  // helper is the rules API that downstream sim/client mirrors consume.
+  "server/crates/rules/src/balance/entrenchment.rs",
   "server/crates/rules/src/balance/stats.rs",
   // Catalog dump tool projects current catalog stats for parity checks.
   "server/crates/rules/src/bin/dump-faction-catalog.rs",
@@ -312,7 +315,8 @@ const approvedSpecialCaseBudgets = new Map([
   // Tank Trap phases add current-catalog construction eligibility and gameplay command handling
   // for a default-faction obstacle before a broader catalog API can absorb obstacle placement.
   // Artillery Fire Control adds one R&D catalog entry for the current Kriegsia tech tree.
-  ["server/crates/rules/src/faction.rs", 91],
+  // Entrenchment Phase 1 adds one Training Centre research entry and its negative Ekat assertion.
+  ["server/crates/rules/src/faction.rs", 93],
   ["server/crates/rules/src/economy.rs", 109],
   ["server/crates/sim/src/game/setup.rs", 30],
   ["server/crates/sim/src/game/services/ability_orders.rs", 18],
