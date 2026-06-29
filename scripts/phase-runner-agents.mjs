@@ -780,7 +780,7 @@ export class Runner {
         throw new Error(`phase-runner: ${phaseId} reported completed but did not mark the phase document done`);
       }
 
-      const phaseHead = this.git(["-C", layout.worktreePath, "rev-parse", "HEAD"], { cwd: repoRoot });
+      let phaseHead = this.git(["-C", layout.worktreePath, "rev-parse", "HEAD"], { cwd: repoRoot });
       this.log(`phase-runner: executor committed ${branch} at ${phaseHead}`);
       this.log(`phase-runner: pushing ${branch} to origin`);
       this.gitInherit(["-C", layout.worktreePath, "push", "-u", "origin", branch], { cwd: repoRoot });
@@ -801,6 +801,11 @@ export class Runner {
         ],
         { cwd: layout.worktreePath, env: { GH_BIN: options.ghBin } },
       );
+      const postQualityHead = this.git(["-C", layout.worktreePath, "rev-parse", "HEAD"], { cwd: repoRoot });
+      if (postQualityHead !== phaseHead) {
+        this.log(`phase-runner: quality pass updated ${branch} from ${phaseHead} to ${postQualityHead}`);
+        phaseHead = postQualityHead;
+      }
 
       const prJson = this.getPrJson(branch, options, layout.worktreePath);
       let pr;

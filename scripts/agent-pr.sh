@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Open or update an agent-owned PR and arm auto-merge.
+# Run the final quality pass, then open or update an agent-owned PR and arm auto-merge.
 set -euo pipefail
 
 GH_BIN="${GH_BIN:-gh}"
@@ -20,8 +20,9 @@ usage() {
   cat <<'EOF'
 Usage: scripts/agent-pr.sh [options]
 
-Opens or updates the PR for the current agent branch, writes predictable
-ownership metadata into the body, applies agent labels, and arms auto-merge.
+Runs the adversarial quality pass, opens or updates the PR for the current
+agent branch, writes predictable ownership metadata into the body, applies
+agent labels, and arms auto-merge.
 
 Options:
   --base BRANCH              Base branch, default: main.
@@ -97,6 +98,28 @@ fi
 if [ -n "$BODY_FILE" ]; then
   EXTRA_BODY="$(cat "$BODY_FILE")"
 fi
+
+run_quality_pass() {
+  if [ "$DRY_RUN" = "1" ]; then
+    echo "agent-pr: would run scripts/adversarial-quality-pass.mjs for $HEAD_BRANCH"
+    return
+  fi
+  scripts/adversarial-quality-pass.mjs \
+    --base "origin/$BASE_BRANCH" \
+    --head-branch "$HEAD_BRANCH" \
+    --gh-bin "$GH_BIN" \
+    --push \
+    --post-status
+
+  local refreshed_branch
+  refreshed_branch="$(git branch --show-current)"
+  if [ "$refreshed_branch" != "$HEAD_BRANCH" ]; then
+    echo "agent-pr: quality pass left checkout on unexpected branch '$refreshed_branch' (expected '$HEAD_BRANCH')" >&2
+    exit 1
+  fi
+}
+
+run_quality_pass
 
 tmp_body="$(mktemp -t rts-agent-pr.XXXXXX)"
 trap 'rm -f "$tmp_body"' EXIT
