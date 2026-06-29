@@ -303,6 +303,8 @@ pub struct Snapshot {
     pub smokes: Vec<SmokeCloudView>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ability_objects: Vec<AbilityObjectView>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub trenches: Vec<TrenchView>,
     /// Row-major current visibility grid for this recipient, one byte per map tile.
     /// Populated only for fog-filtered snapshots; clients keep explored history locally.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -375,6 +377,15 @@ pub struct SmokeCloudView {
     pub y: f32,
     pub radius_tiles: f32,
     pub expires_in: u16,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct TrenchView {
+    pub id: u32,
+    pub x: f32,
+    pub y: f32,
+    pub radius_tiles: f32,
 }
 
 /// Server-side transport and scheduling health attached to every snapshot.

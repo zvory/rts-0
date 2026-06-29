@@ -33,6 +33,9 @@ should not grant combat bonuses yet.
   benefits until the unit stops.
 - Expose enough projected state for the owner and visible enemies/allies to tell that a visible
   unit is occupying a trench, but do not add final occupied-unit art.
+- Expose a simulation helper or predicate that later combat code can use to distinguish active
+  trench occupation from digging in, slotting, or merely being near trench terrain. Phase 4 needs
+  this to suppress idle pursuit only for actually entrenched units.
 - Update `docs/design/server-sim.md` for stationary, creation, occupation, and slotting semantics.
 
 ## Expected Touch Points
@@ -75,6 +78,6 @@ crossing a trench does not become occupied until it stops.
 
 ## Handoff Expectations
 
-Summarize the exact stationary predicate, cancellation cases, slotting radius/shape, and occupation
-projection field. Call out any edge cases deferred to Phase 4, especially if combat code needs a
-helper such as `entity_is_entrenched`.
+Summarize the exact stationary predicate, cancellation cases, slotting radius/shape, occupation
+projection field, and combat-facing occupation helper. Call out any edge cases deferred to Phase 4,
+especially the idle-pursuit suppression behavior for entrenched units.

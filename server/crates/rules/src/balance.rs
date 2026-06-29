@@ -7,6 +7,7 @@
 mod abilities;
 mod bodies;
 mod economy;
+mod entrenchment;
 mod map;
 mod stats;
 mod supply;
@@ -17,6 +18,7 @@ mod upgrades;
 pub use abilities::*;
 pub use bodies::*;
 pub use economy::*;
+pub use entrenchment::*;
 pub use map::*;
 pub use stats::*;
 pub use supply::*;

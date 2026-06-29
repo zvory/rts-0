@@ -9,6 +9,12 @@ import {
   ARTILLERY_SHELL_DELAY_TICKS,
   MINING_CC_RANGE_TILES,
   SMOKE_ABILITY_COST,
+  ENTRENCHMENT_AREA_DAMAGE_REDUCTION,
+  ENTRENCHMENT_DIG_IN_TICKS,
+  ENTRENCHMENT_DIRECT_MISS_CHANCE,
+  ENTRENCHMENT_RANGE_BONUS_TILES,
+  ENTRENCHMENT_RESEARCH_TICKS,
+  ENTRENCHMENT_TRENCH_RADIUS_TILES,
   ABILITIES,
   STATS,
   TICK_HZ,
@@ -76,6 +82,12 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "EKAT_MAGIC_ANCHOR_RANGE_TILES",
   "EKAT_TELEPORT_COOLDOWN_TICKS",
   "EKAT_TELEPORT_RANGE_TILES",
+  "ENTRENCHMENT_AREA_DAMAGE_REDUCTION",
+  "ENTRENCHMENT_DIG_IN_TICKS",
+  "ENTRENCHMENT_DIRECT_MISS_CHANCE",
+  "ENTRENCHMENT_RANGE_BONUS_TILES",
+  "ENTRENCHMENT_RESEARCH_TICKS",
+  "ENTRENCHMENT_TRENCH_RADIUS_TILES",
   "FACTION_CATALOGS",
   "FIXTURE_FACTION_ID",
   "FOG_EXPLORED_ALPHA",
@@ -204,6 +216,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   assert(UPGRADE_CODE[UPGRADE.MORTAR_AUTOCAST] === 5, "Mortar Autocast compact upgrade code should be reserved");
   assert(UPGRADE_CODE[UPGRADE.COMMAND_CAR_UNLOCK] === 6, "Command Car unlock compact upgrade code should be reserved");
   assert(UPGRADE_CODE[UPGRADE.BALLISTIC_TABLES] === 7, "Artillery Fire Control compact upgrade code should be reserved");
+  assert(UPGRADE_CODE[UPGRADE.ENTRENCHMENT] === 8, "Entrenchment compact upgrade code should be reserved");
   assert(
     STATS[KIND.COMMAND_CAR].cost.steel === 150 &&
       STATS[KIND.COMMAND_CAR].cost.oil === 75 &&
@@ -300,10 +313,29 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     "Training Centre should expose Methamphetamines research",
   );
   assert(
+    STATS[KIND.TRAINING_CENTRE].researches.includes(UPGRADE.ENTRENCHMENT),
+    "Training Centre should expose Entrenchment research",
+  );
+  assert(
     UPGRADES[UPGRADE.METHAMPHETAMINES].cost.steel === 100 &&
       UPGRADES[UPGRADE.METHAMPHETAMINES].cost.oil === 100 &&
       UPGRADES[UPGRADE.METHAMPHETAMINES].researchTicks === 600,
     "Methamphetamines research cost and time mirror server",
+  );
+  assert(
+    UPGRADES[UPGRADE.ENTRENCHMENT].cost.steel === 100 &&
+      UPGRADES[UPGRADE.ENTRENCHMENT].cost.oil === 0 &&
+      UPGRADES[UPGRADE.ENTRENCHMENT].researchTicks === ENTRENCHMENT_RESEARCH_TICKS &&
+      ENTRENCHMENT_RESEARCH_TICKS === TICK_HZ * 10,
+    "Entrenchment research cost and time mirror server",
+  );
+  assert(
+    ENTRENCHMENT_DIG_IN_TICKS === TICK_HZ * 3 &&
+      ENTRENCHMENT_RANGE_BONUS_TILES === 1 &&
+      ENTRENCHMENT_DIRECT_MISS_CHANCE === 0.70 &&
+      ENTRENCHMENT_AREA_DAMAGE_REDUCTION === 0.70 &&
+      ENTRENCHMENT_TRENCH_RADIUS_TILES === 0.75,
+    "Entrenchment constants mirror server",
   );
   assert(
     UPGRADES[UPGRADE.MORTAR_AUTOCAST].cost.steel === 150 &&
@@ -551,6 +583,9 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     assert(researchButton && !researchButton.disabled, "Methamphetamines command-card button renders enabled");
     assert(researchButton.dataset.hotkey === "Q", "Methamphetamines command-card button uses Q as its hotkey");
     assert(researchButton.innerHTML.includes("Research time"), "Methamphetamines tooltip includes research time");
+    const entrenchmentButton = renderedButtons.find((button) => button.innerHTML.includes("Entrenchment"));
+    assert(entrenchmentButton && !entrenchmentButton.disabled, "Entrenchment command-card button renders enabled");
+    assert(entrenchmentButton.dataset.hotkey === "W", "Entrenchment command-card button uses W as its hotkey");
     researchButton.click({ shiftKey: true });
     assert(
       sent.length === 1 &&
@@ -558,6 +593,14 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
         sent[0].building === 77 &&
         sent[0].upgrade === UPGRADE.METHAMPHETAMINES,
       "Clicking Methamphetamines should send a research command",
+    );
+    entrenchmentButton.click({ shiftKey: false });
+    assert(
+      sent.length === 2 &&
+        sent[1].c === "research" &&
+        sent[1].building === 77 &&
+        sent[1].upgrade === UPGRADE.ENTRENCHMENT,
+      "Clicking Entrenchment should send a research command",
     );
 
     const mortarButtonsBefore = renderedButtons.length;

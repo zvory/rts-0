@@ -32,7 +32,7 @@ pub use rts_contract::{
     LabVisionMode, MapInfo, MatchControlCapabilities, MovementPathDiagnosticScope, NoticeSeverity,
     OrderPlanMarker, PlayerResourceSnapshot, PlayerScore, PlayerStart, RememberedBuildingView,
     ReplayStartMetadata, ResourceDelta, ResourceNode, RoomCapabilities, RoomTimeCapabilities,
-    RoomTimeState, SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload, TeamId,
+    RoomTimeState, SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload, TeamId, TrenchView,
     VisibilityCapabilities, DEFAULT_FACTION_ID,
 };
 
@@ -1550,6 +1550,12 @@ mod tests {
                     ..Default::default()
                 }),
             }],
+            trenches: vec![TrenchView {
+                id: 80,
+                x: 448.0,
+                y: 480.0,
+                radius_tiles: 0.75,
+            }],
             visible_tiles: vec![1, 1, 0, 0, 0, 1],
             remembered_buildings: vec![RememberedBuildingView {
                 id: 99,
@@ -1719,6 +1725,7 @@ mod tests {
                 [45, null, null, null, null, null]
             ]])
         );
+        assert_eq!(value["tr"], serde_json::json!([[80, 448.0, 480.0, 0.75]]));
         assert_eq!(value["fg"], serde_json::json!([1, 2, 3, 1]));
         assert_eq!(
             value["mb"],
@@ -1823,6 +1830,7 @@ mod tests {
             resource_deltas: Vec::new(),
             smokes: Vec::new(),
             ability_objects: Vec::new(),
+            trenches: Vec::new(),
             visible_tiles: Vec::new(),
             remembered_buildings: Vec::new(),
             events: Vec::new(),

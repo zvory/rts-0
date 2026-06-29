@@ -8,8 +8,7 @@ Status: not started.
 
 Make authoritative trenches readable in the client and harden the complete feature across
 multiplayer, fog, replay, reconnect, and docs. This phase should deliver persistent brown trench
-ground and supporting UI/status affordances while keeping the unapproved occupied-unit visual
-treatment out of scope.
+ground, supporting UI/status affordances, and a practical first-pass occupied-unit visual indicator.
 
 ## Scope
 
@@ -20,10 +19,10 @@ treatment out of scope.
 - Keep trench rendering deterministic and bounded. Avoid per-frame unbounded display-object churn
   when many trenches exist.
 - Add minimal HUD or selection-panel text/status needed to explain researched availability,
-  dig-in/occupied state, and combat benefits without adding an unapproved occupied-unit art
-  treatment.
-- Do not finalize special occupied-unit outlines, badges, auras, or animations unless the user
-  explicitly approves that direction.
+  dig-in/occupied state, and combat benefits.
+- Add a modest occupied-unit visual indicator using the implementing agent's judgment. Prefer a
+  simple, readable, low-risk treatment over a complex art direction; it can be refined after the
+  feature is shipped.
 - Ensure rematch teardown clears trench rendering resources and snapshot state.
 - Add dev/lab scenario coverage or fixtures that let humans inspect newly created trenches,
   existing neutral trench reuse, fogged trenches, and crowded slotting.
@@ -69,11 +68,11 @@ treatment out of scope.
 
 Play a match long enough to research Entrenchment, dig several nearby trenches, move away, and
 return with friendly and enemy eligible infantry. Confirm brown trench ground persists, nearby
-trenches read as connected, fog/replay/reconnect behavior is stable, and no occupied-unit visual
-treatment appears unless explicitly approved.
+trenches read as connected, fog/replay/reconnect behavior is stable, and the first-pass
+occupied-unit indicator is readable without obscuring normal unit state.
 
 ## Handoff Expectations
 
 Summarize the final rendering layer, asset approach, teardown behavior, and manual scenarios that
 passed. Include the complete patch-note bullets for the feature and clearly state whether the
-occupied-unit visual treatment remains deferred.
+occupied-unit visual treatment is a provisional first pass.

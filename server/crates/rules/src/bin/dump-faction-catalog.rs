@@ -348,6 +348,26 @@ fn print_client_constants(indent: &str) {
         balance::TICK_HZ * 2
     );
     println!(
+        "{indent}    \"entrenchmentDigInTicks\": {},",
+        balance::ENTRENCHMENT_DIG_IN_TICKS
+    );
+    println!(
+        "{indent}    \"entrenchmentRangeBonusTiles\": {},",
+        balance::ENTRENCHMENT_RANGE_BONUS_TILES
+    );
+    println!(
+        "{indent}    \"entrenchmentDirectMissChance\": {},",
+        json_f32(balance::ENTRENCHMENT_DIRECT_MISS_CHANCE)
+    );
+    println!(
+        "{indent}    \"entrenchmentAreaDamageReduction\": {},",
+        json_f32(balance::ENTRENCHMENT_AREA_DAMAGE_REDUCTION)
+    );
+    println!(
+        "{indent}    \"entrenchmentTrenchRadiusTiles\": {},",
+        json_f32(balance::ENTRENCHMENT_TRENCH_RADIUS_TILES)
+    );
+    println!(
         "{indent}    \"ekatConsumeGolemRangeTiles\": {},",
         balance::EKAT_CONSUME_GOLEM_RANGE_TILES
     );
@@ -422,6 +442,15 @@ fn print_upgrades(indent: &str) {
         balance::METHAMPHETAMINES_COST_STEEL,
         balance::METHAMPHETAMINES_COST_OIL,
         balance::METHAMPHETAMINES_RESEARCH_TICKS,
+        None,
+        true,
+    );
+    print_upgrade(
+        indent,
+        faction::ENTRENCHMENT_UPGRADE,
+        balance::ENTRENCHMENT_COST_STEEL,
+        balance::ENTRENCHMENT_COST_OIL,
+        balance::ENTRENCHMENT_RESEARCH_TICKS,
         None,
         true,
     );

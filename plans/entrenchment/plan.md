@@ -5,8 +5,8 @@
 Implement the Entrenchment requirements as server-authoritative persistent battlefield state.
 Eligible infantry with the researched upgrade can create neutral trenches by staying still, and
 eligible infantry from any player can later use those trenches for defensive combat benefits. The
-plan keeps the occupied-unit visual treatment out of scope until the user explicitly approves a
-direction.
+plan leaves the occupied-unit visual treatment to a pragmatic first-pass implementation, with the
+expectation that the visuals will be workshopped after the feature is playable.
 
 ## Product Input
 
@@ -41,16 +41,17 @@ combat bonuses.
 
 Apply the defensive and offensive combat rules for eligible infantry that are stationary in an
 active trench. Entrenched infantry gain one tile of weapon range, direct shots against them take a
-70% miss chance, area damage against them is reduced by 70%, and over-penetration through or into
-them is suppressed. This phase should cover Methamphetamines interactions without changing the
-requirement that moving units are not entrenched.
+70% miss chance, area damage against them is reduced by 70%, idle aggressive pursuit is suppressed,
+and over-penetration through or into them is suppressed. This phase should cover Methamphetamines
+interactions without changing the requirement that moving units are not entrenched.
 
 ### [Phase 5 - Client Rendering, UX Polish, And Hardening](phase-5.md)
 
 Render persistent brown trench ground on the client using the authoritative trench snapshots, with
 nearby trenches visually connected where practical. Add HUD/status affordances and focused
-integration coverage for multiplayer trench reuse, fog, replays, and reconnects. Defer the final
-occupied-unit visual treatment unless the user explicitly approves it before or during this phase.
+integration coverage for multiplayer trench reuse, fog, replays, and reconnects. Add a modest
+first-pass occupied-unit visual indicator chosen by the implementing agent; it does not need to be
+the final art direction.
 
 ## Phase Index
 
@@ -72,6 +73,10 @@ occupied-unit visual treatment unless the user explicitly approves it before or 
   movement cancels or prevents new trench creation.
 - Existing trenches are neutral: any eligible infantry can occupy them regardless of whether that
   player's team researched Entrenchment. Research gates creating new trenches only.
+- Only active trench occupation suppresses idle aggressive pursuit. Entrenchment research alone
+  must not make all eligible infantry passive; untrenched eligible units keep existing idle aggro.
+  An entrenched idle unit may fire at legal targets in range like hold position, but must not chase
+  or leave the trench unless given an explicit command that moves it out.
 - Eligible units are Riflemen, Machine Gunners, and Workers/Engineers. Mortar Teams, Ekat, Golems,
   Ekat-faction units, vehicles, buildings, other support weapons, and non-infantry entities must
   not create or benefit from trenches in this feature pass.

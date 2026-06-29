@@ -24,6 +24,7 @@ import {
   STATE_BY_CODE,
   UPGRADE_BY_CODE
 } from "./protocol_constants.js";
+import { decodeCompactTrenches } from "./protocol_snapshot_trenches.js";
 
 export function decodeCompactSnapshot(raw) {
   if (raw.v !== COMPACT_SNAPSHOT_VERSION) {
@@ -52,6 +53,7 @@ export function decodeCompactSnapshot(raw) {
       "abilityObjects",
       MAX_COMPACT_ABILITY_OBJECTS,
     ).map(decodeCompactAbilityObject),
+    trenches: decodeCompactTrenches(raw.tr),
     visibleTiles: decodeVisibilityRuns(raw.fg),
     rememberedBuildings: readOptionalArray(
       raw.mb,
