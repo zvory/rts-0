@@ -346,6 +346,9 @@ impl Serialize for CompactEntity<'_> {
         if entity.build_active {
             len = 30;
         }
+        if entity.deconstruct_progress.is_some() {
+            len = 31;
+        }
 
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&entity.id)?;
@@ -439,6 +442,9 @@ impl Serialize for CompactEntity<'_> {
         }
         if len > 29 {
             seq.serialize_element(&entity.build_active)?;
+        }
+        if len > 30 {
+            seq.serialize_element(&entity.deconstruct_progress)?;
         }
         seq.end()
     }

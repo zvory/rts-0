@@ -132,6 +132,19 @@ export function _drawBuilding(e, colorByOwner, state) {
     overlay.beginFill(COLORS.hpGood);
     overlay.drawRect(bx, by, bw * clamp01(e.buildProgress), 4);
     overlay.endFill();
+  } else if (typeof e.deconstructProgress === "number") {
+    overlay = this._slot("buildingOverlays", e.id);
+    overlay.position.set(0, 0);
+    // Tank Trap deconstruction drains from full to empty across the footprint base.
+    const bw = w * 0.8;
+    const bx = e.x - bw / 2;
+    const by = y0 + h - 6;
+    overlay.beginFill(COLORS.hpBack, 0.85);
+    overlay.drawRect(bx, by, bw, 4);
+    overlay.endFill();
+    overlay.beginFill(COLORS.hpMid);
+    overlay.drawRect(bx, by, bw * clamp01(e.deconstructProgress), 4);
+    overlay.endFill();
   } else if (typeof e.prodProgress === "number" && e.prodProgress > 0) {
     overlay = this._slot("buildingOverlays", e.id);
     overlay.position.set(0, 0);

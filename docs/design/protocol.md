@@ -104,7 +104,7 @@ the transport envelope only and is intentionally absent from replay/simulation c
 | `move`       | `units: u32[]`, `x: f32`, `y: f32`, `queued?: bool` | Move selected units to a world point. Infantry ignore enemies until they arrive or receive another order; tanks and scout cars keep driving and fire at in-range enemies without chasing. When `queued` is true, store future movement intent instead of replacing the active order. |
 | `attackMove` | `units: u32[]`, `x: f32`, `y: f32`, `queued?: bool` | Move while attacking enemies encountered; this is the aggressive movement order. When `queued` is true, store future attack-move intent instead of replacing the active order. |
 | `attack`     | `units: u32[]`, `target: u32`, `queued?: bool` | Attack a specific entity. When `queued` is true, store future attack intent instead of replacing the active order. |
-| `deconstruct` | `units: u32[]`, `target: u32`, `queued?: bool` | Send one selected worker to deconstruct a completed Tank Trap. The target may be friendly, allied, or enemy; enemy traps must be visible when the command is accepted or when a queued stage promotes. Deconstruction uses the Tank Trap's 10-second build time, cannot be sped up by multiple workers on the same trap, and refunds the Tank Trap cost to the deconstructing player's economy. When `queued` is true, store one future deconstruct intent using the same selected-worker allocation policy as build orders. |
+| `deconstruct` | `units: u32[]`, `target: u32`, `queued?: bool` | Send one selected worker to deconstruct a completed Tank Trap. The target may be friendly, allied, or enemy; enemy traps must be visible when the command is accepted or when a queued stage promotes. Deconstruction uses half of the Tank Trap build time (150 ticks / 5 seconds with current balance), cannot be sped up by multiple workers on the same trap, and refunds the Tank Trap cost to the deconstructing player's economy. When `queued` is true, store one future deconstruct intent using the same selected-worker allocation policy as build orders. |
 | `setupAntiTankGuns` | `units: u32[]`, `x: f32`, `y: f32`, `queued?: bool` | Manually emplace owned anti-tank guns and artillery toward a world point. When `queued` is true, append a future setup-facing intent for owned completed Anti-Tank Guns and artillery only; the stored point is evaluated from the unit's position when the stage promotes. Immediate setup clears movement/target state, records the setup facing, and enters `setting_up`. Other selected units are ignored. |
 | `tearDownAntiTankGuns` | `units: u32[]` | Pack up owned anti-tank guns that are `setting_up` or `deployed`. Other selected units are ignored. |
 | `charge`     | `units: u32[]` | Legacy Rifleman Charge activation. Preserved for old clients/replays as a parseable no-op; it has no eligible carriers, cooldown, or runtime status. |
@@ -626,7 +626,7 @@ adds an explicit application compression envelope.
       facing?, weaponFacing?, prodKind?, prodProgress?, prodQueue?,
       buildProgress?, latchedNode?, targetId?, setupState?, remaining?, rally?, oilUsed?,
       setupFacing?, orderPlan?, chargeCooldownLeft?, abilities?, breakthroughTicks?,
-      visionOnly?, debugPath?, rallyPlan?, prodUpgrade?, buildActive?
+      visionOnly?, debugPath?, rallyPlan?, prodUpgrade?, buildActive?, deconstructProgress?
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
@@ -773,6 +773,8 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   // buildings under construction:
   buildProgress?: f32,           // 0..1; when present and <1, render as scaffolding
   buildActive?: bool,            // owner-only; true when server advanced this scaffold this tick
+  // Tank Trap deconstruction:
+  deconstructProgress?: f32,     // 1..0 remaining dismantle progress; render reverse progress bar
   // gatherers:
   latchedNode?: u32,             // node id the Worker/Golem is currently harvesting (attached mining)
   // combat feedback:
