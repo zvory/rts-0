@@ -5,8 +5,8 @@
 Implement the Entrenchment requirements as server-authoritative persistent battlefield state.
 Eligible infantry with the researched upgrade can create neutral trenches by staying still, and
 eligible infantry from any player can later use those trenches for defensive combat benefits. The
-plan keeps the occupied-unit visual treatment out of scope until the user explicitly approves a
-direction.
+plan leaves the occupied-unit visual treatment to a pragmatic first-pass implementation, with the
+expectation that the visuals will be workshopped after the feature is playable.
 
 ## Product Input
 
@@ -49,8 +49,9 @@ interactions without changing the requirement that moving units are not entrench
 
 Render persistent brown trench ground on the client using the authoritative trench snapshots, with
 nearby trenches visually connected where practical. Add HUD/status affordances and focused
-integration coverage for multiplayer trench reuse, fog, replays, and reconnects. Defer the final
-occupied-unit visual treatment unless the user explicitly approves it before or during this phase.
+integration coverage for multiplayer trench reuse, fog, replays, and reconnects. Add a modest
+first-pass occupied-unit visual indicator chosen by the implementing agent; it does not need to be
+the final art direction.
 
 ## Phase Index
 

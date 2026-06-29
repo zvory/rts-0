@@ -89,12 +89,13 @@ Entrenchment benefits apply only while the unit is stationary in a trench.
 - A newly created trench must show brown dug-in ground around the entrenching unit's position.
 - Nearby trenches should visually connect into a continuous brown trench area where practical.
 - Trench ground remains visible after the unit leaves.
-- The occupied-unit visual indicator is not decided yet. Do not implement the final occupied-unit
-  visual treatment until the user approves the direction.
+- The occupied-unit visual indicator should get a practical first-pass treatment in this feature
+  ship. The exact direction is intentionally left to the implementing agent's judgment, and the
+  visuals are expected to be workshopped after the feature is playable.
 
 ## Non-Goals
 
 - Do not define implementation phases in this document.
 - Do not include code, protocol, data-model, test, or rendering implementation details here.
 - Do not include Mortar Teams, Ekat, Golems, or Ekat-faction mechanics in the feature scope.
-- Do not finalize the occupied-unit visual treatment in this requirements draft.
+- Do not treat the first-pass occupied-unit visual treatment as final art direction.
