@@ -298,8 +298,8 @@ export const UPGRADES = Object.freeze({
   }),
   [UPGRADE.ANTI_TANK_GUN_UNLOCK]: Object.freeze({
     upgrade: UPGRADE.ANTI_TANK_GUN_UNLOCK,
-    label: "Field Ordnance",
-    icon: "ORD",
+    label: "Heavy Guns",
+    icon: "HG+",
     cost: Object.freeze({ steel: 200, oil: 75 }),
     researchTicks: ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS,
     description: "Unlock Anti-Tank Gun and Artillery training",
@@ -323,7 +323,7 @@ export const UPGRADES = Object.freeze({
     description: "Artillery fire tightens over repeated shots",
     researchedAt: KIND.RESEARCH_COMPLEX,
     requiresUpgrade: UPGRADE.ANTI_TANK_GUN_UNLOCK,
-    requiresText: "Requires Field Ordnance",
+    requiresText: "Requires Heavy Guns",
   }),
   [UPGRADE.COMMAND_CAR_UNLOCK]: Object.freeze({
     upgrade: UPGRADE.COMMAND_CAR_UNLOCK,

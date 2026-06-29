@@ -274,7 +274,7 @@ fn legacy_artillery_unlock_is_not_current_faction_research() {
 }
 
 #[test]
-fn ballistic_tables_research_requires_field_ordnance() {
+fn ballistic_tables_research_requires_heavy_guns() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
     let (rd_x, rd_y) = footprint_center(&map, EntityKind::ResearchComplex, 6, 6);

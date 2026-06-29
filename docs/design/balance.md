@@ -311,12 +311,12 @@ folded into default targeting.
   faster attacks (16 tick cooldown becomes 12). It also increases that
   player's Machine Gunners from 1.28 px/tick to unupgraded Rifleman speed (1.6 px/tick) and halves
   their setup and teardown timers from 30 ticks to 15.
-- **Field Ordnance** (R&D Complex research, protocol id `anti_tank_gun_unlock`): costs 200 steel / 75 oil
+- **Heavy Guns** (R&D Complex research, protocol id `anti_tank_gun_unlock`): costs 200 steel / 75 oil
   and takes 600 ticks (~20s). Once complete, that player can train Anti-Tank Guns and Artillery
   from Gun Works. The legacy protocol id `artillery_unlock` remains decodable for old compact
   snapshot/replay data but is no longer current-faction research.
 - **Ballistic Tables** (R&D Complex research, protocol id `ballistic_tables`): costs 150 steel /
-  100 oil and takes 600 ticks (~20s). It requires completed Field Ordnance research. Once
+  100 oil and takes 600 ticks (~20s). It requires completed Heavy Guns research. Once
   complete, that player's deployed Artillery tightens repeated point-fire shots from the
   range-scaled starting error down to three tiles over the existing five-shot accuracy period.
 - **Tank Production** (R&D Complex research, protocol id `tank_unlock`): costs 150 steel /
@@ -428,8 +428,8 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | rifleman        | 45  | 5   | 4     | 16 | 1.6   | 8     | 50  | 0   | 1   | 300 (~10s) |
 | machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 8     | 75  | 10  | 2   | 400 (~13s) |
 | mortar_team     | 75  | 40 outer / 100 inner AOE | 20 | 60 | 1.6 | 7 | 100 | 50 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
-| anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 72 | 1.6 | 6     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and Field Ordnance (`anti_tank_gun_unlock`) researched in R&D Complex |
-| artillery       | 150 | 150 AP inner / 150-10 outer AOE | 15-55 point fire | 90 | 1.3 | 4 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind) and Field Ordnance (`anti_tank_gun_unlock`) researched in R&D Complex; tank-sized footprint |
+| anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 72 | 1.6 | 6     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and Heavy Guns (`anti_tank_gun_unlock`) researched in R&D Complex |
+| artillery       | 150 | 150 AP inner / 150-10 outer AOE | 15-55 point fire | 90 | 1.3 | 4 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind) and Heavy Guns (`anti_tank_gun_unlock`) researched in R&D Complex; tank-sized footprint |
 | scout_car       | 100 | 6   | 5     | 6  | 2.35  | 10    | 125 | 50  | 3   | 480 (~16s) |
 | tank            | 292 | 60  | 5 moving / 14 fully stationary | 72 | 2.0   | 6     | 425 | 150 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex |
 | command_car     | 225 | 0   | 0     | 0  | 2.35  | 10    | 150 | 75  | 4   | 450 (~15s); requires Vehicle Works (`factory` kind) and Command Car (`command_car_unlock`) researched in R&D Complex; no weapon; Scout Car-style movement with a smaller jeep-sized body |
@@ -446,7 +446,7 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 | depot                      | Supply Depot       | 110 | 1     | 100 | 2x2  | 300       | +8 supply |
 | barracks                   | Barracks           | 165 | 1     | 150 | 3x2  | 200       | trains rifleman and machine_gunner; requires a City Centre |
 | training_centre            | Training Centre    | 300 | 1     | 100 steel + 50 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner training at barracks and researches Methamphetamines; requires a City Centre and Barracks |
-| research_complex           | R&D Complex        | 165 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Field Ordnance, Ballistic Tables, Tank Production, Command Car, and Mortar Autocast; requires a City Centre and Training Centre |
+| research_complex           | R&D Complex        | 165 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Heavy Guns, Ballistic Tables, Tank Production, Command Car, and Mortar Autocast; requires a City Centre and Training Centre |
 | factory                    | Vehicle Works      | 360 | 1     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, trains tank after Tank Production research, and trains command_car after Command Car research; requires a City Centre and Training Centre |
 | steelworks                 | Gun Works          | 300 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately and trains Anti-Tank Guns/Artillery after R&D Complex research; requires a City Centre and Training Centre |
 | tank_trap                  | Tank Trap          | 150 | 0     | 15 steel + 0 oil | 1x1  | 300       | engineer-built vehicle obstacle; workers deconstruct completed traps in 150 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building; requires a completed Training Centre |
