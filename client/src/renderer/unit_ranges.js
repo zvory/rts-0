@@ -14,6 +14,10 @@ import { drawFacingWedge, finiteNumber } from "./shared.js";
 const UNIT_RANGE_COLOR = 0x8eb7ff;
 const UNIT_RANGE_MIN_COLOR = 0x9f3a34;
 const UNIT_RANGE_DOT_SPACING_PX = 15;
+const UNIT_RANGE_LINE_ALPHA = 0.68;
+const UNIT_RANGE_MIN_LINE_ALPHA = 0.56;
+const UNIT_FIELD_OF_FIRE_FILL_ALPHA = 0.07;
+const UNIT_FIELD_OF_FIRE_LINE_ALPHA = 0.36;
 
 export function _drawSelectedMortarRanges(state) {
   return _drawSelectedUnitRanges.call(this, state);
@@ -42,15 +46,15 @@ export function _drawSelectedUnitRanges(state) {
         profile.facing,
         profile.arc,
         UNIT_RANGE_COLOR,
-        0.035,
-        0.18,
+        UNIT_FIELD_OF_FIRE_FILL_ALPHA,
+        UNIT_FIELD_OF_FIRE_LINE_ALPHA,
         profile.minRadius,
       );
     } else {
-      g.lineStyle(1, UNIT_RANGE_COLOR, 0.34);
+      g.lineStyle(1, UNIT_RANGE_COLOR, UNIT_RANGE_LINE_ALPHA);
       dottedCircle(g, e.x, e.y, profile.maxRadius);
       if (profile.minRadius > 0) {
-        g.lineStyle(1, UNIT_RANGE_MIN_COLOR, 0.28);
+        g.lineStyle(1, UNIT_RANGE_MIN_COLOR, UNIT_RANGE_MIN_LINE_ALPHA);
         dottedCircle(g, e.x, e.y, profile.minRadius, UNIT_RANGE_DOT_SPACING_PX * 0.8);
       }
     }
