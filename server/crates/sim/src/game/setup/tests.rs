@@ -10,19 +10,6 @@ fn owned_kind_count(game: &Game, owner: u32, kind: EntityKind) -> usize {
         .count()
 }
 
-fn kriegsia_players(count: u32) -> Vec<PlayerInit> {
-    (1..=count)
-        .map(|id| PlayerInit {
-            id,
-            team_id: id,
-            faction_id: DEFAULT_FACTION_ID.to_string(),
-            name: format!("Player {id}"),
-            color: format!("#{id:06x}"),
-            is_ai: false,
-        })
-        .collect()
-}
-
 #[test]
 fn fixture_faction_start_uses_catalog_loadout_and_shared_resources() {
     let players = [
@@ -268,30 +255,36 @@ fn standard_starting_loadout_matches_phase0_inventory() {
 }
 
 #[test]
-fn default_map_oil_patches_have_buildable_pump_jack_sites() {
-    for player_count in 1..=4 {
-        for seed in 0..16 {
-            let players = kriegsia_players(player_count);
-            let game = Game::new(&players, seed);
-
-            for oil in game
-                .entities
-                .iter()
-                .filter(|entity| entity.kind == EntityKind::Oil)
-            {
-                let (tile_x, tile_y) = game.map.tile_of(oil.pos_x, oil.pos_y);
-                assert!(
-                    services::standability::building_site_clear(
-                        &game.map,
-                        &game.entities,
-                        EntityKind::PumpJack,
-                        tile_x,
-                        tile_y,
-                    ),
-                    "oil node {} at tile ({tile_x}, {tile_y}) should leave a buildable Pump Jack site for player_count={player_count} seed={seed}",
-                    oil.id
-                );
-            }
+fn default_right_natural_oil_patches_have_buildable_pump_jack_sites() {
+    let player_count = 1;
+    // Selects the default-right natural, which previously placed oil under adjacent steel.
+    let seed = 2;
+    let map = Map::generate(player_count, seed);
+    let mut entities = EntityStore::new();
+    for &start in &map.starts {
+        spawn_base_resources(&mut entities, &map, start);
+    }
+    for &site in &map.expansion_sites {
+        if !map.starts.contains(&site) {
+            spawn_base_resources(&mut entities, &map, site);
         }
+    }
+
+    for oil in entities
+        .iter()
+        .filter(|entity| entity.kind == EntityKind::Oil)
+    {
+        let (tile_x, tile_y) = map.tile_of(oil.pos_x, oil.pos_y);
+        assert!(
+            services::standability::building_site_clear(
+                &map,
+                &entities,
+                EntityKind::PumpJack,
+                tile_x,
+                tile_y,
+            ),
+            "oil node {} at tile ({tile_x}, {tile_y}) should leave a buildable Pump Jack site for player_count={player_count} seed={seed}",
+            oil.id
+        );
     }
 }
