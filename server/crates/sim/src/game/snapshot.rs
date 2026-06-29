@@ -251,6 +251,7 @@ impl Game {
             resource_deltas,
             smokes,
             ability_objects,
+            trenches: Vec::new(),
             visible_tiles: if fogged {
                 fog.visible_tiles_for(player)
             } else {

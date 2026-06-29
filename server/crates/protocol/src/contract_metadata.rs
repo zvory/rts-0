@@ -85,6 +85,7 @@ pub mod lobby_kinds {
 /// Permanent upgrade ids used by production/research and snapshot projection.
 pub mod upgrades {
     pub const METHAMPHETAMINES: &str = "methamphetamines";
+    pub const ENTRENCHMENT: &str = "entrenchment";
     pub const ANTI_TANK_GUN_UNLOCK: &str = "anti_tank_gun_unlock";
     pub const TANK_UNLOCK: &str = "tank_unlock";
     pub const ARTILLERY_UNLOCK: &str = "artillery_unlock";
@@ -99,7 +100,7 @@ pub mod upgrades {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 26;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 27;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -180,6 +181,7 @@ pub struct CompactSlotSchemas {
     snapshot: Vec<SlotField>,
     entity: Vec<SlotField>,
     event: BTreeMap<&'static str, Vec<SlotField>>,
+    trench: Vec<SlotField>,
     ability_object: Vec<SlotField>,
     ability_object_owner_state: Vec<SlotField>,
     ability_cooldown: Vec<SlotField>,
@@ -361,6 +363,7 @@ const UPGRADE_CODES: &[(&str, u8)] = &[
     (upgrades::MORTAR_AUTOCAST, 5),
     (upgrades::COMMAND_CAR_UNLOCK, 6),
     (upgrades::BALLISTIC_TABLES, 7),
+    (upgrades::ENTRENCHMENT, 8),
 ];
 
 fn lookup_code(entries: &[(&str, u8)], value: &str) -> u8 {
@@ -595,6 +598,7 @@ fn lobby_kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
 fn upgrade_vocabulary() -> BTreeMap<&'static str, &'static str> {
     string_map(&[
         ("METHAMPHETAMINES", upgrades::METHAMPHETAMINES),
+        ("ENTRENCHMENT", upgrades::ENTRENCHMENT),
         ("ANTI_TANK_GUN_UNLOCK", upgrades::ANTI_TANK_GUN_UNLOCK),
         ("TANK_UNLOCK", upgrades::TANK_UNLOCK),
         ("ARTILLERY_UNLOCK", upgrades::ARTILLERY_UNLOCK),
@@ -713,6 +717,12 @@ fn compact_slot_schemas() -> CompactSlotSchemas {
             optional_field(31, "weaponRangeTiles"),
         ],
         event: event_slot_schemas(),
+        trench: vec![
+            field(0, "id"),
+            field(1, "x"),
+            field(2, "y"),
+            field(3, "radiusTiles"),
+        ],
         ability_object: vec![
             field(0, "id"),
             field(1, "owner"),

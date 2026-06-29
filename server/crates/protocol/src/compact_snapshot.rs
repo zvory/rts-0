@@ -10,7 +10,7 @@ use crate::SnapshotEncodeError;
 use rts_contract::{
     AbilityCooldownView, AbilityObjectOwnerStateView, AbilityObjectView, AttackReveal,
     DebugPathView, EntityView, Event, OrderPlanMarker, RememberedBuildingView, SmokeCloudView,
-    Snapshot, SnapshotNetStatus,
+    Snapshot, SnapshotNetStatus, TrenchView,
 };
 
 /// Serialize one semantic snapshot as a compact JSON text frame payload.
@@ -84,6 +84,16 @@ impl Serialize for CompactSnapshot<'_> {
                     .ability_objects
                     .iter()
                     .map(CompactAbilityObject)
+                    .collect::<Vec<_>>(),
+            )?;
+        }
+        if !snapshot.trenches.is_empty() {
+            map.serialize_entry(
+                "tr",
+                &snapshot
+                    .trenches
+                    .iter()
+                    .map(CompactTrench)
                     .collect::<Vec<_>>(),
             )?;
         }
@@ -186,6 +196,23 @@ impl Serialize for CompactSmokeCloud<'_> {
         seq.serialize_element(&smoke.y)?;
         seq.serialize_element(&smoke.radius_tiles)?;
         seq.serialize_element(&smoke.expires_in)?;
+        seq.end()
+    }
+}
+
+struct CompactTrench<'a>(&'a TrenchView);
+
+impl Serialize for CompactTrench<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let trench = self.0;
+        let mut seq = serializer.serialize_seq(Some(4))?;
+        seq.serialize_element(&trench.id)?;
+        seq.serialize_element(&trench.x)?;
+        seq.serialize_element(&trench.y)?;
+        seq.serialize_element(&trench.radius_tiles)?;
         seq.end()
     }
 }

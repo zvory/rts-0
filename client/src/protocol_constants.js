@@ -226,7 +226,7 @@ export const MOVEMENT_PATH_DIAGNOSTICS = Object.freeze({
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";
-export const COMPACT_SNAPSHOT_VERSION = 26;
+export const COMPACT_SNAPSHOT_VERSION = 27;
 export const SNAPSHOT_CODEC_VERSION = 1;
 export const SNAPSHOT_CODEC = Object.freeze({
   COMPACT_JSON: "compact-json",
@@ -283,6 +283,7 @@ export const SETUP_CODE = Object.freeze({
 
 export const UPGRADE = Object.freeze({
   METHAMPHETAMINES: "methamphetamines",
+  ENTRENCHMENT: "entrenchment",
   ANTI_TANK_GUN_UNLOCK: "anti_tank_gun_unlock",
   TANK_UNLOCK: "tank_unlock",
   ARTILLERY_UNLOCK: "artillery_unlock",
@@ -299,6 +300,7 @@ export const UPGRADE_CODE = Object.freeze({
   [UPGRADE.MORTAR_AUTOCAST]: 5,
   [UPGRADE.COMMAND_CAR_UNLOCK]: 6,
   [UPGRADE.BALLISTIC_TABLES]: 7,
+  [UPGRADE.ENTRENCHMENT]: 8,
 });
 
 export const EVENT_CODE = Object.freeze({
@@ -391,6 +393,7 @@ export const MAX_COMPACT_ENTITIES = 20000;
 export const MAX_COMPACT_RESOURCE_DELTAS = 20000;
 export const MAX_COMPACT_SMOKES = 1024;
 export const MAX_COMPACT_ABILITY_OBJECTS = 1024;
+export const MAX_COMPACT_TRENCHES = 20000;
 export const MAX_COMPACT_EVENTS = 5000;
 export const MAX_COMPACT_ORDER_PLAN = 9;
 export const MAX_COMPACT_ABILITIES = 8;

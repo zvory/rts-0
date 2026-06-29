@@ -15,6 +15,7 @@ import {
   MAX_COMPACT_REMEMBERED_BUILDINGS,
   MAX_COMPACT_RESOURCE_DELTAS,
   MAX_COMPACT_SMOKES,
+  MAX_COMPACT_TRENCHES,
   MAX_COMPACT_VISIBLE_TILES,
   NOTICE_SEVERITY,
   NOTICE_SEVERITY_BY_CODE,
@@ -52,6 +53,9 @@ export function decodeCompactSnapshot(raw) {
       "abilityObjects",
       MAX_COMPACT_ABILITY_OBJECTS,
     ).map(decodeCompactAbilityObject),
+    trenches: readOptionalArray(raw.tr, "trenches", MAX_COMPACT_TRENCHES).map(
+      decodeCompactTrench,
+    ),
     visibleTiles: decodeVisibilityRuns(raw.fg),
     rememberedBuildings: readOptionalArray(
       raw.mb,
@@ -124,6 +128,17 @@ function decodeCompactSmoke(record, index) {
     y: readNumber(fields[2], "smoke.y"),
     radiusTiles: readNumber(fields[3], "smoke.radiusTiles"),
     expiresIn: readU32(fields[4], "smoke.expiresIn"),
+  };
+}
+
+function decodeCompactTrench(record, index) {
+  const fields = readArray(record, `trench ${index}`, 4);
+  if (fields.length !== 4) throw new Error(`trench ${index} field count mismatch`);
+  return {
+    id: readU32(fields[0], "trench.id"),
+    x: readNumber(fields[1], "trench.x"),
+    y: readNumber(fields[2], "trench.y"),
+    radiusTiles: readNumber(fields[3], "trench.radiusTiles"),
   };
 }
 

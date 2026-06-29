@@ -12,6 +12,7 @@ pub const EKAT_FACTION_ID: &str = "ekat";
 pub const EMPTY_FIXTURE_FACTION_ID: &str = "phase2_empty_fixture";
 
 pub const METHAMPHETAMINES_UPGRADE: &str = "methamphetamines";
+pub const ENTRENCHMENT_UPGRADE: &str = "entrenchment";
 pub const ANTI_TANK_GUN_UNLOCK_UPGRADE: &str = "anti_tank_gun_unlock";
 pub const ARTILLERY_UNLOCK_UPGRADE: &str = "artillery_unlock";
 pub const BALLISTIC_TABLES_UPGRADE: &str = "ballistic_tables";
@@ -142,6 +143,10 @@ const DEFAULT_WORKER_BUILDABLES: &[EntityKind] = &[
 const DEFAULT_UPGRADES: &[UpgradeCatalogEntry] = &[
     UpgradeCatalogEntry {
         id: METHAMPHETAMINES_UPGRADE,
+        researched_at: EntityKind::TrainingCentre,
+    },
+    UpgradeCatalogEntry {
+        id: ENTRENCHMENT_UPGRADE,
         researched_at: EntityKind::TrainingCentre,
     },
     UpgradeCatalogEntry {
@@ -624,6 +629,7 @@ mod tests {
             ]
         );
         assert!(catalog.allows_research(METHAMPHETAMINES_UPGRADE, EntityKind::TrainingCentre));
+        assert!(catalog.allows_research(ENTRENCHMENT_UPGRADE, EntityKind::TrainingCentre));
         assert!(catalog.allows_research(ANTI_TANK_GUN_UNLOCK_UPGRADE, research_complex));
         assert!(!catalog.allows_research(ARTILLERY_UNLOCK_UPGRADE, research_complex));
         assert!(catalog.allows_research(BALLISTIC_TABLES_UPGRADE, research_complex));
@@ -757,6 +763,7 @@ mod tests {
         assert!(catalog.allows_building(EntityKind::Depot));
         assert!(catalog.trainable_units(EntityKind::CityCentre).is_empty());
         assert!(!catalog.allows_research(METHAMPHETAMINES_UPGRADE, EntityKind::TrainingCentre));
+        assert!(!catalog.allows_research(ENTRENCHMENT_UPGRADE, EntityKind::TrainingCentre));
         assert!(!catalog.allows_ability(SMOKE_ABILITY, EntityKind::ScoutCar));
     }
 

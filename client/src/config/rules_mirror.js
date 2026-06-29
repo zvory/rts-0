@@ -57,6 +57,12 @@ export const MORTAR_OUTER_RADIUS_TILES = 1.5;
 export const MORTAR_INNER_RADIUS_TILES = 0.5;
 export const MORTAR_FIRE_COOLDOWN_TICKS = TICK_HZ * 2;
 export const METHAMPHETAMINES_RESEARCH_TICKS = TICK_HZ * 20;
+export const ENTRENCHMENT_RESEARCH_TICKS = TICK_HZ * 10;
+export const ENTRENCHMENT_DIG_IN_TICKS = TICK_HZ * 3;
+export const ENTRENCHMENT_RANGE_BONUS_TILES = 1;
+export const ENTRENCHMENT_DIRECT_MISS_CHANCE = 0.70;
+export const ENTRENCHMENT_AREA_DAMAGE_REDUCTION = 0.70;
+export const ENTRENCHMENT_TRENCH_RADIUS_TILES = 0.75;
 export const ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
 export const ARTILLERY_UNLOCK_RESEARCH_TICKS = TICK_HZ * 30;
 export const BALLISTIC_TABLES_RESEARCH_TICKS = TICK_HZ * 20;
@@ -130,7 +136,7 @@ export const STATS = Object.freeze({
     cost: { steel: 150, oil: 0 }, buildTicks: 200, trains: [KIND.RIFLEMAN, KIND.MACHINE_GUNNER], requires: KIND.CITY_CENTRE },
   [KIND.TRAINING_CENTRE]: { label: "Training Centre", icon: "TC", footW: 3, footH: 2, sight: 1,
     cost: { steel: 100, oil: 50 }, buildTicks: 560, trains: [],
-    researches: [UPGRADE.METHAMPHETAMINES],
+    researches: [UPGRADE.METHAMPHETAMINES, UPGRADE.ENTRENCHMENT],
     requires: [KIND.CITY_CENTRE, KIND.BARRACKS] },
   [KIND.RESEARCH_COMPLEX]: { label: "R&D Complex", icon: "RD", footW: 3, footH: 3, sight: 1,
     cost: { steel: 100, oil: 100 }, buildTicks: TICK_HZ * 15, trains: [],
@@ -294,6 +300,15 @@ export const UPGRADES = Object.freeze({
     cost: Object.freeze({ steel: 100, oil: 100 }),
     researchTicks: METHAMPHETAMINES_RESEARCH_TICKS,
     description: "Boost Riflemen; speed up Machine Gunner movement and setup",
+    researchedAt: KIND.TRAINING_CENTRE,
+  }),
+  [UPGRADE.ENTRENCHMENT]: Object.freeze({
+    upgrade: UPGRADE.ENTRENCHMENT,
+    label: "Entrenchment",
+    icon: "ENT",
+    cost: Object.freeze({ steel: 100, oil: 0 }),
+    researchTicks: ENTRENCHMENT_RESEARCH_TICKS,
+    description: "Let eligible infantry create and use persistent trenches",
     researchedAt: KIND.TRAINING_CENTRE,
   }),
   [UPGRADE.ANTI_TANK_GUN_UNLOCK]: Object.freeze({

@@ -3,6 +3,7 @@ use std::str::FromStr;
 use crate::game::entity::EntityKind;
 
 const METHAMPHETAMINES: &str = "methamphetamines";
+const ENTRENCHMENT: &str = "entrenchment";
 const ANTI_TANK_GUN_UNLOCK: &str = "anti_tank_gun_unlock";
 const ARTILLERY_UNLOCK: &str = "artillery_unlock";
 const BALLISTIC_TABLES: &str = "ballistic_tables";
@@ -13,6 +14,7 @@ const MORTAR_AUTOCAST: &str = "mortar_autocast";
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum UpgradeKind {
     Methamphetamines,
+    Entrenchment,
     AntiTankGunUnlock,
     ArtilleryUnlock,
     BallisticTables,
@@ -25,6 +27,7 @@ impl UpgradeKind {
     pub fn to_protocol_str(self) -> &'static str {
         match self {
             UpgradeKind::Methamphetamines => METHAMPHETAMINES,
+            UpgradeKind::Entrenchment => ENTRENCHMENT,
             UpgradeKind::AntiTankGunUnlock => ANTI_TANK_GUN_UNLOCK,
             UpgradeKind::ArtilleryUnlock => ARTILLERY_UNLOCK,
             UpgradeKind::BallisticTables => BALLISTIC_TABLES,
@@ -41,6 +44,7 @@ impl FromStr for UpgradeKind {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             METHAMPHETAMINES => Ok(UpgradeKind::Methamphetamines),
+            ENTRENCHMENT => Ok(UpgradeKind::Entrenchment),
             ANTI_TANK_GUN_UNLOCK => Ok(UpgradeKind::AntiTankGunUnlock),
             ARTILLERY_UNLOCK => Ok(UpgradeKind::ArtilleryUnlock),
             BALLISTIC_TABLES => Ok(UpgradeKind::BallisticTables),
@@ -65,6 +69,7 @@ pub struct UpgradeDefinition {
 /// All upgrade ids the simulation can decode from protocol or replay data.
 pub const ALL: &[UpgradeKind] = &[
     UpgradeKind::Methamphetamines,
+    UpgradeKind::Entrenchment,
     UpgradeKind::AntiTankGunUnlock,
     UpgradeKind::ArtilleryUnlock,
     UpgradeKind::BallisticTables,
@@ -75,6 +80,7 @@ pub const ALL: &[UpgradeKind] = &[
 
 const CURRENT_RESEARCHABLE: &[UpgradeKind] = &[
     UpgradeKind::Methamphetamines,
+    UpgradeKind::Entrenchment,
     UpgradeKind::AntiTankGunUnlock,
     UpgradeKind::BallisticTables,
     UpgradeKind::TankUnlock,
@@ -99,6 +105,14 @@ pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
             cost_steel: crate::config::METHAMPHETAMINES_COST_STEEL,
             cost_oil: crate::config::METHAMPHETAMINES_COST_OIL,
             research_ticks: crate::config::METHAMPHETAMINES_RESEARCH_TICKS,
+        },
+        UpgradeKind::Entrenchment => UpgradeDefinition {
+            kind,
+            researched_at: EntityKind::TrainingCentre,
+            requires_upgrade: None,
+            cost_steel: crate::config::ENTRENCHMENT_COST_STEEL,
+            cost_oil: crate::config::ENTRENCHMENT_COST_OIL,
+            research_ticks: crate::config::ENTRENCHMENT_RESEARCH_TICKS,
         },
         UpgradeKind::AntiTankGunUnlock => UpgradeDefinition {
             kind,
@@ -168,6 +182,10 @@ mod tests {
     #[test]
     fn researchable_upgrades_exclude_legacy_artillery_unlock() {
         assert_eq!(
+            researchable_upgrades(EntityKind::TrainingCentre),
+            vec![UpgradeKind::Methamphetamines, UpgradeKind::Entrenchment]
+        );
+        assert_eq!(
             researchable_upgrades(EntityKind::ResearchComplex),
             vec![
                 UpgradeKind::AntiTankGunUnlock,
@@ -180,5 +198,21 @@ mod tests {
         assert!(ALL.contains(&UpgradeKind::ArtilleryUnlock));
         assert!(!researchable_upgrades(EntityKind::ResearchComplex)
             .contains(&UpgradeKind::ArtilleryUnlock));
+    }
+
+    #[test]
+    fn entrenchment_definition_matches_training_centre_research_contract() {
+        assert_eq!(
+            "entrenchment".parse::<UpgradeKind>(),
+            Ok(UpgradeKind::Entrenchment)
+        );
+        assert_eq!(UpgradeKind::Entrenchment.to_protocol_str(), "entrenchment");
+
+        let definition = definition(UpgradeKind::Entrenchment);
+        assert_eq!(definition.researched_at, EntityKind::TrainingCentre);
+        assert_eq!(definition.requires_upgrade, None);
+        assert_eq!(definition.cost_steel, 100);
+        assert_eq!(definition.cost_oil, 0);
+        assert_eq!(definition.research_ticks, crate::config::TICK_HZ * 10);
     }
 }

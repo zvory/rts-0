@@ -114,7 +114,7 @@ the transport envelope only and is intentionally absent from replay/simulation c
 | `gather`     | `units: u32[]`, `node: u32`, `queued?: bool` | Send gather-capable units to harvest a direct-mineable resource node. Oil nodes are not direct-mineable; workers extract oil by building Pump Jacks with the `build` command. When `queued` is true, store future gather intent instead of replacing the active order. |
 | `build`      | `units: u32[]`, `building: string`, `tileX: u32`, `tileY: u32`, `queued?: bool` | Selected workers construct a building at a tile. The server allocates one compatible worker per build click, first walks that worker to a nearby point outside the requested footprint, then starts construction once it is in range. `building` ∈ building kinds. `pump_jack` is a contextual worker build that is valid only when its footprint overlaps a live oil node. When `queued` is true, store future build intent instead of replacing the active order. |
 | `train`      | `building: u32`, `unit: string` | Queue a unit at a production building. |
-| `research`   | `building: u32`, `upgrade: string` | Queue a permanent player upgrade at a tech building. Current Kriegsia upgrade ids: `methamphetamines` at the Training Centre; `anti_tank_gun_unlock` (Heavy Guns), `ballistic_tables`, `tank_unlock`, `command_car_unlock`, and `mortar_autocast` at the R&D Complex (`research_complex`). `anti_tank_gun_unlock` unlocks both Anti-Tank Gun and Artillery training. `ballistic_tables` requires completed `anti_tank_gun_unlock`; `command_car_unlock` requires completed `tank_unlock`. Legacy `artillery_unlock` remains in the compact upgrade vocabulary for old snapshot/replay decoding but is not current-faction research. |
+| `research`   | `building: u32`, `upgrade: string` | Queue a permanent player upgrade at a tech building. Current Kriegsia upgrade ids: `methamphetamines` and `entrenchment` at the Training Centre; `anti_tank_gun_unlock` (Heavy Guns), `ballistic_tables`, `tank_unlock`, `command_car_unlock`, and `mortar_autocast` at the R&D Complex (`research_complex`). `anti_tank_gun_unlock` unlocks both Anti-Tank Gun and Artillery training. `ballistic_tables` requires completed `anti_tank_gun_unlock`; `command_car_unlock` requires completed `tank_unlock`. Legacy `artillery_unlock` remains in the compact upgrade vocabulary for old snapshot/replay decoding but is not current-faction research. |
 | `cancel`     | `building: u32` | Cancel the latest item in a building's production queue. |
 | `stop`       | `units: u32[]` | Clear orders and return selected units to ordinary idle behavior. |
 | `holdPosition` | `units: u32[]` | Clear active and queued unit orders, then stand ground. Held units do not chase or path to auto-acquire enemies; they still fire at enemies already in weapon range and can still be pushed by collision resolution. |
@@ -537,6 +537,7 @@ transport decode:
   resourceDeltas?: ResourceDelta[], // visible resource remaining updates; omitted when empty
   smokes?: SmokeCloud[],         // active smoke clouds visible to this recipient; omitted when empty
   abilityObjects?: AbilityObject[], // active ability world objects visible to this recipient; omitted when empty
+  trenches?: Trench[],           // neutral trench terrain visible to this recipient; omitted when empty
   visibleTiles?: u8[],           // row-major current server visibility; 1 = visible, 0 = fogged
   rememberedBuildings?: RememberedBuilding[], // stale enemy building intel for projected players
   events: Event[],               // transient things to surface (see 2.5)
@@ -592,7 +593,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 26. `client/src/net.js` calls
+`messagepack-compact`, codec version 1, compact snapshot version 27. `client/src/net.js` calls
 `parseServerFrame`; the binary frame parser in `client/src/protocol_frame.js` returns the raw
 compact snapshot object, then `decodeCompactSnapshot` expands it back into the semantic object above
 before dispatching `S.SNAPSHOT`.
@@ -618,7 +619,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 26,
+  "v": 27,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
@@ -633,6 +634,7 @@ adds an explicit application compression envelope.
   "r": [[id, remaining]],         // omitted when empty
   "sm": [[id, x, y, radiusTiles, expiresIn]], // omitted when empty
   "ao": [[id, owner, ability, kind, x, y, expiresIn?, sourceCasterId?, ownerState?]], // abilityObjects; omitted when empty
+  "tr": [[id, x, y, radiusTiles]], // trenches; omitted when empty
   "fg": [firstValue, runLen, ...], // RLE visibleTiles; omitted when empty/no-fog
   "mb": [[id, owner, kind, x, y, [[tileX, tileY], ...], observedTick]], // rememberedBuildings; omitted when empty
   "ev": [EventRecord],            // omitted when empty
@@ -652,7 +654,7 @@ Compact numeric codes:
 | `orderStage` | 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`, 6 `smoke`, 7 `setupAntiTankGuns`, 8 `charge`, 9 `mortarFire`, 10 `pointFire`, 11 `breakthrough`, 12 `ekatTeleport`, 13 `ekatLineShot`, 14 `ekatMagicAnchor`, 15 `deconstruct`, 16 `ekatConsumeGolem` |
 | `ability` | 1 `charge`, 2 `smoke`, 3 `mortarFire`, 4 `pointFire`, 5 `breakthrough`, 6 `ekatTeleport`, 7 `ekatLineShot`, 8 `ekatMagicAnchor`, 9 `ekatConsumeGolem` |
 | `abilityObject.kind` | 1 `returnMarker`, 2 `magicAnchor`, 3 `lineProjectile` |
-| `upgrade` | 1 `methamphetamines`, 2 `anti_tank_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock` (legacy decode only), 5 `mortar_autocast`, 6 `command_car_unlock`, 7 `ballistic_tables` |
+| `upgrade` | 1 `methamphetamines`, 2 `anti_tank_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock` (legacy decode only), 5 `mortar_autocast`, 6 `command_car_unlock`, 7 `ballistic_tables`, 8 `entrenchment` |
 | `notice.severity` | 1 `info`, 2 `warn`, 3 `alert` |
 | `EventRecord` | `[1, from, to]` attack, `[1, from, to, reveal?, toPos?]` attack with optional shooter reveal and target position, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice, `[5, [fromX, fromY], [toX, toY], delayTicks]` smoke launch, `[6, x, y, radiusTiles]` mortar impact/marker, `[6, x, y, radiusTiles, from?, reveal?]` mortar impact with optional shooter reveal, `[7, from, [x, y], radiusTiles, delayTicks]` artillery target marker, `[8, x, y, radiusTiles]` artillery impact, `[9, from, [fromX, fromY], [toX, toY], radiusTiles, delayTicks]` mortar launch, `[10, to]` overpenetration damage, `[11, owner, x, y, facing]` global artillery firing minimap marker |
 
@@ -731,6 +733,12 @@ Magic Anchor currently fills only `radius`; the hp and destroyed-lockout slots a
 optional compact slots for compatibility.
 Normal enemy snapshots receive only the public object fields needed to render a marker at a visible
 position.
+
+`Trench`: `{ id, x, y, radiusTiles }`. Trenches are neutral persistent battlefield terrain, not
+buildable entities, and do not carry an owner field. The `id` is stable for the trench lifetime,
+`x`/`y` are the world-pixel center, and `radiusTiles` is the footprint/render radius used by later
+slotting and rendering code. Phase 1 only defines this snapshot boundary; normal snapshots omit
+`trenches` until the server-owned trench store and projection policy are implemented.
 
 `RememberedBuilding`: `{ id, owner, kind, x, y, footprint, observedTick }`. These records are
 recipient-only last-seen enemy building memory, refreshed from team-current actionable observations

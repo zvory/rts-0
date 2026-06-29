@@ -268,6 +268,11 @@ assert(
   "compact ability object slot count must match JS decoder",
 );
 assert(
+  protocolContract.compactSlotSchemas.trench.map((field) => field.name).join(",") ===
+    "id,x,y,radiusTiles",
+  "compact trench slot schema must match JS decoder",
+);
+assert(
   protocolContract.compactSlotSchemas.netStatus.length === 8,
   "compact net status slot count must match JS decoder",
 );

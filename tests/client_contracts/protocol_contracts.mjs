@@ -173,6 +173,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
         [45, null, 14, null, null, null],
       ],
     ],
+    tr: [[80, 448, 480, 0.75]],
     u: [1, UPGRADE_CODE[UPGRADE.ARTILLERY_UNLOCK]],
     fg: [1, 2, 3, 1],
     ev: [
@@ -272,6 +273,13 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
       decoded.abilityObjects[0].ownerState.earliestReturnTick === 45 &&
       decoded.abilityObjects[0].ownerState.radius === 14,
     "ability objects decode",
+  );
+  assert(
+    decoded.trenches[0].id === 80 &&
+      decoded.trenches[0].x === 448 &&
+      decoded.trenches[0].y === 480 &&
+      decoded.trenches[0].radiusTiles === 0.75,
+    "trenches decode",
   );
   assert(
     decoded.visibleTiles.join(",") === "1,1,0,0,0,1",

@@ -129,6 +129,66 @@ fn advanced_unlocks_research_only_at_research_complex() {
 }
 
 #[test]
+fn entrenchment_researches_at_training_centre_with_contract_cost_and_time() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let (tc_x, tc_y) = footprint_center(&map, EntityKind::TrainingCentre, 6, 6);
+    let training_centre = entities
+        .spawn_building(1, EntityKind::TrainingCentre, tc_x, tc_y, true)
+        .expect("training centre should spawn");
+    let (rd_x, rd_y) = footprint_center(&map, EntityKind::ResearchComplex, 12, 6);
+    let research_complex = entities
+        .spawn_building(1, EntityKind::ResearchComplex, rd_x, rd_y, true)
+        .expect("research complex should spawn");
+    let mut players = vec![player_state(1), player_state(2)];
+
+    let events = apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(
+            1,
+            SimCommand::Research {
+                building: research_complex,
+                upgrade: UpgradeKind::Entrenchment,
+            },
+        )],
+    );
+    assert!(entities
+        .get(research_complex)
+        .expect("research complex")
+        .research_queue()
+        .is_empty());
+    assert!(matches!(
+        events.get(&1).and_then(|events| events.first()),
+        Some(Event::Notice { msg, .. }) if msg == "Cannot research that here"
+    ));
+
+    apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(
+            1,
+            SimCommand::Research {
+                building: training_centre,
+                upgrade: UpgradeKind::Entrenchment,
+            },
+        )],
+    );
+    let queue = entities
+        .get(training_centre)
+        .expect("training centre")
+        .research_queue();
+    assert_eq!(queue.len(), 1);
+    assert_eq!(queue[0].upgrade, UpgradeKind::Entrenchment);
+    assert_eq!(queue[0].progress, 0);
+    assert_eq!(queue[0].total, crate::config::TICK_HZ * 10);
+    assert_eq!(players[0].steel, 900);
+    assert_eq!(players[0].oil, 1_000);
+}
+
+#[test]
 fn fixture_faction_rejects_global_build_train_and_research_commands() {
     let map = flat_map(24);
     let mut players = vec![player_state(1), player_state(2)];

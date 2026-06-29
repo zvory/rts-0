@@ -15,7 +15,7 @@ use rts_protocol::{
     RememberedBuildingView, ReplayBranchSeat, ReplayStartMetadata, ResourceDelta, ResourceNode,
     RoomCapabilities, RoomTimeCapabilities, RoomTimeState, ServerMessage, SlotField,
     SmokeCloudView, Snapshot, SnapshotCodec, SnapshotCodecContract, SnapshotEncodeError,
-    SnapshotFrame, SnapshotNetStatus, StartPayload, TeamId, VisibilityCapabilities,
+    SnapshotFrame, SnapshotNetStatus, StartPayload, TeamId, TrenchView, VisibilityCapabilities,
     VisionSelectionRequest, COMPACT_SNAPSHOT_VERSION, COMPACT_UNKNOWN_CODE, DEFAULT_FACTION_ID,
     MESSAGEPACK_SNAPSHOT_FRAME_MAGIC, PREDICTION_PROTOCOL_VERSION, SNAPSHOT_CODEC_COMPACT_JSON,
     SNAPSHOT_CODEC_MESSAGEPACK_COMPACT, SNAPSHOT_CODEC_VERSION, SNAPSHOT_FRAME_KIND_BINARY,
@@ -87,6 +87,7 @@ fn stable_rust_public_surface_compiles() {
     assert_type::<ServerMessage>();
     assert_type::<SlotField>();
     assert_type::<SmokeCloudView>();
+    assert_type::<TrenchView>();
     assert_type::<Snapshot>();
     assert_type::<SnapshotCodec>();
     assert_type::<SnapshotCodecContract>();
@@ -118,10 +119,11 @@ fn stable_rust_public_surface_compiles() {
     assert_eq!(abilities::EKAT_MAGIC_ANCHOR, "ekatMagicAnchor");
     assert_eq!(ability_object_kinds::RETURN_MARKER, "returnMarker");
     assert_eq!(upgrades::METHAMPHETAMINES, "methamphetamines");
+    assert_eq!(upgrades::ENTRENCHMENT, "entrenchment");
 
     assert_eq!(PREDICTION_PROTOCOL_VERSION, 1);
     assert_eq!(DEFAULT_FACTION_ID, "kriegsia");
-    assert_eq!(COMPACT_SNAPSHOT_VERSION, 26);
+    assert_eq!(COMPACT_SNAPSHOT_VERSION, 27);
     assert_eq!(SNAPSHOT_CODEC_VERSION, 1);
     assert_eq!(COMPACT_UNKNOWN_CODE, 255);
     assert_eq!(MESSAGEPACK_SNAPSHOT_FRAME_MAGIC, [0x52, 0x54, 0x53, 0x4d]);
