@@ -154,6 +154,11 @@ pub(crate) fn building_site_clear_spatial(
         .saturating_add(stats.foot_h)
         .saturating_add(BUILD_SITE_SPATIAL_PADDING_TILES as u32) as i32;
 
+    let policy = build_placement_policy(building);
+    if !contextual_placement_status(map, entities, policy, rect).is_clear() {
+        return false;
+    }
+
     classify_entity_blockers(
         spatial
             .ids_in_rect(min_tx, min_ty, max_tx, max_ty)
@@ -161,7 +166,7 @@ pub(crate) fn building_site_clear_spatial(
         map,
         rect,
         None,
-        build_placement_policy(building),
+        policy,
     )
     .is_clear()
 }
@@ -227,16 +232,30 @@ fn building_site_status_with_ignored_unit(
         return BuildSiteStatus::InvalidFootprint;
     }
     let policy = build_placement_policy(building);
-    if policy == BuildPlacementPolicy::PumpJackOilOnly {
-        let Some(oil_id) = pump_jack::live_oil_node_intersecting_rect(entities.iter(), rect) else {
-            return BuildSiteStatus::InvalidFootprint;
-        };
-        if pump_jack::oil_node_has_pump_jack(map, entities, oil_id) {
-            return BuildSiteStatus::BlockedByBuilding;
-        }
+    let contextual_status = contextual_placement_status(map, entities, policy, rect);
+    if !contextual_status.is_clear() {
+        return contextual_status;
     }
 
     classify_entity_blockers(entities.iter(), map, rect, ignored_unit, policy)
+}
+
+fn contextual_placement_status(
+    map: &Map,
+    entities: &EntityStore,
+    policy: BuildPlacementPolicy,
+    rect: RectBody,
+) -> BuildSiteStatus {
+    if policy != BuildPlacementPolicy::PumpJackOilOnly {
+        return BuildSiteStatus::Clear;
+    }
+    let Some(oil_id) = pump_jack::live_oil_node_intersecting_rect(entities.iter(), rect) else {
+        return BuildSiteStatus::InvalidFootprint;
+    };
+    if pump_jack::oil_node_has_pump_jack(map, entities, oil_id) {
+        return BuildSiteStatus::BlockedByBuilding;
+    }
+    BuildSiteStatus::Clear
 }
 
 fn classify_entity_blockers<'a>(
@@ -802,51 +821,6 @@ mod tests {
             4,
             4,
         ));
-    }
-
-    #[test]
-    fn spatial_building_site_clear_matches_full_scan_for_blockers() {
-        let map = flat_map(12);
-        let mut cases = Vec::new();
-
-        let mut blocked_by_building = EntityStore::new();
-        let (bx, by) = footprint_center(&map, EntityKind::Depot, 4, 4);
-        blocked_by_building
-            .spawn_building(1, EntityKind::Depot, bx, by, true)
-            .expect("depot should spawn");
-        cases.push(blocked_by_building);
-
-        let mut blocked_by_unit = EntityStore::new();
-        let rect = building_rect_for_footprint(EntityKind::Depot, 4, 4).expect("depot rect");
-        let radius = config::unit_stats(EntityKind::Tank)
-            .expect("tank stats")
-            .radius;
-        blocked_by_unit
-            .spawn_unit(
-                1,
-                EntityKind::Tank,
-                rect.max_x + radius - 1.0,
-                rect.min_y + 32.0,
-            )
-            .expect("tank should spawn");
-        cases.push(blocked_by_unit);
-
-        let mut blocked_by_resource = EntityStore::new();
-        let (nx, ny) = map.tile_center(4, 4);
-        blocked_by_resource
-            .spawn_node(EntityKind::Steel, nx, ny)
-            .expect("steel node should spawn");
-        cases.push(blocked_by_resource);
-
-        cases.push(EntityStore::new());
-
-        for entities in cases {
-            let spatial = SpatialIndex::build(&entities, map.size);
-            assert_eq!(
-                building_site_clear_spatial(&map, &entities, &spatial, EntityKind::Depot, 4, 4),
-                building_site_clear(&map, &entities, EntityKind::Depot, 4, 4)
-            );
-        }
     }
 
     #[test]

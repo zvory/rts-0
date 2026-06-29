@@ -62,6 +62,46 @@ fn tank_trap_does_not_keep_player_alive() {
 }
 
 #[test]
+fn pump_jack_does_not_keep_player_alive() {
+    let players = [
+        PlayerInit {
+            id: 1,
+            team_id: 1,
+            faction_id: "kriegsia".to_string(),
+            name: "A".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            team_id: 2,
+            faction_id: "kriegsia".to_string(),
+            name: "B".into(),
+            color: "#000".into(),
+            is_ai: false,
+        },
+    ];
+    let mut game = Game::new(&players, 0x1234_5678);
+    let p2_buildings: Vec<u32> = game
+        .entities
+        .iter()
+        .filter(|entity| entity.owner == 2 && entity.is_building())
+        .map(|entity| entity.id)
+        .collect();
+    for id in p2_buildings {
+        game.entities.remove(id);
+    }
+    game.entities
+        .spawn_building(2, EntityKind::PumpJack, 160.0, 160.0, true)
+        .expect("Pump Jack should spawn");
+
+    assert!(
+        !game.alive_players().contains(&2),
+        "Pump Jacks extract resources but are not elimination-survival buildings"
+    );
+}
+
+#[test]
 fn tank_trap_grants_no_local_sight() {
     let players = [
         PlayerInit {
