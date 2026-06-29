@@ -230,7 +230,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   );
   assert(
     STATS[KIND.ARTILLERY].upgradeRequires === UPGRADE.ANTI_TANK_GUN_UNLOCK,
-    "Artillery training requires Field Ordnance",
+    "Artillery training requires Heavy Guns",
   );
   assert(
     ABILITIES[ABILITY.POINT_FIRE].carriers.includes(KIND.ARTILLERY) &&
@@ -292,7 +292,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       UPGRADE.COMMAND_CAR_UNLOCK,
       UPGRADE.MORTAR_AUTOCAST,
     ],
-    "R&D Complex should expose Field Ordnance, Artillery Fire Control, Tank, Command Car, and Mortar Autocast research",
+    "R&D Complex should expose Heavy Guns, Artillery Fire Control, Tank, Command Car, and Mortar Autocast research",
   );
   assert(!ABILITIES[ABILITY.CHARGE], "client no longer exposes Rifleman Charge as a command-card ability");
   assert(
@@ -314,15 +314,18 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   assert(
     UPGRADES[UPGRADE.BALLISTIC_TABLES].cost.steel === 150 &&
       UPGRADES[UPGRADE.BALLISTIC_TABLES].cost.oil === 100 &&
-      UPGRADES[UPGRADE.BALLISTIC_TABLES].researchTicks === 600 &&
-      UPGRADES[UPGRADE.BALLISTIC_TABLES].label === "Artillery Fire Control" &&
+      UPGRADES[UPGRADE.BALLISTIC_TABLES].researchTicks === 600,
+    "Artillery Fire Control research cost and time mirror server",
+  );
+  assert(
+    UPGRADES[UPGRADE.BALLISTIC_TABLES].label === "Artillery Fire Control" &&
       UPGRADES[UPGRADE.BALLISTIC_TABLES].icon === "AFC",
-    "Artillery Fire Control research cost, time, label, and icon mirror server",
+    "Artillery Fire Control research uses the renamed client label and icon",
   );
   assert(
     UPGRADES[UPGRADE.BALLISTIC_TABLES].requiresUpgrade === UPGRADE.ANTI_TANK_GUN_UNLOCK &&
-      UPGRADES[UPGRADE.BALLISTIC_TABLES].requiresText === "Requires Field Ordnance",
-    "Artillery Fire Control research should mirror its Field Ordnance prerequisite",
+      UPGRADES[UPGRADE.BALLISTIC_TABLES].requiresText === "Requires Heavy Guns",
+    "Artillery Fire Control research should mirror its Heavy Guns prerequisite",
   );
   assert(
     STATS[KIND.ANTI_TANK_GUN].upgradeRequiresText === "Requires research in R&D Complex",
@@ -785,7 +788,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     const mortarButton = renderedButtons.find((button) => button.innerHTML.includes("Mortar Team"));
     const antiTankGunButton = renderedButtons.find((button) => button.innerHTML.includes("Anti-Tank Gun"));
     const artilleryButton = renderedButtons.find((button) => button.innerHTML.includes("Artillery"));
-    const fieldOrdnanceResearchButton = renderedButtons.find((button) => button.innerHTML.includes("ORD"));
+    const heavyGunsResearchButton = renderedButtons.find((button) => button.innerHTML.includes("HG+"));
     const artilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
     assert(mortarButton?.dataset.hotkey === "Q", "Mortar Team training should occupy the top-left Q slot");
     assert(
@@ -794,7 +797,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     );
     assert(antiTankGunButton?.dataset.hotkey === "W", "Anti-Tank Gun training should occupy the top-middle W slot");
     assert(artilleryButton?.dataset.hotkey === "E", "Artillery training should occupy the top-right E slot");
-    assert(!fieldOrdnanceResearchButton, "Field Ordnance research should stay out of Gun Works");
+    assert(!heavyGunsResearchButton, "Heavy Guns research should stay out of Gun Works");
     assert(!artilleryResearchButton, "Separate Artillery research should not appear in Gun Works");
 
     renderedButtons.length = 0;
@@ -818,21 +821,21 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     rdHud._cancelRoundRobin = new Map();
     rdHud._resourceIcons = {};
     renderCommandCard(rdHud);
-    const rdFieldOrdnanceResearchButton = renderedButtons.find((button) => button.innerHTML.includes("ORD"));
+    const rdHeavyGunsResearchButton = renderedButtons.find((button) => button.innerHTML.includes("HG+"));
     const rdArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
     const rdArtilleryFireControlButton = renderedButtons.find((button) => button.innerHTML.includes("AFC"));
     const rdTankResearchButton = renderedButtons.find((button) => button.innerHTML.includes("TK+"));
     const rdCommandCarResearchButton = renderedButtons.find((button) => button.innerHTML.includes("CC+"));
     const rdMortarAutocastButton = renderedButtons.find((button) => button.innerHTML.includes("MT+"));
-    assert(rdFieldOrdnanceResearchButton?.dataset.hotkey === "Q", "Field Ordnance research should appear in R&D Complex");
     assert(rdArtilleryFireControlButton?.dataset.hotkey === "W", "Artillery Fire Control research should appear in R&D Complex");
+    assert(rdHeavyGunsResearchButton?.dataset.hotkey === "Q", "Heavy Guns research should appear in R&D Complex");
     assert(rdTankResearchButton?.dataset.hotkey === "E", "Tank Production research should appear in R&D Complex");
     assert(rdCommandCarResearchButton?.dataset.hotkey === "A", "Command Car research should appear in R&D Complex");
     assert(rdMortarAutocastButton?.dataset.hotkey === "S", "Mortar Autocast research should appear in R&D Complex");
     assert(rdCommandCarResearchButton?.disabled, "Command Car research should be disabled before Tank Production");
     assert(rdCommandCarResearchButton?.title === "Requires Tank Production", "Command Car research should name Tank prerequisite");
-    assert(rdArtilleryFireControlButton?.disabled, "Artillery Fire Control research should be disabled before Field Ordnance");
-    assert(rdArtilleryFireControlButton?.title === "Requires Field Ordnance", "Artillery Fire Control research should name Field Ordnance prerequisite");
+    assert(rdArtilleryFireControlButton?.disabled, "Artillery Fire Control research should be disabled before Heavy Guns");
+    assert(rdArtilleryFireControlButton?.title === "Requires Heavy Guns", "Artillery Fire Control research should name Heavy Guns prerequisite");
     assert(!rdArtilleryResearchButton, "R&D Complex should not expose separate Artillery research");
 
     renderedButtons.length = 0;
@@ -840,7 +843,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     rdHud._cardSig = null;
     renderCommandCard(rdHud);
     const unlockedArtilleryFireControlButton = renderedButtons.find((button) => button.innerHTML.includes("AFC"));
-    assert(unlockedArtilleryFireControlButton && !unlockedArtilleryFireControlButton.disabled, "Artillery Fire Control should enable after Field Ordnance");
+    assert(unlockedArtilleryFireControlButton && !unlockedArtilleryFireControlButton.disabled, "Artillery Fire Control should enable after Heavy Guns");
 
     renderedButtons.length = 0;
     rdHud.state.upgrades = [UPGRADE.TANK_UNLOCK];
