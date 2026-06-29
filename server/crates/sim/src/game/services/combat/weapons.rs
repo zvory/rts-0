@@ -3,13 +3,31 @@ use crate::game::entity::{Entity, EntityKind, EntityStore, MovePhase, Order, Wea
 use crate::game::services::movement::{angle_delta, rotate_toward};
 use crate::rules::combat as combat_rules;
 
+use super::projection::tank_effective_range_tiles;
 use super::{
     ANTI_TANK_GUN_FIRE_TOLERANCE_RAD, ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK,
-    TANK_STATIONARY_RANGE_MAX_TILES, TANK_STATIONARY_RANGE_RAMP_TICKS,
     TANK_TURRET_FIRE_TOLERANCE_RAD, TANK_TURRET_TURN_RATE_RAD_PER_TICK,
 };
 
 const SUPPORT_WEAPON_ATTACK_MOVE_NO_TARGET_TICKS: u16 = config::TICK_HZ as u16;
+const TANK_STATIONARY_RANGE_RAMP_TICKS: u16 = config::TICK_HZ as u16 * 3;
+
+pub(super) fn tick_tank_stationary_range(e: &mut Entity) {
+    if e.kind != EntityKind::Tank || e.hp == 0 {
+        return;
+    }
+    let Some(c) = e.combat.as_mut() else {
+        return;
+    };
+    if c.tank_stationary_range_reset_this_tick {
+        c.tank_stationary_range_reset_this_tick = false;
+    } else {
+        c.tank_stationary_range_ticks = c
+            .tank_stationary_range_ticks
+            .saturating_add(1)
+            .min(TANK_STATIONARY_RANGE_RAMP_TICKS);
+    }
+}
 
 pub(super) fn rotate_vehicle_weapon_for_combat(e: &mut Entity, target_angle: f32) -> bool {
     if !target_angle.is_finite() {
@@ -262,24 +280,6 @@ pub(super) fn effective_attack_profile(e: &Entity) -> EffectiveAttackProfile {
         }
     }
     profile
-}
-
-fn tank_effective_range_tiles(e: &Entity, base_range_tiles: f32) -> f32 {
-    if e.kind != EntityKind::Tank {
-        return base_range_tiles;
-    }
-    let ramp_ticks = TANK_STATIONARY_RANGE_RAMP_TICKS.max(1);
-    let ticks = e
-        .combat
-        .as_ref()
-        .map(|c| c.tank_stationary_range_ticks)
-        .unwrap_or(0)
-        .min(ramp_ticks);
-    if ticks == 0 {
-        return base_range_tiles;
-    }
-    let progress = ticks as f32 / ramp_ticks as f32;
-    base_range_tiles + (TANK_STATIONARY_RANGE_MAX_TILES - base_range_tiles) * progress
 }
 
 fn deployed_anti_tank_gun_desired_facing(e: &Entity, target_angle: f32) -> f32 {

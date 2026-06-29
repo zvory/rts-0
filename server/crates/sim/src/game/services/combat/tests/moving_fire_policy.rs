@@ -1,5 +1,7 @@
 use super::*;
 
+const TANK_STATIONARY_RANGE_RAMP_TICKS: u16 = crate::config::TICK_HZ as u16 * 3;
+
 #[test]
 fn moving_fire_move_orders_do_not_chase_targets_outside_weapon_range() {
     for kind in [EntityKind::Tank, EntityKind::ScoutCar] {

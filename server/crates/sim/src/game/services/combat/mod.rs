@@ -1,14 +1,16 @@
 //! Combat service.
 //!
-//! This module owns target acquisition, chase orders, weapon facing/setup, damage application,
-//! and combat events for a tick. It depends on read-only rules and derived spatial/LOS helpers,
-//! but all entity mutation for attacks flows through this service.
+//! This module owns target acquisition, chase orders, weapon facing/setup, damage, and combat
+//! events for a tick. It depends on read-only rules and derived spatial/LOS helpers.
 
 use std::collections::HashMap;
 
 use crate::config;
 use crate::game::ability::AbilityKind;
 use crate::game::entity::{AttackPhase, Entity, EntityKind, EntityStore, Order};
+use crate::game::firing_reveal::{
+    active_firing_reveal_source, record_firing_reveals_for_victim_team, FiringRevealSource,
+};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::mortar::{rotate_mortar_for_fire, MortarShellStore};
@@ -19,7 +21,6 @@ use crate::game::services::occupancy::{Occupancy, StaticPathingRelation};
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
-use crate::game::FiringRevealSource;
 use crate::protocol::Event;
 use rand::rngs::SmallRng;
 
@@ -41,7 +42,6 @@ use acquisition::{
 };
 use chase::{chase_goal_for_target, chase_path_needs_refresh};
 use damage::apply_damage;
-use events::record_anti_tank_firing_reveals;
 use projection::{friendly_hard_blocker_between, shot_hits_intended_target};
 use weapons::{
     anti_tank_gun_can_chase, begin_idle_deployed_weapon_setup, can_fire_while_moving,
@@ -106,14 +106,13 @@ pub(super) const ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK: f32 = 0.035;
 pub(super) const ANTI_TANK_GUN_FIRE_TOLERANCE_RAD: f32 = 0.12;
 pub(super) const TANK_STANDOFF_BUFFER_PX: f32 = config::TILE_SIZE as f32;
 pub(super) const TANK_STANDOFF_REPATH_DELTA_PX: f32 = config::TILE_SIZE as f32;
-pub(super) const TANK_STATIONARY_RANGE_MAX_TILES: f32 = 14.0;
-pub(super) const TANK_STATIONARY_RANGE_RAMP_TICKS: u16 = config::TICK_HZ as u16 * 3;
+const FIRING_REVEAL_RESPONSE_DELAY_TICKS: u32 = config::TICK_HZ;
 
 /// Combat: acquire targets for aggressive / attack-move units, let eligible idle units
 /// auto-acquire enemies, and deal damage when off cooldown. Damage is applied immediately and
 /// emits an `Attack` event (for tracers). Cooldowns tick down here too.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn combat_system(
+pub(in crate::game) fn combat_system(
     map: &Map,
     entities: &mut EntityStore,
     teams: &TeamRelations,
@@ -136,7 +135,7 @@ pub(crate) fn combat_system(
         if let Some(e) = entities.get_mut(id) {
             e.tick_attack_cd();
             tick_deployed_weapon_setup(e);
-            tick_tank_stationary_range(e);
+            weapons::tick_tank_stationary_range(e);
         }
     }
 
@@ -351,6 +350,14 @@ pub(crate) fn combat_system(
             if !deployed_weapon_ready_to_fire(entities, id) {
                 continue;
             }
+            if active_firing_reveal_source(firing_reveals, owner, tid, tick) {
+                let delay_started = entities.get_mut(id).is_some_and(|e| {
+                    e.start_firing_reveal_response_delay(tid, FIRING_REVEAL_RESPONSE_DELAY_TICKS)
+                });
+                if delay_started {
+                    continue;
+                }
+            }
             let ready = matches!(entities.get(id), Some(e) if e.attack_cd() == 0);
             if ready {
                 if matches!(
@@ -381,7 +388,7 @@ pub(crate) fn combat_system(
                 }
                 let extra_miss_chance =
                     entities.get(id).map(moving_fire_miss_chance).unwrap_or(0.0);
-                let attack_recipients = apply_damage(
+                let shot_victim_owner = apply_damage(
                     map,
                     entities,
                     teams,
@@ -401,14 +408,22 @@ pub(crate) fn combat_system(
                     extra_miss_chance,
                     tick,
                 );
-                if matches!(entities.get(id).map(|e| e.kind), Some(EntityKind::AntiTankGun)) {
-                    record_anti_tank_firing_reveals(
-                        firing_reveals,
-                        &attack_recipients,
-                        id,
-                        tick,
-                        cd_reset,
-                    );
+                if is_unit {
+                    if let Some(victim_owner) = shot_victim_owner {
+                        let player_ids = events.keys().copied().collect::<Vec<_>>();
+                        record_firing_reveals_for_victim_team(
+                            firing_reveals,
+                            player_ids,
+                            fog,
+                            teams,
+                            victim_owner,
+                            owner,
+                            id,
+                            (px, py),
+                            tick,
+                            cd_reset,
+                        );
+                    }
                 }
                 if let Some(e) = entities.get_mut(id) {
                     e.set_attack_cd(cd_reset);
@@ -449,20 +464,6 @@ pub(crate) fn combat_system(
                 coordinator.request_chase_path(entities, id, chase_goal);
             }
         }
-    }
-}
-
-fn tick_tank_stationary_range(e: &mut Entity) {
-    if e.kind != EntityKind::Tank || e.hp == 0 {
-        return;
-    }
-    if let Some(c) = e.combat.as_mut() {
-        if c.tank_stationary_range_reset_this_tick {
-            c.tank_stationary_range_reset_this_tick = false;
-            return;
-        }
-        let next = c.tank_stationary_range_ticks.saturating_add(1);
-        c.tank_stationary_range_ticks = next.min(TANK_STATIONARY_RANGE_RAMP_TICKS);
     }
 }
 

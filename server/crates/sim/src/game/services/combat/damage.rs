@@ -21,7 +21,8 @@ use super::projection::{resolve_shot_victim, shot_blocker_intersection};
 use super::RANGE_SLACK;
 
 /// Apply `dmg` to `victim` from `attacker`, emitting an `Attack` event for every fired shot.
-/// Death itself is handled by the death system (we only zero hp here).
+/// Returns the resolved shot victim owner when a shot was emitted. Death itself is handled by the
+/// death system (we only zero hp here).
 #[allow(clippy::too_many_arguments)]
 pub(super) fn apply_damage(
     map: &Map,
@@ -42,9 +43,9 @@ pub(super) fn apply_damage(
     range_px: f32,
     extra_miss_chance: f32,
     tick: u32,
-) -> Vec<u32> {
+) -> Option<u32> {
     if entities.get(victim).map(|e| e.is_node()).unwrap_or(false) {
-        return Vec::new();
+        return None;
     }
     let shot_victim = resolve_shot_victim(
         map,
@@ -56,9 +57,7 @@ pub(super) fn apply_damage(
         ax,
         ay,
     );
-    let Some(shot_victim) = shot_victim else {
-        return Vec::new();
-    };
+    let shot_victim = shot_victim?;
     let shot_victim_pos = entities
         .get(shot_victim)
         .map(|e| (e.pos_x, e.pos_y))
@@ -68,7 +67,7 @@ pub(super) fn apply_damage(
     let victim_kind = entities.get(shot_victim).map(|e| e.kind);
     let victim_facing = entities.get(shot_victim).map(|e| e.facing());
     let victim_owner = entities.get(shot_victim).map(|e| e.owner).unwrap_or(0);
-    let attack_recipients = emit_attack_event(
+    emit_attack_event(
         events,
         fog,
         teams,
@@ -86,7 +85,7 @@ pub(super) fn apply_damage(
     if let (Some(ak), Some(vk)) = (attacker_kind, victim_kind) {
         let mc = combat_rules::miss_chance(ak, vk).max(extra_miss_chance);
         if mc > 0.0 && rng.gen::<f32>() < mc {
-            return attack_recipients;
+            return Some(victim_owner);
         }
     }
     let effective_dmg = match (attacker_kind, victim_kind) {
@@ -142,7 +141,7 @@ pub(super) fn apply_damage(
             shot_victim_pos.1,
         );
     }
-    attack_recipients
+    Some(victim_owner)
 }
 
 #[allow(clippy::too_many_arguments)]
