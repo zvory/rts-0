@@ -427,7 +427,8 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
     for i in 0..config::OIL_PATCHES_PER_BASE {
         let (tile_dx, tile_dy) = oil_patch_tile_offset(i, oil_step_x, oil_step_y);
         let (desired_x, desired_y) = offset_tile_center(map, tx, ty, tile_dx, tile_dy);
-        let (px, py, tile) = oil_patch_tile_center(map, desired_x, desired_y, hx, hy, &oil_tiles);
+        let (px, py, tile) =
+            oil_patch_tile_center(map, entities, desired_x, desired_y, hx, hy, &oil_tiles);
         oil_tiles.insert(tile);
         let dist_tiles = ((px - hx).powi(2) + (py - hy).powi(2)).sqrt() / ts;
         debug_assert!(
@@ -463,22 +464,64 @@ fn offset_tile_center(map: &Map, tx: u32, ty: u32, dx: i32, dy: i32) -> (f32, f3
 
 fn oil_patch_tile_center(
     map: &Map,
+    entities: &EntityStore,
     x: f32,
     y: f32,
     anchor_x: f32,
     anchor_y: f32,
     occupied_tiles: &BTreeSet<(u32, u32)>,
 ) -> (f32, f32, (u32, u32)) {
-    let ts = config::TILE_SIZE as f32;
-    resource_placement::nearest_resource_tile_center(map, x, y, |tile, cx, cy| {
+    let accepts = |tile: (u32, u32),
+                   center_x: f32,
+                   center_y: f32,
+                   enforce_cc_distance: bool| {
         if !resource_placement::tile_has_one_tile_resource_gap(tile, occupied_tiles) {
             return false;
         }
-        let dist_tiles = ((cx - anchor_x).powi(2) + (cy - anchor_y).powi(2)).sqrt() / ts;
+        if !pump_jack_site_clear_of_non_oil_resources(entities, tile) {
+            return false;
+        }
+        if !enforce_cc_distance {
+            return true;
+        }
+
+        let ts = config::TILE_SIZE as f32;
+        let dist_tiles =
+            ((center_x - anchor_x).powi(2) + (center_y - anchor_y).powi(2)).sqrt() / ts;
         (config::CC_RESOURCE_MIN_DIST_TILES..=config::CC_RESOURCE_MAX_DIST_TILES)
             .contains(&dist_tiles)
+    };
+
+    resource_placement::nearest_resource_tile_center(map, x, y, |tile, cx, cy| {
+        accepts(tile, cx, cy, true)
+    })
+    .or_else(|| {
+        resource_placement::nearest_resource_tile_center(map, x, y, |tile, cx, cy| {
+            accepts(tile, cx, cy, false)
+        })
     })
     .unwrap_or_else(|| resource_placement::nearest_tile_center(map, x, y))
+}
+
+fn pump_jack_site_clear_of_non_oil_resources(entities: &EntityStore, tile: (u32, u32)) -> bool {
+    let Some(rect) =
+        services::geometry::building_rect_for_footprint(EntityKind::PumpJack, tile.0, tile.1)
+    else {
+        return false;
+    };
+    entities
+        .iter()
+        .filter(|entity| entity.is_node() && entity.kind != EntityKind::Oil)
+        .all(|entity| {
+            !services::geometry::circle_intersects_rect(
+                services::geometry::CircleBody {
+                    x: entity.pos_x,
+                    y: entity.pos_y,
+                    radius: entity.radius(),
+                },
+                rect,
+            )
+        })
 }
 
 /// Spawn a City Centre, starting workers, and resource clusters for one player.
