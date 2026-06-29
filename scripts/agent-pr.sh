@@ -2,6 +2,19 @@
 # Run the final quality pass, then open or update an agent-owned PR and arm auto-merge.
 set -euo pipefail
 
+if [ "${RTS_ADVERSARIAL_QUALITY_PASS:-}" = "1" ]; then
+  echo "agent-pr: refusing to run inside adversarial quality pass; the outer helper owns PR lifecycle" >&2
+  exit 2
+fi
+
+if [ "${RTS_AGENT_PR_STABLE_COPY:-0}" != "1" ]; then
+  stable_copy="$(mktemp -t rts-agent-pr-stable.XXXXXX)"
+  cp "${BASH_SOURCE[0]}" "$stable_copy"
+  chmod +x "$stable_copy"
+  RTS_AGENT_PR_STABLE_COPY=1 RTS_AGENT_PR_STABLE_COPY_PATH="$stable_copy" exec bash "$stable_copy" "$@"
+fi
+
+STABLE_COPY_PATH="${RTS_AGENT_PR_STABLE_COPY_PATH:-}"
 GH_BIN="${GH_BIN:-gh}"
 BASE_BRANCH="main"
 HEAD_BRANCH=""
@@ -64,11 +77,6 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
-if [ "${RTS_ADVERSARIAL_QUALITY_PASS:-}" = "1" ]; then
-  echo "agent-pr: refusing to run inside adversarial quality pass; the outer helper owns PR lifecycle" >&2
-  exit 2
-fi
-
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
@@ -113,7 +121,14 @@ fi
 quality_report_json="$(mktemp -t rts-adversarial-quality-pass.XXXXXX.json)"
 quality_report_md="$(mktemp -t rts-adversarial-quality-pass.XXXXXX.md)"
 tmp_body="$(mktemp -t rts-agent-pr.XXXXXX)"
-trap 'rm -f "$quality_report_json" "$quality_report_md" "$tmp_body"' EXIT
+
+cleanup() {
+  rm -f "$quality_report_json" "$quality_report_md" "$tmp_body"
+  if [ -n "$STABLE_COPY_PATH" ]; then
+    rm -f "$STABLE_COPY_PATH"
+  fi
+}
+trap cleanup EXIT
 
 collect_changed_files() {
   CHANGED_FILES=()

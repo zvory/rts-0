@@ -220,6 +220,9 @@ if [ "\${RTS_ADVERSARIAL_QUALITY_PASS:-}" != "1" ]; then
   echo "missing quality pass environment" >&2
   exit 1
 fi
+if [ "\${CODEX_MUTATE_AGENT_PR:-}" = "1" ]; then
+  printf '\\n# fixture codex mutation\\n' >> scripts/agent-pr.sh
+fi
 report_file=""
 while [ "$#" -gt 0 ]; do
   if [ "$1" = "--output-last-message" ]; then
@@ -307,6 +310,7 @@ exit 1
     env: {
       AGENT_PR_BODY_CAPTURE: capturedBody,
       CODEX_CALLED_MARKER: codexCalledMarker,
+      CODEX_MUTATE_AGENT_PR: "1",
       GH_BIN: path.join(binPath, "gh"),
       PATH: `${binPath}:${process.env.PATH}`,
     },
