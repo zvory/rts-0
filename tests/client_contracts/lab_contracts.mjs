@@ -721,9 +721,9 @@ await withFakeDocument(async () => {
     "LabPanel does not expose advanced spawn or completion toggles",
   );
   assert(
-    buttonByText("Anti-Tank Gun Crews")?.dataset.researched === "true" &&
-      buttonByText("Anti-Tank Gun Crews")?.dataset.available === "true" &&
-      buttonByText("Anti-Tank Gun Crews")?.["aria-pressed"] === "true",
+    buttonByText("Field Ordnance")?.dataset.researched === "true" &&
+      buttonByText("Field Ordnance")?.dataset.available === "true" &&
+      buttonByText("Field Ordnance")?.["aria-pressed"] === "true",
     "LabPanel renders completed research as a depressed available button",
   );
   assert(

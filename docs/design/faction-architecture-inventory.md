@@ -116,15 +116,15 @@ completed City Centre and Training Centre; Tank Trap requires a completed Traini
 Centre trains Workers. Barracks trains Riflemen immediately and Machine
 Gunners after the Training Centre requirement is met. Factory trains Scout Cars immediately, Tanks
 after Tank Production research, and Command Cars after Command Car research. Gun Works trains
-Mortar Teams immediately, Anti-Tank Guns after Anti-Tank Gun Crews research, and Artillery after
-Unlock Artillery research.
+Mortar Teams immediately, Anti-Tank Guns after Field Ordnance research, and Artillery after Field
+Ordnance research.
 
 Research unlocks live in `server/crates/sim/src/game/upgrade.rs` and client descriptors in
 `client/src/config.js`. Training Centre researches Methamphetamines. R&D Complex researches
-Anti-Tank Gun Crews, Unlock Artillery, Tank Production, Command Car, and Mortar Autocast; Unlock
-Artillery requires completed Anti-Tank Gun Crews research, and Command Car requires completed Tank
-Production research. The current Ekat tech tree starts with Zamok training Golems; Golem-converted
-tech buildings are still planned work.
+Field Ordnance, Ballistic Tables, Tank Production, Command Car, and Mortar Autocast; Ballistic
+Tables requires completed Field Ordnance research, and Command Car requires completed Tank
+Production research. The current Ekat tech tree starts with Zamok training Golems;
+Golem-converted tech buildings are still planned work.
 
 ## Current Ability Surface
 

@@ -62,6 +62,7 @@ pub struct UpgradeDefinition {
     pub research_ticks: u32,
 }
 
+/// All upgrade ids the simulation can decode from protocol or replay data.
 pub const ALL: &[UpgradeKind] = &[
     UpgradeKind::Methamphetamines,
     UpgradeKind::AntiTankGunUnlock,
@@ -72,8 +73,18 @@ pub const ALL: &[UpgradeKind] = &[
     UpgradeKind::MortarAutocast,
 ];
 
+const CURRENT_RESEARCHABLE: &[UpgradeKind] = &[
+    UpgradeKind::Methamphetamines,
+    UpgradeKind::AntiTankGunUnlock,
+    UpgradeKind::BallisticTables,
+    UpgradeKind::TankUnlock,
+    UpgradeKind::CommandCarUnlock,
+    UpgradeKind::MortarAutocast,
+];
+
 pub fn researchable_upgrades(building: EntityKind) -> Vec<UpgradeKind> {
-    ALL.iter()
+    CURRENT_RESEARCHABLE
+        .iter()
         .copied()
         .filter(|upgrade| definition(*upgrade).researched_at == building)
         .collect()
@@ -108,7 +119,7 @@ pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
         UpgradeKind::BallisticTables => UpgradeDefinition {
             kind,
             researched_at: EntityKind::ResearchComplex,
-            requires_upgrade: Some(UpgradeKind::ArtilleryUnlock),
+            requires_upgrade: Some(UpgradeKind::AntiTankGunUnlock),
             cost_steel: crate::config::BALLISTIC_TABLES_COST_STEEL,
             cost_oil: crate::config::BALLISTIC_TABLES_COST_OIL,
             research_ticks: crate::config::BALLISTIC_TABLES_RESEARCH_TICKS,
@@ -143,9 +154,31 @@ pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
 pub fn required_for_unit(unit: EntityKind) -> Option<UpgradeKind> {
     match unit {
         EntityKind::AntiTankGun => Some(UpgradeKind::AntiTankGunUnlock),
-        EntityKind::Artillery => Some(UpgradeKind::ArtilleryUnlock),
+        EntityKind::Artillery => Some(UpgradeKind::AntiTankGunUnlock),
         EntityKind::Tank => Some(UpgradeKind::TankUnlock),
         EntityKind::CommandCar => Some(UpgradeKind::CommandCarUnlock),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn researchable_upgrades_exclude_legacy_artillery_unlock() {
+        assert_eq!(
+            researchable_upgrades(EntityKind::ResearchComplex),
+            vec![
+                UpgradeKind::AntiTankGunUnlock,
+                UpgradeKind::BallisticTables,
+                UpgradeKind::TankUnlock,
+                UpgradeKind::CommandCarUnlock,
+                UpgradeKind::MortarAutocast,
+            ]
+        );
+        assert!(ALL.contains(&UpgradeKind::ArtilleryUnlock));
+        assert!(!researchable_upgrades(EntityKind::ResearchComplex)
+            .contains(&UpgradeKind::ArtilleryUnlock));
     }
 }

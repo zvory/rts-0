@@ -140,7 +140,6 @@ fn lab_start_payload_can_use_bundled_lategame_scenario() {
         "methamphetamines",
         "anti_tank_gun_unlock",
         "tank_unlock",
-        "artillery_unlock",
         "command_car_unlock",
         "mortar_autocast",
     ];

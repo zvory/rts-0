@@ -93,7 +93,7 @@ the AI classifies the visible local threat by weapon DPS: tank-dominated pressur
 local DPS) prioritizes Anti-Tank Guns, infantry-dominated pressure prioritizes Machine Gunners, mixed
 pressure asks for a support mix, and no-DPS pressure falls back to Riflemen. Support panic only uses
 already-completed support tech: Machine Gunners need a Training Centre and Anti-Tank Guns need a
-Gun Works plus Anti-Tank Gun Crews research. It may build Pump Jacks for those support counters; if
+Gun Works plus Field Ordnance research. It may build Pump Jacks for those support counters; if
 the relevant support tech is absent, production falls back to Riflemen and panic mode does not
 create tech buildings.
 If the pressure persists through the panic window, the AI asks for an additional Barracks before
