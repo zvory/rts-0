@@ -258,7 +258,7 @@ boot_server() {
     info "using prebuilt server binary at $SERVER_BIN"
   else
     build_log="$(mktemp -t rts-build.XXXXXX)"
-    if ! cargo build --manifest-path "$SERVER_DIR/Cargo.toml" >"$build_log" 2>&1; then
+    if ! cargo build --manifest-path "$SERVER_DIR/Cargo.toml" -p rts-server --bin rts-server >"$build_log" 2>&1; then
       record_timing "Server build (debug)" "$((SECONDS - build_start))" "FAIL"
       warn "server build failed ($(elapsed_since "$build_start"))"
       cat "$build_log"

@@ -102,15 +102,32 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
+      - name: Cache wasm-bindgen CLI
+        if: needs.changed-files.outputs.run_server_build == 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/wasm-bindgen
+            ~/.cargo/bin/wasm-bindgen-test-runner
+            ~/.cargo/bin/wasm2es6js
+            ~/.cargo/.crates.toml
+            ~/.cargo/.crates2.json
+          key: ${{ runner.os }}-wasm-bindgen-cli-0.2.123
+
       - name: Install prediction WASM tooling
         if: needs.changed-files.outputs.run_server_build == 'true'
         run: |
           rustup target add wasm32-unknown-unknown
-          cargo install wasm-bindgen-cli --version 0.2.123 --locked
+          version="$(wasm-bindgen --version 2>/dev/null || true)"
+          if [ "$version" = "wasm-bindgen 0.2.123" ]; then
+            printf '%s\n' "$version"
+          else
+            cargo install wasm-bindgen-cli --version 0.2.123 --locked
+          fi
 
       - name: Build debug server
         if: needs.changed-files.outputs.run_server_build == 'true'
-        run: cargo build --manifest-path server/Cargo.toml
+        run: cargo build --manifest-path server/Cargo.toml -p rts-server --bin rts-server
 
       - name: Build prediction WASM assets
         if: needs.changed-files.outputs.run_server_build == 'true'
