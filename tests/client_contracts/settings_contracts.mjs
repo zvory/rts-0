@@ -24,6 +24,10 @@ import {
   writePredictionEnabled,
 } from "../../client/src/prediction_settings.js";
 import {
+  readUnitRangesEnabled,
+  writeUnitRangesEnabled,
+} from "../../client/src/unit_range_settings.js";
+import {
   HOTKEY_PRESET_CLASSIC,
   HOTKEY_PROFILE_SCHEMA_VERSION,
   HotkeyProfileService,
@@ -164,6 +168,11 @@ function hotkeyService() {
     assert(!readPredictionEnabled(storage), "prediction setting persists disabled state");
     writePredictionEnabled(true, storage);
     assert(readPredictionEnabled(storage), "prediction setting clears override when re-enabled");
+    assert(readUnitRangesEnabled(storage), "unit range setting defaults on");
+    writeUnitRangesEnabled(false, storage);
+    assert(!readUnitRangesEnabled(storage), "unit range setting persists disabled state");
+    writeUnitRangesEnabled(true, storage);
+    assert(readUnitRangesEnabled(storage), "unit range setting clears override when re-enabled");
   }
 
   withFakeSettingsDocument(() => {
@@ -177,7 +186,7 @@ function hotkeyService() {
           onToggle: () => { predictionToggled = true; },
         },
         unitRanges: {
-          state: () => ({ enabled: false, available: true }),
+          state: () => ({ enabled: true, available: true }),
           onToggle: () => { unitRangeToggled = true; },
         },
       },
@@ -191,7 +200,7 @@ function hotkeyService() {
     assert(predictionToggled, "settings: prediction control calls injected toggle");
     const rangeToggle = findFakeById(root, "unit-range-toggle");
     assert(rangeToggle, "settings: game tab renders unit range control with pinned id");
-    assert(rangeToggle.textContent === "Show Unit Ranges: off", "settings: unit range toggle uses expected label");
+    assert(rangeToggle.textContent === "Show Unit Ranges: on", "settings: unit range toggle uses expected label");
     rangeToggle.listeners.click();
     assert(unitRangeToggled, "settings: unit range control calls injected toggle");
   });

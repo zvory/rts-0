@@ -25,7 +25,7 @@ import { SimWasmPredictionAdapter } from "./sim_wasm_adapter.js";
 import { GameState } from "./state.js";
 import { ClientIntent } from "./client_intent.js";
 import { INTERP_DELAY_MS, SNAPSHOT_MS } from "./config.js";
-import { EVENT, MOVEMENT_PATH_DIAGNOSTICS, NOTICE_SEVERITY, S } from "./protocol.js";
+import { EVENT, NOTICE_SEVERITY, S } from "./protocol.js";
 import {
   UNDER_ATTACK_ID,
   VIEWPORT_ALERT_MARGIN_PX,
@@ -49,6 +49,11 @@ import {
 } from "./match_live_pause.js";
 import { MatchNetReporter, predictionReportFields as buildPredictionReportFields } from "./match_net_reporter.js";
 import { buildMatchSettingsContext } from "./match_settings_context.js";
+import {
+  applyInitialUnitRanges,
+  toggleDebugPaths,
+  toggleUnitRanges,
+} from "./match_settings_toggles.js";
 
 const PREDICTION_REPLAY_BUDGET_MS = 4;
 const DESKTOP_CURSOR_AUTOLOCK_INITIAL_DELAY_MS = 250;
@@ -95,6 +100,7 @@ export class Match {
     this.settings = options.settings || null;
     this.backToLobbyHandler = options.onBackToLobby || null;
     this.onPredictionEnabledChange = options.onPredictionEnabledChange || null;
+    this.onUnitRangesEnabledChange = options.onUnitRangesEnabledChange;
     this.labMetadata = options.labMetadata || null;
     this.labClient = options.labClient || null;
     this.labControlPolicy = options.labControlPolicy || null;
@@ -183,6 +189,7 @@ export class Match {
 
     // --- Build the module graph from the static start payload (docs/design/client-ui.md §4.1). ---
     this.state = this._timeInit("match.state", () => new GameState(payload));
+    applyInitialUnitRanges(this.state, options.unitRangesEnabled);
     this.state.controlPolicy = this.labControlPolicy;
     this.combatAudio = this._timeInit(
       "match.combatAudio",
@@ -818,17 +825,11 @@ export class Match {
   }
 
   toggleDebugPathOverlays() {
-    if (this.capabilities.diagnostics.movementPaths === MOVEMENT_PATH_DIAGNOSTICS.NONE) {
-      this.syncDebugPathUi();
-      return;
-    }
-    this.state.debugPathOverlaysEnabled = !this.state.debugPathOverlaysEnabled;
-    this.syncDebugPathUi();
+    toggleDebugPaths(this);
   }
 
   toggleUnitRangeOverlays() {
-    this.state.showUnitRangesEnabled = !this.state.showUnitRangesEnabled;
-    this.syncUnitRangeUi();
+    toggleUnitRanges(this);
   }
 
   handlePointerLockChange(locked) {
@@ -933,11 +934,7 @@ export class Match {
     if (this.settings?.isOpen()) this.mountSettings({ keepOpen: true });
   }
 
-  syncDebugPathUi() {
-    if (this.settings?.isOpen()) this.mountSettings({ keepOpen: true });
-  }
-
-  syncUnitRangeUi() {
+  syncSettingsToggleUi() {
     if (this.settings?.isOpen()) this.mountSettings({ keepOpen: true });
   }
 

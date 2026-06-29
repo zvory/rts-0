@@ -139,7 +139,7 @@ function polygonCenter(points) {
   assert(commandFeedbackNow === 1500, "feedback view samples live feedback at the requested frame time");
   assert(feedbackView.liveCommandFeedback(999) === feedbackView.commandFeedback, "feedback view returns stable command feedback for the frame");
   assert(feedbackView.selectedEntities() === selected, "feedback view exposes stable selected entities for the frame");
-  assert(!feedbackView.showUnitRangesEnabled, "feedback view exposes unit range preference as off by default");
+  assert(feedbackView.showUnitRangesEnabled, "feedback view exposes unit range preference as on by default");
   assert(!feedbackView.showSelectedFieldOfFireEnabled, "feedback view leaves selected field-of-fire inspection off outside lab");
   assert(selectedReads === 1, "feedback view snapshots selected entities once per frame");
   assert(feedbackView.entityById(7) === selected[0], "feedback view exposes renderer entity lookup");
