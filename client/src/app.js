@@ -29,6 +29,7 @@ import {
 } from "./bootstrap.js";
 import { Match } from "./match.js";
 import { MatchHistory } from "./match_history.js";
+import { applyMatchUnitRanges } from "./match_settings_toggles.js";
 import { readPredictionEnabled, writePredictionEnabled } from "./prediction_settings.js";
 import { readUnitRangesEnabled, writeUnitRangesEnabled } from "./unit_range_settings.js";
 import { createObserverAnalysisOverlayPreferences } from "./observer_analysis_overlay.js";
@@ -353,6 +354,7 @@ export class App {
         settings: this.settings,
         onBackToLobby: this.onBackToLobby,
         predictionEnabled: this.predictionEnabled,
+        unitRangesEnabled: this.unitRangesEnabled,
         onPredictionEnabledChange: (enabled) => this.setPredictionEnabled(enabled),
         onUnitRangesEnabledChange: (enabled) => this.setUnitRangesEnabled(enabled),
         observerAnalysisOverlayPreferences: this.observerAnalysisOverlayPreferences,
@@ -363,8 +365,6 @@ export class App {
         onLabToolChange: (change) => this.labPanel?.applyLabToolChange?.(change),
       },
     );
-    if (this.match?.state) this.match.state.showUnitRangesEnabled = this.unitRangesEnabled;
-    if (this.settings?.isOpen()) this.match?.mountSettings?.({ keepOpen: true });
     if (labMetadata) {
       this.labPanel = new LabPanel({
         root: dom.gameScreen,
@@ -632,12 +632,7 @@ export class App {
   setUnitRangesEnabled(enabled) {
     this.unitRangesEnabled = !!enabled;
     writeUnitRangesEnabled(this.unitRangesEnabled);
-    if (
-      this.match?.state &&
-      this.match.state?.showUnitRangesEnabled !== this.unitRangesEnabled
-    ) {
-      this.match.state.showUnitRangesEnabled = this.unitRangesEnabled;
-    }
+    applyMatchUnitRanges(this.match, this.unitRangesEnabled);
     if (this.settings?.isOpen()) {
       if (this.match && typeof this.match.mountSettings === "function") {
         this.match.mountSettings({ keepOpen: true });
