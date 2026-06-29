@@ -29,7 +29,9 @@ import {
 } from "./bootstrap.js";
 import { Match } from "./match.js";
 import { MatchHistory } from "./match_history.js";
+import { applyMatchUnitRanges } from "./match_settings_toggles.js";
 import { readPredictionEnabled, writePredictionEnabled } from "./prediction_settings.js";
+import { readUnitRangesEnabled, writeUnitRangesEnabled } from "./unit_range_settings.js";
 import { createObserverAnalysisOverlayPreferences } from "./observer_analysis_overlay.js";
 import { ReplayViewer } from "./replay_viewer.js";
 import { createRoomCapabilities } from "./room_capabilities.js";
@@ -135,6 +137,7 @@ export class App {
     this.allowUnloadWithoutWarning = false;
     this.pendingCameraView = null;
     this.predictionEnabled = readPredictionEnabled();
+    this.unitRangesEnabled = readUnitRangesEnabled();
     this.observerAnalysisOverlayPreferences = createObserverAnalysisOverlayPreferences();
     this.mountLobbySettings();
     if (this.labCatalogLaunch) this.lobby.hide();
@@ -351,7 +354,9 @@ export class App {
         settings: this.settings,
         onBackToLobby: this.onBackToLobby,
         predictionEnabled: this.predictionEnabled,
+        unitRangesEnabled: this.unitRangesEnabled,
         onPredictionEnabledChange: (enabled) => this.setPredictionEnabled(enabled),
+        onUnitRangesEnabledChange: (enabled) => this.setUnitRangesEnabled(enabled),
         observerAnalysisOverlayPreferences: this.observerAnalysisOverlayPreferences,
         capabilities,
         labMetadata,
@@ -596,6 +601,13 @@ export class App {
             }),
             onToggle: () => this.setPredictionEnabled(!this.predictionEnabled),
           },
+          unitRanges: {
+            state: () => ({
+              enabled: this.unitRangesEnabled,
+              available: true,
+            }),
+            onToggle: () => this.setUnitRangesEnabled(!this.unitRangesEnabled),
+          },
         },
       }),
     });
@@ -607,6 +619,20 @@ export class App {
     if (this.match && typeof this.match.setPredictionEnabled === "function") {
       this.match.setPredictionEnabled(this.predictionEnabled);
     }
+    if (this.settings?.isOpen()) {
+      if (this.match && typeof this.match.mountSettings === "function") {
+        this.match.mountSettings({ keepOpen: true });
+      } else {
+        this.mountLobbySettings();
+        this.settings.open({ focus: false });
+      }
+    }
+  }
+
+  setUnitRangesEnabled(enabled) {
+    this.unitRangesEnabled = !!enabled;
+    writeUnitRangesEnabled(this.unitRangesEnabled);
+    applyMatchUnitRanges(this.match, this.unitRangesEnabled);
     if (this.settings?.isOpen()) {
       if (this.match && typeof this.match.mountSettings === "function") {
         this.match.mountSettings({ keepOpen: true });

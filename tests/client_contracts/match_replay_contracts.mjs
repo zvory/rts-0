@@ -72,11 +72,27 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   const { Match } = await import("../../client/src/match.js");
   const { ReplayViewer } = await import("../../client/src/replay_viewer.js");
   const { ReplayControls, RoomTimeControls } = await import("../../client/src/replay_controls.js");
+  const { applyMatchUnitRanges } = await import("../../client/src/match_settings_toggles.js");
   const { shouldWarnBeforeUnload } = await import("../../client/src/app.js");
   const { dom } = await import("../../client/src/bootstrap.js");
   assert(ReplayViewer.prototype instanceof Match, "ReplayViewer reuses Match rendering lifecycle");
   assert(ReplayControls.prototype instanceof RoomTimeControls, "replay controls keep a neutral room-time base");
   assert(!("command" in ReplayCameraInput.prototype), "Replay camera input has no gameplay command API");
+  {
+    let synced = 0;
+    const unitRangeMatch = Object.create(Match.prototype);
+    unitRangeMatch.state = { showUnitRangesEnabled: true };
+    unitRangeMatch.syncSettingsToggleUi = () => { synced += 1; };
+    applyMatchUnitRanges(unitRangeMatch, false);
+    assert(!unitRangeMatch.state.showUnitRangesEnabled, "Match unit range helper updates the local display preference");
+
+    let published = null;
+    unitRangeMatch.onUnitRangesEnabledChange = (enabled) => { published = enabled; };
+    unitRangeMatch.toggleUnitRangeOverlays();
+    assert(unitRangeMatch.state.showUnitRangesEnabled && published === true,
+      "Match unit range toggle publishes the persisted preference");
+    assert(synced === 1, "Match unit range toggle refreshes the settings UI");
+  }
   {
     const selectionArea = { hidden: false };
     const commandCard = { hidden: false };

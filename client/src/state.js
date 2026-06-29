@@ -110,7 +110,7 @@ export class GameState {
     this.showAllDebugPathOverlays =
       diagnostics.movementPaths === MOVEMENT_PATH_DIAGNOSTICS.ALL;
     /** @type {boolean} local gear-menu preference for drawing selected unit firing ranges. */
-    this.showUnitRangesEnabled = false;
+    this.showUnitRangesEnabled = true;
     /** @type {Array<Array<number>>} ten local control groups, slot 9 is key 0. */
     this.controlGroups = Array.from({ length: 10 }, () => []);
     /** @type {Array<{id:number,x:number,y:number,radiusTiles:number,expiresIn:number}>} */
