@@ -8,6 +8,7 @@ export class ReplayViewer extends Match {
       hotkeyProfiles: options.hotkeyProfiles,
       settings: options.settings,
       onBackToLobby: options.onBackToLobby,
+      onUnitRangesEnabledChange: options.onUnitRangesEnabledChange,
       capabilities: options.capabilities,
       observerAnalysisOverlayPreferences: options.observerAnalysisOverlayPreferences,
     });

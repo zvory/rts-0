@@ -95,6 +95,7 @@ export class Match {
     this.settings = options.settings || null;
     this.backToLobbyHandler = options.onBackToLobby || null;
     this.onPredictionEnabledChange = options.onPredictionEnabledChange || null;
+    this.onUnitRangesEnabledChange = options.onUnitRangesEnabledChange;
     this.labMetadata = options.labMetadata || null;
     this.labClient = options.labClient || null;
     this.labControlPolicy = options.labControlPolicy || null;
@@ -819,16 +820,17 @@ export class Match {
 
   toggleDebugPathOverlays() {
     if (this.capabilities.diagnostics.movementPaths === MOVEMENT_PATH_DIAGNOSTICS.NONE) {
-      this.syncDebugPathUi();
+      this.syncSettingsToggleUi();
       return;
     }
     this.state.debugPathOverlaysEnabled = !this.state.debugPathOverlaysEnabled;
-    this.syncDebugPathUi();
+    this.syncSettingsToggleUi();
   }
 
   toggleUnitRangeOverlays() {
     this.state.showUnitRangesEnabled = !this.state.showUnitRangesEnabled;
-    this.syncUnitRangeUi();
+    this.syncSettingsToggleUi();
+    this.onUnitRangesEnabledChange?.(this.state.showUnitRangesEnabled);
   }
 
   handlePointerLockChange(locked) {
@@ -933,11 +935,7 @@ export class Match {
     if (this.settings?.isOpen()) this.mountSettings({ keepOpen: true });
   }
 
-  syncDebugPathUi() {
-    if (this.settings?.isOpen()) this.mountSettings({ keepOpen: true });
-  }
-
-  syncUnitRangeUi() {
+  syncSettingsToggleUi() {
     if (this.settings?.isOpen()) this.mountSettings({ keepOpen: true });
   }
 

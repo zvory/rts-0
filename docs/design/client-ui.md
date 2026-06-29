@@ -19,6 +19,7 @@ src/
   prediction_controller.js # PredictionController: local command sequence/buffer bookkeeping
   prediction_compatibility.js # server/client prediction-build compatibility guard
   prediction_settings.js # localStorage-backed prediction toggle
+  unit_range_settings.js # localStorage-backed selected-unit range overlay toggle
   sim_wasm_adapter.js # optional WASM prediction adapter
   state.js        # GameState: holds prev+current snapshot, selection, control groups, display overlays
   state_ground_decals.js # client-only death-event decal queue, classification, owner/facing recovery
@@ -1233,7 +1234,7 @@ Current areas:
 - `renderer`: `renderer/`.
 - `platform`: bootstrap, including the lobby Open Lab entry point to bare `/lab`, `/lab` catalog
   route detection, direct launch URL parsing for scenario/map/seed, audio, combat audio, alerts,
-  fog, camera, prediction settings,
+  fog, camera, prediction settings, unit range settings,
   `report_window_aggregate.js`.
 
 Import rules:

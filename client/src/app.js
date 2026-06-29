@@ -30,6 +30,7 @@ import {
 import { Match } from "./match.js";
 import { MatchHistory } from "./match_history.js";
 import { readPredictionEnabled, writePredictionEnabled } from "./prediction_settings.js";
+import { readUnitRangesEnabled, writeUnitRangesEnabled } from "./unit_range_settings.js";
 import { createObserverAnalysisOverlayPreferences } from "./observer_analysis_overlay.js";
 import { ReplayViewer } from "./replay_viewer.js";
 import { createRoomCapabilities } from "./room_capabilities.js";
@@ -135,6 +136,7 @@ export class App {
     this.allowUnloadWithoutWarning = false;
     this.pendingCameraView = null;
     this.predictionEnabled = readPredictionEnabled();
+    this.unitRangesEnabled = readUnitRangesEnabled();
     this.observerAnalysisOverlayPreferences = createObserverAnalysisOverlayPreferences();
     this.mountLobbySettings();
     if (this.labCatalogLaunch) this.lobby.hide();
@@ -352,6 +354,7 @@ export class App {
         onBackToLobby: this.onBackToLobby,
         predictionEnabled: this.predictionEnabled,
         onPredictionEnabledChange: (enabled) => this.setPredictionEnabled(enabled),
+        onUnitRangesEnabledChange: (enabled) => this.setUnitRangesEnabled(enabled),
         observerAnalysisOverlayPreferences: this.observerAnalysisOverlayPreferences,
         capabilities,
         labMetadata,
@@ -360,6 +363,8 @@ export class App {
         onLabToolChange: (change) => this.labPanel?.applyLabToolChange?.(change),
       },
     );
+    if (this.match?.state) this.match.state.showUnitRangesEnabled = this.unitRangesEnabled;
+    if (this.settings?.isOpen()) this.match?.mountSettings?.({ keepOpen: true });
     if (labMetadata) {
       this.labPanel = new LabPanel({
         root: dom.gameScreen,
@@ -596,6 +601,13 @@ export class App {
             }),
             onToggle: () => this.setPredictionEnabled(!this.predictionEnabled),
           },
+          unitRanges: {
+            state: () => ({
+              enabled: this.unitRangesEnabled,
+              available: true,
+            }),
+            onToggle: () => this.setUnitRangesEnabled(!this.unitRangesEnabled),
+          },
         },
       }),
     });
@@ -606,6 +618,25 @@ export class App {
     writePredictionEnabled(this.predictionEnabled);
     if (this.match && typeof this.match.setPredictionEnabled === "function") {
       this.match.setPredictionEnabled(this.predictionEnabled);
+    }
+    if (this.settings?.isOpen()) {
+      if (this.match && typeof this.match.mountSettings === "function") {
+        this.match.mountSettings({ keepOpen: true });
+      } else {
+        this.mountLobbySettings();
+        this.settings.open({ focus: false });
+      }
+    }
+  }
+
+  setUnitRangesEnabled(enabled) {
+    this.unitRangesEnabled = !!enabled;
+    writeUnitRangesEnabled(this.unitRangesEnabled);
+    if (
+      this.match?.state &&
+      this.match.state?.showUnitRangesEnabled !== this.unitRangesEnabled
+    ) {
+      this.match.state.showUnitRangesEnabled = this.unitRangesEnabled;
     }
     if (this.settings?.isOpen()) {
       if (this.match && typeof this.match.mountSettings === "function") {
