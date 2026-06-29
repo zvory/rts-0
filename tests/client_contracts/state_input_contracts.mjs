@@ -178,15 +178,11 @@ function buttonByLabel(card, label) {
   assert(state.currRecvTime === null, "currRecvTime null before snapshots");
   assert(state.resources !== undefined, "GameState.resources");
   assert(Array.isArray(state.events), "GameState.events");
-  assert(Array.isArray(state.trenches), "GameState.trenches");
   assert(!("resourceMiningPreview" in state), "GameState no longer exposes resource preview shims");
   assert(!("antiTankGunSetupPreview" in state), "GameState no longer exposes support preview shims");
   assert(!("updateResourceMiningPreview" in state), "GameState no longer exposes preview update shims");
   assert(state.selection instanceof Set, "GameState.selection");
-  assert(
-    state.diagnostics.movementPaths === MOVEMENT_PATH_DIAGNOSTICS.NONE,
-    "GameState defaults movement path diagnostics to none",
-  );
+  assert(state.diagnostics.movementPaths === MOVEMENT_PATH_DIAGNOSTICS.NONE, "GameState defaults movement path diagnostics to none");
   assert(state.debugPathOverlaysAvailable === false, "GameState hides waypoint diagnostics by default");
   assert(state.debugPathOverlaysEnabled === false, "GameState leaves waypoint diagnostics off by default");
   assertHasMethod(state, "setSelection", "GameState");

@@ -441,9 +441,7 @@ impl Game {
     #[allow(dead_code)]
     #[cfg(any(test, debug_assertions))]
     pub(crate) fn spawn_trench_for_test(&mut self, x: f32, y: f32) -> Option<u32> {
-        let id = self
-            .trenches
-            .create(&self.map, x, y, config::ENTRENCHMENT_TRENCH_RADIUS_TILES)?;
+        let id = self.trenches.create(&self.map, x, y)?;
         let ids: Vec<u32> = self.players.iter().map(|p| p.id).collect();
         self.refresh_trench_memory(&ids);
         Some(id)

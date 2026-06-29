@@ -62,7 +62,8 @@ impl TrenchStore {
         }
     }
 
-    pub(crate) fn create(&mut self, map: &Map, x: f32, y: f32, radius_tiles: f32) -> Option<u32> {
+    pub(crate) fn create(&mut self, map: &Map, x: f32, y: f32) -> Option<u32> {
+        let radius_tiles = config::ENTRENCHMENT_TRENCH_RADIUS_TILES;
         if self.trenches.len() >= MAX_TRENCHES
             || !x.is_finite()
             || !y.is_finite()
