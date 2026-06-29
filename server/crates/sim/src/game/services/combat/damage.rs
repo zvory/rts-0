@@ -57,9 +57,7 @@ pub(super) fn apply_damage(
         ax,
         ay,
     );
-    let Some(shot_victim) = shot_victim else {
-        return None;
-    };
+    let shot_victim = shot_victim?;
     let shot_victim_pos = entities
         .get(shot_victim)
         .map(|e| (e.pos_x, e.pos_y))

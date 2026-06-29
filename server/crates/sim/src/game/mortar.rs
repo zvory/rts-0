@@ -4,7 +4,6 @@ use crate::config;
 use crate::game::entity::{Entity, EntityKind, EntityStore};
 use crate::game::firing_reveal::{record_mortar_impact_firing_reveals, FiringRevealSource};
 use crate::game::fog::Fog;
-use crate::game::map::Map;
 use crate::game::services::dist2;
 use crate::game::teams::TeamRelations;
 use crate::protocol::{self, AttackReveal, Event};
@@ -116,7 +115,6 @@ impl MortarShellStore {
 
     pub(in crate::game) fn resolve_due(
         &mut self,
-        map: &Map,
         entities: &mut EntityStore,
         teams: &TeamRelations,
         fog: &Fog,
@@ -128,7 +126,7 @@ impl MortarShellStore {
         let due = std::mem::take(&mut self.shells);
         for shell in due {
             if shell.impact_tick <= tick {
-                resolve(map, entities, teams, fog, events, firing_reveals, &shell, tick);
+                resolve(entities, teams, fog, events, firing_reveals, &shell, tick);
             } else {
                 pending.push(shell);
             }
@@ -172,7 +170,6 @@ fn emit_launch(
 }
 
 fn resolve(
-    _map: &Map,
     entities: &mut EntityStore,
     teams: &TeamRelations,
     fog: &Fog,
@@ -349,6 +346,7 @@ fn push_under_attack_notice(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::game::map::Map;
     use crate::protocol::terrain;
 
     fn open_map(size: u32) -> Map {
