@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   autoCommitBody,
@@ -9,10 +11,14 @@ import {
   markdownReport,
   normalizeReport,
   parseArgs,
+  QUALITY_PASS_ENV,
   renderPrompt,
   resolveHeadBranch,
   statusDescription,
 } from "../scripts/adversarial-quality-pass.mjs";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(__dirname, "..");
 
 const options = parseArgs([
   "--base",
@@ -46,6 +52,7 @@ assert.doesNotMatch(prompt, /close the PR/i);
 assert.deepEqual(
   buildCodexArgs({
     repoRoot: "/tmp/repo",
+    gitCommonDir: "/tmp/git-common",
     schemaFile: "/tmp/schema.json",
     reportFile: "/tmp/report.json",
     codexModel: "gpt-5.5",
@@ -55,6 +62,8 @@ assert.deepEqual(
     "exec",
     "--cd",
     "/tmp/repo",
+    "--add-dir",
+    "/tmp/git-common",
     "--sandbox",
     "workspace-write",
     "-c",
@@ -133,5 +142,13 @@ assert.deepEqual(buildFetchArgs({ remote: "origin", baseRef: "upstream/main" }),
   "origin",
   "upstream/main",
 ]);
+
+const nestedAgentPr = spawnSync("bash", ["scripts/agent-pr.sh", "--dry-run"], {
+  cwd: repoRoot,
+  encoding: "utf8",
+  env: { ...process.env, [QUALITY_PASS_ENV]: "1" },
+});
+assert.equal(nestedAgentPr.status, 2);
+assert.match(nestedAgentPr.stderr, /outer helper owns PR lifecycle/);
 
 console.log("adversarial quality pass tests passed");

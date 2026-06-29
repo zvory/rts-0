@@ -62,6 +62,11 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
+if [ "${RTS_ADVERSARIAL_QUALITY_PASS:-}" = "1" ]; then
+  echo "agent-pr: refusing to run inside adversarial quality pass; the outer helper owns PR lifecycle" >&2
+  exit 2
+fi
+
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 

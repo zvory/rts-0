@@ -12,6 +12,7 @@ const DEFAULT_REMOTE = "origin";
 const DEFAULT_CODEX_COMMAND = "codex";
 const DEFAULT_GH_BIN = "gh";
 const VERDICTS = new Set(["passed_unchanged", "improved", "improved_with_concerns"]);
+export const QUALITY_PASS_ENV = "RTS_ADVERSARIAL_QUALITY_PASS";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const defaultRepoRoot = path.resolve(scriptDir, "..");
@@ -166,11 +167,16 @@ Return JSON with:
 `;
 }
 
-export function buildCodexArgs({ repoRoot, schemaFile, reportFile, codexModel, prompt }) {
+export function buildCodexArgs({ repoRoot, gitCommonDir = "", schemaFile, reportFile, codexModel, prompt }) {
   const args = [
     "exec",
     "--cd",
     repoRoot,
+  ];
+  if (gitCommonDir) {
+    args.push("--add-dir", gitCommonDir);
+  }
+  args.push(
     "--sandbox",
     "workspace-write",
     "-c",
@@ -180,7 +186,7 @@ export function buildCodexArgs({ repoRoot, schemaFile, reportFile, codexModel, p
     schemaFile,
     "--output-last-message",
     reportFile,
-  ];
+  );
   if (codexModel) {
     args.push("--model", codexModel);
   }
@@ -362,6 +368,10 @@ class Runner {
     return this.git(["branch", "--show-current"], repoRoot);
   }
 
+  gitCommonDir(repoRoot) {
+    return this.git(["rev-parse", "--path-format=absolute", "--git-common-dir"], repoRoot);
+  }
+
   ensureClean(repoRoot) {
     const status = this.git(["status", "--porcelain=v1"], repoRoot);
     if (status) {
@@ -407,15 +417,11 @@ class Runner {
       currentBranch: this.currentBranch(repoRoot),
     });
     const reportFile = options.reportFile || path.join(os.tmpdir(), `rts-adversarial-quality-pass-${process.pid}.json`);
-
-    this.ensureClean(repoRoot);
-    if (options.fetchBase) {
-      this.gitInherit(buildFetchArgs({ remote: options.remote, baseRef: options.baseRef }), repoRoot);
-    }
-    const beforeHead = this.git(["rev-parse", "HEAD"], repoRoot);
+    const gitCommonDir = this.gitCommonDir(repoRoot);
     const prompt = renderPrompt({ baseRef: options.baseRef, headRef: "HEAD" });
     const codexArgs = buildCodexArgs({
       repoRoot,
+      gitCommonDir,
       schemaFile: options.schemaFile,
       reportFile,
       codexModel: options.codexModel,
@@ -434,8 +440,14 @@ class Runner {
       return;
     }
 
+    this.ensureClean(repoRoot);
+    if (options.fetchBase) {
+      this.gitInherit(buildFetchArgs({ remote: options.remote, baseRef: options.baseRef }), repoRoot);
+    }
+    const beforeHead = this.git(["rev-parse", "HEAD"], repoRoot);
+
     this.log(`quality-pass: running Codex final quality pass for ${headBranch}`);
-    this.runInherit(options.codexCommand, codexArgs, { cwd: repoRoot });
+    this.runInherit(options.codexCommand, codexArgs, { cwd: repoRoot, env: { [QUALITY_PASS_ENV]: "1" } });
     if (!fs.existsSync(reportFile)) {
       throw new Error(`quality pass did not write report file: ${reportFile}`);
     }
