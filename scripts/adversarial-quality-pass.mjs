@@ -220,6 +220,18 @@ export function normalizeReport(raw) {
   };
 }
 
+export function resolveHeadBranch({ requestedHeadBranch, currentBranch }) {
+  const current = cleanString(currentBranch);
+  const requested = cleanString(requestedHeadBranch);
+  if (!current) {
+    throw new Error("quality pass requires a named current branch; detached HEAD is not supported");
+  }
+  if (requested && requested !== current) {
+    throw new Error(`quality pass head branch mismatch: current branch is '${current}', but --head-branch was '${requested}'`);
+  }
+  return requested || current;
+}
+
 function normalizeStringArray(value) {
   return Array.isArray(value) ? value.map(cleanString).filter(Boolean) : [];
 }
@@ -272,6 +284,28 @@ export function statusDescription(report) {
   const prefix = report.verdict.replaceAll("_", " ");
   const suffix = report.remaining_concerns.length ? `; ${report.remaining_concerns.length} concern(s)` : "";
   return `${prefix}${suffix}`.slice(0, 140);
+}
+
+export function autoCommitBody(report) {
+  const list = (items) => (items.length ? items.map((item) => `- ${item}`).join("\n") : "- None.");
+  return [
+    `Verdict: ${report.verdict}`,
+    "",
+    "Summary:",
+    report.summary || "Not recorded.",
+    "",
+    "Issues found:",
+    list(report.issues_found),
+    "",
+    "Changes made:",
+    list(report.changes_made),
+    "",
+    "Verification:",
+    list(report.verification),
+    "",
+    "Remaining concerns:",
+    list(report.remaining_concerns),
+  ].join("\n");
 }
 
 class Runner {
@@ -335,11 +369,11 @@ class Runner {
     }
   }
 
-  commitDirtyFinalState(repoRoot) {
+  commitDirtyFinalState(repoRoot, report) {
     const status = this.git(["status", "--porcelain=v1"], repoRoot);
     if (!status) return false;
     this.gitInherit(["add", "-A"], repoRoot);
-    this.gitInherit(["commit", "-m", "Run adversarial quality pass"], repoRoot);
+    this.gitInherit(["commit", "-m", "Run adversarial quality pass", "-m", autoCommitBody(report)], repoRoot);
     return true;
   }
 
@@ -368,10 +402,10 @@ class Runner {
     if (!fs.existsSync(options.schemaFile)) {
       throw new Error(`missing quality pass schema: ${options.schemaFile}`);
     }
-    const headBranch = cleanString(options.headBranch) || this.currentBranch(repoRoot);
-    if (!headBranch) {
-      throw new Error("quality pass requires a named branch; detached HEAD is not supported");
-    }
+    const headBranch = resolveHeadBranch({
+      requestedHeadBranch: options.headBranch,
+      currentBranch: this.currentBranch(repoRoot),
+    });
     const reportFile = options.reportFile || path.join(os.tmpdir(), `rts-adversarial-quality-pass-${process.pid}.json`);
 
     this.ensureClean(repoRoot);
@@ -406,7 +440,7 @@ class Runner {
       throw new Error(`quality pass did not write report file: ${reportFile}`);
     }
     const report = normalizeReport(fs.readFileSync(reportFile, "utf8"));
-    const autoCommitted = this.commitDirtyFinalState(repoRoot);
+    const autoCommitted = this.commitDirtyFinalState(repoRoot, report);
     const finalHead = this.git(["rev-parse", "HEAD"], repoRoot);
     if (autoCommitted) {
       this.log(`quality-pass: committed final dirty state at ${finalHead}`);

@@ -3,12 +3,14 @@ import assert from "node:assert/strict";
 import path from "node:path";
 
 import {
+  autoCommitBody,
   buildCodexArgs,
   buildFetchArgs,
   markdownReport,
   normalizeReport,
   parseArgs,
   renderPrompt,
+  resolveHeadBranch,
   statusDescription,
 } from "../scripts/adversarial-quality-pass.mjs";
 
@@ -94,8 +96,27 @@ assert.match(markdown, /## Adversarial quality pass/);
 assert.match(markdown, /lazy local patch/);
 assert.match(markdown, /watch CI/);
 assert.equal(statusDescription(report), "improved with concerns; 1 concern(s)");
+assert.match(autoCommitBody(report), /Verdict: improved_with_concerns/);
+assert.match(autoCommitBody(report), /- rewrote helper boundary/);
 
 assert.equal(path.basename(parseArgs([]).schemaFile), "adversarial-quality-pass.schema.json");
+
+assert.equal(
+  resolveHeadBranch({ requestedHeadBranch: "", currentBranch: "zvorygin/example" }),
+  "zvorygin/example",
+);
+assert.equal(
+  resolveHeadBranch({ requestedHeadBranch: "zvorygin/example", currentBranch: "zvorygin/example" }),
+  "zvorygin/example",
+);
+assert.throws(
+  () => resolveHeadBranch({ requestedHeadBranch: "zvorygin/other", currentBranch: "zvorygin/example" }),
+  /head branch mismatch/,
+);
+assert.throws(
+  () => resolveHeadBranch({ requestedHeadBranch: "zvorygin/example", currentBranch: "" }),
+  /detached HEAD/,
+);
 
 assert.deepEqual(buildFetchArgs({ remote: "origin", baseRef: "origin/main" }), [
   "fetch",
