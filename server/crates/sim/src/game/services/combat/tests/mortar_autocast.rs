@@ -12,7 +12,9 @@ fn mortar_autocast_prefers_safe_target_over_nearer_unsafe_target() {
     let safe_enemy = entities
         .spawn_unit(2, EntityKind::Rifleman, 320.0, 100.0)
         .expect("safe enemy should spawn");
-    let (impact_x, impact_y) = mortar_aim_point(&entities, unsafe_enemy, 10);
+    let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
+    let (impact_x, impact_y) =
+        predicted_test_mortar_impact(&entities, &teams, &[1, 2], 1, mortar_id, unsafe_enemy, 10);
     entities
         .spawn_unit(1, EntityKind::Rifleman, impact_x, impact_y + 24.0)
         .expect("friendly should spawn");
@@ -49,7 +51,9 @@ fn mortar_autocast_tracks_safe_target_while_reload_blocks_firing() {
     let safe_enemy = entities
         .spawn_unit(2, EntityKind::Rifleman, 100.0, 20.0)
         .expect("safe enemy should spawn");
-    let (impact_x, impact_y) = mortar_aim_point(&entities, unsafe_enemy, 10);
+    let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
+    let (impact_x, impact_y) =
+        predicted_test_mortar_impact(&entities, &teams, &[1, 2], 1, mortar_id, unsafe_enemy, 10);
     entities
         .spawn_unit(1, EntityKind::Rifleman, impact_x, impact_y + 24.0)
         .expect("friendly should spawn");
@@ -90,7 +94,9 @@ fn mortar_autocast_drops_unsafe_target_when_no_safe_target_exists() {
     let unsafe_enemy = entities
         .spawn_unit(2, EntityKind::Rifleman, 220.0, 100.0)
         .expect("unsafe enemy should spawn");
-    let (impact_x, impact_y) = mortar_aim_point(&entities, unsafe_enemy, 10);
+    let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
+    let (impact_x, impact_y) =
+        predicted_test_mortar_impact(&entities, &teams, &[1, 2], 1, mortar_id, unsafe_enemy, 10);
     entities
         .spawn_unit(1, EntityKind::Rifleman, impact_x, impact_y + 24.0)
         .expect("friendly should spawn");
@@ -127,7 +133,9 @@ fn mortar_autocast_explicit_attack_keeps_commanded_unsafe_target() {
     entities
         .spawn_unit(2, EntityKind::Rifleman, 320.0, 100.0)
         .expect("safe enemy should spawn");
-    let (impact_x, impact_y) = mortar_aim_point(&entities, unsafe_enemy, 10);
+    let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
+    let (impact_x, impact_y) =
+        predicted_test_mortar_impact(&entities, &teams, &[1, 2], 1, mortar_id, unsafe_enemy, 10);
     entities
         .spawn_unit(1, EntityKind::Rifleman, impact_x, impact_y + 24.0)
         .expect("friendly should spawn");

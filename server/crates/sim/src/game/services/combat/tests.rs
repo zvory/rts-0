@@ -233,6 +233,24 @@ fn run_combat_tick_on_map_with_seed_and_smokes(
     events
 }
 
+fn predicted_test_mortar_impact(
+    entities: &EntityStore,
+    teams: &TeamRelations,
+    player_ids: &[u32],
+    owner: u32,
+    attacker: u32,
+    target: u32,
+    tick: u32,
+) -> (f32, f32) {
+    let map = Map::generate(2, 0x00C0_FFEE);
+    let mut fog = Fog::new(map.size);
+    fog.recompute(player_ids, entities, &map);
+    let (x, y) = mortar_aim_point(entities, target, tick);
+    crate::game::mortar_scatter::predicted_mortar_impact(
+        &fog, teams, owner, attacker, x, y, tick,
+    )
+}
+
 fn run_movement_tick(entities: &mut EntityStore) {
     let map = Map::generate(2, 0x00C0_FFEE);
     run_movement_tick_on_map(entities, &map, 0);
@@ -1985,7 +2003,6 @@ fn mortar_turns_fast_before_auto_firing() {
 
 #[test]
 fn mortar_autocast_does_not_lead_stationary_attack_move_targets() {
-    let error_px = config::MORTAR_AUTOFIRE_ERROR_TILES * config::TILE_SIZE as f32;
     let target_kinds = [
         EntityKind::Worker,
         EntityKind::Rifleman,
@@ -2013,15 +2030,14 @@ fn mortar_autocast_does_not_lead_stationary_attack_move_targets() {
         let (aim_x, aim_y) = mortar_aim_point(&entities, target_id, 10);
         let offset = dist2(aim_x, aim_y, 220.0, 100.0).sqrt();
         assert!(
-            offset <= error_px + 0.001,
-            "{target_kind:?} stationary attack-move target should only receive normal mortar error, got offset {offset:.2}"
+            offset <= 0.001,
+            "{target_kind:?} stationary attack-move target should not receive movement lead, got offset {offset:.2}"
         );
     }
 }
 
 #[test]
 fn mortar_autocast_still_leads_actively_moving_attack_move_targets() {
-    let error_px = config::MORTAR_AUTOFIRE_ERROR_TILES * config::TILE_SIZE as f32;
     let target_kinds = [
         EntityKind::Worker,
         EntityKind::Rifleman,
@@ -2053,7 +2069,7 @@ fn mortar_autocast_still_leads_actively_moving_attack_move_targets() {
         let (aim_x, _aim_y) = mortar_aim_point(&entities, target_id, 10);
         let expected_lead = speed * config::MORTAR_SHELL_DELAY_TICKS as f32;
         assert!(
-            aim_x >= 220.0 + expected_lead - error_px - 0.001,
+            aim_x >= 220.0 + expected_lead - 0.001,
             "{target_kind:?} moving target should be led by its current movement delta, got x={aim_x:.2}"
         );
     }
@@ -2061,7 +2077,6 @@ fn mortar_autocast_still_leads_actively_moving_attack_move_targets() {
 
 #[test]
 fn mortar_autocast_leads_current_direction_not_corner_destination() {
-    let error_px = config::MORTAR_AUTOFIRE_ERROR_TILES * config::TILE_SIZE as f32;
     let mut entities = EntityStore::new();
     let target_id = entities
         .spawn_unit(2, EntityKind::Worker, 220.0, 100.0)
@@ -2080,7 +2095,7 @@ fn mortar_autocast_leads_current_direction_not_corner_destination() {
 
     let (aim_x, aim_y) = mortar_aim_point(&entities, target_id, 10);
     assert!(
-        aim_x <= 220.0 + error_px + 0.001,
+        aim_x <= 220.0 + 0.001,
         "target moving north around a corner should not be led east toward its final destination, got x={aim_x:.2}"
     );
     assert!(
@@ -2091,7 +2106,6 @@ fn mortar_autocast_leads_current_direction_not_corner_destination() {
 
 #[test]
 fn mortar_autocast_velocity_clears_when_path_clears() {
-    let error_px = config::MORTAR_AUTOFIRE_ERROR_TILES * config::TILE_SIZE as f32;
     let mut entities = EntityStore::new();
     let target_id = entities
         .spawn_unit(2, EntityKind::Rifleman, 220.0, 100.0)
@@ -2104,14 +2118,13 @@ fn mortar_autocast_velocity_clears_when_path_clears() {
     let (aim_x, aim_y) = mortar_aim_point(&entities, target_id, 10);
     let offset = dist2(aim_x, aim_y, 220.0, 100.0).sqrt();
     assert!(
-        offset <= error_px + 0.001,
+        offset <= 0.001,
         "target with cleared path should not keep stale mortar lead, got offset {offset:.2}"
     );
 }
 
 #[test]
 fn mortar_autocast_velocity_resets_for_stationary_units_each_movement_tick() {
-    let error_px = config::MORTAR_AUTOFIRE_ERROR_TILES * config::TILE_SIZE as f32;
     let mut entities = EntityStore::new();
     let target_id = entities
         .spawn_unit(2, EntityKind::Rifleman, 220.0, 100.0)
@@ -2131,7 +2144,7 @@ fn mortar_autocast_velocity_resets_for_stationary_units_each_movement_tick() {
     let (aim_x, aim_y) = mortar_aim_point(&entities, target_id, 10);
     let offset = dist2(aim_x, aim_y, 220.0, 100.0).sqrt();
     assert!(
-        offset <= error_px + 0.001,
+        offset <= 0.001,
         "stationary target should not retain stale movement-tick mortar lead, got offset {offset:.2}"
     );
 }
@@ -2181,7 +2194,9 @@ fn mortar_autocast_skips_shot_that_would_hit_owned_unit() {
     let enemy_id = entities
         .spawn_unit(2, EntityKind::Rifleman, 220.0, 100.0)
         .expect("enemy should spawn");
-    let (impact_x, impact_y) = mortar_aim_point(&entities, enemy_id, 10);
+    let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
+    let (impact_x, impact_y) =
+        predicted_test_mortar_impact(&entities, &teams, &[1, 2], 1, mortar_id, enemy_id, 10);
     entities
         .spawn_unit(1, EntityKind::Rifleman, impact_x, impact_y + 24.0)
         .expect("friendly should spawn");
@@ -2211,7 +2226,9 @@ fn mortar_autocast_skips_shot_that_would_hit_allied_unit() {
     let enemy_id = entities
         .spawn_unit(3, EntityKind::Rifleman, 220.0, 100.0)
         .expect("enemy should spawn");
-    let (impact_x, impact_y) = mortar_aim_point(&entities, enemy_id, 10);
+    let teams = TeamRelations::from_player_teams([(1, 7), (2, 7), (3, 3)]);
+    let (impact_x, impact_y) =
+        predicted_test_mortar_impact(&entities, &teams, &[1, 2, 3], 1, mortar_id, enemy_id, 10);
     entities
         .spawn_unit(2, EntityKind::Rifleman, impact_x, impact_y + 24.0)
         .expect("allied unit should spawn");
@@ -2247,7 +2264,9 @@ fn mortar_autocast_skips_shot_that_would_hit_owned_building() {
     let enemy_id = entities
         .spawn_unit(2, EntityKind::Rifleman, 220.0, 100.0)
         .expect("enemy should spawn");
-    let (impact_x, impact_y) = mortar_aim_point(&entities, enemy_id, 10);
+    let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
+    let (impact_x, impact_y) =
+        predicted_test_mortar_impact(&entities, &teams, &[1, 2], 1, mortar_id, enemy_id, 10);
     entities
         .spawn_building(1, EntityKind::Depot, impact_x, impact_y + 40.0, true)
         .expect("depot should spawn");

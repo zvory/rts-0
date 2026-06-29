@@ -25,6 +25,7 @@ mod invariants;
 pub mod lab;
 pub mod map;
 mod mortar;
+mod mortar_scatter;
 mod pathfinding;
 mod player_state;
 pub mod replay;

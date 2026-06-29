@@ -4,6 +4,7 @@ use crate::config;
 use crate::game::entity::{Entity, EntityKind, EntityStore};
 use crate::game::firing_reveal::{record_mortar_impact_firing_reveals, FiringRevealSource};
 use crate::game::fog::Fog;
+use crate::game::mortar_scatter::predicted_mortar_impact;
 use crate::game::services::dist2;
 use crate::game::teams::TeamRelations;
 use crate::protocol::{self, AttackReveal, Event};
@@ -92,11 +93,13 @@ impl MortarShellStore {
         tick: u32,
         reveal_launch_to_enemies: bool,
     ) {
+        let (impact_x, impact_y) =
+            predicted_mortar_impact(fog, teams, owner, attacker, x, y, tick);
         self.shells.push(MortarShell {
             owner,
             attacker,
-            x,
-            y,
+            x: impact_x,
+            y: impact_y,
             impact_tick: tick.saturating_add(config::MORTAR_SHELL_DELAY_TICKS),
         });
         emit_launch(
@@ -107,8 +110,8 @@ impl MortarShellStore {
             attacker,
             from_x,
             from_y,
-            x,
-            y,
+            impact_x,
+            impact_y,
             reveal_launch_to_enemies,
         );
     }

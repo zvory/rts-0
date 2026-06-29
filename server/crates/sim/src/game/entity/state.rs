@@ -139,6 +139,11 @@ pub struct CombatState {
     pub pending_redeploy_facing: Option<f32>,
     /// Whether this support weapon may acquire and fire at targets without a point-fire command.
     pub autocast_enabled: bool,
+    /// Ticks this tank has spent still enough to extend its weapon range.
+    pub tank_stationary_range_ticks: u16,
+    /// Set when tank movement reset the range this tick, so combat does not immediately re-add one
+    /// stationary tick after the movement phase.
+    pub tank_stationary_range_reset_this_tick: bool,
 }
 
 impl Default for CombatState {
@@ -155,6 +160,8 @@ impl Default for CombatState {
             emplacement_facing: None,
             pending_redeploy_facing: None,
             autocast_enabled: true,
+            tank_stationary_range_ticks: 0,
+            tank_stationary_range_reset_this_tick: false,
         }
     }
 }

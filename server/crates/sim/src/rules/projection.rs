@@ -20,6 +20,8 @@ use crate::protocol::{AbilityCooldownView, DebugPathPoint, DebugPathView};
 use crate::protocol::{EntityView, OrderPlanMarker};
 
 const MAX_DEBUG_PATH_WAYPOINTS: usize = 128;
+const TANK_STATIONARY_RANGE_MAX_TILES: f32 = 14.0;
+const TANK_STATIONARY_RANGE_RAMP_TICKS: u16 = config::TICK_HZ as u16 * 3;
 
 pub struct EntityProjectionContext<'a> {
     pub fog: &'a Fog,
@@ -230,6 +232,11 @@ pub fn project_entity(
     if let Some(oil_used) = entity.lifetime_oil_used() {
         view.oil_used = Some(oil_used);
     }
+    if entity.kind == EntityKind::Tank && owner_or_ally {
+        if let Some(stats) = config::unit_stats(entity.kind) {
+            view.weapon_range_tiles = Some(tank_weapon_range_tiles(entity, stats.range_tiles as f32));
+        }
+    }
     let active_combat_target = matches!(entity.order(), Order::Attack(_) | Order::AttackMove(_))
         || (fires_while_moving(entity.kind) && entity.target_id().is_some())
         || (entity.is_building() && entity.can_attack());
@@ -426,6 +433,21 @@ pub fn project_entity(
     }
 
     Some(view)
+}
+
+fn tank_weapon_range_tiles(entity: &Entity, base_range_tiles: f32) -> f32 {
+    let ramp_ticks = TANK_STATIONARY_RANGE_RAMP_TICKS.max(1);
+    let ticks = entity
+        .combat
+        .as_ref()
+        .map(|combat| combat.tank_stationary_range_ticks)
+        .unwrap_or(0)
+        .min(ramp_ticks);
+    if ticks == 0 {
+        return base_range_tiles;
+    }
+    let progress = ticks as f32 / ramp_ticks as f32;
+    base_range_tiles + (TANK_STATIONARY_RANGE_MAX_TILES - base_range_tiles) * progress
 }
 
 fn deconstruct_progress_for_target(target: u32, entities: &EntityStore) -> Option<f32> {
@@ -873,6 +895,40 @@ mod tests {
         let view = project_for_test(1, tank, &fog, true, &entities, None, false)
             .expect("tank should be visible");
         assert_eq!(view.oil_used, Some(3.25));
+    }
+
+    #[test]
+    fn tank_weapon_range_tiles_are_owner_only() {
+        let mut entities = EntityStore::new();
+        let tank_id = entities
+            .spawn_unit(1, EntityKind::Tank, 120.0, 100.0)
+            .expect("tank should spawn");
+        entities
+            .spawn_unit(2, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("enemy spotter should spawn");
+        {
+            let tank = entities.get_mut(tank_id).expect("tank should exist");
+            if let Some(combat) = tank.combat.as_mut() {
+                combat.tank_stationary_range_ticks = TANK_STATIONARY_RANGE_RAMP_TICKS / 2;
+            }
+        }
+        let map = Map {
+            size: 64,
+            terrain: vec![terrain::GRASS; 64 * 64],
+            starts: vec![(1, 1)],
+            expansion_sites: Vec::new(),
+        };
+        let mut fog = Fog::new(map.size);
+        fog.recompute(&[1, 2], &entities, &map);
+        let tank = entities.get(tank_id).expect("tank should exist");
+
+        let owner_view = project_for_test(1, tank, &fog, true, &entities, None, false)
+            .expect("owner should see tank");
+        assert_eq!(owner_view.weapon_range_tiles, Some(9.5));
+
+        let enemy_view = project_for_test(2, tank, &fog, true, &entities, None, false)
+            .expect("enemy should see nearby tank");
+        assert_eq!(enemy_view.weapon_range_tiles, None);
     }
 
     #[test]
