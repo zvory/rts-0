@@ -15,8 +15,8 @@
     },
     {
       "path": "server/crates/ai/src/ai_core/actions.rs",
-      "lines": 1645,
-      "reason": "Existing oversized AI action module before repo-wide source-size gate."
+      "lines": 1684,
+      "reason": "Pump Jack oil assignment now emits contextual build commands and focused regression coverage; keep oversized AI action module explicit until action helpers are split."
     },
     {
       "path": "server/crates/ai/src/ai_core/decision/tests.rs",
@@ -54,6 +54,11 @@
       "reason": "Existing oversized movement test module before repo-wide source-size gate."
     },
     {
+      "path": "server/crates/sim/src/game/services/order_queue.rs",
+      "lines": 1527,
+      "reason": "Pump Jack oil validation extended queued gather promotion in the existing oversized order adapter; keep ratcheting until queue validation is extracted."
+    },
+    {
       "path": "server/crates/sim/src/game/services/pathing.rs",
       "lines": 1985,
       "reason": "Existing oversized pathing service before repo-wide source-size gate."
@@ -65,8 +70,8 @@
     },
     {
       "path": "tests/client_contracts/state_input_contracts.mjs",
-      "lines": 2149,
-      "reason": "Existing oversized client contract suite; Ekat Golem gatherer fixture keeps the ratchet explicit."
+      "lines": 2167,
+      "reason": "Pump Jack right-click input coverage extended the existing oversized client contract suite; keep ratcheting until state/input fixtures are split."
     }
   ]
 }
