@@ -775,9 +775,9 @@ Allocation rules:
   closest worker. Work assignment load is the worker's current queued-order count plus one when its
   active order is already a build or deconstruct intent. Deconstruct targets must be completed Tank
   Traps; friendly/allied traps are always legal targets for their team's workers, while enemy traps
-  must be visible when accepted or promoted. Deconstruction takes the Tank Trap's build time, is not
-  accelerated by assigning multiple workers to the same trap, and refunds the Tank Trap cost to the
-  deconstructing player.
+  must be visible when accepted or promoted. Deconstruction takes half of the Tank Trap's build
+  time, is not accelerated by assigning multiple workers to the same trap, and refunds the Tank Trap
+  cost to the deconstructing player.
 - Legacy Charge has no eligible carriers after the Methamphetamines research conversion. It remains
   decodable for old command logs but does not create queued/immediate ability work, cooldowns, or
   runtime status.

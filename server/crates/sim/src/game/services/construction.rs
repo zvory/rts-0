@@ -1,6 +1,7 @@
 use std::collections::{BTreeSet, HashMap};
 
 use crate::config;
+use crate::game::entity::tank_trap_deconstruction_ticks;
 use crate::game::entity::{BuildPhase, DeconstructPhase, EntityKind, EntityStore, Order};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -256,8 +257,8 @@ fn build_wait_unit_blocked_ticks(entities: &EntityStore, worker: u32) -> u32 {
 }
 
 /// Advance Tank Trap deconstruction orders. A worker must first reach the target trap, then spends
-/// the trap's normal build time dismantling it. Completion refunds the trap cost to the worker's
-/// owner and leaves removal/event fanout to the ordinary death system.
+/// half of the trap's normal build time dismantling it. Completion refunds the trap cost to the
+/// worker's owner and leaves removal/event fanout to the ordinary death system.
 pub(crate) fn deconstruction_system(
     entities: &mut EntityStore,
     players: &mut [PlayerState],
@@ -310,9 +311,7 @@ pub(crate) fn deconstruction_system(
             Some((e.id, e.order().deconstruct_target()?))
         })
         .collect();
-    let required_ticks = config::building_stats(EntityKind::TankTrap)
-        .map(|stats| stats.build_ticks)
-        .unwrap_or(config::TICK_HZ * 10);
+    let required_ticks = tank_trap_deconstruction_ticks();
 
     for (worker, target) in working {
         if live_completed_tank_trap_position(entities, target).is_none() {
@@ -778,7 +777,7 @@ mod tests {
     }
 
     #[test]
-    fn deconstruction_refunds_worker_owner_and_marks_trap_dead_after_ten_seconds() {
+    fn deconstruction_refunds_worker_owner_and_marks_trap_dead_at_half_build_time() {
         let map = flat_map(16);
         let mut entities = EntityStore::new();
         let (tx, ty) = footprint_center(&map, EntityKind::TankTrap, 4, 4);
@@ -797,13 +796,16 @@ mod tests {
         let mut players = vec![player_state(1), player_state(2)];
         let steel_before = players[0].steel;
         let enemy_steel_before = players[1].steel;
-        let required_ticks = config::building_stats(EntityKind::TankTrap)
-            .expect("tank trap stats")
-            .build_ticks;
+        let build_ticks = config::building_stats(EntityKind::TankTrap).unwrap().build_ticks;
+        let required_ticks = tank_trap_deconstruction_ticks();
+        assert_eq!(required_ticks * 2, build_ticks);
 
-        for _ in 0..required_ticks {
+        for _ in 1..required_ticks {
             deconstruction_system(&mut entities, &mut players);
         }
+        assert!(entities.get(trap).expect("trap should exist").hp > 0);
+
+        deconstruction_system(&mut entities, &mut players);
 
         assert_eq!(
             players[0].steel,
@@ -845,9 +847,7 @@ mod tests {
             w.append_queued_order(OrderIntent::move_to(handoff.0, handoff.1));
         }
         let mut players = vec![player_state(1), player_state(2)];
-        let required_ticks = config::building_stats(EntityKind::TankTrap)
-            .expect("tank trap stats")
-            .build_ticks;
+        let required_ticks = tank_trap_deconstruction_ticks();
 
         for _ in 0..required_ticks {
             deconstruction_system(&mut entities, &mut players);
