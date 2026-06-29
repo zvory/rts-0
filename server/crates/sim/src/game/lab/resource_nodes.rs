@@ -2,7 +2,7 @@ use crate::game::entity::{EntityKind, EntityStore};
 use crate::game::map::Map;
 use crate::game::resource_placement;
 
-use super::{validate_resource_node_position, validate_world_position, LabError};
+use super::{validate_resource_node_position, LabError};
 
 #[cfg(test)]
 #[path = "resource_nodes_tests.rs"]
@@ -25,7 +25,7 @@ pub(super) fn restore_resource_node_position(
         return Ok((x, y));
     }
 
-    validate_world_position(map, x, y)?;
+    validate_resource_node_position(map, entities, x, y)?;
     let source_tile = map.tile_of(x, y);
     let occupied_tiles = resource_placement::occupied_resource_tiles(map, entities, kind);
     let Some((center_x, center_y, _tile)) =

@@ -1,6 +1,6 @@
 use crate::config;
 use crate::game::entity::{EntityKind, NEUTRAL};
-use crate::game::lab::{LabOp, LabScenarioEntity};
+use crate::game::lab::{LabError, LabOp, LabScenarioEntity};
 use crate::game::map::Map;
 use crate::game::{Game, PlayerInit};
 
@@ -65,6 +65,28 @@ fn lab_oil_entity(id: u32, x: f32, y: f32) -> LabScenarioEntity {
         setup_facing: None,
         setup_target: None,
     }
+}
+
+#[test]
+fn lab_scenario_restore_rejects_oil_source_inside_building() {
+    let game = default_map_game();
+    let city_centre = game
+        .entities
+        .iter()
+        .find(|entity| entity.kind == EntityKind::CityCentre)
+        .expect("lab game should include a City Centre");
+
+    let err = super::restore_resource_node_position(
+        &game.map,
+        &game.entities,
+        EntityKind::Oil,
+        city_centre.pos_x,
+        city_centre.pos_y,
+        true,
+    )
+    .expect_err("invalid oil source positions must not be snapped away");
+
+    assert!(matches!(err, LabError::OccupiedPosition { .. }));
 }
 
 #[test]
