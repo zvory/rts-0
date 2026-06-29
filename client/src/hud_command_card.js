@@ -128,6 +128,7 @@ export function buildCommandCardContextCatalog() {
     upgrades: [
       UPGRADE.METHAMPHETAMINES,
       UPGRADE.ANTI_TANK_GUN_UNLOCK,
+      UPGRADE.BALLISTIC_TABLES,
       UPGRADE.TANK_UNLOCK,
       UPGRADE.COMMAND_CAR_UNLOCK,
     ],

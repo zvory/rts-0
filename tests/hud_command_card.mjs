@@ -56,31 +56,39 @@ function buttonSlots(card) {
 {
   const ids = slotIds(rAndDCard());
   assert.equal(ids[0], `research:${UPGRADE.ANTI_TANK_GUN_UNLOCK}`);
-  assert.equal(ids[1], `research:${UPGRADE.TANK_UNLOCK}`);
-  assert.equal(ids[2], `research:${UPGRADE.COMMAND_CAR_UNLOCK}`);
-  assert.equal(ids[3], `research:${UPGRADE.MORTAR_AUTOCAST}`);
-  assert.deepEqual(slotCommandIds(rAndDCard()).slice(0, 4), [
+  assert.equal(ids[1], `research:${UPGRADE.BALLISTIC_TABLES}`);
+  assert.equal(ids[2], `research:${UPGRADE.TANK_UNLOCK}`);
+  assert.equal(ids[3], `research:${UPGRADE.COMMAND_CAR_UNLOCK}`);
+  assert.equal(ids[4], `research:${UPGRADE.MORTAR_AUTOCAST}`);
+  assert.deepEqual(slotCommandIds(rAndDCard()).slice(0, 5), [
     kriegsiaCommandId("research", UPGRADE.ANTI_TANK_GUN_UNLOCK),
+    kriegsiaCommandId("research", UPGRADE.BALLISTIC_TABLES),
     kriegsiaCommandId("research", UPGRADE.TANK_UNLOCK),
     kriegsiaCommandId("research", UPGRADE.COMMAND_CAR_UNLOCK),
     kriegsiaCommandId("research", UPGRADE.MORTAR_AUTOCAST),
   ]);
+  assert.equal(rAndDCard().slots[1].enabled, false);
+  assert.equal(rAndDCard().slots[1].title, "Requires Field Ordnance");
 }
 
 {
-  const ids = slotIds(rAndDCard([UPGRADE.ANTI_TANK_GUN_UNLOCK]));
+  const card = rAndDCard([UPGRADE.ANTI_TANK_GUN_UNLOCK]);
+  const ids = slotIds(card);
   assert.equal(ids[0], null);
-  assert.equal(ids[1], `research:${UPGRADE.TANK_UNLOCK}`);
-  assert.equal(ids[2], `research:${UPGRADE.COMMAND_CAR_UNLOCK}`);
-  assert.equal(ids[3], `research:${UPGRADE.MORTAR_AUTOCAST}`);
+  assert.equal(ids[1], `research:${UPGRADE.BALLISTIC_TABLES}`);
+  assert.equal(ids[2], `research:${UPGRADE.TANK_UNLOCK}`);
+  assert.equal(ids[3], `research:${UPGRADE.COMMAND_CAR_UNLOCK}`);
+  assert.equal(ids[4], `research:${UPGRADE.MORTAR_AUTOCAST}`);
+  assert.equal(card.slots[1].enabled, true);
 }
 
 {
   const ids = slotIds(rAndDCard([UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.TANK_UNLOCK]));
   assert.equal(ids[0], null);
-  assert.equal(ids[1], null);
-  assert.equal(ids[2], `research:${UPGRADE.COMMAND_CAR_UNLOCK}`);
-  assert.equal(ids[3], `research:${UPGRADE.MORTAR_AUTOCAST}`);
+  assert.equal(ids[1], `research:${UPGRADE.BALLISTIC_TABLES}`);
+  assert.equal(ids[2], null);
+  assert.equal(ids[3], `research:${UPGRADE.COMMAND_CAR_UNLOCK}`);
+  assert.equal(ids[4], `research:${UPGRADE.MORTAR_AUTOCAST}`);
 }
 
 {

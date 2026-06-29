@@ -59,6 +59,7 @@ export const MORTAR_FIRE_COOLDOWN_TICKS = TICK_HZ * 2;
 export const METHAMPHETAMINES_RESEARCH_TICKS = TICK_HZ * 20;
 export const ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
 export const ARTILLERY_UNLOCK_RESEARCH_TICKS = TICK_HZ * 30;
+export const BALLISTIC_TABLES_RESEARCH_TICKS = TICK_HZ * 20;
 export const TANK_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
 export const COMMAND_CAR_UNLOCK_RESEARCH_TICKS = TICK_HZ * 30;
 export const MORTAR_AUTOCAST_RESEARCH_TICKS = TICK_HZ * 20;
@@ -135,6 +136,7 @@ export const STATS = Object.freeze({
     cost: { steel: 100, oil: 100 }, buildTicks: TICK_HZ * 15, trains: [],
     researches: [
       UPGRADE.ANTI_TANK_GUN_UNLOCK,
+      UPGRADE.BALLISTIC_TABLES,
       UPGRADE.TANK_UNLOCK,
       UPGRADE.COMMAND_CAR_UNLOCK,
       UPGRADE.MORTAR_AUTOCAST,
@@ -311,6 +313,17 @@ export const UPGRADES = Object.freeze({
     researchTicks: TANK_UNLOCK_RESEARCH_TICKS,
     description: "Unlock Tank training",
     researchedAt: KIND.RESEARCH_COMPLEX,
+  }),
+  [UPGRADE.BALLISTIC_TABLES]: Object.freeze({
+    upgrade: UPGRADE.BALLISTIC_TABLES,
+    label: "Ballistic Tables",
+    icon: "BT+",
+    cost: Object.freeze({ steel: 150, oil: 100 }),
+    researchTicks: BALLISTIC_TABLES_RESEARCH_TICKS,
+    description: "Artillery fire tightens over repeated shots",
+    researchedAt: KIND.RESEARCH_COMPLEX,
+    requiresUpgrade: UPGRADE.ANTI_TANK_GUN_UNLOCK,
+    requiresText: "Requires Field Ordnance",
   }),
   [UPGRADE.COMMAND_CAR_UNLOCK]: Object.freeze({
     upgrade: UPGRADE.COMMAND_CAR_UNLOCK,
