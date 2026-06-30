@@ -20,6 +20,7 @@ fn build_order_can_start_when_worker_inside_intent_but_stages_outside() {
     let mut ability_runtime = AbilityRuntime::new();
     let mut mortar_shells = MortarShellStore::default();
     let mut artillery_shells = ArtilleryShellStore::default();
+    let mut firing_reveals = Vec::new();
     let mut events: HashMap<u32, Vec<Event>> = players
         .iter()
         .map(|player| (player.id, Vec::new()))
@@ -36,6 +37,7 @@ fn build_order_can_start_when_worker_inside_intent_but_stages_outside() {
         &mut ability_runtime,
         &mut mortar_shells,
         &mut artillery_shells,
+        &mut firing_reveals,
         normal_pending(vec![(
             1,
             SimCommand::Build {
@@ -97,6 +99,7 @@ fn build_order_does_not_pull_worker_off_active_construction() {
     let mut ability_runtime = AbilityRuntime::new();
     let mut mortar_shells = MortarShellStore::default();
     let mut artillery_shells = ArtilleryShellStore::default();
+    let mut firing_reveals = Vec::new();
     let mut events: HashMap<u32, Vec<Event>> = players
         .iter()
         .map(|player| (player.id, Vec::new()))
@@ -113,6 +116,7 @@ fn build_order_does_not_pull_worker_off_active_construction() {
         &mut ability_runtime,
         &mut mortar_shells,
         &mut artillery_shells,
+        &mut firing_reveals,
         normal_pending(vec![(
             1,
             SimCommand::Build {
@@ -172,6 +176,7 @@ fn build_order_accepts_resuming_owned_scaffold() {
     let mut ability_runtime = AbilityRuntime::new();
     let mut mortar_shells = MortarShellStore::default();
     let mut artillery_shells = ArtilleryShellStore::default();
+    let mut firing_reveals = Vec::new();
     let mut events = HashMap::new();
 
     apply_commands(
@@ -185,6 +190,7 @@ fn build_order_accepts_resuming_owned_scaffold() {
         &mut ability_runtime,
         &mut mortar_shells,
         &mut artillery_shells,
+        &mut firing_reveals,
         normal_pending(vec![(
             1,
             SimCommand::Build {
@@ -251,6 +257,7 @@ fn build_order_accepts_resuming_owned_scaffold_without_resources() {
     let mut ability_runtime = AbilityRuntime::new();
     let mut mortar_shells = MortarShellStore::default();
     let mut artillery_shells = ArtilleryShellStore::default();
+    let mut firing_reveals = Vec::new();
     let mut events = HashMap::new();
 
     apply_commands(
@@ -264,6 +271,7 @@ fn build_order_accepts_resuming_owned_scaffold_without_resources() {
         &mut ability_runtime,
         &mut mortar_shells,
         &mut artillery_shells,
+        &mut firing_reveals,
         normal_pending(vec![(
             1,
             SimCommand::Build {

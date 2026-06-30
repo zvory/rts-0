@@ -291,6 +291,7 @@ fn artillery_point_fire_system_rechecks_ammo_affordability() {
         unit.set_order(Order::artillery_point_fire(target.0, target.1));
     }
     let mut artillery_shells = ArtilleryShellStore::default();
+    let mut firing_reveals = Vec::new();
     let mut events: HashMap<u32, Vec<Event>> = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
     let mut fog = Fog::new(map.size);
     fog.recompute(&[1, 2], &entities, &map);
@@ -300,6 +301,7 @@ fn artillery_point_fire_system_rechecks_ammo_affordability() {
         &mut entities,
         &mut players,
         &mut artillery_shells,
+        &mut firing_reveals,
         &mut events,
         &fog,
         7,
