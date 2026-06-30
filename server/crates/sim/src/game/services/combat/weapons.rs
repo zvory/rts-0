@@ -249,14 +249,17 @@ pub(super) fn anti_tank_gun_can_chase(e: &Entity) -> bool {
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct EffectiveAttackProfile {
+    pub weapon: Option<&'static combat_rules::WeaponProfile>,
     pub range_tiles: f32,
     pub dmg: u32,
     pub cooldown: u32,
 }
 
 pub(super) fn effective_attack_profile(e: &Entity) -> EffectiveAttackProfile {
+    let weapon = combat_rules::default_weapon_profile(e.kind);
     let base = combat_rules::attack_profile(e.kind);
     let mut profile = EffectiveAttackProfile {
+        weapon,
         range_tiles: entrenchment_combat::attack_range_tiles(
             e,
             tank_effective_range_tiles(e, base.range_tiles as f32),
@@ -273,9 +276,7 @@ pub(super) fn effective_attack_profile(e: &Entity) -> EffectiveAttackProfile {
             profile.dmg = ((profile.dmg as f32) * config::ANTI_TANK_GUN_PACKED_DAMAGE_MULTIPLIER)
                 .round() as u32;
         }
-        WeaponSetup::Deployed => {
-            profile.range_tiles = config::ANTI_TANK_GUN_DEPLOYED_RANGE_TILES as f32;
-        }
+        WeaponSetup::Deployed => profile.range_tiles = config::ANTI_TANK_GUN_DEPLOYED_RANGE_TILES as f32,
         WeaponSetup::SettingUp { .. }
         | WeaponSetup::TearingDown { .. }
         | WeaponSetup::TearingDownToRedeploy { .. } => {

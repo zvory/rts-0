@@ -30,6 +30,10 @@ fn apply_test_damage_with_seed_and_teams(
     let fog = Fog::new(map.size);
     let smokes = SmokeCloudStore::new();
     let mut rng = SmallRng::seed_from_u64(rng_seed);
+    let weapon_profile = entities
+        .get(attacker)
+        .and_then(|entity| combat_rules::default_weapon_profile(entity.kind))
+        .expect("test attacker should have a default weapon profile");
     apply_damage(
         &map,
         entities,
@@ -40,6 +44,7 @@ fn apply_test_damage_with_seed_and_teams(
         &mut rng,
         attacker,
         victim,
+        weapon_profile,
         dmg,
         attacker_owner,
         ax,
