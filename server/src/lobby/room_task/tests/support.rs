@@ -1,11 +1,36 @@
 pub(super) use super::super::super::lab_timeline::LabTimelineEntryKind;
 pub(super) use super::super::super::replay_branch::BranchStagingState;
 pub(super) use super::super::*;
+use crate::lobby::{CommandLifecycleFamily, CommandLifecycleTiming};
 pub(super) use crate::protocol::{NoticeSeverity, DEFAULT_FACTION_ID};
 pub(super) use rts_rules::faction::{EKAT_FACTION_ID, EMPTY_FIXTURE_FACTION_ID};
+pub(super) use rts_sim::game::command::SimCommand;
 pub(super) use rts_sim::game::map::Map;
+use std::time::Instant as StdInstant;
 
 pub(super) use super::super::helpers::DRAINING_NEW_MATCHES_DISABLED_MSG;
+
+pub(super) trait RoomTaskCommandTestExt {
+    fn on_command(&mut self, player_id: u32, client_seq: u32, cmd: SimCommand);
+}
+
+impl RoomTaskCommandTestExt for RoomTask {
+    fn on_command(&mut self, player_id: u32, client_seq: u32, cmd: SimCommand) {
+        let now = StdInstant::now();
+        self.on_command_with_lifecycle(
+            player_id,
+            client_seq,
+            cmd,
+            CommandLifecycleTiming {
+                received_unix_ms: 0,
+                frame_received_at: now,
+                deserialized_at: now,
+                room_event_enqueued_at: now,
+                family: CommandLifecycleFamily::Other,
+            },
+        );
+    }
+}
 
 pub(super) fn replay_test_players(count: usize) -> Vec<PlayerInit> {
     (1..=count as u32)

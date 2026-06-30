@@ -117,12 +117,46 @@ pub(crate) struct CommandLifecycleSample {
     pub room_handle_ms: u32,
 }
 
+impl CommandLifecycleSample {
+    pub(crate) fn from_timing(
+        client_seq: u32,
+        lifecycle: CommandLifecycleTiming,
+        room_handle_started_at: StdInstant,
+        accepted: bool,
+    ) -> Self {
+        Self {
+            received_unix_ms: lifecycle.received_unix_ms,
+            client_seq,
+            family: lifecycle.family.as_str(),
+            accepted,
+            frame_deserialize_ms: duration_ms_u32(
+                lifecycle
+                    .deserialized_at
+                    .saturating_duration_since(lifecycle.frame_received_at),
+            ),
+            deserialize_to_room_enqueue_ms: duration_ms_u32(
+                lifecycle
+                    .room_event_enqueued_at
+                    .saturating_duration_since(lifecycle.deserialized_at),
+            ),
+            room_queue_ms: duration_ms_u32(
+                room_handle_started_at.saturating_duration_since(lifecycle.room_event_enqueued_at),
+            ),
+            room_handle_ms: duration_ms_u32(room_handle_started_at.elapsed()),
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 pub(crate) struct CommandSimAckSample {
     pub received_unix_ms: u64,
     pub client_seq: u32,
     pub family: &'static str,
     pub accepted_to_sim_ack_ms: u32,
+}
+
+fn duration_ms_u32(duration: std::time::Duration) -> u32 {
+    duration.as_millis().min(u32::MAX as u128) as u32
 }
 
 #[derive(Default)]

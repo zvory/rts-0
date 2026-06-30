@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::time::{Duration, Instant as StdInstant};
+use std::time::Instant as StdInstant;
 
 use tokio::time::Instant as TokioInstant;
 
@@ -145,23 +145,6 @@ impl RoomTask {
         }
     }
 
-    #[cfg(test)]
-    pub(super) fn on_command(&mut self, player_id: u32, client_seq: u32, cmd: SimCommand) {
-        let now = StdInstant::now();
-        self.on_command_with_lifecycle(
-            player_id,
-            client_seq,
-            cmd,
-            CommandLifecycleTiming {
-                received_unix_ms: 0,
-                frame_received_at: now,
-                deserialized_at: now,
-                room_event_enqueued_at: now,
-                family: super::super::CommandLifecycleFamily::Other,
-            },
-        );
-    }
-
     pub(super) fn on_command_with_lifecycle(
         &mut self,
         player_id: u32,
@@ -246,29 +229,13 @@ impl RoomTask {
         let Some(player) = self.players.get(&player_id) else {
             return;
         };
-        player
-            .msg_tx
-            .record_command_lifecycle(CommandLifecycleSample {
-                received_unix_ms: lifecycle.received_unix_ms,
-                client_seq,
-                family: lifecycle.family.as_str(),
-                accepted,
-                frame_deserialize_ms: duration_ms_u32(
-                    lifecycle
-                        .deserialized_at
-                        .saturating_duration_since(lifecycle.frame_received_at),
-                ),
-                deserialize_to_room_enqueue_ms: duration_ms_u32(
-                    lifecycle
-                        .room_event_enqueued_at
-                        .saturating_duration_since(lifecycle.deserialized_at),
-                ),
-                room_queue_ms: duration_ms_u32(
-                    room_handle_started_at
-                        .saturating_duration_since(lifecycle.room_event_enqueued_at),
-                ),
-                room_handle_ms: duration_ms_u32(room_handle_started_at.elapsed()),
-            });
+        let sample = CommandLifecycleSample::from_timing(
+            client_seq,
+            lifecycle,
+            room_handle_started_at,
+            accepted,
+        );
+        player.msg_tx.record_command_lifecycle(sample);
     }
 
     fn send_command_receipt(
@@ -757,8 +724,4 @@ impl RoomTask {
                     .filter(|team_id| *team_id != 0)
             })
     }
-}
-
-fn duration_ms_u32(duration: Duration) -> u32 {
-    duration.as_millis().min(u32::MAX as u128) as u32
 }
