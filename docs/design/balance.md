@@ -407,7 +407,7 @@ folded into default targeting.
   roughly one tile away from the patch. When a patch empties the gatherer goes idle (no automatic
   retarget).
 - Oil extraction: workers do not directly mine oil. A worker right-click or contextual build on a
-  live oil patch issues a free Pump Jack build at that patch. Completed Pump Jacks mine
+  live oil patch issues a Pump Jack build at that patch. Completed Pump Jacks mine
   `OIL_LOAD = 2` every `HARVEST_TICKS = 40`, matching one worker's former oil rate, and deplete the
   underlying oil node. Pump Jack placement requires overlap with a live oil node, but has no tech or
   mining-anchor requirement.
@@ -459,7 +459,7 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 | factory                    | Vehicle Works      | 360 | 1     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, trains tank after Tank Production research, and trains command_car after Command Car research; requires a City Centre and Training Centre |
 | steelworks                 | Gun Works          | 300 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately and trains Anti-Tank Guns/Artillery after R&D Complex research; requires a City Centre and Training Centre |
 | tank_trap                  | Tank Trap          | 120 | 0     | 15 steel + 0 oil | 1x1  | 300       | engineer-built vehicle obstacle; workers deconstruct completed traps in 150 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building; requires a completed Training Centre |
-| pump_jack                  | Pump Jack          | 50  | 1     | 0 steel + 0 oil | 1x1  | 300       | contextual oil extractor built by workers on live oil patches; mines 2 oil per 40 ticks; unarmored, immobile, no trains, no supply, no weapon, and does not block shots or line of sight; no tech requirement |
+| pump_jack                  | Pump Jack          | 50  | 1     | 50 steel + 0 oil | 1x1  | 300       | contextual oil extractor built by workers on live oil patches; mines 2 oil per 40 ticks; unarmored, immobile, no trains, no supply, no weapon, and does not block shots or line of sight; no tech requirement |
 
 Win: a player is **eliminated** when they own zero elimination-counting buildings; units and
 Tank Traps alone do not keep them alive. Last player standing wins; a 1-player match never ends

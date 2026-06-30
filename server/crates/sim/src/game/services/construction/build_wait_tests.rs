@@ -90,6 +90,65 @@ fn waiting_build_starts_when_resources_become_available() {
 }
 
 #[test]
+fn arrived_pump_jack_waits_for_steel_and_charges_on_start() {
+    let map = flat_map(16);
+    let mut entities = EntityStore::new();
+    let (sx, sy) = footprint_center(&map, EntityKind::PumpJack, 4, 4);
+    entities
+        .spawn_node(EntityKind::Oil, sx, sy)
+        .expect("oil node should spawn");
+    let worker = entities
+        .spawn_unit(1, EntityKind::Worker, sx, sy)
+        .expect("worker should spawn");
+    entities
+        .get_mut(worker)
+        .expect("worker should exist")
+        .set_order(Order::build(EntityKind::PumpJack, 4, 4));
+    let mut players = vec![player_state(1)];
+    players[0].set_resources(49, 0);
+    let mut events = HashMap::new();
+
+    run_construction_tick!(&map, &mut entities, &mut players, &mut events);
+
+    assert_eq!(
+        entities
+            .get(worker)
+            .expect("worker should survive")
+            .build_phase(),
+        Some(BuildPhase::WaitingAtSite)
+    );
+    assert!(
+        entities
+            .iter()
+            .all(|entity| entity.kind != EntityKind::PumpJack),
+        "resource wait must not spawn a Pump Jack scaffold"
+    );
+    assert!(matches!(
+        events.get(&1).and_then(|events| events.first()),
+        Some(Event::Notice { msg, .. }) if msg == "Not enough steel"
+    ));
+
+    let cost = rules::economy::resource_cost(EntityKind::PumpJack);
+    assert_eq!((cost.steel, cost.oil), (50, 0));
+    players[0].set_resources(cost.steel, cost.oil);
+    run_construction_tick!(&map, &mut entities, &mut players, &mut events);
+
+    let scaffold = entities
+        .iter()
+        .find(|entity| entity.kind == EntityKind::PumpJack && entity.under_construction())
+        .expect("Pump Jack should spawn once steel is available");
+    assert_eq!(
+        entities
+            .get(worker)
+            .expect("worker should survive")
+            .build_phase(),
+        Some(BuildPhase::Constructing { site: scaffold.id })
+    );
+    assert_eq!(players[0].steel, 0);
+    assert_eq!(players[0].oil, 0);
+}
+
+#[test]
 fn waiting_build_cancels_when_building_claims_footprint() {
     let map = flat_map(16);
     let mut entities = EntityStore::new();
