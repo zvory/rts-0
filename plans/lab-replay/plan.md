@@ -2,8 +2,13 @@
 
 ## Status
 
-Draft for review. This replaces the earlier initializer-based lab replay draft with a larger
-checkpoint-first program.
+Deprecated draft. Do not execute this plan or any `plans/lab-replay/` phase files as the current
+roadmap.
+
+This plan captured an earlier checkpoint-first lab replay program, but it is no longer the active
+source of truth. Current work should use `plans/game-state/plan.md` instead. Lab replay, lab save,
+and checkpoint-backed replay should be revisited later after the game-state ownership and checkpoint
+contract are clear enough to support an executable plan.
 
 ## Purpose
 
