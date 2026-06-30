@@ -6,8 +6,7 @@ use crate::protocol::{AttackReveal, Event};
 use super::fog::Fog;
 use super::teams::TeamRelations;
 
-/// Temporary actionable sight granted to a recipient when a hostile unit fires from fog at that
-/// recipient's team.
+/// Temporary actionable sight granted to a recipient when a hostile unit exposes itself by firing.
 ///
 /// Unlike lingering death sight, this is stamped into live fog so command validation, combat
 /// targeting, and snapshot projection all treat the firing unit as currently visible.
@@ -122,6 +121,28 @@ pub(in crate::game) fn record_firing_reveals_for_victim_teams(
             fired_at_tick,
             firing_cycle_ticks,
         );
+    }
+}
+
+pub(in crate::game) fn record_global_firing_reveals_for_enemy_players(
+    firing_reveals: &mut Vec<FiringRevealSource>,
+    player_ids: &[u32],
+    teams: &TeamRelations,
+    attacker_owner: u32,
+    entity_id: u32,
+    fired_at_tick: u32,
+    firing_cycle_ticks: u32,
+) {
+    if attacker_owner == 0 {
+        return;
+    }
+    let expires_at_tick = fired_at_tick
+        .saturating_add(firing_cycle_ticks)
+        .saturating_add(config::TICK_HZ / 2);
+    for &viewer in player_ids {
+        if teams.is_enemy_owner(attacker_owner, viewer) {
+            FiringRevealSource::upsert(firing_reveals, viewer, entity_id, expires_at_tick);
+        }
     }
 }
 
