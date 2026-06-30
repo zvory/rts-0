@@ -398,6 +398,37 @@ whether lag is in per-player projection/compaction, JSON serialization, or socke
 
 ## Network incident parser
 
+Use `scripts/capture-net-incident.mjs` when a report needs a complete incident directory rather
+than a one-off parser summary. It can package preserved local logs or run a bounded beta Fly query,
+then writes raw logs, parser outputs, standalone agent digest files, key metrics, replay/DB
+availability, player-report notes, a neutral `analysis.md`, and a beta evidence checklist:
+
+```bash
+node scripts/capture-net-incident.mjs \
+  --fixture soupman-alex \
+  --out-dir /tmp/rts-soupman-alex-package \
+  --force \
+  --require-coverage command,snapshot,pathing,client-context
+```
+
+For a fresh beta incident, provide the exact UTC window and run id:
+
+```bash
+node scripts/capture-net-incident.mjs \
+  --beta \
+  --from 2026-06-30T00:16:00Z \
+  --to 2026-06-30T00:42:00Z \
+  --run-id alex-s-lobby-1782778605186-000004 \
+  --match-id 103 \
+  --out-dir /tmp/rts-beta-incident \
+  --require-coverage command,snapshot,pathing,client-context
+```
+
+The beta path shells through `scripts/fly-logs.sh` with a diagnostic-only filter and bounded page
+count. The generated `analysis.md` is intentionally neutral: supported, contradicted, unknown, and
+next diagnostic gap sections only. Do not use it to prescribe pathing, transport, render, snapshot,
+or command fixes.
+
 Use `scripts/parse-net-report-logs.mjs` when a player-reported lag incident has preserved Fly JSONL
 logs. It reads Fly JSONL from `scripts/fly-logs.sh search` or raw tracing text, strips ANSI tracing
 decoration, extracts `client_net_report`, `match_started`, `match_ended`, `performance tick summary`,

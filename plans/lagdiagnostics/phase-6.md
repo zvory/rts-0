@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -56,13 +56,13 @@ template.
 
 ## Implementation Checklist
 
-- [ ] Define the incident package directory layout and template files.
-- [ ] Add capture/parsing script support for run-id evidence packages.
-- [ ] Add local harness or fixture validation for the new digest sections.
-- [ ] Add docs for beta evidence collection and local reproduction.
-- [ ] Add tests or dry-run checks for package generation where practical.
-- [ ] Use the Soupman/Alex incident as a regression fixture for package completeness.
-- [ ] Mark this phase as done in this file in the implementation commit.
+- [x] Define the incident package directory layout and template files.
+- [x] Add capture/parsing script support for run-id evidence packages.
+- [x] Add local harness or fixture validation for the new digest sections.
+- [x] Add docs for beta evidence collection and local reproduction.
+- [x] Add tests or dry-run checks for package generation where practical.
+- [x] Use the Soupman/Alex incident as a regression fixture for package completeness.
+- [x] Mark this phase as done in this file in the implementation commit.
 
 ## Verification
 
