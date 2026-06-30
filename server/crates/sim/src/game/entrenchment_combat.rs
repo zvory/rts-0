@@ -3,7 +3,7 @@
 //! Trench lifecycle and slotting stay in `services::entrenchment`; combat systems consume only the
 //! active occupation predicate so digging progress or nearby terrain never grants benefits.
 
-use crate::game::entity::{active_trench_occupation, Entity, EntityKind};
+use crate::game::entity::{active_trench_occupation, Entity};
 use crate::rules::combat;
 
 pub(crate) fn is_actively_entrenched(entity: &Entity) -> bool {
@@ -22,12 +22,12 @@ pub(crate) fn attack_range_tiles(entity: &Entity, base_range_tiles: f32) -> f32 
 }
 
 pub(crate) fn direct_miss_chance(
-    attacker_kind: EntityKind,
+    weapon_profile: &combat::WeaponProfile,
     victim: &Entity,
     extra_miss_chance: f32,
 ) -> f32 {
-    combat::miss_chance_with_entrenchment(
-        attacker_kind,
+    combat::miss_chance_with_entrenchment_for_weapon(
+        weapon_profile,
         victim.kind,
         is_actively_entrenched(victim),
     )

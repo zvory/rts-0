@@ -279,7 +279,11 @@ pub fn is_armored(kind: EntityKind) -> bool {
 
 /// AP weapons deal full damage to armored targets.
 pub fn is_ap(kind: EntityKind) -> bool {
-    weapon_class(kind) == WeaponClass::AntiTank
+    default_weapon_profile(kind).is_some_and(weapon_is_ap)
+}
+
+pub fn weapon_is_ap(profile: &WeaponProfile) -> bool {
+    profile.weapon_class == WeaponClass::AntiTank
 }
 
 /// Rules-owned armor classification for target ranking and damage policy.
@@ -340,8 +344,14 @@ pub fn default_weapon_target_fit(
 /// infantry-sized targets — the shell flies straight through without finding anyone.
 /// Hits that do connect deal full damage.
 pub fn miss_chance(attacker_kind: EntityKind, victim_kind: EntityKind) -> f32 {
-    match default_weapon_profile(attacker_kind).map(|profile| profile.miss_policy) {
-        Some(MissPolicy::AntiTankGunVsInfantry) if anti_tank_gun_miss_target(victim_kind) => 0.65,
+    default_weapon_profile(attacker_kind)
+        .map(|profile| miss_chance_for_weapon(profile, victim_kind))
+        .unwrap_or(0.0)
+}
+
+pub fn miss_chance_for_weapon(profile: &WeaponProfile, victim_kind: EntityKind) -> f32 {
+    match profile.miss_policy {
+        MissPolicy::AntiTankGunVsInfantry if anti_tank_gun_miss_target(victim_kind) => 0.65,
         _ => 0.0,
     }
 }
@@ -352,7 +362,23 @@ pub fn miss_chance_with_entrenchment(
     victim_kind: EntityKind,
     victim_actively_entrenched: bool,
 ) -> f32 {
-    miss_chance(attacker_kind, victim_kind).max(entrenchment_miss_chance(
+    default_weapon_profile(attacker_kind)
+        .map(|profile| {
+            miss_chance_with_entrenchment_for_weapon(
+                profile,
+                victim_kind,
+                victim_actively_entrenched,
+            )
+        })
+        .unwrap_or_else(|| entrenchment_miss_chance(victim_kind, victim_actively_entrenched))
+}
+
+pub fn miss_chance_with_entrenchment_for_weapon(
+    profile: &WeaponProfile,
+    victim_kind: EntityKind,
+    victim_actively_entrenched: bool,
+) -> f32 {
+    miss_chance_for_weapon(profile, victim_kind).max(entrenchment_miss_chance(
         victim_kind,
         victim_actively_entrenched,
     ))
@@ -396,8 +422,35 @@ pub fn effective_damage(
     base_dmg: u32,
     victim_terrain: Option<TerrainKind>,
 ) -> u32 {
+    default_weapon_profile(attacker_kind)
+        .map(|profile| effective_damage_for_weapon(profile, victim_kind, base_dmg, victim_terrain))
+        .unwrap_or_else(|| {
+            effective_damage_for_weapon_class(
+                WeaponClass::None,
+                victim_kind,
+                base_dmg,
+                victim_terrain,
+            )
+        })
+}
+
+pub fn effective_damage_for_weapon(
+    profile: &WeaponProfile,
+    victim_kind: EntityKind,
+    base_dmg: u32,
+    victim_terrain: Option<TerrainKind>,
+) -> u32 {
+    effective_damage_for_weapon_class(profile.weapon_class, victim_kind, base_dmg, victim_terrain)
+}
+
+fn effective_damage_for_weapon_class(
+    attacker_weapon_class: WeaponClass,
+    victim_kind: EntityKind,
+    base_dmg: u32,
+    victim_terrain: Option<TerrainKind>,
+) -> u32 {
     let armor_class = armor_class(victim_kind);
-    let armor_adjusted = match (is_ap(attacker_kind), armor_class) {
+    let armor_adjusted = match (attacker_weapon_class == WeaponClass::AntiTank, armor_class) {
         (false, Some(ArmorClass::Armored)) => base_dmg / 4,
         (false, Some(ArmorClass::Hard)) => ((base_dmg as f32) * 0.75).round() as u32,
         _ => base_dmg,
@@ -427,13 +480,20 @@ pub fn facing_damage_multiplier(
     victim_kind: EntityKind,
     facing: ArmorFacing,
 ) -> f32 {
+    default_weapon_profile(attacker_kind)
+        .map(|profile| facing_damage_multiplier_for_weapon(profile, victim_kind, facing))
+        .unwrap_or(1.0)
+}
+
+pub fn facing_damage_multiplier_for_weapon(
+    profile: &WeaponProfile,
+    victim_kind: EntityKind,
+    facing: ArmorFacing,
+) -> f32 {
     if victim_kind != EntityKind::Tank {
         return 1.0;
     }
-    if !matches!(
-        default_weapon_profile(attacker_kind).map(|profile| profile.facing_damage_policy),
-        Some(FacingDamagePolicy::TankArmorFacing)
-    ) {
+    if profile.facing_damage_policy != FacingDamagePolicy::TankArmorFacing {
         return 1.0;
     }
     match facing {
@@ -453,12 +513,72 @@ pub fn effective_damage_with_facing(
     victim_pos: (f32, f32),
     attacker_pos: (f32, f32),
 ) -> u32 {
-    let damage = effective_damage(attacker_kind, victim_kind, base_dmg, victim_terrain);
+    default_weapon_profile(attacker_kind)
+        .map(|profile| {
+            effective_damage_with_facing_for_weapon(
+                profile,
+                victim_kind,
+                base_dmg,
+                victim_terrain,
+                victim_facing,
+                victim_pos,
+                attacker_pos,
+            )
+        })
+        .unwrap_or_else(|| {
+            let damage = effective_damage_for_weapon_class(
+                WeaponClass::None,
+                victim_kind,
+                base_dmg,
+                victim_terrain,
+            );
+            apply_facing_damage_multiplier(
+                damage,
+                None,
+                victim_kind,
+                victim_facing,
+                victim_pos,
+                attacker_pos,
+            )
+        })
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn effective_damage_with_facing_for_weapon(
+    profile: &WeaponProfile,
+    victim_kind: EntityKind,
+    base_dmg: u32,
+    victim_terrain: Option<TerrainKind>,
+    victim_facing: Option<f32>,
+    victim_pos: (f32, f32),
+    attacker_pos: (f32, f32),
+) -> u32 {
+    let damage = effective_damage_for_weapon(profile, victim_kind, base_dmg, victim_terrain);
+    apply_facing_damage_multiplier(
+        damage,
+        Some(profile),
+        victim_kind,
+        victim_facing,
+        victim_pos,
+        attacker_pos,
+    )
+}
+
+fn apply_facing_damage_multiplier(
+    damage: u32,
+    profile: Option<&WeaponProfile>,
+    victim_kind: EntityKind,
+    victim_facing: Option<f32>,
+    victim_pos: (f32, f32),
+    attacker_pos: (f32, f32),
+) -> u32 {
     let Some(victim_facing) = victim_facing.filter(|facing| facing.is_finite()) else {
         return damage;
     };
     let facing = classify_armor_facing(victim_facing, victim_pos, attacker_pos);
-    let multiplier = facing_damage_multiplier(attacker_kind, victim_kind, facing);
+    let multiplier = profile
+        .map(|profile| facing_damage_multiplier_for_weapon(profile, victim_kind, facing))
+        .unwrap_or(1.0);
     ((damage as f32) * multiplier).round().max(0.0) as u32
 }
 
@@ -636,6 +756,43 @@ mod tests {
         assert_eq!(machine_gunner.range_tiles, 6);
         assert_eq!(machine_gunner.dmg, 4);
         assert_eq!(machine_gunner.cooldown, 6);
+    }
+
+    #[test]
+    fn weapon_policy_helpers_use_profile_metadata() {
+        let tank_cannon = weapon_profile(WeaponKind::TankCannon).expect("tank cannon profile");
+        let machine_gunner = weapon_profile(WeaponKind::MachineGunnerMg).expect("MG profile");
+        let anti_tank_gun = weapon_profile(WeaponKind::AntiTankGun).expect("AT gun profile");
+
+        assert_eq!(
+            effective_damage_for_weapon(tank_cannon, EntityKind::Tank, 40, None),
+            40
+        );
+        assert_eq!(
+            effective_damage_for_weapon(machine_gunner, EntityKind::Tank, 40, None),
+            10
+        );
+        assert_eq!(
+            facing_damage_multiplier_for_weapon(
+                tank_cannon,
+                EntityKind::Tank,
+                ArmorFacing::Rear,
+            ),
+            REAR_ARMOR_DAMAGE_MULTIPLIER
+        );
+        assert_eq!(
+            facing_damage_multiplier_for_weapon(
+                machine_gunner,
+                EntityKind::Tank,
+                ArmorFacing::Rear,
+            ),
+            1.0
+        );
+        assert_eq!(
+            miss_chance_for_weapon(anti_tank_gun, EntityKind::Rifleman),
+            0.65
+        );
+        assert_eq!(miss_chance_for_weapon(tank_cannon, EntityKind::Rifleman), 0.0);
     }
 
     #[test]

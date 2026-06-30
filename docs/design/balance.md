@@ -11,6 +11,8 @@ helpers read the defs table.
 Default attack range, damage, cooldown, weapon class, and weapon-policy metadata are exposed through
 `server/crates/rules/src/combat.rs` weapon profiles; current profile values mirror the defs records
 so legacy `attack_profile(kind)` and `weapon_class(kind)` callers remain behavior-compatible.
+Direct-fire damage, miss policy, tank-facing modifiers, and over-penetration policy consume the
+selected weapon profile instead of inferring those behaviors only from the firing entity kind.
 `client/src/config.js` is the stable public facade for the subset the UI/render/fog needs (costs,
 supply, sight, sizes, colors, and command-card descriptors). Its internal
 `client/src/config/timing.js`, `client/src/config/rules_mirror.js`, and
