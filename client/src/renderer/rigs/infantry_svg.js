@@ -13,6 +13,11 @@ export const RIFLEMAN_RIG_SVG = `<svg viewBox="-24 -24 48 48" data-rts-rig-kind=
   <rect id="bounds.hp" x="-11" y="-18" width="22" height="6" fill="none" />
 </svg>`;
 
+// Hidden placeholder: Phase 2 reserves the Panzerfaust kind before final unit art exists.
+export const PANZERFAUST_RIG_SVG = RIFLEMAN_RIG_SVG
+  .replace('data-rts-rig-kind="rifleman"', 'data-rts-rig-kind="panzerfaust"')
+  .replace('id="rifleman.authored"', 'id="panzerfaust.placeholder"');
+
 export const MACHINE_GUNNER_RIG_SVG = `<svg viewBox="-36 -30 72 60" data-rts-rig-kind="machine_gunner" data-rts-rig-version="1" data-rts-origin="center" id="machine-gunner.authored">
   <ellipse id="part.shadow" cx="0" cy="3.5" rx="10" ry="6" fill="#000000" opacity="0.28" />
   <polygon id="part.body" points="7.2,0 2.2,-6.2 -5.8,-4.8 -7.8,0 -5.8,4.8 2.2,6.2" fill="#6d89b8" stroke="#1a1712" stroke-width="2" stroke-opacity="0.95" data-rts-tint="team" data-rts-animation="facing:transform.rotation:1:0" />
