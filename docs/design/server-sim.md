@@ -581,12 +581,11 @@ Existing trenches are neutral. Any eligible Rifleman, Machine Gunner, or Worker 
 without owning Entrenchment research when it is stopped in the trench footprint. A stopped eligible
 unit within half a tile of a trench may be slotted by at most half a tile into a legal position
 inside the trench footprint; slotting validates static standability, the swept static segment, and
-unit-body overlap against the current post-collision spatial index. Slotting does not issue a move
-order or path, so the unit can still fire normally.
-`services::entrenchment::active_trench_occupation(entity)` is the simulation predicate for active
-occupation; digging progress, failed slotting, and merely standing near trench terrain do not set
-it. Visible occupied units project `occupiedTrenchId`; remembered trench terrain never exposes
-hidden occupants.
+unit-body overlap against the current live entity positions. Slotting does not issue a move order
+or path, so the unit can still fire normally. `entity::active_trench_occupation(entity)` is the
+simulation predicate for active occupation; digging progress, failed slotting, and merely standing
+near trench terrain do not set it. Visible occupied units project `occupiedTrenchId`; remembered
+trench terrain never exposes hidden occupants.
 
 Per-caster recast state is exposed to the owner through `EntityView.abilities`: active return marker
 id, availability tick, and remaining lifetime are projected only for the owning player's command
@@ -665,7 +664,7 @@ entry and a role-matrix justification.
 `game::systems::run_tick` owns the tick pipeline and the lifecycle of tick-scoped derived state.
 It rebuilds named phase state at explicit boundaries: pre-command state for command validation,
 pathing, and movement; post-movement state for combat and economy queries; pre-collision state
-after production/construction/death mutations; post-collision spatial state for trench slotting;
+after production/construction/death mutations; collision-displacement snapshots for entrenchment;
 and final state for snapshot interest filtering.
 Systems should consume the derived-state object for their phase instead of carrying occupancy or
 spatial indexes across later mutations.

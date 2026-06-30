@@ -127,7 +127,7 @@ const ALLOWED_SERVICE_IMPORTS: &[(&str, &[&str])] = &[
     ),
     (
         "entrenchment",
-        &["geometry", "occupancy", "spatial", "standability"],
+        &["geometry", "occupancy", "standability"],
     ),
     ("geometry", &["occupancy"]),
     (

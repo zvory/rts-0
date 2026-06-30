@@ -9,11 +9,10 @@ use crate::config;
 use crate::game::ability;
 use crate::game::ability_runtime::{AbilityObjectPayload, AbilityRuntime};
 use crate::game::entity::{
-    fires_while_moving, tank_trap_deconstruction_ticks, Entity, EntityKind, EntityStore,
-    GatherPhase, Order, OrderIntent,
+    active_trench_occupation, fires_while_moving, tank_trap_deconstruction_ticks, Entity,
+    EntityKind, EntityStore, GatherPhase, Order, OrderIntent,
 };
 use crate::game::fog::Fog;
-use crate::game::services::entrenchment;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
 use crate::protocol;
@@ -395,7 +394,7 @@ pub fn project_entity(
     if entity.breakthrough_ticks() > 0 {
         view.breakthrough_ticks = Some(entity.breakthrough_ticks());
     }
-    view.occupied_trench_id = entrenchment::active_trench_occupation(entity);
+    view.occupied_trench_id = active_trench_occupation(entity);
 
     if let Some(progress) = entity.build_progress_fraction() {
         view.build_progress = Some(progress);

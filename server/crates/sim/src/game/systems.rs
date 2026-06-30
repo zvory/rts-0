@@ -326,10 +326,6 @@ pub(crate) fn run_tick(
         );
     });
 
-    let post_collision_spatial =
-        crate::perf::timed(perf.as_deref_mut(), "post_collision_spatial", || {
-            SpatialIndex::build(entities, map.size)
-        });
     crate::perf::timed(perf.as_deref_mut(), "entrenchment", || {
         let entrenchment_researched = |owner| {
             players
@@ -343,7 +339,6 @@ pub(crate) fn run_tick(
             &entrenchment_researched,
             &pre_collision_position,
             &pre_collision.occupancy,
-            &post_collision_spatial,
             trenches,
         );
     });

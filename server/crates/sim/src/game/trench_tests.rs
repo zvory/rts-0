@@ -114,7 +114,7 @@ fn entrenchment_dig_ticks(entity: &crate::game::entity::Entity) -> u32 {
 }
 
 fn active_trench_occupation(entity: &crate::game::entity::Entity) -> Option<u32> {
-    services::entrenchment::active_trench_occupation(entity)
+    crate::game::entity::active_trench_occupation(entity)
 }
 
 #[test]

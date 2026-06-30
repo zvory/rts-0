@@ -11,14 +11,12 @@ use crate::game::services::geometry::{
     unit_body_intersects_rect, unit_body_with_facing,
 };
 use crate::game::services::occupancy::Occupancy;
-use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::standability;
 use crate::game::trench::{Trench, TrenchStore};
 
 const STATIONARY_EPS_PX: f32 = 0.05;
 const SLOT_EXTRA_RADIUS_PX: f32 = config::TILE_SIZE as f32 * 0.5;
 const SLOT_MAX_CORRECTION_PX: f32 = config::TILE_SIZE as f32 * 0.5;
-const SLOT_UNIT_QUERY_PADDING_PX: f32 = config::TILE_SIZE as f32;
 
 struct OccupationCandidate {
     trench_id: u32,
@@ -31,7 +29,6 @@ pub(crate) fn entrenchment_system(
     has_entrenchment: &dyn Fn(u32) -> bool,
     pre_collision_position: &dyn Fn(u32) -> Option<(f32, f32)>,
     occ: &Occupancy<'_>,
-    spatial: &SpatialIndex,
     trenches: &mut TrenchStore,
 ) {
     for id in entities.ids() {
@@ -44,7 +41,6 @@ pub(crate) fn entrenchment_system(
             entities,
             pre_collision_position,
             occ,
-            spatial,
             trenches,
             &snapshot,
         ) {
@@ -81,16 +77,11 @@ pub(crate) fn entrenchment_system(
     }
 }
 
-pub(crate) fn active_trench_occupation(entity: &Entity) -> Option<u32> {
-    entity.movement.as_ref().and_then(|m| m.occupied_trench_id)
-}
-
 fn occupation_candidate(
     map: &Map,
     entities: &EntityStore,
     pre_collision_position: &dyn Fn(u32) -> Option<(f32, f32)>,
     occ: &Occupancy<'_>,
-    spatial: &SpatialIndex,
     trenches: &TrenchStore,
     entity: &Entity,
 ) -> Option<OccupationCandidate> {
@@ -99,7 +90,7 @@ fn occupation_candidate(
         return None;
     }
     let trench = nearest_occupiable_trench(trenches, entity)?;
-    let slot = slot_candidate(map, entities, occ, spatial, entity, trench)?;
+    let slot = slot_candidate(map, entities, occ, entity, trench)?;
     Some(OccupationCandidate {
         trench_id: trench.id,
         slot,
@@ -199,7 +190,6 @@ fn slot_candidate(
     map: &Map,
     entities: &EntityStore,
     occ: &Occupancy<'_>,
-    spatial: &SpatialIndex,
     entity: &Entity,
     trench: Trench,
 ) -> Option<Option<(f32, f32)>> {
@@ -208,7 +198,6 @@ fn slot_candidate(
             map,
             entities,
             occ,
-            spatial,
             entity,
             trench,
             (entity.pos_x, entity.pos_y),
@@ -223,7 +212,7 @@ fn slot_candidate(
             distance((entity.pos_x, entity.pos_y), *candidate) <= SLOT_MAX_CORRECTION_PX
         })
         .filter(|candidate| {
-            slot_position_legal(map, entities, occ, spatial, entity, trench, *candidate)
+            slot_position_legal(map, entities, occ, entity, trench, *candidate)
         })
         .min_by(|a, b| {
             distance_sq((entity.pos_x, entity.pos_y), *a)
@@ -280,7 +269,6 @@ fn slot_position_legal(
     map: &Map,
     entities: &EntityStore,
     occ: &Occupancy<'_>,
-    spatial: &SpatialIndex,
     entity: &Entity,
     trench: Trench,
     candidate: (f32, f32),
@@ -312,7 +300,7 @@ fn slot_position_legal(
     if slot_intersects_building(map, entities, entity, candidate) {
         return false;
     }
-    !slot_overlaps_other_unit(entities, spatial, entity, candidate)
+    !slot_overlaps_other_unit(entities, entity, candidate)
 }
 
 fn slot_intersects_building(
@@ -336,7 +324,6 @@ fn slot_intersects_building(
 
 fn slot_overlaps_other_unit(
     entities: &EntityStore,
-    spatial: &SpatialIndex,
     entity: &Entity,
     candidate: (f32, f32),
 ) -> bool {
@@ -345,14 +332,10 @@ fn slot_overlaps_other_unit(
     else {
         return true;
     };
-    let query_radius = candidate_body.bounding_radius() + SLOT_UNIT_QUERY_PADDING_PX;
-    for other_id in spatial.ids_in_circle_bbox(candidate.0, candidate.1, query_radius) {
-        if other_id == entity.id {
+    for other in entities.iter() {
+        if other.id == entity.id {
             continue;
         }
-        let Some(other) = entities.get(other_id) else {
-            continue;
-        };
         if other.hp == 0 || !other.is_unit() {
             continue;
         }

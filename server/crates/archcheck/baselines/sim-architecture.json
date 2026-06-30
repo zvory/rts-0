@@ -641,15 +641,9 @@
     },
     {
       "source": "entrenchment",
-      "target": "spatial",
-      "path": "services/entrenchment.rs",
-      "line": 14
-    },
-    {
-      "source": "entrenchment",
       "target": "standability",
       "path": "services/entrenchment.rs",
-      "line": 15
+      "line": 14
     },
     {
       "source": "geometry",
