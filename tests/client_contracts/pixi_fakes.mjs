@@ -64,7 +64,7 @@ export function installFakePixi() {
     constructor() {
       this.children = [];
       this.position = { set: (x = 0, y = 0) => { this.x = x; this.y = y; } };
-      this.scale = { set: (value = 1) => { this.scaleValue = value; } };
+      this.scale = { set: (x = 1, y = x) => { this.scaleX = x; this.scaleY = y; } };
       this.visible = true;
     }
     addChild(child) {
@@ -103,7 +103,7 @@ export function installFakePixi() {
       this.visible = true;
       this.alpha = 1;
       this.position = { set: (x = 0, y = 0) => { this.x = x; this.y = y; } };
-      this.scale = { set: (value = 1) => { this.scaleValue = value; } };
+      this.scale = { set: (x = 1, y = x) => { this.scaleX = x; this.scaleY = y; } };
       this.anchor = { set: (x = 0, y = x) => { this.anchorX = x; this.anchorY = y; } };
     }
     destroy() {
@@ -160,7 +160,7 @@ export function installFakePixi() {
     constructor(texture) {
       this.texture = texture;
       this.visible = true;
-      this.scale = { set: (value = 1) => { this.scaleValue = value; } };
+      this.scale = { set: (x = 1, y = x) => { this.scaleX = x; this.scaleY = y; } };
       this.position = { set: (x = 0, y = 0) => { this.x = x; this.y = y; } };
     }
     destroy(options) {

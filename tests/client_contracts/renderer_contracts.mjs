@@ -3,6 +3,7 @@
 
 import { assert } from "./assertions.mjs";
 import { FrameProfiler } from "../../client/src/frame_profiler.js";
+import { COLORS } from "../../client/src/config.js";
 import { KIND } from "../../client/src/protocol.js";
 import { GROUND_DECAL_TEXTURE_WORLD_SCALE } from "../../client/src/renderer/decals.js";
 import { TrenchDecalLayer, _drawTrenches } from "../../client/src/renderer/trenches.js";
@@ -437,6 +438,81 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     assert(
       !renderer._pools.selectionRings.has(entrenched.id),
       "occupied infantry no longer draw an unselected trench marker on the selection-ring layer",
+    );
+  } finally {
+    restorePixi();
+  }
+}
+
+{
+  const restorePixi = installFakePixi();
+  try {
+    const parent = {
+      clientWidth: 640,
+      clientHeight: 480,
+      appendChild(view) {
+        view.parentNode = this;
+      },
+      removeChild(view) {
+        view.parentNode = null;
+      },
+    };
+    const renderer = new Renderer(parent);
+    renderer._map = { tileSize: 32 };
+    const entity = {
+      id: 506,
+      owner: 1,
+      kind: KIND.RIFLEMAN,
+      x: 260,
+      y: 160,
+      hp: 40,
+      maxHp: 40,
+      state: "idle",
+      occupiedTrenchId: 80,
+    };
+    const colorByOwner = new Map([[1, 0x4878c8]]);
+    const state = {
+      playerId: 1,
+      selection: new Set(),
+      resources: {},
+    };
+
+    renderer._drawUnit(entity, colorByOwner, state);
+
+    const unitRig = renderer._liveRigPools.liveUnitRigs.get(entity.id);
+    const shadowRig = renderer._liveRigPools.liveUnitRigShadows.get(entity.id);
+    const bodyCalls = unitRig?.parts.get("part.body")?.display.calls || [];
+    const shadowCalls = shadowRig?.parts.get("part.shadow")?.display.calls || [];
+
+    assert(unitRig?.container.scaleX === 0.85 && unitRig.container.scaleY === 0.85,
+      "occupied infantry rig scales down while in a trench");
+    assert(shadowRig?.container.scaleX === 0.85 && shadowRig.container.scaleY === 0.85,
+      "occupied infantry shadow scales with the unit rig");
+    assert(
+      bodyCalls.some((call) => call[0] === "beginFill" && call[1] === COLORS.trenchDirt && Math.abs(call[2] - 0.34) < 0.0001),
+      "occupied infantry rig draws a dirt tint overlay on visible body parts",
+    );
+    assert(
+      !shadowCalls.some((call) => call[0] === "beginFill" && call[1] === COLORS.trenchDirt),
+      "occupied infantry rig does not tint the separate shadow route",
+    );
+
+    delete entity.occupiedTrenchId;
+    renderer._drawUnit(entity, colorByOwner, state);
+
+    let lastClearIndex = -1;
+    for (let i = bodyCalls.length - 1; i >= 0; i -= 1) {
+      if (bodyCalls[i][0] === "clear") {
+        lastClearIndex = i;
+        break;
+      }
+    }
+    const latestBodyCalls = bodyCalls.slice(lastClearIndex + 1);
+    assert(unitRig.container.scaleX === 1 && unitRig.container.scaleY === 1,
+      "infantry rig returns to normal scale after leaving a trench");
+    assert(
+      !latestBodyCalls.some((call) => call[0] === "beginFill" && call[1] === COLORS.trenchDirt),
+      "infantry rig clears the dirt tint overlay after leaving a trench",
     );
   } finally {
     restorePixi();
