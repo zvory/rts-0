@@ -3,8 +3,12 @@
 //! This service owns unit-facing trench lifecycle state. The neutral trench terrain itself lives
 //! in [`crate::game::trench::TrenchStore`].
 
+use std::collections::BTreeMap;
+
 use crate::config;
-use crate::game::entity::{active_trench_occupation, AttackPhase, Entity, EntityStore, MovePhase, Order};
+use crate::game::entity::{
+    active_trench_occupation, AttackPhase, Entity, EntityStore, MovePhase, Order,
+};
 use crate::game::map::Map;
 use crate::game::services::geometry::{
     building_rect_for_entity, unit_bodies_intersect, unit_body_for_entity,
@@ -17,6 +21,8 @@ use crate::game::trench::{Trench, TrenchStore};
 const STATIONARY_EPS_PX: f32 = 0.05;
 const SLOT_EXTRA_RADIUS_PX: f32 = config::TILE_SIZE as f32 * 0.5;
 const SLOT_MAX_CORRECTION_PX: f32 = config::TILE_SIZE as f32 * 0.5;
+
+type OccupiedTrenchCounts = BTreeMap<u32, usize>;
 
 #[derive(Clone, Copy)]
 struct OccupationCandidate {
@@ -38,6 +44,8 @@ pub(crate) fn entrenchment_system(
     occ: &Occupancy<'_>,
     trenches: &mut TrenchStore,
 ) {
+    // Keep single-occupant trench checks cheap while this system mutates occupation state.
+    let mut occupied_trench_counts = build_occupied_trench_counts(entities);
     for id in entities.ids() {
         let Some(snapshot) = entities.get(id).cloned() else {
             continue;
@@ -49,13 +57,18 @@ pub(crate) fn entrenchment_system(
             pre_collision_position,
             occ,
             trenches,
+            &occupied_trench_counts,
             &snapshot,
         ) {
             if let Some(e) = entities.get_mut(id) {
                 if let Some((x, y)) = candidate.slot {
                     e.set_position(x, y);
                 }
-                set_active_trench_occupation(e, Some(candidate.trench_id));
+                set_active_trench_occupation_tracked(
+                    e,
+                    &mut occupied_trench_counts,
+                    Some(candidate.trench_id),
+                );
                 reset_entrenchment_dig(e);
             }
             continue;
@@ -67,18 +80,18 @@ pub(crate) fn entrenchment_system(
             && !standing_in_trench(trenches.all(), snapshot.pos_x, snapshot.pos_y);
         if should_dig {
             let completed = entities.get_mut(id).is_some_and(|e| {
-                set_active_trench_occupation(e, None);
+                set_active_trench_occupation_tracked(e, &mut occupied_trench_counts, None);
                 increment_entrenchment_dig(e) >= config::ENTRENCHMENT_DIG_IN_TICKS
             });
             if completed {
                 let created = trenches.create(map, snapshot.pos_x, snapshot.pos_y);
                 if let Some(e) = entities.get_mut(id) {
                     reset_entrenchment_dig(e);
-                    set_active_trench_occupation(e, created);
+                    set_active_trench_occupation_tracked(e, &mut occupied_trench_counts, created);
                 }
             }
         } else if let Some(e) = entities.get_mut(id) {
-            set_active_trench_occupation(e, None);
+            set_active_trench_occupation_tracked(e, &mut occupied_trench_counts, None);
             reset_entrenchment_dig(e);
         }
     }
@@ -90,13 +103,14 @@ fn occupation_candidate(
     pre_collision_position: &dyn Fn(u32) -> Option<(f32, f32)>,
     occ: &Occupancy<'_>,
     trenches: &TrenchStore,
+    occupied_trench_counts: &OccupiedTrenchCounts,
     entity: &Entity,
 ) -> Option<OccupationCandidate> {
     if !eligible_living_infantry(entity) || !stopped_for_occupation(pre_collision_position, entity)
     {
         return None;
     }
-    best_occupation_candidate(map, entities, occ, trenches, entity)
+    best_occupation_candidate(map, entities, occ, trenches, occupied_trench_counts, entity)
 }
 
 fn can_create_trench(has_entrenchment: &dyn Fn(u32) -> bool, entity: &Entity) -> bool {
@@ -160,15 +174,12 @@ fn best_occupation_candidate(
     entities: &EntityStore,
     occ: &Occupancy<'_>,
     trenches: &TrenchStore,
+    occupied_trench_counts: &OccupiedTrenchCounts,
     entity: &Entity,
 ) -> Option<OccupationCandidate> {
     let mut best: Option<RankedOccupationCandidate> = None;
     for trench in trenches.all().iter().copied() {
-        if entities.iter().any(|other| {
-            other.id != entity.id
-                && other.hp > 0
-                && active_trench_occupation(other) == Some(trench.id)
-        }) {
+        if trench_occupied_by_other(occupied_trench_counts, entity, trench.id) {
             continue;
         }
         let Some(dist_sq) = occupation_search_distance_sq(trench, entity) else {
@@ -398,6 +409,68 @@ fn set_active_trench_occupation(entity: &mut Entity, trench_id: Option<u32>) {
     }
 }
 
+fn build_occupied_trench_counts(entities: &EntityStore) -> OccupiedTrenchCounts {
+    let mut counts = OccupiedTrenchCounts::new();
+    for entity in entities.iter() {
+        if let Some(trench_id) = active_trench_occupation(entity) {
+            increment_occupied_trench_count(&mut counts, trench_id);
+        }
+    }
+    counts
+}
+
+fn trench_occupied_by_other(
+    occupied_trench_counts: &OccupiedTrenchCounts,
+    entity: &Entity,
+    trench_id: u32,
+) -> bool {
+    let count = occupied_trench_counts
+        .get(&trench_id)
+        .copied()
+        .unwrap_or_default();
+    let self_count = usize::from(active_trench_occupation(entity) == Some(trench_id));
+    count > self_count
+}
+
+fn set_active_trench_occupation_tracked(
+    entity: &mut Entity,
+    occupied_trench_counts: &mut OccupiedTrenchCounts,
+    trench_id: Option<u32>,
+) {
+    let previous = active_trench_occupation(entity);
+    set_active_trench_occupation(entity, trench_id);
+    let current = active_trench_occupation(entity);
+    if previous == current {
+        return;
+    }
+    if let Some(previous) = previous {
+        decrement_occupied_trench_count(occupied_trench_counts, previous);
+    }
+    if let Some(current) = current {
+        increment_occupied_trench_count(occupied_trench_counts, current);
+    }
+}
+
+fn increment_occupied_trench_count(
+    occupied_trench_counts: &mut OccupiedTrenchCounts,
+    trench_id: u32,
+) {
+    *occupied_trench_counts.entry(trench_id).or_default() += 1;
+}
+
+fn decrement_occupied_trench_count(
+    occupied_trench_counts: &mut OccupiedTrenchCounts,
+    trench_id: u32,
+) {
+    let Some(count) = occupied_trench_counts.get_mut(&trench_id) else {
+        return;
+    };
+    *count = count.saturating_sub(1);
+    if *count == 0 {
+        occupied_trench_counts.remove(&trench_id);
+    }
+}
+
 fn trench_radius_px(trench: Trench) -> f32 {
     trench.radius_tiles * config::TILE_SIZE as f32
 }
@@ -461,8 +534,16 @@ mod tests {
         }
         let occ = Occupancy::build(&map, &entities);
 
-        let candidate = best_occupation_candidate(&map, &entities, &occ, &trenches, &snapshot)
-            .expect("farther trench should remain occupiable");
+        let occupied_trench_counts = build_occupied_trench_counts(&entities);
+        let candidate = best_occupation_candidate(
+            &map,
+            &entities,
+            &occ,
+            &trenches,
+            &occupied_trench_counts,
+            &snapshot,
+        )
+        .expect("farther trench should remain occupiable");
 
         assert_eq!(candidate.trench_id, farther);
     }
