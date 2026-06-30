@@ -15,6 +15,10 @@ Both modes should reduce setup micro without making artillery automatically walk
 into firing position. The player chooses a target direction or point; artillery either uses its
 current setup cone or redeploys in place to face the chosen target.
 
+Implementation should model each mode as its own terminal fire order, not as a synthetic queued
+`Set Up` order followed by a separate fire order. The fire order owns any setup/redeploy transition
+needed before the first shot.
+
 ## Command Card
 
 - Add `Blanket Fire` for artillery in the bottom-right command-card slot. In the default grid
@@ -29,26 +33,33 @@ current setup cone or redeploys in place to face the chosen target.
 
 - Point fire and blanket fire both auto-set-up artillery if the gun is packed or otherwise not
   deployed.
+- This is an intentional change to Point Fire: a packed artillery piece can now accept an immediate
+  Point Fire order, set up in place toward the effective fire point, then begin point fire once
+  deployed.
 - If an artillery piece is already deployed and the clicked or locked target point is inside its
   current cone, it fires from the current setup.
 - If an artillery piece is deployed and the clicked or locked target point is outside its current
   cone, it tears down, rotates, sets up toward that point, then starts the requested fire mode.
 - This behavior applies to immediate commands and queued commands.
-- Point fire keeps its current convenience behavior of redeploying in place when the target is
-  outside the current cone.
-- Blanket fire should match that convenience behavior instead of requiring the player to issue a
-  separate setup command first.
+- Point Fire and Blanket Fire both redeploy in place when the effective fire point is outside the
+  current cone instead of requiring the player to issue a separate setup command first.
 
 ## Queueing
 
 - Point fire and blanket fire are both queueable.
+- Point fire and blanket fire are terminal per artillery piece. Once either fire order is accepted
+  for a gun, later queued unit orders for that same gun are not appended behind it. Other selected
+  units that did not accept the terminal fire order may still accept compatible queued orders.
 - A queued point fire or blanket fire command after a movement order should use the selected
-  artillery piece's future queued position for preview and execution when that information is
-  available.
+  artillery piece's future queued position for preview and for computing the stored effective fire
+  point when that queued position is available.
 - Example flow: right-click move, hold `Shift`, press point fire or blanket fire, preview from the
   future position where possible, click target, then the gun moves, sets up or redeploys, and begins
   firing.
 - Queued fire commands should not cause automatic walking or staging to get a target into range.
+- Execution remains server-authoritative. If the stored effective fire point is stale or invalid
+  when the queued fire order promotes, the gun skips that fire order safely instead of walking,
+  relocking the original click, or firing outside its valid band.
 
 ## Range Targeting
 
@@ -59,6 +70,15 @@ current setup cone or redeploys in place to face the chosen target.
   - If the clicked point is inside minimum range, lock to minimum range.
   - If the clicked point is outside maximum range, lock to maximum range.
   - If the clicked point is already in valid range, use the clicked point.
+- The per-gun locked point is the command/order target stored for execution. Do not store the raw
+  clicked point and reinterpret it later.
+- For queued commands, compute this locked point from the authoritative future queued position when
+  the server can infer one; otherwise use the gun's current position.
+- For a zero-length ray, use the gun's current or planned setup facing as the ray direction. If no
+  setup facing exists yet, use the gun's current body facing.
+- Clamp the final stored point to the playable map along the same ray. If no in-map point exists on
+  that ray within the valid range band for that gun, that gun ignores the command rather than
+  walking or firing at an invalid point.
 - Cone checks and previews use this per-gun locked point.
 - With multiple artillery pieces selected, different guns may lock to different points because each
   gun has its own origin.
@@ -66,12 +86,19 @@ current setup cone or redeploys in place to face the chosen target.
 ## Blanket Fire Behavior
 
 - Blanket fire repeats until stopped or replaced by another order.
-- Each blanket fire shot picks a random target point inside that artillery piece's valid firing
-  cone and range band.
+- Each blanket fire shot picks a deterministic pseudo-random impact point uniformly from anywhere
+  inside that artillery piece's valid firing cone and range band. The clicked distance does not
+  narrow the blanket area; the whole valid cone/range band is eligible.
+- Blanket fire randomness must remain deterministic for command-log replay. Seed each shot from
+  authoritative simulation inputs such as match seed or tick, artillery id, owner, and shot number;
+  do not use nondeterministic runtime RNG.
 - Blanket fire does not select enemy units or visible enemy positions. It blankets terrain.
 - Blanket fire should use the same shell projectile, ammunition cost, reload cadence, shell delay,
-  impact radius, damage behavior, and fog or reveal handling as artillery point fire unless a later
-  requirement explicitly changes one of those surfaces.
+  impact radius, damage behavior, no-ammo behavior, and fog or reveal handling as artillery point
+  fire unless a later requirement explicitly changes one of those surfaces. The only firing
+  difference is shot placement: Point Fire repeats against its stored effective fire point, while
+  Blanket Fire samples a deterministic uniform point in the full valid cone/range band for each
+  shot.
 
 ## Preview UX
 
@@ -89,12 +116,16 @@ current setup cone or redeploys in place to face the chosen target.
 - Increase artillery minimum range by 10 tiles.
 - The current intended change is from 15 tiles to 25 tiles.
 - Mirror the value anywhere artillery range is surfaced to players.
+- Preserve the current accuracy feel across the remaining valid range band when making this change:
+  the minimum-range error should still apply at the new 25-tile floor, the maximum-range error
+  should still apply at the 55-tile ceiling, and interpolation should be recalculated across the
+  new 25-to-55 tile band.
 
-## Open Product Decision
+## Ballistic Tables Decision
 
-- Decide whether blanket fire benefits from Ballistic Tables repeated-shot accuracy tightening.
-- Current recommendation: keep the accuracy ramp point-fire-only so blanket fire remains area
-  suppression instead of eventually becoming precision fire.
+- Keep Ballistic Tables repeated-shot accuracy tightening Point-Fire-only. Blanket Fire remains
+  deterministic uniform area suppression over the full valid cone/range band instead of tightening
+  into precision fire over time.
 
 ## Non-Goals
 
