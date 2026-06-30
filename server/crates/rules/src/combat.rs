@@ -241,7 +241,8 @@ pub fn default_weapon_kind(kind: EntityKind) -> Option<WeaponKind> {
         EntityKind::Artillery => Some(WeaponKind::ArtilleryGun),
         EntityKind::ScoutCar => Some(WeaponKind::ScoutCarMg),
         EntityKind::Tank => Some(WeaponKind::TankCannon),
-        EntityKind::CommandCar
+        EntityKind::Panzerfaust
+        | EntityKind::CommandCar
         | EntityKind::Ekat
         | EntityKind::CityCentre
         | EntityKind::Zamok
@@ -279,7 +280,7 @@ pub fn is_armored(kind: EntityKind) -> bool {
 
 /// AP weapons deal full damage to armored targets.
 pub fn is_ap(kind: EntityKind) -> bool {
-    weapon_class(kind) == WeaponClass::AntiTank
+    kind == EntityKind::Panzerfaust || weapon_class(kind) == WeaponClass::AntiTank
 }
 
 /// Rules-owned armor classification for target ranking and damage policy.
@@ -298,7 +299,7 @@ pub fn weapon_class(kind: EntityKind) -> WeaponClass {
 
 /// Rules-owned threat role used by sim-local target ranking.
 pub fn target_threat_role(kind: EntityKind) -> TargetThreatRole {
-    if weapon_class(kind) == WeaponClass::AntiTank {
+    if is_ap(kind) {
         TargetThreatRole::AntiArmorThreat
     } else if kind == EntityKind::TankTrap {
         TargetThreatRole::FieldObstacle
@@ -482,6 +483,9 @@ mod tests {
     use super::*;
 
     fn defs_attack_profile_and_class(kind: EntityKind) -> (AttackProfile, WeaponClass) {
+        if kind == EntityKind::Panzerfaust {
+            return (AttackProfile::NONE, WeaponClass::None);
+        }
         if let Some(def) = defs::unit_def(kind) {
             (
                 AttackProfile {
@@ -543,6 +547,7 @@ mod tests {
             (EntityKind::Golem, Some(WeaponKind::GolemFists)),
             (EntityKind::Rifleman, Some(WeaponKind::RiflemanRifle)),
             (EntityKind::MachineGunner, Some(WeaponKind::MachineGunnerMg)),
+            (EntityKind::Panzerfaust, None),
             (EntityKind::AntiTankGun, Some(WeaponKind::AntiTankGun)),
             (EntityKind::MortarTeam, Some(WeaponKind::MortarTeamMortar)),
             (EntityKind::Artillery, Some(WeaponKind::ArtilleryGun)),
@@ -815,6 +820,12 @@ mod tests {
                 false,
                 false,
                 TargetThreatRole::Ordinary,
+            ),
+            (
+                EntityKind::Panzerfaust,
+                false,
+                true,
+                TargetThreatRole::AntiArmorThreat,
             ),
             (
                 EntityKind::AntiTankGun,
