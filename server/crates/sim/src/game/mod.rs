@@ -275,8 +275,8 @@ impl Game {
             perf.as_deref_mut(),
         );
 
-        // Live fog last, from the post-systems world state. Lingering death vision is layered
-        // only when snapshots are projected so it cannot validate commands or combat targeting.
+        // Live fog last, from the post-systems world state. Lingering death vision is not stored
+        // in live fog; attack targeting gets a scoped temporary view built inside `run_tick`.
         self.lingering_sight
             .retain(|source| source.is_active_at(self.tick));
         self.firing_reveals

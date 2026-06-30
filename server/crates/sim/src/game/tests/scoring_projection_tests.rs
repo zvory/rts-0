@@ -250,7 +250,7 @@ fn spectator_player_resources_follow_selected_players() {
 }
 
 #[test]
-fn death_vision_lingers_for_five_seconds_as_visual_only_intel() {
+fn death_vision_lingers_for_five_seconds_and_allows_direct_attack_targets() {
     let players = [
         PlayerInit {
             id: 1,
@@ -282,6 +282,16 @@ fn death_vision_lingers_for_five_seconds_as_visual_only_intel() {
         .entities
         .spawn_unit(1, EntityKind::Rifleman, rifle_pos.0, rifle_pos.1)
         .expect("rifleman should spawn");
+    let second_rifle_pos = game.map.tile_center(2, 3);
+    let second_rifle = game
+        .entities
+        .spawn_unit(
+            1,
+            EntityKind::Rifleman,
+            second_rifle_pos.0,
+            second_rifle_pos.1,
+        )
+        .expect("second rifleman should spawn");
     let spotter_pos = game.map.tile_center(20, 20);
     let spotter = game
         .entities
@@ -292,6 +302,11 @@ fn death_vision_lingers_for_five_seconds_as_visual_only_intel() {
         .entities
         .spawn_unit(2, EntityKind::Rifleman, enemy_pos.0, enemy_pos.1)
         .expect("enemy should spawn");
+    let enemy_depot_pos = game.map.tile_center(24, 21);
+    let enemy_depot = game
+        .entities
+        .spawn_building(2, EntityKind::Depot, enemy_depot_pos.0, enemy_depot_pos.1, true)
+        .expect("enemy depot should spawn");
     systems::recompute_supply(&mut game.players, &game.entities);
     game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
@@ -316,6 +331,13 @@ fn death_vision_lingers_for_five_seconds_as_visual_only_intel() {
         .find(|e| e.id == enemy)
         .expect("enemy should remain visible through lingering death vision");
     assert!(first_linger.vision_only);
+    let first_building_linger = game
+        .snapshot_for(1)
+        .entities
+        .into_iter()
+        .find(|e| e.id == enemy_depot)
+        .expect("enemy building should remain visible through lingering death vision");
+    assert!(first_building_linger.vision_only);
 
     let enemy_goal = game.map.tile_center(24, 20);
     game.enqueue(
@@ -324,6 +346,14 @@ fn death_vision_lingers_for_five_seconds_as_visual_only_intel() {
             units: vec![rifle],
             target: enemy,
             queued: false,
+        },
+    );
+    game.enqueue(
+        1,
+        Command::Attack {
+            units: vec![second_rifle],
+            target: enemy_depot,
+            queued: true,
         },
     );
     game.enqueue(
@@ -340,8 +370,17 @@ fn death_vision_lingers_for_five_seconds_as_visual_only_intel() {
     let rifle_entity = game.entities.get(rifle).expect("rifle should remain alive");
     assert_eq!(
         rifle_entity.order().attack_target(),
-        None,
-        "vision-only enemies should not be accepted as direct attack targets"
+        Some(enemy),
+        "death-vision enemy units should be accepted as direct attack targets"
+    );
+    let second_rifle_entity = game
+        .entities
+        .get(second_rifle)
+        .expect("second rifle should remain alive");
+    assert_eq!(
+        second_rifle_entity.order().attack_target(),
+        Some(enemy_depot),
+        "queued death-vision enemy buildings should promote as direct attack targets"
     );
     let moved_enemy = game.entities.get(enemy).expect("enemy should remain alive");
     let moving_linger = game
@@ -360,5 +399,143 @@ fn death_vision_lingers_for_five_seconds_as_visual_only_intel() {
     assert!(
         game.snapshot_for(1).entities.iter().all(|e| e.id != enemy),
         "lingering death vision should expire after five seconds"
+    );
+}
+
+#[test]
+fn allied_death_vision_allows_teammate_direct_attack_targets() {
+    let players = [
+        PlayerInit {
+            id: 1,
+            team_id: 1,
+            faction_id: "kriegsia".to_string(),
+            name: "One".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            team_id: 1,
+            faction_id: "kriegsia".to_string(),
+            name: "Two".into(),
+            color: "#ddd".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 3,
+            team_id: 3,
+            faction_id: "kriegsia".to_string(),
+            name: "Three".into(),
+            color: "#000".into(),
+            is_ai: false,
+        },
+    ];
+    let mut game = Game::new_for_replay(&players, 0xA11E_D515);
+    for tile in &mut game.map.terrain {
+        *tile = crate::protocol::terrain::GRASS;
+    }
+    for id in game.entities.ids() {
+        game.entities.remove(id);
+    }
+
+    let player_one_base = game.map.tile_center(2, 5);
+    game.entities
+        .spawn_building(
+            1,
+            EntityKind::CityCentre,
+            player_one_base.0,
+            player_one_base.1,
+            true,
+        )
+        .expect("player one base should spawn");
+    let player_two_base = game.map.tile_center(8, 5);
+    game.entities
+        .spawn_building(
+            2,
+            EntityKind::CityCentre,
+            player_two_base.0,
+            player_two_base.1,
+            true,
+        )
+        .expect("player two base should spawn");
+
+    let rifle_pos = game.map.tile_center(2, 2);
+    let rifle = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, rifle_pos.0, rifle_pos.1)
+        .expect("rifleman should spawn");
+    let second_rifle_pos = game.map.tile_center(3, 2);
+    let second_rifle = game
+        .entities
+        .spawn_unit(
+            1,
+            EntityKind::Rifleman,
+            second_rifle_pos.0,
+            second_rifle_pos.1,
+        )
+        .expect("second rifleman should spawn");
+    let spotter_pos = game.map.tile_center(20, 20);
+    let spotter = game
+        .entities
+        .spawn_unit(2, EntityKind::Worker, spotter_pos.0, spotter_pos.1)
+        .expect("allied spotter should spawn");
+    let enemy_pos = game.map.tile_center(22, 20);
+    let enemy = game
+        .entities
+        .spawn_unit(3, EntityKind::Rifleman, enemy_pos.0, enemy_pos.1)
+        .expect("enemy should spawn");
+    systems::recompute_supply(&mut game.players, &game.entities);
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+    game.fog.recompute(&ids, &game.entities, &game.map);
+    assert!(!game.fog.is_visible_world(1, enemy_pos.0, enemy_pos.1));
+    assert!(game.fog.is_visible_world(2, enemy_pos.0, enemy_pos.1));
+
+    game.entities
+        .get_mut(spotter)
+        .expect("spotter should exist")
+        .hp = 0;
+    game.tick();
+
+    let allied_linger = game
+        .snapshot_for(1)
+        .entities
+        .into_iter()
+        .find(|entity| entity.id == enemy)
+        .expect("teammate death vision should be shared into player one's snapshot");
+    assert!(allied_linger.vision_only);
+
+    game.enqueue(
+        1,
+        Command::Attack {
+            units: vec![rifle],
+            target: enemy,
+            queued: false,
+        },
+    );
+    game.enqueue(
+        1,
+        Command::Attack {
+            units: vec![second_rifle],
+            target: enemy,
+            queued: true,
+        },
+    );
+    game.tick();
+
+    let rifle_entity = game.entities.get(rifle).expect("rifle should remain alive");
+    assert_eq!(
+        rifle_entity.order().attack_target(),
+        Some(enemy),
+        "direct attack should validate against team-shared death vision"
+    );
+    let second_rifle_entity = game
+        .entities
+        .get(second_rifle)
+        .expect("second rifle should remain alive");
+    assert_eq!(
+        second_rifle_entity.order().attack_target(),
+        Some(enemy),
+        "queued attack promotion should validate against team-shared death vision"
     );
 }

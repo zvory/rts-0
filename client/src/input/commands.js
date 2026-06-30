@@ -81,10 +81,12 @@ export function _onRightClick(p, ev = {}) {
     this._addCommandFeedback("move", target.x, target.y, queued);
     return;
   }
-  if (target && enemyOwner(this.state, target.owner) && !isResource(target.kind)) {
+  const attackTarget =
+    target || this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ false, { includeVisionOnly: true });
+  if (attackTarget && enemyOwner(this.state, attackTarget.owner) && !isResource(attackTarget.kind)) {
     // Enemy entity -> attack.
-    this._issueCommand(cmd.attack(ownUnits, target.id, queued));
-    this._addCommandFeedback("attack", target.x, target.y, queued);
+    this._issueCommand(cmd.attack(ownUnits, attackTarget.id, queued));
+    this._addCommandFeedback("attack", attackTarget.x, attackTarget.y, queued);
     return;
   }
   if (target && isResource(target.kind) && target.remaining !== 0) {
@@ -164,7 +166,9 @@ export function _issueTargetedCommand(p, ev = {}) {
     return;
   }
 
-  const target = this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ false);
+  const target = this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ false, {
+    includeVisionOnly: true,
+  });
   if (target && enemyOwner(this.state, target.owner) && !isResource(target.kind)) {
     this._issueCommand(cmd.attack(ownUnits, target.id, !!ev.shiftKey));
     this._addCommandFeedback("attack", target.x, target.y, !!ev.shiftKey);

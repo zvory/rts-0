@@ -64,6 +64,7 @@ pub(super) fn resolve_target(
     spatial: &SpatialIndex,
     los: &LineOfSight<'_>,
     fog: &Fog,
+    ordered_target_fog: &Fog,
     smokes: &SmokeCloudStore,
     tank_trap_obstructs_vehicle_route: &dyn Fn(&Entity, &Entity) -> bool,
     self_id: u32,
@@ -88,7 +89,13 @@ pub(super) fn resolve_target(
                     .get(target)
                     .map(|t| {
                         world_query::is_enemy_targetable(t, teams, owner, self_id)
-                            && target_visible_to_owner(fog, smokes, owner, t)
+                            && target_visible_to_owner_team(
+                                ordered_target_fog,
+                                smokes,
+                                teams,
+                                owner,
+                                t,
+                            )
                     })
                     .unwrap_or(false)
                 {
@@ -304,5 +311,16 @@ fn target_visible_to_owner(
     target: &Entity,
 ) -> bool {
     fog.is_visible_world(owner, target.pos_x, target.pos_y)
+        && !smokes.point_inside(target.pos_x, target.pos_y)
+}
+
+fn target_visible_to_owner_team(
+    fog: &Fog,
+    smokes: &SmokeCloudStore,
+    teams: &TeamRelations,
+    owner: u32,
+    target: &Entity,
+) -> bool {
+    crate::rules::projection::team_visible_world(owner, target.pos_x, target.pos_y, fog, teams)
         && !smokes.point_inside(target.pos_x, target.pos_y)
 }

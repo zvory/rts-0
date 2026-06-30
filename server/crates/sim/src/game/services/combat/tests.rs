@@ -15,7 +15,6 @@ use crate::game::{PlayerState, ScoreState};
 use crate::protocol::{terrain, NoticeSeverity};
 use crate::rules::combat as combat_rules;
 use rand::SeedableRng;
-
 mod mortar_autocast;
 mod entrenchment;
 mod moving_fire_policy;
@@ -33,7 +32,6 @@ fn rifleman_with_enemy() -> (EntityStore, u32, u32) {
         .expect("enemy rifleman should spawn");
     (entities, self_id, enemy_id)
 }
-
 fn open_map(size: u32) -> Map {
     Map {
         size,
@@ -224,6 +222,7 @@ fn run_combat_tick_on_map_with_seed_and_smokes(
         &occ,
         &spatial,
         &mut coordinator,
+        &fog,
         &fog,
         smokes,
         &mut mortar_shells,
@@ -1233,6 +1232,7 @@ fn attack_move_resumes_original_destination_after_target_is_gone() {
         &occ,
         &spatial,
         &mut coordinator,
+        &fog,
         &fog,
         &smokes,
         &mut mortar_shells,

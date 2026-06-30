@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-
 use crate::config;
 use crate::game::ability::{self, AbilityKind, AbilityQueuePolicy};
 use crate::game::ability_runtime::AbilityRuntime;
@@ -31,10 +30,8 @@ use crate::game::teams::TeamRelations;
 use crate::game::PlayerState;
 use crate::protocol::{Event, NoticeSeverity};
 use crate::rules;
-
 const ATTACK_UNREACHABLE_PROMOTION_CHECKS: u16 = 3;
 const ATTACK_RANGE_SLACK_PX: f32 = 4.0;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 struct PointPromotionKey {
     owner: u32,
@@ -60,7 +57,6 @@ impl PointPromotionKey {
         (f32::from_bits(self.x_bits), f32::from_bits(self.y_bits))
     }
 }
-
 /// Outcome of popping the next queued intent for a unit. Move/AttackMove are batched into a
 /// group move per destination point; gather/build are issued directly per worker.
 enum PromotedIntent {
@@ -107,6 +103,7 @@ pub(crate) fn promote_ready_orders(
     entities: &mut EntityStore,
     players: &mut [PlayerState],
     fog: &Fog,
+    attack_fog: &Fog,
     coordinator: &mut MoveCoordinator<'_>,
     smokes: &mut SmokeCloudStore,
     ability_runtime: &mut AbilityRuntime,
@@ -117,7 +114,7 @@ pub(crate) fn promote_ready_orders(
     let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
     let ready: Vec<u32> = entities
         .iter()
-        .filter(|e| ready_for_next_order(map, entities, &teams, fog, e))
+        .filter(|e| ready_for_next_order(map, entities, &teams, attack_fog, e))
         .map(|e| e.id)
         .collect();
     if ready.is_empty() {
@@ -178,7 +175,8 @@ pub(crate) fn promote_ready_orders(
             clear_completed_active_order(entities, id);
         }
 
-        let Some(promoted) = pop_next_valid_intent(map, entities, players, &teams, fog, events, id)
+        let Some(promoted) =
+            pop_next_valid_intent(map, entities, players, &teams, fog, attack_fog, events, id)
         else {
             continue;
         };
@@ -258,7 +256,6 @@ pub(crate) fn promote_ready_orders(
         begin_artillery_teardown_for_movement(entities, &ids);
     }
 }
-
 fn ready_for_next_order(
     map: &Map,
     entities: &EntityStore,
@@ -306,12 +303,14 @@ fn clear_completed_active_order(entities: &mut EntityStore, id: u32) {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn pop_next_valid_intent(
     map: &Map,
     entities: &mut EntityStore,
     players: &[PlayerState],
     teams: &TeamRelations,
     fog: &Fog,
+    attack_fog: &Fog,
     events: &mut std::collections::HashMap<u32, Vec<Event>>,
     id: u32,
 ) -> Option<PromotedIntent> {
@@ -369,7 +368,7 @@ fn pop_next_valid_intent(
                 }
             }
             OrderIntent::Attack(attack) => {
-                if attack_intent_valid(entities, teams, fog, owner, id, attack.target) {
+                if attack_intent_valid(entities, teams, attack_fog, owner, id, attack.target) {
                     return Some(PromotedIntent::Attack {
                         target: attack.target,
                     });
@@ -538,7 +537,7 @@ fn attack_intent_valid(
     }
     matches!(entities.get(target),
         Some(t) if world_query::is_enemy_targetable(t, teams, owner, attacker)
-            && fog.is_visible_world(owner, t.pos_x, t.pos_y))
+            && rules::projection::team_visible_world(owner, t.pos_x, t.pos_y, fog, teams))
 }
 
 fn attack_order_complete(
@@ -790,6 +789,7 @@ mod tests {
             map,
             entities,
             &mut players,
+            &fog,
             &fog,
             &mut coordinator,
             &mut smokes,
