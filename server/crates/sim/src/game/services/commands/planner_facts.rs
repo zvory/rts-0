@@ -32,10 +32,15 @@ pub(super) fn planner_facts(
             let mut facts = planner::UnitFacts::new(id);
             facts.pos = planner::Point::new(e.pos_x, e.pos_y);
             facts.queue_len = e.queued_orders().len();
-            facts.queue_terminal = matches!(e.order(), Order::ArtilleryPointFire(_))
-                || e.queued_orders()
-                    .iter()
-                    .any(|intent| matches!(intent, OrderIntent::PointFire(_)));
+            facts.queue_terminal = matches!(
+                e.order(),
+                Order::ArtilleryPointFire(_) | Order::ArtilleryBlanketFire(_)
+            ) || e.queued_orders().iter().any(|intent| {
+                matches!(
+                    intent,
+                    OrderIntent::PointFire(_) | OrderIntent::BlanketFire(_)
+                )
+            });
             facts.active_build = matches!(e.order(), Order::Build(_) | Order::Deconstruct(_));
             facts.activity = match e.order() {
                 Order::Idle | Order::HoldPosition => planner::UnitActivity::Idle,

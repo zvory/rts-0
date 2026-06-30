@@ -286,15 +286,16 @@ folded into default targeting.
   `ARTILLERY_FIELD_OF_FIRE_RAD = 20 degrees total`, `ARTILLERY_RELOAD_TICKS = 90` (~3s),
   `ARTILLERY_SETUP_TICKS = 90` (~3s), `ARTILLERY_SHELL_DELAY_TICKS = 150` (~5s), and
   `ARTILLERY_AMMO_COST_STEEL = 10`.
-  The reserved Blanket Fire command identity mirrors
-  `ARTILLERY_BLANKET_RADIUS_TILES = 15` for later preview and runtime work, but remains hidden from
-  the command card in this contract phase.
+  Blanket Fire uses `ARTILLERY_BLANKET_RADIUS_TILES = 15` around the stored locked center for
+  deterministic uniform impact sampling, but remains hidden from the command card until the client
+  targeting phase exposes it.
   Unupgraded artillery error scales by shot range, from `ARTILLERY_MIN_RANGE_ERROR_TILES = 3.0`
   at minimum range to `ARTILLERY_MAX_RANGE_ERROR_TILES = 15.0` at maximum range, and does not
   tighten over repeated fire. The interpolation span is the current 25-to-55 tile range band.
-  Artillery Fire Control restores repeated-fire tightening for the same
-  deployed gun: starting error is still range-scaled, then tightens to
-  `ARTILLERY_MIN_ERROR_TILES = 3.0` over 5 shots. Moving resets that accuracy ramp.
+  Artillery Fire Control restores repeated Point Fire tightening for the same deployed gun:
+  starting error is still range-scaled, then tightens to `ARTILLERY_MIN_ERROR_TILES = 3.0` over 5
+  shots. Blanket Fire does not tighten with Artillery Fire Control. Moving resets the Point Fire
+  accuracy ramp.
   Its body length, width, clearance, and selection radius match the Tank; its exposed carriage,
   long barrel, large wheels, and deployed spades carry the visual distinction instead of a larger
   footprint. Impacts deal
@@ -360,10 +361,10 @@ folded into default targeting.
   against that registry for client-visible ability descriptors. Server execution maps those
   registry rows to a small set of sim-local effect hooks: legacy no-op, owned area status, delayed
   world effect, dash return, line projectile, Magic Anchor placement, Golem consumption, and the
-  one-off artillery point-fire path. The `blanketFire` id is already registry-backed as an
-  Artillery-carried, world-point, queueable ability with the same range band, ammunition cost, and
-  reload cadence as `pointFire`, plus a 15-tile blanket radius; it is marked non-command-card and
-  has no runtime effect until later artillery UX phases. The legacy `charge` ability id remains
+  artillery fire path. The `blanketFire` id is registry-backed as an Artillery-carried,
+  world-point, queueable ability with the same range band, ammunition cost, and reload cadence as
+  `pointFire`, plus a 15-tile blanket radius; it has server runtime support but is marked
+  non-command-card until the client targeting phase exposes it. The legacy `charge` ability id remains
   registry-backed only for old command/replay decoding and has no carriers, cooldown, command-card
   entry, or runtime status.
 - **Ekat** is the first playable one-hero faction unit. The `ekat` catalog starts with
@@ -458,7 +459,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 8     | 75  | 10  | 2   | 400 (~13s) |
 | mortar_team     | 75  | 40 outer / 100 inner AOE | 20 | 60 | 1.6 | 7 | 100 | 50 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
 | anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 72 | 1.6 | 6     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and Heavy Guns (`anti_tank_gun_unlock`) researched in R&D Complex |
-| artillery       | 150 | 150 AP inner / 150-10 outer AOE | 25-55 point fire | 90 | 1.3 | 4 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind) and Heavy Guns (`anti_tank_gun_unlock`) researched in R&D Complex; tank-sized footprint |
+| artillery       | 150 | 150 AP inner / 150-10 outer AOE | 25-55 artillery fire | 90 | 1.3 | 4 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind) and Heavy Guns (`anti_tank_gun_unlock`) researched in R&D Complex; tank-sized footprint |
 | scout_car       | 100 | 6   | 5     | 6  | 2.35  | 10    | 125 | 50  | 3   | 480 (~16s) |
 | tank            | 292 | 60  | 5 moving / 14 fully stationary | 72 | 2.0   | 6     | 425 | 150 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex |
 | command_car     | 225 | 0   | 0     | 0  | 2.35  | 10    | 150 | 75  | 4   | 450 (~15s); requires Vehicle Works (`factory` kind) and Command Car (`command_car_unlock`) researched in R&D Complex; no weapon; Scout Car-style movement with a smaller jeep-sized body |

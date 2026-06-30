@@ -35,13 +35,13 @@
     },
     {
       "path": "server/crates/sim/src/game/services/commands.rs",
-      "lines": 1914,
-      "reason": "Artillery firing reveal command admission extended the existing oversized command service; keep ratcheting until command validation is further extracted."
+      "lines": 1929,
+      "reason": "Artillery UX Phase 3 adds server-authoritative Blanket Fire command routing and shared Point/Blanket firing execution to the existing oversized command service; keep ratcheting until artillery command runtime is extracted."
     },
     {
       "path": "server/crates/sim/src/game/services/move_coordinator.rs",
-      "lines": 2279,
-      "reason": "Pathing slow-tick diagnostics added per-pass queue/promotion counters and focused coverage to the existing oversized movement coordinator; keep ratcheting until coordinator diagnostics are split."
+      "lines": 2280,
+      "reason": "Artillery UX Phase 3 adds Blanket Fire as a non-pathing artillery order to source classification in the existing oversized movement coordinator; keep ratcheting until coordinator policy is split."
     },
     {
       "path": "server/crates/sim/src/game/services/movement/tests.rs",
@@ -50,8 +50,8 @@
     },
     {
       "path": "server/crates/sim/src/game/services/order_queue.rs",
-      "lines": 1537,
-      "reason": "Mortar manual-fire reload handling extended queued ability promotion in the existing oversized order adapter; keep ratcheting until queue validation is extracted."
+      "lines": 1558,
+      "reason": "Artillery UX Phase 3 adds Blanket Fire queued-order promotion alongside Point Fire in the existing oversized order adapter; keep ratcheting until queue validation is extracted."
     },
     {
       "path": "server/crates/sim/src/game/services/pathing.rs",
