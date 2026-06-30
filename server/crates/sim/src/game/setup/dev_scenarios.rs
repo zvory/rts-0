@@ -570,7 +570,10 @@ fn build_dev_scenario_game_with_teams<const N: usize>(
         })
         .collect();
     let spatial = services::spatial::SpatialIndex::build(&entities, map.size);
-    let pathing = services::pathing::PathingService::new(65_536, 256);
+    let pathing = services::pathing::PathingService::new(
+        LIVE_PATHING_DEFAULT_BUDGET,
+        LIVE_PATHING_CACHE_CAPACITY,
+    );
     let rng = SmallRng::seed_from_u64(seed as u64);
     let mut game = Game::new_without_ai_controllers(&players, seed);
     game.map = map;

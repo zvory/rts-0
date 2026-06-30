@@ -5,6 +5,9 @@ use std::str::FromStr;
 
 mod dev_scenarios;
 
+const LIVE_PATHING_DEFAULT_BUDGET: usize = 32_768;
+const LIVE_PATHING_CACHE_CAPACITY: usize = 256;
+
 impl Game {
     #[allow(dead_code)]
     pub fn new(players: &[PlayerInit], seed: u32) -> Game {
@@ -283,7 +286,10 @@ impl Game {
         }
 
         let spatial = services::spatial::SpatialIndex::build(&entities, map.size);
-        let pathing = services::pathing::PathingService::new(65_536, 256);
+        let pathing = services::pathing::PathingService::new(
+            LIVE_PATHING_DEFAULT_BUDGET,
+            LIVE_PATHING_CACHE_CAPACITY,
+        );
         let rng = SmallRng::seed_from_u64(seed as u64);
         let mut game = Game {
             map,
