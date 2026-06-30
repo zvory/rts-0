@@ -23,6 +23,7 @@ export function createRigRenderContext(entity, {
   visibility = "visible",
   shotRevealAlpha = 1,
   map = null,
+  occupiedTrench = false,
 } = {}) {
   const facing = finite(entity.facing, 0);
   const weaponFacing = finite(entity.weaponFacing, facing);
@@ -68,6 +69,7 @@ export function createRigRenderContext(entity, {
     damaged: finite(entity.maxHp, 0) > 0 && finite(entity.hp, 0) < finite(entity.maxHp, 0),
     shotRevealAlpha: clamp01(shotRevealAlpha),
     visibility,
+    occupiedTrench: Boolean(occupiedTrench),
     mapTileSize: finite(map?.tileSize, 32),
     facing,
     weaponFacing,

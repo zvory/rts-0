@@ -3,6 +3,7 @@
 
 import { assert } from "./assertions.mjs";
 import { FrameProfiler } from "../../client/src/frame_profiler.js";
+import { COLORS } from "../../client/src/config.js";
 import { KIND } from "../../client/src/protocol.js";
 import { GROUND_DECAL_TEXTURE_WORLD_SCALE } from "../../client/src/renderer/decals.js";
 import { TrenchDecalLayer, _drawTrenches } from "../../client/src/renderer/trenches.js";
@@ -242,6 +243,9 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     const ys = firstPolygon.map((call) => call[2]);
     const width = Math.max(...xs) - Math.min(...xs);
     const height = Math.max(...ys) - Math.min(...ys);
+    const authoritativeDiameter =
+      (state.trenches[0].radiusTiles * renderer._map.tileSize * 2) / trenchLayer.downsample;
+    const expectedVisualDiameter = authoritativeDiameter * 0.5;
 
     assert(drawn === 3, "trench renderer draws all valid authoritative trench snapshots");
     assert(trenchLayer.displayObjectCount() === 1, "trench decals use one persistent display object");
@@ -249,6 +253,10 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     assert(trenchLayer.textureUpdateCount === 1, "trench renderer updates the texture once for a changed snapshot");
     assert(firstPolygon.length >= 20, "trench footprints are constructed from low-poly circular polygons");
     assert(width / height > 0.78 && width / height < 1.22, "trench footprints stay circular instead of oval");
+    assert(width > expectedVisualDiameter * 0.85 && width < expectedVisualDiameter * 1.15,
+      "trench footprints render at half the authoritative trench diameter");
+    assert(height > expectedVisualDiameter * 0.85 && height < expectedVisualDiameter * 1.15,
+      "trench footprints render at half the authoritative trench diameter");
     assert(trenchCtx.calls.some((call) => call[0] === "fillStyle" && call[1] === "rgb(90,56,34)"),
       "trench base decal is opaque dirt");
     assert(trenchCtx.calls.some((call) => call[0] === "fillStyle" && String(call[1]).startsWith("rgba(32,20,13")),
@@ -418,8 +426,6 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
 
     const scaffoldHpRects = renderer._pools.hpBars.get(scaffold.id)?.calls.filter((call) => call[0] === "drawRect") || [];
     const scaffoldBarW = scaffoldHpRects[0]?.[3] - 2;
-    const entrenchedMarkerEllipses = renderer._pools.selectionRings.get(entrenched.id)?.calls
-      .filter((call) => call[0] === "drawEllipse") || [];
     assert(
       renderer._pools.selectionRings.has(scaffold.id),
       "selected under-construction building still draws a selection ring",
@@ -437,8 +443,83 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
       "completed damaged building still draws a normal HP bar",
     );
     assert(
-      entrenchedMarkerEllipses.length >= 2,
-      "occupied infantry draw a trench marker on the pooled selection-ring layer even when unselected",
+      !renderer._pools.selectionRings.has(entrenched.id),
+      "occupied infantry no longer draw an unselected trench marker on the selection-ring layer",
+    );
+  } finally {
+    restorePixi();
+  }
+}
+
+{
+  const restorePixi = installFakePixi();
+  try {
+    const parent = {
+      clientWidth: 640,
+      clientHeight: 480,
+      appendChild(view) {
+        view.parentNode = this;
+      },
+      removeChild(view) {
+        view.parentNode = null;
+      },
+    };
+    const renderer = new Renderer(parent);
+    renderer._map = { tileSize: 32 };
+    const entity = {
+      id: 506,
+      owner: 1,
+      kind: KIND.RIFLEMAN,
+      x: 260,
+      y: 160,
+      hp: 40,
+      maxHp: 40,
+      state: "idle",
+      occupiedTrenchId: 80,
+    };
+    const colorByOwner = new Map([[1, 0x4878c8]]);
+    const state = {
+      playerId: 1,
+      selection: new Set(),
+      resources: {},
+    };
+
+    renderer._drawUnit(entity, colorByOwner, state);
+
+    const unitRig = renderer._liveRigPools.liveUnitRigs.get(entity.id);
+    const shadowRig = renderer._liveRigPools.liveUnitRigShadows.get(entity.id);
+    const bodyCalls = unitRig?.parts.get("part.body")?.display.calls || [];
+    const shadowCalls = shadowRig?.parts.get("part.shadow")?.display.calls || [];
+
+    assert(unitRig?.container.scaleX === 0.85 && unitRig.container.scaleY === 0.85,
+      "occupied infantry rig scales down while in a trench");
+    assert(shadowRig?.container.scaleX === 0.85 && shadowRig.container.scaleY === 0.85,
+      "occupied infantry shadow scales with the unit rig");
+    assert(
+      bodyCalls.some((call) => call[0] === "beginFill" && call[1] === COLORS.trenchDirt && Math.abs(call[2] - 0.34) < 0.0001),
+      "occupied infantry rig draws a dirt tint overlay on visible body parts",
+    );
+    assert(
+      !shadowCalls.some((call) => call[0] === "beginFill" && call[1] === COLORS.trenchDirt),
+      "occupied infantry rig does not tint the separate shadow route",
+    );
+
+    delete entity.occupiedTrenchId;
+    renderer._drawUnit(entity, colorByOwner, state);
+
+    let lastClearIndex = -1;
+    for (let i = bodyCalls.length - 1; i >= 0; i -= 1) {
+      if (bodyCalls[i][0] === "clear") {
+        lastClearIndex = i;
+        break;
+      }
+    }
+    const latestBodyCalls = bodyCalls.slice(lastClearIndex + 1);
+    assert(unitRig.container.scaleX === 1 && unitRig.container.scaleY === 1,
+      "infantry rig returns to normal scale after leaving a trench");
+    assert(
+      !latestBodyCalls.some((call) => call[0] === "beginFill" && call[1] === COLORS.trenchDirt),
+      "infantry rig clears the dirt tint overlay after leaving a trench",
     );
   } finally {
     restorePixi();
