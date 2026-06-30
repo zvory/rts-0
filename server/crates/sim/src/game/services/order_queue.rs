@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-
 use crate::config;
 use crate::game::ability::{self, AbilityKind, AbilityQueuePolicy};
 use crate::game::ability_runtime::AbilityRuntime;
@@ -31,10 +30,8 @@ use crate::game::teams::TeamRelations;
 use crate::game::PlayerState;
 use crate::protocol::{Event, NoticeSeverity};
 use crate::rules;
-
 const ATTACK_UNREACHABLE_PROMOTION_CHECKS: u16 = 3;
 const ATTACK_RANGE_SLACK_PX: f32 = 4.0;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 struct PointPromotionKey {
     owner: u32,
@@ -60,7 +57,6 @@ impl PointPromotionKey {
         (f32::from_bits(self.x_bits), f32::from_bits(self.y_bits))
     }
 }
-
 /// Outcome of popping the next queued intent for a unit. Move/AttackMove are batched into a
 /// group move per destination point; gather/build are issued directly per worker.
 enum PromotedIntent {

@@ -1,4 +1,5 @@
 use super::*;
+use crate::game::fog::LingeringSightSource;
 
 fn tank_with_retained_target(
     map: &Map,
@@ -84,6 +85,56 @@ fn shoot_while_moving_units_reacquire_when_retained_target_is_hidden() {
     );
 
     assert_eq!(target, Some(fallback));
+}
+
+#[test]
+fn lingering_death_vision_does_not_feed_auto_acquisition() {
+    let map = open_map(32);
+    let mut entities = EntityStore::new();
+    let attacker_pos = map.tile_center(4, 4);
+    let target_pos = map.tile_center(7, 4);
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, attacker_pos.0, attacker_pos.1)
+        .expect("attacker should spawn");
+    let target = entities
+        .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
+        .expect("target should spawn");
+    let teams = default_team_relations();
+    let spatial = SpatialIndex::build(&entities, map.size);
+    let los = LineOfSight::new(&map);
+    let smokes = SmokeCloudStore::new();
+    let mut live_fog = Fog::new(map.size);
+    live_fog.recompute(&[1, 2], &EntityStore::new(), &map);
+    let mut attack_target_fog = live_fog.clone();
+    let source = LingeringSightSource::new(1, target_pos.0, target_pos.1, 2, 99)
+        .expect("death vision source should be valid");
+    attack_target_fog.stamp_lingering_sources(&[source], &map, &entities);
+
+    assert!(!live_fog.is_visible_world(1, target_pos.0, target_pos.1));
+    assert!(attack_target_fog.is_visible_world(1, target_pos.0, target_pos.1));
+    assert_eq!(
+        resolve_target_with_obstruction(
+            &map,
+            &entities,
+            &teams,
+            &spatial,
+            &los,
+            &live_fog,
+            &attack_target_fog,
+            &smokes,
+            &|_, _| false,
+            attacker,
+            1,
+            attacker_pos.0,
+            attacker_pos.1,
+            1_000.0,
+            CombatMode::Aggressive,
+            false,
+            &|candidate| candidate == target,
+        ),
+        None,
+        "death vision should only validate explicit attack targets, not auto-acquisition"
+    );
 }
 
 #[test]

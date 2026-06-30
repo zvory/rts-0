@@ -1,6 +1,6 @@
 use super::*;
 use crate::game::entity::{BuildPhase, EntityKind, EntityStore, MovePhase, Order, WeaponSetup};
-use crate::game::fog::{Fog, LingeringSightSource};
+use crate::game::fog::Fog;
 use crate::game::mortar;
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::movement::angle_delta;
@@ -15,7 +15,6 @@ use crate::game::{PlayerState, ScoreState};
 use crate::protocol::{terrain, NoticeSeverity};
 use crate::rules::combat as combat_rules;
 use rand::SeedableRng;
-
 mod mortar_autocast;
 mod entrenchment;
 mod moving_fire_policy;
@@ -33,7 +32,6 @@ fn rifleman_with_enemy() -> (EntityStore, u32, u32) {
         .expect("enemy rifleman should spawn");
     (entities, self_id, enemy_id)
 }
-
 fn open_map(size: u32) -> Map {
     Map {
         size,
@@ -113,56 +111,6 @@ fn resolve_tank_test_target(
         192.0,
         combat_mode(tank),
     )
-}
-
-#[test]
-fn lingering_death_vision_does_not_feed_auto_acquisition() {
-    let map = open_map(32);
-    let mut entities = EntityStore::new();
-    let attacker_pos = map.tile_center(4, 4);
-    let target_pos = map.tile_center(7, 4);
-    let attacker = entities
-        .spawn_unit(1, EntityKind::Rifleman, attacker_pos.0, attacker_pos.1)
-        .expect("attacker should spawn");
-    let target = entities
-        .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
-        .expect("target should spawn");
-    let teams = default_team_relations();
-    let spatial = SpatialIndex::build(&entities, map.size);
-    let los = LineOfSight::new(&map);
-    let smokes = SmokeCloudStore::new();
-    let mut live_fog = Fog::new(map.size);
-    live_fog.recompute(&[1, 2], &EntityStore::new(), &map);
-    let mut attack_target_fog = live_fog.clone();
-    let source = LingeringSightSource::new(1, target_pos.0, target_pos.1, 2, 99)
-        .expect("death vision source should be valid");
-    attack_target_fog.stamp_lingering_sources(&[source], &map, &entities);
-
-    assert!(!live_fog.is_visible_world(1, target_pos.0, target_pos.1));
-    assert!(attack_target_fog.is_visible_world(1, target_pos.0, target_pos.1));
-    assert_eq!(
-        resolve_target_with_obstruction(
-            &map,
-            &entities,
-            &teams,
-            &spatial,
-            &los,
-            &live_fog,
-            &attack_target_fog,
-            &smokes,
-            &|_, _| false,
-            attacker,
-            1,
-            attacker_pos.0,
-            attacker_pos.1,
-            1_000.0,
-            CombatMode::Aggressive,
-            false,
-            &|candidate| candidate == target,
-        ),
-        None,
-        "death vision should only validate explicit attack targets, not auto-acquisition"
-    );
 }
 
 fn spawn_tank_priority_target(entities: &mut EntityStore, kind: EntityKind, x: f32) -> Option<u32> {

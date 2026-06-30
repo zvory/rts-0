@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-
 use crate::command_budget::{BASE_COMMAND_SUPPLY_CAP, COMMAND_CAR_SUPPLY_CAP_BONUS};
 use crate::config;
 use crate::game::ability::{self, AbilityKind, AbilityTargetMode};
@@ -44,11 +43,9 @@ use crate::rules;
 const MAX_UNITS_PER_COMMAND: usize = 256;
 const LAB_MAX_UNITS_PER_COMMAND: usize = 4096;
 const MAX_RALLY_STAGES: usize = 4;
-
 mod artillery_scatter;
 mod guards;
 mod planner_facts;
-
 #[cfg(test)]
 use self::artillery_scatter::artillery_error_tiles;
 use self::artillery_scatter::artillery_scattered_point;
@@ -57,7 +54,6 @@ use self::guards::{
     unit_can_accept_player_command,
 };
 use self::planner_facts::{planner_config, planner_facts, AbilityFactInput};
-
 struct CommandExecutionContext<'a, 'pathing> {
     map: &'a Map,
     entities: &'a mut EntityStore,
@@ -74,13 +70,11 @@ struct CommandExecutionContext<'a, 'pathing> {
     teams: TeamRelations,
     tick: u32,
 }
-
 #[derive(Clone, Copy)]
 struct CommandAdmissionPolicy {
     enforce_budget: bool,
     max_units_per_command: usize,
 }
-
 /// Drain + apply queued commands (validate ownership / cost / supply / tech / placement).
 #[allow(clippy::too_many_arguments)]
 pub(in crate::game) fn apply_commands(
@@ -658,10 +652,8 @@ fn build_target_center(building: EntityKind, tile_x: u32, tile_y: u32) -> (f32, 
         tile_y as f32 * ts + stats.foot_h as f32 * ts * 0.5,
     )
 }
-
 mod planned_actions {
     use super::*;
-
     pub(super) fn execute(
         ctx: &mut CommandExecutionContext<'_, '_>,
         players: &mut [PlayerState],
@@ -688,13 +680,11 @@ mod planned_actions {
         let firing_reveals = &mut *ctx.firing_reveals;
         let events = &mut *ctx.events;
         let tick = ctx.tick;
-
         let output = planner::plan_order(planner_config(max_units_per_command), facts, request);
         let mut move_units = Vec::new();
         let mut attack_move_units = Vec::new();
         let mut move_goal = None;
         let mut attack_move_goal = None;
-
         for action in output.actions {
             match action {
                 planner::PlannedAction::ReplaceActive { unit, intent } => match intent {
@@ -976,7 +966,6 @@ mod planned_actions {
             coordinator.order_group_move(entities, player, &attack_move_units, goal, true);
             begin_artillery_teardown_for_movement(entities, &attack_move_units);
         }
-
         for planner_notice in output.notices {
             match planner_notice {
                 planner::PlannerNotice::QueueFull { .. } => {
@@ -986,7 +975,6 @@ mod planned_actions {
         }
     }
 }
-
 fn immediate_unit_can_replace(entities: &EntityStore, player: u32, unit: u32) -> bool {
     unit_can_accept_player_command(entities, player, unit)
 }

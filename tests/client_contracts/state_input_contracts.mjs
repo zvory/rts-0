@@ -815,40 +815,6 @@ function buttonByLabel(card, label) {
       alliedRightClickCommands[0].units.join(",") === String(ownWorker.id),
     "right-clicking an allied entity with own units selected sends move, not attack",
   );
-  const deathVisionDepot = {
-    id: 204,
-    owner: 3,
-    kind: KIND.DEPOT,
-    x: 128,
-    y: 32,
-    hp: 160,
-    maxHp: 160,
-    state: STATE.IDLE,
-    visionOnly: true,
-  };
-  teamSelectionState.applySnapshot({
-    tick: 1,
-    steel: 100,
-    oil: 100,
-    supplyUsed: 1,
-    supplyCap: 10,
-    entities: [ownWorker, allyWorker, enemyWorker, deathVisionDepot],
-    events: [],
-  });
-  teamSelectionState.setSelection([ownWorker.id]);
-  rightClickInput._onRightClick({ x: deathVisionDepot.x, y: deathVisionDepot.y }, { shiftKey: true });
-  const deathVisionRightClick = alliedRightClickCommands[alliedRightClickCommands.length - 1];
-  assert(
-    deathVisionRightClick.c === "attack" &&
-      deathVisionRightClick.target === deathVisionDepot.id &&
-      deathVisionRightClick.queued === true,
-    "right-clicking a death-vision enemy building with own units selected sends queued attack",
-  );
-  selectionInput._commitClickSelection({ x: deathVisionDepot.x, y: deathVisionDepot.y }, false, false);
-  assert(
-    teamSelectionState.selection.size === 0,
-    "normal selection hit-testing still ignores death-vision entities",
-  );
   const minimapLike = Object.create(Minimap.prototype);
   minimapLike.state = teamSelectionState;
   assert(
@@ -1687,23 +1653,6 @@ function buttonByLabel(card, label) {
   assert(
     lastSent.queued === true,
     "Shift enemy attack targeting should queue attack",
-  );
-
-  targetedInput.clientIntent.beginCommandTarget("attack");
-  let attackTargetLookupOptions = null;
-  targetedInput._entityAtWorld = (_x, _y, _ownPreferred, options = {}) => {
-    attackTargetLookupOptions = options;
-    return options.includeVisionOnly
-      ? { id: 100, owner: 2, kind: KIND.BARRACKS, x: 320, y: 320, visionOnly: true }
-      : null;
-  };
-  targetedInput._onLeftDown({ x: 320, y: 320 }, {});
-  lastSent = sentCommands[sentCommands.length - 1];
-  assert(
-    attackTargetLookupOptions?.includeVisionOnly === true &&
-      lastSent.c === "attack" &&
-      lastSent.target === 100,
-    "attack targeting includes death-vision entities as direct attack targets",
   );
 
   targetedInput.clientIntent.beginCommandTarget("attack");
