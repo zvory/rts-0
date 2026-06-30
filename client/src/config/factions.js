@@ -69,7 +69,13 @@ export const FACTION_CATALOGS = Object.freeze({
         UPGRADE.MORTAR_AUTOCAST,
       ],
     },
-    abilities: [ABILITY.SMOKE, ABILITY.MORTAR_FIRE, ABILITY.POINT_FIRE, ABILITY.BREAKTHROUGH],
+    abilities: [
+      ABILITY.SMOKE,
+      ABILITY.MORTAR_FIRE,
+      ABILITY.POINT_FIRE,
+      ABILITY.BLANKET_FIRE,
+      ABILITY.BREAKTHROUGH,
+    ],
   }),
   [FIXTURE_FACTION_ID]: freezeCatalog({
     id: FIXTURE_FACTION_ID,
@@ -131,5 +137,5 @@ export function commandCardAbilitiesForFaction(factionId) {
   return factionCatalog(factionId)
     .abilities
     .map((ability) => ABILITIES[ability])
-    .filter(Boolean);
+    .filter((entry) => entry && entry.commandCard !== false);
 }

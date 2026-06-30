@@ -62,6 +62,7 @@ pub mod abilities {
     pub const SMOKE: &str = "smoke";
     pub const MORTAR_FIRE: &str = "mortarFire";
     pub const POINT_FIRE: &str = "pointFire";
+    pub const BLANKET_FIRE: &str = "blanketFire";
     pub const BREAKTHROUGH: &str = "breakthrough";
     pub const EKAT_TELEPORT: &str = "ekatTeleport";
     pub const EKAT_LINE_SHOT: &str = "ekatLineShot";
@@ -335,6 +336,7 @@ const ORDER_STAGE_CODES: &[(&str, u8)] = &[
     (abilities::EKAT_MAGIC_ANCHOR, 14),
     ("deconstruct", 15),
     (abilities::EKAT_CONSUME_GOLEM, 16),
+    (abilities::BLANKET_FIRE, 17),
 ];
 
 const ABILITY_CODES: &[(&str, u8)] = &[
@@ -347,6 +349,7 @@ const ABILITY_CODES: &[(&str, u8)] = &[
     (abilities::EKAT_LINE_SHOT, 7),
     (abilities::EKAT_MAGIC_ANCHOR, 8),
     (abilities::EKAT_CONSUME_GOLEM, 9),
+    (abilities::BLANKET_FIRE, 10),
 ];
 
 const ABILITY_OBJECT_KIND_CODES: &[(&str, u8)] = &[
@@ -572,6 +575,7 @@ fn ability_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("SMOKE", abilities::SMOKE),
         ("MORTAR_FIRE", abilities::MORTAR_FIRE),
         ("POINT_FIRE", abilities::POINT_FIRE),
+        ("BLANKET_FIRE", abilities::BLANKET_FIRE),
         ("BREAKTHROUGH", abilities::BREAKTHROUGH),
         ("EKAT_TELEPORT", abilities::EKAT_TELEPORT),
         ("EKAT_LINE_SHOT", abilities::EKAT_LINE_SHOT),
@@ -624,6 +628,7 @@ fn order_stage_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("SMOKE", abilities::SMOKE),
         ("MORTAR_FIRE", abilities::MORTAR_FIRE),
         ("POINT_FIRE", abilities::POINT_FIRE),
+        ("BLANKET_FIRE", abilities::BLANKET_FIRE),
         ("BREAKTHROUGH", abilities::BREAKTHROUGH),
         ("EKAT_TELEPORT", abilities::EKAT_TELEPORT),
         ("EKAT_LINE_SHOT", abilities::EKAT_LINE_SHOT),

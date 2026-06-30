@@ -6,6 +6,7 @@ import * as configExports from "../../client/src/config.js";
 import {
   ARTILLERY_MAX_RANGE_TILES,
   ARTILLERY_MIN_RANGE_TILES,
+  ARTILLERY_BLANKET_RADIUS_TILES,
   ARTILLERY_SHELL_DELAY_TICKS,
   MINING_CC_RANGE_TILES,
   SMOKE_ABILITY_COST,
@@ -51,6 +52,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "ANTI_TANK_GUN_FIELD_OF_FIRE_RAD",
   "ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS",
   "ARTILLERY_AMMO_COST",
+  "ARTILLERY_BLANKET_RADIUS_TILES",
   "ARTILLERY_BODY",
   "ARTILLERY_FIELD_OF_FIRE_RAD",
   "ARTILLERY_MAX_RANGE_TILES",
@@ -203,12 +205,14 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   assert(ABILITY_CODE[ABILITY.EKAT_TELEPORT] === 6, "Ekat Teleport compact ability code should be reserved");
   assert(ABILITY_CODE[ABILITY.EKAT_LINE_SHOT] === 7, "Ekat Line Shot compact ability code should be reserved");
   assert(ABILITY_CODE[ABILITY.EKAT_MAGIC_ANCHOR] === 8, "Ekat Magic Anchor compact ability code should be reserved");
+  assert(ABILITY_CODE[ABILITY.BLANKET_FIRE] === 10, "Blanket Fire compact ability code should be reserved");
   assert(ORDER_STAGE_CODE[ORDER_STAGE.POINT_FIRE] === 10, "Point Fire compact order stage code should be reserved");
   assert(ORDER_STAGE_CODE[ORDER_STAGE.BREAKTHROUGH] === 11, "Breakthrough compact order stage code should be reserved");
   assert(ORDER_STAGE_CODE[ORDER_STAGE.EKAT_TELEPORT] === 12, "Ekat Teleport compact order stage code should be reserved");
   assert(ORDER_STAGE_CODE[ORDER_STAGE.EKAT_LINE_SHOT] === 13, "Ekat Line Shot compact order stage code should be reserved");
   assert(ORDER_STAGE_CODE[ORDER_STAGE.EKAT_MAGIC_ANCHOR] === 14, "Ekat Magic Anchor compact order stage code should be reserved");
   assert(ORDER_STAGE_CODE[ORDER_STAGE.DECONSTRUCT] === 15, "Deconstruct compact order stage code should be reserved");
+  assert(ORDER_STAGE_CODE[ORDER_STAGE.BLANKET_FIRE] === 17, "Blanket Fire compact order stage code should be reserved");
   assert(EVENT_CODE[EVENT.ARTILLERY_TARGET] === 7, "Artillery target compact event code should be reserved");
   assert(EVENT_CODE[EVENT.ARTILLERY_IMPACT] === 8, "Artillery impact compact event code should be reserved");
   assert(EVENT_CODE[EVENT.MORTAR_LAUNCH] === 9, "Mortar launch compact event code should be reserved");
@@ -253,6 +257,22 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       ABILITIES[ABILITY.POINT_FIRE].delayTicks === ARTILLERY_SHELL_DELAY_TICKS &&
       ARTILLERY_SHELL_DELAY_TICKS === 150,
     "Point Fire ability exposes Artillery carrier, max range, minimum range, and 5-second delay",
+  );
+  assert(
+    ABILITIES[ABILITY.BLANKET_FIRE].carriers.includes(KIND.ARTILLERY) &&
+      ABILITIES[ABILITY.BLANKET_FIRE].rangeTiles === ARTILLERY_MAX_RANGE_TILES &&
+      ABILITIES[ABILITY.BLANKET_FIRE].minRangeTiles === ARTILLERY_MIN_RANGE_TILES &&
+      ABILITIES[ABILITY.BLANKET_FIRE].radiusTiles === ARTILLERY_BLANKET_RADIUS_TILES &&
+      ABILITIES[ABILITY.BLANKET_FIRE].cost === ABILITIES[ABILITY.POINT_FIRE].cost &&
+      ABILITIES[ABILITY.BLANKET_FIRE].cooldownTicks === ABILITIES[ABILITY.POINT_FIRE].cooldownTicks &&
+      ABILITIES[ABILITY.BLANKET_FIRE].queued === true &&
+      ABILITIES[ABILITY.BLANKET_FIRE].commandCard === false &&
+      ARTILLERY_BLANKET_RADIUS_TILES === 15,
+    "Blanket Fire hidden descriptor exposes Artillery carrier, range band, radius, cost, cooldown, and queueability",
+  );
+  assert(
+    !configExports.commandCardAbilitiesForFaction().some((entry) => entry.ability === ABILITY.BLANKET_FIRE),
+    "Blanket Fire descriptor remains hidden from command-card ability lists",
   );
   assert(
     ABILITIES[ABILITY.EKAT_TELEPORT].queued === true &&

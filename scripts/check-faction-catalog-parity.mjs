@@ -10,6 +10,7 @@ import {
   ANTI_TANK_GUN_DEPLOYED_RANGE_TILES,
   ANTI_TANK_GUN_FIELD_OF_FIRE_RAD,
   ARTILLERY_AMMO_COST,
+  ARTILLERY_BLANKET_RADIUS_TILES,
   ARTILLERY_BODY,
   ARTILLERY_FIELD_OF_FIRE_RAD,
   ARTILLERY_MAX_RANGE_TILES,
@@ -145,6 +146,7 @@ const EXPECTED_CLIENT_CONFIG_CONSTANT_KEYS = Object.freeze([
   "antiTankGunDeployedRangeTiles",
   "antiTankGunFieldOfFireRad",
   "artilleryAmmoCost",
+  "artilleryBlanketRadiusTiles",
   "artilleryFieldOfFireRad",
   "artilleryMaxRangeTiles",
   "artilleryMinRangeTiles",
@@ -211,6 +213,7 @@ const EXPECTED_ABILITY_EFFECT_FIELDS_BY_ID = Object.freeze({
   [ABILITY.SMOKE]: Object.freeze(["durationTicks", "radiusTiles"]),
   [ABILITY.MORTAR_FIRE]: Object.freeze(["radiusTiles"]),
   [ABILITY.POINT_FIRE]: Object.freeze(["delayTicks", "radiusTiles"]),
+  [ABILITY.BLANKET_FIRE]: Object.freeze(["radiusTiles"]),
   [ABILITY.BREAKTHROUGH]: Object.freeze(["durationTicks", "radiusTiles"]),
   [ABILITY.EKAT_TELEPORT]: Object.freeze([]),
   [ABILITY.EKAT_LINE_SHOT]: Object.freeze(["damage", "radiusTiles", "speedPxPerTick"]),
@@ -277,15 +280,22 @@ function assertAbilityDescriptor(entry, factionId) {
     entry.orderStageCode,
     `${factionId} ${entry.id} order stage code mirrors Rust registry`,
   );
-  if (!entry.commandCard) {
+  const descriptor = ABILITIES[ability];
+  if (!entry.commandCard && !descriptor) {
     assert.equal(
-      ABILITIES[ability],
+      descriptor,
       undefined,
       `${factionId} ${entry.id} is registry-only and should not render a command-card descriptor`,
     );
     return;
   }
-  const descriptor = ABILITIES[ability];
+  if (!entry.commandCard) {
+    assert.equal(
+      descriptor.commandCard,
+      false,
+      `${factionId} ${entry.id} descriptor must stay hidden from the command card`,
+    );
+  }
   assert(descriptor, `client ABILITIES is missing command-card descriptor for ${factionId} ${entry.id}`);
   assert.equal(descriptor.ability, ability, `${factionId} ${entry.id} descriptor identity mirrors protocol ability`);
   assert.equal(descriptor.label, entry.label, `${factionId} ${entry.id} label mirrors Rust registry`);
@@ -396,6 +406,16 @@ for (const rustFaction of allRustCatalogs.catalogs) {
     `${rustFaction.id} command-card abilities mirror Rust catalog`,
   );
   assert.deepEqual(
+    clientFaction.abilities.filter((ability) => ABILITIES[ability]),
+    rustFaction.abilities
+      .filter((entry) => {
+        const ability = abilityByStableId.get(entry.id);
+        return entry.commandCard || ABILITIES[ability]?.commandCard === false;
+      })
+      .map((entry) => abilityByStableId.get(entry.id)),
+    `${rustFaction.id} descriptor-backed abilities mirror Rust catalog, including hidden descriptors`,
+  );
+  assert.deepEqual(
     rustFaction.builders.map((kind) => kindByStableId.get(kind)),
     rustFaction.id === DEFAULT_FACTION_ID ? [KIND.WORKER] : [],
     `${rustFaction.id} builder set remains explicit`,
@@ -482,6 +502,7 @@ const clientConstants = {
   artillerySetupTicks: ARTILLERY_SETUP_TICKS,
   artilleryShellDelayTicks: ARTILLERY_SHELL_DELAY_TICKS,
   artilleryOuterRadiusTiles: ARTILLERY_OUTER_RADIUS_TILES,
+  artilleryBlanketRadiusTiles: ARTILLERY_BLANKET_RADIUS_TILES,
   artilleryAmmoCost: ARTILLERY_AMMO_COST,
   smokeAbilityRangeTiles: SMOKE_ABILITY_RANGE_TILES,
   smokeLaunchMaxDelayMs: SMOKE_LAUNCH_MAX_DELAY_MS,

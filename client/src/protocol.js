@@ -270,6 +270,8 @@ export const cmd = Object.freeze({
   setAutocast: (ability, units, enabled) => ({ c: CMD.SET_AUTOCAST, ability, units, enabled }),
   pointFire: (units, x, y, queued = false) =>
     withQueued({ c: CMD.USE_ABILITY, ability: ABILITY.POINT_FIRE, units, x, y }, queued),
+  blanketFire: (units, x, y, queued = false) =>
+    withQueued({ c: CMD.USE_ABILITY, ability: ABILITY.BLANKET_FIRE, units, x, y }, queued),
   gather: (units, node, queued = false) =>
     withQueued({ c: CMD.GATHER, units, node }, queued),
   build: (units, building, tileX, tileY, queued = false) =>
