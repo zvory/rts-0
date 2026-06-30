@@ -78,4 +78,5 @@ export function buildStaticMap(map) {
   this._terrainSprite.scale.set(scale);
   layer.addChild(this._terrainSprite);
   this._initGroundDecalsForMap?.(map);
+  this._initTrenchesForMap?.(map);
 }
