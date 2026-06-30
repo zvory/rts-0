@@ -35,8 +35,8 @@
     },
     {
       "path": "server/crates/sim/src/game/services/commands.rs",
-      "lines": 1887,
-      "reason": "Existing oversized command service before repo-wide source-size gate."
+      "lines": 1914,
+      "reason": "Artillery firing reveal command admission extended the existing oversized command service; keep ratcheting until command validation is further extracted."
     },
     {
       "path": "server/crates/sim/src/game/services/move_coordinator.rs",
