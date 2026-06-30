@@ -18,6 +18,7 @@ await import("./client_contracts/client_boundary_contracts.mjs");
 await import("./client_contracts/renderer_feedback_contracts.mjs");
 await import("./client_contracts/input_contracts.mjs");
 await import("./client_contracts/ability_hotkey_targeting_contracts.mjs");
+await import("./client_contracts/artillery_targeting_contracts.mjs");
 await import("./client_contracts/match_shell_contracts.mjs");
 await import("./client_contracts/match_replay_contracts.mjs");
 await import("./client_contracts/protocol_contracts.mjs");
