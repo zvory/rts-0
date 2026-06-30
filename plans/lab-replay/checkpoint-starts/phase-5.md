@@ -7,7 +7,8 @@ Status: Not started.
 Capture ended matches into the new checkpoint-backed replay artifact. The replay's start checkpoint
 should be the actual initial state used by the match, and the first timeline should preserve normal
 player commands. Match history should store the new artifact shape and avoid offering replay launch
-for old incompatible rows.
+for old incompatible rows. This phase closes the accepted beta dead zone from the schema break by
+making newly captured matches launchable again.
 
 ## Expected Touch Points
 

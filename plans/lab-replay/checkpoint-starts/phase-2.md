@@ -4,22 +4,32 @@ Status: Not started.
 
 ## Scope
 
-Make blank labs, catalog labs, and imported lab setups establish a baseline `GameCheckpoint`. If the
-old lab scenario JSON remains temporarily, treat it as an adapter into checkpoint state rather than
-a separate long-term contract. A lab import or baseline reset should produce a new baseline
-checkpoint and clear the current-branch action log.
+Make blank labs, catalog labs, and imported lab setups establish a baseline `GameCheckpoint`.
+"Lab Scenario" should become a product label over checkpoint-backed lab setup payloads, not a
+separate long-term `LabScenarioV1` serialization contract. If old scenario JSON remains
+temporarily, it must be an explicit adapter into checkpoint state. A lab import or baseline reset
+should produce a new baseline checkpoint and clear the current-branch action log.
 
 ## Expected Touch Points
 
 - `server/crates/sim/src/game/lab.rs`
 - `server/src/lobby/room_task/lab.rs`
+- `server/src/lab_scenarios.rs`
+- `server/src/lab_scenario_submission.rs`
+- `server/assets/lab-scenarios/**` and manifest data if persisted setup shape changes
+- `client/src/lab_client.js`
+- `client/src/lab_panel.js`
+- `client/src/lab_scenario_authoring.js`
+- `client/src/lab_scenario_submission_flow.js`
 - Lab scenario tests
-- `docs/design/protocol.md` if lab artifact shape changes
+- `docs/design/protocol.md` and `docs/design/client-ui.md` if lab artifact/import/export shape
+  changes
 
 ## Verification
 
 - Run focused lab import/export tests.
 - Add tests for blank lab, catalog lab, and imported setup baseline checkpoint creation.
+- Add or adjust catalog and authoring/submission tests if the persisted lab setup shape changes.
 
 ## Manual Testing Focus
 
@@ -28,5 +38,5 @@ correctly.
 
 ## Handoff
 
-The handoff must explain whether old lab scenario files remain accepted and how they map into
-checkpoints.
+The handoff must explain whether old lab scenario files remain accepted, how they map into
+checkpoints, and which user-visible "Lab Scenario" labels remain as product copy.

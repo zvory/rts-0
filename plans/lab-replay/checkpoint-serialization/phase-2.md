@@ -6,8 +6,8 @@ Status: Not started.
 
 Add the initial `GameCheckpoint` DTO and import/export path for minimal tick-zero state. The
 checkpoint should restore map identity, tick count, player slots, teams, starting resources, RNG
-state, and basic entity data with exact entity-id preservation. This should support empty labs and
-fresh normal match starts, not arbitrary mid-game state yet.
+state, basic entity data, and entity allocator/high-water state with exact entity-id preservation.
+This should support empty labs and fresh normal match starts, not arbitrary mid-game state yet.
 
 ## Expected Touch Points
 
@@ -21,6 +21,8 @@ fresh normal match starts, not arbitrary mid-game state yet.
 
 - Run focused Rust tests for checkpoint serde, validation, and tick-zero round trip.
 - Include a test that exports a game, imports it, and exports it again in canonical form.
+- Include a test that spawning after restore allocates the same next entity id as spawning in the
+  original game.
 
 ## Manual Testing Focus
 
@@ -29,4 +31,5 @@ the same first visible state as before.
 
 ## Handoff
 
-The handoff must list which fields are supported and which mid-game fields are still absent.
+The handoff must list which fields are supported, how allocator/high-water preservation was proven,
+and which mid-game fields are still absent.

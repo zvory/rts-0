@@ -6,8 +6,10 @@ Status: Not started.
 
 Inventory every authoritative state owner that affects future simulation results. Produce the first
 `GameCheckpoint` design doc section with field groups, validation expectations, and an explicit
-policy for serialized, derived, and transient state. This phase should identify hard cases before
-DTO work starts.
+policy for serialized, derived, and transient state. Include entity id allocation/high-water state
+as serialized checkpoint state. Document AI controller memory as external/transient: AI players
+restore as player slots, and any live AI resumes from a fresh controller. This phase should identify
+hard cases before DTO work starts.
 
 ## Expected Touch Points
 
@@ -25,8 +27,8 @@ DTO work starts.
 ## Manual Testing Focus
 
 No gameplay manual testing is expected. Review the inventory against a live mental checklist:
-entities, orders, cooldowns, projectiles, smoke, resources, production, fog, RNG, players, AI, and
-timers.
+entities, entity id allocator, orders, cooldowns, projectiles, smoke, resources, production, fog,
+RNG, players, external AI policy, and timers.
 
 ## Handoff
 

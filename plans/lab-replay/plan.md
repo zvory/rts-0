@@ -14,7 +14,8 @@ all use the same checkpoint contract instead of separate initializer families.
 
 Backwards compatibility with old replay artifacts is explicitly out of scope. This is pre-alpha, so
 old `ReplayArtifactV1` files and old match-history replay launches may be rejected with a clear
-incompatibility reason.
+incompatibility reason. Short beta replay dead zones during the schema transition are acceptable as
+long as failures are clear and the final stage restores newly captured replay launch.
 
 ## Core Model
 
@@ -23,11 +24,15 @@ incompatibility reason.
 - `GameCheckpoint` is complete authoritative simulation state at one exact tick. It must include
   enough state to rebuild a `Game`, continue ticking, and produce the same future authoritative
   results as the original game.
-- `Scenario` is a product word, not a separate serialization contract. A scenario is just a
-  `GameCheckpoint` intended to start play.
+- `Scenario` is a product/UI word, not a separate serialization contract. Code, catalog assets,
+  import/export, validation, and submission should move to checkpoint-backed lab setup payloads;
+  visible UI copy may still say "Lab Scenario" where that is the player-facing concept.
 - `ReplayArtifact` is `start: GameCheckpoint` plus `actions: ReplayAction[]`.
 - `ReplayAction` is a typed authoritative action applied at a recorded tick through public game or
   lab APIs.
+- AI controller memory is outside the checkpoint contract. Checkpoints preserve AI player slots as
+  players, but a restored live AI starts from its normal cold controller/profile state. Replays stay
+  authoritative through recorded actions.
 
 ## Program Structure
 
@@ -70,7 +75,8 @@ timeline.
   checkpoint used as a start state.
 - `GameCheckpoint` must be versioned, validated, bounded, and round-trip serializable.
 - Checkpoints must preserve stable entity ids exactly. If a migration ever remaps ids, that remap
-  must be explicit and no replay action may target stale ids.
+  must be explicit and no replay action may target stale ids. The entity allocator/high-water mark
+  is part of that contract, so future spawns cannot collide with restored ids.
 - Checkpoint import must validate map identity/hash, dimensions, player ids, teams, ownership,
   entity ids, command/order references, pathing bounds, resource counts, cooldown ranges, and action
   queue limits.
@@ -96,12 +102,13 @@ timeline.
 - Supporting old replay artifacts after the schema break.
 - Uploading lab captures to a production sharing service.
 - Treating match history as the storage product for lab bugs.
+- Serializing AI controller decision memory. Restored AI players may be resumed by fresh external AI
+  controllers.
 - Serializing purely client-side animation queues that have no authoritative gameplay effect.
 
 ## Open Review Questions
 
 - Should a checkpoint embed full map data, reference map data by stable id/hash, or support both?
-- Which pieces of AI state are authoritative enough to serialize in the first checkpoint pass?
 - Should lab timeline cap resets become a new baseline checkpoint automatically, or should "save
   replay so far" fail if the original action stream was truncated?
 - What canonical serialization format should tests compare: JSON value equality, normalized stable

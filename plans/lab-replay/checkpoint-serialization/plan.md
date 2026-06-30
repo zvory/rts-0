@@ -11,16 +11,18 @@ future mid-game bug clips. It should not change replay behavior or lab UI yet.
 ### [Phase 1 - State Inventory and Contract](phase-1.md)
 
 Inventory authoritative state owned by `Game`, entities, services, queues, timers, RNG, projectiles,
-fog, AI, and room-facing metadata. Draft the `GameCheckpoint` contract and classify each field as
-serialized, derived on import, or explicitly transient. This phase is documentation and test-design
-heavy, with little or no runtime behavior change.
+fog, entity id allocation, and room-facing metadata. Draft the `GameCheckpoint` contract and
+classify each field as serialized, derived on import, or explicitly transient. AI controller
+decision memory should be documented as external/transient: restored AI slots can be driven by fresh
+controllers, while replay correctness comes from recorded actions. This phase is documentation and
+test-design heavy, with little or no runtime behavior change.
 
 ### [Phase 2 - Core Tick Zero Round Trip](phase-2.md)
 
 Introduce the checkpoint DTOs and implement round-trip support for the minimal state needed to
 restore a tick-zero match or empty lab. Cover map identity, players, teams, resources, tick count,
-RNG seed/state, and basic entity fields with exact entity-id preservation. Add initial serde,
-validation, and canonical round-trip tests.
+RNG seed/state, basic entity fields, and the entity allocator/high-water mark with exact entity-id
+preservation. Add initial serde, validation, and canonical round-trip tests.
 
 ### [Phase 3 - Orders, Economy, and Production State](phase-3.md)
 
@@ -56,6 +58,8 @@ transient.
 
 - Do not use `Snapshot` as checkpoint input.
 - Preserve entity ids exactly.
+- Preserve the entity allocator/high-water mark exactly enough that post-restore spawns allocate the
+  same future ids as the original game.
 - Validate all ids, coordinates, counts, timers, queues, and references before import mutates a
   live game.
 - Keep checkpoint serialization in the simulation boundary, not in lobby or client code.
