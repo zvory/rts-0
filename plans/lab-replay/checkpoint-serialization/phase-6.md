@@ -1,6 +1,11 @@
 # Phase 6 - Public Checkpoint API and Docs
 
-Status: Not started.
+> [!WARNING]
+> **POTENTIALLY STALE PHASE - DO NOT IMPLEMENT YET.**
+> This phase belongs to a lab-replay subdivision that may change after `plans/game-state/plan.md`
+> lands. Re-evaluate it before implementation.
+
+Status: POTENTIALLY STALE - not started. Re-evaluate after `plans/game-state/plan.md` lands.
 
 ## Scope
 
