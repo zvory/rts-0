@@ -1,10 +1,12 @@
 export function summarizePathingDiagnostics(rows) {
   const passes = new Map();
-  const topSources = new Map();
+  const topRequestSources = new Map();
+  const topQueuedSources = new Map();
   let worstRequestMaxMs = null;
   let exploredNodesMax = null;
   let pathLenMax = null;
   let totalRequests = 0;
+  let processedMax = 0;
   let totalDeferred = 0;
   let budgetExhaustedCount = 0;
 
@@ -22,7 +24,8 @@ export function summarizePathingDiagnostics(rows) {
       worstRequestMaxMs: 0,
       exploredNodesMax: 0,
       pathLenMax: 0,
-      topSources: new Map(),
+      requestSources: new Map(),
+      queuedSources: new Map(),
     };
     pass.rows += 1;
     pass.awaitingStartMax = Math.max(pass.awaitingStartMax, numeric(row.fields.awaiting_start));
@@ -37,10 +40,13 @@ export function summarizePathingDiagnostics(rows) {
     pass.worstRequestMaxMs = Math.max(pass.worstRequestMaxMs, numeric(row.fields.worst_request_ms));
     pass.exploredNodesMax = Math.max(pass.exploredNodesMax, numeric(row.fields.explored_nodes_max));
     pass.pathLenMax = Math.max(pass.pathLenMax, numeric(row.fields.path_len_max));
-    mergeCountString(pass.topSources, row.fields.source_counts);
-    mergeCountString(topSources, row.fields.source_counts);
+    mergeCountString(pass.requestSources, row.fields.source_counts);
+    mergeCountString(pass.queuedSources, row.fields.queued_source_counts);
+    mergeCountString(topRequestSources, row.fields.source_counts);
+    mergeCountString(topQueuedSources, row.fields.queued_source_counts);
 
     totalRequests += numeric(row.fields.requests_processed);
+    processedMax = Math.max(processedMax, numeric(row.fields.requests_processed));
     totalDeferred = Math.max(totalDeferred, numeric(row.fields.requests_deferred));
     worstRequestMaxMs = maxNullable(worstRequestMaxMs, row.fields.worst_request_ms);
     exploredNodesMax = maxNullable(exploredNodesMax, row.fields.explored_nodes_max);
@@ -49,21 +55,27 @@ export function summarizePathingDiagnostics(rows) {
   }
 
   const passSummaries = [...passes.values()]
-    .map((pass) => ({
-      ...pass,
-      topSources: topCounts(pass.topSources),
-    }))
+    .map((pass) => {
+      const { requestSources, queuedSources, ...summary } = pass;
+      return {
+        ...summary,
+        topSources: topCounts(preferredSourceMap(requestSources, queuedSources)),
+        queuedSources: topCounts(queuedSources),
+      };
+    })
     .sort((a, b) => b.worstRequestMaxMs - a.worstRequestMaxMs || a.pass.localeCompare(b.pass));
 
   const summary = {
     rows: rows.length,
     totalRequests,
+    processedMax,
     totalDeferred,
     budgetExhaustedCount,
     worstRequestMaxMs,
     exploredNodesMax,
     pathLenMax,
-    topSources: topCounts(topSources),
+    topSources: topCounts(preferredSourceMap(topRequestSources, topQueuedSources)),
+    queuedSources: topCounts(topQueuedSources),
     passes: passSummaries,
   };
   summary.interpretation = interpretPathingDiagnostics(summary);
@@ -140,10 +152,10 @@ function interpretPathingDiagnostics(summary) {
   const queuePass = summary.passes.find((pass) => pass.pass === "promote_queued_orders");
   const queuePromotion =
     queuePass && (queuePass.queuedForPathMax >= 16 || queuePass.processedMax >= 16);
-  if (summary.totalDeferred > 0 || summary.budgetExhaustedCount > 0 || summary.totalRequests >= 64) {
+  if (summary.totalDeferred > 0 || summary.budgetExhaustedCount > 0 || summary.processedMax >= 64) {
     return {
       primary: "path request volume",
-      detail: `Processed ${summary.totalRequests} path requests with ${summary.totalDeferred} still awaiting/deferred and ${summary.budgetExhaustedCount} budget-exhausted rows.`,
+      detail: `Processed up to ${summary.processedMax} path requests in one logged pass (${summary.totalRequests} total across rows), with ${summary.totalDeferred} still awaiting/deferred and ${summary.budgetExhaustedCount} budget-exhausted rows.`,
     };
   }
   if ((summary.exploredNodesMax ?? 0) >= 4096 || (summary.worstRequestMaxMs ?? 0) >= 8) {
@@ -198,6 +210,10 @@ function topCounts(map, limit = 5) {
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     .slice(0, limit)
     .map(([label, count]) => ({ label, count }));
+}
+
+function preferredSourceMap(requestSources, queuedSources) {
+  return requestSources.size > 0 ? requestSources : queuedSources;
 }
 
 function formatValue(value) {

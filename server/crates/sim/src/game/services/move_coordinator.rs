@@ -66,6 +66,7 @@ pub struct MoveCoordinator<'a> {
     budget: usize,
     diagnostics_enabled: bool,
     diagnostics: Option<PathingPassDiagnostics>,
+    queued_without_active_diagnostics: Vec<(PathingRequestSource, usize)>,
 }
 
 impl<'a> MoveCoordinator<'a> {
@@ -101,6 +102,7 @@ impl<'a> MoveCoordinator<'a> {
             budget: MAX_REQUESTS_PER_TICK,
             diagnostics_enabled: false,
             diagnostics: None,
+            queued_without_active_diagnostics: Vec::new(),
         }
     }
 
@@ -116,10 +118,11 @@ impl<'a> MoveCoordinator<'a> {
         if !self.diagnostics_enabled {
             return;
         }
-        self.diagnostics = Some(PathingPassDiagnostics::new(
-            pass,
-            count_awaiting_paths(entities),
-        ));
+        let mut diagnostics = PathingPassDiagnostics::new(pass, count_awaiting_paths(entities));
+        for (source, count) in self.queued_without_active_diagnostics.drain(..) {
+            diagnostics.record_group_queued_for_path(source, count);
+        }
+        self.diagnostics = Some(diagnostics);
     }
 
     pub(in crate::game) fn finish_pathing_diagnostics(
@@ -141,6 +144,8 @@ impl<'a> MoveCoordinator<'a> {
     fn record_group_queued_for_path(&mut self, source: PathingRequestSource, count: usize) {
         if let Some(diagnostics) = &mut self.diagnostics {
             diagnostics.record_group_queued_for_path(source, count);
+        } else if self.diagnostics_enabled && count > 0 {
+            self.queued_without_active_diagnostics.push((source, count));
         }
     }
 
@@ -2099,14 +2104,7 @@ mod tests {
         // Set budget artificially low (3).
         coordinator.budget = 3;
 
-        // Mark all units as awaiting path with a Move order.
-        for &id in &ids {
-            if let Some(e) = entities.get_mut(id) {
-                e.set_order(Order::move_to(500.0, 500.0));
-                e.set_path_goal(Some((500.0, 500.0)));
-                e.mark_move_phase(MovePhase::AwaitingPath);
-            }
-        }
+        coordinator.order_group_move(&mut entities, 1, &ids, (500.0, 500.0), false);
 
         coordinator.begin_pathing_diagnostics("awaiting_paths", &entities);
         coordinator.process_awaiting_paths(&mut entities);
@@ -2137,11 +2135,13 @@ mod tests {
         assert_eq!(diagnostics.still_awaiting, 7);
         assert_eq!(diagnostics.requests_deferred, 7);
         assert!(diagnostics.coordinator_budget_exhausted);
+        assert_eq!(diagnostics.queued_for_path, 10);
+        assert_eq!(diagnostics.queued_source_counts.move_orders, 10);
         assert_eq!(diagnostics.source_counts.move_orders, 3);
         assert_eq!(diagnostics.cache_misses, 3);
         assert_eq!(diagnostics.group_size_buckets.one, 0);
         assert_eq!(diagnostics.group_size_buckets.two_to_four, 0);
-        assert_eq!(diagnostics.group_size_buckets.five_to_sixteen, 0);
+        assert_eq!(diagnostics.group_size_buckets.five_to_sixteen, 1);
         assert!(diagnostics.path_len_max > 0);
     }
 

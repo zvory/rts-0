@@ -77,6 +77,17 @@ impl PathingSourceCounts {
         }
     }
 
+    fn add(&mut self, other: Self) {
+        self.move_orders = self.move_orders.saturating_add(other.move_orders);
+        self.attack_move = self.attack_move.saturating_add(other.attack_move);
+        self.attack = self.attack.saturating_add(other.attack);
+        self.gather = self.gather.saturating_add(other.gather);
+        self.build = self.build.saturating_add(other.build);
+        self.deconstruct = self.deconstruct.saturating_add(other.deconstruct);
+        self.ability = self.ability.saturating_add(other.ability);
+        self.other = self.other.saturating_add(other.other);
+    }
+
     fn top(self) -> (&'static str, u32) {
         let (label, count) = [
             ("move", self.move_orders),
@@ -230,6 +241,7 @@ pub(crate) struct PathingPassDiagnostics {
     pub(crate) explored_nodes_max: usize,
     pub(crate) path_len_max: usize,
     pub(crate) source_counts: PathingSourceCounts,
+    pub(crate) queued_source_counts: PathingSourceCounts,
     pub(crate) group_size_buckets: UnitCountBuckets,
     pub(crate) path_len_buckets: PathLengthBuckets,
     pub(crate) explored_node_buckets: ExploredNodeBuckets,
@@ -267,6 +279,7 @@ impl PathingPassDiagnostics {
             explored_nodes_max: 0,
             path_len_max: 0,
             source_counts: PathingSourceCounts::default(),
+            queued_source_counts: PathingSourceCounts::default(),
             group_size_buckets: UnitCountBuckets::default(),
             path_len_buckets: PathLengthBuckets::default(),
             explored_node_buckets: ExploredNodeBuckets::default(),
@@ -279,7 +292,7 @@ impl PathingPassDiagnostics {
         count: usize,
     ) {
         self.queued_for_path = self.queued_for_path.saturating_add(count);
-        self.source_counts
+        self.queued_source_counts
             .record(source, count.min(u32::MAX as usize) as u32);
         self.group_size_buckets.record(count);
     }
@@ -667,6 +680,7 @@ impl TickPerf {
                 explored_nodes_max = record.explored_nodes_max,
                 path_len_max = record.path_len_max,
                 source_counts = %record.source_counts.compact(),
+                queued_source_counts = %record.queued_source_counts.compact(),
                 group_size_buckets = %record.group_size_buckets.compact(),
                 path_len_buckets = %record.path_len_buckets.compact(),
                 explored_node_buckets = %record.explored_node_buckets.compact(),
@@ -729,7 +743,8 @@ struct PathingTickSummary {
 
 impl PathingTickSummary {
     fn from_records(records: &[PathingPassDiagnostics]) -> Self {
-        let mut sources = PathingSourceCounts::default();
+        let mut request_sources = PathingSourceCounts::default();
+        let mut queued_sources = PathingSourceCounts::default();
         let mut out = PathingTickSummary {
             awaiting_start: 0,
             promoted_awaiting_start: 0,
@@ -777,22 +792,15 @@ impl PathingTickSummary {
             out.worst_request = out.worst_request.max(record.worst_request);
             out.explored_nodes_max = out.explored_nodes_max.max(record.explored_nodes_max);
             out.path_len_max = out.path_len_max.max(record.path_len_max);
-            sources.move_orders = sources
-                .move_orders
-                .saturating_add(record.source_counts.move_orders);
-            sources.attack_move = sources
-                .attack_move
-                .saturating_add(record.source_counts.attack_move);
-            sources.attack = sources.attack.saturating_add(record.source_counts.attack);
-            sources.gather = sources.gather.saturating_add(record.source_counts.gather);
-            sources.build = sources.build.saturating_add(record.source_counts.build);
-            sources.deconstruct = sources
-                .deconstruct
-                .saturating_add(record.source_counts.deconstruct);
-            sources.ability = sources.ability.saturating_add(record.source_counts.ability);
-            sources.other = sources.other.saturating_add(record.source_counts.other);
+            request_sources.add(record.source_counts);
+            queued_sources.add(record.queued_source_counts);
         }
-        let (label, count) = sources.top();
+        let (request_label, request_count) = request_sources.top();
+        let (label, count) = if request_count == 0 {
+            queued_sources.top()
+        } else {
+            (request_label, request_count)
+        };
         out.top_source = label;
         out.top_source_count = count;
         out

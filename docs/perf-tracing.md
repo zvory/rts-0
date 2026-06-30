@@ -154,12 +154,16 @@ The tick summary carries aggregate fields:
 - `pathing_worst_request_ms`, `pathing_explored_nodes_max`, and `pathing_path_len_max`: worst
   bounded request timing, A* expanded-node count, and tile-path length observed on the logged tick.
 - `pathing_top_source` and `pathing_top_source_count`: the largest stable source family among
-  `move`, `attackMove`, `attack`, `gather`, `build`, `deconstruct`, `ability`, and `other`.
+  processed path requests, falling back to queued path sources when no request was processed. Stable
+  families are `move`, `attackMove`, `attack`, `gather`, `build`, `deconstruct`, `ability`, and
+  `other`.
 
 Each logged tick also emits one `event="pathing"` row per instrumented pass. Those rows include the
-same counts at pass granularity plus `source_counts`, `group_size_buckets`, `path_len_buckets`,
-`explored_node_buckets`, `worst_request_bucket`, `cache_available`, `complexity_available`, and
-`fuse_triggered`. Bucket values are aggregate labels only; the logs do not include raw paths, raw
+same counts at pass granularity plus `source_counts`, `queued_source_counts`,
+`group_size_buckets`, `path_len_buckets`, `explored_node_buckets`, `worst_request_bucket`,
+`cache_available`, `complexity_available`, and `fuse_triggered`. `source_counts` describes
+processed path requests; `queued_source_counts` describes grouped orders staged for later path
+requests. Bucket values are aggregate labels only; the logs do not include raw paths, raw
 positions, full unit id lists, entity ids, targets, command payloads, or player-entered text. The
 reset window is one coordinator pass inside one logged tick, so missing pathing rows mean perf
 tracing did not log that tick, not that pathing was free. `fuse_triggered` is currently `false`
