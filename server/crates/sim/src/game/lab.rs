@@ -476,7 +476,6 @@ impl Game {
                 })?;
             (entity.kind, entity.is_unit(), entity.is_building())
         };
-
         let mut entities_without = self.entities.clone();
         entities_without.remove(input.entity_id);
         let (x, y) = if is_unit {
@@ -493,10 +492,7 @@ impl Game {
         if let Some(entity) = self.entities.get_mut(input.entity_id) {
             entity.set_position(x, y);
             entity.clear_orders();
-            if let Some(movement) = entity.movement.as_mut() {
-                movement.entrenchment_dig_ticks = 0;
-                movement.occupied_trench_id = None;
-            }
+            entity.replace_active_order(Order::Idle);
         }
         self.entities.release_miner(input.entity_id);
         self.repair_lab_state();
