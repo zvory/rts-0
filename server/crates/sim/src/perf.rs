@@ -35,6 +35,297 @@ pub struct EntityCounts {
     pub resources: usize,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum PathingRequestSource {
+    Move,
+    AttackMove,
+    Attack,
+    Gather,
+    Build,
+    Deconstruct,
+    Ability,
+    Other,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct PathingSourceCounts {
+    pub(crate) move_orders: u32,
+    pub(crate) attack_move: u32,
+    pub(crate) attack: u32,
+    pub(crate) gather: u32,
+    pub(crate) build: u32,
+    pub(crate) deconstruct: u32,
+    pub(crate) ability: u32,
+    pub(crate) other: u32,
+}
+
+impl PathingSourceCounts {
+    pub(crate) fn record(&mut self, source: PathingRequestSource, count: u32) {
+        match source {
+            PathingRequestSource::Move => self.move_orders = self.move_orders.saturating_add(count),
+            PathingRequestSource::AttackMove => {
+                self.attack_move = self.attack_move.saturating_add(count);
+            }
+            PathingRequestSource::Attack => self.attack = self.attack.saturating_add(count),
+            PathingRequestSource::Gather => self.gather = self.gather.saturating_add(count),
+            PathingRequestSource::Build => self.build = self.build.saturating_add(count),
+            PathingRequestSource::Deconstruct => {
+                self.deconstruct = self.deconstruct.saturating_add(count);
+            }
+            PathingRequestSource::Ability => self.ability = self.ability.saturating_add(count),
+            PathingRequestSource::Other => self.other = self.other.saturating_add(count),
+        }
+    }
+
+    fn top(self) -> (&'static str, u32) {
+        [
+            ("move", self.move_orders),
+            ("attackMove", self.attack_move),
+            ("attack", self.attack),
+            ("gather", self.gather),
+            ("build", self.build),
+            ("deconstruct", self.deconstruct),
+            ("ability", self.ability),
+            ("other", self.other),
+        ]
+        .into_iter()
+        .max_by_key(|(label, count)| (*count, std::cmp::Reverse(*label)))
+        .unwrap_or(("none", 0))
+    }
+
+    fn compact(self) -> String {
+        compact_counts([
+            ("move", self.move_orders),
+            ("attackMove", self.attack_move),
+            ("attack", self.attack),
+            ("gather", self.gather),
+            ("build", self.build),
+            ("deconstruct", self.deconstruct),
+            ("ability", self.ability),
+            ("other", self.other),
+        ])
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct UnitCountBuckets {
+    pub(crate) one: u32,
+    pub(crate) two_to_four: u32,
+    pub(crate) five_to_sixteen: u32,
+    pub(crate) seventeen_to_sixty_four: u32,
+    pub(crate) over_sixty_four: u32,
+}
+
+impl UnitCountBuckets {
+    pub(crate) fn record(&mut self, count: usize) {
+        match count {
+            0 => {}
+            1 => self.one = self.one.saturating_add(1),
+            2..=4 => self.two_to_four = self.two_to_four.saturating_add(1),
+            5..=16 => self.five_to_sixteen = self.five_to_sixteen.saturating_add(1),
+            17..=64 => {
+                self.seventeen_to_sixty_four = self.seventeen_to_sixty_four.saturating_add(1);
+            }
+            _ => self.over_sixty_four = self.over_sixty_four.saturating_add(1),
+        }
+    }
+
+    fn compact(self) -> String {
+        compact_counts([
+            ("1", self.one),
+            ("2-4", self.two_to_four),
+            ("5-16", self.five_to_sixteen),
+            ("17-64", self.seventeen_to_sixty_four),
+            ("65+", self.over_sixty_four),
+        ])
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct PathLengthBuckets {
+    pub(crate) zero: u32,
+    pub(crate) one_to_eight: u32,
+    pub(crate) nine_to_thirty_two: u32,
+    pub(crate) thirty_three_to_128: u32,
+    pub(crate) over_128: u32,
+}
+
+impl PathLengthBuckets {
+    pub(crate) fn record(&mut self, count: usize) {
+        match count {
+            0 => self.zero = self.zero.saturating_add(1),
+            1..=8 => self.one_to_eight = self.one_to_eight.saturating_add(1),
+            9..=32 => self.nine_to_thirty_two = self.nine_to_thirty_two.saturating_add(1),
+            33..=128 => self.thirty_three_to_128 = self.thirty_three_to_128.saturating_add(1),
+            _ => self.over_128 = self.over_128.saturating_add(1),
+        }
+    }
+
+    fn compact(self) -> String {
+        compact_counts([
+            ("0", self.zero),
+            ("1-8", self.one_to_eight),
+            ("9-32", self.nine_to_thirty_two),
+            ("33-128", self.thirty_three_to_128),
+            ("129+", self.over_128),
+        ])
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct ExploredNodeBuckets {
+    pub(crate) zero: u32,
+    pub(crate) one_to_512: u32,
+    pub(crate) five_thirteen_to_2048: u32,
+    pub(crate) two_049_to_8192: u32,
+    pub(crate) over_8192: u32,
+}
+
+impl ExploredNodeBuckets {
+    pub(crate) fn record(&mut self, count: usize) {
+        match count {
+            0 => self.zero = self.zero.saturating_add(1),
+            1..=512 => self.one_to_512 = self.one_to_512.saturating_add(1),
+            513..=2048 => {
+                self.five_thirteen_to_2048 = self.five_thirteen_to_2048.saturating_add(1);
+            }
+            2049..=8192 => self.two_049_to_8192 = self.two_049_to_8192.saturating_add(1),
+            _ => self.over_8192 = self.over_8192.saturating_add(1),
+        }
+    }
+
+    fn compact(self) -> String {
+        compact_counts([
+            ("0", self.zero),
+            ("1-512", self.one_to_512),
+            ("513-2048", self.five_thirteen_to_2048),
+            ("2049-8192", self.two_049_to_8192),
+            ("8193+", self.over_8192),
+        ])
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct PathingPassDiagnostics {
+    pub(crate) pass: &'static str,
+    pub(crate) awaiting_start: usize,
+    pub(crate) queued_for_path: usize,
+    pub(crate) requests_processed: usize,
+    pub(crate) requests_deferred: usize,
+    pub(crate) still_awaiting: usize,
+    pub(crate) path_success: usize,
+    pub(crate) path_failed: usize,
+    pub(crate) same_tile: usize,
+    pub(crate) cache_hits: usize,
+    pub(crate) cache_misses: usize,
+    pub(crate) path_budget_exhausted: usize,
+    pub(crate) coordinator_budget_exhausted: bool,
+    pub(crate) total_request_duration: Duration,
+    pub(crate) worst_request: Duration,
+    pub(crate) explored_nodes_max: usize,
+    pub(crate) path_len_max: usize,
+    pub(crate) source_counts: PathingSourceCounts,
+    pub(crate) group_size_buckets: UnitCountBuckets,
+    pub(crate) path_len_buckets: PathLengthBuckets,
+    pub(crate) explored_node_buckets: ExploredNodeBuckets,
+}
+
+impl PathingPassDiagnostics {
+    pub(crate) fn new(pass: &'static str, awaiting_start: usize) -> Self {
+        PathingPassDiagnostics {
+            pass,
+            awaiting_start,
+            queued_for_path: 0,
+            requests_processed: 0,
+            requests_deferred: 0,
+            still_awaiting: 0,
+            path_success: 0,
+            path_failed: 0,
+            same_tile: 0,
+            cache_hits: 0,
+            cache_misses: 0,
+            path_budget_exhausted: 0,
+            coordinator_budget_exhausted: false,
+            total_request_duration: Duration::ZERO,
+            worst_request: Duration::ZERO,
+            explored_nodes_max: 0,
+            path_len_max: 0,
+            source_counts: PathingSourceCounts::default(),
+            group_size_buckets: UnitCountBuckets::default(),
+            path_len_buckets: PathLengthBuckets::default(),
+            explored_node_buckets: ExploredNodeBuckets::default(),
+        }
+    }
+
+    pub(crate) fn record_group_queued_for_path(
+        &mut self,
+        source: PathingRequestSource,
+        count: usize,
+    ) {
+        self.queued_for_path = self.queued_for_path.saturating_add(count);
+        self.source_counts
+            .record(source, count.min(u32::MAX as usize) as u32);
+        self.group_size_buckets.record(count);
+    }
+
+    pub(crate) fn record_path_request(
+        &mut self,
+        source: PathingRequestSource,
+        path_ok: bool,
+        same_tile: bool,
+        cache_hit: Option<bool>,
+        budget_exhausted: bool,
+        expanded_nodes: usize,
+        tile_path_len: usize,
+        duration: Duration,
+    ) {
+        self.requests_processed = self.requests_processed.saturating_add(1);
+        self.source_counts.record(source, 1);
+        self.total_request_duration = self.total_request_duration.saturating_add(duration);
+        self.worst_request = self.worst_request.max(duration);
+        if path_ok {
+            self.path_success = self.path_success.saturating_add(1);
+        } else {
+            self.path_failed = self.path_failed.saturating_add(1);
+        }
+        if same_tile {
+            self.same_tile = self.same_tile.saturating_add(1);
+        }
+        match cache_hit {
+            Some(true) => self.cache_hits = self.cache_hits.saturating_add(1),
+            Some(false) => self.cache_misses = self.cache_misses.saturating_add(1),
+            None => {}
+        }
+        if budget_exhausted {
+            self.path_budget_exhausted = self.path_budget_exhausted.saturating_add(1);
+        }
+        self.explored_nodes_max = self.explored_nodes_max.max(expanded_nodes);
+        self.path_len_max = self.path_len_max.max(tile_path_len);
+        self.path_len_buckets.record(tile_path_len);
+        self.explored_node_buckets.record(expanded_nodes);
+    }
+}
+
+fn compact_counts<const N: usize>(entries: [(&'static str, u32); N]) -> String {
+    let mut out = String::new();
+    for (label, count) in entries {
+        if count == 0 {
+            continue;
+        }
+        if !out.is_empty() {
+            out.push(',');
+        }
+        out.push_str(label);
+        out.push('=');
+        out.push_str(&count.to_string());
+    }
+    if out.is_empty() {
+        "none".to_string()
+    } else {
+        out
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 struct PhaseTiming {
     phase: &'static str,
@@ -56,6 +347,7 @@ struct SnapshotTiming {
 pub struct TickPerf {
     phases: Vec<PhaseTiming>,
     snapshots: Vec<SnapshotTiming>,
+    pathing: Vec<PathingPassDiagnostics>,
     snapshot_stored: u32,
     snapshot_replaced: u32,
     snapshot_closed: u32,
@@ -200,6 +492,7 @@ impl TickPerf {
             Some(TickPerf {
                 phases: Vec::with_capacity(16),
                 snapshots: Vec::with_capacity(4),
+                pathing: Vec::with_capacity(3),
                 snapshot_stored: 0,
                 snapshot_replaced: 0,
                 snapshot_closed: 0,
@@ -223,6 +516,10 @@ impl TickPerf {
             resource_deltas: record.resource_deltas,
             events: record.events,
         });
+    }
+
+    pub(crate) fn record_pathing(&mut self, record: PathingPassDiagnostics) {
+        self.pathing.push(record);
     }
 
     pub fn record_enqueue(&mut self, status: SnapshotEnqueue) {
@@ -273,6 +570,7 @@ impl TickPerf {
             .map(|p| (p.phase, millis(p.duration)))
             .unwrap_or(("none", 0));
         let max_snapshot = self.snapshots.iter().max_by_key(|s| s.snapshot + s.compact);
+        let pathing = PathingTickSummary::from_records(&self.pathing);
 
         info!(
             target: PERF_TARGET,
@@ -300,6 +598,24 @@ impl TickPerf {
             max_snapshot_entities = max_snapshot.map(|s| s.entities).unwrap_or(0),
             slowest_phase,
             slowest_phase_ms,
+            pathing_passes = self.pathing.len(),
+            pathing_awaiting_start = pathing.awaiting_start,
+            pathing_promoted_awaiting_start = pathing.promoted_awaiting_start,
+            pathing_promote_queued_for_path = pathing.promote_queued_for_path,
+            pathing_requests = pathing.requests,
+            pathing_processed = pathing.processed,
+            pathing_deferred = pathing.deferred,
+            pathing_still_awaiting = pathing.still_awaiting,
+            pathing_success = pathing.success,
+            pathing_failed = pathing.failed,
+            pathing_cache_hits = pathing.cache_hits,
+            pathing_cache_misses = pathing.cache_misses,
+            pathing_budget_exhausted = pathing.budget_exhausted,
+            pathing_worst_request_ms = millis(pathing.worst_request),
+            pathing_explored_nodes_max = pathing.explored_nodes_max,
+            pathing_path_len_max = pathing.path_len_max,
+            pathing_top_source = pathing.top_source,
+            pathing_top_source_count = pathing.top_source_count,
             "performance tick summary"
         );
 
@@ -315,6 +631,42 @@ impl TickPerf {
                     "performance phase timing"
                 );
             }
+        }
+
+        for record in &self.pathing {
+            debug!(
+                target: PERF_TARGET,
+                event = "pathing",
+                room = %context.room,
+                match_run_id = %context.match_run_id,
+                tick = context.tick,
+                pass = record.pass,
+                awaiting_start = record.awaiting_start,
+                queued_for_path = record.queued_for_path,
+                requests_processed = record.requests_processed,
+                requests_deferred = record.requests_deferred,
+                still_awaiting = record.still_awaiting,
+                path_success = record.path_success,
+                path_failed = record.path_failed,
+                same_tile = record.same_tile,
+                cache_hits = record.cache_hits,
+                cache_misses = record.cache_misses,
+                path_budget_exhausted = record.path_budget_exhausted,
+                coordinator_budget_exhausted = record.coordinator_budget_exhausted,
+                total_request_ms = millis(record.total_request_duration),
+                worst_request_ms = millis(record.worst_request),
+                worst_request_bucket = request_duration_bucket(record.worst_request),
+                explored_nodes_max = record.explored_nodes_max,
+                path_len_max = record.path_len_max,
+                source_counts = %record.source_counts.compact(),
+                group_size_buckets = %record.group_size_buckets.compact(),
+                path_len_buckets = %record.path_len_buckets.compact(),
+                explored_node_buckets = %record.explored_node_buckets.compact(),
+                cache_available = true,
+                complexity_available = true,
+                fuse_triggered = false,
+                "performance pathing diagnostics"
+            );
         }
 
         for snapshot in &self.snapshots {
@@ -344,6 +696,96 @@ impl TickPerf {
             .filter(|p| p.phase == phase)
             .map(|p| p.duration)
             .sum()
+    }
+}
+
+struct PathingTickSummary {
+    awaiting_start: usize,
+    promoted_awaiting_start: usize,
+    promote_queued_for_path: usize,
+    requests: usize,
+    processed: usize,
+    deferred: usize,
+    still_awaiting: usize,
+    success: usize,
+    failed: usize,
+    cache_hits: usize,
+    cache_misses: usize,
+    budget_exhausted: usize,
+    worst_request: Duration,
+    explored_nodes_max: usize,
+    path_len_max: usize,
+    top_source: &'static str,
+    top_source_count: u32,
+}
+
+impl PathingTickSummary {
+    fn from_records(records: &[PathingPassDiagnostics]) -> Self {
+        let mut sources = PathingSourceCounts::default();
+        let mut out = PathingTickSummary {
+            awaiting_start: 0,
+            promoted_awaiting_start: 0,
+            promote_queued_for_path: 0,
+            requests: 0,
+            processed: 0,
+            deferred: 0,
+            still_awaiting: 0,
+            success: 0,
+            failed: 0,
+            cache_hits: 0,
+            cache_misses: 0,
+            budget_exhausted: 0,
+            worst_request: Duration::ZERO,
+            explored_nodes_max: 0,
+            path_len_max: 0,
+            top_source: "none",
+            top_source_count: 0,
+        };
+        for record in records {
+            match record.pass {
+                "awaiting_paths" => out.awaiting_start = record.awaiting_start,
+                "promoted_awaiting_paths" => {
+                    out.promoted_awaiting_start = record.awaiting_start;
+                }
+                "promote_queued_orders" => {
+                    out.promote_queued_for_path = record.queued_for_path;
+                }
+                _ => {}
+            }
+            out.requests = out.requests.saturating_add(record.requests_processed);
+            out.processed = out.processed.saturating_add(record.requests_processed);
+            out.deferred = out.deferred.saturating_add(record.requests_deferred);
+            out.still_awaiting = out.still_awaiting.max(record.still_awaiting);
+            out.success = out.success.saturating_add(record.path_success);
+            out.failed = out.failed.saturating_add(record.path_failed);
+            out.cache_hits = out.cache_hits.saturating_add(record.cache_hits);
+            out.cache_misses = out.cache_misses.saturating_add(record.cache_misses);
+            out.budget_exhausted = out
+                .budget_exhausted
+                .saturating_add(record.path_budget_exhausted)
+                .saturating_add(usize::from(record.coordinator_budget_exhausted));
+            out.worst_request = out.worst_request.max(record.worst_request);
+            out.explored_nodes_max = out.explored_nodes_max.max(record.explored_nodes_max);
+            out.path_len_max = out.path_len_max.max(record.path_len_max);
+            sources.move_orders = sources
+                .move_orders
+                .saturating_add(record.source_counts.move_orders);
+            sources.attack_move = sources
+                .attack_move
+                .saturating_add(record.source_counts.attack_move);
+            sources.attack = sources.attack.saturating_add(record.source_counts.attack);
+            sources.gather = sources.gather.saturating_add(record.source_counts.gather);
+            sources.build = sources.build.saturating_add(record.source_counts.build);
+            sources.deconstruct = sources
+                .deconstruct
+                .saturating_add(record.source_counts.deconstruct);
+            sources.ability = sources.ability.saturating_add(record.source_counts.ability);
+            sources.other = sources.other.saturating_add(record.source_counts.other);
+        }
+        let (label, count) = sources.top();
+        out.top_source = label;
+        out.top_source_count = count;
+        out
     }
 }
 
@@ -417,6 +859,17 @@ fn bool_env(name: &str) -> bool {
             .as_str(),
         "1" | "true" | "yes" | "on"
     )
+}
+
+fn request_duration_bucket(duration: Duration) -> &'static str {
+    match duration.as_millis() {
+        0 => "0ms",
+        1..=2 => "1-2ms",
+        3..=8 => "3-8ms",
+        9..=16 => "9-16ms",
+        17..=33 => "17-33ms",
+        _ => "34ms+",
+    }
 }
 
 fn millis(duration: Duration) -> u128 {

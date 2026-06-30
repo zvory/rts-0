@@ -58,6 +58,16 @@ const METRICS = [
   ["server_tick_ms", "server tick"],
   ["server_lag_ms", "server lag"],
   ["slow_tick_count", "slow ticks"],
+  ["pathing_requests", "pathing requests"],
+  ["pathing_processed", "pathing processed"],
+  ["pathing_deferred", "pathing deferred"],
+  ["pathing_budget_exhausted", "pathing budget exhausted"],
+  ["pathing_worst_request_ms", "pathing worst request"],
+  ["pathing_explored_nodes_max", "pathing explored nodes"],
+  ["requests_processed", "pathing pass processed"],
+  ["requests_deferred", "pathing pass deferred"],
+  ["worst_request_ms", "pathing pass worst request"],
+  ["explored_nodes_max", "pathing pass explored nodes"],
   ["head_of_line_count", "head of line"],
   ["acknowledged_command_latency_ms", "legacy command ack"],
   ["command_issue_to_socket_send_accepted_max_ms", "command client send max"],
@@ -231,6 +241,29 @@ const ISSUE_GROUPS = [
     fields: ["server_tick_ms", "server_lag_ms", "slow_tick_count", "tick_ms", "scheduler_lag_ms"],
   },
   {
+    id: "server_pathing",
+    label: "server pathing request/complexity pressure",
+    fields: [
+      "pathing_awaiting_start",
+      "pathing_promoted_awaiting_start",
+      "pathing_promote_queued_for_path",
+      "pathing_requests",
+      "pathing_processed",
+      "pathing_deferred",
+      "pathing_still_awaiting",
+      "pathing_budget_exhausted",
+      "pathing_worst_request_ms",
+      "pathing_explored_nodes_max",
+      "pathing_path_len_max",
+      "requests_processed",
+      "requests_deferred",
+      "still_awaiting",
+      "path_budget_exhausted",
+      "worst_request_ms",
+      "explored_nodes_max",
+    ],
+  },
+  {
     id: "server_snapshot_projection",
     label: "server snapshot projection/compact/serialization cost",
     fields: [
@@ -397,6 +430,23 @@ const WARN_THRESHOLD = {
   tick_ms: 40,
   scheduler_lag_ms: 33,
   slowest_phase_ms: 33,
+  pathing_awaiting_start: 64,
+  pathing_promoted_awaiting_start: 64,
+  pathing_promote_queued_for_path: 64,
+  pathing_requests: 64,
+  pathing_processed: 64,
+  pathing_deferred: 1,
+  pathing_still_awaiting: 1,
+  pathing_budget_exhausted: 1,
+  pathing_worst_request_ms: 8,
+  pathing_explored_nodes_max: 4096,
+  pathing_path_len_max: 128,
+  requests_processed: 64,
+  requests_deferred: 1,
+  still_awaiting: 1,
+  path_budget_exhausted: 1,
+  worst_request_ms: 8,
+  explored_nodes_max: 4096,
   max_snapshot_ms: 8,
   snapshot_ms: 8,
   compact_ms: 8,
@@ -474,7 +524,8 @@ Options:
 
 Input is Fly JSONL from scripts/fly-logs.sh search/recent or raw tracing text.
 The parser extracts client_net_report, match_started, match_ended, performance tick summary,
-performance snapshot timing, and performance writer timing rows. Malformed rows become warnings.`);
+performance pathing diagnostics, performance snapshot timing, and performance writer timing rows.
+Malformed rows become warnings.`);
 }
 
 function parseArgs(argv) {
@@ -597,6 +648,9 @@ function normalizeEvent(event, message) {
   }
   if (event === "tick" || message.includes("performance tick summary")) {
     return "performance_tick";
+  }
+  if (event === "pathing" || message.includes("performance pathing diagnostics")) {
+    return "performance_pathing";
   }
   if (event === "snapshot" || message.includes("performance snapshot timing")) {
     return "performance_snapshot";
@@ -774,10 +828,16 @@ function analyze(rows, warnings) {
       applyMatchFields(match, row.fields);
       addPlayerReport(match, row);
     } else if (row.event === "performance_tick") {
+      applyMatchFields(match, row.fields);
       match.serverTicks.push(row);
+    } else if (row.event === "performance_pathing") {
+      applyMatchFields(match, row.fields);
+      match.pathing.push(row);
     } else if (row.event === "performance_snapshot") {
+      applyMatchFields(match, row.fields);
       match.snapshots.push(row);
     } else if (row.event === "performance_writer") {
+      applyMatchFields(match, row.fields);
       match.writers.push(row);
     } else {
       unmatched.push(row);
@@ -808,6 +868,7 @@ function ensureMatch(matches, key, sourceMatch) {
       ended: [],
       players: new Map(),
       serverTicks: [],
+      pathing: [],
       snapshots: [],
       writers: [],
       participants: [],
@@ -885,6 +946,7 @@ function finalizeMatch(match) {
   const groups = ISSUE_GROUPS.map((group) => classifyGroup(group, players, matchPerf, allRows)).filter(Boolean);
   const missing = missingDiagnosticGroups(allRows);
   const transport = summarizeTransport(allRows);
+  const pathingDiagnostics = summarizePathingDiagnostics(match.pathing);
 
   return {
     match: sourceLabel(match),
@@ -905,10 +967,12 @@ function finalizeMatch(match) {
     winnerTeamId: match.winner_team_id,
     reportRows: players.reduce((sum, player) => sum + player.reportCount, 0),
     serverTickRows: match.serverTicks.length,
+    pathingRows: match.pathing.length,
     snapshotRows: match.snapshots.length,
     writerRows: match.writers.length,
     players,
     matchPerf,
+    pathingDiagnostics,
     transport,
     classifications: groups,
     missing,
@@ -1034,6 +1098,28 @@ function summarizePerf(match) {
       "max_snapshot_ms",
       "snapshot_replaced",
       "snapshot_closed",
+      "pathing_awaiting_start",
+      "pathing_promoted_awaiting_start",
+      "pathing_promote_queued_for_path",
+      "pathing_requests",
+      "pathing_processed",
+      "pathing_deferred",
+      "pathing_still_awaiting",
+      "pathing_budget_exhausted",
+      "pathing_worst_request_ms",
+      "pathing_explored_nodes_max",
+      "pathing_path_len_max",
+    ]),
+    pathing: summarizeRows(match.pathing, [
+      "awaiting_start",
+      "queued_for_path",
+      "requests_processed",
+      "requests_deferred",
+      "still_awaiting",
+      "path_budget_exhausted",
+      "worst_request_ms",
+      "explored_nodes_max",
+      "path_len_max",
     ]),
     snapshots: summarizeRows(match.snapshots, [
       "snapshot_ms",
@@ -1047,6 +1133,112 @@ function summarizePerf(match) {
   };
 }
 
+function summarizePathingDiagnostics(rows) {
+  const passes = new Map();
+  const topSources = new Map();
+  let worstRequestMaxMs = null;
+  let exploredNodesMax = null;
+  let pathLenMax = null;
+  let totalRequests = 0;
+  let totalDeferred = 0;
+  let budgetExhaustedCount = 0;
+
+  for (const row of rows) {
+    const passId = String(row.fields.pass || "unknown");
+    const pass = passes.get(passId) || {
+      pass: passId,
+      rows: 0,
+      awaitingStartMax: 0,
+      queuedForPathMax: 0,
+      processedMax: 0,
+      deferredMax: 0,
+      stillAwaitingMax: 0,
+      budgetExhaustedCount: 0,
+      worstRequestMaxMs: 0,
+      exploredNodesMax: 0,
+      pathLenMax: 0,
+      topSources: new Map(),
+    };
+    pass.rows += 1;
+    pass.awaitingStartMax = Math.max(pass.awaitingStartMax, numeric(row.fields.awaiting_start));
+    pass.queuedForPathMax = Math.max(pass.queuedForPathMax, numeric(row.fields.queued_for_path));
+    pass.processedMax = Math.max(pass.processedMax, numeric(row.fields.requests_processed));
+    pass.deferredMax = Math.max(pass.deferredMax, numeric(row.fields.requests_deferred));
+    pass.stillAwaitingMax = Math.max(pass.stillAwaitingMax, numeric(row.fields.still_awaiting));
+    if (truthyField(row.fields.coordinator_budget_exhausted) || numeric(row.fields.path_budget_exhausted) > 0) {
+      pass.budgetExhaustedCount += 1;
+      budgetExhaustedCount += 1;
+    }
+    pass.worstRequestMaxMs = Math.max(pass.worstRequestMaxMs, numeric(row.fields.worst_request_ms));
+    pass.exploredNodesMax = Math.max(pass.exploredNodesMax, numeric(row.fields.explored_nodes_max));
+    pass.pathLenMax = Math.max(pass.pathLenMax, numeric(row.fields.path_len_max));
+    mergeCountString(pass.topSources, row.fields.source_counts);
+    mergeCountString(topSources, row.fields.source_counts);
+
+    totalRequests += numeric(row.fields.requests_processed);
+    totalDeferred += numeric(row.fields.requests_deferred);
+    worstRequestMaxMs = maxNullable(worstRequestMaxMs, row.fields.worst_request_ms);
+    exploredNodesMax = maxNullable(exploredNodesMax, row.fields.explored_nodes_max);
+    pathLenMax = maxNullable(pathLenMax, row.fields.path_len_max);
+    passes.set(passId, pass);
+  }
+
+  const passSummaries = [...passes.values()]
+    .map((pass) => ({
+      ...pass,
+      topSources: topCounts(pass.topSources),
+    }))
+    .sort((a, b) => b.worstRequestMaxMs - a.worstRequestMaxMs || a.pass.localeCompare(b.pass));
+
+  const summary = {
+    rows: rows.length,
+    totalRequests,
+    totalDeferred,
+    budgetExhaustedCount,
+    worstRequestMaxMs,
+    exploredNodesMax,
+    pathLenMax,
+    topSources: topCounts(topSources),
+    passes: passSummaries,
+  };
+  summary.interpretation = interpretPathingDiagnostics(summary);
+  return summary;
+}
+
+function interpretPathingDiagnostics(summary) {
+  if (summary.rows === 0) {
+    return {
+      primary: "unavailable",
+      detail: "Pathing diagnostics were not logged in this artifact.",
+    };
+  }
+  const queuePass = summary.passes.find((pass) => pass.pass === "promote_queued_orders");
+  const queuePromotion =
+    queuePass && (queuePass.queuedForPathMax >= 16 || queuePass.processedMax >= 16 || queuePass.deferredMax > 0);
+  if (summary.totalDeferred > 0 || summary.budgetExhaustedCount > 0 || summary.totalRequests >= 64) {
+    return {
+      primary: "path request volume",
+      detail: `Processed ${summary.totalRequests} path requests with ${summary.totalDeferred} still awaiting/deferred and ${summary.budgetExhaustedCount} budget-exhausted rows.`,
+    };
+  }
+  if ((summary.exploredNodesMax ?? 0) >= 4096 || (summary.worstRequestMaxMs ?? 0) >= 8) {
+    return {
+      primary: "path complexity",
+      detail: `Worst request ${formatValue(summary.worstRequestMaxMs)}ms, explored nodes max ${formatValue(summary.exploredNodesMax)}, path length max ${formatValue(summary.pathLenMax)}.`,
+    };
+  }
+  if (queuePromotion) {
+    return {
+      primary: "queue promotion",
+      detail: `Queued promotion staged up to ${queuePass.queuedForPathMax} units for pathing in one logged pass.`,
+    };
+  }
+  return {
+    primary: "unknown",
+    detail: "Pathing rows were present but did not cross volume, complexity, or queue-promotion thresholds.",
+  };
+}
+
 function summarizeRows(rows, fields) {
   const out = {
     rows: rows.length,
@@ -1055,6 +1247,42 @@ function summarizeRows(rows, fields) {
     out[field] = summarizeField(rows, field);
   }
   return out;
+}
+
+function numeric(value) {
+  return Number.isFinite(value) ? value : 0;
+}
+
+function maxNullable(current, value) {
+  if (!Number.isFinite(value)) {
+    return current;
+  }
+  return current === null ? value : Math.max(current, value);
+}
+
+function truthyField(value) {
+  return value === true || value === "true" || value === 1 || value === "1";
+}
+
+function mergeCountString(target, value) {
+  if (typeof value !== "string" || value === "" || value === "none") {
+    return;
+  }
+  for (const part of value.split(",")) {
+    const [label, rawCount] = part.split("=");
+    const count = Number(rawCount);
+    if (!label || !Number.isFinite(count)) {
+      continue;
+    }
+    target.set(label, (target.get(label) || 0) + count);
+  }
+}
+
+function topCounts(map, limit = 5) {
+  return [...map.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit)
+    .map(([label, count]) => ({ label, count }));
 }
 
 function classifyGroup(group, players, matchPerf, rows) {
@@ -1080,6 +1308,9 @@ function classifyGroup(group, players, matchPerf, rows) {
       }
     }
   }
+  if (group.id === "server_pathing") {
+    addPathingPhaseEvidence(rows, evidenceFor, evidenceAgainst);
+  }
 
   const rawFieldSet = new Set(rows.flatMap((row) => Object.keys(row.fields)));
   const sawRawField = group.fields.some((field) => rawFieldSet.has(field));
@@ -1099,6 +1330,28 @@ function classifyGroup(group, players, matchPerf, rows) {
         ? group.fields.map((field) => `${field}: not logged or unavailable in this artifact`)
         : [],
   };
+}
+
+function addPathingPhaseEvidence(rows, evidenceFor, evidenceAgainst) {
+  const pathingPhases = new Set(["awaiting_paths", "promote_queued_orders", "promoted_awaiting_paths"]);
+  const phaseRows = rows
+    .filter(
+      (row) =>
+        row.event === "performance_tick" &&
+        pathingPhases.has(String(row.fields.slowest_phase || "")) &&
+        Number.isFinite(row.fields.slowest_phase_ms),
+    )
+    .sort((a, b) => Number(b.fields.slowest_phase_ms) - Number(a.fields.slowest_phase_ms));
+  const worst = phaseRows[0];
+  if (worst && worst.fields.slowest_phase_ms >= WARN_THRESHOLD.slowest_phase_ms) {
+    evidenceFor.push(
+      `serverTick slowest_phase ${worst.fields.slowest_phase} ${worst.fields.slowest_phase_ms}ms pathing phase`,
+    );
+  } else if (worst) {
+    evidenceAgainst.push(
+      `serverTick slowest pathing phase ${worst.fields.slowest_phase} ${worst.fields.slowest_phase_ms}ms below ${WARN_THRESHOLD.slowest_phase_ms}`,
+    );
+  }
 }
 
 function addClassificationEvidence(scope, field, metric, evidenceFor, evidenceAgainst) {
@@ -1193,6 +1446,9 @@ function missingDiagnosticGroups(rows) {
   if (!fields.has("server_snapshot_payload_sections")) {
     missing.push("server snapshot payload composition: no section/entity-kind fields in input");
   }
+  if (!fields.has("pathing_requests") && !fields.has("requests_processed")) {
+    missing.push("server pathing diagnostics: no path request/source/complexity fields in input");
+  }
   if (!fields.has("prediction_disable_wasm_count") || !fields.has("prediction_replay_max_ms")) {
     missing.push("prediction disable reason/replay budget detail: no matching fields in input");
   }
@@ -1232,7 +1488,7 @@ function formatMarkdown(report) {
       lines.push(`- Duration: ${formatValue(match.durationMs)} ms / ${formatValue(match.durationTicks)} ticks`);
     }
     lines.push(
-      `- Rows: ${match.reportRows} client reports, ${match.serverTickRows} tick, ${match.snapshotRows} snapshot, ${match.writerRows} writer`
+      `- Rows: ${match.reportRows} client reports, ${match.serverTickRows} tick, ${match.pathingRows} pathing, ${match.snapshotRows} snapshot, ${match.writerRows} writer`
     );
     lines.push(`- Transport diagnostics: ${formatTransportDiagnostics(match.transport)}`);
 
@@ -1274,6 +1530,7 @@ function formatMarkdown(report) {
 
     appendSnapshotPayloadMarkdown(lines, match.players, { formatValue, formatPctX100 });
     appendCommandLifecycleMarkdown(lines, match.players);
+    appendPathingDiagnosticsMarkdown(lines, match.pathingDiagnostics);
 
     lines.push("");
     lines.push("### Classification");
@@ -1300,6 +1557,44 @@ function formatMarkdown(report) {
     }
   }
   return `${lines.join("\n")}\n`;
+}
+
+function appendPathingDiagnosticsMarkdown(lines, diagnostics) {
+  if (!diagnostics || diagnostics.rows === 0) {
+    return;
+  }
+  lines.push("");
+  lines.push("### Pathing Slow-Tick Diagnostics");
+  lines.push(
+    `- Interpretation: ${diagnostics.interpretation.primary}; ${diagnostics.interpretation.detail}`,
+  );
+  lines.push(
+    `- Top sources: ${
+      diagnostics.topSources.length > 0
+        ? diagnostics.topSources.map((item) => `${item.label}=${item.count}`).join(", ")
+        : "n/a"
+    }`,
+  );
+  lines.push("");
+  lines.push("| pass | rows | awaiting start max | queued for path max | processed max | deferred max | budget rows | worst request max | explored nodes max | path len max | top sources |");
+  lines.push("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |");
+  for (const pass of diagnostics.passes) {
+    lines.push(
+      [
+        pass.pass,
+        pass.rows,
+        pass.awaitingStartMax,
+        pass.queuedForPathMax,
+        pass.processedMax,
+        pass.deferredMax,
+        pass.budgetExhaustedCount,
+        pass.worstRequestMaxMs,
+        pass.exploredNodesMax,
+        pass.pathLenMax,
+        pass.topSources.length > 0 ? pass.topSources.map((item) => `${item.label}=${item.count}`).join(", ") : "n/a",
+      ].join(" | ").replace(/^/, "| ").replace(/$/, " |"),
+    );
+  }
 }
 
 function metricPctX100Max(player, field) {

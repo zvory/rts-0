@@ -105,6 +105,7 @@ type SearchKey = (i32, i32, u8);
 ///
 /// `turn_penalty` is added whenever a move's direction differs from the incoming direction.
 /// A value of `0` preserves the legacy tile-only A* scoring.
+#[allow(dead_code)]
 pub fn find_path_with_budget_and_turn_cost<P: Passability>(
     pass: &P,
     sx: i32,
@@ -114,8 +115,29 @@ pub fn find_path_with_budget_and_turn_cost<P: Passability>(
     max_expanded: usize,
     turn_penalty: u32,
 ) -> Vec<(i32, i32)> {
+    find_path_with_budget_and_turn_cost_with_diagnostics(
+        pass,
+        sx,
+        sy,
+        gx,
+        gy,
+        max_expanded,
+        turn_penalty,
+    )
+    .0
+}
+
+pub(super) fn find_path_with_budget_and_turn_cost_with_diagnostics<P: Passability>(
+    pass: &P,
+    sx: i32,
+    sy: i32,
+    gx: i32,
+    gy: i32,
+    max_expanded: usize,
+    turn_penalty: u32,
+) -> (Vec<(i32, i32)>, usize, bool) {
     if sx == gx && sy == gy {
-        return Vec::new();
+        return (Vec::new(), 0, false);
     }
 
     // If the goal tile itself is blocked, retarget to the nearest passable tile around it so
@@ -144,11 +166,12 @@ pub fn find_path_with_budget_and_turn_cost<P: Passability>(
     let mut best_h = heuristic(sx, sy, gx, gy);
 
     let mut expanded = 0usize;
+    let mut budget_exhausted = false;
 
     while let Some(cur) = open.pop() {
         let cur_key = (cur.tx, cur.ty, cur.dir);
         if cur.tx == gx && cur.ty == gy {
-            return reconstruct(&came_from, cur_key);
+            return (reconstruct(&came_from, cur_key), expanded, budget_exhausted);
         }
 
         // Skip stale heap entries (a better g was found after this was pushed).
@@ -160,6 +183,7 @@ pub fn find_path_with_budget_and_turn_cost<P: Passability>(
 
         expanded += 1;
         if expanded > max_expanded {
+            budget_exhausted = true;
             break;
         }
 
@@ -218,11 +242,12 @@ pub fn find_path_with_budget_and_turn_cost<P: Passability>(
     }
 
     // No complete path: head toward whatever we got closest to.
-    if (best_key.0, best_key.1) != (sx, sy) {
+    let path = if (best_key.0, best_key.1) != (sx, sy) {
         reconstruct(&came_from, best_key)
     } else {
         Vec::new()
-    }
+    };
+    (path, expanded, budget_exhausted)
 }
 
 /// Convert a tile path into world-pixel waypoints (tile centers), stored in REVERSE order so
