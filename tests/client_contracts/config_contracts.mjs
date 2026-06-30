@@ -639,7 +639,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     );
     const coolingMortarButton = renderedButtons.find((button) => button.innerHTML.includes("Fire"));
     assert(coolingMortarButton?.dataset.autocastToggle === "true", "Mortar Fire button exposes the autocast toggle hotkey action");
-    assert(coolingMortarButton?.disabled, "cooling-down Mortar Fire remains unavailable for manual fire");
+    assert(!coolingMortarButton?.disabled, "cooling-down Mortar Fire remains armable for queued manual fire");
     globalThis.document.getElementById = (id) => {
       assert(id === "command-card", "Mortar autocast hotkey should query the command card");
       return {

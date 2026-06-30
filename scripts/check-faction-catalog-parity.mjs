@@ -305,6 +305,7 @@ function assertAbilityDescriptor(entry, factionId) {
   assert.deepEqual(descriptor.cost, entry.cost, `${factionId} ${entry.id} cost mirrors Rust registry`);
   assert.equal(descriptor.techRequirement ?? null, entry.techRequirement, `${factionId} ${entry.id} tech requirement mirrors Rust registry`);
   assert.equal(descriptor.queued, entry.mayQueue, `${factionId} ${entry.id} queue behavior mirrors Rust registry`);
+  assert.equal(descriptor.queuePolicy, entry.queuePolicy, `${factionId} ${entry.id} queue policy mirrors Rust registry`);
   assert.equal(!!descriptor.autocast, entry.autocast, `${factionId} ${entry.id} autocast flag mirrors Rust registry`);
 }
 

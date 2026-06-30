@@ -1,4 +1,4 @@
-use crate::game::ability::AbilityKind;
+use crate::game::ability::{self, AbilityKind, AbilityQueuePolicy};
 use crate::game::entity::{Entity, EntityKind, EntityStore, Order, OrderIntent, MAX_QUEUED_ORDERS};
 use crate::game::map::Map;
 use crate::game::services::ability_orders;
@@ -51,7 +51,11 @@ pub(super) fn planner_facts(
             facts.can_setup_anti_tank_gun =
                 matches!(e.kind, EntityKind::AntiTankGun | EntityKind::Artillery);
             if let Some(ability) = ability {
-                if ability_orders::caster_can_accept_order(entities, player, id, ability.kind)
+                let ready_at_issue =
+                    ability_orders::caster_can_accept_order(entities, player, id, ability.kind);
+                let queue_admissible_at_issue =
+                    queue_admissible_at_issue(entities, player, id, ability.kind, ready_at_issue);
+                if (ready_at_issue || queue_admissible_at_issue)
                     && ability_orders::caster_allowed_by_faction(
                         entities,
                         faction_id,
@@ -63,7 +67,8 @@ pub(super) fn planner_facts(
                 {
                     facts.abilities.push(planner::AbilityFacts {
                         ability: ability.id,
-                        ready_at_issue: true,
+                        ready_at_issue,
+                        queue_admissible_at_issue,
                         can_execute_without_interrupt: ability.target.is_some_and(|(x, y)| {
                             world_ability_can_execute_without_interrupt(ability.kind)
                                 && ability_orders::caster_in_range(
@@ -98,6 +103,22 @@ fn has_unreserved_ability_use(entity: &Entity, ability: AbilityKind) -> bool {
     match entity.ability_uses_remaining(ability) {
         Some(remaining) => remaining as usize > reserved_ability_uses(entity, ability),
         None => true,
+    }
+}
+
+fn queue_admissible_at_issue(
+    entities: &EntityStore,
+    player: u32,
+    id: u32,
+    ability: AbilityKind,
+    ready_at_issue: bool,
+) -> bool {
+    match ability::definition(ability).queue_policy {
+        AbilityQueuePolicy::NotQueueable => false,
+        AbilityQueuePolicy::QueueSkipIfNotReady => ready_at_issue,
+        AbilityQueuePolicy::QueueWaitUntilReady => {
+            ability_orders::caster_can_accept_waiting_order(entities, player, id, ability)
+        }
     }
 }
 

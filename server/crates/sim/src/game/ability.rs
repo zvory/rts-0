@@ -4,6 +4,7 @@ use crate::game::entity::EntityKind;
 use crate::protocol;
 use crate::rules;
 use crate::rules::economy::ResourceCost;
+pub use crate::rules::faction::AbilityQueuePolicy;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum AbilityKind {
@@ -83,6 +84,7 @@ pub struct AbilityDefinition {
     pub cost: ResourceCost,
     pub tech_requirement: Option<EntityKind>,
     pub may_queue: bool,
+    pub queue_policy: AbilityQueuePolicy,
     pub autocast: bool,
     pub command_card: bool,
     pub effect_hook: AbilityEffectHook,
@@ -104,7 +106,8 @@ pub fn definition(kind: AbilityKind) -> AbilityDefinition {
         charges: entry.charges,
         cost: entry.cost,
         tech_requirement: entry.tech_requirement,
-        may_queue: entry.may_queue,
+        may_queue: entry.may_queue(),
+        queue_policy: entry.queue_policy,
         autocast: entry.autocast,
         command_card: entry.command_card,
         effect_hook: effect_hook(kind),

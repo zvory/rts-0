@@ -186,7 +186,7 @@ const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
         charges: None,
         cost: ResourceCost::new(0, 0),
         tech_requirement: None,
-        may_queue: false,
+        queue_policy: AbilityQueuePolicy::NotQueueable,
         autocast: false,
         command_card: false,
         protocol_code: 1,
@@ -209,7 +209,7 @@ const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
             balance::SMOKE_ABILITY_COST_OIL,
         ),
         tech_requirement: None,
-        may_queue: true,
+        queue_policy: AbilityQueuePolicy::QueueSkipIfNotReady,
         autocast: false,
         command_card: true,
         protocol_code: 2,
@@ -229,7 +229,7 @@ const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
         charges: None,
         cost: ResourceCost::new(0, 0),
         tech_requirement: None,
-        may_queue: false,
+        queue_policy: AbilityQueuePolicy::QueueWaitUntilReady,
         autocast: true,
         command_card: true,
         protocol_code: 3,
@@ -249,7 +249,7 @@ const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
         charges: None,
         cost: ResourceCost::new(balance::ARTILLERY_AMMO_COST_STEEL, 0),
         tech_requirement: None,
-        may_queue: true,
+        queue_policy: AbilityQueuePolicy::QueueSkipIfNotReady,
         autocast: false,
         command_card: true,
         protocol_code: 4,
@@ -269,7 +269,7 @@ const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
         charges: None,
         cost: ResourceCost::new(0, 0),
         tech_requirement: None,
-        may_queue: true,
+        queue_policy: AbilityQueuePolicy::QueueSkipIfNotReady,
         autocast: false,
         command_card: true,
         protocol_code: 5,
@@ -295,7 +295,7 @@ const EKAT_ABILITIES: &[AbilityCatalogEntry] = &[
         charges: None,
         cost: ResourceCost::new(0, 0),
         tech_requirement: None,
-        may_queue: true,
+        queue_policy: AbilityQueuePolicy::QueueSkipIfNotReady,
         autocast: false,
         command_card: true,
         protocol_code: 6,
@@ -315,7 +315,7 @@ const EKAT_ABILITIES: &[AbilityCatalogEntry] = &[
         charges: None,
         cost: ResourceCost::new(0, 0),
         tech_requirement: None,
-        may_queue: true,
+        queue_policy: AbilityQueuePolicy::QueueSkipIfNotReady,
         autocast: false,
         command_card: true,
         protocol_code: 7,
@@ -335,7 +335,7 @@ const EKAT_ABILITIES: &[AbilityCatalogEntry] = &[
         charges: None,
         cost: ResourceCost::new(0, 0),
         tech_requirement: None,
-        may_queue: true,
+        queue_policy: AbilityQueuePolicy::QueueSkipIfNotReady,
         autocast: false,
         command_card: true,
         protocol_code: 8,
@@ -355,7 +355,7 @@ const EKAT_ABILITIES: &[AbilityCatalogEntry] = &[
         charges: None,
         cost: ResourceCost::new(0, 0),
         tech_requirement: None,
-        may_queue: false,
+        queue_policy: AbilityQueuePolicy::NotQueueable,
         autocast: false,
         command_card: true,
         protocol_code: 9,
@@ -431,6 +431,27 @@ impl AbilityTargetMode {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AbilityQueuePolicy {
+    NotQueueable,
+    QueueSkipIfNotReady,
+    QueueWaitUntilReady,
+}
+
+impl AbilityQueuePolicy {
+    pub fn stable_id(self) -> &'static str {
+        match self {
+            AbilityQueuePolicy::NotQueueable => "notQueueable",
+            AbilityQueuePolicy::QueueSkipIfNotReady => "skipIfNotReady",
+            AbilityQueuePolicy::QueueWaitUntilReady => "waitUntilReady",
+        }
+    }
+
+    pub fn may_queue(self) -> bool {
+        !matches!(self, AbilityQueuePolicy::NotQueueable)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AbilityCatalogEntry {
     pub id: &'static str,
     pub label: &'static str,
@@ -445,11 +466,17 @@ pub struct AbilityCatalogEntry {
     pub charges: Option<u16>,
     pub cost: ResourceCost,
     pub tech_requirement: Option<EntityKind>,
-    pub may_queue: bool,
+    pub queue_policy: AbilityQueuePolicy,
     pub autocast: bool,
     pub command_card: bool,
     pub protocol_code: u8,
     pub order_stage_code: u8,
+}
+
+impl AbilityCatalogEntry {
+    pub fn may_queue(self) -> bool {
+        self.queue_policy.may_queue()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

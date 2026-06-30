@@ -542,6 +542,49 @@ fn mortar_fire_replaces_active_move_order() {
 }
 
 #[test]
+fn queued_mortar_fire_appends_while_reload_is_waitable() {
+    let map = flat_map(32);
+    let mut entities = EntityStore::new();
+    let mortar = entities
+        .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
+        .expect("mortar should spawn");
+    {
+        let mortar_entity = entities.get_mut(mortar).expect("mortar should exist");
+        mortar_entity.set_weapon_setup(WeaponSetup::Deployed);
+        mortar_entity.start_ability_cooldown(AbilityKind::MortarFire, 5);
+        mortar_entity.set_attack_cd(5);
+    }
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::UseAbility {
+                ability: AbilityKind::MortarFire,
+                units: vec![mortar],
+                x: Some(180.0),
+                y: Some(100.0),
+                queued: true,
+            },
+        )],
+    );
+
+    let mortar_entity = entities.get(mortar).expect("mortar should remain alive");
+    assert_eq!(mortar_entity.queued_orders().len(), 1);
+    assert!(
+        matches!(
+            mortar_entity.queued_orders().first(),
+            Some(OrderIntent::WorldAbility(intent))
+                if intent.ability == AbilityKind::MortarFire
+                    && intent.x == 180.0
+                    && intent.y == 100.0
+        ),
+        "queued Mortar Fire should append even while its cooldown/weapon cycle is waiting"
+    );
+}
+
+#[test]
 fn queued_smoke_appends_to_eligible_carriers_until_charges_reserved() {
     let map = flat_map(32);
     let mut entities = EntityStore::new();

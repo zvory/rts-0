@@ -1,6 +1,8 @@
 use super::fixtures::*;
 use super::*;
 use crate::game::entity::MovePhase;
+use crate::game::mortar_scatter::predicted_mortar_impact;
+use crate::game::teams::TeamRelations;
 
 fn manual_fire_fixture() -> (Game, u32, (f32, f32)) {
     let players = [
@@ -47,10 +49,34 @@ fn mortar_launch_count(events: &[(u32, Vec<Event>)], player_id: u32, mortar: u32
         .map(|(_, player_events)| {
             player_events
                 .iter()
-                .filter(|event| matches!(event, Event::MortarLaunch { from, .. } if *from == mortar))
+                .filter(
+                    |event| matches!(event, Event::MortarLaunch { from, .. } if *from == mortar),
+                )
                 .count()
         })
         .unwrap_or(0)
+}
+
+fn mortar_launch_targets(
+    events: &[(u32, Vec<Event>)],
+    player_id: u32,
+    mortar: u32,
+) -> Vec<(f32, f32)> {
+    events
+        .iter()
+        .find(|(id, _)| *id == player_id)
+        .map(|(_, player_events)| {
+            player_events
+                .iter()
+                .filter_map(|event| match event {
+                    Event::MortarLaunch {
+                        from, to_x, to_y, ..
+                    } if *from == mortar => Some((*to_x, *to_y)),
+                    _ => None,
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn enqueue_manual_mortar_fire(game: &mut Game, mortar: u32, target_pos: (f32, f32)) {
@@ -64,6 +90,46 @@ fn enqueue_manual_mortar_fire(game: &mut Game, mortar: u32, target_pos: (f32, f3
             queued: false,
         },
     );
+}
+
+fn enqueue_queued_manual_mortar_fire(game: &mut Game, mortar: u32, target_pos: (f32, f32)) {
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::MortarFire,
+            units: vec![mortar],
+            x: Some(target_pos.0),
+            y: Some(target_pos.1),
+            queued: true,
+        },
+    );
+}
+
+fn expected_mortar_impact(
+    game: &Game,
+    mortar: u32,
+    target_pos: (f32, f32),
+    tick: u32,
+) -> (f32, f32) {
+    let owner = game
+        .entities
+        .get(mortar)
+        .expect("mortar should exist")
+        .owner;
+    let teams = TeamRelations::from_player_teams(game.players.iter().map(|p| (p.id, p.team_id)));
+    predicted_mortar_impact(
+        &game.fog,
+        &teams,
+        owner,
+        mortar,
+        target_pos.0,
+        target_pos.1,
+        tick,
+    )
+}
+
+fn points_nearly_equal(a: (f32, f32), b: (f32, f32)) -> bool {
+    (a.0 - b.0).abs() <= 0.001 && (a.1 - b.1).abs() <= 0.001
 }
 
 #[test]
@@ -228,5 +294,55 @@ fn queued_manual_mortar_fire_promotes_to_wait_for_weapon_cooldown() {
     assert!(
         launched_after_reload,
         "queued manual mortar fire should launch once the shared weapon cooldown is ready"
+    );
+}
+
+#[test]
+fn queued_manual_mortar_fire_commands_fire_finite_shots_across_reload_cycles() {
+    let (mut game, mortar, target_pos) = manual_fire_fixture();
+    let enemy_pos = game.map.tile_center(8, 12);
+    if let Some(mortar_entity) = game.entities.get_mut(mortar) {
+        mortar_entity.set_autocast_enabled(ability::AbilityKind::MortarFire, true);
+    }
+    game.entities
+        .spawn_unit(2, EntityKind::Rifleman, enemy_pos.0, enemy_pos.1)
+        .expect("enemy should spawn");
+    game.players[0]
+        .upgrades
+        .insert(upgrade::UpgradeKind::MortarAutocast);
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+    game.fog.recompute(&ids, &game.entities, &game.map);
+
+    for _ in 0..3 {
+        enqueue_queued_manual_mortar_fire(&mut game, mortar, target_pos);
+    }
+
+    let mut launched_targets = Vec::new();
+    let mut expected_targets = Vec::new();
+    for _ in 0..240 {
+        let tick = game.tick_count().saturating_add(1);
+        let expected = expected_mortar_impact(&game, mortar, target_pos, tick);
+        let events = game.tick();
+        let launches = mortar_launch_targets(&events, 1, mortar);
+        expected_targets.extend(std::iter::repeat(expected).take(launches.len()));
+        launched_targets.extend(launches);
+        if launched_targets.len() == 3 {
+            break;
+        }
+    }
+
+    assert_eq!(
+        launched_targets.len(),
+        3,
+        "queued manual mortar fire should produce three finite manual shots"
+    );
+    assert!(
+        launched_targets
+            .iter()
+            .copied()
+            .zip(expected_targets)
+            .all(|(actual, expected)| points_nearly_equal(actual, expected)),
+        "queued manual mortar fire should produce finite manual shots before autocast can take the weapon cycle"
     );
 }

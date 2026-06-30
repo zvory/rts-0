@@ -287,7 +287,12 @@ export function buildUnitCard(ctx, selection) {
     const definition = affordance.definition;
     const recastActive = affordance.recastTargetObjectId != null;
     const readyCount = recastActive ? affordance.recastReadyIds.length : affordance.readyIds.length;
-    const abilityReadyIds = recastActive ? affordance.recastReadyIds : intentReadyIds(definition, affordance);
+    const commandableCount = recastActive
+      ? affordance.recastReadyIds.length
+      : affordance.queueAdmissibleIds.length;
+    const abilityReadyIds = recastActive
+      ? affordance.recastReadyIds
+      : intentAbilityIds(definition, affordance);
     const showReadyCount = readyCount < affordance.carrierIds.length;
     const preferred = definition.hotkey ? GRID_HOTKEYS.indexOf(definition.hotkey) : -1;
     const slot = claimSlot(preferred);
@@ -308,8 +313,8 @@ export function buildUnitCard(ctx, selection) {
       label: definition.label,
       title: abilityDisabledReason(ctx, affordance),
       ability: definition.ability,
-      enabled: readyCount > 0 && affordance.affordable,
-      unaffordable: readyCount > 0 && !affordance.affordable,
+      enabled: commandableCount > 0 && affordance.affordable,
+      unaffordable: commandableCount > 0 && !affordance.affordable,
       countBadge: showReadyCount ? `${readyCount}` : "",
       cooldownClocks: affordance.cooldownClocks,
       cost: definition.cost,
@@ -445,6 +450,7 @@ export function selectedAbilityAffordances(ctx, selection) {
       const unlocked = abilityUnlocked(ctx, definition);
       const canAfford = affordable(definition.cost, resources);
       const readyUnits = carriers.filter((e) => abilityUnitReady(e, definition));
+      const queueAdmissibleUnits = carriers.filter((e) => abilityUnitQueueAdmissible(e, definition));
       const recastUnits = carriers.filter((e) => abilityActiveObjectId(e, definition.ability) != null);
       const cooldowns = carriers.map((e) =>
         abilityCooldownLeft(e, definition.ability),
@@ -466,6 +472,7 @@ export function selectedAbilityAffordances(ctx, selection) {
         setupBlockedCount,
         carrierIds: carriers.map((e) => e.id),
         readyIds: readyUnits.map((e) => e.id),
+        queueAdmissibleIds: queueAdmissibleUnits.map((e) => e.id),
         readyUnits,
         recastReadyIds: recastUnits.map((e) => e.id),
         recastTargetObjectId: recastUnits.length > 0
@@ -493,6 +500,13 @@ function intentReadyIds(definition, affordance) {
     }
   }
   return [best.id];
+}
+
+function intentAbilityIds(definition, affordance) {
+  if (definition.targetMode === "self" && definition.queuePolicy === "waitUntilReady") {
+    return affordance.queueAdmissibleIds;
+  }
+  return intentReadyIds(definition, affordance);
 }
 
 function averagePosition(units) {
@@ -648,6 +662,14 @@ function abilityUnitReady(entity, definition) {
     !abilityRequiresSetup(entity, definition);
 }
 
+function abilityUnitQueueAdmissible(entity, definition) {
+  if (definition.queuePolicy === "notQueueable") return false;
+  if (definition.queuePolicy !== "waitUntilReady") return abilityUnitReady(entity, definition);
+  return abilityRemainingUses(entity, definition.ability) !== 0 &&
+    !abilityLockoutActive(entity, definition.ability) &&
+    !abilityRequiresSetup(entity, definition);
+}
+
 function abilityLockoutActive(entity, ability) {
   const projected = Array.isArray(entity.abilities)
     ? entity.abilities.find((entry) => entry.ability === ability)
@@ -758,7 +780,10 @@ function abilityDisabledReason(ctx, affordance) {
     return "Set up artillery before using Point Fire";
   }
   if (!affordance.affordable) return "Not enough resources";
-  if (affordance.readyIds.length === 0) return "On cooldown";
+  if (
+    affordance.readyIds.length === 0 &&
+    affordance.definition.queuePolicy !== "waitUntilReady"
+  ) return "On cooldown";
   return affordance.definition.title || "";
 }
 
