@@ -965,11 +965,13 @@ cycle plus 0.5 seconds. Combatants that first engage a target through one of the
 sources spend a one-second response delay before their first counter-shot, so firing-reveal
 counterfire plays out as shot/counter-shot rather than an instant simultaneous chain.
 Snapshot-only lingering death sight is layered after live fog and then unioned for projection, so
-lingering views remain non-actionable (`visionOnly`) and cannot validate commands or refresh
-remembered buildings. Unit live fog stamps a center-origin sight circle. Building live fog stamps
-the whole building footprint plus `sight_tiles` outward from each footprint edge, so a building with
-1-tile sight sees itself and the one-tile perimeter around its edges. Neutral resource nodes never
-stamp vision.
+lingering views stay marked `visionOnly` and do not refresh remembered buildings. The command,
+queued-order, and ordered-combat paths build a scoped attack-targeting fog from live fog plus active
+lingering death sources, allowing direct attacks on death-vision units/buildings without making
+lingering sight part of remembered intel or general auto-acquisition. Unit live fog stamps a
+center-origin sight circle. Building live fog stamps the whole building footprint plus `sight_tiles`
+outward from each footprint edge, so a building with 1-tile sight sees itself and the one-tile
+perimeter around its edges. Neutral resource nodes never stamp vision.
 
 `game::building_memory::BuildingMemory` is server-only stale intel owned by `Game`. After live,
 smoke-aware fog is recomputed, the store records one latest-seen entry per

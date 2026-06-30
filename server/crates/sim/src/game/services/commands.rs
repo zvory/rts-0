@@ -64,6 +64,7 @@ struct CommandExecutionContext<'a, 'pathing> {
     spatial: &'a SpatialIndex,
     coordinator: &'a mut MoveCoordinator<'pathing>,
     fog: &'a Fog,
+    attack_fog: &'a Fog,
     smokes: &'a mut SmokeCloudStore,
     ability_runtime: &'a mut AbilityRuntime,
     mortar_shells: &'a mut MortarShellStore,
@@ -89,6 +90,7 @@ pub(in crate::game) fn apply_commands(
     spatial: &SpatialIndex,
     coordinator: &mut MoveCoordinator<'_>,
     fog: &Fog,
+    attack_fog: &Fog,
     smokes: &mut SmokeCloudStore,
     ability_runtime: &mut AbilityRuntime,
     mortar_shells: &mut MortarShellStore,
@@ -107,6 +109,7 @@ pub(in crate::game) fn apply_commands(
                 spatial,
                 coordinator,
                 fog,
+                attack_fog,
                 smokes,
                 ability_runtime,
                 mortar_shells,
@@ -221,8 +224,15 @@ pub(in crate::game) fn apply_commands(
                 else {
                     continue;
                 };
-                let target_valid =
-                    attack_target_valid(entities, &teams, fog, smokes, player, &units, target);
+                let target_valid = attack_target_valid(
+                    entities,
+                    &teams,
+                    attack_fog,
+                    smokes,
+                    player,
+                    &units,
+                    target,
+                );
                 let request = planner::OrderRequest {
                     units: units.clone(),
                     mode: issue_mode(queued),
@@ -670,6 +680,7 @@ mod planned_actions {
         let coordinator = &mut *ctx.coordinator;
         let teams = &ctx.teams;
         let fog = ctx.fog;
+        let attack_fog = ctx.attack_fog;
         let smokes = &mut *ctx.smokes;
         let ability_runtime = &mut *ctx.ability_runtime;
         let mortar_shells = &mut *ctx.mortar_shells;
@@ -702,7 +713,7 @@ mod planned_actions {
                     planner::OrderIntent::AttackTarget(target) => {
                         if immediate_unit_can_replace(entities, player, unit)
                             && attack_unit_can_target(
-                                entities, teams, fog, smokes, player, unit, target,
+                                entities, teams, attack_fog, smokes, player, unit, target,
                             )
                             && !deployed_anti_tank_gun_target_outside_arc(entities, unit, target)
                         {
@@ -859,7 +870,7 @@ mod planned_actions {
                                 if !attack_unit_can_target(
                                     entities,
                                     teams,
-                                    fog,
+                                    attack_fog,
                                     smokes,
                                     player,
                                     unit,

@@ -608,9 +608,10 @@ Artillery Point Fire creates the same kind of actionable temporary live fog for 
 subject to normal smoke suppression, when the shell is launched. The reveal exposes the firing gun
 as a normal snapshot entity without exposing the target point, surrounding terrain, or pre-impact
 target marker.
-Snapshot-only lingering death sight may make non-owned units/buildings visible as `visionOnly`;
-those views are visual intel only and do not refresh remembered buildings or validate targeted
-commands. Ability world objects are projected separately in `abilityObjects`: normal players
+Snapshot-only lingering death sight may make non-owned units/buildings visible as `visionOnly`.
+Those views do not refresh remembered buildings and cannot be selected, but they can validate
+direct attack targets while the five-second death-vision source remains active. Ability world
+objects are projected separately in `abilityObjects`: normal players
 receive only objects whose world position is visible in their current team fog, while full-world
 dev snapshots include every object and spectator/replay snapshots use the existing union vision.
 Enemy objects never carry owner-only state, and `sourceCasterId` is omitted unless the caster is
@@ -741,8 +742,8 @@ range remains the fallback for render-only range overlays.
 trench. It names the neutral trench terrain id already projected through `trenches`; it is omitted
 while the unit is digging in, slotting is unavailable, merely near a trench, or moving out.
 `visionOnly` is true only for non-owned units/buildings visible through lingering death vision;
-clients render them below the fog overlay and must not select or issue targeted commands against
-them. In `n.flags`, bit 0 = `slowTick` and bit 1 = `headOfLine`.
+clients render them below the fog overlay, must not select them, and may only use them as direct
+attack command targets. In `n.flags`, bit 0 = `slowTick` and bit 1 = `headOfLine`.
 The optional compact `n` prediction fields are present only for live active player snapshots.
 Spectators, replay viewers, and dev full-world viewers omit prediction acknowledgement metadata.
 `debugPath` is present only when the room's projection policy enables movement-path diagnostics for
@@ -849,7 +850,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
       activeObjectId?: u32, availableTick?: u32, lockoutUntilTick?: u32, expiresIn?: u16 }
   ],
   breakthroughTicks?: u16,       // active Breakthrough speed status; visible only with the entity
-  visionOnly?: bool,             // true = visible only through one-second death vision; visual intel only
+  visionOnly?: bool,             // true = visible only through five-second death vision; attack-targetable only
   debugPath?: {                  // diagnostic policy only; remaining movement path; owner-only unless policy says full projected diagnostics
     waypoints: { x: f32, y: f32 }[],
     goal?: { x: f32, y: f32 },

@@ -1200,8 +1200,8 @@ selection rings):
   Mortar impact events that include a shooter reveal show the mortar briefly above fog for players
   whose units or buildings were hit by indirect fire.
   Entities marked `visionOnly` by the server are drawn on the ordinary building/unit layers below
-  the fog overlay, excluded from local fog-source computation and hit-testing, and treated as
-  visual intel only.
+  the fog overlay, excluded from local fog-source computation and normal selection hit-testing, and
+  included only by attack-command target hit-testing.
 - Buildings: footprint-sized blocky field structures with neutral geometry and plain
   two-letter stencils; under construction → translucent with a single HP-layer status bar;
   production → small top-edge progress bar. Tank Trap deconstruction uses that same HP-layer status

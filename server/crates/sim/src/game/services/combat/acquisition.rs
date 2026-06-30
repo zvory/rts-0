@@ -64,6 +64,7 @@ pub(super) fn resolve_target(
     spatial: &SpatialIndex,
     los: &LineOfSight<'_>,
     fog: &Fog,
+    ordered_target_fog: &Fog,
     smokes: &SmokeCloudStore,
     tank_trap_obstructs_vehicle_route: &dyn Fn(&Entity, &Entity) -> bool,
     self_id: u32,
@@ -88,7 +89,7 @@ pub(super) fn resolve_target(
                     .get(target)
                     .map(|t| {
                         world_query::is_enemy_targetable(t, teams, owner, self_id)
-                            && target_visible_to_owner(fog, smokes, owner, t)
+                            && target_visible_to_owner(ordered_target_fog, smokes, owner, t)
                     })
                     .unwrap_or(false)
                 {

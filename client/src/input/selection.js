@@ -156,14 +156,15 @@ export function _closestIdsToPoint(ids, screenX, screenY) {
     .map((e) => e.id);
 }
 
-export function _entityAtWorld(wx, wy, ownPreferred) {
+export function _entityAtWorld(wx, wy, ownPreferred, options = {}) {
   const entities = this.state.entitiesInterpolated(1);
   const tileSize = this.state.map ? this.state.map.tileSize : DEFAULT_TILE_SIZE;
+  const includeVisionOnly = !!options.includeVisionOnly;
 
   let best = null;
   let bestScore = Infinity; // lower is better (distance, with ownership tiebreak)
   for (const e of entities) {
-    if (e.shotReveal || e.visionOnly) continue;
+    if (e.shotReveal || (!includeVisionOnly && e.visionOnly)) continue;
     if (!this._worldPointHitsEntity(e, wx, wy, tileSize)) continue;
     const dx = wx - e.x;
     const dy = wy - e.y;

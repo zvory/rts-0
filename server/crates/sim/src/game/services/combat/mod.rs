@@ -86,6 +86,7 @@ fn resolve_target(
         spatial,
         los,
         fog,
+        fog,
         smokes,
         &tank_trap_obstructs_vehicle_route,
         self_id,
@@ -109,9 +110,7 @@ pub(super) const TANK_STANDOFF_BUFFER_PX: f32 = config::TILE_SIZE as f32;
 pub(super) const TANK_STANDOFF_REPATH_DELTA_PX: f32 = config::TILE_SIZE as f32;
 const FIRING_REVEAL_RESPONSE_DELAY_TICKS: u32 = config::TICK_HZ;
 
-/// Combat: acquire targets for aggressive / attack-move units, let eligible idle units
-/// auto-acquire enemies, and deal damage when off cooldown. Damage is applied immediately and
-/// emits an `Attack` event (for tracers). Cooldowns tick down here too.
+/// Acquire combat targets, apply damage, and emit attack events for one tick.
 #[allow(clippy::too_many_arguments)]
 pub(in crate::game) fn combat_system(
     map: &Map,
@@ -123,6 +122,7 @@ pub(in crate::game) fn combat_system(
     spatial: &SpatialIndex,
     coordinator: &mut MoveCoordinator<'_>,
     fog: &Fog,
+    ordered_target_fog: &Fog,
     smokes: &SmokeCloudStore,
     mortar_shells: &mut MortarShellStore,
     rng: &mut SmallRng,
@@ -131,7 +131,6 @@ pub(in crate::game) fn combat_system(
     tick: u32,
 ) {
     let los = LineOfSight::with_smoke(map, smokes);
-    // Tick down cooldowns first.
     for id in entities.ids() {
         if let Some(e) = entities.get_mut(id) {
             e.tick_attack_cd();
@@ -241,6 +240,7 @@ pub(in crate::game) fn combat_system(
             spatial,
             &los,
             fog,
+            ordered_target_fog,
             smokes,
             &tank_trap_obstructs_vehicle_route,
             id,

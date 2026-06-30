@@ -16,9 +16,10 @@
   state directly.
 - Every tick the server produces a **per-player snapshot**, applying **fog of war**:
   a player only receives neutral/enemy entities standing on tiles that player can
-  currently see, plus visual-only entities inside the one-second lingering sight left behind
-  when that player's unit/building dies. This makes the fog cheat-proof (hidden enemies are never
-  sent outside live or explicit lingering death vision).
+  currently see, plus `visionOnly` entities inside the five-second lingering sight left behind
+  when that player's unit/building dies. Death-vision entities remain non-selectable but can be
+  targeted by direct attack commands while the linger lasts. This makes the fog cheat-proof
+  (hidden enemies are never sent outside live or explicit lingering death vision).
 - Lobby-time spectators are connected humans who are not seated in the simulation. They receive
   snapshots filtered to the union of all active players' current fog, all player resource rows,
   and no controllable units/buildings.

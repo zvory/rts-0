@@ -22,8 +22,7 @@ use crate::game::services::line_of_sight::LineOfSight;
 use crate::game::services::occupancy::building_footprint;
 use crate::game::smoke::SmokeCloudStore;
 
-/// Temporary sight left behind by an owned unit/building after it dies. This is used only by
-/// snapshot projection; command validation and combat still use live fog.
+/// Temporary sight left behind by an owned unit/building after it dies.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct LingeringSightSource {
     owner: u32,
@@ -160,6 +159,30 @@ impl Fog {
         smokes: &SmokeCloudStore,
     ) {
         self.stamp_lingering_sources_inner(sources, map, store, Some(smokes));
+    }
+
+    pub(in crate::game) fn with_active_lingering_sources(
+        &self,
+        sources: &[LingeringSightSource],
+        tick: u32,
+        map: &Map,
+        store: &EntityStore,
+        smokes: &SmokeCloudStore,
+    ) -> Self {
+        if sources.is_empty() {
+            return self.clone();
+        }
+        let active_sources: Vec<LingeringSightSource> = sources
+            .iter()
+            .copied()
+            .filter(|source| source.is_active_at(tick))
+            .collect();
+        if active_sources.is_empty() {
+            return self.clone();
+        }
+        let mut fog = self.clone();
+        fog.stamp_lingering_sources_with_smoke(&active_sources, map, store, smokes);
+        fog
     }
 
     fn stamp_lingering_sources_inner(
