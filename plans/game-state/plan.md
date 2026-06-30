@@ -2,10 +2,19 @@
 
 ## Status
 
-Active planning seed for game-state ownership and checkpoint work. This supersedes the deprecated
-`plans/lab-replay/` checkpoint program for now. It is not yet a full multi-phase implementation
-plan for the whole checkpoint program; the only executable implementation phase currently defined is
-[Phase 0.5 - Derived-State Wipe Harness](phase-0.5.md).
+Active implementation plan for game-state ownership and internal checkpoint-readiness work. This
+supersedes the deprecated `plans/lab-replay/` checkpoint program for now. It is not the public
+checkpoint, replay-migration, or lab-migration plan; those products remain deferred until this
+ownership sequence produces a checkpoint-readiness report. The executable phases currently defined
+are
+[Phase 0.5 - Derived-State Wipe Harness](phase-0.5.md),
+[Phase 1 - State Ownership Inventory](phase-1.md),
+[Phase 2 - Explicit DerivedState Shell](phase-2.md),
+[Phase 3 - GameState Aggregate Shell](phase-3.md),
+[Phase 4 - Cold Checkpoint V0](phase-4.md),
+[Phase 5 - Movement And Economy Checkpoint Coverage](phase-5.md),
+[Phase 6 - Visibility Combat And Effects Checkpoint Coverage](phase-6.md), and
+[Phase 7 - Ownership Guardrails And Release Audit](phase-7.md).
 
 ## Purpose
 
@@ -29,6 +38,88 @@ crate-private harness that runs paired games from the same setup and commands, c
 derived-state path in one copy, and compares semantic state plus per-player fog-filtered snapshots
 after additional ticks. This phase deliberately avoids durable checkpoint DTOs so derived-state
 classification failures surface before broad serialization work begins.
+
+### [Phase 1 - State Ownership Inventory](phase-1.md)
+
+Document a complete ownership registry for every field currently stored on `Game`, classifying each
+as authoritative/serialized, derived/rebuildable, transient, or compatibility metadata. The phase is
+docs/registry work only and is intended to settle hard cases such as pending commands, command logs,
+active construction projection state, pathing cache versus chosen paths, lab god mode, RNG, fog and
+memory stores, effect stores, seed, loadout, and map metadata. It must leave behavior unchanged and
+produce an executor-ready handoff that identifies any unresolved ownership blockers before
+checkpoint DTO or code-movement phases begin.
+
+### [Phase 2 - Explicit DerivedState Shell](phase-2.md)
+
+Introduce a private `DerivedState` shell under `Game` for fields Phase 1 classified as
+derived/rebuildable, initially wrapping the final snapshot `spatial` index and pathing cache/search
+bookkeeping. The phase must preserve the existing tick pipeline by leaving phase-local derived state
+in `systems.rs`, handing the final spatial index back to snapshot code, and clearing pathing cache
+without losing the live default budget/cache configuration. It should extend the Phase 0.5
+wipe/rebuild harness as the proof that the new boundary is behavior-preserving before any
+`GameState` or checkpoint DTO work begins.
+
+### [Phase 3 - GameState Aggregate Shell](phase-3.md)
+
+Introduce a private `GameState` aggregate under `Game` for fields Phase 1 classified as
+`authoritative/serialized` or `compatibility metadata`, after Phase 2 has moved rebuildable caches
+into `DerivedState`. The phase is a behavior-preserving field move and borrow-shaping pass: public
+`Game` methods stay stable, `systems::run_tick` may keep receiving split borrows, and services
+should retain narrow mutation invariants instead of gaining broad mutable getters. It explicitly
+stops before durable checkpoint DTOs, public schema/API changes, replay/lab behavior changes,
+room/session state moves, or new architecture guardrails unless a touched code path requires a
+targeted guardrail update.
+
+### [Phase 4 - Cold Checkpoint V0](phase-4.md)
+
+Add the first internal cold export/import proof by exporting a crate-private or test-friendly
+`GameCheckpoint` from `GameState`, importing it into a fresh `GameState`, rebuilding
+`DerivedState`, and ticking the restored game forward against the baseline. This phase should reuse
+the Phase 0.5 semantic comparator/harness, comparing authoritative state plus per-player
+fog-filtered snapshots after additional ticks while explicitly proving stable ids and allocator
+state survive the checkpoint boundary. It remains behavior-preserving and internal: no public
+checkpoint JSON/schema, wire protocol/client changes, replay keyframe replacement, lab scenario
+migration, broad subsystem coverage promise, or AI decision determinism promise belongs in this
+phase.
+
+### [Phase 5 - Movement And Economy Checkpoint Coverage](phase-5.md)
+
+Extend Phase 4's internal cold checkpoint path and semantic comparator over durable movement,
+order, and economy state, including entity id allocation, active/queued orders, selected paths,
+pending commands, command logs, player resources/upgrades/supply/scores, gather/build/train/research
+progress, worker/resource reservations, and tick/RNG continuity where relevant. The phase should
+mostly add focused tests plus internal DTO/comparator coverage, then prove restored games remain
+semantically equivalent after additional ticks and through per-player snapshots where
+movement/economy projections could diverge. It stays behavior-preserving and internal: no public
+checkpoint schema/API, replay or lab migration, balance/gameplay change, or full
+combat/projectile/smoke/ability/fog-memory coverage belongs in this phase except incidental state
+needed by the movement/economy scenarios.
+
+### [Phase 6 - Visibility Combat And Effects Checkpoint Coverage](phase-6.md)
+
+Extend Phase 4/5's internal cold checkpoint path and semantic comparator over fog/projection-sensitive
+and combat/effects durable state, including live fog output, team visibility, building memory,
+trench memory/discovery/occupation, lingering sight, firing reveals, smoke, ability runtime, shell
+stores, combat target/cooldown/facing/setup state, lab god mode, observer analysis output where
+restore-sensitive, and event privacy surfaces. The phase must compare semantic authoritative state
+after additional ticks plus normal per-player fog-filtered snapshots, selected-player/spectator
+snapshots, full-world diagnostic snapshots, and any produced events without leaking fog-hidden
+entity, position, target, ability payload, remembered occupant, or private event data. It remains
+behavior-preserving and internal: no public checkpoint schema/API, replay or lab migration,
+balance/gameplay change, final release audit, architecture guardrail phase, or broad UI/client work
+belongs here.
+
+### [Phase 7 - Ownership Guardrails And Release Audit](phase-7.md)
+
+Add or tighten architecture and docs checks so future stateful simulation owners must be classified
+in the ownership registry and stored under `GameState`/`DerivedState`, or explicitly documented as
+room/session/test-only state. The phase should update the server-sim design/context docs, run a
+final behavior-preserving audit that public `Game` APIs, wire protocol, replay behavior, lab
+behavior, and private checkpoint behavior did not drift, and produce a checkpoint-readiness report
+listing blockers before public checkpoint schema, replay migration, or lab migration. It remains a
+guardrail and audit phase: no public checkpoint schema/API, replay/lab migration, gameplay/balance
+change, direct main bypass, blanket service-stateless rewrite, or new checkpoint DTO coverage
+scenarios belongs here except a small missing guardrail test discovered by the audit.
 
 ## Current Shape
 
@@ -189,8 +280,8 @@ runtime/session state outside the authoritative simulation.
 ## Execution Constraints
 
 - The phase runner may execute only phase files that exist in this directory. At present that means
-  Phase 0.5 only; the broader checkpoint program still needs additional phase files before it is
-  suitable for unattended serial execution.
+  Phase 0.5 and Phase 1 through Phase 7; public checkpoint schema, checkpoint-backed replay, and lab
+  migration work require a separate follow-up plan after Phase 7's readiness report.
 - Each phase must land through the repo's normal owned-PR workflow with auto-merge armed, then wait
   until GitHub reports the PR merged and the phase head SHA is reachable from `origin/main`.
 - After implementing a phase, the implementing agent must provide a handoff naming what changed, what
@@ -207,10 +298,11 @@ replay plan can reference it as the foundation. That later plan should focus on 
 artifacts, action timing, lab operation capture, schema break handling, and product UI instead of
 also discovering the simulation ownership model.
 
-## Non-Goals For This Draft
+## Non-Goals For This Plan
 
-- Do not define exact Rust APIs yet.
-- Do not split the full implementation sequence yet beyond the explicit Phase 0.5 guard.
+- Do not define exact public Rust APIs yet.
+- Do not split the full public checkpoint, replay-migration, or lab-migration sequence here beyond
+  the explicit Phase 0.5 and Phase 1 through Phase 7 ownership/internal-readiness work.
 - Do not choose the final checkpoint JSON/schema shape here.
 - Do not require all services to become stateless in one pass.
 - Do not move room/session state into `Game` unless it is authoritative simulation state.
