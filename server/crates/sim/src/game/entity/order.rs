@@ -47,6 +47,8 @@ pub enum Order {
     Ability(AbilityOrder),
     /// Artillery repeats point fire at a fixed world position until interrupted.
     ArtilleryPointFire(ArtilleryPointFireOrder),
+    /// Artillery repeats blanket fire around a fixed world center until interrupted.
+    ArtilleryBlanketFire(ArtilleryPointFireOrder),
 }
 
 impl Order {
@@ -80,6 +82,10 @@ impl Order {
 
     pub fn artillery_point_fire(x: f32, y: f32) -> Self {
         Order::ArtilleryPointFire(ArtilleryPointFireOrder::new(x, y))
+    }
+
+    pub fn artillery_blanket_fire(x: f32, y: f32) -> Self {
+        Order::ArtilleryBlanketFire(ArtilleryPointFireOrder::new(x, y))
     }
 
     pub fn attack_target(&self) -> Option<u32> {
@@ -148,6 +154,7 @@ pub enum OrderIntent {
     SelfAbility(SelfAbilityIntent),
     SetupAntiTankGuns(PointIntent),
     PointFire(PointIntent),
+    BlanketFire(PointIntent),
 }
 
 impl OrderIntent {

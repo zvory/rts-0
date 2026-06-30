@@ -902,14 +902,21 @@ Allocation rules:
 - Anti-Tank Gun setup is a queueable facing intent for selected Anti-Tank Guns only. The stored point means
   "face toward this world point from wherever the gun is when the setup stage promotes"; mixed
   selections ignore non-setup-capable units for setup but keep them for later compatible orders.
-- Artillery Point Fire is a queueable, terminal per-gun fire order. Issue-time admission stores a
-  locked effective fire point, not the raw clicked point. Immediate Point Fire can accept packed
-  artillery and set it up in place, or redeploy already-deployed artillery when the effective point
-  is outside the current cone. Queued Point Fire locks from the active or queued future move
-  destination when available, uses a preceding queued setup stage as the zero-length fallback
-  facing, and promotes into the same setup/redeploy-owned fire order. Promotion and firing recheck
-  liveness, ownership, kind, construction state, path state, faction ability eligibility, stored
-  target map/range/cone validity, ammo, and deployment before any shell is launched.
+- Artillery Point Fire and Blanket Fire are queueable, terminal per-gun fire orders. Issue-time
+  admission stores a locked effective fire point for Point Fire or locked blanket center for
+  Blanket Fire, not the raw clicked point. Immediate fire commands can accept packed artillery and
+  set it up in place, or redeploy already-deployed artillery when the effective point is outside the
+  current cone. Queued fire commands lock from the active or queued future move destination when
+  available, use a preceding queued setup stage as the zero-length fallback facing, and promote into
+  the same setup/redeploy-owned fire order. Promotion and firing recheck liveness, ownership, kind,
+  construction state, path state, faction ability eligibility, stored target map/range/cone
+  validity, ammo, and deployment before any shell is launched.
+- Point Fire samples normal artillery scatter around the stored point, with Ballistic Tables
+  tightening repeated Point Fire shots only. Blanket Fire samples each shot deterministically and
+  uniformly within `ARTILLERY_BLANKET_RADIUS_TILES` around the stored center using authoritative
+  shot inputs; sampled impacts are not re-clamped to the artillery cone or range band. Both modes
+  share ammunition cost, reload, shell delay, impact radius, damage, fog-gated impact events,
+  global firing markers, and firing-reveal behavior.
 
 Examples:
 
@@ -924,9 +931,10 @@ Examples:
 - **Packed anti-tank guns.** The player orders packed anti-tank guns to move, then Shift-arms setup and clicks a
   facing point. The setup stage promotes after movement and computes facing from the gun's actual
   arrived position toward the stored world point.
-- **Move then queued Point Fire.** The player orders artillery to move, then Shift-arms Point Fire
-  and clicks a target. The queued stage stores the effective fire point locked from the future move
-  destination; when promoted, the gun sets up or redeploys in place and never walks to repair range.
+- **Move then queued artillery fire.** The player orders artillery to move, then Shift-arms Point
+  Fire or Blanket Fire and clicks a target. The queued stage stores the effective fire point or
+  blanket center locked from the future move destination; when promoted, the gun sets up or
+  redeploys in place and never walks to repair range.
 - **Reactive moving smoke.** A scout car already moving past cover receives an immediate Smoke
   command for an in-range point. The planner emits a noninterrupting ability execution, so the
   smoke launches without dropping the car's current move order or queued future orders.

@@ -47,7 +47,7 @@ fn fixture_faction_point_fire_does_not_spend_steel() {
 }
 
 #[test]
-fn reserved_blanket_fire_command_is_runtime_noop() {
+fn blanket_fire_command_starts_runtime_order() {
     let map = flat_map(64);
     let mut players = vec![player_state(1), player_state(2)];
     let mut entities = EntityStore::new();
@@ -62,47 +62,38 @@ fn reserved_blanket_fire_command_is_runtime_noop() {
     }
     let steel_before = players[0].steel;
 
-    for queued in [false, true] {
-        apply_with_players(
-            &map,
-            &mut entities,
-            &mut players,
-            vec![(
-                1,
-                SimCommand::UseAbility {
-                    ability: AbilityKind::BlanketFire,
-                    units: vec![artillery],
-                    x: Some(960.0),
-                    y: Some(320.0),
-                    queued,
-                },
-            )],
-        );
+    apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(
+            1,
+            SimCommand::UseAbility {
+                ability: AbilityKind::BlanketFire,
+                units: vec![artillery],
+                x: Some(960.0),
+                y: Some(320.0),
+                queued: false,
+            },
+        )],
+    );
 
-        let gun = entities.get(artillery).expect("artillery should exist");
-        assert_eq!(
-            players[0].steel, steel_before,
-            "reserved Blanket Fire must not spend resources before runtime support lands"
-        );
-        assert_eq!(
-            gun.ability_cooldown_ticks(AbilityKind::BlanketFire),
-            0,
-            "reserved Blanket Fire must not start cooldowns before runtime support lands"
-        );
-        assert_eq!(
-            gun.attack_cd(),
-            0,
-            "reserved Blanket Fire must not start the weapon cycle before runtime support lands"
-        );
-        assert!(
-            matches!(gun.order(), Order::Idle),
-            "reserved Blanket Fire must not replace the current artillery order before runtime support lands"
-        );
-        assert!(
-            gun.queued_orders().is_empty(),
-            "reserved Blanket Fire must not append hidden queued orders before runtime support lands"
-        );
-    }
+    let gun = entities.get(artillery).expect("artillery should exist");
+    assert_eq!(
+        players[0].steel,
+        steel_before - config::ARTILLERY_AMMO_COST_STEEL,
+        "Blanket Fire should spend the same artillery ammunition as Point Fire"
+    );
+    assert_eq!(
+        gun.ability_cooldown_ticks(AbilityKind::BlanketFire),
+        0,
+        "Blanket Fire uses the artillery weapon reload, not an ability cooldown"
+    );
+    assert_eq!(gun.attack_cd(), config::ARTILLERY_RELOAD_TICKS);
+    assert!(
+        matches!(gun.order(), Order::ArtilleryBlanketFire(_)),
+        "Blanket Fire must replace the current order with its own runtime order"
+    );
 }
 
 #[test]

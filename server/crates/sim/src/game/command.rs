@@ -616,7 +616,7 @@ mod tests {
     }
 
     #[test]
-    fn reserved_blanket_fire_protocol_command_round_trips() {
+    fn blanket_fire_protocol_command_round_trips() {
         let command = protocol::Command::UseAbility {
             ability: protocol::abilities::BLANKET_FIRE.to_string(),
             units: vec![10],

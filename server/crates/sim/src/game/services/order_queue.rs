@@ -22,7 +22,7 @@ use crate::game::services::order_execution::targeting::{
 };
 use crate::game::services::order_execution::{
     begin_artillery_teardown_for_movement, execute_anti_tank_gun_setup,
-    start_artillery_point_fire_promoted_order, FutureOrderMode,
+    start_artillery_fire_promoted_order, ArtilleryFireMode, FutureOrderMode,
 };
 use crate::game::services::standability;
 use crate::game::services::world_query;
@@ -90,6 +90,10 @@ enum PromotedIntent {
         y: f32,
     },
     PointFire {
+        x: f32,
+        y: f32,
+    },
+    BlanketFire {
         x: f32,
         y: f32,
     },
@@ -201,7 +205,11 @@ pub(crate) fn promote_ready_orders(
                     continue;
                 };
                 if ability == AbilityKind::PointFire {
-                    execute_artillery_point_fire(map, entities, id, x, y);
+                    execute_artillery_fire(map, entities, id, x, y, ArtilleryFireMode::Point);
+                    continue;
+                }
+                if ability == AbilityKind::BlanketFire {
+                    execute_artillery_fire(map, entities, id, x, y, ArtilleryFireMode::Blanket);
                     continue;
                 }
                 let faction_id = players
@@ -246,7 +254,10 @@ pub(crate) fn promote_ready_orders(
                 execute_anti_tank_gun_setup(entities, id, x, y, FutureOrderMode::Preserve);
             }
             PromotedIntent::PointFire { x, y } => {
-                execute_artillery_point_fire(map, entities, id, x, y);
+                execute_artillery_fire(map, entities, id, x, y, ArtilleryFireMode::Point);
+            }
+            PromotedIntent::BlanketFire { x, y } => {
+                execute_artillery_fire(map, entities, id, x, y, ArtilleryFireMode::Blanket);
             }
         }
     }
@@ -283,7 +294,8 @@ fn ready_for_next_order(
         Order::Gather(_)
         | Order::Build(_)
         | Order::Deconstruct(_)
-        | Order::ArtilleryPointFire(_) => false,
+        | Order::ArtilleryPointFire(_)
+        | Order::ArtilleryBlanketFire(_) => false,
         Order::Ability(_) => matches!(
             e.move_phase(),
             Some(MovePhase::Arrived | MovePhase::PathFailed)
@@ -398,6 +410,14 @@ fn pop_next_valid_intent(
                     });
                 }
             }
+            OrderIntent::BlanketFire(point) => {
+                if artillery_point_fire_intent_valid(map, entities, owner, id, point.x, point.y) {
+                    return Some(PromotedIntent::BlanketFire {
+                        x: point.x,
+                        y: point.y,
+                    });
+                }
+            }
             OrderIntent::SelfAbility(ability) => {
                 if self_ability_intent_valid(entities, owner, id, ability.ability) {
                     return Some(PromotedIntent::SelfAbility {
@@ -441,12 +461,13 @@ fn artillery_point_fire_intent_valid(
     .is_some()
 }
 
-fn execute_artillery_point_fire(
+fn execute_artillery_fire(
     map: &Map,
     entities: &mut EntityStore,
     id: u32,
     x: f32,
     y: f32,
+    mode: ArtilleryFireMode,
 ) -> bool {
     let Some(owner) = entities.get(id).map(|e| e.owner) else {
         return false;
@@ -462,7 +483,7 @@ fn execute_artillery_point_fire(
     ) else {
         return false;
     };
-    start_artillery_point_fire_promoted_order(entities, id, target)
+    start_artillery_fire_promoted_order(entities, id, target, mode)
 }
 
 fn world_ability_intent_valid(
@@ -1501,6 +1522,49 @@ mod tests {
         assert!(
             unit.emplacement_facing().unwrap_or_default().abs() < 0.001,
             "queued point fire must not walk the active field of fire before redeploy"
+        );
+    }
+
+    #[test]
+    fn queued_artillery_blanket_fire_outside_arc_redeploys_on_promotion() {
+        let map = flat_map(64);
+        let mut entities = EntityStore::new();
+        let pos = (320.0, 320.0);
+        let angle = config::ARTILLERY_FIELD_OF_FIRE_RAD;
+        let distance = config::TILE_SIZE as f32 * 30.0;
+        let target = (
+            pos.0 + angle.cos() * distance,
+            pos.1 + angle.sin() * distance,
+        );
+        let artillery = entities
+            .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
+            .expect("artillery should spawn");
+        {
+            let unit = entities.get_mut(artillery).expect("artillery should exist");
+            unit.set_weapon_setup(WeaponSetup::Deployed);
+            unit.set_emplacement_facing(Some(0.0));
+            unit.set_weapon_facing(0.0);
+            unit.append_queued_order(OrderIntent::BlanketFire(crate::game::entity::PointIntent {
+                x: target.0,
+                y: target.1,
+            }));
+        }
+
+        promote(&map, &mut entities);
+
+        let unit = entities.get(artillery).expect("artillery should exist");
+        assert!(matches!(
+            unit.weapon_setup(),
+            WeaponSetup::TearingDownToRedeploy { .. }
+        ));
+        assert!(matches!(unit.order(), Order::ArtilleryBlanketFire(_)));
+        assert!(
+            (unit.pending_redeploy_facing().unwrap_or_default() - angle).abs() < 0.001,
+            "queued outside-arc Blanket Fire should redeploy toward the stored center"
+        );
+        assert!(
+            unit.emplacement_facing().unwrap_or_default().abs() < 0.001,
+            "queued Blanket Fire must not walk the active field of fire before redeploy"
         );
     }
 

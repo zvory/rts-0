@@ -11,6 +11,12 @@ pub(crate) enum FutureOrderMode {
     Clear,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ArtilleryFireMode {
+    Point,
+    Blanket,
+}
+
 pub(crate) fn execute_anti_tank_gun_setup(
     entities: &mut EntityStore,
     id: u32,
@@ -65,6 +71,7 @@ pub(crate) fn begin_artillery_teardown_for_movement(entities: &mut EntityStore, 
             continue;
         }
         e.reset_artillery_accuracy();
+        reset_artillery_blanket_sequence(e);
         if !matches!(e.weapon_setup(), WeaponSetup::Packed) {
             e.set_weapon_setup(WeaponSetup::TearingDown {
                 ticks: config::ARTILLERY_SETUP_TICKS,
@@ -77,10 +84,11 @@ fn is_artillery_entity(e: &Entity) -> bool {
     e.kind == EntityKind::Artillery
 }
 
-pub(crate) fn start_artillery_point_fire_command_order(
+pub(crate) fn start_artillery_fire_command_order(
     entities: &mut EntityStore,
     unit: u32,
     target: ArtilleryPointFireTarget,
+    mode: ArtilleryFireMode,
 ) -> bool {
     entities.release_miner(unit);
     let Some(e) = entities.get_mut(unit) else {
@@ -91,25 +99,27 @@ pub(crate) fn start_artillery_point_fire_command_order(
     e.reset_gather_state();
     let (px, py) = (e.pos_x, e.pos_y);
     e.reset_stuck(px, py);
-    start_artillery_point_fire_from_target(e, target)
+    start_artillery_fire_from_target(e, target, mode)
 }
 
-pub(crate) fn start_artillery_point_fire_promoted_order(
+pub(crate) fn start_artillery_fire_promoted_order(
     entities: &mut EntityStore,
     unit: u32,
     target: ArtilleryPointFireTarget,
+    mode: ArtilleryFireMode,
 ) -> bool {
     let Some(e) = entities.get_mut(unit) else {
         return false;
     };
     e.clear_active_order();
     e.set_path_goal(None);
-    start_artillery_point_fire_from_target(e, target)
+    start_artillery_fire_from_target(e, target, mode)
 }
 
-fn start_artillery_point_fire_from_target(
+fn start_artillery_fire_from_target(
     e: &mut Entity,
     target: ArtilleryPointFireTarget,
+    mode: ArtilleryFireMode,
 ) -> bool {
     match e.weapon_setup() {
         WeaponSetup::Deployed if target.inside_field_of_fire => {
@@ -132,8 +142,24 @@ fn start_artillery_point_fire_from_target(
             return false;
         }
     }
-    e.replace_active_order(Order::artillery_point_fire(target.x, target.y));
+    match mode {
+        ArtilleryFireMode::Point => {
+            reset_artillery_blanket_sequence(e);
+            e.replace_active_order(Order::artillery_point_fire(target.x, target.y));
+        }
+        ArtilleryFireMode::Blanket => {
+            e.reset_artillery_accuracy();
+            reset_artillery_blanket_sequence(e);
+            e.replace_active_order(Order::artillery_blanket_fire(target.x, target.y));
+        }
+    }
     true
+}
+
+fn reset_artillery_blanket_sequence(e: &mut Entity) {
+    if let Some(combat) = e.combat.as_mut() {
+        combat.artillery_blanket_shots_fired = 0;
+    }
 }
 
 fn setup_ticks_for(kind: EntityKind) -> u16 {

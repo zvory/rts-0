@@ -330,6 +330,63 @@ fn artillery_point_fire_system_rechecks_ammo_affordability() {
 }
 
 #[test]
+fn artillery_blanket_fire_system_rechecks_ammo_affordability() {
+    let map = flat_map(64);
+    let mut entities = EntityStore::new();
+    let mut players = vec![player_state(1), player_state(2)];
+    assert!(players[0].spend_cost(rules::economy::ResourceCost::new(1_000, 0)));
+    let pos = (640.0, 640.0);
+    let target = (pos.0 + config::TILE_SIZE as f32 * 30.0, pos.1);
+    let artillery = entities
+        .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
+        .expect("artillery should spawn");
+    {
+        let unit = entities.get_mut(artillery).expect("artillery should exist");
+        unit.set_weapon_setup(WeaponSetup::Deployed);
+        unit.set_emplacement_facing(Some(0.0));
+        unit.set_weapon_facing(0.0);
+        unit.set_order(Order::artillery_blanket_fire(target.0, target.1));
+    }
+    let mut artillery_shells = ArtilleryShellStore::default();
+    let mut firing_reveals = Vec::new();
+    let mut events: HashMap<u32, Vec<Event>> = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
+    let mut fog = Fog::new(map.size);
+    fog.recompute(&[1, 2], &entities, &map);
+
+    artillery_point_fire_system(
+        &map,
+        &mut entities,
+        &mut players,
+        &mut artillery_shells,
+        &mut firing_reveals,
+        &mut events,
+        &fog,
+        7,
+    );
+
+    assert_eq!(
+        players[0].steel, 0,
+        "failed blanket fire should not spend unavailable ammo"
+    );
+    assert_eq!(
+        entities
+            .get(artillery)
+            .expect("artillery should exist")
+            .attack_cd(),
+        config::ARTILLERY_RELOAD_TICKS,
+        "promotion-time Blanket Fire ammo failure still applies the current reload penalty"
+    );
+    assert_notice(&events, 1, "Not enough steel");
+    assert!(
+        events
+            .values()
+            .flat_map(|events| events.iter())
+            .all(|event| !matches!(event, Event::ArtilleryTarget { .. })),
+        "unaffordable Blanket Fire should not schedule a visible target marker"
+    );
+}
+
+#[test]
 fn artillery_point_fire_outside_arc_replaces_active_fire_with_redeploy() {
     let map = flat_map(64);
     let mut entities = EntityStore::new();
