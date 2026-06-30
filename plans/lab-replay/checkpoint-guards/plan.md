@@ -1,5 +1,11 @@
 # Checkpoint Architecture Guards Plan
 
+> [!WARNING]
+> **POTENTIALLY STALE SUBDIVISION - DO NOT IMPLEMENT YET.**
+> This lab-replay subdivision depends on assumptions that may change when
+> `plans/game-state/plan.md` lands. Re-evaluate this subplan and its phase files before
+> implementation.
+
 ## Purpose
 
 Make checkpoint completeness hard to accidentally regress. This stage adds explicit ownership rules,
