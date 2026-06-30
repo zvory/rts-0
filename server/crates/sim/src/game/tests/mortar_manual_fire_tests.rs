@@ -325,7 +325,7 @@ fn queued_manual_mortar_fire_commands_fire_finite_shots_across_reload_cycles() {
         let expected = expected_mortar_impact(&game, mortar, target_pos, tick);
         let events = game.tick();
         let launches = mortar_launch_targets(&events, 1, mortar);
-        expected_targets.extend(std::iter::repeat(expected).take(launches.len()));
+        expected_targets.extend(std::iter::repeat_n(expected, launches.len()));
         launched_targets.extend(launches);
         if launched_targets.len() == 3 {
             break;
