@@ -15,7 +15,9 @@ The room task invokes controllers before `game.tick()`, gives each controller th
 fog-filtered `snapshot_for(player)` plus the static `start_payload()`, then enqueues emitted
 ordinary `SimCommand`s. Every AI action therefore goes through the identical validation / cost /
 supply / placement path in `services/commands.rs` — the AI has **no special authority** over the
-simulation and can't cheat economy, placement, or fog rules. Outbound attacks target enemy
+simulation and can't cheat economy, placement, or fog rules. For oil assignments, the controller
+budgets Pump Jack construction like other paid buildings before reserving workers or oil nodes.
+Outbound attacks target enemy
 **start tiles**, which are public via the `start` payload; direct attacks only target currently
 visible enemy units/buildings during local defense.
 The worker direct-hit retreat reflex is the one extra live input: `Game::worker_retreat_commands_for`

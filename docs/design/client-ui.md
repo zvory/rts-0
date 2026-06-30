@@ -726,8 +726,9 @@ should accept the injected frame view when called from the RAF path and fall bac
 queries only for direct module tests or event handlers outside the frame. Static resource nodes with
 no remaining resources are omitted from frame-local entity views and minimap blips. Minimap
 artillery firing indicators render as 30x24 SVG rig images without an extra surrounding ring.
-Frame-local entity views may carry bounded render diagnostics for local profiling consumers without
-changing the authoritative snapshot model. Visible unit death events are normalized by `GameState`
+Selected worker units do not draw weapon range indicators, even when their frame-local view exposes
+weapon range metadata. Frame-local entity views may carry bounded render diagnostics for local
+profiling consumers without changing the authoritative snapshot model. Visible unit death events are normalized by `GameState`
 into deduped, browser-local pending ground decal stamps and rendered below resources and fog as
 visual-only decals. Death decals use SVG-authored mask assets from the client asset path when they
 load, queue stamps while the atlas is loading, and fall back to procedural masks when SVG loading is

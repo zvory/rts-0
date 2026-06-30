@@ -278,11 +278,12 @@ checks local Markdown links in `docs/` and `plans/`.
 The `PR ownership` workflow validates owned agent PR metadata for `zvorygin/*` branches with
 `scripts/check-pr-ownership.sh`.
 
-`scripts/agent-pr.sh` reuses the changed-file policy before opening or updating an owned PR. When
-the branch diff against `origin/main` contains only `.md` files, including Markdown files outside
-`docs/`, it skips the Codex adversarial quality pass but still pushes the branch, posts a successful
-`adversarial-quality-pass` status, and writes a docs-only skip report into the PR body. Any
-non-Markdown changed file keeps the normal adversarial quality pass requirement.
+`scripts/agent-pr.sh` reuses the changed-file policy before opening or updating an owned PR. A
+supplied `--head` value must match the current branch before the docs-only skip can push or post
+status. When the branch diff against `origin/main` contains only `.md` files, including Markdown
+files outside `docs/`, it skips the Codex adversarial quality pass but still pushes the branch, posts
+a successful `adversarial-quality-pass` status, and writes a docs-only skip report into the PR body.
+Any non-Markdown changed file keeps the normal adversarial quality pass requirement.
 
 The old standalone `Rust` and `Integration` workflows are retired. Their package, architecture,
 live Node, and browser coverage is owned by the split `Main test gate` jobs under the required
