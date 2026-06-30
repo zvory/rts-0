@@ -256,7 +256,6 @@ pub(crate) fn promote_ready_orders(
         begin_artillery_teardown_for_movement(entities, &ids);
     }
 }
-
 fn ready_for_next_order(
     map: &Map,
     entities: &EntityStore,
@@ -304,6 +303,7 @@ fn clear_completed_active_order(entities: &mut EntityStore, id: u32) {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn pop_next_valid_intent(
     map: &Map,
     entities: &mut EntityStore,
