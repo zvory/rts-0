@@ -235,11 +235,12 @@ override explicit player attack orders. Forest-specific rules are future work.
 The unit, building, and resource-node tables below are the human-readable form of the authoritative
 `rules::defs` records.
 
-Default auto-acquisition ranks already-legal targets by weapon fit before distance. Small-arms
+Default auto-acquisition ranks already-legal targets by weapon fit before distance, but unit
+attackers treat buildings as last-resort cleanup targets after legal unit targets. Small-arms
 default weapons prefer soft targets (`ArmorClass::Small`) over armored or hard targets, but they
 still fire at armor, buildings, or vehicle obstacles when no better legal target exists; infantry-like
 units still do not auto-acquire Tank Traps without a direct attack order. Anti-armor default weapons
-prefer anti-armor threats and armored/hard targets over ordinary soft targets. Tanks keep a narrower
+prefer anti-armor threats and armored/hard units over ordinary soft units. Tanks keep a narrower
 immediate-threat override for targets already in relevant range: Anti-Tank Guns are first, then
 other anti-armor threats, armored obstacles, support weapons, and only then ordinary soft targets.
 Vehicle-body units treat enemy Tank Traps as high-priority breach targets only when the trap is on

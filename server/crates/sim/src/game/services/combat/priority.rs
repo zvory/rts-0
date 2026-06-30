@@ -153,6 +153,9 @@ fn default_weapon_fit_order(context: &AttackPriorityContext, candidate: &TargetC
     if context.attacker_kind == EntityKind::Tank && !candidate.in_weapon_range {
         return 3;
     }
+    if context.attacker_is_unit && candidate.is_building {
+        return 4;
+    }
     match combat_rules::default_weapon_target_fit(
         context.attacker_weapon_class,
         candidate.armor_class,
@@ -307,6 +310,19 @@ mod tests {
 
         assert_eq!(
             choose_target(&context(EntityKind::AntiTankGun), &candidates),
+            Some(11)
+        );
+    }
+
+    #[test]
+    fn unit_attackers_prefer_units_over_armored_buildings() {
+        let candidates = [
+            candidate(10, EntityKind::CityCentre, 400.0, false),
+            candidate(11, EntityKind::Worker, 2_500.0, false),
+        ];
+
+        assert_eq!(
+            choose_target(&context(EntityKind::Tank), &candidates),
             Some(11)
         );
     }
