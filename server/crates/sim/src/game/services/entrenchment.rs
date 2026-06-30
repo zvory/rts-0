@@ -89,12 +89,7 @@ fn occupation_candidate(
     {
         return None;
     }
-    let trench = nearest_occupiable_trench(trenches, entity)?;
-    let slot = slot_candidate(map, entities, occ, entity, trench)?;
-    Some(OccupationCandidate {
-        trench_id: trench.id,
-        slot,
-    })
+    best_occupation_candidate(map, entities, occ, trenches, entity)
 }
 
 fn can_create_trench(has_entrenchment: &dyn Fn(u32) -> bool, entity: &Entity) -> bool {
@@ -152,31 +147,45 @@ fn forced_movement_delta_distance(
     distance((before_x, before_y), (entity.pos_x, entity.pos_y))
 }
 
-fn nearest_occupiable_trench(trenches: &TrenchStore, entity: &Entity) -> Option<Trench> {
-    let mut best: Option<(f32, Trench)> = None;
+fn best_occupation_candidate(
+    map: &Map,
+    entities: &EntityStore,
+    occ: &Occupancy<'_>,
+    trenches: &TrenchStore,
+    entity: &Entity,
+) -> Option<OccupationCandidate> {
+    let mut best: Option<(f32, u32, Option<(f32, f32)>)> = None;
     for trench in trenches.all().iter().copied() {
-        let dx = entity.pos_x - trench.x;
-        let dy = entity.pos_y - trench.y;
-        let dist_sq = dx * dx + dy * dy;
-        if !dist_sq.is_finite() {
+        let Some(dist_sq) = occupation_search_distance_sq(trench, entity) else {
             continue;
-        }
-        let radius = trench_radius_px(trench) + SLOT_EXTRA_RADIUS_PX;
-        if dist_sq > radius * radius {
+        };
+        let Some(slot) = slot_candidate(map, entities, occ, entity, trench) else {
             continue;
-        }
+        };
         if best
-            .map(|(best_dist, best_trench)| {
+            .map(|(best_dist, best_trench_id, _)| {
                 dist_sq > best_dist
-                    || ((dist_sq - best_dist).abs() <= f32::EPSILON && trench.id > best_trench.id)
+                    || ((dist_sq - best_dist).abs() <= f32::EPSILON
+                        && trench.id > best_trench_id)
             })
             .unwrap_or(false)
         {
             continue;
         }
-        best = Some((dist_sq, trench));
+        best = Some((dist_sq, trench.id, slot));
     }
-    best.map(|(_, trench)| trench)
+    best.map(|(_, trench_id, slot)| OccupationCandidate { trench_id, slot })
+}
+
+fn occupation_search_distance_sq(trench: Trench, entity: &Entity) -> Option<f32> {
+    let dx = entity.pos_x - trench.x;
+    let dy = entity.pos_y - trench.y;
+    let dist_sq = dx * dx + dy * dy;
+    if !dist_sq.is_finite() {
+        return None;
+    }
+    let radius = trench_radius_px(trench) + SLOT_EXTRA_RADIUS_PX;
+    (dist_sq <= radius * radius).then_some(dist_sq)
 }
 
 fn standing_in_trench(trenches: &[Trench], x: f32, y: f32) -> bool {
@@ -390,4 +399,64 @@ fn distance_sq(a: (f32, f32), b: (f32, f32)) -> f32 {
     let dx = a.0 - b.0;
     let dy = a.1 - b.1;
     dx * dx + dy * dy
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::game::entity::EntityKind;
+    use crate::protocol::terrain;
+
+    fn flat_map(size: u32) -> Map {
+        Map {
+            size,
+            terrain: vec![terrain::GRASS; (size * size) as usize],
+            starts: vec![(4, 4)],
+            expansion_sites: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn occupation_search_skips_nearest_trench_without_legal_slot() {
+        let map = flat_map(32);
+        let mut trenches = TrenchStore::new();
+        let nearest = trenches
+            .create(&map, 320.0, 320.0)
+            .expect("nearest trench should seed");
+        let farther = trenches
+            .create(&map, 384.0, 320.0)
+            .expect("farther trench should seed");
+        let mut entities = EntityStore::new();
+        let unit = entities
+            .spawn_unit(1, EntityKind::Rifleman, 352.0, 320.0)
+            .expect("rifleman should spawn");
+        let snapshot = entities.get(unit).expect("rifleman should exist").clone();
+        let nearest_trench = trenches
+            .all()
+            .iter()
+            .copied()
+            .find(|trench| trench.id == nearest)
+            .expect("nearest trench should exist");
+        let blocking_slots = slot_positions(&snapshot, nearest_trench)
+            .into_iter()
+            .filter(|candidate| {
+                distance((snapshot.pos_x, snapshot.pos_y), *candidate) <= SLOT_MAX_CORRECTION_PX
+            })
+            .collect::<Vec<_>>();
+        assert!(
+            !blocking_slots.is_empty(),
+            "fixture should have nearest-trench slots to block"
+        );
+        for (x, y) in blocking_slots {
+            entities
+                .spawn_unit(2, EntityKind::Rifleman, x, y)
+                .expect("blocking rifleman should spawn");
+        }
+        let occ = Occupancy::build(&map, &entities);
+
+        let candidate = best_occupation_candidate(&map, &entities, &occ, &trenches, &snapshot)
+            .expect("farther trench should remain occupiable");
+
+        assert_eq!(candidate.trench_id, farther);
+    }
 }

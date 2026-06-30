@@ -1,6 +1,7 @@
 use super::*;
 use crate::game::command::SimCommand;
 use crate::game::entity::{EntityKind, Order};
+use crate::game::lab::{LabMoveEntity, LabOp};
 use crate::game::services::geometry::{unit_bodies_intersect, unit_body_for_entity};
 use crate::game::upgrade::UpgradeKind;
 use crate::game::{services, systems, SmokeCloudStore};
@@ -394,6 +395,42 @@ fn pre_research_infantry_can_occupy_existing_trench_but_cannot_create_new_one() 
         active_trench_occupation(game.entities.get(worker).expect("worker should exist")),
         None
     );
+}
+
+#[test]
+fn lab_move_clears_trench_occupation_without_waiting_for_tick() {
+    let mut game = empty_flat_game(&players());
+    let trench_pos = game.map.tile_center(24, 24);
+    let trench = game
+        .spawn_trench_for_test(trench_pos.0, trench_pos.1)
+        .expect("trench should seed");
+    let rifleman = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, trench_pos.0, trench_pos.1)
+        .expect("rifleman should spawn");
+    repair_world(&mut game);
+
+    game.tick();
+    assert_eq!(
+        active_trench_occupation(game.entities.get(rifleman).expect("rifleman should exist")),
+        Some(trench)
+    );
+
+    let open_pos = game.map.tile_center(40, 40);
+    game.apply_lab_op(LabOp::MoveEntity(LabMoveEntity {
+        entity_id: rifleman,
+        x: open_pos.0,
+        y: open_pos.1,
+    }))
+    .expect("lab move should succeed");
+
+    assert_eq!(
+        active_trench_occupation(game.entities.get(rifleman).expect("rifleman should exist")),
+        None
+    );
+    assert!(game.snapshot_full_for(1).entities.iter().any(|view| {
+        view.id == rifleman && view.occupied_trench_id.is_none()
+    }));
 }
 
 #[test]

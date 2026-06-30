@@ -493,6 +493,10 @@ impl Game {
         if let Some(entity) = self.entities.get_mut(input.entity_id) {
             entity.set_position(x, y);
             entity.clear_orders();
+            if let Some(movement) = entity.movement.as_mut() {
+                movement.entrenchment_dig_ticks = 0;
+                movement.occupied_trench_id = None;
+            }
         }
         self.entities.release_miner(input.entity_id);
         self.repair_lab_state();
