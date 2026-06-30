@@ -40,8 +40,8 @@ pub(super) struct TargetCandidate {
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct TargetRank {
     priority_bucket: u8,
-    policy_order: u8,
-    unit_order: u8,
+    target_group_order: u8,
+    weapon_fit_order: u8,
     retention_order: u8,
     distance_sq: f32,
     id: u32,
@@ -67,15 +67,15 @@ fn compare_candidates(
     left_rank
         .priority_bucket
         .cmp(&right_rank.priority_bucket)
-        .then_with(|| left_rank.policy_order.cmp(&right_rank.policy_order))
-        .then_with(|| left_rank.unit_order.cmp(&right_rank.unit_order))
+        .then_with(|| left_rank.target_group_order.cmp(&right_rank.target_group_order))
+        .then_with(|| left_rank.weapon_fit_order.cmp(&right_rank.weapon_fit_order))
         .then_with(|| left_rank.retention_order.cmp(&right_rank.retention_order))
         .then_with(|| left_rank.distance_sq.total_cmp(&right_rank.distance_sq))
         .then_with(|| left_rank.id.cmp(&right_rank.id))
 }
 
 fn rank_candidate(context: &AttackPriorityContext, candidate: &TargetCandidate) -> TargetRank {
-    let (priority_bucket, policy_order, unit_order) =
+    let (priority_bucket, target_group_order, weapon_fit_order) =
         if let Some(order) = tank_immediate_threat_order(context, candidate) {
             (0, order, 0)
         } else if let Some(order) = vehicle_route_obstruction_order(context, candidate) {
@@ -83,15 +83,15 @@ fn rank_candidate(context: &AttackPriorityContext, candidate: &TargetCandidate) 
         } else {
             (
                 1,
+                default_target_group_order(context, candidate),
                 default_weapon_fit_order(context, candidate),
-                unit_preference_order(context, candidate),
             )
         };
 
     TargetRank {
         priority_bucket,
-        policy_order,
-        unit_order,
+        target_group_order,
+        weapon_fit_order,
         retention_order: retention_order(context, candidate),
         distance_sq: candidate.distance_sq,
         id: candidate.id,
@@ -171,7 +171,7 @@ fn default_weapon_fit_order(context: &AttackPriorityContext, candidate: &TargetC
     }
 }
 
-fn unit_preference_order(context: &AttackPriorityContext, candidate: &TargetCandidate) -> u8 {
+fn default_target_group_order(context: &AttackPriorityContext, candidate: &TargetCandidate) -> u8 {
     if context.attacker_is_unit && candidate.is_unit {
         0
     } else {
@@ -307,6 +307,32 @@ mod tests {
 
         assert_eq!(
             choose_target(&context(EntityKind::AntiTankGun), &candidates),
+            Some(11)
+        );
+    }
+
+    #[test]
+    fn unit_attackers_prefer_units_over_armored_buildings() {
+        let candidates = [
+            candidate(10, EntityKind::CityCentre, 400.0, false),
+            candidate(11, EntityKind::Worker, 2_500.0, false),
+        ];
+
+        assert_eq!(
+            choose_target(&context(EntityKind::Tank), &candidates),
+            Some(11)
+        );
+    }
+
+    #[test]
+    fn cleanup_building_targets_still_use_weapon_fit() {
+        let candidates = [
+            candidate(10, EntityKind::CityCentre, 400.0, false),
+            candidate(11, EntityKind::PumpJack, 2_500.0, false),
+        ];
+
+        assert_eq!(
+            choose_target(&context(EntityKind::Rifleman), &candidates),
             Some(11)
         );
     }
