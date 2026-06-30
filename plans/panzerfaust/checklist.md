@@ -1,8 +1,8 @@
 # Panzerfaust Unit Checklist
 
-Status: Phase 0 brief and Phase 1 rules/balance spec drafted for user review. This file follows
-[docs/new-unit-checklist.md](../../docs/new-unit-checklist.md). Do not edit implementation files
-until this planning gate is approved.
+Status: Phase 0 brief and Phase 1 rules/balance spec drafted with user-reviewed close-range tuning.
+This file follows [docs/new-unit-checklist.md](../../docs/new-unit-checklist.md). Do not edit
+implementation files until this planning gate is approved for implementation.
 
 Read: [docs/context/balance.md](../../docs/context/balance.md),
 [docs/design/balance.md](../../docs/design/balance.md).
@@ -12,11 +12,14 @@ Read: [docs/context/balance.md](../../docs/context/balance.md),
 - Build source assumption: Panzerfaust is trained from Barracks after a completed Training Centre,
   matching Machine Gunner's existing unlock pattern. If "through the Training Centre" meant direct
   Training Centre training, revise Phase 1 before implementation.
-- Base speed draft: 1.44 px/tick, 10% slower than Rifleman's current 1.6 px/tick.
+- Cost decision: 60 steel / 15 oil.
+- Base loaded speed decision: 1.44 px/tick, 10% slower than Rifleman's current 1.6 px/tick.
 - Build time draft: 330 ticks, 11 seconds at 30 Hz, slightly longer than Rifleman's 300 ticks.
+- Range decision: 3-tile loaded range, extended to 4 tiles only by the normal Entrenchment +1 range
+  rule while actively occupying a trench.
 - Target filter draft: the one-shot weapon targets Tanks only in the first implementation. Future
   armored or hard targets are deferred until explicitly designed.
-- Hull-facing draft: the Panzerfaust shot deals flat 90 armor-piercing damage to Tanks, without
+- Hull-facing draft: the Panzerfaust shot deals flat 60 armor-piercing damage to Tanks, without
   front/side/rear tank-facing multipliers in the first implementation.
 - Order behavior draft: plain Move orders do not auto-interrupt into Panzerfaust firing; Attack,
   Attack Move, Idle, and Hold Position can fire at legal visible Tanks.
@@ -29,11 +32,11 @@ Read: [docs/context/balance.md](../../docs/context/balance.md),
 - [x] Define the player-facing description used by the UI.
   - Short description: "Infantry with a one-shot anti-tank weapon. Fires once at Tanks, then becomes
     a Rifleman."
-  - Tooltip draft: "Slower than Riflemen. Carries one Panzerfaust shot with extended rifle range;
+  - Tooltip draft: "Slower than Riflemen. Carries one short-range Panzerfaust shot;
     Methamphetamines speeds movement and firing."
 - [x] Define the strategic purpose: what problem does this unit solve, and what should counter it?
   - Solves the gap between early infantry control and heavier anti-tank tech by giving infantry
-    armies a cheap one-shot punishment against unsupported Tanks.
+    armies a cheap close-range one-shot punishment against unsupported Tanks.
   - Counters should include screening with infantry, Machine Gunners, Scout Cars, Mortar pressure,
     smoke-enabled dives, killing or forcing the Panzerfaust to spend its shot early, and exploiting
     the Rifleman-only body after the shot is spent.
@@ -65,11 +68,12 @@ Read: [docs/context/balance.md](../../docs/context/balance.md),
   - Intended for normal Kriegsia matches once implemented, not debug-only.
 - [x] Start patch-note bullets for player-facing changes and keep them updated through the work.
   - Barracks gains Panzerfaust infantry after a completed Training Centre.
-  - Panzerfaust costs 55 steel / 10 oil, uses 1 supply, has Rifleman HP and sight, and moves slower
+  - Panzerfaust costs 60 steel / 15 oil, uses 1 supply, has Rifleman HP and sight, and moves slower
     than a Rifleman.
-  - Panzerfaust carries one 90-damage armor-piercing anti-tank shot at 6-tile range, then converts
-    into a Rifleman after a short recovery.
-  - Methamphetamines speeds Panzerfaust movement and firing setup/recovery before conversion.
+  - Panzerfaust carries one 60-damage armor-piercing anti-tank shot at 3-tile range, or 4-tile range
+    while actively entrenched, then converts into a Rifleman after a short recovery.
+  - Methamphetamines speeds Panzerfaust movement and firing setup/recovery before conversion, but
+    the loaded Panzerfaust still does not fire while moving.
   - Entrenchment applies to Panzerfaust infantry, including the normal trench range and defense
     benefits.
 
@@ -83,7 +87,7 @@ Exit criteria:
 ## Phase 1: Rules And Balance Specification
 
 - [x] Cost is specified.
-  - 55 steel / 10 oil.
+  - 60 steel / 15 oil.
 - [x] Supply impact is specified.
   - 1 supply.
 - [x] Build source is specified: which building, unit, queue, or ability creates it.
@@ -116,21 +120,22 @@ Exit criteria:
   - Ordinary infantry ground movement, including forest passability and ordinary unit collision.
   - Cannot move during Panzerfaust windup or post-fire recovery.
   - Does not fire while moving while loaded, even with Methamphetamines; it must stop before launch.
+  - Methamphetamines still applies to loaded Panzerfaust movement speed and firing windup/recovery.
   - After conversion, normal Rifleman movement and Methamphetamines moving-fire rules apply.
 - [x] Pathing semantics are specified if different from ordinary ground units.
   - Same pathing semantics as Rifleman.
 - [x] Attack range is specified.
-  - Base loaded Panzerfaust shot range: 6 tiles, which is Rifleman range 4 plus 2.
-  - While actively occupying a trench: 7 tiles through the existing Entrenchment +1 range rule.
+  - Base loaded Panzerfaust shot range: 3 tiles.
+  - While actively occupying a trench: 4 tiles through the existing Entrenchment +1 range rule.
   - After conversion: normal Rifleman range applies.
 - [x] Damage, cooldown, windup, projectile behavior, area behavior, and target filters are specified.
   - One shot only; no reload and no second Panzerfaust attack.
   - Target filter: visible enemy Tanks only for the first implementation.
   - Direct Attack on non-Tank targets is invalid while loaded; after conversion, Rifleman attack
     rules apply.
-  - Damage: 90 armor-piercing direct damage.
+  - Damage: 60 armor-piercing direct damage.
   - No area damage and no friendly fire.
-  - Hull-facing multipliers do not apply in the first implementation; damage is flat 90 on hit.
+  - Hull-facing multipliers do not apply in the first implementation; damage is flat 60 on hit.
   - Firing windup: 15 ticks, half a second at 30 Hz.
   - Projectile travel: 15 ticks, half a second at 30 Hz.
   - Post-fire recovery: 15 ticks, half a second at 30 Hz, then immediate conversion to Rifleman.
@@ -155,7 +160,8 @@ Exit criteria:
   - Uses normal Barracks training, affordability, supply reservation, queue cancellation, and refund
     behavior.
   - No repair, build, harvest, or production role.
-  - Conversion preserves the paid cost and does not refund the 5 steel / 10 oil premium.
+  - Conversion preserves the paid cost and does not refund the 10 steel / 15 oil premium over a
+    Rifleman.
 - [x] AI availability and intended AI usage are specified.
   - AI does not train Panzerfaust units in the first implementation pass.
   - If spawned by a scenario or lab, AI-owned Panzerfaust units may use normal target acquisition
