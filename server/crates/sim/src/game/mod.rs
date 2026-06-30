@@ -28,10 +28,10 @@ mod mortar;
 mod mortar_scatter;
 mod pathfinding;
 mod player_state;
+pub mod replay;
 mod resource_placement;
 #[cfg(test)]
 mod resource_placement_tests;
-pub mod replay;
 mod scoring;
 pub(crate) mod services;
 mod setup;
@@ -263,6 +263,7 @@ impl Game {
             &mut self.lingering_sight,
             &mut self.firing_reveals,
             &mut self.smokes,
+            &mut self.trenches,
             &mut self.ability_runtime,
             &mut self.mortar_shells,
             &mut self.artillery_shells,

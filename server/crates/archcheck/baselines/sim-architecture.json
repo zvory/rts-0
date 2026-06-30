@@ -1,5 +1,5 @@
 {
-  "reason": "Extract command planner facts while keeping command admission internal",
+  "reason": "track entrenchment trench lifecycle service",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -626,6 +626,24 @@
       "target": "world_query",
       "path": "services/economy.rs",
       "line": 8
+    },
+    {
+      "source": "entrenchment",
+      "target": "geometry",
+      "path": "services/entrenchment.rs",
+      "line": 9
+    },
+    {
+      "source": "entrenchment",
+      "target": "occupancy",
+      "path": "services/entrenchment.rs",
+      "line": 13
+    },
+    {
+      "source": "entrenchment",
+      "target": "standability",
+      "path": "services/entrenchment.rs",
+      "line": 14
     },
     {
       "source": "geometry",

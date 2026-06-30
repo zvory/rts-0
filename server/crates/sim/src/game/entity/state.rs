@@ -83,6 +83,10 @@ pub struct MovementState {
     pub breakthrough_aura_ticks: u16,
     /// Ticks remaining after this unit last stood in smoke. Breakthrough uses this for synergy.
     pub recent_smoke_ticks: u16,
+    /// Consecutive ticks this unit has held ground on untrenched terrain toward creating a trench.
+    pub entrenchment_dig_ticks: u32,
+    /// Active trench occupied by this unit. This is set only when the unit is stopped in a trench.
+    pub occupied_trench_id: Option<u32>,
 }
 
 impl Default for MovementState {
@@ -107,6 +111,8 @@ impl Default for MovementState {
             breakthrough_ticks: 0,
             breakthrough_aura_ticks: 0,
             recent_smoke_ticks: 0,
+            entrenchment_dig_ticks: 0,
+            occupied_trench_id: None,
         }
     }
 }

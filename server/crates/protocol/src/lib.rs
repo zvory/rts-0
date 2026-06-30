@@ -1046,7 +1046,7 @@ mod tests {
                 .unwrap()
                 .last()
                 .unwrap()["name"],
-            serde_json::json!("weaponRangeTiles")
+            serde_json::json!("occupiedTrenchId")
         );
     }
 
@@ -1475,6 +1475,7 @@ mod tests {
             expires_in: None,
         }];
         worker.vision_only = true;
+        worker.occupied_trench_id = Some(80);
 
         let mut gunner = EntityView::new(
             2,
@@ -1699,6 +1700,7 @@ mod tests {
         assert_eq!(value["e"][0][23], serde_json::json!([[1, 87, 2]]));
         assert_eq!(value["e"][0][24], serde_json::Value::Null);
         assert_eq!(value["e"][0][25], serde_json::json!(true));
+        assert_eq!(value["e"][0][32], serde_json::json!(80));
         // Rally point rides in slot 18 of the producing building's record.
         assert_eq!(value["e"][2][18], serde_json::json!([256.0, 512.0]));
         // Rally plan is appended after the legacy optional slots so earlier compact positions stay stable.

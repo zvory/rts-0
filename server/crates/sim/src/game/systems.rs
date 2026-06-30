@@ -16,8 +16,9 @@
 //!   13. rebuild pre-collision occupancy/spatial indexes
 //!   14. unit-unit collision resolution (hard non-stacking; runs after spawning so newly
 //!       produced units that land on the same spawn point are unstacked in the same tick)
-//!   15. recompute supply cap
-//!   16. rebuild final spatial index for snapshot interest filtering
+//!   15. trench occupation, slotting, and dig-in progress
+//!   16. recompute supply cap
+//!   17. rebuild final spatial index for snapshot interest filtering
 
 use std::collections::{BTreeSet, HashMap};
 
@@ -34,6 +35,7 @@ use crate::game::services::pathing::PathingService;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
+use crate::game::trench::TrenchStore;
 use crate::game::upgrade::UpgradeKind;
 use crate::game::PlayerState;
 use crate::protocol::Event;
@@ -118,6 +120,7 @@ pub(crate) fn run_tick(
     lingering_sight: &mut Vec<LingeringSightSource>,
     firing_reveals: &mut Vec<FiringRevealSource>,
     smokes: &mut SmokeCloudStore,
+    trenches: &mut TrenchStore,
     ability_runtime: &mut AbilityRuntime,
     mortar_shells: &mut MortarShellStore,
     artillery_shells: &mut ArtilleryShellStore,
@@ -306,12 +309,37 @@ pub(crate) fn run_tick(
     let pre_collision = crate::perf::timed(perf.as_deref_mut(), "pre_collision_derived", || {
         PreCollisionDerivedState::rebuild(map, entities)
     });
+    let pre_collision_positions =
+        crate::perf::timed(perf.as_deref_mut(), "pre_collision_positions", || {
+            entities
+                .iter()
+                .filter(|entity| entity.is_unit())
+                .map(|entity| (entity.id, (entity.pos_x, entity.pos_y)))
+                .collect::<HashMap<_, _>>()
+        });
     crate::perf::timed(perf.as_deref_mut(), "collision", || {
         services::movement::resolve_collisions(
             entities,
             &pre_collision.spatial,
             map,
             &pre_collision.occupancy,
+        );
+    });
+
+    crate::perf::timed(perf.as_deref_mut(), "entrenchment", || {
+        let entrenchment_researched = |owner| {
+            players
+                .iter()
+                .any(|p| p.id == owner && p.has_upgrade(UpgradeKind::Entrenchment))
+        };
+        let pre_collision_position = |entity_id| pre_collision_positions.get(&entity_id).copied();
+        services::entrenchment::entrenchment_system(
+            map,
+            entities,
+            &entrenchment_researched,
+            &pre_collision_position,
+            &pre_collision.occupancy,
+            trenches,
         );
     });
 
@@ -375,6 +403,7 @@ mod tests {
         let mut lingering_sight = Vec::new();
         let mut firing_reveals = Vec::new();
         let mut smokes = SmokeCloudStore::new();
+        let mut trenches = TrenchStore::new();
         let mut ability_runtime = AbilityRuntime::new();
         let mut mortar_shells = MortarShellStore::default();
         let mut artillery_shells = ArtilleryShellStore::default();
@@ -406,6 +435,7 @@ mod tests {
             &mut lingering_sight,
             &mut firing_reveals,
             &mut smokes,
+            &mut trenches,
             &mut ability_runtime,
             &mut mortar_shells,
             &mut artillery_shells,
