@@ -1,4 +1,4 @@
-import { ABILITY, DEFAULT_FACTION_ID, KIND, ORDER_STAGE, SETUP, STATE, UPGRADE, isBuilding, isUnit } from "./protocol.js";
+import { ABILITY, DEFAULT_FACTION_ID, KIND, SETUP, STATE, UPGRADE, isBuilding, isUnit } from "./protocol.js";
 import {
   STATS,
   UPGRADES,
@@ -7,6 +7,15 @@ import {
   trainableUnitsForFaction,
   workerBuildablesForFaction,
 } from "./config.js";
+import {
+  abilityActiveObjectId,
+  abilityAutocastEnabled,
+  abilityCooldownLeft,
+  abilityRemainingUses,
+  abilityRequiresSetup,
+  abilityUnitQueueAdmissible,
+  abilityUnitReady,
+} from "./hud_ability_affordance.js";
 import { attackDescriptor, holdDescriptor, moveDescriptor, stopDescriptor } from "./hud_unit_commands.js";
 
 // Command-card hotkeys follow the keyboard grid (3 columns):
@@ -238,6 +247,7 @@ export function buildUnitCard(ctx, selection) {
       `${affordance.definition.ability}:${affordance.unlocked ? 1 : 0}:${affordance.affordable ? 1 : 0}:` +
       `${affordance.depletedCount}:${affordance.setupBlockedCount}:` +
       `${affordance.readyIds.join(".")}:` +
+      `${affordance.queueAdmissibleIds.join(".")}:` +
       `${affordance.autocastEnabledIds.join(".")}:` +
       `${affordance.cooldownClocks.map((group) => group.count).join(",")}`,
     ).join("|")}|` +
@@ -503,7 +513,7 @@ function intentReadyIds(definition, affordance) {
 }
 
 function intentAbilityIds(definition, affordance) {
-  if (definition.targetMode === "self" && definition.queuePolicy === "waitUntilReady") {
+  if (definition.queuePolicy === "waitUntilReady") {
     return affordance.queueAdmissibleIds;
   }
   return intentReadyIds(definition, affordance);
@@ -618,74 +628,6 @@ function commandTargetSig(commandTarget) {
   if (!commandTarget) return "";
   if (typeof commandTarget === "string") return commandTarget;
   return `${commandTarget.kind || ""}:${commandTarget.ability || ""}`;
-}
-
-function abilityCooldownLeft(entity, ability) {
-  const projected = Array.isArray(entity.abilities)
-    ? entity.abilities.find((entry) => entry.ability === ability)
-    : null;
-  if (projected && typeof projected.cooldownLeft === "number") return projected.cooldownLeft;
-  return 0;
-}
-
-function abilityRemainingUses(entity, ability) {
-  const projected = Array.isArray(entity.abilities)
-    ? entity.abilities.find((entry) => entry.ability === ability)
-    : null;
-  return projected && typeof projected.remainingUses === "number"
-    ? projected.remainingUses
-    : null;
-}
-
-function abilityAutocastEnabled(entity, ability) {
-  const projected = Array.isArray(entity.abilities)
-    ? entity.abilities.find((entry) => entry.ability === ability)
-    : null;
-  return projected && typeof projected.autocastEnabled === "boolean"
-    ? projected.autocastEnabled
-    : false;
-}
-
-function abilityActiveObjectId(entity, ability) {
-  const projected = Array.isArray(entity.abilities)
-    ? entity.abilities.find((entry) => entry.ability === ability)
-    : null;
-  return projected && typeof projected.activeObjectId === "number"
-    ? projected.activeObjectId
-    : null;
-}
-
-function abilityUnitReady(entity, definition) {
-  return abilityCooldownLeft(entity, definition.ability) === 0 &&
-    abilityRemainingUses(entity, definition.ability) !== 0 &&
-    !abilityLockoutActive(entity, definition.ability) &&
-    !abilityRequiresSetup(entity, definition);
-}
-
-function abilityUnitQueueAdmissible(entity, definition) {
-  if (definition.queuePolicy === "notQueueable") return false;
-  if (definition.queuePolicy !== "waitUntilReady") return abilityUnitReady(entity, definition);
-  return abilityRemainingUses(entity, definition.ability) !== 0 &&
-    !abilityLockoutActive(entity, definition.ability) &&
-    !abilityRequiresSetup(entity, definition);
-}
-
-function abilityLockoutActive(entity, ability) {
-  const projected = Array.isArray(entity.abilities)
-    ? entity.abilities.find((entry) => entry.ability === ability)
-    : null;
-  return projected && typeof projected.lockoutUntilTick === "number";
-}
-
-function abilityRequiresSetup(entity, definition) {
-  return definition.ability === ABILITY.POINT_FIRE &&
-    entity.setupState !== SETUP.DEPLOYED &&
-    !hasPointFireOrder(entity);
-}
-
-function hasPointFireOrder(entity) {
-  return Array.isArray(entity?.orderPlan) &&
-    entity.orderPlan.some((marker) => marker?.kind === ORDER_STAGE.POINT_FIRE);
 }
 
 function affordable(cost, resources) {

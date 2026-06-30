@@ -27,6 +27,7 @@ import {
   groupCooldownClocks,
   playerHasCompletedKind,
 } from "../../client/src/hud.js";
+import { buildCommandCardDescriptors } from "../../client/src/hud_command_card.js";
 import {
   ABILITY,
   ABILITY_CODE,
@@ -640,6 +641,19 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     const coolingMortarButton = renderedButtons.find((button) => button.innerHTML.includes("Fire"));
     assert(coolingMortarButton?.dataset.autocastToggle === "true", "Mortar Fire button exposes the autocast toggle hotkey action");
     assert(!coolingMortarButton?.disabled, "cooling-down Mortar Fire remains armable for queued manual fire");
+    const coolingMortarCard = buildCommandCardDescriptors({
+      playerId,
+      resources: { steel: 100, oil: 100 },
+      selection: [selectedMortar],
+      groupCooldownClocks,
+    });
+    const coolingMortarDescriptor = coolingMortarCard.slots.find((slot) => slot?.ability === ABILITY.MORTAR_FIRE);
+    assert(coolingMortarDescriptor?.enabled, "cooling-down Mortar Fire descriptor remains enabled for queued manual fire");
+    assertDeepEqual(
+      coolingMortarDescriptor?.intent?.readyIds,
+      [selectedMortar.id],
+      "cooling-down Mortar Fire descriptor targets the waitable mortar carrier",
+    );
     globalThis.document.getElementById = (id) => {
       assert(id === "command-card", "Mortar autocast hotkey should query the command card");
       return {
