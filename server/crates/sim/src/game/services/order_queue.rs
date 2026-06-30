@@ -142,7 +142,7 @@ pub(crate) fn promote_ready_orders(
             if !world_ability_facing_ready(entities, id, ability, x, y) {
                 continue;
             }
-            if active_world_ability_waits_for_readiness(entities, owner, id, ability) {
+            if waits_for_readiness(entities, owner, id, ability) {
                 continue;
             }
             let faction_id = players
@@ -294,12 +294,7 @@ fn ready_for_next_order(
     }
 }
 
-fn active_world_ability_waits_for_readiness(
-    entities: &EntityStore,
-    owner: u32,
-    id: u32,
-    ability: AbilityKind,
-) -> bool {
+fn waits_for_readiness(entities: &EntityStore, owner: u32, id: u32, ability: AbilityKind) -> bool {
     ability::definition(ability).queue_policy == AbilityQueuePolicy::QueueWaitUntilReady
         && caster_can_accept_waiting_order(entities, owner, id, ability)
         && !caster_can_attempt(entities, owner, id, ability)
