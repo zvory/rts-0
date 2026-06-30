@@ -283,10 +283,13 @@ fn ready_for_next_order(
         | Order::Build(_)
         | Order::Deconstruct(_)
         | Order::ArtilleryPointFire(_) => false,
-        Order::Ability(_) => matches!(
-            e.move_phase(),
-            Some(MovePhase::Arrived | MovePhase::PathFailed)
-        ),
+        Order::Ability(order) => match e.move_phase() {
+            Some(MovePhase::PathFailed) => true,
+            Some(MovePhase::Arrived) => {
+                order.intent.ability != AbilityKind::MortarFire || e.attack_cd() == 0
+            }
+            _ => false,
+        },
     }
 }
 

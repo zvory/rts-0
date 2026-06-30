@@ -181,6 +181,7 @@ pub(crate) fn launch_world_ability(
                 e.clear_active_order();
                 e.set_path_goal(None);
             }
+            e.set_attack_cd(mortar_fire_weapon_cooldown_ticks());
             mortar_shells.schedule(
                 events, fog, teams, player, caster, from_x, from_y, x, y, tick, false,
             );
@@ -542,6 +543,7 @@ pub(crate) fn caster_can_attempt(
 ) -> bool {
     matches!(entities.get(caster),
         Some(e) if caster_base_ready(e, player, ability)
+            && ability_weapon_cycle_ready(e, ability)
             && ability_launch_ready(e.kind, e.weapon_setup(), e.path_is_empty(), ability))
 }
 
@@ -575,6 +577,14 @@ fn caster_base_ready(e: &crate::game::entity::Entity, player: u32, ability: Abil
         && ability::carried_by(ability, e.kind)
         && e.ability_uses_remaining(ability).unwrap_or(1) > 0
         && e.ability_cooldown_ticks(ability) == 0
+}
+
+fn ability_weapon_cycle_ready(e: &crate::game::entity::Entity, ability: AbilityKind) -> bool {
+    ability != AbilityKind::MortarFire || e.attack_cd() == 0
+}
+
+fn mortar_fire_weapon_cooldown_ticks() -> u32 {
+    config::unit_stats(EntityKind::MortarTeam).map_or(0, |stats| stats.cooldown)
 }
 
 fn ability_order_ready(kind: EntityKind, _setup: WeaponSetup, ability: AbilityKind) -> bool {
