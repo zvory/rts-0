@@ -158,6 +158,16 @@ pub enum ClientMessage {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
+pub struct CommandLifecycleExemplar {
+    pub client_seq: u32,
+    pub family: String,
+    pub issued_elapsed_ms: u32,
+    pub stage: String,
+    pub stage_ms: u16,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct ClientNetReport {
     pub schema_version: u8,
     #[serde(default)]
@@ -311,6 +321,12 @@ pub struct ClientNetReport {
     #[serde(default)]
     pub command_rejected: u32,
     #[serde(default)]
+    pub command_issue_to_socket_send_accepted_latest_ms: u16,
+    #[serde(default)]
+    pub command_issue_to_socket_send_accepted_max_ms: u16,
+    #[serde(default)]
+    pub command_issue_to_socket_send_accepted_p95_ms: u16,
+    #[serde(default)]
     pub command_issue_to_server_receipt_latest_ms: u16,
     #[serde(default)]
     pub command_issue_to_server_receipt_max_ms: u16,
@@ -338,6 +354,18 @@ pub struct ClientNetReport {
     pub oldest_pending_command_age_ms: u16,
     #[serde(default)]
     pub max_pending_command_count: u16,
+    #[serde(default)]
+    pub command_family_move: u32,
+    #[serde(default)]
+    pub command_family_attack_move: u32,
+    #[serde(default)]
+    pub command_family_build: u32,
+    #[serde(default)]
+    pub command_family_train: u32,
+    #[serde(default)]
+    pub command_family_other: u32,
+    #[serde(default)]
+    pub command_lifecycle_exemplars: Vec<CommandLifecycleExemplar>,
     #[serde(default)]
     pub correction_distance_px: u16,
     #[serde(default)]
@@ -1128,6 +1156,9 @@ mod tests {
                 "commandServerReceived":3,
                 "commandSimAcknowledged":2,
                 "commandRejected":1,
+                "commandIssueToSocketSendAcceptedLatestMs":2,
+                "commandIssueToSocketSendAcceptedMaxMs":3,
+                "commandIssueToSocketSendAcceptedP95Ms":2,
                 "commandIssueToServerReceiptLatestMs":80,
                 "commandIssueToServerReceiptMaxMs":120,
                 "commandIssueToServerReceiptP95Ms":100,
@@ -1142,6 +1173,12 @@ mod tests {
                 "commandAckSnapshotReceivedToAppliedP95Ms":8,
                 "oldestPendingCommandAgeMs":250,
                 "maxPendingCommandCount":5,
+                "commandFamilyMove":2,
+                "commandFamilyAttackMove":1,
+                "commandFamilyBuild":1,
+                "commandFamilyTrain":0,
+                "commandFamilyOther":0,
+                "commandLifecycleExemplars":[{"clientSeq":9,"family":"move","issuedElapsedMs":125,"stage":"issueToSimAck","stageMs":180}],
                 "predictionDisableUserCount":1,
                 "predictionDisableReplayCount":2,
                 "predictionDisableSpectatorCount":3,
@@ -1193,9 +1230,15 @@ mod tests {
                 assert_eq!(report.commands_issued, 4);
                 assert_eq!(report.command_server_received, 3);
                 assert_eq!(report.command_rejected, 1);
+                assert_eq!(report.command_issue_to_socket_send_accepted_max_ms, 3);
                 assert_eq!(report.command_issue_to_sim_ack_max_ms, 180);
                 assert_eq!(report.oldest_pending_command_age_ms, 250);
                 assert_eq!(report.max_pending_command_count, 5);
+                assert_eq!(report.command_family_move, 2);
+                assert_eq!(report.command_family_attack_move, 1);
+                assert_eq!(report.command_lifecycle_exemplars.len(), 1);
+                assert_eq!(report.command_lifecycle_exemplars[0].client_seq, 9);
+                assert_eq!(report.command_lifecycle_exemplars[0].family, "move");
                 assert_eq!(report.prediction_disable_user_count, 1);
                 assert_eq!(report.prediction_disable_replay_count, 2);
                 assert_eq!(report.prediction_disable_spectator_count, 3);

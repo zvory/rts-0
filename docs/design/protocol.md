@@ -227,6 +227,9 @@ in a match:
   commandServerReceived: u32,          // accepted commandReceipt count
   commandSimAcknowledged: u32,         // commands covered by snapshot sim-consumption ack
   commandRejected: u32,                // rejected commandReceipt count
+  commandIssueToSocketSendAcceptedLatestMs: u16,
+  commandIssueToSocketSendAcceptedMaxMs: u16,
+  commandIssueToSocketSendAcceptedP95Ms: u16,
   commandIssueToServerReceiptLatestMs: u16,
   commandIssueToServerReceiptMaxMs: u16,
   commandIssueToServerReceiptP95Ms: u16,
@@ -241,6 +244,18 @@ in a match:
   commandAckSnapshotReceivedToAppliedP95Ms: u16,
   oldestPendingCommandAgeMs: u16,
   maxPendingCommandCount: u16,
+  commandFamilyMove: u32,              // command family counts for stable low-cardinality grouping
+  commandFamilyAttackMove: u32,
+  commandFamilyBuild: u32,
+  commandFamilyTrain: u32,
+  commandFamilyOther: u32,
+  commandLifecycleExemplars: [{
+    clientSeq: u32,                    // bounded top-N diagnostic exemplar, no command payload
+    family: "move"|"attackMove"|"build"|"train"|"other",
+    issuedElapsedMs: u32,              // report-window-relative client issue time
+    stage: string,                     // stable lifecycle stage label
+    stageMs: u16
+  }],
   correctionDistancePx: u16,         // largest correction observed by the client
   correctionCount: u32,
   predictionDisableCount: u32,
@@ -258,15 +273,19 @@ in a match:
   predictionReplayBudgetExceededCount: u32
 }
 ```
-The snapshot payload, codec, parse, decode, apply, prediction-apply, cadence, command milestone, and
-desktop cursor runtime fields are report-window aggregates or bounded summaries only; raw snapshot
+The snapshot payload, codec, parse, decode, apply, prediction-apply, cadence, command milestone,
+command lifecycle, and desktop cursor runtime fields are report-window aggregates or bounded
+summaries only; raw snapshot
 payloads, raw timestamp arrays, entity ids, unit ids, target ids, positions, replay data, command
 payloads, and raw cursor input events are not uploaded. HUD `jit` and `snapshotJitterMs` mean
 snapshot arrival jitter, not JavaScript compiler/JIT time. The canonical single-segment payload
 budget is 1280 bytes. It is intentionally below a common 1460-byte Ethernet TCP MSS because the measured
 snapshot bytes are only WebSocket application payload bytes and exclude WebSocket framing plus TLS,
-TCP, and IP overhead. Command milestone timing splits local issue to receipt, receipt to sim
-acknowledgement, issue to sim acknowledgement, and ack snapshot receipt to browser apply. The
+TCP, and IP overhead. Command milestone timing splits local issue to WebSocket send acceptance,
+issue/send to receipt, receipt to sim acknowledgement, issue to sim acknowledgement, and ack snapshot
+receipt to browser apply. `commandLifecycleExemplars` preserves at most five report-window
+exemplars by `clientSeq`, stable command family, stage, and duration; it never includes units,
+targets, positions, raw command payloads, or raw timestamp arrays. The
 frame-work and renderer fields come from the browser's bounded frame-profiler report window; the
 local debug surface may keep richer cumulative phase tables, but those raw arrays and detailed
 recent frames are not uploaded. `commandsIssued` is the report-window total and catches sustained
@@ -278,9 +297,12 @@ notable lag, jitter, browser frame stalls, local JS frame work, large-payload pr
 pressure, snapshot parse/decode/apply cost, snapshot cadence/burst issues, renderer cost, WebSocket
 backlog, server tick/scheduler pressure, sustained or bursty command density, command milestone delay/rejection, or prediction
 correction/fallback signals, alongside the connection's `player_id`, room name, and reported
-`match_run_id`. The same structured row also includes server-observed outbound counters for the
-report window, prefixed `server*`, such as command receipt counts, reliable messages drained while a
-snapshot was pending, snapshot send age, and latest-only snapshot slot stored/replaced/closed counts.
+`match_run_id`. The same structured row also includes server-observed counters for the report
+window, prefixed `server*`, such as command receipt counts, command frame deserialize time,
+deserialize-to-room-enqueue time, room-event queue delay, room handling/receipt queue time,
+receipt-send age, accepted-to-sim-ack time, bounded server command lifecycle exemplars, reliable
+messages drained while a snapshot was pending, snapshot send age, and latest-only snapshot slot
+stored/replaced/closed counts.
 One reliable message before a snapshot with no send age or slot replacement is normal ordering, not
 outbound pressure.
 Those server-only log fields are not client protocol fields. Values are advisory because clients are untrusted; use them to diagnose

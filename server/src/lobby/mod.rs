@@ -62,7 +62,10 @@ mod snapshot_fanout;
 mod snapshots;
 mod tick_control;
 
-pub use connection::{ConnectionReportStats, ConnectionSink, ConnectionWriter};
+pub use connection::{
+    CommandLifecycleExemplarStats, CommandLifecycleReportStats, CommandTimingStats,
+    ConnectionReportStats, ConnectionSink, ConnectionWriter, ConnectionWriterStats,
+};
 use dev_replay::{load_replay_artifact, room_mode_for};
 pub use match_history_writes::MatchHistoryWriteWaitResult;
 pub use replay_validation::faction_loadout_incompatibility_reason as replay_faction_loadout_incompatibility_reason;
@@ -120,6 +123,46 @@ fn pending_create_lease_duration() -> Duration {
 /// Allocate a fresh, process-unique player id. Called once per connection.
 pub fn next_player_id() -> u32 {
     NEXT_PLAYER_ID.fetch_add(1, Ordering::Relaxed)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CommandLifecycleFamily {
+    Move,
+    AttackMove,
+    Build,
+    Train,
+    Other,
+}
+
+impl CommandLifecycleFamily {
+    pub fn from_protocol_command(cmd: &crate::protocol::Command) -> Self {
+        match cmd {
+            crate::protocol::Command::Move { .. } => Self::Move,
+            crate::protocol::Command::AttackMove { .. } => Self::AttackMove,
+            crate::protocol::Command::Build { .. } => Self::Build,
+            crate::protocol::Command::Train { .. } => Self::Train,
+            _ => Self::Other,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Move => "move",
+            Self::AttackMove => "attackMove",
+            Self::Build => "build",
+            Self::Train => "train",
+            Self::Other => "other",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct CommandLifecycleTiming {
+    pub received_unix_ms: u64,
+    pub frame_received_at: Instant,
+    pub deserialized_at: Instant,
+    pub room_event_enqueued_at: Instant,
+    pub family: CommandLifecycleFamily,
 }
 
 fn current_unix_ms() -> u64 {
@@ -333,6 +376,7 @@ pub enum RoomEvent {
         player_id: u32,
         client_seq: u32,
         cmd: SimCommand,
+        lifecycle: CommandLifecycleTiming,
     },
     /// A connected player intentionally gave up the active match.
     GiveUp { player_id: u32 },

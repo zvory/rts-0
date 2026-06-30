@@ -89,14 +89,16 @@ The same upload also includes bounded snapshot diagnostics:
 
 Command-response diagnostics are also reported as bounded window aggregates keyed by the live
 `matchRunId`: issued/send-accepted/server-received/sim-acknowledged/rejected counts,
-issue-to-server-receipt latest/max/p95, server-receipt-to-sim-ack latest/max/p95,
-issue-to-sim-ack latest/max/p95, ack-snapshot-received-to-applied latest/max/p95, oldest pending
-command age, max pending command count, `commandBurstBucketMs`, `commandBurstMax`,
-`commandBurstFrameGapMaxMs`, `commandBurstWorstFramePhase`, and
-`commandBurstWorstFramePhaseMs`. The burst bucket is a fixed 250 ms sliding client window and only
-counts commands that passed local command-budget checks and reached the browser WebSocket send path.
-`commandsIssued` is the report-window total and catches sustained rapid input that may never reach
-the short-bucket burst threshold.
+issue-to-WebSocket-send-accepted latest/max/p95, issue-to-server-receipt latest/max/p95,
+server-receipt-to-sim-ack latest/max/p95, issue-to-sim-ack latest/max/p95,
+ack-snapshot-received-to-applied latest/max/p95, oldest pending command age, max pending command
+count, stable family counts for `move`, `attackMove`, `build`, `train`, and `other`, up to five
+bounded lifecycle exemplars, `commandBurstBucketMs`, `commandBurstMax`,
+`commandBurstFrameGapMaxMs`, `commandBurstWorstFramePhase`, and `commandBurstWorstFramePhaseMs`.
+The burst bucket is a fixed 250 ms sliding client window and only counts commands that passed local
+command-budget checks and reached the browser WebSocket send path. `commandsIssued` is the
+report-window total and catches sustained rapid input that may never reach the short-bucket burst
+threshold.
 The server receipt comes from a tiny reliable
 `commandReceipt` message keyed only by `clientSeq`; it carries no command payload, unit ids, target
 ids, positions, or player-entered text and does not reconcile prediction.
@@ -110,7 +112,9 @@ WASM loader errors stay in local debug output and are not uploaded as labels.
 
 The server augments the `client_net_report` log row with per-connection outbound counters consumed
 on the same report cadence: `server_command_receipts_accepted`, `server_command_receipts_rejected`,
-`server_reliable_drained_before_snapshot`, `server_reliable_drained_before_snapshot_max`,
+server command lifecycle counts/timings for frame deserialize, deserialize-to-room enqueue, room
+queue, room handling, receipt send age, and accepted-to-sim-ack, bounded server command lifecycle
+exemplars, `server_reliable_drained_before_snapshot`, `server_reliable_drained_before_snapshot_max`,
 `server_snapshot_waited_behind_reliable`, `server_snapshot_sent`,
 `server_snapshot_send_age_latest_ms`, `server_snapshot_send_age_max_ms`,
 `server_snapshot_send_age_avg_ms`, `server_snapshot_slot_stored`,
@@ -403,7 +407,8 @@ can see which fields triggered or argued against a diagnosis.
 - Browser processing pressure uses payload size, packet-budget p95/rate, frame parse, compact decode,
   snapshot apply, prediction apply, frame work, renderer timing, frame gaps, and FPS estimates.
 - Command path pressure uses legacy acknowledged-command latency when that is all an old log has, and
-  uses the newer upload/server-receipt/sim-ack/downstream-apply milestones when present.
+  uses the newer client-send, upload/server-receipt, server room queue/handling, receipt-send,
+  sim-ack, and downstream-apply milestones when present.
 - Command density pressure uses `commandsIssued`, `commandBurstMax`, and server command-receipt
   counts. It is a correlation signal, not proof that commands caused later jitter.
 - Prediction health uses stable disable-reason buckets, WASM replay max ms/ticks, replay-budget
@@ -484,11 +489,14 @@ architecture policy gate.
 - Existing buckets continue to separate `network_rtt`, `snapshot_gap`, `snapshot_jitter`,
   `snapshot_cadence`, `server_tick`, `server_scheduler_lag`, `websocket_backlog`, `pending_commands`,
   `prediction_correction`, `prediction_disabled`, and `wasm_budget`.
-- `command_upload_delay`, `command_server_queue`, `command_response_delay`, `command_ack_apply`, and
-  `command_rejected` classify command milestone issues before they fall through to generic RTT or
-  prediction fallback buckets. Upload delay is high issue-to-receipt timing; server queue delay is
-  high receipt-to-sim-ack timing; response delay is high issue-to-sim-ack or oldest pending age; ack
-  apply points at browser processing after the ack snapshot arrives.
+- `command_client_send_delay`, `command_upload_delay`, `command_server_parse`,
+  `command_server_queue`, `command_receipt_delivery`, `command_response_delay`,
+  `command_ack_apply`, and `command_rejected` classify command milestone issues before they fall
+  through to generic RTT or prediction fallback buckets. Client-send delay is browser issue to
+  WebSocket send acceptance; upload delay is high issue-to-receipt timing; server parse is inbound
+  frame deserialize cost; server queue delay is high room-event queue or accepted-to-sim-ack timing;
+  receipt delivery is reliable receipt queue/send age; response delay is high issue-to-sim-ack or
+  oldest pending age; ack apply points at browser processing after the ack snapshot arrives.
 
 `snapshot_cadence` covers `snapshotTickGapMax >= 3`, stale/duplicate/skipped snapshot counters, or
 `snapshotBurstMax >= 3`. Use it to distinguish receive burst/head-of-line symptoms from high RTT:

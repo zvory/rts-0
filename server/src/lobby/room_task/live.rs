@@ -1,14 +1,15 @@
 use std::collections::HashSet;
+use std::time::{Duration, Instant as StdInstant};
 
 use tokio::time::Instant as TokioInstant;
 
-use super::super::connection::{send_or_log, ConnectionSink};
+use super::super::connection::{send_or_log, CommandLifecycleSample, ConnectionSink};
 use super::super::dev_replay::match_seed;
 use super::super::launch::{LaunchPrediction, LaunchRecipient, StartPayloadBuilder};
 use super::super::live_tick::{LiveTickDriver, LiveTickResult};
 use super::super::projection::RecipientRole;
 use super::super::session_policy::{RoomTimeSource, SessionPhase};
-use super::super::{normalize_start_team_id, PlayerInit};
+use super::super::{normalize_start_team_id, CommandLifecycleTiming, PlayerInit};
 use super::helpers::{late_spectator_notice_name, live_ai_controllers, LIVE_PAUSE_LIMIT};
 use super::types::{PendingClientCommandAck, Phase, RoomPlayer};
 use super::RoomTask;
@@ -144,13 +145,44 @@ impl RoomTask {
         }
     }
 
+    #[cfg(test)]
     pub(super) fn on_command(&mut self, player_id: u32, client_seq: u32, cmd: SimCommand) {
+        let now = StdInstant::now();
+        self.on_command_with_lifecycle(
+            player_id,
+            client_seq,
+            cmd,
+            CommandLifecycleTiming {
+                received_unix_ms: 0,
+                frame_received_at: now,
+                deserialized_at: now,
+                room_event_enqueued_at: now,
+                family: super::super::CommandLifecycleFamily::Other,
+            },
+        );
+    }
+
+    pub(super) fn on_command_with_lifecycle(
+        &mut self,
+        player_id: u32,
+        client_seq: u32,
+        cmd: SimCommand,
+        lifecycle: CommandLifecycleTiming,
+    ) {
+        let room_handle_started_at = StdInstant::now();
         if self.is_dev_watch() {
             return;
         }
         if client_seq == 0 {
             crate::log_debug!(room = %self.room, player_id, "ignoring command with reserved clientSeq 0");
             self.send_command_receipt(player_id, client_seq, 0, false, Some("invalidSeq"));
+            self.record_command_lifecycle_sample(
+                player_id,
+                client_seq,
+                lifecycle,
+                room_handle_started_at,
+                false,
+            );
             return;
         }
         let issuer = self.command_issuer_for_connection(player_id);
@@ -171,11 +203,15 @@ impl RoomTask {
                         (server_tick, false, Some("staleSeq"))
                     } else {
                         player.last_received_client_seq = client_seq;
+                        let accepted_at = StdInstant::now();
                         game.enqueue(issuer.seat_id, cmd);
                         self.pending_client_command_acks
                             .push(PendingClientCommandAck {
                                 connection_id: issuer.connection_id,
                                 client_seq,
+                                received_unix_ms: lifecycle.received_unix_ms,
+                                family: lifecycle.family.as_str(),
+                                accepted_at,
                             });
                         (server_tick, true, None)
                     }
@@ -190,6 +226,49 @@ impl RoomTask {
         };
         let (server_tick, accepted, reason) = receipt;
         self.send_command_receipt(player_id, client_seq, server_tick, accepted, reason);
+        self.record_command_lifecycle_sample(
+            player_id,
+            client_seq,
+            lifecycle,
+            room_handle_started_at,
+            accepted,
+        );
+    }
+
+    fn record_command_lifecycle_sample(
+        &self,
+        player_id: u32,
+        client_seq: u32,
+        lifecycle: CommandLifecycleTiming,
+        room_handle_started_at: StdInstant,
+        accepted: bool,
+    ) {
+        let Some(player) = self.players.get(&player_id) else {
+            return;
+        };
+        player
+            .msg_tx
+            .record_command_lifecycle(CommandLifecycleSample {
+                received_unix_ms: lifecycle.received_unix_ms,
+                client_seq,
+                family: lifecycle.family.as_str(),
+                accepted,
+                frame_deserialize_ms: duration_ms_u32(
+                    lifecycle
+                        .deserialized_at
+                        .saturating_duration_since(lifecycle.frame_received_at),
+                ),
+                deserialize_to_room_enqueue_ms: duration_ms_u32(
+                    lifecycle
+                        .room_event_enqueued_at
+                        .saturating_duration_since(lifecycle.deserialized_at),
+                ),
+                room_queue_ms: duration_ms_u32(
+                    room_handle_started_at
+                        .saturating_duration_since(lifecycle.room_event_enqueued_at),
+                ),
+                room_handle_ms: duration_ms_u32(room_handle_started_at.elapsed()),
+            });
     }
 
     fn send_command_receipt(
@@ -678,4 +757,8 @@ impl RoomTask {
                     .filter(|team_id| *team_id != 0)
             })
     }
+}
+
+fn duration_ms_u32(duration: Duration) -> u32 {
+    duration.as_millis().min(u32::MAX as u128) as u32
 }

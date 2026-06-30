@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -65,14 +65,14 @@ incident digest. This phase should make `command_upload_delay`, `command_server_
 
 ## Implementation Checklist
 
-- [ ] Define lifecycle stage names, units, and reset behavior.
-- [ ] Add server ingress and room-queue timestamps without blocking the room task.
-- [ ] Add bounded per-window command lifecycle aggregation.
-- [ ] Add client/report DTO fields and serde/default compatibility.
-- [ ] Extend structured logging and parser summaries.
-- [ ] Update docs with field semantics and caveats.
-- [ ] Add focused Rust and JS tests for defaults, aggregation, and parser output.
-- [ ] Mark this phase as done in this file in the implementation commit.
+- [x] Define lifecycle stage names, units, and reset behavior.
+- [x] Add server ingress and room-queue timestamps without blocking the room task.
+- [x] Add bounded per-window command lifecycle aggregation.
+- [x] Add client/report DTO fields and serde/default compatibility.
+- [x] Extend structured logging and parser summaries.
+- [x] Update docs with field semantics and caveats.
+- [x] Add focused Rust and JS tests for defaults, aggregation, and parser output.
+- [x] Mark this phase as done in this file in the implementation commit.
 
 ## Verification
 

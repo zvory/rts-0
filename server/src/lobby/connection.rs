@@ -51,7 +51,13 @@ pub struct ConnectionWriterStats {
     reliable_drained_before_snapshot: u32,
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+const COMMAND_LIFECYCLE_TOP_N: usize = 5;
+const COMMAND_LIFECYCLE_BUCKETS_MS: [u32; 16] = [
+    1, 2, 4, 8, 12, 16, 24, 33, 50, 75, 100, 150, 250, 500, 1_000, 2_000,
+];
+const COMMAND_LIFECYCLE_BUCKET_COUNT: usize = COMMAND_LIFECYCLE_BUCKETS_MS.len() + 1;
+
+#[derive(Debug, Clone, Default)]
 pub struct ConnectionReportStats {
     pub command_receipts_accepted: u32,
     pub command_receipts_rejected: u32,
@@ -65,6 +71,80 @@ pub struct ConnectionReportStats {
     pub snapshot_slot_stored: u32,
     pub snapshot_slot_replaced: u32,
     pub snapshot_slot_closed: u32,
+    pub command_lifecycle: CommandLifecycleReportStats,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct CommandLifecycleReportStats {
+    pub count: u32,
+    pub accepted: u32,
+    pub rejected: u32,
+    pub frame_deserialize: CommandTimingStats,
+    pub deserialize_to_room_enqueue: CommandTimingStats,
+    pub room_queue: CommandTimingStats,
+    pub room_handle: CommandTimingStats,
+    pub receipt_send_age: CommandTimingStats,
+    pub accepted_to_sim_ack: CommandTimingStats,
+    pub exemplars: Vec<CommandLifecycleExemplarStats>,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct CommandTimingStats {
+    pub latest_ms: u32,
+    pub max_ms: u32,
+    pub p95_ms: u32,
+    pub count: u32,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct CommandLifecycleExemplarStats {
+    pub received_unix_ms: u64,
+    pub client_seq: u32,
+    pub family: String,
+    pub stage: String,
+    pub stage_ms: u32,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct CommandLifecycleSample {
+    pub received_unix_ms: u64,
+    pub client_seq: u32,
+    pub family: &'static str,
+    pub accepted: bool,
+    pub frame_deserialize_ms: u32,
+    pub deserialize_to_room_enqueue_ms: u32,
+    pub room_queue_ms: u32,
+    pub room_handle_ms: u32,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct CommandSimAckSample {
+    pub received_unix_ms: u64,
+    pub client_seq: u32,
+    pub family: &'static str,
+    pub accepted_to_sim_ack_ms: u32,
+}
+
+#[derive(Default)]
+struct CommandLifecycleWindow {
+    count: u32,
+    accepted: u32,
+    rejected: u32,
+    frame_deserialize: CommandTimingWindow,
+    deserialize_to_room_enqueue: CommandTimingWindow,
+    room_queue: CommandTimingWindow,
+    room_handle: CommandTimingWindow,
+    receipt_send_age: CommandTimingWindow,
+    accepted_to_sim_ack: CommandTimingWindow,
+    exemplars: Vec<CommandLifecycleExemplarStats>,
+}
+
+#[derive(Default)]
+struct CommandTimingWindow {
+    latest_ms: u32,
+    max_ms: u32,
+    count: u32,
+    bucket_counts: [u32; COMMAND_LIFECYCLE_BUCKET_COUNT],
 }
 
 #[derive(Default)]
@@ -81,6 +161,8 @@ pub(crate) struct ConnectionReportCounters {
     snapshot_slot_stored: AtomicU32,
     snapshot_slot_replaced: AtomicU32,
     snapshot_slot_closed: AtomicU32,
+    command_receipt_queued_at: StdMutex<Vec<StdInstant>>,
+    command_lifecycle: StdMutex<CommandLifecycleWindow>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -204,17 +286,27 @@ impl ConnectionSink {
         self.stats.consume()
     }
 
+    pub(crate) fn record_command_lifecycle(&self, sample: CommandLifecycleSample) {
+        self.stats.record_command_lifecycle(sample);
+    }
+
+    pub(crate) fn record_command_sim_ack(&self, sample: CommandSimAckSample) {
+        self.stats.record_command_sim_ack(sample);
+    }
+
     fn record_command_receipt_queued(&self, accepted: Option<bool>) {
         match accepted {
             Some(true) => {
                 self.stats
                     .command_receipts_accepted
                     .fetch_add(1, Ordering::Relaxed);
+                self.stats.record_command_receipt_queued_at();
             }
             Some(false) => {
                 self.stats
                     .command_receipts_rejected
                     .fetch_add(1, Ordering::Relaxed);
+                self.stats.record_command_receipt_queued_at();
             }
             None => {}
         }
@@ -320,6 +412,10 @@ impl ConnectionWriterStats {
         self.counters
             .record_snapshot_sent(stats.age_ms, stats.waited_behind_reliable);
     }
+
+    pub fn record_reliable_sent(&self, command_receipt: bool) {
+        self.counters.record_reliable_sent(command_receipt);
+    }
 }
 
 impl ConnectionReportCounters {
@@ -345,9 +441,94 @@ impl ConnectionReportCounters {
         }
     }
 
+    pub(crate) fn record_command_receipt_queued_at(&self) {
+        match self.command_receipt_queued_at.lock() {
+            Ok(mut guard) => guard.push(StdInstant::now()),
+            Err(poisoned) => {
+                let mut guard = poisoned.into_inner();
+                guard.push(StdInstant::now());
+            }
+        }
+    }
+
+    pub(crate) fn record_reliable_sent(&self, command_receipt: bool) {
+        if command_receipt {
+            let queued_at = match self.command_receipt_queued_at.lock() {
+                Ok(mut guard) => {
+                    if guard.is_empty() {
+                        None
+                    } else {
+                        Some(guard.remove(0))
+                    }
+                }
+                Err(poisoned) => {
+                    let mut guard = poisoned.into_inner();
+                    if guard.is_empty() {
+                        None
+                    } else {
+                        Some(guard.remove(0))
+                    }
+                }
+            };
+            if let Some(queued_at) = queued_at {
+                self.with_command_lifecycle(|window| {
+                    window
+                        .receipt_send_age
+                        .add(duration_since_ms_u32(queued_at));
+                });
+            }
+        }
+    }
+
+    pub(crate) fn record_command_lifecycle(&self, sample: CommandLifecycleSample) {
+        self.with_command_lifecycle(|window| {
+            window.count = window.count.saturating_add(1);
+            if sample.accepted {
+                window.accepted = window.accepted.saturating_add(1);
+            } else {
+                window.rejected = window.rejected.saturating_add(1);
+            }
+            window.frame_deserialize.add(sample.frame_deserialize_ms);
+            window
+                .deserialize_to_room_enqueue
+                .add(sample.deserialize_to_room_enqueue_ms);
+            window.room_queue.add(sample.room_queue_ms);
+            window.room_handle.add(sample.room_handle_ms);
+            window.add_exemplar(
+                sample.received_unix_ms,
+                sample.client_seq,
+                sample.family,
+                [
+                    ("serverFrameDeserialize", sample.frame_deserialize_ms),
+                    (
+                        "serverDeserializeToRoomEnqueue",
+                        sample.deserialize_to_room_enqueue_ms,
+                    ),
+                    ("serverRoomQueue", sample.room_queue_ms),
+                    ("serverRoomHandle", sample.room_handle_ms),
+                ],
+            );
+        });
+    }
+
+    pub(crate) fn record_command_sim_ack(&self, sample: CommandSimAckSample) {
+        self.with_command_lifecycle(|window| {
+            window
+                .accepted_to_sim_ack
+                .add(sample.accepted_to_sim_ack_ms);
+            window.add_exemplar(
+                sample.received_unix_ms,
+                sample.client_seq,
+                sample.family,
+                [("serverAcceptedToSimAck", sample.accepted_to_sim_ack_ms)],
+            );
+        });
+    }
+
     fn consume(&self) -> ConnectionReportStats {
         let snapshot_sent = self.snapshot_sent.swap(0, Ordering::Relaxed);
         let snapshot_send_age_total_ms = self.snapshot_send_age_total_ms.swap(0, Ordering::Relaxed);
+        let command_lifecycle = self.consume_command_lifecycle();
         ConnectionReportStats {
             command_receipts_accepted: self.command_receipts_accepted.swap(0, Ordering::Relaxed),
             command_receipts_rejected: self.command_receipts_rejected.swap(0, Ordering::Relaxed),
@@ -373,7 +554,117 @@ impl ConnectionReportCounters {
             snapshot_slot_stored: self.snapshot_slot_stored.swap(0, Ordering::Relaxed),
             snapshot_slot_replaced: self.snapshot_slot_replaced.swap(0, Ordering::Relaxed),
             snapshot_slot_closed: self.snapshot_slot_closed.swap(0, Ordering::Relaxed),
+            command_lifecycle,
         }
+    }
+
+    fn with_command_lifecycle(&self, f: impl FnOnce(&mut CommandLifecycleWindow)) {
+        match self.command_lifecycle.lock() {
+            Ok(mut guard) => f(&mut guard),
+            Err(poisoned) => f(&mut poisoned.into_inner()),
+        }
+    }
+
+    fn consume_command_lifecycle(&self) -> CommandLifecycleReportStats {
+        match self.command_lifecycle.lock() {
+            Ok(mut guard) => guard.consume(),
+            Err(poisoned) => {
+                let mut guard = poisoned.into_inner();
+                guard.consume()
+            }
+        }
+    }
+}
+
+impl CommandLifecycleWindow {
+    fn add_exemplar<const N: usize>(
+        &mut self,
+        received_unix_ms: u64,
+        client_seq: u32,
+        family: &'static str,
+        stages: [(&'static str, u32); N],
+    ) {
+        let Some((stage, stage_ms)) = stages.into_iter().max_by_key(|(_, value)| *value) else {
+            return;
+        };
+        self.exemplars.push(CommandLifecycleExemplarStats {
+            received_unix_ms,
+            client_seq,
+            family: family.to_string(),
+            stage: stage.to_string(),
+            stage_ms,
+        });
+        self.exemplars.sort_by(|a, b| {
+            b.stage_ms
+                .cmp(&a.stage_ms)
+                .then_with(|| a.client_seq.cmp(&b.client_seq))
+        });
+        self.exemplars
+            .truncate(COMMAND_LIFECYCLE_TOP_N.min(self.exemplars.len()));
+    }
+
+    fn consume(&mut self) -> CommandLifecycleReportStats {
+        let out = CommandLifecycleReportStats {
+            count: self.count,
+            accepted: self.accepted,
+            rejected: self.rejected,
+            frame_deserialize: self.frame_deserialize.consume(),
+            deserialize_to_room_enqueue: self.deserialize_to_room_enqueue.consume(),
+            room_queue: self.room_queue.consume(),
+            room_handle: self.room_handle.consume(),
+            receipt_send_age: self.receipt_send_age.consume(),
+            accepted_to_sim_ack: self.accepted_to_sim_ack.consume(),
+            exemplars: std::mem::take(&mut self.exemplars),
+        };
+        self.count = 0;
+        self.accepted = 0;
+        self.rejected = 0;
+        out
+    }
+}
+
+impl CommandTimingWindow {
+    fn add(&mut self, value_ms: u32) {
+        let value_ms = value_ms.min(u16::MAX as u32);
+        self.latest_ms = value_ms;
+        self.max_ms = self.max_ms.max(value_ms);
+        self.count = self.count.saturating_add(1);
+        let index = COMMAND_LIFECYCLE_BUCKETS_MS
+            .iter()
+            .position(|bucket| value_ms <= *bucket)
+            .unwrap_or(COMMAND_LIFECYCLE_BUCKETS_MS.len());
+        if let Some(count) = self.bucket_counts.get_mut(index) {
+            *count = count.saturating_add(1);
+        }
+    }
+
+    fn consume(&mut self) -> CommandTimingStats {
+        let out = CommandTimingStats {
+            latest_ms: self.latest_ms,
+            max_ms: self.max_ms,
+            p95_ms: self.p95_ms(),
+            count: self.count,
+        };
+        *self = Self::default();
+        out
+    }
+
+    fn p95_ms(&self) -> u32 {
+        if self.count == 0 {
+            return 0;
+        }
+        let target = self.count.saturating_mul(95).saturating_add(99) / 100;
+        let mut seen = 0u32;
+        for (index, count) in self.bucket_counts.iter().enumerate() {
+            seen = seen.saturating_add(*count);
+            if seen >= target {
+                return COMMAND_LIFECYCLE_BUCKETS_MS
+                    .get(index)
+                    .copied()
+                    .unwrap_or_else(|| *COMMAND_LIFECYCLE_BUCKETS_MS.last().unwrap_or(&0));
+            }
+        }
+        0
     }
 }
 
@@ -385,6 +676,10 @@ fn fetch_max(target: &AtomicU32, value: u32) {
             Err(next) => current = next,
         }
     }
+}
+
+fn duration_since_ms_u32(start: StdInstant) -> u32 {
+    start.elapsed().as_millis().min(u32::MAX as u128) as u32
 }
 
 fn merge_resource_deltas(snapshot: &mut Snapshot, previous: &[ResourceDelta]) {
