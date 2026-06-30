@@ -17,6 +17,7 @@ use crate::rules::combat as combat_rules;
 use rand::SeedableRng;
 
 mod mortar_autocast;
+mod entrenchment;
 mod moving_fire_policy;
 mod retention;
 mod support_weapon_attack_move;
@@ -147,6 +148,16 @@ fn team_relations(assignments: &[(u32, u32)]) -> TeamRelations {
     TeamRelations::from_player_teams(assignments.iter().copied())
 }
 
+fn mark_entrenched(entities: &mut EntityStore, id: u32) {
+    entities
+        .get_mut(id)
+        .expect("entity should exist")
+        .movement
+        .as_mut()
+        .expect("entity should have movement")
+        .occupied_trench_id = Some(1);
+}
+
 fn run_combat_tick(entities: &mut EntityStore) -> HashMap<u32, Vec<Event>> {
     let mut player = player_state(1, false);
     player.upgrades.insert(UpgradeKind::MortarAutocast);
@@ -246,9 +257,7 @@ fn predicted_test_mortar_impact(
     let mut fog = Fog::new(map.size);
     fog.recompute(player_ids, entities, &map);
     let (x, y) = mortar_aim_point(entities, target, tick);
-    crate::game::mortar_scatter::predicted_mortar_impact(
-        &fog, teams, owner, attacker, x, y, tick,
-    )
+    crate::game::mortar_scatter::predicted_mortar_impact(&fog, teams, owner, attacker, x, y, tick)
 }
 
 fn run_movement_tick(entities: &mut EntityStore) {
@@ -307,10 +316,43 @@ fn apply_test_damage_with_teams(
     vy: f32,
     range_px: f32,
 ) {
+    apply_test_damage_with_seed_and_teams(
+        entities,
+        teams,
+        events,
+        attacker,
+        victim,
+        dmg,
+        attacker_owner,
+        ax,
+        ay,
+        vx,
+        vy,
+        range_px,
+        0,
+    );
+}
+
+#[allow(clippy::too_many_arguments)]
+fn apply_test_damage_with_seed_and_teams(
+    entities: &mut EntityStore,
+    teams: &TeamRelations,
+    events: &mut HashMap<u32, Vec<Event>>,
+    attacker: u32,
+    victim: u32,
+    dmg: u32,
+    attacker_owner: u32,
+    ax: f32,
+    ay: f32,
+    vx: f32,
+    vy: f32,
+    range_px: f32,
+    rng_seed: u64,
+) {
     let map = Map::generate(2, 0x00C0_FFEE);
     let fog = Fog::new(map.size);
     let smokes = SmokeCloudStore::new();
-    let mut rng = SmallRng::seed_from_u64(0);
+    let mut rng = SmallRng::seed_from_u64(rng_seed);
     apply_damage(
         &map,
         entities,

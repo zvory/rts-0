@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::config;
 use crate::game::entity::{Entity, EntityKind, EntityStore};
+use crate::game::entrenchment_combat;
 use crate::game::fog::Fog;
 use crate::game::services::geometry::RectBody;
 use crate::game::teams::TeamRelations;
@@ -89,7 +90,10 @@ fn resolve_shell(
         let Some(target) = entities.get(id) else {
             continue;
         };
-        let damage = artillery_damage(target.kind, d2, inner2, outer2);
+        let damage = entrenchment_combat::reduce_area_damage(
+            target,
+            artillery_damage(target.kind, d2, inner2, outer2),
+        );
         if damage == 0 {
             continue;
         }
@@ -248,10 +252,49 @@ mod tests {
 
     fn has_under_attack_notice(events: &HashMap<u32, Vec<Event>>, player: u32) -> bool {
         events.get(&player).is_some_and(|player_events| {
-            player_events
-                .iter()
-                .any(|event| matches!(event, Event::Notice { msg, .. } if msg == "alert:under_attack"))
+            player_events.iter().any(
+                |event| matches!(event, Event::Notice { msg, .. } if msg == "alert:under_attack"),
+            )
         })
+    }
+
+    fn mark_entrenched(entities: &mut EntityStore, id: u32) {
+        entities
+            .get_mut(id)
+            .expect("entity should exist")
+            .movement
+            .as_mut()
+            .expect("entity should have movement")
+            .occupied_trench_id = Some(1);
+    }
+
+    #[test]
+    fn artillery_area_damage_is_reduced_against_entrenched_infantry() {
+        let map = open_map(20);
+        let mut entities = EntityStore::new();
+        let victim = entities
+            .spawn_unit(2, EntityKind::Rifleman, 160.0, 160.0)
+            .expect("victim should spawn");
+        mark_entrenched(&mut entities, victim);
+        let before = entities.get(victim).expect("victim should exist").hp;
+        let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
+        let fog = visible_team_fog(&map, &entities);
+        let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
+        let shell = ArtilleryShell {
+            owner: 1,
+            x: 160.0,
+            y: 160.0,
+            impact_tick: 0,
+        };
+
+        resolve_shell(&mut entities, &teams, &fog, &mut events, &shell, 10);
+
+        let after = entities.get(victim).expect("victim should survive").hp;
+        assert_eq!(
+            before - after,
+            45,
+            "entrenched infantry should take 30% of inner artillery splash"
+        );
     }
 
     #[test]

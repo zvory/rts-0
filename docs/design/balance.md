@@ -316,10 +316,14 @@ folded into default targeting.
   and takes 300 ticks (~10s). The rules surface defines Riflemen, Machine Gunners, and Workers as
   eligible entrenchment infantry; Mortar Teams, Ekat, Golems, Ekat-faction units, vehicles,
   buildings, support weapons other than Machine Gunners, and non-infantry entities are excluded.
-  The current contract constants are a 90-tick (~3s) dig-in duration, +1 tile entrenched range
-  bonus, 70% direct-shot miss chance, 70% area-damage reduction, and 0.75-tile trench radius. This
-  phase exposes the research and constants only; automatic trench creation, occupation, rendering,
-  and combat bonuses are implemented by later entrenchment phases.
+  Eligible infantry owned by a player with completed Entrenchment create neutral trenches after
+  holding ground on untrenched terrain for 90 ticks (~3s), and any eligible infantry can occupy an
+  existing trench while stopped in its footprint. Active occupation grants +1 tile weapon range,
+  suppresses idle aggressive chase like Hold Position, gives incoming direct shots a 70% miss
+  chance, reduces incoming area damage by 70% after existing falloff/armor rules, and suppresses
+  over-penetration through or into the entrenched unit. Direct-shot miss sources use the highest
+  applicable chance, not composed probability, so an Anti-Tank Gun's 65% infantry miss chance
+  becomes 70% against entrenched eligible infantry. The trench radius is 0.75 tile.
 - **Heavy Guns** (R&D Complex research, protocol id `anti_tank_gun_unlock`): costs 200 steel / 75 oil
   and takes 600 ticks (~20s). Once complete, that player can train Anti-Tank Guns and Artillery
   from Gun Works. The legacy protocol id `artillery_unlock` remains decodable for old compact

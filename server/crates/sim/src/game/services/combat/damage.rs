@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::game::entity::{EntityKind, EntityStore};
+use crate::game::entrenchment_combat;
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::line_of_sight::LineOfSight;
@@ -64,8 +65,10 @@ pub(super) fn apply_damage(
         .unwrap_or((vx, vy));
     let reveal = attack_reveal_for(entities.get(attacker));
     let attacker_kind = entities.get(attacker).map(|e| e.kind);
-    let victim_kind = entities.get(shot_victim).map(|e| e.kind);
-    let victim_facing = entities.get(shot_victim).map(|e| e.facing());
+    let victim = entities.get(shot_victim);
+    let victim_kind = victim.map(|e| e.kind);
+    let victim_facing = victim.map(|e| e.facing());
+    let victim_entrenched = victim.is_some_and(entrenchment_combat::is_actively_entrenched);
     let victim_owner = entities.get(shot_victim).map(|e| e.owner).unwrap_or(0);
     emit_attack_event(
         events,
@@ -82,8 +85,8 @@ pub(super) fn apply_damage(
     );
 
     // Roll for miss before computing damage.
-    if let (Some(ak), Some(vk)) = (attacker_kind, victim_kind) {
-        let mc = combat_rules::miss_chance(ak, vk).max(extra_miss_chance);
+    if let (Some(ak), Some(v)) = (attacker_kind, entities.get(shot_victim)) {
+        let mc = entrenchment_combat::direct_miss_chance(ak, v, extra_miss_chance);
         if mc > 0.0 && rng.gen::<f32>() < mc {
             return Some(victim_owner);
         }
@@ -110,7 +113,7 @@ pub(super) fn apply_damage(
     } else {
         false
     };
-    if damaged {
+    if damaged && !victim_entrenched {
         apply_overpenetration(
             map,
             entities,
@@ -129,6 +132,8 @@ pub(super) fn apply_damage(
             range_px,
             tick,
         );
+    }
+    if damaged {
         push_under_attack_notices_for_visible_attack(
             events,
             fog,
@@ -163,6 +168,12 @@ fn apply_overpenetration(
     range_px: f32,
     tick: u32,
 ) {
+    if entities
+        .get(primary_victim)
+        .is_some_and(entrenchment_combat::is_actively_entrenched)
+    {
+        return;
+    }
     if entities
         .get(primary_victim)
         .map(|e| e.kind == EntityKind::Tank || e.is_building())
@@ -206,6 +217,9 @@ fn apply_overpenetration(
         };
         if target.is_node() || !teams.is_enemy_owner(attacker_owner, target.owner) || target.hp == 0
         {
+            continue;
+        }
+        if entrenchment_combat::is_actively_entrenched(target) {
             continue;
         }
         let along = if target.kind == EntityKind::Tank || target.is_building() {

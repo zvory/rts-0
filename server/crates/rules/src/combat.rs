@@ -141,6 +141,42 @@ pub fn miss_chance(attacker_kind: EntityKind, victim_kind: EntityKind) -> f32 {
     }
 }
 
+/// Direct-shot miss policy composes independent miss sources by using the highest chance.
+pub fn miss_chance_with_entrenchment(
+    attacker_kind: EntityKind,
+    victim_kind: EntityKind,
+    victim_actively_entrenched: bool,
+) -> f32 {
+    miss_chance(attacker_kind, victim_kind).max(entrenchment_miss_chance(
+        victim_kind,
+        victim_actively_entrenched,
+    ))
+}
+
+fn entrenchment_miss_chance(victim_kind: EntityKind, victim_actively_entrenched: bool) -> f32 {
+    if victim_actively_entrenched && crate::balance::is_entrenchment_eligible_infantry(victim_kind)
+    {
+        crate::balance::ENTRENCHMENT_DIRECT_MISS_CHANCE.clamp(0.0, 1.0)
+    } else {
+        0.0
+    }
+}
+
+/// Applies the shared area-damage reduction for actively entrenched eligible infantry.
+pub fn area_damage_after_entrenchment(
+    victim_kind: EntityKind,
+    damage: u32,
+    victim_actively_entrenched: bool,
+) -> u32 {
+    if !victim_actively_entrenched
+        || !crate::balance::is_entrenchment_eligible_infantry(victim_kind)
+    {
+        return damage;
+    }
+    let multiplier = (1.0 - crate::balance::ENTRENCHMENT_AREA_DAMAGE_REDUCTION).clamp(0.0, 1.0);
+    ((damage as f32) * multiplier).round().max(0.0) as u32
+}
+
 fn anti_tank_gun_miss_target(kind: EntityKind) -> bool {
     matches!(
         kind,
@@ -256,6 +292,42 @@ mod tests {
         assert_eq!(
             effective_damage(EntityKind::Rifleman, EntityKind::Rifleman, 20, None),
             20
+        );
+    }
+
+    #[test]
+    fn entrenched_direct_miss_uses_highest_policy_chance() {
+        assert_eq!(
+            miss_chance_with_entrenchment(EntityKind::Rifleman, EntityKind::Rifleman, true),
+            crate::balance::ENTRENCHMENT_DIRECT_MISS_CHANCE
+        );
+        assert_eq!(
+            miss_chance_with_entrenchment(EntityKind::AntiTankGun, EntityKind::Rifleman, true),
+            crate::balance::ENTRENCHMENT_DIRECT_MISS_CHANCE
+        );
+        assert_eq!(
+            miss_chance_with_entrenchment(EntityKind::Rifleman, EntityKind::Depot, true),
+            0.0
+        );
+    }
+
+    #[test]
+    fn entrenched_area_damage_reduces_only_eligible_infantry() {
+        assert_eq!(
+            area_damage_after_entrenchment(EntityKind::Rifleman, 100, true),
+            30
+        );
+        assert_eq!(
+            area_damage_after_entrenchment(EntityKind::MachineGunner, 40, true),
+            12
+        );
+        assert_eq!(
+            area_damage_after_entrenchment(EntityKind::MortarTeam, 100, true),
+            100
+        );
+        assert_eq!(
+            area_damage_after_entrenchment(EntityKind::Rifleman, 100, false),
+            100
         );
     }
 
