@@ -11,6 +11,10 @@ import {
 } from "../protocol.js";
 import { ABILITIES, MINING_CC_RANGE_TILES, STATS, TANK_BODY, isProducerBuilding } from "../config.js";
 import { DEFAULT_HIT_RADIUS, DEFAULT_TILE_SIZE, HIT_PAD_PX, OWN_HIT_BONUS, ZOOM_STEP } from "./constants.js";
+import {
+  buildArtilleryTargetLocks,
+  isArtilleryFireAbility,
+} from "./artillery_targeting.js";
 import { commandHotkeyFromEvent } from "./placement.js";
 import { armPostQuickCastSelectionGuard } from "./quick_cast_selection_guard.js";
 
@@ -145,17 +149,36 @@ export function _issueTargetedCommand(p, ev = {}) {
           .map((e) => e.id)
       : ownUnits;
     if (units.length === 0) return;
+    const queued = !!ev.shiftKey;
     const command = ability === ABILITY.POINT_FIRE
-      ? cmd.pointFire(units, world.x, world.y, !!ev.shiftKey)
-      : cmd.useAbility(ability, units, world.x, world.y, !!ev.shiftKey);
+      ? cmd.pointFire(units, world.x, world.y, queued)
+      : ability === ABILITY.BLANKET_FIRE
+        ? cmd.blanketFire(units, world.x, world.y, queued)
+        : cmd.useAbility(ability, units, world.x, world.y, queued);
     this._issueCommand(command);
-    this._addCommandFeedback(
-      ability === ABILITY.MORTAR_FIRE ? "mortar" : ability === ABILITY.POINT_FIRE ? "artillery" : "attack",
-      world.x,
-      world.y,
-      !!ev.shiftKey,
-      definition?.radiusTiles,
-    );
+    if (isArtilleryFireAbility(ability)) {
+      const locks = buildArtilleryTargetLocks({
+        ability,
+        carriers: this.state.selectedEntities().filter((e) => units.includes(e.id)),
+        rawX: world.x,
+        rawY: world.y,
+        map: this.state.map,
+        tileSize: this.state.map?.tileSize || DEFAULT_TILE_SIZE,
+        definition,
+      });
+      if (locks.length > 0) {
+        for (const lock of locks) {
+          this._addCommandFeedback("artillery", lock.x, lock.y, queued, definition?.radiusTiles);
+        }
+        return;
+      }
+    }
+    const feedbackKind = ability === ABILITY.MORTAR_FIRE
+      ? "mortar"
+      : isArtilleryFireAbility(ability)
+        ? "artillery"
+        : "attack";
+    this._addCommandFeedback(feedbackKind, world.x, world.y, queued, definition?.radiusTiles);
     return;
   }
   if (commandTarget === "move") {
@@ -272,21 +295,32 @@ export function _refreshAbilityTargetPreview() {
   const rangePx = definition.rangeTiles * tileSize;
   const minRangePx = (definition.minRangeTiles || 0) * tileSize;
   const world = this._worldAt(this.mouse.x, this.mouse.y);
-  const locksRangeBand = target.ability === ABILITY.POINT_FIRE;
+  const locksRangeBand = isArtilleryFireAbility(target.ability);
   let hoverInRange = false;
   let hoverInsideMinRange = false;
-  for (const c of carriers) {
-    const dist = Math.hypot(world.x - c.x, world.y - c.y);
-    if (locksRangeBand && Number.isFinite(dist)) {
-      hoverInRange = true;
-      break;
-    }
-    if (minRangePx > 0 && dist < minRangePx) {
-      hoverInsideMinRange = true;
-    }
-    if (dist <= rangePx && dist >= minRangePx) {
-      hoverInRange = true;
-      break;
+  let artilleryLocks = [];
+  if (locksRangeBand) {
+    artilleryLocks = buildArtilleryTargetLocks({
+      ability: target.ability,
+      carriers,
+      rawX: world.x,
+      rawY: world.y,
+      map: this.state.map,
+      tileSize,
+      definition,
+    });
+    hoverInRange = artilleryLocks.length > 0;
+  }
+  if (!locksRangeBand) {
+    for (const c of carriers) {
+      const dist = Math.hypot(world.x - c.x, world.y - c.y);
+      if (minRangePx > 0 && dist < minRangePx) {
+        hoverInsideMinRange = true;
+      }
+      if (dist <= rangePx && dist >= minRangePx) {
+        hoverInRange = true;
+        break;
+      }
     }
   }
   const abilityObjects = Array.isArray(this.state.abilityObjects) ? this.state.abilityObjects : [];
@@ -328,11 +362,15 @@ export function _refreshAbilityTargetPreview() {
     y: carrier.y,
     radiusPx: Math.max(5, (STATS[carrier.kind]?.size || 8) * 0.45),
   }));
+  const primaryLock = artilleryLocks[0] || null;
   intent?.updateAbilityTargetPreview?.({
     ability: target.ability,
-    mouseX: world.x,
-    mouseY: world.y,
+    mouseX: primaryLock?.x ?? world.x,
+    mouseY: primaryLock?.y ?? world.y,
+    rawMouseX: world.x,
+    rawMouseY: world.y,
     carriers,
+    artilleryLocks,
     rangeOrigins: carrierOrigins,
     pathOrigins: target.ability === ABILITY.EKAT_LINE_SHOT
       ? carrierOrigins.concat(anchorOrigins)

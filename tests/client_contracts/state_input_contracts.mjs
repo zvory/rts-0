@@ -10,6 +10,7 @@ import {
 } from "./assertions.mjs";
 import { GameState } from "../../client/src/state.js";
 import {
+  ARTILLERY_BLANKET_RADIUS_TILES,
   ARTILLERY_MAX_RANGE_TILES,
   ARTILLERY_MIN_RANGE_TILES,
   ARTILLERY_SHELL_DELAY_TICKS,
@@ -1951,23 +1952,59 @@ function buttonByLabel(card, label) {
   pointFireInput.commandIssuer = { issueCommand: (command) => artilleryCommands.push(command) };
   pointFireInput._worldAt = (x, y) => ({ x, y });
   pointFireInput._selectedOwnUnitIds = () => [selectedArtillery.id];
-  pointFireInput._issueTargetedCommand({ x: 920, y: 116 }, { shiftKey: true });
+  const closeRawPoint = {
+    x: selectedArtillery.x + ARTILLERY_MIN_RANGE_TILES * 32 - 8,
+    y: selectedArtillery.y,
+  };
+  pointFireInput._issueTargetedCommand(closeRawPoint, { shiftKey: true });
   assert(
     artilleryCommands[0]?.c === "useAbility" &&
       artilleryCommands[0].ability === ABILITY.POINT_FIRE &&
       artilleryCommands[0].units[0] === selectedArtillery.id &&
+      artilleryCommands[0].x === closeRawPoint.x &&
       artilleryCommands[0].queued === true,
-    "Point Fire targeting issues the dedicated pointFire ability command",
+    "Point Fire targeting sends the raw click in the dedicated ability command",
   );
   assert(
-    artilleryFeedback[0]?.kind === "artillery" && artilleryFeedback[0].radiusTiles === ABILITIES[ABILITY.POINT_FIRE].radiusTiles,
-    "Point Fire targeting shows artillery command feedback with splash radius",
+    artilleryFeedback[0]?.kind === "artillery" &&
+      artilleryFeedback[0].radiusTiles === ABILITIES[ABILITY.POINT_FIRE].radiusTiles &&
+      artilleryFeedback[0].x === selectedArtillery.x + ARTILLERY_MIN_RANGE_TILES * 32 &&
+      artilleryFeedback[0].y === selectedArtillery.y,
+    "Point Fire targeting shows command feedback at the locked effective point with splash radius",
   );
 
+  pointFireInput.clientIntent.endCommandTarget();
+  pointFireInput.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.BLANKET_FIRE });
+  const farRawPoint = {
+    x: selectedArtillery.x + ARTILLERY_MAX_RANGE_TILES * 32 + 16,
+    y: selectedArtillery.y,
+  };
+  pointFireInput._issueTargetedCommand(farRawPoint, { shiftKey: false });
+  assert(
+    artilleryCommands[1]?.ability === ABILITY.BLANKET_FIRE &&
+      artilleryCommands[1].x === farRawPoint.x &&
+      artilleryCommands[1].queued !== true,
+    "Blanket Fire targeting sends the raw click through the normal ability command",
+  );
+  assert(
+    artilleryFeedback[1]?.kind === "artillery" &&
+      artilleryFeedback[1].radiusTiles === ARTILLERY_BLANKET_RADIUS_TILES &&
+      artilleryFeedback[1].x === selectedArtillery.x + ARTILLERY_MAX_RANGE_TILES * 32,
+    "Blanket Fire command feedback marks the locked center and blanket radius",
+  );
+
+  pointFireInput.clientIntent.endCommandTarget();
+  pointFireInput.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.POINT_FIRE });
   pointFireInput.mouse = { x: selectedArtillery.x + ARTILLERY_MIN_RANGE_TILES * 32 - 8, y: selectedArtillery.y };
   pointFireInput._refreshAbilityTargetPreview();
   assert(pointFireInput.clientIntent.abilityTargetPreview?.hoverInRange === true && pointFireInput.clientIntent.abilityTargetPreview?.hoverInsideMinRange === false, "Point Fire preview accepts minimum-range locking clicks");
   assert(pointFireInput.clientIntent.abilityTargetPreview?.minRangePx === ARTILLERY_MIN_RANGE_TILES * 32, "Point Fire preview exposes minimum range in pixels");
+  assertApprox(
+    pointFireInput.clientIntent.abilityTargetPreview.mouseX,
+    selectedArtillery.x + ARTILLERY_MIN_RANGE_TILES * 32,
+    0.001,
+    "Point Fire preview reticle locks inside-minimum hovers to the effective point",
+  );
   assert(
     ARTILLERY_MIN_RANGE_TILES === 25 && ARTILLERY_MAX_RANGE_TILES === 55,
     "Artillery point-fire range mirrors the 25-55 tile balance band",
@@ -1993,6 +2030,12 @@ function buttonByLabel(card, label) {
   pointFireInput.mouse = { x: selectedArtillery.x + ARTILLERY_MAX_RANGE_TILES * 32 + 16, y: selectedArtillery.y };
   pointFireInput._refreshAbilityTargetPreview();
   assert(pointFireInput.clientIntent.abilityTargetPreview?.hoverInRange === true, "Point Fire preview accepts maximum-range locking clicks");
+  assertApprox(
+    pointFireInput.clientIntent.abilityTargetPreview.mouseX,
+    selectedArtillery.x + ARTILLERY_MAX_RANGE_TILES * 32,
+    0.001,
+    "Point Fire preview reticle locks beyond-maximum hovers to the effective point",
+  );
   const targetingConeGfx = new RecordingGraphics();
   _drawAbilityTargetPreview.call(
     { _feedbackGfx: targetingConeGfx, _map: { tileSize: 32 } },
@@ -2037,6 +2080,31 @@ function buttonByLabel(card, label) {
       calls[i + 1]?.[2] === pointFireInput.clientIntent.abilityTargetPreview.mouseY,
   );
   assert(lockedHorizontalStroke, "Point Fire minimum-range locking cursor keeps the crosshair stroke");
+
+  pointFireInput.clientIntent.endCommandTarget();
+  pointFireInput.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.BLANKET_FIRE });
+  pointFireInput.mouse = { x: selectedArtillery.x + ARTILLERY_MAX_RANGE_TILES * 32 + 64, y: selectedArtillery.y };
+  pointFireInput._refreshAbilityTargetPreview();
+  assert(
+    pointFireInput.clientIntent.abilityTargetPreview?.artilleryLocks?.[0]?.x === selectedArtillery.x + ARTILLERY_MAX_RANGE_TILES * 32,
+    "Blanket Fire preview locks the blanket center per artillery gun",
+  );
+  assert(
+    pointFireInput.clientIntent.abilityTargetPreview?.radiusPx === ARTILLERY_BLANKET_RADIUS_TILES * 32,
+    "Blanket Fire preview exposes the mirrored blanket radius",
+  );
+  const blanketPreviewGfx = new RecordingGraphics();
+  _drawAbilityTargetPreview.call(
+    { _feedbackGfx: blanketPreviewGfx, _map: { tileSize: 32 } },
+    { abilityTargetPreview: pointFireInput.clientIntent.abilityTargetPreview },
+  );
+  assert(
+    blanketPreviewGfx.calls.some((call) =>
+      call[0] === "moveTo" &&
+        call[1] === pointFireInput.clientIntent.abilityTargetPreview.mouseX + ARTILLERY_BLANKET_RADIUS_TILES * 32 &&
+        call[2] === pointFireInput.clientIntent.abilityTargetPreview.mouseY),
+    "Blanket Fire preview draws the 15-tile blanket radius around the locked center",
+  );
 
   const ekatEntity = { id: 88, owner: 1, kind: KIND.EKAT, x: 200, y: 220 };
   const ekatInput = Object.create(Input.prototype);

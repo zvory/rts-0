@@ -1,5 +1,3 @@
-import { ABILITY, ORDER_STAGE, SETUP } from "./protocol.js";
-
 function abilityStatus(entity, ability) {
   return Array.isArray(entity.abilities)
     ? entity.abilities.find((entry) => entry.ability === ability)
@@ -53,12 +51,7 @@ function abilityLockoutActive(entity, ability) {
 }
 
 export function abilityRequiresSetup(entity, definition) {
-  return definition.ability === ABILITY.POINT_FIRE &&
-    entity.setupState !== SETUP.DEPLOYED &&
-    !hasPointFireOrder(entity);
-}
-
-function hasPointFireOrder(entity) {
-  return Array.isArray(entity?.orderPlan) &&
-    entity.orderPlan.some((marker) => marker?.kind === ORDER_STAGE.POINT_FIRE);
+  void entity;
+  void definition;
+  return false;
 }

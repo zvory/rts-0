@@ -120,7 +120,10 @@ export function buildCommandCardContextCatalog() {
     owner: playerId,
     kind: KIND.ARTILLERY,
     setupState: SETUP.DEPLOYED,
-    abilities: [{ ability: ABILITY.POINT_FIRE, cooldownLeft: 0, remainingUses: null }],
+    abilities: [
+      { ability: ABILITY.POINT_FIRE, cooldownLeft: 0, remainingUses: null },
+      { ability: ABILITY.BLANKET_FIRE, cooldownLeft: 0, remainingUses: null },
+    ],
   };
   const commandCar = {
     id: 15,

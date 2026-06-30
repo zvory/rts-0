@@ -274,7 +274,7 @@ const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
         tech_requirement: None,
         queue_policy: AbilityQueuePolicy::QueueSkipIfNotReady,
         autocast: false,
-        command_card: false,
+        command_card: true,
         protocol_code: 10,
         order_stage_code: 17,
     },
@@ -778,7 +778,7 @@ mod tests {
             blanket_fire.cooldown_ticks,
             balance::ARTILLERY_RELOAD_TICKS as u16
         );
-        assert!(!blanket_fire.command_card);
+        assert!(blanket_fire.command_card);
         assert_eq!(blanket_fire.protocol_code, 10);
         assert_eq!(blanket_fire.order_stage_code, 17);
 

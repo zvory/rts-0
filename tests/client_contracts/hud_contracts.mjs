@@ -593,7 +593,10 @@ function fakeHudRootWithoutResourceSpans() {
     owner: 1,
     kind: KIND.ARTILLERY,
     setupState: SETUP.DEPLOYED,
-    abilities: [{ ability: ABILITY.POINT_FIRE, cooldownLeft: 0, remainingUses: null }],
+    abilities: [
+      { ability: ABILITY.POINT_FIRE, cooldownLeft: 0, remainingUses: null },
+      { ability: ABILITY.BLANKET_FIRE, cooldownLeft: 0, remainingUses: null },
+    ],
   };
   const pointFireCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [artillery],
@@ -603,6 +606,9 @@ function fakeHudRootWithoutResourceSpans() {
   const pointFire = buttonByLabel(pointFireCard, "Point Fire");
   assert(pointFire.unaffordable, "unaffordable ability should stay clickable");
   assert(pointFire.onUnavailableIntent.type === "playNotEnough", "unaffordable ability should play resource notice");
+  const blanketFire = buttonByLabel(pointFireCard, "Blanket Fire");
+  assert(blanketFire.unaffordable, "Blanket Fire shares artillery ammunition affordability");
+  assert(blanketFire.intent.targetMode === "worldPoint", "Blanket Fire always arms a world-point target");
 
   const packedArtillery = {
     ...artillery,
@@ -615,11 +621,9 @@ function fakeHudRootWithoutResourceSpans() {
     resources: { steel: 1000, oil: 1000 },
   }));
   const packedPointFire = buttonByLabel(packedPointFireCard, "Point Fire");
-  assert(!packedPointFire.enabled, "packed artillery Point Fire should be visible but disabled");
-  assert(
-    packedPointFire.title === "Set up artillery before using Point Fire",
-    "packed artillery Point Fire should explain the setup requirement",
-  );
+  const packedBlanketFire = buttonByLabel(packedPointFireCard, "Blanket Fire");
+  assert(packedPointFire.enabled, "packed artillery Point Fire should be enabled for auto-setup");
+  assert(packedBlanketFire.enabled, "packed artillery Blanket Fire should be enabled for auto-setup");
   const redeployingArtillery = {
     ...artillery,
     id: 33,

@@ -234,7 +234,6 @@ export const ABILITIES = Object.freeze({
     radiusTiles: ARTILLERY_BLANKET_RADIUS_TILES,
     queued: true,
     queuePolicy: "skipIfNotReady",
-    commandCard: false,
   }),
   [ABILITY.BREAKTHROUGH]: Object.freeze({
     ability: ABILITY.BREAKTHROUGH,

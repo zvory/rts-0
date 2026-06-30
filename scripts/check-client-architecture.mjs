@@ -122,7 +122,8 @@ const FORBIDDEN_MATCH_LAB_IMPORTS = new Set([
 // update this table with the phase-specific reason.
 const LARGE_FILE_BASELINES = new Map(Object.entries({
   // Tank Trap Phase 5 extends placement feedback to draw multi-site line previews.
-  "renderer/feedback.js": 46315,
+  // Artillery UX Phase 4 adds per-gun locked target/radius previews for Point Fire and Blanket Fire.
+  "renderer/feedback.js": 46960,
   // Lab MVP Phase 5 injects explicit lab control policy into command-card context.
   "hud.js": 44208,
   // Hotspot Cleanup Phase 6 extracted GameState query and visual-effect helpers.

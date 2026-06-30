@@ -15,7 +15,7 @@ import {
   commandCardAbilitiesForFaction,
   workerBuildablesForFaction,
 } from "../client/src/config.js";
-import { ABILITY, KIND, LAB_ROLE, UPGRADE } from "../client/src/protocol.js";
+import { ABILITY, KIND, LAB_ROLE, SETUP, UPGRADE } from "../client/src/protocol.js";
 
 const kriegsiaCommandId = (family, subject) => factionCommandId("kriegsia", family, subject);
 const ekatCommandId = (family, subject) => factionCommandId(EKAT_FACTION_ID, family, subject);
@@ -234,6 +234,42 @@ function buttonSlots(card) {
     label: "Smoke",
     enabled: true,
   }]);
+}
+
+{
+  const artillery = {
+    id: 32,
+    owner: 1,
+    kind: KIND.ARTILLERY,
+    setupState: SETUP.DEPLOYED,
+    abilities: [
+      { ability: ABILITY.POINT_FIRE, cooldownLeft: 0, remainingUses: null },
+      { ability: ABILITY.BLANKET_FIRE, cooldownLeft: 0, remainingUses: null },
+    ],
+  };
+  const artilleryCard = buildCommandCardDescriptors({
+    playerId: 1,
+    selection: [artillery],
+    resources: { steel: 1000, oil: 1000 },
+    upgrades: [],
+    commandTarget: { kind: "ability", ability: ABILITY.BLANKET_FIRE },
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
+  });
+  const pointFireCommandId = kriegsiaCommandId("ability", ABILITY.POINT_FIRE);
+  const blanketFireCommandId = kriegsiaCommandId("ability", ABILITY.BLANKET_FIRE);
+  const pointFire = artilleryCard.slots.find((slot) => slot?.commandId === pointFireCommandId);
+  const blanketFire = artilleryCard.slots.find((slot) => slot?.commandId === blanketFireCommandId);
+  assert.equal(pointFire.slotIndex, 7);
+  assert.equal(pointFire.hotkey, "X");
+  assert.equal(pointFire.label, "Point Fire");
+  assert.equal(blanketFire.slotIndex, 8);
+  assert.equal(blanketFire.hotkey, "C");
+  assert.equal(blanketFire.label, "Blanket Fire");
+  assert.equal(blanketFire.intent.ability, ABILITY.BLANKET_FIRE);
+  assert(!pointFire.cls.includes("active"), "Point Fire does not share Blanket Fire active state");
+  assert(blanketFire.cls.includes("active"), "Blanket Fire has its own active targeting state");
+  assert.deepEqual(duplicateCommandIdsForCard(artilleryCard), [], "artillery fire buttons keep distinct command ids");
 }
 
 {
