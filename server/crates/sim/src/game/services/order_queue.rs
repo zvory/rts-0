@@ -141,6 +141,9 @@ pub(crate) fn promote_ready_orders(
             if !world_ability_facing_ready(entities, id, ability, x, y) {
                 continue;
             }
+            if active_world_ability_waits_for_weapon_cycle(entities, id, ability) {
+                continue;
+            }
             let faction_id = players
                 .iter()
                 .find(|p| p.id == owner)
@@ -283,10 +286,19 @@ fn ready_for_next_order(
         | Order::Build(_)
         | Order::Deconstruct(_)
         | Order::ArtilleryPointFire(_) => false,
-        Order::Ability(order) => matches!(e.move_phase(), Some(MovePhase::PathFailed))
-            || (matches!(e.move_phase(), Some(MovePhase::Arrived))
-                && (order.intent.ability != MortarFire || e.attack_cd() == 0)),
+        Order::Ability(_) => matches!(
+            e.move_phase(),
+            Some(MovePhase::Arrived | MovePhase::PathFailed)
+        ),
     }
+}
+
+fn active_world_ability_waits_for_weapon_cycle(
+    entities: &EntityStore,
+    id: u32,
+    ability: AbilityKind,
+) -> bool {
+    ability == MortarFire && entities.get(id).is_some_and(|e| e.attack_cd() > 0)
 }
 
 fn clear_completed_active_order(entities: &mut EntityStore, id: u32) {

@@ -142,6 +142,50 @@ fn manual_mortar_fire_waits_for_weapon_cooldown() {
 }
 
 #[test]
+fn manual_mortar_fire_turns_while_waiting_for_weapon_cooldown() {
+    let (mut game, mortar, _) = manual_fire_fixture();
+    let target_pos = game.map.tile_center(8, 12);
+    if let Some(mortar_entity) = game.entities.get_mut(mortar) {
+        mortar_entity.set_attack_cd(4);
+        mortar_entity.set_facing(0.0);
+        mortar_entity.set_weapon_facing(0.0);
+    }
+
+    enqueue_manual_mortar_fire(&mut game, mortar, target_pos);
+    let events = game.tick();
+
+    assert_eq!(
+        mortar_launch_count(&events, 1, mortar),
+        0,
+        "manual mortar fire should wait while the weapon cycle is still cooling down"
+    );
+    let facing_after_first_wait = game
+        .entities
+        .get(mortar)
+        .expect("mortar should exist")
+        .weapon_facing()
+        .expect("mortar should have weapon facing");
+    assert!(
+        facing_after_first_wait > 0.0,
+        "manual mortar fire should rotate toward the queued target while waiting to reload"
+    );
+
+    let mut launched_after_reload = false;
+    for _ in 0..8 {
+        let events = game.tick();
+        launched_after_reload |= mortar_launch_count(&events, 1, mortar) == 1;
+        if launched_after_reload {
+            break;
+        }
+    }
+
+    assert!(
+        launched_after_reload,
+        "manual mortar fire should launch once the mortar has both reloaded and faced the target"
+    );
+}
+
+#[test]
 fn queued_manual_mortar_fire_promotes_to_wait_for_weapon_cooldown() {
     let (mut game, mortar, target_pos) = manual_fire_fixture();
     if let Some(mortar_entity) = game.entities.get_mut(mortar) {
