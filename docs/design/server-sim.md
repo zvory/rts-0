@@ -71,7 +71,8 @@ impl Game {
     /// expansion per player. Generated oil clusters place each oil patch on a unique passable tile
     /// center near the intended layout, keep one tile between oil patches, and reject sites whose
     /// Pump Jack footprint would collide with non-oil resources while preserving City Centre
-    /// resource-distance bounds.
+    /// resource-distance bounds. Lab-restored oil nodes are normalized to passable tile centers and
+    /// keep one free tile between oil patches.
     /// AI players are spawned as normal match participants; external AI orchestration owns any
     /// controller/profile selection.
     pub fn new(players: &[PlayerInit], seed: u32) -> Game;
@@ -268,7 +269,8 @@ alive.
   (`Join`, `Leave`, `Ready`, `StartRequest`, `AddAi`, `RemoveAi`, `SetSpectator`, `SetFaction`,
   `Command`, `GiveUp`, `PauseGame`, `UnpauseGame`, `SetRoomTimeSpeed`, `StepRoomTime`,
   `SeekRoomTime`, `SeekRoomTimeTo`, `SetVisionSelection`, `Lab`). The room task is the single writer
-  of game state — no locks around `Game`.
+  of game state — no locks around `Game`. Replay vision selection and successful replay seeks immediately send affected
+  viewers fresh fog-scoped snapshots instead of waiting for the next replay tick.
 - Room-mode, phase, and match-composition dependent lobby checks use a lobby-local `SessionPolicy`
   descriptor for the current room mode and phase matrix, including dev-watch, replay-room,
   branch-staging, speed-only live-game room-time controls, countdown, speed-source, and match-history
@@ -508,7 +510,7 @@ status (`breakthrough`), delayed world effects (`smoke`, `mortarFire`), dash ret
 projectile, Magic Anchor placement, Golem consumption, and the intentionally one-off artillery
 point-fire path. The hook receives the owning player's faction id at execution time through the
 normal command/order helpers, so wrong-faction ability use fails before effects, resource spending,
-cooldowns, or events are applied. The hook is deliberately not a generic script engine. Phase 11 signature abilities
+cooldowns, or events are applied. Artillery point fire records temporary live-fog firing reveal sources for enemy players when a shell launches, using the firing-cycle-plus-half-second lifetime and smoke suppression used by other actionable firing reveals. The hook is deliberately not a generic script engine. Phase 11 signature abilities
 should first use one of the existing shapes; if they cannot, add either a narrow explicit hook or a
 named one-off path with faction validation, cost validation, and fog-safe event tests rather than
 widening the hook into generic scripting.
@@ -520,9 +522,11 @@ widening the hook into generic scripting.
 - `launch_world_ability` — reads range/cost/cooldown from the registry, deducts resources, sets
   the caster's cooldown, clears the active order,
   and dispatches a delayed-world effect hook (currently: schedules a smoke cloud or delayed mortar
-  shell). A scheduled mortar shell resolves from its scheduled impact point even if the firing
-  mortar dies before impact; reveal data at impact is emitted only when the original mortar entity
-  is still alive and valid. Guards:
+  shell). Manual mortar fire also enters the mortar weapon firing cycle: launching a manual shell
+  starts the weapon cooldown, and both immediate in-range manual fire orders and queued MortarFire
+  promotions wait while the mortar weapon is reloading instead of launching early or being cleared. The active manual fire order remains eligible for aiming during reload, so the mortar can rotate toward the target before the weapon cycle is ready. A scheduled mortar shell resolves from its
+  scheduled impact point even if the firing mortar dies before impact; reveal data at impact is
+  emitted only when the original mortar entity is still alive and valid. Guards:
   caster exists + alive + owner + not under construction + correct kind + not on cooldown +
   required tech present + in range + affordable.
   All guards are checked without panicking; missing/stale casters are no-ops.
@@ -727,6 +731,17 @@ queued promotion, or the owning tick system.
 Tank weapon range is dynamic in the simulation: tanks keep their base 5-tile range while moving,
 then linearly ramp to 14 tiles after three stationary seconds. Path-driven translation or hull
 rotation resets the ramp to base range; turret aiming and external pushes do not.
+
+Auto-acquisition prefers unit targets before building cleanup targets by default. Building fallback targets still use weapon-fit ranking among eligible cleanup targets.
+
+Overpenetration checks use the target's pre-damage entrenchment state, so lethal primary hits keep the same entrenched blocking decision used before damage resolution.
+
+Entrenchment auto-occupation chooses the nearest trench that has a legal occupation slot for the
+unit. A closer trench with no legal slot does not block searching for a farther usable trench. For
+dig-in progress, explicit attack orders count as holding ground only after combat advances them to
+the `Firing` phase; chasing or unreachable attack orders do not create trench progress. Lab move
+operations clear trench occupation and dig-in state when repositioning an entity so snapshots do not
+retain stale `occupiedTrenchId` values before the next tick.
 
 Construction build-site checks classify the current site state before deciding whether work can
 start or continue. The status distinguishes invalid terrain, existing buildings or scaffolds,
