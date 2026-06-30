@@ -479,8 +479,9 @@ policy is centralized instead of scattered through services.
   catalog availability. The default catalog is `kriegsia`; `ekat` exposes the current Ekat hero,
   Zamok, and Golem slice; `phase2_empty_fixture` exists only as a command-validation test fixture.
   Server-side lifecycle policy lives in `server/src/lobby/faction_validation.rs`.
-- `rules::combat` — AP/armor predicates (`is_ap`, `is_armored`), target-ranking classifiers
-  (`target_threat_role`, `default_weapon_target_fit`), `attack_profile(kind) -> AttackProfile`, and
+- `rules::combat` — default weapon-profile ids and policy metadata, AP/armor predicates (`is_ap`,
+  `is_armored`), target-ranking classifiers (`target_threat_role`, `default_weapon_target_fit`),
+  compatibility helpers such as `attack_profile(kind) -> AttackProfile`, and
   `effective_damage(attacker_kind, victim_kind, base_dmg, victim_terrain) -> u32`.
 - `rules::economy` — tech/production predicates (`trainable_units_for_faction`,
   `build_requirement_met_for_faction`, `train_requirement_met_for_faction`,

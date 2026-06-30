@@ -10,11 +10,198 @@ const FRONT_ARMOR_DAMAGE_MULTIPLIER: f32 = 1.0;
 const SIDE_ARMOR_DAMAGE_MULTIPLIER: f32 = 1.5;
 const REAR_ARMOR_DAMAGE_MULTIPLIER: f32 = 1.7;
 /// Attack profile for a combat-capable unit or building.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AttackProfile {
     pub range_tiles: u32,
     pub dmg: u32,
     pub cooldown: u32,
 }
+
+impl AttackProfile {
+    pub const NONE: AttackProfile = AttackProfile {
+        range_tiles: 0,
+        dmg: 0,
+        cooldown: 0,
+    };
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum WeaponKind {
+    WorkerTools,
+    GolemFists,
+    RiflemanRifle,
+    MachineGunnerMg,
+    ScoutCarMg,
+    AntiTankGun,
+    MortarTeamMortar,
+    ArtilleryGun,
+    TankCannon,
+    /// Reserved identity for the future Tank coaxial machine gun. It has no live profile yet.
+    TankCoax,
+}
+
+impl WeaponKind {
+    pub const ALL: [WeaponKind; 10] = [
+        WeaponKind::WorkerTools,
+        WeaponKind::GolemFists,
+        WeaponKind::RiflemanRifle,
+        WeaponKind::MachineGunnerMg,
+        WeaponKind::ScoutCarMg,
+        WeaponKind::AntiTankGun,
+        WeaponKind::MortarTeamMortar,
+        WeaponKind::ArtilleryGun,
+        WeaponKind::TankCannon,
+        WeaponKind::TankCoax,
+    ];
+
+    pub fn stable_id(self) -> &'static str {
+        match self {
+            WeaponKind::WorkerTools => "worker_tools",
+            WeaponKind::GolemFists => "golem_fists",
+            WeaponKind::RiflemanRifle => "rifleman_rifle",
+            WeaponKind::MachineGunnerMg => "machine_gunner_mg",
+            WeaponKind::ScoutCarMg => "scout_car_mg",
+            WeaponKind::AntiTankGun => "anti_tank_gun",
+            WeaponKind::MortarTeamMortar => "mortar_team_mortar",
+            WeaponKind::ArtilleryGun => "artillery_gun",
+            WeaponKind::TankCannon => "tank_cannon",
+            WeaponKind::TankCoax => "tank_coax",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MissPolicy {
+    None,
+    AntiTankGunVsInfantry,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FacingDamagePolicy {
+    None,
+    TankArmorFacing,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum OverpenetrationPolicy {
+    None,
+    DirectFire { range_factor: f32 },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WeaponProfile {
+    pub id: WeaponKind,
+    pub range_tiles: u32,
+    pub dmg: u32,
+    pub cooldown: u32,
+    pub weapon_class: WeaponClass,
+    pub miss_policy: MissPolicy,
+    pub facing_damage_policy: FacingDamagePolicy,
+    pub overpenetration: OverpenetrationPolicy,
+}
+
+impl WeaponProfile {
+    pub fn attack_profile(&self) -> AttackProfile {
+        AttackProfile {
+            range_tiles: self.range_tiles,
+            dmg: self.dmg,
+            cooldown: self.cooldown,
+        }
+    }
+}
+
+pub const WEAPON_PROFILES: &[WeaponProfile] = &[
+    WeaponProfile {
+        id: WeaponKind::WorkerTools,
+        range_tiles: 1,
+        dmg: 4,
+        cooldown: 24,
+        weapon_class: WeaponClass::SmallArms,
+        miss_policy: MissPolicy::None,
+        facing_damage_policy: FacingDamagePolicy::None,
+        overpenetration: OverpenetrationPolicy::DirectFire { range_factor: 0.25 },
+    },
+    WeaponProfile {
+        id: WeaponKind::GolemFists,
+        range_tiles: 1,
+        dmg: 16,
+        cooldown: 24,
+        weapon_class: WeaponClass::SmallArms,
+        miss_policy: MissPolicy::None,
+        facing_damage_policy: FacingDamagePolicy::None,
+        overpenetration: OverpenetrationPolicy::DirectFire { range_factor: 0.25 },
+    },
+    WeaponProfile {
+        id: WeaponKind::RiflemanRifle,
+        range_tiles: 4,
+        dmg: 5,
+        cooldown: 16,
+        weapon_class: WeaponClass::SmallArms,
+        miss_policy: MissPolicy::None,
+        facing_damage_policy: FacingDamagePolicy::None,
+        overpenetration: OverpenetrationPolicy::DirectFire { range_factor: 0.25 },
+    },
+    WeaponProfile {
+        id: WeaponKind::MachineGunnerMg,
+        range_tiles: 6,
+        dmg: 4,
+        cooldown: 6,
+        weapon_class: WeaponClass::SmallArms,
+        miss_policy: MissPolicy::None,
+        facing_damage_policy: FacingDamagePolicy::None,
+        overpenetration: OverpenetrationPolicy::DirectFire { range_factor: 0.25 },
+    },
+    WeaponProfile {
+        id: WeaponKind::ScoutCarMg,
+        range_tiles: 5,
+        dmg: 6,
+        cooldown: 6,
+        weapon_class: WeaponClass::SmallArms,
+        miss_policy: MissPolicy::None,
+        facing_damage_policy: FacingDamagePolicy::None,
+        overpenetration: OverpenetrationPolicy::DirectFire { range_factor: 0.25 },
+    },
+    WeaponProfile {
+        id: WeaponKind::AntiTankGun,
+        range_tiles: 5,
+        dmg: 100,
+        cooldown: 72,
+        weapon_class: WeaponClass::AntiTank,
+        miss_policy: MissPolicy::AntiTankGunVsInfantry,
+        facing_damage_policy: FacingDamagePolicy::TankArmorFacing,
+        overpenetration: OverpenetrationPolicy::DirectFire { range_factor: 0.50 },
+    },
+    WeaponProfile {
+        id: WeaponKind::MortarTeamMortar,
+        range_tiles: crate::balance::MORTAR_RANGE_TILES,
+        dmg: crate::balance::MORTAR_OUTER_DAMAGE,
+        cooldown: 60,
+        weapon_class: WeaponClass::SmallArms,
+        miss_policy: MissPolicy::None,
+        facing_damage_policy: FacingDamagePolicy::None,
+        overpenetration: OverpenetrationPolicy::None,
+    },
+    WeaponProfile {
+        id: WeaponKind::ArtilleryGun,
+        range_tiles: crate::balance::ARTILLERY_MAX_RANGE_TILES,
+        dmg: 0,
+        cooldown: crate::balance::ARTILLERY_RELOAD_TICKS,
+        weapon_class: WeaponClass::None,
+        miss_policy: MissPolicy::None,
+        facing_damage_policy: FacingDamagePolicy::None,
+        overpenetration: OverpenetrationPolicy::None,
+    },
+    WeaponProfile {
+        id: WeaponKind::TankCannon,
+        range_tiles: 5,
+        dmg: 60,
+        cooldown: 72,
+        weapon_class: WeaponClass::AntiTank,
+        miss_policy: MissPolicy::None,
+        facing_damage_policy: FacingDamagePolicy::TankArmorFacing,
+        overpenetration: OverpenetrationPolicy::DirectFire { range_factor: 0.25 },
+    },
+];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ArmorFacing {
@@ -39,27 +226,47 @@ pub enum WeaponTargetFit {
     Fallback,
 }
 
+pub fn weapon_profile(kind: WeaponKind) -> Option<&'static WeaponProfile> {
+    WEAPON_PROFILES.iter().find(|profile| profile.id == kind)
+}
+
+pub fn default_weapon_kind(kind: EntityKind) -> Option<WeaponKind> {
+    match kind {
+        EntityKind::Worker => Some(WeaponKind::WorkerTools),
+        EntityKind::Golem => Some(WeaponKind::GolemFists),
+        EntityKind::Rifleman => Some(WeaponKind::RiflemanRifle),
+        EntityKind::MachineGunner => Some(WeaponKind::MachineGunnerMg),
+        EntityKind::AntiTankGun => Some(WeaponKind::AntiTankGun),
+        EntityKind::MortarTeam => Some(WeaponKind::MortarTeamMortar),
+        EntityKind::Artillery => Some(WeaponKind::ArtilleryGun),
+        EntityKind::ScoutCar => Some(WeaponKind::ScoutCarMg),
+        EntityKind::Tank => Some(WeaponKind::TankCannon),
+        EntityKind::CommandCar
+        | EntityKind::Ekat
+        | EntityKind::CityCentre
+        | EntityKind::Zamok
+        | EntityKind::Depot
+        | EntityKind::Barracks
+        | EntityKind::TrainingCentre
+        | EntityKind::ResearchComplex
+        | EntityKind::Factory
+        | EntityKind::Steelworks
+        | EntityKind::TankTrap
+        | EntityKind::PumpJack
+        | EntityKind::Steel
+        | EntityKind::Oil => None,
+    }
+}
+
+pub fn default_weapon_profile(kind: EntityKind) -> Option<&'static WeaponProfile> {
+    default_weapon_kind(kind).and_then(weapon_profile)
+}
+
 /// Returns the attack profile for the given kind, or zeroes if non-combatant.
 pub fn attack_profile(kind: EntityKind) -> AttackProfile {
-    if let Some(s) = defs::unit_def(kind).map(|d| d.stats) {
-        AttackProfile {
-            range_tiles: s.range_tiles,
-            dmg: s.dmg,
-            cooldown: s.cooldown,
-        }
-    } else if let Some(s) = defs::building_def(kind).map(|d| d.stats) {
-        AttackProfile {
-            range_tiles: s.range_tiles,
-            dmg: s.dmg,
-            cooldown: s.cooldown,
-        }
-    } else {
-        AttackProfile {
-            range_tiles: 0,
-            dmg: 0,
-            cooldown: 0,
-        }
-    }
+    default_weapon_profile(kind)
+        .map(WeaponProfile::attack_profile)
+        .unwrap_or(AttackProfile::NONE)
 }
 
 /// Armored targets take 75% damage reduction from non-AP weapons.
@@ -84,9 +291,8 @@ pub fn armor_class(kind: EntityKind) -> Option<ArmorClass> {
 
 /// Rules-owned weapon classification for target ranking and threat policy.
 pub fn weapon_class(kind: EntityKind) -> WeaponClass {
-    defs::unit_def(kind)
-        .map(|d| d.weapon)
-        .or_else(|| defs::building_def(kind).map(|d| d.weapon))
+    default_weapon_profile(kind)
+        .map(|profile| profile.weapon_class)
         .unwrap_or(WeaponClass::None)
 }
 
@@ -140,10 +346,9 @@ pub fn default_weapon_target_fit(
 /// infantry-sized targets — the shell flies straight through without finding anyone.
 /// Hits that do connect deal full damage.
 pub fn miss_chance(attacker_kind: EntityKind, victim_kind: EntityKind) -> f32 {
-    if attacker_kind == EntityKind::AntiTankGun && anti_tank_gun_miss_target(victim_kind) {
-        0.65
-    } else {
-        0.0
+    match default_weapon_profile(attacker_kind).map(|profile| profile.miss_policy) {
+        Some(MissPolicy::AntiTankGunVsInfantry) if anti_tank_gun_miss_target(victim_kind) => 0.65,
+        _ => 0.0,
     }
 }
 
@@ -235,7 +440,10 @@ pub fn facing_damage_multiplier(
     if victim_kind != EntityKind::Tank {
         return 1.0;
     }
-    if !matches!(attacker_kind, EntityKind::Tank | EntityKind::AntiTankGun) {
+    if !matches!(
+        default_weapon_profile(attacker_kind).map(|profile| profile.facing_damage_policy),
+        Some(FacingDamagePolicy::TankArmorFacing)
+    ) {
         return 1.0;
     }
     match facing {
@@ -272,6 +480,173 @@ fn normalized_angle_delta(from: f32, to: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn defs_attack_profile_and_class(kind: EntityKind) -> (AttackProfile, WeaponClass) {
+        if let Some(def) = defs::unit_def(kind) {
+            (
+                AttackProfile {
+                    range_tiles: def.stats.range_tiles,
+                    dmg: def.stats.dmg,
+                    cooldown: def.stats.cooldown,
+                },
+                def.weapon,
+            )
+        } else if let Some(def) = defs::building_def(kind) {
+            (
+                AttackProfile {
+                    range_tiles: def.stats.range_tiles,
+                    dmg: def.stats.dmg,
+                    cooldown: def.stats.cooldown,
+                },
+                def.weapon,
+            )
+        } else {
+            (AttackProfile::NONE, WeaponClass::None)
+        }
+    }
+
+    #[test]
+    fn weapon_kind_stable_ids_cover_current_profiles_and_reserved_coax() {
+        let expected = [
+            (WeaponKind::WorkerTools, "worker_tools"),
+            (WeaponKind::GolemFists, "golem_fists"),
+            (WeaponKind::RiflemanRifle, "rifleman_rifle"),
+            (WeaponKind::MachineGunnerMg, "machine_gunner_mg"),
+            (WeaponKind::ScoutCarMg, "scout_car_mg"),
+            (WeaponKind::AntiTankGun, "anti_tank_gun"),
+            (WeaponKind::MortarTeamMortar, "mortar_team_mortar"),
+            (WeaponKind::ArtilleryGun, "artillery_gun"),
+            (WeaponKind::TankCannon, "tank_cannon"),
+            (WeaponKind::TankCoax, "tank_coax"),
+        ];
+
+        assert_eq!(WeaponKind::ALL.len(), expected.len());
+        for (kind, stable_id) in expected {
+            assert!(WeaponKind::ALL.contains(&kind), "{kind:?} missing from ALL");
+            assert_eq!(kind.stable_id(), stable_id);
+        }
+        for (index, kind) in WeaponKind::ALL.iter().enumerate() {
+            for other in &WeaponKind::ALL[index + 1..] {
+                assert_ne!(
+                    kind.stable_id(),
+                    other.stable_id(),
+                    "weapon stable ids must be unique"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn default_weapon_profile_ids_match_current_combat_entities() {
+        let expected = [
+            (EntityKind::Worker, Some(WeaponKind::WorkerTools)),
+            (EntityKind::Golem, Some(WeaponKind::GolemFists)),
+            (EntityKind::Rifleman, Some(WeaponKind::RiflemanRifle)),
+            (EntityKind::MachineGunner, Some(WeaponKind::MachineGunnerMg)),
+            (EntityKind::AntiTankGun, Some(WeaponKind::AntiTankGun)),
+            (EntityKind::MortarTeam, Some(WeaponKind::MortarTeamMortar)),
+            (EntityKind::Artillery, Some(WeaponKind::ArtilleryGun)),
+            (EntityKind::ScoutCar, Some(WeaponKind::ScoutCarMg)),
+            (EntityKind::Tank, Some(WeaponKind::TankCannon)),
+            (EntityKind::CommandCar, None),
+            (EntityKind::Ekat, None),
+            (EntityKind::CityCentre, None),
+            (EntityKind::Zamok, None),
+            (EntityKind::Depot, None),
+            (EntityKind::Barracks, None),
+            (EntityKind::TrainingCentre, None),
+            (EntityKind::ResearchComplex, None),
+            (EntityKind::Factory, None),
+            (EntityKind::Steelworks, None),
+            (EntityKind::TankTrap, None),
+            (EntityKind::PumpJack, None),
+            (EntityKind::Steel, None),
+            (EntityKind::Oil, None),
+        ];
+
+        assert_eq!(EntityKind::ALL.len(), expected.len());
+        for (kind, weapon_kind) in expected {
+            assert_eq!(
+                default_weapon_kind(kind),
+                weapon_kind,
+                "{kind} default weapon"
+            );
+            assert_eq!(
+                default_weapon_profile(kind).map(|profile| profile.id),
+                weapon_kind,
+                "{kind} default weapon profile"
+            );
+        }
+    }
+
+    #[test]
+    fn default_weapon_profiles_match_legacy_attack_values_and_classes() {
+        for kind in EntityKind::ALL {
+            let (expected_profile, expected_class) = defs_attack_profile_and_class(kind);
+
+            assert_eq!(
+                attack_profile(kind),
+                expected_profile,
+                "{kind} attack profile"
+            );
+            assert_eq!(weapon_class(kind), expected_class, "{kind} weapon class");
+
+            if let Some(profile) = default_weapon_profile(kind) {
+                assert_eq!(
+                    profile.attack_profile(),
+                    expected_profile,
+                    "{kind} profile attack values"
+                );
+                assert_eq!(
+                    profile.weapon_class, expected_class,
+                    "{kind} profile weapon class"
+                );
+            } else {
+                assert_eq!(
+                    expected_profile,
+                    AttackProfile::NONE,
+                    "{kind} without a profile must keep zero attack"
+                );
+                assert_eq!(
+                    expected_class,
+                    WeaponClass::None,
+                    "{kind} without a profile must keep no weapon class"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn weapon_profile_metadata_preserves_current_special_damage_policies() {
+        assert_eq!(weapon_profile(WeaponKind::TankCoax), None);
+
+        let anti_tank_gun = weapon_profile(WeaponKind::AntiTankGun).expect("AT gun profile");
+        assert_eq!(anti_tank_gun.miss_policy, MissPolicy::AntiTankGunVsInfantry);
+        assert_eq!(
+            anti_tank_gun.facing_damage_policy,
+            FacingDamagePolicy::TankArmorFacing
+        );
+        assert_eq!(
+            anti_tank_gun.overpenetration,
+            OverpenetrationPolicy::DirectFire { range_factor: 0.50 }
+        );
+
+        let tank_cannon = weapon_profile(WeaponKind::TankCannon).expect("tank cannon profile");
+        assert_eq!(
+            tank_cannon.facing_damage_policy,
+            FacingDamagePolicy::TankArmorFacing
+        );
+        assert_eq!(
+            tank_cannon.overpenetration,
+            OverpenetrationPolicy::DirectFire { range_factor: 0.25 }
+        );
+
+        let machine_gunner = weapon_profile(WeaponKind::MachineGunnerMg).expect("MG profile");
+        assert_eq!(machine_gunner.weapon_class, WeaponClass::SmallArms);
+        assert_eq!(machine_gunner.range_tiles, 6);
+        assert_eq!(machine_gunner.dmg, 4);
+        assert_eq!(machine_gunner.cooldown, 6);
+    }
 
     #[test]
     fn ap_vs_armored_full_damage() {
@@ -383,10 +758,7 @@ mod tests {
 
         assert_eq!(tank_shot, 60);
         assert!(tank_trap_hp > tank_shot, "one Tank shot should not kill");
-        assert!(
-            tank_trap_hp <= tank_shot * 2,
-            "two Tank shots should kill"
-        );
+        assert!(tank_trap_hp <= tank_shot * 2, "two Tank shots should kill");
     }
 
     #[test]

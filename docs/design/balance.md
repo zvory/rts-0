@@ -8,6 +8,9 @@ starting resources, supply caps, mining amounts, support-weapon constants, body 
 and ability scalars, and stat helpers. Its internal `server/crates/rules/src/balance/*.rs` modules
 group those Rust-owned values by domain, and its `unit_stats(kind)` and `building_stats(kind)`
 helpers read the defs table.
+Default attack range, damage, cooldown, weapon class, and weapon-policy metadata are exposed through
+`server/crates/rules/src/combat.rs` weapon profiles; current profile values mirror the defs records
+so legacy `attack_profile(kind)` and `weapon_class(kind)` callers remain behavior-compatible.
 `client/src/config.js` is the stable public facade for the subset the UI/render/fog needs (costs,
 supply, sight, sizes, colors, and command-card descriptors). Its internal
 `client/src/config/timing.js`, `client/src/config/rules_mirror.js`, and
