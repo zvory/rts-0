@@ -14,16 +14,19 @@ without changing which targets existing units choose.
 
 - Add a target classification surface in `rts-rules` or a closely related rules-owned module.
 - Represent current facts explicitly: unit, building, resource node, armor class, weapon class,
-  anti-armor threat, support weapon, field obstacle, vehicle body, economy unit, and
+  anti-armor threat, support weapon, field obstacle, vehicle body, economy unit, and current
   coax-infantry-priority eligibility.
-- Define coax infantry-priority eligibility as Worker, Rifleman, Machine Gunner, and future
-  Panzerfaust-style infantry when that kind exists. Ekat, Golems, Mortar Teams, Artillery,
-  Anti-Tank Guns, vehicles, buildings, resources, and Tank Traps are not infantry-priority.
+- Define current coax infantry-priority eligibility as Worker, Rifleman, and Machine Gunner. Ekat,
+  Golems, Mortar Teams, Artillery, Anti-Tank Guns, vehicles, buildings, resources, and Tank Traps are
+  not infantry-priority. Keep the classifier easy to extend later, but do not add future unit kinds
+  in this phase.
 - Replace ad hoc candidate fields in combat acquisition with a target-facts snapshot while keeping
   the same data available to existing priority code.
 - Extract direct-fire legality into a helper reusable by default attacks and future secondary
   weapons. It must cover hostile targetability, fog visibility, smoke, LOS, friendly hard blockers,
-  targetability, and resource-node exclusion.
+  targetability, and resource-node exclusion. Include an intended-target mode for future coax use
+  that rejects a target when the shot would resolve to an intervening enemy hard blocker instead of
+  the intended target.
 - Preserve Tank Trap route-obstruction facts and the current special case where infantry does not
   auto-acquire Tank Traps.
 - Add exhaustive classification tests across current `EntityKind` values.
@@ -56,6 +59,8 @@ without changing which targets existing units choose.
 - Smoke at attacker or target still blocks direct-fire acquisition.
 - Fog visibility and team visibility remain unchanged for ordered and auto-acquired targets.
 - Terrain LOS and friendly hard blockers still reject direct shots.
+- The new intended-target legality mode rejects an enemy infantry candidate behind an enemy
+  Tank/building hard blocker when the direct shot would hit the blocker first.
 - Mortar indirect fire keeps its current exception from direct LOS/blocker checks.
 - Tank Trap route-obstruction behavior is unchanged for vehicles.
 - Infantry-like attackers still do not auto-acquire Tank Traps just because the facts surface names
@@ -81,6 +86,6 @@ targets and still refuse blocked or smoke-hidden targets.
 
 ## Handoff Expectations
 
-Name the target facts type, the direct-fire legality helper, and any remaining hard-coded entity
-kind checks. Confirm whether Phase 6 can implement priority policies entirely from target facts or
-needs one additional fact exposed.
+Name the target facts type, the direct-fire legality helper, the intended-target legality mode, and
+any remaining hard-coded entity kind checks. Confirm whether Phase 6 can implement priority policies
+entirely from target facts or needs one additional fact exposed.

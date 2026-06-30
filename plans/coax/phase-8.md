@@ -1,4 +1,4 @@
-# Phase 8 - Coax Client Feedback And Tank Rig
+# Phase 8 - Coax Tank Rig And Feedback Origin Polish
 
 ## Phase Status
 
@@ -6,18 +6,21 @@ Status: pending.
 
 ## Objective
 
-Render and play Tank coax shots as machine-gun-scale secondary weapon feedback instead of cannon
-feedback. This phase consumes `weaponKind` from attack events and makes the coax readable to
-players without changing command UI.
+Replace Phase 7's provisional Tank coax feedback origin with authored rig geometry and a transformed
+coax muzzle anchor. This phase consumes the existing `weaponKind` mapping and makes the coax read as
+a small barrel beside the main gun without changing command UI or server gameplay.
 
 ## Scope
 
 - Add a tiny gray rectangular coax barrel beside the Tank main cannon in the live Tank rig.
 - Add a coax muzzle anchor such as `anchor.coaxMuzzle` and route it through rig import/runtime
   metadata.
-- Teach visual-effect buffers to store weapon identity per muzzle flash and per recoil event rather
-  than only by attacker id.
-- Handle same-tick cannon and coax shots from one Tank without one event erasing the other.
+- Route attack feedback origin through transformed rig anchors where available: `tank_cannon` uses
+  the main muzzle anchor, and `tank_coax` uses the coax muzzle anchor. Shot-reveal entities must use
+  the same weapon-specific origin logic when the reveal carries enough rig data.
+- Preserve the Phase 7 visual-effect buffer behavior that stores weapon identity per muzzle flash
+  and recoil event rather than only by attacker id.
+- Preserve same-tick cannon and coax feedback from one Tank without one event erasing the other.
 - Route feedback by weapon identity:
   - `tank_cannon` or missing/default Tank weapon keeps cannon sound, large flash/tracer,
     overpenetration tail scale, and cannon recoil.
@@ -25,6 +28,9 @@ players without changing command UI.
     and no Tank cannon recoil.
 - Make coax muzzle flash and tracer originate from the coax barrel rather than the main cannon
   muzzle.
+- Use unkeyed MG burst audio for `tank_coax` unless Phase 7 already introduced a weapon-aware keyed
+  lifecycle. Do not reuse Machine Gunner-only looping/key cleanup in a way that creates stuck or
+  immediately stopped Tank coax audio.
 - Keep fallback behavior safe for old/default attack events with no weapon hint.
 - Preserve Tank selection bounds, HP anchor, tinting, animation routes, and existing cannon recoil.
 - Add focused client tests proving weapon identity, not attacker kind alone, controls the Tank
@@ -60,6 +66,8 @@ players without changing command UI.
 - `tank_cannon` or missing/default Tank attack weapon keeps cannon audio, large flash/tracer, and
   cannon recoil.
 - Same-tick Tank cannon and coax events both produce appropriate feedback.
+- Tank cannon feedback originates from the main muzzle anchor and Tank coax feedback originates from
+  the coax muzzle anchor when the rig is available.
 - Artillery self-reveal attack events still do not create tracers or combat audio.
 - Coax overpenetration visuals are small-scale and do not imply a second cannon shot.
 - Shot reveals from fog render with the correct weapon-specific feedback when enough data is
@@ -70,10 +78,15 @@ players without changing command UI.
 
 ## Verification
 
-- Focused audio contract tests for Tank cannon versus Tank coax sound selection.
-- Focused visual-effect/renderer contract tests for weapon-specific muzzle flash, tracer, and
-  recoil state.
-- Rig/schema tests or SVG fixture updates required by the Tank rig route.
+- Focused audio contract tests for Tank cannon versus Tank coax sound selection and the chosen coax
+  MG audio lifecycle.
+- Focused visual-effect/renderer contract tests for weapon-specific muzzle flash, tracer,
+  overpenetration tail scale, recoil state, same-tick cannon/coax feedback, and rig-anchor origin.
+- `node tests/rig_schema.mjs`
+- `node tests/svg_rig_importer.mjs`
+- `node tests/rig_runtime.mjs`
+- Focused Tank rig assertion that the live/authored rig exposes `coaxMuzzle` and preserves existing
+  `muzzle`/`turret` anchors.
 - `node scripts/check-client-architecture.mjs`
 - `node tests/protocol_parity.mjs` if protocol constants/weapon ids are touched.
 - `node scripts/check-docs-health.mjs` if docs are changed.
@@ -87,6 +100,6 @@ Tank is moving or the cannon is reloading.
 
 ## Handoff Expectations
 
-Describe the final client weapon-feedback mapping, recoil storage behavior, and Tank rig
-anchors/routes added. Note any browser/manual rendering checks performed and any remaining art
-polish that Phase 9 should consider.
+Describe the final client weapon-feedback mapping, recoil storage behavior, Tank rig anchors/routes
+added, MG audio lifecycle choice, browser/manual rendering checks performed, and factual patch-note
+bullets. Note any remaining art polish that Phase 9 should consider.

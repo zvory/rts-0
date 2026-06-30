@@ -21,13 +21,24 @@ not start a later phase until the previous phase PR has merged to `origin/main`.
 - Coax cooldown: 6 ticks, independent from the Tank cannon cooldown.
 - Coax arc: 10 degrees on either side of the current authoritative Tank turret/weapon facing.
 - Coax targeting policy: infantry-priority targets first, then fallback legal targets.
-- Coax infantry-priority group for this implementation: Worker, Rifleman, Machine Gunner, and
-  future Panzerfaust-style infantry when that unit exists.
+- Coax infantry-priority group for this implementation: Worker, Rifleman, and Machine Gunner.
+  Keep the classifier extensible for future infantry, but do not add future unit kinds in this plan.
 - Mortar Teams, Artillery, Anti-Tank Guns, Ekat, Golems, vehicles, buildings, resources, and field
   obstacles are not infantry-priority targets for the coax.
 - Fallback legal targets may include vehicles, buildings, support weapons, and field obstacles when
   ordinary direct-fire legality allows them. Resource nodes are never legal coax targets.
 - Ties inside the same material priority use current deterministic style: distance first, then id.
+- Same-tick Tank cannon/coax event order: emit and process the cannon attack first, then the coax
+  attack.
+- Coax intended-target legality must reject targets where the direct shot would resolve to an
+  intervening enemy hard blocker instead of the intended target. Coax can still overpenetrate behind
+  its primary intended target.
+- `Event::Overpenetration` remains a secondary damage event with no shooter, recoil, tracer, audio,
+  or weapon identity. Weapon-specific tracer/tail presentation comes from the originating `attack`
+  event's `weaponKind`.
+- Weapon ids are a closed mirrored vocabulary. Phase 4 must reserve `tank_cannon` and `tank_coax`
+  in any Rust/JS protocol vocabulary or compact code table it introduces, and clients must keep a
+  documented safe fallback for unknown weapon ids.
 
 If implementation discovers a conflict between these decisions and [requirements.md](requirements.md),
 stop as blocked and ask for a product decision instead of inventing new behavior.
@@ -79,19 +90,20 @@ infantry-priority targets ahead of fallback legal targets, with distance/id ties
 threat ordering. The phase ends with current targeting parity plus pure policy tests for the future
 coax policy.
 
-### [Phase 7 - Tank Coax Server Runtime](phase-7.md)
+### [Phase 7 - Tank Coax Server Runtime And Minimum Feedback](phase-7.md)
 
-Add the `tank_coax` weapon profile and server-authoritative secondary firing path for Tanks. The
-coax uses the current turret facing, its own cooldown, the machine-gun-like priority policy, direct
-fire legality, and small-arms overpenetration, without rotating the turret, chasing, changing
-cannon target intent, or stealing pathing state. Existing Tank cannon behavior remains the
-regression baseline.
+Add the `tank_coax` weapon profile, server-authoritative secondary firing path for Tanks, and the
+minimum weapon-specific client feedback needed to make live coax shots shippable. The coax uses the
+current turret facing, its own cooldown, the machine-gun-like priority policy, direct-fire legality,
+and small-arms overpenetration, without rotating the turret, chasing, changing cannon target intent,
+or stealing pathing state. Existing Tank cannon behavior remains the regression baseline, and
+same-tick cannon/coax attacks are ordered cannon first, then coax.
 
-### [Phase 8 - Coax Client Feedback And Tank Rig](phase-8.md)
+### [Phase 8 - Coax Tank Rig And Feedback Origin Polish](phase-8.md)
 
-Teach client feedback to route audio, muzzle flashes, tracers, overpenetration tails, and recoil by
-weapon identity instead of attacker kind alone. Tank cannon shots keep cannon-scale feedback, while
-`tank_coax` shots use machine-gun sound, small feedback, no cannon recoil, and a coax muzzle anchor
+Replace the Phase 7 provisional Tank coax feedback origin with an authored Tank rig barrel and
+transformed coax muzzle anchor. Tank cannon shots keep cannon-scale feedback from the main muzzle,
+while `tank_coax` shots use the existing Phase 7 machine-gun-scale feedback from the coax muzzle
 beside the main barrel. Legacy/default events without weapon hints must continue to degrade safely.
 
 ### [Phase 9 - Docs, Data Surfaces, And Integration Hardening](phase-9.md)
@@ -121,6 +133,8 @@ bullets. No new balance tuning belongs here unless the user explicitly approves 
 - Separate firing entity identity from weapon identity. Once the refactors land, do not use
   `EntityKind::Tank` alone to decide whether a shot is AP, what cooldown it uses, which feedback it
   triggers, or what overpenetration factor it uses.
+- Do not merge a phase that makes live `tank_coax` attacks visible to players while those attacks
+  still use Tank cannon sound, large cannon flash/tracer, or cannon recoil.
 - Coax does not add a command, toggle, upgrade, research, command-card affordance, cost/supply/sight
   change, trainability change, or primary Tank range-display change.
 - Coax does not rotate the turret, move the Tank, chase targets, clear paths, or replace explicit
@@ -128,6 +142,8 @@ bullets. No new balance tuning belongs here unless the user explicitly approves 
   facing.
 - Coax shots overpenetrate with small-arms damage. They must not use Tank AP damage, Tank cannon
   armor-facing multipliers, Tank cannon sound, large muzzle flash, or cannon recoil.
+- Coax patch-note bullets start in the first gameplay/client-facing phase, not only in the final
+  hardening phase.
 - Existing Tank cannon behavior is the baseline: target selection, cooldown, turret rotation,
   stationary range ramp, direct-fire overpenetration, audio, visuals, and recoil should continue to
   work as they do today.

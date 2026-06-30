@@ -23,14 +23,17 @@ coverage.
   from Phase 4 docs.
 - Update `docs/design/client-ui.md` to describe weapon-specific attack feedback and Tank coax rig
   treatment if Phase 8 changed renderer contracts.
-- Update generated stats/wiki surfaces if implementation exposes secondary weapons there. The Tank
-  primary displayed range should remain the main-cannon range unless a later requirement adds a
+- Make an explicit `/wiki/stats` and generated-stats decision. Either display/document Tank coax as
+  a secondary weapon, or add a tested note that the current stats table is primary-weapon-only. The
+  Tank primary displayed range should remain the main-cannon range unless a later requirement adds a
   separate coax range display.
 - Add or tighten focused integration tests for cannon/coax same-tick behavior, event ordering,
   replay stability, fog projection, client fallback behavior, and nearby combat regressions.
-- Add a dev or lab scenario if existing scenarios do not make coax inspection practical.
+- Expand the Phase 7 dev/lab scenario if needed so final manual inspection covers blockers, smoke,
+  resources, Ekat, Golems, support weapons, armored fallback targets, and buildings.
 - Resolve small documentation/product mismatches found during manual playtest or CI.
-- Collect factual patch-note bullets for the final implementation.
+- Consolidate factual patch-note bullets collected in Phase 7 and Phase 8 for the final
+  implementation.
 
 ## Out Of Scope
 
@@ -52,8 +55,8 @@ coverage.
 - Focused client contract tests under `tests/client_contracts/**`
 - Dev or lab scenario setup under `server/crates/sim/src/game/setup/dev_scenarios/**` if needed
 - `server/crates/rules/src/bin/dump-faction-catalog.rs` or wiki data helpers if secondary weapons
-  become generated
-- `server/src/wiki*` or related wiki/stat generation files if applicable
+  become generated or intentionally documented as omitted
+- `server/src/wiki*` or related wiki/stat generation files for the explicit `/wiki/stats` decision
 - `client/src/config*.js` only if a consumed mirror is required
 
 ## Edge Cases To Cover
@@ -63,8 +66,8 @@ coverage.
 - Docs distinguish Tank cannon AP behavior from coax small-arms behavior.
 - Docs state that coax overpenetrates with small-arms damage.
 - Protocol docs match actual Rust and JS attack-event weapon field names and compact slot shape.
-- Wiki/generated stats either mention the secondary weapon accurately or intentionally omit it until
-  secondary weapons are supported.
+- Wiki/generated stats either mention the secondary weapon accurately or explicitly state/test that
+  the table is primary-weapon-only until secondary weapons are supported.
 - Replays and spectator/lab projections show the same weapon-specific feedback as live views within
   their projection policy.
 - Missing weapon identity remains stable for old fixtures and legacy events.
@@ -79,7 +82,7 @@ coverage.
 - `node scripts/check-client-architecture.mjs` if client files are touched.
 - `cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture`
 - `node scripts/check-docs-health.mjs`
-- `node scripts/check-wiki.mjs` if generated stats/wiki surfaces are touched.
+- `node scripts/check-wiki.mjs`
 - `node scripts/check-faction-catalog-parity.mjs` if visible rules/catalog mirrors are touched.
 - `git diff --check`
 
