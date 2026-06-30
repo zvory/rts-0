@@ -14,6 +14,7 @@ pub(crate) struct ArtilleryPointFireTarget {
 pub(crate) enum ArtilleryPointFireAcceptance {
     BasicTarget,
     Command,
+    QueuedCommand,
 }
 
 pub(crate) fn artillery_point_fire_target(
@@ -58,7 +59,7 @@ pub(crate) fn queued_artillery_point_fire_target(
         unit,
         x,
         y,
-        acceptance: ArtilleryPointFireAcceptance::Command,
+        acceptance: ArtilleryPointFireAcceptance::QueuedCommand,
         context_for: queued_artillery_target_context,
         require_stationary: false,
         interpretation: FireTargetInterpretation::LockRawClick,
@@ -144,6 +145,11 @@ fn artillery_point_fire_target_from_context(
     {
         return None;
     }
+    if matches!(acceptance, ArtilleryPointFireAcceptance::QueuedCommand)
+        && !artillery_can_accept_queued_point_fire_command(e)
+    {
+        return None;
+    }
     let context = context_for(e);
     let min_px = config::ARTILLERY_MIN_RANGE_TILES as f32 * config::TILE_SIZE as f32;
     let max_px = config::ARTILLERY_MAX_RANGE_TILES as f32 * config::TILE_SIZE as f32;
@@ -206,9 +212,11 @@ fn lock_artillery_fire_target(
     }
     let dx = raw_click.0 - origin.0;
     let dy = raw_click.1 - origin.1;
-    let distance = (dx * dx + dy * dy).sqrt();
-    let facing = if distance > f32::EPSILON && distance.is_finite() {
-        dy.atan2(dx)
+    let has_click_direction = dx.abs() > f32::EPSILON || dy.abs() > f32::EPSILON;
+    let distance = dx.hypot(dy);
+    let facing = if has_click_direction {
+        let facing = dy.atan2(dx);
+        facing.is_finite().then_some(facing)?
     } else {
         setup_facing
             .filter(|facing| facing.is_finite())
@@ -332,6 +340,12 @@ fn artillery_can_accept_point_fire_command(e: &Entity) -> bool {
     )
 }
 
+fn artillery_can_accept_queued_point_fire_command(e: &Entity) -> bool {
+    artillery_can_accept_point_fire_command(e)
+        || (matches!(e.weapon_setup(), WeaponSetup::TearingDown { .. })
+            && e.move_intent().is_some())
+}
+
 fn artillery_point_fire_queue_terminal(e: &Entity) -> bool {
     matches!(e.order(), Order::ArtilleryPointFire(_))
         || e.queued_orders()
@@ -408,74 +422,4 @@ fn artillery_target_inside_field_of_fire(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    const TILE: f32 = 32.0;
-    const WORLD: f32 = 64.0 * TILE;
-    const ORIGIN: (f32, f32) = (32.0 * TILE, 32.0 * TILE);
-    const MIN: f32 = 25.0 * TILE;
-    const MAX: f32 = 55.0 * TILE;
-
-    fn lock(raw_click: (f32, f32)) -> LockedArtilleryFireTarget {
-        lock_artillery_fire_target(WORLD, ORIGIN, Some(0.0), 0.0, MIN, MAX, raw_click)
-            .expect("target should lock")
-    }
-
-    #[test]
-    fn target_lock_preserves_points_inside_range_band() {
-        let target = lock((ORIGIN.0 + 30.0 * TILE, ORIGIN.1));
-
-        assert!((target.x - (ORIGIN.0 + 30.0 * TILE)).abs() < 0.001);
-        assert!((target.y - ORIGIN.1).abs() < 0.001);
-    }
-
-    #[test]
-    fn target_lock_pushes_close_clicks_to_minimum_range() {
-        let target = lock((ORIGIN.0 + 3.0 * TILE, ORIGIN.1));
-
-        assert!((target.x - (ORIGIN.0 + MIN)).abs() < 0.001);
-        assert!((target.y - ORIGIN.1).abs() < 0.001);
-    }
-
-    #[test]
-    fn target_lock_pulls_far_clicks_to_maximum_or_map_edge() {
-        let target = lock((ORIGIN.0 + 80.0 * TILE, ORIGIN.1));
-
-        assert!((target.x - (WORLD - 1.0)).abs() < 0.001);
-        assert!((target.y - ORIGIN.1).abs() < 0.001);
-    }
-
-    #[test]
-    fn zero_length_target_uses_setup_facing_fallback() {
-        let target = lock_artillery_fire_target(
-            WORLD,
-            ORIGIN,
-            Some(std::f32::consts::FRAC_PI_2),
-            0.0,
-            MIN,
-            MAX,
-            ORIGIN,
-        )
-        .expect("zero-length click should lock along setup facing");
-
-        assert!((target.x - ORIGIN.0).abs() < 0.001);
-        assert!((target.y - (ORIGIN.1 + MIN)).abs() < 0.001);
-    }
-
-    #[test]
-    fn target_lock_rejects_rays_without_an_in_map_range_point() {
-        let origin = (4.0 * TILE, 4.0 * TILE);
-
-        assert!(lock_artillery_fire_target(
-            WORLD,
-            origin,
-            Some(std::f32::consts::PI),
-            std::f32::consts::PI,
-            MIN,
-            MAX,
-            origin,
-        )
-        .is_none());
-    }
-}
+mod tests;
