@@ -2,8 +2,9 @@
 
 ## Status
 
-Concept draft for review. This is not yet a full multi-phase implementation plan and does not
-define phase files, branch sequencing, or exact API wiring.
+Active concept draft for game-state ownership and checkpoint work. This supersedes the deprecated
+`plans/lab-replay/` checkpoint program for now. It is not yet a full multi-phase implementation
+plan and does not define phase files, branch sequencing, or exact API wiring.
 
 ## Purpose
 
@@ -12,8 +13,9 @@ goal is to move toward one explicit state ownership tree rooted at `Game`, so fu
 features cannot accidentally hide durable simulation state in service helpers, room code, caches, or
 ad hoc side channels.
 
-This plan should become a foundation for checkpoint-backed replay and lab capture. Lab replay should
-consume a clearly owned and checkpointable game state model rather than trying to discover every
+This plan should become a foundation for checkpoint-backed replay and future lab capture. Lab replay
+is intentionally deferred until the game-state ownership model and checkpoint contract are
+understood. When revisited, lab replay should consume this model rather than trying to discover every
 piece of authoritative state during replay work.
 
 ## Current Shape
@@ -28,6 +30,10 @@ authoritative gameplay state, derived performance caches, replay or compatibilit
 runtime helpers. Some room-owned structures, such as lab timeline history and replay playback
 cursor state, are appropriate session state, but the boundary between session state and
 authoritative game state must be explicit.
+
+The current replay and lab seek paths can clone an in-process `Game`. That is useful runtime
+machinery, but it is not proof that checkpoint serialization is complete. The checkpoint contract
+must prove cold export/import, not clone-based restore.
 
 ## Desired Architecture
 
@@ -44,14 +50,20 @@ Game
 ```
 
 `GameState` owns durable simulation data. Examples include entities, players, orders, queues,
-resources, scores, RNG state, entity allocators, fog-relevant memory, building memory, trench
-discovery, smokes, shell stores, ability runtime, firing reveals, lingering sight, lab god mode, and
-any other state that changes future authoritative behavior or projected state.
+selected movement paths and waypoints, resource reservations, resources, scores, RNG state, entity
+allocators, fog-relevant memory, building memory, trench discovery, smokes, shell stores, ability
+runtime, firing reveals, lingering sight, lab god mode, and any other state that changes future
+authoritative behavior or projected state.
 
 `DerivedState` owns only cache and performance data. Derived state must be clearable and rebuildable
 at any time without changing gameplay, replay output, scoring, command validity, or fog/projection
 results. If clearing a field changes authoritative behavior, that field is misclassified and belongs
 in `GameState`.
+
+Pathing is the main hard case. The chosen path that a unit is already following is authoritative and
+belongs under `GameState` with that unit's movement/order state. The pathfinding service's reusable
+cache and search bookkeeping are derived; clearing them after import must not change the already
+chosen path, command validity, or future result except for allowed performance cost.
 
 ## Service Ownership
 
@@ -74,8 +86,11 @@ This gives the repo two useful properties:
 `GameState` and `DerivedState`, but they should not depend on mutable authoritative state owned by
 room code, client code, AI controller internals, global singletons, or hidden service instances.
 
-AI controller memory is outside the checkpoint contract. Restored AI player slots may be resumed by
-fresh controllers, while deterministic replay remains authoritative through recorded actions.
+AI controller memory is outside the checkpoint contract. Checkpoints preserve AI player slots and
+the authoritative world they occupy, but exact future AI decisions after restoring a live game from
+fresh controllers are out of scope and are not required to be bit-for-bit identical. Deterministic
+replay remains authoritative through recorded actions; implementation should still avoid needless
+AI divergence where practical.
 
 Perf telemetry and diagnostics may observe tick work, but must not feed back into simulation
 results.
@@ -108,12 +123,24 @@ The checkpoint contract must preserve stable entity ids and allocator/high-water
 migration that remaps ids must make the remap explicit, and replay actions must never silently
 target stale ids.
 
+Existing lab scenario import/export is not the checkpoint contract. Lab scenarios may remain a
+temporary product label or adapter, but the durable setup format should converge on checkpoints.
+Scenario-style restore that respawns entities and returns an id remap is acceptable for today's lab
+authoring flow, but it is not acceptable for checkpoint restore.
+
 ## Verification Strategy
 
 The original-vs-restored comparator should come early, not after most checkpoint work is complete.
-The first useful version should prove that a simple exported game can be restored, have derived
-state cleared or rebuilt, tick forward, and match the original game's semantic state and
-fog-filtered projections.
+The first useful version must be a cold `Game -> GameCheckpoint -> Game` restore that does not use
+`Game::clone_for_replay_keyframe` or any equivalent full-struct clone. It should prove that a simple
+exported game can be restored, have derived state cleared or rebuilt, tick forward, and match the
+original game's semantic state and fog-filtered projections.
+
+Comparison should start from semantic equivalence rather than raw byte equality. The comparator may
+compare canonical DTOs or carefully selected internal struct views, but it must cover every field
+classified as authoritative and should ignore fields explicitly classified as derived or transient.
+For fog-sensitive behavior, compare per-player fog-filtered snapshots in addition to the
+authoritative state view.
 
 Later work should extend that comparator instead of inventing separate proof mechanisms. It should
 cover movement, orders, economy, production, combat, projectiles, smoke, ability runtime, fog memory,
@@ -139,14 +166,14 @@ runtime/session state outside the authoritative simulation.
 
 ## Relationship To Lab Replay
 
-The lab replay plan should depend on this ownership work. Checkpoint-backed replay and lab capture
-need confidence that `Game` contains all authoritative state and that derived state can be rebuilt
-without changing behavior.
+The existing `plans/lab-replay/` checkpoint program is deprecated for now. Checkpoint-backed replay
+and lab capture should be revisited only after this ownership work can clearly state what is
+authoritative, what is derived, and what a cold checkpoint restore must prove.
 
-Once this plan is refined into executable phases, `plans/lab-replay/` should reference it as the
-foundation for checkpoint serialization. Lab replay should then focus on checkpoint artifacts,
-action timing, lab operation capture, schema break handling, and product UI instead of also
-discovering the simulation ownership model.
+Once this plan is refined into executable phases and the core checkpoint contract exists, a new lab
+replay plan can reference it as the foundation. That later plan should focus on checkpoint
+artifacts, action timing, lab operation capture, schema break handling, and product UI instead of
+also discovering the simulation ownership model.
 
 ## Non-Goals For This Draft
 
@@ -162,8 +189,8 @@ discovering the simulation ownership model.
   metadata?
 - Should command history and score counters be checkpointed as part of `GameState`, or should some
   replay products deliberately rebase them at checkpoint boundaries?
-- Which pathing data is pure cache, and what tests prove a cold restored path cache behaves the
-  same as a warm original cache?
+- Which pathing details beyond selected unit paths are pure cache, and what tests prove a cold
+  restored path cache behaves the same as a warm original cache?
 - How strict should service-private mutation be in Rust privacy terms versus architecture-check
   enforcement?
 - Where should the eventual state ownership registry live so it stays close enough to code and docs
