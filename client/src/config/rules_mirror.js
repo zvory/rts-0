@@ -57,13 +57,20 @@ export const MORTAR_RANGE_TILES = 20;
 export const MORTAR_OUTER_RADIUS_TILES = 1.5;
 export const MORTAR_INNER_RADIUS_TILES = 0.5;
 export const MORTAR_FIRE_COOLDOWN_TICKS = TICK_HZ * 2;
+export const PANZERFAUST_RANGE_TILES = 3;
+export const PANZERFAUST_DAMAGE = 60;
+export const PANZERFAUST_WINDUP_TICKS = TICK_HZ / 2;
+export const PANZERFAUST_TRAVEL_TICKS = TICK_HZ / 2;
+export const PANZERFAUST_RECOVERY_TICKS = TICK_HZ / 2;
+export const METHAMPHETAMINES_PANZERFAUST_WINDUP_TICKS = 12;
+export const METHAMPHETAMINES_PANZERFAUST_RECOVERY_TICKS = 12;
 export const METHAMPHETAMINES_RESEARCH_TICKS = TICK_HZ * 20;
 export const ENTRENCHMENT_RESEARCH_TICKS = TICK_HZ * 10;
 export const ENTRENCHMENT_DIG_IN_TICKS = TICK_HZ * 3;
 export const ENTRENCHMENT_RANGE_BONUS_TILES = 1;
 export const ENTRENCHMENT_DIRECT_MISS_CHANCE = 0.70;
 export const ENTRENCHMENT_AREA_DAMAGE_REDUCTION = 0.70;
-export const ENTRENCHMENT_TRENCH_RADIUS_TILES = 0.75;
+export const ENTRENCHMENT_TRENCH_RADIUS_TILES = 0.375;
 export const ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
 export const ARTILLERY_UNLOCK_RESEARCH_TICKS = TICK_HZ * 30;
 export const BALLISTIC_TABLES_RESEARCH_TICKS = TICK_HZ * 20;
@@ -101,6 +108,9 @@ export const STATS = Object.freeze({
     rangeTiles: 4, cost: { steel: 50, oil: 0 }, supply: 1, buildTicks: 300 },
   [KIND.MACHINE_GUNNER]: { label: "Machine Gunner", icon: "MG", size: 10, sight: 8,
     rangeTiles: 6, cost: { steel: 75, oil: 10 }, supply: 2, buildTicks: 400, requires: KIND.TRAINING_CENTRE },
+  [KIND.PANZERFAUST]: { label: "Panzerfaust", icon: "PF", size: 9, sight: 8,
+    rangeTiles: PANZERFAUST_RANGE_TILES, cost: { steel: 60, oil: 15 }, supply: 1, buildTicks: 400,
+    requires: KIND.TRAINING_CENTRE },
   [KIND.ANTI_TANK_GUN]: { label: "Anti-Tank Gun", icon: "ATG", size: 20, sight: 6, body: ANTI_TANK_GUN_BODY,
     rangeTiles: ANTI_TANK_GUN_DEPLOYED_RANGE_TILES, cost: { steel: 75, oil: 25 }, supply: 3, buildTicks: 440,
     requires: KIND.STEELWORKS, upgradeRequires: UPGRADE.ANTI_TANK_GUN_UNLOCK,

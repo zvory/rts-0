@@ -389,6 +389,10 @@ await withFakeDocument(async () => {
     !labSpawnUnitKindsForFaction(DEFAULT_FACTION_ID).includes(KIND.CITY_CENTRE),
     "LabPanel spawn palette excludes buildings from primary unit options",
   );
+  assert(
+    !labSpawnUnitKindsForFaction(DEFAULT_FACTION_ID).includes(KIND.PANZERFAUST),
+    "LabPanel spawn palette keeps hidden Panzerfaust out of product-playable Kriegsia units",
+  );
   assertDeepEqual(
     labSpawnUnitKindsForFaction("ekat"),
     [KIND.EKAT, KIND.GOLEM],

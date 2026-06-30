@@ -25,9 +25,14 @@ pub fn trainable_units(building_kind: EntityKind) -> &'static [EntityKind] {
         .map(|d| d.trains)
         .unwrap_or(&[]);
     debug_assert!(
-        defs::UNITS
-            .iter()
-            .all(|d| (d.trained_at == Some(building_kind)) == units.contains(&d.kind)),
+        defs::UNITS.iter().all(|d| {
+            let listed = units.contains(&d.kind);
+            if d.trained_at == Some(building_kind) {
+                listed || defs::HIDDEN_UNITS_WITH_RESERVED_PRODUCTION.contains(&d.kind)
+            } else {
+                !listed
+            }
+        }),
         "building train list and unit trained_at should agree for {building_kind}"
     );
     units

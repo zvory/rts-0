@@ -241,7 +241,8 @@ pub fn default_weapon_kind(kind: EntityKind) -> Option<WeaponKind> {
         EntityKind::Artillery => Some(WeaponKind::ArtilleryGun),
         EntityKind::ScoutCar => Some(WeaponKind::ScoutCarMg),
         EntityKind::Tank => Some(WeaponKind::TankCannon),
-        EntityKind::CommandCar
+        EntityKind::Panzerfaust
+        | EntityKind::CommandCar
         | EntityKind::Ekat
         | EntityKind::CityCentre
         | EntityKind::Zamok
@@ -279,7 +280,7 @@ pub fn is_armored(kind: EntityKind) -> bool {
 
 /// AP weapons deal full damage to armored targets.
 pub fn is_ap(kind: EntityKind) -> bool {
-    weapon_class(kind) == WeaponClass::AntiTank
+    kind == EntityKind::Panzerfaust || weapon_class(kind) == WeaponClass::AntiTank
 }
 
 /// Rules-owned armor classification for target ranking and damage policy.
@@ -298,7 +299,7 @@ pub fn weapon_class(kind: EntityKind) -> WeaponClass {
 
 /// Rules-owned threat role used by sim-local target ranking.
 pub fn target_threat_role(kind: EntityKind) -> TargetThreatRole {
-    if weapon_class(kind) == WeaponClass::AntiTank {
+    if is_ap(kind) {
         TargetThreatRole::AntiArmorThreat
     } else if kind == EntityKind::TankTrap {
         TargetThreatRole::FieldObstacle
@@ -307,6 +308,12 @@ pub fn target_threat_role(kind: EntityKind) -> TargetThreatRole {
     } else {
         TargetThreatRole::Ordinary
     }
+}
+
+/// First-pass loaded Panzerfaust target filter. The runtime consumes this separately from
+/// default weapon ranking because loaded Panzerfausts do not have a repeat-fire default attack.
+pub fn is_panzerfaust_loaded_shot_target(kind: EntityKind) -> bool {
+    kind == EntityKind::Tank
 }
 
 /// Pure default-weapon fit vocabulary for target ranking.
@@ -385,7 +392,11 @@ pub fn area_damage_after_entrenchment(
 fn anti_tank_gun_miss_target(kind: EntityKind) -> bool {
     matches!(
         kind,
-        EntityKind::Worker | EntityKind::Golem | EntityKind::Rifleman | EntityKind::MachineGunner
+        EntityKind::Worker
+            | EntityKind::Golem
+            | EntityKind::Rifleman
+            | EntityKind::MachineGunner
+            | EntityKind::Panzerfaust
     )
 }
 
@@ -472,6 +483,9 @@ mod tests {
     use super::*;
 
     fn defs_attack_profile_and_class(kind: EntityKind) -> (AttackProfile, WeaponClass) {
+        if kind == EntityKind::Panzerfaust {
+            return (AttackProfile::NONE, WeaponClass::None);
+        }
         if let Some(def) = defs::unit_def(kind) {
             (
                 AttackProfile {
@@ -533,6 +547,7 @@ mod tests {
             (EntityKind::Golem, Some(WeaponKind::GolemFists)),
             (EntityKind::Rifleman, Some(WeaponKind::RiflemanRifle)),
             (EntityKind::MachineGunner, Some(WeaponKind::MachineGunnerMg)),
+            (EntityKind::Panzerfaust, None),
             (EntityKind::AntiTankGun, Some(WeaponKind::AntiTankGun)),
             (EntityKind::MortarTeam, Some(WeaponKind::MortarTeamMortar)),
             (EntityKind::Artillery, Some(WeaponKind::ArtilleryGun)),
@@ -707,6 +722,25 @@ mod tests {
     }
 
     #[test]
+    fn panzerfaust_loaded_shot_filter_is_tank_only_without_facing_multiplier() {
+        for kind in EntityKind::ALL {
+            assert_eq!(
+                is_panzerfaust_loaded_shot_target(kind),
+                kind == EntityKind::Tank,
+                "{kind:?}"
+            );
+        }
+        assert_eq!(
+            facing_damage_multiplier(EntityKind::Panzerfaust, EntityKind::Tank, ArmorFacing::Rear),
+            1.0
+        );
+        assert_eq!(
+            effective_damage(EntityKind::Panzerfaust, EntityKind::Tank, 60, None),
+            60
+        );
+    }
+
+    #[test]
     fn tank_ap_vs_building_full_damage() {
         assert_eq!(
             effective_damage(EntityKind::Tank, EntityKind::Barracks, 50, None),
@@ -786,6 +820,12 @@ mod tests {
                 false,
                 false,
                 TargetThreatRole::Ordinary,
+            ),
+            (
+                EntityKind::Panzerfaust,
+                false,
+                true,
+                TargetThreatRole::AntiArmorThreat,
             ),
             (
                 EntityKind::AntiTankGun,

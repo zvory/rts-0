@@ -8,12 +8,15 @@ pub const ENTRENCHMENT_DIG_IN_TICKS: u32 = TICK_HZ * 3;
 pub const ENTRENCHMENT_RANGE_BONUS_TILES: u32 = 1;
 pub const ENTRENCHMENT_DIRECT_MISS_CHANCE: f32 = 0.70;
 pub const ENTRENCHMENT_AREA_DAMAGE_REDUCTION: f32 = 0.70;
-pub const ENTRENCHMENT_TRENCH_RADIUS_TILES: f32 = 0.75;
+pub const ENTRENCHMENT_TRENCH_RADIUS_TILES: f32 = 0.375;
 
 pub fn is_entrenchment_eligible_infantry(kind: EntityKind) -> bool {
     matches!(
         kind,
-        EntityKind::Rifleman | EntityKind::MachineGunner | EntityKind::Worker
+        EntityKind::Rifleman
+            | EntityKind::MachineGunner
+            | EntityKind::Panzerfaust
+            | EntityKind::Worker
     )
 }
 
@@ -26,6 +29,7 @@ mod tests {
         let eligible = [
             EntityKind::Rifleman,
             EntityKind::MachineGunner,
+            EntityKind::Panzerfaust,
             EntityKind::Worker,
         ];
         for kind in EntityKind::ALL {

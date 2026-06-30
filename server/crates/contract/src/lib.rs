@@ -711,6 +711,22 @@ pub enum Event {
         y: f32,
         radius_tiles: f32,
     },
+    PanzerfaustLaunch {
+        from: u32,
+        from_x: f32,
+        from_y: f32,
+        to_x: f32,
+        to_y: f32,
+        delay_ticks: u32,
+    },
+    PanzerfaustImpact {
+        x: f32,
+        y: f32,
+    },
+    PanzerfaustConversion {
+        id: u32,
+        to_kind: String,
+    },
     Notice {
         msg: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
