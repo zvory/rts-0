@@ -9,7 +9,7 @@ import {
   ANTI_TANK_GUN_FIELD_OF_FIRE_RAD,
   isProducerBuilding,
 } from "../config.js";
-import { KIND, SETUP, STATE, isBuilding, isResource } from "../protocol.js";
+import { KIND, SETUP, STATE, isBuilding, isResource, isUnit } from "../protocol.js";
 import { buildingProgressStatus } from "./entity_state.js";
 import {
   DEPLOYED_WEAPON_ANIM_MS,
@@ -108,23 +108,27 @@ export function _vehicleShadow(g, cx, cy, body, facing) {
 
 export function _drawSelectionAndHp(e, selection, state) {
   const selected = selection.has(e.id);
+  const occupiedTrench = hasOccupiedTrench(e);
   const damaged = e.maxHp && e.hp < e.maxHp;
   const progressStatus = buildingProgressStatus(e);
 
-  if (selected) {
+  if (selected || occupiedTrench) {
     const g = this._slot("selectionRings", e.id);
     g.position.set(e.x, e.y);
     const ring = this._ringRadius(e);
-    let color;
-    if (ownOwner(state, e.owner)) color = COLORS.selectOwn;
-    else if (allyOwner(state, e.owner)) color = COLORS.selectAlly;
-    else if (neutralOwner(state, e.owner)) color = COLORS.selectNeutral;
-    else color = COLORS.selectEnemy;
-    // Glow + crisp ring.
-    g.lineStyle(4, color, 0.25);
-    g.drawEllipse(0, ring.cy, ring.rx, ring.ry);
-    g.lineStyle(2, color, 0.95);
-    g.drawEllipse(0, ring.cy, ring.rx, ring.ry);
+    if (occupiedTrench) drawOccupiedTrenchMarker(g, ring);
+    if (selected) {
+      let color;
+      if (ownOwner(state, e.owner)) color = COLORS.selectOwn;
+      else if (allyOwner(state, e.owner)) color = COLORS.selectAlly;
+      else if (neutralOwner(state, e.owner)) color = COLORS.selectNeutral;
+      else color = COLORS.selectEnemy;
+      // Glow + crisp ring.
+      g.lineStyle(4, color, 0.25);
+      g.drawEllipse(0, ring.cy, ring.rx, ring.ry);
+      g.lineStyle(2, color, 0.95);
+      g.drawEllipse(0, ring.cy, ring.rx, ring.ry);
+    }
   }
 
   if (progressStatus || damaged || selected) {
@@ -132,6 +136,25 @@ export function _drawSelectionAndHp(e, selection, state) {
     g.position.set(0, 0);
     this._hpBar(g, e, progressStatus);
   }
+}
+
+function hasOccupiedTrench(entity) {
+  const id = Number(entity?.occupiedTrenchId);
+  return Number.isInteger(id) && id > 0 && isUnit(entity?.kind);
+}
+
+function drawOccupiedTrenchMarker(g, ring) {
+  const rx = Math.max(9, ring.rx + 3);
+  const ry = Math.max(6, ring.ry + 2);
+  g.lineStyle(7, COLORS.trenchShadow, 0.42);
+  g.drawEllipse(0, ring.cy, rx, ry);
+  g.lineStyle(3, COLORS.trenchRim, 0.72);
+  g.drawEllipse(0, ring.cy, rx * 0.92, ry * 0.86);
+  g.lineStyle(2, COLORS.trenchDirtLight, 0.68);
+  g.moveTo(-rx * 0.55, ring.cy - ry * 0.1);
+  g.lineTo(-rx * 0.16, ring.cy - ry * 0.3);
+  g.moveTo(rx * 0.14, ring.cy + ry * 0.32);
+  g.lineTo(rx * 0.55, ring.cy + ry * 0.08);
 }
 
 function ownOwner(state, owner) {

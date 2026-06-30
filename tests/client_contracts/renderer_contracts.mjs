@@ -5,6 +5,7 @@ import { assert } from "./assertions.mjs";
 import { FrameProfiler } from "../../client/src/frame_profiler.js";
 import { KIND } from "../../client/src/protocol.js";
 import { GROUND_DECAL_TEXTURE_WORLD_SCALE } from "../../client/src/renderer/decals.js";
+import { _drawTrenches } from "../../client/src/renderer/trenches.js";
 import { Renderer } from "../../client/src/renderer/index.js";
 import {
   _drawAbilityObjects,
@@ -16,7 +17,7 @@ import {
   _drawResourceMiningPreview,
 } from "../../client/src/renderer/feedback.js";
 
-import { installFakePixi } from "./pixi_fakes.mjs";
+import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
 
 {
   const restorePixi = installFakePixi();
@@ -114,6 +115,64 @@ import { installFakePixi } from "./pixi_fakes.mjs";
     restorePixi();
     delete globalThis.__rtsRenderErrors;
   }
+}
+
+{
+  const restorePixi = installFakePixi();
+  try {
+    const parent = {
+      clientWidth: 640,
+      clientHeight: 480,
+      appendChild(view) {
+        view.parentNode = this;
+      },
+      removeChild(view) {
+        view.parentNode = null;
+      },
+    };
+    const renderer = new Renderer(parent);
+    const terrainIndex = renderer.world.children.indexOf(renderer.layers.terrain);
+    const decalsIndex = renderer.world.children.indexOf(renderer.layers.decals);
+    const trenchesIndex = renderer.world.children.indexOf(renderer.layers.trenches);
+    const resourcesIndex = renderer.world.children.indexOf(renderer.layers.resources);
+    assert(terrainIndex < decalsIndex && decalsIndex < trenchesIndex && trenchesIndex < resourcesIndex,
+      "renderer mounts trench ground above decals and below resources/units");
+    assert(renderer.layers.trenches.children.length === 1, "renderer owns one persistent trench graphics object");
+    renderer.destroy();
+    assert(renderer.layers.trenches.children.length === 0, "renderer teardown removes the trench graphics object");
+  } finally {
+    restorePixi();
+  }
+}
+
+{
+  const gfx = new RecordingGraphics();
+  const diagnostics = [];
+  const renderer = {
+    _trenchGfx: gfx,
+    _map: { tileSize: 32 },
+    _recordRenderDiagnostic(label, amount = 1) {
+      diagnostics.push([label, amount]);
+    },
+  };
+  const drawn = _drawTrenches.call(renderer, {
+    trenches: [
+      { id: 2, x: 132, y: 96, radiusTiles: 0.75 },
+      { id: 1, x: 96, y: 96, radiusTiles: 0.75 },
+      { id: 3, x: 280, y: 96, radiusTiles: 0.75 },
+    ],
+  });
+  const lineTargets = gfx.calls
+    .filter((call) => call[0] === "lineTo")
+    .map((call) => `${call[1]},${call[2]}`);
+  assert(drawn === 3, "trench renderer draws all valid authoritative trench snapshots");
+  assert(gfx.calls[0]?.[0] === "clear", "trench renderer clears the persistent graphics each frame");
+  assert(lineTargets.includes("132,96"), "nearby trenches are visually connected");
+  assert(!lineTargets.includes("280,96"), "distant trenches are not connected");
+  assert(gfx.calls.filter((call) => call[0] === "drawEllipse").length >= 3,
+    "trench renderer draws brown ground footprints");
+  assert(diagnostics.some(([label, amount]) => label === "renderer.trenches.visible" && amount === 3),
+    "trench renderer records visible trench diagnostics");
 }
 
 {
@@ -245,12 +304,26 @@ import { installFakePixi } from "./pixi_fakes.mjs";
       maxHp: 100,
       state: "idle",
     };
+    const entrenched = {
+      id: 505,
+      owner: 1,
+      kind: KIND.RIFLEMAN,
+      x: 260,
+      y: 160,
+      hp: 40,
+      maxHp: 40,
+      state: "idle",
+      occupiedTrenchId: 80,
+    };
 
     renderer._drawSelectionAndHp(scaffold, new Set([scaffold.id]), { playerId: 1 });
     renderer._drawSelectionAndHp(completed, new Set(), { playerId: 1 });
+    renderer._drawSelectionAndHp(entrenched, new Set(), { playerId: 1 });
 
     const scaffoldHpRects = renderer._pools.hpBars.get(scaffold.id)?.calls.filter((call) => call[0] === "drawRect") || [];
     const scaffoldBarW = scaffoldHpRects[0]?.[3] - 2;
+    const entrenchedMarkerEllipses = renderer._pools.selectionRings.get(entrenched.id)?.calls
+      .filter((call) => call[0] === "drawEllipse") || [];
     assert(
       renderer._pools.selectionRings.has(scaffold.id),
       "selected under-construction building still draws a selection ring",
@@ -266,6 +339,10 @@ import { installFakePixi } from "./pixi_fakes.mjs";
     assert(
       renderer._pools.hpBars.has(completed.id),
       "completed damaged building still draws a normal HP bar",
+    );
+    assert(
+      entrenchedMarkerEllipses.length >= 2,
+      "occupied infantry draw a trench marker on the pooled selection-ring layer even when unselected",
     );
   } finally {
     restorePixi();

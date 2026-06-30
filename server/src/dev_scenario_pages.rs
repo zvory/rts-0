@@ -318,5 +318,7 @@ mod tests {
         assert!(
             html.contains("<input type=\"hidden\" name=\"id\" value=\"tank_trap_pathing_matrix\"")
         );
+        assert!(html.contains("Entrenchment Inspection"));
+        assert!(html.contains("/dev/scenarios?id=entrenchment_inspection&unit=rifleman&count=1"));
     }
 }

@@ -749,7 +749,10 @@ that recipient's current living-team fog, plus trench terrain the recipient has 
 Spectator, replay, and lab selected-perspective snapshots use the selected real players' current
 fog and discovered terrain memory; full-world dev/lab snapshots include every trench. Remembered
 trench terrain is terrain-only: it exposes no creator, owner, occupant, or current hidden unit
-state.
+state. Clients treat each snapshot's `trenches` field as the complete current trench-terrain set
+for that recipient; a missing or empty field clears prior client trench terrain. Rendering uses the
+snapshot data below fog, so reconnects, replay seeks, and fog-memory refreshes restore trench ground
+from the server instead of from local visual history.
 
 `RememberedBuilding`: `{ id, owner, kind, x, y, footprint, observedTick }`. These records are
 recipient-only last-seen enemy building memory, refreshed from team-current actionable observations

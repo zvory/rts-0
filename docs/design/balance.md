@@ -324,7 +324,11 @@ folded into default targeting.
   chance, reduces incoming area damage by 70% after existing falloff/armor rules, and suppresses
   over-penetration through or into the entrenched unit. Direct-shot miss sources use the highest
   applicable chance, not composed probability, so an Anti-Tank Gun's 65% infantry miss chance
-  becomes 70% against entrenched eligible infantry. The trench radius is 0.75 tile.
+  becomes 70% against entrenched eligible infantry. The trench radius is 0.75 tile. The client
+  renders neutral trench terrain as brown ground and marks occupied eligible infantry with a small
+  brown rim. The selected-unit panel reports existing-trench reuse, researched dig-in availability,
+  and occupied benefits as a player-facing status only; the server remains authoritative for actual
+  occupation and combat modifiers.
 - **Heavy Guns** (R&D Complex research, protocol id `anti_tank_gun_unlock`): costs 200 steel / 75 oil
   and takes 600 ticks (~20s). Once complete, that player can train Anti-Tank Guns and Artillery
   from Gun Works. The legacy protocol id `artillery_unlock` remains decodable for old compact

@@ -4,6 +4,7 @@ import { SWEEP_EVICT_FRAMES } from "./palette.js";
 export const LAYERS = [
   "terrain",
   "decals",
+  "trenches",
   "resources",
   "buildingShadows",
   "buildings",

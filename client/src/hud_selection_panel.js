@@ -1,10 +1,15 @@
 import {
   BASE_COMMAND_SUPPLY_CAP,
   COMMAND_CAR_SUPPLY_CAP_BONUS,
+  ENTRENCHMENT_AREA_DAMAGE_REDUCTION,
+  ENTRENCHMENT_DIG_IN_TICKS,
+  ENTRENCHMENT_DIRECT_MISS_CHANCE,
+  ENTRENCHMENT_RANGE_BONUS_TILES,
   STATS,
+  TICK_HZ,
   UPGRADES,
 } from "./config.js";
-import { KIND } from "./protocol.js";
+import { KIND, UPGRADE } from "./protocol.js";
 
 const SELECTION_BUDGET_ROWS = 2;
 const SELECTION_OVERFLOW_FLASH_MS = 1400;
@@ -110,7 +115,7 @@ export class HudSelectionPanel {
     }
 
     if (sel.length === 1) {
-      const sig = selectionPanelSignature(sel, null);
+      const sig = selectionPanelSignature(sel, null, this.state);
       if (sig === this._renderSig) {
         this._recordSelectionDiagnostic("hud.dirty.selectionPanel.hit");
         return;
@@ -123,7 +128,7 @@ export class HudSelectionPanel {
     }
 
     const overflow = this._visibleSelectionOverflow();
-    const sig = selectionPanelSignature(sel, overflow);
+    const sig = selectionPanelSignature(sel, overflow, this.state);
     if (sig === this._renderSig) {
       this._recordSelectionDiagnostic("hud.dirty.selectionPanel.hit");
       return;
@@ -287,6 +292,11 @@ export class HudSelectionPanel {
       ? `<div class="sel-stat"><span>Oil Used:</span>` +
         `<strong>${formatTankOilUsed(e.oilUsed)}</strong></div>`
       : "";
+    const entrenchment = entrenchmentSelectionStatus(e, this.state);
+    const entrenchmentHtml = entrenchment
+      ? `<div class="sel-stat sel-trench-status"><span>${entrenchment.label}:</span>` +
+        `<strong>${entrenchment.value}</strong></div>`
+      : "";
 
     node.innerHTML =
       `<div class="sel-name"><span class="sel-icon">${st.icon || ""}</span>` +
@@ -295,6 +305,7 @@ export class HudSelectionPanel {
       `style="width:${(frac * 100).toFixed(0)}%"></div></div>` +
       `<div class="sel-hptext">${hp} / ${maxHp}</div>` +
       tankOilHtml +
+      entrenchmentHtml +
       prodHtml;
     return node;
   }
@@ -310,9 +321,34 @@ export class HudSelectionPanel {
   }
 }
 
-function selectionPanelSignature(entities, overflow) {
+export function entrenchmentSelectionStatus(entity, state = null) {
+  if (!isEntrenchmentEligibleKind(entity?.kind)) return null;
+  const occupiedTrenchId = Number(entity?.occupiedTrenchId);
+  if (Number.isInteger(occupiedTrenchId) && occupiedTrenchId > 0) {
+    return {
+      label: "Trench",
+      value: `Occupied: +${ENTRENCHMENT_RANGE_BONUS_TILES} range, ` +
+        `${percent(ENTRENCHMENT_DIRECT_MISS_CHANCE)} miss, ` +
+        `-${percent(ENTRENCHMENT_AREA_DAMAGE_REDUCTION)} blast`,
+    };
+  }
+
+  if (canReportOwnResearch(entity, state) && playerHasEntrenchment(state)) {
+    return {
+      label: "Entrenchment",
+      value: `Hold still ${formatDigInSeconds()}s to dig`,
+    };
+  }
+
+  return {
+    label: "Trench",
+    value: "Can use existing trenches",
+  };
+}
+
+function selectionPanelSignature(entities, overflow, state = null) {
   if (!entities || entities.length === 0) return "empty";
-  if (entities.length === 1) return `single:${selectionDetailSignature(entities[0])}`;
+  if (entities.length === 1) return `single:${selectionDetailSignature(entities[0], state)}`;
   const selected = entities.map(selectionBudgetEntitySignature).join("|");
   const overflowSig = overflow
     ? `${numberSig(overflow.used)}:${numberSig(overflow.cap)}:${sigValue(overflow.seq)}`
@@ -320,15 +356,18 @@ function selectionPanelSignature(entities, overflow) {
   return `multi:${selected}|overflow:${overflowSig}`;
 }
 
-function selectionDetailSignature(entity) {
+function selectionDetailSignature(entity, state = null) {
   if (!entity) return "missing";
   const productionPct = Math.round(clamp01(Number(entity.prodProgress) || 0) * 100);
+  const entrenchment = entrenchmentSelectionStatus(entity, state);
   return [
     sigValue(entity.id),
     sigValue(entity.kind),
     sigValue(entity.label),
     sigValue(entity.hp),
     sigValue(entity.maxHp),
+    sigValue(entity.occupiedTrenchId),
+    entrenchment ? `${entrenchment.label}:${entrenchment.value}` : "",
     entity.kind === KIND.TANK ? formatTankOilUsed(entity.oilUsed) : "",
     sigValue(entity.prodQueue),
     sigValue(entity.prodKind),
@@ -336,6 +375,29 @@ function selectionDetailSignature(entity) {
     productionPct,
     entity.optimisticProduction ? 1 : 0,
   ].join(":");
+}
+
+function isEntrenchmentEligibleKind(kind) {
+  return kind === KIND.RIFLEMAN || kind === KIND.MACHINE_GUNNER || kind === KIND.WORKER;
+}
+
+function canReportOwnResearch(entity, state) {
+  if (!state || entity?.owner == null) return false;
+  if (typeof state.isOwnOwner === "function") return state.isOwnOwner(entity.owner);
+  return Number(entity.owner) === Number(state.playerId);
+}
+
+function playerHasEntrenchment(state) {
+  return Array.isArray(state?.upgrades) && state.upgrades.includes(UPGRADE.ENTRENCHMENT);
+}
+
+function formatDigInSeconds() {
+  const seconds = TICK_HZ > 0 ? ENTRENCHMENT_DIG_IN_TICKS / TICK_HZ : 0;
+  return Number.isInteger(seconds) ? String(seconds) : seconds.toFixed(1);
+}
+
+function percent(value) {
+  return `${Math.round(value * 100)}%`;
 }
 
 function selectionBudgetEntitySignature(entity) {

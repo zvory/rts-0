@@ -31,6 +31,7 @@ src/
                   # decals, resources, fog overlay, feedback, rig schema/import, and renderer-local palette helpers
   renderer/decals.js # GroundDecalLayer permanent decal texture, stamping, diagnostics, teardown
   renderer/decals/ # SVG decal atlas manifest, loader, and deterministic stamp selection
+  renderer/trenches.js # Authoritative trench terrain pass and deterministic nearby-trench connectors
   renderer/feedback_view_model.js # Builder for renderer feedback's narrow per-frame read model
   fog.js          # Fog overlay: accumulate explored, compute visible from own entities
   input/          # lifecycle facade plus selection, commands, placement, shared camera navigation, UI input routing
@@ -299,6 +300,17 @@ per-frame records. `diagnostics()` exposes total stamped decals, queued decals, 
 count, texture dimensions/downsample, child count, and asset-load status for stress checks. The
 renderer tears down the decal sprite, texture, canvas, tint scratch canvas, loaded atlas masks, and
 late async asset loads through `Renderer.destroy()` / rematch cleanup.
+
+`renderer/trenches.js`
+```js
+export function normalizedTrenches(trenches, tileSize?)
+export function _drawTrenches(state)
+```
+`_drawTrenches` renders the latest authoritative `state.trenches` into one persistent Pixi
+`Graphics` object on the `trenches` world layer. It clears and redraws that object each frame,
+skips malformed records, and draws deterministic connectors between nearby trench footprints so
+clustered neutral trenches read as continuous ground without allocating per-trench display objects.
+`Renderer.destroy()` removes and destroys the trench graphics object during rematch teardown.
 
 `branch_staging.js`
 ```js
@@ -1114,6 +1126,20 @@ terrain and resources):
 - `Renderer.destroy()` clears the decal texture/canvases and cancels late atlas loads so rematches
   start with a fresh blank decal layer.
 
+Trench terrain rendering (`renderer/trenches.js`; layer `trenches` between ground decals and
+resources):
+- Each frame, redraws the latest authoritative `state.trenches` into one persistent `Graphics`
+  object. Reconnects, replay seeks, and fog-memory updates therefore restore trench ground from
+  snapshots instead of relying on client-only historical effects.
+- Trenches draw as neutral brown ground depressions with lighter dirt highlights. Nearby trench
+  footprints are connected by deterministic filled strokes when they are close enough to read as
+  one fieldwork cluster; distant trenches remain separate.
+- The renderer skips invalid records and does not create per-trench display objects, so large trench
+  lists are bounded by draw commands on one reusable object.
+- Occupied eligible infantry also draw a small brown rim marker around the unit using the existing
+  selection-ring pool. This marker is a provisional readability pass and does not replace selection
+  color, HP, ownership, or fog rules.
+
 Smoke rendering (`renderer/feedback.js`, `_drawSmokes`; layer `smokes` between unit bodies and
 selection rings):
 - Each frame, iterates `state.smokes` (the latest snapshot's fog-filtered cloud list).
@@ -1128,7 +1154,7 @@ selection rings):
   the next snapshot.
 
 ### 4.2 Rendering & look (PixiJS, SVG rigs — neutral PS1 field-command style)
-- Layers (back→front): terrain → ground decals → resource nodes → building shadows → buildings →
+- Layers (back→front): terrain → ground decals → trench terrain → resource nodes → building shadows → buildings →
   building overlays → unit shadows → units → smoke/ability ground effects → selection rings →
   health bars → fog overlay → shot-revealed units → command/hover feedback → placement ghost →
   selection drag-box → (HUD is DOM, not Pixi). Selected unit range rings, minimum-range rings, and
