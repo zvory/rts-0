@@ -418,8 +418,6 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
 
     const scaffoldHpRects = renderer._pools.hpBars.get(scaffold.id)?.calls.filter((call) => call[0] === "drawRect") || [];
     const scaffoldBarW = scaffoldHpRects[0]?.[3] - 2;
-    const entrenchedMarkerEllipses = renderer._pools.selectionRings.get(entrenched.id)?.calls
-      .filter((call) => call[0] === "drawEllipse") || [];
     assert(
       renderer._pools.selectionRings.has(scaffold.id),
       "selected under-construction building still draws a selection ring",
@@ -437,8 +435,8 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
       "completed damaged building still draws a normal HP bar",
     );
     assert(
-      entrenchedMarkerEllipses.length >= 2,
-      "occupied infantry draw a trench marker on the pooled selection-ring layer even when unselected",
+      !renderer._pools.selectionRings.has(entrenched.id),
+      "occupied infantry no longer draw an unselected trench marker on the selection-ring layer",
     );
   } finally {
     restorePixi();
