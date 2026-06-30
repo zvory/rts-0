@@ -40,6 +40,8 @@ fn is_false(value: &bool) -> bool {
     !*value
 }
 
+const MAX_COMMAND_LIFECYCLE_EXEMPLARS: usize = 5;
+
 // ---------------------------------------------------------------------------
 // Client -> Server
 // ---------------------------------------------------------------------------
@@ -164,6 +166,54 @@ pub struct CommandLifecycleExemplar {
     pub issued_elapsed_ms: u32,
     pub stage: String,
     pub stage_ms: u16,
+}
+
+fn deserialize_command_lifecycle_exemplars<'de, D>(
+    deserializer: D,
+) -> Result<Vec<CommandLifecycleExemplar>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    struct BoundedExemplarsVisitor;
+
+    impl<'de> serde::de::Visitor<'de> for BoundedExemplarsVisitor {
+        type Value = Vec<CommandLifecycleExemplar>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            formatter.write_str("an optional command lifecycle exemplar array")
+        }
+
+        fn visit_none<E>(self) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(Vec::new())
+        }
+
+        fn visit_unit<E>(self) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(Vec::new())
+        }
+
+        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+        {
+            let mut exemplars = Vec::with_capacity(MAX_COMMAND_LIFECYCLE_EXEMPLARS);
+            while exemplars.len() < MAX_COMMAND_LIFECYCLE_EXEMPLARS {
+                match seq.next_element::<CommandLifecycleExemplar>()? {
+                    Some(entry) => exemplars.push(entry),
+                    None => return Ok(exemplars),
+                }
+            }
+            while seq.next_element::<serde::de::IgnoredAny>()?.is_some() {}
+            Ok(exemplars)
+        }
+    }
+
+    deserializer.deserialize_any(BoundedExemplarsVisitor)
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
@@ -364,7 +414,7 @@ pub struct ClientNetReport {
     pub command_family_train: u32,
     #[serde(default)]
     pub command_family_other: u32,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_command_lifecycle_exemplars")]
     pub command_lifecycle_exemplars: Vec<CommandLifecycleExemplar>,
     #[serde(default)]
     pub correction_distance_px: u16,
@@ -1306,6 +1356,51 @@ mod tests {
                 assert_eq!(report.prediction_disable_wasm_count, 0);
                 assert_eq!(report.prediction_replay_max_ms, 0);
                 assert_eq!(report.prediction_replay_budget_exceeded_count, 0);
+            }
+            other => panic!("expected net report, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn client_net_report_bounds_command_lifecycle_exemplars() {
+        let raw = r#"{
+            "t":"netReport",
+            "report":{
+                "schemaVersion":1,
+                "elapsedMs":10000,
+                "matchTick":300,
+                "rttMs":82,
+                "rttMaxMs":82,
+                "badRttSamples":0,
+                "snapshotJitterMs":0,
+                "snapshotGapMaxMs":33,
+                "jitterSamples":0,
+                "snapshots":300,
+                "frameGapMaxMs":16,
+                "fpsEstimate":60,
+                "hidden":false,
+                "focused":true,
+                "wsBufferedBytes":0,
+                "serverTickMs":4,
+                "serverLagMs":0,
+                "slowTickCount":0,
+                "headOfLineCount":0,
+                "commandLifecycleExemplars":[
+                    {"clientSeq":1,"family":"move","issuedElapsedMs":1,"stage":"issueToSimAck","stageMs":1},
+                    {"clientSeq":2,"family":"move","issuedElapsedMs":2,"stage":"issueToSimAck","stageMs":2},
+                    {"clientSeq":3,"family":"move","issuedElapsedMs":3,"stage":"issueToSimAck","stageMs":3},
+                    {"clientSeq":4,"family":"move","issuedElapsedMs":4,"stage":"issueToSimAck","stageMs":4},
+                    {"clientSeq":5,"family":"move","issuedElapsedMs":5,"stage":"issueToSimAck","stageMs":5},
+                    {"clientSeq":6,"family":"move","issuedElapsedMs":6,"stage":"issueToSimAck","stageMs":6}
+                ]
+            }
+        }"#;
+        let msg: ClientMessage = serde_json::from_str(raw).unwrap();
+        match msg {
+            ClientMessage::NetReport { report } => {
+                assert_eq!(report.command_lifecycle_exemplars.len(), 5);
+                assert_eq!(report.command_lifecycle_exemplars[0].client_seq, 1);
+                assert_eq!(report.command_lifecycle_exemplars[4].client_seq, 5);
             }
             other => panic!("expected net report, got {other:?}"),
         }

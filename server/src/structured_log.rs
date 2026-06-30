@@ -586,7 +586,14 @@ pub fn classify_client_net_report(
         "command_upload_delay"
     } else if report.command_server_receipt_to_sim_ack_max_ms
         >= NET_REPORT_COMMAND_SERVER_QUEUE_ISSUE_MS
+        || outbound
+            .command_lifecycle
+            .deserialize_to_room_enqueue
+            .max_ms
+            >= NET_REPORT_SERVER_COMMAND_ROOM_QUEUE_ISSUE_MS
         || outbound.command_lifecycle.room_queue.max_ms
+            >= NET_REPORT_SERVER_COMMAND_ROOM_QUEUE_ISSUE_MS
+        || outbound.command_lifecycle.room_handle.max_ms
             >= NET_REPORT_SERVER_COMMAND_ROOM_QUEUE_ISSUE_MS
         || outbound.command_lifecycle.accepted_to_sim_ack.max_ms
             >= NET_REPORT_SERVER_COMMAND_ROOM_QUEUE_ISSUE_MS
@@ -1045,6 +1052,38 @@ mod tests {
         let outbound = ConnectionReportStats {
             command_lifecycle: CommandLifecycleReportStats {
                 room_queue: CommandTimingStats {
+                    max_ms: NET_REPORT_SERVER_COMMAND_ROOM_QUEUE_ISSUE_MS,
+                    ..CommandTimingStats::default()
+                },
+                ..CommandLifecycleReportStats::default()
+            },
+            ..ConnectionReportStats::default()
+        };
+        assert_eq!(
+            classify_client_net_report(&report, &outbound),
+            "command_server_queue"
+        );
+
+        let report = clean_report();
+        let outbound = ConnectionReportStats {
+            command_lifecycle: CommandLifecycleReportStats {
+                deserialize_to_room_enqueue: CommandTimingStats {
+                    max_ms: NET_REPORT_SERVER_COMMAND_ROOM_QUEUE_ISSUE_MS,
+                    ..CommandTimingStats::default()
+                },
+                ..CommandLifecycleReportStats::default()
+            },
+            ..ConnectionReportStats::default()
+        };
+        assert_eq!(
+            classify_client_net_report(&report, &outbound),
+            "command_server_queue"
+        );
+
+        let report = clean_report();
+        let outbound = ConnectionReportStats {
+            command_lifecycle: CommandLifecycleReportStats {
+                room_handle: CommandTimingStats {
                     max_ms: NET_REPORT_SERVER_COMMAND_ROOM_QUEUE_ISSUE_MS,
                     ..CommandTimingStats::default()
                 },
