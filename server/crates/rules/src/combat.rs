@@ -103,6 +103,12 @@ pub fn target_threat_role(kind: EntityKind) -> TargetThreatRole {
     }
 }
 
+/// First-pass loaded Panzerfaust target filter. The runtime consumes this separately from
+/// default weapon ranking because loaded Panzerfausts do not have a repeat-fire default attack.
+pub fn is_panzerfaust_loaded_shot_target(kind: EntityKind) -> bool {
+    kind == EntityKind::Tank
+}
+
 /// Pure default-weapon fit vocabulary for target ranking.
 pub fn default_weapon_target_fit(
     attacker_weapon: WeaponClass,
@@ -180,7 +186,11 @@ pub fn area_damage_after_entrenchment(
 fn anti_tank_gun_miss_target(kind: EntityKind) -> bool {
     matches!(
         kind,
-        EntityKind::Worker | EntityKind::Golem | EntityKind::Rifleman | EntityKind::MachineGunner
+        EntityKind::Worker
+            | EntityKind::Golem
+            | EntityKind::Rifleman
+            | EntityKind::MachineGunner
+            | EntityKind::Panzerfaust
     )
 }
 
@@ -328,6 +338,25 @@ mod tests {
         assert_eq!(
             area_damage_after_entrenchment(EntityKind::Rifleman, 100, false),
             100
+        );
+    }
+
+    #[test]
+    fn panzerfaust_loaded_shot_filter_is_tank_only_without_facing_multiplier() {
+        for kind in EntityKind::ALL {
+            assert_eq!(
+                is_panzerfaust_loaded_shot_target(kind),
+                kind == EntityKind::Tank,
+                "{kind:?}"
+            );
+        }
+        assert_eq!(
+            facing_damage_multiplier(EntityKind::Panzerfaust, EntityKind::Tank, ArmorFacing::Rear),
+            1.0
+        );
+        assert_eq!(
+            effective_damage(EntityKind::Panzerfaust, EntityKind::Tank, 60, None),
+            60
         );
     }
 

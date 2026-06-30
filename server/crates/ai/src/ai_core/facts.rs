@@ -308,6 +308,7 @@ fn is_combat_unit(kind: EntityKind) -> bool {
     match kind {
         EntityKind::Rifleman
         | EntityKind::MachineGunner
+        | EntityKind::Panzerfaust
         | EntityKind::AntiTankGun
         | EntityKind::MortarTeam
         | EntityKind::ScoutCar

@@ -662,6 +662,10 @@ mod tests {
             catalog.trainable_units(EntityKind::Barracks),
             vec![EntityKind::Rifleman, EntityKind::MachineGunner]
         );
+        assert!(
+            !catalog.allows_unit(EntityKind::Panzerfaust),
+            "Panzerfaust has hidden rules data but is not in current production yet"
+        );
         assert_eq!(
             catalog.trainable_units(EntityKind::Factory),
             vec![

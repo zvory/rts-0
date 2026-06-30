@@ -45,10 +45,17 @@ import {
   EKAT_TELEPORT_RANGE_TILES,
   FACTION_CATALOGS,
   MINING_CC_RANGE_TILES,
+  METHAMPHETAMINES_PANZERFAUST_RECOVERY_TICKS,
+  METHAMPHETAMINES_PANZERFAUST_WINDUP_TICKS,
   MORTAR_FIRE_COOLDOWN_TICKS,
   MORTAR_INNER_RADIUS_TILES,
   MORTAR_OUTER_RADIUS_TILES,
   MORTAR_SHELL_DELAY_TICKS,
+  PANZERFAUST_DAMAGE,
+  PANZERFAUST_RANGE_TILES,
+  PANZERFAUST_RECOVERY_TICKS,
+  PANZERFAUST_TRAVEL_TICKS,
+  PANZERFAUST_WINDUP_TICKS,
   RESOURCE_AMOUNTS,
   SCOUT_CAR_BODY,
   SCOUT_CAR_SMOKE_USES,
@@ -179,6 +186,13 @@ const EXPECTED_CLIENT_CONFIG_CONSTANT_KEYS = Object.freeze([
   "mortarInnerRadiusTiles",
   "mortarOuterRadiusTiles",
   "mortarShellDelayTicks",
+  "methamphetaminesPanzerfaustRecoveryTicks",
+  "methamphetaminesPanzerfaustWindupTicks",
+  "panzerfaustDamage",
+  "panzerfaustRangeTiles",
+  "panzerfaustRecoveryTicks",
+  "panzerfaustTravelTicks",
+  "panzerfaustWindupTicks",
   "scoutCarSmokeUses",
   "smokeAbilityCooldownTicks",
   "smokeAbilityCost",
@@ -225,6 +239,7 @@ const EXPECTED_ABILITY_EFFECT_FIELDS_BY_ID = Object.freeze({
   ]),
   [ABILITY.EKAT_CONSUME_GOLEM]: Object.freeze(["radiusTiles"]),
 });
+const EXPECTED_HIDDEN_UNIT_STATS = Object.freeze([KIND.PANZERFAUST]);
 
 function asClientKinds(kinds) {
   return kinds.map((kind) => {
@@ -515,6 +530,13 @@ const clientConstants = {
   mortarOuterRadiusTiles: MORTAR_OUTER_RADIUS_TILES,
   mortarInnerRadiusTiles: MORTAR_INNER_RADIUS_TILES,
   mortarFireCooldownTicks: MORTAR_FIRE_COOLDOWN_TICKS,
+  panzerfaustRangeTiles: PANZERFAUST_RANGE_TILES,
+  panzerfaustDamage: PANZERFAUST_DAMAGE,
+  panzerfaustWindupTicks: PANZERFAUST_WINDUP_TICKS,
+  panzerfaustTravelTicks: PANZERFAUST_TRAVEL_TICKS,
+  panzerfaustRecoveryTicks: PANZERFAUST_RECOVERY_TICKS,
+  methamphetaminesPanzerfaustWindupTicks: METHAMPHETAMINES_PANZERFAUST_WINDUP_TICKS,
+  methamphetaminesPanzerfaustRecoveryTicks: METHAMPHETAMINES_PANZERFAUST_RECOVERY_TICKS,
   entrenchmentDigInTicks: ENTRENCHMENT_DIG_IN_TICKS,
   entrenchmentRangeBonusTiles: ENTRENCHMENT_RANGE_BONUS_TILES,
   entrenchmentDirectMissChance: ENTRENCHMENT_DIRECT_MISS_CHANCE,
@@ -559,8 +581,11 @@ assertClientObjectFields(
 
 assertSortedObjectKeys(
   rustClientConfig.unitStats,
-  new Set(allRustCatalogs.catalogs.flatMap((catalog) => catalog.units)),
-  "rules dump unitStats cover every client-mirrored catalog unit",
+  new Set([
+    ...allRustCatalogs.catalogs.flatMap((catalog) => catalog.units),
+    ...EXPECTED_HIDDEN_UNIT_STATS,
+  ]),
+  "rules dump unitStats cover every client-mirrored catalog unit plus explicit hidden unit stats",
 );
 for (const [kind, expected] of Object.entries(rustClientConfig.unitStats)) {
   assertSortedObjectKeys(

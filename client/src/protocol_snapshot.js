@@ -480,6 +480,34 @@ function decodeCompactEvent(record, index) {
         y: readNumber(fields[2], "event.artilleryImpact.y"),
         radiusTiles: readNumber(fields[3], "event.artilleryImpact.radiusTiles"),
       };
+    case EVENT.PANZERFAUST_LAUNCH: {
+      requireLength(fields, 5, `panzerfaust launch event ${index}`);
+      const from = decodeCompactPoint(fields[2], "event.panzerfaustLaunch.from");
+      const to = decodeCompactPoint(fields[3], "event.panzerfaustLaunch.to");
+      return {
+        e: EVENT.PANZERFAUST_LAUNCH,
+        from: readU32(fields[1], "event.panzerfaustLaunch.from"),
+        fromX: from[0],
+        fromY: from[1],
+        toX: to[0],
+        toY: to[1],
+        delayTicks: readU32(fields[4], "event.panzerfaustLaunch.delayTicks"),
+      };
+    }
+    case EVENT.PANZERFAUST_IMPACT:
+      requireLength(fields, 3, `panzerfaust impact event ${index}`);
+      return {
+        e: EVENT.PANZERFAUST_IMPACT,
+        x: readNumber(fields[1], "event.panzerfaustImpact.x"),
+        y: readNumber(fields[2], "event.panzerfaustImpact.y"),
+      };
+    case EVENT.PANZERFAUST_CONVERSION:
+      requireLength(fields, 3, `panzerfaust conversion event ${index}`);
+      return {
+        e: EVENT.PANZERFAUST_CONVERSION,
+        id: readU32(fields[1], "event.panzerfaustConversion.id"),
+        toKind: readCode(fields[2], KIND_BY_CODE, "event.panzerfaustConversion.toKind"),
+      };
     default:
       throw new Error(`unknown compact event kind ${eventKind}`);
   }
