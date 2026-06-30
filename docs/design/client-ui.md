@@ -1130,14 +1130,18 @@ terrain and resources):
 
 Trench terrain rendering (`renderer/trenches.js`; layer `trenches` between ground decals and
 resources):
-- Each frame, redraws the latest authoritative `state.trenches` into one persistent `Graphics`
-  object. Reconnects, replay seeks, and fog-memory updates therefore restore trench ground from
+- The latest authoritative `state.trenches` snapshot is rendered into one downsampled canvas texture
+  and mounted as one sprite, following the permanent ground-decal path used for blood and scorch
+  marks. Reconnects, replay seeks, and fog-memory updates therefore restore trench ground from
   snapshots instead of relying on client-only historical effects.
-- Trenches draw as neutral brown ground depressions with lighter dirt highlights. Nearby trench
-  footprints are connected by deterministic filled strokes when they are close enough to read as
-  one fieldwork cluster; distant trenches remain separate.
-- The renderer skips invalid records and does not create per-trench display objects, so large trench
-  lists are bounded by draw commands on one reusable object.
+- The trench texture is redrawn only when the normalized trench snapshot changes. Normal frames do
+  not iterate or redraw old trench pixels, so hundreds of accumulated foxholes stay one display
+  object and one cached texture.
+- Trenches draw as separate neutral brown circular foxhole decals: opaque low-poly dirt footprints
+  with interior dark facets for depth and subdued dirt highlights. They do not draw yellow rim
+  strokes, exterior drop shadows, oval footprints, or deterministic connection strokes between
+  nearby foxholes.
+- The renderer skips invalid records and does not create per-trench display objects.
 - Occupied eligible infantry also draw a small brown rim marker around the unit using the existing
   selection-ring pool. This marker is a provisional readability pass and does not replace selection
   color, HP, ownership, or fog rules.

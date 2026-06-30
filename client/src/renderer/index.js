@@ -9,9 +9,10 @@
 //   → feedback → placement-ghost → drag-box
 //
 // Terrain is drawn once into a cached RenderTexture (it never changes mid-match).
-// Everything else is redrawn each frame, but per-entity Graphics are pooled and
-// reconciled by entity id so we never churn the scene graph: each frame we touch
-// the live ids, then hide any pooled object whose id was not seen.
+// Snapshot-backed ground decals and trench terrain stamp into persistent textures.
+// Per-entity Graphics are pooled and reconciled by entity id so we never churn the
+// scene graph: each frame we touch the live ids, then hide any pooled object whose
+// id was not seen.
 //
 // PixiJS v7 is loaded globally as `PIXI`; we never import it.
 
@@ -58,7 +59,7 @@ import { _drawFog, _fogLevel } from "./fog.js";
 import { buildRendererFeedbackView } from "./feedback_view_model.js";
 import { LAYERS, _sweep } from "./layers.js";
 import { GroundDecalLayer, _drawGroundDecals, _initGroundDecalsForMap } from "./decals.js";
-import { _drawTrenches } from "./trenches.js";
+import { TrenchDecalLayer, _drawTrenches, _initTrenchesForMap } from "./trenches.js";
 import { createLiveRigDefinitions } from "./rigs/live_routing.js";
 import { createBuildingRigDefinitions } from "./rigs/building_routing.js";
 import { _drawResource } from "./resources.js";
@@ -120,6 +121,12 @@ export class Renderer {
       getDocument: () => (typeof document !== "undefined" ? document : null),
       recordDiagnostic: (label, amount) => this._recordRenderDiagnostic(label, amount),
     });
+    this._trenchDecals = new TrenchDecalLayer({
+      layer: this.layers.trenches,
+      pixi: PIXI,
+      getDocument: () => (typeof document !== "undefined" ? document : null),
+      recordDiagnostic: (label, amount) => this._recordRenderDiagnostic(label, amount),
+    });
 
     // Long-lived single Graphics for the bulk overlays / per-frame vector draws.
     this._terrainSprite = null; // PIXI.Sprite of the cached terrain RenderTexture
@@ -131,8 +138,6 @@ export class Renderer {
     this.layers.smokes.addChild(this._smokeGfx);
     this._abilityObjectGfx = new PIXI.Graphics();
     this.layers.smokes.addChild(this._abilityObjectGfx);
-    this._trenchGfx = new PIXI.Graphics();
-    this.layers.trenches.addChild(this._trenchGfx);
     this._lineProjectileTrails = new Map();
     this._placementGfx = new PIXI.Graphics();
     this.layers.placement.addChild(this._placementGfx);
@@ -412,6 +417,18 @@ export class Renderer {
     };
   }
 
+  trenchDiagnostics() {
+    return this._trenchDecals?.diagnostics?.() || {
+      visibleTrenches: 0,
+      totalStamped: 0,
+      textureUpdateCount: 0,
+      textureWidth: 0,
+      textureHeight: 0,
+      downsample: 0,
+      layerChildCount: 0,
+    };
+  }
+
   _drawMissingTexture(entity, poolName) {
     if (!entity || entity.id == null || !this._pools?.[poolName]) return;
     const g = this._slot(poolName, entity.id);
@@ -641,17 +658,12 @@ export class Renderer {
     this._feedbackGfx.destroy();
     this._smokeGfx.destroy();
     this._abilityObjectGfx.destroy();
-    if (this._trenchGfx) {
-      if (this._trenchGfx.parent && typeof this._trenchGfx.parent.removeChild === "function") {
-        this._trenchGfx.parent.removeChild(this._trenchGfx);
-      }
-      this._trenchGfx.destroy();
-      this._trenchGfx = null;
-    }
     this._placementGfx.destroy();
     this._dragGfx.destroy();
     this._groundDecals?.destroy();
     this._groundDecals = null;
+    this._trenchDecals?.destroy();
+    this._trenchDecals = null;
 
     // Cached terrain sprite + its generated texture.
     if (this._terrainSprite) {
@@ -670,6 +682,7 @@ export class Renderer {
 Object.assign(Renderer.prototype, {
   buildStaticMap,
   _initGroundDecalsForMap,
+  _initTrenchesForMap,
   _drawGroundDecals,
   _drawTrenches,
   _ownerColors,
