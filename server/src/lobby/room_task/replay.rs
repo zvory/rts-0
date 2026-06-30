@@ -344,17 +344,6 @@ impl RoomTask {
         }
     }
 
-    fn fanout_replay_snapshots(
-        &mut self,
-        session: &ReplaySession,
-        per_player_events: HashMap<u32, Vec<Event>>,
-        context: ReplayTickContext,
-        perf: Option<&mut rts_sim::perf::TickPerf>,
-    ) {
-        let recipients = self.order.clone();
-        self.fanout_replay_snapshots_to(session, recipients, per_player_events, context, perf);
-    }
-
     fn fanout_replay_snapshots_to(
         &mut self,
         session: &ReplaySession,
@@ -381,11 +370,12 @@ impl RoomTask {
         });
     }
 
-    fn clear_pending_snapshots_for(&self, recipients: &[u32]) {
-        for id in recipients {
-            if let Some(player) = self.players.get(id) {
-                player.msg_tx.clear_pending_snapshot();
-            }
+    fn clear_pending_snapshots_for(&self, recipients: impl IntoIterator<Item = u32>) {
+        for player in recipients
+            .into_iter()
+            .filter_map(|id| self.players.get(&id))
+        {
+            player.msg_tx.clear_pending_snapshot();
         }
     }
 
@@ -430,7 +420,14 @@ impl RoomTask {
                 }
             };
             session.record_keyframe_if_due();
-            self.fanout_replay_snapshots(&session, per_player_events, context, perf.as_mut());
+            let recipients = self.order.clone();
+            self.fanout_replay_snapshots_to(
+                &session,
+                recipients,
+                per_player_events,
+                context,
+                perf.as_mut(),
+            );
             self.broadcast_observer_analysis_for(&session, context.projection_policy);
         } else {
             self.broadcast_room_time_state_for(&session);
@@ -548,22 +545,13 @@ impl RoomTask {
         }
         let valid_ids = session.active_player_ids();
         if validate_vision_selection_request(&selection, &valid_ids).is_err() {
-            if let Some(player) = self.players.get(&player_id) {
-                send_or_log(
-                    &self.room,
-                    player_id,
-                    &player.msg_tx,
-                    ServerMessage::Error {
-                        msg: "Invalid vision selection".to_string(),
-                    },
-                );
-            }
+            self.send_error_to(player_id, "Invalid vision selection");
             self.phase = Phase::ReplayViewer(session);
             return;
         }
 
         session.set_vision(player_id, selection);
-        self.clear_pending_snapshots_for(&[player_id]);
+        self.clear_pending_snapshots_for([player_id]);
         self.fanout_replay_snapshots_to(&session, [player_id], HashMap::new(), context, None);
         let analysis = send_analysis.then(|| session.game().observer_analysis());
         if let (Some(analysis), Some(player)) = (analysis, self.players.get(&player_id)) {
@@ -681,7 +669,7 @@ impl RoomTask {
                 let state = session.state();
                 let analysis = send_analysis.then(|| session.game().observer_analysis());
 
-                self.clear_pending_snapshots_for(&recipients);
+                self.clear_pending_snapshots_for(recipients.iter().copied());
                 for (viewer_id, msg_tx, start) in starts {
                     send_or_log(&self.room, viewer_id, &msg_tx, ServerMessage::Start(start));
                 }
