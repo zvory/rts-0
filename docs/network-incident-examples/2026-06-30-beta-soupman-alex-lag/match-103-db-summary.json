@@ -1,0 +1,44 @@
+{
+  "id": 103,
+  "startedAt": "2026-06-30T00:16:45.186368Z",
+  "endedAt": "2026-06-30T00:41:25.867889Z",
+  "durationMs": 1480681,
+  "mapName": "Default",
+  "winnerName": "alex",
+  "outcome": "win",
+  "participants": [
+    "soupman",
+    "alex"
+  ],
+  "scoreScreen": [
+    {
+      "buildingsKilled": 20,
+      "buildingsLost": 103,
+      "color": "#d55e00",
+      "id": 7,
+      "name": "soupman",
+      "structureScore": 6145,
+      "teamId": 2,
+      "unitScore": 24710,
+      "unitsKilled": 97,
+      "unitsLost": 141
+    },
+    {
+      "buildingsKilled": 49,
+      "buildingsLost": 35,
+      "color": "#0072b2",
+      "id": 9,
+      "name": "alex",
+      "structureScore": 6670,
+      "teamId": 3,
+      "unitScore": 24330,
+      "unitsKilled": 136,
+      "unitsLost": 101
+    }
+  ],
+  "humanCount": 2,
+  "debugMode": false,
+  "localOnly": false,
+  "replayAvailable": true,
+  "replayUnavailableReason": null
+}

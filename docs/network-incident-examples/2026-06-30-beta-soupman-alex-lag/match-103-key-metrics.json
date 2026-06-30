@@ -1,0 +1,71 @@
+{
+  "match": "103",
+  "matchRunId": "alex-s-lobby-1782778605186-000004",
+  "startedAt": "2026-06-30T00:16:45.186897894Z",
+  "endedAt": "2026-06-30T00:41:25.868590778Z",
+  "durationMs": 1480681,
+  "durationTicks": 44849,
+  "serverBuildSha": "5d33dc1e4d7c",
+  "mapName": "Default",
+  "mapContentHash": "13ac64aab0be91a8",
+  "seed": 577023137,
+  "winnerId": 9,
+  "winnerTeamId": 3,
+  "commandLogEntries": 3243,
+  "players": [
+    {
+      "id": 7,
+      "name": "soupman",
+      "teamId": 2,
+      "factionId": "kriegsia",
+      "isAi": false
+    },
+    {
+      "id": 9,
+      "name": "alex",
+      "teamId": 3,
+      "factionId": "kriegsia",
+      "isAi": false
+    }
+  ],
+  "networkReportRows": 297,
+  "serverTickRows": 18,
+  "playerMetrics": [
+    {
+      "playerId": 7,
+      "reports": 148,
+      "primaryIssues": "command_upload_delay:73,prediction_correction:56,command_server_queue:10,command_density:7,command_response_delay:2",
+      "rttMaxMs": 807,
+      "rttP95Ms": 220,
+      "snapshotGapMaxMs": 933,
+      "snapshotGapP95Ms": 638,
+      "snapshotJitterMaxMs": 300,
+      "commandResponseMaxMs": 890,
+      "commandResponseP95Ms": 616,
+      "commandUploadMaxMs": 890,
+      "serverQueueMaxMs": 528,
+      "frameGapMaxMs": 150,
+      "frameWorkMaxMs": 15,
+      "payloadP95MaxBytes": 8192,
+      "commandBurstMax": 19
+    },
+    {
+      "playerId": 9,
+      "reports": 149,
+      "primaryIssues": "command_upload_delay:68,packet_budget_pressure:37,command_server_queue:32,snapshot_gap:9,command_density:2,command_response_delay:1",
+      "rttMaxMs": 1385,
+      "rttP95Ms": 368,
+      "snapshotGapMaxMs": 1318,
+      "snapshotGapP95Ms": 637,
+      "snapshotJitterMaxMs": 684,
+      "commandResponseMaxMs": 1533,
+      "commandResponseP95Ms": 563,
+      "commandUploadMaxMs": 1533,
+      "serverQueueMaxMs": 534,
+      "frameGapMaxMs": 58,
+      "frameWorkMaxMs": 49,
+      "payloadP95MaxBytes": 8192,
+      "commandBurstMax": 16
+    }
+  ]
+}
