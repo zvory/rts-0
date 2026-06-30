@@ -14,11 +14,6 @@
       "reason": "Docs sweep core remains over the cap after renderer extraction; keep ratcheting as follow-up pieces split out."
     },
     {
-      "path": "server/crates/ai/src/ai_core/actions.rs",
-      "lines": 1684,
-      "reason": "Pump Jack oil assignment now emits contextual build commands and focused regression coverage; keep oversized AI action module explicit until action helpers are split."
-    },
-    {
       "path": "server/crates/ai/src/ai_core/decision/tests.rs",
       "lines": 4370,
       "reason": "Existing oversized AI decision test module before repo-wide source-size gate."
