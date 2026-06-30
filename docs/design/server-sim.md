@@ -510,7 +510,11 @@ status (`breakthrough`), delayed world effects (`smoke`, `mortarFire`), dash ret
 projectile, Magic Anchor placement, Golem consumption, and the intentionally one-off artillery
 point-fire path. The hook receives the owning player's faction id at execution time through the
 normal command/order helpers, so wrong-faction ability use fails before effects, resource spending,
-cooldowns, or events are applied. Artillery point fire records temporary live-fog firing reveal sources for enemy players when a shell launches, using the firing-cycle-plus-half-second lifetime and smoke suppression used by other actionable firing reveals. The hook is deliberately not a generic script engine. Phase 11 signature abilities
+cooldowns, or events are applied. Artillery point fire locks each raw click to the issuing gun's
+valid 25-to-55 tile range band, stores that effective point, and owns any needed in-place setup or
+redeploy before the first shot. It records temporary live-fog firing reveal sources for enemy
+players when a shell launches, using the firing-cycle-plus-half-second lifetime and smoke
+suppression used by other actionable firing reveals. The hook is deliberately not a generic script engine. Phase 11 signature abilities
 should first use one of the existing shapes; if they cannot, add either a narrow explicit hook or a
 named one-off path with faction validation, cost validation, and fog-safe event tests rather than
 widening the hook into generic scripting.
@@ -898,6 +902,14 @@ Allocation rules:
 - Anti-Tank Gun setup is a queueable facing intent for selected Anti-Tank Guns only. The stored point means
   "face toward this world point from wherever the gun is when the setup stage promotes"; mixed
   selections ignore non-setup-capable units for setup but keep them for later compatible orders.
+- Artillery Point Fire is a queueable, terminal per-gun fire order. Issue-time admission stores a
+  locked effective fire point, not the raw clicked point. Immediate Point Fire can accept packed
+  artillery and set it up in place, or redeploy already-deployed artillery when the effective point
+  is outside the current cone. Queued Point Fire locks from the active or queued future move
+  destination when available, uses a preceding queued setup stage as the zero-length fallback
+  facing, and promotes into the same setup/redeploy-owned fire order. Promotion and firing recheck
+  liveness, ownership, kind, construction state, path state, faction ability eligibility, stored
+  target map/range/cone validity, ammo, and deployment before any shell is launched.
 
 Examples:
 
@@ -912,6 +924,9 @@ Examples:
 - **Packed anti-tank guns.** The player orders packed anti-tank guns to move, then Shift-arms setup and clicks a
   facing point. The setup stage promotes after movement and computes facing from the gun's actual
   arrived position toward the stored world point.
+- **Move then queued Point Fire.** The player orders artillery to move, then Shift-arms Point Fire
+  and clicks a target. The queued stage stores the effective fire point locked from the future move
+  destination; when promoted, the gun sets up or redeploys in place and never walks to repair range.
 - **Reactive moving smoke.** A scout car already moving past cover receives an immediate Smoke
   command for an in-range point. The planner emits a noninterrupting ability execution, so the
   smoke launches without dropping the car's current move order or queued future orders.

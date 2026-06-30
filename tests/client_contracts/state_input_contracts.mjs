@@ -1966,15 +1966,11 @@ function buttonByLabel(card, label) {
 
   pointFireInput.mouse = { x: selectedArtillery.x + ARTILLERY_MIN_RANGE_TILES * 32 - 8, y: selectedArtillery.y };
   pointFireInput._refreshAbilityTargetPreview();
-  assert(pointFireInput.clientIntent.abilityTargetPreview?.hoverInRange === false, "Point Fire preview rejects the minimum range dead zone");
-  assert(pointFireInput.clientIntent.abilityTargetPreview?.hoverInsideMinRange === true, "Point Fire preview identifies minimum range invalidity");
+  assert(pointFireInput.clientIntent.abilityTargetPreview?.hoverInRange === true && pointFireInput.clientIntent.abilityTargetPreview?.hoverInsideMinRange === false, "Point Fire preview accepts minimum-range locking clicks");
+  assert(pointFireInput.clientIntent.abilityTargetPreview?.minRangePx === ARTILLERY_MIN_RANGE_TILES * 32, "Point Fire preview exposes minimum range in pixels");
   assert(
-    pointFireInput.clientIntent.abilityTargetPreview?.minRangePx === ARTILLERY_MIN_RANGE_TILES * 32,
-    "Point Fire preview exposes minimum range in pixels",
-  );
-  assert(
-    ARTILLERY_MIN_RANGE_TILES === 15 && ARTILLERY_MAX_RANGE_TILES === 55,
-    "Artillery point-fire range mirrors the 15-55 tile balance band",
+    ARTILLERY_MIN_RANGE_TILES === 25 && ARTILLERY_MAX_RANGE_TILES === 55,
+    "Artillery point-fire range mirrors the 25-55 tile balance band",
   );
   const deployedArtillery = { ...selectedArtillery, setupState: SETUP.DEPLOYED, setupFacing: 0 };
   const artilleryConeGfx = new RecordingGraphics();
@@ -1993,8 +1989,10 @@ function buttonByLabel(card, label) {
   );
   pointFireInput.mouse = { x: selectedArtillery.x + ARTILLERY_MIN_RANGE_TILES * 32 + 16, y: selectedArtillery.y };
   pointFireInput._refreshAbilityTargetPreview();
-  assert(pointFireInput.clientIntent.abilityTargetPreview?.hoverInRange === true, "Point Fire preview accepts targets past minimum range");
-  assert(pointFireInput.clientIntent.abilityTargetPreview?.hoverInsideMinRange === false, "Point Fire preview clears minimum range invalidity outside the dead zone");
+  assert(pointFireInput.clientIntent.abilityTargetPreview?.hoverInRange === true && pointFireInput.clientIntent.abilityTargetPreview?.hoverInsideMinRange === false, "Point Fire preview accepts targets past minimum range");
+  pointFireInput.mouse = { x: selectedArtillery.x + ARTILLERY_MAX_RANGE_TILES * 32 + 16, y: selectedArtillery.y };
+  pointFireInput._refreshAbilityTargetPreview();
+  assert(pointFireInput.clientIntent.abilityTargetPreview?.hoverInRange === true, "Point Fire preview accepts maximum-range locking clicks");
   const targetingConeGfx = new RecordingGraphics();
   _drawAbilityTargetPreview.call(
     { _feedbackGfx: targetingConeGfx, _map: { tileSize: 32 } },
@@ -2026,19 +2024,19 @@ function buttonByLabel(card, label) {
 
   pointFireInput.mouse = { x: selectedArtillery.x + ARTILLERY_MIN_RANGE_TILES * 32 - 8, y: selectedArtillery.y };
   pointFireInput._refreshAbilityTargetPreview();
-  const invalidGfx = new RecordingGraphics();
+  const lockedGfx = new RecordingGraphics();
   _drawAbilityTargetPreview.call(
-    { _feedbackGfx: invalidGfx },
+    { _feedbackGfx: lockedGfx },
     { abilityTargetPreview: { ...pointFireInput.clientIntent.abilityTargetPreview, carriers: [] } },
   );
-  const invalidDiagonalStroke = invalidGfx.calls.some(
+  const lockedHorizontalStroke = lockedGfx.calls.some(
     (call, i, calls) =>
       call[0] === "moveTo" &&
-      call[2] < pointFireInput.clientIntent.abilityTargetPreview.mouseY &&
+      call[2] === pointFireInput.clientIntent.abilityTargetPreview.mouseY &&
       calls[i + 1]?.[0] === "lineTo" &&
-      calls[i + 1]?.[2] > pointFireInput.clientIntent.abilityTargetPreview.mouseY,
+      calls[i + 1]?.[2] === pointFireInput.clientIntent.abilityTargetPreview.mouseY,
   );
-  assert(invalidDiagonalStroke, "Point Fire invalid minimum-range cursor draws an X");
+  assert(lockedHorizontalStroke, "Point Fire minimum-range locking cursor keeps the crosshair stroke");
 
   const ekatEntity = { id: 88, owner: 1, kind: KIND.EKAT, x: 200, y: 220 };
   const ekatInput = Object.create(Input.prototype);

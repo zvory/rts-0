@@ -13,6 +13,7 @@ use crate::game::ScoreState;
 use crate::protocol::terrain;
 
 mod abilities;
+mod artillery_point_fire_queue;
 mod build;
 mod command_budget;
 mod orders;

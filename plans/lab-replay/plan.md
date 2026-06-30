@@ -1,14 +1,20 @@
 # Checkpoint Backed Replay and Lab Capture Plan
 
+> [!WARNING]
+> **POTENTIALLY STALE - DO NOT IMPLEMENT YET.**
+> Implement `plans/game-state/plan.md` first. That work is expected to change the assumptions,
+> contracts, and phase ordering for lab replay, so this root plan and every subdivision under
+> `plans/lab-replay/` must be re-evaluated before anyone uses them for implementation.
+
 ## Status
 
-Deprecated draft. Do not execute this plan or any `plans/lab-replay/` phase files as the current
-roadmap.
+**POTENTIALLY STALE / deprecated draft.** Do not execute this plan or any `plans/lab-replay/`
+phase files as the current roadmap.
 
 This plan captured an earlier checkpoint-first lab replay program, but it is no longer the active
-source of truth. Current work should use `plans/game-state/plan.md` instead. Lab replay, lab save,
-and checkpoint-backed replay should be revisited later after the game-state ownership and checkpoint
-contract are clear enough to support an executable plan.
+source of truth. Current work should implement `plans/game-state/plan.md` first. Lab replay, lab
+save, and checkpoint-backed replay should be revisited later after the game-state ownership and
+checkpoint contract are clear enough to support a fresh executable plan.
 
 ## Purpose
 

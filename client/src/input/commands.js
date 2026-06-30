@@ -272,10 +272,15 @@ export function _refreshAbilityTargetPreview() {
   const rangePx = definition.rangeTiles * tileSize;
   const minRangePx = (definition.minRangeTiles || 0) * tileSize;
   const world = this._worldAt(this.mouse.x, this.mouse.y);
+  const locksRangeBand = target.ability === ABILITY.POINT_FIRE;
   let hoverInRange = false;
   let hoverInsideMinRange = false;
   for (const c of carriers) {
     const dist = Math.hypot(world.x - c.x, world.y - c.y);
+    if (locksRangeBand && Number.isFinite(dist)) {
+      hoverInRange = true;
+      break;
+    }
     if (minRangePx > 0 && dist < minRangePx) {
       hoverInsideMinRange = true;
     }

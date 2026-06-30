@@ -2,9 +2,10 @@
 
 ## Status
 
-Active concept draft for game-state ownership and checkpoint work. This supersedes the deprecated
+Active planning seed for game-state ownership and checkpoint work. This supersedes the deprecated
 `plans/lab-replay/` checkpoint program for now. It is not yet a full multi-phase implementation
-plan and does not define phase files, branch sequencing, or exact API wiring.
+plan for the whole checkpoint program; the only executable implementation phase currently defined is
+[Phase 0.5 - Derived-State Wipe Harness](phase-0.5.md).
 
 ## Purpose
 
@@ -17,6 +18,17 @@ This plan should become a foundation for checkpoint-backed replay and future lab
 is intentionally deferred until the game-state ownership model and checkpoint contract are
 understood. When revisited, lab replay should consume this model rather than trying to discover every
 piece of authoritative state during replay work.
+
+## Phase Summaries
+
+### [Phase 0.5 - Derived-State Wipe Harness](phase-0.5.md)
+
+Build the first behavior-preserving proof that derived simulation state can be cleared and rebuilt at
+a tick boundary without changing future authoritative results. The phase should add a test-only or
+crate-private harness that runs paired games from the same setup and commands, clears/rebuilds the
+derived-state path in one copy, and compares semantic state plus per-player fog-filtered snapshots
+after additional ticks. This phase deliberately avoids durable checkpoint DTOs so derived-state
+classification failures surface before broad serialization work begins.
 
 ## Current Shape
 
@@ -56,14 +68,20 @@ runtime, firing reveals, lingering sight, lab god mode, and any other state that
 authoritative behavior or projected state.
 
 `DerivedState` owns only cache and performance data. Derived state must be clearable and rebuildable
-at any time without changing gameplay, replay output, scoring, command validity, or fog/projection
-results. If clearing a field changes authoritative behavior, that field is misclassified and belongs
-in `GameState`.
+at a tick boundary without changing gameplay, replay output, scoring, command validity, or
+fog/projection results. If clearing a field changes authoritative behavior, that field is
+misclassified and belongs in `GameState`.
 
 Pathing is the main hard case. The chosen path that a unit is already following is authoritative and
 belongs under `GameState` with that unit's movement/order state. The pathfinding service's reusable
 cache and search bookkeeping are derived; clearing them after import must not change the already
 chosen path, command validity, or future result except for allowed performance cost.
+
+The derived-state contract is intentionally testable: a checkpoint or test clone should be able to
+drop every `DerivedState` field, rebuild it from `GameState`, continue ticking under the same command
+stream, and match the untouched game semantically. Fields that fail this test are either
+authoritative state in disguise or need a stronger rebuild path before checkpoint serialization uses
+them.
 
 ## Service Ownership
 
@@ -149,6 +167,10 @@ trench discovery, building memory, scoring, lab god mode, and replay-relevant co
 The comparator should intentionally clear or rebuild `DerivedState` in at least one path. This makes
 derived-state misclassification visible as a test failure.
 
+Phase 0.5 should land this derived-state wipe/rebuild proof before the plan grows durable
+`GameCheckpoint` DTOs. Later cold export/import tests should reuse the same comparator instead of
+creating a separate confidence mechanism.
+
 ## Safety And Migration Principles
 
 This refactor should be behavior-preserving before it is feature-enabling. Moving state into a
@@ -164,6 +186,16 @@ appear under `GameState` or `DerivedState`, with an explicit checkpoint policy. 
 flag hidden mutable simulation state in services unless it is clearly derived, test-only, or
 runtime/session state outside the authoritative simulation.
 
+## Execution Constraints
+
+- The phase runner may execute only phase files that exist in this directory. At present that means
+  Phase 0.5 only; the broader checkpoint program still needs additional phase files before it is
+  suitable for unattended serial execution.
+- Each phase must land through the repo's normal owned-PR workflow with auto-merge armed, then wait
+  until GitHub reports the PR merged and the phase head SHA is reachable from `origin/main`.
+- After implementing a phase, the implementing agent must provide a handoff naming what changed, what
+  the next agent should do, focused verification that passed, and the core manual testing focus.
+
 ## Relationship To Lab Replay
 
 The existing `plans/lab-replay/` checkpoint program is deprecated for now. Checkpoint-backed replay
@@ -178,7 +210,7 @@ also discovering the simulation ownership model.
 ## Non-Goals For This Draft
 
 - Do not define exact Rust APIs yet.
-- Do not split implementation phases yet.
+- Do not split the full implementation sequence yet beyond the explicit Phase 0.5 guard.
 - Do not choose the final checkpoint JSON/schema shape here.
 - Do not require all services to become stateless in one pass.
 - Do not move room/session state into `Game` unless it is authoritative simulation state.

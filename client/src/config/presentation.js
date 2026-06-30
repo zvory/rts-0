@@ -26,8 +26,8 @@ export const COLORS = Object.freeze({
   placeBad: 0xd47a5f,
   trenchShadow: 0x20140d,
   trenchDirt: 0x5a3822,
-  trenchDirtLight: 0x8a633f,
-  trenchRim: 0xc09a63,
+  trenchDirtLight: 0x6f5136,
+  trenchRim: 0x3f2919,
   fogUnexplored: 0x11110f,
   fogExplored: 0x000000, // drawn at fogExploredAlpha
 });
