@@ -35,7 +35,7 @@
     },
     {
       "path": "server/crates/sim/src/game/services/commands.rs",
-      "lines": 1914,
+      "lines": 1885,
       "reason": "Artillery firing reveal command admission extended the existing oversized command service; keep ratcheting until command validation is further extracted."
     },
     {
@@ -50,8 +50,8 @@
     },
     {
       "path": "server/crates/sim/src/game/services/order_queue.rs",
-      "lines": 1533,
-      "reason": "Mortar manual-fire reload handling extended queued ability promotion in the existing oversized order adapter; keep ratcheting until queue validation is extracted."
+      "lines": 1537,
+      "reason": "Artillery point-fire queue ordering extended the existing oversized order adapter; keep ratcheting until queue validation is extracted."
     },
     {
       "path": "server/crates/sim/src/game/services/pathing.rs",
@@ -65,7 +65,7 @@
     },
     {
       "path": "tests/client_contracts/state_input_contracts.mjs",
-      "lines": 2187,
+      "lines": 2185,
       "reason": "Pump Jack right-click and contextual placement coverage extended the existing oversized client contract suite; keep ratcheting until state/input fixtures are split."
     }
   ]
