@@ -14,7 +14,7 @@ Read: [docs/context/balance.md](../../docs/context/balance.md),
   Training Centre training, revise Phase 1 before implementation.
 - Cost decision: 60 steel / 15 oil.
 - Base loaded speed decision: 1.44 px/tick, 10% slower than Rifleman's current 1.6 px/tick.
-- Build time draft: 330 ticks, 11 seconds at 30 Hz, slightly longer than Rifleman's 300 ticks.
+- Build time decision: 400 ticks, matching Machine Gunner's current build time.
 - Range decision: 3-tile loaded range, extended to 4 tiles only by the normal Entrenchment +1 range
   rule while actively occupying a trench.
 - Target filter draft: the one-shot weapon targets Tanks only in the first implementation. Future
@@ -70,6 +70,7 @@ Read: [docs/context/balance.md](../../docs/context/balance.md),
   - Barracks gains Panzerfaust infantry after a completed Training Centre.
   - Panzerfaust costs 60 steel / 15 oil, uses 1 supply, has Rifleman HP and sight, and moves slower
     than a Rifleman.
+  - Panzerfaust trains in 400 ticks, matching Machine Gunner build time.
   - Panzerfaust carries one 60-damage armor-piercing anti-tank shot at 3-tile range, or 4-tile range
     while actively entrenched, then converts into a Rifleman after a short recovery.
   - Methamphetamines speeds Panzerfaust movement and firing setup/recovery before conversion, but
@@ -96,7 +97,7 @@ Exit criteria:
   - Train hotkey: `E`, assuming Barracks train slots remain Rifleman `Q`, Machine Gunner `W`,
     Panzerfaust `E`.
 - [x] Build time is specified.
-  - 330 ticks, approximately 11 seconds at 30 Hz.
+  - 400 ticks, approximately 13.3 seconds at 30 Hz, matching Machine Gunner build time.
 - [x] Research prerequisite, tech prerequisite, or unlock timing is specified.
   - Requires a completed Training Centre. No new research upgrade is required.
 - [x] Hit points are specified.
