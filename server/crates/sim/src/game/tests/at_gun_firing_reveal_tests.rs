@@ -193,7 +193,7 @@ fn anti_tank_gun_firing_from_fog_projects_as_actionable_snapshot_entity() {
         .expect("firing AT gun should be a normal visible snapshot entity");
     assert!(
         !view.vision_only,
-        "firing reveal must be actionable live fog, not lingering vision-only intel"
+        "firing reveal must use live fog, not death-vision-only intel"
     );
 
     game.enqueue(
@@ -247,7 +247,7 @@ fn tank_firing_from_fog_projects_as_actionable_snapshot_entity() {
         .expect("firing tank should be a normal visible snapshot entity");
     assert!(
         !view.vision_only,
-        "firing reveal must be actionable live fog, not lingering vision-only intel"
+        "firing reveal must use live fog, not death-vision-only intel"
     );
 
     game.enqueue(
