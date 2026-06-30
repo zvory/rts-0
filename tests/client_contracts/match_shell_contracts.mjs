@@ -64,6 +64,7 @@ import {
         snapshots: 3,
         snapshotLateFrameCount: 1,
         predictedSnapshotLateFrameCount: 1,
+        predictionActiveLateFrameCount: 1,
         commandBurstBucketMs: 250,
         commandBurstMax: 3,
         commandBurstFrameGapMaxMs: 24,
@@ -91,7 +92,26 @@ import {
       net,
       health,
       frameProfiler: {
-        reportSummary: () => ({ frameWorkMaxMs: 12, rendererMaxMs: 8, context: {} }),
+        reportSummary: () => ({
+          frameWorkMaxMs: 12,
+          frameRafDispatchMaxMs: 5,
+          frameUnattributedMaxMs: 7,
+          rendererMaxMs: 8,
+          topRendererPhase: "renderer.units",
+          topRendererPhaseMs: 8,
+          topRenderDiagnosticGroup: "renderer.pixi.displayObject",
+          topRenderDiagnosticGroupCount: 3,
+          clientFramePhases: [{ label: "match.renderer", count: 2, maxMs: 8, p95Ms: 8 }],
+          rendererFramePhases: [{ label: "renderer.units", count: 2, maxMs: 8, p95Ms: 8 }],
+          renderDiagnosticCounters: [{
+            label: "renderer.pixi.displayObject",
+            samples: 3,
+            frames: 2,
+            total: 3,
+            maxFrame: 2,
+          }],
+          context: {},
+        }),
         resetReportWindow: () => { resetFrame += 1; },
       },
       snapshotProcessingReport: {
@@ -128,6 +148,21 @@ import {
     assert(
       reports[0].predictedSnapshotLateFrameCount === 1,
       "match net reporter includes prediction coverage during late snapshot frames",
+    );
+    assert(
+      reports[0].predictedSnapshotLateFramePctX100 === 10000 &&
+        reports[0].predictionActiveLateFrameCount === 1,
+      "match net reporter includes bounded late-snapshot prediction coverage context",
+    );
+    assert(
+      reports[0].frameRafDispatchMaxMs === 5 &&
+        reports[0].frameUnattributedMaxMs === 7 &&
+        reports[0].topRendererPhase === "renderer.units",
+      "match net reporter includes bounded local frame context",
+    );
+    assert(
+      reports[0].renderDiagnosticCounters[0].label === "renderer.pixi.displayObject",
+      "match net reporter includes grouped render diagnostics",
     );
     assert(reports[0].hidden === true && reports[0].focused === false, "match net reporter includes document state");
     assert(resetStats === 1 && resetFrame === 1 && resetSnapshot === 1, "match net reporter resets report windows after upload");

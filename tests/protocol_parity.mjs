@@ -52,6 +52,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const rustProtocolPath = path.join(repoRoot, "server/crates/protocol/src/lib.rs");
 const rust = fs.readFileSync(rustProtocolPath, "utf8");
+const rustClientNetReport = fs.readFileSync(
+  path.join(repoRoot, "server/crates/protocol/src/client_net_report.rs"),
+  "utf8",
+);
 const rustContractPath = path.join(repoRoot, "server/crates/contract/src/lib.rs");
 const rustContract = fs.readFileSync(rustContractPath, "utf8");
 const rustLobbyPath = path.join(repoRoot, "server/src/lobby/mod.rs");
@@ -244,7 +248,7 @@ assert(
   "prediction protocol version must match Rust",
 );
 assert(protocolContract.defaultFactionId === DEFAULT_FACTION_ID, "default faction id must match Rust");
-const clientNetReportStruct = rust.match(/pub struct ClientNetReport \{([\s\S]*?)\n\}/);
+const clientNetReportStruct = rustClientNetReport.match(/pub struct ClientNetReport \{([\s\S]*?)\n\}/);
 assert(clientNetReportStruct, "Rust protocol must define ClientNetReport");
 for (const field of CLIENT_NET_REPORT_FIELDS) {
   const rustField = camelToSnake(field);

@@ -66,9 +66,18 @@ default and emits structured `tracing` logs under the `server::perf` target when
 
 Every `ClientNetReport` upload includes a bounded report-window summary from the same profiler:
 `frameWorkMaxMs`, `frameWorkP95Ms`, `slowFrameCount`, `worstFramePhase`, `worstFramePhaseMs`,
-`rendererMaxMs`, `rendererP95Ms`, `entityCount`, `selectedCount`, `visibleTileCount`,
-`viewportWidth`, `viewportHeight`, and `devicePixelRatioX100`. Report-window profiler counters reset
-after each upload; the `window.__rtsPerf` debug summary remains cumulative until `reset()` is called.
+`frameRafDispatchMaxMs`, `frameRafDispatchP95Ms`, `frameUnattributedMaxMs`,
+`frameUnattributedP95Ms`, `rendererMaxMs`, `rendererP95Ms`, `topRendererPhase`,
+`topRendererPhaseMs`, `topRenderDiagnosticGroup`, `topRenderDiagnosticGroupCount`,
+`clientFramePhases`, `rendererFramePhases`, `renderDiagnosticCounters`, `entityCount`,
+`selectedCount`, `visibleTileCount`, `viewportWidth`, `viewportHeight`, and
+`devicePixelRatioX100`. The uploaded phase arrays are capped at five allowlisted labels and include
+only count, max, and p95 buckets. The uploaded diagnostic counters are capped at five stable groups
+such as `renderer.pixi.displayObject`, `renderer.rig.redraw`, `renderer.graphics.clear`,
+`renderer.redraw`, `renderer.groundDecals`, `minimap.cache`, `minimap.invalidate`, `hud.dirty`,
+`observer.dirty`, and `entityViews.*`; raw per-frame rows and unrecognized local labels stay
+local-only. Report-window profiler counters reset after each upload; the `window.__rtsPerf` debug
+summary remains cumulative until `reset()` is called.
 HUD `jit` in the live health readout is snapshot arrival jitter; it is not JavaScript compiler/JIT
 time.
 
@@ -85,7 +94,13 @@ The same upload also includes bounded snapshot diagnostics:
   `skippedSnapshotCount`, `snapshotBurstCount`, and `snapshotBurstMax`.
 - Late-frame prediction coverage: `snapshotLateFrameCount` and
   `predictedSnapshotLateFrameCount`, which count frames where the last snapshot was late and whether
-  an owned-unit predicted snapshot overlay was present on those frames.
+  an owned-unit predicted snapshot overlay was present on those frames. The derived
+  `predictedSnapshotLateFramePctX100` reports that coverage as a percentage multiplied by 100, and
+  `predictionActiveLateFrameCount` counts late-snapshot frames where the prediction controller was
+  locally predicting or resyncing. Interpret these with `predictionReplayMaxMs`,
+  `predictionReplayMaxTicks`, `predictionReplayBudgetExceededCount`, and correction fields: late
+  frames with no predicted overlay mean prediction was absent for local owned world coverage, while
+  high replay or correction fields in the same window point at prediction work/correction pressure.
 
 Command-response diagnostics are also reported as bounded window aggregates keyed by the live
 `matchRunId`: issued/send-accepted/server-received/sim-acknowledged/rejected counts,

@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -57,13 +57,13 @@ reports without uploading raw frames or traces.
 
 ## Implementation Checklist
 
-- [ ] Define the stable uploaded frame/render/prediction summary labels.
-- [ ] Add report-window aggregation and clamping for top phase/counter groups.
-- [ ] Extend protocol/report DTOs and parser output.
-- [ ] Update docs with examples for interpreting local frame contribution.
-- [ ] Add focused JS tests for aggregation, reset, label allowlisting, and clamping.
-- [ ] Run client architecture checks for wiring changes.
-- [ ] Mark this phase as done in this file in the implementation commit.
+- [x] Define the stable uploaded frame/render/prediction summary labels.
+- [x] Add report-window aggregation and clamping for top phase/counter groups.
+- [x] Extend protocol/report DTOs and parser output.
+- [x] Update docs with examples for interpreting local frame contribution.
+- [x] Add focused JS tests for aggregation, reset, label allowlisting, and clamping.
+- [x] Run client architecture checks for wiring changes.
+- [x] Mark this phase as done in this file in the implementation commit.
 
 ## Verification
 

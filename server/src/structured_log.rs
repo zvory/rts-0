@@ -141,6 +141,14 @@ pub fn log_client_net_report(
         "predicted_snapshot_late_frame_count",
         report.predicted_snapshot_late_frame_count
     );
+    field!(
+        "predicted_snapshot_late_frame_pct_x100",
+        report.predicted_snapshot_late_frame_pct_x100
+    );
+    field!(
+        "prediction_active_late_frame_count",
+        report.prediction_active_late_frame_count
+    );
     field!("snapshot_bytes_total", report.snapshot_bytes_total);
     field!("snapshot_bytes_max", report.snapshot_bytes_max);
     field!("snapshot_bytes_avg", report.snapshot_bytes_avg);
@@ -182,11 +190,49 @@ pub fn log_client_net_report(
     field!("fps_estimate", report.fps_estimate);
     field!("frame_work_max_ms", report.frame_work_max_ms);
     field!("frame_work_p95_ms", report.frame_work_p95_ms);
+    field!(
+        "frame_raf_dispatch_max_ms",
+        report.frame_raf_dispatch_max_ms
+    );
+    field!(
+        "frame_raf_dispatch_p95_ms",
+        report.frame_raf_dispatch_p95_ms
+    );
+    field!(
+        "frame_unattributed_max_ms",
+        report.frame_unattributed_max_ms
+    );
+    field!(
+        "frame_unattributed_p95_ms",
+        report.frame_unattributed_p95_ms
+    );
     field!("slow_frame_count", report.slow_frame_count);
     text_field!("worst_frame_phase", &report.worst_frame_phase);
     field!("worst_frame_phase_ms", report.worst_frame_phase_ms);
     field!("renderer_max_ms", report.renderer_max_ms);
     field!("renderer_p95_ms", report.renderer_p95_ms);
+    text_field!("top_renderer_phase", &report.top_renderer_phase);
+    field!("top_renderer_phase_ms", report.top_renderer_phase_ms);
+    text_field!(
+        "top_render_diagnostic_group",
+        &report.top_render_diagnostic_group
+    );
+    field!(
+        "top_render_diagnostic_group_count",
+        report.top_render_diagnostic_group_count
+    );
+    text_field!(
+        "client_frame_phases",
+        &format_client_frame_phases(&report.client_frame_phases)
+    );
+    text_field!(
+        "renderer_frame_phases",
+        &format_client_frame_phases(&report.renderer_frame_phases)
+    );
+    text_field!(
+        "render_diagnostic_counters",
+        &format_client_render_counters(&report.render_diagnostic_counters)
+    );
     field!("entity_count", report.entity_count);
     field!("selected_count", report.selected_count);
     field!("visible_tile_count", report.visible_tile_count);
@@ -515,6 +561,41 @@ fn format_command_lifecycle_exemplars(
     serde_json::to_string(&sanitized).unwrap_or_else(|_| "[]".to_string())
 }
 
+fn format_client_frame_phases(phases: &[crate::protocol::ClientFramePhaseReport]) -> String {
+    let sanitized: Vec<_> = phases
+        .iter()
+        .take(5)
+        .map(|entry| {
+            serde_json::json!({
+                "label": sanitize_client_perf_label(&entry.label),
+                "count": entry.count,
+                "maxMs": entry.max_ms,
+                "p95Ms": entry.p95_ms,
+            })
+        })
+        .collect();
+    serde_json::to_string(&sanitized).unwrap_or_else(|_| "[]".to_string())
+}
+
+fn format_client_render_counters(
+    counters: &[crate::protocol::ClientRenderCounterReport],
+) -> String {
+    let sanitized: Vec<_> = counters
+        .iter()
+        .take(5)
+        .map(|entry| {
+            serde_json::json!({
+                "label": sanitize_client_perf_label(&entry.label),
+                "samples": entry.samples,
+                "frames": entry.frames,
+                "total": entry.total,
+                "maxFrame": entry.max_frame,
+            })
+        })
+        .collect();
+    serde_json::to_string(&sanitized).unwrap_or_else(|_| "[]".to_string())
+}
+
 fn format_snapshot_payload_sections(stats: &[SnapshotPayloadSectionReportStats]) -> String {
     let sanitized: Vec<_> = stats
         .iter()
@@ -592,6 +673,25 @@ fn sanitize_snapshot_kind(value: &str) -> String {
     }
 }
 
+fn sanitize_client_perf_label(value: &str) -> String {
+    let sanitized = value
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | ':' | '.') {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .take(64)
+        .collect::<String>();
+    if sanitized.is_empty() {
+        "unknown".to_string()
+    } else {
+        sanitized
+    }
+}
+
 fn sanitize_command_family(value: &str) -> &str {
     match value {
         "move" | "attackMove" | "build" | "train" | "other" => value,
@@ -648,6 +748,10 @@ pub fn is_notable_net_report(report: &ClientNetReport, outbound: &ConnectionRepo
         || report.frame_gap_max_ms >= NET_REPORT_FRAME_GAP_ISSUE_MS
         || report.frame_work_max_ms >= NET_REPORT_FRAME_WORK_ISSUE_MS
         || report.frame_work_p95_ms >= NET_REPORT_FRAME_WORK_P95_ISSUE_MS
+        || report.frame_raf_dispatch_max_ms >= NET_REPORT_SNAPSHOT_APPLY_ISSUE_MS
+        || report.frame_raf_dispatch_p95_ms >= NET_REPORT_SNAPSHOT_APPLY_P95_ISSUE_MS
+        || report.frame_unattributed_max_ms >= NET_REPORT_SNAPSHOT_APPLY_ISSUE_MS
+        || report.frame_unattributed_p95_ms >= NET_REPORT_SNAPSHOT_APPLY_P95_ISSUE_MS
         || report.slow_frame_count > 0
         || report.renderer_max_ms >= NET_REPORT_RENDERER_ISSUE_MS
         || report.renderer_p95_ms >= NET_REPORT_RENDERER_P95_ISSUE_MS
@@ -768,6 +872,14 @@ pub fn classify_client_net_report(
         || report.renderer_p95_ms >= NET_REPORT_RENDERER_P95_ISSUE_MS
     {
         "client_renderer"
+    } else if report.frame_raf_dispatch_max_ms >= NET_REPORT_SNAPSHOT_APPLY_ISSUE_MS
+        || report.frame_raf_dispatch_p95_ms >= NET_REPORT_SNAPSHOT_APPLY_P95_ISSUE_MS
+    {
+        "client_raf_dispatch"
+    } else if report.frame_unattributed_max_ms >= NET_REPORT_SNAPSHOT_APPLY_ISSUE_MS
+        || report.frame_unattributed_p95_ms >= NET_REPORT_SNAPSHOT_APPLY_P95_ISSUE_MS
+    {
+        "client_frame_unattributed"
     } else if report.frame_work_max_ms >= NET_REPORT_FRAME_WORK_ISSUE_MS
         || report.frame_work_p95_ms >= NET_REPORT_FRAME_WORK_P95_ISSUE_MS
     {
@@ -960,6 +1072,8 @@ mod tests {
             snapshots: 300,
             snapshot_late_frame_count: 0,
             predicted_snapshot_late_frame_count: 0,
+            predicted_snapshot_late_frame_pct_x100: 0,
+            prediction_active_late_frame_count: 0,
             snapshot_bytes_total: 1_200_000,
             snapshot_bytes_max: 5_000,
             snapshot_bytes_avg: 4_000,
@@ -992,11 +1106,22 @@ mod tests {
             fps_estimate: 60,
             frame_work_max_ms: 10,
             frame_work_p95_ms: 8,
+            frame_raf_dispatch_max_ms: 1,
+            frame_raf_dispatch_p95_ms: 1,
+            frame_unattributed_max_ms: 4,
+            frame_unattributed_p95_ms: 2,
             slow_frame_count: 0,
             worst_frame_phase: String::new(),
             worst_frame_phase_ms: 0,
             renderer_max_ms: 6,
             renderer_p95_ms: 4,
+            top_renderer_phase: String::new(),
+            top_renderer_phase_ms: 0,
+            top_render_diagnostic_group: String::new(),
+            top_render_diagnostic_group_count: 0,
+            client_frame_phases: Vec::new(),
+            renderer_frame_phases: Vec::new(),
+            render_diagnostic_counters: Vec::new(),
             entity_count: 120,
             selected_count: 0,
             visible_tile_count: 500,
@@ -1137,6 +1262,19 @@ mod tests {
         report.slow_frame_count = 1;
         assert!(notable(&report));
         assert_eq!(classify(&report), "client_frame_stall");
+    }
+
+    #[test]
+    fn net_report_classifies_local_frame_context_before_generic_work() {
+        let mut report = clean_report();
+        report.frame_raf_dispatch_max_ms = NET_REPORT_SNAPSHOT_APPLY_ISSUE_MS;
+        assert!(notable(&report));
+        assert_eq!(classify(&report), "client_raf_dispatch");
+
+        let mut report = clean_report();
+        report.frame_unattributed_p95_ms = NET_REPORT_SNAPSHOT_APPLY_P95_ISSUE_MS;
+        assert!(notable(&report));
+        assert_eq!(classify(&report), "client_frame_unattributed");
     }
 
     #[test]

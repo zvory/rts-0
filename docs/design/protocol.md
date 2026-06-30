@@ -155,6 +155,8 @@ in a match:
   snapshots: u32,           // snapshots received in this report window
   snapshotLateFrameCount: u32, // frames where the latest snapshot was late by jitter threshold
   predictedSnapshotLateFrameCount: u32, // late-snapshot frames with owned predicted overlay present
+  predictedSnapshotLateFramePctX100: u16, // predicted/late coverage percentage multiplied by 100
+  predictionActiveLateFrameCount: u32, // late-snapshot frames where local prediction was predicting/resyncing
   snapshotBytesTotal: u32,   // total received snapshot application payload bytes
   snapshotBytesMax: u32,     // largest received snapshot application payload bytes
   snapshotBytesAvg: u32,     // average received snapshot application payload bytes
@@ -187,11 +189,22 @@ in a match:
   fpsEstimate: u16,         // coarse average client frame rate for this report window
   frameWorkMaxMs: u16,      // largest measured JS frame work duration
   frameWorkP95Ms: u16,      // bucketed p95 measured JS frame work duration
+  frameRafDispatchMaxMs: u16, // max RAF callback dispatch delay before JS frame work
+  frameRafDispatchP95Ms: u16,
+  frameUnattributedMaxMs: u16, // max frame work not covered by top-level match.* phases
+  frameUnattributedP95Ms: u16,
   slowFrameCount: u32,      // frames whose gap or work crossed the slow-frame threshold
   worstFramePhase: string,  // bounded profiler label most often worst in this report window
   worstFramePhaseMs: u16,   // max duration for worstFramePhase
   rendererMaxMs: u16,       // largest measured match.renderer duration
   rendererP95Ms: u16,       // bucketed p95 match.renderer duration
+  topRendererPhase: string, // allowlisted top renderer.* phase label for this report window
+  topRendererPhaseMs: u16,
+  topRenderDiagnosticGroup: string, // allowlisted grouped render/minimap/HUD diagnostic counter
+  topRenderDiagnosticGroupCount: u32,
+  clientFramePhases: [{ label: string, count: u32, maxMs: u16, p95Ms: u16 }], // top 5 allowlisted frame phases
+  rendererFramePhases: [{ label: string, count: u32, maxMs: u16, p95Ms: u16 }], // top 5 allowlisted renderer.* phases
+  renderDiagnosticCounters: [{ label: string, samples: u32, frames: u32, total: u32, maxFrame: u32 }], // top 5 grouped counters
   entityCount: u32,         // latest client-visible entity count context
   selectedCount: u16,       // latest local selection size context
   visibleTileCount: u32,    // latest visible-tile count context

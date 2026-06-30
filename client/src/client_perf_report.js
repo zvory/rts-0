@@ -6,11 +6,22 @@ export function clientPerfReportFields(frameProfiler) {
   return {
     frameWorkMaxMs: clampU16(perf.frameWorkMaxMs),
     frameWorkP95Ms: clampU16(perf.frameWorkP95Ms),
+    frameRafDispatchMaxMs: clampU16(perf.frameRafDispatchMaxMs),
+    frameRafDispatchP95Ms: clampU16(perf.frameRafDispatchP95Ms),
+    frameUnattributedMaxMs: clampU16(perf.frameUnattributedMaxMs),
+    frameUnattributedP95Ms: clampU16(perf.frameUnattributedP95Ms),
     slowFrameCount: clampU32(perf.slowFrameCount),
     worstFramePhase: clampReportLabel(perf.worstFramePhase),
     worstFramePhaseMs: clampU16(perf.worstFramePhaseMs),
     rendererMaxMs: clampU16(perf.rendererMaxMs),
     rendererP95Ms: clampU16(perf.rendererP95Ms),
+    topRendererPhase: clampReportLabel(perf.topRendererPhase),
+    topRendererPhaseMs: clampU16(perf.topRendererPhaseMs),
+    topRenderDiagnosticGroup: clampReportLabel(perf.topRenderDiagnosticGroup),
+    topRenderDiagnosticGroupCount: clampU32(perf.topRenderDiagnosticGroupCount),
+    clientFramePhases: clampPhaseRows(perf.clientFramePhases),
+    rendererFramePhases: clampPhaseRows(perf.rendererFramePhases),
+    renderDiagnosticCounters: clampCounterRows(perf.renderDiagnosticCounters),
     entityCount: clampU32(context.entityCount),
     selectedCount: clampU16(context.selectedCount),
     visibleTileCount: clampU32(context.visibleTileCount),
@@ -120,4 +131,25 @@ function clampReportLabel(value) {
 
 function clampReportText(value) {
   return String(value || "").replace(/[^A-Za-z0-9_.:;=, -]/g, "_").slice(0, 128);
+}
+
+function clampPhaseRows(rows) {
+  if (!Array.isArray(rows)) return [];
+  return rows.slice(0, 5).map((row) => ({
+    label: clampReportLabel(row?.label),
+    count: clampU32(row?.count),
+    maxMs: clampU16(row?.maxMs),
+    p95Ms: clampU16(row?.p95Ms),
+  }));
+}
+
+function clampCounterRows(rows) {
+  if (!Array.isArray(rows)) return [];
+  return rows.slice(0, 5).map((row) => ({
+    label: clampReportLabel(row?.label),
+    samples: clampU32(row?.samples),
+    frames: clampU32(row?.frames),
+    total: clampU32(row?.total),
+    maxFrame: clampU32(row?.maxFrame),
+  }));
 }

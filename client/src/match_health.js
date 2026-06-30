@@ -56,6 +56,7 @@ export class MatchHealth {
       commandBurstWorstFramePhaseMs: 0,
       snapshotLateFrameCount: 0,
       predictedSnapshotLateFrameCount: 0,
+      predictionActiveLateFrameCount: 0,
       frameGapMaxMs: 0,
       frameCount: 0,
       frameTotalMs: 0,
@@ -127,6 +128,9 @@ export class MatchHealth {
       this.reportStats.snapshotLateFrameCount += 1;
       if (predictedSnapshotPresent) {
         this.reportStats.predictedSnapshotLateFrameCount += 1;
+      }
+      if (predictionModeIndicatesLocalReplay(summary.context?.predictionMode)) {
+        this.reportStats.predictionActiveLateFrameCount += 1;
       }
     }
   }
@@ -247,4 +251,8 @@ function finiteU32(value) {
 function finiteNumber(value) {
   const n = Number(value);
   return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+function predictionModeIndicatesLocalReplay(mode) {
+  return mode === "predicting" || mode === "resyncing";
 }
