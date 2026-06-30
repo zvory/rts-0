@@ -1,5 +1,6 @@
 use super::fixtures::*;
 use super::*;
+use crate::game::entity::MovePhase;
 
 fn manual_fire_fixture() -> (Game, u32, (f32, f32)) {
     let players = [
@@ -137,5 +138,51 @@ fn manual_mortar_fire_waits_for_weapon_cooldown() {
     assert!(
         launched_after_reload,
         "manual mortar fire should launch once the shared weapon cooldown is ready"
+    );
+}
+
+#[test]
+fn queued_manual_mortar_fire_promotes_to_wait_for_weapon_cooldown() {
+    let (mut game, mortar, target_pos) = manual_fire_fixture();
+    if let Some(mortar_entity) = game.entities.get_mut(mortar) {
+        mortar_entity.set_attack_cd(2);
+        mortar_entity.set_order(Order::move_to(mortar_entity.pos_x, mortar_entity.pos_y));
+        mortar_entity.mark_move_phase(MovePhase::Arrived);
+        mortar_entity.append_queued_order(OrderIntent::ability(
+            ability::AbilityKind::MortarFire,
+            target_pos.0,
+            target_pos.1,
+        ));
+    }
+
+    let events = game.tick();
+
+    assert_eq!(
+        mortar_launch_count(&events, 1, mortar),
+        0,
+        "queued manual mortar fire should not launch while the weapon cycle is still cooling down"
+    );
+    let mortar_entity = game.entities.get(mortar).expect("mortar should exist");
+    assert!(
+        matches!(mortar_entity.order(), Order::Ability(_)),
+        "queued manual mortar fire should become the active waiting order instead of being skipped"
+    );
+    assert!(
+        mortar_entity.queued_orders().is_empty(),
+        "promoting the queued manual shot should consume the queued intent"
+    );
+
+    let mut launched_after_reload = false;
+    for _ in 0..4 {
+        let events = game.tick();
+        launched_after_reload |= mortar_launch_count(&events, 1, mortar) == 1;
+        if launched_after_reload {
+            break;
+        }
+    }
+
+    assert!(
+        launched_after_reload,
+        "queued manual mortar fire should launch once the shared weapon cooldown is ready"
     );
 }

@@ -547,6 +547,19 @@ pub(crate) fn caster_can_attempt(
             && ability_launch_ready(e.kind, e.weapon_setup(), e.path_is_empty(), ability))
 }
 
+pub(crate) fn caster_can_promote_queued_world_ability(
+    entities: &EntityStore,
+    player: u32,
+    caster: u32,
+    ability: AbilityKind,
+) -> bool {
+    if ability == AbilityKind::MortarFire {
+        caster_can_accept_order(entities, player, caster, ability)
+    } else {
+        caster_can_attempt(entities, player, caster, ability)
+    }
+}
+
 pub(crate) fn caster_can_accept_order(
     entities: &EntityStore,
     player: u32,

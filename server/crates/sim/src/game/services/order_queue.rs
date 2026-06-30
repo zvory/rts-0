@@ -10,8 +10,8 @@ use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::mortar::MortarShellStore;
 use crate::game::services::ability_orders::{
-    active_ability_order_ready, launch_self_ability, launch_world_ability,
-    order_or_launch_world_ability, world_ability_facing_ready,
+    active_ability_order_ready, caster_can_promote_queued_world_ability, launch_self_ability,
+    launch_world_ability, order_or_launch_world_ability, world_ability_facing_ready,
 };
 use crate::game::services::construction::resumable_site_for_build_intent;
 use crate::game::services::dist2;
@@ -469,7 +469,7 @@ fn world_ability_intent_valid(
     if SmokeCloudStore::clamp_point_to_map(map, x, y).is_none() {
         return false;
     }
-    if !crate::game::services::ability_orders::caster_can_attempt(entities, owner, caster, ability)
+    if !caster_can_promote_queued_world_ability(entities, owner, caster, ability)
         || !crate::game::services::ability_orders::tech_requirement_met(entities, owner, ability)
     {
         return false;

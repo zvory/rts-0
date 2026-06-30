@@ -50,7 +50,7 @@
     },
     {
       "path": "server/crates/sim/src/game/services/order_queue.rs",
-      "lines": 1527,
+      "lines": 1526,
       "reason": "Pump Jack oil validation extended queued gather promotion in the existing oversized order adapter; keep ratcheting until queue validation is extracted."
     },
     {
