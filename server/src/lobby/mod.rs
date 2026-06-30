@@ -65,6 +65,8 @@ mod tick_control;
 pub use connection::{
     CommandLifecycleExemplarStats, CommandLifecycleReportStats, CommandTimingStats,
     ConnectionReportStats, ConnectionSink, ConnectionWriter, ConnectionWriterStats,
+    SnapshotLifecycleReportStats, SnapshotPayloadEntityKindReportStats,
+    SnapshotPayloadSectionReportStats, SnapshotWindowStats, SnapshotWriterSendStats,
 };
 use dev_replay::{load_replay_artifact, room_mode_for};
 pub use match_history_writes::MatchHistoryWriteWaitResult;

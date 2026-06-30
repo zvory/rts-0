@@ -13,6 +13,16 @@ pub(crate) fn serialize_compact_snapshot_value(
     Ok(out)
 }
 
+pub(crate) fn serialized_map_entry_len(
+    key: &str,
+    value: &serde_json::Value,
+) -> Result<usize, SnapshotEncodeError> {
+    let mut out = Vec::new();
+    write_messagepack_string(&mut out, key)?;
+    write_messagepack_value(&mut out, value)?;
+    Ok(out.len())
+}
+
 fn write_messagepack_value(
     out: &mut Vec<u8>,
     value: &serde_json::Value,

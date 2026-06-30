@@ -1,7 +1,8 @@
 #![cfg_attr(test, allow(dead_code))]
 
 use super::*;
-use std::collections::VecDeque;
+use crate::protocol::SnapshotPayloadDiagnostics;
+use std::collections::{BTreeMap, VecDeque};
 use std::time::Instant as StdInstant;
 
 /// Outbound connection handle shared with the room task. Reliable messages keep FIFO ordering;
@@ -47,16 +48,30 @@ pub struct SnapshotSendStats {
     waited_behind_reliable: bool,
 }
 
+pub struct SnapshotWriterSendStats {
+    pub serialize_ms: u32,
+    pub send_ms: u32,
+    pub bytes: u32,
+    pub payload: SnapshotPayloadDiagnostics,
+}
+
 pub struct ConnectionWriterStats {
     counters: Arc<ConnectionReportCounters>,
     reliable_drained_before_snapshot: u32,
 }
 
 const COMMAND_LIFECYCLE_TOP_N: usize = 5;
+const SNAPSHOT_PAYLOAD_TOP_N: usize = 8;
 const COMMAND_LIFECYCLE_BUCKETS_MS: [u32; 16] = [
     1, 2, 4, 8, 12, 16, 24, 33, 50, 75, 100, 150, 250, 500, 1_000, 2_000,
 ];
 const COMMAND_LIFECYCLE_BUCKET_COUNT: usize = COMMAND_LIFECYCLE_BUCKETS_MS.len() + 1;
+const SNAPSHOT_LIFECYCLE_BUCKETS_MS: [u32; 16] = COMMAND_LIFECYCLE_BUCKETS_MS;
+const SNAPSHOT_PAYLOAD_BUCKETS_BYTES: [u32; 25] = [
+    512, 768, 1_024, 1_280, 1_536, 2_048, 3_072, 4_096, 6_144, 8_192, 12_288, 16_384, 24_576,
+    32_768, 49_152, 65_536, 98_304, 131_072, 196_608, 262_144, 393_216, 524_288, 786_432,
+    1_048_576, 1_572_864,
+];
 
 #[derive(Debug, Clone, Default)]
 pub struct ConnectionReportStats {
@@ -72,7 +87,47 @@ pub struct ConnectionReportStats {
     pub snapshot_slot_stored: u32,
     pub snapshot_slot_replaced: u32,
     pub snapshot_slot_closed: u32,
+    pub snapshot_lifecycle: SnapshotLifecycleReportStats,
     pub command_lifecycle: CommandLifecycleReportStats,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct SnapshotLifecycleReportStats {
+    pub projected: SnapshotWindowStats,
+    pub compacted: SnapshotWindowStats,
+    pub queue_age: SnapshotWindowStats,
+    pub serialized: SnapshotWindowStats,
+    pub writer_send: SnapshotWindowStats,
+    pub payload_bytes: SnapshotWindowStats,
+    pub writer_taken: u32,
+    pub sections: Vec<SnapshotPayloadSectionReportStats>,
+    pub entity_kinds: Vec<SnapshotPayloadEntityKindReportStats>,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SnapshotWindowStats {
+    pub latest: u32,
+    pub max: u32,
+    pub p95: u32,
+    pub avg: u32,
+    pub total: u64,
+    pub count: u32,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct SnapshotPayloadSectionReportStats {
+    pub section: String,
+    pub count: u32,
+    pub bytes: u32,
+    pub pct_x100: u16,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct SnapshotPayloadEntityKindReportStats {
+    pub kind: String,
+    pub count: u32,
+    pub approx_bytes: u32,
+    pub pct_x100: u16,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -197,7 +252,36 @@ pub(crate) struct ConnectionReportCounters {
     snapshot_slot_replaced: AtomicU32,
     snapshot_slot_closed: AtomicU32,
     command_receipt_queued_at: StdMutex<VecDeque<StdInstant>>,
+    snapshot_lifecycle: StdMutex<SnapshotLifecycleWindow>,
     command_lifecycle: StdMutex<CommandLifecycleWindow>,
+}
+
+#[derive(Default)]
+struct SnapshotLifecycleWindow {
+    projected: SnapshotValueWindow,
+    compacted: SnapshotValueWindow,
+    queue_age: SnapshotValueWindow,
+    serialized: SnapshotValueWindow,
+    writer_send: SnapshotValueWindow,
+    payload_bytes: SnapshotValueWindow,
+    writer_taken: u32,
+    sections: BTreeMap<&'static str, SnapshotPayloadTotals>,
+    entity_kinds: BTreeMap<String, SnapshotPayloadTotals>,
+}
+
+#[derive(Default)]
+struct SnapshotValueWindow {
+    latest: u32,
+    max: u32,
+    total: u64,
+    count: u32,
+    bucket_counts: Vec<u32>,
+}
+
+#[derive(Default)]
+struct SnapshotPayloadTotals {
+    count: u64,
+    bytes: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -329,6 +413,11 @@ impl ConnectionSink {
         self.stats.record_command_sim_ack(sample);
     }
 
+    pub(crate) fn record_snapshot_projected(&self, projected_ms: u32, compacted_ms: u32) {
+        self.stats
+            .record_snapshot_projected(projected_ms, compacted_ms);
+    }
+
     fn record_command_receipt_queued(&self, accepted: Option<bool>) {
         match accepted {
             Some(true) => {
@@ -432,8 +521,10 @@ impl ConnectionWriterStats {
     fn prepare_snapshot_send(&mut self, pending: PendingSnapshot) -> ConnectionSnapshotSend {
         self.counters
             .record_reliable_drained_before_snapshot(self.reliable_drained_before_snapshot);
+        let age_ms = pending.age_ms();
+        self.counters.record_snapshot_taken(age_ms);
         let stats = SnapshotSendStats {
-            age_ms: pending.age_ms(),
+            age_ms,
             waited_behind_reliable: self.reliable_drained_before_snapshot > 0,
         };
         self.reliable_drained_before_snapshot = 0;
@@ -443,9 +534,14 @@ impl ConnectionWriterStats {
         }
     }
 
-    pub fn record_snapshot_sent(&self, stats: SnapshotSendStats) {
+    pub fn record_snapshot_sent(
+        &self,
+        stats: SnapshotSendStats,
+        writer_stats: SnapshotWriterSendStats,
+    ) {
         self.counters
             .record_snapshot_sent(stats.age_ms, stats.waited_behind_reliable);
+        self.counters.record_snapshot_written(writer_stats);
     }
 
     pub fn record_reliable_sent(&self, command_receipt: bool) {
@@ -474,6 +570,41 @@ impl ConnectionReportCounters {
             self.snapshot_waited_behind_reliable
                 .fetch_add(1, Ordering::Relaxed);
         }
+    }
+
+    pub(crate) fn record_snapshot_projected(&self, projected_ms: u32, compacted_ms: u32) {
+        self.with_snapshot_lifecycle(|window| {
+            window
+                .projected
+                .add(projected_ms, &SNAPSHOT_LIFECYCLE_BUCKETS_MS);
+            window
+                .compacted
+                .add(compacted_ms, &SNAPSHOT_LIFECYCLE_BUCKETS_MS);
+        });
+    }
+
+    pub(crate) fn record_snapshot_taken(&self, queue_age_ms: u32) {
+        self.with_snapshot_lifecycle(|window| {
+            window.writer_taken = window.writer_taken.saturating_add(1);
+            window
+                .queue_age
+                .add(queue_age_ms, &SNAPSHOT_LIFECYCLE_BUCKETS_MS);
+        });
+    }
+
+    pub(crate) fn record_snapshot_written(&self, stats: SnapshotWriterSendStats) {
+        self.with_snapshot_lifecycle(|window| {
+            window
+                .serialized
+                .add(stats.serialize_ms, &SNAPSHOT_LIFECYCLE_BUCKETS_MS);
+            window
+                .writer_send
+                .add(stats.send_ms, &SNAPSHOT_LIFECYCLE_BUCKETS_MS);
+            window
+                .payload_bytes
+                .add(stats.bytes, &SNAPSHOT_PAYLOAD_BUCKETS_BYTES);
+            window.add_payload(stats.payload);
+        });
     }
 
     pub(crate) fn record_command_receipt_queued_at(&self) {
@@ -553,6 +684,7 @@ impl ConnectionReportCounters {
     fn consume(&self) -> ConnectionReportStats {
         let snapshot_sent = self.snapshot_sent.swap(0, Ordering::Relaxed);
         let snapshot_send_age_total_ms = self.snapshot_send_age_total_ms.swap(0, Ordering::Relaxed);
+        let snapshot_lifecycle = self.consume_snapshot_lifecycle();
         let command_lifecycle = self.consume_command_lifecycle();
         ConnectionReportStats {
             command_receipts_accepted: self.command_receipts_accepted.swap(0, Ordering::Relaxed),
@@ -579,7 +711,25 @@ impl ConnectionReportCounters {
             snapshot_slot_stored: self.snapshot_slot_stored.swap(0, Ordering::Relaxed),
             snapshot_slot_replaced: self.snapshot_slot_replaced.swap(0, Ordering::Relaxed),
             snapshot_slot_closed: self.snapshot_slot_closed.swap(0, Ordering::Relaxed),
+            snapshot_lifecycle,
             command_lifecycle,
+        }
+    }
+
+    fn with_snapshot_lifecycle(&self, f: impl FnOnce(&mut SnapshotLifecycleWindow)) {
+        match self.snapshot_lifecycle.lock() {
+            Ok(mut guard) => f(&mut guard),
+            Err(poisoned) => f(&mut poisoned.into_inner()),
+        }
+    }
+
+    fn consume_snapshot_lifecycle(&self) -> SnapshotLifecycleReportStats {
+        match self.snapshot_lifecycle.lock() {
+            Ok(mut guard) => guard.consume(),
+            Err(poisoned) => {
+                let mut guard = poisoned.into_inner();
+                guard.consume()
+            }
         }
     }
 
@@ -599,6 +749,147 @@ impl ConnectionReportCounters {
             }
         }
     }
+}
+
+impl SnapshotLifecycleWindow {
+    fn add_payload(&mut self, payload: SnapshotPayloadDiagnostics) {
+        for section in payload.sections {
+            let entry = self.sections.entry(section.section).or_default();
+            entry.count = entry.count.saturating_add(section.count as u64);
+            entry.bytes = entry.bytes.saturating_add(section.bytes as u64);
+        }
+        for kind in payload.entity_kinds {
+            let entry = self.entity_kinds.entry(kind.kind).or_default();
+            entry.count = entry.count.saturating_add(kind.count as u64);
+            entry.bytes = entry.bytes.saturating_add(kind.approx_bytes as u64);
+        }
+    }
+
+    fn consume(&mut self) -> SnapshotLifecycleReportStats {
+        let payload_total_bytes = self.payload_bytes.total;
+        let out = SnapshotLifecycleReportStats {
+            projected: self.projected.consume(&SNAPSHOT_LIFECYCLE_BUCKETS_MS),
+            compacted: self.compacted.consume(&SNAPSHOT_LIFECYCLE_BUCKETS_MS),
+            queue_age: self.queue_age.consume(&SNAPSHOT_LIFECYCLE_BUCKETS_MS),
+            serialized: self.serialized.consume(&SNAPSHOT_LIFECYCLE_BUCKETS_MS),
+            writer_send: self.writer_send.consume(&SNAPSHOT_LIFECYCLE_BUCKETS_MS),
+            payload_bytes: self.payload_bytes.consume(&SNAPSHOT_PAYLOAD_BUCKETS_BYTES),
+            writer_taken: std::mem::take(&mut self.writer_taken),
+            sections: consume_payload_sections(&mut self.sections, payload_total_bytes),
+            entity_kinds: consume_entity_kinds(&mut self.entity_kinds, payload_total_bytes),
+        };
+        out
+    }
+}
+
+impl SnapshotValueWindow {
+    fn add(&mut self, value: u32, buckets: &[u32]) {
+        if self.bucket_counts.len() != buckets.len() + 1 {
+            self.bucket_counts = vec![0; buckets.len() + 1];
+        }
+        self.latest = value;
+        self.max = self.max.max(value);
+        self.total = self.total.saturating_add(value as u64);
+        self.count = self.count.saturating_add(1);
+        let index = buckets
+            .iter()
+            .position(|bucket| value <= *bucket)
+            .unwrap_or(buckets.len());
+        if let Some(count) = self.bucket_counts.get_mut(index) {
+            *count = count.saturating_add(1);
+        }
+    }
+
+    fn consume(&mut self, buckets: &[u32]) -> SnapshotWindowStats {
+        let out = SnapshotWindowStats {
+            latest: self.latest,
+            max: self.max,
+            p95: self.p95(buckets),
+            avg: if self.count > 0 {
+                (self.total / self.count as u64).min(u32::MAX as u64) as u32
+            } else {
+                0
+            },
+            total: self.total,
+            count: self.count,
+        };
+        *self = Self::default();
+        out
+    }
+
+    fn p95(&self, buckets: &[u32]) -> u32 {
+        if self.count == 0 {
+            return 0;
+        }
+        let target = self.count.saturating_mul(95).saturating_add(99) / 100;
+        let mut seen = 0u32;
+        for (index, count) in self.bucket_counts.iter().enumerate() {
+            seen = seen.saturating_add(*count);
+            if seen >= target {
+                if index == buckets.len() {
+                    return self.max;
+                }
+                return buckets
+                    .get(index)
+                    .copied()
+                    .unwrap_or_else(|| *buckets.last().unwrap_or(&0));
+            }
+        }
+        0
+    }
+}
+
+fn consume_payload_sections(
+    sections: &mut BTreeMap<&'static str, SnapshotPayloadTotals>,
+    total_bytes: u64,
+) -> Vec<SnapshotPayloadSectionReportStats> {
+    let mut out = std::mem::take(sections)
+        .into_iter()
+        .map(|(section, totals)| SnapshotPayloadSectionReportStats {
+            section: section.to_string(),
+            count: totals.count.min(u32::MAX as u64) as u32,
+            bytes: totals.bytes.min(u32::MAX as u64) as u32,
+            pct_x100: pct_x100(totals.bytes, total_bytes),
+        })
+        .collect::<Vec<_>>();
+    out.sort_by(|a, b| {
+        b.bytes
+            .cmp(&a.bytes)
+            .then_with(|| b.count.cmp(&a.count))
+            .then_with(|| a.section.cmp(&b.section))
+    });
+    out.truncate(SNAPSHOT_PAYLOAD_TOP_N);
+    out
+}
+
+fn consume_entity_kinds(
+    entity_kinds: &mut BTreeMap<String, SnapshotPayloadTotals>,
+    total_bytes: u64,
+) -> Vec<SnapshotPayloadEntityKindReportStats> {
+    let mut out = std::mem::take(entity_kinds)
+        .into_iter()
+        .map(|(kind, totals)| SnapshotPayloadEntityKindReportStats {
+            kind,
+            count: totals.count.min(u32::MAX as u64) as u32,
+            approx_bytes: totals.bytes.min(u32::MAX as u64) as u32,
+            pct_x100: pct_x100(totals.bytes, total_bytes),
+        })
+        .collect::<Vec<_>>();
+    out.sort_by(|a, b| {
+        b.approx_bytes
+            .cmp(&a.approx_bytes)
+            .then_with(|| b.count.cmp(&a.count))
+            .then_with(|| a.kind.cmp(&b.kind))
+    });
+    out.truncate(SNAPSHOT_PAYLOAD_TOP_N);
+    out
+}
+
+fn pct_x100(value: u64, total: u64) -> u16 {
+    if total == 0 {
+        return 0;
+    }
+    ((value.saturating_mul(10_000) / total).min(u16::MAX as u64)) as u16
 }
 
 impl CommandLifecycleWindow {

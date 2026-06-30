@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -74,14 +74,14 @@ serialization, writer send, delivery cadence, payload composition, or client pro
 
 ## Implementation Checklist
 
-- [ ] Define snapshot lifecycle and payload composition field names.
-- [ ] Add bounded server-side aggregation for projection, compaction, enqueue, serialize, and send
+- [x] Define snapshot lifecycle and payload composition field names.
+- [x] Add bounded server-side aggregation for projection, compaction, enqueue, serialize, and send
       timing.
-- [ ] Add payload section counts/bytes or stable approximations.
-- [ ] Add client-side arrival/processing aggregation only where existing fields are insufficient.
-- [ ] Extend structured logs, parser output, and docs.
-- [ ] Add focused tests for compact snapshot instrumentation and parser interpretation.
-- [ ] Mark this phase as done in this file in the implementation commit.
+- [x] Add payload section counts/bytes or stable approximations.
+- [x] Add client-side arrival/processing aggregation only where existing fields are insufficient.
+- [x] Extend structured logs, parser output, and docs.
+- [x] Add focused tests for compact snapshot instrumentation and parser interpretation.
+- [x] Mark this phase as done in this file in the implementation commit.
 
 ## Verification
 

@@ -133,6 +133,50 @@ try {
   rmSync(packetDir, { recursive: true, force: true });
 }
 
+const snapshotPayloadDir = mkdtempSync(path.join(os.tmpdir(), "rts-net-report-parser-snapshot-payload-"));
+try {
+  const snapshotPayloadLog = path.join(snapshotPayloadDir, "snapshot-payload.log");
+  const sectionsJson = JSON.stringify([
+    { section: "entities", count: 800, bytes: 62000, pctX100: 5962 },
+    { section: "visibility", count: 1200, bytes: 28000, pctX100: 2692 },
+    { section: "netStatus", count: 26, bytes: 1800, pctX100: 173 },
+  ]).replace(/"/g, '\\"');
+  const kindsJson = JSON.stringify([
+    { kind: "worker", count: 420, approxBytes: 34000, pctX100: 3269 },
+    { kind: "rifleman", count: 260, approxBytes: 21000, pctX100: 2019 },
+  ]).replace(/"/g, '\\"');
+  writeFileSync(
+    snapshotPayloadLog,
+    [
+      `2026-06-24T03:00:00Z INFO event="client_net_report" match_run_id="snapshot-payload-1" player_id=3 primary_issue="server_snapshot_lifecycle" rtt_max_ms=38 snapshot_gap_max_ms=44 snapshot_jitter_ms=2 snapshot_bytes_max=8192 snapshot_bytes_p95=4096 snapshot_bytes_avg=4000 snapshot_segment_budget_bytes=1280 snapshot_over_segment_budget_count=24 snapshot_over_segment_budget_pct_x100=9200 snapshot_byte_source="messagepack-application-payload" snapshot_codec="messagepack-compact" snapshot_codec_version=1 snapshot_frame_kind="binary" websocket_compression="none" frame_gap_max_ms=14 fps_estimate=60 server_tick_ms=5 server_lag_ms=0 server_snapshot_project_max_ms=12 server_snapshot_project_p95_ms=8 server_snapshot_compact_max_ms=7 server_snapshot_compact_p95_ms=4 server_snapshot_queue_age_max_ms=18 server_snapshot_queue_age_p95_ms=12 server_snapshot_serialize_max_ms=14 server_snapshot_serialize_p95_ms=10 server_snapshot_writer_send_max_ms=6 server_snapshot_writer_send_p95_ms=4 server_snapshot_payload_bytes_max=8192 server_snapshot_payload_bytes_p95=4096 server_snapshot_payload_bytes_avg=4000 server_snapshot_payload_bytes_total=104000 server_snapshot_payload_bytes_count=26 server_snapshot_writer_taken=26 server_snapshot_payload_sections="${sectionsJson}" server_snapshot_entity_kinds="${kindsJson}" server_reliable_drained_before_snapshot=0 server_reliable_drained_before_snapshot_max=0 server_snapshot_waited_behind_reliable=0 server_snapshot_sent=26 server_snapshot_send_age_max_ms=18 server_snapshot_slot_stored=26 server_snapshot_slot_replaced=0 server_snapshot_slot_closed=0 "client network report"`,
+    ].join("\n") + "\n"
+  );
+  const snapshotPayloadParsed = JSON.parse(run(["--format", "json", snapshotPayloadLog]));
+  const snapshotPayloadMatch = snapshotPayloadParsed.matches.find((match) => match.matchRunId === "snapshot-payload-1");
+  assert.ok(snapshotPayloadMatch, "expected synthetic snapshot payload match summary");
+  const snapshotPayloadPlayer = snapshotPayloadMatch.players.find((player) => player.playerId === "3");
+  assert.ok(snapshotPayloadPlayer, "expected synthetic snapshot payload player summary");
+  assert.equal(snapshotPayloadPlayer.metrics.server_snapshot_project_max_ms.max, 12);
+  assert.equal(snapshotPayloadPlayer.metrics.server_snapshot_payload_bytes_p95.max, 4096);
+  assert.equal(snapshotPayloadPlayer.snapshotPayload.sections[0].label, "entities");
+  assert.equal(snapshotPayloadPlayer.snapshotPayload.sections[0].pctX100, 5962);
+  assert.equal(snapshotPayloadPlayer.snapshotPayload.entityKinds[0].label, "worker");
+  assert.equal(
+    snapshotPayloadMatch.classifications.find((item) => item.id === "server_snapshot_projection")?.result,
+    "indicated",
+  );
+  assert.equal(
+    snapshotPayloadMatch.classifications.find((item) => item.id === "snapshot_payload_composition")?.result,
+    "indicated",
+  );
+  const snapshotPayloadMarkdown = run([snapshotPayloadLog]);
+  assert.match(snapshotPayloadMarkdown, /Snapshot Payload Composition/);
+  assert.match(snapshotPayloadMarkdown, /entities 59\.62% 62000 bytes/);
+  assert.match(snapshotPayloadMarkdown, /worker 32\.69% 34000 approx bytes/);
+} finally {
+  rmSync(snapshotPayloadDir, { recursive: true, force: true });
+}
+
 const tsv = run(["--format=tsv", ...logs]);
 assert.match(tsv, /^match\tplayer_id\treports/m);
 assert.match(tsv, /^54\t5\t17\tprediction_disabled:17/m);

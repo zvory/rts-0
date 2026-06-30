@@ -86,6 +86,18 @@ const METRICS = [
   ["server_snapshot_waited_behind_reliable", "snapshots waited behind reliable"],
   ["server_snapshot_send_age_max_ms", "server snapshot send age max"],
   ["server_snapshot_slot_replaced", "server snapshot slot replaced"],
+  ["server_snapshot_project_max_ms", "server snapshot project max"],
+  ["server_snapshot_project_p95_ms", "server snapshot project p95"],
+  ["server_snapshot_compact_max_ms", "server snapshot compact max"],
+  ["server_snapshot_compact_p95_ms", "server snapshot compact p95"],
+  ["server_snapshot_queue_age_max_ms", "server snapshot queue age max"],
+  ["server_snapshot_queue_age_p95_ms", "server snapshot queue age p95"],
+  ["server_snapshot_serialize_max_ms", "server snapshot serialize max"],
+  ["server_snapshot_serialize_p95_ms", "server snapshot serialize p95"],
+  ["server_snapshot_writer_send_max_ms", "server snapshot writer send max"],
+  ["server_snapshot_writer_send_p95_ms", "server snapshot writer send p95"],
+  ["server_snapshot_payload_bytes_max", "server snapshot payload bytes max"],
+  ["server_snapshot_payload_bytes_p95", "server snapshot payload bytes p95"],
   ["server_command_frame_deserialize_max_ms", "server command parse max"],
   ["server_command_deserialize_to_room_enqueue_max_ms", "server command enqueue max"],
   ["server_command_room_queue_max_ms", "server command room queue max"],
@@ -167,6 +179,21 @@ const SUMMARY_FIELDS = [
   "server_snapshot_slot_stored",
   "server_snapshot_slot_replaced",
   "server_snapshot_slot_closed",
+  "server_snapshot_project_max_ms",
+  "server_snapshot_project_p95_ms",
+  "server_snapshot_compact_max_ms",
+  "server_snapshot_compact_p95_ms",
+  "server_snapshot_queue_age_max_ms",
+  "server_snapshot_queue_age_p95_ms",
+  "server_snapshot_serialize_max_ms",
+  "server_snapshot_serialize_p95_ms",
+  "server_snapshot_writer_send_max_ms",
+  "server_snapshot_writer_send_p95_ms",
+  "server_snapshot_payload_bytes_max",
+  "server_snapshot_payload_bytes_p95",
+  "server_snapshot_payload_bytes_avg",
+  "server_snapshot_payload_bytes_total",
+  "server_snapshot_writer_taken",
   "server_command_lifecycle_count",
   "server_command_lifecycle_accepted",
   "server_command_lifecycle_rejected",
@@ -202,7 +229,30 @@ const ISSUE_GROUPS = [
   {
     id: "server_snapshot_projection",
     label: "server snapshot projection/compact/serialization cost",
-    fields: ["max_snapshot_ms", "snapshot_ms", "compact_ms", "serialize_ms"],
+    fields: [
+      "max_snapshot_ms",
+      "snapshot_ms",
+      "compact_ms",
+      "serialize_ms",
+      "server_snapshot_project_max_ms",
+      "server_snapshot_project_p95_ms",
+      "server_snapshot_compact_max_ms",
+      "server_snapshot_compact_p95_ms",
+      "server_snapshot_serialize_max_ms",
+      "server_snapshot_serialize_p95_ms",
+    ],
+  },
+  {
+    id: "snapshot_payload_composition",
+    label: "snapshot payload composition and packet-budget pressure",
+    fields: [
+      "snapshot_bytes_max",
+      "snapshot_bytes_p95",
+      "snapshot_over_segment_budget_pct_x100",
+      "server_snapshot_payload_bytes_max",
+      "server_snapshot_payload_bytes_p95",
+      "server_snapshot_payload_bytes_avg",
+    ],
   },
   {
     id: "websocket_writer_send",
@@ -216,6 +266,10 @@ const ISSUE_GROUPS = [
       "server_reliable_drained_before_snapshot_max",
       "server_snapshot_waited_behind_reliable",
       "server_snapshot_send_age_max_ms",
+      "server_snapshot_queue_age_max_ms",
+      "server_snapshot_queue_age_p95_ms",
+      "server_snapshot_writer_send_max_ms",
+      "server_snapshot_writer_send_p95_ms",
       "server_snapshot_slot_replaced",
       "server_snapshot_slot_closed",
     ],
@@ -389,6 +443,19 @@ const WARN_THRESHOLD = {
   server_snapshot_send_age_max_ms: 100,
   server_snapshot_slot_replaced: 1,
   server_snapshot_slot_closed: 1,
+  server_snapshot_project_max_ms: 8,
+  server_snapshot_project_p95_ms: 8,
+  server_snapshot_compact_max_ms: 8,
+  server_snapshot_compact_p95_ms: 8,
+  server_snapshot_queue_age_max_ms: 100,
+  server_snapshot_queue_age_p95_ms: 100,
+  server_snapshot_serialize_max_ms: 10,
+  server_snapshot_serialize_p95_ms: 10,
+  server_snapshot_writer_send_max_ms: 10,
+  server_snapshot_writer_send_p95_ms: 10,
+  server_snapshot_payload_bytes_max: 256 * 1024,
+  server_snapshot_payload_bytes_p95: SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES + 1,
+  server_snapshot_payload_bytes_avg: 128 * 1024,
 };
 
 function usage() {
@@ -879,6 +946,7 @@ function finalizePlayer(player) {
     metrics: values,
     transport: summarizeTransport(reports),
     commandLifecycle: summarizeCommandLifecycle(reports),
+    snapshotPayload: summarizeSnapshotPayload(reports),
     evidence,
   };
 }
@@ -894,6 +962,76 @@ function summarizeTransport(rows) {
       },
     ])
   );
+}
+
+function summarizeSnapshotPayload(rows) {
+  const payloadBytes = summarizeField(rows, "server_snapshot_payload_bytes_total");
+  return {
+    samples: rows.filter((row) => row.fields.server_snapshot_payload_sections !== undefined).length,
+    payloadBytes,
+    sections: aggregateSnapshotPayloadEntries(rows, "server_snapshot_payload_sections", {
+      labelField: "section",
+      bytesField: "bytes",
+    }),
+    entityKinds: aggregateSnapshotPayloadEntries(rows, "server_snapshot_entity_kinds", {
+      labelField: "kind",
+      bytesField: "approxBytes",
+    }),
+  };
+}
+
+function aggregateSnapshotPayloadEntries(rows, field, { labelField, bytesField }) {
+  const totals = new Map();
+  let totalBytes = 0;
+  for (const row of rows) {
+    const rowTotal = Number(row.fields.server_snapshot_payload_bytes_total);
+    if (Number.isFinite(rowTotal) && rowTotal > 0) {
+      totalBytes += rowTotal;
+    }
+    for (const entry of parseJsonArrayField(row.fields[field])) {
+      const label = String(entry?.[labelField] || "unknown").slice(0, 64);
+      const count = positiveNumber(entry?.count);
+      const bytes = positiveNumber(entry?.[bytesField]);
+      if (!label || (count === 0 && bytes === 0)) {
+        continue;
+      }
+      const current = totals.get(label) || { label, count: 0, bytes: 0, samples: 0 };
+      current.count += count;
+      current.bytes += bytes;
+      current.samples += 1;
+      totals.set(label, current);
+    }
+  }
+  if (totalBytes <= 0) {
+    totalBytes = [...totals.values()].reduce((sum, entry) => sum + entry.bytes, 0);
+  }
+  return [...totals.values()]
+    .sort((a, b) => b.bytes - a.bytes || b.count - a.count || a.label.localeCompare(b.label))
+    .slice(0, 8)
+    .map((entry) => ({
+      ...entry,
+      pctX100: totalBytes > 0 ? Math.round((entry.bytes * 10000) / totalBytes) : 0,
+    }));
+}
+
+function parseJsonArrayField(value) {
+  if (Array.isArray(value)) {
+    return value;
+  }
+  if (typeof value !== "string" || value.length === 0) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function positiveNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : 0;
 }
 
 function summarizeStringField(rows, field) {
@@ -1115,6 +1253,12 @@ function missingDiagnosticGroups(rows) {
   if (!fields.has("server_reliable_drained_before_snapshot")) {
     missing.push("server reliable/snapshot outbound pressure: no matching fields in input");
   }
+  if (!fields.has("server_snapshot_project_max_ms") || !fields.has("server_snapshot_serialize_max_ms")) {
+    missing.push("server snapshot lifecycle window: no projection/compact/serialize fields in input");
+  }
+  if (!fields.has("server_snapshot_payload_sections")) {
+    missing.push("server snapshot payload composition: no section/entity-kind fields in input");
+  }
   if (!fields.has("prediction_disable_wasm_count") || !fields.has("prediction_replay_max_ms")) {
     missing.push("prediction disable reason/replay budget detail: no matching fields in input");
   }
@@ -1194,6 +1338,7 @@ function formatMarkdown(report) {
       );
     }
 
+    appendSnapshotPayloadMarkdown(lines, match.players);
     appendCommandLifecycleMarkdown(lines, match.players);
 
     lines.push("");
@@ -1221,6 +1366,49 @@ function formatMarkdown(report) {
     }
   }
   return `${lines.join("\n")}\n`;
+}
+
+function appendSnapshotPayloadMarkdown(lines, players) {
+  const rows = players.filter((player) => player.snapshotPayload?.samples > 0);
+  if (rows.length === 0) {
+    return;
+  }
+  lines.push("");
+  lines.push("### Snapshot Payload Composition");
+  lines.push(
+    "| player | lifecycle max ms project/compact/queue/serialize/send | server payload bytes p95/max | top sections | top entity kinds |"
+  );
+  lines.push("| --- | --- | ---: | --- | --- |");
+  for (const player of rows) {
+    lines.push(
+      [
+        player.playerId,
+        [
+          metricMax(player, "server_snapshot_project_max_ms"),
+          metricMax(player, "server_snapshot_compact_max_ms"),
+          metricMax(player, "server_snapshot_queue_age_max_ms"),
+          metricMax(player, "server_snapshot_serialize_max_ms"),
+          metricMax(player, "server_snapshot_writer_send_max_ms"),
+        ].join("/"),
+        `${metricMax(player, "server_snapshot_payload_bytes_p95")}/${metricMax(player, "server_snapshot_payload_bytes_max")}`,
+        formatSnapshotPayloadEntries(player.snapshotPayload.sections, "bytes"),
+        formatSnapshotPayloadEntries(player.snapshotPayload.entityKinds, "approx bytes"),
+      ]
+        .join(" | ")
+        .replace(/^/, "| ")
+        .replace(/$/, " |")
+    );
+  }
+}
+
+function formatSnapshotPayloadEntries(entries, byteLabel) {
+  if (!Array.isArray(entries) || entries.length === 0) {
+    return "n/a";
+  }
+  return entries
+    .slice(0, 4)
+    .map((entry) => `${entry.label} ${formatPctX100(entry.pctX100)} ${formatValue(entry.bytes)} ${byteLabel}`)
+    .join(", ");
 }
 
 function metricMax(player, field) {
