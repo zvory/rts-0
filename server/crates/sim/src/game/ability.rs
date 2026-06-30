@@ -12,6 +12,7 @@ pub enum AbilityKind {
     Smoke,
     MortarFire,
     PointFire,
+    BlanketFire,
     Breakthrough,
     EkatTeleport,
     EkatLineShot,
@@ -26,6 +27,7 @@ impl AbilityKind {
             AbilityKind::Smoke => protocol::abilities::SMOKE,
             AbilityKind::MortarFire => protocol::abilities::MORTAR_FIRE,
             AbilityKind::PointFire => protocol::abilities::POINT_FIRE,
+            AbilityKind::BlanketFire => protocol::abilities::BLANKET_FIRE,
             AbilityKind::Breakthrough => protocol::abilities::BREAKTHROUGH,
             AbilityKind::EkatTeleport => protocol::abilities::EKAT_TELEPORT,
             AbilityKind::EkatLineShot => protocol::abilities::EKAT_LINE_SHOT,
@@ -44,6 +46,7 @@ impl FromStr for AbilityKind {
             protocol::abilities::SMOKE => Ok(AbilityKind::Smoke),
             protocol::abilities::MORTAR_FIRE => Ok(AbilityKind::MortarFire),
             protocol::abilities::POINT_FIRE => Ok(AbilityKind::PointFire),
+            protocol::abilities::BLANKET_FIRE => Ok(AbilityKind::BlanketFire),
             protocol::abilities::BREAKTHROUGH => Ok(AbilityKind::Breakthrough),
             protocol::abilities::EKAT_TELEPORT => Ok(AbilityKind::EkatTeleport),
             protocol::abilities::EKAT_LINE_SHOT => Ok(AbilityKind::EkatLineShot),
@@ -63,6 +66,7 @@ pub enum AbilityTargetMode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AbilityEffectHook {
     LegacyNoop,
+    ReservedNoop,
     OwnedAreaStatus,
     DelayedWorld,
     ArtilleryPointFire,
@@ -123,6 +127,7 @@ pub fn effect_hook(kind: AbilityKind) -> AbilityEffectHook {
         AbilityKind::Charge => AbilityEffectHook::LegacyNoop,
         AbilityKind::Smoke | AbilityKind::MortarFire => AbilityEffectHook::DelayedWorld,
         AbilityKind::PointFire => AbilityEffectHook::ArtilleryPointFire,
+        AbilityKind::BlanketFire => AbilityEffectHook::ReservedNoop,
         AbilityKind::Breakthrough => AbilityEffectHook::OwnedAreaStatus,
         AbilityKind::EkatTeleport => AbilityEffectHook::DashReturn,
         AbilityKind::EkatLineShot => AbilityEffectHook::LineProjectile,
@@ -152,6 +157,10 @@ mod tests {
         assert_eq!(
             definition(AbilityKind::PointFire).effect_hook,
             AbilityEffectHook::ArtilleryPointFire
+        );
+        assert_eq!(
+            definition(AbilityKind::BlanketFire).effect_hook,
+            AbilityEffectHook::ReservedNoop
         );
         assert_eq!(
             definition(AbilityKind::Breakthrough).effect_hook,
