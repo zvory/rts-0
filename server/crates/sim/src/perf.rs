@@ -78,7 +78,7 @@ impl PathingSourceCounts {
     }
 
     fn top(self) -> (&'static str, u32) {
-        [
+        let (label, count) = [
             ("move", self.move_orders),
             ("attackMove", self.attack_move),
             ("attack", self.attack),
@@ -90,7 +90,12 @@ impl PathingSourceCounts {
         ]
         .into_iter()
         .max_by_key(|(label, count)| (*count, std::cmp::Reverse(*label)))
-        .unwrap_or(("none", 0))
+        .unwrap_or(("none", 0));
+        if count == 0 {
+            ("none", 0)
+        } else {
+            (label, count)
+        }
     }
 
     fn compact(self) -> String {
@@ -230,6 +235,17 @@ pub(crate) struct PathingPassDiagnostics {
     pub(crate) explored_node_buckets: ExploredNodeBuckets,
 }
 
+pub(crate) struct PathingRequestSample {
+    pub(crate) source: PathingRequestSource,
+    pub(crate) path_ok: bool,
+    pub(crate) same_tile: bool,
+    pub(crate) cache_hit: Option<bool>,
+    pub(crate) budget_exhausted: bool,
+    pub(crate) expanded_nodes: usize,
+    pub(crate) tile_path_len: usize,
+    pub(crate) duration: Duration,
+}
+
 impl PathingPassDiagnostics {
     pub(crate) fn new(pass: &'static str, awaiting_start: usize) -> Self {
         PathingPassDiagnostics {
@@ -268,41 +284,33 @@ impl PathingPassDiagnostics {
         self.group_size_buckets.record(count);
     }
 
-    pub(crate) fn record_path_request(
-        &mut self,
-        source: PathingRequestSource,
-        path_ok: bool,
-        same_tile: bool,
-        cache_hit: Option<bool>,
-        budget_exhausted: bool,
-        expanded_nodes: usize,
-        tile_path_len: usize,
-        duration: Duration,
-    ) {
+    pub(crate) fn record_path_request(&mut self, request: PathingRequestSample) {
         self.requests_processed = self.requests_processed.saturating_add(1);
-        self.source_counts.record(source, 1);
-        self.total_request_duration = self.total_request_duration.saturating_add(duration);
-        self.worst_request = self.worst_request.max(duration);
-        if path_ok {
+        self.source_counts.record(request.source, 1);
+        self.total_request_duration = self
+            .total_request_duration
+            .saturating_add(request.duration);
+        self.worst_request = self.worst_request.max(request.duration);
+        if request.path_ok {
             self.path_success = self.path_success.saturating_add(1);
         } else {
             self.path_failed = self.path_failed.saturating_add(1);
         }
-        if same_tile {
+        if request.same_tile {
             self.same_tile = self.same_tile.saturating_add(1);
         }
-        match cache_hit {
+        match request.cache_hit {
             Some(true) => self.cache_hits = self.cache_hits.saturating_add(1),
             Some(false) => self.cache_misses = self.cache_misses.saturating_add(1),
             None => {}
         }
-        if budget_exhausted {
+        if request.budget_exhausted {
             self.path_budget_exhausted = self.path_budget_exhausted.saturating_add(1);
         }
-        self.explored_nodes_max = self.explored_nodes_max.max(expanded_nodes);
-        self.path_len_max = self.path_len_max.max(tile_path_len);
-        self.path_len_buckets.record(tile_path_len);
-        self.explored_node_buckets.record(expanded_nodes);
+        self.explored_nodes_max = self.explored_nodes_max.max(request.expanded_nodes);
+        self.path_len_max = self.path_len_max.max(request.tile_path_len);
+        self.path_len_buckets.record(request.tile_path_len);
+        self.explored_node_buckets.record(request.expanded_nodes);
     }
 }
 
@@ -754,8 +762,10 @@ impl PathingTickSummary {
             }
             out.requests = out.requests.saturating_add(record.requests_processed);
             out.processed = out.processed.saturating_add(record.requests_processed);
-            out.deferred = out.deferred.saturating_add(record.requests_deferred);
-            out.still_awaiting = out.still_awaiting.max(record.still_awaiting);
+            if matches!(record.pass, "awaiting_paths" | "promoted_awaiting_paths") {
+                out.deferred = record.requests_deferred;
+            }
+            out.still_awaiting = record.still_awaiting;
             out.success = out.success.saturating_add(record.path_success);
             out.failed = out.failed.saturating_add(record.path_failed);
             out.cache_hits = out.cache_hits.saturating_add(record.cache_hits);
@@ -874,4 +884,50 @@ fn request_duration_bucket(duration: Duration) -> &'static str {
 
 fn millis(duration: Duration) -> u128 {
     duration.as_millis()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pathing_top_source_reports_none_when_all_sources_are_zero() {
+        assert_eq!(PathingSourceCounts::default().top(), ("none", 0));
+
+        let summary = PathingTickSummary::from_records(&[]);
+        assert_eq!(summary.top_source, "none");
+        assert_eq!(summary.top_source_count, 0);
+    }
+
+    #[test]
+    fn pathing_tick_summary_uses_final_awaiting_deferred_count() {
+        let mut initial = PathingPassDiagnostics::new("awaiting_paths", 96);
+        initial.requests_processed = 64;
+        initial.requests_deferred = 32;
+        initial.still_awaiting = 32;
+        initial.source_counts.record(PathingRequestSource::Move, 64);
+
+        let mut promotion = PathingPassDiagnostics::new("promote_queued_orders", 32);
+        promotion.queued_for_path = 40;
+        promotion.requests_deferred = 0;
+        promotion.still_awaiting = 72;
+        promotion
+            .source_counts
+            .record(PathingRequestSource::AttackMove, 40);
+
+        let mut promoted = PathingPassDiagnostics::new("promoted_awaiting_paths", 72);
+        promoted.requests_processed = 40;
+        promoted.requests_deferred = 32;
+        promoted.still_awaiting = 32;
+        promoted
+            .source_counts
+            .record(PathingRequestSource::AttackMove, 40);
+
+        let summary = PathingTickSummary::from_records(&[initial, promotion, promoted]);
+
+        assert_eq!(summary.processed, 104);
+        assert_eq!(summary.deferred, 32);
+        assert_eq!(summary.still_awaiting, 32);
+        assert_eq!(summary.promote_queued_for_path, 40);
+    }
 }

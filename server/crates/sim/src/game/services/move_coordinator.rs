@@ -37,7 +37,7 @@ use crate::game::services::pathing::{
 };
 use crate::game::services::standability;
 use crate::game::teams::TeamRelations;
-use crate::perf::{PathingPassDiagnostics, PathingRequestSource};
+use crate::perf::{PathingPassDiagnostics, PathingRequestSample, PathingRequestSource};
 
 /// Maximum number of fresh A* path requests serviced in a single tick. Beyond this,
 /// remaining `AwaitingPath` units stay queued for the next tick.
@@ -128,7 +128,11 @@ impl<'a> MoveCoordinator<'a> {
     ) -> Option<PathingPassDiagnostics> {
         let mut diagnostics = self.diagnostics.take()?;
         diagnostics.still_awaiting = count_awaiting_paths(entities);
-        diagnostics.requests_deferred = diagnostics.still_awaiting;
+        diagnostics.requests_deferred = if diagnostics.pass == "promote_queued_orders" {
+            0
+        } else {
+            diagnostics.still_awaiting
+        };
         diagnostics.coordinator_budget_exhausted =
             self.budget == 0 && diagnostics.still_awaiting > 0;
         Some(diagnostics)
@@ -153,16 +157,16 @@ impl<'a> MoveCoordinator<'a> {
                 PathCacheStatus::Hit => true,
                 PathCacheStatus::Miss => false,
             });
-            diagnostics.record_path_request(
+            diagnostics.record_path_request(PathingRequestSample {
                 source,
                 path_ok,
                 same_tile,
                 cache_hit,
-                request.is_some_and(|request| request.budget_exhausted),
-                request.map_or(0, |request| request.expanded_nodes),
-                request.map_or(0, |request| request.tile_path_len),
+                budget_exhausted: request.is_some_and(|request| request.budget_exhausted),
+                expanded_nodes: request.map_or(0, |request| request.expanded_nodes),
+                tile_path_len: request.map_or(0, |request| request.tile_path_len),
                 duration,
-            );
+            });
         }
     }
 

@@ -1176,7 +1176,7 @@ function summarizePathingDiagnostics(rows) {
     mergeCountString(topSources, row.fields.source_counts);
 
     totalRequests += numeric(row.fields.requests_processed);
-    totalDeferred += numeric(row.fields.requests_deferred);
+    totalDeferred = Math.max(totalDeferred, numeric(row.fields.requests_deferred));
     worstRequestMaxMs = maxNullable(worstRequestMaxMs, row.fields.worst_request_ms);
     exploredNodesMax = maxNullable(exploredNodesMax, row.fields.explored_nodes_max);
     pathLenMax = maxNullable(pathLenMax, row.fields.path_len_max);
@@ -1214,7 +1214,7 @@ function interpretPathingDiagnostics(summary) {
   }
   const queuePass = summary.passes.find((pass) => pass.pass === "promote_queued_orders");
   const queuePromotion =
-    queuePass && (queuePass.queuedForPathMax >= 16 || queuePass.processedMax >= 16 || queuePass.deferredMax > 0);
+    queuePass && (queuePass.queuedForPathMax >= 16 || queuePass.processedMax >= 16);
   if (summary.totalDeferred > 0 || summary.budgetExhaustedCount > 0 || summary.totalRequests >= 64) {
     return {
       primary: "path request volume",
