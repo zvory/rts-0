@@ -213,6 +213,8 @@ impl Entity {
             m.path_goal = None;
             m.last_move_delta = (0.0, 0.0);
             m.scout_car_reverse_waypoint = None;
+            m.entrenchment_dig_ticks = 0;
+            m.occupied_trench_id = None;
         }
         self.set_target_id(None);
         self.reset_attack_move_no_target_ticks();

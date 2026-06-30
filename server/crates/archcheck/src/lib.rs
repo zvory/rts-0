@@ -28,6 +28,7 @@ const SERVICE_ROLES: &[(&str, ServiceRole)] = &[
     ("construction", ServiceRole::TickSystem),
     ("death", ServiceRole::TickSystem),
     ("economy", ServiceRole::TickSystem),
+    ("entrenchment", ServiceRole::TickSystem),
     ("geometry", ServiceRole::QueryIndex),
     ("hero", ServiceRole::TickSystem),
     ("line_of_sight", ServiceRole::QueryIndex),
@@ -83,10 +84,7 @@ const PLAYER_STATE_FIELD_WRITE_APPROVED_PATHS: &[&str] = &["player_state.rs"];
 const PLAYER_STATE_FIELDS: &[&str] = &["steel", "oil", "supply_used", "supply_cap", "score"];
 
 const ALLOWED_SERVICE_IMPORTS: &[(&str, &[&str])] = &[
-    (
-        "ability_orders",
-        &["commands", "move_coordinator", "world_query"],
-    ),
+    ("ability_orders", &["commands", "move_coordinator", "world_query"]),
     (
         "combat",
         &[
@@ -124,6 +122,7 @@ const ALLOWED_SERVICE_IMPORTS: &[(&str, &[&str])] = &[
             "world_query",
         ],
     ),
+    ("entrenchment", &["geometry", "occupancy", "standability"]),
     ("geometry", &["occupancy"]),
     (
         "move_coordinator",

@@ -18,6 +18,8 @@ mod store;
 #[cfg(test)]
 mod tests;
 
+use crate::config;
+
 pub use entity::Entity;
 pub use kind::EntityKind;
 pub(crate) use kind::{
@@ -45,3 +47,10 @@ pub use store::EntityStore;
 
 /// Neutral owner id used for resource nodes (steel / oil nodes).
 pub const NEUTRAL: u32 = 0;
+
+pub(crate) fn active_trench_occupation(entity: &Entity) -> Option<u32> {
+    if entity.hp == 0 || !config::is_entrenchment_eligible_infantry(entity.kind) {
+        return None;
+    }
+    entity.movement.as_ref().and_then(|m| m.occupied_trench_id)
+}

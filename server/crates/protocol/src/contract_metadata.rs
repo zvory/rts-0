@@ -100,7 +100,7 @@ pub mod upgrades {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 27;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 28;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -715,6 +715,7 @@ fn compact_slot_schemas() -> CompactSlotSchemas {
             optional_field(29, "buildActive"),
             optional_field(30, "deconstructProgress"),
             optional_field(31, "weaponRangeTiles"),
+            optional_field(32, "occupiedTrenchId"),
         ],
         event: event_slot_schemas(),
         trench: vec![

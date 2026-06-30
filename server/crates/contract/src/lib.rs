@@ -565,6 +565,8 @@ pub struct EntityView {
     pub abilities: Vec<AbilityCooldownView>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub breakthrough_ticks: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub occupied_trench_id: Option<u32>,
 
     #[serde(default, skip_serializing_if = "is_false")]
     pub vision_only: bool,
@@ -617,6 +619,7 @@ impl EntityView {
             charge_cooldown_left: None,
             abilities: Vec::new(),
             breakthrough_ticks: None,
+            occupied_trench_id: None,
             vision_only: false,
             debug_path: None,
         }

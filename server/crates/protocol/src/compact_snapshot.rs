@@ -379,6 +379,9 @@ impl Serialize for CompactEntity<'_> {
         if entity.weapon_range_tiles.is_some() {
             len = 32;
         }
+        if entity.occupied_trench_id.is_some() {
+            len = 33;
+        }
 
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&entity.id)?;
@@ -478,6 +481,9 @@ impl Serialize for CompactEntity<'_> {
         }
         if len > 31 {
             seq.serialize_element(&entity.weapon_range_tiles)?;
+        }
+        if len > 32 {
+            seq.serialize_element(&entity.occupied_trench_id)?;
         }
         seq.end()
     }

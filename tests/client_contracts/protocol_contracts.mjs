@@ -156,6 +156,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
         false,
         0.4,
         9.5,
+        80,
       ],
     ],
     r: [[200, 1498]],
@@ -260,6 +261,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   );
   assert(decoded.entities[3].deconstructProgress === 0.4, "entity deconstructProgress decodes");
   assert(decoded.entities[3].weaponRangeTiles === 9.5, "entity weaponRangeTiles decodes");
+  assert(decoded.entities[3].occupiedTrenchId === 80, "entity occupiedTrenchId decodes");
   assert(decoded.resourceDeltas[0].remaining === 1498, "resource deltas decode");
   assert(
     decoded.smokes[0].id === 50 &&
