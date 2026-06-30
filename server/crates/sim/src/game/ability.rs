@@ -126,8 +126,7 @@ pub fn effect_hook(kind: AbilityKind) -> AbilityEffectHook {
     match kind {
         AbilityKind::Charge => AbilityEffectHook::LegacyNoop,
         AbilityKind::Smoke | AbilityKind::MortarFire => AbilityEffectHook::DelayedWorld,
-        AbilityKind::PointFire => AbilityEffectHook::ArtilleryPointFire,
-        AbilityKind::BlanketFire => AbilityEffectHook::ReservedNoop,
+        AbilityKind::PointFire | AbilityKind::BlanketFire => AbilityEffectHook::ArtilleryPointFire,
         AbilityKind::Breakthrough => AbilityEffectHook::OwnedAreaStatus,
         AbilityKind::EkatTeleport => AbilityEffectHook::DashReturn,
         AbilityKind::EkatLineShot => AbilityEffectHook::LineProjectile,
@@ -160,7 +159,7 @@ mod tests {
         );
         assert_eq!(
             definition(AbilityKind::BlanketFire).effect_hook,
-            AbilityEffectHook::ReservedNoop
+            AbilityEffectHook::ArtilleryPointFire
         );
         assert_eq!(
             definition(AbilityKind::Breakthrough).effect_hook,

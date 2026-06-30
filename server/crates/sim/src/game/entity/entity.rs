@@ -794,6 +794,20 @@ impl Entity {
         }
     }
 
+    pub(in crate::game) fn increment_artillery_blanket_shots_fired(&mut self) -> u16 {
+        let Some(c) = self.combat.as_mut() else {
+            return 0;
+        };
+        c.artillery_blanket_shots_fired = c.artillery_blanket_shots_fired.saturating_add(1);
+        c.artillery_blanket_shots_fired
+    }
+
+    pub(in crate::game) fn reset_artillery_blanket_sequence(&mut self) {
+        if let Some(c) = self.combat.as_mut() {
+            c.artillery_blanket_shots_fired = 0;
+        }
+    }
+
     pub fn tick_attack_cd(&mut self) {
         if let Some(c) = self.combat.as_mut() {
             c.attack_cd = c.attack_cd.saturating_sub(1);
@@ -870,6 +884,7 @@ impl Entity {
             if matches!(setup, WeaponSetup::Packed) {
                 c.emplacement_facing = None;
                 c.artillery_shots_fired = 0;
+                c.artillery_blanket_shots_fired = 0;
             }
             c.setup = setup;
         }
@@ -1195,7 +1210,7 @@ impl Entity {
             Order::Build(_) => states::BUILD,
             Order::Deconstruct(_) => states::BUILD,
             Order::Ability(_) => states::MOVE,
-            Order::ArtilleryPointFire(_) => states::ATTACK,
+            Order::ArtilleryPointFire(_) | Order::ArtilleryBlanketFire(_) => states::ATTACK,
         }
     }
 
@@ -1210,6 +1225,7 @@ impl Entity {
         }
         self.set_target_id(None);
         self.reset_artillery_accuracy();
+        self.reset_artillery_blanket_sequence();
         self.reset_attack_move_no_target_ticks();
     }
 
@@ -1225,6 +1241,7 @@ impl Entity {
         }
         self.set_target_id(None);
         self.reset_artillery_accuracy();
+        self.reset_artillery_blanket_sequence();
         self.reset_attack_move_no_target_ticks();
     }
 

@@ -43,6 +43,64 @@ fn queued_artillery_point_fire_locks_from_future_move_destination() {
 }
 
 #[test]
+fn queued_artillery_blanket_fire_locks_center_from_future_move_destination() {
+    let map = flat_map(64);
+    let mut entities = EntityStore::new();
+    let pos = (320.0, 320.0);
+    let move_dest = (640.0, 320.0);
+    let artillery = entities
+        .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
+        .expect("artillery should spawn");
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::Move {
+                units: vec![artillery],
+                x: move_dest.0,
+                y: move_dest.1,
+                queued: false,
+            },
+        )],
+    );
+    let future = entities
+        .get(artillery)
+        .expect("artillery should exist")
+        .move_intent()
+        .expect("move command should store an authoritative future destination");
+    let raw_click = (future.0 + config::TILE_SIZE as f32 * 5.0, future.1);
+    let expected_x = future.0 + config::ARTILLERY_MIN_RANGE_TILES as f32 * config::TILE_SIZE as f32;
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::UseAbility {
+                ability: AbilityKind::BlanketFire,
+                units: vec![artillery],
+                x: Some(raw_click.0),
+                y: Some(raw_click.1),
+                queued: true,
+            },
+        )],
+    );
+
+    let unit = entities.get(artillery).expect("artillery should exist");
+    let [OrderIntent::BlanketFire(point)] = unit.queued_orders() else {
+        panic!("queued Blanket Fire should be stored behind the move");
+    };
+    assert!(
+        (point.x - expected_x).abs() < 0.001,
+        "expected locked center x {expected_x}, got {}",
+        point.x
+    );
+    assert!((point.y - future.1).abs() < 0.001);
+}
+
+#[test]
 fn queued_artillery_point_fire_accepts_deployed_move_teardown() {
     let map = flat_map(64);
     let mut entities = EntityStore::new();
@@ -72,7 +130,10 @@ fn queued_artillery_point_fire_accepts_deployed_move_teardown() {
         )],
     );
     let unit = entities.get(artillery).expect("artillery should exist");
-    assert!(matches!(unit.weapon_setup(), WeaponSetup::TearingDown { .. }));
+    assert!(matches!(
+        unit.weapon_setup(),
+        WeaponSetup::TearingDown { .. }
+    ));
     let future = unit
         .move_intent()
         .expect("move command should store an authoritative future destination");
@@ -159,12 +220,7 @@ fn queued_artillery_point_fire_zero_click_uses_planned_setup_facing() {
     assert!((point.y - expected_y).abs() < 0.001);
 }
 
-fn queue_point_fire(
-    map: &Map,
-    entities: &mut EntityStore,
-    artillery: u32,
-    raw_click: (f32, f32),
-) {
+fn queue_point_fire(map: &Map, entities: &mut EntityStore, artillery: u32, raw_click: (f32, f32)) {
     apply(
         map,
         entities,
