@@ -332,6 +332,72 @@ fn rapid_vision_selection_changes_remain_per_viewer() {
 }
 
 #[test]
+fn replay_vision_selection_sends_snapshot_without_waiting_for_tick() {
+    let players = replay_test_players(2);
+    let (_live, artifact) = replay_test_artifact(&players, 1);
+    let mut replay = ReplaySession::new(artifact).unwrap();
+    replay.set_speed(100, 0.0);
+
+    let mut task = RoomTask::new(
+        "paused-vision-selection-test".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let writer = add_test_room_spectator(&mut task, 100);
+    let all_player_ids = players.iter().map(|player| player.id).collect::<Vec<_>>();
+    let all_pending = replay.game().snapshot_for_spectator(&all_player_ids);
+    let player_one_expected = replay.game().snapshot_for_spectator(&[players[0].id]);
+    assert!(
+        all_pending.resource_deltas.len() > player_one_expected.resource_deltas.len(),
+        "test setup should make all-player replay vision wider than one-player vision"
+    );
+    task.players
+        .get(&100)
+        .expect("test spectator")
+        .msg_tx
+        .try_send_snapshot(all_pending);
+    task.phase = Phase::ReplayViewer(Box::new(replay));
+
+    task.on_set_vision_selection(
+        100,
+        VisionSelectionRequest::Player {
+            player_id: players[0].id,
+        },
+    );
+
+    let snapshot = writer
+        .snapshots
+        .take()
+        .expect("vision selection should enqueue an immediate replay snapshot");
+    assert_eq!(snapshot.tick, player_one_expected.tick);
+    assert_eq!(snapshot.visible_tiles, player_one_expected.visible_tiles);
+    assert_eq!(
+        snapshot
+            .resource_deltas
+            .iter()
+            .map(|delta| delta.id)
+            .collect::<Vec<_>>(),
+        player_one_expected
+            .resource_deltas
+            .iter()
+            .map(|delta| delta.id)
+            .collect::<Vec<_>>(),
+        "vision switch should not merge stale wider-view resource deltas"
+    );
+    assert_eq!(
+        snapshot
+            .player_resources
+            .iter()
+            .map(|resources| resources.id)
+            .collect::<Vec<_>>(),
+        vec![players[0].id],
+        "single-player replay vision should immediately scope resource rows"
+    );
+}
+
+#[test]
 fn replay_vision_switch_replaces_memory_and_resource_scope() {
     let players = replay_test_players(3);
     let (_live, artifact) = replay_test_artifact(&players, 1);

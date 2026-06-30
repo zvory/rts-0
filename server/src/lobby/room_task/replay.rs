@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::time::Instant as StdInstant;
+use std::time::{Duration, Instant as StdInstant};
 
 use tokio::time::Instant as TokioInstant;
 
@@ -347,11 +347,22 @@ impl RoomTask {
     fn fanout_replay_snapshots(
         &mut self,
         session: &ReplaySession,
-        mut per_player_events: HashMap<u32, Vec<Event>>,
+        per_player_events: HashMap<u32, Vec<Event>>,
         context: ReplayTickContext,
         perf: Option<&mut rts_sim::perf::TickPerf>,
     ) {
         let recipients = self.order.clone();
+        self.fanout_replay_snapshots_to(session, recipients, per_player_events, context, perf);
+    }
+
+    fn fanout_replay_snapshots_to(
+        &mut self,
+        session: &ReplaySession,
+        recipients: impl IntoIterator<Item = u32>,
+        mut per_player_events: HashMap<u32, Vec<Event>>,
+        context: ReplayTickContext,
+        perf: Option<&mut rts_sim::perf::TickPerf>,
+    ) {
         SnapshotFanout::new(
             &self.room,
             context.scheduler_lag,
@@ -507,37 +518,57 @@ impl RoomTask {
         player_id: u32,
         selection: VisionSelectionRequest,
     ) {
-        let send_analysis = self.projection_policy().observer_analysis_audience()
+        let context = ReplayTickContext {
+            scheduler_lag: Duration::ZERO,
+            tick_budget: self.current_tick_interval(),
+            tick_start: StdInstant::now(),
+            projection_policy: self.projection_policy_for_phase(SessionPhase::ReplayViewer),
+        };
+        let send_analysis = context.projection_policy.observer_analysis_audience()
             == ObserverAnalysisAudience::AllRecipients;
-        if let Phase::ReplayViewer(session) = &mut self.phase {
-            if !self.players.contains_key(&player_id) {
+        let mut session = match std::mem::replace(&mut self.phase, Phase::Lobby) {
+            Phase::ReplayViewer(session) => session,
+            other => {
+                self.phase = other;
                 return;
             }
-            let valid_ids = session.active_player_ids();
-            if validate_vision_selection_request(&selection, &valid_ids).is_err() {
-                if let Some(player) = self.players.get(&player_id) {
-                    send_or_log(
-                        &self.room,
-                        player_id,
-                        &player.msg_tx,
-                        ServerMessage::Error {
-                            msg: "Invalid vision selection".to_string(),
-                        },
-                    );
-                }
-                return;
-            }
-            session.set_vision(player_id, selection);
-            let analysis = send_analysis.then(|| session.game().observer_analysis());
-            if let (Some(analysis), Some(player)) = (analysis, self.players.get(&player_id)) {
+        };
+
+        if !self.players.contains_key(&player_id) {
+            self.phase = Phase::ReplayViewer(session);
+            return;
+        }
+        let valid_ids = session.active_player_ids();
+        if validate_vision_selection_request(&selection, &valid_ids).is_err() {
+            if let Some(player) = self.players.get(&player_id) {
                 send_or_log(
                     &self.room,
                     player_id,
                     &player.msg_tx,
-                    ServerMessage::ObserverAnalysis(analysis),
+                    ServerMessage::Error {
+                        msg: "Invalid vision selection".to_string(),
+                    },
                 );
             }
+            self.phase = Phase::ReplayViewer(session);
+            return;
         }
+
+        session.set_vision(player_id, selection);
+        if let Some(player) = self.players.get(&player_id) {
+            player.msg_tx.clear_pending_snapshot();
+        }
+        self.fanout_replay_snapshots_to(&session, [player_id], HashMap::new(), context, None);
+        let analysis = send_analysis.then(|| session.game().observer_analysis());
+        if let (Some(analysis), Some(player)) = (analysis, self.players.get(&player_id)) {
+            send_or_log(
+                &self.room,
+                player_id,
+                &player.msg_tx,
+                ServerMessage::ObserverAnalysis(analysis),
+            );
+        }
+        self.phase = Phase::ReplayViewer(session);
     }
 
     pub(super) fn on_request_branch_from_tick(
