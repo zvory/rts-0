@@ -105,6 +105,7 @@ const AREA_PREFIXES = [
 const ALLOWED_CROSS_AREA_IMPORTS = new Map(Object.entries({
   "net.js -> report_window_aggregate.js": "Net Report Phase 1 shares bounded report-window aggregation with client perf and command diagnostics.",
   "prediction_controller.js -> report_window_aggregate.js": "Net Report Phase 2 reuses the bounded report-window helper for command milestone diagnostics.",
+  "minimap.js -> input/artillery_targeting.js": "Minimap command targeting shares the pure artillery target-lock predictor with viewport input so local feedback matches server locking.",
 }));
 
 const ALLOWED_PROTOTYPE_GRAFTS = new Set([
@@ -122,8 +123,7 @@ const FORBIDDEN_MATCH_LAB_IMPORTS = new Set([
 // update this table with the phase-specific reason.
 const LARGE_FILE_BASELINES = new Map(Object.entries({
   // Tank Trap Phase 5 extends placement feedback to draw multi-site line previews.
-  // Artillery UX Phase 4 adds per-gun locked target/radius previews for Point Fire and Blanket Fire.
-  "renderer/feedback.js": 46960,
+  "renderer/feedback.js": 46315,
   // Lab MVP Phase 5 injects explicit lab control policy into command-card context.
   "hud.js": 44208,
   // Hotspot Cleanup Phase 6 extracted GameState query and visual-effect helpers.

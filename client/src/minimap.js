@@ -9,10 +9,19 @@
 
 import { cmd } from "./protocol.js";
 import { KIND, ORDER_STAGE, TERRAIN, isResource, isUnit } from "./protocol.js";
-import { ABILITIES, isProducerBuilding } from "./config.js";
+import {
+  ABILITIES,
+  COLORS,
+  FOG_EXPLORED_ALPHA,
+  FOG_UNEXPLORED_ALPHA,
+  isProducerBuilding,
+} from "./config.js";
+import {
+  buildArtilleryTargetLocks,
+  isArtilleryFireAbility,
+} from "./input/artillery_targeting.js";
 
 const isImpassableTerrainCode = (code) => code === TERRAIN.ROCK || code === TERRAIN.WATER;
-import { COLORS, FOG_EXPLORED_ALPHA, FOG_UNEXPLORED_ALPHA } from "./config.js";
 
 const PING_MS = 900;
 const BORDER_PULSE_MS = 700;
@@ -1054,6 +1063,22 @@ export class Minimap {
         : unitIds;
       if (abilityUnits.length === 0) return;
       this._issueCommand(cmd.useAbility(ability, abilityUnits, wx, wy, queued));
+      if (isArtilleryFireAbility(ability)) {
+        const locks = buildArtilleryTargetLocks({
+          ability,
+          carriers: sel.filter((e) => abilityUnits.includes(e.id)),
+          rawX: wx,
+          rawY: wy,
+          map: this.state.map,
+          tileSize: this.state.map?.tileSize,
+          definition,
+          queued,
+        });
+        for (const lock of locks) {
+          this._addCommandFeedback("artillery", lock.x, lock.y, queued, definition?.radiusTiles);
+        }
+        return;
+      }
       this._addCommandFeedback("attack", wx, wy, queued);
       return;
     }

@@ -5,7 +5,11 @@ import { MatchInputRouter } from "../client/src/input/router.js";
 import { ClientIntent } from "../client/src/client_intent.js";
 import { createLabControlPolicy } from "../client/src/lab_control_policy.js";
 import { Minimap } from "../client/src/minimap.js";
-import { KIND, LAB_ROLE, ORDER_STAGE, TERRAIN } from "../client/src/protocol.js";
+import {
+  ARTILLERY_BLANKET_RADIUS_TILES,
+  ARTILLERY_MIN_RANGE_TILES,
+} from "../client/src/config.js";
+import { ABILITY, KIND, LAB_ROLE, ORDER_STAGE, SETUP, TERRAIN } from "../client/src/protocol.js";
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg || "Assertion failed");
@@ -355,6 +359,39 @@ function lockedEvent(clientX, clientY, button = 0, extra = {}) {
   assert(h.net.sent[0].c === "attackMove", "attack command-target sends attack-move");
   assert(h.net.sent[0].queued !== true, "plain minimap attack target does not queue attack-move");
   assert(h.clientIntent.commandTarget === null, "attack command-target exits after minimap click");
+  h.minimap.destroy();
+}
+
+// Artillery abilities issued through the minimap keep raw commands but show locked local feedback.
+{
+  const artillery = {
+    id: 17,
+    owner: 1,
+    kind: KIND.ARTILLERY,
+    x: 100,
+    y: 100,
+    setupState: SETUP.DEPLOYED,
+    setupFacing: 0,
+  };
+  const h = minimapHarness({
+    selected: [artillery],
+    commandTarget: { kind: "ability", ability: ABILITY.BLANKET_FIRE },
+  });
+  h.minimap._issueOrder(artillery.x + 5, artillery.y, true);
+  assert(
+    h.net.sent[0]?.c === "useAbility" &&
+      h.net.sent[0].ability === ABILITY.BLANKET_FIRE &&
+      h.net.sent[0].x === artillery.x + 5 &&
+      h.net.sent[0].queued === true,
+    "minimap Blanket Fire targeting sends the raw queued ability command",
+  );
+  assert(
+    h.clientIntent.commandFeedback[0]?.kind === "artillery" &&
+      h.clientIntent.commandFeedback[0].x === artillery.x + ARTILLERY_MIN_RANGE_TILES &&
+      h.clientIntent.commandFeedback[0].y === artillery.y &&
+      h.clientIntent.commandFeedback[0].radiusTiles === ARTILLERY_BLANKET_RADIUS_TILES,
+    "minimap Blanket Fire feedback uses the locked artillery center and blanket radius",
+  );
   h.minimap.destroy();
 }
 

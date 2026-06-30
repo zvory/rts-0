@@ -32,6 +32,10 @@ import {
   WEAPON_RECOIL_PX,
   ZERO_OFFSET,
 } from "./palette.js";
+import {
+  drawArtilleryFireTargetPreview,
+  isArtilleryFirePreview,
+} from "./artillery_fire_preview.js";
 import { MAGIC_ANCHOR_COLOR, drawMagicAnchor } from "./magic_anchor_effect.js";
 import { feedbackOwner, ownOrAllyOwner } from "./feedback_ownership.js";
 import {
@@ -468,59 +472,6 @@ export function _drawAbilityTargetPreview(view) {
     g.moveTo(preview.mouseX, preview.mouseY - radiusPx * 0.45);
     g.lineTo(preview.mouseX, preview.mouseY + radiusPx * 0.45);
   }
-}
-
-function isArtilleryFirePreview(preview) {
-  return preview?.ability === ABILITY.POINT_FIRE || preview?.ability === ABILITY.BLANKET_FIRE;
-}
-
-function drawArtilleryFireTargetPreview(g, preview, map) {
-  const locks = Array.isArray(preview.artilleryLocks) ? preview.artilleryLocks : [];
-  if (locks.length === 0) return false;
-  const tileSize = map?.tileSize || 32;
-  const weapon = fieldOfFireProfile(KIND.ARTILLERY, tileSize);
-  const radiusPx = Number.isFinite(preview.radiusPx) ? preview.radiusPx : 0;
-  const targetColor = preview.hoverInRange ? COLORS.selectOwn : COLORS.selectNeutral;
-  for (const lock of locks) {
-    if (!finiteNumber(lock.x) || !finiteNumber(lock.y)) continue;
-    if (weapon && lock.needsRedeploy && finiteNumber(lock.originX) && finiteNumber(lock.originY)) {
-      drawFacingWedge(
-        g,
-        lock.originX,
-        lock.originY,
-        lock.rangePx || weapon.maxRadius,
-        lock.facing,
-        weapon.arc,
-        FIELD_OF_FIRE_COLOR,
-        0.06,
-        0.38,
-        lock.minRangePx || weapon.minRadius,
-      );
-    }
-    if (finiteNumber(lock.rawX) && finiteNumber(lock.rawY) && Math.hypot(lock.rawX - lock.x, lock.rawY - lock.y) > 1) {
-      g.lineStyle(1.5, 0xffd15c, 0.48);
-      dashedLine(g, lock.rawX, lock.rawY, lock.x, lock.y, 8, 6);
-    }
-    drawLockedArtilleryTarget(g, lock.x, lock.y, radiusPx, targetColor, preview.ability);
-  }
-  return true;
-}
-
-function drawLockedArtilleryTarget(g, x, y, radiusPx, color, ability) {
-  const markerRadius = ability === ABILITY.BLANKET_FIRE
-    ? Math.max(18, radiusPx)
-    : Math.max(18, radiusPx || 24);
-  g.lineStyle(2, color, 0.95);
-  drawDashedCircle(g, x, y, markerRadius, ability === ABILITY.BLANKET_FIRE ? 36 : 18);
-  g.beginFill(color, 0.14);
-  g.drawCircle(x, y, ability === ABILITY.BLANKET_FIRE ? 7 : Math.min(18, markerRadius));
-  g.endFill();
-  g.lineStyle(2, color, 0.85);
-  const arm = ability === ABILITY.BLANKET_FIRE ? 13 : Math.min(18, markerRadius * 0.45);
-  g.moveTo(x - arm, y);
-  g.lineTo(x + arm, y);
-  g.moveTo(x, y - arm);
-  g.lineTo(x, y + arm);
 }
 
 function drawBreakthroughAura(g, x, y, radiusPx, alpha = 0.8) {
