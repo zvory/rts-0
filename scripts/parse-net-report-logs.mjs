@@ -14,6 +14,10 @@ import {
   appendCommandLifecycleMarkdown,
   summarizeCommandLifecycle,
 } from "./net-report-command-lifecycle.mjs";
+import {
+  appendSnapshotPayloadMarkdown,
+  summarizeSnapshotPayload,
+} from "./net-report-snapshot-payload.mjs";
 
 const ANSI_PATTERN = /\x1B\[[0-?]*[ -/]*[@-~]/g;
 const SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES = 1280;
@@ -946,7 +950,7 @@ function finalizePlayer(player) {
     metrics: values,
     transport: summarizeTransport(reports),
     commandLifecycle: summarizeCommandLifecycle(reports),
-    snapshotPayload: summarizeSnapshotPayload(reports),
+    snapshotPayload: summarizeSnapshotPayload(reports, summarizeField),
     evidence,
   };
 }
@@ -962,76 +966,6 @@ function summarizeTransport(rows) {
       },
     ])
   );
-}
-
-function summarizeSnapshotPayload(rows) {
-  const payloadBytes = summarizeField(rows, "server_snapshot_payload_bytes_total");
-  return {
-    samples: rows.filter((row) => row.fields.server_snapshot_payload_sections !== undefined).length,
-    payloadBytes,
-    sections: aggregateSnapshotPayloadEntries(rows, "server_snapshot_payload_sections", {
-      labelField: "section",
-      bytesField: "bytes",
-    }),
-    entityKinds: aggregateSnapshotPayloadEntries(rows, "server_snapshot_entity_kinds", {
-      labelField: "kind",
-      bytesField: "approxBytes",
-    }),
-  };
-}
-
-function aggregateSnapshotPayloadEntries(rows, field, { labelField, bytesField }) {
-  const totals = new Map();
-  let totalBytes = 0;
-  for (const row of rows) {
-    const rowTotal = Number(row.fields.server_snapshot_payload_bytes_total);
-    if (Number.isFinite(rowTotal) && rowTotal > 0) {
-      totalBytes += rowTotal;
-    }
-    for (const entry of parseJsonArrayField(row.fields[field])) {
-      const label = String(entry?.[labelField] || "unknown").slice(0, 64);
-      const count = positiveNumber(entry?.count);
-      const bytes = positiveNumber(entry?.[bytesField]);
-      if (!label || (count === 0 && bytes === 0)) {
-        continue;
-      }
-      const current = totals.get(label) || { label, count: 0, bytes: 0, samples: 0 };
-      current.count += count;
-      current.bytes += bytes;
-      current.samples += 1;
-      totals.set(label, current);
-    }
-  }
-  if (totalBytes <= 0) {
-    totalBytes = [...totals.values()].reduce((sum, entry) => sum + entry.bytes, 0);
-  }
-  return [...totals.values()]
-    .sort((a, b) => b.bytes - a.bytes || b.count - a.count || a.label.localeCompare(b.label))
-    .slice(0, 8)
-    .map((entry) => ({
-      ...entry,
-      pctX100: totalBytes > 0 ? Math.round((entry.bytes * 10000) / totalBytes) : 0,
-    }));
-}
-
-function parseJsonArrayField(value) {
-  if (Array.isArray(value)) {
-    return value;
-  }
-  if (typeof value !== "string" || value.length === 0) {
-    return [];
-  }
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function positiveNumber(value) {
-  const number = Number(value);
-  return Number.isFinite(number) && number > 0 ? number : 0;
 }
 
 function summarizeStringField(rows, field) {
@@ -1338,7 +1272,7 @@ function formatMarkdown(report) {
       );
     }
 
-    appendSnapshotPayloadMarkdown(lines, match.players);
+    appendSnapshotPayloadMarkdown(lines, match.players, { formatValue, formatPctX100 });
     appendCommandLifecycleMarkdown(lines, match.players);
 
     lines.push("");
@@ -1368,55 +1302,12 @@ function formatMarkdown(report) {
   return `${lines.join("\n")}\n`;
 }
 
-function appendSnapshotPayloadMarkdown(lines, players) {
-  const rows = players.filter((player) => player.snapshotPayload?.samples > 0);
-  if (rows.length === 0) {
-    return;
-  }
-  lines.push("");
-  lines.push("### Snapshot Payload Composition");
-  lines.push(
-    "| player | lifecycle max ms project/compact/queue/serialize/send | server payload bytes p95/max | top sections | top entity kinds |"
-  );
-  lines.push("| --- | --- | ---: | --- | --- |");
-  for (const player of rows) {
-    lines.push(
-      [
-        player.playerId,
-        [
-          metricMax(player, "server_snapshot_project_max_ms"),
-          metricMax(player, "server_snapshot_compact_max_ms"),
-          metricMax(player, "server_snapshot_queue_age_max_ms"),
-          metricMax(player, "server_snapshot_serialize_max_ms"),
-          metricMax(player, "server_snapshot_writer_send_max_ms"),
-        ].join("/"),
-        `${metricMax(player, "server_snapshot_payload_bytes_p95")}/${metricMax(player, "server_snapshot_payload_bytes_max")}`,
-        formatSnapshotPayloadEntries(player.snapshotPayload.sections, "bytes"),
-        formatSnapshotPayloadEntries(player.snapshotPayload.entityKinds, "approx bytes"),
-      ]
-        .join(" | ")
-        .replace(/^/, "| ")
-        .replace(/$/, " |")
-    );
-  }
-}
-
-function formatSnapshotPayloadEntries(entries, byteLabel) {
-  if (!Array.isArray(entries) || entries.length === 0) {
-    return "n/a";
-  }
-  return entries
-    .slice(0, 4)
-    .map((entry) => `${entry.label} ${formatPctX100(entry.pctX100)} ${formatValue(entry.bytes)} ${byteLabel}`)
-    .join(", ");
+function metricPctX100Max(player, field) {
+  return formatPctX100(player.metrics[field]?.max);
 }
 
 function metricMax(player, field) {
   return formatValue(player.metrics[field]?.max);
-}
-
-function metricPctX100Max(player, field) {
-  return formatPctX100(player.metrics[field]?.max);
 }
 
 function metricMin(player, field) {
