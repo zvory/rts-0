@@ -113,7 +113,7 @@ pub(super) fn apply_damage(
     } else {
         false
     };
-    if damaged && !victim_entrenched {
+    if damaged {
         apply_overpenetration(
             map,
             entities,
@@ -123,6 +123,7 @@ pub(super) fn apply_damage(
             smokes,
             attacker,
             shot_victim,
+            victim_entrenched,
             effective_dmg,
             attacker_owner,
             ax,
@@ -132,8 +133,6 @@ pub(super) fn apply_damage(
             range_px,
             tick,
         );
-    }
-    if damaged {
         push_under_attack_notices_for_visible_attack(
             events,
             fog,
@@ -159,6 +158,7 @@ fn apply_overpenetration(
     smokes: &SmokeCloudStore,
     attacker: u32,
     primary_victim: u32,
+    primary_victim_was_entrenched: bool,
     primary_dmg: u32,
     attacker_owner: u32,
     ax: f32,
@@ -168,10 +168,7 @@ fn apply_overpenetration(
     range_px: f32,
     tick: u32,
 ) {
-    if entities
-        .get(primary_victim)
-        .is_some_and(entrenchment_combat::is_actively_entrenched)
-    {
+    if primary_victim_was_entrenched {
         return;
     }
     if entities
