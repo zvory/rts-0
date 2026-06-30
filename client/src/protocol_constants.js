@@ -198,6 +198,7 @@ export const ABILITY = Object.freeze({
   SMOKE: "smoke",
   MORTAR_FIRE: "mortarFire",
   POINT_FIRE: "pointFire",
+  BLANKET_FIRE: "blanketFire",
   BREAKTHROUGH: "breakthrough",
   EKAT_TELEPORT: "ekatTeleport",
   EKAT_LINE_SHOT: "ekatLineShot",
@@ -328,6 +329,7 @@ export const ORDER_STAGE = Object.freeze({
   SMOKE: "smoke",
   MORTAR_FIRE: "mortarFire",
   POINT_FIRE: "pointFire",
+  BLANKET_FIRE: "blanketFire",
   BREAKTHROUGH: "breakthrough",
   EKAT_TELEPORT: "ekatTeleport",
   EKAT_LINE_SHOT: "ekatLineShot",
@@ -353,6 +355,7 @@ export const ORDER_STAGE_CODE = Object.freeze({
   [ORDER_STAGE.EKAT_MAGIC_ANCHOR]: 14,
   [ORDER_STAGE.DECONSTRUCT]: 15,
   [ORDER_STAGE.EKAT_CONSUME_GOLEM]: 16,
+  [ORDER_STAGE.BLANKET_FIRE]: 17,
 });
 
 export const ABILITY_CODE = Object.freeze({
@@ -365,6 +368,7 @@ export const ABILITY_CODE = Object.freeze({
   [ABILITY.EKAT_LINE_SHOT]: 7,
   [ABILITY.EKAT_MAGIC_ANCHOR]: 8,
   [ABILITY.EKAT_CONSUME_GOLEM]: 9,
+  [ABILITY.BLANKET_FIRE]: 10,
 });
 
 export const ABILITY_OBJECT_KIND_CODE = Object.freeze({

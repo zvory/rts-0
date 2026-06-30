@@ -23,6 +23,7 @@ pub const MORTAR_AUTOCAST_UPGRADE: &str = "mortar_autocast";
 pub const SMOKE_ABILITY: &str = "smoke";
 pub const MORTAR_FIRE_ABILITY: &str = "mortarFire";
 pub const POINT_FIRE_ABILITY: &str = "pointFire";
+pub const BLANKET_FIRE_ABILITY: &str = "blanketFire";
 pub const BREAKTHROUGH_ABILITY: &str = "breakthrough";
 pub const CHARGE_ABILITY: &str = "charge";
 pub const EKAT_TELEPORT_ABILITY: &str = "ekatTeleport";
@@ -140,6 +141,8 @@ const DEFAULT_WORKER_BUILDABLES: &[EntityKind] = &[
     EntityKind::TankTrap,
 ];
 
+const ARTILLERY_ABILITY_CARRIERS: &[EntityKind] = &[EntityKind::Artillery];
+
 const DEFAULT_UPGRADES: &[UpgradeCatalogEntry] = &[
     UpgradeCatalogEntry {
         id: METHAMPHETAMINES_UPGRADE,
@@ -241,7 +244,7 @@ const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
         icon: "PF",
         hotkey: Some("X"),
         title: "Target artillery fire",
-        carriers: &[EntityKind::Artillery],
+        carriers: ARTILLERY_ABILITY_CARRIERS,
         target_mode: AbilityTargetMode::WorldPoint,
         range_tiles: Some(balance::ARTILLERY_MAX_RANGE_TILES),
         min_range_tiles: Some(balance::ARTILLERY_MIN_RANGE_TILES),
@@ -254,6 +257,26 @@ const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
         command_card: true,
         protocol_code: 4,
         order_stage_code: 10,
+    },
+    AbilityCatalogEntry {
+        id: BLANKET_FIRE_ABILITY,
+        label: "Blanket Fire",
+        icon: "BF",
+        hotkey: Some("C"),
+        title: "Target blanket artillery fire",
+        carriers: ARTILLERY_ABILITY_CARRIERS,
+        target_mode: AbilityTargetMode::WorldPoint,
+        range_tiles: Some(balance::ARTILLERY_MAX_RANGE_TILES),
+        min_range_tiles: Some(balance::ARTILLERY_MIN_RANGE_TILES),
+        cooldown_ticks: balance::ARTILLERY_RELOAD_TICKS as u16,
+        charges: None,
+        cost: ResourceCost::new(balance::ARTILLERY_AMMO_COST_STEEL, 0),
+        tech_requirement: None,
+        queue_policy: AbilityQueuePolicy::QueueSkipIfNotReady,
+        autocast: false,
+        command_card: false,
+        protocol_code: 10,
+        order_stage_code: 17,
     },
     AbilityCatalogEntry {
         id: BREAKTHROUGH_ABILITY,
@@ -672,7 +695,8 @@ mod tests {
         assert!(!catalog.can_act_as_production_anchor(EntityKind::TankTrap));
         assert!(!catalog.can_act_as_production_anchor(EntityKind::PumpJack));
         assert!(catalog.allows_ability(SMOKE_ABILITY, EntityKind::ScoutCar));
-        assert!(catalog.allows_ability(POINT_FIRE_ABILITY, EntityKind::Artillery));
+        assert!(catalog.allows_ability(POINT_FIRE_ABILITY, ARTILLERY_ABILITY_CARRIERS[0]));
+        assert!(catalog.allows_ability(BLANKET_FIRE_ABILITY, ARTILLERY_ABILITY_CARRIERS[0]));
         assert!(!catalog.allows_ability(CHARGE_ABILITY, EntityKind::Rifleman));
         assert!(!catalog.allows_ability(SMOKE_ABILITY, EntityKind::Worker));
     }
@@ -717,7 +741,7 @@ mod tests {
         assert!(smoke.command_card);
 
         let point_fire = CURRENT_CATALOG.ability(POINT_FIRE_ABILITY).unwrap();
-        assert_eq!(point_fire.carriers, &[EntityKind::Artillery]);
+        assert_eq!(point_fire.carriers, ARTILLERY_ABILITY_CARRIERS);
         assert_eq!(
             point_fire.min_range_tiles,
             Some(balance::ARTILLERY_MIN_RANGE_TILES)
@@ -734,6 +758,29 @@ mod tests {
             point_fire.cooldown_ticks,
             balance::ARTILLERY_RELOAD_TICKS as u16
         );
+
+        let blanket_fire = CURRENT_CATALOG.ability(BLANKET_FIRE_ABILITY).unwrap();
+        assert_eq!(blanket_fire.carriers, ARTILLERY_ABILITY_CARRIERS);
+        assert_eq!(blanket_fire.target_mode, AbilityTargetMode::WorldPoint);
+        assert_eq!(
+            blanket_fire.range_tiles,
+            Some(balance::ARTILLERY_MAX_RANGE_TILES)
+        );
+        assert_eq!(
+            blanket_fire.min_range_tiles,
+            Some(balance::ARTILLERY_MIN_RANGE_TILES)
+        );
+        assert_eq!(
+            blanket_fire.cost,
+            ResourceCost::new(balance::ARTILLERY_AMMO_COST_STEEL, 0)
+        );
+        assert_eq!(
+            blanket_fire.cooldown_ticks,
+            balance::ARTILLERY_RELOAD_TICKS as u16
+        );
+        assert!(!blanket_fire.command_card);
+        assert_eq!(blanket_fire.protocol_code, 10);
+        assert_eq!(blanket_fire.order_stage_code, 17);
 
         let breakthrough = CURRENT_CATALOG.ability(BREAKTHROUGH_ABILITY).unwrap();
         assert_eq!(breakthrough.target_mode, AbilityTargetMode::SelfTarget);

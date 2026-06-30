@@ -616,6 +616,32 @@ mod tests {
     }
 
     #[test]
+    fn reserved_blanket_fire_protocol_command_round_trips() {
+        let command = protocol::Command::UseAbility {
+            ability: protocol::abilities::BLANKET_FIRE.to_string(),
+            units: vec![10],
+            x: Some(704.0),
+            y: Some(768.0),
+            queued: true,
+        };
+
+        assert_eq!(
+            SimCommand::from_protocol(command.clone()),
+            SimCommand::UseAbility {
+                ability: AbilityKind::BlanketFire,
+                units: vec![10],
+                x: Some(704.0),
+                y: Some(768.0),
+                queued: true,
+            }
+        );
+        assert_eq!(
+            SimCommand::from_protocol(command.clone()).to_protocol(),
+            Some(command)
+        );
+    }
+
+    #[test]
     fn protocol_recast_ability_command_round_trips() {
         let command = protocol::Command::RecastAbility {
             ability: protocol::abilities::EKAT_TELEPORT.to_string(),

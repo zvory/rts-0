@@ -300,6 +300,10 @@ fn print_client_constants(indent: &str) {
         json_f32(balance::ARTILLERY_OUTER_RADIUS_TILES)
     );
     println!(
+        "{indent}    \"artilleryBlanketRadiusTiles\": {},",
+        json_f32(balance::ARTILLERY_BLANKET_RADIUS_TILES)
+    );
+    println!(
         "{indent}    \"artilleryAmmoCost\": {{\"steel\":{},\"oil\":0}},",
         balance::ARTILLERY_AMMO_COST_STEEL
     );
@@ -536,6 +540,11 @@ fn print_ability_effects(indent: &str) {
         faction::POINT_FIRE_ABILITY,
         json_f32(balance::ARTILLERY_OUTER_RADIUS_TILES),
         balance::ARTILLERY_SHELL_DELAY_TICKS,
+    );
+    println!(
+        "{indent}    \"{}\": {{\"radiusTiles\":{}}},",
+        faction::BLANKET_FIRE_ABILITY,
+        json_f32(balance::ARTILLERY_BLANKET_RADIUS_TILES),
     );
     println!(
         "{indent}    \"{}\": {{\"radiusTiles\":{},\"durationTicks\":{}}},",

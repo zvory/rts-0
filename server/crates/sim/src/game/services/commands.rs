@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use crate::command_budget::{BASE_COMMAND_SUPPLY_CAP, COMMAND_CAR_SUPPLY_CAP_BONUS};
 use crate::config;
-use crate::game::ability::{self, AbilityKind, AbilityTargetMode};
+use crate::game::ability::{self, AbilityEffectHook, AbilityKind, AbilityTargetMode};
 use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::artillery::ArtilleryShellStore;
 use crate::game::command::SimCommand;
@@ -1114,6 +1114,7 @@ fn ability_to_planner(ability: AbilityKind) -> planner::AbilityId {
         AbilityKind::EkatLineShot => planner::AbilityId(6),
         AbilityKind::EkatMagicAnchor => planner::AbilityId(7),
         AbilityKind::EkatConsumeGolem => planner::AbilityId(8),
+        AbilityKind::BlanketFire => planner::AbilityId(9),
     }
 }
 
@@ -1128,6 +1129,7 @@ fn ability_from_planner(ability: planner::AbilityId) -> Option<AbilityKind> {
         6 => Some(AbilityKind::EkatLineShot),
         7 => Some(AbilityKind::EkatMagicAnchor),
         8 => Some(AbilityKind::EkatConsumeGolem),
+        9 => Some(AbilityKind::BlanketFire),
         _ => None,
     }
 }
@@ -1163,6 +1165,9 @@ fn use_ability(
     let ability = request.ability;
     let definition = ability::definition(ability);
     if request.queued && !definition.may_queue {
+        return;
+    }
+    if definition.effect_hook == AbilityEffectHook::ReservedNoop {
         return;
     }
     if ability == AbilityKind::PointFire {

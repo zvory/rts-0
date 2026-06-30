@@ -283,6 +283,9 @@ folded into default targeting.
   `ARTILLERY_FIELD_OF_FIRE_RAD = 20 degrees total`, `ARTILLERY_RELOAD_TICKS = 90` (~3s),
   `ARTILLERY_SETUP_TICKS = 90` (~3s), `ARTILLERY_SHELL_DELAY_TICKS = 150` (~5s), and
   `ARTILLERY_AMMO_COST_STEEL = 10`.
+  The reserved Blanket Fire command identity mirrors
+  `ARTILLERY_BLANKET_RADIUS_TILES = 15` for later preview and runtime work, but remains hidden from
+  the command card in this contract phase.
   Unupgraded artillery error scales by shot range, from `ARTILLERY_MIN_RANGE_ERROR_TILES = 3.0`
   at minimum range to `ARTILLERY_MAX_RANGE_ERROR_TILES = 15.0` at maximum range, and does not
   tighten over repeated fire. Artillery Fire Control restores repeated-fire tightening for the same
@@ -353,8 +356,12 @@ folded into default targeting.
   against that registry for client-visible ability descriptors. Server execution maps those
   registry rows to a small set of sim-local effect hooks: legacy no-op, owned area status, delayed
   world effect, dash return, line projectile, Magic Anchor placement, Golem consumption, and the
-  one-off artillery point-fire path. The legacy `charge` ability id remains registry-backed only for
-  old command/replay decoding and has no carriers, cooldown, command-card entry, or runtime status.
+  one-off artillery point-fire path. The `blanketFire` id is already registry-backed as an
+  Artillery-carried, world-point, queueable ability with the same range band, ammunition cost, and
+  reload cadence as `pointFire`, plus a 15-tile blanket radius; it is marked non-command-card and
+  has no runtime effect until later artillery UX phases. The legacy `charge` ability id remains
+  registry-backed only for old command/replay decoding and has no carriers, cooldown, command-card
+  entry, or runtime status.
 - **Ekat** is the first playable one-hero faction unit. The `ekat` catalog starts with
   one Ekat and one Zamok, no workers, no buildable menu, no research, and no other
   controllable combat units besides Golems produced from Zamok. Ekat has 150 HP, no passive

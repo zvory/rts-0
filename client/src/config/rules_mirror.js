@@ -43,6 +43,7 @@ export const ARTILLERY_FIELD_OF_FIRE_RAD = 20 * Math.PI / 180;
 export const ARTILLERY_SETUP_TICKS = TICK_HZ * 3;
 export const ARTILLERY_SHELL_DELAY_TICKS = TICK_HZ * 5;
 export const ARTILLERY_OUTER_RADIUS_TILES = 3;
+export const ARTILLERY_BLANKET_RADIUS_TILES = 15;
 export const ARTILLERY_AMMO_COST = Object.freeze({ steel: 10, oil: 0 });
 export const SMOKE_ABILITY_RANGE_TILES = 9;
 export const SMOKE_LAUNCH_MAX_DELAY_MS = 100;
@@ -217,6 +218,23 @@ export const ABILITIES = Object.freeze({
     delayTicks: ARTILLERY_SHELL_DELAY_TICKS,
     queued: true,
     queuePolicy: "skipIfNotReady",
+  }),
+  [ABILITY.BLANKET_FIRE]: Object.freeze({
+    ability: ABILITY.BLANKET_FIRE,
+    label: "Blanket Fire",
+    icon: "BF",
+    hotkey: "C",
+    title: "Target blanket artillery fire",
+    carriers: Object.freeze([KIND.ARTILLERY]),
+    targetMode: "worldPoint",
+    rangeTiles: ARTILLERY_MAX_RANGE_TILES,
+    minRangeTiles: ARTILLERY_MIN_RANGE_TILES,
+    cooldownTicks: TICK_HZ * 3,
+    cost: ARTILLERY_AMMO_COST,
+    radiusTiles: ARTILLERY_BLANKET_RADIUS_TILES,
+    queued: true,
+    queuePolicy: "skipIfNotReady",
+    commandCard: false,
   }),
   [ABILITY.BREAKTHROUGH]: Object.freeze({
     ability: ABILITY.BREAKTHROUGH,
