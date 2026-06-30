@@ -1,3 +1,14 @@
+jeffrye playtest 2
+
+artillery should be visible in the map when they fire, not just on the minimpa, they also get the full cycle visibilyt 
+
+* artillery should have the optoin to blanket fire randomly within the firing cone. you should be able to stop this with stop. and resume with c for blanket fire. point fire is unaffected. just like point fire, this should be queueable after a setup. finally, increase the minimum range of artillery by 10. 
+
+sometimes tank range does not increase when they stop moving.
+
+when a unit dies, it provides vision for a few seconds of the area it could see before it died. but unfortunately, enemy units and buildings in this revealed area are not targetable, which is difficult for players to understand. so units in this revealed area shoudl be targetable.
+
+
 jeffrey playtest
 
 - [x] tanks should maintain their existing range while moving, but if they stop moving over the course of three seconds, their range should expand to the existing anti-tank gun range (done: PR #507, stationary tank range ramps from 5 to 14 tiles after 3s)
