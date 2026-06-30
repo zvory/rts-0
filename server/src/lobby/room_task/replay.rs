@@ -381,6 +381,14 @@ impl RoomTask {
         });
     }
 
+    fn clear_pending_snapshots_for(&self, recipients: &[u32]) {
+        for id in recipients {
+            if let Some(player) = self.players.get(id) {
+                player.msg_tx.clear_pending_snapshot();
+            }
+        }
+    }
+
     pub(super) fn on_tick_replay_viewer(&mut self, scheduled: TokioInstant) {
         let context = ReplayTickContext {
             scheduler_lag: scheduled.elapsed(),
@@ -555,9 +563,7 @@ impl RoomTask {
         }
 
         session.set_vision(player_id, selection);
-        if let Some(player) = self.players.get(&player_id) {
-            player.msg_tx.clear_pending_snapshot();
-        }
+        self.clear_pending_snapshots_for(&[player_id]);
         self.fanout_replay_snapshots_to(&session, [player_id], HashMap::new(), context, None);
         let analysis = send_analysis.then(|| session.game().observer_analysis());
         if let (Some(analysis), Some(player)) = (analysis, self.players.get(&player_id)) {
@@ -603,48 +609,9 @@ impl RoomTask {
         }
         let send_analysis = self.projection_policy().observer_analysis_audience()
             == ObserverAnalysisAudience::AllRecipients;
-        let start_stamp = self.replay_start_payload_stamp();
-        if let Phase::ReplayViewer(session) = &mut self.phase {
-            let viewer_count = self.players.len();
-            let seek_result = session.seek_back(&self.room, viewer_count, player_id, ticks_back);
-            let starts = if seek_result.is_ok() {
-                self.order
-                    .iter()
-                    .filter_map(|viewer_id| {
-                        self.players.get(viewer_id).map(|player| {
-                            let start =
-                                Self::replay_start_payload_for(session, *viewer_id, start_stamp);
-                            (*viewer_id, player.msg_tx.clone(), start)
-                        })
-                    })
-                    .collect::<Vec<_>>()
-            } else {
-                Vec::new()
-            };
-            let state = seek_result.as_ref().ok().map(|_| session.state());
-            let analysis = seek_result
-                .as_ref()
-                .ok()
-                .filter(|_| send_analysis)
-                .map(|_| session.game().observer_analysis());
-            match seek_result {
-                Ok(_) => {
-                    for (viewer_id, msg_tx, start) in starts {
-                        send_or_log(&self.room, viewer_id, &msg_tx, ServerMessage::Start(start));
-                    }
-                    if let Some(state) = state {
-                        self.broadcast(&ServerMessage::RoomTimeState(state));
-                    }
-                    if let Some(analysis) = analysis {
-                        self.broadcast(&ServerMessage::ObserverAnalysis(analysis));
-                    }
-                }
-                Err(err) => {
-                    crate::log_warn!(room = %self.room, error = %err, "replay seek failed");
-                    self.send_dev_error(&err);
-                }
-            }
-        }
+        self.on_seek_replay_room_time(player_id, send_analysis, |session, room, viewers, id| {
+            session.seek_back(room, viewers, id, ticks_back)
+        });
     }
 
     /// Seek room-controlled time to an absolute tick. No-op outside rooms whose clock capability
@@ -666,48 +633,77 @@ impl RoomTask {
         }
         let send_analysis = self.projection_policy().observer_analysis_audience()
             == ObserverAnalysisAudience::AllRecipients;
+        self.on_seek_replay_room_time(player_id, send_analysis, |session, room, viewers, id| {
+            session.seek_to(room, viewers, id, tick)
+        });
+    }
+
+    fn on_seek_replay_room_time(
+        &mut self,
+        player_id: u32,
+        send_analysis: bool,
+        seek: impl FnOnce(&mut ReplaySession, &str, usize, u32) -> Result<u32, String>,
+    ) {
+        let context = ReplayTickContext {
+            scheduler_lag: Duration::ZERO,
+            tick_budget: self.current_tick_interval(),
+            tick_start: StdInstant::now(),
+            projection_policy: self.projection_policy_for_phase(SessionPhase::ReplayViewer),
+        };
         let start_stamp = self.replay_start_payload_stamp();
-        if let Phase::ReplayViewer(session) = &mut self.phase {
-            let viewer_count = self.players.len();
-            let seek_result = session.seek_to(&self.room, viewer_count, player_id, tick);
-            let starts = if seek_result.is_ok() {
-                self.order
+        let mut session = match std::mem::replace(&mut self.phase, Phase::Lobby) {
+            Phase::ReplayViewer(session) => session,
+            other => {
+                self.phase = other;
+                return;
+            }
+        };
+
+        let viewer_count = self.players.len();
+        let seek_result = seek(&mut session, &self.room, viewer_count, player_id);
+        match seek_result {
+            Ok(_) => {
+                let starts = self
+                    .order
                     .iter()
                     .filter_map(|viewer_id| {
                         self.players.get(viewer_id).map(|player| {
                             let start =
-                                Self::replay_start_payload_for(session, *viewer_id, start_stamp);
+                                Self::replay_start_payload_for(&session, *viewer_id, start_stamp);
                             (*viewer_id, player.msg_tx.clone(), start)
                         })
                     })
-                    .collect::<Vec<_>>()
-            } else {
-                Vec::new()
-            };
-            let state = seek_result.as_ref().ok().map(|_| session.state());
-            let analysis = seek_result
-                .as_ref()
-                .ok()
-                .filter(|_| send_analysis)
-                .map(|_| session.game().observer_analysis());
-            match seek_result {
-                Ok(_) => {
-                    for (viewer_id, msg_tx, start) in starts {
-                        send_or_log(&self.room, viewer_id, &msg_tx, ServerMessage::Start(start));
-                    }
-                    if let Some(state) = state {
-                        self.broadcast(&ServerMessage::RoomTimeState(state));
-                    }
-                    if let Some(analysis) = analysis {
-                        self.broadcast(&ServerMessage::ObserverAnalysis(analysis));
-                    }
+                    .collect::<Vec<_>>();
+                let recipients = starts
+                    .iter()
+                    .map(|(viewer_id, _, _)| *viewer_id)
+                    .collect::<Vec<_>>();
+                let state = session.state();
+                let analysis = send_analysis.then(|| session.game().observer_analysis());
+
+                self.clear_pending_snapshots_for(&recipients);
+                for (viewer_id, msg_tx, start) in starts {
+                    send_or_log(&self.room, viewer_id, &msg_tx, ServerMessage::Start(start));
                 }
-                Err(err) => {
-                    crate::log_warn!(room = %self.room, error = %err, "replay seek failed");
-                    self.send_dev_error(&err);
+                self.broadcast(&ServerMessage::RoomTimeState(state));
+                self.fanout_replay_snapshots_to(
+                    &session,
+                    recipients,
+                    HashMap::new(),
+                    context,
+                    None,
+                );
+                if let Some(analysis) = analysis {
+                    self.broadcast(&ServerMessage::ObserverAnalysis(analysis));
                 }
             }
+            Err(err) => {
+                crate::log_warn!(room = %self.room, error = %err, "replay seek failed");
+                self.send_dev_error(&err);
+            }
         }
+
+        self.phase = Phase::ReplayViewer(session);
     }
 
     pub(super) fn transition_to_replay_viewer(&mut self, session: ReplaySession) {

@@ -398,6 +398,86 @@ fn replay_vision_selection_sends_snapshot_without_waiting_for_tick() {
 }
 
 #[test]
+fn replay_seek_while_paused_sends_snapshot_without_waiting_for_unpause() {
+    let players = replay_test_players(2);
+    let (_live, artifact) = replay_test_artifact(&players, 4);
+    let mut replay = ReplaySession::new(artifact).unwrap();
+    for _ in 0..3 {
+        replay.enqueue_for_current_tick().unwrap();
+        replay.tick(None);
+    }
+    replay.set_speed(100, 0.0);
+    replay.set_vision(
+        100,
+        VisionSelectionRequest::Player {
+            player_id: players[0].id,
+        },
+    );
+
+    let mut task = RoomTask::new(
+        "paused-replay-seek-snapshot-test".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let mut writer = add_test_room_spectator(&mut task, 100);
+    let all_player_ids = players.iter().map(|player| player.id).collect::<Vec<_>>();
+    let stale_pending = replay.game().snapshot_for_spectator(&all_player_ids);
+    task.players
+        .get(&100)
+        .expect("test spectator")
+        .msg_tx
+        .try_send_snapshot(stale_pending);
+    task.phase = Phase::ReplayViewer(Box::new(replay));
+
+    task.on_seek_room_time_to(100, 1);
+
+    let snapshot = writer
+        .snapshots
+        .take()
+        .expect("paused replay seek should enqueue an immediate snapshot");
+    let Phase::ReplayViewer(session) = &task.phase else {
+        panic!("replay phase should remain active after seek");
+    };
+    let expected = session.game.snapshot_for_spectator(&[players[0].id]);
+    assert_eq!(session.current_tick(), 1);
+    assert_eq!(snapshot.tick, 1);
+    assert_eq!(snapshot.visible_tiles, expected.visible_tiles);
+    assert_eq!(
+        snapshot
+            .resource_deltas
+            .iter()
+            .map(|delta| delta.id)
+            .collect::<Vec<_>>(),
+        expected
+            .resource_deltas
+            .iter()
+            .map(|delta| delta.id)
+            .collect::<Vec<_>>(),
+        "paused seek snapshot should not merge stale wider-view resource deltas"
+    );
+    assert_eq!(
+        snapshot
+            .player_resources
+            .iter()
+            .map(|resources| resources.id)
+            .collect::<Vec<_>>(),
+        vec![players[0].id],
+        "paused seek should preserve the viewer's selected replay perspective"
+    );
+    let seek_messages: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
+    assert!(seek_messages.iter().any(|msg| matches!(
+        msg,
+        ServerMessage::Start(payload) if payload.replay.is_some()
+    )));
+    assert!(seek_messages.iter().any(|msg| matches!(
+        msg,
+        ServerMessage::RoomTimeState(state) if state.current_tick == 1 && state.paused
+    )));
+}
+
+#[test]
 fn replay_vision_switch_replaces_memory_and_resource_scope() {
     let players = replay_test_players(3);
     let (_live, artifact) = replay_test_artifact(&players, 1);
