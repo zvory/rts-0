@@ -9,7 +9,7 @@ implementation plan and does not authorize code, protocol, balance, art, or test
 Artillery should support two deliberate fire modes:
 
 - `Point Fire`: repeatedly shell a chosen target point.
-- `Blanket Fire`: repeatedly shell random points inside a chosen firing cone.
+- `Blanket Fire`: repeatedly shell random points around a chosen target point.
 
 Both modes should reduce setup micro without making artillery automatically walk or stage itself
 into firing position. The player chooses a target direction or point; artillery either uses its
@@ -86,9 +86,13 @@ needed before the first shot.
 ## Blanket Fire Behavior
 
 - Blanket fire repeats until stopped or replaced by another order.
-- Each blanket fire shot picks a deterministic pseudo-random impact point uniformly from anywhere
-  inside that artillery piece's valid firing cone and range band. The clicked distance does not
-  narrow the blanket area; the whole valid cone/range band is eligible.
+- Blanket fire uses the same clicked or locked effective fire point rules as Point Fire. The
+  effective center point must be inside that artillery piece's valid firing cone and range band.
+- Each blanket fire shot picks a deterministic pseudo-random impact point uniformly from a 15-tile
+  radius circle centered on the stored effective fire point.
+- The blanket radius is centered on the chosen point even when that point is near the edge of the
+  firing cone or range band. Individual sampled impact points are not re-clamped to the cone or
+  range band after they are chosen.
 - Blanket fire randomness must remain deterministic for command-log replay. Seed each shot from
   authoritative simulation inputs such as match seed or tick, artillery id, owner, and shot number;
   do not use nondeterministic runtime RNG.
@@ -97,8 +101,8 @@ needed before the first shot.
   impact radius, damage behavior, no-ammo behavior, and fog or reveal handling as artillery point
   fire unless a later requirement explicitly changes one of those surfaces. The only firing
   difference is shot placement: Point Fire repeats against its stored effective fire point, while
-  Blanket Fire samples a deterministic uniform point in the full valid cone/range band for each
-  shot.
+  Blanket Fire samples a deterministic uniform point within the 15-tile blanket radius around that
+  same stored effective fire point for each shot.
 
 ## Preview UX
 
@@ -106,6 +110,8 @@ needed before the first shot.
   command will use the current cone or cause redeploy.
 - If a gun can fire from its current cone, show the current cone.
 - If a gun needs to rotate or redeploy, show the new setup cone following the locked mouse target.
+- Blanket fire previews should show the 15-tile blanket radius around each gun's stored effective
+  center point.
 - For queued commands, previews should account for queued movement destinations where the current
   setup-preview system can already infer a future position.
 - The preview should make out-of-range locking legible enough that players can see the effective
@@ -115,7 +121,8 @@ needed before the first shot.
 
 - Increase artillery minimum range by 10 tiles.
 - The current intended change is from 15 tiles to 25 tiles.
-- Mirror the value anywhere artillery range is surfaced to players.
+- Set Blanket Fire's sampled impact radius to 15 tiles around the stored effective center point.
+- Mirror these values anywhere artillery range or blanket radius is surfaced to players.
 - Preserve the current accuracy feel across the remaining valid range band when making this change:
   the minimum-range error should still apply at the new 25-tile floor, the maximum-range error
   should still apply at the 55-tile ceiling, and interpolation should be recalculated across the
@@ -124,8 +131,8 @@ needed before the first shot.
 ## Ballistic Tables Decision
 
 - Keep Ballistic Tables repeated-shot accuracy tightening Point-Fire-only. Blanket Fire remains
-  deterministic uniform area suppression over the full valid cone/range band instead of tightening
-  into precision fire over time.
+  deterministic uniform area suppression over the fixed 15-tile blanket radius instead of
+  tightening into precision fire over time.
 
 ## Non-Goals
 
