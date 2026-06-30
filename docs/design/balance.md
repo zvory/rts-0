@@ -11,6 +11,8 @@ helpers read the defs table.
 Default attack range, damage, cooldown, weapon class, and weapon-policy metadata are exposed through
 `server/crates/rules/src/combat.rs` weapon profiles; current profile values mirror the defs records
 so legacy `attack_profile(kind)` and `weapon_class(kind)` callers remain behavior-compatible.
+Direct-fire damage, miss policy, tank-facing modifiers, and over-penetration policy consume the
+selected weapon profile instead of inferring those behaviors only from the firing entity kind.
 `client/src/config.js` is the stable public facade for the subset the UI/render/fog needs (costs,
 supply, sight, sizes, colors, and command-card descriptors). Its internal
 `client/src/config/timing.js`, `client/src/config/rules_mirror.js`, and
@@ -302,8 +304,7 @@ folded into default targeting.
   `ARTILLERY_SETUP_TICKS = 90` (~3s), `ARTILLERY_SHELL_DELAY_TICKS = 150` (~5s), and
   `ARTILLERY_AMMO_COST_STEEL = 10`.
   Blanket Fire uses `ARTILLERY_BLANKET_RADIUS_TILES = 15` around the stored locked center for
-  deterministic uniform impact sampling, but remains hidden from the command card until the client
-  targeting phase exposes it.
+  deterministic uniform impact sampling and appears as a separate Artillery command-card ability.
   Unupgraded artillery error scales by shot range, from `ARTILLERY_MIN_RANGE_ERROR_TILES = 3.0`
   at minimum range to `ARTILLERY_MAX_RANGE_ERROR_TILES = 15.0` at maximum range, and does not
   tighten over repeated fire. The interpolation span is the current 25-to-55 tile range band.
@@ -342,12 +343,14 @@ folded into default targeting.
   buildings, support weapons other than Machine Gunners, and non-infantry entities are excluded.
   Eligible infantry owned by a player with completed Entrenchment create neutral trenches after
   holding ground on untrenched terrain for 90 ticks (~3s), and any eligible infantry can occupy an
-  existing trench while stopped in its footprint. Active occupation grants +1 tile weapon range,
-  suppresses idle aggressive chase like Hold Position, gives incoming direct shots a 70% miss
-  chance, reduces incoming area damage by 70% after existing falloff/armor rules, and suppresses
-  over-penetration through or into the entrenched unit. Direct-shot miss sources use the highest
-  applicable chance, not composed probability, so an Anti-Tank Gun's 65% infantry miss chance
-  becomes 70% against entrenched eligible infantry. The trench radius is 0.75 tile. The client
+  existing empty trench while stopped in its footprint. A trench can actively hold only one
+  infantry unit, so nearby eligible infantry dig their own adjacent trenches instead of sharing one.
+  Active occupation grants +1 tile weapon range, suppresses idle aggressive chase like Hold
+  Position, gives incoming direct shots a 70% miss chance, reduces incoming area damage by 70%
+  after existing falloff/armor rules, and suppresses over-penetration through or into the
+  entrenched unit. Direct-shot miss sources use the highest applicable chance, not composed
+  probability, so an Anti-Tank Gun's 65% infantry miss chance becomes 70% against entrenched
+  eligible infantry. The trench radius is 0.375 tile. The client
   renders neutral trench terrain as brown ground and marks occupied eligible infantry with a small
   brown rim. The selected-unit panel reports existing-trench reuse, researched dig-in availability,
   and occupied benefits as a player-facing status only; the server remains authoritative for actual
@@ -378,8 +381,7 @@ folded into default targeting.
   world effect, dash return, line projectile, Magic Anchor placement, Golem consumption, and the
   artillery fire path. The `blanketFire` id is registry-backed as an Artillery-carried,
   world-point, queueable ability with the same range band, ammunition cost, and reload cadence as
-  `pointFire`, plus a 15-tile blanket radius; it has server runtime support but is marked
-  non-command-card until the client targeting phase exposes it. The legacy `charge` ability id remains
+  `pointFire`, plus a 15-tile blanket radius and command-card exposure. The legacy `charge` ability id remains
   registry-backed only for old command/replay decoding and has no carriers, cooldown, command-card
   entry, or runtime status.
 - **Ekat** is the first playable one-hero faction unit. The `ekat` catalog starts with

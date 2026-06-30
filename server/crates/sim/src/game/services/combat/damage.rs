@@ -35,6 +35,7 @@ pub(super) fn apply_damage(
     rng: &mut SmallRng,
     attacker: u32,
     victim: u32,
+    weapon_profile: &combat_rules::WeaponProfile,
     dmg: u32,
     attacker_owner: u32,
     ax: f32,
@@ -64,7 +65,6 @@ pub(super) fn apply_damage(
         .map(|e| (e.pos_x, e.pos_y))
         .unwrap_or((vx, vy));
     let reveal = attack_reveal_for(entities.get(attacker));
-    let attacker_kind = entities.get(attacker).map(|e| e.kind);
     let victim = entities.get(shot_victim);
     let victim_kind = victim.map(|e| e.kind);
     let victim_facing = victim.map(|e| e.facing());
@@ -85,15 +85,15 @@ pub(super) fn apply_damage(
     );
 
     // Roll for miss before computing damage.
-    if let (Some(ak), Some(v)) = (attacker_kind, entities.get(shot_victim)) {
-        let mc = entrenchment_combat::direct_miss_chance(ak, v, extra_miss_chance);
+    if let Some(v) = entities.get(shot_victim) {
+        let mc = entrenchment_combat::direct_miss_chance(weapon_profile, v, extra_miss_chance);
         if mc > 0.0 && rng.gen::<f32>() < mc {
             return Some(victim_owner);
         }
     }
-    let effective_dmg = match (attacker_kind, victim_kind) {
-        (Some(ak), Some(vk)) => combat_rules::effective_damage_with_facing(
-            ak,
+    let effective_dmg = match victim_kind {
+        Some(vk) => combat_rules::effective_damage_with_facing_for_weapon(
+            weapon_profile,
             vk,
             dmg,
             Some(TerrainKind::Open),
@@ -123,6 +123,7 @@ pub(super) fn apply_damage(
             smokes,
             attacker,
             shot_victim,
+            weapon_profile,
             victim_entrenched,
             effective_dmg,
             attacker_owner,
@@ -158,6 +159,7 @@ fn apply_overpenetration(
     smokes: &SmokeCloudStore,
     attacker: u32,
     primary_victim: u32,
+    weapon_profile: &combat_rules::WeaponProfile,
     primary_victim_was_entrenched: bool,
     primary_dmg: u32,
     attacker_owner: u32,
@@ -185,11 +187,9 @@ fn apply_overpenetration(
         return;
     }
 
-    let Some(overpenetration_factor) = entities
-        .get(attacker)
-        .and_then(|e| combat_rules::overpenetration_range_factor(e.kind))
-    else {
-        return;
+    let overpenetration_factor = match weapon_profile.overpenetration {
+        combat_rules::OverpenetrationPolicy::DirectFire { range_factor } => range_factor,
+        combat_rules::OverpenetrationPolicy::None => return,
     };
     let overpenetration_limit = dist + range_px * overpenetration_factor;
     let ux = dx / dist;
@@ -250,20 +250,18 @@ fn apply_overpenetration(
 
     hits.sort_by(|a, b| a.3.total_cmp(&b.3).then_with(|| a.0.cmp(&b.0)));
     for (id, tx, ty, _) in hits {
-        let attacker_kind = entities.get(attacker).map(|e| e.kind);
         let effective_dmg = entities
             .get(id)
-            .map(|e| match attacker_kind {
-                Some(ak) => combat_rules::effective_damage_with_facing(
-                    ak,
+            .map(|e| {
+                combat_rules::effective_damage_with_facing_for_weapon(
+                    weapon_profile,
                     e.kind,
                     splash_dmg,
                     Some(TerrainKind::Open),
                     Some(e.facing()),
                     (e.pos_x, e.pos_y),
                     (ax, ay),
-                ),
-                None => splash_dmg,
+                )
             })
             .unwrap_or(0);
         if effective_dmg == 0 {

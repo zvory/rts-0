@@ -481,10 +481,10 @@ policy is centralized instead of scattered through services.
   Server-side lifecycle policy lives in `server/src/lobby/faction_validation.rs`.
 - `rules::combat` — default weapon-profile ids and policy metadata, AP/armor predicates (`is_ap`,
   `is_armored`), target-ranking classifiers (`target_threat_role`, `default_weapon_target_fit`),
-  compatibility helpers such as `attack_profile(kind) -> AttackProfile`, and
-  `effective_damage(attacker_kind, victim_kind, base_dmg, victim_terrain) -> u32`. The
-  Panzerfaust Tank-only loaded-shot predicate lives here as rules vocabulary while the one-shot
-  state machine stays in the sim combat service.
+  compatibility helpers such as `attack_profile(kind) -> AttackProfile`, and weapon-aware direct
+  damage/miss/facing helpers such as `effective_damage_for_weapon(profile, victim_kind, base_dmg,
+  victim_terrain) -> u32`. The Panzerfaust Tank-only loaded-shot predicate lives here as rules
+  vocabulary while the one-shot state machine stays in the sim combat service.
 - `rules::economy` — tech/production predicates (`trainable_units_for_faction`,
   `build_requirement_met_for_faction`, `train_requirement_met_for_faction`,
   `can_research_for_faction`), resource-node amounts, and cost/supply wrappers (`cost`,
@@ -591,15 +591,17 @@ arrived Attack Move. Firing, target changes, body/weapon facing, and Machine Gun
 do not reset that timer; Move, Attack Move while still travelling, Gather, Build, Deconstruct,
 ability movement, artillery point-fire, path movement, and non-slotting forced movement reset it.
 
-Existing trenches are neutral. Any eligible Rifleman, Machine Gunner, or Worker can occupy one
-without owning Entrenchment research when it is stopped in the trench footprint. A stopped eligible
-unit within half a tile of a trench may be slotted by at most half a tile into a legal position
-inside the trench footprint; slotting validates static standability, the swept static segment, and
-unit-body overlap against the current live entity positions. Slotting does not issue a move order
-or path, so the unit can still fire normally. `entity::active_trench_occupation(entity)` is the
-simulation predicate for active occupation; digging progress, failed slotting, and merely standing
-near trench terrain do not set it. Visible occupied units project `occupiedTrenchId`; remembered
-trench terrain never exposes hidden occupants.
+Existing trenches are neutral. Any eligible Rifleman, Machine Gunner, or Worker can occupy an empty
+one without owning Entrenchment research when it is stopped in the trench footprint. Each trench can
+actively hold only one infantry unit; once occupied, it is skipped as an occupation candidate for
+other units. A stopped eligible unit within half a tile of an empty trench may be slotted by at most
+half a tile into a legal position inside the trench footprint; slotting validates static
+standability, the swept static segment, and unit-body overlap against the current live entity
+positions. Slotting does not issue a move order or path, so the unit can still fire normally.
+`entity::active_trench_occupation(entity)` is the simulation predicate for active occupation;
+digging progress, failed slotting, and merely standing near trench terrain do not set it. Visible
+occupied units project `occupiedTrenchId`; remembered trench terrain never exposes hidden
+occupants.
 
 Entrenched combat benefits consume only active occupation through
 `entrenchment_combat::is_actively_entrenched`. Active entrenched Riflemen, Machine Gunners, and

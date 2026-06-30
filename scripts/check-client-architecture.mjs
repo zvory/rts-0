@@ -105,6 +105,7 @@ const AREA_PREFIXES = [
 const ALLOWED_CROSS_AREA_IMPORTS = new Map(Object.entries({
   "net.js -> report_window_aggregate.js": "Net Report Phase 1 shares bounded report-window aggregation with client perf and command diagnostics.",
   "prediction_controller.js -> report_window_aggregate.js": "Net Report Phase 2 reuses the bounded report-window helper for command milestone diagnostics.",
+  "minimap.js -> input/artillery_targeting.js": "Minimap command targeting shares the pure artillery target-lock predictor with viewport input so local feedback matches server locking.",
 }));
 
 const ALLOWED_PROTOTYPE_GRAFTS = new Set([

@@ -4,7 +4,6 @@ import { finiteNumber } from "./shared.js";
 export const TRENCH_DECAL_TEXTURE_WORLD_SCALE = 4;
 
 const TRENCH_MIN_RADIUS_PX = 4;
-const TRENCH_DECAL_VISUAL_RADIUS_SCALE = 0.5;
 const TRENCH_POLYGON_POINTS = 22;
 const TRENCH_FACET_COUNT = 5;
 
@@ -181,8 +180,7 @@ export function stampTrenchDecal(ctx, trench, downsample = TRENCH_DECAL_TEXTURE_
   const rng = mulberry32(trenchSeed(trench));
   const x = trench.x / downsample;
   const y = trench.y / downsample;
-  const visualRadius = Math.max(TRENCH_MIN_RADIUS_PX, trench.radius * TRENCH_DECAL_VISUAL_RADIUS_SCALE);
-  const r = visualRadius / downsample;
+  const r = Math.max(TRENCH_MIN_RADIUS_PX, trench.radius) / downsample;
 
   drawIrregularDisc(ctx, x, y, r, {
     fillStyle: colorCss(COLORS.trenchDirt, 1),

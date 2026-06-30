@@ -305,13 +305,13 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       ABILITIES[ABILITY.BLANKET_FIRE].cost === ABILITIES[ABILITY.POINT_FIRE].cost &&
       ABILITIES[ABILITY.BLANKET_FIRE].cooldownTicks === ABILITIES[ABILITY.POINT_FIRE].cooldownTicks &&
       ABILITIES[ABILITY.BLANKET_FIRE].queued === true &&
-      ABILITIES[ABILITY.BLANKET_FIRE].commandCard === false &&
+      ABILITIES[ABILITY.BLANKET_FIRE].hotkey === "C" &&
       ARTILLERY_BLANKET_RADIUS_TILES === 15,
-    "Blanket Fire hidden descriptor exposes Artillery carrier, range band, radius, cost, cooldown, and queueability",
+    "Blanket Fire descriptor exposes Artillery carrier, range band, radius, cost, cooldown, queueability, and hotkey",
   );
   assert(
-    !configExports.commandCardAbilitiesForFaction().some((entry) => entry.ability === ABILITY.BLANKET_FIRE),
-    "Blanket Fire descriptor remains hidden from command-card ability lists",
+    configExports.commandCardAbilitiesForFaction().some((entry) => entry.ability === ABILITY.BLANKET_FIRE),
+    "Blanket Fire descriptor is exposed in command-card ability lists",
   );
   assert(
     ABILITIES[ABILITY.EKAT_TELEPORT].queued === true &&
@@ -394,7 +394,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       ENTRENCHMENT_RANGE_BONUS_TILES === 1 &&
       ENTRENCHMENT_DIRECT_MISS_CHANCE === 0.70 &&
       ENTRENCHMENT_AREA_DAMAGE_REDUCTION === 0.70 &&
-      ENTRENCHMENT_TRENCH_RADIUS_TILES === 0.75,
+      ENTRENCHMENT_TRENCH_RADIUS_TILES === 0.375,
     "Entrenchment constants mirror server",
   );
   assert(
