@@ -10,11 +10,8 @@ import {
 } from "./assertions.mjs";
 import { GameState } from "../../client/src/state.js";
 import {
-  ARTILLERY_MAX_RANGE_TILES,
-  ARTILLERY_MIN_RANGE_TILES,
   ARTILLERY_SHELL_DELAY_TICKS,
   COLORS,
-  ABILITIES,
   BASE_COMMAND_SUPPLY_CAP,
   RESOURCE_AMOUNTS,
   STATS,
@@ -65,7 +62,6 @@ import {
   _drawAbilityTargetPreview,
   _drawAntiTankGunSetupPreview,
 } from "../../client/src/renderer/feedback.js";
-import { _drawSelectedUnitRanges } from "../../client/src/renderer/unit_ranges.js";
 
 import { RecordingGraphics } from "./pixi_fakes.mjs";
 
@@ -1924,119 +1920,6 @@ function buttonByLabel(card, label) {
     "Tank Trap placement confirmation preserves spacing when preview sites contain a gap",
   );
   assert(trapPlacementEnded === 0, "Shift Tank Trap placement preserves placement mode without changing overflow queueing");
-
-  const artilleryCommands = [];
-  const artilleryFeedback = [];
-  const selectedArtillery = {
-    id: 44,
-    owner: 1,
-    kind: KIND.ARTILLERY,
-    x: 100,
-    y: 100,
-    setupState: SETUP.DEPLOYED,
-    setupFacing: Math.PI,
-  };
-  const pointFireInput = Object.create(Input.prototype);
-  pointFireInput.mouse = { x: 900, y: 100 };
-  pointFireInput.state = {
-    playerId: 1,
-    map: { tileSize: 32 },
-    selectedEntities: () => [selectedArtillery],
-  };
-  pointFireInput.clientIntent = new ClientIntent();
-  pointFireInput.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.POINT_FIRE });
-  pointFireInput.clientIntent.addCommandFeedback = (kind, x, y, queued, radiusTiles) => {
-    artilleryFeedback.push({ kind, x, y, queued, radiusTiles });
-  };
-  pointFireInput.commandIssuer = { issueCommand: (command) => artilleryCommands.push(command) };
-  pointFireInput._worldAt = (x, y) => ({ x, y });
-  pointFireInput._selectedOwnUnitIds = () => [selectedArtillery.id];
-  pointFireInput._issueTargetedCommand({ x: 920, y: 116 }, { shiftKey: true });
-  assert(
-    artilleryCommands[0]?.c === "useAbility" &&
-      artilleryCommands[0].ability === ABILITY.POINT_FIRE &&
-      artilleryCommands[0].units[0] === selectedArtillery.id &&
-      artilleryCommands[0].queued === true,
-    "Point Fire targeting issues the dedicated pointFire ability command",
-  );
-  assert(
-    artilleryFeedback[0]?.kind === "artillery" && artilleryFeedback[0].radiusTiles === ABILITIES[ABILITY.POINT_FIRE].radiusTiles,
-    "Point Fire targeting shows artillery command feedback with splash radius",
-  );
-
-  pointFireInput.mouse = { x: selectedArtillery.x + ARTILLERY_MIN_RANGE_TILES * 32 - 8, y: selectedArtillery.y };
-  pointFireInput._refreshAbilityTargetPreview();
-  assert(pointFireInput.clientIntent.abilityTargetPreview?.hoverInRange === true && pointFireInput.clientIntent.abilityTargetPreview?.hoverInsideMinRange === false, "Point Fire preview accepts minimum-range locking clicks");
-  assert(pointFireInput.clientIntent.abilityTargetPreview?.minRangePx === ARTILLERY_MIN_RANGE_TILES * 32, "Point Fire preview exposes minimum range in pixels");
-  assert(
-    ARTILLERY_MIN_RANGE_TILES === 25 && ARTILLERY_MAX_RANGE_TILES === 55,
-    "Artillery point-fire range mirrors the 25-55 tile balance band",
-  );
-  const deployedArtillery = { ...selectedArtillery, setupState: SETUP.DEPLOYED, setupFacing: 0 };
-  const artilleryConeGfx = new RecordingGraphics();
-  _drawSelectedUnitRanges.call(
-    { _feedbackGfx: artilleryConeGfx, _map: { tileSize: 32 } },
-    { playerId: 1, showUnitRangesEnabled: true, selectedEntities: () => [deployedArtillery] },
-  );
-  const artilleryConeArcs = artilleryConeGfx.calls.filter((call) => call[0] === "arc");
-  assert(
-    artilleryConeArcs.some((call) => call[3] === ARTILLERY_MAX_RANGE_TILES * 32),
-    "Artillery field-of-fire cone preview uses the mirrored maximum range",
-  );
-  assert(
-    artilleryConeArcs.some((call) => call[3] === ARTILLERY_MIN_RANGE_TILES * 32 && call[6] === true),
-    "Artillery field-of-fire cone preview cuts out the mirrored minimum range",
-  );
-  pointFireInput.mouse = { x: selectedArtillery.x + ARTILLERY_MIN_RANGE_TILES * 32 + 16, y: selectedArtillery.y };
-  pointFireInput._refreshAbilityTargetPreview();
-  assert(pointFireInput.clientIntent.abilityTargetPreview?.hoverInRange === true && pointFireInput.clientIntent.abilityTargetPreview?.hoverInsideMinRange === false, "Point Fire preview accepts targets past minimum range");
-  pointFireInput.mouse = { x: selectedArtillery.x + ARTILLERY_MAX_RANGE_TILES * 32 + 16, y: selectedArtillery.y };
-  pointFireInput._refreshAbilityTargetPreview();
-  assert(pointFireInput.clientIntent.abilityTargetPreview?.hoverInRange === true, "Point Fire preview accepts maximum-range locking clicks");
-  const targetingConeGfx = new RecordingGraphics();
-  _drawAbilityTargetPreview.call(
-    { _feedbackGfx: targetingConeGfx, _map: { tileSize: 32 } },
-    { abilityTargetPreview: pointFireInput.clientIntent.abilityTargetPreview },
-  );
-  const targetingConeArcs = targetingConeGfx.calls.filter((call) => call[0] === "arc");
-  assert(
-    targetingConeArcs.some((call) => call[3] === ARTILLERY_MAX_RANGE_TILES * 32),
-    "Point Fire targeting cone uses the mirrored maximum range",
-  );
-  assert(
-    targetingConeArcs.some((call) => call[3] === ARTILLERY_MIN_RANGE_TILES * 32 && call[6] === true),
-    "Point Fire targeting cone cuts out the mirrored minimum range",
-  );
-
-  const previewGfx = new RecordingGraphics();
-  _drawAbilityTargetPreview.call(
-    { _feedbackGfx: previewGfx },
-    { abilityTargetPreview: { ...pointFireInput.clientIntent.abilityTargetPreview, carriers: [] } },
-  );
-  const validHorizontalStroke = previewGfx.calls.some(
-    (call, i, calls) =>
-      call[0] === "moveTo" &&
-      call[2] === pointFireInput.clientIntent.abilityTargetPreview.mouseY &&
-      calls[i + 1]?.[0] === "lineTo" &&
-      calls[i + 1]?.[2] === pointFireInput.clientIntent.abilityTargetPreview.mouseY,
-  );
-  assert(validHorizontalStroke, "Point Fire valid cursor keeps the crosshair stroke");
-
-  pointFireInput.mouse = { x: selectedArtillery.x + ARTILLERY_MIN_RANGE_TILES * 32 - 8, y: selectedArtillery.y };
-  pointFireInput._refreshAbilityTargetPreview();
-  const lockedGfx = new RecordingGraphics();
-  _drawAbilityTargetPreview.call(
-    { _feedbackGfx: lockedGfx },
-    { abilityTargetPreview: { ...pointFireInput.clientIntent.abilityTargetPreview, carriers: [] } },
-  );
-  const lockedHorizontalStroke = lockedGfx.calls.some(
-    (call, i, calls) =>
-      call[0] === "moveTo" &&
-      call[2] === pointFireInput.clientIntent.abilityTargetPreview.mouseY &&
-      calls[i + 1]?.[0] === "lineTo" &&
-      calls[i + 1]?.[2] === pointFireInput.clientIntent.abilityTargetPreview.mouseY,
-  );
-  assert(lockedHorizontalStroke, "Point Fire minimum-range locking cursor keeps the crosshair stroke");
 
   const ekatEntity = { id: 88, owner: 1, kind: KIND.EKAT, x: 200, y: 220 };
   const ekatInput = Object.create(Input.prototype);

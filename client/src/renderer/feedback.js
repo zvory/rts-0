@@ -32,6 +32,10 @@ import {
   WEAPON_RECOIL_PX,
   ZERO_OFFSET,
 } from "./palette.js";
+import {
+  drawArtilleryFireTargetPreview,
+  isArtilleryFirePreview,
+} from "./artillery_fire_preview.js";
 import { MAGIC_ANCHOR_COLOR, drawMagicAnchor } from "./magic_anchor_effect.js";
 import { feedbackOwner, ownOrAllyOwner } from "./feedback_ownership.js";
 import {
@@ -215,20 +219,21 @@ export function _drawOrderPlan(state) {
     let fromY = e.y;
     for (let i = 0; i < markers.length; i += 1) {
       const marker = markers[i];
-      const pointFire = marker.kind === ORDER_STAGE.POINT_FIRE;
-      const hostile = marker.kind === ORDER_STAGE.ATTACK || marker.kind === ORDER_STAGE.ATTACK_MOVE || pointFire;
+      const artilleryFire =
+        marker.kind === ORDER_STAGE.POINT_FIRE || marker.kind === ORDER_STAGE.BLANKET_FIRE;
+      const hostile = marker.kind === ORDER_STAGE.ATTACK || marker.kind === ORDER_STAGE.ATTACK_MOVE || artilleryFire;
       const attackMove = marker.kind === ORDER_STAGE.ATTACK_MOVE;
-      const color = pointFire ? 0xffd15c : hostile ? attackColor : moveColor;
+      const color = artilleryFire ? 0xffd15c : hostile ? attackColor : moveColor;
       const alpha = i === 0 ? 0.68 : 0.48;
       g.lineStyle(2, color, alpha);
-      if (attackMove || pointFire) {
+      if (attackMove || artilleryFire) {
         dashedLine(g, fromX, fromY, marker.x, marker.y, 12, 8);
       } else {
         g.moveTo(fromX, fromY);
         g.lineTo(marker.x, marker.y);
       }
 
-      if (pointFire) {
+      if (artilleryFire) {
         drawPointFireMarker(g, marker.x, marker.y, color, 0.92);
       } else {
         drawQueuedPointMarker(g, marker.x, marker.y, color, hostile);
@@ -297,26 +302,24 @@ export function _drawAntiTankGunSetupPreview(view) {
   if (!view || typeof view.selectedEntities !== "function") return;
   const g = this._feedbackGfx;
   const tileSize = (this._map && this._map.tileSize) || 32;
-  const pointFirePreview = view.abilityTargetPreview?.ability === ABILITY.POINT_FIRE
+  const artilleryFirePreview = isArtilleryFirePreview(view.abilityTargetPreview)
     ? view.abilityTargetPreview
     : null;
 
-  if (pointFirePreview) {
-    for (const e of view.selectedEntities()) {
-      if (!feedbackOwner(view, e.owner) || e.kind !== KIND.ARTILLERY) continue;
-      if (e.setupState !== SETUP.DEPLOYED) continue;
-      const facing = finiteNumber(e.setupFacing) ? e.setupFacing : finiteNumber(e.facing) ? e.facing : null;
-      if (facing == null) continue;
-      const weapon = fieldOfFireProfile(e.kind, tileSize);
-      if (!weapon || !pointInsideFieldOfFire(e, pointFirePreview.mouseX, pointFirePreview.mouseY, weapon, facing)) {
-        continue;
-      }
+  if (artilleryFirePreview) {
+    const locks = Array.isArray(artilleryFirePreview.artilleryLocks)
+      ? artilleryFirePreview.artilleryLocks
+      : [];
+    for (const lock of locks) {
+      if (!lock.insideCurrentCone || !finiteNumber(lock.currentFacing)) continue;
+      const weapon = fieldOfFireProfile(KIND.ARTILLERY, tileSize);
+      if (!weapon) continue;
       drawFacingWedge(
         g,
-        e.x,
-        e.y,
+        lock.originX,
+        lock.originY,
         weapon.maxRadius,
-        facing,
+        lock.currentFacing,
         weapon.arc,
         FIELD_OF_FIRE_COLOR,
         0.045,
@@ -368,6 +371,9 @@ export function _drawAbilityTargetPreview(view) {
   const preview = view?.abilityTargetPreview;
   if (!preview || !Array.isArray(preview.carriers)) return;
   const g = this._feedbackGfx;
+  if (isArtilleryFirePreview(preview) && drawArtilleryFireTargetPreview(g, preview, this._map)) {
+    return;
+  }
   const areaOrigins = Array.isArray(preview.areaOrigins) ? preview.areaOrigins : [];
   if (areaOrigins.length > 0 && preview.radiusPx > 0) {
     for (const origin of areaOrigins) {

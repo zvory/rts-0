@@ -741,7 +741,12 @@ accepted move or attack-move order-plan endpoints as their field-of-fire origin;
 previews use the current support-weapon position. Minimap hover and click targeting feed support-weapon
 setup previews and commands from minimap world coordinates for Anti-Tank Guns and Artillery. HUD
 command-target arming preserves Shift, and input hover previews track Shift so queued previews match
-the command that will be issued. Tank Trap placement previews keep normal
+the command that will be issued. Armed Point Fire and Blanket Fire previews compute advisory
+per-artillery locked effective points from the current gun origin, the 25-to-55 tile range band,
+the current or planned setup facing fallback, and same-ray map clamping when map bounds are
+available; command feedback marks those locked points when the client can compute them while the
+server still receives and authoritatively validates the raw clicked point. Tank Trap placement
+previews keep normal
 terrain, resource, building, and map-bounds checks, allow infantry overlap, and reject vehicle-body
 units. Tank Trap line dragging treats terrain, building, and map-bounds blockers as skipped sites,
 omits illegal build commands for those sites, and resumes on the far side; vehicle-body unit blockers
@@ -1053,17 +1058,19 @@ remains the command authority. Spectators still receive notice toasts and minima
 `artilleryFiring` events are forwarded directly to `Minimap.markArtilleryFiring`; the minimap draws
 the artillery rig icon above fog for every recipient without using it as entity visibility.
 
-### 4.1a Targeted ability mode (Smoke, Mortar Fire, Point Fire)
+### 4.1a Targeted ability mode (Smoke, Mortar Fire, Point Fire, Blanket Fire)
 
 `input/commands.js` exposes `_onAbilityTarget` and `_refreshAbilityTargetPreview` for world-point
 abilities. When the HUD command card calls `ClientIntent.beginCommandTarget({ kind: "ability", ability })`,
 the input module enters targeted cursor mode:
 - Pointer moves call `_refreshAbilityTargetPreview`: compute which selected units are eligible
-  carriers (`ABILITIES[ability].carriers`), test whether any carrier is within range of the cursor,
-  update `ClientIntent.abilityTargetPreview` for renderer feedback.
+  carriers (`ABILITIES[ability].carriers`), test whether any carrier is within range of the cursor
+  or can lock the raw cursor into the Artillery range band, update
+  `ClientIntent.abilityTargetPreview` for renderer feedback.
 - Left-click: build a `useAbility` command with the ability name, filtered carrier ids, world
-  coords, and the `queued` flag (from Shift). Clear cursor mode unless the resolved command-card
-  hotkey is still held for repeated world-point targeting.
+  coords, and the `queued` flag (from Shift). Artillery Point Fire and Blanket Fire still send the
+  raw clicked world coords; the server owns effective target locking. Clear cursor mode unless the
+  resolved command-card hotkey is still held for repeated world-point targeting.
 - Tapping and releasing the resolved world-point ability hotkey before clicking keeps targeting
   armed until the first unqueued world click. That click issues the ability and clears targeting
   unless Shift is still preserving queued targeting.
@@ -1084,8 +1091,11 @@ does not arm manual targeting.
 
 `client_intent.js` holds `commandTarget` (null or `{ kind, ability }`) and `abilityTargetPreview`
 (null or `{ ability, mouseX, mouseY, carriers, rangeOrigins, pathOrigins, returnMarkers,
-hoverInRange }`). `commandTarget` is a transient UI state; `abilityTargetPreview` is rebuilt every
-mouse move from the cursor world position and the current selection. Server-projected complex
+hoverInRange, artilleryLocks? }`). `artilleryLocks` is advisory client data for selected Artillery
+only: per-gun origin, locked effective point, future/redeploy facing, and whether the locked point
+is inside the deployed current cone. `commandTarget` is a transient UI state;
+`abilityTargetPreview` is rebuilt every mouse move from the cursor world position and the current
+selection. Server-projected complex
 ability world objects are stored separately as `state.abilityObjects` from
 `Snapshot.abilityObjects`. They are authoritative, fog-filtered data for return-marker, Magic
 Anchor, and line-projectile rendering, so the client must not infer gameplay authority from local
@@ -1097,6 +1107,9 @@ Range preview rendering (`renderer/feedback.js`, `_drawAbilityTargetPreview`):
 - `rangeOrigins` keeps normal range rings tied to carrier units, while `pathOrigins` can add
   server-projected origins such as Magic Anchors for multi-origin line-shot previews.
 - `returnMarkers` can draw owner-visible dash-return markers while the dash ability is armed.
+- Point Fire and Blanket Fire draw the current artillery cone when the locked point is inside a
+  deployed gun's cone, otherwise they draw the future setup/redeploy cone toward the locked point.
+  Blanket Fire also draws the 15-tile blanket radius around each locked center.
 - At the cursor position, draws the ability-specific target feedback: smoke uses a 2-tile cloud
   radius, Magic Anchor uses the configured anchor radius, and Ekat Line Shot draws projected path
   segments from every current origin. Feedback is colored green when in range of at least one
