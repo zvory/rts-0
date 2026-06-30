@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use crate::config;
-use crate::game::ability::AbilityKind;
+use crate::game::ability::AbilityKind::{self, MortarFire};
 use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::entity::{
     BuildPhase, Entity, EntityKind, EntityStore, MovePhase, Order, OrderIntent, MAX_QUEUED_ORDERS,
@@ -283,13 +283,9 @@ fn ready_for_next_order(
         | Order::Build(_)
         | Order::Deconstruct(_)
         | Order::ArtilleryPointFire(_) => false,
-        Order::Ability(order) => match e.move_phase() {
-            Some(MovePhase::PathFailed) => true,
-            Some(MovePhase::Arrived) => {
-                order.intent.ability != AbilityKind::MortarFire || e.attack_cd() == 0
-            }
-            _ => false,
-        },
+        Order::Ability(order) => matches!(e.move_phase(), Some(MovePhase::PathFailed))
+            || (matches!(e.move_phase(), Some(MovePhase::Arrived))
+                && (order.intent.ability != MortarFire || e.attack_cd() == 0)),
     }
 }
 
