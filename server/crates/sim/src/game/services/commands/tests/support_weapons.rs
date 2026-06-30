@@ -211,7 +211,7 @@ fn artillery_point_fire_inside_arc_keeps_setup_facing_fixed() {
     let mut players = vec![player_state(1), player_state(2)];
     let pos = (320.0, 320.0);
     let angle = config::ARTILLERY_FIELD_OF_FIRE_RAD * 0.45;
-    let distance = config::TILE_SIZE as f32 * 22.0;
+    let distance = config::TILE_SIZE as f32 * 30.0;
     let target = (
         pos.0 + angle.cos() * distance,
         pos.1 + angle.sin() * distance,
@@ -278,8 +278,8 @@ fn artillery_point_fire_system_rechecks_ammo_affordability() {
     let mut entities = EntityStore::new();
     let mut players = vec![player_state(1), player_state(2)];
     assert!(players[0].spend_cost(rules::economy::ResourceCost::new(1_000, 0)));
-    let pos = (320.0, 320.0);
-    let target = (pos.0 + config::TILE_SIZE as f32 * 22.0, pos.1);
+    let pos = (640.0, 640.0);
+    let target = (pos.0 + config::TILE_SIZE as f32 * 30.0, pos.1);
     let artillery = entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
         .expect("artillery should spawn");
@@ -335,9 +335,9 @@ fn artillery_point_fire_outside_arc_replaces_active_fire_with_redeploy() {
     let mut entities = EntityStore::new();
     let mut players = vec![player_state(1), player_state(2)];
     let pos = (320.0, 320.0);
-    let old_target = (pos.0 + config::TILE_SIZE as f32 * 22.0, pos.1);
+    let old_target = (pos.0 + config::TILE_SIZE as f32 * 30.0, pos.1);
     let angle = config::ARTILLERY_FIELD_OF_FIRE_RAD;
-    let distance = config::TILE_SIZE as f32 * 22.0;
+    let distance = config::TILE_SIZE as f32 * 30.0;
     let target = (
         pos.0 + angle.cos() * distance,
         pos.1 + angle.sin() * distance,
@@ -388,7 +388,12 @@ fn artillery_point_fire_outside_arc_replaces_active_fire_with_redeploy() {
     let Order::ArtilleryPointFire(order) = unit.order() else {
         panic!("retarget should keep an artillery point-fire order");
     };
-    assert!((order.intent.x - target.0).abs() < 0.001);
+    assert!(
+        (order.intent.x - target.0).abs() < 0.001,
+        "expected retarget x {}, got {}",
+        target.0,
+        order.intent.x
+    );
     assert!((order.intent.y - target.1).abs() < 0.001);
 }
 
@@ -397,10 +402,10 @@ fn artillery_point_fire_can_retarget_while_redeploying() {
     let map = flat_map(64);
     let mut entities = EntityStore::new();
     let mut players = vec![player_state(1), player_state(2)];
-    let pos = (320.0, 320.0);
+    let pos = (640.0, 640.0);
     let old_angle = config::ARTILLERY_FIELD_OF_FIRE_RAD;
     let new_angle = -config::ARTILLERY_FIELD_OF_FIRE_RAD;
-    let distance = config::TILE_SIZE as f32 * 22.0;
+    let distance = config::TILE_SIZE as f32 * 30.0;
     let old_target = (
         pos.0 + old_angle.cos() * distance,
         pos.1 + old_angle.sin() * distance,
@@ -447,7 +452,12 @@ fn artillery_point_fire_can_retarget_while_redeploying() {
     let Order::ArtilleryPointFire(order) = unit.order() else {
         panic!("retarget should keep an artillery point-fire order");
     };
-    assert!((order.intent.x - target.0).abs() < 0.001);
+    assert!(
+        (order.intent.x - target.0).abs() < 0.001,
+        "expected retarget x {}, got {}",
+        target.0,
+        order.intent.x
+    );
     assert!((order.intent.y - target.1).abs() < 0.001);
     assert!(
         (unit.pending_redeploy_facing().unwrap_or_default() - new_angle).abs() < 0.001,

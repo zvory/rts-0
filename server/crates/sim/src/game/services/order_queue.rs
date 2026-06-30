@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use crate::config;
 use crate::game::ability::{self, AbilityKind, AbilityQueuePolicy};
 use crate::game::ability_runtime::AbilityRuntime;
@@ -18,10 +17,12 @@ use crate::game::services::dist2;
 use crate::game::services::line_of_sight::LineOfSight;
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::movement::angle_delta;
+use crate::game::services::order_execution::targeting::{
+    stored_artillery_point_fire_target, ArtilleryPointFireAcceptance,
+};
 use crate::game::services::order_execution::{
-    artillery_point_fire_target, begin_artillery_teardown_for_movement,
-    execute_anti_tank_gun_setup, start_artillery_point_fire_promoted_order,
-    ArtilleryPointFireAcceptance, FutureOrderMode,
+    begin_artillery_teardown_for_movement, execute_anti_tank_gun_setup,
+    start_artillery_point_fire_promoted_order, FutureOrderMode,
 };
 use crate::game::services::standability;
 use crate::game::services::world_query;
@@ -30,6 +31,7 @@ use crate::game::teams::TeamRelations;
 use crate::game::PlayerState;
 use crate::protocol::{Event, NoticeSeverity};
 use crate::rules;
+use std::collections::BTreeMap;
 const ATTACK_UNREACHABLE_PROMOTION_CHECKS: u16 = 3;
 const ATTACK_RANGE_SLACK_PX: f32 = 4.0;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -427,14 +429,14 @@ fn artillery_point_fire_intent_valid(
     if x < 0.0 || y < 0.0 || x >= map.world_size_px() || y >= map.world_size_px() {
         return false;
     }
-    artillery_point_fire_target(
+    stored_artillery_point_fire_target(
         map,
         entities,
         owner,
         id,
         x,
         y,
-        ArtilleryPointFireAcceptance::Deployed,
+        ArtilleryPointFireAcceptance::Command,
     )
     .is_some()
 }
@@ -449,14 +451,14 @@ fn execute_artillery_point_fire(
     let Some(owner) = entities.get(id).map(|e| e.owner) else {
         return false;
     };
-    let Some(target) = artillery_point_fire_target(
+    let Some(target) = stored_artillery_point_fire_target(
         map,
         entities,
         owner,
         id,
         x,
         y,
-        ArtilleryPointFireAcceptance::Deployed,
+        ArtilleryPointFireAcceptance::Command,
     ) else {
         return false;
     };
@@ -699,6 +701,8 @@ fn build_intent_promotion_error(
 
 #[cfg(test)]
 mod tests {
+    mod artillery_point_fire_tests;
+
     use super::*;
     use crate::game::ability::AbilityKind;
     use crate::game::entity::{
@@ -1466,7 +1470,7 @@ mod tests {
         let mut entities = EntityStore::new();
         let pos = (320.0, 320.0);
         let angle = config::ARTILLERY_FIELD_OF_FIRE_RAD;
-        let distance = config::TILE_SIZE as f32 * 22.0;
+        let distance = config::TILE_SIZE as f32 * 30.0;
         let target = (
             pos.0 + angle.cos() * distance,
             pos.1 + angle.sin() * distance,
