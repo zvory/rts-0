@@ -86,6 +86,12 @@ fn player_events(events: &[(u32, Vec<Event>)], player: u32) -> &[Event] {
         .unwrap_or(&[])
 }
 
+fn distance_sq(a: (f32, f32), b: (f32, f32)) -> f32 {
+    let dx = a.0 - b.0;
+    let dy = a.1 - b.1;
+    dx * dx + dy * dy
+}
+
 #[test]
 fn spawned_panzerfaust_direct_attack_damages_tank_and_converts_same_id() {
     let (mut game, panzerfaust, tank) = panzerfaust_fixture();
@@ -138,6 +144,50 @@ fn spawned_panzerfaust_direct_attack_damages_tank_and_converts_same_id() {
     assert!(owner_saw_impact);
     assert!(owner_saw_conversion);
     assert!(!uninvolved_saw_panzerfaust_event);
+}
+
+#[test]
+fn direct_attack_conversion_completes_consumed_order_and_promotes_queued_move() {
+    let (mut game, panzerfaust, tank) = panzerfaust_fixture();
+    let start = game
+        .entities
+        .get(panzerfaust)
+        .map(|entity| (entity.pos_x, entity.pos_y))
+        .expect("panzerfaust exists");
+    let move_goal = game.map.tile_center(20, 8);
+    enqueue_attack(&mut game, panzerfaust, tank, false);
+    game.enqueue(
+        1,
+        Command::Move {
+            units: vec![panzerfaust],
+            x: move_goal.0,
+            y: move_goal.1,
+            queued: true,
+        },
+    );
+
+    let mut saw_conversion = false;
+    for _ in 0..120 {
+        let events = game.tick();
+        saw_conversion |= player_events(&events, 1).iter().any(
+            |event| matches!(event, Event::PanzerfaustConversion { id, .. } if *id == panzerfaust),
+        );
+    }
+
+    let converted = game
+        .entities
+        .get(panzerfaust)
+        .expect("same entity id should remain");
+    assert!(saw_conversion);
+    assert_eq!(converted.kind, EntityKind::Rifleman);
+    assert!(
+        !matches!(converted.order(), Order::Attack(_)),
+        "the consumed loaded shot should not leave a direct attack order active"
+    );
+    assert!(
+        distance_sq((converted.pos_x, converted.pos_y), start) > 4.0,
+        "queued movement should resume after same-id conversion"
+    );
 }
 
 #[test]

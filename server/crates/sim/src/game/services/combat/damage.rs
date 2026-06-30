@@ -185,9 +185,11 @@ fn apply_overpenetration(
         return;
     }
 
-    let overpenetration_factor = match entities.get(attacker).map(|e| e.kind) {
-        Some(EntityKind::AntiTankGun) => 0.50,
-        _ => 0.25,
+    let Some(overpenetration_factor) = entities
+        .get(attacker)
+        .and_then(|e| combat_rules::overpenetration_range_factor(e.kind))
+    else {
+        return;
     };
     let overpenetration_limit = dist + range_px * overpenetration_factor;
     let ux = dx / dist;

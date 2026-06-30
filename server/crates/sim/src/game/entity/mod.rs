@@ -63,14 +63,17 @@ pub(crate) fn convert_panzerfaust_to_rifleman(entity: &mut Entity) -> bool {
     let Some(stats) = config::unit_stats(EntityKind::Rifleman) else {
         return false;
     };
+    let active_order = entity.order();
+    let consumed_direct_attack = matches!(active_order, Order::Attack(_));
+    let resume_movement_order = matches!(active_order, Order::Move(_) | Order::AttackMove(_));
     entity.kind = EntityKind::Rifleman;
     entity.max_hp = stats.hp;
     entity.hp = entity.hp.min(stats.hp);
     entity.combat = Some(CombatState::default());
-    if let Some(target) = entity.order().attack_target() {
-        entity.set_target_id(Some(target));
-    }
-    if entity.path_is_empty() && matches!(entity.order(), Order::Move(_) | Order::AttackMove(_)) {
+    entity.set_target_id(None);
+    if consumed_direct_attack {
+        entity.clear_active_order();
+    } else if resume_movement_order && entity.path_is_empty() {
         entity.mark_move_phase(MovePhase::AwaitingPath);
     }
     true

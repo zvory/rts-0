@@ -454,6 +454,13 @@ pub fn facing_damage_multiplier(
     }
 }
 
+pub fn overpenetration_range_factor(attacker_kind: EntityKind) -> Option<f32> {
+    match default_weapon_profile(attacker_kind).map(|profile| profile.overpenetration) {
+        Some(OverpenetrationPolicy::DirectFire { range_factor }) => Some(range_factor),
+        _ => None,
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn effective_damage_with_facing(
     attacker_kind: EntityKind,
@@ -651,6 +658,11 @@ mod tests {
         assert_eq!(machine_gunner.range_tiles, 6);
         assert_eq!(machine_gunner.dmg, 4);
         assert_eq!(machine_gunner.cooldown, 6);
+
+        assert_eq!(overpenetration_range_factor(EntityKind::AntiTankGun), Some(0.50));
+        assert_eq!(overpenetration_range_factor(EntityKind::Tank), Some(0.25));
+        assert_eq!(overpenetration_range_factor(EntityKind::MortarTeam), None);
+        assert_eq!(overpenetration_range_factor(EntityKind::Panzerfaust), None);
     }
 
     #[test]
