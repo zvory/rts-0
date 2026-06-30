@@ -103,7 +103,6 @@ pub(crate) fn promote_ready_orders(
     entities: &mut EntityStore,
     players: &mut [PlayerState],
     fog: &Fog,
-    attack_fog: &Fog,
     coordinator: &mut MoveCoordinator<'_>,
     smokes: &mut SmokeCloudStore,
     ability_runtime: &mut AbilityRuntime,
@@ -114,7 +113,7 @@ pub(crate) fn promote_ready_orders(
     let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
     let ready: Vec<u32> = entities
         .iter()
-        .filter(|e| ready_for_next_order(map, entities, &teams, attack_fog, e))
+        .filter(|e| ready_for_next_order(map, entities, &teams, fog, e))
         .map(|e| e.id)
         .collect();
     if ready.is_empty() {
@@ -175,8 +174,7 @@ pub(crate) fn promote_ready_orders(
             clear_completed_active_order(entities, id);
         }
 
-        let Some(promoted) =
-            pop_next_valid_intent(map, entities, players, &teams, fog, attack_fog, events, id)
+        let Some(promoted) = pop_next_valid_intent(map, entities, players, &teams, fog, events, id)
         else {
             continue;
         };
@@ -310,7 +308,6 @@ fn pop_next_valid_intent(
     players: &[PlayerState],
     teams: &TeamRelations,
     fog: &Fog,
-    attack_fog: &Fog,
     events: &mut std::collections::HashMap<u32, Vec<Event>>,
     id: u32,
 ) -> Option<PromotedIntent> {
@@ -368,7 +365,7 @@ fn pop_next_valid_intent(
                 }
             }
             OrderIntent::Attack(attack) => {
-                if attack_intent_valid(entities, teams, attack_fog, owner, id, attack.target) {
+                if attack_intent_valid(entities, teams, fog, owner, id, attack.target) {
                     return Some(PromotedIntent::Attack {
                         target: attack.target,
                     });
@@ -789,7 +786,6 @@ mod tests {
             map,
             entities,
             &mut players,
-            &fog,
             &fog,
             &mut coordinator,
             &mut smokes,

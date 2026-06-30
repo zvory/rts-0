@@ -66,7 +66,6 @@ fn apply_with_players_and_smokes(
         &spatial,
         &mut coordinator,
         &fog,
-        &fog,
         smokes,
         &mut ability_runtime,
         &mut mortar_shells,

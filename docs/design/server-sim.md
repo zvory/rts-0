@@ -490,8 +490,8 @@ policy is centralized instead of scattered through services.
 - `rules::terrain` — `TerrainKind` plus movement, cover, concealment, and static line-of-sight
   opacity modifiers. It is intentionally small today (`Open` returns current defaults; raw stone
   terrain blocks LOS) so the forest/road/hill feature has one rules file to grow in.
-- `rules::projection` — fog-gated `EntityView` construction, `visionOnly` marking for lingering
-  death sight, and event visibility predicates.
+- `rules::projection` — fog-gated `EntityView` construction, legacy/special `visionOnly`
+  projection support, and event visibility predicates.
 
 ### 3.4 Ability system (`game/ability.rs`, `game/services/ability_orders.rs`)
 
@@ -964,11 +964,12 @@ command validation and combat targeting, and expire at
 cycle plus 0.5 seconds. Combatants that first engage a target through one of these firing-reveal
 sources spend a one-second response delay before their first counter-shot, so firing-reveal
 counterfire plays out as shot/counter-shot rather than an instant simultaneous chain.
-Snapshot-only lingering death sight is layered after live fog and then unioned for projection, so
-lingering views stay marked `visionOnly` and do not refresh remembered buildings. The command,
-queued-order, and ordered-combat paths build a scoped attack-targeting fog from live fog plus active
-lingering death sources, allowing direct attacks on death-vision units/buildings without making
-lingering sight part of remembered intel or general auto-acquisition. Unit live fog stamps a
+Lingering death sight is stamped into live fog as ordinary temporary team sight for five seconds.
+The invisible source stays at the dead unit/building's final position, uses that entity's sight
+radius, respects smoke and line-of-sight blockers, and is stamped into every tracked teammate fog
+grid. Because it is normal fog, snapshots project current enemy positions without `visionOnly`,
+direct and queued attacks validate through it, remembered buildings/trenches refresh from it, and
+idle/attack-move auto-acquisition can choose targets it reveals. Unit live fog stamps a
 center-origin sight circle. Building live fog stamps the whole building footprint plus `sight_tiles`
 outward from each footprint edge, so a building with 1-tile sight sees itself and the one-tile
 perimeter around its edges. Neutral resource nodes never stamp vision.
@@ -978,8 +979,8 @@ smoke-aware fog is recomputed, the store records one latest-seen entry per
 `(viewer_player_id, enemy_building_entity_id)` for non-neutral enemy buildings currently
 projectable to that viewer through team-current actionable fog. Records copy id, owner, kind,
 center position, footprint tiles, hp/max hp, construction progress/completion state, and the tick
-observed. Snapshot-only lingering death vision is intentionally not used for refreshes, so it
-cannot create actionable intel for future commands. If a remembered building no longer exists, the
+observed. Five-second lingering death vision is normal temporary fog, so it refreshes remembered
+building intel while the source remains active. If a remembered building no longer exists, the
 record remains while its footprint is hidden from the viewer's team and is removed once that team
 scouts any remembered footprint tile. This keeps hidden destruction stale until the location is
 checked without adding any wire-protocol fields.

@@ -21,6 +21,7 @@ use crate::game::map::Map;
 use crate::game::services::line_of_sight::LineOfSight;
 use crate::game::services::occupancy::building_footprint;
 use crate::game::smoke::SmokeCloudStore;
+use crate::game::teams::TeamRelations;
 
 /// Temporary sight left behind by an owned unit/building after it dies.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -151,38 +152,15 @@ impl Fog {
         self.stamp_lingering_sources_inner(sources, map, store, None);
     }
 
-    pub(crate) fn stamp_lingering_sources_with_smoke(
+    pub(in crate::game) fn stamp_lingering_sources_for_teams_with_smoke(
         &mut self,
         sources: &[LingeringSightSource],
         map: &Map,
         store: &EntityStore,
         smokes: &SmokeCloudStore,
+        teams: &TeamRelations,
     ) {
-        self.stamp_lingering_sources_inner(sources, map, store, Some(smokes));
-    }
-
-    pub(in crate::game) fn with_active_lingering_sources(
-        &self,
-        sources: &[LingeringSightSource],
-        tick: u32,
-        map: &Map,
-        store: &EntityStore,
-        smokes: &SmokeCloudStore,
-    ) -> Self {
-        if sources.is_empty() {
-            return self.clone();
-        }
-        let active_sources: Vec<LingeringSightSource> = sources
-            .iter()
-            .copied()
-            .filter(|source| source.is_active_at(tick))
-            .collect();
-        if active_sources.is_empty() {
-            return self.clone();
-        }
-        let mut fog = self.clone();
-        fog.stamp_lingering_sources_with_smoke(&active_sources, map, store, smokes);
-        fog
+        self.stamp_lingering_sources_for_teams_inner(sources, map, store, smokes, teams);
     }
 
     fn stamp_lingering_sources_inner(
@@ -211,6 +189,35 @@ impl Fog {
                 continue;
             };
             stamp_sight_at(grid, size, source.x, source.y, source.sight_tiles, &los);
+        }
+        reveal_visible_building_footprints(&mut self.grids, &building_mask);
+    }
+
+    fn stamp_lingering_sources_for_teams_inner(
+        &mut self,
+        sources: &[LingeringSightSource],
+        map: &Map,
+        store: &EntityStore,
+        smokes: &SmokeCloudStore,
+        teams: &TeamRelations,
+    ) {
+        let size = self.size;
+        let building_mask = BuildingLosMask::new(store, map);
+        let los = LineOfSight::with_smoke_and_building_blockers(map, smokes, &building_mask.blockers);
+        for source in sources {
+            if smokes.point_inside(source.x, source.y) {
+                continue;
+            }
+            let mut recipients = teams.same_team_player_ids(source.owner);
+            if recipients.is_empty() {
+                recipients.push(source.owner);
+            }
+            for recipient in recipients {
+                let Some(grid) = self.grids.get_mut(&recipient) else {
+                    continue;
+                };
+                stamp_sight_at(grid, size, source.x, source.y, source.sight_tiles, &los);
+            }
         }
         reveal_visible_building_footprints(&mut self.grids, &building_mask);
     }

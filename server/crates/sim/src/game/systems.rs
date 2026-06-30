@@ -143,9 +143,6 @@ pub(crate) fn run_tick(
             teams.clone(),
         )
     });
-    let attack_fog = crate::perf::timed(perf.as_deref_mut(), "attack_fog", || {
-        fog.with_active_lingering_sources(lingering_sight, tick, map, entities, smokes)
-    });
     if perf.is_some() {
         coordinator.enable_diagnostics();
     }
@@ -158,7 +155,6 @@ pub(crate) fn run_tick(
             &pre_command.spatial,
             &mut coordinator,
             fog,
-            &attack_fog,
             smokes,
             ability_runtime,
             mortar_shells,
@@ -205,7 +201,6 @@ pub(crate) fn run_tick(
             entities,
             players,
             fog,
-            &attack_fog,
             &mut coordinator,
             smokes,
             ability_runtime,
@@ -261,7 +256,6 @@ pub(crate) fn run_tick(
             &post_movement.spatial,
             &mut coordinator,
             fog,
-            &attack_fog,
             smokes,
             mortar_shells,
             rng,

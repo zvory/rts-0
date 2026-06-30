@@ -8,8 +8,8 @@ use super::teams::TeamRelations;
 
 /// Temporary actionable sight granted to a recipient when a hostile unit exposes itself by firing.
 ///
-/// Unlike lingering death sight, this is stamped into live fog so command validation, combat
-/// targeting, and snapshot projection all treat the firing unit as currently visible.
+/// Like lingering death sight, this is stamped into live fog so command validation, combat
+/// targeting, and snapshot projection all treat the revealed unit as currently visible.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(in crate::game) struct FiringRevealSource {
     viewer: u32,

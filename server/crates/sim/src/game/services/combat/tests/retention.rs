@@ -88,7 +88,7 @@ fn shoot_while_moving_units_reacquire_when_retained_target_is_hidden() {
 }
 
 #[test]
-fn lingering_death_vision_does_not_feed_auto_acquisition() {
+fn lingering_death_vision_feeds_auto_acquisition() {
     let map = open_map(32);
     let mut entities = EntityStore::new();
     let attacker_pos = map.tile_center(4, 4);
@@ -105,13 +105,11 @@ fn lingering_death_vision_does_not_feed_auto_acquisition() {
     let smokes = SmokeCloudStore::new();
     let mut live_fog = Fog::new(map.size);
     live_fog.recompute(&[1, 2], &EntityStore::new(), &map);
-    let mut attack_target_fog = live_fog.clone();
     let source = LingeringSightSource::new(1, target_pos.0, target_pos.1, 2, 99)
         .expect("death vision source should be valid");
-    attack_target_fog.stamp_lingering_sources(&[source], &map, &entities);
+    live_fog.stamp_lingering_sources(&[source], &map, &entities);
 
-    assert!(!live_fog.is_visible_world(1, target_pos.0, target_pos.1));
-    assert!(attack_target_fog.is_visible_world(1, target_pos.0, target_pos.1));
+    assert!(live_fog.is_visible_world(1, target_pos.0, target_pos.1));
     assert_eq!(
         resolve_target_with_obstruction(
             &map,
@@ -120,7 +118,6 @@ fn lingering_death_vision_does_not_feed_auto_acquisition() {
             &spatial,
             &los,
             &live_fog,
-            &attack_target_fog,
             &smokes,
             &|_, _| false,
             attacker,
@@ -132,8 +129,8 @@ fn lingering_death_vision_does_not_feed_auto_acquisition() {
             false,
             &|candidate| candidate == target,
         ),
-        None,
-        "death vision should only validate explicit attack targets, not auto-acquisition"
+        Some(target),
+        "death vision is normal fog and should feed auto-acquisition"
     );
 }
 

@@ -793,10 +793,11 @@ export class Fog {
   revision, visibleRevision, exploredRevision
 }
 ```
-`match.js` must exclude `visionOnly` and shot-reveal entities from `ownEntities` before calling
-`fog.update`; those views are rendered as intel, not as local fog sources. Normal match snapshots
-provide `visibleTiles`, so the overlay follows server-authoritative fog including smoke blockers;
-local stamping remains a fallback for older/dev object snapshots.
+`match.js` must exclude legacy/special `visionOnly` and shot-reveal entities from `ownEntities`
+before calling `fog.update`; those views are rendered as intel, not as local fog sources. Normal
+match snapshots provide `visibleTiles`, so the overlay follows server-authoritative fog including
+smoke blockers and five-second lingering death sight; local stamping remains a fallback for
+older/dev object snapshots.
 
 Playable own selections and human multi-unit commands use the mirrored command-supply budget from
 `command_budget.js`: 24 base command supply plus `COMMAND_CAR_SUPPLY_CAP_BONUS = 20` and the
@@ -1200,8 +1201,8 @@ selection rings):
   Mortar impact events that include a shooter reveal show the mortar briefly above fog for players
   whose units or buildings were hit by indirect fire.
   Entities marked `visionOnly` by the server are drawn on the ordinary building/unit layers below
-  the fog overlay, excluded from local fog-source computation and normal selection hit-testing, and
-  included only by attack-command target hit-testing.
+  the fog overlay and excluded from local fog-source computation and selection/command hit-testing.
+  Current death-vision entities are normal visible entities and do not use this flag.
 - Buildings: footprint-sized blocky field structures with neutral geometry and plain
   two-letter stencils; under construction → translucent with a single HP-layer status bar;
   production → small top-edge progress bar. Tank Trap deconstruction uses that same HP-layer status

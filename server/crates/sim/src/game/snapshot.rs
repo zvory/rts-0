@@ -28,26 +28,11 @@ impl Game {
 
     pub fn snapshot_for_with_options(&self, player: u32, options: SnapshotOptions) -> Snapshot {
         let live_fog = self.team_current_fog_for(player, &self.fog);
-        if self.lingering_sight.is_empty() {
-            return self.snapshot_for_mode(
-                SnapshotMode {
-                    player,
-                    memory_players: &[player],
-                    fog: &live_fog,
-                    actionable_fog: Some(&live_fog),
-                    fogged: true,
-                    player_resource_projection: PlayerResourceProjection::None,
-                },
-                options,
-            );
-        }
-        let snapshot_fog = self.snapshot_fog();
-        let team_snapshot_fog = self.team_current_fog_for(player, &snapshot_fog);
         self.snapshot_for_mode(
             SnapshotMode {
                 player,
                 memory_players: &[player],
-                fog: &team_snapshot_fog,
+                fog: &live_fog,
                 actionable_fog: Some(&live_fog),
                 fogged: true,
                 player_resource_projection: PlayerResourceProjection::None,
@@ -93,49 +78,17 @@ impl Game {
         let actionable_fog = self
             .fog
             .union_for(Self::SPECTATOR_VIEWER_ID, visible_players);
-        if self.lingering_sight.is_empty() {
-            return self.snapshot_for_mode(
-                SnapshotMode {
-                    player: Self::SPECTATOR_VIEWER_ID,
-                    memory_players: visible_players,
-                    fog: &actionable_fog,
-                    actionable_fog: Some(&actionable_fog),
-                    fogged: true,
-                    player_resource_projection: PlayerResourceProjection::Selected(
-                        visible_players,
-                    ),
-                },
-                options,
-            );
-        }
-        let snapshot_fog = self
-            .snapshot_fog()
-            .union_for(Self::SPECTATOR_VIEWER_ID, visible_players);
         self.snapshot_for_mode(
             SnapshotMode {
                 player: Self::SPECTATOR_VIEWER_ID,
                 memory_players: visible_players,
-                fog: &snapshot_fog,
+                fog: &actionable_fog,
                 actionable_fog: Some(&actionable_fog),
                 fogged: true,
                 player_resource_projection: PlayerResourceProjection::Selected(visible_players),
             },
             options,
         )
-    }
-
-    fn snapshot_fog(&self) -> Fog {
-        if self.lingering_sight.is_empty() {
-            return self.fog.clone();
-        }
-        let mut fog = self.fog.clone();
-        fog.stamp_lingering_sources_with_smoke(
-            &self.lingering_sight,
-            &self.map,
-            &self.entities,
-            &self.smokes,
-        );
-        fog
     }
 
     fn snapshot_for_mode(&self, mode: SnapshotMode<'_>, options: SnapshotOptions) -> Snapshot {

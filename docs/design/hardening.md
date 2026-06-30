@@ -98,9 +98,10 @@ The server treats every client as potentially hostile. Limits live next to the c
   under-attack events only when their team can currently see the relevant origin/target or when a
   documented damage reveal applies. Defeated/disconnected teammates stop contributing live sight,
   and neutral resources never grant vision. Hidden enemies are never sent except inside explicit
-  five-second lingering death vision, where entity views are marked `visionOnly`, remain
-  non-selectable, and can only validate direct attack targets. Visibility is terrain-aware: stone
-  blocks sight beyond itself on both the server fog grid and the client cosmetic fog overlay.
+  five-second lingering death vision, which is stamped as ordinary temporary team sight and can
+  therefore feed snapshots, command validation, remembered intel, and combat acquisition while it
+  lasts. Visibility is terrain-aware: stone blocks sight beyond itself on both the server fog grid
+  and the client cosmetic fog overlay.
 - **Team-safe hostile command targeting**: explicit `Attack` commands, queued attack promotion, and
   target acquisition reject allied owners through the authoritative team relationship snapshot,
   not raw owner inequality. A malicious client can still send arbitrary entity ids, but allied,
