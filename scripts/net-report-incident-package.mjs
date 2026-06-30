@@ -573,7 +573,7 @@ function buildTimelineBands(rows, bandMs) {
     const startMs = Math.floor(ms / bandMs) * bandMs;
     const band = bands.get(startMs) || newTimelineBand(startMs, bandMs);
     band.rowCount += 1;
-    band.matches.add(row.sourceMatch || row.fields.match_run_id || "unknown");
+    band.matches.add(rowMatchLabel(row));
     addSet(band.matchRunIds, row.fields.match_run_id);
     if (row.fields.player_id !== undefined) band.playerIds.add(String(row.fields.player_id));
     if (row.fields.primary_issue) countMap(band.primaryIssues, row.fields.primary_issue);
@@ -675,7 +675,7 @@ function scoreWindow(row, group, warnThreshold) {
   }
   return {
     timestamp: row.timestamp,
-    match: row.sourceMatch || row.fields.match_run_id || "unknown",
+    match: rowMatchLabel(row),
     matchRunId: row.fields.match_run_id || "",
     playerId: row.fields.player_id !== undefined ? String(row.fields.player_id) : "",
     source: row.source,
@@ -700,7 +700,24 @@ function formatRowsTsv(rows, fields) {
 
 function rowsForMatch(rows, match) {
   const sources = new Set(match.sourceMatches || []);
-  return rows.filter((row) => sources.has(row.sourceMatch) || (match.matchRunId && row.fields.match_run_id === match.matchRunId));
+  if (!match.matchRunId) {
+    return rows.filter((row) => sources.has(row.sourceMatch));
+  }
+  const sourceRows = rows.filter((row) => sources.has(row.sourceMatch));
+  const sourceRunIds = new Set(sourceRows.map((row) => row.fields.match_run_id).filter(Boolean));
+  const canUseSourceFallback = sourceRunIds.size <= 1;
+  return rows.filter(
+    (row) =>
+      row.fields.match_run_id === match.matchRunId ||
+      (canUseSourceFallback && row.fields.match_run_id === undefined && sources.has(row.sourceMatch)),
+  );
+}
+
+function rowMatchLabel(row) {
+  if (/^\d+$/.test(row.sourceMatch || "")) {
+    return row.sourceMatch;
+  }
+  return row.fields.match_run_id || row.sourceMatch || "unknown";
 }
 
 function evidenceClassForRow(row) {

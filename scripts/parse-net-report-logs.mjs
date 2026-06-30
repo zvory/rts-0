@@ -342,7 +342,7 @@ function usage() {
 
 Options:
   --format markdown|json|tsv   Output format for stdout. Default: markdown.
-  --out-dir DIR                Write incident-summary.md, incident-summary.json, and incident-rows.tsv.
+  --out-dir DIR                Write the markdown/json/tsv incident package.
   --timeline-band-ms MS        Timeline band width for the agent digest. Default: 60000.
   -h, --help                   Show this help.
 
@@ -791,7 +791,12 @@ function finalizeMatch(match) {
 }
 
 function sourceLabel(match) {
-  return [...match.sourceMatches].sort().join("+") || match.key;
+  const sourceMatches = [...match.sourceMatches].sort();
+  const numericSources = sourceMatches.filter((source) => /^\d+$/.test(source));
+  if (numericSources.length > 0) {
+    return numericSources.join("+");
+  }
+  return match.matchRunId || sourceMatches.join("+") || match.key;
 }
 
 function firstTimestamp(rows) {

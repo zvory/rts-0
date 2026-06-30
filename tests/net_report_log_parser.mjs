@@ -194,6 +194,37 @@ try {
   rmSync(sustainedCommandDir, { recursive: true, force: true });
 }
 
+const combinedDir = mkdtempSync(path.join(os.tmpdir(), "rts-net-report-parser-combined-"));
+try {
+  const combinedLog = path.join(combinedDir, "combined.log");
+  writeFileSync(
+    combinedLog,
+    [
+      '2026-06-24T11:00:00Z INFO event="client_net_report" match_run_id="combined-a" player_id=1 primary_issue="command_upload_delay" rtt_max_ms=30 snapshot_gap_max_ms=40 snapshot_jitter_ms=1 command_issue_to_server_receipt_max_ms=300 command_issue_to_sim_ack_max_ms=320 frame_gap_max_ms=10 frame_work_max_ms=3 fps_estimate=60 server_tick_ms=4 server_lag_ms=0 slow_tick_count=0 "client network report"',
+      '2026-06-24T11:00:10Z INFO event="client_net_report" match_run_id="combined-b" player_id=2 primary_issue="frame_work" rtt_max_ms=35 snapshot_gap_max_ms=45 snapshot_jitter_ms=2 command_issue_to_server_receipt_max_ms=20 command_issue_to_sim_ack_max_ms=40 frame_gap_max_ms=150 frame_work_max_ms=45 fps_estimate=25 server_tick_ms=5 server_lag_ms=0 slow_tick_count=0 "client network report"',
+    ].join("\n") + "\n"
+  );
+  const combinedParsed = JSON.parse(run(["--format", "json", combinedLog]));
+  assert.deepEqual(
+    combinedParsed.matches.map((match) => match.match).sort(),
+    ["combined-a", "combined-b"],
+  );
+  const combinedCoverage = combinedParsed.agentDigest.coverageMatrix.matches;
+  for (const matchId of ["combined-a", "combined-b"]) {
+    const coverage = combinedCoverage.find((match) => match.match === matchId);
+    assert.ok(coverage, `expected coverage for ${matchId}`);
+    assert.equal(
+      coverage.items.find((item) => item.id === "client_reports")?.rows,
+      1,
+      `expected only ${matchId} rows in its coverage item`,
+    );
+  }
+  const commandTopWindow = combinedParsed.agentDigest.topWindows.groups.find((group) => group.id === "command")?.windows[0];
+  assert.equal(commandTopWindow?.match, "combined-a");
+} finally {
+  rmSync(combinedDir, { recursive: true, force: true });
+}
+
 const outDir = mkdtempSync(path.join(os.tmpdir(), "rts-net-report-parser-"));
 try {
   const out = run(["--out-dir", outDir, ...logs]);
