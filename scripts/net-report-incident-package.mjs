@@ -51,6 +51,12 @@ const SERVER_TICK_ROW_FIELDS = [
   "max_snapshot_ms",
   "snapshot_replaced",
   "snapshot_closed",
+  "pathing_requests",
+  "pathing_deferred",
+  "pathing_budget_exhausted",
+  "pathing_worst_request_ms",
+  "pathing_explored_nodes_max",
+  "pathing_top_source",
 ];
 
 const TOP_WINDOW_GROUPS = [
@@ -87,6 +93,23 @@ const TOP_WINDOW_GROUPS = [
     label: "server tick and slow phase",
     events: ["performance_tick"],
     fields: ["tick_ms", "scheduler_lag_ms", "slowest_phase_ms", "max_snapshot_ms"],
+  },
+  {
+    id: "server_pathing",
+    label: "server pathing volume and complexity",
+    events: ["performance_tick", "performance_pathing"],
+    fields: [
+      "pathing_requests",
+      "pathing_deferred",
+      "pathing_budget_exhausted",
+      "pathing_worst_request_ms",
+      "pathing_explored_nodes_max",
+      "requests_processed",
+      "requests_deferred",
+      "path_budget_exhausted",
+      "worst_request_ms",
+      "explored_nodes_max",
+    ],
   },
   {
     id: "frame_render",
@@ -159,6 +182,14 @@ const COVERAGE_CLASSES = [
     resetWindow: "per logged send row when tracing includes it",
     privacy: "aggregate send timing and bytes only",
     caveat: "client outbound counters can hint at backlog, but missing writer rows are not zero send cost",
+  },
+  {
+    id: "pathing_perf_rows",
+    label: "pathing diagnostics rows",
+    owner: "server movement/pathing coordinator performance tracing",
+    resetWindow: "one bounded row per instrumented pathing pass on logged slow or sampled ticks",
+    privacy: "aggregate request counts, stable source labels, cache/budget signals, and buckets only; no paths, positions, or unit ids",
+    caveat: "available only when the tick itself was logged by perf tracing; missing rows cannot prove pathing was cheap",
   },
   {
     id: "command_lifecycle",
@@ -244,6 +275,20 @@ const FIELD_CATALOG = {
     privacy: "aggregate server phase timing only",
     caveat: "counts logged slow/sampled rows, not every tick unless tracing mode logs every tick",
   },
+  maxPathingRequests: {
+    unit: "requests",
+    owner: "server movement/pathing coordinator performance tracing",
+    resetWindow: "parser timeline band",
+    privacy: "aggregate request counts only; no paths, positions, or unit ids",
+    caveat: "counts only logged slow/sampled ticks and excludes ticks with perf tracing disabled",
+  },
+  maxPathingWorstRequestMs: {
+    unit: "milliseconds",
+    owner: "server movement/pathing coordinator performance tracing",
+    resetWindow: "parser timeline band",
+    privacy: "worst aggregate request timing bucket source only; no raw path data",
+    caveat: "a slow request indicates pathing pressure but does not by itself explain browser delivery or render delay",
+  },
 };
 
 export function attachAgentDigest(report, rows, config = {}) {
@@ -315,7 +360,7 @@ export function formatPackageReadme(report, files) {
   lines.push("## Timeline Bands");
   for (const band of digest.timelineBands.filter((item) => item.issueCount > 0).slice(0, 20)) {
     lines.push(
-      `- ${band.startAt}: cmd ${fmt(band.maxCommandResponseMs)}ms, gap ${fmt(band.maxSnapshotGapMs)}ms, RTT ${fmt(band.maxRttMs)}ms, payload ${band.maxPayloadP95Bucket}, slow ticks ${band.slowTickCount}`,
+      `- ${band.startAt}: cmd ${fmt(band.maxCommandResponseMs)}ms, gap ${fmt(band.maxSnapshotGapMs)}ms, RTT ${fmt(band.maxRttMs)}ms, payload ${band.maxPayloadP95Bucket}, slow ticks ${band.slowTickCount}, pathing req ${fmt(band.maxPathingRequests)}`,
     );
   }
   lines.push("");
@@ -402,8 +447,10 @@ function buildMatchDigest(match) {
     keyMetrics: {
       reportRows: match.reportRows,
       serverTickRows: match.serverTickRows,
+      pathingRows: match.pathingRows,
       snapshotRows: match.snapshotRows,
       writerRows: match.writerRows,
+      pathing: match.pathingDiagnostics?.interpretation,
       playerMetrics: match.players.map((player) => ({
         playerId: player.playerId,
         reports: player.reportCount,
@@ -471,6 +518,9 @@ function matchUnknowns(match, classifications) {
   }
   if (match.writerRows === 0) {
     unknowns.push("writer send detail: not logged or unavailable");
+  }
+  if (!match.pathingRows) {
+    unknowns.push("pathing diagnostics detail: not logged or unavailable");
   }
   return [...new Set(unknowns)].slice(0, 10);
 }
@@ -559,6 +609,7 @@ function coverageItem(coverage, match, rows) {
     server_tick_rows: rows.filter((row) => row.event === "performance_tick").length,
     snapshot_perf_rows: rows.filter((row) => row.event === "performance_snapshot").length,
     writer_rows: rows.filter((row) => row.event === "performance_writer").length,
+    pathing_perf_rows: rows.filter((row) => row.event === "performance_pathing").length,
     command_lifecycle: rows.filter((row) =>
       row.fields.command_issue_to_server_receipt_max_ms !== undefined ||
       row.fields.server_command_room_queue_max_ms !== undefined
@@ -595,6 +646,7 @@ function buildTimelineBands(rows, bandMs) {
     if (row.fields.primary_issue) countMap(band.primaryIssues, row.fields.primary_issue);
     if (row.event === "client_net_report") updateClientBand(band, row.fields);
     if (row.event === "performance_tick") updateTickBand(band, row.fields);
+    if (row.event === "performance_pathing") updatePathingBand(band, row.fields);
     if (row.event === "performance_snapshot") updateMax(band, "maxSnapshotProjectionMs", row.fields.snapshot_ms ?? row.fields.total_ms);
     if (row.event === "performance_writer") {
       updateMax(band, "maxWriterSendMs", row.fields.send_ms);
@@ -647,7 +699,17 @@ function updateTickBand(band, fields) {
   updateMax(band, "maxSchedulerLagMs", fields.scheduler_lag_ms);
   updateMax(band, "maxSlowestPhaseMs", fields.slowest_phase_ms);
   updateMax(band, "maxSnapshotProjectionMs", fields.max_snapshot_ms);
+  updateMax(band, "maxPathingRequests", fields.pathing_requests);
+  updateMax(band, "maxPathingWorstRequestMs", fields.pathing_worst_request_ms);
   if (fields.slowest_phase) countMap(band.slowestPhaseCounts, fields.slowest_phase);
+}
+
+function updatePathingBand(band, fields) {
+  updateMax(band, "maxPathingRequests", fields.requests_processed);
+  updateMax(band, "maxPathingDeferred", fields.requests_deferred);
+  updateMax(band, "maxPathingWorstRequestMs", fields.worst_request_ms);
+  updateMax(band, "maxPathingExploredNodes", fields.explored_nodes_max);
+  if (fields.pass) countMap(band.slowestPhaseCounts, `pathing:${fields.pass}`);
 }
 
 function finalizeBand(band) {
@@ -742,6 +804,7 @@ function rowMatchLabel(row) {
 function evidenceClassForRow(row) {
   if (row.event === "client_net_report") return "client_reports";
   if (row.event === "performance_tick") return "server_tick_rows";
+  if (row.event === "performance_pathing") return "pathing_perf_rows";
   if (row.event === "performance_snapshot") return "snapshot_perf_rows";
   if (row.event === "performance_writer") return "writer_rows";
   return row.event;
@@ -778,6 +841,8 @@ function countBandIssues(band) {
     band.maxFrameWorkMs >= 33,
     band.maxRendererMs >= 33,
     band.maxServerTickMs >= 40,
+    band.maxPathingRequests >= 64,
+    band.maxPathingWorstRequestMs >= 8,
   ].filter(Boolean).length;
 }
 
@@ -820,6 +885,10 @@ function payloadBucket(value) {
 }
 
 function inferredThreshold(field) {
+  if (field.includes("pathing_requests") || field === "requests_processed") return 64;
+  if (field.includes("explored_nodes")) return 4096;
+  if (field.includes("pathing_worst_request") || field === "worst_request_ms") return 8;
+  if (field.includes("pathing_deferred") || field === "requests_deferred") return 1;
   if (field.includes("bytes")) return 1280;
   if (field.includes("count") || field.includes("accepted")) return 1;
   if (field.includes("tick") || field.includes("phase") || field.includes("_ms")) return 33;

@@ -40,8 +40,8 @@
     },
     {
       "path": "server/crates/sim/src/game/services/move_coordinator.rs",
-      "lines": 2068,
-      "reason": "Existing oversized movement coordinator before repo-wide source-size gate."
+      "lines": 2279,
+      "reason": "Pathing slow-tick diagnostics added per-pass queue/promotion counters and focused coverage to the existing oversized movement coordinator; keep ratcheting until coordinator diagnostics are split."
     },
     {
       "path": "server/crates/sim/src/game/services/movement/tests.rs",
@@ -55,8 +55,8 @@
     },
     {
       "path": "server/crates/sim/src/game/services/pathing.rs",
-      "lines": 1985,
-      "reason": "Existing oversized pathing service before repo-wide source-size gate."
+      "lines": 2068,
+      "reason": "Pathing slow-tick diagnostics added bounded request/source/complexity sampling to the existing oversized pathing service; keep ratcheting until pathing diagnostics are split."
     },
     {
       "path": "server/src/main.rs",

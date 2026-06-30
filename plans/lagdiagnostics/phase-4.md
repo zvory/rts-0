@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -56,13 +56,13 @@ budget behavior, and worst-path characteristics.
 
 ## Implementation Checklist
 
-- [ ] Define pathing diagnostic fields and privacy boundaries.
-- [ ] Add bounded counters to `MoveCoordinator` and related order-promotion paths.
-- [ ] Thread diagnostics into `TickPerf` for slow tick logging.
-- [ ] Update parser classification and digest sections for pathing.
-- [ ] Add focused tests for diagnostic counters without changing movement behavior.
-- [ ] Update docs with interpretation examples.
-- [ ] Mark this phase as done in this file in the implementation commit.
+- [x] Define pathing diagnostic fields and privacy boundaries.
+- [x] Add bounded counters to `MoveCoordinator` and related order-promotion paths.
+- [x] Thread diagnostics into `TickPerf` for slow tick logging.
+- [x] Update parser classification and digest sections for pathing.
+- [x] Add focused tests for diagnostic counters without changing movement behavior.
+- [x] Update docs with interpretation examples.
+- [x] Mark this phase as done in this file in the implementation commit.
 
 ## Verification
 

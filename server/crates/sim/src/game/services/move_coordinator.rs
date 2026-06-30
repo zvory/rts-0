@@ -13,6 +13,8 @@
 //! - repath throttling,
 //! - spawn-point search around buildings.
 
+use std::time::{Duration, Instant};
+
 use crate::config;
 use crate::game::ability::AbilityKind;
 use crate::game::entity::{
@@ -30,10 +32,12 @@ use crate::game::services::occupancy::{
     building_footprint, footprint_center, footprint_tiles, Occupancy, StaticPathingRelation,
 };
 use crate::game::services::pathing::{
-    simplify_reverse_waypoints_with_limit, PathRequest, PathingService, RouteShape,
+    simplify_reverse_waypoints_with_limit, PathCacheStatus, PathRequest, PathingRequestDiagnostics,
+    PathingService, RouteShape,
 };
 use crate::game::services::standability;
 use crate::game::teams::TeamRelations;
+use crate::perf::{PathingPassDiagnostics, PathingRequestSample, PathingRequestSource};
 
 /// Maximum number of fresh A* path requests serviced in a single tick. Beyond this,
 /// remaining `AwaitingPath` units stay queued for the next tick.
@@ -60,6 +64,9 @@ pub struct MoveCoordinator<'a> {
     teams: TeamRelations,
     tick: u32,
     budget: usize,
+    diagnostics_enabled: bool,
+    diagnostics: Option<PathingPassDiagnostics>,
+    queued_without_active_diagnostics: Vec<(PathingRequestSource, usize)>,
 }
 
 impl<'a> MoveCoordinator<'a> {
@@ -93,6 +100,78 @@ impl<'a> MoveCoordinator<'a> {
             teams,
             tick,
             budget: MAX_REQUESTS_PER_TICK,
+            diagnostics_enabled: false,
+            diagnostics: None,
+            queued_without_active_diagnostics: Vec::new(),
+        }
+    }
+
+    pub(in crate::game) fn enable_diagnostics(&mut self) {
+        self.diagnostics_enabled = true;
+    }
+
+    pub(in crate::game) fn begin_pathing_diagnostics(
+        &mut self,
+        pass: &'static str,
+        entities: &EntityStore,
+    ) {
+        if !self.diagnostics_enabled {
+            return;
+        }
+        let mut diagnostics = PathingPassDiagnostics::new(pass, count_awaiting_paths(entities));
+        for (source, count) in self.queued_without_active_diagnostics.drain(..) {
+            diagnostics.record_group_queued_for_path(source, count);
+        }
+        self.diagnostics = Some(diagnostics);
+    }
+
+    pub(in crate::game) fn finish_pathing_diagnostics(
+        &mut self,
+        entities: &EntityStore,
+    ) -> Option<PathingPassDiagnostics> {
+        let mut diagnostics = self.diagnostics.take()?;
+        diagnostics.still_awaiting = count_awaiting_paths(entities);
+        diagnostics.requests_deferred = if diagnostics.pass == "promote_queued_orders" {
+            0
+        } else {
+            diagnostics.still_awaiting
+        };
+        diagnostics.coordinator_budget_exhausted =
+            self.budget == 0 && diagnostics.still_awaiting > 0;
+        Some(diagnostics)
+    }
+
+    fn record_group_queued_for_path(&mut self, source: PathingRequestSource, count: usize) {
+        if let Some(diagnostics) = &mut self.diagnostics {
+            diagnostics.record_group_queued_for_path(source, count);
+        } else if self.diagnostics_enabled && count > 0 {
+            self.queued_without_active_diagnostics.push((source, count));
+        }
+    }
+
+    fn record_path_request(
+        &mut self,
+        source: PathingRequestSource,
+        path_ok: bool,
+        same_tile: bool,
+        request: Option<PathingRequestDiagnostics>,
+        duration: Duration,
+    ) {
+        if let Some(diagnostics) = &mut self.diagnostics {
+            let cache_hit = request.as_ref().map(|request| match request.cache_status {
+                PathCacheStatus::Hit => true,
+                PathCacheStatus::Miss => false,
+            });
+            diagnostics.record_path_request(PathingRequestSample {
+                source,
+                path_ok,
+                same_tile,
+                cache_hit,
+                budget_exhausted: request.is_some_and(|request| request.budget_exhausted),
+                expanded_nodes: request.map_or(0, |request| request.expanded_nodes),
+                tile_path_len: request.map_or(0, |request| request.tile_path_len),
+                duration,
+            });
         }
     }
 
@@ -128,6 +207,14 @@ impl<'a> MoveCoordinator<'a> {
         if units.is_empty() {
             return;
         }
+        self.record_group_queued_for_path(
+            if attack_move {
+                PathingRequestSource::AttackMove
+            } else {
+                PathingRequestSource::Move
+            },
+            units.len(),
+        );
         let goals = formation_goals(self.map, self.occ, &units, goal);
 
         for (unit, g) in units.iter().zip(goals.iter()) {
@@ -172,7 +259,7 @@ impl<'a> MoveCoordinator<'a> {
             e.reset_stuck(px, py);
         }
         if request_initial_path {
-            self.request_path(entities, id, (tx, ty), false);
+            self.request_path(entities, id, (tx, ty), false, PathingRequestSource::Attack);
         }
     }
 
@@ -191,7 +278,7 @@ impl<'a> MoveCoordinator<'a> {
             let (px, py) = (e.pos_x, e.pos_y);
             e.reset_stuck(px, py);
         }
-        self.request_path(entities, id, (nx, ny), false);
+        self.request_path(entities, id, (nx, ny), false, PathingRequestSource::Gather);
     }
 
     /// Issue a world-targeted ability order and walk the caster to the launch staging point.
@@ -213,7 +300,7 @@ impl<'a> MoveCoordinator<'a> {
             let (px, py) = (e.pos_x, e.pos_y);
             e.reset_stuck(px, py);
         }
-        self.request_path(entities, id, staging, true);
+        self.request_path(entities, id, staging, true, PathingRequestSource::Ability);
     }
 
     /// Issue a build order: record the placement intent on the worker and walk it to an outside
@@ -234,11 +321,23 @@ impl<'a> MoveCoordinator<'a> {
             let (px, py) = (e.pos_x, e.pos_y);
             e.reset_stuck(px, py);
         }
-        if self.request_build_path(entities, id, kind, tile_x, tile_y) {
+        if self.request_build_path(
+            entities,
+            id,
+            kind,
+            tile_x,
+            tile_y,
+            PathingRequestSource::Build,
+        ) {
             return true;
         }
         for goal in build_staging_goals(self.map, self.occ, entities, id, kind, tile_x, tile_y) {
-            if self.request_exact_path_to_build_goal(entities, id, goal) {
+            if self.request_exact_path_to_build_goal(
+                entities,
+                id,
+                goal,
+                PathingRequestSource::Build,
+            ) {
                 return true;
             }
         }
@@ -250,12 +349,7 @@ impl<'a> MoveCoordinator<'a> {
 
     /// Issue a Tank Trap deconstruction order and walk the worker to the same outside staging ring
     /// used for construction.
-    pub fn order_deconstruct(
-        &mut self,
-        entities: &mut EntityStore,
-        id: u32,
-        target: u32,
-    ) -> bool {
+    pub fn order_deconstruct(&mut self, entities: &mut EntityStore, id: u32, target: u32) -> bool {
         let (target_x, target_y, tile_x, tile_y) = match entities.get(target) {
             Some(t) if t.kind == EntityKind::TankTrap => {
                 let (tile_x, tile_y) = self.map.tile_of(t.pos_x, t.pos_y);
@@ -272,7 +366,14 @@ impl<'a> MoveCoordinator<'a> {
             let (px, py) = (e.pos_x, e.pos_y);
             e.reset_stuck(px, py);
         }
-        if self.request_build_path(entities, id, EntityKind::TankTrap, tile_x, tile_y) {
+        if self.request_build_path(
+            entities,
+            id,
+            EntityKind::TankTrap,
+            tile_x,
+            tile_y,
+            PathingRequestSource::Deconstruct,
+        ) {
             return true;
         }
         for goal in build_staging_goals(
@@ -284,7 +385,12 @@ impl<'a> MoveCoordinator<'a> {
             tile_x,
             tile_y,
         ) {
-            if self.request_exact_path_to_build_goal(entities, id, goal) {
+            if self.request_exact_path_to_build_goal(
+                entities,
+                id,
+                goal,
+                PathingRequestSource::Deconstruct,
+            ) {
                 return true;
             }
         }
@@ -316,7 +422,11 @@ impl<'a> MoveCoordinator<'a> {
                 Some(g) => g,
                 None => continue,
             };
-            self.request_path(entities, id, goal, true);
+            let source = entities
+                .get(id)
+                .map(|entity| pathing_source_from_order(&entity.order()))
+                .unwrap_or(PathingRequestSource::Other);
+            self.request_path(entities, id, goal, true, source);
         }
     }
 
@@ -338,7 +448,13 @@ impl<'a> MoveCoordinator<'a> {
         if self.budget == 0 {
             return false;
         }
-        self.request_path(entities, id, target_pos, false)
+        self.request_path(
+            entities,
+            id,
+            target_pos,
+            false,
+            PathingRequestSource::Attack,
+        )
     }
 
     /// Request a path for a gatherer, respecting throttle and budget.
@@ -355,7 +471,7 @@ impl<'a> MoveCoordinator<'a> {
         if self.budget == 0 {
             return false;
         }
-        self.request_path(entities, id, node_pos, false)
+        self.request_path(entities, id, node_pos, false, PathingRequestSource::Gather)
     }
 
     /// Return a chase goal that the movement system can actually path to.
@@ -541,7 +657,8 @@ impl<'a> MoveCoordinator<'a> {
                         continue;
                     }
                     let tile = (tx as u32, ty as u32);
-                    if blocked_tiles.contains(&tile) || !self.tile_passable_for_kind(tile, attacker_kind)
+                    if blocked_tiles.contains(&tile)
+                        || !self.tile_passable_for_kind(tile, attacker_kind)
                     {
                         continue;
                     }
@@ -563,8 +680,7 @@ impl<'a> MoveCoordinator<'a> {
         }
 
         candidates.sort_by(|left, right| {
-            left
-                .0
+            left.0
                 .cmp(&right.0)
                 .then_with(|| left.1.cmp(&right.1))
                 .then_with(|| left.2.total_cmp(&right.2))
@@ -593,7 +709,9 @@ impl<'a> MoveCoordinator<'a> {
         id: u32,
         goal: (f32, f32),
         smooth_static_segments: bool,
+        source: PathingRequestSource,
     ) -> bool {
+        let request_start = self.diagnostics.as_ref().map(|_| Instant::now());
         let ((sx, sy), owner, kind, start_pos) = match entities.get(id) {
             Some(e) => (
                 self.map.tile_of(e.pos_x, e.pos_y),
@@ -622,6 +740,15 @@ impl<'a> MoveCoordinator<'a> {
                 }
             }
             self.budget = self.budget.saturating_sub(1);
+            self.record_path_request(
+                source,
+                true,
+                true,
+                None,
+                request_start
+                    .map(|start| start.elapsed())
+                    .unwrap_or_default(),
+            );
             return true;
         }
         let radius_tiles = config::unit_radius_tiles(kind);
@@ -639,7 +766,9 @@ impl<'a> MoveCoordinator<'a> {
             route_shape,
             budget: None,
         };
-        let mut waypoints = self.pathing.request(self.map, self.occ, req);
+        let (mut waypoints, request_diagnostics) = self
+            .pathing
+            .request_with_diagnostics(self.map, self.occ, req);
 
         // Snap the final waypoint to the exact requested goal for precise arrival.
         if !waypoints.is_empty() {
@@ -679,6 +808,15 @@ impl<'a> MoveCoordinator<'a> {
             }
         }
         self.budget = self.budget.saturating_sub(1);
+        self.record_path_request(
+            source,
+            path_ok,
+            false,
+            Some(request_diagnostics),
+            request_start
+                .map(|start| start.elapsed())
+                .unwrap_or_default(),
+        );
         path_ok
     }
 
@@ -709,6 +847,7 @@ impl<'a> MoveCoordinator<'a> {
         kind: EntityKind,
         tile_x: u32,
         tile_y: u32,
+        source: PathingRequestSource,
     ) -> bool {
         let footprint = footprint_tiles(kind, tile_x, tile_y);
         if footprint.is_empty() {
@@ -722,7 +861,8 @@ impl<'a> MoveCoordinator<'a> {
         }
 
         let approach_goal = self.map.tile_center(tile_x, tile_y);
-        let Some(tile_path) = self.request_exact_tile_path(entities, id, approach_goal) else {
+        let Some(tile_path) = self.request_exact_tile_path(entities, id, approach_goal, source)
+        else {
             return false;
         };
         let Some(staging_index) = tile_path.iter().rposition(|(tx, ty)| {
@@ -748,8 +888,9 @@ impl<'a> MoveCoordinator<'a> {
         entities: &mut EntityStore,
         id: u32,
         goal: (f32, f32),
+        source: PathingRequestSource,
     ) -> bool {
-        let Some(tile_path) = self.request_exact_tile_path(entities, id, goal) else {
+        let Some(tile_path) = self.request_exact_tile_path(entities, id, goal, source) else {
             return false;
         };
         let waypoints = pathfinding::to_world_waypoints(&tile_path);
@@ -762,10 +903,12 @@ impl<'a> MoveCoordinator<'a> {
         entities: &EntityStore,
         id: u32,
         goal: (f32, f32),
+        source: PathingRequestSource,
     ) -> Option<Vec<(i32, i32)>> {
         if self.budget == 0 {
             return None;
         }
+        let request_start = self.diagnostics.as_ref().map(|_| Instant::now());
         let (unit_owner, unit_kind, sx, sy) = match entities.get(id) {
             Some(e) if e.is_unit() => {
                 let (sx, sy) = self.map.tile_of(e.pos_x, e.pos_y);
@@ -784,12 +927,46 @@ impl<'a> MoveCoordinator<'a> {
             route_shape: RouteShape::Normal,
             budget: None,
         };
-        let tile_path = self.pathing.request_tile_path(self.map, self.occ, req);
+        let (tile_path, request_diagnostics) = self
+            .pathing
+            .request_tile_path_with_diagnostics(self.map, self.occ, req);
         self.budget = self.budget.saturating_sub(1);
-        if tile_path.last().copied() == Some((gx as i32, gy as i32)) {
+        let path_ok = tile_path.last().copied() == Some((gx as i32, gy as i32));
+        self.record_path_request(
+            source,
+            path_ok,
+            false,
+            Some(request_diagnostics),
+            request_start
+                .map(|start| start.elapsed())
+                .unwrap_or_default(),
+        );
+        if path_ok {
             Some(tile_path)
         } else {
             None
+        }
+    }
+}
+
+fn count_awaiting_paths(entities: &EntityStore) -> usize {
+    entities
+        .iter()
+        .filter(|entity| entity.is_unit() && entity.move_phase() == Some(MovePhase::AwaitingPath))
+        .count()
+}
+
+fn pathing_source_from_order(order: &Order) -> PathingRequestSource {
+    match order {
+        Order::Move(_) => PathingRequestSource::Move,
+        Order::AttackMove(_) => PathingRequestSource::AttackMove,
+        Order::Attack(_) => PathingRequestSource::Attack,
+        Order::Gather(_) => PathingRequestSource::Gather,
+        Order::Build(_) => PathingRequestSource::Build,
+        Order::Deconstruct(_) => PathingRequestSource::Deconstruct,
+        Order::Ability(_) => PathingRequestSource::Ability,
+        Order::Idle | Order::HoldPosition | Order::ArtilleryPointFire(_) => {
+            PathingRequestSource::Other
         }
     }
 }
@@ -1427,8 +1604,14 @@ mod tests {
         let occ = Occupancy::build(&map, &entities);
         let rifle = formation_unit_kind(2, EntityKind::Rifleman, &map, (10, 10));
         let tank = formation_unit_kind(3, EntityKind::Tank, &map, (10, 10));
-        let infantry = [FormationAssignment { kind: EntityKind::Rifleman, tile: (20, 20) }];
-        let vehicle = [FormationAssignment { kind: EntityKind::AntiTankGun, tile: (20, 20) }];
+        let infantry = [FormationAssignment {
+            kind: EntityKind::Rifleman,
+            tile: (20, 20),
+        }];
+        let vehicle = [FormationAssignment {
+            kind: EntityKind::AntiTankGun,
+            tile: (20, 20),
+        }];
         let adjacent = (21, 20);
 
         assert!(is_free_goal(&map, &occ, &rifle, adjacent, &infantry, true));
@@ -1916,20 +2099,18 @@ mod tests {
         let mut pathing = PathingService::new(8_192, 256);
         pathing.advance_tick(1);
         let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+        coordinator.enable_diagnostics();
 
         // Set budget artificially low (3).
         coordinator.budget = 3;
 
-        // Mark all units as awaiting path with a Move order.
-        for &id in &ids {
-            if let Some(e) = entities.get_mut(id) {
-                e.set_order(Order::move_to(500.0, 500.0));
-                e.set_path_goal(Some((500.0, 500.0)));
-                e.mark_move_phase(MovePhase::AwaitingPath);
-            }
-        }
+        coordinator.order_group_move(&mut entities, 1, &ids, (500.0, 500.0), false);
 
+        coordinator.begin_pathing_diagnostics("awaiting_paths", &entities);
         coordinator.process_awaiting_paths(&mut entities);
+        let diagnostics = coordinator
+            .finish_pathing_diagnostics(&entities)
+            .expect("diagnostics should be enabled");
 
         // Count how many moved from AwaitingPath to Moving/PathFailed.
         let mut processed = 0;
@@ -1948,6 +2129,20 @@ mod tests {
             "only 3 paths should have been processed with budget=3"
         );
         assert_eq!(still_waiting, 7, "7 units should still be awaiting path");
+        assert_eq!(diagnostics.pass, "awaiting_paths");
+        assert_eq!(diagnostics.awaiting_start, 10);
+        assert_eq!(diagnostics.requests_processed, 3);
+        assert_eq!(diagnostics.still_awaiting, 7);
+        assert_eq!(diagnostics.requests_deferred, 7);
+        assert!(diagnostics.coordinator_budget_exhausted);
+        assert_eq!(diagnostics.queued_for_path, 10);
+        assert_eq!(diagnostics.queued_source_counts.move_orders, 10);
+        assert_eq!(diagnostics.source_counts.move_orders, 3);
+        assert_eq!(diagnostics.cache_misses, 3);
+        assert_eq!(diagnostics.group_size_buckets.one, 0);
+        assert_eq!(diagnostics.group_size_buckets.two_to_four, 0);
+        assert_eq!(diagnostics.group_size_buckets.five_to_sixteen, 1);
+        assert!(diagnostics.path_len_max > 0);
     }
 
     #[test]
@@ -1967,7 +2162,13 @@ mod tests {
         let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
 
         assert!(
-            coordinator.request_path(&mut entities, unit, exact_goal, true),
+            coordinator.request_path(
+                &mut entities,
+                unit,
+                exact_goal,
+                true,
+                PathingRequestSource::Move,
+            ),
             "fixture path should be found"
         );
         let unit = entities.get(unit).expect("unit should still exist");
@@ -1992,7 +2193,11 @@ mod tests {
             starts: vec![],
             expansion_sites: vec![],
         };
-        for kind in [EntityKind::ScoutCar, EntityKind::Tank, EntityKind::AntiTankGun] {
+        for kind in [
+            EntityKind::ScoutCar,
+            EntityKind::Tank,
+            EntityKind::AntiTankGun,
+        ] {
             let mut entities = EntityStore::new();
             let start = map.tile_center(10, 10);
             let unit = entities
@@ -2007,7 +2212,13 @@ mod tests {
             {
                 let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
                 assert!(
-                    coordinator.request_path(&mut entities, unit, goal, true),
+                    coordinator.request_path(
+                        &mut entities,
+                        unit,
+                        goal,
+                        true,
+                        PathingRequestSource::Move,
+                    ),
                     "fixture path should be found for {kind:?}"
                 );
             }
