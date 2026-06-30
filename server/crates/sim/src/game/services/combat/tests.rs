@@ -41,7 +41,6 @@ fn open_map(size: u32) -> Map {
         expansion_sites: Vec::new(),
     }
 }
-
 fn map_with_rock_at(tile: (u32, u32)) -> Map {
     let mut map = open_map(12);
     map.terrain[(tile.1 * map.size + tile.0) as usize] = terrain::ROCK;
@@ -249,7 +248,6 @@ fn predicted_test_mortar_impact(
     let (x, y) = mortar_aim_point(entities, target, tick);
     crate::game::mortar_scatter::predicted_mortar_impact(&fog, teams, owner, attacker, x, y, tick)
 }
-
 fn run_movement_tick(entities: &mut EntityStore) {
     let map = Map::generate(2, 0x00C0_FFEE);
     run_movement_tick_on_map(entities, &map, 0);

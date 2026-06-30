@@ -2,7 +2,6 @@ use super::*;
 use crate::game::command::SimCommand;
 use crate::game::entity::{EntityKind, Order};
 use crate::game::lab::{LabMoveEntity, LabOp};
-use crate::game::services::geometry::{unit_bodies_intersect, unit_body_for_entity};
 use crate::game::upgrade::UpgradeKind;
 use crate::game::{services, systems, SmokeCloudStore};
 use crate::protocol::terrain;
@@ -477,7 +476,7 @@ fn excluded_units_and_buildings_do_not_create_or_occupy_trenches() {
 }
 
 #[test]
-fn slotting_moves_near_stopped_units_to_legal_non_stacking_positions() {
+fn occupied_trenches_reject_second_eligible_occupant() {
     let mut game = empty_flat_game(&players());
     let trench_pos = game.map.tile_center(24, 24);
     let trench = game
@@ -488,7 +487,15 @@ fn slotting_moves_near_stopped_units_to_legal_non_stacking_positions() {
         .entities
         .spawn_unit(1, EntityKind::Rifleman, trench_pos.0, trench_pos.1)
         .expect("first rifleman should spawn");
-    let second_start = (trench_pos.0 + radius + 8.0, trench_pos.1);
+    repair_world(&mut game);
+
+    game.tick();
+    assert_eq!(
+        active_trench_occupation(game.entities.get(first).expect("first should exist")),
+        Some(trench)
+    );
+
+    let second_start = (trench_pos.0 + radius + 10.0, trench_pos.1);
     let second = game
         .entities
         .spawn_unit(1, EntityKind::Rifleman, second_start.0, second_start.1)
@@ -500,25 +507,48 @@ fn slotting_moves_near_stopped_units_to_legal_non_stacking_positions() {
     let first_entity = game.entities.get(first).expect("first should exist");
     let second_entity = game.entities.get(second).expect("second should exist");
     assert_eq!(active_trench_occupation(first_entity), Some(trench));
-    assert_eq!(active_trench_occupation(second_entity), Some(trench));
+    assert_eq!(active_trench_occupation(second_entity), None);
     assert!(
-        (second_entity.pos_x - second_start.0).abs() > 0.1
-            || (second_entity.pos_y - second_start.1).abs() > 0.1,
-        "near unit should make a small slotting correction"
+        !trench_contains_point(
+            *game
+                .trenches
+                .all()
+                .iter()
+                .find(|view| view.id == trench)
+                .expect("trench should still exist"),
+            second_entity.pos_x,
+            second_entity.pos_y
+        ),
+        "second occupant should remain outside the already occupied trench footprint"
     );
-    assert!(
-        game.trenches.all().iter().any(|view| {
-            view.id == trench
-                && trench_contains_point(*view, second_entity.pos_x, second_entity.pos_y)
-        }),
-        "slotted unit should end inside the trench footprint"
-    );
-    let first_body = unit_body_for_entity(first_entity).expect("first body");
-    let second_body = unit_body_for_entity(second_entity).expect("second body");
-    assert!(
-        !unit_bodies_intersect(first_body, second_body),
-        "slotting must not stack unit bodies"
-    );
+}
+
+#[test]
+fn adjacent_researched_infantry_dig_separate_trenches() {
+    let mut game = empty_flat_game(&players());
+    grant_entrenchment(&mut game, 1);
+    let pos = game.map.tile_center(24, 24);
+    let separation = 22.0;
+    let first = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, pos.0, pos.1)
+        .expect("first rifleman should spawn");
+    let second = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, pos.0 + separation, pos.1)
+        .expect("second rifleman should spawn");
+    repair_world(&mut game);
+
+    tick_n(&mut game, config::ENTRENCHMENT_DIG_IN_TICKS);
+
+    let first_trench =
+        active_trench_occupation(game.entities.get(first).expect("first should exist"))
+            .expect("first should occupy its own trench");
+    let second_trench =
+        active_trench_occupation(game.entities.get(second).expect("second should exist"))
+            .expect("second should occupy its own trench");
+    assert_ne!(first_trench, second_trench);
+    assert_eq!(game.trenches.all().len(), 2);
 }
 
 #[test]
@@ -531,7 +561,7 @@ fn slotting_rejects_positions_blocked_by_tank_traps() {
         .spawn_building(2, EntityKind::TankTrap, trench_pos.0, trench_pos.1, true)
         .expect("tank trap should spawn");
     let radius = config::ENTRENCHMENT_TRENCH_RADIUS_TILES * config::TILE_SIZE as f32;
-    let start = (trench_pos.0 + radius + 8.0, trench_pos.1);
+    let start = (trench_pos.0 + radius + 14.0, trench_pos.1);
     let rifleman = game
         .entities
         .spawn_unit(1, EntityKind::Rifleman, start.0, start.1)

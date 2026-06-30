@@ -135,8 +135,8 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   // Artillery minimap markers add a compact visual-only firing event.
   "protocol.js": 45366,
   // Protocol cleanup split compact snapshot decoding behind protocol.js.
-  // Entrenchment Phase 3 adds the occupiedTrenchId compact entity slot.
-  "protocol_snapshot.js": 23004,
+  // Entrenchment Phase 3 adds the occupiedTrenchId slot; Panzerfaust reserves compact events.
+  "protocol_snapshot.js": 24192,
   // Lab MVP Phase 5 lets command descriptors ask the injected policy which owner is controllable.
   "hud_command_card.js": 29498,
   "renderer/shared.js": 28113,

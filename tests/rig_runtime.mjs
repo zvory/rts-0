@@ -16,7 +16,11 @@ import {
   createUnitRigInstance,
   renderLiveUnitRig,
 } from "../client/src/renderer/rigs/runtime.js";
-import { MACHINE_GUNNER_RIG_SVG, RIFLEMAN_RIG_SVG } from "../client/src/renderer/rigs/infantry_svg.js";
+import {
+  MACHINE_GUNNER_RIG_SVG,
+  PANZERFAUST_RIG_SVG,
+  RIFLEMAN_RIG_SVG,
+} from "../client/src/renderer/rigs/infantry_svg.js";
 import {
   ANTI_TANK_GUN_RIG_SVG,
   ARTILLERY_RIG_SVG,
@@ -235,6 +239,8 @@ test("live rig definitions compile production SVG sources", () => {
   assert.equal(GOLEM_RIG_SVG.includes('data-rts-rig-kind="golem"'), true);
   assert.equal(GOLEM_RIG_SVG.includes('id="golem.authored"'), true);
   assert.equal(RIFLEMAN_RIG_SVG.trim(), riflemanFixtureText);
+  assert.equal(PANZERFAUST_RIG_SVG.includes('data-rts-rig-kind="panzerfaust"'), true);
+  assert.equal(PANZERFAUST_RIG_SVG.includes('id="panzerfaust.placeholder"'), true);
   assert.equal(MACHINE_GUNNER_RIG_SVG.trim(), machineGunnerFixtureText);
   assert.equal(ANTI_TANK_GUN_RIG_SVG.trim(), antiTankGunFixtureText);
   assert.equal(MORTAR_TEAM_RIG_SVG.trim(), mortarTeamFixtureText);
@@ -258,6 +264,8 @@ test("live rig definitions compile production SVG sources", () => {
   assert.equal(definitions.get(KIND.MACHINE_GUNNER).id, "machine-gunner.authored");
   assert.equal(definitions.has(KIND.MORTAR_TEAM), true);
   assert.equal(definitions.get(KIND.MORTAR_TEAM).id, "mortar-team.authored");
+  assert.equal(definitions.has(KIND.PANZERFAUST), true);
+  assert.equal(definitions.get(KIND.PANZERFAUST).id, "panzerfaust.placeholder");
   assert.equal(definitions.has(KIND.SCOUT_CAR), true);
   assert.equal(definitions.get(KIND.SCOUT_CAR).id, "scout-car.authored");
   assert.equal(definitions.has(KIND.COMMAND_CAR), true);
@@ -283,6 +291,11 @@ test("live rig routes expose kind-specific production part groups", () => {
   assert.deepEqual(riflemanRoutes[0].parts, ["part.shadow"]);
   assert.equal(riflemanRoutes[1].parts.includes("part.body"), true);
   assert.equal(riflemanRoutes[1].parts.includes("part.rifle.barrel"), true);
+
+  const panzerfaustRoutes = liveRigRoutesFor(KIND.PANZERFAUST);
+  assert.deepEqual(panzerfaustRoutes[0].parts, ["part.shadow"]);
+  assert.equal(panzerfaustRoutes[1].parts.includes("part.body"), true);
+  assert.equal(panzerfaustRoutes[1].parts.includes("part.rifle.barrel"), true);
 
   const machineGunnerRoutes = liveRigRoutesFor(KIND.MACHINE_GUNNER);
   assert.deepEqual(machineGunnerRoutes[0].parts, ["part.shadow"]);

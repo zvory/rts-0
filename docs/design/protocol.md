@@ -108,7 +108,7 @@ the transport envelope only and is intentionally absent from replay/simulation c
 | `setupAntiTankGuns` | `units: u32[]`, `x: f32`, `y: f32`, `queued?: bool` | Manually emplace owned anti-tank guns and artillery toward a world point. When `queued` is true, append a future setup-facing intent for owned completed Anti-Tank Guns and artillery only; the stored point is evaluated from the unit's position when the stage promotes. Immediate setup clears movement/target state, records the setup facing, and enters `setting_up`. Other selected units are ignored. |
 | `tearDownAntiTankGuns` | `units: u32[]` | Pack up owned anti-tank guns that are `setting_up` or `deployed`. Other selected units are ignored. |
 | `charge`     | `units: u32[]` | Legacy Rifleman Charge activation. Preserved for old clients/replays as a parseable no-op; it has no eligible carriers, cooldown, or runtime status. |
-| `useAbility` | `ability: "charge"|"smoke"|"mortarFire"|"pointFire"|"blanketFire"|"breakthrough"|"ekatTeleport"|"ekatLineShot"|"ekatMagicAnchor"|"ekatConsumeGolem"`, `units: u32[]`, `x?: f32`, `y?: f32`, `queued?: bool` | Generic ability command. Ability ids, carriers, target mode, cost, cooldown, finite uses, queueability, queue policy, autocast support, and command-card exposure are mirrored from the Rust faction ability registry. `charge` is legacy/no-op with no carriers or runtime effect; `smoke`, `mortarFire`, Artillery `pointFire`, reserved Artillery `blanketFire`, Ekat `ekatTeleport`, `ekatLineShot`, and `ekatMagicAnchor` target a world point. Command Car `breakthrough` and Ekat `ekatConsumeGolem` are self-targeted and ignore `x`/`y`. Smoke command execution is phased separately from the authoritative smoke world-state/LOS model; mortar fire schedules a delayed area impact. Registry queue policy differentiates non-queued, skip-if-not-ready, and wait-until-ready abilities; queued Mortar Fire waits for ability cooldown/weapon reload and then fires once per queued click. Artillery Point Fire locks the submitted point to each gun's 25-to-55 tile range band along that gun's origin-to-click ray, stores that effective point, and can auto-set-up or redeploy the gun in place before firing. Queued Point Fire locks from the best authoritative future queued position when available, stores the locked point, and is terminal in the unit order queue: once accepted, later queued unit orders are not appended after it. `blanketFire` is currently a hidden mirrored command identity with compact codes and a 15-tile blanket radius; its command-card exposure and runtime execution land in later artillery UX phases. Ekat dash and line shot clamp out-of-range world targets to their max range instead of walking Ekat into range; queued Ekat ability commands append future dash, line shot, or Magic Anchor intents. Ekat dash moves her within the target range if the landing point is statically standable and leaves an authoritative return marker at the original position; Ekat line shot spawns a projected out-and-back line projectile that damages enemy targetables on each swept leg, and an active Magic Anchor adds a second projectile from the anchor toward the same point; Magic Anchor places one replacement-style, non-blocking, non-attackable 10-second pull field. Ekat Consume is non-queued; it permanently removes the nearest owned living Golem within 2 tiles and heals Ekat to full HP. |
+| `useAbility` | `ability: "charge"|"smoke"|"mortarFire"|"pointFire"|"blanketFire"|"breakthrough"|"ekatTeleport"|"ekatLineShot"|"ekatMagicAnchor"|"ekatConsumeGolem"`, `units: u32[]`, `x?: f32`, `y?: f32`, `queued?: bool` | Generic ability command. Ability ids, carriers, target mode, cost, cooldown, finite uses, queueability, queue policy, autocast support, and command-card exposure are mirrored from the Rust faction ability registry. `charge` is legacy/no-op with no carriers or runtime effect; `smoke`, `mortarFire`, Artillery `pointFire`, Artillery `blanketFire`, Ekat `ekatTeleport`, `ekatLineShot`, and `ekatMagicAnchor` target a world point. Command Car `breakthrough` and Ekat `ekatConsumeGolem` are self-targeted and ignore `x`/`y`. Smoke command execution is phased separately from the authoritative smoke world-state/LOS model; mortar fire schedules a delayed area impact. Registry queue policy differentiates non-queued, skip-if-not-ready, and wait-until-ready abilities; queued Mortar Fire waits for ability cooldown/weapon reload and then fires once per queued click. Artillery Point Fire and Blanket Fire lock the submitted point to each gun's 25-to-55 tile range band along that gun's origin-to-click ray, store that effective point as the point-fire target or blanket center, and can auto-set-up or redeploy the gun in place before firing. Queued artillery fire locks from the best authoritative future queued position when available and is terminal in the unit order queue: once accepted, later queued unit orders are not appended after Point Fire or Blanket Fire for that gun. Blanket Fire samples deterministic impacts uniformly within its 15-tile blanket radius around the stored center; sampled impacts are not re-clamped to the cone or range band. Blanket Fire remains hidden from command-card affordance projection until the client targeting phase exposes it. Ekat dash and line shot clamp out-of-range world targets to their max range instead of walking Ekat into range; queued Ekat ability commands append future dash, line shot, or Magic Anchor intents. Ekat dash moves her within the target range if the landing point is statically standable and leaves an authoritative return marker at the original position; Ekat line shot spawns a projected out-and-back line projectile that damages enemy targetables on each swept leg, and an active Magic Anchor adds a second projectile from the anchor toward the same point; Magic Anchor places one replacement-style, non-blocking, non-attackable 10-second pull field. Ekat Consume is non-queued; it permanently removes the nearest owned living Golem within 2 tiles and heals Ekat to full HP. |
 | `recastAbility` | `ability: "ekatTeleport"`, `units: u32[]`, `targetObjectId?: u32`, `queued?: bool` | Explicit second activation for an existing per-caster ability state. The server does not infer recast from missing `x`/`y`; it validates ownership, live caster eligibility, matching active return marker state, the no-instant-return availability tick, and destination standability, then returns Ekat to the marker and consumes it. |
 | `setAutocast` | `ability: "mortarFire"`, `units: u32[]`, `enabled: bool` | Toggle server-authoritative autocast for owned Mortar Teams. Other unit/ability combinations are ignored. |
 | `gather`     | `units: u32[]`, `node: u32`, `queued?: bool` | Send gather-capable units to harvest a direct-mineable resource node. Oil nodes are not direct-mineable; workers extract oil by building Pump Jacks with the `build` command. When `queued` is true, store future gather intent instead of replacing the active order. |
@@ -634,7 +634,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 28. `client/src/net.js` calls
+`messagepack-compact`, codec version 1, compact snapshot version 29. `client/src/net.js` calls
 `parseServerFrame`; the binary frame parser in `client/src/protocol_frame.js` returns the raw
 compact snapshot object, then `decodeCompactSnapshot` expands it back into the semantic object above
 before dispatching `S.SNAPSHOT`.
@@ -660,7 +660,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 28,
+  "v": 29,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
@@ -689,7 +689,7 @@ Compact numeric codes:
 
 | Vocabulary | Codes |
 |------------|-------|
-| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `city_centre`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `research_complex`, 18 `command_car`, 19 `ekat`, 20 `zamok`, 21 `tank_trap`, 22 `golem`, 23 `pump_jack` |
+| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `city_centre`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `research_complex`, 18 `command_car`, 19 `ekat`, 20 `zamok`, 21 `tank_trap`, 22 `golem`, 23 `pump_jack`, 24 `panzerfaust` |
 | `state` | 1 `idle`, 2 `move`, 3 `attack`, 4 `gather`, 5 `build`, 6 `train`, 7 `construct`, 8 `dead` |
 | `setupState` | 1 `packed`, 2 `setting_up`, 3 `deployed`, 4 `tearing_down` |
 | `orderStage` | 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`, 6 `smoke`, 7 `setupAntiTankGuns`, 8 `charge`, 9 `mortarFire`, 10 `pointFire`, 11 `breakthrough`, 12 `ekatTeleport`, 13 `ekatLineShot`, 14 `ekatMagicAnchor`, 15 `deconstruct`, 16 `ekatConsumeGolem`, 17 `blanketFire` |
@@ -697,7 +697,7 @@ Compact numeric codes:
 | `abilityObject.kind` | 1 `returnMarker`, 2 `magicAnchor`, 3 `lineProjectile` |
 | `upgrade` | 1 `methamphetamines`, 2 `anti_tank_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock` (legacy decode only), 5 `mortar_autocast`, 6 `command_car_unlock`, 7 `ballistic_tables`, 8 `entrenchment` |
 | `notice.severity` | 1 `info`, 2 `warn`, 3 `alert` |
-| `EventRecord` | `[1, from, to]` attack, `[1, from, to, reveal?, toPos?]` attack with optional shooter reveal and target position, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice, `[5, [fromX, fromY], [toX, toY], delayTicks]` smoke launch, `[6, x, y, radiusTiles]` mortar impact/marker, `[6, x, y, radiusTiles, from?, reveal?]` mortar impact with optional shooter reveal, `[7, from, [x, y], radiusTiles, delayTicks]` artillery target marker, `[8, x, y, radiusTiles]` artillery impact, `[9, from, [fromX, fromY], [toX, toY], radiusTiles, delayTicks]` mortar launch, `[10, to]` overpenetration damage, `[11, owner, x, y, facing]` global artillery firing minimap marker |
+| `EventRecord` | `[1, from, to]` attack, `[1, from, to, reveal?, toPos?]` attack with optional shooter reveal and target position, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice, `[5, [fromX, fromY], [toX, toY], delayTicks]` smoke launch, `[6, x, y, radiusTiles]` mortar impact/marker, `[6, x, y, radiusTiles, from?, reveal?]` mortar impact with optional shooter reveal, `[7, from, [x, y], radiusTiles, delayTicks]` artillery target marker, `[8, x, y, radiusTiles]` artillery impact, `[9, from, [fromX, fromY], [toX, toY], radiusTiles, delayTicks]` mortar launch, `[10, to]` overpenetration damage, `[11, owner, x, y, facing]` global artillery firing minimap marker, `[12, from, [fromX, fromY], [toX, toY], delayTicks]` Panzerfaust launch, `[13, x, y]` Panzerfaust impact, `[14, id, toKind]` Panzerfaust same-id conversion |
 
 #### 2.4.1 Boundary inventory
 
@@ -722,9 +722,10 @@ Compact entity records are positional arrays. Optional fields keep the semantic 
 trailing missing optional fields are omitted; interior missing optional fields are encoded as
 `null`. The `rally` slot is itself a two-element `[x, y]` array (or `null`).
 The `orderPlan` slot is an owner-only array capped at 9 entries. It contains the current active
-stage first, followed by queued unit stages in execution order. Artillery Point Fire stages carry
-the server-stored effective fire point after range locking, not the raw clicked point. Each compact stage is
-`[kind, x, y]`, where `kind` uses the `orderStage` compact code table above.
+stage first, followed by queued unit stages in execution order. Artillery Point Fire and Blanket
+Fire stages carry the server-stored effective fire point or blanket center after range locking, not
+the raw clicked point. Each compact stage is `[kind, x, y]`, where `kind` uses the `orderStage`
+compact code table above.
 Stages carry safe world points only, never target ids; hidden attack target stages may be omitted
 rather than leaking enemy positions through fog. Production building rally points are exposed
 separately through `rally` and `rallyPlan` and are not part of `orderPlan`. `rallyPlan` is appended
@@ -737,8 +738,8 @@ where `ability` uses the `ability` compact code table above. `charge` is legacy 
 no eligible carriers, cooldown, or runtime status.
 The server projects ability affordances only when the owning player's faction catalog exposes that
 ability for the entity's global kind and the registry marks it for command-card exposure. The
-reserved `blanketFire` identity is intentionally hidden from this projection until the artillery
-runtime and client targeting phases expose it.
+runtime `blanketFire` identity is intentionally hidden from this projection until the client
+targeting phase exposes its command-card affordance.
 `remainingUses` is present for finite-use abilities such as Scout Car Smoke; a value of `0`
 means the ability is depleted and cannot be used by that caster.
 `autocastEnabled` is present for Mortar Team `mortarFire` so the command card can display and
@@ -803,8 +804,9 @@ must not make them selectable live entities or issue entity-targeted commands ag
 `footprint` is an array of `[tileX, tileY]` cells from the last visible state. The record
 intentionally omits hidden live HP, current build progress, and destruction state. Artillery
 `pointFire` remains a world-coordinate ability; remembered buildings help the player know where to
-aim but do not become target ids. `blanketFire` uses the same reserved world-coordinate command
-identity, but remains hidden until later phases add authoritative execution and targeting UX.
+aim but do not become target ids. `blanketFire` uses the same world-coordinate command model and
+server-authoritative locked center, but remains hidden from client targeting affordances until that
+phase exposes it.
 Union views build remembered buildings from the selected real
 players' memory stores. If more than one selected player has stale memory for the same building id,
 the server sends one record: the newest `observedTick` wins, with selected-player order as the
@@ -897,6 +899,9 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
 { e: "artilleryTarget", from: u32, x: f32, y: f32, radiusTiles: f32, delayTicks: u32 }
 { e: "artilleryFiring", owner: u32, x: f32, y: f32, facing: f32 }
 { e: "artilleryImpact", x: f32, y: f32, radiusTiles: f32 }
+{ e: "panzerfaustLaunch", from: u32, fromX: f32, fromY: f32, toX: f32, toY: f32, delayTicks: u32 }
+{ e: "panzerfaustImpact", x: f32, y: f32 }
+{ e: "panzerfaustConversion", id: u32, toKind: string }
 { e: "notice", msg: string, severity?: "info"|"warn"|"alert", x?: f32, y?: f32 }
 ```
 Notices default to `severity: "info"` with no position. `alert:`-prefixed notice ids are
@@ -946,12 +951,14 @@ is unattributed and does not reveal the firing mortar as hostile. Enemy players 
 hidden mortar launch data or hidden mortar impact markers unless their entities were hit or their
 team sees the relevant point.
 Artillery target events are sent to the firing team so enemies never receive pre-impact markers,
-even if they have vision of the gun. The `from` id lets allied clients recoil the specific gun and
-draw launch dust. Every player receives a visual-only `artilleryFiring` event with the firing
-owner, shooter position, and facing so the minimap can show a small global artillery firing marker;
-it does not carry the shooter entity id, target point, terrain, or exploration. Separately, the
-server grants every enemy player actionable temporary live fog on the firing gun, subject to normal
-smoke suppression, so it is projected as a normal world entity and can be targeted during the firing
+even if they have vision of the gun. Point Fire reports the sampled point-fire shell target;
+Blanket Fire reports the deterministically sampled shell target inside the stored blanket radius,
+not the raw clicked point. The `from` id lets allied clients recoil the specific gun and draw launch
+dust. Every player receives a visual-only `artilleryFiring` event with the firing owner, shooter
+position, and facing so the minimap can show a small global artillery firing marker; it does not
+carry the shooter entity id, target point, terrain, or exploration. Separately, the server grants
+every enemy player actionable temporary live fog on the firing gun, subject to normal smoke
+suppression, so it is projected as a normal world entity and can be targeted during the firing
 reveal window.
 Enemy players also receive a visual-only `attack` event with a shooter `reveal` when their team
 currently sees the firing gun, so the gun can be shown briefly without revealing terrain,
@@ -960,6 +967,16 @@ recipients whose team currently sees the impact point; they do not reveal terrai
 exploration, or carry entity visibility. Artillery impact damage follows the same support-fire
 friendly-fire attribution rule as mortar splash: owned and allied entities in the radius can take
 damage, but same-team damage does not produce hostile reveal, under-attack, or score attribution.
+Panzerfaust launch events are reserved for the hidden one-shot anti-tank runtime. They carry the
+loaded unit id, launch point, intended visual endpoint, and travel delay, but never carry the target
+entity id. Launch events are sent to the firing team and to enemy recipients whose team-current fog
+can see the shooter or launch point; the endpoint must be withheld unless it is visible to that
+recipient or otherwise already safe through the recipient's projection. Panzerfaust impact events
+carry only the impact point and are sent to the firing team and to enemy recipients whose
+team-current fog can see that point; they do not imply damage, target identity, terrain reveal, or
+exploration. Panzerfaust conversion events carry only the same entity id and resulting kind, and
+must be projected only to recipients that can see that entity through ordinary snapshot visibility
+or owner/team projection on the conversion tick.
 Events are best-effort visual flavor; the client must not depend on receiving them.
 
 #### 2.5.1 Projection contract summary

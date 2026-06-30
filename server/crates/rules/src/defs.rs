@@ -50,6 +50,9 @@ pub struct NodeDef {
 const WORKER_ONLY: &[EntityKind] = &[EntityKind::Worker];
 const GOLEM_ONLY: &[EntityKind] = &[EntityKind::Golem];
 const BARRACKS_UNITS: &[EntityKind] = &[EntityKind::Rifleman, EntityKind::MachineGunner];
+/// Units with hidden stats and future production metadata that are intentionally omitted from
+/// active building train lists until a later exposure phase.
+pub const HIDDEN_UNITS_WITH_RESERVED_PRODUCTION: &[EntityKind] = &[EntityKind::Panzerfaust];
 const STEELWORKS_UNITS: &[EntityKind] = &[
     EntityKind::MortarTeam,
     EntityKind::AntiTankGun,
@@ -148,6 +151,26 @@ pub const UNITS: &[UnitDef] = &[
         },
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::SmallArms,
+        trained_at: Some(EntityKind::Barracks),
+        train_requires: TRAINING_CENTRE_REQUIRED,
+    },
+    UnitDef {
+        kind: EntityKind::Panzerfaust,
+        stats: balance::UnitStats {
+            hp: 45,
+            dmg: 0,
+            range_tiles: balance::PANZERFAUST_RANGE_TILES,
+            cooldown: 0,
+            speed: 1.44,
+            sight_tiles: 8,
+            cost_steel: 60,
+            cost_oil: 15,
+            supply: 1,
+            build_ticks: 400,
+            radius: 9.0,
+        },
+        armor_class: ArmorClass::Small,
+        weapon: WeaponClass::AntiTank,
         trained_at: Some(EntityKind::Barracks),
         train_requires: TRAINING_CENTRE_REQUIRED,
     },
@@ -544,6 +567,9 @@ mod tests {
             let Some(trainer_kind) = unit.trained_at else {
                 continue;
             };
+            if HIDDEN_UNITS_WITH_RESERVED_PRODUCTION.contains(&unit.kind) {
+                continue;
+            }
             let trainer = building_def(trainer_kind).expect("trainer must be a building def");
             assert!(
                 trainer.trains.contains(&unit.kind),
@@ -576,6 +602,7 @@ mod tests {
                 EntityKind::Golem,
                 EntityKind::Rifleman,
                 EntityKind::MachineGunner,
+                EntityKind::Panzerfaust,
                 EntityKind::AntiTankGun,
                 EntityKind::MortarTeam,
                 EntityKind::Artillery,
@@ -650,6 +677,33 @@ mod tests {
         let tank_speed = unit_def(EntityKind::Tank).expect("tank def").stats.speed;
 
         assert_eq!(worker_speed, tank_speed);
+    }
+
+    #[test]
+    fn panzerfaust_stats_are_hidden_without_default_attack_runtime() {
+        let def = unit_def(EntityKind::Panzerfaust).expect("panzerfaust def");
+
+        assert_eq!(def.stats.hp, 45);
+        assert_eq!(def.stats.dmg, 0);
+        assert_eq!(def.stats.range_tiles, balance::PANZERFAUST_RANGE_TILES);
+        assert_eq!(def.stats.cooldown, 0);
+        assert_eq!(def.stats.speed, 1.44);
+        assert_eq!(def.stats.sight_tiles, 8);
+        assert_eq!((def.stats.cost_steel, def.stats.cost_oil), (60, 15));
+        assert_eq!(def.stats.supply, 1);
+        assert_eq!(def.stats.build_ticks, 400);
+        assert_eq!(def.stats.radius, 9.0);
+        assert_eq!(def.armor_class, ArmorClass::Small);
+        assert_eq!(def.weapon, WeaponClass::AntiTank);
+        assert_eq!(def.trained_at, Some(EntityKind::Barracks));
+        assert_eq!(def.train_requires, TRAINING_CENTRE_REQUIRED);
+        assert!(
+            !building_def(EntityKind::Barracks)
+                .expect("barracks def")
+                .trains
+                .contains(&EntityKind::Panzerfaust),
+            "hidden Panzerfaust production source must not enter active train lists until exposed"
+        );
     }
 
     #[test]

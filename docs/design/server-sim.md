@@ -590,15 +590,17 @@ arrived Attack Move. Firing, target changes, body/weapon facing, and Machine Gun
 do not reset that timer; Move, Attack Move while still travelling, Gather, Build, Deconstruct,
 ability movement, artillery point-fire, path movement, and non-slotting forced movement reset it.
 
-Existing trenches are neutral. Any eligible Rifleman, Machine Gunner, or Worker can occupy one
-without owning Entrenchment research when it is stopped in the trench footprint. A stopped eligible
-unit within half a tile of a trench may be slotted by at most half a tile into a legal position
-inside the trench footprint; slotting validates static standability, the swept static segment, and
-unit-body overlap against the current live entity positions. Slotting does not issue a move order
-or path, so the unit can still fire normally. `entity::active_trench_occupation(entity)` is the
-simulation predicate for active occupation; digging progress, failed slotting, and merely standing
-near trench terrain do not set it. Visible occupied units project `occupiedTrenchId`; remembered
-trench terrain never exposes hidden occupants.
+Existing trenches are neutral. Any eligible Rifleman, Machine Gunner, or Worker can occupy an empty
+one without owning Entrenchment research when it is stopped in the trench footprint. Each trench can
+actively hold only one infantry unit; once occupied, it is skipped as an occupation candidate for
+other units. A stopped eligible unit within half a tile of an empty trench may be slotted by at most
+half a tile into a legal position inside the trench footprint; slotting validates static
+standability, the swept static segment, and unit-body overlap against the current live entity
+positions. Slotting does not issue a move order or path, so the unit can still fire normally.
+`entity::active_trench_occupation(entity)` is the simulation predicate for active occupation;
+digging progress, failed slotting, and merely standing near trench terrain do not set it. Visible
+occupied units project `occupiedTrenchId`; remembered trench terrain never exposes hidden
+occupants.
 
 Entrenched combat benefits consume only active occupation through
 `entrenchment_combat::is_actively_entrenched`. Active entrenched Riflemen, Machine Gunners, and
@@ -904,14 +906,21 @@ Allocation rules:
 - Anti-Tank Gun setup is a queueable facing intent for selected Anti-Tank Guns only. The stored point means
   "face toward this world point from wherever the gun is when the setup stage promotes"; mixed
   selections ignore non-setup-capable units for setup but keep them for later compatible orders.
-- Artillery Point Fire is a queueable, terminal per-gun fire order. Issue-time admission stores a
-  locked effective fire point, not the raw clicked point. Immediate Point Fire can accept packed
-  artillery and set it up in place, or redeploy already-deployed artillery when the effective point
-  is outside the current cone. Queued Point Fire locks from the active or queued future move
-  destination when available, uses a preceding queued setup stage as the zero-length fallback
-  facing, and promotes into the same setup/redeploy-owned fire order. Promotion and firing recheck
-  liveness, ownership, kind, construction state, path state, faction ability eligibility, stored
-  target map/range/cone validity, ammo, and deployment before any shell is launched.
+- Artillery Point Fire and Blanket Fire are queueable, terminal per-gun fire orders. Issue-time
+  admission stores a locked effective fire point for Point Fire or locked blanket center for
+  Blanket Fire, not the raw clicked point. Immediate fire commands can accept packed artillery and
+  set it up in place, or redeploy already-deployed artillery when the effective point is outside the
+  current cone. Queued fire commands lock from the active or queued future move destination when
+  available, use a preceding queued setup stage as the zero-length fallback facing, and promote into
+  the same setup/redeploy-owned fire order. Promotion and firing recheck liveness, ownership, kind,
+  construction state, path state, faction ability eligibility, stored target map/range/cone
+  validity, ammo, and deployment before any shell is launched.
+- Point Fire samples normal artillery scatter around the stored point, with Ballistic Tables
+  tightening repeated Point Fire shots only. Blanket Fire samples each shot deterministically and
+  uniformly within `ARTILLERY_BLANKET_RADIUS_TILES` around the stored center using authoritative
+  shot inputs; sampled impacts are not re-clamped to the artillery cone or range band. Both modes
+  share ammunition cost, reload, shell delay, impact radius, damage, fog-gated impact events,
+  global firing markers, and firing-reveal behavior.
 
 Examples:
 
@@ -926,9 +935,10 @@ Examples:
 - **Packed anti-tank guns.** The player orders packed anti-tank guns to move, then Shift-arms setup and clicks a
   facing point. The setup stage promotes after movement and computes facing from the gun's actual
   arrived position toward the stored world point.
-- **Move then queued Point Fire.** The player orders artillery to move, then Shift-arms Point Fire
-  and clicks a target. The queued stage stores the effective fire point locked from the future move
-  destination; when promoted, the gun sets up or redeploys in place and never walks to repair range.
+- **Move then queued artillery fire.** The player orders artillery to move, then Shift-arms Point
+  Fire or Blanket Fire and clicks a target. The queued stage stores the effective fire point or
+  blanket center locked from the future move destination; when promoted, the gun sets up or
+  redeploys in place and never walks to repair range.
 - **Reactive moving smoke.** A scout car already moving past cover receives an immediate Smoke
   command for an in-range point. The planner emits a noninterrupting ability execution, so the
   smoke launches without dropping the car's current move order or queued future orders.

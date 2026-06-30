@@ -1,5 +1,5 @@
 import { KIND } from "../../protocol.js";
-import { MACHINE_GUNNER_RIG_SVG, RIFLEMAN_RIG_SVG } from "./infantry_svg.js";
+import { MACHINE_GUNNER_RIG_SVG, PANZERFAUST_RIG_SVG, RIFLEMAN_RIG_SVG } from "./infantry_svg.js";
 import { compileSvgRig } from "./svg_importer.js";
 import {
   ANTI_TANK_GUN_PARTS,
@@ -28,6 +28,7 @@ const LIVE_RIG_SOURCES = Object.freeze([
   [KIND.GOLEM, GOLEM_RIG_SVG],
   [KIND.MACHINE_GUNNER, MACHINE_GUNNER_RIG_SVG],
   [KIND.MORTAR_TEAM, MORTAR_TEAM_RIG_SVG],
+  [KIND.PANZERFAUST, PANZERFAUST_RIG_SVG],
   [KIND.RIFLEMAN, RIFLEMAN_RIG_SVG],
   [KIND.SCOUT_CAR, SCOUT_CAR_RIG_SVG],
   [KIND.TANK, TANK_RIG_SVG],
@@ -122,6 +123,10 @@ const LIVE_RIG_PARTS = Object.freeze({
   [KIND.MORTAR_TEAM]: Object.freeze({
     shadow: MORTAR_TEAM_PARTS.shadow,
     unit: MORTAR_TEAM_PARTS.weapon,
+  }),
+  [KIND.PANZERFAUST]: Object.freeze({
+    shadow: Object.freeze(["part.shadow"]),
+    unit: RIFLEMAN_UNIT_PARTS,
   }),
   [KIND.RIFLEMAN]: Object.freeze({
     shadow: Object.freeze(["part.shadow"]),

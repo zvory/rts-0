@@ -124,6 +124,8 @@ pub struct CombatState {
     pub attack_cd: u32,
     /// Artillery consecutive shots since its current deployment/move reset.
     pub artillery_shots_fired: u16,
+    /// Blanket Fire shots since the current blanket order began.
+    pub artillery_blanket_shots_fired: u16,
     /// Current attack/interaction target id. Combat uses enemy ids; gather/build commands use
     /// this for client feedback while the order executes.
     pub target_id: Option<u32>,
@@ -157,6 +159,7 @@ impl Default for CombatState {
         CombatState {
             attack_cd: 0,
             artillery_shots_fired: 0,
+            artillery_blanket_shots_fired: 0,
             target_id: None,
             firing_reveal_response_target: None,
             attack_move_no_target_ticks: 0,

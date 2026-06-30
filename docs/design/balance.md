@@ -181,6 +181,9 @@ Core unit roles:
 - **Tank** is the machine-gun breaker and open-ground power unit: immune to rifle and
   machine-gun small-arms fire, strong against static defenses and exposed infantry, but
   vulnerable to other tanks and anti-tank infantry.
+- **Panzerfaust** is reserved hidden vocabulary for a Training Centre-unlocked infantry
+  anti-tank ambusher. It has rules metadata and protocol ids in this phase but is not in any
+  current faction catalog, command card, lab spawn catalog, or AI build plan yet.
 - **Anti-tank gun team** is the ambush counter to tanks: it can fight while packed at short
   range with reduced damage, or manually set up into a longer-ranged fixed field of fire.
   Deployed guns are dangerous from the side or rear, but weak or inefficient against regular
@@ -282,21 +285,32 @@ folded into default targeting.
 - anti-tank guns use `ANTI_TANK_GUN_PACKED_RANGE_TILES = 5`, `ANTI_TANK_GUN_DEPLOYED_RANGE_TILES = 20`,
   `ANTI_TANK_GUN_PACKED_DAMAGE_MULTIPLIER = 0.75`, and
   `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = 35 degrees total`.
+- Panzerfaust hidden constants reserve a 3-tile, Tank-only, one-shot loaded weapon with
+  `PANZERFAUST_DAMAGE = 60`, `PANZERFAUST_WINDUP_TICKS = 15`,
+  `PANZERFAUST_TRAVEL_TICKS = 15`, and `PANZERFAUST_RECOVERY_TICKS = 15`.
+  Methamphetamines reduces the windup and recovery constants to 12 ticks each; travel stays
+  15 ticks. The `panzerfaust` unit definition carries 45 HP, 8-tile sight, 9 px radius,
+  1.44 px/tick loaded speed, 60 steel / 15 oil cost, 1 supply, and 400 build ticks, but keeps
+  default damage and cooldown at zero so no repeat-fire default attack path exists before the
+  dedicated one-shot runtime phase. Its future Barracks/Training Centre production metadata is
+  reserved on the hidden unit definition, but it is omitted from active Barracks train lists until
+  the production exposure phase.
 - Tank hull-facing damage modifiers for tank and anti-tank gun hits are 1.0x front, 1.5x side,
   and 1.7x rear.
 - Artillery uses `ARTILLERY_MIN_RANGE_TILES = 25`, `ARTILLERY_MAX_RANGE_TILES = 55`,
   `ARTILLERY_FIELD_OF_FIRE_RAD = 20 degrees total`, `ARTILLERY_RELOAD_TICKS = 90` (~3s),
   `ARTILLERY_SETUP_TICKS = 90` (~3s), `ARTILLERY_SHELL_DELAY_TICKS = 150` (~5s), and
   `ARTILLERY_AMMO_COST_STEEL = 10`.
-  The reserved Blanket Fire command identity mirrors
-  `ARTILLERY_BLANKET_RADIUS_TILES = 15` for later preview and runtime work, but remains hidden from
-  the command card in this contract phase.
+  Blanket Fire uses `ARTILLERY_BLANKET_RADIUS_TILES = 15` around the stored locked center for
+  deterministic uniform impact sampling, but remains hidden from the command card until the client
+  targeting phase exposes it.
   Unupgraded artillery error scales by shot range, from `ARTILLERY_MIN_RANGE_ERROR_TILES = 3.0`
   at minimum range to `ARTILLERY_MAX_RANGE_ERROR_TILES = 15.0` at maximum range, and does not
   tighten over repeated fire. The interpolation span is the current 25-to-55 tile range band.
-  Artillery Fire Control restores repeated-fire tightening for the same
-  deployed gun: starting error is still range-scaled, then tightens to
-  `ARTILLERY_MIN_ERROR_TILES = 3.0` over 5 shots. Moving resets that accuracy ramp.
+  Artillery Fire Control restores repeated Point Fire tightening for the same deployed gun:
+  starting error is still range-scaled, then tightens to `ARTILLERY_MIN_ERROR_TILES = 3.0` over 5
+  shots. Blanket Fire does not tighten with Artillery Fire Control. Moving resets the Point Fire
+  accuracy ramp.
   Its body length, width, clearance, and selection radius match the Tank; its exposed carriage,
   long barrel, large wheels, and deployed spades carry the visual distinction instead of a larger
   footprint. Impacts deal
@@ -323,17 +337,19 @@ folded into default targeting.
   player's Machine Gunners from 1.28 px/tick to unupgraded Rifleman speed (1.6 px/tick) and halves
   their setup and teardown timers from 30 ticks to 15.
 - **Entrenchment** (Training Centre research, protocol id `entrenchment`): costs 100 steel / 0 oil
-  and takes 300 ticks (~10s). The rules surface defines Riflemen, Machine Gunners, and Workers as
-  eligible entrenchment infantry; Mortar Teams, Ekat, Golems, Ekat-faction units, vehicles,
+  and takes 300 ticks (~10s). The rules surface defines Riflemen, Machine Gunners, Panzerfausts,
+  and Workers as eligible entrenchment infantry; Mortar Teams, Ekat, Golems, Ekat-faction units, vehicles,
   buildings, support weapons other than Machine Gunners, and non-infantry entities are excluded.
   Eligible infantry owned by a player with completed Entrenchment create neutral trenches after
   holding ground on untrenched terrain for 90 ticks (~3s), and any eligible infantry can occupy an
-  existing trench while stopped in its footprint. Active occupation grants +1 tile weapon range,
-  suppresses idle aggressive chase like Hold Position, gives incoming direct shots a 70% miss
-  chance, reduces incoming area damage by 70% after existing falloff/armor rules, and suppresses
-  over-penetration through or into the entrenched unit. Direct-shot miss sources use the highest
-  applicable chance, not composed probability, so an Anti-Tank Gun's 65% infantry miss chance
-  becomes 70% against entrenched eligible infantry. The trench radius is 0.75 tile. The client
+  existing empty trench while stopped in its footprint. A trench can actively hold only one
+  infantry unit, so nearby eligible infantry dig their own adjacent trenches instead of sharing one.
+  Active occupation grants +1 tile weapon range, suppresses idle aggressive chase like Hold
+  Position, gives incoming direct shots a 70% miss chance, reduces incoming area damage by 70%
+  after existing falloff/armor rules, and suppresses over-penetration through or into the
+  entrenched unit. Direct-shot miss sources use the highest applicable chance, not composed
+  probability, so an Anti-Tank Gun's 65% infantry miss chance becomes 70% against entrenched
+  eligible infantry. The trench radius is 0.375 tile. The client
   renders neutral trench terrain as brown ground and marks occupied eligible infantry with a small
   brown rim. The selected-unit panel reports existing-trench reuse, researched dig-in availability,
   and occupied benefits as a player-facing status only; the server remains authoritative for actual
@@ -362,10 +378,10 @@ folded into default targeting.
   against that registry for client-visible ability descriptors. Server execution maps those
   registry rows to a small set of sim-local effect hooks: legacy no-op, owned area status, delayed
   world effect, dash return, line projectile, Magic Anchor placement, Golem consumption, and the
-  one-off artillery point-fire path. The `blanketFire` id is already registry-backed as an
-  Artillery-carried, world-point, queueable ability with the same range band, ammunition cost, and
-  reload cadence as `pointFire`, plus a 15-tile blanket radius; it is marked non-command-card and
-  has no runtime effect until later artillery UX phases. The legacy `charge` ability id remains
+  artillery fire path. The `blanketFire` id is registry-backed as an Artillery-carried,
+  world-point, queueable ability with the same range band, ammunition cost, and reload cadence as
+  `pointFire`, plus a 15-tile blanket radius; it has server runtime support but is marked
+  non-command-card until the client targeting phase exposes it. The legacy `charge` ability id remains
   registry-backed only for old command/replay decoding and has no carriers, cooldown, command-card
   entry, or runtime status.
 - **Ekat** is the first playable one-hero faction unit. The `ekat` catalog starts with
@@ -458,9 +474,10 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | golem           | 160 | 16  | 1     | 24 | 2.0   | 7     | 0   | 0   | 4   | 396 (~13.2s); provisional free Ekat worker-like economy body trained at Zamok; mines at 4x worker load; can be consumed by Ekat for full heal |
 | rifleman        | 45  | 5   | 4     | 16 | 1.6   | 8     | 50  | 0   | 1   | 300 (~10s) |
 | machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 8     | 75  | 10  | 2   | 400 (~13s) |
+| panzerfaust     | 45  | 60 one-shot AP (default attack disabled) | 3 | 15 windup / 15 travel / 15 recovery | 1.44 | 8 | 60 | 15 | 1 | 400 (~13s); hidden vocabulary only until production exposure; trained at Barracks after Training Centre once exposed |
 | mortar_team     | 75  | 40 outer / 100 inner AOE | 20 | 60 | 1.6 | 7 | 100 | 50 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
 | anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 72 | 1.6 | 6     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and Heavy Guns (`anti_tank_gun_unlock`) researched in R&D Complex |
-| artillery       | 150 | 150 AP inner / 150-10 outer AOE | 25-55 point fire | 90 | 1.3 | 4 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind) and Heavy Guns (`anti_tank_gun_unlock`) researched in R&D Complex; tank-sized footprint |
+| artillery       | 150 | 150 AP inner / 150-10 outer AOE | 25-55 artillery fire | 90 | 1.3 | 4 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind) and Heavy Guns (`anti_tank_gun_unlock`) researched in R&D Complex; tank-sized footprint |
 | scout_car       | 100 | 6   | 5     | 6  | 2.35  | 10    | 125 | 50  | 3   | 480 (~16s) |
 | tank            | 292 | 60  | 5 moving / 14 fully stationary | 72 | 2.0   | 6     | 425 | 150 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex |
 | command_car     | 225 | 0   | 0     | 0  | 2.35  | 10    | 150 | 75  | 4   | 450 (~15s); requires Vehicle Works (`factory` kind) and Command Car (`command_car_unlock`) researched in R&D Complex; no weapon; Scout Car-style movement with a smaller jeep-sized body |

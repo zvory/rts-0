@@ -7,6 +7,7 @@ pub enum EntityKind {
     Golem,
     Rifleman,
     MachineGunner,
+    Panzerfaust,
     AntiTankGun,
     MortarTeam,
     Artillery,
@@ -29,11 +30,12 @@ pub enum EntityKind {
 }
 
 impl EntityKind {
-    pub const ALL: [EntityKind; 23] = [
+    pub const ALL: [EntityKind; 24] = [
         EntityKind::Worker,
         EntityKind::Golem,
         EntityKind::Rifleman,
         EntityKind::MachineGunner,
+        EntityKind::Panzerfaust,
         EntityKind::AntiTankGun,
         EntityKind::MortarTeam,
         EntityKind::Artillery,
@@ -73,6 +75,7 @@ impl EntityKind {
             EntityKind::Golem => "golem",
             EntityKind::Rifleman => "rifleman",
             EntityKind::MachineGunner => "machine_gunner",
+            EntityKind::Panzerfaust => "panzerfaust",
             EntityKind::AntiTankGun => "anti_tank_gun",
             EntityKind::MortarTeam => "mortar_team",
             EntityKind::Artillery => "artillery",
@@ -105,6 +108,7 @@ impl FromStr for EntityKind {
             "golem" => Ok(EntityKind::Golem),
             "rifleman" => Ok(EntityKind::Rifleman),
             "machine_gunner" => Ok(EntityKind::MachineGunner),
+            "panzerfaust" => Ok(EntityKind::Panzerfaust),
             "anti_tank_gun" => Ok(EntityKind::AntiTankGun),
             "mortar_team" => Ok(EntityKind::MortarTeam),
             "artillery" => Ok(EntityKind::Artillery),

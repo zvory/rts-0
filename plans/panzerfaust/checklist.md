@@ -1,8 +1,8 @@
 # Panzerfaust Unit Checklist
 
-Status: Phase 0 brief and Phase 1 rules/balance spec drafted with user-reviewed close-range tuning.
-This file follows [docs/new-unit-checklist.md](../../docs/new-unit-checklist.md). Do not edit
-implementation files until this planning gate is approved for implementation.
+Status: Phase 0 brief and Phase 1 rules/balance spec drafted with user-reviewed close-range tuning;
+Phase 2 hidden vocabulary, balance, and protocol contract has been implemented.
+This file follows [docs/new-unit-checklist.md](../../docs/new-unit-checklist.md).
 
 Read: [docs/context/balance.md](../../docs/context/balance.md),
 [docs/design/balance.md](../../docs/design/balance.md).

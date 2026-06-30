@@ -23,6 +23,7 @@ pub mod kinds {
     pub const GOLEM: &str = "golem";
     pub const RIFLEMAN: &str = "rifleman";
     pub const MACHINE_GUNNER: &str = "machine_gunner";
+    pub const PANZERFAUST: &str = "panzerfaust";
     pub const ANTI_TANK_GUN: &str = "anti_tank_gun";
     pub const MORTAR_TEAM: &str = "mortar_team";
     pub const ARTILLERY: &str = "artillery";
@@ -101,7 +102,7 @@ pub mod upgrades {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 28;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 29;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -266,6 +267,7 @@ const KIND_CODES: &[(&str, u8)] = &[
     (kinds::GOLEM, 22),
     (kinds::RIFLEMAN, 2),
     (kinds::MACHINE_GUNNER, 3),
+    (kinds::PANZERFAUST, 24),
     (kinds::ANTI_TANK_GUN, 4),
     (kinds::MORTAR_TEAM, 15),
     (kinds::ARTILLERY, 16),
@@ -317,6 +319,9 @@ const EVENT_CODES: &[(&str, u8)] = &[
     ("mortarLaunch", 9),
     ("overpenetration", 10),
     ("artilleryFiring", 11),
+    ("panzerfaustLaunch", 12),
+    ("panzerfaustImpact", 13),
+    ("panzerfaustConversion", 14),
 ];
 
 const ORDER_STAGE_CODES: &[(&str, u8)] = &[
@@ -522,6 +527,7 @@ fn kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("GOLEM", kinds::GOLEM),
         ("RIFLEMAN", kinds::RIFLEMAN),
         ("MACHINE_GUNNER", kinds::MACHINE_GUNNER),
+        ("PANZERFAUST", kinds::PANZERFAUST),
         ("ANTI_TANK_GUN", kinds::ANTI_TANK_GUN),
         ("MORTAR_TEAM", kinds::MORTAR_TEAM),
         ("ARTILLERY", kinds::ARTILLERY),
@@ -566,6 +572,9 @@ fn event_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("ARTILLERY_IMPACT", "artilleryImpact"),
         ("OVERPENETRATION", "overpenetration"),
         ("ARTILLERY_FIRING", "artilleryFiring"),
+        ("PANZERFAUST_LAUNCH", "panzerfaustLaunch"),
+        ("PANZERFAUST_IMPACT", "panzerfaustImpact"),
+        ("PANZERFAUST_CONVERSION", "panzerfaustConversion"),
     ])
 }
 
@@ -878,6 +887,28 @@ fn event_slot_schemas() -> BTreeMap<&'static str, Vec<SlotField>> {
                 field(2, "x"),
                 field(3, "y"),
                 field(4, "facing"),
+            ],
+        ),
+        (
+            "panzerfaustLaunch",
+            vec![
+                code_field(0, "kind", "event"),
+                field(1, "from"),
+                field(2, "fromPos"),
+                field(3, "toPos"),
+                field(4, "delayTicks"),
+            ],
+        ),
+        (
+            "panzerfaustImpact",
+            vec![code_field(0, "kind", "event"), field(1, "x"), field(2, "y")],
+        ),
+        (
+            "panzerfaustConversion",
+            vec![
+                code_field(0, "kind", "event"),
+                field(1, "id"),
+                code_field(2, "toKind", "kind"),
             ],
         ),
     ]
