@@ -696,7 +696,7 @@ for explicitly documented architecture-check exceptions.
 control groups, relationship helpers, fog-facing visibility data, and display overlays derived from
 authoritative snapshots. `ClientIntent` owns placement intent, command-card submenu state,
 command-target arming, hover previews, command feedback, and ability previews. Contextual oil
-right-clicks compose the free Pump Jack build intent on the clicked oil patch rather than a gather
+right-clicks compose a Pump Jack build intent on the clicked oil patch rather than a gather
 command. `GameState` must not grow compatibility accessors for those intent fields; HUD, input,
 minimap, and renderer feedback use the injected facade or a narrow read model. Lab Unit Spawn and
 Building Spawn panels expose the target player's color through DOM data/style hooks before map
