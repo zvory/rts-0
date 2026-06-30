@@ -774,9 +774,11 @@ General rules:
   `services::combat::priority` ranker. The ranker owns priority terms such as default-weapon fit,
   Tank immediate-threat order, shoot-while-moving target retention, unit-over-building preference,
   and nearest/id tie-breaks; it does not decide fog, smoke, line-of-sight, blocker, ownership, or
-  acquisition-radius legality. Default small-arms weapons prefer soft targets while keeping armored
-  or hard targets as fallbacks. Default anti-armor weapons prefer anti-armor threats and
-  armored/hard targets, with Tanks treating in-range Anti-Tank Guns as the top immediate threat.
+  acquisition-radius legality. Unit attackers rank legal unit targets above buildings, so buildings
+  remain last-resort cleanup targets unless explicitly ordered or covered by a special obstruction
+  policy. Default small-arms weapons prefer soft targets while keeping armored or hard targets as
+  fallbacks. Default anti-armor weapons prefer anti-armor threats and armored/hard units, with Tanks
+  treating in-range Anti-Tank Guns as the top immediate threat.
   Vehicle-body units rank enemy Tank Traps as high-priority breach targets only when
   `services::occupancy` reports that the trap is on the current bounded route segment or forms a
   closed-gap pinch across that route; irrelevant nearby traps remain legal fallback targets but lose

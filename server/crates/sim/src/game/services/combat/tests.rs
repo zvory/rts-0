@@ -22,6 +22,7 @@ mod moving_fire_policy;
 mod retention;
 mod support_weapon_attack_move;
 mod tank_traps;
+mod target_priority;
 fn rifleman_with_enemy() -> (EntityStore, u32, u32) {
     let mut entities = EntityStore::new();
     let self_id = entities

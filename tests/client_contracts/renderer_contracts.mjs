@@ -343,8 +343,8 @@ import { installFakePixi } from "./pixi_fakes.mjs";
       kind: KIND.TANK_TRAP,
       x: 160,
       y: 160,
-      hp: 150,
-      maxHp: 150,
+      hp: 120,
+      maxHp: 120,
       state: "idle",
       deconstructProgress: 0.35,
     };

@@ -235,11 +235,12 @@ override explicit player attack orders. Forest-specific rules are future work.
 The unit, building, and resource-node tables below are the human-readable form of the authoritative
 `rules::defs` records.
 
-Default auto-acquisition ranks already-legal targets by weapon fit before distance. Small-arms
+Default auto-acquisition ranks already-legal targets by weapon fit before distance, but unit
+attackers treat buildings as last-resort cleanup targets after legal unit targets. Small-arms
 default weapons prefer soft targets (`ArmorClass::Small`) over armored or hard targets, but they
 still fire at armor, buildings, or vehicle obstacles when no better legal target exists; infantry-like
 units still do not auto-acquire Tank Traps without a direct attack order. Anti-armor default weapons
-prefer anti-armor threats and armored/hard targets over ordinary soft targets. Tanks keep a narrower
+prefer anti-armor threats and armored/hard units over ordinary soft units. Tanks keep a narrower
 immediate-threat override for targets already in relevant range: Anti-Tank Guns are first, then
 other anti-armor threats, armored obstacles, support weapons, and only then ordinary soft targets.
 Vehicle-body units treat enemy Tank Traps as high-priority breach targets only when the trap is on
@@ -411,7 +412,7 @@ folded into default targeting.
   roughly one tile away from the patch. When a patch empties the gatherer goes idle (no automatic
   retarget).
 - Oil extraction: workers do not directly mine oil. A worker right-click or contextual build on a
-  live oil patch issues a free Pump Jack build at that patch. Completed Pump Jacks mine
+  live oil patch issues a Pump Jack build at that patch. Completed Pump Jacks mine
   `OIL_LOAD = 2` every `HARVEST_TICKS = 40`, matching one worker's former oil rate, and deplete the
   underlying oil node. Pump Jack placement requires overlap with a live oil node, but has no tech or
   mining-anchor requirement.
@@ -462,8 +463,8 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 | research_complex           | R&D Complex        | 165 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Heavy Guns, Artillery Fire Control, Tank Production, Command Car, and Mortar Autocast; requires a City Centre and Training Centre |
 | factory                    | Vehicle Works      | 360 | 1     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, trains tank after Tank Production research, and trains command_car after Command Car research; requires a City Centre and Training Centre |
 | steelworks                 | Gun Works          | 300 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately and trains Anti-Tank Guns/Artillery after R&D Complex research; requires a City Centre and Training Centre |
-| tank_trap                  | Tank Trap          | 150 | 0     | 15 steel + 0 oil | 1x1  | 300       | engineer-built vehicle obstacle; workers deconstruct completed traps in 150 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building; requires a completed Training Centre |
-| pump_jack                  | Pump Jack          | 50  | 1     | 0 steel + 0 oil | 1x1  | 300       | contextual oil extractor built by workers on live oil patches; mines 2 oil per 40 ticks; unarmored, immobile, no trains, no supply, no weapon, and does not block shots or line of sight; no tech requirement |
+| tank_trap                  | Tank Trap          | 120 | 0     | 15 steel + 0 oil | 1x1  | 300       | engineer-built vehicle obstacle; workers deconstruct completed traps in 150 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building; requires a completed Training Centre |
+| pump_jack                  | Pump Jack          | 50  | 1     | 50 steel + 0 oil | 1x1  | 300       | contextual oil extractor built by workers on live oil patches; mines 2 oil per 40 ticks; unarmored, immobile, no trains, no supply, no weapon, and does not block shots or line of sight; no tech requirement |
 
 Win: a player is **eliminated** when they own zero elimination-counting buildings; units and
 Tank Traps alone do not keep them alive. Last player standing wins; a 1-player match never ends
