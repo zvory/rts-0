@@ -582,6 +582,10 @@ the attack event. The revealed gun is projected as a normal non-`visionOnly` sna
 can validate direct attack commands or combat target acquisition until the firing reveal expires.
 The expiration is calculated from the firing tick plus that gun's firing-cycle cooldown plus
 0.5 seconds (`TICK_HZ / 2`), not from a hardcoded wall-clock duration.
+Artillery Point Fire creates the same kind of actionable temporary live fog for every enemy player,
+subject to normal smoke suppression, when the shell is launched. The reveal exposes the firing gun
+as a normal snapshot entity without exposing the target point, surrounding terrain, or pre-impact
+target marker.
 Snapshot-only lingering death sight may make non-owned units/buildings visible as `visionOnly`;
 those views are visual intel only and do not refresh remembered buildings or validate targeted
 commands. Ability world objects are projected separately in `abilityObjects`: normal players
@@ -895,7 +899,10 @@ Artillery target events are sent to the firing team so enemies never receive pre
 even if they have vision of the gun. The `from` id lets allied clients recoil the specific gun and
 draw launch dust. Every player receives a visual-only `artilleryFiring` event with the firing
 owner, shooter position, and facing so the minimap can show a small global artillery firing marker;
-it does not carry the shooter entity id, target point, terrain, exploration, or entity visibility.
+it does not carry the shooter entity id, target point, terrain, or exploration. Separately, the
+server grants every enemy player actionable temporary live fog on the firing gun, subject to normal
+smoke suppression, so it is projected as a normal world entity and can be targeted during the firing
+reveal window.
 Enemy players also receive a visual-only `attack` event with a shooter `reveal` when their team
 currently sees the firing gun, so the gun can be shown briefly without revealing terrain,
 exploration, or the target point. Artillery impact events are sent to the firing team and to enemy
@@ -919,9 +926,9 @@ projection seam. The same selected ids drive `visibleTiles`, visible entities, r
 memory, `playerResources`, and event unions; switching a replay viewer from all-player vision to
 one player therefore replaces both current fog and stale memory with that player's projection.
 Full-world lab/dev projections use full-world snapshots plus full-world event unions, not a fake
-viewer id. `artilleryFiring` is the only current intentionally global event: it gives every
-recipient a visual minimap firing marker without granting terrain, target, entity id, or hidden
-snapshot visibility.
+viewer id. `artilleryFiring` remains an intentionally global visual event for minimap firing
+markers, while artillery's actionable world reveal is modeled separately as temporary live fog on
+enemy player grids without granting target-point or surrounding-terrain visibility.
 
 When adding a projection-affecting field or event, use
 [docs/projection-audit-checklist.md](../projection-audit-checklist.md) and update this section's

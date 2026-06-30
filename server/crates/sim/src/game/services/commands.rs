@@ -10,6 +10,9 @@ use crate::game::commands::{CommandAdmission, PendingCommand};
 use crate::game::entity::{
     EntityKind, EntityStore, Order, OrderIntent, ProdItem, RallyIntent, ResearchItem, WeaponSetup,
 };
+use crate::game::firing_reveal::{
+    record_global_firing_reveals_for_enemy_players, FiringRevealSource,
+};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::mortar::MortarShellStore;
@@ -65,6 +68,7 @@ struct CommandExecutionContext<'a, 'pathing> {
     ability_runtime: &'a mut AbilityRuntime,
     mortar_shells: &'a mut MortarShellStore,
     artillery_shells: &'a mut ArtilleryShellStore,
+    firing_reveals: &'a mut Vec<FiringRevealSource>,
     events: &'a mut HashMap<u32, Vec<Event>>,
     teams: TeamRelations,
     tick: u32,
@@ -89,6 +93,7 @@ pub(in crate::game) fn apply_commands(
     ability_runtime: &mut AbilityRuntime,
     mortar_shells: &mut MortarShellStore,
     artillery_shells: &mut ArtilleryShellStore,
+    firing_reveals: &mut Vec<FiringRevealSource>,
     pending: Vec<PendingCommand>,
     events: &mut HashMap<u32, Vec<Event>>,
     tick: u32,
@@ -106,6 +111,7 @@ pub(in crate::game) fn apply_commands(
                 ability_runtime,
                 mortar_shells,
                 artillery_shells,
+                firing_reveals,
                 events,
                 teams: teams.clone(),
                 tick,
@@ -668,6 +674,7 @@ mod planned_actions {
         let ability_runtime = &mut *ctx.ability_runtime;
         let mortar_shells = &mut *ctx.mortar_shells;
         let artillery_shells = &mut *ctx.artillery_shells;
+        let firing_reveals = &mut *ctx.firing_reveals;
         let events = &mut *ctx.events;
         let tick = ctx.tick;
 
@@ -772,6 +779,7 @@ mod planned_actions {
                                 teams,
                                 fog,
                                 artillery_shells,
+                                firing_reveals,
                                 events,
                                 player,
                                 unit,
@@ -909,6 +917,7 @@ mod planned_actions {
                                     teams,
                                     fog,
                                     artillery_shells,
+                                    firing_reveals,
                                     events,
                                     player,
                                     unit,
@@ -1151,6 +1160,7 @@ fn use_ability(
     let entities = &mut *ctx.entities;
     let fog = ctx.fog;
     let artillery_shells = &mut *ctx.artillery_shells;
+    let firing_reveals = &mut *ctx.firing_reveals;
     let events = &mut *ctx.events;
     let teams = &ctx.teams;
     let tick = ctx.tick;
@@ -1204,6 +1214,7 @@ fn use_ability(
                     teams,
                     fog,
                     artillery_shells,
+                    firing_reveals,
                     events,
                     player,
                     unit,
@@ -1295,6 +1306,7 @@ fn order_artillery_point_fire(
     teams: &TeamRelations,
     fog: &Fog,
     artillery_shells: &mut ArtilleryShellStore,
+    firing_reveals: &mut Vec<FiringRevealSource>,
     events: &mut HashMap<u32, Vec<Event>>,
     player: u32,
     unit: u32,
@@ -1325,6 +1337,7 @@ fn order_artillery_point_fire(
         teams,
         fog,
         artillery_shells,
+        firing_reveals,
         events,
         player,
         unit,
@@ -1341,6 +1354,7 @@ fn try_fire_artillery(
     teams: &TeamRelations,
     fog: &Fog,
     artillery_shells: &mut ArtilleryShellStore,
+    firing_reveals: &mut Vec<FiringRevealSource>,
     events: &mut HashMap<u32, Vec<Event>>,
     player: u32,
     unit: u32,
@@ -1418,7 +1432,17 @@ fn try_fire_artillery(
     artillery_shells.schedule(player, unit, target_x, target_y, tick);
     if let Some(reveal) = reveal.as_ref() {
         let facing = reveal.weapon_facing.or(reveal.facing).unwrap_or(0.0);
-        for pid in events.keys().copied().collect::<Vec<_>>() {
+        let player_ids: Vec<u32> = events.keys().copied().collect();
+        record_global_firing_reveals_for_enemy_players(
+            firing_reveals,
+            &player_ids,
+            teams,
+            player,
+            unit,
+            tick,
+            config::ARTILLERY_RELOAD_TICKS,
+        );
+        for pid in player_ids {
             events.entry(pid).or_default().push(Event::ArtilleryFiring {
                 owner: reveal.owner,
                 x: reveal.x,
@@ -1459,11 +1483,12 @@ fn try_fire_artillery(
     true
 }
 
-pub(crate) fn artillery_point_fire_system(
+pub(in crate::game) fn artillery_point_fire_system(
     map: &Map,
     entities: &mut EntityStore,
     players: &mut [PlayerState],
     artillery_shells: &mut ArtilleryShellStore,
+    firing_reveals: &mut Vec<FiringRevealSource>,
     events: &mut HashMap<u32, Vec<Event>>,
     fog: &Fog,
     tick: u32,
@@ -1523,6 +1548,7 @@ pub(crate) fn artillery_point_fire_system(
             &teams,
             fog,
             artillery_shells,
+            firing_reveals,
             events,
             owner,
             id,

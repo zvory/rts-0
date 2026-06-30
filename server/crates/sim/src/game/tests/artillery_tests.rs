@@ -43,6 +43,109 @@ fn artillery_point_fire_queue_is_terminal() {
 }
 
 #[test]
+fn artillery_firing_from_fog_is_actionable_for_all_enemies() {
+    let players = [
+        PlayerInit {
+            id: 1,
+            team_id: 1,
+            faction_id: "kriegsia".to_string(),
+            name: "Shooter".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            team_id: 2,
+            faction_id: "kriegsia".to_string(),
+            name: "Counter".into(),
+            color: "#000".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 3,
+            team_id: 3,
+            faction_id: "kriegsia".to_string(),
+            name: "Observer".into(),
+            color: "#f00".into(),
+            is_ai: false,
+        },
+    ];
+    let mut game = empty_flat_game(&players);
+    let pos = game.map.tile_center(20, 20);
+    let target = game.map.tile_center(42, 20);
+    let counter_pos = game.map.tile_center(4, 4);
+    let observer_pos = game.map.tile_center(4, 12);
+    let artillery = game
+        .entities
+        .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
+        .expect("artillery should spawn");
+    let counter = game
+        .entities
+        .spawn_unit(2, EntityKind::Tank, counter_pos.0, counter_pos.1)
+        .expect("counter tank should spawn");
+    game.entities
+        .spawn_unit(3, EntityKind::Worker, observer_pos.0, observer_pos.1)
+        .expect("observer worker should spawn");
+    deploy_artillery_toward(&mut game, artillery, target);
+    systems::recompute_supply(&mut game.players, &game.entities);
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+    game.fog.recompute(&ids, &game.entities, &game.map);
+
+    for viewer in [2, 3] {
+        assert!(
+            !game.fog.is_visible_world(viewer, pos.0, pos.1),
+            "fixture requires artillery to start hidden from player {viewer}"
+        );
+    }
+
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::PointFire,
+            units: vec![artillery],
+            x: Some(target.0),
+            y: Some(target.1),
+            queued: false,
+        },
+    );
+    game.tick();
+
+    for viewer in [2, 3] {
+        let view = game
+            .snapshot_for(viewer)
+            .entities
+            .into_iter()
+            .find(|entity| entity.id == artillery)
+            .expect("firing artillery should be visible to every enemy player");
+        assert!(
+            !view.vision_only,
+            "firing artillery should be actionable live fog for player {viewer}"
+        );
+    }
+
+    game.enqueue(
+        2,
+        Command::Attack {
+            units: vec![counter],
+            target: artillery,
+            queued: false,
+        },
+    );
+    game.tick();
+
+    assert_eq!(
+        game.entities
+            .get(counter)
+            .expect("counter should exist")
+            .order()
+            .attack_target(),
+        Some(artillery),
+        "enemy units should accept direct attack orders against firing-revealed artillery"
+    );
+}
+
+#[test]
 fn artillery_target_is_owner_only_and_enemy_events_require_current_vision() {
     let players = human_vs_ai_players();
     let mut game = empty_flat_game(&players);

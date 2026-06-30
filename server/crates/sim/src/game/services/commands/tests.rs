@@ -57,6 +57,7 @@ fn apply_with_players_and_smokes(
         .collect();
     let mut mortar_shells = MortarShellStore::default();
     let mut artillery_shells = ArtilleryShellStore::default();
+    let mut firing_reveals = Vec::new();
     let mut ability_runtime = AbilityRuntime::new();
     apply_commands(
         map,
@@ -69,6 +70,7 @@ fn apply_with_players_and_smokes(
         &mut ability_runtime,
         &mut mortar_shells,
         &mut artillery_shells,
+        &mut firing_reveals,
         pending,
         &mut events,
         1,
