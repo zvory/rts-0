@@ -22,6 +22,7 @@ mod retention;
 mod support_weapon_attack_move;
 mod tank_traps;
 mod target_priority;
+mod weapon_profiles;
 fn rifleman_with_enemy() -> (EntityStore, u32, u32) {
     let mut entities = EntityStore::new();
     let self_id = entities
@@ -40,7 +41,6 @@ fn open_map(size: u32) -> Map {
         expansion_sites: Vec::new(),
     }
 }
-
 fn map_with_rock_at(tile: (u32, u32)) -> Map {
     let mut map = open_map(12);
     map.terrain[(tile.1 * map.size + tile.0) as usize] = terrain::ROCK;
@@ -248,18 +248,15 @@ fn predicted_test_mortar_impact(
     let (x, y) = mortar_aim_point(entities, target, tick);
     crate::game::mortar_scatter::predicted_mortar_impact(&fog, teams, owner, attacker, x, y, tick)
 }
-
 fn run_movement_tick(entities: &mut EntityStore) {
     let map = Map::generate(2, 0x00C0_FFEE);
     run_movement_tick_on_map(entities, &map, 0);
 }
-
 fn run_movement_tick_on_map(entities: &mut EntityStore, map: &Map, tick: u32) {
     let occ = Occupancy::build(map, entities);
     let spatial = SpatialIndex::build(entities, map.size);
     movement_system(map, entities, &mut [], &occ, &spatial, tick);
 }
-
 #[allow(clippy::too_many_arguments)]
 fn apply_test_damage(
     entities: &mut EntityStore,
@@ -289,7 +286,6 @@ fn apply_test_damage(
         range_px,
     );
 }
-
 #[allow(clippy::too_many_arguments)]
 fn apply_test_damage_with_teams(
     entities: &mut EntityStore,
@@ -305,6 +301,10 @@ fn apply_test_damage_with_teams(
     vy: f32,
     range_px: f32,
 ) {
+    let weapon_profile = entities
+        .get(attacker)
+        .and_then(|entity| combat_rules::default_weapon_profile(entity.kind))
+        .expect("test attacker should have a default weapon profile");
     let map = Map::generate(2, 0x00C0_FFEE);
     let fog = Fog::new(map.size);
     let smokes = SmokeCloudStore::new();
@@ -319,6 +319,7 @@ fn apply_test_damage_with_teams(
         &mut rng,
         attacker,
         victim,
+        weapon_profile,
         dmg,
         attacker_owner,
         ax,
@@ -330,7 +331,6 @@ fn apply_test_damage_with_teams(
         10,
     );
 }
-
 #[test]
 fn idle_army_units_auto_acquire_targets() {
     let (entities, self_id, enemy_id) = rifleman_with_enemy();

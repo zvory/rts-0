@@ -136,15 +136,14 @@ pub(in crate::game) fn combat_system(
             weapons::tick_tank_stationary_range(e);
         }
     }
-
     for id in entities.ids() {
-        // Determine this attacker's combat parameters.
         let (
             owner,
             px,
             py,
             range_px,
             acquire_px,
+            weapon_profile,
             dmg,
             cd_reset,
             mode,
@@ -169,6 +168,9 @@ pub(in crate::game) fn combat_system(
                 continue;
             }
             let profile = effective_attack_profile(e);
+            let Some(weapon_profile) = profile.weapon else {
+                continue;
+            };
             let (range_tiles, dmg, cd) = (profile.range_tiles, profile.dmg, profile.cooldown);
             let owner_has_meth = methamphetamines_researched(e.owner);
             let can_move_fire = can_fire_while_moving(e, owner_has_meth);
@@ -206,6 +208,7 @@ pub(in crate::game) fn combat_system(
                 e.pos_y,
                 range_px,
                 acquire_px,
+                weapon_profile,
                 dmg,
                 cd,
                 mode,
@@ -255,7 +258,6 @@ pub(in crate::game) fn combat_system(
             },
         );
         let Some(tid) = target else {
-            // No target: clear stale combat target id for opportunistic-combat orders.
             if let Some(e) = entities.get_mut(id) {
                 if matches!(
                     e.order(),
@@ -400,6 +402,7 @@ pub(in crate::game) fn combat_system(
                     rng,
                     id,
                     tid,
+                    weapon_profile,
                     dmg,
                     owner,
                     px,
