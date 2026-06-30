@@ -23,6 +23,13 @@ const logs = [
     "fly-match-55-all.jsonl"
   ),
 ];
+const soupmanLog = path.join(
+  repoRoot,
+  "docs",
+  "network-incident-examples",
+  "2026-06-30-beta-soupman-alex-lag",
+  "match-103-runid-logs.jsonl"
+);
 
 function run(args) {
   return execFileSync("node", [script, ...args], {
@@ -63,8 +70,18 @@ const networkClassification = match54.classifications.find(
 );
 const browserClassification = match54.classifications.find((item) => item.id === "browser_processing");
 assert.equal(serverClassification.result, "not indicated");
+assert.equal(serverClassification.status, "contradicted");
+assert.ok(
+  serverClassification.evidenceAgainst.some((item) => item.includes("server_tick_ms")),
+  "expected clean server tick fields to be evidence against server pressure"
+);
 assert.equal(networkClassification.result, "indicated");
+assert.equal(networkClassification.status, "indicated");
 assert.equal(browserClassification.result, "indicated");
+assert.equal(
+  match54.classifications.find((item) => item.id === "server_snapshot_projection")?.status,
+  "unavailable",
+);
 assert.match(match54.transportNote, /Unsupported/);
 assert.ok(
   match54.missing.some((item) => item.includes("server snapshot projection")),
@@ -77,6 +94,7 @@ assert.ok(
 
 const markdown = run([...logs]);
 assert.match(markdown, /## Match 54/);
+assert.match(markdown, /## Agent Digest/);
 assert.match(markdown, /player 5 frame_gap_max_ms max 700/);
 assert.match(markdown, /packet loss, retransmits, or per-packet browser transport data/);
 assert.match(markdown, /payload p95/);
@@ -183,9 +201,42 @@ try {
   assert.ok(existsSync(path.join(outDir, "incident-summary.md")));
   assert.ok(existsSync(path.join(outDir, "incident-summary.json")));
   assert.ok(existsSync(path.join(outDir, "incident-rows.tsv")));
+  assert.ok(existsSync(path.join(outDir, "README.md")));
+  assert.ok(existsSync(path.join(outDir, "evidence-index.json")));
+  assert.ok(existsSync(path.join(outDir, "key-metrics.json")));
+  assert.ok(existsSync(path.join(outDir, "client-net-rows.tsv")));
+  assert.ok(existsSync(path.join(outDir, "server-tick-rows.tsv")));
   assert.match(readFileSync(path.join(outDir, "incident-summary.md"), "utf8"), /## Match 55/);
+  assert.match(readFileSync(path.join(outDir, "README.md"), "utf8"), /Agent Digest/);
+  const evidenceIndex = JSON.parse(readFileSync(path.join(outDir, "evidence-index.json"), "utf8"));
+  assert.equal(evidenceIndex.schemaVersion, 1);
+  assert.equal(evidenceIndex.sourceManifest.sources.length, 2);
+  assert.ok(
+    evidenceIndex.coverageMatrix.matches.some((match) =>
+      match.items.some((item) => item.id === "client_reports" && item.present)
+    ),
+  );
 } finally {
   rmSync(outDir, { recursive: true, force: true });
 }
+
+const soupmanParsed = JSON.parse(run(["--format", "json", soupmanLog]));
+const soupmanDigest = soupmanParsed.agentDigest;
+assert.ok(soupmanDigest, "expected agent digest in JSON output");
+assert.match(soupmanDigest.summary.primaryDiagnoses[0].diagnosis, /Mixed server-side and client\/network/);
+for (const minute of ["00:21", "00:22", "00:23", "00:24", "00:25", "00:26", "00:27", "00:28"]) {
+  const band = soupmanDigest.timelineBands.find((item) => item.startAt.startsWith(`2026-06-30T${minute}`));
+  assert.ok(band, `expected Soupman/Alex timeline band for ${minute}Z`);
+  assert.ok(band.maxCommandResponseMs >= 498, `expected command pressure in ${minute}Z band`);
+  assert.ok(band.maxSnapshotGapMs >= 551, `expected snapshot gap pressure in ${minute}Z band`);
+}
+const soupmanServerTop = soupmanDigest.topWindows.groups.find((group) => group.id === "server_tick")?.windows[0];
+assert.ok(soupmanServerTop, "expected server tick top window");
+assert.match(soupmanServerTop.timestamp, /2026-06-30T00:40:/);
+assert.equal(soupmanServerTop.fields.slowest_phase_ms, 297);
+assert.ok(
+  soupmanDigest.unknowns.some((item) => item.text.includes("writer send detail: not logged or unavailable")),
+  "expected missing writer rows to be explicit unknowns"
+);
 
 console.log("net report log parser test passed");
