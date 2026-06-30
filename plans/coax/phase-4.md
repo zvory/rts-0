@@ -12,22 +12,34 @@ continue to look and sound exactly as they do today.
 
 ## Scope
 
-- Add optional `weapon_kind: Option<String>` to semantic `Event::Attack`, serialized as
-  `weaponKind` on JSON/JS.
+- Add optional attack weapon identity to semantic `Event::Attack`, serialized as `weaponKind` on
+  JSON/JS. Use a closed mirrored weapon vocabulary rather than an arbitrary open string surface; the
+  Rust storage may be a domain type, enum/newtype, or a validated string adapter if that best fits
+  local protocol patterns.
+- Define and export mirrored Rust/JS weapon ids for every current default attack plus the reserved
+  future `tank_coax` id. If compact weapon codes are introduced, reserve both `tank_cannon` and
+  `tank_coax` in the same code table during this phase.
 - Emit default weapon ids for current direct-fire attacks, including `tank_cannon` for Tanks. It is
   acceptable to omit default ids only if the phase explicitly documents why and all fallback tests
   cover both missing and present hints.
-- Update compact attack event encoding to include a trailing `weaponKind` slot after `toPos`.
+- Update compact attack event encoding to include a trailing `weaponKind` slot after `toPos`. The
+  canonical new compact form with a weapon hint is `[attack, from, to, revealOrNull, toPosOrNull,
+  weaponKind]`; shorter legacy `[attack, from, to]`, `[attack, from, to, reveal]`, and
+  `[attack, from, to, reveal, toPos]` records must still decode.
 - Bump `COMPACT_SNAPSHOT_VERSION` unless the final implementation proves old and new compact
   decoders can safely share a version.
 - Add a compact weapon-kind code table if that matches local protocol patterns; otherwise document
   why plain strings are used in the trailing slot.
+- Add an explicit unknown-weapon fallback on the client: unknown values must not throw during normal
+  snapshot application, and must degrade to the same behavior as missing/default weapon identity.
 - Update `server/crates/protocol/src/lib.rs`, compact metadata, JS constants/decoding, protocol
   contract tests, and protocol docs.
 - Teach client audio and visual-effect helpers to accept `weaponKind` while mapping missing/default
   hints to current attacker-kind behavior.
 - Preserve the exact attack-event recipient set. Weapon identity may only be added to events that
-  would already be projected.
+  would already be projected. Attack events emitted to multiple recipients must use a canonical
+  payload so replay, lab, and spectator selected-view event unions do not duplicate the same shot
+  because one bucket has a missing/default weapon hint and another has an explicit default hint.
 - Preserve replay and legacy fixture compatibility for attack events without `weaponKind`.
 
 ## Out Of Scope
@@ -66,6 +78,10 @@ continue to look and sound exactly as they do today.
 
 - Existing compact attack event forms without `weaponKind` still decode.
 - New compact attack event forms with default weapon identity decode.
+- New compact attack event forms with `weaponKind` and missing `reveal` and/or missing `toPos` use
+  explicit `null` placeholders and decode correctly.
+- Unknown `weaponKind` values decode/apply without crashing and fall back to default/missing-hint
+  feedback.
 - Missing `weaponKind` and default `weaponKind` render/play exactly like current mainline.
 - `tank_cannon` from a Tank still plays cannon audio and starts cannon recoil.
 - Artillery self-reveal attack events still do not create tracers or combat audio.
@@ -80,6 +96,11 @@ continue to look and sound exactly as they do today.
 - `node tests/client_contracts/protocol_contracts.mjs`
 - Focused client audio/visual-effect contract tests proving missing/default weapon hints preserve
   current feedback.
+- Focused compact decode tests for legacy attack records, six-slot attack records, missing optional
+  placeholders, and unknown weapon fallback.
+- Focused lobby/replay/lab event-union test proving canonical default weapon identity does not
+  duplicate one attack in selected views.
+- `node tests/server_integration.mjs` with a running server, or `tests/run-all.sh --only-live-node`.
 - `node scripts/check-client-architecture.mjs` if client module wiring changes.
 - `cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture` if sim
   architecture boundaries move.

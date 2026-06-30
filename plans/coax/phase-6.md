@@ -27,7 +27,8 @@ weapon profile, priority ranking, and activation constraints.
   ordering.
 - Keep the machine-gun-like policy unused or test-only until Phase 7 wires the coax runtime.
 - Add an activation-constraint query shape for secondary weapons that can filter by current turret
-  arc, weapon range, and direct-fire legality without chasing, rotating, or altering movement.
+  arc, weapon range, and intended-target direct-fire legality without chasing, rotating, or altering
+  movement.
 - Preserve existing ordered attack behavior and current fallback acquisition semantics.
 
 ## Out Of Scope
@@ -62,6 +63,8 @@ weapon profile, priority ranking, and activation constraints.
   infantry-priority.
 - Machine-gun-like policy falls back to legal vehicles/buildings when no infantry-priority target
   is available.
+- Machine-gun-like policy does not choose an infantry-priority intended target when the secondary
+  weapon activation filter says the shot would hit an intervening enemy hard blocker first.
 - Ties inside the same policy bucket use distance first, then id.
 
 ## Verification
