@@ -268,6 +268,27 @@ mod tests {
     }
 
     #[test]
+    fn tank_two_hits_destroy_tank_trap() {
+        let tank_trap_hp = defs::building_def(EntityKind::TankTrap)
+            .expect("tank trap def")
+            .stats
+            .hp;
+        let tank_shot = effective_damage(
+            EntityKind::Tank,
+            EntityKind::TankTrap,
+            attack_profile(EntityKind::Tank).dmg,
+            None,
+        );
+
+        assert_eq!(tank_shot, 60);
+        assert!(tank_trap_hp > tank_shot, "one Tank shot should not kill");
+        assert!(
+            tank_trap_hp <= tank_shot * 2,
+            "two Tank shots should kill"
+        );
+    }
+
+    #[test]
     fn infantry_vs_building_reduced() {
         assert_eq!(
             effective_damage(EntityKind::MachineGunner, EntityKind::Depot, 40, None),

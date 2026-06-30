@@ -91,3 +91,48 @@ fn tank_prioritizes_anti_tank_gun_over_irrelevant_nearby_tank_trap() {
         Some(anti_tank_gun)
     );
 }
+
+#[test]
+fn tank_destroys_tank_trap_on_second_shot() {
+    let map = open_map(12);
+    let mut entities = EntityStore::new();
+    let tank = entities
+        .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+        .expect("tank should spawn");
+    let trap = entities
+        .spawn_building(2, EntityKind::TankTrap, 150.0, 100.0, true)
+        .expect("tank trap should spawn");
+    entities
+        .get_mut(tank)
+        .expect("tank should exist")
+        .set_order(Order::attack(trap));
+
+    let tank_shot = combat_rules::attack_profile(EntityKind::Tank).dmg;
+    let tank_cooldown = combat_rules::attack_profile(EntityKind::Tank).cooldown;
+
+    run_combat_tick_on_map(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false)],
+        &map,
+    );
+
+    assert_eq!(
+        entities.get(trap).expect("trap should exist").hp,
+        tank_shot,
+        "first Tank shot should leave the trap alive with exactly one shot of HP"
+    );
+
+    for _ in 0..tank_cooldown {
+        run_combat_tick_on_map(
+            &mut entities,
+            &[player_state(1, false), player_state(2, false)],
+            &map,
+        );
+    }
+
+    assert_eq!(
+        entities.get(trap).expect("trap should exist").hp,
+        0,
+        "second Tank shot should destroy the trap"
+    );
+}
