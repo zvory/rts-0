@@ -71,7 +71,7 @@ pub(crate) fn begin_artillery_teardown_for_movement(entities: &mut EntityStore, 
             continue;
         }
         e.reset_artillery_accuracy();
-        reset_artillery_blanket_sequence(e);
+        e.reset_artillery_blanket_sequence();
         if !matches!(e.weapon_setup(), WeaponSetup::Packed) {
             e.set_weapon_setup(WeaponSetup::TearingDown {
                 ticks: config::ARTILLERY_SETUP_TICKS,
@@ -144,22 +144,16 @@ fn start_artillery_fire_from_target(
     }
     match mode {
         ArtilleryFireMode::Point => {
-            reset_artillery_blanket_sequence(e);
+            e.reset_artillery_blanket_sequence();
             e.replace_active_order(Order::artillery_point_fire(target.x, target.y));
         }
         ArtilleryFireMode::Blanket => {
             e.reset_artillery_accuracy();
-            reset_artillery_blanket_sequence(e);
+            e.reset_artillery_blanket_sequence();
             e.replace_active_order(Order::artillery_blanket_fire(target.x, target.y));
         }
     }
     true
-}
-
-fn reset_artillery_blanket_sequence(e: &mut Entity) {
-    if let Some(combat) = e.combat.as_mut() {
-        combat.artillery_blanket_shots_fired = 0;
-    }
 }
 
 fn setup_ticks_for(kind: EntityKind) -> u16 {

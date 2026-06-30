@@ -838,12 +838,7 @@ mod planned_actions {
                                             OrderIntent::point_fire(locked.x, locked.y)
                                         }
                                         ArtilleryFireMode::Blanket => {
-                                            OrderIntent::BlanketFire(
-                                                crate::game::entity::PointIntent {
-                                                    x: locked.x,
-                                                    y: locked.y,
-                                                },
-                                            )
+                                            OrderIntent::blanket_fire(locked.x, locked.y)
                                         }
                                     };
                                     e.append_queued_order(intent);
@@ -1199,12 +1194,9 @@ fn use_ability(
                     if let Some(e) = entities.get_mut(unit) {
                         let intent = match mode {
                             ArtilleryFireMode::Point => OrderIntent::point_fire(target.x, target.y),
-                            ArtilleryFireMode::Blanket => OrderIntent::BlanketFire(
-                                crate::game::entity::PointIntent {
-                                    x: target.x,
-                                    y: target.y,
-                                },
-                            ),
+                            ArtilleryFireMode::Blanket => {
+                                OrderIntent::blanket_fire(target.x, target.y)
+                            }
                         };
                         e.append_queued_order(intent);
                     }
@@ -1419,7 +1411,7 @@ fn try_fire_artillery(
                 e.reset_artillery_accuracy();
                 1
             }
-            ArtilleryFireMode::Blanket => increment_artillery_blanket_shots_fired(e),
+            ArtilleryFireMode::Blanket => e.increment_artillery_blanket_shots_fired(),
         };
         e.set_attack_cd(config::ARTILLERY_RELOAD_TICKS);
         match mode {
@@ -1581,14 +1573,6 @@ pub(in crate::game) fn artillery_point_fire_system(
             mode,
         );
     }
-}
-
-fn increment_artillery_blanket_shots_fired(e: &mut crate::game::entity::Entity) -> u16 {
-    let Some(combat) = e.combat.as_mut() else {
-        return 0;
-    };
-    combat.artillery_blanket_shots_fired = combat.artillery_blanket_shots_fired.saturating_add(1);
-    combat.artillery_blanket_shots_fired
 }
 
 fn setup_ticks_for(kind: EntityKind) -> u16 {

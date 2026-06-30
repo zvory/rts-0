@@ -794,7 +794,15 @@ impl Entity {
         }
     }
 
-    fn reset_artillery_blanket_sequence(&mut self) {
+    pub(in crate::game) fn increment_artillery_blanket_shots_fired(&mut self) -> u16 {
+        let Some(c) = self.combat.as_mut() else {
+            return 0;
+        };
+        c.artillery_blanket_shots_fired = c.artillery_blanket_shots_fired.saturating_add(1);
+        c.artillery_blanket_shots_fired
+    }
+
+    pub(in crate::game) fn reset_artillery_blanket_sequence(&mut self) {
         if let Some(c) = self.combat.as_mut() {
             c.artillery_blanket_shots_fired = 0;
         }

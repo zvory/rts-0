@@ -201,6 +201,10 @@ impl OrderIntent {
     pub fn point_fire(x: f32, y: f32) -> Self {
         OrderIntent::PointFire(PointIntent { x, y })
     }
+
+    pub(in crate::game) fn blanket_fire(x: f32, y: f32) -> Self {
+        OrderIntent::BlanketFire(PointIntent { x, y })
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

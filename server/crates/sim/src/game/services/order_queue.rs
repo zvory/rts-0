@@ -1544,10 +1544,7 @@ mod tests {
             unit.set_weapon_setup(WeaponSetup::Deployed);
             unit.set_emplacement_facing(Some(0.0));
             unit.set_weapon_facing(0.0);
-            unit.append_queued_order(OrderIntent::BlanketFire(crate::game::entity::PointIntent {
-                x: target.0,
-                y: target.1,
-            }));
+            unit.append_queued_order(OrderIntent::blanket_fire(target.0, target.1));
         }
 
         promote(&map, &mut entities);
