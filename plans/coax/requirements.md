@@ -50,7 +50,10 @@ anti-armor weapon, while the coax is a secondary opportunistic small-arms weapon
 ## Target Priority
 
 - The coax prioritizes infantry targets inside its current arc.
-- Ekat is excluded from the coax infantry-priority group.
+- For this implementation, infantry-priority targets are Workers, Riflemen, Machine Gunners, and
+  future Panzerfaust-style infantry when that unit exists.
+- Mortar Teams, Artillery, Anti-Tank Guns, Ekat, Golems, vehicles, buildings, resources, and field
+  obstacles are not infantry-priority targets for the coax.
 - If at least one infantry-priority target is legal and inside the current arc, the coax should pick
   from that group before considering fallback targets.
 - If no infantry-priority target is legal and inside the current arc, the coax should fire at legal

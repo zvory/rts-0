@@ -1,4 +1,4 @@
-# Phase 6 - Stats, Docs, And Data Surface
+# Phase 6 - Declarative Target Priority Policies
 
 ## Phase Status
 
@@ -6,68 +6,82 @@ Status: pending.
 
 ## Objective
 
-Align player-facing data surfaces and source-of-truth docs with the implemented weapon-profile and
-Tank coax behavior. This phase should make the feature understandable in generated references
-without changing Tank commands or primary stat presentation beyond the approved requirement.
+Move current target ranking into named priority policies that preserve existing behavior and add a
+machine-gun-like policy for the future coax. The new policy surface should separate target facts,
+weapon profile, priority ranking, and activation constraints.
 
 ## Scope
 
-- Update `docs/design/server-sim.md` to describe weapon profiles, Tank cannon versus coax firing,
-  independent cooldowns, arc gating, and panic-free stale target behavior.
-- Update `docs/design/balance.md` to describe Tank coax range, damage, cooldown, weapon class,
-  overpenetration, target priority, and unchanged Tank cost/supply/sight/trainability.
-- Update `docs/design/protocol.md` if the final attack weapon identity field or compact schema
-  differs from the Phase 3 draft.
-- Update `docs/design/client-ui.md` to describe weapon-specific attack feedback and Tank coax rig
-  treatment if Phase 5 changed renderer contracts.
-- Update generated stats/wiki surfaces if implementation exposes secondary weapons there. The Tank
-  primary displayed range should remain the main-cannon range unless a later requirement adds a
-  separate coax range display.
-- Ensure client config mirrors only the data the UI/render/fog surface consumes. Do not add
-  unnecessary mirrored damage policy if the client only needs feedback ids.
-- Refresh [requirements.md](requirements.md) only for decisions made during implementation, such as
-  the final infantry-priority group, if they are not already captured.
-- Collect factual patch-note bullets for the final implementation.
-- Do not add a command-card button, toggle, upgrade, research, or new range display.
+- Introduce named priority policy identifiers or an equivalent declarative policy shape.
+- Migrate current default attack ranking into policies without changing behavior:
+  - ordinary small-arms/default soft-target preference,
+  - anti-armor weapon preference,
+  - Tank cannon immediate-threat behavior,
+  - vehicle Tank Trap route-obstruction behavior,
+  - moving-fire target retention,
+  - deterministic distance/id tie-breaks.
+- Make `priority.rs` choose targets from target facts and a policy context instead of directly
+  mixing all ranking rules with attacker entity kind branches.
+- Add a machine-gun-like policy for future `tank_coax`. It should rank infantry-priority targets
+  ahead of fallback legal targets, use distance/id ties, and avoid Tank cannon anti-armor threat
+  ordering.
+- Keep the machine-gun-like policy unused or test-only until Phase 7 wires the coax runtime.
+- Add an activation-constraint query shape for secondary weapons that can filter by current turret
+  arc, weapon range, and direct-fire legality without chasing, rotating, or altering movement.
+- Preserve existing ordered attack behavior and current fallback acquisition semantics.
+
+## Out Of Scope
+
+- No `tank_coax` live firing.
+- No cooldown or protocol changes.
+- No new player command/toggle.
+- No balance changes to existing units.
 
 ## Expected Touch Points
 
+- `server/crates/rules/src/combat.rs`
+- `server/crates/sim/src/game/services/combat/priority.rs`
+- `server/crates/sim/src/game/services/combat/acquisition.rs`
+- `server/crates/sim/src/game/services/combat/weapons.rs`
+- `server/crates/sim/src/game/services/combat/tests/target_priority.rs`
+- `server/crates/sim/src/game/services/combat/tests/retention.rs`
+- `server/crates/sim/src/game/services/combat/tests/tank_traps.rs`
 - `docs/design/server-sim.md`
-- `docs/design/balance.md`
-- `docs/design/protocol.md`
-- `docs/design/client-ui.md`
-- `plans/coax/requirements.md`
-- `server/crates/rules/src/bin/dump-faction-catalog.rs` or wiki data helpers if secondary weapons
-  become generated
-- `server/src/wiki*` or related wiki/stat generation files if applicable
-- `client/src/config*.js` only if a consumed mirror is required
-- `node scripts/check-wiki.mjs` related fixtures if generated stats change
+- `docs/design/balance.md` if priority policy contracts are documented
 
 ## Edge Cases To Cover
 
-- Docs do not imply that the Tank command card, cost, supply, sight, trainability, or primary range
-  display changed.
-- Docs distinguish Tank cannon AP behavior from coax small-arms behavior.
-- Docs state that coax overpenetrates with small-arms damage.
-- Protocol docs match the actual Rust and JS attack-event weapon field names and compact slot
-  shape.
-- Wiki/generated stats either mention the secondary weapon accurately or intentionally omit it
-  until secondary weapons are supported.
+- Tank cannon still prioritizes in-range Anti-Tank Guns and other anti-armor threats as before.
+- Tank cannon route-obstructing Tank Trap behavior remains unchanged.
+- Scout Car and Tank moving-fire retention behavior remains unchanged.
+- Anti-Tank Gun still prefers armored/anti-armor targets as before.
+- Unit attackers still prefer units over buildings in current fallback situations.
+- Machine-gun-like policy prioritizes Worker, Rifleman, and Machine Gunner over fallback vehicles
+  and buildings.
+- Machine-gun-like policy does not treat Mortar Team, Artillery, Anti-Tank Gun, Ekat, or Golem as
+  infantry-priority.
+- Machine-gun-like policy falls back to legal vehicles/buildings when no infantry-priority target
+  is available.
+- Ties inside the same policy bucket use distance first, then id.
 
 ## Verification
 
-- `node scripts/check-docs-health.mjs`.
-- `node scripts/check-wiki.mjs` if generated stats/wiki surfaces are touched.
-- `node scripts/check-faction-catalog-parity.mjs` if visible rules/catalog mirrors are touched.
-- `node tests/protocol_parity.mjs` if protocol docs or constants are touched.
-- `git diff --check`.
+- Existing pure `combat::priority::tests`.
+- Existing `target_priority.rs`, `retention.rs`, and `tank_traps.rs` tests.
+- New pure machine-gun-like policy tests for infantry-priority, exclusions, fallback, and tie
+  ordering.
+- `cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture`
+- `node scripts/check-docs-health.mjs` if docs are changed.
+- `git diff --check`
 
 ## Manual Test Focus
 
-Manual gameplay is optional for this docs/data phase. If a wiki or stats page is changed, open it
-locally and confirm the Tank entry is clear and does not overstate UI behavior.
+No manual gameplay test is required if behavior-preserving priority tests are strong. If a smoke
+test is performed, confirm current Tank, Scout Car, Anti-Tank Gun, and Machine Gunner target choice
+still feels unchanged in a mixed-target local scenario.
 
 ## Handoff Expectations
 
-List the final player-facing patch notes and the docs/data surfaces updated. Call out any deliberate
-omissions, especially if secondary weapons are not yet represented in generated wiki tables.
+Name the priority policy ids, the machine-gun-like policy entry point, and the secondary-weapon
+activation filter shape Phase 7 should use. Confirm that all current attackers still use their
+default policies and that no live coax runtime exists yet.

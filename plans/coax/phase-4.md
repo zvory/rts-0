@@ -1,4 +1,4 @@
-# Phase 4 - Tank Coax Server Runtime
+# Phase 4 - Attack Event Weapon Identity Plumbing
 
 ## Phase Status
 
@@ -6,90 +6,94 @@ Status: pending.
 
 ## Objective
 
-Implement the server-authoritative Tank coax firing behavior using the refactored weapon profile,
-damage, cooldown, and event plumbing. This phase should make Tanks actually fire the coax, but
-client art/audio may still use temporary or fallback feedback until Phase 5.
+Make attack events capable of carrying fog-safe weapon identity across Rust contracts, compact
+snapshots, JavaScript protocol decoding, and fallback client feedback. Existing attacks should
+continue to look and sound exactly as they do today.
 
 ## Scope
 
-- Add a `tank_coax` weapon profile with 6-tile range, 4 damage, 6-tick cooldown, small-arms weapon
-  class, direct-fire legality, and overpenetration enabled.
-- Add independent Tank coax cooldown ticking and reset through the weapon-aware cooldown interface.
-- Implement coax target search for Tanks only. It should use the current authoritative
-  `weapon_facing`/turret direction, not hull facing.
-- Gate coax shots to targets within 10 degrees on either side of the current turret direction.
-  Use a named constant rather than duplicating anonymous tolerances.
-- Reuse or share the direct-fire hostile, visibility, smoke, line-of-sight, targetability,
-  resource-node exclusion, and friendly hard-blocker safety checks.
-- The coax must not call the normal turret-rotation path, set desired weapon facing, request chase
-  paths, clear paths, or replace explicit cannon target intent.
-- The coax may fire while the cannon is rotating, ready, reloading, or otherwise unavailable, as
-  long as the Tank is in a state where it can expose and attack targets.
-- Implement infantry-priority and fallback target selection inside the coax arc. If the
-  requirements still do not define infantry precisely, stop and get that product decision before
-  coding the target group.
-- Emit attack events with the `tank_coax` weapon identity.
-- Make coax overpenetration apply with small-arms damage and coax weapon identity.
-- Preserve all existing Tank cannon behavior and tests, including stationary range ramp,
-  main-cannon cooldown, target priority, turret alignment, firing reveal, overpenetration, and
-  moving-fire path retention.
+- Add optional `weapon_kind: Option<String>` to semantic `Event::Attack`, serialized as
+  `weaponKind` on JSON/JS.
+- Emit default weapon ids for current direct-fire attacks, including `tank_cannon` for Tanks. It is
+  acceptable to omit default ids only if the phase explicitly documents why and all fallback tests
+  cover both missing and present hints.
+- Update compact attack event encoding to include a trailing `weaponKind` slot after `toPos`.
+- Bump `COMPACT_SNAPSHOT_VERSION` unless the final implementation proves old and new compact
+  decoders can safely share a version.
+- Add a compact weapon-kind code table if that matches local protocol patterns; otherwise document
+  why plain strings are used in the trailing slot.
+- Update `server/crates/protocol/src/lib.rs`, compact metadata, JS constants/decoding, protocol
+  contract tests, and protocol docs.
+- Teach client audio and visual-effect helpers to accept `weaponKind` while mapping missing/default
+  hints to current attacker-kind behavior.
+- Preserve the exact attack-event recipient set. Weapon identity may only be added to events that
+  would already be projected.
+- Preserve replay and legacy fixture compatibility for attack events without `weaponKind`.
+
+## Out Of Scope
+
+- No `tank_coax` live firing.
+- No Tank rig coax barrel.
+- No weapon-specific feedback differences yet.
+- No target acquisition or priority changes.
+- No changes to `Event::Overpenetration`; it remains a secondary event without shooter/audio/recoil.
 
 ## Expected Touch Points
 
-- `server/crates/rules/src/combat.rs`
-- `server/crates/rules/src/defs.rs` or the new weapon-profile module from Phase 1
-- `server/crates/sim/src/game/entity/state.rs`
-- `server/crates/sim/src/game/entity/entity.rs`
-- `server/crates/sim/src/game/services/combat/mod.rs`
-- `server/crates/sim/src/game/services/combat/acquisition.rs`
-- `server/crates/sim/src/game/services/combat/priority.rs`
-- `server/crates/sim/src/game/services/combat/weapons.rs`
-- `server/crates/sim/src/game/services/combat/damage.rs`
+- `server/crates/contract/src/lib.rs`
+- `server/crates/protocol/src/compact_snapshot.rs`
+- `server/crates/protocol/src/contract_metadata.rs`
+- `server/crates/protocol/src/lib.rs`
+- `server/src/protocol.rs` if adapter exports are affected
 - `server/crates/sim/src/game/services/combat/events.rs`
-- `server/crates/sim/src/game/services/combat/tests*.rs`
-- `docs/design/balance.md`
+- `server/crates/sim/src/game/services/combat/damage.rs`
+- `server/crates/sim/src/game/services/commands.rs` for artillery self-attack events
+- `client/src/protocol_constants.js`
+- `client/src/protocol_snapshot.js`
+- `client/src/protocol.js`
+- `client/src/combat_audio.js`
+- `client/src/match_combat_audio.js`
+- `client/src/state_visual_effects.js`
+- `client/src/renderer/feedback.js`
+- `tests/protocol_parity.mjs`
+- `tests/client_contracts/protocol_contracts.mjs`
+- `tests/client_contracts/audio_contracts.mjs`
+- `tests/client_contracts/state_input_contracts.mjs`
+- `docs/design/protocol.md`
 - `docs/design/server-sim.md`
 
 ## Edge Cases To Cover
 
-- In-arc eligible infantry takes 4 base small-arms damage from coax.
-- Armored fallback targets take reduced small-arms damage, not Tank AP damage.
-- Coax overpenetration hits secondary targets with small-arms damage and emits normal
-  overpenetration events.
-- Coax prioritizes in-arc infantry-priority targets over fallback targets.
-- Ekat is not treated as infantry priority. The chosen Golem/support-weapon behavior is covered by
-  tests once the product decision is resolved.
-- Coax fires at fallback vehicles or buildings only when no infantry-priority target is legal in arc.
-- Coax does not fire outside the arc, outside range, through smoke, through blocked LOS, through
-  friendly hard blockers, at resources, or at non-hostile entities.
-- Coax cooldown and cannon cooldown are independent in both directions.
-- Coax does not rotate the turret toward its target and does not change current cannon target id or
-  pathing intent.
-- A Tank can fire cannon and coax in the same tick only if the final design allows it and tests make
-  the event ordering deterministic; otherwise define and test a deterministic ordering.
-- Stale targets, dead targets, non-finite facing, missing combat state, and dead Tanks are safe
-  no-ops.
+- Existing compact attack event forms without `weaponKind` still decode.
+- New compact attack event forms with default weapon identity decode.
+- Missing `weaponKind` and default `weaponKind` render/play exactly like current mainline.
+- `tank_cannon` from a Tank still plays cannon audio and starts cannon recoil.
+- Artillery self-reveal attack events still do not create tracers or combat audio.
+- Weapon hints do not change attack-event projection, fog gating, or replay visibility.
+- Projection unions do not duplicate the same attack because one recipient has `None` and another
+  has an explicit default id.
 
 ## Verification
 
-- Focused Rust combat tests for coax damage, small-arms armor reduction, overpenetration,
-  independent cooldown, arc gating, range gating, target priority, fallback targeting, and no turret
-  rotation.
-- Focused Rust regression tests for existing Tank cannon targeting, cooldown, stationary range ramp,
-  moving-fire path retention, overpenetration, and firing reveal.
-- `cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture`.
-- `node scripts/check-docs-health.mjs` if docs are changed.
-- `git diff --check`.
+- `cargo test --manifest-path server/Cargo.toml -p rts-protocol compact_snapshot`
+- `node tests/protocol_parity.mjs`
+- `node tests/client_contracts/protocol_contracts.mjs`
+- Focused client audio/visual-effect contract tests proving missing/default weapon hints preserve
+  current feedback.
+- `node scripts/check-client-architecture.mjs` if client module wiring changes.
+- `cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture` if sim
+  architecture boundaries move.
+- `node scripts/check-docs-health.mjs`
+- `git diff --check`
 
 ## Manual Test Focus
 
-In a local dev scenario, point a Tank turret at a mixed infantry/vehicle group and confirm the coax
-fires only through the turret arc while the cannon behavior remains recognizable. Also check a
-moving Tank and a reloading/rotating cannon case to confirm coax opportunity fire does not make the
-Tank chase or snap the turret.
+Run a short local match or dev scenario only if client feedback code changes materially. Confirm
+Rifleman, Machine Gunner, Anti-Tank Gun, Scout Car, Tank, Mortar, and Artillery attack feedback
+still sounds and looks like current mainline.
 
 ## Handoff Expectations
 
-State the final infantry-priority definition, the coax weapon id, the cooldown storage behavior, and
-whether same-tick cannon/coax events are allowed. Call out any temporary client feedback limitations
-that Phase 5 must replace.
+Name the final attack-event weapon field, compact slot/encoding rule, compact version decision, and
+weapon ids emitted for existing attacks. Describe exactly how Phase 8 should distinguish
+`tank_cannon` from `tank_coax` without breaking missing-hint fallbacks.
