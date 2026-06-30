@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
@@ -112,8 +112,58 @@ try {
   assert.equal(manifest.artifacts.replay.present, true);
   assert.equal(manifest.artifacts.dbSummary.present, true);
   assert.ok(manifest.files.some((file) => file.path === "analysis.md"));
+
+  const secondRun = execFileSync(
+    "node",
+    [
+      script,
+      "--fixture",
+      "soupman-alex",
+      "--out-dir",
+      outDir,
+      "--force",
+      "--require-coverage",
+      "command,snapshot,pathing,client-context",
+    ],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+      maxBuffer: 128 * 1024 * 1024,
+    },
+  );
+  assert.match(secondRun, /incident package:/);
 } finally {
   rmSync(outDir, { recursive: true, force: true });
+}
+
+const unsafeDir = mkdtempSync(path.join(os.tmpdir(), "rts-net-incident-unsafe-"));
+try {
+  writeFileSync(path.join(unsafeDir, "do-not-delete.txt"), "sentinel\n");
+  const unsafeResult = spawnSync("node", [script, "--fixture", "soupman-alex", "--out-dir", unsafeDir, "--force"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    maxBuffer: 128 * 1024 * 1024,
+  });
+  assert.notEqual(unsafeResult.status, 0);
+  assert.match(unsafeResult.stderr, /refusing to replace non-package output directory/);
+  assert.equal(readFileSync(path.join(unsafeDir, "do-not-delete.txt"), "utf8"), "sentinel\n");
+} finally {
+  rmSync(unsafeDir, { recursive: true, force: true });
+}
+
+const genericDir = mkdtempSync(path.join(os.tmpdir(), "rts-net-incident-generic-"));
+try {
+  writeFileSync(path.join(genericDir, "README.md"), "not a capture package\n");
+  const genericResult = spawnSync("node", [script, "--fixture", "soupman-alex", "--out-dir", genericDir, "--force"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    maxBuffer: 128 * 1024 * 1024,
+  });
+  assert.notEqual(genericResult.status, 0);
+  assert.match(genericResult.stderr, /without capture package markers/);
+  assert.equal(readFileSync(path.join(genericDir, "README.md"), "utf8"), "not a capture package\n");
+} finally {
+  rmSync(genericDir, { recursive: true, force: true });
 }
 
 console.log("net report incident capture test passed");

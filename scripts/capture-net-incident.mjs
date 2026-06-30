@@ -27,6 +27,28 @@ const DEFAULT_LOG_FILTER = [
   "performance snapshot timing",
   "performance writer timing",
 ].join("|");
+const PACKAGE_TOP_LEVEL_ENTRIES = new Set([
+  "README.md",
+  "raw",
+  "parser",
+  "agent-digest.md",
+  "agent-digest.json",
+  "key-metrics.json",
+  "diagnostic-coverage.json",
+  "replay",
+  "db",
+  "player-report-notes.md",
+  "analysis.md",
+  "beta-evidence-checklist.md",
+  "package-manifest.json",
+]);
+const PACKAGE_MARKER_ENTRIES = new Set([
+  "package-manifest.json",
+  "raw",
+  "parser",
+  "agent-digest.md",
+  "diagnostic-coverage.json",
+]);
 const FIXTURES = Object.freeze({
   "soupman-alex": Object.freeze({
     incidentId: "2026-06-30-beta-soupman-alex-lag",
@@ -265,14 +287,38 @@ function normalizeCoverageId(value) {
 }
 
 function prepareOutputDir(outDir, force) {
+  const resolved = path.resolve(outDir);
+  if (isDangerousOutputRoot(resolved)) {
+    throw new Error(`refusing to use dangerous output directory: ${resolved}`);
+  }
   if (existsSync(outDir)) {
     const entries = readdirSync(outDir).filter((entry) => entry !== ".DS_Store");
     if (entries.length > 0 && !force) {
       throw new Error(`output directory is not empty: ${outDir} (pass --force to replace it)`);
     }
-    if (entries.length > 0) rmSync(outDir, { recursive: true, force: true });
+    if (entries.length > 0) {
+      const unexpected = entries.filter((entry) => !PACKAGE_TOP_LEVEL_ENTRIES.has(entry));
+      if (unexpected.length > 0) {
+        throw new Error(
+          `refusing to replace non-package output directory: ${outDir} (unexpected entries: ${unexpected
+            .slice(0, 5)
+            .join(", ")})`,
+        );
+      }
+      if (!entries.some((entry) => PACKAGE_MARKER_ENTRIES.has(entry))) {
+        throw new Error(`refusing to replace directory without capture package markers: ${outDir}`);
+      }
+      for (const entry of entries) {
+        rmSync(path.join(outDir, entry), { recursive: true, force: true });
+      }
+    }
   }
   mkdirSync(outDir, { recursive: true });
+}
+
+function isDangerousOutputRoot(outDir) {
+  const parsed = path.parse(outDir);
+  return outDir === parsed.root || outDir === REPO_ROOT;
 }
 
 function plannedFlyCommand(options) {
