@@ -1,5 +1,5 @@
 use crate::config;
-use crate::game::entity::{Entity, EntityKind, EntityStore, Order, WeaponSetup};
+use crate::game::entity::{Entity, EntityStore, Order, WeaponSetup};
 use crate::game::map::Map;
 
 #[derive(Clone, Copy)]
@@ -25,7 +25,7 @@ pub(crate) fn artillery_point_fire_target(
     y: f32,
     acceptance: ArtilleryPointFireAcceptance,
 ) -> Option<ArtilleryPointFireTarget> {
-    artillery_point_fire_target_from_context(
+    artillery_point_fire_target_from_context(ArtilleryPointFireTargetRequest {
         map,
         entities,
         player,
@@ -33,10 +33,10 @@ pub(crate) fn artillery_point_fire_target(
         x,
         y,
         acceptance,
-        current_artillery_target_context,
-        true,
-        FireTargetInterpretation::LockRawClick,
-    )
+        context_for: current_artillery_target_context,
+        require_stationary: true,
+        interpretation: FireTargetInterpretation::LockRawClick,
+    })
 }
 
 pub(crate) fn queued_artillery_point_fire_target(
@@ -51,18 +51,18 @@ pub(crate) fn queued_artillery_point_fire_target(
     if artillery_point_fire_queue_terminal(e) {
         return None;
     }
-    artillery_point_fire_target_from_context(
+    artillery_point_fire_target_from_context(ArtilleryPointFireTargetRequest {
         map,
         entities,
         player,
         unit,
         x,
         y,
-        ArtilleryPointFireAcceptance::Command,
-        queued_artillery_target_context,
-        false,
-        FireTargetInterpretation::LockRawClick,
-    )
+        acceptance: ArtilleryPointFireAcceptance::Command,
+        context_for: queued_artillery_target_context,
+        require_stationary: false,
+        interpretation: FireTargetInterpretation::LockRawClick,
+    })
 }
 
 pub(crate) fn stored_artillery_point_fire_target(
@@ -74,7 +74,7 @@ pub(crate) fn stored_artillery_point_fire_target(
     y: f32,
     acceptance: ArtilleryPointFireAcceptance,
 ) -> Option<ArtilleryPointFireTarget> {
-    artillery_point_fire_target_from_context(
+    artillery_point_fire_target_from_context(ArtilleryPointFireTargetRequest {
         map,
         entities,
         player,
@@ -82,10 +82,10 @@ pub(crate) fn stored_artillery_point_fire_target(
         x,
         y,
         acceptance,
-        current_artillery_target_context,
-        true,
-        FireTargetInterpretation::StoredEffectivePoint,
-    )
+        context_for: current_artillery_target_context,
+        require_stationary: true,
+        interpretation: FireTargetInterpretation::StoredEffectivePoint,
+    })
 }
 
 #[derive(Clone, Copy)]
@@ -102,21 +102,37 @@ enum FireTargetInterpretation {
     StoredEffectivePoint,
 }
 
-fn artillery_point_fire_target_from_context(
-    map: &Map,
-    entities: &EntityStore,
+struct ArtilleryPointFireTargetRequest<'a> {
+    map: &'a Map,
+    entities: &'a EntityStore,
     player: u32,
     unit: u32,
     x: f32,
     y: f32,
     acceptance: ArtilleryPointFireAcceptance,
-    context_for: impl Fn(&Entity) -> ArtilleryTargetContext,
+    context_for: fn(&Entity) -> ArtilleryTargetContext,
     require_stationary: bool,
     interpretation: FireTargetInterpretation,
+}
+
+fn artillery_point_fire_target_from_context(
+    request: ArtilleryPointFireTargetRequest<'_>,
 ) -> Option<ArtilleryPointFireTarget> {
+    let ArtilleryPointFireTargetRequest {
+        map,
+        entities,
+        player,
+        unit,
+        x,
+        y,
+        acceptance,
+        context_for,
+        require_stationary,
+        interpretation,
+    } = request;
     let e = entities.get(unit)?;
     if e.owner != player
-        || e.kind != EntityKind::Artillery
+        || !super::is_artillery_entity(e)
         || e.hp == 0
         || e.under_construction()
         || (require_stationary && !e.path_is_empty())

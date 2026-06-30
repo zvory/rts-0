@@ -73,6 +73,10 @@ pub(crate) fn begin_artillery_teardown_for_movement(entities: &mut EntityStore, 
     }
 }
 
+fn is_artillery_entity(e: &Entity) -> bool {
+    e.kind == EntityKind::Artillery
+}
+
 pub(crate) fn start_artillery_point_fire_command_order(
     entities: &mut EntityStore,
     unit: u32,
