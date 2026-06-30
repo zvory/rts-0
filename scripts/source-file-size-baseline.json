@@ -36,7 +36,7 @@
     {
       "path": "server/crates/sim/src/game/services/commands.rs",
       "lines": 1914,
-      "reason": "Artillery firing reveal integration extended the existing oversized command service; keep ratcheting until command handling is split."
+      "reason": "Artillery firing reveal command admission extended the existing oversized command service; keep ratcheting until command validation is further extracted."
     },
     {
       "path": "server/crates/sim/src/game/services/move_coordinator.rs",

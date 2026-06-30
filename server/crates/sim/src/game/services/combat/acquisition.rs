@@ -2,6 +2,7 @@ use crate::config;
 use crate::game::entity::{
     movement_body_class, Entity, EntityKind, EntityStore, MovePhase, MovementBodyClass, Order,
 };
+use crate::game::entrenchment_combat;
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::line_of_sight::LineOfSight;
@@ -33,6 +34,7 @@ pub(super) fn combat_mode_with_moving_fire(e: &Entity, can_fire_while_moving: bo
     match e.order() {
         Order::Attack(_) => CombatMode::Ordered,
         Order::HoldPosition => CombatMode::Opportunistic,
+        Order::Idle if entrenchment_combat::is_actively_entrenched(e) => CombatMode::Opportunistic,
         Order::AttackMove(_) if moving_fire_movement_order_holds_path(e, can_fire_while_moving) => {
             CombatMode::Opportunistic
         }

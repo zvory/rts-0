@@ -1,5 +1,6 @@
 use crate::config;
 use crate::game::entity::{Entity, EntityKind, EntityStore, MovePhase, Order, WeaponSetup};
+use crate::game::entrenchment_combat;
 use crate::game::services::movement::{angle_delta, rotate_toward};
 use crate::rules::combat as combat_rules;
 
@@ -256,7 +257,10 @@ pub(super) struct EffectiveAttackProfile {
 pub(super) fn effective_attack_profile(e: &Entity) -> EffectiveAttackProfile {
     let base = combat_rules::attack_profile(e.kind);
     let mut profile = EffectiveAttackProfile {
-        range_tiles: tank_effective_range_tiles(e, base.range_tiles as f32),
+        range_tiles: entrenchment_combat::attack_range_tiles(
+            e,
+            tank_effective_range_tiles(e, base.range_tiles as f32),
+        ),
         dmg: base.dmg,
         cooldown: base.cooldown,
     };

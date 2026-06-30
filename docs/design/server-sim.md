@@ -587,6 +587,23 @@ simulation predicate for active occupation; digging progress, failed slotting, a
 near trench terrain do not set it. Visible occupied units project `occupiedTrenchId`; remembered
 trench terrain never exposes hidden occupants.
 
+Entrenched combat benefits consume only active occupation through
+`entrenchment_combat::is_actively_entrenched`. Active entrenched Riflemen, Machine Gunners, and
+Workers gain one tile of weapon range through `entrenchment_combat::attack_range_tiles`, and idle
+target acquisition treats them like Hold Position: they can acquire and fire at legal targets inside
+current weapon range but do not request idle chase paths. Explicit Attack and other player orders
+remain authoritative and may move or chase the unit out of the trench; command application and lab
+moves clear active occupation before later combat decisions use it.
+
+Incoming direct-fire miss policy uses the highest applicable independent chance. Existing
+Anti-Tank Gun infantry miss chance is 65%; entrenched eligible infantry add a 70% miss chance, so
+an Anti-Tank Gun firing at an entrenched Rifleman, Machine Gunner, or Worker rolls 70%, not a
+composed probability. Area effects call `entrenchment_combat::reduce_area_damage` after their
+normal falloff and armor calculations, so Mortar and Artillery splash deal 30% of their current
+post-formula damage to actively entrenched eligible infantry. Direct-fire over-penetration stops at
+an entrenched primary victim, and actively entrenched secondary candidates are skipped rather than
+taking over-penetration damage or emitting secondary hit feedback.
+
 Per-caster recast state is exposed to the owner through `EntityView.abilities`: active return marker
 id, availability tick, and remaining lifetime are projected only for the owning player's command
 card. Ekat's `ekatTeleport` world-point activation is a dash: it validates static standability,

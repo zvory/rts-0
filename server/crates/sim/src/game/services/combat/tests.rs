@@ -17,6 +17,7 @@ use crate::rules::combat as combat_rules;
 use rand::SeedableRng;
 
 mod mortar_autocast;
+mod entrenchment;
 mod moving_fire_policy;
 mod retention;
 mod support_weapon_attack_move;
@@ -247,9 +248,7 @@ fn predicted_test_mortar_impact(
     let mut fog = Fog::new(map.size);
     fog.recompute(player_ids, entities, &map);
     let (x, y) = mortar_aim_point(entities, target, tick);
-    crate::game::mortar_scatter::predicted_mortar_impact(
-        &fog, teams, owner, attacker, x, y, tick,
-    )
+    crate::game::mortar_scatter::predicted_mortar_impact(&fog, teams, owner, attacker, x, y, tick)
 }
 
 fn run_movement_tick(entities: &mut EntityStore) {

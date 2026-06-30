@@ -18,6 +18,7 @@ mod building_memory;
 pub mod command;
 mod commands;
 pub mod entity;
+mod entrenchment_combat;
 mod firing_reveal;
 pub(crate) mod fog;
 mod hero_abilities;
