@@ -1,4 +1,5 @@
 use super::connection::send_or_log;
+use super::connection::CommandSimAckSample;
 use super::crash_replay::{dump_crash_replay, panic_reason};
 use super::participants::Participants;
 use super::projection::{ObserverAnalysisAudience, ProjectionPolicy, RecipientRole};
@@ -317,6 +318,12 @@ impl LiveTickDriver<'_> {
             if ack.client_seq == player.last_sim_consumed_client_seq.saturating_add(1) {
                 player.last_sim_consumed_client_seq = ack.client_seq;
                 player.last_sim_consumed_client_tick = Some(tick);
+                player.msg_tx.record_command_sim_ack(CommandSimAckSample {
+                    received_unix_ms: ack.received_unix_ms,
+                    client_seq: ack.client_seq,
+                    family: ack.family,
+                    accepted_to_sim_ack_ms: duration_ms_u32(ack.accepted_at.elapsed()),
+                });
             }
         }
     }
@@ -343,4 +350,8 @@ impl LiveTickDriver<'_> {
             counts: game.perf_entity_counts(),
         });
     }
+}
+
+fn duration_ms_u32(duration: Duration) -> u32 {
+    duration.as_millis().min(u32::MAX as u128) as u32
 }

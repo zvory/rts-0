@@ -10,6 +10,10 @@ import {
   formatPackageReadme,
   formatServerTickRowsTsv,
 } from "./net-report-incident-package.mjs";
+import {
+  appendCommandLifecycleMarkdown,
+  summarizeCommandLifecycle,
+} from "./net-report-command-lifecycle.mjs";
 
 const ANSI_PATTERN = /\x1B\[[0-?]*[ -/]*[@-~]/g;
 const SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES = 1280;
@@ -52,6 +56,8 @@ const METRICS = [
   ["slow_tick_count", "slow ticks"],
   ["head_of_line_count", "head of line"],
   ["acknowledged_command_latency_ms", "legacy command ack"],
+  ["command_issue_to_socket_send_accepted_max_ms", "command client send max"],
+  ["command_issue_to_socket_send_accepted_p95_ms", "command client send p95"],
   ["command_issue_to_server_receipt_max_ms", "command upload max"],
   ["command_issue_to_server_receipt_p95_ms", "command upload p95"],
   ["command_server_receipt_to_sim_ack_max_ms", "server queue max"],
@@ -80,6 +86,12 @@ const METRICS = [
   ["server_snapshot_waited_behind_reliable", "snapshots waited behind reliable"],
   ["server_snapshot_send_age_max_ms", "server snapshot send age max"],
   ["server_snapshot_slot_replaced", "server snapshot slot replaced"],
+  ["server_command_frame_deserialize_max_ms", "server command parse max"],
+  ["server_command_deserialize_to_room_enqueue_max_ms", "server command enqueue max"],
+  ["server_command_room_queue_max_ms", "server command room queue max"],
+  ["server_command_room_handle_max_ms", "server command handle max"],
+  ["server_command_receipt_send_age_max_ms", "server command receipt send age max"],
+  ["server_command_accepted_to_sim_ack_max_ms", "server command accepted-to-ack max"],
 ];
 
 const SUMMARY_FIELDS = [
@@ -117,6 +129,8 @@ const SUMMARY_FIELDS = [
   "slow_tick_count",
   "head_of_line_count",
   "acknowledged_command_latency_ms",
+  "command_issue_to_socket_send_accepted_max_ms",
+  "command_issue_to_socket_send_accepted_p95_ms",
   "command_issue_to_server_receipt_max_ms",
   "command_issue_to_server_receipt_p95_ms",
   "command_server_receipt_to_sim_ack_max_ms",
@@ -127,6 +141,11 @@ const SUMMARY_FIELDS = [
   "command_ack_snapshot_received_to_applied_p95_ms",
   "oldest_pending_command_age_ms",
   "max_pending_command_count",
+  "command_family_move",
+  "command_family_attack_move",
+  "command_family_build",
+  "command_family_train",
+  "command_family_other",
   "prediction_disable_user_count",
   "prediction_disable_replay_count",
   "prediction_disable_spectator_count",
@@ -148,6 +167,21 @@ const SUMMARY_FIELDS = [
   "server_snapshot_slot_stored",
   "server_snapshot_slot_replaced",
   "server_snapshot_slot_closed",
+  "server_command_lifecycle_count",
+  "server_command_lifecycle_accepted",
+  "server_command_lifecycle_rejected",
+  "server_command_frame_deserialize_max_ms",
+  "server_command_frame_deserialize_p95_ms",
+  "server_command_deserialize_to_room_enqueue_max_ms",
+  "server_command_deserialize_to_room_enqueue_p95_ms",
+  "server_command_room_queue_max_ms",
+  "server_command_room_queue_p95_ms",
+  "server_command_room_handle_max_ms",
+  "server_command_room_handle_p95_ms",
+  "server_command_receipt_send_age_max_ms",
+  "server_command_receipt_send_age_p95_ms",
+  "server_command_accepted_to_sim_ack_max_ms",
+  "server_command_accepted_to_sim_ack_p95_ms",
 ];
 
 const TRANSPORT_DIAGNOSTIC_FIELDS = [
@@ -235,10 +269,17 @@ const ISSUE_GROUPS = [
     label: "command upload/receipt/sim/downstream/render delay",
     fields: [
       "acknowledged_command_latency_ms",
+      "command_issue_to_socket_send_accepted_max_ms",
       "command_issue_to_server_receipt_max_ms",
       "command_server_receipt_to_sim_ack_max_ms",
       "command_issue_to_sim_ack_max_ms",
       "command_ack_snapshot_received_to_applied_max_ms",
+      "server_command_frame_deserialize_max_ms",
+      "server_command_deserialize_to_room_enqueue_max_ms",
+      "server_command_room_queue_max_ms",
+      "server_command_room_handle_max_ms",
+      "server_command_receipt_send_age_max_ms",
+      "server_command_accepted_to_sim_ack_max_ms",
       "oldest_pending_command_age_ms",
       "max_pending_command_count",
       "command_rejected",
@@ -308,6 +349,8 @@ const WARN_THRESHOLD = {
   bad_rtt_samples: 1,
   jitter_samples: 1,
   acknowledged_command_latency_ms: 180,
+  command_issue_to_socket_send_accepted_max_ms: 16,
+  command_issue_to_socket_send_accepted_p95_ms: 16,
   command_issue_to_server_receipt_max_ms: 180,
   command_issue_to_server_receipt_p95_ms: 180,
   command_server_receipt_to_sim_ack_max_ms: 66,
@@ -316,6 +359,18 @@ const WARN_THRESHOLD = {
   command_issue_to_sim_ack_p95_ms: 180,
   command_ack_snapshot_received_to_applied_max_ms: 16,
   command_ack_snapshot_received_to_applied_p95_ms: 16,
+  server_command_frame_deserialize_max_ms: 8,
+  server_command_frame_deserialize_p95_ms: 8,
+  server_command_deserialize_to_room_enqueue_max_ms: 66,
+  server_command_deserialize_to_room_enqueue_p95_ms: 66,
+  server_command_room_queue_max_ms: 66,
+  server_command_room_queue_p95_ms: 66,
+  server_command_room_handle_max_ms: 66,
+  server_command_room_handle_p95_ms: 66,
+  server_command_receipt_send_age_max_ms: 100,
+  server_command_receipt_send_age_p95_ms: 100,
+  server_command_accepted_to_sim_ack_max_ms: 66,
+  server_command_accepted_to_sim_ack_p95_ms: 66,
   oldest_pending_command_age_ms: 180,
   max_pending_command_count: 8,
   command_rejected: 1,
@@ -823,6 +878,7 @@ function finalizePlayer(player) {
     primaryIssues: issues,
     metrics: values,
     transport: summarizeTransport(reports),
+    commandLifecycle: summarizeCommandLifecycle(reports),
     evidence,
   };
 }
@@ -1137,6 +1193,8 @@ function formatMarkdown(report) {
         ].join(" | ").replace(/^/, "| ").replace(/$/, " |")
       );
     }
+
+    appendCommandLifecycleMarkdown(lines, match.players);
 
     lines.push("");
     lines.push("### Classification");

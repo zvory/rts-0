@@ -16,8 +16,12 @@ const CLIENT_ROW_FIELDS = [
   "snapshot_gap_max_ms",
   "snapshot_jitter_ms",
   "command_issue_to_sim_ack_max_ms",
+  "command_issue_to_socket_send_accepted_max_ms",
   "command_issue_to_server_receipt_max_ms",
   "command_server_receipt_to_sim_ack_max_ms",
+  "server_command_room_queue_max_ms",
+  "server_command_receipt_send_age_max_ms",
+  "server_command_accepted_to_sim_ack_max_ms",
   "commands_issued",
   "command_burst_max",
   "frame_gap_max_ms",
@@ -56,8 +60,12 @@ const TOP_WINDOW_GROUPS = [
     events: ["client_net_report"],
     fields: [
       "command_issue_to_sim_ack_max_ms",
+      "command_issue_to_socket_send_accepted_max_ms",
       "command_issue_to_server_receipt_max_ms",
       "command_server_receipt_to_sim_ack_max_ms",
+      "server_command_room_queue_max_ms",
+      "server_command_receipt_send_age_max_ms",
+      "server_command_accepted_to_sim_ack_max_ms",
       "oldest_pending_command_age_ms",
       "acknowledged_command_latency_ms",
     ],
@@ -155,10 +163,10 @@ const COVERAGE_CLASSES = [
   {
     id: "command_lifecycle",
     label: "command lifecycle fields",
-    owner: "client command diagnostics plus server receipt counters",
+    owner: "client command diagnostics plus server room/writer lifecycle counters",
     resetWindow: "client report window",
-    privacy: "client sequence aggregates only; no command payloads or unit lists",
-    caveat: "aggregates split stages coarsely and cannot identify one exact command without later telemetry",
+    privacy: "client sequence aggregates and bounded top exemplars only; no command payloads or unit lists",
+    caveat: "server and client clocks are not synchronized, so compare server-owned stages within the server block and client-observed stages as delivery/apply observations",
   },
   {
     id: "client_frame_render",
@@ -189,10 +197,10 @@ const COVERAGE_CLASSES = [
 const FIELD_CATALOG = {
   maxCommandResponseMs: {
     unit: "milliseconds",
-    owner: "client command lifecycle aggregate",
+    owner: "client command lifecycle aggregate with server lifecycle supplements when present",
     resetWindow: "parser timeline band; max of report-window command response fields",
     privacy: "aggregate sequence timing, no command payload",
-    caveat: "cannot identify which individual command dominated without later lifecycle telemetry",
+    caveat: "bounded top exemplars identify only client sequence, family, stage, and time; they do not include command payloads",
   },
   maxSnapshotGapMs: {
     unit: "milliseconds",
@@ -210,10 +218,10 @@ const FIELD_CATALOG = {
   },
   maxServerQueueMs: {
     unit: "milliseconds",
-    owner: "command receipt-to-sim acknowledgement aggregate",
+    owner: "server command room queue aggregate when present, otherwise client receipt-to-sim acknowledgement aggregate",
     resetWindow: "parser timeline band",
     privacy: "aggregate sequence timing, no command payload",
-    caveat: "coarse queue timing cannot explain the internal room actor cause by itself",
+    caveat: "server room queue and client receipt-to-ack are distinct stages; older logs may still combine them",
   },
   maxPayloadP95Bucket: {
     unit: "payload byte bucket",
@@ -406,7 +414,12 @@ function buildMatchDigest(match) {
           metric(player, "command_issue_to_sim_ack_max_ms", "max") ?? metric(player, "acknowledged_command_latency_ms", "max"),
         commandResponseP95Ms:
           metric(player, "command_issue_to_sim_ack_p95_ms", "max") ?? metric(player, "acknowledged_command_latency_ms", "p95"),
-        serverQueueMaxMs: metric(player, "command_server_receipt_to_sim_ack_max_ms", "max"),
+        clientSendMaxMs: metric(player, "command_issue_to_socket_send_accepted_max_ms", "max"),
+        serverQueueMaxMs:
+          metric(player, "server_command_room_queue_max_ms", "max") ??
+          metric(player, "command_server_receipt_to_sim_ack_max_ms", "max"),
+        serverReceiptSendAgeMaxMs: metric(player, "server_command_receipt_send_age_max_ms", "max"),
+        serverAcceptedToSimAckMaxMs: metric(player, "server_command_accepted_to_sim_ack_max_ms", "max"),
         frameWorkMaxMs: metric(player, "frame_work_max_ms", "max"),
         rendererMaxMs: metric(player, "renderer_max_ms", "max"),
         payloadP95MaxBytes: metric(player, "snapshot_bytes_p95", "max"),
@@ -546,7 +559,10 @@ function coverageItem(coverage, match, rows) {
     server_tick_rows: rows.filter((row) => row.event === "performance_tick").length,
     snapshot_perf_rows: rows.filter((row) => row.event === "performance_snapshot").length,
     writer_rows: rows.filter((row) => row.event === "performance_writer").length,
-    command_lifecycle: rows.filter((row) => row.fields.command_issue_to_server_receipt_max_ms !== undefined).length,
+    command_lifecycle: rows.filter((row) =>
+      row.fields.command_issue_to_server_receipt_max_ms !== undefined ||
+      row.fields.server_command_room_queue_max_ms !== undefined
+    ).length,
     client_frame_render: rows.filter((row) => row.fields.frame_work_max_ms !== undefined || row.fields.renderer_max_ms !== undefined).length,
     replay_metadata: hasArtifactNear(rows, "replay"),
     db_summary_metadata: hasArtifactNear(rows, "db-summary"),
@@ -609,8 +625,11 @@ function newTimelineBand(startMs, bandMs) {
 function updateClientBand(band, fields) {
   band.clientReportRows += 1;
   updateMax(band, "maxCommandResponseMs", fields.command_issue_to_sim_ack_max_ms ?? fields.acknowledged_command_latency_ms);
+  updateMax(band, "maxCommandClientSendMs", fields.command_issue_to_socket_send_accepted_max_ms);
   updateMax(band, "maxCommandUploadMs", fields.command_issue_to_server_receipt_max_ms);
-  updateMax(band, "maxServerQueueMs", fields.command_server_receipt_to_sim_ack_max_ms);
+  updateMax(band, "maxServerQueueMs", fields.server_command_room_queue_max_ms ?? fields.command_server_receipt_to_sim_ack_max_ms);
+  updateMax(band, "maxServerReceiptSendAgeMs", fields.server_command_receipt_send_age_max_ms);
+  updateMax(band, "maxServerAcceptedToSimAckMs", fields.server_command_accepted_to_sim_ack_max_ms);
   updateMax(band, "maxSnapshotGapMs", fields.snapshot_gap_max_ms);
   updateMax(band, "maxRttMs", fields.rtt_max_ms);
   updateMax(band, "maxPayloadP95Bytes", fields.snapshot_bytes_p95);

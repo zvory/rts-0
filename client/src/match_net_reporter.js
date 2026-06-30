@@ -204,6 +204,9 @@ function clampedCommandReportFields(report = {}) {
     commandServerReceived: clampU32(report.commandServerReceived),
     commandSimAcknowledged: clampU32(report.commandSimAcknowledged),
     commandRejected: clampU32(report.commandRejected),
+    commandIssueToSocketSendAcceptedLatestMs: clampU16(report.commandIssueToSocketSendAcceptedLatestMs),
+    commandIssueToSocketSendAcceptedMaxMs: clampU16(report.commandIssueToSocketSendAcceptedMaxMs),
+    commandIssueToSocketSendAcceptedP95Ms: clampU16(report.commandIssueToSocketSendAcceptedP95Ms),
     commandIssueToServerReceiptLatestMs: clampU16(report.commandIssueToServerReceiptLatestMs),
     commandIssueToServerReceiptMaxMs: clampU16(report.commandIssueToServerReceiptMaxMs),
     commandIssueToServerReceiptP95Ms: clampU16(report.commandIssueToServerReceiptP95Ms),
@@ -218,7 +221,42 @@ function clampedCommandReportFields(report = {}) {
     commandAckSnapshotReceivedToAppliedP95Ms: clampU16(report.commandAckSnapshotReceivedToAppliedP95Ms),
     oldestPendingCommandAgeMs: clampU16(report.oldestPendingCommandAgeMs),
     maxPendingCommandCount: clampU16(report.maxPendingCommandCount),
+    commandFamilyMove: clampU32(report.commandFamilyMove),
+    commandFamilyAttackMove: clampU32(report.commandFamilyAttackMove),
+    commandFamilyBuild: clampU32(report.commandFamilyBuild),
+    commandFamilyTrain: clampU32(report.commandFamilyTrain),
+    commandFamilyOther: clampU32(report.commandFamilyOther),
+    commandLifecycleExemplars: clampCommandLifecycleExemplars(report.commandLifecycleExemplars),
   };
+}
+
+function clampCommandLifecycleExemplars(exemplars = []) {
+  if (!Array.isArray(exemplars)) return [];
+  return exemplars.slice(0, 5).map((entry) => ({
+    clientSeq: clampU32(entry?.clientSeq),
+    family: clampCommandFamily(entry?.family),
+    issuedElapsedMs: clampU32(entry?.issuedElapsedMs),
+    stage: clampCommandStage(entry?.stage),
+    stageMs: clampU16(entry?.stageMs),
+  }));
+}
+
+function clampCommandFamily(value) {
+  const text = String(value || "other");
+  return ["move", "attackMove", "build", "train", "other"].includes(text) ? text : "other";
+}
+
+function clampCommandStage(value) {
+  const text = String(value || "unknown");
+  return [
+    "issueToSocketSendAccepted",
+    "issueToServerReceipt",
+    "serverReceiptToSimAck",
+    "issueToSimAck",
+    "ackSnapshotReceivedToApplied",
+  ].includes(text)
+    ? text
+    : "unknown";
 }
 
 function stableDisableReasonCounts(reasons = {}, wasm = {}) {

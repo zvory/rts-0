@@ -29,6 +29,9 @@ pub(in crate::lobby) struct RoomPlayer {
 pub(in crate::lobby) struct PendingClientCommandAck {
     pub(in crate::lobby) connection_id: u32,
     pub(in crate::lobby) client_seq: u32,
+    pub(in crate::lobby) received_unix_ms: u64,
+    pub(in crate::lobby) family: &'static str,
+    pub(in crate::lobby) accepted_at: StdInstant,
 }
 
 /// A computer opponent seated in a room. Has an id (for the lobby list / removal) and a name, but

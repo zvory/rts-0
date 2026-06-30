@@ -92,4 +92,33 @@ import { cmd } from "../../client/src/protocol.js";
   );
 }
 
+{
+  let clock = 1_000;
+  const prediction = new PredictionController({
+    now: () => clock,
+    sendCommand() {
+      clock += 7;
+      return true;
+    },
+  });
+  const moveIssued = prediction.issueCommand(cmd.move([1], 10, 20));
+  clock += 40;
+  prediction.recordSocketReceipt(moveIssued.clientSeq, { serverTick: 11 });
+  const buildIssued = prediction.issueCommand(cmd.build([2], "depot", 4, 5));
+  clock += 80;
+  prediction.applyAuthoritativeSnapshot({
+    tick: 12,
+    netStatus: { lastSimConsumedClientSeq: buildIssued.clientSeq, lastSimConsumedClientTick: 12 },
+  });
+  const report = prediction.peekCommandReportStats();
+  assert(report.commandIssueToSocketSendAcceptedMaxMs === 7, "command report splits client issue-to-send timing");
+  assert(report.commandFamilyMove === 1 && report.commandFamilyBuild === 1, "command report counts stable command families");
+  assert(
+    report.commandLifecycleExemplars.some((entry) => entry.clientSeq === buildIssued.clientSeq && entry.family === "build"),
+    "command report keeps bounded lifecycle exemplars with family and clientSeq",
+  );
+  prediction.consumeCommandReportStats();
+  assert(prediction.peekCommandReportStats().commandLifecycleExemplars.length === 0, "command exemplars reset with the report window");
+}
+
 // ---------------------------------------------------------------------------

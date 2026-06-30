@@ -25,8 +25,8 @@
     },
     {
       "path": "server/crates/protocol/src/lib.rs",
-      "lines": 1851,
-      "reason": "Desktop cursor runtime net-report diagnostics added mirrored wire fields before protocol DTO extraction."
+      "lines": 1989,
+      "reason": "Command lifecycle net-report diagnostics added mirrored wire fields and bounded exemplar deserialization before protocol DTO extraction."
     },
     {
       "path": "server/crates/sim/src/game/services/combat/tests.rs",
@@ -60,8 +60,8 @@
     },
     {
       "path": "server/src/main.rs",
-      "lines": 1928,
-      "reason": "Server shell remains oversized after prior shrink; keep the ratchet at the current line count."
+      "lines": 1965,
+      "reason": "Command lifecycle ingress timing added WebSocket receive and deserialization timestamps in the existing oversized server shell; keep ratcheting until connection handling is split."
     },
     {
       "path": "tests/client_contracts/state_input_contracts.mjs",

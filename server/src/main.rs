@@ -10,7 +10,7 @@
 //! the per-room task in `lobby`. This file never touches a `Game` directly.
 
 use std::net::SocketAddr;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{ConnectInfo, Path, Query, State};
@@ -45,7 +45,6 @@ use rts_sim::game::map::Map;
 use rts_sim::game::replay::{
     ReplayArtifactV1, ReplayValidationError, REPLAY_ARTIFACT_SCHEMA_VERSION_V2,
 };
-use rts_sim::game::SimCommand;
 use rts_sim::perf;
 
 /// Default room name used when a client's `join` omits `room`.
@@ -54,6 +53,13 @@ const DEFAULT_CLIENT_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../client
 const DEFAULT_MAPS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/maps");
 const RTS_CLIENT_DIR_ENV: &str = "RTS_CLIENT_DIR";
 const RTS_MAPS_DIR_ENV: &str = "RTS_MAPS_DIR";
+
+#[derive(Clone, Copy)]
+struct ClientMessageTiming {
+    received_unix_ms: u64,
+    frame_received_at: Instant,
+    deserialized_at: Instant,
+}
 
 /// Treat unset/empty/`0`/`false`/`no`/`off` as falsy; anything else is true.
 fn env_truthy(key: &str) -> bool {
@@ -64,6 +70,13 @@ fn env_truthy(key: &str) -> bool {
         ),
         Err(_) => false,
     }
+}
+
+fn current_unix_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis().min(u128::from(u64::MAX)) as u64)
+        .unwrap_or(0)
 }
 
 fn env_path_or_default(key: &str, default: &str) -> String {
@@ -749,6 +762,15 @@ mod tests {
         .expect("active match count did not settle");
     }
 
+    fn test_message_timing() -> ClientMessageTiming {
+        let now = Instant::now();
+        ClientMessageTiming {
+            received_unix_ms: 0,
+            frame_received_at: now,
+            deserialized_at: now,
+        }
+    }
+
     #[tokio::test]
     async fn join_to_different_room_transfers_connection_and_leaves_previous_room() {
         let lobby = Lobby::new();
@@ -764,6 +786,7 @@ mod tests {
                 spectator: false,
                 replay_ok: false,
             },
+            test_message_timing(),
             &lobby,
             &conn_tx,
             &mut current_room,
@@ -781,6 +804,7 @@ mod tests {
                 spectator: true,
                 replay_ok: false,
             },
+            test_message_timing(),
             &lobby,
             &conn_tx,
             &mut current_room,
@@ -1119,9 +1143,11 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
                 match reliable_rx.try_recv() {
                     Ok(msg) => {
                         writer_stats.note_reliable_for_snapshot(snapshot_waiting, &snapshots);
+                        let command_receipt = matches!(msg, ServerMessage::CommandReceipt { .. });
                         if !send_server_message(player_id, &mut sink, msg).await {
                             break 'write_loop;
                         }
+                        writer_stats.record_reliable_sent(command_receipt);
                     }
                     Err(mpsc::error::TryRecvError::Empty) => break,
                     Err(mpsc::error::TryRecvError::Disconnected) => {
@@ -1150,9 +1176,11 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
                     match maybe_msg {
                         Some(msg) => {
                             writer_stats.note_reliable_message(snapshots.has_pending());
+                            let command_receipt = matches!(msg, ServerMessage::CommandReceipt { .. });
                             if !send_server_message(player_id, &mut sink, msg).await {
                                 break 'write_loop;
                             }
+                            writer_stats.record_reliable_sent(command_receipt);
                         }
                         None => reliable_closed = true,
                     }
@@ -1210,6 +1238,8 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
 
         match frame {
             Message::Text(text) => {
+                let frame_received_at = Instant::now();
+                let received_unix_ms = current_unix_ms();
                 let parsed: ClientMessage = match serde_json::from_str(&text) {
                     Ok(m) => m,
                     Err(err) => {
@@ -1221,9 +1251,15 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
                         continue;
                     }
                 };
+                let timing = ClientMessageTiming {
+                    received_unix_ms,
+                    frame_received_at,
+                    deserialized_at: Instant::now(),
+                };
                 handle_client_message(
                     player_id,
                     parsed,
+                    timing,
                     &lobby,
                     &conn_tx,
                     &mut current_room,
@@ -1387,6 +1423,7 @@ impl ServerFrame {
 async fn handle_client_message(
     player_id: u32,
     msg: ClientMessage,
+    timing: ClientMessageTiming,
     lobby: &Lobby,
     conn_tx: &lobby::ConnectionSink,
     current_room: &mut Option<lobby::RoomHandle>,
@@ -1571,14 +1608,14 @@ async fn handle_client_message(
             .await;
         }
         ClientMessage::Command { client_seq, cmd } => {
-            send_room_event(
+            lobby::send_command_room_event(
                 player_id,
                 current_room,
-                RoomEvent::Command {
-                    player_id,
-                    client_seq,
-                    cmd: SimCommand::from_protocol(cmd),
-                },
+                client_seq,
+                cmd,
+                timing.received_unix_ms,
+                timing.frame_received_at,
+                timing.deserialized_at,
             )
             .await;
         }

@@ -143,7 +143,7 @@ try {
   writeFileSync(
     commandLog,
     [
-      '2026-06-24T02:00:00Z INFO event="client_net_report" match_run_id="command-1" player_id=4 primary_issue="command_density" rtt_max_ms=42 snapshot_gap_max_ms=144 snapshot_jitter_ms=28 snapshot_late_frame_count=3 predicted_snapshot_late_frame_count=2 frame_gap_max_ms=118 frame_work_max_ms=12 fps_estimate=55 commands_issued=24 command_burst_bucket_ms=250 command_burst_max=9 command_burst_frame_gap_max_ms=118 command_burst_worst_frame_phase="match.input" command_burst_worst_frame_phase_ms=14 command_issue_to_sim_ack_max_ms=81 command_rejected=0 prediction_disable_user_count=0 prediction_disable_replay_count=1 prediction_disable_spectator_count=0 prediction_disable_compatibility_count=0 prediction_disable_wasm_count=0 prediction_disable_other_count=0 prediction_replay_max_ms=9 prediction_replay_max_ticks=10 prediction_replay_budget_exceeded_count=1 server_command_receipts_accepted=24 server_command_receipts_rejected=0 server_reliable_drained_before_snapshot=3 server_reliable_drained_before_snapshot_max=2 server_snapshot_waited_behind_reliable=1 server_snapshot_sent=50 server_snapshot_send_age_latest_ms=18 server_snapshot_send_age_max_ms=132 server_snapshot_send_age_avg_ms=12 server_snapshot_slot_stored=50 server_snapshot_slot_replaced=2 server_snapshot_slot_closed=0 server_tick_ms=4 server_lag_ms=1 "client network report"',
+      '2026-06-24T02:00:00Z INFO event="client_net_report" match_run_id="command-1" player_id=4 primary_issue="command_density" rtt_max_ms=42 snapshot_gap_max_ms=144 snapshot_jitter_ms=28 snapshot_late_frame_count=3 predicted_snapshot_late_frame_count=2 frame_gap_max_ms=118 frame_work_max_ms=12 fps_estimate=55 commands_issued=24 command_burst_bucket_ms=250 command_burst_max=9 command_burst_frame_gap_max_ms=118 command_burst_worst_frame_phase="match.input" command_burst_worst_frame_phase_ms=14 command_issue_to_socket_send_accepted_max_ms=7 command_issue_to_socket_send_accepted_p95_ms=4 command_issue_to_server_receipt_max_ms=63 command_server_receipt_to_sim_ack_max_ms=70 command_issue_to_sim_ack_max_ms=81 command_rejected=0 command_family_move=12 command_family_attack_move=3 command_family_build=4 command_family_train=1 command_family_other=4 command_lifecycle_exemplars="[{\\"clientSeq\\":7,\\"family\\":\\"move\\",\\"issuedElapsedMs\\":125,\\"stage\\":\\"issueToSimAck\\",\\"stageMs\\":81}]" prediction_disable_user_count=0 prediction_disable_replay_count=1 prediction_disable_spectator_count=0 prediction_disable_compatibility_count=0 prediction_disable_wasm_count=0 prediction_disable_other_count=0 prediction_replay_max_ms=9 prediction_replay_max_ticks=10 prediction_replay_budget_exceeded_count=1 server_command_receipts_accepted=24 server_command_receipts_rejected=0 server_command_lifecycle_count=24 server_command_lifecycle_accepted=23 server_command_lifecycle_rejected=1 server_command_frame_deserialize_max_ms=3 server_command_frame_deserialize_p95_ms=2 server_command_deserialize_to_room_enqueue_max_ms=5 server_command_deserialize_to_room_enqueue_p95_ms=4 server_command_room_queue_max_ms=74 server_command_room_queue_p95_ms=50 server_command_room_handle_max_ms=6 server_command_room_handle_p95_ms=4 server_command_receipt_send_age_max_ms=132 server_command_receipt_send_age_p95_ms=100 server_command_accepted_to_sim_ack_max_ms=66 server_command_accepted_to_sim_ack_p95_ms=50 server_command_lifecycle_exemplars="[{\\"receivedUnixMs\\":1719194400000,\\"clientSeq\\":7,\\"family\\":\\"move\\",\\"stage\\":\\"serverRoomQueue\\",\\"stageMs\\":74}]" server_reliable_drained_before_snapshot=3 server_reliable_drained_before_snapshot_max=2 server_snapshot_waited_behind_reliable=1 server_snapshot_sent=50 server_snapshot_send_age_latest_ms=18 server_snapshot_send_age_max_ms=132 server_snapshot_send_age_avg_ms=12 server_snapshot_slot_stored=50 server_snapshot_slot_replaced=2 server_snapshot_slot_closed=0 server_tick_ms=4 server_lag_ms=1 "client network report"',
     ].join("\n") + "\n"
   );
   const commandParsed = JSON.parse(run(["--format", "json", commandLog]));
@@ -152,8 +152,16 @@ try {
   const commandPlayer = commandMatch.players.find((player) => player.playerId === "4");
   assert.ok(commandPlayer, "expected synthetic command-density player summary");
   assert.equal(commandPlayer.metrics.command_burst_max.max, 9);
+  assert.equal(commandPlayer.metrics.command_issue_to_socket_send_accepted_max_ms.max, 7);
+  assert.equal(commandPlayer.metrics.server_command_room_queue_max_ms.max, 74);
   assert.equal(commandPlayer.metrics.server_snapshot_send_age_max_ms.max, 132);
   assert.equal(commandPlayer.metrics.predicted_snapshot_late_frame_count.max, 2);
+  assert.equal(commandPlayer.commandLifecycle.familyCounts.move, 12);
+  assert.equal(
+    commandPlayer.commandLifecycle.stages.find((stage) => stage.id === "room_queue")?.maxMs,
+    74,
+  );
+  assert.equal(commandPlayer.commandLifecycle.exemplars[0].stage, "issueToSimAck");
   assert.equal(
     commandMatch.classifications.find((item) => item.id === "command_density")?.result,
     "indicated",
@@ -165,6 +173,9 @@ try {
   const commandMarkdown = run([commandLog]);
   assert.match(commandMarkdown, /cmds\/burst/);
   assert.match(commandMarkdown, /24\/9/);
+  assert.match(commandMarkdown, /Command Lifecycle Waterfall/);
+  assert.match(commandMarkdown, /room_queue 74\/50ms server/);
+  assert.match(commandMarkdown, /seq 7 move issueToSimAck 81ms/);
   assert.match(commandMarkdown, /3\/1\/132\/2/);
 } finally {
   rmSync(commandDir, { recursive: true, force: true });

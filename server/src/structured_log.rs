@@ -2,7 +2,7 @@ use std::fmt::Write as _;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::build_info::build_id;
-use crate::lobby::ConnectionReportStats;
+use crate::lobby::{CommandLifecycleReportStats, CommandTimingStats, ConnectionReportStats};
 use crate::protocol::ClientNetReport;
 
 static NEXT_MATCH_RUN_ID: AtomicU64 = AtomicU64::new(1);
@@ -63,10 +63,14 @@ pub const NET_REPORT_SERVER_TICK_ISSUE_MS: u16 = 33;
 pub const NET_REPORT_SERVER_LAG_ISSUE_MS: u16 = 33;
 pub const NET_REPORT_PENDING_COMMAND_ISSUE: u16 = 8;
 pub const NET_REPORT_COMMAND_COUNT_ISSUE: u32 = 20;
+pub const NET_REPORT_COMMAND_SOCKET_SEND_ISSUE_MS: u16 = 16;
 pub const NET_REPORT_COMMAND_UPLOAD_ISSUE_MS: u16 = 180;
 pub const NET_REPORT_COMMAND_SERVER_QUEUE_ISSUE_MS: u16 = 66;
 pub const NET_REPORT_COMMAND_ACK_APPLY_ISSUE_MS: u16 = 16;
 pub const NET_REPORT_COMMAND_BURST_ISSUE: u16 = 6;
+pub const NET_REPORT_SERVER_COMMAND_PARSE_ISSUE_MS: u32 = 8;
+pub const NET_REPORT_SERVER_COMMAND_ROOM_QUEUE_ISSUE_MS: u32 = 66;
+pub const NET_REPORT_SERVER_COMMAND_RECEIPT_SEND_AGE_ISSUE_MS: u32 = 100;
 pub const NET_REPORT_CORRECTION_ISSUE_PX: u16 = 32;
 pub const NET_REPORT_REPLAY_TICK_ISSUE: u16 = 8;
 pub const NET_REPORT_REPLAY_MS_ISSUE: u16 = 8;
@@ -231,6 +235,18 @@ pub fn log_client_net_report(
     field!("command_sim_acknowledged", report.command_sim_acknowledged);
     field!("command_rejected", report.command_rejected);
     field!(
+        "command_issue_to_socket_send_accepted_latest_ms",
+        report.command_issue_to_socket_send_accepted_latest_ms
+    );
+    field!(
+        "command_issue_to_socket_send_accepted_max_ms",
+        report.command_issue_to_socket_send_accepted_max_ms
+    );
+    field!(
+        "command_issue_to_socket_send_accepted_p95_ms",
+        report.command_issue_to_socket_send_accepted_p95_ms
+    );
+    field!(
         "command_issue_to_server_receipt_latest_ms",
         report.command_issue_to_server_receipt_latest_ms
     );
@@ -285,6 +301,18 @@ pub fn log_client_net_report(
     field!(
         "max_pending_command_count",
         report.max_pending_command_count
+    );
+    field!("command_family_move", report.command_family_move);
+    field!(
+        "command_family_attack_move",
+        report.command_family_attack_move
+    );
+    field!("command_family_build", report.command_family_build);
+    field!("command_family_train", report.command_family_train);
+    field!("command_family_other", report.command_family_other);
+    text_field!(
+        "command_lifecycle_exemplars",
+        &format_command_lifecycle_exemplars(&report.command_lifecycle_exemplars)
     );
     field!("correction_distance_px", report.correction_distance_px);
     field!("correction_count", report.correction_count);
@@ -364,6 +392,7 @@ pub fn log_client_net_report(
         outbound.snapshot_slot_replaced
     );
     field!("server_snapshot_slot_closed", outbound.snapshot_slot_closed);
+    append_server_command_lifecycle_fields(&mut line, &outbound.command_lifecycle);
 
     tracing::info!("{}", line);
 }
@@ -375,6 +404,112 @@ fn append_log_field(line: &mut String, key: &str, value: impl std::fmt::Display)
 fn append_text_log_field(line: &mut String, key: &str, value: &str) {
     let escaped = serde_json::to_string(value).unwrap_or_else(|_| "\"\"".to_string());
     append_log_field(line, key, escaped);
+}
+
+fn append_timing_fields(line: &mut String, prefix: &str, stats: CommandTimingStats) {
+    append_log_field(line, &format!("{prefix}_latest_ms"), stats.latest_ms);
+    append_log_field(line, &format!("{prefix}_max_ms"), stats.max_ms);
+    append_log_field(line, &format!("{prefix}_p95_ms"), stats.p95_ms);
+    append_log_field(line, &format!("{prefix}_count"), stats.count);
+}
+
+fn append_server_command_lifecycle_fields(line: &mut String, stats: &CommandLifecycleReportStats) {
+    append_log_field(line, "server_command_lifecycle_count", stats.count);
+    append_log_field(line, "server_command_lifecycle_accepted", stats.accepted);
+    append_log_field(line, "server_command_lifecycle_rejected", stats.rejected);
+    append_timing_fields(
+        line,
+        "server_command_frame_deserialize",
+        stats.frame_deserialize,
+    );
+    append_timing_fields(
+        line,
+        "server_command_deserialize_to_room_enqueue",
+        stats.deserialize_to_room_enqueue,
+    );
+    append_timing_fields(line, "server_command_room_queue", stats.room_queue);
+    append_timing_fields(line, "server_command_room_handle", stats.room_handle);
+    append_timing_fields(
+        line,
+        "server_command_receipt_send_age",
+        stats.receipt_send_age,
+    );
+    append_timing_fields(
+        line,
+        "server_command_accepted_to_sim_ack",
+        stats.accepted_to_sim_ack,
+    );
+    append_text_log_field(
+        line,
+        "server_command_lifecycle_exemplars",
+        &format_server_command_lifecycle_exemplars(stats),
+    );
+}
+
+fn format_command_lifecycle_exemplars(
+    exemplars: &[crate::protocol::CommandLifecycleExemplar],
+) -> String {
+    let sanitized: Vec<_> = exemplars
+        .iter()
+        .take(5)
+        .map(|entry| {
+            serde_json::json!({
+                "clientSeq": entry.client_seq,
+                "family": sanitize_command_family(&entry.family),
+                "issuedElapsedMs": entry.issued_elapsed_ms,
+                "stage": sanitize_command_stage(&entry.stage),
+                "stageMs": entry.stage_ms,
+            })
+        })
+        .collect();
+    serde_json::to_string(&sanitized).unwrap_or_else(|_| "[]".to_string())
+}
+
+fn format_server_command_lifecycle_exemplars(stats: &CommandLifecycleReportStats) -> String {
+    let sanitized: Vec<_> = stats
+        .exemplars
+        .iter()
+        .take(5)
+        .map(|entry| {
+            serde_json::json!({
+                "receivedUnixMs": entry.received_unix_ms,
+                "clientSeq": entry.client_seq,
+                "family": sanitize_command_family(&entry.family),
+                "stage": sanitize_server_command_stage(&entry.stage),
+                "stageMs": entry.stage_ms,
+            })
+        })
+        .collect();
+    serde_json::to_string(&sanitized).unwrap_or_else(|_| "[]".to_string())
+}
+
+fn sanitize_command_family(value: &str) -> &str {
+    match value {
+        "move" | "attackMove" | "build" | "train" | "other" => value,
+        _ => "other",
+    }
+}
+
+fn sanitize_command_stage(value: &str) -> &str {
+    match value {
+        "issueToSocketSendAccepted"
+        | "issueToServerReceipt"
+        | "serverReceiptToSimAck"
+        | "issueToSimAck"
+        | "ackSnapshotReceivedToApplied" => value,
+        _ => "unknown",
+    }
+}
+
+fn sanitize_server_command_stage(value: &str) -> &str {
+    match value {
+        "serverFrameDeserialize"
+        | "serverDeserializeToRoomEnqueue"
+        | "serverRoomQueue"
+        | "serverRoomHandle"
+        | "serverAcceptedToSimAck" => value,
+        _ => "unknown",
+    }
 }
 
 pub fn is_notable_net_report(report: &ClientNetReport, outbound: &ConnectionReportStats) -> bool {
@@ -413,6 +548,8 @@ pub fn is_notable_net_report(report: &ClientNetReport, outbound: &ConnectionRepo
         || report.pending_command_count >= NET_REPORT_PENDING_COMMAND_ISSUE
         || report.acknowledged_command_latency_ms >= NET_REPORT_LATENCY_ISSUE_MS
         || report.command_rejected > 0
+        || report.command_issue_to_socket_send_accepted_max_ms
+            >= NET_REPORT_COMMAND_SOCKET_SEND_ISSUE_MS
         || report.command_issue_to_server_receipt_max_ms >= NET_REPORT_COMMAND_UPLOAD_ISSUE_MS
         || report.command_server_receipt_to_sim_ack_max_ms
             >= NET_REPORT_COMMAND_SERVER_QUEUE_ISSUE_MS
@@ -421,6 +558,7 @@ pub fn is_notable_net_report(report: &ClientNetReport, outbound: &ConnectionRepo
             >= NET_REPORT_COMMAND_ACK_APPLY_ISSUE_MS
         || report.oldest_pending_command_age_ms >= NET_REPORT_COMMAND_UPLOAD_ISSUE_MS
         || report.max_pending_command_count >= NET_REPORT_PENDING_COMMAND_ISSUE
+        || has_server_command_lifecycle_pressure(outbound)
         || has_command_density(report, outbound)
         || report.command_burst_frame_gap_max_ms >= NET_REPORT_FRAME_GAP_ISSUE_MS
         || report.correction_distance_px >= NET_REPORT_CORRECTION_ISSUE_PX
@@ -440,12 +578,35 @@ pub fn classify_client_net_report(
 ) -> &'static str {
     if report.command_rejected > 0 {
         "command_rejected"
+    } else if report.command_issue_to_socket_send_accepted_max_ms
+        >= NET_REPORT_COMMAND_SOCKET_SEND_ISSUE_MS
+    {
+        "command_client_send_delay"
     } else if report.command_issue_to_server_receipt_max_ms >= NET_REPORT_COMMAND_UPLOAD_ISSUE_MS {
         "command_upload_delay"
     } else if report.command_server_receipt_to_sim_ack_max_ms
         >= NET_REPORT_COMMAND_SERVER_QUEUE_ISSUE_MS
+        || outbound
+            .command_lifecycle
+            .deserialize_to_room_enqueue
+            .max_ms
+            >= NET_REPORT_SERVER_COMMAND_ROOM_QUEUE_ISSUE_MS
+        || outbound.command_lifecycle.room_queue.max_ms
+            >= NET_REPORT_SERVER_COMMAND_ROOM_QUEUE_ISSUE_MS
+        || outbound.command_lifecycle.room_handle.max_ms
+            >= NET_REPORT_SERVER_COMMAND_ROOM_QUEUE_ISSUE_MS
+        || outbound.command_lifecycle.accepted_to_sim_ack.max_ms
+            >= NET_REPORT_SERVER_COMMAND_ROOM_QUEUE_ISSUE_MS
     {
         "command_server_queue"
+    } else if outbound.command_lifecycle.frame_deserialize.max_ms
+        >= NET_REPORT_SERVER_COMMAND_PARSE_ISSUE_MS
+    {
+        "command_server_parse"
+    } else if outbound.command_lifecycle.receipt_send_age.max_ms
+        >= NET_REPORT_SERVER_COMMAND_RECEIPT_SEND_AGE_ISSUE_MS
+    {
+        "command_receipt_delivery"
     } else if report.command_ack_snapshot_received_to_applied_max_ms
         >= NET_REPORT_COMMAND_ACK_APPLY_ISSUE_MS
     {
@@ -540,6 +701,17 @@ fn has_command_density(report: &ClientNetReport, outbound: &ConnectionReportStat
     report.commands_issued >= NET_REPORT_COMMAND_COUNT_ISSUE
         || report.command_burst_max >= NET_REPORT_COMMAND_BURST_ISSUE
         || outbound.command_receipts_accepted >= NET_REPORT_COMMAND_COUNT_ISSUE
+}
+
+fn has_server_command_lifecycle_pressure(outbound: &ConnectionReportStats) -> bool {
+    let lifecycle = &outbound.command_lifecycle;
+    lifecycle.frame_deserialize.max_ms >= NET_REPORT_SERVER_COMMAND_PARSE_ISSUE_MS
+        || lifecycle.deserialize_to_room_enqueue.max_ms
+            >= NET_REPORT_SERVER_COMMAND_ROOM_QUEUE_ISSUE_MS
+        || lifecycle.room_queue.max_ms >= NET_REPORT_SERVER_COMMAND_ROOM_QUEUE_ISSUE_MS
+        || lifecycle.room_handle.max_ms >= NET_REPORT_SERVER_COMMAND_ROOM_QUEUE_ISSUE_MS
+        || lifecycle.receipt_send_age.max_ms >= NET_REPORT_SERVER_COMMAND_RECEIPT_SEND_AGE_ISSUE_MS
+        || lifecycle.accepted_to_sim_ack.max_ms >= NET_REPORT_SERVER_COMMAND_ROOM_QUEUE_ISSUE_MS
 }
 
 fn has_server_snapshot_outbound_pressure(outbound: &ConnectionReportStats) -> bool {
@@ -739,6 +911,9 @@ mod tests {
             command_server_received: 0,
             command_sim_acknowledged: 0,
             command_rejected: 0,
+            command_issue_to_socket_send_accepted_latest_ms: 0,
+            command_issue_to_socket_send_accepted_max_ms: 0,
+            command_issue_to_socket_send_accepted_p95_ms: 0,
             command_issue_to_server_receipt_latest_ms: 0,
             command_issue_to_server_receipt_max_ms: 0,
             command_issue_to_server_receipt_p95_ms: 0,
@@ -753,6 +928,12 @@ mod tests {
             command_ack_snapshot_received_to_applied_p95_ms: 0,
             oldest_pending_command_age_ms: 0,
             max_pending_command_count: 0,
+            command_family_move: 0,
+            command_family_attack_move: 0,
+            command_family_build: 0,
+            command_family_train: 0,
+            command_family_other: 0,
+            command_lifecycle_exemplars: Vec::new(),
             correction_distance_px: 0,
             correction_count: 0,
             prediction_disable_count: 0,
@@ -848,6 +1029,11 @@ mod tests {
     #[test]
     fn net_report_classifies_command_milestones_before_generic_network() {
         let mut report = clean_report();
+        report.command_issue_to_socket_send_accepted_max_ms =
+            NET_REPORT_COMMAND_SOCKET_SEND_ISSUE_MS;
+        assert_eq!(classify(&report), "command_client_send_delay");
+
+        let mut report = clean_report();
         report.rtt_max_ms = NET_REPORT_LATENCY_ISSUE_MS;
         report.command_issue_to_server_receipt_max_ms = NET_REPORT_COMMAND_UPLOAD_ISSUE_MS;
         assert!(notable(&report));
@@ -861,6 +1047,70 @@ mod tests {
         report.command_ack_snapshot_received_to_applied_max_ms =
             NET_REPORT_COMMAND_ACK_APPLY_ISSUE_MS;
         assert_eq!(classify(&report), "command_ack_apply");
+
+        let report = clean_report();
+        let outbound = ConnectionReportStats {
+            command_lifecycle: CommandLifecycleReportStats {
+                room_queue: CommandTimingStats {
+                    max_ms: NET_REPORT_SERVER_COMMAND_ROOM_QUEUE_ISSUE_MS,
+                    ..CommandTimingStats::default()
+                },
+                ..CommandLifecycleReportStats::default()
+            },
+            ..ConnectionReportStats::default()
+        };
+        assert_eq!(
+            classify_client_net_report(&report, &outbound),
+            "command_server_queue"
+        );
+
+        let report = clean_report();
+        let outbound = ConnectionReportStats {
+            command_lifecycle: CommandLifecycleReportStats {
+                deserialize_to_room_enqueue: CommandTimingStats {
+                    max_ms: NET_REPORT_SERVER_COMMAND_ROOM_QUEUE_ISSUE_MS,
+                    ..CommandTimingStats::default()
+                },
+                ..CommandLifecycleReportStats::default()
+            },
+            ..ConnectionReportStats::default()
+        };
+        assert_eq!(
+            classify_client_net_report(&report, &outbound),
+            "command_server_queue"
+        );
+
+        let report = clean_report();
+        let outbound = ConnectionReportStats {
+            command_lifecycle: CommandLifecycleReportStats {
+                room_handle: CommandTimingStats {
+                    max_ms: NET_REPORT_SERVER_COMMAND_ROOM_QUEUE_ISSUE_MS,
+                    ..CommandTimingStats::default()
+                },
+                ..CommandLifecycleReportStats::default()
+            },
+            ..ConnectionReportStats::default()
+        };
+        assert_eq!(
+            classify_client_net_report(&report, &outbound),
+            "command_server_queue"
+        );
+
+        let report = clean_report();
+        let outbound = ConnectionReportStats {
+            command_lifecycle: CommandLifecycleReportStats {
+                receipt_send_age: CommandTimingStats {
+                    max_ms: NET_REPORT_SERVER_COMMAND_RECEIPT_SEND_AGE_ISSUE_MS,
+                    ..CommandTimingStats::default()
+                },
+                ..CommandLifecycleReportStats::default()
+            },
+            ..ConnectionReportStats::default()
+        };
+        assert_eq!(
+            classify_client_net_report(&report, &outbound),
+            "command_receipt_delivery"
+        );
     }
 
     #[test]
