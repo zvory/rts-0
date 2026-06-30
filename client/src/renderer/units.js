@@ -126,7 +126,13 @@ export function _rigRenderContextFor(e, colorByOwner, state) {
     vehicleMotion: body ? this._tankMotionVisual(e, facing, state, body) : null,
     selected: state.selection?.has?.(e.id) ?? false,
     map: this._map,
+    occupiedTrench: hasOccupiedTrench(e),
   });
+}
+
+function hasOccupiedTrench(entity) {
+  const id = Number(entity?.occupiedTrenchId);
+  return Number.isInteger(id) && id > 0;
 }
 
 export function _drawShotRevealUnit(e, colorByOwner, state) {
