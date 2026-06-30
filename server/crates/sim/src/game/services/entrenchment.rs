@@ -4,7 +4,7 @@
 //! in [`crate::game::trench::TrenchStore`].
 
 use crate::config;
-use crate::game::entity::{Entity, EntityStore, MovePhase, Order};
+use crate::game::entity::{AttackPhase, Entity, EntityStore, MovePhase, Order};
 use crate::game::map::Map;
 use crate::game::services::geometry::{
     building_rect_for_entity, unit_bodies_intersect, unit_body_for_entity,
@@ -121,7 +121,8 @@ fn holds_ground(entity: &Entity) -> bool {
         return false;
     }
     match entity.order() {
-        Order::Idle | Order::HoldPosition | Order::Attack(_) => true,
+        Order::Idle | Order::HoldPosition => true,
+        Order::Attack(order) => order.execution.phase == AttackPhase::Firing,
         Order::AttackMove(_) => entity.move_phase() == Some(MovePhase::Arrived),
         Order::Move(_)
         | Order::Gather(_)
@@ -458,5 +459,29 @@ mod tests {
             .expect("farther trench should remain occupiable");
 
         assert_eq!(candidate.trench_id, farther);
+    }
+
+    #[test]
+    fn only_firing_attack_orders_hold_ground() {
+        let mut entities = EntityStore::new();
+        let rifleman = entities
+            .spawn_unit(1, EntityKind::Rifleman, 320.0, 320.0)
+            .expect("rifleman should spawn");
+        let unit = entities
+            .get_mut(rifleman)
+            .expect("rifleman should exist");
+        unit.set_order(Order::attack(99));
+
+        assert!(
+            !holds_ground(unit),
+            "chasing explicit attacks should not advance dig-in"
+        );
+
+        unit.mark_attack_phase(AttackPhase::Firing);
+
+        assert!(
+            holds_ground(unit),
+            "in-range firing attacks should count as holding ground"
+        );
     }
 }
