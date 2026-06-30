@@ -1,0 +1,1547 @@
+{
+  "generatedAt": "2026-06-30T00:51:01.908Z",
+  "input": {
+    "files": [
+      "/tmp/rts-net-diagnose-superman-alex/beta-match-103-run-only.jsonl"
+    ],
+    "rows": 317,
+    "warnings": 0
+  },
+  "warnings": [],
+  "matches": [
+    {
+      "match": "103",
+      "matchRunId": "alex-s-lobby-1782778605186-000004",
+      "sourceMatches": [
+        "103"
+      ],
+      "room": "alex's lobby",
+      "map": "Default",
+      "participants": [
+        "soupman",
+        "alex"
+      ],
+      "startedAt": "2026-06-30T00:16:45.186897894Z",
+      "endedAt": "2026-06-30T00:41:25.868590778Z",
+      "durationMs": 1480681,
+      "durationTicks": 44849,
+      "winnerId": 9,
+      "winnerTeamId": 3,
+      "reportRows": 297,
+      "serverTickRows": 18,
+      "snapshotRows": 0,
+      "writerRows": 0,
+      "players": [
+        {
+          "playerId": "7",
+          "reportCount": 148,
+          "firstReportAt": "2026-06-30T00:16:55.435039644Z",
+          "lastReportAt": "2026-06-30T00:41:26.0583408Z",
+          "primaryIssues": [
+            {
+              "issue": "command_upload_delay",
+              "count": 73
+            },
+            {
+              "issue": "prediction_correction",
+              "count": 56
+            },
+            {
+              "issue": "command_server_queue",
+              "count": 10
+            },
+            {
+              "issue": "command_density",
+              "count": 7
+            },
+            {
+              "issue": "command_response_delay",
+              "count": 2
+            }
+          ],
+          "metrics": {
+            "rtt_ms": {
+              "min": 25,
+              "max": 544,
+              "p95": 220,
+              "selected": 544,
+              "samples": 148
+            },
+            "rtt_max_ms": {
+              "min": 30,
+              "max": 807,
+              "p95": 466,
+              "selected": 807,
+              "samples": 148
+            },
+            "snapshot_jitter_ms": {
+              "min": 1,
+              "max": 300,
+              "p95": 155,
+              "selected": 300,
+              "samples": 148
+            },
+            "snapshot_gap_max_ms": {
+              "min": 50,
+              "max": 933,
+              "p95": 638,
+              "selected": 933,
+              "samples": 148
+            },
+            "snapshot_late_frame_count": {
+              "min": 0,
+              "max": 262,
+              "p95": 236,
+              "selected": 262,
+              "samples": 148
+            },
+            "predicted_snapshot_late_frame_count": {
+              "min": 0,
+              "max": 262,
+              "p95": 236,
+              "selected": 262,
+              "samples": 148
+            },
+            "snapshot_bytes_max": {
+              "min": 519,
+              "max": 6895,
+              "p95": 6125,
+              "selected": 6895,
+              "samples": 148
+            },
+            "snapshot_bytes_p95": {
+              "min": 768,
+              "max": 8192,
+              "p95": 6144,
+              "selected": 8192,
+              "samples": 148
+            },
+            "snapshot_bytes_avg": {
+              "min": 468,
+              "max": 6401,
+              "p95": 5888,
+              "selected": 6401,
+              "samples": 148
+            },
+            "snapshot_segment_budget_bytes": {
+              "min": 1280,
+              "max": 1280,
+              "p95": 1280,
+              "selected": 1280,
+              "samples": 148
+            },
+            "snapshot_over_segment_budget_count": {
+              "min": 0,
+              "max": 314,
+              "p95": 309,
+              "selected": 314,
+              "samples": 148
+            },
+            "snapshot_over_segment_budget_pct_x100": {
+              "min": 0,
+              "max": 10000,
+              "p95": 10000,
+              "selected": 10000,
+              "samples": 148
+            },
+            "snapshot_parse_max_ms": {
+              "min": 1,
+              "max": 5,
+              "p95": 3,
+              "selected": 5,
+              "samples": 148
+            },
+            "snapshot_parse_p95_ms": {
+              "min": 1,
+              "max": 1,
+              "p95": 1,
+              "selected": 1,
+              "samples": 148
+            },
+            "snapshot_decode_max_ms": {
+              "min": 1,
+              "max": 9,
+              "p95": 3,
+              "selected": 9,
+              "samples": 148
+            },
+            "snapshot_decode_p95_ms": {
+              "min": 1,
+              "max": 1,
+              "p95": 1,
+              "selected": 1,
+              "samples": 148
+            },
+            "snapshot_apply_max_ms": {
+              "min": 1,
+              "max": 8,
+              "p95": 3,
+              "selected": 8,
+              "samples": 148
+            },
+            "snapshot_apply_p95_ms": {
+              "min": 1,
+              "max": 1,
+              "p95": 1,
+              "selected": 1,
+              "samples": 148
+            },
+            "frame_gap_max_ms": {
+              "min": 17,
+              "max": 150,
+              "p95": 50,
+              "selected": 150,
+              "samples": 148
+            },
+            "frame_work_max_ms": {
+              "min": 5,
+              "max": 15,
+              "p95": 14,
+              "selected": 15,
+              "samples": 148
+            },
+            "frame_work_p95_ms": {
+              "min": 4,
+              "max": 12,
+              "p95": 12,
+              "selected": 12,
+              "samples": 148
+            },
+            "renderer_max_ms": {
+              "min": 4,
+              "max": 13,
+              "p95": 12,
+              "selected": 13,
+              "samples": 148
+            },
+            "renderer_p95_ms": {
+              "min": 2,
+              "max": 12,
+              "p95": 8,
+              "selected": 12,
+              "samples": 148
+            },
+            "fps_estimate": {
+              "min": 37,
+              "max": 60,
+              "p95": 60,
+              "selected": 37,
+              "samples": 148
+            },
+            "commands_issued": {
+              "min": 0,
+              "max": 32,
+              "p95": 25,
+              "selected": 32,
+              "samples": 148
+            },
+            "command_burst_bucket_ms": {
+              "min": 250,
+              "max": 250,
+              "p95": 250,
+              "selected": 250,
+              "samples": 148
+            },
+            "command_burst_max": {
+              "min": 0,
+              "max": 19,
+              "p95": 6,
+              "selected": 19,
+              "samples": 148
+            },
+            "command_burst_frame_gap_max_ms": {
+              "min": 0,
+              "max": 50,
+              "p95": 33,
+              "selected": 50,
+              "samples": 148
+            },
+            "command_burst_worst_frame_phase_ms": {
+              "min": 0,
+              "max": 32,
+              "p95": 29,
+              "selected": 32,
+              "samples": 148
+            },
+            "server_tick_ms": {
+              "min": 3,
+              "max": 12,
+              "p95": 8,
+              "selected": 12,
+              "samples": 148
+            },
+            "server_lag_ms": {
+              "min": 0,
+              "max": 1,
+              "p95": 1,
+              "selected": 1,
+              "samples": 148
+            },
+            "slow_tick_count": {
+              "min": 0,
+              "max": 32,
+              "p95": 30,
+              "selected": 32,
+              "samples": 148
+            },
+            "head_of_line_count": {
+              "min": 0,
+              "max": 0,
+              "p95": 0,
+              "selected": 0,
+              "samples": 148
+            },
+            "acknowledged_command_latency_ms": {
+              "min": 38,
+              "max": 654,
+              "p95": 312,
+              "selected": 654,
+              "samples": 148
+            },
+            "command_issue_to_server_receipt_max_ms": {
+              "min": 0,
+              "max": 890,
+              "p95": 543,
+              "selected": 890,
+              "samples": 148
+            },
+            "command_issue_to_server_receipt_p95_ms": {
+              "min": 0,
+              "max": 1000,
+              "p95": 1000,
+              "selected": 1000,
+              "samples": 148
+            },
+            "command_server_receipt_to_sim_ack_max_ms": {
+              "min": 0,
+              "max": 528,
+              "p95": 287,
+              "selected": 528,
+              "samples": 148
+            },
+            "command_server_receipt_to_sim_ack_p95_ms": {
+              "min": 0,
+              "max": 1000,
+              "p95": 250,
+              "selected": 1000,
+              "samples": 148
+            },
+            "command_issue_to_sim_ack_max_ms": {
+              "min": 0,
+              "max": 890,
+              "p95": 616,
+              "selected": 890,
+              "samples": 148
+            },
+            "command_issue_to_sim_ack_p95_ms": {
+              "min": 0,
+              "max": 1000,
+              "p95": 1000,
+              "selected": 1000,
+              "samples": 148
+            },
+            "command_ack_snapshot_received_to_applied_max_ms": {
+              "min": 0,
+              "max": 2,
+              "p95": 2,
+              "selected": 2,
+              "samples": 148
+            },
+            "command_ack_snapshot_received_to_applied_p95_ms": {
+              "min": 0,
+              "max": 2,
+              "p95": 2,
+              "selected": 2,
+              "samples": 148
+            },
+            "oldest_pending_command_age_ms": {
+              "min": 0,
+              "max": 396,
+              "p95": 93,
+              "selected": 396,
+              "samples": 148
+            },
+            "max_pending_command_count": {
+              "min": 0,
+              "max": 19,
+              "p95": 6,
+              "selected": 19,
+              "samples": 148
+            },
+            "prediction_disable_user_count": {
+              "min": 0,
+              "max": 0,
+              "p95": 0,
+              "selected": 0,
+              "samples": 148
+            },
+            "prediction_disable_replay_count": {
+              "min": 0,
+              "max": 0,
+              "p95": 0,
+              "selected": 0,
+              "samples": 148
+            },
+            "prediction_disable_spectator_count": {
+              "min": 0,
+              "max": 0,
+              "p95": 0,
+              "selected": 0,
+              "samples": 148
+            },
+            "prediction_disable_compatibility_count": {
+              "min": 0,
+              "max": 0,
+              "p95": 0,
+              "selected": 0,
+              "samples": 148
+            },
+            "prediction_disable_wasm_count": {
+              "min": 0,
+              "max": 0,
+              "p95": 0,
+              "selected": 0,
+              "samples": 148
+            },
+            "prediction_disable_other_count": {
+              "min": 0,
+              "max": 0,
+              "p95": 0,
+              "selected": 0,
+              "samples": 148
+            },
+            "prediction_replay_max_ms": {
+              "min": 2,
+              "max": 2,
+              "p95": 2,
+              "selected": 2,
+              "samples": 148
+            },
+            "prediction_replay_max_ticks": {
+              "min": 0,
+              "max": 19,
+              "p95": 6,
+              "selected": 19,
+              "samples": 148
+            },
+            "prediction_replay_budget_exceeded_count": {
+              "min": 0,
+              "max": 0,
+              "p95": 0,
+              "selected": 0,
+              "samples": 148
+            },
+            "server_command_receipts_accepted": {
+              "min": 0,
+              "max": 32,
+              "p95": 25,
+              "selected": 32,
+              "samples": 148
+            },
+            "server_command_receipts_rejected": {
+              "min": 0,
+              "max": 0,
+              "p95": 0,
+              "selected": 0,
+              "samples": 148
+            },
+            "server_reliable_drained_before_snapshot": {
+              "min": 0,
+              "max": 11,
+              "p95": 1,
+              "selected": 11,
+              "samples": 148
+            },
+            "server_reliable_drained_before_snapshot_max": {
+              "min": 0,
+              "max": 4,
+              "p95": 1,
+              "selected": 4,
+              "samples": 148
+            },
+            "server_snapshot_waited_behind_reliable": {
+              "min": 0,
+              "max": 11,
+              "p95": 1,
+              "selected": 11,
+              "samples": 148
+            },
+            "server_snapshot_sent": {
+              "min": 259,
+              "max": 316,
+              "p95": 310,
+              "selected": 316,
+              "samples": 148
+            },
+            "server_snapshot_send_age_latest_ms": {
+              "min": 0,
+              "max": 1,
+              "p95": 0,
+              "selected": 1,
+              "samples": 148
+            },
+            "server_snapshot_send_age_max_ms": {
+              "min": 0,
+              "max": 4,
+              "p95": 1,
+              "selected": 4,
+              "samples": 148
+            },
+            "server_snapshot_send_age_avg_ms": {
+              "min": 0,
+              "max": 0,
+              "p95": 0,
+              "selected": 0,
+              "samples": 148
+            },
+            "server_snapshot_slot_stored": {
+              "min": 259,
+              "max": 316,
+              "p95": 309,
+              "selected": 316,
+              "samples": 148
+            },
+            "server_snapshot_slot_replaced": {
+              "min": 0,
+              "max": 0,
+              "p95": 0,
+              "selected": 0,
+              "samples": 148
+            },
+            "server_snapshot_slot_closed": {
+              "min": 0,
+              "max": 0,
+              "p95": 0,
+              "selected": 0,
+              "samples": 148
+            }
+          },
+          "transport": {
+            "websocketCompression": {
+              "label": "WebSocket compression",
+              "samples": 148,
+              "values": [
+                {
+                  "value": "none",
+                  "count": 148
+                }
+              ]
+            },
+            "websocketExtensions": {
+              "label": "WebSocket extensions",
+              "samples": 148,
+              "values": [
+                {
+                  "value": "(empty)",
+                  "count": 148
+                }
+              ]
+            },
+            "snapshotByteSource": {
+              "label": "snapshot byte source",
+              "samples": 148,
+              "values": [
+                {
+                  "value": "messagepack-application-payload",
+                  "count": 148
+                }
+              ]
+            },
+            "snapshotCodec": {
+              "label": "snapshot codec",
+              "samples": 148,
+              "values": [
+                {
+                  "value": "messagepack-compact",
+                  "count": 148
+                }
+              ]
+            },
+            "snapshotCodecVersion": {
+              "label": "snapshot codec version",
+              "samples": 148,
+              "values": [
+                {
+                  "value": "1",
+                  "count": 148
+                }
+              ]
+            },
+            "snapshotFrameKind": {
+              "label": "snapshot frame kind",
+              "samples": 148,
+              "values": [
+                {
+                  "value": "binary",
+                  "count": 148
+                }
+              ]
+            }
+          },
+          "evidence": [
+            {
+              "label": "server tick/scheduler pressure",
+              "evidence": [
+                "server tick max 12 (row p95 8)",
+                "server lag max 1 (row p95 1)",
+                "slow ticks max 32 (row p95 30)"
+              ]
+            },
+            {
+              "label": "WebSocket writer/send and outbound snapshot pressure",
+              "evidence": [
+                "WS buffered max 135 (row p95 25)",
+                "head of line max 0 (row p95 0)",
+                "server reliable before snapshots max 11 (row p95 1)",
+                "server reliable before snapshot max max 4 (row p95 1)",
+                "snapshots waited behind reliable max 11 (row p95 1)",
+                "server snapshot send age max max 4 (row p95 1)",
+                "server snapshot slot replaced max 0 (row p95 0)"
+              ]
+            },
+            {
+              "label": "client network RTT/jitter/snapshot delivery gaps",
+              "evidence": [
+                "RTT max 544 (row p95 220)",
+                "RTT max max 807 (row p95 466)",
+                "snapshot jitter max 300 (row p95 155)",
+                "snapshot gap max 933 (row p95 638)",
+                "late snapshot frames max 262 (row p95 236)",
+                "snapshot tick gap max 1 (row p95 1)",
+                "snapshot burst max 18 (row p95 14)"
+              ]
+            },
+            {
+              "label": "browser payload parsing/decode/apply/frame work",
+              "evidence": [
+                "payload bytes max max 6895 (row p95 6125)",
+                "payload bytes p95 max 8192 (row p95 6144)",
+                "payload over budget max 10000 (row p95 10000)",
+                "parse max max 5 (row p95 3)",
+                "decode max max 9 (row p95 3)",
+                "apply max max 8 (row p95 3)",
+                "prediction apply max max 9 (row p95 5)",
+                "frame gap max 150 (row p95 50)",
+                "frame work max max 15 (row p95 14)",
+                "renderer max max 13 (row p95 12)",
+                "FPS estimate min 37 (row p95 60)",
+                "command-burst frame gap max 50 (row p95 33)"
+              ]
+            },
+            {
+              "label": "command density and receipt volume",
+              "evidence": [
+                "commands issued max 32 (row p95 25)",
+                "command burst max max 19 (row p95 6)",
+                "server accepted receipts max 32 (row p95 25)",
+                "server rejected receipts max 0 (row p95 0)"
+              ]
+            },
+            {
+              "label": "command density and receipt volume",
+              "evidence": [
+                "legacy command ack max 654 (row p95 312)",
+                "command upload max max 890 (row p95 543)",
+                "server queue max max 528 (row p95 287)",
+                "command response max max 890 (row p95 616)",
+                "ack apply max max 2 (row p95 2)",
+                "oldest pending command max 396 (row p95 93)",
+                "max pending commands max 19 (row p95 6)"
+              ]
+            },
+            {
+              "label": "client network RTT/jitter/snapshot delivery gaps",
+              "evidence": [
+                "late snapshot frames max 262 (row p95 236)",
+                "predicted while late max 262 (row p95 236)",
+                "prediction disabled/user max 0 (row p95 0)",
+                "prediction disabled/replay max 0 (row p95 0)",
+                "prediction disabled/spectator max 0 (row p95 0)",
+                "prediction disabled/compat max 0 (row p95 0)",
+                "prediction disabled/WASM max 0 (row p95 0)",
+                "prediction disabled/other max 0 (row p95 0)",
+                "prediction replay max max 2 (row p95 2)",
+                "prediction replay ticks max max 19 (row p95 6)",
+                "prediction replay budget exceeded max 0 (row p95 0)"
+              ]
+            }
+          ]
+        },
+        {
+          "playerId": "9",
+          "reportCount": 149,
+          "firstReportAt": "2026-06-30T00:16:55.351139596Z",
+          "lastReportAt": "2026-06-30T00:41:25.967123063Z",
+          "primaryIssues": [
+            {
+              "issue": "command_upload_delay",
+              "count": 68
+            },
+            {
+              "issue": "packet_budget_pressure",
+              "count": 37
+            },
+            {
+              "issue": "command_server_queue",
+              "count": 32
+            },
+            {
+              "issue": "snapshot_gap",
+              "count": 9
+            },
+            {
+              "issue": "command_density",
+              "count": 2
+            },
+            {
+              "issue": "command_response_delay",
+              "count": 1
+            }
+          ],
+          "metrics": {
+            "rtt_ms": {
+              "min": 8,
+              "max": 662,
+              "p95": 368,
+              "selected": 662,
+              "samples": 149
+            },
+            "rtt_max_ms": {
+              "min": 17,
+              "max": 1385,
+              "p95": 552,
+              "selected": 1385,
+              "samples": 149
+            },
+            "snapshot_jitter_ms": {
+              "min": 1,
+              "max": 684,
+              "p95": 73,
+              "selected": 684,
+              "samples": 149
+            },
+            "snapshot_gap_max_ms": {
+              "min": 87,
+              "max": 1318,
+              "p95": 637,
+              "selected": 1318,
+              "samples": 149
+            },
+            "snapshot_late_frame_count": {
+              "min": 4,
+              "max": 465,
+              "p95": 367,
+              "selected": 465,
+              "samples": 149
+            },
+            "predicted_snapshot_late_frame_count": {
+              "min": 0,
+              "max": 0,
+              "p95": 0,
+              "selected": 0,
+              "samples": 149
+            },
+            "snapshot_bytes_max": {
+              "min": 513,
+              "max": 8005,
+              "p95": 7671,
+              "selected": 8005,
+              "samples": 149
+            },
+            "snapshot_bytes_p95": {
+              "min": 512,
+              "max": 8192,
+              "p95": 8192,
+              "selected": 8192,
+              "samples": 149
+            },
+            "snapshot_bytes_avg": {
+              "min": 470,
+              "max": 7677,
+              "p95": 7364,
+              "selected": 7677,
+              "samples": 149
+            },
+            "snapshot_segment_budget_bytes": {
+              "min": 1280,
+              "max": 1280,
+              "p95": 1280,
+              "selected": 1280,
+              "samples": 149
+            },
+            "snapshot_over_segment_budget_count": {
+              "min": 0,
+              "max": 323,
+              "p95": 309,
+              "selected": 323,
+              "samples": 149
+            },
+            "snapshot_over_segment_budget_pct_x100": {
+              "min": 0,
+              "max": 10000,
+              "p95": 10000,
+              "selected": 10000,
+              "samples": 149
+            },
+            "snapshot_parse_max_ms": {
+              "min": 0,
+              "max": 12,
+              "p95": 1,
+              "selected": 12,
+              "samples": 149
+            },
+            "snapshot_parse_p95_ms": {
+              "min": 1,
+              "max": 1,
+              "p95": 1,
+              "selected": 1,
+              "samples": 149
+            },
+            "snapshot_decode_max_ms": {
+              "min": 0,
+              "max": 19,
+              "p95": 3,
+              "selected": 19,
+              "samples": 149
+            },
+            "snapshot_decode_p95_ms": {
+              "min": 1,
+              "max": 1,
+              "p95": 1,
+              "selected": 1,
+              "samples": 149
+            },
+            "snapshot_apply_max_ms": {
+              "min": 0,
+              "max": 1,
+              "p95": 0,
+              "selected": 1,
+              "samples": 149
+            },
+            "snapshot_apply_p95_ms": {
+              "min": 1,
+              "max": 1,
+              "p95": 1,
+              "selected": 1,
+              "samples": 149
+            },
+            "frame_gap_max_ms": {
+              "min": 9,
+              "max": 58,
+              "p95": 42,
+              "selected": 58,
+              "samples": 149
+            },
+            "frame_work_max_ms": {
+              "min": 2,
+              "max": 49,
+              "p95": 26,
+              "selected": 49,
+              "samples": 149
+            },
+            "frame_work_p95_ms": {
+              "min": 2,
+              "max": 8,
+              "p95": 8,
+              "selected": 8,
+              "samples": 149
+            },
+            "renderer_max_ms": {
+              "min": 1,
+              "max": 47,
+              "p95": 24,
+              "selected": 47,
+              "samples": 149
+            },
+            "renderer_p95_ms": {
+              "min": 1,
+              "max": 8,
+              "p95": 8,
+              "selected": 8,
+              "samples": 149
+            },
+            "fps_estimate": {
+              "min": 94,
+              "max": 120,
+              "p95": 120,
+              "selected": 94,
+              "samples": 149
+            },
+            "commands_issued": {
+              "min": 0,
+              "max": 41,
+              "p95": 25,
+              "selected": 41,
+              "samples": 149
+            },
+            "command_burst_bucket_ms": {
+              "min": 250,
+              "max": 250,
+              "p95": 250,
+              "selected": 250,
+              "samples": 149
+            },
+            "command_burst_max": {
+              "min": 0,
+              "max": 16,
+              "p95": 6,
+              "selected": 16,
+              "samples": 149
+            },
+            "command_burst_frame_gap_max_ms": {
+              "min": 0,
+              "max": 43,
+              "p95": 25,
+              "selected": 43,
+              "samples": 149
+            },
+            "command_burst_worst_frame_phase_ms": {
+              "min": 0,
+              "max": 43,
+              "p95": 26,
+              "selected": 43,
+              "samples": 149
+            },
+            "server_tick_ms": {
+              "min": 3,
+              "max": 10,
+              "p95": 9,
+              "selected": 10,
+              "samples": 149
+            },
+            "server_lag_ms": {
+              "min": 0,
+              "max": 2,
+              "p95": 1,
+              "selected": 2,
+              "samples": 149
+            },
+            "slow_tick_count": {
+              "min": 0,
+              "max": 32,
+              "p95": 30,
+              "selected": 32,
+              "samples": 149
+            },
+            "head_of_line_count": {
+              "min": 0,
+              "max": 0,
+              "p95": 0,
+              "selected": 0,
+              "samples": 149
+            },
+            "acknowledged_command_latency_ms": {
+              "min": 0,
+              "max": 0,
+              "p95": 0,
+              "selected": 0,
+              "samples": 149
+            },
+            "command_issue_to_server_receipt_max_ms": {
+              "min": 0,
+              "max": 1533,
+              "p95": 563,
+              "selected": 1533,
+              "samples": 149
+            },
+            "command_issue_to_server_receipt_p95_ms": {
+              "min": 0,
+              "max": 1000,
+              "p95": 1000,
+              "selected": 1000,
+              "samples": 149
+            },
+            "command_server_receipt_to_sim_ack_max_ms": {
+              "min": 0,
+              "max": 534,
+              "p95": 265,
+              "selected": 534,
+              "samples": 149
+            },
+            "command_server_receipt_to_sim_ack_p95_ms": {
+              "min": 0,
+              "max": 1000,
+              "p95": 500,
+              "selected": 1000,
+              "samples": 149
+            },
+            "command_issue_to_sim_ack_max_ms": {
+              "min": 0,
+              "max": 1533,
+              "p95": 563,
+              "selected": 1533,
+              "samples": 149
+            },
+            "command_issue_to_sim_ack_p95_ms": {
+              "min": 0,
+              "max": 1000,
+              "p95": 1000,
+              "selected": 1000,
+              "samples": 149
+            },
+            "command_ack_snapshot_received_to_applied_max_ms": {
+              "min": 0,
+              "max": 0,
+              "p95": 0,
+              "selected": 0,
+              "samples": 149
+            },
+            "command_ack_snapshot_received_to_applied_p95_ms": {
+              "min": 0,
+              "max": 1,
+              "p95": 1,
+              "selected": 1,
+              "samples": 149
+            },
+            "oldest_pending_command_age_ms": {
+              "min": 0,
+              "max": 295,
+              "p95": 77,
+              "selected": 295,
+              "samples": 149
+            },
+            "max_pending_command_count": {
+              "min": 0,
+              "max": 16,
+              "p95": 6,
+              "selected": 16,
+              "samples": 149
+            },
+            "prediction_disable_user_count": {
+              "min": 0,
+              "max": 0,
+              "p95": 0,
+              "selected": 0,
+              "samples": 149
+            },
+            "prediction_disable_replay_count": {
+              "min": 0,
+              "max": 0,
+              "p95": 0,
+              "selected": 0,
+              "samples": 149
+            },
+            "prediction_disable_spectator_count": {
+              "min": 0,
+              "max": 0,
+              "p95": 0,
+              "selected": 0,
+              "samples": 149
+            },
+            "prediction_disable_compatibility_count": {
+              "min": 0,
+              "max": 0,
+              "p95": 0,
+              "selected": 0,
+              "samples": 149
+            },
+            "prediction_disable_wasm_count": {
+              "min": 0,
+              "max": 0,
+              "p95": 0,
+              "selected": 0,
+              "samples": 149
+            },
+            "prediction_disable_other_count": {
+              "min": 0,
+              "max": 0,
+              "p95": 0,
+              "selected": 0,
+              "samples": 149
+            },
+            "prediction_replay_max_ms": {
+              "min": 0,
+              "max": 0,
+              "p95": 0,
+              "selected": 0,
+              "samples": 149
+            },
+            "prediction_replay_max_ticks": {
+              "min": 0,
+              "max": 0,
+              "p95": 0,
+              "selected": 0,
+              "samples": 149
+            },
+            "prediction_replay_budget_exceeded_count": {
+              "min": 0,
+              "max": 0,
+              "p95": 0,
+              "selected": 0,
+              "samples": 149
+            },
+            "server_command_receipts_accepted": {
+              "min": 0,
+              "max": 41,
+              "p95": 25,
+              "selected": 41,
+              "samples": 149
+            },
+            "server_command_receipts_rejected": {
+              "min": 0,
+              "max": 0,
+              "p95": 0,
+              "selected": 0,
+              "samples": 149
+            },
+            "server_reliable_drained_before_snapshot": {
+              "min": 0,
+              "max": 6,
+              "p95": 1,
+              "selected": 6,
+              "samples": 149
+            },
+            "server_reliable_drained_before_snapshot_max": {
+              "min": 0,
+              "max": 3,
+              "p95": 1,
+              "selected": 3,
+              "samples": 149
+            },
+            "server_snapshot_waited_behind_reliable": {
+              "min": 0,
+              "max": 6,
+              "p95": 1,
+              "selected": 6,
+              "samples": 149
+            },
+            "server_snapshot_sent": {
+              "min": 22,
+              "max": 316,
+              "p95": 306,
+              "selected": 316,
+              "samples": 149
+            },
+            "server_snapshot_send_age_latest_ms": {
+              "min": 0,
+              "max": 0,
+              "p95": 0,
+              "selected": 0,
+              "samples": 149
+            },
+            "server_snapshot_send_age_max_ms": {
+              "min": 0,
+              "max": 9,
+              "p95": 1,
+              "selected": 9,
+              "samples": 149
+            },
+            "server_snapshot_send_age_avg_ms": {
+              "min": 0,
+              "max": 0,
+              "p95": 0,
+              "selected": 0,
+              "samples": 149
+            },
+            "server_snapshot_slot_stored": {
+              "min": 21,
+              "max": 315,
+              "p95": 307,
+              "selected": 315,
+              "samples": 149
+            },
+            "server_snapshot_slot_replaced": {
+              "min": 0,
+              "max": 0,
+              "p95": 0,
+              "selected": 0,
+              "samples": 149
+            },
+            "server_snapshot_slot_closed": {
+              "min": 0,
+              "max": 0,
+              "p95": 0,
+              "selected": 0,
+              "samples": 149
+            }
+          },
+          "transport": {
+            "websocketCompression": {
+              "label": "WebSocket compression",
+              "samples": 149,
+              "values": [
+                {
+                  "value": "none",
+                  "count": 149
+                }
+              ]
+            },
+            "websocketExtensions": {
+              "label": "WebSocket extensions",
+              "samples": 149,
+              "values": [
+                {
+                  "value": "(empty)",
+                  "count": 149
+                }
+              ]
+            },
+            "snapshotByteSource": {
+              "label": "snapshot byte source",
+              "samples": 149,
+              "values": [
+                {
+                  "value": "messagepack-application-payload",
+                  "count": 149
+                }
+              ]
+            },
+            "snapshotCodec": {
+              "label": "snapshot codec",
+              "samples": 149,
+              "values": [
+                {
+                  "value": "messagepack-compact",
+                  "count": 149
+                }
+              ]
+            },
+            "snapshotCodecVersion": {
+              "label": "snapshot codec version",
+              "samples": 149,
+              "values": [
+                {
+                  "value": "1",
+                  "count": 149
+                }
+              ]
+            },
+            "snapshotFrameKind": {
+              "label": "snapshot frame kind",
+              "samples": 149,
+              "values": [
+                {
+                  "value": "binary",
+                  "count": 149
+                }
+              ]
+            }
+          },
+          "evidence": [
+            {
+              "label": "server tick/scheduler pressure",
+              "evidence": [
+                "server tick max 10 (row p95 9)",
+                "server lag max 2 (row p95 1)",
+                "slow ticks max 32 (row p95 30)"
+              ]
+            },
+            {
+              "label": "WebSocket writer/send and outbound snapshot pressure",
+              "evidence": [
+                "WS buffered max 293 (row p95 36)",
+                "head of line max 0 (row p95 0)",
+                "server reliable before snapshots max 6 (row p95 1)",
+                "server reliable before snapshot max max 3 (row p95 1)",
+                "snapshots waited behind reliable max 6 (row p95 1)",
+                "server snapshot send age max max 9 (row p95 1)",
+                "server snapshot slot replaced max 0 (row p95 0)"
+              ]
+            },
+            {
+              "label": "client network RTT/jitter/snapshot delivery gaps",
+              "evidence": [
+                "RTT max 662 (row p95 368)",
+                "RTT max max 1385 (row p95 552)",
+                "snapshot jitter max 684 (row p95 73)",
+                "snapshot gap max 1318 (row p95 637)",
+                "late snapshot frames max 465 (row p95 367)",
+                "snapshot tick gap max 1 (row p95 1)",
+                "snapshot burst max 13 (row p95 9)"
+              ]
+            },
+            {
+              "label": "browser payload parsing/decode/apply/frame work",
+              "evidence": [
+                "payload bytes max max 8005 (row p95 7671)",
+                "payload bytes p95 max 8192 (row p95 8192)",
+                "payload over budget max 10000 (row p95 10000)",
+                "parse max max 12 (row p95 1)",
+                "decode max max 19 (row p95 3)",
+                "apply max max 1 (row p95 0)",
+                "prediction apply max max 0 (row p95 0)",
+                "frame gap max 58 (row p95 42)",
+                "frame work max max 49 (row p95 26)",
+                "renderer max max 47 (row p95 24)",
+                "FPS estimate min 94 (row p95 120)",
+                "command-burst frame gap max 43 (row p95 25)"
+              ]
+            },
+            {
+              "label": "command density and receipt volume",
+              "evidence": [
+                "commands issued max 41 (row p95 25)",
+                "command burst max max 16 (row p95 6)",
+                "server accepted receipts max 41 (row p95 25)",
+                "server rejected receipts max 0 (row p95 0)"
+              ]
+            },
+            {
+              "label": "command density and receipt volume",
+              "evidence": [
+                "legacy command ack max 0 (row p95 0)",
+                "command upload max max 1533 (row p95 563)",
+                "server queue max max 534 (row p95 265)",
+                "command response max max 1533 (row p95 563)",
+                "ack apply max max 0 (row p95 0)",
+                "oldest pending command max 295 (row p95 77)",
+                "max pending commands max 16 (row p95 6)"
+              ]
+            },
+            {
+              "label": "client network RTT/jitter/snapshot delivery gaps",
+              "evidence": [
+                "late snapshot frames max 465 (row p95 367)",
+                "predicted while late max 0 (row p95 0)",
+                "prediction disabled/user max 0 (row p95 0)",
+                "prediction disabled/replay max 0 (row p95 0)",
+                "prediction disabled/spectator max 0 (row p95 0)",
+                "prediction disabled/compat max 0 (row p95 0)",
+                "prediction disabled/WASM max 0 (row p95 0)",
+                "prediction disabled/other max 0 (row p95 0)",
+                "prediction replay max max 0 (row p95 0)",
+                "prediction replay ticks max max 0 (row p95 0)",
+                "prediction replay budget exceeded max 0 (row p95 0)"
+              ]
+            }
+          ]
+        }
+      ],
+      "matchPerf": {
+        "serverTick": {
+          "rows": 18,
+          "tick_ms": {
+            "min": 40,
+            "max": 303,
+            "p95": 303,
+            "selected": 303,
+            "samples": 18
+          },
+          "scheduler_lag_ms": {
+            "min": 0,
+            "max": 1,
+            "p95": 1,
+            "selected": 1,
+            "samples": 18
+          },
+          "sim_ms": {
+            "min": 39,
+            "max": 302,
+            "p95": 302,
+            "selected": 302,
+            "samples": 18
+          },
+          "fanout_ms": {
+            "min": 0,
+            "max": 1,
+            "p95": 1,
+            "selected": 1,
+            "samples": 18
+          },
+          "max_snapshot_ms": {
+            "min": 0,
+            "max": 1,
+            "p95": 1,
+            "selected": 1,
+            "samples": 18
+          },
+          "snapshot_replaced": {
+            "min": 0,
+            "max": 0,
+            "p95": 0,
+            "selected": 0,
+            "samples": 18
+          },
+          "snapshot_closed": {
+            "min": 0,
+            "max": 0,
+            "p95": 0,
+            "selected": 0,
+            "samples": 18
+          }
+        },
+        "snapshots": {
+          "rows": 0,
+          "snapshot_ms": null,
+          "compact_ms": null,
+          "total_ms": null,
+          "entities": null,
+          "resource_deltas": null,
+          "events": null
+        },
+        "writers": {
+          "rows": 0,
+          "serialize_ms": null,
+          "send_ms": null,
+          "bytes": null
+        }
+      },
+      "transport": {
+        "websocketCompression": {
+          "label": "WebSocket compression",
+          "samples": 297,
+          "values": [
+            {
+              "value": "none",
+              "count": 297
+            }
+          ]
+        },
+        "websocketExtensions": {
+          "label": "WebSocket extensions",
+          "samples": 297,
+          "values": [
+            {
+              "value": "(empty)",
+              "count": 297
+            }
+          ]
+        },
+        "snapshotByteSource": {
+          "label": "snapshot byte source",
+          "samples": 297,
+          "values": [
+            {
+              "value": "messagepack-application-payload",
+              "count": 297
+            }
+          ]
+        },
+        "snapshotCodec": {
+          "label": "snapshot codec",
+          "samples": 297,
+          "values": [
+            {
+              "value": "messagepack-compact",
+              "count": 297
+            }
+          ]
+        },
+        "snapshotCodecVersion": {
+          "label": "snapshot codec version",
+          "samples": 297,
+          "values": [
+            {
+              "value": "1",
+              "count": 297
+            }
+          ]
+        },
+        "snapshotFrameKind": {
+          "label": "snapshot frame kind",
+          "samples": 297,
+          "values": [
+            {
+              "value": "binary",
+              "count": 297
+            }
+          ]
+        }
+      },
+      "classifications": [
+        {
+          "id": "server_tick_scheduler",
+          "label": "server tick/scheduler pressure",
+          "result": "indicated",
+          "evidence": [
+            "player 7 slow_tick_count max 32",
+            "player 9 slow_tick_count max 32",
+            "serverTick tick_ms max 303"
+          ]
+        },
+        {
+          "id": "server_snapshot_projection",
+          "label": "server snapshot projection/compact/serialization cost",
+          "result": "not indicated",
+          "evidence": []
+        },
+        {
+          "id": "websocket_writer_send",
+          "label": "WebSocket writer/send and outbound snapshot pressure",
+          "result": "indicated",
+          "evidence": [
+            "player 7 server_reliable_drained_before_snapshot_max max 4",
+            "player 9 server_reliable_drained_before_snapshot_max max 3"
+          ]
+        },
+        {
+          "id": "client_network_delivery",
+          "label": "client network RTT/jitter/snapshot delivery gaps",
+          "result": "indicated",
+          "evidence": [
+            "player 7 rtt_ms max 544",
+            "player 7 rtt_max_ms max 807",
+            "player 7 snapshot_jitter_ms max 300",
+            "player 7 snapshot_gap_max_ms max 933",
+            "player 7 snapshot_late_frame_count max 262",
+            "player 9 rtt_ms max 662",
+            "player 9 rtt_max_ms max 1385",
+            "player 9 snapshot_jitter_ms max 684",
+            "player 9 snapshot_gap_max_ms max 1318",
+            "player 9 snapshot_late_frame_count max 465"
+          ]
+        },
+        {
+          "id": "browser_processing",
+          "label": "browser payload parsing/decode/apply/frame work",
+          "result": "indicated",
+          "evidence": [
+            "player 7 snapshot_bytes_p95 max 8192",
+            "player 7 snapshot_over_segment_budget_pct_x100 max 10000",
+            "player 7 frame_gap_max_ms max 150",
+            "player 9 snapshot_bytes_p95 max 8192",
+            "player 9 snapshot_over_segment_budget_pct_x100 max 10000",
+            "player 9 snapshot_decode_max_ms max 19",
+            "player 9 frame_work_max_ms max 49",
+            "player 9 renderer_max_ms max 47"
+          ]
+        },
+        {
+          "id": "command_density",
+          "label": "command density and receipt volume",
+          "result": "indicated",
+          "evidence": [
+            "player 7 commands_issued max 32",
+            "player 7 command_burst_max max 19",
+            "player 7 server_command_receipts_accepted max 32",
+            "player 9 commands_issued max 41",
+            "player 9 command_burst_max max 16",
+            "player 9 server_command_receipts_accepted max 41"
+          ]
+        },
+        {
+          "id": "command_path",
+          "label": "command upload/receipt/sim/downstream/render delay",
+          "result": "indicated",
+          "evidence": [
+            "player 7 acknowledged_command_latency_ms max 654",
+            "player 7 command_issue_to_server_receipt_max_ms max 890",
+            "player 7 command_server_receipt_to_sim_ack_max_ms max 528",
+            "player 7 command_issue_to_sim_ack_max_ms max 890",
+            "player 7 oldest_pending_command_age_ms max 396",
+            "player 7 max_pending_command_count max 19",
+            "player 9 command_issue_to_server_receipt_max_ms max 1533",
+            "player 9 command_server_receipt_to_sim_ack_max_ms max 534",
+            "player 9 command_issue_to_sim_ack_max_ms max 1533",
+            "player 9 oldest_pending_command_age_ms max 295",
+            "player 9 max_pending_command_count max 16"
+          ]
+        },
+        {
+          "id": "prediction_health",
+          "label": "prediction disable/replay/late-snapshot coverage",
+          "result": "indicated",
+          "evidence": [
+            "player 7 prediction_replay_max_ticks max 19",
+            "player 7 snapshot_late_frame_count max 262",
+            "player 7 predicted_snapshot_late_frame_count max 262",
+            "player 9 snapshot_late_frame_count max 465"
+          ]
+        }
+      ],
+      "missing": [],
+      "transportNote": "Unsupported: Fly logs and ClientNetReport do not expose packet loss, retransmits, or per-packet browser transport data. Packet-budget fields are payload bytes only and exclude WebSocket/TLS/TCP/IP overhead. Client reports did not show negotiated WebSocket compression."
+    }
+  ],
+  "unmatched": 0
+}
