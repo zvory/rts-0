@@ -1005,7 +1005,7 @@ fn attack_unit_can_target(
 ) -> bool {
     matches!(entities.get(target),
         Some(t) if world_query::is_enemy_targetable(t, teams, player, unit)
-            && fog.is_visible_world(player, t.pos_x, t.pos_y)
+            && rules::projection::team_visible_world(player, t.pos_x, t.pos_y, fog, teams)
             && !smokes.point_inside(t.pos_x, t.pos_y))
 }
 

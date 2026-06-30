@@ -537,7 +537,7 @@ fn attack_intent_valid(
     }
     matches!(entities.get(target),
         Some(t) if world_query::is_enemy_targetable(t, teams, owner, attacker)
-            && fog.is_visible_world(owner, t.pos_x, t.pos_y))
+            && rules::projection::team_visible_world(owner, t.pos_x, t.pos_y, fog, teams))
 }
 
 fn attack_order_complete(
