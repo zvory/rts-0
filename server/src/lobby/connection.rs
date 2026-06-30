@@ -990,6 +990,9 @@ impl CommandTimingWindow {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::protocol::{
+        SnapshotPayloadEntityKindDiagnostics, SnapshotPayloadSectionDiagnostics,
+    };
 
     #[test]
     fn command_lifecycle_p95_uses_max_for_overflow_bucket() {
@@ -1003,6 +1006,73 @@ mod tests {
         assert_eq!(stats.max_ms, 60_000);
         assert_eq!(stats.p95_ms, 60_000);
         assert_eq!(stats.count, 20);
+    }
+
+    #[test]
+    fn snapshot_lifecycle_stats_aggregate_payload_and_reset() {
+        let counters = ConnectionReportCounters::default();
+        counters.record_snapshot_projected(7, 3);
+        counters.record_snapshot_taken(12);
+        counters.record_snapshot_sent(12, true);
+        counters.record_snapshot_written(SnapshotWriterSendStats {
+            serialize_ms: 11,
+            send_ms: 5,
+            bytes: 1_000,
+            payload: SnapshotPayloadDiagnostics {
+                bytes: 1_000,
+                sections: vec![
+                    SnapshotPayloadSectionDiagnostics {
+                        section: "entities",
+                        count: 6,
+                        bytes: 600,
+                    },
+                    SnapshotPayloadSectionDiagnostics {
+                        section: "visibility",
+                        count: 10,
+                        bytes: 250,
+                    },
+                ],
+                entity_kinds: vec![SnapshotPayloadEntityKindDiagnostics {
+                    kind: "worker".to_string(),
+                    count: 3,
+                    approx_bytes: 300,
+                }],
+            },
+        });
+
+        let stats = counters.consume();
+        let lifecycle = stats.snapshot_lifecycle;
+        assert_eq!(stats.snapshot_sent, 1);
+        assert_eq!(stats.snapshot_waited_behind_reliable, 1);
+        assert_eq!(lifecycle.writer_taken, 1);
+        assert_eq!(lifecycle.projected.latest, 7);
+        assert_eq!(lifecycle.projected.max, 7);
+        assert_eq!(lifecycle.projected.p95, 8);
+        assert_eq!(lifecycle.projected.avg, 7);
+        assert_eq!(lifecycle.compacted.max, 3);
+        assert_eq!(lifecycle.queue_age.max, 12);
+        assert_eq!(lifecycle.serialized.max, 11);
+        assert_eq!(lifecycle.writer_send.max, 5);
+        assert_eq!(lifecycle.payload_bytes.latest, 1_000);
+        assert_eq!(lifecycle.payload_bytes.p95, 1_024);
+        assert_eq!(lifecycle.payload_bytes.total, 1_000);
+
+        assert_eq!(lifecycle.sections.len(), 2);
+        assert_eq!(lifecycle.sections[0].section, "entities");
+        assert_eq!(lifecycle.sections[0].count, 6);
+        assert_eq!(lifecycle.sections[0].bytes, 600);
+        assert_eq!(lifecycle.sections[0].pct_x100, 6_000);
+        assert_eq!(lifecycle.entity_kinds.len(), 1);
+        assert_eq!(lifecycle.entity_kinds[0].kind, "worker");
+        assert_eq!(lifecycle.entity_kinds[0].count, 3);
+        assert_eq!(lifecycle.entity_kinds[0].approx_bytes, 300);
+        assert_eq!(lifecycle.entity_kinds[0].pct_x100, 3_000);
+
+        let reset = counters.consume();
+        assert_eq!(reset.snapshot_sent, 0);
+        assert_eq!(reset.snapshot_lifecycle.projected.count, 0);
+        assert!(reset.snapshot_lifecycle.sections.is_empty());
+        assert!(reset.snapshot_lifecycle.entity_kinds.is_empty());
     }
 }
 
