@@ -205,13 +205,140 @@ fn queued_setup_anti_tank_guns_filters_to_anti_tank_guns_and_preserves_later_att
 }
 
 #[test]
+fn queued_artillery_point_fire_locks_from_future_move_destination() {
+    let map = flat_map(64);
+    let mut entities = EntityStore::new();
+    let pos = (320.0, 320.0);
+    let move_dest = (640.0, 320.0);
+    let artillery = entities
+        .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
+        .expect("artillery should spawn");
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::Move {
+                units: vec![artillery],
+                x: move_dest.0,
+                y: move_dest.1,
+                queued: false,
+            },
+        )],
+    );
+    let future = entities
+        .get(artillery)
+        .expect("artillery should exist")
+        .move_intent()
+        .expect("move command should store an authoritative future destination");
+    let raw_click = (future.0 + config::TILE_SIZE as f32 * 5.0, future.1);
+    let expected_x = future.0 + config::ARTILLERY_MIN_RANGE_TILES as f32 * config::TILE_SIZE as f32;
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::UseAbility {
+                ability: AbilityKind::PointFire,
+                units: vec![artillery],
+                x: Some(raw_click.0),
+                y: Some(raw_click.1),
+                queued: true,
+            },
+        )],
+    );
+
+    let unit = entities.get(artillery).expect("artillery should exist");
+    let [OrderIntent::PointFire(point)] = unit.queued_orders() else {
+        panic!("queued point fire should be stored behind the move");
+    };
+    assert!(
+        (point.x - expected_x).abs() < 0.001,
+        "expected locked x {expected_x}, got {}",
+        point.x
+    );
+    assert!((point.y - future.1).abs() < 0.001);
+}
+
+#[test]
+fn queued_artillery_point_fire_zero_click_uses_planned_setup_facing() {
+    let map = flat_map(64);
+    let mut entities = EntityStore::new();
+    let pos = (320.0, 320.0);
+    let move_dest = (640.0, 320.0);
+    let artillery = entities
+        .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
+        .expect("artillery should spawn");
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::Move {
+                units: vec![artillery],
+                x: move_dest.0,
+                y: move_dest.1,
+                queued: false,
+            },
+        )],
+    );
+    let future = entities
+        .get(artillery)
+        .expect("artillery should exist")
+        .move_intent()
+        .expect("move command should store an authoritative future destination");
+    let setup_face = (future.0, future.1 + config::TILE_SIZE as f32 * 10.0);
+    let expected_y = future.1 + config::ARTILLERY_MIN_RANGE_TILES as f32 * config::TILE_SIZE as f32;
+
+    apply(
+        &map,
+        &mut entities,
+        vec![
+            (
+                1,
+                SimCommand::SetupAntiTankGuns {
+                    units: vec![artillery],
+                    x: setup_face.0,
+                    y: setup_face.1,
+                    queued: true,
+                },
+            ),
+            (
+                1,
+                SimCommand::UseAbility {
+                    ability: AbilityKind::PointFire,
+                    units: vec![artillery],
+                    x: Some(future.0),
+                    y: Some(future.1),
+                    queued: true,
+                },
+            ),
+        ],
+    );
+
+    let unit = entities.get(artillery).expect("artillery should exist");
+    let [OrderIntent::SetupAntiTankGuns(_), OrderIntent::PointFire(point)] = unit.queued_orders()
+    else {
+        panic!(
+            "queued setup and point fire should be stored behind the move, got {:?}",
+            unit.queued_orders()
+        );
+    };
+    assert!((point.x - future.0).abs() < 0.001);
+    assert!((point.y - expected_y).abs() < 0.001);
+}
+
+#[test]
 fn artillery_point_fire_inside_arc_keeps_setup_facing_fixed() {
     let map = flat_map(64);
     let mut entities = EntityStore::new();
     let mut players = vec![player_state(1), player_state(2)];
     let pos = (320.0, 320.0);
     let angle = config::ARTILLERY_FIELD_OF_FIRE_RAD * 0.45;
-    let distance = config::TILE_SIZE as f32 * 22.0;
+    let distance = config::TILE_SIZE as f32 * 30.0;
     let target = (
         pos.0 + angle.cos() * distance,
         pos.1 + angle.sin() * distance,
@@ -278,8 +405,8 @@ fn artillery_point_fire_system_rechecks_ammo_affordability() {
     let mut entities = EntityStore::new();
     let mut players = vec![player_state(1), player_state(2)];
     assert!(players[0].spend_cost(rules::economy::ResourceCost::new(1_000, 0)));
-    let pos = (320.0, 320.0);
-    let target = (pos.0 + config::TILE_SIZE as f32 * 22.0, pos.1);
+    let pos = (640.0, 640.0);
+    let target = (pos.0 + config::TILE_SIZE as f32 * 30.0, pos.1);
     let artillery = entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
         .expect("artillery should spawn");
@@ -335,9 +462,9 @@ fn artillery_point_fire_outside_arc_replaces_active_fire_with_redeploy() {
     let mut entities = EntityStore::new();
     let mut players = vec![player_state(1), player_state(2)];
     let pos = (320.0, 320.0);
-    let old_target = (pos.0 + config::TILE_SIZE as f32 * 22.0, pos.1);
+    let old_target = (pos.0 + config::TILE_SIZE as f32 * 30.0, pos.1);
     let angle = config::ARTILLERY_FIELD_OF_FIRE_RAD;
-    let distance = config::TILE_SIZE as f32 * 22.0;
+    let distance = config::TILE_SIZE as f32 * 30.0;
     let target = (
         pos.0 + angle.cos() * distance,
         pos.1 + angle.sin() * distance,
@@ -388,7 +515,12 @@ fn artillery_point_fire_outside_arc_replaces_active_fire_with_redeploy() {
     let Order::ArtilleryPointFire(order) = unit.order() else {
         panic!("retarget should keep an artillery point-fire order");
     };
-    assert!((order.intent.x - target.0).abs() < 0.001);
+    assert!(
+        (order.intent.x - target.0).abs() < 0.001,
+        "expected retarget x {}, got {}",
+        target.0,
+        order.intent.x
+    );
     assert!((order.intent.y - target.1).abs() < 0.001);
 }
 
@@ -397,10 +529,10 @@ fn artillery_point_fire_can_retarget_while_redeploying() {
     let map = flat_map(64);
     let mut entities = EntityStore::new();
     let mut players = vec![player_state(1), player_state(2)];
-    let pos = (320.0, 320.0);
+    let pos = (640.0, 640.0);
     let old_angle = config::ARTILLERY_FIELD_OF_FIRE_RAD;
     let new_angle = -config::ARTILLERY_FIELD_OF_FIRE_RAD;
-    let distance = config::TILE_SIZE as f32 * 22.0;
+    let distance = config::TILE_SIZE as f32 * 30.0;
     let old_target = (
         pos.0 + old_angle.cos() * distance,
         pos.1 + old_angle.sin() * distance,
@@ -447,7 +579,12 @@ fn artillery_point_fire_can_retarget_while_redeploying() {
     let Order::ArtilleryPointFire(order) = unit.order() else {
         panic!("retarget should keep an artillery point-fire order");
     };
-    assert!((order.intent.x - target.0).abs() < 0.001);
+    assert!(
+        (order.intent.x - target.0).abs() < 0.001,
+        "expected retarget x {}, got {}",
+        target.0,
+        order.intent.x
+    );
     assert!((order.intent.y - target.1).abs() < 0.001);
     assert!(
         (unit.pending_redeploy_facing().unwrap_or_default() - new_angle).abs() < 0.001,

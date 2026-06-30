@@ -6,7 +6,7 @@ fn artillery_point_fire_queue_is_terminal() {
     let players = human_vs_ai_players();
     let mut game = empty_flat_game(&players);
     let pos = game.map.tile_center(10, 10);
-    let target = game.map.tile_center(26, 10);
+    let target = game.map.tile_center(38, 10);
     let artillery = game
         .entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
@@ -72,7 +72,7 @@ fn artillery_firing_from_fog_is_actionable_for_all_enemies() {
     ];
     let mut game = empty_flat_game(&players);
     let pos = game.map.tile_center(20, 20);
-    let target = game.map.tile_center(42, 20);
+    let target = game.map.tile_center(47, 20);
     let counter_pos = game.map.tile_center(4, 4);
     let observer_pos = game.map.tile_center(4, 12);
     let artillery = game
@@ -150,7 +150,7 @@ fn artillery_firing_reveal_does_not_override_smoke_concealment() {
     let players = human_vs_ai_players();
     let mut game = empty_flat_game(&players);
     let pos = game.map.tile_center(20, 20);
-    let target = game.map.tile_center(42, 20);
+    let target = game.map.tile_center(47, 20);
     let counter_pos = game.map.tile_center(4, 4);
     let artillery = game
         .entities
@@ -228,7 +228,7 @@ fn artillery_target_is_owner_only_and_enemy_events_require_current_vision() {
     let mut game = empty_flat_game(&players);
     let initial_steel = game.players[0].steel;
     let pos = game.map.tile_center(10, 10);
-    let target = game.map.tile_center(26, 10);
+    let target = game.map.tile_center(38, 10);
     let artillery = game
         .entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
@@ -308,12 +308,12 @@ fn artillery_target_is_owner_only_and_enemy_events_require_current_vision() {
 }
 
 #[test]
-fn packed_artillery_point_fire_does_not_auto_setup_or_fire() {
+fn packed_artillery_point_fire_auto_sets_up_before_firing() {
     let players = human_vs_ai_players();
     let mut game = empty_flat_game(&players);
     let initial_steel = game.players[0].steel;
     let pos = game.map.tile_center(10, 10);
-    let target = game.map.tile_center(26, 10);
+    let target = game.map.tile_center(38, 10);
     let artillery = game
         .entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
@@ -332,15 +332,33 @@ fn packed_artillery_point_fire_does_not_auto_setup_or_fire() {
     let events = game.tick();
 
     let entity = game.entities.get(artillery).expect("artillery exists");
-    assert!(matches!(entity.weapon_setup(), WeaponSetup::Packed));
-    assert!(!matches!(entity.order(), Order::ArtilleryPointFire(_)));
+    assert!(matches!(
+        entity.weapon_setup(),
+        WeaponSetup::Packed | WeaponSetup::SettingUp { .. }
+    ));
+    assert!(matches!(entity.order(), Order::ArtilleryPointFire(_)));
     assert_eq!(game.players[0].steel, initial_steel);
     assert!(
         events
             .iter()
             .flat_map(|(_, events)| events)
             .all(|event| !matches!(event, Event::ArtilleryTarget { .. })),
-        "packed point fire should not emit a target marker"
+        "packed point fire should not emit a target marker before deployment"
+    );
+
+    let mut owner_saw_target = false;
+    for _ in 0..=(config::ARTILLERY_SETUP_TICKS as u32 + 4) {
+        for (pid, events) in game.tick() {
+            owner_saw_target |= pid == 1
+                && events
+                    .iter()
+                    .any(|event| matches!(event, Event::ArtilleryTarget { from, .. } if *from == artillery));
+        }
+    }
+    assert!(owner_saw_target, "auto-setup should eventually fire");
+    assert!(
+        game.players[0].steel <= initial_steel - config::ARTILLERY_AMMO_COST_STEEL,
+        "auto-setup point fire should spend ammo only once the gun is deployed"
     );
 }
 
@@ -351,7 +369,7 @@ fn manually_deployed_artillery_can_point_fire() {
     let initial_steel = game.players[0].steel;
     let pos = game.map.tile_center(10, 10);
     let setup_target = game.map.tile_center(18, 10);
-    let fire_target = game.map.tile_center(26, 10);
+    let fire_target = game.map.tile_center(38, 10);
     let artillery = game
         .entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
@@ -405,7 +423,7 @@ fn manually_deployed_artillery_can_point_fire() {
 }
 
 #[test]
-fn artillery_point_fire_inside_minimum_range_does_not_spend_steel() {
+fn artillery_point_fire_inside_minimum_range_locks_to_range_floor() {
     let players = human_vs_ai_players();
     let mut game = empty_flat_game(&players);
     let initial_steel = game.players[0].steel;
@@ -430,13 +448,21 @@ fn artillery_point_fire_inside_minimum_range_does_not_spend_steel() {
     );
     let events = game.tick();
 
-    assert_eq!(game.players[0].steel, initial_steel);
+    assert_eq!(
+        game.players[0].steel,
+        initial_steel - config::ARTILLERY_AMMO_COST_STEEL
+    );
+    let entity = game.entities.get(artillery).expect("artillery exists");
+    let Order::ArtilleryPointFire(order) = entity.order() else {
+        panic!("minimum-range click should be accepted as point fire");
+    };
+    assert!((order.intent.x - (pos.0 + min_px)).abs() < 0.001);
+    assert!((order.intent.y - pos.1).abs() < 0.001);
     assert!(
-        events
-            .iter()
-            .flat_map(|(_, events)| events)
-            .all(|event| !matches!(event, Event::ArtilleryTarget { .. })),
-        "minimum-range rejection should not fire or create a target marker"
+        events.iter().flat_map(|(_, events)| events).any(
+            |event| matches!(event, Event::ArtilleryTarget { from, .. } if *from == artillery)
+        ),
+        "minimum-range locking should fire at the stored effective point"
     );
 }
 

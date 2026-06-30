@@ -1,0 +1,465 @@
+use crate::config;
+use crate::game::entity::{Entity, EntityKind, EntityStore, Order, WeaponSetup};
+use crate::game::map::Map;
+
+#[derive(Clone, Copy)]
+pub(crate) struct ArtilleryPointFireTarget {
+    pub(crate) x: f32,
+    pub(crate) y: f32,
+    pub(crate) facing: f32,
+    pub(crate) inside_field_of_fire: bool,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum ArtilleryPointFireAcceptance {
+    BasicTarget,
+    Command,
+}
+
+pub(crate) fn artillery_point_fire_target(
+    map: &Map,
+    entities: &EntityStore,
+    player: u32,
+    unit: u32,
+    x: f32,
+    y: f32,
+    acceptance: ArtilleryPointFireAcceptance,
+) -> Option<ArtilleryPointFireTarget> {
+    artillery_point_fire_target_from_context(
+        map,
+        entities,
+        player,
+        unit,
+        x,
+        y,
+        acceptance,
+        current_artillery_target_context,
+        true,
+        FireTargetInterpretation::LockRawClick,
+    )
+}
+
+pub(crate) fn queued_artillery_point_fire_target(
+    map: &Map,
+    entities: &EntityStore,
+    player: u32,
+    unit: u32,
+    x: f32,
+    y: f32,
+) -> Option<ArtilleryPointFireTarget> {
+    let e = entities.get(unit)?;
+    if artillery_point_fire_queue_terminal(e) {
+        return None;
+    }
+    artillery_point_fire_target_from_context(
+        map,
+        entities,
+        player,
+        unit,
+        x,
+        y,
+        ArtilleryPointFireAcceptance::Command,
+        queued_artillery_target_context,
+        false,
+        FireTargetInterpretation::LockRawClick,
+    )
+}
+
+pub(crate) fn stored_artillery_point_fire_target(
+    map: &Map,
+    entities: &EntityStore,
+    player: u32,
+    unit: u32,
+    x: f32,
+    y: f32,
+    acceptance: ArtilleryPointFireAcceptance,
+) -> Option<ArtilleryPointFireTarget> {
+    artillery_point_fire_target_from_context(
+        map,
+        entities,
+        player,
+        unit,
+        x,
+        y,
+        acceptance,
+        current_artillery_target_context,
+        true,
+        FireTargetInterpretation::StoredEffectivePoint,
+    )
+}
+
+#[derive(Clone, Copy)]
+struct ArtilleryTargetContext {
+    origin_x: f32,
+    origin_y: f32,
+    setup_facing: Option<f32>,
+    body_facing: f32,
+}
+
+#[derive(Clone, Copy)]
+enum FireTargetInterpretation {
+    LockRawClick,
+    StoredEffectivePoint,
+}
+
+fn artillery_point_fire_target_from_context(
+    map: &Map,
+    entities: &EntityStore,
+    player: u32,
+    unit: u32,
+    x: f32,
+    y: f32,
+    acceptance: ArtilleryPointFireAcceptance,
+    context_for: impl Fn(&Entity) -> ArtilleryTargetContext,
+    require_stationary: bool,
+    interpretation: FireTargetInterpretation,
+) -> Option<ArtilleryPointFireTarget> {
+    let e = entities.get(unit)?;
+    if e.owner != player
+        || e.kind != EntityKind::Artillery
+        || e.hp == 0
+        || e.under_construction()
+        || (require_stationary && !e.path_is_empty())
+    {
+        return None;
+    }
+    if matches!(acceptance, ArtilleryPointFireAcceptance::Command)
+        && !artillery_can_accept_point_fire_command(e)
+    {
+        return None;
+    }
+    let context = context_for(e);
+    let min_px = config::ARTILLERY_MIN_RANGE_TILES as f32 * config::TILE_SIZE as f32;
+    let max_px = config::ARTILLERY_MAX_RANGE_TILES as f32 * config::TILE_SIZE as f32;
+    let target = match interpretation {
+        FireTargetInterpretation::LockRawClick => lock_artillery_fire_target(
+            map.world_size_px(),
+            (context.origin_x, context.origin_y),
+            context.setup_facing,
+            context.body_facing,
+            min_px,
+            max_px,
+            (x, y),
+        )?,
+        FireTargetInterpretation::StoredEffectivePoint => stored_artillery_fire_target(
+            map.world_size_px(),
+            (context.origin_x, context.origin_y),
+            min_px,
+            max_px,
+            (x, y),
+        )?,
+    };
+    let inside_field_of_fire =
+        artillery_target_inside_field_of_fire(e, target.facing, context.setup_facing);
+    Some(ArtilleryPointFireTarget {
+        x: target.x,
+        y: target.y,
+        facing: target.facing,
+        inside_field_of_fire,
+    })
+}
+
+#[derive(Clone, Copy)]
+struct LockedArtilleryFireTarget {
+    x: f32,
+    y: f32,
+    facing: f32,
+}
+
+fn lock_artillery_fire_target(
+    world_size_px: f32,
+    origin: (f32, f32),
+    setup_facing: Option<f32>,
+    body_facing: f32,
+    min_range_px: f32,
+    max_range_px: f32,
+    raw_click: (f32, f32),
+) -> Option<LockedArtilleryFireTarget> {
+    if !world_size_px.is_finite()
+        || world_size_px <= 0.0
+        || !origin.0.is_finite()
+        || !origin.1.is_finite()
+        || !raw_click.0.is_finite()
+        || !raw_click.1.is_finite()
+        || !min_range_px.is_finite()
+        || !max_range_px.is_finite()
+        || min_range_px < 0.0
+        || max_range_px < min_range_px
+    {
+        return None;
+    }
+    let dx = raw_click.0 - origin.0;
+    let dy = raw_click.1 - origin.1;
+    let distance = (dx * dx + dy * dy).sqrt();
+    let facing = if distance > f32::EPSILON && distance.is_finite() {
+        dy.atan2(dx)
+    } else {
+        setup_facing
+            .filter(|facing| facing.is_finite())
+            .or_else(|| body_facing.is_finite().then_some(body_facing))?
+    };
+    if !facing.is_finite() {
+        return None;
+    }
+    let dir = (facing.cos(), facing.sin());
+    if !dir.0.is_finite() || !dir.1.is_finite() {
+        return None;
+    }
+    let exit_distance = ray_map_exit_distance(world_size_px, origin, dir)?;
+    let max_valid = max_range_px.min(exit_distance);
+    if max_valid < min_range_px {
+        return None;
+    }
+    let desired_distance = if distance.is_finite() {
+        distance.clamp(min_range_px, max_range_px)
+    } else {
+        max_range_px
+    };
+    let locked_distance = desired_distance.min(max_valid).max(min_range_px);
+    let x = origin.0 + dir.0 * locked_distance;
+    let y = origin.1 + dir.1 * locked_distance;
+    if point_inside_playable_map(world_size_px, x, y) {
+        Some(LockedArtilleryFireTarget { x, y, facing })
+    } else {
+        None
+    }
+}
+
+fn stored_artillery_fire_target(
+    world_size_px: f32,
+    origin: (f32, f32),
+    min_range_px: f32,
+    max_range_px: f32,
+    target: (f32, f32),
+) -> Option<LockedArtilleryFireTarget> {
+    if !point_inside_playable_map(world_size_px, target.0, target.1)
+        || !origin.0.is_finite()
+        || !origin.1.is_finite()
+        || !min_range_px.is_finite()
+        || !max_range_px.is_finite()
+        || min_range_px < 0.0
+        || max_range_px < min_range_px
+    {
+        return None;
+    }
+    let dx = target.0 - origin.0;
+    let dy = target.1 - origin.1;
+    let distance2 = dx * dx + dy * dy;
+    if !distance2.is_finite() {
+        return None;
+    }
+    let min2 = min_range_px * min_range_px;
+    let max2 = max_range_px * max_range_px;
+    let slack = 0.5;
+    if distance2 + slack < min2 || distance2 > max2 + slack {
+        return None;
+    }
+    let facing = dy.atan2(dx);
+    if !facing.is_finite() {
+        return None;
+    }
+    Some(LockedArtilleryFireTarget {
+        x: target.0,
+        y: target.1,
+        facing,
+    })
+}
+
+fn ray_map_exit_distance(world_size_px: f32, origin: (f32, f32), dir: (f32, f32)) -> Option<f32> {
+    let max = (world_size_px - 1.0).max(0.0);
+    let mut enter: f32 = 0.0;
+    let mut exit = f32::INFINITY;
+    for (origin_axis, dir_axis) in [(origin.0, dir.0), (origin.1, dir.1)] {
+        if dir_axis.abs() <= f32::EPSILON {
+            if origin_axis < 0.0 || origin_axis > max {
+                return None;
+            }
+            continue;
+        }
+        let mut near = (0.0 - origin_axis) / dir_axis;
+        let mut far = (max - origin_axis) / dir_axis;
+        if near > far {
+            std::mem::swap(&mut near, &mut far);
+        }
+        enter = enter.max(near);
+        exit = exit.min(far);
+    }
+    if !exit.is_finite() || exit < enter || exit < 0.0 {
+        return None;
+    }
+    Some(exit.max(0.0))
+}
+
+fn point_inside_playable_map(world_size_px: f32, x: f32, y: f32) -> bool {
+    if !world_size_px.is_finite() || world_size_px <= 0.0 || !x.is_finite() || !y.is_finite() {
+        return false;
+    }
+    let max = (world_size_px - 1.0).max(0.0);
+    x >= 0.0 && y >= 0.0 && x <= max && y <= max
+}
+
+fn angle_delta(a: f32, b: f32) -> f32 {
+    let mut d = (a - b).rem_euclid(std::f32::consts::TAU);
+    if d > std::f32::consts::PI {
+        d -= std::f32::consts::TAU;
+    }
+    d
+}
+
+fn artillery_can_accept_point_fire_command(e: &Entity) -> bool {
+    matches!(
+        e.weapon_setup(),
+        WeaponSetup::Packed
+            | WeaponSetup::SettingUp { .. }
+            | WeaponSetup::Deployed
+            | WeaponSetup::TearingDownToRedeploy { .. }
+    )
+}
+
+fn artillery_point_fire_queue_terminal(e: &Entity) -> bool {
+    matches!(e.order(), Order::ArtilleryPointFire(_))
+        || e.queued_orders()
+            .iter()
+            .any(|intent| matches!(intent, crate::game::entity::OrderIntent::PointFire(_)))
+}
+
+fn current_artillery_target_context(e: &Entity) -> ArtilleryTargetContext {
+    ArtilleryTargetContext {
+        origin_x: e.pos_x,
+        origin_y: e.pos_y,
+        setup_facing: artillery_point_fire_field_center(e),
+        body_facing: e.facing(),
+    }
+}
+
+fn queued_artillery_target_context(e: &Entity) -> ArtilleryTargetContext {
+    let mut context = current_artillery_target_context(e);
+    if let Some((x, y)) = e
+        .move_intent()
+        .filter(|(x, y)| x.is_finite() && y.is_finite())
+    {
+        context.origin_x = x;
+        context.origin_y = y;
+        context.setup_facing = None;
+    }
+    for intent in e.queued_orders() {
+        match intent {
+            crate::game::entity::OrderIntent::Move(point)
+            | crate::game::entity::OrderIntent::AttackMove(point) => {
+                if point.x.is_finite() && point.y.is_finite() {
+                    context.origin_x = point.x;
+                    context.origin_y = point.y;
+                    context.setup_facing = None;
+                }
+            }
+            crate::game::entity::OrderIntent::SetupAntiTankGuns(point) => {
+                let facing = (point.y - context.origin_y).atan2(point.x - context.origin_x);
+                if facing.is_finite() {
+                    context.setup_facing = Some(facing);
+                }
+            }
+            crate::game::entity::OrderIntent::PointFire(_) => break,
+            _ => {}
+        }
+    }
+    context
+}
+
+fn artillery_point_fire_field_center(e: &Entity) -> Option<f32> {
+    match e.weapon_setup() {
+        WeaponSetup::TearingDownToRedeploy { .. } => e.pending_redeploy_facing(),
+        WeaponSetup::Packed | WeaponSetup::SettingUp { .. } => e.emplacement_facing(),
+        _ => e.emplacement_facing().or_else(|| e.weapon_facing()),
+    }
+}
+
+fn artillery_target_inside_field_of_fire(
+    e: &Entity,
+    target_facing: f32,
+    planned_facing: Option<f32>,
+) -> bool {
+    let center = match e.weapon_setup() {
+        WeaponSetup::Deployed => artillery_point_fire_field_center(e),
+        WeaponSetup::Packed | WeaponSetup::SettingUp { .. } => planned_facing,
+        WeaponSetup::TearingDownToRedeploy { .. } => e.pending_redeploy_facing(),
+        WeaponSetup::TearingDown { .. } => None,
+    };
+    center
+        .filter(|facing| facing.is_finite())
+        .is_some_and(|center| {
+            angle_delta(center, target_facing).abs() <= config::ARTILLERY_FIELD_OF_FIRE_RAD * 0.5
+        })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TILE: f32 = 32.0;
+    const WORLD: f32 = 64.0 * TILE;
+    const ORIGIN: (f32, f32) = (32.0 * TILE, 32.0 * TILE);
+    const MIN: f32 = 25.0 * TILE;
+    const MAX: f32 = 55.0 * TILE;
+
+    fn lock(raw_click: (f32, f32)) -> LockedArtilleryFireTarget {
+        lock_artillery_fire_target(WORLD, ORIGIN, Some(0.0), 0.0, MIN, MAX, raw_click)
+            .expect("target should lock")
+    }
+
+    #[test]
+    fn target_lock_preserves_points_inside_range_band() {
+        let target = lock((ORIGIN.0 + 30.0 * TILE, ORIGIN.1));
+
+        assert!((target.x - (ORIGIN.0 + 30.0 * TILE)).abs() < 0.001);
+        assert!((target.y - ORIGIN.1).abs() < 0.001);
+    }
+
+    #[test]
+    fn target_lock_pushes_close_clicks_to_minimum_range() {
+        let target = lock((ORIGIN.0 + 3.0 * TILE, ORIGIN.1));
+
+        assert!((target.x - (ORIGIN.0 + MIN)).abs() < 0.001);
+        assert!((target.y - ORIGIN.1).abs() < 0.001);
+    }
+
+    #[test]
+    fn target_lock_pulls_far_clicks_to_maximum_or_map_edge() {
+        let target = lock((ORIGIN.0 + 80.0 * TILE, ORIGIN.1));
+
+        assert!((target.x - (WORLD - 1.0)).abs() < 0.001);
+        assert!((target.y - ORIGIN.1).abs() < 0.001);
+    }
+
+    #[test]
+    fn zero_length_target_uses_setup_facing_fallback() {
+        let target = lock_artillery_fire_target(
+            WORLD,
+            ORIGIN,
+            Some(std::f32::consts::FRAC_PI_2),
+            0.0,
+            MIN,
+            MAX,
+            ORIGIN,
+        )
+        .expect("zero-length click should lock along setup facing");
+
+        assert!((target.x - ORIGIN.0).abs() < 0.001);
+        assert!((target.y - (ORIGIN.1 + MIN)).abs() < 0.001);
+    }
+
+    #[test]
+    fn target_lock_rejects_rays_without_an_in_map_range_point() {
+        let origin = (4.0 * TILE, 4.0 * TILE);
+
+        assert!(lock_artillery_fire_target(
+            WORLD,
+            origin,
+            Some(std::f32::consts::PI),
+            std::f32::consts::PI,
+            MIN,
+            MAX,
+            origin,
+        )
+        .is_none());
+    }
+}

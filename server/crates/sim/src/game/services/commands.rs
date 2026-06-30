@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use crate::command_budget::{BASE_COMMAND_SUPPLY_CAP, COMMAND_CAR_SUPPLY_CAP_BONUS};
 use crate::config;
 use crate::game::ability::{self, AbilityEffectHook, AbilityKind, AbilityTargetMode};
@@ -23,10 +22,13 @@ use crate::game::services::construction::resumable_site_for_build_intent;
 use crate::game::services::dist2;
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::movement::angle_delta;
+use crate::game::services::order_execution::targeting::{
+    artillery_point_fire_target, queued_artillery_point_fire_target,
+    stored_artillery_point_fire_target, ArtilleryPointFireAcceptance,
+};
 use crate::game::services::order_execution::{
-    artillery_point_fire_target, begin_artillery_teardown_for_movement,
-    execute_anti_tank_gun_setup, start_artillery_point_fire_command_order,
-    ArtilleryPointFireAcceptance, FutureOrderMode,
+    begin_artillery_teardown_for_movement, execute_anti_tank_gun_setup,
+    start_artillery_point_fire_command_order, FutureOrderMode,
 };
 use crate::game::services::order_planner as planner;
 use crate::game::services::spatial::SpatialIndex;
@@ -38,6 +40,7 @@ use crate::game::upgrade::{self, UpgradeKind};
 use crate::game::PlayerState;
 use crate::protocol::{self, AttackReveal, Event, NoticeSeverity};
 use crate::rules;
+use std::collections::HashMap;
 /// Max submitted unit ids inspected per multi-unit command. Caps the per-id work a single command
 /// can force, so a repeated/huge id list can't be used to stall the tick loop.
 const MAX_UNITS_PER_COMMAND: usize = 256;
@@ -215,15 +218,8 @@ pub(in crate::game) fn apply_commands(
                 else {
                     continue;
                 };
-                let target_valid = attack_target_valid(
-                    entities,
-                    &teams,
-                    fog,
-                    smokes,
-                    player,
-                    &units,
-                    target,
-                );
+                let target_valid =
+                    attack_target_valid(entities, &teams, fog, smokes, player, &units, target);
                 let request = planner::OrderRequest {
                     units: units.clone(),
                     mode: issue_mode(queued),
@@ -830,20 +826,12 @@ mod planned_actions {
                 planner::PlannedAction::AppendQueued { unit, intent } => {
                     if let planner::OrderIntent::WorldAbility { ability, target } = intent {
                         if ability_from_planner(ability) == Some(AbilityKind::PointFire) {
-                            if artillery_point_fire_target(
-                                map,
-                                entities,
-                                player,
-                                unit,
-                                target.x,
-                                target.y,
-                                ArtilleryPointFireAcceptance::Command,
-                            )
-                            .is_some()
-                            {
+                            if let Some(locked) = queued_artillery_point_fire_target(
+                                map, entities, player, unit, target.x, target.y,
+                            ) {
                                 if let Some(e) = entities.get_mut(unit) {
                                     e.append_queued_order(OrderIntent::point_fire(
-                                        target.x, target.y,
+                                        locked.x, locked.y,
                                     ));
                                 }
                             }
@@ -1177,33 +1165,16 @@ fn use_ability(
         let Some(y) = request.y else {
             return;
         };
-        let Some((x, y)) = SmokeCloudStore::clamp_point_to_map(map, x, y) else {
-            return;
-        };
         for unit in dedupe_cap_units(request.units, request.max_units_per_command) {
             if !ability_orders::caster_allowed_by_faction(entities, &faction_id, unit, ability) {
                 continue;
             }
             if request.queued {
-                if artillery_point_fire_target(
-                    map,
-                    entities,
-                    player,
-                    unit,
-                    x,
-                    y,
-                    ArtilleryPointFireAcceptance::Command,
-                )
-                .is_some()
+                if let Some(target) =
+                    queued_artillery_point_fire_target(map, entities, player, unit, x, y)
                 {
                     if let Some(e) = entities.get_mut(unit) {
-                        if !e
-                            .queued_orders()
-                            .iter()
-                            .any(|intent| matches!(intent, OrderIntent::PointFire(_)))
-                        {
-                            e.append_queued_order(OrderIntent::point_fire(x, y));
-                        }
+                        e.append_queued_order(OrderIntent::point_fire(target.x, target.y));
                     }
                 }
             } else {
@@ -1252,9 +1223,9 @@ fn use_ability(
         if let Some((x, y)) = target_point {
             let eligible: Vec<u32> =
                 dedupe_cap_units(request.units.clone(), request.max_units_per_command)
-                .into_iter()
-                .filter(|id| caster_can_accept_order(entities, player, *id, ability))
-                .collect();
+                    .into_iter()
+                    .filter(|id| caster_can_accept_order(entities, player, *id, ability))
+                    .collect();
             match choose_smoke_caster(map, entities, ability, &eligible, x, y) {
                 Some(caster) => vec![caster],
                 None => request.units.clone(),
@@ -1507,7 +1478,7 @@ pub(in crate::game) fn artillery_point_fire_system(
         })
         .collect();
     for (id, owner, x, y) in orders {
-        let target = artillery_point_fire_target(
+        let target = stored_artillery_point_fire_target(
             map,
             entities,
             owner,
@@ -1525,7 +1496,7 @@ pub(in crate::game) fn artillery_point_fire_system(
                         | WeaponSetup::TearingDown { .. }
                         | WeaponSetup::TearingDownToRedeploy { .. }
                 )
-            ) && artillery_point_fire_target(
+            ) && stored_artillery_point_fire_target(
                 map,
                 entities,
                 owner,

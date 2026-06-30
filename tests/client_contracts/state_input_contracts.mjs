@@ -1973,8 +1973,8 @@ function buttonByLabel(card, label) {
     "Point Fire preview exposes minimum range in pixels",
   );
   assert(
-    ARTILLERY_MIN_RANGE_TILES === 15 && ARTILLERY_MAX_RANGE_TILES === 55,
-    "Artillery point-fire range mirrors the 15-55 tile balance band",
+    ARTILLERY_MIN_RANGE_TILES === 25 && ARTILLERY_MAX_RANGE_TILES === 55,
+    "Artillery point-fire range mirrors the 25-55 tile balance band",
   );
   const deployedArtillery = { ...selectedArtillery, setupState: SETUP.DEPLOYED, setupFacing: 0 };
   const artilleryConeGfx = new RecordingGraphics();
