@@ -5,14 +5,14 @@ use crate::game::ability::AbilityKind;
 use crate::protocol::states;
 use crate::rules;
 
+use super::order::BUILD_UNIT_BLOCK_GRACE_TICKS;
 #[cfg(test)]
 use super::EntityStateGroups;
-use super::order::BUILD_UNIT_BLOCK_GRACE_TICKS;
 use super::{
     AttackPhase, BuildPhase, CombatState, ConstructionState, DeconstructPhase, EntityKind,
-    GatherPhase, MovePhase, MovementState, Order, OrderIntent, ProdItem, ProductionState,
-    RallyIntent, ResearchItem, ResourceNodeState, WeaponSetup, WorkerState, MAX_QUEUED_ORDERS,
-    NEUTRAL, ResourceExtractorState,
+    GatherPhase, MovePhase, MovementState, Order, OrderIntent, PanzerfaustState, ProdItem,
+    ProductionState, RallyIntent, ResearchItem, ResourceExtractorState, ResourceNodeState,
+    WeaponSetup, WorkerState, MAX_QUEUED_ORDERS, NEUTRAL,
 };
 
 const BUILDING_START_HP_NUMERATOR: u32 = 1;
@@ -75,7 +75,8 @@ impl Entity {
             last_damage_tick: None,
             last_damage_pos: None,
             movement: Some(MovementState::default()),
-            combat: if s.dmg > 0 || kind == EntityKind::Artillery {
+            combat: if s.dmg > 0 || matches!(kind, EntityKind::Artillery | EntityKind::Panzerfaust)
+            {
                 Some(initial_combat_state(kind))
             } else {
                 None
@@ -135,7 +136,8 @@ impl Entity {
             }),
             worker: None,
             resource_node: None,
-            resource_extractor: (kind == EntityKind::PumpJack).then(ResourceExtractorState::default),
+            resource_extractor: (kind == EntityKind::PumpJack)
+                .then(ResourceExtractorState::default),
             ability_cooldowns: BTreeMap::new(),
             ability_lockouts_until_tick: BTreeMap::new(),
             ability_uses_remaining: BTreeMap::new(),
@@ -196,6 +198,7 @@ impl Entity {
     }
 
     pub fn set_order(&mut self, order: Order) {
+        self.cancel_panzerfaust_windup();
         if let Some(m) = self.movement.as_mut() {
             m.order = order;
         }
@@ -207,6 +210,7 @@ impl Entity {
     /// This is the common command/promotion boundary for starting a fresh active order: the
     /// previous path, target latch, and path goal no longer belong to the new order.
     pub(crate) fn replace_active_order(&mut self, order: Order) {
+        self.cancel_panzerfaust_windup();
         if let Some(m) = self.movement.as_mut() {
             m.order = order;
             m.path.clear();
@@ -444,8 +448,7 @@ impl Entity {
             order.execution.unit_blocked_ticks = 0;
             return Some(false);
         }
-        order.execution.unit_blocked_ticks =
-            order.execution.unit_blocked_ticks.saturating_add(1);
+        order.execution.unit_blocked_ticks = order.execution.unit_blocked_ticks.saturating_add(1);
         Some(order.execution.unit_blocked_ticks >= BUILD_UNIT_BLOCK_GRACE_TICKS)
     }
 
@@ -1144,6 +1147,13 @@ impl Entity {
 
     /// Whether this entity can deal damage.
     pub fn can_attack(&self) -> bool {
+        if self.kind == EntityKind::Panzerfaust {
+            return self
+                .combat
+                .as_ref()
+                .and_then(|combat| combat.panzerfaust)
+                .is_some();
+        }
         if let Some(s) = config::unit_stats(self.kind) {
             s.dmg > 0
         } else if let Some(s) = config::building_stats(self.kind) {
@@ -1217,6 +1227,7 @@ impl Entity {
     /// Clear all movement/combat orders and reset to idle (the `stop` command, deaths, etc.).
     /// Does not touch production queues (those belong to buildings).
     pub fn clear_orders(&mut self) {
+        self.cancel_panzerfaust_windup();
         if let Some(m) = self.movement.as_mut() {
             m.order = Order::Idle;
             m.queued_orders.clear();
@@ -1231,6 +1242,7 @@ impl Entity {
 
     /// Clear active/queued movement and enter a no-chase hold-position stance.
     pub fn hold_position(&mut self) {
+        self.cancel_panzerfaust_windup();
         if let Some(m) = self.movement.as_mut() {
             m.order = Order::HoldPosition;
             m.queued_orders.clear();
@@ -1250,6 +1262,7 @@ impl Entity {
     /// next one. Used by build/gather completion and failure paths that hand the worker
     /// off to its next queued order.
     pub fn clear_active_order(&mut self) {
+        self.cancel_panzerfaust_windup();
         if let Some(m) = self.movement.as_mut() {
             m.order = Order::Idle;
             m.path.clear();
@@ -1257,6 +1270,17 @@ impl Entity {
         }
         self.set_target_id(None);
         self.reset_attack_move_no_target_ticks();
+    }
+
+    fn cancel_panzerfaust_windup(&mut self) {
+        if matches!(
+            self.combat.as_ref().and_then(|combat| combat.panzerfaust),
+            Some(PanzerfaustState::Windup { .. })
+        ) {
+            if let Some(combat) = self.combat.as_mut() {
+                combat.panzerfaust = Some(PanzerfaustState::Loaded);
+            }
+        }
     }
 }
 
@@ -1301,6 +1325,9 @@ fn initial_combat_state(kind: EntityKind) -> CombatState {
     let mut combat = CombatState::default();
     if kind == EntityKind::MortarTeam {
         combat.autocast_enabled = false;
+    }
+    if kind == EntityKind::Panzerfaust {
+        combat.panzerfaust = Some(PanzerfaustState::Loaded);
     }
     combat
 }

@@ -40,8 +40,9 @@ pub(crate) use order::tank_trap_deconstruction_ticks;
 pub use state::EntityStateGroups;
 #[allow(unused_imports)]
 pub use state::{
-    CarryState, CombatState, ConstructionState, MovementState, ProdItem, ProductionState,
-    ResearchItem, ResourceExtractorState, ResourceNodeState, WeaponSetup, WorkerState,
+    CarryState, CombatState, ConstructionState, MovementState, PanzerfaustState, ProdItem,
+    ProductionState, ResearchItem, ResourceExtractorState, ResourceNodeState, WeaponSetup,
+    WorkerState,
 };
 pub use store::EntityStore;
 
@@ -53,4 +54,24 @@ pub(crate) fn active_trench_occupation(entity: &Entity) -> Option<u32> {
         return None;
     }
     entity.movement.as_ref().and_then(|m| m.occupied_trench_id)
+}
+
+pub(crate) fn convert_panzerfaust_to_rifleman(entity: &mut Entity) -> bool {
+    if entity.kind != EntityKind::Panzerfaust {
+        return false;
+    }
+    let Some(stats) = config::unit_stats(EntityKind::Rifleman) else {
+        return false;
+    };
+    entity.kind = EntityKind::Rifleman;
+    entity.max_hp = stats.hp;
+    entity.hp = entity.hp.min(stats.hp);
+    entity.combat = Some(CombatState::default());
+    if let Some(target) = entity.order().attack_target() {
+        entity.set_target_id(Some(target));
+    }
+    if entity.path_is_empty() && matches!(entity.order(), Order::Move(_) | Order::AttackMove(_)) {
+        entity.mark_move_phase(MovePhase::AwaitingPath);
+    }
+    true
 }

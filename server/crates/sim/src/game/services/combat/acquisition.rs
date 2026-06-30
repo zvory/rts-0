@@ -88,13 +88,7 @@ pub(super) fn resolve_target(
                     .get(target)
                     .map(|t| {
                         world_query::is_enemy_targetable(t, teams, owner, self_id)
-                            && target_visible_to_owner_team(
-                                fog,
-                                smokes,
-                                teams,
-                                owner,
-                                t,
-                            )
+                            && target_visible_to_owner_team(fog, smokes, teams, owner, t)
                     })
                     .unwrap_or(false)
                 {
@@ -179,6 +173,14 @@ fn target_relevant_for_auto_acquisition(attacker: EntityKind, target: &Entity) -
 }
 
 fn weapon_range_px(attacker: &Entity) -> f32 {
+    if attacker.kind == EntityKind::Panzerfaust {
+        return entrenchment_combat::attack_range_tiles(
+            attacker,
+            config::PANZERFAUST_RANGE_TILES as f32,
+        ) * config::TILE_SIZE as f32
+            + attacker.radius()
+            + super::RANGE_SLACK;
+    }
     let profile = effective_attack_profile(attacker);
     profile.range_tiles * config::TILE_SIZE as f32 + attacker.radius() + super::RANGE_SLACK
 }

@@ -152,6 +152,9 @@ pub struct CombatState {
     /// Set when tank movement reset the range this tick, so combat does not immediately re-add one
     /// stationary tick after the movement phase.
     pub tank_stationary_range_reset_this_tick: bool,
+    /// Loaded Panzerfaust one-shot runtime. Only Panzerfaust entities carry this; conversion to
+    /// Rifleman replaces the combat state and clears it.
+    pub panzerfaust: Option<PanzerfaustState>,
 }
 
 impl Default for CombatState {
@@ -171,8 +174,27 @@ impl Default for CombatState {
             autocast_enabled: true,
             tank_stationary_range_ticks: 0,
             tank_stationary_range_reset_this_tick: false,
+            panzerfaust: None,
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum PanzerfaustState {
+    Loaded,
+    Windup {
+        target: u32,
+        ticks_remaining: u16,
+    },
+    InFlight {
+        target: u32,
+        impact_x: f32,
+        impact_y: f32,
+        ticks_remaining: u32,
+    },
+    Recovery {
+        ticks_remaining: u16,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

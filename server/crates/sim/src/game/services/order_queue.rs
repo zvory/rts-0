@@ -4,6 +4,7 @@ use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::entity::{
     BuildPhase, Entity, EntityKind, EntityStore, MovePhase, Order, OrderIntent, MAX_QUEUED_ORDERS,
 };
+use crate::game::entrenchment_combat;
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::mortar::MortarShellStore;
@@ -119,7 +120,7 @@ pub(crate) fn promote_ready_orders(
     let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
     let ready: Vec<u32> = entities
         .iter()
-        .filter(|e| ready_for_next_order(map, entities, &teams, fog, e))
+        .filter(|e| ready_for_next_order(map, entities, &teams, fog, smokes, e))
         .map(|e| e.id)
         .collect();
     if ready.is_empty() {
@@ -180,7 +181,8 @@ pub(crate) fn promote_ready_orders(
             clear_completed_active_order(entities, id);
         }
 
-        let Some(promoted) = pop_next_valid_intent(map, entities, players, &teams, fog, events, id)
+        let Some(promoted) =
+            pop_next_valid_intent(map, entities, players, &teams, fog, smokes, events, id)
         else {
             continue;
         };
@@ -272,6 +274,7 @@ fn ready_for_next_order(
     entities: &EntityStore,
     teams: &TeamRelations,
     fog: &Fog,
+    smokes: &SmokeCloudStore,
     e: &Entity,
 ) -> bool {
     if !e.is_unit() {
@@ -289,7 +292,7 @@ fn ready_for_next_order(
         }
         Order::Attack(order) => {
             !e.queued_orders().is_empty()
-                && attack_order_complete(map, entities, teams, fog, e, order.intent.target)
+                && attack_order_complete(map, entities, teams, fog, smokes, e, order.intent.target)
         }
         Order::Gather(_)
         | Order::Build(_)
@@ -322,6 +325,7 @@ fn pop_next_valid_intent(
     players: &[PlayerState],
     teams: &TeamRelations,
     fog: &Fog,
+    smokes: &SmokeCloudStore,
     events: &mut std::collections::HashMap<u32, Vec<Event>>,
     id: u32,
 ) -> Option<PromotedIntent> {
@@ -379,7 +383,8 @@ fn pop_next_valid_intent(
                 }
             }
             OrderIntent::Attack(attack) => {
-                if attack_intent_valid(entities, teams, fog, owner, id, attack.target) {
+                if attack_intent_valid(entities, teams, fog, Some(smokes), owner, id, attack.target)
+                {
                     return Some(PromotedIntent::Attack {
                         target: attack.target,
                     });
@@ -542,6 +547,7 @@ fn attack_intent_valid(
     entities: &EntityStore,
     teams: &TeamRelations,
     fog: &Fog,
+    smokes: Option<&SmokeCloudStore>,
     owner: u32,
     attacker: u32,
     target: u32,
@@ -555,9 +561,7 @@ fn attack_intent_valid(
     if deployed_anti_tank_gun_target_outside_arc(entities, attacker, target) {
         return false;
     }
-    matches!(entities.get(target),
-        Some(t) if world_query::is_enemy_targetable(t, teams, owner, attacker)
-            && rules::projection::team_visible_world(owner, t.pos_x, t.pos_y, fog, teams))
+    world_query::unit_attack_target_valid(entities, teams, fog, smokes, owner, attacker, target)
 }
 
 fn attack_order_complete(
@@ -565,10 +569,19 @@ fn attack_order_complete(
     entities: &EntityStore,
     teams: &TeamRelations,
     fog: &Fog,
+    smokes: &SmokeCloudStore,
     attacker: &Entity,
     target: u32,
 ) -> bool {
-    if !attack_intent_valid(entities, teams, fog, attacker.owner, attacker.id, target) {
+    if !attack_intent_valid(
+        entities,
+        teams,
+        fog,
+        Some(smokes),
+        attacker.owner,
+        attacker.id,
+        target,
+    ) {
         return true;
     }
     attacker.attack_unreachable_checks() >= ATTACK_UNREACHABLE_PROMOTION_CHECKS
@@ -582,12 +595,21 @@ fn attack_can_fire_now(map: &Map, entities: &EntityStore, attacker: &Entity, tar
     let Some(stats) = config::unit_stats(attacker.kind) else {
         return false;
     };
-    if stats.dmg == 0 {
+    let dmg = if attacker.kind == EntityKind::Panzerfaust {
+        config::PANZERFAUST_DAMAGE
+    } else {
+        stats.dmg
+    };
+    if dmg == 0 {
         return false;
     }
-    let range_px = stats.range_tiles as f32 * config::TILE_SIZE as f32
-        + attacker.radius()
-        + ATTACK_RANGE_SLACK_PX;
+    let range_tiles = if attacker.kind == EntityKind::Panzerfaust {
+        entrenchment_combat::attack_range_tiles(attacker, config::PANZERFAUST_RANGE_TILES as f32)
+    } else {
+        stats.range_tiles as f32
+    };
+    let range_px =
+        range_tiles * config::TILE_SIZE as f32 + attacker.radius() + ATTACK_RANGE_SLACK_PX;
     if dist2(attacker.pos_x, attacker.pos_y, target.pos_x, target.pos_y) > range_px * range_px {
         return false;
     }

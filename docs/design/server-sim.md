@@ -482,7 +482,9 @@ policy is centralized instead of scattered through services.
 - `rules::combat` — default weapon-profile ids and policy metadata, AP/armor predicates (`is_ap`,
   `is_armored`), target-ranking classifiers (`target_threat_role`, `default_weapon_target_fit`),
   compatibility helpers such as `attack_profile(kind) -> AttackProfile`, and
-  `effective_damage(attacker_kind, victim_kind, base_dmg, victim_terrain) -> u32`.
+  `effective_damage(attacker_kind, victim_kind, base_dmg, victim_terrain) -> u32`. The
+  Panzerfaust Tank-only loaded-shot predicate lives here as rules vocabulary while the one-shot
+  state machine stays in the sim combat service.
 - `rules::economy` — tech/production predicates (`trainable_units_for_faction`,
   `build_requirement_met_for_faction`, `train_requirement_met_for_faction`,
   `can_research_for_faction`), resource-node amounts, and cost/supply wrappers (`cost`,
@@ -825,6 +827,13 @@ General rules:
   profiles with explicit activation policy; explicit-only special attacks can be added without
   changing default auto-acquisition, and autocast special attacks need their own conservative plan
   and tests.
+- Spawned Panzerfaust entities use a hidden server-only one-shot state in combat state:
+  `Loaded -> Windup -> InFlight -> Recovery -> Rifleman`. Direct `Attack` commands, queued attack
+  promotion, idle acquisition, hold-position acquisition, and attack-move acquisition all share the
+  Tank-only visible-enemy target predicate. Plain `Move` does not auto-fire. Windup cancels without
+  spending the shot if the order changes or the target stops being legal, visible, in range, or
+  fireable; after launch, the shot is spent, impact applies flat 60 AP damage only to the locked
+  live Tank target, recovery completes, and the same entity id converts into a Rifleman.
 - Resource costs are paid at execution time, not queue time. Queued abilities that become
   unaffordable at promotion are skipped or rejected, but queued and immediate build orders do not
   require current affordability at issue or promotion time. Build promotion checks the worker,

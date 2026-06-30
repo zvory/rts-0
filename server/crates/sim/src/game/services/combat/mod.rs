@@ -29,13 +29,13 @@ mod acquisition;
 mod chase;
 mod damage;
 mod events;
+mod panzerfaust;
 mod priority;
 mod projection;
 mod weapons;
 
 #[cfg(test)]
 mod tests;
-
 #[cfg(test)]
 use acquisition::combat_mode;
 use acquisition::{
@@ -50,7 +50,8 @@ use weapons::{
     mirror_weapon_to_body, moving_fire_miss_chance, moving_fire_movement_order_holds_path,
     relax_vehicle_weapon_toward_body, rotate_anti_tank_gun_for_combat,
     rotate_vehicle_weapon_for_combat, tick_deployed_weapon_setup,
-    update_attack_move_no_target_teardown, uses_stationary_weapon_aggro, uses_vehicle_weapon_policy,
+    update_attack_move_no_target_teardown, uses_stationary_weapon_aggro,
+    uses_vehicle_weapon_policy,
 };
 
 #[cfg(test)]
@@ -136,8 +137,31 @@ pub(in crate::game) fn combat_system(
             weapons::tick_tank_stationary_range(e);
         }
     }
-
+    panzerfaust::tick_states(
+        map,
+        entities,
+        teams,
+        methamphetamines_researched,
+        fog,
+        smokes,
+        events,
+        tick,
+    );
     for id in entities.ids() {
+        if panzerfaust::handle_combat_if_panzerfaust(
+            map,
+            entities,
+            teams,
+            methamphetamines_researched,
+            occ,
+            spatial,
+            coordinator,
+            fog,
+            smokes,
+            id,
+        ) {
+            continue;
+        }
         // Determine this attacker's combat parameters.
         let (
             owner,

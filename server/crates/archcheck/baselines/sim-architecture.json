@@ -1,5 +1,5 @@
 {
-  "reason": "Entrenchment phase 5 adds a dedicated dev inspection scenario for trench rendering verification.",
+  "reason": "Panzerfaust combat shares server-authoritative attack target legality with commands and queued orders.",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -163,7 +163,7 @@
     },
     {
       "path": "services/combat/mod.rs",
-      "lines": 468
+      "lines": 569
     },
     {
       "path": "services/combat/priority.rs",
@@ -524,6 +524,12 @@
       "target": "world_query",
       "path": "services/combat/acquisition.rs",
       "line": 9
+    },
+    {
+      "source": "combat",
+      "target": "world_query",
+      "path": "services/combat/panzerfaust.rs",
+      "line": 7
     },
     {
       "source": "commands",
