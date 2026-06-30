@@ -24,6 +24,12 @@ import {
   summarizePathingDiagnostics,
 } from "./net-report-pathing-diagnostics.mjs";
 import {
+  addClientFrameContextEvidence,
+  appendClientFrameContextMarkdown,
+  summarizeClientContext,
+} from "./net-report-client-context.mjs";
+import { missingDiagnosticGroups } from "./net-report-missing-diagnostics.mjs";
+import {
   formatPctX100,
   formatTransportDiagnostics,
   formatTsv,
@@ -62,8 +68,14 @@ const METRICS = [
   ["frame_gap_max_ms", "frame gap"],
   ["frame_work_max_ms", "frame work max"],
   ["frame_work_p95_ms", "frame work p95"],
+  ["frame_raf_dispatch_max_ms", "RAF dispatch max"],
+  ["frame_raf_dispatch_p95_ms", "RAF dispatch p95"],
+  ["frame_unattributed_max_ms", "unattributed frame max"],
+  ["frame_unattributed_p95_ms", "unattributed frame p95"],
   ["renderer_max_ms", "renderer max"],
   ["renderer_p95_ms", "renderer p95"],
+  ["top_renderer_phase_ms", "top renderer phase"],
+  ["top_render_diagnostic_group_count", "top render diagnostic group count"],
   ["fps_estimate", "FPS estimate", "min"],
   ["commands_issued", "commands issued"],
   ["command_burst_max", "command burst max"],
@@ -107,6 +119,8 @@ const METRICS = [
   ["prediction_replay_max_ms", "prediction replay max"],
   ["prediction_replay_max_ticks", "prediction replay ticks max"],
   ["prediction_replay_budget_exceeded_count", "prediction replay budget exceeded"],
+  ["predicted_snapshot_late_frame_pct_x100", "predicted late-snapshot coverage"],
+  ["prediction_active_late_frame_count", "prediction active while late"],
   ["server_command_receipts_accepted", "server accepted receipts"],
   ["server_command_receipts_rejected", "server rejected receipts"],
   ["server_reliable_drained_before_snapshot", "server reliable before snapshots"],
@@ -156,8 +170,14 @@ const SUMMARY_FIELDS = [
   "frame_gap_max_ms",
   "frame_work_max_ms",
   "frame_work_p95_ms",
+  "frame_raf_dispatch_max_ms",
+  "frame_raf_dispatch_p95_ms",
+  "frame_unattributed_max_ms",
+  "frame_unattributed_p95_ms",
   "renderer_max_ms",
   "renderer_p95_ms",
+  "top_renderer_phase_ms",
+  "top_render_diagnostic_group_count",
   "fps_estimate",
   "commands_issued",
   "command_burst_bucket_ms",
@@ -195,6 +215,8 @@ const SUMMARY_FIELDS = [
   "prediction_replay_max_ms",
   "prediction_replay_max_ticks",
   "prediction_replay_budget_exceeded_count",
+  "predicted_snapshot_late_frame_pct_x100",
+  "prediction_active_late_frame_count",
   "server_command_receipts_accepted",
   "server_command_receipts_rejected",
   "server_reliable_drained_before_snapshot",
@@ -353,8 +375,14 @@ const ISSUE_GROUPS = [
       "prediction_apply_max_ms",
       "frame_gap_max_ms",
       "frame_work_max_ms",
+      "frame_raf_dispatch_max_ms",
+      "frame_raf_dispatch_p95_ms",
+      "frame_unattributed_max_ms",
+      "frame_unattributed_p95_ms",
       "command_burst_frame_gap_max_ms",
       "renderer_max_ms",
+      "top_renderer_phase_ms",
+      "top_render_diagnostic_group_count",
       "fps_estimate",
     ],
   },
@@ -403,6 +431,8 @@ const ISSUE_GROUPS = [
       "prediction_replay_max_ms",
       "prediction_replay_max_ticks",
       "prediction_replay_budget_exceeded_count",
+      "predicted_snapshot_late_frame_pct_x100",
+      "prediction_active_late_frame_count",
       "snapshot_late_frame_count",
       "predicted_snapshot_late_frame_count",
     ],
@@ -433,8 +463,13 @@ const WARN_THRESHOLD = {
   frame_gap_max_ms: 100,
   frame_work_max_ms: 33,
   frame_work_p95_ms: 24,
+  frame_raf_dispatch_max_ms: 16,
+  frame_raf_dispatch_p95_ms: 8,
+  frame_unattributed_max_ms: 16,
+  frame_unattributed_p95_ms: 8,
   renderer_max_ms: 33,
   renderer_p95_ms: 16,
+  top_renderer_phase_ms: 16,
   commands_issued: 20,
   command_burst_max: 6,
   command_burst_frame_gap_max_ms: 100,
@@ -958,7 +993,7 @@ function finalizeMatch(match) {
 
   const matchPerf = summarizePerf(match);
   const groups = ISSUE_GROUPS.map((group) => classifyGroup(group, players, matchPerf, allRows)).filter(Boolean);
-  const missing = missingDiagnosticGroups(allRows);
+  const missing = missingDiagnosticGroups(allRows, ISSUE_GROUPS);
   const transport = summarizeTransport(allRows);
   const pathingDiagnostics = summarizePathingDiagnostics(match.pathing);
 
@@ -1029,6 +1064,7 @@ function finalizePlayer(player) {
     transport: summarizeTransport(reports),
     commandLifecycle: summarizeCommandLifecycle(reports),
     snapshotPayload: summarizeSnapshotPayload(reports, summarizeField),
+    clientContext: summarizeClientContext(reports, WARN_THRESHOLD),
     evidence,
   };
 }
@@ -1183,6 +1219,9 @@ function classifyGroup(group, players, matchPerf, rows) {
   if (group.id === "server_pathing") {
     addPathingPhaseEvidence(rows, evidenceFor, evidenceAgainst, WARN_THRESHOLD.slowest_phase_ms);
   }
+  if (group.id === "browser_processing") {
+    addClientFrameContextEvidence(players, evidenceFor, evidenceAgainst);
+  }
 
   const rawFieldSet = new Set(rows.flatMap((row) => Object.keys(row.fields)));
   const sawRawField = group.fields.some((field) => rawFieldSet.has(field));
@@ -1259,55 +1298,6 @@ function groupEvidence(fields, rows) {
   };
 }
 
-function missingDiagnosticGroups(rows) {
-  const fields = new Set();
-  for (const row of rows) {
-    for (const key of Object.keys(row.fields)) {
-      fields.add(key);
-    }
-  }
-  const missing = [];
-  for (const group of ISSUE_GROUPS) {
-    if (!group.fields.some((field) => fields.has(field))) {
-      missing.push(`${group.label}: no matching fields in input`);
-    }
-  }
-  if (!fields.has("snapshot_bytes_p95") && !fields.has("snapshot_over_segment_budget_pct_x100")) {
-    missing.push("snapshot packet-budget payload p95/rate: no matching fields in input");
-  }
-  if (!fields.has("websocket_compression")) {
-    missing.push("WebSocket compression negotiation: no matching fields in input");
-  }
-  if (!fields.has("snapshot_byte_source")) {
-    missing.push("snapshot byte measurement source: no matching fields in input");
-  }
-  if (!fields.has("snapshot_codec") || !fields.has("snapshot_frame_kind")) {
-    missing.push("snapshot codec/frame kind: no matching fields in input");
-  }
-  if (!fields.has("command_burst_max")) {
-    missing.push("command burst density: no matching fields in input");
-  }
-  if (!fields.has("server_reliable_drained_before_snapshot")) {
-    missing.push("server reliable/snapshot outbound pressure: no matching fields in input");
-  }
-  if (!fields.has("server_snapshot_project_max_ms") || !fields.has("server_snapshot_serialize_max_ms")) {
-    missing.push("server snapshot lifecycle window: no projection/compact/serialize fields in input");
-  }
-  if (!fields.has("server_snapshot_payload_sections")) {
-    missing.push("server snapshot payload composition: no section/entity-kind fields in input");
-  }
-  if (!fields.has("pathing_requests") && !fields.has("requests_processed")) {
-    missing.push("server pathing diagnostics: no path request/source/complexity fields in input");
-  }
-  if (!fields.has("prediction_disable_wasm_count") || !fields.has("prediction_replay_max_ms")) {
-    missing.push("prediction disable reason/replay budget detail: no matching fields in input");
-  }
-  if (!fields.has("predicted_snapshot_late_frame_count")) {
-    missing.push("predicted snapshot coverage during late snapshot frames: no matching fields in input");
-  }
-  return missing;
-}
-
 function formatMarkdown(report) {
   const lines = [];
   lines.push("# Network Incident Summary");
@@ -1381,6 +1371,7 @@ function formatMarkdown(report) {
     appendSnapshotPayloadMarkdown(lines, match.players, { formatValue, formatPctX100 });
     appendCommandLifecycleMarkdown(lines, match.players);
     appendPathingDiagnosticsMarkdown(lines, match.pathingDiagnostics);
+    appendClientFrameContextMarkdown(lines, match.players, { formatPctX100 });
 
     lines.push("");
     lines.push("### Classification");

@@ -282,6 +282,53 @@ try {
   rmSync(commandDir, { recursive: true, force: true });
 }
 
+const clientFrameDir = mkdtempSync(path.join(os.tmpdir(), "rts-net-report-parser-client-frame-"));
+try {
+  const clientFrameLog = path.join(clientFrameDir, "client-frame.log");
+  const framePhasesJson = JSON.stringify([
+    { label: "match.renderer", count: 12, maxMs: 38, p95Ms: 24 },
+    { label: "frame.unattributed", count: 12, maxMs: 7, p95Ms: 4 },
+  ]).replace(/"/g, '\\"');
+  const rendererPhasesJson = JSON.stringify([
+    { label: "renderer.units", count: 12, maxMs: 22, p95Ms: 18 },
+    { label: "renderer.fogDraw", count: 12, maxMs: 9, p95Ms: 4 },
+  ]).replace(/"/g, '\\"');
+  const countersJson = JSON.stringify([
+    { label: "renderer.pixi.displayObject", samples: 180, frames: 12, total: 180, maxFrame: 30 },
+    { label: "hud.dirty", samples: 6, frames: 6, total: 6, maxFrame: 1 },
+  ]).replace(/"/g, '\\"');
+  writeFileSync(
+    clientFrameLog,
+    [
+      `2026-06-24T12:00:00Z INFO event="client_net_report" match_run_id="client-frame-1" player_id=6 primary_issue="client_renderer" rtt_max_ms=35 snapshot_gap_max_ms=140 snapshot_jitter_ms=2 snapshot_late_frame_count=3 predicted_snapshot_late_frame_count=0 predicted_snapshot_late_frame_pct_x100=0 prediction_active_late_frame_count=0 frame_gap_max_ms=120 frame_work_max_ms=45 frame_work_p95_ms=28 frame_raf_dispatch_max_ms=4 frame_raf_dispatch_p95_ms=1 frame_unattributed_max_ms=7 frame_unattributed_p95_ms=4 worst_frame_phase="match.renderer" worst_frame_phase_ms=38 renderer_max_ms=36 renderer_p95_ms=18 top_renderer_phase="renderer.units" top_renderer_phase_ms=22 top_render_diagnostic_group="renderer.pixi.displayObject" top_render_diagnostic_group_count=180 client_frame_phases="${framePhasesJson}" renderer_frame_phases="${rendererPhasesJson}" render_diagnostic_counters="${countersJson}" fps_estimate=28 prediction_replay_max_ms=0 prediction_replay_max_ticks=0 prediction_replay_budget_exceeded_count=0 correction_count=0 server_tick_ms=4 server_lag_ms=0 "client network report"`,
+    ].join("\n") + "\n"
+  );
+  const clientFrameParsed = JSON.parse(run(["--format", "json", clientFrameLog]));
+  const clientFrameMatch = clientFrameParsed.matches.find((match) => match.matchRunId === "client-frame-1");
+  assert.ok(clientFrameMatch, "expected synthetic client-frame match summary");
+  const clientFramePlayer = clientFrameMatch.players.find((player) => player.playerId === "6");
+  assert.ok(clientFramePlayer, "expected synthetic client-frame player summary");
+  assert.equal(clientFramePlayer.clientContext.interpretation.status, "sustained");
+  assert.equal(clientFramePlayer.clientContext.likelyLocalPhase.label, "renderer.units");
+  assert.equal(clientFramePlayer.clientContext.topRenderDiagnosticGroups[0].label, "renderer.pixi.displayObject");
+  assert.match(
+    clientFramePlayer.clientContext.lateSnapshotPredictionCoverage.interpretation,
+    /no owned predicted overlay/,
+  );
+  assert.ok(
+    clientFrameMatch.classifications
+      .find((item) => item.id === "browser_processing")
+      ?.evidenceFor.some((item) => item.includes("likely local phase renderer.units")),
+    "expected browser-processing evidence to name the likely local phase",
+  );
+  const clientFrameMarkdown = run([clientFrameLog]);
+  assert.match(clientFrameMarkdown, /Client Frame Context/);
+  assert.match(clientFrameMarkdown, /renderer\.units/);
+  assert.match(clientFrameMarkdown, /no owned predicted overlay/);
+} finally {
+  rmSync(clientFrameDir, { recursive: true, force: true });
+}
+
 const sustainedCommandDir = mkdtempSync(path.join(os.tmpdir(), "rts-net-report-parser-sustained-command-"));
 try {
   const sustainedCommandLog = path.join(sustainedCommandDir, "sustained-command.log");

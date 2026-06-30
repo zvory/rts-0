@@ -75,6 +75,12 @@ export class MatchNetReporter {
       snapshots: clampU32(stats.snapshots),
       snapshotLateFrameCount: clampU32(stats.snapshotLateFrameCount),
       predictedSnapshotLateFrameCount: clampU32(stats.predictedSnapshotLateFrameCount),
+      predictedSnapshotLateFramePctX100: clampU16(
+        stats.snapshotLateFrameCount > 0
+          ? (stats.predictedSnapshotLateFrameCount * 10000) / stats.snapshotLateFrameCount
+          : 0,
+      ),
+      predictionActiveLateFrameCount: clampU32(stats.predictionActiveLateFrameCount),
       ...snapshotReportFields({
         reportStats: stats,
         transportStats,
@@ -110,8 +116,12 @@ export class MatchNetReporter {
       commandBurstMax: report.commandBurstMax,
       correctionDistancePx: report.correctionDistancePx,
       frameWorkMaxMs: report.frameWorkMaxMs,
+      frameRafDispatchMaxMs: report.frameRafDispatchMaxMs,
+      frameUnattributedMaxMs: report.frameUnattributedMaxMs,
       rendererMaxMs: report.rendererMaxMs,
       worstFramePhase: report.worstFramePhase,
+      topRendererPhase: report.topRendererPhase,
+      topRenderDiagnosticGroup: report.topRenderDiagnosticGroup,
     });
     this.health.resetReportStats();
     this.frameProfiler?.resetReportWindow?.();

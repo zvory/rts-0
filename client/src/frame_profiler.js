@@ -6,7 +6,63 @@ const MAX_RECENT_LONG_FRAMES = 8;
 const MAX_LABEL_LENGTH = 64;
 const MAX_DIAGNOSTIC_COUNTERS = 160;
 const MAX_FRAME_DIAGNOSTIC_COUNTERS = 8;
+const MAX_REPORT_PHASE_GROUPS = 5;
+const MAX_REPORT_COUNTER_GROUPS = 5;
 const FRAME_UNATTRIBUTED_LABEL = "frame.unattributed";
+
+const REPORT_FRAME_PHASE_LABELS = new Set([
+  "frame.rafDispatch",
+  FRAME_UNATTRIBUTED_LABEL,
+  "match.healthFrameGap",
+  "match.latencyRefresh",
+  "match.alpha",
+  "match.camera",
+  "match.input",
+  "match.minimapIntent",
+  "match.predictionVisual",
+  "match.frameEntityViews",
+  "match.fog",
+  "match.renderer",
+  "match.hud",
+  "match.minimap",
+  "match.observerAnalysis",
+  "match.healthPublish",
+]);
+
+const REPORT_RENDERER_PHASE_LABELS = new Set([
+  "renderer.entityPrep",
+  "renderer.feedbackView",
+  "renderer.groundDecals",
+  "renderer.trenches",
+  "renderer.miningPrep",
+  "renderer.resourcesBuildings",
+  "renderer.units",
+  "renderer.selectionHp",
+  "renderer.shotReveals",
+  "renderer.sweeps",
+  "renderer.effectsOverlays",
+  "renderer.fogDraw",
+  "renderer.feedbackOverlays",
+  "renderer.placement",
+]);
+
+const REPORT_COUNTER_GROUPS = Object.freeze([
+  "renderer.pixi.displayObject",
+  "renderer.rig.redraw",
+  "renderer.rig.instance",
+  "renderer.graphics.clear",
+  "renderer.redraw",
+  "renderer.groundDecals",
+  "renderer.trenches",
+  "minimap.cache",
+  "minimap.invalidate",
+  "entityViews.state",
+  "entityViews.cache",
+  "entityViews.uncached",
+  "hud.dirty",
+  "observer.dirty",
+  "commands",
+]);
 
 export class FrameProfiler {
   constructor({
@@ -180,8 +236,13 @@ export class FrameProfiler {
     const frameUnattributed = this.reportPhases.get(FRAME_UNATTRIBUTED_LABEL);
     const frameRafDispatch = this.reportPhases.get("frame.rafDispatch");
     const renderer = this.reportPhases.get("match.renderer");
-    const worstFramePhase = worstPhaseFrom(this.reportWorstPhaseCounts);
+    const worstFramePhase = reportWorstPhaseFrom(this.reportWorstPhaseCounts);
     const worstAggregate = worstFramePhase ? this.reportPhases.get(worstFramePhase.label) : null;
+    const rendererFramePhases = reportPhaseRowsFrom(this.reportPhases, REPORT_RENDERER_PHASE_LABELS);
+    const renderDiagnosticCounters = reportCounterGroupsFrom(
+      this.reportDiagnosticCounters,
+      this.reportFrameCount,
+    );
     return {
       schemaVersion: 1,
       frameCount: this.reportFrameCount,
@@ -197,7 +258,14 @@ export class FrameProfiler {
       rendererMaxMs: aggregateMaxMs(renderer),
       rendererP95Ms: aggregatePercentileMs(renderer, 0.95),
       context: this.latestContext,
+      clientFramePhases: reportPhaseRowsFrom(this.reportPhases, REPORT_FRAME_PHASE_LABELS),
+      rendererFramePhases,
+      topRendererPhase: rendererFramePhases[0]?.label || "",
+      topRendererPhaseMs: rendererFramePhases[0]?.maxMs || 0,
       renderDiagnostics: diagnosticSummaryFrom(this.reportDiagnosticCounters, this.reportFrameCount),
+      renderDiagnosticCounters,
+      topRenderDiagnosticGroup: renderDiagnosticCounters[0]?.label || "",
+      topRenderDiagnosticGroupCount: renderDiagnosticCounters[0]?.total || 0,
     };
   }
 
@@ -444,6 +512,22 @@ function phaseRowsFrom(phases) {
     .sort((a, b) => b.totalMs - a.totalMs || b.maxMs - a.maxMs || a.label.localeCompare(b.label));
 }
 
+function reportPhaseRowsFrom(phases, allowedLabels) {
+  return Array.from(phases.entries())
+    .filter(([label]) => allowedLabels.has(label))
+    .map(([label, aggregate]) => {
+      const summary = aggregate.summary();
+      return {
+        label,
+        count: summary.count,
+        maxMs: summary.maxMs,
+        p95Ms: summary.p95Ms,
+      };
+    })
+    .sort((a, b) => b.maxMs - a.maxMs || b.p95Ms - a.p95Ms || b.count - a.count || a.label.localeCompare(b.label))
+    .slice(0, MAX_REPORT_PHASE_GROUPS);
+}
+
 function topLevelFramePhaseTotalMs(phaseMs) {
   let total = 0;
   for (const [label, ms] of phaseMs || []) {
@@ -463,8 +547,52 @@ function diagnosticSummaryFrom(counters, frameCount) {
   };
 }
 
+function reportCounterGroupsFrom(counters, frameCount) {
+  const groups = new Map();
+  for (const counter of counters.values()) {
+    const groupLabel = reportCounterGroupFor(counter.label);
+    if (!groupLabel) continue;
+    const group = groups.get(groupLabel) || {
+      label: groupLabel,
+      samples: 0,
+      frames: 0,
+      total: 0,
+      maxFrame: 0,
+    };
+    group.samples += counter.samples;
+    group.frames += counter.frames;
+    group.total += counter.total;
+    group.maxFrame = Math.max(group.maxFrame, counter.maxFrame);
+    groups.set(groupLabel, group);
+  }
+  return Array.from(groups.values())
+    .map((group) => ({
+      label: group.label,
+      samples: group.samples,
+      frames: Math.min(group.frames, frameCount),
+      total: round1(group.total),
+      maxFrame: round1(group.maxFrame),
+    }))
+    .sort((a, b) => b.total - a.total || b.maxFrame - a.maxFrame || a.label.localeCompare(b.label))
+    .slice(0, MAX_REPORT_COUNTER_GROUPS);
+}
+
+function reportCounterGroupFor(label) {
+  for (const group of REPORT_COUNTER_GROUPS) {
+    if (label === group || label.startsWith(`${group}.`)) return group;
+  }
+  return null;
+}
+
 function worstPhaseFrom(counts) {
   return Array.from(counts.entries())
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))[0] || null;
+}
+
+function reportWorstPhaseFrom(counts) {
+  return Array.from(counts.entries())
+    .filter(([label]) => REPORT_FRAME_PHASE_LABELS.has(label) || REPORT_RENDERER_PHASE_LABELS.has(label))
     .map(([label, count]) => ({ label, count }))
     .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))[0] || null;
 }

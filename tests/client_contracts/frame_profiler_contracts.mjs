@@ -26,8 +26,10 @@ export function runFrameProfilerContracts() {
     profiler.beginFrame({ at: 0, frameGapMs: 16, scheduledAt: -5 });
     profiler.recordPhase("match.camera", 3);
     profiler.recordPhase("renderer.units", 9);
+    profiler.recordPhase("private.localLabel", 11);
     profiler.recordDiagnosticCounter("renderer.pixi.displayObject.created.units", 2);
     profiler.recordDiagnosticCounter("renderer.pixi.displayObject.created.units", 1);
+    profiler.recordDiagnosticCounter("private.counter.label", 99);
     profiler.endFrame({ at: 25, context: { entityCount: 7, selectedCount: 2, hidden: false, focused: true } });
 
     clock = 40;
@@ -86,6 +88,22 @@ export function runFrameProfilerContracts() {
     assert(report.worstFramePhase === "frame.unattributed", "FrameProfiler report summary names worst phase");
     assert(report.worstFramePhaseMs === 22, "FrameProfiler report summary records worst phase max");
     assert(report.rendererMaxMs === 0, "FrameProfiler report summary tolerates missing renderer phase");
+    assert(
+      report.clientFramePhases.some((phase) => phase.label === "frame.unattributed") &&
+        !report.clientFramePhases.some((phase) => phase.label === "private.localLabel"),
+      "FrameProfiler upload phase summary uses stable allowlisted labels",
+    );
+    assert(report.rendererFramePhases[0].label === "renderer.units", "FrameProfiler upload names top renderer subphase");
+    assert(report.topRendererPhase === "renderer.units", "FrameProfiler upload exposes top renderer phase scalar");
+    assert(
+      report.renderDiagnosticCounters.some((counter) => counter.label === "renderer.pixi.displayObject") &&
+        report.renderDiagnosticCounters.every((counter) => counter.label !== "private.counter.label"),
+      "FrameProfiler upload diagnostics are grouped through an allowlist",
+    );
+    assert(
+      report.topRenderDiagnosticGroup === "renderer.pixi.displayObject",
+      "FrameProfiler upload exposes the top render diagnostic group",
+    );
     assert(
       report.renderDiagnostics.counters.some((counter) => counter.label === "hud.dirty.resources.hit"),
       "FrameProfiler report summary includes bounded diagnostics",
