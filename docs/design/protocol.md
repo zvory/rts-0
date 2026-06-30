@@ -634,7 +634,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 28. `client/src/net.js` calls
+`messagepack-compact`, codec version 1, compact snapshot version 29. `client/src/net.js` calls
 `parseServerFrame`; the binary frame parser in `client/src/protocol_frame.js` returns the raw
 compact snapshot object, then `decodeCompactSnapshot` expands it back into the semantic object above
 before dispatching `S.SNAPSHOT`.
@@ -660,7 +660,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 28,
+  "v": 29,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
@@ -689,7 +689,7 @@ Compact numeric codes:
 
 | Vocabulary | Codes |
 |------------|-------|
-| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `city_centre`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `research_complex`, 18 `command_car`, 19 `ekat`, 20 `zamok`, 21 `tank_trap`, 22 `golem`, 23 `pump_jack` |
+| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `city_centre`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `research_complex`, 18 `command_car`, 19 `ekat`, 20 `zamok`, 21 `tank_trap`, 22 `golem`, 23 `pump_jack`, 24 `panzerfaust` |
 | `state` | 1 `idle`, 2 `move`, 3 `attack`, 4 `gather`, 5 `build`, 6 `train`, 7 `construct`, 8 `dead` |
 | `setupState` | 1 `packed`, 2 `setting_up`, 3 `deployed`, 4 `tearing_down` |
 | `orderStage` | 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`, 6 `smoke`, 7 `setupAntiTankGuns`, 8 `charge`, 9 `mortarFire`, 10 `pointFire`, 11 `breakthrough`, 12 `ekatTeleport`, 13 `ekatLineShot`, 14 `ekatMagicAnchor`, 15 `deconstruct`, 16 `ekatConsumeGolem`, 17 `blanketFire` |
@@ -697,7 +697,7 @@ Compact numeric codes:
 | `abilityObject.kind` | 1 `returnMarker`, 2 `magicAnchor`, 3 `lineProjectile` |
 | `upgrade` | 1 `methamphetamines`, 2 `anti_tank_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock` (legacy decode only), 5 `mortar_autocast`, 6 `command_car_unlock`, 7 `ballistic_tables`, 8 `entrenchment` |
 | `notice.severity` | 1 `info`, 2 `warn`, 3 `alert` |
-| `EventRecord` | `[1, from, to]` attack, `[1, from, to, reveal?, toPos?]` attack with optional shooter reveal and target position, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice, `[5, [fromX, fromY], [toX, toY], delayTicks]` smoke launch, `[6, x, y, radiusTiles]` mortar impact/marker, `[6, x, y, radiusTiles, from?, reveal?]` mortar impact with optional shooter reveal, `[7, from, [x, y], radiusTiles, delayTicks]` artillery target marker, `[8, x, y, radiusTiles]` artillery impact, `[9, from, [fromX, fromY], [toX, toY], radiusTiles, delayTicks]` mortar launch, `[10, to]` overpenetration damage, `[11, owner, x, y, facing]` global artillery firing minimap marker |
+| `EventRecord` | `[1, from, to]` attack, `[1, from, to, reveal?, toPos?]` attack with optional shooter reveal and target position, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice, `[5, [fromX, fromY], [toX, toY], delayTicks]` smoke launch, `[6, x, y, radiusTiles]` mortar impact/marker, `[6, x, y, radiusTiles, from?, reveal?]` mortar impact with optional shooter reveal, `[7, from, [x, y], radiusTiles, delayTicks]` artillery target marker, `[8, x, y, radiusTiles]` artillery impact, `[9, from, [fromX, fromY], [toX, toY], radiusTiles, delayTicks]` mortar launch, `[10, to]` overpenetration damage, `[11, owner, x, y, facing]` global artillery firing minimap marker, `[12, from, [fromX, fromY], [toX, toY], delayTicks]` Panzerfaust launch, `[13, x, y]` Panzerfaust impact, `[14, id, toKind]` Panzerfaust same-id conversion |
 
 #### 2.4.1 Boundary inventory
 
@@ -899,6 +899,9 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
 { e: "artilleryTarget", from: u32, x: f32, y: f32, radiusTiles: f32, delayTicks: u32 }
 { e: "artilleryFiring", owner: u32, x: f32, y: f32, facing: f32 }
 { e: "artilleryImpact", x: f32, y: f32, radiusTiles: f32 }
+{ e: "panzerfaustLaunch", from: u32, fromX: f32, fromY: f32, toX: f32, toY: f32, delayTicks: u32 }
+{ e: "panzerfaustImpact", x: f32, y: f32 }
+{ e: "panzerfaustConversion", id: u32, toKind: string }
 { e: "notice", msg: string, severity?: "info"|"warn"|"alert", x?: f32, y?: f32 }
 ```
 Notices default to `severity: "info"` with no position. `alert:`-prefixed notice ids are
@@ -964,6 +967,16 @@ recipients whose team currently sees the impact point; they do not reveal terrai
 exploration, or carry entity visibility. Artillery impact damage follows the same support-fire
 friendly-fire attribution rule as mortar splash: owned and allied entities in the radius can take
 damage, but same-team damage does not produce hostile reveal, under-attack, or score attribution.
+Panzerfaust launch events are reserved for the hidden one-shot anti-tank runtime. They carry the
+loaded unit id, launch point, intended visual endpoint, and travel delay, but never carry the target
+entity id. Launch events are sent to the firing team and to enemy recipients whose team-current fog
+can see the shooter or launch point; the endpoint must be withheld unless it is visible to that
+recipient or otherwise already safe through the recipient's projection. Panzerfaust impact events
+carry only the impact point and are sent to the firing team and to enemy recipients whose
+team-current fog can see that point; they do not imply damage, target identity, terrain reveal, or
+exploration. Panzerfaust conversion events carry only the same entity id and resulting kind, and
+must be projected only to recipients that can see that entity through ordinary snapshot visibility
+or owner/team projection on the conversion tick.
 Events are best-effort visual flavor; the client must not depend on receiving them.
 
 #### 2.5.1 Projection contract summary

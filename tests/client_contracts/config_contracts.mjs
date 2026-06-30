@@ -10,6 +10,13 @@ import {
   ARTILLERY_SHELL_DELAY_TICKS,
   MINING_CC_RANGE_TILES,
   SMOKE_ABILITY_COST,
+  METHAMPHETAMINES_PANZERFAUST_RECOVERY_TICKS,
+  METHAMPHETAMINES_PANZERFAUST_WINDUP_TICKS,
+  PANZERFAUST_DAMAGE,
+  PANZERFAUST_RANGE_TILES,
+  PANZERFAUST_RECOVERY_TICKS,
+  PANZERFAUST_TRAVEL_TICKS,
+  PANZERFAUST_WINDUP_TICKS,
   ENTRENCHMENT_AREA_DAMAGE_REDUCTION,
   ENTRENCHMENT_DIG_IN_TICKS,
   ENTRENCHMENT_DIRECT_MISS_CHANCE,
@@ -96,6 +103,8 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "FOG_EXPLORED_ALPHA",
   "FOG_UNEXPLORED_ALPHA",
   "INTERP_DELAY_MS",
+  "METHAMPHETAMINES_PANZERFAUST_RECOVERY_TICKS",
+  "METHAMPHETAMINES_PANZERFAUST_WINDUP_TICKS",
   "METHAMPHETAMINES_RESEARCH_TICKS",
   "MINING_CC_RANGE_TILES",
   "MORTAR_AUTOCAST_RESEARCH_TICKS",
@@ -104,6 +113,11 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "MORTAR_OUTER_RADIUS_TILES",
   "MORTAR_RANGE_TILES",
   "MORTAR_SHELL_DELAY_TICKS",
+  "PANZERFAUST_DAMAGE",
+  "PANZERFAUST_RANGE_TILES",
+  "PANZERFAUST_RECOVERY_TICKS",
+  "PANZERFAUST_TRAVEL_TICKS",
+  "PANZERFAUST_WINDUP_TICKS",
   "PLAYER_PALETTE",
   "RESOURCE_AMOUNTS",
   "SCOUT_CAR_BODY",
@@ -200,6 +214,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   assert(KIND_CODE[KIND.EKAT] === 19, "Ekat compact kind code should be reserved");
   assert(KIND_CODE[KIND.ZAMOK] === 20, "Zamok compact kind code should be reserved");
   assert(KIND_CODE[KIND.TANK_TRAP] === 21, "Tank Trap compact kind code should be reserved");
+  assert(KIND_CODE[KIND.PANZERFAUST] === 24, "Panzerfaust compact kind code should be reserved");
   assert(ABILITY_CODE[ABILITY.POINT_FIRE] === 4, "Point Fire compact ability code should be reserved");
   assert(ABILITY_CODE[ABILITY.BREAKTHROUGH] === 5, "Breakthrough compact ability code should be reserved");
   assert(ABILITY_CODE[ABILITY.EKAT_TELEPORT] === 6, "Ekat Teleport compact ability code should be reserved");
@@ -218,6 +233,9 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   assert(EVENT_CODE[EVENT.MORTAR_LAUNCH] === 9, "Mortar launch compact event code should be reserved");
   assert(EVENT_CODE[EVENT.OVERPENETRATION] === 10, "Overpenetration compact event code should be reserved");
   assert(EVENT_CODE[EVENT.ARTILLERY_FIRING] === 11, "Artillery firing compact event code should be reserved");
+  assert(EVENT_CODE[EVENT.PANZERFAUST_LAUNCH] === 12, "Panzerfaust launch compact event code should be reserved");
+  assert(EVENT_CODE[EVENT.PANZERFAUST_IMPACT] === 13, "Panzerfaust impact compact event code should be reserved");
+  assert(EVENT_CODE[EVENT.PANZERFAUST_CONVERSION] === 14, "Panzerfaust conversion compact event code should be reserved");
   assert(UPGRADE_CODE[UPGRADE.MORTAR_AUTOCAST] === 5, "Mortar Autocast compact upgrade code should be reserved");
   assert(UPGRADE_CODE[UPGRADE.COMMAND_CAR_UNLOCK] === 6, "Command Car unlock compact upgrade code should be reserved");
   assert(UPGRADE_CODE[UPGRADE.BALLISTIC_TABLES] === 7, "Artillery Fire Control compact upgrade code should be reserved");
@@ -239,6 +257,27 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       ABILITIES[ABILITY.BREAKTHROUGH].durationTicks === 180 &&
       ABILITIES[ABILITY.BREAKTHROUGH].cooldownTicks === 750,
     "Breakthrough ability exposes Command Car carrier, self target, radius, duration, and cooldown",
+  );
+  assert(
+    STATS[KIND.PANZERFAUST].cost.steel === 60 &&
+      STATS[KIND.PANZERFAUST].cost.oil === 15 &&
+      STATS[KIND.PANZERFAUST].supply === 1 &&
+      STATS[KIND.PANZERFAUST].sight === 8 &&
+      STATS[KIND.PANZERFAUST].size === 9 &&
+      STATS[KIND.PANZERFAUST].rangeTiles === PANZERFAUST_RANGE_TILES &&
+      STATS[KIND.PANZERFAUST].buildTicks === 400 &&
+      PANZERFAUST_RANGE_TILES === 3 &&
+      PANZERFAUST_DAMAGE === 60 &&
+      PANZERFAUST_WINDUP_TICKS === 15 &&
+      PANZERFAUST_TRAVEL_TICKS === 15 &&
+      PANZERFAUST_RECOVERY_TICKS === 15 &&
+      METHAMPHETAMINES_PANZERFAUST_WINDUP_TICKS === 12 &&
+      METHAMPHETAMINES_PANZERFAUST_RECOVERY_TICKS === 12,
+    "Panzerfaust hidden stats and one-shot timing mirror server",
+  );
+  assert(
+    !STATS[KIND.BARRACKS].trains.includes(KIND.PANZERFAUST),
+    "Barracks command card should not expose Panzerfaust until production exposure",
   );
   assert(
     STATS[KIND.ARTILLERY].cost.steel === 300 &&

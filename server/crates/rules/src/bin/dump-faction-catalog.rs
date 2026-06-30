@@ -353,6 +353,34 @@ fn print_client_constants(indent: &str) {
         balance::TICK_HZ * 2
     );
     println!(
+        "{indent}    \"panzerfaustRangeTiles\": {},",
+        balance::PANZERFAUST_RANGE_TILES
+    );
+    println!(
+        "{indent}    \"panzerfaustDamage\": {},",
+        balance::PANZERFAUST_DAMAGE
+    );
+    println!(
+        "{indent}    \"panzerfaustWindupTicks\": {},",
+        balance::PANZERFAUST_WINDUP_TICKS
+    );
+    println!(
+        "{indent}    \"panzerfaustTravelTicks\": {},",
+        balance::PANZERFAUST_TRAVEL_TICKS
+    );
+    println!(
+        "{indent}    \"panzerfaustRecoveryTicks\": {},",
+        balance::PANZERFAUST_RECOVERY_TICKS
+    );
+    println!(
+        "{indent}    \"methamphetaminesPanzerfaustWindupTicks\": {},",
+        balance::METHAMPHETAMINES_PANZERFAUST_WINDUP_TICKS
+    );
+    println!(
+        "{indent}    \"methamphetaminesPanzerfaustRecoveryTicks\": {},",
+        balance::METHAMPHETAMINES_PANZERFAUST_RECOVERY_TICKS
+    );
+    println!(
         "{indent}    \"entrenchmentDigInTicks\": {},",
         balance::ENTRENCHMENT_DIG_IN_TICKS
     );

@@ -972,6 +972,36 @@ impl Serialize for CompactEvent<'_> {
                 seq.serialize_element(radius_tiles)?;
                 seq.end()
             }
+            Event::PanzerfaustLaunch {
+                from,
+                from_x,
+                from_y,
+                to_x,
+                to_y,
+                delay_ticks,
+            } => {
+                let mut seq = serializer.serialize_seq(Some(5))?;
+                seq.serialize_element(&event_code("panzerfaustLaunch"))?;
+                seq.serialize_element(from)?;
+                seq.serialize_element(&[from_x, from_y])?;
+                seq.serialize_element(&[to_x, to_y])?;
+                seq.serialize_element(delay_ticks)?;
+                seq.end()
+            }
+            Event::PanzerfaustImpact { x, y } => {
+                let mut seq = serializer.serialize_seq(Some(3))?;
+                seq.serialize_element(&event_code("panzerfaustImpact"))?;
+                seq.serialize_element(x)?;
+                seq.serialize_element(y)?;
+                seq.end()
+            }
+            Event::PanzerfaustConversion { id, to_kind } => {
+                let mut seq = serializer.serialize_seq(Some(3))?;
+                seq.serialize_element(&event_code("panzerfaustConversion"))?;
+                seq.serialize_element(id)?;
+                seq.serialize_element(&kind_code(to_kind))?;
+                seq.end()
+            }
             Event::Notice {
                 msg,
                 x,

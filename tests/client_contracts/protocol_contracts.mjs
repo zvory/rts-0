@@ -188,6 +188,9 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
       [EVENT_CODE[EVENT.ARTILLERY_TARGET], 10, [320, 352], 3, ARTILLERY_SHELL_DELAY_TICKS],
       [EVENT_CODE[EVENT.ARTILLERY_FIRING], 1, 288, 304, 0.25],
       [EVENT_CODE[EVENT.ARTILLERY_IMPACT], 336, 368, 3],
+      [EVENT_CODE[EVENT.PANZERFAUST_LAUNCH], 11, [360, 384], [416, 384], 15],
+      [EVENT_CODE[EVENT.PANZERFAUST_IMPACT], 416, 384],
+      [EVENT_CODE[EVENT.PANZERFAUST_CONVERSION], 11, KIND_CODE[KIND.RIFLEMAN]],
     ],
   });
 
@@ -324,6 +327,26 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
       decoded.events[9].x === 336 &&
       decoded.events[9].y === 368,
     "artillery impact event decodes",
+  );
+  assert(
+    decoded.events[10].e === EVENT.PANZERFAUST_LAUNCH &&
+      decoded.events[10].from === 11 &&
+      decoded.events[10].fromX === 360 &&
+      decoded.events[10].toX === 416 &&
+      decoded.events[10].delayTicks === 15,
+    "panzerfaust launch event decodes without target id",
+  );
+  assert(
+    decoded.events[11].e === EVENT.PANZERFAUST_IMPACT &&
+      decoded.events[11].x === 416 &&
+      decoded.events[11].y === 384,
+    "panzerfaust impact event decodes",
+  );
+  assert(
+    decoded.events[12].e === EVENT.PANZERFAUST_CONVERSION &&
+      decoded.events[12].id === 11 &&
+      decoded.events[12].toKind === KIND.RIFLEMAN,
+    "panzerfaust same-id conversion event decodes",
   );
 
   const abilityCommand = cmd.useAbility(ABILITY.SMOKE, [7, 8], 320, 384, true);

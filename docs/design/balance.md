@@ -179,6 +179,9 @@ Core unit roles:
 - **Tank** is the machine-gun breaker and open-ground power unit: immune to rifle and
   machine-gun small-arms fire, strong against static defenses and exposed infantry, but
   vulnerable to other tanks and anti-tank infantry.
+- **Panzerfaust** is reserved hidden vocabulary for a Training Centre-unlocked infantry
+  anti-tank ambusher. It has rules metadata and protocol ids in this phase but is not in any
+  current faction catalog, command card, lab spawn catalog, or AI build plan yet.
 - **Anti-tank gun team** is the ambush counter to tanks: it can fight while packed at short
   range with reduced damage, or manually set up into a longer-ranged fixed field of fire.
   Deployed guns are dangerous from the side or rear, but weak or inefficient against regular
@@ -280,6 +283,16 @@ folded into default targeting.
 - anti-tank guns use `ANTI_TANK_GUN_PACKED_RANGE_TILES = 5`, `ANTI_TANK_GUN_DEPLOYED_RANGE_TILES = 20`,
   `ANTI_TANK_GUN_PACKED_DAMAGE_MULTIPLIER = 0.75`, and
   `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = 35 degrees total`.
+- Panzerfaust hidden constants reserve a 3-tile, Tank-only, one-shot loaded weapon with
+  `PANZERFAUST_DAMAGE = 60`, `PANZERFAUST_WINDUP_TICKS = 15`,
+  `PANZERFAUST_TRAVEL_TICKS = 15`, and `PANZERFAUST_RECOVERY_TICKS = 15`.
+  Methamphetamines reduces the windup and recovery constants to 12 ticks each; travel stays
+  15 ticks. The `panzerfaust` unit definition carries 45 HP, 8-tile sight, 9 px radius,
+  1.44 px/tick loaded speed, 60 steel / 15 oil cost, 1 supply, and 400 build ticks, but keeps
+  default damage and cooldown at zero so no repeat-fire default attack path exists before the
+  dedicated one-shot runtime phase. Its future Barracks/Training Centre production metadata is
+  reserved on the hidden unit definition, but it is omitted from active Barracks train lists until
+  the production exposure phase.
 - Tank hull-facing damage modifiers for tank and anti-tank gun hits are 1.0x front, 1.5x side,
   and 1.7x rear.
 - Artillery uses `ARTILLERY_MIN_RANGE_TILES = 25`, `ARTILLERY_MAX_RANGE_TILES = 55`,
@@ -322,8 +335,8 @@ folded into default targeting.
   player's Machine Gunners from 1.28 px/tick to unupgraded Rifleman speed (1.6 px/tick) and halves
   their setup and teardown timers from 30 ticks to 15.
 - **Entrenchment** (Training Centre research, protocol id `entrenchment`): costs 100 steel / 0 oil
-  and takes 300 ticks (~10s). The rules surface defines Riflemen, Machine Gunners, and Workers as
-  eligible entrenchment infantry; Mortar Teams, Ekat, Golems, Ekat-faction units, vehicles,
+  and takes 300 ticks (~10s). The rules surface defines Riflemen, Machine Gunners, Panzerfausts,
+  and Workers as eligible entrenchment infantry; Mortar Teams, Ekat, Golems, Ekat-faction units, vehicles,
   buildings, support weapons other than Machine Gunners, and non-infantry entities are excluded.
   Eligible infantry owned by a player with completed Entrenchment create neutral trenches after
   holding ground on untrenched terrain for 90 ticks (~3s), and any eligible infantry can occupy an
@@ -457,6 +470,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | golem           | 160 | 16  | 1     | 24 | 2.0   | 7     | 0   | 0   | 4   | 396 (~13.2s); provisional free Ekat worker-like economy body trained at Zamok; mines at 4x worker load; can be consumed by Ekat for full heal |
 | rifleman        | 45  | 5   | 4     | 16 | 1.6   | 8     | 50  | 0   | 1   | 300 (~10s) |
 | machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 8     | 75  | 10  | 2   | 400 (~13s) |
+| panzerfaust     | 45  | 60 one-shot AP (default attack disabled) | 3 | 15 windup / 15 travel / 15 recovery | 1.44 | 8 | 60 | 15 | 1 | 400 (~13s); hidden vocabulary only until production exposure; trained at Barracks after Training Centre once exposed |
 | mortar_team     | 75  | 40 outer / 100 inner AOE | 20 | 60 | 1.6 | 7 | 100 | 50 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
 | anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 72 | 1.6 | 6     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and Heavy Guns (`anti_tank_gun_unlock`) researched in R&D Complex |
 | artillery       | 150 | 150 AP inner / 150-10 outer AOE | 25-55 artillery fire | 90 | 1.3 | 4 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind) and Heavy Guns (`anti_tank_gun_unlock`) researched in R&D Complex; tank-sized footprint |

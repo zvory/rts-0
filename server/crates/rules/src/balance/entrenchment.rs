@@ -13,7 +13,10 @@ pub const ENTRENCHMENT_TRENCH_RADIUS_TILES: f32 = 0.75;
 pub fn is_entrenchment_eligible_infantry(kind: EntityKind) -> bool {
     matches!(
         kind,
-        EntityKind::Rifleman | EntityKind::MachineGunner | EntityKind::Worker
+        EntityKind::Rifleman
+            | EntityKind::MachineGunner
+            | EntityKind::Panzerfaust
+            | EntityKind::Worker
     )
 }
 
@@ -26,6 +29,7 @@ mod tests {
         let eligible = [
             EntityKind::Rifleman,
             EntityKind::MachineGunner,
+            EntityKind::Panzerfaust,
             EntityKind::Worker,
         ];
         for kind in EntityKind::ALL {

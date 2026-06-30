@@ -1599,6 +1599,19 @@ mod tests {
                     y: 368.0,
                     radius_tiles: 3.0,
                 },
+                Event::PanzerfaustLaunch {
+                    from: 11,
+                    from_x: 360.0,
+                    from_y: 384.0,
+                    to_x: 416.0,
+                    to_y: 384.0,
+                    delay_ticks: 15,
+                },
+                Event::PanzerfaustImpact { x: 416.0, y: 384.0 },
+                Event::PanzerfaustConversion {
+                    id: 11,
+                    to_kind: kinds::RIFLEMAN.to_string(),
+                },
             ],
             upgrades: vec![upgrades::ARTILLERY_UNLOCK.to_string()],
             player_resources: Vec::new(),
@@ -1707,7 +1720,7 @@ mod tests {
             serde_json::json!([[99, 2, 7, 640.0, 672.0, [[20, 21], [21, 21]], 39]])
         );
         assert_eq!(value["u"], serde_json::json!([4]));
-        assert_eq!(value["ev"].as_array().unwrap().len(), 9);
+        assert_eq!(value["ev"].as_array().unwrap().len(), 12);
         assert_eq!(
             value["n"],
             serde_json::json!([4, 17, 2, 2, 3, PREDICTION_PROTOCOL_VERSION, 8, 42])
@@ -1731,6 +1744,12 @@ mod tests {
             serde_json::json!([11, 1, 288.0, 304.0, 0.25])
         );
         assert_eq!(value["ev"][8], serde_json::json!([8, 336.0, 368.0, 3.0]));
+        assert_eq!(
+            value["ev"][9],
+            serde_json::json!([12, 11, [360.0, 384.0], [416.0, 384.0], 15])
+        );
+        assert_eq!(value["ev"][10], serde_json::json!([13, 416.0, 384.0]));
+        assert_eq!(value["ev"][11], serde_json::json!([14, 11, 2]));
     }
 
     #[test]
@@ -1798,7 +1817,7 @@ mod tests {
         assert_eq!(section("visibility").count, 4);
         assert!(section("visibility").bytes > 0);
         assert_eq!(section("resourceDeltas").count, 1);
-        assert_eq!(section("events").count, 9);
+        assert_eq!(section("events").count, 12);
         assert_eq!(section("smokes").count, 1);
         assert_eq!(section("abilityObjects").count, 1);
         assert_eq!(section("trenches").count, 1);
