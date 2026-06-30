@@ -25,6 +25,8 @@ anti-armor weapon, while the coax is a secondary opportunistic small-arms weapon
 - Coax damage attribution still belongs to the firing Tank's owner for damage alerts, scoring,
   reveal, and AI damage-memory purposes.
 - The coax has its own cooldown independent of the main cannon cooldown.
+- Coax shots should overpenetrate using the same direct-fire overpenetration system as current
+  direct shots, but with coax small-arms damage and coax weapon identity.
 - Main cannon firing, cooldown, target selection, turret rotation, stationary range ramp, and
   overpenetration behavior should continue to work as they do today unless an implementation issue
   requires an explicitly reviewed change.
@@ -103,6 +105,7 @@ Focused verification for an implementation should cover:
 - The coax fires at fallback targets when no infantry-priority target is in arc.
 - The coax does not fire at targets outside the 10-degree arc or outside 6-tile range.
 - The coax cooldown is independent from the main cannon cooldown.
+- Coax overpenetration applies with small-arms damage and does not trigger cannon-scale feedback.
 - Coax attack events produce machine-gun audio and small-barrel visual feedback.
 - Existing tank cannon targeting, cooldown, turret alignment, stationary range ramp, and cannon
   audio/visual behavior continue to pass focused regression tests.
