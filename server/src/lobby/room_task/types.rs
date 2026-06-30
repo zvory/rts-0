@@ -110,4 +110,5 @@ pub(in crate::lobby) enum DevScenarioId {
     TankTrapLineVertical,
     TankTrapLineDiagonal,
     TankTrapPathingMatrix,
+    EntrenchmentInspection,
 }

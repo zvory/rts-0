@@ -604,6 +604,13 @@ post-formula damage to actively entrenched eligible infantry. Direct-fire over-p
 an entrenched primary victim, and actively entrenched secondary candidates are skipped rather than
 taking over-penetration damage or emitting secondary hit feedback.
 
+The `entrenchment_inspection` dev-watch scenario seeds a two-player inspection map with researched
+Entrenchment for player 1, a dig-capable Rifleman, friendly and enemy eligible reuse units, a
+Machine Gunner for crowded slotting checks, and several neutral trenches including a nearby
+connected pair. Its script driver does not issue movement commands after setup, so humans can pause,
+step, and manually inspect trench rendering, reuse, fog-memory behavior, and occupied-unit
+projection from the initial state.
+
 Per-caster recast state is exposed to the owner through `EntityView.abilities`: active return marker
 id, availability tick, and remaining lifetime are projected only for the owning player's command
 card. Ekat's `ekatTeleport` world-point activation is a dash: it validates static standability,

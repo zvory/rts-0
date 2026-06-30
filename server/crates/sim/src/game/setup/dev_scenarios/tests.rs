@@ -319,11 +319,42 @@ fn dev_scenarios_default_to_kriegsia_start_faction() {
             1,
             0x5150_030d,
         ),
+        Game::new_entrenchment_inspection_scenario(EntityKind::Rifleman, 1, 0x5150_030d),
     ];
 
     for setup in scenarios {
         assert_dev_scenario_starts_as_kriegsia(&setup.expect("scenario setup should succeed"));
     }
+}
+
+#[test]
+fn entrenchment_inspection_scenario_seeds_research_trenches_and_reuse_units() {
+    let setup = Game::new_entrenchment_inspection_scenario(EntityKind::Rifleman, 1, 0x5150_0505)
+        .expect("entrenchment inspection scenario setup should succeed");
+    assert_eq!(setup.issue_after_ticks, u32::MAX);
+    assert_eq!(setup.units.len(), 4);
+    assert_eq!(
+        owned_kind_count(&setup.game, 1, EntityKind::TrainingCentre),
+        1
+    );
+    assert_eq!(owned_kind_count(&setup.game, 1, EntityKind::Rifleman), 1);
+    assert_eq!(owned_kind_count(&setup.game, 1, EntityKind::Worker), 1);
+    assert_eq!(
+        owned_kind_count(&setup.game, 1, EntityKind::MachineGunner),
+        1
+    );
+    assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::Rifleman), 1);
+    assert_eq!(setup.game.trenches.all().len(), 3);
+    assert!(setup
+        .game
+        .players
+        .iter()
+        .find(|player| player.id == 1)
+        .expect("scenario player should exist")
+        .upgrades
+        .contains(&upgrade::UpgradeKind::Entrenchment));
+    assert!(!setup.game.snapshot_full_for(1).trenches.is_empty());
+    assert_dev_scenario_starts_as_kriegsia(&setup);
 }
 
 #[test]
@@ -383,12 +414,7 @@ fn tank_trap_pathing_scenarios_spawn_prebuilt_walls_and_expected_units() {
             7usize,
             7usize,
         ),
-        (
-            "enemy_vehicle_breach",
-            EntityKind::Tank,
-            7usize,
-            8usize,
-        ),
+        ("enemy_vehicle_breach", EntityKind::Tank, 7usize, 8usize),
         (
             "infantry_pass_through",
             EntityKind::MachineGunner,
@@ -513,13 +539,9 @@ fn tank_trap_infantry_move_orders_cross_enemy_wall_without_auto_attacks() {
         EntityKind::Rifleman,
         EntityKind::MachineGunner,
     ] {
-        let setup = Game::new_tank_trap_pathing_scenario(
-            "infantry_pass_through",
-            unit,
-            1,
-            0x5150_0104,
-        )
-        .expect("scenario setup should succeed");
+        let setup =
+            Game::new_tank_trap_pathing_scenario("infantry_pass_through", unit, 1, 0x5150_0104)
+                .expect("scenario setup should succeed");
         let mut game = setup.game;
         let unit_id = setup.units[0];
         let wall_x = game
@@ -560,7 +582,10 @@ fn tank_trap_infantry_move_orders_cross_enemy_wall_without_auto_attacks() {
             "{unit} should cross the enemy Tank Trap wall on a normal move order"
         );
         assert_eq!(entity.target_id(), None);
-        assert!(!emitted_attack, "{unit} should not attack traps while moving");
+        assert!(
+            !emitted_attack,
+            "{unit} should not attack traps while moving"
+        );
     }
 }
 
@@ -603,7 +628,10 @@ fn tank_trap_explicit_rifleman_attack_order_remains_valid() {
         }
     }
 
-    let entity = game.entities.get(rifleman).expect("rifleman should survive");
+    let entity = game
+        .entities
+        .get(rifleman)
+        .expect("rifleman should survive");
     assert_eq!(entity.order().attack_target(), Some(trap));
     assert_eq!(entity.target_id(), Some(trap));
     assert!(

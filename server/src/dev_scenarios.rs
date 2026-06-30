@@ -675,7 +675,15 @@ const TANK_TRAP_PATHING_MATRIX_LAUNCHES: [DevScenarioLaunch; 11] = [
     },
 ];
 
-const DEV_SCENARIOS: [DevScenarioSpec; 10] = [
+const ENTRENCHMENT_INSPECTION_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
+    id: "entrenchment_inspection",
+    unit: EntityKind::Rifleman,
+    count: 1,
+    blocker: None,
+    case: None,
+}];
+
+const DEV_SCENARIOS: [DevScenarioSpec; 11] = [
     DevScenarioSpec {
         id: "scout_car_snaking_corridor",
         title: "Scout Car Snaking Corridor",
@@ -736,6 +744,12 @@ const DEV_SCENARIOS: [DevScenarioSpec; 10] = [
         title: "Tank Trap Pathing Matrix",
         description: "Prebuilt Tank Trap walls with selectable owner/pathing and attack cases.",
         launches: &TANK_TRAP_PATHING_MATRIX_LAUNCHES,
+    },
+    DevScenarioSpec {
+        id: "entrenchment_inspection",
+        title: "Entrenchment Inspection",
+        description: "Seeded neutral trenches, eligible infantry, and researched dig-in units for checking trench rendering, reuse, and crowded slotting.",
+        launches: &ENTRENCHMENT_INSPECTION_LAUNCHES,
     },
 ];
 
@@ -1073,6 +1087,16 @@ mod tests {
             })
         );
         assert_eq!(
+            parse_dev_scenario_room("entrenchment_inspection:unit=rifleman:count=1"),
+            Some(DevScenarioLaunch {
+                id: "entrenchment_inspection",
+                unit: EntityKind::Rifleman,
+                count: 1,
+                blocker: None,
+                case: None,
+            })
+        );
+        assert_eq!(
             parse_dev_scenario_launch(
                 "vehicle_small_block_baseline",
                 "scout_car",
@@ -1193,6 +1217,14 @@ mod tests {
         );
         assert_eq!(
             parse_dev_scenario_launch("tank_trap_pathing_matrix", "tank", "1", None),
+            None
+        );
+        assert_eq!(
+            parse_dev_scenario_launch("entrenchment_inspection", "worker", "1", None),
+            None
+        );
+        assert_eq!(
+            parse_dev_scenario_launch("entrenchment_inspection", "rifleman", "2", None),
             None
         );
         assert_eq!(

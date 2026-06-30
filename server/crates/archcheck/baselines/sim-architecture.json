@@ -1,5 +1,5 @@
 {
-  "reason": "track entrenchment trench lifecycle service",
+  "reason": "Entrenchment phase 5 adds a dedicated dev inspection scenario for trench rendering verification.",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -351,7 +351,7 @@
     },
     {
       "path": "setup/dev_scenarios.rs",
-      "lines": 491
+      "lines": 619
     },
     {
       "path": "setup/dev_scenarios/layouts.rs",

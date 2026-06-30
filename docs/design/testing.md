@@ -123,6 +123,8 @@ Current scenario ids:
 - `tank_trap_pathing_matrix` — one dropdown-backed matrix scenario with selectable cases:
   `friendly_vehicle_reroute`, `enemy_vehicle_breach`, `infantry_pass_through`, and
   `explicit_infantry_attack`.
+- `entrenchment_inspection` — seeded neutral trenches, researched friendly infantry, friendly and
+  enemy eligible trench reusers, and a Machine Gunner for crowded slotting/rendering checks.
 
 The watcher shows movement debug path overlays by default. Replay speed controls are reused for
 dev scenarios: `Pause` sets the simulation speed to zero, and `Step` advances exactly one

@@ -298,13 +298,25 @@ impl Game {
             tank_trap_line_build_map(layout, vehicle);
         let mut entities = EntityStore::new();
         entities
-            .spawn_building(1, EntityKind::TrainingCentre, training_pos.0, training_pos.1, true)
+            .spawn_building(
+                1,
+                EntityKind::TrainingCentre,
+                training_pos.0,
+                training_pos.1,
+                true,
+            )
             .ok_or_else(|| "failed to spawn Training Centre".to_string())?;
         spawn_tank_trap_line_workers(&mut entities, worker_starts)?;
         let units = spawn_tank_trap_line_test_units(&mut entities, vehicle, unit_starts)?;
         let player_id = 1;
-        let mut game =
-            build_dev_scenario_game(map, entities, player_id, start_tile, seed, layout.scenario_id());
+        let mut game = build_dev_scenario_game(
+            map,
+            entities,
+            player_id,
+            start_tile,
+            seed,
+            layout.scenario_id(),
+        );
         if let Some(player) = game.players.iter_mut().find(|p| p.id == player_id) {
             player.refund_resources(1_000, 0);
             let _ = player.spend_resources(0, 9_000);
@@ -395,6 +407,117 @@ impl Game {
             issue_after_ticks: config::TICK_HZ,
         })
     }
+
+    pub fn new_entrenchment_inspection_scenario(
+        unit: EntityKind,
+        unit_count: usize,
+        seed: u32,
+    ) -> Result<DevScenarioSetup, String> {
+        if unit != EntityKind::Rifleman {
+            return Err(format!("unsupported entrenchment inspection unit {unit}"));
+        }
+        if unit_count != 1 {
+            return Err(format!(
+                "unsupported entrenchment inspection unit count {unit_count}"
+            ));
+        }
+
+        let mut map = flat_dev_map(2);
+        let center = (map.size / 2, map.size / 2);
+        if let Some(slot) = map.starts.get_mut(0) {
+            *slot = (center.0 - 8, center.1 + 8);
+        }
+        if let Some(slot) = map.starts.get_mut(1) {
+            *slot = (center.0 + 12, center.1 - 8);
+        }
+
+        let ts = config::TILE_SIZE as f32;
+        let preseeded_trench = map.tile_center(center.0, center.1);
+        let connected_trench = (preseeded_trench.0 + ts * 1.25, preseeded_trench.1);
+        let fog_reference_trench = map.tile_center(center.0 + 16, center.1 - 10);
+        let dig_start = map.tile_center(center.0 - 7, center.1 - 4);
+        let reuse_start = (preseeded_trench.0 - ts * 0.42, preseeded_trench.1);
+        let crowd_start = (
+            connected_trench.0 + ts * 0.64,
+            connected_trench.1 + ts * 0.1,
+        );
+        let enemy_reuse_start = (
+            preseeded_trench.0 + ts * 0.35,
+            preseeded_trench.1 + ts * 0.25,
+        );
+        let training_pos = services::occupancy::footprint_center(
+            &map,
+            EntityKind::TrainingCentre,
+            center.0 - 12,
+            center.1 + 7,
+        );
+
+        let mut entities = EntityStore::new();
+        entities
+            .spawn_building(
+                1,
+                EntityKind::TrainingCentre,
+                training_pos.0,
+                training_pos.1,
+                true,
+            )
+            .ok_or_else(|| "failed to spawn entrenchment Training Centre".to_string())?;
+        let digger = entities
+            .spawn_unit(1, EntityKind::Rifleman, dig_start.0, dig_start.1)
+            .ok_or_else(|| "failed to spawn entrenchment digger".to_string())?;
+        let reuse_worker = entities
+            .spawn_unit(1, EntityKind::Worker, reuse_start.0, reuse_start.1)
+            .ok_or_else(|| "failed to spawn entrenchment reuse worker".to_string())?;
+        let crowded_machine_gunner = entities
+            .spawn_unit(1, EntityKind::MachineGunner, crowd_start.0, crowd_start.1)
+            .ok_or_else(|| "failed to spawn entrenchment crowded machine gunner".to_string())?;
+        let enemy_reuser = entities
+            .spawn_unit(
+                2,
+                EntityKind::Rifleman,
+                enemy_reuse_start.0,
+                enemy_reuse_start.1,
+            )
+            .ok_or_else(|| "failed to spawn enemy trench reuser".to_string())?;
+
+        let player_id = 1;
+        let mut game = build_dev_scenario_game_with_teams(
+            map,
+            entities,
+            [(1, 1), (2, 2)],
+            player_id,
+            (center.0 - 8, center.1 + 8),
+            seed,
+            "dev:entrenchment_inspection",
+        );
+        if let Some(player) = game.players.iter_mut().find(|p| p.id == player_id) {
+            player.upgrades.insert(upgrade::UpgradeKind::Entrenchment);
+            player.refund_resources(1_000, 1_000);
+        }
+        if let Some(loadout) = game
+            .starting_loadouts
+            .iter_mut()
+            .find(|loadout| loadout.player_id == player_id)
+        {
+            loadout.starting_steel = 1_000;
+            loadout.starting_oil = 1_000;
+        }
+        for (x, y) in [preseeded_trench, connected_trench, fog_reference_trench] {
+            game.trenches
+                .create(&game.map, x, y)
+                .ok_or_else(|| "failed to seed entrenchment trench".to_string())?;
+        }
+        let player_ids: Vec<u32> = game.players.iter().map(|player| player.id).collect();
+        game.refresh_trench_memory(&player_ids);
+
+        Ok(DevScenarioSetup {
+            game,
+            player_id,
+            units: vec![digger, reuse_worker, crowded_machine_gunner, enemy_reuser],
+            goal: dig_start,
+            issue_after_ticks: u32::MAX,
+        })
+    }
 }
 
 pub struct DevScenarioSetup {
@@ -474,7 +597,11 @@ fn build_dev_scenario_game_with_teams<const N: usize>(
     game.active_construction_sites.clear();
     game.starting_loadout = StartingLoadout::Standard;
     game.rng = rng;
-    if let Some(player) = game.players.iter_mut().find(|player| player.id == player_id) {
+    if let Some(player) = game
+        .players
+        .iter_mut()
+        .find(|player| player.id == player_id)
+    {
         player.reset_for_dev_scenario(start_tile);
     }
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();

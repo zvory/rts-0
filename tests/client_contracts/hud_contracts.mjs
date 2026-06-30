@@ -19,6 +19,7 @@ import {
   selectionBudgetBlockShape,
   selectionBudgetGridModel,
 } from "../../client/src/hud.js";
+import { entrenchmentSelectionStatus } from "../../client/src/hud_selection_panel.js";
 import {
   buildCommandCardContextCatalog,
   buildCommandCardDescriptors,
@@ -253,6 +254,70 @@ function fakeHudRootWithoutResourceSpans() {
     hud._renderSelectedPanel();
     assert(panel.children[0] !== stableNode, "HUD selected detail updates when displayed health changes");
     assert(panel.children[0].innerHTML.includes("40 / 100"), "HUD selected detail renders changed health after dirty guard");
+  });
+
+  {
+    const ownResearchState = {
+      playerId: 1,
+      upgrades: [UPGRADE.ENTRENCHMENT],
+      isOwnOwner(owner) {
+        return owner === 1;
+      },
+    };
+    const ownStatus = entrenchmentSelectionStatus(
+      { id: 2300, owner: 1, kind: KIND.RIFLEMAN },
+      ownResearchState,
+    );
+    const occupiedStatus = entrenchmentSelectionStatus(
+      { id: 2301, owner: 2, kind: KIND.MACHINE_GUNNER, occupiedTrenchId: 81 },
+      { playerId: 1, upgrades: [] },
+    );
+    const unsupportedStatus = entrenchmentSelectionStatus(
+      { id: 2302, owner: 1, kind: KIND.TANK },
+      ownResearchState,
+    );
+    assert(ownStatus?.value === "Hold still 3s to dig", "HUD status explains researched dig-in availability");
+    assert(
+      occupiedStatus?.value.includes("+1 range") &&
+        occupiedStatus.value.includes("70% miss") &&
+        occupiedStatus.value.includes("-70% blast"),
+      "HUD status summarizes occupied-trench combat benefits",
+    );
+    assert(unsupportedStatus === null, "HUD status omits excluded units");
+  }
+
+  withFakeHudDocument(({ FakeElement }) => {
+    const panel = new FakeElement("section");
+    const root = {
+      querySelector(selector) {
+        return selector === "#selected-panel" ? panel : null;
+      },
+    };
+    const selected = { id: 2303, owner: 1, kind: KIND.RIFLEMAN, hp: 40, maxHp: 40 };
+    const state = {
+      playerId: 1,
+      upgrades: [],
+      selectionBudgetOverflow: null,
+      selectedEntities() {
+        return [selected];
+      },
+      isOwnOwner(owner) {
+        return owner === 1;
+      },
+    };
+    const hud = new HUD(root, state, {}, null);
+    hud._renderSelectedPanel();
+    assert(panel.children[0].innerHTML.includes("Can use existing trenches"), "HUD shows neutral trench reuse before research");
+    const reuseNode = panel.children[0];
+
+    state.upgrades = [UPGRADE.ENTRENCHMENT];
+    hud._renderSelectedPanel();
+    assert(panel.children[0] !== reuseNode, "HUD selected detail refreshes when Entrenchment research completes");
+    assert(panel.children[0].innerHTML.includes("Hold still 3s to dig"), "HUD shows dig-in text after research");
+
+    selected.occupiedTrenchId = 82;
+    hud._renderSelectedPanel();
+    assert(panel.children[0].innerHTML.includes("Occupied: +1 range"), "HUD shows occupied trench benefits from server state");
   });
 
   withFakeHudDocument(({ FakeElement }) => {

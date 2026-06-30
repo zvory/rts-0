@@ -4,7 +4,7 @@
 // positioned/scaled from the Camera each frame, plus a screen-space overlay layer
 // for the drag selection box. Layers are drawn back-to-front in this order:
 //
-//   terrain → decals → resources → building-shadows → buildings → building-overlays
+//   terrain → decals → trenches → resources → building-shadows → buildings → building-overlays
 //   → unit-shadows → units → selection-rings → hp-bars → fog → shot-reveals
 //   → feedback → placement-ghost → drag-box
 //
@@ -58,6 +58,7 @@ import { _drawFog, _fogLevel } from "./fog.js";
 import { buildRendererFeedbackView } from "./feedback_view_model.js";
 import { LAYERS, _sweep } from "./layers.js";
 import { GroundDecalLayer, _drawGroundDecals, _initGroundDecalsForMap } from "./decals.js";
+import { _drawTrenches } from "./trenches.js";
 import { createLiveRigDefinitions } from "./rigs/live_routing.js";
 import { createBuildingRigDefinitions } from "./rigs/building_routing.js";
 import { _drawResource } from "./resources.js";
@@ -130,6 +131,8 @@ export class Renderer {
     this.layers.smokes.addChild(this._smokeGfx);
     this._abilityObjectGfx = new PIXI.Graphics();
     this.layers.smokes.addChild(this._abilityObjectGfx);
+    this._trenchGfx = new PIXI.Graphics();
+    this.layers.trenches.addChild(this._trenchGfx);
     this._lineProjectileTrails = new Map();
     this._placementGfx = new PIXI.Graphics();
     this.layers.placement.addChild(this._placementGfx);
@@ -262,6 +265,9 @@ export class Renderer {
     );
     time("renderer.groundDecals", () => {
       this._drawSafely("groundDecals", () => this._drawGroundDecals(state));
+    });
+    time("renderer.trenches", () => {
+      this._drawSafely("trenches", () => this._drawTrenches(state));
     });
 
     // Nodes currently being mined: any worker latched to them. Used by
@@ -635,6 +641,13 @@ export class Renderer {
     this._feedbackGfx.destroy();
     this._smokeGfx.destroy();
     this._abilityObjectGfx.destroy();
+    if (this._trenchGfx) {
+      if (this._trenchGfx.parent && typeof this._trenchGfx.parent.removeChild === "function") {
+        this._trenchGfx.parent.removeChild(this._trenchGfx);
+      }
+      this._trenchGfx.destroy();
+      this._trenchGfx = null;
+    }
     this._placementGfx.destroy();
     this._dragGfx.destroy();
     this._groundDecals?.destroy();
@@ -658,6 +671,7 @@ Object.assign(Renderer.prototype, {
   buildStaticMap,
   _initGroundDecalsForMap,
   _drawGroundDecals,
+  _drawTrenches,
   _ownerColors,
   _tintFor,
   _deployedWeaponSetupVisual,

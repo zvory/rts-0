@@ -2855,9 +2855,18 @@ input[type="text"]:focus {
   color: var(--ink-dim);
   font-variant-numeric: tabular-nums;
 }
+#selected-panel .sel-trench-status {
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
 #selected-panel .sel-stat strong {
   color: var(--supply);
   font-weight: 700;
+}
+#selected-panel .sel-trench-status strong {
+  color: #d8b276;
+  text-align: right;
+  white-space: normal;
 }
 /* HP read-out / bar inside the selected panel. */
 #selected-panel .sel-hp {
