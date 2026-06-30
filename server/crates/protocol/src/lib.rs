@@ -1981,7 +1981,13 @@ mod tests {
         let SnapshotFrame::Binary(bytes) = frame else {
             panic!("default snapshot codec must be binary");
         };
+        let SnapshotFrame::Binary(plain_bytes) =
+            encode_snapshot_frame(&snapshot, default_snapshot_codec()).unwrap()
+        else {
+            panic!("default snapshot codec must be binary");
+        };
 
+        assert_eq!(bytes, plain_bytes);
         assert_eq!(diagnostics.bytes, bytes.len() as u32);
         let section = |name: &str| {
             diagnostics

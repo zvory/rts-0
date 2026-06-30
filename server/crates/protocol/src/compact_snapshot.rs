@@ -27,7 +27,7 @@ pub(crate) fn serialize_compact_snapshot_with_diagnostics(
 ) -> Result<(String, SnapshotPayloadDiagnostics), SnapshotEncodeError> {
     let compact = compact_snapshot_value(snapshot)?;
     let text = serde_json::to_string(&compact)?;
-    let diagnostics = payload_diagnostics(snapshot, &compact, text.len(), SectionByteMode::Json)?;
+    let diagnostics = json_payload_diagnostics(snapshot, &compact, text.len())?;
     Ok((text, diagnostics))
 }
 
@@ -43,9 +43,9 @@ pub(crate) fn serialize_messagepack_compact_snapshot_with_diagnostics(
     snapshot: &Snapshot,
 ) -> Result<(Vec<u8>, SnapshotPayloadDiagnostics), SnapshotEncodeError> {
     let compact = compact_snapshot_value(snapshot)?;
-    let bytes = messagepack_frame::serialize_compact_snapshot_value(&compact)?;
-    let diagnostics =
-        payload_diagnostics(snapshot, &compact, bytes.len(), SectionByteMode::MessagePack)?;
+    let (bytes, entry_bytes) =
+        messagepack_frame::serialize_compact_snapshot_value_with_entry_bytes(&compact)?;
+    let diagnostics = payload_diagnostics_from_entry_bytes(snapshot, bytes.len(), entry_bytes);
     Ok((bytes, diagnostics))
 }
 
@@ -168,12 +168,6 @@ impl Serialize for CompactSnapshot<'_> {
     }
 }
 
-#[derive(Clone, Copy)]
-enum SectionByteMode {
-    Json,
-    MessagePack,
-}
-
 const SECTION_ENTITIES: &str = "entities";
 const SECTION_VISIBILITY: &str = "visibility";
 const SECTION_RESOURCE_DELTAS: &str = "resourceDeltas";
@@ -197,23 +191,37 @@ const SECTION_ORDER: [&str; 10] = [
     SECTION_OTHER,
 ];
 
-fn payload_diagnostics(
+fn json_payload_diagnostics(
     snapshot: &Snapshot,
     compact: &serde_json::Value,
     total_bytes: usize,
-    mode: SectionByteMode,
 ) -> Result<SnapshotPayloadDiagnostics, SnapshotEncodeError> {
+    let mut entry_bytes = Vec::new();
+    if let serde_json::Value::Object(map) = compact {
+        for (key, value) in map {
+            entry_bytes.push((key.as_str(), json_map_entry_len(key, value)?));
+        }
+    }
+    Ok(payload_diagnostics_from_entry_bytes(
+        snapshot,
+        total_bytes,
+        entry_bytes,
+    ))
+}
+
+fn payload_diagnostics_from_entry_bytes<'a>(
+    snapshot: &Snapshot,
+    total_bytes: usize,
+    entries: impl IntoIterator<Item = (&'a str, usize)>,
+) -> SnapshotPayloadDiagnostics {
     let mut counts = section_counts(snapshot);
     let mut bytes: BTreeMap<&'static str, u32> = BTreeMap::new();
     let mut accounted_bytes = 0usize;
 
-    if let serde_json::Value::Object(map) = compact {
-        for (key, value) in map {
-            let section = section_for_compact_key(key);
-            let entry_bytes = section_entry_bytes(key, value, mode)?;
-            accounted_bytes = accounted_bytes.saturating_add(entry_bytes);
-            add_u32(&mut bytes, section, entry_bytes);
-        }
+    for (key, entry_bytes) in entries {
+        let section = section_for_compact_key(key);
+        accounted_bytes = accounted_bytes.saturating_add(entry_bytes);
+        add_u32(&mut bytes, section, entry_bytes);
     }
 
     if total_bytes > accounted_bytes {
@@ -245,11 +253,11 @@ fn payload_diagnostics(
 
     let entity_kinds = entity_kind_diagnostics(snapshot, &sections);
 
-    Ok(SnapshotPayloadDiagnostics {
+    SnapshotPayloadDiagnostics {
         bytes: saturating_usize_u32(total_bytes),
         sections,
         entity_kinds,
-    })
+    }
 }
 
 fn section_counts(snapshot: &Snapshot) -> BTreeMap<&'static str, u32> {
@@ -316,19 +324,13 @@ fn section_for_compact_key(key: &str) -> &'static str {
     }
 }
 
-fn section_entry_bytes(
+fn json_map_entry_len(
     key: &str,
     value: &serde_json::Value,
-    mode: SectionByteMode,
 ) -> Result<usize, SnapshotEncodeError> {
-    match mode {
-        SectionByteMode::Json => {
-            let key_bytes = serde_json::to_string(key)?.len();
-            let value_bytes = serde_json::to_string(value)?.len();
-            Ok(key_bytes.saturating_add(1).saturating_add(value_bytes))
-        }
-        SectionByteMode::MessagePack => messagepack_frame::serialized_map_entry_len(key, value),
-    }
+    let key_bytes = serde_json::to_string(key)?.len();
+    let value_bytes = serde_json::to_string(value)?.len();
+    Ok(key_bytes.saturating_add(1).saturating_add(value_bytes))
 }
 
 fn entity_kind_diagnostics(
