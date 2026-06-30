@@ -174,7 +174,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
         [45, null, 14, null, null, null],
       ],
     ],
-    tr: [[80, 448, 480, 0.75]],
+    tr: [[80, 448, 480, 0.375]],
     u: [1, UPGRADE_CODE[UPGRADE.ARTILLERY_UNLOCK]],
     fg: [1, 2, 3, 1],
     ev: [
@@ -277,10 +277,10 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
     "ability objects decode",
   );
   assert(
-    decoded.trenches[0].id === 80 &&
+      decoded.trenches[0].id === 80 &&
       decoded.trenches[0].x === 448 &&
       decoded.trenches[0].y === 480 &&
-      decoded.trenches[0].radiusTiles === 0.75,
+      decoded.trenches[0].radiusTiles === 0.375,
     "trenches decode",
   );
   assert(

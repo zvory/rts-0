@@ -4,7 +4,7 @@
 //! in [`crate::game::trench::TrenchStore`].
 
 use crate::config;
-use crate::game::entity::{AttackPhase, Entity, EntityStore, MovePhase, Order};
+use crate::game::entity::{active_trench_occupation, AttackPhase, Entity, EntityStore, MovePhase, Order};
 use crate::game::map::Map;
 use crate::game::services::geometry::{
     building_rect_for_entity, unit_bodies_intersect, unit_body_for_entity,
@@ -164,6 +164,13 @@ fn best_occupation_candidate(
 ) -> Option<OccupationCandidate> {
     let mut best: Option<RankedOccupationCandidate> = None;
     for trench in trenches.all().iter().copied() {
+        if entities.iter().any(|other| {
+            other.id != entity.id
+                && other.hp > 0
+                && active_trench_occupation(other) == Some(trench.id)
+        }) {
+            continue;
+        }
         let Some(dist_sq) = occupation_search_distance_sq(trench, entity) else {
             continue;
         };
@@ -434,37 +441,23 @@ mod tests {
     fn occupation_search_skips_nearest_trench_without_legal_slot() {
         let map = flat_map(32);
         let mut trenches = TrenchStore::new();
-        let nearest = trenches
+        trenches
             .create(&map, 320.0, 320.0)
             .expect("nearest trench should seed");
-        let farther = trenches
-            .create(&map, 384.0, 320.0)
-            .expect("farther trench should seed");
+        let farther = trenches.create(&map, 368.0, 320.0).expect("farther trench");
         let mut entities = EntityStore::new();
-        let unit = entities
-            .spawn_unit(1, EntityKind::Rifleman, 352.0, 320.0)
-            .expect("rifleman should spawn");
+        let unit = entities.spawn_unit(1, EntityKind::Rifleman, 344.0, 320.0).expect("rifleman");
         let snapshot = entities.get(unit).expect("rifleman should exist").clone();
-        let nearest_trench = trenches
-            .all()
-            .iter()
-            .copied()
-            .find(|trench| trench.id == nearest)
-            .expect("nearest trench should exist");
+        let nearest_trench = trenches.all().first().copied().expect("nearest trench");
         let blocking_slots = slot_positions(&snapshot, nearest_trench)
             .into_iter()
             .filter(|candidate| {
                 distance((snapshot.pos_x, snapshot.pos_y), *candidate) <= SLOT_MAX_CORRECTION_PX
             })
             .collect::<Vec<_>>();
-        assert!(
-            !blocking_slots.is_empty(),
-            "fixture should have nearest-trench slots to block"
-        );
+        assert!(!blocking_slots.is_empty(), "fixture should have slots to block");
         for (x, y) in blocking_slots {
-            entities
-                .spawn_unit(2, EntityKind::Rifleman, x, y)
-                .expect("blocking rifleman should spawn");
+            entities.spawn_unit(2, EntityKind::Rifleman, x, y).expect("blocker");
         }
         let occ = Occupancy::build(&map, &entities);
 
@@ -477,12 +470,8 @@ mod tests {
     #[test]
     fn only_firing_attack_orders_hold_ground() {
         let mut entities = EntityStore::new();
-        let rifleman = entities
-            .spawn_unit(1, EntityKind::Rifleman, 320.0, 320.0)
-            .expect("rifleman should spawn");
-        let unit = entities
-            .get_mut(rifleman)
-            .expect("rifleman should exist");
+        let rifleman = entities.spawn_unit(1, EntityKind::Rifleman, 320.0, 320.0).expect("rifleman");
+        let unit = entities.get_mut(rifleman).expect("rifleman should exist");
         unit.set_order(Order::attack(99));
 
         assert!(

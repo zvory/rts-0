@@ -227,7 +227,7 @@ function buttonByLabel(card, label) {
     supplyCap: 10,
     entities: [{ id: 1, owner: 1, kind: "worker", x: 10, y: 20, hp: 40, maxHp: 40, state: "idle" }],
     resourceDeltas: [{ id: 200, remaining: 1498 }],
-    trenches: [{ id: 300, x: 96, y: 128, radiusTiles: 0.75 }],
+    trenches: [{ id: 300, x: 96, y: 128, radiusTiles: 0.375 }],
     events: [],
   });
   assert(state.currRecvTime !== null, "currRecvTime set after first snapshot");

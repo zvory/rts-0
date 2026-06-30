@@ -227,9 +227,9 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     };
     const state = {
       trenches: [
-        { id: 2, x: 132, y: 96, radiusTiles: 0.75 },
-        { id: 1, x: 96, y: 96, radiusTiles: 0.75 },
-        { id: 3, x: 280, y: 96, radiusTiles: 0.75 },
+        { id: 2, x: 132, y: 96, radiusTiles: 0.375 },
+        { id: 1, x: 96, y: 96, radiusTiles: 0.375 },
+        { id: 3, x: 280, y: 96, radiusTiles: 0.375 },
       ],
     };
     const drawn = _drawTrenches.call(renderer, state);
@@ -245,7 +245,6 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     const height = Math.max(...ys) - Math.min(...ys);
     const authoritativeDiameter =
       (state.trenches[0].radiusTiles * renderer._map.tileSize * 2) / trenchLayer.downsample;
-    const expectedVisualDiameter = authoritativeDiameter * 0.5;
 
     assert(drawn === 3, "trench renderer draws all valid authoritative trench snapshots");
     assert(trenchLayer.displayObjectCount() === 1, "trench decals use one persistent display object");
@@ -253,10 +252,10 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     assert(trenchLayer.textureUpdateCount === 1, "trench renderer updates the texture once for a changed snapshot");
     assert(firstPolygon.length >= 20, "trench footprints are constructed from low-poly circular polygons");
     assert(width / height > 0.78 && width / height < 1.22, "trench footprints stay circular instead of oval");
-    assert(width > expectedVisualDiameter * 0.85 && width < expectedVisualDiameter * 1.15,
-      "trench footprints render at half the authoritative trench diameter");
-    assert(height > expectedVisualDiameter * 0.85 && height < expectedVisualDiameter * 1.15,
-      "trench footprints render at half the authoritative trench diameter");
+    assert(width > authoritativeDiameter * 0.85 && width < authoritativeDiameter * 1.15,
+      "trench footprints render at the authoritative trench diameter");
+    assert(height > authoritativeDiameter * 0.85 && height < authoritativeDiameter * 1.15,
+      "trench footprints render at the authoritative trench diameter");
     assert(trenchCtx.calls.some((call) => call[0] === "fillStyle" && call[1] === "rgb(90,56,34)"),
       "trench base decal is opaque dirt");
     assert(trenchCtx.calls.some((call) => call[0] === "fillStyle" && String(call[1]).startsWith("rgba(32,20,13")),

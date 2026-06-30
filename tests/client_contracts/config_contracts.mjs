@@ -355,7 +355,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       ENTRENCHMENT_RANGE_BONUS_TILES === 1 &&
       ENTRENCHMENT_DIRECT_MISS_CHANCE === 0.70 &&
       ENTRENCHMENT_AREA_DAMAGE_REDUCTION === 0.70 &&
-      ENTRENCHMENT_TRENCH_RADIUS_TILES === 0.75,
+      ENTRENCHMENT_TRENCH_RADIUS_TILES === 0.375,
     "Entrenchment constants mirror server",
   );
   assert(

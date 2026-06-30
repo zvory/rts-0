@@ -31,7 +31,7 @@ function startPayload() {
     supplyUsed: 0,
     supplyCap: 0,
     entities: [],
-    trenches: [{ id: 300, x: 96, y: 128, radiusTiles: 0.75 }],
+    trenches: [{ id: 300, x: 96, y: 128, radiusTiles: 0.375 }],
     events: [],
   });
   assert(state.trenches[0]?.id === 300, "snapshot trench state updates from authoritative terrain");

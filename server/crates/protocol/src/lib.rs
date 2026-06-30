@@ -1528,7 +1528,7 @@ mod tests {
                 id: 80,
                 x: 448.0,
                 y: 480.0,
-                radius_tiles: 0.75,
+                radius_tiles: 0.375,
             }],
             visible_tiles: vec![1, 1, 0, 0, 0, 1],
             remembered_buildings: vec![RememberedBuildingView {
@@ -1700,7 +1700,7 @@ mod tests {
                 [45, null, null, null, null, null]
             ]])
         );
-        assert_eq!(value["tr"], serde_json::json!([[80, 448.0, 480.0, 0.75]]));
+        assert_eq!(value["tr"], serde_json::json!([[80, 448.0, 480.0, 0.375]]));
         assert_eq!(value["fg"], serde_json::json!([1, 2, 3, 1]));
         assert_eq!(
             value["mb"],
