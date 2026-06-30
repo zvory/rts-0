@@ -19,9 +19,9 @@ rule changes.
 ### [Phase 2 - Lab Start and Import Checkpoints](phase-2.md)
 
 Make blank labs, catalog labs, and imported lab setups produce or consume the same checkpoint type.
-The old "lab scenario" shape should either become an adapter into checkpoints or be replaced by
-checkpoint JSON where practical. Lab baseline resets should store a new baseline checkpoint plus a
-fresh current-branch action log.
+"Lab Scenario" may remain player-facing UI/catalog copy, but the persisted setup payload should be
+checkpoint-backed rather than a separate `LabScenarioV1` contract. Lab baseline resets should store
+a new baseline checkpoint plus a fresh current-branch action log.
 
 ### [Phase 3 - Game Construction From Checkpoint](phase-3.md)
 
@@ -50,6 +50,8 @@ that cannot play.
 - Preserve player ids, teams, entity ids, resources, and RNG state from the generated checkpoint.
 - Do not add lab replay action support in this stage except where lab start checkpoints require it.
 - Old replay compatibility is intentionally not required.
+- Short beta replay dead zones between independently deployed phase PRs are acceptable, but each
+  broken path must fail clearly and the final stage must restore newly captured replay launch.
 - The replay viewer and runtime should remain shared.
 
 ## Handoff Requirements

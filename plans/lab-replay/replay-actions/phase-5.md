@@ -6,8 +6,9 @@ Status: Not started.
 
 Add a minimal capability-gated LabPanel action for "Save replay so far." The UI should show pending,
 success, error, and replay link states without adding a range picker or clip editor. Harden source
-policy, artifact limits, safe names, branch controls, and product boundaries around local/dev save
-versus future sharing.
+policy, branch controls, and product boundaries around local/dev save versus future sharing. File
+write hardening, safe generated names, fixed output directories, and size/action caps should already
+exist from Phase 4; this phase exposes those server capabilities and errors cleanly in the client.
 
 ## Expected Touch Points
 

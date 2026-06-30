@@ -32,7 +32,10 @@ entity-id validation, operator policy, and current-branch ordering rules.
 Add the server-side lab operation that serializes the active baseline checkpoint plus the retained
 current-branch replay action timeline. The save path should handle blank labs, catalog labs,
 imports, rewinds, edits, and cap-reset baselines intentionally. It should return a local
-`/?replayArtifact=<name>` URL for dev use without writing to match history.
+`/?replayArtifact=<name>` URL for dev use without writing to match history. Because this is the
+phase that introduces a browser-triggered server file write, it must also introduce the write
+hardening: generated safe artifact names, a fixed target directory under `target/`, no
+client-supplied paths, payload/action byte caps, capability gating, and clear validation errors.
 
 ### [Phase 5 - Lab UI and Product Hardening](phase-5.md)
 
@@ -45,6 +48,8 @@ Document remaining production sharing decisions separately from match history.
 - Replay actions must be authoritative state changes, not client-only render events.
 - Timing semantics must be explicit and shared by match and lab actions.
 - Lab replay capture uses the current baseline checkpoint plus retained current-branch actions.
+- Lab save writes must be hardened in the same phase that introduces the write operation. Do not
+  accept client-supplied paths or filenames, and do not write to match history.
 - If a lab timeline reset captures a new checkpoint baseline, the replay may start there; if not,
   save must fail clearly when history is insufficient.
 - Branch-from-replay should be source-gated and should not appear for lab captures unless

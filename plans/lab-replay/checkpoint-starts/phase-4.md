@@ -15,6 +15,9 @@ ReplayArtifact
 
 Old replay artifacts should be rejected with clear errors. Do not build migration or dual-read
 support unless a later product decision reverses the compatibility stance.
+It is acceptable for beta match-history replay buttons or dev replay artifacts to have a short
+dead zone while the schema break and new capture path land across separate PRs. The phase must still
+fail with understandable unsupported-schema messages rather than panics or partial playback.
 
 ## Expected Touch Points
 
