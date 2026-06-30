@@ -18,6 +18,20 @@ import {
   appendSnapshotPayloadMarkdown,
   summarizeSnapshotPayload,
 } from "./net-report-snapshot-payload.mjs";
+import {
+  addPathingPhaseEvidence,
+  appendPathingDiagnosticsMarkdown,
+  summarizePathingDiagnostics,
+} from "./net-report-pathing-diagnostics.mjs";
+import {
+  formatPctX100,
+  formatTransportDiagnostics,
+  formatTsv,
+  formatValue,
+  metricMax,
+  metricMin,
+  metricPctX100Max,
+} from "./net-report-output-format.mjs";
 
 const ANSI_PATTERN = /\x1B\[[0-?]*[ -/]*[@-~]/g;
 const SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES = 1280;
@@ -1133,112 +1147,6 @@ function summarizePerf(match) {
   };
 }
 
-function summarizePathingDiagnostics(rows) {
-  const passes = new Map();
-  const topSources = new Map();
-  let worstRequestMaxMs = null;
-  let exploredNodesMax = null;
-  let pathLenMax = null;
-  let totalRequests = 0;
-  let totalDeferred = 0;
-  let budgetExhaustedCount = 0;
-
-  for (const row of rows) {
-    const passId = String(row.fields.pass || "unknown");
-    const pass = passes.get(passId) || {
-      pass: passId,
-      rows: 0,
-      awaitingStartMax: 0,
-      queuedForPathMax: 0,
-      processedMax: 0,
-      deferredMax: 0,
-      stillAwaitingMax: 0,
-      budgetExhaustedCount: 0,
-      worstRequestMaxMs: 0,
-      exploredNodesMax: 0,
-      pathLenMax: 0,
-      topSources: new Map(),
-    };
-    pass.rows += 1;
-    pass.awaitingStartMax = Math.max(pass.awaitingStartMax, numeric(row.fields.awaiting_start));
-    pass.queuedForPathMax = Math.max(pass.queuedForPathMax, numeric(row.fields.queued_for_path));
-    pass.processedMax = Math.max(pass.processedMax, numeric(row.fields.requests_processed));
-    pass.deferredMax = Math.max(pass.deferredMax, numeric(row.fields.requests_deferred));
-    pass.stillAwaitingMax = Math.max(pass.stillAwaitingMax, numeric(row.fields.still_awaiting));
-    if (truthyField(row.fields.coordinator_budget_exhausted) || numeric(row.fields.path_budget_exhausted) > 0) {
-      pass.budgetExhaustedCount += 1;
-      budgetExhaustedCount += 1;
-    }
-    pass.worstRequestMaxMs = Math.max(pass.worstRequestMaxMs, numeric(row.fields.worst_request_ms));
-    pass.exploredNodesMax = Math.max(pass.exploredNodesMax, numeric(row.fields.explored_nodes_max));
-    pass.pathLenMax = Math.max(pass.pathLenMax, numeric(row.fields.path_len_max));
-    mergeCountString(pass.topSources, row.fields.source_counts);
-    mergeCountString(topSources, row.fields.source_counts);
-
-    totalRequests += numeric(row.fields.requests_processed);
-    totalDeferred = Math.max(totalDeferred, numeric(row.fields.requests_deferred));
-    worstRequestMaxMs = maxNullable(worstRequestMaxMs, row.fields.worst_request_ms);
-    exploredNodesMax = maxNullable(exploredNodesMax, row.fields.explored_nodes_max);
-    pathLenMax = maxNullable(pathLenMax, row.fields.path_len_max);
-    passes.set(passId, pass);
-  }
-
-  const passSummaries = [...passes.values()]
-    .map((pass) => ({
-      ...pass,
-      topSources: topCounts(pass.topSources),
-    }))
-    .sort((a, b) => b.worstRequestMaxMs - a.worstRequestMaxMs || a.pass.localeCompare(b.pass));
-
-  const summary = {
-    rows: rows.length,
-    totalRequests,
-    totalDeferred,
-    budgetExhaustedCount,
-    worstRequestMaxMs,
-    exploredNodesMax,
-    pathLenMax,
-    topSources: topCounts(topSources),
-    passes: passSummaries,
-  };
-  summary.interpretation = interpretPathingDiagnostics(summary);
-  return summary;
-}
-
-function interpretPathingDiagnostics(summary) {
-  if (summary.rows === 0) {
-    return {
-      primary: "unavailable",
-      detail: "Pathing diagnostics were not logged in this artifact.",
-    };
-  }
-  const queuePass = summary.passes.find((pass) => pass.pass === "promote_queued_orders");
-  const queuePromotion =
-    queuePass && (queuePass.queuedForPathMax >= 16 || queuePass.processedMax >= 16);
-  if (summary.totalDeferred > 0 || summary.budgetExhaustedCount > 0 || summary.totalRequests >= 64) {
-    return {
-      primary: "path request volume",
-      detail: `Processed ${summary.totalRequests} path requests with ${summary.totalDeferred} still awaiting/deferred and ${summary.budgetExhaustedCount} budget-exhausted rows.`,
-    };
-  }
-  if ((summary.exploredNodesMax ?? 0) >= 4096 || (summary.worstRequestMaxMs ?? 0) >= 8) {
-    return {
-      primary: "path complexity",
-      detail: `Worst request ${formatValue(summary.worstRequestMaxMs)}ms, explored nodes max ${formatValue(summary.exploredNodesMax)}, path length max ${formatValue(summary.pathLenMax)}.`,
-    };
-  }
-  if (queuePromotion) {
-    return {
-      primary: "queue promotion",
-      detail: `Queued promotion staged up to ${queuePass.queuedForPathMax} units for pathing in one logged pass.`,
-    };
-  }
-  return {
-    primary: "unknown",
-    detail: "Pathing rows were present but did not cross volume, complexity, or queue-promotion thresholds.",
-  };
-}
-
 function summarizeRows(rows, fields) {
   const out = {
     rows: rows.length,
@@ -1247,42 +1155,6 @@ function summarizeRows(rows, fields) {
     out[field] = summarizeField(rows, field);
   }
   return out;
-}
-
-function numeric(value) {
-  return Number.isFinite(value) ? value : 0;
-}
-
-function maxNullable(current, value) {
-  if (!Number.isFinite(value)) {
-    return current;
-  }
-  return current === null ? value : Math.max(current, value);
-}
-
-function truthyField(value) {
-  return value === true || value === "true" || value === 1 || value === "1";
-}
-
-function mergeCountString(target, value) {
-  if (typeof value !== "string" || value === "" || value === "none") {
-    return;
-  }
-  for (const part of value.split(",")) {
-    const [label, rawCount] = part.split("=");
-    const count = Number(rawCount);
-    if (!label || !Number.isFinite(count)) {
-      continue;
-    }
-    target.set(label, (target.get(label) || 0) + count);
-  }
-}
-
-function topCounts(map, limit = 5) {
-  return [...map.entries()]
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .slice(0, limit)
-    .map(([label, count]) => ({ label, count }));
 }
 
 function classifyGroup(group, players, matchPerf, rows) {
@@ -1309,7 +1181,7 @@ function classifyGroup(group, players, matchPerf, rows) {
     }
   }
   if (group.id === "server_pathing") {
-    addPathingPhaseEvidence(rows, evidenceFor, evidenceAgainst);
+    addPathingPhaseEvidence(rows, evidenceFor, evidenceAgainst, WARN_THRESHOLD.slowest_phase_ms);
   }
 
   const rawFieldSet = new Set(rows.flatMap((row) => Object.keys(row.fields)));
@@ -1330,28 +1202,6 @@ function classifyGroup(group, players, matchPerf, rows) {
         ? group.fields.map((field) => `${field}: not logged or unavailable in this artifact`)
         : [],
   };
-}
-
-function addPathingPhaseEvidence(rows, evidenceFor, evidenceAgainst) {
-  const pathingPhases = new Set(["awaiting_paths", "promote_queued_orders", "promoted_awaiting_paths"]);
-  const phaseRows = rows
-    .filter(
-      (row) =>
-        row.event === "performance_tick" &&
-        pathingPhases.has(String(row.fields.slowest_phase || "")) &&
-        Number.isFinite(row.fields.slowest_phase_ms),
-    )
-    .sort((a, b) => Number(b.fields.slowest_phase_ms) - Number(a.fields.slowest_phase_ms));
-  const worst = phaseRows[0];
-  if (worst && worst.fields.slowest_phase_ms >= WARN_THRESHOLD.slowest_phase_ms) {
-    evidenceFor.push(
-      `serverTick slowest_phase ${worst.fields.slowest_phase} ${worst.fields.slowest_phase_ms}ms pathing phase`,
-    );
-  } else if (worst) {
-    evidenceAgainst.push(
-      `serverTick slowest pathing phase ${worst.fields.slowest_phase} ${worst.fields.slowest_phase_ms}ms below ${WARN_THRESHOLD.slowest_phase_ms}`,
-    );
-  }
 }
 
 function addClassificationEvidence(scope, field, metric, evidenceFor, evidenceAgainst) {
@@ -1490,7 +1340,7 @@ function formatMarkdown(report) {
     lines.push(
       `- Rows: ${match.reportRows} client reports, ${match.serverTickRows} tick, ${match.pathingRows} pathing, ${match.snapshotRows} snapshot, ${match.writerRows} writer`
     );
-    lines.push(`- Transport diagnostics: ${formatTransportDiagnostics(match.transport)}`);
+    lines.push(`- Transport diagnostics: ${formatTransportDiagnostics(match.transport, TRANSPORT_DIAGNOSTIC_FIELDS)}`);
 
     lines.push("");
     lines.push("| player | reports | primary issues | RTT max | snapshot gap max | jitter max | payload max | payload p95 | over budget | parse/decode/apply max | frame gap max | frame work max | renderer max | FPS min | cmds/burst | cmd response max | server outbound | server tick max | server lag max |");
@@ -1559,121 +1409,8 @@ function formatMarkdown(report) {
   return `${lines.join("\n")}\n`;
 }
 
-function appendPathingDiagnosticsMarkdown(lines, diagnostics) {
-  if (!diagnostics || diagnostics.rows === 0) {
-    return;
-  }
-  lines.push("");
-  lines.push("### Pathing Slow-Tick Diagnostics");
-  lines.push(
-    `- Interpretation: ${diagnostics.interpretation.primary}; ${diagnostics.interpretation.detail}`,
-  );
-  lines.push(
-    `- Top sources: ${
-      diagnostics.topSources.length > 0
-        ? diagnostics.topSources.map((item) => `${item.label}=${item.count}`).join(", ")
-        : "n/a"
-    }`,
-  );
-  lines.push("");
-  lines.push("| pass | rows | awaiting start max | queued for path max | processed max | deferred max | budget rows | worst request max | explored nodes max | path len max | top sources |");
-  lines.push("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |");
-  for (const pass of diagnostics.passes) {
-    lines.push(
-      [
-        pass.pass,
-        pass.rows,
-        pass.awaitingStartMax,
-        pass.queuedForPathMax,
-        pass.processedMax,
-        pass.deferredMax,
-        pass.budgetExhaustedCount,
-        pass.worstRequestMaxMs,
-        pass.exploredNodesMax,
-        pass.pathLenMax,
-        pass.topSources.length > 0 ? pass.topSources.map((item) => `${item.label}=${item.count}`).join(", ") : "n/a",
-      ].join(" | ").replace(/^/, "| ").replace(/$/, " |"),
-    );
-  }
-}
-
-function metricPctX100Max(player, field) {
-  return formatPctX100(player.metrics[field]?.max);
-}
-
-function metricMax(player, field) {
-  return formatValue(player.metrics[field]?.max);
-}
-
-function metricMin(player, field) {
-  return formatValue(player.metrics[field]?.min);
-}
-
-function formatTransportDiagnostics(transport) {
-  return TRANSPORT_DIAGNOSTIC_FIELDS.map(([field, label]) => {
-    const summary = transport[camelCase(field)];
-    return `${label} ${formatTransportCounts(summary)}`;
-  }).join("; ");
-}
-
-function formatTransportCounts(summary) {
-  if (!summary || summary.samples === 0 || summary.values.length === 0) {
-    return "n/a";
-  }
-  return summary.values.map((item) => `${item.value}=${item.count}`).join(", ");
-}
-
-function formatPctX100(value) {
-  if (value === null || value === undefined || value === "") {
-    return "n/a";
-  }
-  const number = Number(value);
-  if (!Number.isFinite(number)) {
-    return "n/a";
-  }
-  return `${(number / 100).toFixed(2).replace(/\.?0+$/, "")}%`;
-}
-
-function formatValue(value) {
-  return value === null || value === undefined || value === "" ? "n/a" : String(value);
-}
-
-function formatTsv(report) {
-  const headers = [
-    "match",
-    "player_id",
-    "reports",
-    "primary_issues",
-    ...SUMMARY_FIELDS.flatMap((field) => [`${field}_max`, `${field}_p95`]),
-  ];
-  const lines = [headers.join("\t")];
-  for (const match of report.matches) {
-    for (const player of match.players) {
-      lines.push(
-        [
-          match.match,
-          player.playerId,
-          player.reportCount,
-          player.primaryIssues.map((issue) => `${issue.issue}:${issue.count}`).join(","),
-          ...SUMMARY_FIELDS.flatMap((field) => [
-            player.metrics[field]?.max ?? "",
-            player.metrics[field]?.p95 ?? "",
-          ]),
-        ]
-          .map(tsvCell)
-          .join("\t")
-      );
-    }
-  }
-  return `${lines.join("\n")}\n`;
-}
-
 function camelCase(value) {
   return value.replace(/_([a-z])/g, (_, ch) => ch.toUpperCase());
-}
-
-function tsvCell(value) {
-  return String(value).replace(/\t/g, " ").replace(/\r?\n/g, " ");
 }
 
 function writeOutputs(report, rows, outDir) {
@@ -1693,7 +1430,7 @@ function writeOutputs(report, rows, outDir) {
   writeFileSync(files.keyMetrics, formatKeyMetricsJson(report));
   writeFileSync(files.markdown, formatMarkdown(report));
   writeFileSync(files.json, `${JSON.stringify(report, null, 2)}\n`);
-  writeFileSync(files.tsv, formatTsv(report));
+  writeFileSync(files.tsv, formatTsv(report, SUMMARY_FIELDS));
   writeFileSync(files.clientRows, formatClientRowsTsv(rows));
   writeFileSync(files.serverTickRows, formatServerTickRowsTsv(rows));
   return files;
@@ -1738,7 +1475,7 @@ function main() {
   if (options.format === "json") {
     console.log(JSON.stringify(report, null, 2));
   } else if (options.format === "tsv") {
-    process.stdout.write(formatTsv(report));
+    process.stdout.write(formatTsv(report, SUMMARY_FIELDS));
   } else {
     process.stdout.write(formatMarkdown(report));
   }
