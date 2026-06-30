@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -59,16 +59,16 @@ correlations, bad windows, provenance, and unknowns in one repeatable format.
 
 ## Implementation Checklist
 
-- [ ] Design the package layout, digest JSON shape, and markdown sections.
-- [ ] Add `evidence-index.json` and `key-metrics.json` outputs.
-- [ ] Add source manifest and coverage matrix output.
-- [ ] Add timeline band aggregation.
-- [ ] Add top-window extraction for command, network, snapshot, server tick, payload, frame/render,
+- [x] Design the package layout, digest JSON shape, and markdown sections.
+- [x] Add `evidence-index.json` and `key-metrics.json` outputs.
+- [x] Add source manifest and coverage matrix output.
+- [x] Add timeline band aggregation.
+- [x] Add top-window extraction for command, network, snapshot, server tick, payload, frame/render,
       prediction, and outbound pressure groups.
-- [ ] Add explicit unknowns and threshold-gating caveats.
-- [ ] Add fixtures/tests for existing incident packages.
-- [ ] Update docs with the digest interpretation flow.
-- [ ] Mark this phase as done in this file in the implementation commit.
+- [x] Add explicit unknowns and threshold-gating caveats.
+- [x] Add fixtures/tests for existing incident packages.
+- [x] Update docs with the digest interpretation flow.
+- [x] Mark this phase as done in this file in the implementation commit.
 
 ## Verification
 

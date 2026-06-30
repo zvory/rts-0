@@ -347,7 +347,7 @@ scripts/fly-logs.sh beta search \
   > /tmp/rts-lag-window.jsonl
 
 node scripts/parse-net-report-logs.mjs --out-dir /tmp/rts-lag-summary /tmp/rts-lag-window.jsonl
-open /tmp/rts-lag-summary/incident-summary.md
+open /tmp/rts-lag-summary/README.md
 ```
 
 For a quick terminal view:
@@ -358,11 +358,36 @@ node scripts/parse-net-report-logs.mjs --format tsv /tmp/rts-lag-window.jsonl
 node scripts/parse-net-report-logs.mjs --format json /tmp/rts-lag-window.jsonl
 ```
 
-The markdown table is the operator-facing summary. The JSON output preserves per-match and per-player
-metrics, row counts, classifications, and missing-data warnings for follow-up scripts. The TSV output
-is intentionally flat so it can be pasted into a spreadsheet or attached to a bug report.
+The markdown table is the operator-facing summary. The first screen now includes an agent digest
+that names the supported diagnosis and biggest unknowns before the detailed tables. The JSON output
+preserves per-match and per-player metrics, row counts, classifications, missing-data warnings, and
+the `agentDigest` block for follow-up scripts. The TSV output is intentionally flat so it can be
+pasted into a spreadsheet or attached to a bug report.
+
+With `--out-dir`, the parser writes an incident package:
+
+- `README.md`: agent-first digest, package inventory, coverage matrix, top bad windows, and timeline.
+- `evidence-index.json`: source manifest, evidence classes, coverage matrix, field catalog, and
+  provenance/privacy notes.
+- `key-metrics.json`: stable digest JSON with classifications, one-minute timeline bands, top
+  issue windows, and explicit unknowns.
+- `incident-summary.md`, `incident-summary.json`, and `incident-rows.tsv`: backwards-compatible
+  parser outputs.
+- `client-net-rows.tsv` and `server-tick-rows.tsv`: filtered rows for spot-checking the windows
+  named in the digest.
+
+Timeline bands default to one minute and can be changed with `--timeline-band-ms`. Treat missing
+snapshot projection, writer, DB summary, replay, or transport rows as "not logged or unavailable";
+they are not zero-cost evidence. Keep beta incident evidence, local replay/perf harness evidence,
+and synthetic stress evidence separated by the `evidenceKind` and source manifest labels rather than
+averaging them together.
 
 Classification is evidence-bounded:
+
+`classifications[].result` is kept for older scripts, while `classifications[].status` carries the
+agent-facing state: `indicated`, `contradicted`, `weak`, `unavailable`, or `unknown`. Each
+classification includes `evidenceFor`, `evidenceAgainst`, and `unavailable` field notes so agents
+can see which fields triggered or argued against a diagnosis.
 
 - Server tick/scheduler pressure requires server tick, scheduler lag, slow-tick, or performance tick
   rows. Clean `server_tick_ms`, `server_lag_ms`, and `slow_tick_count` values are evidence against

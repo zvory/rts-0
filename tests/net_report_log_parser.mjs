@@ -23,6 +23,13 @@ const logs = [
     "fly-match-55-all.jsonl"
   ),
 ];
+const soupmanLog = path.join(
+  repoRoot,
+  "docs",
+  "network-incident-examples",
+  "2026-06-30-beta-soupman-alex-lag",
+  "match-103-runid-logs.jsonl"
+);
 
 function run(args) {
   return execFileSync("node", [script, ...args], {
@@ -63,8 +70,18 @@ const networkClassification = match54.classifications.find(
 );
 const browserClassification = match54.classifications.find((item) => item.id === "browser_processing");
 assert.equal(serverClassification.result, "not indicated");
+assert.equal(serverClassification.status, "contradicted");
+assert.ok(
+  serverClassification.evidenceAgainst.some((item) => item.includes("server_tick_ms")),
+  "expected clean server tick fields to be evidence against server pressure"
+);
 assert.equal(networkClassification.result, "indicated");
+assert.equal(networkClassification.status, "indicated");
 assert.equal(browserClassification.result, "indicated");
+assert.equal(
+  match54.classifications.find((item) => item.id === "server_snapshot_projection")?.status,
+  "unavailable",
+);
 assert.match(match54.transportNote, /Unsupported/);
 assert.ok(
   match54.missing.some((item) => item.includes("server snapshot projection")),
@@ -77,6 +94,7 @@ assert.ok(
 
 const markdown = run([...logs]);
 assert.match(markdown, /## Match 54/);
+assert.match(markdown, /## Agent Digest/);
 assert.match(markdown, /player 5 frame_gap_max_ms max 700/);
 assert.match(markdown, /packet loss, retransmits, or per-packet browser transport data/);
 assert.match(markdown, /payload p95/);
@@ -176,6 +194,37 @@ try {
   rmSync(sustainedCommandDir, { recursive: true, force: true });
 }
 
+const combinedDir = mkdtempSync(path.join(os.tmpdir(), "rts-net-report-parser-combined-"));
+try {
+  const combinedLog = path.join(combinedDir, "combined.log");
+  writeFileSync(
+    combinedLog,
+    [
+      '2026-06-24T11:00:00Z INFO event="client_net_report" match_run_id="combined-a" player_id=1 primary_issue="command_upload_delay" rtt_max_ms=30 snapshot_gap_max_ms=40 snapshot_jitter_ms=1 command_issue_to_server_receipt_max_ms=300 command_issue_to_sim_ack_max_ms=320 frame_gap_max_ms=10 frame_work_max_ms=3 fps_estimate=60 server_tick_ms=4 server_lag_ms=0 slow_tick_count=0 "client network report"',
+      '2026-06-24T11:00:10Z INFO event="client_net_report" match_run_id="combined-b" player_id=2 primary_issue="frame_work" rtt_max_ms=35 snapshot_gap_max_ms=45 snapshot_jitter_ms=2 command_issue_to_server_receipt_max_ms=20 command_issue_to_sim_ack_max_ms=40 frame_gap_max_ms=150 frame_work_max_ms=45 fps_estimate=25 server_tick_ms=5 server_lag_ms=0 slow_tick_count=0 "client network report"',
+    ].join("\n") + "\n"
+  );
+  const combinedParsed = JSON.parse(run(["--format", "json", combinedLog]));
+  assert.deepEqual(
+    combinedParsed.matches.map((match) => match.match).sort(),
+    ["combined-a", "combined-b"],
+  );
+  const combinedCoverage = combinedParsed.agentDigest.coverageMatrix.matches;
+  for (const matchId of ["combined-a", "combined-b"]) {
+    const coverage = combinedCoverage.find((match) => match.match === matchId);
+    assert.ok(coverage, `expected coverage for ${matchId}`);
+    assert.equal(
+      coverage.items.find((item) => item.id === "client_reports")?.rows,
+      1,
+      `expected only ${matchId} rows in its coverage item`,
+    );
+  }
+  const commandTopWindow = combinedParsed.agentDigest.topWindows.groups.find((group) => group.id === "command")?.windows[0];
+  assert.equal(commandTopWindow?.match, "combined-a");
+} finally {
+  rmSync(combinedDir, { recursive: true, force: true });
+}
+
 const outDir = mkdtempSync(path.join(os.tmpdir(), "rts-net-report-parser-"));
 try {
   const out = run(["--out-dir", outDir, ...logs]);
@@ -183,9 +232,42 @@ try {
   assert.ok(existsSync(path.join(outDir, "incident-summary.md")));
   assert.ok(existsSync(path.join(outDir, "incident-summary.json")));
   assert.ok(existsSync(path.join(outDir, "incident-rows.tsv")));
+  assert.ok(existsSync(path.join(outDir, "README.md")));
+  assert.ok(existsSync(path.join(outDir, "evidence-index.json")));
+  assert.ok(existsSync(path.join(outDir, "key-metrics.json")));
+  assert.ok(existsSync(path.join(outDir, "client-net-rows.tsv")));
+  assert.ok(existsSync(path.join(outDir, "server-tick-rows.tsv")));
   assert.match(readFileSync(path.join(outDir, "incident-summary.md"), "utf8"), /## Match 55/);
+  assert.match(readFileSync(path.join(outDir, "README.md"), "utf8"), /Agent Digest/);
+  const evidenceIndex = JSON.parse(readFileSync(path.join(outDir, "evidence-index.json"), "utf8"));
+  assert.equal(evidenceIndex.schemaVersion, 1);
+  assert.equal(evidenceIndex.sourceManifest.sources.length, 2);
+  assert.ok(
+    evidenceIndex.coverageMatrix.matches.some((match) =>
+      match.items.some((item) => item.id === "client_reports" && item.present)
+    ),
+  );
 } finally {
   rmSync(outDir, { recursive: true, force: true });
 }
+
+const soupmanParsed = JSON.parse(run(["--format", "json", soupmanLog]));
+const soupmanDigest = soupmanParsed.agentDigest;
+assert.ok(soupmanDigest, "expected agent digest in JSON output");
+assert.match(soupmanDigest.summary.primaryDiagnoses[0].diagnosis, /Mixed server-side and client\/network/);
+for (const minute of ["00:21", "00:22", "00:23", "00:24", "00:25", "00:26", "00:27", "00:28"]) {
+  const band = soupmanDigest.timelineBands.find((item) => item.startAt.startsWith(`2026-06-30T${minute}`));
+  assert.ok(band, `expected Soupman/Alex timeline band for ${minute}Z`);
+  assert.ok(band.maxCommandResponseMs >= 498, `expected command pressure in ${minute}Z band`);
+  assert.ok(band.maxSnapshotGapMs >= 551, `expected snapshot gap pressure in ${minute}Z band`);
+}
+const soupmanServerTop = soupmanDigest.topWindows.groups.find((group) => group.id === "server_tick")?.windows[0];
+assert.ok(soupmanServerTop, "expected server tick top window");
+assert.match(soupmanServerTop.timestamp, /2026-06-30T00:40:/);
+assert.equal(soupmanServerTop.fields.slowest_phase_ms, 297);
+assert.ok(
+  soupmanDigest.unknowns.some((item) => item.text.includes("writer send detail: not logged or unavailable")),
+  "expected missing writer rows to be explicit unknowns"
+);
 
 console.log("net report log parser test passed");

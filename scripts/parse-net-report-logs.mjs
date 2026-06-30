@@ -1,10 +1,20 @@
 #!/usr/bin/env node
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import {
+  attachAgentDigest,
+  appendAgentDigestMarkdown,
+  formatClientRowsTsv,
+  formatEvidenceIndexJson,
+  formatKeyMetricsJson,
+  formatPackageReadme,
+  formatServerTickRowsTsv,
+} from "./net-report-incident-package.mjs";
 
 const ANSI_PATTERN = /\x1B\[[0-?]*[ -/]*[@-~]/g;
 const SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES = 1280;
 const SNAPSHOT_PACKET_BUDGET_RATE_WARN_X100 = 5000;
+const DEFAULT_TIMELINE_BAND_MS = 60_000;
 
 const METRICS = [
   ["rtt_ms", "RTT"],
@@ -287,6 +297,7 @@ const WARN_THRESHOLD = {
   server_lag_ms: 33,
   tick_ms: 40,
   scheduler_lag_ms: 33,
+  slowest_phase_ms: 33,
   max_snapshot_ms: 8,
   snapshot_ms: 8,
   compact_ms: 8,
@@ -331,7 +342,8 @@ function usage() {
 
 Options:
   --format markdown|json|tsv   Output format for stdout. Default: markdown.
-  --out-dir DIR                Write incident-summary.md, incident-summary.json, and incident-rows.tsv.
+  --out-dir DIR                Write the markdown/json/tsv incident package.
+  --timeline-band-ms MS        Timeline band width for the agent digest. Default: 60000.
   -h, --help                   Show this help.
 
 Input is Fly JSONL from scripts/fly-logs.sh search/recent or raw tracing text.
@@ -343,6 +355,7 @@ function parseArgs(argv) {
   const options = {
     format: "markdown",
     outDir: null,
+    timelineBandMs: DEFAULT_TIMELINE_BAND_MS,
     files: [],
   };
 
@@ -360,6 +373,11 @@ function parseArgs(argv) {
       index += 1;
     } else if (arg.startsWith("--out-dir=")) {
       options.outDir = arg.slice("--out-dir=".length);
+    } else if (arg === "--timeline-band-ms") {
+      options.timelineBandMs = Number(argv[index + 1] || "");
+      index += 1;
+    } else if (arg.startsWith("--timeline-band-ms=")) {
+      options.timelineBandMs = Number(arg.slice("--timeline-band-ms=".length));
     } else if (arg.startsWith("--")) {
       throw new Error(`unknown option: ${arg}`);
     } else {
@@ -369,6 +387,9 @@ function parseArgs(argv) {
 
   if (!["markdown", "json", "tsv"].includes(options.format)) {
     throw new Error(`unsupported --format value: ${options.format}`);
+  }
+  if (!Number.isFinite(options.timelineBandMs) || options.timelineBandMs < 1_000) {
+    throw new Error("--timeline-band-ms must be a number of at least 1000");
   }
   return options;
 }
@@ -405,6 +426,11 @@ function parseInputLine(line, source, lineNumber) {
   if (!event) {
     return null;
   }
+  const normalizedFields = normalizeFields(fields);
+  const room = extractDelimitedField(cleanMessage, "room", "match_run_id");
+  if (room) {
+    normalizedFields.room = room;
+  }
 
   return {
     event,
@@ -413,12 +439,27 @@ function parseInputLine(line, source, lineNumber) {
     sourceMatch: inferSourceMatch(source),
     lineNumber,
     message: cleanMessage,
-    fields: normalizeFields(fields),
+    fields: normalizedFields,
   };
 }
 
 function inferSourceMatch(source) {
   return path.basename(source).match(/match[-_]?(\d+)/i)?.[1] || path.basename(source);
+}
+
+function extractDelimitedField(message, key, nextKey) {
+  const marker = `${key}=`;
+  const start = message.indexOf(marker);
+  if (start < 0) {
+    return "";
+  }
+  const valueStart = start + marker.length;
+  const next = message.slice(valueStart).match(new RegExp(`\\s+${nextKey}=`));
+  if (!next) {
+    return "";
+  }
+  const raw = message.slice(valueStart, valueStart + next.index).trim();
+  return String(parseValue(raw)).trim();
 }
 
 function normalizeEvent(event, message) {
@@ -644,6 +685,8 @@ function ensureMatch(matches, key, sourceMatch) {
       snapshots: [],
       writers: [],
       participants: [],
+      buildIds: new Set(),
+      rooms: new Set(),
     });
   }
   const match = matches.get(key);
@@ -657,8 +700,12 @@ function applyMatchFields(match, fields) {
   if (fields.match_run_id) {
     match.matchRunId = fields.match_run_id;
   }
+  if (fields.build_id) {
+    match.buildIds.add(String(fields.build_id));
+  }
   if (fields.room) {
     match.room = fields.room;
+    match.rooms.add(String(fields.room));
   }
   if (fields.map) {
     match.map = fields.map;
@@ -675,6 +722,8 @@ function applyMatchFields(match, fields) {
     "max_head_of_line_count",
     "humans",
     "ai",
+    "seed",
+    "mode",
   ]) {
     if (fields[key] !== undefined) {
       match[key] = fields[key];
@@ -707,7 +756,7 @@ function finalizeMatch(match) {
     .sort((a, b) => String(a.playerId).localeCompare(String(b.playerId), undefined, { numeric: true }));
 
   const matchPerf = summarizePerf(match);
-  const groups = ISSUE_GROUPS.map((group) => classifyGroup(group, players, matchPerf)).filter(Boolean);
+  const groups = ISSUE_GROUPS.map((group) => classifyGroup(group, players, matchPerf, allRows)).filter(Boolean);
   const missing = missingDiagnosticGroups(allRows);
   const transport = summarizeTransport(allRows);
 
@@ -715,8 +764,12 @@ function finalizeMatch(match) {
     match: sourceLabel(match),
     matchRunId: match.matchRunId || "",
     sourceMatches: [...match.sourceMatches].sort(),
+    buildIds: [...match.buildIds].sort(),
+    rooms: [...match.rooms].sort(),
     room: match.room || "",
     map: match.map || "",
+    seed: match.seed,
+    mode: match.mode || "",
     participants: match.participants,
     startedAt: firstTimestamp(match.started),
     endedAt: firstTimestamp(match.ended),
@@ -738,7 +791,12 @@ function finalizeMatch(match) {
 }
 
 function sourceLabel(match) {
-  return [...match.sourceMatches].sort().join("+") || match.key;
+  const sourceMatches = [...match.sourceMatches].sort();
+  const numericSources = sourceMatches.filter((source) => /^\d+$/.test(source));
+  if (numericSources.length > 0) {
+    return numericSources.join("+");
+  }
+  return match.matchRunId || sourceMatches.join("+") || match.key;
 }
 
 function firstTimestamp(rows) {
@@ -871,48 +929,84 @@ function summarizeRows(rows, fields) {
   return out;
 }
 
-function classifyGroup(group, players, matchPerf) {
-  const evidence = [];
+function classifyGroup(group, players, matchPerf, rows) {
+  const evidenceFor = [];
+  const evidenceAgainst = [];
+  let availableSamples = 0;
   for (const player of players) {
     for (const field of group.fields) {
       const metric = player.metrics[field];
       if (!metric) {
         continue;
       }
-      const threshold = WARN_THRESHOLD[field];
-      if (field === "fps_estimate") {
-        if (metric.min <= 30) {
-          evidence.push(`player ${player.playerId} ${field} min ${metric.min}`);
-        }
-      } else if (threshold !== undefined && metric.max >= threshold) {
-        evidence.push(`player ${player.playerId} ${field} max ${metric.max}`);
-      }
+      availableSamples += metric.samples || 1;
+      addClassificationEvidence(`player ${player.playerId}`, field, metric, evidenceFor, evidenceAgainst);
     }
   }
   for (const [bucketName, bucket] of Object.entries(matchPerf)) {
     for (const field of group.fields) {
       const metric = bucket[field];
-      const threshold = WARN_THRESHOLD[field];
-      if (metric && threshold !== undefined && metric.max >= threshold) {
-        evidence.push(`${bucketName} ${field} max ${metric.max}`);
+      if (metric) {
+        availableSamples += metric.samples || 1;
+        addClassificationEvidence(bucketName, field, metric, evidenceFor, evidenceAgainst);
       }
     }
   }
 
-  if (evidence.length === 0) {
-    return {
-      id: group.id,
-      label: group.label,
-      result: "not indicated",
-      evidence: [],
-    };
-  }
+  const rawFieldSet = new Set(rows.flatMap((row) => Object.keys(row.fields)));
+  const sawRawField = group.fields.some((field) => rawFieldSet.has(field));
+  const status = classificationStatus(evidenceFor, evidenceAgainst, availableSamples, sawRawField);
+  const evidence = evidenceFor.slice();
+
   return {
     id: group.id,
     label: group.label,
-    result: "indicated",
+    result: status === "indicated" || status === "weak" ? "indicated" : "not indicated",
+    status,
     evidence,
+    evidenceFor,
+    evidenceAgainst: evidenceAgainst.slice(0, 8),
+    unavailable:
+      status === "unavailable"
+        ? group.fields.map((field) => `${field}: not logged or unavailable in this artifact`)
+        : [],
   };
+}
+
+function addClassificationEvidence(scope, field, metric, evidenceFor, evidenceAgainst) {
+  const threshold = WARN_THRESHOLD[field];
+  if (field === "fps_estimate") {
+    if (Number.isFinite(metric.min) && metric.min <= 30) {
+      evidenceFor.push(`${scope} ${field} min ${metric.min} at or below 30`);
+    } else if (Number.isFinite(metric.min)) {
+      evidenceAgainst.push(`${scope} ${field} min ${metric.min} above 30`);
+    }
+    return;
+  }
+  if (threshold === undefined) {
+    return;
+  }
+  if (Number.isFinite(metric.max) && metric.max >= threshold) {
+    evidenceFor.push(`${scope} ${field} max ${metric.max} at or above ${threshold}`);
+  } else if (Number.isFinite(metric.max)) {
+    evidenceAgainst.push(`${scope} ${field} max ${metric.max} below ${threshold}`);
+  }
+}
+
+function classificationStatus(evidenceFor, evidenceAgainst, availableSamples, sawRawField) {
+  if (evidenceFor.length >= 2) {
+    return "indicated";
+  }
+  if (evidenceFor.length === 1) {
+    return availableSamples > 1 ? "indicated" : "weak";
+  }
+  if (!sawRawField && availableSamples === 0) {
+    return "unavailable";
+  }
+  if (evidenceAgainst.length > 0) {
+    return "contradicted";
+  }
+  return "unknown";
 }
 
 function groupEvidence(fields, rows) {
@@ -980,6 +1074,7 @@ function formatMarkdown(report) {
   lines.push("");
   lines.push(`Generated: ${report.generatedAt}`);
   lines.push(`Input rows: ${report.input.rows}`);
+  appendAgentDigestMarkdown(lines, report.agentDigest);
   if (report.warnings.length > 0) {
     lines.push("");
     lines.push("## Warnings");
@@ -1046,9 +1141,16 @@ function formatMarkdown(report) {
     lines.push("");
     lines.push("### Classification");
     for (const classification of match.classifications) {
+      const status = classification.status || classification.result;
       const suffix =
-        classification.evidence.length > 0 ? `: ${classification.evidence.slice(0, 4).join("; ")}` : "";
-      lines.push(`- ${classification.label}: ${classification.result}${suffix}`);
+        classification.evidenceFor?.length > 0
+          ? `: for ${classification.evidenceFor.slice(0, 4).join("; ")}`
+          : classification.evidenceAgainst?.length > 0
+            ? `: against ${classification.evidenceAgainst.slice(0, 3).join("; ")}`
+            : classification.unavailable?.length > 0
+              ? `: ${classification.unavailable.slice(0, 2).join("; ")}`
+              : "";
+      lines.push(`- ${classification.label}: ${status}${suffix}`);
     }
     lines.push(`- Transport/WebTransport theory: ${match.transportNote}`);
 
@@ -1142,16 +1244,26 @@ function tsvCell(value) {
   return String(value).replace(/\t/g, " ").replace(/\r?\n/g, " ");
 }
 
-function writeOutputs(report, outDir) {
+function writeOutputs(report, rows, outDir) {
   mkdirSync(outDir, { recursive: true });
   const files = {
+    readme: path.join(outDir, "README.md"),
+    evidenceIndex: path.join(outDir, "evidence-index.json"),
+    keyMetrics: path.join(outDir, "key-metrics.json"),
     markdown: path.join(outDir, "incident-summary.md"),
     json: path.join(outDir, "incident-summary.json"),
     tsv: path.join(outDir, "incident-rows.tsv"),
+    clientRows: path.join(outDir, "client-net-rows.tsv"),
+    serverTickRows: path.join(outDir, "server-tick-rows.tsv"),
   };
+  writeFileSync(files.readme, formatPackageReadme(report, files));
+  writeFileSync(files.evidenceIndex, formatEvidenceIndexJson(report, files));
+  writeFileSync(files.keyMetrics, formatKeyMetricsJson(report));
   writeFileSync(files.markdown, formatMarkdown(report));
   writeFileSync(files.json, `${JSON.stringify(report, null, 2)}\n`);
   writeFileSync(files.tsv, formatTsv(report));
+  writeFileSync(files.clientRows, formatClientRowsTsv(rows));
+  writeFileSync(files.serverTickRows, formatServerTickRowsTsv(rows));
   return files;
 }
 
@@ -1177,12 +1289,17 @@ function main() {
 
   const { rows, warnings } = readRows(options.files);
   const report = analyze(rows, warnings);
+  attachAgentDigest(report, rows, {
+    timelineBandMs: options.timelineBandMs,
+    issueGroups: ISSUE_GROUPS,
+    warnThreshold: WARN_THRESHOLD,
+  });
 
   if (options.outDir) {
-    const files = writeOutputs(report, options.outDir);
-    console.log(`wrote ${files.markdown}`);
-    console.log(`wrote ${files.json}`);
-    console.log(`wrote ${files.tsv}`);
+    const files = writeOutputs(report, rows, options.outDir);
+    for (const file of Object.values(files)) {
+      console.log(`wrote ${file}`);
+    }
     return;
   }
 
