@@ -18,6 +18,20 @@ import {
   appendSnapshotPayloadMarkdown,
   summarizeSnapshotPayload,
 } from "./net-report-snapshot-payload.mjs";
+import {
+  addPathingPhaseEvidence,
+  appendPathingDiagnosticsMarkdown,
+  summarizePathingDiagnostics,
+} from "./net-report-pathing-diagnostics.mjs";
+import {
+  formatPctX100,
+  formatTransportDiagnostics,
+  formatTsv,
+  formatValue,
+  metricMax,
+  metricMin,
+  metricPctX100Max,
+} from "./net-report-output-format.mjs";
 
 const ANSI_PATTERN = /\x1B\[[0-?]*[ -/]*[@-~]/g;
 const SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES = 1280;
@@ -58,6 +72,16 @@ const METRICS = [
   ["server_tick_ms", "server tick"],
   ["server_lag_ms", "server lag"],
   ["slow_tick_count", "slow ticks"],
+  ["pathing_requests", "pathing requests"],
+  ["pathing_processed", "pathing processed"],
+  ["pathing_deferred", "pathing deferred"],
+  ["pathing_budget_exhausted", "pathing budget exhausted"],
+  ["pathing_worst_request_ms", "pathing worst request"],
+  ["pathing_explored_nodes_max", "pathing explored nodes"],
+  ["requests_processed", "pathing pass processed"],
+  ["requests_deferred", "pathing pass deferred"],
+  ["worst_request_ms", "pathing pass worst request"],
+  ["explored_nodes_max", "pathing pass explored nodes"],
   ["head_of_line_count", "head of line"],
   ["acknowledged_command_latency_ms", "legacy command ack"],
   ["command_issue_to_socket_send_accepted_max_ms", "command client send max"],
@@ -231,6 +255,29 @@ const ISSUE_GROUPS = [
     fields: ["server_tick_ms", "server_lag_ms", "slow_tick_count", "tick_ms", "scheduler_lag_ms"],
   },
   {
+    id: "server_pathing",
+    label: "server pathing request/complexity pressure",
+    fields: [
+      "pathing_awaiting_start",
+      "pathing_promoted_awaiting_start",
+      "pathing_promote_queued_for_path",
+      "pathing_requests",
+      "pathing_processed",
+      "pathing_deferred",
+      "pathing_still_awaiting",
+      "pathing_budget_exhausted",
+      "pathing_worst_request_ms",
+      "pathing_explored_nodes_max",
+      "pathing_path_len_max",
+      "requests_processed",
+      "requests_deferred",
+      "still_awaiting",
+      "path_budget_exhausted",
+      "worst_request_ms",
+      "explored_nodes_max",
+    ],
+  },
+  {
     id: "server_snapshot_projection",
     label: "server snapshot projection/compact/serialization cost",
     fields: [
@@ -397,6 +444,23 @@ const WARN_THRESHOLD = {
   tick_ms: 40,
   scheduler_lag_ms: 33,
   slowest_phase_ms: 33,
+  pathing_awaiting_start: 64,
+  pathing_promoted_awaiting_start: 64,
+  pathing_promote_queued_for_path: 64,
+  pathing_requests: 64,
+  pathing_processed: 64,
+  pathing_deferred: 1,
+  pathing_still_awaiting: 1,
+  pathing_budget_exhausted: 1,
+  pathing_worst_request_ms: 8,
+  pathing_explored_nodes_max: 4096,
+  pathing_path_len_max: 128,
+  requests_processed: 64,
+  requests_deferred: 1,
+  still_awaiting: 1,
+  path_budget_exhausted: 1,
+  worst_request_ms: 8,
+  explored_nodes_max: 4096,
   max_snapshot_ms: 8,
   snapshot_ms: 8,
   compact_ms: 8,
@@ -474,7 +538,8 @@ Options:
 
 Input is Fly JSONL from scripts/fly-logs.sh search/recent or raw tracing text.
 The parser extracts client_net_report, match_started, match_ended, performance tick summary,
-performance snapshot timing, and performance writer timing rows. Malformed rows become warnings.`);
+performance pathing diagnostics, performance snapshot timing, and performance writer timing rows.
+Malformed rows become warnings.`);
 }
 
 function parseArgs(argv) {
@@ -597,6 +662,9 @@ function normalizeEvent(event, message) {
   }
   if (event === "tick" || message.includes("performance tick summary")) {
     return "performance_tick";
+  }
+  if (event === "pathing" || message.includes("performance pathing diagnostics")) {
+    return "performance_pathing";
   }
   if (event === "snapshot" || message.includes("performance snapshot timing")) {
     return "performance_snapshot";
@@ -774,10 +842,16 @@ function analyze(rows, warnings) {
       applyMatchFields(match, row.fields);
       addPlayerReport(match, row);
     } else if (row.event === "performance_tick") {
+      applyMatchFields(match, row.fields);
       match.serverTicks.push(row);
+    } else if (row.event === "performance_pathing") {
+      applyMatchFields(match, row.fields);
+      match.pathing.push(row);
     } else if (row.event === "performance_snapshot") {
+      applyMatchFields(match, row.fields);
       match.snapshots.push(row);
     } else if (row.event === "performance_writer") {
+      applyMatchFields(match, row.fields);
       match.writers.push(row);
     } else {
       unmatched.push(row);
@@ -808,6 +882,7 @@ function ensureMatch(matches, key, sourceMatch) {
       ended: [],
       players: new Map(),
       serverTicks: [],
+      pathing: [],
       snapshots: [],
       writers: [],
       participants: [],
@@ -885,6 +960,7 @@ function finalizeMatch(match) {
   const groups = ISSUE_GROUPS.map((group) => classifyGroup(group, players, matchPerf, allRows)).filter(Boolean);
   const missing = missingDiagnosticGroups(allRows);
   const transport = summarizeTransport(allRows);
+  const pathingDiagnostics = summarizePathingDiagnostics(match.pathing);
 
   return {
     match: sourceLabel(match),
@@ -905,10 +981,12 @@ function finalizeMatch(match) {
     winnerTeamId: match.winner_team_id,
     reportRows: players.reduce((sum, player) => sum + player.reportCount, 0),
     serverTickRows: match.serverTicks.length,
+    pathingRows: match.pathing.length,
     snapshotRows: match.snapshots.length,
     writerRows: match.writers.length,
     players,
     matchPerf,
+    pathingDiagnostics,
     transport,
     classifications: groups,
     missing,
@@ -1034,6 +1112,28 @@ function summarizePerf(match) {
       "max_snapshot_ms",
       "snapshot_replaced",
       "snapshot_closed",
+      "pathing_awaiting_start",
+      "pathing_promoted_awaiting_start",
+      "pathing_promote_queued_for_path",
+      "pathing_requests",
+      "pathing_processed",
+      "pathing_deferred",
+      "pathing_still_awaiting",
+      "pathing_budget_exhausted",
+      "pathing_worst_request_ms",
+      "pathing_explored_nodes_max",
+      "pathing_path_len_max",
+    ]),
+    pathing: summarizeRows(match.pathing, [
+      "awaiting_start",
+      "queued_for_path",
+      "requests_processed",
+      "requests_deferred",
+      "still_awaiting",
+      "path_budget_exhausted",
+      "worst_request_ms",
+      "explored_nodes_max",
+      "path_len_max",
     ]),
     snapshots: summarizeRows(match.snapshots, [
       "snapshot_ms",
@@ -1079,6 +1179,9 @@ function classifyGroup(group, players, matchPerf, rows) {
         addClassificationEvidence(bucketName, field, metric, evidenceFor, evidenceAgainst);
       }
     }
+  }
+  if (group.id === "server_pathing") {
+    addPathingPhaseEvidence(rows, evidenceFor, evidenceAgainst, WARN_THRESHOLD.slowest_phase_ms);
   }
 
   const rawFieldSet = new Set(rows.flatMap((row) => Object.keys(row.fields)));
@@ -1193,6 +1296,9 @@ function missingDiagnosticGroups(rows) {
   if (!fields.has("server_snapshot_payload_sections")) {
     missing.push("server snapshot payload composition: no section/entity-kind fields in input");
   }
+  if (!fields.has("pathing_requests") && !fields.has("requests_processed")) {
+    missing.push("server pathing diagnostics: no path request/source/complexity fields in input");
+  }
   if (!fields.has("prediction_disable_wasm_count") || !fields.has("prediction_replay_max_ms")) {
     missing.push("prediction disable reason/replay budget detail: no matching fields in input");
   }
@@ -1232,9 +1338,9 @@ function formatMarkdown(report) {
       lines.push(`- Duration: ${formatValue(match.durationMs)} ms / ${formatValue(match.durationTicks)} ticks`);
     }
     lines.push(
-      `- Rows: ${match.reportRows} client reports, ${match.serverTickRows} tick, ${match.snapshotRows} snapshot, ${match.writerRows} writer`
+      `- Rows: ${match.reportRows} client reports, ${match.serverTickRows} tick, ${match.pathingRows} pathing, ${match.snapshotRows} snapshot, ${match.writerRows} writer`
     );
-    lines.push(`- Transport diagnostics: ${formatTransportDiagnostics(match.transport)}`);
+    lines.push(`- Transport diagnostics: ${formatTransportDiagnostics(match.transport, TRANSPORT_DIAGNOSTIC_FIELDS)}`);
 
     lines.push("");
     lines.push("| player | reports | primary issues | RTT max | snapshot gap max | jitter max | payload max | payload p95 | over budget | parse/decode/apply max | frame gap max | frame work max | renderer max | FPS min | cmds/burst | cmd response max | server outbound | server tick max | server lag max |");
@@ -1274,6 +1380,7 @@ function formatMarkdown(report) {
 
     appendSnapshotPayloadMarkdown(lines, match.players, { formatValue, formatPctX100 });
     appendCommandLifecycleMarkdown(lines, match.players);
+    appendPathingDiagnosticsMarkdown(lines, match.pathingDiagnostics);
 
     lines.push("");
     lines.push("### Classification");
@@ -1302,83 +1409,8 @@ function formatMarkdown(report) {
   return `${lines.join("\n")}\n`;
 }
 
-function metricPctX100Max(player, field) {
-  return formatPctX100(player.metrics[field]?.max);
-}
-
-function metricMax(player, field) {
-  return formatValue(player.metrics[field]?.max);
-}
-
-function metricMin(player, field) {
-  return formatValue(player.metrics[field]?.min);
-}
-
-function formatTransportDiagnostics(transport) {
-  return TRANSPORT_DIAGNOSTIC_FIELDS.map(([field, label]) => {
-    const summary = transport[camelCase(field)];
-    return `${label} ${formatTransportCounts(summary)}`;
-  }).join("; ");
-}
-
-function formatTransportCounts(summary) {
-  if (!summary || summary.samples === 0 || summary.values.length === 0) {
-    return "n/a";
-  }
-  return summary.values.map((item) => `${item.value}=${item.count}`).join(", ");
-}
-
-function formatPctX100(value) {
-  if (value === null || value === undefined || value === "") {
-    return "n/a";
-  }
-  const number = Number(value);
-  if (!Number.isFinite(number)) {
-    return "n/a";
-  }
-  return `${(number / 100).toFixed(2).replace(/\.?0+$/, "")}%`;
-}
-
-function formatValue(value) {
-  return value === null || value === undefined || value === "" ? "n/a" : String(value);
-}
-
-function formatTsv(report) {
-  const headers = [
-    "match",
-    "player_id",
-    "reports",
-    "primary_issues",
-    ...SUMMARY_FIELDS.flatMap((field) => [`${field}_max`, `${field}_p95`]),
-  ];
-  const lines = [headers.join("\t")];
-  for (const match of report.matches) {
-    for (const player of match.players) {
-      lines.push(
-        [
-          match.match,
-          player.playerId,
-          player.reportCount,
-          player.primaryIssues.map((issue) => `${issue.issue}:${issue.count}`).join(","),
-          ...SUMMARY_FIELDS.flatMap((field) => [
-            player.metrics[field]?.max ?? "",
-            player.metrics[field]?.p95 ?? "",
-          ]),
-        ]
-          .map(tsvCell)
-          .join("\t")
-      );
-    }
-  }
-  return `${lines.join("\n")}\n`;
-}
-
 function camelCase(value) {
   return value.replace(/_([a-z])/g, (_, ch) => ch.toUpperCase());
-}
-
-function tsvCell(value) {
-  return String(value).replace(/\t/g, " ").replace(/\r?\n/g, " ");
 }
 
 function writeOutputs(report, rows, outDir) {
@@ -1398,7 +1430,7 @@ function writeOutputs(report, rows, outDir) {
   writeFileSync(files.keyMetrics, formatKeyMetricsJson(report));
   writeFileSync(files.markdown, formatMarkdown(report));
   writeFileSync(files.json, `${JSON.stringify(report, null, 2)}\n`);
-  writeFileSync(files.tsv, formatTsv(report));
+  writeFileSync(files.tsv, formatTsv(report, SUMMARY_FIELDS));
   writeFileSync(files.clientRows, formatClientRowsTsv(rows));
   writeFileSync(files.serverTickRows, formatServerTickRowsTsv(rows));
   return files;
@@ -1443,7 +1475,7 @@ function main() {
   if (options.format === "json") {
     console.log(JSON.stringify(report, null, 2));
   } else if (options.format === "tsv") {
-    process.stdout.write(formatTsv(report));
+    process.stdout.write(formatTsv(report, SUMMARY_FIELDS));
   } else {
     process.stdout.write(formatMarkdown(report));
   }

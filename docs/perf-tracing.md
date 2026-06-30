@@ -138,6 +138,45 @@ WebSocket application payload bytes, currently `messagepack-application-payload`
 timestamp arrays, raw phase arrays, recent frame records, stack traces, entity ids, command
 payloads, command targets, and replay data are intentionally not uploaded.
 
+Logged slow or sampled server ticks also include bounded pathing diagnostics for the movement
+coordinator passes `awaiting_paths`, `promote_queued_orders`, and `promoted_awaiting_paths`.
+The tick summary carries aggregate fields:
+
+- `pathing_awaiting_start`, `pathing_promoted_awaiting_start`, and
+  `pathing_promote_queued_for_path`: unit counts at the start of the two awaiting-path passes and
+  units staged by queued-order promotion.
+- `pathing_requests`, `pathing_processed`, `pathing_deferred`, `pathing_still_awaiting`,
+  `pathing_success`, and `pathing_failed`: per-logged-tick request volume and outcome counts.
+- `pathing_cache_hits` and `pathing_cache_misses`: LRU path cache reuse at the pathing-service
+  boundary.
+- `pathing_budget_exhausted`: count of exhausted pathfinding budgets plus exhausted coordinator
+  pass budgets on that logged tick.
+- `pathing_worst_request_ms`, `pathing_explored_nodes_max`, and `pathing_path_len_max`: worst
+  bounded request timing, A* expanded-node count, and tile-path length observed on the logged tick.
+- `pathing_top_source` and `pathing_top_source_count`: the largest stable source family among
+  processed path requests, falling back to queued path sources when no request was processed. Stable
+  families are `move`, `attackMove`, `attack`, `gather`, `build`, `deconstruct`, `ability`, and
+  `other`.
+
+Each logged tick also emits one `event="pathing"` row per instrumented pass. Those rows include the
+same counts at pass granularity plus `source_counts`, `queued_source_counts`,
+`group_size_buckets`, `path_len_buckets`, `explored_node_buckets`, `worst_request_bucket`,
+`cache_available`, `complexity_available`, and `fuse_triggered`. `source_counts` describes
+processed path requests; `queued_source_counts` describes grouped orders staged for later path
+requests. Bucket values are aggregate labels only; the logs do not include raw paths, raw
+positions, full unit id lists, entity ids, targets, command payloads, or player-entered text. The
+reset window is one coordinator pass inside one logged tick, so missing pathing rows mean perf
+tracing did not log that tick, not that pathing was free. `fuse_triggered` is currently `false`
+because the coordinator exposes budget exhaustion but no separate pathing fuse.
+
+Use these fields with the normal phase timings. `slowest_phase=awaiting_paths` plus high
+`pathing_requests`, deferred counts, or coordinator budget exhaustion points at request volume.
+High `pathing_worst_request_ms` or `pathing_explored_nodes_max` with modest request counts points at
+path complexity. A slow `promote_queued_orders` phase with high `queued_for_path` but few processed
+requests points at queued-order promotion staging work. Cache and complexity are directly measured
+when the row says they are available; do not infer missing cache or complexity fields from duration
+alone.
+
 ## Modes
 
 ```bash

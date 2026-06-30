@@ -185,6 +185,20 @@ struct CacheEntry {
     last_used: u32,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum PathCacheStatus {
+    Hit,
+    Miss,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct PathingRequestDiagnostics {
+    pub cache_status: PathCacheStatus,
+    pub expanded_nodes: usize,
+    pub budget_exhausted: bool,
+    pub tile_path_len: usize,
+}
+
 /// The authoritative pathfinding boundary.
 ///
 /// Holds an LRU cache so multiple units heading to the same destination, or the same unit
@@ -215,16 +229,26 @@ impl PathingService {
     }
 
     /// Request a path. Returns world-pixel waypoints in reverse order (next waypoint = pop).
+    #[allow(dead_code)]
     pub fn request(
         &mut self,
         map: &Map,
         occupancy: &Occupancy,
         req: PathRequest,
     ) -> Vec<(f32, f32)> {
+        self.request_with_diagnostics(map, occupancy, req).0
+    }
+
+    pub(super) fn request_with_diagnostics(
+        &mut self,
+        map: &Map,
+        occupancy: &Occupancy,
+        req: PathRequest,
+    ) -> (Vec<(f32, f32)>, PathingRequestDiagnostics) {
         let start = req.start;
         let kind = req.kind;
         let relation = req.relation();
-        let tile_path = self.request_tile_path(map, occupancy, req);
+        let (tile_path, diagnostics) = self.request_tile_path_with_diagnostics(map, occupancy, req);
         if uses_pivot_vehicle_movement(kind) {
             let pass = TerrainPassability {
                 map,
@@ -236,17 +260,28 @@ impl PathingService {
                 avoid_diagonal_pinch: true,
             };
             let tile_path = expand_vehicle_diagonal_steps_to_l_waypoints(start, &tile_path, &pass);
-            return pathfinding::to_world_waypoints(&tile_path);
+            return (pathfinding::to_world_waypoints(&tile_path), diagnostics);
         }
-        pathfinding::to_world_waypoints(&tile_path)
+        (pathfinding::to_world_waypoints(&tile_path), diagnostics)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn request_tile_path(
         &mut self,
         map: &Map,
         occupancy: &Occupancy,
         req: PathRequest,
     ) -> Vec<(i32, i32)> {
+        self.request_tile_path_with_diagnostics(map, occupancy, req)
+            .0
+    }
+
+    pub(super) fn request_tile_path_with_diagnostics(
+        &mut self,
+        map: &Map,
+        occupancy: &Occupancy,
+        req: PathRequest,
+    ) -> (Vec<(i32, i32)>, PathingRequestDiagnostics) {
         let pass = TerrainPassability {
             map,
             occupancy,
@@ -260,24 +295,37 @@ impl PathingService {
         let static_fingerprint =
             occupancy.static_fingerprint_for_kind_and_relation(req.kind, &req.relation);
         if let Some(tile_path) = self.cache_lookup(&req, &pass, static_fingerprint) {
-            return tile_path;
+            let diagnostics = PathingRequestDiagnostics {
+                cache_status: PathCacheStatus::Hit,
+                expanded_nodes: 0,
+                budget_exhausted: false,
+                tile_path_len: tile_path.len(),
+            };
+            return (tile_path, diagnostics);
         }
 
         let budget = req.budget.unwrap_or(self.default_budget);
-        let tile_path = pathfinding::find_path_with_budget_and_turn_cost(
-            &pass,
-            req.start.0,
-            req.start.1,
-            req.goal.0,
-            req.goal.1,
-            budget,
-            req.route_shape.turn_penalty(),
-        );
+        let (tile_path, expanded_nodes, budget_exhausted) =
+            pathfinding::find_path_with_budget_and_turn_cost_with_diagnostics(
+                &pass,
+                req.start.0,
+                req.start.1,
+                req.goal.0,
+                req.goal.1,
+                budget,
+                req.route_shape.turn_penalty(),
+            );
 
         if !tile_path.is_empty() {
             self.cache_insert(&req, static_fingerprint, tile_path.clone());
         }
-        tile_path
+        let diagnostics = PathingRequestDiagnostics {
+            cache_status: PathCacheStatus::Miss,
+            expanded_nodes,
+            budget_exhausted,
+            tile_path_len: tile_path.len(),
+        };
+        (tile_path, diagnostics)
     }
 
     fn cache_lookup<P: Passability>(
@@ -807,6 +855,37 @@ mod tests {
             assert!(a.cache_contains(EntityKind::Worker, *start, *goal, 0, RouteShape::Normal));
             assert!(b.cache_contains(EntityKind::Worker, *start, *goal, 0, RouteShape::Normal));
         }
+    }
+
+    #[test]
+    fn request_tile_path_reports_cache_and_complexity_diagnostics() {
+        let map = Map::generate(1, 0x1234_5678);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let mut service = PathingService::new(8_192, 256);
+        service.advance_tick(1);
+        let req = PathRequest {
+            relation: StaticPathingRelation::single_owner(1),
+            kind: EntityKind::Worker,
+            start: (1, 1),
+            goal: (8, 8),
+            radius_tiles: 0,
+            route_shape: RouteShape::Normal,
+            budget: None,
+        };
+
+        let (first_path, first) =
+            service.request_tile_path_with_diagnostics(&map, &occ, req.clone());
+        let (second_path, second) = service.request_tile_path_with_diagnostics(&map, &occ, req);
+
+        assert_eq!(first.cache_status, PathCacheStatus::Miss);
+        assert!(first.expanded_nodes > 0);
+        assert!(!first.budget_exhausted);
+        assert_eq!(first.tile_path_len, first_path.len());
+        assert_eq!(second.cache_status, PathCacheStatus::Hit);
+        assert_eq!(second.expanded_nodes, 0);
+        assert_eq!(second.tile_path_len, second_path.len());
+        assert_eq!(first_path, second_path);
     }
 
     #[test]
@@ -1793,7 +1872,11 @@ mod tests {
         let start = (1, 4);
         let goal = (14, 4);
 
-        for kind in [EntityKind::ScoutCar, EntityKind::Tank, EntityKind::AntiTankGun] {
+        for kind in [
+            EntityKind::ScoutCar,
+            EntityKind::Tank,
+            EntityKind::AntiTankGun,
+        ] {
             let normal = service.request_tile_path(
                 &map,
                 &occ,

@@ -146,6 +146,9 @@ pub(crate) fn run_tick(
     let attack_fog = crate::perf::timed(perf.as_deref_mut(), "attack_fog", || {
         fog.with_active_lingering_sources(lingering_sight, tick, map, entities, smokes)
     });
+    if perf.is_some() {
+        coordinator.enable_diagnostics();
+    }
 
     crate::perf::timed(perf.as_deref_mut(), "apply_commands", || {
         services::commands::apply_commands(
@@ -173,9 +176,15 @@ pub(crate) fn run_tick(
             smokes.spawn_due(tick);
         },
     );
+    coordinator.begin_pathing_diagnostics("awaiting_paths", entities);
     crate::perf::timed(perf.as_deref_mut(), "awaiting_paths", || {
         coordinator.process_awaiting_paths(entities);
     });
+    if let Some(record) = coordinator.finish_pathing_diagnostics(entities) {
+        if let Some(perf) = perf.as_deref_mut() {
+            perf.record_pathing(record);
+        }
+    }
     crate::perf::timed(perf.as_deref_mut(), "movement", || {
         services::movement::movement_system_with_events(
             map,
@@ -189,6 +198,7 @@ pub(crate) fn run_tick(
             ability_runtime,
         );
     });
+    coordinator.begin_pathing_diagnostics("promote_queued_orders", entities);
     crate::perf::timed(perf.as_deref_mut(), "promote_queued_orders", || {
         services::order_queue::promote_ready_orders(
             map,
@@ -204,6 +214,11 @@ pub(crate) fn run_tick(
             tick,
         );
     });
+    if let Some(record) = coordinator.finish_pathing_diagnostics(entities) {
+        if let Some(perf) = perf.as_deref_mut() {
+            perf.record_pathing(record);
+        }
+    }
     crate::perf::timed(
         perf.as_deref_mut(),
         "spawn_due_smokes_after_promotions",
@@ -211,9 +226,15 @@ pub(crate) fn run_tick(
             smokes.spawn_due(tick);
         },
     );
+    coordinator.begin_pathing_diagnostics("promoted_awaiting_paths", entities);
     crate::perf::timed(perf.as_deref_mut(), "promoted_awaiting_paths", || {
         coordinator.process_awaiting_paths(entities);
     });
+    if let Some(record) = coordinator.finish_pathing_diagnostics(entities) {
+        if let Some(perf) = perf.as_deref_mut() {
+            perf.record_pathing(record);
+        }
+    }
 
     let post_movement = crate::perf::timed(perf.as_deref_mut(), "post_movement_derived", || {
         PostMovementDerivedState::rebuild(map, entities)

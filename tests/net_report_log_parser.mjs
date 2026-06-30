@@ -177,6 +177,63 @@ try {
   rmSync(snapshotPayloadDir, { recursive: true, force: true });
 }
 
+const pathingDir = mkdtempSync(path.join(os.tmpdir(), "rts-net-report-parser-pathing-"));
+try {
+  const pathingLog = path.join(pathingDir, "pathing.log");
+  writeFileSync(
+    pathingLog,
+    [
+      '2026-06-24T03:30:00Z INFO event="tick" room="beta pathing" match_run_id="pathing-1" tick=123 tick_ms=320 scheduler_lag_ms=0 sim_ms=314 fanout_ms=2 outcome_ms=0 players=2 spectators=0 ai_players=0 entities=900 units=640 buildings=80 resources=180 snapshots=2 snapshot_stored=2 snapshot_replaced=0 snapshot_closed=0 max_snapshot_ms=4 max_snapshot_entities=500 slowest_phase="awaiting_paths" slowest_phase_ms=297 pathing_passes=3 pathing_awaiting_start=96 pathing_promoted_awaiting_start=40 pathing_promote_queued_for_path=40 pathing_requests=64 pathing_processed=64 pathing_deferred=32 pathing_still_awaiting=32 pathing_success=60 pathing_failed=4 pathing_cache_hits=8 pathing_cache_misses=56 pathing_budget_exhausted=1 pathing_worst_request_ms=42 pathing_explored_nodes_max=9001 pathing_path_len_max=220 pathing_top_source="move" pathing_top_source_count=64 "performance tick summary"',
+      '2026-06-24T03:30:00Z DEBUG event="pathing" room="beta pathing" match_run_id="pathing-1" tick=123 pass="awaiting_paths" awaiting_start=96 queued_for_path=0 requests_processed=64 requests_deferred=32 still_awaiting=32 path_success=60 path_failed=4 same_tile=0 cache_hits=8 cache_misses=56 path_budget_exhausted=1 coordinator_budget_exhausted=true total_request_ms=310 worst_request_ms=42 worst_request_bucket="34ms+" explored_nodes_max=9001 path_len_max=220 source_counts="move=64" queued_source_counts="none" group_size_buckets="none" path_len_buckets="129+=64" explored_node_buckets="8193+=1,2049-8192=63" cache_available=true complexity_available=true fuse_triggered=false "performance pathing diagnostics"',
+      '2026-06-24T03:30:00Z DEBUG event="pathing" room="beta pathing" match_run_id="pathing-1" tick=123 pass="promote_queued_orders" awaiting_start=0 queued_for_path=40 requests_processed=0 requests_deferred=0 still_awaiting=40 path_success=0 path_failed=0 same_tile=0 cache_hits=0 cache_misses=0 path_budget_exhausted=0 coordinator_budget_exhausted=false total_request_ms=0 worst_request_ms=0 worst_request_bucket="0ms" explored_nodes_max=0 path_len_max=0 source_counts="none" queued_source_counts="attackMove=40" group_size_buckets="17-64=1" path_len_buckets="none" explored_node_buckets="none" cache_available=true complexity_available=true fuse_triggered=false "performance pathing diagnostics"',
+    ].join("\n") + "\n"
+  );
+  const pathingParsed = JSON.parse(run(["--format", "json", pathingLog]));
+  const pathingMatch = pathingParsed.matches.find((match) => match.matchRunId === "pathing-1");
+  assert.ok(pathingMatch, "expected synthetic pathing match summary");
+  assert.equal(pathingMatch.pathingRows, 2);
+  assert.equal(pathingMatch.pathingDiagnostics.interpretation.primary, "path request volume");
+  assert.equal(pathingMatch.pathingDiagnostics.topSources[0].label, "move");
+  assert.equal(pathingMatch.pathingDiagnostics.passes[0].pass, "awaiting_paths");
+  assert.equal(
+    pathingMatch.classifications.find((item) => item.id === "server_pathing")?.result,
+    "indicated",
+  );
+  assert.ok(
+    pathingParsed.agentDigest.coverageMatrix.matches
+      .find((match) => match.match === "pathing-1")
+      ?.items.find((item) => item.id === "pathing_perf_rows")?.present,
+    "expected pathing perf coverage to be present",
+  );
+  assert.equal(
+    pathingParsed.agentDigest.topWindows.groups.find((group) => group.id === "server_pathing")?.windows[0]
+      ?.match,
+    "pathing-1",
+  );
+  const pathingMarkdown = run([pathingLog]);
+  assert.match(pathingMarkdown, /Pathing Slow-Tick Diagnostics/);
+  assert.match(pathingMarkdown, /path request volume/);
+  assert.match(pathingMarkdown, /awaiting_paths/);
+
+  const lowVolumePathingLog = path.join(pathingDir, "pathing-low-volume.log");
+  writeFileSync(
+    lowVolumePathingLog,
+    [
+      '2026-06-24T03:31:00Z DEBUG event="pathing" match_run_id="pathing-low" tick=1 pass="awaiting_paths" awaiting_start=32 queued_for_path=32 requests_processed=32 requests_deferred=0 still_awaiting=0 path_success=32 path_failed=0 same_tile=0 cache_hits=0 cache_misses=32 path_budget_exhausted=0 coordinator_budget_exhausted=false total_request_ms=8 worst_request_ms=1 worst_request_bucket="1-2ms" explored_nodes_max=64 path_len_max=10 source_counts="move=32" queued_source_counts="move=32" group_size_buckets="17-64=1" path_len_buckets="9-32=32" explored_node_buckets="1-512=32" cache_available=true complexity_available=true fuse_triggered=false "performance pathing diagnostics"',
+      '2026-06-24T03:31:01Z DEBUG event="pathing" match_run_id="pathing-low" tick=2 pass="awaiting_paths" awaiting_start=32 queued_for_path=32 requests_processed=32 requests_deferred=0 still_awaiting=0 path_success=32 path_failed=0 same_tile=0 cache_hits=0 cache_misses=32 path_budget_exhausted=0 coordinator_budget_exhausted=false total_request_ms=8 worst_request_ms=1 worst_request_bucket="1-2ms" explored_nodes_max=64 path_len_max=10 source_counts="move=32" queued_source_counts="move=32" group_size_buckets="17-64=1" path_len_buckets="9-32=32" explored_node_buckets="1-512=32" cache_available=true complexity_available=true fuse_triggered=false "performance pathing diagnostics"',
+      '2026-06-24T03:31:02Z DEBUG event="pathing" match_run_id="pathing-low" tick=3 pass="awaiting_paths" awaiting_start=32 queued_for_path=32 requests_processed=32 requests_deferred=0 still_awaiting=0 path_success=32 path_failed=0 same_tile=0 cache_hits=0 cache_misses=32 path_budget_exhausted=0 coordinator_budget_exhausted=false total_request_ms=8 worst_request_ms=1 worst_request_bucket="1-2ms" explored_nodes_max=64 path_len_max=10 source_counts="move=32" queued_source_counts="move=32" group_size_buckets="17-64=1" path_len_buckets="9-32=32" explored_node_buckets="1-512=32" cache_available=true complexity_available=true fuse_triggered=false "performance pathing diagnostics"',
+    ].join("\n") + "\n"
+  );
+  const lowVolumeParsed = JSON.parse(run(["--format", "json", lowVolumePathingLog]));
+  const lowVolumeMatch = lowVolumeParsed.matches.find((match) => match.matchRunId === "pathing-low");
+  assert.ok(lowVolumeMatch, "expected low-volume pathing match summary");
+  assert.equal(lowVolumeMatch.pathingDiagnostics.totalRequests, 96);
+  assert.equal(lowVolumeMatch.pathingDiagnostics.processedMax, 32);
+  assert.equal(lowVolumeMatch.pathingDiagnostics.interpretation.primary, "unknown");
+} finally {
+  rmSync(pathingDir, { recursive: true, force: true });
+}
+
 const tsv = run(["--format=tsv", ...logs]);
 assert.match(tsv, /^match\tplayer_id\treports/m);
 assert.match(tsv, /^54\t5\t17\tprediction_disabled:17/m);
