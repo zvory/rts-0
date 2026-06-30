@@ -45,7 +45,6 @@ use rts_sim::game::map::Map;
 use rts_sim::game::replay::{
     ReplayArtifactV1, ReplayValidationError, REPLAY_ARTIFACT_SCHEMA_VERSION_V2,
 };
-use rts_sim::game::SimCommand;
 use rts_sim::perf;
 
 /// Default room name used when a client's `join` omits `room`.
@@ -1609,23 +1608,14 @@ async fn handle_client_message(
             .await;
         }
         ClientMessage::Command { client_seq, cmd } => {
-            let family = lobby::CommandLifecycleFamily::from_protocol_command(&cmd);
-            let lifecycle = lobby::CommandLifecycleTiming {
-                received_unix_ms: timing.received_unix_ms,
-                frame_received_at: timing.frame_received_at,
-                deserialized_at: timing.deserialized_at,
-                room_event_enqueued_at: Instant::now(),
-                family,
-            };
-            send_room_event(
+            lobby::send_command_room_event(
                 player_id,
                 current_room,
-                RoomEvent::Command {
-                    player_id,
-                    client_seq,
-                    cmd: SimCommand::from_protocol(cmd),
-                    lifecycle,
-                },
+                client_seq,
+                cmd,
+                timing.received_unix_ms,
+                timing.frame_received_at,
+                timing.deserialized_at,
             )
             .await;
         }

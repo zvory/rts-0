@@ -60,7 +60,7 @@
     },
     {
       "path": "server/src/main.rs",
-      "lines": 1975,
+      "lines": 1965,
       "reason": "Command lifecycle ingress timing added WebSocket receive and deserialization timestamps in the existing oversized server shell; keep ratcheting until connection handling is split."
     },
     {

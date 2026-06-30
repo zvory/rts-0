@@ -1,6 +1,7 @@
 #![cfg_attr(test, allow(dead_code))]
 
 use super::*;
+use std::collections::VecDeque;
 use std::time::Instant as StdInstant;
 
 /// Outbound connection handle shared with the room task. Reliable messages keep FIFO ordering;
@@ -195,7 +196,7 @@ pub(crate) struct ConnectionReportCounters {
     snapshot_slot_stored: AtomicU32,
     snapshot_slot_replaced: AtomicU32,
     snapshot_slot_closed: AtomicU32,
-    command_receipt_queued_at: StdMutex<Vec<StdInstant>>,
+    command_receipt_queued_at: StdMutex<VecDeque<StdInstant>>,
     command_lifecycle: StdMutex<CommandLifecycleWindow>,
 }
 
@@ -477,10 +478,10 @@ impl ConnectionReportCounters {
 
     pub(crate) fn record_command_receipt_queued_at(&self) {
         match self.command_receipt_queued_at.lock() {
-            Ok(mut guard) => guard.push(StdInstant::now()),
+            Ok(mut guard) => guard.push_back(StdInstant::now()),
             Err(poisoned) => {
                 let mut guard = poisoned.into_inner();
-                guard.push(StdInstant::now());
+                guard.push_back(StdInstant::now());
             }
         }
     }
@@ -488,20 +489,10 @@ impl ConnectionReportCounters {
     pub(crate) fn record_reliable_sent(&self, command_receipt: bool) {
         if command_receipt {
             let queued_at = match self.command_receipt_queued_at.lock() {
-                Ok(mut guard) => {
-                    if guard.is_empty() {
-                        None
-                    } else {
-                        Some(guard.remove(0))
-                    }
-                }
+                Ok(mut guard) => guard.pop_front(),
                 Err(poisoned) => {
                     let mut guard = poisoned.into_inner();
-                    if guard.is_empty() {
-                        None
-                    } else {
-                        Some(guard.remove(0))
-                    }
+                    guard.pop_front()
                 }
             };
             if let Some(queued_at) = queued_at {
@@ -692,6 +683,9 @@ impl CommandTimingWindow {
         for (index, count) in self.bucket_counts.iter().enumerate() {
             seen = seen.saturating_add(*count);
             if seen >= target {
+                if index == COMMAND_LIFECYCLE_BUCKETS_MS.len() {
+                    return self.max_ms;
+                }
                 return COMMAND_LIFECYCLE_BUCKETS_MS
                     .get(index)
                     .copied()
@@ -699,6 +693,25 @@ impl CommandTimingWindow {
             }
         }
         0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn command_lifecycle_p95_uses_max_for_overflow_bucket() {
+        let mut window = CommandTimingWindow::default();
+        for _ in 0..20 {
+            window.add(60_000);
+        }
+
+        let stats = window.consume();
+
+        assert_eq!(stats.max_ms, 60_000);
+        assert_eq!(stats.p95_ms, 60_000);
+        assert_eq!(stats.count, 20);
     }
 }
 

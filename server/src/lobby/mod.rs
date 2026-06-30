@@ -165,6 +165,43 @@ pub struct CommandLifecycleTiming {
     pub family: CommandLifecycleFamily,
 }
 
+pub async fn send_command_room_event(
+    player_id: u32,
+    current_room: &Option<RoomHandle>,
+    client_seq: u32,
+    cmd: crate::protocol::Command,
+    received_unix_ms: u64,
+    frame_received_at: Instant,
+    deserialized_at: Instant,
+) {
+    let Some(handle) = current_room else {
+        crate::log_debug!(player_id, "ignoring event before join");
+        return;
+    };
+
+    let family = CommandLifecycleFamily::from_protocol_command(&cmd);
+    let cmd = SimCommand::from_protocol(cmd);
+    match handle.event_tx.reserve().await {
+        Ok(permit) => {
+            permit.send(RoomEvent::Command {
+                player_id,
+                client_seq,
+                cmd,
+                lifecycle: CommandLifecycleTiming {
+                    received_unix_ms,
+                    frame_received_at,
+                    deserialized_at,
+                    room_event_enqueued_at: Instant::now(),
+                    family,
+                },
+            });
+        }
+        Err(_) => {
+            crate::log_warn!(player_id, "room task gone; dropping event");
+        }
+    }
+}
+
 fn current_unix_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
