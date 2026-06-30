@@ -37,6 +37,7 @@ import {
   EVENT,
   KIND,
   MOVEMENT_PATH_DIAGNOSTICS,
+  ORDER_STAGE,
   SETUP,
   STATE,
   TERRAIN,
@@ -1993,8 +1994,38 @@ function buttonByLabel(card, label) {
     "Blanket Fire command feedback marks the locked center and blanket radius",
   );
 
+  const futureOrigin = { x: 640, y: 100 };
+  const queuedMovingArtillery = {
+    ...selectedArtillery,
+    id: 45,
+    orderPlan: [{ kind: ORDER_STAGE.MOVE, x: futureOrigin.x, y: futureOrigin.y }],
+  };
+  pointFireInput.state.selectedEntities = () => [queuedMovingArtillery];
+  pointFireInput._selectedOwnUnitIds = () => [queuedMovingArtillery.id];
   pointFireInput.clientIntent.endCommandTarget();
   pointFireInput.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.POINT_FIRE });
+  const queuedRawPoint = {
+    x: futureOrigin.x + ARTILLERY_MIN_RANGE_TILES * 32 - 8,
+    y: futureOrigin.y,
+  };
+  pointFireInput._issueTargetedCommand(queuedRawPoint, { shiftKey: true });
+  assert(
+    artilleryCommands[2]?.ability === ABILITY.POINT_FIRE &&
+      artilleryCommands[2].x === queuedRawPoint.x &&
+      artilleryCommands[2].queued === true,
+    "Queued Point Fire targeting still sends the raw click to the server",
+  );
+  assertApprox(
+    artilleryFeedback[2]?.x,
+    futureOrigin.x + ARTILLERY_MIN_RANGE_TILES * 32,
+    0.001,
+    "Queued Point Fire feedback locks from the projected movement endpoint",
+  );
+
+  pointFireInput.clientIntent.endCommandTarget();
+  pointFireInput.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.POINT_FIRE });
+  pointFireInput.state.selectedEntities = () => [selectedArtillery];
+  pointFireInput._selectedOwnUnitIds = () => [selectedArtillery.id];
   pointFireInput.mouse = { x: selectedArtillery.x + ARTILLERY_MIN_RANGE_TILES * 32 - 8, y: selectedArtillery.y };
   pointFireInput._refreshAbilityTargetPreview();
   assert(pointFireInput.clientIntent.abilityTargetPreview?.hoverInRange === true && pointFireInput.clientIntent.abilityTargetPreview?.hoverInsideMinRange === false, "Point Fire preview accepts minimum-range locking clicks");
@@ -2009,6 +2040,28 @@ function buttonByLabel(card, label) {
     ARTILLERY_MIN_RANGE_TILES === 25 && ARTILLERY_MAX_RANGE_TILES === 55,
     "Artillery point-fire range mirrors the 25-55 tile balance band",
   );
+  pointFireInput.state.selectedEntities = () => [queuedMovingArtillery];
+  pointFireInput._shiftKeyDown = true;
+  pointFireInput.mouse = queuedRawPoint;
+  pointFireInput._refreshAbilityTargetPreview();
+  assert(
+    pointFireInput.clientIntent.abilityTargetPreview?.artilleryLocks?.[0]?.originX === futureOrigin.x,
+    "Queued Point Fire preview uses the projected movement endpoint as the lock origin",
+  );
+  assertApprox(
+    pointFireInput.clientIntent.abilityTargetPreview.mouseX,
+    futureOrigin.x + ARTILLERY_MIN_RANGE_TILES * 32,
+    0.001,
+    "Queued Point Fire preview reticle locks from the projected movement endpoint",
+  );
+  pointFireInput._shiftKeyDown = false;
+  pointFireInput._refreshAbilityTargetPreview();
+  assert(
+    pointFireInput.clientIntent.abilityTargetPreview?.hoverInRange === false &&
+      pointFireInput.clientIntent.abilityTargetPreview?.artilleryLocks?.length === 0,
+    "Unqueued Point Fire preview does not lock a gun whose active order-plan marker is movement",
+  );
+  pointFireInput.state.selectedEntities = () => [selectedArtillery];
   const deployedArtillery = { ...selectedArtillery, setupState: SETUP.DEPLOYED, setupFacing: 0 };
   const artilleryConeGfx = new RecordingGraphics();
   _drawSelectedUnitRanges.call(

@@ -18,6 +18,7 @@ export function buildArtilleryTargetLocks({
   map = null,
   tileSize = DEFAULT_TILE_SIZE,
   definition = null,
+  queued = false,
 } = {}) {
   if (!isArtilleryFireAbility(ability) || !Array.isArray(carriers)) return [];
   if (!Number.isFinite(rawX) || !Number.isFinite(rawY)) return [];
@@ -31,16 +32,17 @@ export function buildArtilleryTargetLocks({
     const originX = numeric(carrier.x);
     const originY = numeric(carrier.y);
     if (!Number.isFinite(originX) || !Number.isFinite(originY)) continue;
-    const currentFacing = currentArtilleryFieldFacing(carrier, originX, originY);
-    const bodyFacing = numeric(carrier.facing, numeric(carrier.weaponFacing, currentFacing));
+    const currentFacing = currentArtilleryFieldFacing(carrier);
+    const context = artilleryTargetContext(carrier, originX, originY, currentFacing, queued);
+    if (!context) continue;
     const locked = lockArtilleryFireTarget({
       bounds,
-      originX,
-      originY,
+      originX: context.originX,
+      originY: context.originY,
       rawX,
       rawY,
-      setupFacing: currentFacing,
-      bodyFacing,
+      setupFacing: context.setupFacing,
+      bodyFacing: context.bodyFacing,
       minRangePx,
       maxRangePx,
     });
@@ -51,8 +53,8 @@ export function buildArtilleryTargetLocks({
     locks.push({
       id: carrier.id,
       kind: carrier.kind,
-      originX,
-      originY,
+      originX: context.originX,
+      originY: context.originY,
       x: locked.x,
       y: locked.y,
       rawX,
@@ -66,6 +68,54 @@ export function buildArtilleryTargetLocks({
     });
   }
   return locks;
+}
+
+function artilleryTargetContext(entity, originX, originY, currentFacing, queued) {
+  if (!queued && activeMovementOrderPlan(entity)) return null;
+  const bodyFacing = numeric(entity?.facing, numeric(entity?.weaponFacing, currentFacing));
+  const context = {
+    originX,
+    originY,
+    setupFacing: currentFacing,
+    bodyFacing,
+  };
+  if (!queued) return context;
+  return queuedArtilleryTargetContext(entity, context);
+}
+
+function activeMovementOrderPlan(entity) {
+  const first = Array.isArray(entity?.orderPlan) ? entity.orderPlan[0] : null;
+  return first?.kind === ORDER_STAGE.MOVE || first?.kind === ORDER_STAGE.ATTACK_MOVE;
+}
+
+function queuedArtilleryTargetContext(entity, context) {
+  if (!Array.isArray(entity?.orderPlan)) return context;
+  const next = { ...context };
+  for (const marker of entity.orderPlan) {
+    if (
+      (marker?.kind === ORDER_STAGE.MOVE || marker?.kind === ORDER_STAGE.ATTACK_MOVE) &&
+      Number.isFinite(marker.x) &&
+      Number.isFinite(marker.y)
+    ) {
+      next.originX = marker.x;
+      next.originY = marker.y;
+      next.setupFacing = null;
+      continue;
+    }
+    if (
+      marker?.kind === ORDER_STAGE.SETUP_ANTI_TANK_GUNS &&
+      Number.isFinite(marker.x) &&
+      Number.isFinite(marker.y)
+    ) {
+      const facing = Math.atan2(marker.y - next.originY, marker.x - next.originX);
+      if (Number.isFinite(facing)) next.setupFacing = facing;
+      continue;
+    }
+    if (marker?.kind === ORDER_STAGE.POINT_FIRE || marker?.kind === ORDER_STAGE.BLANKET_FIRE) {
+      return null;
+    }
+  }
+  return next;
 }
 
 function lockArtilleryFireTarget({
@@ -153,29 +203,12 @@ function pointInsideBounds(bounds, x, y) {
     y <= bounds.maxY;
 }
 
-function currentArtilleryFieldFacing(entity, originX, originY) {
+function currentArtilleryFieldFacing(entity) {
   return firstFinite(
     entity?.setupFacing,
-    plannedSetupFacing(entity, originX, originY),
     entity?.weaponFacing,
     entity?.facing,
   );
-}
-
-function plannedSetupFacing(entity, originX, originY) {
-  if (!Array.isArray(entity?.orderPlan)) return null;
-  let facing = null;
-  for (const marker of entity.orderPlan) {
-    if (
-      marker?.kind === ORDER_STAGE.SETUP_ANTI_TANK_GUNS &&
-      Number.isFinite(marker.x) &&
-      Number.isFinite(marker.y)
-    ) {
-      const next = Math.atan2(marker.y - originY, marker.x - originX);
-      if (Number.isFinite(next)) facing = next;
-    }
-  }
-  return facing;
 }
 
 function angleDelta(a, b) {

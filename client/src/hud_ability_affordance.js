@@ -33,25 +33,17 @@ export function abilityActiveObjectId(entity, ability) {
 export function abilityUnitReady(entity, definition) {
   return abilityCooldownLeft(entity, definition.ability) === 0 &&
     abilityRemainingUses(entity, definition.ability) !== 0 &&
-    !abilityLockoutActive(entity, definition.ability) &&
-    !abilityRequiresSetup(entity, definition);
+    !abilityLockoutActive(entity, definition.ability);
 }
 
 export function abilityUnitQueueAdmissible(entity, definition) {
   if (definition.queuePolicy === "notQueueable") return false;
   if (definition.queuePolicy !== "waitUntilReady") return abilityUnitReady(entity, definition);
   return abilityRemainingUses(entity, definition.ability) !== 0 &&
-    !abilityLockoutActive(entity, definition.ability) &&
-    !abilityRequiresSetup(entity, definition);
+    !abilityLockoutActive(entity, definition.ability);
 }
 
 function abilityLockoutActive(entity, ability) {
   const projected = abilityStatus(entity, ability);
   return projected && typeof projected.lockoutUntilTick === "number";
-}
-
-export function abilityRequiresSetup(entity, definition) {
-  void entity;
-  void definition;
-  return false;
 }

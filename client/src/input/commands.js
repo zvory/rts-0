@@ -165,19 +165,16 @@ export function _issueTargetedCommand(p, ev = {}) {
         map: this.state.map,
         tileSize: this.state.map?.tileSize || DEFAULT_TILE_SIZE,
         definition,
+        queued,
       });
-      if (locks.length > 0) {
-        for (const lock of locks) {
-          this._addCommandFeedback("artillery", lock.x, lock.y, queued, definition?.radiusTiles);
-        }
-        return;
+      for (const lock of locks) {
+        this._addCommandFeedback("artillery", lock.x, lock.y, queued, definition?.radiusTiles);
       }
+      return;
     }
     const feedbackKind = ability === ABILITY.MORTAR_FIRE
       ? "mortar"
-      : isArtilleryFireAbility(ability)
-        ? "artillery"
-        : "attack";
+      : "attack";
     this._addCommandFeedback(feedbackKind, world.x, world.y, queued, definition?.radiusTiles);
     return;
   }
@@ -308,6 +305,7 @@ export function _refreshAbilityTargetPreview() {
       map: this.state.map,
       tileSize,
       definition,
+      queued: setupPreviewQueued(this, intent),
     });
     hoverInRange = artilleryLocks.length > 0;
   }
