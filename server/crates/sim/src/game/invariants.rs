@@ -377,8 +377,8 @@ impl Game {
                     continue;
                 }
                 let live_visible = live_fog.is_visible_world(pid, v.x, v.y);
-                // Enemy entities must either be live-visible or explicitly marked as
-                // death-vision-only intel.
+                // Enemy entities must either be live-visible or explicitly marked as legacy/special
+                // render-only intel.
                 if v.vision_only {
                     assert!(
                         !live_visible,

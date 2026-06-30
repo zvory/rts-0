@@ -171,7 +171,7 @@ pub struct Game {
     spatial: services::spatial::SpatialIndex,
     /// Persistent pathfinding service with an LRU cache for verified paths.
     pathing: services::pathing::PathingService,
-    /// Five-second death-vision sources used only when building fog-filtered snapshots.
+    /// Five-second death-vision sources stamped into live fog as ordinary temporary team sight.
     lingering_sight: Vec<LingeringSightSource>,
     /// Actionable temporary sight from Anti-Tank Guns that fired from fog.
     firing_reveals: Vec<FiringRevealSource>,
@@ -235,6 +235,10 @@ impl Game {
         self.tick = self.tick.wrapping_add(1);
         self.pathing.advance_tick(self.tick);
         self.smokes.retain_active(self.tick);
+        let player_ids: Vec<u32> = self.players.iter().map(|p| p.id).collect();
+        if self.retain_active_visibility_sources() {
+            self.recompute_live_fog(&player_ids);
+        }
 
         // Per-player event buckets, accumulated by the systems below.
         let mut events: HashMap<u32, Vec<Event>> = HashMap::new();
@@ -275,18 +279,15 @@ impl Game {
             perf.as_deref_mut(),
         );
 
-        // Live fog last, from the post-systems world state. Lingering death vision is not stored
-        // in live fog; attack targeting gets a scoped temporary view built inside `run_tick`.
-        self.lingering_sight
-            .retain(|source| source.is_active_at(self.tick));
-        self.firing_reveals
-            .retain(|source| source.is_active_at(self.tick));
-        let ids: Vec<u32> = self.players.iter().map(|p| p.id).collect();
+        // Live fog last, from the post-systems world state. Lingering death vision is stamped as
+        // ordinary temporary sight so snapshots, commands, and combat all consume one visibility
+        // model.
+        self.retain_active_visibility_sources();
         crate::perf::timed(perf.as_deref_mut(), "fog_recompute", || {
-            self.recompute_live_fog(&ids);
+            self.recompute_live_fog(&player_ids);
         });
-        self.refresh_building_memory(&ids);
-        self.refresh_trench_memory(&ids);
+        self.refresh_building_memory(&player_ids);
+        self.refresh_trench_memory(&player_ids);
 
         // In debug builds, assert that the world state is internally consistent.
         // Panics here mean a system violated a documented invariant.
@@ -504,11 +505,29 @@ impl Game {
     fn recompute_live_fog(&mut self, player_ids: &[u32]) {
         self.fog
             .recompute_with_smoke(player_ids, &self.entities, &self.map, &self.smokes);
+        let teams = self.team_relations();
+        self.fog.stamp_lingering_sources_for_teams_with_smoke(
+            &self.lingering_sight,
+            &self.map,
+            &self.entities,
+            &self.smokes,
+            &teams,
+        );
         self.fog.stamp_firing_reveal_sources_with_smoke(
             &self.firing_reveals,
             &self.entities,
             &self.smokes,
         );
+    }
+
+    fn retain_active_visibility_sources(&mut self) -> bool {
+        let lingering_before = self.lingering_sight.len();
+        let firing_before = self.firing_reveals.len();
+        self.lingering_sight
+            .retain(|source| source.is_active_at(self.tick));
+        self.firing_reveals
+            .retain(|source| source.is_active_at(self.tick));
+        lingering_before != self.lingering_sight.len() || firing_before != self.firing_reveals.len()
     }
 
     pub(crate) fn team_relations(&self) -> teams::TeamRelations {

@@ -250,7 +250,7 @@ fn spectator_player_resources_follow_selected_players() {
 }
 
 #[test]
-fn death_vision_lingers_for_five_seconds_and_allows_direct_attack_targets() {
+fn death_vision_lingers_as_normal_vision_for_five_seconds() {
     let players = [
         PlayerInit {
             id: 1,
@@ -321,8 +321,8 @@ fn death_vision_lingers_for_five_seconds_and_allows_direct_attack_targets() {
 
     assert!(!game.entities.contains(spotter));
     assert!(
-        !game.fog.is_visible_world(1, enemy_pos.0, enemy_pos.1),
-        "live fog should no longer see through the dead spotter"
+        game.fog.is_visible_world(1, enemy_pos.0, enemy_pos.1),
+        "death vision should become ordinary live fog while the linger lasts"
     );
     let first_linger = game
         .snapshot_for(1)
@@ -330,14 +330,14 @@ fn death_vision_lingers_for_five_seconds_and_allows_direct_attack_targets() {
         .into_iter()
         .find(|e| e.id == enemy)
         .expect("enemy should remain visible through lingering death vision");
-    assert!(first_linger.vision_only);
+    assert!(!first_linger.vision_only);
     let first_building_linger = game
         .snapshot_for(1)
         .entities
         .into_iter()
         .find(|e| e.id == enemy_depot)
         .expect("enemy building should remain visible through lingering death vision");
-    assert!(first_building_linger.vision_only);
+    assert!(!first_building_linger.vision_only);
 
     let enemy_goal = game.map.tile_center(24, 20);
     game.enqueue(
@@ -389,21 +389,29 @@ fn death_vision_lingers_for_five_seconds_and_allows_direct_attack_targets() {
         .into_iter()
         .find(|e| e.id == enemy)
         .expect("moving enemy should still be visible during lingering death vision");
-    assert!(moving_linger.vision_only);
+    assert!(!moving_linger.vision_only);
     assert!((moving_linger.x - moved_enemy.pos_x).abs() < 0.001);
     assert!((moving_linger.y - moved_enemy.pos_y).abs() < 0.001);
 
     while game.tick_count() <= config::TICK_HZ * 5 {
         game.tick();
     }
+    let expired_snapshot = game.snapshot_for(1);
     assert!(
-        game.snapshot_for(1).entities.iter().all(|e| e.id != enemy),
+        expired_snapshot.entities.iter().all(|e| e.id != enemy),
         "lingering death vision should expire after five seconds"
+    );
+    assert!(
+        expired_snapshot
+            .remembered_buildings
+            .iter()
+            .any(|view| view.id == enemy_depot),
+        "death vision is normal vision and should refresh remembered enemy buildings"
     );
 }
 
 #[test]
-fn allied_death_vision_allows_teammate_direct_attack_targets() {
+fn allied_death_vision_allows_teammate_attacks_and_auto_acquisition() {
     let players = [
         PlayerInit {
             id: 1,
@@ -438,7 +446,7 @@ fn allied_death_vision_allows_teammate_direct_attack_targets() {
         game.entities.remove(id);
     }
 
-    let player_one_base = game.map.tile_center(2, 5);
+    let player_one_base = game.map.tile_center(2, 8);
     game.entities
         .spawn_building(
             1,
@@ -448,7 +456,7 @@ fn allied_death_vision_allows_teammate_direct_attack_targets() {
             true,
         )
         .expect("player one base should spawn");
-    let player_two_base = game.map.tile_center(8, 5);
+    let player_two_base = game.map.tile_center(2, 25);
     game.entities
         .spawn_building(
             2,
@@ -458,6 +466,10 @@ fn allied_death_vision_allows_teammate_direct_attack_targets() {
             true,
         )
         .expect("player two base should spawn");
+    let enemy_base = game.map.tile_center(28, 28);
+    game.entities
+        .spawn_building(3, EntityKind::CityCentre, enemy_base.0, enemy_base.1, true)
+        .expect("enemy base should spawn");
 
     let rifle_pos = game.map.tile_center(2, 2);
     let rifle = game
@@ -474,15 +486,20 @@ fn allied_death_vision_allows_teammate_direct_attack_targets() {
             second_rifle_pos.1,
         )
         .expect("second rifleman should spawn");
-    let spotter_pos = game.map.tile_center(20, 20);
+    let mortar_pos = game.map.tile_center(4, 2);
+    let mortar = game
+        .entities
+        .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
+        .expect("mortar should spawn");
+    let spotter_pos = game.map.tile_center(15, 2);
     let spotter = game
         .entities
         .spawn_unit(2, EntityKind::Worker, spotter_pos.0, spotter_pos.1)
         .expect("allied spotter should spawn");
-    let enemy_pos = game.map.tile_center(22, 20);
+    let enemy_pos = game.map.tile_center(16, 2);
     let enemy = game
         .entities
-        .spawn_unit(3, EntityKind::Rifleman, enemy_pos.0, enemy_pos.1)
+        .spawn_unit(3, EntityKind::Tank, enemy_pos.0, enemy_pos.1)
         .expect("enemy should spawn");
     systems::recompute_supply(&mut game.players, &game.entities);
     game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
@@ -503,7 +520,11 @@ fn allied_death_vision_allows_teammate_direct_attack_targets() {
         .into_iter()
         .find(|entity| entity.id == enemy)
         .expect("teammate death vision should be shared into player one's snapshot");
-    assert!(allied_linger.vision_only);
+    assert!(!allied_linger.vision_only);
+    assert!(
+        game.fog.is_visible_world(1, enemy_pos.0, enemy_pos.1),
+        "teammate death vision should be stamped into player one's live fog"
+    );
 
     game.enqueue(
         1,
@@ -537,5 +558,11 @@ fn allied_death_vision_allows_teammate_direct_attack_targets() {
         second_rifle_entity.order().attack_target(),
         Some(enemy),
         "queued attack promotion should validate against team-shared death vision"
+    );
+    let mortar_entity = game.entities.get(mortar).expect("mortar should remain alive");
+    assert_eq!(
+        mortar_entity.target_id(),
+        Some(enemy),
+        "allied death vision should drive teammate auto-acquisition"
     );
 }
