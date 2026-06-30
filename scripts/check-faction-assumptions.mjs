@@ -233,6 +233,8 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/rules/src/faction.rs",
   "server/crates/rules/src/kind.rs",
   "server/crates/sim/src/game/ability.rs",
+  // Entrenchment Phase 3 gates trench creation on the current player's Entrenchment research.
+  "server/crates/sim/src/game/services/entrenchment.rs",
   // Inline projectile tests spawn current units directly.
   "server/crates/sim/src/game/ability_projectile.rs",
   "server/crates/sim/src/game/artillery.rs",

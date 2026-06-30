@@ -18,9 +18,16 @@ const STATIONARY_EPS_PX: f32 = 0.05;
 const SLOT_EXTRA_RADIUS_PX: f32 = config::TILE_SIZE as f32 * 0.5;
 const SLOT_MAX_CORRECTION_PX: f32 = config::TILE_SIZE as f32 * 0.5;
 
+#[derive(Clone, Copy)]
 struct OccupationCandidate {
     trench_id: u32,
     slot: Option<(f32, f32)>,
+}
+
+#[derive(Clone, Copy)]
+struct RankedOccupationCandidate {
+    dist_sq: f32,
+    candidate: OccupationCandidate,
 }
 
 pub(crate) fn entrenchment_system(
@@ -155,7 +162,7 @@ fn best_occupation_candidate(
     trenches: &TrenchStore,
     entity: &Entity,
 ) -> Option<OccupationCandidate> {
-    let mut best: Option<(f32, u32, Option<(f32, f32)>)> = None;
+    let mut best: Option<RankedOccupationCandidate> = None;
     for trench in trenches.all().iter().copied() {
         let Some(dist_sq) = occupation_search_distance_sq(trench, entity) else {
             continue;
@@ -164,18 +171,24 @@ fn best_occupation_candidate(
             continue;
         };
         if best
-            .map(|(best_dist, best_trench_id, _)| {
-                dist_sq > best_dist
-                    || ((dist_sq - best_dist).abs() <= f32::EPSILON
-                        && trench.id > best_trench_id)
+            .map(|best| {
+                dist_sq > best.dist_sq
+                    || ((dist_sq - best.dist_sq).abs() <= f32::EPSILON
+                        && trench.id > best.candidate.trench_id)
             })
             .unwrap_or(false)
         {
             continue;
         }
-        best = Some((dist_sq, trench.id, slot));
+        best = Some(RankedOccupationCandidate {
+            dist_sq,
+            candidate: OccupationCandidate {
+                trench_id: trench.id,
+                slot,
+            },
+        });
     }
-    best.map(|(_, trench_id, slot)| OccupationCandidate { trench_id, slot })
+    best.map(|best| best.candidate)
 }
 
 fn occupation_search_distance_sq(trench: Trench, entity: &Entity) -> Option<f32> {
@@ -239,7 +252,7 @@ fn slot_positions(entity: &Entity, trench: Trench) -> Vec<(f32, f32)> {
     let dist = (from_center.0 * from_center.0 + from_center.1 * from_center.1).sqrt();
     if dist.is_finite() && dist > 0.001 {
         let target_dist = trench_radius_px(trench) * 0.55;
-        let step = (dist - target_dist).max(0.0).min(SLOT_MAX_CORRECTION_PX);
+        let step = (dist - target_dist).clamp(0.0, SLOT_MAX_CORRECTION_PX);
         candidates.push((
             entity.pos_x - from_center.0 / dist * step,
             entity.pos_y - from_center.1 / dist * step,
