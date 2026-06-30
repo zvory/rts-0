@@ -83,6 +83,10 @@ impl UnitFacts {
         matches!(self.ability(ability), Some(a) if a.ready_at_issue)
     }
 
+    fn ability_queue_admissible(&self, ability: AbilityId) -> bool {
+        matches!(self.ability(ability), Some(a) if a.queue_admissible_at_issue)
+    }
+
     fn can_execute_ability_without_interrupt(&self, ability: AbilityId) -> bool {
         matches!(self.ability(ability), Some(a) if a.ready_at_issue && a.can_execute_without_interrupt)
     }
@@ -96,6 +100,7 @@ impl UnitFacts {
 pub struct AbilityFacts {
     pub ability: AbilityId,
     pub ready_at_issue: bool,
+    pub queue_admissible_at_issue: bool,
     /// True when this ability can fire now without replacing the active order.
     ///
     /// For a moving scout car and an in-range smoke target, this lets reactive smoke
@@ -289,13 +294,15 @@ pub fn plan_order(
         } if target_point.valid() => {
             plan_deconstruct(config, request.mode, &ordered_facts, target, target_point)
         }
-        RequestedOrder::SetupAntiTankGuns { face_toward } if face_toward.valid() => plan_filtered_units(
-            config,
-            request.mode,
-            &ordered_facts,
-            |u| u.can_setup_anti_tank_gun,
-            OrderIntent::SetupAntiTankGuns { face_toward },
-        ),
+        RequestedOrder::SetupAntiTankGuns { face_toward } if face_toward.valid() => {
+            plan_filtered_units(
+                config,
+                request.mode,
+                &ordered_facts,
+                |u| u.can_setup_anti_tank_gun,
+                OrderIntent::SetupAntiTankGuns { face_toward },
+            )
+        }
         RequestedOrder::UseAbility { ability, target } => {
             plan_ability(config, request.mode, &ordered_facts, ability, target)
         }
@@ -435,7 +442,8 @@ fn plan_deconstruct(
             }
         }
         IssueMode::Queue => {
-            if let Some(unit) = choose_queued_build_worker(&builders, config.max_queue_len, target_point)
+            if let Some(unit) =
+                choose_queued_build_worker(&builders, config.max_queue_len, target_point)
             {
                 append_or_notice(config, &mut out, unit, intent);
             } else {
@@ -455,16 +463,24 @@ fn plan_self_ability(
     ability: AbilityId,
 ) -> PlannerOutput {
     let mut out = PlannerOutput::default();
-    for unit in units.iter().copied().filter(|u| u.ability_ready(ability)) {
-        match mode {
-            IssueMode::Immediate => out.actions.push(PlannedAction::ExecuteAbilityNow {
-                unit: unit.id,
-                ability,
-                target: AbilityTarget::SelfTarget,
-                preserve_orders: true,
-            }),
-            IssueMode::Queue => {
-                append_or_notice(config, &mut out, unit, OrderIntent::SelfAbility { ability })
+    match mode {
+        IssueMode::Immediate => {
+            for unit in units.iter().copied().filter(|u| u.ability_ready(ability)) {
+                out.actions.push(PlannedAction::ExecuteAbilityNow {
+                    unit: unit.id,
+                    ability,
+                    target: AbilityTarget::SelfTarget,
+                    preserve_orders: true,
+                });
+            }
+        }
+        IssueMode::Queue => {
+            for unit in units
+                .iter()
+                .copied()
+                .filter(|u| u.ability_queue_admissible(ability))
+            {
+                append_or_notice(config, &mut out, unit, OrderIntent::SelfAbility { ability });
             }
         }
     }
@@ -484,12 +500,12 @@ fn plan_world_ability(
         .copied()
         .filter(|u| u.ability_ready(ability))
         .collect();
-    if ready.is_empty() {
-        return out;
-    }
 
     match mode {
         IssueMode::Immediate => {
+            if ready.is_empty() {
+                return out;
+            }
             if let Some(unit) = choose_immediate_world_ability_unit(&ready, ability) {
                 let preserve_orders = unit.can_execute_ability_without_interrupt(ability);
                 if preserve_orders {
@@ -508,7 +524,15 @@ fn plan_world_ability(
             }
         }
         IssueMode::Queue => {
-            if let Some(unit) = choose_queued_world_ability_unit(&ready, config.max_queue_len) {
+            let queued: Vec<&UnitFacts> = units
+                .iter()
+                .copied()
+                .filter(|u| u.ability_queue_admissible(ability))
+                .collect();
+            if queued.is_empty() {
+                return out;
+            }
+            if let Some(unit) = choose_queued_world_ability_unit(&queued, config.max_queue_len) {
                 append_or_notice(
                     config,
                     &mut out,
@@ -516,7 +540,7 @@ fn plan_world_ability(
                     OrderIntent::WorldAbility { ability, target },
                 );
             } else {
-                for unit in ready {
+                for unit in queued {
                     out.notices.push(PlannerNotice::QueueFull { unit: unit.id });
                 }
             }
@@ -671,6 +695,22 @@ mod tests {
         unit.abilities.push(AbilityFacts {
             ability,
             ready_at_issue: ready,
+            queue_admissible_at_issue: ready,
+            can_execute_without_interrupt: false,
+            can_interrupt_active_order: false,
+        });
+        unit
+    }
+
+    fn with_queue_admissible_ability(
+        mut unit: UnitFacts,
+        ability: AbilityId,
+        ready: bool,
+    ) -> UnitFacts {
+        unit.abilities.push(AbilityFacts {
+            ability,
+            ready_at_issue: ready,
+            queue_admissible_at_issue: true,
             can_execute_without_interrupt: false,
             can_interrupt_active_order: false,
         });
@@ -685,6 +725,7 @@ mod tests {
         unit.abilities.push(AbilityFacts {
             ability,
             ready_at_issue: ready,
+            queue_admissible_at_issue: ready,
             can_execute_without_interrupt: true,
             can_interrupt_active_order: false,
         });
@@ -699,6 +740,7 @@ mod tests {
         unit.abilities.push(AbilityFacts {
             ability,
             ready_at_issue: ready,
+            queue_admissible_at_issue: ready,
             can_execute_without_interrupt: false,
             can_interrupt_active_order: true,
         });
@@ -776,6 +818,27 @@ mod tests {
         let out = plan_order(config, &facts, &smoke_click(&[1], IssueMode::Queue, 100.0));
         assert!(out.actions.is_empty());
         assert!(out.notices.is_empty());
+    }
+
+    #[test]
+    fn queued_wait_policy_world_ability_can_append_before_ready() {
+        let config = PlannerConfig::default();
+        let facts = vec![with_queue_admissible_ability(unit(1), SMOKE, false)];
+
+        let out = plan_order(config, &facts, &smoke_click(&[1], IssueMode::Queue, 100.0));
+
+        assert_eq!(queued_units(&out), vec![1]);
+        assert!(out.notices.is_empty());
+
+        let immediate = plan_order(
+            config,
+            &facts,
+            &smoke_click(&[1], IssueMode::Immediate, 100.0),
+        );
+        assert!(
+            immediate.actions.is_empty(),
+            "immediate abilities still require ready-now facts"
+        );
     }
 
     #[test]

@@ -497,7 +497,7 @@ policy is centralized instead of scattered through services.
 
 `rules::faction` owns the faction-aware ability registry. Each `AbilityCatalogEntry` records the
 stable id, label/icon/hotkey/title, legal carriers, target mode, optional min/max range, cooldown,
-finite charges, Steel/Oil cost, tech requirement, queue behavior, autocast support, command-card
+finite charges, Steel/Oil cost, tech requirement, queue policy, autocast support, command-card
 visibility, and compact protocol/order-stage codes. `game/ability.rs` keeps the typed
 `AbilityKind` and converts those registry rows into the sim-facing `AbilityDefinition`; it is not a
 second source of metadata. Adding a registry-backed ability means adding a global `AbilityKind` and
@@ -524,7 +524,9 @@ widening the hook into generic scripting.
   and dispatches a delayed-world effect hook (currently: schedules a smoke cloud or delayed mortar
   shell). Manual mortar fire also enters the mortar weapon firing cycle: launching a manual shell
   starts the weapon cooldown, and both immediate in-range manual fire orders and queued MortarFire
-  promotions wait while the mortar weapon is reloading instead of launching early or being cleared. The active manual fire order remains eligible for aiming during reload, so the mortar can rotate toward the target before the weapon cycle is ready. A scheduled mortar shell resolves from its
+  promotions wait while the mortar ability cooldown or weapon cycle is reloading instead of
+  launching early or being cleared. The active manual fire order remains eligible for aiming during
+  reload, so the mortar can rotate toward the target before the weapon cycle is ready. A scheduled mortar shell resolves from its
   scheduled impact point even if the firing mortar dies before impact; reveal data at impact is
   emitted only when the original mortar entity is still alive and valid. Guards:
   caster exists + alive + owner + not under construction + correct kind + not on cooldown +
@@ -540,8 +542,9 @@ widening the hook into generic scripting.
 Active `Order::Ability` movement orders run through `services::order_queue::promote_ready_orders`:
 when the caster arrives (phase `Arrived`), `launch_world_ability` is called; when pathing fails
 (phase `PathFailed`), the order is cleared silently. Stale queued ability intents (caster dead,
-cooldown active, tech gone, target point off-map) are skipped at promotion time via
-`ability_intent_valid`.
+tech gone, target point off-map, or cooldown active for a skip-if-not-ready ability) are skipped at
+promotion time via `ability_intent_valid`. Wait-until-ready world abilities instead promote into an
+active ability order and hold there while cooldown or weapon readiness catches up.
 
 Services in `server/crates/sim/src/game/services/` orchestrate tick logic and call into `rules::*` for classification.
 Rules functions have no imports from `services/`; classification and formula rules read
@@ -849,10 +852,13 @@ General rules:
   a valid append rejected only because the queue is full should emit a player notice.
 - Invalid commands are no-ops except where a notice is explicitly useful. Stale queued stages are
   skipped at promotion time rather than retried forever.
-- Queue planning is issue-time only. A unit with an ability on cooldown is not eligible for a
-  queued ability intent just because the cooldown might expire before the intent promotes.
-  Finite-use abilities also reserve already-active and already-queued same-ability intents at
-  issue time, so queued Smoke clicks cannot exceed the scout car's remaining smoke uses.
+- Queue planning is issue-time only, but ability queue policy decides what "eligible" means.
+  `QueueSkipIfNotReady` abilities, such as Smoke, require a ready carrier at issue time and are
+  skipped if stale at promotion. `QueueWaitUntilReady` abilities, such as Mortar Fire, may append
+  while the carrier is otherwise valid but on ability cooldown or weapon reload; promotion turns the
+  stored intent into an active ability order that waits for readiness before firing. Finite-use
+  abilities also reserve already-active and already-queued same-ability intents at issue time, so
+  queued Smoke clicks cannot exceed the scout car's remaining smoke uses.
 - Later orders still apply to every compatible selected unit. Earlier specialized stages do not
   remove non-carriers from the plan; for example, a queued smoke applies to one scout car, while the
   following queued attack-move applies to all selected units that can receive attack-move.
@@ -876,10 +882,12 @@ Allocation rules:
 - Legacy Charge has no eligible carriers after the Methamphetamines research conversion. It remains
   decodable for old command logs but does not create queued/immediate ability work, cooldowns, or
   runtime status.
-- World-targeted abilities, such as Smoke, allocate one ready carrier per click. For queued
-  commands the planner chooses an eligible selected carrier with the shortest current queue, which
-  gives round-robin behavior across repeated clicks. If all eligible carriers are full, emit queue
-  full notices; if no carrier is ready at issue time, ignore the click.
+- World-targeted abilities allocate one carrier per click. For queued commands the planner chooses
+  an eligible selected carrier with the shortest current queue, which gives round-robin behavior
+  across repeated clicks. Skip-if-not-ready abilities require a ready carrier at issue time;
+  wait-until-ready abilities may use a carrier whose cooldown or weapon cycle is still pending. If
+  all eligible carriers are full, emit queue full notices; if no carrier is eligible at issue time,
+  ignore the click.
 - Immediate world-targeted abilities may be noninterrupting when the ability can fire now without
   replacing the active order. This is the reactive smoke case: a moving scout car that already has
   the target in range may launch smoke and continue its previous move and queued plan. If a

@@ -183,6 +183,7 @@ export const ABILITIES = Object.freeze({
     radiusTiles: SMOKE_CLOUD_RADIUS_TILES,
     durationTicks: SMOKE_CLOUD_DURATION_TICKS,
     queued: true,
+    queuePolicy: "skipIfNotReady",
   }),
   [ABILITY.MORTAR_FIRE]: Object.freeze({
     ability: ABILITY.MORTAR_FIRE,
@@ -196,7 +197,8 @@ export const ABILITIES = Object.freeze({
     cooldownTicks: MORTAR_FIRE_COOLDOWN_TICKS,
     cost: Object.freeze({ steel: 0, oil: 0 }),
     radiusTiles: MORTAR_OUTER_RADIUS_TILES,
-    queued: false,
+    queued: true,
+    queuePolicy: "waitUntilReady",
     autocast: true,
   }),
   [ABILITY.POINT_FIRE]: Object.freeze({
@@ -214,6 +216,7 @@ export const ABILITIES = Object.freeze({
     radiusTiles: ARTILLERY_OUTER_RADIUS_TILES,
     delayTicks: ARTILLERY_SHELL_DELAY_TICKS,
     queued: true,
+    queuePolicy: "skipIfNotReady",
   }),
   [ABILITY.BREAKTHROUGH]: Object.freeze({
     ability: ABILITY.BREAKTHROUGH,
@@ -229,6 +232,7 @@ export const ABILITIES = Object.freeze({
     radiusTiles: BREAKTHROUGH_RADIUS_TILES,
     durationTicks: BREAKTHROUGH_DURATION_TICKS,
     queued: true,
+    queuePolicy: "skipIfNotReady",
   }),
   [ABILITY.EKAT_TELEPORT]: Object.freeze({
     ability: ABILITY.EKAT_TELEPORT,
@@ -242,6 +246,7 @@ export const ABILITIES = Object.freeze({
     cooldownTicks: EKAT_TELEPORT_COOLDOWN_TICKS,
     cost: Object.freeze({ steel: 0, oil: 0 }),
     queued: true,
+    queuePolicy: "skipIfNotReady",
   }),
   [ABILITY.EKAT_LINE_SHOT]: Object.freeze({
     ability: ABILITY.EKAT_LINE_SHOT,
@@ -258,6 +263,7 @@ export const ABILITIES = Object.freeze({
     speedPxPerTick: EKAT_LINE_SHOT_SPEED_PX_PER_TICK,
     damage: EKAT_LINE_SHOT_DAMAGE,
     queued: true,
+    queuePolicy: "skipIfNotReady",
   }),
   [ABILITY.EKAT_MAGIC_ANCHOR]: Object.freeze({
     ability: ABILITY.EKAT_MAGIC_ANCHOR,
@@ -275,6 +281,7 @@ export const ABILITIES = Object.freeze({
     pullAwayMultiplier: EKAT_MAGIC_ANCHOR_PULL_AWAY_MULTIPLIER,
     pullTowardMultiplier: EKAT_MAGIC_ANCHOR_PULL_TOWARD_MULTIPLIER,
     queued: true,
+    queuePolicy: "skipIfNotReady",
   }),
   [ABILITY.EKAT_CONSUME_GOLEM]: Object.freeze({
     ability: ABILITY.EKAT_CONSUME_GOLEM,
@@ -289,6 +296,7 @@ export const ABILITIES = Object.freeze({
     cost: Object.freeze({ steel: 0, oil: 0 }),
     radiusTiles: EKAT_CONSUME_GOLEM_RANGE_TILES,
     queued: false,
+    queuePolicy: "notQueueable",
   }),
 });
 

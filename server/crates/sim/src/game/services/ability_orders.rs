@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 
 use crate::config;
-use crate::game::ability::{self, AbilityEffectHook, AbilityKind, AbilityTargetMode};
+use crate::game::ability::{
+    self, AbilityEffectHook, AbilityKind, AbilityQueuePolicy, AbilityTargetMode,
+};
 use crate::game::ability_runtime::{
     AbilityObjectPayload, AbilityRuntime, AbilityWorldObjectKind, AbilityWorldObjectSpec,
 };
-use crate::game::entity::{EntityKind, EntityStore, MovePhase, Order, WeaponSetup};
+use crate::game::entity::{EntityKind, EntityStore, MovePhase, Order};
 use crate::game::fog::Fog;
 use crate::game::hero_abilities;
 use crate::game::map::Map;
@@ -54,7 +56,7 @@ pub(crate) fn order_or_launch_world_ability(
     if !caster_allowed_by_faction(entities, faction_id, caster, ability) {
         return AbilityOrderResult::Skipped;
     }
-    if !caster_can_accept_order(entities, player, caster, ability) {
+    if !policy_accepts(entities, player, caster, ability) {
         return AbilityOrderResult::Skipped;
     }
     if caster_locked_out(entities, caster, ability, tick) {
@@ -299,12 +301,9 @@ pub(crate) fn launch_world_ability(
             let target_x = hero_projectile_spec.endpoint.0;
             let target_y = hero_projectile_spec.endpoint.1;
             let mut projectile_specs = vec![hero_projectile_spec];
-            if let Some(anchor) = ability_runtime.active_anchor(
-                player,
-                caster,
-                AbilityKind::EkatMagicAnchor,
-                tick,
-            ) {
+            if let Some(anchor) =
+                ability_runtime.active_anchor(player, caster, AbilityKind::EkatMagicAnchor, tick)
+            {
                 if let Some(anchor_projectile_spec) =
                     hero_abilities::ekat_line_projectile_spec_from_origin(
                         player,
@@ -365,9 +364,7 @@ pub(crate) fn launch_world_ability(
                     y: anchor_y,
                     created_tick: tick,
                     expires_tick: tick.saturating_add(config::EKAT_MAGIC_ANCHOR_DURATION_TICKS),
-                    payload: AbilityObjectPayload::MagicAnchor {
-                        radius,
-                    },
+                    payload: AbilityObjectPayload::MagicAnchor { radius },
                 })
                 .is_none()
             {
@@ -544,7 +541,7 @@ pub(crate) fn caster_can_attempt(
     matches!(entities.get(caster),
         Some(e) if caster_base_ready(e, player, ability)
             && ability_weapon_cycle_ready(e, ability)
-            && ability_launch_ready(e.kind, e.weapon_setup(), e.path_is_empty(), ability))
+            && ability_launch_ready(e.kind, ability))
 }
 
 pub(crate) fn caster_can_promote_queued_world_ability(
@@ -553,10 +550,30 @@ pub(crate) fn caster_can_promote_queued_world_ability(
     caster: u32,
     ability: AbilityKind,
 ) -> bool {
-    if ability == AbilityKind::MortarFire {
-        caster_can_accept_order(entities, player, caster, ability)
-    } else {
-        caster_can_attempt(entities, player, caster, ability)
+    match ability::definition(ability).queue_policy {
+        AbilityQueuePolicy::QueueWaitUntilReady => {
+            caster_can_accept_waiting_order(entities, player, caster, ability)
+        }
+        _ => caster_can_attempt(entities, player, caster, ability),
+    }
+}
+
+pub(crate) fn caster_can_accept_waiting_order(
+    entities: &EntityStore,
+    player: u32,
+    caster: u32,
+    ability: AbilityKind,
+) -> bool {
+    matches!(entities.get(caster),
+        Some(e) if base_eligible(e, player, ability) && ability_order_ready(e.kind, ability))
+}
+
+fn policy_accepts(store: &EntityStore, player: u32, caster: u32, ability: AbilityKind) -> bool {
+    match ability::definition(ability).queue_policy {
+        AbilityQueuePolicy::QueueWaitUntilReady => {
+            caster_can_accept_waiting_order(store, player, caster, ability)
+        }
+        _ => caster_can_accept_order(store, player, caster, ability),
     }
 }
 
@@ -568,7 +585,7 @@ pub(crate) fn caster_can_accept_order(
 ) -> bool {
     matches!(entities.get(caster),
         Some(e) if caster_base_ready(e, player, ability)
-            && ability_order_ready(e.kind, e.weapon_setup(), ability))
+            && ability_order_ready(e.kind, ability))
 }
 
 pub(crate) fn caster_allowed_by_faction(
@@ -583,13 +600,16 @@ pub(crate) fn caster_allowed_by_faction(
 }
 
 fn caster_base_ready(e: &crate::game::entity::Entity, player: u32, ability: AbilityKind) -> bool {
+    base_eligible(e, player, ability) && e.ability_cooldown_ticks(ability) == 0
+}
+
+fn base_eligible(e: &crate::game::entity::Entity, player: u32, ability: AbilityKind) -> bool {
     e.owner == player
         && e.hp > 0
         && e.is_unit()
         && !e.under_construction()
         && ability::carried_by(ability, e.kind)
         && e.ability_uses_remaining(ability).unwrap_or(1) > 0
-        && e.ability_cooldown_ticks(ability) == 0
 }
 
 fn ability_weapon_cycle_ready(e: &crate::game::entity::Entity, ability: AbilityKind) -> bool {
@@ -600,19 +620,12 @@ fn mortar_fire_weapon_cooldown_ticks() -> u32 {
     config::unit_stats(EntityKind::MortarTeam).map_or(0, |stats| stats.cooldown)
 }
 
-fn ability_order_ready(kind: EntityKind, _setup: WeaponSetup, ability: AbilityKind) -> bool {
-    ability != AbilityKind::MortarFire
-        || kind == EntityKind::MortarTeam
+fn ability_order_ready(kind: EntityKind, ability: AbilityKind) -> bool {
+    ability != AbilityKind::MortarFire || kind == EntityKind::MortarTeam
 }
 
-fn ability_launch_ready(
-    kind: EntityKind,
-    _setup: WeaponSetup,
-    _path_empty: bool,
-    ability: AbilityKind,
-) -> bool {
-    ability != AbilityKind::MortarFire
-        || kind == EntityKind::MortarTeam
+fn ability_launch_ready(kind: EntityKind, ability: AbilityKind) -> bool {
+    ability != AbilityKind::MortarFire || kind == EntityKind::MortarTeam
 }
 
 pub(crate) fn world_ability_facing_ready(

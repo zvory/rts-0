@@ -392,7 +392,7 @@ fn ability_table() -> StatsTable {
                         ability.cost.steel.to_string(),
                         ability.cost.oil.to_string(),
                         optional_kind(ability.tech_requirement),
-                        bool_text(ability.may_queue),
+                        bool_text(ability.may_queue()),
                         bool_text(ability.autocast),
                         bool_text(ability.command_card),
                     ]
@@ -966,7 +966,7 @@ mod tests {
                     ability.cost.steel.to_string(),
                     ability.cost.oil.to_string(),
                     optional_kind(ability.tech_requirement),
-                    bool_text(ability.may_queue),
+                    bool_text(ability.may_queue()),
                     bool_text(ability.autocast),
                     bool_text(ability.command_card),
                 ]));

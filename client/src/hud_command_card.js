@@ -1,4 +1,4 @@
-import { ABILITY, DEFAULT_FACTION_ID, KIND, ORDER_STAGE, SETUP, STATE, UPGRADE, isBuilding, isUnit } from "./protocol.js";
+import { ABILITY, DEFAULT_FACTION_ID, KIND, SETUP, STATE, UPGRADE, isBuilding, isUnit } from "./protocol.js";
 import {
   STATS,
   UPGRADES,
@@ -7,6 +7,15 @@ import {
   trainableUnitsForFaction,
   workerBuildablesForFaction,
 } from "./config.js";
+import {
+  abilityActiveObjectId,
+  abilityAutocastEnabled,
+  abilityCooldownLeft,
+  abilityRemainingUses,
+  abilityRequiresSetup,
+  abilityUnitQueueAdmissible,
+  abilityUnitReady,
+} from "./hud_ability_affordance.js";
 import { attackDescriptor, holdDescriptor, moveDescriptor, stopDescriptor } from "./hud_unit_commands.js";
 
 // Command-card hotkeys follow the keyboard grid (3 columns):
@@ -238,6 +247,7 @@ export function buildUnitCard(ctx, selection) {
       `${affordance.definition.ability}:${affordance.unlocked ? 1 : 0}:${affordance.affordable ? 1 : 0}:` +
       `${affordance.depletedCount}:${affordance.setupBlockedCount}:` +
       `${affordance.readyIds.join(".")}:` +
+      `${affordance.queueAdmissibleIds.join(".")}:` +
       `${affordance.autocastEnabledIds.join(".")}:` +
       `${affordance.cooldownClocks.map((group) => group.count).join(",")}`,
     ).join("|")}|` +
@@ -287,7 +297,12 @@ export function buildUnitCard(ctx, selection) {
     const definition = affordance.definition;
     const recastActive = affordance.recastTargetObjectId != null;
     const readyCount = recastActive ? affordance.recastReadyIds.length : affordance.readyIds.length;
-    const abilityReadyIds = recastActive ? affordance.recastReadyIds : intentReadyIds(definition, affordance);
+    const commandableCount = recastActive
+      ? affordance.recastReadyIds.length
+      : affordance.queueAdmissibleIds.length;
+    const abilityReadyIds = recastActive
+      ? affordance.recastReadyIds
+      : intentAbilityIds(definition, affordance);
     const showReadyCount = readyCount < affordance.carrierIds.length;
     const preferred = definition.hotkey ? GRID_HOTKEYS.indexOf(definition.hotkey) : -1;
     const slot = claimSlot(preferred);
@@ -308,8 +323,8 @@ export function buildUnitCard(ctx, selection) {
       label: definition.label,
       title: abilityDisabledReason(ctx, affordance),
       ability: definition.ability,
-      enabled: readyCount > 0 && affordance.affordable,
-      unaffordable: readyCount > 0 && !affordance.affordable,
+      enabled: commandableCount > 0 && affordance.affordable,
+      unaffordable: commandableCount > 0 && !affordance.affordable,
       countBadge: showReadyCount ? `${readyCount}` : "",
       cooldownClocks: affordance.cooldownClocks,
       cost: definition.cost,
@@ -445,6 +460,7 @@ export function selectedAbilityAffordances(ctx, selection) {
       const unlocked = abilityUnlocked(ctx, definition);
       const canAfford = affordable(definition.cost, resources);
       const readyUnits = carriers.filter((e) => abilityUnitReady(e, definition));
+      const queueAdmissibleUnits = carriers.filter((e) => abilityUnitQueueAdmissible(e, definition));
       const recastUnits = carriers.filter((e) => abilityActiveObjectId(e, definition.ability) != null);
       const cooldowns = carriers.map((e) =>
         abilityCooldownLeft(e, definition.ability),
@@ -466,6 +482,7 @@ export function selectedAbilityAffordances(ctx, selection) {
         setupBlockedCount,
         carrierIds: carriers.map((e) => e.id),
         readyIds: readyUnits.map((e) => e.id),
+        queueAdmissibleIds: queueAdmissibleUnits.map((e) => e.id),
         readyUnits,
         recastReadyIds: recastUnits.map((e) => e.id),
         recastTargetObjectId: recastUnits.length > 0
@@ -493,6 +510,13 @@ function intentReadyIds(definition, affordance) {
     }
   }
   return [best.id];
+}
+
+function intentAbilityIds(definition, affordance) {
+  if (definition.queuePolicy === "waitUntilReady") {
+    return affordance.queueAdmissibleIds;
+  }
+  return intentReadyIds(definition, affordance);
 }
 
 function averagePosition(units) {
@@ -606,66 +630,6 @@ function commandTargetSig(commandTarget) {
   return `${commandTarget.kind || ""}:${commandTarget.ability || ""}`;
 }
 
-function abilityCooldownLeft(entity, ability) {
-  const projected = Array.isArray(entity.abilities)
-    ? entity.abilities.find((entry) => entry.ability === ability)
-    : null;
-  if (projected && typeof projected.cooldownLeft === "number") return projected.cooldownLeft;
-  return 0;
-}
-
-function abilityRemainingUses(entity, ability) {
-  const projected = Array.isArray(entity.abilities)
-    ? entity.abilities.find((entry) => entry.ability === ability)
-    : null;
-  return projected && typeof projected.remainingUses === "number"
-    ? projected.remainingUses
-    : null;
-}
-
-function abilityAutocastEnabled(entity, ability) {
-  const projected = Array.isArray(entity.abilities)
-    ? entity.abilities.find((entry) => entry.ability === ability)
-    : null;
-  return projected && typeof projected.autocastEnabled === "boolean"
-    ? projected.autocastEnabled
-    : false;
-}
-
-function abilityActiveObjectId(entity, ability) {
-  const projected = Array.isArray(entity.abilities)
-    ? entity.abilities.find((entry) => entry.ability === ability)
-    : null;
-  return projected && typeof projected.activeObjectId === "number"
-    ? projected.activeObjectId
-    : null;
-}
-
-function abilityUnitReady(entity, definition) {
-  return abilityCooldownLeft(entity, definition.ability) === 0 &&
-    abilityRemainingUses(entity, definition.ability) !== 0 &&
-    !abilityLockoutActive(entity, definition.ability) &&
-    !abilityRequiresSetup(entity, definition);
-}
-
-function abilityLockoutActive(entity, ability) {
-  const projected = Array.isArray(entity.abilities)
-    ? entity.abilities.find((entry) => entry.ability === ability)
-    : null;
-  return projected && typeof projected.lockoutUntilTick === "number";
-}
-
-function abilityRequiresSetup(entity, definition) {
-  return definition.ability === ABILITY.POINT_FIRE &&
-    entity.setupState !== SETUP.DEPLOYED &&
-    !hasPointFireOrder(entity);
-}
-
-function hasPointFireOrder(entity) {
-  return Array.isArray(entity?.orderPlan) &&
-    entity.orderPlan.some((marker) => marker?.kind === ORDER_STAGE.POINT_FIRE);
-}
-
 function affordable(cost, resources) {
   if (!cost) return true;
   const steel = resources.steel ?? 0;
@@ -758,7 +722,10 @@ function abilityDisabledReason(ctx, affordance) {
     return "Set up artillery before using Point Fire";
   }
   if (!affordance.affordable) return "Not enough resources";
-  if (affordance.readyIds.length === 0) return "On cooldown";
+  if (
+    affordance.readyIds.length === 0 &&
+    affordance.definition.queuePolicy !== "waitUntilReady"
+  ) return "On cooldown";
   return affordance.definition.title || "";
 }
 
