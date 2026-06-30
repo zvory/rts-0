@@ -19,6 +19,14 @@ Implementation should model each mode as its own terminal fire order, not as a s
 `Set Up` order followed by a separate fire order. The fire order owns any setup/redeploy transition
 needed before the first shot.
 
+When implementation is authorized, `Blanket Fire` must be a real mirrored gameplay command surface,
+not a client-only alias and not Point Fire with an untracked hidden flag. Use `blanketFire` as the
+mirrored ability/order id unless a later implementation plan explicitly renames it. The Rust
+ability vocabulary, faction ability catalog, order-stage vocabulary, compact protocol codes, JS
+protocol constants, client rules mirror, faction ability lists, command-card/hotkey catalog,
+order-plan projection, and protocol/design docs must all distinguish `pointFire` from
+`blanketFire`.
+
 ## Command Card
 
 - Add `Blanket Fire` for artillery in the bottom-right command-card slot. In the default grid
@@ -43,6 +51,11 @@ needed before the first shot.
 - This behavior applies to immediate commands and queued commands.
 - Point Fire and Blanket Fire both redeploy in place when the effective fire point is outside the
   current cone instead of requiring the player to issue a separate setup command first.
+- For Blanket Fire, setup and redeploy decisions use only the stored effective center point. The
+  15-tile blanket radius does not affect whether the command can use the current cone, needs
+  redeploy, or is in range.
+- The effective center point must be inside the cone used by the accepted order: the current cone
+  when the gun can fire from its current setup, or the new cone after an accepted setup/redeploy.
 
 ## Queueing
 
@@ -50,6 +63,9 @@ needed before the first shot.
 - Point fire and blanket fire are terminal per artillery piece. Once either fire order is accepted
   for a gun, later queued unit orders for that same gun are not appended behind it. Other selected
   units that did not accept the terminal fire order may still accept compatible queued orders.
+- The terminal rule must be represented in authoritative queued-order data for both fire modes, so
+  later queued commands for that same gun are rejected or ignored at command-admission time rather
+  than being stored behind a repeating fire order.
 - A queued point fire or blanket fire command after a movement order should use the selected
   artillery piece's future queued position for preview and for computing the stored effective fire
   point when that queued position is available.
@@ -57,6 +73,8 @@ needed before the first shot.
   future position where possible, click target, then the gun moves, sets up or redeploys, and begins
   firing.
 - Queued fire commands should not cause automatic walking or staging to get a target into range.
+- A queued fire order owns any needed setup or redeploy when it promotes. It must not require the gun
+  to already be deployed at promotion time if the stored effective fire point remains valid.
 - Execution remains server-authoritative. If the stored effective fire point is stale or invalid
   when the queued fire order promotes, the gun skips that fire order safely instead of walking,
   relocking the original click, or firing outside its valid band.
@@ -82,6 +100,8 @@ needed before the first shot.
 - Cone checks and previews use this per-gun locked point.
 - With multiple artillery pieces selected, different guns may lock to different points because each
   gun has its own origin.
+- For Blanket Fire, this locked point is the stored blanket center. The sampled impact points inside
+  the 15-tile blanket radius are not individually locked or reinterpreted as command targets.
 
 ## Blanket Fire Behavior
 
@@ -116,6 +136,28 @@ needed before the first shot.
   setup-preview system can already infer a future position.
 - The preview should make out-of-range locking legible enough that players can see the effective
   firing direction and valid cone before committing the click.
+- Command feedback after issuing Point Fire or Blanket Fire should mark the stored effective point,
+  not the raw clicked point, when the client can compute the same lock locally. Blanket Fire feedback
+  should include the 15-tile blanket radius.
+- Minimap targeting must follow the same command semantics as world targeting. If minimap hover
+  cannot show the full per-gun preview, the issued command still uses the same server-authoritative
+  locking, terminal queueing, setup/redeploy, and blanket-radius rules.
+
+## Acceptance Coverage
+
+- Protocol parity should prove `blanketFire` is mirrored across Rust protocol metadata and JS
+  protocol constants, including compact ability/order-stage codes if those vocabularies change.
+- Command-card coverage should prove Point Fire and Blanket Fire are separate artillery buttons with
+  separate command ids, target modes, hotkeys, enabled states, and active targeting state.
+- Simulation coverage should prove packed artillery can accept immediate Point Fire and Blanket
+  Fire, queued fire after movement computes from the future position, queued fire can promote into
+  setup/redeploy without requiring pre-deployed state, stale stored targets skip safely, and terminal
+  fire orders prevent later queued commands for that gun.
+- Range/preview coverage should prove inside-minimum and outside-maximum clicks lock to the stored
+  effective point, feedback/previews use that point, and Blanket Fire displays and samples within
+  the 15-tile radius around it.
+- Replay or deterministic simulation coverage should prove Blanket Fire samples the same sequence of
+  impact points from the same command log and authoritative inputs.
 
 ## Balance Requirement
 
