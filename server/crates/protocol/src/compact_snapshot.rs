@@ -43,9 +43,10 @@ pub(crate) fn serialize_messagepack_compact_snapshot_with_diagnostics(
     snapshot: &Snapshot,
 ) -> Result<(Vec<u8>, SnapshotPayloadDiagnostics), SnapshotEncodeError> {
     let compact = compact_snapshot_value(snapshot)?;
-    let (bytes, entry_bytes) =
-        messagepack_frame::serialize_compact_snapshot_value_with_entry_bytes(&compact)?;
-    let diagnostics = payload_diagnostics_from_entry_bytes(snapshot, bytes.len(), entry_bytes);
+    let encoded = messagepack_frame::serialize_compact_snapshot_value_with_entry_bytes(&compact)?;
+    let diagnostics =
+        payload_diagnostics_from_entry_bytes(snapshot, encoded.bytes.len(), encoded.entry_bytes);
+    let bytes = encoded.bytes;
     Ok((bytes, diagnostics))
 }
 
@@ -243,7 +244,7 @@ fn payload_diagnostics_from_entry_bytes<'a>(
                 None
             } else {
                 Some(SnapshotPayloadSectionDiagnostics {
-                    section: *section,
+                    section,
                     count,
                     bytes,
                 })

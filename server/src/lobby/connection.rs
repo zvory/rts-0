@@ -767,7 +767,7 @@ impl SnapshotLifecycleWindow {
 
     fn consume(&mut self) -> SnapshotLifecycleReportStats {
         let payload_total_bytes = self.payload_bytes.total;
-        let out = SnapshotLifecycleReportStats {
+        SnapshotLifecycleReportStats {
             projected: self.projected.consume(&SNAPSHOT_LIFECYCLE_BUCKETS_MS),
             compacted: self.compacted.consume(&SNAPSHOT_LIFECYCLE_BUCKETS_MS),
             queue_age: self.queue_age.consume(&SNAPSHOT_LIFECYCLE_BUCKETS_MS),
@@ -777,8 +777,7 @@ impl SnapshotLifecycleWindow {
             writer_taken: std::mem::take(&mut self.writer_taken),
             sections: consume_payload_sections(&mut self.sections, payload_total_bytes),
             entity_kinds: consume_entity_kinds(&mut self.entity_kinds, payload_total_bytes),
-        };
-        out
+        }
     }
 }
 
