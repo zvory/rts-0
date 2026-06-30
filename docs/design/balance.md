@@ -340,12 +340,14 @@ folded into default targeting.
   buildings, support weapons other than Machine Gunners, and non-infantry entities are excluded.
   Eligible infantry owned by a player with completed Entrenchment create neutral trenches after
   holding ground on untrenched terrain for 90 ticks (~3s), and any eligible infantry can occupy an
-  existing trench while stopped in its footprint. Active occupation grants +1 tile weapon range,
-  suppresses idle aggressive chase like Hold Position, gives incoming direct shots a 70% miss
-  chance, reduces incoming area damage by 70% after existing falloff/armor rules, and suppresses
-  over-penetration through or into the entrenched unit. Direct-shot miss sources use the highest
-  applicable chance, not composed probability, so an Anti-Tank Gun's 65% infantry miss chance
-  becomes 70% against entrenched eligible infantry. The trench radius is 0.75 tile. The client
+  existing empty trench while stopped in its footprint. A trench can actively hold only one
+  infantry unit, so nearby eligible infantry dig their own adjacent trenches instead of sharing one.
+  Active occupation grants +1 tile weapon range, suppresses idle aggressive chase like Hold
+  Position, gives incoming direct shots a 70% miss chance, reduces incoming area damage by 70%
+  after existing falloff/armor rules, and suppresses over-penetration through or into the
+  entrenched unit. Direct-shot miss sources use the highest applicable chance, not composed
+  probability, so an Anti-Tank Gun's 65% infantry miss chance becomes 70% against entrenched
+  eligible infantry. The trench radius is 0.375 tile. The client
   renders neutral trench terrain as brown ground and marks occupied eligible infantry with a small
   brown rim. The selected-unit panel reports existing-trench reuse, researched dig-in availability,
   and occupied benefits as a player-facing status only; the server remains authoritative for actual
