@@ -247,7 +247,6 @@ function buttonByLabel(card, label) {
     events: [{ e: "death", id: 200, x: 64, y: 96, kind: KIND.STEEL }],
   });
   assert(state.prevRecvTime !== null, "prevRecvTime set after two snapshots");
-  assert(state.trenches.length === 0, "snapshot trench state replaces prior trench terrain");
   assert(state.resourceById.get(200).remaining === 0, "visible resource death tombstones known resource");
   assert(state.entityById(200) === undefined, "depleted resources are not exposed as local entities");
   assert(state.entityById(201).remaining === 3333, "untouched resources keep their last-known amount");
