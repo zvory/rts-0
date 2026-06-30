@@ -136,9 +136,7 @@ pub(in crate::game) fn combat_system(
             weapons::tick_tank_stationary_range(e);
         }
     }
-
     for id in entities.ids() {
-        // Determine this attacker's combat parameters.
         let (
             owner,
             px,
@@ -260,7 +258,6 @@ pub(in crate::game) fn combat_system(
             },
         );
         let Some(tid) = target else {
-            // No target: clear stale combat target id for opportunistic-combat orders.
             if let Some(e) = entities.get_mut(id) {
                 if matches!(
                     e.order(),

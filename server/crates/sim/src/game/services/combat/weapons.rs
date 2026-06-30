@@ -276,9 +276,7 @@ pub(super) fn effective_attack_profile(e: &Entity) -> EffectiveAttackProfile {
             profile.dmg = ((profile.dmg as f32) * config::ANTI_TANK_GUN_PACKED_DAMAGE_MULTIPLIER)
                 .round() as u32;
         }
-        WeaponSetup::Deployed => {
-            profile.range_tiles = config::ANTI_TANK_GUN_DEPLOYED_RANGE_TILES as f32;
-        }
+        WeaponSetup::Deployed => profile.range_tiles = config::ANTI_TANK_GUN_DEPLOYED_RANGE_TILES as f32,
         WeaponSetup::SettingUp { .. }
         | WeaponSetup::TearingDown { .. }
         | WeaponSetup::TearingDownToRedeploy { .. } => {
