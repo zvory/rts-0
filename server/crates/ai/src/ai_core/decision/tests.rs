@@ -1167,7 +1167,7 @@ fn fast_flood_recovery_builds_support_tech_and_takes_oil() {
     owned.extend((0..3).map(|i| worker(40 + i, AiEntityState::Idle)));
     let mut observation = observation(
         AiEconomy {
-            steel: 300,
+            steel: 500,
             oil: 50,
             supply_used: 11,
             supply_cap: 28,
@@ -2683,7 +2683,7 @@ fn steel_expansion_tanks_sends_workers_to_oil_after_expansion_is_planned() {
     let ts = config::TILE_SIZE as f32;
     let mut observation = with_expansion_resources(observation(
         AiEconomy {
-            steel: 500,
+            steel: 550,
             oil: 0,
             supply_used: 17,
             supply_cap: 40,
@@ -2724,7 +2724,7 @@ fn steel_expansion_tanks_sends_workers_to_oil_after_expansion_is_planned() {
         .sum::<usize>();
     assert_eq!(
         oil_assignments, 3,
-        "support tech should fill the three free mineable oil nodes once expanding"
+        "support tech should fill the three mineable oil nodes once expanding"
     );
 }
 
