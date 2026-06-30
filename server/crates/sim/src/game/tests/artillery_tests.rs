@@ -146,6 +146,83 @@ fn artillery_firing_from_fog_is_actionable_for_all_enemies() {
 }
 
 #[test]
+fn artillery_firing_reveal_does_not_override_smoke_concealment() {
+    let players = human_vs_ai_players();
+    let mut game = empty_flat_game(&players);
+    let pos = game.map.tile_center(20, 20);
+    let target = game.map.tile_center(42, 20);
+    let counter_pos = game.map.tile_center(4, 4);
+    let artillery = game
+        .entities
+        .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
+        .expect("artillery should spawn");
+    let counter = game
+        .entities
+        .spawn_unit(2, EntityKind::Tank, counter_pos.0, counter_pos.1)
+        .expect("counter tank should spawn");
+    deploy_artillery_toward(&mut game, artillery, target);
+    systems::recompute_supply(&mut game.players, &game.entities);
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.spawn_smoke_cloud_for_test(pos.0, pos.1)
+        .expect("smoke should spawn over the artillery");
+
+    assert!(
+        !game.fog.is_visible_world(2, pos.0, pos.1),
+        "fixture requires smoke to hide the artillery from player 2"
+    );
+
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::PointFire,
+            units: vec![artillery],
+            x: Some(target.0),
+            y: Some(target.1),
+            queued: false,
+        },
+    );
+    let events = game.tick();
+
+    assert!(
+        events.iter().any(|(pid, events)| {
+            *pid == 2
+                && events
+                    .iter()
+                    .any(|event| matches!(event, Event::ArtilleryFiring { owner: 1, .. }))
+        }),
+        "the global firing marker should still confirm the shot was launched"
+    );
+    assert!(
+        !game
+            .snapshot_for(2)
+            .entities
+            .iter()
+            .any(|entity| entity.id == artillery),
+        "actionable firing reveal must not make a smoke-hidden artillery visible"
+    );
+
+    game.enqueue(
+        2,
+        Command::Attack {
+            units: vec![counter],
+            target: artillery,
+            queued: false,
+        },
+    );
+    game.tick();
+
+    assert_ne!(
+        game.entities
+            .get(counter)
+            .expect("counter should exist")
+            .order()
+            .attack_target(),
+        Some(artillery),
+        "smoke-hidden firing artillery should not validate direct attack commands"
+    );
+}
+
+#[test]
 fn artillery_target_is_owner_only_and_enemy_events_require_current_vision() {
     let players = human_vs_ai_players();
     let mut game = empty_flat_game(&players);
