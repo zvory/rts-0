@@ -3,19 +3,141 @@
 ## Purpose
 
 Implement the tank coaxial machine gun requirements in [requirements.md](requirements.md) without
-bolting a second weapon onto assumptions that every entity has one attack profile. The early phases
-separate weapon identity, damage classification, cooldown state, and feedback hints in
-behavior-preserving steps before any Tank gets a live coax shot. Later phases add the server
-runtime, client audio/visual treatment, generated data surfaces, documentation, and final
-regression hardening.
+bolting a second weapon onto assumptions that every entity has one attack profile. This document is
+a rough architecture roadmap after adversarial review, not an executor-ready phase list. Future
+planning agents should flesh the roadmap into revised phase files before implementation begins.
+
+The core shape is:
+
+1. Build a real weapon-profile system and move existing attacks onto it without changing gameplay.
+2. Build a real target classification and priority-policy system, with user review before code.
+3. Implement the Tank coax as one weapon profile using those systems, then add client feedback,
+   docs, and final hardening.
+
+Do not run `scripts/phase-runner.sh --plan coax ...` against the current phase files until a future
+planning pass updates them to match this roadmap. The existing `phase-*.md` files are historical
+drafts and useful scaffolding, but they still assume too much can be resolved inside the runtime
+phase.
 
 ## Product Input
 
 - [requirements.md](requirements.md) is the active product requirement source.
 - Coax shots must overpenetrate. They use the same direct-fire overpenetration system as other
   direct shots, but with coax small-arms damage and coax feedback scale.
+- User decisions captured during review:
+  - Beta may pass through temporarily broken middle states during serial implementation, but final
+    behavior must meet the requirements.
+  - The coax is fixed to the main cannon/turret direction. The main cannon owns where the turret
+    points; the coax only fires opportunistically at legal targets inside the current turret arc.
+  - Coax targeting should have separate ranking from the Tank cannon. It may reuse direct-fire
+    safety/legality checks, but not Tank cannon priority rules.
+  - Riflemen, Machine Gunners, Workers, and future Panzerfaust-style infantry should be
+    infantry-priority targets for machine-gun-like policies. Mortar Teams and other support weapons
+    should not count as infantry-priority. Ekat and Golems are not part of the first coax decision.
 
-## Phase Summaries
+## Architecture Groups
+
+### Group A - Weapon Profile Foundation
+
+Create a rules-owned weapon-profile abstraction that is useful beyond the Tank coax. A weapon
+profile should carry stable weapon identity, damage class, base damage, range, cooldown, miss/facing
+policy, overpenetration policy, event identity, and enough metadata for client feedback routing when
+that identity reaches the wire. Current unit and building attacks should move onto default weapon
+profiles in behavior-preserving steps.
+
+This group should answer questions such as:
+
+- What is the stable profile id vocabulary? For example, `rifleman_rifle`, `machine_gunner_mg`,
+  `scout_car_mg`, `tank_cannon`, and later `tank_coax`.
+- Which fields belong to a weapon profile versus an entity kind?
+- Which current behavior is genuinely weapon-specific, such as AP damage, small-arms damage,
+  overpenetration depth, armor-facing multipliers, miss policy, cooldown, and feedback?
+- How does an entity expose one or more weapons without changing current one-weapon behavior?
+
+Expected outcome: current gameplay is unchanged, but damage, cooldowns, events, and feedback can
+refer to the weapon that fired instead of inferring everything from `EntityKind`.
+
+### Group B - Target Classification And Priority Policy
+
+Create a rules-owned target classification and priority-policy system before implementing live coax
+targeting. This must not be a pile of per-weapon match statements. Target traits should live on the
+target, while weapons choose from declarative priority policies that can be reused or specialized.
+
+Think in these separate concepts:
+
+- **Weapon profile:** what fired and how it deals damage.
+- **Target classification:** what the target is, such as infantry, support weapon, light vehicle,
+  armored vehicle, building, field obstacle, economy unit, or anti-armor threat.
+- **Priority policy:** how a weapon ranks already-legal targets, such as ordinary small-arms,
+  machine-gun-like, anti-armor, artillery/indirect, field-obstacle breach, or an idiosyncratic
+  weapon-specific policy.
+- **Activation constraint:** whether this weapon is allowed to consider a target at all, such as
+  current turret arc, setup arc, minimum range, smoke/LOS, direct attack order, or no-chase passive
+  fire.
+
+This group is product/design gated. An implementation agent must stop as blocked and ask the user
+clarifying questions before coding the priority-policy system unless a later plan already records
+the answers. Do not infer the final model from this rough plan.
+
+Questions the user should be asked include:
+
+- Which target tags do we want now, and which are likely soon?
+- Which current target behaviors are true reusable policies versus one-off exceptions?
+- Should priority policies be first-matching ordered rules, scoring tuples, bucketed ranking, or
+  another declarative shape?
+- How should "attacking me", anti-armor threat, current target retention, distance, buildings,
+  scout cars, Tank Traps, support weapons, and explicit player attack orders interact?
+- Which policies should machine-gun-like weapons share, and where should the Tank coax differ only
+  because it is locked to the current turret arc?
+
+Expected outcome: existing targeting remains behavior-preserving after migration, and the coax can
+use a machine-gun-like policy constrained by the Tank's current turret arc.
+
+### Group C - Tank Coax Runtime
+
+After Groups A and B land, implement the server-authoritative coax. The coax should be a secondary
+Tank weapon profile with 6-tile range, 4 small-arms damage, 6-tick cooldown, independent cooldown
+state, direct-fire legality checks, direct-fire overpenetration, and attack events carrying the
+coax weapon identity.
+
+Runtime constraints:
+
+- The main cannon owns turret direction and normal Tank attack intent.
+- The coax never rotates the turret, changes cannon target, requests chase paths, clears paths, or
+  changes movement intent.
+- The coax only evaluates targets inside the current authoritative turret/weapon facing arc.
+- The coax should use the machine-gun-like priority policy from Group B, with fallback legal targets
+  only when no infantry-priority target is legal inside the arc.
+- Coax damage is small-arms damage and must not inherit Tank cannon AP behavior or Tank cannon
+  armor-facing multipliers.
+
+### Group D - Client Feedback, Docs, And Hardening
+
+Once runtime behavior exists, teach the client to render and play coax shots from weapon identity.
+Tank cannon shots keep cannon sound, large muzzle flash, tracer scale, and recoil. Tank coax shots
+use machine-gun sound, small muzzle flash/tracer scale, no cannon recoil, and a small coax barrel or
+muzzle anchor beside the main gun.
+
+Finish by updating design docs, generated stats/wiki surfaces if needed, focused regression tests,
+manual scenario coverage, and final patch notes.
+
+## Draft Phase Buckets
+
+The existing `phase-*.md` files need a follow-up planning pass to align with these buckets. A good
+future split is likely:
+
+1. Weapon profile vocabulary and default-profile parity.
+2. Weapon-aware damage, overpenetration, cooldown, and event plumbing.
+3. User-gated target classification and priority-policy design.
+4. Target classification and priority-policy implementation, preserving current behavior.
+5. Tank coax server runtime.
+6. Coax client feedback and Tank rig update.
+7. Docs, generated data surfaces, integration tests, and playtest hardening.
+
+The exact boundaries should be chosen after reading the current combat code and after the user
+answers the target-policy questions in Group B.
+
+## Existing Draft Phase Summaries
 
 ### [Phase 1 - Rules Weapon Profile Skeleton](phase-1.md)
 
@@ -75,6 +197,9 @@ manual inspection.
 
 ## Phase Index
 
+These files are draft scaffolding and must be rewritten or reconciled with the architecture groups
+above before executor automation is used.
+
 1. [Phase 1 - Rules Weapon Profile Skeleton](phase-1.md)
 2. [Phase 2 - Weapon-Aware Damage Refactor](phase-2.md)
 3. [Phase 3 - Weapon Cooldown And Event Plumbing](phase-3.md)
@@ -110,9 +235,12 @@ manual inspection.
 - Existing Tank cannon behavior remains the regression baseline: main cannon target selection,
   cooldown, turret rotation, stationary range ramp, direct-fire overpenetration, audio, visuals,
   and recoil should continue to work as they do today.
-- Before implementing Phase 4, resolve the infantry-priority vocabulary if requirements still leave
-  it ambiguous. The likely implementation should be a rules-owned helper rather than ad hoc matches
-  inside combat code.
+- Before implementing live coax targeting, complete the user-gated target classification and
+  priority-policy design. An implementation agent must stop as blocked and ask the user for the
+  missing policy decisions instead of inventing target tags or ranking rules.
+- Avoid ad hoc per-weapon target lists. Prefer one rules-owned target classification surface plus
+  reusable declarative priority policies, with weapon-specific policies only where a weapon really
+  has unique behavior.
 - Update mirrored contracts together. Protocol event shape changes touch Rust contract/protocol
   crates, compact metadata/encoding, JS protocol decoding, protocol parity coverage, and
   `docs/design/protocol.md`.
@@ -153,15 +281,8 @@ Each phase should run the smallest relevant subset of:
 
 ## Suggested Execution
 
-Implement one phase at a time from a clean worktree. Do not start a later phase from an assumed
-merge; wait for the owned PR to merge and verify reachability from `origin/main`.
-
-```bash
-scripts/phase-runner.sh --plan coax 1 --pr --wait
-scripts/phase-runner.sh --plan coax 2 --pr --wait
-scripts/phase-runner.sh --plan coax 3 --pr --wait
-scripts/phase-runner.sh --plan coax 4 --pr --wait
-scripts/phase-runner.sh --plan coax 5 --pr --wait
-scripts/phase-runner.sh --plan coax 6 --pr --wait
-scripts/phase-runner.sh --plan coax 7 --pr --wait
-```
+Do not execute the existing draft phases yet. First run a planning pass that rewrites the phase
+files around the architecture groups above, especially the user-gated target classification and
+priority-policy work. After the revised phase files are reviewed, implement one phase at a time from
+a clean worktree, push each phase as an owned PR with auto-merge armed, and wait for the phase head
+to reach `origin/main` before starting the next phase.
