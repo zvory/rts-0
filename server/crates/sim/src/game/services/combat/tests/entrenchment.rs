@@ -1,5 +1,57 @@
 use super::*;
 
+fn mark_entrenched(entities: &mut EntityStore, id: u32) {
+    entities
+        .get_mut(id)
+        .expect("entity should exist")
+        .movement
+        .as_mut()
+        .expect("entity should have movement")
+        .occupied_trench_id = Some(1);
+}
+
+#[allow(clippy::too_many_arguments)]
+fn apply_test_damage_with_seed_and_teams(
+    entities: &mut EntityStore,
+    teams: &TeamRelations,
+    events: &mut HashMap<u32, Vec<Event>>,
+    attacker: u32,
+    victim: u32,
+    dmg: u32,
+    attacker_owner: u32,
+    ax: f32,
+    ay: f32,
+    vx: f32,
+    vy: f32,
+    range_px: f32,
+    rng_seed: u64,
+) {
+    let map = Map::generate(2, 0x00C0_FFEE);
+    let fog = Fog::new(map.size);
+    let smokes = SmokeCloudStore::new();
+    let mut rng = SmallRng::seed_from_u64(rng_seed);
+    apply_damage(
+        &map,
+        entities,
+        teams,
+        events,
+        &fog,
+        &smokes,
+        &mut rng,
+        attacker,
+        victim,
+        dmg,
+        attacker_owner,
+        ax,
+        ay,
+        vx,
+        vy,
+        range_px,
+        0.0,
+        10,
+    );
+}
+
 #[test]
 fn entrenched_eligible_infantry_gain_one_tile_of_weapon_range() {
     for kind in [
