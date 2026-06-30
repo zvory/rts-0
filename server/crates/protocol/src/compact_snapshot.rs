@@ -1,12 +1,16 @@
 use serde::ser::{SerializeSeq, Serializer};
 use serde::Serialize;
+use std::collections::BTreeMap;
 
 use crate::contract_metadata::{
     ability_code, ability_object_kind_code, event_code, kind_code, notice_severity_code,
     order_stage_code, setup_state_code, state_code, upgrade_code, COMPACT_SNAPSHOT_VERSION,
 };
 use crate::messagepack_frame;
-use crate::SnapshotEncodeError;
+use crate::{
+    SnapshotEncodeError, SnapshotPayloadDiagnostics, SnapshotPayloadEntityKindDiagnostics,
+    SnapshotPayloadSectionDiagnostics,
+};
 use rts_contract::{
     AbilityCooldownView, AbilityObjectOwnerStateView, AbilityObjectView, AttackReveal,
     DebugPathView, EntityView, Event, OrderPlanMarker, RememberedBuildingView, SmokeCloudView,
@@ -18,12 +22,36 @@ pub(crate) fn serialize_compact_snapshot(snapshot: &Snapshot) -> serde_json::Res
     serde_json::to_string(&CompactSnapshot(snapshot))
 }
 
+pub(crate) fn serialize_compact_snapshot_with_diagnostics(
+    snapshot: &Snapshot,
+) -> Result<(String, SnapshotPayloadDiagnostics), SnapshotEncodeError> {
+    let compact = compact_snapshot_value(snapshot)?;
+    let text = serde_json::to_string(&compact)?;
+    let diagnostics = json_payload_diagnostics(snapshot, &compact, text.len())?;
+    Ok((text, diagnostics))
+}
+
 /// Serialize one semantic snapshot as a versioned MessagePack compact binary frame payload.
 pub(crate) fn serialize_messagepack_compact_snapshot(
     snapshot: &Snapshot,
 ) -> Result<Vec<u8>, SnapshotEncodeError> {
-    let compact = serde_json::to_value(CompactSnapshot(snapshot))?;
+    let compact = compact_snapshot_value(snapshot)?;
     messagepack_frame::serialize_compact_snapshot_value(&compact)
+}
+
+pub(crate) fn serialize_messagepack_compact_snapshot_with_diagnostics(
+    snapshot: &Snapshot,
+) -> Result<(Vec<u8>, SnapshotPayloadDiagnostics), SnapshotEncodeError> {
+    let compact = compact_snapshot_value(snapshot)?;
+    let encoded = messagepack_frame::serialize_compact_snapshot_value_with_entry_bytes(&compact)?;
+    let diagnostics =
+        payload_diagnostics_from_entry_bytes(snapshot, encoded.bytes.len(), encoded.entry_bytes);
+    let bytes = encoded.bytes;
+    Ok((bytes, diagnostics))
+}
+
+fn compact_snapshot_value(snapshot: &Snapshot) -> serde_json::Result<serde_json::Value> {
+    serde_json::to_value(CompactSnapshot(snapshot))
 }
 
 struct CompactSnapshot<'a>(&'a Snapshot);
@@ -139,6 +167,217 @@ impl Serialize for CompactSnapshot<'_> {
         map.serialize_entry("n", &CompactNetStatus(&snapshot.net_status))?;
         map.end()
     }
+}
+
+const SECTION_ENTITIES: &str = "entities";
+const SECTION_VISIBILITY: &str = "visibility";
+const SECTION_RESOURCE_DELTAS: &str = "resourceDeltas";
+const SECTION_EVENTS: &str = "events";
+const SECTION_SMOKES: &str = "smokes";
+const SECTION_ABILITY_OBJECTS: &str = "abilityObjects";
+const SECTION_TRENCHES: &str = "trenches";
+const SECTION_PLAYER_STATUS: &str = "playerStatus";
+const SECTION_NET_STATUS: &str = "netStatus";
+const SECTION_OTHER: &str = "other";
+const SECTION_ORDER: [&str; 10] = [
+    SECTION_ENTITIES,
+    SECTION_VISIBILITY,
+    SECTION_RESOURCE_DELTAS,
+    SECTION_EVENTS,
+    SECTION_SMOKES,
+    SECTION_ABILITY_OBJECTS,
+    SECTION_TRENCHES,
+    SECTION_PLAYER_STATUS,
+    SECTION_NET_STATUS,
+    SECTION_OTHER,
+];
+
+fn json_payload_diagnostics(
+    snapshot: &Snapshot,
+    compact: &serde_json::Value,
+    total_bytes: usize,
+) -> Result<SnapshotPayloadDiagnostics, SnapshotEncodeError> {
+    let mut entry_bytes = Vec::new();
+    if let serde_json::Value::Object(map) = compact {
+        for (key, value) in map {
+            entry_bytes.push((key.as_str(), json_map_entry_len(key, value)?));
+        }
+    }
+    Ok(payload_diagnostics_from_entry_bytes(
+        snapshot,
+        total_bytes,
+        entry_bytes,
+    ))
+}
+
+fn payload_diagnostics_from_entry_bytes<'a>(
+    snapshot: &Snapshot,
+    total_bytes: usize,
+    entries: impl IntoIterator<Item = (&'a str, usize)>,
+) -> SnapshotPayloadDiagnostics {
+    let mut counts = section_counts(snapshot);
+    let mut bytes: BTreeMap<&'static str, u32> = BTreeMap::new();
+    let mut accounted_bytes = 0usize;
+
+    for (key, entry_bytes) in entries {
+        let section = section_for_compact_key(key);
+        accounted_bytes = accounted_bytes.saturating_add(entry_bytes);
+        add_u32(&mut bytes, section, entry_bytes);
+    }
+
+    if total_bytes > accounted_bytes {
+        add_u32(
+            &mut bytes,
+            SECTION_OTHER,
+            total_bytes.saturating_sub(accounted_bytes),
+        );
+    }
+
+    counts.entry(SECTION_OTHER).or_insert(1);
+
+    let sections = SECTION_ORDER
+        .iter()
+        .filter_map(|section| {
+            let count = counts.get(section).copied().unwrap_or(0);
+            let bytes = bytes.get(section).copied().unwrap_or(0);
+            if count == 0 && bytes == 0 {
+                None
+            } else {
+                Some(SnapshotPayloadSectionDiagnostics {
+                    section,
+                    count,
+                    bytes,
+                })
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let entity_kinds = entity_kind_diagnostics(snapshot, &sections);
+
+    SnapshotPayloadDiagnostics {
+        bytes: saturating_usize_u32(total_bytes),
+        sections,
+        entity_kinds,
+    }
+}
+
+fn section_counts(snapshot: &Snapshot) -> BTreeMap<&'static str, u32> {
+    let mut counts = BTreeMap::new();
+    insert_count(&mut counts, SECTION_ENTITIES, snapshot.entities.len());
+    insert_count(
+        &mut counts,
+        SECTION_VISIBILITY,
+        snapshot
+            .visible_tiles
+            .iter()
+            .filter(|tile| **tile != 0)
+            .count()
+            .saturating_add(snapshot.remembered_buildings.len()),
+    );
+    insert_count(
+        &mut counts,
+        SECTION_RESOURCE_DELTAS,
+        snapshot.resource_deltas.len(),
+    );
+    insert_count(&mut counts, SECTION_EVENTS, snapshot.events.len());
+    insert_count(&mut counts, SECTION_SMOKES, snapshot.smokes.len());
+    insert_count(
+        &mut counts,
+        SECTION_ABILITY_OBJECTS,
+        snapshot.ability_objects.len(),
+    );
+    insert_count(&mut counts, SECTION_TRENCHES, snapshot.trenches.len());
+    insert_count(
+        &mut counts,
+        SECTION_PLAYER_STATUS,
+        1usize
+            .saturating_add(snapshot.player_resources.len())
+            .saturating_add(snapshot.upgrades.len()),
+    );
+    counts.insert(SECTION_NET_STATUS, 1);
+    counts
+}
+
+fn insert_count(counts: &mut BTreeMap<&'static str, u32>, section: &'static str, count: usize) {
+    if count > 0 {
+        counts.insert(section, saturating_usize_u32(count));
+    }
+}
+
+fn add_u32(counts: &mut BTreeMap<&'static str, u32>, section: &'static str, value: usize) {
+    let value = saturating_usize_u32(value);
+    let entry = counts.entry(section).or_insert(0);
+    *entry = entry.saturating_add(value);
+}
+
+fn section_for_compact_key(key: &str) -> &'static str {
+    match key {
+        "e" => SECTION_ENTITIES,
+        "fg" | "mb" => SECTION_VISIBILITY,
+        "r" => SECTION_RESOURCE_DELTAS,
+        "ev" => SECTION_EVENTS,
+        "sm" => SECTION_SMOKES,
+        "ao" => SECTION_ABILITY_OBJECTS,
+        "tr" => SECTION_TRENCHES,
+        "s" | "pr" | "u" => SECTION_PLAYER_STATUS,
+        "n" => SECTION_NET_STATUS,
+        _ => SECTION_OTHER,
+    }
+}
+
+fn json_map_entry_len(
+    key: &str,
+    value: &serde_json::Value,
+) -> Result<usize, SnapshotEncodeError> {
+    let key_bytes = serde_json::to_string(key)?.len();
+    let value_bytes = serde_json::to_string(value)?.len();
+    Ok(key_bytes.saturating_add(1).saturating_add(value_bytes))
+}
+
+fn entity_kind_diagnostics(
+    snapshot: &Snapshot,
+    sections: &[SnapshotPayloadSectionDiagnostics],
+) -> Vec<SnapshotPayloadEntityKindDiagnostics> {
+    let entity_bytes = sections
+        .iter()
+        .find(|section| section.section == SECTION_ENTITIES)
+        .map(|section| section.bytes)
+        .unwrap_or(0);
+    let total_entities = snapshot.entities.len() as u32;
+    if total_entities == 0 {
+        return Vec::new();
+    }
+
+    let mut counts: BTreeMap<String, u32> = BTreeMap::new();
+    for entity in &snapshot.entities {
+        let entry = counts.entry(entity.kind.clone()).or_insert(0);
+        *entry = entry.saturating_add(1);
+    }
+
+    let mut kinds = counts
+        .into_iter()
+        .map(|(kind, count)| {
+            let approx_bytes =
+                ((entity_bytes as u64).saturating_mul(count as u64) / total_entities as u64)
+                    .min(u32::MAX as u64) as u32;
+            SnapshotPayloadEntityKindDiagnostics {
+                kind,
+                count,
+                approx_bytes,
+            }
+        })
+        .collect::<Vec<_>>();
+    kinds.sort_by(|a, b| {
+        b.approx_bytes
+            .cmp(&a.approx_bytes)
+            .then_with(|| b.count.cmp(&a.count))
+            .then_with(|| a.kind.cmp(&b.kind))
+    });
+    kinds
+}
+
+fn saturating_usize_u32(value: usize) -> u32 {
+    value.min(u32::MAX as usize) as u32
 }
 
 fn encode_visibility_runs(visible_tiles: &[u8]) -> Vec<u32> {

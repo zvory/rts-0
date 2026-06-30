@@ -14,6 +14,10 @@ import {
   appendCommandLifecycleMarkdown,
   summarizeCommandLifecycle,
 } from "./net-report-command-lifecycle.mjs";
+import {
+  appendSnapshotPayloadMarkdown,
+  summarizeSnapshotPayload,
+} from "./net-report-snapshot-payload.mjs";
 
 const ANSI_PATTERN = /\x1B\[[0-?]*[ -/]*[@-~]/g;
 const SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES = 1280;
@@ -86,6 +90,18 @@ const METRICS = [
   ["server_snapshot_waited_behind_reliable", "snapshots waited behind reliable"],
   ["server_snapshot_send_age_max_ms", "server snapshot send age max"],
   ["server_snapshot_slot_replaced", "server snapshot slot replaced"],
+  ["server_snapshot_project_max_ms", "server snapshot project max"],
+  ["server_snapshot_project_p95_ms", "server snapshot project p95"],
+  ["server_snapshot_compact_max_ms", "server snapshot compact max"],
+  ["server_snapshot_compact_p95_ms", "server snapshot compact p95"],
+  ["server_snapshot_queue_age_max_ms", "server snapshot queue age max"],
+  ["server_snapshot_queue_age_p95_ms", "server snapshot queue age p95"],
+  ["server_snapshot_serialize_max_ms", "server snapshot serialize max"],
+  ["server_snapshot_serialize_p95_ms", "server snapshot serialize p95"],
+  ["server_snapshot_writer_send_max_ms", "server snapshot writer send max"],
+  ["server_snapshot_writer_send_p95_ms", "server snapshot writer send p95"],
+  ["server_snapshot_payload_bytes_max", "server snapshot payload bytes max"],
+  ["server_snapshot_payload_bytes_p95", "server snapshot payload bytes p95"],
   ["server_command_frame_deserialize_max_ms", "server command parse max"],
   ["server_command_deserialize_to_room_enqueue_max_ms", "server command enqueue max"],
   ["server_command_room_queue_max_ms", "server command room queue max"],
@@ -167,6 +183,21 @@ const SUMMARY_FIELDS = [
   "server_snapshot_slot_stored",
   "server_snapshot_slot_replaced",
   "server_snapshot_slot_closed",
+  "server_snapshot_project_max_ms",
+  "server_snapshot_project_p95_ms",
+  "server_snapshot_compact_max_ms",
+  "server_snapshot_compact_p95_ms",
+  "server_snapshot_queue_age_max_ms",
+  "server_snapshot_queue_age_p95_ms",
+  "server_snapshot_serialize_max_ms",
+  "server_snapshot_serialize_p95_ms",
+  "server_snapshot_writer_send_max_ms",
+  "server_snapshot_writer_send_p95_ms",
+  "server_snapshot_payload_bytes_max",
+  "server_snapshot_payload_bytes_p95",
+  "server_snapshot_payload_bytes_avg",
+  "server_snapshot_payload_bytes_total",
+  "server_snapshot_writer_taken",
   "server_command_lifecycle_count",
   "server_command_lifecycle_accepted",
   "server_command_lifecycle_rejected",
@@ -202,7 +233,30 @@ const ISSUE_GROUPS = [
   {
     id: "server_snapshot_projection",
     label: "server snapshot projection/compact/serialization cost",
-    fields: ["max_snapshot_ms", "snapshot_ms", "compact_ms", "serialize_ms"],
+    fields: [
+      "max_snapshot_ms",
+      "snapshot_ms",
+      "compact_ms",
+      "serialize_ms",
+      "server_snapshot_project_max_ms",
+      "server_snapshot_project_p95_ms",
+      "server_snapshot_compact_max_ms",
+      "server_snapshot_compact_p95_ms",
+      "server_snapshot_serialize_max_ms",
+      "server_snapshot_serialize_p95_ms",
+    ],
+  },
+  {
+    id: "snapshot_payload_composition",
+    label: "snapshot payload composition and packet-budget pressure",
+    fields: [
+      "snapshot_bytes_max",
+      "snapshot_bytes_p95",
+      "snapshot_over_segment_budget_pct_x100",
+      "server_snapshot_payload_bytes_max",
+      "server_snapshot_payload_bytes_p95",
+      "server_snapshot_payload_bytes_avg",
+    ],
   },
   {
     id: "websocket_writer_send",
@@ -216,6 +270,10 @@ const ISSUE_GROUPS = [
       "server_reliable_drained_before_snapshot_max",
       "server_snapshot_waited_behind_reliable",
       "server_snapshot_send_age_max_ms",
+      "server_snapshot_queue_age_max_ms",
+      "server_snapshot_queue_age_p95_ms",
+      "server_snapshot_writer_send_max_ms",
+      "server_snapshot_writer_send_p95_ms",
       "server_snapshot_slot_replaced",
       "server_snapshot_slot_closed",
     ],
@@ -389,6 +447,19 @@ const WARN_THRESHOLD = {
   server_snapshot_send_age_max_ms: 100,
   server_snapshot_slot_replaced: 1,
   server_snapshot_slot_closed: 1,
+  server_snapshot_project_max_ms: 8,
+  server_snapshot_project_p95_ms: 8,
+  server_snapshot_compact_max_ms: 8,
+  server_snapshot_compact_p95_ms: 8,
+  server_snapshot_queue_age_max_ms: 100,
+  server_snapshot_queue_age_p95_ms: 100,
+  server_snapshot_serialize_max_ms: 10,
+  server_snapshot_serialize_p95_ms: 10,
+  server_snapshot_writer_send_max_ms: 10,
+  server_snapshot_writer_send_p95_ms: 10,
+  server_snapshot_payload_bytes_max: 256 * 1024,
+  server_snapshot_payload_bytes_p95: SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES + 1,
+  server_snapshot_payload_bytes_avg: 128 * 1024,
 };
 
 function usage() {
@@ -879,6 +950,7 @@ function finalizePlayer(player) {
     metrics: values,
     transport: summarizeTransport(reports),
     commandLifecycle: summarizeCommandLifecycle(reports),
+    snapshotPayload: summarizeSnapshotPayload(reports, summarizeField),
     evidence,
   };
 }
@@ -1115,6 +1187,12 @@ function missingDiagnosticGroups(rows) {
   if (!fields.has("server_reliable_drained_before_snapshot")) {
     missing.push("server reliable/snapshot outbound pressure: no matching fields in input");
   }
+  if (!fields.has("server_snapshot_project_max_ms") || !fields.has("server_snapshot_serialize_max_ms")) {
+    missing.push("server snapshot lifecycle window: no projection/compact/serialize fields in input");
+  }
+  if (!fields.has("server_snapshot_payload_sections")) {
+    missing.push("server snapshot payload composition: no section/entity-kind fields in input");
+  }
   if (!fields.has("prediction_disable_wasm_count") || !fields.has("prediction_replay_max_ms")) {
     missing.push("prediction disable reason/replay budget detail: no matching fields in input");
   }
@@ -1194,6 +1272,7 @@ function formatMarkdown(report) {
       );
     }
 
+    appendSnapshotPayloadMarkdown(lines, match.players, { formatValue, formatPctX100 });
     appendCommandLifecycleMarkdown(lines, match.players);
 
     lines.push("");
@@ -1223,12 +1302,12 @@ function formatMarkdown(report) {
   return `${lines.join("\n")}\n`;
 }
 
-function metricMax(player, field) {
-  return formatValue(player.metrics[field]?.max);
-}
-
 function metricPctX100Max(player, field) {
   return formatPctX100(player.metrics[field]?.max);
+}
+
+function metricMax(player, field) {
+  return formatValue(player.metrics[field]?.max);
 }
 
 function metricMin(player, field) {

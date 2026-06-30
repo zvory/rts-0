@@ -118,9 +118,18 @@ exemplars, `server_reliable_drained_before_snapshot`, `server_reliable_drained_b
 `server_snapshot_waited_behind_reliable`, `server_snapshot_sent`,
 `server_snapshot_send_age_latest_ms`, `server_snapshot_send_age_max_ms`,
 `server_snapshot_send_age_avg_ms`, `server_snapshot_slot_stored`,
-`server_snapshot_slot_replaced`, and `server_snapshot_slot_closed`. These are server-only structured-log
-fields, not client protocol fields. One reliable message before a snapshot with no send age or slot
-replacement is normal ordering, not outbound pressure.
+`server_snapshot_slot_replaced`, and `server_snapshot_slot_closed`. It also emits bounded snapshot
+lifecycle windows: `server_snapshot_project_*_ms`, `server_snapshot_compact_*_ms`,
+`server_snapshot_queue_age_*_ms`, `server_snapshot_serialize_*_ms`,
+`server_snapshot_writer_send_*_ms`, `server_snapshot_writer_taken`, and
+`server_snapshot_payload_bytes_*` for latest/max/p95/avg/count/total application payload bytes.
+Payload composition is summarized in JSON string fields `server_snapshot_payload_sections` and
+`server_snapshot_entity_kinds`; the stable section labels are `entities`, `visibility`,
+`resourceDeltas`, `events`, `smokes`, `abilityObjects`, `trenches`, `playerStatus`, `netStatus`,
+and `other`. Entity-kind bytes are proportional approximations from the entity section rather than
+per-entity serialization traces. These are server-only structured-log fields, not client protocol
+fields. One reliable message before a snapshot with no send age or slot replacement is normal
+ordering, not outbound pressure.
 
 The canonical single-segment payload budget is 1280 bytes. Client measurements count only snapshot
 WebSocket application payload bytes, currently `messagepack-application-payload` from binary
@@ -396,12 +405,16 @@ can see which fields triggered or argued against a diagnosis.
 - Server tick/scheduler pressure requires server tick, scheduler lag, slow-tick, or performance tick
   rows. Clean `server_tick_ms`, `server_lag_ms`, and `slow_tick_count` values are evidence against
   server-lag blame, not proof that every host resource was perfect.
-- Server snapshot projection/compact/serialization pressure requires `performance tick summary` or
-  `performance snapshot timing` rows. Older incidents without those rows are reported as unavailable.
+- Server snapshot projection/compact/serialization pressure requires `performance tick summary`,
+  `performance snapshot timing`, or newer `client_net_report` server lifecycle fields. Older
+  incidents without those rows are reported as unavailable.
+- Snapshot payload composition pressure uses client payload byte/packet-budget fields plus newer
+  server payload byte totals and top section/entity-kind summaries when present. Section bytes are
+  compact-frame attribution estimates, not raw snapshot bodies.
 - WebSocket writer/send pressure requires writer timing, high buffered bytes, or head-of-line/backlog
   evidence. Newer `client_net_report` rows can also show server outbound pressure from multiple
-  reliable messages drained before one snapshot, snapshot send age, or latest-only snapshot slot
-  replacement.
+  reliable messages drained before one snapshot, snapshot queue age, writer-send timing, snapshot
+  send age, or latest-only snapshot slot replacement.
 - Client network/snapshot delivery pressure uses RTT, bad RTT samples, snapshot jitter, snapshot gaps,
   stale/duplicate/skipped snapshot counters, and burst counters.
 - Browser processing pressure uses payload size, packet-budget p95/rate, frame parse, compact decode,
@@ -483,6 +496,8 @@ architecture policy gate.
 - `command_density` classifies sustained report-window command totals, high short-bucket command
   density, or high server command-receipt volume before it falls through to prediction, outbound
   writer, or generic network buckets.
+- `server_snapshot_lifecycle` classifies high server projection, compaction, serialization, queue
+  age, or writer-send timing from the per-connection snapshot lifecycle window.
 - `server_snapshot_outbound` classifies multi-reliable-before-snapshot backlog, snapshot-send-age,
   or latest-slot-replacement pressure observed by the server connection writer. One reliable message
   before a snapshot with zero send age and no slot replacement is normal ordering, not pressure.

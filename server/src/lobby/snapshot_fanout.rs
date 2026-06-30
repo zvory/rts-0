@@ -88,6 +88,10 @@ impl<'a> SnapshotFanout<'a> {
             let compact_start = StdInstant::now();
             compact_snapshot_for_wire(&mut snapshot);
             let compact_duration = compact_start.elapsed();
+            player.msg_tx.record_snapshot_projected(
+                saturating_duration_ms_u32(snapshot_duration),
+                saturating_duration_ms_u32(compact_duration),
+            );
 
             if let Some(perf) = self.perf.as_mut() {
                 perf.record_snapshot(rts_sim::perf::SnapshotRecord {
@@ -176,4 +180,8 @@ fn snapshot_enqueue_status(status: SnapshotSendStatus) -> rts_sim::perf::Snapsho
 
 fn saturating_duration_ms_u16(duration: Duration) -> u16 {
     duration.as_millis().min(u16::MAX as u128) as u16
+}
+
+fn saturating_duration_ms_u32(duration: Duration) -> u32 {
+    duration.as_millis().min(u32::MAX as u128) as u32
 }

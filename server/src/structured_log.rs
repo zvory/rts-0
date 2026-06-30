@@ -2,7 +2,11 @@ use std::fmt::Write as _;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::build_info::build_id;
-use crate::lobby::{CommandLifecycleReportStats, CommandTimingStats, ConnectionReportStats};
+use crate::lobby::{
+    CommandLifecycleReportStats, CommandTimingStats, ConnectionReportStats,
+    SnapshotLifecycleReportStats, SnapshotPayloadEntityKindReportStats,
+    SnapshotPayloadSectionReportStats, SnapshotWindowStats,
+};
 use crate::protocol::ClientNetReport;
 
 static NEXT_MATCH_RUN_ID: AtomicU64 = AtomicU64::new(1);
@@ -77,6 +81,11 @@ pub const NET_REPORT_REPLAY_MS_ISSUE: u16 = 8;
 pub const NET_REPORT_SERVER_RELIABLE_BEFORE_SNAPSHOT_MAX_ISSUE: u32 = 2;
 pub const NET_REPORT_SERVER_SNAPSHOT_SEND_AGE_ISSUE_MS: u32 = 100;
 pub const NET_REPORT_SERVER_SNAPSHOT_REPLACED_ISSUE: u32 = 1;
+pub const NET_REPORT_SERVER_SNAPSHOT_PROJECT_ISSUE_MS: u32 = 8;
+pub const NET_REPORT_SERVER_SNAPSHOT_COMPACT_ISSUE_MS: u32 = 8;
+pub const NET_REPORT_SERVER_SNAPSHOT_QUEUE_AGE_ISSUE_MS: u32 = 100;
+pub const NET_REPORT_SERVER_SNAPSHOT_SERIALIZE_ISSUE_MS: u32 = 10;
+pub const NET_REPORT_SERVER_SNAPSHOT_WRITER_SEND_ISSUE_MS: u32 = 10;
 
 pub fn new_match_run_id(room: &str) -> String {
     let seq = NEXT_MATCH_RUN_ID.fetch_add(1, Ordering::Relaxed);
@@ -392,6 +401,7 @@ pub fn log_client_net_report(
         outbound.snapshot_slot_replaced
     );
     field!("server_snapshot_slot_closed", outbound.snapshot_slot_closed);
+    append_server_snapshot_lifecycle_fields(&mut line, &outbound.snapshot_lifecycle);
     append_server_command_lifecycle_fields(&mut line, &outbound.command_lifecycle);
 
     tracing::info!("{}", line);
@@ -411,6 +421,46 @@ fn append_timing_fields(line: &mut String, prefix: &str, stats: CommandTimingSta
     append_log_field(line, &format!("{prefix}_max_ms"), stats.max_ms);
     append_log_field(line, &format!("{prefix}_p95_ms"), stats.p95_ms);
     append_log_field(line, &format!("{prefix}_count"), stats.count);
+}
+
+fn append_snapshot_window_ms_fields(line: &mut String, prefix: &str, stats: SnapshotWindowStats) {
+    append_log_field(line, &format!("{prefix}_latest_ms"), stats.latest);
+    append_log_field(line, &format!("{prefix}_max_ms"), stats.max);
+    append_log_field(line, &format!("{prefix}_p95_ms"), stats.p95);
+    append_log_field(line, &format!("{prefix}_avg_ms"), stats.avg);
+    append_log_field(line, &format!("{prefix}_count"), stats.count);
+}
+
+fn append_snapshot_window_byte_fields(line: &mut String, prefix: &str, stats: SnapshotWindowStats) {
+    append_log_field(line, &format!("{prefix}_latest"), stats.latest);
+    append_log_field(line, &format!("{prefix}_max"), stats.max);
+    append_log_field(line, &format!("{prefix}_p95"), stats.p95);
+    append_log_field(line, &format!("{prefix}_avg"), stats.avg);
+    append_log_field(line, &format!("{prefix}_total"), stats.total);
+    append_log_field(line, &format!("{prefix}_count"), stats.count);
+}
+
+fn append_server_snapshot_lifecycle_fields(
+    line: &mut String,
+    stats: &SnapshotLifecycleReportStats,
+) {
+    append_snapshot_window_ms_fields(line, "server_snapshot_project", stats.projected);
+    append_snapshot_window_ms_fields(line, "server_snapshot_compact", stats.compacted);
+    append_snapshot_window_ms_fields(line, "server_snapshot_queue_age", stats.queue_age);
+    append_snapshot_window_ms_fields(line, "server_snapshot_serialize", stats.serialized);
+    append_snapshot_window_ms_fields(line, "server_snapshot_writer_send", stats.writer_send);
+    append_snapshot_window_byte_fields(line, "server_snapshot_payload_bytes", stats.payload_bytes);
+    append_log_field(line, "server_snapshot_writer_taken", stats.writer_taken);
+    append_text_log_field(
+        line,
+        "server_snapshot_payload_sections",
+        &format_snapshot_payload_sections(&stats.sections),
+    );
+    append_text_log_field(
+        line,
+        "server_snapshot_entity_kinds",
+        &format_snapshot_entity_kinds(&stats.entity_kinds),
+    );
 }
 
 fn append_server_command_lifecycle_fields(line: &mut String, stats: &CommandLifecycleReportStats) {
@@ -465,6 +515,38 @@ fn format_command_lifecycle_exemplars(
     serde_json::to_string(&sanitized).unwrap_or_else(|_| "[]".to_string())
 }
 
+fn format_snapshot_payload_sections(stats: &[SnapshotPayloadSectionReportStats]) -> String {
+    let sanitized: Vec<_> = stats
+        .iter()
+        .take(8)
+        .map(|entry| {
+            serde_json::json!({
+                "section": sanitize_snapshot_section(&entry.section),
+                "count": entry.count,
+                "bytes": entry.bytes,
+                "pctX100": entry.pct_x100,
+            })
+        })
+        .collect();
+    serde_json::to_string(&sanitized).unwrap_or_else(|_| "[]".to_string())
+}
+
+fn format_snapshot_entity_kinds(stats: &[SnapshotPayloadEntityKindReportStats]) -> String {
+    let sanitized: Vec<_> = stats
+        .iter()
+        .take(8)
+        .map(|entry| {
+            serde_json::json!({
+                "kind": sanitize_snapshot_kind(&entry.kind),
+                "count": entry.count,
+                "approxBytes": entry.approx_bytes,
+                "pctX100": entry.pct_x100,
+            })
+        })
+        .collect();
+    serde_json::to_string(&sanitized).unwrap_or_else(|_| "[]".to_string())
+}
+
 fn format_server_command_lifecycle_exemplars(stats: &CommandLifecycleReportStats) -> String {
     let sanitized: Vec<_> = stats
         .exemplars
@@ -481,6 +563,33 @@ fn format_server_command_lifecycle_exemplars(stats: &CommandLifecycleReportStats
         })
         .collect();
     serde_json::to_string(&sanitized).unwrap_or_else(|_| "[]".to_string())
+}
+
+fn sanitize_snapshot_section(value: &str) -> &str {
+    match value {
+        "entities" | "visibility" | "resourceDeltas" | "events" | "smokes" | "abilityObjects"
+        | "trenches" | "playerStatus" | "netStatus" | "other" => value,
+        _ => "other",
+    }
+}
+
+fn sanitize_snapshot_kind(value: &str) -> String {
+    let sanitized = value
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | ':' | '.') {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .take(64)
+        .collect::<String>();
+    if sanitized.is_empty() {
+        "unknown".to_string()
+    } else {
+        sanitized
+    }
 }
 
 fn sanitize_command_family(value: &str) -> &str {
@@ -570,6 +679,7 @@ pub fn is_notable_net_report(report: &ClientNetReport, outbound: &ConnectionRepo
         || report.prediction_replay_max_ms >= NET_REPORT_REPLAY_MS_ISSUE
         || report.prediction_replay_budget_exceeded_count > 0
         || has_server_snapshot_outbound_pressure(outbound)
+        || has_server_snapshot_lifecycle_pressure(outbound)
 }
 
 pub fn classify_client_net_report(
@@ -617,6 +727,8 @@ pub fn classify_client_net_report(
         "command_response_delay"
     } else if has_command_density(report, outbound) {
         "command_density"
+    } else if has_server_snapshot_lifecycle_pressure(outbound) {
+        "server_snapshot_lifecycle"
     } else if has_server_snapshot_outbound_pressure(outbound) {
         "server_snapshot_outbound"
     } else if report.prediction_disable_count > 0 {
@@ -720,6 +832,15 @@ fn has_server_snapshot_outbound_pressure(outbound: &ConnectionReportStats) -> bo
         || outbound.snapshot_send_age_max_ms >= NET_REPORT_SERVER_SNAPSHOT_SEND_AGE_ISSUE_MS
         || outbound.snapshot_slot_replaced >= NET_REPORT_SERVER_SNAPSHOT_REPLACED_ISSUE
         || outbound.snapshot_slot_closed > 0
+}
+
+fn has_server_snapshot_lifecycle_pressure(outbound: &ConnectionReportStats) -> bool {
+    let lifecycle = &outbound.snapshot_lifecycle;
+    lifecycle.projected.max >= NET_REPORT_SERVER_SNAPSHOT_PROJECT_ISSUE_MS
+        || lifecycle.compacted.max >= NET_REPORT_SERVER_SNAPSHOT_COMPACT_ISSUE_MS
+        || lifecycle.queue_age.max >= NET_REPORT_SERVER_SNAPSHOT_QUEUE_AGE_ISSUE_MS
+        || lifecycle.serialized.max >= NET_REPORT_SERVER_SNAPSHOT_SERIALIZE_ISSUE_MS
+        || lifecycle.writer_send.max >= NET_REPORT_SERVER_SNAPSHOT_WRITER_SEND_ISSUE_MS
 }
 
 fn has_packet_budget_pressure(report: &ClientNetReport) -> bool {
@@ -1162,6 +1283,30 @@ mod tests {
         };
         assert!(!is_notable_net_report(&report, &outbound));
         assert_eq!(classify_client_net_report(&report, &outbound), "other");
+    }
+
+    #[test]
+    fn net_report_classifies_server_snapshot_lifecycle_pressure() {
+        let report = clean_report();
+        let outbound = ConnectionReportStats {
+            snapshot_lifecycle: SnapshotLifecycleReportStats {
+                projected: SnapshotWindowStats {
+                    max: NET_REPORT_SERVER_SNAPSHOT_PROJECT_ISSUE_MS,
+                    ..SnapshotWindowStats::default()
+                },
+                serialized: SnapshotWindowStats {
+                    max: NET_REPORT_SERVER_SNAPSHOT_SERIALIZE_ISSUE_MS,
+                    ..SnapshotWindowStats::default()
+                },
+                ..SnapshotLifecycleReportStats::default()
+            },
+            ..ConnectionReportStats::default()
+        };
+        assert!(is_notable_net_report(&report, &outbound));
+        assert_eq!(
+            classify_client_net_report(&report, &outbound),
+            "server_snapshot_lifecycle"
+        );
     }
 
     #[test]

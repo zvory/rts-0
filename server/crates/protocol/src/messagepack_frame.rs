@@ -7,10 +7,44 @@ pub(crate) fn serialize_compact_snapshot_value(
     compact: &serde_json::Value,
 ) -> Result<Vec<u8>, SnapshotEncodeError> {
     let mut out = Vec::new();
-    out.extend_from_slice(&MESSAGEPACK_SNAPSHOT_FRAME_MAGIC);
-    out.push(MESSAGEPACK_SNAPSHOT_HEADER_VERSION);
+    write_messagepack_frame_header(&mut out);
     write_messagepack_value(&mut out, compact)?;
     Ok(out)
+}
+
+pub(crate) struct SerializedSnapshotWithEntryBytes<'a> {
+    pub bytes: Vec<u8>,
+    pub entry_bytes: Vec<(&'a str, usize)>,
+}
+
+pub(crate) fn serialize_compact_snapshot_value_with_entry_bytes(
+    compact: &serde_json::Value,
+) -> Result<SerializedSnapshotWithEntryBytes<'_>, SnapshotEncodeError> {
+    let mut out = Vec::new();
+    let mut entry_bytes = Vec::new();
+    write_messagepack_frame_header(&mut out);
+
+    if let serde_json::Value::Object(values) = compact {
+        write_messagepack_map_len(&mut out, values.len())?;
+        for (key, item) in values {
+            let entry_start = out.len();
+            write_messagepack_string(&mut out, key)?;
+            write_messagepack_value(&mut out, item)?;
+            entry_bytes.push((key.as_str(), out.len().saturating_sub(entry_start)));
+        }
+    } else {
+        write_messagepack_value(&mut out, compact)?;
+    }
+
+    Ok(SerializedSnapshotWithEntryBytes {
+        bytes: out,
+        entry_bytes,
+    })
+}
+
+fn write_messagepack_frame_header(out: &mut Vec<u8>) {
+    out.extend_from_slice(&MESSAGEPACK_SNAPSHOT_FRAME_MAGIC);
+    out.push(MESSAGEPACK_SNAPSHOT_HEADER_VERSION);
 }
 
 fn write_messagepack_value(

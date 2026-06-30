@@ -37,8 +37,8 @@ use rts_server::lab_scenario_submission::{
 use rts_server::lab_scenarios::catalog_handler as lab_scenarios_handler;
 use rts_server::lobby::{self, Lobby, RoomEvent};
 use rts_server::protocol::{
-    default_snapshot_codec, encode_snapshot_frame, ClientMessage, ServerMessage, SnapshotFrame,
-    SNAPSHOT_FRAME_KIND_TEXT,
+    default_snapshot_codec, encode_snapshot_frame_with_diagnostics, ClientMessage, ServerMessage,
+    SnapshotFrame, SNAPSHOT_FRAME_KIND_TEXT,
 };
 use rts_server::structured_log;
 use rts_sim::game::map::Map;
@@ -1144,7 +1144,9 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
                     Ok(msg) => {
                         writer_stats.note_reliable_for_snapshot(snapshot_waiting, &snapshots);
                         let command_receipt = matches!(msg, ServerMessage::CommandReceipt { .. });
-                        if !send_server_message(player_id, &mut sink, msg).await {
+                        let (keep_writing, _) =
+                            send_server_message(player_id, &mut sink, msg).await;
+                        if !keep_writing {
                             break 'write_loop;
                         }
                         writer_stats.record_reliable_sent(command_receipt);
@@ -1160,10 +1162,14 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
             if let Some(snapshot_send) = snapshots.take_for_send(&mut writer_stats) {
                 let (snapshot, snapshot_stats) = snapshot_send.into_parts();
                 let msg = ServerMessage::Snapshot(snapshot);
-                if !send_server_message(player_id, &mut sink, msg).await {
+                let (keep_writing, writer_send_stats) =
+                    send_server_message(player_id, &mut sink, msg).await;
+                if !keep_writing {
                     break 'write_loop;
                 }
-                writer_stats.record_snapshot_sent(snapshot_stats);
+                if let Some(writer_send_stats) = writer_send_stats {
+                    writer_stats.record_snapshot_sent(snapshot_stats, writer_send_stats);
+                }
                 continue;
             }
 
@@ -1177,7 +1183,9 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
                         Some(msg) => {
                             writer_stats.note_reliable_message(snapshots.has_pending());
                             let command_receipt = matches!(msg, ServerMessage::CommandReceipt { .. });
-                            if !send_server_message(player_id, &mut sink, msg).await {
+                            let (keep_writing, _) =
+                                send_server_message(player_id, &mut sink, msg).await;
+                            if !keep_writing {
                                 break 'write_loop;
                             }
                             writer_stats.record_reliable_sent(command_receipt);
@@ -1307,7 +1315,7 @@ async fn send_server_message(
     player_id: u32,
     sink: &mut futures_util::stream::SplitSink<WebSocket, Message>,
     msg: ServerMessage,
-) -> bool {
+) -> (bool, Option<lobby::SnapshotWriterSendStats>) {
     let message_kind = match &msg {
         ServerMessage::Snapshot(_) => "snapshot",
         ServerMessage::Lobby { .. } => "lobby",
@@ -1330,16 +1338,24 @@ async fn send_server_message(
     let serialize_start = Instant::now();
     let mut snapshot_codec = "";
     let mut snapshot_codec_version = 0;
-    let encoded = match msg {
+    let (encoded, snapshot_payload) = match msg {
         ServerMessage::Snapshot(snapshot) => {
             let codec = default_snapshot_codec();
             snapshot_codec = codec.name();
             snapshot_codec_version = codec.version();
-            encode_snapshot_frame(&snapshot, codec).map(ServerFrame::from_snapshot_frame)
+            match encode_snapshot_frame_with_diagnostics(&snapshot, codec) {
+                Ok((frame, payload)) => {
+                    (Ok(ServerFrame::from_snapshot_frame(frame)), Some(payload))
+                }
+                Err(err) => (Err(err), None),
+            }
         }
-        reliable => serde_json::to_string(&reliable)
-            .map(ServerFrame::Text)
-            .map_err(rts_server::protocol::SnapshotEncodeError::from),
+        reliable => (
+            serde_json::to_string(&reliable)
+                .map(ServerFrame::Text)
+                .map_err(rts_server::protocol::SnapshotEncodeError::from),
+            None,
+        ),
     };
     let serialize_duration = serialize_start.elapsed();
     match encoded {
@@ -1349,6 +1365,7 @@ async fn send_server_message(
             let send_start = Instant::now();
             if sink.send(frame.into_message()).await.is_err() {
                 // Socket gone; stop writing. The reader side will emit Leave.
+                let send_duration = send_start.elapsed();
                 perf::log_writer_message(perf::WriterMessageTiming {
                     player_id,
                     message_kind,
@@ -1356,11 +1373,12 @@ async fn send_server_message(
                     snapshot_codec_version,
                     frame_kind,
                     serialize: serialize_duration,
-                    send: send_start.elapsed(),
+                    send: send_duration,
                     bytes,
                 });
-                return false;
+                return (false, None);
             }
+            let send_duration = send_start.elapsed();
             perf::log_writer_message(perf::WriterMessageTiming {
                 player_id,
                 message_kind,
@@ -1368,16 +1386,27 @@ async fn send_server_message(
                 snapshot_codec_version,
                 frame_kind,
                 serialize: serialize_duration,
-                send: send_start.elapsed(),
+                send: send_duration,
                 bytes,
             });
+            let snapshot_stats = snapshot_payload.map(|payload| lobby::SnapshotWriterSendStats {
+                serialize_ms: saturating_duration_ms_u32(serialize_duration),
+                send_ms: saturating_duration_ms_u32(send_duration),
+                bytes: bytes.min(u32::MAX as usize) as u32,
+                payload,
+            });
+            (true, snapshot_stats)
         }
         Err(err) => {
             // Should never happen for our own types, but never let it kill the task.
             rts_server::log_warn!(player_id, %err, "failed to serialize server message");
+            (true, None)
         }
     }
-    true
+}
+
+fn saturating_duration_ms_u32(duration: Duration) -> u32 {
+    duration.as_millis().min(u32::MAX as u128) as u32
 }
 
 enum ServerFrame {

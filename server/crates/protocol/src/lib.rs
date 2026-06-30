@@ -1059,6 +1059,27 @@ impl From<serde_json::Error> for SnapshotEncodeError {
     }
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SnapshotPayloadDiagnostics {
+    pub bytes: u32,
+    pub sections: Vec<SnapshotPayloadSectionDiagnostics>,
+    pub entity_kinds: Vec<SnapshotPayloadEntityKindDiagnostics>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SnapshotPayloadSectionDiagnostics {
+    pub section: &'static str,
+    pub count: u32,
+    pub bytes: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SnapshotPayloadEntityKindDiagnostics {
+    pub kind: String,
+    pub count: u32,
+    pub approx_bytes: u32,
+}
+
 pub fn encode_snapshot_frame(
     snapshot: &Snapshot,
     codec: SnapshotCodec,
@@ -1069,6 +1090,23 @@ pub fn encode_snapshot_frame(
             .map_err(SnapshotEncodeError::from),
         SnapshotCodec::MessagePackCompact => {
             serialize_messagepack_compact_snapshot(snapshot).map(SnapshotFrame::Binary)
+        }
+    }
+}
+
+pub fn encode_snapshot_frame_with_diagnostics(
+    snapshot: &Snapshot,
+    codec: SnapshotCodec,
+) -> Result<(SnapshotFrame, SnapshotPayloadDiagnostics), SnapshotEncodeError> {
+    match codec {
+        SnapshotCodec::CompactJson => {
+            let (text, diagnostics) = compact_snapshot::serialize_compact_snapshot_with_diagnostics(snapshot)?;
+            Ok((SnapshotFrame::Text(text), diagnostics))
+        }
+        SnapshotCodec::MessagePackCompact => {
+            let (bytes, diagnostics) =
+                compact_snapshot::serialize_messagepack_compact_snapshot_with_diagnostics(snapshot)?;
+            Ok((SnapshotFrame::Binary(bytes), diagnostics))
         }
     }
 }
@@ -1933,6 +1971,51 @@ mod tests {
             }
             SnapshotFrame::Text(_) => panic!("default snapshot codec must be binary"),
         }
+    }
+
+    #[test]
+    fn compact_snapshot_diagnostics_reports_bounded_payload_composition() {
+        let snapshot = representative_snapshot();
+        let (frame, diagnostics) =
+            encode_snapshot_frame_with_diagnostics(&snapshot, default_snapshot_codec()).unwrap();
+        let SnapshotFrame::Binary(bytes) = frame else {
+            panic!("default snapshot codec must be binary");
+        };
+        let SnapshotFrame::Binary(plain_bytes) =
+            encode_snapshot_frame(&snapshot, default_snapshot_codec()).unwrap()
+        else {
+            panic!("default snapshot codec must be binary");
+        };
+
+        assert_eq!(bytes, plain_bytes);
+        assert_eq!(diagnostics.bytes, bytes.len() as u32);
+        let section = |name: &str| {
+            diagnostics
+                .sections
+                .iter()
+                .find(|section| section.section == name)
+                .unwrap_or_else(|| panic!("missing section {name}"))
+        };
+        assert_eq!(section("entities").count, 3);
+        assert!(section("entities").bytes > 0);
+        assert_eq!(section("visibility").count, 4);
+        assert!(section("visibility").bytes > 0);
+        assert_eq!(section("resourceDeltas").count, 1);
+        assert_eq!(section("events").count, 9);
+        assert_eq!(section("smokes").count, 1);
+        assert_eq!(section("abilityObjects").count, 1);
+        assert_eq!(section("trenches").count, 1);
+        assert_eq!(section("playerStatus").count, 2);
+        assert_eq!(section("netStatus").count, 1);
+        assert!(section("other").bytes > 0);
+
+        let worker = diagnostics
+            .entity_kinds
+            .iter()
+            .find(|kind| kind.kind == kinds::WORKER)
+            .expect("worker kind should be summarized");
+        assert_eq!(worker.count, 1);
+        assert!(worker.approx_bytes > 0);
     }
 
     #[test]
