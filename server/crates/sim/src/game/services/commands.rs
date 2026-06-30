@@ -1483,6 +1483,7 @@ fn try_fire_artillery(
     true
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(in crate::game) fn artillery_point_fire_system(
     map: &Map,
     entities: &mut EntityStore,
