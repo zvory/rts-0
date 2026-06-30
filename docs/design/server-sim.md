@@ -24,7 +24,7 @@ crates/
     fog.rs       # per-player live visibility grids; snapshots union living teammate grids
     building_memory.rs # server-only per-player last-seen enemy building records
     systems.rs   # orchestrator: runs services in order each tick
-    services/    # per-tick services: commands, order_planner, move_coordinator, movement (incl. unit collision), combat, economy, production, construction/deconstruction, death, occupancy, supply, pathing, geometry, standability, line_of_sight
+    services/    # per-tick services: commands, order_planner, move_coordinator, movement (incl. unit collision), combat, economy, production, construction/deconstruction, death, entrenchment, occupancy, supply, pathing, geometry, standability, line_of_sight
     replay.rs    # tick-stamped command log replay harness for determinism checks
     src/rules/projection.rs # fog-gated entity/event projection seam
 ```
@@ -567,6 +567,27 @@ world objects, and records per-player discovered terrain so a scouted trench rem
 it becomes fogged. That remembered trench record is terrain-only; it does not expose creator,
 owner, current occupants, or hidden unit state.
 
+`services::entrenchment` updates unit-facing trench state after normal collision cleanup and before
+final snapshot indexing. Riflemen, Machine Gunners, and Workers owned by a player with completed
+Entrenchment research create a neutral trench after holding ground on untrenched terrain for
+90 consecutive simulation ticks. Holding ground means the unit has no movement path, no path
+movement delta for the tick, no collision displacement after pre-collision derived-state rebuild,
+and an order that is effectively stationary: Idle, Hold Position, an in-range Attack order, or an
+arrived Attack Move. Firing, target changes, body/weapon facing, and Machine Gunner setup/teardown
+do not reset that timer; Move, Attack Move while still travelling, Gather, Build, Deconstruct,
+ability movement, artillery point-fire, path movement, and non-slotting forced movement reset it.
+
+Existing trenches are neutral. Any eligible Rifleman, Machine Gunner, or Worker can occupy one
+without owning Entrenchment research when it is stopped in the trench footprint. A stopped eligible
+unit within half a tile of a trench may be slotted by at most half a tile into a legal position
+inside the trench footprint; slotting validates static standability, the swept static segment, and
+unit-body overlap against the current post-collision spatial index. Slotting does not issue a move
+order or path, so the unit can still fire normally.
+`services::entrenchment::active_trench_occupation(entity)` is the simulation predicate for active
+occupation; digging progress, failed slotting, and merely standing near trench terrain do not set
+it. Visible occupied units project `occupiedTrenchId`; remembered trench terrain never exposes
+hidden occupants.
+
 Per-caster recast state is exposed to the owner through `EntityView.abilities`: active return marker
 id, availability tick, and remaining lifetime are projected only for the owning player's command
 card. Ekat's `ekatTeleport` world-point activation is a dash: it validates static standability,
@@ -644,7 +665,8 @@ entry and a role-matrix justification.
 `game::systems::run_tick` owns the tick pipeline and the lifecycle of tick-scoped derived state.
 It rebuilds named phase state at explicit boundaries: pre-command state for command validation,
 pathing, and movement; post-movement state for combat and economy queries; pre-collision state
-after production/construction/death mutations; and final state for snapshot interest filtering.
+after production/construction/death mutations; post-collision spatial state for trench slotting;
+and final state for snapshot interest filtering.
 Systems should consume the derived-state object for their phase instead of carrying occupancy or
 spatial indexes across later mutations.
 

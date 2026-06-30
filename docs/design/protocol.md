@@ -593,7 +593,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 27. `client/src/net.js` calls
+`messagepack-compact`, codec version 1, compact snapshot version 28. `client/src/net.js` calls
 `parseServerFrame`; the binary frame parser in `client/src/protocol_frame.js` returns the raw
 compact snapshot object, then `decodeCompactSnapshot` expands it back into the semantic object above
 before dispatching `S.SNAPSHOT`.
@@ -619,7 +619,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 27,
+  "v": 28,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
@@ -628,7 +628,7 @@ adds an explicit application compression envelope.
       buildProgress?, latchedNode?, targetId?, setupState?, remaining?, rally?, oilUsed?,
       setupFacing?, orderPlan?, chargeCooldownLeft?, abilities?, breakthroughTicks?,
       visionOnly?, debugPath?, rallyPlan?, prodUpgrade?, buildActive?, deconstructProgress?,
-      weaponRangeTiles?
+      weaponRangeTiles?, occupiedTrenchId?
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
@@ -711,6 +711,9 @@ ability cooldown and, while the caster's aura is active, its caster-only `expire
 `weaponRangeTiles` is present for owner/allied Tank views and carries the current authoritative
 default-weapon range, including the stationary range ramp. Enemy views omit it; static unit catalog
 range remains the fallback for render-only range overlays.
+`occupiedTrenchId` is present while a visible eligible infantry unit is actively stopped in a
+trench. It names the neutral trench terrain id already projected through `trenches`; it is omitted
+while the unit is digging in, slotting is unavailable, merely near a trench, or moving out.
 `visionOnly` is true only for non-owned units/buildings visible through lingering death vision;
 clients render them below the fog overlay and must not select or issue targeted commands against
 them. In `n.flags`, bit 0 = `slowTick` and bit 1 = `headOfLine`.
@@ -796,6 +799,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   // combat feedback:
   targetId?: u32,                // current attack target, for drawing tracers
   weaponRangeTiles?: f32,        // owner/allied Tanks only; current authoritative weapon range
+  occupiedTrenchId?: u32,        // visible eligible infantry only while actively stopped in a trench
   setupState?: string,           // machine_gunner/anti_tank_gun/mortar_team/artillery only:
                                   // "packed","setting_up","deployed","tearing_down"
   // unit-producing buildings:

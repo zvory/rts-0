@@ -87,6 +87,10 @@ impl TrenchStore {
         Some(id)
     }
 
+    pub(crate) fn all(&self) -> &[Trench] {
+        &self.trenches
+    }
+
     pub(crate) fn refresh_memory_for_player(&mut self, player: u32, fog: &Fog) {
         for trench in &self.trenches {
             if trench_visible_to_player(*trench, player, fog) {

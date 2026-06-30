@@ -13,6 +13,7 @@ use crate::game::entity::{
     GatherPhase, Order, OrderIntent,
 };
 use crate::game::fog::Fog;
+use crate::game::services::entrenchment;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
 use crate::protocol;
@@ -394,6 +395,7 @@ pub fn project_entity(
     if entity.breakthrough_ticks() > 0 {
         view.breakthrough_ticks = Some(entity.breakthrough_ticks());
     }
+    view.occupied_trench_id = entrenchment::active_trench_occupation(entity);
 
     if let Some(progress) = entity.build_progress_fraction() {
         view.build_progress = Some(progress);

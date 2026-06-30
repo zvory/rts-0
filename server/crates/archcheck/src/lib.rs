@@ -28,6 +28,7 @@ const SERVICE_ROLES: &[(&str, ServiceRole)] = &[
     ("construction", ServiceRole::TickSystem),
     ("death", ServiceRole::TickSystem),
     ("economy", ServiceRole::TickSystem),
+    ("entrenchment", ServiceRole::TickSystem),
     ("geometry", ServiceRole::QueryIndex),
     ("hero", ServiceRole::TickSystem),
     ("line_of_sight", ServiceRole::QueryIndex),
@@ -123,6 +124,10 @@ const ALLOWED_SERVICE_IMPORTS: &[(&str, &[&str])] = &[
             "spatial",
             "world_query",
         ],
+    ),
+    (
+        "entrenchment",
+        &["geometry", "occupancy", "spatial", "standability"],
     ),
     ("geometry", &["occupancy"]),
     (

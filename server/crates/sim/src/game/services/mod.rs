@@ -12,6 +12,7 @@ pub mod commands;
 pub mod construction;
 pub mod death;
 pub mod economy;
+pub mod entrenchment;
 pub mod geometry;
 pub mod line_of_sight;
 pub mod move_coordinator;

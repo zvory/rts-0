@@ -1,5 +1,8 @@
 use super::*;
-use crate::game::entity::EntityKind;
+use crate::game::command::SimCommand;
+use crate::game::entity::{EntityKind, Order};
+use crate::game::services::geometry::{unit_bodies_intersect, unit_body_for_entity};
+use crate::game::upgrade::UpgradeKind;
 use crate::game::{services, systems, SmokeCloudStore};
 use crate::protocol::terrain;
 
@@ -75,6 +78,43 @@ fn repair_world(game: &mut Game) {
     game.recompute_live_fog(&ids);
     game.refresh_building_memory(&ids);
     game.refresh_trench_memory(&ids);
+}
+
+fn grant_entrenchment(game: &mut Game, player: u32) {
+    game.players
+        .iter_mut()
+        .find(|p| p.id == player)
+        .expect("player should exist")
+        .upgrades
+        .insert(UpgradeKind::Entrenchment);
+}
+
+fn tick_n(game: &mut Game, ticks: u32) {
+    for _ in 0..ticks {
+        game.tick();
+    }
+}
+
+fn trench_contains_point(trench: crate::game::trench::Trench, x: f32, y: f32) -> bool {
+    if !x.is_finite() || !y.is_finite() {
+        return false;
+    }
+    let dx = x - trench.x;
+    let dy = y - trench.y;
+    let radius = trench.radius_tiles * config::TILE_SIZE as f32;
+    dx * dx + dy * dy <= radius * radius
+}
+
+fn entrenchment_dig_ticks(entity: &crate::game::entity::Entity) -> u32 {
+    entity
+        .movement
+        .as_ref()
+        .expect("entity should have movement")
+        .entrenchment_dig_ticks
+}
+
+fn active_trench_occupation(entity: &crate::game::entity::Entity) -> Option<u32> {
+    services::entrenchment::active_trench_occupation(entity)
 }
 
 #[test]
@@ -189,4 +229,327 @@ fn spectator_projection_uses_selected_player_trench_vision() {
         .trenches
         .iter()
         .any(|view| view.id == trench));
+}
+
+#[test]
+fn researched_eligible_infantry_creates_trench_after_90_stationary_ticks() {
+    let mut game = empty_flat_game(&players());
+    grant_entrenchment(&mut game, 1);
+    let pos = game.map.tile_center(24, 24);
+    let rifleman = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, pos.0, pos.1)
+        .expect("rifleman should spawn");
+    repair_world(&mut game);
+
+    tick_n(&mut game, config::ENTRENCHMENT_DIG_IN_TICKS - 1);
+    assert_eq!(game.trenches.all().len(), 0);
+    assert_eq!(
+        entrenchment_dig_ticks(game.entities.get(rifleman).expect("rifleman should exist")),
+        config::ENTRENCHMENT_DIG_IN_TICKS - 1
+    );
+
+    game.tick();
+    assert_eq!(game.trenches.all().len(), 1);
+    let occupied =
+        active_trench_occupation(game.entities.get(rifleman).expect("rifleman should exist"))
+            .expect("completed dig-in should occupy the created trench");
+    assert!(game
+        .trenches
+        .all()
+        .iter()
+        .any(|trench| trench.id == occupied));
+    assert!(game
+        .snapshot_full_for(1)
+        .entities
+        .iter()
+        .any(|view| view.id == rifleman && view.occupied_trench_id == Some(occupied)));
+}
+
+#[test]
+fn commanded_movement_cancels_dig_in_progress() {
+    let mut game = empty_flat_game(&players());
+    grant_entrenchment(&mut game, 1);
+    let pos = game.map.tile_center(24, 24);
+    let goal = game.map.tile_center(30, 24);
+    let rifleman = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, pos.0, pos.1)
+        .expect("rifleman should spawn");
+    repair_world(&mut game);
+
+    tick_n(&mut game, config::ENTRENCHMENT_DIG_IN_TICKS / 2);
+    assert!(
+        entrenchment_dig_ticks(game.entities.get(rifleman).expect("rifleman should exist")) > 0
+    );
+
+    game.enqueue(
+        1,
+        SimCommand::Move {
+            units: vec![rifleman],
+            x: goal.0,
+            y: goal.1,
+            queued: false,
+        },
+    );
+    game.tick();
+
+    let unit = game.entities.get(rifleman).expect("rifleman should exist");
+    assert_eq!(entrenchment_dig_ticks(unit), 0);
+    assert_eq!(active_trench_occupation(unit), None);
+    assert_eq!(game.trenches.all().len(), 0);
+}
+
+#[test]
+fn collision_shove_cancels_dig_in_progress() {
+    let mut game = empty_flat_game(&players());
+    grant_entrenchment(&mut game, 1);
+    let pos = game.map.tile_center(24, 24);
+    let rifleman = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, pos.0, pos.1)
+        .expect("rifleman should spawn");
+    repair_world(&mut game);
+
+    tick_n(&mut game, config::ENTRENCHMENT_DIG_IN_TICKS / 2);
+    assert!(
+        entrenchment_dig_ticks(game.entities.get(rifleman).expect("rifleman should exist")) > 0
+    );
+
+    game.entities
+        .spawn_unit(2, EntityKind::Rifleman, pos.0 + 1.0, pos.1)
+        .expect("blocking rifleman should spawn");
+    repair_world(&mut game);
+
+    game.tick();
+
+    let unit = game.entities.get(rifleman).expect("rifleman should exist");
+    assert!(
+        (unit.pos_x - pos.0).abs() > 0.1 || (unit.pos_y - pos.1).abs() > 0.1,
+        "collision fixture should shove the digging unit"
+    );
+    assert_eq!(entrenchment_dig_ticks(unit), 0);
+    assert_eq!(active_trench_occupation(unit), None);
+    assert_eq!(game.trenches.all().len(), 0);
+}
+
+#[test]
+fn firing_facing_and_target_changes_do_not_cancel_stationary_dig_in() {
+    let mut game = empty_flat_game(&players());
+    grant_entrenchment(&mut game, 1);
+    let pos = game.map.tile_center(24, 24);
+    let target_pos = game.map.tile_center(27, 24);
+    let rifleman = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, pos.0, pos.1)
+        .expect("rifleman should spawn");
+    let target = game
+        .entities
+        .spawn_building(2, EntityKind::Depot, target_pos.0, target_pos.1, true)
+        .expect("target depot should spawn");
+    if let Some(unit) = game.entities.get_mut(rifleman) {
+        unit.set_order(Order::attack(target));
+        unit.set_target_id(Some(target));
+    }
+    repair_world(&mut game);
+
+    tick_n(&mut game, config::ENTRENCHMENT_DIG_IN_TICKS);
+
+    let unit = game.entities.get(rifleman).expect("rifleman should exist");
+    assert_eq!(game.trenches.all().len(), 1);
+    assert!(
+        active_trench_occupation(unit).is_some(),
+        "stationary firing should still complete dig-in"
+    );
+}
+
+#[test]
+fn pre_research_infantry_can_occupy_existing_trench_but_cannot_create_new_one() {
+    let mut game = empty_flat_game(&players());
+    let trench_pos = game.map.tile_center(24, 24);
+    let trench = game
+        .spawn_trench_for_test(trench_pos.0, trench_pos.1)
+        .expect("trench should seed");
+    let worker = game
+        .entities
+        .spawn_unit(2, EntityKind::Worker, trench_pos.0, trench_pos.1)
+        .expect("worker should spawn");
+    repair_world(&mut game);
+
+    game.tick();
+    assert_eq!(
+        active_trench_occupation(game.entities.get(worker).expect("worker should exist")),
+        Some(trench)
+    );
+
+    let open_pos = game.map.tile_center(40, 40);
+    if let Some(unit) = game.entities.get_mut(worker) {
+        unit.set_position(open_pos.0, open_pos.1);
+    }
+    repair_world(&mut game);
+    tick_n(&mut game, config::ENTRENCHMENT_DIG_IN_TICKS + 5);
+
+    assert_eq!(game.trenches.all().len(), 1);
+    assert_eq!(
+        active_trench_occupation(game.entities.get(worker).expect("worker should exist")),
+        None
+    );
+}
+
+#[test]
+fn excluded_units_and_buildings_do_not_create_or_occupy_trenches() {
+    for kind in [
+        EntityKind::MortarTeam,
+        EntityKind::AntiTankGun,
+        EntityKind::Artillery,
+        EntityKind::Ekat,
+        EntityKind::Golem,
+        EntityKind::Tank,
+        EntityKind::ScoutCar,
+        EntityKind::CityCentre,
+    ] {
+        let mut game = empty_flat_game(&players());
+        grant_entrenchment(&mut game, 1);
+        let pos = game.map.tile_center(24, 24);
+        game.spawn_trench_for_test(pos.0, pos.1)
+            .expect("trench should seed");
+        let entity = if kind.is_building() {
+            game.entities
+                .spawn_building(1, kind, pos.0, pos.1, true)
+                .expect("building should spawn")
+        } else {
+            game.entities
+                .spawn_unit(1, kind, pos.0, pos.1)
+                .expect("unit should spawn")
+        };
+        repair_world(&mut game);
+
+        tick_n(&mut game, config::ENTRENCHMENT_DIG_IN_TICKS + 1);
+
+        assert_eq!(
+            active_trench_occupation(game.entities.get(entity).expect("entity should exist")),
+            None,
+            "{kind:?} should not occupy trenches"
+        );
+        assert_eq!(
+            game.trenches.all().len(),
+            1,
+            "{kind:?} should not create a trench"
+        );
+    }
+}
+
+#[test]
+fn slotting_moves_near_stopped_units_to_legal_non_stacking_positions() {
+    let mut game = empty_flat_game(&players());
+    let trench_pos = game.map.tile_center(24, 24);
+    let trench = game
+        .spawn_trench_for_test(trench_pos.0, trench_pos.1)
+        .expect("trench should seed");
+    let radius = config::ENTRENCHMENT_TRENCH_RADIUS_TILES * config::TILE_SIZE as f32;
+    let first = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, trench_pos.0, trench_pos.1)
+        .expect("first rifleman should spawn");
+    let second_start = (trench_pos.0 + radius + 8.0, trench_pos.1);
+    let second = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, second_start.0, second_start.1)
+        .expect("second rifleman should spawn");
+    repair_world(&mut game);
+
+    game.tick();
+
+    let first_entity = game.entities.get(first).expect("first should exist");
+    let second_entity = game.entities.get(second).expect("second should exist");
+    assert_eq!(active_trench_occupation(first_entity), Some(trench));
+    assert_eq!(active_trench_occupation(second_entity), Some(trench));
+    assert!(
+        (second_entity.pos_x - second_start.0).abs() > 0.1
+            || (second_entity.pos_y - second_start.1).abs() > 0.1,
+        "near unit should make a small slotting correction"
+    );
+    assert!(
+        game.trenches.all().iter().any(|view| {
+            view.id == trench
+                && trench_contains_point(*view, second_entity.pos_x, second_entity.pos_y)
+        }),
+        "slotted unit should end inside the trench footprint"
+    );
+    let first_body = unit_body_for_entity(first_entity).expect("first body");
+    let second_body = unit_body_for_entity(second_entity).expect("second body");
+    assert!(
+        !unit_bodies_intersect(first_body, second_body),
+        "slotting must not stack unit bodies"
+    );
+}
+
+#[test]
+fn slotting_rejects_positions_blocked_by_tank_traps() {
+    let mut game = empty_flat_game(&players());
+    let trench_pos = game.map.tile_center(24, 24);
+    game.spawn_trench_for_test(trench_pos.0, trench_pos.1)
+        .expect("trench should seed");
+    game.entities
+        .spawn_building(2, EntityKind::TankTrap, trench_pos.0, trench_pos.1, true)
+        .expect("tank trap should spawn");
+    let radius = config::ENTRENCHMENT_TRENCH_RADIUS_TILES * config::TILE_SIZE as f32;
+    let start = (trench_pos.0 + radius + 8.0, trench_pos.1);
+    let rifleman = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, start.0, start.1)
+        .expect("rifleman should spawn");
+    repair_world(&mut game);
+
+    game.tick();
+
+    let unit = game.entities.get(rifleman).expect("rifleman should exist");
+    assert_eq!(active_trench_occupation(unit), None);
+    assert!(
+        (unit.pos_x - start.0).abs() < 0.1 && (unit.pos_y - start.1).abs() < 0.1,
+        "blocked slotting should not move the unit through a Tank Trap"
+    );
+}
+
+#[test]
+fn occupied_visible_units_project_without_revealing_hidden_occupants() {
+    let mut game = empty_flat_game(&players());
+    let trench_pos = game.map.tile_center(24, 24);
+    let scout_pos = game.map.tile_center(26, 24);
+    let far_pos = game.map.tile_center(4, 50);
+    let trench = game
+        .spawn_trench_for_test(trench_pos.0, trench_pos.1)
+        .expect("trench should seed");
+    let occupant = game
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, trench_pos.0, trench_pos.1)
+        .expect("occupant should spawn");
+    let scout = game
+        .entities
+        .spawn_unit(1, EntityKind::Worker, scout_pos.0, scout_pos.1)
+        .expect("scout should spawn");
+    repair_world(&mut game);
+
+    game.tick();
+    let visible = game.snapshot_for(1);
+    assert!(visible
+        .entities
+        .iter()
+        .any(|view| view.id == occupant && view.occupied_trench_id == Some(trench)));
+
+    game.entities.remove(scout);
+    game.entities
+        .spawn_unit(1, EntityKind::Worker, far_pos.0, far_pos.1)
+        .expect("far scout should spawn");
+    game.tick();
+
+    let hidden = game.snapshot_for(1);
+    assert!(
+        hidden.trenches.iter().any(|view| view.id == trench),
+        "remembered trench terrain should stay visible"
+    );
+    assert!(
+        !hidden.entities.iter().any(|view| view.id == occupant),
+        "hidden occupied unit should not be projected"
+    );
 }
