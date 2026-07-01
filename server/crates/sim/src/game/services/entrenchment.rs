@@ -19,8 +19,8 @@ use crate::game::services::standability;
 use crate::game::trench::{Trench, TrenchStore};
 
 const STATIONARY_EPS_PX: f32 = 0.05;
-const SLOT_EXTRA_RADIUS_PX: f32 = config::TILE_SIZE as f32 * 0.5;
-const SLOT_MAX_CORRECTION_PX: f32 = config::TILE_SIZE as f32 * 0.5;
+const SLOT_EXTRA_RADIUS_PX: f32 = config::TILE_SIZE as f32;
+const SLOT_MAX_CORRECTION_PX: f32 = config::TILE_SIZE as f32;
 
 type OccupiedTrenchCounts = BTreeMap<u32, usize>;
 
