@@ -68,13 +68,14 @@ impl Game {
             .ok_or_else(|| "failed to spawn Tank coax inspection smoke cloud".to_string())?;
         refresh_projection_after_smoke(&mut game);
 
-        Ok(DevScenarioSetup {
+        DevScenarioSetup {
             game,
             player_id,
             units,
             goal: tank_pos,
             issue_after_ticks: u32::MAX,
-        })
+        }
+        .checkpoint_backed("dev:tank_coax_inspection")
     }
 }
 
