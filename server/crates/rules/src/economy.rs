@@ -374,19 +374,6 @@ mod tests {
             ]
         );
         assert!(
-            !trainable_units_for_faction(DEFAULT_FACTION_ID, EntityKind::CityCentre)
-                .contains(&EntityKind::ScoutPlane),
-            "Scout Plane stays absent from City Centre training until its production phase"
-        );
-        assert!(
-            !train_requirement_met_for_faction(
-                DEFAULT_FACTION_ID,
-                EntityKind::ScoutPlane,
-                &[EntityKind::Steelworks, EntityKind::Factory]
-            ),
-            "hidden Scout Plane stats are not faction-trainable yet"
-        );
-        assert!(
             can_build_for_faction(DEFAULT_FACTION_ID, EntityKind::Worker, EntityKind::TankTrap),
             "default workers can build Tank Traps after client build-card exposure"
         );
