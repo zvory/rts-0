@@ -320,7 +320,12 @@ fn dev_scenarios_default_to_kriegsia_start_faction() {
             0x5150_030d,
         ),
         Game::new_entrenchment_inspection_scenario(EntityKind::Rifleman, 1, 0x5150_030d),
-        Game::new_panzerfaust_duel_scenario(EntityKind::Panzerfaust, 1, 0x5150_030d),
+        Game::new_panzerfaust_inspection_scenario(
+            "panzerfaust_duel",
+            EntityKind::Panzerfaust,
+            1,
+            0x5150_030d,
+        ),
     ];
 
     for setup in scenarios {
@@ -330,8 +335,13 @@ fn dev_scenarios_default_to_kriegsia_start_faction() {
 
 #[test]
 fn panzerfaust_dev_scenarios_seed_final_inspection_cases() {
-    let duel = Game::new_panzerfaust_duel_scenario(EntityKind::Panzerfaust, 1, 0x5150_0701)
-        .expect("Panzerfaust duel scenario setup should succeed");
+    let duel = Game::new_panzerfaust_inspection_scenario(
+        "panzerfaust_duel",
+        EntityKind::Panzerfaust,
+        1,
+        0x5150_0701,
+    )
+    .expect("Panzerfaust duel scenario setup should succeed");
     assert_eq!(duel.issue_after_ticks, u32::MAX);
     assert_eq!(duel.units.len(), 1);
     assert_eq!(owned_kind_count(&duel.game, 1, EntityKind::Panzerfaust), 1);
@@ -349,9 +359,13 @@ fn panzerfaust_dev_scenarios_seed_final_inspection_cases() {
     );
     assert_dev_scenario_starts_as_kriegsia(&duel);
 
-    let cancel =
-        Game::new_panzerfaust_windup_cancel_scenario(EntityKind::Panzerfaust, 1, 0x5150_0702)
-            .expect("Panzerfaust windup-cancel scenario setup should succeed");
+    let cancel = Game::new_panzerfaust_inspection_scenario(
+        "panzerfaust_windup_cancel",
+        EntityKind::Panzerfaust,
+        1,
+        0x5150_0702,
+    )
+    .expect("Panzerfaust windup-cancel scenario setup should succeed");
     assert_eq!(cancel.issue_after_ticks, config::TICK_HZ / 6);
     assert_eq!(cancel.units.len(), 1);
     assert!(cancel
@@ -364,9 +378,13 @@ fn panzerfaust_dev_scenarios_seed_final_inspection_cases() {
         .is_some());
     assert_dev_scenario_starts_as_kriegsia(&cancel);
 
-    let target_death =
-        Game::new_panzerfaust_target_death_scenario(EntityKind::Panzerfaust, 1, 0x5150_0703)
-            .expect("Panzerfaust target-death scenario setup should succeed");
+    let target_death = Game::new_panzerfaust_inspection_scenario(
+        "panzerfaust_target_death",
+        EntityKind::Panzerfaust,
+        1,
+        0x5150_0703,
+    )
+    .expect("Panzerfaust target-death scenario setup should succeed");
     assert_eq!(target_death.issue_after_ticks, u32::MAX);
     assert_eq!(target_death.units.len(), 2);
     assert_eq!(
@@ -394,9 +412,13 @@ fn panzerfaust_dev_scenarios_seed_final_inspection_cases() {
         .contains(&upgrade::UpgradeKind::Methamphetamines));
     assert_dev_scenario_starts_as_kriegsia(&target_death);
 
-    let entrenched =
-        Game::new_panzerfaust_entrenched_range_scenario(EntityKind::Panzerfaust, 1, 0x5150_0704)
-            .expect("Panzerfaust entrenched-range scenario setup should succeed");
+    let entrenched = Game::new_panzerfaust_inspection_scenario(
+        "panzerfaust_entrenched_range",
+        EntityKind::Panzerfaust,
+        1,
+        0x5150_0704,
+    )
+    .expect("Panzerfaust entrenched-range scenario setup should succeed");
     assert_eq!(entrenched.issue_after_ticks, u32::MAX);
     assert_eq!(entrenched.units.len(), 2);
     assert_eq!(entrenched.game.trenches.all().len(), 1);
@@ -424,9 +446,13 @@ fn panzerfaust_dev_scenarios_seed_final_inspection_cases() {
         .contains(&upgrade::UpgradeKind::Entrenchment));
     assert_dev_scenario_starts_as_kriegsia(&entrenched);
 
-    let meth =
-        Game::new_panzerfaust_methamphetamines_scenario(EntityKind::Panzerfaust, 1, 0x5150_0705)
-            .expect("Panzerfaust Methamphetamines scenario setup should succeed");
+    let meth = Game::new_panzerfaust_inspection_scenario(
+        "panzerfaust_methamphetamines",
+        EntityKind::Panzerfaust,
+        1,
+        0x5150_0705,
+    )
+    .expect("Panzerfaust Methamphetamines scenario setup should succeed");
     assert_eq!(meth.issue_after_ticks, u32::MAX);
     assert_eq!(meth.units.len(), 2);
     assert!(meth
