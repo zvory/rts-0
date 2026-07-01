@@ -41,16 +41,18 @@ use scenario::{
     validate_lab_entity_setup_shape, validate_lab_scenario_shape,
     MAX_LAB_SCENARIO_UPGRADES_PER_PLAYER,
 };
-pub use scenario::{
+pub use checkpoint_scenario::{
     LabCheckpointScenarioMap, LabCheckpointScenarioMapData, LabCheckpointScenarioMetadata,
-    LabCheckpointScenarioSource, LabCheckpointScenarioV1, LabScenarioEntity, LabScenarioMap,
-    LabScenarioMetadata, LabScenarioOrder, LabScenarioPlayer, LabScenarioPoint,
-    LabScenarioResearch, LabScenarioResources, LabScenarioTile, LabScenarioV1,
+    LabCheckpointScenarioSource, LabCheckpointScenarioV1, LabScenarioTile,
+};
+pub use scenario::{
+    LabScenarioEntity, LabScenarioMap, LabScenarioMetadata, LabScenarioOrder, LabScenarioPlayer,
+    LabScenarioPoint, LabScenarioResearch, LabScenarioResources, LabScenarioV1,
 };
 
 pub const LAB_SCENARIO_V1_SCHEMA_VERSION: u32 = scenario::LAB_SCENARIO_V1_SCHEMA_VERSION;
 pub const LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION: u32 =
-    scenario::LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION;
+    checkpoint_scenario::LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum LabOp {

@@ -80,6 +80,19 @@ fn assert_restore_invalid_scenario(
     }
 }
 
+fn assert_restore_invalid_map(
+    scenario: crate::game::lab::LabCheckpointScenarioV1,
+    expected: &str,
+) {
+    match Game::restore_lab_checkpoint_scenario(scenario) {
+        Ok(_) => panic!("checkpoint lab scenario restore should reject {expected}"),
+        Err(LabError::InvalidMap { reason, .. }) => {
+            assert!(reason.contains(expected), "unexpected error: {reason}");
+        }
+        Err(err) => panic!("unexpected error for {expected}: {err:?}"),
+    }
+}
+
 #[test]
 fn checkpoint_lab_scenario_from_v1_matches_direct_restore_and_records_source_metadata() {
     let mut authored = default_lab_game(0x5150_5001);
@@ -207,4 +220,30 @@ fn lab_checkpoint_scenario_export_preserves_god_mode_and_rejects_map_mismatches(
         }
         Err(err) => panic!("unexpected error for wrong materialized map: {err:?}"),
     }
+}
+
+#[test]
+fn lab_checkpoint_scenario_restore_bounds_map_site_lists() {
+    let game = default_lab_game(0x5150_5004);
+    let checkpoint = game
+        .export_lab_checkpoint_scenario(TEST_BUILD_SHA)
+        .expect("live lab checkpoint scenario should export");
+
+    let mut no_starts = checkpoint.clone();
+    no_starts.map.data.starts.clear();
+    assert_restore_invalid_map(no_starts, "start site count");
+
+    let mut too_many_starts = checkpoint.clone();
+    let start = too_many_starts.map.data.starts[0];
+    while too_many_starts.map.data.starts.len() <= 8 {
+        too_many_starts.map.data.starts.push(start);
+    }
+    assert_restore_invalid_map(too_many_starts, "start site count");
+
+    let mut too_many_expansions = checkpoint;
+    let expansion = too_many_expansions.map.data.starts[0];
+    while too_many_expansions.map.data.expansion_sites.len() <= 64 {
+        too_many_expansions.map.data.expansion_sites.push(expansion);
+    }
+    assert_restore_invalid_map(too_many_expansions, "expansion site count");
 }
