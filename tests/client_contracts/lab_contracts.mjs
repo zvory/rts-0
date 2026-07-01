@@ -426,6 +426,10 @@ await withFakeDocument(async () => {
     "LabPanel spawn palette includes trainable Kriegsia Panzerfaust",
   );
   assert(
+    !labSpawnUnitKindsForFaction(DEFAULT_FACTION_ID).includes(KIND.SCOUT_PLANE),
+    "LabPanel spawn palette excludes hidden Scout Plane until its exposure phase",
+  );
+  assert(
     STATS[KIND.BARRACKS].trains.includes(KIND.PANZERFAUST),
     "LabPanel Panzerfaust inspection exposure now matches normal Barracks production exposure",
   );

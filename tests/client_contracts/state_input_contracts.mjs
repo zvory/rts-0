@@ -871,7 +871,12 @@ function buttonByLabel(card, label) {
     "Tank Trap advisory preview allows infantry bodies inside the footprint",
   );
   const tank = { id: 9, owner: 1, kind: KIND.TANK, x: 116, y: 64 };
-  assert(footprintValidAgainstEntities([tank], new Set(), 1, 1, 2, 2, map) === false && footprintValidAgainstEntities([{ id: 90, owner: 1, kind: KIND.SCOUT_PLANE, x: 80, y: 80 }], new Set(), 1, 1, 2, 2, map) === true, "client preview rejects tank bodies but ignores hidden Scout Plane render bodies");
+  const scoutPlane = { id: 90, owner: 1, kind: KIND.SCOUT_PLANE, x: 80, y: 80 };
+  assert(
+    footprintValidAgainstEntities([tank], new Set(), 1, 1, 2, 2, map) === false &&
+      footprintValidAgainstEntities([scoutPlane], new Set(), 1, 1, 2, 2, map) === true,
+    "client preview rejects tank bodies but ignores hidden Scout Plane render bodies",
+  );
   const trapTank = { id: 91, owner: 1, kind: KIND.TANK, x: 58, y: 48 };
   assert(
     footprintValidAgainstEntities(
