@@ -39,11 +39,12 @@ mod tests;
 #[cfg(test)]
 use acquisition::combat_mode;
 use acquisition::{
-    combat_mode_with_moving_fire, resolve_target as resolve_target_with_obstruction, CombatMode,
+    combat_mode_with_moving_fire, direct_fire_target_legal,
+    resolve_target as resolve_target_with_obstruction, CombatMode, DirectFireLegality,
+    DirectFireVisibility,
 };
 use chase::{chase_goal_for_target, chase_path_needs_refresh};
 use damage::apply_damage;
-use projection::{friendly_hard_blocker_between, shot_hits_intended_target};
 use weapons::{
     anti_tank_gun_can_chase, begin_idle_deployed_weapon_setup, can_fire_while_moving,
     deployed_weapon_ready_to_fire, deployed_weapon_ready_to_move, effective_attack_profile,
@@ -340,15 +341,36 @@ pub(in crate::game) fn combat_system(
             .get(id)
             .map(|e| moving_fire_movement_order_holds_path(e, can_move_fire))
             .unwrap_or(false);
-        let terrain_clear = los.clear_between_world_points((px, py), (tx, ty));
         let clear_shot = if is_mortar_team {
             true
-        } else if !terrain_clear {
-            false
         } else if mode == CombatMode::Ordered {
-            shot_hits_intended_target(map, entities, teams, id, owner, tid, (px, py))
+            direct_fire_target_legal(
+                map,
+                entities,
+                teams,
+                &los,
+                fog,
+                smokes,
+                id,
+                owner,
+                (px, py),
+                tid,
+                DirectFireLegality::intended_target(DirectFireVisibility::Team),
+            )
         } else {
-            !friendly_hard_blocker_between(map, entities, id, owner, (px, py), (tx, ty))
+            direct_fire_target_legal(
+                map,
+                entities,
+                teams,
+                &los,
+                fog,
+                smokes,
+                id,
+                owner,
+                (px, py),
+                tid,
+                DirectFireLegality::auto_acquire(),
+            )
         };
 
         if dist <= range_px && clear_shot {

@@ -100,7 +100,7 @@ fn tick_windup(
     };
     if !panzerfaust_target_valid(entities, teams, fog, smokes, owner, id, target)
         || !panzerfaust_target_in_range(map, entities, id, target)
-        || !panzerfaust_target_fireable(map, entities, teams, los, id, owner, target)
+        || !panzerfaust_target_fireable(map, entities, teams, los, fog, smokes, id, owner, target)
     {
         cancel_windup(entities, id);
         return;

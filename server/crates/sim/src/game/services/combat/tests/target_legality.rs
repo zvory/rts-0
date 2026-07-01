@@ -1,0 +1,219 @@
+use super::super::acquisition::{
+    direct_fire_target_legal, DirectFireLegality, DirectFireVisibility,
+};
+use super::*;
+
+fn direct_fire_legal(
+    map: &Map,
+    entities: &EntityStore,
+    smokes: &SmokeCloudStore,
+    attacker: u32,
+    target: u32,
+    legality: DirectFireLegality,
+) -> bool {
+    let teams = default_team_relations();
+    let fog = visible_fog(map, entities);
+    let los = LineOfSight::with_smoke(map, smokes);
+    let attacker_entity = entities.get(attacker).expect("attacker should exist");
+    direct_fire_target_legal(
+        map,
+        entities,
+        &teams,
+        &los,
+        &fog,
+        smokes,
+        attacker,
+        attacker_entity.owner,
+        (attacker_entity.pos_x, attacker_entity.pos_y),
+        target,
+        legality,
+    )
+}
+
+#[test]
+fn direct_fire_legality_rejects_resource_nodes() {
+    let map = open_map(12);
+    let mut entities = EntityStore::new();
+    let attacker_pos = map.tile_center(2, 4);
+    let target_pos = map.tile_center(4, 4);
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, attacker_pos.0, attacker_pos.1)
+        .expect("attacker should spawn");
+    let resource = entities
+        .spawn_node(EntityKind::Steel, target_pos.0, target_pos.1)
+        .expect("resource should spawn");
+    let smokes = SmokeCloudStore::new();
+
+    assert!(!direct_fire_legal(
+        &map,
+        &entities,
+        &smokes,
+        attacker,
+        resource,
+        DirectFireLegality::auto_acquire(),
+    ));
+}
+
+#[test]
+fn direct_fire_legality_rejects_smoke_at_attacker_or_target() {
+    let map = open_map(12);
+    let mut entities = EntityStore::new();
+    let attacker_pos = map.tile_center(2, 4);
+    let target_pos = map.tile_center(4, 4);
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, attacker_pos.0, attacker_pos.1)
+        .expect("attacker should spawn");
+    let target = entities
+        .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
+        .expect("target should spawn");
+
+    let mut attacker_smoke = SmokeCloudStore::new();
+    attacker_smoke
+        .spawn(attacker_pos.0, attacker_pos.1, 1.0, 100, 0)
+        .expect("attacker smoke should spawn");
+    assert!(!direct_fire_legal(
+        &map,
+        &entities,
+        &attacker_smoke,
+        attacker,
+        target,
+        DirectFireLegality::auto_acquire(),
+    ));
+
+    let mut target_smoke = SmokeCloudStore::new();
+    target_smoke
+        .spawn(target_pos.0, target_pos.1, 1.0, 100, 0)
+        .expect("target smoke should spawn");
+    assert!(!direct_fire_legal(
+        &map,
+        &entities,
+        &target_smoke,
+        attacker,
+        target,
+        DirectFireLegality::auto_acquire(),
+    ));
+}
+
+#[test]
+fn direct_fire_legality_rejects_terrain_los_blocking() {
+    let map = map_with_rock_at((4, 4));
+    let mut entities = EntityStore::new();
+    let attacker_pos = map.tile_center(2, 4);
+    let target_pos = map.tile_center(6, 4);
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, attacker_pos.0, attacker_pos.1)
+        .expect("attacker should spawn");
+    let target = entities
+        .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
+        .expect("target should spawn");
+    let smokes = SmokeCloudStore::new();
+
+    assert!(!direct_fire_legal(
+        &map,
+        &entities,
+        &smokes,
+        attacker,
+        target,
+        DirectFireLegality::auto_acquire(),
+    ));
+}
+
+#[test]
+fn direct_fire_legality_rejects_friendly_hard_blockers() {
+    let map = open_map(12);
+    let mut entities = EntityStore::new();
+    let attacker_pos = map.tile_center(2, 4);
+    let blocker_pos = map.tile_center(4, 4);
+    let target_pos = map.tile_center(6, 4);
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, attacker_pos.0, attacker_pos.1)
+        .expect("attacker should spawn");
+    entities
+        .spawn_unit(1, EntityKind::Tank, blocker_pos.0, blocker_pos.1)
+        .expect("friendly blocker should spawn");
+    let target = entities
+        .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
+        .expect("target should spawn");
+    let smokes = SmokeCloudStore::new();
+
+    assert!(!direct_fire_legal(
+        &map,
+        &entities,
+        &smokes,
+        attacker,
+        target,
+        DirectFireLegality::auto_acquire(),
+    ));
+}
+
+#[test]
+fn intended_target_mode_rejects_enemy_hard_blockers_before_target() {
+    let map = open_map(12);
+    let mut entities = EntityStore::new();
+    let attacker_pos = map.tile_center(2, 4);
+    let blocker_pos = map.tile_center(4, 4);
+    let target_pos = map.tile_center(6, 4);
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, attacker_pos.0, attacker_pos.1)
+        .expect("attacker should spawn");
+    entities
+        .spawn_unit(2, EntityKind::Tank, blocker_pos.0, blocker_pos.1)
+        .expect("enemy blocker should spawn");
+    let target = entities
+        .spawn_unit(2, EntityKind::Worker, target_pos.0, target_pos.1)
+        .expect("target should spawn");
+    let smokes = SmokeCloudStore::new();
+
+    assert!(
+        direct_fire_legal(
+            &map,
+            &entities,
+            &smokes,
+            attacker,
+            target,
+            DirectFireLegality::auto_acquire(),
+        ),
+        "current auto-acquisition legality should still allow a shot that resolves to the blocker",
+    );
+    assert!(!direct_fire_legal(
+        &map,
+        &entities,
+        &smokes,
+        attacker,
+        target,
+        DirectFireLegality::intended_target(DirectFireVisibility::Owner),
+    ));
+}
+
+#[test]
+fn intended_target_mode_keeps_tank_traps_and_pump_jacks_non_blocking() {
+    for blocker_kind in [EntityKind::TankTrap, EntityKind::PumpJack] {
+        let map = open_map(12);
+        let mut entities = EntityStore::new();
+        let attacker_pos = map.tile_center(2, 4);
+        let blocker_pos = map.tile_center(4, 4);
+        let target_pos = map.tile_center(6, 4);
+        let attacker = entities
+            .spawn_unit(1, EntityKind::Rifleman, attacker_pos.0, attacker_pos.1)
+            .expect("attacker should spawn");
+        entities
+            .spawn_building(2, blocker_kind, blocker_pos.0, blocker_pos.1, true)
+            .expect("non-blocking building should spawn");
+        let target = entities
+            .spawn_unit(2, EntityKind::Worker, target_pos.0, target_pos.1)
+            .expect("target should spawn");
+        let smokes = SmokeCloudStore::new();
+
+        assert!(
+            direct_fire_legal(
+                &map,
+                &entities,
+                &smokes,
+                attacker,
+                target,
+                DirectFireLegality::intended_target(DirectFireVisibility::Owner),
+            ),
+            "{blocker_kind:?} should not block intended direct fire",
+        );
+    }
+}

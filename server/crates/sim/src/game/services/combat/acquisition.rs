@@ -11,10 +11,11 @@ use crate::game::services::world_query;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
 use crate::rules::combat as combat_rules;
+use crate::rules::target as target_rules;
 use crate::rules::terrain::{self, TerrainKind};
 
 use super::priority::{self, AttackPriorityContext, TargetCandidate};
-use super::projection::friendly_hard_blocker_between;
+use super::projection::{friendly_hard_blocker_between, shot_hits_intended_target};
 use super::weapons::{effective_attack_profile, moving_fire_movement_order_holds_path};
 
 /// How a combatant chooses targets.
@@ -28,6 +29,82 @@ pub(super) enum CombatMode {
     Opportunistic,
     /// Ignores nearby enemies unless explicitly ordered to attack.
     Passive,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum DirectFireVisibility {
+    Owner,
+    Team,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct DirectFireLegality {
+    visibility: DirectFireVisibility,
+    requires_intended_target: bool,
+}
+
+impl DirectFireLegality {
+    pub(super) fn auto_acquire() -> Self {
+        Self {
+            visibility: DirectFireVisibility::Owner,
+            requires_intended_target: false,
+        }
+    }
+
+    pub(super) fn intended_target(visibility: DirectFireVisibility) -> Self {
+        Self {
+            visibility,
+            requires_intended_target: true,
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn direct_fire_target_legal(
+    map: &Map,
+    entities: &EntityStore,
+    teams: &TeamRelations,
+    los: &LineOfSight<'_>,
+    fog: &Fog,
+    smokes: &SmokeCloudStore,
+    attacker: u32,
+    attacker_owner: u32,
+    start: (f32, f32),
+    target: u32,
+    legality: DirectFireLegality,
+) -> bool {
+    let Some(target_entity) = entities.get(target) else {
+        return false;
+    };
+    if !world_query::is_enemy_targetable(target_entity, teams, attacker_owner, attacker) {
+        return false;
+    }
+    let end = (target_entity.pos_x, target_entity.pos_y);
+    if smokes.point_inside(start.0, start.1) || smokes.point_inside(end.0, end.1) {
+        return false;
+    }
+    let visible = match legality.visibility {
+        DirectFireVisibility::Owner => fog.is_visible_world(attacker_owner, end.0, end.1),
+        DirectFireVisibility::Team => {
+            crate::rules::projection::team_visible_world(attacker_owner, end.0, end.1, fog, teams)
+        }
+    };
+    if !visible || !los.clear_between_world_points(start, end) {
+        return false;
+    }
+    if legality.requires_intended_target {
+        shot_hits_intended_target(
+            map,
+            entities,
+            teams,
+            attacker,
+            attacker_owner,
+            target,
+            start,
+        )
+    } else {
+        !friendly_hard_blocker_between(map, entities, attacker, attacker_owner, start, end)
+    }
 }
 
 pub(super) fn combat_mode_with_moving_fire(e: &Entity, can_fire_while_moving: bool) -> CombatMode {
@@ -238,7 +315,7 @@ fn legal_target_candidates(
         let in_weapon_range = effective_weapon_range_px.is_finite()
             && distance_sq <= effective_weapon_range_px * effective_weapon_range_px;
         if !target_has_legal_shot(
-            map, entities, los, fog, smokes, self_id, owner, px, py, target,
+            map, entities, teams, los, fog, smokes, self_id, owner, px, py, target,
         ) {
             continue;
         }
@@ -252,16 +329,11 @@ fn legal_target_candidates(
             };
         candidates.push(TargetCandidate {
             id,
-            kind: target.kind,
             owner: target.owner,
             pos_x: target.pos_x,
             pos_y: target.pos_y,
             distance_sq,
-            is_unit: target.is_unit(),
-            is_building: target.is_building(),
-            armor_class: combat_rules::armor_class(target.kind),
-            weapon_class: combat_rules::weapon_class(target.kind),
-            threat_role: combat_rules::target_threat_role(target.kind),
+            facts: target_rules::target_facts(target.kind),
             in_weapon_range,
             tank_trap_obstructs_vehicle_route,
             retained_target,
@@ -274,6 +346,7 @@ fn legal_target_candidates(
 fn target_has_legal_shot(
     map: &Map,
     entities: &EntityStore,
+    teams: &TeamRelations,
     los: &LineOfSight<'_>,
     fog: &Fog,
     smokes: &SmokeCloudStore,
@@ -287,15 +360,19 @@ fn target_has_legal_shot(
         && !smokes.point_inside(target.pos_x, target.pos_y)
         && target_visible_to_owner(fog, smokes, owner, target)
         && (attacker_uses_indirect_fire(entities, self_id)
-            || (los.clear_between_world_points((px, py), (target.pos_x, target.pos_y))
-                && !friendly_hard_blocker_between(
-                    map,
-                    entities,
-                    self_id,
-                    owner,
-                    (px, py),
-                    (target.pos_x, target.pos_y),
-                )))
+            || direct_fire_target_legal(
+                map,
+                entities,
+                teams,
+                los,
+                fog,
+                smokes,
+                self_id,
+                owner,
+                (px, py),
+                target.id,
+                DirectFireLegality::auto_acquire(),
+            ))
 }
 
 fn attacker_uses_indirect_fire(entities: &EntityStore, self_id: u32) -> bool {

@@ -487,6 +487,9 @@ policy is centralized instead of scattered through services.
   damage/miss/facing helpers such as `effective_damage_for_weapon(profile, victim_kind, base_dmg,
   victim_terrain) -> u32`. The Panzerfaust Tank-only loaded-shot predicate lives here as rules
   vocabulary while the one-shot state machine stays in the sim combat service.
+- `rules::target` — pure `TargetFacts` snapshots for target policy consumers. Facts include unit,
+  building, resource-node, armor class, weapon class, anti-armor threat, support weapon, field
+  obstacle, vehicle-body, economy-unit, and future Tank coax infantry-priority classification.
 - `rules::economy` — tech/production predicates (`trainable_units_for_faction`,
   `build_requirement_met_for_faction`, `train_requirement_met_for_faction`,
   `can_research_for_faction`), resource-node amounts, and cost/supply wrappers (`cost`,
@@ -815,14 +818,19 @@ General rules:
   applies. Direct `Attack` orders and idle-aggressive behavior remain separate and may still pursue.
 - Normal combat auto-acquisition first filters already-legal hostile candidates in
   `services::combat::acquisition`, then chooses between them through the sim-local
-  `services::combat::priority` ranker. The ranker owns priority terms such as default-weapon fit,
-  Tank immediate-threat order, shoot-while-moving target retention, unit-over-building preference,
-  and nearest/id tie-breaks; it does not decide fog, smoke, line-of-sight, blocker, ownership, or
-  acquisition-radius legality. Unit attackers rank legal unit targets above buildings, so buildings
-  remain last-resort cleanup targets unless explicitly ordered or covered by a special obstruction
-  policy. Default small-arms weapons prefer soft targets while keeping armored or hard targets as
-  fallbacks. Default anti-armor weapons prefer anti-armor threats and armored/hard units, with Tanks
-  treating in-range Anti-Tank Guns as the top immediate threat.
+  `services::combat::priority` ranker. Candidate construction stores a `rules::target::TargetFacts`
+  snapshot so ranking consumes explicit facts instead of re-classifying kind-specific fields. The
+  ranker owns priority terms such as default-weapon fit, Tank immediate-threat order,
+  shoot-while-moving target retention, unit-over-building preference, and nearest/id tie-breaks; it
+  does not decide fog, smoke, line-of-sight, blocker, ownership, or acquisition-radius legality.
+  Direct-fire legality is centralized in `services::combat::acquisition::direct_fire_target_legal`:
+  default auto-acquisition/firing uses the current resolved-target mode that rejects friendly hard
+  blockers but may resolve to an intervening enemy hard blocker, while ordered/intended-target uses
+  a stricter mode that requires the shot to hit the intended target. Unit attackers rank legal unit
+  targets above buildings, so buildings remain last-resort cleanup targets unless explicitly ordered
+  or covered by a special obstruction policy. Default small-arms weapons prefer soft targets while
+  keeping armored or hard targets as fallbacks. Default anti-armor weapons prefer anti-armor threats
+  and armored/hard units, with Tanks treating in-range Anti-Tank Guns as the top immediate threat.
   Vehicle-body units rank enemy Tank Traps as high-priority breach targets only when
   `services::occupancy` reports that the trap is on the current bounded route segment or forms a
   closed-gap pinch across that route; irrelevant nearby traps remain legal fallback targets but lose

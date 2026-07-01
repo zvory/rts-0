@@ -21,6 +21,7 @@ mod moving_fire_policy;
 mod retention;
 mod support_weapon_attack_move;
 mod tank_traps;
+mod target_legality;
 mod target_priority;
 mod weapon_cooldowns;
 mod weapon_profiles;
