@@ -463,12 +463,26 @@ fn tank_coax_inspection_scenario_sets_up_static_mixed_targets() {
     let setup = Game::new_tank_coax_inspection_scenario(EntityKind::Tank, 1, 0x5150_0606)
         .expect("Tank coax inspection scenario setup should succeed");
     assert_eq!(setup.issue_after_ticks, u32::MAX);
-    assert_eq!(setup.units.len(), 4);
+    assert_eq!(setup.units.len(), 11);
     assert_eq!(owned_kind_count(&setup.game, 1, EntityKind::Tank), 1);
+    assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::Tank), 1);
     assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::Worker), 1);
     assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::Rifleman), 1);
+    assert_eq!(
+        owned_kind_count(&setup.game, 2, EntityKind::MachineGunner),
+        1
+    );
     assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::ScoutCar), 1);
+    assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::Golem), 1);
+    assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::Ekat), 1);
+    assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::MortarTeam), 1);
+    assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::AntiTankGun), 1);
+    assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::Artillery), 1);
     assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::Depot), 1);
+    assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::TankTrap), 1);
+    assert_eq!(owned_kind_count(&setup.game, 0, EntityKind::Steel), 1);
+    assert_eq!(owned_kind_count(&setup.game, 0, EntityKind::Oil), 1);
+    assert_eq!(setup.game.smokes.iter().count(), 1);
     let tank_id = setup.units[0];
     let tank = setup.game.state.entities.get(tank_id).expect("tank should exist");
     assert_eq!(tank.weapon_facing(), Some(0.0));

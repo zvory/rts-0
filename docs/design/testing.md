@@ -135,6 +135,9 @@ Current scenario ids:
   position against Tanks at four-tile range.
 - `panzerfaust_methamphetamines` — compares normal and Methamphetamines Panzerfaust firing and
   conversion timing side by side.
+- `tank_coax_inspection` — one held Tank with its cannon cooldown delayed faces infantry-priority
+  targets, support weapons, Ekat/Golem units, armored fallback targets, blockers, resources, smoke,
+  and buildings around the coax arc for secondary-machine-gun inspection.
 
 The watcher shows movement debug path overlays by default. Replay speed controls are reused for
 dev scenarios: `Pause` sets the simulation speed to zero, and `Step` advances exactly one
