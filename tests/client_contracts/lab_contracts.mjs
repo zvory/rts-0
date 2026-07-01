@@ -1,6 +1,8 @@
 // tests/client_contracts/lab_contracts.mjs
 // Domain contract assertions imported by ../client_contracts.mjs.
 
+import fs from "node:fs";
+
 import {
   assert,
   assertDeepEqual,
@@ -49,7 +51,10 @@ import {
   fetchLabScenarioSubmissionCapability,
 } from "../../client/src/lab_scenario_submission_capability.js";
 import { LabPanelWindowChrome } from "../../client/src/lab_panel_window.js";
-import { STATS } from "../../client/src/config.js";
+import {
+  researchableUpgradesForFaction,
+  STATS,
+} from "../../client/src/config.js";
 
 import { textWithin } from "./dom_text.mjs";
 
@@ -68,6 +73,27 @@ import { textWithin } from "./dom_text.mjs";
   assert(normalized.id === "lategame", "lab catalog entry keeps stable scenario id");
   assert(normalized.playerCount === 2, "lab catalog entry keeps bounded player count metadata");
   assert(!("scenario" in normalized), "lab catalog entry normalization keeps full scenario JSON out of the listing model");
+}
+
+{
+  const allKriegsiaResearch = [
+    ...researchableUpgradesForFaction(DEFAULT_FACTION_ID, KIND.TRAINING_CENTRE),
+    ...researchableUpgradesForFaction(DEFAULT_FACTION_ID, KIND.RESEARCH_COMPLEX),
+  ];
+  for (const filename of ["lategame.json", "render-preview.json"]) {
+    const scenario = JSON.parse(
+      fs.readFileSync(new URL(`../../server/assets/lab-scenarios/${filename}`, import.meta.url), "utf8"),
+    );
+    assert(scenario.players?.length === 2, `${filename} remains a two-player bundled lab scenario`);
+    for (const player of scenario.players) {
+      const completedResearch = [...(player.research?.completed || [])].sort();
+      assertDeepEqual(
+        completedResearch,
+        [...allKriegsiaResearch].sort(),
+        `${filename} grants all current Kriegsia research to player ${player.id}`,
+      );
+    }
+  }
 }
 
 {
@@ -392,11 +418,11 @@ await withFakeDocument(async () => {
   );
   assert(
     labSpawnUnitKindsForFaction(DEFAULT_FACTION_ID).includes(KIND.PANZERFAUST),
-    "LabPanel spawn palette intentionally exposes hidden Panzerfaust for lab inspection",
+    "LabPanel spawn palette includes trainable Kriegsia Panzerfaust",
   );
   assert(
-    !STATS[KIND.BARRACKS].trains.includes(KIND.PANZERFAUST),
-    "LabPanel Panzerfaust inspection exposure does not imply normal Barracks production exposure",
+    STATS[KIND.BARRACKS].trains.includes(KIND.PANZERFAUST),
+    "LabPanel Panzerfaust inspection exposure now matches normal Barracks production exposure",
   );
   assertDeepEqual(
     labSpawnUnitKindsForFaction("ekat"),

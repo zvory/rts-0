@@ -3930,7 +3930,9 @@
       "research": {
         "completed": [
           "methamphetamines",
+          "entrenchment",
           "anti_tank_gun_unlock",
+          "ballistic_tables",
           "tank_unlock",
           "command_car_unlock",
           "mortar_autocast"
@@ -3951,7 +3953,9 @@
       "research": {
         "completed": [
           "methamphetamines",
+          "entrenchment",
           "anti_tank_gun_unlock",
+          "ballistic_tables",
           "tank_unlock",
           "command_car_unlock",
           "mortar_autocast"

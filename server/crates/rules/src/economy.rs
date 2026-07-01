@@ -28,7 +28,7 @@ pub fn trainable_units(building_kind: EntityKind) -> &'static [EntityKind] {
         defs::UNITS.iter().all(|d| {
             let listed = units.contains(&d.kind);
             if d.trained_at == Some(building_kind) {
-                listed || defs::HIDDEN_UNITS_WITH_RESERVED_PRODUCTION.contains(&d.kind)
+                listed
             } else {
                 !listed
             }
@@ -203,7 +203,11 @@ mod tests {
         assert_eq!(trainable_units(EntityKind::Zamok), &[EntityKind::Golem]);
         assert_eq!(
             trainable_units(EntityKind::Barracks),
-            &[EntityKind::Rifleman, EntityKind::MachineGunner]
+            &[
+                EntityKind::Rifleman,
+                EntityKind::MachineGunner,
+                EntityKind::Panzerfaust
+            ]
         );
         assert_eq!(
             trainable_units(EntityKind::Factory),
@@ -225,6 +229,7 @@ mod tests {
 
         assert!(train_requirement_met(EntityKind::Rifleman, &[]));
         assert!(!train_requirement_met(EntityKind::MachineGunner, &[]));
+        assert!(!train_requirement_met(EntityKind::Panzerfaust, &[]));
         assert!(!train_requirement_met(EntityKind::MortarTeam, &[]));
         assert!(!train_requirement_met(EntityKind::AntiTankGun, &[]));
         assert!(!train_requirement_met(EntityKind::Tank, &[]));
@@ -313,6 +318,12 @@ mod tests {
         assert_eq!(cost(EntityKind::ResearchComplex), (100, 100));
         assert_eq!(supply_cost(EntityKind::Artillery), 5);
         assert_eq!(
+            cost(EntityKind::Panzerfaust),
+            (60, 15),
+            "Panzerfaust cost should match the production exposure contract"
+        );
+        assert_eq!(supply_cost(EntityKind::Panzerfaust), 1);
+        assert_eq!(
             defs::unit_def(EntityKind::Artillery).map(|d| d.stats.radius),
             defs::unit_def(EntityKind::Tank).map(|d| d.stats.radius),
             "artillery should use the same selection/collision radius as tanks"
@@ -360,7 +371,11 @@ mod tests {
             "default workers can build contextual Pump Jacks on oil nodes"
         );
         assert!(
-            !can_build_for_faction(DEFAULT_FACTION_ID, EntityKind::Rifleman, EntityKind::PumpJack),
+            !can_build_for_faction(
+                DEFAULT_FACTION_ID,
+                EntityKind::Rifleman,
+                EntityKind::PumpJack
+            ),
             "non-workers cannot build contextual Pump Jacks"
         );
         assert!(build_requirement_met_for_faction(

@@ -1319,9 +1319,9 @@ Import rules:
 - `app-shell` files may compose other areas; prefer adding new cross-area wiring in `match.js` or
   `app.js` instead of importing collaborators from feature modules.
 - Lab UI and transport lifetimes stay in `App`: `match.js` may receive lab metadata/control policy,
-  but must not import `lab_client.js` or `lab_panel.js`. Lab setup tools may include lab-only
-  inspection spawn entries such as the hidden Panzerfaust; those entries do not imply normal faction
-  catalog membership or production command-card exposure.
+  but must not import `lab_client.js` or `lab_panel.js`. Lab setup tools may include inspection
+  spawn entries such as Panzerfaust; normal faction catalog membership and production command-card
+  exposure are still owned by the Rust rules catalog and client rules mirror.
 - Non-shell cross-area imports should normally become dependency injection through `Match`, `App`,
   or a facade. If one is intentional, update `ALLOWED_CROSS_AREA_IMPORTS` in
   `scripts/check-client-architecture.mjs` with a reason.

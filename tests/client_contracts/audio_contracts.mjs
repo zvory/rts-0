@@ -297,6 +297,18 @@ assert(
     "default tank cannon weapon hint preserves tank feedback",
   );
   assert(
+    defaultWeaponKindForAttackerKind(KIND.PANZERFAUST) === WEAPON_KIND.PANZERFAUST_LOADED_SHOT,
+    "Panzerfaust attack feedback resolves to its loaded-shot weapon id",
+  );
+  assert(
+    attackFeedbackKind(KIND.PANZERFAUST, WEAPON_KIND.PANZERFAUST_LOADED_SHOT) === KIND.PANZERFAUST,
+    "Panzerfaust loaded-shot weapon hint preserves Panzerfaust feedback",
+  );
+  assert(
+    !attackKindHasCombatSound(KIND.PANZERFAUST, WEAPON_KIND.PANZERFAUST_LOADED_SHOT),
+    "Panzerfaust attacks are deliberately silent until the dedicated audio polish pass",
+  );
+  assert(
     attackFeedbackKind(KIND.RIFLEMAN, "future_unknown_weapon") === KIND.RIFLEMAN,
     "unknown attack weapon hints preserve attacker-kind feedback",
   );

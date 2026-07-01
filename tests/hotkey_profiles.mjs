@@ -69,6 +69,17 @@ function workerBuildCard(factionId = "kriegsia") {
 }
 
 {
+  const catalog = buildHotkeyCommandCatalog(buildCommandCardContextCatalog());
+  assert(
+    catalog.commands.some((command) =>
+      command.commandId === kriegsiaCommandId("train", KIND.PANZERFAUST) &&
+        command.slotIndex === 2
+    ),
+    "hotkey command catalog includes the exposed Panzerfaust train command in the E slot",
+  );
+}
+
+{
   const hotkeys = service();
   assert(Object.isFrozen(hotkeys.profileById(HOTKEY_PRESET_GRID)), "Grid preset is immutable");
   assert(Object.isFrozen(hotkeys.profileById(HOTKEY_PRESET_CLASSIC).bindings), "Classic preset bindings are immutable");
