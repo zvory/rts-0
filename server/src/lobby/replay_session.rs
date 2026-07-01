@@ -110,7 +110,11 @@ impl ReplaySession {
         Self::validate_artifact_static_limits(&artifact)?;
         let duration_ticks = artifact.duration_ticks;
         let build_start = StdInstant::now();
-        let game = Box::new(Self::build_game(&artifact)?);
+        let game = Box::new(Self::build_game_for_build(
+            &artifact,
+            crate::build_info::build_id(),
+            true,
+        )?);
         let start_tick = game.tick_count();
         Self::validate_artifact_timeline(&artifact, start_tick)?;
         let keyframes = vec![ReplayKeyframe {
@@ -138,6 +142,15 @@ impl ReplaySession {
             last_controller_id: None,
             last_seek_at: None,
         })
+    }
+
+    pub(super) fn validate_artifact_for_launch(
+        artifact: &ReplayArtifactV1,
+        expected_build_sha: &str,
+    ) -> Result<(), String> {
+        Self::validate_artifact_static_limits(artifact)?;
+        let game = Self::build_game_for_build(artifact, expected_build_sha, false)?;
+        Self::validate_artifact_timeline(artifact, game.tick_count())
     }
 
     fn validate_artifact_static_limits(artifact: &ReplayArtifactV1) -> Result<(), String> {
@@ -210,18 +223,24 @@ impl ReplaySession {
         Ok(())
     }
 
-    fn build_game(artifact: &ReplayArtifactV1) -> Result<Game, String> {
+    fn build_game_for_build(
+        artifact: &ReplayArtifactV1,
+        expected_build_sha: &str,
+        log_build_mismatch: bool,
+    ) -> Result<Game, String> {
         let metadata = Map::metadata_for_name(&artifact.map_name)
             .map_err(|err| format!("cannot load replay map metadata: {err}"))?;
         artifact
-            .validate_against(crate::build_info::build_id(), &metadata)
+            .validate_against(expected_build_sha, &metadata)
             .or_else(|err| match err {
                 ReplayValidationError::BuildShaMismatch { artifact, running } => {
-                    crate::log_warn!(
-                        replay_build_sha = %artifact,
-                        server_build_sha = %running,
-                        "replay build differs from current server; attempting playback"
-                    );
+                    if log_build_mismatch {
+                        crate::log_warn!(
+                            replay_build_sha = %artifact,
+                            server_build_sha = %running,
+                            "replay build differs from current server; attempting playback"
+                        );
+                    }
                     Ok(())
                 }
                 err => Err(err),

@@ -120,6 +120,29 @@ fn match_history_replay_launch_accepts_checkpoint_backed_kriegsia_factions() {
 }
 
 #[test]
+fn match_history_replay_launch_rejects_invalid_checkpoint_start() {
+    let artifact = replay_artifact_for_faction(DEFAULT_FACTION_ID);
+    let mut artifact_json = serde_json::to_value(&artifact).unwrap();
+    let checkpoint_payload = artifact_json["startState"]["checkpointPayload"]
+        .as_str()
+        .unwrap();
+    let mut checkpoint: serde_json::Value = serde_json::from_str(checkpoint_payload).unwrap();
+    checkpoint["mapBinding"]["materializedMapHash"] =
+        serde_json::Value::String("wrong-map".to_string());
+    artifact_json["startState"]["checkpointPayload"] =
+        serde_json::Value::String(serde_json::to_string(&checkpoint).unwrap());
+    let artifact: ReplayArtifactV1 = serde_json::from_value(artifact_json).unwrap();
+
+    let err = replay_incompatibility_reason(&artifact, "current-build")
+        .expect("invalid checkpoint start should reject persisted replay launch");
+
+    assert!(
+        err.contains("checkpoint-backed replay start state is invalid"),
+        "unexpected reject: {err}"
+    );
+}
+
+#[test]
 fn match_history_replay_launch_rejects_unsupported_or_fixture_factions() {
     let mut unknown = replay_artifact_for_faction(DEFAULT_FACTION_ID);
     unknown.players[0].faction_id = "unknown-faction".to_string();

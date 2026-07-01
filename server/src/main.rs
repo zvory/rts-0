@@ -44,7 +44,7 @@ use rts_server::protocol::{
 };
 use rts_server::structured_log;
 use rts_sim::game::map::Map;
-use rts_sim::game::replay::{self, ReplayArtifactV1, ReplayValidationError};
+use rts_sim::game::replay::{self, ReplayArtifactV1};
 use rts_sim::perf;
 
 /// Default room name used when a client's `join` omits `room`.
@@ -541,26 +541,7 @@ fn apply_replay_summary_compatibility(row: &mut rts_server::db::MatchSummary, bu
 }
 
 fn replay_incompatibility_reason(artifact: &ReplayArtifactV1, build_sha: &str) -> Option<String> {
-    let running_map = match Map::metadata_for_name(&artifact.map_name) {
-        Ok(metadata) => metadata,
-        Err(_) => {
-            return Some(format!(
-                "Replay map {:?} is not available on this server.",
-                artifact.map_name
-            ));
-        }
-    };
-    if let Some(reason) = artifact
-        .validate_against(build_sha, &running_map)
-        .err()
-        .and_then(|err| match err {
-            ReplayValidationError::BuildShaMismatch { .. } => None,
-            err => Some(err.to_string()),
-        })
-    {
-        return Some(reason);
-    }
-    lobby::replay_faction_loadout_incompatibility_reason(artifact)
+    lobby::replay_launch_incompatibility_reason(artifact, build_sha)
 }
 
 fn replay_build_warning(server_build_sha: &str, replay_build_sha: &str) -> String {
