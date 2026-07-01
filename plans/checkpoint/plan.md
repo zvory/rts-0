@@ -30,27 +30,30 @@ payload round-trip.
 
 ### [Phase 2 - Payload Round Trip Proof](phase-2.md)
 
-Implement `Game -> GameCheckpointV1 -> text bytes -> Game` for all current checkpointed state
-fields. This phase should replace the cfg-test clone-shaped checkpoint proof with explicit DTO
-conversion, validation, serde, derived-state rebuild, and payload round-trip tests that reuse the
-existing semantic comparator. It may include a test/debug document wrapper to prove disk I/O, but it
-should still expose no player-facing route, command, UI, replay schema, or lab scenario migration.
+Implement `Game + exact supplied map -> GameCheckpointV1 -> text bytes -> exact supplied map ->
+Game` for all current checkpointed state fields except the container-owned map data itself. This
+phase should replace the cfg-test clone-shaped checkpoint proof with explicit DTO conversion,
+validation, serde, derived-state rebuild, and payload round-trip tests that reuse the existing
+semantic comparator. It may include a test/debug document wrapper to prove disk I/O, but it should
+still expose no player-facing route, command, UI, replay schema, or lab scenario migration.
 
 ### [Phase 3 - Checkpoint-Backed Starts](phase-3.md)
 
-Make ordinary game and lab construction compile their setup inputs into a tick-zero start payload:
-the exact map plus a `GameCheckpointV1` payload bound to that map. Existing public constructors and
-room flows should keep their signatures while the implementation proves checkpoint-backed starts
-are behaviorally identical to direct setup. The phase should leave replay artifacts and committed
-lab scenario files on their current formats.
+Make ordinary game and non-scenario lab construction compile their setup inputs into a tick-zero
+start payload: the exact map plus a `GameCheckpointV1` payload bound to that map. Existing public
+constructors and room flows should keep their signatures while the implementation proves
+checkpoint-backed starts are behaviorally identical to direct setup. The phase should leave replay
+artifacts, committed lab scenario files, and the `LabScenarioV1` scenario adapter on their current
+formats until the later lab phases.
 
 ### [Phase 4 - Replay Artifact Migration](phase-4.md)
 
-Introduce a replay artifact version whose start state is the replay map binding plus
-`GameCheckpointV1` and the existing recorded command stream. New captures should write the
-checkpoint-backed artifact while old replay artifacts remain loadable or fail with an intentional,
-documented compatibility reason. Replay seek and branch behavior should keep working while keyframe
-internals are migrated only where the phase explicitly proves parity.
+Introduce a replay artifact version whose start state is the replay map binding plus a tick-zero
+`GameCheckpointV1` and the existing recorded command stream. New captures should save the tick-zero
+map-plus-checkpoint composition at match launch, attach duration/final score/command-stream facts at
+match end, and write the checkpoint-backed artifact while old replay artifacts remain loadable or
+fail with an intentional, documented compatibility reason. Replay seek and branch behavior should
+keep working while keyframe internals are migrated only where the phase explicitly proves parity.
 
 ### [Phase 5 - Lab Scenario Checkpoint Adapter](phase-5.md)
 
@@ -93,10 +96,16 @@ operational rollback.
   schema version, content hash, and any other validation facts needed to prove it is being restored
   against the exact map supplied by the containing artifact or setup path. A standalone debug
   document may include map data beside the checkpoint payload, but map JSON must not become a
-  checkpoint container in disguise.
+  checkpoint container in disguise. Phase 1 must reconcile this public payload policy with the
+  current `docs/design/server-sim.md` registry row that classifies runtime `GameState.map` as a
+  full internal checkpoint field; after that decision, Phase 2 import should construct the live
+  `GameState.map` from the container-supplied map, not from a duplicated map body hidden inside
+  `GameCheckpointV1`.
 - Preserve stable entity ids, store allocator/high-water state, trench ids, ability runtime ids,
-  smoke/shell ids, tick count, RNG draw-stream state, pending commands, and command-log metadata
-  according to the server-sim registry.
+  smoke/shell ids, tick count, RNG draw-stream state, pending commands, command-log metadata,
+  entity-local active orders, queued order intents, selected movement paths/waypoints/path goals,
+  active and pending smoke clouds, scheduled mortar/artillery impacts, and active ability runtime
+  projectiles/world objects according to the server-sim registry.
 - Rebuild `DerivedState` from authoritative DTOs on import. `final_spatial` and pathing
   cache/search data must not be serialized.
 - Import must validate before constructing a live `Game`: schema version, map identity/hash,
@@ -109,6 +118,9 @@ operational rollback.
 - Replay artifact migration must inventory and test every existing load surface: dev/self-play
   files, crash replay artifacts, match-history database rows, and any committed fixtures. Database
   decoding must use the same versioned compatibility/rejection policy as file loading.
+- Replay artifact migration must capture the replay start checkpoint at tick zero before commands
+  mutate the match, then append the authoritative command stream and end-of-match metadata when the
+  artifact is finalized. Do not derive a replay start checkpoint from the final post-match `Game`.
 - Lab scenario migration must treat import/export JSON as protocol-visible unless the phase proves
   the change is server-internal only. Any `LabScenario` message or file-shape change must update the
   mirrored protocol docs/code and run protocol parity checks in the same phase.
