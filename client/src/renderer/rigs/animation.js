@@ -98,6 +98,22 @@ export function createRigRenderContext(entity, {
   return context;
 }
 
+export function transformedRigAnchorPoint(definition, entity, anchorName, renderOptions = {}) {
+  const anchor = definition?.anchors?.[anchorName];
+  if (!anchor || !Number.isFinite(anchor.x) || !Number.isFinite(anchor.y)) return null;
+  if (!Number.isFinite(entity?.x) || !Number.isFinite(entity?.y)) return null;
+  const context = renderOptions?.[RIG_CONTEXT_READY]
+    ? renderOptions
+    : createRigRenderContext(entity, renderOptions);
+  const rotation = rigAnchorRotation(entity.kind, anchorName, context);
+  const c = Math.cos(rotation);
+  const s = Math.sin(rotation);
+  return {
+    x: entity.x + anchor.x * c - anchor.y * s,
+    y: entity.y + anchor.x * s + anchor.y * c,
+  };
+}
+
 function scoutGunnerOffsets(entity, facing, weaponFacing, recoilPx) {
   if (entity.kind !== KIND.SCOUT_CAR) {
     return {
@@ -216,6 +232,14 @@ function visualCarriageFacing(kind, facing, weaponFacing, deploy, fallback) {
   if (kind === KIND.ARTILLERY) return deploy > 0.02 ? weaponFacing : facing;
   if (kind === KIND.ANTI_TANK_GUN || kind === KIND.MORTAR_TEAM) return fallback;
   return facing;
+}
+
+function rigAnchorRotation(kind, anchorName, context) {
+  if (anchorName === "muzzle" || anchorName === "coaxMuzzle") {
+    return context.weaponVisualFacing;
+  }
+  if (kind === KIND.TANK && anchorName === "turret") return context.weaponVisualFacing;
+  return context.facing;
 }
 
 function isBusy(entity) {

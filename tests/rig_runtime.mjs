@@ -11,7 +11,11 @@ import {
 import { _sweep } from "../client/src/renderer/layers.js";
 import { createLiveRigDefinitions, liveRigRoutesFor } from "../client/src/renderer/rigs/live_routing.js";
 import { compileSvgRig } from "../client/src/renderer/rigs/svg_importer.js";
-import { createRigRenderContext, sampleRigAnimation } from "../client/src/renderer/rigs/animation.js";
+import {
+  createRigRenderContext,
+  sampleRigAnimation,
+  transformedRigAnchorPoint,
+} from "../client/src/renderer/rigs/animation.js";
 import {
   createUnitRigInstance,
   renderLiveUnitRig,
@@ -65,6 +69,32 @@ test("animation sampler applies game-state bindings without Pixi", () => {
   assert.equal(sampled.parts["part.hull"].transform.rotation, Math.PI / 2);
   assert.equal(sampled.parts["part.turret"].transform.rotation, Math.PI);
   assert.equal(sampled.parts["part.barrel"].transform.rotation, Math.PI);
+});
+
+test("tank rig exposes transformed main and coax muzzle anchors", () => {
+  const definition = compileFixture("rig-vehicle.svg", KIND.TANK);
+  const entity = {
+    id: 8,
+    kind: KIND.TANK,
+    owner: 1,
+    x: 100,
+    y: 100,
+    hp: 100,
+    maxHp: 100,
+    state: STATE.IDLE,
+    facing: 0,
+    weaponFacing: Math.PI / 2,
+  };
+
+  const mainMuzzle = transformedRigAnchorPoint(definition, entity, "muzzle", { now: fixedNow });
+  const coaxMuzzle = transformedRigAnchorPoint(definition, entity, "coaxMuzzle", { now: fixedNow });
+
+  assert.ok(mainMuzzle, "tank main muzzle anchor should resolve");
+  assert.ok(coaxMuzzle, "tank coax muzzle anchor should resolve");
+  assert.ok(Math.abs(mainMuzzle.x - 100) < 0.001);
+  assert.ok(Math.abs(mainMuzzle.y - 133.2) < 0.001);
+  assert.ok(Math.abs(coaxMuzzle.x - 104.1) < 0.001);
+  assert.ok(Math.abs(coaxMuzzle.y - 131.4) < 0.001);
 });
 
 test("rig runtime creates one container child per part and updates transforms", () => {
@@ -340,6 +370,7 @@ test("live rig routes expose kind-specific production part groups", () => {
   assert.equal(tankRoutes[1].parts.includes("part.track.left"), true);
   assert.equal(tankRoutes[1].parts.includes("part.turret"), true);
   assert.equal(tankRoutes[1].parts.includes("part.barrel"), true);
+  assert.equal(tankRoutes[1].parts.includes("part.coaxBarrel"), true);
   assert.equal(tankRoutes[1].parts.includes("part.fuelCue.box"), true);
 });
 

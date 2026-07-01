@@ -67,6 +67,7 @@ const TANK_UNIT_PARTS = Object.freeze([
   "part.hull.nose",
   "part.hull.noseShadow",
   "part.barrel",
+  "part.coaxBarrel",
   "part.turret",
   "part.noseTick",
   "part.fuelCue.box",
