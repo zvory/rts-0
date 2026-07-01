@@ -17,26 +17,11 @@ pub(super) fn room_mode_for(room: &str) -> RoomMode {
     }
     if let Some(raw) = room.strip_prefix(DEV_SCENARIO_ROOM_PREFIX) {
         if let Some(launch) = parse_dev_scenario_room(raw) {
+            let Some(id) = DevScenarioId::from_room_id(launch.id) else {
+                return RoomMode::Normal;
+            };
             return RoomMode::DevScenario(DevScenarioConfig {
-                id: match launch.id {
-                    "scout_car_snaking_corridor" => DevScenarioId::ScoutCarSnakingCorridor,
-                    "direct_reverse_order" => DevScenarioId::DirectReverseOrder,
-                    "scout_car_wall_chokepoint" => DevScenarioId::ScoutCarWallChokepoint,
-                    "vehicle_corner_wall" => DevScenarioId::VehicleCornerWall,
-                    "vehicle_small_block_baseline" => DevScenarioId::VehicleSmallBlockBaseline,
-                    "factory_zero_gap_perpendicular" => DevScenarioId::FactoryZeroGapPerpendicular,
-                    "tank_trap_line_horizontal" => DevScenarioId::TankTrapLineHorizontal,
-                    "tank_trap_line_vertical" => DevScenarioId::TankTrapLineVertical,
-                    "tank_trap_line_diagonal" => DevScenarioId::TankTrapLineDiagonal,
-                    "tank_trap_pathing_matrix" => DevScenarioId::TankTrapPathingMatrix,
-                    "entrenchment_inspection" => DevScenarioId::EntrenchmentInspection,
-                    "panzerfaust_duel" => DevScenarioId::PanzerfaustDuel,
-                    "panzerfaust_windup_cancel" => DevScenarioId::PanzerfaustWindupCancel,
-                    "panzerfaust_target_death" => DevScenarioId::PanzerfaustTargetDeath,
-                    "panzerfaust_entrenched_range" => DevScenarioId::PanzerfaustEntrenchedRange,
-                    "panzerfaust_methamphetamines" => DevScenarioId::PanzerfaustMethamphetamines,
-                    _ => return RoomMode::Normal,
-                },
+                id,
                 unit: launch.unit,
                 count: launch.count,
                 blocker: launch.blocker,
@@ -156,6 +141,7 @@ pub(super) fn load_replay_artifact(name: &str) -> Result<ReplayArtifactV1, Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rts_sim::game::entity::EntityKind;
     use rts_sim::game::replay::ReplayArtifactV1;
     use rts_sim::game::{Game, PlayerInit};
 
@@ -228,6 +214,20 @@ mod tests {
             room_mode_for("__lab__:sandbox:scenario=unknown"),
             RoomMode::Normal
         ));
+    }
+
+    #[test]
+    fn room_mode_for_accepts_panzerfaust_dev_scenario_room() {
+        match room_mode_for("__dev_scenario__:panzerfaust_target_death:unit=panzerfaust:count=1") {
+            RoomMode::DevScenario(config) => {
+                assert!(matches!(config.id, DevScenarioId::PanzerfaustTargetDeath));
+                assert_eq!(config.unit, EntityKind::Panzerfaust);
+                assert_eq!(config.count, 1);
+                assert_eq!(config.blocker, None);
+                assert_eq!(config.case, None);
+            }
+            _ => panic!("safe Panzerfaust dev scenario room should parse as dev mode"),
+        }
     }
 
     #[test]

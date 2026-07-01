@@ -58,26 +58,6 @@ impl DevScenarioDriver {
     }
 }
 
-fn tank_trap_line_scenario_id(id: &DevScenarioId) -> Option<&'static str> {
-    match id {
-        DevScenarioId::TankTrapLineHorizontal => Some("tank_trap_line_horizontal"),
-        DevScenarioId::TankTrapLineVertical => Some("tank_trap_line_vertical"),
-        DevScenarioId::TankTrapLineDiagonal => Some("tank_trap_line_diagonal"),
-        _ => None,
-    }
-}
-
-fn panzerfaust_inspection_scenario_id(id: &DevScenarioId) -> Option<&'static str> {
-    match id {
-        DevScenarioId::PanzerfaustDuel => Some("panzerfaust_duel"),
-        DevScenarioId::PanzerfaustWindupCancel => Some("panzerfaust_windup_cancel"),
-        DevScenarioId::PanzerfaustTargetDeath => Some("panzerfaust_target_death"),
-        DevScenarioId::PanzerfaustEntrenchedRange => Some("panzerfaust_entrenched_range"),
-        DevScenarioId::PanzerfaustMethamphetamines => Some("panzerfaust_methamphetamines"),
-        _ => None,
-    }
-}
-
 impl RoomTask {
     pub(super) fn on_join_dev_watch(
         &mut self,
@@ -205,10 +185,8 @@ impl RoomTask {
                     DevScenarioId::TankTrapLineHorizontal
                     | DevScenarioId::TankTrapLineVertical
                     | DevScenarioId::TankTrapLineDiagonal => {
-                        let scenario_id = tank_trap_line_scenario_id(&config.id)
-                            .expect("outer match selects Tank Trap line scenarios");
                         session_from_setup!(Game::new_tank_trap_line_build_scenario(
-                            scenario_id,
+                            config.id.room_id(),
                             config.unit,
                             config.count,
                             seed,
@@ -232,17 +210,18 @@ impl RoomTask {
                             seed,
                         )?)
                     }
-                    id if panzerfaust_inspection_scenario_id(id).is_some() => {
-                        let scenario_id = panzerfaust_inspection_scenario_id(id)
-                            .expect("guard only selects Panzerfaust inspection scenarios");
+                    DevScenarioId::PanzerfaustDuel
+                    | DevScenarioId::PanzerfaustWindupCancel
+                    | DevScenarioId::PanzerfaustTargetDeath
+                    | DevScenarioId::PanzerfaustEntrenchedRange
+                    | DevScenarioId::PanzerfaustMethamphetamines => {
                         session_from_setup!(Game::new_panzerfaust_inspection_scenario(
-                            scenario_id,
+                            config.id.room_id(),
                             config.unit,
                             config.count,
                             seed,
                         )?)
                     }
-                    _ => Err("unsupported dev scenario".to_string()),
                 }
             }
         }
