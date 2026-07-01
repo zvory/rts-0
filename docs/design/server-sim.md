@@ -251,7 +251,7 @@ architecture failures.
 
 | Field | Category | Checkpoint policy | Evidence and notes |
 | --- | --- | --- | --- |
-| `map` | `authoritative/serialized` | Serialize the full `Map` value, including terrain, size, starts, and expansion sites. | `Game::new_inner_with_map` stores the generated or supplied map; `systems::run_tick`, pathing, fog, placement, resource setup, and `start_payload` all read it. |
+| `map` | `authoritative/serialized` | Internal cold checkpoints serialize the full live `Map` value. Public `GameCheckpointV1` payloads do not embed a map body; they carry `mapBinding` facts and import only with the exact container-supplied `Map`. See §3.1.3. | `Game::new_inner_with_map` stores the generated or supplied map; `systems::run_tick`, pathing, fog, placement, resource setup, and `start_payload` all read it. Runtime ownership and external artifact composition are intentionally separate contracts. |
 | `entities` | `authoritative/serialized` | Serialize the full `EntityStore`, including stable entity ids, allocator/high-water state, HP, orders, queues, movement state, selected waypoints, path goals, cooldowns, combat state, production/build progress, rally plans, resource reservations, body/weapon/setup facing, and entity flags. | `systems::run_tick` mutates the store every tick; snapshots, score, survival, command validation, replay determinism tests, and the Phase 0.5 comparator all treat entity state as semantic authority. Chosen movement paths live on entities, not in `pathing`. |
 | `fog` | `authoritative/serialized` | Serialize current live visibility grids for now. A later phase may reclassify live fog as rebuildable only after proving an exact deterministic rebuild before every command, combat, and snapshot surface. | `systems::run_tick` receives `&self.state.fog` for command/combat visibility decisions, snapshots project through current team fog, and Phase 0.5 compares per-player visible tiles as semantic state. |
 | `building_memory` | `authoritative/serialized` | Serialize remembered enemy-building entries per player. | `BuildingMemory::refresh` records last-seen enemy building state and only removes hidden destroyed entries after the footprint is scouted again; spectator/player snapshots project remembered buildings while fogged. |
@@ -327,9 +327,10 @@ Final audit for the ownership sequence:
 
 Checkpoint-readiness blockers before follow-up product plans:
 
-- Public checkpoint schema/API needs an explicit versioned DTO, serde policy, compatibility story,
-  migration policy, and operational rollout plan. The current `GameCheckpoint` is private and not a
-  persisted format.
+- The public checkpoint payload contract is defined in §3.1.3, but it still needs implementation:
+  explicit DTO conversion, serde round-trip tests, importer validation, migration tests, rollout
+  observability, and a decision on when any caller may expose it. The current `GameCheckpoint`
+  remains private test machinery and is not a persisted format.
 - Replay migration needs artifact-version decisions, keyframe replacement policy, compatibility
   with existing saved and persisted replay artifacts, command-log rebasing rules, and failure
   behavior for old builds or partial checkpoint coverage.
@@ -382,6 +383,182 @@ Victory resolution is team-aware:
 the room task ends 2+ player matches only when at most one nonzero team still has an alive member,
 and a defeated player does not receive an individual loss screen while any teammate keeps that team
 alive.
+
+#### 3.1.3 `GameCheckpointV1` Embeddable Payload Contract
+
+`GameCheckpointV1` is the first public checkpoint payload contract. It is a versioned UTF-8 JSON
+text payload that can be embedded inside a replay artifact, lab scenario container, match-start
+artifact, or debug document. It is not a standalone product file format, network command, route, UI
+option, replay schema change, or lab schema change by itself. The existing private
+`GameCheckpoint`, `Game::checkpoint_for_test`, and `Game::restore_checkpoint_for_test` stay internal
+test helpers until a later phase replaces them with explicit DTO conversion.
+
+The payload schema is named `rts.gameCheckpoint` and starts at version `1`. Field names are
+camelCase. DTOs must be explicit Rust types with serde support; do not serialize private
+`GameState`, `Entity`, store, service, or snapshot internals directly as the stable persisted
+contract. Persisted DTOs should use strict deserialization (`deny_unknown_fields` or an equivalent
+manual check) except for explicitly versioned compatibility metadata. Unknown required features
+must fail closed; unknown optional features may be ignored only when the schema says the field is
+non-authoritative.
+
+Top-level shape:
+
+```json
+{
+  "schema": "rts.gameCheckpoint",
+  "version": 1,
+  "compatibility": {
+    "createdBy": "server|replay|lab|debug",
+    "serverBuildSha": "...",
+    "simSchemaVersion": 1,
+    "rulesVersion": 1,
+    "protocolVersion": 1,
+    "requiredFeatures": [],
+    "optionalFeatures": []
+  },
+  "mapBinding": {
+    "name": "Default",
+    "schemaVersion": 2,
+    "contentHash": "...",
+    "materializedMapHash": "...",
+    "size": 64,
+    "playerCount": 2
+  },
+  "seed": 1234,
+  "tick": 900,
+  "rng": {
+    "algorithm": "rts-small-rng-0.8-draws-v1",
+    "seed": 1234,
+    "drawsConsumed": 0
+  },
+  "players": [],
+  "startingLoadouts": [],
+  "startingLoadout": {},
+  "entities": {},
+  "pendingCommands": [],
+  "commandLog": [],
+  "commandLogMetadata": {},
+  "fog": {},
+  "buildingMemory": {},
+  "lingeringSight": [],
+  "firingReveals": [],
+  "smokes": {},
+  "trenches": {},
+  "abilityRuntime": {},
+  "mortarShells": [],
+  "artilleryShells": [],
+  "activeConstructionSites": [],
+  "labGodModePlayers": []
+}
+```
+
+The `rng` field is a deterministic draw-stream descriptor, not a raw serde dump of `SmallRng`.
+`drawsConsumed` counts draws from `seed` under the named algorithm. Import reconstructs the stream
+by seeding and advancing, or rejects the payload if the running binary cannot prove the same
+algorithm. Re-seeding from `seed` alone is invalid once any random draw has occurred. If a later
+runtime replaces `SmallRng`, it must either provide a migrator from this descriptor or bump the
+checkpoint version and reject old payloads with a compatibility error.
+
+`commandLog` carries replay/API/crash continuity history. Normal checkpoint import installs the
+log as metadata and must not replay it to reconstruct state. `commandLogMetadata` records the
+command DTO/protocol version, first and last command ticks, whether the log is complete from tick
+zero, and any replay-base tick used by a containing artifact. Replay containers may choose to
+store a separate authoritative command stream, but they must not infer live state by replaying
+`commandLog` during checkpoint import.
+
+Map policy:
+
+- `GameState.map` remains authoritative runtime state because systems read terrain, starts, and
+  expansion sites on every tick. Internal cold checkpoints may still clone the full `Map` while
+  they are private test machinery.
+- `GameCheckpointV1` never embeds map JSON, terrain bytes, starts, or expansion-site bodies. It
+  embeds `mapBinding` only.
+- The containing artifact supplies the exact map data. A replay artifact stores or references the
+  launch-time map composition beside the checkpoint; a lab scenario container embeds or references
+  the authored map data it is editing; a match-start artifact references the selected map asset and
+  frozen materialized map facts; a debug document may include a sibling `map` object next to the
+  checkpoint payload for convenience.
+- Import receives `(container metadata, exact supplied Map, GameCheckpointV1)`. Before constructing
+  a live `Game`, it validates `mapBinding.name`, `schemaVersion`, authored `contentHash`, `size`,
+  `playerCount`, and `materializedMapHash` against the supplied map. `materializedMapHash` is a
+  stable hash over the live `Map` fields that affect simulation (`size`, row-major terrain,
+  selected starts, and expansion sites). If any binding fact differs, the importer rejects the
+  payload; it must not fall back to regenerating a map from seed or silently accepting a nearby map.
+
+Field map for Phase 2 DTO conversion:
+
+| Runtime field | `GameCheckpointV1` strategy |
+| --- | --- |
+| `map` | Excluded as a body; represented by `mapBinding`. Import writes the exact container-supplied `Map` into `GameState.map` only after binding validation succeeds. |
+| `entities` | `EntityStoreV1` with allocator/high-water state and explicit entity DTOs. Entity DTOs must cover stable ids, owners, kind, HP, flags, construction/production/resource state, combat cooldowns and targets, body/weapon/setup facing, entity-local active orders, queued order intents, selected movement paths, selected waypoints, path goals, rally plans, reservations, occupants/transport-like references if added later, and all entity-local timers. |
+| `fog` | `FogStateV1` live visibility grids per player/team. It is serialized for version 1; a later rebuild-only policy needs a proof before changing this row. |
+| `building_memory` | `BuildingMemoryV1` remembered enemy-building entries per player, including last-seen state and footprint facts needed for projection after restore. |
+| `players` | `PlayerStateV1` rows with id, team id, faction id, name, color, start tile, resources, supply, AI slot flag, score counters, and completed upgrades. |
+| `pending` | `pendingCommands` entries with issuer, command DTO, admission/lab context, and original order. Import preserves them so the first post-restore tick drains them exactly once. |
+| `command_log` | `commandLog` plus `commandLogMetadata`. It is compatibility metadata, installed but not replayed by normal import. |
+| `tick` | Top-level `tick`, serialized exactly. Timers and expiry ticks remain absolute tick values. |
+| `lingering_sight` | `LingeringSightSourceV1` entries with owner/team visibility, position/radius, and expiry tick. |
+| `firing_reveals` | `FiringRevealSourceV1` entries with revealer, viewer/team policy, position or source facts, and expiry tick. |
+| `smokes` | `SmokeCloudStoreV1` with next id, active clouds, pending clouds, locations, radii, spawn/due/expiry ticks, and owner/source facts. |
+| `trenches` | `TrenchStoreV1` with deterministic trench ids, geometry, occupation/discovery/memory state, and allocator state. |
+| `ability_runtime` | `AbilityRuntimeV1` with active ability instance ids, cooldown-linked runtime payloads, world objects, projectiles, return/expiry data, owner facts, and any visibility-relevant projection state. |
+| `mortar_shells` | `MortarShellStoreV1` scheduled impacts with owner, attacker/source, impact point, damage/reveal facts, and impact tick. |
+| `artillery_shells` | `ArtilleryShellStoreV1` scheduled impacts with owner/source, scatter/impact point, damage/reveal facts, and impact tick. |
+| `seed` | Top-level `seed` compatibility value. It is retained for setup/replay metadata and for `rng.seed`, but it is never enough to restore current RNG state by itself. |
+| `starting_loadouts` | `startingLoadouts` compatibility records, preserving per-player faction/loadout/resource start facts. |
+| `map_metadata` | Folded into `mapBinding.name`, `schemaVersion`, and `contentHash`; not duplicated as an independent state body. |
+| `active_construction_sites` | `activeConstructionSites` entity-id set. Import validates ids against `entities`; normally empty at tick boundaries but preserved for same-tick snapshot parity. |
+| `lab_god_mode_players` | `labGodModePlayers` player-id set. Import validates players and resyncs mirrored entity invulnerability flags after restore. |
+| `starting_loadout` | `startingLoadout` legacy compatibility object until global-start constructors are retired. Import prefers `startingLoadouts` when both are present and rejects contradictory values. |
+| `rng` | Top-level `rng` draw-stream descriptor with algorithm, seed, and consumed draw count. |
+| `final_spatial` | Omitted. Rebuild with `SpatialIndex::build(&entities, map.size)` after import and after any import repair. |
+| `pathing` | Omitted. Recreate `PathingService` with the live default budget, cache capacity, and current tick alignment; selected unit paths and goals are serialized on `entities`. |
+
+Snapshots, compact snapshots, fog-filtered events, observer projections, selected debug-path
+projections, pathing caches/search queues, room sockets, connection buffers, replay playback
+cursors/keyframes, replay branch runtime, lab timeline history, match-history write tasks, AI
+controller memory, and test fixtures are outside `GameCheckpointV1` unless a later phase promotes
+one of them into explicit authoritative DTO state.
+
+Validation model and bounds:
+
+- Parse and byte caps first: reject payload text above 4 MiB before JSON parsing; reject a
+  start-state container section above 6 MiB, excluding any replay command-stream attachment that has
+  its own cap; reject a sibling map body above 1 MiB until a custom-map phase chooses a larger cap.
+- Version and feature checks happen before field validation: `schema == "rts.gameCheckpoint"`,
+  `version == 1`, supported `compatibility.simSchemaVersion`, known required features, and a
+  compatible RNG algorithm are mandatory.
+- Count caps for version 1: at most 8 players, 2,000 entities, 1,024 pending commands, 200,000
+  command-log entries when a replay container explicitly allows command history, 256 total active
+  plus pending smoke clouds, 4,096 trenches, 512 ability runtime world objects/projectiles, 4,096
+  scheduled mortar shells, 4,096 scheduled artillery shells, 32 completed upgrades per player, and
+  8 queued orders per entity.
+- Numeric validation rejects non-finite coordinates/facing values, out-of-map world positions,
+  invalid tile coordinates, overflowing footprint math, negative or overflowing timers after JSON
+  conversion, supply/resources above configured caps unless a documented lab/debug adapter allows
+  them, and tick/expiry relationships that would make an active item already impossible.
+- Reference validation rejects duplicate player ids, duplicate entity/object/shell/trench ids,
+  unknown owners except neutral owner `0`, unknown team references, unknown entity targets, dangling
+  command/order/rally/ability references, invalid active-construction ids, invalid lab god-mode
+  players, and entity ids at or above the serialized allocator high-water mark.
+- Semantic validation rebuilds derived state, recomputes or verifies supply where needed, validates
+  faction/kind/upgrade ids against the running rules catalogs, validates queued command unit caps,
+  checks command-log ticks are sorted and not in the future of `tick`, and confirms privacy-sensitive
+  fields are authoritative state rather than fog-filtered projection output.
+
+Errors returned to artifact-loading surfaces use stable codes and short user-facing messages for
+malformed JSON, unsupported version, unsupported required feature, payload/container too large, map
+not found, map schema/hash/materialized binding mismatch, count cap exceeded, invalid player/faction
+or unit kind, and incompatible RNG algorithm. Developer-only detail, including the exact duplicate
+id, dangling reference, field path, or invariant that failed, is logged or exposed only in debug
+tooling. The importer must validate all of this before constructing a live `Game`; partially
+constructed state is not allowed to escape.
+
+Compatibility policy for version 1 is strict. Same-version readers may add optional compatibility
+metadata only when old readers can ignore it without changing authoritative state. Adding,
+removing, renaming, or changing the meaning of authoritative fields requires a new checkpoint
+version and either an explicit migrator or a stable rejection reason. Existing replay and lab assets
+remain on their current schemas until their phases introduce containers around this payload.
 
 ### 3.2 Concurrency model
 - One tokio task per **room** owns its `Game` and runs the tick loop (`tokio::time::interval`). Room registry handles carry per-room identity tokens; registry disposal removes only the matching identity and signals that room task to shut down.
