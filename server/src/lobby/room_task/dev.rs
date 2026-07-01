@@ -299,7 +299,6 @@ impl RoomTask {
             }
         }
     }
-
     fn send_dev_start_to(&self, watcher_id: u32) {
         let Some(Phase::InGame(game)) = Some(&self.phase) else {
             return;

@@ -108,6 +108,14 @@ fn tank_destroys_tank_trap_on_second_shot() {
         .set_order(Order::attack(trap));
 
     let tank_shot = combat_rules::attack_profile(EntityKind::Tank).dmg;
+    let coax_profile = combat_rules::weapon_profile(combat_rules::WeaponKind::TankCoax)
+        .expect("Tank coax profile should exist");
+    let coax_damage = combat_rules::effective_damage_for_weapon(
+        coax_profile,
+        EntityKind::TankTrap,
+        coax_profile.dmg,
+        Some(crate::rules::terrain::TerrainKind::Open),
+    );
     let tank_cooldown = combat_rules::attack_profile(EntityKind::Tank).cooldown;
 
     run_combat_tick_on_map(
@@ -118,8 +126,8 @@ fn tank_destroys_tank_trap_on_second_shot() {
 
     assert_eq!(
         entities.get(trap).expect("trap should exist").hp,
-        tank_shot,
-        "first Tank shot should leave the trap alive with exactly one shot of HP"
+        tank_shot - coax_damage,
+        "first Tank shot should leave the trap alive after one cannon shot plus coax fallback damage"
     );
 
     for _ in 0..tank_cooldown {
