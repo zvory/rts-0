@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::derived_state_tests::{
+use super::checkpoint_helpers::{
     assert_equivalent_games, player_ids, repair_after_authoritative_test_spawn,
     restore_checkpoint_and_assert_equivalent, tick_pair_and_assert_equivalent, tick_pair_for,
 };

@@ -13,6 +13,7 @@ mod at_gun_firing_reveal_tests;
 mod artillery_blanket_tests;
 mod artillery_tests;
 mod build_wait_tests;
+mod checkpoint_helpers;
 mod checkpoint_visibility_tests;
 mod derived_state_tests;
 mod determinism_tests;
