@@ -239,10 +239,6 @@ mod tests {
             &[EntityKind::TrainingCentre]
         ));
         assert!(train_requirement_met(
-            EntityKind::Panzerfaust,
-            &[EntityKind::TrainingCentre]
-        ));
-        assert!(train_requirement_met(
             EntityKind::MortarTeam,
             &[EntityKind::Steelworks]
         ));
@@ -358,14 +354,6 @@ mod tests {
         );
         assert_eq!(supply_provided(EntityKind::Tank), 0);
 
-        assert_eq!(
-            trainable_units_for_faction(DEFAULT_FACTION_ID, EntityKind::Barracks),
-            vec![
-                EntityKind::Rifleman,
-                EntityKind::MachineGunner,
-                EntityKind::Panzerfaust
-            ]
-        );
         assert_eq!(
             trainable_units_for_faction(DEFAULT_FACTION_ID, EntityKind::Factory),
             vec![

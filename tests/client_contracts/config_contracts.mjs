@@ -283,7 +283,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   assert(
     STATS[KIND.PANZERFAUST].requires === KIND.TRAINING_CENTRE &&
       STATS[KIND.PANZERFAUST].description.includes("Fires once at Tanks") &&
-      STATS[KIND.PANZERFAUST].description.includes("Methamphetamines speeds"),
+      STATS[KIND.PANZERFAUST].description.includes("Methamphetamines shortens windup and recovery"),
     "Panzerfaust command-card metadata exposes its Training Centre requirement and approved tooltip copy",
   );
   assert(
