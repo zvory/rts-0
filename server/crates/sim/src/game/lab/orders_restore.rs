@@ -22,6 +22,7 @@ use super::{
     ORDER_WORLD_ABILITY,
 };
 
+#[allow(clippy::too_many_arguments)]
 pub(in crate::game::lab) fn restore_lab_entity_orders(
     map: &Map,
     entities: &mut EntityStore,
