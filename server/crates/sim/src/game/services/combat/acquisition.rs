@@ -182,13 +182,12 @@ pub(super) fn resolve_target(
 
     let attacker = entities.get(self_id)?;
     let context = AttackPriorityContext {
-        attacker_kind: attacker.kind,
         attacker_is_unit: attacker.is_unit(),
-        attacker_is_vehicle_body: movement_body_class(attacker.kind)
-            == MovementBodyClass::VehicleBody,
         attacker_weapon_class: combat_rules::weapon_class(attacker.kind),
+        policy_id: combat_rules::default_target_priority_policy(attacker.kind),
         can_retain_moving_target: attacker_can_fire_while_moving,
     };
+    let attacker_is_vehicle_body = movement_body_class(attacker.kind) == MovementBodyClass::VehicleBody;
     let weapon_range_px = weapon_range_px(attacker);
     let candidates = legal_target_candidates(
         map,
@@ -205,6 +204,8 @@ pub(super) fn resolve_target(
         acquire_px,
         weapon_range_px,
         &context,
+        attacker.kind,
+        attacker_is_vehicle_body,
         tank_trap_obstructs_vehicle_route,
         attacker.target_id(),
     );
@@ -278,6 +279,8 @@ fn legal_target_candidates(
     acquire_px: f32,
     weapon_range_px: f32,
     context: &AttackPriorityContext,
+    attacker_kind: EntityKind,
+    attacker_is_vehicle_body: bool,
     tank_trap_obstructs_vehicle_route: &dyn Fn(&Entity, &Entity) -> bool,
     retained_target_id: Option<u32>,
 ) -> Vec<TargetCandidate> {
@@ -296,7 +299,7 @@ fn legal_target_candidates(
             continue;
         }
         if !retained_moving_fire_target
-            && !target_relevant_for_auto_acquisition(context.attacker_kind, target)
+            && !target_relevant_for_auto_acquisition(attacker_kind, target)
         {
             continue;
         }
@@ -320,7 +323,7 @@ fn legal_target_candidates(
             continue;
         }
         let tank_trap_obstructs_vehicle_route =
-            if target.kind == EntityKind::TankTrap && context.attacker_is_vehicle_body {
+            if target.kind == EntityKind::TankTrap && attacker_is_vehicle_body {
                 attacker
                     .map(|attacker| tank_trap_obstructs_vehicle_route(attacker, target))
                     .unwrap_or(false)

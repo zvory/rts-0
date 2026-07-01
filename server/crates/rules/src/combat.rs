@@ -2,7 +2,7 @@
 
 use crate::defs::{self, ArmorClass, WeaponClass};
 use crate::terrain::{self, TerrainKind};
-use crate::EntityKind;
+use crate::{movement_body_class, EntityKind, MovementBodyClass};
 
 const FRONT_ARC_RAD: f32 = std::f32::consts::FRAC_PI_4;
 const SIDE_ARC_RAD: f32 = std::f32::consts::PI * 3.0 / 4.0;
@@ -239,6 +239,25 @@ pub enum WeaponTargetFit {
     Fallback,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum TargetPriorityPolicyId {
+    DefaultWeapon,
+    VehicleDefaultWeapon,
+    TankCannon,
+    TankCoaxMachineGun,
+}
+
+impl TargetPriorityPolicyId {
+    pub fn stable_id(self) -> &'static str {
+        match self {
+            TargetPriorityPolicyId::DefaultWeapon => "default_weapon",
+            TargetPriorityPolicyId::VehicleDefaultWeapon => "vehicle_default_weapon",
+            TargetPriorityPolicyId::TankCannon => "tank_cannon",
+            TargetPriorityPolicyId::TankCoaxMachineGun => "tank_coax_machine_gun",
+        }
+    }
+}
+
 pub fn weapon_profile(kind: WeaponKind) -> Option<&'static WeaponProfile> {
     WEAPON_PROFILES.iter().find(|profile| profile.id == kind)
 }
@@ -281,6 +300,16 @@ pub fn damage_weapon_profile(kind: EntityKind) -> Option<&'static WeaponProfile>
         EntityKind::Panzerfaust => weapon_profile(WeaponKind::PanzerfaustLoadedShot),
         _ => None,
     })
+}
+
+pub fn default_target_priority_policy(kind: EntityKind) -> TargetPriorityPolicyId {
+    if kind == EntityKind::Tank {
+        TargetPriorityPolicyId::TankCannon
+    } else if movement_body_class(kind) == MovementBodyClass::VehicleBody {
+        TargetPriorityPolicyId::VehicleDefaultWeapon
+    } else {
+        TargetPriorityPolicyId::DefaultWeapon
+    }
 }
 
 /// Returns the attack profile for the given kind, or zeroes if non-combatant.
