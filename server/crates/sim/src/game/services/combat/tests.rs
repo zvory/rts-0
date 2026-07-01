@@ -65,7 +65,6 @@ fn resolve_test_target(
     let fog = visible_fog(map, entities);
     let smokes = SmokeCloudStore::new();
     let attacker = entities.get(attacker_id).expect("attacker should exist");
-
     resolve_target(
         map,
         entities,
