@@ -6,46 +6,14 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::replay_artifact::{
-    ReplayStartStateV1, REPLAY_ARTIFACT_SCHEMA_VERSION_V3,
-};
+use super::replay_artifact::REPLAY_ARTIFACT_SCHEMA_VERSION_V3;
 pub use super::replay_artifact::{
-    is_supported_replay_artifact_schema, ReplayStartComposition,
-    REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION,
+    is_supported_replay_artifact_schema, CommandLogEntry, ReplayArtifactV1,
+    ReplayStartComposition, ReplayValidationError, REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION,
 };
 use super::{Game, Map, MapMetadata, PlayerInit, PlayerStartingLoadout};
 use crate::game::command::SimCommand;
-use crate::protocol::{Command, Event, PlayerScore, ReplayStartMetadata, Snapshot};
-
-/// One authoritative gameplay command, stamped with the simulation tick that applied it.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct CommandLogEntry {
-    pub tick: u32,
-    pub player_id: u32,
-    pub command: Command,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct ReplayArtifactV1 {
-    pub artifact_schema_version: u32,
-    pub server_build_sha: String,
-    pub map_name: String,
-    pub map_schema_version: u32,
-    pub map_content_hash: String,
-    pub seed: u32,
-    pub player_loadouts: Vec<PlayerStartingLoadout>,
-    pub players: Vec<PlayerInit>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(in crate::game) start_state: Option<ReplayStartStateV1>,
-    pub duration_ticks: u32,
-    pub command_log: Vec<CommandLogEntry>,
-    pub winner_id: Option<u32>,
-    #[serde(default)]
-    pub winner_team_id: Option<u32>,
-    pub final_scores: Vec<PlayerScore>,
-}
+use crate::protocol::{Event, ReplayStartMetadata, Snapshot};
 
 impl ReplayArtifactV1 {
     pub fn start_metadata(&self) -> ReplayStartMetadata {
@@ -185,83 +153,6 @@ impl ReplayArtifactV1 {
         Ok(())
     }
 }
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ReplayValidationError {
-    UnsupportedArtifactSchema {
-        found: u32,
-        expected: u32,
-    },
-    BuildShaMismatch {
-        artifact: String,
-        running: String,
-    },
-    MapMissing {
-        name: String,
-    },
-    MapSchemaMismatch {
-        map_name: String,
-        artifact: u32,
-        running: u32,
-    },
-    MapHashMismatch {
-        map_name: String,
-        artifact: String,
-        running: String,
-    },
-    CheckpointStartMissing,
-    CheckpointStartInvalid {
-        reason: String,
-    },
-    StartStateMismatch {
-        field: &'static str,
-    },
-}
-
-impl std::fmt::Display for ReplayValidationError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ReplayValidationError::UnsupportedArtifactSchema { found, expected } => write!(
-                f,
-                "unsupported replay artifact schema {found}; expected {expected}"
-            ),
-            ReplayValidationError::BuildShaMismatch { artifact, running } => write!(
-                f,
-                "replay was recorded by server build {artifact}; running build is {running}"
-            ),
-            ReplayValidationError::MapMissing { name } => {
-                write!(f, "replay map {name:?} is not available on this server")
-            }
-            ReplayValidationError::MapSchemaMismatch {
-                map_name,
-                artifact,
-                running,
-            } => write!(
-                f,
-                "replay map {map_name:?} schema is {artifact}; running map schema is {running}"
-            ),
-            ReplayValidationError::MapHashMismatch {
-                map_name,
-                artifact,
-                running,
-            } => write!(
-                f,
-                "replay map {map_name:?} hash is {artifact}; running map hash is {running}"
-            ),
-            ReplayValidationError::CheckpointStartMissing => {
-                write!(f, "checkpoint-backed replay is missing startState")
-            }
-            ReplayValidationError::CheckpointStartInvalid { reason } => {
-                write!(f, "checkpoint-backed replay start state is invalid: {reason}")
-            }
-            ReplayValidationError::StartStateMismatch { field } => {
-                write!(f, "checkpoint-backed replay startState mismatch for {field}")
-            }
-        }
-    }
-}
-
-impl std::error::Error for ReplayValidationError {}
 
 /// One transient event emitted during replay, stamped with the tick that produced it.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
