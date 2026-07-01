@@ -1,6 +1,6 @@
 use crate::config;
 use crate::game::entity::{
-    movement_body_class, Entity, EntityKind, EntityStore, MovePhase, MovementBodyClass, Order,
+    movement_body_class, Entity, EntityKind, EntityStore, MovementBodyClass, Order,
 };
 use crate::game::entrenchment_combat;
 use crate::game::fog::Fog;
@@ -199,17 +199,9 @@ pub(super) fn resolve_target(
         tank_trap_obstructs_vehicle_route,
         attacker.target_id(),
     );
-    if mode_requires_currently_fireable_targets(mode) {
-        return choose_target_preferring_anti_tank_field(
-            &context,
-            attacker,
-            px,
-            py,
-            &candidates,
-            |candidate| candidate.in_weapon_range && target_filter(candidate.id),
-        );
-    }
-    if pathing_attack_move_prefers_currently_fireable_targets(attacker) {
+    if mode_requires_currently_fireable_targets(mode)
+        || aggressive_auto_acquisition_prefers_currently_fireable_targets(mode)
+    {
         let fireable_target = choose_target_preferring_anti_tank_field(
             &context,
             attacker,
@@ -218,6 +210,9 @@ pub(super) fn resolve_target(
             &candidates,
             |candidate| candidate.in_weapon_range && target_filter(candidate.id),
         );
+        if mode_requires_currently_fireable_targets(mode) {
+            return fireable_target;
+        }
         if fireable_target.is_some() {
             return fireable_target;
         }
@@ -236,9 +231,8 @@ fn mode_requires_currently_fireable_targets(mode: CombatMode) -> bool {
     mode == CombatMode::Opportunistic
 }
 
-fn pathing_attack_move_prefers_currently_fireable_targets(attacker: &Entity) -> bool {
-    matches!(attacker.order(), Order::AttackMove(_))
-        && !matches!(attacker.move_phase(), Some(MovePhase::Arrived))
+fn aggressive_auto_acquisition_prefers_currently_fireable_targets(mode: CombatMode) -> bool {
+    mode == CombatMode::Aggressive
 }
 
 fn target_relevant_for_auto_acquisition(attacker: EntityKind, target: &Entity) -> bool {

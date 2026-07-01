@@ -19,6 +19,7 @@ mod anti_tank_acquisition;
 mod coax;
 mod entrenchment;
 mod moving_fire_policy;
+mod range_targeting;
 mod retention;
 mod support_weapon_attack_move;
 mod tank_traps;
@@ -82,7 +83,6 @@ fn resolve_test_target(
         combat_mode(attacker),
     )
 }
-
 fn resolve_tank_test_target(
     map: &Map,
     entities: &EntityStore,
