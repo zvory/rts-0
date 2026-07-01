@@ -27,6 +27,27 @@ fn players() -> [PlayerInit; 2] {
     ]
 }
 
+fn allied_players() -> [PlayerInit; 2] {
+    [
+        PlayerInit {
+            id: 1,
+            team_id: 10,
+            faction_id: "kriegsia".to_string(),
+            name: "One".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            team_id: 10,
+            faction_id: "kriegsia".to_string(),
+            name: "Two".into(),
+            color: "#bbb".into(),
+            is_ai: false,
+        },
+    ]
+}
+
 fn three_players() -> [PlayerInit; 3] {
     [
         PlayerInit {
@@ -421,6 +442,178 @@ fn adjacent_tile_center_infantry_slots_into_existing_trench() {
     assert!(
         trench_contains_point(game.trenches.all()[0], unit.pos_x, unit.pos_y),
         "slotting should move the unit inside the trench footprint"
+    );
+}
+
+#[test]
+fn move_command_near_known_trench_prefers_trench_goal() {
+    let mut game = empty_flat_game(&players());
+    let start = game.map.tile_center(20, 24);
+    let rifleman = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, start.0, start.1)
+        .expect("rifleman should spawn");
+    repair_world(&mut game);
+    let trench_pos = game.map.tile_center(24, 24);
+    game.spawn_trench_for_test(trench_pos.0, trench_pos.1)
+        .expect("visible trench should seed");
+    let click = game.map.tile_center(26, 24);
+
+    game.enqueue(
+        1,
+        SimCommand::Move {
+            units: vec![rifleman],
+            x: click.0,
+            y: click.1,
+            queued: false,
+        },
+    );
+    game.tick();
+
+    let unit = game.entities.get(rifleman).expect("rifleman should exist");
+    assert_eq!(
+        unit.move_intent(),
+        Some(trench_pos),
+        "move orders near known trenches should target the trench for eligible infantry"
+    );
+}
+
+#[test]
+fn move_command_near_hidden_trench_keeps_clicked_goal() {
+    let mut game = empty_flat_game(&players());
+    let start = game.map.tile_center(4, 4);
+    let rifleman = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, start.0, start.1)
+        .expect("rifleman should spawn");
+    repair_world(&mut game);
+    let trench_pos = game.map.tile_center(24, 24);
+    game.spawn_trench_for_test(trench_pos.0, trench_pos.1)
+        .expect("hidden trench should seed");
+    let click = game.map.tile_center(26, 24);
+
+    game.enqueue(
+        1,
+        SimCommand::Move {
+            units: vec![rifleman],
+            x: click.0,
+            y: click.1,
+            queued: false,
+        },
+    );
+    game.tick();
+
+    let unit = game.entities.get(rifleman).expect("rifleman should exist");
+    assert_eq!(
+        unit.move_intent(),
+        Some(click),
+        "hidden trenches must not influence move formation goals"
+    );
+}
+
+#[test]
+fn move_command_to_remembered_trench_ignores_hidden_occupant() {
+    let mut game = empty_flat_game(&players());
+    let scout_pos = game.map.tile_center(20, 24);
+    let rifleman = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, scout_pos.0, scout_pos.1)
+        .expect("rifleman should spawn");
+    repair_world(&mut game);
+    let trench_pos = game.map.tile_center(24, 24);
+    let trench = game
+        .spawn_trench_for_test(trench_pos.0, trench_pos.1)
+        .expect("visible trench should seed");
+    assert!(game
+        .snapshot_for(1)
+        .trenches
+        .iter()
+        .any(|view| view.id == trench));
+
+    let far_pos = game.map.tile_center(4, 4);
+    game.entities
+        .get_mut(rifleman)
+        .expect("rifleman should exist")
+        .set_position(far_pos.0, far_pos.1);
+    let enemy = game
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, trench_pos.0, trench_pos.1)
+        .expect("hidden enemy occupant should spawn");
+    repair_world(&mut game);
+    game.tick();
+    assert_eq!(
+        active_trench_occupation(game.entities.get(enemy).expect("enemy should exist")),
+        Some(trench),
+        "test setup requires a server-side occupied trench"
+    );
+    let hidden = game.snapshot_for(1);
+    assert!(hidden.trenches.iter().any(|view| view.id == trench));
+    assert!(
+        !hidden.entities.iter().any(|view| view.id == enemy),
+        "test setup requires the occupant to be hidden from player one"
+    );
+
+    let click = game.map.tile_center(26, 24);
+    game.enqueue(
+        1,
+        SimCommand::Move {
+            units: vec![rifleman],
+            x: click.0,
+            y: click.1,
+            queued: false,
+        },
+    );
+    game.tick();
+
+    let unit = game.entities.get(rifleman).expect("rifleman should exist");
+    assert_eq!(
+        unit.move_intent(),
+        Some(trench_pos),
+        "hidden occupation must not change the player's issued formation goal"
+    );
+}
+
+#[test]
+fn move_command_ignores_trench_seen_only_by_defeated_teammate() {
+    let mut game = empty_flat_game(&allied_players());
+    let base_pos = game.map.tile_center(4, 4);
+    game.entities
+        .spawn_building(1, EntityKind::CityCentre, base_pos.0, base_pos.1, true)
+        .expect("player one should have a survival building");
+    let start = game.map.tile_center(8, 4);
+    let rifleman = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, start.0, start.1)
+        .expect("rifleman should spawn");
+    let trench_pos = game.map.tile_center(24, 24);
+    game.entities
+        .spawn_unit(2, EntityKind::Rifleman, trench_pos.0, trench_pos.1)
+        .expect("defeated teammate unit should spawn");
+    repair_world(&mut game);
+    game.spawn_trench_for_test(trench_pos.0, trench_pos.1)
+        .expect("trench should seed");
+    assert!(
+        game.snapshot_for(1).trenches.is_empty(),
+        "defeated teammate sight must not project trench terrain to living teammates"
+    );
+
+    let click = game.map.tile_center(26, 24);
+    game.enqueue(
+        1,
+        SimCommand::Move {
+            units: vec![rifleman],
+            x: click.0,
+            y: click.1,
+            queued: false,
+        },
+    );
+    game.tick();
+
+    let unit = game.entities.get(rifleman).expect("rifleman should exist");
+    assert_eq!(
+        unit.move_intent(),
+        Some(click),
+        "movement goals should mirror snapshot team-vision filtering"
     );
 }
 

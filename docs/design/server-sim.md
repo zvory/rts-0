@@ -601,6 +601,12 @@ other units. A stopped eligible unit within one tile of an empty trench may be s
 one tile into a legal position inside the trench footprint; slotting validates static
 standability, the swept static segment, and unit-body overlap against the current live entity
 positions. Slotting does not issue a move order or path, so the unit can still fire normally.
+Move and attack-move formation assignment also prefers a nearby known, unoccupied trench for
+eligible infantry when the trench footprint is within two tiles of the unit's normal formation
+goal. This uses only current team-visible trench terrain plus the issuing player's remembered
+trench terrain; hidden server-only trenches never influence movement goals. Non-eligible units,
+occupied trenches, blocked trench points, and farther trenches fall back to ordinary formation
+spreading.
 `entity::active_trench_occupation(entity)` is the simulation predicate for active occupation;
 digging progress, failed slotting, and merely standing near trench terrain do not set it. Visible
 occupied units project `occupiedTrenchId`; remembered trench terrain never exposes hidden
