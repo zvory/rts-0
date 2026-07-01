@@ -5,10 +5,11 @@ Status: Not started.
 ## Scope
 
 Implement the real versioned checkpoint payload round trip for current authoritative game state:
-`Game -> GameCheckpointV1 -> text bytes -> Game`. This phase should convert every current
-checkpointed state field through explicit DTOs, validate before import, rebuild `DerivedState`, and
-reuse the existing game-state semantic comparator to prove restored games continue exactly like the
-baseline.
+`Game + exact supplied map -> GameCheckpointV1 -> text bytes -> exact supplied map -> Game`. This
+phase should convert every current checkpointed state field through explicit DTOs, except full map
+data when Phase 1 classifies it as container-owned, validate before import, rebuild `DerivedState`,
+and reuse the existing game-state semantic comparator to prove restored games continue exactly like
+the baseline.
 
 The persisted DTOs should be stable and intentionally shaped. Do not expose private struct layout
 as schema just because a Rust type derives serde; use explicit conversion helpers so future
@@ -31,8 +32,9 @@ Explicit non-goals:
 - `server/crates/sim/src/game/mod.rs`: narrow public or crate-visible APIs for exporting and
   importing checkpoint payloads while keeping room callers on the existing `Game` seam.
 - Map/setup helpers: pass the exact map supplied by the caller or test/debug document into import,
-  then validate it against the checkpoint payload's map binding before constructing the live
-  `Game`.
+  validate it against the checkpoint payload's map binding before constructing the live `Game`, and
+  construct the live `GameState.map` from that supplied map rather than a duplicated map body inside
+  the payload.
 - Entity, player, fog, memory, trench, smoke, ability runtime, shell, and command/order modules:
   narrow DTO conversion helpers only where the checkpoint module cannot otherwise serialize stable
   state.
@@ -58,6 +60,12 @@ Implementation should stay inside `rts-sim` unless test fixtures need temporary 
 - Prove imported games rebuild derived state and do not serialize pathing cache/search entries.
 - Prove stable entity id allocation, RNG continuity, pending commands, command logs, fog/memory,
   events after restore, and per-player/spectator/full-world snapshots remain equivalent.
+- Prove entity-local active orders, queued order intents, selected movement paths/waypoints/path
+  goals, active and pending smoke, scheduled mortar/artillery impacts, ability runtime
+  projectiles/world objects, and a representative sustained artillery order such as Point Fire or
+  Blanket Fire survive payload import and continue equivalently. The representative artillery order
+  does not need to cover both Point Fire and Blanket Fire unless implementation evidence shows their
+  DTO paths diverge.
 - Suggested focused commands:
 
 ```bash
@@ -83,6 +91,8 @@ The handoff must name:
 - the checkpoint module/API shape, payload schema, and any test/debug document wrapper;
 - how map data is supplied by callers and validated against the payload binding;
 - every field family converted through explicit DTOs;
+- explicit coverage for queued orders, active paths, smoke, delayed shell/projectile stores, ability
+  runtime state, and the representative sustained artillery order tested;
 - validation errors and bounds added;
 - how temp/golden payloads or debug documents are handled;
 - focused tests and archcheck that passed;
