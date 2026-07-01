@@ -52,8 +52,11 @@ Introduce a replay artifact version whose start state is the replay map binding 
 `GameCheckpointV1` and the existing recorded command stream. New captures should save the tick-zero
 map-plus-checkpoint composition at match launch, attach duration/final score/command-stream facts at
 match end, and write the checkpoint-backed artifact while old replay artifacts remain loadable or
-fail with an intentional, documented compatibility reason. Replay seek and branch behavior should
-keep working while keyframe internals are migrated only where the phase explicitly proves parity.
+fail with an intentional, documented compatibility reason. Every replay writer, including lobby,
+crash, dev/self-play, AI self-play, and match-history paths, must use a launch-time start
+composition rather than deriving start state from the final `Game`. Replay seek and branch behavior
+should keep working while keyframe internals are migrated only where the phase explicitly proves
+parity.
 
 ### [Phase 5 - Lab Scenario Checkpoint Adapter](phase-5.md)
 
@@ -111,6 +114,11 @@ operational rollback.
 - Import must validate before constructing a live `Game`: schema version, map identity/hash,
   player ids/teams, owner references, entity ids, command/order references, coordinates, counts,
   timers, queues, resource values, per-payload size caps, and any container-specific caps.
+- Lab scenario import/export remains a public, untrusted JSON surface once it accepts
+  checkpoint-backed scenario containers. That is distinct from adding a generic live-match
+  checkpoint upload command, but it still requires the same schema validation, map binding checks,
+  payload/container byte limits, entity/count caps, path allowlists, and protocol/client/doc mirrors
+  as any other client-supplied artifact.
 - AI controller memory remains outside the checkpoint contract. Checkpoints preserve AI player
   slots and authoritative world state; replay determinism comes from recorded actions.
 - Keep old replay and lab assets compatible until a phase explicitly proves and documents a
@@ -118,6 +126,11 @@ operational rollback.
 - Replay artifact migration must inventory and test every existing load surface: dev/self-play
   files, crash replay artifacts, match-history database rows, and any committed fixtures. Database
   decoding must use the same versioned compatibility/rejection policy as file loading.
+- Replay artifact migration must inventory and test every existing write surface: post-match lobby
+  capture, shutdown/crash capture, dev replay saves, AI/self-play artifact writers, scripted
+  self-play failure artifacts, match-history attachment, and committed fixture generation. The
+  artifact construction API should make final-state-derived start checkpoints impossible by requiring
+  a launch-time start composition.
 - Replay artifact migration must capture the replay start checkpoint at tick zero before commands
   mutate the match, then append the authoritative command stream and end-of-match metadata when the
   artifact is finalized. Do not derive a replay start checkpoint from the final post-match `Game`.
@@ -140,7 +153,10 @@ operational rollback.
 
 - No gameplay or balance changes.
 - No client-side save/load UI until a later product plan asks for it.
-- No public network protocol command for uploading arbitrary checkpoint payloads in this plan.
+- No public network protocol command for uploading arbitrary live-match checkpoint payloads in this
+  plan. Checkpoint-backed lab scenario import/export is still allowed only through the existing lab
+  scenario surface and must be treated as untrusted scenario JSON, not as a generic restore-any-game
+  checkpoint endpoint.
 - No database migration for historical match rows unless the replay phase explicitly scopes it.
 - No guarantee of cross-version checkpoint migration until the payload contract phase defines and tests
   a migration policy.

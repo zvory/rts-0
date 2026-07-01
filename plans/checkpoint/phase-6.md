@@ -13,6 +13,13 @@ adds a deliberate, documented rejection policy and updates every catalog/submiss
 conversion script must be deterministic, reviewable, and keep generated noise out of unrelated
 files.
 
+Treat checkpoint-backed lab scenario JSON as a public, untrusted import/export contract. The
+existing lab scenario import field lets users paste JSON that the client sends to the server; after
+this cutover, that path may carry an embedded `GameCheckpointV1`. That is still not a generic
+live-match checkpoint upload endpoint, but the server must validate the scenario container, embedded
+payload, map binding, entity/player counts, byte limits, path allowlists, and authoring metadata
+before constructing a live `Game`.
+
 Explicit non-goals:
 
 - No replay artifact migration; that belongs to Phase 4.
@@ -22,6 +29,8 @@ Explicit non-goals:
 - No removal of compatibility readers before all bundled and persisted use cases are audited.
 - No map-as-checkpoint container. Scenario assets may include normal map data or a stable map
   binding beside the checkpoint payload, but bundled map assets remain map assets.
+- No generic restore-any-game checkpoint upload. Checkpoint-backed scenario import/export remains
+  constrained to the lab scenario protocol, lab room permissions, and scenario validation policy.
 
 ## Expected Touch Points
 
@@ -30,6 +39,10 @@ Explicit non-goals:
 - `server/src/lab_scenarios.rs`: load, validate, preview, and catalog checkpoint-backed assets.
 - `server/src/lab_scenario_submission.rs`: default new submissions to checkpoint-backed scenario
   files and preserve path allowlists.
+- `server/src/lobby/room_task/lab.rs` and lab import/export handlers: update scenario import,
+  export, validation, and result mapping only through the existing lab scenario surface; preserve
+  operator permissions, id-remap behavior, room dirty/timeline semantics, and user-facing validation
+  errors.
 - `client/src/lab_*`: update only if visible file labels, download names, or validation messages
   need to distinguish old and new formats.
 - `server/crates/protocol/src/lib.rs`, `server/src/protocol.rs`, `client/src/protocol.js`, and
@@ -45,8 +58,10 @@ Explicit non-goals:
   this phase.
 - Scenario submission still rejects path traversal, duplicate ids/slugs, invalid metadata,
   unsupported maps/factions, over-cap entity counts, and malformed checkpoint payloads.
-- Scenario import/export still validates map identity/hash before restore, and no scenario can
-  smuggle unrelated game state through a map asset.
+- Scenario import/export still validates map identity/hash before restore, rejects oversized
+  scenario containers and embedded payloads, preserves entity id-remap responses expected by current
+  import callers, and prevents scenarios from smuggling unrelated game state through map assets or
+  unchecked checkpoint fields.
 - If the scenario DTO or protocol-visible JSON changes, run `node tests/protocol_parity.mjs`.
 - Suggested focused commands:
 
@@ -77,6 +92,8 @@ The handoff must name:
   checkpoint containers;
 - number and location of converted bundled scenarios;
 - old-format compatibility policy;
+- public lab scenario import/export hardening added for checkpoint-backed JSON, including byte/count
+  caps, map binding checks, path allowlists, id-remap compatibility, and malformed-payload failures;
 - validation and submission tests that passed;
 - any client-facing copy or behavior changes;
 - manual catalog/import/export focus for Phase 7.
