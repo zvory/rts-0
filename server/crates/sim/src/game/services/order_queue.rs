@@ -280,6 +280,9 @@ fn ready_for_next_order(
     if !e.is_unit() {
         return false;
     }
+    if e.kind == EntityKind::ScoutPlane {
+        return false;
+    }
     match e.order() {
         Order::Idle | Order::HoldPosition => !e.queued_orders().is_empty() && e.path_is_empty(),
         Order::Move(_) | Order::AttackMove(_) => {

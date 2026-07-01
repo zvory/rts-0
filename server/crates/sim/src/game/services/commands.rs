@@ -31,6 +31,7 @@ use crate::game::services::order_execution::{
     start_artillery_fire_command_order, ArtilleryFireMode, FutureOrderMode,
 };
 use crate::game::services::order_planner as planner;
+use crate::game::services::scout_plane;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::standability;
 use crate::game::services::world_query::{self, owns_unit};
@@ -562,6 +563,12 @@ pub(in crate::game) fn apply_commands(
                 };
                 for id in units {
                     if unit_can_accept_player_command(entities, player, id) {
+                        if entities
+                            .get(id)
+                            .is_some_and(|entity| entity.kind == EntityKind::ScoutPlane)
+                        {
+                            continue;
+                        }
                         entities.release_miner(id);
                         if let Some(e) = entities.get_mut(id) {
                             e.hold_position();
@@ -682,8 +689,17 @@ mod planned_actions {
                 planner::PlannedAction::ReplaceActive { unit, intent } => match intent {
                     planner::OrderIntent::Move(point) => {
                         if immediate_unit_can_replace(entities, player, unit) {
-                            move_goal = Some((point.x, point.y));
-                            move_units.push(unit);
+                            if entities
+                                .get(unit)
+                                .is_some_and(|entity| entity.kind == EntityKind::ScoutPlane)
+                            {
+                                let _ = scout_plane::retarget(
+                                    map, entities, unit, point.x, point.y, true,
+                                );
+                            } else {
+                                move_goal = Some((point.x, point.y));
+                                move_units.push(unit);
+                            }
                         }
                     }
                     planner::OrderIntent::AttackMove(point) => {
@@ -854,6 +870,17 @@ mod planned_actions {
                         }
                     }
                     if let Some(intent) = entity_order_intent_from_planner(intent) {
+                        if let OrderIntent::Move(point) = intent {
+                            if entities
+                                .get(unit)
+                                .is_some_and(|entity| entity.kind == EntityKind::ScoutPlane)
+                            {
+                                let _ = scout_plane::append_queued_retarget(
+                                    map, entities, unit, point.x, point.y,
+                                );
+                                continue;
+                            }
+                        }
                         match &intent {
                             OrderIntent::Attack(attack)
                                 if !attack_target_valid(
@@ -954,13 +981,13 @@ mod planned_actions {
             }
         }
 
-        if let Some(goal) = move_goal {
+        if let Some(goal) = move_goal.filter(|_| !move_units.is_empty()) {
             clear_queued_orders(entities, &move_units);
             clear_staged_anti_tank_gun_setup(entities, &move_units);
             coordinator.order_group_move(entities, player, &move_units, goal, false);
             begin_artillery_teardown_for_movement(entities, &move_units);
         }
-        if let Some(goal) = attack_move_goal {
+        if let Some(goal) = attack_move_goal.filter(|_| !attack_move_units.is_empty()) {
             clear_queued_orders(entities, &attack_move_units);
             clear_staged_anti_tank_gun_setup(entities, &attack_move_units);
             coordinator.order_group_move(entities, player, &attack_move_units, goal, true);
@@ -1459,7 +1486,11 @@ fn try_fire_artillery(
                 to: unit,
                 reveal: Some(reveal.clone()),
                 to_pos: None,
-                weapon_kind: Some(rules::combat::WeaponKind::ArtilleryGun.stable_id().to_string()),
+                weapon_kind: Some(
+                    rules::combat::WeaponKind::ArtilleryGun
+                        .stable_id()
+                        .to_string(),
+                ),
             });
         }
     }

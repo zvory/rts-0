@@ -8,6 +8,7 @@ fn groups(
     worker: bool,
     resource_node: bool,
     resource_extractor: bool,
+    scout_plane: bool,
 ) -> EntityStateGroups {
     EntityStateGroups {
         movement,
@@ -17,6 +18,7 @@ fn groups(
         worker,
         resource_node,
         resource_extractor,
+        scout_plane,
     }
 }
 
@@ -25,23 +27,27 @@ fn unit_kinds_have_exact_state_groups() {
     let cases = [
         (
             EntityKind::Worker,
-            groups(true, true, false, false, true, false, false),
+            groups(true, true, false, false, true, false, false, false),
         ),
         (
             EntityKind::Rifleman,
-            groups(true, true, false, false, false, false, false),
+            groups(true, true, false, false, false, false, false, false),
         ),
         (
             EntityKind::MachineGunner,
-            groups(true, true, false, false, false, false, false),
+            groups(true, true, false, false, false, false, false, false),
         ),
         (
             EntityKind::AntiTankGun,
-            groups(true, true, false, false, false, false, false),
+            groups(true, true, false, false, false, false, false, false),
         ),
         (
             EntityKind::Tank,
-            groups(true, true, false, false, false, false, false),
+            groups(true, true, false, false, false, false, false, false),
+        ),
+        (
+            EntityKind::ScoutPlane,
+            groups(true, false, false, false, false, false, false, true),
         ),
     ];
 
@@ -140,35 +146,35 @@ fn finished_building_kinds_have_exact_state_groups() {
     let cases = [
         (
             EntityKind::CityCentre,
-            groups(false, false, true, false, false, false, false),
+            groups(false, false, true, false, false, false, false, false),
         ),
         (
             EntityKind::Depot,
-            groups(false, false, false, false, false, false, false),
+            groups(false, false, false, false, false, false, false, false),
         ),
         (
             EntityKind::Barracks,
-            groups(false, false, true, false, false, false, false),
+            groups(false, false, true, false, false, false, false, false),
         ),
         (
             EntityKind::TrainingCentre,
-            groups(false, false, true, false, false, false, false),
+            groups(false, false, true, false, false, false, false, false),
         ),
         (
             EntityKind::ResearchComplex,
-            groups(false, false, true, false, false, false, false),
+            groups(false, false, true, false, false, false, false, false),
         ),
         (
             EntityKind::Factory,
-            groups(false, false, true, false, false, false, false),
+            groups(false, false, true, false, false, false, false, false),
         ),
         (
             EntityKind::Steelworks,
-            groups(false, false, true, false, false, false, false),
+            groups(false, false, true, false, false, false, false, false),
         ),
         (
             EntityKind::PumpJack,
-            groups(false, false, false, false, false, false, true),
+            groups(false, false, false, false, false, false, true, false),
         ),
     ];
 
@@ -246,7 +252,7 @@ fn resource_node_kinds_have_exact_state_groups() {
         let entity = Entity::new_node(kind, 10.0, 20.0).expect("node kind should spawn");
         assert_eq!(
             entity.state_groups(),
-            groups(false, false, false, false, false, true, false),
+            groups(false, false, false, false, false, true, false, false),
             "{kind:?}"
         );
     }

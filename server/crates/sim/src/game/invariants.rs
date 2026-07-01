@@ -77,7 +77,7 @@ impl Game {
             if e.is_unit() {
                 let body = unit_body_for_entity(e);
                 assert!(
-                    body.is_some(),
+                    body.is_some() || e.kind == EntityKind::ScoutPlane,
                     "invariant: tick {} unit has invalid body; {}",
                     self.state.tick,
                     entity_context(&self.state.map, e)
@@ -210,6 +210,9 @@ impl Game {
         let occ = Occupancy::build(&self.state.map, &self.state.entities);
         for e in self.state.entities.iter().filter(|e| e.is_unit()) {
             if is_collision_anchored(e) {
+                continue;
+            }
+            if e.kind == EntityKind::ScoutPlane {
                 continue;
             }
             assert!(
