@@ -1482,12 +1482,12 @@ fn try_fire_artillery(
                 to: unit,
                 reveal: Some(reveal.clone()),
                 to_pos: None,
+                weapon_kind: Some(rules::combat::WeaponKind::ArtilleryGun.stable_id().to_string()),
             });
         }
     }
     true
 }
-
 #[allow(clippy::too_many_arguments)]
 pub(in crate::game) fn artillery_point_fire_system(
     map: &Map,

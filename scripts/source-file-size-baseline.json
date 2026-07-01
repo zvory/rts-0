@@ -65,8 +65,8 @@
     },
     {
       "path": "tests/client_contracts/state_input_contracts.mjs",
-      "lines": 2068,
-      "reason": "Artillery targeting contracts were split into a focused client contract file; keep ratcheting until remaining state/input fixtures are split."
+      "lines": 2123,
+      "reason": "Panzerfaust Phase 4 adds visual event buffer and fog-neutrality coverage to the existing oversized state/input contract fixture; keep ratcheting until remaining state/input fixtures are split."
     }
   ]
 }

@@ -654,6 +654,8 @@ pub enum Event {
         reveal: Option<AttackReveal>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         to_pos: Option<[f32; 2]>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        weapon_kind: Option<String>,
     },
     Overpenetration {
         to: u32,
