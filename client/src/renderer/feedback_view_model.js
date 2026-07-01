@@ -33,6 +33,8 @@ export function buildRendererFeedbackView(
   const artilleryTargets = liveArray(state, "liveArtilleryTargets", now);
   const artilleryLaunches = liveArray(state, "liveArtilleryLaunches", now);
   const artilleryImpacts = liveArray(state, "liveArtilleryImpacts", now);
+  const panzerfaustShots = liveArray(state, "livePanzerfaustShots", now);
+  const panzerfaustImpacts = liveArray(state, "livePanzerfaustImpacts", now);
   const muzzleFlashes = liveArray(state, "liveMuzzleFlashes", now);
 
   return {
@@ -59,6 +61,8 @@ export function buildRendererFeedbackView(
     artilleryTargets,
     artilleryLaunches,
     artilleryImpacts,
+    panzerfaustShots,
+    panzerfaustImpacts,
     resourceMiningPreview: intent?.resourceMiningPreview || null,
     muzzleFlashes,
     liveCommandFeedback: () => commandFeedback,
@@ -70,6 +74,8 @@ export function buildRendererFeedbackView(
     liveArtilleryTargets: () => artilleryTargets,
     liveArtilleryLaunches: () => artilleryLaunches,
     liveArtilleryImpacts: () => artilleryImpacts,
+    livePanzerfaustShots: () => panzerfaustShots,
+    livePanzerfaustImpacts: () => panzerfaustImpacts,
     liveMuzzleFlashes: () => muzzleFlashes,
     entityById(id) {
       return entityLookup.get(id);

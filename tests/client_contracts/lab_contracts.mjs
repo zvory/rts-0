@@ -49,6 +49,7 @@ import {
   fetchLabScenarioSubmissionCapability,
 } from "../../client/src/lab_scenario_submission_capability.js";
 import { LabPanelWindowChrome } from "../../client/src/lab_panel_window.js";
+import { STATS } from "../../client/src/config.js";
 
 import { textWithin } from "./dom_text.mjs";
 
@@ -390,8 +391,12 @@ await withFakeDocument(async () => {
     "LabPanel spawn palette excludes buildings from primary unit options",
   );
   assert(
-    !labSpawnUnitKindsForFaction(DEFAULT_FACTION_ID).includes(KIND.PANZERFAUST),
-    "LabPanel spawn palette keeps hidden Panzerfaust out of product-playable Kriegsia units",
+    labSpawnUnitKindsForFaction(DEFAULT_FACTION_ID).includes(KIND.PANZERFAUST),
+    "LabPanel spawn palette intentionally exposes hidden Panzerfaust for lab inspection",
+  );
+  assert(
+    !STATS[KIND.BARRACKS].trains.includes(KIND.PANZERFAUST),
+    "LabPanel Panzerfaust inspection exposure does not imply normal Barracks production exposure",
   );
   assertDeepEqual(
     labSpawnUnitKindsForFaction("ekat"),

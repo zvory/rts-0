@@ -24,7 +24,7 @@ import {
   terrainAt as queryTerrainAt,
   worldInBounds as queryWorldInBounds,
 } from "./state_queries.js";
-import { VisualEffectBuffers } from "./state_visual_effects.js";
+import { VisualEffectBackedState } from "./state_visual_effects.js";
 
 const TWO_PI = Math.PI * 2;
 const PREDICTION_SMOOTH_MS = 120;
@@ -44,11 +44,12 @@ function lerpAngle(from, to, t) {
   return normalizeAngle(from + shortestAngleDelta(from, to) * t);
 }
 
-export class GameState {
+export class GameState extends VisualEffectBackedState {
   /**
    * @param {object} startInfo the §2.3 `start` payload.
    */
   constructor(startInfo) {
+    super();
     /** @type {number} our player id (repeat of welcome, for convenience). */
     this.playerId = startInfo.playerId;
     /** @type {boolean} true when this client is observing instead of playing. */
@@ -124,7 +125,6 @@ export class GameState {
     /** @type {number[]|Uint8Array} row-major current server-authoritative visibility. */
     this.visibleTiles = [];
 
-    this.visualEffects = new VisualEffectBuffers();
     this.groundDecals = new GroundDecalBuffer();
     /** @type {Map<number, object>} owned predicted entity id -> predicted entity view. */
     this.predictedById = new Map();
@@ -188,102 +188,6 @@ export class GameState {
    */
   get currRecvTime() {
     return this._cur ? this._curRecvTime : null;
-  }
-
-  get smokeCanisters() {
-    return this.visualEffects.smokeCanisters;
-  }
-
-  set smokeCanisters(value) {
-    this.visualEffects.smokeCanisters = Array.isArray(value) ? value : [];
-  }
-
-  get muzzleFlashes() {
-    return this.visualEffects.muzzleFlashes;
-  }
-
-  set muzzleFlashes(value) {
-    this.visualEffects.muzzleFlashes = Array.isArray(value) ? value : [];
-  }
-
-  get mortarLaunches() {
-    return this.visualEffects.mortarLaunches;
-  }
-
-  set mortarLaunches(value) {
-    this.visualEffects.mortarLaunches = Array.isArray(value) ? value : [];
-  }
-
-  get mortarShells() {
-    return this.visualEffects.mortarShells;
-  }
-
-  set mortarShells(value) {
-    this.visualEffects.mortarShells = Array.isArray(value) ? value : [];
-  }
-
-  get mortarTargets() {
-    return this.visualEffects.mortarTargets;
-  }
-
-  set mortarTargets(value) {
-    this.visualEffects.mortarTargets = Array.isArray(value) ? value : [];
-  }
-
-  get mortarImpacts() {
-    return this.visualEffects.mortarImpacts;
-  }
-
-  set mortarImpacts(value) {
-    this.visualEffects.mortarImpacts = Array.isArray(value) ? value : [];
-  }
-
-  get artilleryTargets() {
-    return this.visualEffects.artilleryTargets;
-  }
-
-  set artilleryTargets(value) {
-    this.visualEffects.artilleryTargets = Array.isArray(value) ? value : [];
-  }
-
-  get artilleryLaunches() {
-    return this.visualEffects.artilleryLaunches;
-  }
-
-  set artilleryLaunches(value) {
-    this.visualEffects.artilleryLaunches = Array.isArray(value) ? value : [];
-  }
-
-  get artilleryImpacts() {
-    return this.visualEffects.artilleryImpacts;
-  }
-
-  set artilleryImpacts(value) {
-    this.visualEffects.artilleryImpacts = Array.isArray(value) ? value : [];
-  }
-
-  get weaponRecoilById() {
-    return this.visualEffects.weaponRecoilById;
-  }
-
-  set weaponRecoilById(value) {
-    this.visualEffects.weaponRecoilById = value instanceof Map ? value : new Map();
-  }
-
-  get pendingMortarTargets() {
-    return this.visualEffects.pendingMortarTargets;
-  }
-
-  set pendingMortarTargets(value) {
-    this.visualEffects.pendingMortarTargets = Array.isArray(value) ? value : [];
-  }
-
-  get shotRevealsById() {
-    return this.visualEffects.shotRevealsById;
-  }
-
-  set shotRevealsById(value) {
-    this.visualEffects.shotRevealsById = value instanceof Map ? value : new Map();
   }
 
   // --- snapshots ----------------------------------------------------------
@@ -356,121 +260,8 @@ export class GameState {
     this.visualEffects.applySnapshotEvents(this.events, now, (id) => this.entityById(id));
   }
 
-  addMortarLaunch(ev, now = performance.now()) {
-    this.visualEffects.addMortarLaunch(ev, now);
-  }
-
   consumePendingGroundDecals() {
     return this.groundDecals.consumePending();
-  }
-
-  addMortarImpact(ev, now = performance.now()) {
-    this.visualEffects.addMortarImpact(ev, now);
-  }
-
-  addArtilleryTarget(ev, now = performance.now()) {
-    this.visualEffects.addArtilleryTarget(ev, now, (id) => this.entityById(id));
-  }
-
-  addArtilleryImpact(ev, now = performance.now()) {
-    this.visualEffects.addArtilleryImpact(ev, now);
-  }
-
-  addSmokeCanister(ev, now = performance.now()) {
-    this.visualEffects.addSmokeCanister(ev, now);
-  }
-
-  /**
-   * Return live smoke canister launch visuals, pruning landed ones.
-   * @param {number} now
-   * @returns {Array<{fromX:number,fromY:number,toX:number,toY:number,durationMs:number,createdAt:number}>}
-   */
-  liveSmokeCanisters(now) {
-    return this.visualEffects.liveSmokeCanisters(now);
-  }
-
-  /**
-   * Return live mortar launch dust puffs, pruning expired ones.
-   * @param {number} now
-   * @returns {Array<{x:number,y:number,createdAt:number}>}
-   */
-  liveMortarLaunches(now) {
-    return this.visualEffects.liveMortarLaunches(now);
-  }
-
-  /**
-   * Return live mortar shell projectiles, pruning after expected impact.
-   * @param {number} now
-   * @returns {Array<{fromX:number,fromY:number,toX:number,toY:number,radiusTiles:number,durationMs:number,seed:number,createdAt:number}>}
-   */
-  liveMortarShells(now) {
-    return this.visualEffects.liveMortarShells(now);
-  }
-
-  /**
-   * Return live mortar target warnings, pruning after expected impact.
-   * @param {number} now
-   * @returns {Array<{fromX:number,fromY:number,x:number,y:number,radiusTiles:number,durationMs:number,seed:number,createdAt:number}>}
-   */
-  liveMortarTargets(now) {
-    return this.visualEffects.liveMortarTargets(now);
-  }
-
-  /**
-   * Return live mortar impact explosions, pruning expired ones.
-   * @param {number} now
-   * @returns {Array<{x:number,y:number,radiusTiles:number,seed:number,createdAt:number}>}
-   */
-  liveMortarImpacts(now) {
-    return this.visualEffects.liveMortarImpacts(now);
-  }
-
-  /**
-   * Return live owner-only artillery target markers, pruning after the shell lands.
-   * @param {number} now
-   * @returns {Array<{x:number,y:number,radiusTiles:number,delayTicks:number,seed:number,createdAt:number}>}
-   */
-  liveArtilleryTargets(now) {
-    return this.visualEffects.liveArtilleryTargets(now);
-  }
-
-  /**
-   * Return live owner-only artillery launch dust puffs, pruning expired ones.
-   * @param {number} now
-   * @returns {Array<{x:number,y:number,facing:number,seed:number,createdAt:number}>}
-   */
-  liveArtilleryLaunches(now) {
-    return this.visualEffects.liveArtilleryLaunches(now);
-  }
-
-  /**
-   * Return live visual-only artillery impact explosions, pruning expired ones.
-   * @param {number} now
-   * @returns {Array<{x:number,y:number,radiusTiles:number,seed:number,createdAt:number}>}
-   */
-  liveArtilleryImpacts(now) {
-    return this.visualEffects.liveArtilleryImpacts(now);
-  }
-
-  /**
-   * Return live muzzle-flash records, pruning expired ones.
-   * @param {number} now
-   * @returns {Array<{from:number,to:number,targetPos?:object,weaponKind?:string,createdAt:number}>}
-   */
-  liveMuzzleFlashes(now) {
-    return this.visualEffects.liveMuzzleFlashes(now);
-  }
-
-  /**
-   * Recoil progress for an entity that fired recently. Returns 0 when idle.
-   * @param {number} id
-   * @param {string=} kind
-   * @param {number} now
-   * @param {string=} weaponKind
-   * @returns {number}
-   */
-  weaponRecoil(id, kind, now, weaponKind) {
-    return this.visualEffects.weaponRecoil(id, kind, now, weaponKind);
   }
 
   /**

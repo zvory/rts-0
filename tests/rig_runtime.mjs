@@ -227,6 +227,7 @@ test("geometry-scale animation grows coordinates without scaling stroke width", 
 test("live rig definitions compile production SVG sources", () => {
   const workerFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-worker.svg"), "utf8").trim();
   const riflemanFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-rifleman.svg"), "utf8").trim();
+  const panzerfaustFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-panzerfaust.svg"), "utf8").trim();
   const machineGunnerFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-machine-gunner.svg"), "utf8").trim();
   const antiTankGunFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-anti-tank-gun.svg"), "utf8").trim();
   const mortarTeamFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-mortar-team.svg"), "utf8").trim();
@@ -239,8 +240,9 @@ test("live rig definitions compile production SVG sources", () => {
   assert.equal(GOLEM_RIG_SVG.includes('data-rts-rig-kind="golem"'), true);
   assert.equal(GOLEM_RIG_SVG.includes('id="golem.authored"'), true);
   assert.equal(RIFLEMAN_RIG_SVG.trim(), riflemanFixtureText);
-  assert.equal(PANZERFAUST_RIG_SVG.includes('data-rts-rig-kind="panzerfaust"'), true);
-  assert.equal(PANZERFAUST_RIG_SVG.includes('id="panzerfaust.placeholder"'), true);
+  assert.equal(PANZERFAUST_RIG_SVG.trim(), panzerfaustFixtureText);
+  assert.equal(PANZERFAUST_RIG_SVG.includes('part.pzf.tube'), true);
+  assert.equal(PANZERFAUST_RIG_SVG.includes('part.rifle.barrel'), false);
   assert.equal(MACHINE_GUNNER_RIG_SVG.trim(), machineGunnerFixtureText);
   assert.equal(ANTI_TANK_GUN_RIG_SVG.trim(), antiTankGunFixtureText);
   assert.equal(MORTAR_TEAM_RIG_SVG.trim(), mortarTeamFixtureText);
@@ -265,7 +267,7 @@ test("live rig definitions compile production SVG sources", () => {
   assert.equal(definitions.has(KIND.MORTAR_TEAM), true);
   assert.equal(definitions.get(KIND.MORTAR_TEAM).id, "mortar-team.authored");
   assert.equal(definitions.has(KIND.PANZERFAUST), true);
-  assert.equal(definitions.get(KIND.PANZERFAUST).id, "panzerfaust.placeholder");
+  assert.equal(definitions.get(KIND.PANZERFAUST).id, "panzerfaust.authored");
   assert.equal(definitions.has(KIND.SCOUT_CAR), true);
   assert.equal(definitions.get(KIND.SCOUT_CAR).id, "scout-car.authored");
   assert.equal(definitions.has(KIND.COMMAND_CAR), true);
@@ -295,7 +297,9 @@ test("live rig routes expose kind-specific production part groups", () => {
   const panzerfaustRoutes = liveRigRoutesFor(KIND.PANZERFAUST);
   assert.deepEqual(panzerfaustRoutes[0].parts, ["part.shadow"]);
   assert.equal(panzerfaustRoutes[1].parts.includes("part.body"), true);
-  assert.equal(panzerfaustRoutes[1].parts.includes("part.rifle.barrel"), true);
+  assert.equal(panzerfaustRoutes[1].parts.includes("part.pzf.tube"), true);
+  assert.equal(panzerfaustRoutes[1].parts.includes("part.pzf.warhead"), true);
+  assert.equal(panzerfaustRoutes[1].parts.includes("part.rifle.barrel"), false);
 
   const machineGunnerRoutes = liveRigRoutesFor(KIND.MACHINE_GUNNER);
   assert.deepEqual(machineGunnerRoutes[0].parts, ["part.shadow"]);
@@ -379,6 +383,56 @@ test("default Tank draw uses live SVG rig with separate turret and hull parts", 
   assert.equal(unit.parts.get("part.turret").display.rotation, Math.PI / 2);
   assert.equal(unit.parts.get("part.barrel").display.rotation, Math.PI / 2);
   assert.equal(unit.parts.get("part.shadow").display.visible, false);
+});
+
+test("live rig renderer rebuilds same-id instances when entity kind changes", () => {
+  const panzerfaust = compileSvgRig(PANZERFAUST_RIG_SVG, { expectedKind: KIND.PANZERFAUST });
+  const rifleman = compileSvgRig(RIFLEMAN_RIG_SVG, { expectedKind: KIND.RIFLEMAN });
+  assert.equal(panzerfaust.ok, true, JSON.stringify(panzerfaust.errors));
+  assert.equal(rifleman.ok, true, JSON.stringify(rifleman.errors));
+
+  const renderer = makeRigRenderer();
+  renderer._liveRigDefinitionsByKind = new Map([
+    [KIND.PANZERFAUST, panzerfaust.definition],
+    [KIND.RIFLEMAN, rifleman.definition],
+  ]);
+  const colorByOwner = new Map([[1, 0x336699]]);
+  const state = { playerId: 1, selection: new Set(), weaponRecoil: () => 0 };
+  const id = 92;
+
+  renderer._drawUnit({
+    id,
+    kind: KIND.PANZERFAUST,
+    owner: 1,
+    x: 32,
+    y: 44,
+    facing: 0,
+    state: STATE.IDLE,
+  }, colorByOwner, state);
+  const panzerfaustRig = renderer._liveRigPools.liveUnitRigs.get(id);
+  const panzerfaustContainer = panzerfaustRig.container;
+  assert.equal(panzerfaustRig.kind, KIND.PANZERFAUST);
+  assert.equal(panzerfaustRig.parts.has("part.pzf.tube"), true);
+  assert.equal(renderer.layers.units.children.includes(panzerfaustContainer), true);
+
+  renderer._drawUnit({
+    id,
+    kind: KIND.RIFLEMAN,
+    owner: 1,
+    x: 32,
+    y: 44,
+    facing: 0,
+    state: STATE.IDLE,
+  }, colorByOwner, state);
+  const riflemanRig = renderer._liveRigPools.liveUnitRigs.get(id);
+  assert.equal(panzerfaustRig._destroyed, true);
+  assert.equal(panzerfaustContainer.parent, null);
+  assert.equal(renderer.layers.units.children.includes(panzerfaustContainer), false);
+  assert.equal(riflemanRig.kind, KIND.RIFLEMAN);
+  assert.equal(riflemanRig.parts.has("part.rifle.barrel"), true);
+  assert.equal(riflemanRig.parts.has("part.pzf.tube"), false);
+  assert.equal(renderer.layers.units.children.includes(riflemanRig.container), true);
+  riflemanRig.destroy();
 });
 
 test("missing live rig definitions fail closed instead of drawing procedural fallback", () => {

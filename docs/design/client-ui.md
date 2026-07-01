@@ -1210,14 +1210,16 @@ selection rings):
   field-of-fire overlays. In Lab scenario authoring, deployed Anti-Tank Gun and artillery
   field-of-fire wedges remain visible for the currently selected owner even when the broad unit
   range overlay is off.
-  Distinct silhouette per kind (engineer: compact block; rifleman / machine gunner: shared
-  infantry body with oversized role weapons; Anti-Tank Gun: wheeled gun; mortar team: crewless
+  Distinct silhouette per kind (engineer: compact block; rifleman / machine gunner / Panzerfaust:
+  shared infantry body with oversized role weapons; Panzerfaust specifically carries a short
+  one-shot launcher tube while loaded; Anti-Tank Gun: wheeled gun; mortar team: crewless
   M1938-inspired small wheeled mortar that travels low and deploys upright; scout car: boxy
   WW2-style truck silhouette with enclosed wheels and a rear-top machine-gunner; tank: chunky
   flat-shaded armor with movement-facing tracks, hull, nose, and shadow plus weapon-facing turret and
   barrel parts, recoil, nose tick, and low-oil/oil-starved fuel cues; artillery: SVG-authored
   support-weapon rig routed through the live renderer).
-  Riflemen carry a rifle, Anti-Tank Guns field a wheeled anti-tank gun with a long recoiling barrel,
+  Riflemen carry a rifle, loaded Panzerfaust infantry carry a tube launcher with a team-colored
+  band, Anti-Tank Guns field a wheeled anti-tank gun with a long recoiling barrel,
   carriage, two wheels, and animated deployment bracing, and machine gunners carry an MG42-style
   long machine gun across the body while packed that extends forward with bracing during
   setup/deployment. Units that fire from outside current vision are shown briefly above the fog
@@ -1317,7 +1319,9 @@ Import rules:
 - `app-shell` files may compose other areas; prefer adding new cross-area wiring in `match.js` or
   `app.js` instead of importing collaborators from feature modules.
 - Lab UI and transport lifetimes stay in `App`: `match.js` may receive lab metadata/control policy,
-  but must not import `lab_client.js` or `lab_panel.js`.
+  but must not import `lab_client.js` or `lab_panel.js`. Lab setup tools may include lab-only
+  inspection spawn entries such as the hidden Panzerfaust; those entries do not imply normal faction
+  catalog membership or production command-card exposure.
 - Non-shell cross-area imports should normally become dependency injection through `Match`, `App`,
   or a facade. If one is intentional, update `ALLOWED_CROSS_AREA_IMPORTS` in
   `scripts/check-client-architecture.mjs` with a reason.
