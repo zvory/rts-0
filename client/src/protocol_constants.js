@@ -64,6 +64,11 @@ export const LAB_SCENARIO = Object.freeze({
   SCHEMA_VERSION: 1,
 });
 
+export const LAB_CHECKPOINT_SCENARIO = Object.freeze({
+  KIND: "labCheckpointScenario",
+  SCHEMA_VERSION: 1,
+});
+
 // --- Command discriminators (the `c` field) ---
 export const CMD = Object.freeze({
   MOVE: "move",

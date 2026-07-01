@@ -1,6 +1,6 @@
 # Phase 6 - Lab Asset Cutover
 
-Status: Not started.
+Status: Done.
 
 ## Scope
 

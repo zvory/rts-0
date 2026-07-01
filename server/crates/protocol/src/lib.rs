@@ -24,10 +24,7 @@ pub use contract_metadata::{
 };
 #[cfg(test)]
 use contract_metadata::{ability_code, kind_code};
-pub use lab_scenario::{
-    LabScenarioAuthoringMetadata, LabScenarioEntity, LabScenarioLabMetadata, LabScenarioMap,
-    LabScenarioMetadata, LabScenarioOrder, LabScenarioPlayer, LabScenarioPoint, LabScenarioV1,
-};
+pub use lab_scenario::*;
 pub use messagepack_frame::MESSAGEPACK_SNAPSHOT_FRAME_MAGIC;
 pub use rts_contract::{
     AbilityCooldownView, AbilityObjectOwnerStateView, AbilityObjectView, ActionCapabilities,
@@ -140,7 +137,7 @@ pub enum ClientMessage {
     Lab {
         #[serde(rename = "requestId")]
         request_id: u32,
-        op: LabClientOp,
+        op: Box<LabClientOp>,
     },
     /// Request a new practice branch room from this replay room's current authoritative tick.
     RequestBranchFromTick,
@@ -290,7 +287,7 @@ pub enum LabClientOp {
         name: Option<String>,
     },
     ImportScenario {
-        scenario: LabScenarioV1,
+        scenario: Box<LabScenarioPayload>,
     },
     ValidateScenario {
         metadata: LabScenarioAuthoringMetadata,

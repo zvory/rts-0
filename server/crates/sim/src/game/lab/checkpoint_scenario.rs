@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use serde::{Deserialize, Serialize};
 
 use crate::game::map::Map;
@@ -5,7 +7,9 @@ use crate::game::Game;
 use crate::game::MapMetadata;
 use crate::protocol::terrain;
 
-use super::scenario::{LabScenarioV1, MAX_LAB_SCENARIO_NAME_LEN, MAX_LAB_SCENARIO_PLAYERS};
+#[cfg(test)]
+use super::scenario::LabScenarioV1;
+use super::scenario::{MAX_LAB_SCENARIO_NAME_LEN, MAX_LAB_SCENARIO_PLAYERS};
 use super::{LabEntityIdRemap, LabError};
 
 pub(super) const LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION: u32 = 1;
@@ -212,27 +216,72 @@ fn validate_lab_checkpoint_scenario_shape(
     Ok(())
 }
 
+fn validate_lab_checkpoint_source_entity_id_map(
+    id_map: &[LabEntityIdRemap],
+    game: &Game,
+) -> Result<(), LabError> {
+    let restored_ids: HashSet<_> = game.state.entities.iter().map(|entity| entity.id).collect();
+    if id_map.len() > restored_ids.len() {
+        return Err(LabError::InvalidScenario {
+            reason: "checkpoint scenario sourceEntityIdMap has too many entries".to_string(),
+        });
+    }
+
+    let mut old_ids = HashSet::new();
+    let mut new_ids = HashSet::new();
+    for remap in id_map {
+        if !old_ids.insert(remap.old_id) {
+            return Err(LabError::InvalidScenario {
+                reason: "checkpoint scenario sourceEntityIdMap contains duplicate oldId"
+                    .to_string(),
+            });
+        }
+        if !new_ids.insert(remap.new_id) {
+            return Err(LabError::InvalidScenario {
+                reason: "checkpoint scenario sourceEntityIdMap contains duplicate newId"
+                    .to_string(),
+            });
+        }
+        if !restored_ids.contains(&remap.new_id) {
+            return Err(LabError::InvalidScenario {
+                reason: "checkpoint scenario sourceEntityIdMap newId must reference a restored entity"
+                    .to_string(),
+            });
+        }
+    }
+    Ok(())
+}
+
 impl Game {
-    #[cfg(test)]
-    pub(in crate::game) fn export_lab_checkpoint_scenario(
+    pub fn export_lab_checkpoint_scenario(
         &self,
+        name: String,
         server_build_sha: &str,
     ) -> Result<LabCheckpointScenarioV1, LabError> {
+        let source_entity_id_map = self
+            .state
+            .entities
+            .iter()
+            .map(|entity| LabEntityIdRemap {
+                old_id: entity.id,
+                new_id: entity.id,
+            })
+            .collect();
         self.export_lab_checkpoint_scenario_with_metadata(
-            "Untitled lab scenario".to_string(),
+            name,
             self.tick_count(),
             None,
-            Vec::new(),
+            source_entity_id_map,
             server_build_sha,
         )
     }
 
-    pub fn lab_checkpoint_scenario_from_v1(
+    #[cfg(test)]
+    pub(in crate::game) fn lab_checkpoint_scenario_from_v1(
         scenario: LabScenarioV1,
         server_build_sha: &str,
     ) -> Result<LabCheckpointScenarioV1, LabError> {
         let name = scenario.name.clone();
-        let exported_tick = scenario.metadata.exported_tick;
         let source = LabCheckpointScenarioSource {
             kind: scenario.kind.clone(),
             schema_version: scenario.schema_version,
@@ -240,7 +289,7 @@ impl Game {
         let (game, restore) = Self::lab_game_from_scenario(scenario)?;
         game.export_lab_checkpoint_scenario_with_metadata(
             name,
-            exported_tick,
+            game.tick_count(),
             Some(source),
             restore.entity_id_map,
             server_build_sha,
@@ -266,6 +315,15 @@ impl Game {
                 reason: "checkpoint scenario seed does not match payload seed".to_string(),
             });
         }
+        if scenario.metadata.exported_tick != game.tick_count() {
+            return Err(LabError::InvalidScenario {
+                reason: "checkpoint scenario exportedTick does not match payload tick".to_string(),
+            });
+        }
+        validate_lab_checkpoint_source_entity_id_map(
+            &scenario.metadata.source_entity_id_map,
+            &game,
+        )?;
         Ok(game)
     }
 

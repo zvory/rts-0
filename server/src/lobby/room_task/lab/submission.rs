@@ -97,7 +97,7 @@ impl RoomTask {
                 return Some(lab_submission_result_error(
                     request_id,
                     LabScenarioSubmissionError::validation(format!(
-                        "scenario export did not produce LabScenarioV1: {err}"
+                        "scenario export did not produce a lab scenario payload: {err}"
                     )),
                 ));
             }
