@@ -605,6 +605,19 @@ mod tests {
             .iter()
             .find(|entry| entry.id == "render-preview")
             .expect("render-preview catalog row");
+        assert_eq!(render_preview.title, "Render Preview");
+        assert_eq!(
+            render_preview.description,
+            "Imported two-player lab setup for checking exported render coverage."
+        );
+        assert_eq!(
+            render_preview.tags,
+            vec![
+                "two-player".to_string(),
+                "render-preview".to_string(),
+                "imported".to_string()
+            ]
+        );
         assert_eq!(render_preview.map, "Default");
         assert_eq!(render_preview.player_count, 2);
         assert_eq!(render_preview.filename, "render-preview.json");
@@ -617,7 +630,7 @@ mod tests {
         let scenario = game.export_lab_scenario();
         assert_eq!(scenario.seed, 126_097_607);
         assert_eq!(scenario.players.len(), 2);
-        assert_eq!(scenario.entities.len(), 174);
+        assert_eq!(scenario.entities.len(), 215);
         assert_eq!(game.lab_god_mode_players(), vec![1, 2]);
     }
 
