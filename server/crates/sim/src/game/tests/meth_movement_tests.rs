@@ -116,6 +116,30 @@ fn methamphetamines_boosts_machine_gunner_to_unupgraded_rifleman_speed() {
 }
 
 #[test]
+fn panzerfaust_moves_at_rifleman_speed_with_or_without_methamphetamines() {
+    let (mut game, panzerfaust, _goal) = meth_movement_fixture(EntityKind::Panzerfaust);
+    let rifleman_speed = config::unit_stats(EntityKind::Rifleman)
+        .expect("rifleman stats")
+        .speed;
+
+    let base_step = next_moving_step(&mut game, panzerfaust);
+    assert!(
+        (base_step - rifleman_speed).abs() < 0.01,
+        "Panzerfaust should move at unupgraded Rifleman speed, moved {base_step:.3}px"
+    );
+
+    game.state.players[0]
+        .upgrades
+        .insert(UpgradeKind::Methamphetamines);
+    let meth_step = next_moving_step(&mut game, panzerfaust);
+
+    assert!(
+        (meth_step - rifleman_speed).abs() < 0.01,
+        "Methamphetamines should not change Panzerfaust movement speed, moved {meth_step:.3}px"
+    );
+}
+
+#[test]
 fn methamphetamines_halves_machine_gunner_setup_and_teardown() {
     let (mut game, mg, goal) = meth_unit_fixture(EntityKind::MachineGunner, false);
     game.state.players[0]
