@@ -327,7 +327,8 @@ fn panzerfaust_training_reports_resource_and_supply_blocks() {
         .is_empty());
 
     let mut supply_blocked = vec![player_state(1), player_state(2)];
-    supply_blocked[0].supply_used = supply_blocked[0].supply_cap;
+    let supply_cap = supply_blocked[0].supply_cap;
+    assert!(supply_blocked[0].reserve_supply(supply_cap));
     let events = apply_with_players(
         &map,
         &mut entities,
