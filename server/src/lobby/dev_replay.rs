@@ -2,7 +2,9 @@ use super::room_task::{DevScenarioConfig, DevScenarioId, LabRoomConfig, RoomMode
 use super::*;
 use crate::dev_scenarios::parse_dev_scenario_room;
 use crate::lab_scenarios::lab_scenario_exists;
-use rts_sim::game::replay::REPLAY_ARTIFACT_SCHEMA_VERSION_V2;
+use rts_sim::game::replay::{
+    is_supported_replay_artifact_schema, REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION,
+};
 
 pub(super) fn room_mode_for(room: &str) -> RoomMode {
     if let Some(raw) = room.strip_prefix(LAB_ROOM_PREFIX) {
@@ -123,10 +125,19 @@ pub(super) fn load_replay_artifact(name: &str) -> Result<ReplayArtifactV1, Strin
                         .to_string(),
                 );
             };
-            if schema.as_u64() != Some(REPLAY_ARTIFACT_SCHEMA_VERSION_V2 as u64) {
+            let Some(schema_version) = schema
+                .as_u64()
+                .and_then(|version| u32::try_from(version).ok())
+            else {
                 return Err(format!(
                     "unsupported replay artifact schema {}; expected {}",
-                    schema, REPLAY_ARTIFACT_SCHEMA_VERSION_V2
+                    schema, REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION
+                ));
+            };
+            if !is_supported_replay_artifact_schema(schema_version) {
+                return Err(format!(
+                    "unsupported replay artifact schema {}; expected {}",
+                    schema, REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION
                 ));
             }
             return serde_json::from_value(value)
@@ -142,7 +153,6 @@ pub(super) fn load_replay_artifact(name: &str) -> Result<ReplayArtifactV1, Strin
 mod tests {
     use super::*;
     use rts_sim::game::entity::EntityKind;
-    use rts_sim::game::replay::ReplayArtifactV1;
     use rts_sim::game::{Game, PlayerInit};
 
     fn artifact_dir(name: &str) -> std::path::PathBuf {
@@ -255,12 +265,12 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let players = test_players();
         let game = Game::new(&players, 0x1234_5678);
-        let artifact = ReplayArtifactV1::capture_from_game(
+        let replay_start = rts_sim::game::replay::ReplayStartComposition::capture(
             &game,
             crate::build_info::build_id(),
-            None,
-            game.scores(),
-        );
+        )
+        .unwrap();
+        let artifact = replay_start.finalize(&game, None, game.scores());
         std::fs::write(
             dir.join("replay.json"),
             serde_json::to_vec_pretty(&artifact).unwrap(),
@@ -271,7 +281,7 @@ mod tests {
 
         assert_eq!(
             loaded.artifact_schema_version,
-            REPLAY_ARTIFACT_SCHEMA_VERSION_V2
+            REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION
         );
         assert_eq!(loaded.command_log, artifact.command_log);
         let _ = std::fs::remove_dir_all(&dir);

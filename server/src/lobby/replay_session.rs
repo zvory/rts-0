@@ -219,13 +219,9 @@ impl ReplaySession {
             .collect();
         let map = Map::load_for_players(&artifact.map_name, &replay_start_players, artifact.seed)
             .map_err(|err| format!("cannot load replay map: {err}"))?;
-        Ok(Game::new_for_replay_with_map_metadata(
-            &artifact.players,
-            artifact.seed,
-            &artifact.player_loadouts,
-            map,
-            metadata,
-        ))
+        artifact
+            .restore_start_game(map, metadata)
+            .map_err(|err| err.to_string())
     }
 
     pub(super) fn active_player_ids(&self) -> Vec<u32> {
@@ -475,22 +471,31 @@ mod tests {
 
     fn replay_test_game(players: &[PlayerInit], seed: u32) -> Game {
         let metadata = Map::metadata_for_name("Default").unwrap();
-        let map = Map::load("Default", players.len(), seed).unwrap();
+        let start_players: Vec<_> = players
+            .iter()
+            .map(|player| {
+                (
+                    player.id,
+                    normalize_start_team_id(player.id, player.team_id),
+                )
+            })
+            .collect();
+        let map = Map::load_for_players("Default", &start_players, seed).unwrap();
         Game::new_with_random_ai_profiles_and_map_metadata(players, seed, map, metadata)
     }
 
     fn replay_test_artifact(players: &[PlayerInit], ticks: u32) -> (Game, ReplayArtifactV1) {
         let seed = 0x5150_2202;
         let mut game = replay_test_game(players, seed);
+        let replay_start = rts_sim::game::replay::ReplayStartComposition::capture(
+            &game,
+            crate::build_info::build_id(),
+        )
+        .unwrap();
         for _ in 0..ticks {
             game.tick();
         }
-        let artifact = ReplayArtifactV1::capture_from_game(
-            &game,
-            crate::build_info::build_id(),
-            None,
-            game.scores(),
-        );
+        let artifact = replay_start.finalize(&game, None, game.scores());
         (game, artifact)
     }
 

@@ -4,7 +4,7 @@ use std::time::{Duration, Instant as StdInstant};
 use tokio::time::Instant as TokioInstant;
 
 use super::super::connection::{send_or_log, ConnectionSink};
-use super::super::crash_replay::{dump_crash_replay, panic_reason};
+use super::super::crash_replay::{dump_crash_replay_artifact, panic_reason};
 use super::super::dev_replay::load_replay_artifact;
 use super::super::launch::{LaunchPrediction, StartPayloadBuilder, StartPayloadRecipient};
 use super::super::projection::{ObserverAnalysisAudience, ProjectionPolicy, RecipientRole};
@@ -413,7 +413,12 @@ impl RoomTask {
                 Ok(events) => events,
                 Err(payload) => {
                     let reason = panic_reason(&payload);
-                    dump_crash_replay(&self.room, session.game(), &reason);
+                    dump_crash_replay_artifact(
+                        &self.room,
+                        session.game().tick_count(),
+                        &session.artifact,
+                        &reason,
+                    );
                     self.send_dev_error("Replay playback failed");
                     self.phase = Phase::Lobby;
                     return;

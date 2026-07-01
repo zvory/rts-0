@@ -43,7 +43,8 @@ use rts_server::protocol::{
 use rts_server::structured_log;
 use rts_sim::game::map::Map;
 use rts_sim::game::replay::{
-    ReplayArtifactV1, ReplayValidationError, REPLAY_ARTIFACT_SCHEMA_VERSION_V2,
+    is_supported_replay_artifact_schema, ReplayArtifactV1, ReplayStartComposition,
+    ReplayValidationError, REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION,
 };
 use rts_sim::perf;
 
@@ -493,7 +494,10 @@ fn apply_replay_summary_compatibility(row: &mut rts_server::db::MatchSummary, bu
         row.replay_unavailable_reason = Some("Replay was not recorded for this match.".to_string());
         return;
     };
-    if meta.artifact_schema_version != REPLAY_ARTIFACT_SCHEMA_VERSION_V2 as i32 {
+    let supported_schema = u32::try_from(meta.artifact_schema_version)
+        .ok()
+        .is_some_and(is_supported_replay_artifact_schema);
+    if !supported_schema {
         row.replay_available = false;
         row.replay_unavailable_reason = Some(format!(
             "Replay schema {} is not supported by this server.",
@@ -1018,14 +1022,16 @@ mod tests {
             is_ai: false,
         }];
         let game = rts_sim::game::Game::new(&players, 0x5150_030d);
-        ReplayArtifactV1::capture_from_game(&game, "current-build", None, game.scores())
+        ReplayStartComposition::capture(&game, "current-build")
+            .unwrap()
+            .finalize(&game, None, game.scores())
     }
 
     #[test]
     fn replay_summary_marks_current_build_and_map_available() {
         let map = Map::metadata_for_name("Default").unwrap();
         let mut row = replay_summary_for(Some(rts_server::db::ReplaySummaryMetadata {
-            artifact_schema_version: REPLAY_ARTIFACT_SCHEMA_VERSION_V2 as i32,
+            artifact_schema_version: REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION as i32,
             build_sha: "current-build".to_string(),
             map_name: map.name,
             map_schema_version: map.schema_version as i32,
@@ -1042,7 +1048,7 @@ mod tests {
     fn replay_summary_warns_but_allows_incompatible_build() {
         let map = Map::metadata_for_name("Default").unwrap();
         let mut row = replay_summary_for(Some(rts_server::db::ReplaySummaryMetadata {
-            artifact_schema_version: REPLAY_ARTIFACT_SCHEMA_VERSION_V2 as i32,
+            artifact_schema_version: REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION as i32,
             build_sha: "old-build".to_string(),
             map_name: map.name,
             map_schema_version: map.schema_version as i32,
@@ -1074,7 +1080,7 @@ mod tests {
     }
 
     #[test]
-    fn match_history_replay_launch_accepts_schema_two_kriegsia_factions() {
+    fn match_history_replay_launch_accepts_checkpoint_backed_kriegsia_factions() {
         let artifact = replay_artifact_for_faction(DEFAULT_FACTION_ID);
 
         assert_eq!(

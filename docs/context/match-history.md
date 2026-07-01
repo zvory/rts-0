@@ -39,10 +39,12 @@ scope, or the lobby front-page table.
   `contract::PlayerScore`. Adding fields requires no migration.
 - **Outcome vocabulary.** `matches.outcome` is `win`, `draw`, or `aborted`; `winner_name` is
   winner-only and stays `null` for both draws and deploy-drain aborted matches.
-- **Replay storage.** `match_replays.artifact_json` stores `ReplayArtifactV1`; summaries and
-  launch strictly check artifact schema, map schema, map hash, and faction/loadout validity.
-  Build-SHA mismatches stay launchable with a warning because replay playback is attempted across
-  build drift.
+- **Replay storage.** `match_replays.artifact_json` stores the versioned `ReplayArtifactV1` JSON
+  contract. New writes use artifact schema 3: a launch-time map/checkpoint start state plus the
+  recorded command stream and end metadata. Legacy schema 2 rows remain loadable through the
+  legacy map/loadout start path. Summaries and launch strictly check supported artifact schema, map
+  schema, map hash, and faction/loadout validity. Build-SHA mismatches stay launchable with a
+  warning because replay playback is attempted across build drift.
 - **TLS to Supabase.** `DATABASE_URL` must include `?sslmode=require`.
 - **Drain-abort audit trail.** Interrupted deploy validation should find the forced-abort room log,
   aggregate forced-finalization result, `match recorded` with `outcome=aborted`/`replay=true`, and

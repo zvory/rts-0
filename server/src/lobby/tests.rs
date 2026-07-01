@@ -143,7 +143,9 @@ fn registry_test_replay_artifact() -> ReplayArtifactV1 {
         is_ai: false,
     }];
     let game = Game::new(&players, 0x5150_3003);
-    ReplayArtifactV1::capture_from_game(&game, crate::build_info::build_id(), None, game.scores())
+    rts_sim::game::replay::ReplayStartComposition::capture(&game, crate::build_info::build_id())
+        .unwrap()
+        .finalize(&game, None, game.scores())
 }
 
 #[derive(Default)]

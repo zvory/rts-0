@@ -47,19 +47,43 @@ pub(super) fn replay_test_players(count: usize) -> Vec<PlayerInit> {
 
 pub(super) fn replay_test_game(players: &[PlayerInit], seed: u32) -> Game {
     let metadata = Map::metadata_for_name("Default").unwrap();
-    let map = Map::load("Default", players.len(), seed).unwrap();
+    let start_players: Vec<_> = players
+        .iter()
+        .map(|player| {
+            let team_id = if player.team_id == 0 {
+                player.id
+            } else {
+                player.team_id
+            };
+            (player.id, team_id)
+        })
+        .collect();
+    let map = Map::load_for_players("Default", &start_players, seed).unwrap();
     Game::new_with_random_ai_profiles_and_map_metadata(players, seed, map, metadata)
 }
 
 pub(super) fn replay_test_artifact(players: &[PlayerInit], ticks: u32) -> (Game, ReplayArtifactV1) {
+    let (game, _replay_start, artifact) = replay_test_artifact_with_start(players, ticks);
+    (game, artifact)
+}
+
+pub(super) fn replay_test_artifact_with_start(
+    players: &[PlayerInit],
+    ticks: u32,
+) -> (
+    Game,
+    rts_sim::game::replay::ReplayStartComposition,
+    ReplayArtifactV1,
+) {
     let seed = 0x5150_2202;
     let mut game = replay_test_game(players, seed);
+    let replay_start =
+        rts_sim::game::replay::ReplayStartComposition::capture(&game, server_build_sha()).unwrap();
     for _ in 0..ticks {
         game.tick();
     }
-    let artifact =
-        ReplayArtifactV1::capture_from_game(&game, server_build_sha(), None, game.scores());
-    (game, artifact)
+    let artifact = replay_start.finalize(&game, None, game.scores());
+    (game, replay_start, artifact)
 }
 
 pub(super) fn replay_branch_test_seed(players: &[PlayerInit], ticks: u32) -> ReplayBranchSeed {

@@ -241,7 +241,7 @@ fn aborted_match_history_record_is_winnerless_and_replay_backed() {
 #[test]
 fn end_match_transitions_all_connected_players_to_tick_zero_replay() {
     let players = replay_test_players(2);
-    let (game, _artifact) = replay_test_artifact(&players, 3);
+    let (game, replay_start, _artifact) = replay_test_artifact_with_start(&players, 3);
     let mut task = RoomTask::new(
         "post-match-replay-test".to_string(),
         RoomMode::Normal,
@@ -253,6 +253,7 @@ fn end_match_transitions_all_connected_players_to_tick_zero_replay() {
     let mut writer_b = add_test_room_player(&mut task, players[1].id, true);
     task.match_player_count = 2;
     task.match_human_count = 2;
+    task.replay_start = Some(replay_start);
     task.outcome_sent.insert(players[1].id);
 
     task.players

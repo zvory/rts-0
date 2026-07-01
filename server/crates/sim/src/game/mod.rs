@@ -31,6 +31,7 @@ mod mortar;
 mod mortar_scatter;
 mod pathfinding;
 mod player_state;
+mod replay_artifact;
 pub mod replay;
 mod resource_placement;
 #[cfg(test)]

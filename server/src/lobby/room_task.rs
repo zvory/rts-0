@@ -15,6 +15,7 @@ use rts_ai::AiController;
 use rts_sim::game::entity::EntityKind;
 #[cfg(test)]
 use rts_sim::game::lab::{LabOp, LabSetPlayerResources};
+use rts_sim::game::replay::ReplayStartComposition;
 use tokio::time::Instant as TokioInstant;
 
 mod branch;
@@ -110,6 +111,10 @@ pub(super) struct RoomTask {
     match_map_name: String,
     /// Display names of every participant (humans + AI) in seat order, for match-history rows.
     match_participants: Vec<String>,
+    /// Tick-zero checkpoint-backed replay start captured at match launch and consumed when any
+    /// replay artifact is finalized. This stays outside `Game` so final state cannot be mistaken
+    /// for replay start state.
+    replay_start: Option<ReplayStartComposition>,
     /// Pre-match countdown deadline. While set, lobby membership/settings are frozen and the
     /// match starts on the first room tick at or after this instant.
     match_countdown_deadline: Option<TokioInstant>,
@@ -163,6 +168,7 @@ impl RoomTask {
             match_run_id: None,
             match_map_name: String::new(),
             match_participants: Vec::new(),
+            replay_start: None,
             match_countdown_deadline: None,
             drain,
             match_tracked_for_drain: false,

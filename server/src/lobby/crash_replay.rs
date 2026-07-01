@@ -1,17 +1,36 @@
 use super::*;
+use rts_sim::game::replay::ReplayStartComposition;
 
 /// Persist a replayable artifact when a room's tick panics (a true crash or, in debug
 /// builds, an `assert_invariants` failure). The path is logged and the full file contents
 /// are emitted to the log so an operator can copy them out of terminal output even if the
 /// disk write later disappears or the box is ephemeral.
-pub(super) fn dump_crash_replay(room: &str, game: &Game, reason: &str) {
-    let artifact = ReplayArtifactV1::capture_from_game(
-        game,
-        crate::build_info::build_id(),
-        None,
-        game.scores(),
-    );
-    let json = match serde_json::to_string_pretty(&artifact) {
+pub(super) fn dump_crash_replay(
+    room: &str,
+    game: &Game,
+    replay_start: Option<&ReplayStartComposition>,
+    reason: &str,
+) {
+    let Some(replay_start) = replay_start else {
+        crate::log_error!(
+            room = %room,
+            tick = game.tick_count(),
+            reason = %reason,
+            "tick panic: cannot write crash replay without launch-time start checkpoint"
+        );
+        return;
+    };
+    let artifact = replay_start.finalize(game, None, game.scores());
+    dump_crash_replay_artifact(room, game.tick_count(), &artifact, reason);
+}
+
+pub(super) fn dump_crash_replay_artifact(
+    room: &str,
+    tick: u32,
+    artifact: &ReplayArtifactV1,
+    reason: &str,
+) {
+    let json = match serde_json::to_string_pretty(artifact) {
         Ok(s) => s,
         Err(e) => {
             crate::log_error!(room = %room, reason = %reason, error = %e, "tick panic: failed to serialize crash replay");
@@ -36,7 +55,7 @@ pub(super) fn dump_crash_replay(room: &str, game: &Game, reason: &str) {
         Ok(_) => {
             crate::log_error!(
                 room = %room,
-                tick = game.tick_count(),
+                tick,
                 reason = %reason,
                 path = %path.display(),
                 "tick panic: crash replay written"
@@ -45,7 +64,7 @@ pub(super) fn dump_crash_replay(room: &str, game: &Game, reason: &str) {
         Err(e) => {
             crate::log_error!(
                 room = %room,
-                tick = game.tick_count(),
+                tick,
                 reason = %reason,
                 error = %e,
                 "tick panic: failed to write crash replay; dumping inline only"

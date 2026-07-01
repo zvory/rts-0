@@ -103,6 +103,7 @@ impl RoomTask {
         };
 
         let game = launch.game;
+        self.capture_replay_start_for(&game);
         self.branch_live_seat_by_connection = launch.seat_by_connection;
         self.record_live_match_started(
             launch.match_player_count,
