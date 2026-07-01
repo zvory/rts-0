@@ -1,6 +1,6 @@
 # Phase 1 - Checkpoint Payload Contract
 
-Status: Not started.
+Status: Done.
 
 ## Scope
 
