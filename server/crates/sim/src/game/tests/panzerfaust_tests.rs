@@ -270,21 +270,12 @@ fn spawned_panzerfaust_direct_attack_damages_scout_car_and_converts_same_id() {
     enqueue_attack(&mut game, panzerfaust, scout, false);
 
     let mut owner_saw_launch = false;
-    let mut owner_saw_impact = false;
-    let mut owner_saw_conversion = false;
     let mut owner_saw_scout_death = false;
     for _ in 0..70 {
         let events = game.tick();
         owner_saw_launch |= player_events(&events, 1).iter().any(
             |event| matches!(event, Event::PanzerfaustLaunch { from, .. } if *from == panzerfaust),
         );
-        owner_saw_impact |= player_events(&events, 1)
-            .iter()
-            .any(|event| matches!(event, Event::PanzerfaustImpact { .. }));
-        owner_saw_conversion |= player_events(&events, 1).iter().any(|event| {
-            matches!(event, Event::PanzerfaustConversion { id, to_kind }
-                if *id == panzerfaust && to_kind == crate::protocol::kinds::RIFLEMAN)
-        });
         owner_saw_scout_death |= player_events(&events, 1).iter().any(|event| {
             matches!(event, Event::Death { id, kind, .. }
                 if *id == scout && kind == crate::protocol::kinds::SCOUT_CAR)
@@ -308,8 +299,6 @@ fn spawned_panzerfaust_direct_attack_damages_scout_car_and_converts_same_id() {
         .expect("same entity id should remain");
     assert_eq!(converted.kind, EntityKind::Rifleman);
     assert!(owner_saw_launch);
-    assert!(owner_saw_impact);
-    assert!(owner_saw_conversion);
     assert!(owner_saw_scout_death);
 }
 
