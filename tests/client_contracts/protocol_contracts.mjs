@@ -39,6 +39,8 @@ import {
   STATE_CODE,
   UPGRADE,
   UPGRADE_CODE,
+  WEAPON_KIND,
+  WEAPON_KIND_CODE,
   cmd,
   decodeServerMessage,
   parseServerFrame,
@@ -291,6 +293,31 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
     "compact snapshot decodes server visibility grid",
   );
   assert(decoded.events[0].e === EVENT.ATTACK && decoded.events[0].to === 7, "attack event decodes");
+  const weaponEventDecoded = decodeServerMessage({
+    t: "snapshot",
+    v: COMPACT_SNAPSHOT_VERSION,
+    s: [43, 0, 0, 0, 0],
+    e: [],
+    ev: [
+      [EVENT_CODE[EVENT.ATTACK], 1, 7, null, null, WEAPON_KIND_CODE[WEAPON_KIND.TANK_CANNON]],
+      [EVENT_CODE[EVENT.ATTACK], 1, 7, null, [48, 96], WEAPON_KIND_CODE[WEAPON_KIND.ANTI_TANK_GUN]],
+      [EVENT_CODE[EVENT.ATTACK], 1, 7, null, null, 255],
+    ],
+    n: [0, 0, 0, 0, 0],
+  });
+  assert(
+    weaponEventDecoded.events[0].weaponKind === WEAPON_KIND.TANK_CANNON,
+    "six-slot compact attack event decodes weaponKind",
+  );
+  assert(
+    weaponEventDecoded.events[1].toPos[1] === 96 &&
+      weaponEventDecoded.events[1].weaponKind === WEAPON_KIND.ANTI_TANK_GUN,
+    "six-slot compact attack event preserves explicit null placeholders before weaponKind",
+  );
+  assert(
+    !("weaponKind" in weaponEventDecoded.events[2]),
+    "unknown compact weaponKind falls back to a missing weapon hint",
+  );
   assert(
     decoded.events[1].e === EVENT.OVERPENETRATION && decoded.events[1].to === 22,
     "overpenetration event decodes",

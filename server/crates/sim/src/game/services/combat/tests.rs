@@ -330,7 +330,6 @@ fn apply_test_damage_with_teams(
         10,
     );
 }
-
 #[test]
 fn idle_army_units_auto_acquire_targets() {
     let (entities, self_id, enemy_id) = rifleman_with_enemy();
@@ -1829,7 +1828,6 @@ fn packed_anti_tank_gun_fires_with_shorter_range_and_reduced_damage() {
         "packed anti-tank gun should deal 75% of its deployed 100 damage"
     );
 }
-
 #[test]
 fn deployed_anti_tank_gun_fires_at_long_range() {
     let mut entities = EntityStore::new();
@@ -1866,11 +1864,13 @@ fn deployed_anti_tank_gun_fires_at_long_range() {
                     to,
                     reveal: Some(reveal),
                     to_pos: Some(to_pos),
+                    weapon_kind: Some(weapon_kind),
                 } if *from == at_id
                     && *to == tank_id
                     && reveal.kind == crate::protocol::kind_to_wire(EntityKind::AntiTankGun)
                     && reveal.setup_state.as_deref() == Some(WeaponSetup::Deployed.to_protocol_str())
                     && *to_pos == [310.0, 100.0]
+                    && weapon_kind == crate::rules::combat::WeaponKind::AntiTankGun.stable_id()
             )
         })),
         "anti-tank attack event should carry shooter reveal and target position for visual feedback"

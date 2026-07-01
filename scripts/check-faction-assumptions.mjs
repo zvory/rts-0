@@ -240,6 +240,9 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/artillery.rs",
   "server/crates/sim/src/game/building_memory.rs",
   "server/crates/sim/src/game/command.rs",
+  // Panzerfaust conversion is a phase-scoped special case: the one-shot unit downgrades in place
+  // to a Rifleman after firing and remains intentionally outside normal production catalog flow.
+  "server/crates/sim/src/game/entity/mod.rs",
   "server/crates/sim/src/game/entity/entity.rs",
   "server/crates/sim/src/game/entity/store.rs",
   "server/crates/sim/src/game/fog.rs",
@@ -257,6 +260,8 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/services/combat/damage.rs",
   "server/crates/sim/src/game/services/combat/events.rs",
   "server/crates/sim/src/game/services/combat/mod.rs",
+  // Panzerfaust conversion events announce the post-shot Rifleman kind to visible clients.
+  "server/crates/sim/src/game/services/combat/panzerfaust/events.rs",
   // Default combat target policy is still current-roster based until catalog combat roles exist.
   "server/crates/sim/src/game/services/combat/priority.rs",
   "server/crates/sim/src/game/services/combat/projection.rs",

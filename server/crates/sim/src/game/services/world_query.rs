@@ -16,8 +16,12 @@
 
 use crate::config;
 use crate::game::entity::{Entity, EntityKind, EntityStore, NEUTRAL};
+use crate::game::fog::Fog;
 use crate::game::services::spatial::SpatialIndex;
+use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
+use crate::rules::combat as combat_rules;
+use crate::rules::projection;
 use crate::rules::terrain::{self, TerrainKind};
 
 // --- Ownership scans --------------------------------------------------------
@@ -149,6 +153,35 @@ pub(crate) fn is_enemy_targetable(
         && teams.is_enemy_owner(attacker_owner, candidate.owner)
         && candidate.is_targetable()
         && candidate.hp > 0
+}
+
+pub(crate) fn unit_attack_target_valid(
+    entities: &EntityStore,
+    teams: &TeamRelations,
+    fog: &Fog,
+    smokes: Option<&SmokeCloudStore>,
+    attacker_owner: u32,
+    attacker_id: u32,
+    target_id: u32,
+) -> bool {
+    let Some(attacker) = entities.get(attacker_id) else {
+        return false;
+    };
+    if attacker.owner != attacker_owner || attacker.hp == 0 || !attacker.is_unit() {
+        return false;
+    }
+    matches!(entities.get(target_id),
+        Some(target) if is_enemy_targetable(target, teams, attacker_owner, attacker_id)
+            && projection::team_visible_world(
+                attacker_owner,
+                target.pos_x,
+                target.pos_y,
+                fog,
+                teams
+            )
+            && smokes.is_none_or(|smokes| !smokes.point_inside(target.pos_x, target.pos_y))
+            && (attacker.kind != EntityKind::Panzerfaust
+                || combat_rules::is_panzerfaust_loaded_shot_target(target.kind)))
 }
 
 /// Nearest hostile entity (`is_enemy_targetable`) to `(px, py)` within `radius_px`.

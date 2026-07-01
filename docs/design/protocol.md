@@ -634,7 +634,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 29. `client/src/net.js` calls
+`messagepack-compact`, codec version 1, compact snapshot version 30. `client/src/net.js` calls
 `parseServerFrame`; the binary frame parser in `client/src/protocol_frame.js` returns the raw
 compact snapshot object, then `decodeCompactSnapshot` expands it back into the semantic object above
 before dispatching `S.SNAPSHOT`.
@@ -660,7 +660,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 29,
+  "v": 30,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
@@ -696,8 +696,9 @@ Compact numeric codes:
 | `ability` | 1 `charge`, 2 `smoke`, 3 `mortarFire`, 4 `pointFire`, 5 `breakthrough`, 6 `ekatTeleport`, 7 `ekatLineShot`, 8 `ekatMagicAnchor`, 9 `ekatConsumeGolem`, 10 `blanketFire` |
 | `abilityObject.kind` | 1 `returnMarker`, 2 `magicAnchor`, 3 `lineProjectile` |
 | `upgrade` | 1 `methamphetamines`, 2 `anti_tank_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock` (legacy decode only), 5 `mortar_autocast`, 6 `command_car_unlock`, 7 `ballistic_tables`, 8 `entrenchment` |
+| `weaponKind` | 1 `worker_tools`, 2 `golem_fists`, 3 `rifleman_rifle`, 4 `machine_gunner_mg`, 5 `scout_car_mg`, 6 `anti_tank_gun`, 7 `panzerfaust_loaded_shot`, 8 `mortar_team_mortar`, 9 `artillery_gun`, 10 `tank_cannon`, 11 `tank_coax` |
 | `notice.severity` | 1 `info`, 2 `warn`, 3 `alert` |
-| `EventRecord` | `[1, from, to]` attack, `[1, from, to, reveal?, toPos?]` attack with optional shooter reveal and target position, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice, `[5, [fromX, fromY], [toX, toY], delayTicks]` smoke launch, `[6, x, y, radiusTiles]` mortar impact/marker, `[6, x, y, radiusTiles, from?, reveal?]` mortar impact with optional shooter reveal, `[7, from, [x, y], radiusTiles, delayTicks]` artillery target marker, `[8, x, y, radiusTiles]` artillery impact, `[9, from, [fromX, fromY], [toX, toY], radiusTiles, delayTicks]` mortar launch, `[10, to]` overpenetration damage, `[11, owner, x, y, facing]` global artillery firing minimap marker, `[12, from, [fromX, fromY], [toX, toY], delayTicks]` Panzerfaust launch, `[13, x, y]` Panzerfaust impact, `[14, id, toKind]` Panzerfaust same-id conversion |
+| `EventRecord` | `[1, from, to]` attack, `[1, from, to, reveal?, toPos?]` legacy attack with optional shooter reveal and target position, `[1, from, to, revealOrNull, toPosOrNull, weaponKind]` attack with compact weapon hint, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice, `[5, [fromX, fromY], [toX, toY], delayTicks]` smoke launch, `[6, x, y, radiusTiles]` mortar impact/marker, `[6, x, y, radiusTiles, from?, reveal?]` mortar impact with optional shooter reveal, `[7, from, [x, y], radiusTiles, delayTicks]` artillery target marker, `[8, x, y, radiusTiles]` artillery impact, `[9, from, [fromX, fromY], [toX, toY], radiusTiles, delayTicks]` mortar launch, `[10, to]` overpenetration damage, `[11, owner, x, y, facing]` global artillery firing minimap marker, `[12, from, [fromX, fromY], [toX, toY], delayTicks]` Panzerfaust launch, `[13, x, y]` Panzerfaust impact, `[14, id, toKind]` Panzerfaust same-id conversion |
 
 #### 2.4.1 Boundary inventory
 
@@ -711,9 +712,9 @@ change the wire shape or compact snapshot version.
 | `terrain` codes | `server/crates/protocol/src/contract_metadata.rs` `terrain`, re-exported by `lib.rs`; adapter test checks rules terrain constants | `client/src/protocol_constants.js` `TERRAIN` and `PASSABLE`, re-exported by `client/src/protocol.js` | wire DTO / compact transport code | `tests/protocol_parity.mjs` extracts Rust terrain codes | Structured protocol constants dump | None | No compact snapshot bump today; terrain is in the `start.map.terrain` payload, not the compact snapshot frame |
 | `kinds` strings, `KIND`, `UNIT_KINDS`, `BUILDING_KINDS`, `RESOURCE_KINDS` | `server/crates/protocol/src/contract_metadata.rs` `kinds`, re-exported by `lib.rs`; domain identity is `rts-rules::EntityKind::stable_id()` | `client/src/protocol_constants.js` `KIND`, `UNIT_KINDS`, `BUILDING_KINDS`, `RESOURCE_KINDS`, re-exported by `client/src/protocol.js` | wire DTO plus domain adapter grouping | `tests/protocol_parity.mjs` checks kind code mapping; adapter tests round-trip every `EntityKind`; catalog parity checks many kind references | Structured protocol constants dump plus catalog export that classifies unit/building/resource groups | None | Bump only if compact kind codes or compact slots change; append-only codes otherwise |
 | `server/src/protocol.rs` and `server/crates/sim/src/protocol.rs` kind conversion | Rules/sim-aware adapter modules | No direct JS mirror beyond the protocol kind strings | domain adapter mapping | Rust adapter tests in both modules | One shared rules-aware adapter path with a single round-trip test | Not client data | No compact impact unless output kind strings/codes change |
-| `states`, `SETUP`, `NOTICE_SEVERITY`, `VISION_SELECTION`, and event discriminators | `server/crates/protocol/src/contract_metadata.rs` string vocabulary; compact event serialization lives in `server/crates/protocol/src/compact_snapshot.rs` | `client/src/protocol_constants.js` constants, re-exported by `client/src/protocol.js`; compact decoder lives in `client/src/protocol_snapshot.js` behind `decodeServerMessage` | wire DTO / compact transport code | `tests/protocol_parity.mjs` checks state, setup, notice severity, and event compact codes; selected decoder fixtures | Structured protocol constants and compact event-shape dump | None | Bump when compact event/entity slots change |
+| `states`, `SETUP`, `NOTICE_SEVERITY`, `VISION_SELECTION`, `WEAPON_KIND`, and event discriminators | `server/crates/protocol/src/contract_metadata.rs` string vocabulary; compact event serialization lives in `server/crates/protocol/src/compact_snapshot.rs` | `client/src/protocol_constants.js` constants, re-exported by `client/src/protocol.js`; compact decoder lives in `client/src/protocol_snapshot.js` behind `decodeServerMessage` | wire DTO / compact transport code | `tests/protocol_parity.mjs` checks state, setup, notice severity, weapon kind, and event compact codes; selected decoder fixtures | Structured protocol constants and compact event-shape dump | None | Bump when compact event/entity slots change |
 | `COMPACT_SNAPSHOT_VERSION`, `PREDICTION_PROTOCOL_VERSION`, compact top-level keys, optional entity slots, limits, and net status slots | `server/crates/protocol/src/contract_metadata.rs` owns versions and slot metadata; `server/crates/protocol/src/compact_snapshot.rs` compact serializer; `server/crates/protocol/src/messagepack_frame.rs` frame writer | `client/src/protocol_constants.js` `COMPACT_SNAPSHOT_VERSION` and `MAX_COMPACT_*` limits; `client/src/protocol_snapshot.js` compact decoder; `client/src/protocol_frame.js` binary frame parser | compact transport code | `tests/protocol_parity.mjs` source-text version checks and fixture decode | Structured compact schema dump including slot names, order, caps, and version | None | Direct owner of compact version; slot/order changes require bump unless strictly optional trailing additions preserve decoder compatibility by explicit decision |
-| Compact code tables for kind, state, setup, order stage, ability, ability object kind, upgrade, notice severity, and event records | `server/crates/protocol/src/contract_metadata.rs` code tables and code functions; compact event serializer lives in `server/crates/protocol/src/compact_snapshot.rs` | `client/src/protocol_constants.js` `*_CODE` and reverse-code maps, re-exported through `client/src/protocol.js` where public; compact record decoder lives in `client/src/protocol_snapshot.js` | compact transport code | `tests/protocol_parity.mjs` extracts Rust functions/events and rejects duplicate or `255` real codes | Structured protocol constants dump generated from Rust instead of source scraping | None | `255` remains unknown/sentinel; real codes must not use it. New codes should append without reusing old values; incompatible reorder/removal requires compact version bump |
+| Compact code tables for kind, state, setup, order stage, ability, ability object kind, upgrade, weapon kind, notice severity, and event records | `server/crates/protocol/src/contract_metadata.rs` code tables and code functions; compact event serializer lives in `server/crates/protocol/src/compact_snapshot.rs` | `client/src/protocol_constants.js` `*_CODE` and reverse-code maps, re-exported through `client/src/protocol.js` where public; compact record decoder lives in `client/src/protocol_snapshot.js` | compact transport code | `tests/protocol_parity.mjs` extracts Rust functions/events and rejects duplicate or `255` real codes | Structured protocol constants dump generated from Rust instead of source scraping | None | `255` remains unknown/sentinel; real codes must not use it. New codes should append without reusing old values; incompatible reorder/removal requires compact version bump |
 | Ability and upgrade ids in command/research/snapshot payloads | Protocol string modules in `server/crates/protocol/src/contract_metadata.rs`; catalog facts in `server/crates/rules/src/faction.rs` | `client/src/protocol_constants.js` `ABILITY`, `UPGRADE`, `ABILITY_CODE`, `UPGRADE_CODE`, re-exported by `client/src/protocol.js`; command-card descriptors in `client/src/config.js` | wire DTO, compact transport code, faction catalog fact | `tests/protocol_parity.mjs` checks protocol ids/codes; `scripts/check-faction-catalog-parity.mjs` checks catalog-exposed ability codes and descriptors | Structured protocol dump plus complete faction catalog dump | None where mirrored from Rust; catalog descriptors are not UI-only when exported by Rust | Code/order changes can require compact bump; descriptor-only changes do not |
 | `DEFAULT_FACTION_ID` | `server/crates/contract/src/lib.rs`, re-exported by protocol | `client/src/protocol.js` | wire DTO / faction catalog fact | `tests/protocol_parity.mjs`; `scripts/check-faction-catalog-parity.mjs` checks default catalog id | Structured contract/catalog dump | None | No compact impact |
 | `PLAYER_PALETTE` lobby colors | `server/src/lobby/mod.rs` assigns authoritative lobby/start colors | `client/src/config.js` fallback palette | server-owned presentation data mirrored by client | `tests/protocol_parity.mjs` source-scrapes the Rust palette | Structured lobby/config dump | Not client-only because server sends assigned colors; JS is fallback/render mirror | No compact impact |
@@ -888,7 +889,8 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
 ```
 { e: "attack", from: u32, to: u32,
   reveal?: { owner: u32, kind: string, x: f32, y: f32, facing?: f32, weaponFacing?: f32, setupState?: string },
-  toPos?: [f32, f32] }                         // for muzzle flashes / tracers
+  toPos?: [f32, f32],
+  weaponKind?: "worker_tools"|"golem_fists"|"rifleman_rifle"|"machine_gunner_mg"|"scout_car_mg"|"anti_tank_gun"|"panzerfaust_loaded_shot"|"mortar_team_mortar"|"artillery_gun"|"tank_cannon"|"tank_coax" } // feedback hint; unknown/missing hints fall back to attacker kind
 { e: "overpenetration", to: u32 }               // secondary penetration damage; no tracer/audio
 { e: "death",  id: u32, x: f32, y: f32, kind } // for death poofs
 { e: "build",  id: u32, kind: string }         // building completed
@@ -915,9 +917,13 @@ recipients whose team can currently see the shooter or target point. They includ
 that fires from fog can be rendered briefly as a semi-transparent, non-interactive silhouette above
 the fog overlay; Anti-Tank Gun reveals additionally become the actionable snapshot visibility
 described in §2.4. `toPos` lets tracers draw even when the hit target is no longer in the snapshot.
-Overpenetration events are sent for secondary entities damaged behind the primary target. They carry
-only the damaged entity id and do not imply a separate fired shot, muzzle flash, tracer, shooter
-reveal, weapon recoil, or attack sound.
+`weaponKind` is a closed, fog-safe feedback hint for attack events that would already be projected;
+current default direct-fire attacks emit their default weapon id, Tanks emit `tank_cannon`, and
+artillery self-reveal attacks emit `artillery_gun`. Clients must tolerate missing or unknown
+weapon ids by falling back to the legacy attacker-kind feedback path. Overpenetration events are
+sent for secondary entities damaged behind the primary target. They carry only the damaged entity id
+and do not imply a separate fired shot, muzzle flash, tracer, shooter reveal, weapon recoil, or
+attack sound.
 Full-world room projections, including dev watch and full-world lab vision, attach a deterministic
 deduplicated union of the per-player event buckets so transient effects match the exposed world
 state. Normal active-player views keep player-only event delivery. Live spectators and selected
@@ -967,16 +973,16 @@ recipients whose team currently sees the impact point; they do not reveal terrai
 exploration, or carry entity visibility. Artillery impact damage follows the same support-fire
 friendly-fire attribution rule as mortar splash: owned and allied entities in the radius can take
 damage, but same-team damage does not produce hostile reveal, under-attack, or score attribution.
-Panzerfaust launch events are reserved for the hidden one-shot anti-tank runtime. They carry the
-loaded unit id, launch point, intended visual endpoint, and travel delay, but never carry the target
-entity id. Launch events are sent to the firing team and to enemy recipients whose team-current fog
-can see the shooter or launch point; the endpoint must be withheld unless it is visible to that
-recipient or otherwise already safe through the recipient's projection. Panzerfaust impact events
-carry only the impact point and are sent to the firing team and to enemy recipients whose
-team-current fog can see that point; they do not imply damage, target identity, terrain reveal, or
-exploration. Panzerfaust conversion events carry only the same entity id and resulting kind, and
-must be projected only to recipients that can see that entity through ordinary snapshot visibility
-or owner/team projection on the conversion tick.
+Panzerfaust launch events are emitted by the hidden spawned-unit one-shot anti-tank runtime. They
+carry the loaded unit id, launch point, intended visual endpoint, and travel delay, but never carry
+the target entity id. Launch events are sent to the firing team and to enemy recipients whose
+team-current fog can see the shooter or launch point; the endpoint must be withheld unless it is
+visible to that recipient or otherwise already safe through the recipient's projection. Panzerfaust
+impact events carry only the impact point and are sent to the firing team and to enemy recipients
+whose team-current fog can see that point; they do not imply damage, target identity, terrain
+reveal, or exploration. Panzerfaust conversion events carry only the same entity id and resulting
+kind, and must be projected only to recipients that can see that entity through ordinary snapshot
+visibility or owner/team projection on the conversion tick.
 Events are best-effort visual flavor; the client must not depend on receiving them.
 
 #### 2.5.1 Projection contract summary

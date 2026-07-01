@@ -181,9 +181,10 @@ Core unit roles:
 - **Tank** is the machine-gun breaker and open-ground power unit: immune to rifle and
   machine-gun small-arms fire, strong against static defenses and exposed infantry, but
   vulnerable to other tanks and anti-tank infantry.
-- **Panzerfaust** is reserved hidden vocabulary for a Training Centre-unlocked infantry
-  anti-tank ambusher. It has rules metadata and protocol ids in this phase but is not in any
-  current faction catalog, command card, lab spawn catalog, or AI build plan yet.
+- **Panzerfaust** is hidden spawned-unit vocabulary for a Training Centre-unlocked infantry
+  anti-tank ambusher. It has rules metadata, protocol ids, and server-authoritative one-shot
+  runtime behavior, but is not in any current faction catalog, command card, lab spawn catalog, or
+  AI build plan yet.
 - **Anti-tank gun team** is the ambush counter to tanks: it can fight while packed at short
   range with reduced damage, or manually set up into a longer-ranged fixed field of fire.
   Deployed guns are dangerous from the side or rear, but weak or inefficient against regular
@@ -292,9 +293,10 @@ folded into default targeting.
   Methamphetamines reduces the windup and recovery constants to 12 ticks each; travel stays
   15 ticks. The `panzerfaust` unit definition carries 45 HP, 8-tile sight, 9 px radius,
   1.44 px/tick loaded speed, 60 steel / 15 oil cost, 1 supply, and 400 build ticks, but keeps
-  default damage and cooldown at zero so no repeat-fire default attack path exists before the
-  dedicated one-shot runtime phase. Its future Barracks/Training Centre production metadata is
-  reserved on the hidden unit definition, but it is omitted from active Barracks train lists until
+  default damage and cooldown at zero so no repeat-fire default attack path exists. Spawned
+  Panzerfaust entities use the dedicated server one-shot runtime, then convert into same-id
+  Riflemen after recovery. Its future Barracks/Training Centre production metadata is reserved on
+  the hidden unit definition, but it is omitted from active Barracks train lists until
   the production exposure phase.
 - Tank hull-facing damage modifiers for tank and anti-tank gun hits are 1.0x front, 1.5x side,
   and 1.7x rear.

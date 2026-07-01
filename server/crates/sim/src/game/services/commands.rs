@@ -997,10 +997,7 @@ fn attack_unit_can_target(
     unit: u32,
     target: u32,
 ) -> bool {
-    matches!(entities.get(target),
-        Some(t) if world_query::is_enemy_targetable(t, teams, player, unit)
-            && rules::projection::team_visible_world(player, t.pos_x, t.pos_y, fog, teams)
-            && !smokes.point_inside(t.pos_x, t.pos_y))
+    world_query::unit_attack_target_valid(entities, teams, fog, Some(smokes), player, unit, target)
 }
 
 fn deconstruct_target_valid(
@@ -1485,12 +1482,12 @@ fn try_fire_artillery(
                 to: unit,
                 reveal: Some(reveal.clone()),
                 to_pos: None,
+                weapon_kind: Some(rules::combat::WeaponKind::ArtilleryGun.stable_id().to_string()),
             });
         }
     }
     true
 }
-
 #[allow(clippy::too_many_arguments)]
 pub(in crate::game) fn artillery_point_fire_system(
     map: &Map,

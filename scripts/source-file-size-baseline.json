@@ -35,7 +35,7 @@
     },
     {
       "path": "server/crates/sim/src/game/services/commands.rs",
-      "lines": 1929,
+      "lines": 1926,
       "reason": "Artillery UX Phase 3 adds server-authoritative Blanket Fire command routing and shared Point/Blanket firing execution to the existing oversized command service; keep ratcheting until artillery command runtime is extracted."
     },
     {
@@ -50,8 +50,8 @@
     },
     {
       "path": "server/crates/sim/src/game/services/order_queue.rs",
-      "lines": 1558,
-      "reason": "Artillery UX Phase 3 adds Blanket Fire queued-order promotion alongside Point Fire in the existing oversized order adapter; keep ratcheting until queue validation is extracted."
+      "lines": 1580,
+      "reason": "Panzerfaust Phase 3 extends queued attack promotion with shared loaded-shot legality, smoke-aware target validation, and current-range completion checks in the existing oversized order adapter; keep ratcheting until queue validation is extracted."
     },
     {
       "path": "server/crates/sim/src/game/services/pathing.rs",

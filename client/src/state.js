@@ -455,7 +455,7 @@ export class GameState {
   /**
    * Return live muzzle-flash records, pruning expired ones.
    * @param {number} now
-   * @returns {Array<{from:number,to:number,createdAt:number}>}
+   * @returns {Array<{from:number,to:number,targetPos?:object,weaponKind?:string,createdAt:number}>}
    */
   liveMuzzleFlashes(now) {
     return this.visualEffects.liveMuzzleFlashes(now);
@@ -466,10 +466,11 @@ export class GameState {
    * @param {number} id
    * @param {string=} kind
    * @param {number} now
+   * @param {string=} weaponKind
    * @returns {number}
    */
-  weaponRecoil(id, kind, now) {
-    return this.visualEffects.weaponRecoil(id, kind, now);
+  weaponRecoil(id, kind, now, weaponKind) {
+    return this.visualEffects.weaponRecoil(id, kind, now, weaponKind);
   }
 
   /**

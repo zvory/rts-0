@@ -35,6 +35,8 @@ import {
   TERRAIN,
   UPGRADE,
   UPGRADE_CODE,
+  WEAPON_KIND,
+  WEAPON_KIND_CODE,
   COMPACT_SNAPSHOT_VERSION,
   SNAPSHOT_CODEC,
   SNAPSHOT_CODEC_VERSION,
@@ -119,6 +121,8 @@ const STABLE_JS_PROTOCOL_EXPORTS = [
   "UNIT_KINDS",
   "UPGRADE",
   "UPGRADE_CODE",
+  "WEAPON_KIND",
+  "WEAPON_KIND_CODE",
   "cmd",
   "decodeServerMessage",
   "isBuilding",
@@ -206,6 +210,7 @@ assertSameMap(
 );
 assertSameMap("lobby kind vocabulary", protocolContract.vocabularies.lobbyKinds, LOBBY_KIND);
 assertSameMap("upgrade vocabulary", protocolContract.vocabularies.upgrades, UPGRADE);
+assertSameMap("weapon kind vocabulary", protocolContract.vocabularies.weaponKinds, WEAPON_KIND);
 assertSameMap("notice severity vocabulary", protocolContract.vocabularies.noticeSeverities, NOTICE_SEVERITY);
 assertSameMap("order stage vocabulary", protocolContract.vocabularies.orderStages, ORDER_STAGE);
 assertSameMap("terrain", protocolContract.compactCodes.terrain, TERRAIN);
@@ -217,6 +222,7 @@ assertSameCodes("order stage", protocolContract.compactCodes.orderStage, ORDER_S
 assertSameCodes("ability", protocolContract.compactCodes.ability, ABILITY_CODE);
 assertSameCodes("ability object kind", protocolContract.compactCodes.abilityObjectKind, ABILITY_OBJECT_KIND_CODE);
 assertSameCodes("upgrade", protocolContract.compactCodes.upgrade, UPGRADE_CODE);
+assertSameCodes("weapon kind", protocolContract.compactCodes.weaponKind, WEAPON_KIND_CODE);
 assertSameCodes("notice severity", protocolContract.compactCodes.noticeSeverity, NOTICE_SEVERITY_CODE);
 assertSameCodes(
   "resource kind",
@@ -287,6 +293,7 @@ assertDocsCodeTable("orderStage", protocolContract.compactCodes.orderStage);
 assertDocsCodeTable("ability", protocolContract.compactCodes.ability);
 assertDocsCodeTable("abilityObject.kind", protocolContract.compactCodes.abilityObjectKind);
 assertDocsCodeTable("upgrade", protocolContract.compactCodes.upgrade);
+assertDocsCodeTable("weaponKind", protocolContract.compactCodes.weaponKind);
 assertDocsCodeTable("notice.severity", protocolContract.compactCodes.noticeSeverity);
 
 assert(

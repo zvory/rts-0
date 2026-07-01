@@ -1,4 +1,4 @@
-import { KIND, STATE, isUnit } from "./protocol.js";
+import { KIND, STATE, WEAPON_KIND, isUnit } from "./protocol.js";
 
 const SHOT_REVEAL_MS = 1500;
 const WEAPON_RECOIL_MS = Object.freeze({
@@ -10,12 +10,22 @@ const WEAPON_RECOIL_MS = Object.freeze({
   [KIND.SCOUT_CAR]: 160,
   [KIND.TANK]: 650,
 });
+const WEAPON_RECOIL_MS_BY_WEAPON_KIND = Object.freeze({
+  [WEAPON_KIND.RIFLEMAN_RIFLE]: WEAPON_RECOIL_MS[KIND.RIFLEMAN],
+  [WEAPON_KIND.MACHINE_GUNNER_MG]: WEAPON_RECOIL_MS[KIND.MACHINE_GUNNER],
+  [WEAPON_KIND.ANTI_TANK_GUN]: WEAPON_RECOIL_MS[KIND.ANTI_TANK_GUN],
+  [WEAPON_KIND.MORTAR_TEAM_MORTAR]: WEAPON_RECOIL_MS[KIND.MORTAR_TEAM],
+  [WEAPON_KIND.ARTILLERY_GUN]: WEAPON_RECOIL_MS[KIND.ARTILLERY],
+  [WEAPON_KIND.SCOUT_CAR_MG]: WEAPON_RECOIL_MS[KIND.SCOUT_CAR],
+  [WEAPON_KIND.TANK_CANNON]: WEAPON_RECOIL_MS[KIND.TANK],
+  [WEAPON_KIND.TANK_COAX]: WEAPON_RECOIL_MS[KIND.TANK],
+});
 
 export class VisualEffectBuffers {
   constructor() {
     /** @type {Array<{fromX:number,fromY:number,toX:number,toY:number,durationMs:number,createdAt:number}>} */
     this.smokeCanisters = [];
-    /** @type {Array<{from:number,to:number,createdAt:number}>} */
+    /** @type {Array<{from:number,to:number,targetPos?:object,weaponKind?:string,createdAt:number}>} */
     this.muzzleFlashes = [];
     /** @type {Array<{x:number,y:number,createdAt:number}>} */
     this.mortarLaunches = [];
@@ -31,7 +41,7 @@ export class VisualEffectBuffers {
     this.artilleryLaunches = [];
     /** @type {Array<{x:number,y:number,radiusTiles:number,seed:number,createdAt:number}>} */
     this.artilleryImpacts = [];
-    /** @type {Map<number, number>} attacker id -> latest shot receive time. */
+    /** @type {Map<number, number|{startedAt:number,weaponKind?:string}>} attacker id -> latest shot receive time. */
     this.weaponRecoilById = new Map();
     /** @type {Array<{x:number,y:number,createdAt:number}>} */
     this.pendingMortarTargets = [];
@@ -65,9 +75,15 @@ export class VisualEffectBuffers {
       if (ev && ev.e === "attack" && typeof ev.from === "number" && typeof ev.to === "number") {
         const targetPos = eventTargetPos(ev);
         if (ev.from !== ev.to) {
-          this.muzzleFlashes.push({ from: ev.from, to: ev.to, targetPos, createdAt: now });
+          this.muzzleFlashes.push({
+            from: ev.from,
+            to: ev.to,
+            targetPos,
+            weaponKind: normalizedWeaponKind(ev.weaponKind),
+            createdAt: now,
+          });
         }
-        this.weaponRecoilById.set(ev.from, now);
+        this.weaponRecoilById.set(ev.from, recoilRecord(now, ev.weaponKind));
       } else if (ev && ev.e === "smokeLaunch") {
         this.addSmokeCanister(ev, now);
       } else if (ev && ev.e === "mortarLaunch") {
@@ -97,7 +113,7 @@ export class VisualEffectBuffers {
     const radiusTiles = Number.isFinite(ev.radiusTiles) ? ev.radiusTiles : 1.5;
     const seed = Math.floor(ev.toX * 13 + ev.toY * 7 + now) >>> 0;
     if (typeof ev.from === "number") {
-      this.weaponRecoilById.set(ev.from, now);
+      this.weaponRecoilById.set(ev.from, recoilRecord(now, WEAPON_KIND.MORTAR_TEAM_MORTAR));
     }
     this.pendingMortarTargets = this.pendingMortarTargets.filter(
       (p) => Math.hypot(p.x - ev.toX, p.y - ev.toY) > 2,
@@ -152,7 +168,7 @@ export class VisualEffectBuffers {
   addArtilleryTarget(ev, now = performance.now(), entityById = null) {
     if (!Number.isFinite(ev.x) || !Number.isFinite(ev.y)) return;
     if (typeof ev.from === "number") {
-      this.weaponRecoilById.set(ev.from, now);
+      this.weaponRecoilById.set(ev.from, recoilRecord(now, WEAPON_KIND.ARTILLERY_GUN));
       const shooter = typeof entityById === "function" ? entityById(ev.from) : null;
       if (shooter && Number.isFinite(shooter.x) && Number.isFinite(shooter.y)) {
         const facing = Number.isFinite(shooter.weaponFacing)
@@ -265,14 +281,17 @@ export class VisualEffectBuffers {
     return this.muzzleFlashes;
   }
 
-  weaponRecoil(id, kind, now) {
+  weaponRecoil(id, kind, now, weaponKind) {
     if (typeof now !== "number") {
       now = kind;
       kind = undefined;
+      weaponKind = undefined;
     }
-    const startedAt = this.weaponRecoilById.get(id);
+    const record = this.weaponRecoilById.get(id);
+    const startedAt = typeof record === "number" ? record : record?.startedAt;
     if (typeof startedAt !== "number") return 0;
-    const ttlMs = WEAPON_RECOIL_MS[kind] || 300;
+    const recoilWeaponKind = normalizedWeaponKind(weaponKind) || normalizedWeaponKind(record?.weaponKind);
+    const ttlMs = recoilMsFor(kind, recoilWeaponKind);
     const age = now - startedAt;
     if (age < 0) return 1;
     if (age > ttlMs) {
@@ -335,6 +354,19 @@ export class VisualEffectBuffers {
     trimHead(this.artilleryLaunches, 32);
     trimHead(this.artilleryImpacts, 32);
   }
+}
+
+function recoilRecord(startedAt, weaponKind) {
+  const normalized = normalizedWeaponKind(weaponKind);
+  return normalized ? { startedAt, weaponKind: normalized } : startedAt;
+}
+
+function normalizedWeaponKind(weaponKind) {
+  return Object.values(WEAPON_KIND).includes(weaponKind) ? weaponKind : undefined;
+}
+
+function recoilMsFor(kind, weaponKind) {
+  return WEAPON_RECOIL_MS_BY_WEAPON_KIND[weaponKind] || WEAPON_RECOIL_MS[kind] || 300;
 }
 
 function eventTargetPos(ev) {

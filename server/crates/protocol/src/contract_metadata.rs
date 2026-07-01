@@ -96,13 +96,28 @@ pub mod upgrades {
     pub const MORTAR_AUTOCAST: &str = "mortar_autocast";
 }
 
+/// Closed `Event::Attack.weaponKind` values.
+pub mod weapons {
+    pub const WORKER_TOOLS: &str = "worker_tools";
+    pub const GOLEM_FISTS: &str = "golem_fists";
+    pub const RIFLEMAN_RIFLE: &str = "rifleman_rifle";
+    pub const MACHINE_GUNNER_MG: &str = "machine_gunner_mg";
+    pub const SCOUT_CAR_MG: &str = "scout_car_mg";
+    pub const ANTI_TANK_GUN: &str = "anti_tank_gun";
+    pub const PANZERFAUST_LOADED_SHOT: &str = "panzerfaust_loaded_shot";
+    pub const MORTAR_TEAM_MORTAR: &str = "mortar_team_mortar";
+    pub const ARTILLERY_GUN: &str = "artillery_gun";
+    pub const TANK_CANNON: &str = "tank_cannon";
+    pub const TANK_COAX: &str = "tank_coax";
+}
+
 /// Version for the array-shaped compact snapshot representation sent over WebSocket.
 ///
 /// [`Snapshot`] remains the semantic source of truth for game code. This format is only a
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 29;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 30;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -156,6 +171,7 @@ pub struct ProtocolVocabularies {
     ability_object_kinds: BTreeMap<&'static str, &'static str>,
     lobby_kinds: BTreeMap<&'static str, &'static str>,
     upgrades: BTreeMap<&'static str, &'static str>,
+    weapon_kinds: BTreeMap<&'static str, &'static str>,
     notice_severities: BTreeMap<&'static str, &'static str>,
     order_stages: BTreeMap<&'static str, &'static str>,
     resource_kinds: BTreeMap<&'static str, &'static str>,
@@ -173,6 +189,7 @@ pub struct ProtocolCompactCodes {
     ability: BTreeMap<&'static str, u8>,
     ability_object_kind: BTreeMap<&'static str, u8>,
     upgrade: BTreeMap<&'static str, u8>,
+    weapon_kind: BTreeMap<&'static str, u8>,
     notice_severity: BTreeMap<&'static str, u8>,
     resource_kind: BTreeMap<&'static str, u8>,
 }
@@ -374,6 +391,20 @@ const UPGRADE_CODES: &[(&str, u8)] = &[
     (upgrades::ENTRENCHMENT, 8),
 ];
 
+const WEAPON_KIND_CODES: &[(&str, u8)] = &[
+    (weapons::WORKER_TOOLS, 1),
+    (weapons::GOLEM_FISTS, 2),
+    (weapons::RIFLEMAN_RIFLE, 3),
+    (weapons::MACHINE_GUNNER_MG, 4),
+    (weapons::SCOUT_CAR_MG, 5),
+    (weapons::ANTI_TANK_GUN, 6),
+    (weapons::PANZERFAUST_LOADED_SHOT, 7),
+    (weapons::MORTAR_TEAM_MORTAR, 8),
+    (weapons::ARTILLERY_GUN, 9),
+    (weapons::TANK_CANNON, 10),
+    (weapons::TANK_COAX, 11),
+];
+
 fn lookup_code(entries: &[(&str, u8)], value: &str) -> u8 {
     entries
         .iter()
@@ -489,6 +520,7 @@ pub fn protocol_contract() -> ProtocolContract {
             ability_object_kinds: ability_object_kind_vocabulary(),
             lobby_kinds: lobby_kind_vocabulary(),
             upgrades: upgrade_vocabulary(),
+            weapon_kinds: weapon_kind_vocabulary(),
             notice_severities: notice_severity_vocabulary(),
             order_stages: order_stage_vocabulary(),
             resource_kinds: resource_kind_vocabulary(),
@@ -503,6 +535,7 @@ pub fn protocol_contract() -> ProtocolContract {
             ability: ability_codes(),
             ability_object_kind: ability_object_kind_codes(),
             upgrade: upgrade_codes(),
+            weapon_kind: weapon_kind_codes(),
             notice_severity: notice_severity_codes(),
             resource_kind: code_map(&[
                 (kinds::STEEL, kind_code(kinds::STEEL)),
@@ -621,6 +654,22 @@ fn upgrade_vocabulary() -> BTreeMap<&'static str, &'static str> {
     ])
 }
 
+fn weapon_kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
+    string_map(&[
+        ("WORKER_TOOLS", weapons::WORKER_TOOLS),
+        ("GOLEM_FISTS", weapons::GOLEM_FISTS),
+        ("RIFLEMAN_RIFLE", weapons::RIFLEMAN_RIFLE),
+        ("MACHINE_GUNNER_MG", weapons::MACHINE_GUNNER_MG),
+        ("SCOUT_CAR_MG", weapons::SCOUT_CAR_MG),
+        ("ANTI_TANK_GUN", weapons::ANTI_TANK_GUN),
+        ("PANZERFAUST_LOADED_SHOT", weapons::PANZERFAUST_LOADED_SHOT),
+        ("MORTAR_TEAM_MORTAR", weapons::MORTAR_TEAM_MORTAR),
+        ("ARTILLERY_GUN", weapons::ARTILLERY_GUN),
+        ("TANK_CANNON", weapons::TANK_CANNON),
+        ("TANK_COAX", weapons::TANK_COAX),
+    ])
+}
+
 fn notice_severity_vocabulary() -> BTreeMap<&'static str, &'static str> {
     string_map(&[("INFO", "info"), ("WARN", "warn"), ("ALERT", "alert")])
 }
@@ -681,6 +730,10 @@ fn ability_object_kind_codes() -> BTreeMap<&'static str, u8> {
 
 fn upgrade_codes() -> BTreeMap<&'static str, u8> {
     code_map(UPGRADE_CODES)
+}
+
+fn weapon_kind_codes() -> BTreeMap<&'static str, u8> {
+    code_map(WEAPON_KIND_CODES)
 }
 
 fn notice_severity_codes() -> BTreeMap<&'static str, u8> {
@@ -795,6 +848,7 @@ fn event_slot_schemas() -> BTreeMap<&'static str, Vec<SlotField>> {
                 field(2, "to"),
                 optional_field(3, "reveal"),
                 optional_field(4, "toPos"),
+                optional_code_field(5, "weaponKind", "weaponKind"),
             ],
         ),
         (
@@ -942,6 +996,10 @@ pub(crate) fn ability_object_kind_code(kind: &str) -> u8 {
 
 pub(crate) fn upgrade_code(upgrade: &str) -> u8 {
     lookup_code(UPGRADE_CODES, upgrade)
+}
+
+pub(crate) fn weapon_kind_code(weapon_kind: &str) -> u8 {
+    lookup_code(WEAPON_KIND_CODES, weapon_kind)
 }
 
 pub(crate) fn notice_severity_code(severity: NoticeSeverity) -> u8 {

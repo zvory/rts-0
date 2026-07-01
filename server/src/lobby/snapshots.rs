@@ -102,6 +102,7 @@ mod tests {
             to: 2,
             reveal: None,
             to_pos: None,
+            weapon_kind: None,
         };
         let p1_events = vec![
             private_notice.clone(),
