@@ -1,9 +1,9 @@
 # Panzerfaust Unit Checklist
 
 Status: Phase 0 brief and Phase 1 rules/balance spec drafted with user-reviewed close-range tuning;
-Phases 2-7 have implemented hidden vocabulary, runtime/client inspection, normal Barracks
-production exposure, first-pass launch/impact audio feedback, and final focused regression/dev
-inspection coverage.
+Phases 2-8 have implemented hidden vocabulary, runtime/client inspection, normal Barracks
+production exposure, first-pass launch/impact audio feedback, final focused regression/dev
+inspection coverage, and the final review package.
 This file follows [docs/new-unit-checklist.md](../../docs/new-unit-checklist.md).
 
 Read: [docs/context/balance.md](../../docs/context/balance.md),
@@ -179,8 +179,76 @@ Exit criteria:
 - [x] The unit's numbers and rules can be reviewed without reading implementation code.
 - [x] Any unresolved tuning item is marked as deferred and assigned to a later pass.
   - Deferred: direct Training Centre production alternative, broader armored/hard target filters,
-    hull-facing multipliers, final visuals, production-quality Panzerfaust audio recordings,
-    optional travel/conversion audio after playtests, exact protocol/event representation, and AI
-    build strategy.
+    hull-facing multipliers, final art/audio polish beyond the first pass, optional
+    travel/conversion audio after playtests, and AI build strategy.
 - [x] No implementation files have been edited.
 - [x] The next step is user review, not implementation.
+
+## Phase 8: Human Review Package
+
+- [x] Keep the implementation split into reviewable phases.
+  - Phase 2 through Phase 8 are separate phase files, and implemented phases 2-7 are already marked
+    done.
+- [x] Summarize player-facing behavior and known deferred work.
+  - Player-facing summary: Barracks can train Panzerfaust infantry after a completed Training
+    Centre. The unit is a close-range anti-tank ambusher that fires one Tank-only armor-piercing
+    shot, then converts into a normal Rifleman with the same entity id.
+  - Deferred work remains limited to the direct Training Centre production alternative, broader
+    armored/hard target filters, hull-facing multipliers, final art/audio polish beyond the first
+    pass, optional travel/conversion audio after playtests, and AI training strategy.
+- [x] Include patch-note bullets for stats, economy, combat behavior, UI affordances, and expected
+      strategic impact.
+  - Barracks gains Panzerfaust infantry after a completed Training Centre.
+  - Panzerfaust costs 60 steel / 15 oil, uses 1 supply, has 45 HP, 8-tile sight, 9 px radius,
+    1.44 px/tick loaded speed, and trains in 400 ticks.
+  - Panzerfaust carries one 60-damage armor-piercing shot against visible enemy Tanks at 3-tile
+    range, or 4-tile range while actively occupying a trench.
+  - The loaded shot has 15-tick windup, 15-tick travel, and 15-tick recovery. Methamphetamines
+    reduces windup and recovery to 12 ticks each and increases loaded movement speed, but the
+    loaded unit still stops to fire.
+  - After recovery, the unit converts into a normal Rifleman with the same id, HP, position,
+    selection/control-group continuity, and valid queued follow-up orders.
+  - The Barracks command card exposes Panzerfaust with hotkey `E`; visual launch/impact feedback
+    and low-gain spatial launch/impact audio are first-pass dedicated Panzerfaust cues.
+  - AI production profiles intentionally do not train Panzerfaust units in this pass, but spawned
+    AI-owned Panzerfausts use normal target acquisition against legal Tanks.
+  - Strategic impact to watch in playtests: whether the current cost, short range, one-shot damage,
+    and conversion timing punish unsupported Tanks without making normal armor pushes overly brittle.
+- [x] Link or name the debug scenario used for human inspection.
+  - Primary smoke path: in a normal Kriegsia match, build Barracks and Training Centre, train a
+    Panzerfaust, fire once at a Tank, observe damage and same-id Rifleman conversion, then inspect a
+    replay or fog/spectator view.
+  - Dev scenarios for targeted inspection: `/dev/scenarios?id=panzerfaust_duel&unit=panzerfaust&count=1`,
+    `/dev/scenarios?id=panzerfaust_windup_cancel&unit=panzerfaust&count=1`,
+    `/dev/scenarios?id=panzerfaust_target_death&unit=panzerfaust&count=1`,
+    `/dev/scenarios?id=panzerfaust_entrenched_range&unit=panzerfaust&count=1`, and
+    `/dev/scenarios?id=panzerfaust_methamphetamines&unit=panzerfaust&count=1`.
+- [x] Call out cross-file contracts touched.
+  - Balance mirror: Rust rules definitions, faction catalog exports, client config mirrors, and
+    `docs/design/balance.md` agree on stats, cost, supply, train source, Training Centre
+    prerequisite, one-shot timing, Methamphetamines timing, and Entrenchment range.
+  - Protocol mirror: Rust/JS kind vocabulary includes `panzerfaust`, weapon vocabulary includes
+    `panzerfaust_loaded_shot`, and fog-safe Panzerfaust launch, impact, and conversion events are
+    documented in `docs/design/protocol.md`.
+  - Server sim: the dedicated one-shot state machine lives inside the sim combat service; no new
+    public `Game` API was required.
+  - Fog/projection: launch endpoints, impacts, conversions, target ids, and hidden positions remain
+    recipient-gated by server projection; client visual events do not stamp local fog.
+  - Client UI: command-card descriptors, hotkeys, config mirrors, renderer state, and audio mapping
+    all route through existing dependency-injected client modules.
+- [x] Confirm there are no stray debug logs, debug events, hidden console output, temporary UI labels,
+      placeholder names, or accidental lobby/match messages.
+  - Final sweep found Panzerfaust references in expected docs, tests, protocol/config mirrors,
+    runtime code, dev scenarios, renderer/audio assets, and wiki/catalog surfaces. No
+    Panzerfaust-specific temporary debug label or stray logging path remains in the implementation.
+- [x] Confirm every deferred item has an owner, follow-up task, or explicit decision to leave it out.
+  - Product/balance follow-up: direct Training Centre production, broader target filters, and
+    hull-facing multipliers.
+  - Client polish follow-up: final art/audio treatment and optional travel or conversion sounds
+    after clustered-fire playtests.
+  - AI follow-up: whether and when live AI profiles should train Panzerfaust units.
+
+Exit criteria:
+
+- [x] A reviewer can answer what changed, how to try it, what was tested, and what remains unfinished
+      without reconstructing the whole implementation from code.
