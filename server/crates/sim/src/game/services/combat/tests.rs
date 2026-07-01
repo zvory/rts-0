@@ -95,7 +95,6 @@ fn resolve_tank_test_target(
     fog.recompute(&[1, 2, 3], entities, map);
     let smokes = SmokeCloudStore::new();
     let tank = entities.get(tank_id).expect("tank should exist");
-
     resolve_target(
         map,
         entities,
