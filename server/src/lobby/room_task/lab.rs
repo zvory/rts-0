@@ -186,7 +186,7 @@ fn lab_op_kind(op: &LabClientOp) -> &'static str {
 
 fn lab_client_op_to_game_op(op: LabClientOp) -> Result<LabOp, String> {
     match op {
-        LabClientOp::ImportScenario { scenario } => lab_scenario_payload_to_lab_op(scenario),
+        LabClientOp::ImportScenario { scenario } => lab_scenario_payload_to_lab_op(*scenario),
         LabClientOp::SpawnEntity {
             owner,
             kind,

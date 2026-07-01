@@ -1585,7 +1585,7 @@ async fn handle_client_message(
                 RoomEvent::Lab {
                     player_id,
                     request_id,
-                    op,
+                    op: *op,
                 },
             )
             .await;

@@ -547,7 +547,7 @@ fn lab_scenario_export_and_import_round_trip_through_room_ops() {
         99,
         24,
         LabClientOp::ImportScenario {
-            scenario: crate::protocol::LabScenarioPayload::Checkpoint(scenario),
+            scenario: Box::new(crate::protocol::LabScenarioPayload::Checkpoint(scenario)),
         },
     );
     let import_result = lab_results(&mut writer).pop().expect("import result");
@@ -654,7 +654,13 @@ fn lab_timeline_resets_on_scenario_import() {
         2
     );
 
-    task.on_lab_request(99, 43, LabClientOp::ImportScenario { scenario });
+    task.on_lab_request(
+        99,
+        43,
+        LabClientOp::ImportScenario {
+            scenario: Box::new(scenario),
+        },
+    );
     let messages: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
     assert!(messages.iter().any(|msg| {
         matches!(

@@ -137,7 +137,7 @@ pub enum ClientMessage {
     Lab {
         #[serde(rename = "requestId")]
         request_id: u32,
-        op: LabClientOp,
+        op: Box<LabClientOp>,
     },
     /// Request a new practice branch room from this replay room's current authoritative tick.
     RequestBranchFromTick,
@@ -287,7 +287,7 @@ pub enum LabClientOp {
         name: Option<String>,
     },
     ImportScenario {
-        scenario: LabScenarioPayload,
+        scenario: Box<LabScenarioPayload>,
     },
     ValidateScenario {
         metadata: LabScenarioAuthoringMetadata,
