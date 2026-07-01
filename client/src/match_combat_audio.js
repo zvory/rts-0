@@ -32,11 +32,6 @@ const COMBAT_SOUNDS = Object.freeze({
     priority: 4,
     gain: 2,
   },
-  [KIND.ARTILLERY]: {
-    ids: ["combat_artillery_fire_05"],
-    priority: 4.5,
-    gain: ARTILLERY_FIRE_GAIN,
-  },
   [KIND.MACHINE_GUNNER]: {
     ids: ["combat_mg_burst_02", "combat_mg_burst_03"],
     priority: 2.5,
@@ -67,6 +62,7 @@ export class MatchCombatAudio {
 
   playAttackSound(ev) {
     if (!this.audio) return;
+    if (typeof ev.from === "number" && ev.from === ev.to) return;
     const from = typeof ev.from === "number" ? this.state.entityById(ev.from) : null;
     const to = typeof ev.to === "number" ? this.state.entityById(ev.to) : null;
     const pos = from || to;

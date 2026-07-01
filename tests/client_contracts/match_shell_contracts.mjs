@@ -272,8 +272,12 @@ import {
   combatAudio.playPointFireSound({ e: EVENT.MORTAR_LAUNCH, fromX: 12, fromY: 24 });
   assert(plays.at(-1).id === "combat_mortar_launch_04", "match combat audio routes mortar launches");
   assert(plays.at(-1).opts.x === 12 && plays.at(-1).opts.y === 24, "match combat audio preserves point-fire source position");
+  const playCountBeforeSelfReveal = plays.length;
   combatAudio.playAttackSound({ e: EVENT.ATTACK, from: 3, to: 3, weaponKind: WEAPON_KIND.ARTILLERY_GUN });
-  assert(plays.at(-1).id === "combat_artillery_fire_05", "match combat audio routes artillery weapon hints");
+  assert(
+    plays.length === playCountBeforeSelfReveal,
+    "match combat audio keeps artillery self-reveal attack events silent",
+  );
 
   const labPlays = [];
   const labEntities = new Map([
