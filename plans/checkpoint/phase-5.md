@@ -1,6 +1,6 @@
 # Phase 5 - Lab Scenario Checkpoint Adapter
 
-Status: Not started.
+Status: Done.
 
 ## Scope
 

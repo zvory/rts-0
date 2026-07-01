@@ -27,27 +27,32 @@ mod orientation;
 mod orders;
 #[cfg(test)]
 mod orders_tests;
+mod checkpoint_scenario;
 mod resource_nodes;
 mod scenario;
+mod scenario_export;
 
-use orientation::{
-    lab_entity_facing, lab_entity_is_set_up, lab_entity_setup_facing, lab_entity_setup_target,
-    lab_entity_weapon_facing, restore_lab_entity_orientation, restore_lab_entity_setup,
-};
+use orientation::{restore_lab_entity_orientation, restore_lab_entity_setup};
 use orders::{
-    clear_lab_production_state, lab_entity_active_order, lab_entity_queued_orders,
-    order_intent_references_entity, order_references_entity, restore_lab_entity_orders,
+    clear_lab_production_state, order_intent_references_entity, order_references_entity,
+    restore_lab_entity_orders,
 };
 use scenario::{
-    validate_lab_entity_setup_shape, validate_lab_scenario_shape, LAB_SCENARIO_KIND,
+    validate_lab_entity_setup_shape, validate_lab_scenario_shape,
     MAX_LAB_SCENARIO_UPGRADES_PER_PLAYER,
 };
+pub use checkpoint_scenario::{
+    LabCheckpointScenarioMap, LabCheckpointScenarioMapData, LabCheckpointScenarioMetadata,
+    LabCheckpointScenarioSource, LabCheckpointScenarioV1, LabScenarioTile,
+};
 pub use scenario::{
-    LabScenarioEntity, LabScenarioMap, LabScenarioMetadata, LabScenarioPlayer, LabScenarioPoint,
-    LabScenarioOrder, LabScenarioResearch, LabScenarioResources, LabScenarioV1,
+    LabScenarioEntity, LabScenarioMap, LabScenarioMetadata, LabScenarioOrder, LabScenarioPlayer,
+    LabScenarioPoint, LabScenarioResearch, LabScenarioResources, LabScenarioV1,
 };
 
 pub const LAB_SCENARIO_V1_SCHEMA_VERSION: u32 = scenario::LAB_SCENARIO_V1_SCHEMA_VERSION;
+pub const LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION: u32 =
+    checkpoint_scenario::LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum LabOp {
@@ -255,71 +260,6 @@ impl Game {
         Ok(())
     }
 
-    pub fn export_lab_scenario(&self) -> LabScenarioV1 {
-        let players = self.state.players
-            .iter()
-            .map(|player| LabScenarioPlayer {
-                id: player.id,
-                team_id: player.team_id,
-                faction_id: player.faction_id.clone(),
-                name: player.name.clone(),
-                color: player.color.clone(),
-                is_ai: player.is_ai,
-                resources: LabScenarioResources {
-                    steel: player.steel,
-                    oil: player.oil,
-                },
-                research: LabScenarioResearch {
-                    completed: player
-                        .upgrades
-                        .iter()
-                        .map(|upgrade| upgrade.to_protocol_str().to_string())
-                        .collect(),
-                },
-            })
-            .collect();
-
-        let entities = self.state.entities
-            .iter()
-            .map(|entity| LabScenarioEntity {
-                id: entity.id,
-                owner: entity.owner,
-                kind: entity.kind.to_string(),
-                x: entity.pos_x,
-                y: entity.pos_y,
-                hp: entity.hp,
-                completed: !entity.under_construction(),
-                construction_progress: entity.construction.as_ref().map(|state| state.progress),
-                construction_total: entity.construction.as_ref().map(|state| state.total),
-                resource_remaining: entity.remaining(),
-                facing: lab_entity_facing(entity),
-                weapon_facing: lab_entity_weapon_facing(entity),
-                set_up: lab_entity_is_set_up(entity),
-                setup_facing: lab_entity_setup_facing(entity),
-                setup_target: lab_entity_setup_target(&self.state.map, entity),
-                order: lab_entity_active_order(entity),
-                queued_orders: lab_entity_queued_orders(entity),
-            })
-            .collect();
-
-        LabScenarioV1 {
-            schema_version: LAB_SCENARIO_V1_SCHEMA_VERSION,
-            kind: LAB_SCENARIO_KIND.to_string(),
-            name: "Untitled lab scenario".to_string(),
-            seed: self.state.seed,
-            map: LabScenarioMap {
-                name: self.state.map_metadata.name.clone(),
-                schema_version: self.state.map_metadata.schema_version,
-                content_hash: self.state.map_metadata.content_hash.clone(),
-            },
-            players,
-            entities,
-            metadata: LabScenarioMetadata {
-                exported_tick: self.tick_count(),
-            },
-        }
-    }
-
     pub fn lab_god_mode_players(&self) -> Vec<u32> {
         self.state.lab_god_mode_players.iter().copied().collect()
     }
@@ -328,6 +268,14 @@ impl Game {
         &mut self,
         scenario: LabScenarioV1,
     ) -> Result<LabOpOutcome, LabError> {
+        let (restored, restore) = Self::lab_game_from_scenario(scenario)?;
+        *self = restored;
+        Ok(LabOpOutcome::ScenarioRestored(restore))
+    }
+
+    fn lab_game_from_scenario(
+        scenario: LabScenarioV1,
+    ) -> Result<(Game, LabScenarioRestore), LabError> {
         validate_lab_scenario_shape(&scenario)?;
 
         let mut seen_players = HashSet::new();
@@ -457,10 +405,7 @@ impl Game {
         }
         restored.repair_lab_state();
 
-        *self = restored;
-        Ok(LabOpOutcome::ScenarioRestored(LabScenarioRestore {
-            entity_id_map,
-        }))
+        Ok((restored, LabScenarioRestore { entity_id_map }))
     }
 
     fn lab_spawn_entity(&mut self, input: LabSpawnEntity) -> Result<LabOpOutcome, LabError> {

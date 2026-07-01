@@ -79,6 +79,10 @@ impl LoadedLabScenario {
     pub fn build_game(&self) -> Result<Game, String> {
         build_game_from_scenario(&self.scenario, self.sim_scenario.clone())
     }
+
+    pub fn build_checkpoint_game(&self) -> Result<Game, String> {
+        build_checkpoint_game_from_scenario(&self.scenario, self.sim_scenario.clone())
+    }
 }
 
 pub fn load_lab_scenario_catalog() -> Result<Vec<LabScenarioCatalogEntry>, String> {
@@ -197,12 +201,7 @@ pub fn validate_lab_scenario_authoring(
     }
     let sim_scenario = protocol_scenario_to_sim(&scenario)
         .map_err(|err| format!("invalid lab scenario payload: {err}"))?;
-    build_game_from_scenario(&scenario, sim_scenario).map_err(|err| {
-        format!(
-            "lab scenario {:?} does not restore through Game lab APIs: {err}",
-            entry.id
-        )
-    })?;
+    validate_scenario_restore_paths(&entry.id, &scenario, sim_scenario)?;
 
     Ok(LabScenarioAuthoringPreview {
         slug,
@@ -226,12 +225,7 @@ fn load_lab_scenario_catalog_from_dir(root: &Path) -> Result<Vec<LabScenarioCata
     for entry in &entries {
         let loaded = load_lab_scenario_entry(root, entry)?;
         validate_entry_matches_scenario(entry, &loaded.scenario)?;
-        loaded.build_game().map_err(|err| {
-            format!(
-                "lab scenario {:?} does not restore through Game lab APIs: {err}",
-                entry.id
-            )
-        })?;
+        validate_scenario_restore_paths(&entry.id, &loaded.scenario, loaded.sim_scenario)?;
     }
 
     Ok(entries)
@@ -427,6 +421,82 @@ fn build_game_from_scenario(
     Ok(game)
 }
 
+fn build_checkpoint_game_from_scenario(
+    scenario: &LabScenarioV1,
+    sim_scenario: SimLabScenarioV1,
+) -> Result<Game, String> {
+    let checkpoint =
+        Game::lab_checkpoint_scenario_from_v1(sim_scenario, crate::build_info::build_id())
+            .map_err(|err| format!("checkpoint adapter export failed: {}", lab_error_text(&err)))?;
+    let mut game = Game::restore_lab_checkpoint_scenario(checkpoint).map_err(|err| {
+        format!(
+            "checkpoint adapter restore failed: {}",
+            lab_error_text(&err)
+        )
+    })?;
+    for &player_id in &scenario.metadata.lab.god_mode_players {
+        game.apply_lab_op(LabOp::SetPlayerGodMode {
+            player_id,
+            enabled: true,
+        })
+        .map_err(|err| lab_error_text(&err))?;
+    }
+    Ok(game)
+}
+
+fn validate_scenario_restore_paths(
+    label: &str,
+    scenario: &LabScenarioV1,
+    sim_scenario: SimLabScenarioV1,
+) -> Result<(), String> {
+    let direct = build_game_from_scenario(scenario, sim_scenario.clone()).map_err(|err| {
+        format!("lab scenario {label:?} does not restore through Game lab APIs: {err}")
+    })?;
+    let checkpoint =
+        build_checkpoint_game_from_scenario(scenario, sim_scenario).map_err(|err| {
+            format!("lab scenario {label:?} does not restore through checkpoint adapter: {err}")
+        })?;
+    validate_checkpoint_game_matches(label, &direct, &checkpoint)
+}
+
+fn validate_checkpoint_game_matches(
+    label: &str,
+    direct: &Game,
+    checkpoint: &Game,
+) -> Result<(), String> {
+    if direct.tick_count() != checkpoint.tick_count() {
+        return Err(format!(
+            "lab scenario {label:?} checkpoint adapter tick mismatch: {} != {}",
+            direct.tick_count(),
+            checkpoint.tick_count()
+        ));
+    }
+    if direct.start_payload() != checkpoint.start_payload() {
+        return Err(format!(
+            "lab scenario {label:?} checkpoint adapter start payload mismatch"
+        ));
+    }
+    if direct.lab_god_mode_players() != checkpoint.lab_god_mode_players() {
+        return Err(format!(
+            "lab scenario {label:?} checkpoint adapter god mode mismatch"
+        ));
+    }
+    if direct.scores() != checkpoint.scores() {
+        return Err(format!(
+            "lab scenario {label:?} checkpoint adapter score mismatch"
+        ));
+    }
+    for player in direct.start_payload().players {
+        if direct.snapshot_full_for(player.id) != checkpoint.snapshot_full_for(player.id) {
+            return Err(format!(
+                "lab scenario {label:?} checkpoint adapter snapshot mismatch for player {}",
+                player.id
+            ));
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn validate_lab_scenario_lab_metadata(
     lab: &crate::protocol::LabScenarioLabMetadata,
     players: &[crate::protocol::LabScenarioPlayer],
@@ -570,6 +640,14 @@ mod tests {
         let game = loaded
             .build_game()
             .expect("lategame scenario should restore through lab APIs");
+        let checkpoint_game = loaded
+            .build_checkpoint_game()
+            .expect("lategame scenario should restore through checkpoint adapter");
+        assert_eq!(game.start_payload(), checkpoint_game.start_payload());
+        assert_eq!(
+            game.snapshot_full_for(1),
+            checkpoint_game.snapshot_full_for(1)
+        );
         let scenario = game.export_lab_scenario();
         assert_eq!(scenario.seed, 3_566_641_871);
         assert_eq!(scenario.players.len(), 2);
