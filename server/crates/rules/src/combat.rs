@@ -885,6 +885,10 @@ mod tests {
             miss_chance_with_entrenchment(EntityKind::Rifleman, EntityKind::Depot, true),
             0.0
         );
+        assert_eq!(
+            miss_chance_with_entrenchment(EntityKind::Rifleman, EntityKind::Worker, true),
+            0.0
+        );
     }
 
     #[test]
@@ -899,6 +903,10 @@ mod tests {
         );
         assert_eq!(
             area_damage_after_entrenchment(EntityKind::MortarTeam, 100, true),
+            100
+        );
+        assert_eq!(
+            area_damage_after_entrenchment(EntityKind::Worker, 100, true),
             100
         );
         assert_eq!(

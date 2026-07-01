@@ -276,7 +276,16 @@ function fakeHudRootWithoutResourceSpans() {
       { id: 2302, owner: 1, kind: KIND.TANK },
       ownResearchState,
     );
+    const workerStatus = entrenchmentSelectionStatus(
+      { id: 2304, owner: 1, kind: KIND.WORKER },
+      ownResearchState,
+    );
+    const panzerfaustStatus = entrenchmentSelectionStatus(
+      { id: 2305, owner: 1, kind: KIND.PANZERFAUST },
+      ownResearchState,
+    );
     assert(ownStatus?.value === "Hold still 3s to dig", "HUD status explains researched dig-in availability");
+    assert(panzerfaustStatus?.value === "Hold still 3s to dig", "HUD status includes Panzerfaust eligibility");
     assert(
       occupiedStatus?.value.includes("+1 range") &&
         occupiedStatus.value.includes("70% miss") &&
@@ -284,6 +293,7 @@ function fakeHudRootWithoutResourceSpans() {
       "HUD status summarizes occupied-trench combat benefits",
     );
     assert(unsupportedStatus === null, "HUD status omits excluded units");
+    assert(workerStatus === null, "HUD status omits Engineers from entrenchment");
   }
 
   withFakeHudDocument(({ FakeElement }) => {

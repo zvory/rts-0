@@ -370,20 +370,20 @@ fn pre_research_infantry_can_occupy_existing_trench_but_cannot_create_new_one() 
     let trench = game
         .spawn_trench_for_test(trench_pos.0, trench_pos.1)
         .expect("trench should seed");
-    let worker = game
+    let rifleman = game
         .entities
-        .spawn_unit(2, EntityKind::Worker, trench_pos.0, trench_pos.1)
-        .expect("worker should spawn");
+        .spawn_unit(2, EntityKind::Rifleman, trench_pos.0, trench_pos.1)
+        .expect("rifleman should spawn");
     repair_world(&mut game);
 
     game.tick();
     assert_eq!(
-        active_trench_occupation(game.entities.get(worker).expect("worker should exist")),
+        active_trench_occupation(game.entities.get(rifleman).expect("rifleman should exist")),
         Some(trench)
     );
 
     let open_pos = game.map.tile_center(40, 40);
-    if let Some(unit) = game.entities.get_mut(worker) {
+    if let Some(unit) = game.entities.get_mut(rifleman) {
         unit.set_position(open_pos.0, open_pos.1);
     }
     repair_world(&mut game);
@@ -391,7 +391,7 @@ fn pre_research_infantry_can_occupy_existing_trench_but_cannot_create_new_one() 
 
     assert_eq!(game.trenches.all().len(), 1);
     assert_eq!(
-        active_trench_occupation(game.entities.get(worker).expect("worker should exist")),
+        active_trench_occupation(game.entities.get(rifleman).expect("rifleman should exist")),
         None
     );
 }
@@ -463,6 +463,7 @@ fn lab_move_clears_trench_occupation_without_waiting_for_tick() {
 #[test]
 fn excluded_units_and_buildings_do_not_create_or_occupy_trenches() {
     for kind in [
+        EntityKind::Worker,
         EntityKind::MortarTeam,
         EntityKind::AntiTankGun,
         EntityKind::Artillery,

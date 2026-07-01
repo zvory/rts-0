@@ -465,9 +465,9 @@ impl Game {
         let digger = entities
             .spawn_unit(1, EntityKind::Rifleman, dig_start.0, dig_start.1)
             .ok_or_else(|| "failed to spawn entrenchment digger".to_string())?;
-        let reuse_worker = entities
-            .spawn_unit(1, EntityKind::Worker, reuse_start.0, reuse_start.1)
-            .ok_or_else(|| "failed to spawn entrenchment reuse worker".to_string())?;
+        let reuse_rifleman = entities
+            .spawn_unit(1, EntityKind::Rifleman, reuse_start.0, reuse_start.1)
+            .ok_or_else(|| "failed to spawn entrenchment reuse rifleman".to_string())?;
         let crowded_machine_gunner = entities
             .spawn_unit(1, EntityKind::MachineGunner, crowd_start.0, crowd_start.1)
             .ok_or_else(|| "failed to spawn entrenchment crowded machine gunner".to_string())?;
@@ -513,7 +513,7 @@ impl Game {
         Ok(DevScenarioSetup {
             game,
             player_id,
-            units: vec![digger, reuse_worker, crowded_machine_gunner, enemy_reuser],
+            units: vec![digger, reuse_rifleman, crowded_machine_gunner, enemy_reuser],
             goal: dig_start,
             issue_after_ticks: u32::MAX,
         })
