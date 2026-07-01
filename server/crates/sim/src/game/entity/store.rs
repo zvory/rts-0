@@ -110,7 +110,9 @@ impl EntityStore {
     }
 
     pub(in crate::game) fn checkpoint_entities(&self) -> Vec<Entity> {
-        self.iter().cloned().collect()
+        let mut entities = self.iter().cloned().collect::<Vec<_>>();
+        entities.sort_by_key(|entity| entity.id);
+        entities
     }
 
     pub(in crate::game) fn from_checkpoint_entities(next_id: u32, entities: Vec<Entity>) -> Self {

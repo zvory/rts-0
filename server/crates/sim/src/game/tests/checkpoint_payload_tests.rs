@@ -21,6 +21,26 @@ fn checkpoint_payload_round_trips_through_text_and_normalizes_output() {
 }
 
 #[test]
+fn checkpoint_payload_serializes_entities_in_stable_id_order() {
+    let game = Game::new_for_replay(&human_vs_ai_players(), 0x5150_2006);
+    let text = checkpoint_payload_text_for(&game, "stable entity ordering fixture");
+    let value: serde_json::Value = serde_json::from_str(&text).expect("valid checkpoint JSON");
+    let ids = value["entities"]["entities"]
+        .as_array()
+        .expect("entity array")
+        .iter()
+        .map(|entity| entity["id"].as_u64().expect("entity id"))
+        .collect::<Vec<_>>();
+    let mut sorted = ids.clone();
+    sorted.sort_unstable();
+
+    assert_eq!(
+        ids, sorted,
+        "checkpoint payload should not depend on EntityStore HashMap iteration order"
+    );
+}
+
+#[test]
 fn checkpoint_payload_rejects_corrupt_oversized_and_unsupported_text() {
     let game = Game::new_for_replay(&human_vs_ai_players(), 0x5150_2002);
     let text = checkpoint_payload_text_for(&game, "negative payload fixture");
@@ -39,6 +59,13 @@ fn checkpoint_payload_rejects_corrupt_oversized_and_unsupported_text() {
             game.state.map.clone(),
             game.map_metadata().clone(),
         ),
+        Err(CheckpointPayloadError::PayloadTooLarge { .. })
+    ));
+
+    let mut oversized_export = game.clone();
+    oversized_export.state.players[0].name = "x".repeat(5 * 1024 * 1024);
+    assert!(matches!(
+        oversized_export.checkpoint_payload_text_for_test(),
         Err(CheckpointPayloadError::PayloadTooLarge { .. })
     ));
 

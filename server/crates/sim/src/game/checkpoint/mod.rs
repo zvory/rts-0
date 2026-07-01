@@ -148,8 +148,15 @@ impl GameCheckpointV1 {
     }
 
     fn to_text(&self) -> Result<String, CheckpointPayloadError> {
-        serde_json::to_string(self)
-            .map_err(|err| CheckpointPayloadError::MalformedJson(err.to_string()))
+        let text = serde_json::to_string(self)
+            .map_err(|err| CheckpointPayloadError::MalformedJson(err.to_string()))?;
+        if text.len() > MAX_PAYLOAD_BYTES {
+            return Err(CheckpointPayloadError::PayloadTooLarge {
+                bytes: text.len(),
+                max: MAX_PAYLOAD_BYTES,
+            });
+        }
+        Ok(text)
     }
 
     fn from_text(text: &str) -> Result<Self, CheckpointPayloadError> {
