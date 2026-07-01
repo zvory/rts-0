@@ -79,16 +79,16 @@ impl Game {
 }
 
 const TARGET_SPECS: [(EntityKind, f32, f32); 10] = [
-    (EntityKind::Tank, 4.4, -0.05),
-    (EntityKind::Worker, 5.8, -0.05),
-    (EntityKind::Rifleman, 5.0, -0.72),
-    (EntityKind::MachineGunner, 5.3, 0.80),
-    (EntityKind::ScoutCar, 5.4, 0.30),
-    (EntityKind::Golem, 5.7, -0.42),
-    (EntityKind::Ekat, 5.9, 0.58),
-    (EntityKind::MortarTeam, 6.0, -0.82),
-    (EntityKind::AntiTankGun, 4.9, 0.62),
-    (EntityKind::Artillery, 6.2, -0.20),
+    (EntityKind::Tank, 3.4, 0.00),
+    (EntityKind::Rifleman, 4.16, -0.58),
+    (EntityKind::Worker, 4.86, 0.60),
+    (EntityKind::MachineGunner, 5.50, -0.19),
+    (EntityKind::MortarTeam, 6.14, 0.86),
+    (EntityKind::ScoutCar, 4.57, 1.48),
+    (EntityKind::Golem, 4.95, -1.61),
+    (EntityKind::Ekat, 5.55, 1.70),
+    (EntityKind::AntiTankGun, 5.86, -1.68),
+    (EntityKind::Artillery, 6.59, -0.35),
 ];
 
 fn spawn_static_targets(
@@ -96,26 +96,26 @@ fn spawn_static_targets(
     tank_pos: (f32, f32),
     ts: f32,
 ) -> Result<(), String> {
-    let depot_pos = (tank_pos.0 + ts * 5.9, tank_pos.1 - ts * 0.8);
+    let depot_pos = (tank_pos.0 + ts * 4.70, tank_pos.1 - ts * 3.60);
     entities
         .spawn_building(2, EntityKind::Depot, depot_pos.0, depot_pos.1, true)
         .ok_or_else(|| "failed to spawn Tank coax inspection Depot".to_string())?;
-    let trap_pos = (tank_pos.0 + ts * 4.8, tank_pos.1 - ts * 0.98);
+    let trap_pos = (tank_pos.0 + ts * 3.60, tank_pos.1 - ts * 1.65);
     entities
         .spawn_building(2, EntityKind::TankTrap, trap_pos.0, trap_pos.1, true)
         .ok_or_else(|| "failed to spawn Tank coax inspection Tank Trap".to_string())?;
     entities
         .spawn_node(
             EntityKind::Steel,
-            tank_pos.0 + ts * 5.2,
-            tank_pos.1 + ts * 1.10,
+            tank_pos.0 + ts * 4.00,
+            tank_pos.1 + ts * 2.50,
         )
         .ok_or_else(|| "failed to spawn Tank coax inspection Steel node".to_string())?;
     entities
         .spawn_node(
             EntityKind::Oil,
-            tank_pos.0 + ts * 6.3,
-            tank_pos.1 - ts * 1.10,
+            tank_pos.0 + ts * 6.10,
+            tank_pos.1 + ts * 2.70,
         )
         .ok_or_else(|| "failed to spawn Tank coax inspection Oil node".to_string())?;
     Ok(())

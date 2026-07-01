@@ -9,6 +9,32 @@ fn owned_kind_count(game: &Game, owner: u32, kind: EntityKind) -> usize {
         .count()
 }
 
+fn assert_units_do_not_intersect_buildings(game: &Game) {
+    let buildings: Vec<_> = game
+        .entities
+        .iter()
+        .filter_map(|entity| {
+            crate::game::services::geometry::building_rect_for_entity(&game.map, entity)
+                .map(|rect| (entity.id, entity.kind, rect))
+        })
+        .collect();
+    for unit in game.entities.iter().filter(|entity| entity.is_unit()) {
+        let Some(body) = crate::game::services::geometry::unit_body_for_entity(unit) else {
+            continue;
+        };
+        for &(building_id, building_kind, rect) in &buildings {
+            assert!(
+                !crate::game::services::geometry::unit_body_intersects_rect(body, rect),
+                "scenario unit {} ({}) intersects building {} ({})",
+                unit.id,
+                unit.kind,
+                building_id,
+                building_kind
+            );
+        }
+    }
+}
+
 fn assert_dev_scenario_starts_as_kriegsia(setup: &DevScenarioSetup) {
     let payload = setup.game.start_payload();
     let player = payload
@@ -491,6 +517,9 @@ fn tank_coax_inspection_scenario_sets_up_static_mixed_targets() {
         config::TICK_HZ * 4,
         "inspection scenario should delay cannon fire so coax feedback is easy to see"
     );
+    assert_units_do_not_intersect_buildings(&setup.game);
+    let mut ticked = setup.game.clone();
+    ticked.tick();
     assert_dev_scenario_starts_as_kriegsia(&setup);
 }
 
