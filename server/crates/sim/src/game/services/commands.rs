@@ -694,8 +694,14 @@ mod planned_actions {
                     }
                     planner::OrderIntent::AttackTarget(target) => {
                         if immediate_unit_can_replace(entities, player, unit)
-                            && attack_unit_can_target(
-                                entities, teams, fog, smokes, player, unit, target,
+                            && attack_target_valid(
+                                entities,
+                                teams,
+                                fog,
+                                smokes,
+                                player,
+                                &[unit],
+                                target,
                             )
                             && !deployed_anti_tank_gun_target_outside_arc(entities, unit, target)
                         {
@@ -850,13 +856,13 @@ mod planned_actions {
                     if let Some(intent) = entity_order_intent_from_planner(intent) {
                         match &intent {
                             OrderIntent::Attack(attack)
-                                if !attack_unit_can_target(
+                                if !attack_target_valid(
                                     entities,
                                     teams,
                                     fog,
                                     smokes,
                                     player,
-                                    unit,
+                                    &[unit],
                                     attack.target,
                                 ) =>
                             {
@@ -972,7 +978,6 @@ mod planned_actions {
 fn immediate_unit_can_replace(entities: &EntityStore, player: u32, unit: u32) -> bool {
     unit_can_accept_player_command(entities, player, unit)
 }
-
 fn attack_target_valid(
     entities: &EntityStore,
     teams: &TeamRelations,
@@ -982,30 +987,17 @@ fn attack_target_valid(
     units: &[u32],
     target: u32,
 ) -> bool {
-    units
-        .iter()
-        .copied()
-        .any(|unit| attack_unit_can_target(entities, teams, fog, smokes, player, unit, target))
-}
-
-fn attack_unit_can_target(
-    entities: &EntityStore,
-    teams: &TeamRelations,
-    fog: &Fog,
-    smokes: &SmokeCloudStore,
-    player: u32,
-    unit: u32,
-    target: u32,
-) -> bool {
-    world_query::unit_explicit_attack_target_valid(
-        entities,
-        teams,
-        fog,
-        Some(smokes),
-        player,
-        unit,
-        target,
-    )
+    units.iter().copied().any(|unit| {
+        world_query::unit_explicit_attack_target_valid(
+            entities,
+            teams,
+            fog,
+            Some(smokes),
+            player,
+            unit,
+            target,
+        )
+    })
 }
 
 fn deconstruct_target_valid(
