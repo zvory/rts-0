@@ -170,6 +170,63 @@ fn spawned_panzerfaust_direct_attack_damages_tank_and_converts_same_id() {
 }
 
 #[test]
+fn direct_attack_can_damage_owned_panzerfaust_targets() {
+    let players = panzerfaust_players();
+    let mut game = empty_flat_game(&players);
+    let panzerfaust_pos = game.state.map.tile_center(8, 8);
+    let tank_pos = game.state.map.tile_center(11, 8);
+    let panzerfaust = game.state.entities
+        .spawn_unit(
+            1,
+            EntityKind::Panzerfaust,
+            panzerfaust_pos.0,
+            panzerfaust_pos.1,
+        )
+        .expect("panzerfaust should spawn");
+    let tank = game.state.entities
+        .spawn_unit(1, EntityKind::Tank, tank_pos.0, tank_pos.1)
+        .expect("owned tank should spawn");
+    game.state.entities
+        .get_mut(panzerfaust)
+        .expect("panzerfaust exists")
+        .set_invulnerable(true);
+    refresh_world(&mut game);
+
+    let tank_hp = game.state.entities.get(tank).expect("tank exists").hp;
+    enqueue_attack(&mut game, panzerfaust, tank, false);
+
+    let mut tank_hp_on_impact = None;
+    let mut owner_saw_launch = false;
+    let mut owner_saw_under_attack_notice = false;
+    for _ in 0..70 {
+        let events = game.tick();
+        owner_saw_launch |= player_events(&events, 1).iter().any(
+            |event| matches!(event, Event::PanzerfaustLaunch { from, .. } if *from == panzerfaust),
+        );
+        let owner_events = player_events(&events, 1);
+        let impact_this_tick = owner_events
+            .iter()
+            .any(|event| matches!(event, Event::PanzerfaustImpact { .. }));
+        if impact_this_tick && tank_hp_on_impact.is_none() {
+            tank_hp_on_impact = game.state.entities.get(tank).map(|tank| tank.hp);
+        }
+        owner_saw_under_attack_notice |= owner_events.iter().any(
+            |event| matches!(event, Event::Notice { msg, .. } if msg == "alert:under_attack"),
+        );
+    }
+
+    assert!(owner_saw_launch);
+    assert_eq!(
+        tank_hp_on_impact,
+        Some(tank_hp.saturating_sub(config::PANZERFAUST_DAMAGE))
+    );
+    assert!(
+        !owner_saw_under_attack_notice,
+        "deliberate self-attacks should not raise enemy under-attack alerts"
+    );
+}
+
+#[test]
 fn direct_attack_conversion_completes_consumed_order_and_promotes_queued_move() {
     let (mut game, panzerfaust, tank) = panzerfaust_fixture();
     let start = game.state.entities

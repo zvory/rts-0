@@ -74,7 +74,12 @@ pub(super) fn direct_fire_target_legal(
     let Some(target_entity) = entities.get(target) else {
         return false;
     };
-    if !world_query::is_enemy_targetable(target_entity, teams, attacker_owner, attacker) {
+    let targetable = if legality.requires_intended_target {
+        world_query::is_explicit_attack_targetable(target_entity, teams, attacker_owner, attacker)
+    } else {
+        world_query::is_enemy_targetable(target_entity, teams, attacker_owner, attacker)
+    };
+    if !targetable {
         return false;
     }
     let end = (target_entity.pos_x, target_entity.pos_y);
@@ -146,19 +151,20 @@ pub(super) fn resolve_target(
         return None;
     }
     // Ordered attackers keep command intent outside the ranker. If the target is
-    // still hostile and visible, the combat system may chase for a fireable shot
-    // instead of letting auto-acquisition steal focus.
+    // still explicitly attackable and visible, the combat system may chase for a
+    // fireable shot instead of letting auto-acquisition steal focus.
     if mode == CombatMode::Ordered {
         if let Some(e) = entities.get(self_id) {
             if let Some(target) = e.order().attack_target() {
-                if entities
-                    .get(target)
-                    .map(|t| {
-                        world_query::is_enemy_targetable(t, teams, owner, self_id)
-                            && target_visible_to_owner_team(fog, smokes, teams, owner, t)
-                    })
-                    .unwrap_or(false)
-                {
+                if world_query::unit_explicit_attack_target_valid(
+                    entities,
+                    teams,
+                    fog,
+                    Some(smokes),
+                    owner,
+                    self_id,
+                    target,
+                ) {
                     return Some(target);
                 }
             }
@@ -382,16 +388,5 @@ fn target_visible_to_owner(
     target: &Entity,
 ) -> bool {
     fog.is_visible_world(owner, target.pos_x, target.pos_y)
-        && !smokes.point_inside(target.pos_x, target.pos_y)
-}
-
-fn target_visible_to_owner_team(
-    fog: &Fog,
-    smokes: &SmokeCloudStore,
-    teams: &TeamRelations,
-    owner: u32,
-    target: &Entity,
-) -> bool {
-    crate::rules::projection::team_visible_world(owner, target.pos_x, target.pos_y, fog, teams)
         && !smokes.point_inside(target.pos_x, target.pos_y)
 }

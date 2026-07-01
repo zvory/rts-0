@@ -117,7 +117,7 @@ export function _issueTargetedCommand(p, ev = {}) {
   }
 
   const target = this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ false);
-  if (target && enemyOwner(this.state, target.owner) && !isResource(target.kind)) {
+  if (explicitAttackCommandTarget(this.state, target)) {
     this._issueCommand(cmd.attack(ownUnits, target.id, !!ev.shiftKey));
     this._addCommandFeedback("attack", target.x, target.y, !!ev.shiftKey);
     return;
@@ -254,6 +254,12 @@ function issueNormalRightClickAction(input, action, queued) {
 
 function rightClickFeedback(kind, x, y) {
   return { kind, x, y };
+}
+
+function explicitAttackCommandTarget(state, target) {
+  return !!target &&
+    !isResource(target.kind) &&
+    (ownOwner(state, target.owner) || enemyOwner(state, target.owner));
 }
 
 function attackTargetPreviewForRightClickAction(action) {
