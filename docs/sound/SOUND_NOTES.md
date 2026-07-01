@@ -26,6 +26,8 @@ Files that failed any of these were deleted immediately.
 | combat_kar98k_03.mp3 | Primary. Trimmed to 1.35s — bolt action removed. Original retained as combat_kar98k_03_with_bolt_action.mp3. | unknown |
 | combat_mg42_burst_02.mp3 | Excellent. Clean isolated burst, no bleed. Primary — use in game. | unknown |
 | combat_mg42_burst_03.mp3 | Very good. Backup only. | unknown |
+| combat_panzerfaust_launch_01.mp3 | First-pass generated Panzerfaust launch cue: short low thump plus filtered hiss. Deliberately separate from rifle, MG, tank cannon, and artillery assets; replace with a reviewed recording in final audio polish. | local procedural ffmpeg generation, Phase 6 |
+| combat_panzerfaust_impact_01.mp3 | First-pass generated Panzerfaust impact/miss-expire cue: short muted hit without large explosion tail. Deliberately separate from tank cannon, artillery, and rejected explosion assets; replace with a reviewed recording in final audio polish. | local procedural ffmpeg generation, Phase 6 |
 | units_tank_engine_idle_03.mp3 | Excellent. Clean, long, authentic idle. Primary tank idle. Pair with _running (565597) from same source. | https://freesound.org/people/C-V/sounds/565598/ |
 | combat_tank_cannon_06.mp3 | Acceptable. Not top quality — extracted from US Army video, some compression artifacts — but usable as primary until something better is found. | https://freesound.org/people/qubodup/sounds/161343/ |
 | combat_tank_cannon_09.mp3 | Backup only. Authentic 1958 Nagra field recording of a Finnish 76mm KT cannon (caliber close to Panzer IV 75mm KwK). Good character but recording age is audible. Contains multiple shots; trim individual shots as needed. CC-BY 4.0 — credit YleArkisto / yle.fi. | https://freesound.org/people/YleArkisto/sounds/332935/ |
@@ -171,8 +173,13 @@ Samples reviewed:
 - Realistic artillery explosion recordings: this batch produced no keepers; fetch a new round later
 - Armored vehicle hit impacts: avoid ambiguous "tank" searches that return water-tank/generic metal hits; search for armor impact, vehicle shell hit, anti-tank hit, or ricochet/penetration source material
 - anti-tank round hit variants: defer until mortar and tank hit sounds have acceptable matching coverage
+- Panzerfaust launch and impact recordings: replace Phase 6 generated cues with licensed, reviewed
+  source recordings before the final audio pass
 - Sources unknown for most new keepers — track down before ship
 
 ## Out of scope — first pass
 
 - **Explosions**: explicitly deferred. No explosion SFX for v1. Death events for vehicles will play nothing or a generic hit sound; revisit after first pass ships.
+- **Panzerfaust travel/conversion audio**: deliberately silent in Phase 6. The visual tracer,
+  impact cue, and same-id Rifleman conversion are the intended first-pass feedback; add travel or
+  conversion sounds only after playtests show they improve clarity without adding spam.

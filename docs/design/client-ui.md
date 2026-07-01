@@ -1198,6 +1198,9 @@ selection rings):
   zoom, team color, and animation controls outside a full match.
 - Spatial combat audio keeps full volume for nearby emitters, uses stronger attenuation after the
   listener reference distance for distant emitters, and keeps the same hard drop distance.
+  Panzerfaust launch and impact events use dedicated low-gain spatial cues with coarse cooldown
+  buckets; generic Panzerfaust attack events, projectile travel, and conversion stay silent so the
+  one-shot weapon does not reuse Tank/Rifleman/artillery sounds or spam clustered fights.
 - Buildings: SVG-authored rig definitions are compiled at Renderer startup and rendered on the
   buildings layer; shadows remain imperative draws, production progress bars, queue labels, and
   icons remain imperative draws on the building overlays layer, and construction/deconstruction
