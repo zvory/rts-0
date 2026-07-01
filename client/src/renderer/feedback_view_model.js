@@ -33,8 +33,8 @@ export function buildRendererFeedbackView(
   const artilleryTargets = liveArray(state, "liveArtilleryTargets", now);
   const artilleryLaunches = liveArray(state, "liveArtilleryLaunches", now);
   const artilleryImpacts = liveArray(state, "liveArtilleryImpacts", now);
-  const panzerfaustShots = liveArray(state?.visualEffects || state, "livePanzerfaustShots", now);
-  const panzerfaustImpacts = liveArray(state?.visualEffects || state, "livePanzerfaustImpacts", now);
+  const panzerfaustShots = liveArray(state, "livePanzerfaustShots", now);
+  const panzerfaustImpacts = liveArray(state, "livePanzerfaustImpacts", now);
   const muzzleFlashes = liveArray(state, "liveMuzzleFlashes", now);
 
   return {

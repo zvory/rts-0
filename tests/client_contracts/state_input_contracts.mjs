@@ -282,14 +282,14 @@ function buttonByLabel(card, label) {
       { e: EVENT.PANZERFAUST_LAUNCH, from: 32, toX: 360, toY: 340, delayTicks: 15 },
     ],
   });
-  assert(panzerfaustEventState.visualEffects.livePanzerfaustShots(performance.now()).length === 0, "Panzerfaust impact clears matching in-flight tracer");
-  assert(panzerfaustEventState.visualEffects.livePanzerfaustImpacts(performance.now()).length === 1, "Panzerfaust impact event creates a live impact cue");
+  assert(panzerfaustEventState.livePanzerfaustShots(performance.now()).length === 0, "Panzerfaust impact clears matching in-flight tracer");
+  assert(panzerfaustEventState.livePanzerfaustImpacts(performance.now()).length === 1, "Panzerfaust impact event creates a live impact cue");
   assert(panzerfaustEventState.weaponRecoil(31, KIND.PANZERFAUST, performance.now()) > 0, "Panzerfaust launch starts loaded-weapon recoil");
   assert(
     panzerfaustEventState.visibleTiles.length === 0,
     "Panzerfaust visual events do not stamp or extend client fog visibility",
   );
-  panzerfaustEventState.visualEffects.addPanzerfaustShot({
+  panzerfaustEventState.addPanzerfaustShot({
     e: EVENT.PANZERFAUST_LAUNCH,
     from: 31,
     fromX: 300,
@@ -298,7 +298,7 @@ function buttonByLabel(card, label) {
     toY: 340,
     delayTicks: 15,
   }, performance.now());
-  assert(panzerfaustEventState.visualEffects.livePanzerfaustShots(performance.now()).length === 1, "Panzerfaust launch event creates a live tracer when impact has not arrived");
+  assert(panzerfaustEventState.livePanzerfaustShots(performance.now()).length === 1, "Panzerfaust launch event creates a live tracer when impact has not arrived");
 
   const artilleryRevealState = new GameState({ ...start, map: { ...start.map, resources: [] } });
   artilleryRevealState.applySnapshot({

@@ -98,6 +98,7 @@ export class UnitRigInstance {
   destroy() {
     if (this._destroyed) return;
     this._destroyed = true;
+    this.container.parent?.removeChild?.(this.container);
     for (const { display } of this.parts.values()) {
       display.destroy?.();
     }

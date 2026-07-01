@@ -398,6 +398,65 @@ export class VisualEffectBuffers {
   }
 }
 
+// GameState inherits this facade so render/HUD callers do not reach into buffer internals.
+export class VisualEffectBackedState {
+  constructor() {
+    this.visualEffects = new VisualEffectBuffers();
+  }
+
+  get smokeCanisters() { return this.visualEffects.smokeCanisters; }
+  set smokeCanisters(value) { this.visualEffects.smokeCanisters = Array.isArray(value) ? value : []; }
+  get muzzleFlashes() { return this.visualEffects.muzzleFlashes; }
+  set muzzleFlashes(value) { this.visualEffects.muzzleFlashes = Array.isArray(value) ? value : []; }
+  get mortarLaunches() { return this.visualEffects.mortarLaunches; }
+  set mortarLaunches(value) { this.visualEffects.mortarLaunches = Array.isArray(value) ? value : []; }
+  get mortarShells() { return this.visualEffects.mortarShells; }
+  set mortarShells(value) { this.visualEffects.mortarShells = Array.isArray(value) ? value : []; }
+  get mortarTargets() { return this.visualEffects.mortarTargets; }
+  set mortarTargets(value) { this.visualEffects.mortarTargets = Array.isArray(value) ? value : []; }
+  get mortarImpacts() { return this.visualEffects.mortarImpacts; }
+  set mortarImpacts(value) { this.visualEffects.mortarImpacts = Array.isArray(value) ? value : []; }
+  get artilleryTargets() { return this.visualEffects.artilleryTargets; }
+  set artilleryTargets(value) { this.visualEffects.artilleryTargets = Array.isArray(value) ? value : []; }
+  get artilleryLaunches() { return this.visualEffects.artilleryLaunches; }
+  set artilleryLaunches(value) { this.visualEffects.artilleryLaunches = Array.isArray(value) ? value : []; }
+  get artilleryImpacts() { return this.visualEffects.artilleryImpacts; }
+  set artilleryImpacts(value) { this.visualEffects.artilleryImpacts = Array.isArray(value) ? value : []; }
+  get panzerfaustShots() { return this.visualEffects.panzerfaustShots; }
+  set panzerfaustShots(value) { this.visualEffects.panzerfaustShots = Array.isArray(value) ? value : []; }
+  get panzerfaustImpacts() { return this.visualEffects.panzerfaustImpacts; }
+  set panzerfaustImpacts(value) { this.visualEffects.panzerfaustImpacts = Array.isArray(value) ? value : []; }
+  get weaponRecoilById() { return this.visualEffects.weaponRecoilById; }
+  set weaponRecoilById(value) { this.visualEffects.weaponRecoilById = value instanceof Map ? value : new Map(); }
+  get pendingMortarTargets() { return this.visualEffects.pendingMortarTargets; }
+  set pendingMortarTargets(value) { this.visualEffects.pendingMortarTargets = Array.isArray(value) ? value : []; }
+  get shotRevealsById() { return this.visualEffects.shotRevealsById; }
+  set shotRevealsById(value) { this.visualEffects.shotRevealsById = value instanceof Map ? value : new Map(); }
+
+  addMortarLaunch(ev, now = performance.now()) { this.visualEffects.addMortarLaunch(ev, now); }
+  addMortarImpact(ev, now = performance.now()) { this.visualEffects.addMortarImpact(ev, now); }
+  addArtilleryTarget(ev, now = performance.now()) {
+    this.visualEffects.addArtilleryTarget(ev, now, (id) => this.entityById(id));
+  }
+  addArtilleryImpact(ev, now = performance.now()) { this.visualEffects.addArtilleryImpact(ev, now); }
+  addPanzerfaustShot(ev, now = performance.now()) { this.visualEffects.addPanzerfaustShot(ev, now); }
+  addPanzerfaustImpact(ev, now = performance.now()) { this.visualEffects.addPanzerfaustImpact(ev, now); }
+  addSmokeCanister(ev, now = performance.now()) { this.visualEffects.addSmokeCanister(ev, now); }
+
+  liveSmokeCanisters(now) { return this.visualEffects.liveSmokeCanisters(now); }
+  liveMortarLaunches(now) { return this.visualEffects.liveMortarLaunches(now); }
+  liveMortarShells(now) { return this.visualEffects.liveMortarShells(now); }
+  liveMortarTargets(now) { return this.visualEffects.liveMortarTargets(now); }
+  liveMortarImpacts(now) { return this.visualEffects.liveMortarImpacts(now); }
+  liveArtilleryTargets(now) { return this.visualEffects.liveArtilleryTargets(now); }
+  liveArtilleryLaunches(now) { return this.visualEffects.liveArtilleryLaunches(now); }
+  liveArtilleryImpacts(now) { return this.visualEffects.liveArtilleryImpacts(now); }
+  livePanzerfaustShots(now) { return this.visualEffects.livePanzerfaustShots(now); }
+  livePanzerfaustImpacts(now) { return this.visualEffects.livePanzerfaustImpacts(now); }
+  liveMuzzleFlashes(now) { return this.visualEffects.liveMuzzleFlashes(now); }
+  weaponRecoil(id, kind, now) { return this.visualEffects.weaponRecoil(id, kind, now); }
+}
+
 function eventTargetPos(ev) {
   return Array.isArray(ev.toPos) && ev.toPos.length === 2
     ? { x: ev.toPos[0], y: ev.toPos[1] }

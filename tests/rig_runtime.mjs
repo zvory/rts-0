@@ -410,8 +410,10 @@ test("live rig renderer rebuilds same-id instances when entity kind changes", ()
     state: STATE.IDLE,
   }, colorByOwner, state);
   const panzerfaustRig = renderer._liveRigPools.liveUnitRigs.get(id);
+  const panzerfaustContainer = panzerfaustRig.container;
   assert.equal(panzerfaustRig.kind, KIND.PANZERFAUST);
   assert.equal(panzerfaustRig.parts.has("part.pzf.tube"), true);
+  assert.equal(renderer.layers.units.children.includes(panzerfaustContainer), true);
 
   renderer._drawUnit({
     id,
@@ -424,9 +426,12 @@ test("live rig renderer rebuilds same-id instances when entity kind changes", ()
   }, colorByOwner, state);
   const riflemanRig = renderer._liveRigPools.liveUnitRigs.get(id);
   assert.equal(panzerfaustRig._destroyed, true);
+  assert.equal(panzerfaustContainer.parent, null);
+  assert.equal(renderer.layers.units.children.includes(panzerfaustContainer), false);
   assert.equal(riflemanRig.kind, KIND.RIFLEMAN);
   assert.equal(riflemanRig.parts.has("part.rifle.barrel"), true);
   assert.equal(riflemanRig.parts.has("part.pzf.tube"), false);
+  assert.equal(renderer.layers.units.children.includes(riflemanRig.container), true);
   riflemanRig.destroy();
 });
 
