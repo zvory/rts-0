@@ -773,7 +773,7 @@ impl Game {
         self.sync_lab_god_mode_flags();
         self.repair_mortar_autocast_state();
         systems::recompute_supply(&mut self.players, &self.entities);
-        self.rebuild_final_spatial();
+        self.reset_derived_state();
         let ids: Vec<u32> = self.players.iter().map(|player| player.id).collect();
         self.fog.recompute_with_smoke(&ids, &self.entities, &self.map, &self.smokes);
         self.refresh_building_memory(&ids);
@@ -1116,6 +1116,61 @@ mod tests {
             game.snapshot_for(1).supply_cap,
             before_cap + rules::economy::supply_provided(EntityKind::Depot)
         );
+    }
+
+    #[test]
+    fn lab_world_mutation_clears_rebuildable_pathing_cache() {
+        let mut game = new_game();
+        let (x, y) = free_unit_position(&game, EntityKind::ScoutCar);
+        let LabOpOutcome::Spawned {
+            entity_id: scout_id,
+        } = game
+            .apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
+                owner: 1,
+                kind: EntityKind::ScoutCar,
+                x,
+                y,
+                completed: true,
+            }))
+            .expect("scout car should spawn")
+        else {
+            panic!("unexpected outcome");
+        };
+
+        let goal = tile_center(&game, 52, 52);
+        game.issue_lab_command_as(
+            1,
+            Command::Move {
+                units: vec![scout_id],
+                x: goal.0,
+                y: goal.1,
+                queued: false,
+            },
+            LabCommandOptions::default(),
+        )
+        .expect("move command should be accepted");
+        game.tick();
+        assert!(
+            game.pathing_cache_len_for_test() > 0,
+            "move command should warm the reusable pathing cache"
+        );
+
+        let (moved_x, moved_y) = free_unit_position(&game, EntityKind::ScoutCar);
+        game.apply_lab_op(LabOp::MoveEntity(LabMoveEntity {
+            entity_id: scout_id,
+            x: moved_x,
+            y: moved_y,
+        }))
+        .expect("lab move should repair derived state");
+
+        assert_eq!(
+            game.pathing_cache_len_for_test(),
+            0,
+            "world-changing lab repair should clear rebuildable pathing cache"
+        );
+        assert!(game.snapshot_full_for(1).entities.iter().any(|entity| {
+            entity.id == scout_id && entity.x == moved_x && entity.y == moved_y
+        }));
     }
 
     #[test]

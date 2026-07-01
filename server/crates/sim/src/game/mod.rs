@@ -494,6 +494,7 @@ impl Game {
         self.derived.final_spatial()
     }
 
+    #[cfg(test)]
     pub(in crate::game) fn rebuild_final_spatial(&mut self) {
         self.derived
             .rebuild_final_spatial(&self.map, &self.entities);
