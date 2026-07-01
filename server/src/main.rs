@@ -42,10 +42,7 @@ use rts_server::protocol::{
 };
 use rts_server::structured_log;
 use rts_sim::game::map::Map;
-use rts_sim::game::replay::{
-    is_supported_replay_artifact_schema, ReplayArtifactV1, ReplayStartComposition,
-    ReplayValidationError, REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION,
-};
+use rts_sim::game::replay::{self, ReplayArtifactV1, ReplayValidationError};
 use rts_sim::perf;
 
 /// Default room name used when a client's `join` omits `room`.
@@ -496,7 +493,7 @@ fn apply_replay_summary_compatibility(row: &mut rts_server::db::MatchSummary, bu
     };
     let supported_schema = u32::try_from(meta.artifact_schema_version)
         .ok()
-        .is_some_and(is_supported_replay_artifact_schema);
+        .is_some_and(replay::is_supported_replay_artifact_schema);
     if !supported_schema {
         row.replay_available = false;
         row.replay_unavailable_reason = Some(format!(
@@ -973,15 +970,11 @@ mod tests {
     }
 
     #[test]
-    fn local_match_history_allowed_for_loopback_remote() {
-        let remote: SocketAddr = "127.0.0.1:50000".parse().unwrap();
-        assert!(request_allows_local_match_history(&remote));
-    }
-
-    #[test]
-    fn local_match_history_allowed_for_ipv6_loopback_remote() {
-        let remote: SocketAddr = "[::1]:50000".parse().unwrap();
-        assert!(request_allows_local_match_history(&remote));
+    fn local_match_history_allowed_for_loopback_remotes() {
+        for remote in ["127.0.0.1:50000", "[::1]:50000"] {
+            let remote: SocketAddr = remote.parse().unwrap();
+            assert!(request_allows_local_match_history(&remote));
+        }
     }
 
     #[test]
@@ -1022,16 +1015,15 @@ mod tests {
             is_ai: false,
         }];
         let game = rts_sim::game::Game::new(&players, 0x5150_030d);
-        ReplayStartComposition::capture(&game, "current-build")
-            .unwrap()
-            .finalize(&game, None, game.scores())
+        let replay_start = replay::ReplayStartComposition::capture(&game, "current-build").unwrap();
+        replay_start.finalize(&game, None, game.scores())
     }
 
     #[test]
     fn replay_summary_marks_current_build_and_map_available() {
         let map = Map::metadata_for_name("Default").unwrap();
         let mut row = replay_summary_for(Some(rts_server::db::ReplaySummaryMetadata {
-            artifact_schema_version: REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION as i32,
+            artifact_schema_version: replay::REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION as i32,
             build_sha: "current-build".to_string(),
             map_name: map.name,
             map_schema_version: map.schema_version as i32,
@@ -1048,7 +1040,7 @@ mod tests {
     fn replay_summary_warns_but_allows_incompatible_build() {
         let map = Map::metadata_for_name("Default").unwrap();
         let mut row = replay_summary_for(Some(rts_server::db::ReplaySummaryMetadata {
-            artifact_schema_version: REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION as i32,
+            artifact_schema_version: replay::REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION as i32,
             build_sha: "old-build".to_string(),
             map_name: map.name,
             map_schema_version: map.schema_version as i32,
