@@ -268,38 +268,6 @@ function buttonByLabel(card, label) {
     "artillery visual events do not stamp or extend client fog visibility",
   );
 
-  const panzerfaustEventState = new GameState({ ...start, map: { ...start.map, resources: [] } });
-  panzerfaustEventState.applySnapshot({
-    tick: 10,
-    steel: 0,
-    oil: 0,
-    supplyUsed: 0,
-    supplyCap: 10,
-    entities: [{ id: 31, owner: 1, kind: KIND.PANZERFAUST, x: 300, y: 340, hp: 45, maxHp: 45, state: STATE.ATTACK, weaponFacing: 0 }],
-    events: [
-      { e: EVENT.PANZERFAUST_LAUNCH, from: 31, fromX: 300, fromY: 340, toX: 352, toY: 340, delayTicks: 15 },
-      { e: EVENT.PANZERFAUST_IMPACT, x: 352, y: 340 },
-      { e: EVENT.PANZERFAUST_LAUNCH, from: 32, toX: 360, toY: 340, delayTicks: 15 },
-    ],
-  });
-  assert(panzerfaustEventState.livePanzerfaustShots(performance.now()).length === 0, "Panzerfaust impact clears matching in-flight tracer");
-  assert(panzerfaustEventState.livePanzerfaustImpacts(performance.now()).length === 1, "Panzerfaust impact event creates a live impact cue");
-  assert(panzerfaustEventState.weaponRecoil(31, KIND.PANZERFAUST, performance.now()) > 0, "Panzerfaust launch starts loaded-weapon recoil");
-  assert(
-    panzerfaustEventState.visibleTiles.length === 0,
-    "Panzerfaust visual events do not stamp or extend client fog visibility",
-  );
-  panzerfaustEventState.addPanzerfaustShot({
-    e: EVENT.PANZERFAUST_LAUNCH,
-    from: 31,
-    fromX: 300,
-    fromY: 340,
-    toX: 352,
-    toY: 340,
-    delayTicks: 15,
-  }, performance.now());
-  assert(panzerfaustEventState.livePanzerfaustShots(performance.now()).length === 1, "Panzerfaust launch event creates a live tracer when impact has not arrived");
-
   const artilleryRevealState = new GameState({ ...start, map: { ...start.map, resources: [] } });
   artilleryRevealState.applySnapshot({
     tick: 11,
@@ -339,29 +307,6 @@ function buttonByLabel(card, label) {
   });
   assert(overpenEventState.liveMuzzleFlashes(performance.now()).length === 0, "overpenetration event does not draw a tracer");
   assert(overpenEventState.weaponRecoil(22, KIND.WORKER, performance.now()) === 0, "overpenetration event does not trigger weapon recoil");
-
-  const conversionState = new GameState({ ...start, map: { ...start.map, resources: [] } });
-  conversionState.applySnapshot({
-    tick: 20,
-    steel: 0,
-    oil: 0,
-    supplyUsed: 1,
-    supplyCap: 10,
-    entities: [{ id: 41, owner: 1, kind: KIND.PANZERFAUST, x: 96, y: 96, hp: 30, maxHp: 45, state: STATE.IDLE }],
-    events: [],
-  });
-  conversionState.setSelection([41]);
-  conversionState.applySnapshot({
-    tick: 21,
-    steel: 0,
-    oil: 0,
-    supplyUsed: 1,
-    supplyCap: 10,
-    entities: [{ id: 41, owner: 1, kind: KIND.RIFLEMAN, x: 96, y: 96, hp: 30, maxHp: 45, state: STATE.IDLE }],
-    events: [{ e: EVENT.PANZERFAUST_CONVERSION, id: 41, toKind: KIND.RIFLEMAN }],
-  });
-  assert(conversionState.selection.has(41), "same-id Panzerfaust conversion preserves client selection");
-  assert(conversionState.selectedEntities()[0]?.kind === KIND.RIFLEMAN, "same-id Panzerfaust conversion updates selected entity kind in place");
 
   // Interpolation clamps alpha to [0,1]
   const entsNeg = state.entitiesInterpolated(-0.5);

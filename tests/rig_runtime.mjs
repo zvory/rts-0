@@ -227,6 +227,7 @@ test("geometry-scale animation grows coordinates without scaling stroke width", 
 test("live rig definitions compile production SVG sources", () => {
   const workerFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-worker.svg"), "utf8").trim();
   const riflemanFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-rifleman.svg"), "utf8").trim();
+  const panzerfaustFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-panzerfaust.svg"), "utf8").trim();
   const machineGunnerFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-machine-gunner.svg"), "utf8").trim();
   const antiTankGunFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-anti-tank-gun.svg"), "utf8").trim();
   const mortarTeamFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-mortar-team.svg"), "utf8").trim();
@@ -239,8 +240,7 @@ test("live rig definitions compile production SVG sources", () => {
   assert.equal(GOLEM_RIG_SVG.includes('data-rts-rig-kind="golem"'), true);
   assert.equal(GOLEM_RIG_SVG.includes('id="golem.authored"'), true);
   assert.equal(RIFLEMAN_RIG_SVG.trim(), riflemanFixtureText);
-  assert.equal(PANZERFAUST_RIG_SVG.includes('data-rts-rig-kind="panzerfaust"'), true);
-  assert.equal(PANZERFAUST_RIG_SVG.includes('id="panzerfaust.authored"'), true);
+  assert.equal(PANZERFAUST_RIG_SVG.trim(), panzerfaustFixtureText);
   assert.equal(PANZERFAUST_RIG_SVG.includes('part.pzf.tube'), true);
   assert.equal(PANZERFAUST_RIG_SVG.includes('part.rifle.barrel'), false);
   assert.equal(MACHINE_GUNNER_RIG_SVG.trim(), machineGunnerFixtureText);
