@@ -468,6 +468,64 @@ export function _refreshResourceMiningPreview() {
   });
 }
 
+export function _refreshAttackTargetPreview() {
+  const intent = clientIntent(this);
+  if (
+    this._drag ||
+    intent?.activeLabTool ||
+    intent?.placement ||
+    intent?.commandTarget ||
+    !this.mouse ||
+    this._selectedOwnUnitIds().length === 0
+  ) {
+    intent?.updateAttackTargetPreview?.(null);
+    return;
+  }
+
+  const world = this._worldAt(this.mouse.x, this.mouse.y);
+  const gatherers = this._selectedGathererIds();
+  const workers = this._selectedWorkerIds();
+  const resource = this._resourceAtWorld(world.x, world.y);
+  if (resource && resource.remaining !== 0) {
+    const pumpJack = _pumpJackBuildIntentForResource(resource, this.state.map);
+    const wouldBuildPumpJack = resource.kind === KIND.OIL && workers.length > 0 && pumpJack;
+    const wouldGather = gatherers.length > 0 && resource.kind !== KIND.OIL;
+    if (wouldBuildPumpJack || wouldGather) {
+      intent?.updateAttackTargetPreview?.(null);
+      return;
+    }
+  }
+
+  const target = this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ false);
+  if (!target) {
+    intent?.updateAttackTargetPreview?.(null);
+    return;
+  }
+
+  if (ownOwner(this.state, target.owner) && _isOwnIncompleteBuilding(target)) {
+    const resume = _resumeConstructionIntent(target, this.state.map);
+    if (resume && workers.length > 0) {
+      intent?.updateAttackTargetPreview?.(null);
+      return;
+    }
+  }
+  if (workers.length > 0 && _isCompletedTankTrap(target)) {
+    intent?.updateAttackTargetPreview?.(null);
+    return;
+  }
+  if (!enemyOwner(this.state, target.owner) || isResource(target.kind)) {
+    intent?.updateAttackTargetPreview?.(null);
+    return;
+  }
+
+  intent?.updateAttackTargetPreview?.({
+    targetId: target.id,
+    kind: target.kind,
+    x: target.x,
+    y: target.y,
+  });
+}
+
 export function _nearestOwnCompletedCityCentre(x, y) {
   let best = null;
   for (const e of this.state.entitiesInterpolated(1)) {

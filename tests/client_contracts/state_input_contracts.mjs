@@ -175,8 +175,10 @@ function buttonByLabel(card, label) {
   assert(state.resources !== undefined, "GameState.resources");
   assert(Array.isArray(state.events), "GameState.events");
   assert(!("resourceMiningPreview" in state), "GameState no longer exposes resource preview shims");
+  assert(!("attackTargetPreview" in state), "GameState no longer exposes attack hover preview shims");
   assert(!("antiTankGunSetupPreview" in state), "GameState no longer exposes support preview shims");
   assert(!("updateResourceMiningPreview" in state), "GameState no longer exposes preview update shims");
+  assert(!("updateAttackTargetPreview" in state), "GameState no longer exposes attack hover update shims");
   assert(state.selection instanceof Set, "GameState.selection");
   assert(state.diagnostics.movementPaths === MOVEMENT_PATH_DIAGNOSTICS.NONE, "GameState defaults movement path diagnostics to none");
   assert(state.debugPathOverlaysAvailable === false, "GameState hides waypoint diagnostics by default");
@@ -1206,6 +1208,18 @@ function buttonByLabel(card, label) {
       rightClickCommands[0].queued === true,
     "Shift right-click on enemies should send queued attack",
   );
+  input.clientIntent = new ClientIntent();
+  input.mouse = { x: 180, y: 180 };
+  input._drag = null;
+  input._refreshAttackTargetPreview();
+  assert(
+    input.clientIntent.attackTargetPreview?.targetId === enemyUnit.id &&
+      input.clientIntent.attackTargetPreview.kind === KIND.RIFLEMAN,
+    "enemy hover with own units selected previews the right-click attack target",
+  );
+  input.state.entitiesInterpolated = () => [moveUnit];
+  input._refreshAttackTargetPreview();
+  assert(input.clientIntent.attackTargetPreview === null, "attack target preview clears when right-click would move");
 
   const deconstructWorker = { id: 42, owner: 1, kind: KIND.WORKER, x: 150, y: 150 };
   const enemyTankTrap = { id: 43, owner: 2, kind: KIND.TANK_TRAP, x: 180, y: 180 };
@@ -1225,6 +1239,13 @@ function buttonByLabel(card, label) {
       rightClickCommands[0].target === enemyTankTrap.id &&
       rightClickCommands[0].queued === true,
     "Shift right-click on a Tank Trap with workers selected should send queued deconstruct",
+  );
+  input.clientIntent = new ClientIntent();
+  input.mouse = { x: 180, y: 180 };
+  input._refreshAttackTargetPreview();
+  assert(
+    input.clientIntent.attackTargetPreview === null,
+    "attack target preview stays hidden when worker right-click would deconstruct a Tank Trap",
   );
 
   input.dom = { clientWidth: 800, clientHeight: 600 };

@@ -205,6 +205,22 @@ export function _drawCommandFeedback(view) {
   }
 }
 
+export function _drawAttackTargetPreview(view) {
+  const p = view?.attackTargetPreview;
+  if (!p || !finiteNumber(p.x) || !finiteNumber(p.y)) return;
+  const g = this._feedbackGfx;
+  const ring = typeof this._ringRadius === "function"
+    ? this._ringRadius({ kind: p.kind })
+    : { rx: 16, ry: 11, cy: 4 };
+  const rx = Number.isFinite(ring?.rx) ? ring.rx : 16;
+  const ry = Number.isFinite(ring?.ry) ? ring.ry : 11;
+  const cy = Number.isFinite(ring?.cy) ? ring.cy : 4;
+  g.lineStyle(4, COLORS.selectEnemy, 0.3);
+  g.drawEllipse(p.x, p.y + cy, rx + 2, ry + 2);
+  g.lineStyle(2, COLORS.selectEnemy, 0.98);
+  g.drawEllipse(p.x, p.y + cy, rx, ry);
+}
+
 export function _drawOrderPlan(state) {
   if (!state || typeof state.selectedEntities !== "function") return;
   const g = this._feedbackGfx;
