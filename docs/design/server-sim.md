@@ -484,11 +484,13 @@ policy is centralized instead of scattered through services.
 - `rules::combat` — default weapon-profile ids and policy metadata, AP/armor predicates (`is_ap`,
   `is_armored`), target-ranking classifiers (`target_threat_role`, `default_weapon_target_fit`),
   target priority policy ids (`default_weapon`, `vehicle_default_weapon`, `tank_cannon`, and
-  reserved `tank_coax_machine_gun`), compatibility helpers such as
+  `tank_coax_machine_gun`), compatibility helpers such as
   `attack_profile(kind) -> AttackProfile`, and weapon-aware direct damage/miss/facing helpers such
   as `effective_damage_for_weapon(profile, victim_kind, base_dmg, victim_terrain) -> u32`. The
-  Panzerfaust Tank-only loaded-shot predicate lives here as rules vocabulary while the one-shot
-  state machine stays in the sim combat service.
+  Tank coax profile is a live secondary Tank weapon (`tank_coax`, 6 tiles, 4 damage, 6-tick
+  cooldown, small arms, direct-fire overpenetration). The Panzerfaust Tank-only loaded-shot
+  predicate lives here as rules vocabulary while the one-shot state machine stays in the sim combat
+  service.
 - `rules::target` — pure `TargetFacts` snapshots for target policy consumers. Facts include unit,
   building, resource-node, armor class, weapon class, anti-armor threat, support weapon, field
   obstacle, vehicle-body, economy-unit, and future Tank coax infantry-priority classification.
@@ -763,7 +765,8 @@ Combat weapon cooldowns and firing-reveal response delays are keyed by
 `set_attack_cd()`, and `tick_attack_cd()` shims operate only on an entity kind's default weapon;
 new multi-weapon code should use `weapon_cooldown`, `set_weapon_cooldown`,
 `tick_weapon_cooldowns`, and `start_weapon_firing_reveal_response_delay`. Ability cooldowns,
-lockouts, and uses remain separate from weapon cooldown state.
+lockouts, and uses remain separate from weapon cooldown state. Tanks use this keyed state to keep
+the `tank_cannon` and `tank_coax` reloads independent.
 
 Auto-acquisition prefers unit targets before building cleanup targets by default. Building fallback targets still use weapon-fit ranking among eligible cleanup targets.
 
@@ -831,10 +834,16 @@ General rules:
   ranker selects one named `rules::combat::TargetPriorityPolicyId` and applies that policy's
   declarative terms: default-weapon fit, Tank cannon immediate-threat order, vehicle Tank Trap route
   obstruction, shoot-while-moving target retention, unit-over-building preference, and nearest/id
-  tie-breaks. The reserved `tank_coax_machine_gun` policy is not wired to live firing yet; it ranks
+  tie-breaks. The `tank_coax_machine_gun` policy is used by the Tank secondary-fire pass; it ranks
   Worker, Rifleman, and Machine Gunner targets before all other legal non-resource fallbacks, then
   uses distance/id ties without Tank cannon threat ordering. The ranker does not decide fog, smoke,
   line-of-sight, blocker, ownership, or acquisition-radius legality.
+  Tanks run the coax pass after their normal cannon aim/fire/relax work for the tick. The pass reads
+  the current authoritative turret facing, accepts only targets within a 10-degree half arc and the
+  6-tile coax range, uses intended-target direct-fire legality so enemy hard blockers can reject a
+  behind-them infantry target, and never rotates the turret, changes the cannon target slot, clears
+  paths, or requests chase movement. Same-tick Tank cannon/coax events are emitted cannon first,
+  then coax.
   Direct-fire legality is centralized in `services::combat::acquisition::direct_fire_target_legal`:
   default auto-acquisition/firing uses the current resolved-target mode that rejects friendly hard
   blockers but may resolve to an intervening enemy hard blocker, while ordered/intended-target uses

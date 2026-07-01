@@ -16,6 +16,7 @@ use crate::protocol::{terrain, NoticeSeverity};
 use crate::rules::combat as combat_rules;
 use rand::SeedableRng;
 mod mortar_autocast;
+mod coax;
 mod entrenchment;
 mod moving_fire_policy;
 mod retention;

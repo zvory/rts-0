@@ -320,11 +320,34 @@ fn dev_scenarios_default_to_kriegsia_start_faction() {
             0x5150_030d,
         ),
         Game::new_entrenchment_inspection_scenario(EntityKind::Rifleman, 1, 0x5150_030d),
+        Game::new_tank_coax_inspection_scenario(EntityKind::Tank, 1, 0x5150_030d),
     ];
 
     for setup in scenarios {
         assert_dev_scenario_starts_as_kriegsia(&setup.expect("scenario setup should succeed"));
     }
+}
+
+#[test]
+fn tank_coax_inspection_scenario_sets_up_static_mixed_targets() {
+    let setup = Game::new_tank_coax_inspection_scenario(EntityKind::Tank, 1, 0x5150_0606)
+        .expect("Tank coax inspection scenario setup should succeed");
+    assert_eq!(setup.issue_after_ticks, u32::MAX);
+    assert_eq!(setup.units.len(), 4);
+    assert_eq!(owned_kind_count(&setup.game, 1, EntityKind::Tank), 1);
+    assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::Worker), 1);
+    assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::Rifleman), 1);
+    assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::ScoutCar), 1);
+    assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::Depot), 1);
+    let tank_id = setup.units[0];
+    let tank = setup.game.entities.get(tank_id).expect("tank should exist");
+    assert_eq!(tank.weapon_facing(), Some(0.0));
+    assert_eq!(
+        tank.weapon_cooldown(crate::rules::combat::WeaponKind::TankCannon),
+        config::TICK_HZ * 4,
+        "inspection scenario should delay cannon fire so coax feedback is easy to see"
+    );
+    assert_dev_scenario_starts_as_kriegsia(&setup);
 }
 
 #[test]

@@ -11,6 +11,7 @@ import {
   ORDER_STAGE,
   SETUP,
   STATE,
+  WEAPON_KIND,
 } from "../../client/src/protocol.js";
 import { createLabControlPolicy } from "../../client/src/lab_control_policy.js";
 import { buildRendererFeedbackView } from "../../client/src/renderer/feedback_view_model.js";
@@ -23,6 +24,7 @@ import {
   _drawDebugPathOverlay,
   _drawMortarImpacts,
   _drawMortarShells,
+  _drawMuzzleFlashes,
   _drawOrderPlan,
   _drawPlacement,
   _drawRallyPoints,
@@ -417,6 +419,60 @@ function polygonCenter(points) {
   assert(
     ringGfx.calls.some((call) => call[0] === "lineStyle" && call[2] === COLORS.selectOwn),
     "lab P2 selected entities use own selection-ring color",
+  );
+}
+
+{
+  const priorNow = performance.now;
+  const fixedNow = 8200;
+  const feedbackGfx = new RecordingGraphics();
+  const tank = {
+    id: 91,
+    owner: 1,
+    kind: KIND.TANK,
+    x: 100,
+    y: 100,
+    weaponFacing: 0,
+    facing: 0,
+  };
+  const target = {
+    id: 92,
+    owner: 2,
+    kind: KIND.WORKER,
+    x: 184,
+    y: 100,
+  };
+
+  performance.now = () => fixedNow;
+  try {
+    _drawMuzzleFlashes.call({ _feedbackGfx: feedbackGfx, _map: { tileSize: 32 } }, {
+      entityById(id) {
+        return id === tank.id ? tank : id === target.id ? target : null;
+      },
+      liveMuzzleFlashes(now) {
+        assertApprox(now, fixedNow, 0.001, "muzzle renderer samples current frame time");
+        return [{
+          from: tank.id,
+          to: target.id,
+          targetPos: { x: target.x, y: target.y },
+          weaponKind: WEAPON_KIND.TANK_COAX,
+          createdAt: fixedNow,
+        }];
+      },
+    });
+  } finally {
+    performance.now = priorNow;
+  }
+
+  const circles = feedbackGfx.calls.filter((call) => call[0] === "drawCircle");
+  assert(circles.length >= 2, "tank coax draws a visible muzzle flash");
+  assert(
+    circles.every((call) => call[3] <= 7),
+    "tank coax muzzle flash uses machine-gun scale rather than Tank cannon scale",
+  );
+  assert(
+    feedbackGfx.calls.some((call) => call[0] === "moveTo" && call[1] > tank.x + 15),
+    "tank coax temporary feedback origin stays near the Tank weapon reach until rig polish",
   );
 }
 

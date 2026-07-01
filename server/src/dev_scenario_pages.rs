@@ -320,5 +320,6 @@ mod tests {
         );
         assert!(html.contains("Entrenchment Inspection"));
         assert!(html.contains("/dev/scenarios?id=entrenchment_inspection&unit=rifleman&count=1"));
+        assert!(html.contains("/dev/scenarios?id=tank_coax_inspection&unit=tank&count=1"));
     }
 }

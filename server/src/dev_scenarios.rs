@@ -683,7 +683,15 @@ const ENTRENCHMENT_INSPECTION_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLau
     case: None,
 }];
 
-const DEV_SCENARIOS: [DevScenarioSpec; 11] = [
+const TANK_COAX_INSPECTION_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
+    id: "tank_coax_inspection",
+    unit: EntityKind::Tank,
+    count: 1,
+    blocker: None,
+    case: None,
+}];
+
+const DEV_SCENARIOS: [DevScenarioSpec; 12] = [
     DevScenarioSpec {
         id: "scout_car_snaking_corridor",
         title: "Scout Car Snaking Corridor",
@@ -750,6 +758,12 @@ const DEV_SCENARIOS: [DevScenarioSpec; 11] = [
         title: "Entrenchment Inspection",
         description: "Seeded neutral trenches, eligible infantry, and researched dig-in units for checking trench rendering, reuse, and crowded slotting.",
         launches: &ENTRENCHMENT_INSPECTION_LAUNCHES,
+    },
+    DevScenarioSpec {
+        id: "tank_coax_inspection",
+        title: "Tank Coax Inspection",
+        description: "One held Tank faces a mixed infantry, vehicle, and building group inside the coax arc so the secondary machine gun can be inspected without immediate cannon fire.",
+        launches: &TANK_COAX_INSPECTION_LAUNCHES,
     },
 ];
 
@@ -1097,6 +1111,16 @@ mod tests {
             })
         );
         assert_eq!(
+            parse_dev_scenario_room("tank_coax_inspection:unit=tank:count=1"),
+            Some(DevScenarioLaunch {
+                id: "tank_coax_inspection",
+                unit: EntityKind::Tank,
+                count: 1,
+                blocker: None,
+                case: None,
+            })
+        );
+        assert_eq!(
             parse_dev_scenario_launch(
                 "vehicle_small_block_baseline",
                 "scout_car",
@@ -1225,6 +1249,14 @@ mod tests {
         );
         assert_eq!(
             parse_dev_scenario_launch("entrenchment_inspection", "rifleman", "2", None),
+            None
+        );
+        assert_eq!(
+            parse_dev_scenario_launch("tank_coax_inspection", "scout_car", "1", None),
+            None
+        );
+        assert_eq!(
+            parse_dev_scenario_launch("tank_coax_inspection", "tank", "2", None),
             None
         );
         assert_eq!(

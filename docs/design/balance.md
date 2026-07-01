@@ -12,7 +12,9 @@ Default attack range, damage, cooldown, weapon class, and weapon-policy metadata
 `server/crates/rules/src/combat.rs` weapon profiles; current profile values mirror the defs records
 so legacy `attack_profile(kind)` and `weapon_class(kind)` callers remain behavior-compatible.
 Direct-fire damage, miss policy, tank-facing modifiers, and over-penetration policy consume the
-selected weapon profile instead of inferring those behaviors only from the firing entity kind.
+selected weapon profile instead of inferring those behaviors only from the firing entity kind. Tanks
+also have a live secondary `tank_coax` profile owned by combat rules: 6-tile range, 4 small-arms
+damage, 6-tick cooldown, no Tank armor-facing multiplier, and direct-fire overpenetration.
 `client/src/config.js` is the stable public facade for the subset the UI/render/fog needs (costs,
 supply, sight, sizes, colors, and command-card descriptors). Its internal
 `client/src/config/timing.js`, `client/src/config/rules_mirror.js`, and
@@ -257,8 +259,10 @@ Vehicle-body units treat enemy Tank Traps as high-priority breach targets only w
 the unit's current short route window or helps close a vehicle-body gap across that route; nearby
 irrelevant traps remain attackable fallbacks but no longer outrank ordinary combat targets.
 The rules-owned `TargetFacts` surface records the current target-policy facts for every
-`EntityKind`, including the reserved Tank coax infantry-priority group: Worker, Rifleman, and
-Machine Gunner only.
+`EntityKind`, including the Tank coax infantry-priority group: Worker, Rifleman, and Machine Gunner
+only. The live coax policy ranks those infantry-priority targets before fallback legal targets such
+as vehicles, buildings, support weapons, and field obstacles; resource nodes are not legal coax
+targets.
 Moving-fire retention is sticky but not absolute: Tanks, Scout Cars, and
 Methamphetamines-upgraded Riflemen keep a current legal target across equal-rank comparisons so
 they do not flicker between similar enemies, but higher-rank default-weapon threats still steal
@@ -483,7 +487,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 72 | 1.6 | 6     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and Heavy Guns (`anti_tank_gun_unlock`) researched in R&D Complex |
 | artillery       | 150 | 150 AP inner / 150-10 outer AOE | 25-55 artillery fire | 90 | 1.3 | 4 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind) and Heavy Guns (`anti_tank_gun_unlock`) researched in R&D Complex; tank-sized footprint |
 | scout_car       | 100 | 6   | 5     | 6  | 2.35  | 14    | 125 | 50  | 3   | 480 (~16s) |
-| tank            | 292 | 60  | 5 moving / 14 fully stationary | 72 | 2.0   | 6     | 425 | 150 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex |
+| tank            | 292 | 60 cannon; 4 coax | 5 moving / 14 fully stationary cannon; 6 coax | 72 cannon; 6 coax | 2.0   | 6     | 425 | 150 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex; coax is a secondary small-arms weapon that fires through the current turret arc |
 | command_car     | 225 | 0   | 0     | 0  | 2.35  | 10    | 150 | 75  | 4   | 450 (~15s); requires Vehicle Works (`factory` kind) and Command Car (`command_car_unlock`) researched in R&D Complex; no weapon; Scout Car-style movement with a smaller jeep-sized body |
 | ekat       | 150 | 0   | 0     | 0  | 1.6   | 9     | 0   | 0   | 0   | 0; Ekat faction hero; no default attack; no passive regeneration; consumes nearby Golems for recovery |
 
