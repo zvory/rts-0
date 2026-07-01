@@ -1,4 +1,5 @@
 use super::*;
+use rand::RngCore;
 
 #[derive(Debug, PartialEq)]
 struct SemanticGameView {
@@ -9,9 +10,12 @@ struct SemanticGameView {
     map_metadata: MapMetadata,
     starting_loadouts: Vec<PlayerStartingLoadout>,
     next_entity_id: u32,
+    rng_probe: [u64; 4],
+    pending_commands: Vec<String>,
     players: Vec<SemanticPlayerView>,
     entities: Vec<(u32, String)>,
     command_log: Vec<super::replay::CommandLogEntry>,
+    fog_visible_tiles: Vec<(u32, Vec<u8>)>,
     scores: Vec<PlayerScore>,
     active_construction_sites: Vec<u32>,
     lab_god_mode_players: Vec<u32>,
@@ -65,6 +69,7 @@ fn derived_state_wipe_rebuild_preserves_pathing_state_and_snapshots() {
             queued: false,
         },
     );
+    assert_equivalent_games(&baseline, &wiped, "queued warm-path command");
     tick_pair_and_assert_equivalent(&mut baseline, &mut wiped, "warm path cache tick");
 
     assert!(
@@ -112,6 +117,8 @@ fn derived_state_wipe_rebuild_preserves_pathing_state_and_snapshots() {
             queued: false,
         },
     );
+    wiped.clear_and_rebuild_derived_state_for_test();
+    assert_equivalent_games(&baseline, &wiped, "queued post-wipe repath command");
     tick_pair_and_assert_equivalent(&mut baseline, &mut wiped, "post-wipe repath tick");
     assert!(
         wiped.pathing.cache_len() > 0,
@@ -312,9 +319,19 @@ fn semantic_game_view(game: &Game) -> SemanticGameView {
         map_metadata: game.map_metadata().clone(),
         starting_loadouts: game.starting_loadouts().to_vec(),
         next_entity_id: game.entities.next_id_for_test(),
+        rng_probe: rng_probe(game),
+        pending_commands: game
+            .pending
+            .iter()
+            .map(|pending| format!("{pending:?}"))
+            .collect(),
         players,
         entities,
         command_log: game.command_log().to_vec(),
+        fog_visible_tiles: player_ids(game)
+            .into_iter()
+            .map(|player| (player, game.fog.visible_tiles_for(player)))
+            .collect(),
         scores: game.scores(),
         active_construction_sites: game.active_construction_sites.iter().copied().collect(),
         lab_god_mode_players: game.lab_god_mode_players.iter().copied().collect(),
@@ -346,4 +363,14 @@ fn projection_view(game: &Game) -> ProjectionView {
 
 fn player_ids(game: &Game) -> Vec<u32> {
     game.players.iter().map(|player| player.id).collect()
+}
+
+fn rng_probe(game: &Game) -> [u64; 4] {
+    let mut rng = game.rng.clone();
+    [
+        rng.next_u64(),
+        rng.next_u64(),
+        rng.next_u64(),
+        rng.next_u64(),
+    ]
 }
