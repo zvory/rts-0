@@ -286,12 +286,7 @@ impl Game {
             }
         }
 
-        let derived = DerivedState::new(
-            &map,
-            &entities,
-            LIVE_PATHING_DEFAULT_BUDGET,
-            LIVE_PATHING_CACHE_CAPACITY,
-        );
+        let derived = live_derived_state(&map, &entities, 0);
         let mut game = Game {
             state: GameState::new(
                 map,
@@ -361,6 +356,21 @@ impl Game {
             players,
         }
     }
+}
+
+pub(in crate::game) fn live_derived_state(
+    map: &Map,
+    entities: &EntityStore,
+    tick: u32,
+) -> DerivedState {
+    let mut derived = DerivedState::new(
+        map,
+        entities,
+        LIVE_PATHING_DEFAULT_BUDGET,
+        LIVE_PATHING_CACHE_CAPACITY,
+    );
+    derived.advance_pathing_tick(tick);
+    derived
 }
 
 fn default_map_metadata() -> MapMetadata {

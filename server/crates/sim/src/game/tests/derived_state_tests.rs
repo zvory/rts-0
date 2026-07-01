@@ -147,6 +147,88 @@ fn derived_state_wipe_rebuild_preserves_pathing_state_and_snapshots() {
 }
 
 #[test]
+fn checkpoint_export_import_rebuilds_derived_state_and_preserves_semantics() {
+    let (mut baseline, tank, goal, return_goal) = derived_state_pathing_fixture();
+    baseline.enqueue(
+        1,
+        Command::Move {
+            units: vec![tank],
+            x: goal.0,
+            y: goal.1,
+            queued: false,
+        },
+    );
+    baseline.tick();
+    assert!(
+        baseline.pathing_cache_len_for_test() > 0,
+        "pathing-heavy setup should warm the reusable cache before checkpoint export"
+    );
+
+    baseline.enqueue(
+        1,
+        Command::Move {
+            units: vec![tank],
+            x: return_goal.0,
+            y: return_goal.1,
+            queued: false,
+        },
+    );
+    let checkpoint_next_id = baseline.state.entities.next_id_for_test();
+    let checkpoint_pathing_config = baseline.pathing_config_for_test();
+    let checkpoint = baseline.checkpoint_for_test();
+    let mut restored = Game::restore_checkpoint_for_test(checkpoint);
+
+    assert_eq!(
+        restored.pathing_cache_len_for_test(),
+        0,
+        "checkpoint import must rebuild DerivedState instead of serializing pathing cache entries"
+    );
+    assert_eq!(
+        checkpoint_pathing_config,
+        restored.pathing_config_for_test(),
+        "checkpoint import should use the same live pathing budget/cache capacity"
+    );
+    assert_eq!(
+        checkpoint_next_id,
+        restored.state.entities.next_id_for_test(),
+        "entity allocator high-water state should survive checkpoint import"
+    );
+    assert_final_spatial_matches_entities(&restored);
+    assert_equivalent_games(&baseline, &restored, "after cold checkpoint import");
+
+    let spawn_pos = baseline.state.map.tile_center(30, 30);
+    let baseline_spawn = baseline
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, spawn_pos.0, spawn_pos.1)
+        .expect("baseline allocator should spawn a post-checkpoint unit");
+    let restored_spawn = restored
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, spawn_pos.0, spawn_pos.1)
+        .expect("restored allocator should spawn a post-checkpoint unit");
+    assert_eq!(
+        baseline_spawn, restored_spawn,
+        "same post-checkpoint allocation should receive the same stable entity id"
+    );
+    repair_after_authoritative_test_spawn(&mut baseline);
+    repair_after_authoritative_test_spawn(&mut restored);
+    assert_equivalent_games(
+        &baseline,
+        &restored,
+        "after matching post-checkpoint allocation",
+    );
+
+    for tick in 0..32 {
+        tick_pair_and_assert_equivalent(
+            &mut baseline,
+            &mut restored,
+            &format!("post-checkpoint command tick {tick}"),
+        );
+    }
+}
+
+#[test]
 fn lab_world_mutation_clears_rebuildable_pathing_cache() {
     let mut game = derived_state_lab_fixture();
     let spawn_pos = game.state.map.tile_center(30, 30);
@@ -369,6 +451,26 @@ fn assert_equivalent_games(baseline: &Game, wiped: &Game, label: &str) {
         projection_view(wiped),
         "{label}: fog-filtered snapshots diverged"
     );
+}
+
+fn assert_final_spatial_matches_entities(game: &Game) {
+    let mut spatial_ids = game.final_spatial().all_ids().collect::<Vec<_>>();
+    spatial_ids.sort_unstable();
+    assert_eq!(
+        game.state.entities.ids(),
+        spatial_ids,
+        "rebuilt final spatial index should cover every live entity id"
+    );
+}
+
+fn repair_after_authoritative_test_spawn(game: &mut Game) {
+    systems::recompute_supply(&mut game.state.players, &game.state.entities);
+    game.clear_and_rebuild_derived_state_for_test();
+    let ids = player_ids(game);
+    game.recompute_live_fog(&ids);
+    game.refresh_building_memory(&ids);
+    game.refresh_trench_memory(&ids);
+    game.assert_invariants();
 }
 
 fn semantic_game_view(game: &Game) -> SemanticGameView {

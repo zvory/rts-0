@@ -36,6 +36,32 @@ pub(in crate::game) struct GameState {
     pub(in crate::game) rng: SmallRng,
 }
 
+#[cfg(test)]
+pub(in crate::game) struct GameCheckpoint {
+    map: Map,
+    entities: EntityStore,
+    fog: Fog,
+    building_memory: BuildingMemory,
+    players: Vec<PlayerState>,
+    pending: Vec<commands::PendingCommand>,
+    command_log: Vec<CommandLogEntry>,
+    tick: u32,
+    lingering_sight: Vec<LingeringSightSource>,
+    firing_reveals: Vec<FiringRevealSource>,
+    smokes: SmokeCloudStore,
+    trenches: TrenchStore,
+    ability_runtime: AbilityRuntime,
+    mortar_shells: MortarShellStore,
+    artillery_shells: ArtilleryShellStore,
+    seed: u32,
+    starting_loadouts: Vec<PlayerStartingLoadout>,
+    map_metadata: MapMetadata,
+    active_construction_sites: BTreeSet<u32>,
+    lab_god_mode_players: BTreeSet<u32>,
+    starting_loadout: StartingLoadout,
+    rng: SmallRng,
+}
+
 impl GameState {
     #[allow(clippy::too_many_arguments)]
     pub(in crate::game) fn new(
@@ -76,5 +102,61 @@ impl GameState {
 
     pub(in crate::game) fn player_ids(&self) -> Vec<u32> {
         self.players.iter().map(|player| player.id).collect()
+    }
+
+    #[cfg(test)]
+    pub(in crate::game) fn export_checkpoint(&self) -> GameCheckpoint {
+        GameCheckpoint {
+            map: self.map.clone(),
+            entities: self.entities.clone(),
+            fog: self.fog.clone(),
+            building_memory: self.building_memory.clone(),
+            players: self.players.clone(),
+            pending: self.pending.clone(),
+            command_log: self.command_log.clone(),
+            tick: self.tick,
+            lingering_sight: self.lingering_sight.clone(),
+            firing_reveals: self.firing_reveals.clone(),
+            smokes: self.smokes.clone(),
+            trenches: self.trenches.clone(),
+            ability_runtime: self.ability_runtime.clone(),
+            mortar_shells: self.mortar_shells.clone(),
+            artillery_shells: self.artillery_shells.clone(),
+            seed: self.seed,
+            starting_loadouts: self.starting_loadouts.clone(),
+            map_metadata: self.map_metadata.clone(),
+            active_construction_sites: self.active_construction_sites.clone(),
+            lab_god_mode_players: self.lab_god_mode_players.clone(),
+            starting_loadout: self.starting_loadout,
+            rng: self.rng.clone(),
+        }
+    }
+
+    #[cfg(test)]
+    pub(in crate::game) fn import_checkpoint(checkpoint: GameCheckpoint) -> Self {
+        Self {
+            map: checkpoint.map,
+            entities: checkpoint.entities,
+            fog: checkpoint.fog,
+            building_memory: checkpoint.building_memory,
+            players: checkpoint.players,
+            pending: checkpoint.pending,
+            command_log: checkpoint.command_log,
+            tick: checkpoint.tick,
+            lingering_sight: checkpoint.lingering_sight,
+            firing_reveals: checkpoint.firing_reveals,
+            smokes: checkpoint.smokes,
+            trenches: checkpoint.trenches,
+            ability_runtime: checkpoint.ability_runtime,
+            mortar_shells: checkpoint.mortar_shells,
+            artillery_shells: checkpoint.artillery_shells,
+            seed: checkpoint.seed,
+            starting_loadouts: checkpoint.starting_loadouts,
+            map_metadata: checkpoint.map_metadata,
+            active_construction_sites: checkpoint.active_construction_sites,
+            lab_god_mode_players: checkpoint.lab_god_mode_players,
+            starting_loadout: checkpoint.starting_loadout,
+            rng: checkpoint.rng,
+        }
     }
 }

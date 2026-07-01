@@ -1,6 +1,6 @@
 # Phase 4 - Cold Checkpoint V0
 
-Status: Not started.
+Status: Done.
 
 ## Scope
 
