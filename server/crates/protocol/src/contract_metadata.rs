@@ -28,6 +28,7 @@ pub mod kinds {
     pub const MORTAR_TEAM: &str = "mortar_team";
     pub const ARTILLERY: &str = "artillery";
     pub const SCOUT_CAR: &str = "scout_car";
+    pub const SCOUT_PLANE: &str = "scout_plane";
     pub const TANK: &str = "tank";
     pub const COMMAND_CAR: &str = "command_car";
     pub const EKAT: &str = "ekat";
@@ -65,6 +66,7 @@ pub mod abilities {
     pub const POINT_FIRE: &str = "pointFire";
     pub const BLANKET_FIRE: &str = "blanketFire";
     pub const BREAKTHROUGH: &str = "breakthrough";
+    pub const DISMISS_SCOUT_PLANE: &str = "dismissScoutPlane";
     pub const EKAT_TELEPORT: &str = "ekatTeleport";
     pub const EKAT_LINE_SHOT: &str = "ekatLineShot";
     pub const EKAT_MAGIC_ANCHOR: &str = "ekatMagicAnchor";
@@ -117,7 +119,7 @@ pub mod weapons {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 30;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 31;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -290,6 +292,7 @@ const KIND_CODES: &[(&str, u8)] = &[
     (kinds::ARTILLERY, 16),
     (kinds::TANK, 5),
     (kinds::SCOUT_CAR, 14),
+    (kinds::SCOUT_PLANE, 25),
     (kinds::CITY_CENTRE, 6),
     (kinds::DEPOT, 7),
     (kinds::BARRACKS, 8),
@@ -359,6 +362,7 @@ const ORDER_STAGE_CODES: &[(&str, u8)] = &[
     ("deconstruct", 15),
     (abilities::EKAT_CONSUME_GOLEM, 16),
     (abilities::BLANKET_FIRE, 17),
+    (abilities::DISMISS_SCOUT_PLANE, 18),
 ];
 
 const ABILITY_CODES: &[(&str, u8)] = &[
@@ -372,6 +376,7 @@ const ABILITY_CODES: &[(&str, u8)] = &[
     (abilities::EKAT_MAGIC_ANCHOR, 8),
     (abilities::EKAT_CONSUME_GOLEM, 9),
     (abilities::BLANKET_FIRE, 10),
+    (abilities::DISMISS_SCOUT_PLANE, 11),
 ];
 
 const ABILITY_OBJECT_KIND_CODES: &[(&str, u8)] = &[
@@ -565,6 +570,7 @@ fn kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("MORTAR_TEAM", kinds::MORTAR_TEAM),
         ("ARTILLERY", kinds::ARTILLERY),
         ("SCOUT_CAR", kinds::SCOUT_CAR),
+        ("SCOUT_PLANE", kinds::SCOUT_PLANE),
         ("TANK", kinds::TANK),
         ("COMMAND_CAR", kinds::COMMAND_CAR),
         ("EKAT", kinds::EKAT),
@@ -619,6 +625,7 @@ fn ability_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("POINT_FIRE", abilities::POINT_FIRE),
         ("BLANKET_FIRE", abilities::BLANKET_FIRE),
         ("BREAKTHROUGH", abilities::BREAKTHROUGH),
+        ("DISMISS_SCOUT_PLANE", abilities::DISMISS_SCOUT_PLANE),
         ("EKAT_TELEPORT", abilities::EKAT_TELEPORT),
         ("EKAT_LINE_SHOT", abilities::EKAT_LINE_SHOT),
         ("EKAT_MAGIC_ANCHOR", abilities::EKAT_MAGIC_ANCHOR),
@@ -688,6 +695,7 @@ fn order_stage_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("POINT_FIRE", abilities::POINT_FIRE),
         ("BLANKET_FIRE", abilities::BLANKET_FIRE),
         ("BREAKTHROUGH", abilities::BREAKTHROUGH),
+        ("DISMISS_SCOUT_PLANE", abilities::DISMISS_SCOUT_PLANE),
         ("EKAT_TELEPORT", abilities::EKAT_TELEPORT),
         ("EKAT_LINE_SHOT", abilities::EKAT_LINE_SHOT),
         ("EKAT_MAGIC_ANCHOR", abilities::EKAT_MAGIC_ANCHOR),
@@ -783,6 +791,7 @@ fn compact_slot_schemas() -> CompactSlotSchemas {
             optional_field(30, "deconstructProgress"),
             optional_field(31, "weaponRangeTiles"),
             optional_field(32, "occupiedTrenchId"),
+            optional_field(33, "scoutPlane"),
         ],
         event: event_slot_schemas(),
         trench: vec![

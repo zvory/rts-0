@@ -15,6 +15,7 @@ pub enum AbilityKind {
     PointFire,
     BlanketFire,
     Breakthrough,
+    DismissScoutPlane,
     EkatTeleport,
     EkatLineShot,
     EkatMagicAnchor,
@@ -30,10 +31,44 @@ impl AbilityKind {
             AbilityKind::PointFire => protocol::abilities::POINT_FIRE,
             AbilityKind::BlanketFire => protocol::abilities::BLANKET_FIRE,
             AbilityKind::Breakthrough => protocol::abilities::BREAKTHROUGH,
+            AbilityKind::DismissScoutPlane => protocol::abilities::DISMISS_SCOUT_PLANE,
             AbilityKind::EkatTeleport => protocol::abilities::EKAT_TELEPORT,
             AbilityKind::EkatLineShot => protocol::abilities::EKAT_LINE_SHOT,
             AbilityKind::EkatMagicAnchor => protocol::abilities::EKAT_MAGIC_ANCHOR,
             AbilityKind::EkatConsumeGolem => protocol::abilities::EKAT_CONSUME_GOLEM,
+        }
+    }
+
+    pub fn to_planner_code(self) -> u16 {
+        match self {
+            AbilityKind::Charge => 0,
+            AbilityKind::Smoke => 1,
+            AbilityKind::MortarFire => 2,
+            AbilityKind::PointFire => 3,
+            AbilityKind::Breakthrough => 4,
+            AbilityKind::EkatTeleport => 5,
+            AbilityKind::EkatLineShot => 6,
+            AbilityKind::EkatMagicAnchor => 7,
+            AbilityKind::EkatConsumeGolem => 8,
+            AbilityKind::BlanketFire => 9,
+            AbilityKind::DismissScoutPlane => 10,
+        }
+    }
+
+    pub fn from_planner_code(code: u16) -> Option<Self> {
+        match code {
+            0 => Some(AbilityKind::Charge),
+            1 => Some(AbilityKind::Smoke),
+            2 => Some(AbilityKind::MortarFire),
+            3 => Some(AbilityKind::PointFire),
+            4 => Some(AbilityKind::Breakthrough),
+            5 => Some(AbilityKind::EkatTeleport),
+            6 => Some(AbilityKind::EkatLineShot),
+            7 => Some(AbilityKind::EkatMagicAnchor),
+            8 => Some(AbilityKind::EkatConsumeGolem),
+            9 => Some(AbilityKind::BlanketFire),
+            10 => Some(AbilityKind::DismissScoutPlane),
+            _ => None,
         }
     }
 }
@@ -49,6 +84,7 @@ impl FromStr for AbilityKind {
             protocol::abilities::POINT_FIRE => Ok(AbilityKind::PointFire),
             protocol::abilities::BLANKET_FIRE => Ok(AbilityKind::BlanketFire),
             protocol::abilities::BREAKTHROUGH => Ok(AbilityKind::Breakthrough),
+            protocol::abilities::DISMISS_SCOUT_PLANE => Ok(AbilityKind::DismissScoutPlane),
             protocol::abilities::EKAT_TELEPORT => Ok(AbilityKind::EkatTeleport),
             protocol::abilities::EKAT_LINE_SHOT => Ok(AbilityKind::EkatLineShot),
             protocol::abilities::EKAT_MAGIC_ANCHOR => Ok(AbilityKind::EkatMagicAnchor),
@@ -129,6 +165,7 @@ pub fn effect_hook(kind: AbilityKind) -> AbilityEffectHook {
         AbilityKind::Smoke | AbilityKind::MortarFire => AbilityEffectHook::DelayedWorld,
         AbilityKind::PointFire | AbilityKind::BlanketFire => AbilityEffectHook::ArtilleryPointFire,
         AbilityKind::Breakthrough => AbilityEffectHook::OwnedAreaStatus,
+        AbilityKind::DismissScoutPlane => AbilityEffectHook::ReservedNoop,
         AbilityKind::EkatTeleport => AbilityEffectHook::DashReturn,
         AbilityKind::EkatLineShot => AbilityEffectHook::LineProjectile,
         AbilityKind::EkatMagicAnchor => AbilityEffectHook::MagicAnchor,
@@ -165,6 +202,10 @@ mod tests {
         assert_eq!(
             definition(AbilityKind::Breakthrough).effect_hook,
             AbilityEffectHook::OwnedAreaStatus
+        );
+        assert_eq!(
+            definition(AbilityKind::DismissScoutPlane).effect_hook,
+            AbilityEffectHook::ReservedNoop
         );
         assert_eq!(
             definition(AbilityKind::EkatTeleport).effect_hook,

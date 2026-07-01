@@ -308,6 +308,7 @@ mod tests {
         assert_eq!(cost(EntityKind::Worker), (50, 0));
         assert_eq!(cost(EntityKind::Golem), (0, 0));
         assert_eq!(cost(EntityKind::ScoutCar), (125, 50));
+        assert_eq!(cost(EntityKind::ScoutPlane), (50, 50));
         assert_eq!(cost(EntityKind::Tank), (425, 150));
         assert_eq!(cost(EntityKind::MortarTeam), (100, 50));
         assert_eq!(cost(EntityKind::Factory), (125, 125));
@@ -317,6 +318,16 @@ mod tests {
         assert_eq!(cost(EntityKind::Artillery), (300, 100));
         assert_eq!(cost(EntityKind::ResearchComplex), (100, 100));
         assert_eq!(supply_cost(EntityKind::Artillery), 5);
+        assert_eq!(supply_cost(EntityKind::ScoutPlane), 0);
+        assert_eq!(
+            defs::unit_def(EntityKind::ScoutPlane).map(|d| d.stats.radius),
+            Some(0.0),
+            "Scout Plane should not reserve or block ground collision in the hidden contract"
+        );
+        assert_eq!(
+            defs::unit_def(EntityKind::ScoutPlane).map(|d| d.stats.sight_tiles),
+            Some(crate::balance::SCOUT_PLANE_SIGHT_TILES)
+        );
         assert_eq!(
             cost(EntityKind::Panzerfaust),
             (60, 15),

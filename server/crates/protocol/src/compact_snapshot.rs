@@ -14,8 +14,8 @@ use crate::{
 };
 use rts_contract::{
     AbilityCooldownView, AbilityObjectOwnerStateView, AbilityObjectView, AttackReveal,
-    DebugPathView, EntityView, Event, OrderPlanMarker, RememberedBuildingView, SmokeCloudView,
-    Snapshot, SnapshotNetStatus, TrenchView,
+    DebugPathView, EntityView, Event, OrderPlanMarker, RememberedBuildingView, ScoutPlaneStateView,
+    SmokeCloudView, Snapshot, SnapshotNetStatus, TrenchView,
 };
 
 /// Serialize one semantic snapshot as a compact JSON text frame payload.
@@ -622,6 +622,9 @@ impl Serialize for CompactEntity<'_> {
         if entity.occupied_trench_id.is_some() {
             len = 33;
         }
+        if entity.scout_plane.is_some() {
+            len = 34;
+        }
 
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&entity.id)?;
@@ -725,6 +728,27 @@ impl Serialize for CompactEntity<'_> {
         if len > 32 {
             seq.serialize_element(&entity.occupied_trench_id)?;
         }
+        if len > 33 {
+            seq.serialize_element(&entity.scout_plane.as_ref().map(CompactScoutPlaneState))?;
+        }
+        seq.end()
+    }
+}
+
+struct CompactScoutPlaneState<'a>(&'a ScoutPlaneStateView);
+
+impl Serialize for CompactScoutPlaneState<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let state = self.0;
+        let mut seq = serializer.serialize_seq(Some(5))?;
+        seq.serialize_element(&state.orbit_center)?;
+        seq.serialize_element(&state.fuel_oil)?;
+        seq.serialize_element(&state.fuel_capacity_oil)?;
+        seq.serialize_element(&state.upkeep_oil)?;
+        seq.serialize_element(&state.upkeep_interval_ticks)?;
         seq.end()
     }
 }

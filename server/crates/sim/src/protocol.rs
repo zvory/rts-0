@@ -15,7 +15,7 @@ pub fn kind_from_wire(kind: &str) -> Option<EntityKind> {
 mod tests {
     use super::*;
 
-    const PROTOCOL_KIND_IDS: [&str; 24] = [
+    const PROTOCOL_KIND_IDS: [&str; 25] = [
         kinds::WORKER,
         kinds::GOLEM,
         kinds::RIFLEMAN,
@@ -25,6 +25,7 @@ mod tests {
         kinds::MORTAR_TEAM,
         kinds::ARTILLERY,
         kinds::SCOUT_CAR,
+        kinds::SCOUT_PLANE,
         kinds::TANK,
         kinds::COMMAND_CAR,
         kinds::EKAT,

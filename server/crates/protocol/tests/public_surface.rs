@@ -6,17 +6,18 @@ use rts_protocol::{
     BranchStagingSeat, ClientMessage, ClientNetReport, Command, CommandCapabilities,
     CompactSlotSchemas, DebugPathPoint, DebugPathView, DiagnosticCapabilities, EntityView, Event,
     LabClientOp, LabResult, LabScenarioEntity, LabScenarioLabMetadata, LabScenarioMap,
-    LabScenarioMetadata, LabScenarioPlayer, LabScenarioV1, LabStartMetadata, LabStartRole,
-    LabScenarioOrder, LabState, LabVisionMode, LivePauseState, LobbyPlayer, MapInfo,
-    MatchControlCapabilities, MovementPathDiagnosticScope, NoticeSeverity, ObserverAnalysisKindCount,
-    ObserverAnalysisPayload, ObserverAnalysisPlayer, ObserverAnalysisProduction,
-    ObserverAnalysisResourcesLost, OrderPlanMarker, PlayerResourceSnapshot, PlayerScore,
-    PlayerStart, ProtocolCompactCodes, ProtocolContract, ProtocolMessageTags, ProtocolVocabularies,
-    RememberedBuildingView, ReplayBranchSeat, ReplayStartMetadata, ResourceDelta, ResourceNode,
-    RoomCapabilities, RoomTimeCapabilities, RoomTimeState, ServerMessage, SlotField,
-    SmokeCloudView, Snapshot, SnapshotCodec, SnapshotCodecContract, SnapshotEncodeError,
-    SnapshotFrame, SnapshotNetStatus, StartPayload, TeamId, TrenchView, VisibilityCapabilities,
-    VisionSelectionRequest, COMPACT_SNAPSHOT_VERSION, COMPACT_UNKNOWN_CODE, DEFAULT_FACTION_ID,
+    LabScenarioMetadata, LabScenarioOrder, LabScenarioPlayer, LabScenarioV1, LabStartMetadata,
+    LabStartRole, LabState, LabVisionMode, LivePauseState, LobbyPlayer, MapInfo,
+    MatchControlCapabilities, MovementPathDiagnosticScope, NoticeSeverity,
+    ObserverAnalysisKindCount, ObserverAnalysisPayload, ObserverAnalysisPlayer,
+    ObserverAnalysisProduction, ObserverAnalysisResourcesLost, OrderPlanMarker,
+    PlayerResourceSnapshot, PlayerScore, PlayerStart, ProtocolCompactCodes, ProtocolContract,
+    ProtocolMessageTags, ProtocolVocabularies, RememberedBuildingView, ReplayBranchSeat,
+    ReplayStartMetadata, ResourceDelta, ResourceNode, RoomCapabilities, RoomTimeCapabilities,
+    RoomTimeState, ScoutPlaneStateView, ServerMessage, SlotField, SmokeCloudView, Snapshot,
+    SnapshotCodec, SnapshotCodecContract, SnapshotEncodeError, SnapshotFrame, SnapshotNetStatus,
+    StartPayload, TeamId, TrenchView, VisibilityCapabilities, VisionSelectionRequest,
+    COMPACT_SNAPSHOT_VERSION, COMPACT_UNKNOWN_CODE, DEFAULT_FACTION_ID,
     MESSAGEPACK_SNAPSHOT_FRAME_MAGIC, PREDICTION_PROTOCOL_VERSION, SNAPSHOT_CODEC_COMPACT_JSON,
     SNAPSHOT_CODEC_MESSAGEPACK_COMPACT, SNAPSHOT_CODEC_VERSION, SNAPSHOT_FRAME_KIND_BINARY,
     SNAPSHOT_FRAME_KIND_TEXT,
@@ -85,6 +86,7 @@ fn stable_rust_public_surface_compiles() {
     assert_type::<RoomCapabilities>();
     assert_type::<RoomTimeCapabilities>();
     assert_type::<RoomTimeState>();
+    assert_type::<ScoutPlaneStateView>();
     assert_type::<ServerMessage>();
     assert_type::<SlotField>();
     assert_type::<SmokeCloudView>();
@@ -112,11 +114,13 @@ fn stable_rust_public_surface_compiles() {
     assert_eq!(terrain::ROCK, 1);
     assert_eq!(terrain::WATER, 2);
     assert_eq!(kinds::WORKER, "worker");
+    assert_eq!(kinds::SCOUT_PLANE, "scout_plane");
     assert_eq!(kinds::CITY_CENTRE, "city_centre");
     assert_eq!(kinds::STEEL, "steel");
     assert_eq!(states::IDLE, "idle");
     assert_eq!(states::ATTACK, "attack");
     assert_eq!(abilities::SMOKE, "smoke");
+    assert_eq!(abilities::DISMISS_SCOUT_PLANE, "dismissScoutPlane");
     assert_eq!(abilities::EKAT_MAGIC_ANCHOR, "ekatMagicAnchor");
     assert_eq!(ability_object_kinds::RETURN_MARKER, "returnMarker");
     assert_eq!(upgrades::METHAMPHETAMINES, "methamphetamines");
@@ -124,7 +128,7 @@ fn stable_rust_public_surface_compiles() {
 
     assert_eq!(PREDICTION_PROTOCOL_VERSION, 1);
     assert_eq!(DEFAULT_FACTION_ID, "kriegsia");
-    assert_eq!(COMPACT_SNAPSHOT_VERSION, 30);
+    assert_eq!(COMPACT_SNAPSHOT_VERSION, 31);
     assert_eq!(SNAPSHOT_CODEC_VERSION, 1);
     assert_eq!(COMPACT_UNKNOWN_CODE, 255);
     assert_eq!(MESSAGEPACK_SNAPSHOT_FRAME_MAGIC, [0x52, 0x54, 0x53, 0x4d]);
@@ -156,4 +160,62 @@ fn stable_rust_public_surface_compiles() {
     );
 
     serde_json::to_value(protocol_contract()).expect("protocol contract remains serializable");
+}
+
+#[test]
+fn compact_snapshot_encodes_scout_plane_owner_state() {
+    let mut plane = EntityView::new(
+        5,
+        1,
+        kinds::SCOUT_PLANE,
+        160.0,
+        170.0,
+        40,
+        40,
+        states::IDLE,
+    );
+    plane.scout_plane = Some(ScoutPlaneStateView {
+        orbit_center: Some([512.0, 544.0]),
+        fuel_oil: 8,
+        fuel_capacity_oil: 8,
+        upkeep_oil: 1,
+        upkeep_interval_ticks: 20,
+    });
+
+    let snapshot = Snapshot {
+        tick: 1,
+        steel: 0,
+        oil: 0,
+        supply_used: 0,
+        supply_cap: 0,
+        entities: vec![plane],
+        resource_deltas: Vec::new(),
+        smokes: Vec::new(),
+        ability_objects: Vec::new(),
+        trenches: Vec::new(),
+        visible_tiles: Vec::new(),
+        remembered_buildings: Vec::new(),
+        events: Vec::new(),
+        upgrades: Vec::new(),
+        player_resources: Vec::new(),
+        net_status: SnapshotNetStatus {
+            server_lag_ms: 0,
+            tick_ms: 33,
+            slow_tick: false,
+            slow_tick_count: 0,
+            head_of_line: false,
+            head_of_line_count: 0,
+            prediction_version: 0,
+            last_sim_consumed_client_seq: 0,
+            last_sim_consumed_client_tick: None,
+        },
+    };
+
+    let compact = serialize_compact_snapshot(&snapshot).unwrap();
+    let value: serde_json::Value = serde_json::from_str(&compact).unwrap();
+    assert_eq!(value["e"][0][2], serde_json::json!(25));
+    assert_eq!(
+        value["e"][0][33],
+        serde_json::json!([[512.0, 544.0], 8, 8, 1, 20])
+    );
 }

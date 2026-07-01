@@ -1099,34 +1099,11 @@ fn build_kind_from_code(code: planner::BuildKind) -> Option<EntityKind> {
 }
 
 fn ability_to_planner(ability: AbilityKind) -> planner::AbilityId {
-    match ability {
-        AbilityKind::Charge => planner::AbilityId(0),
-        AbilityKind::Smoke => planner::AbilityId(1),
-        AbilityKind::MortarFire => planner::AbilityId(2),
-        AbilityKind::PointFire => planner::AbilityId(3),
-        AbilityKind::Breakthrough => planner::AbilityId(4),
-        AbilityKind::EkatTeleport => planner::AbilityId(5),
-        AbilityKind::EkatLineShot => planner::AbilityId(6),
-        AbilityKind::EkatMagicAnchor => planner::AbilityId(7),
-        AbilityKind::EkatConsumeGolem => planner::AbilityId(8),
-        AbilityKind::BlanketFire => planner::AbilityId(9),
-    }
+    planner::AbilityId(ability.to_planner_code())
 }
 
 fn ability_from_planner(ability: planner::AbilityId) -> Option<AbilityKind> {
-    match ability.0 {
-        0 => Some(AbilityKind::Charge),
-        1 => Some(AbilityKind::Smoke),
-        2 => Some(AbilityKind::MortarFire),
-        3 => Some(AbilityKind::PointFire),
-        4 => Some(AbilityKind::Breakthrough),
-        5 => Some(AbilityKind::EkatTeleport),
-        6 => Some(AbilityKind::EkatLineShot),
-        7 => Some(AbilityKind::EkatMagicAnchor),
-        8 => Some(AbilityKind::EkatConsumeGolem),
-        9 => Some(AbilityKind::BlanketFire),
-        _ => None,
-    }
+    AbilityKind::from_planner_code(ability.0)
 }
 
 fn artillery_fire_mode_for(ability: AbilityKind) -> Option<ArtilleryFireMode> {

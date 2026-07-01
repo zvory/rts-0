@@ -25,6 +25,7 @@ pub const MORTAR_FIRE_ABILITY: &str = "mortarFire";
 pub const POINT_FIRE_ABILITY: &str = "pointFire";
 pub const BLANKET_FIRE_ABILITY: &str = "blanketFire";
 pub const BREAKTHROUGH_ABILITY: &str = "breakthrough";
+pub const DISMISS_SCOUT_PLANE_ABILITY: &str = "dismissScoutPlane";
 pub const CHARGE_ABILITY: &str = "charge";
 pub const EKAT_TELEPORT_ABILITY: &str = "ekatTeleport";
 pub const EKAT_LINE_SHOT_ABILITY: &str = "ekatLineShot";
@@ -143,6 +144,8 @@ const DEFAULT_WORKER_BUILDABLES: &[EntityKind] = &[
 ];
 
 const ARTILLERY_ABILITY_CARRIERS: &[EntityKind] = &[EntityKind::Artillery];
+pub const SCOUT_PLANE_UNLOCK_BUILDINGS: &[EntityKind] =
+    &[EntityKind::Steelworks, EntityKind::Factory];
 
 const DEFAULT_UPGRADES: &[UpgradeCatalogEntry] = &[
     UpgradeCatalogEntry {
@@ -298,6 +301,26 @@ const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
         command_card: true,
         protocol_code: 5,
         order_stage_code: 11,
+    },
+    AbilityCatalogEntry {
+        id: DISMISS_SCOUT_PLANE_ABILITY,
+        label: "Dismiss",
+        icon: "X",
+        hotkey: Some("X"),
+        title: "Dismiss the Scout Plane",
+        carriers: &[],
+        target_mode: AbilityTargetMode::SelfTarget,
+        range_tiles: None,
+        min_range_tiles: None,
+        cooldown_ticks: 0,
+        charges: None,
+        cost: ResourceCost::new(0, 0),
+        tech_requirement: None,
+        queue_policy: AbilityQueuePolicy::NotQueueable,
+        autocast: false,
+        command_card: false,
+        protocol_code: 11,
+        order_stage_code: 18,
     },
 ];
 
@@ -659,6 +682,10 @@ mod tests {
             catalog.trainable_units(EntityKind::CityCentre),
             vec![EntityKind::Worker]
         );
+        assert!(
+            !catalog.allows_unit(EntityKind::ScoutPlane),
+            "Scout Plane stays hidden from normal production until its runtime/UI phases"
+        );
         assert_eq!(
             catalog.trainable_units(EntityKind::Barracks),
             vec![
@@ -704,6 +731,7 @@ mod tests {
         assert!(catalog.allows_ability(POINT_FIRE_ABILITY, ARTILLERY_ABILITY_CARRIERS[0]));
         assert!(catalog.allows_ability(BLANKET_FIRE_ABILITY, ARTILLERY_ABILITY_CARRIERS[0]));
         assert!(!catalog.allows_ability(CHARGE_ABILITY, EntityKind::Rifleman));
+        assert!(!catalog.allows_ability(DISMISS_SCOUT_PLANE_ABILITY, EntityKind::ScoutPlane));
         assert!(!catalog.allows_ability(SMOKE_ABILITY, EntityKind::Worker));
     }
 
@@ -794,6 +822,13 @@ mod tests {
             breakthrough.cooldown_ticks,
             balance::BREAKTHROUGH_COOLDOWN_TICKS
         );
+
+        let dismiss = ability_definition(DISMISS_SCOUT_PLANE_ABILITY).unwrap();
+        assert!(dismiss.carriers.is_empty());
+        assert_eq!(dismiss.target_mode, AbilityTargetMode::SelfTarget);
+        assert!(!dismiss.command_card);
+        assert_eq!(dismiss.protocol_code, 11);
+        assert_eq!(dismiss.order_stage_code, 18);
 
         let charge = ability_definition(CHARGE_ABILITY).unwrap();
         assert!(!charge.command_card);

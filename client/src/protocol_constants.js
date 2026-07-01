@@ -106,6 +106,7 @@ export const KIND = Object.freeze({
   MORTAR_TEAM: "mortar_team",
   ARTILLERY: "artillery",
   SCOUT_CAR: "scout_car",
+  SCOUT_PLANE: "scout_plane",
   TANK: "tank",
   COMMAND_CAR: "command_car",
   EKAT: "ekat",
@@ -132,6 +133,7 @@ export const UNIT_KINDS = Object.freeze([
   KIND.MORTAR_TEAM,
   KIND.ARTILLERY,
   KIND.SCOUT_CAR,
+  KIND.SCOUT_PLANE,
   KIND.TANK,
   KIND.COMMAND_CAR,
   KIND.EKAT,
@@ -214,6 +216,7 @@ export const ABILITY = Object.freeze({
   EKAT_LINE_SHOT: "ekatLineShot",
   EKAT_MAGIC_ANCHOR: "ekatMagicAnchor",
   EKAT_CONSUME_GOLEM: "ekatConsumeGolem",
+  DISMISS_SCOUT_PLANE: "dismissScoutPlane",
 });
 
 export const WEAPON_KIND = Object.freeze({
@@ -251,7 +254,7 @@ export const MOVEMENT_PATH_DIAGNOSTICS = Object.freeze({
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";
-export const COMPACT_SNAPSHOT_VERSION = 30;
+export const COMPACT_SNAPSHOT_VERSION = 31;
 export const SNAPSHOT_CODEC_VERSION = 1;
 export const SNAPSHOT_CODEC = Object.freeze({
   COMPACT_JSON: "compact-json",
@@ -273,6 +276,7 @@ export const KIND_CODE = Object.freeze({
   [KIND.ARTILLERY]: 16,
   [KIND.TANK]: 5,
   [KIND.SCOUT_CAR]: 14,
+  [KIND.SCOUT_PLANE]: 25,
   [KIND.CITY_CENTRE]: 6,
   [KIND.DEPOT]: 7,
   [KIND.BARRACKS]: 8,
@@ -377,6 +381,7 @@ export const ORDER_STAGE = Object.freeze({
   EKAT_LINE_SHOT: "ekatLineShot",
   EKAT_MAGIC_ANCHOR: "ekatMagicAnchor",
   EKAT_CONSUME_GOLEM: "ekatConsumeGolem",
+  DISMISS_SCOUT_PLANE: "dismissScoutPlane",
   SETUP_ANTI_TANK_GUNS: "setupAntiTankGuns",
 });
 
@@ -398,6 +403,7 @@ export const ORDER_STAGE_CODE = Object.freeze({
   [ORDER_STAGE.DECONSTRUCT]: 15,
   [ORDER_STAGE.EKAT_CONSUME_GOLEM]: 16,
   [ORDER_STAGE.BLANKET_FIRE]: 17,
+  [ORDER_STAGE.DISMISS_SCOUT_PLANE]: 18,
 });
 
 export const ABILITY_CODE = Object.freeze({
@@ -411,6 +417,7 @@ export const ABILITY_CODE = Object.freeze({
   [ABILITY.EKAT_MAGIC_ANCHOR]: 8,
   [ABILITY.EKAT_CONSUME_GOLEM]: 9,
   [ABILITY.BLANKET_FIRE]: 10,
+  [ABILITY.DISMISS_SCOUT_PLANE]: 11,
 });
 
 export const ABILITY_OBJECT_KIND_CODE = Object.freeze({

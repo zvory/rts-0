@@ -60,6 +60,11 @@ import {
   RESOURCE_AMOUNTS,
   SCOUT_CAR_BODY,
   SCOUT_CAR_SMOKE_USES,
+  SCOUT_PLANE_BODY,
+  SCOUT_PLANE_FUEL_RESERVE_OIL,
+  SCOUT_PLANE_ORBIT_RADIUS_TILES,
+  SCOUT_PLANE_UPKEEP_INTERVAL_TICKS,
+  SCOUT_PLANE_UPKEEP_OIL,
   SMOKE_ABILITY_COOLDOWN_TICKS,
   SMOKE_ABILITY_COST,
   SMOKE_ABILITY_RANGE_TILES,
@@ -196,6 +201,10 @@ const EXPECTED_CLIENT_CONFIG_CONSTANT_KEYS = Object.freeze([
   "panzerfaustTravelTicks",
   "panzerfaustWindupTicks",
   "scoutCarSmokeUses",
+  "scoutPlaneFuelReserveOil",
+  "scoutPlaneOrbitRadiusTiles",
+  "scoutPlaneUpkeepIntervalTicks",
+  "scoutPlaneUpkeepOil",
   "smokeAbilityCooldownTicks",
   "smokeAbilityCost",
   "smokeAbilityRangeTiles",
@@ -241,7 +250,7 @@ const EXPECTED_ABILITY_EFFECT_FIELDS_BY_ID = Object.freeze({
   ]),
   [ABILITY.EKAT_CONSUME_GOLEM]: Object.freeze(["radiusTiles"]),
 });
-const EXPECTED_HIDDEN_UNIT_STATS = Object.freeze([KIND.PANZERFAUST]);
+const EXPECTED_HIDDEN_UNIT_STATS = Object.freeze([KIND.PANZERFAUST, KIND.SCOUT_PLANE]);
 
 function asClientKinds(kinds) {
   return kinds.map((kind) => {
@@ -527,6 +536,10 @@ const clientConstants = {
   smokeCloudDurationTicks: SMOKE_CLOUD_DURATION_TICKS,
   smokeAbilityCooldownTicks: SMOKE_ABILITY_COOLDOWN_TICKS,
   scoutCarSmokeUses: SCOUT_CAR_SMOKE_USES,
+  scoutPlaneOrbitRadiusTiles: SCOUT_PLANE_ORBIT_RADIUS_TILES,
+  scoutPlaneUpkeepOil: SCOUT_PLANE_UPKEEP_OIL,
+  scoutPlaneUpkeepIntervalTicks: SCOUT_PLANE_UPKEEP_INTERVAL_TICKS,
+  scoutPlaneFuelReserveOil: SCOUT_PLANE_FUEL_RESERVE_OIL,
   smokeAbilityCost: SMOKE_ABILITY_COST,
   mortarShellDelayTicks: MORTAR_SHELL_DELAY_TICKS,
   mortarOuterRadiusTiles: MORTAR_OUTER_RADIUS_TILES,
@@ -646,6 +659,7 @@ const clientBodies = {
   [KIND.ANTI_TANK_GUN]: ANTI_TANK_GUN_BODY,
   [KIND.ARTILLERY]: ARTILLERY_BODY,
   [KIND.SCOUT_CAR]: SCOUT_CAR_BODY,
+  [KIND.SCOUT_PLANE]: SCOUT_PLANE_BODY,
   [KIND.COMMAND_CAR]: COMMAND_CAR_BODY,
 };
 assertSortedObjectKeys(

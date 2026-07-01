@@ -11,19 +11,19 @@ mod compact_snapshot;
 mod contract_metadata;
 mod lab_scenario;
 mod messagepack_frame;
-#[cfg(test)]
-use contract_metadata::{ability_code, kind_code};
-pub use contract_metadata::{
-    abilities, ability_object_kinds, kinds, lobby_kinds, protocol_contract, states, terrain,
-    upgrades, weapons, CompactSlotSchemas, ProtocolCompactCodes, ProtocolContract, ProtocolMessageTags,
-    ProtocolVocabularies, SlotField, SnapshotCodecContract, COMPACT_SNAPSHOT_VERSION,
-    COMPACT_UNKNOWN_CODE, PREDICTION_PROTOCOL_VERSION, SNAPSHOT_CODEC_COMPACT_JSON,
-    SNAPSHOT_CODEC_MESSAGEPACK_COMPACT, SNAPSHOT_CODEC_VERSION, SNAPSHOT_FRAME_KIND_BINARY,
-    SNAPSHOT_FRAME_KIND_TEXT,
-};
 pub use client_net_report::{
     ClientFramePhaseReport, ClientNetReport, ClientRenderCounterReport, CommandLifecycleExemplar,
 };
+pub use contract_metadata::{
+    abilities, ability_object_kinds, kinds, lobby_kinds, protocol_contract, states, terrain,
+    upgrades, weapons, CompactSlotSchemas, ProtocolCompactCodes, ProtocolContract,
+    ProtocolMessageTags, ProtocolVocabularies, SlotField, SnapshotCodecContract,
+    COMPACT_SNAPSHOT_VERSION, COMPACT_UNKNOWN_CODE, PREDICTION_PROTOCOL_VERSION,
+    SNAPSHOT_CODEC_COMPACT_JSON, SNAPSHOT_CODEC_MESSAGEPACK_COMPACT, SNAPSHOT_CODEC_VERSION,
+    SNAPSHOT_FRAME_KIND_BINARY, SNAPSHOT_FRAME_KIND_TEXT,
+};
+#[cfg(test)]
+use contract_metadata::{ability_code, kind_code};
 pub use lab_scenario::*;
 pub use messagepack_frame::MESSAGEPACK_SNAPSHOT_FRAME_MAGIC;
 pub use rts_contract::{
@@ -33,8 +33,8 @@ pub use rts_contract::{
     LabVisionMode, MapInfo, MatchControlCapabilities, MovementPathDiagnosticScope, NoticeSeverity,
     OrderPlanMarker, PlayerResourceSnapshot, PlayerScore, PlayerStart, RememberedBuildingView,
     ReplayStartMetadata, ResourceDelta, ResourceNode, RoomCapabilities, RoomTimeCapabilities,
-    RoomTimeState, SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload, TeamId, TrenchView,
-    VisibilityCapabilities, DEFAULT_FACTION_ID,
+    RoomTimeState, ScoutPlaneStateView, SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload,
+    TeamId, TrenchView, VisibilityCapabilities, DEFAULT_FACTION_ID,
 };
 
 fn is_false(value: &bool) -> bool {
@@ -717,12 +717,15 @@ pub fn encode_snapshot_frame_with_diagnostics(
 ) -> Result<(SnapshotFrame, SnapshotPayloadDiagnostics), SnapshotEncodeError> {
     match codec {
         SnapshotCodec::CompactJson => {
-            let (text, diagnostics) = compact_snapshot::serialize_compact_snapshot_with_diagnostics(snapshot)?;
+            let (text, diagnostics) =
+                compact_snapshot::serialize_compact_snapshot_with_diagnostics(snapshot)?;
             Ok((SnapshotFrame::Text(text), diagnostics))
         }
         SnapshotCodec::MessagePackCompact => {
             let (bytes, diagnostics) =
-                compact_snapshot::serialize_messagepack_compact_snapshot_with_diagnostics(snapshot)?;
+                compact_snapshot::serialize_messagepack_compact_snapshot_with_diagnostics(
+                    snapshot,
+                )?;
             Ok((SnapshotFrame::Binary(bytes), diagnostics))
         }
     }
@@ -773,14 +776,8 @@ mod tests {
             contract["compactCodes"]["ability"][abilities::EKAT_MAGIC_ANCHOR],
             serde_json::json!(ability_code(abilities::EKAT_MAGIC_ANCHOR))
         );
-        assert_eq!(
-            contract["compactSlotSchemas"]["entity"]
-                .as_array()
-                .unwrap()
-                .last()
-                .unwrap()["name"],
-            serde_json::json!("occupiedTrenchId")
-        );
+        let entity_schema = contract["compactSlotSchemas"]["entity"].as_array().unwrap();
+        assert_eq!(entity_schema.last().unwrap()["name"], serde_json::json!("scoutPlane"));
     }
 
     #[test]

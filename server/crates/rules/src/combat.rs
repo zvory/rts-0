@@ -299,6 +299,7 @@ pub fn default_weapon_kind(kind: EntityKind) -> Option<WeaponKind> {
         EntityKind::ScoutCar => Some(WeaponKind::ScoutCarMg),
         EntityKind::Tank => Some(WeaponKind::TankCannon),
         EntityKind::Panzerfaust
+        | EntityKind::ScoutPlane
         | EntityKind::CommandCar
         | EntityKind::Ekat
         | EntityKind::CityCentre
@@ -778,6 +779,7 @@ mod tests {
             (EntityKind::MortarTeam, Some(WeaponKind::MortarTeamMortar)),
             (EntityKind::Artillery, Some(WeaponKind::ArtilleryGun)),
             (EntityKind::ScoutCar, Some(WeaponKind::ScoutCarMg)),
+            (EntityKind::ScoutPlane, None),
             (EntityKind::Tank, Some(WeaponKind::TankCannon)),
             (EntityKind::CommandCar, None),
             (EntityKind::Ekat, None),
@@ -1177,6 +1179,12 @@ mod tests {
             ),
             (
                 EntityKind::ScoutCar,
+                false,
+                false,
+                TargetThreatRole::Ordinary,
+            ),
+            (
+                EntityKind::ScoutPlane,
                 false,
                 false,
                 TargetThreatRole::Ordinary,
