@@ -2,7 +2,30 @@
 
 ## Phase Status
 
-Status: pending.
+Status: done.
+
+## Implementation Notes
+
+- Finalized the Panzerfaust checklist's review package with player-facing summary, patch-note
+  bullets, smoke paths, touched contracts, and deferred follow-ups.
+- Removed stale checklist drift that still treated exact protocol/event representation as deferred;
+  Panzerfaust kind, weapon, launch, impact, and conversion events are implemented and documented.
+- Confirmed implemented Panzerfaust phases 2-7 are already marked done.
+- Generated and mirrored data surfaces were checked through the docs, faction catalog, and wiki
+  guardrails named below.
+
+## Patch Notes
+
+- Barracks gains Panzerfaust infantry after a completed Training Centre.
+- Panzerfaust costs 60 steel / 15 oil, uses 1 supply, has 45 HP, 8-tile sight, 9 px radius,
+  1.44 px/tick loaded speed, and trains in 400 ticks.
+- Panzerfaust fires one 60-damage armor-piercing shot at visible enemy Tanks, with 3-tile base range
+  or 4-tile range while actively entrenched, then converts into a same-id Rifleman after recovery.
+- Methamphetamines speeds loaded movement and reduces windup/recovery to 12 ticks, while the loaded
+  unit still stops to fire.
+- Panzerfaust has a Barracks `E` command-card button plus dedicated first-pass launch/impact
+  visuals and low-gain spatial audio cues.
+- AI production profiles intentionally do not train Panzerfaust units in this pass.
 
 ## Objective
 
