@@ -3,6 +3,7 @@ use crate::lab_scenario_submission::{
     LabScenarioPrRequest, LabScenarioSubmissionService, LabScenarioSubmissionSuccess,
     ScenarioPrBackend, ScenarioPrFuture, LAB_SCENARIO_SUBMISSION_MANIFEST_PATH,
 };
+use rts_rules::{faction::CURRENT_CATALOG, EntityKind};
 use std::sync::{Arc, Mutex as StdMutex};
 
 #[derive(Clone)]
@@ -136,25 +137,22 @@ fn lab_start_payload_can_use_bundled_lategame_scenario() {
     assert_eq!(scenario.players[0].resources.oil, 99_999);
     assert_eq!(scenario.players[1].resources.steel, 99_999);
     assert_eq!(scenario.players[1].resources.oil, 99_999);
-    let all_research = [
-        "methamphetamines",
-        "anti_tank_gun_unlock",
-        "tank_unlock",
-        "command_car_unlock",
-        "mortar_autocast",
-    ];
+    let mut all_research = CURRENT_CATALOG.researchable_upgrades(EntityKind::TrainingCentre);
+    all_research.extend(CURRENT_CATALOG.researchable_upgrades(EntityKind::ResearchComplex));
+    all_research.sort_unstable();
     for player in &scenario.players {
-        for upgrade in all_research {
-            assert!(
-                player
-                    .research
-                    .completed
-                    .iter()
-                    .any(|completed| completed == upgrade),
-                "player {} should have {upgrade}",
-                player.id
-            );
-        }
+        let mut completed_research = player
+            .research
+            .completed
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>();
+        completed_research.sort_unstable();
+        assert_eq!(
+            completed_research, all_research,
+            "player {} should have all current Kriegsia research",
+            player.id
+        );
     }
     assert_eq!(
         task.lab_timeline

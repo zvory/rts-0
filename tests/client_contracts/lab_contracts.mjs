@@ -86,9 +86,10 @@ import { textWithin } from "./dom_text.mjs";
     );
     assert(scenario.players?.length === 2, `${filename} remains a two-player bundled lab scenario`);
     for (const player of scenario.players) {
+      const completedResearch = [...(player.research?.completed || [])].sort();
       assertDeepEqual(
-        player.research?.completed,
-        allKriegsiaResearch,
+        completedResearch,
+        [...allKriegsiaResearch].sort(),
         `${filename} grants all current Kriegsia research to player ${player.id}`,
       );
     }
