@@ -38,6 +38,39 @@ impl AbilityKind {
             AbilityKind::EkatConsumeGolem => protocol::abilities::EKAT_CONSUME_GOLEM,
         }
     }
+
+    pub fn to_planner_code(self) -> u16 {
+        match self {
+            AbilityKind::Charge => 0,
+            AbilityKind::Smoke => 1,
+            AbilityKind::MortarFire => 2,
+            AbilityKind::PointFire => 3,
+            AbilityKind::Breakthrough => 4,
+            AbilityKind::EkatTeleport => 5,
+            AbilityKind::EkatLineShot => 6,
+            AbilityKind::EkatMagicAnchor => 7,
+            AbilityKind::EkatConsumeGolem => 8,
+            AbilityKind::BlanketFire => 9,
+            AbilityKind::DismissScoutPlane => 10,
+        }
+    }
+
+    pub fn from_planner_code(code: u16) -> Option<Self> {
+        match code {
+            0 => Some(AbilityKind::Charge),
+            1 => Some(AbilityKind::Smoke),
+            2 => Some(AbilityKind::MortarFire),
+            3 => Some(AbilityKind::PointFire),
+            4 => Some(AbilityKind::Breakthrough),
+            5 => Some(AbilityKind::EkatTeleport),
+            6 => Some(AbilityKind::EkatLineShot),
+            7 => Some(AbilityKind::EkatMagicAnchor),
+            8 => Some(AbilityKind::EkatConsumeGolem),
+            9 => Some(AbilityKind::BlanketFire),
+            10 => Some(AbilityKind::DismissScoutPlane),
+            _ => None,
+        }
+    }
 }
 
 impl FromStr for AbilityKind {

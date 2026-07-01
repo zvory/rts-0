@@ -779,14 +779,8 @@ mod tests {
             contract["compactCodes"]["ability"][abilities::EKAT_MAGIC_ANCHOR],
             serde_json::json!(ability_code(abilities::EKAT_MAGIC_ANCHOR))
         );
-        assert_eq!(
-            contract["compactSlotSchemas"]["entity"]
-                .as_array()
-                .unwrap()
-                .last()
-                .unwrap()["name"],
-            serde_json::json!("scoutPlane")
-        );
+        let entity_schema = contract["compactSlotSchemas"]["entity"].as_array().unwrap();
+        assert_eq!(entity_schema.last().unwrap()["name"], serde_json::json!("scoutPlane"));
     }
 
     #[test]
@@ -1404,23 +1398,13 @@ mod tests {
             },
         ];
 
-        let mut scout_plane =
-            EntityView::new(4, 1, kinds::SCOUT_PLANE, 200.0, 220.0, 40, 40, states::IDLE);
-        scout_plane.scout_plane = Some(ScoutPlaneStateView {
-            orbit_center: Some([256.0, 288.0]),
-            fuel_oil: 8,
-            fuel_capacity_oil: 8,
-            upkeep_oil: 1,
-            upkeep_interval_ticks: 20,
-        });
-
         Snapshot {
             tick: 42,
             steel: 100,
             oil: 25,
             supply_used: 3,
             supply_cap: 10,
-            entities: vec![worker, gunner, center, scout_plane],
+            entities: vec![worker, gunner, center],
             resource_deltas: vec![ResourceDelta {
                 id: 200,
                 remaining: 1498,
@@ -1590,7 +1574,7 @@ mod tests {
         assert_eq!(value["t"], "snapshot");
         assert_eq!(value["v"], COMPACT_SNAPSHOT_VERSION);
         assert_eq!(value["s"], serde_json::json!([42, 100, 25, 3, 10]));
-        assert_eq!(value["e"].as_array().unwrap().len(), 4);
+        assert_eq!(value["e"].as_array().unwrap().len(), 3);
         assert_eq!(value["e"][0][8], serde_json::json!(1.5));
         assert_eq!(value["e"][0][9], serde_json::json!(1.75));
         assert_eq!(value["e"][0][14], serde_json::json!(200));
@@ -1616,11 +1600,6 @@ mod tests {
         assert_eq!(
             value["e"][2][27],
             serde_json::json!([[1, 256.0, 512.0], [2, 320.0, 544.0]])
-        );
-        assert_eq!(value["e"][3][2], serde_json::json!(25));
-        assert_eq!(
-            value["e"][3][33],
-            serde_json::json!([[256.0, 288.0], 8, 8, 1, 20])
         );
         assert_eq!(value["r"], serde_json::json!([[200, 1498]]));
         assert_eq!(
@@ -1741,7 +1720,7 @@ mod tests {
                 .find(|section| section.section == name)
                 .unwrap_or_else(|| panic!("missing section {name}"))
         };
-        assert_eq!(section("entities").count, 4);
+        assert_eq!(section("entities").count, 3);
         assert!(section("entities").bytes > 0);
         assert_eq!(section("visibility").count, 4);
         assert!(section("visibility").bytes > 0);

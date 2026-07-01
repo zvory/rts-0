@@ -161,3 +161,61 @@ fn stable_rust_public_surface_compiles() {
 
     serde_json::to_value(protocol_contract()).expect("protocol contract remains serializable");
 }
+
+#[test]
+fn compact_snapshot_encodes_scout_plane_owner_state() {
+    let mut plane = EntityView::new(
+        5,
+        1,
+        kinds::SCOUT_PLANE,
+        160.0,
+        170.0,
+        40,
+        40,
+        states::IDLE,
+    );
+    plane.scout_plane = Some(ScoutPlaneStateView {
+        orbit_center: Some([512.0, 544.0]),
+        fuel_oil: 8,
+        fuel_capacity_oil: 8,
+        upkeep_oil: 1,
+        upkeep_interval_ticks: 20,
+    });
+
+    let snapshot = Snapshot {
+        tick: 1,
+        steel: 0,
+        oil: 0,
+        supply_used: 0,
+        supply_cap: 0,
+        entities: vec![plane],
+        resource_deltas: Vec::new(),
+        smokes: Vec::new(),
+        ability_objects: Vec::new(),
+        trenches: Vec::new(),
+        visible_tiles: Vec::new(),
+        remembered_buildings: Vec::new(),
+        events: Vec::new(),
+        upgrades: Vec::new(),
+        player_resources: Vec::new(),
+        net_status: SnapshotNetStatus {
+            server_lag_ms: 0,
+            tick_ms: 33,
+            slow_tick: false,
+            slow_tick_count: 0,
+            head_of_line: false,
+            head_of_line_count: 0,
+            prediction_version: 0,
+            last_sim_consumed_client_seq: 0,
+            last_sim_consumed_client_tick: None,
+        },
+    };
+
+    let compact = serialize_compact_snapshot(&snapshot).unwrap();
+    let value: serde_json::Value = serde_json::from_str(&compact).unwrap();
+    assert_eq!(value["e"][0][2], serde_json::json!(25));
+    assert_eq!(
+        value["e"][0][33],
+        serde_json::json!([[512.0, 544.0], 8, 8, 1, 20])
+    );
+}
