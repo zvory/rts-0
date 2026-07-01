@@ -26,12 +26,14 @@ use crate::protocol::Event;
 use rand::rngs::SmallRng;
 
 mod acquisition;
+mod activation;
 mod chase;
 mod damage;
 mod events;
 mod panzerfaust;
 mod priority;
 mod projection;
+mod target_policy;
 mod weapons;
 
 #[cfg(test)]
