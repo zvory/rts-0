@@ -17,6 +17,7 @@ import {
   EVENT_CODE,
   KIND,
   KIND_CODE,
+  LAB_CHECKPOINT_SCENARIO,
   LAB_SCENARIO,
   LAB_ROLE,
   LAB_VISION,
@@ -441,6 +442,8 @@ assert(
     rust.includes("ImportScenario") &&
     rust.includes("ValidateScenario") &&
     rust.includes("SubmitScenario") &&
+    rust.includes("LabScenarioPayload") &&
+    rust.includes("LabCheckpointScenarioV1") &&
     rust.includes("LabScenarioV1") &&
     rust.includes("set_up") &&
     rust.includes("weapon_facing") &&
@@ -449,6 +452,10 @@ assert(
     rust.includes("god_mode_players") &&
     LAB_SCENARIO.KIND === "labScenario" &&
     LAB_SCENARIO.SCHEMA_VERSION === 1 &&
+    LAB_CHECKPOINT_SCENARIO.KIND === "labCheckpointScenario" &&
+    LAB_CHECKPOINT_SCENARIO.SCHEMA_VERSION === 1 &&
+    protocolDoc.includes("LabScenarioPayload") &&
+    protocolDoc.includes("LabCheckpointScenarioV1") &&
     protocolDoc.includes("LabScenarioV1") &&
     protocolDoc.includes("LabScenarioOrder") &&
     protocolDoc.includes("setUp") &&

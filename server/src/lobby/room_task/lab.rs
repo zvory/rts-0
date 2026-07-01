@@ -4,9 +4,8 @@ use std::time::{Duration, Instant as StdInstant};
 
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::lab::{
-    LabCommandOptions, LabError, LabMoveEntity, LabOp, LabOpOutcome,
-    LabScenarioV1 as SimLabScenarioV1, LabSetCompletedResearch, LabSetEntityOwner,
-    LabSetPlayerResources, LabSpawnEntity,
+    LabCommandOptions, LabError, LabMoveEntity, LabOp, LabOpOutcome, LabSetCompletedResearch,
+    LabSetEntityOwner, LabSetPlayerResources, LabSpawnEntity,
 };
 use rts_sim::game::map::Map;
 use rts_sim::game::upgrade::UpgradeKind;
@@ -24,11 +23,14 @@ use super::helpers::{DRAINING_NEW_MATCHES_DISABLED_MSG, LAB_PLAYER_ONE_ID, LAB_P
 use super::types::{LabRoomConfig, LabSeekTarget, Phase, RoomMode, RoomPlayer};
 use super::RoomTask;
 use crate::lab_scenarios::{
-    load_lab_scenario_by_id, validate_lab_scenario_authoring, validate_lab_scenario_lab_metadata,
+    export_lab_checkpoint_scenario_for_protocol, lab_scenario_payload_lab_metadata,
+    lab_scenario_payload_legacy_god_mode_players, lab_scenario_payload_to_lab_op,
+    load_lab_scenario_by_id, validate_lab_scenario_authoring,
 };
 use crate::protocol::{
-    Command, Event, LabClientOp, LabResult, LabScenarioLabMetadata, LabStartMetadata, LabStartRole,
-    LabState, LabVisionMode, RoomTimeState, ServerMessage, TeamId, DEFAULT_FACTION_ID,
+    Command, Event, LabClientOp, LabResult, LabScenarioLabMetadata, LabScenarioPayload,
+    LabStartMetadata, LabStartRole, LabState, LabVisionMode, RoomTimeState, ServerMessage, TeamId,
+    DEFAULT_FACTION_ID,
 };
 use crate::structured_log::{self, MatchStartedLog};
 use rts_sim::game::{Game, PlayerInit};
@@ -184,15 +186,7 @@ fn lab_op_kind(op: &LabClientOp) -> &'static str {
 
 fn lab_client_op_to_game_op(op: LabClientOp) -> Result<LabOp, String> {
     match op {
-        LabClientOp::ImportScenario { scenario } => {
-            validate_lab_scenario_lab_metadata(&scenario.metadata.lab, &scenario.players)?;
-            let scenario: SimLabScenarioV1 = serde_json::from_value(
-                serde_json::to_value(scenario)
-                    .map_err(|err| format!("invalid scenario payload: {err}"))?,
-            )
-            .map_err(|err| format!("invalid scenario payload: {err}"))?;
-            Ok(LabOp::RestoreScenario(Box::new(scenario)))
-        }
+        LabClientOp::ImportScenario { scenario } => lab_scenario_payload_to_lab_op(*scenario),
         LabClientOp::SpawnEntity {
             owner,
             kind,
@@ -523,22 +517,30 @@ impl RoomTask {
     fn build_lab_launch_from_scenario(&self, scenario_id: &str) -> Result<LabLaunch, String> {
         let loaded = load_lab_scenario_by_id(scenario_id)
             .map_err(|err| format!("Cannot load lab scenario \"{scenario_id}\": {err}"))?;
-        let scenario = &loaded.scenario;
         let game = loaded
             .build_game()
             .map_err(|err| format!("Cannot load lab scenario \"{scenario_id}\": {err}"))?;
         let god_mode_players = game.lab_god_mode_players();
+        let start_payload = game.start_payload();
+        let (seed, map_name) = match &loaded.scenario {
+            LabScenarioPayload::Legacy(scenario) => (scenario.seed, scenario.map.name.clone()),
+            LabScenarioPayload::Checkpoint(scenario) => (scenario.seed, scenario.map.name.clone()),
+        };
         Ok(LabLaunch {
             game,
-            seed: scenario.seed,
-            map_name: scenario.map.name.clone(),
-            player_count: scenario.players.len(),
-            participants: scenario
+            seed,
+            map_name,
+            player_count: start_payload.players.len(),
+            participants: start_payload
                 .players
                 .iter()
                 .map(|player| player.name.clone())
                 .collect(),
-            default_vision: Some(scenario.metadata.lab.vision.clone()),
+            default_vision: Some(
+                lab_scenario_payload_lab_metadata(&loaded.scenario)
+                    .vision
+                    .clone(),
+            ),
             god_mode_players,
         })
     }
@@ -1044,7 +1046,7 @@ impl RoomTask {
                 return lab_result_error(
                     request_id,
                     op,
-                    &format!("scenario export did not produce LabScenarioV1: {err}"),
+                    &format!("scenario export did not produce a lab scenario payload: {err}"),
                 );
             }
         };
@@ -1075,32 +1077,21 @@ impl RoomTask {
         let Some(session) = &self.lab_session else {
             return Err("lab session is not running".to_string());
         };
-        let mut scenario = serde_json::to_value(game.export_lab_scenario())
-            .map_err(|err| format!("scenario export failed: {err}"))?;
-        let Some(object) = scenario.as_object_mut() else {
-            return Err("scenario export did not produce a JSON object".to_string());
-        };
-        if let Some(scenario_name) = name.map(str::trim).filter(|value| !value.is_empty()) {
-            object.insert(
-                "name".to_string(),
-                serde_json::Value::String(truncate_lab_scenario_name(scenario_name)),
-            );
-        }
-        let Some(metadata) = object
-            .get_mut("metadata")
-            .and_then(|value| value.as_object_mut())
-        else {
-            return Err("scenario export did not produce metadata".to_string());
-        };
-        metadata.insert(
-            "lab".to_string(),
-            serde_json::to_value(LabScenarioLabMetadata {
+        let scenario_name = name
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(truncate_lab_scenario_name)
+            .unwrap_or_else(|| "Untitled lab scenario".to_string());
+        let scenario = export_lab_checkpoint_scenario_for_protocol(
+            game,
+            scenario_name,
+            LabScenarioLabMetadata {
                 vision: session.vision_for(operator_id),
                 god_mode_players: game.lab_god_mode_players(),
-            })
-            .unwrap_or_else(|_| serde_json::json!({ "vision": { "mode": "fullWorld" } })),
-        );
-        Ok(scenario)
+            },
+            crate::build_info::build_id(),
+        )?;
+        serde_json::to_value(scenario).map_err(|err| format!("scenario export failed: {err}"))
     }
 
     fn apply_lab_mutation(
@@ -1111,12 +1102,14 @@ impl RoomTask {
     ) -> LabResult {
         let op_kind = lab_op_kind(&op).to_string();
         let imported_vision = match &op {
-            LabClientOp::ImportScenario { scenario } => Some(scenario.metadata.lab.vision.clone()),
+            LabClientOp::ImportScenario { scenario } => {
+                Some(lab_scenario_payload_lab_metadata(scenario).vision.clone())
+            }
             _ => None,
         };
         let imported_god_mode_players = match &op {
             LabClientOp::ImportScenario { scenario } => {
-                Some(scenario.metadata.lab.god_mode_players.clone())
+                lab_scenario_payload_legacy_god_mode_players(scenario)
             }
             _ => None,
         };
@@ -1124,7 +1117,10 @@ impl RoomTask {
             Ok(op) => op,
             Err(err) => return lab_result_error(request_id, op_kind, &err),
         };
-        let resets_timeline = matches!(lab_op, LabOp::RestoreScenario(_));
+        let resets_timeline = matches!(
+            lab_op,
+            LabOp::RestoreScenario(_) | LabOp::RestoreCheckpointScenario(_)
+        );
         let timeline_op = lab_op.clone();
         let log_operations = self.session_policy().logs_lab_operations();
         let timeline_capacity_reset = if resets_timeline {

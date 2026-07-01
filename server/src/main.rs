@@ -53,6 +53,7 @@ const DEFAULT_CLIENT_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../client
 const DEFAULT_MAPS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/maps");
 const RTS_CLIENT_DIR_ENV: &str = "RTS_CLIENT_DIR";
 const RTS_MAPS_DIR_ENV: &str = "RTS_MAPS_DIR";
+const MAX_CLIENT_MESSAGE_BYTES: usize = 1_000_000 + 64 * 1024; // lab scenario cap + envelope
 
 #[derive(Clone, Copy)]
 struct ClientMessageTiming {
@@ -283,10 +284,9 @@ async fn shutdown_signal(lobby: Lobby) {
 
 /// Axum handler for `GET /ws`: perform the WebSocket upgrade and hand the socket to a task.
 async fn ws_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl IntoResponse {
-    // Bound inbound frame/message size so multi-MB command frames never reach serde. Our protocol
-    // is tiny JSON, so 256 KiB is generous headroom.
-    ws.max_message_size(256 * 1024)
-        .max_frame_size(256 * 1024)
+    // Bound inbound frame/message size while leaving room for capped lab scenario imports.
+    ws.max_message_size(MAX_CLIENT_MESSAGE_BYTES)
+        .max_frame_size(MAX_CLIENT_MESSAGE_BYTES)
         .on_upgrade(move |socket| handle_connection(socket, state.lobby))
 }
 
@@ -1585,7 +1585,7 @@ async fn handle_client_message(
                 RoomEvent::Lab {
                     player_id,
                     request_id,
-                    op,
+                    op: *op,
                 },
             )
             .await;

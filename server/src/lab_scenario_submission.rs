@@ -549,7 +549,7 @@ fn scenario_pr_body(
 
 ## Validation
 
-Server validation exported the current authoritative lab game, applied authoring metadata, formatted deterministic JSON, checked catalog duplicate/path/size/entity limits, verified bundled map metadata, and restored the scenario through the lab `Game` API.
+Server validation exported the current authoritative lab game as a checkpoint-backed scenario, applied authoring metadata, formatted deterministic JSON, checked catalog duplicate/path/size/entity limits, verified map binding metadata, and restored the scenario through the lab `Game` API.
 
 ## Author Notes
 
@@ -585,10 +585,24 @@ fn scenario_entity_count(preview: &LabScenarioAuthoringPreview) -> String {
     serde_json::from_str::<serde_json::Value>(&preview.scenario_json)
         .ok()
         .and_then(|value| {
-            value
+            if let Some(count) = value
                 .get("entities")
                 .and_then(serde_json::Value::as_array)
                 .map(Vec::len)
+            {
+                return Some(count);
+            }
+            value
+                .get("checkpointPayload")
+                .and_then(serde_json::Value::as_str)
+                .and_then(|payload| serde_json::from_str::<serde_json::Value>(payload).ok())
+                .and_then(|payload| {
+                    payload
+                        .get("entities")
+                        .and_then(|entities| entities.get("entities"))
+                        .and_then(serde_json::Value::as_array)
+                        .map(Vec::len)
+                })
         })
         .map(|count| count.to_string())
         .unwrap_or_else(|| "unknown".to_string())

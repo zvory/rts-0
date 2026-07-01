@@ -363,8 +363,8 @@ creation time, active-slot counts, spectator count, phase, and join state.
 
 `GET /api/lab-scenarios` returns a bounded catalog of bundled lab scenario metadata:
 `[{ id, title, description, tags, map, playerCount, filename }]`. `id` is the stable safe token used
-in direct lab room URLs as `scenario=<id>`, `map` and `playerCount` mirror the listed
-`LabScenarioV1`, and `filename` is the safe bundled JSON filename under
+in direct lab room URLs as `scenario=<id>`, `map` and `playerCount` mirror the listed scenario
+payload, and `filename` is the safe bundled JSON filename under
 `server/assets/lab-scenarios/`. The listing deliberately omits the full scenario JSON; lab starts
 load it server-side from the manifest source of truth.
 
@@ -1095,7 +1095,7 @@ event unions follow the same selected real player ids as the snapshot body.
 { op: "setVision", vision: LabVisionMode }
 { op: "issueCommandAs", playerId: u32, cmd: Command, ignoreCommandLimits?: bool }
 { op: "exportScenario", name?: string }
-{ op: "importScenario", scenario: LabScenarioV1 }
+{ op: "importScenario", scenario: LabScenarioPayload }
 { op: "validateScenario", metadata: LabScenarioAuthoringMetadata }
 { op: "submitScenario", metadata: LabScenarioAuthoringMetadata }
 ```
@@ -1118,7 +1118,46 @@ the larger bounded lab command window instead of the ordinary live-player unit-i
 damage, while resources keep normal damage behavior. The current enabled player ids are mirrored in
 `start.lab.godModePlayers` and `labState.godModePlayers`.
 
-`LabScenarioV1` is versioned lab setup JSON with stable command intent, not a full saved snapshot:
+`LabScenarioPayload` accepts the current checkpoint-backed scenario container or a legacy
+`LabScenarioV1` compatibility file. New exports, validation previews, submissions, and bundled
+catalog assets use `LabCheckpointScenarioV1`:
+```
+{
+  schemaVersion: 1,
+  kind: "labCheckpointScenario",
+  name: string,
+  seed: u32,
+  map: {
+    name: string,
+    schemaVersion: u32,
+    contentHash: string,
+    materializedHash: string,
+    data: {
+      size: u32,
+      terrain: u8[],
+      starts: [{ x: u32, y: u32 }],
+      expansionSites: [{ x: u32, y: u32 }]
+    }
+  },
+  metadata: {
+    exportedTick: u32,
+    lab: { vision: LabVisionMode, godModePlayers?: u32[] },
+    sourceScenario?: { kind: string, schemaVersion: u32 },
+    sourceEntityIdMap?: [{ oldId: u32, newId: u32 }]
+  },
+  checkpointPayload: string // GameCheckpointV1 JSON text
+}
+```
+The map body is a scenario-container sibling of the checkpoint payload, not part of
+`GameCheckpointV1`. Import validates the scenario map data and materialized hash, the embedded
+checkpoint `mapBinding`, player/team/resource/research/entity/count bounds, lab metadata,
+checkpoint byte limits, `metadata.lab.godModePlayers`, and a one-to-one `sourceEntityIdMap` whose
+`newId` values reference restored entities before replacing the live lab game. `sourceEntityIdMap`
+is returned as `outcome.entityIdMap` on checkpoint import so converted legacy files and fresh
+exports preserve existing id-remap callers.
+
+`LabScenarioV1` remains readable during the transition. It is versioned lab setup JSON with stable
+command intent, not a full saved snapshot:
 ```
 {
   schemaVersion: 1,
@@ -1155,22 +1194,25 @@ damage, while resources keep normal damage behavior. The current enabled player 
   stagingX?: f32, stagingY?: f32
 }
 ```
-Export returns `{ scenario: LabScenarioV1 }` in `labResult.outcome` using the requesting operator's
-current lab vision in `metadata.lab.vision` and the current room god-mode player ids in
-`metadata.lab.godModePlayers`. Import validates the schema, map metadata,
+Export returns `{ scenario: LabCheckpointScenarioV1 }` in `labResult.outcome` using the requesting
+operator's current lab vision in `metadata.lab.vision` and the current room god-mode player ids in
+`metadata.lab.godModePlayers`. Legacy `LabScenarioV1` import validates the schema, map metadata,
 player/team/resource/research/entity/order fields, restores through the public lab `Game` API,
 remaps target ids inside active and queued order intents, applies scenario vision to the requester
 and future join default without overwriting already connected collaborators, restores
 `godModePlayers` as room state, and returns an entity id remap in `outcome.entityIdMap`.
-`validateScenario` exports the current authoritative lab `Game`, applies authoring metadata, pretty
-formats the scenario JSON, checks duplicate catalog ids/filenames, id-matched filenames, manifest
-limits, scenario entity count, and scenario JSON byte limits, validates map metadata, and restores
-through the same lab `Game` API without mutating the room or creating any Git branch.
+Checkpoint-backed import applies scenario vision the same way, restores god mode from the embedded
+checkpoint payload, and returns the container `sourceEntityIdMap`.
+`validateScenario` exports the current authoritative lab `Game` as a checkpoint-backed scenario,
+applies authoring metadata, pretty formats the scenario JSON, checks duplicate catalog
+ids/filenames, id-matched filenames, manifest limits, scenario entity count, and scenario JSON byte
+limits, validates map metadata and checkpoint map binding, and restores through the same lab `Game`
+API without mutating the room or creating any Git branch.
 `LabScenarioAuthoringMetadata` is:
 ```
 {
   slug: string,        // future catalog id and filename stem, max 48 catalog-safe bytes
-  name: string,        // LabScenarioV1.name, max 80 bytes
+  name: string,        // exported scenario name, max 80 bytes
   title: string,       // catalog title, max 96 bytes
   description: string, // catalog description, max 320 bytes
   tags?: string[],     // up to 8 catalog-safe tags, max 32 bytes each

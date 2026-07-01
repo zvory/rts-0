@@ -493,7 +493,7 @@ fn lab_scenario_export_and_import_round_trip_through_room_ops() {
     );
     let export_result = lab_results(&mut writer).pop().expect("export result");
     assert!(export_result.ok);
-    let scenario: crate::protocol::LabScenarioV1 = serde_json::from_value(
+    let scenario: crate::protocol::LabCheckpointScenarioV1 = serde_json::from_value(
         export_result
             .outcome
             .as_ref()
@@ -502,7 +502,7 @@ fn lab_scenario_export_and_import_round_trip_through_room_ops() {
             .expect("scenario outcome"),
     )
     .expect("scenario JSON");
-    assert_eq!(scenario.kind, "labScenario");
+    assert_eq!(scenario.kind, "labCheckpointScenario");
     assert_eq!(scenario.name, "saved setup");
     assert_eq!(
         scenario.metadata.lab.vision,
@@ -512,11 +512,15 @@ fn lab_scenario_export_and_import_round_trip_through_room_ops() {
         scenario.metadata.lab.god_mode_players,
         vec![LAB_PLAYER_TWO_ID]
     );
-    assert!(scenario.players.iter().any(|player| {
-        player.id == LAB_PLAYER_ONE_ID
-            && player.resources.steel == 777
-            && player.resources.oil == 66
-    }));
+    let checkpoint_payload: serde_json::Value =
+        serde_json::from_str(&scenario.checkpoint_payload).expect("checkpoint payload JSON");
+    assert!(checkpoint_payload["players"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|player| {
+            player["id"] == LAB_PLAYER_ONE_ID && player["steel"] == 777 && player["oil"] == 66
+        }));
 
     task.on_lab_request(
         100,
@@ -539,7 +543,13 @@ fn lab_scenario_export_and_import_round_trip_through_room_ops() {
     );
     assert!(lab_results(&mut writer)[0].ok);
 
-    task.on_lab_request(99, 24, LabClientOp::ImportScenario { scenario });
+    task.on_lab_request(
+        99,
+        24,
+        LabClientOp::ImportScenario {
+            scenario: Box::new(crate::protocol::LabScenarioPayload::Checkpoint(scenario)),
+        },
+    );
     let import_result = lab_results(&mut writer).pop().expect("import result");
     assert!(import_result.ok);
     assert_eq!(import_result.op, "importScenario");
@@ -615,7 +625,7 @@ fn lab_timeline_resets_on_scenario_import() {
         },
     );
     let export_result = lab_results(&mut writer).pop().expect("export result");
-    let scenario: crate::protocol::LabScenarioV1 = serde_json::from_value(
+    let scenario: crate::protocol::LabScenarioPayload = serde_json::from_value(
         export_result
             .outcome
             .as_ref()
@@ -644,7 +654,13 @@ fn lab_timeline_resets_on_scenario_import() {
         2
     );
 
-    task.on_lab_request(99, 43, LabClientOp::ImportScenario { scenario });
+    task.on_lab_request(
+        99,
+        43,
+        LabClientOp::ImportScenario {
+            scenario: Box::new(scenario),
+        },
+    );
     let messages: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
     assert!(messages.iter().any(|msg| {
         matches!(

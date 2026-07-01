@@ -84,12 +84,17 @@ import { textWithin } from "./dom_text.mjs";
     const scenario = JSON.parse(
       fs.readFileSync(new URL(`../../server/assets/lab-scenarios/${filename}`, import.meta.url), "utf8"),
     );
-    assert(scenario.players?.length === 2, `${filename} remains a two-player bundled lab scenario`);
-    for (const player of scenario.players) {
-      const completedResearch = [...(player.research?.completed || [])].sort();
+    assert(scenario.kind === "labCheckpointScenario", `${filename} uses checkpoint-backed lab scenario shape`);
+    const checkpoint = JSON.parse(scenario.checkpointPayload);
+    assert(checkpoint.players?.length === 2, `${filename} remains a two-player bundled lab scenario`);
+    for (const player of checkpoint.players) {
+      const completedResearch = [...(player.upgrades || [])].sort();
+      const expectedResearch = allKriegsiaResearch.map((upgrade) =>
+        upgrade.replace(/(^|_)([a-z])/g, (_match, _prefix, letter) => letter.toUpperCase()),
+      );
       assertDeepEqual(
         completedResearch,
-        [...allKriegsiaResearch].sort(),
+        [...expectedResearch].sort(),
         `${filename} grants all current Kriegsia research to player ${player.id}`,
       );
     }
@@ -1044,13 +1049,13 @@ await withFakeDocument(async () => {
         slug: "saved-setup",
         scenarioPath: "server/assets/lab-scenarios/saved-setup.json",
         manifestEntry: { id: "saved-setup", title: "Saved Setup" },
-        scenarioJson: "{\n  \"kind\": \"labScenario\"\n}\n",
+        scenarioJson: "{\n  \"kind\": \"labCheckpointScenario\"\n}\n",
       },
     },
   });
   await validatePromise;
   assert(
-    panel.fields.get("scenario-json").value.includes("\"kind\": \"labScenario\"") &&
+    panel.fields.get("scenario-json").value.includes("\"kind\": \"labCheckpointScenario\"") &&
       textWithin(root).includes("server/assets/lab-scenarios/saved-setup.json"),
     "LabPanel shows the dry-run scenario JSON and target file preview",
   );
@@ -1091,7 +1096,7 @@ await withFakeDocument(async () => {
         slug: "submitted-setup",
         scenarioPath: "server/assets/lab-scenarios/submitted-setup.json",
         manifestEntry: { id: "submitted-setup", title: "Submitted Setup" },
-        scenarioJson: "{\n  \"kind\": \"labScenario\"\n}\n",
+        scenarioJson: "{\n  \"kind\": \"labCheckpointScenario\"\n}\n",
       },
     },
   });
@@ -1137,7 +1142,7 @@ await withFakeDocument(async () => {
         slug: "failed-setup",
         scenarioPath: "server/assets/lab-scenarios/failed-setup.json",
         manifestEntry: { id: "failed-setup", title: "Failed Setup" },
-        scenarioJson: "{\n  \"kind\": \"labScenario\"\n}\n",
+        scenarioJson: "{\n  \"kind\": \"labCheckpointScenario\"\n}\n",
       },
     },
   });
