@@ -20,12 +20,12 @@
     },
     {
       "path": "server/crates/archcheck/src/lib.rs",
-      "lines": 2400,
-      "reason": "Game-state Phase 7 expands the existing oversized architecture checker with state-owner registry and production guardrail enforcement; keep ratcheting until archcheck scanners and tests are split into modules."
+      "lines": 2461,
+      "reason": "Checkpoint Phase 7 expands the existing oversized architecture checker with state-owner checkpoint policy/evidence enforcement; keep ratcheting until archcheck scanners and tests are split into modules."
     },
     {
       "path": "server/crates/protocol/src/lib.rs",
-      "lines": 1799,
+      "lines": 1796,
       "reason": "Lab scenario DTO extraction lowered the existing oversized protocol module; keep ratcheting until remaining protocol DTO groups are split."
     },
     {
@@ -50,7 +50,7 @@
     },
     {
       "path": "server/crates/sim/src/game/services/order_queue.rs",
-      "lines": 1580,
+      "lines": 1556,
       "reason": "Panzerfaust Phase 3 extends queued attack promotion with shared loaded-shot legality, smoke-aware target validation, and current-range completion checks in the existing oversized order adapter; keep ratcheting until queue validation is extracted."
     },
     {

@@ -55,7 +55,7 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
 - Can the new logic be pure policy in `rts-rules` or a pure service helper instead of direct state
   mutation?
 - Does new durable state live under `GameState`, rebuildable cache/search state under
-  `DerivedState`, and the registry classify it with a checkpoint policy?
+  `DerivedState`, and the registry classify it with a concrete checkpoint policy and evidence row?
 - Can mutation go through an existing entity/player helper rather than direct field writes?
 - Did this add a new service-to-service import edge? Command/order edges need an exact allowlist
   entry and role-matrix justification.

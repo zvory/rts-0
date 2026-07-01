@@ -280,7 +280,8 @@ architecture failures.
 The Phase 0.5 and Phase 2 derived-state wipe harnesses confirm the current derived boundary: only
 `final_spatial` and `pathing` are cleared and rebuilt. Every current `GameState` field is treated as
 authoritative or compatibility metadata until a later phase adds a deterministic rebuild proof and
-updates this registry. No current field has an unresolved ownership category blocker.
+updates this registry. No current field has an unresolved ownership category or checkpoint-policy
+blocker.
 
 #### 3.1.2 Ownership guardrails and checkpoint-readiness audit
 
@@ -292,6 +293,8 @@ updates this registry. No current field has an unresolved ownership category blo
 - a `GameState` or `DerivedState` field is missing from the registry, has a stale registry row, or
   is categorized outside its owner (`GameState` accepts `authoritative/serialized` or
   `compatibility metadata`; `DerivedState` accepts only `derived/rebuildable`);
+- a registry row omits a concrete checkpoint policy or evidence/notes cell, which would allow a
+  new authoritative state owner to bypass the DTO/import decision record;
 - production `rts-sim::game` code adds module-level mutable state such as `static mut`,
   `Mutex`/`RwLock` statics, `OnceLock`/`LazyLock` mutable singletons, or `thread_local!` state;
 - a service module lacks a role classification, adds an unapproved service edge, exposes broad
@@ -311,43 +314,44 @@ under `rts-sim::game` are used by the semantic comparator and validation tests; 
 public route, command, replay artifact format, lab scenario format, UI affordance, or lobby/server
 call path by themselves.
 
-Final audit for the ownership sequence:
+Phase 7 release audit for the ownership sequence:
 
 - Public `Game` API signatures remain the §3.1 seam. Lobby, replay, lab, AI, server, and snapshot
-  callers still go through public `Game` methods rather than reading internal state owners.
+  callers still go through public `Game` methods rather than reading internal state owners. Normal
+  match starts and blank lab starts build a private direct setup value only as the canonical setup
+  compiler, then immediately restore the authoritative start through `GameCheckpointV1`; the
+  `new_direct_start_for_test` oracle is retained only for setup parity tests.
 - Wire protocol mirrors, protocol DTOs, compact snapshots, start payloads, and
   `client/src/protocol.js` are not changed by the private checkpoint path.
 - Replay artifact schema 3 captures the replay start state as a launch-time
   `ReplayStartComposition` containing the map binding plus `GameCheckpointV1`, then finalizes with
   recorded commands and end metadata. Legacy schema 2 artifacts still load through the
   map/loadout-start compatibility path. Replay seek still uses recorded commands plus in-process
-  `clone_for_replay_keyframe` keyframes after the start game is rebuilt.
+  `clone_for_replay_keyframe` keyframes after the start game is rebuilt. Schema 2 compatibility is
+  retained because dev files, self-play artifacts, crash artifacts, match-history rows, and old
+  fixtures may still contain it; schema, map, faction, and loadout drift reject with explicit
+  messages while build-SHA drift remains warning-compatible.
 - Lab timeline seek still replays lab timeline entries from in-process keyframes. Current lab
   import/export UI uses checkpoint-backed `LabCheckpointScenarioV1` containers by default:
   materialized map data/binding lives beside an embedded `GameCheckpointV1` text payload, and
   `sourceEntityIdMap` preserves existing import remap callers. Old `LabScenarioV1` setup files
-  remain accepted as compatibility inputs and are converted through the same restore path.
-- Projection privacy remains enforced by normal snapshot/event projection tests plus the Phase 6
+  remain accepted as compatibility inputs and are converted through the same restore path because
+  user-supplied scenario JSON and historical fixtures can still arrive on the public lab surface.
+- Projection privacy remains enforced by normal snapshot/event projection tests plus
   checkpoint/privacy coverage; checkpoint helpers must not expose fog-hidden entity ids, positions,
   targets, ability payloads, remembered occupants, or private events.
+- Persistence is unchanged outside replay artifact contents: match history stores the same
+  versioned `ReplayArtifactV1` JSON row, now with schema 3 `startState` for new writes, and the DB
+  reader uses the same compatibility policy as file/dev replay loading.
+- Operational rollback remains a normal server rollback or revert. New schema 3 artifacts are
+  rejected by old binaries that do not know the schema; current binaries retain schema 2 and legacy
+  lab-scenario readers so rolling forward again does not require a data migration. No generic
+  checkpoint upload route or client save/load UI exists to disable during rollback.
 
-Checkpoint-readiness blockers before follow-up product plans:
-
-- The public checkpoint payload contract is defined in §3.1.3 and has an internal `rts-sim`
-  round-trip proof: explicit DTO conversion, serde text bytes, map-binding validation, importer
-  validation, and semantic continuation tests. Follow-up product phases still need migration tests,
-  rollout observability, compatibility decisions, and a decision on when any caller may expose it.
-- Replay migration currently writes schema 3 checkpoint-backed starts and retains schema 2 loading.
-  Future cleanup still needs a keyframe replacement decision, any cross-version migrators beyond
-  schema 2 compatibility, and release audit coverage for old builds or partial checkpoint coverage.
-- Lab migration now writes checkpoint-backed catalog assets, exports, validation previews, and
-  submission files while retaining the `LabScenarioV1` compatibility reader. Future cleanup still
-  needs a product decision for when to remove the old setup DTO, a timeline operation
-  capture/replay policy, and validation for imported artifacts across map/faction versions.
-- Coverage gaps for a public checkpoint program include long-run/cross-version serialization,
-  corruption/partial-load handling, AI-controller reconstruction expectations, performance and
-  storage limits, privacy review for every exported projection-adjacent field, and deployment
-  observability for rollout and rollback.
+Remaining follow-up product decisions are deliberately outside this checkpoint plan: when to remove
+schema 2 replay loading, when to remove `LabScenarioV1` compatibility input, whether to replace
+in-process replay/lab keyframes with checkpoint keyframes, and whether a separate product plan
+should expose any public checkpoint save/load surface with rollout observability.
 
 `PlayerInit.team_id` is canonical team identity. Phase 1 preserves FFA gameplay by assigning each
 seated player a unique nonzero team by default; deserialized or hand-built fixtures with
