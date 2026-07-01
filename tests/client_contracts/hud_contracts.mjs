@@ -11,9 +11,11 @@ import {
   BASE_COMMAND_SUPPLY_CAP,
   COMMAND_CAR_SUPPLY_CAP_BONUS,
   STATS,
+  TICK_HZ,
 } from "../../client/src/config.js";
 import {
   HUD,
+  formatGameTime,
   groupCooldownClocks,
   playerHasCompletedKind,
   selectionBudgetBlockShape,
@@ -133,6 +135,51 @@ function fakeHudRootWithoutResourceSpans() {
       },
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// HUD game timer
+// ---------------------------------------------------------------------------
+{
+  assert(formatGameTime(null) === "00:00", "HUD game timer treats missing ticks as match start");
+  assert(formatGameTime(-90) === "00:00", "HUD game timer clamps negative ticks");
+  assert(formatGameTime(TICK_HZ - 1) === "00:00", "HUD game timer floors partial seconds");
+  assert(formatGameTime(TICK_HZ) === "00:01", "HUD game timer formats one elapsed second");
+  assert(formatGameTime(TICK_HZ * 60) === "01:00", "HUD game timer formats minutes");
+  assert(formatGameTime(TICK_HZ * 3661) === "1:01:01", "HUD game timer formats hours");
+
+  let text = "";
+  const timerEl = {
+    title: "",
+    textWrites: 0,
+    get textContent() {
+      return text;
+    },
+    set textContent(value) {
+      this.textWrites += 1;
+      text = String(value);
+    },
+  };
+  const state = { tick: 0 };
+  const hud = new HUD({
+    querySelector(selector) {
+      return selector === "#game-timer" ? timerEl : null;
+    },
+  }, state, {}, null);
+  assert(timerEl.textContent === "00:00", "HUD initializes the minimap game timer");
+  const initialWrites = timerEl.textWrites;
+  hud._renderGameTimer();
+  assert(timerEl.textWrites === initialWrites, "HUD game timer skips duplicate DOM writes");
+  state.tick = TICK_HZ * 125;
+  hud._renderGameTimer();
+  assert(timerEl.textContent === "02:05", "HUD game timer updates from authoritative state tick");
+  assert(timerEl.title === "Game time 02:05", "HUD game timer title mirrors the visible time");
+  state.tick = TICK_HZ * 65;
+  hud._renderGameTimer();
+  assert(timerEl.textContent === "01:05", "HUD game timer can move backward for replay seeks");
+  hud.destroy();
+  assert(timerEl.textContent === "00:00", "HUD destroy resets the persistent minimap game timer DOM");
+  assert(timerEl.title === "Game time 00:00", "HUD destroy resets the minimap game timer title");
 }
 
 // ---------------------------------------------------------------------------

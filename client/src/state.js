@@ -190,6 +190,17 @@ export class GameState extends VisualEffectBackedState {
     return this._cur ? this._curRecvTime : null;
   }
 
+  /**
+   * Current authoritative simulation tick, or 0 before the first snapshot.
+   * Views should use this for sim-time readouts so replay seeks and room-time
+   * speed changes are reflected from server state instead of wall time.
+   * @returns {number}
+   */
+  get tick() {
+    const tick = this._cur?.tick;
+    return Number.isFinite(tick) ? Math.max(0, Math.trunc(tick)) : 0;
+  }
+
   // --- snapshots ----------------------------------------------------------
 
   /**

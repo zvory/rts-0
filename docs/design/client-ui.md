@@ -657,6 +657,7 @@ export class GameState {
   // snapshot buffering for interpolation:
   applySnapshot(msg)                     // pushes msg, keeps prev+current, stamps recvTime
   entitiesInterpolated(alpha)            // -> entities with lerped x,y,facing,weaponFacing
+  get tick()                             // latest authoritative simulation tick; 0 before snapshots
   get prevRecvTime() / get currRecvTime()// recv timestamps of the two buffered snapshots
                                          //   (null until two exist); main.js derives interp alpha
   resources                             // {steel,oil,supplyUsed,supplyCap} (latest)
