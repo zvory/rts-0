@@ -441,15 +441,18 @@ assert(
     rust.includes("set_up") &&
     rust.includes("weapon_facing") &&
     rust.includes("setup_facing") &&
+    rust.includes("queued_orders") &&
     rust.includes("god_mode_players") &&
     LAB_SCENARIO.KIND === "labScenario" &&
     LAB_SCENARIO.SCHEMA_VERSION === 1 &&
     protocolDoc.includes("LabScenarioV1") &&
+    protocolDoc.includes("LabScenarioOrder") &&
     protocolDoc.includes("setUp") &&
     protocolDoc.includes("facing") &&
     protocolDoc.includes("weaponFacing") &&
     protocolDoc.includes("setupFacing") &&
     protocolDoc.includes("setupTarget") &&
+    protocolDoc.includes("queuedOrders") &&
     protocolDoc.includes("godModePlayers") &&
     protocolDoc.includes("validateScenario") &&
     protocolDoc.includes("submitScenario"),

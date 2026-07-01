@@ -544,6 +544,7 @@ fn lab_error_text(err: &LabError) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::protocol::Event;
 
     fn temp_catalog_dir(name: &str) -> PathBuf {
         let dir =
@@ -660,6 +661,50 @@ mod tests {
         assert!(
             panzerfaust_count >= 12,
             "render-preview scenario should include Panzerfaust formation coverage"
+        );
+    }
+
+    #[test]
+    fn render_preview_anti_tank_guns_emit_attack_events() {
+        let loaded = load_lab_scenario_by_id("render-preview")
+            .expect("bundled render-preview scenario should load");
+        let mut game = loaded
+            .build_game()
+            .expect("render-preview scenario should restore through lab APIs");
+        let anti_tank_gun_ids: HashSet<_> = game
+            .export_lab_scenario()
+            .entities
+            .into_iter()
+            .filter(|entity| entity.kind == "anti_tank_gun")
+            .map(|entity| entity.id)
+            .collect();
+        assert_eq!(
+            anti_tank_gun_ids.len(),
+            8,
+            "render-preview should keep both AT gun batteries"
+        );
+
+        let mut saw_anti_tank_attack = false;
+        for _ in 0..180 {
+            let events = game.tick();
+            saw_anti_tank_attack |=
+                events
+                    .iter()
+                    .flat_map(|(_, events)| events.iter())
+                    .any(|event| {
+                        matches!(
+                            event,
+                            Event::Attack { from, .. } if anti_tank_gun_ids.contains(from)
+                        )
+                    });
+            if saw_anti_tank_attack {
+                break;
+            }
+        }
+
+        assert!(
+            saw_anti_tank_attack,
+            "render-preview AT guns should auto-acquire in-arc targets and emit tracer events"
         );
     }
 

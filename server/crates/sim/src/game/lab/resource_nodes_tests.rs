@@ -64,6 +64,8 @@ fn lab_oil_entity(id: u32, x: f32, y: f32) -> LabScenarioEntity {
         set_up: false,
         setup_facing: None,
         setup_target: None,
+        order: None,
+        queued_orders: Vec::new(),
     }
 }
 

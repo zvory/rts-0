@@ -2692,6 +2692,11 @@
       "id": 156,
       "kind": "artillery",
       "owner": 2,
+      "order": {
+        "kind": "pointFire",
+        "x": 1516.719,
+        "y": 1537.264
+      },
       "resourceRemaining": null,
       "setUp": true,
       "setupFacing": -2.752610683441162,
@@ -2712,6 +2717,11 @@
       "id": 157,
       "kind": "artillery",
       "owner": 2,
+      "order": {
+        "kind": "blanketFire",
+        "x": 2196.633,
+        "y": 1934.254
+      },
       "resourceRemaining": null,
       "setUp": true,
       "setupFacing": -3.1276750564575195,
@@ -2732,6 +2742,11 @@
       "id": 158,
       "kind": "artillery",
       "owner": 1,
+      "order": {
+        "kind": "pointFire",
+        "x": 2658.46,
+        "y": 1577.267
+      },
       "resourceRemaining": null,
       "setUp": true,
       "setupFacing": -0.39728522300720215,
@@ -2752,6 +2767,11 @@
       "id": 159,
       "kind": "artillery",
       "owner": 1,
+      "order": {
+        "kind": "blanketFire",
+        "x": 2426.22,
+        "y": 1928.781
+      },
       "resourceRemaining": null,
       "setUp": true,
       "setupFacing": 0.007911443710327148,

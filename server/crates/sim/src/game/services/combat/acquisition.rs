@@ -16,7 +16,10 @@ use crate::rules::terrain::{self, TerrainKind};
 
 use super::priority::{self, AttackPriorityContext, TargetCandidate};
 use super::projection::{friendly_hard_blocker_between, shot_hits_intended_target};
-use super::weapons::{effective_attack_profile, moving_fire_movement_order_holds_path};
+use super::weapons::{
+    anti_tank_gun_target_inside_field_of_fire, effective_attack_profile,
+    moving_fire_movement_order_holds_path,
+};
 
 /// How a combatant chooses targets.
 #[derive(Copy, Clone, PartialEq)]
@@ -312,6 +315,14 @@ fn legal_target_candidates(
         let dy = target.pos_y - py;
         let distance_sq = dx * dx + dy * dy;
         if distance_sq > effective_acquire_px * effective_acquire_px {
+            continue;
+        }
+        if attacker
+            .filter(|attacker| attacker.kind == EntityKind::AntiTankGun)
+            .is_some_and(|attacker| {
+                !anti_tank_gun_target_inside_field_of_fire(attacker, dy.atan2(dx))
+            })
+        {
             continue;
         }
         let effective_weapon_range_px = weapon_range_px * concealment;

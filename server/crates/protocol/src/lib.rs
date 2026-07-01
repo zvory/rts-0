@@ -408,6 +408,34 @@ pub struct LabScenarioEntity {
     pub setup_facing: Option<f32>,
     #[serde(default)]
     pub setup_target: Option<LabScenarioPoint>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub order: Option<LabScenarioOrder>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub queued_orders: Vec<LabScenarioOrder>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabScenarioOrder {
+    pub kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub x: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub y: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entity_kind: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tile_x: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tile_y: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ability: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub staging_x: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub staging_y: Option<f32>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]

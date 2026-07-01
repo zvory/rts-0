@@ -303,7 +303,7 @@ fn deployed_anti_tank_gun_desired_facing(e: &Entity, target_angle: f32) -> f32 {
     }
 }
 
-fn anti_tank_gun_target_inside_field_of_fire(e: &Entity, target_angle: f32) -> bool {
+pub(super) fn anti_tank_gun_target_inside_field_of_fire(e: &Entity, target_angle: f32) -> bool {
     if !matches!(e.weapon_setup(), WeaponSetup::Deployed) {
         return true;
     }
