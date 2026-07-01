@@ -1,5 +1,4 @@
 use super::*;
-use crate::game::entity::Order;
 use crate::rules::combat::WeaponKind;
 
 impl Game {
@@ -31,7 +30,7 @@ impl Game {
             .spawn_unit(1, EntityKind::Tank, tank_pos.0, tank_pos.1)
             .ok_or_else(|| "failed to spawn Tank coax inspection Tank".to_string())?;
         if let Some(tank) = entities.get_mut(tank) {
-            tank.set_order(Order::HoldPosition);
+            tank.hold_position();
             tank.set_facing(0.0);
             tank.set_weapon_facing(0.0);
             tank.set_weapon_cooldown(WeaponKind::TankCannon, config::TICK_HZ * 4);
@@ -98,7 +97,7 @@ fn make_static_inspection_target(entities: &mut EntityStore, id: u32) {
     let Some(target) = entities.get_mut(id) else {
         return;
     };
-    target.set_order(Order::HoldPosition);
+    target.hold_position();
     target.set_facing(std::f32::consts::PI);
     target.set_weapon_facing(std::f32::consts::PI);
     for weapon in WeaponKind::ALL {
@@ -137,7 +136,7 @@ fn spawn_static_targets(
 }
 
 fn refresh_projection_after_smoke(game: &mut Game) {
-    let player_ids: Vec<u32> = game.state.players.iter().map(|player| player.id).collect();
+    let player_ids = game.state.player_ids();
     game.state.fog = Fog::new(game.state.map.size);
     game.state.fog.recompute_with_smoke(
         &player_ids,

@@ -555,15 +555,36 @@ fn tank_coax_inspection_scenario_sets_up_static_mixed_targets() {
     assert_units_do_not_intersect_buildings(&setup.game);
     assert_enemy_units_are_static_inspection_targets(&setup.game);
     let tank_hp_before = tank.hp;
+    let enemy_hp_total = |game: &Game| {
+        game.state
+            .entities
+            .iter()
+            .filter(|entity| entity.owner == 2 && entity.is_unit())
+            .map(|entity| entity.hp)
+            .sum::<u32>()
+    };
+    let enemy_hp_before = enemy_hp_total(&setup.game);
     let mut ticked = setup.game.clone();
     ticked.tick();
+    let ticked_tank = ticked.state.entities.get(tank_id).expect("tank should survive first tick");
     assert_eq!(
-        ticked
-            .state
-            .entities
-            .get(tank_id)
-            .expect("tank should survive first tick")
-            .hp,
+        ticked_tank.weapon_cooldown(WeaponKind::TankCannon),
+        config::TICK_HZ * 4 - 1,
+        "inspection scenario should keep the Tank cannon delayed on the first tick"
+    );
+    assert_eq!(
+        ticked_tank.weapon_cooldown(WeaponKind::TankCoax),
+        crate::rules::combat::weapon_profile(WeaponKind::TankCoax)
+            .expect("Tank coax profile should exist")
+            .cooldown,
+        "inspection scenario should make the held Tank fire its coax immediately"
+    );
+    assert!(
+        enemy_hp_total(&ticked) < enemy_hp_before,
+        "inspection scenario should place at least one enemy target inside the coax arc"
+    );
+    assert_eq!(
+        ticked_tank.hp,
         tank_hp_before,
         "static inspection targets should not fire back on the first tick"
     );
