@@ -57,7 +57,8 @@ impl Game {
             seed,
             "dev:tank_coax_inspection",
         );
-        game.smokes
+        game.state
+            .smokes
             .spawn(
                 tank_pos.0 + ts * 5.3,
                 tank_pos.1 + ts * 2.55,
@@ -136,10 +137,14 @@ fn spawn_static_targets(
 }
 
 fn refresh_projection_after_smoke(game: &mut Game) {
-    let player_ids: Vec<u32> = game.players.iter().map(|player| player.id).collect();
-    game.fog = Fog::new(game.map.size);
-    game.fog
-        .recompute_with_smoke(&player_ids, &game.entities, &game.map, &game.smokes);
+    let player_ids: Vec<u32> = game.state.players.iter().map(|player| player.id).collect();
+    game.state.fog = Fog::new(game.state.map.size);
+    game.state.fog.recompute_with_smoke(
+        &player_ids,
+        &game.state.entities,
+        &game.state.map,
+        &game.state.smokes,
+    );
     game.refresh_building_memory(&player_ids);
     game.refresh_trench_memory(&player_ids);
 }

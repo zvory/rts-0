@@ -13,14 +13,20 @@ fn owned_kind_count(game: &Game, owner: u32, kind: EntityKind) -> usize {
 
 fn assert_units_do_not_intersect_buildings(game: &Game) {
     let buildings: Vec<_> = game
+        .state
         .entities
         .iter()
         .filter_map(|entity| {
-            crate::game::services::geometry::building_rect_for_entity(&game.map, entity)
+            crate::game::services::geometry::building_rect_for_entity(&game.state.map, entity)
                 .map(|rect| (entity.id, entity.kind, rect))
         })
         .collect();
-    for unit in game.entities.iter().filter(|entity| entity.is_unit()) {
+    for unit in game
+        .state
+        .entities
+        .iter()
+        .filter(|entity| entity.is_unit())
+    {
         let Some(body) = crate::game::services::geometry::unit_body_for_entity(unit) else {
             continue;
         };
@@ -39,6 +45,7 @@ fn assert_units_do_not_intersect_buildings(game: &Game) {
 
 fn assert_enemy_units_are_static_inspection_targets(game: &Game) {
     for entity in game
+        .state
         .entities
         .iter()
         .filter(|entity| entity.owner == 2 && entity.is_unit())
@@ -536,7 +543,7 @@ fn tank_coax_inspection_scenario_sets_up_static_mixed_targets() {
     assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::TankTrap), 1);
     assert_eq!(owned_kind_count(&setup.game, 0, EntityKind::Steel), 1);
     assert_eq!(owned_kind_count(&setup.game, 0, EntityKind::Oil), 1);
-    assert_eq!(setup.game.smokes.iter().count(), 1);
+    assert_eq!(setup.game.state.smokes.iter().count(), 1);
     let tank_id = setup.units[0];
     let tank = setup.game.state.entities.get(tank_id).expect("tank should exist");
     assert_eq!(tank.weapon_facing(), Some(0.0));
@@ -552,6 +559,7 @@ fn tank_coax_inspection_scenario_sets_up_static_mixed_targets() {
     ticked.tick();
     assert_eq!(
         ticked
+            .state
             .entities
             .get(tank_id)
             .expect("tank should survive first tick")

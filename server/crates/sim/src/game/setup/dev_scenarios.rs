@@ -1,6 +1,4 @@
 use super::*;
-use crate::game::entity::Order;
-use crate::rules::combat::WeaponKind;
 use rand::{rngs::SmallRng, SeedableRng};
 
 mod layouts;
