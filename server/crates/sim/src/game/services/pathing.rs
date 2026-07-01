@@ -516,6 +516,10 @@ fn distance_between(a: (f32, f32), b: (f32, f32)) -> f32 {
 
 #[cfg(test)]
 impl PathingService {
+    pub fn clear_rebuildable_state_for_test(&mut self) {
+        self.cache.clear();
+    }
+
     pub fn cache_len(&self) -> usize {
         self.cache.len()
     }

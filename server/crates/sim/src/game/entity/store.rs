@@ -99,6 +99,11 @@ impl EntityStore {
         ids
     }
 
+    #[cfg(test)]
+    pub(crate) fn next_id_for_test(&self) -> u32 {
+        self.next_id
+    }
+
     /// Whether `player` owns at least one entity (unit or building).
     pub fn player_alive(&self, player: u32) -> bool {
         self.map.values().any(|e| e.owner == player)
