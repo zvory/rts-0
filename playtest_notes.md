@@ -20,7 +20,7 @@ jeffrey playtest
 - [x] when clicking inside of a cluster, they should group and ignore formations, i guess this is hard because sometimes we need to retain formation, so instead we should do it like the closer the move command is i think, the smaller the size of the resultant formation, like sc2 behaviour (done: distance-scaled formation goals)
 - [x] riflemen need some kind of anti tank behaviour, not very strong, but enough to at least hold off an emergency situation under some situations (done: in-range armored fallback targeting)
 - [x] meth should increase machine gunner move speed to rifleman speed without meth (1.6px/tick) (done: PR #467)
-- [ ] maybe we should return to the old charge behaviour so that riflemen with melee attack on tanks aren't chasing down tanks
+- [x] maybe we should return to the old charge behaviour so that riflemen with melee attack on tanks aren't chasing down tanks (done: Methamphetamines Riflemen no longer acquire out-of-range targets during move/attack-move orders and keep their path while firing)
 - [x] watch replays as a group, hitting watch replay should create a lobby with all spectators (done: replay staging lobbies)
 - [ ] proxy mortars, maybe like two mortars should be able to one shot a huge clump of workers
 - [ ] increase the vision range of all units, or make that a training centre upgrade (binoculars)
@@ -70,27 +70,27 @@ luke playtest
 
 - [ ] make the debug mdoe more obvious
 
-- [ ] shift right clicking on windows opens the context menu (firefox only) (unsure: fullscreen control-group fix only)
+- [x] shift right clicking on windows opens the context menu (firefox only) (done: Shift+right-click is handled on mousedown, suppresses the browser context menu, preserves queued orders, and avoids duplicate contextmenu orders)
 
-- [ ] selection box doesn't show the production queue (like the +2) obviously enough
+- [x] selection box doesn't show the production queue (like the +2) obviously enough (done: selected producer details show the active item, +N queue depth, and progress; producer buildings also render queue depth labels)
 
 - [x] would be good to see the ranges of units, either in the description, or when they're selected? (done: PR #520, selected-unit range overlays)
 
-- [ ] AI is not sending riflemen in waves properly
+- [x] AI is not sending riflemen in waves properly (done: AI 1.2 stages Rifleman wave cohorts on a line, launches four-Rifleman waves, and excludes already-launched attackers from fresh waves)
 
 - [x] rally should be attack move
 
 - [ ] should allow attacking through buildings because it's causing confusing behaviour where units don't attack the enemy
 
-- [ ] AI should attack with first tank, and it doens't seem to be attacking?
+- [x] AI should attack with first tank, and it doens't seem to be attacking? (done: AI 1.1 launches the first ready Tank as an attack-move wave once the tech gates are met)
 
-- [ ] AI is producing workers, but tbecuase the main base is fully saturated, the worker just idle
+- [x] AI is producing workers, but tbecuase the main base is fully saturated, the worker just idle (done: AI 1.1 assigns idle main-base workers to expansion steel once the main steel line is fully saturated)
 
 - [ ] AI machine gunners seem to move to attack? like in the luke vs AI replay, luke's tanks show up, and the MG's seem to unset up, and then set up again?
 
 - [ ] they AI lost 178 units but luke's say it only killed 78? buildings killed and buildings lost is also fucked
 
-- [ ] when clicking different players vision, it doesn't like, switch to only showing what that player has explored. you know how there's the stuff you have explored and haven't?
+- [x] when clicking different players vision, it doesn't like, switch to only showing what that player has explored. you know how there's the stuff you have explored and haven't? (done: replay fog perspective controls immediately rebuild snapshots for selected player vision, including explored/resource state)
 
 - [ ] in replay, it should show who is still viewing the replay
 
@@ -108,13 +108,13 @@ luke playtest
 
 - [ ] auto attacking (unsure: too broad)
 
-- [ ] analysis tab is broken and does not update after the first tick
+- [x] analysis tab is broken and does not update after the first tick (done: observer analysis tabs update from later payloads and render current production, units-lost, and resources-lost rows)
 
-- [ ] replay seek is broken, i think the player in this case clicked a couple of times, and then we get full fog screen, no units spawned, and no replay controls
+- [x] replay seek is broken, i think the player in this case clicked a couple of times, and then we get full fog screen, no units spawned, and no replay controls (done: replay seek restores from room-time/keyframe state and sends an immediate scoped snapshot, including while paused)
 
-- [ ] target fire doens't seem to work, it give sthe player feedback that the unit is target firing, but it doesn't. in this ase it happened with riflemen while methamphetamines was researched, not sure if that's related
+- [x] target fire doens't seem to work, it give sthe player feedback that the unit is target firing, but it doesn't. in this ase it happened with riflemen while methamphetamines was researched, not sure if that's related (done: ordered attacks retain the commanded visible hostile target so auto-acquisition does not steal target fire)
 
-- [ ] methamphetamines should icnrease rifleman attack speed evne more
+- [x] methamphetamines should icnrease rifleman attack speed evne more (done: Methamphetamines reduces Rifleman attack cooldown to 75% and preserves moving-fire behavior)
 
 - [ ] increase all unit sight range by two
 
@@ -136,7 +136,7 @@ luke playtest
 
 - [ ] if a tank is not moving, it should rotate itself so the front is towards the enemy
 
-- [ ] AT gun cone qhen shift queued should originate at the position that it's projected to arrive at
+- [x] AT gun cone qhen shift queued should originate at the position that it's projected to arrive at (done: queued AT-gun setup computes facing from the arrived/projected position before preserving later queued orders)
 
 - [ ] should be able to click on a resource patch and see how much is left
 
@@ -189,21 +189,21 @@ luke playtest
 
 - [x] make it so tanks take up more selection slots (done: PR #181)
 
-- [ ] attempting to join a replay in progress doesn't give you vision, it's all fog, but when reclaiming position from this all fog mode, the top bar actualy works
+- [x] attempting to join a replay in progress doesn't give you vision, it's all fog, but when reclaiming position from this all fog mode, the top bar actualy works (done: confirmed replay joins receive replay start/room-time state and spectator snapshots from the current replay session)
 
 - [x] when host leaves the replay, it seems to kill the repolay? (done: leaving one replay viewer keeps playback alive for remaining viewers)
 
-- [ ] add an are you sure you want to close the tab, because control w kill the tab
+- [x] add an are you sure you want to close the tab, because control w kill the tab (done: live player matches install a beforeunload warning; spectators, replays, labs, and resolved matches bypass it)
 
 - [ ] when one player leaves the match it should watch the replay
 
 - [x] mortar teams shoudl should even if they don't hav eline of sight (done: PR #512, mortars can fire indirectly at owner-visible targets behind LOS blockers)
 
-- [ ] when resuming from replay, the top bar hud which displayes resources and supply does not work, it's frozen at the dol values
+- [x] when resuming from replay, the top bar hud which displayes resources and supply does not work, it's frozen at the dol values (done: HUD restores single-player steel/oil/supply spans after replay resource rows and resumes live updates)
 
-- [ ] whenresuming from replay, it should rpeserve the camera location form the replay, and not jump back to the camera start location
+- [x] whenresuming from replay, it should rpeserve the camera location form the replay, and not jump back to the camera start location (done: replay-branch starts carry the current camera x/y/zoom into the resumed match)
 
-- [ ] seeking backwards should also not reset the camera location
+- [x] seeking backwards should also not reset the camera location (done: replay seek/start transitions carry the existing camera view instead of recentering)
 
 
 -----
@@ -230,11 +230,11 @@ luke playtest
 
 - [ ] sometimes refreshing puts the player back in the replay they were just in
 
-- [ ] workers on build orders should ignore unit blockage
+- [x] workers on build orders should ignore unit blockage (done: workers on build/gather orders are collision-exempt so traffic cannot strand construction/economy orders)
 
-- [ ] when seeking in replays, add a visual indicator that it's working, and progress so far. potentially, could also play visual feedback as the game speeds forwrad
+- [x] when seeking in replays, add a visual indicator that it's working, and progress so far. potentially, could also play visual feedback as the game speeds forwrad (done: room-time controls show timeline progress, keyframe marks, and a pending Seeking tick status)
 
-- [ ] create checkpoints for replays
+- [x] create checkpoints for replays (done: replay playback records periodic keyframes and seeks by restoring the nearest prior keyframe before fast-forwarding)
 
 
 -------
@@ -263,7 +263,7 @@ luke playtest
 
 - [x] dead vehicles should leave a permanent blackened spot in their silhouette on the ground (done: vehicle and support-weapon deaths stamp blackened scorch/hull decals)
 
-- [ ] prevent any player from playing as black or red
+- [x] prevent any player from playing as black or red (done: server/client player palettes assign colorblind-safer colors and exclude black/red)
 
 - [ ] add an APM counter
 
