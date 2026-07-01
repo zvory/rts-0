@@ -4,6 +4,7 @@ use crate::game::derived_state::DerivedState;
 use crate::rules::faction::{catalog_for_or_default_empty, FactionLoadout, StartingFormation};
 use std::str::FromStr;
 
+mod checkpoint_start;
 mod dev_scenarios;
 
 const LIVE_PATHING_DEFAULT_BUDGET: usize = 32_768;
@@ -198,6 +199,49 @@ impl Game {
 
     #[allow(clippy::too_many_arguments)]
     pub(super) fn new_inner_with_map(
+        players: &[PlayerInit],
+        resource_override: Option<(u32, u32)>,
+        seed: u32,
+        starting_loadout: StartingLoadout,
+        starting_loadout_overrides: Option<&[PlayerStartingLoadout]>,
+        map_override: Option<Map>,
+        map_metadata: MapMetadata,
+    ) -> Game {
+        let direct = Self::new_inner_direct_with_map(
+            players,
+            resource_override,
+            seed,
+            starting_loadout,
+            starting_loadout_overrides,
+            map_override,
+            map_metadata,
+        );
+        Self::checkpoint_backed_start_from_direct(direct, "game setup")
+    }
+
+    #[cfg(test)]
+    #[allow(clippy::too_many_arguments)]
+    pub(in crate::game) fn new_direct_start_for_test(
+        players: &[PlayerInit],
+        resource_override: Option<(u32, u32)>,
+        seed: u32,
+        starting_loadout_overrides: Option<&[PlayerStartingLoadout]>,
+        map_override: Option<Map>,
+        map_metadata: MapMetadata,
+    ) -> Game {
+        Self::new_inner_direct_with_map(
+            players,
+            resource_override,
+            seed,
+            StartingLoadout::Standard,
+            starting_loadout_overrides,
+            map_override,
+            map_metadata,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn new_inner_direct_with_map(
         players: &[PlayerInit],
         resource_override: Option<(u32, u32)>,
         seed: u32,

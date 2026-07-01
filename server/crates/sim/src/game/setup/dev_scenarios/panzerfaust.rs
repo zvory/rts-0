@@ -90,7 +90,7 @@ fn panzerfaust_duel_scenario(seed: u32) -> Result<DevScenarioSetup, String> {
     let tank = spawn_tank(&mut entities, 2, tank_pos, "target ")?;
     set_attack_order(&mut entities, panzerfaust, tank)?;
 
-    Ok(build_panzerfaust_setup(PanzerfaustSetupSpec {
+    build_panzerfaust_setup(PanzerfaustSetupSpec {
         map,
         entities,
         teams: [(1, 1), (2, 2)],
@@ -101,7 +101,8 @@ fn panzerfaust_duel_scenario(seed: u32) -> Result<DevScenarioSetup, String> {
         units: vec![panzerfaust],
         goal: panzerfaust_pos,
         issue_after_ticks: u32::MAX,
-    }))
+    })
+    .checkpoint_backed("dev:panzerfaust_duel")
 }
 
 fn panzerfaust_windup_cancel_scenario(seed: u32) -> Result<DevScenarioSetup, String> {
@@ -117,7 +118,7 @@ fn panzerfaust_windup_cancel_scenario(seed: u32) -> Result<DevScenarioSetup, Str
     let tank = spawn_tank(&mut entities, 2, tank_pos, "target ")?;
     set_attack_order(&mut entities, panzerfaust, tank)?;
 
-    Ok(build_panzerfaust_setup(PanzerfaustSetupSpec {
+    build_panzerfaust_setup(PanzerfaustSetupSpec {
         map,
         entities,
         teams: [(1, 1), (2, 2)],
@@ -128,7 +129,8 @@ fn panzerfaust_windup_cancel_scenario(seed: u32) -> Result<DevScenarioSetup, Str
         units: vec![panzerfaust],
         goal: cancel_goal,
         issue_after_ticks: config::TICK_HZ / 6,
-    }))
+    })
+    .checkpoint_backed("dev:panzerfaust_windup_cancel")
 }
 
 fn panzerfaust_target_death_scenario(seed: u32) -> Result<DevScenarioSetup, String> {
@@ -165,7 +167,7 @@ fn panzerfaust_target_death_scenario(seed: u32) -> Result<DevScenarioSetup, Stri
         issue_after_ticks: u32::MAX,
     });
     grant_methamphetamines(&mut setup.game, 3);
-    Ok(setup)
+    setup.checkpoint_backed("dev:panzerfaust_target_death")
 }
 
 fn panzerfaust_entrenched_range_scenario(seed: u32) -> Result<DevScenarioSetup, String> {
@@ -181,7 +183,12 @@ fn panzerfaust_entrenched_range_scenario(seed: u32) -> Result<DevScenarioSetup, 
     let entrenched_panzerfaust =
         spawn_panzerfaust(&mut entities, 1, entrenched_pos, "entrenched ")?;
     let exposed_panzerfaust = spawn_panzerfaust(&mut entities, 1, exposed_pos, "exposed ")?;
-    spawn_tank(&mut entities, 2, entrenched_tank_pos, "entrenched-range target ")?;
+    spawn_tank(
+        &mut entities,
+        2,
+        entrenched_tank_pos,
+        "entrenched-range target ",
+    )?;
     spawn_tank(&mut entities, 2, exposed_tank_pos, "exposed-range target ")?;
     for id in [entrenched_panzerfaust, exposed_panzerfaust] {
         entities
@@ -204,7 +211,9 @@ fn panzerfaust_entrenched_range_scenario(seed: u32) -> Result<DevScenarioSetup, 
     });
     grant_entrenchment(&mut setup.game, setup.player_id);
     let trench = setup
-        .game.state.trenches
+        .game
+        .state
+        .trenches
         .create(&setup.game.state.map, entrenched_pos.0, entrenched_pos.1)
         .ok_or_else(|| "failed to seed Panzerfaust trench".to_string())?;
     if let Some(entity) = setup.game.state.entities.get_mut(entrenched_panzerfaust) {
@@ -213,7 +222,7 @@ fn panzerfaust_entrenched_range_scenario(seed: u32) -> Result<DevScenarioSetup, 
         }
     }
     refresh_trench_memory(&mut setup.game);
-    Ok(setup)
+    setup.checkpoint_backed("dev:panzerfaust_entrenched_range")
 }
 
 fn panzerfaust_methamphetamines_scenario(seed: u32) -> Result<DevScenarioSetup, String> {
@@ -248,7 +257,7 @@ fn panzerfaust_methamphetamines_scenario(seed: u32) -> Result<DevScenarioSetup, 
         issue_after_ticks: u32::MAX,
     });
     grant_methamphetamines(&mut setup.game, 3);
-    Ok(setup)
+    setup.checkpoint_backed("dev:panzerfaust_methamphetamines")
 }
 
 struct PanzerfaustSetupSpec<const N: usize> {
@@ -316,13 +325,23 @@ fn spawn_tank(
 }
 
 fn grant_entrenchment(game: &mut Game, player_id: u32) {
-    if let Some(player) = game.state.players.iter_mut().find(|player| player.id == player_id) {
+    if let Some(player) = game
+        .state
+        .players
+        .iter_mut()
+        .find(|player| player.id == player_id)
+    {
         player.upgrades.insert(upgrade::UpgradeKind::Entrenchment);
     }
 }
 
 fn grant_methamphetamines(game: &mut Game, player_id: u32) {
-    if let Some(player) = game.state.players.iter_mut().find(|player| player.id == player_id) {
+    if let Some(player) = game
+        .state
+        .players
+        .iter_mut()
+        .find(|player| player.id == player_id)
+    {
         player
             .upgrades
             .insert(upgrade::UpgradeKind::Methamphetamines);

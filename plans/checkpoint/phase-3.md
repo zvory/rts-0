@@ -1,6 +1,6 @@
 # Phase 3 - Checkpoint-Backed Starts
 
-Status: Not started.
+Status: Done.
 
 ## Scope
 

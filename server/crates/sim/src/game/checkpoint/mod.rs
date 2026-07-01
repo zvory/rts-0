@@ -24,9 +24,7 @@ mod player_dto;
 mod validation;
 
 pub(in crate::game) use error::CheckpointPayloadError;
-use metadata::{
-    CheckpointCompatibilityV1, CommandLogMetadataV1, MapBindingV1, RngDescriptorV1,
-};
+use metadata::{CheckpointCompatibilityV1, CommandLogMetadataV1, MapBindingV1, RngDescriptorV1};
 use player_dto::PlayerStateV1;
 use validation::*;
 
@@ -63,13 +61,13 @@ const MAX_UNITS_PER_CHECKPOINT_COMMAND: usize = 4_096;
 
 #[allow(dead_code)]
 impl Game {
-    pub(in crate::game) fn checkpoint_payload_text_for_test(
+    pub(in crate::game) fn checkpoint_payload_text(
         &self,
     ) -> Result<String, CheckpointPayloadError> {
         GameCheckpointV1::from_state(&self.state)?.to_text()
     }
 
-    pub(in crate::game) fn restore_checkpoint_payload_text_for_test(
+    pub(in crate::game) fn restore_checkpoint_payload_text(
         text: &str,
         map: Map,
         map_metadata: MapMetadata,
@@ -81,6 +79,22 @@ impl Game {
             game.sync_lab_god_mode_flags();
         }
         Ok(game)
+    }
+
+    #[cfg(test)]
+    pub(in crate::game) fn checkpoint_payload_text_for_test(
+        &self,
+    ) -> Result<String, CheckpointPayloadError> {
+        self.checkpoint_payload_text()
+    }
+
+    #[cfg(test)]
+    pub(in crate::game) fn restore_checkpoint_payload_text_for_test(
+        text: &str,
+        map: Map,
+        map_metadata: MapMetadata,
+    ) -> Result<Self, CheckpointPayloadError> {
+        Self::restore_checkpoint_payload_text(text, map, map_metadata)
     }
 }
 

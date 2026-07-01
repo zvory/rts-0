@@ -35,13 +35,14 @@ impl Game {
             "dev:scout_car_snaking_corridor",
         );
 
-        Ok(DevScenarioSetup {
+        DevScenarioSetup {
             game,
             player_id,
             units,
             goal,
             issue_after_ticks: 0,
-        })
+        }
+        .checkpoint_backed("dev:scout_car_snaking_corridor")
     }
 
     pub fn new_direct_reverse_order_scenario(
@@ -87,13 +88,14 @@ impl Game {
             "dev:direct_reverse_order",
         );
 
-        Ok(DevScenarioSetup {
+        DevScenarioSetup {
             game,
             player_id,
             units: vec![unit_id],
             goal,
             issue_after_ticks: 0,
-        })
+        }
+        .checkpoint_backed("dev:direct_reverse_order")
     }
 
     pub fn new_scout_car_wall_chokepoint_scenario(
@@ -126,13 +128,14 @@ impl Game {
             "dev:scout_car_wall_chokepoint",
         );
 
-        Ok(DevScenarioSetup {
+        DevScenarioSetup {
             game,
             player_id,
             units,
             goal,
             issue_after_ticks: 0,
-        })
+        }
+        .checkpoint_backed("dev:scout_car_wall_chokepoint")
     }
 
     pub fn new_vehicle_corner_wall_scenario(
@@ -165,13 +168,14 @@ impl Game {
             "dev:vehicle_corner_wall",
         );
 
-        Ok(DevScenarioSetup {
+        DevScenarioSetup {
             game,
             player_id,
             units,
             goal,
             issue_after_ticks: 0,
-        })
+        }
+        .checkpoint_backed("dev:vehicle_corner_wall")
     }
 
     pub fn new_vehicle_small_block_baseline_scenario(
@@ -220,13 +224,14 @@ impl Game {
             "dev:vehicle_small_block_baseline",
         );
 
-        Ok(DevScenarioSetup {
+        DevScenarioSetup {
             game,
             player_id,
             units,
             goal,
             issue_after_ticks: 0,
-        })
+        }
+        .checkpoint_backed("dev:vehicle_small_block_baseline")
     }
 
     pub fn new_factory_zero_gap_perpendicular_scenario(
@@ -263,13 +268,14 @@ impl Game {
             "dev:factory_zero_gap_perpendicular",
         );
 
-        Ok(DevScenarioSetup {
+        DevScenarioSetup {
             game,
             player_id,
             units,
             goal,
             issue_after_ticks: config::TICK_HZ / 2,
-        })
+        }
+        .checkpoint_backed("dev:factory_zero_gap_perpendicular")
     }
 
     pub fn new_tank_trap_line_build_scenario(
@@ -334,13 +340,14 @@ impl Game {
             loadout.starting_oil = 1_000;
         }
 
-        Ok(DevScenarioSetup {
+        DevScenarioSetup {
             game,
             player_id,
             units,
             goal,
             issue_after_ticks: config::TICK_HZ * 30,
-        })
+        }
+        .checkpoint_backed(layout.scenario_id())
     }
 
     pub fn new_tank_trap_pathing_scenario(
@@ -403,13 +410,17 @@ impl Game {
             &format!("dev:tank_trap_pathing_matrix:{}", layout.scenario_case()),
         );
 
-        Ok(DevScenarioSetup {
+        DevScenarioSetup {
             game,
             player_id,
             units,
             goal,
             issue_after_ticks: config::TICK_HZ,
-        })
+        }
+        .checkpoint_backed(&format!(
+            "dev:tank_trap_pathing_matrix:{}",
+            layout.scenario_case()
+        ))
     }
 
     pub fn new_entrenchment_inspection_scenario(
@@ -516,13 +527,14 @@ impl Game {
         let player_ids = game.state.player_ids();
         game.refresh_trench_memory(&player_ids);
 
-        Ok(DevScenarioSetup {
+        DevScenarioSetup {
             game,
             player_id,
             units: vec![digger, reuse_rifleman, crowded_machine_gunner, enemy_reuser],
             goal: dig_start,
             issue_after_ticks: u32::MAX,
-        })
+        }
+        .checkpoint_backed("dev:entrenchment_inspection")
     }
 }
 
@@ -532,6 +544,14 @@ pub struct DevScenarioSetup {
     pub units: Vec<u32>,
     pub goal: (f32, f32),
     pub issue_after_ticks: u32,
+}
+
+impl DevScenarioSetup {
+    fn checkpoint_backed(mut self, label: &str) -> Result<Self, String> {
+        self.game = Game::checkpoint_backed_start_from_direct_for_setup(self.game, label)
+            .map_err(|err| format!("failed to build checkpoint-backed {label} start: {err}"))?;
+        Ok(self)
+    }
 }
 
 fn build_dev_scenario_game(
