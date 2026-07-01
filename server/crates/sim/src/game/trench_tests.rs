@@ -397,6 +397,34 @@ fn pre_research_infantry_can_occupy_existing_trench_but_cannot_create_new_one() 
 }
 
 #[test]
+fn adjacent_tile_center_infantry_slots_into_existing_trench() {
+    let mut game = empty_flat_game(&players());
+    let trench_pos = game.map.tile_center(24, 24);
+    let trench = game
+        .spawn_trench_for_test(trench_pos.0, trench_pos.1)
+        .expect("trench should seed");
+    let start = game.map.tile_center(25, 24);
+    let rifleman = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, start.0, start.1)
+        .expect("rifleman should spawn");
+    repair_world(&mut game);
+
+    game.tick();
+
+    let unit = game.entities.get(rifleman).expect("rifleman should exist");
+    assert_eq!(
+        active_trench_occupation(unit),
+        Some(trench),
+        "eligible infantry stopped on the neighboring tile center should enter the trench"
+    );
+    assert!(
+        trench_contains_point(game.trenches.all()[0], unit.pos_x, unit.pos_y),
+        "slotting should move the unit inside the trench footprint"
+    );
+}
+
+#[test]
 fn lab_move_clears_trench_occupation_without_waiting_for_tick() {
     let mut game = empty_flat_game(&players());
     let trench_pos = game.map.tile_center(24, 24);
