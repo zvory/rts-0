@@ -250,7 +250,7 @@ fn apply_projectile_hits(
             continue;
         };
         if target.hp == 0
-            || target.is_node()
+            || !target.is_targetable()
             || !teams.is_enemy_owner(projectile.owner, target.owner)
             || projectile.hits_for_current_leg().contains(&id)
         {

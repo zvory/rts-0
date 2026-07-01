@@ -1,8 +1,10 @@
 use super::*;
 use crate::game::entity::{EntityKind, Order, ProdItem, RallyIntent, RallyKind, ScoutPlaneState};
 use crate::game::map::{Map, MapMetadata, CURRENT_MAP_VERSION};
+use crate::game::teams::TeamRelations;
 use crate::game::{Game, PlayerInit, SimCommand};
 use crate::protocol::terrain;
+use std::collections::HashMap;
 
 const EPS: f32 = 0.01;
 
@@ -93,6 +95,28 @@ fn distance(a: (f32, f32), b: (f32, f32)) -> f32 {
 }
 
 #[test]
+fn orbit_transition_spends_one_movement_budget() {
+    let speed = config::SCOUT_PLANE_SPEED_PX_PER_TICK;
+    let orbit_radius = config::SCOUT_PLANE_ORBIT_RADIUS_TILES as f32 * config::TILE_SIZE as f32;
+    let center = (512.0, 512.0);
+    let snapshot = ScoutPlaneSnapshot {
+        x: center.0 - orbit_radius - speed,
+        y: center.1,
+        center,
+        phase: 0.0,
+        orbiting: false,
+    };
+
+    let step = advance_one(snapshot, speed, orbit_radius, 2_048.0);
+
+    assert!(step.orbiting);
+    assert!(
+        distance((snapshot.x, snapshot.y), (step.x, step.y)) <= speed + EPS,
+        "reaching the orbit ring must not also spend a full orbit step"
+    );
+}
+
+#[test]
 fn scout_plane_does_not_stamp_standard_fog_before_aerial_vision_phase() {
     let mut game = empty_game(test_map(40));
     spawn_city_centre(&mut game, 1, 64.0, 64.0);
@@ -111,6 +135,10 @@ fn scout_plane_does_not_stamp_standard_fog_before_aerial_vision_phase() {
     );
     let snapshot = game.snapshot_for(1);
     assert!(
+        snapshot.entities.iter().all(|entity| entity.id != plane),
+        "Phase 3 Scout Planes should stay out of normal player snapshots"
+    );
+    assert!(
         snapshot.entities.iter().all(|entity| entity.id != hidden_enemy),
         "Phase 3 must not let Scout Planes reveal enemies through the generic fog path"
     );
@@ -121,6 +149,13 @@ fn scout_plane_does_not_stamp_standard_fog_before_aerial_vision_phase() {
         Some(0),
         "the enemy tile should remain fogged until Phase 4 adds aerial Scout Plane sight"
     );
+    let full = game.snapshot_full_for(1);
+    let full_plane = full
+        .entities
+        .iter()
+        .find(|entity| entity.id == plane)
+        .expect("full-world diagnostics should still include hidden plane state");
+    assert!(full_plane.scout_plane.is_some());
 }
 
 #[test]
@@ -359,6 +394,7 @@ fn combat_and_hold_commands_do_not_apply_to_plane() {
         },
     );
     game.enqueue(1, SimCommand::HoldPosition { units: vec![plane] });
+    game.enqueue(1, SimCommand::Stop { units: vec![plane] });
     game.tick();
 
     let plane_entity = game.state.entities.get(plane).expect("plane");
@@ -387,6 +423,46 @@ fn combat_and_hold_commands_do_not_apply_to_plane() {
             Order::Attack(_)
         ),
         "Scout Planes should not be legal explicit attack targets"
+    );
+}
+
+#[test]
+fn artillery_area_damage_ignores_hidden_scout_plane() {
+    let mut game = empty_game(test_map(40));
+    let plane = spawn_plane(&mut game, 1, 160.0, 160.0);
+    let rifleman = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, 160.0, 160.0)
+        .expect("rifleman should spawn");
+    let plane_hp = game.state.entities.get(plane).expect("plane").hp;
+    let rifleman_hp = game.state.entities.get(rifleman).expect("rifleman").hp;
+    let teams = TeamRelations::from_player_teams(
+        game.state
+            .players
+            .iter()
+            .map(|player| (player.id, player.team_id)),
+    );
+    let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
+
+    game.state
+        .artillery_shells
+        .schedule(2, 0, 160.0, 160.0, 0);
+    game.state.artillery_shells.resolve_due(
+        &mut game.state.entities,
+        &teams,
+        &game.state.fog,
+        &mut events,
+        config::ARTILLERY_SHELL_DELAY_TICKS,
+    );
+
+    assert_eq!(game.state.entities.get(plane).expect("plane").hp, plane_hp);
+    assert!(
+        game.state
+            .entities
+            .get(rifleman)
+            .is_none_or(|entity| entity.hp < rifleman_hp),
+        "the same shell should still damage ordinary targetable units"
     );
 }
 

@@ -11,7 +11,7 @@ use crate::game::{ability::AbilityKind, entity::EntityKind};
 /// item queued and retry next tick. Supply was already reserved on enqueue, so spawning does not
 /// re-charge it. Cost was charged at enqueue too.
 pub(crate) fn production_system(
-    _map: &Map,
+    map: &Map,
     entities: &mut EntityStore,
     players: &mut [PlayerState],
     coordinator: &mut MoveCoordinator<'_>,
@@ -83,7 +83,7 @@ pub(crate) fn production_system(
             // the side of the building facing the rally plan.
             let rally_plan = entities.get(id).map(|b| b.rally_plan()).unwrap_or_default();
             if unit == EntityKind::ScoutPlane {
-                if scout_plane::launch_from_building(_map, entities, owner, id).is_some() {
+                if scout_plane::launch_from_building(map, entities, owner, id).is_some() {
                     if let Some(b) = entities.get_mut(id) {
                         b.remove_front_production();
                     }

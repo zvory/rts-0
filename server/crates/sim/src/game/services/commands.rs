@@ -547,6 +547,9 @@ pub(in crate::game) fn apply_commands(
                 };
                 for id in units {
                     if unit_can_accept_player_command(entities, player, id) {
+                        if is_scout_plane(entities, id) {
+                            continue;
+                        }
                         entities.release_miner(id);
                         if let Some(e) = entities.get_mut(id) {
                             e.clear_orders();

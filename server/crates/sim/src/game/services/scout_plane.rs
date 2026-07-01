@@ -178,6 +178,7 @@ fn advance_one(
     );
     let mut phase = snapshot.phase;
     let mut orbiting = snapshot.orbiting;
+    let mut budget = speed;
     let mut facing = None;
 
     if !orbiting {
@@ -185,12 +186,13 @@ fn advance_one(
         let dy = center.1 - y;
         let dist = (dx * dx + dy * dy).sqrt();
         if dist.is_finite() && dist > orbit_radius {
-            let travel = speed.min(dist - orbit_radius);
+            let travel = budget.min(dist - orbit_radius);
             if travel > 0.0 {
                 let inv = 1.0 / dist;
                 x = (x + dx * inv * travel).clamp(0.0, world_max);
                 y = (y + dy * inv * travel).clamp(0.0, world_max);
                 facing = Some(dy.atan2(dx));
+                budget = (budget - travel).max(0.0);
             }
             orbiting = dist - travel <= orbit_radius + ORBIT_PHASE_EPS;
             if orbiting {
@@ -212,13 +214,18 @@ fn advance_one(
         let dx = ring.0 - x;
         let dy = ring.1 - y;
         let dist = (dx * dx + dy * dy).sqrt();
-        if dist.is_finite() && dist > speed {
-            let inv = 1.0 / dist;
-            x = (x + dx * inv * speed).clamp(0.0, world_max);
-            y = (y + dy * inv * speed).clamp(0.0, world_max);
-            facing = Some(dy.atan2(dx));
-        } else {
-            phase = normalize_angle(phase + speed / orbit_radius);
+        if dist.is_finite() && dist > ORBIT_PHASE_EPS {
+            let travel = budget.min(dist);
+            if travel > 0.0 {
+                let inv = 1.0 / dist;
+                x = (x + dx * inv * travel).clamp(0.0, world_max);
+                y = (y + dy * inv * travel).clamp(0.0, world_max);
+                facing = Some(dy.atan2(dx));
+                budget = (budget - travel).max(0.0);
+            }
+        }
+        if budget > 0.0 {
+            phase = normalize_angle(phase + budget / orbit_radius);
             x = (center.0 + phase.cos() * orbit_radius).clamp(0.0, world_max);
             y = (center.1 + phase.sin() * orbit_radius).clamp(0.0, world_max);
             facing = Some(normalize_angle(phase + std::f32::consts::FRAC_PI_2));

@@ -173,7 +173,7 @@ fn apply_magic_anchor_stationary_pull(
     let world_max = map.world_size_px() - 0.01;
     for id in entities.ids() {
         let Some((kind, x, y, facing, speed, resistance)) = entities.get(id).and_then(|e| {
-            if !e.is_unit() || !e.path_is_empty() {
+            if !e.is_unit() || e.kind == EntityKind::ScoutPlane || !e.path_is_empty() {
                 return None;
             }
             let profile = standability::footing_profile(e);
