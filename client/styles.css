@@ -2729,7 +2729,25 @@ input[type="text"]:focus {
   padding: 8px;
   border-radius: var(--radius);
   pointer-events: auto; /* clickable: pan / move commands */
-  line-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  line-height: normal;
+}
+.game-timer {
+  min-height: 24px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: rgba(15, 14, 12, 0.72);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  line-height: 1;
+  text-align: center;
+  text-shadow: 1px 1px 0 #191710;
 }
 #minimap {
   display: block;

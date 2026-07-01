@@ -32,7 +32,7 @@
                 pre-join product controls.
         Game:   #game-screen, #viewport (Pixi canvas mounts here),
                 #hud, #res-steel, #res-oil, #res-supply,
-                #minimap (canvas), #selection-area, #control-group-tabs,
+                #game-timer, #minimap (canvas), #selection-area, #control-group-tabs,
                 #selected-panel, #command-card,
                 #game-menu, #settings-button, #settings-menu, #pointer-lock-toggle,
                 #give-up-open, #give-up-confirm, #give-up-cancel, #give-up-confirm-button,
@@ -173,6 +173,7 @@
 
         <!-- Bottom-left minimap -->
         <div id="minimap-wrap">
+          <div id="game-timer" class="game-timer" aria-label="Game time">00:00</div>
           <canvas id="minimap" width="242" height="242"></canvas>
         </div>
 

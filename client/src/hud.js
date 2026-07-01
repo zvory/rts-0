@@ -113,6 +113,20 @@ export function groupCooldownClocks(
   });
 }
 
+export function formatGameTime(tick, tickHz = TICK_HZ) {
+  const safeTick = Number.isFinite(tick) ? Math.max(0, Math.trunc(tick)) : 0;
+  const safeTickHz = Number.isFinite(tickHz) && tickHz > 0 ? tickHz : TICK_HZ;
+  const totalSeconds = Math.floor(safeTick / safeTickHz);
+  const seconds = totalSeconds % 60;
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  const minutes = totalMinutes % 60;
+  const hours = Math.floor(totalMinutes / 60);
+  const two = (value) => String(value).padStart(2, "0");
+  return hours > 0
+    ? `${hours}:${two(minutes)}:${two(seconds)}`
+    : `${two(minutes)}:${two(seconds)}`;
+}
+
 /**
  * The bottom/top DOM HUD: resources, selected panel, and the command card.
  *
@@ -143,6 +157,7 @@ export class HUD {
     this.elSteel = rootEl.querySelector("#res-steel");
     this.elOil = rootEl.querySelector("#res-oil");
     this.elSupply = rootEl.querySelector("#res-supply");
+    this.elGameTimer = rootEl.querySelector("#game-timer");
     // Rebuild the static shell once so the top bar, replay rows, and command-card
     // hovers all use the shared resource icon definitions.
     if (this.elHud) {
@@ -167,6 +182,8 @@ export class HUD {
     this._resSig = null;
     // Signature for the inert control-group tabs.
     this._controlGroupSig = null;
+    this._gameTimerSig = null;
+    this._renderGameTimer();
   }
 
   /**
@@ -175,6 +192,7 @@ export class HUD {
    */
   update(frameViews = null, { profiler = null } = {}) {
     this._profiler = profiler || null;
+    this._renderGameTimer();
     this._renderResources();
     this._renderControlGroupTabs(frameViews);
     this._renderSelectedPanel(frameViews);
@@ -190,11 +208,16 @@ export class HUD {
     }
     if (this.elCommand) this.elCommand.innerHTML = "";
     if (this.elSupply) this.elSupply.classList.remove("supply-capped");
+    if (this.elGameTimer) {
+      this.elGameTimer.textContent = "00:00";
+      this.elGameTimer.title = "Game time 00:00";
+    }
     this._cardSig = null;
     this._trainRoundRobin.clear();
     this._cancelRoundRobin.clear();
     this._resSig = null;
     this._controlGroupSig = null;
+    this._gameTimerSig = null;
   }
 
   _issueCommand(command, options = {}) {
@@ -208,6 +231,15 @@ export class HUD {
 
   _intent() {
     return this.clientIntent;
+  }
+
+  _renderGameTimer() {
+    if (!this.elGameTimer) return;
+    const text = formatGameTime(this.state?.tick ?? 0, TICK_HZ);
+    if (text === this._gameTimerSig) return;
+    this.elGameTimer.textContent = text;
+    this.elGameTimer.title = `Game time ${text}`;
+    this._gameTimerSig = text;
   }
 
   // --- Resource / supply bar -------------------------------------------------
