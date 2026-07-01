@@ -1,7 +1,5 @@
 use crate::config;
-use crate::game::entity::{
-    EntityKind, EntityStore, OrderIntent, ScoutPlaneState, MAX_QUEUED_ORDERS,
-};
+use crate::game::entity::{EntityKind, EntityStore, OrderIntent, MAX_QUEUED_ORDERS};
 use crate::game::map::Map;
 
 const TWO_PI: f32 = std::f32::consts::PI * 2.0;
@@ -102,11 +100,7 @@ pub(crate) fn advance_scout_planes(map: &Map, entities: &mut EntityStore) {
             if let Some(facing) = step.facing {
                 plane.set_facing(facing);
             }
-            if let Some(state) = plane.scout_plane_state_mut() {
-                state.orbit_center = step.center;
-                state.orbit_phase = step.phase;
-                state.orbiting = step.orbiting;
-            }
+            let _ = plane.update_scout_plane_runtime(step.center, step.phase, step.orbiting);
         }
         if step.orbiting {
             promote_next_queued_center(map, entities, id);
@@ -118,9 +112,7 @@ fn ensure_state(entities: &mut EntityStore, id: u32) {
     let Some(plane) = entities.get_mut(id) else {
         return;
     };
-    if plane.kind == EntityKind::ScoutPlane && plane.scout_plane.is_none() {
-        plane.scout_plane = Some(ScoutPlaneState::launched_at(plane.pos_x, plane.pos_y));
-    }
+    plane.ensure_scout_plane_state();
 }
 
 #[derive(Clone, Copy)]
@@ -196,12 +188,12 @@ fn advance_one(
             }
             orbiting = dist - travel <= orbit_radius + ORBIT_PHASE_EPS;
             if orbiting {
-                phase = (y - center.1).atan2(x - center.0);
+                phase = phase_from_center((x, y), center);
             }
         } else {
             orbiting = true;
             if dist.is_finite() && dist > ORBIT_PHASE_EPS {
-                phase = dy.atan2(dx);
+                phase = phase_from_center((x, y), center);
             }
         }
     }
@@ -273,6 +265,10 @@ fn normalize_angle(angle: f32) -> f32 {
     } else {
         0.0
     }
+}
+
+fn phase_from_center(point: (f32, f32), center: (f32, f32)) -> f32 {
+    normalize_angle((point.1 - center.1).atan2(point.0 - center.0))
 }
 
 #[cfg(test)]

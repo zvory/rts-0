@@ -46,6 +46,12 @@ fn players() -> [PlayerInit; 2] {
     ]
 }
 
+fn players_with_ai_opponent() -> [PlayerInit; 2] {
+    let mut players = players();
+    players[1].is_ai = true;
+    players
+}
+
 fn empty_game(map: Map) -> Game {
     let players = players();
     let mut game = Game::new_direct_start_for_test(
@@ -117,6 +123,29 @@ fn orbit_transition_spends_one_movement_budget() {
 }
 
 #[test]
+fn inside_radius_retarget_uses_nearest_orbit_phase() {
+    let speed = config::SCOUT_PLANE_SPEED_PX_PER_TICK;
+    let orbit_radius = config::SCOUT_PLANE_ORBIT_RADIUS_TILES as f32 * config::TILE_SIZE as f32;
+    let center = (512.0, 512.0);
+    let snapshot = ScoutPlaneSnapshot {
+        x: center.0 - orbit_radius * 0.5,
+        y: center.1,
+        center,
+        phase: 0.0,
+        orbiting: false,
+    };
+
+    let step = advance_one(snapshot, speed, orbit_radius, 2_048.0);
+
+    assert!(step.orbiting);
+    assert!(
+        step.x < snapshot.x,
+        "a plane already inside the orbit radius should fly to the nearest ring point"
+    );
+    assert!((step.phase - std::f32::consts::PI).abs() <= EPS);
+}
+
+#[test]
 fn scout_plane_does_not_stamp_standard_fog_before_aerial_vision_phase() {
     let mut game = empty_game(test_map(40));
     spawn_city_centre(&mut game, 1, 64.0, 64.0);
@@ -156,6 +185,35 @@ fn scout_plane_does_not_stamp_standard_fog_before_aerial_vision_phase() {
         .find(|entity| entity.id == plane)
         .expect("full-world diagnostics should still include hidden plane state");
     assert!(full_plane.scout_plane.is_some());
+}
+
+#[test]
+fn hidden_scout_plane_does_not_keep_ai_player_alive() {
+    let players = players_with_ai_opponent();
+    let mut game = Game::new_direct_start_for_test(
+        &players,
+        Some((1_000, 1_000)),
+        0x5150_7004,
+        None,
+        Some(test_map(40)),
+        test_metadata(),
+    );
+    let ai_units: Vec<u32> = game
+        .state
+        .entities
+        .iter()
+        .filter(|entity| entity.owner == 2 && entity.is_unit())
+        .map(|entity| entity.id)
+        .collect();
+    for id in ai_units {
+        game.state.entities.remove(id);
+    }
+    spawn_plane(&mut game, 2, 640.0, 640.0);
+
+    assert!(
+        !game.alive_players().contains(&2),
+        "hidden non-targetable planes must not satisfy the AI survival-unit predicate"
+    );
 }
 
 #[test]

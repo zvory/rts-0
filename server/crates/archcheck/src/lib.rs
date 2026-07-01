@@ -85,6 +85,7 @@ const ENTITY_FIELDS: &[&str] = &[
     "resource_node",
     "ability_cooldowns",
     "ability_uses_remaining",
+    "scout_plane",
 ];
 const PLAYER_STATE_FIELD_WRITE_APPROVED_PATHS: &[&str] = &["player_state.rs"];
 const PLAYER_STATE_FIELDS: &[&str] = &["steel", "oil", "supply_used", "supply_cap", "score"];

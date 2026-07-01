@@ -57,6 +57,21 @@ impl ScoutPlaneState {
         self.orbiting = false;
         true
     }
+
+    pub(in crate::game) fn update_runtime(
+        &mut self,
+        orbit_center: (f32, f32),
+        orbit_phase: f32,
+        orbiting: bool,
+    ) -> bool {
+        if !orbit_center.0.is_finite() || !orbit_center.1.is_finite() || !orbit_phase.is_finite() {
+            return false;
+        }
+        self.orbit_center = orbit_center;
+        self.orbit_phase = orbit_phase;
+        self.orbiting = orbiting;
+        true
+    }
 }
 
 /// Reserved for future round-trip harvesting if attached mining is replaced.

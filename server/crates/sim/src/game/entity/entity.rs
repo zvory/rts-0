@@ -694,14 +694,39 @@ impl Entity {
         self.scout_plane.as_ref()
     }
 
+    #[cfg(test)]
     pub(in crate::game) fn scout_plane_state_mut(&mut self) -> Option<&mut ScoutPlaneState> {
         self.scout_plane.as_mut()
     }
 
     pub(crate) fn scout_plane_private_details(&self) -> Option<((f32, f32), u8)> {
+        if self.kind != EntityKind::ScoutPlane {
+            return None;
+        }
         self.scout_plane
             .as_ref()
             .map(|state| (state.orbit_center, state.fuel_oil))
+    }
+
+    pub(in crate::game) fn ensure_scout_plane_state(&mut self) {
+        if self.kind == EntityKind::ScoutPlane && self.scout_plane.is_none() {
+            self.scout_plane = Some(ScoutPlaneState::launched_at(self.pos_x, self.pos_y));
+        }
+    }
+
+    pub(in crate::game) fn update_scout_plane_runtime(
+        &mut self,
+        orbit_center: (f32, f32),
+        orbit_phase: f32,
+        orbiting: bool,
+    ) -> bool {
+        if self.kind != EntityKind::ScoutPlane {
+            return false;
+        }
+        let Some(state) = self.scout_plane.as_mut() else {
+            return false;
+        };
+        state.update_runtime(orbit_center, orbit_phase, orbiting)
     }
 
     pub(in crate::game) fn retarget_scout_plane(&mut self, x: f32, y: f32) -> bool {

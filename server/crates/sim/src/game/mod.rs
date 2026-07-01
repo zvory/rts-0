@@ -344,8 +344,7 @@ impl Game {
                 }
                 if p.is_ai {
                     services::world_query::owned_units(&self.state.entities, p.id)
-                        .next()
-                        .is_some()
+                        .any(|entity| entity.hp > 0 && entity.is_targetable())
                 } else {
                     true
                 }
