@@ -10,15 +10,15 @@ itself.
 Scout Planes give Kriegsia a paid, late-early scouting tool from the City Centre once the player
 has committed to Gun Works or Vehicle Works tech. The plane should create temporary strategic
 information without becoming a combat unit, blocker, or target. It is expensive enough to matter,
-costs ongoing oil attention, and is limited to one active plane per player.
+costs ongoing oil attention, and is limited to one active or in-production plane per player.
 
 ## Unit Brief
 
 - Name: Scout Plane.
 - Visual reference: Focke-Wulf Fw 189-style twin-boom scout aircraft.
 - Role: persistent aerial reconnaissance.
-- Player-facing description: "Launch a scout plane that circles a target area and reveals fog while
-  consuming oil."
+- Player-facing description: "Build a scout plane that launches from the City Centre, circles the
+  rally area, and reveals fog while consuming oil."
 - Strategic purpose: reveal expansions, artillery targets, attack paths, and enemy tech without
   committing a ground scout through blockers.
 - Counterplay: deny or smoke the scouted area, pressure oil income, or exploit the player's spent
@@ -27,6 +27,8 @@ costs ongoing oil attention, and is limited to one active plane per player.
   authorization.
 - Unusual interactions:
   - Selectable and commandable despite being non-combat and non-colliding.
+  - Produced like a normal City Centre unit, but flies directly to an aerial orbit instead of using
+    ground pathing.
   - Reveals through terrain and building line-of-sight blockers.
   - Smoke still blocks Scout Plane vision.
   - Enemy players can see the plane only while it is inside their current vision.
@@ -34,18 +36,22 @@ costs ongoing oil attention, and is limited to one active plane per player.
 
 ## Rules And Balance
 
-- Spawn source: selected completed City Centre.
+- Spawn source: selected completed City Centre production queue.
 - Unlock requirement: at least one completed Gun Works or completed Vehicle Works owned by the
   player.
 - Spawn cost: 50 Steel and 50 Oil.
-- Active limit: one Scout Plane per player.
+- Build time: 20 seconds, or 600 ticks at 30 Hz.
+- Build hotkeys: grid hotkey `Z`; RTS classic hotkey `S`.
+- Active limit: one active or in-production Scout Plane per player.
 - If the player already has an active Scout Plane, the City Centre Scout Plane button should select
-  the existing plane and pan the camera to it instead of spending resources or spawning another.
+  the existing plane and pan the camera to it instead of spending resources or queueing another.
+- If the player already has a Scout Plane in production, no second Scout Plane should be queued.
 - Supply impact: 0 Supply.
-- Build time: none; the plane spawns immediately when the command is accepted.
-- Hit points: no normal HP. It cannot be damaged or killed by combat.
-- Armor/status: non-attackable, non-repairable, non-harvestable, non-garrisonable, immune to all
-  combat targeting and collision effects.
+- Production interruption: use existing production behavior if the producing City Centre is
+  destroyed before completion; do not add Scout Plane-specific cancellation or refund rules.
+- Hit points: 40 HP.
+- Armor/status: non-targetable by attacks, non-repairable, non-harvestable, non-garrisonable, immune
+  to combat targeting and collision effects.
 - Sight range: 12 tiles.
 - Movement speed: 2 world pixels per tick.
 - Movement semantics: flying, ignores terrain pathing, ignores unit/building collision, and does
@@ -55,36 +61,46 @@ costs ongoing oil attention, and is limited to one active plane per player.
 - AI availability: deferred. AI should not launch or command Scout Planes in the first
   implementation unless a later phase explicitly adds that behavior.
 
-## Launch And Movement
+## Production, Launch, And Movement
 
-- The player selects a City Centre, clicks the Scout Plane command-card button, then clicks any
-  world point.
-- Target range is unlimited; the player may target any point on the map.
-- The plane spawns at the selected City Centre's world position.
-- The plane's lifetime starts when it spawns.
-- The plane flies from the selected City Centre toward the clicked point.
-- Once it reaches the target area, it circles the clicked point.
+- The player selects a City Centre and clicks the Scout Plane command-card button or presses the
+  resolved hotkey. The command queues Scout Plane production immediately if prerequisites and
+  resources are satisfied; it does not enter world-point targeting mode.
+- When production completes, the plane launches automatically from above the producing City
+  Centre's world position.
+- The plane's lifetime and oil upkeep start when it launches.
+- The plane flies from the City Centre toward that City Centre's first rally point.
+- If the City Centre has no rally point, the plane's initial orbit center is the City Centre's world
+  position.
+- Queued rally stages are not required for the first implementation; the first rally point is the
+  launch destination.
+- Once the plane reaches the rally area, it circles the rally point.
 - Orbit radius: 4 tiles.
 - The plane remains selectable while active.
+- Direct selection, box selection, and control groups should treat the plane like a normal friendly
+  unit.
 - A move command issued to the selected plane retargets its orbit center.
-- Recommended first implementation selection behavior: direct-click selectable and control-groupable,
-  but excluded from ordinary drag-box ground-army selection so it does not pollute normal army
-  control. This is an implementation simplicity decision and may be revised if the existing
-  selection system makes another approach cleaner.
+- Queued move commands append later orbit centers using the existing queued-move command semantics.
+- Mixed selections should preserve normal land-unit control: land units receive ordinary land
+  commands, while any selected Scout Plane receives only aerial retarget/dismiss commands that apply
+  to the plane.
 
 ## Oil Upkeep And Dismissal
 
 - Upkeep is one Pump Jack worth of oil income.
 - Current Pump Jack rate is 2 Oil every 40 ticks, equivalent to 0.05 Oil per tick or 1.5 Oil per
   second at 30 Hz.
-- First-pass upkeep should be implemented as a discrete 2 Oil charge every 40 ticks, or an
-  equivalent accumulator that produces the same rate.
-- The Scout Plane has a 10-second oil-starvation grace buffer.
-- If upkeep is due and the player cannot pay, the plane consumes grace time instead of disappearing
-  immediately.
-- If the player successfully pays upkeep again, the grace buffer refills to 10 seconds.
-- If the player remains unable to pay until the grace buffer is exhausted, the Scout Plane is
-  dismissed automatically.
+- Upkeep starts immediately when the plane launches.
+- Resource payments should be integer Oil deductions while preserving the one-Pump-Jack average
+  upkeep rate. A simple acceptable implementation is 1 Oil every 20 ticks.
+- The Scout Plane has a 5-second fuel tank. At the target upkeep rate this is 7.5 Oil worth of
+  reserve, rounded up to 8 Oil for integer-resource accounting.
+- If upkeep is due and the player has enough Oil, spend the Oil and keep the fuel tank full.
+- If upkeep is due and the player has zero Oil, the fuel tank drains for the unpaid upkeep time.
+- If the player gains Oil again before the fuel tank reaches zero, the plane should spend available
+  Oil rapidly, refill the fuel tank, and continue flying.
+- If the fuel tank reaches zero, the Scout Plane is dismissed automatically.
+- Do not show a special warning before fuel dismissal in the first implementation.
 - The player may manually dismiss the Scout Plane at any time with its cancel/dismiss command.
 - Dismissal removes the plane and stops its oil upkeep.
 
@@ -108,15 +124,21 @@ costs ongoing oil attention, and is limited to one active plane per player.
   Vehicle Works.
 - Disabled reason: "Requires Gun Works or Vehicle Works."
 - Button cost display: 50 Steel / 50 Oil.
-- Button behavior with no active plane: enter world-point targeting mode.
+- Button label should follow current production-button conventions; expected label is "Scout
+  Plane".
+- Command-card placement: City Centre grid slot `Z`.
+- Hotkeys: grid profile `Z`; RTS classic profile `S`.
+- Button behavior with no active or in-production plane: queue Scout Plane production from the
+  selected City Centre.
 - Button behavior with an active plane: select the existing plane and pan the camera to it.
+- Button behavior with a Scout Plane already in production: do not queue another Scout Plane.
 - Plane command card should expose:
   - Move/retarget orbit center.
   - Cancel/Dismiss.
 - Plane should not expose Attack, Hold Position, Stop, train, build, harvest, repair, setup, rally,
   or autocast commands unless a later requirement changes this.
-- Exact hotkey, icon text, tooltip copy, and command-card slot are deferred to implementation, but
-  the button should not conflict with existing high-use City Centre controls.
+- Exact icon art and tooltip copy are deferred to implementation, but the button should use the
+  specified hotkeys and command-card slot.
 
 ## Visual And Audio Direction
 
@@ -131,14 +153,13 @@ costs ongoing oil attention, and is limited to one active plane per player.
 
 ## Contract Notes For Later Phases
 
-- This feature likely needs a new ability id, command-card affordance, and protocol mirror entry if
-  it uses the existing generic ability command path.
-- Existing ability handling is currently unit-carrier oriented. A later design phase must decide
-  whether Scout Plane is a building-cast ability, a new explicit `callScoutPlane` command, or a
-  generalized selectable aerial entity command path.
-- The active plane should probably be modeled as a transient world entity or ability object rather
-  than a normal trainable unit. The final implementation choice must preserve selection, move
-  commands, fog stamping, enemy projection, replay/checkpoint behavior, and dismissal.
+- Scout Plane is a produced City Centre unit, not a targeted ability.
+- The active plane should be modeled as a selectable world entity with special non-targetable,
+  non-colliding aerial movement and upkeep rules. The final implementation choice must preserve
+  selection, move commands, fog stamping, enemy projection, replay/checkpoint behavior, and
+  dismissal.
+- Protocol and client command-card work must account for the one-active-or-in-production limit and
+  the City Centre button behavior that selects/pans to an existing active plane.
 - Fog changes must update the authoritative fog/projection design if Scout Plane vision introduces
   a new "aerial sight through blockers but not smoke" category.
 - Protocol changes must update Rust DTOs, JavaScript mirrors, compact codes if used, and
@@ -152,35 +173,40 @@ Focused implementation verification should cover:
 
 - City Centre Scout Plane button is disabled without Gun Works or Vehicle Works and enabled when
   either completed building exists.
-- Launch spends 50 Steel and 50 Oil and spawns at the selected City Centre.
-- Launch is rejected without resources and emits the normal resource shortage feedback.
-- Only one active Scout Plane exists per player.
+- Queueing production spends 50 Steel and 50 Oil and completes after 600 ticks.
+- Completion launches the plane from above the selected City Centre.
+- The completed plane flies to the City Centre's first rally point, or orbits above the City Centre
+  if no rally point exists.
+- Production is rejected without resources and emits the normal resource shortage feedback.
+- Only one active or in-production Scout Plane exists per player.
 - Pressing the City Centre button with an active Scout Plane selects and pans to the existing plane.
 - Move command retargets the orbit center.
 - Plane moves at 2 px/tick and circles at 4-tile orbit radius.
 - Plane reveals 12 tiles from its current position.
 - Plane vision ignores terrain/building blockers but not smoke.
 - Enemy sees the plane only when the plane is in enemy current vision.
-- Plane cannot be attacked, damaged, repaired, blocked, or collided with.
+- Plane has 40 HP but cannot be targeted by attacks, repaired, blocked, or collided with.
 - Plane persists after the launching City Centre is destroyed.
-- Upkeep drains at one Pump Jack worth of oil and auto-dismisses only after the 10-second grace
-  buffer is exhausted at zero oil.
+- Producing City Centre destruction before completion follows existing production behavior.
+- Upkeep starts immediately on launch, drains at one Pump Jack worth of oil, uses integer Oil
+  payments, and auto-dismisses only after the 5-second fuel tank is exhausted at zero oil.
+- Oil income during fuel drain refills the plane and keeps it flying.
 - Manual dismiss removes the plane and stops upkeep.
 - Replay/checkpoint/lab/spectator projection remains fog-safe.
 
 ## Patch Notes Draft
 
-- Added a City Centre Scout Plane call-in unlocked by either Gun Works or Vehicle Works.
-- Scout Plane costs 50 Steel / 50 Oil, consumes one Pump Jack worth of Oil while active, and is
-  limited to one per player.
-- Scout Plane provides 12-tile aerial vision while circling a target point, ignoring terrain and
-  building blockers but not smoke.
+- Added a City Centre Scout Plane unlocked by either Gun Works or Vehicle Works.
+- Scout Plane costs 50 Steel / 50 Oil, takes 20 seconds to build, consumes one Pump Jack worth of
+  Oil while active, and is limited to one active or in-production plane per player.
+- Scout Plane automatically launches from the City Centre to its rally point, then provides 12-tile
+  aerial vision while orbiting, ignoring terrain and building blockers but not smoke.
 - Scout Plane can be selected, retargeted, and dismissed, but cannot fight or be attacked.
 
 ## Non-Goals
 
-- Do not add aircraft combat, anti-air weapons, plane HP, crashes, repair, veterancy, transport, or
-  bombing behavior in the first Scout Plane implementation.
+- Do not add aircraft combat, anti-air weapons, crashes, repair, veterancy, transport, or bombing
+  behavior in the first Scout Plane implementation.
 - Do not make the plane block movement, reserve collision, or interact with ground pathfinding.
 - Do not let AI launch or manage Scout Planes unless a later AI-specific requirement adds it.
 - Do not treat this requirements document as implementation approval for code, protocol, balance,
