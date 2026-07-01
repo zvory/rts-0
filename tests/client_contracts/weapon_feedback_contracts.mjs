@@ -71,6 +71,48 @@ const start = {
 
 {
   const state = new GameState(start);
+  state.applySnapshot({
+    tick: 21,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 0,
+    supplyCap: 10,
+    entities: [
+      { id: 15, owner: 1, kind: KIND.TANK, x: 100, y: 100, hp: 180, maxHp: 180, state: STATE.ATTACK, weaponFacing: 0 },
+      { id: 16, owner: 2, kind: KIND.WORKER, x: 160, y: 100, hp: 40, maxHp: 40, state: STATE.IDLE },
+    ],
+    events: [{ e: EVENT.ATTACK, from: 15, to: 16, toPos: [160, 100], weaponKind: WEAPON_KIND.TANK_COAX }],
+  });
+  assert(state.liveMuzzleFlashes(performance.now())[0]?.weaponKind === WEAPON_KIND.TANK_COAX, "tank coax weapon hint is retained on muzzle feedback");
+  assert(state.weaponRecoil(15, KIND.TANK, performance.now()) === 0, "tank coax attack events do not start Tank cannon recoil");
+}
+
+{
+  const state = new GameState(start);
+  state.applySnapshot({
+    tick: 22,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 0,
+    supplyCap: 10,
+    entities: [
+      { id: 25, owner: 1, kind: KIND.TANK, x: 100, y: 100, hp: 180, maxHp: 180, state: STATE.ATTACK, weaponFacing: 0 },
+      { id: 26, owner: 2, kind: KIND.TANK, x: 160, y: 100, hp: 180, maxHp: 180, state: STATE.IDLE },
+    ],
+    events: [
+      { e: EVENT.ATTACK, from: 25, to: 26, toPos: [160, 100], weaponKind: WEAPON_KIND.TANK_CANNON },
+      { e: EVENT.ATTACK, from: 25, to: 26, toPos: [160, 100], weaponKind: WEAPON_KIND.TANK_COAX },
+    ],
+  });
+  const flashes = state.liveMuzzleFlashes(performance.now());
+  assert(flashes.length === 2, "same-tick cannon and coax events both keep muzzle feedback");
+  assert(flashes[0].weaponKind === WEAPON_KIND.TANK_CANNON, "same-tick cannon feedback stays first");
+  assert(flashes[1].weaponKind === WEAPON_KIND.TANK_COAX, "same-tick coax feedback stays second");
+  assert(state.weaponRecoil(25, KIND.TANK, performance.now()) > 0, "same-tick cannon recoil is preserved when followed by coax feedback");
+}
+
+{
+  const state = new GameState(start);
   state.weaponRecoilById.set(91, performance.now() - 500);
   assert(
     state.weaponRecoil(91, KIND.RIFLEMAN, performance.now(), WEAPON_KIND.ARTILLERY_GUN) > 0,

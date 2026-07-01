@@ -1,6 +1,6 @@
 # Phase 0.5 - Derived-State Wipe Harness
 
-Status: Not started.
+Status: Done.
 
 ## Scope
 

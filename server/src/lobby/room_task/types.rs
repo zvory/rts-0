@@ -119,6 +119,7 @@ pub(in crate::lobby) enum DevScenarioId {
     PanzerfaustTargetDeath,
     PanzerfaustEntrenchedRange,
     PanzerfaustMethamphetamines,
+    TankCoaxInspection,
 }
 
 impl DevScenarioId {
@@ -140,6 +141,7 @@ impl DevScenarioId {
             "panzerfaust_target_death" => Some(Self::PanzerfaustTargetDeath),
             "panzerfaust_entrenched_range" => Some(Self::PanzerfaustEntrenchedRange),
             "panzerfaust_methamphetamines" => Some(Self::PanzerfaustMethamphetamines),
+            "tank_coax_inspection" => Some(Self::TankCoaxInspection),
             _ => None,
         }
     }
@@ -162,6 +164,7 @@ impl DevScenarioId {
             Self::PanzerfaustTargetDeath => "panzerfaust_target_death",
             Self::PanzerfaustEntrenchedRange => "panzerfaust_entrenched_range",
             Self::PanzerfaustMethamphetamines => "panzerfaust_methamphetamines",
+            Self::TankCoaxInspection => "tank_coax_inspection",
         }
     }
 }

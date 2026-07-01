@@ -1,3 +1,6 @@
+use super::super::activation::{
+    secondary_weapon_target_passes_activation, SecondaryWeaponActivationConstraints,
+};
 use super::super::acquisition::{
     direct_fire_target_legal, DirectFireLegality, DirectFireVisibility,
 };
@@ -27,6 +30,33 @@ fn direct_fire_legal(
         (attacker_entity.pos_x, attacker_entity.pos_y),
         target,
         legality,
+    )
+}
+
+fn secondary_weapon_activation_legal(
+    map: &Map,
+    entities: &EntityStore,
+    smokes: &SmokeCloudStore,
+    attacker: u32,
+    target: u32,
+    constraints: SecondaryWeaponActivationConstraints,
+) -> bool {
+    let teams = default_team_relations();
+    let fog = visible_fog(map, entities);
+    let los = LineOfSight::with_smoke(map, smokes);
+    let attacker_entity = entities.get(attacker).expect("attacker should exist");
+    secondary_weapon_target_passes_activation(
+        map,
+        entities,
+        &teams,
+        &los,
+        &fog,
+        smokes,
+        attacker,
+        attacker_entity.owner,
+        (attacker_entity.pos_x, attacker_entity.pos_y),
+        target,
+        constraints,
     )
 }
 
@@ -216,4 +246,97 @@ fn intended_target_mode_keeps_tank_traps_and_pump_jacks_non_blocking() {
             "{blocker_kind:?} should not block intended direct fire",
         );
     }
+}
+
+#[test]
+fn secondary_weapon_activation_requires_range_and_turret_arc() {
+    let map = open_map(12);
+    let mut entities = EntityStore::new();
+    let attacker_pos = map.tile_center(2, 4);
+    let in_arc_pos = map.tile_center(4, 4);
+    let out_of_arc_pos = map.tile_center(2, 6);
+    let out_of_range_pos = map.tile_center(8, 4);
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Tank, attacker_pos.0, attacker_pos.1)
+        .expect("attacker should spawn");
+    let in_arc = entities
+        .spawn_unit(2, EntityKind::Worker, in_arc_pos.0, in_arc_pos.1)
+        .expect("in-arc target should spawn");
+    let out_of_arc = entities
+        .spawn_unit(2, EntityKind::Worker, out_of_arc_pos.0, out_of_arc_pos.1)
+        .expect("out-of-arc target should spawn");
+    let out_of_range = entities
+        .spawn_unit(
+            2,
+            EntityKind::Worker,
+            out_of_range_pos.0,
+            out_of_range_pos.1,
+        )
+        .expect("out-of-range target should spawn");
+    let smokes = SmokeCloudStore::new();
+    let constraints = SecondaryWeaponActivationConstraints {
+        facing_rad: 0.0,
+        half_arc_rad: std::f32::consts::FRAC_PI_4,
+        range_px: config::TILE_SIZE as f32 * 3.0,
+        direct_fire_legality: DirectFireLegality::intended_target(DirectFireVisibility::Owner),
+    };
+
+    assert!(secondary_weapon_activation_legal(
+        &map,
+        &entities,
+        &smokes,
+        attacker,
+        in_arc,
+        constraints,
+    ));
+    assert!(!secondary_weapon_activation_legal(
+        &map,
+        &entities,
+        &smokes,
+        attacker,
+        out_of_arc,
+        constraints,
+    ));
+    assert!(!secondary_weapon_activation_legal(
+        &map,
+        &entities,
+        &smokes,
+        attacker,
+        out_of_range,
+        constraints,
+    ));
+}
+
+#[test]
+fn secondary_weapon_activation_requires_intended_direct_fire_hit() {
+    let map = open_map(12);
+    let mut entities = EntityStore::new();
+    let attacker_pos = map.tile_center(2, 4);
+    let blocker_pos = map.tile_center(4, 4);
+    let target_pos = map.tile_center(6, 4);
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Tank, attacker_pos.0, attacker_pos.1)
+        .expect("attacker should spawn");
+    let blocker = entities
+        .spawn_unit(2, EntityKind::Tank, blocker_pos.0, blocker_pos.1)
+        .expect("blocker should spawn");
+    let target = entities
+        .spawn_unit(2, EntityKind::Worker, target_pos.0, target_pos.1)
+        .expect("target should spawn");
+    let smokes = SmokeCloudStore::new();
+    let constraints = SecondaryWeaponActivationConstraints {
+        facing_rad: 0.0,
+        half_arc_rad: std::f32::consts::FRAC_PI_4,
+        range_px: config::TILE_SIZE as f32 * 6.0,
+        direct_fire_legality: DirectFireLegality::intended_target(DirectFireVisibility::Owner),
+    };
+
+    assert!(
+        secondary_weapon_activation_legal(&map, &entities, &smokes, attacker, blocker, constraints,),
+        "the first enemy hard blocker is a legal intended target"
+    );
+    assert!(
+        !secondary_weapon_activation_legal(&map, &entities, &smokes, attacker, target, constraints,),
+        "secondary weapons must reject an intended target when the shot would hit a blocker first"
+    );
 }

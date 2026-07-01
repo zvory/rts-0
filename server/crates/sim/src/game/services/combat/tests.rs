@@ -16,6 +16,7 @@ use crate::protocol::{terrain, NoticeSeverity};
 use crate::rules::combat as combat_rules;
 use rand::SeedableRng;
 mod mortar_autocast;
+mod coax;
 mod entrenchment;
 mod moving_fire_policy;
 mod retention;
@@ -94,7 +95,6 @@ fn resolve_tank_test_target(
     fog.recompute(&[1, 2, 3], entities, map);
     let smokes = SmokeCloudStore::new();
     let tank = entities.get(tank_id).expect("tank should exist");
-
     resolve_target(
         map,
         entities,
@@ -3597,11 +3597,11 @@ fn friendly_tank_between_attacker_and_target_prevents_firing() {
     }
     if let Some(blocker_entity) = entities.get_mut(blocker) {
         blocker_entity.set_attack_cd(99);
+        blocker_entity.set_weapon_cooldown(combat_rules::WeaponKind::TankCoax, 99);
     }
     let blocker_hp_before = entities.get(blocker).expect("blocker should exist").hp;
     let intended_hp_before = entities.get(intended).expect("intended should exist").hp;
     let map = open_map(12);
-
     let events = run_combat_tick_on_map(
         &mut entities,
         &[player_state(1, false), player_state(2, false)],

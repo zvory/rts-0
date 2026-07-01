@@ -691,6 +691,14 @@ const PANZERFAUST_DUEL_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
     case: None,
 }];
 
+const TANK_COAX_INSPECTION_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
+    id: "tank_coax_inspection",
+    unit: EntityKind::Tank,
+    count: 1,
+    blocker: None,
+    case: None,
+}];
+
 const PANZERFAUST_WINDUP_CANCEL_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
     id: "panzerfaust_windup_cancel",
     unit: EntityKind::Panzerfaust,
@@ -723,7 +731,7 @@ const PANZERFAUST_METHAMPHETAMINES_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenar
     case: None,
 }];
 
-const DEV_SCENARIOS: [DevScenarioSpec; 16] = [
+const DEV_SCENARIOS: [DevScenarioSpec; 17] = [
     DevScenarioSpec {
         id: "scout_car_snaking_corridor",
         title: "Scout Car Snaking Corridor",
@@ -820,6 +828,12 @@ const DEV_SCENARIOS: [DevScenarioSpec; 16] = [
         title: "Panzerfaust Methamphetamines Timing",
         description: "Normal and Methamphetamines Panzerfausts fire side by side so launch and conversion timing can be compared.",
         launches: &PANZERFAUST_METHAMPHETAMINES_LAUNCHES,
+    },
+    DevScenarioSpec {
+        id: "tank_coax_inspection",
+        title: "Tank Coax Inspection",
+        description: "One held Tank faces a mixed infantry, vehicle, and building group inside the coax arc so the secondary machine gun can be inspected without immediate cannon fire.",
+        launches: &TANK_COAX_INSPECTION_LAUNCHES,
     },
 ];
 
@@ -1218,6 +1232,16 @@ mod tests {
             })
         );
         assert_eq!(
+            parse_dev_scenario_room("tank_coax_inspection:unit=tank:count=1"),
+            Some(DevScenarioLaunch {
+                id: "tank_coax_inspection",
+                unit: EntityKind::Tank,
+                count: 1,
+                blocker: None,
+                case: None,
+            })
+        );
+        assert_eq!(
             parse_dev_scenario_launch(
                 "vehicle_small_block_baseline",
                 "scout_car",
@@ -1366,6 +1390,14 @@ mod tests {
         );
         assert_eq!(
             parse_dev_scenario_launch("panzerfaust_methamphetamines", "worker", "1", None),
+            None
+        );
+        assert_eq!(
+            parse_dev_scenario_launch("tank_coax_inspection", "scout_car", "1", None),
+            None
+        );
+        assert_eq!(
+            parse_dev_scenario_launch("tank_coax_inspection", "tank", "2", None),
             None
         );
         assert_eq!(

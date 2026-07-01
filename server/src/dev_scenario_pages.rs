@@ -336,5 +336,6 @@ mod tests {
         assert!(html.contains("Panzerfaust Methamphetamines Timing"));
         assert!(html
             .contains("/dev/scenarios?id=panzerfaust_methamphetamines&unit=panzerfaust&count=1"));
+        assert!(html.contains("/dev/scenarios?id=tank_coax_inspection&unit=tank&count=1"));
     }
 }

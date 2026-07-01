@@ -20,7 +20,6 @@ const WEAPON_RECOIL_MS_BY_WEAPON_KIND = Object.freeze({
   [WEAPON_KIND.SCOUT_CAR_MG]: WEAPON_RECOIL_MS[KIND.SCOUT_CAR],
   [WEAPON_KIND.PANZERFAUST_LOADED_SHOT]: WEAPON_RECOIL_MS[KIND.PANZERFAUST],
   [WEAPON_KIND.TANK_CANNON]: WEAPON_RECOIL_MS[KIND.TANK],
-  [WEAPON_KIND.TANK_COAX]: WEAPON_RECOIL_MS[KIND.TANK],
 });
 
 export class VisualEffectBuffers {
@@ -89,7 +88,9 @@ export class VisualEffectBuffers {
             createdAt: now,
           });
         }
-        this.weaponRecoilById.set(ev.from, recoilRecord(now, ev.weaponKind));
+        if (ev.weaponKind !== WEAPON_KIND.TANK_COAX) {
+          this.weaponRecoilById.set(ev.from, recoilRecord(now, ev.weaponKind));
+        }
       } else if (ev && ev.e === EVENT.SMOKE_LAUNCH) {
         this.addSmokeCanister(ev, now);
       } else if (ev && ev.e === EVENT.MORTAR_LAUNCH) {
@@ -353,6 +354,7 @@ export class VisualEffectBuffers {
     const startedAt = typeof record === "number" ? record : record?.startedAt;
     if (typeof startedAt !== "number") return 0;
     const recoilWeaponKind = normalizedWeaponKind(weaponKind) || normalizedWeaponKind(record?.weaponKind);
+    if (recoilWeaponKind === WEAPON_KIND.TANK_COAX) return 0;
     const ttlMs = recoilMsFor(kind, recoilWeaponKind);
     const age = now - startedAt;
     if (age < 0) return 1;

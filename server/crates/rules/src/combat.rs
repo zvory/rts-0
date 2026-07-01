@@ -2,7 +2,7 @@
 
 use crate::defs::{self, ArmorClass, WeaponClass};
 use crate::terrain::{self, TerrainKind};
-use crate::EntityKind;
+use crate::{movement_body_class, EntityKind, MovementBodyClass};
 
 const FRONT_ARC_RAD: f32 = std::f32::consts::FRAC_PI_4;
 const SIDE_ARC_RAD: f32 = std::f32::consts::PI * 3.0 / 4.0;
@@ -37,7 +37,7 @@ pub enum WeaponKind {
     MortarTeamMortar,
     ArtilleryGun,
     TankCannon,
-    /// Reserved identity for the future Tank coaxial machine gun. It has no live profile yet.
+    /// Tank coaxial machine gun. Tanks fire this as a secondary weapon.
     TankCoax,
 }
 
@@ -214,6 +214,16 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         facing_damage_policy: FacingDamagePolicy::TankArmorFacing,
         overpenetration: OverpenetrationPolicy::DirectFire { range_factor: 0.25 },
     },
+    WeaponProfile {
+        id: WeaponKind::TankCoax,
+        range_tiles: 6,
+        dmg: 4,
+        cooldown: 6,
+        weapon_class: WeaponClass::SmallArms,
+        miss_policy: MissPolicy::None,
+        facing_damage_policy: FacingDamagePolicy::None,
+        overpenetration: OverpenetrationPolicy::DirectFire { range_factor: 0.25 },
+    },
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -237,6 +247,25 @@ pub enum WeaponTargetFit {
     PreferredArmor,
     PreferredSoft,
     Fallback,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum TargetPriorityPolicyId {
+    DefaultWeapon,
+    VehicleDefaultWeapon,
+    TankCannon,
+    TankCoaxMachineGun,
+}
+
+impl TargetPriorityPolicyId {
+    pub fn stable_id(self) -> &'static str {
+        match self {
+            TargetPriorityPolicyId::DefaultWeapon => "default_weapon",
+            TargetPriorityPolicyId::VehicleDefaultWeapon => "vehicle_default_weapon",
+            TargetPriorityPolicyId::TankCannon => "tank_cannon",
+            TargetPriorityPolicyId::TankCoaxMachineGun => "tank_coax_machine_gun",
+        }
+    }
 }
 
 pub fn weapon_profile(kind: WeaponKind) -> Option<&'static WeaponProfile> {
@@ -281,6 +310,16 @@ pub fn damage_weapon_profile(kind: EntityKind) -> Option<&'static WeaponProfile>
         EntityKind::Panzerfaust => weapon_profile(WeaponKind::PanzerfaustLoadedShot),
         _ => None,
     })
+}
+
+pub fn default_target_priority_policy(kind: EntityKind) -> TargetPriorityPolicyId {
+    if kind == EntityKind::Tank {
+        TargetPriorityPolicyId::TankCannon
+    } else if movement_body_class(kind) == MovementBodyClass::VehicleBody {
+        TargetPriorityPolicyId::VehicleDefaultWeapon
+    } else {
+        TargetPriorityPolicyId::DefaultWeapon
+    }
 }
 
 /// Returns the attack profile for the given kind, or zeroes if non-combatant.
@@ -764,8 +803,6 @@ mod tests {
 
     #[test]
     fn weapon_profile_metadata_preserves_current_special_damage_policies() {
-        assert_eq!(weapon_profile(WeaponKind::TankCoax), None);
-
         let anti_tank_gun = weapon_profile(WeaponKind::AntiTankGun).expect("AT gun profile");
         assert_eq!(anti_tank_gun.miss_policy, MissPolicy::AntiTankGunVsInfantry);
         assert_eq!(
@@ -792,6 +829,25 @@ mod tests {
         assert_eq!(machine_gunner.range_tiles, 6);
         assert_eq!(machine_gunner.dmg, 4);
         assert_eq!(machine_gunner.cooldown, 6);
+
+        let tank_coax = weapon_profile(WeaponKind::TankCoax).expect("Tank coax profile");
+        assert_eq!(tank_coax.weapon_class, WeaponClass::SmallArms);
+        assert_eq!(tank_coax.range_tiles, 6);
+        assert_eq!(tank_coax.dmg, 4);
+        assert_eq!(tank_coax.cooldown, 6);
+        assert_eq!(tank_coax.miss_policy, MissPolicy::None);
+        assert_eq!(tank_coax.facing_damage_policy, FacingDamagePolicy::None);
+        assert_eq!(
+            tank_coax.overpenetration,
+            OverpenetrationPolicy::DirectFire { range_factor: 0.25 }
+        );
+        assert_eq!(
+            default_weapon_profile(EntityKind::Tank)
+                .expect("Tank default profile")
+                .id,
+            WeaponKind::TankCannon,
+            "Tank coax must not replace the default Tank cannon profile"
+        );
 
         let panzerfaust =
             weapon_profile(WeaponKind::PanzerfaustLoadedShot).expect("Panzerfaust profile");

@@ -309,6 +309,14 @@ assert(
     "default tank cannon weapon hint preserves tank feedback",
   );
   assert(
+    attackFeedbackKind(KIND.TANK, WEAPON_KIND.TANK_COAX) === KIND.MACHINE_GUNNER,
+    "tank coax weapon hint maps to machine-gun feedback",
+  );
+  assert(
+    attackKindHasCombatSound(KIND.TANK, WEAPON_KIND.TANK_COAX),
+    "tank coax attack events play machine-gun combat sound",
+  );
+  assert(
     defaultWeaponKindForAttackerKind(KIND.PANZERFAUST) === WEAPON_KIND.PANZERFAUST_LOADED_SHOT,
     "Panzerfaust attack feedback resolves to its loaded-shot weapon id",
   );
@@ -351,6 +359,43 @@ assert(
   assert(
     attackFeedbackKind(KIND.RIFLEMAN, "future_unknown_weapon") === KIND.RIFLEMAN,
     "unknown attack weapon hints preserve attacker-kind feedback",
+  );
+}
+
+{
+  const plays = [];
+  const entities = new Map([
+    [21, { id: 21, owner: 1, kind: KIND.TANK, x: 220, y: 240 }],
+    [22, { id: 22, owner: 2, kind: KIND.WORKER, x: 280, y: 240 }],
+  ]);
+  const combatAudio = new MatchCombatAudio({
+    state: {
+      playerId: 1,
+      entityById: (id) => entities.get(id) || null,
+    },
+    audio: {
+      pickVariant: (ids) => ids[0],
+      play(id, opts) {
+        plays.push({ id, opts });
+        return true;
+      },
+      stopByKey() {},
+    },
+  });
+
+  combatAudio.playAttackSound({
+    e: EVENT.ATTACK,
+    from: 21,
+    to: 22,
+    weaponKind: WEAPON_KIND.TANK_COAX,
+  });
+
+  assert(plays[0].id === "combat_mg_burst_02", "tank coax uses the machine-gun burst cue");
+  assert(plays[0].opts.category === "combat_self", "own tank coax cue uses the self combat bus");
+  assert(!plays[0].opts.key, "tank coax bursts do not start the sustained MG loop key");
+  assert(
+    combatAudio.activeMachineGunSoundKeys.size === 0,
+    "tank coax audio does not register as a persistent machine-gunner loop",
   );
 }
 

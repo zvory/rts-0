@@ -103,7 +103,9 @@ export class MatchCombatAudio {
     if (!id) return;
     const category = from && audioSelfOwner(this.state, from.owner) ? "combat_self" : "combat_other";
     const key =
-      feedbackKind === KIND.MACHINE_GUNNER && typeof ev.from === "number"
+      from?.kind === KIND.MACHINE_GUNNER
+        && feedbackKind === KIND.MACHINE_GUNNER
+        && typeof ev.from === "number"
         ? machineGunSoundKey(ev.from)
         : undefined;
     const played = this.audio.play(id, {

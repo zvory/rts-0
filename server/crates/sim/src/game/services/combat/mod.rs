@@ -26,12 +26,15 @@ use crate::protocol::Event;
 use rand::rngs::SmallRng;
 
 mod acquisition;
+mod activation;
 mod chase;
+mod coax;
 mod damage;
 mod events;
 mod panzerfaust;
 mod priority;
 mod projection;
+mod target_policy;
 mod weapons;
 
 #[cfg(test)]
@@ -515,6 +518,19 @@ pub(in crate::game) fn combat_system(
             }
         }
     }
+    coax::fire_tank_coax_system(
+        map,
+        entities,
+        teams,
+        spatial,
+        &los,
+        fog,
+        smokes,
+        rng,
+        events,
+        firing_reveals,
+        tick,
+    );
 }
 
 #[allow(clippy::too_many_arguments)]

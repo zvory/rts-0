@@ -262,8 +262,12 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/services/combat/damage.rs",
   "server/crates/sim/src/game/services/combat/events.rs",
   "server/crates/sim/src/game/services/combat/mod.rs",
+  // Tank coax is a Tank-only secondary weapon until catalog combat roles/weapon slots exist.
+  "server/crates/sim/src/game/services/combat/coax.rs",
   // Panzerfaust conversion events announce the post-shot Rifleman kind to visible clients.
   "server/crates/sim/src/game/services/combat/panzerfaust/events.rs",
+  // Declarative combat target policy owns current-roster ranking groups until catalog combat roles exist.
+  "server/crates/sim/src/game/services/combat/target_policy.rs",
   // Default combat target policy is still current-roster based until catalog combat roles exist.
   "server/crates/sim/src/game/services/combat/priority.rs",
   "server/crates/sim/src/game/services/combat/projection.rs",
