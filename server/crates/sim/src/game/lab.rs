@@ -15,7 +15,6 @@ use crate::game::services::geometry::{
     building_rect_for_entity, circle_intersects_rect, CircleBody,
 };
 use crate::game::services::occupancy::{footprint_center, footprint_tiles, Occupancy};
-use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::{production, standability};
 use crate::game::upgrade::UpgradeKind;
 use crate::protocol::Command;
@@ -774,9 +773,10 @@ impl Game {
         self.sync_lab_god_mode_flags();
         self.repair_mortar_autocast_state();
         systems::recompute_supply(&mut self.players, &self.entities);
-        self.spatial = SpatialIndex::build(&self.entities, self.map.size);
+        self.reset_derived_state();
         let ids: Vec<u32> = self.players.iter().map(|player| player.id).collect();
-        self.fog.recompute_with_smoke(&ids, &self.entities, &self.map, &self.smokes);
+        self.fog
+            .recompute_with_smoke(&ids, &self.entities, &self.map, &self.smokes);
         self.refresh_building_memory(&ids);
         self.refresh_trench_memory(&ids);
         #[cfg(debug_assertions)]
@@ -1496,5 +1496,4 @@ mod tests {
             Err(LabError::InvalidScenario { .. })
         ));
     }
-
 }

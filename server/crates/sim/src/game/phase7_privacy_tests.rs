@@ -3,7 +3,7 @@ use crate::game::command::SimCommand as Command;
 use crate::game::entity::{
     EntityKind, Order, ProdItem, RallyIntent, RallyKind, ResearchItem, WeaponSetup,
 };
-use crate::game::{services, systems, SmokeCloudStore};
+use crate::game::{systems, SmokeCloudStore};
 use crate::protocol::{kinds, terrain, Event};
 
 fn empty_flat_game(players: &[PlayerInit]) -> Game {
@@ -23,7 +23,7 @@ fn empty_flat_game(players: &[PlayerInit]) -> Game {
 
 fn refresh_world(game: &mut Game) {
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog
         .recompute_with_smoke(&ids, &game.entities, &game.map, &game.smokes);

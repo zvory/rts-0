@@ -36,7 +36,7 @@ fn manual_fire_fixture() -> (Game, u32, (f32, f32)) {
         mortar_entity.set_weapon_setup(WeaponSetup::Deployed);
     }
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog.recompute(&ids, &game.entities, &game.map);
     (game, mortar, target_pos)
@@ -144,7 +144,7 @@ fn manual_mortar_fire_with_autocast_enabled_only_launches_once() {
     game.players[0]
         .upgrades
         .insert(upgrade::UpgradeKind::MortarAutocast);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog.recompute(&ids, &game.entities, &game.map);
 
@@ -310,7 +310,7 @@ fn queued_manual_mortar_fire_commands_fire_finite_shots_across_reload_cycles() {
     game.players[0]
         .upgrades
         .insert(upgrade::UpgradeKind::MortarAutocast);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog.recompute(&ids, &game.entities, &game.map);
 

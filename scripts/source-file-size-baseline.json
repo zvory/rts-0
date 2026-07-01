@@ -55,8 +55,8 @@
     },
     {
       "path": "server/crates/sim/src/game/services/pathing.rs",
-      "lines": 2072,
-      "reason": "Game-state Phase 0.5 adds a test-only derived-state cache wipe seam to the existing oversized pathing service; keep ratcheting until pathing diagnostics are split."
+      "lines": 2077,
+      "reason": "Game-state Phase 2 routes pathing through the DerivedState shell and exposes internal config preservation for reset; keep ratcheting until pathing diagnostics are split."
     },
     {
       "path": "server/src/main.rs",

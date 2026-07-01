@@ -120,7 +120,7 @@ fn line_projectiles(game: &Game) -> Vec<ability_projectile::AbilityProjectile> {
 
 fn refresh_visibility(game: &mut Game) {
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog.recompute(&ids, &game.entities, &game.map);
 }
@@ -235,7 +235,12 @@ fn ekat_consumes_nearby_golem_to_heal_to_full() {
         .expect("hero should spawn");
     let golem = game
         .entities
-        .spawn_unit(1, EntityKind::Golem, pos.0 + config::TILE_SIZE as f32, pos.1)
+        .spawn_unit(
+            1,
+            EntityKind::Golem,
+            pos.0 + config::TILE_SIZE as f32,
+            pos.1,
+        )
         .expect("Golem should spawn");
     game.entities
         .get_mut(hero)

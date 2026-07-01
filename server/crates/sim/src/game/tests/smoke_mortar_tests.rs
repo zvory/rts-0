@@ -61,7 +61,7 @@ fn smoke_projection_fixture() -> (Game, u32, u32, u32, (f32, f32)) {
         .spawn_unit(2, EntityKind::Rifleman, smoke_pos.0, smoke_pos.1)
         .expect("enemy should spawn");
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     game.smokes
         .spawn(
             smoke_pos.0,
@@ -139,7 +139,7 @@ fn team_fog_fixture() -> (Game, u32, u32, u32, (f32, f32)) {
         )
         .expect("hidden enemy should spawn");
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog
         .recompute_with_smoke(&ids, &game.entities, &game.map, &game.smokes);
@@ -284,7 +284,7 @@ fn team_current_vision_keeps_smoke_blocking() {
         )
         .expect("smoke should spawn");
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog
         .recompute_with_smoke(&ids, &game.entities, &game.map, &game.smokes);
@@ -333,7 +333,7 @@ fn manual_mortar_fire_impacts_without_toast_notice() {
         .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
         .expect("target should spawn");
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog.recompute(&ids, &game.entities, &game.map);
 
@@ -518,7 +518,7 @@ fn visible_autocast_mortar_launch_is_sent_to_enemy() {
         .upgrades
         .insert(upgrade::UpgradeKind::MortarAutocast);
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog.recompute(&ids, &game.entities, &game.map);
     assert!(
@@ -589,7 +589,7 @@ fn hidden_mortar_launch_is_not_sent_but_impact_reveals_attacker_to_victim() {
         )
         .expect("counter tank should spawn");
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog.recompute(&ids, &game.entities, &game.map);
     assert!(
@@ -730,7 +730,7 @@ fn manual_mortar_fire_impacts_after_shooter_dies_before_impact() {
         .spawn_unit(2, EntityKind::Tank, target_pos.0, target_pos.1)
         .expect("target should spawn");
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog.recompute(&ids, &game.entities, &game.map);
 
@@ -750,9 +750,9 @@ fn manual_mortar_fire_impacts_after_shooter_dies_before_impact() {
     assert!(
         launch_events.iter().any(|(player_id, events)| {
             *player_id == 1
-                && events
-                    .iter()
-                    .any(|event| matches!(event, Event::MortarLaunch { from, .. } if *from == mortar))
+                && events.iter().any(
+                    |event| matches!(event, Event::MortarLaunch { from, .. } if *from == mortar),
+                )
         }),
         "accepted mortar command should emit a launch before shooter death: {launch_events:?}"
     );
@@ -781,12 +781,14 @@ fn manual_mortar_fire_impacts_after_shooter_dies_before_impact() {
         let events = game.tick();
         impact_seen |= events.iter().any(|(player_id, events)| {
             *player_id == 1
-                && events.iter().any(|event| matches!(
-                    event,
-                    Event::MortarImpact { x, y, .. }
-                        if (*x - impact_pos.0).abs() < 0.001
-                            && (*y - impact_pos.1).abs() < 0.001
-                ))
+                && events.iter().any(|event| {
+                    matches!(
+                        event,
+                        Event::MortarImpact { x, y, .. }
+                            if (*x - impact_pos.0).abs() < 0.001
+                                && (*y - impact_pos.1).abs() < 0.001
+                    )
+                })
         });
     }
 
@@ -838,7 +840,7 @@ fn manual_mortar_fire_turns_briefly_before_launching() {
         .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
         .expect("target should spawn");
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog.recompute(&ids, &game.entities, &game.map);
 
@@ -937,7 +939,7 @@ fn manual_mortar_fire_damages_friendly_units_at_enemy_rate() {
         .spawn_unit(2, EntityKind::MachineGunner, target_pos.0, target_pos.1)
         .expect("enemy should spawn");
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog.recompute(&ids, &game.entities, &game.map);
 
@@ -1026,7 +1028,7 @@ fn manual_mortar_fire_inner_splash_pierces_armor_and_outer_splash_hits_for_outer
         .expect("outer target exists")
         .hp;
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog.recompute(&ids, &game.entities, &game.map);
 
@@ -1124,7 +1126,7 @@ fn manual_mortar_fire_damages_allied_units_without_kill_credit() {
         .expect("ally should exist")
         .set_last_damage_owner(Some(3));
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog.recompute(&ids, &game.entities, &game.map);
 
@@ -1204,7 +1206,7 @@ fn manual_mortar_fire_damages_friendly_buildings() {
         .expect("depot should spawn");
     let hp_before = game.entities.get(depot).expect("depot exists").hp;
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog.recompute(&ids, &game.entities, &game.map);
 
@@ -1278,7 +1280,7 @@ fn snapshot_keeps_smoke_visible_to_owner_with_unit_inside() {
         unit.pos_x = smoke_pos.0;
         unit.pos_y = smoke_pos.1;
     }
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog
         .recompute_with_smoke(&ids, &game.entities, &game.map, &game.smokes);

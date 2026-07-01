@@ -1,5 +1,6 @@
 use super::resource_placement;
 use super::*;
+use crate::game::derived_state::DerivedState;
 use crate::rules::faction::{catalog_for_or_default_empty, FactionLoadout, StartingFormation};
 use std::str::FromStr;
 
@@ -285,8 +286,9 @@ impl Game {
             }
         }
 
-        let spatial = services::spatial::SpatialIndex::build(&entities, map.size);
-        let pathing = services::pathing::PathingService::new(
+        let derived = DerivedState::new(
+            &map,
+            &entities,
             LIVE_PATHING_DEFAULT_BUDGET,
             LIVE_PATHING_CACHE_CAPACITY,
         );
@@ -300,8 +302,7 @@ impl Game {
             pending: Vec::new(),
             command_log: Vec::new(),
             tick: 0,
-            spatial,
-            pathing,
+            derived,
             lingering_sight: Vec::new(),
             firing_reveals: Vec::new(),
             smokes: SmokeCloudStore::new(),
@@ -430,15 +431,13 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
     let oil_angle = base_angle + std::f32::consts::FRAC_PI_2;
     let oil_step_x = tile_step(oil_angle.cos());
     let oil_step_y = tile_step(oil_angle.sin());
-    let mut oil_tiles =
-        resource_placement::occupied_resource_tiles(map, entities, EntityKind::Oil);
-    let blocked_pump_jack_tiles =
-        resource_placement::resource_blocked_building_tiles(
-            map,
-            entities,
-            EntityKind::PumpJack,
-            Some(EntityKind::Oil),
-        );
+    let mut oil_tiles = resource_placement::occupied_resource_tiles(map, entities, EntityKind::Oil);
+    let blocked_pump_jack_tiles = resource_placement::resource_blocked_building_tiles(
+        map,
+        entities,
+        EntityKind::PumpJack,
+        Some(EntityKind::Oil),
+    );
     for i in 0..config::OIL_PATCHES_PER_BASE {
         let (tile_dx, tile_dy) = oil_patch_tile_offset(i, oil_step_x, oil_step_y);
         let (desired_x, desired_y) = offset_tile_center(map, tx, ty, tile_dx, tile_dy);
@@ -465,7 +464,11 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
 }
 
 fn tile_step(value: f32) -> i32 {
-    if value < 0.0 { -1 } else { 1 }
+    if value < 0.0 {
+        -1
+    } else {
+        1
+    }
 }
 
 fn oil_patch_tile_offset(index: u32, step_x: i32, step_y: i32) -> (i32, i32) {

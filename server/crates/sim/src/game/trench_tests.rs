@@ -3,7 +3,7 @@ use crate::game::command::SimCommand;
 use crate::game::entity::{EntityKind, Order};
 use crate::game::lab::{LabMoveEntity, LabOp};
 use crate::game::upgrade::UpgradeKind;
-use crate::game::{services, systems, SmokeCloudStore};
+use crate::game::{systems, SmokeCloudStore};
 use crate::protocol::terrain;
 
 fn players() -> [PlayerInit; 2] {
@@ -94,7 +94,7 @@ fn empty_flat_game(players: &[PlayerInit]) -> Game {
 
 fn repair_world(game: &mut Game) {
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.recompute_live_fog(&ids);
     game.refresh_building_memory(&ids);
@@ -648,9 +648,11 @@ fn lab_move_clears_trench_occupation_without_waiting_for_tick() {
         active_trench_occupation(game.entities.get(rifleman).expect("rifleman should exist")),
         None
     );
-    assert!(game.snapshot_full_for(1).entities.iter().any(|view| {
-        view.id == rifleman && view.occupied_trench_id.is_none()
-    }));
+    assert!(game
+        .snapshot_full_for(1)
+        .entities
+        .iter()
+        .any(|view| { view.id == rifleman && view.occupied_trench_id.is_none() }));
 }
 
 #[test]

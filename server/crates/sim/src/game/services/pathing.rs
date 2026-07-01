@@ -386,6 +386,15 @@ impl PathingService {
             },
         );
     }
+
+    #[allow(dead_code)]
+    pub(in crate::game) fn clear_rebuildable_state(&mut self) {
+        self.cache.clear();
+    }
+
+    pub(in crate::game) fn config(&self) -> (usize, usize) {
+        (self.default_budget, self.cache_cap)
+    }
 }
 
 fn expand_vehicle_diagonal_steps_to_l_waypoints<P: Passability>(
@@ -516,10 +525,6 @@ fn distance_between(a: (f32, f32), b: (f32, f32)) -> f32 {
 
 #[cfg(test)]
 impl PathingService {
-    pub fn clear_rebuildable_state_for_test(&mut self) {
-        self.cache.clear();
-    }
-
     pub fn cache_len(&self) -> usize {
         self.cache.len()
     }

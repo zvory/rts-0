@@ -25,7 +25,7 @@ fn meth_unit_fixture(kind: EntityKind, enqueue_move: bool) -> (Game, u32, (f32, 
         .spawn_unit(1, kind, start.0, start.1)
         .expect("unit should spawn");
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog.recompute(&ids, &game.entities, &game.map);
     game.assert_invariants();
@@ -79,7 +79,9 @@ fn removed_methamphetamines_immediately_clears_rifleman_speed_boost() {
         .expect("rifleman stats")
         .speed;
 
-    game.players[0].upgrades.insert(UpgradeKind::Methamphetamines);
+    game.players[0]
+        .upgrades
+        .insert(UpgradeKind::Methamphetamines);
     let boosted_step = next_moving_step(&mut game, rifleman);
     assert!(
         (boosted_step - base_speed * config::METHAMPHETAMINES_SPEED_MULTIPLIER).abs() < 0.01,
@@ -103,7 +105,9 @@ fn methamphetamines_boosts_machine_gunner_to_unupgraded_rifleman_speed() {
         .expect("rifleman stats")
         .speed;
 
-    game.players[0].upgrades.insert(UpgradeKind::Methamphetamines);
+    game.players[0]
+        .upgrades
+        .insert(UpgradeKind::Methamphetamines);
     let boosted_step = next_moving_step(&mut game, mg);
 
     assert!(
@@ -115,12 +119,17 @@ fn methamphetamines_boosts_machine_gunner_to_unupgraded_rifleman_speed() {
 #[test]
 fn methamphetamines_halves_machine_gunner_setup_and_teardown() {
     let (mut game, mg, goal) = meth_unit_fixture(EntityKind::MachineGunner, false);
-    game.players[0].upgrades.insert(UpgradeKind::Methamphetamines);
+    game.players[0]
+        .upgrades
+        .insert(UpgradeKind::Methamphetamines);
 
     game.tick();
     assert!(
         matches!(
-            game.entities.get(mg).expect("mg should exist").weapon_setup(),
+            game.entities
+                .get(mg)
+                .expect("mg should exist")
+                .weapon_setup(),
             WeaponSetup::SettingUp { .. }
         ),
         "idle machine gunner should start setting up"
@@ -138,7 +147,10 @@ fn methamphetamines_halves_machine_gunner_setup_and_teardown() {
     );
     game.tick();
     assert_eq!(
-        game.entities.get(mg).expect("mg should exist").weapon_setup(),
+        game.entities
+            .get(mg)
+            .expect("mg should exist")
+            .weapon_setup(),
         WeaponSetup::Deployed
     );
 
@@ -160,7 +172,10 @@ fn methamphetamines_halves_machine_gunner_setup_and_teardown() {
     );
     assert!(
         matches!(
-            game.entities.get(mg).expect("mg should exist").weapon_setup(),
+            game.entities
+                .get(mg)
+                .expect("mg should exist")
+                .weapon_setup(),
             WeaponSetup::TearingDown { .. }
         ),
         "move command should start teardown from deployed state"
@@ -170,7 +185,10 @@ fn methamphetamines_halves_machine_gunner_setup_and_teardown() {
         game.tick();
     }
     assert_eq!(
-        game.entities.get(mg).expect("mg should exist").weapon_setup(),
+        game.entities
+            .get(mg)
+            .expect("mg should exist")
+            .weapon_setup(),
         WeaponSetup::Packed
     );
 

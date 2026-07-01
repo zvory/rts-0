@@ -1,6 +1,6 @@
 # Phase 2 - Explicit DerivedState Shell
 
-Status: Not started.
+Status: Done.
 
 ## Scope
 
