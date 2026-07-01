@@ -16,7 +16,9 @@ use super::super::{
     SELFPLAY_FAILURE_DIR,
 };
 use rts_sim::game::entity::EntityKind;
-use rts_sim::game::replay::{CommandLogEntry, EventLogEntry, ReplayArtifactV1};
+use rts_sim::game::replay::{
+    CommandLogEntry, EventLogEntry, ReplayArtifactV1, ReplayStartComposition,
+};
 use rts_sim::game::{Game, PlayerInit};
 use rts_sim::protocol::{Command as WireCommand, Event, Snapshot, StartPayload};
 
@@ -24,6 +26,7 @@ pub(super) struct SelfPlayRunner {
     test_name: &'static str,
     max_ticks: u32,
     pub(super) game: Game,
+    replay_start: ReplayStartComposition,
     start: StartPayload,
     resource_kinds: BTreeMap<u32, EntityKind>,
     player_specs: Vec<PlayerInit>,
@@ -77,10 +80,14 @@ impl SelfPlayRunner {
         milestones: Milestones,
     ) -> Self {
         let resource_kinds = resource_kinds_from_start(&start);
+        let replay_start =
+            ReplayStartComposition::capture(&game, super::server_build_sha())
+                .expect("self-play replay start should export");
         SelfPlayRunner {
             test_name,
             max_ticks,
             game,
+            replay_start,
             start,
             resource_kinds,
             player_specs,
@@ -328,12 +335,7 @@ impl SelfPlayRunner {
 
     fn write_artifact_dir(&self, dir: &Path, failure: Option<String>) -> Result<(), String> {
         fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-        let artifact = ReplayArtifactV1::capture_from_game(
-            &self.game,
-            super::server_build_sha(),
-            None,
-            self.game.scores(),
-        );
+        let artifact = self.replay_start.finalize(&self.game, None, self.game.scores());
         let json = serde_json::to_vec_pretty(&artifact).map_err(|e| e.to_string())?;
         fs::write(dir.join("replay.json"), json).map_err(|e| e.to_string())?;
         let diagnostic = self.diagnostic_payload(failure);
@@ -366,7 +368,7 @@ fn selfplay_failure_artifact_writes_unified_replay_schema() {
 
     assert_eq!(
         artifact.artifact_schema_version,
-        rts_sim::game::replay::REPLAY_ARTIFACT_SCHEMA_VERSION_V2
+        rts_sim::game::replay::REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION
     );
     assert_eq!(artifact.seed, 0x1234_5678);
     assert_eq!(artifact.players[0].name, "Failure Artifact");

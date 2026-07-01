@@ -455,6 +455,7 @@ impl RoomTask {
         }
         let launch_god_mode_players = launch.god_mode_players.clone();
         let game = launch.game;
+        self.capture_replay_start_for(&game);
         self.record_live_match_started(
             launch.player_count,
             0,

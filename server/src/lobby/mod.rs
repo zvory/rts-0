@@ -78,6 +78,13 @@ pub fn load_saved_replay_artifact(name: &str) -> Result<ReplayArtifactV1, String
     load_replay_artifact(name)
 }
 
+pub fn replay_launch_incompatibility_reason(
+    artifact: &ReplayArtifactV1,
+    expected_build_sha: &str,
+) -> Option<String> {
+    replay_session::ReplaySession::validate_artifact_for_launch(artifact, expected_build_sha).err()
+}
+
 /// Player colors, assigned in colorblind-safer order. MUST match `client/src/config.js`
 /// `PLAYER_PALETTE`.
 const PLAYER_PALETTE: [&str; 8] = [

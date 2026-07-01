@@ -22,16 +22,20 @@ pub(super) struct CheckpointCompatibilityV1 {
 }
 
 impl CheckpointCompatibilityV1 {
-    pub(super) fn debug_default() -> Self {
+    pub(super) fn new(created_by: &str, server_build_sha: &str) -> Self {
         Self {
-            created_by: "debug".to_string(),
-            server_build_sha: option_env!("GIT_SHA").unwrap_or("unknown").to_string(),
+            created_by: created_by.to_string(),
+            server_build_sha: server_build_sha.to_string(),
             sim_schema_version: SIM_SCHEMA_VERSION,
             rules_version: RULES_VERSION,
             protocol_version: PROTOCOL_VERSION,
             required_features: Vec::new(),
             optional_features: Vec::new(),
         }
+    }
+
+    pub(super) fn debug_default() -> Self {
+        Self::new("debug", option_env!("GIT_SHA").unwrap_or("unknown"))
     }
 
     pub(super) fn validate(&self) -> Result<(), CheckpointPayloadError> {

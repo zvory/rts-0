@@ -67,6 +67,18 @@ impl Game {
         GameCheckpointV1::from_state(&self.state)?.to_text()
     }
 
+    pub(in crate::game) fn checkpoint_payload_text_for_container(
+        &self,
+        created_by: &str,
+        server_build_sha: &str,
+    ) -> Result<String, CheckpointPayloadError> {
+        GameCheckpointV1::from_state_with_compatibility(
+            &self.state,
+            CheckpointCompatibilityV1::new(created_by, server_build_sha),
+        )?
+        .to_text()
+    }
+
     pub(in crate::game) fn restore_checkpoint_payload_text(
         text: &str,
         map: Map,
@@ -130,10 +142,17 @@ struct GameCheckpointV1 {
 
 impl GameCheckpointV1 {
     fn from_state(state: &GameState) -> Result<Self, CheckpointPayloadError> {
+        Self::from_state_with_compatibility(state, CheckpointCompatibilityV1::debug_default())
+    }
+
+    fn from_state_with_compatibility(
+        state: &GameState,
+        compatibility: CheckpointCompatibilityV1,
+    ) -> Result<Self, CheckpointPayloadError> {
         let checkpoint = Self {
             schema: CHECKPOINT_SCHEMA.to_string(),
             version: CHECKPOINT_VERSION,
-            compatibility: CheckpointCompatibilityV1::debug_default(),
+            compatibility,
             map_binding: MapBindingV1::from_state(state),
             seed: state.seed,
             tick: state.tick,

@@ -143,14 +143,7 @@ impl RoomTask {
             .unwrap_or(0);
         let replay_artifact = game
             .filter(|_| self.should_capture_post_match_replay())
-            .map(|game| {
-                ReplayArtifactV1::capture_from_game(
-                    game,
-                    server_build_sha(),
-                    winner_id,
-                    scores.clone(),
-                )
-            });
+            .and_then(|game| self.finalize_replay_artifact(game, winner_id, scores.clone()));
         let winner_name =
             winner_id.and_then(|wid| scores.iter().find(|s| s.id == wid).map(|s| s.name.clone()));
         let outcome = crate::db::MatchOutcome::from_winner_name(winner_name.as_deref());
@@ -278,9 +271,8 @@ impl RoomTask {
             && match_history_allowed;
         let replay_artifact = (will_record_history
             && self.should_attach_match_history_replay_artifact())
-        .then(|| {
-            ReplayArtifactV1::capture_from_game(&game, server_build_sha(), None, scores.clone())
-        });
+        .then(|| self.finalize_replay_artifact(&game, None, scores.clone()))
+        .flatten();
         structured_log::log_match_ended(MatchEndedLog {
             room: &self.room,
             match_run_id: self.match_run_id.as_deref(),
@@ -351,6 +343,37 @@ impl RoomTask {
         self.reset_match_net_status();
         self.reset_live_pause_state();
         self.reset_room_time_state();
+        self.replay_start = None;
+    }
+
+    pub(super) fn capture_replay_start_for(&mut self, game: &Game) {
+        match rts_sim::game::replay::ReplayStartComposition::capture(game, server_build_sha()) {
+            Ok(start) => self.replay_start = Some(start),
+            Err(err) => {
+                self.replay_start = None;
+                crate::log_warn!(
+                    room = %self.room,
+                    error = %err,
+                    "failed to capture launch-time replay start"
+                );
+            }
+        }
+    }
+
+    pub(super) fn finalize_replay_artifact(
+        &self,
+        game: &Game,
+        winner_id: Option<u32>,
+        scores: Vec<PlayerScore>,
+    ) -> Option<ReplayArtifactV1> {
+        let Some(start) = &self.replay_start else {
+            crate::log_warn!(
+                room = %self.room,
+                "cannot finalize replay artifact without launch-time start checkpoint"
+            );
+            return None;
+        };
+        Some(start.finalize(game, winner_id, scores))
     }
 
     pub(super) fn record_live_match_started(
@@ -377,6 +400,7 @@ impl RoomTask {
         self.pending_recipient_notices.clear();
         self.reset_live_pause_state();
         self.reset_room_time_state();
+        self.replay_start = None;
         for player in self.players.values_mut() {
             player.ready = false;
             player.msg_tx.clear_pending_snapshot();
@@ -388,6 +412,7 @@ impl RoomTask {
         self.match_run_id = None;
         self.match_map_name.clear();
         self.match_participants.clear();
+        self.replay_start = None;
     }
 
     pub(super) fn reset_empty_room_state(&mut self) {

@@ -8,6 +8,7 @@ use super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::snapshots::union_events;
 use crate::protocol::{Event, PlayerScore, ServerMessage};
 use rts_ai::{AiController, AiThinkContext};
+use rts_sim::game::replay::ReplayStartComposition;
 use rts_sim::game::Game;
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant as StdInstant};
@@ -49,6 +50,7 @@ pub(super) struct LiveTickDriver<'a> {
     pub(super) spectator_visible_players: Vec<u32>,
     pub(super) lab_snapshot_projections: HashMap<u32, LabSnapshotProjection>,
     pub(super) projection_policy: ProjectionPolicy,
+    pub(super) replay_start: Option<&'a ReplayStartComposition>,
 }
 
 impl LiveTickDriver<'_> {
@@ -62,7 +64,7 @@ impl LiveTickDriver<'_> {
             Ok(events) => events.into_iter().collect(),
             Err(payload) => {
                 let reason = panic_reason(&payload);
-                dump_crash_replay(self.room, &game, &reason);
+                dump_crash_replay(self.room, &game, self.replay_start, &reason);
                 self.finish_perf_tick(perf.as_ref(), &game, scheduler_lag, tick_start);
                 return LiveTickResult::PanicEnd {
                     scores: game.scores(),

@@ -1,7 +1,7 @@
 use super::super::replay::assert_replay_matches_live;
 use super::harness::replay_artifact_url;
 use crate::{AiController, AiThinkContext};
-use rts_sim::game::replay::{EventLogEntry, ReplayArtifactV1};
+use rts_sim::game::replay::{EventLogEntry, ReplayStartComposition};
 use rts_sim::game::{Game, PlayerInit};
 use rts_sim::protocol::{kinds, Command as WireCommand, Event};
 
@@ -40,6 +40,8 @@ fn real_ai_vs_real_ai() {
         },
     ];
     let mut game = Game::new(&players, 0x1234_5678);
+    let replay_start = ReplayStartComposition::capture(&game, super::server_build_sha())
+        .expect("real-ai replay start should export");
     let mut controllers: Vec<AiController> = players
         .iter()
         .map(|player| AiController::new(player.id))
@@ -81,12 +83,7 @@ fn real_ai_vs_real_ai() {
             .join("selfplay-failures")
             .join(&artifact_name);
         if std::fs::create_dir_all(&dir).is_ok() {
-            let artifact = ReplayArtifactV1::capture_from_game(
-                game,
-                super::server_build_sha(),
-                None,
-                game.scores(),
-            );
+            let artifact = replay_start.finalize(game, None, game.scores());
             if let Ok(json) = serde_json::to_vec_pretty(&artifact) {
                 let _ = std::fs::write(dir.join("replay.json"), json);
             }
@@ -390,8 +387,7 @@ fn real_ai_vs_real_ai() {
     }
 
     // Write a replay artifact so the neutral replay artifact viewer can load it.
-    let artifact =
-        ReplayArtifactV1::capture_from_game(&game, super::server_build_sha(), None, game.scores());
+    let artifact = replay_start.finalize(&game, None, game.scores());
     let ts = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()

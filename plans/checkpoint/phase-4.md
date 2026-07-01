@@ -1,6 +1,6 @@
 # Phase 4 - Replay Artifact Migration
 
-Status: Not started.
+Status: Done.
 
 ## Scope
 

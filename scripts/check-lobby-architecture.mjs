@@ -156,7 +156,7 @@ function checkEndMatchPersistencePolicy(source) {
   }
   const body = endMatch;
   if (
-    body.includes("ReplayArtifactV1::capture_from_game") &&
+    body.includes("finalize_replay_artifact") &&
     !body.includes("should_capture_post_match_replay")
   ) {
     failures.push(
