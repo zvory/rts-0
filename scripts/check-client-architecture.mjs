@@ -151,6 +151,7 @@ const FORBIDDEN_GAMESTATE_INTENT_SHIMS = [
   "commandTarget",
   "placement",
   "commandCardMode",
+  "attackTargetPreview",
   "resourceMiningPreview",
   "antiTankGunSetupPreview",
   "abilityTargetPreview",
@@ -170,6 +171,7 @@ const FORBIDDEN_GAMESTATE_INTENT_SHIMS = [
   "beginLabTool",
   "cancelLabTool",
   "updateResourceMiningPreview",
+  "updateAttackTargetPreview",
   "updateAntiTankGunSetupPreview",
   "updateAbilityTargetPreview",
 ];

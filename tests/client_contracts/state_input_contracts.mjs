@@ -1206,7 +1206,6 @@ function buttonByLabel(card, label) {
       rightClickCommands[0].queued === true,
     "Shift right-click on enemies should send queued attack",
   );
-
   const deconstructWorker = { id: 42, owner: 1, kind: KIND.WORKER, x: 150, y: 150 };
   const enemyTankTrap = { id: 43, owner: 2, kind: KIND.TANK_TRAP, x: 180, y: 180 };
   input.state = {
@@ -1226,7 +1225,6 @@ function buttonByLabel(card, label) {
       rightClickCommands[0].queued === true,
     "Shift right-click on a Tank Trap with workers selected should send queued deconstruct",
   );
-
   input.dom = { clientWidth: 800, clientHeight: 600 };
   input.camera = { screenToWorld: (x, y) => ({ x, y }) };
   const deployedAntiTankGun = {

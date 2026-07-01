@@ -39,6 +39,7 @@ import {
   _drawArtilleryLaunches,
   _drawArtilleryTargets,
   _drawAntiTankGunSetupPreview,
+  _drawAttackTargetPreview,
   _drawCommandFeedback,
   _drawDebugPathOverlay,
   _drawMuzzleFlashes,
@@ -348,6 +349,7 @@ export class Renderer {
     time("renderer.feedbackOverlays", () => {
       this._drawSafely("smokeCanisters", () => this._drawSmokeCanisters(feedbackView));
       this._drawSafely("commandFeedback", () => this._drawCommandFeedback(feedbackView));
+      this._drawSafely("attackTargetPreview", () => this._drawAttackTargetPreview(feedbackView));
       this._drawSafely("mortarTargets", () => this._drawMortarTargets(feedbackView));
       this._drawSafely("mortarLaunches", () => this._drawMortarLaunches(feedbackView));
       this._drawSafely("mortarShells", () => this._drawMortarShells(feedbackView));
@@ -711,6 +713,7 @@ Object.assign(Renderer.prototype, {
   _fogLevel,
   _drawPlacement,
   _drawCommandFeedback,
+  _drawAttackTargetPreview,
   _drawSmokeCanisters,
   _drawArtilleryLaunches,
   _drawArtilleryTargets,

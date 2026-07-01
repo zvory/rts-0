@@ -36,79 +36,8 @@ export function _onRightClick(p, ev = {}) {
     return;
   }
 
-  const ownUnits = this._selectedOwnUnitIds();
   const queued = !!ev.shiftKey;
-  if (ownUnits.length === 0) {
-    // No units selected: a buildings-only selection sets a rally point on any
-    // unit-producing buildings in it. Units in the selection take priority, so a
-    // mixed selection always moves the units (handled by the branch above).
-    const producers = this._selectedProducerBuildingIds();
-    if (producers.length > 0) {
-      const world = this._worldAt(p.x, p.y);
-      for (const building of producers) {
-        this._issueCommand(cmd.setRally(building, world.x, world.y, queued, ORDER_STAGE.MOVE));
-      }
-      this._addCommandFeedback("move", world.x, world.y, queued);
-    }
-    return;
-  }
-
-  const world = this._worldAt(p.x, p.y);
-  const gatherers = this._selectedGathererIds();
-  const workers = this._selectedWorkerIds();
-  const resource = this._resourceAtWorld(world.x, world.y);
-  if (resource && resource.remaining !== 0) {
-    const pumpJack = _pumpJackBuildIntentForResource(resource, this.state.map);
-    if (resource.kind === KIND.OIL && workers.length > 0 && pumpJack) {
-      this._issueCommand(cmd.build(workers, KIND.PUMP_JACK, pumpJack.tileX, pumpJack.tileY, queued));
-      this._addCommandFeedback("move", resource.x, resource.y, queued);
-      return;
-    }
-    if (gatherers.length > 0 && resource.kind !== KIND.OIL) {
-      this._issueCommand(cmd.gather(gatherers, resource.id, queued));
-      this._addCommandFeedback("move", world.x, world.y, queued);
-      return;
-    }
-  }
-
-  const target = this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ false);
-  if (target && ownOwner(this.state, target.owner) && _isOwnIncompleteBuilding(target)) {
-    const resume = _resumeConstructionIntent(target, this.state.map);
-    if (resume && workers.length > 0) {
-      this._issueCommand(cmd.build(workers, resume.building, resume.tileX, resume.tileY, queued));
-      this._addCommandFeedback("move", target.x, target.y, queued);
-      return;
-    }
-  }
-  if (target && workers.length > 0 && _isCompletedTankTrap(target)) {
-    this._issueCommand(cmd.deconstruct(workers, target.id, queued));
-    this._addCommandFeedback("move", target.x, target.y, queued);
-    return;
-  }
-  if (target && enemyOwner(this.state, target.owner) && !isResource(target.kind)) {
-    // Enemy entity -> attack.
-    this._issueCommand(cmd.attack(ownUnits, target.id, queued));
-    this._addCommandFeedback("attack", target.x, target.y, queued);
-    return;
-  }
-  if (target && isResource(target.kind) && target.remaining !== 0) {
-    const pumpJack = _pumpJackBuildIntentForResource(target, this.state.map);
-    if (target.kind === KIND.OIL && workers.length > 0 && pumpJack) {
-      this._issueCommand(cmd.build(workers, KIND.PUMP_JACK, pumpJack.tileX, pumpJack.tileY, queued));
-      this._addCommandFeedback("move", target.x, target.y, queued);
-      return;
-    }
-    // Non-oil resource node -> gather, but only with the gatherers in the selection.
-    if (gatherers.length > 0 && target.kind !== KIND.OIL) {
-      this._issueCommand(cmd.gather(gatherers, target.id, queued));
-      this._addCommandFeedback("move", world.x, world.y, queued);
-      return;
-    }
-    // Selection has no gatherers: fall through to a move onto the node's position.
-  }
-  // Default -> move to the world point.
-  this._issueCommand(cmd.move(ownUnits, world.x, world.y, queued));
-  this._addCommandFeedback("move", world.x, world.y, queued);
+  issueNormalRightClickAction(this, normalRightClickAction(this, p), queued);
 }
 
 export function _issueTargetedCommand(p, ev = {}) {
@@ -196,6 +125,145 @@ export function _issueTargetedCommand(p, ev = {}) {
 
   this._issueCommand(cmd.attackMove(ownUnits, world.x, world.y, !!ev.shiftKey));
   this._addCommandFeedback("attack", world.x, world.y, !!ev.shiftKey);
+}
+
+function normalRightClickAction(input, p) {
+  const ownUnits = input._selectedOwnUnitIds();
+  const world = input._worldAt(p.x, p.y);
+  if (ownUnits.length === 0) {
+    // No units selected: a buildings-only selection sets a rally point on any
+    // unit-producing buildings in it. Units in the selection take priority, so a
+    // mixed selection always moves the units.
+    const producers = input._selectedProducerBuildingIds();
+    if (producers.length === 0) return null;
+    return {
+      kind: "setRally",
+      producers,
+      x: world.x,
+      y: world.y,
+      stage: ORDER_STAGE.MOVE,
+      feedback: rightClickFeedback("move", world.x, world.y),
+    };
+  }
+
+  const gatherers = input._selectedGathererIds();
+  const workers = input._selectedWorkerIds();
+  const resource = input._resourceAtWorld(world.x, world.y);
+  if (resource && resource.remaining !== 0) {
+    const action = resourceRightClickAction(resource, world, gatherers, workers, input.state.map);
+    if (action) return action;
+  }
+
+  const target = input._entityAtWorld(world.x, world.y, /*ownPreferred=*/ false);
+  if (target && ownOwner(input.state, target.owner) && _isOwnIncompleteBuilding(target)) {
+    const resume = _resumeConstructionIntent(target, input.state.map);
+    if (resume && workers.length > 0) {
+      return {
+        kind: "build",
+        units: workers,
+        building: resume.building,
+        tileX: resume.tileX,
+        tileY: resume.tileY,
+        feedback: rightClickFeedback("move", target.x, target.y),
+      };
+    }
+  }
+  if (target && workers.length > 0 && _isCompletedTankTrap(target)) {
+    return {
+      kind: "deconstruct",
+      units: workers,
+      target,
+      feedback: rightClickFeedback("move", target.x, target.y),
+    };
+  }
+  if (target && enemyOwner(input.state, target.owner) && !isResource(target.kind)) {
+    return {
+      kind: "attack",
+      units: ownUnits,
+      target,
+      feedback: rightClickFeedback("attack", target.x, target.y),
+    };
+  }
+  if (target && isResource(target.kind) && target.remaining !== 0) {
+    const action = resourceRightClickAction(target, world, gatherers, workers, input.state.map);
+    if (action) return action;
+    // Selection has no gatherers: fall through to a move onto the node's position.
+  }
+  return {
+    kind: "move",
+    units: ownUnits,
+    x: world.x,
+    y: world.y,
+    feedback: rightClickFeedback("move", world.x, world.y),
+  };
+}
+
+function resourceRightClickAction(resource, world, gatherers, workers, map) {
+  const pumpJack = _pumpJackBuildIntentForResource(resource, map);
+  if (resource.kind === KIND.OIL && workers.length > 0 && pumpJack) {
+    return {
+      kind: "build",
+      units: workers,
+      building: KIND.PUMP_JACK,
+      tileX: pumpJack.tileX,
+      tileY: pumpJack.tileY,
+      feedback: rightClickFeedback("move", resource.x, resource.y),
+    };
+  }
+  if (gatherers.length > 0 && resource.kind !== KIND.OIL) {
+    return {
+      kind: "gather",
+      units: gatherers,
+      target: resource,
+      feedback: rightClickFeedback("move", world.x, world.y),
+    };
+  }
+  return null;
+}
+
+function issueNormalRightClickAction(input, action, queued) {
+  if (!action) return;
+  switch (action.kind) {
+    case "setRally":
+      for (const building of action.producers) {
+        input._issueCommand(cmd.setRally(building, action.x, action.y, queued, action.stage));
+      }
+      break;
+    case "build":
+      input._issueCommand(cmd.build(action.units, action.building, action.tileX, action.tileY, queued));
+      break;
+    case "gather":
+      input._issueCommand(cmd.gather(action.units, action.target.id, queued));
+      break;
+    case "deconstruct":
+      input._issueCommand(cmd.deconstruct(action.units, action.target.id, queued));
+      break;
+    case "attack":
+      input._issueCommand(cmd.attack(action.units, action.target.id, queued));
+      break;
+    case "move":
+      input._issueCommand(cmd.move(action.units, action.x, action.y, queued));
+      break;
+    default:
+      return;
+  }
+  if (action.feedback) {
+    input._addCommandFeedback(action.feedback.kind, action.feedback.x, action.feedback.y, queued);
+  }
+}
+
+function rightClickFeedback(kind, x, y) {
+  return { kind, x, y };
+}
+
+function attackTargetPreviewForRightClickAction(action) {
+  if (action?.kind !== "attack" || !action.target) return null;
+  return {
+    targetId: action.target.id,
+    kind: action.target.kind,
+    x: action.target.x,
+    y: action.target.y,
+  };
 }
 
 export function _selectedOwnUnitIds() {
@@ -466,6 +534,25 @@ export function _refreshResourceMiningPreview() {
     ccY: nearest.y,
     inRange: nearest.dist <= rangePx + 0.001,
   });
+}
+
+export function _refreshAttackTargetPreview() {
+  const intent = clientIntent(this);
+  if (
+    !intent ||
+    this._drag ||
+    intent?.activeLabTool ||
+    intent?.placement ||
+    intent?.commandTarget ||
+    !this.mouse
+  ) {
+    intent?.updateAttackTargetPreview?.(null);
+    return;
+  }
+
+  intent.updateAttackTargetPreview(attackTargetPreviewForRightClickAction(
+    normalRightClickAction(this, this.mouse),
+  ));
 }
 
 export function _nearestOwnCompletedCityCentre(x, y) {

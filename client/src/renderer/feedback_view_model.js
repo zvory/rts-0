@@ -45,6 +45,7 @@ export function buildRendererFeedbackView(
     map: state?.map || null,
     placement: intent?.placement || null,
     commandFeedback,
+    attackTargetPreview: intent?.attackTargetPreview || null,
     selectedEntities: () => selected,
     showUnitRangesEnabled: state?.showUnitRangesEnabled !== false,
     showSelectedFieldOfFireEnabled: controlOwner.showSelectedFieldOfFireEnabled,

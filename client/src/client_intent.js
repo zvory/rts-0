@@ -30,6 +30,8 @@ export class ClientIntent {
     this.lastCommandTargetArm = null;
     /** @type {Array<{kind:string,x:number,y:number,append:boolean,radiusTiles:number|null,createdAt:number,ownerId:number|null}>} */
     this.commandFeedback = [];
+    /** @type {null | {targetId:number, kind:string, x:number, y:number}} */
+    this.attackTargetPreview = null;
     /** @type {null | {resourceId:number, resourceX:number, resourceY:number, ccId:number, ccX:number, ccY:number, inRange:boolean}} */
     this.resourceMiningPreview = null;
     /** @type {null | {source?:string, mouseX:number, mouseY:number, guns:Array<object>}} */
@@ -47,6 +49,7 @@ export class ClientIntent {
     this.commandTarget = null;
     this.lastCommandTargetArm = null;
     this.antiTankGunSetupPreview = null;
+    this.attackTargetPreview = null;
     this.commandCardMode = "workerBuild";
   }
 
@@ -69,6 +72,7 @@ export class ClientIntent {
     this._clearActiveLabTool();
     this.commandTarget = null;
     this.lastCommandTargetArm = null;
+    this.attackTargetPreview = null;
     this.closeCommandCardMenu();
     this.placement = { building: buildingKind, tileX: 0, tileY: 0, valid: false };
   }
@@ -149,6 +153,7 @@ export class ClientIntent {
 
   _syncCommandTargetFromComposer() {
     this.commandTarget = this.commandComposer.target;
+    this.attackTargetPreview = null;
     this.antiTankGunSetupPreview = null;
     this.abilityTargetPreview = null;
   }
@@ -187,6 +192,14 @@ export class ClientIntent {
     const ttlMs = 650;
     this.commandFeedback = this.commandFeedback.filter((f) => now - f.createdAt <= ttlMs);
     return this.commandFeedback;
+  }
+
+  /**
+   * Set or clear the enemy unit/entity under the cursor that a normal right-click would attack.
+   * @param {null | {targetId:number, kind:string, x:number, y:number}} preview
+   */
+  updateAttackTargetPreview(preview) {
+    this.attackTargetPreview = preview;
   }
 
   /**
@@ -375,6 +388,7 @@ export class ClientIntent {
     this.lastCommandTargetArm = null;
     this._syncCommandTargetFromComposer();
     this.commandCardMode = null;
+    this.attackTargetPreview = null;
     this.resourceMiningPreview = null;
     const active = { id, kind };
     if (tool?.payload && typeof tool.payload === "object") active.payload = { ...tool.payload };

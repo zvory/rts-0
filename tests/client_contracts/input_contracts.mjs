@@ -6,6 +6,7 @@ import { ClientIntent } from "../../client/src/client_intent.js";
 import { HUD } from "../../client/src/hud.js";
 import { Input } from "../../client/src/input/index.js";
 import { CameraNavigationInput } from "../../client/src/input/camera_navigation.js";
+import { KIND } from "../../client/src/protocol.js";
 import { _controlGroupSaveModifierActive } from "../../client/src/input/control_groups.js";
 import {
   cursorLockSupported,
@@ -116,6 +117,51 @@ import {
   unregisterHigh();
   assert(router.pointerDown({ clientX: 150, clientY: 70, button: 0 }), "router falls back after unregister");
   assert(calls.at(-1) === "lowDown", "unregistered zone no longer receives events");
+}
+
+// ---------------------------------------------------------------------------
+// Context-sensitive hover previews
+// ---------------------------------------------------------------------------
+{
+  const moveUnit = { id: 40, owner: 1, kind: KIND.RIFLEMAN, x: 120, y: 120 };
+  const enemyUnit = { id: 41, owner: 2, kind: KIND.RIFLEMAN, x: 180, y: 180 };
+  const attackHoverInput = Object.create(Input.prototype);
+  attackHoverInput.clientIntent = new ClientIntent();
+  attackHoverInput.mouse = { x: 180, y: 180 };
+  attackHoverInput._drag = null;
+  attackHoverInput._worldAt = (x, y) => ({ x, y });
+  attackHoverInput.state = {
+    playerId: 1,
+    map: { tileSize: 32 },
+    entitiesInterpolated: () => [moveUnit, enemyUnit],
+    selectedEntities: () => [moveUnit],
+  };
+
+  attackHoverInput._refreshAttackTargetPreview();
+  assert(
+    attackHoverInput.clientIntent.attackTargetPreview?.targetId === enemyUnit.id &&
+      attackHoverInput.clientIntent.attackTargetPreview.kind === KIND.RIFLEMAN,
+    "enemy hover with own units selected previews the right-click attack target",
+  );
+
+  attackHoverInput.state.entitiesInterpolated = () => [moveUnit];
+  attackHoverInput._refreshAttackTargetPreview();
+  assert(attackHoverInput.clientIntent.attackTargetPreview === null, "attack target preview clears when right-click would move");
+
+  const deconstructWorker = { id: 42, owner: 1, kind: KIND.WORKER, x: 150, y: 150 };
+  const enemyTankTrap = { id: 43, owner: 2, kind: KIND.TANK_TRAP, x: 180, y: 180 };
+  attackHoverInput.clientIntent.updateAttackTargetPreview({ targetId: enemyUnit.id, kind: enemyUnit.kind, x: enemyUnit.x, y: enemyUnit.y });
+  attackHoverInput.state = {
+    playerId: 1,
+    map: { tileSize: 32 },
+    entitiesInterpolated: () => [deconstructWorker, enemyTankTrap],
+    selectedEntities: () => [deconstructWorker],
+  };
+  attackHoverInput._refreshAttackTargetPreview();
+  assert(
+    attackHoverInput.clientIntent.attackTargetPreview === null,
+    "attack target preview stays hidden when worker right-click would deconstruct a Tank Trap",
+  );
 }
 
 {

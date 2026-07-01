@@ -21,6 +21,7 @@ import {
   _drawAbilityObjects,
   _drawAbilityTargetPreview,
   _drawAntiTankGunSetupPreview,
+  _drawAttackTargetPreview,
   _drawCommandFeedback,
   _drawDebugPathOverlay,
   _drawMortarImpacts,
@@ -130,6 +131,12 @@ function nearPoint(call, point, epsilon = 0.001) {
       radiusPx: 24,
       hoverInRange: true,
     },
+    attackTargetPreview: {
+      targetId: 88,
+      kind: KIND.RIFLEMAN,
+      x: 144,
+      y: 160,
+    },
     resourceMiningPreview: {
       resourceId: 200,
       resourceX: 80,
@@ -161,6 +168,7 @@ function nearPoint(call, point, epsilon = 0.001) {
   assert(selectedReads === 1, "feedback view snapshots selected entities once per frame");
   assert(feedbackView.entityById(7) === selected[0], "feedback view exposes renderer entity lookup");
   assert(feedbackView.abilityTargetPreview?.ability === ABILITY.SMOKE, "feedback view exposes ability target preview");
+  assert(feedbackView.attackTargetPreview?.targetId === 88, "feedback view exposes attack target hover preview");
   assert(feedbackView.resourceMiningPreview?.resourceId === 200, "feedback view exposes resource mining preview");
   assert(feedbackView.abilityObjects.length === 1, "feedback view exposes ability objects");
   assert(feedbackView.panzerfaustShots.length === 1, "feedback view exposes Panzerfaust launch/travel effects");
@@ -175,9 +183,11 @@ function nearPoint(call, point, epsilon = 0.001) {
     _abilityObjectGfx: abilityObjectGfx,
     _lineProjectileTrails: new Map(),
     _map: { tileSize: 32 },
+    _ringRadius: () => ({ rx: 18, ry: 12, cy: 5 }),
   };
   _drawPlacement.call(renderer, feedbackView, null);
   _drawCommandFeedback.call(renderer, feedbackView);
+  _drawAttackTargetPreview.call(renderer, feedbackView);
   _drawAntiTankGunSetupPreview.call(renderer, feedbackView);
   _drawAbilityTargetPreview.call(renderer, feedbackView);
   _drawAbilityObjects.call(renderer, feedbackView);
@@ -188,6 +198,10 @@ function nearPoint(call, point, epsilon = 0.001) {
 
   assert(placementGfx.calls.some((call) => call[0] === "drawRoundedRect"), "renderer feedback reads placement through the feedback view");
   assert(feedbackGfx.calls.some((call) => call[0] === "drawCircle"), "renderer feedback reads command/preview state through the feedback view");
+  assert(
+    feedbackGfx.calls.some((call) => call[0] === "drawEllipse" && call[1] === 144 && call[2] === 165 && call[3] === 18),
+    "renderer feedback draws attack target hover rings through the feedback view",
+  );
   assert(feedbackGfx.calls.some((call) => call[0] === "lineTo"), "renderer feedback reads resource mining preview through the feedback view");
   assert(feedbackGfx.calls.some((call) => call[0] === "drawPolygon"), "renderer feedback draws live mortar impacts without missing helper references");
   assert(feedbackGfx.calls.some((call) => call[0] === "drawRect" || call[0] === "drawPolygon"), "renderer feedback draws Panzerfaust shot and impact cues");

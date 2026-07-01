@@ -56,6 +56,7 @@ import {
   _nearestOwnCompletedCityCentre,
   _onRightClick,
   _quickCastCommandTarget,
+  _refreshAttackTargetPreview,
   _refreshAbilityTargetPreview,
   _refreshAntiTankGunSetupPreview,
   _refreshResourceMiningPreview,
@@ -354,18 +355,21 @@ export class Input {
     void dt;
     this._flushPointerLockCursor();
     if (this._placement()) {
+      this._intent()?.updateAttackTargetPreview?.(null);
       this._intent()?.updateResourceMiningPreview?.(null);
       this._intent()?.updateAntiTankGunSetupPreview?.(null);
       this._refreshPlacement();
       return;
     }
     if (this._commandTarget() === "setupAntiTankGuns") {
+      this._intent()?.updateAttackTargetPreview?.(null);
       this._intent()?.updateResourceMiningPreview?.(null);
       this._intent()?.updateAbilityTargetPreview?.(null);
       this._refreshAntiTankGunSetupPreview();
       return;
     }
     if (this._commandTarget()?.kind === "ability") {
+      this._intent()?.updateAttackTargetPreview?.(null);
       this._intent()?.updateResourceMiningPreview?.(null);
       this._intent()?.updateAntiTankGunSetupPreview?.(null);
       this._refreshAbilityTargetPreview();
@@ -373,6 +377,7 @@ export class Input {
     }
     this._intent()?.updateAbilityTargetPreview?.(null);
     this._intent()?.updateAntiTankGunSetupPreview?.(null);
+    this._refreshAttackTargetPreview();
     this._refreshResourceMiningPreview();
   }
 
@@ -929,6 +934,7 @@ Object.assign(Input.prototype, {
   _selectedGathererIds,
   _selectedWorkerIds,
   _selectedOwnAntiTankGunIds,
+  _refreshAttackTargetPreview,
   _refreshAntiTankGunSetupPreview,
   _refreshAbilityTargetPreview,
   _refreshResourceMiningPreview,
