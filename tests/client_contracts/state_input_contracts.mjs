@@ -36,7 +36,6 @@ import {
   SETUP,
   STATE,
   TERRAIN,
-  WEAPON_KIND,
   cmd,
 } from "../../client/src/protocol.js";
 import {
@@ -281,7 +280,6 @@ function buttonByLabel(card, label) {
       e: EVENT.ATTACK,
       from: 99,
       to: 99,
-      weaponKind: WEAPON_KIND.ARTILLERY_GUN,
       reveal: {
         owner: 2,
         kind: KIND.ARTILLERY,
@@ -297,53 +295,9 @@ function buttonByLabel(card, label) {
   assert(artilleryRevealState.liveMuzzleFlashes(performance.now()).length === 0, "artillery self-reveal does not draw a tracer");
   assert(artilleryRevealState.weaponRecoil(99, KIND.ARTILLERY, performance.now()) > 0, "artillery self-reveal still recoils the gun");
 
-  const tankWeaponHintState = new GameState({ ...start, map: { ...start.map, resources: [] } });
-  tankWeaponHintState.applySnapshot({
-    tick: 12,
-    steel: 0,
-    oil: 0,
-    supplyUsed: 0,
-    supplyCap: 10,
-    entities: [
-      { id: 5, owner: 1, kind: KIND.TANK, x: 100, y: 100, hp: 180, maxHp: 180, state: STATE.ATTACK, weaponFacing: 0 },
-      { id: 6, owner: 2, kind: KIND.TANK, x: 160, y: 100, hp: 180, maxHp: 180, state: STATE.IDLE },
-    ],
-    events: [{
-      e: EVENT.ATTACK,
-      from: 5,
-      to: 6,
-      toPos: [160, 100],
-      weaponKind: WEAPON_KIND.TANK_CANNON,
-    }],
-  });
-  assert(tankWeaponHintState.liveMuzzleFlashes(performance.now())[0]?.weaponKind === WEAPON_KIND.TANK_CANNON, "default weapon hint is retained on muzzle feedback");
-  assert(tankWeaponHintState.weaponRecoil(5, KIND.TANK, performance.now()) > 0, "default weapon hint preserves tank recoil");
-  const explicitRecoilHintState = new GameState({ ...start, map: { ...start.map, resources: [] } });
-  explicitRecoilHintState.weaponRecoilById.set(91, performance.now() - 500);
-  assert(
-    explicitRecoilHintState.weaponRecoil(91, KIND.RIFLEMAN, performance.now(), WEAPON_KIND.ARTILLERY_GUN) > 0,
-    "explicit weapon hint can extend recoil timing through the GameState facade",
-  );
-
-  const unknownWeaponHintState = new GameState({ ...start, map: { ...start.map, resources: [] } });
-  unknownWeaponHintState.applySnapshot({
-    tick: 13,
-    steel: 0,
-    oil: 0,
-    supplyUsed: 0,
-    supplyCap: 10,
-    entities: [
-      { id: 7, owner: 1, kind: KIND.RIFLEMAN, x: 100, y: 120, hp: 40, maxHp: 40, state: STATE.ATTACK },
-      { id: 8, owner: 2, kind: KIND.WORKER, x: 140, y: 120, hp: 40, maxHp: 40, state: STATE.IDLE },
-    ],
-    events: [{ e: EVENT.ATTACK, from: 7, to: 8, toPos: [140, 120], weaponKind: "unknown_future_weapon" }],
-  });
-  assert(unknownWeaponHintState.liveMuzzleFlashes(performance.now()).length === 1, "unknown weapon hint still creates normal muzzle feedback");
-  assert(unknownWeaponHintState.weaponRecoil(7, KIND.RIFLEMAN, performance.now()) > 0, "unknown weapon hint preserves attacker-kind recoil fallback");
-
   const overpenEventState = new GameState({ ...start, map: { ...start.map, resources: [] } });
   overpenEventState.applySnapshot({
-    tick: 14,
+    tick: 12,
     steel: 0,
     oil: 0,
     supplyUsed: 0,

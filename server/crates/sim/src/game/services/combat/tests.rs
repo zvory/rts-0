@@ -330,7 +330,6 @@ fn apply_test_damage_with_teams(
         10,
     );
 }
-
 #[test]
 fn idle_army_units_auto_acquire_targets() {
     let (entities, self_id, enemy_id) = rifleman_with_enemy();
@@ -1829,7 +1828,6 @@ fn packed_anti_tank_gun_fires_with_shorter_range_and_reduced_damage() {
         "packed anti-tank gun should deal 75% of its deployed 100 damage"
     );
 }
-
 #[test]
 fn deployed_anti_tank_gun_fires_at_long_range() {
     let mut entities = EntityStore::new();

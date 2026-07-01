@@ -5,9 +5,7 @@
 //!
 //! Tag conventions: top-level messages use `"t"`, commands use `"c"`, events use `"e"`.
 //! Coordinates are world pixels (floats) unless the field name ends in `Tile`.
-
 use serde::{Deserialize, Serialize};
-
 mod client_net_report;
 mod compact_snapshot;
 mod contract_metadata;
