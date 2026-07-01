@@ -12,12 +12,18 @@ import {
   noticeSoundId,
 } from "../../client/src/audio.js";
 import {
+  PANZERFAUST_IMPACT_SOUND_ID,
+  PANZERFAUST_LAUNCH_SOUND_ID,
   attackFeedbackKind,
   attackKindHasCombatSound,
   defaultWeaponKindForAttackerKind,
   machineGunnerHasAudibleTarget,
+  panzerfaustFeedbackDedupKey,
+  panzerfaustFeedbackSoundId,
 } from "../../client/src/combat_audio.js";
+import { MatchCombatAudio } from "../../client/src/match_combat_audio.js";
 import {
+  EVENT,
   KIND,
   SETUP,
   STATE,
@@ -97,6 +103,12 @@ assert(
     SOUND_MANIFEST.some((entry) => entry.id === id && entry.url.startsWith("/assets/sound/ui/"))
   ),
   "countdown voice cues are exposed through the shared sound manifest",
+);
+assert(
+  [PANZERFAUST_LAUNCH_SOUND_ID, PANZERFAUST_IMPACT_SOUND_ID].every((id) =>
+    SOUND_MANIFEST.some((entry) => entry.id === id && entry.url.startsWith("/assets/sound/combat/"))
+  ),
+  "Panzerfaust combat cues are exposed through the shared sound manifest",
 );
 
 // Audio
@@ -306,12 +318,88 @@ assert(
   );
   assert(
     !attackKindHasCombatSound(KIND.PANZERFAUST, WEAPON_KIND.PANZERFAUST_LOADED_SHOT),
-    "Panzerfaust attacks are deliberately silent until the dedicated audio polish pass",
+    "generic Panzerfaust attack events stay silent instead of reusing rifle or tank sounds",
+  );
+  assert(
+    panzerfaustFeedbackSoundId(EVENT.PANZERFAUST_LAUNCH) === PANZERFAUST_LAUNCH_SOUND_ID,
+    "Panzerfaust launch events map to a dedicated launch cue",
+  );
+  assert(
+    panzerfaustFeedbackSoundId(EVENT.PANZERFAUST_IMPACT) === PANZERFAUST_IMPACT_SOUND_ID,
+    "Panzerfaust impact events map to a dedicated impact cue",
+  );
+  assert(
+    panzerfaustFeedbackSoundId(EVENT.PANZERFAUST_CONVERSION) === null,
+    "Panzerfaust conversion stays silent in the first polish pass",
+  );
+  assert(
+    ![
+      "combat_tank_01",
+      "combat_rifle_02",
+      "combat_rifle_03",
+      "combat_mg_burst_02",
+      "combat_mg_burst_03",
+      "combat_artillery_fire_05",
+    ].includes(panzerfaustFeedbackSoundId(EVENT.PANZERFAUST_LAUNCH)),
+    "Panzerfaust launch does not reuse tank, rifle, machine-gun, or artillery cues",
+  );
+  assert(
+    panzerfaustFeedbackDedupKey(EVENT.PANZERFAUST_LAUNCH, 320, 384, "combat_self") ===
+      "panzerfaust_launch:combat_self:1:2",
+    "Panzerfaust launch dedup buckets nearby grouped shots",
   );
   assert(
     attackFeedbackKind(KIND.RIFLEMAN, "future_unknown_weapon") === KIND.RIFLEMAN,
     "unknown attack weapon hints preserve attacker-kind feedback",
   );
+}
+
+{
+  const plays = [];
+  const entities = new Map([
+    [31, { id: 31, owner: 1, kind: KIND.PANZERFAUST, x: 300, y: 340 }],
+  ]);
+  const combatAudio = new MatchCombatAudio({
+    state: {
+      playerId: 1,
+      entityById: (id) => entities.get(id) || null,
+    },
+    audio: {
+      pickVariant: (ids) => ids[0],
+      play(id, opts) {
+        plays.push({ id, opts });
+        return true;
+      },
+      stopByKey() {},
+    },
+  });
+
+  combatAudio.playPointFireSound({
+    e: EVENT.PANZERFAUST_LAUNCH,
+    from: 31,
+    fromX: 300,
+    fromY: 340,
+    toX: 352,
+    toY: 340,
+  });
+  assert(plays[0].id === PANZERFAUST_LAUNCH_SOUND_ID, "match combat audio routes Panzerfaust launches");
+  assert(plays[0].opts.x === 300 && plays[0].opts.y === 340, "Panzerfaust launch audio uses the projected launch point");
+  assert(plays[0].opts.category === "combat_self", "own visible Panzerfaust launches use the self combat bus");
+  assert(plays[0].opts.cooldownMs >= 120, "Panzerfaust launch audio applies an anti-spam cooldown");
+  assert(
+    plays[0].opts.dedupKey.startsWith("panzerfaust_launch:combat_self:"),
+    "Panzerfaust launch audio uses a coarse spatial dedup bucket",
+  );
+
+  combatAudio.playPointFireSound({ e: EVENT.PANZERFAUST_IMPACT, x: 352, y: 340 });
+  assert(plays.at(-1).id === PANZERFAUST_IMPACT_SOUND_ID, "match combat audio routes Panzerfaust impacts");
+  assert(plays.at(-1).opts.x === 352 && plays.at(-1).opts.y === 340, "Panzerfaust impact audio uses the projected impact point");
+  assert(plays.at(-1).opts.category === "combat_other", "Panzerfaust impacts without a visible source avoid claiming self ownership");
+  assert(plays.at(-1).opts.gain < plays[0].opts.gain, "Panzerfaust impact cue is quieter than the launch cue");
+
+  const playCount = plays.length;
+  combatAudio.playPointFireSound({ e: EVENT.PANZERFAUST_CONVERSION, id: 31 });
+  assert(plays.length === playCount, "Panzerfaust conversion does not play a combat cue");
 }
 
 // ---------------------------------------------------------------------------

@@ -3,6 +3,8 @@ import {
   attackKindHasCombatSound,
   machineGunnerHasAudibleTarget,
   machineGunSoundKey,
+  panzerfaustFeedbackDedupKey,
+  panzerfaustFeedbackSoundId,
 } from "./combat_audio.js";
 import { EVENT, KIND } from "./protocol.js";
 
@@ -10,6 +12,8 @@ const KAR98K_GAIN = 0.25;
 const MG_BURST_GAIN = 0.7;
 const MORTAR_LAUNCH_GAIN = 0.85;
 const ARTILLERY_FIRE_GAIN = 1.2;
+const PANZERFAUST_LAUNCH_GAIN = 0.52;
+const PANZERFAUST_IMPACT_GAIN = 0.42;
 
 const COMBAT_SOUNDS = Object.freeze({
   [KIND.TANK]: {
@@ -39,7 +43,7 @@ const COMBAT_SOUNDS = Object.freeze({
   },
 });
 
-const POINT_FIRE_SOUNDS = Object.freeze({
+const POSITIONAL_EVENT_SOUNDS = Object.freeze({
   [EVENT.MORTAR_LAUNCH]: {
     id: "combat_mortar_launch_04",
     priority: 3.5,
@@ -49,6 +53,22 @@ const POINT_FIRE_SOUNDS = Object.freeze({
     id: "combat_artillery_fire_05",
     priority: 4.5,
     gain: ARTILLERY_FIRE_GAIN,
+  },
+  [EVENT.PANZERFAUST_LAUNCH]: {
+    id: panzerfaustFeedbackSoundId(EVENT.PANZERFAUST_LAUNCH),
+    priority: 3.25,
+    gain: PANZERFAUST_LAUNCH_GAIN,
+    cooldownMs: 140,
+    pitchVariance: 0.035,
+    panzerfaustDedup: true,
+  },
+  [EVENT.PANZERFAUST_IMPACT]: {
+    id: panzerfaustFeedbackSoundId(EVENT.PANZERFAUST_IMPACT),
+    priority: 3,
+    gain: PANZERFAUST_IMPACT_GAIN,
+    cooldownMs: 120,
+    pitchVariance: 0.03,
+    panzerfaustDedup: true,
   },
 });
 
@@ -99,25 +119,30 @@ export class MatchCombatAudio {
 
   playPointFireSound(ev) {
     if (!this.audio) return;
-    const spec = POINT_FIRE_SOUNDS[ev.e];
+    const spec = POSITIONAL_EVENT_SOUNDS[ev.e];
     if (!spec) return;
-    let pos = null;
-    if (ev.e === EVENT.MORTAR_LAUNCH && Number.isFinite(ev.fromX) && Number.isFinite(ev.fromY)) {
-      pos = { x: ev.fromX, y: ev.fromY };
-    } else if (ev.e === EVENT.ARTILLERY_TARGET && typeof ev.from === "number") {
-      const from = this.state.entityById(ev.from);
-      if (from && Number.isFinite(from.x) && Number.isFinite(from.y)) pos = from;
-    }
+    const pos = positionalEventSoundPosition(ev, this.state);
     if (!pos) return;
     const from = typeof ev.from === "number" ? this.state.entityById(ev.from) : null;
     const category = from && audioSelfOwner(this.state, from.owner) ? "combat_self" : "combat_other";
-    this.audio.play(spec.id, {
+    const opts = {
       x: pos.x,
       y: pos.y,
       category,
       priority: spec.priority,
       gain: spec.gain,
-    });
+    };
+    if (typeof spec.cooldownMs === "number") opts.cooldownMs = spec.cooldownMs;
+    if (typeof spec.pitchVariance === "number") opts.pitchVariance = spec.pitchVariance;
+    if (spec.panzerfaustDedup) {
+      const dedupKey = panzerfaustFeedbackDedupKey(ev.e, pos.x, pos.y, category);
+      if (dedupKey) opts.dedupKey = dedupKey;
+    }
+    this.audio.play(spec.id, opts);
+  }
+
+  hasPointFireSound(eventKind) {
+    return !!POSITIONAL_EVENT_SOUNDS[eventKind];
   }
 
   stopInactiveMachineGunSounds() {
@@ -139,6 +164,28 @@ export class MatchCombatAudio {
     }
     this.activeMachineGunSoundKeys.clear();
   }
+}
+
+function positionalEventSoundPosition(ev, state) {
+  if (!ev) return null;
+  if (ev.e === EVENT.MORTAR_LAUNCH && Number.isFinite(ev.fromX) && Number.isFinite(ev.fromY)) {
+    return { x: ev.fromX, y: ev.fromY };
+  }
+  if (ev.e === EVENT.ARTILLERY_TARGET && typeof ev.from === "number") {
+    const from = state.entityById(ev.from);
+    if (from && Number.isFinite(from.x) && Number.isFinite(from.y)) return from;
+  }
+  if (
+    ev.e === EVENT.PANZERFAUST_LAUNCH &&
+    Number.isFinite(ev.fromX) &&
+    Number.isFinite(ev.fromY)
+  ) {
+    return { x: ev.fromX, y: ev.fromY };
+  }
+  if (ev.e === EVENT.PANZERFAUST_IMPACT && Number.isFinite(ev.x) && Number.isFinite(ev.y)) {
+    return { x: ev.x, y: ev.y };
+  }
+  return null;
 }
 
 function audioSelfOwner(state, owner) {

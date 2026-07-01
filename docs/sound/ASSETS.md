@@ -44,6 +44,8 @@ with licensed recordings before any commercial distribution.
 | `combat/combat_kar98k_03_with_bolt_action.mp3` | Kar98k original (bolt retained) | unknown | unknown |
 | `combat/combat_mg42_burst_02.mp3` | MG42 primary — clean isolated burst | unknown | unknown |
 | `combat/combat_mg42_burst_03.mp3` | MG42 backup | unknown | unknown |
+| `combat/combat_panzerfaust_launch_01.mp3` | Panzerfaust launch — generated first-pass cue; replace with reviewed recording before final audio pass | local procedural ffmpeg generation, Phase 6 | project-generated |
+| `combat/combat_panzerfaust_impact_01.mp3` | Panzerfaust tank impact/miss-expire cue — generated first-pass cue; replace with reviewed recording before final audio pass | local procedural ffmpeg generation, Phase 6 | project-generated |
 | `combat/combat_mortar_launch_04.mp3` | Mortar launch — selected from CC0 examples; too long, trim before final polish | https://opengameart.org/content/25-cc0-bang-firework-sfx | CC0 |
 | `combat/combat_artillery_fire_05.mp3` | Artillery fire — selected from CC0 examples | https://opengameart.org/content/25-cc0-bang-firework-sfx | CC0 |
 | `combat/combat_tank_cannon_01.mp3` | Tank cannon (a bit loud) | unknown | unknown |
@@ -65,4 +67,6 @@ with licensed recordings before any commercial distribution.
 - Grass infantry footstep pack: need 6–10 clean variations on grass surface
 - Tank engine running (moving): https://freesound.org/people/C-V/sounds/565597/ (same session as idle_03)
 - No explosion sounds (all candidates rejected — see SOUND_NOTES)
+- Replace generated Panzerfaust launch/impact cues with reviewed realistic recordings before final
+  audio polish
 - `ambient/` directory is empty

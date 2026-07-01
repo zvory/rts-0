@@ -1,8 +1,8 @@
 # Panzerfaust Unit Checklist
 
 Status: Phase 0 brief and Phase 1 rules/balance spec drafted with user-reviewed close-range tuning;
-Phases 2-5 have implemented hidden vocabulary, runtime/client inspection, and normal Barracks
-production exposure.
+Phases 2-6 have implemented hidden vocabulary, runtime/client inspection, normal Barracks
+production exposure, and first-pass launch/impact audio feedback.
 This file follows [docs/new-unit-checklist.md](../../docs/new-unit-checklist.md).
 
 Read: [docs/context/balance.md](../../docs/context/balance.md),
@@ -78,6 +78,8 @@ Read: [docs/context/balance.md](../../docs/context/balance.md),
     the loaded Panzerfaust still does not fire while moving.
   - Entrenchment applies to Panzerfaust infantry, including the normal trench range and defense
     benefits.
+  - Panzerfaust launch and impact now use distinct first-pass spatial combat cues; projectile
+    travel and same-id conversion remain silent to avoid clustered-fire spam.
 
 Exit criteria:
 
@@ -174,7 +176,8 @@ Exit criteria:
 - [x] The unit's numbers and rules can be reviewed without reading implementation code.
 - [x] Any unresolved tuning item is marked as deferred and assigned to a later pass.
   - Deferred: direct Training Centre production alternative, broader armored/hard target filters,
-    hull-facing multipliers, final visuals, audio, exact protocol/event representation, and AI build
-    strategy.
+    hull-facing multipliers, final visuals, production-quality Panzerfaust audio recordings,
+    optional travel/conversion audio after playtests, exact protocol/event representation, and AI
+    build strategy.
 - [x] No implementation files have been edited.
 - [x] The next step is user review, not implementation.

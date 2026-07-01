@@ -1,4 +1,9 @@
-import { KIND, WEAPON_KIND } from "./protocol.js";
+import { EVENT, KIND, WEAPON_KIND } from "./protocol.js";
+
+export const PANZERFAUST_LAUNCH_SOUND_ID = "combat_panzerfaust_launch_01";
+export const PANZERFAUST_IMPACT_SOUND_ID = "combat_panzerfaust_impact_01";
+
+const PANZERFAUST_SOUND_BUCKET_PX = 192;
 
 const DEFAULT_WEAPON_KIND_BY_ATTACKER_KIND = Object.freeze({
   [KIND.WORKER]: WEAPON_KIND.WORKER_TOOLS,
@@ -27,6 +32,11 @@ const ATTACK_FEEDBACK_KIND_BY_WEAPON = Object.freeze({
   [WEAPON_KIND.TANK_COAX]: KIND.TANK,
 });
 
+const PANZERFAUST_FEEDBACK_SOUND_IDS = Object.freeze({
+  [EVENT.PANZERFAUST_LAUNCH]: PANZERFAUST_LAUNCH_SOUND_ID,
+  [EVENT.PANZERFAUST_IMPACT]: PANZERFAUST_IMPACT_SOUND_ID,
+});
+
 export function machineGunSoundKey(id) {
   return `combat:machine_gunner:${id}`;
 }
@@ -52,4 +62,20 @@ export function attackFeedbackKind(kind, weaponKind) {
 export function attackKindHasCombatSound(kind, weaponKind) {
   const feedbackKind = attackFeedbackKind(kind, weaponKind);
   return feedbackKind !== KIND.WORKER && feedbackKind !== KIND.PANZERFAUST;
+}
+
+export function panzerfaustFeedbackSoundId(eventKind) {
+  return PANZERFAUST_FEEDBACK_SOUND_IDS[eventKind] || null;
+}
+
+export function panzerfaustFeedbackDedupKey(eventKind, x, y, category = "combat_other") {
+  if (!panzerfaustFeedbackSoundId(eventKind) || !Number.isFinite(x) || !Number.isFinite(y)) {
+    return null;
+  }
+  const prefix = eventKind === EVENT.PANZERFAUST_LAUNCH
+    ? "panzerfaust_launch"
+    : "panzerfaust_impact";
+  const bx = Math.floor(x / PANZERFAUST_SOUND_BUCKET_PX);
+  const by = Math.floor(y / PANZERFAUST_SOUND_BUCKET_PX);
+  return `${prefix}:${category}:${bx}:${by}`;
 }

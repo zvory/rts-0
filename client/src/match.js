@@ -1090,7 +1090,7 @@ export class Match {
         this.playAttackSound(ev);
       } else if (ev && ev.e === EVENT.ARTILLERY_FIRING) {
         this.minimap?.markArtilleryFiring(ev);
-      } else if (ev && (ev.e === EVENT.MORTAR_LAUNCH || ev.e === EVENT.ARTILLERY_TARGET)) {
+      } else if (ev && this.combatAudio?.hasPointFireSound(ev.e)) {
         this.playPointFireSound(ev);
       }
     }
