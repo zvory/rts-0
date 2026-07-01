@@ -11,6 +11,8 @@ winners, and the authoritative command stream at match end, and use the checkpoi
 while old replay artifacts remain loadable through compatibility code or fail with an intentional,
 documented incompatibility reason. Do not try to derive the replay start checkpoint from the final
 post-match `Game`; by then the authoritative state is no longer the replay start state.
+The artifact construction API should make that mistake hard to represent: capture/finalization
+helpers should require a launch-time replay start composition, not just a final `&Game`.
 
 Replay playback must remain authoritative through recorded actions. AI controller memory stays
 outside the checkpoint; AI slots are restored as players, and replay correctness comes from the
@@ -36,10 +38,20 @@ Explicit non-goals:
   playback through the checkpoint start path. Add room/lifecycle storage for the launch-time
   replay start checkpoint or equivalent start composition, then finalize the replay artifact with
   end-of-match command log, duration, winner, and scores.
+- `server/crates/ai/src/selfplay/**`: route AI matchup, balance-matrix, scripted self-play, and
+  failure-artifact writers through the same launch-time replay start composition. These writers
+  currently save artifacts outside the lobby room task, so they must not keep a convenience
+  `capture_from_final_game` path that can accidentally derive replay start state from the final
+  `Game`.
 - `server/src/db.rs`: update persisted replay artifact handling to decode the same versioned replay
   artifact contract used by file/dev loading. Database rows must not deserialize directly into only
   the old concrete replay type once a new artifact shape exists.
+- `server/src/main.rs`: update Recent Matches compatibility metadata and match replay launch
+  validation to understand the same replay artifact version enum/policy as file/dev loading. The
+  public `/api/matches` and replay-launch paths must not hard-code only the old schema once new
+  checkpoint-backed artifacts are written.
 - Replay tests under `server/src/lobby/**` and `server/crates/sim/src/game/**`.
+- AI/self-play replay artifact tests under `server/crates/ai/**` where the writer lives.
 - Docs for replay artifact compatibility and migration behavior.
 
 ## Verification
@@ -48,10 +60,16 @@ Explicit non-goals:
   live game.
 - New captures preserve the tick-zero start checkpoint captured at launch; tests should fail if the
   artifact start checkpoint is accidentally exported from the final post-match `Game`.
+- Every replay writer preserves the launch-time start checkpoint: post-match lobby capture,
+  shutdown/crash capture, dev replay saves, AI/self-play artifacts, scripted self-play failure
+  artifacts, match-history attachment, and any committed fixture-generation path.
 - Existing saved/dev replay artifacts still launch if compatibility is retained; if not retained,
   failures are explicit and covered by tests.
 - Match-history database replay rows use the same versioned compatibility or rejection policy as
   dev/self-play/crash replay files.
+- Recent Matches summary metadata and HTTP replay launch report new checkpoint-backed replay
+  artifacts as available or intentionally incompatible according to the same versioned policy as the
+  loader; they must not reject the new schema via stale hard-coded V2 checks.
 - The replay artifact's map binding rejects playback against the wrong map identity/hash before a
   live `Game` is constructed.
 - Replay seek, branch seed, selected vision, spectator vision, crash replay capture, and match
@@ -65,13 +83,15 @@ Explicit non-goals:
 cargo fmt --manifest-path server/Cargo.toml
 cargo test --manifest-path server/Cargo.toml -p rts-sim replay
 cargo test --manifest-path server/Cargo.toml -p rts-server replay
+cargo test --manifest-path server/Cargo.toml -p rts-ai replay
 cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture
 node scripts/check-crate-boundaries.mjs
-git diff --check -- server/crates/sim/src/game server/src/lobby server/src/db.rs docs plans/checkpoint
+git diff --check -- server/crates/sim/src/game server/crates/ai server/src/lobby server/src/db.rs server/src/main.rs docs plans/checkpoint
 ```
 
 If there is no `rts-server` replay filter, use the narrowest server/lobby replay test filters that
-cover launch, seek, branch, and match-history capture.
+cover launch, seek, branch, match-history capture, and match-history HTTP launch compatibility. If
+there is no `rts-ai` replay filter, use the narrowest AI/self-play artifact writer tests.
 
 ## Manual Testing Focus
 
@@ -87,10 +107,15 @@ The handoff must name:
 - how the artifact embeds `GameCheckpointV1` and map binding data;
 - old artifact compatibility or rejection policy;
 - every replay load surface audited: dev/self-play files, crash replay artifacts, match-history DB
-  rows, and committed fixtures;
+  rows, Recent Matches summaries, HTTP replay launch, and committed fixtures;
+- every replay write surface audited: post-match lobby capture, shutdown/crash capture, dev replay
+  saves, AI/self-play artifacts, scripted self-play failure artifacts, match-history attachment, and
+  fixture generation;
 - capture/playback paths changed;
 - where the launch-time replay start checkpoint is stored before match end, and how artifact
   finalization combines it with command log, duration, winner, and scores;
+- the capture/finalization API shape that prevents deriving a replay start checkpoint from the final
+  post-match `Game`;
 - command timing convention at checkpoint start;
 - focused tests that passed;
 - manual replay smoke focus for Phase 5.
