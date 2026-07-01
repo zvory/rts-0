@@ -4,6 +4,7 @@ use crate::config;
 use crate::game::entity::{AttackPhase, EntityKind, EntityStore, PanzerfaustState};
 use crate::protocol::Event;
 use crate::rules::combat as combat_rules;
+use crate::rules::projection as projection_rules;
 use crate::rules::terrain::TerrainKind;
 
 use super::super::events::push_under_attack_notice;
@@ -187,13 +188,6 @@ fn tick_in_flight(
         .get(id)
         .map(|attacker| (attacker.owner, (attacker.pos_x, attacker.pos_y)))
         .unwrap_or((0, stored_impact));
-    let impact = entities
-        .get(target)
-        .filter(|target| target.hp > 0)
-        .map(|target| (target.pos_x, target.pos_y))
-        .unwrap_or(stored_impact);
-    emit_impact(events, fog, smokes, teams, owner, impact);
-
     let damage_result = entities.get(target).and_then(|target_entity| {
         if target_entity.hp == 0
             || !teams.is_enemy_owner(owner, target_entity.owner)
@@ -201,9 +195,22 @@ fn tick_in_flight(
         {
             return None;
         }
-        Some((target_entity.owner, target_entity.kind))
+        Some((
+            target_entity.owner,
+            target_entity.kind,
+            (target_entity.pos_x, target_entity.pos_y),
+        ))
     });
-    if let Some((victim_owner, victim_kind)) = damage_result {
+    let visual_impact = damage_result
+        .and_then(|(_, _, pos)| {
+            (projection_rules::team_visible_world(owner, pos.0, pos.1, fog, teams)
+                && !smokes.point_inside(pos.0, pos.1))
+            .then_some(pos)
+        })
+        .unwrap_or(stored_impact);
+    emit_impact(events, fog, smokes, teams, owner, visual_impact);
+
+    if let Some((victim_owner, victim_kind, victim_pos)) = damage_result {
         let damage = combat_rules::effective_damage(
             EntityKind::Panzerfaust,
             victim_kind,
@@ -220,8 +227,8 @@ fn tick_in_flight(
                 victim_owner,
                 victim_owner,
                 owner,
-                impact.0,
-                impact.1,
+                victim_pos.0,
+                victim_pos.1,
             );
         }
     }

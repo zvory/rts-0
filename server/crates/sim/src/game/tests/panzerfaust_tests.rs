@@ -555,6 +555,60 @@ fn replacing_order_after_launch_spends_shot_and_resumes_after_conversion() {
 }
 
 #[test]
+fn impact_visual_uses_launch_endpoint_after_target_leaves_visibility() {
+    let (mut game, panzerfaust, tank) = panzerfaust_fixture();
+    let tank_hp = game.entities.get(tank).expect("tank exists").hp;
+    enqueue_attack(&mut game, panzerfaust, tank, false);
+
+    let mut launch_endpoint = None;
+    for _ in 0..40 {
+        let events = game.tick();
+        if let Some(endpoint) = player_events(&events, 1).iter().find_map(|event| match event {
+            Event::PanzerfaustLaunch { to_x, to_y, .. } => Some((*to_x, *to_y)),
+            _ => None,
+        }) {
+            launch_endpoint = Some(endpoint);
+            break;
+        }
+    }
+    let launch_endpoint = launch_endpoint.expect("test setup should reach launch");
+
+    let moved_pos = game.map.tile_center(24, 8);
+    {
+        let tank_entity = game.entities.get_mut(tank).expect("tank exists");
+        tank_entity.set_position(moved_pos.0, moved_pos.1);
+        tank_entity.clear_path();
+    }
+    refresh_world(&mut game);
+
+    let mut impact_pos = None;
+    for _ in 0..40 {
+        let events = game.tick();
+        if let Some(pos) = player_events(&events, 1).iter().find_map(|event| match event {
+            Event::PanzerfaustImpact { x, y } => Some((*x, *y)),
+            _ => None,
+        }) {
+            impact_pos = Some(pos);
+            break;
+        }
+    }
+
+    let impact_pos = impact_pos.expect("impact should still be emitted");
+    assert!(
+        distance_sq(impact_pos, launch_endpoint) < 0.01,
+        "owner impact feedback should stay at the launch-safe endpoint"
+    );
+    assert!(
+        distance_sq(impact_pos, moved_pos) > (config::TILE_SIZE * config::TILE_SIZE) as f32,
+        "impact feedback should not reveal the target's new hidden position"
+    );
+    assert_eq!(
+        game.entities.get(tank).expect("tank exists").hp,
+        tank_hp.saturating_sub(config::PANZERFAUST_DAMAGE)
+    );
+}
+
+#[test]
 fn target_death_during_travel_spends_shot_and_still_converts() {
     let (mut game, panzerfaust, tank) = panzerfaust_fixture();
     enqueue_attack(&mut game, panzerfaust, tank, false);
