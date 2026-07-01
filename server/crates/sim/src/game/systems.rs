@@ -143,6 +143,11 @@ pub(crate) fn run_tick(
             teams.clone(),
         )
     });
+    coordinator.enable_trench_formation_preference(
+        trenches,
+        fog,
+        players.iter().map(|player| player.id),
+    );
     if perf.is_some() {
         coordinator.enable_diagnostics();
     }

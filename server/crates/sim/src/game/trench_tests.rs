@@ -425,6 +425,72 @@ fn adjacent_tile_center_infantry_slots_into_existing_trench() {
 }
 
 #[test]
+fn move_command_near_known_trench_prefers_trench_goal() {
+    let mut game = empty_flat_game(&players());
+    let start = game.map.tile_center(20, 24);
+    let rifleman = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, start.0, start.1)
+        .expect("rifleman should spawn");
+    repair_world(&mut game);
+    let trench_pos = game.map.tile_center(24, 24);
+    game.spawn_trench_for_test(trench_pos.0, trench_pos.1)
+        .expect("visible trench should seed");
+    let click = game.map.tile_center(26, 24);
+
+    game.enqueue(
+        1,
+        SimCommand::Move {
+            units: vec![rifleman],
+            x: click.0,
+            y: click.1,
+            queued: false,
+        },
+    );
+    game.tick();
+
+    let unit = game.entities.get(rifleman).expect("rifleman should exist");
+    assert_eq!(
+        unit.move_intent(),
+        Some(trench_pos),
+        "move orders near known trenches should target the trench for eligible infantry"
+    );
+}
+
+#[test]
+fn move_command_near_hidden_trench_keeps_clicked_goal() {
+    let mut game = empty_flat_game(&players());
+    let start = game.map.tile_center(4, 4);
+    let rifleman = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, start.0, start.1)
+        .expect("rifleman should spawn");
+    repair_world(&mut game);
+    let trench_pos = game.map.tile_center(24, 24);
+    game.spawn_trench_for_test(trench_pos.0, trench_pos.1)
+        .expect("hidden trench should seed");
+    let click = game.map.tile_center(26, 24);
+
+    game.enqueue(
+        1,
+        SimCommand::Move {
+            units: vec![rifleman],
+            x: click.0,
+            y: click.1,
+            queued: false,
+        },
+    );
+    game.tick();
+
+    let unit = game.entities.get(rifleman).expect("rifleman should exist");
+    assert_eq!(
+        unit.move_intent(),
+        Some(click),
+        "hidden trenches must not influence move formation goals"
+    );
+}
+
+#[test]
 fn lab_move_clears_trench_occupation_without_waiting_for_tick() {
     let mut game = empty_flat_game(&players());
     let trench_pos = game.map.tile_center(24, 24);

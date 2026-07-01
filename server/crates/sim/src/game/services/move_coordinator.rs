@@ -13,14 +13,16 @@
 //! - repath throttling,
 //! - spawn-point search around buildings.
 
+use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 
 use crate::config;
 use crate::game::ability::AbilityKind;
 use crate::game::entity::{
-    uses_oriented_vehicle_body, uses_pivot_vehicle_movement, EntityKind, EntityStore, MovePhase,
-    Order, WeaponSetup,
+    active_trench_occupation, uses_oriented_vehicle_body, uses_pivot_vehicle_movement, EntityKind,
+    EntityStore, MovePhase, Order, WeaponSetup,
 };
+use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::pathfinding;
 use crate::game::services::geometry::{
@@ -37,7 +39,10 @@ use crate::game::services::pathing::{
 };
 use crate::game::services::standability;
 use crate::game::teams::TeamRelations;
+use crate::game::trench::TrenchStore;
 use crate::perf::{PathingPassDiagnostics, PathingRequestSample, PathingRequestSource};
+
+mod formation;
 
 /// Maximum number of fresh A* path requests serviced in a single tick. Beyond this,
 /// remaining `AwaitingPath` units stay queued for the next tick.
@@ -49,10 +54,6 @@ const MIN_REPATH_TICKS: u32 = 3;
 /// If the goal moves by more than this many world pixels, bypass the repath throttle.
 const MATERIAL_GOAL_DELTA_PX: f32 = config::TILE_SIZE as f32;
 
-const FORMATION_NEAR_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 4.0;
-const FORMATION_FAR_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 18.0;
-const FORMATION_MAX_OFFSET_PX: f32 = config::TILE_SIZE as f32 * 4.0;
-const VEHICLE_BODY_FORMATION_GAP_TILES: u32 = 1;
 const SPAWN_PREFERRED_GAP_UNIT_FRACTION: f32 = 0.10;
 const SCOUT_CAR_ROUTE_SIMPLIFY_MAX_SEGMENT_PX: f32 = config::TILE_SIZE as f32 * 3.0;
 
@@ -67,6 +68,7 @@ pub struct MoveCoordinator<'a> {
     diagnostics_enabled: bool,
     diagnostics: Option<PathingPassDiagnostics>,
     queued_without_active_diagnostics: Vec<(PathingRequestSource, usize)>,
+    known_trenches: Vec<formation::PlayerKnownTrenches>,
 }
 
 impl<'a> MoveCoordinator<'a> {
@@ -103,7 +105,31 @@ impl<'a> MoveCoordinator<'a> {
             diagnostics_enabled: false,
             diagnostics: None,
             queued_without_active_diagnostics: Vec::new(),
+            known_trenches: Vec::new(),
         }
+    }
+
+    pub(in crate::game) fn enable_trench_formation_preference(
+        &mut self,
+        trenches: &TrenchStore,
+        fog: &Fog,
+        players: impl IntoIterator<Item = u32>,
+    ) {
+        self.known_trenches = players
+            .into_iter()
+            .map(|player| {
+                let mut visible_players = self.teams.same_team_player_ids(player);
+                if visible_players.is_empty() {
+                    visible_players.push(player);
+                }
+                let team_fog = fog.union_for(player, &visible_players);
+                let views = trenches.views_for(player, &team_fog, true, &[player]);
+                formation::PlayerKnownTrenches {
+                    player,
+                    trenches: formation::known_trenches_from_views(views),
+                }
+            })
+            .collect();
     }
 
     pub(in crate::game) fn enable_diagnostics(&mut self) {
@@ -193,11 +219,11 @@ impl<'a> MoveCoordinator<'a> {
         if ids.is_empty() {
             return;
         }
-        let units: Vec<FormationUnit> = ids
+        let units: Vec<formation::FormationUnit> = ids
             .iter()
             .filter_map(|&id| {
                 let e = entities.get(id)?;
-                (e.is_unit() && e.owner == player).then_some(FormationUnit {
+                (e.is_unit() && e.owner == player).then_some(formation::FormationUnit {
                     id,
                     kind: e.kind,
                     pos: (e.pos_x, e.pos_y),
@@ -215,7 +241,16 @@ impl<'a> MoveCoordinator<'a> {
             },
             units.len(),
         );
-        let goals = formation_goals(self.map, self.occ, &units, goal);
+        let selected_units = units.iter().map(|unit| unit.id).collect::<BTreeSet<_>>();
+        let occupied_trenches = occupied_trench_ids_excluding(entities, &selected_units);
+        let goals = formation::formation_goals_with_known_trenches(
+            self.map,
+            self.occ,
+            &units,
+            goal,
+            self.known_trenches_for_player(player),
+            &occupied_trenches,
+        );
 
         for (unit, g) in units.iter().zip(goals.iter()) {
             entities.release_miner(unit.id);
@@ -235,6 +270,14 @@ impl<'a> MoveCoordinator<'a> {
             let (px, py) = (e.pos_x, e.pos_y);
             e.reset_stuck(px, py);
         }
+    }
+
+    fn known_trenches_for_player(&self, player: u32) -> &[formation::KnownTrench] {
+        self.known_trenches
+            .iter()
+            .find(|entry| entry.player == player)
+            .map(|entry| entry.trenches.as_slice())
+            .unwrap_or(&[])
     }
 
     /// Issue an attack order against a specific target. Sets the order and requests an
@@ -956,6 +999,14 @@ fn count_awaiting_paths(entities: &EntityStore) -> usize {
         .count()
 }
 
+fn occupied_trench_ids_excluding(entities: &EntityStore, excluded_ids: &BTreeSet<u32>) -> BTreeSet<u32> {
+    entities
+        .iter()
+        .filter(|entity| !excluded_ids.contains(&entity.id))
+        .filter_map(active_trench_occupation)
+        .collect()
+}
+
 fn pathing_source_from_order(order: &Order) -> PathingRequestSource {
     match order {
         Order::Move(_) => PathingRequestSource::Move,
@@ -1073,228 +1124,6 @@ fn requires_weapon_setup(kind: EntityKind) -> bool {
     matches!(kind, EntityKind::MachineGunner | EntityKind::AntiTankGun)
 }
 
-// ---------------------------------------------------------------------------
-// Goal spreading
-// ---------------------------------------------------------------------------
-
-#[derive(Clone, Copy)]
-struct FormationUnit {
-    id: u32,
-    kind: EntityKind,
-    pos: (f32, f32),
-}
-
-/// Spread unit goals around the requested anchor tile. Returns one goal world point per unit
-/// in the same order as `ids`.
-fn spread_goals(
-    map: &Map,
-    occ: &Occupancy,
-    units: &[FormationUnit],
-    anchor: (u32, u32),
-) -> Vec<(f32, f32)> {
-    let mut out = Vec::with_capacity(units.len());
-    let mut assigned: Vec<FormationAssignment> = Vec::new();
-
-    for unit in units {
-        if let Some(tile) = find_unique_tile_near(map, occ, unit, anchor, &assigned) {
-            assigned.push(FormationAssignment {
-                kind: unit.kind,
-                tile,
-            });
-            out.push(map.tile_center(tile.0, tile.1));
-        } else {
-            out.push(unit.pos);
-        }
-    }
-
-    out
-}
-
-/// Assign formation-aware path goals in the same order as `units`.
-fn formation_goals(
-    map: &Map,
-    occ: &Occupancy,
-    units: &[FormationUnit],
-    goal: (f32, f32),
-) -> Vec<(f32, f32)> {
-    if units.len() <= 1 {
-        let anchor = map.tile_of(goal.0, goal.1);
-        return spread_goals(map, occ, units, anchor);
-    }
-
-    let inv_count = 1.0 / units.len() as f32;
-    let centroid = units.iter().fold((0.0f32, 0.0f32), |acc, unit| {
-        (
-            acc.0 + unit.pos.0 * inv_count,
-            acc.1 + unit.pos.1 * inv_count,
-        )
-    });
-    let dx = goal.0 - centroid.0;
-    let dy = goal.1 - centroid.1;
-    let move_distance = (dx * dx + dy * dy).sqrt();
-    let formation_scale = formation_scale_for_distance(move_distance);
-    let max = map.world_size_px() - 1.0;
-    let mut out = Vec::with_capacity(units.len());
-    let mut assigned: Vec<FormationAssignment> = Vec::new();
-
-    for unit in units {
-        let offset = clamp_offset(
-            unit.pos.0 - centroid.0,
-            unit.pos.1 - centroid.1,
-            FORMATION_MAX_OFFSET_PX,
-        );
-        let desired = (
-            (goal.0 + offset.0 * formation_scale).clamp(0.0, max),
-            (goal.1 + offset.1 * formation_scale).clamp(0.0, max),
-        );
-        let anchor = map.tile_of(desired.0, desired.1);
-        if let Some(tile) = find_unique_tile_near(map, occ, unit, anchor, &assigned) {
-            assigned.push(FormationAssignment {
-                kind: unit.kind,
-                tile,
-            });
-            out.push(map.tile_center(tile.0, tile.1));
-        } else {
-            out.push(unit.pos);
-        }
-    }
-
-    out
-}
-
-fn formation_scale_for_distance(distance: f32) -> f32 {
-    let t = ((distance - FORMATION_NEAR_DISTANCE_PX)
-        / (FORMATION_FAR_DISTANCE_PX - FORMATION_NEAR_DISTANCE_PX))
-        .clamp(0.0, 1.0);
-    t * t * (3.0 - 2.0 * t)
-}
-
-fn clamp_offset(dx: f32, dy: f32, max_len: f32) -> (f32, f32) {
-    let len = (dx * dx + dy * dy).sqrt();
-    if len <= max_len || len <= f32::EPSILON {
-        return (dx, dy);
-    }
-    let scale = max_len / len;
-    (dx * scale, dy * scale)
-}
-
-#[derive(Clone, Copy)]
-struct FormationAssignment {
-    kind: EntityKind,
-    tile: (u32, u32),
-}
-
-/// Search outward from `anchor` in deterministic ring order and return the first body-standable
-/// tile not already assigned. Some unit kinds prefer additional spacing and get a strict first
-/// pass before falling back to the ordinary unique-tile rule.
-fn find_unique_tile_near(
-    map: &Map,
-    occ: &Occupancy,
-    unit: &FormationUnit,
-    anchor: (u32, u32),
-    assigned: &[FormationAssignment],
-) -> Option<(u32, u32)> {
-    if let Some(tile) = find_unique_tile_near_with_spacing(map, occ, unit, anchor, assigned, true) {
-        return Some(tile);
-    }
-    find_unique_tile_near_with_spacing(map, occ, unit, anchor, assigned, false)
-}
-
-fn find_unique_tile_near_with_spacing(
-    map: &Map,
-    occ: &Occupancy,
-    unit: &FormationUnit,
-    anchor: (u32, u32),
-    assigned: &[FormationAssignment],
-    require_preferred_spacing: bool,
-) -> Option<(u32, u32)> {
-    if is_free_goal(map, occ, unit, anchor, assigned, require_preferred_spacing) {
-        return Some(anchor);
-    }
-    for r in 1i32..=6 {
-        for dy in -r..=r {
-            for dx in -r..=r {
-                if dx.abs().max(dy.abs()) != r {
-                    continue;
-                }
-                let tx = anchor.0 as i32 + dx;
-                let ty = anchor.1 as i32 + dy;
-                if tx < 0 || ty < 0 {
-                    continue;
-                }
-                let t = (tx as u32, ty as u32);
-                if is_free_goal(map, occ, unit, t, assigned, require_preferred_spacing) {
-                    return Some(t);
-                }
-            }
-        }
-    }
-
-    None
-}
-
-fn is_free_goal(
-    map: &Map,
-    occ: &Occupancy,
-    unit: &FormationUnit,
-    tile: (u32, u32),
-    assigned: &[FormationAssignment],
-    require_preferred_spacing: bool,
-) -> bool {
-    if !map.is_passable(tile.0 as i32, tile.1 as i32) {
-        return false;
-    }
-    if !occ.passable_for_kind(tile.0 as i32, tile.1 as i32, unit.kind) {
-        return false;
-    }
-    if assigned.iter().any(|assignment| assignment.tile == tile) {
-        return false;
-    }
-    if require_preferred_spacing && !preferred_goal_spacing_clear(unit, tile, assigned) {
-        return false;
-    }
-    let center = map.tile_center(tile.0, tile.1);
-    let facing = formation_goal_facing(unit, center);
-    standability::unit_static_standable_with_facing(map, occ, unit.kind, center.0, center.1, facing)
-}
-
-fn preferred_goal_spacing_clear(
-    unit: &FormationUnit,
-    tile: (u32, u32),
-    assigned: &[FormationAssignment],
-) -> bool {
-    assigned.iter().all(|assignment| {
-        let gap_tiles = preferred_gap_tiles(unit.kind).max(preferred_gap_tiles(assignment.kind));
-        gap_tiles == 0 || tile_chebyshev_distance(tile, assignment.tile) > gap_tiles
-    })
-}
-
-fn preferred_gap_tiles(kind: EntityKind) -> u32 {
-    if uses_oriented_vehicle_body(kind) {
-        VEHICLE_BODY_FORMATION_GAP_TILES
-    } else {
-        0
-    }
-}
-
-fn tile_chebyshev_distance(a: (u32, u32), b: (u32, u32)) -> u32 {
-    a.0.abs_diff(b.0).max(a.1.abs_diff(b.1))
-}
-
-fn formation_goal_facing(unit: &FormationUnit, center: (f32, f32)) -> f32 {
-    if !uses_oriented_vehicle_body(unit.kind) {
-        return 0.0;
-    }
-    let dx = center.0 - unit.pos.0;
-    let dy = center.1 - unit.pos.1;
-    let dist2 = dx * dx + dy * dy;
-    if !dist2.is_finite() || dist2 <= 1.0e-4 {
-        0.0
-    } else {
-        dy.atan2(dx)
-    }
-}
-
 /// Pick a walk target outside a build footprint.
 ///
 /// Construction starts when the worker is close enough to the footprint center, so walking to an
@@ -1395,6 +1224,11 @@ fn build_staging_goals(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::formation::{
+        formation_goal_facing, formation_goals, formation_goals_with_known_trenches, is_free_goal,
+        tile_chebyshev_distance, FormationAssignment, FormationUnit, KnownTrench,
+        VEHICLE_BODY_FORMATION_GAP_TILES,
+    };
     use crate::game::entity::{EntityKind, EntityStore, MovePhase, Order};
     use crate::game::map::Map;
     use crate::game::pathfinding::Passability;
@@ -1425,6 +1259,16 @@ mod tests {
             formation_unit(3, map, (8, 67)),
             formation_unit(4, map, (12, 67)),
         ]
+    }
+
+    fn trench_at(id: u32, map: &Map, tile: (u32, u32)) -> KnownTrench {
+        let (x, y) = map.tile_center(tile.0, tile.1);
+        KnownTrench {
+            id,
+            x,
+            y,
+            radius_tiles: config::ENTRENCHMENT_TRENCH_RADIUS_TILES,
+        }
     }
 
     fn offset_from(point: (f32, f32), origin: (f32, f32)) -> (f32, f32) {
@@ -1573,6 +1417,69 @@ mod tests {
     }
 
     #[test]
+    fn eligible_infantry_prefers_known_trench_near_formation_goal() {
+        let map = flat_map(40);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let units = vec![formation_unit_kind(1, EntityKind::Rifleman, &map, (10, 20))];
+        let click = map.tile_center(20, 20);
+        let trench = trench_at(1, &map, (22, 20));
+
+        let goals = formation_goals_with_known_trenches(
+            &map,
+            &occ,
+            &units,
+            click,
+            &[trench],
+            &std::collections::BTreeSet::new(),
+        );
+
+        assert_eq!(
+            goals[0],
+            (trench.x, trench.y),
+            "eligible infantry should target the nearby known trench"
+        );
+    }
+
+    #[test]
+    fn trench_preference_ignores_non_eligible_units_far_trenches_and_occupied_trenches() {
+        let map = flat_map(40);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let click = map.tile_center(20, 20);
+        let near_trench = trench_at(1, &map, (22, 20));
+        let far_trench = trench_at(2, &map, (27, 20));
+
+        let worker = vec![formation_unit_kind(1, EntityKind::Worker, &map, (10, 20))];
+        let worker_goals = formation_goals_with_known_trenches(
+            &map,
+            &occ,
+            &worker,
+            click,
+            &[near_trench],
+            &std::collections::BTreeSet::new(),
+        );
+        assert_eq!(worker_goals[0], click);
+
+        let rifle = vec![formation_unit_kind(2, EntityKind::Rifleman, &map, (10, 20))];
+        let far_goals = formation_goals_with_known_trenches(
+            &map,
+            &occ,
+            &rifle,
+            click,
+            &[far_trench],
+            &std::collections::BTreeSet::new(),
+        );
+        assert_eq!(far_goals[0], click);
+
+        let mut occupied = std::collections::BTreeSet::new();
+        occupied.insert(near_trench.id);
+        let occupied_goals =
+            formation_goals_with_known_trenches(&map, &occ, &rifle, click, &[near_trench], &occupied);
+        assert_eq!(occupied_goals[0], click);
+    }
+
+    #[test]
     fn vehicle_body_group_move_prefers_one_tile_gap_between_final_goals() {
         let map = flat_map(40);
         let entities = EntityStore::new();
@@ -1608,10 +1515,12 @@ mod tests {
         let infantry = [FormationAssignment {
             kind: EntityKind::Rifleman,
             tile: (20, 20),
+            trench_id: None,
         }];
         let vehicle = [FormationAssignment {
             kind: EntityKind::AntiTankGun,
             tile: (20, 20),
+            trench_id: None,
         }];
         let adjacent = (21, 20);
 
