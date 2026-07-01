@@ -297,6 +297,9 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/services/world_query.rs",
   "server/crates/sim/src/game/setup.rs",
   "server/crates/sim/src/game/setup/dev_scenarios.rs",
+  // Panzerfaust inspection scenarios deliberately seed current Tank/Rifleman interactions as
+  // no-fog dev fixtures; public faction admission still routes through the dev scenario launcher.
+  "server/crates/sim/src/game/setup/dev_scenarios/panzerfaust.rs",
   "server/crates/sim/src/game/setup/dev_scenarios/layouts.rs",
   "server/crates/sim/src/game/setup/dev_scenarios/layouts/tank_traps.rs",
   "server/crates/sim/src/game/systems.rs",
