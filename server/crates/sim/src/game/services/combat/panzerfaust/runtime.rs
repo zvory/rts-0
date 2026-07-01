@@ -8,7 +8,7 @@ use crate::rules::projection as projection_rules;
 use crate::rules::terrain::TerrainKind;
 
 use super::super::events::push_under_attack_notice;
-use super::events::{emit_conversion, emit_impact, emit_launch};
+use super::events::{emit_conversion, emit_impact, emit_launch, LaunchEvent};
 use super::{
     convert_panzerfaust_to_rifleman, mirror_weapon_to_body, panzerfaust_state,
     panzerfaust_target_fireable, panzerfaust_target_in_range, panzerfaust_target_valid,
@@ -148,10 +148,12 @@ fn tick_windup(
         fog,
         smokes,
         teams,
-        owner,
-        id,
-        (ax, ay),
-        (impact_x, impact_y),
+        LaunchEvent {
+            owner,
+            from: id,
+            from_pos: (ax, ay),
+            to_pos: (impact_x, impact_y),
+        },
     );
 }
 
