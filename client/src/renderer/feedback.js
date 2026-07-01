@@ -1238,6 +1238,7 @@ export function _drawMuzzleFlashes(state) {
     const fade = 1 - t;
 
     const feedbackKind = attackFeedbackKindForWeapon(attacker.kind, f.weaponKind);
+    const originKind = attackFeedbackOriginKindForWeapon(attacker.kind, f.weaponKind);
     const baseR = muzzleFlashRadius(feedbackKind);
     if (baseR <= 0) continue;
 
@@ -1249,11 +1250,12 @@ export function _drawMuzzleFlashes(state) {
       ? Math.atan2(targetPos.y - attacker.y, targetPos.x - attacker.x)
       : 0;
     const stat = STATS[feedbackKind] || STATS[attacker.kind] || {};
-    const reach = isBuilding(feedbackKind)
-      ? Math.max(stat.footW || 2, stat.footH || 2) * ((this._map && this._map.tileSize) || 32) * 0.5
-      : feedbackKind === KIND.ANTI_TANK_GUN
-        ? (stat.size || 9) * 1.9
-      : (stat.size || 9) * 1.1;
+    const originStat = STATS[originKind] || STATS[attacker.kind] || stat;
+    const reach = isBuilding(originKind)
+      ? Math.max(originStat.footW || 2, originStat.footH || 2) * ((this._map && this._map.tileSize) || 32) * 0.5
+      : originKind === KIND.ANTI_TANK_GUN
+        ? (originStat.size || 9) * 1.9
+      : (originStat.size || 9) * 1.1;
     const mx = attacker.x + Math.cos(facing) * reach;
     const my = attacker.y + Math.sin(facing) * reach;
 
@@ -1314,11 +1316,17 @@ function attackFeedbackKindForWeapon(attackerKind, weaponKind) {
     case WEAPON_KIND.ARTILLERY_GUN:
       return KIND.ARTILLERY;
     case WEAPON_KIND.TANK_CANNON:
-    case WEAPON_KIND.TANK_COAX:
       return KIND.TANK;
+    case WEAPON_KIND.TANK_COAX:
+      return KIND.MACHINE_GUNNER;
     default:
       return attackerKind;
   }
+}
+
+function attackFeedbackOriginKindForWeapon(attackerKind, weaponKind) {
+  if (weaponKind === WEAPON_KIND.TANK_COAX) return attackerKind;
+  return attackFeedbackKindForWeapon(attackerKind, weaponKind);
 }
 
 export function drawSelectionBox(rect) {

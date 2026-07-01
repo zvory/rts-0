@@ -37,7 +37,7 @@ pub enum WeaponKind {
     MortarTeamMortar,
     ArtilleryGun,
     TankCannon,
-    /// Reserved identity for the future Tank coaxial machine gun. It has no live profile yet.
+    /// Tank coaxial machine gun. Tanks fire this as a secondary weapon.
     TankCoax,
 }
 
@@ -212,6 +212,16 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         weapon_class: WeaponClass::AntiTank,
         miss_policy: MissPolicy::None,
         facing_damage_policy: FacingDamagePolicy::TankArmorFacing,
+        overpenetration: OverpenetrationPolicy::DirectFire { range_factor: 0.25 },
+    },
+    WeaponProfile {
+        id: WeaponKind::TankCoax,
+        range_tiles: 6,
+        dmg: 4,
+        cooldown: 6,
+        weapon_class: WeaponClass::SmallArms,
+        miss_policy: MissPolicy::None,
+        facing_damage_policy: FacingDamagePolicy::None,
         overpenetration: OverpenetrationPolicy::DirectFire { range_factor: 0.25 },
     },
 ];
@@ -793,8 +803,6 @@ mod tests {
 
     #[test]
     fn weapon_profile_metadata_preserves_current_special_damage_policies() {
-        assert_eq!(weapon_profile(WeaponKind::TankCoax), None);
-
         let anti_tank_gun = weapon_profile(WeaponKind::AntiTankGun).expect("AT gun profile");
         assert_eq!(anti_tank_gun.miss_policy, MissPolicy::AntiTankGunVsInfantry);
         assert_eq!(
@@ -821,6 +829,25 @@ mod tests {
         assert_eq!(machine_gunner.range_tiles, 6);
         assert_eq!(machine_gunner.dmg, 4);
         assert_eq!(machine_gunner.cooldown, 6);
+
+        let tank_coax = weapon_profile(WeaponKind::TankCoax).expect("Tank coax profile");
+        assert_eq!(tank_coax.weapon_class, WeaponClass::SmallArms);
+        assert_eq!(tank_coax.range_tiles, 6);
+        assert_eq!(tank_coax.dmg, 4);
+        assert_eq!(tank_coax.cooldown, 6);
+        assert_eq!(tank_coax.miss_policy, MissPolicy::None);
+        assert_eq!(tank_coax.facing_damage_policy, FacingDamagePolicy::None);
+        assert_eq!(
+            tank_coax.overpenetration,
+            OverpenetrationPolicy::DirectFire { range_factor: 0.25 }
+        );
+        assert_eq!(
+            default_weapon_profile(EntityKind::Tank)
+                .expect("Tank default profile")
+                .id,
+            WeaponKind::TankCannon,
+            "Tank coax must not replace the default Tank cannon profile"
+        );
 
         let panzerfaust =
             weapon_profile(WeaponKind::PanzerfaustLoadedShot).expect("Panzerfaust profile");

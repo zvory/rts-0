@@ -30,6 +30,7 @@ pub(super) fn room_mode_for(room: &str) -> RoomMode {
                     "tank_trap_line_diagonal" => DevScenarioId::TankTrapLineDiagonal,
                     "tank_trap_pathing_matrix" => DevScenarioId::TankTrapPathingMatrix,
                     "entrenchment_inspection" => DevScenarioId::EntrenchmentInspection,
+                    "tank_coax_inspection" => DevScenarioId::TankCoaxInspection,
                     _ => return RoomMode::Normal,
                 },
                 unit: launch.unit,

@@ -37,6 +37,9 @@ fn default_weapon_cooldown_cadence_matches_profiles() {
             if kind == EntityKind::MortarTeam {
                 attacker.set_autocast_enabled(AbilityKind::MortarFire, true);
             }
+            if kind == EntityKind::Tank {
+                attacker.set_weapon_cooldown(combat_rules::WeaponKind::TankCoax, 999);
+            }
         }
 
         run_combat_tick(&mut entities);

@@ -1201,6 +1201,8 @@ selection rings):
   Panzerfaust launch and impact events use dedicated low-gain spatial cues with coarse cooldown
   buckets; generic Panzerfaust attack events, projectile travel, and conversion stay silent so the
   one-shot weapon does not reuse Tank/Rifleman/artillery sounds or spam clustered fights.
+  Tank coax `weaponKind` feedback uses machine-gun burst audio instead of Tank cannon audio, and it
+  does not register as a sustained Machine Gunner loop.
 - Buildings: SVG-authored rig definitions are compiled at Renderer startup and rendered on the
   buildings layer; shadows remain imperative draws, production progress bars, queue labels, and
   icons remain imperative draws on the building overlays layer, and construction/deconstruction
@@ -1228,6 +1230,9 @@ selection rings):
   setup/deployment. Units that fire from outside current vision are shown briefly above the fog
   as semi-transparent silhouettes with the same recoil animation and a yellow tracer to the hit
   point.
+  Attack `weaponKind` selects feedback scale; TankCoax uses a small machine-gun flash/tracer/tail
+  and no Tank recoil while using a provisional Tank reach origin until the coax muzzle anchor is
+  authored.
   Mortar launch events draw launch dust/recoil for recipients that can see the mortar, a black
   shell arcing from the mortar to the impact point, and a darker red dotted line/crosshair warning
   that lasts until the reported shell delay elapses or the impact event arrives. The shell
