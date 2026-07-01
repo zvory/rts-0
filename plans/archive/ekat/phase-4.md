@@ -11,8 +11,8 @@ commitment and first Line Shot unlock before Anchorage or Positioning is designe
 
 ## Scope
 
-- Read [docs/context/balance.md](../../docs/context/balance.md) before editing rules/spec details.
-- Use [docs/new-building-checklist.md](../../docs/new-building-checklist.md) for this building.
+- Read [docs/context/balance.md](../../../docs/context/balance.md) before editing rules/spec details.
+- Use [docs/new-building-checklist.md](../../../docs/new-building-checklist.md) for this building.
 - Complete only the Killing Tools sections in [checklists.md](checklists.md), or mark items as
   deferred with named unknowns.
 - Specify Line Shot unlocks, upgrades, transformation tradeoff, destruction consequence, and first
