@@ -1,4 +1,6 @@
 use super::*;
+use crate::game::entity::Order;
+use crate::rules::combat::WeaponKind;
 use rayon::prelude::*;
 use rts_rules::faction::DEFAULT_FACTION_ID;
 
@@ -7,6 +9,65 @@ fn owned_kind_count(game: &Game, owner: u32, kind: EntityKind) -> usize {
         .iter()
         .filter(|e| e.owner == owner && e.kind == kind)
         .count()
+}
+
+fn assert_units_do_not_intersect_buildings(game: &Game) {
+    let buildings: Vec<_> = game
+        .state
+        .entities
+        .iter()
+        .filter_map(|entity| {
+            crate::game::services::geometry::building_rect_for_entity(&game.state.map, entity)
+                .map(|rect| (entity.id, entity.kind, rect))
+        })
+        .collect();
+    for unit in game
+        .state
+        .entities
+        .iter()
+        .filter(|entity| entity.is_unit())
+    {
+        let Some(body) = crate::game::services::geometry::unit_body_for_entity(unit) else {
+            continue;
+        };
+        for &(building_id, building_kind, rect) in &buildings {
+            assert!(
+                !crate::game::services::geometry::unit_body_intersects_rect(body, rect),
+                "scenario unit {} ({}) intersects building {} ({})",
+                unit.id,
+                unit.kind,
+                building_id,
+                building_kind
+            );
+        }
+    }
+}
+
+fn assert_enemy_units_are_static_inspection_targets(game: &Game) {
+    for entity in game
+        .state
+        .entities
+        .iter()
+        .filter(|entity| entity.owner == 2 && entity.is_unit())
+    {
+        assert!(
+            matches!(entity.order(), Order::HoldPosition),
+            "scenario target {} ({}) should hold position for static inspection",
+            entity.id,
+            entity.kind
+        );
+        if entity.can_attack() {
+            for weapon in WeaponKind::ALL {
+                assert_eq!(
+                    entity.weapon_cooldown(weapon),
+                    config::TICK_HZ * 120,
+                    "scenario target {} ({}) should have delayed {weapon:?} fire",
+                    entity.id,
+                    entity.kind
+                );
+            }
+        }
+    }
 }
 
 fn assert_dev_scenario_starts_as_kriegsia(setup: &DevScenarioSetup) {
@@ -463,12 +524,26 @@ fn tank_coax_inspection_scenario_sets_up_static_mixed_targets() {
     let setup = Game::new_tank_coax_inspection_scenario(EntityKind::Tank, 1, 0x5150_0606)
         .expect("Tank coax inspection scenario setup should succeed");
     assert_eq!(setup.issue_after_ticks, u32::MAX);
-    assert_eq!(setup.units.len(), 4);
+    assert_eq!(setup.units.len(), 11);
     assert_eq!(owned_kind_count(&setup.game, 1, EntityKind::Tank), 1);
+    assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::Tank), 1);
     assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::Worker), 1);
     assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::Rifleman), 1);
+    assert_eq!(
+        owned_kind_count(&setup.game, 2, EntityKind::MachineGunner),
+        1
+    );
     assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::ScoutCar), 1);
+    assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::Golem), 1);
+    assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::Ekat), 1);
+    assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::MortarTeam), 1);
+    assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::AntiTankGun), 1);
+    assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::Artillery), 1);
     assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::Depot), 1);
+    assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::TankTrap), 1);
+    assert_eq!(owned_kind_count(&setup.game, 0, EntityKind::Steel), 1);
+    assert_eq!(owned_kind_count(&setup.game, 0, EntityKind::Oil), 1);
+    assert_eq!(setup.game.state.smokes.iter().count(), 1);
     let tank_id = setup.units[0];
     let tank = setup.game.state.entities.get(tank_id).expect("tank should exist");
     assert_eq!(tank.weapon_facing(), Some(0.0));
@@ -476,6 +551,42 @@ fn tank_coax_inspection_scenario_sets_up_static_mixed_targets() {
         tank.weapon_cooldown(crate::rules::combat::WeaponKind::TankCannon),
         config::TICK_HZ * 4,
         "inspection scenario should delay cannon fire so coax feedback is easy to see"
+    );
+    assert_units_do_not_intersect_buildings(&setup.game);
+    assert_enemy_units_are_static_inspection_targets(&setup.game);
+    let tank_hp_before = tank.hp;
+    let enemy_hp_total = |game: &Game| {
+        game.state
+            .entities
+            .iter()
+            .filter(|entity| entity.owner == 2 && entity.is_unit())
+            .map(|entity| entity.hp)
+            .sum::<u32>()
+    };
+    let enemy_hp_before = enemy_hp_total(&setup.game);
+    let mut ticked = setup.game.clone();
+    ticked.tick();
+    let ticked_tank = ticked.state.entities.get(tank_id).expect("tank should survive first tick");
+    assert_eq!(
+        ticked_tank.weapon_cooldown(WeaponKind::TankCannon),
+        config::TICK_HZ * 4 - 1,
+        "inspection scenario should keep the Tank cannon delayed on the first tick"
+    );
+    assert_eq!(
+        ticked_tank.weapon_cooldown(WeaponKind::TankCoax),
+        crate::rules::combat::weapon_profile(WeaponKind::TankCoax)
+            .expect("Tank coax profile should exist")
+            .cooldown,
+        "inspection scenario should make the held Tank fire its coax immediately"
+    );
+    assert!(
+        enemy_hp_total(&ticked) < enemy_hp_before,
+        "inspection scenario should place at least one enemy target inside the coax arc"
+    );
+    assert_eq!(
+        ticked_tank.hp,
+        tank_hp_before,
+        "static inspection targets should not fire back on the first tick"
     );
     assert_dev_scenario_starts_as_kriegsia(&setup);
 }

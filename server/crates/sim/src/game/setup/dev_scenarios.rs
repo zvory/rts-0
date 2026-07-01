@@ -1,10 +1,9 @@
 use super::*;
-use crate::game::entity::Order;
-use crate::rules::combat::WeaponKind;
 use rand::{rngs::SmallRng, SeedableRng};
 
 mod layouts;
 mod panzerfaust;
+mod tank_coax;
 
 use layouts::*;
 
@@ -517,78 +516,6 @@ impl Game {
             player_id,
             units: vec![digger, reuse_rifleman, crowded_machine_gunner, enemy_reuser],
             goal: dig_start,
-            issue_after_ticks: u32::MAX,
-        })
-    }
-
-    pub fn new_tank_coax_inspection_scenario(
-        unit: EntityKind,
-        unit_count: usize,
-        seed: u32,
-    ) -> Result<DevScenarioSetup, String> {
-        if unit != EntityKind::Tank || unit_count != 1 {
-            return Err(format!(
-                "unsupported Tank coax inspection launch {unit} x{unit_count}"
-            ));
-        }
-
-        let mut map = flat_dev_map(2);
-        let center = (map.size / 2, map.size / 2);
-        let start_tile = (center.0 - 8, center.1);
-        if let Some(slot) = map.starts.get_mut(0) {
-            *slot = start_tile;
-        }
-        if let Some(slot) = map.starts.get_mut(1) {
-            *slot = (center.0 + 8, center.1);
-        }
-
-        let ts = config::TILE_SIZE as f32;
-        let tank_pos = map.tile_center(start_tile.0, start_tile.1);
-        let mut entities = EntityStore::new();
-        let tank = entities
-            .spawn_unit(1, EntityKind::Tank, tank_pos.0, tank_pos.1)
-            .ok_or_else(|| "failed to spawn Tank coax inspection Tank".to_string())?;
-        if let Some(tank) = entities.get_mut(tank) {
-            tank.set_order(Order::HoldPosition);
-            tank.set_facing(0.0);
-            tank.set_weapon_facing(0.0);
-            tank.set_weapon_cooldown(WeaponKind::TankCannon, config::TICK_HZ * 4);
-        }
-
-        let target_specs = [
-            (EntityKind::Worker, 5.2, -0.35),
-            (EntityKind::Rifleman, 5.6, 0.45),
-            (EntityKind::ScoutCar, 5.4, 0.75),
-        ];
-        let mut units = vec![tank];
-        for (kind, dx, dy) in target_specs {
-            units.push(
-                entities
-                    .spawn_unit(2, kind, tank_pos.0 + ts * dx, tank_pos.1 + ts * dy)
-                    .ok_or_else(|| format!("failed to spawn Tank coax inspection {kind}"))?,
-            );
-        }
-        let depot_pos = (tank_pos.0 + ts * 5.9, tank_pos.1 - ts * 0.8);
-        entities
-            .spawn_building(2, EntityKind::Depot, depot_pos.0, depot_pos.1, true)
-            .ok_or_else(|| "failed to spawn Tank coax inspection Depot".to_string())?;
-
-        let player_id = 1;
-        let game = build_dev_scenario_game_with_teams(
-            map,
-            entities,
-            [(1, 1), (2, 2)],
-            player_id,
-            start_tile,
-            seed,
-            "dev:tank_coax_inspection",
-        );
-
-        Ok(DevScenarioSetup {
-            game,
-            player_id,
-            units,
-            goal: tank_pos,
             issue_after_ticks: u32::MAX,
         })
     }

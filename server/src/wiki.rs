@@ -102,12 +102,14 @@ table {{ border-collapse: collapse; width: 100%; margin: 16px 0 28px; font-size:
 th, td {{ border: 1px solid #d8d2c7; padding: 4px 8px; text-align: left; vertical-align: top; }}
 th {{ background: #f1eee6; }}
 td.numeric {{ text-align: right; font-variant-numeric: tabular-nums; }}
+.scope-note {{ max-width: 820px; }}
 </style>
 </head>
 <body>
 <nav><a href="/wiki">Wiki index</a></nav>
 <main>
 <h1>Gameplay Stats</h1>
+<p class="scope-note">Unit and building damage, range, cooldown, and weapon columns list primary/default weapon stats. Secondary weapons such as the Tank coaxial machine gun are documented in the balance design notes until generated secondary-weapon rows are supported.</p>
 {body}
 </main>
 </body>
@@ -1155,6 +1157,8 @@ mod tests {
             .unwrap();
         let body = String::from_utf8(body.to_vec()).unwrap();
         assert!(body.contains("<title>Gameplay Stats - Bewegungskrieg Wiki</title>"));
+        assert!(body.contains("primary/default weapon stats"));
+        assert!(body.contains("Tank coaxial machine gun"));
         assert!(body.contains("<h2>Units</h2>"));
         assert!(body.contains("<td>Tank</td>"));
         assert!(body.contains("<td>kriegsia</td>"));

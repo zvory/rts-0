@@ -832,7 +832,7 @@ const DEV_SCENARIOS: [DevScenarioSpec; 17] = [
     DevScenarioSpec {
         id: "tank_coax_inspection",
         title: "Tank Coax Inspection",
-        description: "One held Tank faces a mixed infantry, vehicle, and building group inside the coax arc so the secondary machine gun can be inspected without immediate cannon fire.",
+        description: "One held Tank faces infantry-priority targets, support weapons, Ekat/Golem units, armored fallback targets, blockers, resources, smoke, and buildings around the coax arc so the secondary machine gun can be inspected without immediate cannon fire.",
         launches: &TANK_COAX_INSPECTION_LAUNCHES,
     },
 ];

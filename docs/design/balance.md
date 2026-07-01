@@ -24,9 +24,11 @@ sync; run
 `node scripts/check-faction-catalog-parity.mjs` to mechanically compare the Rust-authoritative
 default faction catalog to the client descriptors.
 The server wiki's `/wiki/stats` page is generated from the same Rust definitions and faction
-catalogs. For changes that affect visible stats, faction availability, upgrades, or ability
-metadata, run `node scripts/check-wiki.mjs`; it includes the wiki route/table checks and the client
-catalog parity check.
+catalogs. Its unit/building damage, range, cooldown, and weapon columns intentionally show
+primary/default weapon stats only; secondary weapons such as the Tank coax are documented here until
+generated secondary-weapon rows exist. For changes that affect visible stats, faction availability,
+upgrades, or ability metadata, run `node scripts/check-wiki.mjs`; it includes the wiki route/table
+checks and the client catalog parity check.
 
 `server/src/config.rs` and `server/crates/sim/src/config.rs` are compatibility shims for
 Rust-owned balance exports while call sites are migrated. They should not accumulate server-shell

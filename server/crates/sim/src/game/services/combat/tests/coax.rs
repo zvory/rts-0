@@ -85,6 +85,49 @@ fn tank_coax_fires_in_arc_with_small_arms_damage_and_weapon_event() {
 }
 
 #[test]
+fn tank_coax_attack_events_remain_fog_projected() {
+    let map = open_map(16);
+    let mut entities = EntityStore::new();
+    let tank = entities
+        .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+        .expect("tank should spawn");
+    let worker = entities
+        .spawn_unit(2, EntityKind::Worker, COAX_TARGET_X, 100.0)
+        .expect("worker should spawn");
+    prepare_coax_tank(&mut entities, tank);
+    let worker_hp_before = entities.get(worker).expect("worker should exist").hp;
+
+    let events = run_combat_tick_on_map(
+        &mut entities,
+        &[
+            player_state(1, false),
+            player_state(2, false),
+            player_state(3, false),
+        ],
+        &map,
+    );
+
+    assert_eq!(
+        worker_hp_before - entities.get(worker).expect("worker should exist").hp,
+        4
+    );
+    assert_eq!(
+        attack_weapon_kinds(&events, 1, tank),
+        vec!["tank_coax".to_string()],
+        "the attacker team should receive coax feedback"
+    );
+    assert_eq!(
+        attack_weapon_kinds(&events, 2, tank),
+        vec!["tank_coax".to_string()],
+        "the visible victim owner should receive coax feedback"
+    );
+    assert!(
+        attack_weapon_kinds(&events, 3, tank).is_empty(),
+        "hidden third-party viewers must not receive coax weapon hints"
+    );
+}
+
+#[test]
 fn tank_coax_fallback_vehicle_damage_stays_small_arms() {
     let map = open_map(16);
     let mut entities = EntityStore::new();
