@@ -1,12 +1,12 @@
 jeffrye playtest 2
 
-artillery should be visible in the map when they fire, not just on the minimpa, they also get the full cycle visibilyt 
+- [x] artillery should be visible in the map when they fire, not just on the minimpa, they also get the full cycle visibilyt (done: artillery firing reveal projects the firing gun as a normal targetable world entity and adds global minimap firing markers)
 
-* artillery should have the optoin to blanket fire randomly within the firing cone. you should be able to stop this with stop. and resume with c for blanket fire. point fire is unaffected. just like point fire, this should be queueable after a setup. finally, increase the minimum range of artillery by 10. 
+- [x] artillery should have the optoin to blanket fire randomly within the firing cone. you should be able to stop this with stop. and resume with c for blanket fire. point fire is unaffected. just like point fire, this should be queueable after a setup. finally, increase the minimum range of artillery by 10. (done: Blanket Fire command, C hotkey, Stop cancellation, queued fire planning, and 25-tile artillery minimum range)
 
-sometimes tank range does not increase when they stop moving.
+- [x] sometimes tank range does not increase when they stop moving. (done: stationary tank range ramps to 14 tiles after three seconds and resets on movement)
 
-when a unit dies, it provides vision for a few seconds of the area it could see before it died. but unfortunately, enemy units and buildings in this revealed area are not targetable, which is difficult for players to understand. so units in this revealed area shoudl be targetable.
+- [x] when a unit dies, it provides vision for a few seconds of the area it could see before it died. but unfortunately, enemy units and buildings in this revealed area are not targetable, which is difficult for players to understand. so units in this revealed area shoudl be targetable. (done: death vision is ordinary temporary team sight, with direct attacks, queued attacks, and auto-acquisition allowed)
 
 
 jeffrey playtest
@@ -33,7 +33,7 @@ jeffrey playtest
 - [ ]
 - [ ] side paths slowing field that A* is aware of, they are muddy/rocky or something
 - [x] anti tank atack for riflement (done: in-range armored fallback targeting)
-- [ ] machine gunners dig in and attacks get change to miss OR increased machine gunner range so one can deter a scout car
+- [x] machine gunners dig in and attacks get change to miss OR increased machine gunner range so one can deter a scout car (done: Entrenchment lets eligible infantry, including Machine Gunners, dig trenches with +1 range, 70% direct miss chance, and 70% area damage reduction)
 - [ ] remove the R&D structure, instead split it into two. steel press is a new building tthat unlocks building anti tank guns, and has an upgrade for artillery production and mortar auto cast. engine industry (name to be workshopped, ask user before implementing) unlocks tank and has a research for command cars
 - [ ] oh actually better than above player sbuild factories, instead of gunworks or vehicle works. this produces mortar and scout car by default. player can then conver the factory into either a vehicle works or a gun works
 - [x] workers should not mine oil directly, instead right clicking a worker onto a oil patch will have it build an pump jack for ten seconds. pump jack has 50 hp, cannot move, mines oil at the same rate as a worker, is NOT ARMORED, does not block shooting, requires no tech (done: PR #510, contextual Pump Jacks mine oil at the old worker rate)
@@ -179,11 +179,11 @@ luke playtest
 
 - [ ] make the line shot a deep blue color that leaves a streak
 
-- [ ] command cars should not count towards seleciton limit
+- [x] command cars should not count towards seleciton limit (done: command budget adds each Command Car's own command weight plus the Command Car cap bonus)
 
 - [ ] make it so taht mortarts shoot instantly and have no setup time, and reduce their fly time to 1s, and they do 1.5x the damage they do now (partial: no setup and higher inner damage; fly time still ~2.25s)
 
-- [ ] ekat line shot and dash, if targetted outside of max range, should just do a max range use of the ability, and they should not have ekat walk towards a position wher ehtey can use the ability. you should be able to shift queue a dash also. also you should be able to dash over walla nd buildings.
+- [x] ekat line shot and dash, if targetted outside of max range, should just do a max range use of the ability, and they should not have ekat walk towards a position wher ehtey can use the ability. you should be able to shift queue a dash also. also you should be able to dash over walla nd buildings. (done: Ekat Dash and Line Shot clamp out-of-range targets, queue as ability intents, and Dash resolves immediately to a standable landing without staging a path)
 
 - [x] when a mortar is autocasting on a unit that is attack moved but stantionary, it keeps predicted their attack will not be at their location (done: mortar autocast no longer leads stationary attack-move targets)
 
@@ -191,7 +191,7 @@ luke playtest
 
 - [ ] attempting to join a replay in progress doesn't give you vision, it's all fog, but when reclaiming position from this all fog mode, the top bar actualy works
 
-- [ ] when host leaves the replay, it seems to kill the repolay?
+- [x] when host leaves the replay, it seems to kill the repolay? (done: leaving one replay viewer keeps playback alive for remaining viewers)
 
 - [ ] add an are you sure you want to close the tab, because control w kill the tab
 
@@ -224,7 +224,7 @@ luke playtest
 
 - [x] make tanks take up multiple spots in the selection box (done: PR #181)
 
-- [ ] replay playback should not end if one player in the replay leaves
+- [x] replay playback should not end if one player in the replay leaves (done: `returnToLobby` detaches only that viewer; the replay room resets only after the last viewer leaves)
 
 - [x] confirm if scout car starts with smoke grenade (done: 2 smoke uses configured)
 
@@ -259,9 +259,9 @@ luke playtest
 
 - [ ] tanks should not rotate their turrets back ot the centre, unless they start moving
 
-- [ ] dead infantry should leave a permanent black/red spot on the ground
+- [x] dead infantry should leave a permanent black/red spot on the ground (done: infantry deaths stamp permanent client-local ground decals)
 
-- [ ] dead vehicles should leave a permanent blackened spot in their silhouette on the ground
+- [x] dead vehicles should leave a permanent blackened spot in their silhouette on the ground (done: vehicle and support-weapon deaths stamp blackened scorch/hull decals)
 
 - [ ] prevent any player from playing as black or red
 

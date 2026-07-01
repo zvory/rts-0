@@ -5,8 +5,8 @@ decisions recorded. This file is the working checklist for the active Ekat seria
 
 Sources:
 
-- [docs/new-unit-checklist.md](../../docs/new-unit-checklist.md)
-- [docs/new-building-checklist.md](../../docs/new-building-checklist.md)
+- [docs/new-unit-checklist.md](../../../docs/new-unit-checklist.md)
+- [docs/new-building-checklist.md](../../../docs/new-building-checklist.md)
 - [plans/ekat/requirements.md](requirements.md)
 
 Do not edit implementation files until every required per-entity Phase 0 brief item and Phase 1

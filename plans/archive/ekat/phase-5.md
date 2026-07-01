@@ -11,8 +11,8 @@ and first Magic Anchor unlock before Positioning is designed.
 
 ## Scope
 
-- Read [docs/context/balance.md](../../docs/context/balance.md) before editing rules/spec details.
-- Use [docs/new-building-checklist.md](../../docs/new-building-checklist.md) for this building.
+- Read [docs/context/balance.md](../../../docs/context/balance.md) before editing rules/spec details.
+- Use [docs/new-building-checklist.md](../../../docs/new-building-checklist.md) for this building.
 - Complete only the Anchorage sections in [checklists.md](checklists.md), or mark items as deferred
   with named unknowns.
 - Specify Magic Anchor unlocks, upgrades, transformation tradeoff, destruction consequence, and
