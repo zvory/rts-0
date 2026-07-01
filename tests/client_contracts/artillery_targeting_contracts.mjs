@@ -12,6 +12,7 @@ import { ClientIntent } from "../../client/src/client_intent.js";
 import { Input } from "../../client/src/input/index.js";
 import {
   ABILITY,
+  cmd,
   KIND,
   ORDER_STAGE,
   SETUP,
@@ -149,6 +150,7 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
   );
 
   pointFireInput.state.selectedEntities = () => [queuedMovingArtillery];
+  pointFireInput.clientIntent.clearPlannedOrders();
   pointFireInput._shiftKeyDown = true;
   pointFireInput.mouse = queuedRawPoint;
   pointFireInput._refreshAbilityTargetPreview();
@@ -168,6 +170,90 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
     pointFireInput.clientIntent.abilityTargetPreview?.hoverInRange === false &&
       pointFireInput.clientIntent.abilityTargetPreview?.artilleryLocks?.length === 0,
     "Unqueued Point Fire preview does not lock a gun whose active order-plan marker is movement",
+  );
+
+  const locallyPlannedArtillery = {
+    ...selectedArtillery,
+    id: 46,
+    x: 200,
+    y: 200,
+    orderPlan: [],
+  };
+  const localMove = { x: 720, y: 256 };
+  const localSetupTarget = { x: localMove.x, y: localMove.y + 320 };
+  pointFireInput.state.selectedEntities = () => [locallyPlannedArtillery];
+  pointFireInput._selectedOwnUnitIds = () => [locallyPlannedArtillery.id];
+  pointFireInput.clientIntent.recordPlannedCommand(
+    cmd.move([locallyPlannedArtillery.id], localMove.x, localMove.y, false),
+    [locallyPlannedArtillery],
+    { sent: true, clientSeq: 90 },
+  );
+  pointFireInput.clientIntent.recordPlannedCommand(
+    cmd.setupAntiTankGuns([locallyPlannedArtillery.id], localSetupTarget.x, localSetupTarget.y, true),
+    [locallyPlannedArtillery],
+    { sent: true, clientSeq: 91 },
+  );
+  pointFireInput._shiftKeyDown = true;
+  pointFireInput.mouse = { x: localMove.x, y: localMove.y };
+  pointFireInput._refreshAbilityTargetPreview();
+  assert(
+    pointFireInput.clientIntent.abilityTargetPreview?.artilleryLocks?.[0]?.originX === localMove.x &&
+      pointFireInput.clientIntent.abilityTargetPreview?.artilleryLocks?.[0]?.originY === localMove.y,
+    "Queued Point Fire preview uses local movement before authoritative orderPlan echo",
+  );
+  assertApprox(
+    pointFireInput.clientIntent.abilityTargetPreview?.mouseY,
+    localMove.y + ARTILLERY_MIN_RANGE_TILES * 32,
+    0.001,
+    "Queued Point Fire preview uses the frozen setup facing for zero-length target rays",
+  );
+  pointFireInput.clientIntent.recordPlannedCommand(
+    cmd.pointFire([locallyPlannedArtillery.id], localMove.x, localMove.y, true),
+    [locallyPlannedArtillery],
+    { sent: true, clientSeq: 92 },
+  );
+  pointFireInput.clientIntent.recordPlannedCommand(
+    cmd.move([locallyPlannedArtillery.id], localMove.x + 64, localMove.y, true),
+    [locallyPlannedArtillery],
+    { sent: true, clientSeq: 93 },
+  );
+  const localPlanAfterTerminal = pointFireInput.clientIntent.plannedOrderPlanForEntity(locallyPlannedArtillery);
+  assert(
+    localPlanAfterTerminal.some((stage) => stage.kind === ORDER_STAGE.POINT_FIRE) &&
+      !localPlanAfterTerminal.some((stage) => stage.kind === ORDER_STAGE.MOVE && stage.x === localMove.x + 64),
+    "Client planned order stages do not append behind terminal queued Point Fire",
+  );
+  const rejectedSetupArtillery = { ...locallyPlannedArtillery, id: 47 };
+  pointFireInput.clientIntent.recordPlannedCommand(
+    cmd.move([rejectedSetupArtillery.id], localMove.x, localMove.y, false),
+    [rejectedSetupArtillery],
+    { sent: true, clientSeq: 100 },
+  );
+  pointFireInput.clientIntent.recordPlannedCommand(
+    cmd.setupAntiTankGuns([rejectedSetupArtillery.id], localSetupTarget.x, localSetupTarget.y, true),
+    [rejectedSetupArtillery],
+    { sent: true, clientSeq: 101 },
+  );
+  pointFireInput.clientIntent.recordPlannedCommand(
+    cmd.pointFire([rejectedSetupArtillery.id], localMove.x, localMove.y, true),
+    [rejectedSetupArtillery],
+    { sent: true, clientSeq: 102 },
+  );
+  pointFireInput.clientIntent.clearPlannedOrdersForClientSeq(101);
+  const rejectionPlan = pointFireInput.clientIntent.plannedOrderPlanForEntity(rejectedSetupArtillery);
+  assert(
+    rejectionPlan.length === 1 && rejectionPlan[0].kind === ORDER_STAGE.MOVE,
+    "Rejected queued setup clears dependent local fire previews for that artillery",
+  );
+  pointFireInput.clientIntent.reconcilePlannedOrders([
+    {
+      ...locallyPlannedArtillery,
+      orderPlan: [{ kind: ORDER_STAGE.MOVE, x: localMove.x, y: localMove.y }],
+    },
+  ], { acknowledgedClientSeq: 93 });
+  assert(
+    pointFireInput.clientIntent.plannedOrderPlanForEntity(locallyPlannedArtillery).length === 0,
+    "Authoritative orderPlan mismatch clears stale local queued setup and fire stages",
   );
 
   pointFireInput.state.selectedEntities = () => [selectedArtillery];

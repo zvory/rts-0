@@ -816,7 +816,12 @@ export class Minimap {
   }
 
   _issueCommand(command) {
-    return issueGameplayCommand(this.commandIssuer, command);
+    const selected = typeof this.state?.selectedEntities === "function"
+      ? this.state.selectedEntities()
+      : [];
+    const result = issueGameplayCommand(this.commandIssuer, command);
+    this._intent()?.recordPlannedCommand?.(command, selected, result);
+    return result;
   }
 
   _intent() {
@@ -1006,6 +1011,7 @@ export class Minimap {
 
   _setupPreviewEntities(queued = false) {
     return this._selectedOwnSupportWeapons()
+      .map((e) => plannedEntityForIntent(this._intent(), e))
       .map((e) => queued ? supportWeaponSetupPreviewEntity(e) : e);
   }
 
@@ -1062,19 +1068,24 @@ export class Minimap {
             .map((e) => e.id)
         : unitIds;
       if (abilityUnits.length === 0) return;
-      this._issueCommand(cmd.useAbility(ability, abilityUnits, wx, wy, queued));
-      if (isArtilleryFireAbility(ability)) {
-        const locks = buildArtilleryTargetLocks({
+      const selectedCarriers = sel
+        .filter((e) => abilityUnits.includes(e.id))
+        .map((e) => plannedEntityForIntent(this._intent(), e));
+      const artilleryLocks = isArtilleryFireAbility(ability)
+        ? buildArtilleryTargetLocks({
           ability,
-          carriers: sel.filter((e) => abilityUnits.includes(e.id)),
+          carriers: selectedCarriers,
           rawX: wx,
           rawY: wy,
           map: this.state.map,
           tileSize: this.state.map?.tileSize,
           definition,
           queued,
-        });
-        for (const lock of locks) {
+        })
+        : [];
+      this._issueCommand(cmd.useAbility(ability, abilityUnits, wx, wy, queued));
+      if (isArtilleryFireAbility(ability)) {
+        for (const lock of artilleryLocks) {
           this._addCommandFeedback("artillery", lock.x, lock.y, queued, definition?.radiusTiles);
         }
         return;
@@ -1090,6 +1101,12 @@ export class Minimap {
 function supportWeaponSetupPreviewEntity(entity) {
   const origin = latestMovementOrderPlanPoint(entity);
   return origin ? { ...entity, x: origin.x, y: origin.y } : entity;
+}
+
+function plannedEntityForIntent(intent, entity) {
+  return typeof intent?.entityWithPlannedOrder === "function"
+    ? intent.entityWithPlannedOrder(entity)
+    : entity;
 }
 
 function latestMovementOrderPlanPoint(entity) {

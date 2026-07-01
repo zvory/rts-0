@@ -1,4 +1,11 @@
 import { CommandComposer } from "./command_composer.js";
+import { ABILITY, CMD, ORDER_STAGE } from "./protocol.js";
+
+const ARTILLERY_TERMINAL_STAGES = new Set([
+  ORDER_STAGE.POINT_FIRE,
+  ORDER_STAGE.BLANKET_FIRE,
+]);
+const PLAN_XY_EPSILON = 0.5;
 
 /**
  * Browser-local intent state shared by HUD, input, minimap, and renderer feedback.
@@ -29,6 +36,8 @@ export class ClientIntent {
     this.antiTankGunSetupPreview = null;
     /** @type {null | {ability:string, source?:string, mouseX?:number, mouseY?:number, carriers:Array<object>, areaOrigins?:Array<object>, rangeOrigins?:Array<object>, pathOrigins?:Array<object>, returnMarkers?:Array<object>, rangePx?:number, hoverInRange:boolean, hoverInsideMinRange?:boolean}} */
     this.abilityTargetPreview = null;
+    /** @type {Map<number, Array<{kind:string,x?:number,y?:number,clientSeq:number|null,createdAt:number}>>} */
+    this._plannedOrderStagesByUnit = new Map();
   }
 
   /** Open the worker build command-card submenu. */
@@ -205,6 +214,148 @@ export class ClientIntent {
   }
 
   /**
+   * Record the local queued-order shape of a command that was accepted for send.
+   * This is intentionally small and client-only: it exists to keep previews stable
+   * until authoritative orderPlan snapshots confirm or replace the plan.
+   * @param {object} command
+   * @param {Array<object>} selectedEntities
+   * @param {object|boolean|null} result
+   */
+  recordPlannedCommand(command, selectedEntities = [], result = null) {
+    if (!command || typeof command !== "object") return;
+    if (result && typeof result === "object" && result.sent === false) return;
+    const units = normalizeUnitIds(command.units);
+    if (units.length === 0) return;
+    const clientSeq = normalizeClientSeq(result?.clientSeq);
+    const stage = commandOrderStage(command, clientSeq, this._now());
+    if (!stage) {
+      if (!command.queued || clearsPlannedStages(command.c)) {
+        this.clearPlannedOrdersForUnits(units);
+      }
+      return;
+    }
+
+    const selectedById = new Map(
+      (Array.isArray(selectedEntities) ? selectedEntities : [])
+        .filter((entity) => Number.isInteger(entity?.id))
+        .map((entity) => [entity.id, entity]),
+    );
+    for (const unitId of units) {
+      const entity = selectedById.get(unitId) || null;
+      if (command.queued) {
+        this._appendPlannedStage(unitId, stage, entity);
+      } else {
+        this._plannedOrderStagesByUnit.set(unitId, [cloneStage(stage)]);
+      }
+    }
+  }
+
+  /**
+   * Return the authoritative orderPlan plus unconfirmed local stages for an entity.
+   * @param {object} entity
+   * @returns {Array<object>}
+   */
+  plannedOrderPlanForEntity(entity) {
+    const authority = Array.isArray(entity?.orderPlan)
+      ? entity.orderPlan.map((stage) => ({ ...stage }))
+      : [];
+    const local = this._plannedOrderStagesByUnit.get(entity?.id) || [];
+    const merged = [];
+    for (const stage of authority.concat(local)) {
+      merged.push({ ...stage });
+      if (ARTILLERY_TERMINAL_STAGES.has(stage.kind)) break;
+    }
+    return merged;
+  }
+
+  /**
+   * Return an entity clone whose orderPlan includes pending local stages.
+   * @param {object} entity
+   * @returns {object}
+   */
+  entityWithPlannedOrder(entity) {
+    if (!entity || !this._plannedOrderStagesByUnit.has(entity.id)) return entity;
+    return { ...entity, orderPlan: this.plannedOrderPlanForEntity(entity) };
+  }
+
+  /** Clear local planned stages for specific unit ids. */
+  clearPlannedOrdersForUnits(unitIds) {
+    for (const id of normalizeUnitIds(unitIds)) {
+      this._plannedOrderStagesByUnit.delete(id);
+    }
+  }
+
+  /** Clear local planned stages that came from a rejected client command. */
+  clearPlannedOrdersForClientSeq(clientSeq) {
+    const seq = normalizeClientSeq(clientSeq);
+    if (seq == null) return;
+    for (const [unitId, stages] of this._plannedOrderStagesByUnit.entries()) {
+      const rejectedIndex = stages.findIndex((stage) => stage.clientSeq === seq);
+      if (rejectedIndex < 0) continue;
+      const kept = stages.slice(0, rejectedIndex);
+      if (kept.length > 0) this._plannedOrderStagesByUnit.set(unitId, kept);
+      else this._plannedOrderStagesByUnit.delete(unitId);
+    }
+  }
+
+  /** Clear local planned stages for units no longer selected. */
+  clearPlannedOrdersOutsideSelection(selectedIds) {
+    const selected = new Set(normalizeUnitIds(selectedIds));
+    for (const id of this._plannedOrderStagesByUnit.keys()) {
+      if (!selected.has(id)) this._plannedOrderStagesByUnit.delete(id);
+    }
+  }
+
+  /** Clear all local planned stages. */
+  clearPlannedOrders() {
+    this._plannedOrderStagesByUnit.clear();
+  }
+
+  /**
+   * Reconcile local stages with selected authoritative entity views.
+   * @param {Array<object>} entities
+   * @param {{acknowledgedClientSeq?: number|null}} options
+   */
+  reconcilePlannedOrders(entities = [], options = {}) {
+    const visibleSelected = new Map(
+      (Array.isArray(entities) ? entities : [])
+        .filter((entity) => Number.isInteger(entity?.id))
+        .map((entity) => [entity.id, entity]),
+    );
+    const ackSeq = normalizeClientSeq(options.acknowledgedClientSeq);
+    for (const [unitId, stages] of this._plannedOrderStagesByUnit.entries()) {
+      const entity = visibleSelected.get(unitId);
+      if (!entity) {
+        this._plannedOrderStagesByUnit.delete(unitId);
+        continue;
+      }
+      const authority = Array.isArray(entity.orderPlan) ? entity.orderPlan : [];
+      const pending = [];
+      let stale = false;
+      for (const stage of stages) {
+        if (stage.clientSeq != null && ackSeq != null && stage.clientSeq <= ackSeq) {
+          if (!stageConfirmedByAuthority(stage, authority)) stale = true;
+          continue;
+        }
+        if (stale) continue;
+        pending.push(stage);
+      }
+      if (pending.length > 0) this._plannedOrderStagesByUnit.set(unitId, pending);
+      else this._plannedOrderStagesByUnit.delete(unitId);
+    }
+  }
+
+  _appendPlannedStage(unitId, stage, entity = null) {
+    const authorityPlan = Array.isArray(entity?.orderPlan) ? entity.orderPlan : [];
+    if (planHasTerminal(authorityPlan)) return;
+    const current = this._plannedOrderStagesByUnit.get(unitId) || [];
+    if (planHasTerminal(current)) return;
+    const next = replaceContradictoryLocalStages(current, stage);
+    next.push(cloneStage(stage));
+    this._plannedOrderStagesByUnit.set(unitId, next);
+  }
+
+  /**
    * Arm a lab setup tool for world clicks.
    * @param {{kind:string,payload?:object,label?:string,id?:string,keepArmedOnWorldClick?:boolean,consumeBoxSelection?:boolean,keepArmedOnBoxSelection?:boolean}} tool
    */
@@ -239,6 +390,103 @@ export class ClientIntent {
   _clearActiveLabTool() {
     this.activeLabTool = null;
   }
+}
+
+function commandOrderStage(command, clientSeq, createdAt) {
+  const base = { clientSeq, createdAt };
+  switch (command.c) {
+    case CMD.MOVE:
+      return finitePointStage(ORDER_STAGE.MOVE, command, base);
+    case CMD.ATTACK_MOVE:
+      return finitePointStage(ORDER_STAGE.ATTACK_MOVE, command, base);
+    case CMD.SETUP_ANTI_TANK_GUNS:
+      return finitePointStage(ORDER_STAGE.SETUP_ANTI_TANK_GUNS, command, base);
+    case CMD.USE_ABILITY:
+      if (command.ability === ABILITY.POINT_FIRE) {
+        return finitePointStage(ORDER_STAGE.POINT_FIRE, command, base);
+      }
+      if (command.ability === ABILITY.BLANKET_FIRE) {
+        return finitePointStage(ORDER_STAGE.BLANKET_FIRE, command, base);
+      }
+      return null;
+    default:
+      return null;
+  }
+}
+
+function finitePointStage(kind, command, base) {
+  if (!Number.isFinite(command.x) || !Number.isFinite(command.y)) return null;
+  return { kind, x: command.x, y: command.y, ...base };
+}
+
+function clearsPlannedStages(commandKind) {
+  return commandKind === CMD.STOP ||
+    commandKind === CMD.HOLD_POSITION ||
+    commandKind === CMD.ATTACK ||
+    commandKind === CMD.GATHER ||
+    commandKind === CMD.BUILD ||
+    commandKind === CMD.DECONSTRUCT ||
+    commandKind === CMD.TEAR_DOWN_ANTI_TANK_GUNS ||
+    commandKind === CMD.RECAST_ABILITY ||
+    commandKind === CMD.CHARGE;
+}
+
+function replaceContradictoryLocalStages(stages, nextStage) {
+  const out = stages.map(cloneStage);
+  if (nextStage.kind === ORDER_STAGE.SETUP_ANTI_TANK_GUNS) {
+    const index = out.findIndex((stage) =>
+      stage.kind === ORDER_STAGE.SETUP_ANTI_TANK_GUNS || ARTILLERY_TERMINAL_STAGES.has(stage.kind));
+    return index >= 0 ? out.slice(0, index) : out;
+  }
+  if (ARTILLERY_TERMINAL_STAGES.has(nextStage.kind)) {
+    const index = out.findIndex((stage) => ARTILLERY_TERMINAL_STAGES.has(stage.kind));
+    return index >= 0 ? out.slice(0, index) : out;
+  }
+  return out;
+}
+
+function planHasTerminal(plan) {
+  return Array.isArray(plan) && plan.some((stage) => ARTILLERY_TERMINAL_STAGES.has(stage?.kind));
+}
+
+function stageConfirmedByAuthority(stage, authorityPlan) {
+  if (!Array.isArray(authorityPlan)) return false;
+  return authorityPlan.some((authority) => {
+    if (authority?.kind !== stage.kind) return false;
+    if (ARTILLERY_TERMINAL_STAGES.has(stage.kind)) return true;
+    return closePoint(authority, stage);
+  });
+}
+
+function closePoint(a, b) {
+  return Number.isFinite(a?.x) &&
+    Number.isFinite(a?.y) &&
+    Number.isFinite(b?.x) &&
+    Number.isFinite(b?.y) &&
+    Math.abs(a.x - b.x) <= PLAN_XY_EPSILON &&
+    Math.abs(a.y - b.y) <= PLAN_XY_EPSILON;
+}
+
+function cloneStage(stage) {
+  return { ...stage };
+}
+
+function normalizeUnitIds(units) {
+  if (!Array.isArray(units)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const unit of units) {
+    const id = Number(unit);
+    if (!Number.isInteger(id) || id <= 0 || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+}
+
+function normalizeClientSeq(clientSeq) {
+  const seq = Number(clientSeq);
+  return Number.isInteger(seq) && seq >= 0 ? seq : null;
 }
 
 function defaultNow() {
