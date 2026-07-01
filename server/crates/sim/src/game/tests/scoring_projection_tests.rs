@@ -184,7 +184,7 @@ fn phase4_projection_matches_legacy_snapshot_entities() {
         e.set_order(Order::attack(target));
         e.set_target_id(Some(target));
     }
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog.recompute(&ids, &game.entities, &game.map);
 
@@ -220,7 +220,7 @@ fn spectator_snapshot_uses_union_fog_not_full_world() {
         .entities
         .spawn_unit(99, EntityKind::Rifleman, hidden_pos.0, hidden_pos.1)
         .expect("hidden unit should spawn");
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     game.fog
         .recompute(&active_players, &game.entities, &game.map);
 
@@ -308,7 +308,7 @@ fn death_vision_lingers_as_normal_vision_for_five_seconds() {
         .spawn_building(2, EntityKind::Depot, enemy_depot_pos.0, enemy_depot_pos.1, true)
         .expect("enemy depot should spawn");
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog.recompute(&ids, &game.entities, &game.map);
     assert!(game.fog.is_visible_world(1, enemy_pos.0, enemy_pos.1));
@@ -502,7 +502,7 @@ fn allied_death_vision_allows_teammate_attacks_and_auto_acquisition() {
         .spawn_unit(3, EntityKind::Tank, enemy_pos.0, enemy_pos.1)
         .expect("enemy should spawn");
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog.recompute(&ids, &game.entities, &game.map);
     assert!(!game.fog.is_visible_world(1, enemy_pos.0, enemy_pos.1));

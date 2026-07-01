@@ -17,6 +17,7 @@ mod artillery;
 mod building_memory;
 pub mod command;
 mod commands;
+mod derived_state;
 pub mod entity;
 mod entrenchment_combat;
 mod firing_reveal;
@@ -56,6 +57,7 @@ use serde::{Deserialize, Serialize};
 
 use artillery::ArtilleryShellStore;
 use building_memory::{BuildingMemory, BuildingMemoryEntry};
+use derived_state::DerivedState;
 use entity::{BuildPhase, EntityKind, EntityStore};
 use firing_reveal::FiringRevealSource;
 use fog::{Fog, LingeringSightSource};
@@ -166,11 +168,8 @@ pub struct Game {
     /// because they are emitted into the same pending queue before command application.
     command_log: Vec<CommandLogEntry>,
     tick: u32,
-    /// Post-tick spatial index, rebuilt every tick after all systems run so [`snapshot_for`]
-    /// can use it for interest filtering without rebuilding.
-    spatial: services::spatial::SpatialIndex,
-    /// Persistent pathfinding service with an LRU cache for verified paths.
-    pathing: services::pathing::PathingService,
+    /// Rebuildable cache and index state: final post-tick spatial index plus pathing cache.
+    derived: DerivedState,
     /// Five-second death-vision sources stamped into live fog as ordinary temporary team sight.
     lingering_sight: Vec<LingeringSightSource>,
     /// Actionable temporary sight from Anti-Tank Guns that fired from fog.
@@ -233,7 +232,7 @@ impl Game {
         mut perf: Option<&mut crate::perf::TickPerf>,
     ) -> Vec<(u32, Vec<Event>)> {
         self.tick = self.tick.wrapping_add(1);
-        self.pathing.advance_tick(self.tick);
+        self.derived.advance_pathing_tick(self.tick);
         self.smokes.retain_active(self.tick);
         let player_ids: Vec<u32> = self.players.iter().map(|p| p.id).collect();
         if self.retain_active_visibility_sources() {
@@ -259,13 +258,13 @@ impl Game {
         // entity store, player economy, and the event buckets, so it can mutate resources and
         // entities together without locks.
         let active_vision_players = self.alive_players().into_iter().collect::<BTreeSet<_>>();
-        self.spatial = systems::run_tick(
+        let final_spatial = systems::run_tick(
             &self.map,
             &mut self.entities,
             &mut self.players,
             &active_vision_players,
             &self.fog,
-            &mut self.pathing,
+            self.derived.pathing_mut(),
             &mut self.rng,
             &mut self.lingering_sight,
             &mut self.firing_reveals,
@@ -280,6 +279,7 @@ impl Game {
             self.tick,
             perf.as_deref_mut(),
         );
+        self.derived.set_final_spatial(final_spatial);
 
         // Live fog last, from the post-systems world state. Lingering death vision is stamped as
         // ordinary temporary sight so snapshots, commands, and combat all consume one visibility
@@ -486,8 +486,40 @@ impl Game {
     // --- internal helpers ------------------------------------------------------
     #[cfg(test)]
     pub(in crate::game) fn clear_and_rebuild_derived_state_for_test(&mut self) {
-        self.pathing.clear_rebuildable_state_for_test();
-        self.spatial = services::spatial::SpatialIndex::build(&self.entities, self.map.size);
+        self.derived
+            .clear_and_rebuild_from_authoritative(&self.map, &self.entities);
+    }
+
+    pub(in crate::game) fn final_spatial(&self) -> &services::spatial::SpatialIndex {
+        self.derived.final_spatial()
+    }
+
+    pub(in crate::game) fn rebuild_final_spatial(&mut self) {
+        self.derived
+            .rebuild_final_spatial(&self.map, &self.entities);
+    }
+
+    pub(in crate::game) fn reset_derived_state(
+        &mut self,
+        default_pathing_budget: usize,
+        pathing_cache_capacity: usize,
+    ) {
+        self.derived = DerivedState::new(
+            &self.map,
+            &self.entities,
+            default_pathing_budget,
+            pathing_cache_capacity,
+        );
+    }
+
+    #[cfg(test)]
+    pub(in crate::game) fn pathing_cache_len_for_test(&self) -> usize {
+        self.derived.pathing_cache_len_for_test()
+    }
+
+    #[cfg(test)]
+    pub(in crate::game) fn pathing_config_for_test(&self) -> (usize, usize) {
+        self.derived.pathing_config_for_test()
     }
 
     fn refresh_building_memory(&mut self, player_ids: &[u32]) {

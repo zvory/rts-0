@@ -643,11 +643,6 @@ fn build_dev_scenario_game_with_teams<const N: usize>(
             is_ai: false,
         })
         .collect();
-    let spatial = services::spatial::SpatialIndex::build(&entities, map.size);
-    let pathing = services::pathing::PathingService::new(
-        LIVE_PATHING_DEFAULT_BUDGET,
-        LIVE_PATHING_CACHE_CAPACITY,
-    );
     let rng = SmallRng::seed_from_u64(seed as u64);
     let mut game = Game::new_without_ai_controllers(&players, seed);
     game.map = map;
@@ -656,8 +651,7 @@ fn build_dev_scenario_game_with_teams<const N: usize>(
     game.pending.clear();
     game.command_log.clear();
     game.tick = 0;
-    game.spatial = spatial;
-    game.pathing = pathing;
+    game.reset_derived_state(LIVE_PATHING_DEFAULT_BUDGET, LIVE_PATHING_CACHE_CAPACITY);
     game.lingering_sight.clear();
     game.smokes = SmokeCloudStore::new();
     game.starting_loadouts = players

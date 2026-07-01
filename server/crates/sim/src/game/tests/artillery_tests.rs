@@ -88,7 +88,7 @@ fn artillery_firing_from_fog_is_actionable_for_all_enemies() {
         .expect("observer worker should spawn");
     deploy_artillery_toward(&mut game, artillery, target);
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog.recompute(&ids, &game.entities, &game.map);
 
@@ -162,7 +162,7 @@ fn artillery_firing_reveal_does_not_override_smoke_concealment() {
         .expect("counter tank should spawn");
     deploy_artillery_toward(&mut game, artillery, target);
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     game.spawn_smoke_cloud_for_test(pos.0, pos.1)
         .expect("smoke should spawn over the artillery");
 
@@ -245,7 +245,7 @@ fn artillery_target_is_owner_only_and_enemy_events_require_current_vision() {
         .spawn_unit(2, EntityKind::Worker, target.0, target.1)
         .expect("enemy impact spotter should spawn");
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog.recompute(&ids, &game.entities, &game.map);
     deploy_artillery_toward(&mut game, artillery, target);

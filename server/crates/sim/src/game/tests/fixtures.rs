@@ -23,7 +23,7 @@ pub(super) fn human_vs_ai_players() -> [PlayerInit; 2] {
 
 pub(super) fn legacy_snapshot_entities(game: &Game, player: u32, fogged: bool) -> Vec<EntityView> {
     let mut entities = Vec::new();
-    for id in game.spatial.all_ids() {
+    for id in game.final_spatial().all_ids() {
         let Some(e) = game.entities.get(id) else {
             continue;
         };
@@ -181,7 +181,7 @@ pub(super) fn flat_tank_move_fixture() -> (Game, u32, (f32, f32)) {
         .spawn_unit(1, EntityKind::Tank, start.0, start.1)
         .expect("tank should spawn");
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog.recompute(&ids, &game.entities, &game.map);
     game.assert_invariants();
@@ -201,7 +201,7 @@ pub(super) fn empty_flat_game(players: &[PlayerInit]) -> Game {
     game.mortar_shells = MortarShellStore::default();
     game.artillery_shells = artillery::ArtilleryShellStore::default();
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog.recompute(&ids, &game.entities, &game.map);
     game
@@ -232,7 +232,7 @@ pub(super) fn smoke_command_fixture() -> (Game, u32, (f32, f32), (f32, f32)) {
         .spawn_unit(1, EntityKind::ScoutCar, scout_pos.0, scout_pos.1)
         .expect("scout car should spawn");
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog
         .recompute_with_smoke(&ids, &game.entities, &game.map, &game.smokes);

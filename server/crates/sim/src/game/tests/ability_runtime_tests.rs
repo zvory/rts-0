@@ -136,7 +136,7 @@ fn snapshot_projects_abilities_from_owner_faction_catalog() {
         .entities
         .spawn_unit(1, EntityKind::ScoutCar, pos.0, pos.1)
         .expect("scout should spawn");
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     game.fog.recompute(&[1], &game.entities, &game.map);
 
     let snapshot = game.snapshot_for(1);

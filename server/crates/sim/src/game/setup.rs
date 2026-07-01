@@ -1,5 +1,6 @@
 use super::resource_placement;
 use super::*;
+use crate::game::derived_state::DerivedState;
 use crate::rules::faction::{catalog_for_or_default_empty, FactionLoadout, StartingFormation};
 use std::str::FromStr;
 
@@ -285,8 +286,9 @@ impl Game {
             }
         }
 
-        let spatial = services::spatial::SpatialIndex::build(&entities, map.size);
-        let pathing = services::pathing::PathingService::new(
+        let derived = DerivedState::new(
+            &map,
+            &entities,
             LIVE_PATHING_DEFAULT_BUDGET,
             LIVE_PATHING_CACHE_CAPACITY,
         );
@@ -300,8 +302,7 @@ impl Game {
             pending: Vec::new(),
             command_log: Vec::new(),
             tick: 0,
-            spatial,
-            pathing,
+            derived,
             lingering_sight: Vec::new(),
             firing_reveals: Vec::new(),
             smokes: SmokeCloudStore::new(),

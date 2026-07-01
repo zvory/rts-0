@@ -14,7 +14,7 @@ fn player(id: u32) -> PlayerInit {
 
 fn refresh_derived_state(game: &mut Game) {
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog.recompute(&ids, &game.entities, &game.map);
     game.assert_invariants();

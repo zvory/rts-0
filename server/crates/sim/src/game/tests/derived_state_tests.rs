@@ -73,13 +73,19 @@ fn derived_state_wipe_rebuild_preserves_pathing_state_and_snapshots() {
     tick_pair_and_assert_equivalent(&mut baseline, &mut wiped, "warm path cache tick");
 
     assert!(
-        baseline.pathing.cache_len() > 0,
+        baseline.pathing_cache_len_for_test() > 0,
         "pathing-heavy setup should warm the baseline path cache before the wipe"
     );
     assert_eq!(
-        baseline.pathing.cache_len(),
-        wiped.pathing.cache_len(),
+        baseline.pathing_cache_len_for_test(),
+        wiped.pathing_cache_len_for_test(),
         "paired games should warm the same cache entries before the wipe"
+    );
+    let baseline_pathing_config = baseline.pathing_config_for_test();
+    assert_eq!(
+        baseline_pathing_config,
+        wiped.pathing_config_for_test(),
+        "paired games should use the same live pathing budget/cache configuration before the wipe"
     );
     assert!(
         !baseline
@@ -92,9 +98,14 @@ fn derived_state_wipe_rebuild_preserves_pathing_state_and_snapshots() {
 
     wiped.clear_and_rebuild_derived_state_for_test();
     assert_eq!(
-        wiped.pathing.cache_len(),
+        wiped.pathing_cache_len_for_test(),
         0,
         "the derived-state wipe should clear the persistent pathing cache"
+    );
+    assert_eq!(
+        baseline_pathing_config,
+        wiped.pathing_config_for_test(),
+        "clearing derived pathing state must preserve the live default budget/cache capacity"
     );
     assert_equivalent_games(&baseline, &wiped, "after derived-state wipe/rebuild");
 
@@ -121,7 +132,7 @@ fn derived_state_wipe_rebuild_preserves_pathing_state_and_snapshots() {
     assert_equivalent_games(&baseline, &wiped, "queued post-wipe repath command");
     tick_pair_and_assert_equivalent(&mut baseline, &mut wiped, "post-wipe repath tick");
     assert!(
-        wiped.pathing.cache_len() > 0,
+        wiped.pathing_cache_len_for_test() > 0,
         "future path requests should rebuild pathing cache entries after the wipe"
     );
 

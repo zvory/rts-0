@@ -16,7 +16,7 @@ fn deploy_anti_tank_gun_toward(game: &mut Game, id: u32, target: (f32, f32)) {
 
 fn refresh_visibility_for_test(game: &mut Game) {
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.recompute_live_fog(&ids);
     game.refresh_building_memory(&ids);

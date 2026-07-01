@@ -27,7 +27,7 @@ fn queued_move_fixture() -> (Game, u32, (f32, f32), (f32, f32), (f32, f32)) {
         .spawn_unit(1, EntityKind::Rifleman, start.0, start.1)
         .expect("rifleman should spawn");
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog.recompute(&ids, &game.entities, &game.map);
     game.assert_invariants();
@@ -107,7 +107,7 @@ fn mixed_queued_fixture() -> MixedQueuedFixture {
         .expect("enemy should spawn");
 
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog.recompute(&ids, &game.entities, &game.map);
     game.assert_invariants();
@@ -202,7 +202,7 @@ fn phase_six_intent_fixture() -> PhaseSixIntentFixture {
         .expect("enemy should spawn");
 
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog
         .recompute_with_smoke(&ids, &game.entities, &game.map, &game.smokes);

@@ -110,7 +110,7 @@ impl Game {
         let mut entities = Vec::new();
         let mut resource_deltas = Vec::new();
         // Use the spatial index for interest filtering instead of a full entity scan.
-        for id in self.spatial.all_ids() {
+        for id in self.final_spatial().all_ids() {
             let e = match self.entities.get(id) {
                 Some(e) => e,
                 None => continue,

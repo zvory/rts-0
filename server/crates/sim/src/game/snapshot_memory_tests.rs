@@ -1,6 +1,6 @@
 use super::*;
 use crate::game::entity::EntityKind;
-use crate::game::{services, systems, SmokeCloudStore};
+use crate::game::{systems, SmokeCloudStore};
 use crate::protocol::terrain;
 
 fn players() -> [PlayerInit; 2] {
@@ -69,7 +69,7 @@ fn empty_flat_game_with_players(players: &[PlayerInit]) -> Game {
     game.mortar_shells = MortarShellStore::default();
     game.artillery_shells = artillery::ArtilleryShellStore::default();
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog.recompute(&ids, &game.entities, &game.map);
     game.refresh_building_memory(&ids);
@@ -179,7 +179,7 @@ fn remembered_buildings_use_team_visible_observations() {
         .spawn_building(3, EntityKind::Depot, depot_pos.0, depot_pos.1, true)
         .expect("enemy depot should spawn");
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog.recompute(&ids, &game.entities, &game.map);
     game.refresh_building_memory(&ids);
@@ -198,7 +198,7 @@ fn remembered_buildings_use_team_visible_observations() {
         .spawn_unit(2, EntityKind::Rifleman, far.0, far.1)
         .expect("far ally scout should spawn");
     systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.rebuild_final_spatial();
     game.fog.recompute(&ids, &game.entities, &game.map);
 
     let hidden = game.snapshot_for(1);
