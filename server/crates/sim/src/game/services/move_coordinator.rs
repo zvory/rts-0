@@ -25,6 +25,7 @@ use crate::game::entity::{
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::pathfinding;
+use crate::game::smoke::SmokeCloudStore;
 use crate::game::services::geometry::{
     building_rect_for_entity, unit_bodies_intersect, unit_body, unit_body_for_entity,
     unit_body_with_facing, RectBody, UnitBody,
@@ -41,6 +42,7 @@ use crate::game::services::standability;
 use crate::game::teams::TeamRelations;
 use crate::game::trench::TrenchStore;
 use crate::perf::{PathingPassDiagnostics, PathingRequestSample, PathingRequestSource};
+use crate::rules::projection;
 
 mod formation;
 
@@ -111,8 +113,10 @@ impl<'a> MoveCoordinator<'a> {
 
     pub(in crate::game) fn enable_trench_formation_preference(
         &mut self,
+        entities: &EntityStore,
         trenches: &TrenchStore,
         fog: &Fog,
+        smokes: &SmokeCloudStore,
         players: impl IntoIterator<Item = u32>,
         active_vision_players: &BTreeSet<u32>,
     ) {
@@ -130,9 +134,12 @@ impl<'a> MoveCoordinator<'a> {
                 }
                 let team_fog = fog.union_for(player, &visible_players);
                 let views = trenches.views_for(player, &team_fog, true, &[player]);
+                let occupied_trenches =
+                    visible_occupied_trench_ids_for_player(entities, player, &team_fog, smokes);
                 formation::PlayerKnownTrenches {
                     player,
                     trenches: formation::known_trenches_from_views(views),
+                    occupied_trenches,
                 }
             })
             .collect();
@@ -248,7 +255,13 @@ impl<'a> MoveCoordinator<'a> {
             units.len(),
         );
         let selected_units = units.iter().map(|unit| unit.id).collect::<BTreeSet<_>>();
-        let occupied_trenches = occupied_trench_ids_excluding(entities, &selected_units);
+        let mut occupied_trenches = self
+            .known_trench_entry_for_player(player)
+            .map(|entry| entry.occupied_trenches.clone())
+            .unwrap_or_default();
+        for trench_id in occupied_trench_ids_for_units(entities, &selected_units) {
+            occupied_trenches.remove(&trench_id);
+        }
         let goals = formation::formation_goals_with_known_trenches(
             self.map,
             self.occ,
@@ -279,11 +292,18 @@ impl<'a> MoveCoordinator<'a> {
     }
 
     fn known_trenches_for_player(&self, player: u32) -> &[formation::KnownTrench] {
+        self.known_trench_entry_for_player(player)
+            .map(|entry| entry.trenches.as_slice())
+            .unwrap_or(&[])
+    }
+
+    fn known_trench_entry_for_player(
+        &self,
+        player: u32,
+    ) -> Option<&formation::PlayerKnownTrenches> {
         self.known_trenches
             .iter()
             .find(|entry| entry.player == player)
-            .map(|entry| entry.trenches.as_slice())
-            .unwrap_or(&[])
     }
 
     /// Issue an attack order against a specific target. Sets the order and requests an
@@ -1005,10 +1025,26 @@ fn count_awaiting_paths(entities: &EntityStore) -> usize {
         .count()
 }
 
-fn occupied_trench_ids_excluding(entities: &EntityStore, excluded_ids: &BTreeSet<u32>) -> BTreeSet<u32> {
+fn visible_occupied_trench_ids_for_player(
+    entities: &EntityStore,
+    player: u32,
+    fog: &Fog,
+    smokes: &SmokeCloudStore,
+) -> BTreeSet<u32> {
     entities
         .iter()
-        .filter(|entity| !excluded_ids.contains(&entity.id))
+        .filter(|entity| projection::entity_visible_to_with_smoke(player, entity, fog, smokes))
+        .filter_map(active_trench_occupation)
+        .collect()
+}
+
+fn occupied_trench_ids_for_units(
+    entities: &EntityStore,
+    unit_ids: &BTreeSet<u32>,
+) -> BTreeSet<u32> {
+    entities
+        .iter()
+        .filter(|entity| unit_ids.contains(&entity.id))
         .filter_map(active_trench_occupation)
         .collect()
 }

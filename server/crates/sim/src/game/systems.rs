@@ -145,8 +145,10 @@ pub(crate) fn run_tick(
         )
     });
     coordinator.enable_trench_formation_preference(
+        entities,
         trenches,
         fog,
+        smokes,
         players.iter().map(|player| player.id),
         active_vision_players,
     );

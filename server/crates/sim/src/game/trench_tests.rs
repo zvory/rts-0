@@ -512,6 +512,68 @@ fn move_command_near_hidden_trench_keeps_clicked_goal() {
 }
 
 #[test]
+fn move_command_to_remembered_trench_ignores_hidden_occupant() {
+    let mut game = empty_flat_game(&players());
+    let scout_pos = game.map.tile_center(20, 24);
+    let rifleman = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, scout_pos.0, scout_pos.1)
+        .expect("rifleman should spawn");
+    repair_world(&mut game);
+    let trench_pos = game.map.tile_center(24, 24);
+    let trench = game
+        .spawn_trench_for_test(trench_pos.0, trench_pos.1)
+        .expect("visible trench should seed");
+    assert!(game
+        .snapshot_for(1)
+        .trenches
+        .iter()
+        .any(|view| view.id == trench));
+
+    let far_pos = game.map.tile_center(4, 4);
+    game.entities
+        .get_mut(rifleman)
+        .expect("rifleman should exist")
+        .set_position(far_pos.0, far_pos.1);
+    let enemy = game
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, trench_pos.0, trench_pos.1)
+        .expect("hidden enemy occupant should spawn");
+    repair_world(&mut game);
+    game.tick();
+    assert_eq!(
+        active_trench_occupation(game.entities.get(enemy).expect("enemy should exist")),
+        Some(trench),
+        "test setup requires a server-side occupied trench"
+    );
+    let hidden = game.snapshot_for(1);
+    assert!(hidden.trenches.iter().any(|view| view.id == trench));
+    assert!(
+        !hidden.entities.iter().any(|view| view.id == enemy),
+        "test setup requires the occupant to be hidden from player one"
+    );
+
+    let click = game.map.tile_center(26, 24);
+    game.enqueue(
+        1,
+        SimCommand::Move {
+            units: vec![rifleman],
+            x: click.0,
+            y: click.1,
+            queued: false,
+        },
+    );
+    game.tick();
+
+    let unit = game.entities.get(rifleman).expect("rifleman should exist");
+    assert_eq!(
+        unit.move_intent(),
+        Some(trench_pos),
+        "hidden occupation must not change the player's issued formation goal"
+    );
+}
+
+#[test]
 fn move_command_ignores_trench_seen_only_by_defeated_teammate() {
     let mut game = empty_flat_game(&allied_players());
     let base_pos = game.map.tile_center(4, 4);

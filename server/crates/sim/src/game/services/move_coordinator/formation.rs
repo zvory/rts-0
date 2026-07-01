@@ -15,6 +15,7 @@ pub(super) const VEHICLE_BODY_FORMATION_GAP_TILES: u32 = 1;
 pub(super) struct PlayerKnownTrenches {
     pub(super) player: u32,
     pub(super) trenches: Vec<KnownTrench>,
+    pub(super) occupied_trenches: BTreeSet<u32>,
 }
 
 #[derive(Clone, Copy)]
