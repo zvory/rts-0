@@ -3597,11 +3597,11 @@ fn friendly_tank_between_attacker_and_target_prevents_firing() {
     }
     if let Some(blocker_entity) = entities.get_mut(blocker) {
         blocker_entity.set_attack_cd(99);
+        blocker_entity.set_weapon_cooldown(combat_rules::WeaponKind::TankCoax, 99);
     }
     let blocker_hp_before = entities.get(blocker).expect("blocker should exist").hp;
     let intended_hp_before = entities.get(intended).expect("intended should exist").hp;
     let map = open_map(12);
-
     let events = run_combat_tick_on_map(
         &mut entities,
         &[player_state(1, false), player_state(2, false)],
