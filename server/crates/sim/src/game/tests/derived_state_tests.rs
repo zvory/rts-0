@@ -1,5 +1,9 @@
+use super::fixtures::empty_flat_game;
 use super::lab::{LabCommandOptions, LabMoveEntity, LabOp, LabOpOutcome, LabSpawnEntity};
 use super::*;
+use crate::game::entity::{BuildPhase, DeconstructPhase, MovePhase, RallyKind};
+use crate::game::services::occupancy::footprint_center;
+use crate::game::upgrade::UpgradeKind;
 use crate::protocol::Command as WireCommand;
 use rand::RngCore;
 
@@ -53,6 +57,9 @@ struct ProjectionView {
     snapshots: Vec<(u32, Snapshot)>,
     full_snapshots: Vec<(u32, Snapshot)>,
     spectator_snapshot: Snapshot,
+    debug_path_snapshots: Vec<(u32, Snapshot)>,
+    debug_path_full_snapshots: Vec<(u32, Snapshot)>,
+    debug_path_spectator_snapshot: Snapshot,
 }
 
 #[test]
@@ -226,6 +233,541 @@ fn checkpoint_export_import_rebuilds_derived_state_and_preserves_semantics() {
             &format!("post-checkpoint command tick {tick}"),
         );
     }
+}
+
+#[test]
+fn movement_economy_checkpoint_applies_pending_commands_once_and_preserves_existing_log() {
+    let (mut baseline, tank, goal, return_goal) = derived_state_pathing_fixture();
+    baseline.enqueue(
+        1,
+        Command::Move {
+            units: vec![tank],
+            x: goal.0,
+            y: goal.1,
+            queued: false,
+        },
+    );
+    baseline.tick();
+    assert_eq!(
+        baseline.command_log().len(),
+        1,
+        "fixture should have one already-applied command before the checkpoint"
+    );
+
+    let queued_attack_goal = baseline.state.map.tile_center(22, 16);
+    baseline.enqueue(
+        1,
+        Command::Move {
+            units: vec![tank],
+            x: return_goal.0,
+            y: return_goal.1,
+            queued: true,
+        },
+    );
+    baseline.enqueue(
+        1,
+        Command::AttackMove {
+            units: vec![tank],
+            x: queued_attack_goal.0,
+            y: queued_attack_goal.1,
+            queued: true,
+        },
+    );
+    let checkpoint_tick = baseline.tick_count();
+    let checkpoint_log_len = baseline.command_log().len();
+    let checkpoint_pending_len = baseline.state.pending.len();
+    assert_eq!(
+        checkpoint_pending_len, 2,
+        "fixture should checkpoint two pending commands before the next tick"
+    );
+
+    let mut restored = restore_checkpoint_and_assert_equivalent(
+        &baseline,
+        "pending commands preserved at checkpoint boundary",
+    );
+    assert_eq!(
+        restored.state.pending.len(),
+        checkpoint_pending_len,
+        "checkpoint import should preserve queued pending commands"
+    );
+
+    tick_pair_and_assert_equivalent(
+        &mut baseline,
+        &mut restored,
+        "pending command drain after checkpoint",
+    );
+
+    let baseline_log = baseline.command_log();
+    let restored_log = restored.command_log();
+    assert_eq!(baseline_log, restored_log);
+    assert_eq!(
+        baseline_log.len(),
+        checkpoint_log_len + checkpoint_pending_len,
+        "pending commands should be recorded exactly once"
+    );
+    let appended = &baseline_log[checkpoint_log_len..];
+    assert!(
+        appended
+            .iter()
+            .all(|entry| entry.tick == checkpoint_tick + 1),
+        "pending commands should receive the first post-checkpoint tick stamp"
+    );
+    assert!(
+        matches!(appended[0].command, crate::protocol::Command::Move { queued: true, .. }),
+        "first pending command should keep command-log order"
+    );
+    assert!(
+        matches!(
+            appended[1].command,
+            crate::protocol::Command::AttackMove { queued: true, .. }
+        ),
+        "second pending command should keep command-log order"
+    );
+
+    tick_pair_for(
+        &mut baseline,
+        &mut restored,
+        12,
+        "post-pending movement/economy checkpoint",
+    );
+}
+
+#[test]
+fn movement_economy_checkpoint_preserves_active_paths_and_debug_projection() {
+    let (mut baseline, tank, goal, return_goal) = derived_state_pathing_fixture();
+    baseline.enqueue(
+        1,
+        Command::Move {
+            units: vec![tank],
+            x: goal.0,
+            y: goal.1,
+            queued: false,
+        },
+    );
+    baseline.tick();
+    let second_queued_goal = baseline.state.map.tile_center(22, 18);
+    baseline.enqueue(
+        1,
+        Command::Move {
+            units: vec![tank],
+            x: return_goal.0,
+            y: return_goal.1,
+            queued: true,
+        },
+    );
+    baseline.enqueue(
+        1,
+        Command::AttackMove {
+            units: vec![tank],
+            x: second_queued_goal.0,
+            y: second_queued_goal.1,
+            queued: true,
+        },
+    );
+    baseline.tick();
+
+    let moving_tank = baseline
+        .state
+        .entities
+        .get(tank)
+        .expect("tank should survive");
+    match moving_tank.order() {
+        Order::Move(order) => assert_eq!(
+            order.execution.phase,
+            MovePhase::Moving,
+            "checkpoint should catch the active move after path selection"
+        ),
+        other => panic!("expected active move order, got {other:?}"),
+    }
+    assert_eq!(
+        moving_tank.queued_orders().len(),
+        2,
+        "future queued movement stages should be durable entity state"
+    );
+    assert!(
+        !moving_tank.path_is_empty(),
+        "selected path/waypoints should be live at the checkpoint"
+    );
+    assert_eq!(moving_tank.path_goal(), Some(goal));
+    assert_debug_path_visible(&baseline, 1, tank, "baseline active movement checkpoint");
+
+    let mut restored = restore_checkpoint_and_assert_equivalent(
+        &baseline,
+        "active movement/order checkpoint import",
+    );
+    assert_debug_path_visible(&restored, 1, tank, "restored active movement checkpoint");
+
+    tick_pair_for(
+        &mut baseline,
+        &mut restored,
+        40,
+        "active movement/order checkpoint continuation",
+    );
+}
+
+#[test]
+fn movement_economy_checkpoint_preserves_harvesting_state_and_resource_projection() {
+    let players = phase5_players();
+    let mut baseline = empty_flat_game(&players);
+    let cc_pos = footprint_center(&baseline.state.map, EntityKind::CityCentre, 8, 8);
+    baseline
+        .state
+        .entities
+        .spawn_building(1, EntityKind::CityCentre, cc_pos.0, cc_pos.1, true)
+        .expect("city centre should spawn");
+    let enemy_cc = footprint_center(&baseline.state.map, EntityKind::CityCentre, 40, 40);
+    baseline
+        .state
+        .entities
+        .spawn_building(2, EntityKind::CityCentre, enemy_cc.0, enemy_cc.1, true)
+        .expect("enemy city centre should spawn");
+    let node_pos = (cc_pos.0 + config::TILE_SIZE as f32 * 3.0, cc_pos.1);
+    let node = baseline
+        .state
+        .entities
+        .spawn_node(EntityKind::Steel, node_pos.0, node_pos.1)
+        .expect("steel node should spawn");
+    let worker = baseline
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Worker, node_pos.0, node_pos.1)
+        .expect("worker should spawn");
+    baseline.state.players[0].set_resources(25, 7);
+    repair_after_authoritative_test_spawn(&mut baseline);
+
+    baseline.enqueue(
+        1,
+        Command::Gather {
+            units: vec![worker],
+            node,
+            queued: false,
+        },
+    );
+    baseline.tick();
+    for _ in 0..8 {
+        baseline.tick();
+    }
+    assert_eq!(
+        baseline
+            .state
+            .entities
+            .get(worker)
+            .and_then(|worker| worker.gather_phase()),
+        Some(GatherPhase::Harvesting),
+        "checkpoint should catch worker harvest progress in flight"
+    );
+    assert_eq!(
+        baseline.state.entities.node_slot_holder(node),
+        Some(worker),
+        "resource-node miner reservation should be live at the checkpoint"
+    );
+
+    let mut restored =
+        restore_checkpoint_and_assert_equivalent(&baseline, "harvesting checkpoint import");
+    tick_pair_for(
+        &mut baseline,
+        &mut restored,
+        config::HARVEST_TICKS + 4,
+        "harvesting checkpoint continuation",
+    );
+    assert_eq!(
+        baseline
+            .state
+            .entities
+            .get(node)
+            .and_then(|node| node.remaining()),
+        restored
+            .state
+            .entities
+            .get(node)
+            .and_then(|node| node.remaining()),
+        "resource-node remaining amount should stay equivalent after harvest payout"
+    );
+    assert_eq!(
+        baseline.state.players[0].steel,
+        restored.state.players[0].steel,
+        "player steel totals should stay equivalent after harvest payout"
+    );
+}
+
+#[test]
+fn movement_economy_checkpoint_preserves_construction_and_deconstruction_progress() {
+    let players = phase5_players();
+    let mut baseline = empty_flat_game(&players);
+    let cc_pos = footprint_center(&baseline.state.map, EntityKind::CityCentre, 5, 5);
+    baseline
+        .state
+        .entities
+        .spawn_building(1, EntityKind::CityCentre, cc_pos.0, cc_pos.1, true)
+        .expect("city centre should spawn");
+    let enemy_cc = footprint_center(&baseline.state.map, EntityKind::CityCentre, 43, 43);
+    baseline
+        .state
+        .entities
+        .spawn_building(2, EntityKind::CityCentre, enemy_cc.0, enemy_cc.1, true)
+        .expect("enemy city centre should spawn");
+    let (depot_tile_x, depot_tile_y) = (12, 8);
+    let depot_site = footprint_center(
+        &baseline.state.map,
+        EntityKind::Depot,
+        depot_tile_x,
+        depot_tile_y,
+    );
+    let build_worker = baseline
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Worker, depot_site.0, depot_site.1)
+        .expect("build worker should spawn");
+    let trap_pos = footprint_center(&baseline.state.map, EntityKind::TankTrap, 20, 8);
+    let trap = baseline
+        .state
+        .entities
+        .spawn_building(2, EntityKind::TankTrap, trap_pos.0, trap_pos.1, true)
+        .expect("tank trap should spawn");
+    let deconstruct_worker = baseline
+        .state
+        .entities
+        .spawn_unit(
+            1,
+            EntityKind::Worker,
+            trap_pos.0 - config::TILE_SIZE as f32 * 1.5,
+            trap_pos.1,
+        )
+        .expect("deconstruct worker should spawn");
+    baseline.state.players[0].set_resources(1_000, 1_000);
+    repair_after_authoritative_test_spawn(&mut baseline);
+
+    let handoff = baseline.state.map.tile_center(16, 8);
+    baseline.enqueue(
+        1,
+        Command::Build {
+            units: vec![build_worker],
+            building: EntityKind::Depot,
+            tile_x: depot_tile_x,
+            tile_y: depot_tile_y,
+            queued: false,
+        },
+    );
+    baseline.enqueue(
+        1,
+        Command::Move {
+            units: vec![build_worker],
+            x: handoff.0,
+            y: handoff.1,
+            queued: true,
+        },
+    );
+    baseline.enqueue(
+        1,
+        Command::Deconstruct {
+            units: vec![deconstruct_worker],
+            target: trap,
+            queued: false,
+        },
+    );
+    baseline.tick();
+
+    let scaffold = baseline
+        .state
+        .entities
+        .iter()
+        .find(|entity| entity.kind == EntityKind::Depot && entity.under_construction())
+        .map(|entity| entity.id)
+        .expect("build command should spawn a scaffold before checkpoint");
+    assert!(baseline.state.active_construction_sites.contains(&scaffold));
+    assert_eq!(
+        baseline
+            .state
+            .entities
+            .get(build_worker)
+            .and_then(|worker| worker.build_phase()),
+        Some(BuildPhase::Constructing { site: scaffold })
+    );
+    assert_eq!(
+        baseline
+            .state
+            .entities
+            .get(deconstruct_worker)
+            .and_then(|worker| worker.deconstruct_phase()),
+        Some(DeconstructPhase::Deconstructing)
+    );
+
+    let mut restored = restore_checkpoint_and_assert_equivalent(
+        &baseline,
+        "construction/deconstruction checkpoint import",
+    );
+    let finish_ticks = config::building_stats(EntityKind::Depot)
+        .expect("depot stats")
+        .build_ticks
+        .max(crate::game::entity::tank_trap_deconstruction_ticks())
+        + 4;
+    tick_pair_for(
+        &mut baseline,
+        &mut restored,
+        finish_ticks,
+        "construction/deconstruction checkpoint continuation",
+    );
+    assert!(
+        baseline
+            .state
+            .entities
+            .get(scaffold)
+            .is_some_and(|entity| !entity.under_construction()),
+        "scaffold should finish construction after checkpoint continuation"
+    );
+    assert!(
+        baseline.state.entities.get(trap).is_none(),
+        "tank trap should be removed after deconstruction continuation"
+    );
+}
+
+#[test]
+fn movement_economy_checkpoint_preserves_production_research_rally_and_allocator_continuity() {
+    let players = phase5_players();
+    let mut baseline = empty_flat_game(&players);
+    let cc_pos = footprint_center(&baseline.state.map, EntityKind::CityCentre, 5, 5);
+    baseline
+        .state
+        .entities
+        .spawn_building(1, EntityKind::CityCentre, cc_pos.0, cc_pos.1, true)
+        .expect("city centre should spawn");
+    let enemy_cc = footprint_center(&baseline.state.map, EntityKind::CityCentre, 43, 43);
+    baseline
+        .state
+        .entities
+        .spawn_building(2, EntityKind::CityCentre, enemy_cc.0, enemy_cc.1, true)
+        .expect("enemy city centre should spawn");
+    let barracks_pos = footprint_center(&baseline.state.map, EntityKind::Barracks, 10, 8);
+    let barracks = baseline
+        .state
+        .entities
+        .spawn_building(1, EntityKind::Barracks, barracks_pos.0, barracks_pos.1, true)
+        .expect("barracks should spawn");
+    let training_pos = footprint_center(&baseline.state.map, EntityKind::TrainingCentre, 16, 8);
+    let training_centre = baseline
+        .state
+        .entities
+        .spawn_building(
+            1,
+            EntityKind::TrainingCentre,
+            training_pos.0,
+            training_pos.1,
+            true,
+        )
+        .expect("training centre should spawn");
+    baseline.state.players[0].set_resources(1_000, 1_000);
+    repair_after_authoritative_test_spawn(&mut baseline);
+    baseline.state.players[0].set_resources(1_000, 1_000);
+
+    let rally_a = baseline.state.map.tile_center(18, 14);
+    let rally_b = baseline.state.map.tile_center(22, 14);
+    baseline.enqueue(
+        1,
+        Command::SetRally {
+            building: barracks,
+            x: rally_a.0,
+            y: rally_a.1,
+            kind: RallyKind::Move,
+            queued: false,
+        },
+    );
+    baseline.enqueue(
+        1,
+        Command::SetRally {
+            building: barracks,
+            x: rally_b.0,
+            y: rally_b.1,
+            kind: RallyKind::AttackMove,
+            queued: true,
+        },
+    );
+    baseline.enqueue(
+        1,
+        Command::Train {
+            building: barracks,
+            unit: EntityKind::Rifleman,
+        },
+    );
+    baseline.enqueue(
+        1,
+        Command::Research {
+            building: training_centre,
+            upgrade: UpgradeKind::Entrenchment,
+        },
+    );
+    baseline.tick();
+
+    {
+        let producer = baseline
+            .state
+            .entities
+            .get_mut(barracks)
+            .expect("barracks should exist");
+        let front = producer
+            .production
+            .as_mut()
+            .and_then(|production| production.queue.first_mut())
+            .expect("rifleman should be queued");
+        front.progress = front.total.saturating_sub(1);
+    }
+    {
+        let researcher = baseline
+            .state
+            .entities
+            .get_mut(training_centre)
+            .expect("training centre should exist");
+        let front = researcher
+            .research_queue_mut()
+            .and_then(|queue| queue.first_mut())
+            .expect("entrenchment research should be queued");
+        front.progress = front.total.saturating_sub(1);
+    }
+
+    let next_spawn_id = baseline.state.entities.next_id_for_test();
+    let mut restored = restore_checkpoint_and_assert_equivalent(
+        &baseline,
+        "production/research/rally checkpoint import",
+    );
+    tick_pair_and_assert_equivalent(
+        &mut baseline,
+        &mut restored,
+        "production/research/rally completion after checkpoint",
+    );
+
+    let baseline_spawn = baseline
+        .state
+        .entities
+        .get(next_spawn_id)
+        .expect("production should allocate the next entity id");
+    let restored_spawn = restored
+        .state
+        .entities
+        .get(next_spawn_id)
+        .expect("restored production should allocate the same entity id");
+    assert_eq!(baseline_spawn.kind, EntityKind::Rifleman);
+    assert_eq!(restored_spawn.kind, EntityKind::Rifleman);
+    assert!(
+        baseline.state.players[0]
+            .upgrades
+            .contains(&UpgradeKind::Entrenchment),
+        "research completion should insert the upgrade after restore"
+    );
+    assert!(
+        matches!(baseline_spawn.order(), Order::AttackMove(_)),
+        "spawned combat unit should receive the first rally stage"
+    );
+    assert_eq!(
+        baseline_spawn.queued_orders().len(),
+        1,
+        "spawned unit should keep queued rally stages"
+    );
+
+    tick_pair_for(
+        &mut baseline,
+        &mut restored,
+        4,
+        "post-production rally path checkpoint continuation",
+    );
 }
 
 #[test]
@@ -440,6 +982,12 @@ fn tick_pair_and_assert_equivalent(baseline: &mut Game, wiped: &mut Game, label:
     assert_equivalent_games(baseline, wiped, label);
 }
 
+fn tick_pair_for(baseline: &mut Game, restored: &mut Game, ticks: u32, label: &str) {
+    for tick in 0..ticks {
+        tick_pair_and_assert_equivalent(baseline, restored, &format!("{label} tick {tick}"));
+    }
+}
+
 fn assert_equivalent_games(baseline: &Game, wiped: &Game, label: &str) {
     assert_eq!(
         semantic_game_view(baseline),
@@ -453,6 +1001,31 @@ fn assert_equivalent_games(baseline: &Game, wiped: &Game, label: &str) {
     );
 }
 
+fn restore_checkpoint_and_assert_equivalent(baseline: &Game, label: &str) -> Game {
+    let checkpoint_next_id = baseline.state.entities.next_id_for_test();
+    let checkpoint_pathing_config = baseline.pathing_config_for_test();
+    let checkpoint = baseline.checkpoint_for_test();
+    let restored = Game::restore_checkpoint_for_test(checkpoint);
+    assert_eq!(
+        restored.pathing_cache_len_for_test(),
+        0,
+        "{label}: checkpoint import must rebuild DerivedState instead of serializing pathing cache entries"
+    );
+    assert_eq!(
+        checkpoint_pathing_config,
+        restored.pathing_config_for_test(),
+        "{label}: checkpoint import should preserve live pathing budget/cache configuration"
+    );
+    assert_eq!(
+        checkpoint_next_id,
+        restored.state.entities.next_id_for_test(),
+        "{label}: entity allocator high-water state should survive checkpoint import"
+    );
+    assert_final_spatial_matches_entities(&restored);
+    assert_equivalent_games(baseline, &restored, label);
+    restored
+}
+
 fn assert_final_spatial_matches_entities(game: &Game) {
     let mut spatial_ids = game.final_spatial().all_ids().collect::<Vec<_>>();
     spatial_ids.sort_unstable();
@@ -463,6 +1036,27 @@ fn assert_final_spatial_matches_entities(game: &Game) {
     );
 }
 
+fn phase5_players() -> [PlayerInit; 2] {
+    [
+        PlayerInit {
+            id: 1,
+            team_id: 1,
+            faction_id: "kriegsia".to_string(),
+            name: "Alpha".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            team_id: 2,
+            faction_id: "kriegsia".to_string(),
+            name: "Bravo".into(),
+            color: "#000".into(),
+            is_ai: false,
+        },
+    ]
+}
+
 fn repair_after_authoritative_test_spawn(game: &mut Game) {
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.clear_and_rebuild_derived_state_for_test();
@@ -471,6 +1065,23 @@ fn repair_after_authoritative_test_spawn(game: &mut Game) {
     game.refresh_building_memory(&ids);
     game.refresh_trench_memory(&ids);
     game.assert_invariants();
+}
+
+fn assert_debug_path_visible(game: &Game, player: u32, entity_id: u32, label: &str) {
+    let snapshot = game.snapshot_for_with_options(player, owner_debug_path_options());
+    let view = snapshot
+        .entities
+        .iter()
+        .find(|entity| entity.id == entity_id)
+        .unwrap_or_else(|| panic!("{label}: moving entity {entity_id} should be visible"));
+    let debug_path = view
+        .debug_path
+        .as_ref()
+        .unwrap_or_else(|| panic!("{label}: debug path should be projected"));
+    assert!(
+        debug_path.total_waypoints > 0,
+        "{label}: debug path should include selected waypoints"
+    );
 }
 
 fn semantic_game_view(game: &Game) -> SemanticGameView {
@@ -548,6 +1159,8 @@ fn semantic_game_view(game: &Game) -> SemanticGameView {
 
 fn projection_view(game: &Game) -> ProjectionView {
     let player_ids = player_ids(game);
+    let owner_debug_options = owner_debug_path_options();
+    let full_debug_options = all_projected_debug_path_options();
     ProjectionView {
         snapshots: player_ids
             .iter()
@@ -558,6 +1171,35 @@ fn projection_view(game: &Game) -> ProjectionView {
             .map(|&player| (player, game.snapshot_full_for(player)))
             .collect(),
         spectator_snapshot: game.snapshot_for_spectator(&player_ids),
+        debug_path_snapshots: player_ids
+            .iter()
+            .map(|&player| (player, game.snapshot_for_with_options(player, owner_debug_options)))
+            .collect(),
+        debug_path_full_snapshots: player_ids
+            .iter()
+            .map(|&player| {
+                (
+                    player,
+                    game.snapshot_full_for_with_options(player, full_debug_options),
+                )
+            })
+            .collect(),
+        debug_path_spectator_snapshot: game
+            .snapshot_for_spectator_with_options(&player_ids, full_debug_options),
+    }
+}
+
+fn owner_debug_path_options() -> SnapshotOptions {
+    SnapshotOptions {
+        include_movement_paths: true,
+        movement_paths_for_all_projected: false,
+    }
+}
+
+fn all_projected_debug_path_options() -> SnapshotOptions {
+    SnapshotOptions {
+        include_movement_paths: true,
+        movement_paths_for_all_projected: true,
     }
 }
 
