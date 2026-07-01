@@ -449,6 +449,22 @@ impl Game {
             .clear_and_rebuild_from_authoritative(&self.state.map, &self.state.entities);
     }
 
+    #[cfg(test)]
+    pub(in crate::game) fn checkpoint_for_test(&self) -> state::GameCheckpoint {
+        self.state.export_checkpoint()
+    }
+
+    #[cfg(test)]
+    pub(in crate::game) fn restore_checkpoint_for_test(checkpoint: state::GameCheckpoint) -> Self {
+        let state = GameState::import_checkpoint(checkpoint);
+        let derived = setup::live_derived_state(&state.map, &state.entities, state.tick);
+        let mut game = Self { state, derived };
+        if !game.state.lab_god_mode_players.is_empty() {
+            game.sync_lab_god_mode_flags();
+        }
+        game
+    }
+
     pub(in crate::game) fn final_spatial(&self) -> &services::spatial::SpatialIndex {
         self.derived.final_spatial()
     }
