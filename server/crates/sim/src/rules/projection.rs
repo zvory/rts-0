@@ -27,6 +27,7 @@ pub struct EntityProjectionContext<'a> {
     pub fog: &'a Fog,
     pub actionable_fog: Option<&'a Fog>,
     pub private_detail_fog: Option<&'a Fog>,
+    pub private_detail_projection: PrivateDetailProjection,
     pub smokes: Option<&'a SmokeCloudStore>,
     pub fogged: bool,
     pub entities: &'a EntityStore,
@@ -52,6 +53,21 @@ impl DebugPathProjection {
             Self::None => false,
             Self::OwnerOnly => entity.owner == viewer,
             Self::AllProjected => true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PrivateDetailProjection {
+    ExactViewer,
+    AllProjected,
+}
+
+impl PrivateDetailProjection {
+    fn viewer_for(self, viewer: u32, entity: &Entity) -> Option<u32> {
+        match self {
+            Self::ExactViewer => (entity.owner == viewer).then_some(viewer),
+            Self::AllProjected => (entity.owner != 0).then_some(entity.owner),
         }
     }
 }
@@ -212,10 +228,13 @@ pub fn project_entity(
     );
     let actionable_fog = context.actionable_fog.unwrap_or(context.fog);
     let private_detail_fog = context.private_detail_fog.unwrap_or(actionable_fog);
+    let private_detail_viewer = context.private_detail_projection.viewer_for(viewer, entity);
+    let private_detail_owner = private_detail_viewer.is_some();
     let owner_or_ally = context
         .teams
         .map(|teams| teams.same_team_or_same_owner(viewer, entity.owner))
-        .unwrap_or(entity.owner == viewer);
+        .unwrap_or(entity.owner == viewer)
+        || private_detail_owner;
     let exact_owner = entity.owner == viewer;
     let vision_only = context.fogged
         && !owner_or_ally
@@ -311,8 +330,9 @@ pub fn project_entity(
         }
     }
 
-    // Rally point is a private planning aid: only ever revealed to the owner.
-    if entity.owner == viewer {
+    // Rally/order/ability details are private in normal projections. Full-world diagnostic
+    // projections intentionally inspect each entity through its real owner instead of a fake viewer.
+    if let Some(private_viewer) = private_detail_viewer {
         if let Some((rx, ry)) = entity.rally_point() {
             view.rally = Some([rx, ry]);
         }
@@ -328,7 +348,7 @@ pub fn project_entity(
         view.order_plan = order_plan(
             entity,
             context.entities,
-            viewer,
+            private_viewer,
             private_detail_fog,
             context.smokes,
         );
@@ -398,7 +418,7 @@ pub fn project_entity(
 
     if let Some(progress) = entity.build_progress_fraction() {
         view.build_progress = Some(progress);
-        view.build_active = entity.owner == viewer
+        view.build_active = private_detail_owner
             && context
                 .active_construction_sites
                 .is_some_and(|sites| sites.contains(&entity.id));
@@ -785,6 +805,7 @@ mod tests {
                 fog,
                 actionable_fog: Some(fog),
                 private_detail_fog: Some(fog),
+                private_detail_projection: PrivateDetailProjection::ExactViewer,
                 smokes: None,
                 fogged,
                 entities,

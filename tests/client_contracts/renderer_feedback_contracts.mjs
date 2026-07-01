@@ -428,6 +428,112 @@ function nearPoint(call, point, epsilon = 0.001) {
 }
 
 {
+  const selected = [
+    {
+      id: 81,
+      owner: 1,
+      kind: KIND.BARRACKS,
+      x: 100,
+      y: 100,
+      hp: 500,
+      maxHp: 500,
+      rallyPlan: [{ kind: "move", x: 140, y: 110 }],
+    },
+    {
+      id: 82,
+      owner: 2,
+      kind: KIND.BARRACKS,
+      x: 260,
+      y: 100,
+      hp: 500,
+      maxHp: 500,
+      rallyPlan: [{ kind: "move", x: 300, y: 110 }],
+    },
+    {
+      id: 83,
+      owner: 1,
+      kind: KIND.ANTI_TANK_GUN,
+      x: 100,
+      y: 180,
+      hp: 120,
+      maxHp: 120,
+      setupState: SETUP.DEPLOYED,
+      setupFacing: 0,
+    },
+    {
+      id: 84,
+      owner: 2,
+      kind: KIND.ANTI_TANK_GUN,
+      x: 260,
+      y: 180,
+      hp: 120,
+      maxHp: 120,
+      setupState: SETUP.DEPLOYED,
+      setupFacing: Math.PI,
+    },
+  ];
+  const feedbackState = {
+    playerId: 1,
+    spectator: true,
+    players: [
+      { id: 1, teamId: 1 },
+      { id: 2, teamId: 2 },
+    ],
+    controlPolicy: createLabControlPolicy({ metadata: { role: LAB_ROLE.OPERATOR } }),
+    showUnitRangesEnabled: false,
+    selectedEntities() {
+      return selected;
+    },
+  };
+  const feedbackView = buildRendererFeedbackView(feedbackState, { selectedEntities: selected });
+  assert(feedbackView.issueAsOwnerId === null, "mixed-owner lab selection has no issue-as owner");
+  assert(feedbackView.feedbackOwnerId === null, "mixed-owner lab selection has no single feedback owner");
+  assert(
+    JSON.stringify(feedbackView.feedbackOwnerIds) === JSON.stringify([1, 2]),
+    "mixed-owner lab feedback keeps selected owners inspectable",
+  );
+  assert(feedbackView.isFeedbackOwner(1), "mixed-owner lab feedback treats selected P1 as inspectable");
+  assert(feedbackView.isFeedbackOwner(2), "mixed-owner lab feedback treats selected P2 as inspectable");
+  assert(feedbackView.showSelectedFieldOfFireEnabled, "mixed-owner lab support weapons keep inspection cones enabled");
+
+  const rallyGfx = new RecordingGraphics();
+  _drawRallyPoints.call({ _feedbackGfx: rallyGfx }, feedbackView);
+  assert(
+    rallyGfx.calls.filter((call) => call[0] === "drawPolygon").length === 2,
+    "mixed-owner lab selections draw rally flags for every selected owner",
+  );
+
+  const rangeGfx = new RecordingGraphics();
+  _drawSelectedUnitRanges.call({ _feedbackGfx: rangeGfx, _map: { tileSize: 32 } }, feedbackView);
+  assert(
+    rangeGfx.calls.filter((call) => call[0] === "arc").length >= 2,
+    "mixed-owner lab selections draw field-of-fire wedges for every selected owner",
+  );
+
+  for (const entity of selected.slice(0, 2)) {
+    const ringGfx = new RecordingGraphics();
+    _drawSelectionAndHp.call(
+      {
+        _slot() {
+          return ringGfx;
+        },
+        _ringRadius() {
+          return { rx: 12, ry: 8, cy: 0 };
+        },
+        _hpBar() {},
+      },
+      entity,
+      new Set([entity.id]),
+      feedbackView,
+    );
+    assert(
+      ringGfx.calls.some((call) => call[0] === "lineStyle" && call[2] === COLORS.selectOwn),
+      "mixed-owner lab selected entities use controllable selection-ring color",
+    );
+  }
+}
+
+{
   const priorNow = performance.now;
   const fixedNow = 8200;
   const feedbackGfx = new RecordingGraphics();

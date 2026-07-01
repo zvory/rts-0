@@ -15,6 +15,7 @@ struct SnapshotMode<'a> {
     actionable_fog: Option<&'a Fog>,
     fogged: bool,
     player_resource_projection: PlayerResourceProjection<'a>,
+    private_detail_projection: projection::PrivateDetailProjection,
 }
 
 impl Game {
@@ -36,6 +37,7 @@ impl Game {
                 actionable_fog: Some(&live_fog),
                 fogged: true,
                 player_resource_projection: PlayerResourceProjection::None,
+                private_detail_projection: projection::PrivateDetailProjection::ExactViewer,
             },
             options,
         )
@@ -60,6 +62,7 @@ impl Game {
                 actionable_fog: None,
                 fogged: false,
                 player_resource_projection: PlayerResourceProjection::All,
+                private_detail_projection: projection::PrivateDetailProjection::AllProjected,
             },
             options,
         )
@@ -85,6 +88,7 @@ impl Game {
                 actionable_fog: Some(&actionable_fog),
                 fogged: true,
                 player_resource_projection: PlayerResourceProjection::Selected(visible_players),
+                private_detail_projection: projection::PrivateDetailProjection::ExactViewer,
             },
             options,
         )
@@ -98,6 +102,7 @@ impl Game {
             actionable_fog,
             fogged,
             player_resource_projection,
+            private_detail_projection,
         } = mode;
         let ps = self.player(player);
         let teams = self.team_relations();
@@ -130,6 +135,7 @@ impl Game {
                     fog,
                     actionable_fog,
                     private_detail_fog: Some(&self.state.fog),
+                    private_detail_projection,
                     smokes: Some(&self.state.smokes),
                     fogged,
                     entities: &self.state.entities,
@@ -280,6 +286,7 @@ impl Game {
                     fog,
                     actionable_fog: Some(fog),
                     private_detail_fog: Some(&self.state.fog),
+                    private_detail_projection: projection::PrivateDetailProjection::ExactViewer,
                     smokes: Some(&self.state.smokes),
                     fogged: true,
                     entities: &self.state.entities,

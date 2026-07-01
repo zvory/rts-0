@@ -551,6 +551,9 @@ replay viewers, and normal spectators remain passive. Lab selection itself is no
 control. Operator gameplay commands still flow through `commandIssuer.issueCommand`, where
 `LabControlPolicy` wraps them as lab `issueCommandAs` requests for the single controllable selected
 owner and includes whether that command should bypass the normal command-supply limit.
+Mixed-owner lab selections remain command-blocked, but renderer inspection treats every selected
+operator-controllable owner as a feedback owner so full-world lab overlays such as rally/order
+markers and selected support-weapon field-of-fire wedges can be compared across players.
 Every client surface that needs ownership semantics must read through the injected control policy
 or the `GameState` helpers that delegate to it: command-card resources/faction/upgrades,
 right-click enemy classification, control groups, renderer feedback ownership, rally/order overlays,
