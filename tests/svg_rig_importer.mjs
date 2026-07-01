@@ -21,7 +21,7 @@ const fixtures = [
   ["rig-ekat.svg", KIND.EKAT, []],
   ["rig-infantry-weapon.svg", KIND.RIFLEMAN, ["muzzle"]],
   ["rig-crew-weapon.svg", KIND.MACHINE_GUNNER, ["muzzle", "bipod"]],
-  ["rig-vehicle.svg", KIND.TANK, ["muzzle", "turret"]],
+  ["rig-vehicle.svg", KIND.TANK, ["muzzle", "coaxMuzzle", "turret"]],
 ];
 
 test("authored SVG fixtures compile to normalized rig definitions", () => {
@@ -47,7 +47,9 @@ test("metadata, anchors, paint, draw order, and animation bindings are extracted
   assert.equal(result.definition.kind, KIND.TANK);
   assert.deepEqual(result.definition.parts.map((part) => part.id).slice(0, 3), ["part.shadow", "part.track.left", "part.track.right"]);
   assert.deepEqual(result.definition.anchors.muzzle, { x: 33.2, y: 0 });
+  assert.deepEqual(result.definition.anchors.coaxMuzzle, { x: 31.4, y: -4.1 });
   assert.deepEqual(result.definition.parts.find((part) => part.id === "part.hull").paint.fill, "#5d7896");
+  assert.equal(result.definition.parts.some((part) => part.id === "part.coaxBarrel"), true);
   assert.deepEqual(result.definition.parts.find((part) => part.id === "part.turret").tintSlot, "team-light");
   assert.ok(result.definition.animations.some((binding) => binding.partId === "part.barrel" && binding.input === "weaponFacing"));
   assert.ok(result.definition.requiredRuntimeInputs.includes("weaponFacing"));

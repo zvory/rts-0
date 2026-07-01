@@ -1220,8 +1220,8 @@ selection rings):
   one-shot launcher tube while loaded; Anti-Tank Gun: wheeled gun; mortar team: crewless
   M1938-inspired small wheeled mortar that travels low and deploys upright; scout car: boxy
   WW2-style truck silhouette with enclosed wheels and a rear-top machine-gunner; tank: chunky
-  flat-shaded armor with movement-facing tracks, hull, nose, and shadow plus weapon-facing turret and
-  barrel parts, recoil, nose tick, and low-oil/oil-starved fuel cues; artillery: SVG-authored
+  flat-shaded armor with movement-facing tracks, hull, nose, and shadow plus weapon-facing turret,
+  main barrel, coax barrel, recoil, nose tick, and low-oil/oil-starved fuel cues; artillery: SVG-authored
   support-weapon rig routed through the live renderer).
   Riflemen carry a rifle, loaded Panzerfaust infantry carry a tube launcher with a team-colored
   band, Anti-Tank Guns field a wheeled anti-tank gun with a long recoiling barrel,
@@ -1230,9 +1230,9 @@ selection rings):
   setup/deployment. Units that fire from outside current vision are shown briefly above the fog
   as semi-transparent silhouettes with the same recoil animation and a yellow tracer to the hit
   point.
-  Attack `weaponKind` selects feedback scale; TankCoax uses a small machine-gun flash/tracer/tail
-  and no Tank recoil while using a provisional Tank reach origin until the coax muzzle anchor is
-  authored.
+  Attack `weaponKind` selects feedback scale and rig muzzle origin; TankCoax uses a small
+  machine-gun flash/tracer/tail from the authored coax muzzle anchor and no Tank recoil, while
+  TankCannon or default Tank attacks use cannon-scale feedback from the main muzzle anchor.
   Mortar launch events draw launch dust/recoil for recipients that can see the mortar, a black
   shell arcing from the mortar to the impact point, and a darker red dotted line/crosshair warning
   that lasts until the reported shell delay elapses or the impact event arrives. The shell

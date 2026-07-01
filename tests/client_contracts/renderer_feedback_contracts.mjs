@@ -15,6 +15,7 @@ import {
 } from "../../client/src/protocol.js";
 import { createLabControlPolicy } from "../../client/src/lab_control_policy.js";
 import { buildRendererFeedbackView } from "../../client/src/renderer/feedback_view_model.js";
+import { createLiveRigDefinitions } from "../../client/src/renderer/rigs/live_routing.js";
 import { _drawSelectionAndHp } from "../../client/src/renderer/entities.js";
 import {
   _drawAbilityObjects,
@@ -47,6 +48,10 @@ function polygonCenter(points) {
     y += points[i + 1];
   }
   return { x: x / count, y: y / count };
+}
+
+function nearPoint(call, point, epsilon = 0.001) {
+  return Math.abs(call[1] - point.x) <= epsilon && Math.abs(call[2] - point.y) <= epsilon;
 }
 
 {
@@ -442,16 +447,32 @@ function polygonCenter(points) {
     x: 184,
     y: 100,
   };
+  const mainMuzzle = { x: tank.x + 24.875, y: tank.y };
+  const coaxMuzzle = { x: tank.x + 27.575, y: tank.y - 4.1 };
 
   performance.now = () => fixedNow;
   try {
-    _drawMuzzleFlashes.call({ _feedbackGfx: feedbackGfx, _map: { tileSize: 32 } }, {
+    _drawMuzzleFlashes.call({
+      _feedbackGfx: feedbackGfx,
+      _map: { tileSize: 32 },
+      _liveRigDefinitionsByKind: createLiveRigDefinitions(),
+    }, {
       entityById(id) {
         return id === tank.id ? tank : id === target.id ? target : null;
+      },
+      weaponRecoil(id, kind, now) {
+        assertApprox(now, fixedNow, 0.001, "muzzle origin samples recoil at the current frame time");
+        return id === tank.id && kind === KIND.TANK ? 0.5 : 0;
       },
       liveMuzzleFlashes(now) {
         assertApprox(now, fixedNow, 0.001, "muzzle renderer samples current frame time");
         return [{
+          from: tank.id,
+          to: target.id,
+          targetPos: { x: target.x, y: target.y },
+          weaponKind: WEAPON_KIND.TANK_CANNON,
+          createdAt: fixedNow,
+        }, {
           from: tank.id,
           to: target.id,
           targetPos: { x: target.x, y: target.y },
@@ -465,14 +486,79 @@ function polygonCenter(points) {
   }
 
   const circles = feedbackGfx.calls.filter((call) => call[0] === "drawCircle");
-  assert(circles.length >= 2, "tank coax draws a visible muzzle flash");
+  assert(circles.length >= 4, "same-tick tank cannon and coax both draw visible muzzle flashes");
+  const cannonCircles = circles.filter((call) => nearPoint(call, mainMuzzle));
+  const coaxCircles = circles.filter((call) => nearPoint(call, coaxMuzzle));
+  assert(cannonCircles.length >= 2, "tank cannon muzzle flash uses the animated main muzzle anchor");
+  assert(coaxCircles.length >= 2, "tank coax muzzle flash uses the animated coax muzzle anchor");
   assert(
-    circles.every((call) => call[3] <= 7),
+    cannonCircles.some((call) => call[3] > 7),
+    "tank cannon keeps cannon-scale muzzle feedback",
+  );
+  assert(
+    coaxCircles.every((call) => call[3] <= 7),
     "tank coax muzzle flash uses machine-gun scale rather than Tank cannon scale",
   );
   assert(
-    feedbackGfx.calls.some((call) => call[0] === "moveTo" && call[1] > tank.x + 15),
-    "tank coax temporary feedback origin stays near the Tank weapon reach until rig polish",
+    feedbackGfx.calls.some((call) => call[0] === "moveTo" && nearPoint(call, mainMuzzle)),
+    "tank cannon tracer starts at the main muzzle anchor",
+  );
+  assert(
+    feedbackGfx.calls.some((call) => call[0] === "moveTo" && nearPoint(call, coaxMuzzle)),
+    "tank coax tracer starts at the coax muzzle anchor",
+  );
+}
+
+{
+  const priorNow = performance.now;
+  const fixedNow = 8400;
+  const feedbackGfx = new RecordingGraphics();
+  const tankReveal = {
+    id: 93,
+    owner: 2,
+    kind: KIND.TANK,
+    x: 200,
+    y: 200,
+    weaponFacing: Math.PI / 2,
+    facing: 0,
+    shotReveal: true,
+  };
+  const target = {
+    id: 94,
+    owner: 1,
+    kind: KIND.WORKER,
+    x: 200,
+    y: 280,
+  };
+  const expectedCoaxMuzzle = { x: 204.1, y: 231.4 };
+
+  performance.now = () => fixedNow;
+  try {
+    _drawMuzzleFlashes.call({
+      _feedbackGfx: feedbackGfx,
+      _map: { tileSize: 32 },
+      _liveRigDefinitionsByKind: createLiveRigDefinitions(),
+    }, {
+      entityById(id) {
+        return id === tankReveal.id ? tankReveal : id === target.id ? target : null;
+      },
+      liveMuzzleFlashes() {
+        return [{
+          from: tankReveal.id,
+          to: target.id,
+          targetPos: { x: target.x, y: target.y },
+          weaponKind: WEAPON_KIND.TANK_COAX,
+          createdAt: fixedNow,
+        }];
+      },
+    });
+  } finally {
+    performance.now = priorNow;
+  }
+
+  assert(
+    feedbackGfx.calls.some((call) => call[0] === "moveTo" && nearPoint(call, expectedCoaxMuzzle)),
+    "shot-reveal tank coax tracer uses the transformed coax muzzle when rig data is available",
   );
 }
 

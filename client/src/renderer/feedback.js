@@ -22,7 +22,6 @@ import {
   ORDER_STAGE,
   SETUP,
   STATE,
-  WEAPON_KIND,
   isBuilding,
   isResource,
   isUnit,
@@ -39,6 +38,10 @@ import {
 } from "./artillery_fire_preview.js";
 import { MAGIC_ANCHOR_COLOR, drawMagicAnchor } from "./magic_anchor_effect.js";
 import { feedbackOwner, ownOrAllyOwner } from "./feedback_ownership.js";
+import {
+  attackFeedbackKindForWeapon,
+  attackFeedbackOriginForWeapon,
+} from "./attack_feedback_origin.js";
 import {
   angleDelta,
   clamp01,
@@ -58,7 +61,6 @@ import {
   hash2,
   hexToInt,
   isImpassableAt,
-  isVehicleBodyKind,
   muzzleFlashRadius,
   normRect,
   polar,
@@ -1238,26 +1240,22 @@ export function _drawMuzzleFlashes(state) {
     const fade = 1 - t;
 
     const feedbackKind = attackFeedbackKindForWeapon(attacker.kind, f.weaponKind);
-    const originKind = attackFeedbackOriginKindForWeapon(attacker.kind, f.weaponKind);
     const baseR = muzzleFlashRadius(feedbackKind);
     if (baseR <= 0) continue;
 
-    const facing = isVehicleBodyKind(attacker.kind) && typeof attacker.weaponFacing === "number"
-      ? attacker.weaponFacing
-      : typeof attacker.facing === "number"
-      ? attacker.facing
-      : targetPos
-      ? Math.atan2(targetPos.y - attacker.y, targetPos.x - attacker.x)
-      : 0;
     const stat = STATS[feedbackKind] || STATS[attacker.kind] || {};
-    const originStat = STATS[originKind] || STATS[attacker.kind] || stat;
-    const reach = isBuilding(originKind)
-      ? Math.max(originStat.footW || 2, originStat.footH || 2) * ((this._map && this._map.tileSize) || 32) * 0.5
-      : originKind === KIND.ANTI_TANK_GUN
-        ? (originStat.size || 9) * 1.9
-      : (originStat.size || 9) * 1.1;
-    const mx = attacker.x + Math.cos(facing) * reach;
-    const my = attacker.y + Math.sin(facing) * reach;
+    const origin = attackFeedbackOriginForWeapon({
+      definitionsByKind: this._liveRigDefinitionsByKind,
+      attacker,
+      weaponKind: f.weaponKind,
+      targetPos,
+      state,
+      now,
+      map: this._map,
+      stat,
+    });
+    const mx = origin.x;
+    const my = origin.y;
 
     if (targetPos) {
       const dx = targetPos.x - mx;
@@ -1295,38 +1293,6 @@ export function _drawMuzzleFlashes(state) {
     g.drawCircle(mx, my, r * 0.55);
     g.endFill();
   }
-}
-
-function attackFeedbackKindForWeapon(attackerKind, weaponKind) {
-  switch (weaponKind) {
-    case WEAPON_KIND.WORKER_TOOLS:
-      return KIND.WORKER;
-    case WEAPON_KIND.GOLEM_FISTS:
-      return KIND.GOLEM;
-    case WEAPON_KIND.RIFLEMAN_RIFLE:
-      return KIND.RIFLEMAN;
-    case WEAPON_KIND.MACHINE_GUNNER_MG:
-      return KIND.MACHINE_GUNNER;
-    case WEAPON_KIND.SCOUT_CAR_MG:
-      return KIND.SCOUT_CAR;
-    case WEAPON_KIND.ANTI_TANK_GUN:
-      return KIND.ANTI_TANK_GUN;
-    case WEAPON_KIND.MORTAR_TEAM_MORTAR:
-      return KIND.MORTAR_TEAM;
-    case WEAPON_KIND.ARTILLERY_GUN:
-      return KIND.ARTILLERY;
-    case WEAPON_KIND.TANK_CANNON:
-      return KIND.TANK;
-    case WEAPON_KIND.TANK_COAX:
-      return KIND.MACHINE_GUNNER;
-    default:
-      return attackerKind;
-  }
-}
-
-function attackFeedbackOriginKindForWeapon(attackerKind, weaponKind) {
-  if (weaponKind === WEAPON_KIND.TANK_COAX) return attackerKind;
-  return attackFeedbackKindForWeapon(attackerKind, weaponKind);
 }
 
 export function drawSelectionBox(rect) {
