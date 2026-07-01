@@ -98,7 +98,7 @@ luke playtest
 
 - [x] need to make it so that it's not two tanks per selection (done: PR #181, now four)
 
-- [ ] audio attenuation needs work, player looking at own base, and has some machine gunners all teh way on the other end of the map, and it sounds like the machine gunners are halfway across the map, not the other end. we need to increase the attenuation
+- [x] audio attenuation needs work, player looking at own base, and has some machine gunners all teh way on the other end of the map, and it sounds like the machine gunners are halfway across the map, not the other end. we need to increase the attenuation (done: confirmed resolved in follow-up)
 
 - [ ] AI should always build vehicle works and gun works towards the enem,y never behind itself
 
