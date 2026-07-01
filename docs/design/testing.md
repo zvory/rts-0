@@ -135,7 +135,7 @@ Current scenario ids:
   position against Tanks at four-tile range.
 - `panzerfaust_methamphetamines` — compares normal and Methamphetamines Panzerfaust firing and
   conversion timing side by side.
-- `tank_coax_inspection` — one held Tank with its cannon cooldown delayed faces infantry-priority
+- `tank_coax_inspection` — one held Tank with its cannon cooldown delayed faces static, weapon-delayed infantry-priority
   targets, support weapons, Ekat/Golem units, armored fallback targets, blockers, resources, smoke,
   and buildings around the coax arc for secondary-machine-gun inspection.
 
@@ -184,6 +184,9 @@ suites.
 - `rts-rules`: run rules tests plus sim tests that consume stats/formulas. If visible balance
   values changed, run client config/protocol mirror checks and include factual player-facing patch
   notes.
+- `rts-sim` derived state: run `cargo test --manifest-path server/Cargo.toml -p rts-sim derived_state`
+  when changing `GameState`/`DerivedState` rebuild seams, pathing caches, or spatial-index rebuild
+  behavior.
 - Faction guardrails: run `node scripts/check-faction-assumptions.mjs` for faction docs, lifecycle
   policy, lobby admission, protocol/config vocabulary, or checker changes. Run
   `node scripts/check-faction-catalog-parity.mjs` when faction catalog facts, the Rust catalog dump,
@@ -192,6 +195,10 @@ suites.
   `client/src/lobby_view.js`, protocol/config mirror files, or the catalog parity checker itself.
   Docs-only faction policy edits should select these guardrails without requiring live-server
   suites.
+- Network incident capture: run `node tests/net_report_incident_capture.mjs` when changing
+  `scripts/capture-net-incident.mjs`, generated capture package cleanup behavior, `docs/network-incident-examples/**`, `docs/perf-tracing.md`,
+  or the incident-capture regression itself. Coverage should preserve readable command, snapshot,
+  pathing, and client-context evidence in incident packages before diagnostic plans consume them.
 - `rts-sim`: run sim package tests, deterministic replay coverage, and live-server integration for
   changed behavior that crosses the room/network boundary. Run
   `node scripts/check-lobby-architecture.mjs` when changing lobby room-task ownership or mutation

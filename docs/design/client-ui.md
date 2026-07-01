@@ -711,9 +711,10 @@ for explicitly documented architecture-check exceptions.
 control groups, relationship helpers, fog-facing visibility data, and display overlays derived from
 authoritative snapshots. `ClientIntent` owns placement intent, command-card submenu state,
 command-target arming, hover previews, command feedback, ability previews, and the short-lived local
-planned-order stages used only for previews while the server echo is pending. Contextual oil
-right-clicks compose a Pump Jack build intent on the clicked oil patch rather than a gather
-command. `GameState` must not grow compatibility accessors for those intent fields; HUD, input,
+planned-order stages used only for previews while the server echo is pending. Unqueued local planned
+orders replace stale authoritative planned-order stages for preview planning; async Lab command
+results are not recorded as durable local plans. Contextual oil right-clicks compose a Pump Jack
+build intent on the clicked oil patch rather than a gather command. `GameState` must not grow compatibility accessors for those intent fields; HUD, input,
 minimap, and renderer feedback use the injected facade or a narrow read model. Lab Unit Spawn and
 Building Spawn panels expose the target player's color through DOM data/style hooks before map
 placement. In Lab, visual and audio
@@ -730,6 +731,9 @@ should accept the injected frame view when called from the RAF path and fall bac
 queries only for direct module tests or event handlers outside the frame. Static resource nodes with
 no remaining resources are omitted from frame-local entity views and minimap blips. Minimap
 artillery firing indicators render as 30x24 SVG rig images without an extra surrounding ring.
+Occupied trenches render entrenched units as smaller trench-tinted rig instances; the selection layer
+does not add a separate occupied-infantry trench ring marker. Trench ground decals are drawn at the authoritative trench radius. Hidden Panzerfaust live entity views
+use the Rifleman SVG rig placeholder rather than the missing-rig fail-closed path.
 Selected worker units do not draw weapon range indicators, even when their frame-local view exposes
 weapon range metadata. Frame-local entity views may carry bounded render diagnostics for local
 profiling consumers without changing the authoritative snapshot model. Visible unit death events are normalized by `GameState`
@@ -1073,12 +1077,13 @@ abilities. When the HUD command card calls `ClientIntent.beginCommandTarget({ ki
 the input module enters targeted cursor mode:
 - Pointer moves call `_refreshAbilityTargetPreview`: compute which selected units are eligible
   carriers (`ABILITIES[ability].carriers`), test whether any carrier is within range of the cursor
-  or can lock the raw cursor into the Artillery range band from the authoritative or locally planned
-  origin, update `ClientIntent.abilityTargetPreview` for renderer feedback.
+  or can lock the raw cursor into the Artillery range band from the authoritative origin, locally
+  planned origin, or queued projected movement/setup origin, update `ClientIntent.abilityTargetPreview`
+  for renderer feedback.
 - Left-click: build a `useAbility` command with the ability name, filtered carrier ids, world
   coords, and the `queued` flag (from Shift). Artillery Point Fire and Blanket Fire still send the
   raw clicked world coords; the server owns effective target locking. The local feedback marker uses
-  the client-computed locked point when available. Clear cursor mode unless the resolved
+  the client-computed locked point and radius when available. Clear cursor mode unless the resolved
   command-card hotkey is still held for repeated world-point targeting.
 - Tapping and releasing the resolved world-point ability hotkey before clicking keeps targeting
   armed until the first unqueued world click. That click issues the ability and clears targeting
@@ -1212,7 +1217,8 @@ selection rings):
   damaged/selected, and glowing selection ring when selected. When the in-match Game settings
   tab enables unit ranges, selected ordinary units draw dotted firing-range circles, deployed
   Anti-Tank Guns and artillery draw field-of-fire wedges, and their packed states do not draw
-  field-of-fire overlays. In Lab scenario authoring, deployed Anti-Tank Gun and artillery
+  field-of-fire overlays. Muzzle flash and shot feedback origins resolve from sampled rig part
+  transforms so recoiling authored weapon anchors stay aligned with the visible barrel tips. In Lab scenario authoring, deployed Anti-Tank Gun and artillery
   field-of-fire wedges remain visible for the currently selected owner even when the broad unit
   range overlay is off.
   Distinct silhouette per kind (engineer: compact block; rifleman / machine gunner / Panzerfaust:
@@ -1306,7 +1312,7 @@ Current areas:
   `config/rules_mirror.js`, and `config/factions.js`.
 - `ui`: HUD, command card descriptors/selection panels, hotkey profiles/editor, lobby
   controller/browser/roster views, match history, minimap, resource icons, scoreboard, status badge, branch
-  staging, lab panel, lab scenario authoring/submission helpers, settings. Command-card tooltips render optional unit descriptions when descriptor metadata provides them. Lab research controls render direct per-upgrade toggle buttons for the selected Lab target player; completed upgrades render as pressed buttons with a check-mark background. The Lab panel window toggle button shows Collapse when expanded and Expand when collapsed. The settings panel uses the in-match header action slot for Give Up
+  staging, lab panel, lab scenario authoring/submission helpers, settings. Command-card tooltips render optional unit descriptions when descriptor metadata provides them. Command-card ability wait-until-ready descriptors stay aligned with the queue-admissible carrier set used for queued commands. Lab research controls render direct per-upgrade toggle buttons for the selected Lab target player; completed upgrades render as pressed buttons with a check-mark background. The Lab panel window toggle button shows Collapse when expanded and Expand when collapsed. The settings panel uses the in-match header action slot for Give Up
   in live matches and Back to Lobby in Lab/replay sessions. After a finished match, App resets the
   Lobby controller to the root browser before showing the lobby screen again. Lobby AI creation is
   exposed from the roster's team context, not as a duplicate global sidebar action. The in-match

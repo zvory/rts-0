@@ -228,7 +228,8 @@ production queues, rally plans, cooldowns, and command logs are not part of the 
 `GameState` (`server/crates/sim/src/game/state.rs`) and rebuildable cache/search state stored under
 `DerivedState` (`server/crates/sim/src/game/derived_state.rs`). `GameState` is private to
 `crate::game`; public `Game` methods remain the only seam for lobby, replay, lab, AI, server, and
-snapshot callers.
+snapshot callers. Test code may use a derived-state rebuild seam that clears rebuildable caches at a
+tick boundary and reconstructs them from authoritative state.
 
 This registry is the source of truth for classifying fields currently owned by `GameState` or
 `DerivedState`. Any change that adds, removes, or changes the semantics of a `GameState` or
@@ -323,6 +324,8 @@ alive.
 ### 3.2 Concurrency model
 - One tokio task per **room** owns its `Game` and runs the tick loop (`tokio::time::interval`). Room registry handles carry per-room identity tokens; registry disposal removes only the matching identity and signals that room task to shut down.
 - Each **connection** is a task with an `mpsc::Sender<ServerMessage>` to push to its socket.
+  Snapshot fanout records per-connection lifecycle diagnostics for projection, compaction,
+  queue-age, serialization, writer-send, and payload-byte windows alongside outbound counters.
 - Connection→room communication uses an `mpsc` channel of internal `RoomEvent`
   (`Join`, `Leave`, `Ready`, `StartRequest`, `AddAi`, `RemoveAi`, `SetSpectator`, `SetFaction`,
   `Command`, `GiveUp`, `PauseGame`, `UnpauseGame`, `SetRoomTimeSpeed`, `StepRoomTime`,
@@ -336,7 +339,8 @@ alive.
   replay-branch handlers live in `room_task/branch.rs`, lab request handling lives in
   `room_task/lab.rs`, dev-watch scenario handling lives in `room_task/dev.rs`, and room lifecycle
   bookkeeping lives in `room_task/lifecycle.rs`; `RoomTask` remains the owner of mutation and tick
-  authority. Plain `/lab` is a client-side catalog selector. Direct lab URLs keep compatibility:
+  authority. Dev-watch scenario startup converts through the shared restore-scenario path before
+  launching a `Game`. Plain `/lab` is a client-side catalog selector. Direct lab URLs keep compatibility:
   `scenario=lategame` requests the bundled catalog scenario, `scenario=blank` keeps blank lab
   startup, and custom map or seed lab URLs stay blank unless they set an explicit scenario. Bundled
   lab scenario ids are safe tokens listed in `server/assets/lab-scenarios/manifest.json`; the
@@ -344,10 +348,11 @@ alive.
   ids, JSON parseability, map/player-count consistency, and restore compatibility through the
   public lab `Game` API before a scenario is exposed or launched. Bundled lab scenario startup uses
   the same restore-scenario path as manual imports and starts with `operation_count=0` plus a tick-0
-  timeline keyframe. Lab god mode is lab-only state: `setPlayerGodMode` marks that player's units
+  timeline keyframe. Bundled scenario launch and JSON import restore lab god-mode player ids through
+  the public lab API. Lab god mode is lab-only state: `setPlayerGodMode` marks that player's units
   and buildings
   invulnerable, applies across lab mutations, owner changes, spawned assets, and timeline replay
-  state, and is mirrored in start/labState metadata.
+  state, and is mirrored in start/labState/scenario metadata.
 - The public lobby browser asks room tasks for bounded summaries over `RoomEvent::Summary` instead
   of reading room internals. Normal lobby/countdown/live-match rooms and persisted match-history
   replay staging lobbies are summarized; dev, replay-artifact, replay playback, replay-branch, and
@@ -573,14 +578,17 @@ protocol id, adding the faction catalog entry, updating the client mirror/parity
 adding only the effect-specific code that the registry cannot express.
 
 `AbilityDefinition` also carries a sim-local `AbilityEffectHook` discriminator for the reusable
-effect shapes that actually exist today: legacy no-op (`charge` compatibility), owned area
-status (`breakthrough`), delayed world effects (`smoke`, `mortarFire`), dash return, line
-projectile, Magic Anchor placement, Golem consumption, and the intentionally one-off artillery
-point-fire path. The hook receives the owning player's faction id at execution time through the
+effect shapes that actually exist today: legacy no-op (`charge` compatibility), reserved no-op
+(`blanketFire` skeleton), owned area status (`breakthrough`), delayed world effects (`smoke`,
+`mortarFire`), dash return, line projectile, Magic Anchor placement, Golem consumption, and the
+intentionally one-off artillery point-fire path. The hook receives the owning player's faction id at execution time through the
 normal command/order helpers, so wrong-faction ability use fails before effects, resource spending,
 cooldowns, or events are applied. Artillery point fire locks each raw click to the issuing gun's
 valid 25-to-55 tile range band, stores that effective point, and owns any needed in-place setup or
-redeploy before the first shot. It records temporary live-fog firing reveal sources for enemy
+redeploy before the first shot. The lock derives the ray direction from `atan2`, so every finite
+click coordinate uses the same range-band clamping path. Queued Point Fire may also be accepted
+while a deployed gun is tearing down for an active move; the queued order keeps its locked future
+point for later promotion instead of being dropped. It records temporary live-fog firing reveal sources for enemy
 players when a shell launches, using the firing-cycle-plus-half-second lifetime and smoke
 suppression used by other actionable firing reveals. The hook is deliberately not a generic script engine. Phase 11 signature abilities
 should first use one of the existing shapes; if they cannot, add either a narrow explicit hook or a
@@ -788,7 +796,14 @@ Keyboard latching, double-tap quick-cast, Shift lifetime, and cursor previews ar
 simulation contract begins when a `SimCommand` reaches `services::commands`: the command service
 dedupes and caps unit-id lists, rejects over-budget human unit-list commands, builds issue-time
 facts for the referenced units/targets, and must produce unit-local actions that match the policy
-below. The budget scalars live in the sim-owned `command_budget` helper so parity checks can dump
+below. Direct attack commands validate target visibility against team-current attack fog, including
+teammate death vision; auto-acquisition uses ordinary live fog and ignores targets visible only
+through death vision. Tank coax secondary-weapon target filtering uses the shared secondary-weapon
+activation helper for range checks, facing-arc checks, and intended-target direct-fire legality. Move-command trench preference also uses ordinary live fog from alive players
+only, so formation goals do not prefer trench terrain visible only through defeated teammates'
+leftover units. Formation assignment treats a trench as occupied only when the occupant is visible
+to the issuing player through the same fog/smoke projection used by snapshots; selected units still
+free their own occupied trenches for group moves. The budget scalars live in the sim-owned `command_budget` helper so parity checks can dump
 them without moving ownership into rules. Human command budget is supply-based: 24 base command
 supply plus `COMMAND_CAR_SUPPLY_CAP_BONUS = 20` per submitted owned Command Car plus that Command
 Car's own mirrored supply weight, so Command Cars offset their own weight before adding bonus
@@ -810,11 +825,20 @@ economy, or cooldown mutation dependency; it accepts plain facts and emits one o
 are needed by both issue-time command application and queued promotion, such as support-weapon
 setup, artillery point-fire targeting, and artillery teardown before movement. It should not grow
 new validation policy or tick orchestration; those responsibilities remain with command admission,
-queued promotion, or the owning tick system.
+queued promotion, or the owning tick system. When a living direct Panzerfaust attacker consumes the loaded
+one-shot and converts the unit into a Rifleman, that attack order is complete so queued movement can
+promote normally. Dead Panzerfaust entities do not tick pending loaded-shot windup or recovery state,
+so normal death cleanup prevents later launch or conversion. Panzerfaust damage still resolves against the locked live Tank; if that target
+moves out of the firing team's current visible fog before impact, shooter impact feedback uses the
+stored launch endpoint while victim under-attack notices use the victim's actual position.
 
 Tank weapon range is dynamic in the simulation: tanks keep their base 5-tile range while moving,
 then linearly ramp to 14 tiles after three stationary seconds. Path-driven translation or hull
 rotation resets the ramp to base range; turret aiming and external pushes do not.
+
+Live `PathingService` searches expand at most 32,768 nodes per path request. Dev scenario setup uses
+the same expansion budget as normal matches, so unusually complex routes can fall back to
+best-effort paths at the same limit in both flows.
 
 Combat weapon cooldowns and firing-reveal response delays are keyed by
 `rules::combat::WeaponKind` inside `CombatState`. The legacy `Entity::attack_cd()`,

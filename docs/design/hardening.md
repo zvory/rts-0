@@ -2,6 +2,8 @@
 The server treats every client as potentially hostile. Limits live next to the code:
 - **WebSocket frame cap** (`main.rs`): `max_message_size`/`max_frame_size` = 256 KiB. Oversized
   frames are rejected and the connection closed before they reach serde.
+- **Net-report diagnostic cap** (`rts-protocol`): client-supplied command lifecycle exemplars are
+  capped during deserialization so notable diagnostics stay bounded at the protocol boundary.
 - **Command unit cap and budget** (`services/commands.rs`, with mirrored budget scalars in
   `command_budget.rs`): ordinary unit-list commands inspect at most
   `MAX_UNITS_PER_COMMAND = 256` submitted ids, dedupe that bounded window, and reject

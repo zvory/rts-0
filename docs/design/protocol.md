@@ -561,7 +561,8 @@ after playback has started; they keep the shared replay session alive until the 
 
 ### 2.4 `snapshot` payload (per-player, fog-filtered)
 `Snapshot` remains the semantic shape used by server game code and by client modules after
-transport decode:
+transport decode. Compact snapshot diagnostics may report aggregate payload-byte windows by stable
+snapshot section and entity kind, but do not log raw snapshot bodies or entity ids:
 ```
 {
   t: "snapshot",
