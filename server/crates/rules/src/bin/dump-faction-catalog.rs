@@ -361,6 +361,10 @@ fn print_client_constants(indent: &str) {
         balance::PANZERFAUST_DAMAGE
     );
     println!(
+        "{indent}    \"panzerfaustArmorPenetration\": {},",
+        json_f32(balance::PANZERFAUST_ARMOR_PENETRATION)
+    );
+    println!(
         "{indent}    \"panzerfaustWindupTicks\": {},",
         balance::PANZERFAUST_WINDUP_TICKS
     );
