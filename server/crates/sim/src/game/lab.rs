@@ -9,7 +9,7 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 
 use crate::config;
-use crate::game::entity::{EntityKind, EntityStore, Order, OrderIntent, NEUTRAL};
+use crate::game::entity::{EntityKind, EntityStore, Order, NEUTRAL};
 use crate::game::map::Map;
 use crate::game::services::geometry::{
     building_rect_for_entity, circle_intersects_rect, CircleBody,
@@ -35,7 +35,8 @@ use orientation::{
     lab_entity_weapon_facing, restore_lab_entity_orientation, restore_lab_entity_setup,
 };
 use orders::{
-    lab_entity_active_order, lab_entity_queued_orders, restore_lab_entity_orders,
+    clear_lab_production_state, lab_entity_active_order, lab_entity_queued_orders,
+    order_intent_references_entity, order_references_entity, restore_lab_entity_orders,
 };
 use scenario::{
     validate_lab_entity_setup_shape, validate_lab_scenario_shape, LAB_SCENARIO_KIND,
@@ -949,29 +950,6 @@ fn validate_upgrade_for_player(
             player_id: player.id,
             upgrade: upgrade_id.to_string(),
         })
-    }
-}
-
-fn clear_lab_production_state(entity: &mut crate::game::entity::Entity) {
-    if let Some(production) = entity.production.as_mut() {
-        production.queue.clear();
-        production.research_queue.clear();
-        production.rally_point = None;
-        production.rally_queue.clear();
-    }
-}
-
-fn order_references_entity(order: &Order, entity_id: u32) -> bool {
-    order.attack_target() == Some(entity_id)
-        || order.gather_node() == Some(entity_id)
-        || order.build_site() == Some(entity_id)
-}
-
-fn order_intent_references_entity(intent: &OrderIntent, entity_id: u32) -> bool {
-    match intent {
-        OrderIntent::Attack(target) => target.target == entity_id,
-        OrderIntent::Gather(gather) => gather.node == entity_id,
-        _ => false,
     }
 }
 

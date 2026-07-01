@@ -53,7 +53,11 @@ import { PLAYER_PALETTE } from "../client/src/config.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const rustProtocolPath = path.join(repoRoot, "server/crates/protocol/src/lib.rs");
-const rust = fs.readFileSync(rustProtocolPath, "utf8");
+const rustProtocolLabScenarioPath = path.join(repoRoot, "server/crates/protocol/src/lab_scenario.rs");
+const rust = [
+  fs.readFileSync(rustProtocolPath, "utf8"),
+  fs.readFileSync(rustProtocolLabScenarioPath, "utf8"),
+].join("\n");
 const rustClientNetReport = fs.readFileSync(
   path.join(repoRoot, "server/crates/protocol/src/client_net_report.rs"),
   "utf8",

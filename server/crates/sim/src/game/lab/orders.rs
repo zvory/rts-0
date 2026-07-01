@@ -39,6 +39,29 @@ pub(super) fn lab_entity_queued_orders(entity: &Entity) -> Vec<LabScenarioOrder>
         .collect()
 }
 
+pub(super) fn clear_lab_production_state(entity: &mut Entity) {
+    if let Some(production) = entity.production.as_mut() {
+        production.queue.clear();
+        production.research_queue.clear();
+        production.rally_point = None;
+        production.rally_queue.clear();
+    }
+}
+
+pub(super) fn order_references_entity(order: &Order, entity_id: u32) -> bool {
+    order.attack_target() == Some(entity_id)
+        || order.gather_node() == Some(entity_id)
+        || order.build_site() == Some(entity_id)
+}
+
+pub(super) fn order_intent_references_entity(intent: &OrderIntent, entity_id: u32) -> bool {
+    match intent {
+        OrderIntent::Attack(target) => target.target == entity_id,
+        OrderIntent::Gather(gather) => gather.node == entity_id,
+        _ => false,
+    }
+}
+
 fn scenario_order_from_active(order: &Order) -> Option<LabScenarioOrder> {
     match order {
         Order::Idle => None,
