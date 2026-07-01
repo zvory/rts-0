@@ -93,6 +93,37 @@ fn distance(a: (f32, f32), b: (f32, f32)) -> f32 {
 }
 
 #[test]
+fn scout_plane_does_not_stamp_standard_fog_before_aerial_vision_phase() {
+    let mut game = empty_game(test_map(40));
+    spawn_city_centre(&mut game, 1, 64.0, 64.0);
+    let plane = spawn_plane(&mut game, 1, 640.0, 640.0);
+    let hidden_enemy = game
+        .state
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, 704.0, 640.0)
+        .expect("enemy should spawn");
+
+    game.tick();
+
+    assert!(
+        game.state.entities.get(plane).is_some(),
+        "the hidden plane runtime should remain active"
+    );
+    let snapshot = game.snapshot_for(1);
+    assert!(
+        snapshot.entities.iter().all(|entity| entity.id != hidden_enemy),
+        "Phase 3 must not let Scout Planes reveal enemies through the generic fog path"
+    );
+    let (tx, ty) = game.state.map.tile_of(704.0, 640.0);
+    let index = (ty * game.state.map.size + tx) as usize;
+    assert_eq!(
+        snapshot.visible_tiles.get(index).copied(),
+        Some(0),
+        "the enemy tile should remain fogged until Phase 4 adds aerial Scout Plane sight"
+    );
+}
+
+#[test]
 fn spawned_plane_flies_directly_over_blockers_and_establishes_orbit() {
     let mut map = test_map(32);
     for tx in 4..20 {

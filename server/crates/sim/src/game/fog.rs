@@ -15,7 +15,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use crate::config;
-use crate::game::entity::{blocks_line_of_sight, Entity, EntityStore};
+use crate::game::entity::{blocks_line_of_sight, Entity, EntityKind, EntityStore};
 use crate::game::firing_reveal::FiringRevealSource;
 use crate::game::map::Map;
 use crate::game::services::line_of_sight::LineOfSight;
@@ -147,6 +147,9 @@ impl Fog {
         for e in store.iter() {
             if e.owner == 0 {
                 continue; // neutral resource nodes do not grant a player vision
+            }
+            if !entity_grants_standard_sight(e) {
+                continue;
             }
             if smokes
                 .map(|smokes| smokes.point_inside(e.pos_x, e.pos_y))
@@ -320,6 +323,12 @@ impl Fog {
         }
         self.is_visible(player, tx as u32, ty as u32)
     }
+}
+
+fn entity_grants_standard_sight(entity: &Entity) -> bool {
+    // Scout Plane aerial fog is intentionally a separate Phase 4 path. Until that exists, the
+    // hidden Phase 3 runtime must not fall through to ordinary ground line-of-sight stamping.
+    entity.kind != EntityKind::ScoutPlane
 }
 
 fn stamp_point(grid: &mut [bool], size: u32, x: f32, y: f32) {
