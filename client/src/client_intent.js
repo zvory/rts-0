@@ -36,7 +36,7 @@ export class ClientIntent {
     this.antiTankGunSetupPreview = null;
     /** @type {null | {ability:string, source?:string, mouseX?:number, mouseY?:number, carriers:Array<object>, areaOrigins?:Array<object>, rangeOrigins?:Array<object>, pathOrigins?:Array<object>, returnMarkers?:Array<object>, rangePx?:number, hoverInRange:boolean, hoverInsideMinRange?:boolean}} */
     this.abilityTargetPreview = null;
-    /** @type {Map<number, Array<{kind:string,x?:number,y?:number,clientSeq:number|null,createdAt:number}>>} */
+    /** @type {Map<number, Array<{kind:string,x?:number,y?:number,clientSeq:number|null,createdAt:number,replacesAuthority?:boolean}>>} */
     this._plannedOrderStagesByUnit = new Map();
   }
 
@@ -223,6 +223,7 @@ export class ClientIntent {
    */
   recordPlannedCommand(command, selectedEntities = [], result = null) {
     if (!command || typeof command !== "object") return;
+    if (result === false || isPromiseLike(result)) return;
     if (result && typeof result === "object" && result.sent === false) return;
     const units = normalizeUnitIds(command.units);
     if (units.length === 0) return;
@@ -245,7 +246,7 @@ export class ClientIntent {
       if (command.queued) {
         this._appendPlannedStage(unitId, stage, entity);
       } else {
-        this._plannedOrderStagesByUnit.set(unitId, [cloneStage(stage)]);
+        this._plannedOrderStagesByUnit.set(unitId, [cloneStage(stage, { replacesAuthority: true })]);
       }
     }
   }
@@ -260,9 +261,10 @@ export class ClientIntent {
       ? entity.orderPlan.map((stage) => ({ ...stage }))
       : [];
     const local = this._plannedOrderStagesByUnit.get(entity?.id) || [];
+    const base = local[0]?.replacesAuthority ? [] : authority;
     const merged = [];
-    for (const stage of authority.concat(local)) {
-      merged.push({ ...stage });
+    for (const stage of base.concat(local)) {
+      merged.push(publicOrderStage(stage));
       if (ARTILLERY_TERMINAL_STAGES.has(stage.kind)) break;
     }
     return merged;
@@ -346,9 +348,13 @@ export class ClientIntent {
   }
 
   _appendPlannedStage(unitId, stage, entity = null) {
-    const authorityPlan = Array.isArray(entity?.orderPlan) ? entity.orderPlan : [];
-    if (planHasTerminal(authorityPlan)) return;
     const current = this._plannedOrderStagesByUnit.get(unitId) || [];
+    const authorityPlan = current[0]?.replacesAuthority
+      ? []
+      : Array.isArray(entity?.orderPlan)
+        ? entity.orderPlan
+        : [];
+    if (planHasTerminal(authorityPlan)) return;
     if (planHasTerminal(current)) return;
     const next = replaceContradictoryLocalStages(current, stage);
     next.push(cloneStage(stage));
@@ -453,8 +459,10 @@ function stageConfirmedByAuthority(stage, authorityPlan) {
   if (!Array.isArray(authorityPlan)) return false;
   return authorityPlan.some((authority) => {
     if (authority?.kind !== stage.kind) return false;
-    if (ARTILLERY_TERMINAL_STAGES.has(stage.kind)) return true;
-    return closePoint(authority, stage);
+    if (Number.isFinite(stage.x) && Number.isFinite(stage.y)) {
+      return closePoint(authority, stage);
+    }
+    return true;
   });
 }
 
@@ -467,12 +475,24 @@ function closePoint(a, b) {
     Math.abs(a.y - b.y) <= PLAN_XY_EPSILON;
 }
 
-function cloneStage(stage) {
-  return { ...stage };
+function cloneStage(stage, extra = null) {
+  return extra ? { ...stage, ...extra } : { ...stage };
+}
+
+function publicOrderStage(stage) {
+  const out = { kind: stage.kind };
+  if (Number.isFinite(stage.x)) out.x = stage.x;
+  if (Number.isFinite(stage.y)) out.y = stage.y;
+  return out;
 }
 
 function normalizeUnitIds(units) {
-  if (!Array.isArray(units)) return [];
+  if (
+    !Array.isArray(units) &&
+    (typeof units === "string" || !units || typeof units[Symbol.iterator] !== "function")
+  ) {
+    return [];
+  }
   const out = [];
   const seen = new Set();
   for (const unit of units) {
@@ -487,6 +507,10 @@ function normalizeUnitIds(units) {
 function normalizeClientSeq(clientSeq) {
   const seq = Number(clientSeq);
   return Number.isInteger(seq) && seq >= 0 ? seq : null;
+}
+
+function isPromiseLike(value) {
+  return !!value && typeof value === "object" && typeof value.then === "function";
 }
 
 function defaultNow() {

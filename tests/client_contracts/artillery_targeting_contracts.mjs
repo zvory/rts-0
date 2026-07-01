@@ -256,6 +256,58 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
     "Authoritative orderPlan mismatch clears stale local queued setup and fire stages",
   );
 
+  const terminalAuthorityArtillery = {
+    ...selectedArtillery,
+    id: 48,
+    orderPlan: [{ kind: ORDER_STAGE.POINT_FIRE, x: 300, y: 300 }],
+  };
+  const replacementMove = { x: 520, y: 540 };
+  pointFireInput.clientIntent.recordPlannedCommand(
+    cmd.move([terminalAuthorityArtillery.id], replacementMove.x, replacementMove.y, false),
+    [terminalAuthorityArtillery],
+    { sent: true, clientSeq: 110 },
+  );
+  pointFireInput.clientIntent.recordPlannedCommand(
+    cmd.setupAntiTankGuns([terminalAuthorityArtillery.id], replacementMove.x, replacementMove.y + 96, true),
+    [terminalAuthorityArtillery],
+    { sent: true, clientSeq: 111 },
+  );
+  const replacementPlan = pointFireInput.clientIntent.plannedOrderPlanForEntity(terminalAuthorityArtillery);
+  assert(
+    replacementPlan[0]?.kind === ORDER_STAGE.MOVE &&
+      replacementPlan[0].x === replacementMove.x &&
+      replacementPlan[1]?.kind === ORDER_STAGE.SETUP_ANTI_TANK_GUNS &&
+      !replacementPlan.some((stage) => stage.kind === ORDER_STAGE.POINT_FIRE),
+    "Unqueued local movement replaces an old terminal authoritative plan before queued setup is appended",
+  );
+
+  pointFireInput.clientIntent.recordPlannedCommand(
+    cmd.move([locallyPlannedArtillery.id], localMove.x, localMove.y, false),
+    [locallyPlannedArtillery],
+    { sent: true, clientSeq: 120 },
+  );
+  pointFireInput.clientIntent.recordPlannedCommand(
+    cmd.move([rejectedSetupArtillery.id], localMove.x, localMove.y, false),
+    [rejectedSetupArtillery],
+    { sent: true, clientSeq: 121 },
+  );
+  pointFireInput.clientIntent.clearPlannedOrdersOutsideSelection(new Set([locallyPlannedArtillery.id]));
+  assert(
+    pointFireInput.clientIntent.plannedOrderPlanForEntity(locallyPlannedArtillery).length === 1 &&
+      pointFireInput.clientIntent.plannedOrderPlanForEntity(rejectedSetupArtillery).length === 0,
+    "Selection reconciliation preserves local plans for ids kept in a Set selection",
+  );
+
+  pointFireInput.clientIntent.recordPlannedCommand(
+    cmd.move([rejectedSetupArtillery.id], localMove.x, localMove.y, false),
+    [rejectedSetupArtillery],
+    Promise.resolve({ sent: true }),
+  );
+  assert(
+    pointFireInput.clientIntent.plannedOrderPlanForEntity(rejectedSetupArtillery).length === 0,
+    "Async lab-style command results are not recorded as durable local order plans without a client sequence",
+  );
+
   pointFireInput.state.selectedEntities = () => [selectedArtillery];
   const deployedArtillery = { ...selectedArtillery, setupState: SETUP.DEPLOYED, setupFacing: 0 };
   const artilleryConeGfx = new RecordingGraphics();
