@@ -89,7 +89,10 @@ const PLAYER_STATE_FIELD_WRITE_APPROVED_PATHS: &[&str] = &["player_state.rs"];
 const PLAYER_STATE_FIELDS: &[&str] = &["steel", "oil", "supply_used", "supply_cap", "score"];
 
 const ALLOWED_SERVICE_IMPORTS: &[(&str, &[&str])] = &[
-    ("ability_orders", &["commands", "move_coordinator", "world_query"]),
+    (
+        "ability_orders",
+        &["commands", "move_coordinator", "world_query"],
+    ),
     (
         "combat",
         &[
@@ -287,6 +290,14 @@ impl StateOwner {
     fn label(self) -> &'static str {
         self.struct_name()
     }
+
+    fn expected_path(self) -> &'static str {
+        match self {
+            StateOwner::Game => "mod.rs",
+            StateOwner::GameState => "state.rs",
+            StateOwner::DerivedState => "derived_state.rs",
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -399,11 +410,7 @@ fn analyze_source_files_with_registry(
 
     check_service_roles(&service_modules, &service_roles, &mut report);
     let state_owner_scan = collect_state_owner_scan(files);
-    check_state_owner_tree(
-        &state_owner_scan,
-        registry_text.is_some(),
-        &mut report,
-    );
+    check_state_owner_tree(&state_owner_scan, registry_text.is_some(), &mut report);
     check_state_owner_registry(&state_owner_scan, registry_text, &mut report);
 
     for file in files {
@@ -516,8 +523,15 @@ fn read_state_registry_doc(game_root: &Path) -> io::Result<String> {
 
 fn collect_state_owner_scan(files: &[SourceFile]) -> StateOwnerScan {
     let mut scan = StateOwnerScan::default();
-    for file in files {
-        for owner in [StateOwner::Game, StateOwner::GameState, StateOwner::DerivedState] {
+    for owner in [
+        StateOwner::Game,
+        StateOwner::GameState,
+        StateOwner::DerivedState,
+    ] {
+        if let Some(file) = files
+            .iter()
+            .find(|file| file.rel_path == owner.expected_path())
+        {
             if let Some(fields) = collect_struct_fields(file, owner) {
                 scan.found_owners.insert(owner);
                 scan.fields.extend(fields);
@@ -533,7 +547,11 @@ fn check_state_owner_tree(
     report: &mut ArchitectureReport,
 ) {
     if require_full_tree {
-        for owner in [StateOwner::Game, StateOwner::GameState, StateOwner::DerivedState] {
+        for owner in [
+            StateOwner::Game,
+            StateOwner::GameState,
+            StateOwner::DerivedState,
+        ] {
             if !scan.found_owners.contains(&owner) {
                 report.failures.push(format!(
                     "{} struct must exist so state ownership can be checked",
@@ -552,10 +570,7 @@ fn check_state_owner_tree(
         return;
     }
 
-    let expected = BTreeMap::from([
-        ("state", "GameState"),
-        ("derived", "DerivedState"),
-    ]);
+    let expected = BTreeMap::from([("state", "GameState"), ("derived", "DerivedState")]);
     for field in &game_fields {
         match expected.get(field.name.as_str()) {
             Some(expected_ty) if field.ty == *expected_ty => {}
@@ -599,11 +614,12 @@ fn check_state_owner_registry(
     }
 
     let mut code_fields = BTreeMap::<String, &StructField>::new();
-    for field in scan
-        .fields
-        .iter()
-        .filter(|field| matches!(field.owner, StateOwner::GameState | StateOwner::DerivedState))
-    {
+    for field in scan.fields.iter().filter(|field| {
+        matches!(
+            field.owner,
+            StateOwner::GameState | StateOwner::DerivedState
+        )
+    }) {
         if let Some(previous) = code_fields.insert(field.name.clone(), field) {
             report.failures.push(format!(
                 "{}:{}: state owner field `{}` duplicates {}:{}; field names must be unique across GameState and DerivedState for registry checks",
@@ -996,6 +1012,7 @@ fn collect_struct_fields(file: &SourceFile, owner: StateOwner) -> Option<Vec<Str
     let mut fields = Vec::new();
     let mut depth = 0isize;
     let mut inside_body = false;
+    let mut cfg_test_field_pending = false;
     for (index, line) in lines.iter().enumerate().skip(start) {
         let code = code_before_comment(line);
         if !inside_body {
@@ -1015,7 +1032,16 @@ fn collect_struct_fields(file: &SourceFile, owner: StateOwner) -> Option<Vec<Str
         }
 
         if depth == 1 {
-            if let Some(field) = parse_struct_field_line(code, file, owner, index + 1) {
+            let trimmed = code.trim();
+            if is_cfg_test_attribute(trimmed) {
+                cfg_test_field_pending = true;
+            } else if cfg_test_field_pending && trimmed.starts_with("#[") {
+                // Preserve the cfg(test) skip across stacked attributes on the same field.
+            } else if cfg_test_field_pending {
+                if !trimmed.is_empty() {
+                    cfg_test_field_pending = false;
+                }
+            } else if let Some(field) = parse_struct_field_line(code, file, owner, index + 1) {
                 fields.push(field);
             }
         }
@@ -1460,16 +1486,36 @@ fn collect_entity_field_writes(file: &SourceFile, text: &str, report: &mut Archi
     }
 }
 
-fn check_module_level_mutable_state(file: &SourceFile, text: &str, report: &mut ArchitectureReport) {
+fn check_module_level_mutable_state(
+    file: &SourceFile,
+    text: &str,
+    report: &mut ArchitectureReport,
+) {
+    if is_test_path(&file.rel_path) {
+        return;
+    }
+
     let mut depth = 0isize;
+    let mut cfg_test_item_pending = false;
     for (index, line) in text.lines().enumerate() {
         let code = code_before_comment(line).trim();
-        if depth == 0 && module_level_mutable_state_decl(code) {
-            report.failures.push(format!(
-                "{}:{}: module-level mutable simulation state is not allowed; store durable state under GameState, rebuildable state under DerivedState, or keep room/session/test-only state outside rts-sim",
-                file.rel_path,
-                index + 1
-            ));
+        if depth == 0 {
+            if is_cfg_test_attribute(code) {
+                cfg_test_item_pending = true;
+            } else if cfg_test_item_pending && code.starts_with("#[") {
+                // Preserve the cfg(test) skip across stacked attributes on the same item.
+            } else {
+                if module_level_mutable_state_decl(code) && !cfg_test_item_pending {
+                    report.failures.push(format!(
+                        "{}:{}: module-level mutable simulation state is not allowed; store durable state under GameState, rebuildable state under DerivedState, or keep room/session/test-only state outside rts-sim",
+                        file.rel_path,
+                        index + 1
+                    ));
+                }
+                if !code.is_empty() {
+                    cfg_test_item_pending = false;
+                }
+            }
         }
         depth += brace_delta(code);
         if depth < 0 {
@@ -1489,6 +1535,10 @@ fn module_level_mutable_state_decl(line: &str) -> bool {
             .any(|needle| line.contains(needle));
     }
     line.starts_with("thread_local!")
+}
+
+fn is_cfg_test_attribute(line: &str) -> bool {
+    line.starts_with("#[cfg(test")
 }
 
 fn strip_visibility_prefix(line: &str) -> &str {
@@ -1822,9 +1872,8 @@ mod tests {
             "pub struct Game {\n    pub(in crate::game) state: GameState,\n    pub(in crate::game) derived: DerivedState,\n    pub(in crate::game) hidden_cache: Vec<u32>,\n}\n",
         )]);
 
-        assert!(report.failures.iter().any(|failure| failure.contains(
-            "Game must only store `state: GameState` and `derived: DerivedState`"
-        )));
+        assert!(report.failures.iter().any(|failure| failure
+            .contains("Game must only store `state: GameState` and `derived: DerivedState`")));
     }
 
     #[test]
@@ -1837,15 +1886,50 @@ mod tests {
 
         let report = analyze_source_files_with_registry(&files, Some(&doc));
 
-        assert!(report.failures.iter().any(|failure| failure.contains(
-            "DerivedState.final_spatial is missing from docs/design/server-sim.md"
-        )));
+        assert!(report.failures.iter().any(|failure| failure
+            .contains("DerivedState.final_spatial is missing from docs/design/server-sim.md")));
     }
 
     #[test]
     fn state_registry_accepts_private_visibility_fields() {
         let files = minimal_state_tree_sources(
             "    pub(in crate::game) map: Map,",
+            "    final_spatial: SpatialIndex,",
+        );
+        let doc = registry(&[
+            ("map", "authoritative/serialized"),
+            ("final_spatial", "derived/rebuildable"),
+        ]);
+
+        let report = analyze_source_files_with_registry(&files, Some(&doc));
+
+        assert!(report.failures.is_empty());
+    }
+
+    #[test]
+    fn state_owner_scan_ignores_test_shadow_structs() {
+        let mut files = minimal_state_tree_sources(
+            "    pub(in crate::game) map: Map,",
+            "    final_spatial: SpatialIndex,",
+        );
+        files.push(source(
+            "tests/game_tests.rs",
+            "struct Game { hidden_cache: Vec<u32> }\nstruct GameState { test_cache: Vec<u32> }\n",
+        ));
+        let doc = registry(&[
+            ("map", "authoritative/serialized"),
+            ("final_spatial", "derived/rebuildable"),
+        ]);
+
+        let report = analyze_source_files_with_registry(&files, Some(&doc));
+
+        assert!(report.failures.is_empty());
+    }
+
+    #[test]
+    fn state_registry_ignores_cfg_test_owner_fields() {
+        let files = minimal_state_tree_sources(
+            "    pub(in crate::game) map: Map,\n    #[cfg(test)]\n    debug_cache: Vec<u32>,",
             "    final_spatial: SpatialIndex,",
         );
         let doc = registry(&[
@@ -1909,6 +1993,26 @@ mod tests {
                 "services/pathing.rs:1: module-level mutable simulation state is not allowed; store durable state under GameState, rebuildable state under DerivedState, or keep room/session/test-only state outside rts-sim".to_string()
             ]
         );
+    }
+
+    #[test]
+    fn module_level_mutable_state_ignores_test_files() {
+        let report = analyze_source_files(&[source(
+            "tests/pathing_cache_tests.rs",
+            "static CACHE: Mutex<u32> = Mutex::new(0);\n",
+        )]);
+
+        assert!(report.failures.is_empty());
+    }
+
+    #[test]
+    fn module_level_mutable_state_ignores_cfg_test_items() {
+        let report = analyze_source_files(&[source(
+            "services/pathing.rs",
+            "#[cfg(test)]\n#[allow(dead_code)]\nstatic CACHE: Mutex<u32> = Mutex::new(0);\n",
+        )]);
+
+        assert!(report.failures.is_empty());
     }
 
     #[test]
