@@ -132,7 +132,7 @@ fn start_payload_reports_team_id_with_assigned_start_tile() {
         assert_eq!(payload.team_id, player.team_id);
         assert_eq!(
             (payload.start_tile_x, payload.start_tile_y),
-            game.map.starts[index]
+            game.state.map.starts[index]
         );
     }
 }
@@ -181,8 +181,8 @@ fn replay_reconstruction_preserves_team_aware_start_assignment() {
         live.seed(),
     );
 
-    assert_eq!(replay.map.starts, live.map.starts);
-    assert_eq!(replay.map.expansion_sites, live.map.expansion_sites);
+    assert_eq!(replay.state.map.starts, live.state.map.starts);
+    assert_eq!(replay.state.map.expansion_sites, live.state.map.expansion_sites);
 }
 
 fn start_players(players: &[(u32, u32)]) -> Vec<(u32, u32)> {

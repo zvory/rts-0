@@ -224,9 +224,15 @@ production queues, rally plans, cooldowns, and command logs are not part of the 
 
 #### 3.1.1 `Game` State Ownership Registry
 
-This registry is the source of truth for classifying fields currently stored directly on
-`server/crates/sim/src/game/mod.rs::Game`. Any change that adds, removes, or changes the semantics
-of a `Game` field must update this table in the same change. The categories are:
+`Game` is a private ownership tree with durable authoritative state stored under
+`GameState` (`server/crates/sim/src/game/state.rs`) and rebuildable cache/search state stored under
+`DerivedState` (`server/crates/sim/src/game/derived_state.rs`). `GameState` is private to
+`crate::game`; public `Game` methods remain the only seam for lobby, replay, lab, AI, server, and
+snapshot callers.
+
+This registry is the source of truth for classifying fields currently owned by `GameState` or
+`DerivedState`. Any change that adds, removes, or changes the semantics of a `GameState` or
+`DerivedState` field must update this table in the same change. The categories are:
 
 - `authoritative/serialized` - durable simulation state that can affect future ticks, command
   validity, fog/projection, replay output, scoring, entity ids, or checkpoint restore.
@@ -237,14 +243,14 @@ of a `Game` field must update this table in the same change. The categories are:
 - `compatibility metadata` - replay/API/setup metadata retained with an explicit checkpoint policy,
   even when it does not directly mutate tick results.
 
-No current `Game` field is classified as `transient`; room/session transient state remains outside
+No current state field is classified as `transient`; room/session transient state remains outside
 `Game` in `server/src/lobby/`.
 
 | Field | Category | Checkpoint policy | Evidence and notes |
 | --- | --- | --- | --- |
 | `map` | `authoritative/serialized` | Serialize the full `Map` value, including terrain, size, starts, and expansion sites. | `Game::new_inner_with_map` stores the generated or supplied map; `systems::run_tick`, pathing, fog, placement, resource setup, and `start_payload` all read it. |
 | `entities` | `authoritative/serialized` | Serialize the full `EntityStore`, including stable entity ids, allocator/high-water state, HP, orders, queues, movement state, selected waypoints, path goals, cooldowns, combat state, production/build progress, rally plans, resource reservations, body/weapon/setup facing, and entity flags. | `systems::run_tick` mutates the store every tick; snapshots, score, survival, command validation, replay determinism tests, and the Phase 0.5 comparator all treat entity state as semantic authority. Chosen movement paths live on entities, not in `pathing`. |
-| `fog` | `authoritative/serialized` | Serialize current live visibility grids for now. A later phase may reclassify live fog as rebuildable only after proving an exact deterministic rebuild before every command, combat, and snapshot surface. | `systems::run_tick` receives `&self.fog` for command/combat visibility decisions, snapshots project through current team fog, and Phase 0.5 compares per-player visible tiles as semantic state. |
+| `fog` | `authoritative/serialized` | Serialize current live visibility grids for now. A later phase may reclassify live fog as rebuildable only after proving an exact deterministic rebuild before every command, combat, and snapshot surface. | `systems::run_tick` receives `&self.state.fog` for command/combat visibility decisions, snapshots project through current team fog, and Phase 0.5 compares per-player visible tiles as semantic state. |
 | `building_memory` | `authoritative/serialized` | Serialize remembered enemy-building entries per player. | `BuildingMemory::refresh` records last-seen enemy building state and only removes hidden destroyed entries after the footprint is scouted again; spectator/player snapshots project remembered buildings while fogged. |
 | `players` | `authoritative/serialized` | Serialize all `PlayerState` rows, including id/team/faction/name/color/start tile, current Steel/Oil, supply, AI flag, score counters, and completed upgrades. | Economy, command authority, team relations, alive checks, scores, faction-specific tech, and snapshot resource rows are all read from `players`. |
 | `pending` | `authoritative/serialized` | Serialize unapplied pending commands unless a future checkpoint caller explicitly proves it captures only immediately after command drain with `pending` empty. | `Game::enqueue` appends commands between ticks; `tick_inner` drains `pending`, records them in `command_log`, and applies them. Dropping a non-empty queue would skip authoritative player/AI intent. |
@@ -264,13 +270,13 @@ No current `Game` field is classified as `transient`; room/session transient sta
 | `active_construction_sites` | `authoritative/serialized` | Serialize the set when checkpointing a post-tick state that may immediately produce snapshots; otherwise it should normally be empty at the next tick start. | `tick_inner` clears it before systems; `construction_system` inserts sites that received progress this tick; `snapshot` passes it to projection so same-tick construction progress is visible. |
 | `lab_god_mode_players` | `authoritative/serialized` | Serialize the canonical enabled-player set and resync mirrored entity invulnerability flags after import. | Lab ops mutate the set; `sync_lab_god_mode_flags` mirrors it onto unit/building invulnerability, and damage checks consume those entity flags. |
 | `starting_loadout` | `compatibility metadata` | Serialize until legacy/global-starting-resource compatibility constructors are retired. Checkpoint import should prefer `starting_loadouts` for per-player setup facts. | The field is set by setup constructors and dev scenarios but does not feed the per-tick systems after match creation. |
-| `rng` | `authoritative/serialized` | Serialize the exact current generator state or an equivalent deterministic draw-stream state. Re-seeding from `seed` is not valid after any random draw. | `systems::run_tick` passes `&mut self.rng` into combat damage/miss logic; Phase 0.5 probes cloned RNG output as semantic state. |
+| `rng` | `authoritative/serialized` | Serialize the exact current generator state or an equivalent deterministic draw-stream state. Re-seeding from `seed` is not valid after any random draw. | `systems::run_tick` passes `&mut self.state.rng` into combat damage/miss logic; Phase 0.5 probes cloned RNG output as semantic state. |
 
 The Phase 0.5 and Phase 2 derived-state wipe harnesses confirm the current derived boundary: only
 the `derived` shell, containing the final spatial index and rebuildable pathing cache/search state,
-is cleared and rebuilt. Every other current `Game` field is treated as authoritative or
-compatibility metadata until a later phase adds a deterministic rebuild proof and updates this
-registry. No current field has an unresolved ownership category blocker.
+is cleared and rebuilt. Every current `GameState` field is treated as authoritative or compatibility
+metadata until a later phase adds a deterministic rebuild proof and updates this registry. No
+current field has an unresolved ownership category blocker.
 
 `PlayerInit.team_id` is canonical team identity. Phase 1 preserves FFA gameplay by assigning each
 seated player a unique nonzero team by default; deserialized or hand-built fixtures with

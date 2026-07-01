@@ -88,7 +88,7 @@ fn enqueue_ekat_consume_golem(game: &mut Game, hero: u32) {
 }
 
 fn active_return_marker_id(game: &Game, hero: u32) -> Option<u32> {
-    game.ability_runtime
+    game.state.ability_runtime
         .active_return_marker(
             1,
             hero,
@@ -100,7 +100,7 @@ fn active_return_marker_id(game: &Game, hero: u32) -> Option<u32> {
 }
 
 fn active_anchor_id(game: &Game, hero: u32) -> Option<u32> {
-    game.ability_runtime
+    game.state.ability_runtime
         .active_anchor(
             1,
             hero,
@@ -111,7 +111,7 @@ fn active_anchor_id(game: &Game, hero: u32) -> Option<u32> {
 }
 
 fn line_projectiles(game: &Game) -> Vec<ability_projectile::AbilityProjectile> {
-    game.ability_runtime
+    game.state.ability_runtime
         .projectiles()
         .filter(|projectile| projectile.ability == ability::AbilityKind::EkatLineShot)
         .cloned()
@@ -119,18 +119,17 @@ fn line_projectiles(game: &Game) -> Vec<ability_projectile::AbilityProjectile> {
 }
 
 fn refresh_visibility(game: &mut Game) {
-    systems::recompute_supply(&mut game.players, &game.entities);
+    systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
-    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
-    game.fog.recompute(&ids, &game.entities, &game.map);
+    let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
+    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
 }
 
 #[test]
 fn zamok_trains_golem_for_ekat_faction() {
     let players = [ekat_player()];
     let mut game = Game::new_for_replay(&players, 0x1234_5678);
-    let zamok = game
-        .entities
+    let zamok = game.state.entities
         .iter()
         .find(|entity| entity.owner == 1 && entity.kind == EntityKind::Zamok)
         .map(|entity| entity.id)
@@ -151,28 +150,26 @@ fn zamok_trains_golem_for_ekat_faction() {
     }
 
     assert!(
-        game.entities
+        game.state.entities
             .iter()
             .any(|entity| entity.owner == 1 && entity.kind == EntityKind::Golem),
         "Zamok should produce Golems"
     );
-    assert_eq!(game.players[0].supply_used, 4);
+    assert_eq!(game.state.players[0].supply_used, 4);
 }
 
 #[test]
 fn golem_mines_four_worker_loads_near_zamok() {
     let players = [ekat_player()];
     let mut game = empty_flat_game(&players);
-    let center = game.map.tile_center(10, 10);
-    game.entities
+    let center = game.state.map.tile_center(10, 10);
+    game.state.entities
         .spawn_building(1, EntityKind::Zamok, center.0, center.1, true)
         .expect("Zamok should spawn");
-    let node = game
-        .entities
+    let node = game.state.entities
         .spawn_node(EntityKind::Steel, center.0 + 96.0, center.1)
         .expect("steel node should spawn");
-    let golem = game
-        .entities
+    let golem = game.state.entities
         .spawn_unit(1, EntityKind::Golem, center.0 + 128.0, center.1)
         .expect("Golem should spawn");
 
@@ -188,25 +185,23 @@ fn golem_mines_four_worker_loads_near_zamok() {
         game.tick();
     }
 
-    assert_eq!(game.players[0].steel, config::STEEL_LOAD * 4);
+    assert_eq!(game.state.players[0].steel, config::STEEL_LOAD * 4);
 }
 
 #[test]
 fn golem_ordered_attack_deals_four_worker_damage() {
     let players = [ekat_player(), kriegsia_enemy()];
     let mut game = empty_flat_game(&players);
-    let pos = game.map.tile_center(10, 10);
-    let golem = game
-        .entities
+    let pos = game.state.map.tile_center(10, 10);
+    let golem = game.state.entities
         .spawn_unit(1, EntityKind::Golem, pos.0, pos.1)
         .expect("Golem should spawn");
-    let target = game
-        .entities
+    let target = game.state.entities
         .spawn_unit(2, EntityKind::Worker, pos.0 + 20.0, pos.1)
         .expect("target worker should spawn");
-    let target_hp = game.entities.get(target).expect("target exists").hp;
-    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
-    game.fog.recompute(&ids, &game.entities, &game.map);
+    let target_hp = game.state.entities.get(target).expect("target exists").hp;
+    let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
+    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
 
     game.enqueue(
         1,
@@ -219,7 +214,7 @@ fn golem_ordered_attack_deals_four_worker_damage() {
     game.tick();
 
     assert_eq!(
-        game.entities.get(target).expect("target exists").hp,
+        game.state.entities.get(target).expect("target exists").hp,
         target_hp - 16
     );
 }
@@ -228,13 +223,11 @@ fn golem_ordered_attack_deals_four_worker_damage() {
 fn ekat_consumes_nearby_golem_to_heal_to_full() {
     let players = [ekat_player()];
     let mut game = empty_flat_game(&players);
-    let pos = game.map.tile_center(10, 10);
-    let hero = game
-        .entities
+    let pos = game.state.map.tile_center(10, 10);
+    let hero = game.state.entities
         .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
         .expect("hero should spawn");
-    let golem = game
-        .entities
+    let golem = game.state.entities
         .spawn_unit(
             1,
             EntityKind::Golem,
@@ -242,7 +235,7 @@ fn ekat_consumes_nearby_golem_to_heal_to_full() {
             pos.1,
         )
         .expect("Golem should spawn");
-    game.entities
+    game.state.entities
         .get_mut(hero)
         .expect("hero exists")
         .apply_damage(70, None);
@@ -250,10 +243,10 @@ fn ekat_consumes_nearby_golem_to_heal_to_full() {
     enqueue_ekat_consume_golem(&mut game, hero);
     game.tick();
 
-    let hero_entity = game.entities.get(hero).expect("hero exists");
+    let hero_entity = game.state.entities.get(hero).expect("hero exists");
     assert_eq!(hero_entity.hp, hero_entity.max_hp);
     assert!(
-        game.entities.get(golem).is_none(),
+        game.state.entities.get(golem).is_none(),
         "consumed Golem should be removed permanently"
     );
 }
@@ -262,13 +255,11 @@ fn ekat_consumes_nearby_golem_to_heal_to_full() {
 fn ekat_consume_requires_nearby_golem() {
     let players = [ekat_player()];
     let mut game = empty_flat_game(&players);
-    let pos = game.map.tile_center(10, 10);
-    let hero = game
-        .entities
+    let pos = game.state.map.tile_center(10, 10);
+    let hero = game.state.entities
         .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
         .expect("hero should spawn");
-    let golem = game
-        .entities
+    let golem = game.state.entities
         .spawn_unit(
             1,
             EntityKind::Golem,
@@ -276,7 +267,7 @@ fn ekat_consume_requires_nearby_golem() {
             pos.1,
         )
         .expect("Golem should spawn");
-    game.entities
+    game.state.entities
         .get_mut(hero)
         .expect("hero exists")
         .apply_damage(70, None);
@@ -284,9 +275,9 @@ fn ekat_consume_requires_nearby_golem() {
     enqueue_ekat_consume_golem(&mut game, hero);
     game.tick();
 
-    assert_eq!(game.entities.get(hero).expect("hero exists").hp, 80);
+    assert_eq!(game.state.entities.get(hero).expect("hero exists").hp, 80);
     assert!(
-        game.entities.get(golem).is_some(),
+        game.state.entities.get(golem).is_some(),
         "out-of-range Golem should not be consumed"
     );
 }
@@ -302,25 +293,23 @@ fn ekat_dash_moves_up_to_five_tiles_leaves_return_marker_and_starts_cooldown() {
         is_ai: false,
     }];
     let mut game = empty_flat_game(&players);
-    let pos = game.map.tile_center(10, 10);
+    let pos = game.state.map.tile_center(10, 10);
     let target = (pos.0 + config::TILE_SIZE as f32 * 5.0, pos.1);
-    let hero = game
-        .entities
+    let hero = game.state.entities
         .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
         .expect("hero should spawn");
 
     enqueue_ekat_dash(&mut game, hero, target);
     game.tick();
 
-    let hero_entity = game.entities.get(hero).expect("hero exists");
+    let hero_entity = game.state.entities.get(hero).expect("hero exists");
     assert!((hero_entity.pos_x - target.0).abs() < f32::EPSILON);
     assert!((hero_entity.pos_y - target.1).abs() < f32::EPSILON);
     assert_eq!(
         hero_entity.ability_cooldown_ticks(ability::AbilityKind::EkatTeleport),
         config::EKAT_TELEPORT_COOLDOWN_TICKS.saturating_sub(1)
     );
-    let marker = game
-        .ability_runtime
+    let marker = game.state.ability_runtime
         .active_return_marker(1, hero, ability::AbilityKind::EkatTeleport, None, 1)
         .expect("dash should leave a return marker");
     assert!((marker.x - pos.0).abs() < f32::EPSILON);
@@ -335,18 +324,17 @@ fn ekat_dash_moves_up_to_five_tiles_leaves_return_marker_and_starts_cooldown() {
 fn ekat_dash_far_target_clamps_to_max_range_without_staging_move() {
     let players = [ekat_player()];
     let mut game = empty_flat_game(&players);
-    let pos = game.map.tile_center(10, 10);
+    let pos = game.state.map.tile_center(10, 10);
     let far_target = (pos.0 + config::TILE_SIZE as f32 * 20.0, pos.1);
     let expected_x = pos.0 + config::TILE_SIZE as f32 * config::EKAT_TELEPORT_RANGE_TILES as f32;
-    let hero = game
-        .entities
+    let hero = game.state.entities
         .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
         .expect("hero should spawn");
 
     enqueue_ekat_dash(&mut game, hero, far_target);
     game.tick();
 
-    let hero_entity = game.entities.get(hero).expect("hero exists");
+    let hero_entity = game.state.entities.get(hero).expect("hero exists");
     assert!((hero_entity.pos_x - expected_x).abs() < 0.001);
     assert!((hero_entity.pos_y - pos.1).abs() < 0.001);
     assert!(
@@ -360,13 +348,12 @@ fn ekat_dash_far_target_clamps_to_max_range_without_staging_move() {
 fn queued_ekat_abilities_append_future_world_ability_intents() {
     let players = [ekat_player()];
     let mut game = empty_flat_game(&players);
-    let pos = game.map.tile_center(10, 10);
-    let hero = game
-        .entities
+    let pos = game.state.map.tile_center(10, 10);
+    let hero = game.state.entities
         .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
         .expect("hero should spawn");
     {
-        let hero_entity = game.entities.get_mut(hero).expect("hero exists");
+        let hero_entity = game.state.entities.get_mut(hero).expect("hero exists");
         hero_entity.set_order(Order::move_to(pos.0 + config::TILE_SIZE as f32, pos.1));
         hero_entity.mark_move_phase(crate::game::entity::MovePhase::Moving);
     }
@@ -403,8 +390,7 @@ fn queued_ekat_abilities_append_future_world_ability_intents() {
     );
     game.tick();
 
-    let queued = game
-        .entities
+    let queued = game.state.entities
         .get(hero)
         .expect("hero exists")
         .queued_orders();
@@ -430,19 +416,18 @@ fn queued_ekat_abilities_append_future_world_ability_intents() {
 fn ekat_dash_rejects_invalid_landing_without_marker_or_cooldown() {
     let players = [ekat_player()];
     let mut game = empty_flat_game(&players);
-    let pos = game.map.tile_center(10, 10);
-    let target = game.map.tile_center(15, 10);
-    let blocked_index = game.map.index(15, 10);
-    game.map.terrain[blocked_index] = terrain::ROCK;
-    let hero = game
-        .entities
+    let pos = game.state.map.tile_center(10, 10);
+    let target = game.state.map.tile_center(15, 10);
+    let blocked_index = game.state.map.index(15, 10);
+    game.state.map.terrain[blocked_index] = terrain::ROCK;
+    let hero = game.state.entities
         .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
         .expect("hero should spawn");
 
     enqueue_ekat_dash(&mut game, hero, target);
     game.tick();
 
-    let hero_entity = game.entities.get(hero).expect("hero exists");
+    let hero_entity = game.state.entities.get(hero).expect("hero exists");
     assert!((hero_entity.pos_x - pos.0).abs() < f32::EPSILON);
     assert_eq!(
         hero_entity.ability_cooldown_ticks(ability::AbilityKind::EkatTeleport),
@@ -455,10 +440,9 @@ fn ekat_dash_rejects_invalid_landing_without_marker_or_cooldown() {
 fn ekat_return_cannot_happen_in_same_tick_as_dash() {
     let players = [ekat_player()];
     let mut game = empty_flat_game(&players);
-    let pos = game.map.tile_center(10, 10);
+    let pos = game.state.map.tile_center(10, 10);
     let target = (pos.0 + config::TILE_SIZE as f32 * 5.0, pos.1);
-    let hero = game
-        .entities
+    let hero = game.state.entities
         .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
         .expect("hero should spawn");
 
@@ -466,7 +450,7 @@ fn ekat_return_cannot_happen_in_same_tick_as_dash() {
     enqueue_ekat_return(&mut game, hero, None);
     game.tick();
 
-    let hero_entity = game.entities.get(hero).expect("hero exists");
+    let hero_entity = game.state.entities.get(hero).expect("hero exists");
     assert!((hero_entity.pos_x - target.0).abs() < f32::EPSILON);
     assert!(active_return_marker_id(&game, hero).is_some());
 }
@@ -475,10 +459,9 @@ fn ekat_return_cannot_happen_in_same_tick_as_dash() {
 fn ekat_return_recasts_to_marker_and_consumes_it_after_delay() {
     let players = [ekat_player()];
     let mut game = empty_flat_game(&players);
-    let pos = game.map.tile_center(10, 10);
+    let pos = game.state.map.tile_center(10, 10);
     let target = (pos.0 + config::TILE_SIZE as f32 * 5.0, pos.1);
-    let hero = game
-        .entities
+    let hero = game.state.entities
         .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
         .expect("hero should spawn");
 
@@ -488,7 +471,7 @@ fn ekat_return_recasts_to_marker_and_consumes_it_after_delay() {
     enqueue_ekat_return(&mut game, hero, Some(marker_id));
     game.tick();
 
-    let hero_entity = game.entities.get(hero).expect("hero exists");
+    let hero_entity = game.state.entities.get(hero).expect("hero exists");
     assert!((hero_entity.pos_x - pos.0).abs() < f32::EPSILON);
     assert!((hero_entity.pos_y - pos.1).abs() < f32::EPSILON);
     assert!(active_return_marker_id(&game, hero).is_none());
@@ -498,10 +481,9 @@ fn ekat_return_recasts_to_marker_and_consumes_it_after_delay() {
 fn ekat_return_fails_after_marker_expires() {
     let players = [ekat_player()];
     let mut game = empty_flat_game(&players);
-    let pos = game.map.tile_center(10, 10);
+    let pos = game.state.map.tile_center(10, 10);
     let target = (pos.0 + config::TILE_SIZE as f32 * 5.0, pos.1);
-    let hero = game
-        .entities
+    let hero = game.state.entities
         .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
         .expect("hero should spawn");
 
@@ -513,7 +495,7 @@ fn ekat_return_fails_after_marker_expires() {
     enqueue_ekat_return(&mut game, hero, None);
     game.tick();
 
-    let hero_entity = game.entities.get(hero).expect("hero exists");
+    let hero_entity = game.state.entities.get(hero).expect("hero exists");
     assert!((hero_entity.pos_x - target.0).abs() < f32::EPSILON);
     assert!(active_return_marker_id(&game, hero).is_none());
 }
@@ -522,22 +504,21 @@ fn ekat_return_fails_after_marker_expires() {
 fn ekat_return_fails_when_marker_destination_is_blocked() {
     let players = [ekat_player()];
     let mut game = empty_flat_game(&players);
-    let pos = game.map.tile_center(10, 10);
+    let pos = game.state.map.tile_center(10, 10);
     let target = (pos.0 + config::TILE_SIZE as f32 * 5.0, pos.1);
-    let hero = game
-        .entities
+    let hero = game.state.entities
         .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
         .expect("hero should spawn");
 
     enqueue_ekat_dash(&mut game, hero, target);
     game.tick();
     let marker_id = active_return_marker_id(&game, hero).expect("return marker exists");
-    let blocked_index = game.map.index(10, 10);
-    game.map.terrain[blocked_index] = terrain::ROCK;
+    let blocked_index = game.state.map.index(10, 10);
+    game.state.map.terrain[blocked_index] = terrain::ROCK;
     enqueue_ekat_return(&mut game, hero, Some(marker_id));
     game.tick();
 
-    let hero_entity = game.entities.get(hero).expect("hero exists");
+    let hero_entity = game.state.entities.get(hero).expect("hero exists");
     assert!((hero_entity.pos_x - target.0).abs() < f32::EPSILON);
     assert_eq!(active_return_marker_id(&game, hero), Some(marker_id));
 }
@@ -546,33 +527,31 @@ fn ekat_return_fails_when_marker_destination_is_blocked() {
 fn ekat_return_with_stale_caster_is_panic_free() {
     let players = [ekat_player()];
     let mut game = empty_flat_game(&players);
-    let pos = game.map.tile_center(10, 10);
+    let pos = game.state.map.tile_center(10, 10);
     let target = (pos.0 + config::TILE_SIZE as f32 * 5.0, pos.1);
-    let hero = game
-        .entities
+    let hero = game.state.entities
         .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
         .expect("hero should spawn");
 
     enqueue_ekat_dash(&mut game, hero, target);
     game.tick();
-    game.entities.remove(hero);
+    game.state.entities.remove(hero);
     enqueue_ekat_return(&mut game, hero, None);
     game.tick();
 
-    assert!(game.entities.get(hero).is_none());
+    assert!(game.state.entities.get(hero).is_none());
 }
 
 #[test]
 fn ekat_dash_return_marker_projection_respects_fog() {
     let players = [ekat_player(), kriegsia_enemy()];
     let mut game = empty_flat_game(&players);
-    let pos = game.map.tile_center(10, 10);
+    let pos = game.state.map.tile_center(10, 10);
     let target = (pos.0 + config::TILE_SIZE as f32 * 5.0, pos.1);
-    let hero = game
-        .entities
+    let hero = game.state.entities
         .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
         .expect("hero should spawn");
-    game.entities
+    game.state.entities
         .spawn_unit(2, EntityKind::Worker, target.0 + 500.0, target.1 + 500.0)
         .expect("enemy should spawn");
 
@@ -596,19 +575,17 @@ fn ekat_dash_return_marker_projection_respects_fog() {
 fn ekat_magic_anchor_places_single_visible_ten_second_object() {
     let players = [ekat_player()];
     let mut game = empty_flat_game(&players);
-    let pos = game.map.tile_center(10, 10);
-    let first_target = game.map.tile_center(13, 10);
-    let second_target = game.map.tile_center(14, 10);
-    let hero = game
-        .entities
+    let pos = game.state.map.tile_center(10, 10);
+    let first_target = game.state.map.tile_center(13, 10);
+    let second_target = game.state.map.tile_center(14, 10);
+    let hero = game.state.entities
         .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
         .expect("hero should spawn");
 
     enqueue_ekat_anchor(&mut game, hero, first_target);
     game.tick();
     let first_anchor = active_anchor_id(&game, hero).expect("anchor should exist");
-    let anchor = game
-        .ability_runtime
+    let anchor = game.state.ability_runtime
         .active_anchor(
             1,
             hero,
@@ -628,7 +605,7 @@ fn ekat_magic_anchor_places_single_visible_ten_second_object() {
         active_anchor_id(&game, hero).expect("replacement anchor should exist");
     assert_ne!(first_anchor, replacement_anchor);
     assert_eq!(
-        game.ability_runtime
+        game.state.ability_runtime
             .world_objects()
             .filter(|object| object.kind == ability_runtime::AbilityWorldObjectKind::MagicAnchor)
             .count(),
@@ -640,10 +617,9 @@ fn ekat_magic_anchor_places_single_visible_ten_second_object() {
 fn ekat_magic_anchor_rejects_out_of_range_or_locked_placement() {
     let players = [ekat_player()];
     let mut game = empty_flat_game(&players);
-    let pos = game.map.tile_center(10, 10);
-    let far_target = game.map.tile_center(40, 10);
-    let hero = game
-        .entities
+    let pos = game.state.map.tile_center(10, 10);
+    let far_target = game.state.map.tile_center(40, 10);
+    let hero = game.state.entities
         .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
         .expect("hero should spawn");
 
@@ -652,8 +628,8 @@ fn ekat_magic_anchor_rejects_out_of_range_or_locked_placement() {
     assert!(active_anchor_id(&game, hero).is_none());
 
     let lockout_until = game.current_tick().saturating_add(30);
-    let retry_target = game.map.tile_center(11, 10);
-    game.entities
+    let retry_target = game.state.map.tile_center(11, 10);
+    game.state.entities
         .get_mut(hero)
         .expect("hero exists")
         .start_ability_lockout_until(ability::AbilityKind::EkatMagicAnchor, lockout_until);
@@ -666,10 +642,9 @@ fn ekat_magic_anchor_rejects_out_of_range_or_locked_placement() {
 fn ekat_magic_anchor_natural_expiry_does_not_lock_out_recast() {
     let players = [ekat_player()];
     let mut game = empty_flat_game(&players);
-    let pos = game.map.tile_center(10, 10);
-    let target = game.map.tile_center(12, 10);
-    let hero = game
-        .entities
+    let pos = game.state.map.tile_center(10, 10);
+    let target = game.state.map.tile_center(12, 10);
+    let hero = game.state.entities
         .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
         .expect("hero should spawn");
 
@@ -679,8 +654,7 @@ fn ekat_magic_anchor_natural_expiry_does_not_lock_out_recast() {
         game.tick();
     }
     assert!(active_anchor_id(&game, hero).is_none());
-    assert!(game
-        .entities
+    assert!(game.state.entities
         .get(hero)
         .expect("hero exists")
         .ability_lockout_until_tick(ability::AbilityKind::EkatMagicAnchor, game.current_tick(),)
@@ -695,13 +669,12 @@ fn ekat_magic_anchor_natural_expiry_does_not_lock_out_recast() {
 fn ekat_magic_anchor_is_not_attackable_by_enemy_weapons() {
     let players = [ekat_player(), kriegsia_enemy()];
     let mut game = empty_flat_game(&players);
-    let pos = game.map.tile_center(10, 10);
-    let target = game.map.tile_center(12, 10);
-    let hero = game
-        .entities
+    let pos = game.state.map.tile_center(10, 10);
+    let target = game.state.map.tile_center(12, 10);
+    let hero = game.state.entities
         .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
         .expect("hero should spawn");
-    game.entities
+    game.state.entities
         .spawn_unit(
             2,
             EntityKind::Tank,
@@ -714,8 +687,8 @@ fn ekat_magic_anchor_is_not_attackable_by_enemy_weapons() {
     enqueue_ekat_anchor(&mut game, hero, target);
     game.tick();
     assert!(active_anchor_id(&game, hero).is_some());
-    let far = game.map.tile_center(40, 40);
-    game.entities
+    let far = game.state.map.tile_center(40, 40);
+    game.state.entities
         .get_mut(hero)
         .expect("hero exists")
         .set_position(far.0, far.1);
@@ -728,8 +701,7 @@ fn ekat_magic_anchor_is_not_attackable_by_enemy_weapons() {
         active_anchor_id(&game, hero).is_some(),
         "enemy combat should ignore Magic Anchor instead of damaging it"
     );
-    assert!(game
-        .entities
+    assert!(game.state.entities
         .get(hero)
         .expect("hero exists")
         .ability_lockout_until_tick(ability::AbilityKind::EkatMagicAnchor, game.current_tick())
@@ -769,20 +741,17 @@ fn ekat_magic_anchor_pulls_stationary_units_with_weight_resistance() {
         },
     ];
     let mut game = empty_flat_game(&players);
-    let hero_pos = game.map.tile_center(8, 10);
-    let anchor_target = game.map.tile_center(12, 10);
-    let infantry_start = game.map.tile_center(10, 10);
-    let tank_start = game.map.tile_center(10, 12);
-    let hero = game
-        .entities
+    let hero_pos = game.state.map.tile_center(8, 10);
+    let anchor_target = game.state.map.tile_center(12, 10);
+    let infantry_start = game.state.map.tile_center(10, 10);
+    let tank_start = game.state.map.tile_center(10, 12);
+    let hero = game.state.entities
         .spawn_unit(1, EntityKind::Ekat, hero_pos.0, hero_pos.1)
         .expect("hero should spawn");
-    let infantry = game
-        .entities
+    let infantry = game.state.entities
         .spawn_unit(2, EntityKind::Rifleman, infantry_start.0, infantry_start.1)
         .expect("infantry should spawn");
-    let tank = game
-        .entities
+    let tank = game.state.entities
         .spawn_unit(2, EntityKind::Tank, tank_start.0, tank_start.1)
         .expect("tank should spawn");
 
@@ -810,14 +779,13 @@ fn ekat_magic_anchor_pulls_stationary_units_with_weight_resistance() {
 fn ekat_anchor_move_delta(destination_tiles_from_start: f32) -> f32 {
     let players = [ekat_player()];
     let mut game = empty_flat_game(&players);
-    let start = game.map.tile_center(10, 10);
-    let anchor_target = game.map.tile_center(12, 10);
+    let start = game.state.map.tile_center(10, 10);
+    let anchor_target = game.state.map.tile_center(12, 10);
     let destination = (
         start.0 + destination_tiles_from_start * config::TILE_SIZE as f32,
         start.1,
     );
-    let hero = game
-        .entities
+    let hero = game.state.entities
         .spawn_unit(1, EntityKind::Ekat, start.0, start.1)
         .expect("hero should spawn");
 
@@ -834,7 +802,7 @@ fn ekat_anchor_move_delta(destination_tiles_from_start: f32) -> f32 {
     );
     game.tick();
 
-    let hero_entity = game.entities.get(hero).expect("hero exists");
+    let hero_entity = game.state.entities.get(hero).expect("hero exists");
     (hero_entity.pos_x - start.0).abs()
 }
 
@@ -842,13 +810,12 @@ fn ekat_anchor_move_delta(destination_tiles_from_start: f32) -> f32 {
 fn ekat_magic_anchor_projection_respects_fog_and_owner_lockout() {
     let players = [ekat_player(), kriegsia_enemy()];
     let mut game = empty_flat_game(&players);
-    let pos = game.map.tile_center(10, 10);
-    let target = game.map.tile_center(12, 10);
-    let hero = game
-        .entities
+    let pos = game.state.map.tile_center(10, 10);
+    let target = game.state.map.tile_center(12, 10);
+    let hero = game.state.entities
         .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
         .expect("hero should spawn");
-    game.entities
+    game.state.entities
         .spawn_unit(2, EntityKind::Worker, target.0 + 500.0, target.1 + 500.0)
         .expect("enemy should spawn");
     refresh_visibility(&mut game);
@@ -880,7 +847,7 @@ fn ekat_magic_anchor_projection_respects_fog_and_owner_lockout() {
         .any(|object| object.id == anchor_id));
 
     let lockout_until = game.current_tick().saturating_add(100);
-    game.entities
+    game.state.entities
         .get_mut(hero)
         .expect("hero exists")
         .start_ability_lockout_until(ability::AbilityKind::EkatMagicAnchor, lockout_until);
@@ -899,33 +866,30 @@ fn ekat_magic_anchor_projection_respects_fog_and_owner_lockout() {
 fn ekat_magic_anchor_with_stale_caster_is_panic_free() {
     let players = [ekat_player()];
     let mut game = empty_flat_game(&players);
-    let pos = game.map.tile_center(10, 10);
-    let target = game.map.tile_center(12, 10);
-    let hero = game
-        .entities
+    let pos = game.state.map.tile_center(10, 10);
+    let target = game.state.map.tile_center(12, 10);
+    let hero = game.state.entities
         .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
         .expect("hero should spawn");
 
     enqueue_ekat_anchor(&mut game, hero, target);
     game.tick();
     assert!(active_anchor_id(&game, hero).is_some());
-    game.entities.remove(hero);
+    game.state.entities.remove(hero);
     game.tick();
-    assert!(game.ability_runtime.world_objects().next().is_none());
+    assert!(game.state.ability_runtime.world_objects().next().is_none());
 }
 
 #[test]
 fn ekat_line_shot_spawns_moving_projectile_and_starts_cooldown_without_immediate_damage() {
     let players = [ekat_player(), kriegsia_enemy()];
     let mut game = empty_flat_game(&players);
-    let pos = game.map.tile_center(10, 10);
+    let pos = game.state.map.tile_center(10, 10);
     let target = (pos.0 + config::TILE_SIZE as f32 * 6.0, pos.1);
-    let hero = game
-        .entities
+    let hero = game.state.entities
         .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
         .expect("hero should spawn");
-    let enemy = game
-        .entities
+    let enemy = game.state.entities
         .spawn_unit(
             2,
             EntityKind::Rifleman,
@@ -933,8 +897,7 @@ fn ekat_line_shot_spawns_moving_projectile_and_starts_cooldown_without_immediate
             pos.1,
         )
         .expect("enemy should spawn");
-    let ally = game
-        .entities
+    let ally = game.state.entities
         .spawn_unit(
             1,
             EntityKind::Rifleman,
@@ -946,8 +909,7 @@ fn ekat_line_shot_spawns_moving_projectile_and_starts_cooldown_without_immediate
     enqueue_ekat_line_shot(&mut game, hero, target);
     game.tick();
 
-    let projectile = game
-        .ability_runtime
+    let projectile = game.state.ability_runtime
         .world_objects()
         .find(|object| object.ability == ability::AbilityKind::EkatLineShot)
         .expect("line shot should spawn a projected ability object");
@@ -965,12 +927,12 @@ fn ekat_line_shot_spawns_moving_projectile_and_starts_cooldown_without_immediate
         "line shot without an anchor should keep the Phase 7 single-origin behavior"
     );
     assert_eq!(
-        game.entities.get(enemy).expect("enemy exists").hp,
-        game.entities.get(enemy).expect("enemy exists").max_hp
+        game.state.entities.get(enemy).expect("enemy exists").hp,
+        game.state.entities.get(enemy).expect("enemy exists").max_hp
     );
-    assert_eq!(game.entities.get(ally).expect("ally exists").hp, 45);
+    assert_eq!(game.state.entities.get(ally).expect("ally exists").hp, 45);
     assert_eq!(
-        game.entities
+        game.state.entities
             .get(hero)
             .expect("hero exists")
             .ability_cooldown_ticks(ability::AbilityKind::EkatLineShot),
@@ -982,11 +944,10 @@ fn ekat_line_shot_spawns_moving_projectile_and_starts_cooldown_without_immediate
 fn ekat_line_shot_with_active_anchor_launches_from_both_origins_once() {
     let players = [ekat_player(), kriegsia_enemy()];
     let mut game = empty_flat_game(&players);
-    let hero_pos = game.map.tile_center(10, 10);
-    let anchor_pos = game.map.tile_center(10, 13);
-    let target = game.map.tile_center(17, 10);
-    let hero = game
-        .entities
+    let hero_pos = game.state.map.tile_center(10, 10);
+    let anchor_pos = game.state.map.tile_center(10, 13);
+    let target = game.state.map.tile_center(17, 10);
+    let hero = game.state.entities
         .spawn_unit(1, EntityKind::Ekat, hero_pos.0, hero_pos.1)
         .expect("hero should spawn");
 
@@ -1012,7 +973,7 @@ fn ekat_line_shot_with_active_anchor_launches_from_both_origins_once() {
         "anchor-origin projectile should carry the source anchor id"
     );
     assert_eq!(
-        game.entities
+        game.state.entities
             .get(hero)
             .expect("hero exists")
             .ability_cooldown_ticks(ability::AbilityKind::EkatLineShot),
@@ -1025,11 +986,11 @@ fn ekat_line_shot_with_active_anchor_launches_from_both_origins_once() {
 fn ekat_line_shot_ignores_expired_anchors() {
     let players = [ekat_player(), kriegsia_enemy()];
     let mut expired_game = empty_flat_game(&players);
-    let pos = expired_game.map.tile_center(10, 10);
-    let anchor_pos = expired_game.map.tile_center(12, 10);
-    let target = expired_game.map.tile_center(17, 10);
+    let pos = expired_game.state.map.tile_center(10, 10);
+    let anchor_pos = expired_game.state.map.tile_center(12, 10);
+    let target = expired_game.state.map.tile_center(17, 10);
     let expired_hero = expired_game
-        .entities
+        .state.entities
         .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
         .expect("hero should spawn");
 
@@ -1048,25 +1009,23 @@ fn ekat_line_shot_ignores_expired_anchors() {
 fn ekat_anchor_line_projectiles_have_independent_hit_dedupe_and_return_to_ekat() {
     let players = [ekat_player(), kriegsia_enemy()];
     let mut game = empty_flat_game(&players);
-    let hero_pos = game.map.tile_center(10, 10);
-    let anchor_pos = game.map.tile_center(10, 12);
-    let target = game.map.tile_center(16, 10);
-    let dash_target = game.map.tile_center(10, 15);
-    let hero = game
-        .entities
+    let hero_pos = game.state.map.tile_center(10, 10);
+    let anchor_pos = game.state.map.tile_center(10, 12);
+    let target = game.state.map.tile_center(16, 10);
+    let dash_target = game.state.map.tile_center(10, 15);
+    let hero = game.state.entities
         .spawn_unit(1, EntityKind::Ekat, hero_pos.0, hero_pos.1)
         .expect("hero should spawn");
-    let enemy = game
-        .entities
+    let enemy = game.state.entities
         .spawn_building(
             2,
             EntityKind::Depot,
-            game.map.tile_center(13, 10).0,
-            game.map.tile_center(13, 10).1,
+            game.state.map.tile_center(13, 10).0,
+            game.state.map.tile_center(13, 10).1,
             true,
         )
         .expect("enemy should spawn");
-    let enemy_max_hp = game.entities.get(enemy).expect("enemy exists").max_hp;
+    let enemy_max_hp = game.state.entities.get(enemy).expect("enemy exists").max_hp;
 
     enqueue_ekat_anchor(&mut game, hero, anchor_pos);
     game.tick();
@@ -1075,7 +1034,7 @@ fn ekat_anchor_line_projectiles_have_independent_hit_dedupe_and_return_to_ekat()
         game.tick();
     }
     assert!(
-        game.entities.get(enemy).expect("enemy exists").hp
+        game.state.entities.get(enemy).expect("enemy exists").hp
             <= enemy_max_hp.saturating_sub(config::EKAT_LINE_SHOT_DAMAGE * 2),
         "the same target may be hit by both simultaneous origin projectiles"
     );
@@ -1098,14 +1057,13 @@ fn ekat_anchor_line_projectiles_have_independent_hit_dedupe_and_return_to_ekat()
 fn ekat_anchor_origin_projectile_clamps_from_anchor_and_stays_fog_filtered() {
     let players = [ekat_player(), kriegsia_enemy()];
     let mut game = empty_flat_game(&players);
-    let hero_pos = game.map.tile_center(10, 10);
-    let anchor_pos = game.map.tile_center(10, 15);
-    let far_target = game.map.tile_center(40, 15);
-    let hero = game
-        .entities
+    let hero_pos = game.state.map.tile_center(10, 10);
+    let anchor_pos = game.state.map.tile_center(10, 15);
+    let far_target = game.state.map.tile_center(40, 15);
+    let hero = game.state.entities
         .spawn_unit(1, EntityKind::Ekat, hero_pos.0, hero_pos.1)
         .expect("hero should spawn");
-    game.entities
+    game.state.entities
         .spawn_unit(
             2,
             EntityKind::Worker,
@@ -1149,14 +1107,12 @@ fn ekat_anchor_origin_projectile_clamps_from_anchor_and_stays_fog_filtered() {
 fn ekat_line_shot_hits_enemies_on_outbound_and_return_legs() {
     let players = [ekat_player(), kriegsia_enemy()];
     let mut game = empty_flat_game(&players);
-    let pos = game.map.tile_center(10, 10);
+    let pos = game.state.map.tile_center(10, 10);
     let target = (pos.0 + config::TILE_SIZE as f32 * 6.0, pos.1);
-    let hero = game
-        .entities
+    let hero = game.state.entities
         .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
         .expect("hero should spawn");
-    let enemy = game
-        .entities
+    let enemy = game.state.entities
         .spawn_building(
             2,
             EntityKind::Depot,
@@ -1165,13 +1121,13 @@ fn ekat_line_shot_hits_enemies_on_outbound_and_return_legs() {
             true,
         )
         .expect("enemy should spawn");
-    let enemy_max_hp = game.entities.get(enemy).expect("enemy exists").max_hp;
+    let enemy_max_hp = game.state.entities.get(enemy).expect("enemy exists").max_hp;
 
     enqueue_ekat_line_shot(&mut game, hero, target);
     for _ in 0..23 {
         game.tick();
     }
-    let after_outbound = game.entities.get(enemy).expect("enemy exists").hp;
+    let after_outbound = game.state.entities.get(enemy).expect("enemy exists").hp;
     assert!(
         after_outbound <= enemy_max_hp.saturating_sub(config::EKAT_LINE_SHOT_DAMAGE),
         "outbound leg should damage the enemy"
@@ -1180,7 +1136,7 @@ fn ekat_line_shot_hits_enemies_on_outbound_and_return_legs() {
         game.tick();
     }
     assert!(
-        game.entities.get(enemy).expect("enemy exists").hp
+        game.state.entities.get(enemy).expect("enemy exists").hp
             <= after_outbound.saturating_sub(config::EKAT_LINE_SHOT_DAMAGE),
         "return leg should damage the enemy again"
     );
@@ -1190,14 +1146,12 @@ fn ekat_line_shot_hits_enemies_on_outbound_and_return_legs() {
 fn ekat_line_shot_endpoint_clamps_to_range() {
     let players = [ekat_player(), kriegsia_enemy()];
     let mut game = empty_flat_game(&players);
-    let pos = game.map.tile_center(10, 10);
+    let pos = game.state.map.tile_center(10, 10);
     let far_target = (pos.0 + config::TILE_SIZE as f32 * 20.0, pos.1);
-    let hero = game
-        .entities
+    let hero = game.state.entities
         .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
         .expect("hero should spawn");
-    let inside_range_enemy = game
-        .entities
+    let inside_range_enemy = game.state.entities
         .spawn_building(
             2,
             EntityKind::Depot,
@@ -1206,8 +1160,7 @@ fn ekat_line_shot_endpoint_clamps_to_range() {
             true,
         )
         .expect("inside range enemy should spawn");
-    let beyond_range_enemy = game
-        .entities
+    let beyond_range_enemy = game.state.entities
         .spawn_building(
             2,
             EntityKind::Depot,
@@ -1216,13 +1169,11 @@ fn ekat_line_shot_endpoint_clamps_to_range() {
             true,
         )
         .expect("beyond range enemy should spawn");
-    let inside_max_hp = game
-        .entities
+    let inside_max_hp = game.state.entities
         .get(inside_range_enemy)
         .expect("inside range enemy exists")
         .max_hp;
-    let beyond_max_hp = game
-        .entities
+    let beyond_max_hp = game.state.entities
         .get(beyond_range_enemy)
         .expect("beyond range enemy exists")
         .max_hp;
@@ -1233,7 +1184,7 @@ fn ekat_line_shot_endpoint_clamps_to_range() {
     }
 
     assert!(
-        game.entities
+        game.state.entities
             .get(inside_range_enemy)
             .expect("inside range enemy exists")
             .hp
@@ -1241,7 +1192,7 @@ fn ekat_line_shot_endpoint_clamps_to_range() {
         "clamped endpoint should allow targets inside range to be hit"
     );
     assert_eq!(
-        game.entities
+        game.state.entities
             .get(beyond_range_enemy)
             .expect("beyond range enemy exists")
             .hp,
@@ -1253,11 +1204,10 @@ fn ekat_line_shot_endpoint_clamps_to_range() {
 fn ekat_line_shot_return_tracks_ekats_current_position_after_dash() {
     let players = [ekat_player(), kriegsia_enemy()];
     let mut game = empty_flat_game(&players);
-    let pos = game.map.tile_center(10, 10);
+    let pos = game.state.map.tile_center(10, 10);
     let target = (pos.0 + config::TILE_SIZE as f32 * 6.0, pos.1);
     let dash_target = (pos.0, pos.1 + config::TILE_SIZE as f32 * 5.0);
-    let hero = game
-        .entities
+    let hero = game.state.entities
         .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
         .expect("hero should spawn");
 
@@ -1269,8 +1219,7 @@ fn ekat_line_shot_return_tracks_ekats_current_position_after_dash() {
         game.tick();
     }
 
-    let projectile = game
-        .ability_runtime
+    let projectile = game.state.ability_runtime
         .world_objects()
         .find(|object| object.ability == ability::AbilityKind::EkatLineShot)
         .expect("line shot should still be returning");

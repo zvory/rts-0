@@ -24,14 +24,14 @@ pub(super) fn human_vs_ai_players() -> [PlayerInit; 2] {
 pub(super) fn legacy_snapshot_entities(game: &Game, player: u32, fogged: bool) -> Vec<EntityView> {
     let mut entities = Vec::new();
     for id in game.final_spatial().all_ids() {
-        let Some(e) = game.entities.get(id) else {
+        let Some(e) = game.state.entities.get(id) else {
             continue;
         };
         let own = e.owner == player;
         if fogged
             && !own
             && !e.kind.is_node()
-            && !game.fog.is_visible_world(player, e.pos_x, e.pos_y)
+            && !game.state.fog.is_visible_world(player, e.pos_x, e.pos_y)
         {
             continue;
         }
@@ -59,13 +59,12 @@ fn legacy_view_of(game: &Game, e: &Entity, viewer: u32, fogged: bool) -> EntityV
     let active_combat_target = matches!(e.order(), Order::Attack(_) | Order::AttackMove(_))
         || (e.is_building() && e.can_attack());
     let target_visible = if let Some(t) = e.target_id() {
-        game.entities
+        game.state.entities
             .get(t)
             .map(|target| {
                 e.owner == viewer
                     || !fogged
-                    || game
-                        .fog
+                    || game.state.fog
                         .is_visible_world(viewer, target.pos_x, target.pos_y)
             })
             .unwrap_or(false)
@@ -120,7 +119,7 @@ fn legacy_view_of(game: &Game, e: &Entity, viewer: u32, fogged: bool) -> EntityV
     }
     if let Some(t) = e.target_id() {
         if active_combat_target {
-            if game.entities.get(t).is_some() {
+            if game.state.entities.get(t).is_some() {
                 if target_visible {
                     v.target_id = Some(t);
                 }
@@ -143,7 +142,7 @@ fn legacy_view_of(game: &Game, e: &Entity, viewer: u32, fogged: bool) -> EntityV
             }
         }
         if let Order::Attack(order) = e.order() {
-            if let Some(target) = game.entities.get(order.intent.target) {
+            if let Some(target) = game.state.entities.get(order.intent.target) {
                 if target_visible {
                     v.order_plan.push(OrderPlanMarker {
                         kind: "attack".to_string(),
@@ -167,23 +166,22 @@ pub(super) fn flat_tank_move_fixture() -> (Game, u32, (f32, f32)) {
         is_ai: false,
     }];
     let mut game = Game::new_for_replay(&players, 0x1234_5678);
-    for tile in &mut game.map.terrain {
+    for tile in &mut game.state.map.terrain {
         *tile = crate::protocol::terrain::GRASS;
     }
-    for id in game.entities.ids() {
-        game.entities.remove(id);
+    for id in game.state.entities.ids() {
+        game.state.entities.remove(id);
     }
 
-    let start = game.map.tile_center(4, 4);
-    let goal = game.map.tile_center(28, 17);
-    let tank = game
-        .entities
+    let start = game.state.map.tile_center(4, 4);
+    let goal = game.state.map.tile_center(28, 17);
+    let tank = game.state.entities
         .spawn_unit(1, EntityKind::Tank, start.0, start.1)
         .expect("tank should spawn");
-    systems::recompute_supply(&mut game.players, &game.entities);
+    systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
-    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
-    game.fog.recompute(&ids, &game.entities, &game.map);
+    let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
+    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
     game.assert_invariants();
 
     (game, tank, goal)
@@ -191,19 +189,19 @@ pub(super) fn flat_tank_move_fixture() -> (Game, u32, (f32, f32)) {
 
 pub(super) fn empty_flat_game(players: &[PlayerInit]) -> Game {
     let mut game = Game::new_for_replay(players, 0x1234_5678);
-    for tile in &mut game.map.terrain {
+    for tile in &mut game.state.map.terrain {
         *tile = crate::protocol::terrain::GRASS;
     }
-    for id in game.entities.ids() {
-        game.entities.remove(id);
+    for id in game.state.entities.ids() {
+        game.state.entities.remove(id);
     }
-    game.smokes = SmokeCloudStore::new();
-    game.mortar_shells = MortarShellStore::default();
-    game.artillery_shells = artillery::ArtilleryShellStore::default();
-    systems::recompute_supply(&mut game.players, &game.entities);
+    game.state.smokes = SmokeCloudStore::new();
+    game.state.mortar_shells = MortarShellStore::default();
+    game.state.artillery_shells = artillery::ArtilleryShellStore::default();
+    systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
-    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
-    game.fog.recompute(&ids, &game.entities, &game.map);
+    let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
+    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
     game
 }
 
@@ -217,32 +215,31 @@ pub(super) fn smoke_command_fixture() -> (Game, u32, (f32, f32), (f32, f32)) {
         is_ai: false,
     }];
     let mut game = Game::new_for_replay_with_starting_resources(&players, 500, 500, 0x5150_0303);
-    for tile in &mut game.map.terrain {
+    for tile in &mut game.state.map.terrain {
         *tile = crate::protocol::terrain::GRASS;
     }
-    for id in game.entities.ids() {
-        game.entities.remove(id);
+    for id in game.state.entities.ids() {
+        game.state.entities.remove(id);
     }
 
-    let scout_pos = game.map.tile_center(8, 8);
-    let target = game.map.tile_center(20, 8);
-    let second_target = game.map.tile_center(21, 10);
-    let scout = game
-        .entities
+    let scout_pos = game.state.map.tile_center(8, 8);
+    let target = game.state.map.tile_center(20, 8);
+    let second_target = game.state.map.tile_center(21, 10);
+    let scout = game.state.entities
         .spawn_unit(1, EntityKind::ScoutCar, scout_pos.0, scout_pos.1)
         .expect("scout car should spawn");
-    systems::recompute_supply(&mut game.players, &game.entities);
+    systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
-    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
-    game.fog
-        .recompute_with_smoke(&ids, &game.entities, &game.map, &game.smokes);
+    let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
+    game.state.fog
+        .recompute_with_smoke(&ids, &game.state.entities, &game.state.map, &game.state.smokes);
     game.assert_invariants();
 
     (game, scout, target, second_target)
 }
 
 pub(super) fn entity_distance_to(game: &Game, id: u32, point: (f32, f32)) -> f32 {
-    let entity = game.entities.get(id).expect("entity should exist");
+    let entity = game.state.entities.get(id).expect("entity should exist");
     let dx = entity.pos_x - point.0;
     let dy = entity.pos_y - point.1;
     (dx * dx + dy * dy).sqrt()

@@ -204,11 +204,10 @@ fn panzerfaust_entrenched_range_scenario(seed: u32) -> Result<DevScenarioSetup, 
     });
     grant_entrenchment(&mut setup.game, setup.player_id);
     let trench = setup
-        .game
-        .trenches
-        .create(&setup.game.map, entrenched_pos.0, entrenched_pos.1)
+        .game.state.trenches
+        .create(&setup.game.state.map, entrenched_pos.0, entrenched_pos.1)
         .ok_or_else(|| "failed to seed Panzerfaust trench".to_string())?;
-    if let Some(entity) = setup.game.entities.get_mut(entrenched_panzerfaust) {
+    if let Some(entity) = setup.game.state.entities.get_mut(entrenched_panzerfaust) {
         if let Some(movement) = entity.movement.as_mut() {
             movement.occupied_trench_id = Some(trench);
         }
@@ -317,13 +316,13 @@ fn spawn_tank(
 }
 
 fn grant_entrenchment(game: &mut Game, player_id: u32) {
-    if let Some(player) = game.players.iter_mut().find(|player| player.id == player_id) {
+    if let Some(player) = game.state.players.iter_mut().find(|player| player.id == player_id) {
         player.upgrades.insert(upgrade::UpgradeKind::Entrenchment);
     }
 }
 
 fn grant_methamphetamines(game: &mut Game, player_id: u32) {
-    if let Some(player) = game.players.iter_mut().find(|player| player.id == player_id) {
+    if let Some(player) = game.state.players.iter_mut().find(|player| player.id == player_id) {
         player
             .upgrades
             .insert(upgrade::UpgradeKind::Methamphetamines);
@@ -331,6 +330,6 @@ fn grant_methamphetamines(game: &mut Game, player_id: u32) {
 }
 
 fn refresh_trench_memory(game: &mut Game) {
-    let player_ids: Vec<u32> = game.players.iter().map(|player| player.id).collect();
+    let player_ids: Vec<u32> = game.state.players.iter().map(|player| player.id).collect();
     game.refresh_trench_memory(&player_ids);
 }

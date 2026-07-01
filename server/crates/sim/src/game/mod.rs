@@ -39,6 +39,7 @@ pub(crate) mod services;
 mod setup;
 pub(crate) mod smoke;
 mod snapshot;
+mod state;
 mod systems;
 pub mod teams;
 pub(crate) mod trench;
@@ -52,24 +53,24 @@ use crate::protocol::{
     ResourceDelta, ResourceNode, Snapshot, StartPayload, DEFAULT_FACTION_ID,
 };
 use crate::rules::{economy as economy_rules, projection};
-use ability_runtime::AbilityRuntime;
 use serde::{Deserialize, Serialize};
 
-use artillery::ArtilleryShellStore;
-use building_memory::{BuildingMemory, BuildingMemoryEntry};
+pub(in crate::game) use building_memory::BuildingMemory;
+use building_memory::BuildingMemoryEntry;
 use derived_state::DerivedState;
 use entity::{BuildPhase, EntityKind, EntityStore};
-use firing_reveal::FiringRevealSource;
-use fog::{Fog, LingeringSightSource};
+use fog::Fog;
 use map::Map;
 pub use map::MapMetadata;
-use mortar::MortarShellStore;
+#[cfg(test)]
+pub(in crate::game) use mortar::MortarShellStore;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 use replay::CommandLogEntry;
 pub(crate) use setup::StartingLoadout;
 use smoke::SmokeCloudStore;
-use trench::TrenchStore;
+use state::GameState;
+pub(in crate::game) use trench::TrenchStore;
 
 pub use crate::game::command::SimCommand;
 pub use teams::TeamId;
@@ -156,48 +157,10 @@ pub(crate) struct ScoreState {
 /// The authoritative match state.
 #[derive(Clone)]
 pub struct Game {
-    map: Map,
-    entities: EntityStore,
-    fog: Fog,
-    building_memory: BuildingMemory,
-    players: Vec<PlayerState>,
-    /// Commands received this tick window, drained at the start of [`tick`]. Each carries the
-    /// issuing player so ownership can be validated on apply.
-    pending: Vec<commands::PendingCommand>,
-    /// Authoritative commands stamped with the tick where they were applied. Includes AI commands
-    /// because they are emitted into the same pending queue before command application.
-    command_log: Vec<CommandLogEntry>,
-    tick: u32,
+    /// Durable authoritative state plus setup/replay compatibility metadata.
+    pub(in crate::game) state: GameState,
     /// Rebuildable cache and index state: final post-tick spatial index plus pathing cache.
-    derived: DerivedState,
-    /// Five-second death-vision sources stamped into live fog as ordinary temporary team sight.
-    lingering_sight: Vec<LingeringSightSource>,
-    /// Actionable temporary sight from Anti-Tank Guns that fired from fog.
-    firing_reveals: Vec<FiringRevealSource>,
-    /// Neutral smoke clouds that block authoritative fog and combat LOS without being entities.
-    smokes: SmokeCloudStore,
-    /// Neutral persistent trench terrain. Trenches do not participate in entity lifecycle systems.
-    trenches: TrenchStore,
-    /// Persistent ability runtime state that is not a normal entity or one-off projectile event.
-    ability_runtime: AbilityRuntime,
-    /// Delayed mortar shell impacts waiting to resolve area damage.
-    mortar_shells: MortarShellStore,
-    /// Delayed artillery shell impacts waiting to resolve area damage.
-    artillery_shells: ArtilleryShellStore,
-    /// Match seed retained for replay metadata/API compatibility. The current hardcoded map
-    /// ignores it until lobby map selection or randomized maps are reintroduced.
-    seed: u32,
-    /// Per-player faction loadouts used to build the initial match state. Replays persist this
-    /// alongside player faction ids so mixed starts do not collapse into one global resource pair.
-    starting_loadouts: Vec<PlayerStartingLoadout>,
-    /// Stable authored map identity used by replay artifacts.
-    map_metadata: MapMetadata,
-    /// Under-construction building ids that received authoritative build progress this tick.
-    active_construction_sites: BTreeSet<u32>,
-    /// Lab-only player ids whose units and buildings ignore incoming damage.
-    lab_god_mode_players: BTreeSet<u32>,
-    starting_loadout: StartingLoadout,
-    pub(crate) rng: SmallRng,
+    pub(in crate::game) derived: DerivedState,
 }
 
 impl Game {
@@ -231,26 +194,26 @@ impl Game {
         &mut self,
         mut perf: Option<&mut crate::perf::TickPerf>,
     ) -> Vec<(u32, Vec<Event>)> {
-        self.tick = self.tick.wrapping_add(1);
-        self.derived.advance_pathing_tick(self.tick);
-        self.smokes.retain_active(self.tick);
-        let player_ids: Vec<u32> = self.players.iter().map(|p| p.id).collect();
+        self.state.tick = self.state.tick.wrapping_add(1);
+        self.derived.advance_pathing_tick(self.state.tick);
+        self.state.smokes.retain_active(self.state.tick);
+        let player_ids: Vec<u32> = self.state.players.iter().map(|p| p.id).collect();
         if self.retain_active_visibility_sources() {
             self.recompute_live_fog(&player_ids);
         }
 
         // Per-player event buckets, accumulated by the systems below.
         let mut events: HashMap<u32, Vec<Event>> = HashMap::new();
-        for p in &self.players {
+        for p in &self.state.players {
             events.entry(p.id).or_default();
         }
 
-        let pending = std::mem::take(&mut self.pending);
+        let pending = std::mem::take(&mut self.state.pending);
         crate::perf::timed(perf.as_deref_mut(), "record_commands", || {
             self.record_commands_for_tick(&pending);
         });
-        self.active_construction_sites.clear();
-        if !self.lab_god_mode_players.is_empty() {
+        self.state.active_construction_sites.clear();
+        if !self.state.lab_god_mode_players.is_empty() {
             self.sync_lab_god_mode_flags();
         }
 
@@ -259,24 +222,24 @@ impl Game {
         // entities together without locks.
         let active_vision_players = self.alive_players().into_iter().collect::<BTreeSet<_>>();
         let final_spatial = systems::run_tick(
-            &self.map,
-            &mut self.entities,
-            &mut self.players,
+            &self.state.map,
+            &mut self.state.entities,
+            &mut self.state.players,
             &active_vision_players,
-            &self.fog,
+            &self.state.fog,
             self.derived.pathing_mut(),
-            &mut self.rng,
-            &mut self.lingering_sight,
-            &mut self.firing_reveals,
-            &mut self.smokes,
-            &mut self.trenches,
-            &mut self.ability_runtime,
-            &mut self.mortar_shells,
-            &mut self.artillery_shells,
-            &mut self.active_construction_sites,
+            &mut self.state.rng,
+            &mut self.state.lingering_sight,
+            &mut self.state.firing_reveals,
+            &mut self.state.smokes,
+            &mut self.state.trenches,
+            &mut self.state.ability_runtime,
+            &mut self.state.mortar_shells,
+            &mut self.state.artillery_shells,
+            &mut self.state.active_construction_sites,
             pending,
             &mut events,
-            self.tick,
+            self.state.tick,
             perf.as_deref_mut(),
         );
         self.derived.set_final_spatial(final_spatial);
@@ -305,7 +268,7 @@ impl Game {
     }
 
     pub fn current_tick(&self) -> u32 {
-        self.tick
+        self.state.tick
     }
 
     /// Ordinary retreat commands for AI-owned workers hit on the previous tick.
@@ -314,11 +277,11 @@ impl Game {
     /// entity state. Callers still enqueue the returned commands through [`Game::enqueue`], so the
     /// normal command validation and replay logging path applies.
     pub fn worker_retreat_commands_for(&self, player: u32) -> Vec<SimCommand> {
-        let last_tick = self.tick.checked_sub(1);
-        let world_max = self.map.world_size_px() - 0.01;
+        let last_tick = self.state.tick.checked_sub(1);
+        let world_max = self.state.map.world_size_px() - 0.01;
         let retreat_px = AI_WORKER_RETREAT_TILES * config::TILE_SIZE as f32;
         let mut commands = Vec::new();
-        for entity in self.entities.iter() {
+        for entity in self.state.entities.iter() {
             if entity.owner != player || entity.kind != EntityKind::Worker || entity.hp == 0 {
                 continue;
             }
@@ -352,7 +315,7 @@ impl Game {
 
     pub fn perf_entity_counts(&self) -> crate::perf::EntityCounts {
         let mut counts = crate::perf::EntityCounts::default();
-        for entity in self.entities.iter() {
+        for entity in self.state.entities.iter() {
             counts.entities += 1;
             if entity.is_unit() {
                 counts.units += 1;
@@ -368,18 +331,18 @@ impl Game {
     /// Player ids that are not yet defeated. Human players are defeated when they lose all
     /// buildings; AI players are also defeated when they have no units left.
     pub fn alive_players(&self) -> Vec<u32> {
-        self.players
+        self.state.players
             .iter()
             .filter(|p| {
                 let has_building =
-                    services::world_query::owned_survival_buildings(&self.entities, p.id)
+                    services::world_query::owned_survival_buildings(&self.state.entities, p.id)
                         .next()
                         .is_some();
                 if !has_building {
                     return false;
                 }
                 if p.is_ai {
-                    services::world_query::owned_units(&self.entities, p.id)
+                    services::world_query::owned_units(&self.state.entities, p.id)
                         .next()
                         .is_some()
                 } else {
@@ -392,51 +355,51 @@ impl Game {
 
     /// Remove every entity owned by `player` (e.g. on disconnect) so the match can resolve.
     pub fn eliminate(&mut self, player: u32) {
-        let doomed: Vec<u32> = services::world_query::owned_units(&self.entities, player)
+        let doomed: Vec<u32> = services::world_query::owned_units(&self.state.entities, player)
             .chain(services::world_query::owned_buildings(
-                &self.entities,
+                &self.state.entities,
                 player,
             ))
             .map(|e| e.id)
             .collect();
         for id in doomed {
-            if let Some(entity) = self.entities.remove(id) {
-                if let Some(p) = self.players.iter_mut().find(|p| p.id == entity.owner) {
+            if let Some(entity) = self.state.entities.remove(id) {
+                if let Some(p) = self.state.players.iter_mut().find(|p| p.id == entity.owner) {
                     p.record_entity_lost(entity.kind);
                 }
             }
         }
-        if let Some(p) = self.players.iter_mut().find(|p| p.id == player) {
+        if let Some(p) = self.state.players.iter_mut().find(|p| p.id == player) {
             p.reset_supply();
         }
-        self.lingering_sight
+        self.state.lingering_sight
             .retain(|source| source.owner() != player);
-        self.firing_reveals
+        self.state.firing_reveals
             .retain(|source| source.viewer() != player);
         // Recompute fog so the now-entity-less player's visibility goes dark immediately;
         // otherwise a stale grid would keep leaking neutral/enemy entities into their snapshots.
-        let ids: Vec<u32> = self.players.iter().map(|p| p.id).collect();
+        let ids: Vec<u32> = self.state.players.iter().map(|p| p.id).collect();
         self.recompute_live_fog(&ids);
         self.refresh_building_memory(&ids);
         self.refresh_trench_memory(&ids);
     }
 
     pub fn tick_count(&self) -> u32 {
-        self.tick
+        self.state.tick
     }
 
     #[allow(dead_code)]
     #[cfg(any(test, debug_assertions))]
     pub(crate) fn spawn_smoke_cloud_for_test(&mut self, x: f32, y: f32) -> Option<u32> {
-        let (x, y) = SmokeCloudStore::clamp_point_to_map(&self.map, x, y)?;
-        let id = self.smokes.spawn(
+        let (x, y) = SmokeCloudStore::clamp_point_to_map(&self.state.map, x, y)?;
+        let id = self.state.smokes.spawn(
             x,
             y,
             config::SMOKE_CLOUD_RADIUS_TILES,
             config::SMOKE_CLOUD_DURATION_TICKS,
-            self.tick,
+            self.state.tick,
         )?;
-        let ids: Vec<u32> = self.players.iter().map(|p| p.id).collect();
+        let ids: Vec<u32> = self.state.players.iter().map(|p| p.id).collect();
         self.recompute_live_fog(&ids);
         self.refresh_building_memory(&ids);
         self.refresh_trench_memory(&ids);
@@ -446,8 +409,8 @@ impl Game {
     #[allow(dead_code)]
     #[cfg(any(test, debug_assertions))]
     pub(crate) fn spawn_trench_for_test(&mut self, x: f32, y: f32) -> Option<u32> {
-        let id = self.trenches.create(&self.map, x, y)?;
-        let ids: Vec<u32> = self.players.iter().map(|p| p.id).collect();
+        let id = self.state.trenches.create(&self.state.map, x, y)?;
+        let ids: Vec<u32> = self.state.players.iter().map(|p| p.id).collect();
         self.refresh_trench_memory(&ids);
         Some(id)
     }
@@ -458,19 +421,19 @@ impl Game {
         &mut self,
         spec: ability_runtime::AbilityWorldObjectSpec,
     ) -> Option<u32> {
-        self.ability_runtime.spawn_world_object(spec)
+        self.state.ability_runtime.spawn_world_object(spec)
     }
 
     /// Authoritative commands applied so far, in exact application order.
     #[allow(dead_code)]
     pub fn command_log(&self) -> &[CommandLogEntry] {
-        &self.command_log
+        &self.state.command_log
     }
 
     /// Reconstruct the `PlayerInit` list this game was created from, so a crash/invariant
     /// failure can persist a replayable artifact.
     pub fn player_inits(&self) -> Vec<PlayerInit> {
-        self.players
+        self.state.players
             .iter()
             .map(|p| PlayerInit {
                 id: p.id,
@@ -487,7 +450,7 @@ impl Game {
     #[cfg(test)]
     pub(in crate::game) fn clear_and_rebuild_derived_state_for_test(&mut self) {
         self.derived
-            .clear_and_rebuild_from_authoritative(&self.map, &self.entities);
+            .clear_and_rebuild_from_authoritative(&self.state.map, &self.state.entities);
     }
 
     pub(in crate::game) fn final_spatial(&self) -> &services::spatial::SpatialIndex {
@@ -497,18 +460,18 @@ impl Game {
     #[cfg(test)]
     pub(in crate::game) fn rebuild_final_spatial(&mut self) {
         self.derived
-            .rebuild_final_spatial(&self.map, &self.entities);
+            .rebuild_final_spatial(&self.state.map, &self.state.entities);
     }
 
     pub(in crate::game) fn reset_derived_state(&mut self) {
         let (default_pathing_budget, pathing_cache_capacity) = self.derived.pathing_config();
         self.derived = DerivedState::new(
-            &self.map,
-            &self.entities,
+            &self.state.map,
+            &self.state.entities,
             default_pathing_budget,
             pathing_cache_capacity,
         );
-        self.derived.advance_pathing_tick(self.tick);
+        self.derived.advance_pathing_tick(self.state.tick);
     }
 
     #[cfg(test)]
@@ -523,54 +486,54 @@ impl Game {
 
     fn refresh_building_memory(&mut self, player_ids: &[u32]) {
         let teams = self.team_relations();
-        self.building_memory.refresh(
+        self.state.building_memory.refresh(
             player_ids,
-            &self.entities,
-            &self.fog,
-            &self.map,
-            &self.smokes,
+            &self.state.entities,
+            &self.state.fog,
+            &self.state.map,
+            &self.state.smokes,
             &teams,
-            self.tick,
+            self.state.tick,
         );
     }
 
     pub(in crate::game) fn refresh_trench_memory(&mut self, player_ids: &[u32]) {
         for &player in player_ids {
-            let fog = self.team_current_fog_for(player, &self.fog);
-            self.trenches.refresh_memory_for_player(player, &fog);
+            let fog = self.team_current_fog_for(player, &self.state.fog);
+            self.state.trenches.refresh_memory_for_player(player, &fog);
         }
     }
 
     fn recompute_live_fog(&mut self, player_ids: &[u32]) {
-        self.fog
-            .recompute_with_smoke(player_ids, &self.entities, &self.map, &self.smokes);
+        self.state.fog
+            .recompute_with_smoke(player_ids, &self.state.entities, &self.state.map, &self.state.smokes);
         let teams = self.team_relations();
-        self.fog.stamp_lingering_sources_for_teams_with_smoke(
-            &self.lingering_sight,
-            &self.map,
-            &self.entities,
-            &self.smokes,
+        self.state.fog.stamp_lingering_sources_for_teams_with_smoke(
+            &self.state.lingering_sight,
+            &self.state.map,
+            &self.state.entities,
+            &self.state.smokes,
             &teams,
         );
-        self.fog.stamp_firing_reveal_sources_with_smoke(
-            &self.firing_reveals,
-            &self.entities,
-            &self.smokes,
+        self.state.fog.stamp_firing_reveal_sources_with_smoke(
+            &self.state.firing_reveals,
+            &self.state.entities,
+            &self.state.smokes,
         );
     }
 
     fn retain_active_visibility_sources(&mut self) -> bool {
-        let lingering_before = self.lingering_sight.len();
-        let firing_before = self.firing_reveals.len();
-        self.lingering_sight
-            .retain(|source| source.is_active_at(self.tick));
-        self.firing_reveals
-            .retain(|source| source.is_active_at(self.tick));
-        lingering_before != self.lingering_sight.len() || firing_before != self.firing_reveals.len()
+        let lingering_before = self.state.lingering_sight.len();
+        let firing_before = self.state.firing_reveals.len();
+        self.state.lingering_sight
+            .retain(|source| source.is_active_at(self.state.tick));
+        self.state.firing_reveals
+            .retain(|source| source.is_active_at(self.state.tick));
+        lingering_before != self.state.lingering_sight.len() || firing_before != self.state.firing_reveals.len()
     }
 
     pub(crate) fn team_relations(&self) -> teams::TeamRelations {
-        teams::TeamRelations::from_player_teams(self.players.iter().map(|p| (p.id, p.team_id)))
+        teams::TeamRelations::from_player_teams(self.state.players.iter().map(|p| (p.id, p.team_id)))
     }
 
     #[allow(dead_code)]
@@ -579,7 +542,7 @@ impl Game {
         player: u32,
         building: u32,
     ) -> Option<&BuildingMemoryEntry> {
-        self.building_memory.get(player, building)
+        self.state.building_memory.get(player, building)
     }
 }
 

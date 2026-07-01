@@ -6,7 +6,7 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
 - [docs/design/architecture.md](../design/architecture.md) — tick and networking model
 - [docs/design/server-sim.md](../design/server-sim.md) — Rust server and `Game` core API
 - §3.1 `game::Game` public API; this is the seam and should stay stable
-- §3.1.1 `Game` state ownership registry; update this when `Game` fields change
+- §3.1.1 `Game` state ownership registry; update this when `GameState`/`DerivedState` fields change
 - §3.2 Concurrency model; the room task is the sole `Game` owner
 - §3.3 Rules layer
 - §3.5 Command planning and queued order semantics
@@ -17,9 +17,10 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
   touching scripted tests or scenario setup
 
 ## Code map
-- `server/crates/sim/src/game/mod.rs`, `lab.rs`, `systems.rs`, `entity/`, `command*.rs`,
-  `snapshot.rs`, `fog.rs`, `building_memory.rs`, `pathfinding.rs`, and `map/` — public `Game` API,
-  lab mutation API, tick orchestration, and core sim state/behavior.
+- `server/crates/sim/src/game/mod.rs`, `state.rs`, `derived_state.rs`, `lab.rs`, `systems.rs`,
+  `entity/`, `command*.rs`, `snapshot.rs`, `fog.rs`, `building_memory.rs`, `pathfinding.rs`, and
+  `map/` — public `Game` API, private durable/derived state owners, lab mutation API, tick
+  orchestration, and core sim state/behavior.
 - `server/crates/sim/src/game/services/` — per-tick services; `order_planner.rs` and
   `order_execution.rs` own command/queue planning and issue-time mutation helpers.
 - `server/crates/rules/src/` and `server/crates/sim/src/rules/projection.rs` — declarative rules

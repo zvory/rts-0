@@ -3,8 +3,7 @@ use crate::game::tests::fixtures::{empty_flat_game, human_vs_ai_players};
 use crate::protocol::DEFAULT_FACTION_ID;
 
 fn deploy_anti_tank_gun_toward(game: &mut Game, id: u32, target: (f32, f32)) {
-    let gun = game
-        .entities
+    let gun = game.state.entities
         .get_mut(id)
         .expect("anti-tank gun should exist");
     let facing = (target.1 - gun.pos_y).atan2(target.0 - gun.pos_x);
@@ -15,9 +14,9 @@ fn deploy_anti_tank_gun_toward(game: &mut Game, id: u32, target: (f32, f32)) {
 }
 
 fn refresh_visibility_for_test(game: &mut Game) {
-    systems::recompute_supply(&mut game.players, &game.entities);
+    systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
-    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+    let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
     game.recompute_live_fog(&ids);
     game.refresh_building_memory(&ids);
 }
@@ -25,26 +24,24 @@ fn refresh_visibility_for_test(game: &mut Game) {
 fn hidden_enemy_at_gun_fixture() -> (Game, u32, u32) {
     let players = human_vs_ai_players();
     let mut game = empty_flat_game(&players);
-    let target_pos = game.map.tile_center(10, 10);
+    let target_pos = game.state.map.tile_center(10, 10);
     let enemy_pos = (target_pos.0 + config::TILE_SIZE as f32 * 5.0, target_pos.1);
-    let tank_pos = game.map.tile_center(3, 3);
+    let tank_pos = game.state.map.tile_center(3, 3);
 
-    game.entities
+    game.state.entities
         .spawn_building(1, EntityKind::CityCentre, target_pos.0, target_pos.1, true)
         .expect("city centre should spawn");
-    let tank = game
-        .entities
+    let tank = game.state.entities
         .spawn_unit(1, EntityKind::Tank, tank_pos.0, tank_pos.1)
         .expect("tank should spawn");
-    let enemy_at = game
-        .entities
+    let enemy_at = game.state.entities
         .spawn_unit(2, EntityKind::AntiTankGun, enemy_pos.0, enemy_pos.1)
         .expect("anti-tank gun should spawn");
     deploy_anti_tank_gun_toward(&mut game, enemy_at, target_pos);
     refresh_visibility_for_test(&mut game);
 
     assert!(
-        !game.fog.is_visible_world(1, enemy_pos.0, enemy_pos.1),
+        !game.state.fog.is_visible_world(1, enemy_pos.0, enemy_pos.1),
         "fixture requires the AT gun to start outside player 1 live fog"
     );
     assert!(
@@ -62,22 +59,20 @@ fn hidden_enemy_at_gun_fixture() -> (Game, u32, u32) {
 fn hidden_enemy_tank_fixture() -> (Game, u32, u32) {
     let players = human_vs_ai_players();
     let mut game = empty_flat_game(&players);
-    let target_pos = game.map.tile_center(10, 10);
+    let target_pos = game.state.map.tile_center(10, 10);
     let enemy_pos = (target_pos.0 + config::TILE_SIZE as f32 * 5.0, target_pos.1);
-    let tank_pos = game.map.tile_center(3, 3);
+    let tank_pos = game.state.map.tile_center(3, 3);
 
-    game.entities
+    game.state.entities
         .spawn_building(1, EntityKind::CityCentre, target_pos.0, target_pos.1, true)
         .expect("city centre should spawn");
-    let tank = game
-        .entities
+    let tank = game.state.entities
         .spawn_unit(1, EntityKind::Tank, tank_pos.0, tank_pos.1)
         .expect("tank should spawn");
-    let enemy_tank = game
-        .entities
+    let enemy_tank = game.state.entities
         .spawn_unit(2, EntityKind::Tank, enemy_pos.0, enemy_pos.1)
         .expect("enemy tank should spawn");
-    if let Some(enemy) = game.entities.get_mut(enemy_tank) {
+    if let Some(enemy) = game.state.entities.get_mut(enemy_tank) {
         let facing = (target_pos.1 - enemy.pos_y).atan2(target_pos.0 - enemy.pos_x);
         enemy.set_facing(facing);
         enemy.set_weapon_facing(facing);
@@ -85,7 +80,7 @@ fn hidden_enemy_tank_fixture() -> (Game, u32, u32) {
     refresh_visibility_for_test(&mut game);
 
     assert!(
-        !game.fog.is_visible_world(1, enemy_pos.0, enemy_pos.1),
+        !game.state.fog.is_visible_world(1, enemy_pos.0, enemy_pos.1),
         "fixture requires the tank to start outside player 1 live fog"
     );
 
@@ -95,19 +90,17 @@ fn hidden_enemy_tank_fixture() -> (Game, u32, u32) {
 fn hidden_enemy_at_gun_with_counter_fixture() -> (Game, u32, u32) {
     let players = human_vs_ai_players();
     let mut game = empty_flat_game(&players);
-    let target_pos = game.map.tile_center(10, 10);
+    let target_pos = game.state.map.tile_center(10, 10);
     let enemy_pos = (target_pos.0 + config::TILE_SIZE as f32 * 5.0, target_pos.1);
     let counter_pos = (target_pos.0, target_pos.1 + config::TILE_SIZE as f32 * 10.0);
 
-    game.entities
+    game.state.entities
         .spawn_building(1, EntityKind::CityCentre, target_pos.0, target_pos.1, true)
         .expect("city centre should spawn");
-    let counter_at = game
-        .entities
+    let counter_at = game.state.entities
         .spawn_unit(1, EntityKind::AntiTankGun, counter_pos.0, counter_pos.1)
         .expect("counter anti-tank gun should spawn");
-    let enemy_at = game
-        .entities
+    let enemy_at = game.state.entities
         .spawn_unit(2, EntityKind::AntiTankGun, enemy_pos.0, enemy_pos.1)
         .expect("enemy anti-tank gun should spawn");
     deploy_anti_tank_gun_toward(&mut game, counter_at, enemy_pos);
@@ -115,7 +108,7 @@ fn hidden_enemy_at_gun_with_counter_fixture() -> (Game, u32, u32) {
     refresh_visibility_for_test(&mut game);
 
     assert!(
-        !game.fog.is_visible_world(1, enemy_pos.0, enemy_pos.1),
+        !game.state.fog.is_visible_world(1, enemy_pos.0, enemy_pos.1),
         "fixture requires the enemy AT gun to start outside player 1 live fog"
     );
 
@@ -195,7 +188,7 @@ fn anti_tank_gun_firing_from_fog_projects_as_actionable_snapshot_entity() {
     game.tick();
 
     assert_eq!(
-        game.entities
+        game.state.entities
             .get(tank)
             .expect("tank should exist")
             .order()
@@ -249,7 +242,7 @@ fn tank_firing_from_fog_projects_as_actionable_snapshot_entity() {
     game.tick();
 
     assert_eq!(
-        game.entities
+        game.state.entities
             .get(tank)
             .expect("tank should exist")
             .order()
@@ -263,35 +256,32 @@ fn tank_firing_from_fog_projects_as_actionable_snapshot_entity() {
 fn third_party_combat_does_not_make_hidden_shooter_actionable() {
     let players = three_player_combat_fixture();
     let mut game = empty_flat_game(&players);
-    let target_pos = game.map.tile_center(10, 10);
+    let target_pos = game.state.map.tile_center(10, 10);
     let shooter_pos = (target_pos.0 + config::TILE_SIZE as f32 * 5.0, target_pos.1);
     let observer_pos = (target_pos.0 - config::TILE_SIZE as f32 * 7.0, target_pos.1);
 
-    let observer = game
-        .entities
+    let observer = game.state.entities
         .spawn_unit(1, EntityKind::Worker, observer_pos.0, observer_pos.1)
         .expect("observer worker should spawn");
-    let victim_cc = game
-        .entities
+    let victim_cc = game.state.entities
         .spawn_building(3, EntityKind::CityCentre, target_pos.0, target_pos.1, true)
         .expect("victim city centre should spawn");
-    let shooter = game
-        .entities
+    let shooter = game.state.entities
         .spawn_unit(2, EntityKind::AntiTankGun, shooter_pos.0, shooter_pos.1)
         .expect("shooter anti-tank gun should spawn");
     deploy_anti_tank_gun_toward(&mut game, shooter, target_pos);
-    if let Some(shooter_entity) = game.entities.get_mut(shooter) {
+    if let Some(shooter_entity) = game.state.entities.get_mut(shooter) {
         shooter_entity.set_order(Order::attack(victim_cc));
         shooter_entity.set_target_id(Some(victim_cc));
     }
     refresh_visibility_for_test(&mut game);
 
     assert!(
-        game.fog.is_visible_world(1, target_pos.0, target_pos.1),
+        game.state.fog.is_visible_world(1, target_pos.0, target_pos.1),
         "observer should see the third-party target"
     );
     assert!(
-        !game.fog.is_visible_world(1, shooter_pos.0, shooter_pos.1),
+        !game.state.fog.is_visible_world(1, shooter_pos.0, shooter_pos.1),
         "observer should not see the third-party shooter"
     );
 
@@ -324,7 +314,7 @@ fn third_party_combat_does_not_make_hidden_shooter_actionable() {
     game.tick();
 
     assert_ne!(
-        game.entities
+        game.state.entities
             .get(observer)
             .expect("observer should exist")
             .order()
@@ -339,19 +329,18 @@ fn counterfire_against_firing_revealed_target_waits_one_second() {
     let (mut game, enemy_at, counter_at) = hidden_enemy_at_gun_with_counter_fixture();
 
     game.tick();
-    let hp_after_reveal = game
-        .entities
+    let hp_after_reveal = game.state.entities
         .get(enemy_at)
         .expect("enemy AT gun should exist")
         .hp;
-    game.entities
+    game.state.entities
         .get_mut(enemy_at)
         .expect("enemy AT gun should exist")
         .set_attack_cd(u32::MAX);
 
     game.tick();
     assert_eq!(
-        game.entities
+        game.state.entities
             .get(enemy_at)
             .expect("enemy AT gun should still exist")
             .hp,
@@ -359,7 +348,7 @@ fn counterfire_against_firing_revealed_target_waits_one_second() {
         "counter AT gun should not fire on the first revealed-target acquisition tick"
     );
     assert_eq!(
-        game.entities
+        game.state.entities
             .get(counter_at)
             .expect("counter AT gun should exist")
             .target_id(),
@@ -370,7 +359,7 @@ fn counterfire_against_firing_revealed_target_waits_one_second() {
     for _ in 1..config::TICK_HZ {
         game.tick();
         assert_eq!(
-            game.entities
+            game.state.entities
                 .get(enemy_at)
                 .expect("enemy AT gun should still exist")
                 .hp,
@@ -381,7 +370,7 @@ fn counterfire_against_firing_revealed_target_waits_one_second() {
 
     game.tick();
     assert!(
-        game.entities.get(enemy_at).is_none_or(|entity| entity.hp < hp_after_reveal),
+        game.state.entities.get(enemy_at).is_none_or(|entity| entity.hp < hp_after_reveal),
         "counter AT gun should fire after the one-second response delay while reveal remains active"
     );
 }
@@ -396,11 +385,11 @@ fn anti_tank_gun_firing_reveal_lasts_for_firing_cycle_plus_half_second() {
         .cooldown
         + config::TICK_HZ / 2;
 
-    game.entities
+    game.state.entities
         .get_mut(enemy_at)
         .expect("anti-tank gun should exist")
         .set_attack_cd(u32::MAX);
-    game.entities
+    game.state.entities
         .get_mut(tank)
         .expect("tank should exist")
         .set_attack_cd(u32::MAX);

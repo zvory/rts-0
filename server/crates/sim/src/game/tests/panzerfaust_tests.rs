@@ -32,19 +32,18 @@ fn panzerfaust_players() -> [PlayerInit; 3] {
 }
 
 fn refresh_world(game: &mut Game) {
-    systems::recompute_supply(&mut game.players, &game.entities);
+    systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
-    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
-    game.fog.recompute(&ids, &game.entities, &game.map);
+    let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
+    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
 }
 
 fn panzerfaust_fixture_at_tank_tile(tank_tile_x: u32) -> (Game, u32, u32) {
     let players = panzerfaust_players();
     let mut game = empty_flat_game(&players);
-    let panzerfaust_pos = game.map.tile_center(8, 8);
-    let tank_pos = game.map.tile_center(tank_tile_x, 8);
-    let panzerfaust = game
-        .entities
+    let panzerfaust_pos = game.state.map.tile_center(8, 8);
+    let tank_pos = game.state.map.tile_center(tank_tile_x, 8);
+    let panzerfaust = game.state.entities
         .spawn_unit(
             1,
             EntityKind::Panzerfaust,
@@ -52,11 +51,10 @@ fn panzerfaust_fixture_at_tank_tile(tank_tile_x: u32) -> (Game, u32, u32) {
             panzerfaust_pos.1,
         )
         .expect("panzerfaust should spawn");
-    let tank = game
-        .entities
+    let tank = game.state.entities
         .spawn_unit(2, EntityKind::Tank, tank_pos.0, tank_pos.1)
         .expect("tank should spawn");
-    game.entities
+    game.state.entities
         .get_mut(panzerfaust)
         .expect("panzerfaust exists")
         .set_invulnerable(true);
@@ -94,7 +92,7 @@ fn distance_sq(a: (f32, f32), b: (f32, f32)) -> f32 {
 }
 
 fn panzerfaust_state_of(game: &Game, id: u32) -> Option<PanzerfaustState> {
-    game.entities
+    game.state.entities
         .get(id)
         .and_then(|entity| entity.combat.as_ref())
         .and_then(|combat| combat.panzerfaust)
@@ -103,7 +101,7 @@ fn panzerfaust_state_of(game: &Game, id: u32) -> Option<PanzerfaustState> {
 #[test]
 fn spawned_panzerfaust_direct_attack_damages_tank_and_converts_same_id() {
     let (mut game, panzerfaust, tank) = panzerfaust_fixture();
-    let tank_hp = game.entities.get(tank).expect("tank exists").hp;
+    let tank_hp = game.state.entities.get(tank).expect("tank exists").hp;
     enqueue_attack(&mut game, panzerfaust, tank, false);
 
     let mut owner_saw_launch = false;
@@ -120,7 +118,7 @@ fn spawned_panzerfaust_direct_attack_damages_tank_and_converts_same_id() {
             .iter()
             .any(|event| matches!(event, Event::PanzerfaustImpact { .. }));
         if impact_this_tick && tank_hp_on_impact.is_none() {
-            tank_hp_on_impact = game.entities.get(tank).map(|tank| tank.hp);
+            tank_hp_on_impact = game.state.entities.get(tank).map(|tank| tank.hp);
         }
         owner_saw_impact |= impact_this_tick;
         owner_saw_conversion |= player_events(&events, 1).iter().any(|event| {
@@ -141,8 +139,7 @@ fn spawned_panzerfaust_direct_attack_damages_tank_and_converts_same_id() {
         tank_hp_on_impact,
         Some(tank_hp.saturating_sub(config::PANZERFAUST_DAMAGE))
     );
-    let converted = game
-        .entities
+    let converted = game.state.entities
         .get(panzerfaust)
         .expect("same entity id should remain");
     assert_eq!(converted.kind, EntityKind::Rifleman);
@@ -166,12 +163,11 @@ fn spawned_panzerfaust_direct_attack_damages_tank_and_converts_same_id() {
 #[test]
 fn direct_attack_conversion_completes_consumed_order_and_promotes_queued_move() {
     let (mut game, panzerfaust, tank) = panzerfaust_fixture();
-    let start = game
-        .entities
+    let start = game.state.entities
         .get(panzerfaust)
         .map(|entity| (entity.pos_x, entity.pos_y))
         .expect("panzerfaust exists");
-    let move_goal = game.map.tile_center(20, 8);
+    let move_goal = game.state.map.tile_center(20, 8);
     enqueue_attack(&mut game, panzerfaust, tank, false);
     game.enqueue(
         1,
@@ -191,8 +187,7 @@ fn direct_attack_conversion_completes_consumed_order_and_promotes_queued_move() 
         );
     }
 
-    let converted = game
-        .entities
+    let converted = game.state.entities
         .get(panzerfaust)
         .expect("same entity id should remain");
     assert!(saw_conversion);
@@ -211,10 +206,9 @@ fn direct_attack_conversion_completes_consumed_order_and_promotes_queued_move() 
 fn spawned_panzerfaust_rejects_direct_attack_on_non_tank() {
     let players = panzerfaust_players();
     let mut game = empty_flat_game(&players);
-    let panzerfaust_pos = game.map.tile_center(8, 8);
-    let target_pos = game.map.tile_center(10, 8);
-    let panzerfaust = game
-        .entities
+    let panzerfaust_pos = game.state.map.tile_center(8, 8);
+    let target_pos = game.state.map.tile_center(10, 8);
+    let panzerfaust = game.state.entities
         .spawn_unit(
             1,
             EntityKind::Panzerfaust,
@@ -222,8 +216,7 @@ fn spawned_panzerfaust_rejects_direct_attack_on_non_tank() {
             panzerfaust_pos.1,
         )
         .expect("panzerfaust should spawn");
-    let rifleman = game
-        .entities
+    let rifleman = game.state.entities
         .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
         .expect("rifleman should spawn");
     refresh_world(&mut game);
@@ -231,11 +224,11 @@ fn spawned_panzerfaust_rejects_direct_attack_on_non_tank() {
     enqueue_attack(&mut game, panzerfaust, rifleman, false);
     let events = game.tick();
 
-    let panzerfaust_entity = game.entities.get(panzerfaust).expect("panzerfaust exists");
+    let panzerfaust_entity = game.state.entities.get(panzerfaust).expect("panzerfaust exists");
     assert_eq!(panzerfaust_entity.kind, EntityKind::Panzerfaust);
     assert_eq!(panzerfaust_entity.order(), Order::Idle);
     assert_eq!(panzerfaust_entity.target_id(), None);
-    assert_eq!(game.entities.get(rifleman).expect("target exists").hp, 45);
+    assert_eq!(game.state.entities.get(rifleman).expect("target exists").hp, 45);
     assert!(player_events(&events, 1)
         .iter()
         .all(|event| !matches!(event, Event::PanzerfaustLaunch { .. })));
@@ -245,11 +238,11 @@ fn spawned_panzerfaust_rejects_direct_attack_on_non_tank() {
 fn attack_move_acquires_tanks_but_plain_move_does_not_auto_fire() {
     let (mut moving_game, moving_panzerfaust, moving_tank) = panzerfaust_fixture();
     let moving_tank_hp = moving_game
-        .entities
+        .state.entities
         .get(moving_tank)
         .expect("tank exists")
         .hp;
-    let move_goal = moving_game.map.tile_center(20, 8);
+    let move_goal = moving_game.state.map.tile_center(20, 8);
     moving_game.enqueue(
         1,
         Command::Move {
@@ -268,7 +261,7 @@ fn attack_move_acquires_tanks_but_plain_move_does_not_auto_fire() {
     }
     assert_eq!(
         moving_game
-            .entities
+            .state.entities
             .get(moving_tank)
             .expect("tank exists")
             .hp,
@@ -278,11 +271,11 @@ fn attack_move_acquires_tanks_but_plain_move_does_not_auto_fire() {
 
     let (mut attack_move_game, attack_move_panzerfaust, attack_move_tank) = panzerfaust_fixture();
     let attack_move_tank_hp = attack_move_game
-        .entities
+        .state.entities
         .get(attack_move_tank)
         .expect("tank exists")
         .hp;
-    let attack_move_goal = attack_move_game.map.tile_center(20, 8);
+    let attack_move_goal = attack_move_game.state.map.tile_center(20, 8);
     attack_move_game.enqueue(
         1,
         Command::AttackMove {
@@ -300,7 +293,7 @@ fn attack_move_acquires_tanks_but_plain_move_does_not_auto_fire() {
             .any(|event| matches!(event, Event::PanzerfaustImpact { .. }));
         if impact_this_tick && attack_move_impact_hp.is_none() {
             attack_move_impact_hp = attack_move_game
-                .entities
+                .state.entities
                 .get(attack_move_tank)
                 .map(|tank| tank.hp);
         }
@@ -316,7 +309,7 @@ fn methamphetamines_shortens_windup_and_recovery_timing() {
     fn conversion_tick(has_methamphetamines: bool) -> u32 {
         let (mut game, panzerfaust, tank) = panzerfaust_fixture();
         if has_methamphetamines {
-            game.players
+            game.state.players
                 .iter_mut()
                 .find(|player| player.id == 1)
                 .expect("player exists")
@@ -354,17 +347,17 @@ fn hold_position_uses_only_current_entrenched_panzerfaust_range() {
     let (mut outside_game, outside_panzerfaust, outside_tank) =
         panzerfaust_fixture_at_tank_tile(12);
     let outside_start = outside_game
-        .entities
+        .state.entities
         .get(outside_panzerfaust)
         .map(|entity| (entity.pos_x, entity.pos_y))
         .expect("panzerfaust exists");
     let outside_tank_hp = outside_game
-        .entities
+        .state.entities
         .get(outside_tank)
         .expect("tank exists")
         .hp;
     outside_game
-        .entities
+        .state.entities
         .get_mut(outside_panzerfaust)
         .expect("panzerfaust exists")
         .hold_position();
@@ -376,7 +369,7 @@ fn hold_position_uses_only_current_entrenched_panzerfaust_range() {
             .any(|event| matches!(event, Event::PanzerfaustLaunch { .. }));
     }
     let outside_panzerfaust_entity = outside_game
-        .entities
+        .state.entities
         .get(outside_panzerfaust)
         .expect("panzerfaust exists");
     assert_eq!(
@@ -388,7 +381,7 @@ fn hold_position_uses_only_current_entrenched_panzerfaust_range() {
     );
     assert_eq!(
         outside_game
-            .entities
+            .state.entities
             .get(outside_tank)
             .expect("tank exists")
             .hp,
@@ -399,12 +392,12 @@ fn hold_position_uses_only_current_entrenched_panzerfaust_range() {
     let (mut entrenched_game, entrenched_panzerfaust, entrenched_tank) =
         panzerfaust_fixture_at_tank_tile(12);
     let entrenched_tank_hp = entrenched_game
-        .entities
+        .state.entities
         .get(entrenched_tank)
         .expect("tank exists")
         .hp;
     let trench_pos = entrenched_game
-        .entities
+        .state.entities
         .get(entrenched_panzerfaust)
         .map(|panzerfaust| (panzerfaust.pos_x, panzerfaust.pos_y))
         .expect("panzerfaust exists");
@@ -413,7 +406,7 @@ fn hold_position_uses_only_current_entrenched_panzerfaust_range() {
         .expect("trench should seed");
     {
         let panzerfaust = entrenched_game
-            .entities
+            .state.entities
             .get_mut(entrenched_panzerfaust)
             .expect("panzerfaust exists");
         panzerfaust.hold_position();
@@ -432,7 +425,7 @@ fn hold_position_uses_only_current_entrenched_panzerfaust_range() {
             .any(|event| matches!(event, Event::PanzerfaustImpact { .. }));
         if impact_this_tick && entrenched_impact_hp.is_none() {
             entrenched_impact_hp = entrenched_game
-                .entities
+                .state.entities
                 .get(entrenched_tank)
                 .map(|tank| tank.hp);
         }
@@ -445,7 +438,7 @@ fn hold_position_uses_only_current_entrenched_panzerfaust_range() {
         Some(entrenched_tank_hp.saturating_sub(config::PANZERFAUST_DAMAGE))
     );
     let converted = entrenched_game
-        .entities
+        .state.entities
         .get(entrenched_panzerfaust)
         .expect("entrenched Panzerfaust should keep the same id");
     assert!(saw_entrenched_conversion);
@@ -463,11 +456,11 @@ fn hold_position_uses_only_current_entrenched_panzerfaust_range() {
 #[test]
 fn replacing_order_during_windup_cancels_without_spending_shot() {
     let (mut game, panzerfaust, tank) = panzerfaust_fixture();
-    let tank_hp = game.entities.get(tank).expect("tank exists").hp;
+    let tank_hp = game.state.entities.get(tank).expect("tank exists").hp;
     enqueue_attack(&mut game, panzerfaust, tank, false);
     game.tick();
 
-    let move_goal = game.map.tile_center(20, 8);
+    let move_goal = game.state.map.tile_center(20, 8);
     game.enqueue(
         1,
         Command::Move {
@@ -485,9 +478,9 @@ fn replacing_order_during_windup_cancels_without_spending_shot() {
             .any(|event| matches!(event, Event::PanzerfaustLaunch { .. }));
     }
 
-    assert_eq!(game.entities.get(tank).expect("tank exists").hp, tank_hp);
+    assert_eq!(game.state.entities.get(tank).expect("tank exists").hp, tank_hp);
     assert_eq!(
-        game.entities
+        game.state.entities
             .get(panzerfaust)
             .expect("panzerfaust exists")
             .kind,
@@ -502,7 +495,7 @@ fn target_death_during_windup_cancels_without_spending_shot() {
     enqueue_attack(&mut game, panzerfaust, tank, false);
     game.tick();
 
-    game.entities
+    game.state.entities
         .get_mut(tank)
         .expect("tank exists")
         .apply_damage(u32::MAX, None);
@@ -514,9 +507,8 @@ fn target_death_during_windup_cancels_without_spending_shot() {
             .any(|event| matches!(event, Event::PanzerfaustLaunch { .. }));
     }
 
-    assert!(game.entities.get(tank).is_none());
-    let panzerfaust_entity = game
-        .entities
+    assert!(game.state.entities.get(tank).is_none());
+    let panzerfaust_entity = game.state.entities
         .get(panzerfaust)
         .expect("panzerfaust should survive with its shot still loaded");
     assert_eq!(panzerfaust_entity.kind, EntityKind::Panzerfaust);
@@ -526,7 +518,7 @@ fn target_death_during_windup_cancels_without_spending_shot() {
 #[test]
 fn panzerfaust_killed_during_windup_does_not_launch_or_convert() {
     let (mut game, panzerfaust, tank) = panzerfaust_fixture();
-    game.entities
+    game.state.entities
         .get_mut(panzerfaust)
         .expect("panzerfaust exists")
         .set_invulnerable(false);
@@ -537,7 +529,7 @@ fn panzerfaust_killed_during_windup_does_not_launch_or_convert() {
         Some(PanzerfaustState::Windup { .. })
     ));
 
-    game.entities
+    game.state.entities
         .get_mut(panzerfaust)
         .expect("panzerfaust exists")
         .apply_damage(u32::MAX, None);
@@ -560,7 +552,7 @@ fn panzerfaust_killed_during_windup_does_not_launch_or_convert() {
     }
 
     assert!(
-        game.entities.get(panzerfaust).is_none(),
+        game.state.entities.get(panzerfaust).is_none(),
         "dead Panzerfaust should be removed instead of converting"
     );
     assert!(
@@ -577,8 +569,7 @@ fn panzerfaust_killed_during_windup_does_not_launch_or_convert() {
 fn panzerfaust_killed_during_recovery_does_not_convert_after_death() {
     let (mut game, panzerfaust, _tank) = panzerfaust_fixture();
     {
-        let entity = game
-            .entities
+        let entity = game.state.entities
             .get_mut(panzerfaust)
             .expect("panzerfaust exists");
         entity.set_invulnerable(false);
@@ -592,7 +583,7 @@ fn panzerfaust_killed_during_recovery_does_not_convert_after_death() {
 
     let events = game.tick();
     assert!(
-        game.entities.get(panzerfaust).is_none(),
+        game.state.entities.get(panzerfaust).is_none(),
         "dead recovering Panzerfaust should be removed"
     );
     assert!(
@@ -613,12 +604,11 @@ fn panzerfaust_killed_during_recovery_does_not_convert_after_death() {
 #[test]
 fn replacing_order_after_launch_spends_shot_and_resumes_after_conversion() {
     let (mut game, panzerfaust, tank) = panzerfaust_fixture();
-    let start = game
-        .entities
+    let start = game.state.entities
         .get(panzerfaust)
         .map(|entity| (entity.pos_x, entity.pos_y))
         .expect("panzerfaust exists");
-    let tank_hp = game.entities.get(tank).expect("tank exists").hp;
+    let tank_hp = game.state.entities.get(tank).expect("tank exists").hp;
     enqueue_attack(&mut game, panzerfaust, tank, false);
 
     let mut saw_launch = false;
@@ -637,7 +627,7 @@ fn replacing_order_after_launch_spends_shot_and_resumes_after_conversion() {
         "test setup should reach launch before replacing the order"
     );
 
-    let move_goal = game.map.tile_center(20, 8);
+    let move_goal = game.state.map.tile_center(20, 8);
     game.enqueue(
         1,
         Command::Move {
@@ -656,7 +646,7 @@ fn replacing_order_after_launch_spends_shot_and_resumes_after_conversion() {
             .iter()
             .any(|event| matches!(event, Event::PanzerfaustImpact { .. }));
         if impact_this_tick && impact_hp.is_none() {
-            impact_hp = game.entities.get(tank).map(|tank| tank.hp);
+            impact_hp = game.state.entities.get(tank).map(|tank| tank.hp);
         }
         saw_conversion |= player_events(&events, 1).iter().any(
             |event| matches!(event, Event::PanzerfaustConversion { id, .. } if *id == panzerfaust),
@@ -667,8 +657,7 @@ fn replacing_order_after_launch_spends_shot_and_resumes_after_conversion() {
         impact_hp,
         Some(tank_hp.saturating_sub(config::PANZERFAUST_DAMAGE))
     );
-    let converted = game
-        .entities
+    let converted = game.state.entities
         .get(panzerfaust)
         .expect("same entity id should remain");
     assert!(saw_conversion);
@@ -682,7 +671,7 @@ fn replacing_order_after_launch_spends_shot_and_resumes_after_conversion() {
 #[test]
 fn impact_visual_uses_launch_endpoint_after_target_leaves_visibility() {
     let (mut game, panzerfaust, tank) = panzerfaust_fixture();
-    let tank_hp = game.entities.get(tank).expect("tank exists").hp;
+    let tank_hp = game.state.entities.get(tank).expect("tank exists").hp;
     enqueue_attack(&mut game, panzerfaust, tank, false);
 
     let mut launch_endpoint = None;
@@ -701,9 +690,9 @@ fn impact_visual_uses_launch_endpoint_after_target_leaves_visibility() {
     }
     let launch_endpoint = launch_endpoint.expect("test setup should reach launch");
 
-    let moved_pos = game.map.tile_center(24, 8);
+    let moved_pos = game.state.map.tile_center(24, 8);
     {
-        let tank_entity = game.entities.get_mut(tank).expect("tank exists");
+        let tank_entity = game.state.entities.get_mut(tank).expect("tank exists");
         tank_entity.set_position(moved_pos.0, moved_pos.1);
         tank_entity.clear_path();
     }
@@ -734,7 +723,7 @@ fn impact_visual_uses_launch_endpoint_after_target_leaves_visibility() {
         "impact feedback should not reveal the target's new hidden position"
     );
     assert_eq!(
-        game.entities.get(tank).expect("tank exists").hp,
+        game.state.entities.get(tank).expect("tank exists").hp,
         tank_hp.saturating_sub(config::PANZERFAUST_DAMAGE)
     );
 }
@@ -759,7 +748,7 @@ fn target_death_during_travel_spends_shot_and_still_converts() {
         saw_launch,
         "test setup should reach launch before killing target"
     );
-    game.entities
+    game.state.entities
         .get_mut(tank)
         .expect("tank exists")
         .apply_damage(u32::MAX, None);
@@ -776,9 +765,9 @@ fn target_death_during_travel_spends_shot_and_still_converts() {
         );
     }
 
-    assert!(game.entities.get(tank).is_none());
+    assert!(game.state.entities.get(tank).is_none());
     assert_eq!(
-        game.entities
+        game.state.entities
             .get(panzerfaust)
             .expect("panzerfaust id should remain")
             .kind,

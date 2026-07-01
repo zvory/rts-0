@@ -37,9 +37,9 @@ fn default_map_game() -> Game {
 }
 
 fn first_passable_tile(game: &Game) -> (u32, u32) {
-    for ty in 8..game.map.size.saturating_sub(8) {
-        for tx in 8..game.map.size.saturating_sub(8) {
-            if game.map.is_passable(tx as i32, ty as i32) {
+    for ty in 8..game.state.map.size.saturating_sub(8) {
+        for tx in 8..game.state.map.size.saturating_sub(8) {
+            if game.state.map.is_passable(tx as i32, ty as i32) {
                 return (tx, ty);
             }
         }
@@ -70,15 +70,14 @@ fn lab_oil_entity(id: u32, x: f32, y: f32) -> LabScenarioEntity {
 #[test]
 fn lab_scenario_restore_rejects_oil_source_inside_building() {
     let game = default_map_game();
-    let city_centre = game
-        .entities
+    let city_centre = game.state.entities
         .iter()
         .find(|entity| entity.kind == EntityKind::CityCentre)
         .expect("lab game should include a City Centre");
 
     let err = super::restore_resource_node_position(
-        &game.map,
-        &game.entities,
+        &game.state.map,
+        &game.state.entities,
         EntityKind::Oil,
         city_centre.pos_x,
         city_centre.pos_y,
@@ -94,7 +93,7 @@ fn lab_scenario_restore_centers_and_spaces_oil_nodes() {
     let source = default_map_game();
     let mut scenario = source.export_lab_scenario();
     let (tile_x, tile_y) = first_passable_tile(&source);
-    let (center_x, center_y) = source.map.tile_center(tile_x, tile_y);
+    let (center_x, center_y) = source.state.map.tile_center(tile_x, tile_y);
     scenario.entities = vec![
         lab_oil_entity(101, center_x - 12.0, center_y - 12.0),
         lab_oil_entity(102, center_x + 10.0, center_y + 10.0),
@@ -106,16 +105,15 @@ fn lab_scenario_restore_centers_and_spaces_oil_nodes() {
         .apply_lab_op(LabOp::RestoreScenario(Box::new(scenario)))
         .expect("scenario restore should normalize oil nodes");
 
-    let oils: Vec<_> = restored
-        .entities
+    let oils: Vec<_> = restored.state.entities
         .iter()
         .filter(|entity| entity.kind == EntityKind::Oil)
         .collect();
     assert_eq!(oils.len(), 3);
     let mut oil_tiles = Vec::new();
     for oil in oils {
-        let (oil_tile_x, oil_tile_y) = restored.map.tile_of(oil.pos_x, oil.pos_y);
-        let (expected_x, expected_y) = restored.map.tile_center(oil_tile_x, oil_tile_y);
+        let (oil_tile_x, oil_tile_y) = restored.state.map.tile_of(oil.pos_x, oil.pos_y);
+        let (expected_x, expected_y) = restored.state.map.tile_center(oil_tile_x, oil_tile_y);
         assert!(
             (oil.pos_x - expected_x).abs() < 0.001 && (oil.pos_y - expected_y).abs() < 0.001,
             "restored oil node {} should be centered on tile ({oil_tile_x}, {oil_tile_y})",

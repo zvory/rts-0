@@ -27,7 +27,7 @@ impl Game {
     }
 
     pub fn snapshot_for_with_options(&self, player: u32, options: SnapshotOptions) -> Snapshot {
-        let live_fog = self.team_current_fog_for(player, &self.fog);
+        let live_fog = self.team_current_fog_for(player, &self.state.fog);
         self.snapshot_for_mode(
             SnapshotMode {
                 player,
@@ -56,7 +56,7 @@ impl Game {
             SnapshotMode {
                 player,
                 memory_players: &[],
-                fog: &self.fog,
+                fog: &self.state.fog,
                 actionable_fog: None,
                 fogged: false,
                 player_resource_projection: PlayerResourceProjection::All,
@@ -75,8 +75,7 @@ impl Game {
         visible_players: &[u32],
         options: SnapshotOptions,
     ) -> Snapshot {
-        let actionable_fog = self
-            .fog
+        let actionable_fog = self.state.fog
             .union_for(Self::SPECTATOR_VIEWER_ID, visible_players);
         self.snapshot_for_mode(
             SnapshotMode {
@@ -111,11 +110,11 @@ impl Game {
         let mut resource_deltas = Vec::new();
         // Use the spatial index for interest filtering instead of a full entity scan.
         for id in self.final_spatial().all_ids() {
-            let e = match self.entities.get(id) {
+            let e = match self.state.entities.get(id) {
                 Some(e) => e,
                 None => continue,
             };
-            let target = e.target_id().and_then(|target| self.entities.get(target));
+            let target = e.target_id().and_then(|target| self.state.entities.get(target));
             if e.is_node() && (!fogged || fog.is_visible_world(player, e.pos_x, e.pos_y)) {
                 if let Some(remaining) = e.remaining() {
                     resource_deltas.push(ResourceDelta {
@@ -130,17 +129,17 @@ impl Game {
                 projection::EntityProjectionContext {
                     fog,
                     actionable_fog,
-                    private_detail_fog: Some(&self.fog),
-                    smokes: Some(&self.smokes),
+                    private_detail_fog: Some(&self.state.fog),
+                    smokes: Some(&self.state.smokes),
                     fogged,
-                    entities: &self.entities,
+                    entities: &self.state.entities,
                     target,
                     debug_path_projection: options.debug_path_projection(),
-                    active_construction_sites: Some(&self.active_construction_sites),
+                    active_construction_sites: Some(&self.state.active_construction_sites),
                     teams: Some(&teams),
                     owner_faction_id: self.player(e.owner).map(|p| p.faction_id.as_str()),
-                    ability_runtime: Some(&self.ability_runtime),
-                    tick: self.tick,
+                    ability_runtime: Some(&self.state.ability_runtime),
+                    tick: self.state.tick,
                 },
             ) {
                 entities.push(view);
@@ -156,29 +155,29 @@ impl Game {
         };
         let mut smokes =
             if fogged && matches!(player_resource_projection, PlayerResourceProjection::None) {
-                self.smokes
+                self.state.smokes
                     .iter()
                     .filter(|cloud| {
-                        self.smokes
-                            .visible_to_player(cloud, player, fog, &self.entities, &teams)
+                        self.state.smokes
+                            .visible_to_player(cloud, player, fog, &self.state.entities, &teams)
                     })
                     .map(|cloud| crate::protocol::SmokeCloudView {
                         id: cloud.id,
                         x: cloud.x,
                         y: cloud.y,
                         radius_tiles: cloud.radius_tiles,
-                        expires_in: cloud.expires_in(self.tick),
+                        expires_in: cloud.expires_in(self.state.tick),
                     })
                     .collect::<Vec<_>>()
             } else {
-                self.smokes
+                self.state.smokes
                     .iter()
                     .map(|cloud| crate::protocol::SmokeCloudView {
                         id: cloud.id,
                         x: cloud.x,
                         y: cloud.y,
                         radius_tiles: cloud.radius_tiles,
-                        expires_in: cloud.expires_in(self.tick),
+                        expires_in: cloud.expires_in(self.state.tick),
                     })
                     .collect::<Vec<_>>()
             };
@@ -191,12 +190,12 @@ impl Game {
             !matches!(player_resource_projection, PlayerResourceProjection::None),
         );
         ability_objects.sort_by_key(|object| object.id);
-        let trenches = self.trenches.views_for(player, fog, fogged, memory_players);
+        let trenches = self.state.trenches.views_for(player, fog, fogged, memory_players);
 
         let player_resources = self.player_resource_snapshots(player_resource_projection);
 
         Snapshot {
-            tick: self.tick,
+            tick: self.state.tick,
             steel,
             oil,
             supply_used,
@@ -228,7 +227,7 @@ impl Game {
     }
 
     fn player(&self, id: u32) -> Option<&PlayerState> {
-        self.players.iter().find(|p| p.id == id)
+        self.state.players.iter().find(|p| p.id == id)
     }
 
     fn remembered_building_views_for(
@@ -240,7 +239,7 @@ impl Game {
     ) -> Vec<RememberedBuildingView> {
         let mut views: Vec<RememberedBuildingView> = Vec::new();
         for &memory_player in memory_players {
-            for entry in self.building_memory.entries_for_player(memory_player) {
+            for entry in self.state.building_memory.entries_for_player(memory_player) {
                 if self.live_entity_projects_for_remembered_building(player, entry.id, fog, teams) {
                     continue;
                 }
@@ -273,24 +272,24 @@ impl Game {
         fog: &Fog,
         teams: &crate::game::teams::TeamRelations,
     ) -> bool {
-        self.entities.get(entity_id).is_some_and(|entity| {
+        self.state.entities.get(entity_id).is_some_and(|entity| {
             projection::project_entity(
                 player,
                 entity,
                 projection::EntityProjectionContext {
                     fog,
                     actionable_fog: Some(fog),
-                    private_detail_fog: Some(&self.fog),
-                    smokes: Some(&self.smokes),
+                    private_detail_fog: Some(&self.state.fog),
+                    smokes: Some(&self.state.smokes),
                     fogged: true,
-                    entities: &self.entities,
+                    entities: &self.state.entities,
                     target: None,
                     debug_path_projection: projection::DebugPathProjection::None,
-                    active_construction_sites: Some(&self.active_construction_sites),
+                    active_construction_sites: Some(&self.state.active_construction_sites),
                     teams: Some(teams),
                     owner_faction_id: self.player(entity.owner).map(|p| p.faction_id.as_str()),
-                    ability_runtime: Some(&self.ability_runtime),
-                    tick: self.tick,
+                    ability_runtime: Some(&self.state.ability_runtime),
+                    tick: self.state.tick,
                 },
             )
             .is_some()
@@ -301,7 +300,7 @@ impl Game {
         &self,
         projection: PlayerResourceProjection<'_>,
     ) -> Vec<PlayerResourceSnapshot> {
-        self.players
+        self.state.players
             .iter()
             .filter(|player| match projection {
                 PlayerResourceProjection::None => false,

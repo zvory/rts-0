@@ -99,7 +99,8 @@ impl Game {
     }
 
     pub fn team_of_player(&self, player_id: u32) -> Option<TeamId> {
-        self.players
+        self.state
+            .players
             .iter()
             .find(|player| player.id == player_id)
             .map(|player| player.team_id)
@@ -134,7 +135,8 @@ impl Game {
         let Some(team_id) = self.team_of_player(player_id) else {
             return Vec::new();
         };
-        self.players
+        self.state
+            .players
             .iter()
             .filter(|player| player.id != player_id && player.team_id == team_id && team_id != 0)
             .map(|player| player.id)
@@ -149,7 +151,8 @@ impl Game {
             return Vec::new();
         }
         let alive_players = self.alive_players();
-        self.players
+        self.state
+            .players
             .iter()
             .filter(|player| player.team_id == team_id && alive_players.contains(&player.id))
             .map(|player| player.id)

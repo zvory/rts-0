@@ -14,8 +14,7 @@ impl Game {
     pub fn observer_analysis(&self) -> ObserverAnalysisPayload {
         ObserverAnalysisPayload {
             tick: self.tick_count(),
-            players: self
-                .players
+            players: self.state.players
                 .iter()
                 .map(|player| ObserverAnalysisPlayer {
                     id: player.id,
@@ -30,7 +29,7 @@ impl Game {
 
     fn current_unit_inventory(&self, player_id: u32) -> Vec<ObserverAnalysisKindCount> {
         let mut counts = BTreeMap::new();
-        for entity in self.entities.iter() {
+        for entity in self.state.entities.iter() {
             if entity.owner == player_id && entity.kind.is_unit() && entity.hp > 0 {
                 *counts.entry(entity.kind).or_insert(0) += 1;
             }
@@ -40,7 +39,7 @@ impl Game {
 
     fn current_production(&self, player_id: u32) -> Vec<ObserverAnalysisProduction> {
         let mut rows = Vec::new();
-        for entity in self.entities.iter() {
+        for entity in self.state.entities.iter() {
             if entity.owner != player_id || !entity.kind.is_building() || entity.hp == 0 {
                 continue;
             }

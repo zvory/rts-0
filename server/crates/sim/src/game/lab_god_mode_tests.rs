@@ -49,22 +49,20 @@ fn new_game() -> Game {
 }
 
 fn tile_center(game: &Game, x: u32, y: u32) -> (f32, f32) {
-    game.map.tile_center(x, y)
+    game.state.map.tile_center(x, y)
 }
 
 #[test]
 fn lab_god_mode_makes_player_units_and_buildings_ignore_damage() {
     let mut game = new_game();
-    let worker_id = game
-        .entities
+    let worker_id = game.state.entities
         .iter()
         .find(|entity| entity.owner == 1 && entity.kind == EntityKind::Worker)
         .expect("starting worker")
         .id;
-    let worker_hp = game.entities.get(worker_id).expect("worker").hp;
+    let worker_hp = game.state.entities.get(worker_id).expect("worker").hp;
     let (node_x, node_y) = tile_center(&game, 42, 42);
-    let node_id = game
-        .entities
+    let node_id = game.state.entities
         .spawn_node(EntityKind::Steel, node_x, node_y)
         .expect("steel node should spawn");
 
@@ -74,7 +72,7 @@ fn lab_god_mode_makes_player_units_and_buildings_ignore_damage() {
     })
     .expect("god mode should enable");
 
-    let worker = game.entities.get_mut(worker_id).expect("worker");
+    let worker = game.state.entities.get_mut(worker_id).expect("worker");
     assert!(worker.invulnerable());
     assert!(!worker.apply_damage(10, Some((2, (0.0, 0.0), 1))));
     assert_eq!(worker.hp, worker_hp);
@@ -92,9 +90,9 @@ fn lab_god_mode_makes_player_units_and_buildings_ignore_damage() {
     else {
         panic!("unexpected outcome");
     };
-    assert!(game.entities.get(unit_id).expect("rifleman").invulnerable());
+    assert!(game.state.entities.get(unit_id).expect("rifleman").invulnerable());
 
-    let (building_x, building_y) = footprint_center(&game.map, EntityKind::Depot, 34, 34);
+    let (building_x, building_y) = footprint_center(&game.state.map, EntityKind::Depot, 34, 34);
     let LabOpOutcome::Spawned {
         entity_id: depot_id,
     } = game
@@ -109,13 +107,13 @@ fn lab_god_mode_makes_player_units_and_buildings_ignore_damage() {
     else {
         panic!("unexpected outcome");
     };
-    let depot = game.entities.get_mut(depot_id).expect("depot");
+    let depot = game.state.entities.get_mut(depot_id).expect("depot");
     let depot_hp = depot.hp;
     assert!(depot.invulnerable());
     assert!(!depot.apply_damage(10, Some((2, (0.0, 0.0), 1))));
     assert_eq!(depot.hp, depot_hp);
 
-    let node = game.entities.get(node_id).expect("steel node");
+    let node = game.state.entities.get(node_id).expect("steel node");
     assert!(!node.invulnerable());
 
     game.apply_lab_op(LabOp::SetPlayerGodMode {
@@ -123,12 +121,12 @@ fn lab_god_mode_makes_player_units_and_buildings_ignore_damage() {
         enabled: false,
     })
     .expect("god mode should disable");
-    let worker = game.entities.get_mut(worker_id).expect("worker");
+    let worker = game.state.entities.get_mut(worker_id).expect("worker");
     assert!(!worker.invulnerable());
     assert!(worker.apply_damage(10, Some((2, (0.0, 0.0), 2))));
     assert_eq!(worker.hp, worker_hp - 10);
 
-    let depot = game.entities.get_mut(depot_id).expect("depot");
+    let depot = game.state.entities.get_mut(depot_id).expect("depot");
     assert!(!depot.invulnerable());
     assert!(depot.apply_damage(10, Some((2, (0.0, 0.0), 2))));
     assert_eq!(depot.hp, depot_hp - 10);
@@ -156,14 +154,14 @@ fn lab_god_mode_follows_unit_owner_changes() {
     else {
         panic!("unexpected outcome");
     };
-    assert!(!game.entities.get(entity_id).expect("tank").invulnerable());
+    assert!(!game.state.entities.get(entity_id).expect("tank").invulnerable());
 
     game.apply_lab_op(LabOp::SetEntityOwner(LabSetEntityOwner {
         entity_id,
         owner: 2,
     }))
     .expect("owner should change");
-    assert!(game.entities.get(entity_id).expect("tank").invulnerable());
+    assert!(game.state.entities.get(entity_id).expect("tank").invulnerable());
 
     assert!(matches!(
         game.apply_lab_op(LabOp::SetPlayerGodMode {

@@ -320,12 +320,11 @@ impl Game {
             seed,
             layout.scenario_id(),
         );
-        if let Some(player) = game.players.iter_mut().find(|p| p.id == player_id) {
+        if let Some(player) = game.state.players.iter_mut().find(|p| p.id == player_id) {
             player.refund_resources(1_000, 0);
             let _ = player.spend_resources(0, 9_000);
         }
-        if let Some(loadout) = game
-            .starting_loadouts
+        if let Some(loadout) = game.state.starting_loadouts
             .iter_mut()
             .find(|loadout| loadout.player_id == player_id)
         {
@@ -493,12 +492,11 @@ impl Game {
             seed,
             "dev:entrenchment_inspection",
         );
-        if let Some(player) = game.players.iter_mut().find(|p| p.id == player_id) {
+        if let Some(player) = game.state.players.iter_mut().find(|p| p.id == player_id) {
             player.upgrades.insert(upgrade::UpgradeKind::Entrenchment);
             player.refund_resources(1_000, 1_000);
         }
-        if let Some(loadout) = game
-            .starting_loadouts
+        if let Some(loadout) = game.state.starting_loadouts
             .iter_mut()
             .find(|loadout| loadout.player_id == player_id)
         {
@@ -506,11 +504,11 @@ impl Game {
             loadout.starting_oil = 1_000;
         }
         for (x, y) in [preseeded_trench, connected_trench, fog_reference_trench] {
-            game.trenches
-                .create(&game.map, x, y)
+            game.state.trenches
+                .create(&game.state.map, x, y)
                 .ok_or_else(|| "failed to seed entrenchment trench".to_string())?;
         }
-        let player_ids: Vec<u32> = game.players.iter().map(|player| player.id).collect();
+        let player_ids: Vec<u32> = game.state.players.iter().map(|player| player.id).collect();
         game.refresh_trench_memory(&player_ids);
 
         Ok(DevScenarioSetup {
@@ -646,16 +644,16 @@ fn build_dev_scenario_game_with_teams<const N: usize>(
         .collect();
     let rng = SmallRng::seed_from_u64(seed as u64);
     let mut game = Game::new_without_ai_controllers(&players, seed);
-    game.map = map;
-    game.entities = entities;
-    game.fog = Fog::new(game.map.size);
-    game.pending.clear();
-    game.command_log.clear();
-    game.tick = 0;
+    game.state.map = map;
+    game.state.entities = entities;
+    game.state.fog = Fog::new(game.state.map.size);
+    game.state.pending.clear();
+    game.state.command_log.clear();
+    game.state.tick = 0;
     game.reset_derived_state();
-    game.lingering_sight.clear();
-    game.smokes = SmokeCloudStore::new();
-    game.starting_loadouts = players
+    game.state.lingering_sight.clear();
+    game.state.smokes = SmokeCloudStore::new();
+    game.state.starting_loadouts = players
         .iter()
         .map(|player| PlayerStartingLoadout {
             player_id: player.id,
@@ -665,21 +663,20 @@ fn build_dev_scenario_game_with_teams<const N: usize>(
             starting_oil: 0,
         })
         .collect();
-    game.map_metadata = super::dev_map_metadata(metadata_name);
-    game.active_construction_sites.clear();
-    game.starting_loadout = StartingLoadout::Standard;
-    game.rng = rng;
-    if let Some(player) = game
-        .players
+    game.state.map_metadata = super::dev_map_metadata(metadata_name);
+    game.state.active_construction_sites.clear();
+    game.state.starting_loadout = StartingLoadout::Standard;
+    game.state.rng = rng;
+    if let Some(player) = game.state.players
         .iter_mut()
         .find(|player| player.id == player_id)
     {
         player.reset_for_dev_scenario(start_tile);
     }
-    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
-    game.fog = Fog::new(game.map.size);
-    game.fog
-        .recompute_with_smoke(&ids, &game.entities, &game.map, &game.smokes);
+    let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
+    game.state.fog = Fog::new(game.state.map.size);
+    game.state.fog
+        .recompute_with_smoke(&ids, &game.state.entities, &game.state.map, &game.state.smokes);
     game.refresh_trench_memory(&ids);
     game
 }
