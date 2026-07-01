@@ -1497,6 +1497,11 @@
       "path": "state.rs",
       "line": 18,
       "code": "pub(in crate::game) players: Vec<PlayerState>,"
+    },
+    {
+      "path": "state.rs",
+      "line": 45,
+      "code": "players: Vec<PlayerState>,"
     }
   ],
   "player_state_field_writes": [

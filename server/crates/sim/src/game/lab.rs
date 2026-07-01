@@ -764,7 +764,7 @@ impl Game {
         self.repair_mortar_autocast_state();
         systems::recompute_supply(&mut self.state.players, &self.state.entities);
         self.reset_derived_state();
-        let ids: Vec<u32> = self.state.players.iter().map(|player| player.id).collect();
+        let ids = self.state.player_ids();
         self.state.fog
             .recompute_with_smoke(&ids, &self.state.entities, &self.state.map, &self.state.smokes);
         self.refresh_building_memory(&ids);

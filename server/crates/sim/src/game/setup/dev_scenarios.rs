@@ -1,6 +1,7 @@
 use super::*;
 use crate::game::entity::Order;
 use crate::rules::combat::WeaponKind;
+use rand::{rngs::SmallRng, SeedableRng};
 
 mod layouts;
 mod panzerfaust;
@@ -508,7 +509,7 @@ impl Game {
                 .create(&game.state.map, x, y)
                 .ok_or_else(|| "failed to seed entrenchment trench".to_string())?;
         }
-        let player_ids: Vec<u32> = game.state.players.iter().map(|player| player.id).collect();
+        let player_ids = game.state.player_ids();
         game.refresh_trench_memory(&player_ids);
 
         Ok(DevScenarioSetup {
@@ -673,7 +674,7 @@ fn build_dev_scenario_game_with_teams<const N: usize>(
     {
         player.reset_for_dev_scenario(start_tile);
     }
-    let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
+    let ids = game.state.player_ids();
     game.state.fog = Fog::new(game.state.map.size);
     game.state.fog
         .recompute_with_smoke(&ids, &game.state.entities, &game.state.map, &game.state.smokes);

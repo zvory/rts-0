@@ -55,7 +55,6 @@ use crate::protocol::{
 use crate::rules::{economy as economy_rules, projection};
 use serde::{Deserialize, Serialize};
 
-pub(in crate::game) use building_memory::BuildingMemory;
 use building_memory::BuildingMemoryEntry;
 use derived_state::DerivedState;
 use entity::{BuildPhase, EntityKind, EntityStore};
@@ -64,13 +63,10 @@ use map::Map;
 pub use map::MapMetadata;
 #[cfg(test)]
 pub(in crate::game) use mortar::MortarShellStore;
-use rand::rngs::SmallRng;
-use rand::SeedableRng;
 use replay::CommandLogEntry;
 pub(crate) use setup::StartingLoadout;
 use smoke::SmokeCloudStore;
 use state::GameState;
-pub(in crate::game) use trench::TrenchStore;
 
 pub use crate::game::command::SimCommand;
 pub use teams::TeamId;
@@ -197,7 +193,7 @@ impl Game {
         self.state.tick = self.state.tick.wrapping_add(1);
         self.derived.advance_pathing_tick(self.state.tick);
         self.state.smokes.retain_active(self.state.tick);
-        let player_ids: Vec<u32> = self.state.players.iter().map(|p| p.id).collect();
+        let player_ids = self.state.player_ids();
         if self.retain_active_visibility_sources() {
             self.recompute_live_fog(&player_ids);
         }
@@ -378,7 +374,7 @@ impl Game {
             .retain(|source| source.viewer() != player);
         // Recompute fog so the now-entity-less player's visibility goes dark immediately;
         // otherwise a stale grid would keep leaking neutral/enemy entities into their snapshots.
-        let ids: Vec<u32> = self.state.players.iter().map(|p| p.id).collect();
+        let ids = self.state.player_ids();
         self.recompute_live_fog(&ids);
         self.refresh_building_memory(&ids);
         self.refresh_trench_memory(&ids);
@@ -399,7 +395,7 @@ impl Game {
             config::SMOKE_CLOUD_DURATION_TICKS,
             self.state.tick,
         )?;
-        let ids: Vec<u32> = self.state.players.iter().map(|p| p.id).collect();
+        let ids = self.state.player_ids();
         self.recompute_live_fog(&ids);
         self.refresh_building_memory(&ids);
         self.refresh_trench_memory(&ids);
@@ -410,7 +406,7 @@ impl Game {
     #[cfg(any(test, debug_assertions))]
     pub(crate) fn spawn_trench_for_test(&mut self, x: f32, y: f32) -> Option<u32> {
         let id = self.state.trenches.create(&self.state.map, x, y)?;
-        let ids: Vec<u32> = self.state.players.iter().map(|p| p.id).collect();
+        let ids = self.state.player_ids();
         self.refresh_trench_memory(&ids);
         Some(id)
     }

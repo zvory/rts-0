@@ -292,37 +292,22 @@ impl Game {
             LIVE_PATHING_DEFAULT_BUDGET,
             LIVE_PATHING_CACHE_CAPACITY,
         );
-        let rng = SmallRng::seed_from_u64(seed as u64);
         let mut game = Game {
-            state: GameState {
+            state: GameState::new(
                 map,
                 entities,
                 fog,
-                building_memory: BuildingMemory::default(),
-                players: player_states,
-                pending: Vec::new(),
-                command_log: Vec::new(),
-                tick: 0,
-                lingering_sight: Vec::new(),
-                firing_reveals: Vec::new(),
-                smokes: SmokeCloudStore::new(),
-                trenches: TrenchStore::new(),
-                ability_runtime: crate::game::ability_runtime::AbilityRuntime::new(),
-                mortar_shells: crate::game::mortar::MortarShellStore::default(),
-                artillery_shells: crate::game::artillery::ArtilleryShellStore::default(),
+                player_states,
                 seed,
-                starting_loadouts: resolved_starting_loadouts,
+                resolved_starting_loadouts,
                 map_metadata,
-                active_construction_sites: BTreeSet::new(),
-                lab_god_mode_players: BTreeSet::new(),
                 starting_loadout,
-                rng,
-            },
+            ),
             derived,
         };
         // Initialize supply accounting and fog so the very first snapshot is correct.
         systems::recompute_supply(&mut game.state.players, &game.state.entities);
-        let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
+        let ids = game.state.player_ids();
         game.recompute_live_fog(&ids);
         game.refresh_building_memory(&ids);
         game.refresh_trench_memory(&ids);
