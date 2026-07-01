@@ -171,7 +171,8 @@ impl Game {
             };
             for &(building_id, building_kind, rect) in &building_rects {
                 assert!(
-                    !circle_intersects_rect(body, rect),
+                    standability::resource_node_building_overlap_allowed(node, building_kind, rect)
+                        || !circle_intersects_rect(body, rect),
                     "invariant: tick {} resource node body overlaps building footprint; node={}; building=id={} kind={} {}; collision={}",
                     self.tick,
                     entity_context(&self.map, node),
@@ -695,6 +696,7 @@ fn third_label(
 #[cfg(test)]
 mod tests {
     use std::panic::{catch_unwind, AssertUnwindSafe};
+    use std::str::FromStr;
 
     use super::{location_context, unit_body_rect_overlap_depth, STATIC_BODY_OVERLAP_TOLERANCE_PX};
     use crate::config;
@@ -869,6 +871,33 @@ mod tests {
         assert!(message.contains("tile=("));
         assert!(message.contains("region="));
         assert!(message.contains("overlap_depth="));
+    }
+
+    #[test]
+    fn pump_jack_oil_overlap_is_valid_invariant_state() {
+        let players = [PlayerInit {
+            id: 1,
+            team_id: 1,
+            faction_id: "kriegsia".to_string(),
+            name: "Solo".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        }];
+        let mut game = Game::new(&players, 0x1234_5678);
+        for tile in &mut game.map.terrain {
+            *tile = crate::protocol::terrain::GRASS;
+        }
+
+        let (x, y) = footprint_center(&game.map, EntityKind::PumpJack, 10, 10);
+        let oil_kind = EntityKind::from_str("oil").expect("oil kind");
+        game.entities
+            .spawn_node(oil_kind, x, y)
+            .expect("oil spawn");
+        game.entities
+            .spawn_building(1, EntityKind::PumpJack, x, y, true)
+            .expect("pump jack spawn");
+
+        game.assert_invariants();
     }
 
     #[test]

@@ -186,7 +186,7 @@ pub fn validate_lab_scenario_authoring(
     }
 
     validate_entry_matches_scenario(&entry, &scenario)?;
-    validate_lab_scenario_vision(&scenario.metadata.lab.vision, &scenario.players)?;
+    validate_lab_scenario_lab_metadata(&scenario.metadata.lab, &scenario.players)?;
     let scenario_json = serde_json::to_string_pretty(&scenario)
         .map_err(|err| format!("failed to format lab scenario JSON: {err}"))?
         + "\n";
@@ -286,7 +286,7 @@ fn load_lab_scenario_entry(
     })?;
     let scenario: LabScenarioV1 = serde_json::from_str(&json)
         .map_err(|err| format!("invalid lab scenario {:?} JSON: {err}", entry.id))?;
-    validate_lab_scenario_vision(&scenario.metadata.lab.vision, &scenario.players)?;
+    validate_lab_scenario_lab_metadata(&scenario.metadata.lab, &scenario.players)?;
     let sim_scenario = protocol_scenario_to_sim(&scenario)
         .map_err(|err| format!("invalid lab scenario {:?} payload: {err}", entry.id))?;
     Ok(LoadedLabScenario {
@@ -417,7 +417,22 @@ fn build_game_from_scenario(
     let mut game = Game::new_lab(&inits, scenario.seed, map, map_metadata);
     game.apply_lab_op(LabOp::RestoreScenario(Box::new(sim_scenario)))
         .map_err(|err| lab_error_text(&err))?;
+    for &player_id in &scenario.metadata.lab.god_mode_players {
+        game.apply_lab_op(LabOp::SetPlayerGodMode {
+            player_id,
+            enabled: true,
+        })
+        .map_err(|err| lab_error_text(&err))?;
+    }
     Ok(game)
+}
+
+pub(crate) fn validate_lab_scenario_lab_metadata(
+    lab: &crate::protocol::LabScenarioLabMetadata,
+    players: &[crate::protocol::LabScenarioPlayer],
+) -> Result<(), String> {
+    validate_lab_scenario_vision(&lab.vision, players)?;
+    validate_lab_scenario_god_mode_players(&lab.god_mode_players, players)
 }
 
 fn validate_lab_scenario_vision(
@@ -449,6 +464,22 @@ fn validate_lab_scenario_vision(
             Ok(())
         }
     }
+}
+
+fn validate_lab_scenario_god_mode_players(
+    player_ids: &[u32],
+    players: &[crate::protocol::LabScenarioPlayer],
+) -> Result<(), String> {
+    let mut seen = HashSet::new();
+    for player_id in player_ids {
+        if !seen.insert(*player_id) {
+            return Err("godModePlayers must not contain duplicates".to_string());
+        }
+        if !players.iter().any(|player| player.id == *player_id) {
+            return Err("unknown scenario god mode player id".to_string());
+        }
+    }
+    Ok(())
 }
 
 fn safe_scenario_id(value: &str) -> bool {
@@ -523,7 +554,7 @@ mod tests {
     }
 
     #[test]
-    fn bundled_lab_scenario_catalog_loads_lategame_and_restores() {
+    fn bundled_lab_scenario_catalog_loads_bundled_scenarios_and_restores() {
         let catalog = load_lab_scenario_catalog().expect("bundled lab catalog should load");
         let lategame = catalog
             .iter()
@@ -569,6 +600,25 @@ mod tests {
                 );
             }
         }
+
+        let render_preview = catalog
+            .iter()
+            .find(|entry| entry.id == "render-preview")
+            .expect("render-preview catalog row");
+        assert_eq!(render_preview.map, "Default");
+        assert_eq!(render_preview.player_count, 2);
+        assert_eq!(render_preview.filename, "render-preview.json");
+
+        let loaded = load_lab_scenario_by_id("render-preview")
+            .expect("bundled render-preview scenario should load");
+        let game = loaded
+            .build_game()
+            .expect("render-preview scenario should restore through lab APIs");
+        let scenario = game.export_lab_scenario();
+        assert_eq!(scenario.seed, 126_097_607);
+        assert_eq!(scenario.players.len(), 2);
+        assert_eq!(scenario.entities.len(), 174);
+        assert_eq!(game.lab_god_mode_players(), vec![1, 2]);
     }
 
     #[test]

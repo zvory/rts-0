@@ -10,10 +10,8 @@ mod client_net_report;
 mod compact_snapshot;
 mod contract_metadata;
 mod messagepack_frame;
-
 #[cfg(test)]
 use contract_metadata::{ability_code, kind_code};
-
 pub use contract_metadata::{
     abilities, ability_object_kinds, kinds, lobby_kinds, protocol_contract, states, terrain,
     upgrades, weapons, CompactSlotSchemas, ProtocolCompactCodes, ProtocolContract, ProtocolMessageTags,
@@ -430,6 +428,8 @@ pub struct LabScenarioMetadata {
 #[serde(rename_all = "camelCase")]
 pub struct LabScenarioLabMetadata {
     pub vision: LabVisionMode,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub god_mode_players: Vec<u32>,
 }
 
 // ---------------------------------------------------------------------------

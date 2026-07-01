@@ -465,6 +465,17 @@ fn lab_scenario_export_and_import_round_trip_through_room_ops() {
 
     task.on_lab_request(
         99,
+        26,
+        LabClientOp::SetPlayerGodMode {
+            player_id: LAB_PLAYER_TWO_ID,
+            enabled: true,
+        },
+    );
+    assert!(lab_results(&mut writer)[0].ok);
+    while collab_writer.reliable_rx.try_recv().is_ok() {}
+
+    task.on_lab_request(
+        99,
         21,
         LabClientOp::SetVision {
             vision: LabVisionMode::Team { team_id: 2 },
@@ -496,6 +507,10 @@ fn lab_scenario_export_and_import_round_trip_through_room_ops() {
     assert_eq!(
         scenario.metadata.lab.vision,
         LabVisionMode::Team { team_id: 2 }
+    );
+    assert_eq!(
+        scenario.metadata.lab.god_mode_players,
+        vec![LAB_PLAYER_TWO_ID]
     );
     assert!(scenario.players.iter().any(|player| {
         player.id == LAB_PLAYER_ONE_ID
@@ -531,6 +546,7 @@ fn lab_scenario_export_and_import_round_trip_through_room_ops() {
     let Phase::InGame(game) = &task.phase else {
         panic!("lab should still be live after import");
     };
+    assert_eq!(game.lab_god_mode_players(), vec![LAB_PLAYER_TWO_ID]);
     let snapshot = game.snapshot_full_for(LAB_PLAYER_ONE_ID);
     assert!(snapshot.player_resources.iter().any(|player| {
         player.id == LAB_PLAYER_ONE_ID && player.steel == 777 && player.oil == 66

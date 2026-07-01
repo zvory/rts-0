@@ -171,6 +171,15 @@ pub(crate) fn building_site_clear_spatial(
     .is_clear()
 }
 
+pub(crate) fn resource_node_building_overlap_allowed(
+    node: &Entity,
+    building_kind: EntityKind,
+    rect: RectBody,
+) -> bool {
+    build_placement_policy(building_kind) == BuildPlacementPolicy::PumpJackOilOnly
+        && pump_jack::oil_node_center_in_rect(node, rect)
+}
+
 #[cfg(test)]
 pub(crate) fn building_site_clear_for_build_intent(
     map: &Map,
