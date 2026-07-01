@@ -149,8 +149,9 @@ impl Game {
     /// Same projection as `snapshot_for_spectator`, with explicit room-projection diagnostic options.
     pub fn snapshot_for_spectator_with_options(&self, visible_players: &[u32], options: SnapshotOptions) -> Snapshot;
 
-    /// Build a full-world snapshot for a room projection that intentionally exposes all state.
-    /// Normal gameplay must not use this.
+    /// Build a full-world snapshot for a room projection that intentionally exposes all state,
+    /// including per-entity planning details through each entity's real owner. Normal gameplay
+    /// must not use this.
     pub fn snapshot_full_for(&self, player: u32) -> Snapshot;
 
     /// Same full-world projection, with explicit room-projection diagnostic options.

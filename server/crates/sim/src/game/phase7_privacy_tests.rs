@@ -206,6 +206,99 @@ fn allied_snapshot_exposes_read_only_details_but_not_private_controls() {
 }
 
 #[test]
+fn full_world_snapshot_exposes_private_planning_for_all_projected_owners() {
+    let mut game = empty_flat_game(&phase7_players());
+    let observer_pos = game.state.map.tile_center(10, 10);
+    game.state.entities
+        .spawn_unit(1, EntityKind::Worker, observer_pos.0, observer_pos.1)
+        .expect("observer worker should spawn");
+
+    let barracks_pos = game.state.map.tile_center(12, 10);
+    let barracks = game.state.entities
+        .spawn_building(
+            3,
+            EntityKind::Barracks,
+            barracks_pos.0,
+            barracks_pos.1,
+            true,
+        )
+        .expect("enemy barracks should spawn");
+    let rally = game.state.map.tile_center(16, 10);
+    game.state.entities
+        .get_mut(barracks)
+        .expect("enemy barracks should exist")
+        .set_rally_point(Some(RallyIntent::new(RallyKind::Move, rally.0, rally.1)));
+
+    let rifle_pos = game.state.map.tile_center(22, 12);
+    let rifle = game.state.entities
+        .spawn_unit(3, EntityKind::Rifleman, rifle_pos.0, rifle_pos.1)
+        .expect("enemy rifleman should spawn");
+    let move_goal = game.state.map.tile_center(16, 12);
+    game.state.entities
+        .get_mut(rifle)
+        .expect("enemy rifleman should exist")
+        .set_order(Order::move_to(move_goal.0, move_goal.1));
+
+    let gun_pos = game.state.map.tile_center(24, 14);
+    let gun = game.state.entities
+        .spawn_unit(3, EntityKind::AntiTankGun, gun_pos.0, gun_pos.1)
+        .expect("enemy anti-tank gun should spawn");
+    let gun_facing = 1.125;
+    {
+        let gun = game
+            .state
+            .entities
+            .get_mut(gun)
+            .expect("enemy anti-tank gun should exist");
+        gun.set_weapon_setup(WeaponSetup::Deployed);
+        gun.set_emplacement_facing(Some(gun_facing));
+        gun.set_weapon_facing(gun_facing);
+    }
+
+    refresh_world(&mut game);
+
+    let normal = game.snapshot_for(1);
+    let normal_barracks = normal
+        .entities
+        .iter()
+        .find(|entity| entity.id == barracks)
+        .expect("visible enemy barracks should project");
+    assert!(normal_barracks.rally.is_none());
+    assert!(normal_barracks.rally_plan.is_empty());
+    let full_world = game.snapshot_full_for(1);
+    let full_barracks = full_world
+        .entities
+        .iter()
+        .find(|entity| entity.id == barracks)
+        .expect("full-world enemy barracks should project");
+    assert_eq!(full_barracks.rally, Some([rally.0, rally.1]));
+    assert_eq!(full_barracks.rally_plan.len(), 1);
+    assert_eq!(full_barracks.rally_plan[0].kind, "move");
+    assert_eq!(full_barracks.rally_plan[0].x, rally.0);
+    assert_eq!(full_barracks.rally_plan[0].y, rally.1);
+
+    let full_rifle = full_world
+        .entities
+        .iter()
+        .find(|entity| entity.id == rifle)
+        .expect("full-world enemy rifleman should project");
+    assert_eq!(full_rifle.order_plan.len(), 1);
+    assert_eq!(full_rifle.order_plan[0].kind, "move");
+    assert_eq!(full_rifle.order_plan[0].x, move_goal.0);
+    assert_eq!(full_rifle.order_plan[0].y, move_goal.1);
+
+    let full_gun = full_world
+        .entities
+        .iter()
+        .find(|entity| entity.id == gun)
+        .expect("full-world enemy anti-tank gun should project");
+    let projected_facing = full_gun
+        .setup_facing
+        .expect("full-world enemy setup facing should project");
+    assert!((projected_facing - gun_facing).abs() < 0.0001);
+}
+
+#[test]
 fn artillery_target_marker_is_visible_to_allies_not_hidden_enemies() {
     let mut game = empty_flat_game(&phase7_players());
     let pos = game.state.map.tile_center(10, 10);
