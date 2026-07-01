@@ -25,6 +25,12 @@ export function renderLiveUnitRig(renderer, entity, colorByOwner, state, definit
     const pool = renderer._liveRigPools?.[route.poolName];
     if (!pool) continue;
     let instance = pool.get(entity.id);
+    if (instance && !instance.matches(entity.kind, definition)) {
+      instance.destroy();
+      pool.delete(entity.id);
+      instance = null;
+      renderer._recordRenderDiagnostic?.(`renderer.rig.instance.rebuilt.${route.poolName}`);
+    }
     if (!instance) {
       instance = createUnitRigInstance(entity.kind, definition, renderer._rigPixiFactory ?? createDefaultPixiFactory());
       renderer._recordRenderDiagnostic?.(`renderer.rig.instance.created.${route.poolName}`);
@@ -61,6 +67,10 @@ export class UnitRigInstance {
       this.parts.set(part.id, { definition: part, display });
       this.container.addChild(display);
     }
+  }
+
+  matches(kind, definition) {
+    return this.kind === kind && this.definition === definition;
   }
 
   update(entity, renderContext = {}, options = {}) {

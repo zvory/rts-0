@@ -1,4 +1,4 @@
-import { KIND, STATE, isUnit } from "./protocol.js";
+import { EVENT, KIND, STATE, isUnit } from "./protocol.js";
 
 const SHOT_REVEAL_MS = 1500;
 const WEAPON_RECOIL_MS = Object.freeze({
@@ -7,6 +7,7 @@ const WEAPON_RECOIL_MS = Object.freeze({
   [KIND.ANTI_TANK_GUN]: 820,
   [KIND.MORTAR_TEAM]: 520,
   [KIND.ARTILLERY]: 980,
+  [KIND.PANZERFAUST]: 620,
   [KIND.SCOUT_CAR]: 160,
   [KIND.TANK]: 650,
 });
@@ -31,6 +32,10 @@ export class VisualEffectBuffers {
     this.artilleryLaunches = [];
     /** @type {Array<{x:number,y:number,radiusTiles:number,seed:number,createdAt:number}>} */
     this.artilleryImpacts = [];
+    /** @type {Array<{from?:number,fromX:number,fromY:number,toX:number,toY:number,durationMs:number,seed:number,createdAt:number}>} */
+    this.panzerfaustShots = [];
+    /** @type {Array<{x:number,y:number,seed:number,createdAt:number}>} */
+    this.panzerfaustImpacts = [];
     /** @type {Map<number, number>} attacker id -> latest shot receive time. */
     this.weaponRecoilById = new Map();
     /** @type {Array<{x:number,y:number,createdAt:number}>} */
@@ -49,7 +54,7 @@ export class VisualEffectBuffers {
     for (const ev of events) {
       if (
         !ev ||
-        (ev.e !== "attack" && ev.e !== "mortarImpact") ||
+        (ev.e !== EVENT.ATTACK && ev.e !== EVENT.MORTAR_IMPACT) ||
         typeof ev.from !== "number"
       ) {
         continue;
@@ -62,22 +67,26 @@ export class VisualEffectBuffers {
 
   applySnapshotEvents(events, now, entityById) {
     for (const ev of events) {
-      if (ev && ev.e === "attack" && typeof ev.from === "number" && typeof ev.to === "number") {
+      if (ev && ev.e === EVENT.ATTACK && typeof ev.from === "number" && typeof ev.to === "number") {
         const targetPos = eventTargetPos(ev);
         if (ev.from !== ev.to) {
           this.muzzleFlashes.push({ from: ev.from, to: ev.to, targetPos, createdAt: now });
         }
         this.weaponRecoilById.set(ev.from, now);
-      } else if (ev && ev.e === "smokeLaunch") {
+      } else if (ev && ev.e === EVENT.SMOKE_LAUNCH) {
         this.addSmokeCanister(ev, now);
-      } else if (ev && ev.e === "mortarLaunch") {
+      } else if (ev && ev.e === EVENT.MORTAR_LAUNCH) {
         this.addMortarLaunch(ev, now);
-      } else if (ev && ev.e === "mortarImpact") {
+      } else if (ev && ev.e === EVENT.MORTAR_IMPACT) {
         this.addMortarImpact(ev, now);
-      } else if (ev && ev.e === "artilleryTarget") {
+      } else if (ev && ev.e === EVENT.ARTILLERY_TARGET) {
         this.addArtilleryTarget(ev, now, entityById);
-      } else if (ev && ev.e === "artilleryImpact") {
+      } else if (ev && ev.e === EVENT.ARTILLERY_IMPACT) {
         this.addArtilleryImpact(ev, now);
+      } else if (ev && ev.e === EVENT.PANZERFAUST_LAUNCH) {
+        this.addPanzerfaustShot(ev, now);
+      } else if (ev && ev.e === EVENT.PANZERFAUST_IMPACT) {
+        this.addPanzerfaustImpact(ev, now);
       }
     }
     this._trimQueues();
@@ -190,6 +199,43 @@ export class VisualEffectBuffers {
     });
   }
 
+  addPanzerfaustShot(ev, now = performance.now()) {
+    if (
+      !Number.isFinite(ev.fromX) ||
+      !Number.isFinite(ev.fromY) ||
+      !Number.isFinite(ev.toX) ||
+      !Number.isFinite(ev.toY)
+    ) {
+      return;
+    }
+    const delayTicks = Number.isFinite(ev.delayTicks) ? Math.max(0, ev.delayTicks) : 15;
+    const durationMs = Math.max(80, (delayTicks / 30) * 1000);
+    if (typeof ev.from === "number") this.weaponRecoilById.set(ev.from, now);
+    this.panzerfaustShots.push({
+      from: typeof ev.from === "number" ? ev.from : undefined,
+      fromX: ev.fromX,
+      fromY: ev.fromY,
+      toX: ev.toX,
+      toY: ev.toY,
+      durationMs,
+      seed: Math.floor(ev.fromX * 17 + ev.toY * 19 + now) >>> 0,
+      createdAt: now,
+    });
+  }
+
+  addPanzerfaustImpact(ev, now = performance.now()) {
+    if (!Number.isFinite(ev.x) || !Number.isFinite(ev.y)) return;
+    this.panzerfaustShots = this.panzerfaustShots.filter(
+      (shot) => Math.hypot(shot.toX - ev.x, shot.toY - ev.y) > 2,
+    );
+    this.panzerfaustImpacts.push({
+      x: ev.x,
+      y: ev.y,
+      seed: Math.floor(ev.x * 29 + ev.y * 31 + now) >>> 0,
+      createdAt: now,
+    });
+  }
+
   addSmokeCanister(ev, now = performance.now()) {
     if (
       !Number.isFinite(ev.fromX) ||
@@ -257,6 +303,19 @@ export class VisualEffectBuffers {
     const ttlMs = 850;
     this.artilleryImpacts = this.artilleryImpacts.filter((f) => now - f.createdAt <= ttlMs);
     return this.artilleryImpacts;
+  }
+
+  livePanzerfaustShots(now) {
+    this.panzerfaustShots = this.panzerfaustShots.filter(
+      (f) => now - f.createdAt <= f.durationMs + 160,
+    );
+    return this.panzerfaustShots;
+  }
+
+  livePanzerfaustImpacts(now) {
+    const ttlMs = 720;
+    this.panzerfaustImpacts = this.panzerfaustImpacts.filter((f) => now - f.createdAt <= ttlMs);
+    return this.panzerfaustImpacts;
   }
 
   liveMuzzleFlashes(now) {
@@ -334,6 +393,8 @@ export class VisualEffectBuffers {
     trimHead(this.artilleryTargets, 48);
     trimHead(this.artilleryLaunches, 32);
     trimHead(this.artilleryImpacts, 32);
+    trimHead(this.panzerfaustShots, 48);
+    trimHead(this.panzerfaustImpacts, 48);
   }
 }
 
