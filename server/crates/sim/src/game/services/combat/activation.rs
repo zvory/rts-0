@@ -6,7 +6,6 @@ use crate::game::teams::TeamRelations;
 
 use super::acquisition::{direct_fire_target_legal, DirectFireLegality};
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(super) struct SecondaryWeaponActivationConstraints {
     pub facing_rad: f32,
@@ -15,7 +14,7 @@ pub(super) struct SecondaryWeaponActivationConstraints {
     pub direct_fire_legality: DirectFireLegality,
 }
 
-#[allow(dead_code, clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)]
 pub(super) fn secondary_weapon_target_passes_activation(
     map: &Map,
     entities: &EntityStore,

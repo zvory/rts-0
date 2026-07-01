@@ -16,7 +16,10 @@ use crate::rules::combat as combat_rules;
 use crate::rules::target as target_rules;
 use crate::rules::terrain::{self, TerrainKind};
 
-use super::acquisition::{direct_fire_target_legal, DirectFireLegality, DirectFireVisibility};
+use super::activation::{
+    secondary_weapon_target_passes_activation, SecondaryWeaponActivationConstraints,
+};
+use super::acquisition::{DirectFireLegality, DirectFireVisibility};
 use super::damage::apply_damage;
 use super::priority::{self, AttackPriorityContext, TargetCandidate};
 use super::{FIRING_REVEAL_RESPONSE_DELAY_TICKS, RANGE_SLACK};
@@ -211,22 +214,12 @@ fn tank_coax_target_candidates(
         let dx = target.pos_x - snapshot.pos_x;
         let dy = target.pos_y - snapshot.pos_y;
         let distance_sq = dx * dx + dy * dy;
-        let target_angle = dy.atan2(dx);
-        if !target_angle.is_finite()
-            || crate::game::services::movement::angle_delta(snapshot.weapon_facing, target_angle)
-                .abs()
-                > TANK_COAX_HALF_ARC_RAD
-        {
+        if !distance_sq.is_finite() {
             continue;
         }
         let concealment = terrain::concealment_modifier(target.kind, TerrainKind::Open).max(0.0);
         let effective_weapon_range_px = snapshot.range_px * concealment;
-        if !effective_weapon_range_px.is_finite()
-            || distance_sq > effective_weapon_range_px * effective_weapon_range_px
-        {
-            continue;
-        }
-        if !direct_fire_target_legal(
+        if !secondary_weapon_target_passes_activation(
             map,
             entities,
             teams,
@@ -237,7 +230,14 @@ fn tank_coax_target_candidates(
             snapshot.owner,
             (snapshot.pos_x, snapshot.pos_y),
             target.id,
-            DirectFireLegality::intended_target(DirectFireVisibility::Owner),
+            SecondaryWeaponActivationConstraints {
+                facing_rad: snapshot.weapon_facing,
+                half_arc_rad: TANK_COAX_HALF_ARC_RAD,
+                range_px: effective_weapon_range_px,
+                direct_fire_legality: DirectFireLegality::intended_target(
+                    DirectFireVisibility::Owner,
+                ),
+            },
         ) {
             continue;
         }
