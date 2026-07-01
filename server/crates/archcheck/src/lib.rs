@@ -45,6 +45,7 @@ const SERVICE_ROLES: &[(&str, ServiceRole)] = &[
     ("order_queue", ServiceRole::CommandAdapter),
     ("pathing", ServiceRole::QueryIndex),
     ("production", ServiceRole::TickSystem),
+    ("scout_plane", ServiceRole::MutationHelper),
     ("spatial", ServiceRole::QueryIndex),
     ("standability", ServiceRole::QueryIndex),
     ("supply", ServiceRole::TickSystem),
@@ -84,15 +85,13 @@ const ENTITY_FIELDS: &[&str] = &[
     "resource_node",
     "ability_cooldowns",
     "ability_uses_remaining",
+    "scout_plane",
 ];
 const PLAYER_STATE_FIELD_WRITE_APPROVED_PATHS: &[&str] = &["player_state.rs"];
 const PLAYER_STATE_FIELDS: &[&str] = &["steel", "oil", "supply_used", "supply_cap", "score"];
 
 const ALLOWED_SERVICE_IMPORTS: &[(&str, &[&str])] = &[
-    (
-        "ability_orders",
-        &["commands", "move_coordinator", "world_query"],
-    ),
+    ("ability_orders", &["commands", "move_coordinator", "world_query"]),
     (
         "combat",
         &[
@@ -114,6 +113,7 @@ const ALLOWED_SERVICE_IMPORTS: &[(&str, &[&str])] = &[
             "movement",
             "order_execution",
             "order_planner",
+            "scout_plane",
             "spatial",
             "standability",
             "world_query",
@@ -143,6 +143,7 @@ const ALLOWED_SERVICE_IMPORTS: &[(&str, &[&str])] = &[
             "move_coordinator",
             "occupancy",
             "pathing",
+            "scout_plane",
             "spatial",
             "standability",
         ],
@@ -163,10 +164,7 @@ const ALLOWED_SERVICE_IMPORTS: &[(&str, &[&str])] = &[
         ],
     ),
     ("pathing", &["occupancy", "standability"]),
-    (
-        "production",
-        &["move_coordinator", "occupancy", "pathing", "standability"],
-    ),
+    ("production", &["move_coordinator", "occupancy", "pathing", "scout_plane", "standability"]),
     ("standability", &["geometry", "occupancy", "spatial"]),
     ("world_query", &["spatial"]),
 ];

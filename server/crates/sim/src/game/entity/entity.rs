@@ -13,7 +13,7 @@ use super::{
     AttackPhase, BuildPhase, CombatState, ConstructionState, DeconstructPhase, EntityKind,
     GatherPhase, MovePhase, MovementState, Order, OrderIntent, PanzerfaustState, ProdItem,
     ProductionState, RallyIntent, ResearchItem, ResourceExtractorState, ResourceNodeState,
-    WeaponSetup, WorkerState, MAX_QUEUED_ORDERS, NEUTRAL,
+    ScoutPlaneState, WeaponSetup, WorkerState, MAX_QUEUED_ORDERS, NEUTRAL,
 };
 
 const BUILDING_START_HP_NUMERATOR: u32 = 1;
@@ -55,6 +55,8 @@ pub struct Entity {
     pub worker: Option<WorkerState>,
     pub resource_node: Option<ResourceNodeState>,
     pub resource_extractor: Option<ResourceExtractorState>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(in crate::game) scout_plane: Option<ScoutPlaneState>,
     pub ability_cooldowns: BTreeMap<AbilityKind, u16>,
     pub ability_lockouts_until_tick: BTreeMap<AbilityKind, u32>,
     pub ability_uses_remaining: BTreeMap<AbilityKind, u16>,
@@ -88,6 +90,8 @@ impl Entity {
                 .then(WorkerState::default),
             resource_node: None,
             resource_extractor: None,
+            scout_plane: (kind == EntityKind::ScoutPlane)
+                .then_some(ScoutPlaneState::launched_at(x, y)),
             ability_cooldowns: BTreeMap::new(),
             ability_lockouts_until_tick: BTreeMap::new(),
             ability_uses_remaining: initial_ability_uses(kind),
@@ -139,6 +143,7 @@ impl Entity {
             resource_node: None,
             resource_extractor: (kind == EntityKind::PumpJack)
                 .then(ResourceExtractorState::default),
+            scout_plane: None,
             ability_cooldowns: BTreeMap::new(),
             ability_lockouts_until_tick: BTreeMap::new(),
             ability_uses_remaining: BTreeMap::new(),
@@ -172,6 +177,7 @@ impl Entity {
                 miner: None,
             }),
             resource_extractor: None,
+            scout_plane: None,
             ability_cooldowns: BTreeMap::new(),
             ability_lockouts_until_tick: BTreeMap::new(),
             ability_uses_remaining: BTreeMap::new(),
@@ -188,6 +194,7 @@ impl Entity {
             worker: self.worker.is_some(),
             resource_node: self.resource_node.is_some(),
             resource_extractor: self.resource_extractor.is_some(),
+            scout_plane: self.scout_plane.is_some(),
         }
     }
 
@@ -681,6 +688,55 @@ impl Entity {
     pub fn set_position(&mut self, x: f32, y: f32) {
         self.pos_x = x;
         self.pos_y = y;
+    }
+
+    pub(in crate::game) fn scout_plane_state(&self) -> Option<&ScoutPlaneState> {
+        self.scout_plane.as_ref()
+    }
+
+    #[cfg(test)]
+    pub(in crate::game) fn scout_plane_state_mut(&mut self) -> Option<&mut ScoutPlaneState> {
+        self.scout_plane.as_mut()
+    }
+
+    pub(crate) fn scout_plane_private_details(&self) -> Option<((f32, f32), u8)> {
+        if self.kind != EntityKind::ScoutPlane {
+            return None;
+        }
+        self.scout_plane
+            .as_ref()
+            .map(|state| (state.orbit_center, state.fuel_oil))
+    }
+
+    pub(in crate::game) fn ensure_scout_plane_state(&mut self) {
+        if self.kind == EntityKind::ScoutPlane && self.scout_plane.is_none() {
+            self.scout_plane = Some(ScoutPlaneState::launched_at(self.pos_x, self.pos_y));
+        }
+    }
+
+    pub(in crate::game) fn update_scout_plane_runtime(
+        &mut self,
+        orbit_center: (f32, f32),
+        orbit_phase: f32,
+        orbiting: bool,
+    ) -> bool {
+        if self.kind != EntityKind::ScoutPlane {
+            return false;
+        }
+        let Some(state) = self.scout_plane.as_mut() else {
+            return false;
+        };
+        state.update_runtime(orbit_center, orbit_phase, orbiting)
+    }
+
+    pub(in crate::game) fn retarget_scout_plane(&mut self, x: f32, y: f32) -> bool {
+        if self.kind != EntityKind::ScoutPlane {
+            return false;
+        }
+        let Some(state) = self.scout_plane.as_mut() else {
+            return false;
+        };
+        state.retarget(x, y)
     }
 
     pub fn set_facing(&mut self, facing: f32) {
@@ -1183,7 +1239,7 @@ impl Entity {
     /// Whether this building can be attacked / can take damage and die. Resource nodes are
     /// indestructible (they only deplete).
     pub fn is_targetable(&self) -> bool {
-        !self.is_node()
+        !self.is_node() && self.kind != EntityKind::ScoutPlane
     }
 
     /// Whether this entity can deal damage.
@@ -1245,6 +1301,9 @@ impl Entity {
                 return states::TRAIN;
             }
             return states::IDLE;
+        }
+        if self.kind == EntityKind::ScoutPlane {
+            return states::MOVE;
         }
         match self.order() {
             Order::Idle | Order::HoldPosition => states::IDLE,

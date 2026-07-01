@@ -45,7 +45,11 @@ pub(super) fn apply_damage(
     extra_miss_chance: f32,
     tick: u32,
 ) -> Option<u32> {
-    if entities.get(victim).map(|e| e.is_node()).unwrap_or(false) {
+    if entities
+        .get(victim)
+        .map(|e| !e.is_targetable())
+        .unwrap_or(false)
+    {
         return None;
     }
     let shot_victim = resolve_shot_victim(
@@ -214,7 +218,9 @@ fn apply_overpenetration(
         let Some(target) = entities.get(id) else {
             continue;
         };
-        if target.is_node() || !teams.is_enemy_owner(attacker_owner, target.owner) || target.hp == 0
+        if !target.is_targetable()
+            || !teams.is_enemy_owner(attacker_owner, target.owner)
+            || target.hp == 0
         {
             continue;
         }

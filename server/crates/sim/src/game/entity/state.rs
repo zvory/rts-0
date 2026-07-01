@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use crate::config;
 use crate::game::upgrade::UpgradeKind;
 use crate::rules::combat::WeaponKind;
 use serde::{Deserialize, Serialize};
@@ -23,6 +24,54 @@ pub struct ResearchItem {
     pub upgrade: UpgradeKind,
     pub progress: u32,
     pub total: u32,
+}
+
+/// Authoritative runtime carried by an active Scout Plane.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub(in crate::game) struct ScoutPlaneState {
+    /// Current intended orbit center in world pixels.
+    pub(in crate::game) orbit_center: (f32, f32),
+    /// Deterministic phase around the orbit ring, in radians.
+    pub(in crate::game) orbit_phase: f32,
+    /// Whether the plane has reached the orbit area for `orbit_center`.
+    pub(in crate::game) orbiting: bool,
+    /// Integer oil reserve. Phase 3 does not drain it; upkeep owns it in the next phase.
+    pub(in crate::game) fuel_oil: u8,
+}
+
+impl ScoutPlaneState {
+    pub(in crate::game) fn launched_at(x: f32, y: f32) -> Self {
+        Self {
+            orbit_center: (x, y),
+            orbit_phase: 0.0,
+            orbiting: false,
+            fuel_oil: config::SCOUT_PLANE_FUEL_RESERVE_OIL,
+        }
+    }
+
+    pub(in crate::game) fn retarget(&mut self, x: f32, y: f32) -> bool {
+        if !x.is_finite() || !y.is_finite() {
+            return false;
+        }
+        self.orbit_center = (x, y);
+        self.orbiting = false;
+        true
+    }
+
+    pub(in crate::game) fn update_runtime(
+        &mut self,
+        orbit_center: (f32, f32),
+        orbit_phase: f32,
+        orbiting: bool,
+    ) -> bool {
+        if !orbit_center.0.is_finite() || !orbit_center.1.is_finite() || !orbit_phase.is_finite() {
+            return false;
+        }
+        self.orbit_center = orbit_center;
+        self.orbit_phase = orbit_phase;
+        self.orbiting = orbiting;
+        true
+    }
 }
 
 /// Reserved for future round-trip harvesting if attached mining is replaced.
@@ -343,4 +392,5 @@ pub struct EntityStateGroups {
     pub worker: bool,
     pub resource_node: bool,
     pub resource_extractor: bool,
+    pub scout_plane: bool,
 }

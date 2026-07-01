@@ -49,6 +49,7 @@ pub(super) fn planner_facts(
                 }
                 _ => planner::UnitActivity::Busy,
             };
+            facts.can_attack_move = e.kind != EntityKind::ScoutPlane;
             facts.can_attack = e.can_attack();
             facts.can_gather = rules::economy::can_gather_for_faction(faction_id, e.kind);
             facts.can_build = rules::faction::catalog_for(faction_id)

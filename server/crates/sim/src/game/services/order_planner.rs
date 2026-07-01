@@ -49,6 +49,7 @@ pub struct UnitFacts {
     pub queue_len: usize,
     pub active_build: bool,
     pub activity: UnitActivity,
+    pub can_attack_move: bool,
     pub can_attack: bool,
     pub can_gather: bool,
     pub can_build: bool,
@@ -66,6 +67,7 @@ impl UnitFacts {
             queue_len: 0,
             active_build: false,
             activity: UnitActivity::Idle,
+            can_attack_move: true,
             can_attack: false,
             can_gather: false,
             can_build: false,
@@ -246,10 +248,11 @@ pub fn plan_order(
         RequestedOrder::Move { to } if to.valid() => {
             plan_simple_point(config, request.mode, &ordered_facts, OrderIntent::Move(to))
         }
-        RequestedOrder::AttackMove { to } if to.valid() => plan_simple_point(
+        RequestedOrder::AttackMove { to } if to.valid() => plan_filtered_units(
             config,
             request.mode,
             &ordered_facts,
+            |u| u.can_attack_move,
             OrderIntent::AttackMove(to),
         ),
         RequestedOrder::AttackTarget {

@@ -277,7 +277,7 @@ fn ready_for_next_order(
     smokes: &SmokeCloudStore,
     e: &Entity,
 ) -> bool {
-    if !e.is_unit() {
+    if !e.is_unit() || e.kind == EntityKind::ScoutPlane {
         return false;
     }
     match e.order() {

@@ -27,6 +27,7 @@ pub(crate) use kind::{
     uses_car_movement_semantics, uses_oriented_vehicle_body, uses_pivot_vehicle_movement,
     MovementBodyClass, StaticBlockerClass,
 };
+pub(crate) use order::tank_trap_deconstruction_ticks;
 #[allow(unused_imports)]
 pub use order::{
     AbilityExecution, AbilityIntent, AbilityOrder, AttackExecution, AttackOrder, AttackPhase,
@@ -35,9 +36,9 @@ pub use order::{
     MoveOrder, MovePhase, Order, OrderIntent, PointIntent, RallyIntent, RallyKind, TargetIntent,
     MAX_QUEUED_ORDERS,
 };
-pub(crate) use order::tank_trap_deconstruction_ticks;
 #[cfg(test)]
 pub use state::EntityStateGroups;
+pub(in crate::game) use state::ScoutPlaneState;
 #[allow(unused_imports)]
 pub use state::{
     CarryState, CombatState, ConstructionState, MovementState, PanzerfaustState, ProdItem,

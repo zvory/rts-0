@@ -207,6 +207,9 @@ pub fn project_entity(
     entity: &Entity,
     context: EntityProjectionContext<'_>,
 ) -> Option<EntityView> {
+    if context.fogged && entity.kind == EntityKind::ScoutPlane {
+        return None;
+    }
     if context.fogged
         && !context
             .smokes
@@ -352,6 +355,15 @@ pub fn project_entity(
             private_detail_fog,
             context.smokes,
         );
+        if let Some((orbit_center, fuel_oil)) = entity.scout_plane_private_details() {
+            view.scout_plane = Some(protocol::ScoutPlaneStateView {
+                orbit_center: Some([orbit_center.0, orbit_center.1]),
+                fuel_oil,
+                fuel_capacity_oil: config::SCOUT_PLANE_FUEL_RESERVE_OIL,
+                upkeep_oil: config::SCOUT_PLANE_UPKEEP_OIL,
+                upkeep_interval_ticks: config::SCOUT_PLANE_UPKEEP_INTERVAL_TICKS,
+            });
+        }
         let catalog = context
             .owner_faction_id
             .and_then(crate::rules::faction::catalog_for);

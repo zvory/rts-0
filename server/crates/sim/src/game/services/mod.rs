@@ -23,6 +23,7 @@ pub mod order_planner;
 pub mod order_queue;
 pub mod pathing;
 pub mod production;
+pub(in crate::game::services) mod scout_plane;
 pub mod spatial;
 pub mod standability;
 pub mod supply;

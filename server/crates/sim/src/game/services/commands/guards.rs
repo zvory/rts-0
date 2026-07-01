@@ -53,6 +53,15 @@ pub(super) fn unit_can_accept_player_command(
         && !is_constructing(entities, unit)
 }
 
+pub(super) fn unit_can_accept_ground_command(
+    entities: &EntityStore,
+    player: u32,
+    unit: u32,
+) -> bool {
+    unit_can_accept_player_command(entities, player, unit)
+        && !matches!(entities.get(unit), Some(entity) if entity.kind == EntityKind::ScoutPlane)
+}
+
 /// True if this unit is a worker that has already begun laying concrete - it cannot
 /// be pulled away until the building finishes or is destroyed.
 pub(super) fn is_constructing(entities: &EntityStore, id: u32) -> bool {

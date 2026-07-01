@@ -743,6 +743,12 @@
     },
     {
       "source": "commands",
+      "target": "scout_plane",
+      "path": "services/commands.rs",
+      "line": 34
+    },
+    {
+      "source": "commands",
       "target": "spatial",
       "path": "services/commands.rs",
       "line": 34
@@ -911,6 +917,12 @@
     },
     {
       "source": "movement",
+      "target": "scout_plane",
+      "path": "services/movement/mod.rs",
+      "line": 16
+    },
+    {
+      "source": "movement",
       "target": "spatial",
       "path": "services/movement/collision.rs",
       "line": 6
@@ -1034,6 +1046,12 @@
       "target": "move_coordinator",
       "path": "services/production.rs",
       "line": 3
+    },
+    {
+      "source": "production",
+      "target": "scout_plane",
+      "path": "services/production.rs",
+      "line": 4
     },
     {
       "source": "standability",

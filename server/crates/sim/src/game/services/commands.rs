@@ -31,6 +31,7 @@ use crate::game::services::order_execution::{
     start_artillery_fire_command_order, ArtilleryFireMode, FutureOrderMode,
 };
 use crate::game::services::order_planner as planner;
+use crate::game::services::scout_plane;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::standability;
 use crate::game::services::world_query::{self, owns_unit};
@@ -54,7 +55,7 @@ use self::artillery_scatter::artillery_error_tiles;
 use self::artillery_scatter::{artillery_blanket_point, artillery_scattered_point};
 use self::guards::{
     dedupe_cap_units, is_constructing, player_is_ai, rally_intent_for_map,
-    unit_can_accept_player_command,
+    unit_can_accept_ground_command, unit_can_accept_player_command,
 };
 use self::planner_facts::{planner_config, planner_facts, AbilityFactInput};
 struct CommandExecutionContext<'a, 'pathing> {
@@ -545,7 +546,7 @@ pub(in crate::game) fn apply_commands(
                     continue;
                 };
                 for id in units {
-                    if unit_can_accept_player_command(entities, player, id) {
+                    if unit_can_accept_ground_command(entities, player, id) {
                         entities.release_miner(id);
                         if let Some(e) = entities.get_mut(id) {
                             e.clear_orders();
@@ -561,7 +562,7 @@ pub(in crate::game) fn apply_commands(
                     continue;
                 };
                 for id in units {
-                    if unit_can_accept_player_command(entities, player, id) {
+                    if unit_can_accept_ground_command(entities, player, id) {
                         entities.release_miner(id);
                         if let Some(e) = entities.get_mut(id) {
                             e.hold_position();
@@ -645,6 +646,11 @@ fn build_target_center(building: EntityKind, tile_x: u32, tile_y: u32) -> (f32, 
         tile_y as f32 * ts + stats.foot_h as f32 * ts * 0.5,
     )
 }
+
+fn is_scout_plane(entities: &EntityStore, id: u32) -> bool {
+    entities.get(id).is_some_and(|e| e.kind == EntityKind::ScoutPlane)
+}
+
 mod planned_actions {
     use super::*;
     pub(super) fn execute(
@@ -682,8 +688,14 @@ mod planned_actions {
                 planner::PlannedAction::ReplaceActive { unit, intent } => match intent {
                     planner::OrderIntent::Move(point) => {
                         if immediate_unit_can_replace(entities, player, unit) {
-                            move_goal = Some((point.x, point.y));
-                            move_units.push(unit);
+                            if is_scout_plane(entities, unit) {
+                                let _ = scout_plane::retarget(
+                                    map, entities, unit, point.x, point.y, true,
+                                );
+                            } else {
+                                move_goal = Some((point.x, point.y));
+                                move_units.push(unit);
+                            }
                         }
                     }
                     planner::OrderIntent::AttackMove(point) => {
@@ -854,6 +866,14 @@ mod planned_actions {
                         }
                     }
                     if let Some(intent) = entity_order_intent_from_planner(intent) {
+                        if let OrderIntent::Move(point) = intent {
+                            if is_scout_plane(entities, unit) {
+                                let _ = scout_plane::append_queued_retarget(
+                                    map, entities, unit, point.x, point.y,
+                                );
+                                continue;
+                            }
+                        }
                         match &intent {
                             OrderIntent::Attack(attack)
                                 if !attack_target_valid(
@@ -954,13 +974,13 @@ mod planned_actions {
             }
         }
 
-        if let Some(goal) = move_goal {
+        if let Some(goal) = move_goal.filter(|_| !move_units.is_empty()) {
             clear_queued_orders(entities, &move_units);
             clear_staged_anti_tank_gun_setup(entities, &move_units);
             coordinator.order_group_move(entities, player, &move_units, goal, false);
             begin_artillery_teardown_for_movement(entities, &move_units);
         }
-        if let Some(goal) = attack_move_goal {
+        if let Some(goal) = attack_move_goal.filter(|_| !attack_move_units.is_empty()) {
             clear_queued_orders(entities, &attack_move_units);
             clear_staged_anti_tank_gun_setup(entities, &attack_move_units);
             coordinator.order_group_move(entities, player, &attack_move_units, goal, true);
