@@ -39,15 +39,20 @@ use orders::{
     order_intent_references_entity, order_references_entity, restore_lab_entity_orders,
 };
 use scenario::{
-    validate_lab_entity_setup_shape, validate_lab_scenario_shape, LAB_SCENARIO_KIND,
+    validate_lab_checkpoint_scenario_shape, validate_lab_entity_setup_shape,
+    validate_lab_scenario_shape, LAB_CHECKPOINT_SCENARIO_KIND, LAB_SCENARIO_KIND,
     MAX_LAB_SCENARIO_UPGRADES_PER_PLAYER,
 };
 pub use scenario::{
-    LabScenarioEntity, LabScenarioMap, LabScenarioMetadata, LabScenarioPlayer, LabScenarioPoint,
-    LabScenarioOrder, LabScenarioResearch, LabScenarioResources, LabScenarioV1,
+    LabCheckpointScenarioMap, LabCheckpointScenarioMapData, LabCheckpointScenarioMetadata,
+    LabCheckpointScenarioSource, LabCheckpointScenarioV1, LabScenarioEntity, LabScenarioMap,
+    LabScenarioMetadata, LabScenarioOrder, LabScenarioPlayer, LabScenarioPoint,
+    LabScenarioResearch, LabScenarioResources, LabScenarioTile, LabScenarioV1,
 };
 
 pub const LAB_SCENARIO_V1_SCHEMA_VERSION: u32 = scenario::LAB_SCENARIO_V1_SCHEMA_VERSION;
+pub const LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION: u32 =
+    scenario::LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum LabOp {
@@ -320,6 +325,61 @@ impl Game {
         }
     }
 
+    pub fn export_lab_checkpoint_scenario(
+        &self,
+        server_build_sha: &str,
+    ) -> Result<LabCheckpointScenarioV1, LabError> {
+        self.export_lab_checkpoint_scenario_with_metadata(
+            "Untitled lab scenario".to_string(),
+            self.tick_count(),
+            None,
+            Vec::new(),
+            server_build_sha,
+        )
+    }
+
+    pub fn lab_checkpoint_scenario_from_v1(
+        scenario: LabScenarioV1,
+        server_build_sha: &str,
+    ) -> Result<LabCheckpointScenarioV1, LabError> {
+        let name = scenario.name.clone();
+        let exported_tick = scenario.metadata.exported_tick;
+        let source = LabCheckpointScenarioSource {
+            kind: scenario.kind.clone(),
+            schema_version: scenario.schema_version,
+        };
+        let (game, restore) = Self::lab_game_from_scenario(scenario)?;
+        game.export_lab_checkpoint_scenario_with_metadata(
+            name,
+            exported_tick,
+            Some(source),
+            restore.entity_id_map,
+            server_build_sha,
+        )
+    }
+
+    pub fn restore_lab_checkpoint_scenario(
+        scenario: LabCheckpointScenarioV1,
+    ) -> Result<Game, LabError> {
+        validate_lab_checkpoint_scenario_shape(&scenario)?;
+        let seed = scenario.seed;
+        let (map, map_metadata) = scenario.map.into_map()?;
+        let game = Game::restore_checkpoint_payload_text(
+            &scenario.checkpoint_payload,
+            map,
+            map_metadata,
+        )
+        .map_err(|err| LabError::InvalidScenario {
+            reason: format!("checkpoint scenario payload is invalid: {err}"),
+        })?;
+        if game.seed() != seed {
+            return Err(LabError::InvalidScenario {
+                reason: "checkpoint scenario seed does not match payload seed".to_string(),
+            });
+        }
+        Ok(game)
+    }
+
     pub fn lab_god_mode_players(&self) -> Vec<u32> {
         self.state.lab_god_mode_players.iter().copied().collect()
     }
@@ -328,6 +388,42 @@ impl Game {
         &mut self,
         scenario: LabScenarioV1,
     ) -> Result<LabOpOutcome, LabError> {
+        let (restored, restore) = Self::lab_game_from_scenario(scenario)?;
+        *self = restored;
+        Ok(LabOpOutcome::ScenarioRestored(restore))
+    }
+
+    fn export_lab_checkpoint_scenario_with_metadata(
+        &self,
+        name: String,
+        exported_tick: u32,
+        source_scenario: Option<LabCheckpointScenarioSource>,
+        source_entity_id_map: Vec<LabEntityIdRemap>,
+        server_build_sha: &str,
+    ) -> Result<LabCheckpointScenarioV1, LabError> {
+        let checkpoint_payload = self
+            .checkpoint_payload_text_for_container("lab", server_build_sha)
+            .map_err(|err| LabError::InvalidScenario {
+                reason: format!("checkpoint scenario payload export failed: {err}"),
+            })?;
+        Ok(LabCheckpointScenarioV1 {
+            schema_version: LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION,
+            kind: LAB_CHECKPOINT_SCENARIO_KIND.to_string(),
+            name,
+            seed: self.state.seed,
+            map: LabCheckpointScenarioMap::from_map(&self.state.map, &self.state.map_metadata),
+            metadata: LabCheckpointScenarioMetadata {
+                exported_tick,
+                source_scenario,
+                source_entity_id_map,
+            },
+            checkpoint_payload,
+        })
+    }
+
+    fn lab_game_from_scenario(
+        scenario: LabScenarioV1,
+    ) -> Result<(Game, LabScenarioRestore), LabError> {
         validate_lab_scenario_shape(&scenario)?;
 
         let mut seen_players = HashSet::new();
@@ -457,10 +553,7 @@ impl Game {
         }
         restored.repair_lab_state();
 
-        *self = restored;
-        Ok(LabOpOutcome::ScenarioRestored(LabScenarioRestore {
-            entity_id_map,
-        }))
+        Ok((restored, LabScenarioRestore { entity_id_map }))
     }
 
     fn lab_spawn_entity(&mut self, input: LabSpawnEntity) -> Result<LabOpOutcome, LabError> {
