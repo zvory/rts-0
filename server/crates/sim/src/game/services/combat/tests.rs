@@ -22,6 +22,7 @@ mod retention;
 mod support_weapon_attack_move;
 mod tank_traps;
 mod target_priority;
+mod weapon_cooldowns;
 mod weapon_profiles;
 fn rifleman_with_enemy() -> (EntityStore, u32, u32) {
     let mut entities = EntityStore::new();
@@ -46,13 +47,11 @@ fn map_with_rock_at(tile: (u32, u32)) -> Map {
     map.terrain[(tile.1 * map.size + tile.0) as usize] = terrain::ROCK;
     map
 }
-
 fn visible_fog(map: &Map, entities: &EntityStore) -> Fog {
     let mut fog = Fog::new(map.size);
     fog.recompute(&[1, 2], entities, map);
     fog
 }
-
 fn resolve_test_target(
     map: &Map,
     entities: &EntityStore,
@@ -331,6 +330,7 @@ fn apply_test_damage_with_teams(
         10,
     );
 }
+
 #[test]
 fn idle_army_units_auto_acquire_targets() {
     let (entities, self_id, enemy_id) = rifleman_with_enemy();

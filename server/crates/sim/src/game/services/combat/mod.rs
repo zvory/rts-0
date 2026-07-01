@@ -50,7 +50,8 @@ use weapons::{
     mirror_weapon_to_body, moving_fire_miss_chance, moving_fire_movement_order_holds_path,
     relax_vehicle_weapon_toward_body, rotate_anti_tank_gun_for_combat,
     rotate_vehicle_weapon_for_combat, tick_deployed_weapon_setup,
-    update_attack_move_no_target_teardown, uses_stationary_weapon_aggro, uses_vehicle_weapon_policy,
+    update_attack_move_no_target_teardown, uses_stationary_weapon_aggro,
+    uses_vehicle_weapon_policy,
 };
 
 #[cfg(test)]
@@ -131,7 +132,7 @@ pub(in crate::game) fn combat_system(
     let los = LineOfSight::with_smoke(map, smokes);
     for id in entities.ids() {
         if let Some(e) = entities.get_mut(id) {
-            e.tick_attack_cd();
+            e.tick_weapon_cooldowns();
             tick_deployed_weapon_setup(e);
             weapons::tick_tank_stationary_range(e);
         }
@@ -354,18 +355,15 @@ pub(in crate::game) fn combat_system(
             }
             if active_firing_reveal_source(firing_reveals, owner, tid, tick) {
                 let delay_started = entities.get_mut(id).is_some_and(|e| {
-                    e.start_firing_reveal_response_delay(tid, FIRING_REVEAL_RESPONSE_DELAY_TICKS)
+                    e.start_weapon_firing_reveal_response_delay(weapon_profile.id, tid, FIRING_REVEAL_RESPONSE_DELAY_TICKS)
                 });
                 if delay_started {
                     continue;
                 }
             }
-            let ready = matches!(entities.get(id), Some(e) if e.attack_cd() == 0);
+            let ready = matches!(entities.get(id), Some(e) if e.weapon_cooldown(weapon_profile.id) == 0);
             if ready {
-                if matches!(
-                    entities.get(id).map(|e| e.kind),
-                    Some(EntityKind::MortarTeam)
-                ) {
+                if matches!(entities.get(id).map(|e| e.kind), Some(EntityKind::MortarTeam)) {
                     if !matches!(
                         entities
                             .get(id)
@@ -386,7 +384,7 @@ pub(in crate::game) fn combat_system(
                     mortar_shells
                         .schedule(events, fog, teams, owner, id, px, py, mx, my, tick, true);
                     if let Some(e) = entities.get_mut(id) {
-                        e.set_attack_cd(cd_reset);
+                        e.set_weapon_cooldown(weapon_profile.id, cd_reset);
                     }
                     continue;
                 }
@@ -431,7 +429,7 @@ pub(in crate::game) fn combat_system(
                     }
                 }
                 if let Some(e) = entities.get_mut(id) {
-                    e.set_attack_cd(cd_reset);
+                    e.set_weapon_cooldown(weapon_profile.id, cd_reset);
                 }
             }
         } else if is_unit && mode != CombatMode::Opportunistic && !holds_commanded_movement_path {

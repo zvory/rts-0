@@ -52,6 +52,90 @@ fn unit_kinds_have_exact_state_groups() {
 }
 
 #[test]
+fn weapon_cooldowns_keep_default_attack_cd_shim_isolated() {
+    let mut tank = Entity::new_unit(1, EntityKind::Tank, 10.0, 20.0).expect("tank should spawn");
+
+    assert_eq!(tank.attack_cd(), 0);
+    assert_eq!(
+        tank.weapon_cooldown(crate::rules::combat::WeaponKind::TankCoax),
+        0,
+        "missing weapon cooldown entries should read as ready"
+    );
+
+    tank.set_weapon_cooldown(crate::rules::combat::WeaponKind::TankCannon, 72);
+    tank.set_weapon_cooldown(crate::rules::combat::WeaponKind::TankCoax, 6);
+    assert_eq!(
+        tank.attack_cd(),
+        72,
+        "legacy attack_cd shim should read the default tank cannon"
+    );
+
+    tank.tick_attack_cd();
+    assert_eq!(
+        tank.weapon_cooldown(crate::rules::combat::WeaponKind::TankCannon),
+        71
+    );
+    assert_eq!(
+        tank.weapon_cooldown(crate::rules::combat::WeaponKind::TankCoax),
+        6,
+        "legacy tick_attack_cd shim should only tick the default weapon"
+    );
+
+    tank.tick_weapon_cooldowns();
+    assert_eq!(
+        tank.weapon_cooldown(crate::rules::combat::WeaponKind::TankCannon),
+        70
+    );
+    assert_eq!(
+        tank.weapon_cooldown(crate::rules::combat::WeaponKind::TankCoax),
+        5
+    );
+
+    tank.set_attack_cd(0);
+    assert_eq!(tank.attack_cd(), 0);
+    assert_eq!(
+        tank.weapon_cooldown(crate::rules::combat::WeaponKind::TankCoax),
+        5,
+        "legacy set_attack_cd shim should not clear non-default weapons"
+    );
+}
+
+#[test]
+fn firing_reveal_response_delay_is_tracked_per_weapon() {
+    let mut tank = Entity::new_unit(1, EntityKind::Tank, 10.0, 20.0).expect("tank should spawn");
+
+    assert!(tank.start_weapon_firing_reveal_response_delay(
+        crate::rules::combat::WeaponKind::TankCannon,
+        42,
+        30
+    ));
+    assert!(
+        !tank.start_weapon_firing_reveal_response_delay(
+            crate::rules::combat::WeaponKind::TankCannon,
+            42,
+            30
+        ),
+        "same weapon should not pay the same revealed-target delay twice"
+    );
+    assert!(
+        tank.start_weapon_firing_reveal_response_delay(
+            crate::rules::combat::WeaponKind::TankCoax,
+            42,
+            30
+        ),
+        "a separate weapon must pay its own revealed-target delay"
+    );
+    assert_eq!(
+        tank.weapon_cooldown(crate::rules::combat::WeaponKind::TankCannon),
+        30
+    );
+    assert_eq!(
+        tank.weapon_cooldown(crate::rules::combat::WeaponKind::TankCoax),
+        30
+    );
+}
+
+#[test]
 fn finished_building_kinds_have_exact_state_groups() {
     let cases = [
         (
