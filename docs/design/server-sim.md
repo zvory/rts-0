@@ -323,10 +323,10 @@ Final audit for the ownership sequence:
   map/loadout-start compatibility path. Replay seek still uses recorded commands plus in-process
   `clone_for_replay_keyframe` keyframes after the start game is rebuilt.
 - Lab timeline seek still replays lab timeline entries from in-process keyframes. Current lab
-  import/export UI keeps the `LabScenarioV1` DTO and fresh-id remap behavior, while the internal
-  side-by-side `LabCheckpointScenarioV1` adapter can convert a scenario into materialized map
-  data/binding plus embedded `GameCheckpointV1` text and source id-remap metadata for parity
-  validation.
+  import/export UI uses checkpoint-backed `LabCheckpointScenarioV1` containers by default:
+  materialized map data/binding lives beside an embedded `GameCheckpointV1` text payload, and
+  `sourceEntityIdMap` preserves existing import remap callers. Old `LabScenarioV1` setup files
+  remain accepted as compatibility inputs and are converted through the same restore path.
 - Projection privacy remains enforced by normal snapshot/event projection tests plus the Phase 6
   checkpoint/privacy coverage; checkpoint helpers must not expose fog-hidden entity ids, positions,
   targets, ability payloads, remembered occupants, or private events.
@@ -340,10 +340,10 @@ Checkpoint-readiness blockers before follow-up product plans:
 - Replay migration currently writes schema 3 checkpoint-backed starts and retains schema 2 loading.
   Future cleanup still needs a keyframe replacement decision, any cross-version migrators beyond
   schema 2 compatibility, and release audit coverage for old builds or partial checkpoint coverage.
-- Lab migration has a side-by-side checkpoint adapter proof for current scenarios. Cutover still
-  needs a product decision for public scenario versus checkpoint semantics, timeline operation
-  capture/replay policy, authoring metadata migration, old-asset compatibility, and validation for
-  imported artifacts across map/faction versions.
+- Lab migration now writes checkpoint-backed catalog assets, exports, validation previews, and
+  submission files while retaining the `LabScenarioV1` compatibility reader. Future cleanup still
+  needs a product decision for when to remove the old setup DTO, a timeline operation
+  capture/replay policy, and validation for imported artifacts across map/faction versions.
 - Coverage gaps for a public checkpoint program include long-run/cross-version serialization,
   corruption/partial-load handling, AI-controller reconstruction expectations, performance and
   storage limits, privacy review for every exported projection-adjacent field, and deployment
@@ -644,10 +644,11 @@ remain on their current schemas until their phases introduce containers around t
   which rejects mixed-owner selections before queuing a normal command. Lab state, dirty flags,
   viewer roles, per-operator selected vision, the future-join vision default, shared room-time
   speed/pause/controller state, and append-only operation log records stay in the room task rather
-  than in `Game`. Bundled catalog and authoring validation restore each `LabScenarioV1` through the
-  current lab API and the side-by-side checkpoint adapter, then compare public start/snapshot state
-  before exposing the scenario. Scenario PR submission also starts in `room_task/lab.rs`: the room
-  exports the authoritative lab `Game`, validates authoring metadata, rate-limits the room to one
+  than in `Game`. Bundled catalog and authoring validation restore checkpoint-backed
+  `LabCheckpointScenarioV1` containers through the lab `Game` API and still accept old
+  `LabScenarioV1` files as compatibility inputs before exposing a scenario. Scenario PR submission
+  also starts in `room_task/lab.rs`: the room exports the authoritative lab `Game` as a checkpoint
+  scenario, validates authoring metadata, rate-limits the room to one
   PR job, and then hands the already-validated preview to a bounded background service so GitHub or
   git work never runs on the room tick path. The submission service rechecks catalog duplicates,
   safe filenames, path allowlists, payload/entity caps, branch safety, and the exact scenario plus

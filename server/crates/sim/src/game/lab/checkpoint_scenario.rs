@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use serde::{Deserialize, Serialize};
 
 use crate::game::map::Map;
@@ -212,17 +214,62 @@ fn validate_lab_checkpoint_scenario_shape(
     Ok(())
 }
 
+fn validate_lab_checkpoint_source_entity_id_map(
+    id_map: &[LabEntityIdRemap],
+    game: &Game,
+) -> Result<(), LabError> {
+    let restored_ids: HashSet<_> = game.state.entities.iter().map(|entity| entity.id).collect();
+    if id_map.len() > restored_ids.len() {
+        return Err(LabError::InvalidScenario {
+            reason: "checkpoint scenario sourceEntityIdMap has too many entries".to_string(),
+        });
+    }
+
+    let mut old_ids = HashSet::new();
+    let mut new_ids = HashSet::new();
+    for remap in id_map {
+        if !old_ids.insert(remap.old_id) {
+            return Err(LabError::InvalidScenario {
+                reason: "checkpoint scenario sourceEntityIdMap contains duplicate oldId"
+                    .to_string(),
+            });
+        }
+        if !new_ids.insert(remap.new_id) {
+            return Err(LabError::InvalidScenario {
+                reason: "checkpoint scenario sourceEntityIdMap contains duplicate newId"
+                    .to_string(),
+            });
+        }
+        if !restored_ids.contains(&remap.new_id) {
+            return Err(LabError::InvalidScenario {
+                reason: "checkpoint scenario sourceEntityIdMap newId must reference a restored entity"
+                    .to_string(),
+            });
+        }
+    }
+    Ok(())
+}
+
 impl Game {
-    #[cfg(test)]
-    pub(in crate::game) fn export_lab_checkpoint_scenario(
+    pub fn export_lab_checkpoint_scenario(
         &self,
+        name: String,
         server_build_sha: &str,
     ) -> Result<LabCheckpointScenarioV1, LabError> {
+        let source_entity_id_map = self
+            .state
+            .entities
+            .iter()
+            .map(|entity| LabEntityIdRemap {
+                old_id: entity.id,
+                new_id: entity.id,
+            })
+            .collect();
         self.export_lab_checkpoint_scenario_with_metadata(
-            "Untitled lab scenario".to_string(),
+            name,
             self.tick_count(),
             None,
-            Vec::new(),
+            source_entity_id_map,
             server_build_sha,
         )
     }
@@ -266,6 +313,10 @@ impl Game {
                 reason: "checkpoint scenario seed does not match payload seed".to_string(),
             });
         }
+        validate_lab_checkpoint_source_entity_id_map(
+            &scenario.metadata.source_entity_id_map,
+            &game,
+        )?;
         Ok(game)
     }
 

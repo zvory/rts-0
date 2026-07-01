@@ -1,9 +1,9 @@
 use super::checkpoint_helpers::{assert_equivalent_games, tick_pair_for};
 use super::*;
 use crate::game::lab::{
-    LabCheckpointScenarioSource, LabError, LabOp, LabOpOutcome, LabSetCompletedResearch,
-    LabSetPlayerResources, LabSpawnEntity, LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION,
-    LAB_SCENARIO_V1_SCHEMA_VERSION,
+    LabCheckpointScenarioSource, LabEntityIdRemap, LabError, LabOp, LabOpOutcome,
+    LabSetCompletedResearch, LabSetPlayerResources, LabSpawnEntity,
+    LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION, LAB_SCENARIO_V1_SCHEMA_VERSION,
 };
 use crate::game::upgrade::UpgradeKind;
 
@@ -193,7 +193,7 @@ fn lab_checkpoint_scenario_export_preserves_god_mode_and_rejects_map_mismatches(
     game.tick();
 
     let checkpoint = game
-        .export_lab_checkpoint_scenario(TEST_BUILD_SHA)
+        .export_lab_checkpoint_scenario("Untitled lab scenario".to_string(), TEST_BUILD_SHA)
         .expect("live lab checkpoint scenario should export");
     assert_eq!(checkpoint.metadata.exported_tick, game.tick_count());
     assert_eq!(checkpoint.metadata.source_scenario, None);
@@ -223,10 +223,33 @@ fn lab_checkpoint_scenario_export_preserves_god_mode_and_rejects_map_mismatches(
 }
 
 #[test]
+fn lab_checkpoint_scenario_restore_rejects_untrusted_source_entity_id_maps() {
+    let game = default_lab_game(0x5150_5005);
+    let checkpoint = game
+        .export_lab_checkpoint_scenario("Untitled lab scenario".to_string(), TEST_BUILD_SHA)
+        .expect("live lab checkpoint scenario should export");
+
+    let mut missing_new_id = checkpoint.clone();
+    missing_new_id.metadata.source_entity_id_map = vec![LabEntityIdRemap {
+        old_id: 1,
+        new_id: u32::MAX,
+    }];
+    assert_restore_invalid_scenario(
+        missing_new_id,
+        "sourceEntityIdMap newId must reference a restored entity",
+    );
+
+    let mut duplicate = checkpoint;
+    let old_id = duplicate.metadata.source_entity_id_map[0].old_id;
+    duplicate.metadata.source_entity_id_map[1].old_id = old_id;
+    assert_restore_invalid_scenario(duplicate, "sourceEntityIdMap contains duplicate oldId");
+}
+
+#[test]
 fn lab_checkpoint_scenario_restore_bounds_map_site_lists() {
     let game = default_lab_game(0x5150_5004);
     let checkpoint = game
-        .export_lab_checkpoint_scenario(TEST_BUILD_SHA)
+        .export_lab_checkpoint_scenario("Untitled lab scenario".to_string(), TEST_BUILD_SHA)
         .expect("live lab checkpoint scenario should export");
 
     let mut no_starts = checkpoint.clone();

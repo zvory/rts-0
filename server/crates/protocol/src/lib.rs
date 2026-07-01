@@ -25,8 +25,11 @@ pub use client_net_report::{
     ClientFramePhaseReport, ClientNetReport, ClientRenderCounterReport, CommandLifecycleExemplar,
 };
 pub use lab_scenario::{
-    LabScenarioAuthoringMetadata, LabScenarioEntity, LabScenarioLabMetadata, LabScenarioMap,
-    LabScenarioMetadata, LabScenarioOrder, LabScenarioPlayer, LabScenarioPoint, LabScenarioV1,
+    LabCheckpointScenarioMap, LabCheckpointScenarioMapData, LabCheckpointScenarioMetadata,
+    LabCheckpointScenarioSource, LabCheckpointScenarioV1, LabScenarioAuthoringMetadata,
+    LabScenarioEntity, LabScenarioEntityIdRemap, LabScenarioLabMetadata, LabScenarioMap,
+    LabScenarioMetadata, LabScenarioOrder, LabScenarioPayload, LabScenarioPlayer,
+    LabScenarioPoint, LabScenarioTile, LabScenarioV1,
 };
 pub use messagepack_frame::MESSAGEPACK_SNAPSHOT_FRAME_MAGIC;
 pub use rts_contract::{
@@ -290,7 +293,7 @@ pub enum LabClientOp {
         name: Option<String>,
     },
     ImportScenario {
-        scenario: LabScenarioV1,
+        scenario: LabScenarioPayload,
     },
     ValidateScenario {
         metadata: LabScenarioAuthoringMetadata,

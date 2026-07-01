@@ -28,6 +28,76 @@ pub struct LabScenarioV1 {
     pub metadata: LabScenarioMetadata,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(untagged)]
+pub enum LabScenarioPayload {
+    Checkpoint(LabCheckpointScenarioV1),
+    Legacy(LabScenarioV1),
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LabCheckpointScenarioV1 {
+    pub schema_version: u32,
+    pub kind: String,
+    pub name: String,
+    pub seed: u32,
+    pub map: LabCheckpointScenarioMap,
+    pub metadata: LabCheckpointScenarioMetadata,
+    pub checkpoint_payload: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LabCheckpointScenarioMap {
+    pub name: String,
+    pub schema_version: u32,
+    pub content_hash: String,
+    pub materialized_hash: String,
+    pub data: LabCheckpointScenarioMapData,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LabCheckpointScenarioMapData {
+    pub size: u32,
+    pub terrain: Vec<u8>,
+    pub starts: Vec<LabScenarioTile>,
+    pub expansion_sites: Vec<LabScenarioTile>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LabScenarioTile {
+    pub x: u32,
+    pub y: u32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LabCheckpointScenarioMetadata {
+    pub exported_tick: u32,
+    pub lab: LabScenarioLabMetadata,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_scenario: Option<LabCheckpointScenarioSource>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub source_entity_id_map: Vec<LabScenarioEntityIdRemap>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LabCheckpointScenarioSource {
+    pub kind: String,
+    pub schema_version: u32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabScenarioEntityIdRemap {
+    pub old_id: u32,
+    pub new_id: u32,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LabScenarioMap {

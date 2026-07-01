@@ -351,7 +351,19 @@ async fn lab_scenario_submission_dispatches_authoritative_export_and_rate_limits
         .iter()
         .find(|file| file.path == "server/assets/lab-scenarios/successful-submit.json")
         .expect("scenario file should be part of PR request");
-    assert!(scenario_file.contents.contains("\"steel\": 777"));
+    let scenario: crate::protocol::LabCheckpointScenarioV1 =
+        serde_json::from_str(&scenario_file.contents).expect("submitted checkpoint scenario JSON");
+    assert_eq!(scenario.kind, "labCheckpointScenario");
+    let checkpoint: serde_json::Value =
+        serde_json::from_str(&scenario.checkpoint_payload).expect("embedded checkpoint payload");
+    let player = checkpoint["players"]
+        .as_array()
+        .expect("checkpoint players")
+        .iter()
+        .find(|player| player["id"].as_u64() == Some(u64::from(LAB_PLAYER_ONE_ID)))
+        .expect("lab player one in checkpoint payload");
+    assert_eq!(player["steel"].as_u64(), Some(777));
+    assert_eq!(player["oil"].as_u64(), Some(66));
     drop(captured);
 
     task.on_lab_request(

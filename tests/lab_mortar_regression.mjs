@@ -63,8 +63,24 @@ async function exportScenario(client, requestId) {
     "export scenario",
   );
   const scenario = result.outcome?.scenario;
-  requireCondition(scenario && Array.isArray(scenario.entities), "export scenario returns entities");
+  const checkpoint = checkpointPayload(scenario);
+  requireCondition(
+    Array.isArray(checkpoint.entities?.entities),
+    "export scenario returns checkpoint entities",
+  );
   return scenario;
+}
+
+function checkpointPayload(scenario) {
+  requireCondition(
+    scenario?.kind === "labCheckpointScenario" && typeof scenario.checkpointPayload === "string",
+    "scenario uses checkpoint-backed lab shape",
+  );
+  return JSON.parse(scenario.checkpointPayload);
+}
+
+function writeCheckpointPayload(scenario, checkpoint) {
+  scenario.checkpointPayload = JSON.stringify(checkpoint);
 }
 
 async function importScenario(client, requestId, scenario, oldMortarId) {
@@ -96,13 +112,16 @@ async function prepareDeployedPlayerTwoMortar(client) {
   });
 
   const scenario = await exportScenario(client, 3);
-  const mortar = scenario.entities.find((entity) => entity.id === mortarId);
+  const checkpoint = checkpointPayload(scenario);
+  const mortar = checkpoint.entities.entities.find((entity) => entity.id === mortarId);
   requireCondition(mortar, "exported scenario includes spawned P2 mortar");
-  mortar.setUp = true;
-  mortar.setupFacing = Math.atan2(targetPosition.y - mortar.y, targetPosition.x - mortar.x);
-  mortar.facing = mortar.setupFacing;
-  mortar.weaponFacing = mortar.setupFacing;
-  mortar.setupTarget = { ...targetPosition };
+  const setupFacing = Math.atan2(targetPosition.y - mortar.pos_y, targetPosition.x - mortar.pos_x);
+  mortar.combat.setup = "Deployed";
+  mortar.combat.weapon_facing = setupFacing;
+  mortar.combat.desired_weapon_facing = setupFacing;
+  mortar.combat.emplacement_facing = setupFacing;
+  if (mortar.movement) mortar.movement.facing = setupFacing;
+  writeCheckpointPayload(scenario, checkpoint);
 
   const { mortarId: remappedMortarId, importStartMessageIndex } = await importScenario(
     client,

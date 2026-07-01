@@ -64,6 +64,7 @@ pub enum LabOp {
     SetPlayerGodMode { player_id: u32, enabled: bool },
     SetCompletedResearch(LabSetCompletedResearch),
     RestoreScenario(Box<LabScenarioV1>),
+    RestoreCheckpointScenario(Box<LabCheckpointScenarioV1>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -222,6 +223,9 @@ impl Game {
             }
             LabOp::SetCompletedResearch(input) => self.lab_set_completed_research(input),
             LabOp::RestoreScenario(scenario) => self.restore_lab_scenario(*scenario),
+            LabOp::RestoreCheckpointScenario(scenario) => {
+                self.restore_lab_checkpoint_scenario_op(*scenario)
+            }
         }
     }
 
@@ -271,6 +275,18 @@ impl Game {
         let (restored, restore) = Self::lab_game_from_scenario(scenario)?;
         *self = restored;
         Ok(LabOpOutcome::ScenarioRestored(restore))
+    }
+
+    pub fn restore_lab_checkpoint_scenario_op(
+        &mut self,
+        scenario: LabCheckpointScenarioV1,
+    ) -> Result<LabOpOutcome, LabError> {
+        let entity_id_map = scenario.metadata.source_entity_id_map.clone();
+        let restored = Self::restore_lab_checkpoint_scenario(scenario)?;
+        *self = restored;
+        Ok(LabOpOutcome::ScenarioRestored(LabScenarioRestore {
+            entity_id_map,
+        }))
     }
 
     fn lab_game_from_scenario(
