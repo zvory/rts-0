@@ -257,6 +257,8 @@ visible entities project full read-only inspection details, but command authorit
 resources/supply/upgrades, rally/order plans, ability controls, and debug path overlays remain
 exact-owner-only. Combat target ids and weapon facing for allied entities are projected only when
 the target is team-visible, so allied inspection does not reveal hidden enemy ids or directions.
+Attack events may carry a closed `weaponKind` feedback hint, but it is added only to attack events
+that were already projected and must not change event recipients or reveal hidden target facts.
 Victory resolution is team-aware:
 the room task ends 2+ player matches only when at most one nonzero team still has an alive member,
 and a defeated player does not receive an individual loss screen while any teammate keeps that team

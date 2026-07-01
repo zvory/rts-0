@@ -12,13 +12,16 @@ import {
   noticeSoundId,
 } from "../../client/src/audio.js";
 import {
+  attackFeedbackKind,
   attackKindHasCombatSound,
+  defaultWeaponKindForAttackerKind,
   machineGunnerHasAudibleTarget,
 } from "../../client/src/combat_audio.js";
 import {
   KIND,
   SETUP,
   STATE,
+  WEAPON_KIND,
 } from "../../client/src/protocol.js";
 
 function fakeAudioParam(value = 1) {
@@ -285,6 +288,18 @@ assert(
     "worker attacks are silent instead of falling back to rifle shots",
   );
   assert(attackKindHasCombatSound(KIND.RIFLEMAN), "rifleman attacks still play combat sounds");
+  assert(
+    defaultWeaponKindForAttackerKind(KIND.TANK) === WEAPON_KIND.TANK_CANNON,
+    "tank default attack resolves to the tank cannon weapon id",
+  );
+  assert(
+    attackFeedbackKind(KIND.TANK, WEAPON_KIND.TANK_CANNON) === KIND.TANK,
+    "default tank cannon weapon hint preserves tank feedback",
+  );
+  assert(
+    attackFeedbackKind(KIND.RIFLEMAN, "future_unknown_weapon") === KIND.RIFLEMAN,
+    "unknown attack weapon hints preserve attacker-kind feedback",
+  );
 }
 
 // ---------------------------------------------------------------------------

@@ -22,6 +22,7 @@ import {
   ORDER_STAGE,
   SETUP,
   STATE,
+  WEAPON_KIND,
   isBuilding,
   isResource,
   isUnit,
@@ -1236,7 +1237,8 @@ export function _drawMuzzleFlashes(state) {
     const t = clamp01(age / 240);
     const fade = 1 - t;
 
-    const baseR = muzzleFlashRadius(attacker.kind);
+    const feedbackKind = attackFeedbackKindForWeapon(attacker.kind, f.weaponKind);
+    const baseR = muzzleFlashRadius(feedbackKind);
     if (baseR <= 0) continue;
 
     const facing = isVehicleBodyKind(attacker.kind) && typeof attacker.weaponFacing === "number"
@@ -1246,10 +1248,10 @@ export function _drawMuzzleFlashes(state) {
       : targetPos
       ? Math.atan2(targetPos.y - attacker.y, targetPos.x - attacker.x)
       : 0;
-    const stat = STATS[attacker.kind] || {};
-    const reach = isBuilding(attacker.kind)
+    const stat = STATS[feedbackKind] || STATS[attacker.kind] || {};
+    const reach = isBuilding(feedbackKind)
       ? Math.max(stat.footW || 2, stat.footH || 2) * ((this._map && this._map.tileSize) || 32) * 0.5
-      : attacker.kind === KIND.ANTI_TANK_GUN
+      : feedbackKind === KIND.ANTI_TANK_GUN
         ? (stat.size || 9) * 1.9
       : (stat.size || 9) * 1.1;
     const mx = attacker.x + Math.cos(facing) * reach;
@@ -1262,9 +1264,9 @@ export function _drawMuzzleFlashes(state) {
       // Mirror the server overpenetration band: a round that hits a tank stops dead (no tail),
       // and Anti-Tank Guns punch twice as deep as everyone else.
       const tileSize = (this._map && this._map.tileSize) || 32;
-      const penFactor = target?.kind === KIND.TANK ? 0 : attacker.kind === KIND.ANTI_TANK_GUN ? 0.5 : 0.25;
+      const penFactor = target?.kind === KIND.TANK ? 0 : feedbackKind === KIND.ANTI_TANK_GUN ? 0.5 : 0.25;
       const tailLen = (stat.rangeTiles || 0) * tileSize * penFactor;
-      const tracerWidth = attacker.kind === KIND.ANTI_TANK_GUN ? 2.5 : 1.5;
+      const tracerWidth = feedbackKind === KIND.ANTI_TANK_GUN ? 2.5 : 1.5;
 
       g.lineStyle(tracerWidth, 0xffe066, 0.92 * fade);
       g.moveTo(mx, my);
@@ -1275,7 +1277,7 @@ export function _drawMuzzleFlashes(state) {
         const uy = dy / shotLen;
         const ex = targetPos.x + ux * tailLen;
         const ey = targetPos.y + uy * tailLen;
-        g.lineStyle(attacker.kind === KIND.ANTI_TANK_GUN ? 1.4 : 1.0, 0xffd84a, 0.46 * fade);
+        g.lineStyle(feedbackKind === KIND.ANTI_TANK_GUN ? 1.4 : 1.0, 0xffd84a, 0.46 * fade);
         g.moveTo(targetPos.x, targetPos.y);
         g.lineTo(ex, ey);
       }
@@ -1290,6 +1292,32 @@ export function _drawMuzzleFlashes(state) {
     g.beginFill(0xffd84a, 0.55 * fade);
     g.drawCircle(mx, my, r * 0.55);
     g.endFill();
+  }
+}
+
+function attackFeedbackKindForWeapon(attackerKind, weaponKind) {
+  switch (weaponKind) {
+    case WEAPON_KIND.WORKER_TOOLS:
+      return KIND.WORKER;
+    case WEAPON_KIND.GOLEM_FISTS:
+      return KIND.GOLEM;
+    case WEAPON_KIND.RIFLEMAN_RIFLE:
+      return KIND.RIFLEMAN;
+    case WEAPON_KIND.MACHINE_GUNNER_MG:
+      return KIND.MACHINE_GUNNER;
+    case WEAPON_KIND.SCOUT_CAR_MG:
+      return KIND.SCOUT_CAR;
+    case WEAPON_KIND.ANTI_TANK_GUN:
+      return KIND.ANTI_TANK_GUN;
+    case WEAPON_KIND.MORTAR_TEAM_MORTAR:
+      return KIND.MORTAR_TEAM;
+    case WEAPON_KIND.ARTILLERY_GUN:
+      return KIND.ARTILLERY;
+    case WEAPON_KIND.TANK_CANNON:
+    case WEAPON_KIND.TANK_COAX:
+      return KIND.TANK;
+    default:
+      return attackerKind;
   }
 }
 

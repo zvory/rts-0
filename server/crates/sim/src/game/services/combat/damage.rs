@@ -82,6 +82,7 @@ pub(super) fn apply_damage(
         shot_victim_pos.0,
         shot_victim_pos.1,
         reveal.clone(),
+        Some(weapon_profile.id.stable_id()),
     );
 
     // Roll for miss before computing damage.
