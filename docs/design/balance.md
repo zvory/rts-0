@@ -193,7 +193,8 @@ Core unit roles:
   lands delayed area shells that punish static positions and clumped units.
 - **Artillery** is the Superior Firepower late capstone from Gun Works: it uses a tank-sized
   gameplay footprint but reads as an exposed field piece, must deploy into a narrow firing arc,
-  cannot shoot inside its minimum range, and spends steel on each long-range point-fire shell.
+  cannot shoot inside its minimum range, and spends steel on each long-range Point Fire or Blanket
+  Fire shell.
 
 Terrain rules:
 - **Open ground** favors machine guns and tanks.
