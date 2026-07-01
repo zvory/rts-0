@@ -1,5 +1,5 @@
-use super::*;
 use super::lab::{LabCommandOptions, LabMoveEntity, LabOp, LabOpOutcome, LabSpawnEntity};
+use super::*;
 use crate::protocol::Command as WireCommand;
 use rand::RngCore;
 
@@ -197,9 +197,11 @@ fn lab_world_mutation_clears_rebuildable_pathing_cache() {
         0,
         "world-changing lab repair should clear rebuildable pathing cache"
     );
-    assert!(game.snapshot_full_for(1).entities.iter().any(|entity| {
-        entity.id == scout_id && entity.x == moved.0 && entity.y == moved.1
-    }));
+    assert!(game
+        .snapshot_full_for(1)
+        .entities
+        .iter()
+        .any(|entity| { entity.id == scout_id && entity.x == moved.0 && entity.y == moved.1 }));
 }
 
 fn derived_state_pathing_fixture() -> (Game, u32, (f32, f32), (f32, f32)) {

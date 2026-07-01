@@ -26,10 +26,7 @@ fn hidden_enemy_at_gun_fixture() -> (Game, u32, u32) {
     let players = human_vs_ai_players();
     let mut game = empty_flat_game(&players);
     let target_pos = game.map.tile_center(10, 10);
-    let enemy_pos = (
-        target_pos.0 + config::TILE_SIZE as f32 * 5.0,
-        target_pos.1,
-    );
+    let enemy_pos = (target_pos.0 + config::TILE_SIZE as f32 * 5.0, target_pos.1);
     let tank_pos = game.map.tile_center(3, 3);
 
     game.entities
@@ -66,10 +63,7 @@ fn hidden_enemy_tank_fixture() -> (Game, u32, u32) {
     let players = human_vs_ai_players();
     let mut game = empty_flat_game(&players);
     let target_pos = game.map.tile_center(10, 10);
-    let enemy_pos = (
-        target_pos.0 + config::TILE_SIZE as f32 * 5.0,
-        target_pos.1,
-    );
+    let enemy_pos = (target_pos.0 + config::TILE_SIZE as f32 * 5.0, target_pos.1);
     let tank_pos = game.map.tile_center(3, 3);
 
     game.entities
@@ -102,14 +96,8 @@ fn hidden_enemy_at_gun_with_counter_fixture() -> (Game, u32, u32) {
     let players = human_vs_ai_players();
     let mut game = empty_flat_game(&players);
     let target_pos = game.map.tile_center(10, 10);
-    let enemy_pos = (
-        target_pos.0 + config::TILE_SIZE as f32 * 5.0,
-        target_pos.1,
-    );
-    let counter_pos = (
-        target_pos.0,
-        target_pos.1 + config::TILE_SIZE as f32 * 10.0,
-    );
+    let enemy_pos = (target_pos.0 + config::TILE_SIZE as f32 * 5.0, target_pos.1);
+    let counter_pos = (target_pos.0, target_pos.1 + config::TILE_SIZE as f32 * 10.0);
 
     game.entities
         .spawn_building(1, EntityKind::CityCentre, target_pos.0, target_pos.1, true)
@@ -276,14 +264,8 @@ fn third_party_combat_does_not_make_hidden_shooter_actionable() {
     let players = three_player_combat_fixture();
     let mut game = empty_flat_game(&players);
     let target_pos = game.map.tile_center(10, 10);
-    let shooter_pos = (
-        target_pos.0 + config::TILE_SIZE as f32 * 5.0,
-        target_pos.1,
-    );
-    let observer_pos = (
-        target_pos.0 - config::TILE_SIZE as f32 * 7.0,
-        target_pos.1,
-    );
+    let shooter_pos = (target_pos.0 + config::TILE_SIZE as f32 * 5.0, target_pos.1);
+    let observer_pos = (target_pos.0 - config::TILE_SIZE as f32 * 7.0, target_pos.1);
 
     let observer = game
         .entities

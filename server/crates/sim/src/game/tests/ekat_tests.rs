@@ -235,7 +235,12 @@ fn ekat_consumes_nearby_golem_to_heal_to_full() {
         .expect("hero should spawn");
     let golem = game
         .entities
-        .spawn_unit(1, EntityKind::Golem, pos.0 + config::TILE_SIZE as f32, pos.1)
+        .spawn_unit(
+            1,
+            EntityKind::Golem,
+            pos.0 + config::TILE_SIZE as f32,
+            pos.1,
+        )
         .expect("Golem should spawn");
     game.entities
         .get_mut(hero)

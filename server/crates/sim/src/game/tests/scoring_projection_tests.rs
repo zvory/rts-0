@@ -305,7 +305,13 @@ fn death_vision_lingers_as_normal_vision_for_five_seconds() {
     let enemy_depot_pos = game.map.tile_center(24, 21);
     let enemy_depot = game
         .entities
-        .spawn_building(2, EntityKind::Depot, enemy_depot_pos.0, enemy_depot_pos.1, true)
+        .spawn_building(
+            2,
+            EntityKind::Depot,
+            enemy_depot_pos.0,
+            enemy_depot_pos.1,
+            true,
+        )
         .expect("enemy depot should spawn");
     systems::recompute_supply(&mut game.players, &game.entities);
     game.rebuild_final_spatial();
@@ -559,7 +565,10 @@ fn allied_death_vision_allows_teammate_attacks_and_auto_acquisition() {
         Some(enemy),
         "queued attack promotion should validate against team-shared death vision"
     );
-    let mortar_entity = game.entities.get(mortar).expect("mortar should remain alive");
+    let mortar_entity = game
+        .entities
+        .get(mortar)
+        .expect("mortar should remain alive");
     assert_eq!(
         mortar_entity.target_id(),
         Some(enemy),

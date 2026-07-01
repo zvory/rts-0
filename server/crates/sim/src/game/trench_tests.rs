@@ -648,9 +648,11 @@ fn lab_move_clears_trench_occupation_without_waiting_for_tick() {
         active_trench_occupation(game.entities.get(rifleman).expect("rifleman should exist")),
         None
     );
-    assert!(game.snapshot_full_for(1).entities.iter().any(|view| {
-        view.id == rifleman && view.occupied_trench_id.is_none()
-    }));
+    assert!(game
+        .snapshot_full_for(1)
+        .entities
+        .iter()
+        .any(|view| { view.id == rifleman && view.occupied_trench_id.is_none() }));
 }
 
 #[test]

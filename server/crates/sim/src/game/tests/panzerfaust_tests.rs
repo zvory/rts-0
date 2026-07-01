@@ -510,7 +510,10 @@ fn replacing_order_after_launch_spends_shot_and_resumes_after_conversion() {
             break;
         }
     }
-    assert!(saw_launch, "test setup should reach launch before replacing the order");
+    assert!(
+        saw_launch,
+        "test setup should reach launch before replacing the order"
+    );
 
     let move_goal = game.map.tile_center(20, 8);
     game.enqueue(
@@ -563,10 +566,13 @@ fn impact_visual_uses_launch_endpoint_after_target_leaves_visibility() {
     let mut launch_endpoint = None;
     for _ in 0..40 {
         let events = game.tick();
-        if let Some(endpoint) = player_events(&events, 1).iter().find_map(|event| match event {
-            Event::PanzerfaustLaunch { to_x, to_y, .. } => Some((*to_x, *to_y)),
-            _ => None,
-        }) {
+        if let Some(endpoint) = player_events(&events, 1)
+            .iter()
+            .find_map(|event| match event {
+                Event::PanzerfaustLaunch { to_x, to_y, .. } => Some((*to_x, *to_y)),
+                _ => None,
+            })
+        {
             launch_endpoint = Some(endpoint);
             break;
         }
@@ -584,10 +590,13 @@ fn impact_visual_uses_launch_endpoint_after_target_leaves_visibility() {
     let mut impact_pos = None;
     for _ in 0..40 {
         let events = game.tick();
-        if let Some(pos) = player_events(&events, 1).iter().find_map(|event| match event {
-            Event::PanzerfaustImpact { x, y } => Some((*x, *y)),
-            _ => None,
-        }) {
+        if let Some(pos) = player_events(&events, 1)
+            .iter()
+            .find_map(|event| match event {
+                Event::PanzerfaustImpact { x, y } => Some((*x, *y)),
+                _ => None,
+            })
+        {
             impact_pos = Some(pos);
             break;
         }

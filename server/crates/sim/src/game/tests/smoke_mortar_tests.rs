@@ -750,9 +750,9 @@ fn manual_mortar_fire_impacts_after_shooter_dies_before_impact() {
     assert!(
         launch_events.iter().any(|(player_id, events)| {
             *player_id == 1
-                && events
-                    .iter()
-                    .any(|event| matches!(event, Event::MortarLaunch { from, .. } if *from == mortar))
+                && events.iter().any(
+                    |event| matches!(event, Event::MortarLaunch { from, .. } if *from == mortar),
+                )
         }),
         "accepted mortar command should emit a launch before shooter death: {launch_events:?}"
     );
@@ -781,12 +781,14 @@ fn manual_mortar_fire_impacts_after_shooter_dies_before_impact() {
         let events = game.tick();
         impact_seen |= events.iter().any(|(player_id, events)| {
             *player_id == 1
-                && events.iter().any(|event| matches!(
-                    event,
-                    Event::MortarImpact { x, y, .. }
-                        if (*x - impact_pos.0).abs() < 0.001
-                            && (*y - impact_pos.1).abs() < 0.001
-                ))
+                && events.iter().any(|event| {
+                    matches!(
+                        event,
+                        Event::MortarImpact { x, y, .. }
+                            if (*x - impact_pos.0).abs() < 0.001
+                                && (*y - impact_pos.1).abs() < 0.001
+                    )
+                })
         });
     }
 

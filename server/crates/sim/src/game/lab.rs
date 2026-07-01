@@ -775,7 +775,8 @@ impl Game {
         systems::recompute_supply(&mut self.players, &self.entities);
         self.reset_derived_state();
         let ids: Vec<u32> = self.players.iter().map(|player| player.id).collect();
-        self.fog.recompute_with_smoke(&ids, &self.entities, &self.map, &self.smokes);
+        self.fog
+            .recompute_with_smoke(&ids, &self.entities, &self.map, &self.smokes);
         self.refresh_building_memory(&ids);
         self.refresh_trench_memory(&ids);
         #[cfg(debug_assertions)]
@@ -1495,5 +1496,4 @@ mod tests {
             Err(LabError::InvalidScenario { .. })
         ));
     }
-
 }
