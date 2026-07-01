@@ -96,7 +96,8 @@ fn handle_loaded_combat(
     else {
         return;
     };
-    if !teams.is_enemy_owner(owner, target_owner) && !(mode == CombatMode::Ordered && target_owner == owner)
+    if !(teams.is_enemy_owner(owner, target_owner)
+        || mode == CombatMode::Ordered && target_owner == owner)
     {
         return;
     }
