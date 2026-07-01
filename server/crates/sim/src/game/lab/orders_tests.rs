@@ -53,6 +53,22 @@ fn free_unit_position(game: &Game, kind: EntityKind) -> (f32, f32) {
     panic!("no free position found for {kind:?}");
 }
 
+fn free_building_position(game: &Game, kind: EntityKind) -> (f32, f32) {
+    for ty in 8..game.state.map.size.saturating_sub(8) {
+        for tx in 8..game.state.map.size.saturating_sub(8) {
+            let (x, y) =
+                crate::game::services::occupancy::footprint_center(&game.state.map, kind, tx, ty);
+            if game
+                .validate_building_position(&game.state.entities, kind, x, y)
+                .is_ok()
+            {
+                return (x, y);
+            }
+        }
+    }
+    panic!("no free building position found for {kind:?}");
+}
+
 #[test]
 fn lab_scenario_export_restores_active_and_queued_orders() {
     let mut game = default_map_game();
@@ -176,6 +192,80 @@ fn lab_scenario_export_restores_active_and_queued_orders() {
         Order::ArtilleryBlanketFire(order)
             if order.intent.x == blanket_x && order.intent.y == blanket_y
     ));
+}
+
+#[test]
+fn lab_delete_entity_clears_deconstruct_references_before_scenario_export() {
+    let mut game = default_map_game();
+    let (trap_x, trap_y) = free_building_position(&game, EntityKind::TankTrap);
+    let LabOpOutcome::Spawned { entity_id: trap } = game
+        .apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
+            owner: 1,
+            kind: EntityKind::TankTrap,
+            x: trap_x,
+            y: trap_y,
+            completed: true,
+        }))
+        .expect("tank trap should spawn")
+    else {
+        panic!("unexpected outcome");
+    };
+    let workers: Vec<_> = game
+        .state
+        .entities
+        .iter()
+        .filter(|entity| entity.owner == 1 && entity.kind == EntityKind::Worker)
+        .map(|entity| entity.id)
+        .take(2)
+        .collect();
+    let [active_worker, queued_worker] = workers.as_slice() else {
+        panic!("default lab player should have two workers");
+    };
+    let (active_worker, queued_worker) = (*active_worker, *queued_worker);
+    {
+        let worker = game
+            .state
+            .entities
+            .get_mut(active_worker)
+            .expect("active worker");
+        worker.replace_active_order(Order::deconstruct(trap));
+        worker.set_target_id(Some(trap));
+    }
+    {
+        let worker = game
+            .state
+            .entities
+            .get_mut(queued_worker)
+            .expect("queued worker");
+        worker.clear_orders();
+        assert!(worker.append_queued_order(OrderIntent::deconstruct(trap)));
+    }
+
+    game.apply_lab_op(LabOp::DeleteEntity { entity_id: trap })
+        .expect("deleting tank trap should clean dependent orders");
+
+    let active = game
+        .state
+        .entities
+        .get(active_worker)
+        .expect("active worker should remain");
+    assert!(matches!(active.order(), Order::Idle));
+    assert!(active.queued_orders().is_empty());
+    let queued = game
+        .state
+        .entities
+        .get(queued_worker)
+        .expect("queued worker should remain");
+    assert!(
+        queued.queued_orders().is_empty(),
+        "stale queued deconstruct target should not be exported"
+    );
+
+    let scenario = game.export_lab_scenario();
+    let mut restored = default_map_game();
+    restored
+        .apply_lab_op(LabOp::RestoreScenario(Box::new(scenario)))
+        .expect("export after deleting a deconstruct target should remain restorable");
 }
 
 #[test]

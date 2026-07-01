@@ -52,12 +52,14 @@ pub(super) fn order_references_entity(order: &Order, entity_id: u32) -> bool {
     order.attack_target() == Some(entity_id)
         || order.gather_node() == Some(entity_id)
         || order.build_site() == Some(entity_id)
+        || order.deconstruct_target() == Some(entity_id)
 }
 
 pub(super) fn order_intent_references_entity(intent: &OrderIntent, entity_id: u32) -> bool {
     match intent {
         OrderIntent::Attack(target) => target.target == entity_id,
         OrderIntent::Gather(gather) => gather.node == entity_id,
+        OrderIntent::Deconstruct(target) => target.target == entity_id,
         _ => false,
     }
 }
