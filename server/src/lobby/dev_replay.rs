@@ -231,6 +231,23 @@ mod tests {
     }
 
     #[test]
+    fn indexed_dev_scenario_ids_all_route_to_dev_mode() {
+        let ids: std::collections::BTreeSet<_> = crate::dev_scenarios::all_dev_scenarios()
+            .iter()
+            .flat_map(|scenario| {
+                std::iter::once(scenario.id).chain(scenario.launches.iter().map(|launch| launch.id))
+            })
+            .collect();
+
+        for id in ids {
+            assert!(
+                DevScenarioId::from_room_id(id).is_some(),
+                "indexed dev scenario {id:?} must map to a room-task scenario id"
+            );
+        }
+    }
+
+    #[test]
     fn load_replay_artifact_accepts_unified_selfplay_artifact() {
         let name = test_artifact_name("unified");
         let dir = artifact_dir(&name);
