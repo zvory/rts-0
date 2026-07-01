@@ -20,6 +20,7 @@ mod fixtures;
 mod meth_movement_tests;
 mod mortar_manual_fire_tests;
 mod movement_replay_tests;
+mod panzerfaust_tests;
 mod resources_mining_tests;
 mod scoring_projection_tests;
 mod smoke_mortar_tests;

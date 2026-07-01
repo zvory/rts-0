@@ -4,7 +4,7 @@ use crate::config;
 use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::entity::{
     uses_car_movement_semantics, uses_oriented_vehicle_body, uses_pivot_vehicle_movement, Entity,
-    EntityKind, EntityStore, MovePhase, Order, WeaponSetup,
+    EntityKind, EntityStore, MovePhase, Order, PanzerfaustState, WeaponSetup,
 };
 use crate::game::map::Map;
 use crate::game::services::geometry::{
@@ -34,6 +34,17 @@ const PIVOT_ROTATION_ASSIST_STEP_SCALE: f32 = 0.25;
 const PIVOT_ROTATION_ASSIST_MAX_STEPS: u32 = 4;
 const SCOUT_CAR_RECOVERY_SEARCH_STEP_PX: f32 = config::TILE_SIZE as f32 * 0.5;
 
+fn panzerfaust_movement_locked(e: &Entity) -> bool {
+    matches!(
+        e.combat.as_ref().and_then(|combat| combat.panzerfaust),
+        Some(
+            PanzerfaustState::Windup { .. }
+                | PanzerfaustState::InFlight { .. }
+                | PanzerfaustState::Recovery { .. }
+        )
+    )
+}
+
 /// Advance every moving unit along its waypoint path at its speed. Clamps the final landing
 /// tile to passable terrain (soft overlap with other units is allowed, so we don't resolve
 /// unit-unit collisions here). Arriving at the last waypoint of a plain Move clears the order.
@@ -55,6 +66,9 @@ pub(super) fn advance_moving_units(
                 Some(e) if e.is_unit() && !e.path_is_empty() => e,
                 _ => continue,
             };
+            if panzerfaust_movement_locked(e) {
+                continue;
+            }
             if requires_weapon_setup(e.kind) && !matches!(e.weapon_setup(), WeaponSetup::Packed) {
                 continue;
             }
@@ -89,12 +103,7 @@ pub(super) fn advance_moving_units(
             )
         };
         if let Some((wx, wy)) = movement_target {
-            speed *= ability_runtime.magic_anchor_movement_multiplier(
-                x,
-                y,
-                (wx - x, wy - y),
-                tick,
-            );
+            speed *= ability_runtime.magic_anchor_movement_multiplier(x, y, (wx - x, wy - y), tick);
         }
         if speed <= 0.0 {
             continue;
@@ -105,7 +114,9 @@ pub(super) fn advance_moving_units(
         let is_car = uses_car_movement_semantics(kind);
         let vehicle_oil_cost_per_px = match kind {
             EntityKind::Tank => Some(config::TANK_OIL_COST_PER_PX),
-            EntityKind::ScoutCar | EntityKind::CommandCar => Some(config::SCOUT_CAR_OIL_COST_PER_PX),
+            EntityKind::ScoutCar | EntityKind::CommandCar => {
+                Some(config::SCOUT_CAR_OIL_COST_PER_PX)
+            }
             _ => None,
         };
         // Experimental vehicle fuel rule: an oil-starved vehicle pauses before retrying so sparse

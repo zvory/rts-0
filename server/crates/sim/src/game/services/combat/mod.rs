@@ -29,13 +29,13 @@ mod acquisition;
 mod chase;
 mod damage;
 mod events;
+mod panzerfaust;
 mod priority;
 mod projection;
 mod weapons;
 
 #[cfg(test)]
 mod tests;
-
 #[cfg(test)]
 use acquisition::combat_mode;
 use acquisition::{
@@ -137,7 +137,32 @@ pub(in crate::game) fn combat_system(
             weapons::tick_tank_stationary_range(e);
         }
     }
+    panzerfaust::tick_states(
+        map,
+        entities,
+        teams,
+        methamphetamines_researched,
+        fog,
+        smokes,
+        events,
+        tick,
+    );
     for id in entities.ids() {
+        if panzerfaust::handle_combat_if_panzerfaust(
+            map,
+            entities,
+            teams,
+            methamphetamines_researched,
+            occ,
+            spatial,
+            coordinator,
+            fog,
+            smokes,
+            id,
+        ) {
+            continue;
+        }
+        // Determine this attacker's combat parameters.
         let (
             owner,
             px,
