@@ -16,8 +16,10 @@ use crate::rules::terrain::{self, TerrainKind};
 
 use super::priority::{AttackPriorityContext, TargetCandidate};
 use super::projection::{friendly_hard_blocker_between, shot_hits_intended_target};
-use super::target_selection::choose_target_preferring_anti_tank_field;
-use super::weapons::{effective_attack_profile, moving_fire_movement_order_holds_path};
+use super::weapons::{
+    choose_target_preferring_anti_tank_field, effective_attack_profile,
+    moving_fire_movement_order_holds_path,
+};
 
 #[derive(Copy, Clone, PartialEq)]
 pub(super) enum CombatMode {

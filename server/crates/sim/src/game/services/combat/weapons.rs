@@ -4,6 +4,7 @@ use crate::game::entrenchment_combat;
 use crate::game::services::movement::{angle_delta, rotate_toward};
 use crate::rules::combat as combat_rules;
 
+use super::priority::{self, AttackPriorityContext, TargetCandidate};
 use super::projection::tank_effective_range_tiles;
 use super::{
     ANTI_TANK_GUN_FIRE_TOLERANCE_RAD, ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK,
@@ -311,6 +312,29 @@ pub(super) fn anti_tank_gun_target_inside_field_of_fire(e: &Entity, target_angle
         return true;
     };
     angle_delta(center, target_angle).abs() <= config::ANTI_TANK_GUN_FIELD_OF_FIRE_RAD * 0.5
+}
+
+pub(super) fn choose_target_preferring_anti_tank_field(
+    context: &AttackPriorityContext,
+    attacker: &Entity,
+    px: f32,
+    py: f32,
+    candidates: &[TargetCandidate],
+    filter: impl Fn(&TargetCandidate) -> bool,
+) -> Option<u32> {
+    if attacker.kind == EntityKind::AntiTankGun {
+        let in_field = priority::choose_target(context, candidates.iter().filter(|candidate| {
+            filter(candidate)
+                && anti_tank_gun_target_inside_field_of_fire(
+                    attacker,
+                    (candidate.pos_y - py).atan2(candidate.pos_x - px),
+                )
+        }));
+        if in_field.is_some() {
+            return in_field;
+        }
+    }
+    priority::choose_target(context, candidates.iter().filter(|candidate| filter(candidate)))
 }
 
 fn anti_tank_gun_field_center(e: &Entity) -> Option<f32> {

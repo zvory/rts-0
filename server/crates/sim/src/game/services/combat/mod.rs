@@ -35,7 +35,6 @@ mod panzerfaust;
 mod priority;
 mod projection;
 mod target_policy;
-mod target_selection;
 mod weapons;
 
 #[cfg(test)]
