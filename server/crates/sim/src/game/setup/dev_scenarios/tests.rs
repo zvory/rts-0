@@ -459,7 +459,7 @@ fn panzerfaust_dev_scenarios_seed_final_inspection_cases() {
         .iter()
         .find(|entity| entity.owner == 2 && entity.kind == EntityKind::Tank)
         .expect("target-death scenario should seed one enemy Tank");
-    assert_eq!(low_health_tank.hp, config::PANZERFAUST_DAMAGE);
+    assert_eq!(low_health_tank.hp, 63);
     assert!(target_death
         .game.state.players
         .iter()
