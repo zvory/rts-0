@@ -11,19 +11,19 @@ mod compact_snapshot;
 mod contract_metadata;
 mod lab_scenario;
 mod messagepack_frame;
-#[cfg(test)]
-use contract_metadata::{ability_code, kind_code};
-pub use contract_metadata::{
-    abilities, ability_object_kinds, kinds, lobby_kinds, protocol_contract, states, terrain,
-    upgrades, weapons, CompactSlotSchemas, ProtocolCompactCodes, ProtocolContract, ProtocolMessageTags,
-    ProtocolVocabularies, SlotField, SnapshotCodecContract, COMPACT_SNAPSHOT_VERSION,
-    COMPACT_UNKNOWN_CODE, PREDICTION_PROTOCOL_VERSION, SNAPSHOT_CODEC_COMPACT_JSON,
-    SNAPSHOT_CODEC_MESSAGEPACK_COMPACT, SNAPSHOT_CODEC_VERSION, SNAPSHOT_FRAME_KIND_BINARY,
-    SNAPSHOT_FRAME_KIND_TEXT,
-};
 pub use client_net_report::{
     ClientFramePhaseReport, ClientNetReport, ClientRenderCounterReport, CommandLifecycleExemplar,
 };
+pub use contract_metadata::{
+    abilities, ability_object_kinds, kinds, lobby_kinds, protocol_contract, states, terrain,
+    upgrades, weapons, CompactSlotSchemas, ProtocolCompactCodes, ProtocolContract,
+    ProtocolMessageTags, ProtocolVocabularies, SlotField, SnapshotCodecContract,
+    COMPACT_SNAPSHOT_VERSION, COMPACT_UNKNOWN_CODE, PREDICTION_PROTOCOL_VERSION,
+    SNAPSHOT_CODEC_COMPACT_JSON, SNAPSHOT_CODEC_MESSAGEPACK_COMPACT, SNAPSHOT_CODEC_VERSION,
+    SNAPSHOT_FRAME_KIND_BINARY, SNAPSHOT_FRAME_KIND_TEXT,
+};
+#[cfg(test)]
+use contract_metadata::{ability_code, kind_code};
 pub use lab_scenario::{
     LabScenarioAuthoringMetadata, LabScenarioEntity, LabScenarioLabMetadata, LabScenarioMap,
     LabScenarioMetadata, LabScenarioOrder, LabScenarioPlayer, LabScenarioPoint, LabScenarioV1,
@@ -36,8 +36,8 @@ pub use rts_contract::{
     LabVisionMode, MapInfo, MatchControlCapabilities, MovementPathDiagnosticScope, NoticeSeverity,
     OrderPlanMarker, PlayerResourceSnapshot, PlayerScore, PlayerStart, RememberedBuildingView,
     ReplayStartMetadata, ResourceDelta, ResourceNode, RoomCapabilities, RoomTimeCapabilities,
-    RoomTimeState, SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload, TeamId, TrenchView,
-    VisibilityCapabilities, DEFAULT_FACTION_ID,
+    RoomTimeState, ScoutPlaneStateView, SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload,
+    TeamId, TrenchView, VisibilityCapabilities, DEFAULT_FACTION_ID,
 };
 
 fn is_false(value: &bool) -> bool {
@@ -720,12 +720,15 @@ pub fn encode_snapshot_frame_with_diagnostics(
 ) -> Result<(SnapshotFrame, SnapshotPayloadDiagnostics), SnapshotEncodeError> {
     match codec {
         SnapshotCodec::CompactJson => {
-            let (text, diagnostics) = compact_snapshot::serialize_compact_snapshot_with_diagnostics(snapshot)?;
+            let (text, diagnostics) =
+                compact_snapshot::serialize_compact_snapshot_with_diagnostics(snapshot)?;
             Ok((SnapshotFrame::Text(text), diagnostics))
         }
         SnapshotCodec::MessagePackCompact => {
             let (bytes, diagnostics) =
-                compact_snapshot::serialize_messagepack_compact_snapshot_with_diagnostics(snapshot)?;
+                compact_snapshot::serialize_messagepack_compact_snapshot_with_diagnostics(
+                    snapshot,
+                )?;
             Ok((SnapshotFrame::Binary(bytes), diagnostics))
         }
     }
@@ -782,7 +785,7 @@ mod tests {
                 .unwrap()
                 .last()
                 .unwrap()["name"],
-            serde_json::json!("occupiedTrenchId")
+            serde_json::json!("scoutPlane")
         );
     }
 
@@ -1401,13 +1404,23 @@ mod tests {
             },
         ];
 
+        let mut scout_plane =
+            EntityView::new(4, 1, kinds::SCOUT_PLANE, 200.0, 220.0, 40, 40, states::IDLE);
+        scout_plane.scout_plane = Some(ScoutPlaneStateView {
+            orbit_center: Some([256.0, 288.0]),
+            fuel_oil: 8,
+            fuel_capacity_oil: 8,
+            upkeep_oil: 1,
+            upkeep_interval_ticks: 20,
+        });
+
         Snapshot {
             tick: 42,
             steel: 100,
             oil: 25,
             supply_used: 3,
             supply_cap: 10,
-            entities: vec![worker, gunner, center],
+            entities: vec![worker, gunner, center, scout_plane],
             resource_deltas: vec![ResourceDelta {
                 id: 200,
                 remaining: 1498,
@@ -1577,7 +1590,7 @@ mod tests {
         assert_eq!(value["t"], "snapshot");
         assert_eq!(value["v"], COMPACT_SNAPSHOT_VERSION);
         assert_eq!(value["s"], serde_json::json!([42, 100, 25, 3, 10]));
-        assert_eq!(value["e"].as_array().unwrap().len(), 3);
+        assert_eq!(value["e"].as_array().unwrap().len(), 4);
         assert_eq!(value["e"][0][8], serde_json::json!(1.5));
         assert_eq!(value["e"][0][9], serde_json::json!(1.75));
         assert_eq!(value["e"][0][14], serde_json::json!(200));
@@ -1603,6 +1616,11 @@ mod tests {
         assert_eq!(
             value["e"][2][27],
             serde_json::json!([[1, 256.0, 512.0], [2, 320.0, 544.0]])
+        );
+        assert_eq!(value["e"][3][2], serde_json::json!(25));
+        assert_eq!(
+            value["e"][3][33],
+            serde_json::json!([[256.0, 288.0], 8, 8, 1, 20])
         );
         assert_eq!(value["r"], serde_json::json!([[200, 1498]]));
         assert_eq!(
@@ -1723,7 +1741,7 @@ mod tests {
                 .find(|section| section.section == name)
                 .unwrap_or_else(|| panic!("missing section {name}"))
         };
-        assert_eq!(section("entities").count, 3);
+        assert_eq!(section("entities").count, 4);
         assert!(section("entities").bytes > 0);
         assert_eq!(section("visibility").count, 4);
         assert!(section("visibility").bytes > 0);

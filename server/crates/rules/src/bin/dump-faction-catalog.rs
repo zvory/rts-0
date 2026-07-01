@@ -246,6 +246,13 @@ fn print_client_config(indent: &str) {
         json_f32(balance::SCOUT_CAR_BODY_CLEARANCE_PX),
     );
     println!(
+        "{indent}    \"{}\": {{\"length\":{},\"width\":{},\"clearance\":{}}},",
+        EntityKind::ScoutPlane.stable_id(),
+        json_f32(balance::SCOUT_PLANE_BODY_LENGTH_PX),
+        json_f32(balance::SCOUT_PLANE_BODY_WIDTH_PX),
+        json_f32(balance::SCOUT_PLANE_BODY_CLEARANCE_PX),
+    );
+    println!(
         "{indent}    \"{}\": {{\"length\":{},\"width\":{},\"clearance\":{}}}",
         EntityKind::CommandCar.stable_id(),
         json_f32(balance::COMMAND_CAR_BODY_LENGTH_PX),
@@ -330,6 +337,22 @@ fn print_client_constants(indent: &str) {
     println!(
         "{indent}    \"scoutCarSmokeUses\": {},",
         balance::SCOUT_CAR_SMOKE_USES
+    );
+    println!(
+        "{indent}    \"scoutPlaneOrbitRadiusTiles\": {},",
+        balance::SCOUT_PLANE_ORBIT_RADIUS_TILES
+    );
+    println!(
+        "{indent}    \"scoutPlaneUpkeepOil\": {},",
+        balance::SCOUT_PLANE_UPKEEP_OIL
+    );
+    println!(
+        "{indent}    \"scoutPlaneUpkeepIntervalTicks\": {},",
+        balance::SCOUT_PLANE_UPKEEP_INTERVAL_TICKS
+    );
+    println!(
+        "{indent}    \"scoutPlaneFuelReserveOil\": {},",
+        balance::SCOUT_PLANE_FUEL_RESERVE_OIL
     );
     println!(
         "{indent}    \"smokeAbilityCost\": {{\"steel\":{},\"oil\":{}}},",

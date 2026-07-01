@@ -122,6 +122,11 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "RESOURCE_AMOUNTS",
   "SCOUT_CAR_BODY",
   "SCOUT_CAR_SMOKE_USES",
+  "SCOUT_PLANE_BODY",
+  "SCOUT_PLANE_FUEL_RESERVE_OIL",
+  "SCOUT_PLANE_ORBIT_RADIUS_TILES",
+  "SCOUT_PLANE_UPKEEP_INTERVAL_TICKS",
+  "SCOUT_PLANE_UPKEEP_OIL",
   "SMOKE_ABILITY_COOLDOWN_TICKS",
   "SMOKE_ABILITY_COST",
   "SMOKE_ABILITY_RANGE_TILES",
@@ -165,6 +170,17 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   assert(
     STATS[KIND.STEELWORKS].label === "Gun Works",
     "steelworks protocol kind should present as Gun Works",
+  );
+  assert(
+    STATS[KIND.SCOUT_PLANE].cost.steel === 50 &&
+      STATS[KIND.SCOUT_PLANE].cost.oil === 50 &&
+      STATS[KIND.SCOUT_PLANE].supply === 0 &&
+      STATS[KIND.SCOUT_PLANE].body.length === 48,
+    "hidden Scout Plane stats mirror the approved contract",
+  );
+  assert(
+    !STATS[KIND.CITY_CENTRE].trains.includes(KIND.SCOUT_PLANE),
+    "City Centre trainables do not expose the hidden Scout Plane yet",
   );
   assert(
     Array.isArray(STATS[KIND.TRAINING_CENTRE].requires),

@@ -444,6 +444,7 @@ mod tests {
                     breakthrough_ticks: None,
                     occupied_trench_id: None,
                     vision_only: false,
+                    scout_plane: None,
                     debug_path: None,
                 },
                 EntityView {
@@ -479,6 +480,7 @@ mod tests {
                     breakthrough_ticks: None,
                     occupied_trench_id: None,
                     vision_only: false,
+                    scout_plane: None,
                     debug_path: None,
                 },
                 EntityView {
@@ -514,6 +516,7 @@ mod tests {
                     breakthrough_ticks: None,
                     occupied_trench_id: None,
                     vision_only: false,
+                    scout_plane: None,
                     debug_path: None,
                 },
                 EntityView {
@@ -549,6 +552,7 @@ mod tests {
                     breakthrough_ticks: None,
                     occupied_trench_id: None,
                     vision_only: false,
+                    scout_plane: None,
                     debug_path: None,
                 },
                 EntityView {
@@ -584,6 +588,7 @@ mod tests {
                     breakthrough_ticks: None,
                     occupied_trench_id: None,
                     vision_only: false,
+                    scout_plane: None,
                     debug_path: None,
                 },
             ],

@@ -15,6 +15,7 @@ pub enum AbilityKind {
     PointFire,
     BlanketFire,
     Breakthrough,
+    DismissScoutPlane,
     EkatTeleport,
     EkatLineShot,
     EkatMagicAnchor,
@@ -30,6 +31,7 @@ impl AbilityKind {
             AbilityKind::PointFire => protocol::abilities::POINT_FIRE,
             AbilityKind::BlanketFire => protocol::abilities::BLANKET_FIRE,
             AbilityKind::Breakthrough => protocol::abilities::BREAKTHROUGH,
+            AbilityKind::DismissScoutPlane => protocol::abilities::DISMISS_SCOUT_PLANE,
             AbilityKind::EkatTeleport => protocol::abilities::EKAT_TELEPORT,
             AbilityKind::EkatLineShot => protocol::abilities::EKAT_LINE_SHOT,
             AbilityKind::EkatMagicAnchor => protocol::abilities::EKAT_MAGIC_ANCHOR,
@@ -49,6 +51,7 @@ impl FromStr for AbilityKind {
             protocol::abilities::POINT_FIRE => Ok(AbilityKind::PointFire),
             protocol::abilities::BLANKET_FIRE => Ok(AbilityKind::BlanketFire),
             protocol::abilities::BREAKTHROUGH => Ok(AbilityKind::Breakthrough),
+            protocol::abilities::DISMISS_SCOUT_PLANE => Ok(AbilityKind::DismissScoutPlane),
             protocol::abilities::EKAT_TELEPORT => Ok(AbilityKind::EkatTeleport),
             protocol::abilities::EKAT_LINE_SHOT => Ok(AbilityKind::EkatLineShot),
             protocol::abilities::EKAT_MAGIC_ANCHOR => Ok(AbilityKind::EkatMagicAnchor),
@@ -129,6 +132,7 @@ pub fn effect_hook(kind: AbilityKind) -> AbilityEffectHook {
         AbilityKind::Smoke | AbilityKind::MortarFire => AbilityEffectHook::DelayedWorld,
         AbilityKind::PointFire | AbilityKind::BlanketFire => AbilityEffectHook::ArtilleryPointFire,
         AbilityKind::Breakthrough => AbilityEffectHook::OwnedAreaStatus,
+        AbilityKind::DismissScoutPlane => AbilityEffectHook::ReservedNoop,
         AbilityKind::EkatTeleport => AbilityEffectHook::DashReturn,
         AbilityKind::EkatLineShot => AbilityEffectHook::LineProjectile,
         AbilityKind::EkatMagicAnchor => AbilityEffectHook::MagicAnchor,
@@ -165,6 +169,10 @@ mod tests {
         assert_eq!(
             definition(AbilityKind::Breakthrough).effect_hook,
             AbilityEffectHook::OwnedAreaStatus
+        );
+        assert_eq!(
+            definition(AbilityKind::DismissScoutPlane).effect_hook,
+            AbilityEffectHook::ReservedNoop
         );
         assert_eq!(
             definition(AbilityKind::EkatTeleport).effect_hook,

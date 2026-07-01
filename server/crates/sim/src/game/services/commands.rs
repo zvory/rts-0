@@ -1110,6 +1110,7 @@ fn ability_to_planner(ability: AbilityKind) -> planner::AbilityId {
         AbilityKind::EkatMagicAnchor => planner::AbilityId(7),
         AbilityKind::EkatConsumeGolem => planner::AbilityId(8),
         AbilityKind::BlanketFire => planner::AbilityId(9),
+        AbilityKind::DismissScoutPlane => planner::AbilityId(10),
     }
 }
 
@@ -1125,6 +1126,7 @@ fn ability_from_planner(ability: planner::AbilityId) -> Option<AbilityKind> {
         7 => Some(AbilityKind::EkatMagicAnchor),
         8 => Some(AbilityKind::EkatConsumeGolem),
         9 => Some(AbilityKind::BlanketFire),
+        10 => Some(AbilityKind::DismissScoutPlane),
         _ => None,
     }
 }

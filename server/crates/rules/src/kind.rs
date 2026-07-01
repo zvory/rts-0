@@ -14,6 +14,7 @@ pub enum EntityKind {
     MortarTeam,
     Artillery,
     ScoutCar,
+    ScoutPlane,
     Tank,
     CommandCar,
     Ekat,
@@ -32,7 +33,7 @@ pub enum EntityKind {
 }
 
 impl EntityKind {
-    pub const ALL: [EntityKind; 24] = [
+    pub const ALL: [EntityKind; 25] = [
         EntityKind::Worker,
         EntityKind::Golem,
         EntityKind::Rifleman,
@@ -42,6 +43,7 @@ impl EntityKind {
         EntityKind::MortarTeam,
         EntityKind::Artillery,
         EntityKind::ScoutCar,
+        EntityKind::ScoutPlane,
         EntityKind::Tank,
         EntityKind::CommandCar,
         EntityKind::Ekat,
@@ -82,6 +84,7 @@ impl EntityKind {
             EntityKind::MortarTeam => "mortar_team",
             EntityKind::Artillery => "artillery",
             EntityKind::ScoutCar => "scout_car",
+            EntityKind::ScoutPlane => "scout_plane",
             EntityKind::Tank => "tank",
             EntityKind::CommandCar => "command_car",
             EntityKind::Ekat => "ekat",
@@ -115,6 +118,7 @@ impl FromStr for EntityKind {
             "mortar_team" => Ok(EntityKind::MortarTeam),
             "artillery" => Ok(EntityKind::Artillery),
             "scout_car" => Ok(EntityKind::ScoutCar),
+            "scout_plane" => Ok(EntityKind::ScoutPlane),
             "tank" => Ok(EntityKind::Tank),
             "command_car" => Ok(EntityKind::CommandCar),
             "ekat" => Ok(EntityKind::Ekat),

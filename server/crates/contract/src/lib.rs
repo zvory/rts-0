@@ -498,6 +498,19 @@ pub struct AbilityCooldownView {
     pub expires_in: Option<u16>,
 }
 
+/// Owner/spectator-only Scout Plane state. Enemy snapshots that can see the plane still omit this
+/// private state so orbit/fuel intent does not leak through fog.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ScoutPlaneStateView {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub orbit_center: Option<[f32; 2]>,
+    pub fuel_oil: u8,
+    pub fuel_capacity_oil: u8,
+    pub upkeep_oil: u8,
+    pub upkeep_interval_ticks: u16,
+}
+
 /// One entity as seen by one player. Optional fields are omitted when not applicable.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -567,6 +580,8 @@ pub struct EntityView {
     pub breakthrough_ticks: Option<u16>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub occupied_trench_id: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scout_plane: Option<ScoutPlaneStateView>,
 
     #[serde(default, skip_serializing_if = "is_false")]
     pub vision_only: bool,
@@ -620,6 +635,7 @@ impl EntityView {
             abilities: Vec::new(),
             breakthrough_ticks: None,
             occupied_trench_id: None,
+            scout_plane: None,
             vision_only: false,
             debug_path: None,
         }

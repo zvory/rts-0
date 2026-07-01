@@ -276,6 +276,27 @@ pub const UNITS: &[UnitDef] = &[
         train_requires: &[],
     },
     UnitDef {
+        kind: EntityKind::ScoutPlane,
+        stats: balance::UnitStats {
+            hp: balance::SCOUT_PLANE_HP,
+            dmg: 0,
+            range_tiles: 0,
+            cooldown: 0,
+            speed: balance::SCOUT_PLANE_SPEED_PX_PER_TICK,
+            sight_tiles: balance::SCOUT_PLANE_SIGHT_TILES,
+            cost_steel: balance::SCOUT_PLANE_COST_STEEL,
+            cost_oil: balance::SCOUT_PLANE_COST_OIL,
+            supply: balance::SCOUT_PLANE_SUPPLY,
+            build_ticks: balance::SCOUT_PLANE_BUILD_TICKS,
+            radius: 0.0,
+        },
+        armor_class: ArmorClass::Small,
+        weapon: WeaponClass::None,
+        // Hidden until Phase 6 adds the City Centre production path and any-of tech unlock.
+        trained_at: None,
+        train_requires: &[],
+    },
+    UnitDef {
         kind: EntityKind::CommandCar,
         stats: balance::UnitStats {
             hp: 225,
@@ -606,6 +627,7 @@ mod tests {
                 EntityKind::Artillery,
                 EntityKind::Tank,
                 EntityKind::ScoutCar,
+                EntityKind::ScoutPlane,
                 EntityKind::CommandCar,
                 EntityKind::Ekat,
             ]

@@ -211,6 +211,20 @@ mod tests {
                 },
             ),
             (
+                EntityKind::ScoutPlane,
+                ExpectedTargetFacts {
+                    is_unit: true,
+                    is_building: false,
+                    is_resource_node: false,
+                    armor_class: Some(ArmorClass::Small),
+                    weapon_class: WeaponClass::None,
+                    threat_role: TargetThreatRole::Ordinary,
+                    is_vehicle_body: false,
+                    is_economy_unit: false,
+                    is_coax_infantry_priority: false,
+                },
+            ),
+            (
                 EntityKind::Tank,
                 ExpectedTargetFacts {
                     is_unit: true,
