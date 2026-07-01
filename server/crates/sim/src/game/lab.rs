@@ -27,20 +27,18 @@ mod orientation;
 mod orders;
 #[cfg(test)]
 mod orders_tests;
+mod checkpoint_scenario;
 mod resource_nodes;
 mod scenario;
+mod scenario_export;
 
-use orientation::{
-    lab_entity_facing, lab_entity_is_set_up, lab_entity_setup_facing, lab_entity_setup_target,
-    lab_entity_weapon_facing, restore_lab_entity_orientation, restore_lab_entity_setup,
-};
+use orientation::{restore_lab_entity_orientation, restore_lab_entity_setup};
 use orders::{
-    clear_lab_production_state, lab_entity_active_order, lab_entity_queued_orders,
-    order_intent_references_entity, order_references_entity, restore_lab_entity_orders,
+    clear_lab_production_state, order_intent_references_entity, order_references_entity,
+    restore_lab_entity_orders,
 };
 use scenario::{
-    validate_lab_checkpoint_scenario_shape, validate_lab_entity_setup_shape,
-    validate_lab_scenario_shape, LAB_CHECKPOINT_SCENARIO_KIND, LAB_SCENARIO_KIND,
+    validate_lab_entity_setup_shape, validate_lab_scenario_shape,
     MAX_LAB_SCENARIO_UPGRADES_PER_PLAYER,
 };
 pub use scenario::{
@@ -260,126 +258,6 @@ impl Game {
         Ok(())
     }
 
-    pub fn export_lab_scenario(&self) -> LabScenarioV1 {
-        let players = self.state.players
-            .iter()
-            .map(|player| LabScenarioPlayer {
-                id: player.id,
-                team_id: player.team_id,
-                faction_id: player.faction_id.clone(),
-                name: player.name.clone(),
-                color: player.color.clone(),
-                is_ai: player.is_ai,
-                resources: LabScenarioResources {
-                    steel: player.steel,
-                    oil: player.oil,
-                },
-                research: LabScenarioResearch {
-                    completed: player
-                        .upgrades
-                        .iter()
-                        .map(|upgrade| upgrade.to_protocol_str().to_string())
-                        .collect(),
-                },
-            })
-            .collect();
-
-        let entities = self.state.entities
-            .iter()
-            .map(|entity| LabScenarioEntity {
-                id: entity.id,
-                owner: entity.owner,
-                kind: entity.kind.to_string(),
-                x: entity.pos_x,
-                y: entity.pos_y,
-                hp: entity.hp,
-                completed: !entity.under_construction(),
-                construction_progress: entity.construction.as_ref().map(|state| state.progress),
-                construction_total: entity.construction.as_ref().map(|state| state.total),
-                resource_remaining: entity.remaining(),
-                facing: lab_entity_facing(entity),
-                weapon_facing: lab_entity_weapon_facing(entity),
-                set_up: lab_entity_is_set_up(entity),
-                setup_facing: lab_entity_setup_facing(entity),
-                setup_target: lab_entity_setup_target(&self.state.map, entity),
-                order: lab_entity_active_order(entity),
-                queued_orders: lab_entity_queued_orders(entity),
-            })
-            .collect();
-
-        LabScenarioV1 {
-            schema_version: LAB_SCENARIO_V1_SCHEMA_VERSION,
-            kind: LAB_SCENARIO_KIND.to_string(),
-            name: "Untitled lab scenario".to_string(),
-            seed: self.state.seed,
-            map: LabScenarioMap {
-                name: self.state.map_metadata.name.clone(),
-                schema_version: self.state.map_metadata.schema_version,
-                content_hash: self.state.map_metadata.content_hash.clone(),
-            },
-            players,
-            entities,
-            metadata: LabScenarioMetadata {
-                exported_tick: self.tick_count(),
-            },
-        }
-    }
-
-    pub fn export_lab_checkpoint_scenario(
-        &self,
-        server_build_sha: &str,
-    ) -> Result<LabCheckpointScenarioV1, LabError> {
-        self.export_lab_checkpoint_scenario_with_metadata(
-            "Untitled lab scenario".to_string(),
-            self.tick_count(),
-            None,
-            Vec::new(),
-            server_build_sha,
-        )
-    }
-
-    pub fn lab_checkpoint_scenario_from_v1(
-        scenario: LabScenarioV1,
-        server_build_sha: &str,
-    ) -> Result<LabCheckpointScenarioV1, LabError> {
-        let name = scenario.name.clone();
-        let exported_tick = scenario.metadata.exported_tick;
-        let source = LabCheckpointScenarioSource {
-            kind: scenario.kind.clone(),
-            schema_version: scenario.schema_version,
-        };
-        let (game, restore) = Self::lab_game_from_scenario(scenario)?;
-        game.export_lab_checkpoint_scenario_with_metadata(
-            name,
-            exported_tick,
-            Some(source),
-            restore.entity_id_map,
-            server_build_sha,
-        )
-    }
-
-    pub fn restore_lab_checkpoint_scenario(
-        scenario: LabCheckpointScenarioV1,
-    ) -> Result<Game, LabError> {
-        validate_lab_checkpoint_scenario_shape(&scenario)?;
-        let seed = scenario.seed;
-        let (map, map_metadata) = scenario.map.into_map()?;
-        let game = Game::restore_checkpoint_payload_text(
-            &scenario.checkpoint_payload,
-            map,
-            map_metadata,
-        )
-        .map_err(|err| LabError::InvalidScenario {
-            reason: format!("checkpoint scenario payload is invalid: {err}"),
-        })?;
-        if game.seed() != seed {
-            return Err(LabError::InvalidScenario {
-                reason: "checkpoint scenario seed does not match payload seed".to_string(),
-            });
-        }
-        Ok(game)
-    }
-
     pub fn lab_god_mode_players(&self) -> Vec<u32> {
         self.state.lab_god_mode_players.iter().copied().collect()
     }
@@ -391,34 +269,6 @@ impl Game {
         let (restored, restore) = Self::lab_game_from_scenario(scenario)?;
         *self = restored;
         Ok(LabOpOutcome::ScenarioRestored(restore))
-    }
-
-    fn export_lab_checkpoint_scenario_with_metadata(
-        &self,
-        name: String,
-        exported_tick: u32,
-        source_scenario: Option<LabCheckpointScenarioSource>,
-        source_entity_id_map: Vec<LabEntityIdRemap>,
-        server_build_sha: &str,
-    ) -> Result<LabCheckpointScenarioV1, LabError> {
-        let checkpoint_payload = self
-            .checkpoint_payload_text_for_container("lab", server_build_sha)
-            .map_err(|err| LabError::InvalidScenario {
-                reason: format!("checkpoint scenario payload export failed: {err}"),
-            })?;
-        Ok(LabCheckpointScenarioV1 {
-            schema_version: LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION,
-            kind: LAB_CHECKPOINT_SCENARIO_KIND.to_string(),
-            name,
-            seed: self.state.seed,
-            map: LabCheckpointScenarioMap::from_map(&self.state.map, &self.state.map_metadata),
-            metadata: LabCheckpointScenarioMetadata {
-                exported_tick,
-                source_scenario,
-                source_entity_id_map,
-            },
-            checkpoint_payload,
-        })
     }
 
     fn lab_game_from_scenario(
