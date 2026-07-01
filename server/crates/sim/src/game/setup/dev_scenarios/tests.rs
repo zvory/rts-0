@@ -1,4 +1,6 @@
 use super::*;
+use crate::game::entity::Order;
+use crate::rules::combat::WeaponKind;
 use rayon::prelude::*;
 use rts_rules::faction::DEFAULT_FACTION_ID;
 
@@ -31,6 +33,32 @@ fn assert_units_do_not_intersect_buildings(game: &Game) {
                 building_id,
                 building_kind
             );
+        }
+    }
+}
+
+fn assert_enemy_units_are_static_inspection_targets(game: &Game) {
+    for entity in game
+        .entities
+        .iter()
+        .filter(|entity| entity.owner == 2 && entity.is_unit())
+    {
+        assert!(
+            matches!(entity.order(), Order::HoldPosition),
+            "scenario target {} ({}) should hold position for static inspection",
+            entity.id,
+            entity.kind
+        );
+        if entity.can_attack() {
+            for weapon in WeaponKind::ALL {
+                assert_eq!(
+                    entity.weapon_cooldown(weapon),
+                    config::TICK_HZ * 120,
+                    "scenario target {} ({}) should have delayed {weapon:?} fire",
+                    entity.id,
+                    entity.kind
+                );
+            }
         }
     }
 }
@@ -518,8 +546,19 @@ fn tank_coax_inspection_scenario_sets_up_static_mixed_targets() {
         "inspection scenario should delay cannon fire so coax feedback is easy to see"
     );
     assert_units_do_not_intersect_buildings(&setup.game);
+    assert_enemy_units_are_static_inspection_targets(&setup.game);
+    let tank_hp_before = tank.hp;
     let mut ticked = setup.game.clone();
     ticked.tick();
+    assert_eq!(
+        ticked
+            .entities
+            .get(tank_id)
+            .expect("tank should survive first tick")
+            .hp,
+        tank_hp_before,
+        "static inspection targets should not fire back on the first tick"
+    );
     assert_dev_scenario_starts_as_kriegsia(&setup);
 }
 

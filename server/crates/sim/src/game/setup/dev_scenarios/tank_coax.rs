@@ -39,11 +39,11 @@ impl Game {
 
         let mut units = vec![tank];
         for (kind, dx, dy) in TARGET_SPECS {
-            units.push(
-                entities
-                    .spawn_unit(2, kind, tank_pos.0 + ts * dx, tank_pos.1 + ts * dy)
-                    .ok_or_else(|| format!("failed to spawn Tank coax inspection {kind}"))?,
-            );
+            let target = entities
+                .spawn_unit(2, kind, tank_pos.0 + ts * dx, tank_pos.1 + ts * dy)
+                .ok_or_else(|| format!("failed to spawn Tank coax inspection {kind}"))?;
+            make_static_inspection_target(&mut entities, target);
+            units.push(target);
         }
         spawn_static_targets(&mut entities, tank_pos, ts)?;
 
@@ -90,6 +90,20 @@ const TARGET_SPECS: [(EntityKind, f32, f32); 10] = [
     (EntityKind::AntiTankGun, 5.86, -1.68),
     (EntityKind::Artillery, 6.59, -0.35),
 ];
+
+const INSPECTION_TARGET_WEAPON_DELAY_TICKS: u32 = config::TICK_HZ * 120;
+
+fn make_static_inspection_target(entities: &mut EntityStore, id: u32) {
+    let Some(target) = entities.get_mut(id) else {
+        return;
+    };
+    target.set_order(Order::HoldPosition);
+    target.set_facing(std::f32::consts::PI);
+    target.set_weapon_facing(std::f32::consts::PI);
+    for weapon in WeaponKind::ALL {
+        target.set_weapon_cooldown(weapon, INSPECTION_TARGET_WEAPON_DELAY_TICKS);
+    }
+}
 
 fn spawn_static_targets(
     entities: &mut EntityStore,
