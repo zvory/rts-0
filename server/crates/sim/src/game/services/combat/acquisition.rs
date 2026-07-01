@@ -14,12 +14,10 @@ use crate::rules::combat as combat_rules;
 use crate::rules::target as target_rules;
 use crate::rules::terrain::{self, TerrainKind};
 
-use super::priority::{self, AttackPriorityContext, TargetCandidate};
+use super::priority::{AttackPriorityContext, TargetCandidate};
 use super::projection::{friendly_hard_blocker_between, shot_hits_intended_target};
-use super::weapons::{
-    anti_tank_gun_target_inside_field_of_fire, effective_attack_profile,
-    moving_fire_movement_order_holds_path,
-};
+use super::target_selection::choose_target_preferring_anti_tank_field;
+use super::weapons::{effective_attack_profile, moving_fire_movement_order_holds_path};
 
 #[derive(Copy, Clone, PartialEq)]
 pub(super) enum CombatMode {
@@ -200,29 +198,35 @@ pub(super) fn resolve_target(
         attacker.target_id(),
     );
     if mode_requires_currently_fireable_targets(mode) {
-        return priority::choose_target(
+        return choose_target_preferring_anti_tank_field(
             &context,
-            candidates
-                .iter()
-                .filter(|candidate| candidate.in_weapon_range && target_filter(candidate.id)),
+            attacker,
+            px,
+            py,
+            &candidates,
+            |candidate| candidate.in_weapon_range && target_filter(candidate.id),
         );
     }
     if pathing_attack_move_prefers_currently_fireable_targets(attacker) {
-        let fireable_target = priority::choose_target(
+        let fireable_target = choose_target_preferring_anti_tank_field(
             &context,
-            candidates
-                .iter()
-                .filter(|candidate| candidate.in_weapon_range && target_filter(candidate.id)),
+            attacker,
+            px,
+            py,
+            &candidates,
+            |candidate| candidate.in_weapon_range && target_filter(candidate.id),
         );
         if fireable_target.is_some() {
             return fireable_target;
         }
     }
-    priority::choose_target(
+    choose_target_preferring_anti_tank_field(
         &context,
-        candidates
-            .iter()
-            .filter(|candidate| target_filter(candidate.id)),
+        attacker,
+        px,
+        py,
+        &candidates,
+        |candidate| target_filter(candidate.id),
     )
 }
 
@@ -302,14 +306,6 @@ fn legal_target_candidates(
         let dy = target.pos_y - py;
         let distance_sq = dx * dx + dy * dy;
         if distance_sq > effective_acquire_px * effective_acquire_px {
-            continue;
-        }
-        if attacker
-            .filter(|attacker| attacker.kind == EntityKind::AntiTankGun)
-            .is_some_and(|attacker| {
-                !anti_tank_gun_target_inside_field_of_fire(attacker, dy.atan2(dx))
-            })
-        {
             continue;
         }
         let effective_weapon_range_px = weapon_range_px * concealment;
