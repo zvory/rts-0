@@ -142,7 +142,7 @@ fn checkpoint_lab_scenario_from_v1_matches_direct_restore_and_records_source_met
     assert_eq!(checkpoint.kind, "labCheckpointScenario");
     assert_eq!(checkpoint.name, "Checkpoint Adapter Proof");
     assert_eq!(checkpoint.seed, 0x5150_5001);
-    assert_eq!(checkpoint.metadata.exported_tick, authored.tick_count());
+    assert_eq!(checkpoint.metadata.exported_tick, direct.tick_count());
     assert_eq!(
         checkpoint.metadata.source_scenario,
         Some(LabCheckpointScenarioSource {
@@ -206,6 +206,10 @@ fn lab_checkpoint_scenario_export_preserves_god_mode_and_rejects_map_mismatches(
     let mut wrong_hash = checkpoint.clone();
     wrong_hash.map.content_hash = "wrong-content-hash".to_string();
     assert_restore_invalid_scenario(wrong_hash, "contentHash");
+
+    let mut wrong_tick = checkpoint.clone();
+    wrong_tick.metadata.exported_tick = wrong_tick.metadata.exported_tick.saturating_add(1);
+    assert_restore_invalid_scenario(wrong_tick, "exportedTick");
 
     let mut wrong_map_data = checkpoint;
     wrong_map_data.map.data.terrain[0] = if wrong_map_data.map.data.terrain[0] == terrain::GRASS {

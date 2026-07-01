@@ -282,7 +282,6 @@ impl Game {
         server_build_sha: &str,
     ) -> Result<LabCheckpointScenarioV1, LabError> {
         let name = scenario.name.clone();
-        let exported_tick = scenario.metadata.exported_tick;
         let source = LabCheckpointScenarioSource {
             kind: scenario.kind.clone(),
             schema_version: scenario.schema_version,
@@ -290,7 +289,7 @@ impl Game {
         let (game, restore) = Self::lab_game_from_scenario(scenario)?;
         game.export_lab_checkpoint_scenario_with_metadata(
             name,
-            exported_tick,
+            game.tick_count(),
             Some(source),
             restore.entity_id_map,
             server_build_sha,
@@ -314,6 +313,11 @@ impl Game {
         if game.seed() != seed {
             return Err(LabError::InvalidScenario {
                 reason: "checkpoint scenario seed does not match payload seed".to_string(),
+            });
+        }
+        if scenario.metadata.exported_tick != game.tick_count() {
+            return Err(LabError::InvalidScenario {
+                reason: "checkpoint scenario exportedTick does not match payload tick".to_string(),
             });
         }
         validate_lab_checkpoint_source_entity_id_map(

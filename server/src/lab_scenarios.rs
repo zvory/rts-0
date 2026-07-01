@@ -127,13 +127,13 @@ pub fn load_lab_scenario_by_id(id: &str) -> Result<LoadedLabScenario, String> {
         return Err("invalid lab scenario id".to_string());
     }
     let root = default_lab_scenario_dir();
-    let entries = load_lab_scenario_catalog_from_dir(&root)?;
+    let entries = load_lab_scenario_manifest_entries_from_dir(&root)?;
     let entry = entries
         .into_iter()
         .find(|entry| entry.id == id)
         .ok_or_else(|| format!("unknown lab scenario id {id:?}"))?;
     let loaded = load_lab_scenario_entry(&root, &entry)?;
-    validate_entry_matches_loaded_scenario(&entry, &loaded)?;
+    validate_loaded_lab_scenario(&entry, &loaded)?;
     Ok(loaded)
 }
 
@@ -213,8 +213,6 @@ pub fn validate_lab_scenario_authoring(
             "scenario JSON must be at most {MAX_AUTHORING_SCENARIO_JSON_BYTES} bytes"
         ));
     }
-    validate_checkpoint_authoring_payload(&entry.id, &scenario)?;
-
     Ok(LabScenarioAuthoringPreview {
         slug,
         filename: filename.clone(),
@@ -236,8 +234,7 @@ fn load_lab_scenario_catalog_from_dir(root: &Path) -> Result<Vec<LabScenarioCata
 
     for entry in &entries {
         let loaded = load_lab_scenario_entry(root, entry)?;
-        validate_entry_matches_loaded_scenario(entry, &loaded)?;
-        validate_scenario_restore_paths(&entry.id, &loaded.scenario, loaded.sim_scenario)?;
+        validate_loaded_lab_scenario(entry, &loaded)?;
     }
 
     Ok(entries)
@@ -368,7 +365,6 @@ fn payload_to_loaded_body(scenario: &LabScenarioPayload) -> Result<LoadedLabScen
         }
         LabScenarioPayload::Checkpoint(scenario) => {
             let sim_scenario = protocol_checkpoint_to_sim(scenario)?;
-            validate_protocol_checkpoint_scenario("checkpoint", scenario)?;
             Ok(LoadedLabScenarioBody::Checkpoint(sim_scenario))
         }
     }
@@ -443,7 +439,7 @@ fn legacy_scenario_to_checkpoint_protocol(
                 lab_error_text(&err)
             )
         })?;
-    checkpoint.metadata.exported_tick = scenario.metadata.exported_tick;
+    checkpoint.metadata.exported_tick = game.tick_count();
     checkpoint.metadata.source_scenario = Some(rts_sim::game::lab::LabCheckpointScenarioSource {
         kind: scenario.kind.clone(),
         schema_version: scenario.schema_version,
@@ -461,13 +457,6 @@ fn validate_authoring_entity_count(entity_count: usize) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_checkpoint_authoring_payload(
-    label: &str,
-    scenario: &LabCheckpointScenarioV1,
-) -> Result<(), String> {
-    validate_protocol_checkpoint_scenario(label, scenario).map(|_| ())
-}
-
 fn validate_entry_matches_loaded_scenario(
     entry: &LabScenarioCatalogEntry,
     loaded: &LoadedLabScenario,
@@ -481,6 +470,14 @@ fn validate_entry_matches_loaded_scenario(
             validate_entry_matches_checkpoint_facts(entry, scenario, &facts)
         }
     }
+}
+
+fn validate_loaded_lab_scenario(
+    entry: &LabScenarioCatalogEntry,
+    loaded: &LoadedLabScenario,
+) -> Result<(), String> {
+    validate_entry_matches_loaded_scenario(entry, loaded)?;
+    validate_scenario_restore_paths(&entry.id, &loaded.scenario, loaded.sim_scenario.clone())
 }
 
 fn validate_entry_matches_legacy_scenario(
@@ -645,7 +642,7 @@ fn build_checkpoint_game_from_scenario(
     let mut checkpoint = direct
         .export_lab_checkpoint_scenario(scenario.name.clone(), crate::build_info::build_id())
         .map_err(|err| format!("checkpoint adapter export failed: {}", lab_error_text(&err)))?;
-    checkpoint.metadata.exported_tick = scenario.metadata.exported_tick;
+    checkpoint.metadata.exported_tick = direct.tick_count();
     checkpoint.metadata.source_scenario = Some(rts_sim::game::lab::LabCheckpointScenarioSource {
         kind: scenario.kind.clone(),
         schema_version: scenario.schema_version,
@@ -688,15 +685,7 @@ fn validate_scenario_restore_paths(
                 })?;
             validate_checkpoint_game_matches(label, &direct, &checkpoint)
         }
-        (
-            LabScenarioPayload::Checkpoint(scenario),
-            LoadedLabScenarioBody::Checkpoint(sim_scenario),
-        ) => {
-            let game = build_game_from_checkpoint(scenario, sim_scenario).map_err(|err| {
-                format!("lab scenario {label:?} does not restore through checkpoint payload: {err}")
-            })?;
-            validate_checkpoint_lab_metadata_matches_game(&scenario.metadata.lab, &game)
-        }
+        (LabScenarioPayload::Checkpoint(_), LoadedLabScenarioBody::Checkpoint(_)) => Ok(()),
         _ => Err(format!("lab scenario {label:?} payload kind mismatch")),
     }
 }
