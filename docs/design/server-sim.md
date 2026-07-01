@@ -222,6 +222,57 @@ ids, repairs derived state, and returns the id remap for callers that need to re
 selection. Snapshot-only projections, transient events, projectile runtime state, active commands,
 production queues, rally plans, cooldowns, and command logs are not part of the scenario format.
 
+#### 3.1.1 `Game` State Ownership Registry
+
+This registry is the source of truth for classifying fields currently stored directly on
+`server/crates/sim/src/game/mod.rs::Game`. Any change that adds, removes, or changes the semantics
+of a `Game` field must update this table in the same change. The categories are:
+
+- `authoritative/serialized` - durable simulation state that can affect future ticks, command
+  validity, fog/projection, replay output, scoring, entity ids, or checkpoint restore.
+- `derived/rebuildable` - cache, index, or search state that can be cleared at a tick boundary and
+  rebuilt from authoritative state without changing semantic results or fog-filtered snapshots.
+- `transient` - intentionally dropped runtime state that cannot affect future authoritative
+  behavior.
+- `compatibility metadata` - replay/API/setup metadata retained with an explicit checkpoint policy,
+  even when it does not directly mutate tick results.
+
+No current `Game` field is classified as `transient`; room/session transient state remains outside
+`Game` in `server/src/lobby/`.
+
+| Field | Category | Checkpoint policy | Evidence and notes |
+| --- | --- | --- | --- |
+| `map` | `authoritative/serialized` | Serialize the full `Map` value, including terrain, size, starts, and expansion sites. | `Game::new_inner_with_map` stores the generated or supplied map; `systems::run_tick`, pathing, fog, placement, resource setup, and `start_payload` all read it. |
+| `entities` | `authoritative/serialized` | Serialize the full `EntityStore`, including stable entity ids, allocator/high-water state, HP, orders, queues, movement state, selected waypoints, path goals, cooldowns, combat state, production/build progress, rally plans, resource reservations, body/weapon/setup facing, and entity flags. | `systems::run_tick` mutates the store every tick; snapshots, score, survival, command validation, replay determinism tests, and the Phase 0.5 comparator all treat entity state as semantic authority. Chosen movement paths live on entities, not in `pathing`. |
+| `fog` | `authoritative/serialized` | Serialize current live visibility grids for now. A later phase may reclassify live fog as rebuildable only after proving an exact deterministic rebuild before every command, combat, and snapshot surface. | `systems::run_tick` receives `&self.fog` for command/combat visibility decisions, snapshots project through current team fog, and Phase 0.5 compares per-player visible tiles as semantic state. |
+| `building_memory` | `authoritative/serialized` | Serialize remembered enemy-building entries per player. | `BuildingMemory::refresh` records last-seen enemy building state and only removes hidden destroyed entries after the footprint is scouted again; spectator/player snapshots project remembered buildings while fogged. |
+| `players` | `authoritative/serialized` | Serialize all `PlayerState` rows, including id/team/faction/name/color/start tile, current Steel/Oil, supply, AI flag, score counters, and completed upgrades. | Economy, command authority, team relations, alive checks, scores, faction-specific tech, and snapshot resource rows are all read from `players`. |
+| `pending` | `authoritative/serialized` | Serialize unapplied pending commands unless a future checkpoint caller explicitly proves it captures only immediately after command drain with `pending` empty. | `Game::enqueue` appends commands between ticks; `tick_inner` drains `pending`, records them in `command_log`, and applies them. Dropping a non-empty queue would skip authoritative player/AI intent. |
+| `command_log` | `compatibility metadata` | Serialize command history for replay/crash/API continuity; do not replay it during normal checkpoint import unless building a replay artifact. | `Game::command_log` is public, `ReplayArtifactV1::from_game` persists it, and tick logic only appends/applies new pending commands instead of reading old log entries. |
+| `tick` | `authoritative/serialized` | Serialize the exact tick count. | `tick_inner` increments it before systems, logs commands with it, drives expirations/cooldowns, passes it to projection/runtime stores, and advances `PathingService` to the same tick. |
+| `spatial` | `derived/rebuildable` | Do not serialize. Rebuild with `SpatialIndex::build(&entities, map.size)` after import and after any lab mutation that changes entity positions/existence. | The spatial module says it is rebuilt from live `EntityStore`; `tick_inner` assigns the final `systems::run_tick` spatial result; Phase 0.5 clears/rebuilds it without changing semantic state or snapshots. |
+| `pathing` | `derived/rebuildable` | Do not serialize cached paths/search bookkeeping. Recreate the service with the live default budget/cache capacity, set/advance it to `tick`, and start with an empty cache. | `PathingService` owns default budget, cache cap, LRU cache, and cache tick; cached paths are verified against current occupancy and Phase 0.5 clears only rebuildable cache state. Chosen unit paths, movement phases, waypoints, goals, and throttling remain serialized on entities. |
+| `lingering_sight` | `authoritative/serialized` | Serialize all active death-vision sources and their expiry ticks. | `retain_active_visibility_sources` prunes by `tick`; `recompute_live_fog` stamps these sources into team fog, affecting command legality, combat visibility, and snapshots. |
+| `firing_reveals` | `authoritative/serialized` | Serialize active firing-reveal sources and expiry ticks. | Anti-Tank Gun and artillery/mortar reveal logic records temporary actionable sight; `recompute_live_fog` stamps sources into viewer fog until expiry. |
+| `smokes` | `authoritative/serialized` | Serialize the full `SmokeCloudStore`, including next id, active clouds, pending clouds, locations, radii, spawn/due/expiry ticks. | Smoke blocks authoritative fog, line of sight, combat projection, and delayed smoke scheduling; `tick_inner` retains active smoke and systems may resolve pending smoke. |
+| `trenches` | `authoritative/serialized` | Serialize the full `TrenchStore`, including deterministic trench ids, terrain positions, discovery/memory data, and any store allocator state. | Trenches are persistent neutral terrain outside `EntityStore`; entrenchment services create/discover/update them and snapshots project current plus remembered trench terrain. |
+| `ability_runtime` | `authoritative/serialized` | Serialize active ability runtime state, object ids, world objects, projectiles, cooldown-linked runtime payloads, and expiry/return data. | `AbilityRuntime` owns deterministic active instances and non-entity world objects; systems and snapshots read it for Ekat return markers, line projectiles, anchors, and owner/enemy projection. |
+| `mortar_shells` | `authoritative/serialized` | Serialize all scheduled mortar impacts with owner, attacker, impact point, and impact tick. | `MortarShellStore::schedule` records delayed impacts; later ticks resolve area damage/events even if the firing mortar dies before impact. |
+| `artillery_shells` | `authoritative/serialized` | Serialize all scheduled artillery impacts with their owners, source data, impact points, and impact ticks. | The artillery store mirrors the delayed-shell contract used by the tick pipeline; dropping it would cancel future area damage and reveal/event output. |
+| `seed` | `compatibility metadata` | Serialize the original match seed as setup/replay metadata. Do not use it as a substitute for `rng`. | Constructors and replay artifacts expose `seed`; the current map is stored separately and the current random stream lives in `rng`. |
+| `starting_loadouts` | `compatibility metadata` | Serialize per-player starting loadout records for replay/setup compatibility. | Replay constructors and artifacts persist these records so mixed faction/resource starts can be reconstructed without a global resource pair. |
+| `map_metadata` | `compatibility metadata` | Serialize stable authored map identity/version metadata alongside the map. | Replay/lab setup paths expose map metadata; it identifies the authored map but is not the live terrain grid used by systems. |
+| `active_construction_sites` | `authoritative/serialized` | Serialize the set when checkpointing a post-tick state that may immediately produce snapshots; otherwise it should normally be empty at the next tick start. | `tick_inner` clears it before systems; `construction_system` inserts sites that received progress this tick; `snapshot` passes it to projection so same-tick construction progress is visible. |
+| `lab_god_mode_players` | `authoritative/serialized` | Serialize the canonical enabled-player set and resync mirrored entity invulnerability flags after import. | Lab ops mutate the set; `sync_lab_god_mode_flags` mirrors it onto unit/building invulnerability, and damage checks consume those entity flags. |
+| `starting_loadout` | `compatibility metadata` | Serialize until legacy/global-starting-resource compatibility constructors are retired. Checkpoint import should prefer `starting_loadouts` for per-player setup facts. | The field is set by setup constructors and dev scenarios but does not feed the per-tick systems after match creation. |
+| `rng` | `authoritative/serialized` | Serialize the exact current generator state or an equivalent deterministic draw-stream state. Re-seeding from `seed` is not valid after any random draw. | `systems::run_tick` passes `&mut self.rng` into combat damage/miss logic; Phase 0.5 probes cloned RNG output as semantic state. |
+
+Phase 0.5's derived-state wipe harness confirms the current derived boundary: only the final
+`spatial` index and rebuildable `pathing` cache/search state are cleared and rebuilt. Every other
+current `Game` field is treated as authoritative or compatibility metadata until a later phase adds
+a deterministic rebuild proof and updates this registry. No current field has an unresolved
+ownership category blocker.
+
 `PlayerInit.team_id` is canonical team identity. Phase 1 preserves FFA gameplay by assigning each
 seated player a unique nonzero team by default; deserialized or hand-built fixtures with
 `team_id == 0` are normalized to `team_id = id` when constructing a `Game`. Relationship helpers
