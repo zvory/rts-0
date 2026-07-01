@@ -75,7 +75,9 @@ pub(super) fn advance_moving_units(
             let has_meth = players
                 .iter()
                 .any(|p| p.id == e.owner && p.has_upgrade(UpgradeKind::Methamphetamines));
-            let speed_multiplier = if e.kind == EntityKind::Rifleman && has_meth {
+            let speed_multiplier = if matches!(e.kind, EntityKind::Rifleman | EntityKind::Panzerfaust)
+                && has_meth
+            {
                 config::METHAMPHETAMINES_SPEED_MULTIPLIER
             } else if e.breakthrough_ticks() > 0 {
                 if e.recent_smoke_ticks() > 0 {

@@ -111,7 +111,7 @@ export const STATS = Object.freeze({
   [KIND.PANZERFAUST]: { label: "Panzerfaust", icon: "PF", size: 9, sight: 8,
     rangeTiles: PANZERFAUST_RANGE_TILES, cost: { steel: 60, oil: 15 }, supply: 1, buildTicks: 400,
     requires: KIND.TRAINING_CENTRE,
-    description: "Infantry with a one-shot anti-tank weapon. Fires once at Tanks, then becomes a Rifleman. Moves at Rifleman speed with or without Methamphetamines; Methamphetamines shortens windup and recovery." },
+    description: "Infantry with a one-shot anti-tank weapon. Fires once at Tanks, then becomes a Rifleman. Moves at Rifleman speed; Methamphetamines shortens windup and recovery and boosts movement." },
   [KIND.ANTI_TANK_GUN]: { label: "Anti-Tank Gun", icon: "ATG", size: 20, sight: 6, body: ANTI_TANK_GUN_BODY,
     rangeTiles: ANTI_TANK_GUN_DEPLOYED_RANGE_TILES, cost: { steel: 75, oil: 25 }, supply: 3, buildTicks: 440,
     requires: KIND.STEELWORKS, upgradeRequires: UPGRADE.ANTI_TANK_GUN_UNLOCK,
@@ -335,7 +335,7 @@ export const UPGRADES = Object.freeze({
     icon: "METH",
     cost: Object.freeze({ steel: 100, oil: 100 }),
     researchTicks: METHAMPHETAMINES_RESEARCH_TICKS,
-    description: "Boost Riflemen; speed up Machine Gunner movement and setup",
+    description: "Boost Riflemen and Panzerfausts; speed up Machine Gunner movement and setup",
     researchedAt: KIND.TRAINING_CENTRE,
   }),
   [UPGRADE.ENTRENCHMENT]: Object.freeze({
