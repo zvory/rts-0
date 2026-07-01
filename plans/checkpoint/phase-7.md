@@ -6,7 +6,7 @@ Status: Not started.
 
 Clean up obsolete setup, replay, and lab scenario paths after checkpoint-backed starts are proven as
 the default. Tighten docs, guardrails, tests, compatibility messages, and operational notes so
-future authoritative state must participate in the file checkpoint contract.
+future authoritative state must participate in the embeddable checkpoint payload contract.
 
 This phase is primarily hardening and release audit. It should not expand product scope; if the
 audit finds a missing migration or coverage gap too large for a small fix, record it as a follow-up
@@ -24,7 +24,7 @@ Explicit non-goals:
 - `docs/design/server-sim.md`, `docs/context/server-sim.md`, and any replay/lab design docs touched
   by earlier phases.
 - `server/crates/archcheck` or related scripts if new guardrails are needed for checkpoint DTO
-  coverage, schema version updates, or hidden state owners.
+  coverage, schema version updates, hidden state owners, or map/checkpoint container separation.
 - `server/crates/sim/src/game/**`, `server/src/lobby/**`, `server/src/lab_scenarios.rs`, and
   replay/lab compatibility modules: remove obsolete paths only where tests prove replacement.
 - `plans/checkpoint/*`: mark completed phases done as each implementation lands and record any
@@ -39,6 +39,11 @@ Explicit non-goals:
 - Old compatibility paths either remain tested or fail with clear, documented messages.
 - Architecture/docs checks fail when a new `GameState` field is added without checkpoint DTO policy
   or registry coverage.
+- Architecture/docs checks or release-audit notes make clear that `GameCheckpointV1` is an
+  embeddable payload, not a product-specific file format, and that maps remain normal map data
+  supplied or referenced by outer artifacts.
+- Replay and lab compatibility policies cover file/dev artifacts, crash artifacts, match-history DB
+  rows, bundled scenarios, submitted scenarios, and old-format fixtures.
 - Projection privacy tests still cover checkpoint import/export boundaries for player, spectator,
   selected-player, and full-world diagnostic views.
 - Suggested focused commands:
@@ -69,7 +74,9 @@ the checkpoint-backed paths are the defaults.
 The handoff must name:
 
 - obsolete paths removed or deliberately retained;
-- final compatibility policy for checkpoint, replay, and lab files;
+- final compatibility policy for checkpoint payloads, replay artifacts, lab scenarios, and debug
+  documents;
+- final map binding/container policy for match starts, replays, scenarios, and any debug wrappers;
 - guardrails added or tightened;
 - release-audit result for gameplay parity, replay, lab, privacy, persistence, and rollback;
 - exact verification commands that passed;

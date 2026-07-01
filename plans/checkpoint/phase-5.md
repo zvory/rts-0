@@ -4,9 +4,10 @@ Status: Not started.
 
 ## Scope
 
-Add side-by-side adapters between current lab scenarios and checkpoint starts. Current
-`LabScenarioV1` assets should be convertible into `GameCheckpointV1` starts, and lab export should
-be able to emit checkpoint-backed scenario data behind a test/debug or explicit internal option.
+Add side-by-side adapters between current lab scenarios and checkpoint-backed scenario containers.
+Current `LabScenarioV1` assets should be convertible into map data/binding plus `GameCheckpointV1`,
+and lab export should be able to emit checkpoint-backed scenario data behind a test/debug or
+explicit internal option.
 
 This phase is compatibility-first. Preserve current lab import/export UI behavior, id remap
 responses, validation messages, authoring metadata, submission guardrails, and catalog behavior
@@ -18,6 +19,9 @@ Explicit non-goals:
 - No removal of `LabScenarioV1` support.
 - No lab timeline action-stream migration.
 - No public file picker/upload feature beyond existing lab scenario import/export behavior.
+- No casual wire/protocol shape change. If the optional checkpoint-backed scenario export changes
+  client-visible JSON, it must be treated as a protocol change and mirrored in docs/client/server
+  protocol code in this same phase.
 
 ## Expected Touch Points
 
@@ -28,7 +32,10 @@ Explicit non-goals:
 - `server/src/lobby/room_task/lab.rs` and lab submission helpers: read-only unless an internal
   option is needed to exercise the adapter.
 - `server/crates/protocol` and `client/src/lab_*`: avoid changes unless the phase explicitly adds a
-  compatibility metadata field; do not alter UI copy casually.
+  compatibility metadata field or exposes checkpoint-backed scenario JSON; do not alter UI copy
+  casually.
+- `docs/design/protocol.md` and `docs/context/protocol.md`: update if any import/export scenario
+  shape, metadata field, or validation response changes.
 - Tests covering scenario import/export parity, validation failures, id remap behavior, and
   authoring/submission guardrails.
 
@@ -37,9 +44,17 @@ Explicit non-goals:
 - For representative `LabScenarioV1` fixtures, direct scenario restore and checkpoint-adapter
   restore produce equivalent semantic state and snapshots.
 - Id remap responses remain correct for existing lab import callers.
+- The checkpoint-backed scenario container preserves the scenario's map binding and rejects restore
+  against the wrong map identity/hash.
 - Exported scenario metadata, authoring fields, selected lab vision, god mode, resources, research,
   and entity setup targets survive adapter round trips.
 - Invalid scenario files still fail closed with clear messages before constructing a live game.
+- If protocol-visible JSON changes, run protocol parity:
+
+```bash
+node tests/protocol_parity.mjs
+```
+
 - Suggested focused commands:
 
 ```bash
@@ -64,6 +79,7 @@ exists, inspect one exported checkpoint-backed lab file for expected metadata an
 The handoff must name:
 
 - adapter direction(s) implemented;
+- scenario container shape, including map data/binding plus embedded `GameCheckpointV1`;
 - preserved id-remap and metadata behavior;
 - validation coverage;
 - any protocol/client changes, or confirmation there were none;

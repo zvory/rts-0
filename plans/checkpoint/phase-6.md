@@ -5,8 +5,8 @@ Status: Not started.
 ## Scope
 
 Migrate bundled lab scenario assets and lab export/submission defaults to checkpoint-backed scenario
-files. This is the first phase that may intentionally change the on-disk lab scenario format, but it
-should do so only after Phase 5 proves side-by-side parity.
+containers. This is the first phase that may intentionally change the lab scenario JSON shape, but
+it should do so only after Phase 5 proves side-by-side parity.
 
 Old `LabScenarioV1` files should remain readable during the transition unless the implementation
 adds a deliberate, documented rejection policy and updates every catalog/submission caller. Any
@@ -20,6 +20,8 @@ Explicit non-goals:
 - No gameplay/balance changes in scenario contents unless a scenario cannot be represented and the
   change is called out explicitly.
 - No removal of compatibility readers before all bundled and persisted use cases are audited.
+- No map-as-checkpoint container. Scenario assets may include normal map data or a stable map
+  binding beside the checkpoint payload, but bundled map assets remain map assets.
 
 ## Expected Touch Points
 
@@ -30,6 +32,8 @@ Explicit non-goals:
   files and preserve path allowlists.
 - `client/src/lab_*`: update only if visible file labels, download names, or validation messages
   need to distinguish old and new formats.
+- `server/crates/protocol/src/lib.rs`, `server/src/protocol.rs`, `client/src/protocol.js`, and
+  `docs/design/protocol.md`: update if the scenario import/export message shape or DTO changes.
 - Conversion script under `scripts/` if useful, with deterministic output and tests.
 - Docs/catalog manifest updates for new scenario format.
 
@@ -40,7 +44,10 @@ Explicit non-goals:
 - Old `LabScenarioV1` compatibility fixtures still load or fail with the deliberate policy chosen in
   this phase.
 - Scenario submission still rejects path traversal, duplicate ids/slugs, invalid metadata,
-  unsupported maps/factions, over-cap entity counts, and malformed checkpoint files.
+  unsupported maps/factions, over-cap entity counts, and malformed checkpoint payloads.
+- Scenario import/export still validates map identity/hash before restore, and no scenario can
+  smuggle unrelated game state through a map asset.
+- If the scenario DTO or protocol-visible JSON changes, run `node tests/protocol_parity.mjs`.
 - Suggested focused commands:
 
 ```bash
@@ -66,6 +73,8 @@ shows the intended compatibility or validation message.
 The handoff must name:
 
 - asset format chosen and conversion method;
+- how map data/binding and embedded `GameCheckpointV1` are represented without turning maps into
+  checkpoint containers;
 - number and location of converted bundled scenarios;
 - old-format compatibility policy;
 - validation and submission tests that passed;
