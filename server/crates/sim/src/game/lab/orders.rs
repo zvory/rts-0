@@ -8,6 +8,11 @@ use crate::game::map::Map;
 use super::scenario::{LabScenarioEntity, LabScenarioOrder};
 use super::{validate_world_position, LabError};
 
+#[path = "orders_restore.rs"]
+mod restore;
+
+pub(super) use restore::restore_lab_entity_orders;
+
 const ORDER_IDLE: &str = "idle";
 const ORDER_HOLD_POSITION: &str = "holdPosition";
 const ORDER_MOVE: &str = "move";
@@ -32,42 +37,6 @@ pub(super) fn lab_entity_queued_orders(entity: &Entity) -> Vec<LabScenarioOrder>
         .iter()
         .map(scenario_order_from_intent)
         .collect()
-}
-
-pub(super) fn restore_lab_entity_orders(
-    map: &Map,
-    scenario_entity: &LabScenarioEntity,
-    restored: &mut Entity,
-    id_map: &HashMap<u32, u32>,
-) -> Result<(), LabError> {
-    if scenario_entity.order.is_none() && scenario_entity.queued_orders.is_empty() {
-        return Ok(());
-    }
-    if !restored.is_unit() {
-        return Err(LabError::InvalidScenario {
-            reason: format!(
-                "entity {} kind {} cannot have orders",
-                scenario_entity.id, scenario_entity.kind
-            ),
-        });
-    }
-    if let Some(order) = scenario_entity.order.as_ref() {
-        if let Some(active) = active_order_from_scenario(map, scenario_entity, order, id_map)? {
-            restored.replace_active_order(active);
-        }
-    }
-    if !scenario_entity.queued_orders.is_empty() {
-        restored.clear_queued_orders();
-    }
-    for order in &scenario_entity.queued_orders {
-        let intent = queued_order_from_scenario(map, scenario_entity, order, id_map)?;
-        if !restored.append_queued_order(intent) {
-            return Err(LabError::InvalidScenario {
-                reason: format!("entity {} cannot accept queued order", scenario_entity.id),
-            });
-        }
-    }
-    Ok(())
 }
 
 fn scenario_order_from_active(order: &Order) -> Option<LabScenarioOrder> {
@@ -130,54 +99,6 @@ fn scenario_order_from_intent(intent: &OrderIntent) -> LabScenarioOrder {
         OrderIntent::PointFire(point) => point_order(ORDER_POINT_FIRE, point.x, point.y),
         OrderIntent::BlanketFire(point) => point_order(ORDER_BLANKET_FIRE, point.x, point.y),
     }
-}
-
-fn active_order_from_scenario(
-    map: &Map,
-    entity: &LabScenarioEntity,
-    order: &LabScenarioOrder,
-    id_map: &HashMap<u32, u32>,
-) -> Result<Option<Order>, LabError> {
-    Ok(match order.kind.as_str() {
-        ORDER_IDLE => None,
-        ORDER_HOLD_POSITION => Some(Order::HoldPosition),
-        ORDER_MOVE => {
-            let (x, y) = required_point(map, entity, order)?;
-            Some(Order::move_to(x, y))
-        }
-        ORDER_ATTACK_MOVE => {
-            let (x, y) = required_point(map, entity, order)?;
-            Some(Order::attack_move_to(x, y))
-        }
-        ORDER_ATTACK => Some(Order::attack(required_target(entity, order, id_map)?)),
-        ORDER_GATHER => Some(Order::gather(required_target(entity, order, id_map)?)),
-        ORDER_BUILD => {
-            let (kind, tile_x, tile_y) = required_build(entity, order, map)?;
-            Some(Order::build(kind, tile_x, tile_y))
-        }
-        ORDER_DECONSTRUCT => Some(Order::deconstruct(required_target(entity, order, id_map)?)),
-        ORDER_WORLD_ABILITY => {
-            let ability = required_ability(entity, order)?;
-            let (x, y) = required_point(map, entity, order)?;
-            let staging_x = order.staging_x.unwrap_or(x);
-            let staging_y = order.staging_y.unwrap_or(y);
-            validate_world_position(map, staging_x, staging_y)?;
-            Some(Order::ability(ability, x, y, staging_x, staging_y))
-        }
-        ORDER_POINT_FIRE => {
-            let (x, y) = required_point(map, entity, order)?;
-            Some(Order::artillery_point_fire(x, y))
-        }
-        ORDER_BLANKET_FIRE => {
-            let (x, y) = required_point(map, entity, order)?;
-            Some(Order::artillery_blanket_fire(x, y))
-        }
-        _ => {
-            return Err(LabError::InvalidScenario {
-                reason: format!("entity {} has unsupported order kind {:?}", entity.id, order.kind),
-            })
-        }
-    })
 }
 
 fn queued_order_from_scenario(

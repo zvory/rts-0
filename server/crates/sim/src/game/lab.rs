@@ -16,6 +16,7 @@ use crate::game::services::geometry::{
 };
 use crate::game::services::occupancy::{footprint_center, footprint_tiles, Occupancy};
 use crate::game::services::{production, standability};
+use crate::game::teams::TeamRelations;
 use crate::game::upgrade::UpgradeKind;
 use crate::protocol::Command;
 use crate::rules;
@@ -24,6 +25,8 @@ use super::{systems, Game, MapMetadata, PlayerInit};
 
 mod orientation;
 mod orders;
+#[cfg(test)]
+mod orders_tests;
 mod resource_nodes;
 mod scenario;
 
@@ -434,14 +437,22 @@ impl Game {
             .iter()
             .map(|remap| (remap.old_id, remap.new_id))
             .collect();
+        let teams =
+            TeamRelations::from_player_teams(restored.state.players.iter().map(|p| (p.id, p.team_id)));
         for entity in &scenario.entities {
             let Some(new_id) = id_map.get(&entity.id).copied() else {
                 continue;
             };
-            let Some(restored_entity) = restored.state.entities.get_mut(new_id) else {
-                continue;
-            };
-            restore_lab_entity_orders(&restored.state.map, entity, restored_entity, &id_map)?;
+            restore_lab_entity_orders(
+                &restored.state.map,
+                &mut restored.state.entities,
+                restored.derived.pathing_mut(),
+                restored.state.tick,
+                &teams,
+                entity,
+                new_id,
+                &id_map,
+            )?;
         }
         restored.repair_lab_state();
 
@@ -1459,131 +1470,6 @@ mod tests {
             restored_gun.weapon_facing().unwrap_or_default(),
             gun_weapon_facing,
         );
-    }
-
-    #[test]
-    fn lab_scenario_export_restores_active_and_queued_orders() {
-        let mut game = default_map_game();
-        let (point_x, point_y) = tile_center(&game, 48, 16);
-        let (blanket_x, blanket_y) = tile_center(&game, 48, 24);
-        let (x, y) = free_unit_position(&game, EntityKind::Artillery);
-        let LabOpOutcome::Spawned {
-            entity_id: point_artillery,
-        } = game
-            .apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
-                owner: 1,
-                kind: EntityKind::Artillery,
-                x,
-                y,
-                completed: true,
-            }))
-            .expect("artillery should spawn")
-        else {
-            panic!("unexpected outcome");
-        };
-        {
-            let artillery = game
-                .state
-                .entities
-                .get_mut(point_artillery)
-                .expect("spawned artillery");
-            artillery.set_weapon_setup(WeaponSetup::Deployed);
-            artillery.replace_active_order(Order::artillery_point_fire(point_x, point_y));
-            assert!(artillery.append_queued_order(OrderIntent::blanket_fire(
-                blanket_x, blanket_y,
-            )));
-        }
-
-        let (x, y) = free_unit_position(&game, EntityKind::Artillery);
-        let LabOpOutcome::Spawned {
-            entity_id: blanket_artillery,
-        } = game
-            .apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
-                owner: 1,
-                kind: EntityKind::Artillery,
-                x,
-                y,
-                completed: true,
-            }))
-            .expect("artillery should spawn")
-        else {
-            panic!("unexpected outcome");
-        };
-        {
-            let artillery = game
-                .state
-                .entities
-                .get_mut(blanket_artillery)
-                .expect("spawned artillery");
-            artillery.set_weapon_setup(WeaponSetup::Deployed);
-            artillery.replace_active_order(Order::artillery_blanket_fire(blanket_x, blanket_y));
-        }
-
-        let scenario = game.export_lab_scenario();
-        let exported_point = scenario
-            .entities
-            .iter()
-            .find(|entity| entity.id == point_artillery)
-            .expect("exported point artillery");
-        assert_eq!(
-            exported_point.order.as_ref().map(|order| order.kind.as_str()),
-            Some("pointFire")
-        );
-        assert_eq!(exported_point.queued_orders.len(), 1);
-        assert_eq!(exported_point.queued_orders[0].kind, "blanketFire");
-        let exported_blanket = scenario
-            .entities
-            .iter()
-            .find(|entity| entity.id == blanket_artillery)
-            .expect("exported blanket artillery");
-        assert_eq!(
-            exported_blanket.order.as_ref().map(|order| order.kind.as_str()),
-            Some("blanketFire")
-        );
-
-        let mut restored = default_map_game();
-        let LabOpOutcome::ScenarioRestored(result) = restored
-            .apply_lab_op(LabOp::RestoreScenario(Box::new(scenario)))
-            .expect("scenario restore should succeed")
-        else {
-            panic!("unexpected outcome");
-        };
-        let point_id = result
-            .entity_id_map
-            .iter()
-            .find(|entry| entry.old_id == point_artillery)
-            .expect("point artillery should be remapped")
-            .new_id;
-        let restored_point = restored
-            .state
-            .entities
-            .get(point_id)
-            .expect("restored point artillery");
-        assert!(matches!(
-            restored_point.order(),
-            Order::ArtilleryPointFire(order)
-                if order.intent.x == point_x && order.intent.y == point_y
-        ));
-        assert!(matches!(
-            restored_point.queued_orders(),
-            [OrderIntent::BlanketFire(point)] if point.x == blanket_x && point.y == blanket_y
-        ));
-        let blanket_id = result
-            .entity_id_map
-            .iter()
-            .find(|entry| entry.old_id == blanket_artillery)
-            .expect("blanket artillery should be remapped")
-            .new_id;
-        let restored_blanket = restored
-            .state
-            .entities
-            .get(blanket_id)
-            .expect("restored blanket artillery");
-        assert!(matches!(
-            restored_blanket.order(),
-            Order::ArtilleryBlanketFire(order)
-                if order.intent.x == blanket_x && order.intent.y == blanket_y
-        ));
     }
 
     #[test]

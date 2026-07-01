@@ -21,16 +21,11 @@ use super::weapons::{
     moving_fire_movement_order_holds_path,
 };
 
-/// How a combatant chooses targets.
 #[derive(Copy, Clone, PartialEq)]
 pub(super) enum CombatMode {
-    /// Has an explicit attack target id.
     Ordered,
-    /// Engages and chases any enemy within acquisition range.
     Aggressive,
-    /// Engages enemies already in weapon range, without chasing them.
     Opportunistic,
-    /// Ignores nearby enemies unless explicitly ordered to attack.
     Passive,
 }
 
@@ -96,15 +91,7 @@ pub(super) fn direct_fire_target_legal(
         return false;
     }
     if legality.requires_intended_target {
-        shot_hits_intended_target(
-            map,
-            entities,
-            teams,
-            attacker,
-            attacker_owner,
-            target,
-            start,
-        )
+        shot_hits_intended_target(map, entities, teams, attacker, attacker_owner, target, start)
     } else {
         !friendly_hard_blocker_between(map, entities, attacker, attacker_owner, start, end)
     }
