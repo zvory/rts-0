@@ -319,6 +319,8 @@ struct StateOwnerScan {
 struct RegistryEntry {
     line: usize,
     category: String,
+    checkpoint_policy: String,
+    evidence: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -647,6 +649,7 @@ fn check_state_owner_registry(
                         entry.line, field.name, entry.category
                     ));
                 }
+                check_registry_checkpoint_policy(field, entry, report);
             }
             StateOwner::DerivedState => {
                 if entry.category != DERIVED_STATE_ALLOWED_CATEGORY {
@@ -655,6 +658,7 @@ fn check_state_owner_registry(
                         entry.line, field.name, entry.category
                     ));
                 }
+                check_registry_checkpoint_policy(field, entry, report);
             }
             StateOwner::Game => {}
         }
@@ -667,6 +671,29 @@ fn check_state_owner_registry(
                 entry.line, name
             ));
         }
+    }
+}
+
+fn check_registry_checkpoint_policy(
+    field: &StructField,
+    entry: &RegistryEntry,
+    report: &mut ArchitectureReport,
+) {
+    if registry_cell_unresolved(&entry.checkpoint_policy) {
+        report.failures.push(format!(
+            "{STATE_REGISTRY_DOC}:{}: {}.{} registry row must include a concrete checkpoint policy",
+            entry.line,
+            field.owner.label(),
+            field.name
+        ));
+    }
+    if registry_cell_unresolved(&entry.evidence) {
+        report.failures.push(format!(
+            "{STATE_REGISTRY_DOC}:{}: {}.{} registry row must include evidence and notes",
+            entry.line,
+            field.owner.label(),
+            field.name
+        ));
     }
 }
 
@@ -1126,6 +1153,8 @@ fn parse_state_registry(
         }
         let field = trim_code(cells[0]);
         let category = trim_code(cells[1]);
+        let checkpoint_policy = cells.get(2).map(|cell| trim_code(cell)).unwrap_or_default();
+        let evidence = cells.get(3).map(|cell| trim_code(cell)).unwrap_or_default();
         if field.is_empty() || category.is_empty() {
             continue;
         }
@@ -1134,6 +1163,8 @@ fn parse_state_registry(
             RegistryEntry {
                 line: line_number,
                 category,
+                checkpoint_policy,
+                evidence,
             },
         ) {
             report.failures.push(format!(
@@ -1163,6 +1194,14 @@ fn state_registry_lines(text: &str) -> Option<Vec<(usize, &str)>> {
 
 fn trim_code(text: &str) -> String {
     text.trim().trim_matches('`').trim().to_string()
+}
+
+fn registry_cell_unresolved(text: &str) -> bool {
+    let normalized = text.trim().trim_matches('`').trim().to_ascii_lowercase();
+    matches!(
+        normalized.as_str(),
+        "" | "-" | "todo" | "tbd" | "n/a" | "na" | "none" | "unresolved"
+    )
 }
 
 fn service_modules(files: &[SourceFile]) -> BTreeSet<String> {
@@ -1950,6 +1989,28 @@ mod tests {
         assert!(report.failures.iter().any(|failure| failure.contains(
             "DerivedState.final_spatial is categorized as `authoritative/serialized`; DerivedState fields must be derived/rebuildable"
         )));
+    }
+
+    #[test]
+    fn state_registry_requires_checkpoint_policy_and_evidence() {
+        let files = minimal_state_tree_sources(
+            "    pub(in crate::game) map: Map,",
+            "    final_spatial: SpatialIndex,",
+        );
+        let doc = format!(
+            "{STATE_REGISTRY_HEADING}\n\n\
+             | Field | Category | Checkpoint policy | Evidence and notes |\n\
+             | --- | --- | --- | --- |\n\
+             | `map` | `authoritative/serialized` |  | test evidence |\n\
+             | `final_spatial` | `derived/rebuildable` | test policy |  |\n"
+        );
+
+        let report = analyze_source_files_with_registry(&files, Some(&doc));
+
+        assert!(report.failures.iter().any(|failure| failure
+            .contains("GameState.map registry row must include a concrete checkpoint policy")));
+        assert!(report.failures.iter().any(|failure| failure
+            .contains("DerivedState.final_spatial registry row must include evidence and notes")));
     }
 
     #[test]

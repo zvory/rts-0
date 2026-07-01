@@ -105,11 +105,6 @@ async function prepareDeployedPlayerTwoMortar(client) {
     kind: KIND.MORTAR_TEAM,
     ...mortarPosition,
   });
-  await spawnLabEntity(client, 2, {
-    owner: PLAYER_ONE_ID,
-    kind: KIND.RIFLEMAN,
-    ...targetPosition,
-  });
 
   const scenario = await exportScenario(client, 3);
   const checkpoint = checkpointPayload(scenario);
