@@ -114,4 +114,9 @@ pub(in crate::lobby) enum DevScenarioId {
     TankTrapLineDiagonal,
     TankTrapPathingMatrix,
     EntrenchmentInspection,
+    PanzerfaustDuel,
+    PanzerfaustWindupCancel,
+    PanzerfaustTargetDeath,
+    PanzerfaustEntrenchedRange,
+    PanzerfaustMethamphetamines,
 }

@@ -1,5 +1,6 @@
 use super::fixtures::*;
 use super::*;
+use crate::game::entity::PanzerfaustState;
 
 fn panzerfaust_players() -> [PlayerInit; 3] {
     [
@@ -92,6 +93,13 @@ fn distance_sq(a: (f32, f32), b: (f32, f32)) -> f32 {
     dx * dx + dy * dy
 }
 
+fn panzerfaust_state_of(game: &Game, id: u32) -> Option<PanzerfaustState> {
+    game.entities
+        .get(id)
+        .and_then(|entity| entity.combat.as_ref())
+        .and_then(|combat| combat.panzerfaust)
+}
+
 #[test]
 fn spawned_panzerfaust_direct_attack_damages_tank_and_converts_same_id() {
     let (mut game, panzerfaust, tank) = panzerfaust_fixture();
@@ -140,6 +148,15 @@ fn spawned_panzerfaust_direct_attack_damages_tank_and_converts_same_id() {
     assert_eq!(converted.kind, EntityKind::Rifleman);
     assert_eq!(converted.owner, 1);
     assert_eq!(converted.hp, 45);
+    assert_eq!(
+        converted
+            .combat
+            .as_ref()
+            .expect("converted Rifleman should have combat state")
+            .panzerfaust,
+        None,
+        "same-id conversion must clear loaded Panzerfaust timers and target filters"
+    );
     assert!(owner_saw_launch);
     assert!(owner_saw_impact);
     assert!(owner_saw_conversion);
@@ -407,6 +424,7 @@ fn hold_position_uses_only_current_entrenched_panzerfaust_range() {
             .occupied_trench_id = Some(trench);
     }
     let mut entrenched_impact_hp = None;
+    let mut saw_entrenched_conversion = false;
     for _ in 0..70 {
         let events = entrenched_game.tick();
         let impact_this_tick = player_events(&events, 1)
@@ -418,10 +436,27 @@ fn hold_position_uses_only_current_entrenched_panzerfaust_range() {
                 .get(entrenched_tank)
                 .map(|tank| tank.hp);
         }
+        saw_entrenched_conversion |= player_events(&events, 1).iter().any(
+            |event| matches!(event, Event::PanzerfaustConversion { id, .. } if *id == entrenched_panzerfaust),
+        );
     }
     assert_eq!(
         entrenched_impact_hp,
         Some(entrenched_tank_hp.saturating_sub(config::PANZERFAUST_DAMAGE))
+    );
+    let converted = entrenched_game
+        .entities
+        .get(entrenched_panzerfaust)
+        .expect("entrenched Panzerfaust should keep the same id");
+    assert!(saw_entrenched_conversion);
+    assert_eq!(converted.kind, EntityKind::Rifleman);
+    assert_eq!(
+        converted
+            .movement
+            .as_ref()
+            .and_then(|movement| movement.occupied_trench_id),
+        Some(trench),
+        "same-id conversion should preserve active trench occupation"
     );
 }
 
@@ -489,6 +524,93 @@ fn target_death_during_windup_cancels_without_spending_shot() {
 }
 
 #[test]
+fn panzerfaust_killed_during_windup_does_not_launch_or_convert() {
+    let (mut game, panzerfaust, tank) = panzerfaust_fixture();
+    game.entities
+        .get_mut(panzerfaust)
+        .expect("panzerfaust exists")
+        .set_invulnerable(false);
+    enqueue_attack(&mut game, panzerfaust, tank, false);
+    game.tick();
+    assert!(matches!(
+        panzerfaust_state_of(&game, panzerfaust),
+        Some(PanzerfaustState::Windup { .. })
+    ));
+
+    game.entities
+        .get_mut(panzerfaust)
+        .expect("panzerfaust exists")
+        .apply_damage(u32::MAX, None);
+    let mut saw_panzerfaust_combat_event = false;
+    let mut saw_death_as_panzerfaust = false;
+    for _ in 0..70 {
+        let events = game.tick();
+        saw_panzerfaust_combat_event |= player_events(&events, 1).iter().any(|event| {
+            matches!(
+                event,
+                Event::PanzerfaustLaunch { .. }
+                    | Event::PanzerfaustImpact { .. }
+                    | Event::PanzerfaustConversion { .. }
+            )
+        });
+        saw_death_as_panzerfaust |= player_events(&events, 1).iter().any(|event| {
+            matches!(event, Event::Death { id, kind, .. }
+                if *id == panzerfaust && kind == crate::protocol::kinds::PANZERFAUST)
+        });
+    }
+
+    assert!(
+        game.entities.get(panzerfaust).is_none(),
+        "dead Panzerfaust should be removed instead of converting"
+    );
+    assert!(
+        !saw_panzerfaust_combat_event,
+        "dead Panzerfaust windup must not leak launch, impact, or conversion events"
+    );
+    assert!(
+        saw_death_as_panzerfaust,
+        "death cleanup should report the loaded unit kind that actually died"
+    );
+}
+
+#[test]
+fn panzerfaust_killed_during_recovery_does_not_convert_after_death() {
+    let (mut game, panzerfaust, _tank) = panzerfaust_fixture();
+    {
+        let entity = game
+            .entities
+            .get_mut(panzerfaust)
+            .expect("panzerfaust exists");
+        entity.set_invulnerable(false);
+        entity
+            .combat
+            .as_mut()
+            .expect("panzerfaust has combat state")
+            .panzerfaust = Some(PanzerfaustState::Recovery { ticks_remaining: 1 });
+        entity.apply_damage(u32::MAX, None);
+    }
+
+    let events = game.tick();
+    assert!(
+        game.entities.get(panzerfaust).is_none(),
+        "dead recovering Panzerfaust should be removed"
+    );
+    assert!(
+        player_events(&events, 1)
+            .iter()
+            .all(|event| !matches!(event, Event::PanzerfaustConversion { .. })),
+        "recovery should not convert after the entity has already died"
+    );
+    assert!(
+        player_events(&events, 1).iter().any(|event| {
+            matches!(event, Event::Death { id, kind, .. }
+                if *id == panzerfaust && kind == crate::protocol::kinds::PANZERFAUST)
+        }),
+        "death cleanup should retain the Panzerfaust kind rather than converting first"
+    );
+}
+
+#[test]
 fn replacing_order_after_launch_spends_shot_and_resumes_after_conversion() {
     let (mut game, panzerfaust, tank) = panzerfaust_fixture();
     let start = game
@@ -510,7 +632,10 @@ fn replacing_order_after_launch_spends_shot_and_resumes_after_conversion() {
             break;
         }
     }
-    assert!(saw_launch, "test setup should reach launch before replacing the order");
+    assert!(
+        saw_launch,
+        "test setup should reach launch before replacing the order"
+    );
 
     let move_goal = game.map.tile_center(20, 8);
     game.enqueue(
@@ -563,10 +688,13 @@ fn impact_visual_uses_launch_endpoint_after_target_leaves_visibility() {
     let mut launch_endpoint = None;
     for _ in 0..40 {
         let events = game.tick();
-        if let Some(endpoint) = player_events(&events, 1).iter().find_map(|event| match event {
-            Event::PanzerfaustLaunch { to_x, to_y, .. } => Some((*to_x, *to_y)),
-            _ => None,
-        }) {
+        if let Some(endpoint) = player_events(&events, 1)
+            .iter()
+            .find_map(|event| match event {
+                Event::PanzerfaustLaunch { to_x, to_y, .. } => Some((*to_x, *to_y)),
+                _ => None,
+            })
+        {
             launch_endpoint = Some(endpoint);
             break;
         }
@@ -584,10 +712,13 @@ fn impact_visual_uses_launch_endpoint_after_target_leaves_visibility() {
     let mut impact_pos = None;
     for _ in 0..40 {
         let events = game.tick();
-        if let Some(pos) = player_events(&events, 1).iter().find_map(|event| match event {
-            Event::PanzerfaustImpact { x, y } => Some((*x, *y)),
-            _ => None,
-        }) {
+        if let Some(pos) = player_events(&events, 1)
+            .iter()
+            .find_map(|event| match event {
+                Event::PanzerfaustImpact { x, y } => Some((*x, *y)),
+                _ => None,
+            })
+        {
             impact_pos = Some(pos);
             break;
         }

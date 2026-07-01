@@ -48,6 +48,16 @@ async function testDevWatchScenarioConfig() {
     );
 
     globalThis.window.location = new URL(
+      "http://localhost/?watchScenario=1&id=panzerfaust_target_death&unit=panzerfaust&count=1",
+    );
+    config = devWatchConfig();
+    assert(config, "panzerfaust_target_death dev scenario should be recognized");
+    assert(
+      config.room === "__dev_scenario__:panzerfaust_target_death:unit=panzerfaust:count=1",
+      "Panzerfaust dev scenarios should auto-join the server scenario room",
+    );
+
+    globalThis.window.location = new URL(
       "http://localhost/?watchScenario=1&id=bad/scenario&unit=scout_car&count=5",
     );
     config = devWatchConfig();

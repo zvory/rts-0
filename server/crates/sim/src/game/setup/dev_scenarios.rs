@@ -2,7 +2,30 @@ use super::*;
 
 mod layouts;
 
+use crate::game::entity::Order;
 use layouts::*;
+
+fn validate_panzerfaust_inspection_args(
+    scenario: &str,
+    unit: EntityKind,
+    unit_count: usize,
+) -> Result<(), String> {
+    if unit != EntityKind::Panzerfaust {
+        return Err(format!("unsupported {scenario} unit {unit}"));
+    }
+    if unit_count != 1 {
+        return Err(format!("unsupported {scenario} unit count {unit_count}"));
+    }
+    Ok(())
+}
+
+fn set_attack_order(entities: &mut EntityStore, attacker: u32, target: u32) -> Result<(), String> {
+    entities
+        .get_mut(attacker)
+        .ok_or_else(|| format!("missing attacker {attacker}"))?
+        .set_order(Order::attack(target));
+    Ok(())
+}
 
 impl Game {
     pub fn new_snaking_corridor_scenario(
@@ -515,6 +538,327 @@ impl Game {
             player_id,
             units: vec![digger, reuse_rifleman, crowded_machine_gunner, enemy_reuser],
             goal: dig_start,
+            issue_after_ticks: u32::MAX,
+        })
+    }
+
+    pub fn new_panzerfaust_duel_scenario(
+        unit: EntityKind,
+        unit_count: usize,
+        seed: u32,
+    ) -> Result<DevScenarioSetup, String> {
+        validate_panzerfaust_inspection_args("Panzerfaust duel", unit, unit_count)?;
+
+        let mut map = flat_dev_map(2);
+        let center = (map.size / 2, map.size / 2);
+        if let Some(slot) = map.starts.get_mut(0) {
+            *slot = (center.0 - 8, center.1);
+        }
+        if let Some(slot) = map.starts.get_mut(1) {
+            *slot = (center.0 + 8, center.1);
+        }
+
+        let panzerfaust_pos = map.tile_center(center.0 - 2, center.1);
+        let tank_pos = map.tile_center(center.0 + 1, center.1);
+        let mut entities = EntityStore::new();
+        let panzerfaust = entities
+            .spawn_unit(
+                1,
+                EntityKind::Panzerfaust,
+                panzerfaust_pos.0,
+                panzerfaust_pos.1,
+            )
+            .ok_or_else(|| "failed to spawn Panzerfaust".to_string())?;
+        let tank = entities
+            .spawn_unit(2, EntityKind::Tank, tank_pos.0, tank_pos.1)
+            .ok_or_else(|| "failed to spawn target Tank".to_string())?;
+        set_attack_order(&mut entities, panzerfaust, tank)?;
+
+        let player_id = 1;
+        let game = build_dev_scenario_game_with_teams(
+            map,
+            entities,
+            [(1, 1), (2, 2)],
+            player_id,
+            (center.0 - 8, center.1),
+            seed,
+            "dev:panzerfaust_duel",
+        );
+
+        Ok(DevScenarioSetup {
+            game,
+            player_id,
+            units: vec![panzerfaust],
+            goal: panzerfaust_pos,
+            issue_after_ticks: u32::MAX,
+        })
+    }
+
+    pub fn new_panzerfaust_windup_cancel_scenario(
+        unit: EntityKind,
+        unit_count: usize,
+        seed: u32,
+    ) -> Result<DevScenarioSetup, String> {
+        validate_panzerfaust_inspection_args("Panzerfaust windup cancel", unit, unit_count)?;
+
+        let mut map = flat_dev_map(2);
+        let center = (map.size / 2, map.size / 2);
+        if let Some(slot) = map.starts.get_mut(0) {
+            *slot = (center.0 - 8, center.1);
+        }
+        if let Some(slot) = map.starts.get_mut(1) {
+            *slot = (center.0 + 8, center.1);
+        }
+
+        let panzerfaust_pos = map.tile_center(center.0 - 2, center.1);
+        let tank_pos = map.tile_center(center.0 + 1, center.1);
+        let cancel_goal = map.tile_center(center.0 - 8, center.1 + 1);
+        let mut entities = EntityStore::new();
+        let panzerfaust = entities
+            .spawn_unit(
+                1,
+                EntityKind::Panzerfaust,
+                panzerfaust_pos.0,
+                panzerfaust_pos.1,
+            )
+            .ok_or_else(|| "failed to spawn Panzerfaust".to_string())?;
+        let tank = entities
+            .spawn_unit(2, EntityKind::Tank, tank_pos.0, tank_pos.1)
+            .ok_or_else(|| "failed to spawn target Tank".to_string())?;
+        set_attack_order(&mut entities, panzerfaust, tank)?;
+
+        let player_id = 1;
+        let game = build_dev_scenario_game_with_teams(
+            map,
+            entities,
+            [(1, 1), (2, 2)],
+            player_id,
+            (center.0 - 8, center.1),
+            seed,
+            "dev:panzerfaust_windup_cancel",
+        );
+
+        Ok(DevScenarioSetup {
+            game,
+            player_id,
+            units: vec![panzerfaust],
+            goal: cancel_goal,
+            issue_after_ticks: config::TICK_HZ / 6,
+        })
+    }
+
+    pub fn new_panzerfaust_target_death_scenario(
+        unit: EntityKind,
+        unit_count: usize,
+        seed: u32,
+    ) -> Result<DevScenarioSetup, String> {
+        validate_panzerfaust_inspection_args("Panzerfaust target death", unit, unit_count)?;
+
+        let mut map = flat_dev_map(3);
+        let center = (map.size / 2, map.size / 2);
+        if let Some(slot) = map.starts.get_mut(0) {
+            *slot = (center.0 - 8, center.1 - 1);
+        }
+        if let Some(slot) = map.starts.get_mut(1) {
+            *slot = (center.0 + 8, center.1);
+        }
+        if let Some(slot) = map.starts.get_mut(2) {
+            *slot = (center.0 - 8, center.1 + 1);
+        }
+
+        let normal_pos = map.tile_center(center.0 - 2, center.1 - 1);
+        let boosted_pos = map.tile_center(center.0 - 2, center.1 + 1);
+        let tank_pos = map.tile_center(center.0 + 1, center.1);
+        let mut entities = EntityStore::new();
+        let normal_panzerfaust = entities
+            .spawn_unit(1, EntityKind::Panzerfaust, normal_pos.0, normal_pos.1)
+            .ok_or_else(|| "failed to spawn normal Panzerfaust".to_string())?;
+        let boosted_panzerfaust = entities
+            .spawn_unit(3, EntityKind::Panzerfaust, boosted_pos.0, boosted_pos.1)
+            .ok_or_else(|| "failed to spawn boosted Panzerfaust".to_string())?;
+        let tank = entities
+            .spawn_unit(2, EntityKind::Tank, tank_pos.0, tank_pos.1)
+            .ok_or_else(|| "failed to spawn low-health target Tank".to_string())?;
+        if let Some(tank_entity) = entities.get_mut(tank) {
+            let damage = tank_entity.hp.saturating_sub(config::PANZERFAUST_DAMAGE);
+            tank_entity.apply_damage(damage, None);
+        }
+        set_attack_order(&mut entities, normal_panzerfaust, tank)?;
+        set_attack_order(&mut entities, boosted_panzerfaust, tank)?;
+
+        let player_id = 1;
+        let mut game = build_dev_scenario_game_with_teams(
+            map,
+            entities,
+            [(1, 1), (2, 2), (3, 1)],
+            player_id,
+            (center.0 - 8, center.1 - 1),
+            seed,
+            "dev:panzerfaust_target_death",
+        );
+        if let Some(player) = game.players.iter_mut().find(|player| player.id == 3) {
+            player
+                .upgrades
+                .insert(upgrade::UpgradeKind::Methamphetamines);
+        }
+
+        Ok(DevScenarioSetup {
+            game,
+            player_id,
+            units: vec![normal_panzerfaust, boosted_panzerfaust],
+            goal: normal_pos,
+            issue_after_ticks: u32::MAX,
+        })
+    }
+
+    pub fn new_panzerfaust_entrenched_range_scenario(
+        unit: EntityKind,
+        unit_count: usize,
+        seed: u32,
+    ) -> Result<DevScenarioSetup, String> {
+        validate_panzerfaust_inspection_args("Panzerfaust entrenched range", unit, unit_count)?;
+
+        let mut map = flat_dev_map(2);
+        let center = (map.size / 2, map.size / 2);
+        if let Some(slot) = map.starts.get_mut(0) {
+            *slot = (center.0 - 8, center.1);
+        }
+        if let Some(slot) = map.starts.get_mut(1) {
+            *slot = (center.0 + 8, center.1);
+        }
+
+        let entrenched_pos = map.tile_center(center.0 - 2, center.1 - 3);
+        let exposed_pos = map.tile_center(center.0 - 2, center.1 + 3);
+        let entrenched_tank_pos = map.tile_center(center.0 + 2, center.1 - 3);
+        let exposed_tank_pos = map.tile_center(center.0 + 2, center.1 + 3);
+        let mut entities = EntityStore::new();
+        let entrenched_panzerfaust = entities
+            .spawn_unit(
+                1,
+                EntityKind::Panzerfaust,
+                entrenched_pos.0,
+                entrenched_pos.1,
+            )
+            .ok_or_else(|| "failed to spawn entrenched Panzerfaust".to_string())?;
+        let exposed_panzerfaust = entities
+            .spawn_unit(1, EntityKind::Panzerfaust, exposed_pos.0, exposed_pos.1)
+            .ok_or_else(|| "failed to spawn exposed Panzerfaust".to_string())?;
+        entities
+            .spawn_unit(
+                2,
+                EntityKind::Tank,
+                entrenched_tank_pos.0,
+                entrenched_tank_pos.1,
+            )
+            .ok_or_else(|| "failed to spawn entrenched-range target Tank".to_string())?;
+        entities
+            .spawn_unit(2, EntityKind::Tank, exposed_tank_pos.0, exposed_tank_pos.1)
+            .ok_or_else(|| "failed to spawn exposed-range target Tank".to_string())?;
+        for id in [entrenched_panzerfaust, exposed_panzerfaust] {
+            entities
+                .get_mut(id)
+                .ok_or_else(|| format!("missing Panzerfaust {id}"))?
+                .hold_position();
+        }
+
+        let player_id = 1;
+        let mut game = build_dev_scenario_game_with_teams(
+            map,
+            entities,
+            [(1, 1), (2, 2)],
+            player_id,
+            (center.0 - 8, center.1),
+            seed,
+            "dev:panzerfaust_entrenched_range",
+        );
+        if let Some(player) = game
+            .players
+            .iter_mut()
+            .find(|player| player.id == player_id)
+        {
+            player.upgrades.insert(upgrade::UpgradeKind::Entrenchment);
+        }
+        let trench = game
+            .trenches
+            .create(&game.map, entrenched_pos.0, entrenched_pos.1)
+            .ok_or_else(|| "failed to seed Panzerfaust trench".to_string())?;
+        if let Some(entity) = game.entities.get_mut(entrenched_panzerfaust) {
+            if let Some(movement) = entity.movement.as_mut() {
+                movement.occupied_trench_id = Some(trench);
+            }
+        }
+        let player_ids: Vec<u32> = game.players.iter().map(|player| player.id).collect();
+        game.refresh_trench_memory(&player_ids);
+
+        Ok(DevScenarioSetup {
+            game,
+            player_id,
+            units: vec![entrenched_panzerfaust, exposed_panzerfaust],
+            goal: entrenched_pos,
+            issue_after_ticks: u32::MAX,
+        })
+    }
+
+    pub fn new_panzerfaust_methamphetamines_scenario(
+        unit: EntityKind,
+        unit_count: usize,
+        seed: u32,
+    ) -> Result<DevScenarioSetup, String> {
+        validate_panzerfaust_inspection_args("Panzerfaust Methamphetamines", unit, unit_count)?;
+
+        let mut map = flat_dev_map(3);
+        let center = (map.size / 2, map.size / 2);
+        if let Some(slot) = map.starts.get_mut(0) {
+            *slot = (center.0 - 8, center.1 - 2);
+        }
+        if let Some(slot) = map.starts.get_mut(1) {
+            *slot = (center.0 + 8, center.1);
+        }
+        if let Some(slot) = map.starts.get_mut(2) {
+            *slot = (center.0 - 8, center.1 + 2);
+        }
+
+        let normal_pos = map.tile_center(center.0 - 2, center.1 - 2);
+        let boosted_pos = map.tile_center(center.0 - 2, center.1 + 2);
+        let normal_tank_pos = map.tile_center(center.0 + 1, center.1 - 2);
+        let boosted_tank_pos = map.tile_center(center.0 + 1, center.1 + 2);
+        let mut entities = EntityStore::new();
+        let normal_panzerfaust = entities
+            .spawn_unit(1, EntityKind::Panzerfaust, normal_pos.0, normal_pos.1)
+            .ok_or_else(|| "failed to spawn normal Panzerfaust".to_string())?;
+        let boosted_panzerfaust = entities
+            .spawn_unit(3, EntityKind::Panzerfaust, boosted_pos.0, boosted_pos.1)
+            .ok_or_else(|| "failed to spawn boosted Panzerfaust".to_string())?;
+        let normal_tank = entities
+            .spawn_unit(2, EntityKind::Tank, normal_tank_pos.0, normal_tank_pos.1)
+            .ok_or_else(|| "failed to spawn normal target Tank".to_string())?;
+        let boosted_tank = entities
+            .spawn_unit(2, EntityKind::Tank, boosted_tank_pos.0, boosted_tank_pos.1)
+            .ok_or_else(|| "failed to spawn boosted target Tank".to_string())?;
+        set_attack_order(&mut entities, normal_panzerfaust, normal_tank)?;
+        set_attack_order(&mut entities, boosted_panzerfaust, boosted_tank)?;
+
+        let player_id = 1;
+        let mut game = build_dev_scenario_game_with_teams(
+            map,
+            entities,
+            [(1, 1), (2, 2), (3, 1)],
+            player_id,
+            (center.0 - 8, center.1 - 2),
+            seed,
+            "dev:panzerfaust_methamphetamines",
+        );
+        if let Some(player) = game.players.iter_mut().find(|player| player.id == 3) {
+            player
+                .upgrades
+                .insert(upgrade::UpgradeKind::Methamphetamines);
+        }
+
+        Ok(DevScenarioSetup {
+            game,
+            player_id,
+            units: vec![normal_panzerfaust, boosted_panzerfaust],
+            goal: normal_pos,
             issue_after_ticks: u32::MAX,
         })
     }
