@@ -7,7 +7,9 @@ use crate::game::Game;
 use crate::game::MapMetadata;
 use crate::protocol::terrain;
 
-use super::scenario::{LabScenarioV1, MAX_LAB_SCENARIO_NAME_LEN, MAX_LAB_SCENARIO_PLAYERS};
+#[cfg(test)]
+use super::scenario::LabScenarioV1;
+use super::scenario::{MAX_LAB_SCENARIO_NAME_LEN, MAX_LAB_SCENARIO_PLAYERS};
 use super::{LabEntityIdRemap, LabError};
 
 pub(super) const LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION: u32 = 1;
@@ -274,7 +276,8 @@ impl Game {
         )
     }
 
-    pub fn lab_checkpoint_scenario_from_v1(
+    #[cfg(test)]
+    pub(in crate::game) fn lab_checkpoint_scenario_from_v1(
         scenario: LabScenarioV1,
         server_build_sha: &str,
     ) -> Result<LabCheckpointScenarioV1, LabError> {

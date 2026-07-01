@@ -38,7 +38,8 @@ const MAX_SCENARIO_NAME_LEN: usize = 80;
 const MAX_REVIEW_NOTES_LEN: usize = 2000;
 const MAX_SCENARIO_CATALOG_ENTRIES: usize = 256;
 const MAX_AUTHORING_SCENARIO_ENTITIES: usize = 2000;
-const MAX_AUTHORING_SCENARIO_JSON_BYTES: usize = 1_000_000;
+pub const MAX_LAB_SCENARIO_IMPORT_JSON_BYTES: usize = 1_000_000;
+const MAX_AUTHORING_SCENARIO_JSON_BYTES: usize = MAX_LAB_SCENARIO_IMPORT_JSON_BYTES;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -871,6 +872,7 @@ pub(crate) fn lab_scenario_payload_legacy_god_mode_players(
 pub(crate) fn lab_scenario_payload_to_lab_op(
     scenario: LabScenarioPayload,
 ) -> Result<LabOp, String> {
+    validate_lab_scenario_payload_size(&scenario)?;
     match scenario {
         LabScenarioPayload::Legacy(scenario) => {
             validate_lab_scenario_lab_metadata(&scenario.metadata.lab, &scenario.players)?;
@@ -885,6 +887,18 @@ pub(crate) fn lab_scenario_payload_to_lab_op(
             Ok(LabOp::RestoreCheckpointScenario(Box::new(sim_scenario)))
         }
     }
+}
+
+fn validate_lab_scenario_payload_size(scenario: &LabScenarioPayload) -> Result<(), String> {
+    let bytes = serde_json::to_vec(scenario)
+        .map_err(|err| format!("failed to measure lab scenario JSON: {err}"))?
+        .len();
+    if bytes <= MAX_LAB_SCENARIO_IMPORT_JSON_BYTES {
+        return Ok(());
+    }
+    Err(format!(
+        "scenario JSON must be at most {MAX_LAB_SCENARIO_IMPORT_JSON_BYTES} bytes"
+    ))
 }
 
 pub(crate) fn export_lab_checkpoint_scenario_for_protocol(
@@ -1108,6 +1122,8 @@ mod tests {
         let loaded = load_lab_scenario_by_id("render-preview")
             .expect("bundled render-preview scenario should load");
         assert!(loaded.is_checkpoint_backed());
+        lab_scenario_payload_to_lab_op(loaded.scenario.clone())
+            .expect("checkpoint scenario should fit import cap");
         let game = loaded
             .build_game()
             .expect("render-preview scenario should restore through lab APIs");
@@ -1336,6 +1352,10 @@ mod tests {
         scenario
             .checkpoint_payload
             .push_str(&" ".repeat(MAX_AUTHORING_SCENARIO_JSON_BYTES));
+        let import_err =
+            lab_scenario_payload_to_lab_op(LabScenarioPayload::Checkpoint(scenario.clone()))
+                .expect_err("oversized import payload should be rejected before restore");
+        assert!(import_err.contains("scenario JSON must be at most"));
 
         let err = validate_lab_scenario_authoring(
             LabScenarioAuthoringMetadata {

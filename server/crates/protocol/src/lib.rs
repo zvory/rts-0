@@ -24,13 +24,7 @@ pub use contract_metadata::{
 pub use client_net_report::{
     ClientFramePhaseReport, ClientNetReport, ClientRenderCounterReport, CommandLifecycleExemplar,
 };
-pub use lab_scenario::{
-    LabCheckpointScenarioMap, LabCheckpointScenarioMapData, LabCheckpointScenarioMetadata,
-    LabCheckpointScenarioSource, LabCheckpointScenarioV1, LabScenarioAuthoringMetadata,
-    LabScenarioEntity, LabScenarioEntityIdRemap, LabScenarioLabMetadata, LabScenarioMap,
-    LabScenarioMetadata, LabScenarioOrder, LabScenarioPayload, LabScenarioPlayer,
-    LabScenarioPoint, LabScenarioTile, LabScenarioV1,
-};
+pub use lab_scenario::*;
 pub use messagepack_frame::MESSAGEPACK_SNAPSHOT_FRAME_MAGIC;
 pub use rts_contract::{
     AbilityCooldownView, AbilityObjectOwnerStateView, AbilityObjectView, ActionCapabilities,
