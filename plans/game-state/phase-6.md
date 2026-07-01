@@ -1,6 +1,6 @@
 # Phase 6 - Visibility Combat And Effects Checkpoint Coverage
 
-Status: Not started.
+Status: Done.
 
 ## Scope
 
