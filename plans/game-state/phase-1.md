@@ -1,6 +1,6 @@
 # Phase 1 - State Ownership Inventory
 
-Status: Not started.
+Status: Done.
 
 ## Scope
 

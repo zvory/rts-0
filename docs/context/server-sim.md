@@ -6,6 +6,7 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
 - [docs/design/architecture.md](../design/architecture.md) — tick and networking model
 - [docs/design/server-sim.md](../design/server-sim.md) — Rust server and `Game` core API
 - §3.1 `game::Game` public API; this is the seam and should stay stable
+- §3.1.1 `Game` state ownership registry; update this when `Game` fields change
 - §3.2 Concurrency model; the room task is the sole `Game` owner
 - §3.3 Rules layer
 - §3.5 Command planning and queued order semantics
