@@ -8,24 +8,25 @@ use crate::game::ability_runtime::{
 use crate::game::entity::EntityStore;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::teams::TeamRelations;
+use serde::{Deserialize, Serialize};
 
 const MAX_ACTIVE_ABILITY_PROJECTILES: usize = 512;
 const PROJECTILE_EPSILON: f32 = 0.001;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub(crate) enum AbilityProjectileLeg {
     Outbound,
     Return,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[allow(dead_code)]
 pub(crate) enum AbilityProjectileReturnTarget {
     FixedPoint { x: f32, y: f32 },
     Entity { id: u32 },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub(crate) struct AbilityProjectileSpec {
     pub(crate) owner: u32,
     pub(crate) caster_id: u32,
@@ -41,7 +42,7 @@ pub(crate) struct AbilityProjectileSpec {
     pub(crate) expires_tick: u32,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub(crate) struct AbilityProjectile {
     pub(crate) id: AbilityRuntimeObjectId,
     pub(crate) owner: u32,

@@ -5,8 +5,9 @@ use crate::protocol;
 use crate::rules;
 use crate::rules::economy::ResourceCost;
 pub use crate::rules::faction::AbilityQueuePolicy;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum AbilityKind {
     Charge,
     Smoke,

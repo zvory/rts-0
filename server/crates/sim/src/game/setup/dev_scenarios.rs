@@ -1,5 +1,5 @@
 use super::*;
-use rand::{rngs::SmallRng, SeedableRng};
+use crate::game::state::TrackedRng;
 
 mod layouts;
 mod panzerfaust;
@@ -324,7 +324,9 @@ impl Game {
             player.refund_resources(1_000, 0);
             let _ = player.spend_resources(0, 9_000);
         }
-        if let Some(loadout) = game.state.starting_loadouts
+        if let Some(loadout) = game
+            .state
+            .starting_loadouts
             .iter_mut()
             .find(|loadout| loadout.player_id == player_id)
         {
@@ -496,7 +498,9 @@ impl Game {
             player.upgrades.insert(upgrade::UpgradeKind::Entrenchment);
             player.refund_resources(1_000, 1_000);
         }
-        if let Some(loadout) = game.state.starting_loadouts
+        if let Some(loadout) = game
+            .state
+            .starting_loadouts
             .iter_mut()
             .find(|loadout| loadout.player_id == player_id)
         {
@@ -504,7 +508,8 @@ impl Game {
             loadout.starting_oil = 1_000;
         }
         for (x, y) in [preseeded_trench, connected_trench, fog_reference_trench] {
-            game.state.trenches
+            game.state
+                .trenches
                 .create(&game.state.map, x, y)
                 .ok_or_else(|| "failed to seed entrenchment trench".to_string())?;
         }
@@ -570,7 +575,6 @@ fn build_dev_scenario_game_with_teams<const N: usize>(
             is_ai: false,
         })
         .collect();
-    let rng = SmallRng::seed_from_u64(seed as u64);
     let mut game = Game::new_without_ai_controllers(&players, seed);
     game.state.map = map;
     game.state.entities = entities;
@@ -594,8 +598,10 @@ fn build_dev_scenario_game_with_teams<const N: usize>(
     game.state.map_metadata = super::dev_map_metadata(metadata_name);
     game.state.active_construction_sites.clear();
     game.state.starting_loadout = StartingLoadout::Standard;
-    game.state.rng = rng;
-    if let Some(player) = game.state.players
+    game.state.rng = TrackedRng::seed_from_match_seed(seed);
+    if let Some(player) = game
+        .state
+        .players
         .iter_mut()
         .find(|player| player.id == player_id)
     {
@@ -603,8 +609,12 @@ fn build_dev_scenario_game_with_teams<const N: usize>(
     }
     let ids = game.state.player_ids();
     game.state.fog = Fog::new(game.state.map.size);
-    game.state.fog
-        .recompute_with_smoke(&ids, &game.state.entities, &game.state.map, &game.state.smokes);
+    game.state.fog.recompute_with_smoke(
+        &ids,
+        &game.state.entities,
+        &game.state.map,
+        &game.state.smokes,
+    );
     game.refresh_trench_memory(&ids);
     game
 }

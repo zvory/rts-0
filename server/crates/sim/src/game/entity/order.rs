@@ -1,5 +1,6 @@
 use crate::config;
 use crate::game::ability::AbilityKind;
+use serde::{Deserialize, Serialize};
 
 use super::EntityKind;
 
@@ -21,7 +22,7 @@ pub(crate) fn tank_trap_deconstruction_ticks() -> u32 {
 /// activity (production, construction) is tracked by their dedicated fields. Each active order
 /// keeps immutable intent separate from execution phase, so systems transition explicit state
 /// machines instead of smuggling progress through unrelated fields.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Order {
     /// No order: units hold position; idle army units and armed buildings may auto-acquire,
     /// but worker-like gatherers stay passive unless explicitly ordered.
@@ -142,7 +143,7 @@ impl Order {
 
 /// Lightweight future order intent. Unlike [`Order`], this stores no execution phase, path,
 /// progress, or target latch state.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum OrderIntent {
     Move(PointIntent),
     AttackMove(PointIntent),
@@ -207,14 +208,14 @@ impl OrderIntent {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct PointIntent {
     pub x: f32,
     pub y: f32,
 }
 
 /// Future order intent applied to units as they leave a production building.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RallyKind {
     Move,
     AttackMove,
@@ -237,7 +238,7 @@ impl RallyKind {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct RallyIntent {
     pub kind: RallyKind,
     pub point: PointIntent,
@@ -259,19 +260,19 @@ impl RallyIntent {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct AbilityIntent {
     pub ability: AbilityKind,
     pub x: f32,
     pub y: f32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct SelfAbilityIntent {
     pub ability: AbilityKind,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MoveOrder {
     pub intent: PointIntent,
     pub execution: MoveExecution,
@@ -288,12 +289,12 @@ impl MoveOrder {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MoveExecution {
     pub phase: MovePhase,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MovePhase {
     AwaitingPath,
     Moving,
@@ -301,12 +302,12 @@ pub enum MovePhase {
     PathFailed,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TargetIntent {
     pub target: u32,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AttackOrder {
     pub intent: TargetIntent,
     pub execution: AttackExecution,
@@ -324,7 +325,7 @@ impl AttackOrder {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AttackExecution {
     pub phase: AttackPhase,
     /// Consecutive failed chase-path checks while the target could not be fired on.
@@ -332,18 +333,18 @@ pub struct AttackExecution {
     pub unreachable_checks: u16,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AttackPhase {
     Chasing,
     Firing,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GatherIntent {
     pub node: u32,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GatherOrder {
     pub intent: GatherIntent,
     pub execution: GatherExecution,
@@ -361,20 +362,20 @@ impl GatherOrder {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GatherExecution {
     pub phase: GatherPhase,
     pub harvest_progress: u32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BuildIntent {
     pub kind: EntityKind,
     pub tile_x: u32,
     pub tile_y: u32,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BuildOrder {
     pub intent: BuildIntent,
     pub execution: BuildExecution,
@@ -393,7 +394,7 @@ impl BuildOrder {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BuildExecution {
     pub phase: BuildPhase,
     pub unit_blocked_ticks: u32,
@@ -408,7 +409,7 @@ impl BuildExecution {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BuildPhase {
     /// Worker is walking toward the target tile. No building has been spawned and no
     /// resources have been deducted yet.
@@ -421,7 +422,7 @@ pub enum BuildPhase {
     Constructing { site: u32 },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DeconstructOrder {
     pub intent: TargetIntent,
     pub execution: DeconstructExecution,
@@ -439,13 +440,13 @@ impl DeconstructOrder {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DeconstructExecution {
     pub phase: DeconstructPhase,
     pub progress: u32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DeconstructPhase {
     /// Worker is walking toward the Tank Trap.
     ToTarget,
@@ -453,7 +454,7 @@ pub enum DeconstructPhase {
     Deconstructing,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AbilityOrder {
     pub intent: AbilityIntent,
     pub execution: AbilityExecution,
@@ -474,13 +475,13 @@ impl AbilityOrder {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct AbilityExecution {
     pub phase: MovePhase,
     pub staging: PointIntent,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ArtilleryPointFireOrder {
     pub intent: PointIntent,
 }
@@ -496,7 +497,7 @@ impl ArtilleryPointFireOrder {
 /// The phase a gathering worker is in. Kept inside [`GatherOrder`] so the order's intent
 /// (which node) stays stable while the worker's execution cycles through phases.
 #[allow(dead_code)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum GatherPhase {
     /// Walking out to the resource node.
     ToNode,

@@ -178,6 +178,23 @@ impl Map {
         })
     }
 
+    pub(crate) fn materialized_hash(&self) -> String {
+        let mut hash = FNV_OFFSET_BASIS;
+        hash = fnv_bytes(hash, &self.size.to_le_bytes());
+        hash = fnv_bytes(hash, &self.terrain);
+        hash = fnv_usize(hash, self.starts.len());
+        for &(x, y) in &self.starts {
+            hash = fnv_bytes(hash, &x.to_le_bytes());
+            hash = fnv_bytes(hash, &y.to_le_bytes());
+        }
+        hash = fnv_usize(hash, self.expansion_sites.len());
+        for &(x, y) in &self.expansion_sites {
+            hash = fnv_bytes(hash, &x.to_le_bytes());
+            hash = fnv_bytes(hash, &y.to_le_bytes());
+        }
+        format!("{hash:016x}")
+    }
+
     fn authored_json_for_name(map_name: &str) -> Result<(String, String), String> {
         // First try to match by `name` field, then by filename stem.
         if let Some(dir) = bundled_maps_dir() {
@@ -304,15 +321,21 @@ impl Map {
     pub fn world_size_px(&self) -> f32 {
         self.size as f32 * config::TILE_SIZE as f32
     }
-
 }
 
 fn stable_content_hash(content: &str) -> String {
-    let mut hash = FNV_OFFSET_BASIS;
-    for byte in content.as_bytes() {
+    format!("{:016x}", fnv_bytes(FNV_OFFSET_BASIS, content.as_bytes()))
+}
+
+fn fnv_usize(hash: u64, value: usize) -> u64 {
+    fnv_bytes(hash, &(value as u64).to_le_bytes())
+}
+
+fn fnv_bytes(mut hash: u64, bytes: &[u8]) -> u64 {
+    for byte in bytes {
         hash = (hash ^ u64::from(*byte)).wrapping_mul(FNV_PRIME);
     }
-    format!("{hash:016x}")
+    hash
 }
 
 fn bundled_maps_dir() -> Option<PathBuf> {

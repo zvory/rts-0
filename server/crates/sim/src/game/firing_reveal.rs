@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::config;
 use crate::protocol::{AttackReveal, Event};
+use serde::{Deserialize, Serialize};
 
 use super::fog::Fog;
 use super::teams::TeamRelations;
@@ -10,7 +11,7 @@ use super::teams::TeamRelations;
 ///
 /// Like lingering death sight, this is stamped into live fog so command validation, combat
 /// targeting, and snapshot projection all treat the revealed unit as currently visible.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub(in crate::game) struct FiringRevealSource {
     viewer: u32,
     entity_id: u32,
@@ -45,12 +46,7 @@ impl FiringRevealSource {
         self.expires_at_tick
     }
 
-    fn upsert(
-        sources: &mut Vec<Self>,
-        viewer: u32,
-        entity_id: u32,
-        expires_at_tick: u32,
-    ) {
+    fn upsert(sources: &mut Vec<Self>, viewer: u32, entity_id: u32, expires_at_tick: u32) {
         let Some(source) = Self::new(viewer, entity_id, expires_at_tick) else {
             return;
         };

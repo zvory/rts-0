@@ -3,6 +3,7 @@
 use crate::defs::{self, ArmorClass, WeaponClass};
 use crate::terrain::{self, TerrainKind};
 use crate::{movement_body_class, EntityKind, MovementBodyClass};
+use serde::{Deserialize, Serialize};
 
 const FRONT_ARC_RAD: f32 = std::f32::consts::FRAC_PI_4;
 const SIDE_ARC_RAD: f32 = std::f32::consts::PI * 3.0 / 4.0;
@@ -25,7 +26,7 @@ impl AttackProfile {
     };
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum WeaponKind {
     WorkerTools,
     GolemFists,
@@ -855,7 +856,10 @@ mod tests {
         assert_eq!(panzerfaust.facing_damage_policy, FacingDamagePolicy::None);
         assert_eq!(panzerfaust.overpenetration, OverpenetrationPolicy::None);
         assert_eq!(default_weapon_profile(EntityKind::Panzerfaust), None);
-        assert_eq!(damage_weapon_profile(EntityKind::Panzerfaust), Some(panzerfaust));
+        assert_eq!(
+            damage_weapon_profile(EntityKind::Panzerfaust),
+            Some(panzerfaust)
+        );
     }
 
     #[test]
@@ -873,11 +877,7 @@ mod tests {
             10
         );
         assert_eq!(
-            facing_damage_multiplier_for_weapon(
-                tank_cannon,
-                EntityKind::Tank,
-                ArmorFacing::Rear,
-            ),
+            facing_damage_multiplier_for_weapon(tank_cannon, EntityKind::Tank, ArmorFacing::Rear,),
             REAR_ARMOR_DAMAGE_MULTIPLIER
         );
         assert_eq!(
@@ -892,7 +892,10 @@ mod tests {
             miss_chance_for_weapon(anti_tank_gun, EntityKind::Rifleman),
             0.65
         );
-        assert_eq!(miss_chance_for_weapon(tank_cannon, EntityKind::Rifleman), 0.0);
+        assert_eq!(
+            miss_chance_for_weapon(tank_cannon, EntityKind::Rifleman),
+            0.0
+        );
     }
 
     #[test]

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use rand::rngs::SmallRng;
+use rand::Rng;
 
 use crate::config;
 use crate::game::entity::{EntityKind, EntityStore};
@@ -16,10 +16,10 @@ use crate::rules::combat as combat_rules;
 use crate::rules::target as target_rules;
 use crate::rules::terrain::{self, TerrainKind};
 
+use super::acquisition::{DirectFireLegality, DirectFireVisibility};
 use super::activation::{
     secondary_weapon_target_passes_activation, SecondaryWeaponActivationConstraints,
 };
-use super::acquisition::{DirectFireLegality, DirectFireVisibility};
 use super::damage::apply_damage;
 use super::priority::{self, AttackPriorityContext, TargetCandidate};
 use super::{FIRING_REVEAL_RESPONSE_DELAY_TICKS, RANGE_SLACK};
@@ -44,7 +44,7 @@ pub(super) fn fire_tank_coax_system(
     los: &crate::game::services::line_of_sight::LineOfSight<'_>,
     fog: &Fog,
     smokes: &SmokeCloudStore,
-    rng: &mut SmallRng,
+    rng: &mut impl Rng,
     events: &mut HashMap<u32, Vec<Event>>,
     firing_reveals: &mut Vec<FiringRevealSource>,
     tick: u32,

@@ -11,7 +11,6 @@ use crate::protocol::Event;
 use crate::rules::combat as combat_rules;
 use crate::rules::projection as projection_rules;
 use crate::rules::terrain::TerrainKind;
-use rand::rngs::SmallRng;
 use rand::Rng;
 
 use super::events::{
@@ -32,7 +31,7 @@ pub(super) fn apply_damage(
     events: &mut HashMap<u32, Vec<Event>>,
     fog: &Fog,
     smokes: &SmokeCloudStore,
-    rng: &mut SmallRng,
+    rng: &mut impl Rng,
     attacker: u32,
     victim: u32,
     weapon_profile: &combat_rules::WeaponProfile,

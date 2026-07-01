@@ -8,8 +8,9 @@ use crate::game::ability::AbilityKind;
 use crate::game::entity::{EntityKind, RallyKind};
 use crate::game::upgrade::UpgradeKind;
 use crate::protocol;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SimCommand {
     Move {
         units: Vec<u32>,
@@ -101,7 +102,7 @@ pub enum SimCommand {
     },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CommandRejection {
     Building,
     Unit,

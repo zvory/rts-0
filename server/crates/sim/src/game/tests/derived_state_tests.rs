@@ -1,6 +1,6 @@
 use super::checkpoint_helpers::{
-    assert_debug_path_visible, assert_equivalent_games, assert_final_spatial_matches_entities,
-    player_ids, repair_after_authoritative_test_spawn, restore_checkpoint_and_assert_equivalent,
+    assert_debug_path_visible, assert_equivalent_games, player_ids,
+    repair_after_authoritative_test_spawn, restore_checkpoint_and_assert_equivalent,
     tick_pair_and_assert_equivalent, tick_pair_for,
 };
 use super::fixtures::empty_flat_game;
@@ -46,7 +46,9 @@ fn derived_state_wipe_rebuild_preserves_pathing_state_and_snapshots() {
         "paired games should use the same live pathing budget/cache configuration before the wipe"
     );
     assert!(
-        !baseline.state.entities
+        !baseline
+            .state
+            .entities
             .get(tank)
             .expect("tank should survive")
             .path_is_empty(),
@@ -129,28 +131,8 @@ fn checkpoint_export_import_rebuilds_derived_state_and_preserves_semantics() {
             queued: false,
         },
     );
-    let checkpoint_next_id = baseline.state.entities.next_id_for_test();
-    let checkpoint_pathing_config = baseline.pathing_config_for_test();
-    let checkpoint = baseline.checkpoint_for_test();
-    let mut restored = Game::restore_checkpoint_for_test(checkpoint);
-
-    assert_eq!(
-        restored.pathing_cache_len_for_test(),
-        0,
-        "checkpoint import must rebuild DerivedState instead of serializing pathing cache entries"
-    );
-    assert_eq!(
-        checkpoint_pathing_config,
-        restored.pathing_config_for_test(),
-        "checkpoint import should use the same live pathing budget/cache capacity"
-    );
-    assert_eq!(
-        checkpoint_next_id,
-        restored.state.entities.next_id_for_test(),
-        "entity allocator high-water state should survive checkpoint import"
-    );
-    assert_final_spatial_matches_entities(&restored);
-    assert_equivalent_games(&baseline, &restored, "after cold checkpoint import");
+    let mut restored =
+        restore_checkpoint_and_assert_equivalent(&baseline, "after cold checkpoint import");
 
     let spawn_pos = baseline.state.map.tile_center(30, 30);
     let baseline_spawn = baseline
@@ -262,7 +244,10 @@ fn movement_economy_checkpoint_applies_pending_commands_once_and_preserves_exist
         "pending commands should receive the first post-checkpoint tick stamp"
     );
     assert!(
-        matches!(appended[0].command, crate::protocol::Command::Move { queued: true, .. }),
+        matches!(
+            appended[0].command,
+            crate::protocol::Command::Move { queued: true, .. }
+        ),
         "first pending command should keep command-log order"
     );
     assert!(
@@ -433,8 +418,7 @@ fn movement_economy_checkpoint_preserves_harvesting_state_and_resource_projectio
         "resource-node remaining amount should stay equivalent after harvest payout"
     );
     assert_eq!(
-        baseline.state.players[0].steel,
-        restored.state.players[0].steel,
+        baseline.state.players[0].steel, restored.state.players[0].steel,
         "player steel totals should stay equivalent after harvest payout"
     );
 }
@@ -590,7 +574,13 @@ fn movement_economy_checkpoint_preserves_production_research_rally_and_allocator
     let barracks = baseline
         .state
         .entities
-        .spawn_building(1, EntityKind::Barracks, barracks_pos.0, barracks_pos.1, true)
+        .spawn_building(
+            1,
+            EntityKind::Barracks,
+            barracks_pos.0,
+            barracks_pos.1,
+            true,
+        )
         .expect("barracks should spawn");
     let training_pos = footprint_center(&baseline.state.map, EntityKind::TrainingCentre, 16, 8);
     let training_centre = baseline
@@ -811,15 +801,19 @@ fn derived_state_pathing_fixture() -> (Game, u32, (f32, f32), (f32, f32)) {
 
     let start = game.state.map.tile_center(3, 12);
     let goal = game.state.map.tile_center(20, 12);
-    let tank = game.state.entities
+    let tank = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::Tank, start.0, start.1)
         .expect("tank should spawn");
     let enemy_pos = game.state.map.tile_center(20, 15);
-    game.state.entities
+    game.state
+        .entities
         .spawn_unit(2, EntityKind::Rifleman, enemy_pos.0, enemy_pos.1)
         .expect("enemy should spawn");
     let resource_pos = game.state.map.tile_center(8, 18);
-    game.state.entities
+    game.state
+        .entities
         .spawn_node(EntityKind::Steel, resource_pos.0, resource_pos.1)
         .expect("resource node should spawn");
 

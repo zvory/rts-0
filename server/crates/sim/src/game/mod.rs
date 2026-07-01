@@ -15,6 +15,7 @@ pub(crate) mod ability_runtime;
 mod analysis;
 mod artillery;
 mod building_memory;
+mod checkpoint;
 pub mod command;
 mod commands;
 mod derived_state;
@@ -118,7 +119,8 @@ impl SnapshotOptions {
 
 /// Per-player economy and bookkeeping carried for the whole match. Visible to `systems` (the
 /// only other module that mutates economy), but not part of the public API.
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct PlayerState {
     pub(crate) id: u32,
     pub(crate) team_id: TeamId,
@@ -139,7 +141,8 @@ pub(crate) struct PlayerState {
 
 /// Per-player score-screen counters. Values are accumulated from authoritative entity lifecycle
 /// events, not inferred from fog-filtered snapshots.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct ScoreState {
     unit_score: u32,
     structure_score: u32,
@@ -327,7 +330,8 @@ impl Game {
     /// Player ids that are not yet defeated. Human players are defeated when they lose all
     /// buildings; AI players are also defeated when they have no units left.
     pub fn alive_players(&self) -> Vec<u32> {
-        self.state.players
+        self.state
+            .players
             .iter()
             .filter(|p| {
                 let has_building =
@@ -368,9 +372,11 @@ impl Game {
         if let Some(p) = self.state.players.iter_mut().find(|p| p.id == player) {
             p.reset_supply();
         }
-        self.state.lingering_sight
+        self.state
+            .lingering_sight
             .retain(|source| source.owner() != player);
-        self.state.firing_reveals
+        self.state
+            .firing_reveals
             .retain(|source| source.viewer() != player);
         // Recompute fog so the now-entity-less player's visibility goes dark immediately;
         // otherwise a stale grid would keep leaking neutral/enemy entities into their snapshots.
@@ -429,7 +435,8 @@ impl Game {
     /// Reconstruct the `PlayerInit` list this game was created from, so a crash/invariant
     /// failure can persist a replayable artifact.
     pub fn player_inits(&self) -> Vec<PlayerInit> {
-        self.state.players
+        self.state
+            .players
             .iter()
             .map(|p| PlayerInit {
                 id: p.id,
@@ -447,22 +454,6 @@ impl Game {
     pub(in crate::game) fn clear_and_rebuild_derived_state_for_test(&mut self) {
         self.derived
             .clear_and_rebuild_from_authoritative(&self.state.map, &self.state.entities);
-    }
-
-    #[cfg(test)]
-    pub(in crate::game) fn checkpoint_for_test(&self) -> state::GameCheckpoint {
-        self.state.export_checkpoint()
-    }
-
-    #[cfg(test)]
-    pub(in crate::game) fn restore_checkpoint_for_test(checkpoint: state::GameCheckpoint) -> Self {
-        let state = GameState::import_checkpoint(checkpoint);
-        let derived = setup::live_derived_state(&state.map, &state.entities, state.tick);
-        let mut game = Self { state, derived };
-        if !game.state.lab_god_mode_players.is_empty() {
-            game.sync_lab_god_mode_flags();
-        }
-        game
     }
 
     pub(in crate::game) fn final_spatial(&self) -> &services::spatial::SpatialIndex {
@@ -517,8 +508,12 @@ impl Game {
     }
 
     fn recompute_live_fog(&mut self, player_ids: &[u32]) {
-        self.state.fog
-            .recompute_with_smoke(player_ids, &self.state.entities, &self.state.map, &self.state.smokes);
+        self.state.fog.recompute_with_smoke(
+            player_ids,
+            &self.state.entities,
+            &self.state.map,
+            &self.state.smokes,
+        );
         let teams = self.team_relations();
         self.state.fog.stamp_lingering_sources_for_teams_with_smoke(
             &self.state.lingering_sight,
@@ -537,15 +532,20 @@ impl Game {
     fn retain_active_visibility_sources(&mut self) -> bool {
         let lingering_before = self.state.lingering_sight.len();
         let firing_before = self.state.firing_reveals.len();
-        self.state.lingering_sight
+        self.state
+            .lingering_sight
             .retain(|source| source.is_active_at(self.state.tick));
-        self.state.firing_reveals
+        self.state
+            .firing_reveals
             .retain(|source| source.is_active_at(self.state.tick));
-        lingering_before != self.state.lingering_sight.len() || firing_before != self.state.firing_reveals.len()
+        lingering_before != self.state.lingering_sight.len()
+            || firing_before != self.state.firing_reveals.len()
     }
 
     pub(crate) fn team_relations(&self) -> teams::TeamRelations {
-        teams::TeamRelations::from_player_teams(self.state.players.iter().map(|p| (p.id, p.team_id)))
+        teams::TeamRelations::from_player_teams(
+            self.state.players.iter().map(|p| (p.id, p.team_id)),
+        )
     }
 
     #[allow(dead_code)]

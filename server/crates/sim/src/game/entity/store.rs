@@ -1,13 +1,14 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use super::{Entity, EntityKind, GatherPhase};
+use serde::{Deserialize, Serialize};
 
 /// The authoritative collection of all entities, keyed by stable id.
 ///
 /// Ids increase monotonically and are never reused. All access is fallible so the tick loop
 /// can freely reference ids that may have been removed (dead units, depleted state) without
 /// risking a panic.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct EntityStore {
     next_id: u32,
     map: HashMap<u32, Entity>,
@@ -102,6 +103,24 @@ impl EntityStore {
     #[cfg(test)]
     pub(crate) fn next_id_for_test(&self) -> u32 {
         self.next_id
+    }
+
+    pub(in crate::game) fn checkpoint_next_id(&self) -> u32 {
+        self.next_id
+    }
+
+    pub(in crate::game) fn checkpoint_entities(&self) -> Vec<Entity> {
+        self.iter().cloned().collect()
+    }
+
+    pub(in crate::game) fn from_checkpoint_entities(next_id: u32, entities: Vec<Entity>) -> Self {
+        let map = entities
+            .into_iter()
+            .map(|entity| (entity.id, entity))
+            .collect::<BTreeMap<_, _>>()
+            .into_iter()
+            .collect();
+        Self { next_id, map }
     }
 
     /// Whether `player` owns at least one entity (unit or building).

@@ -1,15 +1,16 @@
 #![allow(dead_code)]
 
+use crate::config;
 use crate::game::ability::AbilityKind;
 use crate::game::ability_projectile::{AbilityProjectile, AbilityProjectileSpec};
-use crate::config;
 use crate::game::entity::EntityStore;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::teams::TeamRelations;
+use serde::{Deserialize, Serialize};
 
 pub(in crate::game) const MAX_ACTIVE_ABILITY_OBJECTS: usize = 512;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub(crate) struct AbilityRuntimeObjectId(u32);
 
 impl AbilityRuntimeObjectId {
@@ -18,7 +19,7 @@ impl AbilityRuntimeObjectId {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[allow(dead_code)]
 pub(in crate::game) enum ActiveAbilityInstanceKind {
     DashReturn,
@@ -26,7 +27,7 @@ pub(in crate::game) enum ActiveAbilityInstanceKind {
     LineProjectile,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[allow(dead_code)]
 pub(in crate::game) enum AbilityWorldObjectKind {
     ReturnMarker,
@@ -34,7 +35,7 @@ pub(in crate::game) enum AbilityWorldObjectKind {
     LineProjectile,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 pub(crate) enum AbilityObjectPayload {
     #[default]
     None,
@@ -50,7 +51,7 @@ pub(crate) enum AbilityObjectPayload {
     },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub(crate) struct ActiveAbilityInstance {
     pub(in crate::game) id: AbilityRuntimeObjectId,
     pub(in crate::game) owner: u32,
@@ -74,7 +75,7 @@ impl ActiveAbilityInstance {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub(crate) struct AbilityWorldObject {
     pub(crate) id: AbilityRuntimeObjectId,
     pub(crate) owner: u32,
@@ -106,7 +107,7 @@ impl AbilityWorldObject {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(in crate::game) struct AbilityWorldObjectStore {
     objects: Vec<AbilityWorldObject>,
 }
@@ -173,7 +174,7 @@ impl AbilityWorldObjectStore {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct AbilityRuntime {
     next_id: u32,
     instances: Vec<ActiveAbilityInstance>,
@@ -467,7 +468,7 @@ impl AbilityRuntime {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub(in crate::game) struct ActiveAbilityInstanceSpec {
     pub(in crate::game) owner: u32,
     pub(in crate::game) caster_id: u32,
@@ -478,7 +479,7 @@ pub(in crate::game) struct ActiveAbilityInstanceSpec {
     pub(in crate::game) payload: AbilityObjectPayload,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub(in crate::game) struct AbilityWorldObjectSpec {
     pub(in crate::game) owner: u32,
     pub(in crate::game) caster_id: u32,

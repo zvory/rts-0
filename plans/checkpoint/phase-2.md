@@ -1,6 +1,6 @@
 # Phase 2 - Payload Round Trip Proof
 
-Status: Not started.
+Status: Done.
 
 ## Scope
 

@@ -5,3 +5,4 @@ edition = "2021"
 description = "Gameplay domain vocabulary, balance data, and pure rules for Bewegungskrieg"
 
 [dependencies]
+serde = { version = "1", features = ["derive"] }

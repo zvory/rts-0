@@ -155,14 +155,16 @@ impl Game {
     }
 
     pub fn starting_steel(&self) -> u32 {
-        self.state.starting_loadouts
+        self.state
+            .starting_loadouts
             .first()
             .map(|loadout| loadout.starting_steel)
             .unwrap_or(config::STARTING_STEEL)
     }
 
     pub fn starting_oil(&self) -> u32 {
-        self.state.starting_loadouts
+        self.state
+            .starting_loadouts
             .first()
             .map(|loadout| loadout.starting_oil)
             .unwrap_or(config::STARTING_OIL)
@@ -312,7 +314,9 @@ impl Game {
     /// Static info for the `start` message: terrain grid + each player's start tile. The
     /// `player_id` is left 0; the networking layer overwrites it per recipient.
     pub fn start_payload(&self) -> StartPayload {
-        let resources = self.state.entities
+        let resources = self
+            .state
+            .entities
             .iter()
             .filter(|e| e.kind.is_node())
             .map(|e| ResourceNode {
@@ -329,7 +333,9 @@ impl Game {
             terrain: self.state.map.terrain.clone(),
             resources,
         };
-        let players = self.state.players
+        let players = self
+            .state
+            .players
             .iter()
             .map(|p| PlayerStart {
                 id: p.id,
@@ -520,7 +526,7 @@ fn spawn_player_start(
     spawn_base_resources(entities, map, start);
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub(crate) enum StartingLoadout {
     Standard,
 }
