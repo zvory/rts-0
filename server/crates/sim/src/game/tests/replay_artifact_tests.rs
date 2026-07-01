@@ -84,6 +84,21 @@ fn replay_artifact_captures_live_game_contract() {
 }
 
 #[test]
+fn replay_start_capture_rejects_pending_commands() {
+    let players = players();
+    let mut game = Game::new(&players, 0x1234_5678);
+    game.enqueue(1, Command::Stop { units: vec![1] });
+
+    let err = ReplayStartComposition::capture(&game, "test-sha")
+        .expect_err("pending commands should reject replay start capture");
+
+    assert!(
+        err.contains("pending commands"),
+        "unexpected replay start capture error: {err}"
+    );
+}
+
+#[test]
 fn replay_artifact_requires_faction_schema_and_defaults_missing_winner_team() {
     let json = serde_json::json!({
         "artifactSchemaVersion": 2,
@@ -178,6 +193,13 @@ fn replay_validation_rejects_incompatible_build_and_map_metadata() {
         artifact.validate_against("sha-a", &wrong_hash),
         Err(ReplayValidationError::MapHashMismatch { .. })
     ));
+
+    let mut wrong_hash_and_build = wrong_hash.clone();
+    wrong_hash_and_build.content_hash.push_str("-again");
+    assert!(matches!(
+        artifact.validate_against("sha-b", &wrong_hash_and_build),
+        Err(ReplayValidationError::MapHashMismatch { .. })
+    ));
 }
 
 #[test]
@@ -252,5 +274,36 @@ fn checkpoint_backed_replay_rejects_top_level_start_metadata_mismatch() {
     assert!(matches!(
         err,
         ReplayValidationError::StartStateMismatch { field: "players" }
+    ));
+}
+
+#[test]
+fn checkpoint_backed_replay_rejects_checkpoint_seed_mismatch() {
+    let players = players();
+    let game = Game::new(&players, 0x1234_5678);
+    let replay_start = ReplayStartComposition::capture(&game, "sha-a").unwrap();
+    let artifact = replay_start.finalize(&game, None, game.scores());
+    let mut artifact_json = serde_json::to_value(&artifact).unwrap();
+    let checkpoint_payload = artifact_json["startState"]["checkpointPayload"]
+        .as_str()
+        .unwrap();
+    let mut checkpoint: serde_json::Value = serde_json::from_str(checkpoint_payload).unwrap();
+    checkpoint["seed"] = serde_json::Value::Number(0x8765_4321u64.into());
+    checkpoint["rng"]["seed"] = serde_json::Value::Number(0x8765_4321u64.into());
+    artifact_json["startState"]["checkpointPayload"] =
+        serde_json::Value::String(serde_json::to_string(&checkpoint).unwrap());
+    let artifact: ReplayArtifactV1 = serde_json::from_value(artifact_json).unwrap();
+
+    let err = match artifact.restore_start_game(game.state.map.clone(), game.map_metadata().clone())
+    {
+        Ok(_) => panic!("checkpoint seed drift should reject replay restore"),
+        Err(err) => err,
+    };
+
+    assert!(matches!(
+        err,
+        ReplayValidationError::StartStateMismatch {
+            field: "checkpointSeed"
+        }
     ));
 }

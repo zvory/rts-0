@@ -93,6 +93,11 @@ impl ReplayArtifactV1 {
                 .map_err(|err| ReplayValidationError::CheckpointStartInvalid {
                     reason: err.to_string(),
                 })?;
+                if game.seed() != self.seed {
+                    return Err(ReplayValidationError::StartStateMismatch {
+                        field: "checkpointSeed",
+                    });
+                }
                 if game.player_inits() != self.players {
                     return Err(ReplayValidationError::StartStateMismatch { field: "players" });
                 }
@@ -132,12 +137,6 @@ impl ReplayArtifactV1 {
         {
             return Err(ReplayValidationError::CheckpointStartMissing);
         }
-        if self.server_build_sha != expected_server_build_sha {
-            return Err(ReplayValidationError::BuildShaMismatch {
-                artifact: self.server_build_sha.clone(),
-                running: expected_server_build_sha.to_string(),
-            });
-        }
         if self.map_name != running_map.name {
             return Err(ReplayValidationError::MapMissing {
                 name: self.map_name.clone(),
@@ -176,6 +175,12 @@ impl ReplayArtifactV1 {
             if start_state.seed != self.seed {
                 return Err(ReplayValidationError::StartStateMismatch { field: "seed" });
             }
+        }
+        if self.server_build_sha != expected_server_build_sha {
+            return Err(ReplayValidationError::BuildShaMismatch {
+                artifact: self.server_build_sha.clone(),
+                running: expected_server_build_sha.to_string(),
+            });
         }
         Ok(())
     }

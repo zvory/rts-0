@@ -36,6 +36,12 @@ pub struct ReplayStartComposition {
 
 impl ReplayStartComposition {
     pub fn capture(game: &Game, server_build_sha: impl Into<String>) -> Result<Self, String> {
+        if !game.state.pending.is_empty() {
+            return Err(format!(
+                "cannot capture replay start with {} pending commands",
+                game.state.pending.len()
+            ));
+        }
         let server_build_sha = server_build_sha.into();
         let map = game.map_metadata();
         let checkpoint_payload = game

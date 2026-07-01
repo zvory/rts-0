@@ -502,11 +502,6 @@ fn apply_replay_summary_compatibility(row: &mut rts_server::db::MatchSummary, bu
         ));
         return;
     }
-    if meta.build_sha != build_sha {
-        row.replay_available = true;
-        row.replay_unavailable_reason = Some(replay_build_warning(build_sha, &meta.build_sha));
-        return;
-    }
     let running_map = match Map::metadata_for_name(&meta.map_name) {
         Ok(metadata) => metadata,
         Err(_) => {
@@ -532,6 +527,11 @@ fn apply_replay_summary_compatibility(row: &mut rts_server::db::MatchSummary, bu
             "Replay map {:?} has changed on this server.",
             meta.map_name
         ));
+        return;
+    }
+    if meta.build_sha != build_sha {
+        row.replay_available = true;
+        row.replay_unavailable_reason = Some(replay_build_warning(build_sha, &meta.build_sha));
         return;
     }
     row.replay_available = true;
@@ -1055,6 +1055,26 @@ mod tests {
             Some(
                 "Replay Potentially Incompatible With Current Server (server: new-build, replay: old-build)"
             )
+        );
+    }
+
+    #[test]
+    fn replay_summary_rejects_map_drift_before_build_warning() {
+        let map = Map::metadata_for_name("Default").unwrap();
+        let mut row = replay_summary_for(Some(rts_server::db::ReplaySummaryMetadata {
+            artifact_schema_version: replay::REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION as i32,
+            build_sha: "old-build".to_string(),
+            map_name: map.name,
+            map_schema_version: map.schema_version as i32,
+            map_hash: "changed-map-hash".to_string(),
+        }));
+
+        apply_replay_summary_compatibility(&mut row, "new-build");
+
+        assert!(!row.replay_available);
+        assert_eq!(
+            row.replay_unavailable_reason.as_deref(),
+            Some("Replay map \"Default\" has changed on this server.")
         );
     }
 
