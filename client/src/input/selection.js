@@ -201,21 +201,29 @@ function closeCommandCardMenu(input) {
 function setSelection(input, ids) {
   closeCommandCardMenu(input);
   input.state.setSelection(ids);
+  reconcileLocalPlannedOrders(input);
 }
 
 function addToSelection(input, ids) {
   closeCommandCardMenu(input);
   input.state.addToSelection(ids);
+  reconcileLocalPlannedOrders(input);
 }
 
 function removeFromSelection(input, ids) {
   closeCommandCardMenu(input);
   input.state.removeFromSelection(ids);
+  reconcileLocalPlannedOrders(input);
 }
 
 function clearSelection(input) {
   closeCommandCardMenu(input);
   input.state.clearSelection();
+  reconcileLocalPlannedOrders(input);
+}
+
+function reconcileLocalPlannedOrders(input) {
+  input?.clientIntent?.clearPlannedOrdersOutsideSelection?.(input.state?.selection || []);
 }
 
 export function _resourceAtWorld(wx, wy) {

@@ -922,6 +922,12 @@ Allocation rules:
   the same setup/redeploy-owned fire order. Promotion and firing recheck liveness, ownership, kind,
   construction state, path state, faction ability eligibility, stored target map/range/cone
   validity, ammo, and deployment before any shell is launched.
+- Client world-view and minimap previews may temporarily combine local pending move/setup/fire
+  stages with owner-only `orderPlan` snapshots so queued Point Fire and Blanket Fire appear to aim
+  from the future origin before the server echo arrives. This is preview-only: command admission,
+  target locking, terminal queue behavior, stale-stage skipping, and the projected `orderPlan`
+  remain server-owned. Minimap targeting sends the same world-coordinate `useAbility` command as
+  viewport targeting; there is no separate minimap simulation path.
 - Point Fire samples normal artillery scatter around the stored point, with Ballistic Tables
   tightening repeated Point Fire shots only. Blanket Fire samples each shot deterministically and
   uniformly within `ARTILLERY_BLANKET_RADIUS_TILES` around the stored center using authoritative

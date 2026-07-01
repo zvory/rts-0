@@ -155,19 +155,22 @@ export function _issueTargetedCommand(p, ev = {}) {
       : ability === ABILITY.BLANKET_FIRE
         ? cmd.blanketFire(units, world.x, world.y, queued)
         : cmd.useAbility(ability, units, world.x, world.y, queued);
-    this._issueCommand(command);
-    if (isArtilleryFireAbility(ability)) {
-      const locks = buildArtilleryTargetLocks({
+    const selectedCarriers = this.state.selectedEntities().filter((e) => units.includes(e.id));
+    const artilleryLocks = isArtilleryFireAbility(ability)
+      ? buildArtilleryTargetLocks({
         ability,
-        carriers: this.state.selectedEntities().filter((e) => units.includes(e.id)),
+        carriers: selectedCarriers.map((e) => plannedEntityForIntent(intent, e)),
         rawX: world.x,
         rawY: world.y,
         map: this.state.map,
         tileSize: this.state.map?.tileSize || DEFAULT_TILE_SIZE,
         definition,
         queued,
-      });
-      for (const lock of locks) {
+      })
+      : [];
+    this._issueCommand(command);
+    if (isArtilleryFireAbility(ability)) {
+      for (const lock of artilleryLocks) {
         this._addCommandFeedback("artillery", lock.x, lock.y, queued, definition?.radiusTiles);
       }
       return;
@@ -283,7 +286,8 @@ export function _refreshAbilityTargetPreview() {
   }
   const carriers = this.state
     .selectedEntities()
-    .filter((e) => ownOwner(this.state, e.owner) && definition.carriers.includes(e.kind));
+    .filter((e) => ownOwner(this.state, e.owner) && definition.carriers.includes(e.kind))
+    .map((e) => plannedEntityForIntent(intent, e));
   if (carriers.length === 0) {
     intent?.updateAbilityTargetPreview?.(null);
     return;
@@ -391,7 +395,7 @@ export function _refreshAntiTankGunSetupPreview() {
   const guns = this.state
     .selectedEntities()
     .filter((e) => ownOwner(this.state, e.owner) && (e.kind === KIND.ANTI_TANK_GUN || e.kind === KIND.ARTILLERY))
-    .map((e) => supportWeaponSetupPreviewEntity(e, setupPreviewQueued(this, intent)));
+    .map((e) => supportWeaponSetupPreviewEntity(plannedEntityForIntent(intent, e), setupPreviewQueued(this, intent)));
   if (guns.length === 0) {
     intent?.updateAntiTankGunSetupPreview?.(null);
     return;
@@ -409,6 +413,12 @@ function supportWeaponSetupPreviewEntity(entity, queued) {
   const origin = latestMovementOrderPlanPoint(entity);
   if (!origin) return entity;
   return { ...entity, x: origin.x, y: origin.y };
+}
+
+function plannedEntityForIntent(intent, entity) {
+  return typeof intent?.entityWithPlannedOrder === "function"
+    ? intent.entityWithPlannedOrder(entity)
+    : entity;
 }
 
 function latestMovementOrderPlanPoint(entity) {
