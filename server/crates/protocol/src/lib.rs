@@ -430,6 +430,8 @@ pub struct LabScenarioMetadata {
 #[serde(rename_all = "camelCase")]
 pub struct LabScenarioLabMetadata {
     pub vision: LabVisionMode,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub god_mode_players: Vec<u32>,
 }
 
 // ---------------------------------------------------------------------------

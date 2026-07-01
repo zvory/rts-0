@@ -171,7 +171,8 @@ impl Game {
             };
             for &(building_id, building_kind, rect) in &building_rects {
                 assert!(
-                    !circle_intersects_rect(body, rect),
+                    valid_pump_jack_oil_overlap(node, building_kind, rect)
+                        || !circle_intersects_rect(body, rect),
                     "invariant: tick {} resource node body overlaps building footprint; node={}; building=id={} kind={} {}; collision={}",
                     self.tick,
                     entity_context(&self.map, node),
@@ -463,6 +464,15 @@ fn location_context(map: &Map, x: f32, y: f32) -> String {
         map.size,
         map.world_size_px()
     )
+}
+
+fn valid_pump_jack_oil_overlap(node: &Entity, building_kind: EntityKind, rect: RectBody) -> bool {
+    node.kind == EntityKind::Oil
+        && building_kind == EntityKind::PumpJack
+        && node.pos_x >= rect.min_x
+        && node.pos_x <= rect.max_x
+        && node.pos_y >= rect.min_y
+        && node.pos_y <= rect.max_y
 }
 
 fn tile_location_context(map: &Map, tile: (u32, u32)) -> String {
@@ -869,6 +879,32 @@ mod tests {
         assert!(message.contains("tile=("));
         assert!(message.contains("region="));
         assert!(message.contains("overlap_depth="));
+    }
+
+    #[test]
+    fn pump_jack_oil_overlap_is_valid_invariant_state() {
+        let players = [PlayerInit {
+            id: 1,
+            team_id: 1,
+            faction_id: "kriegsia".to_string(),
+            name: "Solo".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        }];
+        let mut game = Game::new(&players, 0x1234_5678);
+        for tile in &mut game.map.terrain {
+            *tile = crate::protocol::terrain::GRASS;
+        }
+
+        let (x, y) = footprint_center(&game.map, EntityKind::PumpJack, 10, 10);
+        game.entities
+            .spawn_node(EntityKind::Oil, x, y)
+            .expect("oil spawn");
+        game.entities
+            .spawn_building(1, EntityKind::PumpJack, x, y, true)
+            .expect("pump jack spawn");
+
+        game.assert_invariants();
     }
 
     #[test]

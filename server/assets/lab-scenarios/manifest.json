@@ -8,6 +8,15 @@
       "map": "Default",
       "playerCount": 2,
       "filename": "lategame.json"
+    },
+    {
+      "id": "render-preview",
+      "title": "Render Preview",
+      "description": "Imported two-player lab setup for checking exported render coverage.",
+      "tags": ["two-player", "render-preview", "imported"],
+      "map": "Default",
+      "playerCount": 2,
+      "filename": "render-preview.json"
     }
   ]
 }
