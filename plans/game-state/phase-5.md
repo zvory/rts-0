@@ -1,6 +1,6 @@
 # Phase 5 - Movement And Economy Checkpoint Coverage
 
-Status: Not started.
+Status: Done.
 
 ## Scope
 
