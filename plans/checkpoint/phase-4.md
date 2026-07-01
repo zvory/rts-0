@@ -4,10 +4,10 @@ Status: Not started.
 
 ## Scope
 
-Introduce a replay artifact version whose start state is `GameCheckpointV1` plus the recorded
-authoritative command stream. New replay captures should use the checkpoint-backed artifact while
-old replay artifacts remain loadable through compatibility code or fail with an intentional,
-documented incompatibility reason.
+Introduce a replay artifact version whose start state is a map binding plus `GameCheckpointV1` plus
+the recorded authoritative command stream. New replay captures should use the checkpoint-backed
+artifact while old replay artifacts remain loadable through compatibility code or fail with an
+intentional, documented incompatibility reason.
 
 Replay playback must remain authoritative through recorded actions. AI controller memory stays
 outside the checkpoint; AI slots are restored as players, and replay correctness comes from the
@@ -20,16 +20,20 @@ Explicit non-goals:
 - No client protocol change except surfaced replay incompatibility text if already routed through
   existing server messages.
 - No deletion of old replay code until compatibility and fallback behavior are proven.
+- No standalone checkpoint document product surface; the checkpoint payload is embedded inside the
+  replay artifact.
 
 ## Expected Touch Points
 
 - `server/crates/sim/src/game/replay.rs`: add the checkpoint-backed replay artifact version,
-  validation, capture, and load helpers.
+  validation, capture, load helpers, and a versioned enum or equivalent decoder that can distinguish
+  legacy artifacts from checkpoint-backed artifacts.
 - `server/src/lobby/replay_session.rs`, `dev_replay.rs`, `crash_replay.rs`,
   `room_task/lifecycle.rs`, `room_task/replay.rs`, and match-history helpers: route new captures and
   playback through the checkpoint start path.
-- `server/src/db.rs`: update persisted replay artifact handling only if the stored JSON shape must
-  distinguish versions.
+- `server/src/db.rs`: update persisted replay artifact handling to decode the same versioned replay
+  artifact contract used by file/dev loading. Database rows must not deserialize directly into only
+  the old concrete replay type once a new artifact shape exists.
 - Replay tests under `server/src/lobby/**` and `server/crates/sim/src/game/**`.
 - Docs for replay artifact compatibility and migration behavior.
 
@@ -39,6 +43,10 @@ Explicit non-goals:
   live game.
 - Existing saved/dev replay artifacts still launch if compatibility is retained; if not retained,
   failures are explicit and covered by tests.
+- Match-history database replay rows use the same versioned compatibility or rejection policy as
+  dev/self-play/crash replay files.
+- The replay artifact's map binding rejects playback against the wrong map identity/hash before a
+  live `Game` is constructed.
 - Replay seek, branch seed, selected vision, spectator vision, crash replay capture, and match
   history replay launch keep their documented behavior.
 - Command timing has no off-by-one drift around the start checkpoint tick.
@@ -67,7 +75,10 @@ fixture or saved artifact exists for the compatibility path.
 The handoff must name:
 
 - the new replay artifact version and JSON shape;
+- how the artifact embeds `GameCheckpointV1` and map binding data;
 - old artifact compatibility or rejection policy;
+- every replay load surface audited: dev/self-play files, crash replay artifacts, match-history DB
+  rows, and committed fixtures;
 - capture/playback paths changed;
 - command timing convention at checkpoint start;
 - focused tests that passed;

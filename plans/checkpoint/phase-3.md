@@ -4,14 +4,17 @@ Status: Not started.
 
 ## Scope
 
-Make normal match and lab setup flows construct their initial authoritative state as a
-`GameCheckpointV1`, then restore the live `Game` from that checkpoint. Public constructors and room
-callers should keep their current signatures where practical, but their internals should exercise
-the same import path that later replay and lab assets will use.
+Make normal match and lab setup flows construct their initial authoritative state as a start
+composition: the exact map plus a `GameCheckpointV1` payload bound to that map. Restore the live
+`Game` from that composition. Public constructors and room callers should keep their current
+signatures where practical, but their internals should exercise the same import path that later
+replay and lab assets will use.
 
 This phase should prove that tick-zero checkpoint starts are behaviorally identical to direct setup
 for normal matches, replay-compatible starts, dev scenarios, and blank/catalog lab starts. It should
-not change committed replay artifact or lab scenario file formats yet.
+not change committed replay artifact or lab scenario JSON shapes yet. Keep the direct setup path
+available as a private/test-only oracle until this phase's parity tests prove the checkpoint-backed
+path is equivalent; do not delete it merely because the live constructors have switched.
 
 Explicit non-goals:
 
@@ -22,13 +25,15 @@ Explicit non-goals:
 
 ## Expected Touch Points
 
-- `server/crates/sim/src/game/setup.rs`: compile setup inputs to checkpoint DTOs and restore through
-  the validated import path.
+- `server/crates/sim/src/game/setup.rs`: compile setup inputs into a map plus checkpoint DTOs and
+  restore through the validated import path.
 - `server/crates/sim/src/game/mod.rs`: preserve public constructor signatures or add narrow
   constructor overloads only where needed.
 - `server/crates/sim/src/game/lab.rs` and setup/dev scenario helpers: route blank lab and scenario
   setup through checkpoint-backed construction where the current scenario format can be compiled to
   equivalent start state.
+- Private/test-only direct setup helpers: retain enough of the old construction path to compare
+  direct setup against checkpoint-backed setup throughout this phase.
 - `server/src/lobby/launch.rs`, `server/src/lobby/room_task/**`, and `server/src/main.rs`: read-only
   unless constructor signatures force small call-site updates.
 - Focused tests in sim setup, replay setup, and lab setup modules.
@@ -40,6 +45,7 @@ Explicit non-goals:
   teams, factions, authored maps, generated maps, and AI slots.
 - Compare blank lab and catalog lab starts before and after checkpoint-backed construction.
 - Prove first snapshot and several post-start ticks match for each setup family.
+- Prove a mismatched map identity/hash fails before constructing a live `Game`.
 - Confirm replay artifact capture still records the same command log/start metadata as before for
   existing replay schema.
 - Suggested focused commands:
@@ -66,6 +72,9 @@ The handoff must name:
 
 - which constructors now go through checkpoint import;
 - any setup paths deliberately left direct, with reason;
+- how the private direct setup oracle is retained for future parity/debugging, or why it was safe to
+  remove;
+- how map-plus-payload start validation works;
 - parity tests added;
 - whether public constructor signatures changed;
 - exact verification commands that passed;
