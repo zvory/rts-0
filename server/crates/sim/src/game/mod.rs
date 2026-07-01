@@ -484,6 +484,12 @@ impl Game {
     }
 
     // --- internal helpers ------------------------------------------------------
+    #[cfg(test)]
+    pub(in crate::game) fn clear_and_rebuild_derived_state_for_test(&mut self) {
+        self.pathing.clear_rebuildable_state_for_test();
+        self.spatial = services::spatial::SpatialIndex::build(&self.entities, self.map.size);
+    }
+
     fn refresh_building_memory(&mut self, player_ids: &[u32]) {
         let teams = self.team_relations();
         self.building_memory.refresh(
