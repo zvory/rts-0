@@ -229,11 +229,11 @@ weapon range while moving. After a tank has spent three seconds (90 ticks) witho
 translation or hull rotation, its range has linearly expanded to 14 tiles; any later path-driven
 movement or hull rotation resets it to the base range. Riflemen upgraded with Methamphetamines gain
 permanent moving fire, keep advancing while firing with normal accuracy, and move at tank speed.
-Machine Gunners upgraded with Methamphetamines move at unupgraded Rifleman speed and use half-length
-setup/teardown timers; other mobile combat units
-still hold position once a target is in weapon range. Scout cars also fire while moving using an
-independent rear machine-gun facing. They are unarmored light vehicles and do not receive
-armored damage reduction, but anti-tank guns do not roll their infantry miss chance against them.
+Panzerfausts upgraded with Methamphetamines also move at tank speed. Machine Gunners upgraded with
+Methamphetamines move at unupgraded Rifleman speed and use half-length setup/teardown timers; other
+mobile combat units still hold position once a target is in weapon range. Scout cars also fire while
+moving using an independent rear machine-gun facing. They are unarmored light vehicles and do not
+receive armored damage reduction, but anti-tank guns do not roll their infantry miss chance against them.
 Plain `Move` tanks, scout cars, and upgraded riflemen only fire at enemies already in
 weapon range. Their active `AttackMove` orders use the same moving-fire policy while they are still
 following the player-issued path: auto-acquisition can aim and fire only at targets that are
@@ -345,8 +345,8 @@ folded into default targeting.
   1.25x movement speed (matching tank speed at 2.0 px/tick), no extra movement miss chance, and 25%
   faster attacks (16 tick cooldown becomes 12). It also increases that
   player's Machine Gunners from 1.28 px/tick to unupgraded Rifleman speed (1.6 px/tick) and halves
-  their setup and teardown timers from 30 ticks to 15. Panzerfausts keep their 1.6 px/tick Rifleman
-  movement speed with or without Methamphetamines.
+  their setup and teardown timers from 30 ticks to 15. It also boosts Panzerfaust movement by the
+  same 1.25x multiplier as Riflemen, from 1.6 px/tick to 2.0 px/tick.
 - **Entrenchment** (Training Centre research, protocol id `entrenchment`): costs 100 steel / 0 oil
   and takes 300 ticks (~10s). The rules surface defines Riflemen, Machine Gunners, and Panzerfausts
   as eligible entrenchment infantry; Engineers/Workers, Mortar Teams, Ekat, Golems,
