@@ -155,7 +155,23 @@ pub(crate) fn is_enemy_targetable(
         && candidate.hp > 0
 }
 
-pub(crate) fn unit_attack_target_valid(
+/// Whether `candidate` is a legal explicit attack target for an attacker owned by
+/// `attacker_owner`. Explicit player commands may target the attacker's own entities, but not
+/// allied teammates; automatic acquisition remains enemy-only through `is_enemy_targetable`.
+pub(crate) fn is_explicit_attack_targetable(
+    candidate: &Entity,
+    teams: &TeamRelations,
+    attacker_owner: u32,
+    attacker_id: u32,
+) -> bool {
+    candidate.id != attacker_id
+        && candidate.owner != NEUTRAL
+        && (candidate.owner == attacker_owner || teams.is_enemy_owner(attacker_owner, candidate.owner))
+        && candidate.is_targetable()
+        && candidate.hp > 0
+}
+
+pub(crate) fn unit_explicit_attack_target_valid(
     entities: &EntityStore,
     teams: &TeamRelations,
     fog: &Fog,
@@ -171,7 +187,7 @@ pub(crate) fn unit_attack_target_valid(
         return false;
     }
     matches!(entities.get(target_id),
-        Some(target) if is_enemy_targetable(target, teams, attacker_owner, attacker_id)
+        Some(target) if is_explicit_attack_targetable(target, teams, attacker_owner, attacker_id)
             && projection::team_visible_world(
                 attacker_owner,
                 target.pos_x,

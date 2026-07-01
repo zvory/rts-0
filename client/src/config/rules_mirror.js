@@ -63,7 +63,8 @@ export const MORTAR_OUTER_RADIUS_TILES = 1.5;
 export const MORTAR_INNER_RADIUS_TILES = 0.5;
 export const MORTAR_FIRE_COOLDOWN_TICKS = TICK_HZ * 2;
 export const PANZERFAUST_RANGE_TILES = 3;
-export const PANZERFAUST_DAMAGE = 60;
+export const PANZERFAUST_DAMAGE = 100;
+export const PANZERFAUST_ARMOR_PENETRATION = 0.5;
 export const PANZERFAUST_WINDUP_TICKS = TICK_HZ / 2;
 export const PANZERFAUST_TRAVEL_TICKS = TICK_HZ / 2;
 export const PANZERFAUST_RECOVERY_TICKS = TICK_HZ / 2;
@@ -120,7 +121,7 @@ export const STATS = Object.freeze({
   [KIND.PANZERFAUST]: { label: "Panzerfaust", icon: "PF", size: 9, sight: 8,
     rangeTiles: PANZERFAUST_RANGE_TILES, cost: { steel: 60, oil: 15 }, supply: 1, buildTicks: 400,
     requires: KIND.TRAINING_CENTRE,
-    description: "Infantry with a one-shot anti-tank weapon. Fires once at Tanks, then becomes a Rifleman. Moves at Rifleman speed; Methamphetamines shortens windup and recovery and boosts movement." },
+    description: `Infantry with a one-shot anti-tank weapon. Fires once at Tanks or Scout Cars for ${PANZERFAUST_DAMAGE} damage with ${PANZERFAUST_ARMOR_PENETRATION * 100}% armor penetration, then becomes a Rifleman. Moves at Rifleman speed; Methamphetamines shortens windup and recovery and boosts movement.` },
   [KIND.ANTI_TANK_GUN]: { label: "Anti-Tank Gun", icon: "ATG", size: 20, sight: 6, body: ANTI_TANK_GUN_BODY,
     rangeTiles: ANTI_TANK_GUN_DEPLOYED_RANGE_TILES, cost: { steel: 75, oil: 25 }, supply: 3, buildTicks: 440,
     requires: KIND.STEELWORKS, upgradeRequires: UPGRADE.ANTI_TANK_GUN_UNLOCK,

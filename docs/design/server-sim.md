@@ -322,9 +322,11 @@ Final audit for the ownership sequence:
   recorded commands and end metadata. Legacy schema 2 artifacts still load through the
   map/loadout-start compatibility path. Replay seek still uses recorded commands plus in-process
   `clone_for_replay_keyframe` keyframes after the start game is rebuilt.
-- Lab timeline seek still replays lab timeline entries from in-process keyframes, while lab scenario
-  import/export keeps its scenario DTO and fresh-id remap behavior rather than becoming a checkpoint
-  restore.
+- Lab timeline seek still replays lab timeline entries from in-process keyframes. Current lab
+  import/export UI keeps the `LabScenarioV1` DTO and fresh-id remap behavior, while the internal
+  side-by-side `LabCheckpointScenarioV1` adapter can convert a scenario into materialized map
+  data/binding plus embedded `GameCheckpointV1` text and source id-remap metadata for parity
+  validation.
 - Projection privacy remains enforced by normal snapshot/event projection tests plus the Phase 6
   checkpoint/privacy coverage; checkpoint helpers must not expose fog-hidden entity ids, positions,
   targets, ability payloads, remembered occupants, or private events.
@@ -338,9 +340,10 @@ Checkpoint-readiness blockers before follow-up product plans:
 - Replay migration currently writes schema 3 checkpoint-backed starts and retains schema 2 loading.
   Future cleanup still needs a keyframe replacement decision, any cross-version migrators beyond
   schema 2 compatibility, and release audit coverage for old builds or partial checkpoint coverage.
-- Lab migration needs a product decision for scenario versus checkpoint semantics, id remap
-  compatibility, timeline operation capture/replay policy, authoring metadata migration, and
-  validation for imported artifacts across map/faction versions.
+- Lab migration has a side-by-side checkpoint adapter proof for current scenarios. Cutover still
+  needs a product decision for public scenario versus checkpoint semantics, timeline operation
+  capture/replay policy, authoring metadata migration, old-asset compatibility, and validation for
+  imported artifacts across map/faction versions.
 - Coverage gaps for a public checkpoint program include long-run/cross-version serialization,
   corruption/partial-load handling, AI-controller reconstruction expectations, performance and
   storage limits, privacy review for every exported projection-adjacent field, and deployment
@@ -641,11 +644,13 @@ remain on their current schemas until their phases introduce containers around t
   which rejects mixed-owner selections before queuing a normal command. Lab state, dirty flags,
   viewer roles, per-operator selected vision, the future-join vision default, shared room-time
   speed/pause/controller state, and append-only operation log records stay in the room task rather
-  than in `Game`. Scenario PR submission also starts in `room_task/lab.rs`: the room exports the
-  authoritative lab `Game`, validates authoring metadata, rate-limits the room to one PR job, and
-  then hands the already-validated preview to a bounded background service so GitHub or git work
-  never runs on the room tick path. The submission service rechecks catalog duplicates, safe
-  filenames, path allowlists, payload/entity caps, branch safety, and the exact scenario plus
+  than in `Game`. Bundled catalog and authoring validation restore each `LabScenarioV1` through the
+  current lab API and the side-by-side checkpoint adapter, then compare public start/snapshot state
+  before exposing the scenario. Scenario PR submission also starts in `room_task/lab.rs`: the room
+  exports the authoritative lab `Game`, validates authoring metadata, rate-limits the room to one
+  PR job, and then hands the already-validated preview to a bounded background service so GitHub or
+  git work never runs on the room tick path. The submission service rechecks catalog duplicates,
+  safe filenames, path allowlists, payload/entity caps, branch safety, and the exact scenario plus
   manifest file set before opening a draft PR with a reviewer checklist. Paused lab room-time
   suppresses scheduled ticks; one-tick lab steps and running lab ticks use the same
   `LiveTickDriver` path as ordinary live simulation.
@@ -791,9 +796,9 @@ policy is centralized instead of scattered through services.
   `attack_profile(kind) -> AttackProfile`, and weapon-aware direct damage/miss/facing helpers such
   as `effective_damage_for_weapon(profile, victim_kind, base_dmg, victim_terrain) -> u32`. The
   Tank coax profile is a live secondary Tank weapon (`tank_coax`, 6 tiles, 4 damage, 6-tick
-  cooldown, small arms, direct-fire overpenetration). The Panzerfaust Tank-only loaded-shot
-  predicate lives here as rules vocabulary while the one-shot state machine stays in the sim combat
-  service.
+  cooldown, small arms, direct-fire overpenetration). The Panzerfaust loaded-shot target predicate
+  for Tanks and Scout Cars lives here as rules vocabulary while the one-shot state machine stays in
+  the sim combat service.
 - `rules::target` — pure `TargetFacts` snapshots for target policy consumers. Facts include unit,
   building, resource-node, armor class, weapon class, anti-armor threat, support weapon, field
   obstacle, vehicle-body, economy-unit, and future Tank coax infantry-priority classification.
@@ -1180,10 +1185,11 @@ General rules:
 - Spawned Panzerfaust entities use a hidden server-only one-shot state in combat state:
   `Loaded -> Windup -> InFlight -> Recovery -> Rifleman`. Direct `Attack` commands, queued attack
   promotion, idle acquisition, hold-position acquisition, and attack-move acquisition all share the
-  Tank-only visible-enemy target predicate. Plain `Move` does not auto-fire. Windup cancels without
-  spending the shot if the order changes or the target stops being legal, visible, in range, or
-  fireable; after launch, the shot is spent, impact applies flat 60 AP damage only to the locked
-  live Tank target, recovery completes, and the same entity id converts into a Rifleman.
+  visible-enemy target predicate for Tanks and Scout Cars. Plain `Move` does not auto-fire. Windup
+  cancels without spending the shot if the order changes or the target stops being legal, visible,
+  in range, or fireable; after launch, the shot is spent, impact applies 100 base damage with 50%
+  armor penetration only to the locked live Tank or Scout Car target, recovery completes, and the
+  same entity id converts into a Rifleman.
 - Resource costs are paid at execution time, not queue time. Queued abilities that become
   unaffordable at promotion are skipped or rejected, but queued and immediate build orders do not
   require current affordability at issue or promotion time. Build promotion checks the worker,

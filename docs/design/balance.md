@@ -188,7 +188,8 @@ Core unit roles:
   machine-gun small-arms fire, strong against static defenses and exposed infantry, but
   vulnerable to other tanks and anti-tank infantry.
 - **Panzerfaust** is a Training Centre-unlocked Barracks infantry anti-tank ambusher. It fires one
-  short-range Tank-only armor-piercing shot, then converts into a Rifleman with the same entity id.
+  short-range 50%-armor-penetrating shot at Tanks or Scout Cars, then converts into a Rifleman with
+  the same entity id.
   Current AI profiles do not train Panzerfaust units in the first pass, but spawned AI-owned
   Panzerfausts can still use the normal one-shot acquisition behavior.
 - **Anti-tank gun team** is the ambush counter to tanks: it can fight while packed at short
@@ -298,16 +299,17 @@ folded into default targeting.
 - anti-tank guns use `ANTI_TANK_GUN_PACKED_RANGE_TILES = 5`, `ANTI_TANK_GUN_DEPLOYED_RANGE_TILES = 20`,
   `ANTI_TANK_GUN_PACKED_DAMAGE_MULTIPLIER = 0.75`, and
   `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = 35 degrees total`.
-- Panzerfaust uses a 3-tile, Tank-only, one-shot loaded weapon with
-  `PANZERFAUST_DAMAGE = 60`, `PANZERFAUST_WINDUP_TICKS = 15`,
-  `PANZERFAUST_TRAVEL_TICKS = 15`, and `PANZERFAUST_RECOVERY_TICKS = 15`.
-  Methamphetamines reduces the windup and recovery constants to 12 ticks each; travel stays
-  15 ticks. The `panzerfaust` unit definition carries 45 HP, 8-tile sight, 9 px radius,
-  1.6 px/tick loaded speed matching Riflemen, 60 steel / 15 oil cost, 1 supply, and 400 build
-  ticks, but keeps default damage and cooldown at zero so no repeat-fire default attack path
-  exists. Spawned Panzerfaust entities use the dedicated server one-shot runtime, then convert into
-  same-id Riflemen after recovery. Barracks trains Panzerfaust after the owner has a completed
-  Training Centre.
+- Panzerfaust uses a 3-tile, Tank-or-Scout-Car, one-shot loaded weapon with
+  `PANZERFAUST_DAMAGE = 100`, `PANZERFAUST_ARMOR_PENETRATION = 0.5`,
+  `PANZERFAUST_WINDUP_TICKS = 15`, `PANZERFAUST_TRAVEL_TICKS = 15`, and
+  `PANZERFAUST_RECOVERY_TICKS = 15`. Against Armored Tanks, the 50% penetration lands as 63
+  effective damage; unarmored Scout Cars take the full 100 damage. Methamphetamines reduces the
+  windup and recovery constants to 12 ticks each; travel stays 15 ticks. The `panzerfaust` unit
+  definition carries 45 HP, 8-tile sight, 9 px radius, 1.6 px/tick loaded speed matching Riflemen,
+  60 steel / 15 oil cost, 1 supply, and 400 build ticks, but keeps default damage and cooldown at
+  zero so no repeat-fire default attack path exists. Spawned Panzerfaust entities use the dedicated
+  server one-shot runtime, then convert into same-id Riflemen after recovery. Barracks trains
+  Panzerfaust after the owner has a completed Training Centre.
 - Tank hull-facing damage modifiers for tank and anti-tank gun hits are 1.0x front, 1.5x side,
   and 1.7x rear.
 - Artillery uses `ARTILLERY_MIN_RANGE_TILES = 25`, `ARTILLERY_MAX_RANGE_TILES = 55`,
@@ -496,7 +498,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | golem           | 160 | 16  | 1     | 24 | 2.0   | 7     | 0   | 0   | 4   | 396 (~13.2s); provisional free Ekat worker-like economy body trained at Zamok; mines at 4x worker load; can be consumed by Ekat for full heal |
 | rifleman        | 45  | 5   | 4     | 16 | 1.6   | 8     | 50  | 0   | 1   | 300 (~10s) |
 | machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 8     | 75  | 10  | 2   | 400 (~13s) |
-| panzerfaust     | 45  | 60 one-shot AP (default attack disabled) | 3 | 15 windup / 15 travel / 15 recovery | 1.6 | 8 | 60 | 15 | 1 | 400 (~13s); trained at Barracks after completed Training Centre |
+| panzerfaust     | 45  | 100 one-shot, 50% AP vs Tanks / full vs Scout Cars (default attack disabled) | 3 | 15 windup / 15 travel / 15 recovery | 1.6 | 8 | 60 | 15 | 1 | 400 (~13s); trained at Barracks after completed Training Centre |
 | mortar_team     | 75  | 40 outer / 100 inner AOE | 20 | 60 | 1.6 | 7 | 100 | 50 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
 | anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 72 | 1.6 | 6     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and Heavy Guns (`anti_tank_gun_unlock`) researched in R&D Complex |
 | artillery       | 150 | 150 AP inner / 150-10 outer AOE | 25-55 artillery fire | 90 | 1.3 | 4 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind) and Heavy Guns (`anti_tank_gun_unlock`) researched in R&D Complex; tank-sized footprint |

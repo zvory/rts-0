@@ -2,32 +2,22 @@ use super::fixtures::*;
 use super::*;
 use crate::game::entity::PanzerfaustState;
 
+fn player(id: u32, team_id: u32, name: &str, color: &str) -> PlayerInit {
+    PlayerInit {
+        id,
+        team_id,
+        faction_id: "kriegsia".to_string(),
+        name: name.into(),
+        color: color.into(),
+        is_ai: false,
+    }
+}
+
 fn panzerfaust_players() -> [PlayerInit; 3] {
     [
-        PlayerInit {
-            id: 1,
-            team_id: 1,
-            faction_id: "kriegsia".to_string(),
-            name: "One".into(),
-            color: "#fff".into(),
-            is_ai: false,
-        },
-        PlayerInit {
-            id: 2,
-            team_id: 2,
-            faction_id: "kriegsia".to_string(),
-            name: "Two".into(),
-            color: "#000".into(),
-            is_ai: false,
-        },
-        PlayerInit {
-            id: 3,
-            team_id: 3,
-            faction_id: "kriegsia".to_string(),
-            name: "Three".into(),
-            color: "#888".into(),
-            is_ai: false,
-        },
+        player(1, 1, "One", "#fff"),
+        player(2, 2, "Two", "#000"),
+        player(3, 3, "Three", "#888"),
     ]
 }
 
@@ -38,26 +28,34 @@ fn refresh_world(game: &mut Game) {
     game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
 }
 
+fn spawn_unit_on_tile(
+    game: &mut Game,
+    owner: u32,
+    kind: EntityKind,
+    tile_x: u32,
+    tile_y: u32,
+) -> u32 {
+    let pos = game.state.map.tile_center(tile_x, tile_y);
+    game.state
+        .entities
+        .spawn_unit(owner, kind, pos.0, pos.1)
+        .expect("unit should spawn")
+}
+
+fn make_invulnerable(game: &mut Game, id: u32) {
+    game.state
+        .entities
+        .get_mut(id)
+        .expect("unit should exist")
+        .set_invulnerable(true);
+}
+
 fn panzerfaust_fixture_at_tank_tile(tank_tile_x: u32) -> (Game, u32, u32) {
     let players = panzerfaust_players();
     let mut game = empty_flat_game(&players);
-    let panzerfaust_pos = game.state.map.tile_center(8, 8);
-    let tank_pos = game.state.map.tile_center(tank_tile_x, 8);
-    let panzerfaust = game.state.entities
-        .spawn_unit(
-            1,
-            EntityKind::Panzerfaust,
-            panzerfaust_pos.0,
-            panzerfaust_pos.1,
-        )
-        .expect("panzerfaust should spawn");
-    let tank = game.state.entities
-        .spawn_unit(2, EntityKind::Tank, tank_pos.0, tank_pos.1)
-        .expect("tank should spawn");
-    game.state.entities
-        .get_mut(panzerfaust)
-        .expect("panzerfaust exists")
-        .set_invulnerable(true);
+    let panzerfaust = spawn_unit_on_tile(&mut game, 1, EntityKind::Panzerfaust, 8, 8);
+    let tank = spawn_unit_on_tile(&mut game, 2, EntityKind::Tank, tank_tile_x, 8);
+    make_invulnerable(&mut game, panzerfaust);
     refresh_world(&mut game);
     (game, panzerfaust, tank)
 }
@@ -96,6 +94,15 @@ fn panzerfaust_state_of(game: &Game, id: u32) -> Option<PanzerfaustState> {
         .get(id)
         .and_then(|entity| entity.combat.as_ref())
         .and_then(|combat| combat.panzerfaust)
+}
+
+fn panzerfaust_damage_to(victim_kind: EntityKind) -> u32 {
+    crate::rules::combat::effective_damage(
+        EntityKind::Panzerfaust,
+        victim_kind,
+        config::PANZERFAUST_DAMAGE,
+        Some(crate::rules::terrain::TerrainKind::Open),
+    )
 }
 
 #[test]
@@ -137,7 +144,7 @@ fn spawned_panzerfaust_direct_attack_damages_tank_and_converts_same_id() {
 
     assert_eq!(
         tank_hp_on_impact,
-        Some(tank_hp.saturating_sub(config::PANZERFAUST_DAMAGE))
+        Some(tank_hp.saturating_sub(panzerfaust_damage_to(EntityKind::Tank)))
     );
     let converted = game.state.entities
         .get(panzerfaust)
@@ -158,6 +165,49 @@ fn spawned_panzerfaust_direct_attack_damages_tank_and_converts_same_id() {
     assert!(owner_saw_impact);
     assert!(owner_saw_conversion);
     assert!(!uninvolved_saw_panzerfaust_event);
+}
+
+#[test]
+fn panzerfaust_direct_attack_can_damage_owned_tank_targets() {
+    let players = panzerfaust_players();
+    let mut game = empty_flat_game(&players);
+    let panzerfaust = spawn_unit_on_tile(&mut game, 1, EntityKind::Panzerfaust, 8, 8);
+    let tank = spawn_unit_on_tile(&mut game, 1, EntityKind::Tank, 11, 8);
+    make_invulnerable(&mut game, panzerfaust);
+    refresh_world(&mut game);
+
+    let tank_hp = game.state.entities.get(tank).expect("tank exists").hp;
+    enqueue_attack(&mut game, panzerfaust, tank, false);
+
+    let mut tank_hp_on_impact = None;
+    let mut owner_saw_launch = false;
+    let mut owner_saw_under_attack_notice = false;
+    for _ in 0..70 {
+        let events = game.tick();
+        owner_saw_launch |= player_events(&events, 1).iter().any(
+            |event| matches!(event, Event::PanzerfaustLaunch { from, .. } if *from == panzerfaust),
+        );
+        let owner_events = player_events(&events, 1);
+        let impact_this_tick = owner_events
+            .iter()
+            .any(|event| matches!(event, Event::PanzerfaustImpact { .. }));
+        if impact_this_tick && tank_hp_on_impact.is_none() {
+            tank_hp_on_impact = game.state.entities.get(tank).map(|tank| tank.hp);
+        }
+        owner_saw_under_attack_notice |= owner_events.iter().any(
+            |event| matches!(event, Event::Notice { msg, .. } if msg == "alert:under_attack"),
+        );
+    }
+
+    assert!(owner_saw_launch);
+    assert_eq!(
+        tank_hp_on_impact,
+        Some(tank_hp.saturating_sub(panzerfaust_damage_to(EntityKind::Tank)))
+    );
+    assert!(
+        !owner_saw_under_attack_notice,
+        "deliberate self-attacks should not raise enemy under-attack alerts"
+    );
 }
 
 #[test]
@@ -203,22 +253,11 @@ fn direct_attack_conversion_completes_consumed_order_and_promotes_queued_move() 
 }
 
 #[test]
-fn spawned_panzerfaust_rejects_direct_attack_on_non_tank() {
+fn spawned_panzerfaust_rejects_direct_attack_on_non_loaded_shot_target() {
     let players = panzerfaust_players();
     let mut game = empty_flat_game(&players);
-    let panzerfaust_pos = game.state.map.tile_center(8, 8);
-    let target_pos = game.state.map.tile_center(10, 8);
-    let panzerfaust = game.state.entities
-        .spawn_unit(
-            1,
-            EntityKind::Panzerfaust,
-            panzerfaust_pos.0,
-            panzerfaust_pos.1,
-        )
-        .expect("panzerfaust should spawn");
-    let rifleman = game.state.entities
-        .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
-        .expect("rifleman should spawn");
+    let panzerfaust = spawn_unit_on_tile(&mut game, 1, EntityKind::Panzerfaust, 8, 8);
+    let rifleman = spawn_unit_on_tile(&mut game, 2, EntityKind::Rifleman, 10, 8);
     refresh_world(&mut game);
 
     enqueue_attack(&mut game, panzerfaust, rifleman, false);
@@ -232,6 +271,51 @@ fn spawned_panzerfaust_rejects_direct_attack_on_non_tank() {
     assert!(player_events(&events, 1)
         .iter()
         .all(|event| !matches!(event, Event::PanzerfaustLaunch { .. })));
+}
+
+#[test]
+fn spawned_panzerfaust_direct_attack_damages_scout_car_and_converts_same_id() {
+    let players = panzerfaust_players();
+    let mut game = empty_flat_game(&players);
+    let panzerfaust = spawn_unit_on_tile(&mut game, 1, EntityKind::Panzerfaust, 8, 8);
+    let scout = spawn_unit_on_tile(&mut game, 2, EntityKind::ScoutCar, 11, 8);
+    let scout_hp = game.state.entities.get(scout).expect("scout exists").hp;
+    make_invulnerable(&mut game, panzerfaust);
+    refresh_world(&mut game);
+
+    enqueue_attack(&mut game, panzerfaust, scout, false);
+
+    let mut owner_saw_launch = false;
+    let mut owner_saw_scout_death = false;
+    for _ in 0..70 {
+        let events = game.tick();
+        owner_saw_launch |= player_events(&events, 1).iter().any(
+            |event| matches!(event, Event::PanzerfaustLaunch { from, .. } if *from == panzerfaust),
+        );
+        owner_saw_scout_death |= player_events(&events, 1).iter().any(|event| {
+            matches!(event, Event::Death { id, kind, .. }
+                if *id == scout && kind == crate::protocol::kinds::SCOUT_CAR)
+        });
+    }
+
+    assert_eq!(
+        panzerfaust_damage_to(EntityKind::ScoutCar),
+        config::PANZERFAUST_DAMAGE
+    );
+    assert!(
+        scout_hp <= panzerfaust_damage_to(EntityKind::ScoutCar),
+        "Scout Car fixture should be destroyed by one Panzerfaust hit"
+    );
+    assert!(
+        game.state.entities.get(scout).is_none(),
+        "Scout Car should be a legal Panzerfaust target and die to the hit"
+    );
+    let converted = game.state.entities
+        .get(panzerfaust)
+        .expect("same entity id should remain");
+    assert_eq!(converted.kind, EntityKind::Rifleman);
+    assert!(owner_saw_launch);
+    assert!(owner_saw_scout_death);
 }
 
 #[test]
@@ -300,7 +384,48 @@ fn attack_move_acquires_tanks_but_plain_move_does_not_auto_fire() {
     }
     assert_eq!(
         attack_move_impact_hp,
-        Some(attack_move_tank_hp.saturating_sub(config::PANZERFAUST_DAMAGE))
+        Some(attack_move_tank_hp.saturating_sub(panzerfaust_damage_to(EntityKind::Tank)))
+    );
+}
+
+#[test]
+fn attack_move_acquires_scout_cars() {
+    let players = panzerfaust_players();
+    let mut game = empty_flat_game(&players);
+    let panzerfaust = spawn_unit_on_tile(&mut game, 1, EntityKind::Panzerfaust, 8, 8);
+    let scout = spawn_unit_on_tile(&mut game, 2, EntityKind::ScoutCar, 11, 8);
+    make_invulnerable(&mut game, panzerfaust);
+    refresh_world(&mut game);
+
+    let attack_move_goal = game.state.map.tile_center(20, 8);
+    game.enqueue(
+        1,
+        Command::AttackMove {
+            units: vec![panzerfaust],
+            x: attack_move_goal.0,
+            y: attack_move_goal.1,
+            queued: false,
+        },
+    );
+
+    let mut owner_saw_launch = false;
+    let mut owner_saw_scout_death = false;
+    for _ in 0..70 {
+        let events = game.tick();
+        owner_saw_launch |= player_events(&events, 1).iter().any(
+            |event| matches!(event, Event::PanzerfaustLaunch { from, .. } if *from == panzerfaust),
+        );
+        owner_saw_scout_death |= player_events(&events, 1).iter().any(|event| {
+            matches!(event, Event::Death { id, kind, .. }
+                if *id == scout && kind == crate::protocol::kinds::SCOUT_CAR)
+        });
+    }
+
+    assert!(owner_saw_launch);
+    assert!(owner_saw_scout_death);
+    assert!(
+        game.state.entities.get(scout).is_none(),
+        "attack-move Panzerfaust should auto-acquire Scout Cars"
     );
 }
 
@@ -435,7 +560,7 @@ fn hold_position_uses_only_current_entrenched_panzerfaust_range() {
     }
     assert_eq!(
         entrenched_impact_hp,
-        Some(entrenched_tank_hp.saturating_sub(config::PANZERFAUST_DAMAGE))
+        Some(entrenched_tank_hp.saturating_sub(panzerfaust_damage_to(EntityKind::Tank)))
     );
     let converted = entrenched_game
         .state.entities
@@ -655,7 +780,7 @@ fn replacing_order_after_launch_spends_shot_and_resumes_after_conversion() {
 
     assert_eq!(
         impact_hp,
-        Some(tank_hp.saturating_sub(config::PANZERFAUST_DAMAGE))
+        Some(tank_hp.saturating_sub(panzerfaust_damage_to(EntityKind::Tank)))
     );
     let converted = game.state.entities
         .get(panzerfaust)
@@ -724,7 +849,7 @@ fn impact_visual_uses_launch_endpoint_after_target_leaves_visibility() {
     );
     assert_eq!(
         game.state.entities.get(tank).expect("tank exists").hp,
-        tank_hp.saturating_sub(config::PANZERFAUST_DAMAGE)
+        tank_hp.saturating_sub(panzerfaust_damage_to(EntityKind::Tank))
     );
 }
 

@@ -762,3 +762,35 @@ fn attack_command_rejects_allied_targets() {
     assert_eq!(rifle.target_id(), None);
     assert_eq!(rifle.path_goal(), None);
 }
+
+#[test]
+fn attack_command_accepts_owned_targets() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let rifle = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("rifleman should spawn");
+    let own_building = entities
+        .spawn_building(1, EntityKind::Barracks, 132.0, 100.0, true)
+        .expect("owned building should spawn");
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::Attack {
+                units: vec![rifle],
+                target: own_building,
+                queued: false,
+            },
+        )],
+    );
+
+    let rifle = entities.get(rifle).expect("rifleman should exist");
+    assert_eq!(
+        rifle.order().attack_target(),
+        Some(own_building),
+        "explicit attack commands should allow owned unit/building targets"
+    );
+}

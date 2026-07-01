@@ -561,7 +561,9 @@ fn attack_intent_valid(
     if deployed_anti_tank_gun_target_outside_arc(entities, attacker, target) {
         return false;
     }
-    world_query::unit_attack_target_valid(entities, teams, fog, smokes, owner, attacker, target)
+    world_query::unit_explicit_attack_target_valid(
+        entities, teams, fog, smokes, owner, attacker, target,
+    )
 }
 
 fn attack_order_complete(
@@ -745,6 +747,7 @@ fn build_intent_promotion_error(
 #[cfg(test)]
 mod tests {
     mod artillery_point_fire_tests;
+    mod queued_attack_tests;
 
     use super::*;
     use crate::game::ability::AbilityKind;
@@ -1339,33 +1342,6 @@ mod tests {
         assert!(
             matches!(unit.order(), Order::Move(_)),
             "dead attack target should be skipped and next move promoted"
-        );
-        assert!(unit.queued_orders().is_empty());
-    }
-
-    #[test]
-    fn queued_attack_skips_when_target_is_not_targetable() {
-        let map = flat_map(24);
-        let mut entities = EntityStore::new();
-        let attacker = entities
-            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
-            .expect("rifleman should spawn");
-        let node = entities
-            .spawn_node(EntityKind::Steel, 160.0, 100.0)
-            .expect("node should spawn");
-        {
-            let unit = entities.get_mut(attacker).expect("attacker should exist");
-            unit.append_queued_order(OrderIntent::attack(node));
-            unit.append_queued_order(OrderIntent::attack_move_to(220.0, 100.0));
-        }
-        let players = vec![player_state(1), player_state(2)];
-
-        promote_with_players(&map, &mut entities, &players);
-
-        let unit = entities.get(attacker).expect("attacker should exist");
-        assert!(
-            matches!(unit.order(), Order::AttackMove(_)),
-            "non-targetable attack target should be skipped and next attack-move promoted"
         );
         assert!(unit.queued_orders().is_empty());
     }
