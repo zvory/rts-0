@@ -60,7 +60,7 @@
     },
     {
       "path": "server/src/main.rs",
-      "lines": 1992,
+      "lines": 1865,
       "reason": "Snapshot lifecycle diagnostics added writer serialization/send timing to the existing oversized server shell; keep ratcheting until connection writer handling is split."
     },
     {
