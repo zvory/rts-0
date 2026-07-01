@@ -211,6 +211,20 @@ export const ABILITY = Object.freeze({
   EKAT_CONSUME_GOLEM: "ekatConsumeGolem",
 });
 
+export const WEAPON_KIND = Object.freeze({
+  WORKER_TOOLS: "worker_tools",
+  GOLEM_FISTS: "golem_fists",
+  RIFLEMAN_RIFLE: "rifleman_rifle",
+  MACHINE_GUNNER_MG: "machine_gunner_mg",
+  SCOUT_CAR_MG: "scout_car_mg",
+  ANTI_TANK_GUN: "anti_tank_gun",
+  PANZERFAUST_LOADED_SHOT: "panzerfaust_loaded_shot",
+  MORTAR_TEAM_MORTAR: "mortar_team_mortar",
+  ARTILLERY_GUN: "artillery_gun",
+  TANK_CANNON: "tank_cannon",
+  TANK_COAX: "tank_coax",
+});
+
 export const VISION_SELECTION = Object.freeze({
   ALL: "all",
   PLAYER: "player",
@@ -232,7 +246,7 @@ export const MOVEMENT_PATH_DIAGNOSTICS = Object.freeze({
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";
-export const COMPACT_SNAPSHOT_VERSION = 29;
+export const COMPACT_SNAPSHOT_VERSION = 30;
 export const SNAPSHOT_CODEC_VERSION = 1;
 export const SNAPSHOT_CODEC = Object.freeze({
   COMPACT_JSON: "compact-json",
@@ -308,6 +322,20 @@ export const UPGRADE_CODE = Object.freeze({
   [UPGRADE.COMMAND_CAR_UNLOCK]: 6,
   [UPGRADE.BALLISTIC_TABLES]: 7,
   [UPGRADE.ENTRENCHMENT]: 8,
+});
+
+export const WEAPON_KIND_CODE = Object.freeze({
+  [WEAPON_KIND.WORKER_TOOLS]: 1,
+  [WEAPON_KIND.GOLEM_FISTS]: 2,
+  [WEAPON_KIND.RIFLEMAN_RIFLE]: 3,
+  [WEAPON_KIND.MACHINE_GUNNER_MG]: 4,
+  [WEAPON_KIND.SCOUT_CAR_MG]: 5,
+  [WEAPON_KIND.ANTI_TANK_GUN]: 6,
+  [WEAPON_KIND.PANZERFAUST_LOADED_SHOT]: 7,
+  [WEAPON_KIND.MORTAR_TEAM_MORTAR]: 8,
+  [WEAPON_KIND.ARTILLERY_GUN]: 9,
+  [WEAPON_KIND.TANK_CANNON]: 10,
+  [WEAPON_KIND.TANK_COAX]: 11,
 });
 
 export const EVENT_CODE = Object.freeze({
@@ -401,6 +429,7 @@ export const ABILITY_BY_CODE = Object.freeze(reverseCodes(ABILITY_CODE));
 export const UPGRADE_BY_CODE = Object.freeze(reverseCodes(UPGRADE_CODE));
 export const ABILITY_OBJECT_KIND_BY_CODE = Object.freeze(reverseCodes(ABILITY_OBJECT_KIND_CODE));
 export const NOTICE_SEVERITY_BY_CODE = Object.freeze(reverseCodes(NOTICE_SEVERITY_CODE));
+export const WEAPON_KIND_BY_CODE = Object.freeze(reverseCodes(WEAPON_KIND_CODE));
 
 export const MAX_COMPACT_ENTITIES = 20000;
 export const MAX_COMPACT_RESOURCE_DELTAS = 20000;

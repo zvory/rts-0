@@ -1866,11 +1866,13 @@ fn deployed_anti_tank_gun_fires_at_long_range() {
                     to,
                     reveal: Some(reveal),
                     to_pos: Some(to_pos),
+                    weapon_kind: Some(weapon_kind),
                 } if *from == at_id
                     && *to == tank_id
                     && reveal.kind == crate::protocol::kind_to_wire(EntityKind::AntiTankGun)
                     && reveal.setup_state.as_deref() == Some(WeaponSetup::Deployed.to_protocol_str())
                     && *to_pos == [310.0, 100.0]
+                    && weapon_kind == crate::rules::combat::WeaponKind::AntiTankGun.stable_id()
             )
         })),
         "anti-tank attack event should carry shooter reveal and target position for visual feedback"

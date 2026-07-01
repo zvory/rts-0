@@ -897,6 +897,7 @@ mod tests {
                 to: 99,
                 reveal: None,
                 to_pos: None,
+                weapon_kind: None,
             },
             &snapshot,
         );

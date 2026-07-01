@@ -1,4 +1,5 @@
 import {
+  attackFeedbackKind,
   attackKindHasCombatSound,
   machineGunnerHasAudibleTarget,
   machineGunSoundKey,
@@ -67,20 +68,21 @@ export class MatchCombatAudio {
     if (!pos || typeof pos.x !== "number" || typeof pos.y !== "number") return;
 
     const kind = from?.kind || KIND.RIFLEMAN;
-    if (!attackKindHasCombatSound(kind)) return;
-    let spec = COMBAT_SOUNDS[kind];
+    const feedbackKind = attackFeedbackKind(kind, ev.weaponKind);
+    if (!attackKindHasCombatSound(kind, ev.weaponKind)) return;
+    let spec = COMBAT_SOUNDS[feedbackKind];
     if (!spec) {
       spec = COMBAT_SOUNDS[KIND.RIFLEMAN];
-      if (!this.missingCombatSoundKinds.has(kind)) {
-        this.missingCombatSoundKinds.add(kind);
-        console.warn(`audio: missing combat sound mapping for ${kind}, using rifle`);
+      if (!this.missingCombatSoundKinds.has(feedbackKind)) {
+        this.missingCombatSoundKinds.add(feedbackKind);
+        console.warn(`audio: missing combat sound mapping for ${feedbackKind}, using rifle`);
       }
     }
     const id = this.audio.pickVariant(spec.ids);
     if (!id) return;
     const category = from && audioSelfOwner(this.state, from.owner) ? "combat_self" : "combat_other";
     const key =
-      kind === KIND.MACHINE_GUNNER && typeof ev.from === "number"
+      feedbackKind === KIND.MACHINE_GUNNER && typeof ev.from === "number"
         ? machineGunSoundKey(ev.from)
         : undefined;
     const played = this.audio.play(id, {

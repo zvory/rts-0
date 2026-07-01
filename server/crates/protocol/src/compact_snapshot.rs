@@ -4,7 +4,8 @@ use std::collections::BTreeMap;
 
 use crate::contract_metadata::{
     ability_code, ability_object_kind_code, event_code, kind_code, notice_severity_code,
-    order_stage_code, setup_state_code, state_code, upgrade_code, COMPACT_SNAPSHOT_VERSION,
+    order_stage_code, setup_state_code, state_code, upgrade_code, weapon_kind_code,
+    COMPACT_SNAPSHOT_VERSION,
 };
 use crate::messagepack_frame;
 use crate::{
@@ -834,8 +835,11 @@ impl Serialize for CompactEvent<'_> {
                 to,
                 reveal,
                 to_pos,
+                weapon_kind,
             } => {
-                let len = if to_pos.is_some() {
+                let len = if weapon_kind.is_some() {
+                    6
+                } else if to_pos.is_some() {
                     5
                 } else if reveal.is_some() {
                     4
@@ -851,6 +855,9 @@ impl Serialize for CompactEvent<'_> {
                 }
                 if len > 4 {
                     seq.serialize_element(to_pos)?;
+                }
+                if len > 5 {
+                    seq.serialize_element(&weapon_kind.as_deref().map(weapon_kind_code))?;
                 }
                 seq.end()
             }

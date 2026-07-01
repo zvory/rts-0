@@ -18,7 +18,7 @@ use contract_metadata::{ability_code, kind_code};
 
 pub use contract_metadata::{
     abilities, ability_object_kinds, kinds, lobby_kinds, protocol_contract, states, terrain,
-    upgrades, CompactSlotSchemas, ProtocolCompactCodes, ProtocolContract, ProtocolMessageTags,
+    upgrades, weapons, CompactSlotSchemas, ProtocolCompactCodes, ProtocolContract, ProtocolMessageTags,
     ProtocolVocabularies, SlotField, SnapshotCodecContract, COMPACT_SNAPSHOT_VERSION,
     COMPACT_UNKNOWN_CODE, PREDICTION_PROTOCOL_VERSION, SNAPSHOT_CODEC_COMPACT_JSON,
     SNAPSHOT_CODEC_MESSAGEPACK_COMPACT, SNAPSHOT_CODEC_VERSION, SNAPSHOT_FRAME_KIND_BINARY,
@@ -1554,6 +1554,7 @@ mod tests {
                         setup_state: Some("deployed".to_string()),
                     }),
                     to_pos: Some([48.0, 96.0]),
+                    weapon_kind: Some(weapons::ANTI_TANK_GUN.to_string()),
                 },
                 Event::Overpenetration { to: 8 },
                 Event::Death {
@@ -1730,6 +1731,7 @@ mod tests {
             serde_json::json!([1, 4, 12.0, 24.0, 0.5, 0.75, 3])
         );
         assert_eq!(value["ev"][0][4], serde_json::json!([48.0, 96.0]));
+        assert_eq!(value["ev"][0][5], serde_json::json!(6));
         assert_eq!(value["ev"][1], serde_json::json!([10, 8]));
         assert_eq!(
             value["ev"][5],

@@ -40,6 +40,7 @@ pub(super) fn emit_attack_event(
     vx: f32,
     vy: f32,
     reveal: Option<AttackReveal>,
+    weapon_kind: Option<&str>,
 ) -> Vec<u32> {
     let mut recipients = Vec::new();
     let player_ids: Vec<u32> = events.keys().copied().collect();
@@ -61,6 +62,7 @@ pub(super) fn emit_attack_event(
             to: victim,
             reveal: reveal.clone(),
             to_pos: Some([vx, vy]),
+            weapon_kind: weapon_kind.map(str::to_string),
         });
         recipients.push(pid);
     }
