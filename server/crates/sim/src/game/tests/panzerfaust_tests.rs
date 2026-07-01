@@ -462,6 +462,99 @@ fn replacing_order_during_windup_cancels_without_spending_shot() {
 }
 
 #[test]
+fn target_death_during_windup_cancels_without_spending_shot() {
+    let (mut game, panzerfaust, tank) = panzerfaust_fixture();
+    enqueue_attack(&mut game, panzerfaust, tank, false);
+    game.tick();
+
+    game.entities
+        .get_mut(tank)
+        .expect("tank exists")
+        .apply_damage(u32::MAX, None);
+    let mut saw_launch = false;
+    for _ in 0..70 {
+        let events = game.tick();
+        saw_launch |= player_events(&events, 1)
+            .iter()
+            .any(|event| matches!(event, Event::PanzerfaustLaunch { .. }));
+    }
+
+    assert!(game.entities.get(tank).is_none());
+    let panzerfaust_entity = game
+        .entities
+        .get(panzerfaust)
+        .expect("panzerfaust should survive with its shot still loaded");
+    assert_eq!(panzerfaust_entity.kind, EntityKind::Panzerfaust);
+    assert!(!saw_launch);
+}
+
+#[test]
+fn replacing_order_after_launch_spends_shot_and_resumes_after_conversion() {
+    let (mut game, panzerfaust, tank) = panzerfaust_fixture();
+    let start = game
+        .entities
+        .get(panzerfaust)
+        .map(|entity| (entity.pos_x, entity.pos_y))
+        .expect("panzerfaust exists");
+    let tank_hp = game.entities.get(tank).expect("tank exists").hp;
+    enqueue_attack(&mut game, panzerfaust, tank, false);
+
+    let mut saw_launch = false;
+    for _ in 0..40 {
+        let events = game.tick();
+        if player_events(&events, 1)
+            .iter()
+            .any(|event| matches!(event, Event::PanzerfaustLaunch { .. }))
+        {
+            saw_launch = true;
+            break;
+        }
+    }
+    assert!(saw_launch, "test setup should reach launch before replacing the order");
+
+    let move_goal = game.map.tile_center(20, 8);
+    game.enqueue(
+        1,
+        Command::Move {
+            units: vec![panzerfaust],
+            x: move_goal.0,
+            y: move_goal.1,
+            queued: false,
+        },
+    );
+
+    let mut impact_hp = None;
+    let mut saw_conversion = false;
+    for _ in 0..130 {
+        let events = game.tick();
+        let impact_this_tick = player_events(&events, 1)
+            .iter()
+            .any(|event| matches!(event, Event::PanzerfaustImpact { .. }));
+        if impact_this_tick && impact_hp.is_none() {
+            impact_hp = game.entities.get(tank).map(|tank| tank.hp);
+        }
+        saw_conversion |= player_events(&events, 1).iter().any(
+            |event| matches!(event, Event::PanzerfaustConversion { id, .. } if *id == panzerfaust),
+        );
+    }
+
+    assert_eq!(
+        impact_hp,
+        Some(tank_hp.saturating_sub(config::PANZERFAUST_DAMAGE))
+    );
+    let converted = game
+        .entities
+        .get(panzerfaust)
+        .expect("same entity id should remain");
+    assert!(saw_conversion);
+    assert_eq!(converted.kind, EntityKind::Rifleman);
+    assert!(
+        distance_sq((converted.pos_x, converted.pos_y), start) > 4.0,
+        "replacement movement should resume after the spent shot completes"
+    );
+}
+
+#[test]
 fn target_death_during_travel_spends_shot_and_still_converts() {
     let (mut game, panzerfaust, tank) = panzerfaust_fixture();
     enqueue_attack(&mut game, panzerfaust, tank, false);
