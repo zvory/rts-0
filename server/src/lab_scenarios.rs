@@ -617,8 +617,50 @@ mod tests {
         let scenario = game.export_lab_scenario();
         assert_eq!(scenario.seed, 126_097_607);
         assert_eq!(scenario.players.len(), 2);
-        assert_eq!(scenario.entities.len(), 174);
         assert_eq!(game.lab_god_mode_players(), vec![1, 2]);
+
+        let render_kinds: HashSet<_> = scenario
+            .entities
+            .iter()
+            .map(|entity| entity.kind.as_str())
+            .collect();
+        for kind in [
+            "anti_tank_gun",
+            "artillery",
+            "barracks",
+            "city_centre",
+            "command_car",
+            "depot",
+            "factory",
+            "machine_gunner",
+            "mortar_team",
+            "oil",
+            "panzerfaust",
+            "pump_jack",
+            "research_complex",
+            "rifleman",
+            "scout_car",
+            "steel",
+            "steelworks",
+            "tank",
+            "tank_trap",
+            "training_centre",
+            "worker",
+        ] {
+            assert!(
+                render_kinds.contains(kind),
+                "render-preview scenario should include {kind} render coverage"
+            );
+        }
+        let panzerfaust_count = scenario
+            .entities
+            .iter()
+            .filter(|entity| entity.kind == "panzerfaust")
+            .count();
+        assert!(
+            panzerfaust_count >= 12,
+            "render-preview scenario should include Panzerfaust formation coverage"
+        );
     }
 
     #[test]
