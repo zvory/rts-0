@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use rand::rngs::SmallRng;
-use rand::SeedableRng;
+use rand::{Error as RngError, RngCore, SeedableRng};
 
 use super::{
     ability_runtime::AbilityRuntime, artillery::ArtilleryShellStore, building_memory::BuildingMemory,
@@ -33,33 +33,69 @@ pub(in crate::game) struct GameState {
     pub(in crate::game) active_construction_sites: BTreeSet<u32>,
     pub(in crate::game) lab_god_mode_players: BTreeSet<u32>,
     pub(in crate::game) starting_loadout: StartingLoadout,
-    pub(in crate::game) rng: SmallRng,
+    pub(in crate::game) rng: TrackedRng,
 }
 
-#[cfg(test)]
-pub(in crate::game) struct GameCheckpoint {
-    map: Map,
-    entities: EntityStore,
-    fog: Fog,
-    building_memory: BuildingMemory,
-    players: Vec<PlayerState>,
-    pending: Vec<commands::PendingCommand>,
-    command_log: Vec<CommandLogEntry>,
-    tick: u32,
-    lingering_sight: Vec<LingeringSightSource>,
-    firing_reveals: Vec<FiringRevealSource>,
-    smokes: SmokeCloudStore,
-    trenches: TrenchStore,
-    ability_runtime: AbilityRuntime,
-    mortar_shells: MortarShellStore,
-    artillery_shells: ArtilleryShellStore,
-    seed: u32,
-    starting_loadouts: Vec<PlayerStartingLoadout>,
-    map_metadata: MapMetadata,
-    active_construction_sites: BTreeSet<u32>,
-    lab_god_mode_players: BTreeSet<u32>,
-    starting_loadout: StartingLoadout,
-    rng: SmallRng,
+#[derive(Clone)]
+pub(in crate::game) struct TrackedRng {
+    seed: u64,
+    draws_consumed: u64,
+    inner: SmallRng,
+}
+
+impl TrackedRng {
+    pub(in crate::game) fn seed_from_match_seed(seed: u32) -> Self {
+        Self::from_seed_and_draws(seed as u64, 0)
+    }
+
+    pub(in crate::game) fn from_seed_and_draws(seed: u64, draws_consumed: u64) -> Self {
+        let mut rng = Self {
+            seed,
+            draws_consumed: 0,
+            inner: SmallRng::seed_from_u64(seed),
+        };
+        for _ in 0..draws_consumed {
+            let _ = rng.next_u32();
+        }
+        rng
+    }
+
+    pub(in crate::game) fn seed(&self) -> u64 {
+        self.seed
+    }
+
+    pub(in crate::game) fn draws_consumed(&self) -> u64 {
+        self.draws_consumed
+    }
+}
+
+impl RngCore for TrackedRng {
+    fn next_u32(&mut self) -> u32 {
+        self.draws_consumed = self.draws_consumed.saturating_add(1);
+        self.inner.next_u32()
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        let lo = self.next_u32() as u64;
+        let hi = self.next_u32() as u64;
+        (hi << 32) | lo
+    }
+
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        let mut offset = 0;
+        while offset < dest.len() {
+            let bytes = self.next_u32().to_le_bytes();
+            let remaining = dest.len() - offset;
+            let count = remaining.min(bytes.len());
+            dest[offset..offset + count].copy_from_slice(&bytes[..count]);
+            offset += count;
+        }
+    }
+
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), RngError> {
+        self.fill_bytes(dest);
+        Ok(())
+    }
 }
 
 impl GameState {
@@ -96,67 +132,11 @@ impl GameState {
             active_construction_sites: BTreeSet::new(),
             lab_god_mode_players: BTreeSet::new(),
             starting_loadout,
-            rng: SmallRng::seed_from_u64(seed as u64),
+            rng: TrackedRng::seed_from_match_seed(seed),
         }
     }
 
     pub(in crate::game) fn player_ids(&self) -> Vec<u32> {
         self.players.iter().map(|player| player.id).collect()
-    }
-
-    #[cfg(test)]
-    pub(in crate::game) fn export_checkpoint(&self) -> GameCheckpoint {
-        GameCheckpoint {
-            map: self.map.clone(),
-            entities: self.entities.clone(),
-            fog: self.fog.clone(),
-            building_memory: self.building_memory.clone(),
-            players: self.players.clone(),
-            pending: self.pending.clone(),
-            command_log: self.command_log.clone(),
-            tick: self.tick,
-            lingering_sight: self.lingering_sight.clone(),
-            firing_reveals: self.firing_reveals.clone(),
-            smokes: self.smokes.clone(),
-            trenches: self.trenches.clone(),
-            ability_runtime: self.ability_runtime.clone(),
-            mortar_shells: self.mortar_shells.clone(),
-            artillery_shells: self.artillery_shells.clone(),
-            seed: self.seed,
-            starting_loadouts: self.starting_loadouts.clone(),
-            map_metadata: self.map_metadata.clone(),
-            active_construction_sites: self.active_construction_sites.clone(),
-            lab_god_mode_players: self.lab_god_mode_players.clone(),
-            starting_loadout: self.starting_loadout,
-            rng: self.rng.clone(),
-        }
-    }
-
-    #[cfg(test)]
-    pub(in crate::game) fn import_checkpoint(checkpoint: GameCheckpoint) -> Self {
-        Self {
-            map: checkpoint.map,
-            entities: checkpoint.entities,
-            fog: checkpoint.fog,
-            building_memory: checkpoint.building_memory,
-            players: checkpoint.players,
-            pending: checkpoint.pending,
-            command_log: checkpoint.command_log,
-            tick: checkpoint.tick,
-            lingering_sight: checkpoint.lingering_sight,
-            firing_reveals: checkpoint.firing_reveals,
-            smokes: checkpoint.smokes,
-            trenches: checkpoint.trenches,
-            ability_runtime: checkpoint.ability_runtime,
-            mortar_shells: checkpoint.mortar_shells,
-            artillery_shells: checkpoint.artillery_shells,
-            seed: checkpoint.seed,
-            starting_loadouts: checkpoint.starting_loadouts,
-            map_metadata: checkpoint.map_metadata,
-            active_construction_sites: checkpoint.active_construction_sites,
-            lab_god_mode_players: checkpoint.lab_god_mode_players,
-            starting_loadout: checkpoint.starting_loadout,
-            rng: checkpoint.rng,
-        }
     }
 }

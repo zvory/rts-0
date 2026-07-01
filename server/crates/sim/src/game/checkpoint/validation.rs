@@ -1,0 +1,356 @@
+use std::collections::BTreeSet;
+
+use crate::config;
+use crate::game::commands::PendingCommand;
+use crate::game::entity::{Entity, MAX_QUEUED_ORDERS};
+use crate::game::firing_reveal::FiringRevealSource;
+use crate::game::fog::LingeringSightSource;
+use crate::game::map::Map;
+use crate::game::replay::CommandLogEntry;
+use crate::game::SimCommand;
+use crate::rules;
+
+use super::{
+    BuildingMemoryV1, CheckpointPayloadError, EntityStoreV1, FogStateV1, PlayerStateV1,
+    MAX_COMPLETED_UPGRADES_PER_PLAYER, MAX_UNITS_PER_CHECKPOINT_COMMAND,
+};
+
+pub(super) fn validate_supplied_map(map: &Map) -> Result<(), CheckpointPayloadError> {
+    if map.size == 0 {
+        return Err(CheckpointPayloadError::InvalidValue { field: "map.size" });
+    }
+    let cells = (map.size as usize)
+        .checked_mul(map.size as usize)
+        .ok_or(CheckpointPayloadError::InvalidValue { field: "map.size" })?;
+    if map.terrain.len() != cells {
+        return Err(CheckpointPayloadError::InvalidValue {
+            field: "map.terrain",
+        });
+    }
+    Ok(())
+}
+
+pub(super) fn validate_count(
+    field: &'static str,
+    count: usize,
+    max: usize,
+) -> Result<(), CheckpointPayloadError> {
+    if count > max {
+        Err(CheckpointPayloadError::CountCapExceeded { field, count, max })
+    } else {
+        Ok(())
+    }
+}
+
+pub(super) fn validate_players(
+    players: &[PlayerStateV1],
+) -> Result<BTreeSet<u32>, CheckpointPayloadError> {
+    let mut ids = BTreeSet::new();
+    for player in players {
+        if player.id == 0 || !ids.insert(player.id) {
+            return Err(CheckpointPayloadError::DuplicateId {
+                field: "players",
+                id: player.id,
+            });
+        }
+        validate_count(
+            "players.upgrades",
+            player.upgrades.len(),
+            MAX_COMPLETED_UPGRADES_PER_PLAYER,
+        )?;
+        if player.supply_cap > config::SUPPLY_CAP_MAX {
+            return Err(CheckpointPayloadError::InvalidValue {
+                field: "players.supplyCap",
+            });
+        }
+    }
+    Ok(ids)
+}
+
+pub(super) fn validate_entities(
+    entities: &EntityStoreV1,
+    player_ids: &BTreeSet<u32>,
+    map: &Map,
+) -> Result<BTreeSet<u32>, CheckpointPayloadError> {
+    if entities.next_id == 0 {
+        return Err(CheckpointPayloadError::InvalidValue {
+            field: "entities.nextId",
+        });
+    }
+    let mut ids = BTreeSet::new();
+    let world = map.world_size_px();
+    for entity in &entities.entities {
+        validate_entity(entity, entities.next_id, player_ids, world, &mut ids)?;
+    }
+    Ok(ids)
+}
+
+pub(super) fn validate_player_supply(
+    players: &[PlayerStateV1],
+    entities: &EntityStoreV1,
+) -> Result<(), CheckpointPayloadError> {
+    for player in players {
+        let catalog = rules::faction::catalog_for(&player.faction_id);
+        let mut expected_used = 0u32;
+        let mut expected_cap = 0u32;
+        for entity in &entities.entities {
+            if entity.owner != player.id {
+                continue;
+            }
+            if entity.is_building() && !entity.under_construction() {
+                if catalog.is_some_and(|catalog| catalog.allows_building(entity.kind)) {
+                    expected_cap =
+                        expected_cap.saturating_add(rules::economy::supply_provided(entity.kind));
+                }
+                for item in entity.prod_queue() {
+                    if catalog.is_some_and(|catalog| catalog.allows_unit(item.unit)) {
+                        expected_used =
+                            expected_used.saturating_add(rules::economy::supply_cost(item.unit));
+                    }
+                }
+            } else if entity.is_unit()
+                && catalog.is_some_and(|catalog| catalog.allows_unit(entity.kind))
+            {
+                expected_used =
+                    expected_used.saturating_add(rules::economy::supply_cost(entity.kind));
+            }
+        }
+        expected_cap = expected_cap.min(config::SUPPLY_CAP_MAX);
+        if player.supply_used != expected_used {
+            return Err(CheckpointPayloadError::InvalidValue {
+                field: "players.supplyUsed",
+            });
+        }
+        if player.supply_cap != expected_cap {
+            return Err(CheckpointPayloadError::InvalidValue {
+                field: "players.supplyCap",
+            });
+        }
+    }
+    Ok(())
+}
+
+fn validate_entity(
+    entity: &Entity,
+    next_id: u32,
+    player_ids: &BTreeSet<u32>,
+    world: f32,
+    ids: &mut BTreeSet<u32>,
+) -> Result<(), CheckpointPayloadError> {
+    if entity.id == 0 || !ids.insert(entity.id) {
+        return Err(CheckpointPayloadError::DuplicateId {
+            field: "entities",
+            id: entity.id,
+        });
+    }
+    if entity.id >= next_id {
+        return Err(CheckpointPayloadError::InvalidValue {
+            field: "entities.id",
+        });
+    }
+    if entity.owner != 0 && !player_ids.contains(&entity.owner) {
+        return Err(CheckpointPayloadError::InvalidReference {
+            field: "entities.owner",
+            id: entity.owner,
+        });
+    }
+    if !in_world(entity.pos_x, entity.pos_y, world) {
+        return Err(CheckpointPayloadError::InvalidValue {
+            field: "entities.position",
+        });
+    }
+    if entity.max_hp == 0 || entity.hp > entity.max_hp {
+        return Err(CheckpointPayloadError::InvalidValue {
+            field: "entities.hp",
+        });
+    }
+    if entity.queued_orders().len() > MAX_QUEUED_ORDERS {
+        return Err(CheckpointPayloadError::CountCapExceeded {
+            field: "entities.queuedOrders",
+            count: entity.queued_orders().len(),
+            max: MAX_QUEUED_ORDERS,
+        });
+    }
+    Ok(())
+}
+
+pub(super) fn validate_fog(
+    fog: &FogStateV1,
+    player_ids: &BTreeSet<u32>,
+    map: &Map,
+) -> Result<(), CheckpointPayloadError> {
+    if fog.size != map.size {
+        return Err(CheckpointPayloadError::InvalidValue { field: "fog.size" });
+    }
+    let cells = (map.size as usize)
+        .checked_mul(map.size as usize)
+        .ok_or(CheckpointPayloadError::InvalidValue { field: "fog.size" })?;
+    for (&player, grid) in &fog.grids {
+        if !player_ids.contains(&player) {
+            return Err(CheckpointPayloadError::InvalidReference {
+                field: "fog.grids",
+                id: player,
+            });
+        }
+        if grid.len() != cells {
+            return Err(CheckpointPayloadError::InvalidValue { field: "fog.grids" });
+        }
+    }
+    Ok(())
+}
+
+pub(super) fn validate_building_memory(
+    memory: &BuildingMemoryV1,
+    player_ids: &BTreeSet<u32>,
+) -> Result<(), CheckpointPayloadError> {
+    let mut keys = BTreeSet::new();
+    for entry in &memory.entries {
+        if !player_ids.contains(&entry.player_id) {
+            return Err(CheckpointPayloadError::InvalidReference {
+                field: "buildingMemory.playerId",
+                id: entry.player_id,
+            });
+        }
+        if entry.entry.id != entry.building_id {
+            return Err(CheckpointPayloadError::InvalidValue {
+                field: "buildingMemory.entry.id",
+            });
+        }
+        if !keys.insert((entry.player_id, entry.building_id)) {
+            return Err(CheckpointPayloadError::DuplicateId {
+                field: "buildingMemory",
+                id: entry.building_id,
+            });
+        }
+    }
+    Ok(())
+}
+
+pub(super) fn validate_pending_commands(
+    pending: &[PendingCommand],
+    player_ids: &BTreeSet<u32>,
+) -> Result<(), CheckpointPayloadError> {
+    for command in pending {
+        if !player_ids.contains(&command.player) {
+            return Err(CheckpointPayloadError::InvalidReference {
+                field: "pendingCommands.player",
+                id: command.player,
+            });
+        }
+        validate_command_units(&command.command)?;
+    }
+    Ok(())
+}
+
+pub(super) fn validate_command_log(
+    command_log: &[CommandLogEntry],
+    tick: u32,
+    player_ids: &BTreeSet<u32>,
+) -> Result<(), CheckpointPayloadError> {
+    let mut last_tick = 0;
+    for entry in command_log {
+        if entry.tick < last_tick || entry.tick > tick {
+            return Err(CheckpointPayloadError::InvalidValue {
+                field: "commandLog.tick",
+            });
+        }
+        if !player_ids.contains(&entry.player_id) {
+            return Err(CheckpointPayloadError::InvalidReference {
+                field: "commandLog.playerId",
+                id: entry.player_id,
+            });
+        }
+        last_tick = entry.tick;
+    }
+    Ok(())
+}
+
+pub(super) fn validate_active_sources(
+    lingering_sight: &[LingeringSightSource],
+    firing_reveals: &[FiringRevealSource],
+    tick: u32,
+    player_ids: &BTreeSet<u32>,
+    entity_ids: &BTreeSet<u32>,
+) -> Result<(), CheckpointPayloadError> {
+    for source in lingering_sight {
+        if !player_ids.contains(&source.owner()) {
+            return Err(CheckpointPayloadError::InvalidReference {
+                field: "lingeringSight.owner",
+                id: source.owner(),
+            });
+        }
+        if !source.is_active_at(tick) {
+            return Err(CheckpointPayloadError::InvalidValue {
+                field: "lingeringSight.expiresAtTick",
+            });
+        }
+    }
+    for source in firing_reveals {
+        if !player_ids.contains(&source.viewer()) {
+            return Err(CheckpointPayloadError::InvalidReference {
+                field: "firingReveals.viewer",
+                id: source.viewer(),
+            });
+        }
+        if !entity_ids.contains(&source.entity_id()) {
+            return Err(CheckpointPayloadError::InvalidReference {
+                field: "firingReveals.entityId",
+                id: source.entity_id(),
+            });
+        }
+        if !source.is_active_at(tick) {
+            return Err(CheckpointPayloadError::InvalidValue {
+                field: "firingReveals.expiresAtTick",
+            });
+        }
+    }
+    Ok(())
+}
+
+pub(super) fn validate_id_set(
+    field: &'static str,
+    ids: &BTreeSet<u32>,
+    valid_ids: &BTreeSet<u32>,
+) -> Result<(), CheckpointPayloadError> {
+    for id in ids {
+        if !valid_ids.contains(id) {
+            return Err(CheckpointPayloadError::InvalidReference { field, id: *id });
+        }
+    }
+    Ok(())
+}
+
+fn validate_command_units(command: &SimCommand) -> Result<(), CheckpointPayloadError> {
+    let units = match command {
+        SimCommand::Move { units, .. }
+        | SimCommand::AttackMove { units, .. }
+        | SimCommand::Attack { units, .. }
+        | SimCommand::Deconstruct { units, .. }
+        | SimCommand::SetupAntiTankGuns { units, .. }
+        | SimCommand::TearDownAntiTankGuns { units }
+        | SimCommand::UseAbility { units, .. }
+        | SimCommand::RecastAbility { units, .. }
+        | SimCommand::SetAutocast { units, .. }
+        | SimCommand::Gather { units, .. }
+        | SimCommand::Build { units, .. }
+        | SimCommand::Stop { units }
+        | SimCommand::HoldPosition { units } => Some(units),
+        SimCommand::Train { .. }
+        | SimCommand::Research { .. }
+        | SimCommand::Cancel { .. }
+        | SimCommand::SetRally { .. }
+        | SimCommand::Rejected { .. } => None,
+    };
+    if let Some(units) = units {
+        validate_count(
+            "command.units",
+            units.len(),
+            MAX_UNITS_PER_CHECKPOINT_COMMAND,
+        )?;
+    }
+    Ok(())
+}
+
+fn in_world(x: f32, y: f32, world: f32) -> bool {
+    x.is_finite() && y.is_finite() && x >= 0.0 && y >= 0.0 && x < world && y < world
+}

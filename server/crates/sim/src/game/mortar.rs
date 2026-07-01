@@ -12,12 +12,13 @@ use crate::protocol::{self, AttackReveal, Event};
 use crate::rules::combat;
 use crate::rules::projection;
 use crate::rules::terrain::TerrainKind;
+use serde::{Deserialize, Serialize};
 
 pub(crate) const FIRE_TOLERANCE_RAD: f32 = 15.0_f32.to_radians();
 pub(crate) const HALF_TURN_TICKS: u32 = config::TICK_HZ / 5;
 pub(crate) const TURN_RATE_RAD_PER_TICK: f32 = std::f32::consts::PI / HALF_TURN_TICKS as f32;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct MortarShell {
     owner: u32,
     attacker: u32,
@@ -26,7 +27,7 @@ struct MortarShell {
     impact_tick: u32,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub(crate) struct MortarShellStore {
     shells: Vec<MortarShell>,
 }
@@ -78,6 +79,10 @@ fn rotate_toward(current: f32, desired: f32, max_delta: f32) -> f32 {
 }
 
 impl MortarShellStore {
+    pub(in crate::game) fn checkpoint_len(&self) -> usize {
+        self.shells.len()
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn schedule(
         &mut self,

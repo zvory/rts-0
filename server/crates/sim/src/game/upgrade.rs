@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use crate::game::entity::EntityKind;
+use serde::{Deserialize, Serialize};
 
 const METHAMPHETAMINES: &str = "methamphetamines";
 const ENTRENCHMENT: &str = "entrenchment";
@@ -11,7 +12,7 @@ const TANK_UNLOCK: &str = "tank_unlock";
 const COMMAND_CAR_UNLOCK: &str = "command_car_unlock";
 const MORTAR_AUTOCAST: &str = "mortar_autocast";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum UpgradeKind {
     Methamphetamines,
     Entrenchment,

@@ -39,7 +39,7 @@ use crate::game::trench::TrenchStore;
 use crate::game::upgrade::UpgradeKind;
 use crate::game::PlayerState;
 use crate::protocol::Event;
-use rand::rngs::SmallRng;
+use rand::Rng;
 
 /// Derived state valid before commands mutate orders or units move.
 ///
@@ -117,7 +117,7 @@ pub(crate) fn run_tick(
     active_vision_players: &BTreeSet<u32>,
     fog: &Fog,
     pathing: &mut PathingService,
-    rng: &mut SmallRng,
+    rng: &mut impl Rng,
     lingering_sight: &mut Vec<LingeringSightSource>,
     firing_reveals: &mut Vec<FiringRevealSource>,
     smokes: &mut SmokeCloudStore,
@@ -395,6 +395,7 @@ mod tests {
     use crate::game::fog::Fog;
     use crate::game::map::Map;
     use crate::protocol::terrain;
+    use rand::rngs::SmallRng;
     use rand::SeedableRng;
 
     fn flat_map(size: u32) -> Map {

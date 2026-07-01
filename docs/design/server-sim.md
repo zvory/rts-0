@@ -305,10 +305,10 @@ participant capabilities, AI controller memory, persisted match-history writes, 
 are outside the cold checkpoint contract unless a future plan promotes them into authoritative
 recorded actions.
 
-Private checkpoint export/import remains internal test machinery. `GameCheckpoint`,
-`Game::checkpoint_for_test`, and `Game::restore_checkpoint_for_test` are cfg-test/private helpers
-used by the semantic comparator; they do not define a public Rust API, route, command, JSON schema,
-file format, replay artifact format, lab scenario format, or UI affordance.
+Private checkpoint export/import remains internal test machinery. `GameCheckpointV1` payload helpers
+under `rts-sim::game` are used by the semantic comparator and validation tests; they do not define a
+public route, command, replay artifact format, lab scenario format, UI affordance, or lobby/server
+call path by themselves.
 
 Final audit for the ownership sequence:
 
@@ -317,7 +317,7 @@ Final audit for the ownership sequence:
 - Wire protocol mirrors, protocol DTOs, compact snapshots, start payloads, and
   `client/src/protocol.js` are not changed by the private checkpoint path.
 - Replay artifact capture/playback and replay seek still use recorded commands plus in-process
-  `clone_for_replay_keyframe` keyframes; they are not routed through `GameCheckpoint`.
+  `clone_for_replay_keyframe` keyframes; they are not routed through `GameCheckpointV1`.
 - Lab timeline seek still replays lab timeline entries from in-process keyframes, while lab scenario
   import/export keeps its scenario DTO and fresh-id remap behavior rather than becoming a checkpoint
   restore.
@@ -327,10 +327,10 @@ Final audit for the ownership sequence:
 
 Checkpoint-readiness blockers before follow-up product plans:
 
-- The public checkpoint payload contract is defined in §3.1.3, but it still needs implementation:
-  explicit DTO conversion, serde round-trip tests, importer validation, migration tests, rollout
-  observability, and a decision on when any caller may expose it. The current `GameCheckpoint`
-  remains private test machinery and is not a persisted format.
+- The public checkpoint payload contract is defined in §3.1.3 and has an internal `rts-sim`
+  round-trip proof: explicit DTO conversion, serde text bytes, map-binding validation, importer
+  validation, and semantic continuation tests. Follow-up product phases still need migration tests,
+  rollout observability, compatibility decisions, and a decision on when any caller may expose it.
 - Replay migration needs artifact-version decisions, keyframe replacement policy, compatibility
   with existing saved and persisted replay artifacts, command-log rebasing rules, and failure
   behavior for old builds or partial checkpoint coverage.
@@ -389,9 +389,9 @@ alive.
 `GameCheckpointV1` is the first public checkpoint payload contract. It is a versioned UTF-8 JSON
 text payload that can be embedded inside a replay artifact, lab scenario container, match-start
 artifact, or debug document. It is not a standalone product file format, network command, route, UI
-option, replay schema change, or lab schema change by itself. The existing private
-`GameCheckpoint`, `Game::checkpoint_for_test`, and `Game::restore_checkpoint_for_test` stay internal
-test helpers until a later phase replaces them with explicit DTO conversion.
+option, replay schema change, or lab schema change by itself. The internal implementation exports
+`Game + supplied map binding` through explicit DTOs to JSON text bytes, imports only with the exact
+container-supplied `Map`, and rebuilds derived state before returning a live `Game`.
 
 The payload schema is named `rts.gameCheckpoint` and starts at version `1`. Field names are
 camelCase. DTOs must be explicit Rust types with serde support; do not serialize private

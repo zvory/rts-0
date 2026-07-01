@@ -2,11 +2,12 @@ use std::collections::BTreeMap;
 
 use crate::game::upgrade::UpgradeKind;
 use crate::rules::combat::WeaponKind;
+use serde::{Deserialize, Serialize};
 
 use super::{EntityKind, Order, OrderIntent, RallyIntent};
 
 /// A queued production order on a building.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProdItem {
     /// Unit kind being produced.
     pub unit: EntityKind,
@@ -17,7 +18,7 @@ pub struct ProdItem {
 }
 
 /// A queued research order on a tech building.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResearchItem {
     pub upgrade: UpgradeKind,
     pub progress: u32,
@@ -26,7 +27,7 @@ pub struct ResearchItem {
 
 /// Reserved for future round-trip harvesting if attached mining is replaced.
 #[allow(dead_code)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct CarryState {
     /// Amount of resource currently held.
     pub amount: u32,
@@ -35,7 +36,7 @@ pub struct CarryState {
 }
 
 /// Mobile unit state. Only units have this group.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MovementState {
     /// Facing angle in radians (for unit orientation / render). Updated when moving/attacking.
     pub facing: f32,
@@ -121,7 +122,7 @@ impl Default for MovementState {
 }
 
 /// Weapon and active target state. Present on combat-capable entities.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CombatState {
     /// Ticks until each weapon may attack again (missing or 0 = ready).
     pub weapon_cooldowns: BTreeMap<WeaponKind, u32>,
@@ -231,7 +232,7 @@ impl CombatState {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum PanzerfaustState {
     Loaded,
     Windup {
@@ -249,7 +250,7 @@ pub enum PanzerfaustState {
     },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum WeaponSetup {
     Packed,
     SettingUp {
@@ -279,7 +280,7 @@ impl WeaponSetup {
 }
 
 /// Production queue state. Present only on buildings that can train units.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ProductionState {
     /// FIFO production queue (front = item being produced).
     pub queue: Vec<ProdItem>,
@@ -293,7 +294,7 @@ pub struct ProductionState {
 }
 
 /// Construction progress state. Present only while a building is under construction.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConstructionState {
     /// Ticks of construction accumulated so far.
     pub progress: u32,
@@ -303,7 +304,7 @@ pub struct ConstructionState {
 
 /// Worker-only economy state.
 #[allow(dead_code)]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct WorkerState {
     /// Present only if round-trip harvesting is reintroduced.
     pub carry: Option<CarryState>,
@@ -312,7 +313,7 @@ pub struct WorkerState {
 }
 
 /// Resource-node state. Present only on steel/oil nodes.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceNodeState {
     /// Remaining resource amount.
     pub remaining: u32,
@@ -325,7 +326,7 @@ pub struct ResourceNodeState {
 }
 
 /// Static resource extractor state. Present only on completed-capable extractor buildings.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ResourceExtractorState {
     /// Ticks accumulated toward the next attached harvest payout.
     pub progress: u32,

@@ -7,8 +7,9 @@ use crate::game::services::occupancy::building_footprint;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
 use crate::rules::projection;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub(crate) struct BuildingMemoryEntry {
     pub(crate) id: u32,
     pub(crate) owner: u32,
@@ -23,7 +24,7 @@ pub(crate) struct BuildingMemoryEntry {
     pub(crate) observed_tick: u32,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub(crate) struct BuildingMemory {
     entries: HashMap<(u32, u32), BuildingMemoryEntry>,
 }
@@ -85,6 +86,27 @@ impl BuildingMemory {
             .filter_map(move |(&(entry_player, _), entry)| {
                 (entry_player == player_id).then_some(entry)
             })
+    }
+
+    pub(in crate::game) fn from_checkpoint_entries(
+        entries: Vec<(u32, u32, BuildingMemoryEntry)>,
+    ) -> Self {
+        BuildingMemory {
+            entries: entries
+                .into_iter()
+                .map(|(player_id, building_id, entry)| ((player_id, building_id), entry))
+                .collect(),
+        }
+    }
+
+    pub(in crate::game) fn checkpoint_entries(&self) -> Vec<(u32, u32, BuildingMemoryEntry)> {
+        let mut entries = self
+            .entries
+            .iter()
+            .map(|(&(player_id, building_id), entry)| (player_id, building_id, entry.clone()))
+            .collect::<Vec<_>>();
+        entries.sort_by_key(|(player_id, building_id, _)| (*player_id, *building_id));
+        entries
     }
 
     #[cfg(test)]

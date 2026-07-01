@@ -4,6 +4,7 @@ use crate::config;
 use crate::game::ability::AbilityKind;
 use crate::protocol::states;
 use crate::rules;
+use serde::{Deserialize, Serialize};
 
 use super::order::BUILD_UNIT_BLOCK_GRACE_TICKS;
 #[cfg(test)]
@@ -23,7 +24,7 @@ const BUILDING_START_HP_DENOMINATOR: u32 = 10;
 /// All positional state is in world pixels (`pos_x`/`pos_y` are the entity center).
 /// State that only applies to a subset of kinds lives in typed optional groups, keeping
 /// the store homogeneous while making kind-specific state explicit.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Entity {
     /// Stable unique id (never reused).
     pub id: u32,

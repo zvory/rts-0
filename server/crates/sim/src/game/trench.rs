@@ -4,10 +4,11 @@ use crate::config;
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::protocol::TrenchView;
+use serde::{Deserialize, Serialize};
 
 pub(crate) const MAX_TRENCHES: usize = 4096;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub(crate) struct Trench {
     pub(crate) id: u32,
     pub(crate) x: f32,
@@ -40,7 +41,7 @@ impl Trench {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct TrenchStore {
     next_id: u32,
     trenches: Vec<Trench>,
@@ -89,6 +90,10 @@ impl TrenchStore {
 
     pub(crate) fn all(&self) -> &[Trench] {
         &self.trenches
+    }
+
+    pub(in crate::game) fn checkpoint_len(&self) -> usize {
+        self.trenches.len()
     }
 
     pub(crate) fn refresh_memory_for_player(&mut self, player: u32, fog: &Fog) {

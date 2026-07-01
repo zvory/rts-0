@@ -93,8 +93,22 @@ pub(super) fn assert_equivalent_games(baseline: &Game, restored: &Game, label: &
 pub(super) fn restore_checkpoint_and_assert_equivalent(baseline: &Game, label: &str) -> Game {
     let checkpoint_next_id = baseline.state.entities.next_id_for_test();
     let checkpoint_pathing_config = baseline.pathing_config_for_test();
-    let checkpoint = baseline.checkpoint_for_test();
-    let restored = Game::restore_checkpoint_for_test(checkpoint);
+    let checkpoint_text = checkpoint_payload_text_for(baseline, label);
+    assert!(
+        !checkpoint_text.contains("\"terrain\""),
+        "{label}: GameCheckpointV1 payload must not embed map terrain"
+    );
+    let restored = Game::restore_checkpoint_payload_text_for_test(
+        &checkpoint_text,
+        baseline.state.map.clone(),
+        baseline.map_metadata().clone(),
+    )
+    .unwrap_or_else(|err| panic!("{label}: payload import failed: {err}"));
+    let normalized_text = checkpoint_payload_text_for(&restored, label);
+    assert_eq!(
+        checkpoint_text, normalized_text,
+        "{label}: checkpoint payload should have stable normalized output"
+    );
     assert_eq!(
         restored.pathing_cache_len_for_test(),
         0,
@@ -113,6 +127,11 @@ pub(super) fn restore_checkpoint_and_assert_equivalent(baseline: &Game, label: &
     assert_final_spatial_matches_entities(&restored);
     assert_equivalent_games(baseline, &restored, label);
     restored
+}
+
+pub(super) fn checkpoint_payload_text_for(game: &Game, label: &str) -> String {
+    game.checkpoint_payload_text_for_test()
+        .unwrap_or_else(|err| panic!("{label}: payload export failed: {err}"))
 }
 
 pub(super) fn repair_after_authoritative_test_spawn(game: &mut Game) {
@@ -263,7 +282,12 @@ fn projection_view(game: &Game) -> ProjectionView {
         spectator_snapshot: game.snapshot_for_spectator(&player_ids),
         debug_path_snapshots: player_ids
             .iter()
-            .map(|&player| (player, game.snapshot_for_with_options(player, owner_debug_options)))
+            .map(|&player| {
+                (
+                    player,
+                    game.snapshot_for_with_options(player, owner_debug_options),
+                )
+            })
             .collect(),
         debug_path_full_snapshots: player_ids
             .iter()

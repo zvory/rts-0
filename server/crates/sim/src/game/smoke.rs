@@ -3,10 +3,11 @@ use crate::game::entity::EntityStore;
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::teams::TeamRelations;
+use serde::{Deserialize, Serialize};
 
 pub(crate) const MAX_ACTIVE_SMOKE_CLOUDS: usize = 256;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub(crate) struct SmokeCloud {
     pub(crate) id: u32,
     pub(crate) x: f32,
@@ -40,7 +41,7 @@ impl SmokeCloud {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub(crate) struct PendingSmokeCloud {
     pub(crate) x: f32,
     pub(crate) y: f32,
@@ -49,7 +50,7 @@ pub(crate) struct PendingSmokeCloud {
     pub(crate) due_tick: u32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct SmokeCloudStore {
     #[allow(dead_code)]
     next_id: u32,
@@ -149,6 +150,10 @@ impl SmokeCloudStore {
 
     pub(crate) fn iter(&self) -> impl Iterator<Item = &SmokeCloud> {
         self.clouds.iter()
+    }
+
+    pub(in crate::game) fn checkpoint_len(&self) -> usize {
+        self.clouds.len().saturating_add(self.pending.len())
     }
 
     pub(crate) fn point_inside(&self, x: f32, y: f32) -> bool {

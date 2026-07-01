@@ -10,8 +10,9 @@ use crate::protocol::{Event, NoticeSeverity};
 use crate::rules::combat;
 use crate::rules::projection;
 use crate::rules::terrain::TerrainKind;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct ArtilleryShell {
     owner: u32,
     x: f32,
@@ -19,12 +20,16 @@ struct ArtilleryShell {
     impact_tick: u32,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub(crate) struct ArtilleryShellStore {
     shells: Vec<ArtilleryShell>,
 }
 
 impl ArtilleryShellStore {
+    pub(in crate::game) fn checkpoint_len(&self) -> usize {
+        self.shells.len()
+    }
+
     pub(crate) fn schedule(&mut self, owner: u32, _attacker: u32, x: f32, y: f32, tick: u32) {
         if !x.is_finite() || !y.is_finite() {
             return;

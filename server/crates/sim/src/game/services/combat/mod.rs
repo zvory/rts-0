@@ -23,7 +23,7 @@ use crate::game::services::spatial::SpatialIndex;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
 use crate::protocol::Event;
-use rand::rngs::SmallRng;
+use rand::Rng;
 
 mod acquisition;
 mod activation;
@@ -128,7 +128,7 @@ pub(in crate::game) fn combat_system(
     fog: &Fog,
     smokes: &SmokeCloudStore,
     mortar_shells: &mut MortarShellStore,
-    rng: &mut SmallRng,
+    rng: &mut impl Rng,
     events: &mut HashMap<u32, Vec<Event>>,
     firing_reveals: &mut Vec<FiringRevealSource>,
     tick: u32,
@@ -405,15 +405,23 @@ pub(in crate::game) fn combat_system(
             }
             if active_firing_reveal_source(firing_reveals, owner, tid, tick) {
                 let delay_started = entities.get_mut(id).is_some_and(|e| {
-                    e.start_weapon_firing_reveal_response_delay(weapon_profile.id, tid, FIRING_REVEAL_RESPONSE_DELAY_TICKS)
+                    e.start_weapon_firing_reveal_response_delay(
+                        weapon_profile.id,
+                        tid,
+                        FIRING_REVEAL_RESPONSE_DELAY_TICKS,
+                    )
                 });
                 if delay_started {
                     continue;
                 }
             }
-            let ready = matches!(entities.get(id), Some(e) if e.weapon_cooldown(weapon_profile.id) == 0);
+            let ready =
+                matches!(entities.get(id), Some(e) if e.weapon_cooldown(weapon_profile.id) == 0);
             if ready {
-                if matches!(entities.get(id).map(|e| e.kind), Some(EntityKind::MortarTeam)) {
+                if matches!(
+                    entities.get(id).map(|e| e.kind),
+                    Some(EntityKind::MortarTeam)
+                ) {
                     if !matches!(
                         entities
                             .get(id)

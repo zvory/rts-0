@@ -12,7 +12,7 @@
 //! not currently visible" dimming locally (see `docs/design/client-ui.md`). So this module tracks only
 //! the per-tick visible set.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::config;
 use crate::game::entity::{blocks_line_of_sight, Entity, EntityStore};
@@ -22,9 +22,10 @@ use crate::game::services::line_of_sight::LineOfSight;
 use crate::game::services::occupancy::building_footprint;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
+use serde::{Deserialize, Serialize};
 
 /// Temporary sight left behind by an owned unit/building after it dies.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub(crate) struct LingeringSightSource {
     owner: u32,
     x: f32,
@@ -64,7 +65,7 @@ impl LingeringSightSource {
 
 /// Visible-tile grids, one per player. Recomputed every tick from scratch (cheap at our map
 /// sizes) so it always reflects current entity positions and never leaks stale visibility.
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct Fog {
     size: u32,
     /// player id -> row-major visibility grid (`true` = visible this tick).
@@ -77,6 +78,27 @@ impl Fog {
             size,
             grids: HashMap::new(),
         }
+    }
+
+    pub(in crate::game) fn from_checkpoint_grids(
+        size: u32,
+        grids: BTreeMap<u32, Vec<bool>>,
+    ) -> Self {
+        Fog {
+            size,
+            grids: grids.into_iter().collect(),
+        }
+    }
+
+    pub(in crate::game) fn checkpoint_size(&self) -> u32 {
+        self.size
+    }
+
+    pub(in crate::game) fn checkpoint_grids(&self) -> BTreeMap<u32, Vec<bool>> {
+        self.grids
+            .iter()
+            .map(|(&player, grid)| (player, grid.clone()))
+            .collect()
     }
 
     /// Recompute visibility for all `players` from the union of their entities' sight circles.
@@ -203,7 +225,8 @@ impl Fog {
     ) {
         let size = self.size;
         let building_mask = BuildingLosMask::new(store, map);
-        let los = LineOfSight::with_smoke_and_building_blockers(map, smokes, &building_mask.blockers);
+        let los =
+            LineOfSight::with_smoke_and_building_blockers(map, smokes, &building_mask.blockers);
         for source in sources {
             if smokes.point_inside(source.x, source.y) {
                 continue;
