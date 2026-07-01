@@ -80,6 +80,7 @@ pub(super) struct ReplaySession {
     pub(super) game: Box<Game>,
     pub(super) next_command: usize,
     pub(super) keyframes: Vec<ReplayKeyframe>,
+    start_tick: u32,
     pub(super) duration_ticks: u32,
     speed: f32,
     viewer_selection: HashMap<u32, VisionSelection>,
@@ -106,12 +107,14 @@ impl ReplaySession {
 
     #[allow(dead_code)]
     pub(super) fn new(artifact: ReplayArtifactV1) -> Result<Self, String> {
-        Self::validate_artifact_limits(&artifact)?;
+        Self::validate_artifact_static_limits(&artifact)?;
         let duration_ticks = artifact.duration_ticks;
         let build_start = StdInstant::now();
         let game = Box::new(Self::build_game(&artifact)?);
+        let start_tick = game.tick_count();
+        Self::validate_artifact_timeline(&artifact, start_tick)?;
         let keyframes = vec![ReplayKeyframe {
-            tick: 0,
+            tick: start_tick,
             game: Box::new(game.clone_for_replay_keyframe()),
             next_command: 0,
         }];
@@ -128,6 +131,7 @@ impl ReplaySession {
             game,
             next_command: 0,
             keyframes,
+            start_tick,
             duration_ticks,
             speed: Self::DEFAULT_SPEED,
             viewer_selection: HashMap::new(),
@@ -136,7 +140,7 @@ impl ReplaySession {
         })
     }
 
-    fn validate_artifact_limits(artifact: &ReplayArtifactV1) -> Result<(), String> {
+    fn validate_artifact_static_limits(artifact: &ReplayArtifactV1) -> Result<(), String> {
         if artifact.players.is_empty() {
             return Err("replay artifact has no players".to_string());
         }
@@ -147,7 +151,6 @@ impl ReplaySession {
             ));
         }
         replay_validation::validate_faction_loadouts(artifact)?;
-        let seen_players: HashSet<u32> = artifact.players.iter().map(|player| player.id).collect();
         if artifact.duration_ticks > Self::MAX_DURATION_TICKS {
             return Err(format!(
                 "replay duration {} exceeds maximum {}",
@@ -162,6 +165,20 @@ impl ReplaySession {
                 Self::MAX_COMMAND_LOG_ENTRIES
             ));
         }
+        Ok(())
+    }
+
+    fn validate_artifact_timeline(
+        artifact: &ReplayArtifactV1,
+        start_tick: u32,
+    ) -> Result<(), String> {
+        if artifact.duration_ticks < start_tick {
+            return Err(format!(
+                "replay duration {} is before start tick {}",
+                artifact.duration_ticks, start_tick
+            ));
+        }
+        let seen_players: HashSet<u32> = artifact.players.iter().map(|player| player.id).collect();
         let mut previous_tick = 0;
         for (index, entry) in artifact.command_log.iter().enumerate() {
             if !seen_players.contains(&entry.player_id) {
@@ -170,8 +187,11 @@ impl ReplaySession {
                     entry.player_id
                 ));
             }
-            if entry.tick == 0 {
-                return Err(format!("replay command {index} has invalid tick 0"));
+            if entry.tick <= start_tick {
+                return Err(format!(
+                    "replay command {index} tick {} is not after start tick {}",
+                    entry.tick, start_tick
+                ));
             }
             if entry.tick > artifact.duration_ticks {
                 return Err(format!(
@@ -383,6 +403,7 @@ impl ReplaySession {
         let target_tick = self
             .current_tick()
             .saturating_sub(ticks_back)
+            .max(self.start_tick)
             .min(self.duration_ticks);
         self.seek_to(room, viewer_count, controller_id, target_tick)
     }
@@ -401,7 +422,7 @@ impl ReplaySession {
             return Err("Replay seek ignored; wait before seeking again.".to_string());
         }
         let from_tick = self.current_tick();
-        let target_tick = target_tick.min(self.duration_ticks);
+        let target_tick = target_tick.clamp(self.start_tick, self.duration_ticks);
         let seek_start = StdInstant::now();
         let keyframe_tick = self.rebuild_to(target_tick)?;
         self.last_seek_at = Some(StdInstant::now());
@@ -554,6 +575,52 @@ mod tests {
             replay.tick(None);
         }
 
+        for player in &players {
+            assert_eq!(
+                replay.game.snapshot_for(player.id),
+                live.snapshot_for(player.id)
+            );
+        }
+    }
+
+    #[test]
+    fn checkpoint_backed_replay_can_start_from_nonzero_tick() {
+        let players = replay_test_players(2);
+        let seed = 0x5150_3301;
+        let mut live = replay_test_game(&players, seed);
+        live.enqueue(1, SimCommand::Stop { units: vec![1] });
+        live.tick();
+        let branch_start = rts_sim::game::replay::ReplayStartComposition::capture(
+            &live,
+            crate::build_info::build_id(),
+        )
+        .unwrap();
+        let start_tick = live.tick_count();
+
+        live.enqueue(1, SimCommand::Stop { units: vec![2] });
+        live.tick();
+        let artifact = branch_start.finalize(&live, None, live.scores());
+
+        assert_eq!(start_tick, 1);
+        assert_eq!(
+            artifact
+                .command_log
+                .iter()
+                .map(|entry| entry.tick)
+                .collect::<Vec<_>>(),
+            vec![2],
+            "checkpoint-backed artifacts should store only commands after the start checkpoint"
+        );
+
+        let mut replay = ReplaySession::new(artifact).unwrap();
+        assert_eq!(replay.current_tick(), start_tick);
+        let clamped = replay.seek_to("test", 1, 42, 0).unwrap();
+        assert_eq!(clamped, start_tick);
+        assert_eq!(replay.current_tick(), start_tick);
+        replay.enqueue_for_current_tick().unwrap();
+        replay.tick(None);
+
+        assert_eq!(replay.current_tick(), live.tick_count());
         for player in &players {
             assert_eq!(
                 replay.game.snapshot_for(player.id),

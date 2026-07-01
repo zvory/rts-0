@@ -234,3 +234,23 @@ fn checkpoint_backed_replay_rejects_wrong_materialized_map_binding() {
         ReplayValidationError::CheckpointStartInvalid { .. }
     ));
 }
+
+#[test]
+fn checkpoint_backed_replay_rejects_top_level_start_metadata_mismatch() {
+    let players = players();
+    let game = Game::new(&players, 0x1234_5678);
+    let replay_start = ReplayStartComposition::capture(&game, "sha-a").unwrap();
+    let mut artifact = replay_start.finalize(&game, None, game.scores());
+    artifact.players[0].name = "Tampered".to_string();
+
+    let err = match artifact.restore_start_game(game.state.map.clone(), game.map_metadata().clone())
+    {
+        Ok(_) => panic!("mismatched top-level player metadata should reject replay restore"),
+        Err(err) => err,
+    };
+
+    assert!(matches!(
+        err,
+        ReplayValidationError::StartStateMismatch { field: "players" }
+    ));
+}

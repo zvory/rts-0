@@ -29,6 +29,7 @@ pub(in crate::game) struct ReplayStartStateV1 {
 pub struct ReplayStartComposition {
     server_build_sha: String,
     start_state: ReplayStartStateV1,
+    start_tick: u32,
     player_loadouts: Vec<PlayerStartingLoadout>,
     players: Vec<PlayerInit>,
 }
@@ -49,6 +50,7 @@ impl ReplayStartComposition {
                 seed: game.seed(),
                 checkpoint_payload,
             },
+            start_tick: game.tick_count(),
             player_loadouts: game.starting_loadouts().to_vec(),
             players: game.player_inits(),
         })
@@ -65,6 +67,7 @@ impl ReplayStartComposition {
         debug_assert_eq!(self.start_state.map_schema_version, map.schema_version);
         debug_assert_eq!(self.start_state.map_content_hash, map.content_hash);
         debug_assert_eq!(self.start_state.seed, game.seed());
+        debug_assert!(game.tick_count() >= self.start_tick);
         ReplayArtifactV1 {
             artifact_schema_version: REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION,
             server_build_sha: self.server_build_sha.clone(),
@@ -76,7 +79,12 @@ impl ReplayStartComposition {
             players: self.players.clone(),
             start_state: Some(self.start_state.clone()),
             duration_ticks: game.tick_count(),
-            command_log: game.command_log().to_vec(),
+            command_log: game
+                .command_log()
+                .iter()
+                .filter(|entry| entry.tick > self.start_tick)
+                .cloned()
+                .collect(),
             winner_id,
             winner_team_id: winner_id.and_then(|id| game.team_of_player(id)),
             final_scores,

@@ -85,14 +85,23 @@ impl ReplayArtifactV1 {
                 if start_state.seed != self.seed {
                     return Err(ReplayValidationError::StartStateMismatch { field: "seed" });
                 }
-                Game::restore_checkpoint_payload_text(
+                let game = Game::restore_checkpoint_payload_text(
                     &start_state.checkpoint_payload,
                     map,
                     map_metadata,
                 )
                 .map_err(|err| ReplayValidationError::CheckpointStartInvalid {
                     reason: err.to_string(),
-                })
+                })?;
+                if game.player_inits() != self.players {
+                    return Err(ReplayValidationError::StartStateMismatch { field: "players" });
+                }
+                if game.starting_loadouts() != self.player_loadouts.as_slice() {
+                    return Err(ReplayValidationError::StartStateMismatch {
+                        field: "playerLoadouts",
+                    });
+                }
+                Ok(game)
             }
             Some(_) | None if self.artifact_schema_version == REPLAY_ARTIFACT_SCHEMA_VERSION_V3 => {
                 Err(ReplayValidationError::CheckpointStartMissing)
