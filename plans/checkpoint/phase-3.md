@@ -1,0 +1,72 @@
+# Phase 3 - Checkpoint-Backed Starts
+
+Status: Not started.
+
+## Scope
+
+Make normal match and lab setup flows construct their initial authoritative state as a
+`GameCheckpointV1`, then restore the live `Game` from that checkpoint. Public constructors and room
+callers should keep their current signatures where practical, but their internals should exercise
+the same import path that later replay and lab assets will use.
+
+This phase should prove that tick-zero checkpoint starts are behaviorally identical to direct setup
+for normal matches, replay-compatible starts, dev scenarios, and blank/catalog lab starts. It should
+not change committed replay artifact or lab scenario file formats yet.
+
+Explicit non-goals:
+
+- No replay artifact schema migration.
+- No lab catalog asset rewrite.
+- No public checkpoint upload/download UI.
+- No balance, faction loadout, map generation, or spawn policy changes.
+
+## Expected Touch Points
+
+- `server/crates/sim/src/game/setup.rs`: compile setup inputs to checkpoint DTOs and restore through
+  the validated import path.
+- `server/crates/sim/src/game/mod.rs`: preserve public constructor signatures or add narrow
+  constructor overloads only where needed.
+- `server/crates/sim/src/game/lab.rs` and setup/dev scenario helpers: route blank lab and scenario
+  setup through checkpoint-backed construction where the current scenario format can be compiled to
+  equivalent start state.
+- `server/src/lobby/launch.rs`, `server/src/lobby/room_task/**`, and `server/src/main.rs`: read-only
+  unless constructor signatures force small call-site updates.
+- Focused tests in sim setup, replay setup, and lab setup modules.
+- Docs only if constructor behavior or checkpoint policy becomes part of the public `Game` seam.
+
+## Verification
+
+- Compare direct setup versus checkpoint-backed setup for normal matches with multiple players,
+  teams, factions, authored maps, generated maps, and AI slots.
+- Compare blank lab and catalog lab starts before and after checkpoint-backed construction.
+- Prove first snapshot and several post-start ticks match for each setup family.
+- Confirm replay artifact capture still records the same command log/start metadata as before for
+  existing replay schema.
+- Suggested focused commands:
+
+```bash
+cargo fmt --manifest-path server/Cargo.toml
+cargo test --manifest-path server/Cargo.toml -p rts-sim checkpoint_start
+cargo test --manifest-path server/Cargo.toml -p rts-sim setup
+cargo test --manifest-path server/Cargo.toml -p rts-sim lab
+cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture
+git diff --check -- server/crates/sim/src/game server/src/lobby docs/design/server-sim.md docs/context/server-sim.md plans/checkpoint
+```
+
+Use narrower filters if the implementation adds more precise names.
+
+## Manual Testing Focus
+
+Start one ordinary local match and one lab scenario. Confirm the first visible state, resources,
+starting units/buildings, fog, lab controls, and first few commands behave as before.
+
+## Handoff
+
+The handoff must name:
+
+- which constructors now go through checkpoint import;
+- any setup paths deliberately left direct, with reason;
+- parity tests added;
+- whether public constructor signatures changed;
+- exact verification commands that passed;
+- manual match/lab smoke focus for Phase 4.
