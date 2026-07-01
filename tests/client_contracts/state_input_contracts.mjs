@@ -318,6 +318,12 @@ function buttonByLabel(card, label) {
   });
   assert(tankWeaponHintState.liveMuzzleFlashes(performance.now())[0]?.weaponKind === WEAPON_KIND.TANK_CANNON, "default weapon hint is retained on muzzle feedback");
   assert(tankWeaponHintState.weaponRecoil(5, KIND.TANK, performance.now()) > 0, "default weapon hint preserves tank recoil");
+  const explicitRecoilHintState = new GameState({ ...start, map: { ...start.map, resources: [] } });
+  explicitRecoilHintState.weaponRecoilById.set(91, performance.now() - 500);
+  assert(
+    explicitRecoilHintState.weaponRecoil(91, KIND.RIFLEMAN, performance.now(), WEAPON_KIND.ARTILLERY_GUN) > 0,
+    "explicit weapon hint can extend recoil timing through the GameState facade",
+  );
 
   const unknownWeaponHintState = new GameState({ ...start, map: { ...start.map, resources: [] } });
   unknownWeaponHintState.applySnapshot({
