@@ -102,8 +102,8 @@ fn handle_loaded_combat(
 
     let distance = dist2(px, py, tx, ty).sqrt();
     let target_angle = (ty - py).atan2(tx - px);
-    let clear_shot =
-        panzerfaust_target_fireable(map, entities, teams, &los, fog, smokes, id, owner, target);
+    let fire_context = PanzerfaustFireContext::new(map, entities, teams, &los, fog, smokes);
+    let clear_shot = panzerfaust_target_fireable(&fire_context, id, owner, target);
     if distance <= range_px && clear_shot {
         if let Some(attacker) = entities.get_mut(id) {
             if target_angle.is_finite() {
@@ -326,27 +326,51 @@ fn panzerfaust_target_in_range(
         && target.pos_y < map.world_size_px()
 }
 
+pub(super) struct PanzerfaustFireContext<'a, 'los> {
+    map: &'a Map,
+    entities: &'a EntityStore,
+    teams: &'a TeamRelations,
+    los: &'a LineOfSight<'los>,
+    fog: &'a Fog,
+    smokes: &'a SmokeCloudStore,
+}
+
+impl<'a, 'los> PanzerfaustFireContext<'a, 'los> {
+    fn new(
+        map: &'a Map,
+        entities: &'a EntityStore,
+        teams: &'a TeamRelations,
+        los: &'a LineOfSight<'los>,
+        fog: &'a Fog,
+        smokes: &'a SmokeCloudStore,
+    ) -> Self {
+        Self {
+            map,
+            entities,
+            teams,
+            los,
+            fog,
+            smokes,
+        }
+    }
+}
+
 fn panzerfaust_target_fireable(
-    map: &Map,
-    entities: &EntityStore,
-    teams: &TeamRelations,
-    los: &LineOfSight<'_>,
-    fog: &Fog,
-    smokes: &SmokeCloudStore,
+    context: &PanzerfaustFireContext<'_, '_>,
     attacker_id: u32,
     owner: u32,
     target_id: u32,
 ) -> bool {
-    let Some(attacker) = entities.get(attacker_id) else {
+    let Some(attacker) = context.entities.get(attacker_id) else {
         return false;
     };
     direct_fire_target_legal(
-        map,
-        entities,
-        teams,
-        los,
-        fog,
-        smokes,
+        context.map,
+        context.entities,
+        context.teams,
+        context.los,
+        context.fog,
+        context.smokes,
         attacker_id,
         owner,
         (attacker.pos_x, attacker.pos_y),

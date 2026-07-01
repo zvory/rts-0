@@ -232,6 +232,8 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/rules/src/economy.rs",
   "server/crates/rules/src/faction.rs",
   "server/crates/rules/src/kind.rs",
+  // Target facts centralize current-roster target groups until catalog combat roles exist.
+  "server/crates/rules/src/target.rs",
   "server/crates/sim/src/game/ability.rs",
   // Entrenchment Phase 3 gates trench creation on the current player's Entrenchment research.
   "server/crates/sim/src/game/services/entrenchment.rs",
