@@ -224,11 +224,12 @@ production queues, rally plans, cooldowns, and command logs are not part of the 
 
 #### 3.1.1 `Game` State Ownership Registry
 
-`Game` is a private ownership tree with durable authoritative state stored under
-`GameState` (`server/crates/sim/src/game/state.rs`) and rebuildable cache/search state stored under
-`DerivedState` (`server/crates/sim/src/game/derived_state.rs`). `GameState` is private to
-`crate::game`; public `Game` methods remain the only seam for lobby, replay, lab, AI, server, and
-snapshot callers.
+`Game` is a private ownership tree with only two top-level state roots:
+`GameState` (`server/crates/sim/src/game/state.rs`) for durable authoritative state and setup/replay
+compatibility metadata, and `DerivedState`
+(`server/crates/sim/src/game/derived_state.rs`) for rebuildable cache/search state. Both owners are
+private to `crate::game`; public `Game` methods remain the only seam for lobby, replay, lab, AI,
+server, and snapshot callers.
 
 This registry is the source of truth for classifying fields currently owned by `GameState` or
 `DerivedState`. Any change that adds, removes, or changes the semantics of a `GameState` or
@@ -244,7 +245,9 @@ This registry is the source of truth for classifying fields currently owned by `
   even when it does not directly mutate tick results.
 
 No current state field is classified as `transient`; room/session transient state remains outside
-`Game` in `server/src/lobby/`.
+`Game` in `server/src/lobby/`. Field names in this table must match current `GameState` or
+`DerivedState` fields exactly; `rts-archcheck` treats missing, stale, or wrongly categorized rows as
+architecture failures.
 
 | Field | Category | Checkpoint policy | Evidence and notes |
 | --- | --- | --- | --- |
@@ -256,7 +259,6 @@ No current state field is classified as `transient`; room/session transient stat
 | `pending` | `authoritative/serialized` | Serialize unapplied pending commands unless a future checkpoint caller explicitly proves it captures only immediately after command drain with `pending` empty. | `Game::enqueue` appends commands between ticks; `tick_inner` drains `pending`, records them in `command_log`, and applies them. Dropping a non-empty queue would skip authoritative player/AI intent. |
 | `command_log` | `compatibility metadata` | Serialize command history for replay/crash/API continuity; do not replay it during normal checkpoint import unless building a replay artifact. | `Game::command_log` is public, `ReplayArtifactV1::from_game` persists it, and tick logic only appends/applies new pending commands instead of reading old log entries. |
 | `tick` | `authoritative/serialized` | Serialize the exact tick count. | `tick_inner` increments it before systems, logs commands with it, drives expirations/cooldowns, passes it to projection/runtime stores, and advances `PathingService` to the same tick. |
-| `derived` | `derived/rebuildable` | Do not serialize. Rebuild the final spatial index with `SpatialIndex::build(&entities, map.size)` after import and after any lab mutation that changes entity positions/existence; clear cached pathing/search bookkeeping while preserving the live default budget, cache capacity, and tick alignment. | `DerivedState` owns the final post-tick spatial index used by snapshots plus `PathingService`'s reusable cache/search boundary. The spatial module says it is rebuilt from live `EntityStore`; `tick_inner` stores the final `systems::run_tick` spatial result under `derived`; Phase 0.5/2 clears the shell without changing semantic state or snapshots. Chosen unit paths, movement phases, waypoints, goals, and throttling remain serialized on entities. |
 | `lingering_sight` | `authoritative/serialized` | Serialize all active death-vision sources and their expiry ticks. | `retain_active_visibility_sources` prunes by `tick`; `recompute_live_fog` stamps these sources into team fog, affecting command legality, combat visibility, and snapshots. |
 | `firing_reveals` | `authoritative/serialized` | Serialize active firing-reveal sources and expiry ticks. | Anti-Tank Gun and artillery/mortar reveal logic records temporary actionable sight; `recompute_live_fog` stamps sources into viewer fog until expiry. |
 | `smokes` | `authoritative/serialized` | Serialize the full `SmokeCloudStore`, including next id, active clouds, pending clouds, locations, radii, spawn/due/expiry ticks. | Smoke blocks authoritative fog, line of sight, combat projection, and delayed smoke scheduling; `tick_inner` retains active smoke and systems may resolve pending smoke. |
@@ -271,12 +273,73 @@ No current state field is classified as `transient`; room/session transient stat
 | `lab_god_mode_players` | `authoritative/serialized` | Serialize the canonical enabled-player set and resync mirrored entity invulnerability flags after import. | Lab ops mutate the set; `sync_lab_god_mode_flags` mirrors it onto unit/building invulnerability, and damage checks consume those entity flags. |
 | `starting_loadout` | `compatibility metadata` | Serialize until legacy/global-starting-resource compatibility constructors are retired. Checkpoint import should prefer `starting_loadouts` for per-player setup facts. | The field is set by setup constructors and dev scenarios but does not feed the per-tick systems after match creation. |
 | `rng` | `authoritative/serialized` | Serialize the exact current generator state or an equivalent deterministic draw-stream state. Re-seeding from `seed` is not valid after any random draw. | `systems::run_tick` passes `&mut self.state.rng` into combat damage/miss logic; Phase 0.5 probes cloned RNG output as semantic state. |
+| `final_spatial` | `derived/rebuildable` | Do not serialize. Rebuild with `SpatialIndex::build(&entities, map.size)` after import, after lab mutations that change entity positions/existence, and after any derived-state wipe. | `DerivedState` owns the final post-tick spatial index used by snapshots. `tick_inner` stores the final `systems::run_tick` spatial result, and Phase 0.5/2/4 checkpoint proofs compare snapshots after clearing and rebuilding it. |
+| `pathing` | `derived/rebuildable` | Do not serialize reusable pathing cache/search entries. Recreate `PathingService` with the live default budget, cache capacity, and current tick alignment during import or derived-state rebuild. | `PathingService` cache/search bookkeeping only affects performance. Chosen unit paths, movement phases, waypoints, path goals, and throttling remain serialized on entities. Phase 0.5/2/4 tests prove clearing this cache does not change semantic state or fog-filtered snapshots. |
 
 The Phase 0.5 and Phase 2 derived-state wipe harnesses confirm the current derived boundary: only
-the `derived` shell, containing the final spatial index and rebuildable pathing cache/search state,
-is cleared and rebuilt. Every current `GameState` field is treated as authoritative or compatibility
-metadata until a later phase adds a deterministic rebuild proof and updates this registry. No
-current field has an unresolved ownership category blocker.
+`final_spatial` and `pathing` are cleared and rebuilt. Every current `GameState` field is treated as
+authoritative or compatibility metadata until a later phase adds a deterministic rebuild proof and
+updates this registry. No current field has an unresolved ownership category blocker.
+
+#### 3.1.2 Ownership guardrails and checkpoint-readiness audit
+
+`server/crates/archcheck` turns the registry above into an executable guardrail. The
+`check-sim-architecture` command fails if:
+
+- `Game` stores any top-level state field other than `state: GameState` and
+  `derived: DerivedState`;
+- a `GameState` or `DerivedState` field is missing from the registry, has a stale registry row, or
+  is categorized outside its owner (`GameState` accepts `authoritative/serialized` or
+  `compatibility metadata`; `DerivedState` accepts only `derived/rebuildable`);
+- production `rts-sim::game` code adds module-level mutable state such as `static mut`,
+  `Mutex`/`RwLock` statics, `OnceLock`/`LazyLock` mutable singletons, or `thread_local!` state;
+- a service module lacks a role classification, adds an unapproved service edge, exposes broad
+  mutable world-state APIs, or grows direct entity/player mutation sites beyond the baseline.
+
+Durable state owners belong under `GameState`; rebuildable cache/index/search owners belong under
+`DerivedState`. Services may own invariants and narrow mutation/query APIs, but long-lived state
+that changes future authoritative behavior must be stored in the explicit tree. Room/session
+exceptions stay documented in §3.2 and `server/src/lobby/`: sockets, room identity/lifecycle,
+replay session cursors/keyframes, replay branch seeds, lab timeline history, selected vision,
+participant capabilities, AI controller memory, persisted match-history writes, and test fixtures
+are outside the cold checkpoint contract unless a future plan promotes them into authoritative
+recorded actions.
+
+Private checkpoint export/import remains internal test machinery. `GameCheckpoint`,
+`Game::checkpoint_for_test`, and `Game::restore_checkpoint_for_test` are cfg-test/private helpers
+used by the semantic comparator; they do not define a public Rust API, route, command, JSON schema,
+file format, replay artifact format, lab scenario format, or UI affordance.
+
+Final audit for the ownership sequence:
+
+- Public `Game` API signatures remain the §3.1 seam. Lobby, replay, lab, AI, server, and snapshot
+  callers still go through public `Game` methods rather than reading internal state owners.
+- Wire protocol mirrors, protocol DTOs, compact snapshots, start payloads, and
+  `client/src/protocol.js` are not changed by the private checkpoint path.
+- Replay artifact capture/playback and replay seek still use recorded commands plus in-process
+  `clone_for_replay_keyframe` keyframes; they are not routed through `GameCheckpoint`.
+- Lab timeline seek still replays lab timeline entries from in-process keyframes, while lab scenario
+  import/export keeps its scenario DTO and fresh-id remap behavior rather than becoming a checkpoint
+  restore.
+- Projection privacy remains enforced by normal snapshot/event projection tests plus the Phase 6
+  checkpoint/privacy coverage; checkpoint helpers must not expose fog-hidden entity ids, positions,
+  targets, ability payloads, remembered occupants, or private events.
+
+Checkpoint-readiness blockers before follow-up product plans:
+
+- Public checkpoint schema/API needs an explicit versioned DTO, serde policy, compatibility story,
+  migration policy, and operational rollout plan. The current `GameCheckpoint` is private and not a
+  persisted format.
+- Replay migration needs artifact-version decisions, keyframe replacement policy, compatibility
+  with existing saved and persisted replay artifacts, command-log rebasing rules, and failure
+  behavior for old builds or partial checkpoint coverage.
+- Lab migration needs a product decision for scenario versus checkpoint semantics, id remap
+  compatibility, timeline operation capture/replay policy, authoring metadata migration, and
+  validation for imported artifacts across map/faction versions.
+- Coverage gaps for a public checkpoint program include long-run/cross-version serialization,
+  corruption/partial-load handling, AI-controller reconstruction expectations, performance and
+  storage limits, privacy review for every exported projection-adjacent field, and deployment
+  observability for rollout and rollback.
 
 `PlayerInit.team_id` is canonical team identity. Phase 1 preserves FFA gameplay by assigning each
 seated player a unique nonzero team by default; deserialized or hand-built fixtures with

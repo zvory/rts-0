@@ -20,8 +20,8 @@
     },
     {
       "path": "server/crates/archcheck/src/lib.rs",
-      "lines": 1724,
-      "reason": "Existing oversized architecture checker before repo-wide source-size gate."
+      "lines": 2400,
+      "reason": "Game-state Phase 7 expands the existing oversized architecture checker with state-owner registry and production guardrail enforcement; keep ratcheting until archcheck scanners and tests are split into modules."
     },
     {
       "path": "server/crates/protocol/src/lib.rs",

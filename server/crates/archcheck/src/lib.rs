@@ -11,6 +11,11 @@ const NEW_FILE_LINE_BUDGET: usize = 500;
 const NEW_TEST_FILE_LINE_BUDGET: usize = 1_500;
 const PUBLIC_EXPORT_GROWTH_BUFFER: usize = 2;
 const NEW_MODULE_PUBLIC_EXPORT_BUDGET: usize = 8;
+const STATE_REGISTRY_DOC: &str = "docs/design/server-sim.md";
+const STATE_REGISTRY_HEADING: &str = "#### 3.1.1 `Game` State Ownership Registry";
+const GAME_STATE_ALLOWED_CATEGORIES: &[&str] =
+    &["authoritative/serialized", "compatibility metadata"];
+const DERIVED_STATE_ALLOWED_CATEGORY: &str = "derived/rebuildable";
 
 const PURE_POLICY_FORBIDDEN_IMPORTS: &[&str] = &[
     "EntityStore",
@@ -84,7 +89,10 @@ const PLAYER_STATE_FIELD_WRITE_APPROVED_PATHS: &[&str] = &["player_state.rs"];
 const PLAYER_STATE_FIELDS: &[&str] = &["steel", "oil", "supply_used", "supply_cap", "score"];
 
 const ALLOWED_SERVICE_IMPORTS: &[(&str, &[&str])] = &[
-    ("ability_orders", &["commands", "move_coordinator", "world_query"]),
+    (
+        "ability_orders",
+        &["commands", "move_coordinator", "world_query"],
+    ),
     (
         "combat",
         &[
@@ -263,6 +271,56 @@ struct UseStatement {
     text: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum StateOwner {
+    Game,
+    GameState,
+    DerivedState,
+}
+
+impl StateOwner {
+    fn struct_name(self) -> &'static str {
+        match self {
+            StateOwner::Game => "Game",
+            StateOwner::GameState => "GameState",
+            StateOwner::DerivedState => "DerivedState",
+        }
+    }
+
+    fn label(self) -> &'static str {
+        self.struct_name()
+    }
+
+    fn expected_path(self) -> &'static str {
+        match self {
+            StateOwner::Game => "mod.rs",
+            StateOwner::GameState => "state.rs",
+            StateOwner::DerivedState => "derived_state.rs",
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct StructField {
+    owner: StateOwner,
+    path: String,
+    line: usize,
+    name: String,
+    ty: String,
+}
+
+#[derive(Debug, Default)]
+struct StateOwnerScan {
+    found_owners: BTreeSet<StateOwner>,
+    fields: Vec<StructField>,
+}
+
+#[derive(Debug, Clone)]
+struct RegistryEntry {
+    line: usize,
+    category: String,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ServiceRole {
     TickSystem,
@@ -291,7 +349,11 @@ pub fn check_sim_architecture(game_root: &Path) -> io::Result<ArchitectureReport
         let rel_path = relative_slash_path(game_root, &path);
         files.push(SourceFile { rel_path, text });
     }
-    Ok(analyze_source_files(&files))
+    let registry_text = read_state_registry_doc(game_root)?;
+    Ok(analyze_source_files_with_registry(
+        &files,
+        Some(&registry_text),
+    ))
 }
 
 pub fn check_sim_architecture_with_baseline(
@@ -332,13 +394,24 @@ pub fn bless_sim_architecture_baseline(
     Ok(summary)
 }
 
+#[cfg(test)]
 fn analyze_source_files(files: &[SourceFile]) -> ArchitectureReport {
+    analyze_source_files_with_registry(files, None)
+}
+
+fn analyze_source_files_with_registry(
+    files: &[SourceFile],
+    registry_text: Option<&str>,
+) -> ArchitectureReport {
     let mut report = ArchitectureReport::default();
     let service_modules = service_modules(files);
     let allowed_service_imports = allowed_service_imports();
     let service_roles = service_roles();
 
     check_service_roles(&service_modules, &service_roles, &mut report);
+    let state_owner_scan = collect_state_owner_scan(files);
+    check_state_owner_tree(&state_owner_scan, registry_text.is_some(), &mut report);
+    check_state_owner_registry(&state_owner_scan, registry_text, &mut report);
 
     for file in files {
         let stripped = strip_cfg_test_modules(&file.text);
@@ -363,6 +436,7 @@ fn analyze_source_files(files: &[SourceFile]) -> ArchitectureReport {
         collect_player_state_field_writes(file, &stripped, &mut report);
         collect_public_exports(file, &stripped, &mut report);
         collect_entity_field_writes(file, &stripped, &mut report);
+        check_module_level_mutable_state(file, &stripped, &mut report);
     }
 
     report.failures.sort();
@@ -420,6 +494,180 @@ fn read_baseline(path: &Path) -> io::Result<ArchitectureBaseline> {
         ));
     }
     Ok(baseline)
+}
+
+fn read_state_registry_doc(game_root: &Path) -> io::Result<String> {
+    let registry_path = game_root
+        .ancestors()
+        .map(|ancestor| ancestor.join(STATE_REGISTRY_DOC))
+        .find(|candidate| candidate.is_file())
+        .ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::NotFound,
+                format!(
+                    "could not find {STATE_REGISTRY_DOC} above game root {}",
+                    game_root.display()
+                ),
+            )
+        })?;
+    fs::read_to_string(&registry_path).map_err(|error| {
+        io::Error::new(
+            error.kind(),
+            format!(
+                "could not read state ownership registry {}: {error}",
+                registry_path.display()
+            ),
+        )
+    })
+}
+
+fn collect_state_owner_scan(files: &[SourceFile]) -> StateOwnerScan {
+    let mut scan = StateOwnerScan::default();
+    for owner in [
+        StateOwner::Game,
+        StateOwner::GameState,
+        StateOwner::DerivedState,
+    ] {
+        if let Some(file) = files
+            .iter()
+            .find(|file| file.rel_path == owner.expected_path())
+        {
+            if let Some(fields) = collect_struct_fields(file, owner) {
+                scan.found_owners.insert(owner);
+                scan.fields.extend(fields);
+            }
+        }
+    }
+    scan
+}
+
+fn check_state_owner_tree(
+    scan: &StateOwnerScan,
+    require_full_tree: bool,
+    report: &mut ArchitectureReport,
+) {
+    if require_full_tree {
+        for owner in [
+            StateOwner::Game,
+            StateOwner::GameState,
+            StateOwner::DerivedState,
+        ] {
+            if !scan.found_owners.contains(&owner) {
+                report.failures.push(format!(
+                    "{} struct must exist so state ownership can be checked",
+                    owner.label()
+                ));
+            }
+        }
+    }
+
+    let game_fields = scan
+        .fields
+        .iter()
+        .filter(|field| field.owner == StateOwner::Game)
+        .collect::<Vec<_>>();
+    if game_fields.is_empty() {
+        return;
+    }
+
+    let expected = BTreeMap::from([("state", "GameState"), ("derived", "DerivedState")]);
+    for field in &game_fields {
+        match expected.get(field.name.as_str()) {
+            Some(expected_ty) if field.ty == *expected_ty => {}
+            Some(expected_ty) => report.failures.push(format!(
+                "{}:{}: Game.{} must have type {}; found {}",
+                field.path, field.line, field.name, expected_ty, field.ty
+            )),
+            None => report.failures.push(format!(
+                "{}:{}: Game must only store `state: GameState` and `derived: DerivedState`; move `{}` under GameState or DerivedState, or document it as room/session/test-only state outside Game",
+                field.path, field.line, field.name
+            )),
+        }
+    }
+
+    for (name, ty) in expected {
+        if !game_fields
+            .iter()
+            .any(|field| field.name == name && field.ty == ty)
+        {
+            report.failures.push(format!(
+                "Game must contain `{name}: {ty}` so authoritative and derived state stay under the explicit ownership tree"
+            ));
+        }
+    }
+}
+
+fn check_state_owner_registry(
+    scan: &StateOwnerScan,
+    registry_text: Option<&str>,
+    report: &mut ArchitectureReport,
+) {
+    let Some(registry_text) = registry_text else {
+        return;
+    };
+    let entries = parse_state_registry(registry_text, report);
+    if entries.is_empty() {
+        report.failures.push(format!(
+            "{STATE_REGISTRY_DOC}: {STATE_REGISTRY_HEADING} must contain a field/category registry table"
+        ));
+        return;
+    }
+
+    let mut code_fields = BTreeMap::<String, &StructField>::new();
+    for field in scan.fields.iter().filter(|field| {
+        matches!(
+            field.owner,
+            StateOwner::GameState | StateOwner::DerivedState
+        )
+    }) {
+        if let Some(previous) = code_fields.insert(field.name.clone(), field) {
+            report.failures.push(format!(
+                "{}:{}: state owner field `{}` duplicates {}:{}; field names must be unique across GameState and DerivedState for registry checks",
+                field.path, field.line, field.name, previous.path, previous.line
+            ));
+        }
+    }
+
+    for field in code_fields.values() {
+        let Some(entry) = entries.get(field.name.as_str()) else {
+            report.failures.push(format!(
+                "{}:{}: {}.{} is missing from {STATE_REGISTRY_DOC} {STATE_REGISTRY_HEADING}",
+                field.path,
+                field.line,
+                field.owner.label(),
+                field.name
+            ));
+            continue;
+        };
+        match field.owner {
+            StateOwner::GameState => {
+                if !GAME_STATE_ALLOWED_CATEGORIES.contains(&entry.category.as_str()) {
+                    report.failures.push(format!(
+                        "{STATE_REGISTRY_DOC}:{}: GameState.{} is categorized as `{}`; GameState fields must be authoritative/serialized or compatibility metadata",
+                        entry.line, field.name, entry.category
+                    ));
+                }
+            }
+            StateOwner::DerivedState => {
+                if entry.category != DERIVED_STATE_ALLOWED_CATEGORY {
+                    report.failures.push(format!(
+                        "{STATE_REGISTRY_DOC}:{}: DerivedState.{} is categorized as `{}`; DerivedState fields must be derived/rebuildable",
+                        entry.line, field.name, entry.category
+                    ));
+                }
+            }
+            StateOwner::Game => {}
+        }
+    }
+
+    for (name, entry) in entries {
+        if !code_fields.contains_key(name.as_str()) {
+            report.failures.push(format!(
+                "{STATE_REGISTRY_DOC}:{}: registry field `{}` is not a current GameState or DerivedState field",
+                entry.line, name
+            ));
+        }
+    }
 }
 
 fn compare_to_baseline(baseline: &ArchitectureBaseline, report: &mut ArchitectureReport) {
@@ -749,6 +997,174 @@ fn relative_slash_path(root: &Path, path: &Path) -> String {
         .join("/")
 }
 
+fn collect_struct_fields(file: &SourceFile, owner: StateOwner) -> Option<Vec<StructField>> {
+    let lines = file.text.lines().collect::<Vec<_>>();
+    let mut start = None;
+    for (index, line) in lines.iter().enumerate() {
+        let code = code_before_comment(line);
+        if struct_declares(code, owner.struct_name()) {
+            start = Some(index);
+            break;
+        }
+    }
+    let start = start?;
+
+    let mut fields = Vec::new();
+    let mut depth = 0isize;
+    let mut inside_body = false;
+    let mut cfg_test_field_pending = false;
+    for (index, line) in lines.iter().enumerate().skip(start) {
+        let code = code_before_comment(line);
+        if !inside_body {
+            if let Some(open_index) = code.find('{') {
+                inside_body = true;
+                depth = 1 + brace_delta(&code[open_index + 1..]);
+                if let Some(field) =
+                    parse_struct_field_line(&code[open_index + 1..], file, owner, index + 1)
+                {
+                    fields.push(field);
+                }
+                if depth <= 0 {
+                    break;
+                }
+            }
+            continue;
+        }
+
+        if depth == 1 {
+            let trimmed = code.trim();
+            if is_cfg_test_attribute(trimmed) {
+                cfg_test_field_pending = true;
+            } else if cfg_test_field_pending && trimmed.starts_with("#[") {
+                // Preserve the cfg(test) skip across stacked attributes on the same field.
+            } else if cfg_test_field_pending {
+                if !trimmed.is_empty() {
+                    cfg_test_field_pending = false;
+                }
+            } else if let Some(field) = parse_struct_field_line(code, file, owner, index + 1) {
+                fields.push(field);
+            }
+        }
+        depth += brace_delta(code);
+        if inside_body && depth <= 0 {
+            break;
+        }
+    }
+    Some(fields)
+}
+
+fn struct_declares(line: &str, struct_name: &str) -> bool {
+    let parts = line
+        .split(|ch: char| !(ch == '_' || ch.is_ascii_alphanumeric()))
+        .collect::<Vec<_>>();
+    parts
+        .windows(2)
+        .any(|window| window[0] == "struct" && window[1] == struct_name)
+}
+
+fn parse_struct_field_line(
+    line: &str,
+    file: &SourceFile,
+    owner: StateOwner,
+    line_number: usize,
+) -> Option<StructField> {
+    let trimmed = line.trim();
+    if trimmed.is_empty()
+        || trimmed.starts_with('#')
+        || trimmed.starts_with('}')
+        || trimmed.starts_with("//")
+    {
+        return None;
+    }
+    let field_text = strip_visibility_prefix(trimmed);
+    let colon = field_text.find(':')?;
+    let before_colon = &field_text[..colon];
+    let name = before_colon
+        .split(|ch: char| !(ch == '_' || ch.is_ascii_alphanumeric()))
+        .rfind(|part| !part.is_empty())?;
+    let ty = field_text[colon + 1..]
+        .trim()
+        .trim_end_matches(',')
+        .trim()
+        .to_string();
+    if name == "pub" || ty.is_empty() {
+        return None;
+    }
+    Some(StructField {
+        owner,
+        path: file.rel_path.clone(),
+        line: line_number,
+        name: name.to_string(),
+        ty,
+    })
+}
+
+fn parse_state_registry(
+    registry_text: &str,
+    report: &mut ArchitectureReport,
+) -> BTreeMap<String, RegistryEntry> {
+    let Some(section_lines) = state_registry_lines(registry_text) else {
+        report.failures.push(format!(
+            "{STATE_REGISTRY_DOC}: missing {STATE_REGISTRY_HEADING}"
+        ));
+        return BTreeMap::new();
+    };
+
+    let mut entries = BTreeMap::new();
+    for (line_number, line) in section_lines {
+        let trimmed = line.trim();
+        if !trimmed.starts_with('|') {
+            continue;
+        }
+        let cells = trimmed
+            .trim_matches('|')
+            .split('|')
+            .map(|cell| cell.trim())
+            .collect::<Vec<_>>();
+        if cells.len() < 2 || cells[0] == "Field" || cells[0].starts_with("---") {
+            continue;
+        }
+        let field = trim_code(cells[0]);
+        let category = trim_code(cells[1]);
+        if field.is_empty() || category.is_empty() {
+            continue;
+        }
+        if let Some(previous) = entries.insert(
+            field.clone(),
+            RegistryEntry {
+                line: line_number,
+                category,
+            },
+        ) {
+            report.failures.push(format!(
+                "{STATE_REGISTRY_DOC}:{line_number}: registry field `{field}` duplicates earlier entry on line {}",
+                previous.line
+            ));
+        }
+    }
+    entries
+}
+
+fn state_registry_lines(text: &str) -> Option<Vec<(usize, &str)>> {
+    let mut in_section = false;
+    let mut section = Vec::new();
+    for (index, line) in text.lines().enumerate() {
+        if line.trim() == STATE_REGISTRY_HEADING {
+            in_section = true;
+        } else if in_section && line.starts_with("###") {
+            break;
+        }
+        if in_section {
+            section.push((index + 1, line));
+        }
+    }
+    in_section.then_some(section)
+}
+
+fn trim_code(text: &str) -> String {
+    text.trim().trim_matches('`').trim().to_string()
+}
+
 fn service_modules(files: &[SourceFile]) -> BTreeSet<String> {
     let mut modules = BTreeSet::new();
     for file in files {
@@ -1069,6 +1485,67 @@ fn collect_entity_field_writes(file: &SourceFile, text: &str, report: &mut Archi
     }
 }
 
+fn check_module_level_mutable_state(
+    file: &SourceFile,
+    text: &str,
+    report: &mut ArchitectureReport,
+) {
+    if is_test_path(&file.rel_path) {
+        return;
+    }
+
+    let mut cfg_test_item_pending = false;
+    for (index, line) in text.lines().enumerate() {
+        let code = code_before_comment(line).trim();
+        if is_cfg_test_attribute(code) {
+            cfg_test_item_pending = true;
+        } else if cfg_test_item_pending && code.starts_with("#[") {
+            // Preserve the cfg(test) skip across stacked attributes on the same item.
+        } else {
+            if module_level_mutable_state_decl(code) && !cfg_test_item_pending {
+                report.failures.push(format!(
+                    "{}:{}: module-level mutable simulation state is not allowed; store durable state under GameState, rebuildable state under DerivedState, or keep room/session/test-only state outside rts-sim",
+                    file.rel_path,
+                    index + 1
+                ));
+            }
+            if !code.is_empty() {
+                cfg_test_item_pending = false;
+            }
+        }
+    }
+}
+
+fn module_level_mutable_state_decl(line: &str) -> bool {
+    let line = strip_visibility_prefix(line.trim_start());
+    if line.starts_with("static mut ") {
+        return true;
+    }
+    if line.starts_with("static ") {
+        return ["Mutex<", "RwLock<", "OnceLock<", "LazyLock<"]
+            .iter()
+            .any(|needle| line.contains(needle));
+    }
+    line.starts_with("thread_local!")
+}
+
+fn is_cfg_test_attribute(line: &str) -> bool {
+    line.starts_with("#[cfg(test")
+}
+
+fn strip_visibility_prefix(line: &str) -> &str {
+    let line = line.trim_start();
+    if let Some(rest) = line.strip_prefix("pub ") {
+        return rest.trim_start();
+    }
+    if let Some(after_pub) = line.strip_prefix("pub(") {
+        if let Some(close) = after_pub.find(')') {
+            return after_pub[close + 1..].trim_start();
+        }
+    }
+    line
+}
+
 fn code_before_comment(line: &str) -> &str {
     line.split("//").next().unwrap_or_default()
 }
@@ -1344,6 +1821,205 @@ mod tests {
 
     fn baseline(reason: &str, metrics: &ArchitectureMetrics) -> ArchitectureBaseline {
         ArchitectureBaseline::from_metrics(reason, metrics)
+    }
+
+    fn registry(rows: &[(&str, &str)]) -> String {
+        let mut text = format!(
+            "{STATE_REGISTRY_HEADING}\n\n| Field | Category | Checkpoint policy | Evidence and notes |\n| --- | --- | --- | --- |\n"
+        );
+        for (field, category) in rows {
+            text.push_str(&format!(
+                "| `{field}` | `{category}` | test policy | test evidence |\n"
+            ));
+        }
+        text
+    }
+
+    fn minimal_state_tree_sources(
+        game_state_fields: &str,
+        derived_state_fields: &str,
+    ) -> Vec<SourceFile> {
+        vec![
+            source(
+                "mod.rs",
+                "pub struct Game {\n    pub(in crate::game) state: GameState,\n    pub(in crate::game) derived: DerivedState,\n}\n",
+            ),
+            source(
+                "state.rs",
+                &format!("pub(in crate::game) struct GameState {{\n{game_state_fields}\n}}\n"),
+            ),
+            source(
+                "derived_state.rs",
+                &format!(
+                    "pub(in crate::game) struct DerivedState {{\n{derived_state_fields}\n}}\n"
+                ),
+            ),
+        ]
+    }
+
+    #[test]
+    fn game_must_only_store_explicit_state_tree_roots() {
+        let report = analyze_source_files(&[source(
+            "mod.rs",
+            "pub struct Game {\n    pub(in crate::game) state: GameState,\n    pub(in crate::game) derived: DerivedState,\n    pub(in crate::game) hidden_cache: Vec<u32>,\n}\n",
+        )]);
+
+        assert!(report.failures.iter().any(|failure| failure
+            .contains("Game must only store `state: GameState` and `derived: DerivedState`")));
+    }
+
+    #[test]
+    fn state_registry_requires_every_game_state_and_derived_state_field() {
+        let files = minimal_state_tree_sources(
+            "    pub(in crate::game) map: Map,",
+            "    final_spatial: SpatialIndex,",
+        );
+        let doc = registry(&[("map", "authoritative/serialized")]);
+
+        let report = analyze_source_files_with_registry(&files, Some(&doc));
+
+        assert!(report.failures.iter().any(|failure| failure
+            .contains("DerivedState.final_spatial is missing from docs/design/server-sim.md")));
+    }
+
+    #[test]
+    fn state_registry_accepts_private_visibility_fields() {
+        let files = minimal_state_tree_sources(
+            "    pub(in crate::game) map: Map,",
+            "    final_spatial: SpatialIndex,",
+        );
+        let doc = registry(&[
+            ("map", "authoritative/serialized"),
+            ("final_spatial", "derived/rebuildable"),
+        ]);
+
+        let report = analyze_source_files_with_registry(&files, Some(&doc));
+
+        assert!(report.failures.is_empty());
+    }
+
+    #[test]
+    fn state_owner_scan_ignores_test_shadow_structs() {
+        let mut files = minimal_state_tree_sources(
+            "    pub(in crate::game) map: Map,",
+            "    final_spatial: SpatialIndex,",
+        );
+        files.push(source(
+            "tests/game_tests.rs",
+            "struct Game { hidden_cache: Vec<u32> }\nstruct GameState { test_cache: Vec<u32> }\n",
+        ));
+        let doc = registry(&[
+            ("map", "authoritative/serialized"),
+            ("final_spatial", "derived/rebuildable"),
+        ]);
+
+        let report = analyze_source_files_with_registry(&files, Some(&doc));
+
+        assert!(report.failures.is_empty());
+    }
+
+    #[test]
+    fn state_registry_ignores_cfg_test_owner_fields() {
+        let files = minimal_state_tree_sources(
+            "    pub(in crate::game) map: Map,\n    #[cfg(test)]\n    debug_cache: Vec<u32>,",
+            "    final_spatial: SpatialIndex,",
+        );
+        let doc = registry(&[
+            ("map", "authoritative/serialized"),
+            ("final_spatial", "derived/rebuildable"),
+        ]);
+
+        let report = analyze_source_files_with_registry(&files, Some(&doc));
+
+        assert!(report.failures.is_empty());
+    }
+
+    #[test]
+    fn state_registry_rejects_wrong_derived_state_category() {
+        let files = minimal_state_tree_sources(
+            "    pub(in crate::game) map: Map,",
+            "    final_spatial: SpatialIndex,",
+        );
+        let doc = registry(&[
+            ("map", "authoritative/serialized"),
+            ("final_spatial", "authoritative/serialized"),
+        ]);
+
+        let report = analyze_source_files_with_registry(&files, Some(&doc));
+
+        assert!(report.failures.iter().any(|failure| failure.contains(
+            "DerivedState.final_spatial is categorized as `authoritative/serialized`; DerivedState fields must be derived/rebuildable"
+        )));
+    }
+
+    #[test]
+    fn state_registry_rejects_stale_entries() {
+        let files = minimal_state_tree_sources(
+            "    pub(in crate::game) map: Map,",
+            "    final_spatial: SpatialIndex,",
+        );
+        let doc = registry(&[
+            ("map", "authoritative/serialized"),
+            ("final_spatial", "derived/rebuildable"),
+            ("old_cache", "derived/rebuildable"),
+        ]);
+
+        let report = analyze_source_files_with_registry(&files, Some(&doc));
+
+        assert!(report
+            .failures
+            .iter()
+            .any(|failure| failure.contains("registry field `old_cache` is not a current")));
+    }
+
+    #[test]
+    fn module_level_mutable_state_fails() {
+        let report = analyze_source_files(&[source(
+            "services/pathing.rs",
+            "static CACHE: Mutex<u32> = Mutex::new(0);\n",
+        )]);
+
+        assert_eq!(
+            report.failures,
+            vec![
+                "services/pathing.rs:1: module-level mutable simulation state is not allowed; store durable state under GameState, rebuildable state under DerivedState, or keep room/session/test-only state outside rts-sim".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn module_level_mutable_state_fails_inside_inline_modules() {
+        let report = analyze_source_files(&[source(
+            "services/pathing.rs",
+            "mod hidden {\n    static CACHE: Mutex<u32> = Mutex::new(0);\n}\n",
+        )]);
+
+        assert_eq!(
+            report.failures,
+            vec![
+                "services/pathing.rs:2: module-level mutable simulation state is not allowed; store durable state under GameState, rebuildable state under DerivedState, or keep room/session/test-only state outside rts-sim".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn module_level_mutable_state_ignores_test_files() {
+        let report = analyze_source_files(&[source(
+            "tests/pathing_cache_tests.rs",
+            "static CACHE: Mutex<u32> = Mutex::new(0);\n",
+        )]);
+
+        assert!(report.failures.is_empty());
+    }
+
+    #[test]
+    fn module_level_mutable_state_ignores_cfg_test_items() {
+        let report = analyze_source_files(&[source(
+            "services/pathing.rs",
+            "#[cfg(test)]\n#[allow(dead_code)]\nstatic CACHE: Mutex<u32> = Mutex::new(0);\n",
+        )]);
+
+        assert!(report.failures.is_empty());
     }
 
     #[test]
