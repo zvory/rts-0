@@ -258,10 +258,12 @@ impl Game {
         // Run every per-tick system in order. `run_tick` takes split borrows of the map,
         // entity store, player economy, and the event buckets, so it can mutate resources and
         // entities together without locks.
+        let active_vision_players = self.alive_players().into_iter().collect::<BTreeSet<_>>();
         self.spatial = systems::run_tick(
             &self.map,
             &mut self.entities,
             &mut self.players,
+            &active_vision_players,
             &self.fog,
             &mut self.pathing,
             &mut self.rng,

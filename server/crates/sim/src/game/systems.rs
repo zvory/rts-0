@@ -114,6 +114,7 @@ pub(crate) fn run_tick(
     map: &Map,
     entities: &mut EntityStore,
     players: &mut [PlayerState],
+    active_vision_players: &BTreeSet<u32>,
     fog: &Fog,
     pathing: &mut PathingService,
     rng: &mut SmallRng,
@@ -147,6 +148,7 @@ pub(crate) fn run_tick(
         trenches,
         fog,
         players.iter().map(|player| player.id),
+        active_vision_players,
     );
     if perf.is_some() {
         coordinator.enable_diagnostics();
@@ -436,6 +438,7 @@ mod tests {
         let mut mortar_shells = MortarShellStore::default();
         let mut artillery_shells = ArtilleryShellStore::default();
         let mut active_construction_sites = BTreeSet::new();
+        let active_vision_players = BTreeSet::new();
 
         let worker = entities
             .spawn_unit(1, EntityKind::Worker, 400.0, 390.0)
@@ -457,6 +460,7 @@ mod tests {
             &map,
             &mut entities,
             &mut players,
+            &active_vision_players,
             &fog,
             &mut pathing,
             &mut SmallRng::seed_from_u64(0),

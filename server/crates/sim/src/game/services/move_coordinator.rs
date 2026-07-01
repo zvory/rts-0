@@ -114,11 +114,17 @@ impl<'a> MoveCoordinator<'a> {
         trenches: &TrenchStore,
         fog: &Fog,
         players: impl IntoIterator<Item = u32>,
+        active_vision_players: &BTreeSet<u32>,
     ) {
         self.known_trenches = players
             .into_iter()
             .map(|player| {
-                let mut visible_players = self.teams.same_team_player_ids(player);
+                let mut visible_players = self
+                    .teams
+                    .same_team_player_ids(player)
+                    .into_iter()
+                    .filter(|team_player| active_vision_players.contains(team_player))
+                    .collect::<Vec<_>>();
                 if visible_players.is_empty() {
                     visible_players.push(player);
                 }
