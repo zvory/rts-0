@@ -171,7 +171,7 @@ impl Game {
             };
             for &(building_id, building_kind, rect) in &building_rects {
                 assert!(
-                    valid_pump_jack_oil_overlap(node, building_kind, rect)
+                    standability::resource_node_building_overlap_allowed(node, building_kind, rect)
                         || !circle_intersects_rect(body, rect),
                     "invariant: tick {} resource node body overlaps building footprint; node={}; building=id={} kind={} {}; collision={}",
                     self.tick,
@@ -466,15 +466,6 @@ fn location_context(map: &Map, x: f32, y: f32) -> String {
     )
 }
 
-fn valid_pump_jack_oil_overlap(node: &Entity, building_kind: EntityKind, rect: RectBody) -> bool {
-    node.kind == EntityKind::Oil
-        && building_kind == EntityKind::PumpJack
-        && node.pos_x >= rect.min_x
-        && node.pos_x <= rect.max_x
-        && node.pos_y >= rect.min_y
-        && node.pos_y <= rect.max_y
-}
-
 fn tile_location_context(map: &Map, tile: (u32, u32)) -> String {
     let max_tile = map.size.saturating_sub(1);
     let (x, y) = map.tile_center(tile.0.min(max_tile), tile.1.min(max_tile));
@@ -705,6 +696,7 @@ fn third_label(
 #[cfg(test)]
 mod tests {
     use std::panic::{catch_unwind, AssertUnwindSafe};
+    use std::str::FromStr;
 
     use super::{location_context, unit_body_rect_overlap_depth, STATIC_BODY_OVERLAP_TOLERANCE_PX};
     use crate::config;
@@ -897,8 +889,9 @@ mod tests {
         }
 
         let (x, y) = footprint_center(&game.map, EntityKind::PumpJack, 10, 10);
+        let oil_kind = EntityKind::from_str("oil").expect("oil kind");
         game.entities
-            .spawn_node(EntityKind::Oil, x, y)
+            .spawn_node(oil_kind, x, y)
             .expect("oil spawn");
         game.entities
             .spawn_building(1, EntityKind::PumpJack, x, y, true)
