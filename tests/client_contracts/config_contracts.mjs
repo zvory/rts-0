@@ -267,7 +267,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       STATS[KIND.PANZERFAUST].rangeTiles === PANZERFAUST_RANGE_TILES &&
       STATS[KIND.PANZERFAUST].buildTicks === 400 &&
       PANZERFAUST_RANGE_TILES === 3 &&
-      PANZERFAUST_DAMAGE === 60 &&
+      PANZERFAUST_DAMAGE === 100 &&
       PANZERFAUST_WINDUP_TICKS === 15 &&
       PANZERFAUST_TRAVEL_TICKS === 15 &&
       PANZERFAUST_RECOVERY_TICKS === 15 &&
@@ -282,7 +282,8 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   );
   assert(
     STATS[KIND.PANZERFAUST].requires === KIND.TRAINING_CENTRE &&
-      STATS[KIND.PANZERFAUST].description.includes("Fires once at Tanks") &&
+      STATS[KIND.PANZERFAUST].description.includes("Fires once at Tanks or Scout Cars") &&
+      STATS[KIND.PANZERFAUST].description.includes("50% armor penetration") &&
       STATS[KIND.PANZERFAUST].description.includes("Methamphetamines shortens windup and recovery"),
     "Panzerfaust command-card metadata exposes its Training Centre requirement and approved tooltip copy",
   );
