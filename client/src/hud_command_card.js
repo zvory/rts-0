@@ -12,7 +12,6 @@ import {
   abilityAutocastEnabled,
   abilityCooldownLeft,
   abilityRemainingUses,
-  abilityRequiresSetup,
   abilityUnitQueueAdmissible,
   abilityUnitReady,
 } from "./hud_ability_affordance.js";
@@ -120,7 +119,10 @@ export function buildCommandCardContextCatalog() {
     owner: playerId,
     kind: KIND.ARTILLERY,
     setupState: SETUP.DEPLOYED,
-    abilities: [{ ability: ABILITY.POINT_FIRE, cooldownLeft: 0, remainingUses: null }],
+    abilities: [
+      { ability: ABILITY.POINT_FIRE, cooldownLeft: 0, remainingUses: null },
+      { ability: ABILITY.BLANKET_FIRE, cooldownLeft: 0, remainingUses: null },
+    ],
   };
   const commandCar = {
     id: 15,
@@ -245,7 +247,7 @@ export function buildUnitCard(ctx, selection) {
     `|setup:${setupGunIds.join(".")}|` +
     `|abilities:${abilityAffordances.map((affordance) =>
       `${affordance.definition.ability}:${affordance.unlocked ? 1 : 0}:${affordance.affordable ? 1 : 0}:` +
-      `${affordance.depletedCount}:${affordance.setupBlockedCount}:` +
+      `${affordance.depletedCount}:` +
       `${affordance.readyIds.join(".")}:` +
       `${affordance.queueAdmissibleIds.join(".")}:` +
       `${affordance.autocastEnabledIds.join(".")}:` +
@@ -468,9 +470,6 @@ export function selectedAbilityAffordances(ctx, selection) {
       const depletedCount = carriers.filter(
         (e) => abilityRemainingUses(e, definition.ability) === 0,
       ).length;
-      const setupBlockedCount = carriers.filter((e) =>
-        abilityRequiresSetup(e, definition),
-      ).length;
       const autocastEnabledIds = carriers
         .filter((e) => abilityAutocastEnabled(e, definition.ability))
         .map((e) => e.id);
@@ -479,7 +478,6 @@ export function selectedAbilityAffordances(ctx, selection) {
         unlocked,
         affordable: canAfford,
         depletedCount,
-        setupBlockedCount,
         carrierIds: carriers.map((e) => e.id),
         readyIds: readyUnits.map((e) => e.id),
         queueAdmissibleIds: queueAdmissibleUnits.map((e) => e.id),
@@ -718,9 +716,6 @@ function abilityDisabledReason(ctx, affordance) {
     if (missing) return `Requires ${STATS[missing]?.label || missing}`;
   }
   if (affordance.depletedCount === affordance.carrierIds.length) return "Depleted";
-  if (affordance.setupBlockedCount === affordance.carrierIds.length) {
-    return "Set up artillery before using Point Fire";
-  }
   if (!affordance.affordable) return "Not enough resources";
   if (
     affordance.readyIds.length === 0 &&

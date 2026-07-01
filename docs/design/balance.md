@@ -302,8 +302,7 @@ folded into default targeting.
   `ARTILLERY_SETUP_TICKS = 90` (~3s), `ARTILLERY_SHELL_DELAY_TICKS = 150` (~5s), and
   `ARTILLERY_AMMO_COST_STEEL = 10`.
   Blanket Fire uses `ARTILLERY_BLANKET_RADIUS_TILES = 15` around the stored locked center for
-  deterministic uniform impact sampling, but remains hidden from the command card until the client
-  targeting phase exposes it.
+  deterministic uniform impact sampling and appears as a separate Artillery command-card ability.
   Unupgraded artillery error scales by shot range, from `ARTILLERY_MIN_RANGE_ERROR_TILES = 3.0`
   at minimum range to `ARTILLERY_MAX_RANGE_ERROR_TILES = 15.0` at maximum range, and does not
   tighten over repeated fire. The interpolation span is the current 25-to-55 tile range band.
@@ -380,8 +379,7 @@ folded into default targeting.
   world effect, dash return, line projectile, Magic Anchor placement, Golem consumption, and the
   artillery fire path. The `blanketFire` id is registry-backed as an Artillery-carried,
   world-point, queueable ability with the same range band, ammunition cost, and reload cadence as
-  `pointFire`, plus a 15-tile blanket radius; it has server runtime support but is marked
-  non-command-card until the client targeting phase exposes it. The legacy `charge` ability id remains
+  `pointFire`, plus a 15-tile blanket radius and command-card exposure. The legacy `charge` ability id remains
   registry-backed only for old command/replay decoding and has no carriers, cooldown, command-card
   entry, or runtime status.
 - **Ekat** is the first playable one-hero faction unit. The `ekat` catalog starts with
