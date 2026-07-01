@@ -695,7 +695,7 @@ impl Entity {
     pub fn set_target_id(&mut self, target_id: Option<u32>) {
         if let Some(c) = self.combat.as_mut() {
             if c.target_id != target_id {
-                c.firing_reveal_response_target = None;
+                c.clear_firing_reveal_response_targets();
             }
             c.target_id = target_id;
             if target_id.is_some() {
@@ -705,15 +705,22 @@ impl Entity {
     }
 
     pub fn start_firing_reveal_response_delay(&mut self, target_id: u32, ticks: u32) -> bool {
+        let Some(weapon) = self.default_weapon_kind() else {
+            return false;
+        };
+        self.start_weapon_firing_reveal_response_delay(weapon, target_id, ticks)
+    }
+
+    pub(in crate::game) fn start_weapon_firing_reveal_response_delay(
+        &mut self,
+        weapon: rules::combat::WeaponKind,
+        target_id: u32,
+        ticks: u32,
+    ) -> bool {
         let Some(c) = self.combat.as_mut() else {
             return false;
         };
-        if ticks == 0 || c.firing_reveal_response_target == Some(target_id) {
-            return false;
-        }
-        c.firing_reveal_response_target = Some(target_id);
-        c.attack_cd = c.attack_cd.saturating_add(ticks);
-        true
+        c.start_firing_reveal_response_delay(weapon, target_id, ticks)
     }
 
     pub fn reset_attack_move_no_target_ticks(&mut self) {
@@ -767,12 +774,38 @@ impl Entity {
     }
 
     pub fn attack_cd(&self) -> u32 {
-        self.combat.as_ref().map(|c| c.attack_cd).unwrap_or(0)
+        self.default_weapon_kind()
+            .map(|weapon| self.weapon_cooldown(weapon))
+            .unwrap_or(0)
     }
 
     pub fn set_attack_cd(&mut self, attack_cd: u32) {
+        let Some(weapon) = self.default_weapon_kind() else {
+            return;
+        };
+        self.set_weapon_cooldown(weapon, attack_cd);
+    }
+
+    pub(in crate::game) fn weapon_cooldown(&self, weapon: rules::combat::WeaponKind) -> u32 {
+        self.combat
+            .as_ref()
+            .map(|c| c.weapon_cooldown(weapon))
+            .unwrap_or(0)
+    }
+
+    pub(in crate::game) fn set_weapon_cooldown(
+        &mut self,
+        weapon: rules::combat::WeaponKind,
+        ticks: u32,
+    ) {
         if let Some(c) = self.combat.as_mut() {
-            c.attack_cd = attack_cd;
+            c.set_weapon_cooldown(weapon, ticks);
+        }
+    }
+
+    pub(in crate::game) fn tick_weapon_cooldowns(&mut self) {
+        if let Some(c) = self.combat.as_mut() {
+            c.tick_weapon_cooldowns();
         }
     }
 
@@ -812,9 +845,16 @@ impl Entity {
     }
 
     pub fn tick_attack_cd(&mut self) {
+        let Some(weapon) = self.default_weapon_kind() else {
+            return;
+        };
         if let Some(c) = self.combat.as_mut() {
-            c.attack_cd = c.attack_cd.saturating_sub(1);
+            c.tick_weapon_cooldown(weapon);
         }
+    }
+
+    fn default_weapon_kind(&self) -> Option<rules::combat::WeaponKind> {
+        rules::combat::default_weapon_kind(self.kind)
     }
 
     pub fn last_damage_owner(&self) -> Option<u32> {

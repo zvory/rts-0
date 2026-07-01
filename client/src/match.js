@@ -289,6 +289,9 @@ export class Match {
           this.applyPredictedSnapshot();
         },
       );
+      this.clientIntent?.reconcilePlannedOrders?.(this.state.selectedEntities(), {
+        acknowledgedClientSeq: ackSeq,
+      });
       if (ackSeq != null) this.prediction.recordAckSnapshotApplied(ackSeq, now);
       this.lastSnapshotTick = Number.isFinite(m?.tick) ? m.tick : this.lastSnapshotTick;
       this.roomTimeControls?.noteSnapshotTick(m?.tick);
@@ -572,7 +575,10 @@ export class Match {
       reason: typeof message.reason === "string" ? message.reason : null,
     };
     if (detail.accepted) this.prediction.recordSocketReceipt(message.clientSeq, detail);
-    else this.prediction.recordCommandRejection(message.clientSeq, detail.reason, detail);
+    else {
+      this.clientIntent?.clearPlannedOrdersForClientSeq?.(message.clientSeq);
+      this.prediction.recordCommandRejection(message.clientSeq, detail.reason, detail);
+    }
     this.publishPredictionDebug();
   }
 

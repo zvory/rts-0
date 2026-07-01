@@ -744,6 +744,13 @@ Tank weapon range is dynamic in the simulation: tanks keep their base 5-tile ran
 then linearly ramp to 14 tiles after three stationary seconds. Path-driven translation or hull
 rotation resets the ramp to base range; turret aiming and external pushes do not.
 
+Combat weapon cooldowns and firing-reveal response delays are keyed by
+`rules::combat::WeaponKind` inside `CombatState`. The legacy `Entity::attack_cd()`,
+`set_attack_cd()`, and `tick_attack_cd()` shims operate only on an entity kind's default weapon;
+new multi-weapon code should use `weapon_cooldown`, `set_weapon_cooldown`,
+`tick_weapon_cooldowns`, and `start_weapon_firing_reveal_response_delay`. Ability cooldowns,
+lockouts, and uses remain separate from weapon cooldown state.
+
 Auto-acquisition prefers unit targets before building cleanup targets by default. Building fallback targets still use weapon-fit ranking among eligible cleanup targets.
 
 Overpenetration checks use the target's pre-damage entrenchment state, so lethal primary hits keep the same entrenched blocking decision used before damage resolution.
@@ -923,6 +930,12 @@ Allocation rules:
   the same setup/redeploy-owned fire order. Promotion and firing recheck liveness, ownership, kind,
   construction state, path state, faction ability eligibility, stored target map/range/cone
   validity, ammo, and deployment before any shell is launched.
+- Client world-view and minimap previews may temporarily combine local pending move/setup/fire
+  stages with owner-only `orderPlan` snapshots so queued Point Fire and Blanket Fire appear to aim
+  from the future origin before the server echo arrives. This is preview-only: command admission,
+  target locking, terminal queue behavior, stale-stage skipping, and the projected `orderPlan`
+  remain server-owned. Minimap targeting sends the same world-coordinate `useAbility` command as
+  viewport targeting; there is no separate minimap simulation path.
 - Point Fire samples normal artillery scatter around the stored point, with Ballistic Tables
   tightening repeated Point Fire shots only. Blanket Fire samples each shot deterministically and
   uniformly within `ARTILLERY_BLANKET_RADIUS_TILES` around the stored center using authoritative

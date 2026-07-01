@@ -1,4 +1,7 @@
+use std::collections::BTreeMap;
+
 use crate::game::upgrade::UpgradeKind;
+use crate::rules::combat::WeaponKind;
 
 use super::{EntityKind, Order, OrderIntent, RallyIntent};
 
@@ -120,8 +123,8 @@ impl Default for MovementState {
 /// Weapon and active target state. Present on combat-capable entities.
 #[derive(Debug, Clone)]
 pub struct CombatState {
-    /// Ticks until this entity may attack again (0 = ready).
-    pub attack_cd: u32,
+    /// Ticks until each weapon may attack again (missing or 0 = ready).
+    pub weapon_cooldowns: BTreeMap<WeaponKind, u32>,
     /// Artillery consecutive shots since its current deployment/move reset.
     pub artillery_shots_fired: u16,
     /// Blanket Fire shots since the current blanket order began.
@@ -129,8 +132,8 @@ pub struct CombatState {
     /// Current attack/interaction target id. Combat uses enemy ids; gather/build commands use
     /// this for client feedback while the order executes.
     pub target_id: Option<u32>,
-    /// Target id this combatant has already spent its firing-reveal reaction delay on.
-    pub firing_reveal_response_target: Option<u32>,
+    /// Per-weapon target id this combatant has already spent its firing-reveal reaction delay on.
+    pub firing_reveal_response_targets: BTreeMap<WeaponKind, u32>,
     /// Consecutive no-target ticks while a deployed/setup support weapon is trying to resume an
     /// unfinished attack-move order.
     pub attack_move_no_target_ticks: u16,
@@ -160,11 +163,11 @@ pub struct CombatState {
 impl Default for CombatState {
     fn default() -> Self {
         CombatState {
-            attack_cd: 0,
+            weapon_cooldowns: BTreeMap::new(),
             artillery_shots_fired: 0,
             artillery_blanket_shots_fired: 0,
             target_id: None,
-            firing_reveal_response_target: None,
+            firing_reveal_response_targets: BTreeMap::new(),
             attack_move_no_target_ticks: 0,
             setup: WeaponSetup::Packed,
             weapon_facing: 0.0,
@@ -176,6 +179,55 @@ impl Default for CombatState {
             tank_stationary_range_reset_this_tick: false,
             panzerfaust: None,
         }
+    }
+}
+
+impl CombatState {
+    pub(in crate::game) fn weapon_cooldown(&self, weapon: WeaponKind) -> u32 {
+        self.weapon_cooldowns.get(&weapon).copied().unwrap_or(0)
+    }
+    pub(in crate::game) fn set_weapon_cooldown(&mut self, weapon: WeaponKind, ticks: u32) {
+        if ticks == 0 {
+            self.weapon_cooldowns.remove(&weapon);
+        } else {
+            self.weapon_cooldowns.insert(weapon, ticks);
+        }
+    }
+
+    pub(in crate::game) fn tick_weapon_cooldown(&mut self, weapon: WeaponKind) {
+        let ticks = self.weapon_cooldown(weapon).saturating_sub(1);
+        self.set_weapon_cooldown(weapon, ticks);
+    }
+
+    pub(in crate::game) fn tick_weapon_cooldowns(&mut self) {
+        self.weapon_cooldowns.retain(|_, ticks| {
+            *ticks = ticks.saturating_sub(1);
+            *ticks > 0
+        });
+    }
+
+    pub(in crate::game) fn start_firing_reveal_response_delay(
+        &mut self,
+        weapon: WeaponKind,
+        target_id: u32,
+        ticks: u32,
+    ) -> bool {
+        if ticks == 0
+            || self
+                .firing_reveal_response_targets
+                .get(&weapon)
+                .is_some_and(|previous_target| *previous_target == target_id)
+        {
+            return false;
+        }
+        self.firing_reveal_response_targets
+            .insert(weapon, target_id);
+        self.set_weapon_cooldown(weapon, self.weapon_cooldown(weapon).saturating_add(ticks));
+        true
+    }
+
+    pub(in crate::game) fn clear_firing_reveal_response_targets(&mut self) {
+        self.firing_reveal_response_targets.clear();
     }
 }
 
