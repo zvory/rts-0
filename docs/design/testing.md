@@ -125,6 +125,16 @@ Current scenario ids:
   `explicit_infantry_attack`.
 - `entrenchment_inspection` — seeded neutral trenches, researched friendly infantry, friendly and
   enemy eligible trench reusers, and a Machine Gunner for crowded slotting/rendering checks.
+- `panzerfaust_duel` — one loaded Panzerfaust versus one Tank for launch, impact, damage, and
+  same-id conversion inspection.
+- `panzerfaust_windup_cancel` — starts a Panzerfaust attack, then issues movement during windup to
+  inspect cancellation without shot consumption.
+- `panzerfaust_target_death` — pairs normal and boosted Panzerfausts against one low-health Tank so
+  a projectile reaches a target that died during travel.
+- `panzerfaust_entrenched_range` — compares occupied-trench and exposed Panzerfausts holding
+  position against Tanks at four-tile range.
+- `panzerfaust_methamphetamines` — compares normal and Methamphetamines Panzerfaust firing and
+  conversion timing side by side.
 
 The watcher shows movement debug path overlays by default. Replay speed controls are reused for
 dev scenarios: `Pause` sets the simulation speed to zero, and `Step` advances exactly one

@@ -32,6 +32,9 @@ pub(in crate::game::services::combat) fn tick_states(
         let Some(state) = entities.get(id).and_then(panzerfaust_state) else {
             continue;
         };
+        if entities.get(id).is_none_or(|entity| entity.hp == 0) {
+            continue;
+        }
         match state {
             PanzerfaustState::Loaded => {}
             PanzerfaustState::Windup {

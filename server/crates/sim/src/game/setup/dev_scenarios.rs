@@ -3,6 +3,7 @@ use crate::game::entity::Order;
 use crate::rules::combat::WeaponKind;
 
 mod layouts;
+mod panzerfaust;
 
 use layouts::*;
 

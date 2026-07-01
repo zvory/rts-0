@@ -1,8 +1,9 @@
 # Panzerfaust Unit Checklist
 
 Status: Phase 0 brief and Phase 1 rules/balance spec drafted with user-reviewed close-range tuning;
-Phases 2-6 have implemented hidden vocabulary, runtime/client inspection, normal Barracks
-production exposure, and first-pass launch/impact audio feedback.
+Phases 2-7 have implemented hidden vocabulary, runtime/client inspection, normal Barracks
+production exposure, first-pass launch/impact audio feedback, and final focused regression/dev
+inspection coverage.
 This file follows [docs/new-unit-checklist.md](../../docs/new-unit-checklist.md).
 
 Read: [docs/context/balance.md](../../docs/context/balance.md),
@@ -80,6 +81,8 @@ Read: [docs/context/balance.md](../../docs/context/balance.md),
     benefits.
   - Panzerfaust launch and impact now use distinct first-pass spatial combat cues; projectile
     travel and same-id conversion remain silent to avoid clustered-fire spam.
+  - Dedicated dev scenarios cover one-shot firing, windup cancellation, target death during travel,
+    entrenched range, and Methamphetamines timing for final playtest inspection.
 
 Exit criteria:
 

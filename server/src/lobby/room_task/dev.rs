@@ -130,170 +130,104 @@ impl RoomTask {
             RoomMode::DevScenario(config) => {
                 let _scenario_faction_id =
                     default_faction_id_for(FactionRequestContext::DevScenario);
-                match config.id {
-                    DevScenarioId::ScoutCarSnakingCorridor => {
-                        let setup = Game::new_snaking_corridor_scenario(
-                            config.unit,
-                            config.count,
-                            match_seed(),
-                        )?;
+                let seed = match_seed();
+                macro_rules! session_from_setup {
+                    ($setup:expr $(,)?) => {{
+                        let setup = $setup;
+                        let player_id = setup.player_id;
                         let driver = DevScenarioDriver {
-                            player_id: setup.player_id,
+                            player_id,
                             units: setup.units,
                             goal: setup.goal,
                             issue_after_ticks: setup.issue_after_ticks,
                             issued: false,
                         };
-                        Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
-                    }
-                    DevScenarioId::DirectReverseOrder => {
-                        let setup = Game::new_direct_reverse_order_scenario(
-                            config.unit,
-                            config.count,
-                            match_seed(),
-                        )?;
-                        let driver = DevScenarioDriver {
-                            player_id: setup.player_id,
-                            units: setup.units,
-                            goal: setup.goal,
-                            issue_after_ticks: setup.issue_after_ticks,
-                            issued: false,
-                        };
-                        Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
-                    }
+                        Ok::<(Game, DevDriver, u32), String>((
+                            setup.game,
+                            DevDriver::Scenario(driver),
+                            player_id,
+                        ))
+                    }};
+                }
+
+                match &config.id {
+                    DevScenarioId::ScoutCarSnakingCorridor => session_from_setup!(
+                        Game::new_snaking_corridor_scenario(config.unit, config.count, seed)?,
+                    ),
+                    DevScenarioId::DirectReverseOrder => session_from_setup!(
+                        Game::new_direct_reverse_order_scenario(config.unit, config.count, seed)?,
+                    ),
                     DevScenarioId::ScoutCarWallChokepoint => {
-                        let setup = Game::new_scout_car_wall_chokepoint_scenario(
+                        session_from_setup!(Game::new_scout_car_wall_chokepoint_scenario(
                             config.unit,
                             config.count,
-                            match_seed(),
-                        )?;
-                        let driver = DevScenarioDriver {
-                            player_id: setup.player_id,
-                            units: setup.units,
-                            goal: setup.goal,
-                            issue_after_ticks: setup.issue_after_ticks,
-                            issued: false,
-                        };
-                        Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
+                            seed,
+                        )?)
                     }
-                    DevScenarioId::VehicleCornerWall => {
-                        let setup = Game::new_vehicle_corner_wall_scenario(
-                            config.unit,
-                            config.count,
-                            match_seed(),
-                        )?;
-                        let driver = DevScenarioDriver {
-                            player_id: setup.player_id,
-                            units: setup.units,
-                            goal: setup.goal,
-                            issue_after_ticks: setup.issue_after_ticks,
-                            issued: false,
-                        };
-                        Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
-                    }
+                    DevScenarioId::VehicleCornerWall => session_from_setup!(
+                        Game::new_vehicle_corner_wall_scenario(config.unit, config.count, seed)?,
+                    ),
                     DevScenarioId::VehicleSmallBlockBaseline => {
-                        let setup = Game::new_vehicle_small_block_baseline_scenario(
+                        session_from_setup!(Game::new_vehicle_small_block_baseline_scenario(
                             config.unit,
                             config.count,
                             config.blocker,
-                            match_seed(),
-                        )?;
-                        let driver = DevScenarioDriver {
-                            player_id: setup.player_id,
-                            units: setup.units,
-                            goal: setup.goal,
-                            issue_after_ticks: setup.issue_after_ticks,
-                            issued: false,
-                        };
-                        Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
+                            seed,
+                        )?)
                     }
                     DevScenarioId::FactoryZeroGapPerpendicular => {
-                        let setup = Game::new_factory_zero_gap_perpendicular_scenario(
+                        session_from_setup!(Game::new_factory_zero_gap_perpendicular_scenario(
                             config.unit,
                             config.count,
-                            match_seed(),
-                        )?;
-                        let driver = DevScenarioDriver {
-                            player_id: setup.player_id,
-                            units: setup.units,
-                            goal: setup.goal,
-                            issue_after_ticks: setup.issue_after_ticks,
-                            issued: false,
-                        };
-                        Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
+                            seed,
+                        )?)
                     }
                     DevScenarioId::TankTrapLineHorizontal
                     | DevScenarioId::TankTrapLineVertical
                     | DevScenarioId::TankTrapLineDiagonal => {
-                        let scenario_id = match config.id {
-                            DevScenarioId::TankTrapLineHorizontal => "tank_trap_line_horizontal",
-                            DevScenarioId::TankTrapLineVertical => "tank_trap_line_vertical",
-                            DevScenarioId::TankTrapLineDiagonal => "tank_trap_line_diagonal",
-                            _ => unreachable!("outer match selects Tank Trap line scenarios"),
-                        };
-                        let setup = Game::new_tank_trap_line_build_scenario(
-                            scenario_id,
+                        session_from_setup!(Game::new_tank_trap_line_build_scenario(
+                            config.id.room_id(),
                             config.unit,
                             config.count,
-                            match_seed(),
-                        )?;
-                        let driver = DevScenarioDriver {
-                            player_id: setup.player_id,
-                            units: setup.units,
-                            goal: setup.goal,
-                            issue_after_ticks: setup.issue_after_ticks,
-                            issued: false,
-                        };
-                        Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
+                            seed,
+                        )?)
                     }
                     DevScenarioId::TankTrapPathingMatrix => {
                         let scenario_case = config
                             .case
                             .ok_or_else(|| "missing Tank Trap pathing case".to_string())?;
-                        let setup = Game::new_tank_trap_pathing_scenario(
+                        session_from_setup!(Game::new_tank_trap_pathing_scenario(
                             scenario_case,
                             config.unit,
                             config.count,
-                            match_seed(),
-                        )?;
-                        let driver = DevScenarioDriver {
-                            player_id: setup.player_id,
-                            units: setup.units,
-                            goal: setup.goal,
-                            issue_after_ticks: setup.issue_after_ticks,
-                            issued: false,
-                        };
-                        Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
+                            seed,
+                        )?)
                     }
                     DevScenarioId::EntrenchmentInspection => {
-                        let setup = Game::new_entrenchment_inspection_scenario(
+                        session_from_setup!(Game::new_entrenchment_inspection_scenario(
                             config.unit,
                             config.count,
-                            match_seed(),
-                        )?;
-                        let driver = DevScenarioDriver {
-                            player_id: setup.player_id,
-                            units: setup.units,
-                            goal: setup.goal,
-                            issue_after_ticks: setup.issue_after_ticks,
-                            issued: false,
-                        };
-                        Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
+                            seed,
+                        )?)
+                    }
+                    DevScenarioId::PanzerfaustDuel
+                    | DevScenarioId::PanzerfaustWindupCancel
+                    | DevScenarioId::PanzerfaustTargetDeath
+                    | DevScenarioId::PanzerfaustEntrenchedRange
+                    | DevScenarioId::PanzerfaustMethamphetamines => {
+                        session_from_setup!(Game::new_panzerfaust_inspection_scenario(
+                            config.id.room_id(),
+                            config.unit,
+                            config.count,
+                            seed,
+                        )?)
                     }
                     DevScenarioId::TankCoaxInspection => {
-                        let setup = Game::new_tank_coax_inspection_scenario(
+                        session_from_setup!(Game::new_tank_coax_inspection_scenario(
                             config.unit,
                             config.count,
-                            match_seed(),
-                        )?;
-                        let driver = DevScenarioDriver {
-                            player_id: setup.player_id,
-                            units: setup.units,
-                            goal: setup.goal,
-                            issue_after_ticks: setup.issue_after_ticks,
-                            issued: false,
-                        };
-                        Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
+                            seed,
+                        )?)
                     }
                 }
             }

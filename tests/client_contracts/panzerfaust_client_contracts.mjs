@@ -67,6 +67,7 @@ const start = {
     events: [],
   });
   state.setSelection([41]);
+  state.setControlGroup(0, state.selection);
   state.applySnapshot({
     tick: 21,
     steel: 0,
@@ -79,4 +80,6 @@ const start = {
 
   assert(state.selection.has(41), "same-id Panzerfaust conversion preserves client selection");
   assert(state.selectedEntities()[0]?.kind === KIND.RIFLEMAN, "same-id Panzerfaust conversion updates selected entity kind in place");
+  assert(state.controlGroups[0].join(",") === "41", "same-id Panzerfaust conversion preserves local control groups");
+  assert(state.controlGroupEntities(0)[0]?.kind === KIND.RIFLEMAN, "control-group recall resolves the converted Rifleman in place");
 }
