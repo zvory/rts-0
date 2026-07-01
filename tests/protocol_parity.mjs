@@ -53,7 +53,11 @@ import { PLAYER_PALETTE } from "../client/src/config.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const rustProtocolPath = path.join(repoRoot, "server/crates/protocol/src/lib.rs");
-const rust = fs.readFileSync(rustProtocolPath, "utf8");
+const rustProtocolLabScenarioPath = path.join(repoRoot, "server/crates/protocol/src/lab_scenario.rs");
+const rust = [
+  fs.readFileSync(rustProtocolPath, "utf8"),
+  fs.readFileSync(rustProtocolLabScenarioPath, "utf8"),
+].join("\n");
 const rustClientNetReport = fs.readFileSync(
   path.join(repoRoot, "server/crates/protocol/src/client_net_report.rs"),
   "utf8",
@@ -441,15 +445,18 @@ assert(
     rust.includes("set_up") &&
     rust.includes("weapon_facing") &&
     rust.includes("setup_facing") &&
+    rust.includes("queued_orders") &&
     rust.includes("god_mode_players") &&
     LAB_SCENARIO.KIND === "labScenario" &&
     LAB_SCENARIO.SCHEMA_VERSION === 1 &&
     protocolDoc.includes("LabScenarioV1") &&
+    protocolDoc.includes("LabScenarioOrder") &&
     protocolDoc.includes("setUp") &&
     protocolDoc.includes("facing") &&
     protocolDoc.includes("weaponFacing") &&
     protocolDoc.includes("setupFacing") &&
     protocolDoc.includes("setupTarget") &&
+    protocolDoc.includes("queuedOrders") &&
     protocolDoc.includes("godModePlayers") &&
     protocolDoc.includes("validateScenario") &&
     protocolDoc.includes("submitScenario"),

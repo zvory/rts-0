@@ -7,8 +7,8 @@ use rts_protocol::{
     CompactSlotSchemas, DebugPathPoint, DebugPathView, DiagnosticCapabilities, EntityView, Event,
     LabClientOp, LabResult, LabScenarioEntity, LabScenarioLabMetadata, LabScenarioMap,
     LabScenarioMetadata, LabScenarioPlayer, LabScenarioV1, LabStartMetadata, LabStartRole,
-    LabState, LabVisionMode, LivePauseState, LobbyPlayer, MapInfo, MatchControlCapabilities,
-    MovementPathDiagnosticScope, NoticeSeverity, ObserverAnalysisKindCount,
+    LabScenarioOrder, LabState, LabVisionMode, LivePauseState, LobbyPlayer, MapInfo,
+    MatchControlCapabilities, MovementPathDiagnosticScope, NoticeSeverity, ObserverAnalysisKindCount,
     ObserverAnalysisPayload, ObserverAnalysisPlayer, ObserverAnalysisProduction,
     ObserverAnalysisResourcesLost, OrderPlanMarker, PlayerResourceSnapshot, PlayerScore,
     PlayerStart, ProtocolCompactCodes, ProtocolContract, ProtocolMessageTags, ProtocolVocabularies,
@@ -50,6 +50,7 @@ fn stable_rust_public_surface_compiles() {
     assert_type::<LabScenarioLabMetadata>();
     assert_type::<LabScenarioMap>();
     assert_type::<LabScenarioMetadata>();
+    assert_type::<LabScenarioOrder>();
     assert_type::<LabScenarioPlayer>();
     assert_type::<LabScenarioV1>();
     assert_type::<LabStartMetadata>();

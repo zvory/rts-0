@@ -14,20 +14,18 @@ use crate::rules::combat as combat_rules;
 use crate::rules::target as target_rules;
 use crate::rules::terrain::{self, TerrainKind};
 
-use super::priority::{self, AttackPriorityContext, TargetCandidate};
+use super::priority::{AttackPriorityContext, TargetCandidate};
 use super::projection::{friendly_hard_blocker_between, shot_hits_intended_target};
-use super::weapons::{effective_attack_profile, moving_fire_movement_order_holds_path};
+use super::weapons::{
+    choose_target_preferring_anti_tank_field, effective_attack_profile,
+    moving_fire_movement_order_holds_path,
+};
 
-/// How a combatant chooses targets.
 #[derive(Copy, Clone, PartialEq)]
 pub(super) enum CombatMode {
-    /// Has an explicit attack target id.
     Ordered,
-    /// Engages and chases any enemy within acquisition range.
     Aggressive,
-    /// Engages enemies already in weapon range, without chasing them.
     Opportunistic,
-    /// Ignores nearby enemies unless explicitly ordered to attack.
     Passive,
 }
 
@@ -93,15 +91,7 @@ pub(super) fn direct_fire_target_legal(
         return false;
     }
     if legality.requires_intended_target {
-        shot_hits_intended_target(
-            map,
-            entities,
-            teams,
-            attacker,
-            attacker_owner,
-            target,
-            start,
-        )
+        shot_hits_intended_target(map, entities, teams, attacker, attacker_owner, target, start)
     } else {
         !friendly_hard_blocker_between(map, entities, attacker, attacker_owner, start, end)
     }
@@ -210,29 +200,35 @@ pub(super) fn resolve_target(
         attacker.target_id(),
     );
     if mode_requires_currently_fireable_targets(mode) {
-        return priority::choose_target(
+        return choose_target_preferring_anti_tank_field(
             &context,
-            candidates
-                .iter()
-                .filter(|candidate| candidate.in_weapon_range && target_filter(candidate.id)),
+            attacker,
+            px,
+            py,
+            &candidates,
+            |candidate| candidate.in_weapon_range && target_filter(candidate.id),
         );
     }
     if pathing_attack_move_prefers_currently_fireable_targets(attacker) {
-        let fireable_target = priority::choose_target(
+        let fireable_target = choose_target_preferring_anti_tank_field(
             &context,
-            candidates
-                .iter()
-                .filter(|candidate| candidate.in_weapon_range && target_filter(candidate.id)),
+            attacker,
+            px,
+            py,
+            &candidates,
+            |candidate| candidate.in_weapon_range && target_filter(candidate.id),
         );
         if fireable_target.is_some() {
             return fireable_target;
         }
     }
-    priority::choose_target(
+    choose_target_preferring_anti_tank_field(
         &context,
-        candidates
-            .iter()
-            .filter(|candidate| target_filter(candidate.id)),
+        attacker,
+        px,
+        py,
+        &candidates,
+        |candidate| target_filter(candidate.id),
     )
 }
 

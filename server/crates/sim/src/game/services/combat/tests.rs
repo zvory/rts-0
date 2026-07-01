@@ -3,8 +3,7 @@ use crate::game::entity::{BuildPhase, EntityKind, EntityStore, MovePhase, Order,
 use crate::game::fog::Fog;
 use crate::game::mortar;
 use crate::game::services::move_coordinator::MoveCoordinator;
-use crate::game::services::movement::angle_delta;
-use crate::game::services::movement::movement_system;
+use crate::game::services::movement::{angle_delta, movement_system};
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::pathing::PathingService;
 use crate::game::services::spatial::SpatialIndex;
@@ -16,6 +15,7 @@ use crate::protocol::{terrain, NoticeSeverity};
 use crate::rules::combat as combat_rules;
 use rand::SeedableRng;
 mod mortar_autocast;
+mod anti_tank_acquisition;
 mod coax;
 mod entrenchment;
 mod moving_fire_policy;

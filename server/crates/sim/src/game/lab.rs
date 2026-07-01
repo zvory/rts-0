@@ -3,19 +3,20 @@
 //! Lab callers get typed operations with validation at the `Game` seam. This module owns the repair
 //! pass so room/client code never reaches into stores, fog, spatial indexes, or economy state.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
 use crate::config;
-use crate::game::entity::{EntityKind, EntityStore, Order, OrderIntent, NEUTRAL};
+use crate::game::entity::{EntityKind, EntityStore, Order, NEUTRAL};
 use crate::game::map::Map;
 use crate::game::services::geometry::{
     building_rect_for_entity, circle_intersects_rect, CircleBody,
 };
 use crate::game::services::occupancy::{footprint_center, footprint_tiles, Occupancy};
 use crate::game::services::{production, standability};
+use crate::game::teams::TeamRelations;
 use crate::game::upgrade::UpgradeKind;
 use crate::protocol::Command;
 use crate::rules;
@@ -23,6 +24,9 @@ use crate::rules;
 use super::{systems, Game, MapMetadata, PlayerInit};
 
 mod orientation;
+mod orders;
+#[cfg(test)]
+mod orders_tests;
 mod resource_nodes;
 mod scenario;
 
@@ -30,13 +34,17 @@ use orientation::{
     lab_entity_facing, lab_entity_is_set_up, lab_entity_setup_facing, lab_entity_setup_target,
     lab_entity_weapon_facing, restore_lab_entity_orientation, restore_lab_entity_setup,
 };
+use orders::{
+    clear_lab_production_state, lab_entity_active_order, lab_entity_queued_orders,
+    order_intent_references_entity, order_references_entity, restore_lab_entity_orders,
+};
 use scenario::{
     validate_lab_entity_setup_shape, validate_lab_scenario_shape, LAB_SCENARIO_KIND,
     MAX_LAB_SCENARIO_UPGRADES_PER_PLAYER,
 };
 pub use scenario::{
     LabScenarioEntity, LabScenarioMap, LabScenarioMetadata, LabScenarioPlayer, LabScenarioPoint,
-    LabScenarioResearch, LabScenarioResources, LabScenarioV1,
+    LabScenarioOrder, LabScenarioResearch, LabScenarioResources, LabScenarioV1,
 };
 
 pub const LAB_SCENARIO_V1_SCHEMA_VERSION: u32 = scenario::LAB_SCENARIO_V1_SCHEMA_VERSION;
@@ -289,6 +297,8 @@ impl Game {
                 set_up: lab_entity_is_set_up(entity),
                 setup_facing: lab_entity_setup_facing(entity),
                 setup_target: lab_entity_setup_target(&self.state.map, entity),
+                order: lab_entity_active_order(entity),
+                queued_orders: lab_entity_queued_orders(entity),
             })
             .collect();
 
@@ -423,6 +433,27 @@ impl Game {
                 old_id: entity.id,
                 new_id,
             });
+        }
+        let id_map: HashMap<u32, u32> = entity_id_map
+            .iter()
+            .map(|remap| (remap.old_id, remap.new_id))
+            .collect();
+        let teams =
+            TeamRelations::from_player_teams(restored.state.players.iter().map(|p| (p.id, p.team_id)));
+        for entity in &scenario.entities {
+            let Some(new_id) = id_map.get(&entity.id).copied() else {
+                continue;
+            };
+            restore_lab_entity_orders(
+                &restored.state.map,
+                &mut restored.state.entities,
+                restored.derived.pathing_mut(),
+                restored.state.tick,
+                &teams,
+                entity,
+                new_id,
+                &id_map,
+            )?;
         }
         restored.repair_lab_state();
 
@@ -919,29 +950,6 @@ fn validate_upgrade_for_player(
             player_id: player.id,
             upgrade: upgrade_id.to_string(),
         })
-    }
-}
-
-fn clear_lab_production_state(entity: &mut crate::game::entity::Entity) {
-    if let Some(production) = entity.production.as_mut() {
-        production.queue.clear();
-        production.research_queue.clear();
-        production.rally_point = None;
-        production.rally_queue.clear();
-    }
-}
-
-fn order_references_entity(order: &Order, entity_id: u32) -> bool {
-    order.attack_target() == Some(entity_id)
-        || order.gather_node() == Some(entity_id)
-        || order.build_site() == Some(entity_id)
-}
-
-fn order_intent_references_entity(intent: &OrderIntent, entity_id: u32) -> bool {
-    match intent {
-        OrderIntent::Attack(target) => target.target == entity_id,
-        OrderIntent::Gather(gather) => gather.node == entity_id,
-        _ => false,
     }
 }
 

@@ -1105,7 +1105,7 @@ the larger bounded lab command window instead of the ordinary live-player unit-i
 damage, while resources keep normal damage behavior. The current enabled player ids are mirrored in
 `start.lab.godModePlayers` and `labState.godModePlayers`.
 
-`LabScenarioV1` is versioned setup JSON, not a saved snapshot:
+`LabScenarioV1` is versioned lab setup JSON with stable command intent, not a full saved snapshot:
 ```
 {
   schemaVersion: 1,
@@ -1122,18 +1122,33 @@ damage, while resources keep normal damage behavior. The current enabled player 
     id: u32, owner: u32, kind: string, x: f32, y: f32, hp: u32, completed: bool,
     constructionProgress?: u32, constructionTotal?: u32, resourceRemaining?: u32,
     facing?: f32, weaponFacing?: f32,
-    setUp?: bool, setupFacing?: f32, setupTarget?: { x: f32, y: f32 }
+    setUp?: bool, setupFacing?: f32, setupTarget?: { x: f32, y: f32 },
+    order?: LabScenarioOrder,
+    queuedOrders?: LabScenarioOrder[]
   }],
   metadata: { exportedTick: u32, lab: { vision: LabVisionMode, godModePlayers?: u32[] } }
+}
+```
+`LabScenarioOrder` stores replayable command intent only:
+```
+{
+  kind: "idle" | "holdPosition" | "move" | "attackMove" | "attack" | "gather" |
+        "build" | "deconstruct" | "worldAbility" | "selfAbility" |
+        "setupAntiTankGuns" | "pointFire" | "blanketFire",
+  x?: f32, y?: f32,
+  target?: u32,       // scenario entity id, remapped on import
+  entityKind?: string, tileX?: u32, tileY?: u32,
+  ability?: string,
+  stagingX?: f32, stagingY?: f32
 }
 ```
 Export returns `{ scenario: LabScenarioV1 }` in `labResult.outcome` using the requesting operator's
 current lab vision in `metadata.lab.vision` and the current room god-mode player ids in
 `metadata.lab.godModePlayers`. Import validates the schema, map metadata,
-player/team/resource/research/entity fields, restores through the public lab `Game` API, applies
-scenario vision to the requester and future join default without overwriting already connected
-collaborators, restores `godModePlayers` as room state, and returns an entity id remap in
-`outcome.entityIdMap`.
+player/team/resource/research/entity/order fields, restores through the public lab `Game` API,
+remaps target ids inside active and queued order intents, applies scenario vision to the requester
+and future join default without overwriting already connected collaborators, restores
+`godModePlayers` as room state, and returns an entity id remap in `outcome.entityIdMap`.
 `validateScenario` exports the current authoritative lab `Game`, applies authoring metadata, pretty
 formats the scenario JSON, checks duplicate catalog ids/filenames, id-matched filenames, manifest
 limits, scenario entity count, and scenario JSON byte limits, validates map metadata, and restores
@@ -1170,11 +1185,14 @@ support-weapon state for machine gunners, anti-tank guns, mortar teams, and arti
 direction in radians. `setupTarget` is a legacy finite world point fallback used to reconstruct
 that direction for older exported scenarios; new exports include `setupFacing` and may also include
 `setupTarget` for compatibility. A setup entity must include `setupFacing` or legacy
-`setupTarget`; both setup direction fields are rejected when `setUp` is false. Setup/teardown
-transition timers, active/queued orders, production/research queues, rally plans, attack cooldowns,
+`setupTarget`; both setup direction fields are rejected when `setUp` is false. `order` and
+`queuedOrders` persist stable active and future command intents, including artillery point and
+blanket fire orders for preview scenarios. Setup/teardown transition timers, path progress,
+gather/build execution progress, production/research queues, rally plans, attack cooldowns,
 ability cooldowns/uses/lockouts, projectile runtime state, transient snapshot fields, fog
 recipient projections, events, command logs, interpolation state, and lab operation result metadata
-are intentionally omitted because lab scenarios are setup fixtures rather than mid-match savegames.
+are intentionally omitted because lab scenarios remain setup fixtures rather than mid-match
+savegames.
 
 Reliable lab server messages:
 
