@@ -46,6 +46,14 @@ struct FormationGoal {
     trench_id: Option<u32>,
 }
 
+struct FormationGoalContext<'a> {
+    map: &'a Map,
+    occ: &'a Occupancy<'a>,
+    known_trenches: &'a [KnownTrench],
+    occupied_trenches: &'a BTreeSet<u32>,
+    assigned: &'a [FormationAssignment],
+}
+
 pub(super) fn known_trenches_from_views(views: Vec<TrenchView>) -> Vec<KnownTrench> {
     views
         .into_iter()
@@ -118,16 +126,14 @@ pub(super) fn formation_goals_with_known_trenches(
             (goal.1 + offset.1 * formation_scale).clamp(0.0, max),
         );
         let anchor = map.tile_of(desired.0, desired.1);
-        if let Some(formation_goal) = assign_formation_goal(
+        let context = FormationGoalContext {
             map,
             occ,
-            unit,
-            anchor,
-            desired,
             known_trenches,
             occupied_trenches,
-            &assigned,
-        ) {
+            assigned: &assigned,
+        };
+        if let Some(formation_goal) = assign_formation_goal(&context, unit, anchor, desired) {
             assigned.push(FormationAssignment {
                 kind: unit.kind,
                 tile: formation_goal.tile,
@@ -155,16 +161,14 @@ fn spread_goals_with_known_trenches(
     let mut assigned: Vec<FormationAssignment> = Vec::new();
 
     for unit in units {
-        if let Some(formation_goal) = assign_formation_goal(
+        let context = FormationGoalContext {
             map,
             occ,
-            unit,
-            anchor,
-            desired,
             known_trenches,
             occupied_trenches,
-            &assigned,
-        ) {
+            assigned: &assigned,
+        };
+        if let Some(formation_goal) = assign_formation_goal(&context, unit, anchor, desired) {
             assigned.push(FormationAssignment {
                 kind: unit.kind,
                 tile: formation_goal.tile,
@@ -180,30 +184,28 @@ fn spread_goals_with_known_trenches(
 }
 
 fn assign_formation_goal(
-    map: &Map,
-    occ: &Occupancy,
+    context: &FormationGoalContext<'_>,
     unit: &FormationUnit,
     anchor: (u32, u32),
     desired: (f32, f32),
-    known_trenches: &[KnownTrench],
-    occupied_trenches: &BTreeSet<u32>,
-    assigned: &[FormationAssignment],
 ) -> Option<FormationGoal> {
     if let Some(goal) = find_preferred_trench_goal(
-        map,
-        occ,
+        context.map,
+        context.occ,
         unit,
         desired,
-        known_trenches,
-        occupied_trenches,
-        assigned,
+        context.known_trenches,
+        context.occupied_trenches,
+        context.assigned,
     ) {
         return Some(goal);
     }
-    find_unique_tile_near(map, occ, unit, anchor, assigned).map(|tile| FormationGoal {
-        point: map.tile_center(tile.0, tile.1),
-        tile,
-        trench_id: None,
+    find_unique_tile_near(context.map, context.occ, unit, anchor, context.assigned).map(|tile| {
+        FormationGoal {
+            point: context.map.tile_center(tile.0, tile.1),
+            tile,
+            trench_id: None,
+        }
     })
 }
 
