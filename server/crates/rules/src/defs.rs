@@ -49,10 +49,11 @@ pub struct NodeDef {
 
 const WORKER_ONLY: &[EntityKind] = &[EntityKind::Worker];
 const GOLEM_ONLY: &[EntityKind] = &[EntityKind::Golem];
-const BARRACKS_UNITS: &[EntityKind] = &[EntityKind::Rifleman, EntityKind::MachineGunner];
-/// Units with hidden stats and future production metadata that are intentionally omitted from
-/// active building train lists until a later exposure phase.
-pub const HIDDEN_UNITS_WITH_RESERVED_PRODUCTION: &[EntityKind] = &[EntityKind::Panzerfaust];
+const BARRACKS_UNITS: &[EntityKind] = &[
+    EntityKind::Rifleman,
+    EntityKind::MachineGunner,
+    EntityKind::Panzerfaust,
+];
 const STEELWORKS_UNITS: &[EntityKind] = &[
     EntityKind::MortarTeam,
     EntityKind::AntiTankGun,
@@ -567,9 +568,6 @@ mod tests {
             let Some(trainer_kind) = unit.trained_at else {
                 continue;
             };
-            if HIDDEN_UNITS_WITH_RESERVED_PRODUCTION.contains(&unit.kind) {
-                continue;
-            }
             let trainer = building_def(trainer_kind).expect("trainer must be a building def");
             assert!(
                 trainer.trains.contains(&unit.kind),
@@ -680,7 +678,7 @@ mod tests {
     }
 
     #[test]
-    fn panzerfaust_stats_are_hidden_without_default_attack_runtime() {
+    fn panzerfaust_stats_use_barracks_training_without_default_attack_runtime() {
         let def = unit_def(EntityKind::Panzerfaust).expect("panzerfaust def");
 
         assert_eq!(def.stats.hp, 45);
@@ -698,11 +696,11 @@ mod tests {
         assert_eq!(def.trained_at, Some(EntityKind::Barracks));
         assert_eq!(def.train_requires, TRAINING_CENTRE_REQUIRED);
         assert!(
-            !building_def(EntityKind::Barracks)
+            building_def(EntityKind::Barracks)
                 .expect("barracks def")
                 .trains
                 .contains(&EntityKind::Panzerfaust),
-            "hidden Panzerfaust production source must not enter active train lists until exposed"
+            "Panzerfaust should be exposed through Barracks production"
         );
     }
 

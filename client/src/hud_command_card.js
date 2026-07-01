@@ -155,6 +155,7 @@ export function buildCommandCardContextCatalog() {
     { id: "worker-build", card: buildCommandCardDescriptors(ctx([worker], { commandCardMode: "workerBuild" })) },
     { id: "mixed-army-support", card: buildCommandCardDescriptors(ctx([rifleman, scoutCar, mortar, artillery, commandCar])) },
     { id: "city-centre-train", card: buildCommandCardDescriptors(ctx([baseEntities[0]])) },
+    { id: "barracks-train", card: buildCommandCardDescriptors(ctx([baseEntities[1]])) },
     { id: "factory-train", card: buildCommandCardDescriptors(ctx([baseEntities[4]])) },
     { id: "gun-works-train", card: buildCommandCardDescriptors(ctx([baseEntities[5]])) },
     { id: "research-complex", card: buildCommandCardDescriptors(ctx([baseEntities[3]], { upgrades: [] })) },

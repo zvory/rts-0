@@ -863,11 +863,7 @@ mod tests {
 
         assert_eq!(
             profiles.map(|profile| profile.id),
-            [
-                AI_1_0_TECH_ID,
-                AI_1_1_TANK_MG_ID,
-                AI_1_2_WAVE_COHORTS_ID
-            ]
+            [AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID, AI_1_2_WAVE_COHORTS_ID]
         );
         assert_eq!(profile_by_id(AI_1_0_TECH_ID).unwrap().id, AI_1_0_TECH_ID);
         assert_eq!(
@@ -879,6 +875,48 @@ mod tests {
             AI_1_2_WAVE_COHORTS_ID
         );
         assert!(profile_by_id("tech_tree").is_none());
+    }
+
+    #[test]
+    fn current_ai_profiles_do_not_train_panzerfaust_first_pass() {
+        for profile in [
+            &RIFLE_FLOOD_FAST,
+            &RIFLE_FLOOD_FULL_SATURATION,
+            &TECH_TO_TANKS,
+            &STEEL_EXPANSION_TANKS,
+            &AI_1_0_TECH,
+            &AI_1_1_TANK_MG,
+            &AI_1_2_WAVE_COHORTS,
+        ] {
+            assert!(
+                !profile
+                    .production
+                    .unit_priorities
+                    .contains(&EntityKind::Panzerfaust),
+                "{} base production must not train Panzerfaust in the first pass",
+                profile.id
+            );
+            if let Some(transition) = profile.tech_transition {
+                assert!(
+                    !transition
+                        .production
+                        .unit_priorities
+                        .contains(&EntityKind::Panzerfaust),
+                    "{} tech transition must not train Panzerfaust in the first pass",
+                    profile.id
+                );
+            }
+            if let Some(recovery) = profile.recovery_transition {
+                assert!(
+                    !recovery
+                        .production
+                        .unit_priorities
+                        .contains(&EntityKind::Panzerfaust),
+                    "{} recovery transition must not train Panzerfaust in the first pass",
+                    profile.id
+                );
+            }
+        }
     }
 
     #[test]

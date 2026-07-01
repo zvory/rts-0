@@ -392,11 +392,11 @@ await withFakeDocument(async () => {
   );
   assert(
     labSpawnUnitKindsForFaction(DEFAULT_FACTION_ID).includes(KIND.PANZERFAUST),
-    "LabPanel spawn palette intentionally exposes hidden Panzerfaust for lab inspection",
+    "LabPanel spawn palette includes trainable Kriegsia Panzerfaust",
   );
   assert(
-    !STATS[KIND.BARRACKS].trains.includes(KIND.PANZERFAUST),
-    "LabPanel Panzerfaust inspection exposure does not imply normal Barracks production exposure",
+    STATS[KIND.BARRACKS].trains.includes(KIND.PANZERFAUST),
+    "LabPanel Panzerfaust inspection exposure now matches normal Barracks production exposure",
   );
   assertDeepEqual(
     labSpawnUnitKindsForFaction("ekat"),

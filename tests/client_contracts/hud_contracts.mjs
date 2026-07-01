@@ -555,6 +555,42 @@ function fakeHudRootWithoutResourceSpans() {
   assert(trainCard.slots[1].label === "Machine Gunner", "Barracks second train slot should be Machine Gunner");
   assert(!trainCard.slots[1].enabled, "requirement-gated train button should be disabled");
   assert(trainCard.slots[1].title === "Requires Training Centre", "train locked tooltip should name requirement");
+  assert(trainCard.slots[2].label === "Panzerfaust", "Barracks third train slot should be Panzerfaust");
+  assert(trainCard.slots[2].commandId === defaultFactionCommandId("train", KIND.PANZERFAUST), "Panzerfaust train button should expose stable train identity");
+  assert(trainCard.slots[2].hotkey === "E", "Panzerfaust train button should use E in the third Barracks slot");
+  assert(!trainCard.slots[2].enabled, "Panzerfaust train button should be locked before Training Centre");
+  assert(trainCard.slots[2].title === "Requires Training Centre", "Panzerfaust locked tooltip should name Training Centre");
+
+  const completedTrainingCentre = { id: 22, owner: 1, kind: KIND.TRAINING_CENTRE, buildProgress: null };
+  const unlockedPanzerfaustCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [barracks],
+    entities: [cityCentre, barracks, completedTrainingCentre],
+    resources: { steel: 60, oil: 15, supplyUsed: 9, supplyCap: 10 },
+  }));
+  assert(unlockedPanzerfaustCard.slots[2].enabled, "completed Training Centre should unlock Panzerfaust training");
+  assert(unlockedPanzerfaustCard.slots[2].cost.steel === 60, "Panzerfaust train button should show 60 steel");
+  assert(unlockedPanzerfaustCard.slots[2].cost.oil === 15, "Panzerfaust train button should show 15 oil");
+  assert(
+    unlockedPanzerfaustCard.slots[2].onUnavailableIntent.supply === STATS[KIND.PANZERFAUST].supply,
+    "Panzerfaust train button should carry supply for unavailable feedback",
+  );
+
+  const oilBlockedPanzerfaustCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [barracks],
+    entities: [cityCentre, barracks, completedTrainingCentre],
+    resources: { steel: 60, oil: 14, supplyUsed: 0, supplyCap: 10 },
+  }));
+  assert(!oilBlockedPanzerfaustCard.slots[2].enabled, "Panzerfaust train should disable when oil is short");
+  assert(oilBlockedPanzerfaustCard.slots[2].unaffordable, "resource-blocked Panzerfaust should stay clickable for feedback");
+  assert(oilBlockedPanzerfaustCard.slots[2].title === "Not enough resources", "Panzerfaust resource-blocked tooltip should name resources");
+
+  const supplyBlockedPanzerfaustCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [barracks],
+    entities: [cityCentre, barracks, completedTrainingCentre],
+    resources: { steel: 60, oil: 15, supplyUsed: 10, supplyCap: 10 },
+  }));
+  assert(!supplyBlockedPanzerfaustCard.slots[2].enabled, "Panzerfaust train should disable when supply is capped");
+  assert(supplyBlockedPanzerfaustCard.slots[2].title === "Not enough supply", "Panzerfaust supply-blocked tooltip should name supply");
 
   const supplyReservedTrainCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [cityCentre],

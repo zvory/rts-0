@@ -1,7 +1,8 @@
 # Panzerfaust Unit Checklist
 
 Status: Phase 0 brief and Phase 1 rules/balance spec drafted with user-reviewed close-range tuning;
-Phase 2 hidden vocabulary, balance, and protocol contract has been implemented.
+Phases 2-5 have implemented hidden vocabulary, runtime/client inspection, and normal Barracks
+production exposure.
 This file follows [docs/new-unit-checklist.md](../../docs/new-unit-checklist.md).
 
 Read: [docs/context/balance.md](../../docs/context/balance.md),
