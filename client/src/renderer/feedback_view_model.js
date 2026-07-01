@@ -40,6 +40,7 @@ export function buildRendererFeedbackView(
   return {
     playerId: state?.playerId,
     feedbackOwnerId: controlOwner.feedbackOwnerId,
+    feedbackOwnerIds: controlOwner.feedbackOwnerIds,
     issueAsOwnerId: controlOwner.issueAsOwnerId,
     map: state?.map || null,
     placement: intent?.placement || null,
@@ -90,8 +91,9 @@ export function buildRendererFeedbackView(
       return controlOwner.isFeedbackOwner(owner);
     },
     isAllyOwner(owner) {
-      if (controlOwner.feedbackOwnerId != null) {
-        return isAllyForPlayer(state?.players, controlOwner.feedbackOwnerId, owner);
+      if (controlOwner.feedbackOwnerIds.length > 0) {
+        return controlOwner.feedbackOwnerIds.some((feedbackOwnerId) =>
+          isAllyForPlayer(state?.players, feedbackOwnerId, owner));
       }
       if (typeof state?.isAllyOwner === "function") return state.isAllyOwner(owner);
       return false;
@@ -112,17 +114,25 @@ function buildControlOwnerReadModel(state, selected) {
       : null;
   const fallbackOwner = defaultFeedbackOwner(state);
   const feedbackOwnerId = policyFeedbackOwner ?? fallbackOwner;
+  const labFeedbackOwnerIds = isLabPolicy ? labFeedbackOwners(policy, selected) : EMPTY_ARRAY;
+  const feedbackOwnerIds = labFeedbackOwnerIds.length > 0
+    ? labFeedbackOwnerIds
+    : feedbackOwnerId == null
+      ? EMPTY_ARRAY
+      : [feedbackOwnerId];
+  const feedbackOwnerSet = new Set(feedbackOwnerIds);
 
   return {
     feedbackOwnerId,
+    feedbackOwnerIds,
     issueAsOwnerId,
-    showSelectedFieldOfFireEnabled: isLabPolicy && policyFeedbackOwner != null,
+    showSelectedFieldOfFireEnabled: isLabPolicy && feedbackOwnerIds.length > 0,
     canControlOwner(owner) {
       if (typeof policy?.canControlOwner === "function") return !!policy.canControlOwner(owner, state);
       return feedbackOwnerId != null && Number(owner) === feedbackOwnerId;
     },
     isFeedbackOwner(owner) {
-      return feedbackOwnerId != null && Number(owner) === feedbackOwnerId;
+      return feedbackOwnerSet.has(Number(owner));
     },
   };
 }
@@ -152,6 +162,28 @@ function addEntities(lookup, entities) {
 function normalizeOwner(owner) {
   const value = Number(owner);
   return Number.isInteger(value) && value > 0 ? value : null;
+}
+
+function labFeedbackOwners(policy, selected) {
+  const owners = typeof policy?.selectedOwners === "function"
+    ? policy.selectedOwners(selected)
+    : selectedOwners(selected);
+  return owners
+    .map(normalizeOwner)
+    .filter((owner) => owner != null && labCanIssueAs(policy, owner));
+}
+
+function selectedOwners(selected) {
+  const owners = new Set();
+  for (const entity of selected || []) {
+    const owner = normalizeOwner(entity?.owner);
+    if (owner != null) owners.add(owner);
+  }
+  return Array.from(owners).sort((a, b) => a - b);
+}
+
+function labCanIssueAs(policy, owner) {
+  return typeof policy?.canIssueAs === "function" ? !!policy.canIssueAs(owner) : owner != null;
 }
 
 function defaultFeedbackOwner(state) {

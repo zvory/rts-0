@@ -316,7 +316,7 @@ export class Renderer {
       for (const e of regularEntities) {
         liveIds.add(e.id);
         this._drawSafely(`selectionHp:${e.kind || "unknown"}`, () => {
-          this._drawSelectionAndHp(e, selection, state);
+          this._drawSelectionAndHp(e, selection, feedbackView);
         });
       }
     });

@@ -611,7 +611,10 @@ Combat `targetId` and `weaponFacing` for allied units are sent only when the tar
 the recipient's team-current actionable fog, so allied units attacking hidden enemies do not reveal
 hidden target ids or target directions. `steel`, `oil`, supply, `upgrades`, rallies, order plans,
 construction activity hints, ability controls/autocast toggles, debug paths, and command authority
-remain exact-owner-only.
+remain exact-owner-only in normal active-player and selected-player/team observer projections.
+Full-world diagnostic projections are the explicit exception: they may project those per-entity
+planning and setup details through each entity's real owner so lab/dev inspection overlays are
+complete for every player.
 Anti-Tank Guns that fire from fog create actionable temporary live fog for the recipients that see
 the attack event. The revealed gun is projected as a normal non-`visionOnly` snapshot entity and
 can validate direct attack commands or combat target acquisition until the firing reveal expires.
@@ -722,19 +725,21 @@ change the wire shape or compact snapshot version.
 Compact entity records are positional arrays. Optional fields keep the semantic order above and
 trailing missing optional fields are omitted; interior missing optional fields are encoded as
 `null`. The `rally` slot is itself a two-element `[x, y]` array (or `null`).
-The `orderPlan` slot is an owner-only array capped at 9 entries. It contains the current active
-stage first, followed by queued unit stages in execution order. Artillery Point Fire and Blanket
-Fire stages carry the server-stored effective fire point or blanket center after range locking, not
-the raw clicked point. Clients may temporarily merge local pending move/setup/fire stages for
-preview continuity while waiting for command acknowledgement, but the snapshot `orderPlan` is the
-only authoritative queued-plan contract and stale local previews must reconcile to it. Each compact
-stage is `[kind, x, y]`, where `kind` uses the `orderStage` compact code table above.
+The `orderPlan` slot is an owner-private array capped at 9 entries: exact-owner in normal and
+selected observer projections, and per-entity-owner in full-world diagnostic projections. It contains
+the current active stage first, followed by queued unit stages in execution order. Artillery Point
+Fire and Blanket Fire stages carry the server-stored effective fire point or blanket center after
+range locking, not the raw clicked point. Clients may temporarily merge local pending
+move/setup/fire stages for preview continuity while waiting for command acknowledgement, but the
+snapshot `orderPlan` is the only authoritative queued-plan contract and stale local previews must
+reconcile to it. Each compact stage is `[kind, x, y]`, where `kind` uses the `orderStage` compact
+code table above.
 Stages carry safe world points only, never target ids; hidden attack target stages may be omitted
 rather than leaking enemy positions through fog. Production building rally points are exposed
 separately through `rally` and `rallyPlan` and are not part of `orderPlan`. `rallyPlan` is appended
-after `debugPath` in compact snapshots to preserve older optional slot positions; it is owner-only,
-capped at four stages, and uses the same `[kind, x, y]` compact stage encoding with `move` and
-`attackMove` stages.
+after `debugPath` in compact snapshots to preserve older optional slot positions; it follows the
+same owner-private projection policy, is capped at four stages, and uses the same `[kind, x, y]`
+compact stage encoding with `move` and `attackMove` stages.
 The `abilities` slot is owner-only and capped at 8 entries. Each compact ability cooldown is
 `[ability, cooldownLeft, remainingUses?, autocastEnabled?, activeObjectId?, availableTick?, lockoutUntilTick?, expiresIn?]`,
 where `ability` uses the `ability` compact code table above. `charge` is legacy and currently has
@@ -856,14 +861,14 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   setupState?: string,           // machine_gunner/anti_tank_gun/mortar_team/artillery only:
                                   // "packed","setting_up","deployed","tearing_down"
   // unit-producing buildings:
-  rally?: [f32, f32],            // first rally point (world px); ONLY ever sent to the owner
-  rallyPlan?: [                  // building rally stages; ONLY ever sent to the owner
+  rally?: [f32, f32],            // first rally point (world px); owner-private except full-world diagnostics
+  rallyPlan?: [                  // building rally stages; owner-private except full-world diagnostics
     { kind: "move"|"attackMove", x: f32, y: f32 }
   ],
   // tanks:
   oilUsed?: f32,                 // lifetime oil burned by movement, in resource units
   setupFacing?: f32,             // anti_tank_gun/artillery only: owner/allied deployed arc center; appended after oilUsed in compact snapshots
-  orderPlan?: [                  // current + queued order stages; ONLY ever sent to the owner
+  orderPlan?: [                  // current + queued order stages; owner-private except full-world diagnostics
     { kind: "move"|"attackMove"|"attack"|"gather"|"build"|"deconstruct"|"smoke"|"mortarFire"|"pointFire"|"blanketFire"|"breakthrough"|"ekatTeleport"|"ekatLineShot"|"ekatMagicAnchor"|"ekatConsumeGolem"|"setupAntiTankGuns", x: f32, y: f32 }
   ],
   chargeCooldownLeft?: u16,      // legacy; no longer projected by current server
@@ -999,7 +1004,8 @@ projection seam. The same selected ids drive `visibleTiles`, visible entities, r
 memory, `playerResources`, and event unions; switching a replay viewer from all-player vision to
 one player therefore replaces both current fog and stale memory with that player's projection.
 Full-world lab/dev projections use full-world snapshots plus full-world event unions, not a fake
-viewer id. `artilleryFiring` remains an intentionally global visual event for minimap firing
+viewer id; per-entity private planning fields are evaluated against each entity's real owner.
+`artilleryFiring` remains an intentionally global visual event for minimap firing
 markers, while artillery's actionable world reveal is modeled separately as temporary live fog on
 enemy player grids without granting target-point or surrounding-terrain visibility.
 
@@ -1093,9 +1099,10 @@ room task before snapshot projection; unknown, empty, or duplicate team selectio
 Lab vision is server-owned per operator, so one operator can inspect full world while another uses
 team fog in the same room. `labState.vision` and `start.lab.vision` are stamped for the recipient.
 Lab snapshot projection keeps snapshot body visibility and transient event visibility aligned but
-separate: full-world lab vision receives the full-world snapshot body plus the union of event
-buckets for all active lab players, while team and teams lab vision receive spectator-style snapshot
-bodies, event unions, remembered building memory, and `playerResources` rows for only the selected
+separate: full-world lab vision receives the full-world snapshot body, including per-owner planning
+details for all projected entities, plus the union of event buckets for all active lab players,
+while team and teams lab vision receive spectator-style snapshot bodies, event unions, remembered
+building memory, and `playerResources` rows for only the selected
 real players.
 `issueCommandAs` queues a normal gameplay command as the selected player only when all selected
 units belong to that player; mixed-owner selections are rejected instead of partitioned. When
