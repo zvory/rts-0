@@ -17,8 +17,8 @@ use crate::ai_core::profiles::{
 use crate::live::DEFAULT_LIVE_PROFILE_ID;
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::replay::{
-    replay_commands, CommandLogEntry, EventLogEntry, PlayerSnapshot, ReplayArtifactV1,
-    ReplayOutcome,
+    replay_commands, CommandLogEntry, EventLogEntry, PlayerSnapshot, ReplayOutcome,
+    ReplayStartComposition,
 };
 use rts_sim::game::{Game, PlayerInit};
 use rts_sim::protocol::{kinds, Command as WireCommand, Event, Snapshot};
@@ -205,6 +205,7 @@ pub fn run_profile_matchup_result(
         },
     ];
     let mut game = Game::new_without_ai_controllers(&players, options.seed);
+    let replay_start = ReplayStartComposition::capture(&game, server_build_sha())?;
     let start = game.start_payload();
     let mut scripts: Vec<Box<dyn ScriptedPlayer>> = vec![
         Box::new(ProfileBackedScript::new(1, profile_a.id)),
@@ -302,7 +303,7 @@ pub fn run_profile_matchup_result(
 
     let replay_artifact = match &options.save_replay_name {
         Some(name) => Some(
-            write_replay_artifact(name, options.replay_dir.as_ref(), &game)?
+            write_replay_artifact(name, options.replay_dir.as_ref(), &replay_start, &game)?
                 .display()
                 .to_string(),
         ),
@@ -603,6 +604,7 @@ fn is_harass_command(command: &rts_sim::game::command::SimCommand) -> bool {
 fn write_replay_artifact(
     name: &str,
     replay_dir: Option<&PathBuf>,
+    replay_start: &ReplayStartComposition,
     game: &Game,
 ) -> Result<PathBuf, String> {
     let dir = replay_dir
@@ -614,8 +616,7 @@ fn write_replay_artifact(
         })
         .join(name);
     fs::create_dir_all(&dir).map_err(|err| err.to_string())?;
-    let artifact =
-        ReplayArtifactV1::capture_from_game(game, server_build_sha(), None, game.scores());
+    let artifact = replay_start.finalize(game, None, game.scores());
     let json = serde_json::to_vec_pretty(&artifact).map_err(|err| err.to_string())?;
     fs::write(dir.join("replay.json"), json).map_err(|err| err.to_string())?;
     Ok(dir)

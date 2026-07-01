@@ -258,7 +258,7 @@ architecture failures.
 | `building_memory` | `authoritative/serialized` | Serialize remembered enemy-building entries per player. | `BuildingMemory::refresh` records last-seen enemy building state and only removes hidden destroyed entries after the footprint is scouted again; spectator/player snapshots project remembered buildings while fogged. |
 | `players` | `authoritative/serialized` | Serialize all `PlayerState` rows, including id/team/faction/name/color/start tile, current Steel/Oil, supply, AI flag, score counters, and completed upgrades. | Economy, command authority, team relations, alive checks, scores, faction-specific tech, and snapshot resource rows are all read from `players`. |
 | `pending` | `authoritative/serialized` | Serialize unapplied pending commands unless a future checkpoint caller explicitly proves it captures only immediately after command drain with `pending` empty. | `Game::enqueue` appends commands between ticks; `tick_inner` drains `pending`, records them in `command_log`, and applies them. Dropping a non-empty queue would skip authoritative player/AI intent. |
-| `command_log` | `compatibility metadata` | Serialize command history for replay/crash/API continuity; do not replay it during normal checkpoint import unless building a replay artifact. | `Game::command_log` is public, `ReplayArtifactV1::from_game` persists it, and tick logic only appends/applies new pending commands instead of reading old log entries. |
+| `command_log` | `compatibility metadata` | Serialize command history for replay/crash/API continuity; do not replay it during normal checkpoint import unless building a replay artifact. | `Game::command_log` is public, schema 3 replay artifacts finalize the stored launch-time `ReplayStartComposition` with this log, and tick logic only appends/applies new pending commands instead of reading old log entries. |
 | `tick` | `authoritative/serialized` | Serialize the exact tick count. | `tick_inner` increments it before systems, logs commands with it, drives expirations/cooldowns, passes it to projection/runtime stores, and advances `PathingService` to the same tick. |
 | `lingering_sight` | `authoritative/serialized` | Serialize all active death-vision sources and their expiry ticks. | `retain_active_visibility_sources` prunes by `tick`; `recompute_live_fog` stamps these sources into team fog, affecting command legality, combat visibility, and snapshots. |
 | `firing_reveals` | `authoritative/serialized` | Serialize active firing-reveal sources and expiry ticks. | Anti-Tank Gun and artillery/mortar reveal logic records temporary actionable sight; `recompute_live_fog` stamps sources into viewer fog until expiry. |
@@ -317,8 +317,11 @@ Final audit for the ownership sequence:
   callers still go through public `Game` methods rather than reading internal state owners.
 - Wire protocol mirrors, protocol DTOs, compact snapshots, start payloads, and
   `client/src/protocol.js` are not changed by the private checkpoint path.
-- Replay artifact capture/playback and replay seek still use recorded commands plus in-process
-  `clone_for_replay_keyframe` keyframes; they are not routed through `GameCheckpointV1`.
+- Replay artifact schema 3 captures the replay start state as a launch-time
+  `ReplayStartComposition` containing the map binding plus `GameCheckpointV1`, then finalizes with
+  recorded commands and end metadata. Legacy schema 2 artifacts still load through the
+  map/loadout-start compatibility path. Replay seek still uses recorded commands plus in-process
+  `clone_for_replay_keyframe` keyframes after the start game is rebuilt.
 - Lab timeline seek still replays lab timeline entries from in-process keyframes, while lab scenario
   import/export keeps its scenario DTO and fresh-id remap behavior rather than becoming a checkpoint
   restore.
@@ -332,9 +335,9 @@ Checkpoint-readiness blockers before follow-up product plans:
   round-trip proof: explicit DTO conversion, serde text bytes, map-binding validation, importer
   validation, and semantic continuation tests. Follow-up product phases still need migration tests,
   rollout observability, compatibility decisions, and a decision on when any caller may expose it.
-- Replay migration needs artifact-version decisions, keyframe replacement policy, compatibility
-  with existing saved and persisted replay artifacts, command-log rebasing rules, and failure
-  behavior for old builds or partial checkpoint coverage.
+- Replay migration currently writes schema 3 checkpoint-backed starts and retains schema 2 loading.
+  Future cleanup still needs a keyframe replacement decision, any cross-version migrators beyond
+  schema 2 compatibility, and release audit coverage for old builds or partial checkpoint coverage.
 - Lab migration needs a product decision for scenario versus checkpoint semantics, id remap
   compatibility, timeline operation capture/replay policy, authoring metadata migration, and
   validation for imported artifacts across map/faction versions.
@@ -649,11 +652,14 @@ remain on their current schemas until their phases introduce containers around t
 - Dev scenario watch rooms are a special-case room mode inside the same task model: they own a
   normal `Game`, drive authored scenario setup and optional scripted movement, and use the shared
   projection and fanout helpers to send watchers full-world snapshots for the configured view
-  player. Saved self-play artifacts are normal `ReplayArtifactV1` files and load through
-  `Phase::ReplayViewer` via the neutral replay-artifact room path.
+  player. Saved self-play artifacts are normal schema 3 `ReplayArtifactV1` files and load through
+  `Phase::ReplayViewer` via the neutral replay-artifact room path; schema 2 artifacts remain
+  accepted by the same loader.
 - Replay viewer rooms use `Phase::ReplayViewer`, which owns a lobby-local
-  `replay_session::ReplaySession`: the immutable `ReplayArtifactV1`, rebuilt `Game`, command
-  cursor, shared playback speed, and per-viewer fog selection. Replay snapshots use `game.snapshot_for_spectator(selected_player_ids)`
+  `replay_session::ReplaySession`: the immutable versioned `ReplayArtifactV1`, rebuilt `Game`,
+  command cursor, shared playback speed, and per-viewer fog selection. Schema 3 rebuilds the start
+  `Game` from `startState.checkpointPayload` and the exact generated map; schema 2 rebuilds from
+  map, seed, players, and loadouts. Replay snapshots use `game.snapshot_for_spectator(selected_player_ids)`
   so viewers see authoritative union-fog or single-player fog, selected-player resource rows, and
   selected-player remembered building memory, never full-world state.
 

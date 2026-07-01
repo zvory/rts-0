@@ -800,7 +800,7 @@ fn post_match_replay_join_prompts_before_attaching_viewer() {
 #[test]
 fn replay_viewer_return_detaches_only_requesting_viewer() {
     let players = replay_test_players(2);
-    let (game, _artifact) = replay_test_artifact(&players, 1);
+    let (game, replay_start, _artifact) = replay_test_artifact_with_start(&players, 1);
     let mut task = RoomTask::new(
         "post-match-lobby-test".to_string(),
         RoomMode::Normal,
@@ -812,6 +812,7 @@ fn replay_viewer_return_detaches_only_requesting_viewer() {
     let writer_b = add_test_room_player(&mut task, players[1].id, true);
     task.match_player_count = 2;
     task.match_human_count = 2;
+    task.replay_start = Some(replay_start);
 
     task.end_match(Some(players[0].id), game.scores(), Some(&game));
     assert!(matches!(task.phase, Phase::ReplayViewer(_)));
@@ -833,7 +834,7 @@ fn replay_viewer_return_detaches_only_requesting_viewer() {
 #[test]
 fn replay_viewer_return_resets_room_when_last_viewer_leaves() {
     let players = replay_test_players(2);
-    let (game, _artifact) = replay_test_artifact(&players, 1);
+    let (game, replay_start, _artifact) = replay_test_artifact_with_start(&players, 1);
     let mut task = RoomTask::new(
         "post-match-empty-test".to_string(),
         RoomMode::Normal,
@@ -845,6 +846,7 @@ fn replay_viewer_return_resets_room_when_last_viewer_leaves() {
     let _writer_b = add_test_room_player(&mut task, players[1].id, true);
     task.match_player_count = 2;
     task.match_human_count = 2;
+    task.replay_start = Some(replay_start);
 
     task.end_match(Some(players[0].id), game.scores(), Some(&game));
     assert!(matches!(task.phase, Phase::ReplayViewer(_)));

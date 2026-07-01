@@ -104,6 +104,7 @@ impl RoomTask {
             }
         };
         self.mark_match_started_for_drain();
+        self.capture_replay_start_for(&game);
         self.phase = Phase::InGame(Box::new(game));
         self.match_player_count = 2;
         self.dev_driver = Some(driver);
@@ -320,7 +321,7 @@ impl RoomTask {
             Ok(events) => events.into_iter().collect(),
             Err(payload) => {
                 let reason = panic_reason(&payload);
-                dump_crash_replay(&self.room, &game, &reason);
+                dump_crash_replay(&self.room, &game, self.replay_start.as_ref(), &reason);
                 self.finish_perf_tick(perf.as_ref(), &game, scheduler_lag, tick_start);
                 self.phase = Phase::Lobby;
                 self.dev_driver = None;

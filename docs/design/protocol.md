@@ -525,23 +525,28 @@ fall back to authoritative snapshots/tracking instead of running local visual re
 Replay start payloads include `replay` metadata so the client can display or cache a
 self-describing playback session. The server validates replay artifacts before playback: artifact
 schema version, map name, map schema version, and map content hash must match the running
-server/map asset or the replay is rejected with a clear error. A server build-SHA mismatch is
-warning-compatible: replay metadata keeps the original `serverBuildSha`, and the server logs or
-surfaces a warning while attempting playback. Saved self-play artifacts use the same
-`ReplayArtifactV1` contract as post-match and match-history replays; pre-unified dev-only artifact
-payloads are rejected instead of falling back to a separate loader.
+server/map asset or the replay is rejected with a clear error. Schema 3 artifacts additionally
+validate the embedded `startState.checkpointPayload` map binding, including the materialized map
+hash, before constructing the replay `Game`. A server build-SHA mismatch is warning-compatible:
+replay metadata keeps the original `serverBuildSha`, and the server logs or surfaces a warning
+while attempting playback. Saved self-play artifacts use the same `ReplayArtifactV1` contract as
+post-match and match-history replays; pre-unified dev-only artifact payloads are rejected instead
+of falling back to a separate loader.
 
-Replay artifact schema version 2 stores ordered `players[]` with each original `team_id` and
-required `faction_id`, plus `playerLoadouts[]` with one `{ playerId, factionId, loadoutId,
-startingSteel, startingOil }` record per player. Replay reconstruction uses those per-player
-loadout records instead of one global `startingSteel`/`startingOil`/`startingLoadoutMode` shim.
-The compatibility `winnerId`, optional `winnerTeamId`, and `finalScores[]` with each row's
-`teamId` remain part of the artifact. Missing `players[].faction_id`, missing/mismatched
-`playerLoadouts[]`, or artifact schema version 1 payloads are rejected. Missing
-`players[].team_id`, `finalScores[].teamId`, or `winnerTeamId` in older singleton-FFA-compatible
-schema-2 fixtures defaults through the documented singleton team behavior; new captures always
-include explicit nonzero player and score team ids, required player faction ids, required player
-loadout records, and `winnerTeamId` when there is a winning team.
+Replay artifact schema version 3 stores a launch-time `startState` containing map binding fields
+and a tick-zero `GameCheckpointV1` text payload, plus ordered `players[]` with each original
+`team_id` and required `faction_id`, plus `playerLoadouts[]` with one `{ playerId, factionId,
+loadoutId, startingSteel, startingOil }` record per player. Replay reconstruction restores the
+start `Game` from the checkpoint payload and then applies the authoritative `commandLog[]` on the
+recorded ticks. The compatibility `winnerId`, optional `winnerTeamId`, `durationTicks`, and
+`finalScores[]` with each row's `teamId` remain part of the artifact. Legacy schema 2 artifacts
+have no `startState`; they still load by reconstructing from map, seed, players, and
+`playerLoadouts[]`. Missing `players[].faction_id`, missing/mismatched `playerLoadouts[]`, or
+artifact schema version 1 payloads are rejected. Missing `players[].team_id`,
+`finalScores[].teamId`, or `winnerTeamId` in older singleton-FFA-compatible schema-2 fixtures
+defaults through the documented singleton team behavior; new captures always include explicit
+nonzero player and score team ids, required player faction ids, required player loadout records,
+`startState`, and `winnerTeamId` when there is a winning team.
 
 Persisted match-history replay launch creates a replay staging lobby rather than starting playback
 on the first join. The first spectator becomes host, additional viewers may gather from the lobby

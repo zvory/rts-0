@@ -496,6 +496,7 @@ impl RoomTask {
 
         let game =
             Game::new_with_random_ai_profiles_and_map_metadata(&inits, seed, map, map_metadata);
+        self.capture_replay_start_for(&game);
         let match_player_count = inits.len();
         let match_human_count = inits.iter().filter(|p| !p.is_ai).count();
         let match_map_name = self.selected_map.clone();
@@ -638,6 +639,7 @@ impl RoomTask {
             spectator_visible_players,
             lab_snapshot_projections,
             projection_policy,
+            replay_start: self.replay_start.as_ref(),
         }
         .run(game);
 

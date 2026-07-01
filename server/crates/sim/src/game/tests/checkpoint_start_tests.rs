@@ -3,7 +3,7 @@ use super::checkpoint_helpers::{
 };
 use super::*;
 use crate::game::checkpoint::CheckpointPayloadError;
-use crate::game::replay::ReplayArtifactV1;
+use crate::game::replay::ReplayStartComposition;
 use crate::protocol::terrain;
 
 fn default_map_metadata() -> MapMetadata {
@@ -161,6 +161,10 @@ fn checkpoint_start_preserves_replay_loadouts_and_artifact_metadata() {
         checkpoint_backed,
         "replay loadout checkpoint start",
     );
+    let direct_replay_start =
+        ReplayStartComposition::capture(&direct, "test-sha").expect("direct replay start");
+    let checkpoint_replay_start = ReplayStartComposition::capture(&checkpoint_backed, "test-sha")
+        .expect("checkpoint-backed replay start");
 
     let worker_ids = owned_kind_ids(&direct, 1, EntityKind::Worker);
     direct.enqueue(
@@ -176,14 +180,9 @@ fn checkpoint_start_preserves_replay_loadouts_and_artifact_metadata() {
         "replay command-log continuation after checkpoint start",
     );
 
-    let direct_artifact =
-        ReplayArtifactV1::capture_from_game(&direct, "test-sha", Some(1), direct.scores());
-    let checkpoint_artifact = ReplayArtifactV1::capture_from_game(
-        &checkpoint_backed,
-        "test-sha",
-        Some(1),
-        checkpoint_backed.scores(),
-    );
+    let direct_artifact = direct_replay_start.finalize(&direct, Some(1), direct.scores());
+    let checkpoint_artifact =
+        checkpoint_replay_start.finalize(&checkpoint_backed, Some(1), checkpoint_backed.scores());
     assert_eq!(
         direct_artifact, checkpoint_artifact,
         "checkpoint-backed starts should not change replay artifact start metadata or command log"

@@ -28,6 +28,8 @@ use std::sync::Arc;
 
 mod dev_replay_pages;
 mod dev_scenario_pages;
+#[cfg(test)]
+mod main_replay_tests;
 mod wiki;
 
 use rts_server::db::Db;
@@ -42,9 +44,7 @@ use rts_server::protocol::{
 };
 use rts_server::structured_log;
 use rts_sim::game::map::Map;
-use rts_sim::game::replay::{
-    ReplayArtifactV1, ReplayValidationError, REPLAY_ARTIFACT_SCHEMA_VERSION_V2,
-};
+use rts_sim::game::replay::{self, ReplayArtifactV1};
 use rts_sim::perf;
 
 /// Default room name used when a client's `join` omits `room`.
@@ -493,17 +493,15 @@ fn apply_replay_summary_compatibility(row: &mut rts_server::db::MatchSummary, bu
         row.replay_unavailable_reason = Some("Replay was not recorded for this match.".to_string());
         return;
     };
-    if meta.artifact_schema_version != REPLAY_ARTIFACT_SCHEMA_VERSION_V2 as i32 {
+    let supported_schema = u32::try_from(meta.artifact_schema_version)
+        .ok()
+        .is_some_and(replay::is_supported_replay_artifact_schema);
+    if !supported_schema {
         row.replay_available = false;
         row.replay_unavailable_reason = Some(format!(
             "Replay schema {} is not supported by this server.",
             meta.artifact_schema_version
         ));
-        return;
-    }
-    if meta.build_sha != build_sha {
-        row.replay_available = true;
-        row.replay_unavailable_reason = Some(replay_build_warning(build_sha, &meta.build_sha));
         return;
     }
     let running_map = match Map::metadata_for_name(&meta.map_name) {
@@ -533,31 +531,17 @@ fn apply_replay_summary_compatibility(row: &mut rts_server::db::MatchSummary, bu
         ));
         return;
     }
+    if meta.build_sha != build_sha {
+        row.replay_available = true;
+        row.replay_unavailable_reason = Some(replay_build_warning(build_sha, &meta.build_sha));
+        return;
+    }
     row.replay_available = true;
     row.replay_unavailable_reason = None;
 }
 
 fn replay_incompatibility_reason(artifact: &ReplayArtifactV1, build_sha: &str) -> Option<String> {
-    let running_map = match Map::metadata_for_name(&artifact.map_name) {
-        Ok(metadata) => metadata,
-        Err(_) => {
-            return Some(format!(
-                "Replay map {:?} is not available on this server.",
-                artifact.map_name
-            ));
-        }
-    };
-    if let Some(reason) = artifact
-        .validate_against(build_sha, &running_map)
-        .err()
-        .and_then(|err| match err {
-            ReplayValidationError::BuildShaMismatch { .. } => None,
-            err => Some(err.to_string()),
-        })
-    {
-        return Some(reason);
-    }
-    lobby::replay_faction_loadout_incompatibility_reason(artifact)
+    lobby::replay_launch_incompatibility_reason(artifact, build_sha)
 }
 
 fn replay_build_warning(server_build_sha: &str, replay_build_sha: &str) -> String {
@@ -704,8 +688,6 @@ mod tests {
 
         result
     }
-    use rts_rules::faction::{DEFAULT_FACTION_ID, EMPTY_FIXTURE_FACTION_ID};
-
     const TEST_PLAYER_ID: u32 = 42;
 
     #[test]
@@ -969,147 +951,17 @@ mod tests {
     }
 
     #[test]
-    fn local_match_history_allowed_for_loopback_remote() {
-        let remote: SocketAddr = "127.0.0.1:50000".parse().unwrap();
-        assert!(request_allows_local_match_history(&remote));
-    }
-
-    #[test]
-    fn local_match_history_allowed_for_ipv6_loopback_remote() {
-        let remote: SocketAddr = "[::1]:50000".parse().unwrap();
-        assert!(request_allows_local_match_history(&remote));
+    fn local_match_history_allowed_for_loopback_remotes() {
+        for remote in ["127.0.0.1:50000", "[::1]:50000"] {
+            let remote: SocketAddr = remote.parse().unwrap();
+            assert!(request_allows_local_match_history(&remote));
+        }
     }
 
     #[test]
     fn local_match_history_rejected_for_public_remote() {
         let remote: SocketAddr = "203.0.113.10:50000".parse().unwrap();
         assert!(!request_allows_local_match_history(&remote));
-    }
-
-    fn replay_summary_for(
-        meta: Option<rts_server::db::ReplaySummaryMetadata>,
-    ) -> rts_server::db::MatchSummary {
-        rts_server::db::MatchSummary {
-            id: 1,
-            started_at: chrono::Utc::now(),
-            ended_at: chrono::Utc::now(),
-            duration_ms: 1_000,
-            map_name: "Default".to_string(),
-            winner_name: Some("Alpha".to_string()),
-            outcome: "win".to_string(),
-            participants: vec!["Alpha".to_string(), "Bravo".to_string()],
-            score_screen: serde_json::Value::Array(Vec::new()),
-            human_count: 2,
-            debug_mode: false,
-            local_only: false,
-            replay_available: meta.is_some(),
-            replay_unavailable_reason: None,
-            replay_metadata: meta,
-        }
-    }
-
-    fn replay_artifact_for_faction(faction_id: &str) -> ReplayArtifactV1 {
-        let players = vec![rts_sim::game::PlayerInit {
-            id: 1,
-            team_id: 1,
-            faction_id: faction_id.to_string(),
-            name: "Replay".to_string(),
-            color: "#ffffff".to_string(),
-            is_ai: false,
-        }];
-        let game = rts_sim::game::Game::new(&players, 0x5150_030d);
-        ReplayArtifactV1::capture_from_game(&game, "current-build", None, game.scores())
-    }
-
-    #[test]
-    fn replay_summary_marks_current_build_and_map_available() {
-        let map = Map::metadata_for_name("Default").unwrap();
-        let mut row = replay_summary_for(Some(rts_server::db::ReplaySummaryMetadata {
-            artifact_schema_version: REPLAY_ARTIFACT_SCHEMA_VERSION_V2 as i32,
-            build_sha: "current-build".to_string(),
-            map_name: map.name,
-            map_schema_version: map.schema_version as i32,
-            map_hash: map.content_hash,
-        }));
-
-        apply_replay_summary_compatibility(&mut row, "current-build");
-
-        assert!(row.replay_available);
-        assert_eq!(row.replay_unavailable_reason, None);
-    }
-
-    #[test]
-    fn replay_summary_warns_but_allows_incompatible_build() {
-        let map = Map::metadata_for_name("Default").unwrap();
-        let mut row = replay_summary_for(Some(rts_server::db::ReplaySummaryMetadata {
-            artifact_schema_version: REPLAY_ARTIFACT_SCHEMA_VERSION_V2 as i32,
-            build_sha: "old-build".to_string(),
-            map_name: map.name,
-            map_schema_version: map.schema_version as i32,
-            map_hash: map.content_hash,
-        }));
-
-        apply_replay_summary_compatibility(&mut row, "new-build");
-
-        assert!(row.replay_available);
-        assert_eq!(
-            row.replay_unavailable_reason.as_deref(),
-            Some(
-                "Replay Potentially Incompatible With Current Server (server: new-build, replay: old-build)"
-            )
-        );
-    }
-
-    #[test]
-    fn replay_summary_explains_missing_artifact() {
-        let mut row = replay_summary_for(None);
-
-        apply_replay_summary_compatibility(&mut row, "current-build");
-
-        assert!(!row.replay_available);
-        assert_eq!(
-            row.replay_unavailable_reason.as_deref(),
-            Some("Replay was not recorded for this match.")
-        );
-    }
-
-    #[test]
-    fn match_history_replay_launch_accepts_schema_two_kriegsia_factions() {
-        let artifact = replay_artifact_for_faction(DEFAULT_FACTION_ID);
-
-        assert_eq!(
-            replay_incompatibility_reason(&artifact, "current-build"),
-            None
-        );
-    }
-
-    #[test]
-    fn match_history_replay_launch_rejects_unsupported_or_fixture_factions() {
-        let mut unknown = replay_artifact_for_faction(DEFAULT_FACTION_ID);
-        unknown.players[0].faction_id = "unknown-faction".to_string();
-        let err = replay_incompatibility_reason(&unknown, "current-build")
-            .expect("unsupported future faction should reject");
-        assert!(err.contains("unknown faction"), "unexpected reject: {err}");
-
-        let fixture = replay_artifact_for_faction(EMPTY_FIXTURE_FACTION_ID);
-        let err = replay_incompatibility_reason(&fixture, "current-build")
-            .expect("fixture faction should reject persisted replay launch");
-        assert!(err.contains("fixture-only"), "unexpected reject: {err}");
-    }
-
-    #[test]
-    fn match_history_replay_launch_rejects_unknown_player_loadout() {
-        let mut artifact = replay_artifact_for_faction(DEFAULT_FACTION_ID);
-        let mut extra_loadout = artifact.player_loadouts[0].clone();
-        extra_loadout.player_id = 999;
-        artifact.player_loadouts.push(extra_loadout);
-
-        let err = replay_incompatibility_reason(&artifact, "current-build")
-            .expect("unknown-player replay loadout should reject");
-        assert!(
-            err.contains("unknown player 999"),
-            "unexpected reject: {err}"
-        );
     }
 }
 

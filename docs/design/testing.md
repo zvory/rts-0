@@ -46,9 +46,11 @@ coverage. These scripts are kept isolated from the canonical profile list.
 **Artifacts.** On failure, the test writes `target/selfplay-failures/<test>-<pid>-<time>/`
 with:
 - `replay.json`: a normal `ReplayArtifactV1` command-log replay artifact, loadable through the
-  same replay runtime as post-match and match-history replays. Team-capable artifacts preserve
-  `players[].teamId`, `winnerTeamId`, and team-aware final score rows; old singleton-FFA artifacts
-  without team fields still load through compatibility defaults.
+  same replay runtime as post-match and match-history replays. New artifacts use schema 3 with a
+  launch-time `startState.checkpointPayload` (`GameCheckpointV1`) plus the recorded command stream;
+  legacy schema 2 artifacts still load through the map/loadout start compatibility path.
+  Team-capable artifacts preserve `players[].teamId`, `winnerTeamId`, and team-aware final score
+  rows; old singleton-FFA artifacts without team fields still load through compatibility defaults.
 - `diagnostic.json`: self-play-only start payload, script decision log, event log, milestone state,
   and sampled snapshot summaries.
 - `summary.log`: short human-readable failure summary and missing milestones.
