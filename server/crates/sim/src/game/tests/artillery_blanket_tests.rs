@@ -129,6 +129,93 @@ fn blanket_fire_sampling_is_replay_stable_and_ignores_ballistic_tables() {
     );
 }
 
+#[test]
+fn queued_blanket_fire_mixed_selection_locks_each_artillery_and_keeps_rifle_queueable() {
+    let players = human_vs_ai_players();
+    let mut game = empty_flat_game(&players);
+    let min_px = config::ARTILLERY_MIN_RANGE_TILES as f32 * config::TILE_SIZE as f32;
+    let first_pos = game.map.tile_center(10, 10);
+    let second_pos = game.map.tile_center(10, 12);
+    let raw_click = (first_pos.0 + min_px - 8.0, first_pos.1);
+    let move_target = game.map.tile_center(18, 18);
+    let first_artillery = game
+        .entities
+        .spawn_unit(1, EntityKind::Artillery, first_pos.0, first_pos.1)
+        .expect("first artillery should spawn");
+    let second_artillery = game
+        .entities
+        .spawn_unit(1, EntityKind::Artillery, second_pos.0, second_pos.1)
+        .expect("second artillery should spawn");
+    let rifle = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, first_pos.0, first_pos.1 + 192.0)
+        .expect("rifleman should spawn");
+    deploy_artillery_toward(&mut game, first_artillery, raw_click);
+    deploy_artillery_toward(&mut game, second_artillery, raw_click);
+
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::BlanketFire,
+            units: vec![first_artillery, rifle, second_artillery],
+            x: Some(raw_click.0),
+            y: Some(raw_click.1),
+            queued: true,
+        },
+    );
+    game.enqueue(
+        1,
+        Command::Move {
+            units: vec![first_artillery, rifle, second_artillery],
+            x: move_target.0,
+            y: move_target.1,
+            queued: true,
+        },
+    );
+    game.tick();
+
+    let first_entity = game
+        .entities
+        .get(first_artillery)
+        .expect("first artillery should exist");
+    let second_entity = game
+        .entities
+        .get(second_artillery)
+        .expect("second artillery should exist");
+    let Order::ArtilleryBlanketFire(first_order) = first_entity.order() else {
+        panic!("first artillery should promote queued Blanket Fire");
+    };
+    let Order::ArtilleryBlanketFire(second_order) = second_entity.order() else {
+        panic!("second artillery should promote queued Blanket Fire");
+    };
+
+    assert!(
+        first_entity.queued_orders().is_empty() && second_entity.queued_orders().is_empty(),
+        "later queued movement must not append behind terminal Blanket Fire for either gun"
+    );
+    assert!(
+        (first_order.intent.x - second_order.intent.x).abs() > 0.5
+            || (first_order.intent.y - second_order.intent.y).abs() > 0.5,
+        "different artillery origins should store different locked Blanket Fire centers"
+    );
+    let first_distance = ((first_order.intent.x - first_pos.0).powi(2)
+        + (first_order.intent.y - first_pos.1).powi(2))
+    .sqrt();
+    let second_distance = ((second_order.intent.x - second_pos.0).powi(2)
+        + (second_order.intent.y - second_pos.1).powi(2))
+    .sqrt();
+    assert!(
+        (first_distance - min_px).abs() < 0.001 && (second_distance - min_px).abs() < 0.001,
+        "inside-minimum mixed Blanket Fire clicks should lock each gun to its own range floor"
+    );
+
+    let rifle_entity = game.entities.get(rifle).expect("rifleman should exist");
+    assert!(
+        matches!(rifle_entity.order(), Order::Move(_)),
+        "non-artillery in the mixed selection should still accept the later queued move"
+    );
+}
+
 fn collect_blanket_fire_targets(ballistic_tables: bool) -> Vec<(u32, u32)> {
     let players = human_vs_ai_players();
     let mut game = empty_flat_game(&players);

@@ -725,8 +725,10 @@ trailing missing optional fields are omitted; interior missing optional fields a
 The `orderPlan` slot is an owner-only array capped at 9 entries. It contains the current active
 stage first, followed by queued unit stages in execution order. Artillery Point Fire and Blanket
 Fire stages carry the server-stored effective fire point or blanket center after range locking, not
-the raw clicked point. Each compact stage is `[kind, x, y]`, where `kind` uses the `orderStage`
-compact code table above.
+the raw clicked point. Clients may temporarily merge local pending move/setup/fire stages for
+preview continuity while waiting for command acknowledgement, but the snapshot `orderPlan` is the
+only authoritative queued-plan contract and stale local previews must reconcile to it. Each compact
+stage is `[kind, x, y]`, where `kind` uses the `orderStage` compact code table above.
 Stages carry safe world points only, never target ids; hidden attack target stages may be omitted
 rather than leaking enemy positions through fog. Production building rally points are exposed
 separately through `rally` and `rallyPlan` and are not part of `orderPlan`. `rallyPlan` is appended

@@ -198,7 +198,12 @@ export class HUD {
   }
 
   _issueCommand(command, options = {}) {
-    return issueGameplayCommand(this.commandIssuer, command, options);
+    const selected = typeof this.state?.selectedEntities === "function"
+      ? this.state.selectedEntities()
+      : [];
+    const result = issueGameplayCommand(this.commandIssuer, command, options);
+    this._intent()?.recordPlannedCommand?.(command, selected, result);
+    return result;
   }
 
   _intent() {

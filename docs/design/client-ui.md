@@ -691,6 +691,9 @@ export class ClientIntent {
   resourceMiningPreview, updateResourceMiningPreview(preview)
   antiTankGunSetupPreview, updateAntiTankGunSetupPreview(preview)
   abilityTargetPreview, updateAbilityTargetPreview(preview)
+  recordPlannedCommand(command, selectedEntities, result?)
+  plannedOrderPlanForEntity(entity), entityWithPlannedOrder(entity)
+  reconcilePlannedOrders(entities, options?), clearPlannedOrdersForUnits(ids), clearPlannedOrders()
   activeLabTool, beginLabTool(tool), cancelLabTool(reason?)
 }
 ```
@@ -707,7 +710,8 @@ for explicitly documented architecture-check exceptions.
 `GameState` is the authoritative browser view of server snapshots, interpolation, selected ids,
 control groups, relationship helpers, fog-facing visibility data, and display overlays derived from
 authoritative snapshots. `ClientIntent` owns placement intent, command-card submenu state,
-command-target arming, hover previews, command feedback, and ability previews. Contextual oil
+command-target arming, hover previews, command feedback, ability previews, and the short-lived local
+planned-order stages used only for previews while the server echo is pending. Contextual oil
 right-clicks compose a Pump Jack build intent on the clicked oil patch rather than a gather
 command. `GameState` must not grow compatibility accessors for those intent fields; HUD, input,
 minimap, and renderer feedback use the injected facade or a narrow read model. Lab Unit Spawn and
@@ -737,15 +741,19 @@ unavailable or fails; they do not change server protocol, simulation, or balance
 Renderer feedback should consume a narrow read model containing placement, command feedback,
 support-weapon setup previews, ability targeting previews, ability objects, and selected entities,
 rather than relying on the full mutable `GameState`. Queued support-weapon setup previews use
-accepted move or attack-move order-plan endpoints as their field-of-fire origin; unqueued setup
-previews use the current support-weapon position. Minimap hover and click targeting feed support-weapon
-setup previews and commands from minimap world coordinates for Anti-Tank Guns and Artillery. HUD
-command-target arming preserves Shift, and input hover previews track Shift so queued previews match
-the command that will be issued. Armed Point Fire and Blanket Fire previews compute advisory
-per-artillery locked effective points from the current gun origin, the 25-to-55 tile range band,
-the current or planned setup facing fallback, and same-ray map clamping when map bounds are
-available; command feedback marks those locked points when the client can compute them while the
-server still receives and authoritatively validates the raw clicked point. Tank Trap placement
+accepted move or attack-move order-plan endpoints as their field-of-fire origin, plus local pending
+move/setup stages when the command has been sent but no owner-only `orderPlan` echo has arrived;
+unqueued setup previews use the current support-weapon position. Minimap hover and click targeting
+feed support-weapon setup previews and commands from minimap world coordinates for Anti-Tank Guns
+and Artillery. HUD command-target arming preserves Shift, and input hover previews track Shift so
+queued previews match the command that will be issued. Armed Point Fire and Blanket Fire previews
+compute advisory per-artillery locked effective points from the current gun origin, the authoritative
+or local pending planned origin, the 25-to-55 tile range band, the current or planned setup facing
+fallback, and same-ray map clamping when map bounds are available; command feedback marks those
+locked points when the client can compute them while the server still receives and authoritatively
+validates the raw clicked point. Local planned setup/fire stages are reconciled on snapshots using
+the owner-only `orderPlan` and command acknowledgement metadata, and are cleared on deselection,
+Stop/Hold, replacement commands, rejected command receipts, and match teardown. Tank Trap placement
 previews keep normal
 terrain, resource, building, and map-bounds checks, allow infantry overlap, and reject vehicle-body
 units. Tank Trap line dragging treats terrain, building, and map-bounds blockers as skipped sites,
@@ -1065,12 +1073,13 @@ abilities. When the HUD command card calls `ClientIntent.beginCommandTarget({ ki
 the input module enters targeted cursor mode:
 - Pointer moves call `_refreshAbilityTargetPreview`: compute which selected units are eligible
   carriers (`ABILITIES[ability].carriers`), test whether any carrier is within range of the cursor
-  or can lock the raw cursor into the Artillery range band, update
-  `ClientIntent.abilityTargetPreview` for renderer feedback.
+  or can lock the raw cursor into the Artillery range band from the authoritative or locally planned
+  origin, update `ClientIntent.abilityTargetPreview` for renderer feedback.
 - Left-click: build a `useAbility` command with the ability name, filtered carrier ids, world
   coords, and the `queued` flag (from Shift). Artillery Point Fire and Blanket Fire still send the
-  raw clicked world coords; the server owns effective target locking. Clear cursor mode unless the
-  resolved command-card hotkey is still held for repeated world-point targeting.
+  raw clicked world coords; the server owns effective target locking. The local feedback marker uses
+  the client-computed locked point when available. Clear cursor mode unless the resolved
+  command-card hotkey is still held for repeated world-point targeting.
 - Tapping and releasing the resolved world-point ability hotkey before clicking keeps targeting
   armed until the first unqueued world click. That click issues the ability and clears targeting
   unless Shift is still preserving queued targeting.
@@ -1082,18 +1091,24 @@ the input module enters targeted cursor mode:
   keep targeted mode armed so multi-selected Mortar Teams and Scout Cars can distribute repeated
   point commands without the next click falling back to normal selection.
 - Right-click / Escape: cancel cursor mode through `ClientIntent.endCommandTarget()`, including while cursor lock is active.
-- Minimap right-click also fires an ability command if in targeted mode.
+- Minimap right-click or targeted left-click also fires the same ability command if in targeted
+  mode, including Shift queueing and the artillery raw-click/locked-feedback split. Minimap hover is
+  allowed to omit full per-gun artillery cone or blanket previews rather than drawing simplified
+  feedback that could disagree with world targeting.
 Selected owned Mortar Teams also draw dotted firing-range circles even when the Fire command is not
 armed. The Mortar Team Fire command-card button shows an autocast swirl while any selected mortar's
 owner-only `mortarFire` affordance has `autocastEnabled`; right-clicking that button or pressing
 Alt plus its resolved command-card hotkey sends `setAutocast(mortarFire, enabled=<toggle>)` and
 does not arm manual targeting.
 
-`client_intent.js` holds `commandTarget` (null or `{ kind, ability }`) and `abilityTargetPreview`
-(null or `{ ability, mouseX, mouseY, carriers, rangeOrigins, pathOrigins, returnMarkers,
-hoverInRange, artilleryLocks? }`). `artilleryLocks` is advisory client data for selected Artillery
-only: per-gun origin, locked effective point, future/redeploy facing, and whether the locked point
-is inside the deployed current cone. `commandTarget` is a transient UI state;
+`client_intent.js` holds `commandTarget` (null or `{ kind, ability }`), ability previews, and a
+small local planned-stage map keyed by unit id. The local map stores only pending move, attack-move,
+setup, Point Fire, and Blanket Fire stages needed for queued preview origins; it is not serialized
+and never replaces server `orderPlan`. `abilityTargetPreview` is null or `{ ability, mouseX, mouseY,
+carriers, rangeOrigins, pathOrigins, returnMarkers, hoverInRange, artilleryLocks? }`.
+`artilleryLocks` is advisory client data for selected Artillery only: per-gun origin, locked
+effective point, future/redeploy facing, and whether the locked point is inside the deployed current
+cone. `commandTarget` is a transient UI state;
 `abilityTargetPreview` is rebuilt every mouse move from the cursor world position and the current
 selection. Server-projected complex
 ability world objects are stored separately as `state.abilityObjects` from

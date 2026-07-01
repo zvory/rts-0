@@ -193,7 +193,8 @@ Core unit roles:
   lands delayed area shells that punish static positions and clumped units.
 - **Artillery** is the Superior Firepower late capstone from Gun Works: it uses a tank-sized
   gameplay footprint but reads as an exposed field piece, must deploy into a narrow firing arc,
-  cannot shoot inside its minimum range, and spends steel on each long-range point-fire shell.
+  cannot shoot inside its minimum range, and spends steel on each long-range Point Fire or Blanket
+  Fire shell.
 
 Terrain rules:
 - **Open ground** favors machine guns and tanks.
@@ -476,7 +477,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | mortar_team     | 75  | 40 outer / 100 inner AOE | 20 | 60 | 1.6 | 7 | 100 | 50 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
 | anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 72 | 1.6 | 6     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and Heavy Guns (`anti_tank_gun_unlock`) researched in R&D Complex |
 | artillery       | 150 | 150 AP inner / 150-10 outer AOE | 25-55 artillery fire | 90 | 1.3 | 4 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind) and Heavy Guns (`anti_tank_gun_unlock`) researched in R&D Complex; tank-sized footprint |
-| scout_car       | 100 | 6   | 5     | 6  | 2.35  | 10    | 125 | 50  | 3   | 480 (~16s) |
+| scout_car       | 100 | 6   | 5     | 6  | 2.35  | 14    | 125 | 50  | 3   | 480 (~16s) |
 | tank            | 292 | 60  | 5 moving / 14 fully stationary | 72 | 2.0   | 6     | 425 | 150 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex |
 | command_car     | 225 | 0   | 0     | 0  | 2.35  | 10    | 150 | 75  | 4   | 450 (~15s); requires Vehicle Works (`factory` kind) and Command Car (`command_car_unlock`) researched in R&D Complex; no weapon; Scout Car-style movement with a smaller jeep-sized body |
 | ekat       | 150 | 0   | 0     | 0  | 1.6   | 9     | 0   | 0   | 0   | 0; Ekat faction hero; no default attack; no passive regeneration; consumes nearby Golems for recovery |

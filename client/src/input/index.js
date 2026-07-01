@@ -274,6 +274,7 @@ export class Input {
   /** Remove all installed listeners (e.g. on game teardown / screen change). */
   destroy() {
     this.exitPointerLock();
+    this.clientIntent?.clearPlannedOrders?.();
     const el = this.dom;
     el.removeEventListener("mousedown", this._onMouseDown);
     window.removeEventListener("mousemove", this._onMouseMove);
@@ -300,7 +301,12 @@ export class Input {
   }
 
   _issueCommand(command) {
-    return issueGameplayCommand(this.commandIssuer, command);
+    const selected = typeof this.state?.selectedEntities === "function"
+      ? this.state.selectedEntities()
+      : [];
+    const result = issueGameplayCommand(this.commandIssuer, command);
+    this._intent()?.recordPlannedCommand?.(command, selected, result);
+    return result;
   }
 
   _intent() {

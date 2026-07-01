@@ -9,7 +9,7 @@ import {
   ARTILLERY_BLANKET_RADIUS_TILES,
   ARTILLERY_MIN_RANGE_TILES,
 } from "../client/src/config.js";
-import { ABILITY, KIND, LAB_ROLE, ORDER_STAGE, SETUP, TERRAIN } from "../client/src/protocol.js";
+import { ABILITY, cmd, KIND, LAB_ROLE, ORDER_STAGE, SETUP, TERRAIN } from "../client/src/protocol.js";
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg || "Assertion failed");
@@ -436,6 +436,56 @@ function lockedEvent(clientX, clientY, button = 0, extra = {}) {
   assert(
     previewGun?.x === 150 && previewGun?.y === 160 && selected[0].x === 50 && selected[0].y === 60,
     "queued minimap setup preview uses movement endpoints without mutating selection",
+  );
+  h.minimap.destroy();
+}
+
+// Queued minimap artillery fire uses the same local planned origin and setup facing as world targeting.
+{
+  const artillery = {
+    id: 33,
+    owner: 1,
+    kind: KIND.ARTILLERY,
+    x: 40,
+    y: 50,
+    setupState: SETUP.PACKED,
+    facing: 0,
+    orderPlan: [],
+  };
+  const plannedOrigin = { x: 140, y: 150 };
+  const h = minimapHarness({
+    selected: [artillery],
+    commandTarget: { kind: "ability", ability: ABILITY.POINT_FIRE },
+  });
+  h.clientIntent.recordPlannedCommand(
+    cmd.move([artillery.id], plannedOrigin.x, plannedOrigin.y, false),
+    [artillery],
+    { sent: true, clientSeq: 7 },
+  );
+  h.clientIntent.recordPlannedCommand(
+    cmd.setupAntiTankGuns([artillery.id], plannedOrigin.x, plannedOrigin.y + 40, true),
+    [artillery],
+    { sent: true, clientSeq: 8 },
+  );
+  h.minimap._issueOrder(plannedOrigin.x, plannedOrigin.y, true);
+  assert(
+    h.net.sent[0]?.ability === ABILITY.POINT_FIRE &&
+      h.net.sent[0].queued === true &&
+      h.net.sent[0].x === plannedOrigin.x &&
+      h.net.sent[0].y === plannedOrigin.y,
+    "minimap queued Point Fire sends the same raw command semantics as world targeting",
+  );
+  assertApprox(
+    h.clientIntent.commandFeedback[0]?.x,
+    plannedOrigin.x,
+    0.001,
+    "minimap queued Point Fire feedback keeps the locally planned origin x",
+  );
+  assertApprox(
+    h.clientIntent.commandFeedback[0]?.y,
+    plannedOrigin.y + ARTILLERY_MIN_RANGE_TILES,
+    0.001,
+    "minimap queued Point Fire feedback locks from the frozen setup facing",
   );
   h.minimap.destroy();
 }
