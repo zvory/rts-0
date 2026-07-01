@@ -170,7 +170,7 @@ fn spawned_panzerfaust_direct_attack_damages_tank_and_converts_same_id() {
 }
 
 #[test]
-fn direct_attack_can_damage_owned_panzerfaust_targets() {
+fn panzerfaust_direct_attack_can_damage_owned_tank_targets() {
     let players = panzerfaust_players();
     let mut game = empty_flat_game(&players);
     let panzerfaust_pos = game.state.map.tile_center(8, 8);
@@ -218,7 +218,7 @@ fn direct_attack_can_damage_owned_panzerfaust_targets() {
     assert!(owner_saw_launch);
     assert_eq!(
         tank_hp_on_impact,
-        Some(tank_hp.saturating_sub(config::PANZERFAUST_DAMAGE))
+        Some(tank_hp.saturating_sub(panzerfaust_damage_to(EntityKind::Tank)))
     );
     assert!(
         !owner_saw_under_attack_notice,
