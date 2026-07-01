@@ -20,7 +20,7 @@
     },
     {
       "path": "server/crates/archcheck/src/lib.rs",
-      "lines": 2393,
+      "lines": 2400,
       "reason": "Game-state Phase 7 expands the existing oversized architecture checker with state-owner registry and production guardrail enforcement; keep ratcheting until archcheck scanners and tests are split into modules."
     },
     {

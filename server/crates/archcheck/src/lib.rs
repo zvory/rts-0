@@ -1081,8 +1081,7 @@ fn parse_struct_field_line(
     let before_colon = &field_text[..colon];
     let name = before_colon
         .split(|ch: char| !(ch == '_' || ch.is_ascii_alphanumeric()))
-        .filter(|part| !part.is_empty())
-        .last()?;
+        .rfind(|part| !part.is_empty())?;
     let ty = field_text[colon + 1..]
         .trim()
         .trim_end_matches(',')
@@ -1495,31 +1494,24 @@ fn check_module_level_mutable_state(
         return;
     }
 
-    let mut depth = 0isize;
     let mut cfg_test_item_pending = false;
     for (index, line) in text.lines().enumerate() {
         let code = code_before_comment(line).trim();
-        if depth == 0 {
-            if is_cfg_test_attribute(code) {
-                cfg_test_item_pending = true;
-            } else if cfg_test_item_pending && code.starts_with("#[") {
-                // Preserve the cfg(test) skip across stacked attributes on the same item.
-            } else {
-                if module_level_mutable_state_decl(code) && !cfg_test_item_pending {
-                    report.failures.push(format!(
-                        "{}:{}: module-level mutable simulation state is not allowed; store durable state under GameState, rebuildable state under DerivedState, or keep room/session/test-only state outside rts-sim",
-                        file.rel_path,
-                        index + 1
-                    ));
-                }
-                if !code.is_empty() {
-                    cfg_test_item_pending = false;
-                }
+        if is_cfg_test_attribute(code) {
+            cfg_test_item_pending = true;
+        } else if cfg_test_item_pending && code.starts_with("#[") {
+            // Preserve the cfg(test) skip across stacked attributes on the same item.
+        } else {
+            if module_level_mutable_state_decl(code) && !cfg_test_item_pending {
+                report.failures.push(format!(
+                    "{}:{}: module-level mutable simulation state is not allowed; store durable state under GameState, rebuildable state under DerivedState, or keep room/session/test-only state outside rts-sim",
+                    file.rel_path,
+                    index + 1
+                ));
             }
-        }
-        depth += brace_delta(code);
-        if depth < 0 {
-            depth = 0;
+            if !code.is_empty() {
+                cfg_test_item_pending = false;
+            }
         }
     }
 }
@@ -1991,6 +1983,21 @@ mod tests {
             report.failures,
             vec![
                 "services/pathing.rs:1: module-level mutable simulation state is not allowed; store durable state under GameState, rebuildable state under DerivedState, or keep room/session/test-only state outside rts-sim".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn module_level_mutable_state_fails_inside_inline_modules() {
+        let report = analyze_source_files(&[source(
+            "services/pathing.rs",
+            "mod hidden {\n    static CACHE: Mutex<u32> = Mutex::new(0);\n}\n",
+        )]);
+
+        assert_eq!(
+            report.failures,
+            vec![
+                "services/pathing.rs:2: module-level mutable simulation state is not allowed; store durable state under GameState, rebuildable state under DerivedState, or keep room/session/test-only state outside rts-sim".to_string()
             ]
         );
     }
