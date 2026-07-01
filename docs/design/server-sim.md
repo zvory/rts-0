@@ -1130,7 +1130,10 @@ General rules:
   ranker selects one named `rules::combat::TargetPriorityPolicyId` and applies that policy's
   declarative terms: default-weapon fit, Tank cannon immediate-threat order, vehicle Tank Trap route
   obstruction, shoot-while-moving target retention, unit-over-building preference, and nearest/id
-  tie-breaks. The `tank_coax_machine_gun` policy is used by the Tank secondary-fire pass; it ranks
+  tie-breaks. Aggressive auto-acquisition ranks currently fireable candidates first; only when no
+  target is already in weapon range does it fall back to ranking legal chase candidates. Explicit
+  `Attack` orders keep their commanded target while it remains hostile and visible. The
+  `tank_coax_machine_gun` policy is used by the Tank secondary-fire pass; it ranks
   Worker, Rifleman, and Machine Gunner targets before all other legal non-resource fallbacks, then
   uses distance/id ties without Tank cannon threat ordering. The ranker does not decide fog, smoke,
   line-of-sight, blocker, ownership, or acquisition-radius legality.

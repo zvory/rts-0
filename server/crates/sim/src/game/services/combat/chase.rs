@@ -1,7 +1,10 @@
+use crate::config;
 use crate::game::entity::{Entity, EntityStore};
 use crate::game::map::Map;
 
 use super::{TANK_STANDOFF_BUFFER_PX, TANK_STANDOFF_REPATH_DELTA_PX};
+
+const CHASE_REPATH_GOAL_DELTA_PX: f32 = config::TILE_SIZE as f32;
 
 fn uses_vehicle_standoff_policy(e: &Entity) -> bool {
     crate::game::entity::fires_while_moving(e.kind)
@@ -63,13 +66,14 @@ pub(super) fn chase_path_needs_refresh(e: &Entity, chase_goal: (f32, f32)) -> bo
     if e.path_is_empty() {
         return true;
     }
-    if !uses_vehicle_standoff_policy(e) {
-        return false;
-    }
     e.path_goal()
         .map(|goal| {
-            (goal.0 - chase_goal.0).abs() > TANK_STANDOFF_REPATH_DELTA_PX
-                || (goal.1 - chase_goal.1).abs() > TANK_STANDOFF_REPATH_DELTA_PX
+            let delta_px = if uses_vehicle_standoff_policy(e) {
+                TANK_STANDOFF_REPATH_DELTA_PX
+            } else {
+                CHASE_REPATH_GOAL_DELTA_PX
+            };
+            (goal.0 - chase_goal.0).abs() > delta_px || (goal.1 - chase_goal.1).abs() > delta_px
         })
         .unwrap_or(true)
 }
