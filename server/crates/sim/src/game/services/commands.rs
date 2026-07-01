@@ -997,7 +997,15 @@ fn attack_unit_can_target(
     unit: u32,
     target: u32,
 ) -> bool {
-    world_query::unit_attack_target_valid(entities, teams, fog, Some(smokes), player, unit, target)
+    world_query::unit_explicit_attack_target_valid(
+        entities,
+        teams,
+        fog,
+        Some(smokes),
+        player,
+        unit,
+        target,
+    )
 }
 
 fn deconstruct_target_valid(

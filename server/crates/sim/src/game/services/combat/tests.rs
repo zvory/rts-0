@@ -330,6 +330,45 @@ fn apply_test_damage_with_teams(
         10,
     );
 }
+
+#[test]
+fn ordered_attack_can_damage_owned_targets() {
+    let map = open_map(12);
+    let mut entities = EntityStore::new();
+    let attacker_pos = map.tile_center(2, 4);
+    let target_pos = map.tile_center(4, 4);
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, attacker_pos.0, attacker_pos.1)
+        .expect("attacker should spawn");
+    let target = entities
+        .spawn_building(1, EntityKind::Barracks, target_pos.0, target_pos.1, true)
+        .expect("owned target should spawn");
+    entities
+        .get_mut(attacker)
+        .expect("attacker should exist")
+        .set_order(Order::attack(target));
+    let target_hp = entities.get(target).expect("target should exist").hp;
+
+    let events = run_combat_tick_on_map(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false)],
+        &map,
+    );
+
+    assert!(
+        entities.get(target).expect("target should exist").hp < target_hp,
+        "ordered self-attack should damage the owned target"
+    );
+    assert!(
+        events
+            .get(&1)
+            .expect("owner events should exist")
+            .iter()
+            .any(|event| matches!(event, Event::Attack { from, to, .. } if *from == attacker && *to == target)),
+        "owner should receive attack feedback for explicit self-attacks"
+    );
+}
+
 #[test]
 fn idle_army_units_auto_acquire_targets() {
     let (entities, self_id, enemy_id) = rifleman_with_enemy();
