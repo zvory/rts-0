@@ -51,20 +51,8 @@ impl RoomTask {
             return;
         }
         self.order.push(player_id);
-        self.players.insert(
-            player_id,
-            RoomPlayer {
-                name,
-                color: "#6f8fa8".to_string(),
-                ready: true,
-                spectator: true,
-                msg_tx,
-                head_of_line_count: 0,
-                last_received_client_seq: 0,
-                last_sim_consumed_client_seq: 0,
-                last_sim_consumed_client_tick: None,
-            },
-        );
+        self.players
+            .insert(player_id, replay_room_player(name, msg_tx));
         let _ = ack.send(true);
         self.send_replay_start_to(player_id);
         self.send_room_time_state_to(player_id);
@@ -83,20 +71,8 @@ impl RoomTask {
             return;
         }
         self.order.push(player_id);
-        self.players.insert(
-            player_id,
-            RoomPlayer {
-                name,
-                color: "#6f8fa8".to_string(),
-                ready: true,
-                spectator: true,
-                msg_tx,
-                head_of_line_count: 0,
-                last_received_client_seq: 0,
-                last_sim_consumed_client_seq: 0,
-                last_sim_consumed_client_tick: None,
-            },
-        );
+        self.players
+            .insert(player_id, replay_room_player(name, msg_tx));
         self.reassign_host_if_needed();
         let _ = ack.send(true);
         self.send_current_shutdown_warning_to(player_id);
@@ -115,20 +91,8 @@ impl RoomTask {
             return;
         }
         self.order.push(player_id);
-        self.players.insert(
-            player_id,
-            RoomPlayer {
-                name,
-                color: "#6f8fa8".to_string(),
-                ready: true,
-                spectator: true,
-                msg_tx,
-                head_of_line_count: 0,
-                last_received_client_seq: 0,
-                last_sim_consumed_client_seq: 0,
-                last_sim_consumed_client_tick: None,
-            },
-        );
+        self.players
+            .insert(player_id, replay_room_player(name, msg_tx));
         let _ = ack.send(true);
 
         match &self.phase {
@@ -203,12 +167,6 @@ impl RoomTask {
         let artifact = match &self.mode {
             RoomMode::Replay { artifact } => artifact.clone(),
             RoomMode::ReplayArtifact { artifact } => load_replay_artifact(artifact)?,
-            RoomMode::ReplayBranch { .. } => {
-                return Err("room is not configured for replay playback".to_string());
-            }
-            RoomMode::Lab(_) => {
-                return Err("room is not configured for replay playback".to_string());
-            }
             _ => return Err("room is not configured for replay playback".to_string()),
         };
         ReplaySession::new(artifact)
@@ -716,9 +674,22 @@ impl RoomTask {
     }
 
     pub(super) fn on_return_to_lobby(&mut self, player_id: u32) {
-        if !self.players.contains_key(&player_id) || !matches!(self.phase, Phase::ReplayViewer(_)) {
-            return;
+        if self.players.contains_key(&player_id) && matches!(self.phase, Phase::ReplayViewer(_)) {
+            self.on_leave(player_id);
         }
-        self.on_leave(player_id);
+    }
+}
+
+fn replay_room_player(name: String, msg_tx: ConnectionSink) -> RoomPlayer {
+    RoomPlayer {
+        name,
+        color: "#6f8fa8".to_string(),
+        ready: true,
+        spectator: true,
+        msg_tx,
+        head_of_line_count: 0,
+        last_received_client_seq: 0,
+        last_sim_consumed_client_seq: 0,
+        last_sim_consumed_client_tick: None,
     }
 }
