@@ -81,6 +81,7 @@ export function movementBodyClass(kind) {
 function entityBlocksPlacement(e, policy) {
   if (isBuilding(e.kind) || isResource(e.kind)) return true;
   if (!isUnit(e.kind)) return false;
+  if (STATS[e.kind]?.blocksGroundPlacement === false) return false;
   if (policy?.unitOverlap === "infantryAllowed") {
     return movementBodyClass(e.kind) === "vehicleBody";
   }

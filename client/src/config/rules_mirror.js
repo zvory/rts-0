@@ -138,6 +138,7 @@ export const STATS = Object.freeze({
   [KIND.SCOUT_CAR]: { label: "Scout Car", icon: "SC", size: 14.4, sight: 14, body: SCOUT_CAR_BODY,
     rangeTiles: 5, cost: { steel: 125, oil: 50 }, supply: 3, buildTicks: 480 },
   [KIND.SCOUT_PLANE]: { label: "Scout Plane", icon: "SP", size: 17, sight: 12, body: SCOUT_PLANE_BODY,
+    blocksGroundPlacement: false,
     rangeTiles: 0, cost: { steel: 50, oil: 50 }, supply: 0, buildTicks: TICK_HZ * 20 },
   [KIND.TANK]: { label: "Tank", icon: "TK", size: 18, sight: 6, body: TANK_BODY,
     rangeTiles: 5, cost: { steel: 425, oil: 150 }, supply: 8, buildTicks: 750,

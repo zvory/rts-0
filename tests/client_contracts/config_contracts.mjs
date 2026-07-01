@@ -177,7 +177,8 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     STATS[KIND.SCOUT_PLANE].cost.steel === 50 &&
       STATS[KIND.SCOUT_PLANE].cost.oil === 50 &&
       STATS[KIND.SCOUT_PLANE].supply === 0 &&
-      STATS[KIND.SCOUT_PLANE].body.length === 48,
+      STATS[KIND.SCOUT_PLANE].body.length === 48 &&
+      STATS[KIND.SCOUT_PLANE].blocksGroundPlacement === false,
     "hidden Scout Plane stats mirror the approved contract",
   );
   assert(
