@@ -59,11 +59,7 @@ fn apply_test_damage_with_seed_and_teams(
 
 #[test]
 fn entrenched_eligible_infantry_gain_one_tile_of_weapon_range() {
-    for kind in [
-        EntityKind::Worker,
-        EntityKind::Rifleman,
-        EntityKind::MachineGunner,
-    ] {
+    for kind in [EntityKind::Rifleman, EntityKind::MachineGunner] {
         let mut entities = EntityStore::new();
         let id = entities
             .spawn_unit(1, kind, 100.0, 100.0)
@@ -87,7 +83,12 @@ fn entrenched_eligible_infantry_gain_one_tile_of_weapon_range() {
 
 #[test]
 fn excluded_units_do_not_gain_range_from_stale_trench_state() {
-    for kind in [EntityKind::MortarTeam, EntityKind::Golem, EntityKind::Tank] {
+    for kind in [
+        EntityKind::Worker,
+        EntityKind::MortarTeam,
+        EntityKind::Golem,
+        EntityKind::Tank,
+    ] {
         let mut entities = EntityStore::new();
         let id = entities
             .spawn_unit(1, kind, 100.0, 100.0)
@@ -376,7 +377,7 @@ fn entrenched_secondary_candidate_skips_overpenetration_damage() {
         .spawn_unit(2, EntityKind::Rifleman, 140.0, 100.0)
         .expect("primary target should spawn");
     let secondary = entities
-        .spawn_unit(2, EntityKind::Worker, 165.0, 100.0)
+        .spawn_unit(2, EntityKind::Rifleman, 165.0, 100.0)
         .expect("secondary target should spawn");
     mark_entrenched(&mut entities, secondary);
     let secondary_hp = entities.get(secondary).expect("secondary should exist").hp;

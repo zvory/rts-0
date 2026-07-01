@@ -337,8 +337,8 @@ fn entrenchment_inspection_scenario_seeds_research_trenches_and_reuse_units() {
         owned_kind_count(&setup.game, 1, EntityKind::TrainingCentre),
         1
     );
-    assert_eq!(owned_kind_count(&setup.game, 1, EntityKind::Rifleman), 1);
-    assert_eq!(owned_kind_count(&setup.game, 1, EntityKind::Worker), 1);
+    assert_eq!(owned_kind_count(&setup.game, 1, EntityKind::Rifleman), 2);
+    assert_eq!(owned_kind_count(&setup.game, 1, EntityKind::Worker), 0);
     assert_eq!(
         owned_kind_count(&setup.game, 1, EntityKind::MachineGunner),
         1

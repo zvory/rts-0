@@ -581,16 +581,17 @@ it becomes fogged. That remembered trench record is terrain-only; it does not ex
 owner, current occupants, or hidden unit state.
 
 `services::entrenchment` updates unit-facing trench state after normal collision cleanup and before
-final snapshot indexing. Riflemen, Machine Gunners, and Workers owned by a player with completed
-Entrenchment research create a neutral trench after holding ground on untrenched terrain for
-90 consecutive simulation ticks. Holding ground means the unit has no movement path, no path
+final snapshot indexing. Riflemen, Machine Gunners, and Panzerfausts owned by a player with
+completed Entrenchment research create a neutral trench after holding ground on untrenched terrain
+for 90 consecutive simulation ticks. Engineers/Workers are not eligible: they neither dig new
+trenches nor occupy existing trenches. Holding ground means the unit has no movement path, no path
 movement delta for the tick, no collision displacement after pre-collision derived-state rebuild,
 and an order that is effectively stationary: Idle, Hold Position, an in-range Attack order, or an
 arrived Attack Move. Firing, target changes, body/weapon facing, and Machine Gunner setup/teardown
 do not reset that timer; Move, Attack Move while still travelling, Gather, Build, Deconstruct,
 ability movement, artillery point-fire, path movement, and non-slotting forced movement reset it.
 
-Existing trenches are neutral. Any eligible Rifleman, Machine Gunner, or Worker can occupy an empty
+Existing trenches are neutral. Any eligible Rifleman, Machine Gunner, or Panzerfaust can occupy an empty
 one without owning Entrenchment research when it is stopped in the trench footprint. Each trench can
 actively hold only one infantry unit; once occupied, it is skipped as an occupation candidate for
 other units. A stopped eligible unit within half a tile of an empty trench may be slotted by at most
@@ -604,7 +605,7 @@ occupants.
 
 Entrenched combat benefits consume only active occupation through
 `entrenchment_combat::is_actively_entrenched`. Active entrenched Riflemen, Machine Gunners, and
-Workers gain one tile of weapon range through `entrenchment_combat::attack_range_tiles`, and idle
+Panzerfausts gain one tile of weapon range through `entrenchment_combat::attack_range_tiles`, and idle
 target acquisition treats them like Hold Position: they can acquire and fire at legal targets inside
 current weapon range but do not request idle chase paths. Explicit Attack and other player orders
 remain authoritative and may move or chase the unit out of the trench; command application and lab
@@ -612,7 +613,7 @@ moves clear active occupation before later combat decisions use it.
 
 Incoming direct-fire miss policy uses the highest applicable independent chance. Existing
 Anti-Tank Gun infantry miss chance is 65%; entrenched eligible infantry add a 70% miss chance, so
-an Anti-Tank Gun firing at an entrenched Rifleman, Machine Gunner, or Worker rolls 70%, not a
+an Anti-Tank Gun firing at an entrenched Rifleman, Machine Gunner, or Panzerfaust rolls 70%, not a
 composed probability. Area effects call `entrenchment_combat::reduce_area_damage` after their
 normal falloff and armor calculations, so Mortar and Artillery splash deal 30% of their current
 post-formula damage to actively entrenched eligible infantry. Direct-fire over-penetration stops at

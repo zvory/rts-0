@@ -336,9 +336,10 @@ folded into default targeting.
   player's Machine Gunners from 1.28 px/tick to unupgraded Rifleman speed (1.6 px/tick) and halves
   their setup and teardown timers from 30 ticks to 15.
 - **Entrenchment** (Training Centre research, protocol id `entrenchment`): costs 100 steel / 0 oil
-  and takes 300 ticks (~10s). The rules surface defines Riflemen, Machine Gunners, Panzerfausts,
-  and Workers as eligible entrenchment infantry; Mortar Teams, Ekat, Golems, Ekat-faction units, vehicles,
-  buildings, support weapons other than Machine Gunners, and non-infantry entities are excluded.
+  and takes 300 ticks (~10s). The rules surface defines Riflemen, Machine Gunners, and Panzerfausts
+  as eligible entrenchment infantry; Engineers/Workers, Mortar Teams, Ekat, Golems,
+  Ekat-faction units, vehicles, buildings, support weapons other than Machine Gunners, and
+  non-infantry entities are excluded.
   Eligible infantry owned by a player with completed Entrenchment create neutral trenches after
   holding ground on untrenched terrain for 90 ticks (~3s), and any eligible infantry can occupy an
   existing empty trench while stopped in its footprint. A trench can actively hold only one
