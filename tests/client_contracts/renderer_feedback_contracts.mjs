@@ -447,8 +447,8 @@ function nearPoint(call, point, epsilon = 0.001) {
     x: 184,
     y: 100,
   };
-  const mainMuzzle = { x: tank.x + 33.2, y: tank.y };
-  const coaxMuzzle = { x: tank.x + 31.4, y: tank.y - 4.1 };
+  const mainMuzzle = { x: tank.x + 24.875, y: tank.y };
+  const coaxMuzzle = { x: tank.x + 27.575, y: tank.y - 4.1 };
 
   performance.now = () => fixedNow;
   try {
@@ -459,6 +459,10 @@ function nearPoint(call, point, epsilon = 0.001) {
     }, {
       entityById(id) {
         return id === tank.id ? tank : id === target.id ? target : null;
+      },
+      weaponRecoil(id, kind, now) {
+        assertApprox(now, fixedNow, 0.001, "muzzle origin samples recoil at the current frame time");
+        return id === tank.id && kind === KIND.TANK ? 0.5 : 0;
       },
       liveMuzzleFlashes(now) {
         assertApprox(now, fixedNow, 0.001, "muzzle renderer samples current frame time");
@@ -485,8 +489,8 @@ function nearPoint(call, point, epsilon = 0.001) {
   assert(circles.length >= 4, "same-tick tank cannon and coax both draw visible muzzle flashes");
   const cannonCircles = circles.filter((call) => nearPoint(call, mainMuzzle));
   const coaxCircles = circles.filter((call) => nearPoint(call, coaxMuzzle));
-  assert(cannonCircles.length >= 2, "tank cannon muzzle flash uses the authored main muzzle anchor");
-  assert(coaxCircles.length >= 2, "tank coax muzzle flash uses the authored coax muzzle anchor");
+  assert(cannonCircles.length >= 2, "tank cannon muzzle flash uses the animated main muzzle anchor");
+  assert(coaxCircles.length >= 2, "tank coax muzzle flash uses the animated coax muzzle anchor");
   assert(
     cannonCircles.some((call) => call[3] > 7),
     "tank cannon keeps cannon-scale muzzle feedback",

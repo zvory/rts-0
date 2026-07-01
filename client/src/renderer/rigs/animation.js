@@ -105,6 +105,12 @@ export function transformedRigAnchorPoint(definition, entity, anchorName, render
   const context = renderOptions?.[RIG_CONTEXT_READY]
     ? renderOptions
     : createRigRenderContext(entity, renderOptions);
+  const partId = rigAnchorPartId(entity.kind, anchorName);
+  if (partId) {
+    const sampled = sampleRigAnimation(definition, entity, context);
+    const part = sampled.parts?.[partId];
+    if (part) return transformedRigPartPoint(entity, anchor, part);
+  }
   const rotation = rigAnchorRotation(entity.kind, anchorName, context);
   const c = Math.cos(rotation);
   const s = Math.sin(rotation);
@@ -240,6 +246,40 @@ function rigAnchorRotation(kind, anchorName, context) {
   }
   if (kind === KIND.TANK && anchorName === "turret") return context.weaponVisualFacing;
   return context.facing;
+}
+
+function rigAnchorPartId(kind, anchorName) {
+  if (kind !== KIND.TANK) return null;
+  if (anchorName === "muzzle") return "part.barrel";
+  if (anchorName === "coaxMuzzle") return "part.coaxBarrel";
+  if (anchorName === "turret") return "part.turret";
+  return null;
+}
+
+function transformedRigPartPoint(entity, point, part) {
+  const rotation = finite(part.transform?.rotation, 0);
+  const c = Math.cos(rotation);
+  const s = Math.sin(rotation);
+  const localOffset = rotateLocalOffset(part.localOffset, rotation);
+  const localX = (point.x * finite(part.geometryScale?.x, 1) - finite(part.pivot?.x, 0))
+    * finite(part.transform?.scaleX, 1);
+  const localY = (point.y * finite(part.geometryScale?.y, 1) - finite(part.pivot?.y, 0))
+    * finite(part.transform?.scaleY, 1);
+  const partX = finite(part.transform?.x, 0) + localOffset.x;
+  const partY = finite(part.transform?.y, 0) + localOffset.y;
+  return {
+    x: entity.x + partX + localX * c - localY * s,
+    y: entity.y + partY + localX * s + localY * c,
+  };
+}
+
+function rotateLocalOffset(offset, rotation) {
+  const x = finite(offset?.x, 0);
+  const y = finite(offset?.y, 0);
+  if (x === 0 && y === 0) return { x: 0, y: 0 };
+  const c = Math.cos(rotation);
+  const s = Math.sin(rotation);
+  return { x: x * c - y * s, y: x * s + y * c };
 }
 
 function isBusy(entity) {

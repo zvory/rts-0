@@ -95,6 +95,20 @@ test("tank rig exposes transformed main and coax muzzle anchors", () => {
   assert.ok(Math.abs(mainMuzzle.y - 133.2) < 0.001);
   assert.ok(Math.abs(coaxMuzzle.x - 104.1) < 0.001);
   assert.ok(Math.abs(coaxMuzzle.y - 131.4) < 0.001);
+
+  const recoilingMainMuzzle = transformedRigAnchorPoint(definition, entity, "muzzle", {
+    now: fixedNow,
+    state: { weaponRecoil: () => 0.5 },
+  });
+  const recoilingCoaxMuzzle = transformedRigAnchorPoint(definition, entity, "coaxMuzzle", {
+    now: fixedNow,
+    state: { weaponRecoil: () => 0.5 },
+  });
+
+  assert.ok(Math.abs(recoilingMainMuzzle.x - 100) < 0.001);
+  assert.ok(Math.abs(recoilingMainMuzzle.y - 124.875) < 0.001);
+  assert.ok(Math.abs(recoilingCoaxMuzzle.x - 104.1) < 0.001);
+  assert.ok(Math.abs(recoilingCoaxMuzzle.y - 127.575) < 0.001);
 });
 
 test("rig runtime creates one container child per part and updates transforms", () => {
