@@ -162,7 +162,7 @@ pub const UNITS: &[UnitDef] = &[
             dmg: 0,
             range_tiles: balance::PANZERFAUST_RANGE_TILES,
             cooldown: 0,
-            speed: 1.44,
+            speed: 1.6,
             sight_tiles: 8,
             cost_steel: 60,
             cost_oil: 15,
@@ -680,12 +680,16 @@ mod tests {
     #[test]
     fn panzerfaust_stats_use_barracks_training_without_default_attack_runtime() {
         let def = unit_def(EntityKind::Panzerfaust).expect("panzerfaust def");
+        let rifleman_speed = unit_def(EntityKind::Rifleman)
+            .expect("rifleman def")
+            .stats
+            .speed;
 
         assert_eq!(def.stats.hp, 45);
         assert_eq!(def.stats.dmg, 0);
         assert_eq!(def.stats.range_tiles, balance::PANZERFAUST_RANGE_TILES);
         assert_eq!(def.stats.cooldown, 0);
-        assert_eq!(def.stats.speed, 1.44);
+        assert_eq!(def.stats.speed, rifleman_speed);
         assert_eq!(def.stats.sight_tiles, 8);
         assert_eq!((def.stats.cost_steel, def.stats.cost_oil), (60, 15));
         assert_eq!(def.stats.supply, 1);
