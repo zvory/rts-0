@@ -19,10 +19,14 @@ use super::trench::TrenchStore;
 use super::{setup, Game, MapMetadata, PlayerStartingLoadout};
 
 mod error;
+mod metadata;
 mod player_dto;
 mod validation;
 
 pub(in crate::game) use error::CheckpointPayloadError;
+use metadata::{
+    CheckpointCompatibilityV1, CommandLogMetadataV1, MapBindingV1, RngDescriptorV1,
+};
 use player_dto::PlayerStateV1;
 use validation::*;
 
@@ -207,7 +211,7 @@ impl GameCheckpointV1 {
             });
         }
         self.compatibility.validate()?;
-        self.rng.validate()?;
+        self.rng.validate(self.seed)?;
         self.map_binding.validate_against(map, map_metadata)?;
         validate_supplied_map(map)?;
         validate_count("players", self.players.len(), MAX_PLAYERS)?;
@@ -244,10 +248,13 @@ impl GameCheckpointV1 {
 
         let player_ids = validate_players(&self.players)?;
         let entity_ids = validate_entities(&self.entities, &player_ids, map)?;
+        validate_player_supply(&self.players, &self.entities)?;
         validate_fog(&self.fog, &player_ids, map)?;
         validate_building_memory(&self.building_memory, &player_ids)?;
         validate_pending_commands(&self.pending_commands, &player_ids)?;
         validate_command_log(&self.command_log, self.tick, &player_ids)?;
+        self.command_log_metadata
+            .validate_against(&self.command_log)?;
         validate_active_sources(
             &self.lingering_sight,
             &self.firing_reveals,
@@ -262,158 +269,6 @@ impl GameCheckpointV1 {
         )?;
         validate_id_set("labGodModePlayers", &self.lab_god_mode_players, &player_ids)?;
         Ok(())
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct CheckpointCompatibilityV1 {
-    created_by: String,
-    server_build_sha: String,
-    sim_schema_version: u32,
-    rules_version: u32,
-    protocol_version: u32,
-    required_features: Vec<String>,
-    optional_features: Vec<String>,
-}
-
-impl CheckpointCompatibilityV1 {
-    fn debug_default() -> Self {
-        Self {
-            created_by: "debug".to_string(),
-            server_build_sha: option_env!("GIT_SHA").unwrap_or("unknown").to_string(),
-            sim_schema_version: SIM_SCHEMA_VERSION,
-            rules_version: RULES_VERSION,
-            protocol_version: PROTOCOL_VERSION,
-            required_features: Vec::new(),
-            optional_features: Vec::new(),
-        }
-    }
-
-    fn validate(&self) -> Result<(), CheckpointPayloadError> {
-        if self.sim_schema_version != SIM_SCHEMA_VERSION {
-            return Err(CheckpointPayloadError::InvalidValue {
-                field: "compatibility.simSchemaVersion",
-            });
-        }
-        for feature in &self.required_features {
-            return Err(CheckpointPayloadError::UnsupportedRequiredFeature {
-                feature: feature.clone(),
-            });
-        }
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct MapBindingV1 {
-    name: String,
-    schema_version: u32,
-    content_hash: String,
-    materialized_map_hash: String,
-    size: u32,
-    player_count: u32,
-}
-
-impl MapBindingV1 {
-    fn from_state(state: &GameState) -> Self {
-        Self {
-            name: state.map_metadata.name.clone(),
-            schema_version: state.map_metadata.schema_version,
-            content_hash: state.map_metadata.content_hash.clone(),
-            materialized_map_hash: state.map.materialized_hash(),
-            size: state.map.size,
-            player_count: state.players.len() as u32,
-        }
-    }
-
-    fn validate_against(
-        &self,
-        map: &Map,
-        map_metadata: &MapMetadata,
-    ) -> Result<(), CheckpointPayloadError> {
-        if self.name != map_metadata.name {
-            return Err(CheckpointPayloadError::MapBindingMismatch { field: "name" });
-        }
-        if self.schema_version != map_metadata.schema_version {
-            return Err(CheckpointPayloadError::MapBindingMismatch {
-                field: "schemaVersion",
-            });
-        }
-        if self.content_hash != map_metadata.content_hash {
-            return Err(CheckpointPayloadError::MapBindingMismatch {
-                field: "contentHash",
-            });
-        }
-        if self.materialized_map_hash != map.materialized_hash() {
-            return Err(CheckpointPayloadError::MapBindingMismatch {
-                field: "materializedMapHash",
-            });
-        }
-        if self.size != map.size {
-            return Err(CheckpointPayloadError::MapBindingMismatch { field: "size" });
-        }
-        if self.player_count as usize != map.starts.len() {
-            return Err(CheckpointPayloadError::MapBindingMismatch {
-                field: "playerCount",
-            });
-        }
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct RngDescriptorV1 {
-    algorithm: String,
-    seed: u64,
-    draws_consumed: u64,
-}
-
-impl RngDescriptorV1 {
-    fn from_rng(rng: &TrackedRng) -> Self {
-        Self {
-            algorithm: RNG_ALGORITHM.to_string(),
-            seed: rng.seed(),
-            draws_consumed: rng.draws_consumed(),
-        }
-    }
-
-    fn validate(&self) -> Result<(), CheckpointPayloadError> {
-        if self.algorithm != RNG_ALGORITHM {
-            return Err(CheckpointPayloadError::IncompatibleRngAlgorithm {
-                found: self.algorithm.clone(),
-            });
-        }
-        if self.draws_consumed > MAX_RNG_DRAWS_CONSUMED {
-            return Err(CheckpointPayloadError::InvalidValue {
-                field: "rng.drawsConsumed",
-            });
-        }
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct CommandLogMetadataV1 {
-    protocol_version: u32,
-    first_tick: Option<u32>,
-    last_tick: Option<u32>,
-    complete_from_tick_zero: bool,
-    replay_base_tick: Option<u32>,
-}
-
-impl CommandLogMetadataV1 {
-    fn from_command_log(command_log: &[CommandLogEntry]) -> Self {
-        Self {
-            protocol_version: PROTOCOL_VERSION,
-            first_tick: command_log.first().map(|entry| entry.tick),
-            last_tick: command_log.last().map(|entry| entry.tick),
-            complete_from_tick_zero: true,
-            replay_base_tick: None,
-        }
     }
 }
 

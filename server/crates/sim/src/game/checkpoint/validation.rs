@@ -8,6 +8,7 @@ use crate::game::fog::LingeringSightSource;
 use crate::game::map::Map;
 use crate::game::replay::CommandLogEntry;
 use crate::game::SimCommand;
+use crate::rules;
 
 use super::{
     BuildingMemoryV1, CheckpointPayloadError, EntityStoreV1, FogStateV1, PlayerStateV1,
@@ -82,6 +83,51 @@ pub(super) fn validate_entities(
         validate_entity(entity, entities.next_id, player_ids, world, &mut ids)?;
     }
     Ok(ids)
+}
+
+pub(super) fn validate_player_supply(
+    players: &[PlayerStateV1],
+    entities: &EntityStoreV1,
+) -> Result<(), CheckpointPayloadError> {
+    for player in players {
+        let catalog = rules::faction::catalog_for(&player.faction_id);
+        let mut expected_used = 0u32;
+        let mut expected_cap = 0u32;
+        for entity in &entities.entities {
+            if entity.owner != player.id {
+                continue;
+            }
+            if entity.is_building() && !entity.under_construction() {
+                if catalog.is_some_and(|catalog| catalog.allows_building(entity.kind)) {
+                    expected_cap =
+                        expected_cap.saturating_add(rules::economy::supply_provided(entity.kind));
+                }
+                for item in entity.prod_queue() {
+                    if catalog.is_some_and(|catalog| catalog.allows_unit(item.unit)) {
+                        expected_used =
+                            expected_used.saturating_add(rules::economy::supply_cost(item.unit));
+                    }
+                }
+            } else if entity.is_unit()
+                && catalog.is_some_and(|catalog| catalog.allows_unit(entity.kind))
+            {
+                expected_used =
+                    expected_used.saturating_add(rules::economy::supply_cost(entity.kind));
+            }
+        }
+        expected_cap = expected_cap.min(config::SUPPLY_CAP_MAX);
+        if player.supply_used != expected_used {
+            return Err(CheckpointPayloadError::InvalidValue {
+                field: "players.supplyUsed",
+            });
+        }
+        if player.supply_cap != expected_cap {
+            return Err(CheckpointPayloadError::InvalidValue {
+                field: "players.supplyCap",
+            });
+        }
+    }
+    Ok(())
 }
 
 fn validate_entity(

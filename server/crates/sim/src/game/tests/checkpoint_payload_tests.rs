@@ -66,6 +66,20 @@ fn checkpoint_payload_rejects_corrupt_oversized_and_unsupported_text() {
         ),
         Err(CheckpointPayloadError::UnsupportedRequiredFeature { .. })
     ));
+
+    let unsupported_protocol = mutate_payload(&text, |value| {
+        value["compatibility"]["protocolVersion"] = serde_json::json!(99);
+    });
+    assert!(matches!(
+        Game::restore_checkpoint_payload_text_for_test(
+            &unsupported_protocol,
+            game.state.map.clone(),
+            game.map_metadata().clone(),
+        ),
+        Err(CheckpointPayloadError::InvalidValue {
+            field: "compatibility.protocolVersion",
+        })
+    ));
 }
 
 #[test]
@@ -157,6 +171,52 @@ fn checkpoint_payload_rejects_invalid_coordinates_and_queue_caps() {
         Err(CheckpointPayloadError::CountCapExceeded {
             field: "pendingCommands",
             ..
+        })
+    ));
+}
+
+#[test]
+fn checkpoint_payload_rejects_inconsistent_metadata_rng_and_supply() {
+    let game = Game::new_for_replay(&human_vs_ai_players(), 0x5150_2005);
+    let text = checkpoint_payload_text_for(&game, "inconsistent metadata payload fixture");
+
+    let mismatched_rng_seed = mutate_payload(&text, |value| {
+        value["rng"]["seed"] = serde_json::json!(123);
+    });
+    assert!(matches!(
+        Game::restore_checkpoint_payload_text_for_test(
+            &mismatched_rng_seed,
+            game.state.map.clone(),
+            game.map_metadata().clone(),
+        ),
+        Err(CheckpointPayloadError::InvalidValue { field: "rng.seed" })
+    ));
+
+    let inconsistent_command_log_metadata = mutate_payload(&text, |value| {
+        value["commandLogMetadata"]["firstTick"] = serde_json::json!(0);
+    });
+    assert!(matches!(
+        Game::restore_checkpoint_payload_text_for_test(
+            &inconsistent_command_log_metadata,
+            game.state.map.clone(),
+            game.map_metadata().clone(),
+        ),
+        Err(CheckpointPayloadError::InvalidValue {
+            field: "commandLogMetadata.firstTick",
+        })
+    ));
+
+    let inconsistent_supply = mutate_payload(&text, |value| {
+        value["players"][0]["supplyUsed"] = serde_json::json!(999);
+    });
+    assert!(matches!(
+        Game::restore_checkpoint_payload_text_for_test(
+            &inconsistent_supply,
+            game.state.map.clone(),
+            game.map_metadata().clone(),
+        ),
+        Err(CheckpointPayloadError::InvalidValue {
+            field: "players.supplyUsed",
         })
     ));
 }
