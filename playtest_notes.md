@@ -1,3 +1,5 @@
+- [ ] TODO: download an FW 189 scout plane sound effect
+
 jeffrye playtest 2
 
 - [x] artillery should be visible in the map when they fire, not just on the minimpa, they also get the full cycle visibilyt (done: artillery firing reveal projects the firing gun as a normal targetable world entity and adds global minimap firing markers)
