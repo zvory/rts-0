@@ -50,7 +50,7 @@ impl CheckpointCompatibilityV1 {
                 field: "compatibility.protocolVersion",
             });
         }
-        for feature in &self.required_features {
+        if let Some(feature) = self.required_features.first() {
             return Err(CheckpointPayloadError::UnsupportedRequiredFeature {
                 feature: feature.clone(),
             });
