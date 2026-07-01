@@ -55,7 +55,7 @@ use self::artillery_scatter::artillery_error_tiles;
 use self::artillery_scatter::{artillery_blanket_point, artillery_scattered_point};
 use self::guards::{
     dedupe_cap_units, is_constructing, player_is_ai, rally_intent_for_map,
-    unit_can_accept_player_command,
+    unit_can_accept_ground_command, unit_can_accept_player_command,
 };
 use self::planner_facts::{planner_config, planner_facts, AbilityFactInput};
 struct CommandExecutionContext<'a, 'pathing> {
@@ -546,10 +546,7 @@ pub(in crate::game) fn apply_commands(
                     continue;
                 };
                 for id in units {
-                    if unit_can_accept_player_command(entities, player, id) {
-                        if is_scout_plane(entities, id) {
-                            continue;
-                        }
+                    if unit_can_accept_ground_command(entities, player, id) {
                         entities.release_miner(id);
                         if let Some(e) = entities.get_mut(id) {
                             e.clear_orders();
@@ -565,10 +562,7 @@ pub(in crate::game) fn apply_commands(
                     continue;
                 };
                 for id in units {
-                    if unit_can_accept_player_command(entities, player, id) {
-                        if is_scout_plane(entities, id) {
-                            continue;
-                        }
+                    if unit_can_accept_ground_command(entities, player, id) {
                         entities.release_miner(id);
                         if let Some(e) = entities.get_mut(id) {
                             e.hold_position();
