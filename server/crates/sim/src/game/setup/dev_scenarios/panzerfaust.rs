@@ -90,18 +90,18 @@ fn panzerfaust_duel_scenario(seed: u32) -> Result<DevScenarioSetup, String> {
     let tank = spawn_tank(&mut entities, 2, tank_pos, "target ")?;
     set_attack_order(&mut entities, panzerfaust, tank)?;
 
-    Ok(build_panzerfaust_setup(
+    Ok(build_panzerfaust_setup(PanzerfaustSetupSpec {
         map,
         entities,
-        [(1, 1), (2, 2)],
-        1,
-        (center.0 - 8, center.1),
+        teams: [(1, 1), (2, 2)],
+        player_id: 1,
+        start_tile: (center.0 - 8, center.1),
         seed,
-        "dev:panzerfaust_duel",
-        vec![panzerfaust],
-        panzerfaust_pos,
-        u32::MAX,
-    ))
+        metadata_name: "dev:panzerfaust_duel",
+        units: vec![panzerfaust],
+        goal: panzerfaust_pos,
+        issue_after_ticks: u32::MAX,
+    }))
 }
 
 fn panzerfaust_windup_cancel_scenario(seed: u32) -> Result<DevScenarioSetup, String> {
@@ -117,18 +117,18 @@ fn panzerfaust_windup_cancel_scenario(seed: u32) -> Result<DevScenarioSetup, Str
     let tank = spawn_tank(&mut entities, 2, tank_pos, "target ")?;
     set_attack_order(&mut entities, panzerfaust, tank)?;
 
-    Ok(build_panzerfaust_setup(
+    Ok(build_panzerfaust_setup(PanzerfaustSetupSpec {
         map,
         entities,
-        [(1, 1), (2, 2)],
-        1,
-        (center.0 - 8, center.1),
+        teams: [(1, 1), (2, 2)],
+        player_id: 1,
+        start_tile: (center.0 - 8, center.1),
         seed,
-        "dev:panzerfaust_windup_cancel",
-        vec![panzerfaust],
-        cancel_goal,
-        config::TICK_HZ / 6,
-    ))
+        metadata_name: "dev:panzerfaust_windup_cancel",
+        units: vec![panzerfaust],
+        goal: cancel_goal,
+        issue_after_ticks: config::TICK_HZ / 6,
+    }))
 }
 
 fn panzerfaust_target_death_scenario(seed: u32) -> Result<DevScenarioSetup, String> {
@@ -152,18 +152,18 @@ fn panzerfaust_target_death_scenario(seed: u32) -> Result<DevScenarioSetup, Stri
     set_attack_order(&mut entities, normal_panzerfaust, tank)?;
     set_attack_order(&mut entities, boosted_panzerfaust, tank)?;
 
-    let mut setup = build_panzerfaust_setup(
+    let mut setup = build_panzerfaust_setup(PanzerfaustSetupSpec {
         map,
         entities,
-        [(1, 1), (2, 2), (3, 1)],
-        1,
-        (center.0 - 8, center.1 - 1),
+        teams: [(1, 1), (2, 2), (3, 1)],
+        player_id: 1,
+        start_tile: (center.0 - 8, center.1 - 1),
         seed,
-        "dev:panzerfaust_target_death",
-        vec![normal_panzerfaust, boosted_panzerfaust],
-        normal_pos,
-        u32::MAX,
-    );
+        metadata_name: "dev:panzerfaust_target_death",
+        units: vec![normal_panzerfaust, boosted_panzerfaust],
+        goal: normal_pos,
+        issue_after_ticks: u32::MAX,
+    });
     grant_methamphetamines(&mut setup.game, 3);
     Ok(setup)
 }
@@ -190,18 +190,18 @@ fn panzerfaust_entrenched_range_scenario(seed: u32) -> Result<DevScenarioSetup, 
             .hold_position();
     }
 
-    let mut setup = build_panzerfaust_setup(
+    let mut setup = build_panzerfaust_setup(PanzerfaustSetupSpec {
         map,
         entities,
-        [(1, 1), (2, 2)],
-        1,
-        (center.0 - 8, center.1),
+        teams: [(1, 1), (2, 2)],
+        player_id: 1,
+        start_tile: (center.0 - 8, center.1),
         seed,
-        "dev:panzerfaust_entrenched_range",
-        vec![entrenched_panzerfaust, exposed_panzerfaust],
-        entrenched_pos,
-        u32::MAX,
-    );
+        metadata_name: "dev:panzerfaust_entrenched_range",
+        units: vec![entrenched_panzerfaust, exposed_panzerfaust],
+        goal: entrenched_pos,
+        issue_after_ticks: u32::MAX,
+    });
     grant_entrenchment(&mut setup.game, setup.player_id);
     let trench = setup
         .game
@@ -236,48 +236,50 @@ fn panzerfaust_methamphetamines_scenario(seed: u32) -> Result<DevScenarioSetup, 
     set_attack_order(&mut entities, normal_panzerfaust, normal_tank)?;
     set_attack_order(&mut entities, boosted_panzerfaust, boosted_tank)?;
 
-    let mut setup = build_panzerfaust_setup(
+    let mut setup = build_panzerfaust_setup(PanzerfaustSetupSpec {
         map,
         entities,
-        [(1, 1), (2, 2), (3, 1)],
-        1,
-        (center.0 - 8, center.1 - 2),
+        teams: [(1, 1), (2, 2), (3, 1)],
+        player_id: 1,
+        start_tile: (center.0 - 8, center.1 - 2),
         seed,
-        "dev:panzerfaust_methamphetamines",
-        vec![normal_panzerfaust, boosted_panzerfaust],
-        normal_pos,
-        u32::MAX,
-    );
+        metadata_name: "dev:panzerfaust_methamphetamines",
+        units: vec![normal_panzerfaust, boosted_panzerfaust],
+        goal: normal_pos,
+        issue_after_ticks: u32::MAX,
+    });
     grant_methamphetamines(&mut setup.game, 3);
     Ok(setup)
 }
 
-fn build_panzerfaust_setup<const N: usize>(
+struct PanzerfaustSetupSpec<const N: usize> {
     map: Map,
     entities: EntityStore,
     teams: [(u32, u32); N],
     player_id: u32,
     start_tile: (u32, u32),
     seed: u32,
-    metadata_name: &str,
+    metadata_name: &'static str,
     units: Vec<u32>,
     goal: (f32, f32),
     issue_after_ticks: u32,
-) -> DevScenarioSetup {
+}
+
+fn build_panzerfaust_setup<const N: usize>(spec: PanzerfaustSetupSpec<N>) -> DevScenarioSetup {
     DevScenarioSetup {
         game: build_dev_scenario_game_with_teams(
-            map,
-            entities,
-            teams,
-            player_id,
-            start_tile,
-            seed,
-            metadata_name,
+            spec.map,
+            spec.entities,
+            spec.teams,
+            spec.player_id,
+            spec.start_tile,
+            spec.seed,
+            spec.metadata_name,
         ),
-        player_id,
-        units,
-        goal,
-        issue_after_ticks,
+        player_id: spec.player_id,
+        units: spec.units,
+        goal: spec.goal,
+        issue_after_ticks: spec.issue_after_ticks,
     }
 }
 
