@@ -335,8 +335,9 @@ pub(in crate::game) fn combat_system(
             Some(t) => (t.pos_x, t.pos_y, t.owner),
             None => continue,
         };
-        if !teams.is_enemy_owner(owner, t_owner) {
-            continue; // never intentionally fire on non-hostile players
+        if !(teams.is_enemy_owner(owner, t_owner) || mode == CombatMode::Ordered && t_owner == owner)
+        {
+            continue; // auto-acquisition stays hostile-only; explicit self-attacks are ordered.
         }
         let dist = dist2(px, py, tx, ty).sqrt();
         let target_angle = (ty - py).atan2(tx - px);

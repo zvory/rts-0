@@ -96,7 +96,9 @@ fn handle_loaded_combat(
     else {
         return;
     };
-    if !teams.is_enemy_owner(owner, target_owner) {
+    if !(teams.is_enemy_owner(owner, target_owner)
+        || mode == CombatMode::Ordered && target_owner == owner)
+    {
         return;
     }
 
@@ -273,7 +275,7 @@ fn panzerfaust_target_valid(
     attacker: u32,
     target: u32,
 ) -> bool {
-    world_query::unit_attack_target_valid(
+    world_query::unit_explicit_attack_target_valid(
         entities,
         teams,
         fog,

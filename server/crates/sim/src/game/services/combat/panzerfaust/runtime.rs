@@ -200,8 +200,12 @@ fn tick_in_flight(
         .map(|attacker| (attacker.owner, (attacker.pos_x, attacker.pos_y)))
         .unwrap_or((0, stored_impact));
     let damage_result = entities.get(target).and_then(|target_entity| {
+        let target_attackable =
+            owner != 0
+                && (target_entity.owner == owner
+                    || teams.is_enemy_owner(owner, target_entity.owner));
         if target_entity.hp == 0
-            || !teams.is_enemy_owner(owner, target_entity.owner)
+            || !target_attackable
             || !combat_rules::is_panzerfaust_loaded_shot_target(target_entity.kind)
         {
             return None;
@@ -228,9 +232,13 @@ fn tick_in_flight(
             config::PANZERFAUST_DAMAGE,
             Some(TerrainKind::Open),
         );
-        let damaged = entities.get_mut(target).is_some_and(|target_entity| {
-            target_entity.apply_damage(damage, Some((owner, attacker_pos, tick)))
-        });
+        let attribution =
+            teams
+                .is_enemy_owner(owner, victim_owner)
+                .then_some((owner, attacker_pos, tick));
+        let damaged = entities
+            .get_mut(target)
+            .is_some_and(|target_entity| target_entity.apply_damage(damage, attribution));
         if damaged {
             push_under_attack_notice(
                 events,

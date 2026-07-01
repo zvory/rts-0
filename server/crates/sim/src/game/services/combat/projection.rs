@@ -70,11 +70,24 @@ pub(super) fn friendly_hard_blocker_between(
     start: (f32, f32),
     end: (f32, f32),
 ) -> bool {
+    friendly_hard_blocker_between_except(map, entities, attacker, attacker_owner, start, end, None)
+}
+
+fn friendly_hard_blocker_between_except(
+    map: &Map,
+    entities: &EntityStore,
+    attacker: u32,
+    attacker_owner: u32,
+    start: (f32, f32),
+    end: (f32, f32),
+    ignored_target: Option<u32>,
+) -> bool {
     if !start.0.is_finite() || !start.1.is_finite() || !end.0.is_finite() || !end.1.is_finite() {
         return true;
     }
     entities.iter().any(|candidate| {
         candidate.id != attacker
+            && Some(candidate.id) != ignored_target
             && candidate.owner == attacker_owner
             && candidate.hp > 0
             && shot_blocker_intersection(map, candidate, start, end).is_some()
@@ -94,7 +107,15 @@ pub(super) fn shot_hits_intended_target(
         return false;
     };
     let end = (target.pos_x, target.pos_y);
-    if friendly_hard_blocker_between(map, entities, attacker, attacker_owner, start, end) {
+    if friendly_hard_blocker_between_except(
+        map,
+        entities,
+        attacker,
+        attacker_owner,
+        start,
+        end,
+        Some(intended_victim),
+    ) {
         return false;
     }
     resolve_shot_victim(

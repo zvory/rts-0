@@ -1421,10 +1421,10 @@ function buttonByLabel(card, label) {
   targetedInput._onLeftDown({ x: 200, y: 200 }, {});
   assert(targetedInput.clientIntent.commandTarget === null, "attack targeting clears after one click");
   assert(sentCommands.length === 1, "own click while attack targeting should issue one command");
-  assert(sentCommands[0].c === "attackMove", "own click while attack targeting should attack-move");
-  assert(sentCommands[0].units.join(",") === "7", "attack-move should use selected own units");
-  assert(sentCommands[0].x === 200 && sentCommands[0].y === 200, "attack-move should go to the clicked own position");
-  assert(feedback.length === 1 && feedback[0].kind === "attack", "own attack-move click should show attack feedback");
+  assert(sentCommands[0].c === "attack", "own click while attack targeting should issue attack");
+  assert(sentCommands[0].units.join(",") === "7", "self-attack should use selected own units");
+  assert(sentCommands[0].target === ownBuilding.id, "self-attack should target the clicked own entity");
+  assert(feedback.length === 1 && feedback[0].kind === "attack", "self-attack click should show attack feedback");
   assert(targetedInput._drag == null, "attack targeting should not fall through to selection on the same click");
   targetedInput._handleMouseUp({
     button: 0,
