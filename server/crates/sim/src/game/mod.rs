@@ -499,17 +499,15 @@ impl Game {
             .rebuild_final_spatial(&self.map, &self.entities);
     }
 
-    pub(in crate::game) fn reset_derived_state(
-        &mut self,
-        default_pathing_budget: usize,
-        pathing_cache_capacity: usize,
-    ) {
+    pub(in crate::game) fn reset_derived_state(&mut self) {
+        let (default_pathing_budget, pathing_cache_capacity) = self.derived.pathing_config();
         self.derived = DerivedState::new(
             &self.map,
             &self.entities,
             default_pathing_budget,
             pathing_cache_capacity,
         );
+        self.derived.advance_pathing_tick(self.tick);
     }
 
     #[cfg(test)]

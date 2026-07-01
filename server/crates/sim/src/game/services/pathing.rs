@@ -391,6 +391,10 @@ impl PathingService {
     pub(in crate::game) fn clear_rebuildable_state(&mut self) {
         self.cache.clear();
     }
+
+    pub(in crate::game) fn config(&self) -> (usize, usize) {
+        (self.default_budget, self.cache_cap)
+    }
 }
 
 fn expand_vehicle_diagonal_steps_to_l_waypoints<P: Passability>(
@@ -523,14 +527,6 @@ fn distance_between(a: (f32, f32), b: (f32, f32)) -> f32 {
 impl PathingService {
     pub fn cache_len(&self) -> usize {
         self.cache.len()
-    }
-
-    pub fn default_budget_for_test(&self) -> usize {
-        self.default_budget
-    }
-
-    pub fn cache_capacity_for_test(&self) -> usize {
-        self.cache_cap
     }
 
     pub fn cache_contains(

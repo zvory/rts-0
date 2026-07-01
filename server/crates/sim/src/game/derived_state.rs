@@ -42,6 +42,10 @@ impl DerivedState {
         self.pathing.advance_tick(tick);
     }
 
+    pub(in crate::game) fn pathing_config(&self) -> (usize, usize) {
+        self.pathing.config()
+    }
+
     pub(in crate::game) fn rebuild_final_spatial(&mut self, map: &Map, entities: &EntityStore) {
         self.final_spatial = SpatialIndex::build(entities, map.size);
     }
@@ -63,9 +67,6 @@ impl DerivedState {
 
     #[cfg(test)]
     pub(in crate::game) fn pathing_config_for_test(&self) -> (usize, usize) {
-        (
-            self.pathing.default_budget_for_test(),
-            self.pathing.cache_capacity_for_test(),
-        )
+        self.pathing_config()
     }
 }

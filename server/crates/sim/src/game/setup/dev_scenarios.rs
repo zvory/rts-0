@@ -651,7 +651,7 @@ fn build_dev_scenario_game_with_teams<const N: usize>(
     game.pending.clear();
     game.command_log.clear();
     game.tick = 0;
-    game.reset_derived_state(LIVE_PATHING_DEFAULT_BUDGET, LIVE_PATHING_CACHE_CAPACITY);
+    game.reset_derived_state();
     game.lingering_sight.clear();
     game.smokes = SmokeCloudStore::new();
     game.starting_loadouts = players
