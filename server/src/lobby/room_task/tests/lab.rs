@@ -166,6 +166,33 @@ fn lab_start_payload_can_use_bundled_lategame_scenario() {
 }
 
 #[test]
+fn lab_start_payload_uses_bundled_render_preview_god_mode() {
+    let mut config = lab_config();
+    config.scenario = Some("render-preview".to_string());
+    let mut task = RoomTask::new(
+        "__lab__:sandbox:map=Default:scenario=render-preview".to_string(),
+        RoomMode::Lab(config),
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let (msg_tx, mut writer) = ConnectionSink::new();
+    let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
+
+    task.on_join(99, "Operator".to_string(), true, false, msg_tx, ack);
+
+    assert_eq!(ack_rx.try_recv(), Ok(true));
+    let starts = start_payloads(&mut writer);
+    assert_eq!(starts.len(), 1);
+    let lab = starts[0].lab.as_ref().expect("lab metadata");
+    assert_eq!(lab.god_mode_players, vec![1, 2]);
+    let Phase::InGame(game) = &task.phase else {
+        panic!("render preview lab should start immediately");
+    };
+    assert_eq!(game.lab_god_mode_players(), vec![1, 2]);
+}
+
+#[test]
 fn lab_authoring_validation_returns_repo_preview_without_mutating_lab() {
     let mut task = RoomTask::new(
         "__lab__:sandbox:map=Default".to_string(),

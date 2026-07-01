@@ -441,6 +441,7 @@ assert(
     rust.includes("set_up") &&
     rust.includes("weapon_facing") &&
     rust.includes("setup_facing") &&
+    rust.includes("god_mode_players") &&
     LAB_SCENARIO.KIND === "labScenario" &&
     LAB_SCENARIO.SCHEMA_VERSION === 1 &&
     protocolDoc.includes("LabScenarioV1") &&
@@ -449,6 +450,7 @@ assert(
     protocolDoc.includes("weaponFacing") &&
     protocolDoc.includes("setupFacing") &&
     protocolDoc.includes("setupTarget") &&
+    protocolDoc.includes("godModePlayers") &&
     protocolDoc.includes("validateScenario") &&
     protocolDoc.includes("submitScenario"),
   "lab scenario import/export protocol surface must be documented and mirrored",

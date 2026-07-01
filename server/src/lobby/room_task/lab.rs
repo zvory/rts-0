@@ -23,7 +23,9 @@ use super::super::{normalize_start_team_id, PLAYER_PALETTE};
 use super::helpers::{DRAINING_NEW_MATCHES_DISABLED_MSG, LAB_PLAYER_ONE_ID, LAB_PLAYER_TWO_ID};
 use super::types::{LabRoomConfig, LabSeekTarget, Phase, RoomMode, RoomPlayer};
 use super::RoomTask;
-use crate::lab_scenarios::{load_lab_scenario_by_id, validate_lab_scenario_authoring};
+use crate::lab_scenarios::{
+    load_lab_scenario_by_id, validate_lab_scenario_authoring, validate_lab_scenario_lab_metadata,
+};
 use crate::protocol::{
     Command, Event, LabClientOp, LabResult, LabScenarioLabMetadata, LabStartMetadata, LabStartRole,
     LabState, LabVisionMode, RoomTimeState, ServerMessage, TeamId, DEFAULT_FACTION_ID,
@@ -62,6 +64,7 @@ struct LabLaunch {
     player_count: usize,
     participants: Vec<String>,
     default_vision: Option<LabVisionMode>,
+    god_mode_players: Vec<u32>,
 }
 
 impl LabSession {
@@ -182,7 +185,7 @@ fn lab_op_kind(op: &LabClientOp) -> &'static str {
 fn lab_client_op_to_game_op(op: LabClientOp) -> Result<LabOp, String> {
     match op {
         LabClientOp::ImportScenario { scenario } => {
-            validate_lab_scenario_vision(&scenario.metadata.lab.vision, &scenario.players)?;
+            validate_lab_scenario_lab_metadata(&scenario.metadata.lab, &scenario.players)?;
             let scenario: SimLabScenarioV1 = serde_json::from_value(
                 serde_json::to_value(scenario)
                     .map_err(|err| format!("invalid scenario payload: {err}"))?,
@@ -288,37 +291,6 @@ fn truncate_lab_scenario_name(name: &str) -> String {
         out.push(ch);
     }
     out
-}
-
-fn validate_lab_scenario_vision(
-    vision: &LabVisionMode,
-    players: &[crate::protocol::LabScenarioPlayer],
-) -> Result<(), String> {
-    match vision {
-        LabVisionMode::FullWorld => Ok(()),
-        LabVisionMode::Team { team_id } => {
-            if players.iter().any(|player| player.team_id == *team_id) {
-                Ok(())
-            } else {
-                Err("unknown scenario lab team id".to_string())
-            }
-        }
-        LabVisionMode::Teams { team_ids } => {
-            if team_ids.is_empty() {
-                return Err("teamIds must not be empty".to_string());
-            }
-            let mut seen = HashSet::new();
-            for team_id in team_ids {
-                if !seen.insert(*team_id) {
-                    return Err("teamIds must not contain duplicates".to_string());
-                }
-                if !players.iter().any(|player| player.team_id == *team_id) {
-                    return Err("unknown scenario lab team id".to_string());
-                }
-            }
-            Ok(())
-        }
-    }
 }
 
 fn lab_result_error(request_id: u32, op: String, error: &str) -> LabResult {
@@ -481,6 +453,7 @@ impl RoomTask {
                 session.import_vision_for(session.operator_id, vision);
             }
         }
+        let launch_god_mode_players = launch.god_mode_players.clone();
         let game = launch.game;
         self.record_live_match_started(
             launch.player_count,
@@ -496,27 +469,29 @@ impl RoomTask {
 
         let projection_policy = self.projection_policy_for_phase(SessionPhase::LiveMatch);
         let start_policy = SessionPolicy::for_room(&self.mode, SessionPhase::LiveMatch);
-        let recipients: Vec<_> = self
-            .order
-            .iter()
-            .filter_map(|&id| {
-                self.players.get(&id).map(|player| LaunchRecipient {
-                    connection_id: id,
-                    payload_player_id: self
-                        .lab_session
-                        .as_ref()
-                        .map(|session| session.view_player_id)
-                        .unwrap_or(LAB_PLAYER_ONE_ID),
-                    role: RecipientRole::Spectator,
-                    prediction: LaunchPrediction::Disabled,
-                    diagnostics: projection_policy
-                        .diagnostic_capabilities_for(RecipientRole::Spectator),
-                    clear_pending_snapshot: false,
-                    lab: self.lab_start_metadata_for(id),
-                    msg_tx: player.msg_tx.clone(),
+        let recipients: Vec<_> =
+            self.order
+                .iter()
+                .filter_map(|&id| {
+                    self.players.get(&id).map(|player| LaunchRecipient {
+                        connection_id: id,
+                        payload_player_id: self
+                            .lab_session
+                            .as_ref()
+                            .map(|session| session.view_player_id)
+                            .unwrap_or(LAB_PLAYER_ONE_ID),
+                        role: RecipientRole::Spectator,
+                        prediction: LaunchPrediction::Disabled,
+                        diagnostics: projection_policy
+                            .diagnostic_capabilities_for(RecipientRole::Spectator),
+                        clear_pending_snapshot: false,
+                        lab: self.lab_session.as_ref().map(|session| {
+                            session.metadata_for(id, launch_god_mode_players.clone())
+                        }),
+                        msg_tx: player.msg_tx.clone(),
+                    })
                 })
-            })
-            .collect();
+                .collect();
         let builder = StartPayloadBuilder::simulation(start_policy, &payload);
         super::super::launch::send_start_payloads(&self.room, &builder, recipients);
 
@@ -551,6 +526,7 @@ impl RoomTask {
         let game = loaded
             .build_game()
             .map_err(|err| format!("Cannot load lab scenario \"{scenario_id}\": {err}"))?;
+        let god_mode_players = game.lab_god_mode_players();
         Ok(LabLaunch {
             game,
             seed: scenario.seed,
@@ -562,6 +538,7 @@ impl RoomTask {
                 .map(|player| player.name.clone())
                 .collect(),
             default_vision: Some(scenario.metadata.lab.vision.clone()),
+            god_mode_players,
         })
     }
 
@@ -590,6 +567,7 @@ impl RoomTask {
             player_count: inits.len(),
             participants: inits.iter().map(|player| player.name.clone()).collect(),
             default_vision: None,
+            god_mode_players: Vec::new(),
         })
     }
 
@@ -1117,6 +1095,7 @@ impl RoomTask {
             "lab".to_string(),
             serde_json::to_value(LabScenarioLabMetadata {
                 vision: session.vision_for(operator_id),
+                god_mode_players: game.lab_god_mode_players(),
             })
             .unwrap_or_else(|_| serde_json::json!({ "vision": { "mode": "fullWorld" } })),
         );
@@ -1132,6 +1111,12 @@ impl RoomTask {
         let op_kind = lab_op_kind(&op).to_string();
         let imported_vision = match &op {
             LabClientOp::ImportScenario { scenario } => Some(scenario.metadata.lab.vision.clone()),
+            _ => None,
+        };
+        let imported_god_mode_players = match &op {
+            LabClientOp::ImportScenario { scenario } => {
+                Some(scenario.metadata.lab.god_mode_players.clone())
+            }
             _ => None,
         };
         let lab_op = match lab_client_op_to_game_op(op) {
@@ -1154,6 +1139,16 @@ impl RoomTask {
                 Ok(outcome) => outcome,
                 Err(err) => return lab_result_error(request_id, op_kind, &lab_error_text(&err)),
             };
+            if let Some(player_ids) = imported_god_mode_players.as_ref() {
+                for &player_id in player_ids {
+                    if let Err(err) = game.apply_lab_op(LabOp::SetPlayerGodMode {
+                        player_id,
+                        enabled: true,
+                    }) {
+                        return lab_result_error(request_id, op_kind, &lab_error_text(&err));
+                    }
+                }
+            }
             (game.tick_count(), lab_outcome_json(&outcome))
         };
         let reset_game = if resets_timeline {

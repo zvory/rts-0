@@ -28,6 +28,10 @@ import {
   _drawRallyPoints,
   _drawResourceMiningPreview,
 } from "../../client/src/renderer/feedback.js";
+import {
+  _drawPanzerfaustImpacts,
+  _drawPanzerfaustShots,
+} from "../../client/src/renderer/panzerfaust_feedback.js";
 import { _drawSelectedUnitRanges } from "../../client/src/renderer/unit_ranges.js";
 
 import { RecordingGraphics } from "./pixi_fakes.mjs";
@@ -89,6 +93,12 @@ function polygonCenter(points) {
     liveArtilleryTargets() { return []; },
     liveArtilleryLaunches() { return []; },
     liveArtilleryImpacts() { return []; },
+    livePanzerfaustShots() {
+      return [{ fromX: 128, fromY: 128, toX: 176, toY: 128, durationMs: 500, seed: 123, createdAt: performance.now() - 120 }];
+    },
+    livePanzerfaustImpacts() {
+      return [{ x: 176, y: 128, seed: 124, createdAt: performance.now() - 100 }];
+    },
     liveMuzzleFlashes() { return []; },
     isOwnOwner(owner) {
       return owner === 1;
@@ -146,6 +156,8 @@ function polygonCenter(points) {
   assert(feedbackView.abilityTargetPreview?.ability === ABILITY.SMOKE, "feedback view exposes ability target preview");
   assert(feedbackView.resourceMiningPreview?.resourceId === 200, "feedback view exposes resource mining preview");
   assert(feedbackView.abilityObjects.length === 1, "feedback view exposes ability objects");
+  assert(feedbackView.panzerfaustShots.length === 1, "feedback view exposes Panzerfaust launch/travel effects");
+  assert(feedbackView.panzerfaustImpacts.length === 1, "feedback view exposes Panzerfaust impact effects");
 
   const placementGfx = new RecordingGraphics();
   const feedbackGfx = new RecordingGraphics();
@@ -164,11 +176,14 @@ function polygonCenter(points) {
   _drawAbilityObjects.call(renderer, feedbackView);
   _drawResourceMiningPreview.call(renderer, feedbackView);
   _drawMortarImpacts.call(renderer, feedbackView);
+  _drawPanzerfaustShots.call(renderer, feedbackView);
+  _drawPanzerfaustImpacts.call(renderer, feedbackView);
 
   assert(placementGfx.calls.some((call) => call[0] === "drawRoundedRect"), "renderer feedback reads placement through the feedback view");
   assert(feedbackGfx.calls.some((call) => call[0] === "drawCircle"), "renderer feedback reads command/preview state through the feedback view");
   assert(feedbackGfx.calls.some((call) => call[0] === "lineTo"), "renderer feedback reads resource mining preview through the feedback view");
   assert(feedbackGfx.calls.some((call) => call[0] === "drawPolygon"), "renderer feedback draws live mortar impacts without missing helper references");
+  assert(feedbackGfx.calls.some((call) => call[0] === "drawRect" || call[0] === "drawPolygon"), "renderer feedback draws Panzerfaust shot and impact cues");
   assert(abilityObjectGfx.calls.some((call) => call[0] === "drawCircle"), "renderer feedback reads ability objects through the feedback view");
 }
 

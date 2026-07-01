@@ -1,5 +1,5 @@
 import { PLAYABLE_FACTIONS } from "./lobby_view.js";
-import { DEFAULT_FACTION_ID, LAB_ROLE, msg } from "./protocol.js";
+import { DEFAULT_FACTION_ID, KIND, LAB_ROLE, msg } from "./protocol.js";
 import { factionCatalog, PLAYER_PALETTE, STATS, UPGRADES } from "./config.js";
 import { LabPanelWindowChrome } from "./lab_panel_window.js";
 import { createLabScenarioAuthoringState, slugifyLabScenario } from "./lab_scenario_authoring.js";
@@ -24,6 +24,9 @@ const labVision = Object.freeze({
 const GIVE_ALL_RESOURCE_AMOUNT = 99999;
 const OPTIONS_PANEL_STORAGE_KEY = "rts.labPanel.options.window.v1";
 const TOOLS_PANEL_STORAGE_KEY = "rts.labPanel.tools.window.v1";
+const LAB_ONLY_UNIT_SPAWNS_BY_FACTION = Object.freeze({
+  [DEFAULT_FACTION_ID]: Object.freeze([KIND.PANZERFAUST]),
+});
 
 export class LabPanel {
   constructor({
@@ -1268,7 +1271,11 @@ export function labSpawnFactionOptions() {
 }
 
 export function labSpawnUnitKindsForFaction(factionId) {
-  return factionCatalog(factionId).units.filter((kind) => STATS[kind]);
+  const catalogUnits = factionCatalog(factionId).units;
+  const labOnlyUnits = LAB_ONLY_UNIT_SPAWNS_BY_FACTION[factionId] || [];
+  return [...catalogUnits, ...labOnlyUnits].filter((kind, index, units) =>
+    STATS[kind] && units.indexOf(kind) === index
+  );
 }
 
 export function labBuildingSpawnFactionOptions() {

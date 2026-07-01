@@ -101,6 +101,18 @@ const MACHINE_GUNNER_UNIT_PARTS = Object.freeze([
   "part.mg.muzzleCap",
 ]);
 
+const PANZERFAUST_UNIT_PARTS = Object.freeze([
+  "part.body",
+  "part.head",
+  "part.shoulders",
+  "part.pzf.sling",
+  "part.pzf.tube",
+  "part.pzf.rear",
+  "part.pzf.warhead",
+  "part.pzf.teamBand",
+  "part.pzf.grip",
+]);
+
 const LIVE_RIG_PARTS = Object.freeze({
   [KIND.ANTI_TANK_GUN]: Object.freeze({
     shadow: ANTI_TANK_GUN_PARTS.shadow,
@@ -126,7 +138,7 @@ const LIVE_RIG_PARTS = Object.freeze({
   }),
   [KIND.PANZERFAUST]: Object.freeze({
     shadow: Object.freeze(["part.shadow"]),
-    unit: RIFLEMAN_UNIT_PARTS,
+    unit: PANZERFAUST_UNIT_PARTS,
   }),
   [KIND.RIFLEMAN]: Object.freeze({
     shadow: Object.freeze(["part.shadow"]),

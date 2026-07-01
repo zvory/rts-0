@@ -17,6 +17,10 @@ pub(super) fn live_oil_node_centers_in_rect<'a>(
         .collect()
 }
 
+pub(super) fn oil_node_center_in_rect(entity: &Entity, rect: RectBody) -> bool {
+    entity.kind == EntityKind::Oil && point_inside_rect((entity.pos_x, entity.pos_y), rect)
+}
+
 pub(super) fn oil_node_has_pump_jack(map: &Map, entities: &EntityStore, oil_id: u32) -> bool {
     let Some(oil) = entities.get(oil_id) else {
         return false;

@@ -1124,14 +1124,16 @@ damage, while resources keep normal damage behavior. The current enabled player 
     facing?: f32, weaponFacing?: f32,
     setUp?: bool, setupFacing?: f32, setupTarget?: { x: f32, y: f32 }
   }],
-  metadata: { exportedTick: u32, lab: { vision: LabVisionMode } }
+  metadata: { exportedTick: u32, lab: { vision: LabVisionMode, godModePlayers?: u32[] } }
 }
 ```
 Export returns `{ scenario: LabScenarioV1 }` in `labResult.outcome` using the requesting operator's
-current lab vision in `metadata.lab.vision`. Import validates the schema, map metadata,
+current lab vision in `metadata.lab.vision` and the current room god-mode player ids in
+`metadata.lab.godModePlayers`. Import validates the schema, map metadata,
 player/team/resource/research/entity fields, restores through the public lab `Game` API, applies
 scenario vision to the requester and future join default without overwriting already connected
-collaborators, and returns an entity id remap in `outcome.entityIdMap`.
+collaborators, restores `godModePlayers` as room state, and returns an entity id remap in
+`outcome.entityIdMap`.
 `validateScenario` exports the current authoritative lab `Game`, applies authoring metadata, pretty
 formats the scenario JSON, checks duplicate catalog ids/filenames, id-matched filenames, manifest
 limits, scenario entity count, and scenario JSON byte limits, validates map metadata, and restores
