@@ -1,5 +1,5 @@
 {
-  "reason": "Merge Panzerfaust runtime state with weapon cooldown CombatState fields",
+  "reason": "GameState owns durable PlayerState rows",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -1487,6 +1487,21 @@
       "path": "systems.rs",
       "line": 40,
       "code": "use crate::game::PlayerState;"
+    },
+    {
+      "path": "state.rs",
+      "line": 9,
+      "code": "trench::TrenchStore, EntityStore, MapMetadata, PlayerStartingLoadout, PlayerState,"
+    },
+    {
+      "path": "state.rs",
+      "line": 18,
+      "code": "pub(in crate::game) players: Vec<PlayerState>,"
+    },
+    {
+      "path": "state.rs",
+      "line": 45,
+      "code": "players: Vec<PlayerState>,"
     }
   ],
   "player_state_field_writes": [

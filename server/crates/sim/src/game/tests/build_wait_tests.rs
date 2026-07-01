@@ -13,19 +13,19 @@ fn player(id: u32) -> PlayerInit {
 }
 
 fn refresh_derived_state(game: &mut Game) {
-    systems::recompute_supply(&mut game.players, &game.entities);
+    systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
-    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
-    game.fog.recompute(&ids, &game.entities, &game.map);
+    let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
+    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
     game.assert_invariants();
 }
 
 fn depot_center(game: &Game, tile_x: u32, tile_y: u32) -> (f32, f32) {
-    services::occupancy::footprint_center(&game.map, EntityKind::Depot, tile_x, tile_y)
+    services::occupancy::footprint_center(&game.state.map, EntityKind::Depot, tile_x, tile_y)
 }
 
 fn staging_point(game: &Game, tile_x: u32, tile_y: u32, x_offset: i32) -> (f32, f32) {
-    game.map
+    game.state.map
         .tile_center((tile_x as i32 + x_offset) as u32, tile_y)
 }
 
@@ -39,7 +39,7 @@ fn notice_count(events: &[(u32, Vec<Event>)], player: u32, expected: &str) -> us
 }
 
 fn under_construction_depots(game: &Game) -> Vec<u32> {
-    game.entities
+    game.state.entities
         .iter()
         .filter(|entity| entity.kind == EntityKind::Depot && entity.under_construction())
         .map(|entity| entity.id)
@@ -52,11 +52,10 @@ fn build_wait_full_tick_retries_resources_without_notice_spam() {
     let mut game = empty_flat_game(&players);
     let (tile_x, tile_y) = (10, 10);
     let worker_pos = staging_point(&game, tile_x, tile_y, -1);
-    let worker = game
-        .entities
+    let worker = game.state.entities
         .spawn_unit(1, EntityKind::Worker, worker_pos.0, worker_pos.1)
         .expect("worker should spawn");
-    game.players[0].set_resources(0, 0);
+    game.state.players[0].set_resources(0, 0);
     refresh_derived_state(&mut game);
 
     game.enqueue(
@@ -72,7 +71,7 @@ fn build_wait_full_tick_retries_resources_without_notice_spam() {
 
     let first_events = game.tick();
     assert_eq!(
-        game.entities
+        game.state.entities
             .get(worker)
             .expect("worker should survive")
             .build_phase(),
@@ -96,20 +95,20 @@ fn build_wait_full_tick_retries_resources_without_notice_spam() {
     );
 
     let cost = crate::rules::economy::resource_cost(EntityKind::Depot);
-    game.players[0].set_resources(cost.steel, cost.oil);
+    game.state.players[0].set_resources(cost.steel, cost.oil);
     game.tick();
 
     let scaffolds = under_construction_depots(&game);
     assert_eq!(scaffolds.len(), 1);
     assert_eq!(
-        game.entities
+        game.state.entities
             .get(worker)
             .expect("worker should survive")
             .build_phase(),
         Some(crate::game::entity::BuildPhase::Constructing { site: scaffolds[0] })
     );
-    assert_eq!(game.players[0].steel, 0);
-    assert_eq!(game.players[0].oil, 0);
+    assert_eq!(game.state.players[0].steel, 0);
+    assert_eq!(game.state.players[0].oil, 0);
 }
 
 #[test]
@@ -119,16 +118,15 @@ fn unit_block_timeout_preserves_queue_until_next_promotion_tick() {
     let (tile_x, tile_y) = (10, 10);
     let worker_pos = staging_point(&game, tile_x, tile_y, -1);
     let site = depot_center(&game, tile_x, tile_y);
-    let handoff = game.map.tile_center(15, 10);
-    let worker = game
-        .entities
+    let handoff = game.state.map.tile_center(15, 10);
+    let worker = game.state.entities
         .spawn_unit(1, EntityKind::Worker, worker_pos.0, worker_pos.1)
         .expect("worker should spawn");
-    game.entities
+    game.state.entities
         .spawn_unit(1, EntityKind::Tank, site.0, site.1)
         .expect("unit blocker should spawn");
     {
-        let worker = game.entities.get_mut(worker).expect("worker should exist");
+        let worker = game.state.entities.get_mut(worker).expect("worker should exist");
         worker.set_order(Order::build(EntityKind::Depot, tile_x, tile_y));
         worker.append_queued_order(OrderIntent::move_to(handoff.0, handoff.1));
     }
@@ -140,7 +138,7 @@ fn unit_block_timeout_preserves_queue_until_next_promotion_tick() {
         timeout_events = game.tick();
     }
 
-    let worker_entity = game.entities.get(worker).expect("worker should survive");
+    let worker_entity = game.state.entities.get(worker).expect("worker should survive");
     assert!(matches!(worker_entity.order(), Order::Idle));
     assert_eq!(
         worker_entity.queued_orders(),
@@ -155,7 +153,7 @@ fn unit_block_timeout_preserves_queue_until_next_promotion_tick() {
 
     game.tick();
 
-    let worker_entity = game.entities.get(worker).expect("worker should survive");
+    let worker_entity = game.state.entities.get(worker).expect("worker should survive");
     assert!(
         matches!(worker_entity.order(), Order::Move(_)),
         "queued handoff should promote on the next order-promotion pass"
@@ -170,16 +168,15 @@ fn building_block_cancellation_preserves_queue_until_next_promotion_tick() {
     let (tile_x, tile_y) = (10, 10);
     let worker_pos = staging_point(&game, tile_x, tile_y, -1);
     let site = depot_center(&game, tile_x, tile_y);
-    let handoff = game.map.tile_center(15, 10);
-    let worker = game
-        .entities
+    let handoff = game.state.map.tile_center(15, 10);
+    let worker = game.state.entities
         .spawn_unit(1, EntityKind::Worker, worker_pos.0, worker_pos.1)
         .expect("worker should spawn");
-    game.entities
+    game.state.entities
         .spawn_building(2, EntityKind::Depot, site.0, site.1, true)
         .expect("competing building should spawn");
     {
-        let worker = game.entities.get_mut(worker).expect("worker should exist");
+        let worker = game.state.entities.get_mut(worker).expect("worker should exist");
         worker.set_order(Order::build(EntityKind::Depot, tile_x, tile_y));
         worker.append_queued_order(OrderIntent::move_to(handoff.0, handoff.1));
     }
@@ -187,7 +184,7 @@ fn building_block_cancellation_preserves_queue_until_next_promotion_tick() {
 
     let events = game.tick();
 
-    let worker_entity = game.entities.get(worker).expect("worker should survive");
+    let worker_entity = game.state.entities.get(worker).expect("worker should survive");
     assert!(matches!(worker_entity.order(), Order::Idle));
     assert_eq!(
         worker_entity.queued_orders(),
@@ -198,7 +195,7 @@ fn building_block_cancellation_preserves_queue_until_next_promotion_tick() {
 
     game.tick();
 
-    let worker_entity = game.entities.get(worker).expect("worker should survive");
+    let worker_entity = game.state.entities.get(worker).expect("worker should survive");
     assert!(matches!(worker_entity.order(), Order::Move(_)));
     assert!(worker_entity.queued_orders().is_empty());
 }
@@ -210,17 +207,15 @@ fn overlapping_build_race_charges_only_the_worker_that_spawns_scaffold() {
     let (tile_x, tile_y) = (10, 10);
     let left = staging_point(&game, tile_x, tile_y, -1);
     let right = staging_point(&game, tile_x, tile_y, 2);
-    let worker_a = game
-        .entities
+    let worker_a = game.state.entities
         .spawn_unit(1, EntityKind::Worker, left.0, left.1)
         .expect("first worker should spawn");
-    let worker_b = game
-        .entities
+    let worker_b = game.state.entities
         .spawn_unit(2, EntityKind::Worker, right.0, right.1)
         .expect("second worker should spawn");
     let cost = crate::rules::economy::resource_cost(EntityKind::Depot);
-    game.players[0].set_resources(cost.steel, cost.oil);
-    game.players[1].set_resources(cost.steel, cost.oil);
+    game.state.players[0].set_resources(cost.steel, cost.oil);
+    game.state.players[1].set_resources(cost.steel, cost.oil);
     refresh_derived_state(&mut game);
 
     for player_id in [1, 2] {
@@ -241,8 +236,7 @@ fn overlapping_build_race_charges_only_the_worker_that_spawns_scaffold() {
 
     let scaffolds = under_construction_depots(&game);
     assert_eq!(scaffolds.len(), 1);
-    let scaffold = game
-        .entities
+    let scaffold = game.state.entities
         .get(scaffolds[0])
         .expect("scaffold should exist");
     assert_eq!(
@@ -250,22 +244,22 @@ fn overlapping_build_race_charges_only_the_worker_that_spawns_scaffold() {
         "lower-id first arrival should win the race"
     );
     assert_eq!(
-        game.entities
+        game.state.entities
             .get(worker_a)
             .expect("first worker should survive")
             .build_phase(),
         Some(crate::game::entity::BuildPhase::Constructing { site: scaffolds[0] })
     );
     assert!(matches!(
-        game.entities
+        game.state.entities
             .get(worker_b)
             .expect("second worker should survive")
             .order(),
         Order::Idle
     ));
-    assert_eq!(game.players[0].steel, 0);
+    assert_eq!(game.state.players[0].steel, 0);
     assert_eq!(
-        game.players[1].steel, cost.steel,
+        game.state.players[1].steel, cost.steel,
         "losing worker must not pay for a footprint already claimed by a building"
     );
     assert_eq!(notice_count(&events, 2, "Cannot build there"), 1);

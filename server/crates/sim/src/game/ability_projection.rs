@@ -9,13 +9,13 @@ pub(in crate::game) fn ability_object_views_for(
     fogged: bool,
     include_player_resources: bool,
 ) -> Vec<crate::protocol::AbilityObjectView> {
-    game.ability_runtime
+    game.state.ability_runtime
         .world_objects()
         .filter(|object| !fogged || fog.is_visible_world(player, object.x, object.y))
         .map(|object| {
             let owner_visible = object.owner == player || include_player_resources || !fogged;
             let source_caster_id = if owner_visible
-                || game.entities.get(object.caster_id).is_some_and(|caster| {
+                || game.state.entities.get(object.caster_id).is_some_and(|caster| {
                     !fogged || fog.is_visible_world(player, caster.pos_x, caster.pos_y)
                 }) {
                 Some(object.caster_id)
@@ -29,7 +29,7 @@ pub(in crate::game) fn ability_object_views_for(
                 kind: ability_object_kind_to_protocol(object.kind).to_string(),
                 x: object.x,
                 y: object.y,
-                expires_in: object.expires_in(game.tick),
+                expires_in: object.expires_in(game.state.tick),
                 source_caster_id,
                 owner_state: owner_visible
                     .then(|| ability_object_owner_state_to_protocol(object.payload)),

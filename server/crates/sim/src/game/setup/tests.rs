@@ -4,7 +4,7 @@ use crate::game::entity::Order;
 use crate::rules::faction::EMPTY_FIXTURE_FACTION_ID;
 
 fn owned_kind_count(game: &Game, owner: u32, kind: EntityKind) -> usize {
-    game.entities
+    game.state.entities
         .iter()
         .filter(|e| e.owner == owner && e.kind == kind)
         .count()
@@ -33,7 +33,7 @@ fn fixture_faction_start_uses_catalog_loadout_and_shared_resources() {
     let game = Game::new(&players, 9);
     game.assert_invariants();
 
-    let fixture = game.players.iter().find(|p| p.id == 2).unwrap();
+    let fixture = game.state.players.iter().find(|p| p.id == 2).unwrap();
     assert_eq!(fixture.faction_id, EMPTY_FIXTURE_FACTION_ID);
     assert_eq!(fixture.steel, 125);
     assert_eq!(fixture.oil, 25);
@@ -57,7 +57,7 @@ fn fixture_faction_start_uses_catalog_loadout_and_shared_resources() {
     assert_eq!(loadout.starting_steel, 125);
     assert_eq!(loadout.starting_oil, 25);
 
-    let resource_nodes = game.entities.iter().filter(|e| e.kind.is_node()).count();
+    let resource_nodes = game.state.entities.iter().filter(|e| e.kind.is_node()).count();
     assert!(
         resource_nodes > 0,
         "fixture starts still use universal Steel/Oil nodes"
@@ -79,10 +79,10 @@ fn unknown_faction_start_and_commands_fail_closed() {
 
     assert_eq!(
         (
-            game.players[0].steel,
-            game.players[0].oil,
-            game.players[0].supply_used,
-            game.players[0].supply_cap
+            game.state.players[0].steel,
+            game.state.players[0].oil,
+            game.state.players[0].supply_used,
+            game.state.players[0].supply_cap
         ),
         (0, 0, 0, 0)
     );
@@ -91,33 +91,28 @@ fn unknown_faction_start_and_commands_fail_closed() {
     assert_eq!(loadout.loadout_id, "unknown_faction.invalid");
     assert_eq!((loadout.starting_steel, loadout.starting_oil), (0, 0));
 
-    let (x, y) = game.map.tile_center(4, 4);
-    let worker = game
-        .entities
+    let (x, y) = game.state.map.tile_center(4, 4);
+    let worker = game.state.entities
         .spawn_unit(1, EntityKind::Worker, x, y)
         .unwrap();
-    let city_centre = game
-        .entities
+    let city_centre = game.state.entities
         .spawn_building(1, EntityKind::CityCentre, x + 96.0, y, true)
         .unwrap();
-    let research_complex = game
-        .entities
+    let research_complex = game.state.entities
         .spawn_building(1, EntityKind::ResearchComplex, x + 192.0, y, true)
         .unwrap();
-    let artillery = game
-        .entities
+    let artillery = game.state.entities
         .spawn_unit(1, EntityKind::Artillery, x, y + 96.0)
         .unwrap();
-    let node = game
-        .entities
+    let node = game.state.entities
         .spawn_node(EntityKind::Steel, x + 320.0, y + 320.0)
         .unwrap();
-    systems::recompute_supply(&mut game.players, &game.entities);
+    systems::recompute_supply(&mut game.state.players, &game.state.entities);
     let resources_before = (
-        game.players[0].steel,
-        game.players[0].oil,
-        game.players[0].supply_used,
-        game.players[0].supply_cap,
+        game.state.players[0].steel,
+        game.state.players[0].oil,
+        game.state.players[0].supply_used,
+        game.state.players[0].supply_cap,
     );
     assert_eq!(resources_before, (0, 0, 0, 0));
 
@@ -156,31 +151,29 @@ fn unknown_faction_start_and_commands_fail_closed() {
 
     assert_eq!(
         (
-            game.players[0].steel,
-            game.players[0].oil,
-            game.players[0].supply_used,
-            game.players[0].supply_cap
+            game.state.players[0].steel,
+            game.state.players[0].oil,
+            game.state.players[0].supply_used,
+            game.state.players[0].supply_cap
         ),
         resources_before,
         "rejected unknown-faction commands must not spend resources or reserve supply"
     );
     assert!(!matches!(
-        game.entities.get(worker).expect("worker").order(),
+        game.state.entities.get(worker).expect("worker").order(),
         Order::Build(_) | Order::Gather(_)
     ));
-    assert!(game
-        .entities
+    assert!(game.state.entities
         .get(city_centre)
         .expect("city centre")
         .prod_queue()
         .is_empty());
-    assert!(game
-        .entities
+    assert!(game.state.entities
         .get(research_complex)
         .expect("research complex")
         .research_queue()
         .is_empty());
-    let artillery = game.entities.get(artillery).expect("artillery");
+    let artillery = game.state.entities.get(artillery).expect("artillery");
     assert!(!matches!(artillery.order(), Order::Ability(_)));
     assert_eq!(artillery.ability_cooldown_ticks(AbilityKind::PointFire), 0);
 }
@@ -211,7 +204,7 @@ fn standard_starting_loadout_matches_phase0_inventory() {
     assert_eq!(game.starting_oil(), config::STARTING_OIL);
     assert_eq!(game.starting_loadouts()[0].loadout_id, "kriegsia.standard");
 
-    for player in &game.players {
+    for player in &game.state.players {
         assert_eq!(player.faction_id, DEFAULT_FACTION_ID);
         assert_eq!(player.steel, config::STARTING_STEEL);
         assert_eq!(player.oil, config::STARTING_OIL);
@@ -234,12 +227,10 @@ fn standard_starting_loadout_matches_phase0_inventory() {
         );
     }
 
-    assert!(game
-        .entities
+    assert!(game.state.entities
         .iter()
         .any(|e| e.owner == 0 && e.kind == EntityKind::Steel));
-    assert!(game
-        .entities
+    assert!(game.state.entities
         .iter()
         .any(|e| e.owner == 0 && e.kind == EntityKind::Oil));
 

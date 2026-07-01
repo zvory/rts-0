@@ -90,8 +90,7 @@ fn derived_state_wipe_rebuild_preserves_pathing_state_and_snapshots() {
         "paired games should use the same live pathing budget/cache configuration before the wipe"
     );
     assert!(
-        !baseline
-            .entities
+        !baseline.state.entities
             .get(tank)
             .expect("tank should survive")
             .path_is_empty(),
@@ -150,7 +149,7 @@ fn derived_state_wipe_rebuild_preserves_pathing_state_and_snapshots() {
 #[test]
 fn lab_world_mutation_clears_rebuildable_pathing_cache() {
     let mut game = derived_state_lab_fixture();
-    let spawn_pos = game.map.tile_center(30, 30);
+    let spawn_pos = game.state.map.tile_center(30, 30);
     let LabOpOutcome::Spawned {
         entity_id: scout_id,
     } = game
@@ -166,7 +165,7 @@ fn lab_world_mutation_clears_rebuildable_pathing_cache() {
         panic!("unexpected outcome");
     };
 
-    let goal = game.map.tile_center(52, 52);
+    let goal = game.state.map.tile_center(52, 52);
     game.issue_lab_command_as(
         1,
         WireCommand::Move {
@@ -184,7 +183,7 @@ fn lab_world_mutation_clears_rebuildable_pathing_cache() {
         "move command should warm the reusable pathing cache"
     );
 
-    let moved = game.map.tile_center(34, 34);
+    let moved = game.state.map.tile_center(34, 34);
     game.apply_lab_op(LabOp::MoveEntity(LabMoveEntity {
         entity_id: scout_id,
         x: moved.0,
@@ -225,34 +224,33 @@ fn derived_state_pathing_fixture() -> (Game, u32, (f32, f32), (f32, f32)) {
     ];
     let mut game =
         Game::new_for_replay_with_starting_resources(&players, 5_000, 5_000, 0x5150_0500);
-    for tile in &mut game.map.terrain {
+    for tile in &mut game.state.map.terrain {
         *tile = terrain::GRASS;
     }
-    for id in game.entities.ids() {
-        game.entities.remove(id);
+    for id in game.state.entities.ids() {
+        game.state.entities.remove(id);
     }
 
     for (tx, ty) in pathing_obstacle_tiles() {
-        let index = game.map.index(tx, ty);
-        game.map.terrain[index] = terrain::ROCK;
+        let index = game.state.map.index(tx, ty);
+        game.state.map.terrain[index] = terrain::ROCK;
     }
 
-    let start = game.map.tile_center(3, 12);
-    let goal = game.map.tile_center(20, 12);
-    let tank = game
-        .entities
+    let start = game.state.map.tile_center(3, 12);
+    let goal = game.state.map.tile_center(20, 12);
+    let tank = game.state.entities
         .spawn_unit(1, EntityKind::Tank, start.0, start.1)
         .expect("tank should spawn");
-    let enemy_pos = game.map.tile_center(20, 15);
-    game.entities
+    let enemy_pos = game.state.map.tile_center(20, 15);
+    game.state.entities
         .spawn_unit(2, EntityKind::Rifleman, enemy_pos.0, enemy_pos.1)
         .expect("enemy should spawn");
-    let resource_pos = game.map.tile_center(8, 18);
-    game.entities
+    let resource_pos = game.state.map.tile_center(8, 18);
+    game.state.entities
         .spawn_node(EntityKind::Steel, resource_pos.0, resource_pos.1)
         .expect("resource node should spawn");
 
-    systems::recompute_supply(&mut game.players, &game.entities);
+    systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.clear_and_rebuild_derived_state_for_test();
     let player_ids = player_ids(&game);
     game.recompute_live_fog(&player_ids);
@@ -374,8 +372,7 @@ fn assert_equivalent_games(baseline: &Game, wiped: &Game, label: &str) {
 }
 
 fn semantic_game_view(game: &Game) -> SemanticGameView {
-    let players = game
-        .players
+    let players = game.state.players
         .iter()
         .map(|player| SemanticPlayerView {
             id: player.id,
@@ -397,16 +394,14 @@ fn semantic_game_view(game: &Game) -> SemanticGameView {
                 .collect(),
         })
         .collect();
-    let entities = game
-        .entities
+    let entities = game.state.entities
         .iter()
         .map(|entity| (entity.id, format!("{entity:?}")))
         .collect();
     let building_memory = player_ids(game)
         .into_iter()
         .map(|player| {
-            let mut entries = game
-                .building_memory
+            let mut entries = game.state.building_memory
                 .entries_for_player_for_test(player)
                 .cloned()
                 .collect::<Vec<_>>();
@@ -418,14 +413,13 @@ fn semantic_game_view(game: &Game) -> SemanticGameView {
     SemanticGameView {
         tick: game.tick_count(),
         seed: game.seed(),
-        map_size: game.map.size,
-        map_terrain: game.map.terrain.clone(),
+        map_size: game.state.map.size,
+        map_terrain: game.state.map.terrain.clone(),
         map_metadata: game.map_metadata().clone(),
         starting_loadouts: game.starting_loadouts().to_vec(),
-        next_entity_id: game.entities.next_id_for_test(),
+        next_entity_id: game.state.entities.next_id_for_test(),
         rng_probe: rng_probe(game),
-        pending_commands: game
-            .pending
+        pending_commands: game.state.pending
             .iter()
             .map(|pending| format!("{pending:?}"))
             .collect(),
@@ -434,19 +428,19 @@ fn semantic_game_view(game: &Game) -> SemanticGameView {
         command_log: game.command_log().to_vec(),
         fog_visible_tiles: player_ids(game)
             .into_iter()
-            .map(|player| (player, game.fog.visible_tiles_for(player)))
+            .map(|player| (player, game.state.fog.visible_tiles_for(player)))
             .collect(),
         scores: game.scores(),
-        active_construction_sites: game.active_construction_sites.iter().copied().collect(),
-        lab_god_mode_players: game.lab_god_mode_players.iter().copied().collect(),
+        active_construction_sites: game.state.active_construction_sites.iter().copied().collect(),
+        lab_god_mode_players: game.state.lab_god_mode_players.iter().copied().collect(),
         building_memory,
-        lingering_sight: format!("{:?}", game.lingering_sight),
-        firing_reveals: format!("{:?}", game.firing_reveals),
-        smokes: format!("{:?}", game.smokes),
-        trenches: format!("{:?}", game.trenches),
-        ability_runtime: format!("{:?}", game.ability_runtime),
-        mortar_shells: format!("{:?}", game.mortar_shells),
-        artillery_shells: format!("{:?}", game.artillery_shells),
+        lingering_sight: format!("{:?}", game.state.lingering_sight),
+        firing_reveals: format!("{:?}", game.state.firing_reveals),
+        smokes: format!("{:?}", game.state.smokes),
+        trenches: format!("{:?}", game.state.trenches),
+        ability_runtime: format!("{:?}", game.state.ability_runtime),
+        mortar_shells: format!("{:?}", game.state.mortar_shells),
+        artillery_shells: format!("{:?}", game.state.artillery_shells),
     }
 }
 
@@ -466,11 +460,11 @@ fn projection_view(game: &Game) -> ProjectionView {
 }
 
 fn player_ids(game: &Game) -> Vec<u32> {
-    game.players.iter().map(|player| player.id).collect()
+    game.state.players.iter().map(|player| player.id).collect()
 }
 
 fn rng_probe(game: &Game) -> [u64; 4] {
-    let mut rng = game.rng.clone();
+    let mut rng = game.state.rng.clone();
     [
         rng.next_u64(),
         rng.next_u64(),

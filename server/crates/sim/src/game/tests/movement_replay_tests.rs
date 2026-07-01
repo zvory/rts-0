@@ -11,25 +11,24 @@ fn queued_move_fixture() -> (Game, u32, (f32, f32), (f32, f32), (f32, f32)) {
         is_ai: false,
     }];
     let mut game = Game::new_for_replay(&players, 0x5150_0001);
-    for tile in &mut game.map.terrain {
+    for tile in &mut game.state.map.terrain {
         *tile = crate::protocol::terrain::GRASS;
     }
-    for id in game.entities.ids() {
-        game.entities.remove(id);
+    for id in game.state.entities.ids() {
+        game.state.entities.remove(id);
     }
 
-    let start = game.map.tile_center(8, 8);
-    let first = game.map.tile_center(10, 8);
-    let second = game.map.tile_center(12, 8);
-    let replacement = game.map.tile_center(8, 10);
-    let unit = game
-        .entities
+    let start = game.state.map.tile_center(8, 8);
+    let first = game.state.map.tile_center(10, 8);
+    let second = game.state.map.tile_center(12, 8);
+    let replacement = game.state.map.tile_center(8, 10);
+    let unit = game.state.entities
         .spawn_unit(1, EntityKind::Rifleman, start.0, start.1)
         .expect("rifleman should spawn");
-    systems::recompute_supply(&mut game.players, &game.entities);
+    systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
-    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
-    game.fog.recompute(&ids, &game.entities, &game.map);
+    let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
+    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
     game.assert_invariants();
 
     (game, unit, first, second, replacement)
@@ -67,49 +66,44 @@ fn mixed_queued_fixture() -> MixedQueuedFixture {
     ];
     let mut game =
         Game::new_for_replay_with_starting_resources(&players, 5_000, 5_000, 0x5150_0601);
-    for tile in &mut game.map.terrain {
+    for tile in &mut game.state.map.terrain {
         *tile = crate::protocol::terrain::GRASS;
     }
-    for id in game.entities.ids() {
-        game.entities.remove(id);
+    for id in game.state.entities.ids() {
+        game.state.entities.remove(id);
     }
 
     let (cc_x, cc_y) =
-        services::occupancy::footprint_center(&game.map, EntityKind::CityCentre, 4, 4);
-    game.entities
+        services::occupancy::footprint_center(&game.state.map, EntityKind::CityCentre, 4, 4);
+    game.state.entities
         .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
         .expect("player city centre should spawn");
     let (enemy_cc_x, enemy_cc_y) =
-        services::occupancy::footprint_center(&game.map, EntityKind::CityCentre, 24, 4);
-    game.entities
+        services::occupancy::footprint_center(&game.state.map, EntityKind::CityCentre, 24, 4);
+    game.state.entities
         .spawn_building(2, EntityKind::CityCentre, enemy_cc_x, enemy_cc_y, true)
         .expect("enemy city centre should spawn");
 
-    let node = game
-        .entities
+    let node = game.state.entities
         .spawn_node(EntityKind::Steel, cc_x + 96.0, cc_y)
         .expect("resource node should spawn");
-    let worker_builder = game
-        .entities
+    let worker_builder = game.state.entities
         .spawn_unit(1, EntityKind::Worker, cc_x + 96.0, cc_y + 32.0)
         .expect("builder should spawn");
-    let worker_gatherer = game
-        .entities
+    let worker_gatherer = game.state.entities
         .spawn_unit(1, EntityKind::Worker, cc_x, cc_y + 96.0)
         .expect("gatherer should spawn");
-    let rifleman = game
-        .entities
+    let rifleman = game.state.entities
         .spawn_unit(1, EntityKind::Rifleman, cc_x + 96.0, cc_y + 160.0)
         .expect("rifleman should spawn");
-    let enemy = game
-        .entities
+    let enemy = game.state.entities
         .spawn_unit(2, EntityKind::Rifleman, cc_x + 224.0, cc_y + 160.0)
         .expect("enemy should spawn");
 
-    systems::recompute_supply(&mut game.players, &game.entities);
+    systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
-    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
-    game.fog.recompute(&ids, &game.entities, &game.map);
+    let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
+    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
     game.assert_invariants();
 
     MixedQueuedFixture {
@@ -159,66 +153,62 @@ fn phase_six_intent_fixture() -> PhaseSixIntentFixture {
     ];
     let mut game =
         Game::new_for_replay_with_starting_resources(&players, 5_000, 5_000, 0x5150_0602);
-    for tile in &mut game.map.terrain {
+    for tile in &mut game.state.map.terrain {
         *tile = crate::protocol::terrain::GRASS;
     }
-    for id in game.entities.ids() {
-        game.entities.remove(id);
+    for id in game.state.entities.ids() {
+        game.state.entities.remove(id);
     }
 
     let (steelworks_x, steelworks_y) =
-        services::occupancy::footprint_center(&game.map, EntityKind::Steelworks, 4, 4);
-    game.entities
+        services::occupancy::footprint_center(&game.state.map, EntityKind::Steelworks, 4, 4);
+    game.state.entities
         .spawn_building(1, EntityKind::Steelworks, steelworks_x, steelworks_y, true)
         .expect("steelworks should spawn");
     let (training_x, training_y) =
-        services::occupancy::footprint_center(&game.map, EntityKind::TrainingCentre, 8, 4);
-    game.entities
+        services::occupancy::footprint_center(&game.state.map, EntityKind::TrainingCentre, 8, 4);
+    game.state.entities
         .spawn_building(1, EntityKind::TrainingCentre, training_x, training_y, true)
         .expect("training centre should spawn");
-    let scout_a_pos = game.map.tile_center(8, 10);
-    let scout_b_pos = game.map.tile_center(8, 12);
-    let scout_a = game
-        .entities
+    let scout_a_pos = game.state.map.tile_center(8, 10);
+    let scout_b_pos = game.state.map.tile_center(8, 12);
+    let scout_a = game.state.entities
         .spawn_unit(1, EntityKind::ScoutCar, scout_a_pos.0, scout_a_pos.1)
         .expect("first scout should spawn");
-    let scout_b = game
-        .entities
+    let scout_b = game.state.entities
         .spawn_unit(1, EntityKind::ScoutCar, scout_b_pos.0, scout_b_pos.1)
         .expect("second scout should spawn");
-    let rifle_pos = game.map.tile_center(9, 14);
-    let rifleman = game
-        .entities
+    let rifle_pos = game.state.map.tile_center(9, 14);
+    let rifleman = game.state.entities
         .spawn_unit(1, EntityKind::Rifleman, rifle_pos.0, rifle_pos.1)
         .expect("rifleman should spawn");
-    let at_pos = game.map.tile_center(10, 14);
-    let anti_tank_gun = game
-        .entities
+    let at_pos = game.state.map.tile_center(10, 14);
+    let anti_tank_gun = game.state.entities
         .spawn_unit(1, EntityKind::AntiTankGun, at_pos.0, at_pos.1)
         .expect("Anti-Tank Gun should spawn");
-    let enemy_pos = game.map.tile_center(18, 14);
-    game.entities
+    let enemy_pos = game.state.map.tile_center(18, 14);
+    game.state.entities
         .spawn_unit(2, EntityKind::Rifleman, enemy_pos.0, enemy_pos.1)
         .expect("enemy should spawn");
 
-    systems::recompute_supply(&mut game.players, &game.entities);
+    systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
-    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
-    game.fog
-        .recompute_with_smoke(&ids, &game.entities, &game.map, &game.smokes);
+    let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
+    game.state.fog
+        .recompute_with_smoke(&ids, &game.state.entities, &game.state.map, &game.state.smokes);
     game.assert_invariants();
 
-    let first_move = game.map.tile_center(12, 10);
-    let second_move = game.map.tile_center(14, 12);
+    let first_move = game.state.map.tile_center(12, 10);
+    let second_move = game.state.map.tile_center(14, 12);
     let smoke_targets = [
-        game.map.tile_center(13, 10),
-        game.map.tile_center(13, 12),
-        game.map.tile_center(14, 10),
-        game.map.tile_center(14, 12),
+        game.state.map.tile_center(13, 10),
+        game.state.map.tile_center(13, 12),
+        game.state.map.tile_center(14, 10),
+        game.state.map.tile_center(14, 12),
     ];
-    let charge_goal = game.map.tile_center(12, 14);
-    let attack_move_goal = game.map.tile_center(16, 14);
-    let setup_facing = game.map.tile_center(18, 14);
+    let charge_goal = game.state.map.tile_center(12, 14);
+    let attack_move_goal = game.state.map.tile_center(16, 14);
+    let setup_facing = game.state.map.tile_center(18, 14);
 
     PhaseSixIntentFixture {
         game,
@@ -263,7 +253,7 @@ fn tank_move_command_preserves_exact_goal_and_repeats_deterministically() {
             },
         }]
     );
-    let moved_tank = live.entities.get(tank).expect("tank should exist");
+    let moved_tank = live.state.entities.get(tank).expect("tank should exist");
     assert_eq!(moved_tank.path_goal(), Some(goal));
     let path = moved_tank
         .movement
@@ -302,8 +292,8 @@ fn tank_move_command_preserves_exact_goal_and_repeats_deterministically() {
         repeat_b.tick();
     }
 
-    let a = repeat_a.entities.get(tank_a).expect("tank A should exist");
-    let b = repeat_b.entities.get(tank_b).expect("tank B should exist");
+    let a = repeat_a.state.entities.get(tank_a).expect("tank A should exist");
+    let b = repeat_b.state.entities.get(tank_b).expect("tank B should exist");
     assert_eq!(
         (a.pos_x, a.pos_y, a.facing()),
         (b.pos_x, b.pos_y, b.facing())
@@ -340,7 +330,7 @@ fn queued_move_commands_follow_waypoints_in_order() {
     );
     game.tick();
 
-    let entity = game.entities.get(unit).expect("unit should exist");
+    let entity = game.state.entities.get(unit).expect("unit should exist");
     assert_eq!(
         entity.move_intent(),
         Some(first),
@@ -352,7 +342,7 @@ fn queued_move_commands_follow_waypoints_in_order() {
         game.tick();
     }
 
-    let entity = game.entities.get(unit).expect("unit should exist");
+    let entity = game.state.entities.get(unit).expect("unit should exist");
     assert!(
         entity_distance_to(&game, unit, second) <= 3.0,
         "unit should end at the second queued waypoint"
@@ -385,20 +375,20 @@ fn out_of_range_smoke_moves_into_range_launches_then_idles() {
     game.tick();
 
     assert!(
-        matches!(game.entities.get(scout).unwrap().order(), Order::Ability(_)),
+        matches!(game.state.entities.get(scout).unwrap().order(), Order::Ability(_)),
         "out-of-range Smoke should become an active ability movement order"
     );
 
     for _ in 0..240 {
-        if game.smokes.iter().count() > 0 {
+        if game.state.smokes.iter().count() > 0 {
             break;
         }
         game.tick();
     }
 
-    let scout_entity = game.entities.get(scout).expect("scout should exist");
+    let scout_entity = game.state.entities.get(scout).expect("scout should exist");
     assert_eq!(
-        game.smokes.iter().count(),
+        game.state.smokes.iter().count(),
         1,
         "Smoke cloud should spawn once the scout car reaches launch range"
     );
@@ -408,8 +398,8 @@ fn out_of_range_smoke_moves_into_range_launches_then_idles() {
         config::SMOKE_ABILITY_COOLDOWN_TICKS
             .saturating_sub(config::SMOKE_LAUNCH_MAX_DELAY_TICKS as u16)
     );
-    assert_eq!(game.players[0].steel, 500);
-    assert_eq!(game.players[0].oil, 500);
+    assert_eq!(game.state.players[0].steel, 500);
+    assert_eq!(game.state.players[0].oil, 500);
 }
 
 #[test]
@@ -857,7 +847,7 @@ fn snapshot_options_control_runtime_movement_debug_path() {
         if let Some(debug_path) = view.debug_path {
             assert_eq!(
                 debug_path.waypoints.first().map(|point| (point.x, point.y)),
-                game.entities
+                game.state.entities
                     .get(unit)
                     .and_then(|entity| entity.next_waypoint())
             );
@@ -907,30 +897,30 @@ fn wall_chokepoint_dev_scenario_matches_authored_layout() {
     let mut game = setup.game;
 
     assert_eq!(setup.units.len(), 15);
-    let wall_y = game.map.size - 18;
-    let gap_left_x = game.map.size / 2 - 1;
-    let gap_right_x = game.map.size / 2;
+    let wall_y = game.state.map.size - 18;
+    let gap_left_x = game.state.map.size / 2 - 1;
+    let gap_right_x = game.state.map.size / 2;
     assert_eq!(
-        game.map.terrain[game.map.index(gap_left_x, wall_y)],
+        game.state.map.terrain[game.state.map.index(gap_left_x, wall_y)],
         terrain::GRASS
     );
     assert_eq!(
-        game.map.terrain[game.map.index(gap_right_x, wall_y)],
+        game.state.map.terrain[game.state.map.index(gap_right_x, wall_y)],
         terrain::GRASS
     );
     assert_eq!(
-        game.map.terrain[game.map.index(gap_left_x - 1, wall_y)],
+        game.state.map.terrain[game.state.map.index(gap_left_x - 1, wall_y)],
         terrain::ROCK
     );
     assert_eq!(
-        game.map.terrain[game.map.index(gap_right_x + 1, wall_y)],
+        game.state.map.terrain[game.state.map.index(gap_right_x + 1, wall_y)],
         terrain::ROCK
     );
 
     let start_y = (wall_y + 10) as f32 * config::TILE_SIZE as f32 + config::TILE_SIZE as f32 * 0.5;
     let north = -std::f32::consts::FRAC_PI_2;
     for unit in &setup.units {
-        let entity = game.entities.get(*unit).expect("scenario unit exists");
+        let entity = game.state.entities.get(*unit).expect("scenario unit exists");
         assert_eq!(entity.kind, EntityKind::ScoutCar);
         assert!((entity.pos_y - start_y).abs() < 0.1);
         assert!((entity.facing() - north).abs() < 0.001);
@@ -978,8 +968,7 @@ fn wall_chokepoint_dev_scenario_supports_all_vehicles() {
         assert_eq!(setup.units.len(), 5);
         for unit_id in setup.units {
             let entity = setup
-                .game
-                .entities
+                .game.state.entities
                 .get(unit_id)
                 .expect("scenario unit exists");
             assert_eq!(entity.kind, unit);
@@ -1014,14 +1003,14 @@ fn replacement_move_and_stop_clear_queued_movement() {
     );
     game.tick();
 
-    let entity = game.entities.get(unit).expect("unit should exist");
+    let entity = game.state.entities.get(unit).expect("unit should exist");
     assert_eq!(entity.move_intent(), Some(replacement));
     assert!(entity.queued_orders().is_empty());
 
     game.enqueue(1, Command::Stop { units: vec![unit] });
     game.tick();
 
-    let entity = game.entities.get(unit).expect("unit should exist");
+    let entity = game.state.entities.get(unit).expect("unit should exist");
     assert!(matches!(entity.order(), Order::Idle));
     assert!(entity.queued_orders().is_empty());
     assert!(entity.path_is_empty());

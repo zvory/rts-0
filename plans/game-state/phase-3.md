@@ -1,6 +1,6 @@
 # Phase 3 - GameState Aggregate Shell
 
-Status: Not started.
+Status: Done.
 
 ## Scope
 

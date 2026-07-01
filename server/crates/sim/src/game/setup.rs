@@ -151,29 +151,29 @@ impl Game {
     }
 
     pub fn seed(&self) -> u32 {
-        self.seed
+        self.state.seed
     }
 
     pub fn starting_steel(&self) -> u32 {
-        self.starting_loadouts
+        self.state.starting_loadouts
             .first()
             .map(|loadout| loadout.starting_steel)
             .unwrap_or(config::STARTING_STEEL)
     }
 
     pub fn starting_oil(&self) -> u32 {
-        self.starting_loadouts
+        self.state.starting_loadouts
             .first()
             .map(|loadout| loadout.starting_oil)
             .unwrap_or(config::STARTING_OIL)
     }
 
     pub fn starting_loadouts(&self) -> &[PlayerStartingLoadout] {
-        &self.starting_loadouts
+        &self.state.starting_loadouts
     }
 
     pub fn map_metadata(&self) -> &MapMetadata {
-        &self.map_metadata
+        &self.state.map_metadata
     }
 
     fn new_inner(
@@ -292,35 +292,22 @@ impl Game {
             LIVE_PATHING_DEFAULT_BUDGET,
             LIVE_PATHING_CACHE_CAPACITY,
         );
-        let rng = SmallRng::seed_from_u64(seed as u64);
         let mut game = Game {
-            map,
-            entities,
-            fog,
-            building_memory: BuildingMemory::default(),
-            players: player_states,
-            pending: Vec::new(),
-            command_log: Vec::new(),
-            tick: 0,
+            state: GameState::new(
+                map,
+                entities,
+                fog,
+                player_states,
+                seed,
+                resolved_starting_loadouts,
+                map_metadata,
+                starting_loadout,
+            ),
             derived,
-            lingering_sight: Vec::new(),
-            firing_reveals: Vec::new(),
-            smokes: SmokeCloudStore::new(),
-            trenches: TrenchStore::new(),
-            ability_runtime: crate::game::ability_runtime::AbilityRuntime::new(),
-            mortar_shells: crate::game::mortar::MortarShellStore::default(),
-            artillery_shells: crate::game::artillery::ArtilleryShellStore::default(),
-            seed,
-            starting_loadouts: resolved_starting_loadouts,
-            map_metadata,
-            active_construction_sites: BTreeSet::new(),
-            lab_god_mode_players: BTreeSet::new(),
-            starting_loadout,
-            rng,
         };
         // Initialize supply accounting and fog so the very first snapshot is correct.
-        systems::recompute_supply(&mut game.players, &game.entities);
-        let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+        systems::recompute_supply(&mut game.state.players, &game.state.entities);
+        let ids = game.state.player_ids();
         game.recompute_live_fog(&ids);
         game.refresh_building_memory(&ids);
         game.refresh_trench_memory(&ids);
@@ -330,8 +317,7 @@ impl Game {
     /// Static info for the `start` message: terrain grid + each player's start tile. The
     /// `player_id` is left 0; the networking layer overwrites it per recipient.
     pub fn start_payload(&self) -> StartPayload {
-        let resources = self
-            .entities
+        let resources = self.state.entities
             .iter()
             .filter(|e| e.kind.is_node())
             .map(|e| ResourceNode {
@@ -342,14 +328,13 @@ impl Game {
             })
             .collect();
         let map = MapInfo {
-            width: self.map.size,
-            height: self.map.size,
+            width: self.state.map.size,
+            height: self.state.map.size,
             tile_size: config::TILE_SIZE,
-            terrain: self.map.terrain.clone(),
+            terrain: self.state.map.terrain.clone(),
             resources,
         };
-        let players = self
-            .players
+        let players = self.state.players
             .iter()
             .map(|p| PlayerStart {
                 id: p.id,
@@ -371,7 +356,7 @@ impl Game {
             diagnostics: Default::default(),
             replay: None,
             lab: None,
-            tick: self.tick,
+            tick: self.state.tick,
             map,
             players,
         }

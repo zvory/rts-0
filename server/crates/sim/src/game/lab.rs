@@ -226,7 +226,7 @@ impl Game {
             });
         }
         for entity_id in authority_entities {
-            let Some(entity) = self.entities.get(entity_id) else {
+            let Some(entity) = self.state.entities.get(entity_id) else {
                 return Err(LabError::StaleEntity { entity_id });
             };
             if entity.owner != player_id {
@@ -248,8 +248,7 @@ impl Game {
     }
 
     pub fn export_lab_scenario(&self) -> LabScenarioV1 {
-        let players = self
-            .players
+        let players = self.state.players
             .iter()
             .map(|player| LabScenarioPlayer {
                 id: player.id,
@@ -272,8 +271,7 @@ impl Game {
             })
             .collect();
 
-        let entities = self
-            .entities
+        let entities = self.state.entities
             .iter()
             .map(|entity| LabScenarioEntity {
                 id: entity.id,
@@ -290,7 +288,7 @@ impl Game {
                 weapon_facing: lab_entity_weapon_facing(entity),
                 set_up: lab_entity_is_set_up(entity),
                 setup_facing: lab_entity_setup_facing(entity),
-                setup_target: lab_entity_setup_target(&self.map, entity),
+                setup_target: lab_entity_setup_target(&self.state.map, entity),
             })
             .collect();
 
@@ -298,11 +296,11 @@ impl Game {
             schema_version: LAB_SCENARIO_V1_SCHEMA_VERSION,
             kind: LAB_SCENARIO_KIND.to_string(),
             name: "Untitled lab scenario".to_string(),
-            seed: self.seed,
+            seed: self.state.seed,
             map: LabScenarioMap {
-                name: self.map_metadata.name.clone(),
-                schema_version: self.map_metadata.schema_version,
-                content_hash: self.map_metadata.content_hash.clone(),
+                name: self.state.map_metadata.name.clone(),
+                schema_version: self.state.map_metadata.schema_version,
+                content_hash: self.state.map_metadata.content_hash.clone(),
             },
             players,
             entities,
@@ -313,7 +311,7 @@ impl Game {
     }
 
     pub fn lab_god_mode_players(&self) -> Vec<u32> {
-        self.lab_god_mode_players.iter().copied().collect()
+        self.state.lab_god_mode_players.iter().copied().collect()
     }
 
     pub fn restore_lab_scenario(
@@ -385,8 +383,7 @@ impl Game {
 
         let mut restored = Game::new_lab(&inits, scenario.seed, map, map_metadata);
         for player in &scenario.players {
-            let Some(state) = restored
-                .players
+            let Some(state) = restored.state.players
                 .iter_mut()
                 .find(|state| state.id == player.id)
             else {
@@ -407,7 +404,7 @@ impl Game {
             }
         }
 
-        restored.entities = EntityStore::new();
+        restored.state.entities = EntityStore::new();
         let mut entity_id_map = Vec::with_capacity(scenario.entities.len());
         let mut seen_entities = HashSet::new();
         for entity in &scenario.entities {
@@ -438,14 +435,14 @@ impl Game {
     fn lab_spawn_entity(&mut self, input: LabSpawnEntity) -> Result<LabOpOutcome, LabError> {
         self.validate_owner(input.owner)?;
         let id = if input.kind.is_unit() {
-            self.validate_unit_position(&self.entities, input.kind, input.x, input.y)?;
-            self.entities
+            self.validate_unit_position(&self.state.entities, input.kind, input.x, input.y)?;
+            self.state.entities
                 .spawn_unit(input.owner, input.kind, input.x, input.y)
                 .ok_or_else(|| invalid_kind(input.kind, "spawnEntity"))?
         } else if input.kind.is_building() {
             let (_, _, x, y) =
-                self.validate_building_position(&self.entities, input.kind, input.x, input.y)?;
-            self.entities
+                self.validate_building_position(&self.state.entities, input.kind, input.x, input.y)?;
+            self.state.entities
                 .spawn_building(input.owner, input.kind, x, y, input.completed)
                 .ok_or_else(|| invalid_kind(input.kind, "spawnEntity"))?
         } else {
@@ -456,10 +453,10 @@ impl Game {
     }
 
     fn lab_delete_entity(&mut self, entity_id: u32) -> Result<LabOpOutcome, LabError> {
-        self.entities
+        self.state.entities
             .remove(entity_id)
             .ok_or(LabError::StaleEntity { entity_id })?;
-        self.entities.release_miner(entity_id);
+        self.state.entities.release_miner(entity_id);
         self.cleanup_entity_references(entity_id);
         self.repair_lab_state();
         Ok(LabOpOutcome::Deleted { entity_id })
@@ -467,15 +464,14 @@ impl Game {
 
     fn lab_move_entity(&mut self, input: LabMoveEntity) -> Result<LabOpOutcome, LabError> {
         let (kind, is_unit, is_building) = {
-            let entity = self
-                .entities
+            let entity = self.state.entities
                 .get(input.entity_id)
                 .ok_or(LabError::StaleEntity {
                     entity_id: input.entity_id,
                 })?;
             (entity.kind, entity.is_unit(), entity.is_building())
         };
-        let mut entities_without = self.entities.clone();
+        let mut entities_without = self.state.entities.clone();
         entities_without.remove(input.entity_id);
         let (x, y) = if is_unit {
             self.validate_unit_position(&entities_without, kind, input.x, input.y)?;
@@ -488,12 +484,12 @@ impl Game {
             return Err(invalid_kind(kind, "moveEntity"));
         };
 
-        if let Some(entity) = self.entities.get_mut(input.entity_id) {
+        if let Some(entity) = self.state.entities.get_mut(input.entity_id) {
             entity.set_position(x, y);
             entity.clear_orders();
             entity.replace_active_order(Order::Idle);
         }
-        self.entities.release_miner(input.entity_id);
+        self.state.entities.release_miner(input.entity_id);
         self.repair_lab_state();
         Ok(LabOpOutcome::Moved {
             entity_id: input.entity_id,
@@ -504,8 +500,7 @@ impl Game {
 
     fn lab_set_entity_owner(&mut self, input: LabSetEntityOwner) -> Result<LabOpOutcome, LabError> {
         self.validate_owner(input.owner)?;
-        let kind = self
-            .entities
+        let kind = self.state.entities
             .get(input.entity_id)
             .ok_or(LabError::StaleEntity {
                 entity_id: input.entity_id,
@@ -515,12 +510,12 @@ impl Game {
             return Err(invalid_kind(kind, "setEntityOwner"));
         }
 
-        if let Some(entity) = self.entities.get_mut(input.entity_id) {
+        if let Some(entity) = self.state.entities.get_mut(input.entity_id) {
             entity.owner = input.owner;
             entity.clear_orders();
             clear_lab_production_state(entity);
         }
-        self.entities.release_miner(input.entity_id);
+        self.state.entities.release_miner(input.entity_id);
         self.cleanup_entity_references(input.entity_id);
         self.repair_lab_state();
         Ok(LabOpOutcome::OwnerSet {
@@ -533,8 +528,7 @@ impl Game {
         &mut self,
         input: LabSetPlayerResources,
     ) -> Result<LabOpOutcome, LabError> {
-        let player = self
-            .players
+        let player = self.state.players
             .iter_mut()
             .find(|player| player.id == input.player_id)
             .ok_or(LabError::InvalidPlayer {
@@ -556,9 +550,9 @@ impl Game {
     ) -> Result<LabOpOutcome, LabError> {
         self.validate_player(player_id)?;
         if enabled {
-            self.lab_god_mode_players.insert(player_id);
+            self.state.lab_god_mode_players.insert(player_id);
         } else {
-            self.lab_god_mode_players.remove(&player_id);
+            self.state.lab_god_mode_players.remove(&player_id);
         }
         self.sync_lab_god_mode_flags();
         Ok(LabOpOutcome::PlayerGodModeSet { player_id, enabled })
@@ -568,8 +562,7 @@ impl Game {
         &mut self,
         input: LabSetCompletedResearch,
     ) -> Result<LabOpOutcome, LabError> {
-        let player = self
-            .players
+        let player = self.state.players
             .iter_mut()
             .find(|player| player.id == input.player_id)
             .ok_or(LabError::InvalidPlayer {
@@ -582,7 +575,7 @@ impl Game {
             player.upgrades.remove(&input.upgrade);
         }
         production::sync_owned_autocast_from_upgrades(
-            &mut self.entities,
+            &mut self.state.entities,
             input.player_id,
             &player.upgrades,
         );
@@ -598,7 +591,7 @@ impl Game {
         entity: &LabScenarioEntity,
         kind: EntityKind,
     ) -> Result<u32, LabError> {
-        validate_world_position(&self.map, entity.x, entity.y)?;
+        validate_world_position(&self.state.map, entity.x, entity.y)?;
         if entity.hp == 0 {
             return Err(LabError::InvalidScenario {
                 reason: format!("entity {} has zero hp", entity.id),
@@ -612,27 +605,25 @@ impl Game {
                 });
             }
             self.validate_owner(entity.owner)?;
-            self.validate_unit_position(&self.entities, kind, entity.x, entity.y)?;
-            let id = self
-                .entities
+            self.validate_unit_position(&self.state.entities, kind, entity.x, entity.y)?;
+            let id = self.state.entities
                 .spawn_unit(entity.owner, kind, entity.x, entity.y)
                 .ok_or_else(|| invalid_kind(kind, "restoreScenario"))?;
-            if let Some(restored) = self.entities.get_mut(id) {
+            if let Some(restored) = self.state.entities.get_mut(id) {
                 restored.hp = entity.hp.min(restored.max_hp).max(1);
                 restore_lab_entity_orientation(entity, restored)?;
-                restore_lab_entity_setup(&self.map, entity, restored)?;
+                restore_lab_entity_setup(&self.state.map, entity, restored)?;
             }
             id
         } else if kind.is_building() {
             self.validate_owner(entity.owner)?;
             let (_, _, x, y) =
-                self.validate_building_position(&self.entities, kind, entity.x, entity.y)?;
+                self.validate_building_position(&self.state.entities, kind, entity.x, entity.y)?;
             let completed = entity.completed && entity.construction_progress.is_none();
-            let id = self
-                .entities
+            let id = self.state.entities
                 .spawn_building(entity.owner, kind, x, y, completed)
                 .ok_or_else(|| invalid_kind(kind, "restoreScenario"))?;
-            if let Some(restored) = self.entities.get_mut(id) {
+            if let Some(restored) = self.state.entities.get_mut(id) {
                 if let Some(progress) = entity.construction_progress {
                     if entity.completed {
                         return Err(LabError::InvalidScenario {
@@ -665,18 +656,17 @@ impl Game {
                 });
             }
             let (x, y) = resource_nodes::restore_resource_node_position(
-                &self.map,
-                &self.entities,
+                &self.state.map,
+                &self.state.entities,
                 kind,
                 entity.x,
                 entity.y,
                 kind == EntityKind::Oil,
             )?;
-            let id = self
-                .entities
+            let id = self.state.entities
                 .spawn_node(kind, x, y)
                 .ok_or_else(|| invalid_kind(kind, "restoreScenario"))?;
-            if let Some(restored) = self.entities.get_mut(id) {
+            if let Some(restored) = self.state.entities.get_mut(id) {
                 if let Some(remaining) = entity.resource_remaining {
                     if let Some(node) = restored.resource_node.as_mut() {
                         node.remaining = remaining;
@@ -699,7 +689,7 @@ impl Game {
     }
 
     fn validate_player(&self, player_id: u32) -> Result<(), LabError> {
-        if self.players.iter().any(|player| player.id == player_id) {
+        if self.state.players.iter().any(|player| player.id == player_id) {
             Ok(())
         } else {
             Err(LabError::InvalidPlayer { player_id })
@@ -713,9 +703,9 @@ impl Game {
         x: f32,
         y: f32,
     ) -> Result<(), LabError> {
-        validate_world_position(&self.map, x, y)?;
-        let occ = Occupancy::build(&self.map, entities);
-        if !standability::unit_spawn_standable(&self.map, &occ, entities, kind, x, y) {
+        validate_world_position(&self.state.map, x, y)?;
+        let occ = Occupancy::build(&self.state.map, entities);
+        if !standability::unit_spawn_standable(&self.state.map, &occ, entities, kind, x, y) {
             return Err(LabError::OccupiedPosition { x, y });
         }
         Ok(())
@@ -728,12 +718,12 @@ impl Game {
         x: f32,
         y: f32,
     ) -> Result<(u32, u32, f32, f32), LabError> {
-        validate_world_position(&self.map, x, y)?;
+        validate_world_position(&self.state.map, x, y)?;
         let (tile_x, tile_y, center_x, center_y) =
-            building_top_left_for_center(&self.map, kind, x, y)?;
+            building_top_left_for_center(&self.state.map, kind, x, y)?;
         for (tx, ty) in footprint_tiles(kind, tile_x, tile_y) {
-            if !self.map.in_bounds(tx as i32, ty as i32)
-                || !self.map.is_passable(tx as i32, ty as i32)
+            if !self.state.map.in_bounds(tx as i32, ty as i32)
+                || !self.state.map.is_passable(tx as i32, ty as i32)
             {
                 return Err(LabError::InvalidPosition {
                     x,
@@ -742,15 +732,15 @@ impl Game {
                 });
             }
         }
-        if !standability::building_site_clear(&self.map, entities, kind, tile_x, tile_y) {
+        if !standability::building_site_clear(&self.state.map, entities, kind, tile_x, tile_y) {
             return Err(LabError::OccupiedPosition { x, y });
         }
         Ok((tile_x, tile_y, center_x, center_y))
     }
 
     fn cleanup_entity_references(&mut self, entity_id: u32) {
-        for id in self.entities.ids() {
-            let Some(entity) = self.entities.get_mut(id) else {
+        for id in self.state.entities.ids() {
+            let Some(entity) = self.state.entities.get_mut(id) else {
                 continue;
             };
             if entity.target_id() == Some(entity_id) {
@@ -765,18 +755,18 @@ impl Game {
                     .retain(|intent| !order_intent_references_entity(intent, entity_id));
             }
         }
-        self.entities.clear_stale_miner_slots();
+        self.state.entities.clear_stale_miner_slots();
     }
 
     fn repair_lab_state(&mut self) {
-        self.entities.clear_stale_miner_slots();
+        self.state.entities.clear_stale_miner_slots();
         self.sync_lab_god_mode_flags();
         self.repair_mortar_autocast_state();
-        systems::recompute_supply(&mut self.players, &self.entities);
+        systems::recompute_supply(&mut self.state.players, &self.state.entities);
         self.reset_derived_state();
-        let ids: Vec<u32> = self.players.iter().map(|player| player.id).collect();
-        self.fog
-            .recompute_with_smoke(&ids, &self.entities, &self.map, &self.smokes);
+        let ids = self.state.player_ids();
+        self.state.fog
+            .recompute_with_smoke(&ids, &self.state.entities, &self.state.map, &self.state.smokes);
         self.refresh_building_memory(&ids);
         self.refresh_trench_memory(&ids);
         #[cfg(debug_assertions)]
@@ -784,9 +774,9 @@ impl Game {
     }
 
     fn repair_mortar_autocast_state(&mut self) {
-        for player in &self.players {
+        for player in &self.state.players {
             production::sync_owned_autocast_from_upgrades(
-                &mut self.entities,
+                &mut self.state.entities,
                 player.id,
                 &player.upgrades,
             );
@@ -794,9 +784,9 @@ impl Game {
     }
 
     pub(crate) fn sync_lab_god_mode_flags(&mut self) {
-        let enabled_players = self.lab_god_mode_players.clone();
-        for entity_id in self.entities.ids() {
-            if let Some(entity) = self.entities.get_mut(entity_id) {
+        let enabled_players = self.state.lab_god_mode_players.clone();
+        for entity_id in self.state.entities.ids() {
+            if let Some(entity) = self.state.entities.get_mut(entity_id) {
                 let is_player_asset = entity.is_unit() || entity.is_building();
                 entity.set_invulnerable(is_player_asset && enabled_players.contains(&entity.owner));
             }
@@ -1018,7 +1008,7 @@ mod tests {
     }
 
     fn tile_center(game: &Game, x: u32, y: u32) -> (f32, f32) {
-        game.map.tile_center(x, y)
+        game.state.map.tile_center(x, y)
     }
 
     fn assert_angle_close(actual: f32, expected: f32) {
@@ -1029,11 +1019,11 @@ mod tests {
     }
 
     fn free_unit_position(game: &Game, kind: EntityKind) -> (f32, f32) {
-        for ty in 8..game.map.size.saturating_sub(8) {
-            for tx in 8..game.map.size.saturating_sub(8) {
-                let (x, y) = game.map.tile_center(tx, ty);
+        for ty in 8..game.state.map.size.saturating_sub(8) {
+            for tx in 8..game.state.map.size.saturating_sub(8) {
+                let (x, y) = game.state.map.tile_center(tx, ty);
                 if game
-                    .validate_unit_position(&game.entities, kind, x, y)
+                    .validate_unit_position(&game.state.entities, kind, x, y)
                     .is_ok()
                 {
                     return (x, y);
@@ -1102,7 +1092,7 @@ mod tests {
     fn lab_spawn_building_repairs_supply_cap() {
         let mut game = new_game();
         let before_cap = game.snapshot_for(1).supply_cap;
-        let (x, y) = footprint_center(&game.map, EntityKind::Depot, 28, 28);
+        let (x, y) = footprint_center(&game.state.map, EntityKind::Depot, 28, 28);
 
         game.apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
             owner: 1,
@@ -1155,8 +1145,7 @@ mod tests {
             Err(LabError::InvalidPosition { .. })
         ));
 
-        let worker = game
-            .entities
+        let worker = game.state.entities
             .iter()
             .find(|entity| entity.owner == 1 && entity.kind == EntityKind::Worker)
             .expect("starting worker")
@@ -1172,8 +1161,7 @@ mod tests {
             Err(LabError::OccupiedPosition { .. })
         ));
 
-        let city_centre = game
-            .entities
+        let city_centre = game.state.entities
             .iter()
             .find(|entity| entity.owner == 1 && entity.kind == EntityKind::CityCentre)
             .expect("starting city centre")
@@ -1214,11 +1202,10 @@ mod tests {
             y: move_y,
         }))
         .expect("move should be accepted");
-        let moved = game.entities.get(entity_id).expect("moved entity");
+        let moved = game.state.entities.get(entity_id).expect("moved entity");
         assert_eq!((moved.pos_x, moved.pos_y), (move_x, move_y));
 
-        let city_centre = game
-            .entities
+        let city_centre = game.state.entities
             .iter()
             .find(|entity| entity.owner == 1 && entity.kind == EntityKind::CityCentre)
             .expect("starting city centre")
@@ -1255,7 +1242,7 @@ mod tests {
             owner: 2,
         }))
         .expect("owner change should be accepted");
-        assert_eq!(game.entities.get(entity_id).expect("tank").owner, 2);
+        assert_eq!(game.state.entities.get(entity_id).expect("tank").owner, 2);
         assert_eq!(
             game.snapshot_for(1).supply_used,
             rules::economy::supply_cost(EntityKind::Worker) * config::STARTING_WORKERS
@@ -1264,7 +1251,7 @@ mod tests {
 
         game.apply_lab_op(LabOp::DeleteEntity { entity_id })
             .expect("delete should be accepted");
-        assert!(game.entities.get(entity_id).is_none());
+        assert!(game.state.entities.get(entity_id).is_none());
         assert!(matches!(
             game.apply_lab_op(LabOp::DeleteEntity { entity_id }),
             Err(LabError::StaleEntity { .. })
@@ -1361,7 +1348,7 @@ mod tests {
             panic!("unexpected outcome");
         };
         {
-            let tank = game.entities.get_mut(tank_id).expect("spawned tank");
+            let tank = game.state.entities.get_mut(tank_id).expect("spawned tank");
             tank.set_facing(tank_facing);
             tank.set_weapon_facing(tank_weapon_facing);
             tank.set_desired_weapon_facing(tank_weapon_facing);
@@ -1383,7 +1370,7 @@ mod tests {
         let setup_facing = (setup_target.1 - y).atan2(setup_target.0 - x);
         let gun_weapon_facing = setup_facing + 0.125;
         {
-            let gun = game.entities.get_mut(gun_id).expect("spawned gun");
+            let gun = game.state.entities.get_mut(gun_id).expect("spawned gun");
             gun.set_weapon_setup(WeaponSetup::Deployed);
             gun.set_emplacement_facing(Some(setup_facing));
             gun.set_weapon_facing(gun_weapon_facing);
@@ -1426,7 +1413,7 @@ mod tests {
             .iter()
             .find(|entry| entry.old_id == tank_id)
             .expect("spawned entity should be remapped");
-        let restored_tank = restored.entities.get(remap.new_id).expect("restored tank");
+        let restored_tank = restored.state.entities.get(remap.new_id).expect("restored tank");
         assert_eq!(restored_tank.kind, EntityKind::Tank);
         assert_eq!(restored_tank.owner, 1);
         assert!(matches!(restored_tank.weapon_setup(), WeaponSetup::Packed));
@@ -1440,8 +1427,7 @@ mod tests {
             .iter()
             .find(|entry| entry.old_id == gun_id)
             .expect("gun should be remapped");
-        let restored_gun = restored
-            .entities
+        let restored_gun = restored.state.entities
             .get(gun_remap.new_id)
             .expect("restored gun");
         assert_eq!(restored_gun.kind, EntityKind::AntiTankGun);

@@ -33,7 +33,7 @@ impl PendingCommand {
 
 impl Game {
     pub fn enqueue(&mut self, player: u32, cmd: SimCommand) {
-        self.pending.push(PendingCommand::normal(player, cmd));
+        self.state.pending.push(PendingCommand::normal(player, cmd));
     }
 
     pub(in crate::game) fn enqueue_lab_command_ignoring_limits(
@@ -41,15 +41,15 @@ impl Game {
         player: u32,
         cmd: SimCommand,
     ) {
-        self.pending
+        self.state.pending
             .push(PendingCommand::lab_ignore_command_limits(player, cmd));
     }
 
     pub(super) fn record_commands_for_tick(&mut self, pending: &[PendingCommand]) {
-        self.command_log
+        self.state.command_log
             .extend(pending.iter().filter_map(|pending| {
                 pending.command.to_protocol().map(|command| CommandLogEntry {
-                    tick: self.tick,
+                    tick: self.state.tick,
                     player_id: pending.player,
                     command,
                 })

@@ -34,21 +34,21 @@ impl Game {
     /// Called automatically at the end of [`Game::tick`] in debug builds. Tests may also call it
     /// explicitly after manual state mutations.
     pub fn assert_invariants(&self) {
-        let world_max = self.map.world_size_px();
-        let player_ids: Vec<u32> = self.players.iter().map(|p| p.id).collect();
+        let world_max = self.state.map.world_size_px();
+        let player_ids: Vec<u32> = self.state.players.iter().map(|p| p.id).collect();
 
         // ------------------------------------------------------------------
         // 1. Entity id / store-key consistency
         // ------------------------------------------------------------------
-        for e in self.entities.iter() {
+        for e in self.state.entities.iter() {
             assert!(
-                self.entities.contains(e.id),
+                self.state.entities.contains(e.id),
                 "invariant: entity {} kind {:?} has id that does not exist in store",
                 e.id,
                 e.kind
             );
             // Also verify the entity we get back by id is the same record.
-            if let Some(by_key) = self.entities.get(e.id) {
+            if let Some(by_key) = self.state.entities.get(e.id) {
                 assert_eq!(
                     by_key.id, e.id,
                     "invariant: store key {} does not match entity id {}",
@@ -60,27 +60,27 @@ impl Game {
         // ------------------------------------------------------------------
         // 2. No NaN, invalid unit bodies, or out-of-world coordinates
         // ------------------------------------------------------------------
-        for e in self.entities.iter() {
+        for e in self.state.entities.iter() {
             assert!(
                 e.pos_x.is_finite() && e.pos_y.is_finite(),
                 "invariant: tick {} entity has non-finite position; {}",
-                self.tick,
-                entity_context(&self.map, e)
+                self.state.tick,
+                entity_context(&self.state.map, e)
             );
             assert!(
                 e.pos_x >= 0.0 && e.pos_x < world_max && e.pos_y >= 0.0 && e.pos_y < world_max,
                 "invariant: tick {} entity position out of world bounds [0, {:.2}); {}",
-                self.tick,
+                self.state.tick,
                 world_max,
-                entity_context(&self.map, e)
+                entity_context(&self.state.map, e)
             );
             if e.is_unit() {
                 let body = unit_body_for_entity(e);
                 assert!(
                     body.is_some(),
                     "invariant: tick {} unit has invalid body; {}",
-                    self.tick,
-                    entity_context(&self.map, e)
+                    self.state.tick,
+                    entity_context(&self.state.map, e)
                 );
             }
         }
@@ -88,11 +88,11 @@ impl Game {
         // ------------------------------------------------------------------
         // 3. Supply equals living plus queued units
         // ------------------------------------------------------------------
-        for ps in &self.players {
+        for ps in &self.state.players {
             let catalog = rules::faction::catalog_for(&ps.faction_id);
             let mut expected_cap = 0u32;
             let mut expected_used = 0u32;
-            for e in self.entities.iter() {
+            for e in self.state.entities.iter() {
                 if e.owner != ps.id {
                     continue;
                 }
@@ -127,11 +127,11 @@ impl Game {
         // 4. Buildings never overlap
         // ------------------------------------------------------------------
         let mut occupied: Vec<(u32, EntityKind, (u32, u32))> = Vec::new();
-        for e in self.entities.iter() {
+        for e in self.state.entities.iter() {
             if !e.is_building() {
                 continue;
             }
-            let footprint = building_footprint(&self.map, e);
+            let footprint = building_footprint(&self.state.map, e);
             for tile in &footprint {
                 let previous = occupied
                     .iter()
@@ -139,10 +139,10 @@ impl Game {
                 assert!(
                     previous.is_none(),
                     "invariant: tick {} building footprint overlaps another building at tile {:?} {}; building={}; other={}; footprint={:?}",
-                    self.tick,
+                    self.state.tick,
                     tile,
-                    tile_location_context(&self.map, *tile),
-                    entity_context(&self.map, e),
+                    tile_location_context(&self.state.map, *tile),
+                    entity_context(&self.state.map, e),
                     previous
                         .map(|(id, kind, _)| format!("id={} kind={}", id, kind))
                         .unwrap_or_else(|| "unknown".to_string()),
@@ -152,18 +152,17 @@ impl Game {
             }
         }
 
-        let building_rects: Vec<_> = self
-            .entities
+        let building_rects: Vec<_> = self.state.entities
             .iter()
             .filter_map(|e| {
                 if e.is_building() {
-                    building_rect_for_entity(&self.map, e).map(|rect| (e.id, e.kind, rect))
+                    building_rect_for_entity(&self.state.map, e).map(|rect| (e.id, e.kind, rect))
                 } else {
                     None
                 }
             })
             .collect();
-        for node in self.entities.iter().filter(|e| e.is_node()) {
+        for node in self.state.entities.iter().filter(|e| e.is_node()) {
             let body = CircleBody {
                 x: node.pos_x,
                 y: node.pos_y,
@@ -174,12 +173,12 @@ impl Game {
                     standability::resource_node_building_overlap_allowed(node, building_kind, rect)
                         || !circle_intersects_rect(body, rect),
                     "invariant: tick {} resource node body overlaps building footprint; node={}; building=id={} kind={} {}; collision={}",
-                    self.tick,
-                    entity_context(&self.map, node),
+                    self.state.tick,
+                    entity_context(&self.state.map, node),
                     building_id,
                     building_kind,
-                    rect_context(&self.map, rect),
-                    circle_rect_collision_context(&self.map, body, rect)
+                    rect_context(&self.state.map, rect),
+                    circle_rect_collision_context(&self.state.map, body, rect)
                 );
             }
         }
@@ -187,7 +186,7 @@ impl Game {
         // ------------------------------------------------------------------
         // 5. Non-ghost unit bodies never intersect static blockers.
         // ------------------------------------------------------------------
-        for e in self.entities.iter().filter(|e| e.is_unit()) {
+        for e in self.state.entities.iter().filter(|e| e.is_unit()) {
             if is_collision_anchored(e) {
                 continue;
             }
@@ -197,25 +196,25 @@ impl Game {
                     assert!(
                         overlap_depth <= STATIC_BODY_OVERLAP_TOLERANCE_PX,
                         "invariant: tick {} unit body intersects building footprint; unit={}; building=id={} kind={} {}; collision={}",
-                        self.tick,
-                        entity_context(&self.map, e),
+                        self.state.tick,
+                        entity_context(&self.state.map, e),
                         building_id,
                         building_kind,
-                        rect_context(&self.map, rect),
-                        unit_body_rect_collision_context(&self.map, body, rect)
+                        rect_context(&self.state.map, rect),
+                        unit_body_rect_collision_context(&self.state.map, body, rect)
                     );
                 }
             }
         }
 
-        let occ = Occupancy::build(&self.map, &self.entities);
-        for e in self.entities.iter().filter(|e| e.is_unit()) {
+        let occ = Occupancy::build(&self.state.map, &self.state.entities);
+        for e in self.state.entities.iter().filter(|e| e.is_unit()) {
             if is_collision_anchored(e) {
                 continue;
             }
             assert!(
                 standability::unit_static_standable_with_facing(
-                    &self.map,
+                    &self.state.map,
                     &occ,
                     e.kind,
                     e.pos_x,
@@ -223,21 +222,21 @@ impl Game {
                     e.facing()
                 ),
                 "invariant: tick {} unit body is not static-standable; {}",
-                self.tick,
-                entity_context(&self.map, e)
+                self.state.tick,
+                entity_context(&self.state.map, e)
             );
         }
 
         // ------------------------------------------------------------------
         // 6. Resource-node miner reservations are valid or ignored
         // ------------------------------------------------------------------
-        for e in self.entities.iter() {
+        for e in self.state.entities.iter() {
             if !e.is_node() {
                 continue;
             }
             if let Some(miner_id) = e.miner() {
                 assert_eq!(
-                    self.entities.node_slot_holder(e.id),
+                    self.state.entities.node_slot_holder(e.id),
                     Some(miner_id),
                     "invariant: node {} miner {} is not a valid harvest-slot holder",
                     e.id,
@@ -251,7 +250,7 @@ impl Game {
         //    (transition windows where a target just died are allowed because
         //     death_system cleans them up on the same tick).
         // ------------------------------------------------------------------
-        for e in self.entities.iter() {
+        for e in self.state.entities.iter() {
             if !e.is_unit() {
                 continue;
             }
@@ -260,7 +259,7 @@ impl Game {
                     let Some(target) = e.order().attack_target() else {
                         continue;
                     };
-                    if let Some(t) = self.entities.get(target) {
+                    if let Some(t) = self.state.entities.get(target) {
                         assert!(
                             t.is_targetable() && t.hp > 0,
                             "invariant: entity {} Attack order targets invalid entity {} (hp {} targetable {})",
@@ -272,7 +271,7 @@ impl Game {
                     let Some(node) = e.order().gather_node() else {
                         continue;
                     };
-                    if let Some(n) = self.entities.get(node) {
+                    if let Some(n) = self.state.entities.get(node) {
                         assert!(
                             n.is_node() && n.remaining().unwrap_or(0) > 0,
                             "invariant: entity {} Gather order targets invalid node {} (kind {:?} remaining {})",
@@ -284,7 +283,7 @@ impl Game {
                     let Some(site) = e.order().build_site() else {
                         continue;
                     };
-                    if let Some(b) = self.entities.get(site) {
+                    if let Some(b) = self.state.entities.get(site) {
                         assert!(
                             b.is_building() && b.under_construction(),
                             "invariant: entity {} Build order targets invalid site {} (building {} under_construction {})",
@@ -296,7 +295,7 @@ impl Game {
                     let Some(target) = e.order().deconstruct_target() else {
                         continue;
                     };
-                    if let Some(t) = self.entities.get(target) {
+                    if let Some(t) = self.state.entities.get(target) {
                         assert!(
                             t.kind == EntityKind::TankTrap && t.hp > 0 && !t.under_construction(),
                             "invariant: entity {} Deconstruct order targets invalid trap {} (kind {:?} hp {} under_construction {})",
@@ -317,13 +316,13 @@ impl Game {
         // ------------------------------------------------------------------
         for &pid in &player_ids {
             assert!(
-                self.fog.has_grid(pid),
+                self.state.fog.has_grid(pid),
                 "invariant: fog grid missing for player {}",
                 pid
             );
         }
         assert!(
-            !self.fog.has_grid(NEUTRAL),
+            !self.state.fog.has_grid(NEUTRAL),
             "invariant: fog grid must not exist for neutral owner (0)"
         );
 
@@ -334,7 +333,7 @@ impl Game {
         //     keep body overlap within `OVERLAP_TOLERANCE_PX` of floating-point and terrain-pinned
         //     residue.
         // ------------------------------------------------------------------
-        let units: Vec<_> = self.entities.iter().filter(|e| e.is_unit()).collect();
+        let units: Vec<_> = self.state.entities.iter().filter(|e| e.is_unit()).collect();
         for i in 0..units.len() {
             let a = units[i];
             if is_collision_anchored(a) {
@@ -354,12 +353,12 @@ impl Game {
                 assert!(
                     overlap <= OVERLAP_TOLERANCE_PX,
                     "invariant: tick {} unit bodies overlap by {:.2}px; a={}; b={}; midpoint={}",
-                    self.tick,
+                    self.state.tick,
                     overlap,
-                    entity_context(&self.map, a),
-                    entity_context(&self.map, b),
+                    entity_context(&self.state.map, a),
+                    entity_context(&self.state.map, b),
                     location_context(
-                        &self.map,
+                        &self.state.map,
                         (a.pos_x + b.pos_x) * 0.5,
                         (a.pos_y + b.pos_y) * 0.5
                     )
@@ -372,7 +371,7 @@ impl Game {
         // ------------------------------------------------------------------
         for &pid in &player_ids {
             let snap = self.snapshot_for(pid);
-            let live_fog = self.invariant_team_current_fog_for(pid, &self.fog);
+            let live_fog = self.invariant_team_current_fog_for(pid, &self.state.fog);
             for v in &snap.entities {
                 if v.owner == pid || v.owner == NEUTRAL || self.same_team_owner(pid, v.owner) {
                     continue;
@@ -384,33 +383,33 @@ impl Game {
                     assert!(
                         !live_visible,
                         "invariant: tick {} snapshot for player {} marks live-visible enemy entity {} as vision-only at {}",
-                        self.tick,
+                        self.state.tick,
                         pid,
                         v.id,
-                        location_context(&self.map, v.x, v.y)
+                        location_context(&self.state.map, v.x, v.y)
                     );
                 } else {
                     assert!(
                         live_visible,
                         "invariant: tick {} snapshot for player {} exposes hidden enemy entity {} at {}",
-                        self.tick,
+                        self.state.tick,
                         pid,
                         v.id,
-                        location_context(&self.map, v.x, v.y)
+                        location_context(&self.state.map, v.x, v.y)
                     );
                 }
                 // If a target_id is exposed, the target must be visible too.
                 if let Some(tid) = v.target_id {
-                    if let Some(t) = self.entities.get(tid) {
+                    if let Some(t) = self.state.entities.get(tid) {
                         let visible =
-                            v.owner == pid || self.fog.is_visible_world(pid, t.pos_x, t.pos_y);
+                            v.owner == pid || self.state.fog.is_visible_world(pid, t.pos_x, t.pos_y);
                         assert!(
                             visible,
                             "invariant: tick {} snapshot for player {} exposes hidden target_id {}; target={}",
-                            self.tick,
+                            self.state.tick,
                             pid,
                             tid,
-                            entity_context(&self.map, t)
+                            entity_context(&self.state.map, t)
                         );
                     }
                 }
@@ -770,19 +769,19 @@ mod tests {
             is_ai: false,
         }];
         let mut game = Game::new(&players, 0x1234_5678);
-        for tile in &mut game.map.terrain {
+        for tile in &mut game.state.map.terrain {
             *tile = crate::protocol::terrain::GRASS;
         }
 
-        let (bx, by) = footprint_center(&game.map, EntityKind::Depot, 10, 10);
-        game.entities
+        let (bx, by) = footprint_center(&game.state.map, EntityKind::Depot, 10, 10);
+        game.state.entities
             .spawn_building(99, EntityKind::Depot, bx, by, true)
             .expect("building spawn");
         let rect = building_rect_for_footprint(EntityKind::Depot, 10, 10).expect("depot rect");
         let radius = config::unit_stats(EntityKind::Tank)
             .expect("tank stats")
             .radius;
-        game.entities
+        game.state.entities
             .spawn_unit(
                 99,
                 EntityKind::Tank,
@@ -846,16 +845,16 @@ mod tests {
             is_ai: false,
         }];
         let mut game = Game::new(&players, 0x1234_5678);
-        for tile in &mut game.map.terrain {
+        for tile in &mut game.state.map.terrain {
             *tile = crate::protocol::terrain::GRASS;
         }
 
-        let (bx, by) = footprint_center(&game.map, EntityKind::Depot, 10, 10);
-        game.entities
+        let (bx, by) = footprint_center(&game.state.map, EntityKind::Depot, 10, 10);
+        game.state.entities
             .spawn_building(99, EntityKind::Depot, bx, by, true)
             .expect("building spawn");
         let rect = building_rect_for_footprint(EntityKind::Depot, 10, 10).expect("depot rect");
-        game.entities
+        game.state.entities
             .spawn_node(
                 EntityKind::Steel,
                 rect.max_x + config::TILE_SIZE as f32 * 0.25,
@@ -884,16 +883,16 @@ mod tests {
             is_ai: false,
         }];
         let mut game = Game::new(&players, 0x1234_5678);
-        for tile in &mut game.map.terrain {
+        for tile in &mut game.state.map.terrain {
             *tile = crate::protocol::terrain::GRASS;
         }
 
-        let (x, y) = footprint_center(&game.map, EntityKind::PumpJack, 10, 10);
+        let (x, y) = footprint_center(&game.state.map, EntityKind::PumpJack, 10, 10);
         let oil_kind = EntityKind::from_str("oil").expect("oil kind");
-        game.entities
+        game.state.entities
             .spawn_node(oil_kind, x, y)
             .expect("oil spawn");
-        game.entities
+        game.state.entities
             .spawn_building(1, EntityKind::PumpJack, x, y, true)
             .expect("pump jack spawn");
 
