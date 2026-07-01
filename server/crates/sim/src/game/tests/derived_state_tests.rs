@@ -33,6 +33,7 @@ struct SemanticGameView {
     ability_runtime: String,
     mortar_shells: String,
     artillery_shells: String,
+    observer_analysis: String,
 }
 
 #[derive(Debug, PartialEq)]
@@ -56,9 +57,11 @@ struct SemanticPlayerView {
 struct ProjectionView {
     snapshots: Vec<(u32, Snapshot)>,
     full_snapshots: Vec<(u32, Snapshot)>,
+    selected_spectator_snapshots: Vec<(u32, Snapshot)>,
     spectator_snapshot: Snapshot,
     debug_path_snapshots: Vec<(u32, Snapshot)>,
     debug_path_full_snapshots: Vec<(u32, Snapshot)>,
+    debug_path_selected_spectator_snapshots: Vec<(u32, Snapshot)>,
     debug_path_spectator_snapshot: Snapshot,
 }
 
@@ -975,20 +978,25 @@ fn enqueue_pair(baseline: &mut Game, wiped: &mut Game, player: u32, command: Com
     wiped.enqueue(player, command);
 }
 
-fn tick_pair_and_assert_equivalent(baseline: &mut Game, wiped: &mut Game, label: &str) {
+pub(super) fn tick_pair_and_assert_equivalent(
+    baseline: &mut Game,
+    wiped: &mut Game,
+    label: &str,
+) -> Vec<(u32, Vec<Event>)> {
     let baseline_events = baseline.tick();
     let wiped_events = wiped.tick();
     assert_eq!(baseline_events, wiped_events, "{label}: events diverged");
     assert_equivalent_games(baseline, wiped, label);
+    baseline_events
 }
 
-fn tick_pair_for(baseline: &mut Game, restored: &mut Game, ticks: u32, label: &str) {
+pub(super) fn tick_pair_for(baseline: &mut Game, restored: &mut Game, ticks: u32, label: &str) {
     for tick in 0..ticks {
         tick_pair_and_assert_equivalent(baseline, restored, &format!("{label} tick {tick}"));
     }
 }
 
-fn assert_equivalent_games(baseline: &Game, wiped: &Game, label: &str) {
+pub(super) fn assert_equivalent_games(baseline: &Game, wiped: &Game, label: &str) {
     assert_eq!(
         semantic_game_view(baseline),
         semantic_game_view(wiped),
@@ -1001,7 +1009,7 @@ fn assert_equivalent_games(baseline: &Game, wiped: &Game, label: &str) {
     );
 }
 
-fn restore_checkpoint_and_assert_equivalent(baseline: &Game, label: &str) -> Game {
+pub(super) fn restore_checkpoint_and_assert_equivalent(baseline: &Game, label: &str) -> Game {
     let checkpoint_next_id = baseline.state.entities.next_id_for_test();
     let checkpoint_pathing_config = baseline.pathing_config_for_test();
     let checkpoint = baseline.checkpoint_for_test();
@@ -1057,7 +1065,7 @@ fn phase5_players() -> [PlayerInit; 2] {
     ]
 }
 
-fn repair_after_authoritative_test_spawn(game: &mut Game) {
+pub(super) fn repair_after_authoritative_test_spawn(game: &mut Game) {
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.clear_and_rebuild_derived_state_for_test();
     let ids = player_ids(game);
@@ -1154,6 +1162,7 @@ fn semantic_game_view(game: &Game) -> SemanticGameView {
         ability_runtime: format!("{:?}", game.state.ability_runtime),
         mortar_shells: format!("{:?}", game.state.mortar_shells),
         artillery_shells: format!("{:?}", game.state.artillery_shells),
+        observer_analysis: format!("{:?}", game.observer_analysis()),
     }
 }
 
@@ -1170,6 +1179,10 @@ fn projection_view(game: &Game) -> ProjectionView {
             .iter()
             .map(|&player| (player, game.snapshot_full_for(player)))
             .collect(),
+        selected_spectator_snapshots: player_ids
+            .iter()
+            .map(|&player| (player, game.snapshot_for_spectator(&[player])))
+            .collect(),
         spectator_snapshot: game.snapshot_for_spectator(&player_ids),
         debug_path_snapshots: player_ids
             .iter()
@@ -1181,6 +1194,15 @@ fn projection_view(game: &Game) -> ProjectionView {
                 (
                     player,
                     game.snapshot_full_for_with_options(player, full_debug_options),
+                )
+            })
+            .collect(),
+        debug_path_selected_spectator_snapshots: player_ids
+            .iter()
+            .map(|&player| {
+                (
+                    player,
+                    game.snapshot_for_spectator_with_options(&[player], full_debug_options),
                 )
             })
             .collect(),
@@ -1203,7 +1225,7 @@ fn all_projected_debug_path_options() -> SnapshotOptions {
     }
 }
 
-fn player_ids(game: &Game) -> Vec<u32> {
+pub(super) fn player_ids(game: &Game) -> Vec<u32> {
     game.state.players.iter().map(|player| player.id).collect()
 }
 
