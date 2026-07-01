@@ -12,7 +12,8 @@ use super::events::{emit_conversion, emit_impact, emit_launch, LaunchEvent};
 use super::{
     convert_panzerfaust_to_rifleman, mirror_weapon_to_body, panzerfaust_state,
     panzerfaust_target_fireable, panzerfaust_target_in_range, panzerfaust_target_valid,
-    recovery_ticks, set_panzerfaust_state, Fog, LineOfSight, Map, SmokeCloudStore, TeamRelations,
+    recovery_ticks, set_panzerfaust_state, Fog, LineOfSight, Map, PanzerfaustFireContext,
+    SmokeCloudStore, TeamRelations,
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -100,7 +101,12 @@ fn tick_windup(
     };
     if !panzerfaust_target_valid(entities, teams, fog, smokes, owner, id, target)
         || !panzerfaust_target_in_range(map, entities, id, target)
-        || !panzerfaust_target_fireable(map, entities, teams, los, id, owner, target)
+        || !panzerfaust_target_fireable(
+            &PanzerfaustFireContext::new(map, entities, teams, los, fog, smokes),
+            id,
+            owner,
+            target,
+        )
     {
         cancel_windup(entities, id);
         return;

@@ -8,6 +8,7 @@ pub mod combat;
 pub mod defs;
 pub mod economy;
 pub mod faction;
+pub mod target;
 pub mod terrain;
 
 mod kind;

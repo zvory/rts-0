@@ -2,7 +2,8 @@ use std::cmp::Ordering;
 
 use crate::game::entity::EntityKind;
 use crate::rules::combat as combat_rules;
-use crate::rules::defs::{ArmorClass, WeaponClass};
+use crate::rules::defs::WeaponClass;
+use crate::rules::target::TargetFacts;
 
 #[derive(Debug, Clone, Copy)]
 pub(super) struct AttackPriorityContext {
@@ -22,16 +23,11 @@ pub(super) struct AttackPriorityContext {
 #[allow(dead_code)]
 pub(super) struct TargetCandidate {
     pub id: u32,
-    pub kind: EntityKind,
     pub owner: u32,
     pub pos_x: f32,
     pub pos_y: f32,
     pub distance_sq: f32,
-    pub is_unit: bool,
-    pub is_building: bool,
-    pub armor_class: Option<ArmorClass>,
-    pub weapon_class: WeaponClass,
-    pub threat_role: combat_rules::TargetThreatRole,
+    pub facts: TargetFacts,
     pub in_weapon_range: bool,
     pub tank_trap_obstructs_vehicle_route: bool,
     pub retained_target: bool,
@@ -113,13 +109,13 @@ fn tank_immediate_threat_order(
     if context.attacker_kind != EntityKind::Tank || !candidate.in_weapon_range {
         return None;
     }
-    if candidate.kind == EntityKind::AntiTankGun {
+    if candidate.facts.kind == EntityKind::AntiTankGun {
         Some(0)
     } else {
-        match candidate.threat_role {
+        match candidate.facts.threat_role {
             combat_rules::TargetThreatRole::AntiArmorThreat => Some(1),
             combat_rules::TargetThreatRole::FieldObstacle
-                if candidate.kind == EntityKind::TankTrap
+                if candidate.facts.kind == EntityKind::TankTrap
                     && candidate.tank_trap_obstructs_vehicle_route =>
             {
                 Some(2)
@@ -136,7 +132,7 @@ fn vehicle_route_obstruction_order(
     candidate: &TargetCandidate,
 ) -> Option<u8> {
     if !context.attacker_is_vehicle_body
-        || candidate.kind != EntityKind::TankTrap
+        || candidate.facts.kind != EntityKind::TankTrap
         || !candidate.tank_trap_obstructs_vehicle_route
     {
         return None;
@@ -155,11 +151,11 @@ fn default_weapon_fit_order(context: &AttackPriorityContext, candidate: &TargetC
     }
     match combat_rules::default_weapon_target_fit(
         context.attacker_weapon_class,
-        candidate.armor_class,
-        candidate.threat_role,
+        candidate.facts.armor_class,
+        candidate.facts.threat_role,
     ) {
         combat_rules::WeaponTargetFit::PreferredThreat => {
-            if candidate.kind == EntityKind::AntiTankGun {
+            if candidate.facts.kind == EntityKind::AntiTankGun {
                 0
             } else {
                 1
@@ -172,7 +168,7 @@ fn default_weapon_fit_order(context: &AttackPriorityContext, candidate: &TargetC
 }
 
 fn default_target_group_order(context: &AttackPriorityContext, candidate: &TargetCandidate) -> u8 {
-    if context.attacker_is_unit && candidate.is_unit {
+    if context.attacker_is_unit && candidate.facts.is_unit {
         0
     } else {
         1
@@ -212,16 +208,11 @@ mod tests {
     ) -> TargetCandidate {
         TargetCandidate {
             id,
-            kind,
             owner: 2,
             pos_x: 0.0,
             pos_y: 0.0,
             distance_sq,
-            is_unit: kind.is_unit(),
-            is_building: kind.is_building(),
-            armor_class: combat_rules::armor_class(kind),
-            weapon_class: combat_rules::weapon_class(kind),
-            threat_role: combat_rules::target_threat_role(kind),
+            facts: crate::rules::target::target_facts(kind),
             in_weapon_range: true,
             tank_trap_obstructs_vehicle_route: false,
             retained_target,

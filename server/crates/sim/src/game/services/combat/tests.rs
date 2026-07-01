@@ -21,6 +21,7 @@ mod moving_fire_policy;
 mod retention;
 mod support_weapon_attack_move;
 mod tank_traps;
+mod target_legality;
 mod target_priority;
 mod weapon_cooldowns;
 mod weapon_profiles;
@@ -64,7 +65,6 @@ fn resolve_test_target(
     let fog = visible_fog(map, entities);
     let smokes = SmokeCloudStore::new();
     let attacker = entities.get(attacker_id).expect("attacker should exist");
-
     resolve_target(
         map,
         entities,

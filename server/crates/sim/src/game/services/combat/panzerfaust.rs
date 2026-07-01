@@ -7,10 +7,11 @@ use crate::game::entrenchment_combat;
 use crate::game::services::world_query;
 
 use super::acquisition::{
-    combat_mode_with_moving_fire, resolve_target as resolve_target_with_obstruction, CombatMode,
+    combat_mode_with_moving_fire, direct_fire_target_legal,
+    resolve_target as resolve_target_with_obstruction, CombatMode, DirectFireLegality,
+    DirectFireVisibility,
 };
 use super::chase::{chase_goal_for_target, chase_path_needs_refresh};
-use super::projection::shot_hits_intended_target;
 use super::weapons::mirror_weapon_to_body;
 use super::{
     dist2, Fog, LineOfSight, Map, MoveCoordinator, Occupancy, SmokeCloudStore, SpatialIndex,
@@ -101,7 +102,8 @@ fn handle_loaded_combat(
 
     let distance = dist2(px, py, tx, ty).sqrt();
     let target_angle = (ty - py).atan2(tx - px);
-    let clear_shot = panzerfaust_target_fireable(map, entities, teams, &los, id, owner, target);
+    let fire_context = PanzerfaustFireContext::new(map, entities, teams, &los, fog, smokes);
+    let clear_shot = panzerfaust_target_fireable(&fire_context, id, owner, target);
     if distance <= range_px && clear_shot {
         if let Some(attacker) = entities.get_mut(id) {
             if target_angle.is_finite() {
@@ -324,32 +326,56 @@ fn panzerfaust_target_in_range(
         && target.pos_y < map.world_size_px()
 }
 
+pub(super) struct PanzerfaustFireContext<'a, 'los> {
+    map: &'a Map,
+    entities: &'a EntityStore,
+    teams: &'a TeamRelations,
+    los: &'a LineOfSight<'los>,
+    fog: &'a Fog,
+    smokes: &'a SmokeCloudStore,
+}
+
+impl<'a, 'los> PanzerfaustFireContext<'a, 'los> {
+    fn new(
+        map: &'a Map,
+        entities: &'a EntityStore,
+        teams: &'a TeamRelations,
+        los: &'a LineOfSight<'los>,
+        fog: &'a Fog,
+        smokes: &'a SmokeCloudStore,
+    ) -> Self {
+        Self {
+            map,
+            entities,
+            teams,
+            los,
+            fog,
+            smokes,
+        }
+    }
+}
+
 fn panzerfaust_target_fireable(
-    map: &Map,
-    entities: &EntityStore,
-    teams: &TeamRelations,
-    los: &LineOfSight<'_>,
+    context: &PanzerfaustFireContext<'_, '_>,
     attacker_id: u32,
     owner: u32,
     target_id: u32,
 ) -> bool {
-    let Some(attacker) = entities.get(attacker_id) else {
+    let Some(attacker) = context.entities.get(attacker_id) else {
         return false;
     };
-    let Some(target) = entities.get(target_id) else {
-        return false;
-    };
-    los.clear_between_world_points(
-        (attacker.pos_x, attacker.pos_y),
-        (target.pos_x, target.pos_y),
-    ) && shot_hits_intended_target(
-        map,
-        entities,
-        teams,
+    direct_fire_target_legal(
+        context.map,
+        context.entities,
+        context.teams,
+        context.los,
+        context.fog,
+        context.smokes,
         attacker_id,
         owner,
-        target_id,
         (attacker.pos_x, attacker.pos_y),
+        target_id,
+        DirectFireLegality::intended_target(DirectFireVisibility::Team),
     )
 }
 
