@@ -973,9 +973,9 @@ recipients whose team currently sees the impact point; they do not reveal terrai
 exploration, or carry entity visibility. Artillery impact damage follows the same support-fire
 friendly-fire attribution rule as mortar splash: owned and allied entities in the radius can take
 damage, but same-team damage does not produce hostile reveal, under-attack, or score attribution.
-Panzerfaust launch events are emitted by the hidden spawned-unit one-shot anti-tank runtime. They
-carry the loaded unit id, launch point, intended visual endpoint, and travel delay, but never carry
-the target entity id. Launch events are sent to the firing team and to enemy recipients whose
+Panzerfaust launch events are emitted by the one-shot anti-tank runtime. They carry the loaded unit
+id, launch point, intended visual endpoint, and travel delay, but never carry the target entity id.
+Launch events are sent to the firing team and to enemy recipients whose
 team-current fog can see the shooter or launch point; the endpoint must be withheld unless it is
 visible to that recipient or otherwise already safe through the recipient's projection. Panzerfaust
 impact events carry only the impact point and are sent to the firing team and to enemy recipients

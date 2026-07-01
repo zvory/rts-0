@@ -273,11 +273,18 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       PANZERFAUST_RECOVERY_TICKS === 15 &&
       METHAMPHETAMINES_PANZERFAUST_WINDUP_TICKS === 12 &&
       METHAMPHETAMINES_PANZERFAUST_RECOVERY_TICKS === 12,
-    "Panzerfaust hidden stats and one-shot timing mirror server",
+    "Panzerfaust stats and one-shot timing mirror server",
   );
   assert(
-    !STATS[KIND.BARRACKS].trains.includes(KIND.PANZERFAUST),
-    "Barracks command card should not expose Panzerfaust until production exposure",
+    STATS[KIND.BARRACKS].trains[2] === KIND.PANZERFAUST &&
+      configExports.trainableUnitsForFaction("kriegsia", KIND.BARRACKS)[2] === KIND.PANZERFAUST,
+    "Barracks command card exposes Panzerfaust as the third Kriegsia train button",
+  );
+  assert(
+    STATS[KIND.PANZERFAUST].requires === KIND.TRAINING_CENTRE &&
+      STATS[KIND.PANZERFAUST].description.includes("Fires once at Tanks") &&
+      STATS[KIND.PANZERFAUST].description.includes("Methamphetamines speeds"),
+    "Panzerfaust command-card metadata exposes its Training Centre requirement and approved tooltip copy",
   );
   assert(
     STATS[KIND.ARTILLERY].cost.steel === 300 &&

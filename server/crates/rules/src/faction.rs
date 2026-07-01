@@ -110,6 +110,7 @@ const DEFAULT_UNITS: &[EntityKind] = &[
     EntityKind::Worker,
     EntityKind::Rifleman,
     EntityKind::MachineGunner,
+    EntityKind::Panzerfaust,
     EntityKind::AntiTankGun,
     EntityKind::MortarTeam,
     EntityKind::Artillery,
@@ -660,12 +661,13 @@ mod tests {
         );
         assert_eq!(
             catalog.trainable_units(EntityKind::Barracks),
-            vec![EntityKind::Rifleman, EntityKind::MachineGunner]
+            vec![
+                EntityKind::Rifleman,
+                EntityKind::MachineGunner,
+                EntityKind::Panzerfaust
+            ]
         );
-        assert!(
-            !catalog.allows_unit(EntityKind::Panzerfaust),
-            "Panzerfaust has hidden rules data but is not in current production yet"
-        );
+        assert!(catalog.allows_unit(EntityKind::Panzerfaust));
         assert_eq!(
             catalog.trainable_units(EntityKind::Factory),
             vec![

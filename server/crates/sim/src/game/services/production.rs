@@ -160,7 +160,11 @@ pub(crate) fn sync_owned_autocast_from_upgrades(
     owner: u32,
     upgrades: &std::collections::BTreeSet<UpgradeKind>,
 ) {
-    set_owned_mortar_autocast(entities, owner, upgrades.contains(&UpgradeKind::MortarAutocast));
+    set_owned_mortar_autocast(
+        entities,
+        owner,
+        upgrades.contains(&UpgradeKind::MortarAutocast),
+    );
 }
 
 #[cfg(test)]
@@ -262,6 +266,37 @@ mod tests {
             .find(|e| e.owner == 1 && e.kind == EntityKind::MortarTeam)
             .expect("produced mortar should exist");
         assert_eq!(mortar.autocast_enabled(AbilityKind::MortarFire), Some(true));
+    }
+
+    #[test]
+    fn panzerfaust_production_completes_from_barracks_queue() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let barracks = spawn_building_training(
+            &map,
+            &mut entities,
+            10,
+            10,
+            EntityKind::Barracks,
+            EntityKind::Panzerfaust,
+        );
+        let mut players = vec![player(1)];
+
+        tick_production(&map, &mut entities, &mut players);
+
+        assert!(entities
+            .get(barracks)
+            .expect("barracks")
+            .prod_queue()
+            .is_empty());
+        let panzerfaust = entities
+            .iter()
+            .find(|e| e.owner == 1 && e.kind == EntityKind::Panzerfaust && e.hp > 0)
+            .expect("Panzerfaust should spawn from completed Barracks queue");
+        assert!(
+            matches!(panzerfaust.order(), Order::Idle),
+            "without a rally point the produced Panzerfaust should stay idle"
+        );
     }
 
     #[test]
