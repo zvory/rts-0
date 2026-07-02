@@ -1,8 +1,9 @@
 # Raster unit art handoff
 
-Status: experimental handoff only. The checked-in tank PNG rig path is deliberately disabled, and
-the current generated images are not final game art. This note records what worked, what failed, and
-how to reproduce the next experiment without rediscovering the same traps.
+Status: active visual experiment only. The checked-in tank PNG rig path is enabled for a pass-06
+Tiger I body/turret experiment, but the generated images are not final game art. This note records
+what worked, what failed, and how to reproduce the next experiment without rediscovering the same
+traps.
 
 ## Goal
 
@@ -18,8 +19,8 @@ The intended workflow is:
    pivots, recoil, facing, selection anchors, and route split.
 
 The current tank prototype proves the shape of this pipeline but does not yet produce an acceptable
-asset. The imagegen outputs still fail component consistency and alignment checks, so the atlas must
-remain inactive until a later pass fixes those problems.
+asset. Pass 06 is enabled only as a local visual experiment; it still fails component consistency and
+alignment checks, so it should not be treated as accepted art.
 
 ## Current files
 
@@ -29,15 +30,17 @@ remain inactive until a later pass fixes those problems.
   `client/assets/rigs/tank-ps1/tank-contact-sheet.png` are the current semantic source sheet.
 - `client/assets/rigs/tank-ps1/metadata/source-grid.json` records the cell order, source parts, and
   semantic sprite grouping.
-- `client/assets/rigs/tank-ps1/metadata/prompt*.md` records the base prompt and the four Tiger I
-  prompt iterations.
+- `client/assets/rigs/tank-ps1/metadata/prompt*.md` records the base prompt and Tiger I prompt
+  iterations.
 - `client/assets/rigs/tank-ps1/generated/` keeps generated candidates and alpha-converted copies.
-- `client/assets/rigs/tank-ps1/tank-atlas.png` is currently just the disabled semantic source atlas,
-  not a final generated art pass.
+- `client/assets/rigs/tank-ps1/tank-atlas.png` is the enabled pass-06 runtime atlas. It uses only
+  the generated hull/body and turret/barrel cells; the top row is transparent so generated/default
+  tracks are not rendered during this experiment. The runtime sprite frames are normalized to the
+  visible component alpha bounds, not the full generated cell bounds.
 - `client/src/renderer/rigs/tank_png_atlas.js` is generated metadata. Its `enabled` field is
-  currently `false`.
-- `client/src/renderer/rigs/png_runtime.js` and `png_routing.js` are the disabled runtime path that
-  can render atlas sprites in place of SVG pixels when an atlas is enabled and loaded.
+  currently `true` for the pass-06 experiment.
+- `client/src/renderer/rigs/png_runtime.js` and `png_routing.js` render atlas sprites in place of
+  SVG pixels when an atlas is enabled and loaded.
 
 ## Current guided semantic sheet
 
@@ -52,8 +55,9 @@ grid, and center marks to give imagegen stronger alignment and scale cues:
 
 The runtime atlas metadata still exposes `sprite.track.left` and `sprite.track.right`, but both
 sprites point at the same `sprite.track` source cell with different rig origins. This keeps the
-contact sheet to one track art element while preserving left/right tank placement when the disabled
-PNG path is tested locally. The fuel/no-oil cue is intentionally omitted from the PNG atlas and
+contact sheet to one track art element while preserving left/right tank placement when the prototype
+PNG path is tested locally. In pass 06 the active runtime alpha sheet blanks that track cell to
+suppress tracks entirely. The fuel/no-oil cue is intentionally omitted from the PNG atlas and
 remains SVG-only through a separate overlay route.
 
 The SVG is annotated with stable `part.*` ids, but those ids are not enough for image generation.
@@ -122,7 +126,9 @@ python "${CODEX_HOME:-$HOME/.codex}/skills/.system/imagegen/scripts/remove_chrom
 Use an explicit `#ff00ff` key while the guide boxes touch the sheet border. Border auto-key can
 sample the cyan guide line instead of the background.
 
-Write atlas metadata disabled while evaluating:
+Write atlas metadata disabled while evaluating. For imagegen sheets that keep guide edges, generated
+cell dividers, or extra padding, use the normalization flags so runtime scale comes from the visible
+component bounds rather than the whole cell:
 
 ```bash
 node scripts/art/tank-raster-pipeline.mjs write-atlas \
@@ -130,9 +136,31 @@ node scripts/art/tank-raster-pipeline.mjs write-atlas \
   --columns 2 \
   --layout tight \
   --profile semantic \
+  --normalize-visible-bounds \
+  --clear-cell-edge-alpha 16 \
+  --visible-padding 2 \
   --disabled \
   --model "built-in image generation" \
   --notes "Candidate Tiger I raster pass; disabled pending alignment and component consistency review."
+```
+
+For a local no-track experiment like pass 06, also blank the reference and track cells and add an
+image version so a browser reload fetches the updated atlas:
+
+```bash
+node scripts/art/tank-raster-pipeline.mjs write-atlas \
+  --sheet client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-06-lowpoly-body-turret-alpha.png \
+  --columns 2 \
+  --layout tight \
+  --profile semantic \
+  --blank-cells reference.full,sprite.track \
+  --normalize-visible-bounds \
+  --clear-cell-edge-alpha 16 \
+  --visible-padding 2 \
+  --image-version pass06-normalized \
+  --prompt-file client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-06-lowpoly.md \
+  --model "built-in image generation" \
+  --notes "Experimental Tiger I low-poly raster pass 06."
 ```
 
 Only omit `--disabled` for a local experiment after the validation checklist passes. Do not commit
@@ -206,6 +234,12 @@ cheap checks before any generated atlas can be enabled.
 - `tank-tiger-i-pass-05-guided.png`: preserved the guided 2x2 sheet, removed the fuel/no-oil cue,
   and generated one reusable track-link strip. Rejected for activation because it retained guide
   lines in the alpha output and was still more detailed than the intended low-end raster style.
+- `tank-tiger-i-pass-06-lowpoly.png`: active experiment. Recognizable Tiger I low-poly direction
+  with separate hull/body and turret/barrel cells. The raw generated sheet included tracks, but the
+  runtime alpha sheet blanks the top row so no generated or fallback tracks render. The atlas
+  writer now clears generated guide-edge alpha and normalizes frames to visible alpha bounds, which
+  fixes the earlier too-small render and black cell-box artifacts. Not final art: the hull has an
+  open turret-ring hole and component alignment still needs review.
 
 These candidates are useful references for what to avoid. None should be treated as accepted art.
 

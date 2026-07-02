@@ -164,6 +164,12 @@ function writeAtlas(args) {
   const profile = profileArg(args.profile);
   const transparentKey = args["transparent-key"];
   const enabled = !args.disabled && args.enabled !== "false";
+  const blankCells = parseListArg(args["blank-cells"]);
+  const normalizeVisibleBounds = Boolean(args["normalize-visible-bounds"]);
+  const clearCellEdgeAlpha = nonNegativeInteger(args["clear-cell-edge-alpha"], normalizeVisibleBounds ? 16 : 0);
+  const visiblePadding = nonNegativeInteger(args["visible-padding"], normalizeVisibleBounds ? 2 : 0);
+  const imageVersion = safeVersionArg(args["image-version"]);
+  const promptFile = args["prompt-file"] ? path.resolve(repoRoot, String(args["prompt-file"])) : promptPath;
   const compiled = compileTankRig();
   const partIds = compiled.definition.parts.map((part) => part.id);
   const sheetSpec = sheetForProfile(compiled.definition, profile);
@@ -179,9 +185,19 @@ function writeAtlas(args) {
   }
 
   const { width, height } = identifyImage(atlasPath);
+  if (blankCells.length > 0) {
+    clearAtlasCellAlpha(atlasPath, blankCells, cells, columns, rows, width, height);
+  }
+  if (clearCellEdgeAlpha > 0) {
+    clearAtlasCellEdgeAlpha(atlasPath, cells, columns, rows, width, height, clearCellEdgeAlpha);
+  }
   const frames = {};
   const sprites = profile === "semantic"
-    ? atlasSpritesForSemanticProfile(compiled.definition, cells, columns, rows, width, height, layout)
+    ? atlasSpritesForSemanticProfile(compiled.definition, cells, columns, rows, width, height, layout, {
+      atlasPath,
+      normalizeVisibleBounds,
+      visiblePadding,
+    })
     : [];
   if (profile !== "semantic") {
     const frameSources = sheetSpec.frameSources;
@@ -206,7 +222,7 @@ function writeAtlas(args) {
   const atlas = {
     enabled,
     unit: "tank",
-    image: "/assets/rigs/tank-ps1/tank-atlas.png",
+    image: `/assets/rigs/tank-ps1/tank-atlas.png${imageVersion ? `?v=${imageVersion}` : ""}`,
     viewBox: VIEW_BOX,
     grid: {
       columns,
@@ -218,6 +234,13 @@ function writeAtlas(args) {
       sourceSheet: rel(sheet),
       cells,
       frameSources: sheetSpec.frameSources,
+      normalization: {
+        visibleBounds: normalizeVisibleBounds,
+        visiblePadding,
+        clearCellEdgeAlpha,
+        blankCells,
+      },
+      imageVersion,
     },
     frames,
     sprites,
@@ -233,7 +256,8 @@ function writeAtlas(args) {
     sourceSheet: rel(sheet),
     atlas: rel(atlasPath),
     atlasModule: rel(atlasModulePath),
-    prompt: rel(promptPath),
+    promptFile: rel(promptFile),
+    prompt: rel(promptFile),
     model: args.model || "built-in image_gen",
     notes: args.notes || "Prototype tank-only PNG rig atlas. SVG rig remains the source for anchors and animation.",
     enabled,
@@ -483,16 +507,22 @@ function semanticFrameSources(sprites) {
   return sources;
 }
 
-function atlasSpritesForSemanticProfile(definition, cells, columns, rows, width, height, layout) {
+function atlasSpritesForSemanticProfile(definition, cells, columns, rows, width, height, layout, options = {}) {
   return semanticSprites(definition.parts.map((part) => part.id)).map((sprite) => {
     const cellId = sprite.sourceCell || sprite.id;
     const index = cells.indexOf(cellId);
     if (index < 0) return null;
-    const frame = cellFrame(index, columns, rows, width, height);
+    const cell = cellFrame(index, columns, rows, width, height);
     const parts = sprite.sourceParts
       .map((partId) => definition.parts.find((part) => part.id === partId))
       .filter(Boolean);
-    const geometry = groupFrameGeometry(parts, frame.w, frame.h, layout);
+    const visibleFrame = options.normalizeVisibleBounds
+      ? visibleFrameForCell(options.atlasPath, cell, options.visiblePadding)
+      : null;
+    const frame = visibleFrame || cell;
+    const geometry = visibleFrame
+      ? normalizedVisibleFrameGeometry(parts, visibleFrame)
+      : groupFrameGeometry(parts, frame.w, frame.h, layout);
     return {
       ...sprite,
       sourceCell: cellId,
@@ -505,6 +535,58 @@ function atlasSpritesForSemanticProfile(definition, cells, columns, rows, width,
       },
     };
   }).filter(Boolean);
+}
+
+function visibleFrameForCell(file, cell, padding = 0) {
+  if (!file) return null;
+  const result = run("magick", [
+    file,
+    "-crop",
+    `${cell.w}x${cell.h}+${cell.x}+${cell.y}`,
+    "+repage",
+    "-alpha",
+    "extract",
+    "-trim",
+    "-format",
+    "%w %h %X %Y",
+    "info:",
+  ], { capture: true, allowFailure: true });
+  if (result.status !== 0 || /geometry does not contain image/i.test(result.stderr || "")) return null;
+  const [w, h, offsetX, offsetY] = result.stdout.trim().split(/\s+/).map(Number);
+  if (!Number.isFinite(w) || !Number.isFinite(h) || !Number.isFinite(offsetX) || !Number.isFinite(offsetY)) return null;
+  if (w <= 0 || h <= 0 || offsetX < 0 || offsetY < 0) return null;
+  const pad = Math.max(0, Math.floor(padding));
+  const x = Math.max(cell.x, cell.x + offsetX - pad);
+  const y = Math.max(cell.y, cell.y + offsetY - pad);
+  const right = Math.min(cell.x + cell.w, cell.x + offsetX + w + pad);
+  const bottom = Math.min(cell.y + cell.h, cell.y + offsetY + h + pad);
+  return {
+    x,
+    y,
+    w: Math.max(1, right - x),
+    h: Math.max(1, bottom - y),
+    visibleBounds: {
+      x: cell.x + offsetX,
+      y: cell.y + offsetY,
+      w,
+      h,
+    },
+  };
+}
+
+function normalizedVisibleFrameGeometry(parts, frame) {
+  const bounds = unionBounds(parts.map(partBounds));
+  const targetW = Math.max(1, bounds.maxX - bounds.minX);
+  const targetH = Math.max(1, bounds.maxY - bounds.minY);
+  const visible = frame.visibleBounds || frame;
+  const pixelsPerUnitX = Math.max(1, visible.w) / targetW;
+  const pixelsPerUnitY = Math.max(1, visible.h) / targetH;
+  return {
+    originX: visible.x - frame.x - bounds.minX * pixelsPerUnitX,
+    originY: visible.y - frame.y - bounds.minY * pixelsPerUnitY,
+    pixelsPerUnitX,
+    pixelsPerUnitY,
+  };
 }
 
 function cellFrame(index, columns, rows, width, height) {
@@ -611,6 +693,65 @@ function identifyImage(file) {
   return { width, height };
 }
 
+function clearAtlasCellAlpha(file, cellIds, cells, columns, rows, width, height) {
+  const wanted = new Set(cellIds);
+  const drawOps = [];
+  cells.forEach((cellId, index) => {
+    if (!wanted.has(cellId)) return;
+    const frame = cellFrame(index, columns, rows, width, height);
+    drawOps.push(rectangleDrawOp(frame.x, frame.y, frame.x + frame.w, frame.y + frame.h));
+  });
+  if (drawOps.length === 0) return;
+  clearAtlasAlpha(file, drawOps);
+}
+
+function clearAtlasCellEdgeAlpha(file, cells, columns, rows, width, height, inset) {
+  const amount = Math.max(0, Math.floor(inset));
+  if (amount <= 0) return;
+  const drawOps = [];
+  cells.forEach((_cellId, index) => {
+    const frame = cellFrame(index, columns, rows, width, height);
+    const right = frame.x + frame.w;
+    const bottom = frame.y + frame.h;
+    const x2 = Math.min(right, frame.x + amount);
+    const y2 = Math.min(bottom, frame.y + amount);
+    const x1 = Math.max(frame.x, right - amount);
+    const y1 = Math.max(frame.y, bottom - amount);
+    drawOps.push(
+      rectangleDrawOp(frame.x, frame.y, x2, bottom),
+      rectangleDrawOp(x1, frame.y, right, bottom),
+      rectangleDrawOp(frame.x, frame.y, right, y2),
+      rectangleDrawOp(frame.x, y1, right, bottom),
+    );
+  });
+  clearAtlasAlpha(file, drawOps);
+}
+
+function clearAtlasAlpha(file, drawOps) {
+  run("magick", [
+    file,
+    "(",
+    "+clone",
+    "-alpha",
+    "extract",
+    "-fill",
+    "black",
+    "-draw",
+    drawOps.join(" "),
+    ")",
+    "-alpha",
+    "off",
+    "-compose",
+    "CopyOpacity",
+    "-composite",
+    file,
+  ]);
+}
+
+function rectangleDrawOp(x0, y0, x1, y1) {
+  return `rectangle ${Math.round(x0)},${Math.round(y0)} ${Math.round(x1)},${Math.round(y1)}`;
+}
+
 function ensureDirs() {
   fs.mkdirSync(assetDir, { recursive: true });
   fs.mkdirSync(generatedDir, { recursive: true });
@@ -624,6 +765,33 @@ function positiveInteger(value, fallback) {
     throw new Error(`expected positive integer, got ${value}`);
   }
   return parsed;
+}
+
+function nonNegativeInteger(value, fallback) {
+  if (value == null) return fallback;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new Error(`expected non-negative integer, got ${value}`);
+  }
+  return parsed;
+}
+
+function parseListArg(value) {
+  if (value == null || value === true) return [];
+  return String(value)
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function safeVersionArg(value) {
+  if (value == null || value === true) return "";
+  const version = String(value).trim();
+  if (!version) return "";
+  if (!/^[A-Za-z0-9._-]{1,80}$/.test(version)) {
+    throw new Error(`invalid image version ${JSON.stringify(value)}; use letters, numbers, dot, underscore, or dash`);
+  }
+  return version;
 }
 
 function parseArgs(args) {
@@ -649,7 +817,7 @@ function run(cmd, args, options = {}) {
     encoding: "utf8",
     stdio: options.capture ? ["ignore", "pipe", "pipe"] : "inherit",
   });
-  if (result.status !== 0) {
+  if (result.status !== 0 && !options.allowFailure) {
     throw new Error(`${cmd} ${args.join(" ")} failed\n${result.stderr || ""}`);
   }
   return result;
@@ -662,7 +830,7 @@ function rel(file) {
 function usage() {
   console.error(`Usage:
   node scripts/art/tank-raster-pipeline.mjs make-sheet [--scale 3] [--columns 2] [--layout tight] [--profile semantic] [--key #ff00ff]
-  node scripts/art/tank-raster-pipeline.mjs write-atlas --sheet <png> [--columns 2] [--layout tight] [--profile semantic] [--transparent-key #ff00ff] [--disabled]
+  node scripts/art/tank-raster-pipeline.mjs write-atlas --sheet <png> [--columns 2] [--layout tight] [--profile semantic] [--transparent-key #ff00ff] [--disabled] [--blank-cells cell[,cell]] [--normalize-visible-bounds] [--clear-cell-edge-alpha 16] [--visible-padding 2] [--image-version pass-id] [--prompt-file metadata/prompt.md]
   node scripts/art/tank-raster-pipeline.mjs write-prompt`);
 }
 

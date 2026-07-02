@@ -1,0 +1,28 @@
+{
+  "candidate": "tiger-i-pass-06-lowpoly",
+  "status": "active-experiment",
+  "sourceSheet": "client/assets/rigs/tank-ps1/tank-contact-sheet.png",
+  "prompt": "client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-06-lowpoly.md",
+  "builtInImageGenSource": "/Users/az/.codex/generated_images/019f2492-10dd-73b3-8d83-ad9d31bb5026/ig_03c296b4727d3b92016a46cde6f5f48193859e51ead8a41079.png",
+  "candidateSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-06-lowpoly.png",
+  "candidateAlphaSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-06-lowpoly-alpha.png",
+  "runtimeAlphaSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-06-lowpoly-body-turret-alpha.png",
+  "activeAtlas": "client/assets/rigs/tank-ps1/tank-atlas.png",
+  "activeAtlasUrl": "/assets/rigs/tank-ps1/tank-atlas.png?v=pass06-normalized",
+  "alphaConversion": {
+    "keyColor": "#ff00ff",
+    "autoKey": "none",
+    "softMatte": true,
+    "transparentThreshold": 12,
+    "opaqueThreshold": 220,
+    "despill": true,
+    "pipelineCleanup": [
+      "blank reference.full and sprite.track cells",
+      "clear 16px generated guide-edge alpha inside each semantic cell",
+      "normalize hull/body and turret/barrel frames to visible alpha bounds with 2px padding",
+      "cache-bust the runtime atlas URL with pass06-normalized"
+    ]
+  },
+  "runtimeNotes": "The raw generated pass includes a reference tank and track strip for recordkeeping, but the active runtime alpha sheet exposes only normalized bottom-row hull/body and turret/barrel frames. The track frame is transparent and still covers track source parts, preventing fallback SVG tracks from rendering during this experiment.",
+  "notes": "Recognizable Tiger I low-poly raster direction with separate hull/body and turret/barrel components. The pipeline now removes generated black cell-edge boxes and scales frames against SVG rig bounds. Not final art: the hull has an open turret-ring hole and the active experiment intentionally omits tracks."
+}
