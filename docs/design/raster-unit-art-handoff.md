@@ -88,6 +88,10 @@ Refresh the base prompt:
 node scripts/art/tank-raster-pipeline.mjs write-prompt
 ```
 
+Before any image generation pass, present the exact contact sheet image to the user and wait for
+explicit confirmation. Do not start imagegen from a new, edited, cropped, or regenerated sheet until
+the user has seen that specific sheet and approved it as the input.
+
 Use `client/assets/rigs/tank-ps1/tank-contact-sheet.png` as the input image. Start from the latest
 short prompt direction rather than the most detailed prompt: strict top-down Tiger I, no shadows,
 very simple low-end 3D raster rendering, anti-aliased raster shapes, not pixel art, and much less
@@ -207,6 +211,8 @@ These candidates are useful references for what to avoid. None should be treated
 
 ## Validation checklist before activation
 
+- The exact input contact sheet was shown to the user before imagegen, and the user explicitly
+  confirmed that sheet before generation started.
 - The output keeps the exact 2x2 grid and cell order.
 - Every cell has transparent or perfectly keyable background.
 - There is no drop shadow, cast shadow, contact shadow, ambient blob, floor, or ground plane.
