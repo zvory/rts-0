@@ -817,7 +817,6 @@ function buttonByLabel(card, label) {
     minimapLike._blipColor(allyWorker) === `#${COLORS.selectAlly.toString(16).padStart(6, "0")}`,
     "minimap blip color distinguishes allies from enemies",
   );
-
   // Placement is local-only
   const placementIntent = new ClientIntent();
   placementIntent.beginPlacement("barracks");
@@ -848,8 +847,9 @@ function buttonByLabel(card, label) {
       movementBodyClass(KIND.ARTILLERY) === "vehicleBody" &&
       movementBodyClass(KIND.SCOUT_CAR) === "vehicleBody" &&
       movementBodyClass(KIND.TANK) === "vehicleBody" &&
-      movementBodyClass(KIND.COMMAND_CAR) === "vehicleBody",
-    "client placement movement-body classes mirror server vehicle-body blockers",
+      movementBodyClass(KIND.COMMAND_CAR) === "vehicleBody" &&
+      movementBodyClass(KIND.SCOUT_PLANE) === "infantryLike",
+    "client placement movement-body classes mirror server ground blockers",
   );
   assert(
     placementPolicyForBuilding(KIND.TANK_TRAP).unitOverlap === "infantryAllowed" &&

@@ -617,11 +617,33 @@ export class Minimap {
     this._recordMinimapDiagnostic("minimap.entities.blips", entities.length);
     for (const e of entities) {
       const p = this._worldToCanvas(e.x, e.y);
-      ctx.fillStyle = this._blipColor(e);
+      const color = this._blipColor(e);
+      ctx.fillStyle = color;
+      if (e.kind === KIND.SCOUT_PLANE) {
+        this._drawScoutPlaneBlip(p.x, p.y, color);
+        continue;
+      }
       // Buildings/resources read a touch larger than units so bases stand out.
       const r = e.owner !== 0 && !isResource(e.kind) ? 1.6 : 2.2;
       ctx.fillRect(p.x - r, p.y - r, r * 2, r * 2);
     }
+  }
+
+  _drawScoutPlaneBlip(cx, cy, color) {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.strokeStyle = "#101010";
+    ctx.fillStyle = color;
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(cx + 2.7, cy);
+    ctx.lineTo(cx - 1.8, cy - 2.2);
+    ctx.lineTo(cx - 0.9, cy);
+    ctx.lineTo(cx - 1.8, cy + 2.2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
   }
 
   _recordMinimapInvalidation(kind, prev, next) {
@@ -1035,10 +1057,14 @@ export class Minimap {
       return;
     }
     const unitIds = [];
+    const landUnitIds = [];
+    const scoutPlaneIds = [];
     for (const e of sel) {
       // Only own, controllable units take move orders (skip buildings/resources/enemies).
       if (ownOwner(this.state, e.owner) && isUnit(e.kind)) {
         unitIds.push(e.id);
+        if (e.kind === KIND.SCOUT_PLANE) scoutPlaneIds.push(e.id);
+        else landUnitIds.push(e.id);
       }
     }
     if (unitIds.length === 0) {
@@ -1054,8 +1080,15 @@ export class Minimap {
       return;
     }
     if (commandTarget === "attack") {
-      this._issueCommand(cmd.attackMove(unitIds, wx, wy, queued));
-      this._addCommandFeedback("attack", wx, wy, queued);
+      if (landUnitIds.length > 0) {
+        this._issueCommand(cmd.attackMove(landUnitIds, wx, wy, queued));
+      }
+      if (scoutPlaneIds.length > 0) {
+        this._issueCommand(cmd.move(scoutPlaneIds, wx, wy, queued));
+      }
+      if (landUnitIds.length > 0 || scoutPlaneIds.length > 0) {
+        this._addCommandFeedback(landUnitIds.length > 0 ? "attack" : "move", wx, wy, queued);
+      }
       return;
     }
     if (commandTarget?.kind === "ability") {

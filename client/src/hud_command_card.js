@@ -15,7 +15,13 @@ import {
   abilityUnitQueueAdmissible,
   abilityUnitReady,
 } from "./hud_ability_affordance.js";
-import { attackDescriptor, holdDescriptor, moveDescriptor, stopDescriptor } from "./hud_unit_commands.js";
+import {
+  attackDescriptor,
+  dismissScoutPlaneDescriptor,
+  holdDescriptor,
+  moveDescriptor,
+  stopDescriptor,
+} from "./hud_unit_commands.js";
 
 // Command-card hotkeys follow the keyboard grid (3 columns):
 //   Q W E
@@ -130,7 +136,19 @@ export function buildCommandCardContextCatalog() {
     kind: KIND.COMMAND_CAR,
     abilities: [{ ability: ABILITY.BREAKTHROUGH, cooldownLeft: 0, remainingUses: null }],
   };
-  const allEntities = [...baseEntities, worker, rifleman, scoutCar, mortar, artillery, commandCar];
+  const scoutPlane = {
+    id: 16,
+    owner: playerId,
+    kind: KIND.SCOUT_PLANE,
+    scoutPlane: {
+      orbitCenter: [256, 256],
+      fuelOil: 8,
+      fuelCapacityOil: 8,
+      upkeepOil: 1,
+      upkeepIntervalTicks: 20,
+    },
+  };
+  const allEntities = [...baseEntities, worker, rifleman, scoutCar, mortar, artillery, commandCar, scoutPlane];
   const ctx = (selection, overrides = {}) => ({
     playerId,
     factionId: DEFAULT_FACTION_ID,
@@ -154,6 +172,8 @@ export function buildCommandCardContextCatalog() {
     { id: "worker-main", card: buildCommandCardDescriptors(ctx([worker])) },
     { id: "worker-build", card: buildCommandCardDescriptors(ctx([worker], { commandCardMode: "workerBuild" })) },
     { id: "mixed-army-support", card: buildCommandCardDescriptors(ctx([rifleman, scoutCar, mortar, artillery, commandCar])) },
+    { id: "scout-plane", card: buildCommandCardDescriptors(ctx([scoutPlane])) },
+    { id: "mixed-worker-scout-plane", card: buildCommandCardDescriptors(ctx([worker, scoutPlane])) },
     { id: "city-centre-train", card: buildCommandCardDescriptors(ctx([baseEntities[0]])) },
     { id: "barracks-train", card: buildCommandCardDescriptors(ctx([baseEntities[1]])) },
     { id: "factory-train", card: buildCommandCardDescriptors(ctx([baseEntities[4]])) },
@@ -237,15 +257,21 @@ export function buildUnitCard(ctx, selection) {
   const factionId = commandFactionId(ctx);
   const ownUnits = selectedOwnUnits(ctx, selection);
   const unitIds = ownUnits.map((e) => e.id);
-  const setupGunIds = ownUnits
+  const scoutPlaneIds = ownUnits
+    .filter((e) => e.kind === KIND.SCOUT_PLANE)
+    .map((e) => e.id);
+  const landUnits = ownUnits.filter((e) => e.kind !== KIND.SCOUT_PLANE);
+  const landUnitIds = landUnits.map((e) => e.id);
+  const setupGunIds = landUnits
     .filter((e) => e.kind === KIND.ANTI_TANK_GUN || e.kind === KIND.ARTILLERY)
     .map((e) => e.id);
-  const abilityAffordances = selectedAbilityAffordances(ctx, selection);
-  const hasArmyUnit = ownUnits.some((e) => e.kind !== KIND.WORKER);
-  const workerSelected = !hasArmyUnit && ownUnits.some((e) => e.kind === KIND.WORKER);
+  const abilityAffordances = selectedAbilityAffordances(ctx, landUnits);
+  const hasArmyUnit = landUnits.some((e) => e.kind !== KIND.WORKER);
+  const workerSelected = !hasArmyUnit && landUnits.some((e) => e.kind === KIND.WORKER);
   const signature =
     `units|${unitIds.join(".")}|target:${commandTargetSig(ctx.commandTarget)}|` +
     `|setup:${setupGunIds.join(".")}|` +
+    `|scoutPlanes:${scoutPlaneIds.join(".")}|` +
     `|abilities:${abilityAffordances.map((affordance) =>
       `${affordance.definition.ability}:${affordance.unlocked ? 1 : 0}:${affordance.affordable ? 1 : 0}:` +
       `${affordance.depletedCount}:` +
@@ -259,10 +285,10 @@ export function buildUnitCard(ctx, selection) {
   if (workerSelected) {
     return card("unit", signature, [
         moveDescriptor(ctx, unitIds),
-        holdDescriptor(unitIds),
+        holdDescriptor(landUnitIds),
         null,
-        attackDescriptor(ctx, unitIds),
-        stopDescriptor(unitIds),
+        attackDescriptor(ctx, landUnitIds),
+        stopDescriptor(landUnitIds),
         null,
         {
           id: "worker:build-menu",
@@ -273,18 +299,20 @@ export function buildUnitCard(ctx, selection) {
           icon: "BLD",
           label: "Build",
           title: "Open worker build menu",
-          enabled: unitIds.length > 0,
+          enabled: landUnitIds.length > 0,
         },
         null,
-        null,
+        scoutPlaneIds.length > 0 ? dismissScoutPlaneDescriptor(scoutPlaneIds) : null,
       ], { abilityAffordances });
   }
 
   const slots = new Array(9).fill(null);
   slots[0] = moveDescriptor(ctx, unitIds);
-  slots[1] = holdDescriptor(unitIds);
-  slots[3] = attackDescriptor(ctx, unitIds);
-  slots[4] = stopDescriptor(unitIds);
+  if (landUnitIds.length > 0) {
+    slots[1] = holdDescriptor(landUnitIds);
+    slots[3] = attackDescriptor(ctx, landUnitIds);
+    slots[4] = stopDescriptor(landUnitIds);
+  }
 
   let sequentialSlot = 6;
   const claimSlot = (preferred) => {
@@ -362,6 +390,13 @@ export function buildUnitCard(ctx, selection) {
         enabled: true,
         cls: ctx.commandTarget === "setupAntiTankGuns" ? "active" : "",
       };
+    }
+  }
+
+  if (scoutPlaneIds.length > 0) {
+    const dismissSlot = firstOpenCommandSlot(slots, 8);
+    if (dismissSlot >= 0) {
+      slots[dismissSlot] = dismissScoutPlaneDescriptor(scoutPlaneIds);
     }
   }
 

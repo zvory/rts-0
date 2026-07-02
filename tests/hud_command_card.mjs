@@ -438,6 +438,8 @@ function buttonSlots(card) {
     "worker-main",
     "worker-build",
     "mixed-army-support",
+    "scout-plane",
+    "mixed-worker-scout-plane",
     "city-centre-train",
     "barracks-train",
     "factory-train",

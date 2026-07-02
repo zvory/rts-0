@@ -2,9 +2,9 @@ import { isUnit, isBuilding, isResource, KIND, SETUP } from "../protocol.js";
 import { STATS } from "../config.js";
 import { DEFAULT_HIT_RADIUS, DEFAULT_TILE_SIZE, HIT_PAD_PX, OWN_HIT_BONUS } from "./constants.js";
 import {
-  entityIntersectsRect,
-  isVehicleBodyKind,
+  hasOrientedSelectionBody,
   pointHitsOrientedVehicle,
+  selectionEntityIntersectsRect,
 } from "./placement.js";
 
 export function _commitClickSelection(p, additive, ctrl) {
@@ -258,13 +258,13 @@ export function _worldPointHitsEntity(e, wx, wy, tileSize) {
     );
   }
   if (e.kind === KIND.ANTI_TANK_GUN) return pointHitsOrientedVehicle(e, wx, wy, 0);
-  if (isVehicleBodyKind(e.kind)) return pointHitsOrientedVehicle(e, wx, wy, HIT_PAD_PX);
+  if (hasOrientedSelectionBody(e.kind)) return pointHitsOrientedVehicle(e, wx, wy, HIT_PAD_PX);
   const radius = (stat && stat.size ? stat.size : DEFAULT_HIT_RADIUS) + HIT_PAD_PX;
   return Math.hypot(wx - e.x, wy - e.y) <= radius;
 }
 
 export function _entityIntersectsRect(e, minX, minY, maxX, maxY) {
-  return entityIntersectsRect(
+  return selectionEntityIntersectsRect(
     e,
     minX,
     minY,
