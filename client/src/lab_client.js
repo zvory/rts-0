@@ -1,6 +1,7 @@
-import { S, msg } from "./protocol.js";
+import { LAB_CHECKPOINT_SCENARIO, S, msg } from "./protocol.js";
 
 const DEFAULT_TIMEOUT_MS = 5000;
+const LEGACY_LAB_SCENARIO_KIND = "labScenario";
 
 export class LabClient {
   constructor(net, { timeoutMs = DEFAULT_TIMEOUT_MS, timers = globalThis } = {}) {
@@ -52,6 +53,8 @@ export class LabClient {
   }
 
   importScenario(scenario) {
+    const rejection = labScenarioImportRejection(scenario);
+    if (rejection) return this.failLocalRequest("importScenario", rejection);
     return this.request({ op: "importScenario", scenario });
   }
 
@@ -100,14 +103,14 @@ export class LabClient {
     const opName = typeof op?.op === "string" ? op.op : "unknown";
     const sent = this.net.lab(requestId, op);
     if (!sent) {
-      const result = {
+      this.onResult({
+        t: S.LAB_RESULT,
         requestId,
         ok: false,
         op: opName,
         error: "Lab request could not be sent; the socket is not open.",
-      };
-      this.onResult({ t: S.LAB_RESULT, ...result });
-      return Promise.resolve(result);
+      });
+      return Promise.resolve(this.lastResult);
     }
 
     return new Promise((resolve) => {
@@ -123,6 +126,18 @@ export class LabClient {
     this.nextRequestId += 1;
     if (this.nextRequestId > 0xffffffff) this.nextRequestId = 1;
     return id;
+  }
+
+  failLocalRequest(opName, error) {
+    const requestId = this.allocateRequestId();
+    this.onResult({
+      t: S.LAB_RESULT,
+      requestId,
+      ok: false,
+      op: opName,
+      error,
+    });
+    return Promise.resolve(this.lastResult);
   }
 
   onState(message) {
@@ -222,4 +237,17 @@ function normalizePlayerIds(ids) {
     out.push(id);
   }
   return out.sort((a, b) => a - b);
+}
+
+function labScenarioImportRejection(scenario) {
+  if (!scenario || typeof scenario !== "object") {
+    return "Lab setup import expects a checkpoint-backed setup JSON object.";
+  }
+  if (scenario.kind === LEGACY_LAB_SCENARIO_KIND) {
+    return "Legacy labScenario JSON is no longer supported; export a checkpoint-backed lab setup from a current build.";
+  }
+  if (typeof scenario.kind === "string" && scenario.kind !== LAB_CHECKPOINT_SCENARIO.KIND) {
+    return `Lab setup import expects kind ${JSON.stringify(LAB_CHECKPOINT_SCENARIO.KIND)}.`;
+  }
+  return "";
 }

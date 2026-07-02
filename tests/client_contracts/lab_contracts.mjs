@@ -300,6 +300,19 @@ await withFakeDocument(async () => {
       sent.at(-1).op.scenario.name === "saved setup",
     "LabClient sends checkpoint setup import requests through the compatibility op",
   );
+  const beforeLegacyImportCount = sent.length;
+  const legacyImport = await labClient.importScenario({
+    schemaVersion: 1,
+    kind: "labScenario",
+    name: "old setup",
+  });
+  assert(
+    sent.length === beforeLegacyImportCount &&
+      !legacyImport.ok &&
+      legacyImport.op === "importScenario" &&
+      legacyImport.error.includes("Legacy labScenario JSON is no longer supported"),
+    "LabClient rejects legacy setup imports locally with an explicit compatibility error",
+  );
   void labClient.validateScenario({
     slug: "saved-setup",
     name: "Saved setup",
