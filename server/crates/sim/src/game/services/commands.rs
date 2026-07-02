@@ -54,7 +54,7 @@ mod planner_facts;
 use self::artillery_scatter::artillery_error_tiles;
 use self::artillery_scatter::{artillery_blanket_point, artillery_scattered_point};
 use self::guards::{
-    dedupe_cap_units, is_constructing, player_is_ai, rally_intent_for_map,
+    dedupe_cap_units, is_constructing, is_scout_plane, player_is_ai, rally_intent_for_map,
     unit_can_accept_ground_command, unit_can_accept_player_command,
 };
 use self::planner_facts::{planner_config, planner_facts, AbilityFactInput};
@@ -647,10 +647,6 @@ fn build_target_center(building: EntityKind, tile_x: u32, tile_y: u32) -> (f32, 
     )
 }
 
-fn is_scout_plane(entities: &EntityStore, id: u32) -> bool {
-    entities.get(id).is_some_and(|e| e.kind == EntityKind::ScoutPlane)
-}
-
 mod planned_actions {
     use super::*;
     pub(super) fn execute(
@@ -1164,11 +1160,8 @@ fn use_ability(
 
     let ability = request.ability;
     if ability == AbilityKind::DismissScoutPlane {
-        if request.queued {
-            return;
-        }
-        for unit in request.units {
-            let _ = scout_plane::dismiss(entities, player, unit);
+        if !request.queued {
+            scout_plane::dismiss_selected(entities, player, &request.units);
         }
         return;
     }

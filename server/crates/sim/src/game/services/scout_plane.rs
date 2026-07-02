@@ -91,6 +91,16 @@ pub(in crate::game::services) fn dismiss(
     entities.remove(unit).is_some()
 }
 
+pub(in crate::game::services) fn dismiss_selected(
+    entities: &mut EntityStore,
+    owner: u32,
+    units: &[u32],
+) {
+    for unit in units {
+        let _ = dismiss(entities, owner, *unit);
+    }
+}
+
 pub(crate) fn advance_scout_planes(map: &Map, entities: &mut EntityStore) {
     let world_max = (map.world_size_px() - 0.01).max(0.0);
     let speed = config::unit_stats(EntityKind::ScoutPlane)
