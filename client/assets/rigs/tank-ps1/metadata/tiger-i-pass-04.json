@@ -1,0 +1,11 @@
+{
+  "candidate": "tiger-i-pass-04",
+  "status": "candidate-not-active",
+  "sourceSheet": "client/assets/rigs/tank-ps1/tank-contact-sheet.png",
+  "prompt": "client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-04.md",
+  "builtInImageGenSource": "/Users/az/.codex/generated_images/019f2034-197e-75f0-a333-07b665044b85/ig_05d2afd1a9b48cb3016a45c22831d081948b9a673764c09e3a.png",
+  "candidateSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-04.png",
+  "candidateAlphaSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-04-alpha.png",
+  "preview": "/tmp/tank-tiger-i-pass-04-preview.png",
+  "notes": "Generated from the semantic 3x2 tank sheet using the very-low-end 3D raster prompt. This pass is much simpler and less detailed than pass 03, but the model rotated the tank/component orientation relative to the source, so it is not slice-ready."
+}

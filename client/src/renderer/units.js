@@ -1,7 +1,9 @@
 import { STATS } from "../config.js";
 import { KIND, SETUP, STATE } from "../protocol.js";
 import { liveRigDefinitionFor, liveRigRoutesFor } from "./rigs/live_routing.js";
+import { livePngRigAtlasFor } from "./rigs/png_routing.js";
 import { createRigRenderContext } from "./rigs/animation.js";
+import { pngAtlasCanRenderRoute, renderPngUnitRig } from "./rigs/png_runtime.js";
 import { renderLiveUnitRig } from "./rigs/runtime.js";
 import {
   ARTILLERY_DEPLOYED_WEAPON_ANIM_MS,
@@ -107,6 +109,36 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
   const routes = liveRigRoutesFor(e.kind, pools);
   if (routes.length === 0) {
     throw new Error(`missing live SVG rig route for unit kind ${e.kind}`);
+  }
+
+  const pngAtlas = livePngRigAtlasFor(this._livePngRigAtlasesByKind, e.kind);
+  const pngAtlasTexture = this._livePngRigAtlasTextures?.get?.(e.kind) ?? null;
+  if (pngAtlas && pngAtlasTexture) {
+    const renderContext = this._rigRenderContextFor?.(e, colorByOwner, state) ?? {};
+    const pngRoutes = [];
+    const svgRoutes = [];
+    for (const route of routes) {
+      if (pngAtlasCanRenderRoute(definition, pngAtlas, route)) pngRoutes.push(route);
+      else svgRoutes.push(route);
+    }
+    const rendered = [];
+    if (svgRoutes.length > 0) {
+      rendered.push(...(renderLiveUnitRig(this, e, colorByOwner, state, definition, {
+        routes: svgRoutes,
+        alpha: pools.alpha,
+        renderContext,
+      }) || []));
+    }
+    if (pngRoutes.length > 0) {
+      rendered.push(...(renderPngUnitRig(this, e, colorByOwner, state, definition, {
+        atlas: pngAtlas,
+        atlasTexture: pngAtlasTexture,
+        routes: pngRoutes,
+        alpha: pools.alpha,
+        renderContext,
+      }) || []));
+    }
+    return rendered;
   }
 
   return renderLiveUnitRig(this, e, colorByOwner, state, definition, {

@@ -1,0 +1,11 @@
+{
+  "candidate": "tiger-i-pass-01",
+  "status": "candidate-not-active",
+  "sourceSheet": "client/assets/rigs/tank-ps1/tank-contact-sheet.png",
+  "prompt": "client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-01.md",
+  "builtInImageGenSource": "/Users/az/.codex/generated_images/019f2034-197e-75f0-a333-07b665044b85/ig_022dd4327e757c06016a45ba27b7308194b33ac67219fa7e1f.png",
+  "candidateSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-01.png",
+  "candidateAlphaSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-01-alpha.png",
+  "preview": "/tmp/tank-tiger-i-pass-01-preview.png",
+  "notes": "Generated from the semantic 3x2 tank sheet. Preserves six cells, has no visible drop/cast shadow, and reads as a top-down Tiger I-style heavy tank. Not wired as the active runtime atlas yet."
+}

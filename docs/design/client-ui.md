@@ -256,6 +256,22 @@ SVG unit art workflow:
 - Runtime contract changes are accepted through schema, importer, animation, renderer smoke, and
   architecture tests rather than static design previews.
 
+Prototype raster rig workflow:
+- Tank rendering may opt into a PNG atlas through `renderer/rigs/tank_png_atlas.js`,
+  `png_routing.js`, and `png_runtime.js`. The SVG rig remains authoritative for anchors,
+  animation bindings, part ids, recoil, facing, and route split; the PNG atlas only supplies
+  pixels for those sampled parts. The current tank atlas is disabled and exists only as a handoff
+  prototype; see [raster-unit-art-handoff.md](raster-unit-art-handoff.md) for the methodology,
+  rejected imagegen passes, and next validation work.
+- `scripts/art/tank-raster-pipeline.mjs` builds the tank contact sheet, records the exact prompt
+  under `client/assets/rigs/tank-ps1/metadata/prompt.md`, and rewrites the atlas metadata after an
+  image-generation pass. The current prototype uses semantic grouped cells: complete tank reference
+  without the drop shadow or fuel icon, left track assembly, right track assembly, hull assembly,
+  turret/barrel assembly, and fuel cue.
+- Keep the source sheet, generated pass, alpha atlas, prompt, and manifest together under
+  `client/assets/rigs/tank-ps1/` so raster iterations remain reproducible. The renderer falls back
+  to the SVG rig until the atlas texture loads or if the atlas load fails.
+
 `renderer/feedback_view_model.js`
 ```js
 export function buildRendererFeedbackView(state, options?)

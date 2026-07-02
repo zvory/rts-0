@@ -18,14 +18,14 @@ export function createUnitRigInstance(kind, definition, pixiFactory = createDefa
 
 export function renderLiveUnitRig(renderer, entity, colorByOwner, state, definition, options = {}) {
   if (!definition) return null;
-  const context = renderer._rigRenderContextFor?.(entity, colorByOwner, state) ?? {};
+  const context = options.renderContext ?? renderer._rigRenderContextFor?.(entity, colorByOwner, state) ?? {};
   if (typeof options.alpha === "number") context.shotRevealAlpha = options.alpha;
   const rendered = [];
   for (const route of options.routes || []) {
     const pool = renderer._liveRigPools?.[route.poolName];
     if (!pool) continue;
     let instance = pool.get(entity.id);
-    if (instance && !instance.matches(entity.kind, definition)) {
+    if (instance && (typeof instance.matches !== "function" || !instance.matches(entity.kind, definition))) {
       instance.destroy();
       pool.delete(entity.id);
       instance = null;

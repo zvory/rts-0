@@ -1,0 +1,20 @@
+{
+  "pipelineVersion": 1,
+  "generatedAt": "2026-07-02T11:31:40.800Z",
+  "sourceSvgModule": "client/src/renderer/rigs/tank_svg.js",
+  "sourceSvgRuntimeKind": "tank",
+  "promptFile": "client/assets/rigs/tank-ps1/metadata/prompt.md",
+  "columns": 3,
+  "rows": 2,
+  "layout": "tight",
+  "profile": "semantic",
+  "width": 720,
+  "height": 384,
+  "sourceSheet": "client/assets/rigs/tank-ps1/tank-contact-sheet.png",
+  "atlas": "client/assets/rigs/tank-ps1/tank-atlas.png",
+  "atlasModule": "client/src/renderer/rigs/tank_png_atlas.js",
+  "prompt": "client/assets/rigs/tank-ps1/metadata/prompt.md",
+  "model": "source SVG semantic grouped raster",
+  "notes": "Disabled handoff atlas grouped semantically from the tank SVG: complete reference without shadow/fuel cue plus left/right tracks, hull, turret/barrel, and fuel cue. Imagegen candidates remain inactive until a future pass preserves these groups and alignment.",
+  "enabled": false
+}
