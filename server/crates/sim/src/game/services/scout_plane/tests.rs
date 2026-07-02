@@ -365,6 +365,31 @@ fn scout_plane_upkeep_spends_oil_every_interval_and_keeps_full_reserve() {
 }
 
 #[test]
+fn scout_plane_due_upkeep_does_not_free_refill_depleted_reserve() {
+    let mut game = empty_game(test_map(40));
+    let plane = spawn_plane(&mut game, 1, 160.0, 160.0);
+    if let Some(state) = game
+        .state
+        .entities
+        .get_mut(plane)
+        .and_then(|entity| entity.scout_plane_state_mut())
+    {
+        state.fuel_oil = config::SCOUT_PLANE_FUEL_RESERVE_OIL - 3;
+        state.upkeep_ticks_until_due = 1;
+    }
+    set_player_oil(&mut game, 1, 1);
+
+    game.tick();
+
+    assert_eq!(player_oil(&game, 1), 0);
+    assert_eq!(
+        plane_fuel(&game, plane),
+        config::SCOUT_PLANE_FUEL_RESERVE_OIL - 3,
+        "the due upkeep payment should not also refill previously missing reserve"
+    );
+}
+
+#[test]
 fn scout_plane_zero_oil_drains_reserve_and_auto_dismisses() {
     let mut game = empty_game(test_map(40));
     let plane = spawn_plane(&mut game, 1, 160.0, 160.0);

@@ -312,11 +312,9 @@ pub(crate) fn run_tick(
             }
             if services::scout_plane::tick_upkeep_timer(entities, id) {
                 let upkeep = crate::config::SCOUT_PLANE_UPKEEP_OIL as u32;
-                if players[player_index].spend_resources(0, upkeep) {
-                    services::scout_plane::set_fuel_full(entities, id);
-                    continue;
-                }
-                if services::scout_plane::drain_fuel(entities, id) {
+                if !players[player_index].spend_resources(0, upkeep)
+                    && services::scout_plane::drain_fuel(entities, id)
+                {
                     let _ = entities.remove(id);
                     continue;
                 }

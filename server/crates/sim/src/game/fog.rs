@@ -367,8 +367,8 @@ impl Fog {
 }
 
 fn entity_grants_standard_sight(entity: &Entity) -> bool {
-    // Scout Plane aerial fog is intentionally a separate Phase 4 path. Until that exists, the
-    // hidden Phase 3 runtime must not fall through to ordinary ground line-of-sight stamping.
+    // Scout Plane aerial fog has its own smoke-only team sight pass, so it must not also fall
+    // through to ordinary ground line-of-sight stamping.
     entity.kind != EntityKind::ScoutPlane
 }
 

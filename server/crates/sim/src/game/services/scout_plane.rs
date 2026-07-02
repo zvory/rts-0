@@ -77,7 +77,11 @@ pub(crate) fn append_queued_retarget(
     plane.append_queued_order(OrderIntent::move_to(x, y))
 }
 
-pub(in crate::game) fn dismiss(entities: &mut EntityStore, owner: u32, unit: u32) -> bool {
+pub(in crate::game::services) fn dismiss(
+    entities: &mut EntityStore,
+    owner: u32,
+    unit: u32,
+) -> bool {
     let Some(plane) = entities.get(unit) else {
         return false;
     };
@@ -175,16 +179,6 @@ pub(in crate::game) fn scout_plane_fuel(entities: &EntityStore, id: u32) -> Opti
         .get(id)?
         .scout_plane_state()
         .map(|state| state.fuel_oil)
-}
-
-pub(in crate::game) fn set_fuel_full(entities: &mut EntityStore, id: u32) {
-    let Some(plane) = entities.get_mut(id) else {
-        return;
-    };
-    let Some(state) = plane.scout_plane_state_mut() else {
-        return;
-    };
-    state.fuel_oil = config::SCOUT_PLANE_FUEL_RESERVE_OIL;
 }
 
 pub(in crate::game) fn drain_fuel(entities: &mut EntityStore, id: u32) -> bool {
