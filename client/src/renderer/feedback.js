@@ -42,6 +42,7 @@ import {
   attackFeedbackKindForWeapon,
   attackFeedbackOriginForWeapon,
 } from "./attack_feedback_origin.js";
+import { muzzleFeedbackStyle } from "./weapon_feedback_style.js";
 import {
   angleDelta,
   clamp01,
@@ -61,7 +62,6 @@ import {
   hash2,
   hexToInt,
   isImpassableAt,
-  muzzleFlashRadius,
   normRect,
   polar,
   recoilVector,
@@ -1256,7 +1256,8 @@ export function _drawMuzzleFlashes(state) {
     const fade = 1 - t;
 
     const feedbackKind = attackFeedbackKindForWeapon(attacker.kind, f.weaponKind);
-    const baseR = muzzleFlashRadius(feedbackKind);
+    const style = muzzleFeedbackStyle(feedbackKind, f.weaponKind);
+    const baseR = style.flashRadius;
     if (baseR <= 0) continue;
 
     const stat = STATS[feedbackKind] || STATS[attacker.kind] || {};
@@ -1282,18 +1283,22 @@ export function _drawMuzzleFlashes(state) {
       const tileSize = (this._map && this._map.tileSize) || 32;
       const penFactor = target?.kind === KIND.TANK ? 0 : feedbackKind === KIND.ANTI_TANK_GUN ? 0.5 : 0.25;
       const tailLen = (stat.rangeTiles || 0) * tileSize * penFactor;
-      const tracerWidth = feedbackKind === KIND.ANTI_TANK_GUN ? 2.5 : 1.5;
 
-      g.lineStyle(tracerWidth, 0xffe066, 0.92 * fade);
+      g.lineStyle(style.tracerWidth, style.tracerColor, style.tracerAlpha * fade);
       g.moveTo(mx, my);
       g.lineTo(targetPos.x, targetPos.y);
+      if (style.tracerCoreWidth > 0) {
+        g.lineStyle(style.tracerCoreWidth, style.tracerCoreColor, style.tracerCoreAlpha * fade);
+        g.moveTo(mx, my);
+        g.lineTo(targetPos.x, targetPos.y);
+      }
 
       if (shotLen > 0.001 && tailLen > 0) {
         const ux = dx / shotLen;
         const uy = dy / shotLen;
         const ex = targetPos.x + ux * tailLen;
         const ey = targetPos.y + uy * tailLen;
-        g.lineStyle(feedbackKind === KIND.ANTI_TANK_GUN ? 1.4 : 1.0, 0xffd84a, 0.46 * fade);
+        g.lineStyle(style.tailWidth, style.tailColor, style.tailAlpha * fade);
         g.moveTo(targetPos.x, targetPos.y);
         g.lineTo(ex, ey);
       }

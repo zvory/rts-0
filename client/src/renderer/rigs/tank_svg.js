@@ -28,7 +28,7 @@ export const TANK_RIG_SVG = `<svg viewBox="-40 -32 80 64" data-rts-rig-kind="tan
   <rect id="part.hull.noseShadow" x="20.7" y="-8.64" width="3" height="17.28" fill="#1a1712" fill-opacity="0.22" stroke="#100d0a" stroke-width="1.5" stroke-opacity="0.95" data-rts-animation="facing:transform.rotation:1:0;recoilKickX:transform.x:1:0;recoilKickY:transform.y:1:0" />
 
   <line id="part.barrel" x1="0" y1="0" x2="33.2" y2="0" stroke="#241d17" stroke-width="5" opacity="0.95" data-rts-animation="weaponFacing:transform.rotation:1:0;recoilPx:transform.scaleX:-0.0301204819:0;recoilKickX:transform.x:1:0;recoilKickY:transform.y:1:0" />
-  <rect id="part.coaxBarrel" x="5.2" y="-5.3" width="26.2" height="2.4" fill="#74787d" stroke="#1a1712" stroke-width="1.2" opacity="0.95" data-rts-animation="weaponFacing:transform.rotation:1:0;recoilKickX:transform.x:1:0;recoilKickY:transform.y:1:0" />
+  <rect id="part.coaxBarrel" x="11.4" y="-6.0" width="5.2" height="0.9" fill="#74787d" stroke="#1a1712" stroke-width="0.6" opacity="0.95" data-rts-animation="weaponFacing:transform.rotation:1:0;recoilKickX:transform.x:1:0;recoilKickY:transform.y:1:0" />
   <rect id="part.turret" x="-8.072" y="-6.48" width="18.144" height="12.96" fill="#6b8cac" stroke="#1a1712" stroke-width="2" stroke-opacity="0.95" data-rts-tint="team-light" data-rts-animation="weaponFacing:transform.rotation:1:0;recoilKickX:transform.x:1:0;recoilKickY:transform.y:1:0" />
   <line id="part.noseTick" x1="18.2" y1="0" x2="23.2" y2="0" stroke="#d8d0b0" stroke-width="2" opacity="0.75" data-rts-animation="facing:transform.rotation:1:0;recoilKickX:transform.x:1:0;recoilKickY:transform.y:1:0" />
   <rect id="part.fuelCue.box" x="-23.2" y="-20.9" width="8" height="5" fill="none" stroke="#c9b56a" stroke-width="2" opacity="0.75" data-rts-animation="facing:transform.rotation:1:0;fuelCueVisible:visible:1:0;recoilKickX:transform.x:1:0;recoilKickY:transform.y:1:0" />
@@ -39,7 +39,7 @@ export const TANK_RIG_SVG = `<svg viewBox="-40 -32 80 64" data-rts-rig-kind="tan
   <circle id="anchor.selection" cx="0" cy="2" r="1" fill="#ffffff" />
   <circle id="anchor.hp" cx="0" cy="-26" r="1" fill="#ffffff" />
   <circle id="anchor.muzzle" cx="33.2" cy="0" r="1" fill="#ffffff" />
-  <circle id="anchor.coaxMuzzle" cx="31.4" cy="-4.1" r="1" fill="#ffffff" />
+  <circle id="anchor.coaxMuzzle" cx="16.6" cy="-5.55" r="1" fill="#ffffff" />
   <circle id="anchor.turret" cx="1" cy="0" r="1" fill="#ffffff" />
   <rect id="bounds.selection" x="-29.2" y="-19.4" width="58.4" height="38.8" fill="none" />
   <rect id="bounds.hp" x="-16" y="-31" width="32" height="5" fill="none" />
