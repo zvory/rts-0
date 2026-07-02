@@ -9,10 +9,11 @@ export function renderPngUnitRig(renderer, entity, colorByOwner, state, definiti
   const atlas = options.atlas;
   const atlasTexture = options.atlasTexture;
   if (!definition || !atlas || !atlasTexture) return null;
-  const context = renderer._rigRenderContextFor?.(entity, colorByOwner, state) ?? {};
+  const context = options.renderContext ?? renderer._rigRenderContextFor?.(entity, colorByOwner, state) ?? {};
   if (typeof options.alpha === "number") context.shotRevealAlpha = options.alpha;
   const rendered = [];
   for (const route of options.routes || []) {
+    if (!pngAtlasCanRenderRoute(definition, atlas, route)) continue;
     const pool = renderer._liveRigPools?.[route.poolName];
     if (!pool) continue;
     let instance = pool.get(entity.id);
@@ -47,6 +48,21 @@ export function renderPngUnitRig(renderer, entity, colorByOwner, state, definiti
     rendered.push(instance);
   }
   return rendered;
+}
+
+export function pngAtlasCanRenderRoute(definition, atlas, route) {
+  if (!definition || !atlas) return false;
+  const includeParts = normalizedPartSet(route?.parts);
+  const sprites = atlasSprites(definition, atlas);
+  if (!includeParts) return sprites.length > 0;
+  if (includeParts.size === 0) return false;
+  const coveredParts = new Set();
+  for (const sprite of sprites) {
+    for (const partId of sprite.sourceParts) {
+      if (includeParts.has(partId)) coveredParts.add(partId);
+    }
+  }
+  return coveredParts.size === includeParts.size;
 }
 
 function createDefaultPngPixiFactory(pixi = globalThis.PIXI) {

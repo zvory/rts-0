@@ -21,6 +21,10 @@ import {
   renderLiveUnitRig,
 } from "../client/src/renderer/rigs/runtime.js";
 import {
+  pngAtlasCanRenderRoute,
+} from "../client/src/renderer/rigs/png_runtime.js";
+import { TANK_PNG_RIG_ATLAS } from "../client/src/renderer/rigs/tank_png_atlas.js";
+import {
   MACHINE_GUNNER_RIG_SVG,
   PANZERFAUST_RIG_SVG,
   RIFLEMAN_RIG_SVG,
@@ -430,6 +434,45 @@ test("default Tank draw uses live SVG rig with separate turret and hull parts", 
   assert.equal(unit.parts.get("part.shadow").display.visible, false);
 });
 
+test("tank PNG atlas route falls back to SVG for the omitted shadow", () => {
+  const definition = compileFixture("rig-vehicle.svg", KIND.TANK);
+  const [shadowRoute, unitRoute] = liveRigRoutesFor(KIND.TANK);
+  assert.equal(pngAtlasCanRenderRoute(definition, TANK_PNG_RIG_ATLAS, shadowRoute), false);
+  assert.equal(pngAtlasCanRenderRoute(definition, TANK_PNG_RIG_ATLAS, unitRoute), true);
+
+  const entity = {
+    id: 41,
+    kind: KIND.TANK,
+    owner: 1,
+    x: 32,
+    y: 44,
+    facing: 0,
+    weaponFacing: Math.PI / 2,
+    state: STATE.IDLE,
+  };
+  const renderer = makeRigRenderer();
+  let contextCallCount = 0;
+  renderer._liveRigDefinitionsByKind = new Map([[KIND.TANK, definition]]);
+  renderer._livePngRigAtlasesByKind = new Map([[KIND.TANK, { ...TANK_PNG_RIG_ATLAS, enabled: true }]]);
+  renderer._livePngRigAtlasTextures = new Map([[KIND.TANK, fakeAtlasTexture()]]);
+  renderer._rigRenderContextFor = function(entityArg, colorByOwnerArg, stateArg) {
+    contextCallCount += 1;
+    return _rigRenderContextFor.call(this, entityArg, colorByOwnerArg, stateArg);
+  };
+
+  renderer._drawUnit(entity, new Map([[1, 0x336699]]), { playerId: 1, resources: { oil: 10 }, weaponRecoil: () => 0 });
+
+  const shadow = renderer._liveRigPools.liveUnitRigShadows.get(entity.id);
+  const unit = renderer._liveRigPools.liveUnitRigs.get(entity.id);
+  assert.equal(contextCallCount, 1);
+  assert.equal(typeof shadow.matches, "function");
+  assert.equal(shadow.parts.get("part.shadow").display.visible, true);
+  assert.equal(typeof unit.matchesPngAtlasRig, "function");
+  assert.equal(unit.parts.has("sprite.hull"), true);
+  assert.equal(unit.parts.has("sprite.turret"), true);
+  assert.equal(unit.parts.get("sprite.turret").display.rotation, Math.PI / 2);
+});
+
 test("live rig renderer rebuilds same-id instances when entity kind changes", () => {
   const panzerfaust = compileSvgRig(PANZERFAUST_RIG_SVG, { expectedKind: KIND.PANZERFAUST });
   const rifleman = compileSvgRig(RIFLEMAN_RIG_SVG, { expectedKind: KIND.RIFLEMAN });
@@ -537,7 +580,7 @@ function makeRigRenderer() {
       liveShotRevealRigShadows: { poolName: "liveShotRevealRigShadows", layerName: "shotRevealShadows" },
       liveShotRevealRigs: { poolName: "liveShotRevealRigs", layerName: "shotReveals" },
     },
-    _rigPixiFactory: createInspectionPixiFactory(),
+    _rigPixiFactory: createInspectionPngPixiFactory(),
     _pools: { unitShadows: new Map(), units: new Map(), shotRevealShadows: new Map(), shotReveals: new Map() },
     _seen: {
       unitShadows: new Set(),
@@ -599,6 +642,19 @@ function createInspectionPixiFactory() {
   };
 }
 
+function createInspectionPngPixiFactory() {
+  return {
+    ...createInspectionPixiFactory(),
+    createRectangle: (x, y, width, height) => ({ x, y, width, height, w: width, h: height }),
+    createTexture: (baseTexture, rectangle) => ({ baseTexture, frame: rectangle }),
+    createSprite: (texture) => new FakeSprite(texture),
+  };
+}
+
+function fakeAtlasTexture() {
+  return { baseTexture: { id: "fake-tank-atlas" } };
+}
+
 class FakeContainer {
   constructor() {
     this.children = [];
@@ -627,6 +683,23 @@ class FakeContainer {
 
   destroy() {
     this.destroyed = true;
+  }
+}
+
+class FakeSprite extends FakeContainer {
+  constructor(texture) {
+    super();
+    this.texture = texture;
+    this.tint = 0xffffff;
+    this.anchorX = 0;
+    this.anchorY = 0;
+    this.anchor = makePointSetter(this, "anchorX", "anchorY");
+    this.destroyOptions = null;
+  }
+
+  destroy(options = null) {
+    this.destroyed = true;
+    this.destroyOptions = options;
   }
 }
 
