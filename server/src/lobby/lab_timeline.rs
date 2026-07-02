@@ -3,14 +3,18 @@
 //! The room task owns this alongside the authoritative lab `Game`. It records enough typed data
 //! for a later seek/rebuild pass without making timeline state part of the simulation crate.
 
-use crate::protocol::Command;
+use crate::protocol::{
+    Command, LabCheckpointScenarioV1, LabReplayOperation, LabReplayOperationEntry,
+};
 use rts_sim::game::lab::{LabCommandOptions, LabOp};
 use rts_sim::game::Game;
 use std::time::{Duration, Instant as StdInstant};
 
 pub(super) struct LabTimeline {
+    initial_setup: LabCheckpointScenarioV1,
     keyframes: Vec<LabTimelineKeyframe>,
     entries: Vec<LabTimelineEntry>,
+    replay_entries: Vec<LabReplayOperationEntry>,
     next_sequence: u64,
     last_seek_at: Option<StdInstant>,
 }
@@ -56,10 +60,12 @@ impl LabTimeline {
     pub(super) const MAX_ENTRIES: usize = 50_000;
     const SEEK_COOLDOWN: Duration = Duration::from_millis(500);
 
-    pub(super) fn new(game: &Game) -> Self {
+    pub(super) fn new(game: &Game, initial_setup: LabCheckpointScenarioV1) -> Self {
         let mut timeline = Self {
+            initial_setup,
             keyframes: Vec::new(),
             entries: Vec::new(),
+            replay_entries: Vec::new(),
             next_sequence: 0,
             last_seek_at: None,
         };
@@ -67,9 +73,11 @@ impl LabTimeline {
         timeline
     }
 
-    pub(super) fn reset(&mut self, game: &Game) {
+    pub(super) fn reset(&mut self, game: &Game, initial_setup: LabCheckpointScenarioV1) {
+        self.initial_setup = initial_setup;
         self.keyframes.clear();
         self.entries.clear();
+        self.replay_entries.clear();
         self.next_sequence = 0;
         self.last_seek_at = None;
         self.push_keyframe(game);
@@ -98,12 +106,14 @@ impl LabTimeline {
         operator_id: u32,
         op_kind: String,
         op: LabOp,
+        replay_op: LabReplayOperation,
     ) {
         self.push_entry(
             tick,
             request_id,
             operator_id,
             LabTimelineEntryKind::LabOperation { op_kind, op },
+            replay_op,
         );
     }
 
@@ -122,10 +132,56 @@ impl LabTimeline {
             operator_id,
             LabTimelineEntryKind::IssueCommandAs {
                 player_id,
-                command,
+                command: command.clone(),
                 options,
             },
+            LabReplayOperation::IssueCommandAs {
+                player_id,
+                cmd: command,
+                ignore_command_limits: options.ignore_command_limits,
+            },
         );
+    }
+
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(super) fn record_replayed_entry(
+        &mut self,
+        replay_entry: LabReplayOperationEntry,
+        kind: LabTimelineEntryKind,
+    ) -> Result<(), String> {
+        if replay_entry.sequence != self.next_sequence {
+            return Err(format!(
+                "Lab replay operation sequence mismatch: expected {}, got {}.",
+                self.next_sequence, replay_entry.sequence
+            ));
+        }
+        self.entries.push(LabTimelineEntry {
+            sequence: replay_entry.sequence,
+            tick: replay_entry.tick,
+            request_id: replay_entry.request_id,
+            operator_id: replay_entry.operator_id,
+            kind,
+        });
+        self.replay_entries.push(replay_entry);
+        self.next_sequence = self.next_sequence.saturating_add(1);
+        debug_assert!(self.entries.len() <= Self::MAX_ENTRIES);
+        debug_assert!(self.replay_entries.len() <= Self::MAX_ENTRIES);
+        Ok(())
+    }
+
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(super) fn initial_setup(&self) -> &LabCheckpointScenarioV1 {
+        &self.initial_setup
+    }
+
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(super) fn replay_entries(&self) -> &[LabReplayOperationEntry] {
+        &self.replay_entries
+    }
+
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(super) fn replay_entry_count(&self) -> usize {
+        self.replay_entries.len()
     }
 
     pub(super) fn keyframe_ticks(&self) -> Vec<u32> {
@@ -144,21 +200,27 @@ impl LabTimeline {
     }
 
     pub(super) fn is_entry_cap_reached(&self) -> bool {
-        self.entries.len() >= Self::MAX_ENTRIES
+        self.entries.len() >= Self::MAX_ENTRIES || self.replay_entries.len() >= Self::MAX_ENTRIES
     }
 
     pub(super) fn truncate_future(&mut self, current_tick: u32) -> bool {
         let old_entry_count = self.entries.len();
+        let old_replay_entry_count = self.replay_entries.len();
         let old_keyframe_count = self.keyframes.len();
         self.entries.retain(|entry| entry.tick <= current_tick);
+        self.replay_entries
+            .retain(|entry| entry.tick <= current_tick);
         self.keyframes
             .retain(|keyframe| keyframe.tick <= current_tick);
         if self.keyframes.is_empty() {
             return old_entry_count != self.entries.len()
+                || old_replay_entry_count != self.replay_entries.len()
                 || old_keyframe_count != self.keyframes.len();
         }
         self.recompute_next_sequence();
-        old_entry_count != self.entries.len() || old_keyframe_count != self.keyframes.len()
+        old_entry_count != self.entries.len()
+            || old_replay_entry_count != self.replay_entries.len()
+            || old_keyframe_count != self.keyframes.len()
     }
 
     pub(super) fn seek_back(
@@ -244,16 +306,26 @@ impl LabTimeline {
         request_id: u32,
         operator_id: u32,
         kind: LabTimelineEntryKind,
+        replay_op: LabReplayOperation,
     ) {
+        let sequence = self.next_sequence;
         self.entries.push(LabTimelineEntry {
-            sequence: self.next_sequence,
+            sequence,
             tick,
             request_id,
             operator_id,
             kind,
         });
+        self.replay_entries.push(LabReplayOperationEntry {
+            sequence,
+            tick,
+            request_id,
+            operator_id,
+            op: replay_op,
+        });
         self.next_sequence = self.next_sequence.saturating_add(1);
         debug_assert!(self.entries.len() <= Self::MAX_ENTRIES);
+        debug_assert!(self.replay_entries.len() <= Self::MAX_ENTRIES);
     }
 
     fn push_keyframe(&mut self, game: &Game) {
@@ -300,14 +372,20 @@ impl LabTimeline {
             .last()
             .map(|keyframe| keyframe.next_sequence)
             .unwrap_or(0);
-        self.next_sequence = entry_next.max(keyframe_next);
+        let replay_entry_next = self
+            .replay_entries
+            .last()
+            .map(|entry| entry.sequence.saturating_add(1))
+            .unwrap_or(0);
+        self.next_sequence = entry_next.max(keyframe_next).max(replay_entry_next);
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::DEFAULT_FACTION_ID;
+    use crate::lab_scenarios::export_lab_checkpoint_scenario_for_protocol;
+    use crate::protocol::{LabScenarioLabMetadata, LabVisionMode, DEFAULT_FACTION_ID};
     use rts_sim::game::PlayerInit;
 
     fn test_game() -> Game {
@@ -332,21 +410,36 @@ mod tests {
         Game::new(&players, 1234)
     }
 
+    fn test_initial_setup(game: &Game) -> LabCheckpointScenarioV1 {
+        export_lab_checkpoint_scenario_for_protocol(
+            game,
+            "timeline baseline".to_string(),
+            LabScenarioLabMetadata {
+                vision: LabVisionMode::FullWorld,
+                god_mode_players: game.lab_god_mode_players(),
+            },
+            "test-build",
+        )
+        .expect("checkpoint baseline")
+    }
+
     #[test]
     fn lab_timeline_starts_with_baseline_keyframe() {
         let game = test_game();
-        let timeline = LabTimeline::new(&game);
+        let timeline = LabTimeline::new(&game, test_initial_setup(&game));
 
         assert_eq!(timeline.keyframe_ticks(), vec![0]);
         assert_eq!(timeline.duration_ticks(game.tick_count()), 0);
         assert!(timeline.entries().is_empty());
+        assert!(timeline.replay_entries().is_empty());
         assert_eq!(timeline.keyframes[0].next_sequence, 0);
+        assert_eq!(timeline.initial_setup().kind, "labCheckpointScenario");
     }
 
     #[test]
     fn lab_timeline_records_periodic_keyframes() {
         let mut game = test_game();
-        let mut timeline = LabTimeline::new(&game);
+        let mut timeline = LabTimeline::new(&game, test_initial_setup(&game));
 
         for _ in 0..LabTimeline::KEYFRAME_INTERVAL_TICKS {
             game.tick();

@@ -1,6 +1,6 @@
 # Phase 2 - Lab Operation Recording And Playback
 
-Status: Not started.
+Status: Done.
 
 ## Scope
 
