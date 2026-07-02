@@ -575,6 +575,52 @@ function fakeHudRootWithoutResourceSpans() {
   assert(buildCard.slots[8].intent.type === "closeCommandCardMenu", "worker return button should close submenu");
   assert(buildCard.slots[8].commandId === "worker.return", "worker return should expose stable command identity");
 
+  const scoutPlane = { id: 18, owner: 1, kind: KIND.SCOUT_PLANE };
+  const scoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [scoutPlane],
+    entities: [scoutPlane],
+  }));
+  assert(buttonByAction(scoutPlaneCard, "move")?.intent.target === "move", "Scout Plane command card exposes retarget/move");
+  assert(buttonByAction(scoutPlaneCard, "dismissScoutPlane")?.intent.unitIds.join(",") === "18", "Scout Plane command card exposes dismiss");
+  assert(!buttonByAction(scoutPlaneCard, "attack"), "Scout Plane command card does not expose attack");
+  assert(!buttonByAction(scoutPlaneCard, "holdPosition"), "Scout Plane command card does not expose hold position");
+  assert(!buttonByAction(scoutPlaneCard, "stop"), "Scout Plane command card does not expose stop");
+
+  const workerScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [worker, scoutPlane],
+    entities: [worker, cityCentre, scoutPlane],
+  }));
+  assert(
+    buttonByAction(workerScoutPlaneCard, "move")?.enabled &&
+      buttonByAction(workerScoutPlaneCard, "holdPosition")?.intent.unitIds.join(",") === "10" &&
+      buttonByAction(workerScoutPlaneCard, "attack")?.intent.target === "attack" &&
+      buttonByAction(workerScoutPlaneCard, "stop")?.intent.unitIds.join(",") === "10" &&
+      buttonByAction(workerScoutPlaneCard, "openWorkerBuildMenu")?.enabled,
+    "mixed Worker plus Scout Plane selection preserves normal worker commands for land units",
+  );
+  assert(
+    buttonByAction(workerScoutPlaneCard, "dismissScoutPlane")?.intent.unitIds.join(",") === "18",
+    "mixed land plus Scout Plane selection keeps dismiss scoped to Scout Planes",
+  );
+  const dismissHud = Object.create(HUD.prototype);
+  const dismissCommands = [];
+  let dismissIntentEnded = false;
+  dismissHud._issueCommand = (command) => dismissCommands.push(command);
+  dismissHud._intent = () => ({
+    endCommandTarget() {
+      dismissIntentEnded = true;
+    },
+  });
+  dismissHud._dispatchCommandIntent({ type: "dismissScoutPlane", unitIds: [18] });
+  assert(
+    dismissCommands.length === 1 &&
+      dismissCommands[0].c === "useAbility" &&
+      dismissCommands[0].ability === ABILITY.DISMISS_SCOUT_PLANE &&
+      dismissCommands[0].units.join(",") === "18" &&
+      dismissIntentEnded,
+    "Scout Plane dismiss intent sends the hidden ability command and clears command targeting",
+  );
+
   const barracks = { id: 20, owner: 1, kind: KIND.BARRACKS, buildProgress: null };
   const producingBarracks = {
     id: 21,

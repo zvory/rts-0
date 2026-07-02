@@ -25,7 +25,7 @@ const GIVE_ALL_RESOURCE_AMOUNT = 99999;
 const OPTIONS_PANEL_STORAGE_KEY = "rts.labPanel.options.window.v1";
 const TOOLS_PANEL_STORAGE_KEY = "rts.labPanel.tools.window.v1";
 const LAB_ONLY_UNIT_SPAWNS_BY_FACTION = Object.freeze({
-  [DEFAULT_FACTION_ID]: Object.freeze([KIND.PANZERFAUST]),
+  [DEFAULT_FACTION_ID]: Object.freeze([KIND.PANZERFAUST, KIND.SCOUT_PLANE]),
 });
 
 export class LabPanel {

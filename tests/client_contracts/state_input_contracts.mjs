@@ -691,6 +691,58 @@ function buttonByLabel(card, label) {
     teamSelectionState.controlGroups[2].join(",") === String(ownWorker.id),
     "mixed own/allied selections save only own entities into control groups",
   );
+  const selectableScoutPlane = {
+    id: 5500,
+    owner: 1,
+    kind: KIND.SCOUT_PLANE,
+    x: 96,
+    y: 96,
+    hp: 40,
+    maxHp: 40,
+    state: STATE.IDLE,
+  };
+  const scoutSelectionState = new GameState({
+    ...start,
+    map: { ...start.map, width: 6, height: 6, resources: [] },
+  });
+  scoutSelectionState.applySnapshot({
+    tick: 0,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 0,
+    supplyCap: 10,
+    entities: [selectableScoutPlane],
+    events: [],
+  });
+  const scoutSelectionInput = Object.create(Input.prototype);
+  scoutSelectionInput.state = scoutSelectionState;
+  scoutSelectionInput.camera = selectionInput.camera;
+  scoutSelectionInput.dom = selectionInput.dom;
+  scoutSelectionInput._worldAt = Input.prototype._worldAt;
+  scoutSelectionInput._entityAtWorld = Input.prototype._entityAtWorld;
+  scoutSelectionInput._worldPointHitsEntity = Input.prototype._worldPointHitsEntity;
+  scoutSelectionInput._entityIntersectsRect = Input.prototype._entityIntersectsRect;
+  scoutSelectionInput._closestIdsToPoint = Input.prototype._closestIdsToPoint;
+  scoutSelectionInput._commitClickSelection = Input.prototype._commitClickSelection;
+  scoutSelectionInput._commitBoxSelection = Input.prototype._commitBoxSelection;
+  scoutSelectionInput._ownBuildingsOfKindInViewport = Input.prototype._ownBuildingsOfKindInViewport;
+  scoutSelectionInput._closestOwnUnitKindInViewport = Input.prototype._closestOwnUnitKindInViewport;
+  scoutSelectionInput._commitClickSelection({ x: 96, y: 96 }, false, false);
+  assert(
+    Array.from(scoutSelectionState.selection).join(",") === "5500",
+    "Scout Plane can be selected directly for hidden-client inspection",
+  );
+  scoutSelectionState.clearSelection();
+  scoutSelectionInput._commitBoxSelection({ x0: 70, y0: 70, x1: 120, y1: 120 }, false);
+  assert(
+    Array.from(scoutSelectionState.selection).join(",") === "5500",
+    "Scout Plane can be box-selected as a friendly unit",
+  );
+  scoutSelectionState.setControlGroup(3, scoutSelectionState.selection);
+  assert(
+    scoutSelectionState.controlGroups[3].join(",") === "5500",
+    "Scout Plane can be stored in a control group",
+  );
   const allyOnlyCard = buildCommandCardDescriptors(commandCardCtx({
     playerId: 1,
     selection: [allyWorker],
@@ -816,6 +868,31 @@ function buttonByLabel(card, label) {
   assert(
     minimapLike._blipColor(allyWorker) === `#${COLORS.selectAlly.toString(16).padStart(6, "0")}`,
     "minimap blip color distinguishes allies from enemies",
+  );
+  const minimapScoutOrders = [];
+  const minimapRifleman = { id: 615, owner: 1, kind: KIND.RIFLEMAN, x: 96, y: 128 };
+  const minimapScoutPlane = { id: 616, owner: 1, kind: KIND.SCOUT_PLANE, x: 120, y: 128 };
+  const minimapOrders = Object.create(Minimap.prototype);
+  minimapOrders.state = {
+    playerId: 1,
+    selectedEntities: () => [minimapRifleman, minimapScoutPlane],
+  };
+  minimapOrders.clientIntent = new ClientIntent();
+  minimapOrders.clientIntent.beginCommandTarget("attack");
+  minimapOrders._issueCommand = (command) => minimapScoutOrders.push(command);
+  minimapOrders._addCommandFeedback = () => {};
+  minimapOrders._issueOrder(512, 544, true);
+  assert(
+    minimapScoutOrders.length === 2 &&
+      minimapScoutOrders[0].c === "attackMove" &&
+      minimapScoutOrders[0].units.join(",") === "615" &&
+      minimapScoutOrders[0].queued === true &&
+      minimapScoutOrders[1].c === "move" &&
+      minimapScoutOrders[1].units.join(",") === "616" &&
+      minimapScoutOrders[1].x === 512 &&
+      minimapScoutOrders[1].y === 544 &&
+      minimapScoutOrders[1].queued === true,
+    "minimap attack-move sends land units to attack while Scout Planes receive only move retargets",
   );
 
   // Placement is local-only
@@ -1204,6 +1281,45 @@ function buttonByLabel(card, label) {
       rightClickCommands[0].c === "attack" &&
       rightClickCommands[0].queued === true,
     "Shift right-click on enemies should send queued attack",
+  );
+  const selectedScoutPlane = { id: 90, owner: 1, kind: KIND.SCOUT_PLANE, x: 140, y: 150 };
+  input.state = {
+    playerId: 1,
+    map: { tileSize: 32 },
+    entitiesInterpolated: () => [moveUnit, selectedScoutPlane, enemyUnit],
+    selectedEntities: () => [moveUnit, selectedScoutPlane],
+    addCommandFeedback() {},
+  };
+  rightClickCommands.length = 0;
+  input._onRightClick({ x: 180, y: 180 }, { shiftKey: true });
+  assert(
+    rightClickCommands.length === 2 &&
+      rightClickCommands[0].c === "attack" &&
+      rightClickCommands[0].units.join(",") === "40" &&
+      rightClickCommands[0].target === enemyUnit.id &&
+      rightClickCommands[0].queued === true &&
+      rightClickCommands[1].c === "move" &&
+      rightClickCommands[1].units.join(",") === "90" &&
+      rightClickCommands[1].queued === true,
+    "mixed land plus Scout Plane right-click attacks with land units and retargets planes",
+  );
+  input.state = {
+    playerId: 1,
+    map: { tileSize: 32 },
+    entitiesInterpolated: () => [selectedScoutPlane, enemyUnit],
+    selectedEntities: () => [selectedScoutPlane],
+    addCommandFeedback() {},
+  };
+  rightClickCommands.length = 0;
+  input._onRightClick({ x: 180, y: 180 }, { shiftKey: true });
+  assert(
+    rightClickCommands.length === 1 &&
+      rightClickCommands[0].c === "move" &&
+      rightClickCommands[0].units.join(",") === "90" &&
+      rightClickCommands[0].x === enemyUnit.x &&
+      rightClickCommands[0].y === enemyUnit.y &&
+      rightClickCommands[0].queued === true,
+    "Scout Plane-only enemy right-click retargets orbit instead of issuing attack",
   );
   const deconstructWorker = { id: 42, owner: 1, kind: KIND.WORKER, x: 150, y: 150 };
   const enemyTankTrap = { id: 43, owner: 2, kind: KIND.TANK_TRAP, x: 180, y: 180 };
@@ -1646,6 +1762,60 @@ function buttonByLabel(card, label) {
   assert(
     lastSent.queued === true,
     "Shift enemy attack targeting should queue attack",
+  );
+
+  const planeTargetedInput = Object.create(Input.prototype);
+  const planeTargetedCommands = [];
+  const targetedRifleman = { id: 140, owner: 1, kind: KIND.RIFLEMAN, x: 128, y: 128 };
+  const targetedScoutPlane = { id: 141, owner: 1, kind: KIND.SCOUT_PLANE, x: 140, y: 140 };
+  const targetedEnemy = { id: 142, owner: 2, kind: KIND.RIFLEMAN, x: 320, y: 320 };
+  planeTargetedInput.state = {
+    playerId: 1,
+    selectedEntities: () => [targetedRifleman, targetedScoutPlane],
+  };
+  planeTargetedInput.clientIntent = new ClientIntent();
+  planeTargetedInput.commandIssuer = { issueCommand: (command) => planeTargetedCommands.push(command) };
+  planeTargetedInput._worldAt = (x, y) => ({ x, y });
+  planeTargetedInput._entityAtWorld = () => targetedEnemy;
+  planeTargetedInput._addCommandFeedback = () => {};
+  planeTargetedInput.clientIntent.beginCommandTarget("attack");
+  planeTargetedInput._issueTargetedCommand({ x: targetedEnemy.x, y: targetedEnemy.y }, { shiftKey: true });
+  assert(
+    planeTargetedCommands.length === 2 &&
+      planeTargetedCommands[0].c === "attack" &&
+      planeTargetedCommands[0].units.join(",") === "140" &&
+      planeTargetedCommands[0].target === targetedEnemy.id &&
+      planeTargetedCommands[0].queued === true &&
+      planeTargetedCommands[1].c === "move" &&
+      planeTargetedCommands[1].units.join(",") === "141" &&
+      planeTargetedCommands[1].x === targetedEnemy.x &&
+      planeTargetedCommands[1].y === targetedEnemy.y &&
+      planeTargetedCommands[1].queued === true,
+    "mixed targeted attack sends attack to land units and retargets Scout Planes",
+  );
+  planeTargetedCommands.length = 0;
+  planeTargetedInput._entityAtWorld = () => null;
+  planeTargetedInput.clientIntent.beginCommandTarget("attack");
+  planeTargetedInput._issueTargetedCommand({ x: 352, y: 384 }, { shiftKey: true });
+  assert(
+    planeTargetedCommands.length === 2 &&
+      planeTargetedCommands[0].c === "attackMove" &&
+      planeTargetedCommands[0].units.join(",") === "140" &&
+      planeTargetedCommands[1].c === "move" &&
+      planeTargetedCommands[1].units.join(",") === "141" &&
+      planeTargetedCommands[1].x === 352 &&
+      planeTargetedCommands[1].y === 384,
+    "mixed targeted attack-move sends only a move retarget to Scout Planes",
+  );
+  planeTargetedCommands.length = 0;
+  planeTargetedInput.clientIntent.beginCommandTarget("move");
+  planeTargetedInput._issueTargetedCommand({ x: 400, y: 416 }, { shiftKey: true });
+  assert(
+    planeTargetedCommands.length === 1 &&
+      planeTargetedCommands[0].c === "move" &&
+      planeTargetedCommands[0].units.join(",") === "140,141" &&
+      planeTargetedCommands[0].queued === true,
+    "mixed targeted move keeps Scout Plane retargeting in the normal move command",
   );
 
   targetedInput.clientIntent.beginCommandTarget("attack");
