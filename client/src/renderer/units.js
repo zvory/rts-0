@@ -1,7 +1,9 @@
 import { STATS } from "../config.js";
 import { KIND, SETUP, STATE } from "../protocol.js";
 import { liveRigDefinitionFor, liveRigRoutesFor } from "./rigs/live_routing.js";
+import { livePngRigAtlasFor } from "./rigs/png_routing.js";
 import { createRigRenderContext } from "./rigs/animation.js";
+import { renderPngUnitRig } from "./rigs/png_runtime.js";
 import { renderLiveUnitRig } from "./rigs/runtime.js";
 import {
   ARTILLERY_DEPLOYED_WEAPON_ANIM_MS,
@@ -107,6 +109,17 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
   const routes = liveRigRoutesFor(e.kind, pools);
   if (routes.length === 0) {
     throw new Error(`missing live SVG rig route for unit kind ${e.kind}`);
+  }
+
+  const pngAtlas = livePngRigAtlasFor(this._livePngRigAtlasesByKind, e.kind);
+  const pngAtlasTexture = this._livePngRigAtlasTextures?.get?.(e.kind) ?? null;
+  if (pngAtlas && pngAtlasTexture) {
+    return renderPngUnitRig(this, e, colorByOwner, state, definition, {
+      atlas: pngAtlas,
+      atlasTexture: pngAtlasTexture,
+      routes,
+      alpha: pools.alpha,
+    });
   }
 
   return renderLiveUnitRig(this, e, colorByOwner, state, definition, {
