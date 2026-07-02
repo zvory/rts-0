@@ -962,6 +962,10 @@ buildings in reverse round-robin order for the displayed producer type. The Scou
 button is pinned to the `Z` grid slot, unlocks after either completed Gun Works or completed Vehicle
 Works, and changes to a select-and-pan action while the player already has an active Scout Plane;
 while a Scout Plane is in production it stays disabled instead of issuing another train command.
+Selected Scout Planes use ordinary selection and control-group flows, but their unit command card
+keeps only Move/retarget and Dismiss plane affordances for the plane; mixed selections keep land-unit
+attack/hold/stop commands scoped to land units while Scout Planes receive only aerial retarget or
+dismiss commands.
 Command identities are stable and split by scope: global tactical/navigation/production-control
 buttons remain un-namespaced, while build, train, research, and ability buttons emitted for a
 faction catalog use the local player's faction id as the command-id prefix.

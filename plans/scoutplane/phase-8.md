@@ -2,7 +2,16 @@
 
 ## Phase Status
 
-Status: pending.
+Status: done.
+
+Completion notes:
+
+- Audited `requirements.md` against the landed implementation and added final status, review route,
+  patch-note, and deferred-item notes.
+- Corrected stale contract wording in protocol, balance, server-sim, and client UI docs so Scout
+  Plane production and selected-plane controls are described as current normal-match behavior.
+- No gameplay behavior, balance values, protocol shapes, generated catalog data, or AI logic changed
+  in this phase.
 
 ## Objective
 

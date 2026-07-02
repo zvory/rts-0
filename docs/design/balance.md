@@ -164,9 +164,8 @@ support readable gameplay, clear unit roles, and strong terrain identity without
 or regime-specific iconography.
 
 MVP scope:
-- No combat air forces. `scout_plane` is non-combat reconnaissance vocabulary exposed through
-  City Centre production only after its launch, upkeep, fog, UI, and rendering contracts are in
-  place.
+- No combat air forces. `scout_plane` is non-combat reconnaissance exposed through City Centre
+  production after its launch, upkeep, fog, UI, and rendering contracts are in place.
 - Late-game Artillery is implemented as the Superior Firepower capstone; Mortar Teams remain the
   early delayed-area fire tool.
 - No mines, morale, logistics, suppression-depth model, or detailed tank armor model yet. Tanks
