@@ -101,7 +101,8 @@ function unitVehicleBody(kind, stat) {
 }
 
 export function _drawUnit(e, colorByOwner, state, pools = {}) {
-  const definition = liveRigDefinitionFor(this._liveRigDefinitionsByKind, e.kind);
+  const visualOverride = pools.visualOverride || null;
+  const definition = visualOverride?.definition || liveRigDefinitionFor(this._liveRigDefinitionsByKind, e.kind);
   if (!definition) {
     throw new Error(`missing live SVG rig definition for unit kind ${e.kind}`);
   }
@@ -111,7 +112,7 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
     throw new Error(`missing live SVG rig route for unit kind ${e.kind}`);
   }
 
-  const pngAtlas = livePngRigAtlasFor(this._livePngRigAtlasesByKind, e.kind);
+  const pngAtlas = visualOverride ? null : livePngRigAtlasFor(this._livePngRigAtlasesByKind, e.kind);
   const pngAtlasTexture = this._livePngRigAtlasTextures?.get?.(e.kind) ?? null;
   if (pngAtlas && pngAtlasTexture) {
     const renderContext = this._rigRenderContextFor?.(e, colorByOwner, state) ?? {};
@@ -215,13 +216,14 @@ function hasOccupiedTrench(entity) {
   return Number.isInteger(id) && id > 0;
 }
 
-export function _drawShotRevealUnit(e, colorByOwner, state) {
+export function _drawShotRevealUnit(e, colorByOwner, state, pools = {}) {
   const now = performance.now();
   const age = Math.max(0, now - (e.shotRevealCreatedAt || now));
   const ttl = Math.max(1, (e.shotRevealExpiresAt || now + 1) - (e.shotRevealCreatedAt || now));
   const t = clamp01(age / ttl);
   const alpha = 0.82 * (1 - smoothstep01(Math.max(0, t - 0.62) / 0.38));
   this._drawUnit(e, colorByOwner, state, {
+    visualOverride: pools.visualOverride || null,
     shadow: "shotRevealShadows",
     unit: "shotReveals",
     effects: "shotReveals",

@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-Status: not started.
+Status: done.
 
 ## Objective
 
@@ -92,3 +92,17 @@ normal lab or match with no `visualProfile` and confirm standard unit art still 
 Name the supported selector forms, candidate registration path, override routing helper, and the
 profile URL used for manual testing. Include the requirements audit result and call out any remaining
 visual polish that should be handled as a separate follow-up rather than hidden inside this phase.
+
+## Implementation Audit
+
+- Real-unit overrides are local renderer behavior only: profile rules resolve against frame-local
+  real units, choose checked-in candidate rig ids, and pass candidate SVG definitions through the
+  normal live rig runtime without mutating entity kind, snapshots, command state, fog, minimap, HP,
+  selection, or lab scenario data.
+- Supported selectors are exact `entityId`, `kind` plus one-based `ordinal`, `kind` plus `nearest`
+  world position with optional `owner` and `maxDistance`, and exact single-match kind/owner filters.
+- Candidate registration lives in `client/src/renderer/rigs/visual_override_rigs.js`; the manual
+  profile is `/lab?scenario=render-preview&visualProfile=unit-rig-overrides-1`.
+- Deferred polish: add world-space labels for real unit override candidates and author richer
+  non-tank rig variants once an art direction is chosen. The current phase proves routing and safety
+  with three checked-in Tank SVG candidates.

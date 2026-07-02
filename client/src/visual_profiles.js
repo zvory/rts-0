@@ -1,3 +1,5 @@
+import { KIND } from "./protocol.js";
+
 const VISUAL_PROFILE_ERROR_MESSAGES = Object.freeze({
   invalid: "Invalid visualProfile. Use letters, numbers, underscores, or dashes, up to 48 characters.",
   unknown: "Unknown visualProfile.",
@@ -51,6 +53,32 @@ const TRENCH_VARIANTS_1_STATIC_SAMPLES = Object.freeze([
   }),
 ]);
 
+const UNIT_RIG_OVERRIDES_1 = Object.freeze([
+  Object.freeze({
+    id: "tank-by-entity",
+    label: "A Low",
+    candidateId: "tank-low-profile",
+    selector: Object.freeze({ entityId: 126 }),
+  }),
+  Object.freeze({
+    id: "tank-by-ordinal",
+    label: "B Wide",
+    candidateId: "tank-wide-turret",
+    selector: Object.freeze({ kind: KIND.TANK, owner: 1, ordinal: 2 }),
+  }),
+  Object.freeze({
+    id: "tank-by-nearest",
+    label: "C Long",
+    candidateId: "tank-long-cannon",
+    selector: Object.freeze({
+      kind: KIND.TANK,
+      owner: 1,
+      nearest: Object.freeze({ x: 1884, y: 2032 }),
+      maxDistance: 64,
+    }),
+  }),
+]);
+
 const VISUAL_PROFILE_ENTRIES = Object.freeze([
   Object.freeze({
     id: "trench-variants-1",
@@ -58,6 +86,13 @@ const VISUAL_PROFILE_ENTRIES = Object.freeze([
     description: "Initial checked-in profile for local entrenchment visual candidates.",
     initialCamera: Object.freeze({ x: 960, y: 640, zoom: 0.9 }),
     staticSamples: TRENCH_VARIANTS_1_STATIC_SAMPLES,
+  }),
+  Object.freeze({
+    id: "unit-rig-overrides-1",
+    label: "Unit rig overrides 1",
+    description: "Local checked-in profile for comparing real Tank rig candidates in the render-preview lab scenario.",
+    initialCamera: Object.freeze({ x: 2040, y: 1950, zoom: 0.9 }),
+    unitOverrides: UNIT_RIG_OVERRIDES_1,
   }),
 ]);
 

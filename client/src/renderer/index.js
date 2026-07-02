@@ -64,6 +64,11 @@ import { GroundDecalLayer, _drawGroundDecals, _initGroundDecalsForMap } from "./
 import { TrenchDecalLayer, _drawTrenches, _initTrenchesForMap } from "./trenches.js";
 import { VisualSampleLayer, _drawVisualSamples } from "./visual_samples.js";
 import { createLiveRigDefinitions } from "./rigs/live_routing.js";
+import { compileVisualUnitRigCandidates } from "./rigs/visual_override_rigs.js";
+import {
+  publishVisualUnitOverrideDiagnostics,
+  resolveVisualUnitOverrides,
+} from "./visual_unit_overrides.js";
 import { createLivePngRigAtlases, loadPngRigAtlasTexture } from "./rigs/png_routing.js";
 import { createBuildingRigDefinitions } from "./rigs/building_routing.js";
 import { _drawResource } from "./resources.js";
@@ -138,6 +143,13 @@ export class Renderer {
       recordDiagnostic: (label, amount) => this._recordRenderDiagnostic(label, amount),
       recordError: (label, err) => this._recordRenderError(label, err),
     });
+    this._visualUnitRigCandidates = null;
+    this._visualUnitOverrideDiagnostics = {
+      rules: 0,
+      activeOverrides: 0,
+      errors: 0,
+      candidateCount: 0,
+    };
 
     // Long-lived single Graphics for the bulk overlays / per-frame vector draws.
     this._terrainSprite = null; // PIXI.Sprite of the cached terrain RenderTexture
@@ -259,6 +271,7 @@ export class Renderer {
     frameViews = null,
     profiler = null,
     visualSamples = null,
+    visualUnitOverrides = null,
   } = {}) {
     this._profiler = profiler || null;
     const time = (label, fn) => profiler ? profiler.time(label, fn) : fn();
@@ -316,6 +329,10 @@ export class Renderer {
     time("renderer.visualSamples", () => {
       this._drawSafely("visualSamples", () => this._drawVisualSamples(visualSamples, { state, camera }));
     });
+    let visualUnitOverrideMap = new Map();
+    time("renderer.visualUnitOverrides", () => {
+      visualUnitOverrideMap = this._resolveVisualUnitOverridesSafely(visualUnitOverrides, entities).overrides;
+    });
 
     // Nodes currently being mined: any worker latched to them. Used by
     // _drawResource to overlay an X marker.
@@ -348,7 +365,11 @@ export class Renderer {
       for (const e of regularEntities) {
         liveIds.add(e.id);
         if (isUnit(e.kind)) {
-          this._drawEntitySafely("unit", e, "units", () => this._drawUnit(e, colorByOwner, state));
+          this._drawEntitySafely("unit", e, "units", () => {
+            this._drawUnit(e, colorByOwner, state, {
+              visualOverride: visualUnitOverrideMap.get(e.id) || null,
+            });
+          });
         }
       }
     });
@@ -365,7 +386,9 @@ export class Renderer {
       for (const e of shotReveals) {
         liveIds.add(e.id);
         this._drawEntitySafely("shotReveal", e, "shotReveals", () => {
-          this._drawShotRevealUnit(e, colorByOwner, state);
+          this._drawShotRevealUnit(e, colorByOwner, state, {
+            visualOverride: visualUnitOverrideMap.get(e.id) || null,
+          });
         });
       }
     });
@@ -483,6 +506,88 @@ export class Renderer {
       labelDisplayObjects: 0,
       layerChildCount: 0,
     };
+  }
+
+  visualUnitOverrideDiagnostics() {
+    return this._visualUnitOverrideDiagnostics || {
+      rules: 0,
+      activeOverrides: 0,
+      errors: 0,
+      candidateCount: 0,
+    };
+  }
+
+  _visualUnitRigCandidateRegistry() {
+    if (!this._visualUnitRigCandidates) {
+      this._visualUnitRigCandidates = compileVisualUnitRigCandidates();
+    }
+    return this._visualUnitRigCandidates;
+  }
+
+  _resolveVisualUnitOverridesSafely(rules, entities) {
+    try {
+      return this._resolveVisualUnitOverrides(rules, entities);
+    } catch (err) {
+      const error = Object.freeze({
+        reason: "resolver-error",
+        ruleId: "renderer",
+        index: -1,
+        candidateId: "",
+        message: `Visual unit override resolution failed: ${err?.message || String(err)}`,
+      });
+      const result = {
+        overrides: new Map(),
+        errors: [error],
+        diagnostics: Object.freeze({
+          rules: Array.isArray(rules) ? rules.length : 0,
+          activeOverrides: 0,
+          errors: 1,
+        }),
+      };
+      this._visualUnitOverrideDiagnostics = {
+        ...result.diagnostics,
+        candidateCount: this._visualUnitRigCandidates?.definitions?.size || 0,
+      };
+      publishVisualUnitOverrideDiagnostics(result);
+      this._recordRenderError("visualUnitOverrides", err);
+      this._recordRenderDiagnostic("renderer.visualUnitOverrides.active", 0);
+      this._recordRenderDiagnostic("renderer.visualUnitOverrides.invalid", 1);
+      return result;
+    }
+  }
+
+  _resolveVisualUnitOverrides(rules, entities) {
+    if (!Array.isArray(rules) || rules.length === 0) {
+      const empty = {
+        overrides: new Map(),
+        errors: [],
+        diagnostics: { rules: 0, activeOverrides: 0, errors: 0 },
+      };
+      this._visualUnitOverrideDiagnostics = {
+        ...empty.diagnostics,
+        candidateCount: this._visualUnitRigCandidates?.definitions?.size || 0,
+      };
+      publishVisualUnitOverrideDiagnostics(empty);
+      return empty;
+    }
+    const registry = this._visualUnitRigCandidateRegistry();
+    const resolved = resolveVisualUnitOverrides(rules, entities, registry.definitions, {
+      candidateErrors: registry.errors,
+    });
+    this._visualUnitOverrideDiagnostics = {
+      ...resolved.diagnostics,
+      candidateCount: registry.definitions.size,
+    };
+    publishVisualUnitOverrideDiagnostics(resolved);
+    for (const error of resolved.errors) {
+      this._recordRenderError(
+        `visualUnitOverride:${error.ruleId}:${error.reason}`,
+        new Error(error.message),
+      );
+    }
+    this._recordRenderDiagnostic("renderer.visualUnitOverrides.active", resolved.overrides.size);
+    this._recordRenderDiagnostic("renderer.visualUnitOverrides.invalid", resolved.errors.length);
+    return resolved;
   }
 
   _drawMissingTexture(entity, poolName) {
