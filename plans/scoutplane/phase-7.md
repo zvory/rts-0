@@ -2,7 +2,22 @@
 
 ## Phase Status
 
-Status: pending.
+Status: done.
+
+Completion notes:
+
+- Added focused Rust regressions for the approved Scout Plane numeric/non-combat contract, team
+  aerial vision without leaking owner-private telemetry to allies, and invalid utility/ability
+  command filtering for planes.
+- Added a minimap contract that keeps Scout Planes on the aircraft-shaped blip path while ordinary
+  ground units continue to draw square minimap dots.
+- The requirements audit found existing focused coverage for the remaining production, active-limit,
+  upkeep, projection, checkpoint, lab, rendering, command-card, hotkey, AI-exclusion, and teardown
+  bullets, so this phase did not change product behavior or balance.
+- Manual review route: run a normal local match for the production flow below, and optionally open
+  `/lab?room=scout-plane-review&map=Default` to start a blank lab, spawn a Kriegsia Scout Plane from
+  the Lab panel, and inspect selection, retargeting, queued retargeting, dismissal, minimap shape,
+  and rematch teardown.
 
 ## Objective
 

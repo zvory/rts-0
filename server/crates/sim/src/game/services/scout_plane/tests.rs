@@ -5,6 +5,10 @@ use crate::game::map::{Map, MapMetadata, CURRENT_MAP_VERSION};
 use crate::game::teams::TeamRelations;
 use crate::game::{Game, PlayerInit, SimCommand};
 use crate::protocol::terrain;
+use crate::rules::{
+    combat,
+    defs::{self, TechRequirement, WeaponClass},
+};
 use std::collections::HashMap;
 
 const EPS: f32 = 0.01;
@@ -53,12 +57,40 @@ fn players_with_ai_opponent() -> [PlayerInit; 2] {
     players
 }
 
-fn empty_game(map: Map) -> Game {
-    let players = players();
+fn players_with_ally() -> [PlayerInit; 3] {
+    [
+        PlayerInit {
+            id: 1,
+            team_id: 1,
+            faction_id: "kriegsia".to_string(),
+            name: "One".to_string(),
+            color: "#fff".to_string(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            team_id: 1,
+            faction_id: "kriegsia".to_string(),
+            name: "Two".to_string(),
+            color: "#88f".to_string(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 3,
+            team_id: 3,
+            faction_id: "kriegsia".to_string(),
+            name: "Three".to_string(),
+            color: "#000".to_string(),
+            is_ai: false,
+        },
+    ]
+}
+
+fn empty_game_for_players(player_inits: &[PlayerInit], map: Map, seed: u32) -> Game {
     let mut game = Game::new_direct_start_for_test(
-        &players,
+        player_inits,
         Some((1_000, 1_000)),
-        0x5150_7003,
+        seed,
         None,
         Some(map),
         test_metadata(),
@@ -69,6 +101,11 @@ fn empty_game(map: Map) -> Game {
     crate::game::systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.clear_and_rebuild_derived_state_for_test();
     game
+}
+
+fn empty_game(map: Map) -> Game {
+    let players = players();
+    empty_game_for_players(&players, map, 0x5150_7003)
 }
 
 fn spawn_city_centre(game: &mut Game, owner: u32, x: f32, y: f32) -> u32 {
@@ -128,6 +165,33 @@ fn distance(a: (f32, f32), b: (f32, f32)) -> f32 {
     let dx = a.0 - b.0;
     let dy = a.1 - b.1;
     (dx * dx + dy * dy).sqrt()
+}
+
+#[test]
+fn scout_plane_requirement_numbers_and_non_combat_contract_are_stable() {
+    let def = defs::unit_def(EntityKind::ScoutPlane).expect("Scout Plane def");
+    assert_eq!(def.trained_at, Some(EntityKind::CityCentre));
+    assert!(matches!(
+        def.train_requirement,
+        TechRequirement::Any(requirements) if requirements == defs::SCOUT_PLANE_UNLOCK_BUILDINGS
+    ));
+    assert_eq!(def.weapon, WeaponClass::None);
+    assert_eq!(combat::default_weapon_kind(EntityKind::ScoutPlane), None);
+    assert_eq!(def.stats.hp, 40);
+    assert_eq!(def.stats.dmg, 0);
+    assert_eq!(def.stats.range_tiles, 0);
+    assert_eq!(def.stats.cooldown, 0);
+    assert_eq!(def.stats.speed, 2.0);
+    assert_eq!(def.stats.sight_tiles, 12);
+    assert_eq!(def.stats.cost_steel, 50);
+    assert_eq!(def.stats.cost_oil, 50);
+    assert_eq!(def.stats.supply, 0);
+    assert_eq!(def.stats.build_ticks, config::TICK_HZ * 20);
+    assert_eq!(def.stats.radius, 0.0);
+    assert_eq!(config::SCOUT_PLANE_ORBIT_RADIUS_TILES, 4);
+    assert_eq!(config::SCOUT_PLANE_UPKEEP_OIL, 1);
+    assert_eq!(config::SCOUT_PLANE_UPKEEP_INTERVAL_TICKS, 20);
+    assert_eq!(config::SCOUT_PLANE_FUEL_RESERVE_OIL, 8);
 }
 
 #[test]
@@ -219,6 +283,40 @@ fn scout_plane_stamps_aerial_fog_and_projects_to_owner() {
         .find(|entity| entity.id == plane)
         .expect("full-world diagnostics should still include hidden plane state");
     assert!(full_plane.scout_plane.is_some());
+}
+
+#[test]
+fn scout_plane_team_vision_reveals_without_private_ally_state() {
+    let players = players_with_ally();
+    let mut game = empty_game_for_players(&players, test_map(40), 0x5150_7005);
+    let plane_pos = game.state.map.tile_center(10, 10);
+    let enemy_pos = game.state.map.tile_center(13, 10);
+    let plane = spawn_plane(&mut game, 1, plane_pos.0, plane_pos.1);
+    let hidden_enemy = game
+        .state
+        .entities
+        .spawn_unit(3, EntityKind::Rifleman, enemy_pos.0, enemy_pos.1)
+        .expect("enemy should spawn");
+
+    game.tick();
+
+    let ally = game.snapshot_for(2);
+    let ally_plane = ally
+        .entities
+        .iter()
+        .find(|entity| entity.id == plane)
+        .expect("same-team player should see the Scout Plane through team aerial vision");
+    assert_eq!(
+        ally_plane.scout_plane, None,
+        "allied projection should not expose owner-private fuel/orbit telemetry"
+    );
+    assert!(
+        ally.entities.iter().any(|entity| entity.id == hidden_enemy),
+        "same-team player should receive enemy entities revealed by Scout Plane sight"
+    );
+    let (tx, ty) = game.state.map.tile_of(enemy_pos.0, enemy_pos.1);
+    let index = (ty * game.state.map.size + tx) as usize;
+    assert_eq!(ally.visible_tiles.get(index).copied(), Some(1));
 }
 
 #[test]
@@ -517,17 +615,22 @@ fn duplicate_scout_plane_does_not_add_extra_aerial_fog_before_cleanup() {
         &game.state.smokes,
     );
     let teams = game.team_relations();
-    game.state.fog.stamp_scout_plane_sources_for_teams_with_smoke(
-        &game.state.map,
-        &game.state.entities,
-        &game.state.smokes,
-        &teams,
-    );
+    game.state
+        .fog
+        .stamp_scout_plane_sources_for_teams_with_smoke(
+            &game.state.map,
+            &game.state.entities,
+            &game.state.smokes,
+            &teams,
+        );
     game.rebuild_final_spatial();
 
     let snapshot = game.snapshot_for(1);
     assert!(
-        snapshot.entities.iter().all(|entity| entity.id != hidden_enemy),
+        snapshot
+            .entities
+            .iter()
+            .all(|entity| entity.id != hidden_enemy),
         "duplicate Scout Planes should not grant extra aerial fog before tick cleanup"
     );
 }
@@ -855,6 +958,92 @@ fn combat_and_hold_commands_do_not_apply_to_plane() {
             Order::Attack(_)
         ),
         "Scout Planes should not be legal explicit attack targets"
+    );
+}
+
+#[test]
+fn utility_and_ability_commands_do_not_apply_to_plane() {
+    let mut game = empty_game(test_map(40));
+    let plane = spawn_plane(&mut game, 1, 96.0, 96.0);
+    let node = game
+        .state
+        .entities
+        .spawn_node(EntityKind::Steel, 160.0, 96.0)
+        .expect("resource node should spawn");
+    let depot = game
+        .state
+        .entities
+        .spawn_building(1, EntityKind::Depot, 224.0, 96.0, true)
+        .expect("deconstruct target should spawn");
+    let original_center = plane_state(&game, plane).orbit_center;
+    let entity_count_before = game.state.entities.iter().count();
+    let smoke_count_before = game.state.smokes.iter().count();
+    let resources_before = game
+        .state
+        .players
+        .iter()
+        .find(|player| player.id == 1)
+        .map(|player| (player.steel, player.oil))
+        .expect("player should exist");
+
+    game.enqueue(
+        1,
+        SimCommand::Gather {
+            units: vec![plane],
+            node,
+            queued: false,
+        },
+    );
+    game.enqueue(
+        1,
+        SimCommand::Build {
+            units: vec![plane],
+            building: EntityKind::TankTrap,
+            tile_x: 8,
+            tile_y: 8,
+            queued: false,
+        },
+    );
+    game.enqueue(
+        1,
+        SimCommand::Deconstruct {
+            units: vec![plane],
+            target: depot,
+            queued: false,
+        },
+    );
+    game.enqueue(
+        1,
+        SimCommand::UseAbility {
+            ability: AbilityKind::Smoke,
+            units: vec![plane],
+            x: Some(192.0),
+            y: Some(96.0),
+            queued: false,
+        },
+    );
+    game.tick();
+
+    let plane_entity = game.state.entities.get(plane).expect("plane should remain");
+    assert_eq!(
+        plane_entity.scout_plane_state().unwrap().orbit_center,
+        original_center
+    );
+    assert!(matches!(plane_entity.order(), Order::Idle));
+    assert!(plane_entity.queued_orders().is_empty());
+    assert_eq!(plane_entity.target_id(), None);
+    assert_eq!(game.state.entities.iter().count(), entity_count_before);
+    assert!(game.state.entities.get(depot).is_some());
+    assert!(game.state.active_construction_sites.is_empty());
+    assert_eq!(game.state.smokes.iter().count(), smoke_count_before);
+    assert_eq!(
+        game.state
+            .players
+            .iter()
+            .find(|player| player.id == 1)
+            .map(|player| (player.steel, player.oil)),
+        Some(resources_before),
+        "invalid utility commands must not spend resources"
     );
 }
 

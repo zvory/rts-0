@@ -628,6 +628,39 @@ function lockedEvent(clientX, clientY, button = 0, extra = {}) {
   minimap.destroy();
 }
 
+// Scout Planes draw as aircraft-shaped minimap blips instead of square ground-unit dots.
+{
+  installWindowStub();
+  const canvas = fakeRenderableCanvas({ width: 16, height: 16 });
+  const state = {
+    playerId: 1,
+    map: {
+      width: 4,
+      height: 4,
+      tileSize: 1,
+      terrain: new Array(16).fill(TERRAIN.GRASS),
+      resources: [],
+    },
+    selectedEntities() {
+      return [];
+    },
+    entitiesInterpolated() {
+      return [
+        { id: 500, owner: 1, kind: KIND.SCOUT_PLANE, x: 2, y: 2 },
+        { id: 501, owner: 1, kind: KIND.RIFLEMAN, x: 3, y: 2 },
+      ];
+    },
+    players: [{ id: 1, color: "#4878c8" }],
+  };
+  const minimap = new Minimap(canvas, state, { x: 0, y: 0, zoom: 1, viewW: 4, viewH: 4 }, null, { issueCommand() {} }, null);
+  minimap.render();
+  assert(canvas.context.calls.some((call) => call.op === "moveTo"), "Scout Plane blip starts an aircraft path");
+  assert(canvas.context.calls.filter((call) => call.op === "lineTo").length >= 3, "Scout Plane blip draws a multi-point aircraft silhouette");
+  assert(canvas.context.calls.some((call) => call.op === "stroke"), "Scout Plane blip includes an outline for readability");
+  assert(canvas.context.calls.some((call) => call.op === "fillRect"), "ordinary ground units still draw square minimap blips");
+  minimap.destroy();
+}
+
 // Cacheable fog grids repaint the fog layer only when fog revisions change.
 {
   installWindowStub();
