@@ -53,16 +53,31 @@ export function renderPngUnitRig(renderer, entity, colorByOwner, state, definiti
 export function pngAtlasCanRenderRoute(definition, atlas, route) {
   if (!definition || !atlas) return false;
   const includeParts = normalizedPartSet(route?.parts);
-  const sprites = atlasSprites(definition, atlas);
-  if (!includeParts) return sprites.length > 0;
+  if (!includeParts) return atlasSprites(definition, atlas).length > 0;
   if (includeParts.size === 0) return false;
+  const coverage = pngAtlasRouteCoverage(definition, atlas, route);
+  return coverage.coveredParts.length === includeParts.size && coverage.missingParts.length === 0;
+}
+
+export function pngAtlasRouteCoverage(definition, atlas, route) {
+  const includeParts = normalizedPartSet(route?.parts);
+  if (!definition || !atlas) {
+    return {
+      coveredParts: [],
+      missingParts: includeParts ? [...includeParts] : [],
+    };
+  }
+  const sprites = atlasSprites(definition, atlas);
   const coveredParts = new Set();
   for (const sprite of sprites) {
     for (const partId of sprite.sourceParts) {
-      if (includeParts.has(partId)) coveredParts.add(partId);
+      if (!includeParts || includeParts.has(partId)) coveredParts.add(partId);
     }
   }
-  return coveredParts.size === includeParts.size;
+  return {
+    coveredParts: [...coveredParts],
+    missingParts: includeParts ? [...includeParts].filter((partId) => !coveredParts.has(partId)) : [],
+  };
 }
 
 function createDefaultPngPixiFactory(pixi = globalThis.PIXI) {

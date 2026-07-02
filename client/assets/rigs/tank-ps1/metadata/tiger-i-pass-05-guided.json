@@ -1,0 +1,18 @@
+{
+  "candidate": "tiger-i-pass-05-guided",
+  "status": "candidate-not-active",
+  "sourceSheet": "client/assets/rigs/tank-ps1/tank-contact-sheet.png",
+  "prompt": "client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-05-guided.md",
+  "builtInImageGenSource": "/Users/az/.codex/generated_images/019f22b3-9c00-76b0-a97c-4fcc2cc1dca4/ig_04d77b9c3fbbfa52016a4654c97fe481949073967d7ed62f0e.png",
+  "candidateSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-05-guided.png",
+  "candidateAlphaSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-05-guided-alpha.png",
+  "alphaConversion": {
+    "keyColor": "#ff00ff",
+    "autoKey": "none",
+    "softMatte": true,
+    "transparentThreshold": 12,
+    "opaqueThreshold": 220,
+    "despill": true
+  },
+  "notes": "Generated from the guided 2x2 semantic tank sheet. It preserved the boxed grid, omitted the fuel/no-oil cue, and produced one reusable track-link strip, but it kept guide lines in the alpha output and added more surface detail than the target low-end raster style, so it is not wired as the active atlas."
+}

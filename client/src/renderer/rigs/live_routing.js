@@ -199,6 +199,13 @@ export function liveRigRoutesFor(kind, pools = {}) {
       parts: parts.unit,
     },
   ];
+  if (Array.isArray(parts.overlay) && parts.overlay.length > 0) {
+    routes.push({
+      poolName: pools.liveRigOverlay || "liveUnitRigOverlays",
+      layerName: pools.overlay || pools.unit || "units",
+      parts: parts.overlay,
+    });
+  }
   if (parts.effects?.length) {
     routes.push({
       poolName: pools.liveRigEffects || "liveUnitRigEffects",

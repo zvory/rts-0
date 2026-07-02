@@ -3,7 +3,7 @@ import { KIND, SETUP, STATE } from "../protocol.js";
 import { liveRigDefinitionFor, liveRigRoutesFor } from "./rigs/live_routing.js";
 import { livePngRigAtlasFor } from "./rigs/png_routing.js";
 import { createRigRenderContext } from "./rigs/animation.js";
-import { pngAtlasCanRenderRoute, renderPngUnitRig } from "./rigs/png_runtime.js";
+import { pngAtlasRouteCoverage, renderPngUnitRig } from "./rigs/png_runtime.js";
 import { renderLiveUnitRig } from "./rigs/runtime.js";
 import {
   ARTILLERY_DEPLOYED_WEAPON_ANIM_MS,
@@ -116,30 +116,62 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
   if (pngAtlas && pngAtlasTexture) {
     const renderContext = this._rigRenderContextFor?.(e, colorByOwner, state) ?? {};
     const rendered = [];
+    const fallbackPoolNames = new Set();
     for (const route of routes) {
-      if (pngAtlasCanRenderRoute(definition, pngAtlas, route)) {
+      const coverage = pngAtlasRouteCoverage(definition, pngAtlas, route);
+      if (coverage.coveredParts.length > 0) {
+        const pngRoute = coverage.missingParts.length === 0
+          ? route
+          : { ...route, parts: coverage.coveredParts };
         rendered.push(...(renderPngUnitRig(this, e, colorByOwner, state, definition, {
           atlas: pngAtlas,
           atlasTexture: pngAtlasTexture,
-          routes: [route],
+          routes: [pngRoute],
           alpha: pools.alpha,
           renderContext,
         }) || []));
-      } else {
+      }
+      if (coverage.missingParts.length > 0) {
+        const svgRoute = coverage.coveredParts.length > 0
+          ? { ...pngFallbackSvgRoute(route, pools), parts: coverage.missingParts }
+          : { ...route, parts: coverage.missingParts };
+        if (coverage.coveredParts.length > 0) fallbackPoolNames.add(svgRoute.poolName);
         rendered.push(...(renderLiveUnitRig(this, e, colorByOwner, state, definition, {
-          routes: [route],
+          routes: [svgRoute],
           alpha: pools.alpha,
           renderContext,
         }) || []));
       }
     }
+    destroyInactivePngFallbackRoutes(this, e.id, pools, fallbackPoolNames);
     return rendered;
   }
 
+  destroyInactivePngFallbackRoutes(this, e.id, pools, new Set(routes.map((route) => route.poolName)));
   return renderLiveUnitRig(this, e, colorByOwner, state, definition, {
     routes,
     alpha: pools.alpha,
   });
+}
+
+function pngFallbackSvgRoute(route, pools = {}) {
+  return {
+    ...route,
+    poolName: pools.liveRigOverlay || "liveUnitRigOverlays",
+    layerName: pools.overlay || route.layerName,
+  };
+}
+
+function destroyInactivePngFallbackRoutes(renderer, entityId, pools = {}, activePoolNames = new Set()) {
+  const poolName = pools.liveRigOverlay || "liveUnitRigOverlays";
+  if (activePoolNames.has(poolName)) return;
+  const pool = renderer._liveRigPools?.[poolName];
+  const instance = pool?.get?.(entityId);
+  if (!instance) return;
+  instance.destroy?.();
+  pool.delete(entityId);
+  renderer._seen?.[poolName]?.delete?.(entityId);
+  renderer._recordRenderDiagnostic?.(`renderer.rig.instance.destroyed.unused.${poolName}`);
 }
 
 export function _rigRenderContextFor(e, colorByOwner, state) {
@@ -174,6 +206,7 @@ export function _drawShotRevealUnit(e, colorByOwner, state) {
     effects: "shotReveals",
     liveRigShadow: "liveShotRevealRigShadows",
     liveRigUnit: "liveShotRevealRigs",
+    liveRigOverlay: "liveShotRevealRigOverlays",
     liveRigEffects: "liveShotRevealRigEffects",
     alpha,
   });
