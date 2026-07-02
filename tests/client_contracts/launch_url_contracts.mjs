@@ -149,6 +149,14 @@ async function testLabLaunchConfig() {
       "room-only lab route should prefill the catalog room label",
     );
 
+    globalThis.window.location = new URL("http://localhost/lab?room=sandbox&visualProfile=trench-variants-1");
+    config = labLaunchConfig();
+    assert(config === null, "catalog lab route should not auto-join only because visualProfile is present");
+    assert(
+      labCatalogRouteConfig().visualProfileId === "trench-variants-1",
+      "catalog lab route should retain a safe visual profile id for the selected scenario launch",
+    );
+
     globalThis.window.location = new URL("http://localhost/lab?scenario=lategame");
     config = labLaunchConfig();
     assert(
@@ -163,6 +171,33 @@ async function testLabLaunchConfig() {
       "explicit lab scenario override should be preserved",
     );
 
+    globalThis.window.location = new URL(
+      "http://localhost/lab?scenario=entrenchment_inspection&visualProfile=trench-variants-1",
+    );
+    config = labLaunchConfig();
+    assert(
+      config.visualProfileId === "trench-variants-1",
+      "lab launch should keep a safe visual profile id for local registry resolution",
+    );
+    assert(
+      config.room === "__lab__:default:map=Default:scenario=entrenchment_inspection",
+      "visual profile ids must not enter the server lab room id",
+    );
+
+    globalThis.window.location = new URL(
+      "http://localhost/lab?scenario=entrenchment_inspection&visualProfile=../bad.svg",
+    );
+    config = labLaunchConfig();
+    assert(config.visualProfileId === "", "unsafe visual profile ids are not preserved");
+    assert(
+      config.visualProfileError?.code === "invalid",
+      "unsafe visual profile ids should fail closed before registry lookup",
+    );
+    assert(
+      !config.room.includes("visualProfile") && !config.room.includes("bad.svg"),
+      "unsafe visual profile input must not leak into the server room id",
+    );
+
     globalThis.window.location = new URL("http://localhost/?room=sandbox");
     assert(labLaunchConfig() === null, "non-lab route does not auto-join a lab");
   } finally {
@@ -173,6 +208,78 @@ async function testLabLaunchConfig() {
   }
 }
 
+async function testVisualProfileRegistry() {
+  const priorFetch = globalThis.fetch;
+  globalThis.fetch = () => {
+    throw new Error("visual profile registry must not fetch");
+  };
+  try {
+    const {
+      getVisualProfile,
+      resolveVisualProfileLaunch,
+      visualProfileIds,
+    } = await import("../../client/src/visual_profiles.js");
+
+    assert(
+      visualProfileIds().includes("trench-variants-1"),
+      "visual profile registry should include the first trench workflow profile",
+    );
+    const resolved = resolveVisualProfileLaunch({ visualProfileId: "trench-variants-1" });
+    assert(
+      resolved.profile?.id === "trench-variants-1",
+      "registry should resolve checked-in visual profiles by id",
+    );
+    assert(
+      Array.isArray(resolved.profile.staticSamples),
+      "trench profile exposes staticSamples for the renderer-only Phase 2 read model",
+    );
+    assert(
+      Number.isFinite(resolved.profile.initialCamera?.x) &&
+        Number.isFinite(resolved.profile.initialCamera?.y) &&
+        Number.isFinite(resolved.profile.initialCamera?.zoom),
+      "trench profile can provide an initial camera view",
+    );
+    assert(
+      getVisualProfile("trench-variants-1") === resolved.profile,
+      "direct registry lookup returns the checked-in profile object",
+    );
+    assert(
+      getVisualProfile("constructor") === null,
+      "registry lookup must not resolve inherited object prototype names",
+    );
+
+    let lookupCount = 0;
+    const invalid = resolveVisualProfileLaunch(
+      { visualProfileId: "", visualProfileError: { code: "invalid" } },
+      () => {
+        lookupCount += 1;
+        return null;
+      },
+    );
+    assert(invalid.error?.code === "invalid", "invalid visual profile ids remain local errors");
+    assert(lookupCount === 0, "invalid visual profile ids must not reach registry lookup");
+
+    const unknown = resolveVisualProfileLaunch({ visualProfileId: "future-profile" }, () => {
+      lookupCount += 1;
+      return null;
+    });
+    assert(unknown.profile === null, "unknown safe visual profile ids should not resolve");
+    assert(unknown.error?.code === "unknown", "unknown safe visual profile ids should surface a local error");
+    assert(lookupCount === 1, "unknown safe visual profile ids perform only registry lookup");
+
+    const inheritedName = resolveVisualProfileLaunch({ visualProfileId: "toString" });
+    assert(inheritedName.profile === null, "object prototype property names are not profiles");
+    assert(
+      inheritedName.error?.code === "unknown",
+      "prototype property names should report the same local unknown-profile error",
+    );
+  } finally {
+    if (priorFetch === undefined) delete globalThis.fetch;
+    else globalThis.fetch = priorFetch;
+  }
+}
+
 await testDevWatchScenarioConfig();
 await testReplayArtifactLaunchConfig();
 await testLabLaunchConfig();
+await testVisualProfileRegistry();

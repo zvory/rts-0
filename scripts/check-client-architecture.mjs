@@ -29,6 +29,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "replay_viewer.js": "app-shell",
   "lab_control_policy.js": "app-shell",
   "room_capabilities.js": "app-shell",
+  "visual_profiles.js": "app-shell",
 
   "state.js": "model",
   "state_control_groups.js": "model",
@@ -133,8 +134,8 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   "state.js": 30123,
   // Lab MVP2 Phase 5 routes lab setup-tool cancellation through the input controller.
   "input/index.js": 40927,
-  // Artillery minimap markers forward the visual-only firing event and inject the rig icon.
-  "match.js": 47157,
+  // Visual Experimentation Phase 1 injects local lab visual profile state for renderer-only samples.
+  "match.js": 47478,
   // Artillery minimap markers add a compact visual-only firing event.
   "protocol.js": 45366,
   // Protocol cleanup split compact snapshot decoding behind protocol.js.
