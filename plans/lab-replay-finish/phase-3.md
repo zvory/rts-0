@@ -24,10 +24,15 @@ setup checkpoints from lab replays, while old `LabScenarioV1` remains only as a 
 - Rename user-facing labels and docs so new exported setup artifacts are lab checkpoint setups, not
   legacy lab scenarios.
 - Introduce lab replay save/open affordances separately from setup checkpoint import/export.
+- Audit the current `exportScenario`/`importScenario` wire and client helper names. Keep them only as
+  compatibility/setup internals with clear comments, or add new lab replay-specific helpers so new
+  save/open behavior does not extend the legacy scenario vocabulary.
 - Keep old `LabScenarioV1` import readable with explicit "legacy scenario" compatibility wording.
 - Ensure bundled catalog entries and submission previews use checkpoint-backed setup artifacts.
 - Update protocol parity/client contract tests to prevent new UI or docs from extending
   `LabScenarioV1` as the preferred path.
+- Add client contract coverage for the lab replay save/open labels and for the setup-vs-replay
+  distinction in import/export controls.
 
 ## Out Of Scope
 
