@@ -568,7 +568,7 @@ function nearPoint(call, point, epsilon = 0.001) {
     y: 100,
   };
   const mainMuzzle = { x: tank.x + 24.875, y: tank.y };
-  const coaxMuzzle = { x: tank.x + 27.575, y: tank.y - 4.1 };
+  const coaxMuzzle = { x: tank.x + 12.775, y: tank.y - 5.55 };
 
   performance.now = () => fixedNow;
   try {
@@ -627,6 +627,14 @@ function nearPoint(call, point, epsilon = 0.001) {
     feedbackGfx.calls.some((call) => call[0] === "moveTo" && nearPoint(call, coaxMuzzle)),
     "tank coax tracer starts at the coax muzzle anchor",
   );
+  assert(
+    feedbackGfx.calls.some((call) => call[0] === "lineStyle" && call[1] === 1.8 && call[2] === 0xfff0a6),
+    "tank coax tracer uses a bright MG tracer line",
+  );
+  assert(
+    feedbackGfx.calls.some((call) => call[0] === "lineStyle" && call[1] === 0.75 && call[2] === 0xffffff),
+    "tank coax tracer includes a hot core line for readability",
+  );
 }
 
 {
@@ -650,7 +658,7 @@ function nearPoint(call, point, epsilon = 0.001) {
     x: 200,
     y: 280,
   };
-  const expectedCoaxMuzzle = { x: 204.1, y: 231.4 };
+  const expectedCoaxMuzzle = { x: 205.55, y: 216.6 };
 
   performance.now = () => fixedNow;
   try {
