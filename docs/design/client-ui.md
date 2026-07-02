@@ -1260,7 +1260,8 @@ selection rings):
   point.
   Attack `weaponKind` selects feedback scale and rig muzzle origin; TankCoax uses a small
   machine-gun flash/tracer/tail from the authored coax muzzle anchor and no Tank recoil, while
-  TankCannon or default Tank attacks use cannon-scale feedback from the main muzzle anchor.
+  TankCannon or default Tank attacks use a direct tracer from the main muzzle anchor plus the
+  tank rig's half-scale artillery-style muzzle flare.
   Mortar launch events draw launch dust/recoil for recipients that can see the mortar, a black
   shell arcing from the mortar to the impact point, and a darker red dotted line/crosshair warning
   that lasts until the reported shell delay elapses or the impact event arrives. The shell

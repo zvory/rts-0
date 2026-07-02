@@ -22,6 +22,7 @@ import {
   ORDER_STAGE,
   SETUP,
   STATE,
+  WEAPON_KIND,
   isBuilding,
   isResource,
   isUnit,
@@ -1304,15 +1305,18 @@ export function _drawMuzzleFlashes(state) {
       }
     }
 
-    // Flash: bright core that scales up slightly then fades.
-    const r = baseR * (0.7 + 0.45 * t);
-    g.lineStyle(0);
-    g.beginFill(0xfff2a8, 0.85 * fade);
-    g.drawCircle(mx, my, r);
-    g.endFill();
-    g.beginFill(0xffd84a, 0.55 * fade);
-    g.drawCircle(mx, my, r * 0.55);
-    g.endFill();
+    const rigOwnsTankCannonFlash = attacker.kind === KIND.TANK && f.weaponKind !== WEAPON_KIND.TANK_COAX;
+    if (!rigOwnsTankCannonFlash) {
+      // Flash: bright core that scales up slightly then fades.
+      const r = baseR * (0.7 + 0.45 * t);
+      g.lineStyle(0);
+      g.beginFill(0xfff2a8, 0.85 * fade);
+      g.drawCircle(mx, my, r);
+      g.endFill();
+      g.beginFill(0xffd84a, 0.55 * fade);
+      g.drawCircle(mx, my, r * 0.55);
+      g.endFill();
+    }
   }
 }
 

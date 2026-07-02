@@ -116,6 +116,47 @@ test("tank rig exposes transformed main and coax muzzle anchors", () => {
   assert.ok(Math.abs(recoilingCoaxMuzzle.y - 112.775) < 0.001);
 });
 
+test("tank rig adds a half-scale artillery-style muzzle flare on cannon recoil", () => {
+  const definition = compileFixture("rig-vehicle.svg", KIND.TANK);
+  const entity = {
+    id: 9,
+    kind: KIND.TANK,
+    owner: 1,
+    x: 100,
+    y: 100,
+    hp: 100,
+    maxHp: 100,
+    state: STATE.IDLE,
+    facing: 0,
+    weaponFacing: 0,
+  };
+
+  const idle = sampleRigAnimation(definition, entity, createRigRenderContext(entity, {
+    now: fixedNow,
+    state: { weaponRecoil: () => 0 },
+  }));
+  assert.equal(idle.parts["part.tank.flashCone"].alpha, 0);
+  assert.equal(idle.parts["part.tank.flashCore"].alpha, 0);
+  assert.equal(idle.parts["part.tank.flashGlow"].alpha, 0);
+
+  const firing = sampleRigAnimation(definition, entity, createRigRenderContext(entity, {
+    now: fixedNow,
+    state: { weaponRecoil: () => 1 },
+  }));
+  const cone = firing.parts["part.tank.flashCone"];
+  const core = firing.parts["part.tank.flashCore"];
+  const glow = firing.parts["part.tank.flashGlow"];
+  assert.ok(Math.abs(cone.transform.x - 16.55) < 0.001);
+  assert.ok(Math.abs(cone.transform.y) < 0.001);
+  assert.ok(Math.abs(cone.geometryScale.x - 4) < 0.001);
+  assert.ok(Math.abs(cone.geometryScale.y - 3.533333333329) < 0.001);
+  assert.ok(Math.abs(core.geometryScale.x - 3.4) < 0.001);
+  assert.ok(Math.abs(glow.geometryScale.x - 3) < 0.001);
+  assert.ok(Math.abs(cone.alpha - 1) < 0.001);
+  assert.ok(Math.abs(core.alpha - 1) < 0.001);
+  assert.ok(Math.abs(glow.alpha - 1) < 0.001);
+});
+
 test("rig runtime creates one container child per part and updates transforms", () => {
   const definition = compileFixture("rig-worker.svg", KIND.WORKER);
   const instance = createUnitRigInstance(KIND.WORKER, definition, createInspectionPixiFactory());
@@ -391,7 +432,8 @@ test("live rig routes expose kind-specific production part groups", () => {
   assert.equal(tankRoutes[1].parts.includes("part.barrel"), true);
   assert.equal(tankRoutes[1].parts.includes("part.coaxBarrel"), true);
   assert.equal(tankRoutes[1].parts.includes("part.fuelCue.box"), true);
-  assert.equal(tankRoutes.length, 2);
+  assert.equal(tankRoutes.length, 3);
+  assert.deepEqual(tankRoutes[2].parts, ["part.tank.flashCone", "part.tank.flashCore", "part.tank.flashGlow"]);
 });
 
 test("default Worker draw uses live SVG rig without enabling comparison", () => {
@@ -430,19 +472,24 @@ test("default Tank draw uses live SVG rig with separate turret and hull parts", 
   assert.equal(renderer._liveRigPools.liveUnitRigShadows.size, 1);
   assert.equal(renderer._liveRigPools.liveUnitRigs.size, 1);
   assert.equal(renderer._liveRigPools.liveUnitRigOverlays.size, 0);
+  assert.equal(renderer._liveRigPools.liveUnitRigEffects.size, 1);
   const unit = renderer._liveRigPools.liveUnitRigs.get(entity.id);
+  const effects = renderer._liveRigPools.liveUnitRigEffects.get(entity.id);
   assert.equal(unit.parts.get("part.hull").display.rotation, 0);
   assert.equal(unit.parts.get("part.turret").display.rotation, Math.PI / 2);
   assert.equal(unit.parts.get("part.barrel").display.rotation, Math.PI / 2);
+  assert.equal(effects.parts.get("part.tank.flashCore").display.visible, true);
+  assert.equal(effects.parts.get("part.tank.flashCore").display.alpha, 0);
   assert.equal(unit.parts.get("part.shadow").display.visible, false);
   assert.equal(unit.parts.get("part.fuelCue.box").display.visible, false);
 });
 
 test("tank PNG atlas route splits omitted shadow and fuel cue back to SVG", () => {
   const definition = compileFixture("rig-vehicle.svg", KIND.TANK);
-  const [shadowRoute, unitRoute] = liveRigRoutesFor(KIND.TANK);
+  const [shadowRoute, unitRoute, effectRoute] = liveRigRoutesFor(KIND.TANK);
   assert.equal(pngAtlasCanRenderRoute(definition, TANK_PNG_RIG_ATLAS, shadowRoute), false);
   assert.equal(pngAtlasCanRenderRoute(definition, TANK_PNG_RIG_ATLAS, unitRoute), false);
+  assert.equal(pngAtlasCanRenderRoute(definition, TANK_PNG_RIG_ATLAS, effectRoute), false);
   const unitCoverage = pngAtlasRouteCoverage(definition, TANK_PNG_RIG_ATLAS, unitRoute);
   assert.equal(unitCoverage.coveredParts.includes("part.hull"), true);
   assert.equal(unitCoverage.coveredParts.includes("part.turret"), true);
@@ -473,15 +520,18 @@ test("tank PNG atlas route splits omitted shadow and fuel cue back to SVG", () =
   const shadow = renderer._liveRigPools.liveUnitRigShadows.get(entity.id);
   const unit = renderer._liveRigPools.liveUnitRigs.get(entity.id);
   const overlay = renderer._liveRigPools.liveUnitRigOverlays.get(entity.id);
+  const effects = renderer._liveRigPools.liveUnitRigEffects.get(entity.id);
   assert.equal(contextCallCount, 1);
   assert.equal(typeof shadow.matches, "function");
   assert.equal(shadow.parts.get("part.shadow").display.visible, true);
   assert.equal(typeof unit.matchesPngAtlasRig, "function");
   assert.equal(typeof overlay.matches, "function");
+  assert.equal(typeof effects.matches, "function");
   assert.equal(unit.parts.has("sprite.hull"), true);
   assert.equal(unit.parts.has("sprite.turret"), true);
   assert.equal(unit.parts.has("sprite.fuelCue"), false);
   assert.equal(overlay.parts.get("part.fuelCue.box").display.visible, false);
+  assert.equal(effects.parts.get("part.tank.flashCore").display.alpha, 0);
   assert.equal(unit.parts.get("sprite.turret").display.rotation, Math.PI / 2);
 });
 
@@ -509,7 +559,9 @@ test("tank PNG atlas SVG fallback is destroyed when same id no longer needs it",
   renderer._drawUnit(entity, new Map([[1, 0x336699]]), { playerId: 1, resources: { oil: 10 }, weaponRecoil: () => 0 });
 
   const overlay = renderer._liveRigPools.liveUnitRigOverlays.get(entity.id);
+  const effects = renderer._liveRigPools.liveUnitRigEffects.get(entity.id);
   assert.equal(typeof overlay.matches, "function");
+  assert.equal(typeof effects.matches, "function");
 
   renderer._drawUnit({
     ...entity,
@@ -519,7 +571,9 @@ test("tank PNG atlas SVG fallback is destroyed when same id no longer needs it",
 
   const workerRig = renderer._liveRigPools.liveUnitRigs.get(entity.id);
   assert.equal(overlay._destroyed, true);
+  assert.equal(effects._destroyed, true);
   assert.equal(renderer._liveRigPools.liveUnitRigOverlays.has(entity.id), false);
+  assert.equal(renderer._liveRigPools.liveUnitRigEffects.has(entity.id), false);
   assert.equal(workerRig.kind, KIND.WORKER);
   assert.equal(workerRig.parts.has("part.body"), true);
 });
@@ -623,17 +677,21 @@ function makeRigRenderer() {
       liveUnitRigShadows: new Map(),
       liveUnitRigs: new Map(),
       liveUnitRigOverlays: new Map(),
+      liveUnitRigEffects: new Map(),
       liveShotRevealRigShadows: new Map(),
       liveShotRevealRigs: new Map(),
       liveShotRevealRigOverlays: new Map(),
+      liveShotRevealRigEffects: new Map(),
     },
     _liveRigRoutes: {
       liveUnitRigShadows: { poolName: "liveUnitRigShadows", layerName: "unitShadows" },
       liveUnitRigs: { poolName: "liveUnitRigs", layerName: "units" },
       liveUnitRigOverlays: { poolName: "liveUnitRigOverlays", layerName: "units" },
+      liveUnitRigEffects: { poolName: "liveUnitRigEffects", layerName: "units" },
       liveShotRevealRigShadows: { poolName: "liveShotRevealRigShadows", layerName: "shotRevealShadows" },
       liveShotRevealRigs: { poolName: "liveShotRevealRigs", layerName: "shotReveals" },
       liveShotRevealRigOverlays: { poolName: "liveShotRevealRigOverlays", layerName: "shotReveals" },
+      liveShotRevealRigEffects: { poolName: "liveShotRevealRigEffects", layerName: "shotReveals" },
     },
     _rigPixiFactory: createInspectionPngPixiFactory(),
     _pools: { unitShadows: new Map(), units: new Map(), shotRevealShadows: new Map(), shotReveals: new Map() },
@@ -645,9 +703,11 @@ function makeRigRenderer() {
       liveUnitRigShadows: new Set(),
       liveUnitRigs: new Set(),
       liveUnitRigOverlays: new Set(),
+      liveUnitRigEffects: new Set(),
       liveShotRevealRigShadows: new Set(),
       liveShotRevealRigs: new Set(),
       liveShotRevealRigOverlays: new Set(),
+      liveShotRevealRigEffects: new Set(),
     },
     layers: {
       unitShadows: new FakeContainer(),

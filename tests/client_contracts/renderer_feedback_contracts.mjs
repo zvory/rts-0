@@ -630,15 +630,13 @@ function nearPoint(call, point, epsilon = 0.001) {
   }
 
   const circles = feedbackGfx.calls.filter((call) => call[0] === "drawCircle");
-  assert(circles.length >= 4, "same-tick tank cannon and coax both draw visible muzzle flashes");
+  assert(circles.length >= 2, "same-tick tank coax still draws visible muzzle flashes");
   const cannonCircles = circles.filter((call) => nearPoint(call, mainMuzzle));
   const coaxCircles = circles.filter((call) => nearPoint(call, coaxMuzzle));
-  assert(cannonCircles.length >= 2, "tank cannon muzzle flash uses the animated main muzzle anchor");
+  const cannonTraceStarts = feedbackGfx.calls.filter((call) => call[0] === "moveTo" && nearPoint(call, mainMuzzle));
+  assert(cannonTraceStarts.length >= 1, "tank cannon tracer uses the animated main muzzle anchor");
+  assert(cannonCircles.length === 0, "tank cannon circular muzzle flash is suppressed for the rig-authored flare");
   assert(coaxCircles.length >= 2, "tank coax muzzle flash uses the animated coax muzzle anchor");
-  assert(
-    cannonCircles.some((call) => call[3] > 7),
-    "tank cannon keeps cannon-scale muzzle feedback",
-  );
   assert(
     coaxCircles.every((call) => call[3] <= 7),
     "tank coax muzzle flash uses machine-gun scale rather than Tank cannon scale",

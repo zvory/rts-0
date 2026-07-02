@@ -185,18 +185,22 @@ export class Renderer {
       liveUnitRigShadows: new Map(),
       liveUnitRigs: new Map(),
       liveUnitRigOverlays: new Map(),
+      liveUnitRigEffects: new Map(),
       liveShotRevealRigShadows: new Map(),
       liveShotRevealRigs: new Map(),
       liveShotRevealRigOverlays: new Map(),
+      liveShotRevealRigEffects: new Map(),
       buildingRigs: new Map(),
     };
     this._liveRigRoutes = {
       liveUnitRigShadows: { poolName: "liveUnitRigShadows", layerName: "unitShadows" },
       liveUnitRigs: { poolName: "liveUnitRigs", layerName: "units" },
       liveUnitRigOverlays: { poolName: "liveUnitRigOverlays", layerName: "units" },
+      liveUnitRigEffects: { poolName: "liveUnitRigEffects", layerName: "units" },
       liveShotRevealRigShadows: { poolName: "liveShotRevealRigShadows", layerName: "shotRevealShadows" },
       liveShotRevealRigs: { poolName: "liveShotRevealRigs", layerName: "shotReveals" },
       liveShotRevealRigOverlays: { poolName: "liveShotRevealRigOverlays", layerName: "shotReveals" },
+      liveShotRevealRigEffects: { poolName: "liveShotRevealRigEffects", layerName: "shotReveals" },
       buildingRigs: { poolName: "buildingRigs", layerName: "buildings" },
     };
     for (const key of Object.keys(this._liveRigPools)) this._seen[key] = new Set();
