@@ -612,7 +612,8 @@ team. A defeated/disconnected teammate stops contributing live sight; if that pl
 has a living member, their own connection continues to receive the surviving team's current
 visibility. Allied non-resource entities visible through team current fog expose full read-only
 inspection details: hp/state/facing/setup state, production or research kind/progress/queue length,
-construction progress, gatherer latched node, active Breakthrough status, and safe combat tracers.
+Scout Plane queue presence, construction progress, gatherer latched node, active Breakthrough
+status, and safe combat tracers.
 Combat `targetId` and `weaponFacing` for allied units are sent only when the target is visible in
 the recipient's team-current actionable fog, so allied units attacking hidden enemies do not reveal
 hidden target ids or target directions. `steel`, `oil`, supply, `upgrades`, rallies, order plans,
@@ -643,7 +644,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 31. `client/src/net.js` calls
+`messagepack-compact`, codec version 1, compact snapshot version 32. `client/src/net.js` calls
 `parseServerFrame`; the binary frame parser in `client/src/protocol_frame.js` returns the raw
 compact snapshot object, then `decodeCompactSnapshot` expands it back into the semantic object above
 before dispatching `S.SNAPSHOT`.
@@ -669,7 +670,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 31,
+  "v": 32,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
@@ -678,7 +679,7 @@ adds an explicit application compression envelope.
       buildProgress?, latchedNode?, targetId?, setupState?, remaining?, rally?, oilUsed?,
       setupFacing?, orderPlan?, chargeCooldownLeft?, abilities?, breakthroughTicks?,
       visionOnly?, debugPath?, rallyPlan?, prodUpgrade?, buildActive?, deconstructProgress?,
-      weaponRangeTiles?, occupiedTrenchId?, scoutPlane?
+      weaponRangeTiles?, occupiedTrenchId?, scoutPlane?, prodScoutPlaneQueued?
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
@@ -858,6 +859,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   prodUpgrade?: string,          // upgrade currently being researched
   prodProgress?: f32,            // 0..1
   prodQueue?: u32,               // queued count (including the in-progress one)
+  prodScoutPlaneQueued?: bool,   // owner/allied; true if any queued item is a Scout Plane
   // buildings under construction:
   buildProgress?: f32,           // 0..1; when present and <1, render as scaffolding
   buildActive?: bool,            // owner-only; true when server advanced this scaffold this tick
@@ -1231,6 +1233,72 @@ API without mutating the room or creating any Git branch.
   reviewNotes?: string // PR/reviewer context, max 2000 bytes
 }
 ```
+`LabReplayArtifactV1` is the portable lab-session artifact contract owned by `rts-protocol`
+because it is a shareable JSON file shape and reuses the public `Command` DTO for issued commands.
+It is not sim-private `LabOp`, not `LabSession.operationLog`, and not the room-local
+`LabTimeline` keyframe list. The first schema is latest-version-only:
+```
+{
+  schema: "rts.labReplay",
+  schemaVersion: 1,
+  kind: "labReplay",
+  serverBuildSha: string,
+  authoring: {
+    name: string,              // max 120 bytes
+    author?: string,           // max 80 bytes
+    createdAtUnixMs?: u64,
+    description?: string,      // max 2000 bytes
+    tags?: string[]            // max 16, each max 32 safe ASCII bytes
+  },
+  initialSetup: LabCheckpointScenarioV1,
+  timeline: {
+    initialTick: u32,          // must match initialSetup.metadata.exportedTick
+    durationTicks: u32,        // final replayable tick
+    keyframeIntervalTicks: 2000
+  },
+  operations: [{
+    sequence: u64,             // contiguous from 0
+    tick: u32,                 // nondecreasing and within timeline bounds
+    requestId: u32,            // nonzero original lab request id
+    operatorId: u32,           // nonzero room connection id, not necessarily a game player
+    op: LabReplayOperation
+  }]
+}
+```
+Whole artifacts are capped at 8 MiB. The operation stream is capped at 50,000 entries, each
+non-setup operation payload is capped at 64 KiB, and embedded `GameCheckpointV1` text payloads in
+the initial setup are capped at 4 MiB. A lab replay may be saved/opened by a bounded local-file or
+future HTTP/dev-artifact path; it is not carried through the current WebSocket `lab` request
+envelope because long lab sessions can exceed that control frame budget.
+
+`LabReplayOperation` deliberately promotes only replayable lab state changes:
+```
+{ op: "spawnEntity", owner: u32, kind: string, x: f32, y: f32, completed?: bool }
+{ op: "deleteEntity", entityId: u32 }
+{ op: "moveEntity", entityId: u32, x: f32, y: f32 }
+{ op: "setEntityOwner", entityId: u32, owner: u32 }
+{ op: "setPlayerResources", playerId: u32, steel: u32, oil: u32 }
+{ op: "setPlayerGodMode", playerId: u32, enabled: bool }
+{ op: "setCompletedResearch", playerId: u32, upgrade: string, completed: bool }
+{ op: "issueCommandAs", playerId: u32, cmd: Command, ignoreCommandLimits?: bool }
+```
+`setVision` is excluded because it is per-operator projection metadata; reopening a lab replay
+starts from `initialSetup.metadata.lab.vision` and connected viewers may choose their own current
+lab vision afterward. `exportScenario`, `validateScenario`, and `submitScenario` are UI/control
+requests and never enter the durable stream. Checkpoint setup import uses rebase semantics: the
+artifact replaces `initialSetup` with the imported `LabCheckpointScenarioV1` and clears prior
+operations instead of storing an import operation. That keeps later entity references unambiguous:
+after a rebase, operation entity ids refer to the rebased setup's current ids, and
+`initialSetup.metadata.sourceEntityIdMap` remains the only setup-import id-remap record. Seeking
+into the past and then accepting a new lab mutation truncates future operation entries just like
+the room-local timeline does.
+
+Lab replay import validates schema/kind/version, artifact bytes, authoring metadata, checkpoint
+map binding, player/team ids, lab metadata, entity ids and allocator facts, operation count,
+operation payload sizes, non-finite coordinates, stale entity references, bad player ids, command
+unit caps (`256` normally, `4096` when `ignoreCommandLimits` is true), timeline order, and rejects
+excluded session/setup/import operations before mutating a live lab game.
+
 Accepted validation returns `{ summary, preview }` in `labResult.outcome`; `preview` includes
 `manifestEntry`, `manifestPath`, `scenarioPath`, deterministic `scenarioJson`, and `reviewNotes`
 for the future server-side PR submission flow.

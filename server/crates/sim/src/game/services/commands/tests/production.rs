@@ -539,6 +539,80 @@ fn scout_plane_training_rejects_second_active_or_in_production_plane_before_spen
 }
 
 #[test]
+fn scout_plane_training_rejects_second_plane_queued_behind_another_city_centre_item() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 6, 6);
+    let city_centre = entities
+        .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
+        .expect("city centre should spawn");
+    let (vw_x, vw_y) = footprint_center(&map, EntityKind::Factory, 12, 6);
+    entities
+        .spawn_building(1, EntityKind::Factory, vw_x, vw_y, true)
+        .expect("vehicle works should spawn");
+    let mut players = vec![player_state(1), player_state(2)];
+
+    apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![
+            (
+                1,
+                SimCommand::Train {
+                    building: city_centre,
+                    unit: EntityKind::Worker,
+                },
+            ),
+            (
+                1,
+                SimCommand::Train {
+                    building: city_centre,
+                    unit: EntityKind::ScoutPlane,
+                },
+            ),
+        ],
+    );
+    let resources_after_queue = (
+        players[0].steel,
+        players[0].oil,
+        players[0].supply_used,
+        players[0].supply_cap,
+    );
+    let queue = entities.get(city_centre).expect("city centre").prod_queue();
+    assert_eq!(queue.len(), 2);
+    assert_eq!(queue[0].unit, EntityKind::Worker);
+    assert_eq!(queue[1].unit, EntityKind::ScoutPlane);
+
+    let events = apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(
+            1,
+            SimCommand::Train {
+                building: city_centre,
+                unit: EntityKind::ScoutPlane,
+            },
+        )],
+    );
+
+    let queue = entities.get(city_centre).expect("city centre").prod_queue();
+    assert_eq!(queue.len(), 2);
+    assert_eq!(
+        (
+            players[0].steel,
+            players[0].oil,
+            players[0].supply_used,
+            players[0].supply_cap,
+        ),
+        resources_after_queue,
+        "hidden queued Scout Plane rejection must happen before spending resources"
+    );
+    assert_notice(&events, 1, "Scout Plane already in production");
+}
+
+#[test]
 fn panzerfaust_training_reports_resource_and_supply_blocks() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();

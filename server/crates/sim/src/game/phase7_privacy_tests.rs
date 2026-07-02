@@ -84,6 +84,36 @@ fn allied_snapshot_exposes_read_only_details_but_not_private_controls() {
             .expect("city centre should spawn");
     }
 
+    let ally_city_pos = game.state.map.tile_center(15, 2);
+    let ally_city_centre = game
+        .state
+        .entities
+        .spawn_building(
+            2,
+            EntityKind::CityCentre,
+            ally_city_pos.0,
+            ally_city_pos.1,
+            true,
+        )
+        .expect("ally producing city centre should spawn");
+    {
+        let building = game
+            .state
+            .entities
+            .get_mut(ally_city_centre)
+            .expect("city centre exists");
+        building.push_production(ProdItem {
+            unit: EntityKind::Worker,
+            progress: 30,
+            total: 120,
+        });
+        building.push_production(ProdItem {
+            unit: EntityKind::ScoutPlane,
+            progress: 0,
+            total: 600,
+        });
+    }
+
     let barracks_pos = game.state.map.tile_center(7, 2);
     let barracks = game.state.entities
         .spawn_building(
@@ -170,6 +200,18 @@ fn allied_snapshot_exposes_read_only_details_but_not_private_controls() {
     assert_eq!(barracks_view.rally, None);
     assert!(barracks_view.rally_plan.is_empty());
     assert!(barracks_view.order_plan.is_empty());
+
+    let city_centre_view = snapshot
+        .entities
+        .iter()
+        .find(|entity| entity.id == ally_city_centre)
+        .expect("ally city centre should be visible");
+    assert_eq!(city_centre_view.prod_kind.as_deref(), Some(kinds::WORKER));
+    assert_eq!(city_centre_view.prod_queue, Some(2));
+    assert!(
+        city_centre_view.prod_scout_plane_queued,
+        "allied production details include hidden Scout Plane queue presence"
+    );
 
     let research_view = snapshot
         .entities

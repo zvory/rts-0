@@ -809,6 +809,21 @@ function fakeHudRootWithoutResourceSpans() {
   assert(!producingScoutPlaneCard.slots[6].unaffordable, "in-production Scout Plane block is not a resource-feedback state");
   assert(producingScoutPlaneCard.slots[6].title === "Scout Plane already in production", "Scout Plane in-production tooltip should explain the one-plane limit");
 
+  const queuedBehindWorkerCityCentre = {
+    ...scoutPlaneCityCentre,
+    prodKind: KIND.WORKER,
+    prodQueue: 2,
+    state: STATE.TRAIN,
+    prodScoutPlaneQueued: true,
+  };
+  const queuedBehindWorkerScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [queuedBehindWorkerCityCentre],
+    entities: [queuedBehindWorkerCityCentre, completedGunWorks],
+    resources: { steel: 100, oil: 100, supplyUsed: 0, supplyCap: 10 },
+  }));
+  assert(!queuedBehindWorkerScoutPlaneCard.slots[6].enabled, "Scout Plane button should disable when a queued plane is behind another City Centre item");
+  assert(queuedBehindWorkerScoutPlaneCard.slots[6].title === "Scout Plane already in production", "hidden queued Scout Plane flag should use the in-production reason");
+
   const optimisticScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [scoutPlaneCityCentre],
     entities: [scoutPlaneCityCentre, completedGunWorks],

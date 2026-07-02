@@ -69,6 +69,17 @@ export const LAB_CHECKPOINT_SCENARIO = Object.freeze({
   SCHEMA_VERSION: 1,
 });
 
+export const LAB_REPLAY = Object.freeze({
+  SCHEMA: "rts.labReplay",
+  KIND: "labReplay",
+  SCHEMA_VERSION: 1,
+  TIMELINE_KEYFRAME_INTERVAL_TICKS: 2000,
+  MAX_ARTIFACT_BYTES: 8 * 1024 * 1024,
+  MAX_OPERATIONS: 50000,
+  MAX_OPERATION_JSON_BYTES: 64 * 1024,
+  MAX_CHECKPOINT_PAYLOAD_BYTES: 4 * 1024 * 1024,
+});
+
 // --- Command discriminators (the `c` field) ---
 export const CMD = Object.freeze({
   MOVE: "move",
@@ -254,7 +265,7 @@ export const MOVEMENT_PATH_DIAGNOSTICS = Object.freeze({
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";
-export const COMPACT_SNAPSHOT_VERSION = 31;
+export const COMPACT_SNAPSHOT_VERSION = 32;
 export const SNAPSHOT_CODEC_VERSION = 1;
 export const SNAPSHOT_CODEC = Object.freeze({
   COMPACT_JSON: "compact-json",

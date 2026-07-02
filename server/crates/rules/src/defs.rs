@@ -28,7 +28,7 @@ pub struct UnitDef {
     pub armor_class: ArmorClass,
     pub weapon: WeaponClass,
     pub trained_at: Option<EntityKind>,
-    pub train_requires: &'static [EntityKind],
+    pub train_requirement: TechRequirement,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -45,6 +45,21 @@ pub struct BuildingDef {
 pub struct NodeDef {
     pub kind: EntityKind,
     pub amount: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TechRequirement {
+    All(&'static [EntityKind]),
+    Any(&'static [EntityKind]),
+}
+
+impl TechRequirement {
+    pub fn is_met(self, owned: &[EntityKind]) -> bool {
+        match self {
+            Self::All(requirements) => requirements.iter().all(|req| owned.contains(req)),
+            Self::Any(requirements) => requirements.iter().any(|req| owned.contains(req)),
+        }
+    }
 }
 
 const CITY_CENTRE_UNITS: &[EntityKind] = &[EntityKind::Worker, EntityKind::ScoutPlane];
@@ -95,7 +110,7 @@ pub const UNITS: &[UnitDef] = &[
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::SmallArms,
         trained_at: Some(EntityKind::CityCentre),
-        train_requires: &[],
+        train_requirement: TechRequirement::All(&[]),
     },
     UnitDef {
         kind: EntityKind::Golem,
@@ -115,7 +130,7 @@ pub const UNITS: &[UnitDef] = &[
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::SmallArms,
         trained_at: Some(EntityKind::Zamok),
-        train_requires: &[],
+        train_requirement: TechRequirement::All(&[]),
     },
     UnitDef {
         kind: EntityKind::Rifleman,
@@ -135,7 +150,7 @@ pub const UNITS: &[UnitDef] = &[
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::SmallArms,
         trained_at: Some(EntityKind::Barracks),
-        train_requires: &[],
+        train_requirement: TechRequirement::All(&[]),
     },
     UnitDef {
         kind: EntityKind::MachineGunner,
@@ -155,7 +170,7 @@ pub const UNITS: &[UnitDef] = &[
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::SmallArms,
         trained_at: Some(EntityKind::Barracks),
-        train_requires: TRAINING_CENTRE_REQUIRED,
+        train_requirement: TechRequirement::All(TRAINING_CENTRE_REQUIRED),
     },
     UnitDef {
         kind: EntityKind::Panzerfaust,
@@ -175,7 +190,7 @@ pub const UNITS: &[UnitDef] = &[
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::AntiTank,
         trained_at: Some(EntityKind::Barracks),
-        train_requires: TRAINING_CENTRE_REQUIRED,
+        train_requirement: TechRequirement::All(TRAINING_CENTRE_REQUIRED),
     },
     UnitDef {
         kind: EntityKind::AntiTankGun,
@@ -195,7 +210,7 @@ pub const UNITS: &[UnitDef] = &[
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::AntiTank,
         trained_at: Some(EntityKind::Steelworks),
-        train_requires: STEELWORKS_REQUIRED,
+        train_requirement: TechRequirement::All(STEELWORKS_REQUIRED),
     },
     UnitDef {
         kind: EntityKind::MortarTeam,
@@ -215,7 +230,7 @@ pub const UNITS: &[UnitDef] = &[
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::SmallArms,
         trained_at: Some(EntityKind::Steelworks),
-        train_requires: STEELWORKS_REQUIRED,
+        train_requirement: TechRequirement::All(STEELWORKS_REQUIRED),
     },
     UnitDef {
         kind: EntityKind::Artillery,
@@ -235,7 +250,7 @@ pub const UNITS: &[UnitDef] = &[
         armor_class: ArmorClass::Hard,
         weapon: WeaponClass::None,
         trained_at: Some(EntityKind::Steelworks),
-        train_requires: STEELWORKS_REQUIRED,
+        train_requirement: TechRequirement::All(STEELWORKS_REQUIRED),
     },
     UnitDef {
         kind: EntityKind::Tank,
@@ -255,7 +270,7 @@ pub const UNITS: &[UnitDef] = &[
         armor_class: ArmorClass::Armored,
         weapon: WeaponClass::AntiTank,
         trained_at: Some(EntityKind::Factory),
-        train_requires: FACTORY_BUILDING_REQUIRED,
+        train_requirement: TechRequirement::All(FACTORY_BUILDING_REQUIRED),
     },
     UnitDef {
         kind: EntityKind::ScoutCar,
@@ -275,7 +290,7 @@ pub const UNITS: &[UnitDef] = &[
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::SmallArms,
         trained_at: Some(EntityKind::Factory),
-        train_requires: &[],
+        train_requirement: TechRequirement::All(&[]),
     },
     UnitDef {
         kind: EntityKind::ScoutPlane,
@@ -295,7 +310,7 @@ pub const UNITS: &[UnitDef] = &[
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::None,
         trained_at: Some(EntityKind::CityCentre),
-        train_requires: SCOUT_PLANE_UNLOCK_BUILDINGS,
+        train_requirement: TechRequirement::Any(SCOUT_PLANE_UNLOCK_BUILDINGS),
     },
     UnitDef {
         kind: EntityKind::CommandCar,
@@ -315,7 +330,7 @@ pub const UNITS: &[UnitDef] = &[
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::None,
         trained_at: Some(EntityKind::Factory),
-        train_requires: FACTORY_BUILDING_REQUIRED,
+        train_requirement: TechRequirement::All(FACTORY_BUILDING_REQUIRED),
     },
     UnitDef {
         kind: EntityKind::Ekat,
@@ -335,7 +350,7 @@ pub const UNITS: &[UnitDef] = &[
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::None,
         trained_at: None,
-        train_requires: &[],
+        train_requirement: TechRequirement::All(&[]),
     },
 ];
 
@@ -721,7 +736,10 @@ mod tests {
         assert_eq!(def.armor_class, ArmorClass::Small);
         assert_eq!(def.weapon, WeaponClass::AntiTank);
         assert_eq!(def.trained_at, Some(EntityKind::Barracks));
-        assert_eq!(def.train_requires, TRAINING_CENTRE_REQUIRED);
+        assert_eq!(
+            def.train_requirement,
+            TechRequirement::All(TRAINING_CENTRE_REQUIRED)
+        );
         assert!(
             building_def(EntityKind::Barracks)
                 .expect("barracks def")

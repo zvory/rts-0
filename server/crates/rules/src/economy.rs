@@ -73,13 +73,8 @@ pub fn train_requirement_met(
     unit_kind: EntityKind,
     owned_complete_building_kinds: &[EntityKind],
 ) -> bool {
-    if unit_kind == EntityKind::ScoutPlane {
-        return defs::SCOUT_PLANE_UNLOCK_BUILDINGS
-            .iter()
-            .any(|req| owned_complete_building_kinds.contains(req));
-    }
     defs::unit_def(unit_kind)
-        .map(|d| requirements_met(d.train_requires, owned_complete_building_kinds))
+        .map(|d| d.train_requirement.is_met(owned_complete_building_kinds))
         .unwrap_or(true)
 }
 

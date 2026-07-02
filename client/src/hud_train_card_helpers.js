@@ -154,7 +154,7 @@ function scoutPlaneInProduction(ctx, isOwn) {
     isOwn(ctx, e) &&
       e.kind === KIND.CITY_CENTRE &&
       e.buildProgress == null &&
-      e.prodKind === KIND.SCOUT_PLANE &&
+      (e.prodScoutPlaneQueued === true || e.prodKind === KIND.SCOUT_PLANE) &&
       ((e.prodQueue ?? 1) > 0 || e.state === STATE.TRAIN)
   );
 }

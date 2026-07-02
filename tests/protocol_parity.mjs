@@ -18,6 +18,7 @@ import {
   KIND,
   KIND_CODE,
   LAB_CHECKPOINT_SCENARIO,
+  LAB_REPLAY,
   LAB_SCENARIO,
   LAB_ROLE,
   LAB_VISION,
@@ -54,9 +55,11 @@ import { PLAYER_PALETTE } from "../client/src/config.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const rustProtocolPath = path.join(repoRoot, "server/crates/protocol/src/lib.rs");
+const rustProtocolLabReplayPath = path.join(repoRoot, "server/crates/protocol/src/lab_replay.rs");
 const rustProtocolLabScenarioPath = path.join(repoRoot, "server/crates/protocol/src/lab_scenario.rs");
 const rust = [
   fs.readFileSync(rustProtocolPath, "utf8"),
+  fs.readFileSync(rustProtocolLabReplayPath, "utf8"),
   fs.readFileSync(rustProtocolLabScenarioPath, "utf8"),
 ].join("\n");
 const rustClientNetReport = fs.readFileSync(
@@ -103,6 +106,7 @@ const STABLE_JS_PROTOCOL_EXPORTS = [
   "KIND",
   "KIND_CODE",
   "LAB_ROLE",
+  "LAB_REPLAY",
   "LAB_VISION",
   "LOBBY_KIND",
   "MOVEMENT_PATH_DIAGNOSTICS",
@@ -275,7 +279,7 @@ assert(
   "compact snapshot scalar schema must match JS decoder",
 );
 assert(
-  protocolContract.compactSlotSchemas.entity.at(-1).name === "scoutPlane",
+  protocolContract.compactSlotSchemas.entity.at(-1).name === "prodScoutPlaneQueued",
   "compact entity slot schema must include the latest appended field",
 );
 assert(
@@ -454,8 +458,25 @@ assert(
     LAB_SCENARIO.SCHEMA_VERSION === 1 &&
     LAB_CHECKPOINT_SCENARIO.KIND === "labCheckpointScenario" &&
     LAB_CHECKPOINT_SCENARIO.SCHEMA_VERSION === 1 &&
+    LAB_REPLAY.SCHEMA === "rts.labReplay" &&
+    LAB_REPLAY.KIND === "labReplay" &&
+    LAB_REPLAY.SCHEMA_VERSION === 1 &&
+    LAB_REPLAY.TIMELINE_KEYFRAME_INTERVAL_TICKS === 2000 &&
+    LAB_REPLAY.MAX_OPERATIONS === 50000 &&
+    LAB_REPLAY.MAX_ARTIFACT_BYTES === 8 * 1024 * 1024 &&
+    LAB_REPLAY.MAX_OPERATION_JSON_BYTES === 64 * 1024 &&
+    LAB_REPLAY.MAX_CHECKPOINT_PAYLOAD_BYTES === 4 * 1024 * 1024 &&
+    rust.includes("LabReplayArtifactV1") &&
+    rust.includes("LAB_REPLAY_ARTIFACT_KIND") &&
+    rust.includes("IssueCommandAs") &&
+    rust.includes("SetPlayerGodMode") &&
     protocolDoc.includes("LabScenarioPayload") &&
     protocolDoc.includes("LabCheckpointScenarioV1") &&
+    protocolDoc.includes("LabReplayArtifactV1") &&
+    protocolDoc.includes("rts.labReplay") &&
+    protocolDoc.includes("labReplay") &&
+    protocolDoc.includes("issueCommandAs") &&
+    protocolDoc.includes("setVision") &&
     protocolDoc.includes("LabScenarioV1") &&
     protocolDoc.includes("LabScenarioOrder") &&
     protocolDoc.includes("setUp") &&
