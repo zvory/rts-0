@@ -104,6 +104,13 @@ export class Match {
     this.labMetadata = options.labMetadata || null;
     this.labClient = options.labClient || null;
     this.labControlPolicy = options.labControlPolicy || null;
+    this.visualProfile = options.visualProfile || null;
+    this.visualProfileError = options.visualProfileError || null;
+    if (typeof window !== "undefined") {
+      window.__rtsVisualProfile = this.visualProfile || this.visualProfileError
+        ? { profile: this.visualProfile, error: this.visualProfileError }
+        : null;
+    }
     this.onLabToolChange = options.onLabToolChange || null;
     this.labToolWorldClickHandler = null;
     this.labToolBoxSelectionHandler = null;

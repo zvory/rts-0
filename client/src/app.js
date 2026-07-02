@@ -51,6 +51,7 @@ import {
 } from "./lab_scenario_submission_capability.js";
 import { SettingsContainer } from "./settings_container.js";
 import { buildSettingsTabs } from "./settings_panels.js";
+import { resolveVisualProfileLaunch } from "./visual_profiles.js";
 
 /**
  * App-level heartbeat interval (ms). The server drops connections idle for 40s,
@@ -87,6 +88,7 @@ export class App {
     this.devWatch = devWatchConfig();
     this.labCatalogLaunch = labCatalogRouteConfig();
     this.labLaunch = labLaunchConfig();
+    this.labVisualProfileState = resolveVisualProfileLaunch(this.labLaunch || this.labCatalogLaunch);
     this.replayLaunch = replayLaunchConfig();
     /**
      * Audio engine. Long-lived across matches: the AudioContext is unlocked
@@ -220,6 +222,20 @@ export class App {
     if (this.lobby?.roomBlock) this.lobby.roomBlock.hidden = true;
     if (this.labCatalogLaunch) this.labCatalog?.setStatus("Starting lab...");
     else this.lobby.setStatus("Starting lab...");
+    this.showLabVisualProfileNotice();
+  }
+
+  showLabVisualProfileNotice() {
+    const launch = this.labLaunch || this.labCatalogLaunch;
+    if (!launch?.visualProfileId && !launch?.visualProfileError) return;
+    const state = this.labVisualProfileState || { profile: null, error: null };
+    if (state.error) {
+      this.showToast(state.error.message, 10000);
+      return;
+    }
+    if (state.profile) {
+      this.showToast(`Visual profile: ${state.profile.label || state.profile.id}`, 5000);
+    }
   }
 
   showLabCatalog() {
@@ -231,11 +247,19 @@ export class App {
       root: dom.labEntryScreen,
       initialRoom: this.labCatalogLaunch?.room || "default",
       onStart: (selection) => {
-        this.labLaunch = buildLabLaunchConfig(selection);
+        this.labLaunch = {
+          ...buildLabLaunchConfig({
+            ...selection,
+            visualProfile: this.labCatalogLaunch?.visualProfileId || "",
+          }),
+          visualProfileError: this.labCatalogLaunch?.visualProfileError || null,
+        };
+        this.labVisualProfileState = resolveVisualProfileLaunch(this.labLaunch);
         this.maybeAutoJoinLab();
       },
     });
     this.labCatalog.mount();
+    this.showLabVisualProfileNotice();
   }
 
   /**
@@ -310,8 +334,14 @@ export class App {
     const startsReplay = !!payload?.replay;
     const preserveScorePanel = startsReplay && !dom.gameOver.hidden;
     const capabilities = createRoomCapabilities({ startPayload: payload });
+    const labMetadata = payload?.lab || null;
+    const visualProfile = labMetadata ? this.labVisualProfileState?.profile || null : null;
+    const visualProfileError = labMetadata ? this.labVisualProfileState?.error || null : null;
 
-    const carriedCamera = this.takeMatchCameraView() || this.pendingCameraView;
+    const carriedCamera = this.takeMatchCameraView() ||
+      this.pendingCameraView ||
+      visualProfile?.initialCamera ||
+      null;
     this.pendingCameraView = null;
 
     // If a previous match somehow lingers, tear it down first.
@@ -331,7 +361,6 @@ export class App {
     }
 
     const MatchClass = startsReplay ? ReplayViewer : Match;
-    const labMetadata = payload?.lab || null;
     if (labMetadata) {
       this.labClient = new LabClient(this.net);
       this.labClient.setInitialState(labMetadata);
@@ -364,6 +393,8 @@ export class App {
         labMetadata,
         labClient: this.labClient,
         labControlPolicy: this.labControlPolicy,
+        visualProfile,
+        visualProfileError,
         onLabToolChange: (change) => this.labPanel?.applyLabToolChange?.(change),
       },
     );

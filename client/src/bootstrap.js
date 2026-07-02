@@ -159,20 +159,32 @@ function safeLabSeed(value) {
   return /^[0-9]+$/.test(raw) && Number(raw) <= 0xffffffff ? raw : "";
 }
 
+function safeLabVisualProfile(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return { id: "", error: null };
+  if (!/^[A-Za-z0-9_-]{1,48}$/.test(raw)) {
+    return { id: "", error: { code: "invalid" } };
+  }
+  return { id: raw, error: null };
+}
+
 function isLabPath(pathname) {
   return pathname === "/lab" || pathname === "/lab/";
 }
 
-export function buildLabLaunchConfig({ room, map, seed = "", scenario = "" } = {}) {
+export function buildLabLaunchConfig({ room, map, seed = "", scenario = "", visualProfile = "" } = {}) {
   const publicRoom = safeLabToken(room, "default", 40);
   const mapName = safeLabToken(map, "Default", 48);
   const seedPart = safeLabSeed(seed);
   const scenarioId = safeLabToken(scenario, "", 48);
+  const visualProfileResult = safeLabVisualProfile(visualProfile);
   return {
     room: `__lab__:${publicRoom}:map=${mapName}${seedPart ? `:seed=${seedPart}` : ""}${scenarioId ? `:scenario=${scenarioId}` : ""}`,
     publicRoom,
     map: mapName,
     scenario: scenarioId,
+    visualProfileId: visualProfileResult.id,
+    visualProfileError: visualProfileResult.error,
     banner: `lab ${publicRoom} map=${mapName}${scenarioId ? ` scenario=${scenarioId}` : ""}`,
   };
 }
@@ -181,8 +193,11 @@ export function labCatalogRouteConfig() {
   if (!isLabPath(window.location.pathname)) return null;
   const params = new URLSearchParams(window.location.search);
   if (params.has("scenario") || params.has("map") || params.has("seed")) return null;
+  const visualProfileResult = safeLabVisualProfile(params.get("visualProfile"));
   return {
     room: safeLabToken(params.get("room"), "default", 40),
+    visualProfileId: visualProfileResult.id,
+    visualProfileError: visualProfileResult.error,
   };
 }
 
@@ -195,6 +210,7 @@ export function labLaunchConfig() {
     map: params.get("map"),
     seed: params.get("seed"),
     scenario: params.get("scenario"),
+    visualProfile: params.get("visualProfile"),
   });
 }
 
