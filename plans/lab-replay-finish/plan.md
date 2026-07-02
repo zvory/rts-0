@@ -61,8 +61,24 @@ rollback, old artifact behavior, lab replay portability, and any remaining clean
   or from old scenario setup instructions.
 - Lab operation replay should use the same public `Game` lab API seam used by live lab operations.
   Do not reach into `GameState` internals from lobby/server replay code.
+- The portable lab replay operation stream must be durable, typed, and replayable. Do not serialize
+  `LabSession.operation_log`, because it is display/count metadata, and do not treat in-memory
+  `LabTimeline` keyframes as the source of portable truth.
+- A timeline reset or setup import must not silently drop artifact history. Either record the import
+  as a durable operation that can be replayed from the original baseline, or explicitly rebase the
+  artifact by replacing the initial checkpoint-backed setup and clearing prior operation entries.
+- Seeking into the past and applying a new lab operation must truncate future portable artifact
+  entries the same way it truncates the room-local timeline.
 - Preserve id remapping semantics for setup imports. Any operation that imports a checkpoint setup
   must make later operation references unambiguous.
+- Decide and document the crate/DTO ownership boundary before adding types. A stable lab replay
+  artifact may reuse the existing wire `Command` shape, but it must not expose sim-private `LabOp`
+  internals unless those operation DTOs are deliberately promoted to a shared contract/protocol
+  surface with parity coverage.
+- Save/open transport and caps must be explicit. Long lab replay artifacts may exceed the current
+  WebSocket lab scenario frame budget, so each phase that introduces import/export behavior must name
+  whether the path is WebSocket lab op, HTTP/dev route, local file-only client handling, or another
+  bounded route.
 - Keep old replay schema 2 and `LabScenarioV1` loading until the new lab replay path has passed CI
   and manual use on representative artifacts. Removal belongs in Phase 4, not in the first
   implementation phase.
