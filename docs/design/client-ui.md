@@ -272,8 +272,10 @@ Prototype raster rig workflow:
   animation bindings, part ids, recoil, facing, and route split; the PNG atlas only supplies
   pixels for those sampled parts. The current tank atlas is an enabled visual experiment, not final
   art: it uses the pass-06 Tiger I hull/body and turret/barrel cells while transparent track frames
-  suppress track rendering. The atlas metadata is normalized to visible alpha bounds so generated
-  cell padding/edge artifacts do not affect in-game scale. See
+  suppress track rendering. The current active variant is the no-imagegen `pass06-bright` atlas,
+  which applies ImageMagick brightness/saturation modulation after normalization. The atlas metadata
+  is normalized to visible alpha bounds so generated cell padding/edge artifacts do not affect
+  in-game scale. See
   [raster-unit-art-handoff.md](raster-unit-art-handoff.md) for the methodology, rejected imagegen
   passes, and next validation work.
 - `scripts/art/tank-raster-pipeline.mjs` builds the tank contact sheet, records the exact prompt

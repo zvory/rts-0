@@ -170,6 +170,9 @@ function writeAtlas(args) {
   const visiblePadding = nonNegativeInteger(args["visible-padding"], normalizeVisibleBounds ? 2 : 0);
   const imageVersion = safeVersionArg(args["image-version"]);
   const promptFile = args["prompt-file"] ? path.resolve(repoRoot, String(args["prompt-file"])) : promptPath;
+  const brightness = percentArg(args.brightness, 100);
+  const saturation = percentArg(args.saturation, 100);
+  const hue = percentArg(args.hue, 100);
   const compiled = compileTankRig();
   const partIds = compiled.definition.parts.map((part) => part.id);
   const sheetSpec = sheetForProfile(compiled.definition, profile);
@@ -190,6 +193,9 @@ function writeAtlas(args) {
   }
   if (clearCellEdgeAlpha > 0) {
     clearAtlasCellEdgeAlpha(atlasPath, cells, columns, rows, width, height, clearCellEdgeAlpha);
+  }
+  if (brightness !== 100 || saturation !== 100 || hue !== 100) {
+    modulateAtlasColor(atlasPath, { brightness, saturation, hue });
   }
   const frames = {};
   const sprites = profile === "semantic"
@@ -241,6 +247,11 @@ function writeAtlas(args) {
         blankCells,
       },
       imageVersion,
+      colorAdjustment: {
+        brightness,
+        saturation,
+        hue,
+      },
     },
     frames,
     sprites,
@@ -748,6 +759,15 @@ function clearAtlasAlpha(file, drawOps) {
   ]);
 }
 
+function modulateAtlasColor(file, { brightness, saturation, hue }) {
+  run("magick", [
+    file,
+    "-modulate",
+    `${brightness},${saturation},${hue}`,
+    file,
+  ]);
+}
+
 function rectangleDrawOp(x0, y0, x1, y1) {
   return `rectangle ${Math.round(x0)},${Math.round(y0)} ${Math.round(x1)},${Math.round(y1)}`;
 }
@@ -772,6 +792,15 @@ function nonNegativeInteger(value, fallback) {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < 0) {
     throw new Error(`expected non-negative integer, got ${value}`);
+  }
+  return parsed;
+}
+
+function percentArg(value, fallback) {
+  if (value == null) return fallback;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 400) {
+    throw new Error(`expected percentage in (0, 400], got ${value}`);
   }
   return parsed;
 }
@@ -830,7 +859,7 @@ function rel(file) {
 function usage() {
   console.error(`Usage:
   node scripts/art/tank-raster-pipeline.mjs make-sheet [--scale 3] [--columns 2] [--layout tight] [--profile semantic] [--key #ff00ff]
-  node scripts/art/tank-raster-pipeline.mjs write-atlas --sheet <png> [--columns 2] [--layout tight] [--profile semantic] [--transparent-key #ff00ff] [--disabled] [--blank-cells cell[,cell]] [--normalize-visible-bounds] [--clear-cell-edge-alpha 16] [--visible-padding 2] [--image-version pass-id] [--prompt-file metadata/prompt.md]
+  node scripts/art/tank-raster-pipeline.mjs write-atlas --sheet <png> [--columns 2] [--layout tight] [--profile semantic] [--transparent-key #ff00ff] [--disabled] [--blank-cells cell[,cell]] [--normalize-visible-bounds] [--clear-cell-edge-alpha 16] [--visible-padding 2] [--brightness 120] [--saturation 100] [--hue 100] [--image-version pass-id] [--prompt-file metadata/prompt.md]
   node scripts/art/tank-raster-pipeline.mjs write-prompt`);
 }
 

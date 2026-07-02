@@ -35,8 +35,10 @@ alignment checks, so it should not be treated as accepted art.
 - `client/assets/rigs/tank-ps1/generated/` keeps generated candidates and alpha-converted copies.
 - `client/assets/rigs/tank-ps1/tank-atlas.png` is the enabled pass-06 runtime atlas. It uses only
   the generated hull/body and turret/barrel cells; the top row is transparent so generated/default
-  tracks are not rendered during this experiment. The runtime sprite frames are normalized to the
-  visible component alpha bounds, not the full generated cell bounds.
+  tracks are not rendered during this experiment. The current active variant is `pass06-bright`,
+  which applies ImageMagick brightness/saturation modulation after normalization. The runtime
+  sprite frames are normalized to the visible component alpha bounds, not the full generated cell
+  bounds.
 - `client/src/renderer/rigs/tank_png_atlas.js` is generated metadata. Its `enabled` field is
   currently `true` for the pass-06 experiment.
 - `client/src/renderer/rigs/png_runtime.js` and `png_routing.js` render atlas sprites in place of
@@ -157,7 +159,9 @@ node scripts/art/tank-raster-pipeline.mjs write-atlas \
   --normalize-visible-bounds \
   --clear-cell-edge-alpha 16 \
   --visible-padding 2 \
-  --image-version pass06-normalized \
+  --brightness 130 \
+  --saturation 105 \
+  --image-version pass06-bright \
   --prompt-file client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-06-lowpoly.md \
   --model "built-in image generation" \
   --notes "Experimental Tiger I low-poly raster pass 06."
@@ -240,6 +244,9 @@ cheap checks before any generated atlas can be enabled.
   writer now clears generated guide-edge alpha and normalizes frames to visible alpha bounds, which
   fixes the earlier too-small render and black cell-box artifacts. Not final art: the hull has an
   open turret-ring hole and component alignment still needs review.
+- `tank-tiger-i-pass-06-lowpoly-bright-body-turret-alpha.png`: active no-imagegen brightness pass.
+  Derived from pass 06 with `--brightness 130 --saturation 105`, retaining the same normalized
+  component frames and no-track behavior while making the tank read more clearly on the map.
 
 These candidates are useful references for what to avoid. None should be treated as accepted art.
 

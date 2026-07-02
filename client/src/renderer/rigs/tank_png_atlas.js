@@ -11,7 +11,7 @@ function deepFreeze(value) {
 export const TANK_PNG_RIG_ATLAS = deepFreeze({
   "enabled": true,
   "unit": "tank",
-  "image": "/assets/rigs/tank-ps1/tank-atlas.png?v=pass06-normalized",
+  "image": "/assets/rigs/tank-ps1/tank-atlas.png?v=pass06-bright",
   "viewBox": {
     "x": -40,
     "y": -32,
@@ -25,7 +25,7 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
     "profile": "semantic",
     "width": 1774,
     "height": 887,
-    "sourceSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-06-lowpoly-body-turret-alpha.png",
+    "sourceSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-06-lowpoly-alpha.png",
     "cells": [
       "reference.full",
       "sprite.track",
@@ -71,7 +71,12 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
         "sprite.track"
       ]
     },
-    "imageVersion": "pass06-normalized"
+    "imageVersion": "pass06-bright",
+    "colorAdjustment": {
+      "brightness": 130,
+      "saturation": 105,
+      "hue": 100
+    }
   },
   "frames": {},
   "sprites": [

@@ -1,6 +1,6 @@
 {
   "pipelineVersion": 1,
-  "generatedAt": "2026-07-02T21:30:21.264Z",
+  "generatedAt": "2026-07-02T21:35:13.495Z",
   "sourceSvgModule": "client/src/renderer/rigs/tank_svg.js",
   "sourceSvgRuntimeKind": "tank",
   "promptFile": "client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-06-lowpoly.md",
@@ -10,11 +10,11 @@
   "profile": "semantic",
   "width": 1774,
   "height": 887,
-  "sourceSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-06-lowpoly-body-turret-alpha.png",
+  "sourceSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-06-lowpoly-alpha.png",
   "atlas": "client/assets/rigs/tank-ps1/tank-atlas.png",
   "atlasModule": "client/src/renderer/rigs/tank_png_atlas.js",
   "prompt": "client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-06-lowpoly.md",
-  "model": "built-in image generation",
-  "notes": "Experimental Tiger I low-poly raster pass 06. The atlas writer blanks reference/track cells, clears generated cell-edge alpha, normalizes hull/body plus turret/barrel frames to visible alpha bounds, and cache-busts the atlas image so only the normalized body and turret render at SVG rig scale.",
+  "model": "built-in image generation + ImageMagick brightness pass",
+  "notes": "Experimental Tiger I low-poly raster pass 06 brightness pass. The atlas writer blanks reference/track cells, clears generated cell-edge alpha, normalizes hull/body plus turret/barrel frames to visible alpha bounds, and applies brightness 130/saturation 105 without another image generation pass.",
   "enabled": true
 }
