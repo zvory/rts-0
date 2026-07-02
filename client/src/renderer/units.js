@@ -115,28 +115,23 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
   const pngAtlasTexture = this._livePngRigAtlasTextures?.get?.(e.kind) ?? null;
   if (pngAtlas && pngAtlasTexture) {
     const renderContext = this._rigRenderContextFor?.(e, colorByOwner, state) ?? {};
-    const pngRoutes = [];
-    const svgRoutes = [];
-    for (const route of routes) {
-      if (pngAtlasCanRenderRoute(definition, pngAtlas, route)) pngRoutes.push(route);
-      else svgRoutes.push(route);
-    }
     const rendered = [];
-    if (svgRoutes.length > 0) {
-      rendered.push(...(renderLiveUnitRig(this, e, colorByOwner, state, definition, {
-        routes: svgRoutes,
-        alpha: pools.alpha,
-        renderContext,
-      }) || []));
-    }
-    if (pngRoutes.length > 0) {
-      rendered.push(...(renderPngUnitRig(this, e, colorByOwner, state, definition, {
-        atlas: pngAtlas,
-        atlasTexture: pngAtlasTexture,
-        routes: pngRoutes,
-        alpha: pools.alpha,
-        renderContext,
-      }) || []));
+    for (const route of routes) {
+      if (pngAtlasCanRenderRoute(definition, pngAtlas, route)) {
+        rendered.push(...(renderPngUnitRig(this, e, colorByOwner, state, definition, {
+          atlas: pngAtlas,
+          atlasTexture: pngAtlasTexture,
+          routes: [route],
+          alpha: pools.alpha,
+          renderContext,
+        }) || []));
+      } else {
+        rendered.push(...(renderLiveUnitRig(this, e, colorByOwner, state, definition, {
+          routes: [route],
+          alpha: pools.alpha,
+          renderContext,
+        }) || []));
+      }
     }
     return rendered;
   }
@@ -176,8 +171,10 @@ export function _drawShotRevealUnit(e, colorByOwner, state) {
   this._drawUnit(e, colorByOwner, state, {
     shadow: "shotRevealShadows",
     unit: "shotReveals",
+    effects: "shotReveals",
     liveRigShadow: "liveShotRevealRigShadows",
     liveRigUnit: "liveShotRevealRigs",
+    liveRigEffects: "liveShotRevealRigEffects",
     alpha,
   });
 }

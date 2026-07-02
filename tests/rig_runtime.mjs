@@ -115,6 +115,47 @@ test("tank rig exposes transformed main and coax muzzle anchors", () => {
   assert.ok(Math.abs(recoilingCoaxMuzzle.y - 112.775) < 0.001);
 });
 
+test("tank rig adds a half-scale artillery-style muzzle flare on cannon recoil", () => {
+  const definition = compileFixture("rig-vehicle.svg", KIND.TANK);
+  const entity = {
+    id: 9,
+    kind: KIND.TANK,
+    owner: 1,
+    x: 100,
+    y: 100,
+    hp: 100,
+    maxHp: 100,
+    state: STATE.IDLE,
+    facing: 0,
+    weaponFacing: 0,
+  };
+
+  const idle = sampleRigAnimation(definition, entity, createRigRenderContext(entity, {
+    now: fixedNow,
+    state: { weaponRecoil: () => 0 },
+  }));
+  assert.equal(idle.parts["part.tank.flashCone"].alpha, 0);
+  assert.equal(idle.parts["part.tank.flashCore"].alpha, 0);
+  assert.equal(idle.parts["part.tank.flashGlow"].alpha, 0);
+
+  const firing = sampleRigAnimation(definition, entity, createRigRenderContext(entity, {
+    now: fixedNow,
+    state: { weaponRecoil: () => 1 },
+  }));
+  const cone = firing.parts["part.tank.flashCone"];
+  const core = firing.parts["part.tank.flashCore"];
+  const glow = firing.parts["part.tank.flashGlow"];
+  assert.ok(Math.abs(cone.transform.x - 16.55) < 0.001);
+  assert.ok(Math.abs(cone.transform.y) < 0.001);
+  assert.ok(Math.abs(cone.geometryScale.x - 4) < 0.001);
+  assert.ok(Math.abs(cone.geometryScale.y - 3.533333333329) < 0.001);
+  assert.ok(Math.abs(core.geometryScale.x - 3.4) < 0.001);
+  assert.ok(Math.abs(glow.geometryScale.x - 3) < 0.001);
+  assert.ok(Math.abs(cone.alpha - 1) < 0.001);
+  assert.ok(Math.abs(core.alpha - 1) < 0.001);
+  assert.ok(Math.abs(glow.alpha - 1) < 0.001);
+});
+
 test("rig runtime creates one container child per part and updates transforms", () => {
   const definition = compileFixture("rig-worker.svg", KIND.WORKER);
   const instance = createUnitRigInstance(KIND.WORKER, definition, createInspectionPixiFactory());
@@ -390,6 +431,7 @@ test("live rig routes expose kind-specific production part groups", () => {
   assert.equal(tankRoutes[1].parts.includes("part.barrel"), true);
   assert.equal(tankRoutes[1].parts.includes("part.coaxBarrel"), true);
   assert.equal(tankRoutes[1].parts.includes("part.fuelCue.box"), true);
+  assert.deepEqual(tankRoutes[2].parts, ["part.tank.flashCone", "part.tank.flashCore", "part.tank.flashGlow"]);
 });
 
 test("default Worker draw uses live SVG rig without enabling comparison", () => {
@@ -427,18 +469,23 @@ test("default Tank draw uses live SVG rig with separate turret and hull parts", 
 
   assert.equal(renderer._liveRigPools.liveUnitRigShadows.size, 1);
   assert.equal(renderer._liveRigPools.liveUnitRigs.size, 1);
+  assert.equal(renderer._liveRigPools.liveUnitRigEffects.size, 1);
   const unit = renderer._liveRigPools.liveUnitRigs.get(entity.id);
+  const effects = renderer._liveRigPools.liveUnitRigEffects.get(entity.id);
   assert.equal(unit.parts.get("part.hull").display.rotation, 0);
   assert.equal(unit.parts.get("part.turret").display.rotation, Math.PI / 2);
   assert.equal(unit.parts.get("part.barrel").display.rotation, Math.PI / 2);
+  assert.equal(effects.parts.get("part.tank.flashCore").display.visible, true);
+  assert.equal(effects.parts.get("part.tank.flashCore").display.alpha, 0);
   assert.equal(unit.parts.get("part.shadow").display.visible, false);
 });
 
 test("tank PNG atlas route falls back to SVG for the omitted shadow", () => {
   const definition = compileFixture("rig-vehicle.svg", KIND.TANK);
-  const [shadowRoute, unitRoute] = liveRigRoutesFor(KIND.TANK);
+  const [shadowRoute, unitRoute, effectRoute] = liveRigRoutesFor(KIND.TANK);
   assert.equal(pngAtlasCanRenderRoute(definition, TANK_PNG_RIG_ATLAS, shadowRoute), false);
   assert.equal(pngAtlasCanRenderRoute(definition, TANK_PNG_RIG_ATLAS, unitRoute), true);
+  assert.equal(pngAtlasCanRenderRoute(definition, TANK_PNG_RIG_ATLAS, effectRoute), false);
 
   const entity = {
     id: 41,
@@ -571,14 +618,18 @@ function makeRigRenderer() {
     _liveRigPools: {
       liveUnitRigShadows: new Map(),
       liveUnitRigs: new Map(),
+      liveUnitRigEffects: new Map(),
       liveShotRevealRigShadows: new Map(),
       liveShotRevealRigs: new Map(),
+      liveShotRevealRigEffects: new Map(),
     },
     _liveRigRoutes: {
       liveUnitRigShadows: { poolName: "liveUnitRigShadows", layerName: "unitShadows" },
       liveUnitRigs: { poolName: "liveUnitRigs", layerName: "units" },
+      liveUnitRigEffects: { poolName: "liveUnitRigEffects", layerName: "units" },
       liveShotRevealRigShadows: { poolName: "liveShotRevealRigShadows", layerName: "shotRevealShadows" },
       liveShotRevealRigs: { poolName: "liveShotRevealRigs", layerName: "shotReveals" },
+      liveShotRevealRigEffects: { poolName: "liveShotRevealRigEffects", layerName: "shotReveals" },
     },
     _rigPixiFactory: createInspectionPngPixiFactory(),
     _pools: { unitShadows: new Map(), units: new Map(), shotRevealShadows: new Map(), shotReveals: new Map() },
@@ -589,8 +640,10 @@ function makeRigRenderer() {
       shotReveals: new Set(),
       liveUnitRigShadows: new Set(),
       liveUnitRigs: new Set(),
+      liveUnitRigEffects: new Set(),
       liveShotRevealRigShadows: new Set(),
       liveShotRevealRigs: new Set(),
+      liveShotRevealRigEffects: new Set(),
     },
     layers: {
       unitShadows: new FakeContainer(),

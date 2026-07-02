@@ -77,6 +77,12 @@ const TANK_UNIT_PARTS = Object.freeze([
   "part.fuelCue.x2",
 ]);
 
+const TANK_EFFECT_PARTS = Object.freeze([
+  "part.tank.flashCone",
+  "part.tank.flashCore",
+  "part.tank.flashGlow",
+]);
+
 const RIFLEMAN_UNIT_PARTS = Object.freeze([
   "part.body",
   "part.head",
@@ -152,6 +158,7 @@ const LIVE_RIG_PARTS = Object.freeze({
   [KIND.TANK]: Object.freeze({
     shadow: Object.freeze(["part.shadow"]),
     unit: TANK_UNIT_PARTS,
+    effects: TANK_EFFECT_PARTS,
   }),
   [KIND.WORKER]: Object.freeze({
     shadow: Object.freeze(["part.shadow"]),
@@ -180,7 +187,7 @@ export function liveRigDefinitionFor(definitions, kind) {
 export function liveRigRoutesFor(kind, pools = {}) {
   const parts = LIVE_RIG_PARTS[kind];
   if (!parts) return [];
-  return [
+  const routes = [
     {
       poolName: pools.liveRigShadow || "liveUnitRigShadows",
       layerName: pools.shadow || "unitShadows",
@@ -192,4 +199,12 @@ export function liveRigRoutesFor(kind, pools = {}) {
       parts: parts.unit,
     },
   ];
+  if (parts.effects?.length) {
+    routes.push({
+      poolName: pools.liveRigEffects || "liveUnitRigEffects",
+      layerName: pools.effects || pools.unit || "units",
+      parts: parts.effects,
+    });
+  }
+  return routes;
 }
