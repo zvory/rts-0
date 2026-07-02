@@ -184,7 +184,7 @@ function normalRightClickAction(input, p) {
       feedback: rightClickFeedback("move", target.x, target.y),
     };
   }
-  if (target && enemyOwner(input.state, target.owner) && !isResource(target.kind)) {
+  if (target && enemyOwner(input.state, target.owner) && isAttackableEntityTarget(target)) {
     if (landUnits.length === 0 && scoutPlanes.length > 0) {
       return {
         kind: "move",
@@ -307,8 +307,12 @@ function rightClickFeedback(kind, x, y) {
 
 function explicitAttackCommandTarget(state, target) {
   return !!target &&
-    !isResource(target.kind) &&
+    isAttackableEntityTarget(target) &&
     (ownOwner(state, target.owner) || enemyOwner(state, target.owner));
+}
+
+function isAttackableEntityTarget(target) {
+  return !!target && !isResource(target.kind) && target.kind !== KIND.SCOUT_PLANE;
 }
 
 function attackTargetPreviewForRightClickAction(action) {

@@ -291,6 +291,7 @@ export function isVehicleBodyKind(kind) {
     kind === KIND.ARTILLERY ||
     kind === KIND.TANK ||
     kind === KIND.SCOUT_CAR ||
+    kind === KIND.SCOUT_PLANE ||
     kind === KIND.COMMAND_CAR;
 }
 

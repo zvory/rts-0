@@ -727,6 +727,14 @@ function buttonByLabel(card, label) {
   scoutSelectionInput._commitBoxSelection = Input.prototype._commitBoxSelection;
   scoutSelectionInput._ownBuildingsOfKindInViewport = Input.prototype._ownBuildingsOfKindInViewport;
   scoutSelectionInput._closestOwnUnitKindInViewport = Input.prototype._closestOwnUnitKindInViewport;
+  assert(
+    scoutSelectionInput._worldPointHitsEntity(selectableScoutPlane, 122, 96, 32),
+    "Scout Plane click targeting uses its mirrored 48x34 selection body",
+  );
+  assert(
+    scoutSelectionInput._entityIntersectsRect(selectableScoutPlane, 119, 94, 124, 98),
+    "Scout Plane box selection uses its mirrored 48x34 selection body",
+  );
   scoutSelectionInput._commitClickSelection({ x: 96, y: 96 }, false, false);
   assert(
     Array.from(scoutSelectionState.selection).join(",") === "5500",
@@ -1321,6 +1329,23 @@ function buttonByLabel(card, label) {
       rightClickCommands[0].queued === true,
     "Scout Plane-only enemy right-click retargets orbit instead of issuing attack",
   );
+  const enemyScoutPlane = { id: 91, owner: 2, kind: KIND.SCOUT_PLANE, x: 180, y: 180 };
+  input.state = {
+    playerId: 1,
+    map: { tileSize: 32 },
+    entitiesInterpolated: () => [moveUnit, enemyScoutPlane],
+    selectedEntities: () => [moveUnit],
+    addCommandFeedback() {},
+  };
+  rightClickCommands.length = 0;
+  input._onRightClick({ x: 180, y: 180 }, { shiftKey: true });
+  assert(
+    rightClickCommands.length === 1 &&
+      rightClickCommands[0].c === "move" &&
+      rightClickCommands[0].units.join(",") === "40" &&
+      rightClickCommands[0].queued === true,
+    "right-clicking a visible enemy Scout Plane moves instead of issuing an invalid attack",
+  );
   const deconstructWorker = { id: 42, owner: 1, kind: KIND.WORKER, x: 150, y: 150 };
   const enemyTankTrap = { id: 43, owner: 2, kind: KIND.TANK_TRAP, x: 180, y: 180 };
   input.state = {
@@ -1792,6 +1817,24 @@ function buttonByLabel(card, label) {
       planeTargetedCommands[1].y === targetedEnemy.y &&
       planeTargetedCommands[1].queued === true,
     "mixed targeted attack sends attack to land units and retargets Scout Planes",
+  );
+  const targetedEnemyScoutPlane = { id: 143, owner: 2, kind: KIND.SCOUT_PLANE, x: 336, y: 336 };
+  planeTargetedCommands.length = 0;
+  planeTargetedInput._entityAtWorld = () => targetedEnemyScoutPlane;
+  planeTargetedInput.clientIntent.beginCommandTarget("attack");
+  planeTargetedInput._issueTargetedCommand({ x: targetedEnemyScoutPlane.x, y: targetedEnemyScoutPlane.y }, { shiftKey: true });
+  assert(
+    planeTargetedCommands.length === 2 &&
+      planeTargetedCommands[0].c === "attackMove" &&
+      planeTargetedCommands[0].units.join(",") === "140" &&
+      planeTargetedCommands[0].target === undefined &&
+      planeTargetedCommands[0].queued === true &&
+      planeTargetedCommands[1].c === "move" &&
+      planeTargetedCommands[1].units.join(",") === "141" &&
+      planeTargetedCommands[1].x === targetedEnemyScoutPlane.x &&
+      planeTargetedCommands[1].y === targetedEnemyScoutPlane.y &&
+      planeTargetedCommands[1].queued === true,
+    "attack targeting a visible enemy Scout Plane does not issue invalid target attacks",
   );
   planeTargetedCommands.length = 0;
   planeTargetedInput._entityAtWorld = () => null;
