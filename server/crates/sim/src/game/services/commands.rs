@@ -1163,6 +1163,15 @@ fn use_ability(
     let tick = ctx.tick;
 
     let ability = request.ability;
+    if ability == AbilityKind::DismissScoutPlane {
+        if request.queued {
+            return;
+        }
+        for unit in request.units {
+            let _ = scout_plane::dismiss(entities, player, unit);
+        }
+        return;
+    }
     let definition = ability::definition(ability);
     if request.queued && !definition.may_queue {
         return;

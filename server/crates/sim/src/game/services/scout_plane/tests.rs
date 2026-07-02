@@ -1,4 +1,5 @@
 use super::*;
+use crate::game::ability::AbilityKind;
 use crate::game::entity::{EntityKind, Order, ProdItem, RallyIntent, RallyKind, ScoutPlaneState};
 use crate::game::map::{Map, MapMetadata, CURRENT_MAP_VERSION};
 use crate::game::teams::TeamRelations;
@@ -94,6 +95,35 @@ fn plane_state(game: &Game, id: u32) -> ScoutPlaneState {
         .expect("plane state should exist")
 }
 
+fn plane_fuel(game: &Game, id: u32) -> u8 {
+    plane_state(game, id).fuel_oil
+}
+
+fn set_player_oil(game: &mut Game, player_id: u32, oil: u32) {
+    let player = game
+        .state
+        .players
+        .iter_mut()
+        .find(|player| player.id == player_id)
+        .expect("player should exist");
+    player.set_resources(player.steel, oil);
+}
+
+fn player_oil(game: &Game, player_id: u32) -> u32 {
+    game.state
+        .players
+        .iter()
+        .find(|player| player.id == player_id)
+        .expect("player should exist")
+        .oil
+}
+
+fn tick_n(game: &mut Game, ticks: u32) {
+    for _ in 0..ticks {
+        game.tick();
+    }
+}
+
 fn distance(a: (f32, f32), b: (f32, f32)) -> f32 {
     let dx = a.0 - b.0;
     let dy = a.1 - b.1;
@@ -146,7 +176,7 @@ fn inside_radius_retarget_uses_nearest_orbit_phase() {
 }
 
 #[test]
-fn scout_plane_does_not_stamp_standard_fog_before_aerial_vision_phase() {
+fn scout_plane_stamps_aerial_fog_and_projects_to_owner() {
     let mut game = empty_game(test_map(40));
     spawn_city_centre(&mut game, 1, 64.0, 64.0);
     let plane = spawn_plane(&mut game, 1, 640.0, 640.0);
@@ -158,25 +188,29 @@ fn scout_plane_does_not_stamp_standard_fog_before_aerial_vision_phase() {
 
     game.tick();
 
-    assert!(
-        game.state.entities.get(plane).is_some(),
-        "the hidden plane runtime should remain active"
-    );
     let snapshot = game.snapshot_for(1);
+    let owner_plane = snapshot
+        .entities
+        .iter()
+        .find(|entity| entity.id == plane)
+        .expect("owner should see the active Scout Plane");
     assert!(
-        snapshot.entities.iter().all(|entity| entity.id != plane),
-        "Phase 3 Scout Planes should stay out of normal player snapshots"
+        owner_plane.scout_plane.is_some(),
+        "owner projection should include private fuel/orbit state"
     );
     assert!(
-        snapshot.entities.iter().all(|entity| entity.id != hidden_enemy),
-        "Phase 3 must not let Scout Planes reveal enemies through the generic fog path"
+        snapshot
+            .entities
+            .iter()
+            .any(|entity| entity.id == hidden_enemy),
+        "Scout Plane sight should reveal nearby enemies"
     );
     let (tx, ty) = game.state.map.tile_of(704.0, 640.0);
     let index = (ty * game.state.map.size + tx) as usize;
     assert_eq!(
         snapshot.visible_tiles.get(index).copied(),
-        Some(0),
-        "the enemy tile should remain fogged until Phase 4 adds aerial Scout Plane sight"
+        Some(1),
+        "the enemy tile should be visible through aerial Scout Plane sight"
     );
     let full = game.snapshot_full_for(1);
     let full_plane = full
@@ -213,6 +247,284 @@ fn hidden_scout_plane_does_not_keep_ai_player_alive() {
     assert!(
         !game.alive_players().contains(&2),
         "hidden non-targetable planes must not satisfy the AI survival-unit predicate"
+    );
+}
+
+#[test]
+fn scout_plane_sight_ignores_terrain_and_building_blockers() {
+    let mut map = test_map(40);
+    map.terrain[(4 * map.size + 5) as usize] = terrain::ROCK;
+    let mut game = empty_game(map);
+    let plane_pos = game.state.map.tile_center(3, 4);
+    let rock_hidden_pos = game.state.map.tile_center(7, 4);
+    let depot_pos = crate::game::services::occupancy::footprint_center(
+        &game.state.map,
+        EntityKind::Depot,
+        9,
+        3,
+    );
+    let building_hidden_pos = game.state.map.tile_center(13, 4);
+    spawn_plane(&mut game, 1, plane_pos.0, plane_pos.1);
+    let rock_hidden = game
+        .state
+        .entities
+        .spawn_unit(
+            2,
+            EntityKind::Rifleman,
+            rock_hidden_pos.0,
+            rock_hidden_pos.1,
+        )
+        .expect("enemy behind rock should spawn");
+    game.state
+        .entities
+        .spawn_building(2, EntityKind::Depot, depot_pos.0, depot_pos.1, true)
+        .expect("line-of-sight blocker should spawn");
+    let building_hidden = game
+        .state
+        .entities
+        .spawn_unit(
+            2,
+            EntityKind::Rifleman,
+            building_hidden_pos.0,
+            building_hidden_pos.1,
+        )
+        .expect("enemy behind building should spawn");
+
+    game.tick();
+
+    let snapshot = game.snapshot_for(1);
+    assert!(
+        snapshot
+            .entities
+            .iter()
+            .any(|entity| entity.id == rock_hidden),
+        "Scout Plane sight should reveal through terrain blockers"
+    );
+    assert!(
+        snapshot
+            .entities
+            .iter()
+            .any(|entity| entity.id == building_hidden),
+        "Scout Plane sight should reveal through building blockers"
+    );
+}
+
+#[test]
+fn scout_plane_sight_is_blocked_by_smoke() {
+    let mut game = empty_game(test_map(40));
+    let plane_pos = game.state.map.tile_center(3, 4);
+    let smoke_pos = game.state.map.tile_center(5, 4);
+    let hidden_pos = game.state.map.tile_center(8, 4);
+    spawn_plane(&mut game, 1, plane_pos.0, plane_pos.1);
+    let hidden_enemy = game
+        .state
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, hidden_pos.0, hidden_pos.1)
+        .expect("smoke-hidden enemy should spawn");
+    game.spawn_smoke_cloud_for_test(smoke_pos.0, smoke_pos.1)
+        .expect("smoke should spawn");
+
+    game.tick();
+
+    let snapshot = game.snapshot_for(1);
+    assert!(
+        snapshot
+            .entities
+            .iter()
+            .all(|entity| entity.id != hidden_enemy),
+        "smoke between the Scout Plane and target should block aerial vision"
+    );
+    let (tx, ty) = game.state.map.tile_of(hidden_pos.0, hidden_pos.1);
+    let index = (ty * game.state.map.size + tx) as usize;
+    assert_eq!(snapshot.visible_tiles.get(index).copied(), Some(0));
+}
+
+#[test]
+fn scout_plane_upkeep_spends_oil_every_interval_and_keeps_full_reserve() {
+    let mut game = empty_game(test_map(40));
+    let plane = spawn_plane(&mut game, 1, 160.0, 160.0);
+    set_player_oil(&mut game, 1, 10);
+
+    tick_n(
+        &mut game,
+        (config::SCOUT_PLANE_UPKEEP_INTERVAL_TICKS - 1) as u32,
+    );
+    assert_eq!(player_oil(&game, 1), 10);
+    assert_eq!(
+        plane_fuel(&game, plane),
+        config::SCOUT_PLANE_FUEL_RESERVE_OIL
+    );
+
+    game.tick();
+
+    assert_eq!(player_oil(&game, 1), 9);
+    assert_eq!(
+        plane_fuel(&game, plane),
+        config::SCOUT_PLANE_FUEL_RESERVE_OIL
+    );
+}
+
+#[test]
+fn scout_plane_zero_oil_drains_reserve_and_auto_dismisses() {
+    let mut game = empty_game(test_map(40));
+    let plane = spawn_plane(&mut game, 1, 160.0, 160.0);
+    set_player_oil(&mut game, 1, 0);
+
+    tick_n(&mut game, config::SCOUT_PLANE_UPKEEP_INTERVAL_TICKS as u32);
+    assert_eq!(
+        plane_fuel(&game, plane),
+        config::SCOUT_PLANE_FUEL_RESERVE_OIL - 1
+    );
+    assert!(game.state.entities.get(plane).is_some());
+
+    tick_n(
+        &mut game,
+        config::SCOUT_PLANE_UPKEEP_INTERVAL_TICKS as u32
+            * (config::SCOUT_PLANE_FUEL_RESERVE_OIL as u32 - 1),
+    );
+
+    assert!(
+        game.state.entities.get(plane).is_none(),
+        "fuel exhaustion should automatically dismiss the Scout Plane"
+    );
+}
+
+#[test]
+fn scout_plane_oil_income_refills_reserve_before_fuel_exhaustion() {
+    let mut game = empty_game(test_map(40));
+    let plane = spawn_plane(&mut game, 1, 160.0, 160.0);
+    set_player_oil(&mut game, 1, 0);
+
+    tick_n(
+        &mut game,
+        config::SCOUT_PLANE_UPKEEP_INTERVAL_TICKS as u32 * 3,
+    );
+    assert_eq!(
+        plane_fuel(&game, plane),
+        config::SCOUT_PLANE_FUEL_RESERVE_OIL - 3
+    );
+
+    set_player_oil(&mut game, 1, 3);
+    game.tick();
+
+    assert_eq!(player_oil(&game, 1), 0);
+    assert_eq!(
+        plane_fuel(&game, plane),
+        config::SCOUT_PLANE_FUEL_RESERVE_OIL
+    );
+
+    tick_n(
+        &mut game,
+        config::SCOUT_PLANE_UPKEEP_INTERVAL_TICKS as u32 * 5,
+    );
+    assert!(
+        game.state.entities.get(plane).is_some(),
+        "refilled reserve should keep the plane alive past the original exhaustion tick"
+    );
+}
+
+#[test]
+fn manual_dismiss_removes_plane_and_stops_upkeep() {
+    let mut game = empty_game(test_map(40));
+    let plane = spawn_plane(&mut game, 1, 160.0, 160.0);
+    set_player_oil(&mut game, 1, 10);
+
+    game.enqueue(
+        1,
+        SimCommand::UseAbility {
+            ability: AbilityKind::DismissScoutPlane,
+            units: vec![plane],
+            x: None,
+            y: None,
+            queued: false,
+        },
+    );
+    game.tick();
+    tick_n(&mut game, config::SCOUT_PLANE_UPKEEP_INTERVAL_TICKS as u32);
+
+    assert!(game.state.entities.get(plane).is_none());
+    assert_eq!(
+        player_oil(&game, 1),
+        10,
+        "dismissed planes should not continue charging upkeep"
+    );
+}
+
+#[test]
+fn runtime_duplicate_cleanup_keeps_one_active_plane_per_owner() {
+    let mut game = empty_game(test_map(40));
+    let first = spawn_plane(&mut game, 1, 160.0, 160.0);
+    let second = spawn_plane(&mut game, 1, 192.0, 160.0);
+
+    game.tick();
+
+    assert!(game.state.entities.get(first).is_some());
+    assert!(game.state.entities.get(second).is_none());
+    assert_eq!(
+        game.state
+            .entities
+            .iter()
+            .filter(|entity| entity.kind == EntityKind::ScoutPlane && entity.owner == 1)
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn scout_plane_projection_is_fog_safe_for_owner_enemy_and_spectator() {
+    let mut game = empty_game(test_map(40));
+    let plane = spawn_plane(&mut game, 1, 160.0, 160.0);
+
+    game.tick();
+
+    let owner = game.snapshot_for(1);
+    assert!(
+        owner
+            .entities
+            .iter()
+            .any(|entity| entity.id == plane && entity.scout_plane.is_some()),
+        "owner should see the plane with private fuel/orbit details"
+    );
+    let blind_enemy = game.snapshot_for(2);
+    assert!(
+        blind_enemy.entities.iter().all(|entity| entity.id != plane),
+        "enemies without current vision should not receive the plane"
+    );
+
+    game.state
+        .entities
+        .spawn_unit(2, EntityKind::Worker, 176.0, 160.0)
+        .expect("enemy spotter should spawn");
+    game.tick();
+
+    let enemy = game.snapshot_for(2);
+    let enemy_plane = enemy
+        .entities
+        .iter()
+        .find(|entity| entity.id == plane)
+        .expect("enemy should see the plane only while it is currently visible");
+    assert_eq!(
+        enemy_plane.scout_plane, None,
+        "enemy plane projection must omit private fuel/orbit state"
+    );
+
+    let spectator = game.snapshot_for_spectator(&[1]);
+    let spectator_plane = spectator
+        .entities
+        .iter()
+        .find(|entity| entity.id == plane)
+        .expect("selected-owner spectator view should include the visible plane");
+    assert_eq!(
+        spectator_plane.scout_plane, None,
+        "selected spectator projections should not expose owner-private plane state"
+    );
+
+    let full = game.snapshot_full_for(2);
+    assert!(
+        full.entities
+            .iter()
+            .any(|entity| entity.id == plane && entity.scout_plane.is_some()),
+        "full-world diagnostics should retain private plane state"
     );
 }
 
@@ -503,9 +815,7 @@ fn artillery_area_damage_ignores_hidden_scout_plane() {
     );
     let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
 
-    game.state
-        .artillery_shells
-        .schedule(2, 0, 160.0, 160.0, 0);
+    game.state.artillery_shells.schedule(2, 0, 160.0, 160.0, 0);
     game.state.artillery_shells.resolve_due(
         &mut game.state.entities,
         &teams,

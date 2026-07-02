@@ -14,6 +14,7 @@ pub(crate) struct LineOfSight<'a> {
     map: &'a Map,
     smokes: Option<&'a SmokeCloudStore>,
     building_blockers: Option<&'a [bool]>,
+    static_blockers: bool,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -29,6 +30,7 @@ impl<'a> LineOfSight<'a> {
             map,
             smokes: None,
             building_blockers: None,
+            static_blockers: true,
         }
     }
 
@@ -37,6 +39,16 @@ impl<'a> LineOfSight<'a> {
             map,
             smokes: Some(smokes),
             building_blockers: None,
+            static_blockers: true,
+        }
+    }
+
+    pub(crate) fn with_smoke_only(map: &'a Map, smokes: &'a SmokeCloudStore) -> Self {
+        LineOfSight {
+            map,
+            smokes: Some(smokes),
+            building_blockers: None,
+            static_blockers: false,
         }
     }
 
@@ -45,6 +57,7 @@ impl<'a> LineOfSight<'a> {
             map,
             smokes: None,
             building_blockers: Some(building_blockers),
+            static_blockers: true,
         }
     }
 
@@ -57,6 +70,7 @@ impl<'a> LineOfSight<'a> {
             map,
             smokes: Some(smokes),
             building_blockers: Some(building_blockers),
+            static_blockers: true,
         }
     }
 
@@ -209,7 +223,9 @@ impl<'a> LineOfSight<'a> {
     }
 
     fn tile_blocks(&self, tile: (u32, u32)) -> bool {
-        if terrain::blocks_line_of_sight(self.map.terrain_at(tile.0, tile.1)) {
+        if self.static_blockers
+            && terrain::blocks_line_of_sight(self.map.terrain_at(tile.0, tile.1))
+        {
             return true;
         }
         let Some(blockers) = self.building_blockers else {

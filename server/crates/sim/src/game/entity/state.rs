@@ -35,8 +35,11 @@ pub(in crate::game) struct ScoutPlaneState {
     pub(in crate::game) orbit_phase: f32,
     /// Whether the plane has reached the orbit area for `orbit_center`.
     pub(in crate::game) orbiting: bool,
-    /// Integer oil reserve. Phase 3 does not drain it; upkeep owns it in the next phase.
+    /// Integer oil reserve. Drained only when scheduled oil upkeep cannot be paid.
     pub(in crate::game) fuel_oil: u8,
+    /// Active-flight ticks until the next upkeep payment or reserve drain.
+    #[serde(default = "default_scout_plane_upkeep_ticks_until_due")]
+    pub(in crate::game) upkeep_ticks_until_due: u16,
 }
 
 impl ScoutPlaneState {
@@ -46,6 +49,7 @@ impl ScoutPlaneState {
             orbit_phase: 0.0,
             orbiting: false,
             fuel_oil: config::SCOUT_PLANE_FUEL_RESERVE_OIL,
+            upkeep_ticks_until_due: config::SCOUT_PLANE_UPKEEP_INTERVAL_TICKS,
         }
     }
 
@@ -72,6 +76,10 @@ impl ScoutPlaneState {
         self.orbiting = orbiting;
         true
     }
+}
+
+fn default_scout_plane_upkeep_ticks_until_due() -> u16 {
+    config::SCOUT_PLANE_UPKEEP_INTERVAL_TICKS
 }
 
 /// Reserved for future round-trip harvesting if attached mining is replaced.

@@ -9,16 +9,17 @@
 //!   6. combat
 //!   7. gather progression
 //!   8. production progression + spawning
-//!   9. construction progression
-//!   10. deconstruction progression
-//!   11. ability projectile/runtime progression
-//!   12. deaths
-//!   13. rebuild pre-collision occupancy/spatial indexes
-//!   14. unit-unit collision resolution (hard non-stacking; runs after spawning so newly
+//!   9. Scout Plane upkeep, fuel refill/drain, and dismissal
+//!   10. construction progression
+//!   11. deconstruction progression
+//!   12. ability projectile/runtime progression
+//!   13. deaths
+//!   14. rebuild pre-collision occupancy/spatial indexes
+//!   15. unit-unit collision resolution (hard non-stacking; runs after spawning so newly
 //!       produced units that land on the same spawn point are unstacked in the same tick)
-//!   15. trench occupation, slotting, and dig-in progress
-//!   16. recompute supply cap
-//!   17. rebuild final spatial index for snapshot interest filtering
+//!   16. trench occupation, slotting, and dig-in progress
+//!   17. recompute supply cap
+//!   18. rebuild final spatial index for snapshot interest filtering
 
 use std::collections::{BTreeSet, HashMap};
 
@@ -297,6 +298,35 @@ pub(crate) fn run_tick(
     });
     crate::perf::timed(perf.as_deref_mut(), "production", || {
         services::production::production_system(map, entities, players, &mut coordinator, events);
+    });
+    crate::perf::timed(perf.as_deref_mut(), "scout_plane_upkeep", || {
+        services::scout_plane::dismiss_inactive_or_duplicate_planes(entities);
+        for (id, owner) in services::scout_plane::active_scout_planes(entities) {
+            let Some(player_index) = players.iter().position(|player| player.id == owner) else {
+                let _ = entities.remove(id);
+                continue;
+            };
+            if services::scout_plane::scout_plane_fuel(entities, id).is_some_and(|fuel| fuel == 0) {
+                let _ = entities.remove(id);
+                continue;
+            }
+            if services::scout_plane::tick_upkeep_timer(entities, id) {
+                let upkeep = crate::config::SCOUT_PLANE_UPKEEP_OIL as u32;
+                if players[player_index].spend_resources(0, upkeep) {
+                    services::scout_plane::set_fuel_full(entities, id);
+                    continue;
+                }
+                if services::scout_plane::drain_fuel(entities, id) {
+                    let _ = entities.remove(id);
+                    continue;
+                }
+            }
+            let refill = services::scout_plane::missing_fuel_oil(entities, id)
+                .min(players[player_index].oil);
+            if players[player_index].spend_resources(0, refill) {
+                services::scout_plane::refill_fuel(entities, id, refill as u8);
+            }
+        }
     });
     crate::perf::timed(perf.as_deref_mut(), "construction", || {
         services::construction::construction_system(

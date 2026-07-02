@@ -1,7 +1,7 @@
 //! Hidden Scout Plane contract constants.
 //!
-//! Phase 2 makes these values mirrorable before normal production exposure. Server runtime,
-//! upkeep, fog stamping, and command-card behavior land in later Scout Plane phases.
+//! Phase 2 makes these values mirrorable before normal production exposure. Hidden server runtime,
+//! upkeep, and fog stamping land before later command-card and normal production exposure.
 
 use super::TICK_HZ;
 

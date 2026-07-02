@@ -5,8 +5,10 @@
 //! within the sight area of any of that player's entities (`sight_tiles`) and the line from
 //! the entity to that tile is not blocked by stone, smoke, or sight-blocking building footprints.
 //! Units stamp a circle from their body center; buildings stamp their full footprint plus
-//! `sight_tiles` around the footprint edge. The snapshot layer uses this to withhold neutral/enemy
-//! entities standing on non-visible tiles, making the fog cheat-proof.
+//! `sight_tiles` around the footprint edge. Scout Planes add a separate team aerial sight pass
+//! that ignores stone and building blockers but still respects active smoke clouds. The snapshot
+//! layer uses this to withhold neutral/enemy entities standing on non-visible tiles, making the fog
+//! cheat-proof.
 //!
 //! Note the server only needs *currently visible* — the client maintains the "explored but
 //! not currently visible" dimming locally (see `docs/design/client-ui.md`). So this module tracks only
@@ -267,6 +269,45 @@ impl Fog {
             };
             stamp_point(grid, size, entity.pos_x, entity.pos_y);
         }
+    }
+
+    pub(in crate::game) fn stamp_scout_plane_sources_for_teams_with_smoke(
+        &mut self,
+        map: &Map,
+        store: &EntityStore,
+        smokes: &SmokeCloudStore,
+        teams: &TeamRelations,
+    ) {
+        let size = self.size;
+        let building_mask = BuildingLosMask::new(store, map);
+        let los = LineOfSight::with_smoke_only(map, smokes);
+        for plane in store.iter() {
+            if plane.kind != EntityKind::ScoutPlane
+                || plane.owner == 0
+                || plane.hp == 0
+                || smokes.point_inside(plane.pos_x, plane.pos_y)
+            {
+                continue;
+            }
+            let mut recipients = teams.same_team_player_ids(plane.owner);
+            if recipients.is_empty() {
+                recipients.push(plane.owner);
+            }
+            for recipient in recipients {
+                let Some(grid) = self.grids.get_mut(&recipient) else {
+                    continue;
+                };
+                stamp_sight_at(
+                    grid,
+                    size,
+                    plane.pos_x,
+                    plane.pos_y,
+                    plane.sight_tiles(),
+                    &los,
+                );
+            }
+        }
+        reveal_visible_building_footprints(&mut self.grids, &building_mask);
     }
 
     /// Whether `player` can currently see the tile `(tx, ty)`.
