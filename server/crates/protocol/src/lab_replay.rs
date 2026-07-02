@@ -73,7 +73,12 @@ pub struct LabReplayOperationEntry {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
-#[serde(tag = "op", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[serde(
+    tag = "op",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
 pub enum LabReplayOperation {
     SpawnEntity {
         owner: u32,
@@ -167,6 +172,7 @@ pub fn lab_replay_artifact_from_slice(
     }
     let value: serde_json::Value = serde_json::from_slice(bytes)
         .map_err(|err| invalid(format!("invalid lab replay JSON: {err}")))?;
+    validate_raw_operation_stream(&value)?;
     reject_unsupported_session_ops(&value)?;
     let artifact: LabReplayArtifactV1 = serde_json::from_value(value)
         .map_err(|err| invalid(format!("invalid lab replay artifact shape: {err}")))?;
@@ -327,6 +333,7 @@ fn validate_entry(
             entry.sequence
         )));
     }
+    validate_operation(&entry.op, state)?;
     let op_bytes = serde_json::to_vec(&entry.op)
         .map_err(|err| invalid(format!("failed to measure lab replay operation: {err}")))?;
     if op_bytes.len() > LAB_REPLAY_MAX_OPERATION_JSON_BYTES {
@@ -334,7 +341,6 @@ fn validate_entry(
             "lab replay operation payload must be at most {LAB_REPLAY_MAX_OPERATION_JSON_BYTES} bytes"
         )));
     }
-    validate_operation(&entry.op, state)?;
     *last_tick = entry.tick;
     Ok(())
 }
@@ -457,9 +463,12 @@ fn validate_command(
         }
         Command::Train { building, .. }
         | Command::Research { building, .. }
-        | Command::Cancel { building }
-        | Command::SetRally { building, .. } => {
+        | Command::Cancel { building } => {
             validate_entity_id(*building, "command.building", state)?;
+        }
+        Command::SetRally { building, x, y, .. } => {
+            validate_entity_id(*building, "command.building", state)?;
+            validate_finite_point(*x, *y, "command.setRally")?;
         }
     }
     Ok(())
@@ -653,6 +662,11 @@ fn validate_checkpoint_map_binding(
             "{label} checkpoint mapBinding.playerCount mismatch"
         )));
     }
+    if player_count as usize != scenario.map.data.starts.len() {
+        return Err(invalid(format!(
+            "{label} checkpoint mapBinding.playerCount must match map starts"
+        )));
+    }
     Ok(())
 }
 
@@ -810,6 +824,38 @@ fn validate_source_entity_id_map(
         if !entity_ids.contains(&remap.new_id) {
             return Err(invalid(format!(
                 "{label}.metadata.sourceEntityIdMap newId must reference a checkpoint entity"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn validate_raw_operation_stream(
+    value: &serde_json::Value,
+) -> Result<(), LabReplayValidationError> {
+    let Some(operations) = value
+        .get("operations")
+        .and_then(serde_json::Value::as_array)
+    else {
+        return Ok(());
+    };
+    if operations.len() > LAB_REPLAY_MAX_OPERATIONS {
+        return Err(invalid(format!(
+            "lab replay operation count must be at most {LAB_REPLAY_MAX_OPERATIONS}"
+        )));
+    }
+    for entry in operations {
+        let Some(op) = entry.get("op") else {
+            continue;
+        };
+        let op_bytes = serde_json::to_vec(op).map_err(|err| {
+            invalid(format!(
+                "failed to measure raw lab replay operation payload: {err}"
+            ))
+        })?;
+        if op_bytes.len() > LAB_REPLAY_MAX_OPERATION_JSON_BYTES {
+            return Err(invalid(format!(
+                "lab replay operation payload must be at most {LAB_REPLAY_MAX_OPERATION_JSON_BYTES} bytes"
             )));
         }
     }
@@ -1204,6 +1250,27 @@ mod tests {
     }
 
     #[test]
+    fn lab_replay_artifact_rejects_oversized_raw_operation_payload() {
+        let mut value = serde_json::to_value(valid_artifact()).unwrap();
+        value["operations"][0]["op"]["ignoredPayload"] =
+            json!("x".repeat(LAB_REPLAY_MAX_OPERATION_JSON_BYTES + 1));
+
+        let err = validate_value(value).expect_err("raw entry cap should fail");
+
+        assert!(err.to_string().contains("operation payload"));
+    }
+
+    #[test]
+    fn lab_replay_artifact_rejects_unknown_operation_fields() {
+        let mut value = serde_json::to_value(valid_artifact()).unwrap();
+        value["operations"][0]["op"]["ignoredPayload"] = json!("small");
+
+        let err = validate_value(value).expect_err("unknown op fields should fail");
+
+        assert!(err.to_string().contains("unknown field"));
+    }
+
+    #[test]
     fn lab_replay_artifact_rejects_stale_entity_ids() {
         let mut artifact = valid_artifact();
         artifact.operations[0].op = LabReplayOperation::MoveEntity {
@@ -1245,6 +1312,39 @@ mod tests {
             .expect_err("map binding mismatch should fail");
 
         assert!(err.to_string().contains("contentHash mismatch"));
+    }
+
+    #[test]
+    fn lab_replay_artifact_rejects_checkpoint_player_count_start_mismatch() {
+        let mut artifact = valid_artifact();
+        artifact.initial_setup.map.data.starts.pop();
+
+        let err = lab_replay_artifact_from_slice(&serde_json::to_vec(&artifact).unwrap())
+            .expect_err("map starts must match checkpoint player count");
+
+        assert!(err
+            .to_string()
+            .contains("playerCount must match map starts"));
+    }
+
+    #[test]
+    fn lab_replay_artifact_rejects_nonfinite_set_rally_coordinates() {
+        let mut artifact = valid_artifact();
+        artifact.operations[0].op = LabReplayOperation::IssueCommandAs {
+            player_id: 1,
+            cmd: Command::SetRally {
+                building: 1,
+                x: f32::NAN,
+                y: 10.0,
+                kind: Some("move".to_string()),
+                queued: false,
+            },
+            ignore_command_limits: false,
+        };
+
+        let err = validate_lab_replay_artifact(&artifact).expect_err("NaN rally should fail");
+
+        assert!(err.to_string().contains("command.setRally coordinates"));
     }
 
     #[test]
