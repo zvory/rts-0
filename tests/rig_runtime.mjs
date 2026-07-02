@@ -559,7 +559,9 @@ test("tank PNG atlas SVG fallback is destroyed when same id no longer needs it",
   renderer._drawUnit(entity, new Map([[1, 0x336699]]), { playerId: 1, resources: { oil: 10 }, weaponRecoil: () => 0 });
 
   const overlay = renderer._liveRigPools.liveUnitRigOverlays.get(entity.id);
+  const effects = renderer._liveRigPools.liveUnitRigEffects.get(entity.id);
   assert.equal(typeof overlay.matches, "function");
+  assert.equal(typeof effects.matches, "function");
 
   renderer._drawUnit({
     ...entity,
@@ -569,7 +571,9 @@ test("tank PNG atlas SVG fallback is destroyed when same id no longer needs it",
 
   const workerRig = renderer._liveRigPools.liveUnitRigs.get(entity.id);
   assert.equal(overlay._destroyed, true);
+  assert.equal(effects._destroyed, true);
   assert.equal(renderer._liveRigPools.liveUnitRigOverlays.has(entity.id), false);
+  assert.equal(renderer._liveRigPools.liveUnitRigEffects.has(entity.id), false);
   assert.equal(workerRig.kind, KIND.WORKER);
   assert.equal(workerRig.parts.has("part.body"), true);
 });

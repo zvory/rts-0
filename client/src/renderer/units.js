@@ -116,13 +116,14 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
   if (pngAtlas && pngAtlasTexture) {
     const renderContext = this._rigRenderContextFor?.(e, colorByOwner, state) ?? {};
     const rendered = [];
-    const fallbackPoolNames = new Set();
+    const activePoolNames = new Set();
     for (const route of routes) {
       const coverage = pngAtlasRouteCoverage(definition, pngAtlas, route);
       if (coverage.coveredParts.length > 0) {
         const pngRoute = coverage.missingParts.length === 0
           ? route
           : { ...route, parts: coverage.coveredParts };
+        activePoolNames.add(pngRoute.poolName);
         rendered.push(...(renderPngUnitRig(this, e, colorByOwner, state, definition, {
           atlas: pngAtlas,
           atlasTexture: pngAtlasTexture,
@@ -135,7 +136,7 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
         const svgRoute = coverage.coveredParts.length > 0
           ? { ...pngFallbackSvgRoute(route, pools), parts: coverage.missingParts }
           : { ...route, parts: coverage.missingParts };
-        if (coverage.coveredParts.length > 0) fallbackPoolNames.add(svgRoute.poolName);
+        activePoolNames.add(svgRoute.poolName);
         rendered.push(...(renderLiveUnitRig(this, e, colorByOwner, state, definition, {
           routes: [svgRoute],
           alpha: pools.alpha,
@@ -143,11 +144,11 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
         }) || []));
       }
     }
-    destroyInactivePngFallbackRoutes(this, e.id, pools, fallbackPoolNames);
+    destroyInactiveLiveRigInstances(this, e.id, activePoolNames);
     return rendered;
   }
 
-  destroyInactivePngFallbackRoutes(this, e.id, pools, new Set(routes.map((route) => route.poolName)));
+  destroyInactiveLiveRigInstances(this, e.id, routePoolNames(routes));
   return renderLiveUnitRig(this, e, colorByOwner, state, definition, {
     routes,
     alpha: pools.alpha,
@@ -162,16 +163,36 @@ function pngFallbackSvgRoute(route, pools = {}) {
   };
 }
 
-function destroyInactivePngFallbackRoutes(renderer, entityId, pools = {}, activePoolNames = new Set()) {
-  const poolName = pools.liveRigOverlay || "liveUnitRigOverlays";
-  if (activePoolNames.has(poolName)) return;
-  const pool = renderer._liveRigPools?.[poolName];
-  const instance = pool?.get?.(entityId);
-  if (!instance) return;
-  instance.destroy?.();
-  pool.delete(entityId);
-  renderer._seen?.[poolName]?.delete?.(entityId);
-  renderer._recordRenderDiagnostic?.(`renderer.rig.instance.destroyed.unused.${poolName}`);
+function routePoolNames(...routeGroups) {
+  const out = new Set();
+  for (const routes of routeGroups) {
+    for (const route of routes || []) out.add(route.poolName);
+  }
+  return out;
+}
+
+const UNIT_RIG_POOL_NAMES = Object.freeze([
+  "liveUnitRigShadows",
+  "liveUnitRigs",
+  "liveUnitRigOverlays",
+  "liveUnitRigEffects",
+  "liveShotRevealRigShadows",
+  "liveShotRevealRigs",
+  "liveShotRevealRigOverlays",
+  "liveShotRevealRigEffects",
+]);
+
+function destroyInactiveLiveRigInstances(renderer, entityId, activePoolNames = new Set()) {
+  for (const poolName of UNIT_RIG_POOL_NAMES) {
+    if (activePoolNames.has(poolName)) continue;
+    const pool = renderer._liveRigPools?.[poolName];
+    const instance = pool?.get?.(entityId);
+    if (!instance) continue;
+    instance.destroy?.();
+    pool.delete(entityId);
+    renderer._seen?.[poolName]?.delete?.(entityId);
+    renderer._recordRenderDiagnostic?.(`renderer.rig.instance.destroyed.unused.${poolName}`);
+  }
 }
 
 export function _rigRenderContextFor(e, colorByOwner, state) {
