@@ -351,6 +351,73 @@ const NOOP_RENDERER_OVERLAYS = [
 
 {
   const restorePixi = installFakePixi();
+  const priorConsoleError = console.error;
+  console.error = () => {};
+  try {
+    const renderer = new Renderer(fakeParent());
+    for (const name of NOOP_RENDERER_OVERLAYS) renderer[name] = () => {};
+    renderer._drawGroundDecals = () => 0;
+    renderer._drawTrenches = () => 0;
+    renderer._visualUnitRigCandidateRegistry = () => {
+      throw new Error("candidate registry failed");
+    };
+    const tank = {
+      id: 126,
+      owner: 1,
+      kind: KIND.TANK,
+      x: 1887.97,
+      y: 1860.91,
+      hp: 180,
+      maxHp: 180,
+      facing: 0,
+      weaponFacing: 0,
+    };
+    const state = {
+      playerId: 1,
+      players: [{ id: 1, color: "#4878c8" }],
+      resources: { oil: 10 },
+      selection: new Set(),
+      rememberedBuildings: [],
+      map: { tileSize: 32 },
+      trenches: [],
+      entitiesInterpolated() {
+        return [tank];
+      },
+      selectedEntities() {
+        return [];
+      },
+      weaponRecoil() {
+        return 0;
+      },
+    };
+
+    renderer.render(state, { x: 0, y: 0, zoom: 1 }, null, 1, {
+      visualUnitOverrides: [
+        { id: "registry-fails", candidateId: "tank-low-profile", selector: { entityId: tank.id } },
+      ],
+    });
+
+    const diagnostics = renderer.visualUnitOverrideDiagnostics();
+    assert(diagnostics.activeOverrides === 0, "failed override resolution falls back to zero active overrides");
+    assert(diagnostics.errors === 1, "failed override resolution records a diagnostic error");
+    assert(globalThis.__rtsVisualUnitOverrideErrors?.latest?.reason === "resolver-error",
+      "unexpected override resolution failures publish local diagnostics");
+    assert(globalThis.__rtsRenderErrors?.latest?.label === "visualUnitOverrides",
+      "unexpected override resolution failures use renderer error diagnostics");
+    assert(renderer._liveRigPools.liveUnitRigs.get(tank.id)?.definition.id === "tank.authored",
+      "unit rendering falls back to the normal live rig when override resolution fails");
+
+    renderer.destroy();
+  } finally {
+    console.error = priorConsoleError;
+    delete globalThis.__rtsVisualUnitOverrideErrors;
+    delete globalThis.__rtsRenderErrors;
+    restorePixi();
+  }
+}
+
+{
+  const restorePixi = installFakePixi();
   try {
     const renderer = new Renderer(fakeParent());
     for (const name of NOOP_RENDERER_OVERLAYS) renderer[name] = () => {};

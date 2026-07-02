@@ -331,7 +331,7 @@ export class Renderer {
     });
     let visualUnitOverrideMap = new Map();
     time("renderer.visualUnitOverrides", () => {
-      visualUnitOverrideMap = this._resolveVisualUnitOverrides(visualUnitOverrides, entities).overrides;
+      visualUnitOverrideMap = this._resolveVisualUnitOverridesSafely(visualUnitOverrides, entities).overrides;
     });
 
     // Nodes currently being mined: any worker latched to them. Used by
@@ -522,6 +522,38 @@ export class Renderer {
       this._visualUnitRigCandidates = compileVisualUnitRigCandidates();
     }
     return this._visualUnitRigCandidates;
+  }
+
+  _resolveVisualUnitOverridesSafely(rules, entities) {
+    try {
+      return this._resolveVisualUnitOverrides(rules, entities);
+    } catch (err) {
+      const error = Object.freeze({
+        reason: "resolver-error",
+        ruleId: "renderer",
+        index: -1,
+        candidateId: "",
+        message: `Visual unit override resolution failed: ${err?.message || String(err)}`,
+      });
+      const result = {
+        overrides: new Map(),
+        errors: [error],
+        diagnostics: Object.freeze({
+          rules: Array.isArray(rules) ? rules.length : 0,
+          activeOverrides: 0,
+          errors: 1,
+        }),
+      };
+      this._visualUnitOverrideDiagnostics = {
+        ...result.diagnostics,
+        candidateCount: this._visualUnitRigCandidates?.definitions?.size || 0,
+      };
+      publishVisualUnitOverrideDiagnostics(result);
+      this._recordRenderError("visualUnitOverrides", err);
+      this._recordRenderDiagnostic("renderer.visualUnitOverrides.active", 0);
+      this._recordRenderDiagnostic("renderer.visualUnitOverrides.invalid", 1);
+      return result;
+    }
   }
 
   _resolveVisualUnitOverrides(rules, entities) {
