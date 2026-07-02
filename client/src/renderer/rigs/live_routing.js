@@ -72,9 +72,6 @@ const TANK_UNIT_PARTS = Object.freeze([
   "part.coaxBarrel",
   "part.turret",
   "part.noseTick",
-]);
-
-const TANK_FUEL_CUE_PARTS = Object.freeze([
   "part.fuelCue.box",
   "part.fuelCue.x1",
   "part.fuelCue.x2",
@@ -155,7 +152,6 @@ const LIVE_RIG_PARTS = Object.freeze({
   [KIND.TANK]: Object.freeze({
     shadow: Object.freeze(["part.shadow"]),
     unit: TANK_UNIT_PARTS,
-    overlay: TANK_FUEL_CUE_PARTS,
   }),
   [KIND.WORKER]: Object.freeze({
     shadow: Object.freeze(["part.shadow"]),
