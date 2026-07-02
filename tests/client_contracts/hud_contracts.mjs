@@ -602,6 +602,31 @@ function fakeHudRootWithoutResourceSpans() {
     buttonByAction(workerScoutPlaneCard, "dismissScoutPlane")?.intent.unitIds.join(",") === "18",
     "mixed land plus Scout Plane selection keeps dismiss scoped to Scout Planes",
   );
+
+  const scoutPlaneMixedArtillery = {
+    id: 19,
+    owner: 1,
+    kind: KIND.ARTILLERY,
+    setupState: SETUP.DEPLOYED,
+    abilities: [
+      { ability: ABILITY.POINT_FIRE, cooldownLeft: 0, remainingUses: null },
+      { ability: ABILITY.BLANKET_FIRE, cooldownLeft: 0, remainingUses: null },
+    ],
+  };
+  const artilleryScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [scoutPlaneMixedArtillery, scoutPlane],
+    entities: [scoutPlaneMixedArtillery, scoutPlane],
+  }));
+  assert(
+    buttonByAction(artilleryScoutPlaneCard, "setupAntiTankGuns")?.slotIndex === 6 &&
+      buttonByLabel(artilleryScoutPlaneCard, "Point Fire")?.slotIndex === 7 &&
+      buttonByLabel(artilleryScoutPlaneCard, "Blanket Fire")?.slotIndex === 8,
+    "mixed Artillery plus Scout Plane selection preserves support-weapon setup and fire controls",
+  );
+  assert(
+    buttonByAction(artilleryScoutPlaneCard, "dismissScoutPlane")?.intent.unitIds.join(",") === "18",
+    "mixed support-weapon plus Scout Plane selection still exposes plane dismiss in an open slot",
+  );
   const dismissHud = Object.create(HUD.prototype);
   const dismissCommands = [];
   let dismissIntentEnded = false;

@@ -315,12 +315,11 @@ export function buildUnitCard(ctx, selection) {
   }
 
   let sequentialSlot = 6;
-  const reservedDismissSlot = scoutPlaneIds.length > 0 ? 8 : -1;
   const claimSlot = (preferred) => {
-    if (preferred != null && preferred >= 0 && preferred < 9 && preferred !== reservedDismissSlot && slots[preferred] == null) {
+    if (preferred != null && preferred >= 0 && preferred < 9 && slots[preferred] == null) {
       return preferred;
     }
-    while (sequentialSlot < 9 && (slots[sequentialSlot] != null || sequentialSlot === reservedDismissSlot)) sequentialSlot++;
+    while (sequentialSlot < 9 && slots[sequentialSlot] != null) sequentialSlot++;
     return sequentialSlot < 9 ? sequentialSlot++ : -1;
   };
 
@@ -395,7 +394,10 @@ export function buildUnitCard(ctx, selection) {
   }
 
   if (scoutPlaneIds.length > 0) {
-    slots[reservedDismissSlot] = dismissScoutPlaneDescriptor(scoutPlaneIds);
+    const dismissSlot = firstOpenCommandSlot(slots, 8);
+    if (dismissSlot >= 0) {
+      slots[dismissSlot] = dismissScoutPlaneDescriptor(scoutPlaneIds);
+    }
   }
 
   return card("unit", signature, slots, { abilityAffordances });
