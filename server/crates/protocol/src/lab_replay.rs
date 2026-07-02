@@ -160,6 +160,8 @@ struct ValidationState {
     player_ids: HashSet<u32>,
     entity_ids: HashSet<u32>,
     next_entity_id: u32,
+    entity_ids_precise: bool,
+    command_effects_pending: bool,
 }
 
 pub fn lab_replay_artifact_from_slice(
@@ -212,6 +214,8 @@ pub fn validate_lab_replay_artifact(
         player_ids: initial.player_ids,
         entity_ids: initial.entity_ids,
         next_entity_id: initial.next_entity_id,
+        entity_ids_precise: true,
+        command_effects_pending: false,
     };
     let mut last_tick = artifact.timeline.initial_tick;
     for (index, entry) in artifact.operations.iter().enumerate() {
@@ -321,6 +325,11 @@ fn validate_entry(
             entry.sequence
         )));
     }
+    // Once command-driven simulation has advanced, only the authoritative replay rebuild can know
+    // which entities were produced, killed, or otherwise removed by normal systems.
+    if entry.tick > *last_tick && state.command_effects_pending {
+        state.entity_ids_precise = false;
+    }
     if entry.request_id == 0 {
         return Err(invalid(format!(
             "lab replay operation {} requestId must be nonzero",
@@ -341,6 +350,9 @@ fn validate_entry(
             "lab replay operation payload must be at most {LAB_REPLAY_MAX_OPERATION_JSON_BYTES} bytes"
         )));
     }
+    if matches!(entry.op, LabReplayOperation::IssueCommandAs { .. }) {
+        state.command_effects_pending = true;
+    }
     *last_tick = entry.tick;
     Ok(())
 }
@@ -356,24 +368,28 @@ fn validate_operation(
             validate_player_id(*owner, "spawnEntity.owner", state)?;
             validate_non_empty_len("spawnEntity.kind", kind, 64)?;
             validate_finite_point(*x, *y, "spawnEntity")?;
-            if state.next_entity_id == 0 {
-                return Err(invalid(
-                    "checkpoint entity allocator nextId must be nonzero",
-                ));
+            if state.entity_ids_precise {
+                if state.next_entity_id == 0 {
+                    return Err(invalid(
+                        "checkpoint entity allocator nextId must be nonzero",
+                    ));
+                }
+                if !state.entity_ids.insert(state.next_entity_id) {
+                    return Err(invalid(format!(
+                        "spawnEntity would reuse existing entity id {}",
+                        state.next_entity_id
+                    )));
+                }
+                state.next_entity_id = state.next_entity_id.checked_add(1).ok_or_else(|| {
+                    invalid("spawnEntity would overflow the artifact entity id allocator")
+                })?;
             }
-            if !state.entity_ids.insert(state.next_entity_id) {
-                return Err(invalid(format!(
-                    "spawnEntity would reuse existing entity id {}",
-                    state.next_entity_id
-                )));
-            }
-            state.next_entity_id = state.next_entity_id.checked_add(1).ok_or_else(|| {
-                invalid("spawnEntity would overflow the artifact entity id allocator")
-            })?;
         }
         LabReplayOperation::DeleteEntity { entity_id } => {
             validate_entity_id(*entity_id, "deleteEntity.entityId", state)?;
-            state.entity_ids.remove(entity_id);
+            if state.entity_ids_precise {
+                state.entity_ids.remove(entity_id);
+            }
         }
         LabReplayOperation::MoveEntity { entity_id, x, y } => {
             validate_entity_id(*entity_id, "moveEntity.entityId", state)?;
@@ -937,6 +953,12 @@ fn validate_entity_id(
     label: &str,
     state: &ValidationState,
 ) -> Result<(), LabReplayValidationError> {
+    if !state.entity_ids_precise {
+        if entity_id == 0 {
+            return Err(invalid(format!("{label} must be nonzero")));
+        }
+        return Ok(());
+    }
     if !state.entity_ids.contains(&entity_id) {
         return Err(invalid(format!(
             "{label} references stale entity id {entity_id}"
@@ -1283,6 +1305,88 @@ mod tests {
             .expect_err("stale entity should fail");
 
         assert!(err.to_string().contains("stale entity id 999"));
+    }
+
+    #[test]
+    fn lab_replay_artifact_allows_command_created_entity_references_after_ticks() {
+        let mut artifact = valid_artifact();
+        artifact.initial_setup = checkpoint_scenario(&[1], 2);
+        artifact.timeline.duration_ticks = 12;
+        artifact.operations = vec![
+            LabReplayOperationEntry {
+                sequence: 0,
+                tick: 0,
+                request_id: 1,
+                operator_id: 100,
+                op: LabReplayOperation::IssueCommandAs {
+                    player_id: 1,
+                    cmd: Command::Train {
+                        building: 1,
+                        unit: "rifleman".to_string(),
+                    },
+                    ignore_command_limits: false,
+                },
+            },
+            LabReplayOperationEntry {
+                sequence: 1,
+                tick: 12,
+                request_id: 2,
+                operator_id: 100,
+                op: LabReplayOperation::IssueCommandAs {
+                    player_id: 1,
+                    cmd: Command::Move {
+                        units: vec![2],
+                        x: 64.0,
+                        y: 64.0,
+                        queued: false,
+                    },
+                    ignore_command_limits: false,
+                },
+            },
+        ];
+
+        let parsed = lab_replay_artifact_from_slice(&serde_json::to_vec(&artifact).unwrap())
+            .expect("command-created entity references after simulated ticks should validate");
+
+        assert_eq!(parsed.operations.len(), 2);
+    }
+
+    #[test]
+    fn lab_replay_artifact_still_rejects_same_tick_unknown_entity_ids() {
+        let mut artifact = valid_artifact();
+        artifact.initial_setup = checkpoint_scenario(&[1], 2);
+        artifact.operations = vec![
+            LabReplayOperationEntry {
+                sequence: 0,
+                tick: 0,
+                request_id: 1,
+                operator_id: 100,
+                op: LabReplayOperation::IssueCommandAs {
+                    player_id: 1,
+                    cmd: Command::Train {
+                        building: 1,
+                        unit: "rifleman".to_string(),
+                    },
+                    ignore_command_limits: false,
+                },
+            },
+            LabReplayOperationEntry {
+                sequence: 1,
+                tick: 0,
+                request_id: 2,
+                operator_id: 100,
+                op: LabReplayOperation::MoveEntity {
+                    entity_id: 2,
+                    x: 64.0,
+                    y: 64.0,
+                },
+            },
+        ];
+
+        let err = lab_replay_artifact_from_slice(&serde_json::to_vec(&artifact).unwrap())
+            .expect_err("same-tick unknown entity should still fail");
+
+        assert!(err.to_string().contains("stale entity id 2"));
     }
 
     #[test]
