@@ -114,10 +114,13 @@
 <rect id="source.part.hull.shadow" x="-16.49" y="-5.904" width="28.98" height="11.808" fill="#1a1712" fill-opacity="0.24" stroke="#100d0a" stroke-width="1.5" stroke-opacity="0.95" />
 <rect id="source.part.hull.nose" x="14.7" y="-9.72" width="7" height="19.44" fill="#6381a0" fill-opacity="0.95" stroke="#100d0a" stroke-width="1.5" stroke-opacity="0.95" />
 <rect id="source.part.hull.noseShadow" x="20.7" y="-8.64" width="3" height="17.28" fill="#1a1712" fill-opacity="0.22" stroke="#100d0a" stroke-width="1.5" stroke-opacity="0.95" />
-<line id="source.part.barrel" x1="0" y1="0" x2="33.2" y2="0" stroke="#d8d0b0" stroke-width="5" opacity="0.95" />
+<line id="source.part.barrel" x1="0" y1="0" x2="33.2" y2="0" stroke="#241d17" stroke-width="5" opacity="0.95" />
 <rect id="source.part.coaxBarrel" x="11.4" y="-6.0" width="5.2" height="0.9" fill="#74787d" stroke="#1a1712" stroke-width="0.6" opacity="0.95" />
 <rect id="source.part.turret" x="-8.072" y="-6.48" width="18.144" height="12.96" fill="#6b8cac" stroke="#1a1712" stroke-width="2" stroke-opacity="0.95" />
 <line id="source.part.noseTick" x1="18.2" y1="0" x2="23.2" y2="0" stroke="#d8d0b0" stroke-width="2" opacity="0.75" />
+<polygon id="source.part.tank.flashCone" points="-1.35,0 4.5,-2.25 4.5,2.25" fill="#ffd84a" fill-opacity="0.78" stroke="#d8d0b0" stroke-width="1.1" stroke-opacity="0.62" />
+<circle id="source.part.tank.flashCore" cx="0" cy="0" r="1.75" fill="#fff2d0" fill-opacity="0.9" stroke="#d8d0b0" stroke-width="1.1" stroke-opacity="0.62" />
+<circle id="source.part.tank.flashGlow" cx="0" cy="0" r="3" fill="#fff06a" fill-opacity="0.58" stroke="#d8d0b0" stroke-width="1.1" stroke-opacity="0.62" />
 </g>
 <g transform="translate(361.916451 134.009612) scale(3.194085 3.194085)">
 </g>
@@ -133,6 +136,6 @@
 <rect id="source.part.turret" x="-8.072" y="-6.48" width="18.144" height="12.96" fill="#6b8cac" stroke="#1a1712" stroke-width="2" stroke-opacity="0.95" />
 </g>
 <g transform="translate(46.82449 480) scale(4.408163 4.408163)">
-<line id="source.part.barrel" x1="0" y1="0" x2="33.2" y2="0" stroke="#d8d0b0" stroke-width="5" opacity="0.95" />
+<line id="source.part.barrel" x1="0" y1="0" x2="33.2" y2="0" stroke="#241d17" stroke-width="5" opacity="0.95" />
 </g>
 </svg>

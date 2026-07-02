@@ -1,6 +1,6 @@
 {
   "candidate": "tiger-i-pass-06-bright",
-  "status": "active-experiment",
+  "status": "saved-experiment",
   "baseCandidate": "tiger-i-pass-06-lowpoly",
   "sourceSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-06-lowpoly-alpha.png",
   "prompt": "client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-06-lowpoly.md",

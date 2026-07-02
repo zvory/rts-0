@@ -1,0 +1,37 @@
+{
+  "candidate": "tiger-i-pass-07-separated",
+  "status": "active-experiment",
+  "sourceSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-07-separated-input-sheet.png",
+  "sourceSheetSvg": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-07-separated-input-sheet.svg",
+  "prompt": "client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-07-separated.md",
+  "builtInImageGenSource": "/Users/az/.codex/generated_images/019f2492-10dd-73b3-8d83-ad9d31bb5026/ig_00aee1d587567987016a46dceacaf481959dbf0c730cfdc341.png",
+  "candidateSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-07-separated.png",
+  "candidateAlphaSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-07-separated-alpha.png",
+  "runtimeAlphaSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-07-separated-runtime-alpha.png",
+  "activeAtlas": "client/assets/rigs/tank-ps1/tank-atlas.png",
+  "activeAtlasUrl": "/assets/rigs/tank-ps1/tank-atlas.png?v=pass07-separated",
+  "alphaConversion": {
+    "keyColor": "#ff00ff",
+    "autoKey": "none",
+    "softMatte": true,
+    "transparentThreshold": 18,
+    "opaqueThreshold": 220,
+    "despill": true
+  },
+  "pipelineOptions": {
+    "blankCells": ["reference.full", "sprite.track", "unused.blank"],
+    "normalizeVisibleBounds": true,
+    "ignoreGuideBounds": true,
+    "guideMaskFuzz": 30,
+    "guideMaskAlphaThreshold": 45,
+    "guideMaskLineWidth": 12,
+    "clearCellEdgeAlpha": 16,
+    "visiblePadding": 2,
+    "brightness": 120,
+    "saturation": 105,
+    "hue": 100,
+    "imageVersion": "pass07-separated"
+  },
+  "runtimeNotes": "The active PNG atlas covers track parts with transparent sprites to suppress SVG tracks, exposes hull as sprite.hull, turret/coax as sprite.turret, and main cannon as sprite.barrel. Because sprite.barrel animates against part.barrel, the original SVG barrel recoil scaling is visible again.",
+  "notes": "Regenerated from a no-track 2x3 semantic sheet after pass 06 merged turret and barrel. The result is brighter and structurally better for recoil, but it still has minor baked guide-line edge artifacts in the source cell imagery."
+}
