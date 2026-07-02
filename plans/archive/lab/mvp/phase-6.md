@@ -11,7 +11,7 @@ reloaded, and shared without server-side public storage.
 
 ## Work
 
-- Define `LabScenarioV1` as authoritative setup data with schema version, kind, name, map identity,
+- Define legacy setup JSON as authoritative setup data with schema version, kind, name, map identity,
   seed, players, player state, entities, and lab metadata.
 - Keep the scenario format intentionally smaller than `Snapshot`; exclude transient events,
   compact transport details, fog-filtered recipient projections, client interpolation state,
@@ -45,7 +45,7 @@ reloaded, and shared without server-side public storage.
 
 ## Implementation Checklist
 
-- [x] Define `LabScenarioV1` with schema version and stable, legible JSON fields.
+- [x] Define legacy setup JSON with schema version and stable, legible JSON fields.
 - [x] Export authoritative setup state without snapshot-only projection data.
 - [x] Import and validate scenario JSON with bounded size, names, ids, kinds, coordinates, players,
       teams, resources, upgrades, and entity state.

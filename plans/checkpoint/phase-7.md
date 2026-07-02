@@ -4,21 +4,19 @@ Status: Done.
 
 ## Implementation Notes
 
-- No active compatibility reader was removed. The direct setup path is retained as the private setup
-  compiler and test oracle before immediate checkpoint-backed restore; replay schema 2 loading is
-  retained for dev/self-play/crash/match-history fixtures; `LabScenarioV1` remains a public
-  compatibility input for pasted or historical lab scenario JSON.
+- This checkpoint phase did not remove active compatibility readers. The later lab replay finish
+  cleanup removed legacy lab setup loading and replay schema 2 loading; current builds reject both
+  with explicit compatibility errors.
 - `server/crates/archcheck` now fails when a `GameState` or `DerivedState` registry row lacks a
   concrete checkpoint policy or evidence/notes cell, in addition to the existing missing/stale row
   and owner-category checks.
 - The release audit in `docs/design/server-sim.md` records the final public surface policy:
   checkpoint payloads remain embeddable JSON text only, maps stay container-supplied map data or map
-  asset references, schema 3 replays and checkpoint-backed lab scenarios are the defaults, and there
+  asset references, schema 3 replays and checkpoint-backed lab setups are the defaults, and there
   is still no generic checkpoint upload/download product surface.
 - Remaining follow-up plan needs are product decisions, not blockers for this checkpoint plan:
-  removal timing for replay schema 2 and `LabScenarioV1`, whether to replace replay/lab keyframes
-  with checkpoint keyframes, and whether to design a public checkpoint save/load surface with
-  rollout observability.
+  whether to replace replay/lab keyframes with checkpoint keyframes and whether to design a public
+  checkpoint save/load surface with rollout observability.
 
 ## Scope
 

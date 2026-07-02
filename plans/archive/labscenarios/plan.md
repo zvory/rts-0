@@ -14,7 +14,7 @@ labs into a visual asset iteration tool.
 - A user can open the lab route and choose from a visible catalog of bundled lab scenarios, or start
   from a blank map setup.
 - A scenario in the catalog has stable id, title, description, tags, player count, map metadata, and
-  the `LabScenarioV1` setup JSON needed to restore it.
+  the legacy setup JSON needed to restore it.
 - The lab authoring panel can export the current authoritative lab setup, validate it as
   repo-ready, and show clear blocking errors before submission.
 - A configured deployment can submit the current lab setup as a draft GitHub pull request that adds
@@ -31,9 +31,9 @@ labs into a visual asset iteration tool.
   workflows beyond creating a draft PR.
 - Do not migrate `/dev/scenario` or scripted dev-watch scenarios in this plan.
 - Do not add map authoring or map PR submission. Scenarios may reference only bundled maps whose
-  metadata matches the current `LabScenarioV1` validation path.
+  metadata matches the then-current legacy setup validation path.
 - Do not serialize exact runtime snapshots. Projectiles, command logs, transient events, fog
-  projections, interpolation, and setup/teardown timers remain outside `LabScenarioV1`.
+  projections, interpolation, and setup/teardown timers remain outside legacy setup JSON.
 - Do not let the browser hold GitHub credentials or write arbitrary repository paths.
 
 ## Phase Summaries
@@ -50,7 +50,7 @@ start without depending on hand-coded Rust enum entries for every new scenario.
 
 Turn the existing import/export panel into an authoring surface for repo-ready scenarios. The phase
 adds metadata fields, slug rules, validation feedback, and a dry-run path that proves the current
-lab state can round-trip through `LabScenarioV1` and fit the catalog constraints. The user-facing
+lab state can round-trip through legacy setup JSON and fit the catalog constraints. The user-facing
 outcome is that authors can tell whether a scenario is ready to submit before any GitHub side
 effects happen.
 
@@ -78,8 +78,9 @@ process with clear operational constraints.
 
 ## Overall Constraints
 
-- Keep `LabScenarioV1` as the only reusable scenario setup format for this plan. If a phase needs a
-  metadata wrapper, keep the scenario JSON itself valid under the existing import/restore path.
+- Keep legacy setup JSON as the only reusable scenario setup format for this archived plan. If a
+  phase needs a metadata wrapper, keep the scenario JSON itself valid under the existing
+  import/restore path.
 - Keep all privileged game-state changes through public `Game` lab APIs. PR submission may export
   lab state, but it must not mutate sim internals or read a browser-supplied snapshot as authority.
 - Keep GitHub credentials server-side only and disabled unless configured through environment or

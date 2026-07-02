@@ -8,7 +8,7 @@
 - Duration: `73304ms` / `2221` ticks
 - Build: `fb3abd0b3fcc`
 - Map: `Default`, hash `13ac64aab0be91a8`
-- Replay: `match-89-replay.json`
+- Replay: `match-89-replay.schema2-unsupported.json` (historical schema 2; unsupported by current replay runtime)
 
 ## Metrics
 

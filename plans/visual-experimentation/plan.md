@@ -18,7 +18,7 @@ not start a later phase until the previous phase PR has merged to `origin/main`.
   per-instance unit overrides.
 - No product decision is needed before Phase 1. The plan chooses a small implementation path where
   the browser parses and resolves a local profile while the server room, wire protocol, and
-  `LabScenarioV1` remain unchanged.
+  checkpoint-backed lab setup payloads remain unchanged.
 - The first iteration loop is complete after Phase 2. Phase 3 broadens the workflow to live unit rig
   experiments once the lab profile and renderer-only sample surface are already proven.
 
@@ -51,9 +51,9 @@ workflow against the visual experimentation requirements and documenting any def
 - Keep this workflow local and lab-scoped. Do not add production-facing visual experiment UI,
   multiplayer synchronization, hot reload, remote asset loading, file pickers, uploads, or public
   catalog persistence.
-- Do not change the server wire protocol, compact snapshot shape, `LabScenarioV1`, checkpoint
-  payloads, saved lab scenario JSON, lab scenario PR submission data, balance values, commands,
-  combat, fog, pathing, minimap authority, or simulation state for this local workflow.
+- Do not change the server wire protocol, compact snapshot shape, checkpoint payloads,
+  checkpoint-backed lab setup JSON, lab setup PR submission data, balance values, commands, combat,
+  fog, pathing, minimap authority, or simulation state for this local workflow.
 - Treat the URL as an id selector only. `visualProfile` must be sanitized, must not enter the lab
   room string as executable data, and must never be interpreted as a path, URL, SVG body, module
   name, or image source.

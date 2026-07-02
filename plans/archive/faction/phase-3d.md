@@ -9,7 +9,7 @@ self-play, match-history, or dev paths without an explicit source of faction tru
 
 ## Scope
 
-- Replay playback loads faction ids from recorded schema-2 player rows. It must not recompute
+- Replay playback loads faction ids from recorded replay artifact player rows. It must not recompute
   faction ids from lobby state or current defaults.
 - Replay branch staging and launch copy recorded player faction ids from the source replay seed.
   Seat claims do not alter faction ids.
@@ -19,7 +19,7 @@ self-play, match-history, or dev paths without an explicit source of faction tru
 - Quickstart/debug starts default to Kriegsia unless a later phase explicitly adds a dev fixture
   path.
 - Self-play and AI-driven lifecycle paths remain Kriegsia-only.
-- Match-history replay uses the stored schema-2 artifact as source of truth and rejects old or
+- Match-history replay uses the stored replay artifact as source of truth and rejects old or
   unsupported faction data.
 - `phase2_empty_fixture` remains restricted to Rust tests and explicitly documented dev/test
   harnesses.
@@ -36,8 +36,8 @@ self-play, match-history, or dev paths without an explicit source of faction tru
 
 ## Verification
 
-- Replay artifact tests prove schema 2 preserves `kriegsia` faction ids and schema 1 remains
-  rejected.
+- Replay artifact tests prove the then-current schema preserves `kriegsia` faction ids and older
+  schemas remain rejected.
 - Replay branch tests prove branch seats and launches preserve recorded faction ids.
 - Dev scenario/self-play tests prove starts default to Kriegsia and reject unsupported factions
   where faction input is representable.

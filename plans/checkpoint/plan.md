@@ -4,7 +4,7 @@
 
 Active implementation plan for turning the internal `GameState` checkpoint proof from
 `plans/game-state/` into a versioned, embeddable text payload and then migrating starts, replays,
-and lab scenarios onto that shared payload. This supersedes the stale checkpoint portions of
+and lab setup containers onto that shared payload. This supersedes the stale checkpoint portions of
 `plans/lab-replay/`, which should remain historical reference only. Each phase below should land
 through the normal owned-PR workflow before the next phase starts.
 
@@ -12,11 +12,11 @@ through the normal owned-PR workflow before the next phase starts.
 
 Make authoritative simulation state a durable, validated, versioned text contract that can be
 embedded in multiple artifact types. A checkpoint payload, combined with the exact map supplied by
-its containing match start, replay artifact, lab scenario, or debug document, should be able to
-restore a `Game`, rebuild derived state, continue ticking, and match the current authoritative
-world with the same semantic and projection accuracy proven by `plans/game-state/`. Once that is
-true, normal match starts, replay artifacts, and lab scenario assets can converge on one start-state
-payload instead of maintaining separate setup formats.
+its containing match start, replay artifact, checkpoint-backed lab setup, or debug document, should
+be able to restore a `Game`, rebuild derived state, continue ticking, and match the current
+authoritative world with the same semantic and projection accuracy proven by `plans/game-state/`.
+Once that is true, normal match starts, replay artifacts, and lab setup assets can converge on one
+start-state payload instead of maintaining separate setup formats.
 
 ## Phase Summaries
 
@@ -35,7 +35,7 @@ Game` for all current checkpointed state fields except the container-owned map d
 phase should replace the cfg-test clone-shaped checkpoint proof with explicit DTO conversion,
 validation, serde, derived-state rebuild, and payload round-trip tests that reuse the existing
 semantic comparator. It may include a test/debug document wrapper to prove disk I/O, but it should
-still expose no player-facing route, command, UI, replay schema, or lab scenario migration.
+still expose no player-facing route, command, UI, replay schema, or lab setup migration.
 
 ### [Phase 3 - Checkpoint-Backed Starts](phase-3.md)
 
@@ -43,8 +43,7 @@ Make ordinary game and non-scenario lab construction compile their setup inputs 
 start payload: the exact map plus a `GameCheckpointV1` payload bound to that map. Existing public
 constructors and room flows should keep their signatures while the implementation proves
 checkpoint-backed starts are behaviorally identical to direct setup. The phase should leave replay
-artifacts, committed lab scenario files, and the `LabScenarioV1` scenario adapter on their current
-formats until the later lab phases.
+artifacts and committed lab setup files on their current formats until the later lab phases.
 
 ### [Phase 4 - Replay Artifact Migration](phase-4.md)
 
@@ -58,21 +57,21 @@ composition rather than deriving start state from the final `Game`. Replay seek 
 should keep working while keyframe internals are migrated only where the phase explicitly proves
 parity.
 
-### [Phase 5 - Lab Scenario Checkpoint Adapter](phase-5.md)
+### [Phase 5 - Lab Setup Checkpoint Adapter](phase-5.md)
 
-Add side-by-side lab scenario adapters so current `LabScenarioV1` assets can be converted into a
-scenario container with map data/binding, authoring metadata, and `GameCheckpointV1`. New lab
-exports can optionally emit the checkpoint-backed scenario shape behind an internal option. This
+Add side-by-side lab setup adapters so legacy setup assets can be converted into a setup container
+with map data/binding, authoring metadata, and `GameCheckpointV1`. New lab exports can optionally
+emit the checkpoint-backed setup shape behind an internal option. This
 phase should preserve today's lab import/export UI behavior, id-remap responses, validation, and
 authoring metadata while proving the checkpoint path reaches the same restored lab state. It should
 not rewrite the catalog assets yet.
 
 ### [Phase 6 - Lab Asset Cutover](phase-6.md)
 
-Migrate the bundled lab catalog and lab submission/export path to checkpoint-backed scenario
-containers. Keep compatibility readers for old `LabScenarioV1` files during the transition, or
-explicitly remove them only after every bundled and persisted caller has a tested replacement. This
-phase is the first one that may intentionally change the lab scenario JSON shape.
+Migrate the bundled lab catalog and lab submission/export path to checkpoint-backed setup
+containers. Keep compatibility readers for old lab setup files during the transition, or explicitly
+remove them only after every bundled and persisted caller has a tested replacement. This phase is
+the first one that may intentionally change the lab setup JSON shape.
 
 ### [Phase 7 - Public Surface Cleanup And Release Audit](phase-7.md)
 
@@ -93,7 +92,7 @@ operational rollback.
   contract.
   Use explicit DTOs so Rust refactors do not silently become schema breaks.
 - `GameCheckpointV1` is the canonical embeddable payload, not a product-specific file format.
-  Replays, lab scenarios, match-start artifacts, and any test/debug files are containers around the
+  Replays, lab setups, match-start artifacts, and any test/debug files are containers around the
   same payload.
 - A map should remain a map. The checkpoint payload should carry a map binding such as stable name,
   schema version, content hash, and any other validation facts needed to prove it is being restored

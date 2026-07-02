@@ -119,8 +119,9 @@ performance, and failure-mode checks.
 - `node tests/protocol_parity.mjs`
 - focused codec unit tests added under the Rust protocol crate
 - focused client decoder tests added or updated for binary/malformed frame behavior
-- `node scripts/client-perf-harness.mjs --workload matt-alex-replay --seconds 6` for each candidate
-  when the harness is stable on the implementing machine
+- `node scripts/client-perf-harness.mjs --workload vehicle-wall-stress --seconds 6` for each
+  candidate when the harness is stable on the implementing machine; use a fresh schema 3 replay
+  workload if replay playback evidence is required
 - `scripts/ai-perf-harness.sh --ticks 5000 --perf full --no-log-snapshots` or an equivalent
   documented server-side payload benchmark
 - `node scripts/check-docs-health.mjs`

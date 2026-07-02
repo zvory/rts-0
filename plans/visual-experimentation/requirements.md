@@ -122,17 +122,17 @@ presentation assets.
 
 - A developer should be able to launch an experiment with one local visual profile identifier.
 - No profile id means normal lab behavior.
-- A visual profile must be separate from authoritative lab scenario JSON.
-- Visual profile data must not be submitted through the lab scenario PR workflow.
+- A visual profile must be separate from authoritative checkpoint-backed lab setup JSON.
+- Visual profile data must not be submitted through the lab setup PR workflow.
 - A profile may be tied to a specific scenario or map when that keeps the local comparison simple.
 - Profiles may use brittle local selectors when acceptable for developer-only work, but they must
   fail visibly if they no longer match the current lab scene.
 
 ### Architectural Boundaries
 
-- `LabScenarioV1` remains authoritative setup data for maps, players, resources, research, and real
-  entities.
-- Visual experiment metadata must not be added to saved scenario JSON for the local-only workflow.
+- Checkpoint-backed lab setup payloads remain authoritative setup data for maps, players,
+  resources, research, and real entities.
+- Visual experiment metadata must not be added to saved lab setup JSON for the local-only workflow.
 - Visual experiment metadata must not change the wire protocol unless a later requirement adds
   shareable or collaborative experiment sessions.
 - Renderer-only samples belong to renderer/lab-visual code, not the simulation.
@@ -153,7 +153,7 @@ presentation assets.
 - No general-purpose custom asset loading system.
 - No changes to unit balance, collision, commands, combat, fog, or protocol for local visual
   experiments.
-- No visual experiment metadata inside `LabScenarioV1`, checkpoint payloads, or lab scenario PR
+- No visual experiment metadata inside checkpoint-backed lab setup payloads or lab setup PR
   submissions.
 - No requirement to make renderer-only samples behave like real game objects.
 
@@ -198,4 +198,4 @@ presentation assets.
 - Opening a profile can start with the camera centered on the intended comparison area.
 - Invalid profiles or candidates fail soft and do not crash the match loop.
 - The implementation does not require protocol changes for the local-only workflow.
-- The implementation does not add visual metadata to `LabScenarioV1`.
+- The implementation does not add visual metadata to checkpoint-backed lab setup payloads.

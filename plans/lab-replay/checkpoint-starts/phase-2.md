@@ -11,7 +11,7 @@ Status: POTENTIALLY STALE - not started. Re-evaluate after `plans/game-state/pla
 
 Make blank labs, catalog labs, and imported lab setups establish a baseline `GameCheckpoint`.
 "Lab Scenario" should become a product label over checkpoint-backed lab setup payloads, not a
-separate long-term `LabScenarioV1` serialization contract. If old scenario JSON remains
+separate long-term legacy setup serialization contract. If old scenario JSON remains
 temporarily, it must be an explicit adapter into checkpoint state. A lab import or baseline reset
 should produce a new baseline checkpoint and clear the current-branch action log.
 

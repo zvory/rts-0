@@ -5,7 +5,7 @@ Status: Done.
 ## Scope
 
 Stop treating "lab scenarios" as the primary product concept. New UX and docs should distinguish
-setup checkpoints from lab replays, while old `LabScenarioV1` remains only as a compatibility input.
+setup checkpoints from lab replays while legacy setup compatibility waits for Phase 4 cleanup.
 
 ## Expected Touch Points
 
@@ -27,10 +27,10 @@ setup checkpoints from lab replays, while old `LabScenarioV1` remains only as a 
 - Audit the current `exportScenario`/`importScenario` wire and client helper names. Keep them only as
   compatibility/setup internals with clear comments, or add new lab replay-specific helpers so new
   save/open behavior does not extend the legacy scenario vocabulary.
-- Keep old `LabScenarioV1` import readable with explicit "legacy scenario" compatibility wording.
+- Keep old legacy setup imports readable during this phase with explicit compatibility wording.
 - Ensure bundled catalog entries and submission previews use checkpoint-backed setup artifacts.
-- Update protocol parity/client contract tests to prevent new UI or docs from extending
-  `LabScenarioV1` as the preferred path.
+- Update protocol parity/client contract tests to prevent new UI or docs from extending legacy
+  setup DTOs as the preferred path.
 - Add client contract coverage for the lab replay save/open labels and for the setup-vs-replay
   distinction in import/export controls.
 

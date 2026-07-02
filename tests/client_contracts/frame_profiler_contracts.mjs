@@ -229,7 +229,7 @@ export function runFrameProfilerContracts() {
       "stress matrix parser accepts presets and explicit viewport sizes",
     );
 
-    const workloads = [{ id: "matt-alex-replay" }, { id: "fog-combat-replay-stress" }];
+    const workloads = [{ id: "vehicle-wall-stress" }, { id: "selected-unit-hud-stress" }];
     const cells = buildRenderStressMatrixCells({
       workloads,
       cpuThrottles: [1, 4],
@@ -265,11 +265,11 @@ export function runFrameProfilerContracts() {
     const matrixSummary = buildRenderStressMatrixSummary([
       {
         status: "passed",
-        workloadId: "matt-alex-replay",
-        artifactDir: "target/client-perf/matt-alex-replay/a",
+        workloadId: "vehicle-wall-stress",
+        artifactDir: "target/client-perf/vehicle-wall-stress/a",
         renderBudget: passingBudget,
         matrixCell: {
-          workloadId: "matt-alex-replay",
+          workloadId: "vehicle-wall-stress",
           configLabel: "cpu1-vpdefault-dpr1",
           cpuThrottleRate: 1,
           viewport: { label: "default", width: 1440, height: 900 },
@@ -280,11 +280,11 @@ export function runFrameProfilerContracts() {
       },
       {
         status: "passed",
-        workloadId: "fog-combat-replay-stress",
-        artifactDir: "target/client-perf/fog-combat-replay-stress/a",
+        workloadId: "selected-unit-hud-stress",
+        artifactDir: "target/client-perf/selected-unit-hud-stress/a",
         renderBudget: failingBudget,
         matrixCell: {
-          workloadId: "fog-combat-replay-stress",
+          workloadId: "selected-unit-hud-stress",
           configLabel: "cpu4-vplarge-dpr2",
           cpuThrottleRate: 4,
           viewport: { label: "large", width: 1920, height: 1080 },
@@ -296,7 +296,7 @@ export function runFrameProfilerContracts() {
     ], { durationMs: 1000, matrixRepeatCount: 1 });
     assert(matrixSummary.cells.length === 2, "stress matrix summary groups runs into cells");
     assert(
-      matrixSummary.firstFailingCell.workloadId === "fog-combat-replay-stress",
+      matrixSummary.firstFailingCell.workloadId === "selected-unit-hud-stress",
       "stress matrix summary ranks the first failing cell",
     );
     assert(
@@ -304,7 +304,7 @@ export function runFrameProfilerContracts() {
       "stress matrix summary reports unattributed work when it is the top measured phase",
     );
     assert(
-      formatRenderStressMatrixMarkdown(matrixSummary).includes("fog-combat-replay-stress"),
+      formatRenderStressMatrixMarkdown(matrixSummary).includes("selected-unit-hud-stress"),
       "stress matrix markdown includes failing workload rows",
     );
   }

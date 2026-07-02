@@ -121,7 +121,8 @@ smoke, the rollback is to revert the MessagePack change rather than carry both s
 - `node tests/protocol_parity.mjs`
 - focused Rust protocol tests for the MessagePack codec
 - a focused local live/browser smoke for normal match snapshots and commands
-- `node scripts/client-perf-harness.mjs --workload matt-alex-replay --seconds 6` when practical
+- `node scripts/client-perf-harness.mjs --workload vehicle-wall-stress --seconds 6` when practical;
+  use a fresh schema 3 replay workload if replay playback evidence is required
 - a high-entity stress browser harness workload when practical
 - `scripts/ai-perf-harness.sh --ticks 5000 --perf full --no-log-snapshots` or an equivalent
   documented server-side payload benchmark

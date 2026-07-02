@@ -187,7 +187,7 @@ node tests/client_smoke.mjs
 
 ## Browser performance harness
 
-`scripts/client-perf-harness.mjs` drives headless Chrome against fixed replay/dev workloads and
+`scripts/client-perf-harness.mjs` drives headless Chrome against fixed dev-scenario workloads and
 writes machine-readable summaries under `target/client-perf/<workload>/<timestamp>/`.
 
 ```bash

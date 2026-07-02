@@ -54,7 +54,7 @@ can add GC pressure during selected-unit, replay, and spectator views.
 - Selected-unit DOM guard coverage is in `node tests/client_contracts.mjs`: unchanged resource
   values skip text writes, unchanged selected detail/grid renders keep existing DOM, changed health
   refreshes, and unchanged observer Army Value rows skip body replacement.
-- `node scripts/client-perf-harness.mjs --workload matt-alex-replay --workload vehicle-wall-stress
+- `node scripts/client-perf-harness.mjs --workload selected-unit-hud-stress --workload vehicle-wall-stress
   --seconds 10` was attempted before and after the code changes, but this executor sandbox rejected
   the harness localhost probe with `listen EPERM: operation not permitted 127.0.0.1` before browser
   collection could start.
@@ -64,8 +64,8 @@ can add GC pressure during selected-unit, replay, and spectator views.
 - `node tests/client_contracts.mjs`
 - relevant HUD or command-card tests selected by `node tests/select-suites.mjs --from=origin/main`
 - `node scripts/check-client-architecture.mjs`
-- `node scripts/client-perf-harness.mjs --workload matt-alex-replay --seconds 10`
 - `node scripts/client-perf-harness.mjs --workload vehicle-wall-stress --seconds 10`
+- `node scripts/client-perf-harness.mjs --workload selected-unit-hud-stress --seconds 10`
 - `git diff --check`
 
 If client design docs change, also run:

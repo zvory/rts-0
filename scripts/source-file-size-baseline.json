@@ -5,8 +5,8 @@
   "exceptions": [
     {
       "path": "scripts/client-perf-harness.mjs",
-      "lines": 1953,
-      "reason": "Existing oversized harness before repo-wide source-size gate."
+      "lines": 1916,
+      "reason": "Replay workload cleanup lowered the existing oversized harness; keep ratcheting until browser harness reporting is split."
     },
     {
       "path": "scripts/docdrift-sweep.mjs",

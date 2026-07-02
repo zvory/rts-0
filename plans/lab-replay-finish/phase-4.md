@@ -5,8 +5,8 @@ Status: Done.
 ## Scope
 
 Remove old compatibility paths only after the lab replay and checkpoint setup paths have proven out.
-This phase is the deliberate cleanup pass for `LabScenarioV1`, replay artifact schema 2, stale docs,
-and stale tests.
+This phase is the deliberate cleanup pass for legacy lab setup DTO loading, replay artifact schema
+2 loading, stale docs, and stale tests.
 
 ## Expected Touch Points
 
@@ -27,7 +27,7 @@ and stale tests.
 ## Requirements
 
 - Confirm the bake-in gate from `plan.md` is satisfied before deleting compatibility.
-- Remove `LabScenarioV1` compatibility import/export code, protocol mirrors, stale docs, and tests.
+- Remove legacy lab setup compatibility import/export code, protocol mirrors, stale docs, and tests.
 - Remove replay schema 2 loading or replace it with a clear intentional rejection message if old
   artifacts are still expected to appear.
 - Audit dev replay, self-play, crash replay, match-history, and committed fixture load paths.
@@ -54,8 +54,8 @@ cross-process replay tooling, not a requirement for completing the lab replay mi
 ## Manual Testing Focus
 
 Open one new schema 3 replay, one new lab replay, and one lab checkpoint setup. Then attempt an old
-schema 2 replay and old `LabScenarioV1` import and verify they either load by an intentional
-remaining policy or fail with clear compatibility messages.
+schema 2 replay and old legacy lab setup import and verify they fail with clear compatibility
+messages.
 
 ## Handoff Notes
 

@@ -43,24 +43,7 @@ export const RENDER_FRAME_BUDGET_TARGETS = Object.freeze([
 export const RECURRING_PHASE_WARN_MS = 1;
 export const RECURRING_PHASE_HIGH_WARN_MS = 2;
 const MAX_RECURRING_WARNINGS = 8;
-const MATT_ALEX_SOURCE = path.join(
-  REPO_ROOT,
-  "docs",
-  "network-incident-examples",
-  "2026-06-19-beta-matt-alex",
-  "match-54-replay.json",
-);
-const MATT_ALEX_ARTIFACT_NAME = "client_perf_matt_alex_match_54";
-
 const WORKLOADS = Object.freeze([
-  {
-    id: "matt-alex-replay",
-    description: "Preserved 2026-06-19 Matt/Alex match 54 replay artifact.",
-    kind: "replayArtifact",
-    replayName: MATT_ALEX_ARTIFACT_NAME,
-    source: MATT_ALEX_SOURCE,
-    url: `/dev/replay-artifact?replay=${MATT_ALEX_ARTIFACT_NAME}`,
-  },
   {
     id: "vehicle-wall-stress",
     description: "No-fog dev scenario with 15 tanks moving through a wall chokepoint.",
@@ -75,26 +58,6 @@ const WORKLOADS = Object.freeze([
     setup: {
       selectFirstEntities: 4,
       minSelectedCount: 1,
-    },
-  },
-  {
-    id: "fog-combat-replay-stress",
-    description: "Matt/Alex replay fast-forwarded under one player's fog to exercise combat buildup, selection overlays, and minimap fog edges.",
-    kind: "replayArtifact",
-    replayName: MATT_ALEX_ARTIFACT_NAME,
-    source: MATT_ALEX_SOURCE,
-    url: `/dev/replay-artifact?replay=${MATT_ALEX_ARTIFACT_NAME}`,
-    setup: {
-      visionSelectionPlayerIndex: 1,
-      setRoomTimeSpeed: 8,
-      waitRoomTimeTo: 1800,
-      roomTimeWaitTimeoutMs: 20000,
-      waitForMinEntities: 20,
-      selectFirstEntities: 12,
-      selectUnitKindsOnly: true,
-      selectVisionSelectionPlayer: true,
-      minSelectedCount: 4,
-      focusSelectedEntities: true,
     },
   },
 ]);
@@ -723,7 +686,7 @@ function writeRenderLagComparisonSummary(results, outputRoot, args) {
     })),
     notes: [
       "Warnings are advisory and machine-local; compare branches on the same machine.",
-      "Keep beta Matt/Alex per-player reports separate from local replay and dev-scenario measurements.",
+      "Keep beta Matt/Alex per-player reports separate from local harness measurements.",
       "Detailed timing and trace artifacts stay under target/client-perf and are ignored by git.",
     ],
   };

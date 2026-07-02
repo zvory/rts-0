@@ -19,7 +19,7 @@ are added to the repo.
 - Replace or wrap the current `LabScenarioPreset` enum path so new catalog entries do not require a
   hand-written Rust enum variant for each scenario.
 - Add a server-side catalog loader that validates manifest entries, filename/id safety, duplicate
-  ids, JSON parseability, and `LabScenarioV1` restore compatibility.
+  ids, JSON parseability, and legacy setup restore compatibility.
 - Expose catalog entries to the browser through a bounded HTTP endpoint or existing launch metadata.
   Keep the full scenario JSON out of the listing unless a phase proves it is needed.
 - Add a lab entry UI for choosing an existing scenario or blank setup before starting the room.

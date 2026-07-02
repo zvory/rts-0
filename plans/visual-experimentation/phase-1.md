@@ -35,8 +35,8 @@ carry one sanitized `visualProfile` id, `App` can resolve that id through a chec
 - No real-unit visual overrides yet.
 - No arbitrary asset loading, path loading, dynamic import from URL, hot reload, file picker, upload,
   or remote fetch.
-- No server, protocol, `LabScenarioV1`, checkpoint, lab scenario submission, minimap, fog, command,
-  balance, or simulation changes.
+- No server, protocol, checkpoint payload, lab setup submission, minimap, fog, command, balance, or
+  simulation changes.
 
 ## Expected Touch Points
 
