@@ -20,6 +20,10 @@ const allowedSnapshotCalls = new Map(Object.entries({
 const snapshotCallRe = /\.\s*(snapshot_full_for|snapshot_for_spectator|snapshot_for)\s*\(/g;
 const labMutationCallRe = /\.\s*(apply_lab_op|issue_lab_command_as|restore_lab_scenario)\s*\(/g;
 const failures = [];
+const allowedLabMutationFiles = new Set([
+  "room_task/lab.rs",
+  "room_task/lab/replay.rs",
+]);
 const roomTaskRootBudget = {
   file: "room_task.rs",
   maxLines: 550,
@@ -29,6 +33,7 @@ const roomTaskChildLineBudgets = new Map(Object.entries({
   "room_task/dev.rs": 470,
   "room_task/helpers.rs": 140,
   "room_task/lab.rs": 1400,
+  "room_task/lab/replay.rs": 650,
   "room_task/lab/submission.rs": 180,
   "room_task/lifecycle.rs": 560,
   "room_task/live.rs": 750,
@@ -37,7 +42,7 @@ const roomTaskChildLineBudgets = new Map(Object.entries({
   "room_task/replay.rs": 720,
   "room_task/types.rs": 220,
 }));
-const roomTaskTotalLineBudget = 5800;
+const roomTaskTotalLineBudget = 6300;
 
 const lobbyRustFiles = listRustFiles(lobbySrc);
 
@@ -54,7 +59,7 @@ for (const file of lobbyRustFiles) {
     );
   }
 
-  if (file !== "room_task/lab.rs") {
+  if (!allowedLabMutationFiles.has(file)) {
     for (const match of stripped.matchAll(labMutationCallRe)) {
       failures.push(
         `${path.posix.join("server/src/lobby", file)}:${lineNumberAt(stripped, match.index)}: ${match[1]} must stay centralized in room_task/lab.rs lab request handling`,
