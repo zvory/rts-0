@@ -207,9 +207,6 @@ pub fn project_entity(
     entity: &Entity,
     context: EntityProjectionContext<'_>,
 ) -> Option<EntityView> {
-    if context.fogged && entity.kind == EntityKind::ScoutPlane {
-        return None;
-    }
     if context.fogged
         && !context
             .smokes

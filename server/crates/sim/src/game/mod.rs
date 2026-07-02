@@ -31,8 +31,8 @@ mod mortar;
 mod mortar_scatter;
 mod pathfinding;
 mod player_state;
-mod replay_artifact;
 pub mod replay;
+mod replay_artifact;
 mod resource_placement;
 #[cfg(test)]
 mod resource_placement_tests;
@@ -515,6 +515,14 @@ impl Game {
             &self.state.smokes,
         );
         let teams = self.team_relations();
+        self.state
+            .fog
+            .stamp_scout_plane_sources_for_teams_with_smoke(
+                &self.state.map,
+                &self.state.entities,
+                &self.state.smokes,
+                &teams,
+            );
         self.state.fog.stamp_lingering_sources_for_teams_with_smoke(
             &self.state.lingering_sight,
             &self.state.map,

@@ -9,16 +9,17 @@
 //!   6. combat
 //!   7. gather progression
 //!   8. production progression + spawning
-//!   9. construction progression
-//!   10. deconstruction progression
-//!   11. ability projectile/runtime progression
-//!   12. deaths
-//!   13. rebuild pre-collision occupancy/spatial indexes
-//!   14. unit-unit collision resolution (hard non-stacking; runs after spawning so newly
+//!   9. Scout Plane upkeep, fuel refill/drain, and dismissal
+//!   10. construction progression
+//!   11. deconstruction progression
+//!   12. ability projectile/runtime progression
+//!   13. deaths
+//!   14. rebuild pre-collision occupancy/spatial indexes
+//!   15. unit-unit collision resolution (hard non-stacking; runs after spawning so newly
 //!       produced units that land on the same spawn point are unstacked in the same tick)
-//!   15. trench occupation, slotting, and dig-in progress
-//!   16. recompute supply cap
-//!   17. rebuild final spatial index for snapshot interest filtering
+//!   16. trench occupation, slotting, and dig-in progress
+//!   17. recompute supply cap
+//!   18. rebuild final spatial index for snapshot interest filtering
 
 use std::collections::{BTreeSet, HashMap};
 
@@ -297,6 +298,25 @@ pub(crate) fn run_tick(
     });
     crate::perf::timed(perf.as_deref_mut(), "production", || {
         services::production::production_system(map, entities, players, &mut coordinator, events);
+    });
+    crate::perf::timed(perf.as_deref_mut(), "scout_plane_upkeep", || {
+        services::scout_plane::upkeep_system(entities, |owner, request| {
+            let player = players.iter_mut().find(|player| player.id == owner)?;
+            match request {
+                services::scout_plane::FuelAccountRequest::CheckAccount => Some(0),
+                services::scout_plane::FuelAccountRequest::PayUpkeep(oil) => {
+                    Some(if player.spend_resources(0, oil) { oil } else { 0 })
+                }
+                services::scout_plane::FuelAccountRequest::RefillReserveUpTo(max_oil) => {
+                    let refill = max_oil.min(player.oil);
+                    Some(if player.spend_resources(0, refill) {
+                        refill
+                    } else {
+                        0
+                    })
+                }
+            }
+        });
     });
     crate::perf::timed(perf.as_deref_mut(), "construction", || {
         services::construction::construction_system(

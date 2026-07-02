@@ -5,14 +5,16 @@
 //! within the sight area of any of that player's entities (`sight_tiles`) and the line from
 //! the entity to that tile is not blocked by stone, smoke, or sight-blocking building footprints.
 //! Units stamp a circle from their body center; buildings stamp their full footprint plus
-//! `sight_tiles` around the footprint edge. The snapshot layer uses this to withhold neutral/enemy
-//! entities standing on non-visible tiles, making the fog cheat-proof.
+//! `sight_tiles` around the footprint edge. Scout Planes add a separate team aerial sight pass
+//! that ignores stone and building blockers but still respects active smoke clouds. The snapshot
+//! layer uses this to withhold neutral/enemy entities standing on non-visible tiles, making the fog
+//! cheat-proof.
 //!
 //! Note the server only needs *currently visible* — the client maintains the "explored but
 //! not currently visible" dimming locally (see `docs/design/client-ui.md`). So this module tracks only
 //! the per-tick visible set.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use crate::config;
 use crate::game::entity::{blocks_line_of_sight, Entity, EntityKind, EntityStore};
@@ -269,6 +271,47 @@ impl Fog {
         }
     }
 
+    pub(in crate::game) fn stamp_scout_plane_sources_for_teams_with_smoke(
+        &mut self,
+        map: &Map,
+        store: &EntityStore,
+        smokes: &SmokeCloudStore,
+        teams: &TeamRelations,
+    ) {
+        let size = self.size;
+        let building_mask = BuildingLosMask::new(store, map);
+        let los = LineOfSight::with_smoke_only(map, smokes);
+        let mut seen_owners = BTreeSet::new();
+        for plane in store.iter() {
+            if plane.kind != EntityKind::ScoutPlane
+                || plane.owner == 0
+                || plane.hp == 0
+                || smokes.point_inside(plane.pos_x, plane.pos_y)
+                || !seen_owners.insert(plane.owner)
+            {
+                continue;
+            }
+            let mut recipients = teams.same_team_player_ids(plane.owner);
+            if recipients.is_empty() {
+                recipients.push(plane.owner);
+            }
+            for recipient in recipients {
+                let Some(grid) = self.grids.get_mut(&recipient) else {
+                    continue;
+                };
+                stamp_sight_at(
+                    grid,
+                    size,
+                    plane.pos_x,
+                    plane.pos_y,
+                    plane.sight_tiles(),
+                    &los,
+                );
+            }
+        }
+        reveal_visible_building_footprints(&mut self.grids, &building_mask);
+    }
+
     /// Whether `player` can currently see the tile `(tx, ty)`.
     pub fn is_visible(&self, player: u32, tx: u32, ty: u32) -> bool {
         if tx >= self.size || ty >= self.size {
@@ -326,8 +369,8 @@ impl Fog {
 }
 
 fn entity_grants_standard_sight(entity: &Entity) -> bool {
-    // Scout Plane aerial fog is intentionally a separate Phase 4 path. Until that exists, the
-    // hidden Phase 3 runtime must not fall through to ordinary ground line-of-sight stamping.
+    // Scout Plane aerial fog has its own smoke-only team sight pass, so it must not also fall
+    // through to ordinary ground line-of-sight stamping.
     entity.kind != EntityKind::ScoutPlane
 }
 

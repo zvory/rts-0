@@ -694,7 +694,6 @@ impl Entity {
         self.scout_plane.as_ref()
     }
 
-    #[cfg(test)]
     pub(in crate::game) fn scout_plane_state_mut(&mut self) -> Option<&mut ScoutPlaneState> {
         self.scout_plane.as_mut()
     }
