@@ -493,12 +493,17 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     const unitRig = renderer._liveRigPools.liveUnitRigs.get(entity.id);
     const shadowRig = renderer._liveRigPools.liveUnitRigShadows.get(entity.id);
     const ring = renderer._ringRadius(entity);
+    const bounds = unitRig?.definition?.bounds?.selection;
     assert(unitRig?.parts.has("part.wing"), "Scout Plane live rig includes a wing silhouette");
     assert(unitRig?.parts.has("part.fuselage"), "Scout Plane live rig includes a fuselage silhouette");
     assert(shadowRig?.parts.has("part.shadow"), "Scout Plane live rig includes a separate shadow route");
     assert(
       ring.rx === 28 && ring.ry === 22 && ring.cy === 2,
       "Scout Plane selection ring uses the mirrored 48x34 aircraft body",
+    );
+    assert(
+      bounds?.width <= 52 && bounds?.height <= 36,
+      "Scout Plane authored rig stays aligned with the mirrored aircraft selection body",
     );
     assert(
       renderer.layers.units.children.includes(unitRig.container) &&
