@@ -779,7 +779,7 @@ mod tests {
             serde_json::json!(ability_code(abilities::EKAT_MAGIC_ANCHOR))
         );
         let entity_schema = contract["compactSlotSchemas"]["entity"].as_array().unwrap();
-        assert_eq!(entity_schema.last().unwrap()["name"], serde_json::json!("scoutPlane"));
+        assert_eq!(entity_schema.last().unwrap()["name"], "prodScoutPlaneQueued");
     }
 
     #[test]
@@ -1381,6 +1381,7 @@ mod tests {
         center.prod_kind = Some(kinds::WORKER.to_string());
         center.prod_progress = Some(0.25);
         center.prod_queue = Some(2);
+        center.prod_scout_plane_queued = true;
         center.build_progress = Some(0.75);
         center.build_active = true;
         center.rally = Some([256.0, 512.0]);
@@ -1593,13 +1594,13 @@ mod tests {
         assert_eq!(value["e"][0][24], serde_json::Value::Null);
         assert_eq!(value["e"][0][25], serde_json::json!(true));
         assert_eq!(value["e"][0][32], serde_json::json!(80));
-        // Rally point rides in slot 18 of the producing building's record.
         assert_eq!(value["e"][2][18], serde_json::json!([256.0, 512.0]));
         // Rally plan is appended after the legacy optional slots so earlier compact positions stay stable.
         assert_eq!(
             value["e"][2][27],
             serde_json::json!([[1, 256.0, 512.0], [2, 320.0, 544.0]])
         );
+        assert_eq!(value["e"][2][34], serde_json::json!(true));
         assert_eq!(value["r"], serde_json::json!([[200, 1498]]));
         assert_eq!(
             value["sm"],

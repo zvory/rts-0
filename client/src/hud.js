@@ -142,8 +142,9 @@ export class HUD {
    * @param {import("./hotkey_profiles.js").HotkeyProfileService} [hotkeyProfiles] active hotkey resolver.
    * @param {import("./client_intent.js").ClientIntent} [clientIntent] browser-local command/placement intent facade.
    * @param {object} [controlPolicy] policy that decides command-surface and owner control.
+   * @param {import("./camera.js").Camera} [camera] viewport camera for command-card focus actions.
    */
-  constructor(rootEl, state, commandIssuer, audio = null, hotkeyProfiles = null, clientIntent = null, controlPolicy = null) {
+  constructor(rootEl, state, commandIssuer, audio = null, hotkeyProfiles = null, clientIntent = null, controlPolicy = null, camera = null) {
     this.root = rootEl;
     this.state = state;
     this.commandIssuer = commandIssuer;
@@ -151,6 +152,7 @@ export class HUD {
     this.hotkeyProfiles = hotkeyProfiles;
     this.clientIntent = clientIntent;
     this.controlPolicy = controlPolicy;
+    this.camera = camera;
 
     // Resource / supply bar elements.
     this.elHud = rootEl.querySelector("#hud");
@@ -372,6 +374,7 @@ export class HUD {
 
   _commandDescriptorContext(frameViews = null) {
     const selection = frameSelectedEntities(this.state, frameViews);
+    const currentEntities = frameCurrentEntities(this.state, frameViews);
     const commandOwner = this._commandOwnerForSelection(selection);
     this._recordHudDiagnostic(
       Array.isArray(frameViews?.selectedEntities)
@@ -391,6 +394,7 @@ export class HUD {
       commandOwner,
       factionId: this._commandFactionId(commandOwner),
       selection,
+      currentEntities,
       resources: this._commandResources(commandOwner),
       optimisticProduction: this.state.optimisticProduction || [],
       upgrades: this._commandUpgrades(commandOwner),
@@ -398,7 +402,11 @@ export class HUD {
       commandTarget: this._intent()?.commandTarget,
       controlPolicy: this.controlPolicy,
       groupCooldownClocks,
-      playerHasCompleteKind: (kind) => this._playerHasCompleteKind(kind, frameViews, commandOwner),
+      playerHasCompleteKind: (kind) => playerHasCompletedKind(
+        currentEntities,
+        commandOwner ?? this.state.playerId,
+        kind,
+      ),
     };
   }
 
@@ -481,6 +489,10 @@ export class HUD {
         return;
       case "dismissScoutPlane":
         this._issueCommand(cmd.dismissScoutPlane(intent.unitIds || []));
+        this._intent()?.endCommandTarget?.();
+        return;
+      case "selectActiveScoutPlane":
+        this._selectAndPanToEntity(intent.unitId);
         this._intent()?.endCommandTarget?.();
         return;
       case "train":
@@ -621,6 +633,11 @@ export class HUD {
     return Array.isArray(st.requires) ? st.requires : [st.requires];
   }
 
+  _requirementsAnyOf(st) {
+    if (!st || !st.requiresAny) return [];
+    return Array.isArray(st.requiresAny) ? st.requiresAny : [st.requiresAny];
+  }
+
   /** Selected own production buildings that can train `unit`, in selection order. */
   _selectedProducerBuildingsForUnit(unit) {
     const sel = this.state.selectedEntities() || [];
@@ -686,6 +703,18 @@ export class HUD {
     });
   }
 
+  _selectAndPanToEntity(entityId) {
+    const id = Number(entityId);
+    if (!Number.isInteger(id)) return;
+    const entity = (typeof this.state?.entityById === "function" ? this.state.entityById(id) : null) ||
+      frameCurrentEntities(this.state).find((e) => e.id === id);
+    if (!entity) return;
+    this.state?.setSelection?.([id]);
+    if (Number.isFinite(entity.x) && Number.isFinite(entity.y)) {
+      this.camera?.centerOn?.(entity.x, entity.y);
+    }
+  }
+
   /** Cancel one production item from the next selected producer in reverse order. */
   _issueCancelProduction(kind) {
     const building = this._previousProducingBuildingForKind(kind);
@@ -741,15 +770,20 @@ export class HUD {
     if (!st) return "";
     const cost = st.cost || {};
     const requirements = this._requirementsOf(st);
+    const anyRequirements = this._requirementsAnyOf(st);
     const upgradeRequirement = st.upgradeRequires
       ? (st.upgradeRequiresText ||
         ((UPGRADES[st.upgradeRequires] && UPGRADES[st.upgradeRequires].label) || st.upgradeRequires))
       : null;
-    const requirementLabels = requirements.length > 0 || upgradeRequirement
-      ? requirements.map((req) => (STATS[req] && STATS[req].label) || req).join(", ")
-        + (requirements.length > 0 && upgradeRequirement ? ", " : "")
-        + (upgradeRequirement || "")
-      : "None";
+    const requirementParts = [];
+    if (requirements.length > 0) {
+      requirementParts.push(requirements.map((req) => (STATS[req] && STATS[req].label) || req).join(", "));
+    }
+    if (anyRequirements.length > 0) {
+      requirementParts.push(anyRequirements.map((req) => (STATS[req] && STATS[req].label) || req).join(" or "));
+    }
+    if (upgradeRequirement) requirementParts.push(upgradeRequirement);
+    const requirementLabels = requirementParts.join(", ") || "None";
     const buildSeconds = Math.max(0, (st.buildTicks || 0) / TICK_HZ);
     const buildTime = Number.isInteger(buildSeconds)
       ? `${buildSeconds}s`

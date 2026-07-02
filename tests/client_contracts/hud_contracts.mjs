@@ -69,6 +69,7 @@ function commandCardCtx({
     commandCardMode,
     commandTarget,
     controlPolicy,
+    currentEntities: entities,
     groupCooldownClocks,
     playerHasCompleteKind: (kind) => playerHasCompletedKind(entities, playerId, kind),
   };
@@ -732,6 +733,149 @@ function fakeHudRootWithoutResourceSpans() {
   }));
   assert(!steelReservedTrainCard.slots[0].enabled, "pending train optimism should reserve steel for train buttons");
   assert(steelReservedTrainCard.slots[0].title === "Not enough resources", "resource-blocked train tooltip should name resources");
+
+  const scoutPlaneCityCentre = { id: 70, owner: 1, kind: KIND.CITY_CENTRE, buildProgress: null };
+  const incompleteGunWorks = { id: 71, owner: 1, kind: KIND.STEELWORKS, buildProgress: 0.5 };
+  const lockedScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [scoutPlaneCityCentre],
+    entities: [scoutPlaneCityCentre, incompleteGunWorks],
+    resources: { steel: 50, oil: 50, supplyUsed: 0, supplyCap: 10 },
+  }));
+  const lockedScoutPlaneButton = lockedScoutPlaneCard.slots[6];
+  assert(lockedScoutPlaneButton.label === "Scout Plane", "City Centre should expose Scout Plane in the Z slot");
+  assert(lockedScoutPlaneButton.commandId === defaultFactionCommandId("train", KIND.SCOUT_PLANE), "Scout Plane train button should expose stable train identity");
+  assert(lockedScoutPlaneButton.hotkey === "Z", "Scout Plane train button should use the Z grid hotkey");
+  assert(!lockedScoutPlaneButton.enabled, "Scout Plane train button should stay disabled before completed Gun Works or Vehicle Works");
+  assert(lockedScoutPlaneButton.title === "Requires Gun Works or Vehicle Works.", "Scout Plane locked tooltip should use the approved any-path reason");
+  assert(lockedScoutPlaneButton.cost.steel === 50, "Scout Plane train button should show 50 steel");
+  assert(lockedScoutPlaneButton.cost.oil === 50, "Scout Plane train button should show 50 oil");
+
+  const completedGunWorks = { id: 72, owner: 1, kind: KIND.STEELWORKS, buildProgress: null };
+  const gunUnlockedScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [scoutPlaneCityCentre],
+    entities: [scoutPlaneCityCentre, completedGunWorks],
+    resources: { steel: 50, oil: 50, supplyUsed: 0, supplyCap: 10 },
+  }));
+  assert(gunUnlockedScoutPlaneCard.slots[6].enabled, "completed Gun Works should unlock Scout Plane training");
+  assert(gunUnlockedScoutPlaneCard.slots[6].intent.type === "train", "unbuilt Scout Plane button should queue production");
+  assert(gunUnlockedScoutPlaneCard.slots[6].repeatable, "normal Scout Plane training remains repeatable until queued");
+
+  const completedVehicleWorks = { id: 73, owner: 1, kind: KIND.FACTORY, buildProgress: null };
+  const vehicleUnlockedScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [scoutPlaneCityCentre],
+    entities: [scoutPlaneCityCentre, completedVehicleWorks],
+    resources: { steel: 50, oil: 50, supplyUsed: 0, supplyCap: 10 },
+  }));
+  assert(vehicleUnlockedScoutPlaneCard.slots[6].enabled, "completed Vehicle Works should also unlock Scout Plane training");
+
+  const oilBlockedScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [scoutPlaneCityCentre],
+    entities: [scoutPlaneCityCentre, completedGunWorks],
+    resources: { steel: 50, oil: 49, supplyUsed: 0, supplyCap: 10 },
+  }));
+  assert(!oilBlockedScoutPlaneCard.slots[6].enabled, "Scout Plane train should disable when oil is short");
+  assert(oilBlockedScoutPlaneCard.slots[6].unaffordable, "resource-blocked Scout Plane should stay clickable for feedback");
+  assert(oilBlockedScoutPlaneCard.slots[6].title === "Not enough resources", "Scout Plane resource-blocked tooltip should name resources");
+
+  const activeScoutPlaneForTrain = {
+    id: 74,
+    owner: 1,
+    kind: KIND.SCOUT_PLANE,
+    x: 320,
+    y: 448,
+  };
+  const activeScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [scoutPlaneCityCentre],
+    entities: [scoutPlaneCityCentre, completedGunWorks, activeScoutPlaneForTrain],
+    resources: { steel: 50, oil: 50, supplyUsed: 0, supplyCap: 10 },
+  }));
+  assert(activeScoutPlaneCard.slots[6].enabled, "active Scout Plane button should remain enabled for selection");
+  assert(activeScoutPlaneCard.slots[6].action === "selectActiveScoutPlane", "active Scout Plane button should not be a train action");
+  assert(activeScoutPlaneCard.slots[6].intent.unitId === 74, "active Scout Plane button should target the existing plane");
+  assert(!activeScoutPlaneCard.slots[6].repeatable, "active Scout Plane selection should not repeat as a production hotkey");
+
+  const producingScoutPlaneCityCentre = {
+    ...scoutPlaneCityCentre,
+    prodKind: KIND.SCOUT_PLANE,
+    prodQueue: 1,
+    state: STATE.TRAIN,
+  };
+  const producingScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [producingScoutPlaneCityCentre],
+    entities: [producingScoutPlaneCityCentre, completedGunWorks],
+    resources: { steel: 100, oil: 100, supplyUsed: 0, supplyCap: 10 },
+  }));
+  assert(!producingScoutPlaneCard.slots[6].enabled, "Scout Plane button should disable while a plane is in production");
+  assert(!producingScoutPlaneCard.slots[6].unaffordable, "in-production Scout Plane block is not a resource-feedback state");
+  assert(producingScoutPlaneCard.slots[6].title === "Scout Plane already in production", "Scout Plane in-production tooltip should explain the one-plane limit");
+
+  const queuedBehindWorkerCityCentre = {
+    ...scoutPlaneCityCentre,
+    prodKind: KIND.WORKER,
+    prodQueue: 2,
+    state: STATE.TRAIN,
+    prodScoutPlaneQueued: true,
+  };
+  const queuedBehindWorkerScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [queuedBehindWorkerCityCentre],
+    entities: [queuedBehindWorkerCityCentre, completedGunWorks],
+    resources: { steel: 100, oil: 100, supplyUsed: 0, supplyCap: 10 },
+  }));
+  assert(!queuedBehindWorkerScoutPlaneCard.slots[6].enabled, "Scout Plane button should disable when a queued plane is behind another City Centre item");
+  assert(queuedBehindWorkerScoutPlaneCard.slots[6].title === "Scout Plane already in production", "queued Scout Plane flag should use the in-production reason");
+
+  const queuedElsewhereProducer = {
+    id: 75,
+    owner: 1,
+    kind: KIND.FACTORY,
+    buildProgress: null,
+    prodScoutPlaneQueued: true,
+    prodQueue: 1,
+    state: STATE.TRAIN,
+  };
+  const queuedElsewhereScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [scoutPlaneCityCentre],
+    entities: [scoutPlaneCityCentre, completedGunWorks, queuedElsewhereProducer],
+    resources: { steel: 100, oil: 100, supplyUsed: 0, supplyCap: 10 },
+  }));
+  assert(!queuedElsewhereScoutPlaneCard.slots[6].enabled, "Scout Plane button should mirror the server one-plane limit across any owned production queue");
+  assert(queuedElsewhereScoutPlaneCard.slots[6].title === "Scout Plane already in production", "off-selection Scout Plane queue flag should use the in-production reason");
+
+  const optimisticScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [scoutPlaneCityCentre],
+    entities: [scoutPlaneCityCentre, completedGunWorks],
+    resources: { steel: 100, oil: 100, supplyUsed: 0, supplyCap: 10 },
+    optimisticProduction: [{ building: scoutPlaneCityCentre.id, unit: KIND.SCOUT_PLANE, optimisticQueue: 1 }],
+  }));
+  assert(!optimisticScoutPlaneCard.slots[6].enabled, "pending Scout Plane optimism should block a second local train click");
+  assert(optimisticScoutPlaneCard.slots[6].title === "Scout Plane already in production", "optimistic Scout Plane production should use the in-production reason");
+
+  const selectScoutPlaneHud = Object.create(HUD.prototype);
+  let selectedScoutPlaneIds = [];
+  let selectedScoutPlanePan = null;
+  let selectScoutPlaneEnded = false;
+  selectScoutPlaneHud.state = {
+    entityById(id) {
+      return id === activeScoutPlaneForTrain.id ? activeScoutPlaneForTrain : null;
+    },
+    setSelection(ids) {
+      selectedScoutPlaneIds = ids;
+    },
+  };
+  selectScoutPlaneHud.camera = {
+    centerOn(x, y) {
+      selectedScoutPlanePan = [x, y];
+    },
+  };
+  selectScoutPlaneHud._intent = () => ({
+    endCommandTarget() {
+      selectScoutPlaneEnded = true;
+    },
+  });
+  selectScoutPlaneHud._dispatchCommandIntent({ type: "selectActiveScoutPlane", unitId: activeScoutPlaneForTrain.id });
+  assert(selectedScoutPlaneIds.join(",") === "74", "Scout Plane active-select intent selects the existing plane");
+  assert(selectedScoutPlanePan?.join(",") === "320,448", "Scout Plane active-select intent pans to the existing plane");
+  assert(selectScoutPlaneEnded, "Scout Plane active-select intent clears command targeting");
 
   const scoutCar = {
     id: 30,

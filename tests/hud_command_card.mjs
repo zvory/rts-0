@@ -209,6 +209,28 @@ function buttonSlots(card) {
 }
 
 {
+  const cityCentre = { id: 27, owner: 1, kind: KIND.CITY_CENTRE, buildProgress: null };
+  const scoutPlaneCard = buildCommandCardDescriptors({
+    playerId: 1,
+    selection: [cityCentre],
+    resources: { steel: 1000, oil: 1000, supplyUsed: 0, supplyCap: 20 },
+    upgrades: [],
+    playerHasCompleteKind: (kind) => kind === KIND.STEELWORKS,
+    groupCooldownClocks: () => [],
+  });
+  const scoutPlaneCommandId = kriegsiaCommandId("train", KIND.SCOUT_PLANE);
+  assert.deepEqual(commandCardActivationCandidates(scoutPlaneCard, scoutPlaneCommandId), [{
+    commandId: scoutPlaneCommandId,
+    slotIndex: 6,
+    hotkey: "Z",
+    label: "Scout Plane",
+    enabled: true,
+  }], "City Centre exposes Scout Plane production in the Z slot");
+  assert.equal(scoutPlaneCard.slots[6].cost.steel, 50);
+  assert.equal(scoutPlaneCard.slots[6].cost.oil, 50);
+}
+
+{
   const barracks = { id: 28, owner: 1, kind: KIND.BARRACKS, buildProgress: null };
   const panzerfaustCard = buildCommandCardDescriptors({
     playerId: 1,

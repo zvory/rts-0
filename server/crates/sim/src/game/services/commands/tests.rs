@@ -19,6 +19,7 @@ mod command_budget;
 mod orders;
 mod production;
 mod rally;
+mod scout_plane_production;
 mod support_weapons;
 mod tank_traps;
 

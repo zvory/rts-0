@@ -87,7 +87,7 @@ function commandInput(selected, entities) {
   scoutSelectionInput._commitClickSelection({ x: 96, y: 96 }, false, false);
   assert(
     Array.from(scoutSelectionState.selection).join(",") === "5500",
-    "Scout Plane can be selected directly for hidden-client inspection",
+    "Scout Plane can be selected directly",
   );
   scoutSelectionState.clearSelection();
   scoutSelectionInput._commitBoxSelection({ x0: 70, y0: 70, x1: 120, y1: 120 }, false);

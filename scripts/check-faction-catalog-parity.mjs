@@ -250,7 +250,7 @@ const EXPECTED_ABILITY_EFFECT_FIELDS_BY_ID = Object.freeze({
   ]),
   [ABILITY.EKAT_CONSUME_GOLEM]: Object.freeze(["radiusTiles"]),
 });
-const EXPECTED_HIDDEN_UNIT_STATS = Object.freeze([KIND.PANZERFAUST, KIND.SCOUT_PLANE]);
+const EXPECTED_EXTRA_UNIT_STATS = Object.freeze([KIND.PANZERFAUST]);
 
 function asClientKinds(kinds) {
   return kinds.map((kind) => {
@@ -599,9 +599,9 @@ assertSortedObjectKeys(
   rustClientConfig.unitStats,
   new Set([
     ...allRustCatalogs.catalogs.flatMap((catalog) => catalog.units),
-    ...EXPECTED_HIDDEN_UNIT_STATS,
+    ...EXPECTED_EXTRA_UNIT_STATS,
   ]),
-  "rules dump unitStats cover every client-mirrored catalog unit plus explicit hidden unit stats",
+  "rules dump unitStats cover every client-mirrored catalog unit plus explicit extra unit stats",
 );
 for (const [kind, expected] of Object.entries(rustClientConfig.unitStats)) {
   assertSortedObjectKeys(

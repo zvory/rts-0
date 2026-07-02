@@ -179,11 +179,16 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       STATS[KIND.SCOUT_PLANE].supply === 0 &&
       STATS[KIND.SCOUT_PLANE].body.length === 48 &&
       STATS[KIND.SCOUT_PLANE].blocksGroundPlacement === false,
-    "hidden Scout Plane stats mirror the approved contract",
+    "Scout Plane stats mirror the approved production contract",
   );
   assert(
-    !STATS[KIND.CITY_CENTRE].trains.includes(KIND.SCOUT_PLANE),
-    "City Centre trainables do not expose the hidden Scout Plane yet",
+    STATS[KIND.CITY_CENTRE].trains[1] === KIND.SCOUT_PLANE &&
+      configExports.trainableUnitsForFaction("kriegsia", KIND.CITY_CENTRE)[1] === KIND.SCOUT_PLANE &&
+      STATS[KIND.SCOUT_PLANE].requiresAny.includes(KIND.STEELWORKS) &&
+      STATS[KIND.SCOUT_PLANE].requiresAny.includes(KIND.FACTORY) &&
+      STATS[KIND.SCOUT_PLANE].requiresAnyText === "Requires Gun Works or Vehicle Works." &&
+      STATS[KIND.SCOUT_PLANE].trainSlot === 6,
+    "City Centre command card exposes Scout Plane with the approved any-path unlock and Z slot",
   );
   assert(
     Array.isArray(STATS[KIND.TRAINING_CENTRE].requires),

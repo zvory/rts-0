@@ -878,7 +878,8 @@ mod tests {
     }
 
     #[test]
-    fn current_ai_profiles_do_not_train_panzerfaust_first_pass() {
+    fn current_ai_profiles_do_not_train_specialist_first_pass_units() {
+        let omitted_units = [EntityKind::Panzerfaust, EntityKind::ScoutPlane];
         for profile in [
             &RIFLE_FLOOD_FAST,
             &RIFLE_FLOOD_FULL_SATURATION,
@@ -888,33 +889,26 @@ mod tests {
             &AI_1_1_TANK_MG,
             &AI_1_2_WAVE_COHORTS,
         ] {
-            assert!(
-                !profile
-                    .production
-                    .unit_priorities
-                    .contains(&EntityKind::Panzerfaust),
-                "{} base production must not train Panzerfaust in the first pass",
-                profile.id
-            );
-            if let Some(transition) = profile.tech_transition {
+            for unit in omitted_units {
                 assert!(
-                    !transition
-                        .production
-                        .unit_priorities
-                        .contains(&EntityKind::Panzerfaust),
-                    "{} tech transition must not train Panzerfaust in the first pass",
+                    !profile.production.unit_priorities.contains(&unit),
+                    "{} base production must not train {unit:?} in the first pass",
                     profile.id
                 );
-            }
-            if let Some(recovery) = profile.recovery_transition {
-                assert!(
-                    !recovery
-                        .production
-                        .unit_priorities
-                        .contains(&EntityKind::Panzerfaust),
-                    "{} recovery transition must not train Panzerfaust in the first pass",
-                    profile.id
-                );
+                if let Some(transition) = profile.tech_transition {
+                    assert!(
+                        !transition.production.unit_priorities.contains(&unit),
+                        "{} tech transition must not train {unit:?} in the first pass",
+                        profile.id
+                    );
+                }
+                if let Some(recovery) = profile.recovery_transition {
+                    assert!(
+                        !recovery.production.unit_priorities.contains(&unit),
+                        "{} recovery transition must not train {unit:?} in the first pass",
+                        profile.id
+                    );
+                }
             }
         }
     }

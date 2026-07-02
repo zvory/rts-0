@@ -164,9 +164,9 @@ support readable gameplay, clear unit roles, and strong terrain identity without
 or regime-specific iconography.
 
 MVP scope:
-- No combat air forces. The hidden `scout_plane` contract is non-combat reconnaissance vocabulary
-  reserved for staged Scout Plane implementation and remains absent from normal production until
-  its launch/upkeep/fog/UI phases are complete.
+- No combat air forces. `scout_plane` is non-combat reconnaissance vocabulary exposed through
+  City Centre production only after its launch, upkeep, fog, UI, and rendering contracts are in
+  place.
 - Late-game Artillery is implemented as the Superior Firepower capstone; Mortar Teams remain the
   early delayed-area fire tool.
 - No mines, morale, logistics, suppression-depth model, or detailed tank armor model yet. Tanks
@@ -336,7 +336,7 @@ folded into default targeting.
 - `SCOUT_CAR_OIL_COST_PER_PX = 5 / (96 * TILE_SIZE)`: scout cars burn oil for movement at
   half the previous tank movement rate. Command Cars use this same movement-oil cost. Tanks, scout
   cars, and command cars cannot advance while their owner has zero oil.
-- Hidden Scout Plane constants are reserved but not exposed in normal production yet:
+- Scout Plane constants for normal City Centre production:
   `SCOUT_PLANE_COST_STEEL = 50`, `SCOUT_PLANE_COST_OIL = 50`,
   `SCOUT_PLANE_BUILD_TICKS = 600`, `SCOUT_PLANE_HP = 40`,
   `SCOUT_PLANE_SIGHT_TILES = 12`, `SCOUT_PLANE_SPEED_PX_PER_TICK = 2.0`,
@@ -344,7 +344,9 @@ folded into default targeting.
   `SCOUT_PLANE_UPKEEP_OIL = 1`, `SCOUT_PLANE_UPKEEP_INTERVAL_TICKS = 20`, and
   `SCOUT_PLANE_FUEL_RESERVE_OIL = 8`. It has no default weapon and a zero-radius authoritative
   movement/collision body, so it neither reserves nor blocks ground pathing. The client mirror uses
-  a 48x34 px body and 17 px selection/render size for future visuals.
+  a 48x34 px body and 17 px selection/render size. Training unlocks after either completed Gun
+  Works or completed Vehicle Works, and the simulation admits at most one active or in-production
+  Scout Plane per player.
 - Tank stationary range ramps from the base 5-tile weapon range to 14 tiles over
   `TICK_HZ * 3` ticks. Movement-path translation or hull rotation resets the ramp; turret aiming,
   collision shoves, and external pulls do not.
@@ -503,7 +505,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 72 | 1.6 | 6     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and Heavy Guns (`anti_tank_gun_unlock`) researched in R&D Complex |
 | artillery       | 150 | 150 AP inner / 150-10 outer AOE | 25-55 artillery fire | 90 | 1.3 | 4 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind) and Heavy Guns (`anti_tank_gun_unlock`) researched in R&D Complex; tank-sized footprint |
 | scout_car       | 100 | 6   | 5     | 6  | 2.35  | 14    | 125 | 50  | 3   | 480 (~16s) |
-| scout_plane     | 40  | 0   | 0     | 0  | 2.0   | 12    | 50  | 50  | 0   | 600 (~20s); hidden/non-trainable until later Scout Plane phases; non-combat recon with 4-tile orbit radius, 1 oil per 20 ticks upkeep, 8 oil reserve, no ground collision reservation, and 48x34 px client render/selection body |
+| scout_plane     | 40  | 0   | 0     | 0  | 2.0   | 12    | 50  | 50  | 0   | 600 (~20s); trained at City Centre after completed Gun Works or Vehicle Works; one active or in-production per player; non-combat recon with 4-tile orbit radius, 1 oil per 20 ticks upkeep, 8 oil reserve, no ground collision reservation, and 48x34 px client render/selection body |
 | tank            | 292 | 60 cannon; 4 coax | 5 moving / 14 fully stationary cannon; 6 coax | 72 cannon; 6 coax | 2.0   | 6     | 425 | 150 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex; coax is a secondary small-arms weapon that fires through the current turret arc |
 | command_car     | 225 | 0   | 0     | 0  | 2.35  | 10    | 150 | 75  | 4   | 450 (~15s); requires Vehicle Works (`factory` kind) and Command Car (`command_car_unlock`) researched in R&D Complex; no weapon; Scout Car-style movement with a smaller jeep-sized body |
 | ekat       | 150 | 0   | 0     | 0  | 1.6   | 9     | 0   | 0   | 0   | 0; Ekat faction hero; no default attack; no passive regeneration; consumes nearby Golems for recovery |
@@ -514,7 +516,7 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 
 | kind                       | player-facing name | hp  | sight | cost | foot | buildTicks | notes |
 |----------------------------|--------------------|-----|-------|-----|------|-----------|-------|
-| city_centre                | City Centre        | 600 | 1     | 225 | 3x3  | 550       | trains worker; +10 supply; players start with one free |
+| city_centre                | City Centre        | 600 | 1     | 225 | 3x3  | 550       | trains worker and Scout Plane; +10 supply; players start with one free |
 | zamok                      | Zamok              | 600 | 1     | 0   | 3x3  | 0         | Ekat start building; +10 supply; trains Golem; no research in first playable slice |
 | depot                      | Supply Depot       | 110 | 1     | 100 | 2x2  | 300       | +8 supply |
 | barracks                   | Barracks           | 165 | 1     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, and panzerfaust; Panzerfaust and Machine Gunner require completed Training Centre; requires a City Centre |

@@ -1,4 +1,4 @@
-import { ABILITY, DEFAULT_FACTION_ID, KIND, SETUP, STATE, UPGRADE, isBuilding, isUnit } from "./protocol.js";
+import { ABILITY, DEFAULT_FACTION_ID, KIND, SETUP, UPGRADE, isBuilding, isUnit } from "./protocol.js";
 import {
   STATS,
   UPGRADES,
@@ -22,6 +22,19 @@ import {
   moveDescriptor,
   stopDescriptor,
 } from "./hud_unit_commands.js";
+import {
+  firstOpenCommandSlot,
+  researchAvailability,
+  researchDisabledReason,
+  researchSlotForUpgrade,
+  scoutPlaneTrainLimit,
+  selectedProducerBuildingsForUnit,
+  selectedProducingBuildingsForKind,
+  trainAvailability,
+  trainDisabledReason,
+  trainLimitSignature,
+  trainSlotForUnit,
+} from "./hud_train_card_helpers.js";
 
 // Command-card hotkeys follow the keyboard grid (3 columns):
 //   Q W E
@@ -408,39 +421,43 @@ export function buildTrainCard(ctx, building) {
   const factionId = commandFactionId(ctx);
   const trains = factionTrainsOf(ctx, building.kind);
   const researches = availableResearchesOf(ctx, building.kind);
-  const producingBuildings = selectedProducingBuildingsForKind(ctx, building.kind);
+  const producingBuildings = selectedProducingBuildingsForKind(ctx, building.kind, isOwn);
   const cancelSlot = 8;
   const signature =
     `train|${building.id}|` +
     trains.map((unit) => {
-      const producerIds = selectedProducerBuildingsForUnit(ctx, unit).map((e) => e.id).join(".");
-      return `${unit}:${trainAvailability(ctx, unit, resources)}:${producerIds}`;
+      const producerIds = selectedProducerBuildingsForUnit(ctx, unit, isOwn, factionTrainsOf).map((e) => e.id).join(".");
+      return `${unit}:${trainAvailability(ctx, unit, resources, isOwn)}:${trainLimitSignature(ctx, unit, isOwn)}:${producerIds}`;
     }).join(",") +
     `|research:` +
-    researches.map((upgrade) => `${upgrade}:${researchAvailability(ctx, upgrade, resources)}`).join(",") +
+    researches.map((upgrade) => `${upgrade}:${researchAvailability(ctx, upgrade, resources, isOwn)}`).join(",") +
     `|cancel:${producingBuildings.map((e) => e.id).join(".")}`;
 
   const slots = new Array(9).fill(null);
   for (const unit of trains) {
     const st = STATS[unit];
     if (!st) continue;
-    const slot = slots.findIndex((entry, idx) => entry == null && idx !== cancelSlot);
-    if (slot < 0) break;
-    const availability = trainAvailability(ctx, unit, resources);
+    const slot = firstOpenCommandSlot(slots, trainSlotForUnit(building.kind, unit, trains), cancelSlot);
+    if (slot < 0) continue;
+    const availability = trainAvailability(ctx, unit, resources, isOwn);
+    const scoutLimit = scoutPlaneTrainLimit(ctx, unit, isOwn);
+    const selectActive = scoutLimit.status === "active" && scoutLimit.active;
     slots[slot] = {
       id: `train:${unit}`,
       commandId: factionCommandId(factionId, "train", unit),
       kind: "button",
-      action: "train",
-      intent: { type: "train", unit },
+      action: selectActive ? "selectActiveScoutPlane" : "train",
+      intent: selectActive
+        ? { type: "selectActiveScoutPlane", unitId: scoutLimit.active.id }
+        : { type: "train", unit },
       icon: st.icon,
       label: st.label,
       cost: st.cost,
-      enabled: availability === "ready",
+      enabled: availability === "ready" || availability === "active",
       unaffordable: availability === "unaffordable",
-      title: trainDisabledReason(ctx, unit, resources),
+      title: trainDisabledReason(ctx, unit, resources, isOwn),
       tooltipKind: unit,
-      repeatable: true,
+      repeatable: availability === "ready",
       onUnavailableIntent: { type: "playNotEnough", cost: st.cost, supply: st.supply },
     };
   }
@@ -450,7 +467,7 @@ export function buildTrainCard(ctx, building) {
     const preferredSlot = researchSlotForUpgrade(building.kind, upgrade, trains);
     const slot = firstOpenCommandSlot(slots, preferredSlot, cancelSlot);
     if (slot < 0) continue;
-    const availability = researchAvailability(ctx, upgrade, resources);
+    const availability = researchAvailability(ctx, upgrade, resources, isOwn);
     slots[slot] = {
       id: `research:${upgrade}`,
       commandId: factionCommandId(factionId, "research", upgrade),
@@ -462,7 +479,7 @@ export function buildTrainCard(ctx, building) {
       cost: def.cost,
       enabled: availability === "ready",
       unaffordable: availability === "unaffordable",
-      title: researchDisabledReason(ctx, upgrade, resources),
+      title: researchDisabledReason(ctx, upgrade, resources, isOwn),
       tooltipUpgrade: upgrade,
       repeatable: false,
       onUnavailableIntent: { type: "playNotEnough", cost: def.cost },
@@ -687,62 +704,9 @@ function buildDisabledReason(ctx, kind, resources) {
   return "";
 }
 
-function trainAvailability(ctx, unit, resources) {
-  const st = STATS[unit];
-  if (!st) return "locked";
-  if (requirementsOf(st).some((req) => !playerHasCompleteKind(ctx, req))) return "locked";
-  if (st.upgradeRequires && !(ctx.upgrades || []).includes(st.upgradeRequires)) return "locked";
-  return affordable(st.cost, resources) && hasSupplyFor(st, resources) ? "ready" : "unaffordable";
-}
-
-function trainDisabledReason(ctx, unit, resources) {
-  const st = STATS[unit];
-  if (!st) return "";
-  const missing = requirementsOf(st).find((req) => !playerHasCompleteKind(ctx, req));
-  if (missing) return `Requires ${STATS[missing]?.label || missing}`;
-  if (st.upgradeRequires && !(ctx.upgrades || []).includes(st.upgradeRequires)) {
-    return st.upgradeRequiresText ||
-      `Requires ${UPGRADES[st.upgradeRequires]?.label || st.upgradeRequires}`;
-  }
-  if (!affordable(st.cost, resources)) return "Not enough resources";
-  if (!hasSupplyFor(st, resources)) return "Not enough supply";
-  return "";
-}
-
-function hasSupplyFor(st, resources) {
-  const supply = st?.supply ?? 0;
-  if (!Number.isFinite(supply) || supply <= 0) return true;
-  if (!Number.isFinite(resources.supplyCap)) return true;
-  const used = resources.supplyUsed ?? 0;
-  return used + supply <= resources.supplyCap;
-}
-
 function availableResearchesOf(ctx, kind) {
   const completed = ctx.upgrades || [];
   return factionResearchesOf(ctx, kind).filter((upgrade) => !completed.includes(upgrade));
-}
-
-function researchAvailability(ctx, upgrade, resources) {
-  const def = UPGRADES[upgrade];
-  if (!def) return "locked";
-  if ((ctx.upgrades || []).includes(upgrade)) return "locked";
-  if (selectedProducingBuildingsForKind(ctx, def.researchedAt)
-    .some((e) => e.prodUpgrade === upgrade)) return "locked";
-  if (def.requiresUpgrade && !(ctx.upgrades || []).includes(def.requiresUpgrade)) return "locked";
-  return affordable(def.cost, resources) ? "ready" : "unaffordable";
-}
-
-function researchDisabledReason(ctx, upgrade, resources) {
-  const def = UPGRADES[upgrade];
-  if (!def) return "";
-  if ((ctx.upgrades || []).includes(upgrade)) return "Researched";
-  if (selectedProducingBuildingsForKind(ctx, def.researchedAt)
-    .some((e) => e.prodUpgrade === upgrade)) return "Researching";
-  if (def.requiresUpgrade && !(ctx.upgrades || []).includes(def.requiresUpgrade)) {
-    return def.requiresText || `Requires ${UPGRADES[def.requiresUpgrade]?.label || def.requiresUpgrade}`;
-  }
-  if (!affordable(def.cost, resources)) return "Not enough resources";
-  return "";
 }
 
 function abilityDisabledReason(ctx, affordance) {
@@ -758,44 +722,4 @@ function abilityDisabledReason(ctx, affordance) {
     affordance.definition.queuePolicy !== "waitUntilReady"
   ) return "On cooldown";
   return affordance.definition.title || "";
-}
-
-function selectedProducerBuildingsForUnit(ctx, unit) {
-  return (ctx.selection || []).filter(
-    (e) =>
-      isOwn(ctx, e) &&
-      isBuilding(e.kind) &&
-      e.buildProgress == null &&
-      factionTrainsOf(ctx, e.kind).includes(unit),
-  );
-}
-
-function selectedProducingBuildingsForKind(ctx, kind) {
-  return (ctx.selection || []).filter(
-    (e) =>
-      isOwn(ctx, e) &&
-      e.kind === kind &&
-      isBuilding(e.kind) &&
-      e.buildProgress == null &&
-      ((e.prodQueue ?? 0) > 0 || e.state === STATE.TRAIN),
-  );
-}
-
-function researchSlotForUpgrade(buildingKind, upgrade, trains) {
-  const unitIndex = trains.findIndex((unit) => STATS[unit]?.upgradeRequires === upgrade);
-  if (unitIndex >= 0) return unitIndex + 3;
-  const researchIndex = researchesOf(buildingKind).indexOf(upgrade);
-  if (researchIndex >= 0) return researchIndex;
-  const afterTrainSlot = trains.findIndex((unit) => STATS[unit] == null);
-  return afterTrainSlot >= 0 ? afterTrainSlot : trains.length;
-}
-
-function firstOpenCommandSlot(slots, preferredSlot, reservedSlot = -1) {
-  const trySlot = (slot) =>
-    slot >= 0 && slot < slots.length && slot !== reservedSlot && slots[slot] == null;
-  if (trySlot(preferredSlot)) return preferredSlot;
-  for (let slot = 0; slot < slots.length; slot++) {
-    if (trySlot(slot)) return slot;
-  }
-  return -1;
 }

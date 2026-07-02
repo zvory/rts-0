@@ -213,6 +213,7 @@ export class Match {
         this.hotkeyProfiles,
         this.clientIntent,
         this.labControlPolicy,
+        this.camera,
       ),
     );
     this.inputRouter = this._timeInit("match.inputRouter", () => new MatchInputRouter(dom.viewport));

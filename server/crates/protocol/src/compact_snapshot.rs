@@ -625,6 +625,9 @@ impl Serialize for CompactEntity<'_> {
         if entity.scout_plane.is_some() {
             len = 34;
         }
+        if entity.prod_scout_plane_queued {
+            len = 35;
+        }
 
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&entity.id)?;
@@ -730,6 +733,9 @@ impl Serialize for CompactEntity<'_> {
         }
         if len > 33 {
             seq.serialize_element(&entity.scout_plane.as_ref().map(CompactScoutPlaneState))?;
+        }
+        if len > 34 {
+            seq.serialize_element(&entity.prod_scout_plane_queued)?;
         }
         seq.end()
     }

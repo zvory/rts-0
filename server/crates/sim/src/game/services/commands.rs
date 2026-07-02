@@ -31,7 +31,7 @@ use crate::game::services::order_execution::{
     start_artillery_fire_command_order, ArtilleryFireMode, FutureOrderMode,
 };
 use crate::game::services::order_planner as planner;
-use crate::game::services::scout_plane;
+use crate::game::services::scout_plane::{self, train_notice};
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::standability;
 use crate::game::services::world_query::{self, owns_unit};
@@ -40,7 +40,7 @@ use crate::game::teams::TeamRelations;
 use crate::game::upgrade::{self, UpgradeKind};
 use crate::game::PlayerState;
 use crate::protocol::{self, AttackReveal, Event, NoticeSeverity};
-use crate::rules;
+use crate::rules::{self, combat::WeaponKind};
 use std::collections::HashMap;
 /// Max submitted unit ids inspected per multi-unit command. Caps the per-id work a single command
 /// can force, so a repeated/huge id list can't be used to stall the tick loop.
@@ -1481,7 +1481,7 @@ fn try_fire_artillery(
                 to: unit,
                 reveal: Some(reveal.clone()),
                 to_pos: None,
-                weapon_kind: Some(rules::combat::WeaponKind::ArtilleryGun.stable_id().to_string()),
+                weapon_kind: Some(WeaponKind::ArtilleryGun.stable_id().to_string()),
             });
         }
     }
@@ -1755,6 +1755,7 @@ fn order_train(
         notice(events, player, "Requirement not met");
         return;
     }
+    if let Some(msg) = train_notice(unit, entities, player) { notice(events, player, msg); return; }
     let stats = match config::unit_stats(unit) {
         Some(s) => s,
         None => {

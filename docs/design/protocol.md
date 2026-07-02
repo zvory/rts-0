@@ -612,7 +612,8 @@ team. A defeated/disconnected teammate stops contributing live sight; if that pl
 has a living member, their own connection continues to receive the surviving team's current
 visibility. Allied non-resource entities visible through team current fog expose full read-only
 inspection details: hp/state/facing/setup state, production or research kind/progress/queue length,
-construction progress, gatherer latched node, active Breakthrough status, and safe combat tracers.
+Scout Plane queue presence, construction progress, gatherer latched node, active Breakthrough
+status, and safe combat tracers.
 Combat `targetId` and `weaponFacing` for allied units are sent only when the target is visible in
 the recipient's team-current actionable fog, so allied units attacking hidden enemies do not reveal
 hidden target ids or target directions. `steel`, `oil`, supply, `upgrades`, rallies, order plans,
@@ -643,7 +644,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 31. `client/src/net.js` calls
+`messagepack-compact`, codec version 1, compact snapshot version 32. `client/src/net.js` calls
 `parseServerFrame`; the binary frame parser in `client/src/protocol_frame.js` returns the raw
 compact snapshot object, then `decodeCompactSnapshot` expands it back into the semantic object above
 before dispatching `S.SNAPSHOT`.
@@ -669,7 +670,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 31,
+  "v": 32,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
@@ -678,7 +679,7 @@ adds an explicit application compression envelope.
       buildProgress?, latchedNode?, targetId?, setupState?, remaining?, rally?, oilUsed?,
       setupFacing?, orderPlan?, chargeCooldownLeft?, abilities?, breakthroughTicks?,
       visionOnly?, debugPath?, rallyPlan?, prodUpgrade?, buildActive?, deconstructProgress?,
-      weaponRangeTiles?, occupiedTrenchId?, scoutPlane?
+      weaponRangeTiles?, occupiedTrenchId?, scoutPlane?, prodScoutPlaneQueued?
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
@@ -858,6 +859,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   prodUpgrade?: string,          // upgrade currently being researched
   prodProgress?: f32,            // 0..1
   prodQueue?: u32,               // queued count (including the in-progress one)
+  prodScoutPlaneQueued?: bool,   // owner/allied; true if any queued item is a Scout Plane
   // buildings under construction:
   buildProgress?: f32,           // 0..1; when present and <1, render as scaffolding
   buildActive?: bool,            // owner-only; true when server advanced this scaffold this tick

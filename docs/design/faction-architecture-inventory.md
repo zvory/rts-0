@@ -56,7 +56,7 @@ Runtime identity is still global `EntityKind`. The current roster has 25 global 
 The current production catalog is in `server/crates/rules/src/defs.rs`:
 
 - Units: Worker, Golem, Rifleman, Machine Gunner, Panzerfaust, Anti-Tank Gun, Mortar Team,
-  Artillery, Scout Car, hidden/non-trainable Scout Plane, Tank, Command Car, and Ekat.
+  Artillery, Scout Car, Scout Plane, Tank, Command Car, and Ekat.
 - Buildings: City Centre, Zamok, Depot, Barracks, Training Centre, R&D Complex, Factory, Gun
   Works, Tank Trap, and Pump Jack. Tank Trap construction is server-authoritative after Training
   Centre eligibility and is exposed through the mirrored worker build menu; Pump Jack construction

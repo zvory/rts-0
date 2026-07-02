@@ -314,6 +314,10 @@ pub fn project_entity(
         }
         if owner_or_ally {
             view.prod_queue = Some(entity.prod_queue().len() as u32);
+            view.prod_scout_plane_queued = entity
+                .prod_queue()
+                .iter()
+                .any(|item| item.unit == EntityKind::ScoutPlane);
         }
     }
     if entity.is_building() && !entity.research_queue().is_empty() {

@@ -104,6 +104,10 @@ fn legacy_view_of(game: &Game, e: &Entity, viewer: u32, fogged: bool) -> EntityV
         }
         if e.owner == viewer {
             v.prod_queue = Some(e.prod_queue().len() as u32);
+            v.prod_scout_plane_queued = e
+                .prod_queue()
+                .iter()
+                .any(|item| item.unit == EntityKind::ScoutPlane);
         }
     }
     if let Some(progress) = e.build_progress_fraction() {
