@@ -265,15 +265,15 @@ mod tests {
         ));
         assert!(train_requirement_met(
             EntityKind::ScoutPlane,
-            &[EntityKind::Steelworks]
+            &[defs::SCOUT_PLANE_UNLOCK_BUILDINGS[0]]
         ));
         assert!(train_requirement_met(
             EntityKind::ScoutPlane,
-            &[EntityKind::Factory]
+            &[defs::SCOUT_PLANE_UNLOCK_BUILDINGS[1]]
         ));
         assert!(!train_requirement_met(
             EntityKind::ScoutPlane,
-            &[EntityKind::TrainingCentre]
+            &[EntityKind::ScoutPlane]
         ));
 
         assert!(!build_requirement_met(EntityKind::TrainingCentre, &[]));

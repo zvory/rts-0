@@ -24,8 +24,7 @@ pub(crate) fn production_limit(
         return Some(ScoutPlaneProductionLimit::Active);
     }
     if entities.iter().any(|building| {
-        building.kind == EntityKind::CityCentre
-            && building.owner == owner
+        building.owner == owner
             && building
                 .prod_queue()
                 .iter()
