@@ -28,6 +28,7 @@ impl PlayerState {
         true
     }
 
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn set_resources(&mut self, steel: u32, oil: u32) {
         self.steel = steel;
         self.oil = oil;

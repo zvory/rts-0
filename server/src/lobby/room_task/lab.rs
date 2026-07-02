@@ -24,8 +24,7 @@ use super::types::{LabRoomConfig, Phase, RoomMode, RoomPlayer};
 use super::RoomTask;
 use crate::lab_scenarios::{
     export_lab_checkpoint_scenario_for_protocol, lab_scenario_payload_lab_metadata,
-    lab_scenario_payload_legacy_god_mode_players, lab_scenario_payload_to_lab_op,
-    load_lab_scenario_by_id, validate_lab_scenario_authoring,
+    lab_scenario_payload_to_lab_op, load_lab_scenario_by_id, validate_lab_scenario_authoring,
 };
 use crate::protocol::{
     Event, LabClientOp, LabResult, LabScenarioLabMetadata, LabScenarioPayload, LabStartMetadata,
@@ -541,7 +540,6 @@ impl RoomTask {
         let god_mode_players = game.lab_god_mode_players();
         let start_payload = game.start_payload();
         let (seed, map_name) = match &loaded.scenario {
-            LabScenarioPayload::Legacy(scenario) => (scenario.seed, scenario.map.name.clone()),
             LabScenarioPayload::Checkpoint(scenario) => (scenario.seed, scenario.map.name.clone()),
         };
         Ok(LabLaunch {
@@ -1006,12 +1004,6 @@ impl RoomTask {
                 LabScenarioPayload::Checkpoint(scenario) => Some(
                     LabReplayRebaseSource::Checkpoint(Box::new(scenario.clone())),
                 ),
-                LabScenarioPayload::Legacy(scenario) => Some(LabReplayRebaseSource::Legacy {
-                    name: scenario.name.clone(),
-                    kind: scenario.kind.clone(),
-                    schema_version: scenario.schema_version,
-                    lab: scenario.metadata.lab.clone(),
-                }),
             },
             _ => None,
         };
@@ -1021,20 +1013,11 @@ impl RoomTask {
             }
             _ => None,
         };
-        let imported_god_mode_players = match &op {
-            LabClientOp::ImportScenario { scenario } => {
-                lab_scenario_payload_legacy_god_mode_players(scenario)
-            }
-            _ => None,
-        };
         let lab_op = match lab_client_op_to_game_op(op) {
             Ok(op) => op,
             Err(err) => return lab_result_error(request_id, op_kind, &err),
         };
-        let resets_timeline = matches!(
-            lab_op,
-            LabOp::RestoreScenario(_) | LabOp::RestoreCheckpointScenario(_)
-        );
+        let resets_timeline = matches!(lab_op, LabOp::RestoreCheckpointScenario(_));
         let timeline_op = lab_op.clone();
         let replay_op = if resets_timeline {
             None
@@ -1067,16 +1050,6 @@ impl RoomTask {
                 Ok(outcome) => outcome,
                 Err(err) => return lab_result_error(request_id, op_kind, &lab_error_text(&err)),
             };
-            if let Some(player_ids) = imported_god_mode_players.as_ref() {
-                for &player_id in player_ids {
-                    if let Err(err) = game.apply_lab_op(LabOp::SetPlayerGodMode {
-                        player_id,
-                        enabled: true,
-                    }) {
-                        return lab_result_error(request_id, op_kind, &lab_error_text(&err));
-                    }
-                }
-            }
             (game.tick_count(), outcome)
         };
         let outcome_json = lab_outcome_json(&outcome);

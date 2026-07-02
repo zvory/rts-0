@@ -6,17 +6,15 @@ use crate::game::map::Map;
 use crate::game::Game;
 use crate::game::MapMetadata;
 use crate::protocol::terrain;
-
-#[cfg(test)]
-use super::scenario::LabScenarioV1;
-use super::scenario::{MAX_LAB_SCENARIO_NAME_LEN, MAX_LAB_SCENARIO_PLAYERS};
 use super::{LabEntityIdRemap, LabError};
 
 pub(super) const LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION: u32 = 1;
 pub(super) const LAB_CHECKPOINT_SCENARIO_KIND: &str = "labCheckpointScenario";
+const MAX_LAB_CHECKPOINT_SCENARIO_NAME_LEN: usize = 80;
+const MAX_LAB_CHECKPOINT_PLAYERS: usize = 8;
 const MAX_LAB_CHECKPOINT_MAP_TILES: usize = 1_000_000;
-const MAX_LAB_CHECKPOINT_MAP_STARTS: usize = MAX_LAB_SCENARIO_PLAYERS;
-const MAX_LAB_CHECKPOINT_MAP_EXPANSION_SITES: usize = MAX_LAB_SCENARIO_PLAYERS * 8;
+const MAX_LAB_CHECKPOINT_MAP_STARTS: usize = MAX_LAB_CHECKPOINT_PLAYERS;
+const MAX_LAB_CHECKPOINT_MAP_EXPANSION_SITES: usize = MAX_LAB_CHECKPOINT_PLAYERS * 8;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -203,7 +201,9 @@ fn validate_lab_checkpoint_scenario_shape(
             reason: "checkpoint scenario kind must be labCheckpointScenario".to_string(),
         });
     }
-    if scenario.name.trim().is_empty() || scenario.name.len() > MAX_LAB_SCENARIO_NAME_LEN {
+    if scenario.name.trim().is_empty()
+        || scenario.name.len() > MAX_LAB_CHECKPOINT_SCENARIO_NAME_LEN
+    {
         return Err(LabError::InvalidScenario {
             reason: "checkpoint scenario name must be non-empty and at most 80 bytes".to_string(),
         });
@@ -272,26 +272,6 @@ impl Game {
             self.tick_count(),
             None,
             source_entity_id_map,
-            server_build_sha,
-        )
-    }
-
-    #[cfg(test)]
-    pub(in crate::game) fn lab_checkpoint_scenario_from_v1(
-        scenario: LabScenarioV1,
-        server_build_sha: &str,
-    ) -> Result<LabCheckpointScenarioV1, LabError> {
-        let name = scenario.name.clone();
-        let source = LabCheckpointScenarioSource {
-            kind: scenario.kind.clone(),
-            schema_version: scenario.schema_version,
-        };
-        let (game, restore) = Self::lab_game_from_scenario(scenario)?;
-        game.export_lab_checkpoint_scenario_with_metadata(
-            name,
-            game.tick_count(),
-            Some(source),
-            restore.entity_id_map,
             server_build_sha,
         )
     }

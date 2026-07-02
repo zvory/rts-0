@@ -41,9 +41,9 @@ scope, or the lobby front-page table.
   winner-only and stays `null` for both draws and deploy-drain aborted matches.
 - **Replay storage.** `match_replays.artifact_json` stores the versioned `ReplayArtifactV1` JSON
   contract. New writes use artifact schema 3: a launch-time map/checkpoint start state plus the
-  recorded command stream and end metadata. Legacy schema 2 rows remain loadable through the
-  legacy map/loadout start path. Summaries and launch strictly check supported artifact schema, map
-  schema, map hash, and faction/loadout validity. Build-SHA mismatches stay launchable with a
+  recorded command stream and end metadata. Schema 2 and older rows are intentionally rejected by
+  the replay compatibility checks. Summaries and launch strictly check supported artifact schema,
+  map schema, map hash, and faction/loadout validity. Build-SHA mismatches stay launchable with a
   warning because replay playback is attempted across build drift.
 - **TLS to Supabase.** `DATABASE_URL` must include `?sslmode=require`.
 - **Drain-abort audit trail.** Interrupted deploy validation should find the forced-abort room log,

@@ -59,11 +59,6 @@ export const C = Object.freeze({
   SELECT_MAP: "selectMap",
 });
 
-export const LAB_SCENARIO = Object.freeze({
-  KIND: "labScenario",
-  SCHEMA_VERSION: 1,
-});
-
 export const LAB_CHECKPOINT_SCENARIO = Object.freeze({
   KIND: "labCheckpointScenario",
   SCHEMA_VERSION: 1,

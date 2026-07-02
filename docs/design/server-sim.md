@@ -109,18 +109,19 @@ impl Game {
     /// must not mutate entity stores or player state directly.
     pub fn apply_lab_op(&mut self, op: lab::LabOp) -> Result<lab::LabOpOutcome, lab::LabError>;
 
-    /// Export authoritative lab setup data as versioned JSON-friendly legacy scenario state, without
-    /// treating snapshots, fog, transient events, command logs, or room-owned lab metadata as the
-    /// scenario format.
-    pub fn export_lab_scenario(&self) -> lab::LabScenarioV1;
+    /// Export authoritative lab setup data as a checkpoint-backed setup container. The JSON-friendly
+    /// transport name is still `LabScenarioPayload`, but the payload is `LabCheckpointScenarioV1`.
+    pub fn export_lab_checkpoint_scenario(
+        &self,
+        name: String,
+        server_build_sha: &str,
+    ) -> Result<lab::LabCheckpointScenarioV1, lab::LabError>;
 
-    /// Restore a versioned legacy lab scenario through the same validation/repair path used by
-    /// `apply_lab_op(LabOp::RestoreScenario(...))`, remapping scenario entity ids to fresh
-    /// authoritative ids.
-    pub fn restore_lab_scenario(
-        &mut self,
-        scenario: lab::LabScenarioV1,
-    ) -> Result<lab::LabOpOutcome, lab::LabError>;
+    /// Restore a checkpoint-backed setup into a fresh lab `Game` after validating map binding,
+    /// checkpoint shape, player metadata, lab metadata, and entity-id remap metadata.
+    pub fn restore_lab_checkpoint_scenario(
+        scenario: lab::LabCheckpointScenarioV1,
+    ) -> Result<Game, lab::LabError>;
 
     /// Static info for the `start` message (terrain + player start tiles). Call once.
     pub fn start_payload(&self) -> StartPayload;
@@ -213,15 +214,15 @@ Lab mutation types live under `game::lab`. `LabOp` is intentionally narrow rathe
 backdoor: entity mutations validate known unit/building kinds, real players, finite in-map
 positions, placement/collision legality, and stale ids before changing the world. Accepted lab
 mutations clear stale orders and reservations where needed, then rebuild supply, spatial index,
-fog, and building memory before returning. `LabScenarioV1` is legacy setup data keyed by map identity,
-player resources, completed research, entity records including stable body/weapon/setup facing, and
-small lab metadata such as setup name and exported tick;
-room-owned protocol export adds the requesting operator's current lab vision metadata before
-sending JSON to the browser.
-Restore loads the named map, validates faction/research/kind data, recreates entities with fresh
-ids, repairs derived state, and returns the id remap for callers that need to reconcile UI
-selection. Snapshot-only projections, transient events, projectile runtime state, active commands,
-production queues, rally plans, cooldowns, and command logs are not part of the setup format.
+fog, and building memory before returning. Lab setup import/export uses checkpoint-backed
+`LabCheckpointScenarioV1` containers: materialized map data and binding live beside an embedded
+`GameCheckpointV1` payload, and small lab metadata carries setup name, exported tick, selected
+vision, god-mode players, and optional source entity-id remap rows. Restore validates map binding,
+checkpoint payload, player and lab metadata, repairs derived state, and returns the id remap for
+callers that need to reconcile UI selection. Snapshot-only projections, transient events,
+projectile runtime state, active commands, production queues, rally plans, cooldowns, and command
+logs are not part of the setup format. Legacy `kind:"labScenario"` setup JSON is rejected before it
+can mutate a lab room.
 
 #### 3.1.1 `Game` State Ownership Registry
 
@@ -325,18 +326,15 @@ Phase 7 release audit for the ownership sequence:
   `client/src/protocol.js` are not changed by the private checkpoint path.
 - Replay artifact schema 3 captures the replay start state as a launch-time
   `ReplayStartComposition` containing the map binding plus `GameCheckpointV1`, then finalizes with
-  recorded commands and end metadata. Legacy schema 2 artifacts still load through the
-  map/loadout-start compatibility path. Replay seek still uses recorded commands plus in-process
-  `clone_for_replay_keyframe` keyframes after the start game is rebuilt. Schema 2 compatibility is
-  retained because dev files, self-play artifacts, crash artifacts, match-history rows, and old
-  fixtures may still contain it; schema, map, faction, and loadout drift reject with explicit
-  messages while build-SHA drift remains warning-compatible.
+  recorded commands and end metadata. Schema 2 and older replay artifacts reject with the
+  unsupported-schema error. Replay seek still uses recorded commands plus in-process
+  `clone_for_replay_keyframe` keyframes after the start game is rebuilt. Schema, map, faction, and
+  loadout drift reject with explicit messages while build-SHA drift remains warning-compatible.
 - Lab timeline seek still replays lab timeline entries from in-process keyframes. Current lab
-  import/export UI uses checkpoint-backed `LabCheckpointScenarioV1` containers by default:
+  import/export UI uses checkpoint-backed `LabCheckpointScenarioV1` containers:
   materialized map data/binding lives beside an embedded `GameCheckpointV1` text payload, and
-  `sourceEntityIdMap` preserves existing import remap callers. Old `LabScenarioV1` setup files
-  remain accepted as compatibility inputs and are converted through the same restore path because
-  user-supplied legacy scenario JSON and historical fixtures can still arrive on the public lab surface.
+  `sourceEntityIdMap` preserves existing import remap callers. Old `kind:"labScenario"` setup
+  files are rejected by the checkpoint-only payload parser.
   Portable lab sessions use the protocol-owned `LabReplayArtifactV1` contract: an initial
   checkpoint-backed lab setup plus ordered replayable lab mutations and issue-as commands. The
   portable stream is not `LabSession.operation_log` and not retained `LabTimeline` keyframes;
@@ -347,16 +345,16 @@ Phase 7 release audit for the ownership sequence:
   targets, ability payloads, remembered occupants, or private events.
 - Persistence is unchanged outside replay artifact contents: match history stores the same
   versioned `ReplayArtifactV1` JSON row, now with schema 3 `startState` for new writes, and the DB
-  reader uses the same compatibility policy as file/dev replay loading.
+  reader rejects schema 2 and older artifacts the same way file/dev replay loading does.
 - Operational rollback remains a normal server rollback or revert. New schema 3 artifacts are
-  rejected by old binaries that do not know the schema; current binaries retain schema 2 and legacy
-  lab-scenario readers so rolling forward again does not require a data migration. No generic
-  checkpoint upload route or client save/load UI exists to disable during rollback.
+  rejected by old binaries that do not know the schema; current binaries reject removed schema 2
+  replay artifacts and legacy lab setup JSON, so old artifacts need to be recreated through the
+  current checkpoint-backed lab setup or replay flow. No generic checkpoint upload route exists
+  outside the bounded lab setup/replay surfaces.
 
-Remaining follow-up product decisions are deliberately outside this checkpoint plan: when to remove
-schema 2 replay loading, when to remove `LabScenarioV1` compatibility input, whether to replace
-in-process replay/lab keyframes with checkpoint keyframes, and whether a separate product plan
-should expose any public checkpoint save/load surface with rollout observability.
+Remaining follow-up product decisions are deliberately outside this checkpoint plan: whether to
+replace in-process replay/lab keyframes with checkpoint keyframes, and whether a separate product
+plan should expose any public checkpoint save/load surface with rollout observability.
 
 `PlayerInit.team_id` is canonical team identity. Phase 1 preserves FFA gameplay by assigning each
 seated player a unique nonzero team by default; deserialized or hand-built fixtures with
@@ -654,8 +652,8 @@ remain on their current schemas until their phases introduce containers around t
   viewer roles, per-operator selected vision, the future-join vision default, shared room-time
   speed/pause/controller state, and append-only operation log records stay in the room task rather
   than in `Game`. Bundled catalog and authoring validation restore checkpoint-backed
-  `LabCheckpointScenarioV1` containers through the lab `Game` API and still accept old
-  `LabScenarioV1` files as compatibility inputs before exposing a setup. Setup PR submission
+  `LabCheckpointScenarioV1` containers through the lab `Game` API; legacy lab setup JSON is
+  rejected before exposing a setup. Setup PR submission
   also starts in `room_task/lab.rs`: the room exports the authoritative lab `Game` as a checkpoint
   setup, validates authoring metadata, rate-limits the room to one
   PR job, and then hands the already-validated preview to a bounded background service so GitHub or
@@ -668,13 +666,13 @@ remain on their current schemas until their phases introduce containers around t
   normal `Game`, drive authored scenario setup and optional scripted movement, and use the shared
   projection and fanout helpers to send watchers full-world snapshots for the configured view
   player. Saved self-play artifacts are normal schema 3 `ReplayArtifactV1` files and load through
-  `Phase::ReplayViewer` via the neutral replay-artifact room path; schema 2 artifacts remain
-  accepted by the same loader.
+  `Phase::ReplayViewer` via the neutral replay-artifact room path; schema 2 and older artifacts
+  reject in the same loader.
 - Replay viewer rooms use `Phase::ReplayViewer`, which owns a lobby-local
   `replay_session::ReplaySession`: the immutable versioned `ReplayArtifactV1`, rebuilt `Game`,
   command cursor, shared playback speed, and per-viewer fog selection. Schema 3 rebuilds the start
-  `Game` from `startState.checkpointPayload` and the exact generated map; schema 2 rebuilds from
-  map, seed, players, and loadouts. Replay snapshots use `game.snapshot_for_spectator(selected_player_ids)`
+  `Game` from `startState.checkpointPayload` and the exact generated map; schema 2 and older
+  artifacts reject before playback. Replay snapshots use `game.snapshot_for_spectator(selected_player_ids)`
   so viewers see authoritative union-fog or single-player fog, selected-player resource rows, and
   selected-player remembered building memory, never full-world state.
 

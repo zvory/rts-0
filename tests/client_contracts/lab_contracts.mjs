@@ -18,7 +18,6 @@ import {
   KIND,
   LAB_CHECKPOINT_SCENARIO,
   LAB_REPLAY,
-  LAB_SCENARIO,
   LAB_ROLE,
   UPGRADE,
   cmd,
@@ -80,7 +79,7 @@ import { textWithin } from "./dom_text.mjs";
     tags: ["two-player", "lategame"],
     map: "Default",
     playerCount: 2,
-    scenario: { kind: "labScenario" },
+    scenario: { kind: LAB_CHECKPOINT_SCENARIO.KIND },
   });
   assert(normalized.id === "lategame", "lab catalog entry keeps stable setup id");
   assert(normalized.playerCount === 2, "lab catalog entry keeps bounded player count metadata");
@@ -291,15 +290,15 @@ await withFakeDocument(async () => {
   void labClient.exportScenario("saved setup");
   assert(sent.at(-1).op.op === "exportScenario" && sent.at(-1).op.name === "saved setup", "LabClient sends setup export requests through the compatibility op");
   void labClient.importScenario({
-    schemaVersion: LAB_SCENARIO.SCHEMA_VERSION,
-    kind: LAB_SCENARIO.KIND,
-    entities: [{ id: 7, facing: 0.25, weaponFacing: 0.5, setUp: true, setupFacing: 0.75 }],
+    schemaVersion: LAB_CHECKPOINT_SCENARIO.SCHEMA_VERSION,
+    kind: LAB_CHECKPOINT_SCENARIO.KIND,
+    name: "saved setup",
   });
   assert(
     sent.at(-1).op.op === "importScenario" &&
-      sent.at(-1).op.scenario.kind === LAB_SCENARIO.KIND &&
-      sent.at(-1).op.scenario.entities[0].setupFacing === 0.75,
-    "LabClient sends legacy scenario import requests with orientation setup fields",
+      sent.at(-1).op.scenario.kind === LAB_CHECKPOINT_SCENARIO.KIND &&
+      sent.at(-1).op.scenario.name === "saved setup",
+    "LabClient sends checkpoint setup import requests through the compatibility op",
   );
   void labClient.validateScenario({
     slug: "saved-setup",
@@ -1194,13 +1193,13 @@ await withFakeDocument(async () => {
   void labClient.exportScenario(panel.value("scenario-name"));
   assert(sent.at(-1).op.op === "exportScenario" && sent.at(-1).op.name === "saved setup", "LabPanel setup name feeds export requests");
   panel.fields.get("scenario-json").value = JSON.stringify({
-    schemaVersion: 1,
-    kind: "labScenario",
+    schemaVersion: LAB_CHECKPOINT_SCENARIO.SCHEMA_VERSION,
+    kind: LAB_CHECKPOINT_SCENARIO.KIND,
     name: "saved setup",
     metadata: { exportedTick: 0, lab: { vision: labVision.fullWorld() } },
   });
   void panel.importScenario();
-  assert(sent.at(-1).op.op === "importScenario" && sent.at(-1).op.scenario.name === "saved setup", "LabPanel imports pasted legacy scenario JSON");
+  assert(sent.at(-1).op.op === "importScenario" && sent.at(-1).op.scenario.name === "saved setup", "LabPanel imports pasted checkpoint setup JSON");
   buttonByText("Reset setup").listeners.click();
   assert(sent.at(-1).t === "seekRoomTimeTo" && sent.at(-1).tick === 0, "LabPanel reset setup seeks the lab timeline to the setup start");
   assert(textWithin(root).includes("Setup reset requested."), "LabPanel surfaces reset setup requests locally");

@@ -44,9 +44,9 @@ Use when adding, removing, or changing any field on a client↔server message, s
   countdown skipping is not a debug preset.
 - `LobbyPlayer` carries `teamId`, `factionId`, `aiProfileId?`, and `isSpectator`; spectators are
   lobby members but not active match players.
-- Lab setup import/export uses the compatibility-named `LabScenarioPayload`: new
-  exports/submissions and bundled assets are checkpoint-backed `LabCheckpointScenarioV1`
-  containers, while old `LabScenarioV1` JSON remains a legacy scenario compatibility input. Setup
+- Lab setup import/export uses the compatibility-named `LabScenarioPayload`; the only accepted
+  payload is a checkpoint-backed `LabCheckpointScenarioV1` container. Legacy `kind:"labScenario"`
+  JSON is rejected before it can mutate a lab room. Setup
   authoring has `validateScenario` for dry-run previews and `submitScenario` for the
   disabled-by-default draft PR service. `submitScenario` returns one async `labResult` and never
   accepts client-supplied setup JSON, branch names, paths, or credentials. Validation and submission

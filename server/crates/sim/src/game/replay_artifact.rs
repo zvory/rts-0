@@ -4,14 +4,10 @@ use super::{Game, PlayerInit, PlayerStartingLoadout};
 use crate::protocol::{Command, PlayerScore};
 
 pub(in crate::game) const REPLAY_ARTIFACT_SCHEMA_VERSION_V3: u32 = 3;
-pub(in crate::game) const REPLAY_ARTIFACT_SCHEMA_VERSION_V2: u32 = 2;
 pub const REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION: u32 = REPLAY_ARTIFACT_SCHEMA_VERSION_V3;
 
 pub fn is_supported_replay_artifact_schema(version: u32) -> bool {
-    matches!(
-        version,
-        REPLAY_ARTIFACT_SCHEMA_VERSION_V2 | REPLAY_ARTIFACT_SCHEMA_VERSION_V3
-    )
+    version == REPLAY_ARTIFACT_SCHEMA_VERSION_V3
 }
 
 /// One authoritative gameplay command, stamped with the simulation tick that applied it.

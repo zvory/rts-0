@@ -48,7 +48,7 @@ with:
 - `replay.json`: a normal `ReplayArtifactV1` command-log replay artifact, loadable through the
   same replay runtime as post-match and match-history replays. New artifacts use schema 3 with a
   launch-time `startState.checkpointPayload` (`GameCheckpointV1`) plus the recorded command stream;
-  legacy schema 2 artifacts still load through the map/loadout start compatibility path.
+  schema 2 and older artifacts are intentionally rejected by the current replay loader.
   Team-capable artifacts preserve `players[].teamId`, `winnerTeamId`, and team-aware final score
   rows; old singleton-FFA artifacts without team fields still load through compatibility defaults.
 - `diagnostic.json`: self-play-only start payload, script decision log, event log, milestone state,
