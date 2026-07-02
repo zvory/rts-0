@@ -73,6 +73,25 @@ fn lab_timeline_records_mutations_and_issue_as_commands() {
     assert_eq!(timeline.keyframe_ticks(), vec![0]);
     let entries = timeline.entries();
     assert_eq!(entries.len(), 2);
+    assert_eq!(timeline.replay_entry_count(), 2);
+    assert_eq!(timeline.replay_entries()[0].sequence, 0);
+    assert!(matches!(
+        &timeline.replay_entries()[0].op,
+        crate::protocol::LabReplayOperation::SetPlayerResources {
+            player_id: LAB_PLAYER_ONE_ID,
+            steel: 456,
+            oil: 78
+        }
+    ));
+    assert_eq!(timeline.replay_entries()[1].sequence, 1);
+    assert!(matches!(
+        &timeline.replay_entries()[1].op,
+        crate::protocol::LabReplayOperation::IssueCommandAs {
+            player_id: LAB_PLAYER_ONE_ID,
+            cmd,
+            ignore_command_limits: true,
+        } if cmd == &issued_command
+    ));
     assert_eq!(entries[0].sequence, 0);
     assert_eq!(entries[0].tick, 0);
     assert_eq!(entries[0].request_id, 30);
@@ -284,6 +303,152 @@ fn lab_seek_replays_issue_as_commands_through_rebuild() {
 }
 
 #[test]
+fn lab_replay_export_reopens_process_cold_from_serialized_artifact() {
+    let mut task = RoomTask::new(
+        "__lab__:sandbox:map=Default".to_string(),
+        RoomMode::Lab(lab_config()),
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let (operator_tx, mut operator_writer) = ConnectionSink::new();
+    let (operator_ack, _operator_ack_rx) = tokio::sync::oneshot::channel();
+    task.on_join(
+        99,
+        "Operator".to_string(),
+        true,
+        false,
+        operator_tx,
+        operator_ack,
+    );
+    while operator_writer.reliable_rx.try_recv().is_ok() {}
+
+    let worker = lab_worker_id(&task);
+    let start_position = lab_entity_position(&task, worker);
+    task.on_lab_request(
+        99,
+        80,
+        LabClientOp::SetPlayerResources {
+            player_id: LAB_PLAYER_ONE_ID,
+            steel: 1234,
+            oil: 55,
+        },
+    );
+    assert!(lab_results(&mut operator_writer)[0].ok);
+    task.on_lab_request(
+        99,
+        81,
+        LabClientOp::SetPlayerGodMode {
+            player_id: LAB_PLAYER_TWO_ID,
+            enabled: true,
+        },
+    );
+    assert!(lab_results(&mut operator_writer)[0].ok);
+    task.on_lab_request(
+        99,
+        82,
+        LabClientOp::SetVision {
+            vision: LabVisionMode::Team { team_id: 2 },
+        },
+    );
+    assert!(lab_results(&mut operator_writer)[0].ok);
+    task.on_lab_request(
+        99,
+        83,
+        LabClientOp::IssueCommandAs {
+            player_id: LAB_PLAYER_ONE_ID,
+            cmd: Command::Move {
+                units: vec![worker],
+                x: start_position.0 + 128.0,
+                y: start_position.1,
+                queued: false,
+            },
+            ignore_command_limits: false,
+        },
+    );
+    assert!(lab_results(&mut operator_writer)[0].ok);
+    for _ in 0..12 {
+        task.on_tick(TokioInstant::now());
+    }
+    let moved_position = lab_entity_position(&task, worker);
+    assert_ne!(moved_position, start_position);
+
+    let artifact = task
+        .export_lab_replay_artifact(99, Some("portable lab replay"))
+        .expect("lab replay export");
+    assert_eq!(artifact.authoring.name, "portable lab replay");
+    assert_eq!(
+        artifact.initial_setup.metadata.lab.vision,
+        LabVisionMode::Team { team_id: 2 }
+    );
+    assert_eq!(artifact.timeline.initial_tick, 0);
+    assert_eq!(artifact.timeline.duration_ticks, in_game_tick(&task));
+    assert_eq!(artifact.operations.len(), 3);
+    assert!(matches!(
+        &artifact.operations[2].op,
+        crate::protocol::LabReplayOperation::IssueCommandAs {
+            player_id: LAB_PLAYER_ONE_ID,
+            cmd: Command::Move { units, .. },
+            ignore_command_limits: false,
+        } if units.as_slice() == &[worker]
+    ));
+
+    let json = serde_json::to_string(&artifact).expect("artifact JSON");
+    let reopened_artifact: crate::protocol::LabReplayArtifactV1 =
+        serde_json::from_str(&json).expect("process-cold artifact parse");
+    let mut reopened = RoomTask::new(
+        "__lab__:sandbox:map=Default".to_string(),
+        RoomMode::Lab(lab_config()),
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let (reopened_tx, mut reopened_writer) = ConnectionSink::new();
+    let (reopened_ack, _reopened_ack_rx) = tokio::sync::oneshot::channel();
+    reopened.on_join(
+        99,
+        "Operator".to_string(),
+        true,
+        false,
+        reopened_tx,
+        reopened_ack,
+    );
+    while reopened_writer.reliable_rx.try_recv().is_ok() {}
+    reopened
+        .load_lab_replay_artifact(99, reopened_artifact)
+        .expect("lab replay open");
+
+    assert_eq!(in_game_tick(&reopened), in_game_tick(&task));
+    assert_eq!(
+        lab_player_resources(&reopened, LAB_PLAYER_ONE_ID),
+        (1234, 55)
+    );
+    assert_eq!(lab_entity_position(&reopened, worker), moved_position);
+    let Phase::InGame(game) = &reopened.phase else {
+        panic!("reopened lab should be running");
+    };
+    assert_eq!(game.lab_god_mode_players(), vec![LAB_PLAYER_TWO_ID]);
+    assert_eq!(game.command_log().len(), 1);
+    assert_eq!(game.command_log()[0].player_id, LAB_PLAYER_ONE_ID);
+    let reopened_session = reopened.lab_session.as_ref().expect("lab session");
+    assert_eq!(
+        reopened_session.vision_for(99),
+        LabVisionMode::Team { team_id: 2 }
+    );
+    assert!(!reopened_session.dirty);
+    assert!(reopened_session.operation_log.is_empty());
+    let reopened_timeline = reopened.lab_timeline.as_ref().expect("lab timeline");
+    assert_eq!(reopened_timeline.replay_entry_count(), 3);
+    reopened.send_lab_room_time_state_to(99);
+    let room_time = room_time_states(&mut reopened_writer)
+        .pop()
+        .expect("lab room time");
+    assert_eq!(room_time.current_tick, in_game_tick(&task));
+    assert_eq!(room_time.duration_ticks, in_game_tick(&task));
+    assert_eq!(room_time.keyframe_ticks, vec![0]);
+}
+
+#[test]
 fn lab_timeline_truncates_future_after_past_seek_and_new_operation() {
     let mut task = RoomTask::new(
         "__lab__:sandbox:map=Default".to_string(),
@@ -352,7 +517,12 @@ fn lab_timeline_truncates_future_after_past_seek_and_new_operation() {
     assert_eq!(lab_player_resources(&task, LAB_PLAYER_ONE_ID), (300, 30));
     let timeline = task.lab_timeline.as_ref().expect("lab timeline");
     assert_eq!(timeline.entries().len(), 2);
+    assert_eq!(timeline.replay_entry_count(), 2);
     assert!(timeline.entries().iter().all(|entry| entry.tick == 0));
+    assert!(timeline
+        .replay_entries()
+        .iter()
+        .all(|entry| entry.tick == 0));
     assert_eq!(timeline.keyframe_ticks(), vec![0]);
     let messages: Vec<_> =
         std::iter::from_fn(|| operator_writer.reliable_rx.try_recv().ok()).collect();
@@ -686,7 +856,23 @@ fn lab_timeline_resets_on_scenario_import() {
     }));
     let timeline = task.lab_timeline.as_ref().expect("lab timeline");
     assert!(timeline.entries().is_empty());
+    assert!(timeline.replay_entries().is_empty());
     assert_eq!(timeline.keyframe_ticks(), vec![0]);
+    let artifact = task
+        .export_lab_replay_artifact(99, Some("rebased replay"))
+        .expect("rebased lab replay export");
+    assert!(artifact.operations.is_empty());
+    assert_eq!(artifact.initial_setup.name, "baseline");
+    let checkpoint_payload: serde_json::Value =
+        serde_json::from_str(&artifact.initial_setup.checkpoint_payload)
+            .expect("checkpoint payload JSON");
+    assert!(checkpoint_payload["players"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|player| {
+            player["id"] == LAB_PLAYER_ONE_ID && player["steel"] == 777 && player["oil"] == 66
+        }));
     assert_eq!(
         task.lab_session
             .as_ref()
