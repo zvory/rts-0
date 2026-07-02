@@ -1,0 +1,622 @@
+use std::str::FromStr;
+
+use rts_sim::game::entity::EntityKind;
+use rts_sim::game::lab::{
+    LabCommandOptions, LabMoveEntity, LabOp, LabOpOutcome, LabSetCompletedResearch,
+    LabSetEntityOwner, LabSetPlayerResources, LabSpawnEntity,
+};
+use rts_sim::game::upgrade::UpgradeKind;
+use rts_sim::game::Game;
+
+use super::super::super::connection::send_or_log;
+use super::super::super::current_unix_ms;
+use super::super::super::lab_timeline::{LabTimeline, LabTimelineEntry, LabTimelineEntryKind};
+use super::super::super::session_policy::RoomTimeSource;
+use super::super::types::{LabSeekTarget, Phase};
+use super::super::RoomTask;
+use super::{lab_error_text, lab_result_error, LabOperationLogEntry};
+use crate::lab_scenarios::{
+    export_lab_checkpoint_scenario_for_protocol, lab_scenario_payload_to_lab_op,
+};
+use crate::protocol::{
+    lab_replay_artifact_from_slice, Command, LabCheckpointScenarioSource, LabCheckpointScenarioV1,
+    LabReplayArtifactV1, LabReplayAuthoringMetadata, LabReplayOperation, LabReplayOperationEntry,
+    LabReplayTimelineMetadata, LabResult, LabScenarioLabMetadata, LabScenarioPayload,
+    LabVisionMode, RoomTimeState, ServerMessage, LAB_REPLAY_ARTIFACT_KIND,
+    LAB_REPLAY_ARTIFACT_SCHEMA, LAB_REPLAY_ARTIFACT_SCHEMA_VERSION,
+    LAB_REPLAY_MAX_AUTHORING_NAME_BYTES, LAB_REPLAY_TIMELINE_KEYFRAME_INTERVAL_TICKS,
+};
+
+pub(super) enum LabReplayRebaseSource {
+    Checkpoint(LabCheckpointScenarioV1),
+    Legacy {
+        name: String,
+        kind: String,
+        schema_version: u32,
+        lab: LabScenarioLabMetadata,
+    },
+}
+
+pub(super) fn lab_op_to_replay_operation(op: &LabOp) -> Option<LabReplayOperation> {
+    match op {
+        LabOp::SpawnEntity(input) => Some(LabReplayOperation::SpawnEntity {
+            owner: input.owner,
+            kind: input.kind.stable_id().to_string(),
+            x: input.x,
+            y: input.y,
+            completed: input.completed,
+        }),
+        LabOp::DeleteEntity { entity_id } => Some(LabReplayOperation::DeleteEntity {
+            entity_id: *entity_id,
+        }),
+        LabOp::MoveEntity(input) => Some(LabReplayOperation::MoveEntity {
+            entity_id: input.entity_id,
+            x: input.x,
+            y: input.y,
+        }),
+        LabOp::SetEntityOwner(input) => Some(LabReplayOperation::SetEntityOwner {
+            entity_id: input.entity_id,
+            owner: input.owner,
+        }),
+        LabOp::SetPlayerResources(input) => Some(LabReplayOperation::SetPlayerResources {
+            player_id: input.player_id,
+            steel: input.steel,
+            oil: input.oil,
+        }),
+        LabOp::SetPlayerGodMode { player_id, enabled } => {
+            Some(LabReplayOperation::SetPlayerGodMode {
+                player_id: *player_id,
+                enabled: *enabled,
+            })
+        }
+        LabOp::SetCompletedResearch(input) => Some(LabReplayOperation::SetCompletedResearch {
+            player_id: input.player_id,
+            upgrade: input.upgrade.to_protocol_str().to_string(),
+            completed: input.completed,
+        }),
+        LabOp::RestoreScenario(_) | LabOp::RestoreCheckpointScenario(_) => None,
+    }
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+fn lab_replay_operation_kind(op: &LabReplayOperation) -> &'static str {
+    match op {
+        LabReplayOperation::SpawnEntity { .. } => "spawnEntity",
+        LabReplayOperation::DeleteEntity { .. } => "deleteEntity",
+        LabReplayOperation::MoveEntity { .. } => "moveEntity",
+        LabReplayOperation::SetEntityOwner { .. } => "setEntityOwner",
+        LabReplayOperation::SetPlayerResources { .. } => "setPlayerResources",
+        LabReplayOperation::SetPlayerGodMode { .. } => "setPlayerGodMode",
+        LabReplayOperation::SetCompletedResearch { .. } => "setCompletedResearch",
+        LabReplayOperation::IssueCommandAs { .. } => "issueCommandAs",
+    }
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+fn lab_replay_operation_to_entry_kind(
+    replay_op: &LabReplayOperation,
+) -> Result<LabTimelineEntryKind, String> {
+    match replay_op {
+        LabReplayOperation::SpawnEntity {
+            owner,
+            kind,
+            x,
+            y,
+            completed,
+        } => {
+            let kind = EntityKind::from_str(kind).map_err(|_| "unknown entity kind".to_string())?;
+            Ok(LabTimelineEntryKind::LabOperation {
+                op_kind: lab_replay_operation_kind(replay_op).to_string(),
+                op: LabOp::SpawnEntity(LabSpawnEntity {
+                    owner: *owner,
+                    kind,
+                    x: *x,
+                    y: *y,
+                    completed: *completed,
+                }),
+            })
+        }
+        LabReplayOperation::DeleteEntity { entity_id } => Ok(LabTimelineEntryKind::LabOperation {
+            op_kind: lab_replay_operation_kind(replay_op).to_string(),
+            op: LabOp::DeleteEntity {
+                entity_id: *entity_id,
+            },
+        }),
+        LabReplayOperation::MoveEntity { entity_id, x, y } => {
+            Ok(LabTimelineEntryKind::LabOperation {
+                op_kind: lab_replay_operation_kind(replay_op).to_string(),
+                op: LabOp::MoveEntity(LabMoveEntity {
+                    entity_id: *entity_id,
+                    x: *x,
+                    y: *y,
+                }),
+            })
+        }
+        LabReplayOperation::SetEntityOwner { entity_id, owner } => {
+            Ok(LabTimelineEntryKind::LabOperation {
+                op_kind: lab_replay_operation_kind(replay_op).to_string(),
+                op: LabOp::SetEntityOwner(LabSetEntityOwner {
+                    entity_id: *entity_id,
+                    owner: *owner,
+                }),
+            })
+        }
+        LabReplayOperation::SetPlayerResources {
+            player_id,
+            steel,
+            oil,
+        } => Ok(LabTimelineEntryKind::LabOperation {
+            op_kind: lab_replay_operation_kind(replay_op).to_string(),
+            op: LabOp::SetPlayerResources(LabSetPlayerResources {
+                player_id: *player_id,
+                steel: *steel,
+                oil: *oil,
+            }),
+        }),
+        LabReplayOperation::SetPlayerGodMode { player_id, enabled } => {
+            Ok(LabTimelineEntryKind::LabOperation {
+                op_kind: lab_replay_operation_kind(replay_op).to_string(),
+                op: LabOp::SetPlayerGodMode {
+                    player_id: *player_id,
+                    enabled: *enabled,
+                },
+            })
+        }
+        LabReplayOperation::SetCompletedResearch {
+            player_id,
+            upgrade,
+            completed,
+        } => {
+            let upgrade =
+                UpgradeKind::from_str(upgrade).map_err(|_| "unknown research id".to_string())?;
+            Ok(LabTimelineEntryKind::LabOperation {
+                op_kind: lab_replay_operation_kind(replay_op).to_string(),
+                op: LabOp::SetCompletedResearch(LabSetCompletedResearch {
+                    player_id: *player_id,
+                    upgrade,
+                    completed: *completed,
+                }),
+            })
+        }
+        LabReplayOperation::IssueCommandAs {
+            player_id,
+            cmd,
+            ignore_command_limits,
+        } => Ok(LabTimelineEntryKind::IssueCommandAs {
+            player_id: *player_id,
+            command: cmd.clone(),
+            options: LabCommandOptions {
+                ignore_command_limits: *ignore_command_limits,
+            },
+        }),
+    }
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+fn apply_lab_replay_operation(
+    game: &mut Game,
+    replay_entry: &LabReplayOperationEntry,
+) -> Result<LabTimelineEntryKind, String> {
+    let entry_kind = lab_replay_operation_to_entry_kind(&replay_entry.op)?;
+    match &entry_kind {
+        LabTimelineEntryKind::LabOperation { op_kind, op } => {
+            game.apply_lab_op(op.clone()).map(|_| ()).map_err(|err| {
+                format!(
+                    "Lab replay operation {op_kind} failed at sequence {} request {}: {}.",
+                    replay_entry.sequence,
+                    replay_entry.request_id,
+                    lab_error_text(&err)
+                )
+            })?
+        }
+        LabTimelineEntryKind::IssueCommandAs {
+            player_id,
+            command,
+            options,
+        } => game
+            .issue_lab_command_as(*player_id, command.clone(), *options)
+            .map_err(|err| {
+                format!(
+                    "Lab replay issue-as failed at sequence {} request {}: {}.",
+                    replay_entry.sequence,
+                    replay_entry.request_id,
+                    lab_error_text(&err)
+                )
+            })?,
+    }
+    Ok(entry_kind)
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+fn truncate_lab_replay_name(name: &str) -> String {
+    let mut out = String::new();
+    for ch in name.chars() {
+        if out.len() + ch.len_utf8() > LAB_REPLAY_MAX_AUTHORING_NAME_BYTES {
+            break;
+        }
+        out.push(ch);
+    }
+    out
+}
+
+impl RoomTask {
+    pub(super) fn apply_lab_issue_command(
+        &mut self,
+        request_id: u32,
+        operator_id: u32,
+        command_player_id: u32,
+        cmd: Command,
+        options: LabCommandOptions,
+    ) -> LabResult {
+        let op = "issueCommandAs".to_string();
+        let log_operations = self.session_policy().logs_lab_operations();
+        let timeline_capacity_reset = match self.lab_timeline_entry_cap_reset() {
+            Ok(reset) => reset,
+            Err(err) => return lab_result_error(request_id, op, &err),
+        };
+        let tick = {
+            let Some(game) = self.live_game_mut() else {
+                return lab_result_error(request_id, op, "lab game is not running");
+            };
+            if let Err(err) = game.issue_lab_command_as(command_player_id, cmd.clone(), options) {
+                return lab_result_error(request_id, op, &lab_error_text(&err));
+            }
+            game.tick_count()
+        };
+        let mut timeline_truncated = false;
+        if let Some(timeline) = &mut self.lab_timeline {
+            if let Some((game, initial_setup)) = timeline_capacity_reset.as_ref() {
+                timeline.reset(game, initial_setup.clone());
+            } else {
+                timeline_truncated = timeline.truncate_future(tick);
+            }
+            timeline.record_issue_command_as(
+                tick,
+                request_id,
+                operator_id,
+                command_player_id,
+                cmd,
+                options,
+            );
+        }
+        if let Some(session) = &mut self.lab_session {
+            session.dirty = true;
+            if log_operations {
+                session.operation_log.push(LabOperationLogEntry {
+                    tick,
+                    request_id,
+                    operator_id,
+                    op: op.clone(),
+                    result: format!("playerId={command_player_id}"),
+                });
+            }
+        }
+        self.broadcast_lab_state();
+        if timeline_capacity_reset.is_some() || timeline_truncated {
+            self.broadcast_lab_room_time_state();
+        }
+        LabResult {
+            request_id,
+            ok: true,
+            op,
+            error: None,
+            outcome: None,
+        }
+    }
+
+    pub(super) fn export_lab_replay_initial_setup(
+        &self,
+        game: &Game,
+        name: String,
+    ) -> Result<LabCheckpointScenarioV1, String> {
+        let vision = self
+            .lab_session
+            .as_ref()
+            .map(|session| session.default_vision.clone())
+            .unwrap_or(LabVisionMode::FullWorld);
+        export_lab_checkpoint_scenario_for_protocol(
+            game,
+            name,
+            LabScenarioLabMetadata {
+                vision,
+                god_mode_players: game.lab_god_mode_players(),
+            },
+            crate::build_info::build_id(),
+        )
+    }
+
+    pub(super) fn lab_replay_initial_setup_for_rebase(
+        &self,
+        source: LabReplayRebaseSource,
+        outcome: &LabOpOutcome,
+    ) -> Result<LabCheckpointScenarioV1, String> {
+        match source {
+            LabReplayRebaseSource::Checkpoint(scenario) => Ok(scenario),
+            LabReplayRebaseSource::Legacy {
+                name,
+                kind,
+                schema_version,
+                lab,
+            } => {
+                let Some(game) = self.live_game() else {
+                    return Err("lab game is not running".to_string());
+                };
+                let mut scenario = export_lab_checkpoint_scenario_for_protocol(
+                    game,
+                    name,
+                    lab,
+                    crate::build_info::build_id(),
+                )?;
+                scenario.metadata.source_scenario = Some(LabCheckpointScenarioSource {
+                    kind,
+                    schema_version,
+                });
+                if let LabOpOutcome::ScenarioRestored(restore) = outcome {
+                    scenario.metadata.source_entity_id_map = restore
+                        .entity_id_map
+                        .iter()
+                        .map(|remap| crate::protocol::LabScenarioEntityIdRemap {
+                            old_id: remap.old_id,
+                            new_id: remap.new_id,
+                        })
+                        .collect();
+                }
+                Ok(scenario)
+            }
+        }
+    }
+
+    pub(super) fn lab_timeline_entry_cap_reset(
+        &self,
+    ) -> Result<Option<(Game, LabCheckpointScenarioV1)>, String> {
+        if !self
+            .lab_timeline
+            .as_ref()
+            .is_some_and(LabTimeline::is_entry_cap_reached)
+        {
+            return Ok(None);
+        }
+        let Some(game) = self.live_game().map(Game::clone_for_replay_keyframe) else {
+            return Ok(None);
+        };
+        let initial_setup = self.export_lab_replay_initial_setup(
+            &game,
+            "Lab replay rebased at entry cap".to_string(),
+        )?;
+        Ok(Some((game, initial_setup)))
+    }
+
+    pub(in crate::lobby::room_task) fn send_lab_room_time_state_to(&self, player_id: u32) {
+        let Some(state) = self.lab_room_time_state() else {
+            return;
+        };
+        let Some(player) = self.players.get(&player_id) else {
+            return;
+        };
+        send_or_log(
+            &self.room,
+            player_id,
+            &player.msg_tx,
+            ServerMessage::RoomTimeState(state),
+        );
+    }
+
+    pub(in crate::lobby::room_task) fn broadcast_lab_room_time_state(&self) {
+        let Some(state) = self.lab_room_time_state() else {
+            return;
+        };
+        self.broadcast(&ServerMessage::RoomTimeState(state));
+    }
+
+    pub(in crate::lobby::room_task) fn lab_room_time_control_allowed(
+        &self,
+        player_id: u32,
+    ) -> bool {
+        self.lab_session
+            .as_ref()
+            .map(|session| session.can_operate(player_id))
+            .unwrap_or(false)
+    }
+
+    fn lab_room_time_state(&self) -> Option<RoomTimeState> {
+        if self.session_policy().clock.room_time_source() != Some(RoomTimeSource::Lab) {
+            return None;
+        }
+        let Phase::InGame(game) = &self.phase else {
+            return None;
+        };
+        let mut state = self.room_time_state_for_live_game(game, self.lab_room_time_controller_id);
+        if let Some(timeline) = &self.lab_timeline {
+            state.duration_ticks = timeline.duration_ticks(game.tick_count());
+            state.keyframe_ticks = timeline.keyframe_ticks();
+        }
+        Some(state)
+    }
+
+    pub(in crate::lobby::room_task) fn on_seek_lab_room_time(
+        &mut self,
+        player_id: u32,
+        target: LabSeekTarget,
+    ) {
+        if !self.lab_room_time_control_allowed(player_id) {
+            self.send_error_to(player_id, "Only lab operators can seek lab time.");
+            return;
+        }
+        let Some(current_tick) = self.live_game().map(Game::tick_count) else {
+            self.send_error_to(player_id, "Lab seek failed: lab game is not running.");
+            return;
+        };
+        let viewer_count = self.players.len();
+        let seek_result = {
+            let Some(timeline) = &mut self.lab_timeline else {
+                self.send_error_to(player_id, "Lab seek failed: timeline is not available.");
+                return;
+            };
+            match target {
+                LabSeekTarget::Relative(ticks_back) => {
+                    timeline.seek_back(current_tick, ticks_back, Self::replay_lab_timeline_entry)
+                }
+                LabSeekTarget::Absolute(tick) => {
+                    timeline.seek_to(current_tick, tick, Self::replay_lab_timeline_entry)
+                }
+            }
+        };
+        match seek_result {
+            Ok(seek) => {
+                crate::log_info!(
+                    room = %self.room,
+                    controller_id = player_id,
+                    viewer_count,
+                    from_tick = current_tick,
+                    to_tick = seek.target_tick,
+                    keyframe_tick = seek.keyframe_tick,
+                    rebuild_ms = seek.rebuild_ms,
+                    "lab seek rebuilt"
+                );
+                self.phase = Phase::InGame(Box::new(seek.game));
+                self.lab_room_time_controller_id = Some(player_id);
+                self.send_lab_start_payloads_to_all(true);
+                self.broadcast_lab_room_time_state();
+                self.broadcast_lab_state();
+                self.fanout_current_lab_snapshots();
+            }
+            Err(err) => {
+                crate::log_warn!(room = %self.room, error = %err, "lab seek failed");
+                self.send_error_to(player_id, &err);
+            }
+        }
+    }
+
+    fn replay_lab_timeline_entry(game: &mut Game, entry: &LabTimelineEntry) -> Result<(), String> {
+        match &entry.kind {
+            LabTimelineEntryKind::LabOperation { op_kind, op } => game
+                .apply_lab_op(op.clone())
+                .map(|_| ())
+                .map_err(|err| {
+                    format!(
+                        "Lab timeline operation {op_kind} failed at sequence {} request {}: {err:?}.",
+                        entry.sequence, entry.request_id
+                    )
+                }),
+            LabTimelineEntryKind::IssueCommandAs {
+                player_id,
+                command,
+                options,
+            } => game
+                .issue_lab_command_as(*player_id, command.clone(), *options)
+                .map_err(|err| {
+                    format!(
+                        "Lab timeline issue-as failed at sequence {} request {}: {err:?}.",
+                        entry.sequence, entry.request_id
+                    )
+                }),
+        }
+    }
+
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(in crate::lobby::room_task) fn export_lab_replay_artifact(
+        &self,
+        operator_id: u32,
+        name: Option<&str>,
+    ) -> Result<LabReplayArtifactV1, String> {
+        let Some(game) = self.live_game() else {
+            return Err("lab game is not running".to_string());
+        };
+        let Some(session) = &self.lab_session else {
+            return Err("lab session is not running".to_string());
+        };
+        let Some(timeline) = &self.lab_timeline else {
+            return Err("lab replay timeline is not available".to_string());
+        };
+        let replay_name = name
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(truncate_lab_replay_name)
+            .unwrap_or_else(|| "Untitled lab replay".to_string());
+        let mut initial_setup = timeline.initial_setup().clone();
+        initial_setup.metadata.lab.vision = session.vision_for(operator_id);
+        let artifact = LabReplayArtifactV1 {
+            schema: LAB_REPLAY_ARTIFACT_SCHEMA.to_string(),
+            schema_version: LAB_REPLAY_ARTIFACT_SCHEMA_VERSION,
+            kind: LAB_REPLAY_ARTIFACT_KIND.to_string(),
+            server_build_sha: crate::build_info::build_id().to_string(),
+            authoring: LabReplayAuthoringMetadata {
+                name: replay_name,
+                author: None,
+                created_at_unix_ms: Some(current_unix_ms()),
+                description: None,
+                tags: Vec::new(),
+            },
+            timeline: LabReplayTimelineMetadata {
+                initial_tick: initial_setup.metadata.exported_tick,
+                duration_ticks: timeline.duration_ticks(game.tick_count()),
+                keyframe_interval_ticks: LAB_REPLAY_TIMELINE_KEYFRAME_INTERVAL_TICKS,
+            },
+            initial_setup,
+            operations: timeline.replay_entries().to_vec(),
+        };
+        let bytes = serde_json::to_vec(&artifact)
+            .map_err(|err| format!("lab replay export failed: {err}"))?;
+        lab_replay_artifact_from_slice(&bytes)
+            .map_err(|err| format!("lab replay export validation failed: {err}"))
+    }
+
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(in crate::lobby::room_task) fn load_lab_replay_artifact(
+        &mut self,
+        operator_id: u32,
+        artifact: LabReplayArtifactV1,
+    ) -> Result<(), String> {
+        let bytes = serde_json::to_vec(&artifact)
+            .map_err(|err| format!("lab replay artifact could not be serialized: {err}"))?;
+        let artifact = lab_replay_artifact_from_slice(&bytes)
+            .map_err(|err| format!("lab replay artifact rejected: {err}"))?;
+        let (game, timeline) = Self::rebuild_lab_replay_artifact(&artifact)?;
+        self.phase = Phase::InGame(Box::new(game));
+        self.lab_timeline = Some(timeline);
+        if let Some(session) = &mut self.lab_session {
+            session.import_vision_for(operator_id, artifact.initial_setup.metadata.lab.vision);
+            session.dirty = false;
+            session.operation_log.clear();
+        }
+        Ok(())
+    }
+
+    #[cfg_attr(not(test), allow(dead_code))]
+    fn rebuild_lab_replay_artifact(
+        artifact: &LabReplayArtifactV1,
+    ) -> Result<(Game, LabTimeline), String> {
+        let lab_op = lab_scenario_payload_to_lab_op(LabScenarioPayload::Checkpoint(
+            artifact.initial_setup.clone(),
+        ))?;
+        let LabOp::RestoreCheckpointScenario(scenario) = lab_op else {
+            return Err(
+                "lab replay initial setup did not produce a checkpoint restore".to_string(),
+            );
+        };
+        let mut game =
+            Game::restore_lab_checkpoint_scenario(*scenario).map_err(|err| lab_error_text(&err))?;
+        let mut timeline = LabTimeline::new(&game, artifact.initial_setup.clone());
+        for replay_entry in &artifact.operations {
+            if replay_entry.tick < game.tick_count() {
+                return Err(format!(
+                    "Lab replay operation {} is out of order: tick {} before {}.",
+                    replay_entry.sequence,
+                    replay_entry.tick,
+                    game.tick_count()
+                ));
+            }
+            while game.tick_count() < replay_entry.tick {
+                game.tick();
+                timeline.record_keyframe_if_due(&game);
+            }
+            let entry_kind = apply_lab_replay_operation(&mut game, replay_entry)?;
+            timeline.record_replayed_entry(replay_entry.clone(), entry_kind)?;
+        }
+        while game.tick_count() < artifact.timeline.duration_ticks {
+            game.tick();
+            timeline.record_keyframe_if_due(&game);
+        }
+        Ok((game, timeline))
+    }
+}
