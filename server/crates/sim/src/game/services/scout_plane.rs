@@ -134,7 +134,52 @@ pub(crate) fn advance_scout_planes(map: &Map, entities: &mut EntityStore) {
     }
 }
 
-pub(in crate::game) fn dismiss_inactive_or_duplicate_planes(entities: &mut EntityStore) {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(in crate::game) enum FuelAccountRequest {
+    CheckAccount,
+    PayUpkeep(u32),
+    RefillReserveUpTo(u32),
+}
+
+pub(in crate::game) fn upkeep_system(
+    entities: &mut EntityStore,
+    mut account_fuel: impl FnMut(u32, FuelAccountRequest) -> Option<u32>,
+) {
+    dismiss_inactive_or_duplicate_planes(entities);
+    for (id, owner) in active_scout_planes(entities) {
+        if account_fuel(owner, FuelAccountRequest::CheckAccount).is_none() {
+            let _ = entities.remove(id);
+            continue;
+        }
+        if scout_plane_fuel(entities, id).is_some_and(|fuel| fuel == 0) {
+            let _ = entities.remove(id);
+            continue;
+        }
+        if tick_upkeep_timer(entities, id) {
+            let upkeep = config::SCOUT_PLANE_UPKEEP_OIL as u32;
+            let Some(paid) = account_fuel(owner, FuelAccountRequest::PayUpkeep(upkeep)) else {
+                let _ = entities.remove(id);
+                continue;
+            };
+            if paid < upkeep && drain_fuel(entities, id) {
+                let _ = entities.remove(id);
+                continue;
+            }
+        }
+        let missing = missing_fuel_oil(entities, id);
+        let Some(refill) = account_fuel(owner, FuelAccountRequest::RefillReserveUpTo(missing))
+        else {
+            let _ = entities.remove(id);
+            continue;
+        };
+        let refill = refill.min(missing);
+        if refill > 0 {
+            refill_fuel(entities, id, refill as u8);
+        }
+    }
+}
+
+fn dismiss_inactive_or_duplicate_planes(entities: &mut EntityStore) {
     let mut seen_owners = BTreeSet::new();
     let mut dismissals = Vec::new();
     for id in entities.ids() {
@@ -156,7 +201,7 @@ pub(in crate::game) fn dismiss_inactive_or_duplicate_planes(entities: &mut Entit
     }
 }
 
-pub(in crate::game) fn active_scout_planes(entities: &EntityStore) -> Vec<(u32, u32)> {
+fn active_scout_planes(entities: &EntityStore) -> Vec<(u32, u32)> {
     entities
         .iter()
         .filter(|plane| plane.kind == EntityKind::ScoutPlane && plane.hp > 0 && plane.owner != 0)
@@ -164,7 +209,7 @@ pub(in crate::game) fn active_scout_planes(entities: &EntityStore) -> Vec<(u32, 
         .collect()
 }
 
-pub(in crate::game) fn tick_upkeep_timer(entities: &mut EntityStore, id: u32) -> bool {
+fn tick_upkeep_timer(entities: &mut EntityStore, id: u32) -> bool {
     let Some(plane) = entities.get_mut(id) else {
         return false;
     };
@@ -184,14 +229,14 @@ pub(in crate::game) fn tick_upkeep_timer(entities: &mut EntityStore, id: u32) ->
     }
 }
 
-pub(in crate::game) fn scout_plane_fuel(entities: &EntityStore, id: u32) -> Option<u8> {
+fn scout_plane_fuel(entities: &EntityStore, id: u32) -> Option<u8> {
     entities
         .get(id)?
         .scout_plane_state()
         .map(|state| state.fuel_oil)
 }
 
-pub(in crate::game) fn drain_fuel(entities: &mut EntityStore, id: u32) -> bool {
+fn drain_fuel(entities: &mut EntityStore, id: u32) -> bool {
     let Some(plane) = entities.get_mut(id) else {
         return true;
     };
@@ -204,14 +249,14 @@ pub(in crate::game) fn drain_fuel(entities: &mut EntityStore, id: u32) -> bool {
     state.fuel_oil == 0
 }
 
-pub(in crate::game) fn missing_fuel_oil(entities: &EntityStore, id: u32) -> u32 {
+fn missing_fuel_oil(entities: &EntityStore, id: u32) -> u32 {
     let Some(fuel) = scout_plane_fuel(entities, id) else {
         return 0;
     };
     config::SCOUT_PLANE_FUEL_RESERVE_OIL.saturating_sub(fuel) as u32
 }
 
-pub(in crate::game) fn refill_fuel(entities: &mut EntityStore, id: u32, amount: u8) {
+fn refill_fuel(entities: &mut EntityStore, id: u32, amount: u8) {
     if amount == 0 {
         return;
     }

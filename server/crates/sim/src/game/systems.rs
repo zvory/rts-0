@@ -300,31 +300,23 @@ pub(crate) fn run_tick(
         services::production::production_system(map, entities, players, &mut coordinator, events);
     });
     crate::perf::timed(perf.as_deref_mut(), "scout_plane_upkeep", || {
-        services::scout_plane::dismiss_inactive_or_duplicate_planes(entities);
-        for (id, owner) in services::scout_plane::active_scout_planes(entities) {
-            let Some(player_index) = players.iter().position(|player| player.id == owner) else {
-                let _ = entities.remove(id);
-                continue;
-            };
-            if services::scout_plane::scout_plane_fuel(entities, id).is_some_and(|fuel| fuel == 0) {
-                let _ = entities.remove(id);
-                continue;
-            }
-            if services::scout_plane::tick_upkeep_timer(entities, id) {
-                let upkeep = crate::config::SCOUT_PLANE_UPKEEP_OIL as u32;
-                if !players[player_index].spend_resources(0, upkeep)
-                    && services::scout_plane::drain_fuel(entities, id)
-                {
-                    let _ = entities.remove(id);
-                    continue;
+        services::scout_plane::upkeep_system(entities, |owner, request| {
+            let player = players.iter_mut().find(|player| player.id == owner)?;
+            match request {
+                services::scout_plane::FuelAccountRequest::CheckAccount => Some(0),
+                services::scout_plane::FuelAccountRequest::PayUpkeep(oil) => {
+                    Some(if player.spend_resources(0, oil) { oil } else { 0 })
+                }
+                services::scout_plane::FuelAccountRequest::RefillReserveUpTo(max_oil) => {
+                    let refill = max_oil.min(player.oil);
+                    Some(if player.spend_resources(0, refill) {
+                        refill
+                    } else {
+                        0
+                    })
                 }
             }
-            let refill = services::scout_plane::missing_fuel_oil(entities, id)
-                .min(players[player_index].oil);
-            if players[player_index].spend_resources(0, refill) {
-                services::scout_plane::refill_fuel(entities, id, refill as u8);
-            }
-        }
+        });
     });
     crate::perf::timed(perf.as_deref_mut(), "construction", || {
         services::construction::construction_system(

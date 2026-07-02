@@ -496,6 +496,43 @@ fn runtime_duplicate_cleanup_keeps_one_active_plane_per_owner() {
 }
 
 #[test]
+fn duplicate_scout_plane_does_not_add_extra_aerial_fog_before_cleanup() {
+    let mut game = empty_game(test_map(40));
+    let first_pos = game.state.map.tile_center(4, 4);
+    let duplicate_pos = game.state.map.tile_center(24, 24);
+    let hidden_pos = game.state.map.tile_center(25, 24);
+    spawn_plane(&mut game, 1, first_pos.0, first_pos.1);
+    spawn_plane(&mut game, 1, duplicate_pos.0, duplicate_pos.1);
+    let hidden_enemy = game
+        .state
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, hidden_pos.0, hidden_pos.1)
+        .expect("enemy near duplicate plane should spawn");
+
+    let player_ids = game.state.player_ids();
+    game.state.fog.recompute_with_smoke(
+        &player_ids,
+        &game.state.entities,
+        &game.state.map,
+        &game.state.smokes,
+    );
+    let teams = game.team_relations();
+    game.state.fog.stamp_scout_plane_sources_for_teams_with_smoke(
+        &game.state.map,
+        &game.state.entities,
+        &game.state.smokes,
+        &teams,
+    );
+    game.rebuild_final_spatial();
+
+    let snapshot = game.snapshot_for(1);
+    assert!(
+        snapshot.entities.iter().all(|entity| entity.id != hidden_enemy),
+        "duplicate Scout Planes should not grant extra aerial fog before tick cleanup"
+    );
+}
+
+#[test]
 fn scout_plane_projection_is_fog_safe_for_owner_enemy_and_spectator() {
     let mut game = empty_game(test_map(40));
     let plane = spawn_plane(&mut game, 1, 160.0, 160.0);
