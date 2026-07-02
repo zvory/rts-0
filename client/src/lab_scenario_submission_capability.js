@@ -24,11 +24,11 @@ export async function fetchLabScenarioSubmissionCapability({
 } = {}) {
   if (typeof fetchImpl !== "function") {
     return failedCapability(
-      "Scenario PR submission capability check failed: fetch is unavailable.",
+      "Setup PR submission capability check failed: fetch is unavailable.",
     );
   }
 
-  let failureReason = "Scenario PR submission capability check failed.";
+  let failureReason = "Setup PR submission capability check failed.";
   const attempts = Math.max(1, retryDelaysMs.length + 1);
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     let shouldRetry = true;
@@ -39,10 +39,10 @@ export async function fetchLabScenarioSubmissionCapability({
       );
       if (response?.ok) return await response.json();
       const status = Number(response?.status || 0);
-      failureReason = `Scenario PR submission capability check failed (${status || "unknown"}).`;
+      failureReason = `Setup PR submission capability check failed (${status || "unknown"}).`;
       shouldRetry = transientCapabilityStatus(status);
     } catch (err) {
-      failureReason = `Scenario PR submission capability check failed: ${err?.message || err}`;
+      failureReason = `Setup PR submission capability check failed: ${err?.message || err}`;
     }
 
     if (!shouldRetry || attempt >= retryDelaysMs.length) break;

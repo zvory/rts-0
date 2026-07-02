@@ -43,6 +43,8 @@ export class LabClient {
     return this.request({ op: "setVision", vision });
   }
 
+  // Wire compatibility names for checkpoint setup import/export. Product UI should label these
+  // as setup checkpoint actions; lab replay save/open must use a separate replay-artifact path.
   exportScenario(name = "") {
     const op = { op: "exportScenario" };
     if (name) op.name = name;

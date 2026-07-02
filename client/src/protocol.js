@@ -170,6 +170,8 @@ export const msg = Object.freeze({
   seekRoomTimeTo: (tick) => ({ t: C.SEEK_ROOM_TIME_TO, tick }),
   setVisionSelection: (selection) => ({ t: C.SET_VISION_SELECTION, selection }),
   lab: (requestId, op) => ({ t: C.LAB, requestId, op }),
+  // Compatibility/setup builders. Visible UI labels these as checkpoint setup actions; lab replay
+  // save/open must not reuse the legacy scenario operation names.
   labExportScenario: (requestId, name = undefined) => {
     const op = { op: "exportScenario" };
     if (name != null) op.name = name;

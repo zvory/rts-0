@@ -410,12 +410,12 @@ assert(
 assert(
   JSON.stringify(msg.labExportScenario(14, "saved setup")) ===
     JSON.stringify({ t: "lab", requestId: 14, op: { op: "exportScenario", name: "saved setup" } }),
-  "lab scenario export builder must emit the exact wire shape",
+  "lab setup export compatibility builder must emit the exact wire shape",
 );
 assert(
   JSON.stringify(msg.labImportScenario(15, { schemaVersion: LAB_SCENARIO.SCHEMA_VERSION, kind: LAB_SCENARIO.KIND })) ===
     JSON.stringify({ t: "lab", requestId: 15, op: { op: "importScenario", scenario: { schemaVersion: 1, kind: "labScenario" } } }),
-  "lab scenario import builder must emit the exact wire shape",
+  "legacy lab scenario import compatibility builder must emit the exact wire shape",
 );
 assert(
   JSON.stringify(msg.labValidateScenario(16, { slug: "new-lab", name: "New Lab", title: "New Lab", description: "Ready", tags: ["test"] })) ===
@@ -427,7 +427,7 @@ assert(
         metadata: { slug: "new-lab", name: "New Lab", title: "New Lab", description: "Ready", tags: ["test"] },
       },
     }),
-  "lab scenario validation builder must emit the exact wire shape",
+  "lab setup validation builder must emit the exact wire shape",
 );
 assert(
   JSON.stringify(msg.labSubmitScenario(17, { slug: "new-lab", name: "New Lab", title: "New Lab", description: "Ready", tags: ["test"] })) ===
@@ -439,7 +439,7 @@ assert(
         metadata: { slug: "new-lab", name: "New Lab", title: "New Lab", description: "Ready", tags: ["test"] },
       },
     }),
-  "lab scenario submission builder must emit the exact wire shape",
+  "lab setup submission builder must emit the exact wire shape",
 );
 assert(
   rust.includes("ExportScenario") &&
@@ -473,6 +473,9 @@ assert(
     protocolDoc.includes("LabScenarioPayload") &&
     protocolDoc.includes("LabCheckpointScenarioV1") &&
     protocolDoc.includes("LabReplayArtifactV1") &&
+    protocolDoc.includes("checkpoint-backed setup") &&
+    protocolDoc.includes("legacy scenario compatibility") &&
+    protocolDoc.includes("Lab replay import validates") &&
     protocolDoc.includes("rts.labReplay") &&
     protocolDoc.includes("labReplay") &&
     protocolDoc.includes("issueCommandAs") &&
@@ -488,7 +491,7 @@ assert(
     protocolDoc.includes("godModePlayers") &&
     protocolDoc.includes("validateScenario") &&
     protocolDoc.includes("submitScenario"),
-  "lab scenario import/export protocol surface must be documented and mirrored",
+  "lab setup/replay protocol surface must be documented and mirrored",
 );
 assert(
   rustContract.includes("DEFAULT_FACTION_ID") &&

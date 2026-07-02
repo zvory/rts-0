@@ -526,10 +526,10 @@ impl RoomTask {
 
     fn build_lab_launch_from_scenario(&self, scenario_id: &str) -> Result<LabLaunch, String> {
         let loaded = load_lab_scenario_by_id(scenario_id)
-            .map_err(|err| format!("Cannot load lab scenario \"{scenario_id}\": {err}"))?;
+            .map_err(|err| format!("Cannot load lab setup \"{scenario_id}\": {err}"))?;
         let game = loaded
             .build_game()
-            .map_err(|err| format!("Cannot load lab scenario \"{scenario_id}\": {err}"))?;
+            .map_err(|err| format!("Cannot load lab setup \"{scenario_id}\": {err}"))?;
         let god_mode_players = game.lab_god_mode_players();
         let start_payload = game.start_payload();
         let (seed, map_name) = match &loaded.scenario {
@@ -799,7 +799,7 @@ impl RoomTask {
                     ok: false,
                     op: op_kind,
                     error: Some(
-                        "lab scenario import/export is not enabled in this room".to_string(),
+                        "lab setup import/export is not enabled in this room".to_string(),
                     ),
                     outcome: None,
                 },
@@ -903,7 +903,7 @@ impl RoomTask {
     ) -> LabResult {
         let op = "exportScenario".to_string();
         if !self.session_policy().allows_lab_scenario_io() {
-            return lab_result_error(request_id, op, "lab scenario export is not enabled");
+            return lab_result_error(request_id, op, "lab setup export is not enabled");
         }
         let scenario = match self.export_lab_scenario_value(operator_id, name.as_deref()) {
             Ok(value) => value,
@@ -928,7 +928,7 @@ impl RoomTask {
     ) -> LabResult {
         let op = "validateScenario".to_string();
         if !self.session_policy().allows_lab_scenario_io() {
-            return lab_result_error(request_id, op, "lab scenario validation is not enabled");
+            return lab_result_error(request_id, op, "lab setup validation is not enabled");
         }
         let scenario_value = match self.export_lab_scenario_value(operator_id, None) {
             Ok(value) => value,
@@ -940,7 +940,7 @@ impl RoomTask {
                 return lab_result_error(
                     request_id,
                     op,
-                    &format!("scenario export did not produce a lab scenario payload: {err}"),
+                    &format!("setup export did not produce a lab scenario payload: {err}"),
                 );
             }
         };
@@ -975,7 +975,7 @@ impl RoomTask {
             .map(str::trim)
             .filter(|value| !value.is_empty())
             .map(truncate_lab_scenario_name)
-            .unwrap_or_else(|| "Untitled lab scenario".to_string());
+            .unwrap_or_else(|| "Untitled lab setup".to_string());
         let scenario = export_lab_checkpoint_scenario_for_protocol(
             game,
             scenario_name,

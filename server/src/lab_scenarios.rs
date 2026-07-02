@@ -1,7 +1,7 @@
-//! Bundled lab scenario catalog loading and validation.
+//! Bundled lab checkpoint setup catalog loading and validation.
 //!
-//! The catalog manifest is the source of truth for scenarios shown in the browser. Each listed
-//! scenario must parse as protocol JSON and restore through the public lab `Game` API before it is
+//! The catalog manifest is the source of truth for setup fixtures shown in the browser. Each listed
+//! setup must parse as protocol JSON and restore through the public lab `Game` API before it is
 //! exposed or used to start a lab room.
 
 use std::collections::HashSet;
@@ -108,14 +108,14 @@ pub fn load_lab_scenario_catalog() -> Result<Vec<LabScenarioCatalogEntry>, Strin
     load_lab_scenario_catalog_from_dir(&default_lab_scenario_dir())
 }
 
-/// GET /api/lab-scenarios - bounded metadata for bundled lab scenarios.
+/// GET /api/lab-scenarios - bounded metadata for bundled lab checkpoint setups.
 pub async fn catalog_handler() -> impl IntoResponse {
     match load_lab_scenario_catalog() {
         Ok(entries) => Json(entries).into_response(),
         Err(err) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(LabScenarioCatalogError {
-                error: format!("Lab scenario catalog unavailable: {err}"),
+                error: format!("Lab setup catalog unavailable: {err}"),
             }),
         )
             .into_response(),
@@ -124,14 +124,14 @@ pub async fn catalog_handler() -> impl IntoResponse {
 
 pub fn load_lab_scenario_by_id(id: &str) -> Result<LoadedLabScenario, String> {
     if !safe_scenario_id(id) {
-        return Err("invalid lab scenario id".to_string());
+        return Err("invalid lab setup id".to_string());
     }
     let root = default_lab_scenario_dir();
     let entries = load_lab_scenario_manifest_entries_from_dir(&root)?;
     let entry = entries
         .into_iter()
         .find(|entry| entry.id == id)
-        .ok_or_else(|| format!("unknown lab scenario id {id:?}"))?;
+        .ok_or_else(|| format!("unknown lab setup id {id:?}"))?;
     let loaded = load_lab_scenario_entry(&root, &entry)?;
     validate_loaded_lab_scenario(&entry, &loaded)?;
     Ok(loaded)
@@ -162,7 +162,7 @@ pub fn validate_lab_scenario_authoring(
 
     if name.is_empty() || name.len() > MAX_SCENARIO_NAME_LEN {
         return Err(format!(
-            "scenario name must be non-empty and at most {MAX_SCENARIO_NAME_LEN} bytes"
+            "setup name must be non-empty and at most {MAX_SCENARIO_NAME_LEN} bytes"
         ));
     }
     if review_notes.len() > MAX_REVIEW_NOTES_LEN {
@@ -210,7 +210,7 @@ pub fn validate_lab_scenario_authoring(
         + "\n";
     if scenario_json.len() > MAX_AUTHORING_SCENARIO_JSON_BYTES {
         return Err(format!(
-            "scenario JSON must be at most {MAX_AUTHORING_SCENARIO_JSON_BYTES} bytes"
+            "setup JSON must be at most {MAX_AUTHORING_SCENARIO_JSON_BYTES} bytes"
         ));
     }
     Ok(LabScenarioAuthoringPreview {
@@ -221,7 +221,7 @@ pub fn validate_lab_scenario_authoring(
         manifest_entry: entry,
         scenario_json,
         review_notes,
-        summary: format!("Scenario ready for server/assets/lab-scenarios/{filename}."),
+        summary: format!("Checkpoint setup ready for server/assets/lab-scenarios/{filename}."),
     })
 }
 
@@ -1357,10 +1357,10 @@ mod tests {
             },
             LabScenarioPayload::Checkpoint(scenario),
         )
-        .expect_err("authoring should reject oversized scenario JSON");
+        .expect_err("authoring should reject oversized setup JSON");
 
         assert!(
-            err.contains("scenario JSON must be at most"),
+            err.contains("setup JSON must be at most"),
             "unexpected error: {err}"
         );
     }

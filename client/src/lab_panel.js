@@ -204,7 +204,7 @@ export class LabPanel {
 
     root.appendChild(this.renderCommandOptions());
 
-    root.appendChild(this.renderScenarioOptions());
+    for (const section of this.renderScenarioOptions()) root.appendChild(section);
 
     return root;
   }
@@ -1110,8 +1110,24 @@ export class LabPanel {
   resetScenario() {
     const sent = this.labClient.resetScenario();
     if (sent) this.researchOverrides.clear();
-    const summary = sent ? "Scenario reset requested." : "Scenario reset could not be sent.";
+    const summary = sent ? "Setup reset requested." : "Setup reset could not be sent.";
     return this.publishLocalResult("resetScenario", sent, summary);
+  }
+
+  saveLabReplay() {
+    return this.publishLocalResult(
+      "saveLabReplay",
+      false,
+      "Lab replay save is separate from setup JSON export and is not enabled in this UI build.",
+    );
+  }
+
+  openLabReplay() {
+    return this.publishLocalResult(
+      "openLabReplay",
+      false,
+      "Lab replay open is separate from setup JSON import and is not enabled in this UI build.",
+    );
   }
 
   activeLabTool() {
@@ -1243,7 +1259,7 @@ export class LabPanel {
     if (typeof anchor.click !== "function") return;
     const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
     anchor.href = url;
-    anchor.download = `${slugifyLabScenario(scenario?.name || "lab-scenario")}.json`;
+    anchor.download = `${slugifyLabScenario(scenario?.name || "lab-setup")}.json`;
     anchor.click();
     URL.revokeObjectURL?.(url);
   }
