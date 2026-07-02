@@ -5,22 +5,26 @@ use rts_protocol::{
     AbilityObjectView, ActionCapabilities, AttackReveal, AvailableMap, BranchStagingOccupant,
     BranchStagingSeat, ClientMessage, ClientNetReport, Command, CommandCapabilities,
     CompactSlotSchemas, DebugPathPoint, DebugPathView, DiagnosticCapabilities, EntityView, Event,
-    LabClientOp, LabResult, LabScenarioEntity, LabScenarioLabMetadata, LabScenarioMap,
-    LabScenarioMetadata, LabScenarioOrder, LabScenarioPlayer, LabScenarioV1, LabStartMetadata,
-    LabStartRole, LabState, LabVisionMode, LivePauseState, LobbyPlayer, MapInfo,
-    MatchControlCapabilities, MovementPathDiagnosticScope, NoticeSeverity,
-    ObserverAnalysisKindCount, ObserverAnalysisPayload, ObserverAnalysisPlayer,
-    ObserverAnalysisProduction, ObserverAnalysisResourcesLost, OrderPlanMarker,
-    PlayerResourceSnapshot, PlayerScore, PlayerStart, ProtocolCompactCodes, ProtocolContract,
-    ProtocolMessageTags, ProtocolVocabularies, RememberedBuildingView, ReplayBranchSeat,
-    ReplayStartMetadata, ResourceDelta, ResourceNode, RoomCapabilities, RoomTimeCapabilities,
-    RoomTimeState, ScoutPlaneStateView, ServerMessage, SlotField, SmokeCloudView, Snapshot,
-    SnapshotCodec, SnapshotCodecContract, SnapshotEncodeError, SnapshotFrame, SnapshotNetStatus,
-    StartPayload, TeamId, TrenchView, VisibilityCapabilities, VisionSelectionRequest,
-    COMPACT_SNAPSHOT_VERSION, COMPACT_UNKNOWN_CODE, DEFAULT_FACTION_ID,
-    MESSAGEPACK_SNAPSHOT_FRAME_MAGIC, PREDICTION_PROTOCOL_VERSION, SNAPSHOT_CODEC_COMPACT_JSON,
-    SNAPSHOT_CODEC_MESSAGEPACK_COMPACT, SNAPSHOT_CODEC_VERSION, SNAPSHOT_FRAME_KIND_BINARY,
-    SNAPSHOT_FRAME_KIND_TEXT,
+    LabClientOp, LabReplayArtifactV1, LabReplayAuthoringMetadata, LabReplayOperation,
+    LabReplayOperationEntry, LabReplayTimelineMetadata, LabReplayValidationError, LabResult,
+    LabScenarioEntity, LabScenarioLabMetadata, LabScenarioMap, LabScenarioMetadata,
+    LabScenarioOrder, LabScenarioPlayer, LabScenarioV1, LabStartMetadata, LabStartRole, LabState,
+    LabVisionMode, LivePauseState, LobbyPlayer, MapInfo, MatchControlCapabilities,
+    MovementPathDiagnosticScope, NoticeSeverity, ObserverAnalysisKindCount, ObserverAnalysisPayload,
+    ObserverAnalysisPlayer, ObserverAnalysisProduction, ObserverAnalysisResourcesLost,
+    OrderPlanMarker, PlayerResourceSnapshot, PlayerScore, PlayerStart, ProtocolCompactCodes,
+    ProtocolContract, ProtocolMessageTags, ProtocolVocabularies, RememberedBuildingView,
+    ReplayBranchSeat, ReplayStartMetadata, ResourceDelta, ResourceNode, RoomCapabilities,
+    RoomTimeCapabilities, RoomTimeState, ScoutPlaneStateView, ServerMessage, SlotField,
+    SmokeCloudView, Snapshot, SnapshotCodec, SnapshotCodecContract, SnapshotEncodeError,
+    SnapshotFrame, SnapshotNetStatus, StartPayload, TeamId, TrenchView, VisibilityCapabilities,
+    VisionSelectionRequest, COMPACT_SNAPSHOT_VERSION, COMPACT_UNKNOWN_CODE, DEFAULT_FACTION_ID,
+    LAB_REPLAY_ARTIFACT_KIND, LAB_REPLAY_ARTIFACT_SCHEMA, LAB_REPLAY_ARTIFACT_SCHEMA_VERSION,
+    LAB_REPLAY_MAX_ARTIFACT_BYTES, LAB_REPLAY_MAX_OPERATIONS,
+    LAB_REPLAY_TIMELINE_KEYFRAME_INTERVAL_TICKS, MESSAGEPACK_SNAPSHOT_FRAME_MAGIC,
+    PREDICTION_PROTOCOL_VERSION, SNAPSHOT_CODEC_COMPACT_JSON, SNAPSHOT_CODEC_MESSAGEPACK_COMPACT,
+    SNAPSHOT_CODEC_VERSION, SNAPSHOT_FRAME_KIND_BINARY, SNAPSHOT_FRAME_KIND_TEXT,
+    lab_replay_artifact_from_slice, validate_lab_replay_artifact,
 };
 
 fn assert_type<T>() {}
@@ -46,6 +50,12 @@ fn stable_rust_public_surface_compiles() {
     assert_type::<EntityView>();
     assert_type::<Event>();
     assert_type::<LabClientOp>();
+    assert_type::<LabReplayArtifactV1>();
+    assert_type::<LabReplayAuthoringMetadata>();
+    assert_type::<LabReplayOperation>();
+    assert_type::<LabReplayOperationEntry>();
+    assert_type::<LabReplayTimelineMetadata>();
+    assert_type::<LabReplayValidationError>();
     assert_type::<LabResult>();
     assert_type::<LabScenarioEntity>();
     assert_type::<LabScenarioLabMetadata>();
@@ -109,6 +119,10 @@ fn stable_rust_public_surface_compiles() {
     let _compact_json: fn(&Snapshot) -> serde_json::Result<String> = serialize_compact_snapshot;
     let _messagepack: fn(&Snapshot) -> Result<Vec<u8>, SnapshotEncodeError> =
         serialize_messagepack_compact_snapshot;
+    let _lab_replay_parse: fn(&[u8]) -> Result<LabReplayArtifactV1, LabReplayValidationError> =
+        lab_replay_artifact_from_slice;
+    let _lab_replay_validate: fn(&LabReplayArtifactV1) -> Result<(), LabReplayValidationError> =
+        validate_lab_replay_artifact;
 
     assert_eq!(terrain::GRASS, 0);
     assert_eq!(terrain::ROCK, 1);
@@ -131,6 +145,12 @@ fn stable_rust_public_surface_compiles() {
     assert_eq!(COMPACT_SNAPSHOT_VERSION, 31);
     assert_eq!(SNAPSHOT_CODEC_VERSION, 1);
     assert_eq!(COMPACT_UNKNOWN_CODE, 255);
+    assert_eq!(LAB_REPLAY_ARTIFACT_SCHEMA, "rts.labReplay");
+    assert_eq!(LAB_REPLAY_ARTIFACT_KIND, "labReplay");
+    assert_eq!(LAB_REPLAY_ARTIFACT_SCHEMA_VERSION, 1);
+    assert_eq!(LAB_REPLAY_TIMELINE_KEYFRAME_INTERVAL_TICKS, 2_000);
+    assert_eq!(LAB_REPLAY_MAX_ARTIFACT_BYTES, 8 * 1024 * 1024);
+    assert_eq!(LAB_REPLAY_MAX_OPERATIONS, 50_000);
     assert_eq!(MESSAGEPACK_SNAPSHOT_FRAME_MAGIC, [0x52, 0x54, 0x53, 0x4d]);
 
     let codec = default_snapshot_codec();

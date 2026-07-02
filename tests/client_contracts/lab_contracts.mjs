@@ -16,6 +16,7 @@ import { Net } from "../../client/src/net.js";
 import {
   DEFAULT_FACTION_ID,
   KIND,
+  LAB_REPLAY,
   LAB_SCENARIO,
   LAB_ROLE,
   UPGRADE,
@@ -60,6 +61,16 @@ import { textWithin } from "./dom_text.mjs";
 
 // Lab client and panel
 // ---------------------------------------------------------------------------
+{
+  assert(
+    LAB_REPLAY.SCHEMA === "rts.labReplay" &&
+      LAB_REPLAY.KIND === "labReplay" &&
+      LAB_REPLAY.SCHEMA_VERSION === 1 &&
+      LAB_REPLAY.MAX_OPERATIONS === 50000,
+    "lab replay artifact constants are available through the stable protocol mirror",
+  );
+}
+
 {
   const normalized = normalizeLabScenarioEntry({
     id: "lategame",

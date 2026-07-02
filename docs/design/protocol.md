@@ -1231,6 +1231,72 @@ API without mutating the room or creating any Git branch.
   reviewNotes?: string // PR/reviewer context, max 2000 bytes
 }
 ```
+`LabReplayArtifactV1` is the portable lab-session artifact contract owned by `rts-protocol`
+because it is a shareable JSON file shape and reuses the public `Command` DTO for issued commands.
+It is not sim-private `LabOp`, not `LabSession.operationLog`, and not the room-local
+`LabTimeline` keyframe list. The first schema is latest-version-only:
+```
+{
+  schema: "rts.labReplay",
+  schemaVersion: 1,
+  kind: "labReplay",
+  serverBuildSha: string,
+  authoring: {
+    name: string,              // max 120 bytes
+    author?: string,           // max 80 bytes
+    createdAtUnixMs?: u64,
+    description?: string,      // max 2000 bytes
+    tags?: string[]            // max 16, each max 32 safe ASCII bytes
+  },
+  initialSetup: LabCheckpointScenarioV1,
+  timeline: {
+    initialTick: u32,          // must match initialSetup.metadata.exportedTick
+    durationTicks: u32,        // final replayable tick
+    keyframeIntervalTicks: 2000
+  },
+  operations: [{
+    sequence: u64,             // contiguous from 0
+    tick: u32,                 // nondecreasing and within timeline bounds
+    requestId: u32,            // nonzero original lab request id
+    operatorId: u32,           // nonzero room connection id, not necessarily a game player
+    op: LabReplayOperation
+  }]
+}
+```
+Whole artifacts are capped at 8 MiB. The operation stream is capped at 50,000 entries, each
+non-setup operation payload is capped at 64 KiB, and embedded `GameCheckpointV1` text payloads in
+the initial setup are capped at 4 MiB. A lab replay may be saved/opened by a bounded local-file or
+future HTTP/dev-artifact path; it is not carried through the current WebSocket `lab` request
+envelope because long lab sessions can exceed that control frame budget.
+
+`LabReplayOperation` deliberately promotes only replayable lab state changes:
+```
+{ op: "spawnEntity", owner: u32, kind: string, x: f32, y: f32, completed?: bool }
+{ op: "deleteEntity", entityId: u32 }
+{ op: "moveEntity", entityId: u32, x: f32, y: f32 }
+{ op: "setEntityOwner", entityId: u32, owner: u32 }
+{ op: "setPlayerResources", playerId: u32, steel: u32, oil: u32 }
+{ op: "setPlayerGodMode", playerId: u32, enabled: bool }
+{ op: "setCompletedResearch", playerId: u32, upgrade: string, completed: bool }
+{ op: "issueCommandAs", playerId: u32, cmd: Command, ignoreCommandLimits?: bool }
+```
+`setVision` is excluded because it is per-operator projection metadata; reopening a lab replay
+starts from `initialSetup.metadata.lab.vision` and connected viewers may choose their own current
+lab vision afterward. `exportScenario`, `validateScenario`, and `submitScenario` are UI/control
+requests and never enter the durable stream. Checkpoint setup import uses rebase semantics: the
+artifact replaces `initialSetup` with the imported `LabCheckpointScenarioV1` and clears prior
+operations instead of storing an import operation. That keeps later entity references unambiguous:
+after a rebase, operation entity ids refer to the rebased setup's current ids, and
+`initialSetup.metadata.sourceEntityIdMap` remains the only setup-import id-remap record. Seeking
+into the past and then accepting a new lab mutation truncates future operation entries just like
+the room-local timeline does.
+
+Lab replay import validates schema/kind/version, artifact bytes, authoring metadata, checkpoint
+map binding, player/team ids, lab metadata, entity ids and allocator facts, operation count,
+operation payload sizes, non-finite coordinates, stale entity references, bad player ids, command
+unit caps (`256` normally, `4096` when `ignoreCommandLimits` is true), timeline order, and rejects
+excluded session/setup/import operations before mutating a live lab game.
+
 Accepted validation returns `{ summary, preview }` in `labResult.outcome`; `preview` includes
 `manifestEntry`, `manifestPath`, `scenarioPath`, deterministic `scenarioJson`, and `reviewNotes`
 for the future server-side PR submission flow.

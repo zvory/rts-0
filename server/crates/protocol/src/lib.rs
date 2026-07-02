@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 mod client_net_report;
 mod compact_snapshot;
 mod contract_metadata;
+mod lab_replay;
 mod lab_scenario;
 mod messagepack_frame;
 pub use client_net_report::{
@@ -24,6 +25,7 @@ pub use contract_metadata::{
 };
 #[cfg(test)]
 use contract_metadata::{ability_code, kind_code};
+pub use lab_replay::*;
 pub use lab_scenario::*;
 pub use messagepack_frame::MESSAGEPACK_SNAPSHOT_FRAME_MAGIC;
 pub use rts_contract::{

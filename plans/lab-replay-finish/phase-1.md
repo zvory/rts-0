@@ -1,6 +1,6 @@
 # Phase 1 - Lab Replay Artifact Contract
 
-Status: Not started.
+Status: Done.
 
 ## Scope
 
