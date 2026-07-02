@@ -176,6 +176,13 @@ function countCalls(context, op) {
   return context.calls.filter((call) => call.op === op).length;
 }
 
+function hasCallWithApproxArgs(context, op, expectedArgs, epsilon = 0.001) {
+  return context.calls.some((call) => {
+    if (call.op !== op || call.args.length !== expectedArgs.length) return false;
+    return call.args.every((arg, index) => Math.abs(arg - expectedArgs[index]) <= epsilon);
+  });
+}
+
 function minimapHarness({
   selected = [],
   commandTarget = null,
@@ -631,6 +638,7 @@ function lockedEvent(clientX, clientY, button = 0, extra = {}) {
 // Scout Planes draw as aircraft-shaped minimap blips instead of square ground-unit dots.
 {
   installWindowStub();
+  const layers = [];
   const canvas = fakeRenderableCanvas({ width: 16, height: 16 });
   const state = {
     playerId: 1,
@@ -652,12 +660,38 @@ function lockedEvent(clientX, clientY, button = 0, extra = {}) {
     },
     players: [{ id: 1, color: "#4878c8" }],
   };
-  const minimap = new Minimap(canvas, state, { x: 0, y: 0, zoom: 1, viewW: 4, viewH: 4 }, null, { issueCommand() {} }, null);
+  const minimap = new Minimap(
+    canvas,
+    state,
+    { x: 0, y: 0, zoom: 1, viewW: 4, viewH: 4 },
+    null,
+    { issueCommand() {} },
+    null,
+    { staticCanvasFactory: staticCanvasFactory(layers) },
+  );
   minimap.render();
-  assert(canvas.context.calls.some((call) => call.op === "moveTo"), "Scout Plane blip starts an aircraft path");
-  assert(canvas.context.calls.filter((call) => call.op === "lineTo").length >= 3, "Scout Plane blip draws a multi-point aircraft silhouette");
-  assert(canvas.context.calls.some((call) => call.op === "stroke"), "Scout Plane blip includes an outline for readability");
-  assert(canvas.context.calls.some((call) => call.op === "fillRect"), "ordinary ground units still draw square minimap blips");
+  assert(
+    hasCallWithApproxArgs(canvas.context, "moveTo", [10.7, 8]),
+    "Scout Plane blip starts an aircraft path at the plane canvas position",
+  );
+  assert(
+    hasCallWithApproxArgs(canvas.context, "lineTo", [6.2, 5.8])
+      && hasCallWithApproxArgs(canvas.context, "lineTo", [7.1, 8])
+      && hasCallWithApproxArgs(canvas.context, "lineTo", [6.2, 10.2]),
+    "Scout Plane blip draws the expected multi-point aircraft silhouette",
+  );
+  assert(
+    canvas.context.calls.some((call) => call.op === "stroke"),
+    "Scout Plane blip includes an outline for readability",
+  );
+  assert(
+    hasCallWithApproxArgs(canvas.context, "fillRect", [10.4, 6.4, 3.2, 3.2]),
+    "ordinary ground units still draw square minimap blips at their canvas position",
+  );
+  assert(
+    !hasCallWithApproxArgs(canvas.context, "fillRect", [6.4, 6.4, 3.2, 3.2]),
+    "Scout Plane blips should not also use the ordinary square unit marker",
+  );
   minimap.destroy();
 }
 
