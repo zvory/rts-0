@@ -10,6 +10,7 @@ import {
 } from "../client/src/renderer/units.js";
 import { _sweep } from "../client/src/renderer/layers.js";
 import { createLiveRigDefinitions, liveRigRoutesFor } from "../client/src/renderer/rigs/live_routing.js";
+import { compileVisualUnitRigCandidates } from "../client/src/renderer/rigs/visual_override_rigs.js";
 import { compileSvgRig } from "../client/src/renderer/rigs/svg_importer.js";
 import {
   createRigRenderContext,
@@ -143,11 +144,18 @@ test("tank rig adds a half-scale artillery-style muzzle flare on cannon recoil",
     now: fixedNow,
     state: { weaponRecoil: () => 1 },
   }));
+  const recoiledMuzzle = transformedRigAnchorPoint(definition, entity, "muzzle", {
+    now: fixedNow,
+    state: { weaponRecoil: () => 1 },
+  });
   const cone = firing.parts["part.tank.flashCone"];
   const core = firing.parts["part.tank.flashCore"];
   const glow = firing.parts["part.tank.flashGlow"];
-  assert.ok(Math.abs(cone.transform.x - 16.55) < 0.001);
+  assert.ok(Math.abs(cone.transform.x - 25.35) < 0.001);
   assert.ok(Math.abs(cone.transform.y) < 0.001);
+  assert.ok(recoiledMuzzle);
+  const recoiledMuzzleLocalX = recoiledMuzzle.x - entity.x;
+  assert.ok(Math.abs(cone.transform.x - recoiledMuzzleLocalX - 8.8) < 0.001);
   assert.ok(Math.abs(cone.geometryScale.x - 4) < 0.001);
   assert.ok(Math.abs(cone.geometryScale.y - 3.533333333329) < 0.001);
   assert.ok(Math.abs(core.geometryScale.x - 3.4) < 0.001);
@@ -155,6 +163,37 @@ test("tank rig adds a half-scale artillery-style muzzle flare on cannon recoil",
   assert.ok(Math.abs(cone.alpha - 1) < 0.001);
   assert.ok(Math.abs(core.alpha - 1) < 0.001);
   assert.ok(Math.abs(glow.alpha - 1) < 0.001);
+});
+
+test("tank long-cannon override keeps the flare ahead of the recoiling muzzle", () => {
+  const compiled = compileVisualUnitRigCandidates();
+  const definition = compiled.definitions.get("tank-long-cannon")?.definition;
+  assert.ok(definition, JSON.stringify([...compiled.errors.entries()]));
+  assert.ok(Math.abs(definition.anchors.muzzle.x - 39.2) < 0.001);
+  const entity = {
+    id: 10,
+    kind: KIND.TANK,
+    owner: 1,
+    x: 100,
+    y: 100,
+    hp: 100,
+    maxHp: 100,
+    state: STATE.IDLE,
+    facing: 0,
+    weaponFacing: 0,
+  };
+  const context = createRigRenderContext(entity, {
+    now: fixedNow,
+    state: { weaponRecoil: () => 1 },
+  });
+  const firing = sampleRigAnimation(definition, entity, context);
+  const recoiledMuzzle = transformedRigAnchorPoint(definition, entity, "muzzle", context);
+  assert.ok(recoiledMuzzle);
+  const recoiledMuzzleLocalX = recoiledMuzzle.x - entity.x;
+  const cone = firing.parts["part.tank.flashCone"];
+  assert.ok(Math.abs(recoiledMuzzleLocalX - 22.55) < 0.001);
+  assert.ok(Math.abs(cone.transform.x - 31.35) < 0.001);
+  assert.ok(Math.abs(cone.transform.x - recoiledMuzzleLocalX - 8.8) < 0.001);
 });
 
 test("rig runtime creates one container child per part and updates transforms", () => {
@@ -486,11 +525,9 @@ test("default Tank draw uses live SVG rig with separate turret and hull parts", 
 
 test("visual unit override draws a real Tank through candidate SVG art without changing kind", () => {
   const defaultDefinition = compileFixture("rig-vehicle.svg", KIND.TANK);
-  const candidate = compileSvgRig(TANK_RIG_SVG.replaceAll("33.2", "39.2"), {
-    id: "tank-visual-test",
-    expectedKind: KIND.TANK,
-  });
-  assert.equal(candidate.ok, true, JSON.stringify(candidate.errors));
+  const compiled = compileVisualUnitRigCandidates();
+  const candidate = compiled.definitions.get("tank-long-cannon");
+  assert.ok(candidate, JSON.stringify([...compiled.errors.entries()]));
   const entity = {
     id: 43,
     kind: KIND.TANK,
@@ -513,7 +550,7 @@ test("visual unit override draws a real Tank through candidate SVG art without c
     weaponRecoil: () => 0,
   }, {
     visualOverride: {
-      candidateId: "tank-visual-test",
+      candidateId: "tank-long-cannon",
       kind: KIND.TANK,
       definition: candidate.definition,
     },
@@ -522,9 +559,9 @@ test("visual unit override draws a real Tank through candidate SVG art without c
   const unit = renderer._liveRigPools.liveUnitRigs.get(entity.id);
   const effects = renderer._liveRigPools.liveUnitRigEffects.get(entity.id);
   assert.equal(entity.kind, KIND.TANK, "override rendering keeps the authoritative unit kind");
-  assert.equal(unit.definition.id, "tank-visual-test");
+  assert.equal(unit.definition.id, "tank-long-cannon");
   assert.equal(typeof unit.matchesPngAtlasRig, "undefined", "visual overrides bypass the production Tank PNG atlas");
-  assert.equal(effects.definition.id, "tank-visual-test", "override effects use the same candidate definition");
+  assert.equal(effects.definition.id, "tank-long-cannon", "override effects use the same candidate definition");
 });
 
 test("tank PNG atlas route splits omitted shadow and fuel cue back to SVG", () => {
