@@ -47,9 +47,10 @@ test("metadata, anchors, paint, draw order, and animation bindings are extracted
   assert.equal(result.definition.kind, KIND.TANK);
   assert.deepEqual(result.definition.parts.map((part) => part.id).slice(0, 3), ["part.shadow", "part.track.left", "part.track.right"]);
   assert.deepEqual(result.definition.anchors.muzzle, { x: 33.2, y: 0 });
-  assert.deepEqual(result.definition.anchors.coaxMuzzle, { x: 31.4, y: -4.1 });
+  assert.deepEqual(result.definition.anchors.coaxMuzzle, { x: 16.6, y: -5.55 });
   assert.deepEqual(result.definition.parts.find((part) => part.id === "part.hull").paint.fill, "#5d7896");
-  assert.equal(result.definition.parts.some((part) => part.id === "part.coaxBarrel"), true);
+  const coaxBarrel = result.definition.parts.find((part) => part.id === "part.coaxBarrel");
+  assert.deepEqual(coaxBarrel.geometry, { type: "rect", x: 11.4, y: -6, width: 5.2, height: 0.9 });
   assert.deepEqual(result.definition.parts.find((part) => part.id === "part.turret").tintSlot, "team-light");
   assert.ok(result.definition.animations.some((binding) => binding.partId === "part.barrel" && binding.input === "weaponFacing"));
   assert.ok(result.definition.requiredRuntimeInputs.includes("weaponFacing"));
