@@ -72,6 +72,9 @@ const TANK_UNIT_PARTS = Object.freeze([
   "part.coaxBarrel",
   "part.turret",
   "part.noseTick",
+]);
+
+const TANK_FUEL_CUE_PARTS = Object.freeze([
   "part.fuelCue.box",
   "part.fuelCue.x1",
   "part.fuelCue.x2",
@@ -152,6 +155,7 @@ const LIVE_RIG_PARTS = Object.freeze({
   [KIND.TANK]: Object.freeze({
     shadow: Object.freeze(["part.shadow"]),
     unit: TANK_UNIT_PARTS,
+    overlay: TANK_FUEL_CUE_PARTS,
   }),
   [KIND.WORKER]: Object.freeze({
     shadow: Object.freeze(["part.shadow"]),
@@ -180,7 +184,7 @@ export function liveRigDefinitionFor(definitions, kind) {
 export function liveRigRoutesFor(kind, pools = {}) {
   const parts = LIVE_RIG_PARTS[kind];
   if (!parts) return [];
-  return [
+  const routes = [
     {
       poolName: pools.liveRigShadow || "liveUnitRigShadows",
       layerName: pools.shadow || "unitShadows",
@@ -192,4 +196,12 @@ export function liveRigRoutesFor(kind, pools = {}) {
       parts: parts.unit,
     },
   ];
+  if (Array.isArray(parts.overlay) && parts.overlay.length > 0) {
+    routes.push({
+      poolName: pools.liveRigOverlay || "liveUnitRigOverlays",
+      layerName: pools.overlay || pools.unit || "units",
+      parts: parts.overlay,
+    });
+  }
+  return routes;
 }

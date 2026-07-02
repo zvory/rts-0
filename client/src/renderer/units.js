@@ -178,6 +178,7 @@ export function _drawShotRevealUnit(e, colorByOwner, state) {
     unit: "shotReveals",
     liveRigShadow: "liveShotRevealRigShadows",
     liveRigUnit: "liveShotRevealRigs",
+    liveRigOverlay: "liveShotRevealRigOverlays",
     alpha,
   });
 }

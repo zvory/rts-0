@@ -20,12 +20,16 @@ const manifestPath = path.join(metadataDir, "manifest.json");
 const promptPath = path.join(metadataDir, "prompt.md");
 
 const VIEW_BOX = Object.freeze({ x: -40, y: -32, width: 80, height: 64 });
-const DEFAULT_COLUMNS = 3;
+const DEFAULT_COLUMNS = 2;
 const DEFAULT_SCALE = 3;
 const DEFAULT_KEY = "#ff00ff";
 const DEFAULT_LAYOUT = "tight";
 const DEFAULT_PROFILE = "semantic";
 const TIGHT_CELL_FILL = 0.72;
+const GUIDE_SUBDIVISIONS = 8;
+const GUIDE_BORDER_COLOR = "#00e5ff";
+const GUIDE_MINOR_COLOR = "#80f6ff";
+const GUIDE_CENTER_COLOR = "#fff4a3";
 
 function main() {
   const [command, ...rest] = process.argv.slice(2);
@@ -68,6 +72,11 @@ function makeSheet(args) {
 
   const body = [];
   body.push(`<rect x="0" y="0" width="${sheetW}" height="${sheetH}" fill="${key}" />`);
+  cells.forEach((_cellId, index) => {
+    const col = index % columns;
+    const row = Math.floor(index / columns);
+    appendCellGuides(body, col * cellW, row * cellH, cellW, cellH);
+  });
   cells.forEach((cellId, index) => {
     const col = index % columns;
     const row = Math.floor(index / columns);
@@ -81,13 +90,13 @@ function makeSheet(args) {
       );
       return;
     }
-    const semanticSprite = sheet.sprites.find((sprite) => sprite.id === cellId);
-    if (semanticSprite) {
-      const parts = semanticSprite.sourceParts
+    const semanticElement = sheet.sheetElements.find((element) => element.id === cellId);
+    if (semanticElement) {
+      const parts = semanticElement.sourceParts
         .map((partId) => compiled.definition.parts.find((part) => part.id === partId))
         .filter(Boolean);
       const frame = groupFrameGeometry(parts, cellW, cellH, layout);
-      const groupElements = semanticSprite.sourceParts
+      const groupElements = (semanticElement.renderParts || semanticElement.sourceParts)
         .map((partId) => elementsById.get(partId))
         .filter(Boolean);
       body.push(
@@ -130,6 +139,15 @@ function makeSheet(args) {
     partIds,
     frameSources: sheet.frameSources,
     semanticSprites: sheet.sprites,
+    semanticSheetElements: sheet.sheetElements,
+    guides: {
+      outerCellBox: true,
+      subdivisions: GUIDE_SUBDIVISIONS,
+      centerLines: true,
+      borderColor: GUIDE_BORDER_COLOR,
+      minorColor: GUIDE_MINOR_COLOR,
+      centerColor: GUIDE_CENTER_COLOR,
+    },
     sourceSvg: rel(sourceSvgPath),
     sourcePng: rel(sourcePngPath),
   };
@@ -227,14 +245,15 @@ function writePrompt() {
   ensureDirs();
   const prompt = `Use case: stylized-concept
 Asset type: top-down RTS unit raster atlas for Bewegungskrieg
-Primary request: Restyle this semantic tank contact sheet into a coherent, strict top-down, World War II plausible RTS tank with every grouped component preserved in its same grid cell.
-Input image role: edit target and layout reference. The first cell is the assembled tank without a drop shadow or warning icon; every later cell is a context-rich grouped component from the same tank rig: left track assembly, right track assembly, hull assembly, turret/barrel assembly, and fuel warning cue.
+Primary request: Restyle this guided semantic tank contact sheet into a coherent, strict top-down, World War II plausible RTS tank with every grouped component preserved in its same grid cell.
+Input image role: edit target and layout reference. The sheet has exactly four boxed cells in a 2x2 grid: assembled reference tank, one reusable track-link strip, hull assembly, and turret/barrel assembly. The visible guide boxes, subgrid lines, and center marks are alignment guides only.
 Style/medium: clean RTS-readable PlayStation 1 era raster art, low-resolution textured/pixely surfaces, grounded proportions, not cartoonish.
-Composition/framing: preserve the exact grid, exact cell count, exact cell order, centered component framing, relative component silhouette, and top-down orientation. Keep each component isolated inside its original cell.
+Composition/framing: preserve the exact 2x2 grid, exact four-cell count, exact cell order, boxed cell boundaries, centered component framing, relative component silhouette, and top-down orientation. Use the smaller guide grid inside each cell to keep scale and center alignment stable. Keep each component isolated inside its original cell.
 Color/materials: neutral grayscale team-colorable armor on parts that are currently blue, dark rubber/track metal, dull steel barrels, subtle chipped paint, grime, panel texture, no glossy modern materials.
 Background: perfectly flat solid ${DEFAULT_KEY} chroma-key background in every cell.
-Constraints: strict top-down orthographic view; no perspective tilt; no drop shadow; no text, labels, numbers, watermarks, arrows, or extra UI; no merged cells; do not add missing parts; do not remove any part; leave empty background areas empty.
-Avoid: invented sprockets, gears, road wheels, extra hatches, extra barrels, thick cartoon outlines, toy proportions, oversized turret/barrel, painterly blur, photorealistic perspective, dramatic lighting, gradients in the background, camouflage that hides the silhouette.
+Track cell: generate only one straight reusable track-link strip or short collection of repeatable track links. It should work as a seamless scrolling/rotating texture segment when reused for both tank sides. Do not draw a closed track assembly, end cap, perimeter contour, sprocket, wheel, or outline around the whole strip.
+Constraints: strict top-down orthographic view; no perspective tilt; no drop shadow; no text, labels, numbers, watermarks, arrows, or extra UI; no merged cells; no fuel warning/no-oil indicator; do not add missing parts; do not remove any required art part; leave empty background areas empty. Keep guide lines thin and separate from the sprite art; do not turn the guide grid into armor seams or track detail.
+Avoid: invented sprockets, gears, road wheels, extra hatches, extra barrels, fuel icons, warning symbols, closed track loops, track end contours, thick cartoon outlines, toy proportions, oversized turret/barrel, painterly blur, photorealistic perspective, dramatic lighting, gradients in the background, camouflage that hides the silhouette.
 `;
   fs.writeFileSync(promptPath, prompt);
   console.log(`wrote ${rel(promptPath)}`);
@@ -339,14 +358,36 @@ function groupFrameGeometry(parts, cellW, cellH, layout) {
   };
 }
 
+function appendCellGuides(body, x, y, cellW, cellH) {
+  body.push(`<g fill="none" shape-rendering="crispEdges">`);
+  for (let i = 1; i < GUIDE_SUBDIVISIONS; i += 1) {
+    const tx = round(x + (cellW * i) / GUIDE_SUBDIVISIONS);
+    const ty = round(y + (cellH * i) / GUIDE_SUBDIVISIONS);
+    const major = i === GUIDE_SUBDIVISIONS / 2;
+    const stroke = major ? GUIDE_CENTER_COLOR : GUIDE_MINOR_COLOR;
+    const opacity = major ? 0.66 : 0.32;
+    body.push(
+      `<line x1="${tx}" y1="${y}" x2="${tx}" y2="${round(y + cellH)}" stroke="${stroke}" stroke-width="1" opacity="${opacity}" />`,
+      `<line x1="${x}" y1="${ty}" x2="${round(x + cellW)}" y2="${ty}" stroke="${stroke}" stroke-width="1" opacity="${opacity}" />`,
+    );
+  }
+  body.push(
+    `<rect x="${round(x + 1)}" y="${round(y + 1)}" width="${round(cellW - 2)}" height="${round(cellH - 2)}" stroke="${GUIDE_BORDER_COLOR}" stroke-width="2" opacity="0.9" />`,
+    `<rect x="${round(x + cellW * 0.25)}" y="${round(y + cellH * 0.25)}" width="${round(cellW * 0.5)}" height="${round(cellH * 0.5)}" stroke="${GUIDE_CENTER_COLOR}" stroke-width="1" opacity="0.45" />`,
+    "</g>",
+  );
+}
+
 function sheetForProfile(definition, profile) {
   const partIds = definition.parts.map((part) => part.id);
   if (profile === "semantic") {
     const sprites = semanticSprites(partIds);
+    const sheetElements = semanticSheetElements(partIds);
     return {
-      cells: ["reference.full", ...sprites.map((sprite) => sprite.id)],
-      frameSources: Object.fromEntries(partIds.map((partId) => [partId, partId])),
+      cells: ["reference.full", ...sheetElements.map((element) => element.id)],
+      frameSources: semanticFrameSources(sprites),
       sprites,
+      sheetElements,
     };
   }
   const frameSources = frameSourcesForProfile(partIds, profile);
@@ -354,6 +395,7 @@ function sheetForProfile(definition, profile) {
     cells: cellsForFrameSources(frameSources),
     frameSources,
     sprites: [],
+    sheetElements: [],
   };
 }
 
@@ -370,6 +412,7 @@ function semanticSprites(partIds) {
   return [
     {
       id: "sprite.track.left",
+      sourceCell: "sprite.track",
       animationPart: "part.track.left",
       sourceParts: ["part.track.left", ...leftTreads],
       tintSlot: "fixed",
@@ -377,6 +420,7 @@ function semanticSprites(partIds) {
     },
     {
       id: "sprite.track.right",
+      sourceCell: "sprite.track",
       animationPart: "part.track.right",
       sourceParts: ["part.track.right", ...rightTreads],
       tintSlot: "fixed",
@@ -396,22 +440,53 @@ function semanticSprites(partIds) {
       tintSlot: "team-light",
       drawOrder: 30,
     },
-    {
-      id: "sprite.fuelCue",
-      animationPart: "part.fuelCue.box",
-      sourceParts: ["part.fuelCue.box", "part.fuelCue.x1", "part.fuelCue.x2"],
-      tintSlot: "fixed",
-      drawOrder: 40,
-    },
   ].map((sprite) => ({
     ...sprite,
     sourceParts: sprite.sourceParts.filter((partId) => partIds.includes(partId)),
   })).filter((sprite) => sprite.sourceParts.length > 0);
 }
 
+function semanticSheetElements(partIds) {
+  const leftTreads = partIds.filter((partId) => /^part\.tread\.left\./.test(partId));
+  const trackSourceParts = ["part.track.left", ...leftTreads].filter((partId) => partIds.includes(partId));
+  const trackRenderParts = leftTreads.filter((partId) => partIds.includes(partId));
+  return [
+    {
+      id: "sprite.track",
+      sourceParts: trackSourceParts,
+      renderParts: trackRenderParts.length > 0 ? trackRenderParts : trackSourceParts,
+      description: "single reusable track-link strip; no closed track assembly or end contour",
+    },
+    {
+      id: "sprite.hull",
+      sourceParts: ["part.hull", "part.hull.shadow", "part.hull.nose", "part.hull.noseShadow", "part.noseTick"],
+      description: "hull assembly",
+    },
+    {
+      id: "sprite.turret",
+      sourceParts: ["part.barrel", "part.coaxBarrel", "part.turret"],
+      description: "turret and barrel assembly",
+    },
+  ].map((element) => ({
+    ...element,
+    sourceParts: element.sourceParts.filter((partId) => partIds.includes(partId)),
+    renderParts: element.renderParts?.filter((partId) => partIds.includes(partId)),
+  })).filter((element) => element.sourceParts.length > 0);
+}
+
+function semanticFrameSources(sprites) {
+  const sources = {};
+  for (const sprite of sprites) {
+    const cellId = sprite.sourceCell || sprite.id;
+    for (const partId of sprite.sourceParts) sources[partId] = cellId;
+  }
+  return sources;
+}
+
 function atlasSpritesForSemanticProfile(definition, cells, columns, rows, width, height, layout) {
   return semanticSprites(definition.parts.map((part) => part.id)).map((sprite) => {
-    const index = cells.indexOf(sprite.id);
+    const cellId = sprite.sourceCell || sprite.id;
+    const index = cells.indexOf(cellId);
     if (index < 0) return null;
     const frame = cellFrame(index, columns, rows, width, height);
     const parts = sprite.sourceParts
@@ -420,6 +495,7 @@ function atlasSpritesForSemanticProfile(definition, cells, columns, rows, width,
     const geometry = groupFrameGeometry(parts, frame.w, frame.h, layout);
     return {
       ...sprite,
+      sourceCell: cellId,
       frame: {
         ...frame,
         originX: geometry.originX,
@@ -585,8 +661,8 @@ function rel(file) {
 
 function usage() {
   console.error(`Usage:
-  node scripts/art/tank-raster-pipeline.mjs make-sheet [--scale 3] [--columns 3] [--layout tight] [--profile semantic] [--key #ff00ff]
-  node scripts/art/tank-raster-pipeline.mjs write-atlas --sheet <png> [--columns 3] [--layout tight] [--profile semantic] [--transparent-key #ff00ff] [--disabled]
+  node scripts/art/tank-raster-pipeline.mjs make-sheet [--scale 3] [--columns 2] [--layout tight] [--profile semantic] [--key #ff00ff]
+  node scripts/art/tank-raster-pipeline.mjs write-atlas --sheet <png> [--columns 2] [--layout tight] [--profile semantic] [--transparent-key #ff00ff] [--disabled]
   node scripts/art/tank-raster-pipeline.mjs write-prompt`);
 }
 
