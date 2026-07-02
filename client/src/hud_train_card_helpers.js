@@ -152,7 +152,7 @@ function scoutPlaneInProduction(ctx, isOwn) {
   }
   return currentEntitiesOf(ctx).some((e) =>
     isOwn(ctx, e) &&
-      e.kind === KIND.CITY_CENTRE &&
+      isBuilding(e.kind) &&
       e.buildProgress == null &&
       (e.prodScoutPlaneQueued === true || e.prodKind === KIND.SCOUT_PLANE) &&
       ((e.prodQueue ?? 1) > 0 || e.state === STATE.TRAIN)

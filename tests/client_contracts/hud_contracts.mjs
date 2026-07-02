@@ -822,7 +822,24 @@ function fakeHudRootWithoutResourceSpans() {
     resources: { steel: 100, oil: 100, supplyUsed: 0, supplyCap: 10 },
   }));
   assert(!queuedBehindWorkerScoutPlaneCard.slots[6].enabled, "Scout Plane button should disable when a queued plane is behind another City Centre item");
-  assert(queuedBehindWorkerScoutPlaneCard.slots[6].title === "Scout Plane already in production", "hidden queued Scout Plane flag should use the in-production reason");
+  assert(queuedBehindWorkerScoutPlaneCard.slots[6].title === "Scout Plane already in production", "queued Scout Plane flag should use the in-production reason");
+
+  const queuedElsewhereProducer = {
+    id: 75,
+    owner: 1,
+    kind: KIND.FACTORY,
+    buildProgress: null,
+    prodScoutPlaneQueued: true,
+    prodQueue: 1,
+    state: STATE.TRAIN,
+  };
+  const queuedElsewhereScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [scoutPlaneCityCentre],
+    entities: [scoutPlaneCityCentre, completedGunWorks, queuedElsewhereProducer],
+    resources: { steel: 100, oil: 100, supplyUsed: 0, supplyCap: 10 },
+  }));
+  assert(!queuedElsewhereScoutPlaneCard.slots[6].enabled, "Scout Plane button should mirror the server one-plane limit across any owned production queue");
+  assert(queuedElsewhereScoutPlaneCard.slots[6].title === "Scout Plane already in production", "off-selection Scout Plane queue flag should use the in-production reason");
 
   const optimisticScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [scoutPlaneCityCentre],
