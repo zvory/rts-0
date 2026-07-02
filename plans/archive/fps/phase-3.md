@@ -17,10 +17,10 @@ should provide evidence for future optimization work while avoiding brittle mach
 - Start or reuse a local server on an isolated port, following the existing `tests/run-all.sh` pattern
   for `RTS_URL`, `RTS_WS`, `PORT`, and Chrome selection where practical.
 - Support fixed workloads:
-  - the preserved Matt/Alex replay artifact copied at runtime from
-    `docs/network-incident-examples/2026-06-19-beta-matt-alex/match-54-replay.json` into an ignored
-    `server/target/selfplay-artifacts/<name>/replay.json` directory, then loaded via
-    `/dev/replay-artifact?replay=<name>`;
+  - current dev scenarios or fresh schema 3 replay captures. The preserved Matt/Alex schema 2
+    artifact at
+    `docs/network-incident-examples/2026-06-19-beta-matt-alex/match-54-replay.schema2-unsupported.json`
+    is historical incident evidence only and is no longer a current harness workload;
   - at least one dev scenario or live match workload that stresses visible entities, fog, minimap,
     renderer overlays, or selection/HUD behavior;
   - optional future workload selection via flags without requiring every workload in the default run.

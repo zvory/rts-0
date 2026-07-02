@@ -21,7 +21,7 @@ Make lab vision per operator while keeping the current all-operators collaborato
   for that recipient.
 - Change lab snapshot fanout so each recipient's `LabVisionMode` drives that recipient's projection.
   Full-world projection, one-team fog, and team-union fog must remain server-side and authoritative.
-- Define import/export semantics without widening `LabScenarioV1`: exporting uses the requesting
+- Define import/export semantics without widening legacy setup JSON: exporting uses the requesting
   operator's current vision, and importing applies scenario vision to the requester plus the default
   vision for future joiners without overwriting other connected operators.
 - Preserve scenario dirty state, operation counts, result routing, and operation log attribution.

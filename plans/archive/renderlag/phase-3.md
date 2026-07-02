@@ -61,7 +61,7 @@ and observer consumers that need the same data.
 - `node tests/client_contracts.mjs`
 - `node tests/minimap_input_contracts.mjs`
 - `node scripts/check-client-architecture.mjs`
-- `node scripts/client-perf-harness.mjs --workload matt-alex-replay --seconds 10`
+- `node scripts/client-perf-harness.mjs --workload vehicle-wall-stress --seconds 10`
 - `node scripts/client-perf-harness.mjs --workload vehicle-wall-stress --seconds 10`
 - `git diff --check`
 

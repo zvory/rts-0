@@ -12,9 +12,9 @@ replay and lab assets will use.
 
 This phase should prove that tick-zero checkpoint starts are behaviorally identical to direct setup
 for normal matches, replay-compatible starts, dev scenarios, and blank lab starts. Bundled/catalog
-lab scenarios that currently restore from `LabScenarioV1` may keep using the existing scenario
-restore path until Phase 5 adds the side-by-side scenario adapter. This phase should not change
-committed replay artifact or lab scenario JSON shapes yet. Keep the direct setup path available as a
+lab setup assets may keep using the existing setup restore path until Phase 5 adds the side-by-side
+setup adapter. This phase should not change committed replay artifact or lab setup JSON shapes yet.
+Keep the direct setup path available as a
 private/test-only oracle until this phase's parity tests prove the checkpoint-backed path is
 equivalent; do not delete it merely because the live constructors have switched.
 
@@ -33,8 +33,8 @@ Explicit non-goals:
   constructor overloads only where needed.
 - `server/crates/sim/src/game/lab.rs` and setup/dev scenario helpers: route blank lab setup through
   checkpoint-backed construction where the setup inputs can be compiled directly to equivalent
-  start state. Leave `LabScenarioV1` catalog/import adapter work to Phase 5 unless a very small
-  internal shim is required for parity tests and does not change scenario JSON.
+  start state. Leave legacy setup catalog/import adapter work to Phase 5 unless a very small
+  internal shim is required for parity tests and does not change setup JSON.
 - Private/test-only direct setup helpers: retain enough of the old construction path to compare
   direct setup against checkpoint-backed setup throughout this phase.
 - `server/src/lobby/launch.rs`, `server/src/lobby/room_task/**`, and `server/src/main.rs`: read-only
@@ -46,9 +46,9 @@ Explicit non-goals:
 
 - Compare direct setup versus checkpoint-backed setup for normal matches with multiple players,
   teams, factions, authored maps, generated maps, and AI slots.
-- Compare blank lab starts before and after checkpoint-backed construction. For catalog lab
-  scenarios, verify they still launch through the existing `LabScenarioV1` path and record that
-  checkpoint adapter parity belongs to Phase 5.
+- Compare blank lab starts before and after checkpoint-backed construction. For catalog lab setups,
+  verify they still launch through the existing setup path and record that checkpoint adapter parity
+  belongs to Phase 5.
 - Prove first snapshot and several post-start ticks match for each setup family.
 - Prove a mismatched map identity/hash fails before constructing a live `Game`.
 - Confirm replay artifact capture still records the same command log/start metadata as before for

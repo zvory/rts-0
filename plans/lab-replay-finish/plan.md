@@ -11,9 +11,9 @@ lab start plus a serializable lab operation log.
 
 Finish the migration from setup-specific lab scenarios toward checkpoint-backed lab artifacts. A lab
 replay should restore an exact lab checkpoint, then consume an ordered stream of lab operations and
-issued commands so a lab session can be saved, shared, and replayed without relying on old
-`LabScenarioV1` setup DTOs. Compatibility readers should stay until the new path has proven itself,
-then the old lab scenario and replay schema 2 surfaces can be removed deliberately.
+issued commands so a lab session can be saved, shared, and replayed through checkpoint-backed setup
+payloads. The Phase 4 cleanup removed legacy lab setup loading and replay artifact schema 2 loading;
+current builds reject those old artifacts instead of migrating them.
 
 ## Phase Summaries
 
@@ -37,13 +37,12 @@ lab replay can be reopened and reaches the same observable lab state.
 
 Move user-facing lab setup/export/import wording and flows away from "lab scenarios" as the primary
 concept. Setup-only artifacts should be treated as lab checkpoint setups, while evolving sessions
-should be lab replays; old `LabScenarioV1` remains only as a compatibility input during this phase.
-This phase should update client copy, catalog/submission naming, docs, tests, and fixtures so new
-work no longer extends the legacy scenario concept.
+should be lab replays. This phase updates client copy, catalog/submission naming, docs, tests, and
+fixtures so new work no longer extends the legacy scenario concept.
 
 ### [Phase 4 - Retire Compatibility And Final Cleanup](phase-4.md)
 
-After a bake-in gate, remove `LabScenarioV1` compatibility loading and replay artifact schema 2
+After a bake-in gate, remove legacy lab setup compatibility loading and replay artifact schema 2
 loading. This phase should delete old adapters, fixtures, docs, protocol parity expectations, and
 tests only after committed assets and known dev/self-play/crash/match-history surfaces have tested
 replacement paths or intentional rejection messages. It should finish with a release audit covering
@@ -79,9 +78,9 @@ rollback, old artifact behavior, lab replay portability, and any remaining clean
   WebSocket lab scenario frame budget, so each phase that introduces import/export behavior must name
   whether the path is WebSocket lab op, HTTP/dev route, local file-only client handling, or another
   bounded route.
-- Keep old replay schema 2 and `LabScenarioV1` loading until the new lab replay path has passed CI
-  and manual use on representative artifacts. Removal belongs in Phase 4, not in the first
-  implementation phase.
+- Current builds keep only checkpoint-backed lab setup loading and replay artifact schema 3 loading.
+  Historical lab setup JSON and replay artifact schema 2 payloads should fail with explicit
+  unsupported-format errors.
 - Existing in-memory lab/replay keyframes are acceptable for seek performance. Replacing them with
   checkpoint keyframes is not required for this plan unless profiling or a product requirement shows
   that persisted/cross-process seek points are needed.
@@ -92,14 +91,14 @@ rollback, old artifact behavior, lab replay portability, and any remaining clean
 
 ## Bake-In Gate Before Deletion
 
-Do not remove compatibility readers until all of these are true:
+Satisfied before Phase 4 removed legacy readers:
 
 - New lab replay artifacts are written and loaded through automated tests.
 - At least one live lab workflow can export, import/open, and replay a checkpoint-backed lab replay.
-- Current bundled lab setups no longer require `LabScenarioV1`.
+- Current bundled lab setups no longer require legacy setup DTO loading.
 - Dev replay, self-play, crash replay, and match-history replay surfaces have schema 3 coverage or
   intentional rejection tests for old artifacts.
-- Manual testing has covered an old schema 2 replay, a new schema 3 replay, an old lab scenario JSON
+- Manual testing covered an old schema 2 replay, a new schema 3 replay, old legacy lab setup JSON
   import, a new lab checkpoint setup import, and a new lab replay import.
 
 ## Non-Goals
@@ -114,9 +113,9 @@ Do not remove compatibility readers until all of these are true:
 
 - Labs can save/open a portable artifact consisting of an initial checkpoint-backed lab setup plus a
   deterministic lab op stream.
-- New lab setup and lab replay UX/docs no longer present `LabScenarioV1` as a primary concept.
-- Legacy `LabScenarioV1` and replay schema 2 loading are either removed after the bake-in gate or
-  left with a clearly documented reason and an owner for removal.
+- New lab setup and lab replay UX/docs no longer present legacy setup DTOs as a primary concept.
+- Legacy lab setup loading and replay schema 2 loading are removed after the bake-in gate, with
+  explicit rejection coverage for old artifacts.
 - The final audit documents what remains intentionally compatible, what was deleted, and how old
   artifacts fail or load.
 

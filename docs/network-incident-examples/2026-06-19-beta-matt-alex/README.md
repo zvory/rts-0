@@ -6,7 +6,9 @@ but one player's client and network path made the match feel unplayable.
 The games happened on beta during the evening of 2026-06-18 America/New_York, recorded in UTC on
 2026-06-19. The current beta deploy changed after the matches were recorded, so the public match
 API may warn that the replays are potentially incompatible with the current server. The raw replay
-artifacts in this directory are the stored DB artifacts from the recording build.
+artifacts in this directory are the stored DB artifacts from the recording build. They are replay
+artifact schema 2 payloads preserved for incident analysis only; current checkpoint-backed replay
+loaders reject them as unsupported.
 
 ## Evidence
 
@@ -14,8 +16,8 @@ artifacts in this directory are the stored DB artifacts from the recording build
 | --- | --- |
 | `fly-match-54-all.jsonl` | All Fly log rows returned for match 54's UTC interval. |
 | `fly-match-55-all.jsonl` | All Fly log rows returned for match 55's UTC interval. |
-| `match-54-replay.json` | Stored replay artifact for match 54. |
-| `match-55-replay.json` | Stored replay artifact for match 55. |
+| `match-54-replay.schema2-unsupported.json` | Historical schema 2 replay artifact for match 54; not loadable by current replay runtime. |
+| `match-55-replay.schema2-unsupported.json` | Historical schema 2 replay artifact for match 55; not loadable by current replay runtime. |
 | `matches-54-55-db-summary.json` | DB match rows without the large replay blobs. |
 | `parsed-net-reports.tsv` | Parsed client network reports used for this analysis. |
 | `player-report-quotes.md` | Exact user-supplied quotes about the reported player experience. |

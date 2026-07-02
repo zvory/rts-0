@@ -14,7 +14,7 @@
   },
   "artifacts": {
     "dbSummary": "match-89-db-summary.json",
-    "replay": "match-89-replay.json",
+    "replay": "match-89-replay.schema2-unsupported.json",
     "logs": "match-89-runid-logs.jsonl"
   },
   "players": {

@@ -108,7 +108,7 @@ research ids produce explicit results rather than client-only assumptions.
 
 ### [Phase 6 - Scenario Import and Export](phase-6.md)
 
-Add versioned `LabScenarioV1` import/export for browser JSON files and optional bundled read-only
+Add versioned legacy setup import/export for browser JSON files and optional bundled read-only
 examples. Export should capture map identity, seed, players, teams, useful player state, entities,
 and lab metadata without copying transient snapshot-only fields. Import should validate schema,
 remap entity ids, rebuild a coherent `Game`, and return clear errors without reading arbitrary

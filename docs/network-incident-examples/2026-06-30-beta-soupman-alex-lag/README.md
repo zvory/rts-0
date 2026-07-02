@@ -6,6 +6,9 @@ participant name is `soupman`; this is the Superman player from the report.
 The game ran on beta, not mainline. Mainline Fly log search for the same UTC window returned zero
 matching rows.
 
+The preserved match replay is a replay artifact schema 2 payload kept for incident analysis only.
+Current checkpoint-backed replay loaders reject schema 2 rather than loading or migrating it.
+
 ## Match
 
 | field | value |
@@ -27,7 +30,7 @@ matching rows.
 | file | contents |
 | --- | --- |
 | `match-103-runid-logs.jsonl` | Fly log rows filtered to the exact live match run id: start/end, client network reports, and slow tick summaries. |
-| `match-103-replay.json` | Stored `ReplayArtifactV1` from `match_replays.artifact_json`. |
+| `match-103-replay.schema2-unsupported.json` | Historical schema 2 `ReplayArtifactV1` from `match_replays.artifact_json`; not loadable by current replay runtime. |
 | `match-103-db-summary.json` | Public `/api/matches` summary row for match `103`. |
 | `match-103-incident-summary.md` | Markdown output from `scripts/parse-net-report-logs.mjs`. |
 | `match-103-incident-summary.json` | Structured parser output. |

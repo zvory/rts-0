@@ -4,6 +4,10 @@ This document is a planning artifact, not an approved implementation phase list.
 current product target and the architectural hypotheses that should be tested before cutting
 implementation phases.
 
+Current implementation note: lab setup import/export now uses checkpoint-backed setup containers,
+and legacy setup JSON is intentionally rejected. Treat older scenario-shaped examples below as
+historical planning context unless they have been rewritten to checkpoint-backed setup language.
+
 Related subplans:
 
 - [Room architecture requirements](../archive/lab/room/requirements.md) defines the high-level goal that rooms,
@@ -294,18 +298,18 @@ struct LabSession {
 flags that affect damage, deaths, cooldowns, or command execution should be mirrored into `Game`
 through typed lab APIs.
 
-### `LabScenarioV1`
+### Checkpoint-Backed Lab Setup
 
-`LabScenarioV1` should be snapshot-like, but it should not literally be the over-the-wire
+Checkpoint-backed lab setup should be snapshot-like, but it should not literally be the over-the-wire
 `Snapshot`. Snapshots are recipient projections with fog filtering, transient events, compact
-network fields, and client convenience data. A saved scenario is authoritative setup data.
+network fields, and client convenience data. A saved setup is authoritative setup data.
 
 Sketch:
 
 ```json
 {
   "schemaVersion": 1,
-  "kind": "labScenario",
+  "kind": "labCheckpointScenario",
   "name": "two_tank_lines",
   "map": {
     "name": "River Crossing",
@@ -426,15 +430,15 @@ Initial candidates:
 Most of these are not MVP-critical. The architecture should reserve a typed flag path so they do
 not get added later as scattered debug booleans.
 
-### `LabScenarioStore`
+### `LabSetupStore`
 
 Hypothesis:
 
 ```rust
-pub trait LabScenarioStore {
+pub trait LabSetupStore {
     fn list(&self) -> Result<Vec<LabScenarioSummary>, LabScenarioError>;
-    fn load(&self, source: LabScenarioSource) -> Result<LabScenarioV1, LabScenarioError>;
-    fn save(&self, scenario: &LabScenarioV1) -> Result<LabScenarioSummary, LabScenarioError>;
+    fn load(&self, source: LabScenarioSource) -> Result<LabCheckpointScenarioV1, LabScenarioError>;
+    fn save(&self, setup: &LabCheckpointScenarioV1) -> Result<LabScenarioSummary, LabScenarioError>;
 }
 ```
 
@@ -454,9 +458,12 @@ impl Game {
         seed: u32,
     ) -> Result<Self, LabError>;
 
-    pub fn export_lab_scenario(&self, metadata: LabScenarioMetadata) -> LabScenarioV1;
+    pub fn export_lab_checkpoint_scenario(
+        &self,
+        metadata: LabScenarioMetadata,
+    ) -> Result<LabCheckpointScenarioV1, LabError>;
 
-    pub fn restore_lab_scenario(scenario: LabScenarioV1) -> Result<Self, LabError>;
+    pub fn restore_lab_checkpoint_scenario(setup: LabCheckpointScenarioV1) -> Result<Self, LabError>;
 
     pub fn apply_lab_op(&mut self, op: LabOp) -> Result<LabOpResult, LabError>;
 

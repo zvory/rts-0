@@ -55,7 +55,7 @@ CI contract.
 
 ## Verification
 
-- `node scripts/client-perf-harness.mjs --workload matt-alex-replay --seconds 10`
+- `node scripts/client-perf-harness.mjs --workload vehicle-wall-stress --seconds 10`
 - `node scripts/client-perf-harness.mjs --workload vehicle-wall-stress --seconds 10`
 - any new selected-unit or render-lag comparison command added by this phase
 - `node tests/client_contracts.mjs` or focused harness tests for pure JS changes

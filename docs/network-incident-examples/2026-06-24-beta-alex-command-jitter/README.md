@@ -9,12 +9,15 @@ available rows do not support a server-lag explanation: reported `server_tick_ms
 `slow_tick_count`, and `head_of_line_count` stayed healthy. The stronger signals are command-path
 delay, snapshot arrival cadence/jitter, and client frame stalls.
 
+The preserved match replay is a replay artifact schema 2 payload kept for incident analysis only.
+Current checkpoint-backed replay loaders reject schema 2 rather than loading or migrating it.
+
 ## Evidence
 
 | file | contents |
 | --- | --- |
 | `match-89-db-summary.json` | Public match-history summary for match `89` without the replay blob. |
-| `match-89-replay.json` | Stored replay artifact for public match `89`. |
+| `match-89-replay.schema2-unsupported.json` | Historical schema 2 replay artifact for public match `89`; not loadable by current replay runtime. |
 | `match-89-runid-logs.jsonl` | Exact Fly JSONL rows for `alex-s-lobby-1782260675313-000003`. |
 | `match-89-incident-summary.md` | Concise facts for match `89`. |
 | `match-89-incident-summary.json` | Machine-readable facts for match `89`. |
@@ -47,7 +50,7 @@ node ../../../scripts/parse-net-report-logs.mjs \
 
 | case | UTC window | identifier | replay/history |
 | --- | --- | --- | --- |
-| Recorded Alex vs Alex | `2026-06-24T00:24:35.313112Z` to `2026-06-24T00:25:48.617844Z` | public match `89`, run `alex-s-lobby-1782260675313-000003` | replay stored in `match-89-replay.json` |
+| Recorded Alex vs Alex | `2026-06-24T00:24:35.313112Z` to `2026-06-24T00:25:48.617844Z` | public match `89`, run `alex-s-lobby-1782260675313-000003` | historical schema 2 replay stored in `match-89-replay.schema2-unsupported.json` |
 | Aborted Alex lobby | approx `2026-06-24T00:22:30Z` to `2026-06-24T00:24:24Z` | run `alex-s-lobby-1782260563198-000002` | no match-history replay; room disposed at `2026-06-24T00:24:24Z` |
 | Command-density repro | started `2026-06-24T00:49:28.796Z` | run `commander-s-lobby-1782262168796-000006` | solo live sandbox row, no replay artifact in this package |
 

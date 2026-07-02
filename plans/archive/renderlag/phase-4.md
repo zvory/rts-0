@@ -65,7 +65,7 @@ especially in unit, resource/building, selection/HP, rig, and feedback paths.
 - `node tests/client_contracts.mjs`
 - `node scripts/check-client-architecture.mjs`
 - renderer-specific visual or contract tests selected by the touched files
-- `node scripts/client-perf-harness.mjs --workload matt-alex-replay --seconds 10`
+- `node scripts/client-perf-harness.mjs --workload vehicle-wall-stress --seconds 10`
 - `node scripts/client-perf-harness.mjs --workload vehicle-wall-stress --seconds 10`
 - `tests/run-all.sh --only-browser` if practical for the touched renderer surface
 - `git diff --check`

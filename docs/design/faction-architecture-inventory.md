@@ -42,7 +42,7 @@ Lifecycle status is explicit and separate from catalog existence:
 | Faction id or path | Status | Current lifecycle policy |
 | --- | --- | --- |
 | `kriegsia` | playable | Default faction for missing non-replay requests. Supported by normal human lobby, AI seats, dev starts, self-play defaults, replay/branch records, match-history replay, post-match replay, spectator metadata, and local prediction when version/build metadata is compatible. |
-| `ekat` | playable | Human-selectable through normal lobby faction selection. Explicit playable validation accepts it for start/replay-capable contexts, and schema-2 replay/branch records may carry it. Public AI seat creation has no faction selector and still defaults to `kriegsia`; current local prediction is disabled when the local player is `ekat`. |
+| `ekat` | playable | Human-selectable through normal lobby faction selection. Explicit playable validation accepts it for start/replay-capable contexts, and schema 3 replay records plus replay-branch metadata may carry it. Public AI seat creation has no faction selector and still defaults to `kriegsia`; current local prediction is disabled when the local player is `ekat`. |
 | `phase2_empty_fixture` | test-fixture-only | Catalog and loadout exist for explicit Rust/test fixture coverage. It is rejected by normal lobby, AI, replay, branch, dev scenario, self-play, match-history, and post-match paths unless the caller uses the `TestFixture` validation context or a direct lower-level sim test helper that deliberately owns the fixture. |
 | `plans/archive/faction/*` | historical-only | Archived phase plans, handoffs, and lifecycle matrices are not active faction policy and are not checker lifecycle inputs. |
 

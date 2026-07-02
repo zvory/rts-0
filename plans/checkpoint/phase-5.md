@@ -1,12 +1,12 @@
-# Phase 5 - Lab Scenario Checkpoint Adapter
+# Phase 5 - Lab Setup Checkpoint Adapter
 
 Status: Done.
 
 ## Scope
 
-Add side-by-side adapters between current lab scenarios and checkpoint-backed scenario containers.
-Current `LabScenarioV1` assets should be convertible into map data/binding plus `GameCheckpointV1`,
-and lab export should be able to emit checkpoint-backed scenario data behind a test/debug or
+Add side-by-side adapters between current lab setups and checkpoint-backed setup containers. Legacy
+setup assets should be convertible into map data/binding plus `GameCheckpointV1`, and lab export
+should be able to emit checkpoint-backed setup data behind a test/debug or
 explicit internal option.
 
 This phase is compatibility-first. Preserve current lab import/export UI behavior, id remap
@@ -16,39 +16,39 @@ while proving the checkpoint path restores the same lab world.
 Explicit non-goals:
 
 - No bundled lab catalog asset rewrite.
-- No removal of `LabScenarioV1` support.
+- No removal of legacy lab setup support.
 - No lab timeline action-stream migration.
-- No public file picker/upload feature beyond existing lab scenario import/export behavior.
-- No casual wire/protocol shape change. If the optional checkpoint-backed scenario export changes
+- No public file picker/upload feature beyond existing lab setup import/export behavior.
+- No casual wire/protocol shape change. If the optional checkpoint-backed setup export changes
   client-visible JSON, it must be treated as a protocol change and mirrored in docs/client/server
   protocol code in this same phase.
 
 ## Expected Touch Points
 
-- `server/crates/sim/src/game/lab.rs`: compile `LabScenarioV1` into checkpoint starts and optionally
-  export checkpoint-backed lab setup data.
-- `server/src/lab_scenarios.rs`: validate checkpoint-backed previews beside existing scenario
+- `server/crates/sim/src/game/lab.rs`: compile legacy lab setup data into checkpoint starts and
+  optionally export checkpoint-backed lab setup data.
+- `server/src/lab_scenarios.rs`: validate checkpoint-backed previews beside existing setup
   previews if needed.
 - `server/src/lobby/room_task/lab.rs` and lab submission helpers: read-only unless an internal
   option is needed to exercise the adapter.
 - `server/crates/protocol` and `client/src/lab_*`: avoid changes unless the phase explicitly adds a
-  compatibility metadata field or exposes checkpoint-backed scenario JSON; do not alter UI copy
+  compatibility metadata field or exposes checkpoint-backed setup JSON; do not alter UI copy
   casually.
 - `docs/design/protocol.md` and `docs/context/protocol.md`: update if any import/export scenario
   shape, metadata field, or validation response changes.
-- Tests covering scenario import/export parity, validation failures, id remap behavior, and
+- Tests covering setup import/export parity, validation failures, id remap behavior, and
   authoring/submission guardrails.
 
 ## Verification
 
-- For representative `LabScenarioV1` fixtures, direct scenario restore and checkpoint-adapter
+- For representative legacy setup fixtures, direct setup restore and checkpoint-adapter
   restore produce equivalent semantic state and snapshots.
 - Id remap responses remain correct for existing lab import callers.
-- The checkpoint-backed scenario container preserves the scenario's map binding and rejects restore
+- The checkpoint-backed setup container preserves the setup's map binding and rejects restore
   against the wrong map identity/hash.
-- Exported scenario metadata, authoring fields, selected lab vision, god mode, resources, research,
+- Exported setup metadata, authoring fields, selected lab vision, god mode, resources, research,
   and entity setup targets survive adapter round trips.
-- Invalid scenario files still fail closed with clear messages before constructing a live game.
+- Invalid setup files still fail closed with clear messages before constructing a live game.
 - If protocol-visible JSON changes, run protocol parity:
 
 ```bash

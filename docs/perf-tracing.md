@@ -235,19 +235,17 @@ Browser client performance harness:
 ```bash
 node scripts/client-perf-harness.mjs --list
 node scripts/client-perf-harness.mjs --render-lag-suite --seconds 10
-node scripts/client-perf-harness.mjs --workload matt-alex-replay --seconds 10
 node scripts/client-perf-harness.mjs --workload vehicle-wall-stress --seconds 10
 node scripts/client-perf-harness.mjs --workload selected-unit-hud-stress --seconds 10
-node scripts/client-perf-harness.mjs --workload fog-combat-replay-stress --seconds 10
 ```
 
 The browser harness starts a local server on an isolated port unless `RTS_URL` or `--base-url`
 points at an already-healthy server. It drives headless Chrome with the existing
-`tests/package.json` `puppeteer-core` dependency path, copies the preserved Matt/Alex replay into
-`server/target/selfplay-artifacts/client_perf_matt_alex_match_54/replay.json` at runtime, and writes
-one `summary.json` per workload under `target/client-perf/<workload>/<timestamp>/`. The
-`--render-lag-suite` path runs the Matt/Alex replay, the vehicle-wall stress scenario, a
-selected-unit HUD stress scenario, and a fog/combat-heavy Matt/Alex replay fast-forward, then writes a rollup at
+`tests/package.json` `puppeteer-core` dependency path and writes one `summary.json` per workload
+under `target/client-perf/<workload>/<timestamp>/`. The current checked-in workload set uses
+dev-scenario URLs only: `vehicle-wall-stress` and `selected-unit-hud-stress`. Preserved schema 2
+incident replays are analysis evidence only and are not replay-harness workloads. The
+`--render-lag-suite` path runs the current workload set, then writes a rollup at
 `target/client-perf/render-lag-comparison/<timestamp>/summary.json`. Each workload summary includes
 `renderBudget` advisory output for 60, 120, 240, and 480 FPS frame-work budgets, including
 per-budget margins and the next missed p95 budget. The same block includes `frameAttribution`,
@@ -317,16 +315,18 @@ trace to explain the missing time, then add a narrower phase label or fix the sc
 off-RAF, or uncaptured work it reveals.
 
 Keep evidence streams separate. Matt and Alex beta FPS/network reports are per-player browser
-observations from deployed matches; `matt-alex-replay` is a local replay of preserved match 54 data;
-`vehicle-wall-stress` and `selected-unit-hud-stress` are local no-fog dev scenarios. Do not average
-or merge those rows when deciding whether a branch improved render cost.
+observations from deployed matches, and their preserved replay JSON files are historical schema 2
+artifacts rejected by the current replay loader. `vehicle-wall-stress` and
+`selected-unit-hud-stress` are local no-fog dev scenarios. Capture a fresh schema 3 replay before
+using replay playback as a browser harness workload again; do not average or merge these evidence
+streams when deciding whether a branch improved render cost.
 
 Snapshot codec bake-off:
 
 ```bash
 node scripts/snapshot-codec-bakeoff.mjs --fixture
-node scripts/client-perf-harness.mjs --workload matt-alex-replay --seconds 6 --snapshot-codec-bakeoff
 node scripts/client-perf-harness.mjs --workload vehicle-wall-stress --seconds 6 --snapshot-codec-bakeoff
+node scripts/client-perf-harness.mjs --workload selected-unit-hud-stress --seconds 6 --snapshot-codec-bakeoff
 ```
 
 The standalone bake-off reads local compact snapshot frames from JSON/JSONL or deterministic
@@ -344,8 +344,8 @@ verified WebSocket extension wire bytes.
 Snapshot transport diagnostics:
 
 ```bash
-node scripts/client-perf-harness.mjs --workload matt-alex-replay --seconds 6 --snapshot-codec-bakeoff
 node scripts/client-perf-harness.mjs --workload vehicle-wall-stress --seconds 6 --snapshot-codec-bakeoff
+node scripts/client-perf-harness.mjs --workload selected-unit-hud-stress --seconds 6 --snapshot-codec-bakeoff
 scripts/ai-perf-harness.sh --ticks 5000 --perf full --no-log-snapshots
 scripts/fly-logs.sh beta recent | rg 'client_net_report|websocket_compression|snapshot_byte_source|snapshot_codec|writer_send'
 ```

@@ -55,8 +55,8 @@ replayed into the same lab state.
 ## Out Of Scope
 
 - No UI changes.
-- No deletion of `LabScenarioV1`.
-- No deletion of replay schema 2 loading.
+- No deletion of legacy lab setup loading in this phase; that cleanup belonged to Phase 4.
+- No deletion of replay schema 2 loading in this phase; that cleanup belonged to Phase 4.
 - No checkpoint keyframe replacement.
 
 ## Verification

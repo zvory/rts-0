@@ -55,7 +55,8 @@ Completed verification on 2026-06-19:
 - `git diff --check` passed.
 - `node scripts/client-perf-harness.mjs --render-lag-suite --seconds 10` passed.
   Artifacts:
-  - `target/client-perf/matt-alex-replay/2026-06-19T23-57-48-442Z`
+  - historical output from the retired schema 2 replay workload at
+    `target/client-perf/<retired-replay-workload>/2026-06-19T23-57-48-442Z`
   - `target/client-perf/vehicle-wall-stress/2026-06-19T23-58-00-084Z`
   - `target/client-perf/selected-unit-hud-stress/2026-06-19T23-58-11-324Z`
   - `target/client-perf/render-lag-comparison/2026-06-19T23-58-22-564Z/summary.json`

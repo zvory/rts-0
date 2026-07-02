@@ -69,7 +69,7 @@ const FIXTURES = Object.freeze({
       "docs",
       "network-incident-examples",
       "2026-06-30-beta-soupman-alex-lag",
-      "match-103-replay.json",
+      "match-103-replay.schema2-unsupported.json",
     ),
     dbSummary: path.join(
       REPO_ROOT,

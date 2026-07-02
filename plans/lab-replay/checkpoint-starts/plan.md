@@ -26,7 +26,7 @@ rule changes.
 
 Make blank labs, catalog labs, and imported lab setups produce or consume the same checkpoint type.
 "Lab Scenario" may remain player-facing UI/catalog copy, but the persisted setup payload should be
-checkpoint-backed rather than a separate `LabScenarioV1` contract. Lab baseline resets should store
+checkpoint-backed rather than a separate legacy setup contract. Lab baseline resets should store
 a new baseline checkpoint plus a fresh current-branch action log.
 
 ### [Phase 3 - Game Construction From Checkpoint](phase-3.md)
