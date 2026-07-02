@@ -997,9 +997,9 @@ impl RoomTask {
         let op_kind = lab_op_kind(&op).to_string();
         let rebase_source = match &op {
             LabClientOp::ImportScenario { scenario } => match scenario.as_ref() {
-                LabScenarioPayload::Checkpoint(scenario) => {
-                    Some(LabReplayRebaseSource::Checkpoint(scenario.clone()))
-                }
+                LabScenarioPayload::Checkpoint(scenario) => Some(
+                    LabReplayRebaseSource::Checkpoint(Box::new(scenario.clone())),
+                ),
                 LabScenarioPayload::Legacy(scenario) => Some(LabReplayRebaseSource::Legacy {
                     name: scenario.name.clone(),
                     kind: scenario.kind.clone(),

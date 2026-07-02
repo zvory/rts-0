@@ -28,7 +28,7 @@ use crate::protocol::{
 };
 
 pub(super) enum LabReplayRebaseSource {
-    Checkpoint(LabCheckpointScenarioV1),
+    Checkpoint(Box<LabCheckpointScenarioV1>),
     Legacy {
         name: String,
         kind: String,
@@ -331,7 +331,7 @@ impl RoomTask {
         outcome: &LabOpOutcome,
     ) -> Result<LabCheckpointScenarioV1, String> {
         match source {
-            LabReplayRebaseSource::Checkpoint(scenario) => Ok(scenario),
+            LabReplayRebaseSource::Checkpoint(scenario) => Ok(*scenario),
             LabReplayRebaseSource::Legacy {
                 name,
                 kind,
