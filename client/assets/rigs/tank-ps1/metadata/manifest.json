@@ -1,6 +1,6 @@
 {
   "pipelineVersion": 1,
-  "generatedAt": "2026-07-02T21:35:13.495Z",
+  "generatedAt": "2026-07-02T21:42:16.306Z",
   "sourceSvgModule": "client/src/renderer/rigs/tank_svg.js",
   "sourceSvgRuntimeKind": "tank",
   "promptFile": "client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-06-lowpoly.md",
@@ -15,6 +15,6 @@
   "atlasModule": "client/src/renderer/rigs/tank_png_atlas.js",
   "prompt": "client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-06-lowpoly.md",
   "model": "built-in image generation + ImageMagick brightness pass",
-  "notes": "Experimental Tiger I low-poly raster pass 06 brightness pass. The atlas writer blanks reference/track cells, clears generated cell-edge alpha, normalizes hull/body plus turret/barrel frames to visible alpha bounds, and applies brightness 130/saturation 105 without another image generation pass.",
+  "notes": "Experimental Tiger I low-poly raster pass 06 brighter pass. The atlas writer blanks reference/track cells, clears generated cell-edge alpha, normalizes hull/body plus turret/barrel frames to visible alpha bounds, and applies brightness 145/saturation 108 without another image generation pass.",
   "enabled": true
 }

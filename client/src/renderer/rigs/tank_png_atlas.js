@@ -11,7 +11,7 @@ function deepFreeze(value) {
 export const TANK_PNG_RIG_ATLAS = deepFreeze({
   "enabled": true,
   "unit": "tank",
-  "image": "/assets/rigs/tank-ps1/tank-atlas.png?v=pass06-bright",
+  "image": "/assets/rigs/tank-ps1/tank-atlas.png?v=pass06-brighter",
   "viewBox": {
     "x": -40,
     "y": -32,
@@ -71,10 +71,10 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
         "sprite.track"
       ]
     },
-    "imageVersion": "pass06-bright",
+    "imageVersion": "pass06-brighter",
     "colorAdjustment": {
-      "brightness": 130,
-      "saturation": 105,
+      "brightness": 145,
+      "saturation": 108,
       "hue": 100
     }
   },
