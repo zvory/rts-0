@@ -11,6 +11,7 @@ runFrameProfilerContracts();
 await import("./client_contracts/frame_entity_contracts.mjs");
 await import("./client_contracts/launch_url_contracts.mjs");
 await import("./client_contracts/renderer_contracts.mjs");
+await import("./client_contracts/visual_experiment_contracts.mjs");
 await import("./client_contracts/ground_decal_contracts.mjs");
 await import("./client_contracts/ground_decal_asset_contracts.mjs");
 await import("./client_contracts/ground_decal_stress_contracts.mjs");

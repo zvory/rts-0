@@ -73,6 +73,7 @@ function runMatchFrame(match, now) {
         clientIntent: match.clientIntent,
         frameViews,
         profiler: match.frameProfiler,
+        visualSamples: match.visualProfile?.staticSamples || null,
       });
     });
     time("match.hud", () => match.hud.update(frameViews, { profiler: match.frameProfiler }));

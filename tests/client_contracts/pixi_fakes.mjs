@@ -1,6 +1,6 @@
 class FakeGraphics {
   constructor() {
-    this.position = { set() {} };
+    this.position = { set: (x = 0, y = 0) => { this.x = x; this.y = y; } };
   }
   clear() {}
   lineStyle() {}

@@ -3,13 +3,61 @@ const VISUAL_PROFILE_ERROR_MESSAGES = Object.freeze({
   unknown: "Unknown visualProfile.",
 });
 
+const TRENCH_VARIANTS_1_STATIC_SAMPLES = Object.freeze([
+  Object.freeze({
+    id: "trench-a-basin",
+    kind: "trench",
+    label: "A Basin",
+    x: 760,
+    y: 640,
+    radiusTiles: 0.375,
+    variant: "basin",
+  }),
+  Object.freeze({
+    id: "trench-b-wide-shadow",
+    kind: "trench",
+    label: "B Wide",
+    x: 850,
+    y: 640,
+    radiusTiles: 0.375,
+    variant: "wide_shadow",
+  }),
+  Object.freeze({
+    id: "trench-c-hard-rim",
+    kind: "trench",
+    label: "C Rim",
+    x: 940,
+    y: 640,
+    radiusTiles: 0.375,
+    variant: "hard_rim",
+  }),
+  Object.freeze({
+    id: "trench-d-broken-earth",
+    kind: "trench",
+    label: "D Broken",
+    x: 1030,
+    y: 640,
+    radiusTiles: 0.375,
+    variant: "broken_earth",
+  }),
+  Object.freeze({
+    id: "trench-e-compact-dark",
+    kind: "trench",
+    label: "E Compact",
+    x: 1120,
+    y: 640,
+    radiusTiles: 0.375,
+    variant: "compact_dark",
+  }),
+]);
+
 const VISUAL_PROFILE_ENTRIES = Object.freeze([
   Object.freeze({
     id: "trench-variants-1",
     label: "Trench variants 1",
     description: "Initial checked-in profile for local entrenchment visual candidates.",
     initialCamera: Object.freeze({ x: 960, y: 640, zoom: 0.9 }),
-    staticSamples: Object.freeze([]),
+    staticSamples: TRENCH_VARIANTS_1_STATIC_SAMPLES,
   }),
 ]);
 
