@@ -1,9 +1,28 @@
 # Scout Plane Requirements
 
-Status: Draft product requirements. This document records the approved Phase 0 unit brief and
-Phase 1 rules/balance specification for the Scout Plane feature. It is not an implementation plan
-and does not authorize Rust, JavaScript, protocol, balance, art, test, or scenario changes by
-itself.
+Status: Implemented for normal-match review. This document records the approved Phase 0 unit brief
+and Phase 1 rules/balance specification for the Scout Plane feature, plus the final Phase 8 audit
+notes. It is the factual behavior contract and review checklist, not a standalone implementation
+plan.
+
+## Phase 8 Implementation Audit
+
+- Implemented: Kriegsia City Centre production unlocked by completed Gun Works or Vehicle Works;
+  50 Steel / 50 Oil cost; 600-tick build time; 0 Supply; one active or in-production Scout Plane
+  per player; active-plane select-and-pan behavior; normal production cancellation/interruption.
+- Implemented: launch from the City Centre to the first rally point or building position, direct
+  aerial movement, 4-tile orbiting, immediate and queued orbit retargeting, selection/control group
+  support, manual dismiss, and automatic dismissal after fuel exhaustion.
+- Implemented: 1 Oil per 20 ticks upkeep with an 8 Oil reserve, refill on renewed income, 12-tile
+  owner/team aerial vision through terrain and building blockers, smoke-blocked aerial sight,
+  fog-safe enemy/spectator/replay/lab projection, non-combat targeting filters, no ground
+  collision reservation, and checkpoint/replay state.
+- Implemented: City Centre command-card button, `Z` grid hotkey, `S` RTS-classic hotkey,
+  selected-plane move/dismiss card, mixed-selection command routing, lab spawn/review path, rough
+  client-native FW 189-inspired rendering, and minimap aircraft blip.
+- Intentionally deferred: dedicated audio, final commissioned aircraft art/icon polish, AI
+  production/management, balance tuning beyond the approved numbers, and all non-goal aircraft
+  combat or anti-air systems.
 
 ## Purpose
 
@@ -23,8 +42,8 @@ costs ongoing oil attention, and is limited to one active or in-production plane
   committing a ground scout through blockers.
 - Counterplay: deny or smoke the scouted area, pressure oil income, or exploit the player's spent
   resources. The plane itself is not attackable.
-- Initial availability: normal playable feature after user review and explicit implementation
-  authorization.
+- Current availability: normal playable feature through Kriegsia City Centre production after Gun
+  Works or Vehicle Works.
 - Unusual interactions:
   - Selectable and commandable despite being non-combat and non-colliding.
   - Produced like a normal City Centre unit, but flies directly to an aerial orbit instead of using
@@ -137,8 +156,8 @@ costs ongoing oil attention, and is limited to one active or in-production plane
   - Cancel/Dismiss.
 - Plane should not expose Attack, Hold Position, Stop, train, build, harvest, repair, setup, rally,
   or autocast commands unless a later requirement changes this.
-- Exact icon art and tooltip copy are deferred to implementation, but the button should use the
-  specified hotkeys and command-card slot.
+- Final icon/art polish is deferred, but the current button uses the specified hotkeys and
+  command-card slot.
 
 ## Visual And Audio Direction
 
@@ -148,23 +167,22 @@ costs ongoing oil attention, and is limited to one active or in-production plane
   documented if final art is deferred.
 - The plane should have a lightweight flying animation or directional motion treatment.
 - The orbit should read as aerial circling, not ground driving.
-- A playtest-note TODO exists to download an FW 189 Scout Plane sound effect.
-- Audio is deferred unless an implementation phase explicitly includes it.
+- Dedicated Scout Plane audio is deferred; the first implementation does not add launch, orbit, or
+  dismiss sounds.
 
-## Contract Notes For Later Phases
+## Contract Notes
 
 - Scout Plane is a produced City Centre unit, not a targeted ability.
-- The active plane should be modeled as a selectable world entity with special non-targetable,
-  non-colliding aerial movement and upkeep rules. The final implementation choice must preserve
-  selection, move commands, fog stamping, enemy projection, replay/checkpoint behavior, and
-  dismissal.
-- Protocol and client command-card work must account for the one-active-or-in-production limit and
-  the City Centre button behavior that selects/pans to an existing active plane.
-- Fog changes must update the authoritative fog/projection design if Scout Plane vision introduces
-  a new "aerial sight through blockers but not smoke" category.
-- Protocol changes must update Rust DTOs, JavaScript mirrors, compact codes if used, and
+- The active plane is modeled as a selectable world entity with special non-targetable,
+  non-colliding aerial movement and upkeep rules. Selection, move commands, fog stamping, enemy
+  projection, replay/checkpoint behavior, and dismissal are part of the contract.
+- Protocol and client command-card contracts include the one-active-or-in-production limit and the
+  City Centre button behavior that selects/pans to an existing active plane.
+- Fog/projection docs cover the Scout Plane's "aerial sight through blockers but not smoke"
+  category.
+- Future protocol changes must update Rust DTOs, JavaScript mirrors, compact codes if used, and
   `docs/design/protocol.md` together.
-- Client-visible balance/config values must be mirrored through the existing Rust rules and client
+- Client-visible balance/config values must stay mirrored through the existing Rust rules and client
   config parity surfaces.
 
 ## Testing Expectations
@@ -194,7 +212,17 @@ Focused implementation verification should cover:
 - Manual dismiss removes the plane and stops upkeep.
 - Replay/checkpoint/lab/spectator projection remains fog-safe.
 
-## Patch Notes Draft
+## Review Route
+
+- Normal match: build Gun Works or Vehicle Works, train one Scout Plane from a City Centre, confirm
+  the second City Centre button selects/pans to the active plane or stays blocked while production
+  is queued, retarget the orbit with move commands, queue a later retarget, spend/deny Oil to watch
+  upkeep and fuel dismissal, and manually dismiss the plane.
+- Lab inspection: open `/lab?room=scout-plane-review&map=Default`, spawn a Kriegsia Scout Plane
+  from the Lab panel, then inspect selection, control groups, move/queued retargeting, dismissal,
+  minimap blip, fog/projection modes, and teardown across rematch/reset.
+
+## Patch Notes
 
 - Added a City Centre Scout Plane unlocked by either Gun Works or Vehicle Works.
 - Scout Plane costs 50 Steel / 50 Oil, takes 20 seconds to build, consumes one Pump Jack worth of
@@ -202,6 +230,8 @@ Focused implementation verification should cover:
 - Scout Plane automatically launches from the City Centre to its rally point, then provides 12-tile
   aerial vision while orbiting, ignoring terrain and building blockers but not smoke.
 - Scout Plane can be selected, retargeted, and dismissed, but cannot fight or be attacked.
+- Rough client-native aircraft art is in place for readability; dedicated audio and final art polish
+  remain deferred.
 
 ## Non-Goals
 

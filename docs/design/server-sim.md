@@ -1038,15 +1038,15 @@ into tick-system helpers are named one by one in the role allowlist; there is no
 adapter exception. New command/order service edges therefore need both an exact import allowlist
 entry and a role-matrix justification.
 
-`services::scout_plane` is a mutation helper for the hidden aerial unit. Production calls it when a
-City Centre completes a Scout Plane so the unit launches from the building position toward the first
-rally point; command admission calls it to translate immediate and queued move clicks into orbit
-retargets and hidden dismiss commands into safe removals; movement calls it before ground pathing so
-planes fly directly and do not reserve or block occupancy; the tick orchestrator calls it after
-economy/production so Pump Jack income can pay or refill the plane's 1 Oil per 20 ticks upkeep
-before zero-fuel automatic dismissal. Live fog recompute stamps Scout Plane sight as team aerial
-vision that ignores terrain and building line-of-sight blockers while still using active smoke
-clouds as blockers.
+`services::scout_plane` is a mutation helper for the Scout Plane aerial unit. Production calls it
+when a City Centre completes a Scout Plane so the unit launches from the building position toward
+the first rally point; command admission calls it to translate immediate and queued move clicks into
+orbit retargets and runtime dismiss commands into safe removals; movement calls it before ground
+pathing so planes fly directly and do not reserve or block occupancy; the tick orchestrator calls it
+after economy/production so Pump Jack income can pay or refill the plane's 1 Oil per 20 ticks
+upkeep before zero-fuel automatic dismissal. Live fog recompute stamps Scout Plane sight as team
+aerial vision that ignores terrain and building line-of-sight blockers while still using active
+smoke clouds as blockers.
 
 `game::systems::run_tick` owns the tick pipeline and the lifecycle of tick-scoped derived state.
 It rebuilds named phase state at explicit boundaries: pre-command state for command validation,
