@@ -37,6 +37,7 @@ import {
   _drawPanzerfaustShots,
 } from "../../client/src/renderer/panzerfaust_feedback.js";
 import { _drawSelectedUnitRanges } from "../../client/src/renderer/unit_ranges.js";
+import { muzzleFeedbackStyle } from "../../client/src/renderer/weapon_feedback_style.js";
 
 import { RecordingGraphics } from "./pixi_fakes.mjs";
 
@@ -53,6 +54,29 @@ function polygonCenter(points) {
 
 function nearPoint(call, point, epsilon = 0.001) {
   return Math.abs(call[1] - point.x) <= epsilon && Math.abs(call[2] - point.y) <= epsilon;
+}
+
+{
+  const rifle = muzzleFeedbackStyle(KIND.RIFLEMAN, WEAPON_KIND.RIFLEMAN_RIFLE);
+  assertApprox(rifle.tracerWidth, 0.45, 0.0001, "rifleman tracer width is 30% of the old infantry line");
+  assertApprox(rifle.tailWidth, 0.3, 0.0001, "rifleman tracer tail width is 30% of the old infantry tail");
+
+  const mg = muzzleFeedbackStyle(KIND.MACHINE_GUNNER, WEAPON_KIND.MACHINE_GUNNER_MG);
+  assertApprox(mg.tracerWidth, 0.75, 0.0001, "machine gunner tracer width is 50% of the old infantry line");
+  assertApprox(mg.tailWidth, 0.5, 0.0001, "machine gunner tracer tail width is 50% of the old infantry tail");
+
+  const scoutCar = muzzleFeedbackStyle(KIND.SCOUT_CAR, WEAPON_KIND.SCOUT_CAR_MG);
+  assertApprox(scoutCar.tracerWidth, 0.75, 0.0001, "scout car MG tracer width matches machine gun tracers");
+  assertApprox(scoutCar.tailWidth, 0.5, 0.0001, "scout car MG tracer tail width matches machine gun tracers");
+
+  const coax = muzzleFeedbackStyle(KIND.MACHINE_GUNNER, WEAPON_KIND.TANK_COAX);
+  assertApprox(coax.tracerWidth, 0.9, 0.0001, "tank coax tracer width is 50% of the old coax line");
+  assertApprox(coax.tracerCoreWidth, 0.375, 0.0001, "tank coax tracer core width is 50% of the old coax core");
+  assertApprox(coax.tailWidth, 0.45, 0.0001, "tank coax tracer tail width is 50% of the old coax tail");
+
+  const antiTankGun = muzzleFeedbackStyle(KIND.ANTI_TANK_GUN, WEAPON_KIND.ANTI_TANK_GUN);
+  assertApprox(antiTankGun.tracerWidth, 2.5, 0.0001, "anti-tank gun tracer width is unchanged");
+  assertApprox(antiTankGun.tailWidth, 1.4, 0.0001, "anti-tank gun tracer tail width is unchanged");
 }
 
 {
@@ -628,12 +652,20 @@ function nearPoint(call, point, epsilon = 0.001) {
     "tank coax tracer starts at the coax muzzle anchor",
   );
   assert(
-    feedbackGfx.calls.some((call) => call[0] === "lineStyle" && call[1] === 1.8 && call[2] === 0xfff0a6),
-    "tank coax tracer uses a bright MG tracer line",
+    feedbackGfx.calls.some((call) => (
+      call[0] === "lineStyle" &&
+      Math.abs(call[1] - 0.9) <= 0.0001 &&
+      call[2] === 0xfff0a6
+    )),
+    "tank coax tracer uses a thinner bright MG tracer line",
   );
   assert(
-    feedbackGfx.calls.some((call) => call[0] === "lineStyle" && call[1] === 0.75 && call[2] === 0xffffff),
-    "tank coax tracer includes a hot core line for readability",
+    feedbackGfx.calls.some((call) => (
+      call[0] === "lineStyle" &&
+      Math.abs(call[1] - 0.375) <= 0.0001 &&
+      call[2] === 0xffffff
+    )),
+    "tank coax tracer includes a thinner hot core line for readability",
   );
 }
 
