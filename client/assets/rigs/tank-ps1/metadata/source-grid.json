@@ -1,6 +1,6 @@
 {
   "unit": "tank",
-  "columns": 3,
+  "columns": 2,
   "rows": 2,
   "scale": 3,
   "key": "#ff00ff",
@@ -14,11 +14,9 @@
   },
   "cells": [
     "reference.full",
-    "sprite.track.left",
-    "sprite.track.right",
+    "sprite.track",
     "sprite.hull",
-    "sprite.turret",
-    "sprite.fuelCue"
+    "sprite.turret"
   ],
   "partIds": [
     "part.shadow",
@@ -55,42 +53,39 @@
     "part.fuelCue.x2"
   ],
   "frameSources": {
-    "part.shadow": "part.shadow",
-    "part.track.left": "part.track.left",
-    "part.track.right": "part.track.right",
-    "part.tread.left.0": "part.tread.left.0",
-    "part.tread.left.1": "part.tread.left.1",
-    "part.tread.left.2": "part.tread.left.2",
-    "part.tread.left.3": "part.tread.left.3",
-    "part.tread.left.4": "part.tread.left.4",
-    "part.tread.left.5": "part.tread.left.5",
-    "part.tread.left.6": "part.tread.left.6",
-    "part.tread.left.7": "part.tread.left.7",
-    "part.tread.left.8": "part.tread.left.8",
-    "part.tread.right.0": "part.tread.right.0",
-    "part.tread.right.1": "part.tread.right.1",
-    "part.tread.right.2": "part.tread.right.2",
-    "part.tread.right.3": "part.tread.right.3",
-    "part.tread.right.4": "part.tread.right.4",
-    "part.tread.right.5": "part.tread.right.5",
-    "part.tread.right.6": "part.tread.right.6",
-    "part.tread.right.7": "part.tread.right.7",
-    "part.tread.right.8": "part.tread.right.8",
-    "part.hull": "part.hull",
-    "part.hull.shadow": "part.hull.shadow",
-    "part.hull.nose": "part.hull.nose",
-    "part.hull.noseShadow": "part.hull.noseShadow",
-    "part.barrel": "part.barrel",
-    "part.coaxBarrel": "part.coaxBarrel",
-    "part.turret": "part.turret",
-    "part.noseTick": "part.noseTick",
-    "part.fuelCue.box": "part.fuelCue.box",
-    "part.fuelCue.x1": "part.fuelCue.x1",
-    "part.fuelCue.x2": "part.fuelCue.x2"
+    "part.track.left": "sprite.track",
+    "part.tread.left.0": "sprite.track",
+    "part.tread.left.1": "sprite.track",
+    "part.tread.left.2": "sprite.track",
+    "part.tread.left.3": "sprite.track",
+    "part.tread.left.4": "sprite.track",
+    "part.tread.left.5": "sprite.track",
+    "part.tread.left.6": "sprite.track",
+    "part.tread.left.7": "sprite.track",
+    "part.tread.left.8": "sprite.track",
+    "part.track.right": "sprite.track",
+    "part.tread.right.0": "sprite.track",
+    "part.tread.right.1": "sprite.track",
+    "part.tread.right.2": "sprite.track",
+    "part.tread.right.3": "sprite.track",
+    "part.tread.right.4": "sprite.track",
+    "part.tread.right.5": "sprite.track",
+    "part.tread.right.6": "sprite.track",
+    "part.tread.right.7": "sprite.track",
+    "part.tread.right.8": "sprite.track",
+    "part.hull": "sprite.hull",
+    "part.hull.shadow": "sprite.hull",
+    "part.hull.nose": "sprite.hull",
+    "part.hull.noseShadow": "sprite.hull",
+    "part.noseTick": "sprite.hull",
+    "part.barrel": "sprite.turret",
+    "part.coaxBarrel": "sprite.turret",
+    "part.turret": "sprite.turret"
   },
   "semanticSprites": [
     {
       "id": "sprite.track.left",
+      "sourceCell": "sprite.track",
       "animationPart": "part.track.left",
       "sourceParts": [
         "part.track.left",
@@ -109,6 +104,7 @@
     },
     {
       "id": "sprite.track.right",
+      "sourceCell": "sprite.track",
       "animationPart": "part.track.right",
       "sourceParts": [
         "part.track.right",
@@ -148,19 +144,65 @@
       ],
       "tintSlot": "team-light",
       "drawOrder": 30
-    },
-    {
-      "id": "sprite.fuelCue",
-      "animationPart": "part.fuelCue.box",
-      "sourceParts": [
-        "part.fuelCue.box",
-        "part.fuelCue.x1",
-        "part.fuelCue.x2"
-      ],
-      "tintSlot": "fixed",
-      "drawOrder": 40
     }
   ],
+  "semanticSheetElements": [
+    {
+      "id": "sprite.track",
+      "sourceParts": [
+        "part.track.left",
+        "part.tread.left.0",
+        "part.tread.left.1",
+        "part.tread.left.2",
+        "part.tread.left.3",
+        "part.tread.left.4",
+        "part.tread.left.5",
+        "part.tread.left.6",
+        "part.tread.left.7",
+        "part.tread.left.8"
+      ],
+      "renderParts": [
+        "part.tread.left.0",
+        "part.tread.left.1",
+        "part.tread.left.2",
+        "part.tread.left.3",
+        "part.tread.left.4",
+        "part.tread.left.5",
+        "part.tread.left.6",
+        "part.tread.left.7",
+        "part.tread.left.8"
+      ],
+      "description": "single reusable track-link strip; no closed track assembly or end contour"
+    },
+    {
+      "id": "sprite.hull",
+      "sourceParts": [
+        "part.hull",
+        "part.hull.shadow",
+        "part.hull.nose",
+        "part.hull.noseShadow",
+        "part.noseTick"
+      ],
+      "description": "hull assembly"
+    },
+    {
+      "id": "sprite.turret",
+      "sourceParts": [
+        "part.barrel",
+        "part.coaxBarrel",
+        "part.turret"
+      ],
+      "description": "turret and barrel assembly"
+    }
+  ],
+  "guides": {
+    "outerCellBox": true,
+    "subdivisions": 8,
+    "centerLines": true,
+    "borderColor": "#00e5ff",
+    "minorColor": "#80f6ff",
+    "centerColor": "#fff4a3"
+  },
   "sourceSvg": "client/assets/rigs/tank-ps1/tank-contact-sheet.svg",
   "sourcePng": "client/assets/rigs/tank-ps1/tank-contact-sheet.png"
 }

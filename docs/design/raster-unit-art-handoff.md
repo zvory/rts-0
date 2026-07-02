@@ -39,16 +39,22 @@ remain inactive until a later pass fixes those problems.
 - `client/src/renderer/rigs/png_runtime.js` and `png_routing.js` are the disabled runtime path that
   can render atlas sprites in place of SVG pixels when an atlas is enabled and loaded.
 
-## Current semantic sheet
+## Current guided semantic sheet
 
-The current tank sheet uses a 3x2 grid:
+The current tank sheet uses a 2x2 grid. Every cell has an outer guide box, an 8x8 internal guide
+grid, and center marks to give imagegen stronger alignment and scale cues:
 
 1. `reference.full` - assembled tank reference, with the SVG drop shadow and fuel cue removed.
-2. `sprite.track.left` - left track assembly, including all left tread blocks.
-3. `sprite.track.right` - right track assembly, including all right tread blocks.
-4. `sprite.hull` - hull, nose, hull shading parts, and nose tick.
-5. `sprite.turret` - turret, main barrel, and coax barrel.
-6. `sprite.fuelCue` - the fuel warning cue.
+2. `sprite.track` - one reusable straight track-link strip, rendered from the left tread blocks only
+   so the model does not draw a closed track assembly or an end contour.
+3. `sprite.hull` - hull, nose, hull shading parts, and nose tick.
+4. `sprite.turret` - turret, main barrel, and coax barrel.
+
+The runtime atlas metadata still exposes `sprite.track.left` and `sprite.track.right`, but both
+sprites point at the same `sprite.track` source cell with different rig origins. This keeps the
+contact sheet to one track art element while preserving left/right tank placement when the disabled
+PNG path is tested locally. The fuel/no-oil cue is intentionally omitted from the PNG atlas and
+remains SVG-only through a separate overlay route.
 
 The SVG is annotated with stable `part.*` ids, but those ids are not enough for image generation.
 Many individual SVG parts are rectangles, lines, or tiny treads with no independent semantic
@@ -71,7 +77,7 @@ Generate the semantic source sheet:
 ```bash
 node scripts/art/tank-raster-pipeline.mjs make-sheet \
   --scale 3 \
-  --columns 3 \
+  --columns 2 \
   --layout tight \
   --profile semantic
 ```
@@ -90,30 +96,34 @@ detail than concept art.
 Save each generated candidate with a pass number, for example:
 
 ```text
-client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-05.png
-client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-05.md
-client/assets/rigs/tank-ps1/metadata/tiger-i-pass-05.json
+client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-06.png
+client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-06.md
+client/assets/rigs/tank-ps1/metadata/tiger-i-pass-06.json
 ```
 
 Convert the chroma-key background to alpha before atlas wiring:
 
 ```bash
 python "${CODEX_HOME:-$HOME/.codex}/skills/.system/imagegen/scripts/remove_chroma_key.py" \
-  --input client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-05.png \
-  --out client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-05-alpha.png \
-  --auto-key border \
+  --input client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-06.png \
+  --out client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-06-alpha.png \
+  --key-color '#ff00ff' \
+  --auto-key none \
   --soft-matte \
   --transparent-threshold 12 \
   --opaque-threshold 220 \
   --despill
 ```
 
+Use an explicit `#ff00ff` key while the guide boxes touch the sheet border. Border auto-key can
+sample the cyan guide line instead of the background.
+
 Write atlas metadata disabled while evaluating:
 
 ```bash
 node scripts/art/tank-raster-pipeline.mjs write-atlas \
-  --sheet client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-05-alpha.png \
-  --columns 3 \
+  --sheet client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-06-alpha.png \
+  --columns 2 \
   --layout tight \
   --profile semantic \
   --disabled \
@@ -141,6 +151,10 @@ scratches, bolts, and independent redesigns. The better direction is:
 - no shadows of any kind
 - no labels, text, insignia, loose parts, or extra cells
 - preserve grid, cell order, centers, scale, and orientation
+- preserve the guide boxes as alignment only; do not turn guide lines into armor seams or track
+  detail
+- the track cell is one reusable strip/segment of track links, not left and right full track
+  assemblies
 
 The prompt must say that the complete tank cell is a reference only. Runtime truth should come from
 the component cells. A generated complete tank that does not match the generated components should
@@ -185,21 +199,28 @@ cheap checks before any generated atlas can be enabled.
 - `tank-tiger-i-pass-03.png`: smoother raster graphics direction, but too realistic and too busy.
 - `tank-tiger-i-pass-04.png`: closer to the desired simple early-3D raster style, but not slice-ready
   because orientation/scale and component-to-reference consistency drifted.
+- `tank-tiger-i-pass-05-guided.png`: preserved the guided 2x2 sheet, removed the fuel/no-oil cue,
+  and generated one reusable track-link strip. Rejected for activation because it retained guide
+  lines in the alpha output and was still more detailed than the intended low-end raster style.
 
 These candidates are useful references for what to avoid. None should be treated as accepted art.
 
 ## Validation checklist before activation
 
-- The output keeps the exact 3x2 grid and cell order.
+- The output keeps the exact 2x2 grid and cell order.
 - Every cell has transparent or perfectly keyable background.
 - There is no drop shadow, cast shadow, contact shadow, ambient blob, floor, or ground plane.
 - The tank is strict top-down, not perspective or side-biased.
-- No invented loose gears, sprockets, road wheels, extra turrets, extra barrels, labels, or UI.
+- No invented loose gears, sprockets, road wheels, extra turrets, extra barrels, labels, fuel icons,
+  warning symbols, or UI.
+- The single track cell is a reusable track-link strip with no closed end cap or perimeter contour.
 - The component cells preserve source orientation, center, approximate footprint, and pivot meaning.
 - The component cells can be assembled into the complete tank reference.
 - The complete tank reference did not diverge into its own independent design.
 - The detail level is simple low-end raster art, not pixel art and not detailed concept art.
 - Team-colorable regions remain clean enough for runtime tinting or a future mask/chroma pass.
+- Guide lines are absent from any alpha sheet wired into `tank-atlas.png`, or removed before
+  activation without cutting through the component art.
 - The generated atlas is inspected on a dark background after alpha conversion to catch fringes.
 
 ## Next work
@@ -209,6 +230,8 @@ These candidates are useful references for what to avoid. None should be treated
   non-authoritative so the model cannot redesign it independently.
 - Add a preview that reconstructs the tank from sliced component cells and compares it against the
   reference cell.
+- Add a guide-removal/deguide step or make the guides model-visible without preserving them in the
+  generated atlas.
 - Add alignment normalization for generated components: rotation, scale, center, and alpha bounds.
 - Decide the team-color strategy. The runtime can tint atlas sprites by existing tint slots, but a
   final art pass may still need neutral grayscale masks or explicit chroma-key regions per part.

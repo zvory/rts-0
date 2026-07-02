@@ -19,60 +19,55 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
     "height": 64
   },
   "grid": {
-    "columns": 3,
+    "columns": 2,
     "rows": 2,
     "layout": "tight",
     "profile": "semantic",
-    "width": 720,
+    "width": 480,
     "height": 384,
     "sourceSheet": "client/assets/rigs/tank-ps1/tank-contact-sheet.png",
     "cells": [
       "reference.full",
-      "sprite.track.left",
-      "sprite.track.right",
+      "sprite.track",
       "sprite.hull",
-      "sprite.turret",
-      "sprite.fuelCue"
+      "sprite.turret"
     ],
     "frameSources": {
-      "part.shadow": "part.shadow",
-      "part.track.left": "part.track.left",
-      "part.track.right": "part.track.right",
-      "part.tread.left.0": "part.tread.left.0",
-      "part.tread.left.1": "part.tread.left.1",
-      "part.tread.left.2": "part.tread.left.2",
-      "part.tread.left.3": "part.tread.left.3",
-      "part.tread.left.4": "part.tread.left.4",
-      "part.tread.left.5": "part.tread.left.5",
-      "part.tread.left.6": "part.tread.left.6",
-      "part.tread.left.7": "part.tread.left.7",
-      "part.tread.left.8": "part.tread.left.8",
-      "part.tread.right.0": "part.tread.right.0",
-      "part.tread.right.1": "part.tread.right.1",
-      "part.tread.right.2": "part.tread.right.2",
-      "part.tread.right.3": "part.tread.right.3",
-      "part.tread.right.4": "part.tread.right.4",
-      "part.tread.right.5": "part.tread.right.5",
-      "part.tread.right.6": "part.tread.right.6",
-      "part.tread.right.7": "part.tread.right.7",
-      "part.tread.right.8": "part.tread.right.8",
-      "part.hull": "part.hull",
-      "part.hull.shadow": "part.hull.shadow",
-      "part.hull.nose": "part.hull.nose",
-      "part.hull.noseShadow": "part.hull.noseShadow",
-      "part.barrel": "part.barrel",
-      "part.coaxBarrel": "part.coaxBarrel",
-      "part.turret": "part.turret",
-      "part.noseTick": "part.noseTick",
-      "part.fuelCue.box": "part.fuelCue.box",
-      "part.fuelCue.x1": "part.fuelCue.x1",
-      "part.fuelCue.x2": "part.fuelCue.x2"
+      "part.track.left": "sprite.track",
+      "part.tread.left.0": "sprite.track",
+      "part.tread.left.1": "sprite.track",
+      "part.tread.left.2": "sprite.track",
+      "part.tread.left.3": "sprite.track",
+      "part.tread.left.4": "sprite.track",
+      "part.tread.left.5": "sprite.track",
+      "part.tread.left.6": "sprite.track",
+      "part.tread.left.7": "sprite.track",
+      "part.tread.left.8": "sprite.track",
+      "part.track.right": "sprite.track",
+      "part.tread.right.0": "sprite.track",
+      "part.tread.right.1": "sprite.track",
+      "part.tread.right.2": "sprite.track",
+      "part.tread.right.3": "sprite.track",
+      "part.tread.right.4": "sprite.track",
+      "part.tread.right.5": "sprite.track",
+      "part.tread.right.6": "sprite.track",
+      "part.tread.right.7": "sprite.track",
+      "part.tread.right.8": "sprite.track",
+      "part.hull": "sprite.hull",
+      "part.hull.shadow": "sprite.hull",
+      "part.hull.nose": "sprite.hull",
+      "part.hull.noseShadow": "sprite.hull",
+      "part.noseTick": "sprite.hull",
+      "part.barrel": "sprite.turret",
+      "part.coaxBarrel": "sprite.turret",
+      "part.turret": "sprite.turret"
     }
   },
   "frames": {},
   "sprites": [
     {
       "id": "sprite.track.left",
+      "sourceCell": "sprite.track",
       "animationPart": "part.track.left",
       "sourceParts": [
         "part.track.left",
@@ -101,6 +96,7 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
     },
     {
       "id": "sprite.track.right",
+      "sourceCell": "sprite.track",
       "animationPart": "part.track.right",
       "sourceParts": [
         "part.track.right",
@@ -117,7 +113,7 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
       "tintSlot": "fixed",
       "drawOrder": 11,
       "frame": {
-        "x": 480,
+        "x": 240,
         "y": 0,
         "w": 240,
         "h": 192,
@@ -139,6 +135,7 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
       ],
       "tintSlot": "team",
       "drawOrder": 20,
+      "sourceCell": "sprite.hull",
       "frame": {
         "x": 0,
         "y": 192,
@@ -160,6 +157,7 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
       ],
       "tintSlot": "team-light",
       "drawOrder": 30,
+      "sourceCell": "sprite.turret",
       "frame": {
         "x": 240,
         "y": 192,
@@ -169,27 +167,6 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
         "originY": 96,
         "pixelsPerUnitX": 3.775233767368696,
         "pixelsPerUnitY": 3.775233767368696
-      }
-    },
-    {
-      "id": "sprite.fuelCue",
-      "animationPart": "part.fuelCue.box",
-      "sourceParts": [
-        "part.fuelCue.box",
-        "part.fuelCue.x1",
-        "part.fuelCue.x2"
-      ],
-      "tintSlot": "fixed",
-      "drawOrder": 40,
-      "frame": {
-        "x": 480,
-        "y": 192,
-        "w": 240,
-        "h": 192,
-        "originX": 421.6145454545454,
-        "originY": 385.0472727272727,
-        "pixelsPerUnitX": 15.709090909090907,
-        "pixelsPerUnitY": 15.709090909090907
       }
     }
   ]

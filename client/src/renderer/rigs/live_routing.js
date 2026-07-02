@@ -180,7 +180,7 @@ export function liveRigDefinitionFor(definitions, kind) {
 export function liveRigRoutesFor(kind, pools = {}) {
   const parts = LIVE_RIG_PARTS[kind];
   if (!parts) return [];
-  return [
+  const routes = [
     {
       poolName: pools.liveRigShadow || "liveUnitRigShadows",
       layerName: pools.shadow || "unitShadows",
@@ -192,4 +192,12 @@ export function liveRigRoutesFor(kind, pools = {}) {
       parts: parts.unit,
     },
   ];
+  if (Array.isArray(parts.overlay) && parts.overlay.length > 0) {
+    routes.push({
+      poolName: pools.liveRigOverlay || "liveUnitRigOverlays",
+      layerName: pools.overlay || pools.unit || "units",
+      parts: parts.overlay,
+    });
+  }
+  return routes;
 }
