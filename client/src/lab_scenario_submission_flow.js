@@ -18,7 +18,7 @@ const AUTHORING_FIELD_IDS = Object.freeze([
 const DEFAULT_SUBMISSION_CAPABILITY = Object.freeze({
   available: false,
   unavailableCode: "unavailable",
-  unavailableReason: "Scenario PR submission is unavailable.",
+  unavailableReason: "Setup PR submission is unavailable.",
   branchPrefix: "zvorygin/lab-scenario-",
   scenarioPathPrefix: "server/assets/lab-scenarios/",
   manifestPath: "server/assets/lab-scenarios/manifest.json",
@@ -55,7 +55,7 @@ export function setLabScenarioSubmissionCapability(panel, source) {
       panel.submission.capability = normalizeSubmissionCapability({
         available: false,
         unavailableCode: "capabilityCheckFailed",
-        unavailableReason: `Scenario PR submission availability could not be checked: ${err?.message || err}`,
+        unavailableReason: `Setup PR submission availability could not be checked: ${err?.message || err}`,
       });
       panel.submission.capabilityPending = false;
       panel.render();
@@ -92,54 +92,72 @@ export function renderLabScenarioOptions(panel) {
   const setAuthoring = (key) => (value) => {
     panel.authoring[key] = value;
   };
-  return panel.fieldset("Scenario", [
-    panel.inputField("scenario-name", "Name", "text", panel.authoring.name, {
-      maxLength: limits.name,
-      onChange: (value) => { panel.authoring.name = value; if (!panel.authoring.title) panel.authoring.title = value; },
+  return [
+    panel.fieldset("Checkpoint Setup", [
+      panel.inputField("scenario-name", "Name", "text", panel.authoring.name, {
+        maxLength: limits.name,
+        onChange: (value) => { panel.authoring.name = value; if (!panel.authoring.title) panel.authoring.title = value; },
+      }),
+      panel.inputField("scenario-title", "Title", "text", panel.authoring.title, {
+        maxLength: limits.title,
+        onChange: (value) => updateLabScenarioTitle(panel, value),
+      }),
+      panel.inputField("scenario-slug", "Slug", "text", panel.authoring.slug, {
+        maxLength: limits.slug,
+        onChange: (value) => { panel.authoring.slug = value; panel.authoringSlugEdited = true; },
+      }),
+      panel.inputField("scenario-tags", "Tags", "text", panel.authoring.tags, {
+        maxLength: (limits.tag + 1) * limits.tags,
+        onChange: setAuthoring("tags"),
+      }),
+      panel.textAreaField("scenario-description", "Description", panel.authoring.description, {
+        maxLength: limits.description,
+        rows: 3,
+        wide: true,
+        onChange: setAuthoring("description"),
+      }),
+      panel.textAreaField("scenario-review-notes", "Review notes", panel.authoring.reviewNotes, {
+        maxLength: limits.reviewNotes,
+        rows: 3,
+        wide: true,
+        onChange: setAuthoring("reviewNotes"),
+      }),
+      panel.textAreaField("scenario-json", "Setup JSON", panel.authoring.scenarioJson, {
+        rows: 7,
+        wide: true,
+        onChange: setAuthoring("scenarioJson"),
+      }),
+      renderLabScenarioAuthoringFeedback(panel),
+      renderLabScenarioSubmissionFeedback(panel),
+      panel.button("Validate setup", () => validateLabScenario(panel)),
+      panel.button("Submit setup PR", () => submitLabScenario(panel), {
+        disabled: !!labScenarioSubmissionDisabledReason(panel),
+        title: labScenarioSubmissionDisabledReason(panel) || "Validate and submit this checkpoint-backed lab setup as a draft pull request",
+        dataset: {
+          scenarioSubmit: "true",
+          pending: panel.submission.pending ? "true" : "false",
+        },
+      }),
+      panel.button("Export setup JSON", () => panel.exportScenario()),
+      panel.button("Import setup JSON", () => panel.importScenario()),
+      panel.button("Reset setup", () => panel.resetScenario()),
+    ]),
+    renderLabReplayOptions(panel),
+  ];
+}
+
+export function renderLabReplayOptions(panel) {
+  return panel.fieldset("Lab Replay", [
+    panel.button("Save lab replay", () => panel.saveLabReplay(), {
+      disabled: true,
+      title: "Lab replay save uses the bounded replay-artifact path, not the setup JSON wire request.",
+      dataset: { labReplayAction: "save" },
     }),
-    panel.inputField("scenario-title", "Title", "text", panel.authoring.title, {
-      maxLength: limits.title,
-      onChange: (value) => updateLabScenarioTitle(panel, value),
+    panel.button("Open lab replay", () => panel.openLabReplay(), {
+      disabled: true,
+      title: "Lab replay open uses the bounded replay-artifact path, not the setup JSON wire request.",
+      dataset: { labReplayAction: "open" },
     }),
-    panel.inputField("scenario-slug", "Slug", "text", panel.authoring.slug, {
-      maxLength: limits.slug,
-      onChange: (value) => { panel.authoring.slug = value; panel.authoringSlugEdited = true; },
-    }),
-    panel.inputField("scenario-tags", "Tags", "text", panel.authoring.tags, {
-      maxLength: (limits.tag + 1) * limits.tags,
-      onChange: setAuthoring("tags"),
-    }),
-    panel.textAreaField("scenario-description", "Description", panel.authoring.description, {
-      maxLength: limits.description,
-      rows: 3,
-      wide: true,
-      onChange: setAuthoring("description"),
-    }),
-    panel.textAreaField("scenario-review-notes", "Review notes", panel.authoring.reviewNotes, {
-      maxLength: limits.reviewNotes,
-      rows: 3,
-      wide: true,
-      onChange: setAuthoring("reviewNotes"),
-    }),
-    panel.textAreaField("scenario-json", "JSON", panel.authoring.scenarioJson, {
-      rows: 7,
-      wide: true,
-      onChange: setAuthoring("scenarioJson"),
-    }),
-    renderLabScenarioAuthoringFeedback(panel),
-    renderLabScenarioSubmissionFeedback(panel),
-    panel.button("Validate scenario", () => validateLabScenario(panel)),
-    panel.button("Submit scenario PR", () => submitLabScenario(panel), {
-      disabled: !!labScenarioSubmissionDisabledReason(panel),
-      title: labScenarioSubmissionDisabledReason(panel) || "Validate and submit this lab scenario as a draft pull request",
-      dataset: {
-        scenarioSubmit: "true",
-        pending: panel.submission.pending ? "true" : "false",
-      },
-    }),
-    panel.button("Export JSON", () => panel.exportScenario()),
-    panel.button("Import JSON", () => panel.importScenario()),
-    panel.button("Reset scenario", () => panel.resetScenario()),
   ]);
 }
 
@@ -175,10 +193,10 @@ export function renderLabScenarioSubmissionFeedback(panel) {
 }
 
 export function labScenarioSubmissionDisabledReason(panel) {
-  if (panel.submission.pending) return "Scenario PR submission is already running.";
-  if (panel.submission.capabilityPending) return "Scenario PR submission availability is still loading.";
+  if (panel.submission.pending) return "Setup PR submission is already running.";
+  if (panel.submission.capabilityPending) return "Setup PR submission availability is still loading.";
   const capability = submissionCapability(panel);
-  if (!capability.available) return capability.unavailableReason || "Scenario PR submission is not configured.";
+  if (!capability.available) return capability.unavailableReason || "Setup PR submission is not configured.";
   return "";
 }
 
@@ -194,7 +212,7 @@ export async function validateLabScenario(panel) {
   const preview = result?.ok ? (result.outcome?.preview || null) : null;
   panel.authoringValidation = result?.ok
     ? { errors: [], preview }
-    : { errors: [result?.error || "Scenario validation failed."], preview: null };
+    : { errors: [result?.error || "Setup validation failed."], preview: null };
   applyScenarioPreview(panel, preview);
   panel.render();
   return result;
@@ -213,14 +231,14 @@ export function submitLabScenario(panel) {
   if (disabledReason) {
     panel.submission.result = {
       ok: false,
-      error: `Scenario PR submission unavailable: ${disabledReason}`,
+      error: `Setup PR submission unavailable: ${disabledReason}`,
     };
     return panel.publishLocalResult("submitScenario", false, panel.submission.result.error);
   }
 
   panel.submission.pending = true;
   panel.submission.pendingPromise = runLabScenarioSubmission(panel, validation.metadata);
-  panel.submission.message = "Validating scenario before submission...";
+  panel.submission.message = "Validating setup before submission...";
   panel.submission.result = null;
   panel.authoringValidation = { errors: [], preview: null };
   panel.render();
@@ -238,7 +256,7 @@ async function runLabScenarioSubmission(panel, metadata) {
     if (panel.destroyed) return validationResult;
     const preview = validationResult?.ok ? (validationResult.outcome?.preview || null) : null;
     if (!validationResult?.ok) {
-      const error = validationResult?.error || "Scenario validation failed.";
+      const error = validationResult?.error || "Setup validation failed.";
       panel.authoringValidation = { errors: [error], preview: null };
       panel.submission.result = { ok: false, error };
       return validationResult;
@@ -266,7 +284,7 @@ async function runLabScenarioSubmission(panel, metadata) {
       const code = result?.outcome?.code ? `[${result.outcome.code}] ` : "";
       panel.submission.result = {
         ok: false,
-        error: `${code}${result?.error || "Scenario PR submission failed."}`,
+        error: `${code}${result?.error || "Setup PR submission failed."}`,
       };
     }
     return result;
@@ -300,17 +318,17 @@ function submissionFeedbackState(panel) {
 }
 
 function submissionFeedbackText(panel) {
-  if (panel.submission.pending) return panel.submission.message || "Submitting scenario PR...";
+  if (panel.submission.pending) return panel.submission.message || "Submitting setup PR...";
   if (panel.submission.result?.ok) return "Draft PR created. The link is available below.";
   if (panel.submission.result && !panel.submission.result.ok) {
-    const error = panel.submission.result.error || "Scenario PR submission failed.";
-    return `${error} Export JSON remains available.`;
+    const error = panel.submission.result.error || "Setup PR submission failed.";
+    return `${error} Export setup JSON remains available.`;
   }
-  if (panel.submission.capabilityPending) return "Checking scenario PR submission availability...";
+  if (panel.submission.capabilityPending) return "Checking setup PR submission availability...";
   const capability = submissionCapability(panel);
-  if (capability.available) return `Scenario PR submission enabled for ${capability.scenarioPathPrefix}`;
+  if (capability.available) return `Setup PR submission enabled for ${capability.scenarioPathPrefix}`;
   const reason = capability.unavailableReason || "backend is not configured";
-  return `Scenario PR submission disabled: ${reason} Export JSON remains available.`;
+  return `Setup PR submission disabled: ${reason} Export setup JSON remains available.`;
 }
 
 function openSubmissionPr(panel, prUrl) {

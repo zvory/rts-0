@@ -37,8 +37,9 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
   `ALLOWED_CROSS_AREA_IMPORTS` with a reason.
 - **Lab UI stays app-owned.** `App` owns `LabClient` and `LabPanel`; `Match` receives injected lab
   metadata/control policy and must not import the lab transport or panel modules directly.
-- **Scenario authoring flow.** `/lab` opens catalog or blank setups; the app-owned panel validates
-  authoritative state before draft-PR submission, with JSON export/import as the disabled fallback.
+- **Setup authoring flow.** `/lab` opens catalog or blank setups; the app-owned panel validates
+  authoritative state before draft-PR submission, with setup JSON export/import as the disabled
+  fallback.
 - **Room affordances are metadata-driven.** `room_capabilities.js` parses `startPayload.capabilities`
   and `startPayload.diagnostics`; shared controls must not be inferred from replay/dev/lab identity.
 - **Client intent is explicit.** `Match` owns `ClientIntent` and injects it into HUD, input,

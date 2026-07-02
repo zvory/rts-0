@@ -41,6 +41,8 @@ fn lab_submission_result_success(
 fn lab_submission_validation_error(error: String) -> LabScenarioSubmissionError {
     if error.contains("duplicate lab scenario id")
         || error.contains("duplicate lab scenario filename")
+        || error.contains("duplicate lab setup id")
+        || error.contains("duplicate lab setup filename")
     {
         LabScenarioSubmissionError::duplicate_slug(error)
     } else {
@@ -59,7 +61,7 @@ impl RoomTask {
             return Some(lab_submission_result_error(
                 request_id,
                 LabScenarioSubmissionError::validation(
-                    "lab scenario submission is not enabled in this room",
+                    "lab setup submission is not enabled in this room",
                 ),
             ));
         }
@@ -77,7 +79,7 @@ impl RoomTask {
             return Some(lab_submission_result_error(
                 request_id,
                 LabScenarioSubmissionError::rate_limit(
-                    "this lab room has already started a scenario PR submission",
+                    "this lab room has already started a setup PR submission",
                 ),
             ));
         }
@@ -97,7 +99,7 @@ impl RoomTask {
                 return Some(lab_submission_result_error(
                     request_id,
                     LabScenarioSubmissionError::validation(format!(
-                        "scenario export did not produce a lab scenario payload: {err}"
+                        "setup export did not produce a lab setup payload: {err}"
                     )),
                 ));
             }
@@ -135,7 +137,7 @@ impl RoomTask {
                     room = %room,
                     player_id = operator_id,
                     %err,
-                    "failed to send lab scenario submission result"
+                    "failed to send lab setup submission result"
                 );
             }
         });

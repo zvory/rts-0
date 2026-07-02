@@ -59,9 +59,9 @@ src/
   frame_profiler.js # bounded client frame phase profiler and debug summary API
   live_pause_overlay.js # live-match pause state overlay and unpause affordance
   branch_staging.js # replay branch staging panel
-  lab_catalog.js # LabCatalogScreen: app-owned `/lab` scenario/blank selector
+  lab_catalog.js # LabCatalogScreen: app-owned `/lab` setup/blank selector
   lab_client.js  # LabClient: lab request ids, pending results, state/result subscriptions
-  lab_scenario_authoring.js # pure lab scenario metadata defaults, slugging, and local validation
+  lab_scenario_authoring.js # pure lab setup metadata defaults, slugging, and local validation
   lab_scenario_submission_capability.js # HTTP capability probe with transient-failure retry
   lab_scenario_submission_flow.js # LabPanel scenario validation/submission orchestration
   lab_panel.js   # LabPanel: app-owned lab controls/status UI mounted around Match
@@ -435,7 +435,7 @@ createRoomCapabilities({ startPayload })
 `startPayload.diagnostics` record for room-time controls, diagnostic settings, observer analysis,
 vision-selection controls, live pause controls, replay branch actions, and read-only/gameplay command
 affordances. Product shells may still use product metadata for launch/routing and owned controls
-such as lab scenario tools, but shared affordances must not be inferred from replay/dev/lab
+such as lab setup tools, but shared affordances must not be inferred from replay/dev/lab
 identity.
 
 `lab_client.js`
@@ -447,9 +447,11 @@ export class LabClient {
   subscribeResult(handler)               // returns unsubscribe
   setVision(vision)                      // sends {op:"setVision", vision} for this operator only
   setPlayerGodMode(playerId, enabled)    // sends {op:"setPlayerGodMode", playerId, enabled}
+  exportScenario(name?)                  // compatibility wire name for checkpoint setup export
+  importScenario(scenario)               // compatibility wire name for checkpoint/legacy setup import
   validateScenario(metadata)             // sends {op:"validateScenario", metadata}
   submitScenario(metadata, options?)      // sends {op:"submitScenario", metadata}
-  resetScenario()                        // seeks lab room time to the current scenario baseline
+  resetScenario()                        // seeks lab room time to the current setup baseline
   request(op, options?)                  // allocates requestId, resolves with labResult/timeout
   destroy()
 }
@@ -468,7 +470,7 @@ export class LabCatalogScreen {
 }
 ```
 `LabCatalogScreen` is app-owned and used only for the bare `/lab` route. It renders a blank lab row
-plus bundled scenario metadata from `GET /api/lab-scenarios`; clicking a row builds the existing
+plus bundled checkpoint setup metadata from `GET /api/lab-scenarios`; clicking a row builds the existing
 hidden `__lab__:<room>:map=<map>:scenario=<id>` join room and lets `App` start the normal lab flow.
 Direct `/lab?scenario=lategame`, `/lab?scenario=blank`, map, and seed URLs still bypass the selector
 and auto-join for compatibility.
@@ -481,10 +483,10 @@ export function slugifyLabScenario(value)
 export function validateLabScenarioAuthoringState(state)
 export function labScenarioPreviewLabel(preview)
 ```
-`lab_scenario_authoring.js` is a pure UI helper for the app-owned lab panel. It owns default
-authoring field values, slug generation, client-side metadata limits that mirror the server catalog
-limits, comma-separated tag parsing, and local blocking errors before the panel sends a server
-dry-run validation request.
+`lab_scenario_authoring.js` is a pure UI helper for the app-owned lab panel. It owns checkpoint
+setup authoring field defaults, slug generation, client-side metadata limits that mirror the server
+catalog limits, comma-separated tag parsing, and local blocking errors before the panel sends a
+server dry-run validation request.
 
 `lab_scenario_submission_capability.js`
 ```js
@@ -508,7 +510,7 @@ export function validateLabScenario(panel)
 export function submitLabScenario(panel)
 export function destroyLabScenarioSubmission(panel)
 ```
-`lab_scenario_submission_flow.js` is the LabPanel-owned UI helper for scenario dry-run validation,
+`lab_scenario_submission_flow.js` is the LabPanel-owned UI helper for checkpoint setup dry-run validation,
 submission capability normalization, duplicate-click guarding, draft PR progress/result rendering,
 and teardown of pending submission state.
 
@@ -525,23 +527,27 @@ export class LabPanel {
   armBuildingSpawnPaletteTool(kind?)     // arms a Match-owned completed building spawnEntity tool
   cancelActiveTool()
   validateScenario(), submitScenario(), exportScenario(), importScenario()
+  saveLabReplay(), openLabReplay()        // distinct replay affordances; not legacy scenario ops
   destroy()
 }
 ```
 `LabPanel` renders separate floating, collapsible Options and Tools windows. Options owns room
-status, lab vision, command-limit policy, scenario authoring metadata, validation, PR submission,
-import/export/reset, and result status; Tools owns target player, player state, spawn palettes,
+status, lab vision, command-limit policy, setup authoring metadata, validation, PR submission,
+setup import/export/reset, and result status; Tools owns target player, player state, spawn palettes,
 active tool status, and the remove setup tool. App passes the HTTP
 `/api/lab-scenarios/submission` capability probe into the panel; unavailable deployments keep the
-submit action disabled and leave local JSON export visible. Successful submissions open the draft PR
+submit action disabled and leave local setup JSON export visible. Successful submissions open the draft PR
 when allowed and always render the PR URL in-panel so popup blocking does not hide the review link.
-The supported author workflow starts at `/lab`: choose a bundled catalog scenario or blank setup,
-edit authoritative state with lab tools, fill in scenario name/title/slug/description/tags/review
+The supported author workflow starts at `/lab`: choose a bundled catalog setup or blank setup,
+edit authoritative state with lab tools, fill in setup name/title/slug/description/tags/review
 notes, run validation, then submit a draft PR when the backend capability is available. After human
-review and merge, the merged scenario becomes selectable from the catalog on the next deployed build
-or local server restart that includes the new manifest entry. The browser never supplies scenario
+review and merge, the merged setup becomes selectable from the catalog on the next deployed build
+or local server restart that includes the new manifest entry. The browser never supplies setup
 JSON, target paths, branch names, credentials, or commit text for PR submission; local JSON
-export/import remains the fallback for iteration and for deployments with submission disabled.
+export/import remains the fallback for setup iteration and for deployments with submission
+disabled. The lab replay controls are visually separate from setup checkpoint JSON controls; replay
+save/open uses the bounded lab replay artifact path instead of the legacy `exportScenario` and
+`importScenario` lab operations.
 `lab_panel_window.js` owns local drag, resize, collapse/expand, reset, keyboard nudge,
 viewport-clamping, and localStorage geometry hints for those app-owned lab windows. It has no
 transport or match authority.
@@ -557,7 +563,7 @@ policy lifetimes when a `start` payload carries `lab` metadata. `Match` receives
 `labClient`, and `labControlPolicy` through constructor options only; renderer, HUD, input, and
 minimap do not import lab modules. The shipped MVP exposes catalog/blank lab selection,
 per-operator lab vision, per-player asset god mode, setup mutations, issue-as commands, and
-scenario import/export through those collaborators while keeping the normal match screen authentic.
+setup checkpoint import/export through those collaborators while keeping the normal match screen authentic.
 Lab operator starts are still spectator-shaped for projection and prediction, and
 `LabClient` treats `start.lab.vision` plus `labState.vision` as the recipient's server-authoritative
 choice; `start.lab.godModePlayers` plus `labState.godModePlayers` mirror room-scoped player god
@@ -1335,7 +1341,7 @@ Current areas:
   `config/rules_mirror.js`, and `config/factions.js`.
 - `ui`: HUD, command card descriptors/selection panels, hotkey profiles/editor, lobby
   controller/browser/roster views, match history, minimap, resource icons, scoreboard, status badge, branch
-  staging, lab panel, lab scenario authoring/submission helpers, settings. Command-card tooltips render optional unit descriptions when descriptor metadata provides them. Lab research controls render direct per-upgrade toggle buttons for the selected Lab target player; completed upgrades render as pressed buttons with a check-mark background. The Lab panel window toggle button shows Collapse when expanded and Expand when collapsed. The settings panel uses the in-match header action slot for Give Up
+  staging, lab panel, lab setup authoring/submission helpers, settings. Command-card tooltips render optional unit descriptions when descriptor metadata provides them. Lab research controls render direct per-upgrade toggle buttons for the selected Lab target player; completed upgrades render as pressed buttons with a check-mark background. The Lab panel window toggle button shows Collapse when expanded and Expand when collapsed. The settings panel uses the in-match header action slot for Give Up
   in live matches and Back to Lobby in Lab/replay sessions. After a finished match, App resets the
   Lobby controller to the root browser before showing the lobby screen again. Lobby AI creation is
   exposed from the roster's team context, not as a duplicate global sidebar action. The in-match

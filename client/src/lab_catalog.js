@@ -3,7 +3,7 @@ const DEFAULT_LAB_MAP = "Default";
 
 export function normalizeLabScenarioEntry(entry) {
   const id = safeCatalogText(entry?.id, "");
-  const title = safeCatalogText(entry?.title, id || "Scenario");
+  const title = safeCatalogText(entry?.title, id || "Setup");
   const description = safeCatalogText(entry?.description, "");
   const map = safeCatalogText(entry?.map, DEFAULT_LAB_MAP);
   const playerCount = Math.max(0, Math.trunc(Number(entry?.playerCount) || 0));
@@ -73,7 +73,7 @@ export class LabCatalogScreen {
       this.status = "";
     } catch (_) {
       this.entries = [];
-      this.error = "Scenario catalog unavailable.";
+      this.error = "Setup catalog unavailable.";
       this.status = this.error;
     } finally {
       this.loading = false;
@@ -96,7 +96,7 @@ export class LabCatalogScreen {
     kicker.className = "lobby-kicker";
     kicker.textContent = "Shared Lab";
     const title = document.createElement("h1");
-    title.textContent = "Scenario Catalog";
+    title.textContent = "Setup Catalog";
     titleGroup.append(kicker, title);
     const status = document.createElement("p");
     status.className = "lab-entry-status";
@@ -119,10 +119,10 @@ export class LabCatalogScreen {
 
     const catalog = document.createElement("section");
     catalog.className = "lab-entry-list";
-    catalog.setAttribute("aria-label", "Lab scenarios");
+    catalog.setAttribute("aria-label", "Lab checkpoint setups");
     catalog.appendChild(this.renderBlankRow());
     for (const entry of this.entries) catalog.appendChild(this.renderScenarioRow(entry));
-    if (this.loading) catalog.appendChild(this.renderStateRow("Loading scenarios"));
+    if (this.loading) catalog.appendChild(this.renderStateRow("Loading setups"));
     else if (this.error && this.entries.length === 0) {
       catalog.appendChild(this.renderStateRow(this.error));
     }
@@ -150,7 +150,7 @@ export class LabCatalogScreen {
       map: entry.map,
       playerCount: entry.playerCount,
       tags: entry.tags,
-      action: "Start scenario",
+      action: "Start setup",
       onStart: () => this.start({ scenario: entry.id, map: entry.map }),
     });
   }

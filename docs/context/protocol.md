@@ -44,13 +44,14 @@ Use when adding, removing, or changing any field on a client↔server message, s
   countdown skipping is not a debug preset.
 - `LobbyPlayer` carries `teamId`, `factionId`, `aiProfileId?`, and `isSpectator`; spectators are
   lobby members but not active match players.
-- Lab scenario import/export uses `LabScenarioPayload`: new exports/submissions and bundled assets
-  are checkpoint-backed `LabCheckpointScenarioV1` containers, while old `LabScenarioV1` JSON remains
-  a compatibility input. Lab scenario authoring has `validateScenario` for dry-run previews and
-  `submitScenario` for the disabled-by-default draft PR service. `submitScenario` returns one async
-  `labResult` and never accepts client-supplied scenario JSON, branch names, paths, or credentials.
-  Validation and submission recheck catalog duplicates, id-matched filenames, entity/payload caps,
-  map binding, and the scenario-plus-manifest path allowlist before any GitHub side effect.
+- Lab setup import/export uses the compatibility-named `LabScenarioPayload`: new
+  exports/submissions and bundled assets are checkpoint-backed `LabCheckpointScenarioV1`
+  containers, while old `LabScenarioV1` JSON remains a legacy scenario compatibility input. Setup
+  authoring has `validateScenario` for dry-run previews and `submitScenario` for the
+  disabled-by-default draft PR service. `submitScenario` returns one async `labResult` and never
+  accepts client-supplied setup JSON, branch names, paths, or credentials. Validation and submission
+  recheck catalog duplicates, id-matched filenames, entity/payload caps, map binding, and the
+  setup-plus-manifest path allowlist before any GitHub side effect.
 
 ## Invariants
 - **Mirror.** Every protocol change touches both files **and**

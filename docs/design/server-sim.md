@@ -7,7 +7,7 @@ src/
   main.rs        # tokio runtime, axum router: static files + /ws, room manager task
   protocol.rs    # server-shell protocol adapter shim; serde DTOs live in crates/protocol
   config.rs      # server-shell balance shim; authoritative values live in crates/rules
-  lab_scenarios.rs # bundled lab scenario manifest loader and restore validator
+  lab_scenarios.rs # bundled lab checkpoint setup manifest loader and restore validator
   lobby/         # Lobby API plus room task, connection writers, snapshots, dev replay, crash replay
 crates/
   contract/      # semantic DTOs shared below protocol/sim/server
@@ -105,16 +105,16 @@ impl Game {
 
     /// Apply one typed, validated lab mutation and repair derived sim state before returning.
     /// Accepted operations can spawn, delete, move, reassign, set resources, set completed
-    /// research, or restore a versioned lab scenario. Bad lab input returns `LabError`; room code
+    /// research, or restore a versioned lab setup. Bad lab input returns `LabError`; room code
     /// must not mutate entity stores or player state directly.
     pub fn apply_lab_op(&mut self, op: lab::LabOp) -> Result<lab::LabOpOutcome, lab::LabError>;
 
-    /// Export authoritative lab setup data as versioned JSON-friendly scenario state, without
+    /// Export authoritative lab setup data as versioned JSON-friendly legacy scenario state, without
     /// treating snapshots, fog, transient events, command logs, or room-owned lab metadata as the
     /// scenario format.
     pub fn export_lab_scenario(&self) -> lab::LabScenarioV1;
 
-    /// Restore a versioned lab scenario through the same validation/repair path used by
+    /// Restore a versioned legacy lab scenario through the same validation/repair path used by
     /// `apply_lab_op(LabOp::RestoreScenario(...))`, remapping scenario entity ids to fresh
     /// authoritative ids.
     pub fn restore_lab_scenario(
@@ -213,15 +213,15 @@ Lab mutation types live under `game::lab`. `LabOp` is intentionally narrow rathe
 backdoor: entity mutations validate known unit/building kinds, real players, finite in-map
 positions, placement/collision legality, and stale ids before changing the world. Accepted lab
 mutations clear stale orders and reservations where needed, then rebuild supply, spatial index,
-fog, and building memory before returning. `LabScenarioV1` is setup data keyed by map identity,
+fog, and building memory before returning. `LabScenarioV1` is legacy setup data keyed by map identity,
 player resources, completed research, entity records including stable body/weapon/setup facing, and
-small lab metadata such as scenario name and exported tick;
+small lab metadata such as setup name and exported tick;
 room-owned protocol export adds the requesting operator's current lab vision metadata before
 sending JSON to the browser.
 Restore loads the named map, validates faction/research/kind data, recreates entities with fresh
 ids, repairs derived state, and returns the id remap for callers that need to reconcile UI
 selection. Snapshot-only projections, transient events, projectile runtime state, active commands,
-production queues, rally plans, cooldowns, and command logs are not part of the scenario format.
+production queues, rally plans, cooldowns, and command logs are not part of the setup format.
 
 #### 3.1.1 `Game` State Ownership Registry
 
@@ -311,7 +311,7 @@ recorded actions.
 
 Private checkpoint export/import remains internal test machinery. `GameCheckpointV1` payload helpers
 under `rts-sim::game` are used by the semantic comparator and validation tests; they do not define a
-public route, command, replay artifact format, lab scenario format, UI affordance, or lobby/server
+public route, command, replay artifact format, lab setup format, UI affordance, or lobby/server
 call path by themselves.
 
 Phase 7 release audit for the ownership sequence:
@@ -336,7 +336,7 @@ Phase 7 release audit for the ownership sequence:
   materialized map data/binding lives beside an embedded `GameCheckpointV1` text payload, and
   `sourceEntityIdMap` preserves existing import remap callers. Old `LabScenarioV1` setup files
   remain accepted as compatibility inputs and are converted through the same restore path because
-  user-supplied scenario JSON and historical fixtures can still arrive on the public lab surface.
+  user-supplied legacy scenario JSON and historical fixtures can still arrive on the public lab surface.
   Portable lab sessions use the protocol-owned `LabReplayArtifactV1` contract: an initial
   checkpoint-backed lab setup plus ordered replayable lab mutations and issue-as commands. The
   portable stream is not `LabSession.operation_log` and not retained `LabTimeline` keyframes;
@@ -403,7 +403,7 @@ alive.
 #### 3.1.3 `GameCheckpointV1` Embeddable Payload Contract
 
 `GameCheckpointV1` is the first public checkpoint payload contract. It is a versioned UTF-8 JSON
-text payload that can be embedded inside a replay artifact, lab scenario container, match-start
+text payload that can be embedded inside a replay artifact, lab setup container, match-start
 artifact, or debug document. It is not a standalone product file format, network command, route, UI
 option, replay schema change, or lab schema change by itself. The internal implementation exports
 `Game + supplied map binding` through explicit DTOs to JSON text bytes, imports only with the exact
@@ -490,7 +490,7 @@ Map policy:
 - `GameCheckpointV1` never embeds map JSON, terrain bytes, starts, or expansion-site bodies. It
   embeds `mapBinding` only.
 - The containing artifact supplies the exact map data. A replay artifact stores or references the
-  launch-time map composition beside the checkpoint; a lab scenario container embeds or references
+  launch-time map composition beside the checkpoint; a lab setup container embeds or references
   the authored map data it is editing; a match-start artifact references the selected map asset and
   frozen materialized map facts; a debug document may include a sibling `map` object next to the
   checkpoint payload for convenience.
@@ -593,13 +593,13 @@ remain on their current schemas until their phases introduce containers around t
   `room_task/lab.rs`, dev-watch scenario handling lives in `room_task/dev.rs`, and room lifecycle
   bookkeeping lives in `room_task/lifecycle.rs`; `RoomTask` remains the owner of mutation and tick
   authority. Plain `/lab` is a client-side catalog selector. Direct lab URLs keep compatibility:
-  `scenario=lategame` requests the bundled catalog scenario, `scenario=blank` keeps blank lab
-  startup, and custom map or seed lab URLs stay blank unless they set an explicit scenario. Bundled
-  lab scenario ids are safe tokens listed in `server/assets/lab-scenarios/manifest.json`; the
+  `scenario=lategame` requests the bundled catalog setup, `scenario=blank` keeps blank lab
+  startup, and custom map or seed lab URLs stay blank unless they set an explicit setup. Bundled
+  lab setup ids are safe tokens listed in `server/assets/lab-scenarios/manifest.json`; the
   loader in `server/src/lab_scenarios.rs` validates manifest metadata, safe filenames, duplicate
   ids, JSON parseability, map/player-count consistency, and restore compatibility through the
-  public lab `Game` API before a scenario is exposed or launched. Bundled lab scenario startup uses
-  the same restore-scenario path as manual imports and starts with `operation_count=0` plus a tick-0
+  public lab `Game` API before a setup is exposed or launched. Bundled lab setup startup uses
+  the same setup restore path as manual imports and starts with `operation_count=0` plus a tick-0
   timeline keyframe. Lab god mode is lab-only state: `setPlayerGodMode` marks that player's units
   and buildings
   invulnerable, applies across lab mutations, owner changes, spawned assets, and timeline replay
@@ -655,12 +655,12 @@ remain on their current schemas until their phases introduce containers around t
   speed/pause/controller state, and append-only operation log records stay in the room task rather
   than in `Game`. Bundled catalog and authoring validation restore checkpoint-backed
   `LabCheckpointScenarioV1` containers through the lab `Game` API and still accept old
-  `LabScenarioV1` files as compatibility inputs before exposing a scenario. Scenario PR submission
+  `LabScenarioV1` files as compatibility inputs before exposing a setup. Setup PR submission
   also starts in `room_task/lab.rs`: the room exports the authoritative lab `Game` as a checkpoint
-  scenario, validates authoring metadata, rate-limits the room to one
+  setup, validates authoring metadata, rate-limits the room to one
   PR job, and then hands the already-validated preview to a bounded background service so GitHub or
   git work never runs on the room tick path. The submission service rechecks catalog duplicates,
-  safe filenames, path allowlists, payload/entity caps, branch safety, and the exact scenario plus
+  safe filenames, path allowlists, payload/entity caps, branch safety, and the exact setup plus
   manifest file set before opening a draft PR with a reviewer checklist. Paused lab room-time
   suppresses scheduled ticks; one-tick lab steps and running lab ticks use the same
   `LiveTickDriver` path as ordinary live simulation.
@@ -736,7 +736,7 @@ branch seed.
   scheduled action. `RoomTask` still owns the Tokio interval and remains the only task that advances
   a room.
 - `lab_timeline.rs` owns room-local in-memory lab rewind recording outside the simulation crate. It
-  records a baseline keyframe after lab `Game` creation or scenario import, records accepted lab
+  records a baseline keyframe after lab `Game` creation or setup import, records accepted lab
   world mutations and issue-as commands in authoritative room order, stores periodic cloned `Game`
   keyframes, rebuilds lab seeks from the nearest retained keyframe, and truncates future history
   after a past seek plus a new accepted lab operation or issue-as command. Portable

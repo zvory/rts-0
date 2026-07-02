@@ -1,6 +1,6 @@
-//! Server-side draft PR creation for validated lab scenarios.
+//! Server-side draft PR creation for validated lab checkpoint setups.
 //!
-//! This module owns the privileged GitHub boundary for scenario authoring. Browser clients can
+//! This module owns the privileged GitHub boundary for setup authoring. Browser clients can
 //! request submission only through a lab room; the room exports the authoritative `Game` state and
 //! hands a validated preview here. The service is disabled unless explicitly configured with
 //! server-side credentials.
@@ -218,7 +218,7 @@ impl LabScenarioSubmissionService {
     pub fn disabled() -> Self {
         Self::disabled_with(
             LabScenarioSubmissionErrorCode::CredentialsMissing,
-            "Scenario PR submission is disabled.",
+            "Setup PR submission is disabled.",
         )
     }
 
@@ -361,7 +361,7 @@ impl LabScenarioSubmissionService {
         let LabScenarioSubmissionState::Enabled { config, .. } = self.state.as_ref() else {
             return Err(self.unavailable_error().unwrap_or_else(|| {
                 LabScenarioSubmissionError::credentials_missing(
-                    "Scenario PR submission is unavailable.",
+                    "Setup PR submission is unavailable.",
                 )
             }));
         };
@@ -369,10 +369,10 @@ impl LabScenarioSubmissionService {
         let branch_name = scenario_branch_name(&config.branch_prefix, &preview.slug)?;
         let title = scenario_pr_title(preview);
         let body = scenario_pr_body(preview, &artifacts, config);
-        let commit_subject = format!("Add lab scenario {}", preview.slug);
+        let commit_subject = format!("Add lab setup {}", preview.slug);
         let scenario_title = &preview.manifest_entry.title;
         let commit_body = format!(
-            "Adds {scenario_title} to the bundled lab scenario catalog.\n\nScenario path: {}\nManifest path: {}",
+            "Adds {scenario_title} to the bundled lab setup catalog.\n\nSetup path: {}\nManifest path: {}",
             artifacts.scenario_path, artifacts.manifest_path
         );
 
@@ -412,7 +412,7 @@ pub(crate) fn build_submission_artifacts(
         format!("{LAB_SCENARIO_SUBMISSION_PATH_PREFIX}{}", preview.filename);
     if preview.scenario_path != expected_scenario_path {
         return Err(LabScenarioSubmissionError::validation(format!(
-            "scenario path must be {expected_scenario_path:?}"
+            "setup path must be {expected_scenario_path:?}"
         )));
     }
     if preview.manifest_path != LAB_SCENARIO_SUBMISSION_MANIFEST_PATH {
@@ -424,13 +424,13 @@ pub(crate) fn build_submission_artifacts(
         || !allowed_submission_path(&preview.manifest_path)
     {
         return Err(LabScenarioSubmissionError::validation(
-            "scenario submission paths are outside the allowlist",
+            "setup submission paths are outside the allowlist",
         ));
     }
 
     let mut entries = load_lab_scenario_catalog().map_err(|err| {
         LabScenarioSubmissionError::validation(format!(
-            "cannot load existing lab scenario catalog: {err}"
+            "cannot load existing lab setup catalog: {err}"
         ))
     })?;
     if entries
@@ -438,7 +438,7 @@ pub(crate) fn build_submission_artifacts(
         .any(|entry| entry.id == preview.manifest_entry.id)
     {
         return Err(LabScenarioSubmissionError::duplicate_slug(format!(
-            "duplicate lab scenario id {:?}",
+            "duplicate lab setup id {:?}",
             preview.manifest_entry.id
         )));
     }
@@ -447,7 +447,7 @@ pub(crate) fn build_submission_artifacts(
         .any(|entry| entry.filename == preview.manifest_entry.filename)
     {
         return Err(LabScenarioSubmissionError::duplicate_slug(format!(
-            "duplicate lab scenario filename {:?}",
+            "duplicate lab setup filename {:?}",
             preview.manifest_entry.filename
         )));
     }
@@ -458,7 +458,7 @@ pub(crate) fn build_submission_artifacts(
         serde_json::to_string_pretty(&LabScenarioManifestWrite { scenarios: entries }).map_err(
             |err| {
                 LabScenarioSubmissionError::validation(format!(
-                    "failed to format lab scenario manifest: {err}"
+                    "failed to format lab setup manifest: {err}"
                 ))
             },
         )? + "\n";
@@ -500,20 +500,20 @@ pub(crate) fn scenario_branch_name(
 ) -> Result<String, LabScenarioSubmissionError> {
     if !safe_branch_prefix(prefix) {
         return Err(LabScenarioSubmissionError::configuration(
-            "scenario branch prefix is not safe",
+            "setup branch prefix is not safe",
         ));
     }
     let branch = format!("{prefix}{slug}");
     if branch.len() > MAX_BRANCH_NAME_LEN || !safe_branch_name(&branch) {
         return Err(LabScenarioSubmissionError::configuration(
-            "scenario branch name is not safe",
+            "setup branch name is not safe",
         ));
     }
     Ok(branch)
 }
 
 fn scenario_pr_title(preview: &LabScenarioAuthoringPreview) -> String {
-    format!("Add lab scenario: {}", preview.manifest_entry.title)
+    format!("Add lab setup: {}", preview.manifest_entry.title)
 }
 
 fn scenario_pr_body(
@@ -534,7 +534,7 @@ fn scenario_pr_body(
     };
     format!(
         "\
-## Scenario
+## Checkpoint Setup
 
 - ID: `{}`
 - Title: {}
@@ -543,13 +543,13 @@ fn scenario_pr_body(
 - Map: {}
 - Players: {}
 - Entities: {}
-- Scenario path: `{}`
+- Setup path: `{}`
 - Manifest path: `{}`
 - Base branch: `{}`
 
 ## Validation
 
-Server validation exported the current authoritative lab game as a checkpoint-backed scenario, applied authoring metadata, formatted deterministic JSON, checked catalog duplicate/path/size/entity limits, verified map binding metadata, and restored the scenario through the lab `Game` API.
+Server validation exported the current authoritative lab game as a checkpoint-backed setup, applied authoring metadata, formatted deterministic JSON, checked catalog duplicate/path/size/entity limits, verified map binding metadata, and restored the setup through the lab `Game` API.
 
 ## Author Notes
 
@@ -557,14 +557,14 @@ Server validation exported the current authoritative lab game as a checkpoint-ba
 
 ## Manual Review Checklist
 
-- Confirm the scenario name, catalog title, and description are review-ready.
+- Confirm the setup name, catalog title, and description are review-ready.
 - Confirm the map is the intended bundled map.
 - Confirm player/faction setup, teams, resources, and completed research are correct.
 - Confirm entity count ({}) and entity placement match the author intent.
 - Confirm the intended use is clear from the description or author notes.
-- Confirm the scenario loads from the lab catalog after merge.
-- Run manual lab smoke from `/lab`: launch the scenario, inspect setup, validate controls, and export JSON if needed.
-- Let normal CI and human scenario review pass before merge.
+- Confirm the setup loads from the lab catalog after merge.
+- Run manual lab smoke from `/lab`: launch the setup, inspect it, validate controls, and export setup JSON if needed.
+- Let normal CI and human setup review pass before merge.
 ",
         preview.slug,
         preview.manifest_entry.title,
@@ -631,7 +631,7 @@ async fn create_draft_pr_with_git_and_gh(
         .arg(&request.base_branch)
         .arg(&repo_url)
         .arg(&workdir);
-    run_git_command(&mut clone_cmd, "clone scenario PR repository").await?;
+    run_git_command(&mut clone_cmd, "clone setup PR repository").await?;
 
     let mut checkout_cmd = git_command(&request.token);
     checkout_cmd
@@ -640,7 +640,7 @@ async fn create_draft_pr_with_git_and_gh(
         .arg("checkout")
         .arg("-b")
         .arg(&request.branch_name);
-    run_git_command(&mut checkout_cmd, "create scenario PR branch").await?;
+    run_git_command(&mut checkout_cmd, "create setup PR branch").await?;
 
     for file in &request.files {
         let path = workdir.join(&file.path);
@@ -666,7 +666,7 @@ async fn create_draft_pr_with_git_and_gh(
     for file in &request.files {
         add.arg(&file.path);
     }
-    run_git_command(&mut add, "stage scenario PR files").await?;
+    run_git_command(&mut add, "stage setup PR files").await?;
 
     let mut author_name_cmd = git_plain_command();
     author_name_cmd
@@ -674,12 +674,8 @@ async fn create_draft_pr_with_git_and_gh(
         .arg(&workdir)
         .arg("config")
         .arg("user.name")
-        .arg("Lab Scenario Bot");
-    run_git_command(
-        &mut author_name_cmd,
-        "configure scenario PR git author name",
-    )
-    .await?;
+        .arg("Lab Setup Bot");
+    run_git_command(&mut author_name_cmd, "configure setup PR git author name").await?;
 
     let mut author_email_cmd = git_plain_command();
     author_email_cmd
@@ -687,12 +683,8 @@ async fn create_draft_pr_with_git_and_gh(
         .arg(&workdir)
         .arg("config")
         .arg("user.email")
-        .arg("lab-scenario-bot@users.noreply.github.com");
-    run_git_command(
-        &mut author_email_cmd,
-        "configure scenario PR git author email",
-    )
-    .await?;
+        .arg("lab-setup-bot@users.noreply.github.com");
+    run_git_command(&mut author_email_cmd, "configure setup PR git author email").await?;
 
     let mut commit_cmd = git_plain_command();
     commit_cmd
@@ -703,7 +695,7 @@ async fn create_draft_pr_with_git_and_gh(
         .arg(&request.commit_subject)
         .arg("-m")
         .arg(&request.commit_body);
-    run_git_command(&mut commit_cmd, "commit scenario PR files").await?;
+    run_git_command(&mut commit_cmd, "commit setup PR files").await?;
 
     let mut push_cmd = git_command(&request.token);
     push_cmd
@@ -712,7 +704,7 @@ async fn create_draft_pr_with_git_and_gh(
         .arg("push")
         .arg("origin")
         .arg(format!("HEAD:refs/heads/{}", request.branch_name));
-    run_git_command(&mut push_cmd, "push scenario PR branch").await?;
+    run_git_command(&mut push_cmd, "push setup PR branch").await?;
 
     let mut pr_cmd = gh_command(&request.token);
     pr_cmd
@@ -729,7 +721,7 @@ async fn create_draft_pr_with_git_and_gh(
         .arg("--body")
         .arg(&request.body)
         .arg("--draft");
-    let pr_url = run_gh_command(&mut pr_cmd, "create draft scenario PR").await?;
+    let pr_url = run_gh_command(&mut pr_cmd, "create draft setup PR").await?;
 
     let scenario_path = request
         .files
@@ -751,7 +743,7 @@ fn validate_pr_request_files(
 ) -> Result<(), LabScenarioSubmissionError> {
     if files.len() != 2 {
         return Err(LabScenarioSubmissionError::validation(
-            "scenario PR requests must write exactly one scenario file and the manifest",
+            "setup PR requests must write exactly one setup file and the manifest",
         ));
     }
 
@@ -767,7 +759,7 @@ fn validate_pr_request_files(
         }
         if !seen.insert(file.path.as_str()) {
             return Err(LabScenarioSubmissionError::validation(format!(
-                "duplicate scenario PR file path {:?}",
+                "duplicate setup PR file path {:?}",
                 file.path
             )));
         }
@@ -780,7 +772,7 @@ fn validate_pr_request_files(
 
     if scenario_files != 1 || manifest_files != 1 {
         return Err(LabScenarioSubmissionError::validation(
-            "scenario PR requests must include one scenario JSON file and one manifest file",
+            "setup PR requests must include one setup JSON file and one manifest file",
         ));
     }
     Ok(())
@@ -798,7 +790,7 @@ async fn remote_branch_exists(
         .arg("--heads")
         .arg(repo_url)
         .arg(branch_name);
-    let output = command_output(&mut command, "check scenario PR branch collision").await?;
+    let output = command_output(&mut command, "check setup PR branch collision").await?;
     if output.status.success() {
         return Ok(true);
     }
@@ -901,20 +893,18 @@ impl TempScenarioRepo {
             .duration_since(UNIX_EPOCH)
             .map(|duration| duration.as_nanos())
             .unwrap_or(0);
-        let path = std::env::temp_dir().join(format!(
-            "rts-lab-scenario-pr-{}-{unique}",
-            std::process::id()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("rts-lab-setup-pr-{}-{unique}", std::process::id()));
         if path.exists() {
             std::fs::remove_dir_all(&path).map_err(|err| {
                 LabScenarioSubmissionError::io(format!(
-                    "failed to clear existing temp scenario PR directory: {err}"
+                    "failed to clear existing temp setup PR directory: {err}"
                 ))
             })?;
         }
         std::fs::create_dir_all(&path).map_err(|err| {
             LabScenarioSubmissionError::io(format!(
-                "failed to create temp scenario PR directory: {err}"
+                "failed to create temp setup PR directory: {err}"
             ))
         })?;
         Ok(Self { path })
@@ -1026,19 +1016,19 @@ mod tests {
 
     fn preview_for(slug: &str) -> LabScenarioAuthoringPreview {
         let loaded =
-            load_lab_scenario_by_id("lategame").expect("bundled lategame scenario should load");
+            load_lab_scenario_by_id("lategame").expect("bundled lategame setup should load");
         validate_lab_scenario_authoring(
             LabScenarioAuthoringMetadata {
                 slug: slug.to_string(),
                 name: "Submission Test".to_string(),
                 title: "Submission Test".to_string(),
-                description: "A scenario used to test submission plumbing.".to_string(),
+                description: "A setup used to test submission plumbing.".to_string(),
                 tags: vec!["test".to_string()],
                 review_notes: Some("Check the generated PR body.".to_string()),
             },
             loaded.scenario,
         )
-        .expect("scenario authoring metadata should validate")
+        .expect("setup authoring metadata should validate")
     }
 
     #[test]
@@ -1097,7 +1087,7 @@ mod tests {
         let preview = preview_for("file-pair-test");
         let artifacts = build_submission_artifacts(&preview).expect("artifacts should build");
         let files = artifacts.files();
-        validate_pr_request_files(&files).expect("valid scenario plus manifest pair should pass");
+        validate_pr_request_files(&files).expect("valid setup plus manifest pair should pass");
 
         let mut duplicate = files.clone();
         duplicate[1] = duplicate[0].clone();
@@ -1167,7 +1157,7 @@ mod tests {
         assert!(body.contains("Entities: 227"));
         assert!(body.contains("Check the generated PR body."));
         assert!(body.contains("Manual Review Checklist"));
-        assert!(body.contains("scenario name"));
+        assert!(body.contains("setup name"));
         assert!(body.contains("map is the intended bundled map"));
         assert!(body.contains("player/faction setup"));
         assert!(body.contains("entity count (227)"));
@@ -1199,7 +1189,7 @@ mod tests {
         assert_eq!(captured.len(), 1);
         let request = &captured[0];
         assert_eq!(request.branch_name, "zvorygin/lab-scenario-submit-test");
-        assert_eq!(request.title, "Add lab scenario: Submission Test");
+        assert_eq!(request.title, "Add lab setup: Submission Test");
         assert_eq!(request.files.len(), 2);
         assert!(request
             .files

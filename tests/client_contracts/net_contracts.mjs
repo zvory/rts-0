@@ -78,11 +78,11 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   assert(sent[3].t === "lab" && sent[3].requestId === 12, "Net.lab sends lab request envelopes");
   assert(
     msg.labExportScenario(13, "saved").op.name === "saved",
-    "lab export builder includes a scenario name",
+    "lab setup export builder includes a name",
   );
   assert(
     msg.labImportScenario(14, { schemaVersion: 1 }).op.scenario.schemaVersion === 1,
-    "lab import builder includes a scenario payload",
+    "lab setup import builder includes a compatibility payload",
   );
   assert(!("replayOk" in msg.join("A", "main")), "join builder omits replayOk by default");
   assert(

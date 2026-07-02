@@ -8,8 +8,8 @@ export const LAB_SCENARIO_AUTHORING_LIMITS = Object.freeze({
   reviewNotes: 2000,
 });
 
-export function createLabScenarioAuthoringState({ defaultName = "Untitled lab scenario" } = {}) {
-  const name = cleanAuthoringText(defaultName) || "Untitled lab scenario";
+export function createLabScenarioAuthoringState({ defaultName = "Untitled lab setup" } = {}) {
+  const name = cleanAuthoringText(defaultName) || "Untitled lab setup";
   return {
     name,
     title: name,
@@ -28,7 +28,7 @@ export function slugifyLabScenario(value) {
     .replace(/^-+|-+$/g, "")
     .slice(0, LAB_SCENARIO_AUTHORING_LIMITS.slug)
     .replace(/-+$/g, "");
-  return slug || "lab-scenario";
+  return slug || "lab-setup";
 }
 
 export function validateLabScenarioAuthoringState(state) {

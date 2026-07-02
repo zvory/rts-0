@@ -361,11 +361,11 @@ and send an empty `maps[]` because map selection is disabled. The HTTP `GET /api
 uses the same `kind` values and includes only safe room metadata: room, kind, host name, map,
 creation time, active-slot counts, spectator count, phase, and join state.
 
-`GET /api/lab-scenarios` returns a bounded catalog of bundled lab scenario metadata:
+`GET /api/lab-scenarios` returns a bounded catalog of bundled lab checkpoint setup metadata:
 `[{ id, title, description, tags, map, playerCount, filename }]`. `id` is the stable safe token used
-in direct lab room URLs as `scenario=<id>`, `map` and `playerCount` mirror the listed scenario
+in direct lab room URLs as `scenario=<id>`, `map` and `playerCount` mirror the listed setup
 payload, and `filename` is the safe bundled JSON filename under
-`server/assets/lab-scenarios/`. The listing deliberately omits the full scenario JSON; lab starts
+`server/assets/lab-scenarios/`. The listing deliberately omits the full setup JSON; lab starts
 load it server-side from the manifest source of truth.
 
 `teamId` is nonzero for active match players and AI seats. New active players and default-added AI
@@ -717,7 +717,7 @@ change the wire shape or compact snapshot version.
 
 | Value/path | Rust owner | JS mirror path | Category | Current checker | Proposed future checker | Client-only exclusion reason | Compact version impact |
 |------------|------------|----------------|----------|-----------------|-------------------------|------------------------------|------------------------|
-| `ClientMessage`, `ServerMessage`, `Command`, HTTP lobby browser/create endpoints, HTTP lab scenario catalog endpoint, lobby/replay/branch message tags and fields | `server/crates/protocol/src/lib.rs`; lobby/lab catalog HTTP route handlers in `server/src/main.rs`; lab catalog source of truth in `server/src/lab_scenarios.rs`; room-task summaries in `server/src/lobby/**` | `client/src/protocol.js` `C`, `S`, `CMD`, `msg.*`, `decodeServerMessage`; `client/src/lab_catalog.js` consumes the HTTP lab catalog; future internal `client/src/protocol_*.js` or `client/src/protocol/**` files must re-export through `client/src/protocol.js` | wire/HTTP DTO | `tests/protocol_parity.mjs` compares the structured Rust protocol contract dump to JS tags/builders/decoder and asserts stable JS public exports; serde compile/tests plus `rts-protocol` public-surface integration coverage guard Rust export names; focused server tests cover lobby summary, create-lobby behavior, and lab catalog loading | Remaining source-text checks for DTO/lobby assertions outside the current dump scope | Lab catalog rows are HTTP metadata, not mirrored through `protocol.js`; they are consumed by the app-owned catalog selector | No compact bump unless a compact snapshot slot/code changes; normal JSON message changes still require Rust, JS, and docs together |
+| `ClientMessage`, `ServerMessage`, `Command`, HTTP lobby browser/create endpoints, HTTP lab setup catalog endpoint, lobby/replay/branch message tags and fields | `server/crates/protocol/src/lib.rs`; lobby/lab catalog HTTP route handlers in `server/src/main.rs`; lab catalog source of truth in `server/src/lab_scenarios.rs`; room-task summaries in `server/src/lobby/**` | `client/src/protocol.js` `C`, `S`, `CMD`, `msg.*`, `decodeServerMessage`; `client/src/lab_catalog.js` consumes the HTTP lab catalog; future internal `client/src/protocol_*.js` or `client/src/protocol/**` files must re-export through `client/src/protocol.js` | wire/HTTP DTO | `tests/protocol_parity.mjs` compares the structured Rust protocol contract dump to JS tags/builders/decoder and asserts stable JS public exports; serde compile/tests plus `rts-protocol` public-surface integration coverage guard Rust export names; focused server tests cover lobby summary, create-lobby behavior, and lab catalog loading | Remaining source-text checks for DTO/lobby assertions outside the current dump scope | Lab catalog rows are HTTP metadata, not mirrored through `protocol.js`; they are consumed by the app-owned catalog selector | No compact bump unless a compact snapshot slot/code changes; normal JSON message changes still require Rust, JS, and docs together |
 | Semantic start/snapshot/replay/analysis DTOs | `server/crates/contract/src/lib.rs`, re-exported by `server/crates/protocol/src/lib.rs` | `client/src/protocol.js` decoder output consumed by client modules | wire DTO | `tests/protocol_parity.mjs` fixture decodes selected compact fields; Rust serde tests cover local serialization | Structured contract/schema dump for semantic DTO fields plus compact round-trip fixtures | None; JS is a protocol mirror | Compact bump only when the live compact representation changes |
 | `terrain` codes | `server/crates/protocol/src/contract_metadata.rs` `terrain`, re-exported by `lib.rs`; adapter test checks rules terrain constants | `client/src/protocol_constants.js` `TERRAIN` and `PASSABLE`, re-exported by `client/src/protocol.js` | wire DTO / compact transport code | `tests/protocol_parity.mjs` extracts Rust terrain codes | Structured protocol constants dump | None | No compact snapshot bump today; terrain is in the `start.map.terrain` payload, not the compact snapshot frame |
 | `kinds` strings, `KIND`, `UNIT_KINDS`, `BUILDING_KINDS`, `RESOURCE_KINDS` | `server/crates/protocol/src/contract_metadata.rs` `kinds`, re-exported by `lib.rs`; domain identity is `rts-rules::EntityKind::stable_id()` | `client/src/protocol_constants.js` `KIND`, `UNIT_KINDS`, `BUILDING_KINDS`, `RESOURCE_KINDS`, re-exported by `client/src/protocol.js` | wire DTO plus domain adapter grouping | `tests/protocol_parity.mjs` checks kind code mapping; adapter tests round-trip every `EntityKind`; catalog parity checks many kind references | Structured protocol constants dump plus catalog export that classifies unit/building/resource groups | None | Bump only if compact kind codes or compact slots change; append-only codes otherwise |
@@ -1132,9 +1132,9 @@ the larger bounded lab command window instead of the ordinary live-player unit-i
 damage, while resources keep normal damage behavior. The current enabled player ids are mirrored in
 `start.lab.godModePlayers` and `labState.godModePlayers`.
 
-`LabScenarioPayload` accepts the current checkpoint-backed scenario container or a legacy
-`LabScenarioV1` compatibility file. New exports, validation previews, submissions, and bundled
-catalog assets use `LabCheckpointScenarioV1`:
+`LabScenarioPayload` accepts the current checkpoint-backed setup container or a legacy
+`LabScenarioV1` compatibility file. New setup exports, validation previews, submissions, and
+bundled catalog assets use `LabCheckpointScenarioV1`:
 ```
 {
   schemaVersion: 1,
@@ -1162,16 +1162,16 @@ catalog assets use `LabCheckpointScenarioV1`:
   checkpointPayload: string // GameCheckpointV1 JSON text
 }
 ```
-The map body is a scenario-container sibling of the checkpoint payload, not part of
-`GameCheckpointV1`. Import validates the scenario map data and materialized hash, the embedded
+The map body is a setup-container sibling of the checkpoint payload, not part of
+`GameCheckpointV1`. Import validates the setup map data and materialized hash, the embedded
 checkpoint `mapBinding`, player/team/resource/research/entity/count bounds, lab metadata,
 checkpoint byte limits, `metadata.lab.godModePlayers`, and a one-to-one `sourceEntityIdMap` whose
 `newId` values reference restored entities before replacing the live lab game. `sourceEntityIdMap`
 is returned as `outcome.entityIdMap` on checkpoint import so converted legacy files and fresh
 exports preserve existing id-remap callers.
 
-`LabScenarioV1` remains readable during the transition. It is versioned lab setup JSON with stable
-command intent, not a full saved snapshot:
+`LabScenarioV1` remains readable during the transition only as legacy scenario compatibility. It is
+versioned lab setup JSON with stable command intent, not a full saved snapshot:
 ```
 {
   schemaVersion: 1,
@@ -1208,7 +1208,7 @@ command intent, not a full saved snapshot:
   stagingX?: f32, stagingY?: f32
 }
 ```
-Export returns `{ scenario: LabCheckpointScenarioV1 }` in `labResult.outcome` using the requesting
+Setup export returns `{ scenario: LabCheckpointScenarioV1 }` in `labResult.outcome` using the requesting
 operator's current lab vision in `metadata.lab.vision` and the current room god-mode player ids in
 `metadata.lab.godModePlayers`. Legacy `LabScenarioV1` import validates the schema, map metadata,
 player/team/resource/research/entity/order fields, restores through the public lab `Game` API,
@@ -1217,16 +1217,16 @@ and future join default without overwriting already connected collaborators, res
 `godModePlayers` as room state, and returns an entity id remap in `outcome.entityIdMap`.
 Checkpoint-backed import applies scenario vision the same way, restores god mode from the embedded
 checkpoint payload, and returns the container `sourceEntityIdMap`.
-`validateScenario` exports the current authoritative lab `Game` as a checkpoint-backed scenario,
-applies authoring metadata, pretty formats the scenario JSON, checks duplicate catalog
-ids/filenames, id-matched filenames, manifest limits, scenario entity count, and scenario JSON byte
+`validateScenario` exports the current authoritative lab `Game` as a checkpoint-backed setup,
+applies authoring metadata, pretty formats the setup JSON, checks duplicate catalog
+ids/filenames, id-matched filenames, manifest limits, setup entity count, and setup JSON byte
 limits, validates map metadata and checkpoint map binding, and restores through the same lab `Game`
 API without mutating the room or creating any Git branch.
 `LabScenarioAuthoringMetadata` is:
 ```
 {
   slug: string,        // future catalog id and filename stem, max 48 catalog-safe bytes
-  name: string,        // exported scenario name, max 80 bytes
+  name: string,        // exported setup name, max 80 bytes
   title: string,       // catalog title, max 96 bytes
   description: string, // catalog description, max 320 bytes
   tags?: string[],     // up to 8 catalog-safe tags, max 32 bytes each
@@ -1284,8 +1284,8 @@ envelope because long lab sessions can exceed that control frame budget.
 ```
 `setVision` is excluded because it is per-operator projection metadata; reopening a lab replay
 starts from `initialSetup.metadata.lab.vision` and connected viewers may choose their own current
-lab vision afterward. `exportScenario`, `validateScenario`, and `submitScenario` are UI/control
-requests and never enter the durable stream. Checkpoint setup import uses rebase semantics: the
+lab vision afterward. `exportScenario`, `validateScenario`, and `submitScenario` are checkpoint
+setup UI/control requests and never enter the durable stream. Checkpoint setup import uses rebase semantics: the
 artifact replaces `initialSetup` with the imported `LabCheckpointScenarioV1` and clears prior
 operations instead of storing an import operation. That keeps later entity references unambiguous:
 after a rebase, operation entity ids refer to the rebased setup's current ids, and
@@ -1299,19 +1299,19 @@ operation payload sizes, non-finite coordinates, stale entity references, bad pl
 unit caps (`256` normally, `4096` when `ignoreCommandLimits` is true), timeline order, and rejects
 excluded session/setup/import operations before mutating a live lab game.
 
-Accepted validation returns `{ summary, preview }` in `labResult.outcome`; `preview` includes
+Accepted setup validation returns `{ summary, preview }` in `labResult.outcome`; `preview` includes
 `manifestEntry`, `manifestPath`, `scenarioPath`, deterministic `scenarioJson`, and `reviewNotes`
-for the future server-side PR submission flow.
+for the server-side setup PR submission flow.
 `submitScenario` uses the same authoritative export and validation path, then hands the validated
 preview to the disabled-by-default server-side PR submission service. It does not accept browser
-supplied scenario JSON, branch names, paths, commit content, or credentials. The room returns one
+supplied setup JSON, branch names, paths, commit content, or credentials. The room returns one
 final async `labResult` for the request: success has
 `{ status: "submitted", prUrl, branchName, scenarioPath, manifestPath }`; failure has `error` plus
 `outcome.code` using one of `credentialsMissing`, `configurationError`, `validationFailure`,
 `duplicateSlug`, `branchCollision`, `githubApiError`, `rateLimit`, or `ioError`. Each lab room can
-start at most one PR submission job so a bad client cannot spam repository writes; failed
+start at most one setup PR submission job so a bad client cannot spam repository writes; failed
 credential/capability checks happen before a job is counted. Generated draft PR bodies include
-scenario metadata, validation summary, author notes, and a reviewer checklist for scenario name,
+setup metadata, validation summary, author notes, and a reviewer checklist for setup name,
 map, player/faction setup, entity count, intended use, and manual lab smoke after merge.
 `facing` serializes unit body orientation, and `weaponFacing` serializes stable combat
 weapon/turret orientation for entities with combat state. `setUp` serializes only stable deployed
@@ -1326,8 +1326,7 @@ blanket fire orders for preview scenarios. Setup/teardown transition timers, pat
 gather/build execution progress, production/research queues, rally plans, attack cooldowns,
 ability cooldowns/uses/lockouts, projectile runtime state, transient snapshot fields, fog
 recipient projections, events, command logs, interpolation state, and lab operation result metadata
-are intentionally omitted because lab scenarios remain setup fixtures rather than mid-match
-savegames.
+are intentionally omitted because lab setup fixtures are not mid-match savegames.
 
 Reliable lab server messages:
 
@@ -1337,9 +1336,9 @@ Reliable lab server messages:
 | `labResult` | `requestId`, `ok`, `op`, `error?`, `outcome?` | Targeted reply for every lab request accepted by the room task. Rejected requests include `error`; accepted setup mutations may include typed outcome metadata such as `entityId`. |
 
 Lab protocol deliberately omits seek controls, broad lab simulation flags such as globally disabled
-damage, user-writable public scenario storage, fine-grained multi-operator permissions, visual
+damage, user-writable public setup storage, fine-grained multi-operator permissions, visual
 iteration hot reload, and `/dev/scenario` migration. Bundled prebuilt setups are selected before
-join through the HTTP lab scenario catalog and direct lab URL `scenario=<id>` tokens, not through a
+join through the HTTP lab setup catalog and direct lab URL `scenario=<id>` tokens, not through a
 normal-lobby command or a lab client op. Pause, speed, step, and room-local timeline metadata use
 the neutral room-time messages instead of overloading `LabClientOp`.
 
@@ -1355,7 +1354,7 @@ the neutral room-time messages instead of overloading `LabClientOp`.
 }
 ```
 The endpoint never exposes GitHub tokens or repository credentials. When unavailable, local lab
-scenario import/export and validation remain usable.
+setup import/export and validation remain usable.
 
 ### 2.7 Observer analysis state
 
