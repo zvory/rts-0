@@ -315,12 +315,20 @@ fn lab_error_text(err: &LabError) -> String {
             format!("invalid research {upgrade:?} for player {player_id}")
         }
         LabError::InvalidScenarioVersion { version } => {
-            format!("unsupported scenario version {version}")
+            format!("unsupported setup JSON version {version}")
         }
-        LabError::InvalidScenario { reason } => reason.clone(),
+        LabError::InvalidScenario { reason } => lab_setup_error_text(reason),
         LabError::InvalidMap { name, reason } => format!("invalid map {name:?}: {reason}"),
         LabError::InvalidCommand { reason } => reason.clone(),
     }
+}
+
+fn lab_setup_error_text(reason: &str) -> String {
+    reason
+        .replace("scenario kind", "legacy scenario kind")
+        .replace("scenario name", "setup name")
+        .replace("scenario must contain", "setup must contain")
+        .replace("scenario has too many", "setup has too many")
 }
 
 fn lab_outcome_json(outcome: &LabOpOutcome) -> serde_json::Value {
@@ -798,9 +806,7 @@ impl RoomTask {
                     request_id,
                     ok: false,
                     op: op_kind,
-                    error: Some(
-                        "lab setup import/export is not enabled in this room".to_string(),
-                    ),
+                    error: Some("lab setup import/export is not enabled in this room".to_string()),
                     outcome: None,
                 },
             );
@@ -940,7 +946,7 @@ impl RoomTask {
                 return lab_result_error(
                     request_id,
                     op,
-                    &format!("setup export did not produce a lab scenario payload: {err}"),
+                    &format!("setup export did not produce a lab setup payload: {err}"),
                 );
             }
         };
@@ -985,7 +991,7 @@ impl RoomTask {
             },
             crate::build_info::build_id(),
         )?;
-        serde_json::to_value(scenario).map_err(|err| format!("scenario export failed: {err}"))
+        serde_json::to_value(scenario).map_err(|err| format!("setup export failed: {err}"))
     }
 
     fn apply_lab_mutation(

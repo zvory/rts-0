@@ -675,11 +675,7 @@ async fn create_draft_pr_with_git_and_gh(
         .arg("config")
         .arg("user.name")
         .arg("Lab Setup Bot");
-    run_git_command(
-        &mut author_name_cmd,
-        "configure setup PR git author name",
-    )
-    .await?;
+    run_git_command(&mut author_name_cmd, "configure setup PR git author name").await?;
 
     let mut author_email_cmd = git_plain_command();
     author_email_cmd
@@ -688,11 +684,7 @@ async fn create_draft_pr_with_git_and_gh(
         .arg("config")
         .arg("user.email")
         .arg("lab-setup-bot@users.noreply.github.com");
-    run_git_command(
-        &mut author_email_cmd,
-        "configure setup PR git author email",
-    )
-    .await?;
+    run_git_command(&mut author_email_cmd, "configure setup PR git author email").await?;
 
     let mut commit_cmd = git_plain_command();
     commit_cmd
@@ -901,10 +893,8 @@ impl TempScenarioRepo {
             .duration_since(UNIX_EPOCH)
             .map(|duration| duration.as_nanos())
             .unwrap_or(0);
-        let path = std::env::temp_dir().join(format!(
-            "rts-lab-setup-pr-{}-{unique}",
-            std::process::id()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("rts-lab-setup-pr-{}-{unique}", std::process::id()));
         if path.exists() {
             std::fs::remove_dir_all(&path).map_err(|err| {
                 LabScenarioSubmissionError::io(format!(
