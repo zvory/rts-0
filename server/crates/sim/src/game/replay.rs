@@ -79,13 +79,10 @@ impl ReplayArtifactV1 {
             Some(_) | None if self.artifact_schema_version == REPLAY_ARTIFACT_SCHEMA_VERSION_V3 => {
                 Err(ReplayValidationError::CheckpointStartMissing)
             }
-            _ => Ok(Game::new_for_replay_with_map_metadata(
-                &self.players,
-                self.seed,
-                &self.player_loadouts,
-                map,
-                map_metadata,
-            )),
+            _ => Err(ReplayValidationError::UnsupportedArtifactSchema {
+                found: self.artifact_schema_version,
+                expected: REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION,
+            }),
         }
     }
 

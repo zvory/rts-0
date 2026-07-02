@@ -1,9 +1,8 @@
 use super::checkpoint_helpers::{assert_equivalent_games, tick_pair_for};
 use super::*;
 use crate::game::lab::{
-    LabCheckpointScenarioSource, LabEntityIdRemap, LabError, LabOp, LabOpOutcome,
-    LabSetCompletedResearch, LabSetPlayerResources, LabSpawnEntity,
-    LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION, LAB_SCENARIO_V1_SCHEMA_VERSION,
+    LabEntityIdRemap, LabError, LabOp, LabSetCompletedResearch, LabSetPlayerResources,
+    LabSpawnEntity, LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION,
 };
 use crate::game::upgrade::UpgradeKind;
 
@@ -94,7 +93,7 @@ fn assert_restore_invalid_map(
 }
 
 #[test]
-fn checkpoint_lab_scenario_from_v1_matches_direct_restore_and_records_source_metadata() {
+fn checkpoint_lab_scenario_export_matches_direct_state() {
     let mut authored = default_lab_game(0x5150_5001);
     authored
         .apply_lab_op(LabOp::SetPlayerResources(LabSetPlayerResources {
@@ -122,38 +121,23 @@ fn checkpoint_lab_scenario_from_v1_matches_direct_restore_and_records_source_met
         .expect("tank should spawn");
     authored.tick();
 
-    let mut scenario = authored.export_lab_scenario();
-    scenario.name = "Checkpoint Adapter Proof".to_string();
-
-    let mut direct = default_lab_game(0x5150_5002);
-    let LabOpOutcome::ScenarioRestored(direct_restore) = direct
-        .apply_lab_op(LabOp::RestoreScenario(Box::new(scenario.clone())))
-        .expect("direct scenario restore should succeed")
-    else {
-        panic!("restore should return id remap");
-    };
-
-    let checkpoint = Game::lab_checkpoint_scenario_from_v1(scenario, TEST_BUILD_SHA)
-        .expect("scenario should convert into checkpoint container");
+    let checkpoint = authored
+        .export_lab_checkpoint_scenario("Checkpoint Export Proof".to_string(), TEST_BUILD_SHA)
+        .expect("checkpoint setup should export");
     assert_eq!(
         checkpoint.schema_version,
         LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION
     );
     assert_eq!(checkpoint.kind, "labCheckpointScenario");
-    assert_eq!(checkpoint.name, "Checkpoint Adapter Proof");
+    assert_eq!(checkpoint.name, "Checkpoint Export Proof");
     assert_eq!(checkpoint.seed, 0x5150_5001);
-    assert_eq!(checkpoint.metadata.exported_tick, direct.tick_count());
-    assert_eq!(
-        checkpoint.metadata.source_scenario,
-        Some(LabCheckpointScenarioSource {
-            kind: "labScenario".to_string(),
-            schema_version: LAB_SCENARIO_V1_SCHEMA_VERSION,
-        })
-    );
-    assert_eq!(
-        checkpoint.metadata.source_entity_id_map,
-        direct_restore.entity_id_map
-    );
+    assert_eq!(checkpoint.metadata.exported_tick, authored.tick_count());
+    assert_eq!(checkpoint.metadata.source_scenario, None);
+    assert!(checkpoint
+        .metadata
+        .source_entity_id_map
+        .iter()
+        .all(|entry| entry.old_id == entry.new_id));
     assert_eq!(
         checkpoint.map.data.terrain.len(),
         (checkpoint.map.data.size * checkpoint.map.data.size) as usize
@@ -173,7 +157,8 @@ fn checkpoint_lab_scenario_from_v1_matches_direct_restore_and_records_source_met
 
     let mut restored = Game::restore_lab_checkpoint_scenario(checkpoint)
         .expect("checkpoint scenario restore should succeed");
-    assert_equivalent_games(&direct, &restored, "checkpoint-backed lab scenario restore");
+    assert_equivalent_games(&authored, &restored, "checkpoint-backed lab scenario restore");
+    let mut direct = authored;
     tick_pair_for(
         &mut direct,
         &mut restored,

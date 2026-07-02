@@ -15929,10 +15929,6 @@
         2
       ]
     },
-    "sourceScenario": {
-      "kind": "labScenario",
-      "schemaVersion": 1
-    },
     "sourceEntityIdMap": [
       {
         "oldId": 1,

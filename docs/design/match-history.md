@@ -62,8 +62,8 @@ Replay artifacts live in `match_replays`, keyed one-to-one by `match_id`:
 `score_screen`. New replay rows write `artifactSchemaVersion: 3`, whose `startState` carries the
 launch map binding and an embedded tick-zero `GameCheckpointV1` text payload. The authoritative
 command stream, `durationTicks`, `winnerId`, `winnerTeamId`, and `finalScores` are attached when
-the artifact is finalized at match end. Legacy schema 2 rows have no `startState` and remain
-loadable through the old map/loadout start reconstruction path. The replay `artifact_json` carries
+the artifact is finalized at match end. Schema 2 rows have no `startState` and are intentionally
+rejected by current replay compatibility checks. The replay `artifact_json` carries
 `players[].teamId`, `winnerId`, `winnerTeamId`, and `finalScores[].teamId`; `winner_name` remains
 the display-compatible name for the first living player represented by `winnerId`.
 

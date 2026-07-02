@@ -3,54 +3,26 @@
 //! Lab callers get typed operations with validation at the `Game` seam. This module owns the repair
 //! pass so room/client code never reaches into stores, fog, spatial indexes, or economy state.
 
-use std::collections::{HashMap, HashSet};
-use std::str::FromStr;
-
 use serde::{Deserialize, Serialize};
 
 use crate::config;
-use crate::game::entity::{EntityKind, EntityStore, Order, NEUTRAL};
+use crate::game::entity::{Entity, EntityKind, EntityStore, Order, OrderIntent, NEUTRAL};
 use crate::game::map::Map;
-use crate::game::services::geometry::{
-    building_rect_for_entity, circle_intersects_rect, CircleBody,
-};
 use crate::game::services::occupancy::{footprint_center, footprint_tiles, Occupancy};
 use crate::game::services::{production, standability};
-use crate::game::teams::TeamRelations;
 use crate::game::upgrade::UpgradeKind;
 use crate::protocol::Command;
 use crate::rules;
 
 use super::{systems, Game, MapMetadata, PlayerInit};
 
-mod orientation;
-mod orders;
-#[cfg(test)]
-mod orders_tests;
 mod checkpoint_scenario;
-mod resource_nodes;
-mod scenario;
-mod scenario_export;
 
-use orientation::{restore_lab_entity_orientation, restore_lab_entity_setup};
-use orders::{
-    clear_lab_production_state, order_intent_references_entity, order_references_entity,
-    restore_lab_entity_orders,
-};
-use scenario::{
-    validate_lab_entity_setup_shape, validate_lab_scenario_shape,
-    MAX_LAB_SCENARIO_UPGRADES_PER_PLAYER,
-};
 pub use checkpoint_scenario::{
     LabCheckpointScenarioMap, LabCheckpointScenarioMapData, LabCheckpointScenarioMetadata,
     LabCheckpointScenarioSource, LabCheckpointScenarioV1, LabScenarioTile,
 };
-pub use scenario::{
-    LabScenarioEntity, LabScenarioMap, LabScenarioMetadata, LabScenarioOrder, LabScenarioPlayer,
-    LabScenarioPoint, LabScenarioResearch, LabScenarioResources, LabScenarioV1,
-};
 
-pub const LAB_SCENARIO_V1_SCHEMA_VERSION: u32 = scenario::LAB_SCENARIO_V1_SCHEMA_VERSION;
 pub const LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION: u32 =
     checkpoint_scenario::LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION;
 
@@ -63,7 +35,6 @@ pub enum LabOp {
     SetPlayerResources(LabSetPlayerResources),
     SetPlayerGodMode { player_id: u32, enabled: bool },
     SetCompletedResearch(LabSetCompletedResearch),
-    RestoreScenario(Box<LabScenarioV1>),
     RestoreCheckpointScenario(Box<LabCheckpointScenarioV1>),
 }
 
@@ -222,7 +193,6 @@ impl Game {
                 self.lab_set_player_god_mode(player_id, enabled)
             }
             LabOp::SetCompletedResearch(input) => self.lab_set_completed_research(input),
-            LabOp::RestoreScenario(scenario) => self.restore_lab_scenario(*scenario),
             LabOp::RestoreCheckpointScenario(scenario) => {
                 self.restore_lab_checkpoint_scenario_op(*scenario)
             }
@@ -268,15 +238,6 @@ impl Game {
         self.state.lab_god_mode_players.iter().copied().collect()
     }
 
-    pub fn restore_lab_scenario(
-        &mut self,
-        scenario: LabScenarioV1,
-    ) -> Result<LabOpOutcome, LabError> {
-        let (restored, restore) = Self::lab_game_from_scenario(scenario)?;
-        *self = restored;
-        Ok(LabOpOutcome::ScenarioRestored(restore))
-    }
-
     pub fn restore_lab_checkpoint_scenario_op(
         &mut self,
         scenario: LabCheckpointScenarioV1,
@@ -287,141 +248,6 @@ impl Game {
         Ok(LabOpOutcome::ScenarioRestored(LabScenarioRestore {
             entity_id_map,
         }))
-    }
-
-    fn lab_game_from_scenario(
-        scenario: LabScenarioV1,
-    ) -> Result<(Game, LabScenarioRestore), LabError> {
-        validate_lab_scenario_shape(&scenario)?;
-
-        let mut seen_players = HashSet::new();
-        let mut inits = Vec::with_capacity(scenario.players.len());
-        for player in &scenario.players {
-            if player.id == NEUTRAL || !seen_players.insert(player.id) {
-                return Err(LabError::InvalidPlayer {
-                    player_id: player.id,
-                });
-            }
-            if rules::faction::catalog_for_or_default_empty(&player.faction_id).is_none() {
-                return Err(LabError::InvalidScenario {
-                    reason: format!("unknown faction {:?}", player.faction_id),
-                });
-            }
-            if player.name.len() > 48 || player.color.len() > 32 {
-                return Err(LabError::InvalidScenario {
-                    reason: format!("player {} has invalid display metadata", player.id),
-                });
-            }
-            if player.research.completed.len() > MAX_LAB_SCENARIO_UPGRADES_PER_PLAYER {
-                return Err(LabError::InvalidScenario {
-                    reason: format!("player {} has too many upgrades", player.id),
-                });
-            }
-            inits.push(PlayerInit {
-                id: player.id,
-                team_id: player.team_id,
-                faction_id: player.faction_id.clone(),
-                name: player.name.clone(),
-                color: player.color.clone(),
-                is_ai: player.is_ai,
-            });
-        }
-
-        let start_players: Vec<_> = inits
-            .iter()
-            .map(|player| {
-                (
-                    player.id,
-                    super::teams::normalize_team_id(player.id, player.team_id),
-                )
-            })
-            .collect();
-        let map = Map::load_for_players(&scenario.map.name, &start_players, scenario.seed)
-            .map_err(|reason| LabError::InvalidMap {
-                name: scenario.map.name.clone(),
-                reason,
-            })?;
-        let map_metadata =
-            Map::metadata_for_name(&scenario.map.name).map_err(|reason| LabError::InvalidMap {
-                name: scenario.map.name.clone(),
-                reason,
-            })?;
-        if map_metadata.schema_version != scenario.map.schema_version
-            || map_metadata.content_hash != scenario.map.content_hash
-        {
-            return Err(LabError::InvalidMap {
-                name: scenario.map.name,
-                reason: "scenario map metadata does not match the bundled map".to_string(),
-            });
-        }
-
-        let mut restored = Game::new_lab(&inits, scenario.seed, map, map_metadata);
-        for player in &scenario.players {
-            let Some(state) = restored.state.players
-                .iter_mut()
-                .find(|state| state.id == player.id)
-            else {
-                return Err(LabError::InvalidPlayer {
-                    player_id: player.id,
-                });
-            };
-            state.set_resources(player.resources.steel, player.resources.oil);
-            state.upgrades.clear();
-            for upgrade_id in &player.research.completed {
-                let upgrade =
-                    UpgradeKind::from_str(upgrade_id).map_err(|_| LabError::InvalidResearch {
-                        player_id: player.id,
-                        upgrade: upgrade_id.clone(),
-                    })?;
-                validate_upgrade_for_player(state, upgrade)?;
-                state.upgrades.insert(upgrade);
-            }
-        }
-
-        restored.state.entities = EntityStore::new();
-        let mut entity_id_map = Vec::with_capacity(scenario.entities.len());
-        let mut seen_entities = HashSet::new();
-        for entity in &scenario.entities {
-            if entity.id == 0 || !seen_entities.insert(entity.id) {
-                return Err(LabError::InvalidScenario {
-                    reason: format!("duplicate or zero entity id {}", entity.id),
-                });
-            }
-            let kind = EntityKind::from_str(&entity.kind).map_err(|_| LabError::InvalidKind {
-                kind: entity.kind.clone(),
-                operation: "restoreScenario",
-            })?;
-            validate_lab_entity_setup_shape(entity, kind)?;
-            let new_id = restored.restore_lab_entity(entity, kind)?;
-            entity_id_map.push(LabEntityIdRemap {
-                old_id: entity.id,
-                new_id,
-            });
-        }
-        let id_map: HashMap<u32, u32> = entity_id_map
-            .iter()
-            .map(|remap| (remap.old_id, remap.new_id))
-            .collect();
-        let teams =
-            TeamRelations::from_player_teams(restored.state.players.iter().map(|p| (p.id, p.team_id)));
-        for entity in &scenario.entities {
-            let Some(new_id) = id_map.get(&entity.id).copied() else {
-                continue;
-            };
-            restore_lab_entity_orders(
-                &restored.state.map,
-                &mut restored.state.entities,
-                restored.derived.pathing_mut(),
-                restored.state.tick,
-                &teams,
-                entity,
-                new_id,
-                &id_map,
-            )?;
-        }
-        restored.repair_lab_state();
-
-        Ok((restored, LabScenarioRestore { entity_id_map }))
     }
 
     fn lab_spawn_entity(&mut self, input: LabSpawnEntity) -> Result<LabOpOutcome, LabError> {
@@ -576,100 +402,6 @@ impl Game {
             upgrade: input.upgrade,
             completed: input.completed,
         })
-    }
-
-    fn restore_lab_entity(
-        &mut self,
-        entity: &LabScenarioEntity,
-        kind: EntityKind,
-    ) -> Result<u32, LabError> {
-        validate_world_position(&self.state.map, entity.x, entity.y)?;
-        if entity.hp == 0 {
-            return Err(LabError::InvalidScenario {
-                reason: format!("entity {} has zero hp", entity.id),
-            });
-        }
-
-        let new_id = if kind.is_unit() {
-            if !entity.completed || entity.construction_progress.is_some() {
-                return Err(LabError::InvalidScenario {
-                    reason: format!("unit {} cannot have construction state", entity.id),
-                });
-            }
-            self.validate_owner(entity.owner)?;
-            self.validate_unit_position(&self.state.entities, kind, entity.x, entity.y)?;
-            let id = self.state.entities
-                .spawn_unit(entity.owner, kind, entity.x, entity.y)
-                .ok_or_else(|| invalid_kind(kind, "restoreScenario"))?;
-            if let Some(restored) = self.state.entities.get_mut(id) {
-                restored.hp = entity.hp.min(restored.max_hp).max(1);
-                restore_lab_entity_orientation(entity, restored)?;
-                restore_lab_entity_setup(&self.state.map, entity, restored)?;
-            }
-            id
-        } else if kind.is_building() {
-            self.validate_owner(entity.owner)?;
-            let (_, _, x, y) =
-                self.validate_building_position(&self.state.entities, kind, entity.x, entity.y)?;
-            let completed = entity.completed && entity.construction_progress.is_none();
-            let id = self.state.entities
-                .spawn_building(entity.owner, kind, x, y, completed)
-                .ok_or_else(|| invalid_kind(kind, "restoreScenario"))?;
-            if let Some(restored) = self.state.entities.get_mut(id) {
-                if let Some(progress) = entity.construction_progress {
-                    if entity.completed {
-                        return Err(LabError::InvalidScenario {
-                            reason: format!(
-                                "building {} cannot be both completed and under construction",
-                                entity.id
-                            ),
-                        });
-                    }
-                    restored.set_construction_progress(progress);
-                }
-                if entity.construction_total.is_some_and(|total| {
-                    restored
-                        .construction
-                        .as_ref()
-                        .is_some_and(|state| state.total != total)
-                }) {
-                    return Err(LabError::InvalidScenario {
-                        reason: format!("building {} construction total mismatch", entity.id),
-                    });
-                }
-                restored.hp = entity.hp.min(restored.max_hp).max(1);
-                restore_lab_entity_orientation(entity, restored)?;
-            }
-            id
-        } else if kind.is_node() {
-            if entity.owner != NEUTRAL {
-                return Err(LabError::InvalidOwner {
-                    owner: entity.owner,
-                });
-            }
-            let (x, y) = resource_nodes::restore_resource_node_position(
-                &self.state.map,
-                &self.state.entities,
-                kind,
-                entity.x,
-                entity.y,
-                kind == EntityKind::Oil,
-            )?;
-            let id = self.state.entities
-                .spawn_node(kind, x, y)
-                .ok_or_else(|| invalid_kind(kind, "restoreScenario"))?;
-            if let Some(restored) = self.state.entities.get_mut(id) {
-                if let Some(remaining) = entity.resource_remaining {
-                    if let Some(node) = restored.resource_node.as_mut() {
-                        node.remaining = remaining;
-                    }
-                }
-            }
-            id
-        } else {
-            return Err(invalid_kind(kind, "restoreScenario"));
-        };
-        Ok(new_id)
     }
 
     fn validate_owner(&self, owner: u32) -> Result<(), LabError> {
@@ -864,37 +596,29 @@ fn building_top_left_for_center(
     Ok((tile_x, tile_y, center_x, center_y))
 }
 
-fn validate_resource_node_position(
-    map: &Map,
-    entities: &EntityStore,
-    x: f32,
-    y: f32,
-) -> Result<(), LabError> {
-    validate_world_position(map, x, y)?;
-    let (tx, ty) = map.tile_of(x, y);
-    if !map.is_passable(tx as i32, ty as i32) {
-        return Err(LabError::InvalidPosition {
-            x,
-            y,
-            reason: "resource node must be on passable terrain",
-        });
+fn clear_lab_production_state(entity: &mut Entity) {
+    if let Some(production) = entity.production.as_mut() {
+        production.queue.clear();
+        production.research_queue.clear();
+        production.rally_point = None;
+        production.rally_queue.clear();
     }
-    let body = CircleBody {
-        x,
-        y,
-        radius: config::TILE_SIZE as f32 * 0.5,
-    };
-    for entity in entities.iter() {
-        if !entity.is_building() {
-            continue;
-        }
-        if building_rect_for_entity(map, entity)
-            .is_some_and(|rect| circle_intersects_rect(body, rect))
-        {
-            return Err(LabError::OccupiedPosition { x, y });
-        }
+}
+
+fn order_references_entity(order: &Order, entity_id: u32) -> bool {
+    order.attack_target() == Some(entity_id)
+        || order.gather_node() == Some(entity_id)
+        || order.build_site() == Some(entity_id)
+        || order.deconstruct_target() == Some(entity_id)
+}
+
+fn order_intent_references_entity(intent: &OrderIntent, entity_id: u32) -> bool {
+    match intent {
+        OrderIntent::Attack(target) => target.target == entity_id,
+        OrderIntent::Gather(gather) => gather.node == entity_id,
+        OrderIntent::Deconstruct(target) => target.target == entity_id,
+        _ => false,
     }
-    Ok(())
 }
 
 fn validate_upgrade_for_player(
@@ -1299,7 +1023,7 @@ mod tests {
     }
 
     #[test]
-    fn lab_scenario_export_restore_round_trips_setup_with_id_remap() {
+    fn lab_checkpoint_setup_round_trips_exact_state_with_id_map() {
         let mut game = default_map_game();
         let tank_facing = -1.25;
         let tank_weapon_facing = 0.75;
@@ -1346,43 +1070,24 @@ mod tests {
             gun.set_desired_weapon_facing(gun_weapon_facing);
         }
 
-        let scenario = game.export_lab_scenario();
-        let exported_tank = scenario
-            .entities
+        let scenario = game
+            .export_lab_checkpoint_scenario("Checkpoint setup".to_string(), "test-build")
+            .expect("checkpoint setup should export");
+        assert_eq!(scenario.metadata.source_scenario, None);
+        assert!(scenario
+            .metadata
+            .source_entity_id_map
             .iter()
-            .find(|entity| entity.id == tank_id)
-            .expect("exported tank");
-        assert!(!exported_tank.set_up);
-        assert_eq!(exported_tank.facing, Some(tank_facing));
-        assert_eq!(exported_tank.weapon_facing, Some(tank_weapon_facing));
-        assert_eq!(exported_tank.setup_facing, None);
-        assert_eq!(exported_tank.setup_target, None);
-        let exported_gun = scenario
-            .entities
+            .any(|entry| entry.old_id == tank_id && entry.new_id == tank_id));
+        assert!(scenario
+            .metadata
+            .source_entity_id_map
             .iter()
-            .find(|entity| entity.id == gun_id)
-            .expect("exported gun");
-        assert!(exported_gun.set_up);
-        assert_angle_close(exported_gun.setup_facing.unwrap_or_default(), setup_facing);
-        assert_angle_close(
-            exported_gun.weapon_facing.unwrap_or_default(),
-            gun_weapon_facing,
-        );
-        assert!(exported_gun.setup_target.is_some());
+            .any(|entry| entry.old_id == gun_id && entry.new_id == gun_id));
 
-        let mut restored = default_map_game();
-        let LabOpOutcome::ScenarioRestored(result) = restored
-            .apply_lab_op(LabOp::RestoreScenario(Box::new(scenario)))
-            .expect("scenario restore should succeed")
-        else {
-            panic!("unexpected outcome");
-        };
-        let remap = result
-            .entity_id_map
-            .iter()
-            .find(|entry| entry.old_id == tank_id)
-            .expect("spawned entity should be remapped");
-        let restored_tank = restored.state.entities.get(remap.new_id).expect("restored tank");
+        let mut restored = Game::restore_lab_checkpoint_scenario(scenario.clone())
+            .expect("checkpoint setup should restore");
+        let restored_tank = restored.state.entities.get(tank_id).expect("restored tank");
         assert_eq!(restored_tank.kind, EntityKind::Tank);
         assert_eq!(restored_tank.owner, 1);
         assert!(matches!(restored_tank.weapon_setup(), WeaponSetup::Packed));
@@ -1391,13 +1096,8 @@ mod tests {
             restored_tank.weapon_facing().unwrap_or_default(),
             tank_weapon_facing,
         );
-        let gun_remap = result
-            .entity_id_map
-            .iter()
-            .find(|entry| entry.old_id == gun_id)
-            .expect("gun should be remapped");
         let restored_gun = restored.state.entities
-            .get(gun_remap.new_id)
+            .get(gun_id)
             .expect("restored gun");
         assert_eq!(restored_gun.kind, EntityKind::AntiTankGun);
         assert!(matches!(restored_gun.weapon_setup(), WeaponSetup::Deployed));
@@ -1409,46 +1109,6 @@ mod tests {
             restored_gun.weapon_facing().unwrap_or_default(),
             gun_weapon_facing,
         );
-    }
-
-    #[test]
-    fn lab_scenario_restore_rejects_invalid_upgrade_string() {
-        let mut game = default_map_game();
-        let mut scenario = game.export_lab_scenario();
-        scenario.players[0]
-            .research
-            .completed
-            .push("not_real".to_string());
-
-        assert!(matches!(
-            game.apply_lab_op(LabOp::RestoreScenario(Box::new(scenario))),
-            Err(LabError::InvalidResearch { player_id: 1, .. })
-        ));
-    }
-
-    #[test]
-    fn lab_scenario_restore_rejects_invalid_schema_fields() {
-        let mut game = default_map_game();
-        let mut scenario = game.export_lab_scenario();
-        scenario.kind = "snapshot".to_string();
-        assert!(matches!(
-            game.apply_lab_op(LabOp::RestoreScenario(Box::new(scenario))),
-            Err(LabError::InvalidScenario { .. })
-        ));
-
-        let mut scenario = game.export_lab_scenario();
-        scenario.name.clear();
-        assert!(matches!(
-            game.apply_lab_op(LabOp::RestoreScenario(Box::new(scenario))),
-            Err(LabError::InvalidScenario { .. })
-        ));
-
-        let mut scenario = game.export_lab_scenario();
-        scenario.entities[0].set_up = true;
-        scenario.entities[0].setup_facing = Some(0.0);
-        assert!(matches!(
-            game.apply_lab_op(LabOp::RestoreScenario(Box::new(scenario))),
-            Err(LabError::InvalidScenario { .. })
-        ));
+        restored.tick();
     }
 }

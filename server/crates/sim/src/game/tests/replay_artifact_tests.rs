@@ -101,7 +101,7 @@ fn replay_start_capture_rejects_pending_commands() {
 #[test]
 fn replay_artifact_requires_faction_schema_and_defaults_missing_winner_team() {
     let json = serde_json::json!({
-        "artifactSchemaVersion": 2,
+        "artifactSchemaVersion": 3,
         "serverBuildSha": "test-sha",
         "mapName": "Default",
         "mapSchemaVersion": 1,
@@ -203,7 +203,7 @@ fn replay_validation_rejects_incompatible_build_and_map_metadata() {
 }
 
 #[test]
-fn replay_artifact_legacy_schema_two_still_loads_without_checkpoint_start() {
+fn replay_artifact_schema_two_is_intentionally_rejected() {
     let players = players();
     let game = Game::new(&players, 0x1234_5678);
     let map = game.map_metadata().clone();
@@ -224,7 +224,13 @@ fn replay_artifact_legacy_schema_two_still_loads_without_checkpoint_start() {
     });
     let artifact: ReplayArtifactV1 = serde_json::from_value(json).unwrap();
 
-    artifact.validate_against("sha-a", game.map_metadata()).unwrap();
+    assert!(matches!(
+        artifact.validate_against("sha-a", game.map_metadata()),
+        Err(ReplayValidationError::UnsupportedArtifactSchema {
+            found: 2,
+            ..
+        })
+    ));
     assert!(serde_json::to_value(&artifact).unwrap().get("startState").is_none());
 }
 

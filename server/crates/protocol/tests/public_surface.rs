@@ -7,9 +7,10 @@ use rts_protocol::{
     CompactSlotSchemas, DebugPathPoint, DebugPathView, DiagnosticCapabilities, EntityView, Event,
     LabClientOp, LabReplayArtifactV1, LabReplayAuthoringMetadata, LabReplayOperation,
     LabReplayOperationEntry, LabReplayTimelineMetadata, LabReplayValidationError, LabResult,
-    LabScenarioEntity, LabScenarioLabMetadata, LabScenarioMap, LabScenarioMetadata,
-    LabScenarioOrder, LabScenarioPlayer, LabScenarioV1, LabStartMetadata, LabStartRole, LabState,
-    LabVisionMode, LivePauseState, LobbyPlayer, MapInfo, MatchControlCapabilities,
+    LabCheckpointScenarioMap, LabCheckpointScenarioMapData, LabCheckpointScenarioMetadata,
+    LabCheckpointScenarioSource, LabCheckpointScenarioV1, LabScenarioEntityIdRemap,
+    LabScenarioLabMetadata, LabScenarioPayload, LabScenarioTile, LabStartMetadata, LabStartRole,
+    LabState, LabVisionMode, LivePauseState, LobbyPlayer, MapInfo, MatchControlCapabilities,
     MovementPathDiagnosticScope, NoticeSeverity, ObserverAnalysisKindCount, ObserverAnalysisPayload,
     ObserverAnalysisPlayer, ObserverAnalysisProduction, ObserverAnalysisResourcesLost,
     OrderPlanMarker, PlayerResourceSnapshot, PlayerScore, PlayerStart, ProtocolCompactCodes,
@@ -57,13 +58,15 @@ fn stable_rust_public_surface_compiles() {
     assert_type::<LabReplayTimelineMetadata>();
     assert_type::<LabReplayValidationError>();
     assert_type::<LabResult>();
-    assert_type::<LabScenarioEntity>();
+    assert_type::<LabCheckpointScenarioMap>();
+    assert_type::<LabCheckpointScenarioMapData>();
+    assert_type::<LabCheckpointScenarioMetadata>();
+    assert_type::<LabCheckpointScenarioSource>();
+    assert_type::<LabCheckpointScenarioV1>();
+    assert_type::<LabScenarioEntityIdRemap>();
     assert_type::<LabScenarioLabMetadata>();
-    assert_type::<LabScenarioMap>();
-    assert_type::<LabScenarioMetadata>();
-    assert_type::<LabScenarioOrder>();
-    assert_type::<LabScenarioPlayer>();
-    assert_type::<LabScenarioV1>();
+    assert_type::<LabScenarioPayload>();
+    assert_type::<LabScenarioTile>();
     assert_type::<LabStartMetadata>();
     assert_type::<LabStartRole>();
     assert_type::<LabState>();

@@ -10,22 +10,17 @@ use std::path::{Path, PathBuf};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
-use rts_sim::game::lab::{
-    LabCheckpointScenarioV1 as SimLabCheckpointScenarioV1, LabError, LabOp, LabOpOutcome,
-    LabScenarioRestore, LabScenarioV1 as SimLabScenarioV1,
-};
-use rts_sim::game::map::Map;
-use rts_sim::game::{Game, PlayerInit};
+use rts_sim::game::lab::{LabCheckpointScenarioV1 as SimLabCheckpointScenarioV1, LabError, LabOp};
+use rts_sim::game::Game;
 use serde::{Deserialize, Serialize};
 
 use crate::protocol::{
     LabCheckpointScenarioV1, LabScenarioAuthoringMetadata, LabScenarioLabMetadata,
-    LabScenarioPayload, LabScenarioV1, LabVisionMode, TeamId,
+    LabScenarioPayload, LabVisionMode, TeamId,
 };
 
 const LAB_SCENARIO_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/lab-scenarios");
 const LAB_SCENARIO_MANIFEST: &str = "manifest.json";
-const LAB_SCENARIO_KIND: &str = "labScenario";
 const LAB_CHECKPOINT_SCENARIO_KIND: &str = "labCheckpointScenario";
 const LAB_CHECKPOINT_ASSET_BUILD_SHA: &str = "bundled-lab-scenario-asset-v1";
 const MAX_SCENARIO_ID_LEN: usize = 48;
@@ -81,26 +76,23 @@ struct LabScenarioCatalogError {
 pub struct LoadedLabScenario {
     pub entry: LabScenarioCatalogEntry,
     pub scenario: LabScenarioPayload,
-    sim_scenario: LoadedLabScenarioBody,
-}
-
-#[derive(Debug, Clone)]
-enum LoadedLabScenarioBody {
-    Legacy(SimLabScenarioV1),
-    Checkpoint(SimLabCheckpointScenarioV1),
+    sim_scenario: SimLabCheckpointScenarioV1,
 }
 
 impl LoadedLabScenario {
     pub fn build_game(&self) -> Result<Game, String> {
-        build_game_from_loaded_body(&self.scenario, self.sim_scenario.clone())
+        build_game_from_checkpoint(
+            &checkpoint_payload(&self.scenario),
+            self.sim_scenario.clone(),
+        )
     }
 
     pub fn build_checkpoint_game(&self) -> Result<Game, String> {
-        build_checkpoint_game_from_loaded_body(&self.scenario, self.sim_scenario.clone())
+        self.build_game()
     }
 
     pub fn is_checkpoint_backed(&self) -> bool {
-        matches!(self.scenario, LabScenarioPayload::Checkpoint(_))
+        true
     }
 }
 
@@ -283,7 +275,7 @@ fn load_lab_scenario_entry(
     })?;
     let scenario: LabScenarioPayload = serde_json::from_str(&json)
         .map_err(|err| format!("invalid lab setup {:?} JSON: {err}", entry.id))?;
-    let sim_scenario = payload_to_loaded_body(&scenario)
+    let sim_scenario = payload_to_sim_checkpoint(&scenario)
         .map_err(|err| format!("invalid lab setup {:?} payload: {err}", entry.id))?;
     Ok(LoadedLabScenario {
         entry: entry.clone(),
@@ -343,26 +335,22 @@ struct LabScenarioFacts {
     entity_count: usize,
 }
 
-fn payload_to_loaded_body(scenario: &LabScenarioPayload) -> Result<LoadedLabScenarioBody, String> {
+fn checkpoint_payload(scenario: &LabScenarioPayload) -> LabCheckpointScenarioV1 {
     match scenario {
-        LabScenarioPayload::Legacy(scenario) => {
-            validate_lab_scenario_lab_metadata(&scenario.metadata.lab, &scenario.players)?;
-            Ok(LoadedLabScenarioBody::Legacy(protocol_scenario_to_sim(
-                scenario,
-            )?))
-        }
-        LabScenarioPayload::Checkpoint(scenario) => {
-            let sim_scenario = protocol_checkpoint_to_sim(scenario)?;
-            Ok(LoadedLabScenarioBody::Checkpoint(sim_scenario))
-        }
+        LabScenarioPayload::Checkpoint(scenario) => scenario.clone(),
     }
 }
 
-fn protocol_scenario_to_sim(scenario: &LabScenarioV1) -> Result<SimLabScenarioV1, String> {
-    serde_json::from_value(
-        serde_json::to_value(scenario).map_err(|err| format!("serialize failed: {err}"))?,
-    )
-    .map_err(|err| err.to_string())
+fn checkpoint_payload_ref(scenario: &LabScenarioPayload) -> &LabCheckpointScenarioV1 {
+    match scenario {
+        LabScenarioPayload::Checkpoint(scenario) => scenario,
+    }
+}
+
+fn payload_to_sim_checkpoint(
+    scenario: &LabScenarioPayload,
+) -> Result<SimLabCheckpointScenarioV1, String> {
+    protocol_checkpoint_to_sim(checkpoint_payload_ref(scenario))
 }
 
 fn protocol_checkpoint_to_sim(
@@ -404,31 +392,7 @@ fn checkpoint_backed_authoring_scenario(
             scenario.name = name.to_string();
             Ok(scenario)
         }
-        LabScenarioPayload::Legacy(mut scenario) => {
-            scenario.name = name.to_string();
-            legacy_scenario_to_checkpoint_protocol(scenario, crate::build_info::build_id())
-        }
     }
-}
-
-fn legacy_scenario_to_checkpoint_protocol(
-    scenario: LabScenarioV1,
-    server_build_sha: &str,
-) -> Result<LabCheckpointScenarioV1, String> {
-    validate_lab_scenario_lab_metadata(&scenario.metadata.lab, &scenario.players)?;
-    let sim_scenario = protocol_scenario_to_sim(&scenario)
-        .map_err(|err| format!("invalid legacy scenario payload: {err}"))?;
-    let (game, restore) = build_game_from_legacy_scenario(&scenario, sim_scenario)?;
-    let mut checkpoint = game
-        .export_lab_checkpoint_scenario(scenario.name.clone(), server_build_sha)
-        .map_err(|err| format!("checkpoint setup export failed: {}", lab_error_text(&err)))?;
-    checkpoint.metadata.exported_tick = game.tick_count();
-    checkpoint.metadata.source_scenario = Some(rts_sim::game::lab::LabCheckpointScenarioSource {
-        kind: scenario.kind.clone(),
-        schema_version: scenario.schema_version,
-    });
-    checkpoint.metadata.source_entity_id_map = restore.entity_id_map;
-    sim_checkpoint_to_protocol(checkpoint, scenario.metadata.lab)
 }
 
 fn validate_authoring_entity_count(entity_count: usize) -> Result<(), String> {
@@ -444,45 +408,16 @@ fn validate_entry_matches_loaded_scenario(
     entry: &LabScenarioCatalogEntry,
     loaded: &LoadedLabScenario,
 ) -> Result<(), String> {
-    match &loaded.scenario {
-        LabScenarioPayload::Legacy(scenario) => {
-            validate_entry_matches_legacy_scenario(entry, scenario)
-        }
-        LabScenarioPayload::Checkpoint(scenario) => {
-            let facts = validate_protocol_checkpoint_scenario(&entry.id, scenario)?;
-            validate_entry_matches_checkpoint_facts(entry, scenario, &facts)
-        }
-    }
+    let scenario = checkpoint_payload_ref(&loaded.scenario);
+    let facts = validate_protocol_checkpoint_scenario(&entry.id, scenario)?;
+    validate_entry_matches_checkpoint_facts(entry, scenario, &facts)
 }
 
 fn validate_loaded_lab_scenario(
     entry: &LabScenarioCatalogEntry,
     loaded: &LoadedLabScenario,
 ) -> Result<(), String> {
-    validate_entry_matches_loaded_scenario(entry, loaded)?;
-    validate_scenario_restore_paths(&entry.id, &loaded.scenario, loaded.sim_scenario.clone())
-}
-
-fn validate_entry_matches_legacy_scenario(
-    entry: &LabScenarioCatalogEntry,
-    scenario: &LabScenarioV1,
-) -> Result<(), String> {
-    validate_legacy_scenario_identity(&entry.id, scenario)?;
-    if scenario.map.name != entry.map {
-        return Err(format!(
-            "lab setup {:?} manifest map {:?} does not match JSON map {:?}",
-            entry.id, entry.map, scenario.map.name
-        ));
-    }
-    if scenario.players.len() != entry.player_count {
-        return Err(format!(
-            "lab setup {:?} manifest playerCount {} does not match JSON player count {}",
-            entry.id,
-            entry.player_count,
-            scenario.players.len()
-        ));
-    }
-    Ok(())
+    validate_entry_matches_loaded_scenario(entry, loaded)
 }
 
 fn validate_entry_matches_checkpoint_facts(
@@ -506,15 +441,6 @@ fn validate_entry_matches_checkpoint_facts(
     Ok(())
 }
 
-fn validate_legacy_scenario_identity(label: &str, scenario: &LabScenarioV1) -> Result<(), String> {
-    if scenario.kind != LAB_SCENARIO_KIND {
-        return Err(format!(
-            "legacy lab scenario {label:?} kind must be {LAB_SCENARIO_KIND:?}"
-        ));
-    }
-    Ok(())
-}
-
 fn validate_checkpoint_scenario_identity(
     label: &str,
     scenario: &LabCheckpointScenarioV1,
@@ -527,108 +453,6 @@ fn validate_checkpoint_scenario_identity(
     Ok(())
 }
 
-fn build_game_from_loaded_body(
-    scenario: &LabScenarioPayload,
-    sim_scenario: LoadedLabScenarioBody,
-) -> Result<Game, String> {
-    match (scenario, sim_scenario) {
-        (LabScenarioPayload::Legacy(scenario), LoadedLabScenarioBody::Legacy(sim_scenario)) => {
-            build_game_from_scenario(scenario, sim_scenario)
-        }
-        (
-            LabScenarioPayload::Checkpoint(scenario),
-            LoadedLabScenarioBody::Checkpoint(sim_scenario),
-        ) => build_game_from_checkpoint(scenario, sim_scenario),
-        _ => Err("lab setup payload and restore body kind mismatch".to_string()),
-    }
-}
-
-fn build_checkpoint_game_from_loaded_body(
-    scenario: &LabScenarioPayload,
-    sim_scenario: LoadedLabScenarioBody,
-) -> Result<Game, String> {
-    match (scenario, sim_scenario) {
-        (LabScenarioPayload::Legacy(scenario), LoadedLabScenarioBody::Legacy(sim_scenario)) => {
-            build_checkpoint_game_from_scenario(scenario, sim_scenario)
-        }
-        (
-            LabScenarioPayload::Checkpoint(scenario),
-            LoadedLabScenarioBody::Checkpoint(sim_scenario),
-        ) => build_game_from_checkpoint(scenario, sim_scenario),
-        _ => Err("lab setup payload and restore body kind mismatch".to_string()),
-    }
-}
-
-fn build_game_from_scenario(
-    scenario: &LabScenarioV1,
-    sim_scenario: SimLabScenarioV1,
-) -> Result<Game, String> {
-    build_game_from_legacy_scenario(scenario, sim_scenario).map(|(game, _)| game)
-}
-
-fn build_game_from_legacy_scenario(
-    scenario: &LabScenarioV1,
-    sim_scenario: SimLabScenarioV1,
-) -> Result<(Game, LabScenarioRestore), String> {
-    let inits: Vec<_> = scenario
-        .players
-        .iter()
-        .map(|player| PlayerInit {
-            id: player.id,
-            team_id: player.team_id,
-            faction_id: player.faction_id.clone(),
-            name: player.name.clone(),
-            color: player.color.clone(),
-            is_ai: player.is_ai,
-        })
-        .collect();
-    let start_players: Vec<_> = inits
-        .iter()
-        .map(|player| (player.id, normalize_team_id(player.id, player.team_id)))
-        .collect();
-    let map_metadata = Map::metadata_for_name(&scenario.map.name)
-        .map_err(|err| format!("Cannot load lab setup map {:?}: {err}", scenario.map.name))?;
-    let map = Map::load_for_players(&scenario.map.name, &start_players, scenario.seed)
-        .map_err(|err| format!("Cannot load lab setup map {:?}: {err}", scenario.map.name))?;
-    let mut game = Game::new_lab(&inits, scenario.seed, map, map_metadata);
-    let LabOpOutcome::ScenarioRestored(restore) = game
-        .apply_lab_op(LabOp::RestoreScenario(Box::new(sim_scenario)))
-        .map_err(|err| lab_error_text(&err))?
-    else {
-        return Err("restoreScenario did not return entity id remap".to_string());
-    };
-    for &player_id in &scenario.metadata.lab.god_mode_players {
-        game.apply_lab_op(LabOp::SetPlayerGodMode {
-            player_id,
-            enabled: true,
-        })
-        .map_err(|err| lab_error_text(&err))?;
-    }
-    Ok((game, restore))
-}
-
-fn build_checkpoint_game_from_scenario(
-    scenario: &LabScenarioV1,
-    sim_scenario: SimLabScenarioV1,
-) -> Result<Game, String> {
-    let (direct, restore) = build_game_from_legacy_scenario(scenario, sim_scenario)?;
-    let mut checkpoint = direct
-        .export_lab_checkpoint_scenario(scenario.name.clone(), crate::build_info::build_id())
-        .map_err(|err| format!("checkpoint adapter export failed: {}", lab_error_text(&err)))?;
-    checkpoint.metadata.exported_tick = direct.tick_count();
-    checkpoint.metadata.source_scenario = Some(rts_sim::game::lab::LabCheckpointScenarioSource {
-        kind: scenario.kind.clone(),
-        schema_version: scenario.schema_version,
-    });
-    checkpoint.metadata.source_entity_id_map = restore.entity_id_map;
-    Game::restore_lab_checkpoint_scenario(checkpoint).map_err(|err| {
-        format!(
-            "checkpoint adapter restore failed: {}",
-            lab_error_text(&err)
-        )
-    })
-}
-
 fn build_game_from_checkpoint(
     scenario: &LabCheckpointScenarioV1,
     sim_scenario: SimLabCheckpointScenarioV1,
@@ -637,30 +461,6 @@ fn build_game_from_checkpoint(
         Game::restore_lab_checkpoint_scenario(sim_scenario).map_err(|err| lab_error_text(&err))?;
     validate_checkpoint_lab_metadata_matches_game(&scenario.metadata.lab, &game)?;
     Ok(game)
-}
-
-fn validate_scenario_restore_paths(
-    label: &str,
-    scenario: &LabScenarioPayload,
-    sim_scenario: LoadedLabScenarioBody,
-) -> Result<(), String> {
-    match (scenario, sim_scenario) {
-        (LabScenarioPayload::Legacy(scenario), LoadedLabScenarioBody::Legacy(sim_scenario)) => {
-            let direct =
-                build_game_from_scenario(scenario, sim_scenario.clone()).map_err(|err| {
-                    format!("lab setup {label:?} does not restore through Game lab APIs: {err}")
-                })?;
-            let checkpoint =
-                build_checkpoint_game_from_scenario(scenario, sim_scenario).map_err(|err| {
-                    format!(
-                        "lab setup {label:?} does not restore through checkpoint adapter: {err}"
-                    )
-                })?;
-            validate_checkpoint_game_matches(label, &direct, &checkpoint)
-        }
-        (LabScenarioPayload::Checkpoint(_), LoadedLabScenarioBody::Checkpoint(_)) => Ok(()),
-        _ => Err(format!("lab setup {label:?} payload kind mismatch")),
-    }
 }
 
 fn validate_protocol_checkpoint_scenario(
@@ -676,57 +476,8 @@ fn validate_protocol_checkpoint_scenario(
     Ok(LabScenarioFacts {
         map: scenario.map.name.clone(),
         player_count: start.players.len(),
-        entity_count: game.export_lab_scenario().entities.len(),
+        entity_count: game.perf_entity_counts().entities,
     })
-}
-
-fn validate_checkpoint_game_matches(
-    label: &str,
-    direct: &Game,
-    checkpoint: &Game,
-) -> Result<(), String> {
-    if direct.tick_count() != checkpoint.tick_count() {
-        return Err(format!(
-            "lab setup {label:?} checkpoint adapter tick mismatch: {} != {}",
-            direct.tick_count(),
-            checkpoint.tick_count()
-        ));
-    }
-    if direct.start_payload() != checkpoint.start_payload() {
-        return Err(format!(
-            "lab setup {label:?} checkpoint adapter start payload mismatch"
-        ));
-    }
-    if direct.lab_god_mode_players() != checkpoint.lab_god_mode_players() {
-        return Err(format!(
-            "lab setup {label:?} checkpoint adapter god mode mismatch"
-        ));
-    }
-    if direct.scores() != checkpoint.scores() {
-        return Err(format!(
-            "lab setup {label:?} checkpoint adapter score mismatch"
-        ));
-    }
-    for player in direct.start_payload().players {
-        if direct.snapshot_full_for(player.id) != checkpoint.snapshot_full_for(player.id) {
-            return Err(format!(
-                "lab setup {label:?} checkpoint adapter snapshot mismatch for player {}",
-                player.id
-            ));
-        }
-    }
-    Ok(())
-}
-
-pub(crate) fn validate_lab_scenario_lab_metadata(
-    lab: &crate::protocol::LabScenarioLabMetadata,
-    players: &[crate::protocol::LabScenarioPlayer],
-) -> Result<(), String> {
-    let player_facts: Vec<_> = players
-        .iter()
-        .map(|player| (player.id, player.team_id))
-        .collect();
-    validate_lab_metadata_for_player_facts(lab, &player_facts)
 }
 
 fn validate_checkpoint_lab_metadata_matches_game(
@@ -815,19 +566,7 @@ pub(crate) fn lab_scenario_payload_lab_metadata(
     scenario: &LabScenarioPayload,
 ) -> &LabScenarioLabMetadata {
     match scenario {
-        LabScenarioPayload::Legacy(scenario) => &scenario.metadata.lab,
         LabScenarioPayload::Checkpoint(scenario) => &scenario.metadata.lab,
-    }
-}
-
-pub(crate) fn lab_scenario_payload_legacy_god_mode_players(
-    scenario: &LabScenarioPayload,
-) -> Option<Vec<u32>> {
-    match scenario {
-        LabScenarioPayload::Legacy(scenario) => {
-            Some(scenario.metadata.lab.god_mode_players.clone())
-        }
-        LabScenarioPayload::Checkpoint(_) => None,
     }
 }
 
@@ -836,12 +575,6 @@ pub(crate) fn lab_scenario_payload_to_lab_op(
 ) -> Result<LabOp, String> {
     validate_lab_scenario_payload_size(&scenario)?;
     match scenario {
-        LabScenarioPayload::Legacy(scenario) => {
-            validate_lab_scenario_lab_metadata(&scenario.metadata.lab, &scenario.players)?;
-            let sim_scenario = protocol_scenario_to_sim(&scenario)
-                .map_err(|err| format!("invalid legacy scenario payload: {err}"))?;
-            Ok(LabOp::RestoreScenario(Box::new(sim_scenario)))
-        }
         LabScenarioPayload::Checkpoint(scenario) => {
             validate_protocol_checkpoint_scenario("import", &scenario)?;
             let sim_scenario = protocol_checkpoint_to_sim(&scenario)
@@ -877,10 +610,9 @@ pub(crate) fn export_lab_checkpoint_scenario_for_protocol(
 
 pub fn convert_lab_scenario_catalog_assets_to_checkpoints(
     root: &Path,
-    server_build_sha: &str,
+    _server_build_sha: &str,
 ) -> Result<usize, String> {
     let entries = load_lab_scenario_manifest_entries_from_dir(root)?;
-    let mut converted = 0;
     for entry in &entries {
         let path = root.join(&entry.filename);
         let json = std::fs::read_to_string(&path).map_err(|err| {
@@ -891,30 +623,11 @@ pub fn convert_lab_scenario_catalog_assets_to_checkpoints(
         })?;
         let scenario: LabScenarioPayload = serde_json::from_str(&json)
             .map_err(|err| format!("invalid lab setup {:?} JSON: {err}", entry.id))?;
-        let checkpoint = match scenario {
-            LabScenarioPayload::Checkpoint(scenario) => {
-                let facts = validate_protocol_checkpoint_scenario(&entry.id, &scenario)?;
-                validate_entry_matches_checkpoint_facts(entry, &scenario, &facts)?;
-                continue;
-            }
-            LabScenarioPayload::Legacy(scenario) => {
-                legacy_scenario_to_checkpoint_protocol(scenario, server_build_sha)?
-            }
-        };
-        let facts = validate_protocol_checkpoint_scenario(&entry.id, &checkpoint)?;
-        validate_entry_matches_checkpoint_facts(entry, &checkpoint, &facts)?;
-        let scenario_json = serde_json::to_string_pretty(&checkpoint)
-            .map_err(|err| format!("failed to format checkpoint setup {:?}: {err}", entry.id))?
-            + "\n";
-        std::fs::write(&path, scenario_json).map_err(|err| {
-            format!(
-                "failed to write checkpoint setup {:?} to {:?}: {err}",
-                entry.id, entry.filename
-            )
-        })?;
-        converted += 1;
+        let scenario = checkpoint_payload_ref(&scenario);
+        let facts = validate_protocol_checkpoint_scenario(&entry.id, scenario)?;
+        validate_entry_matches_checkpoint_facts(entry, scenario, &facts)?;
     }
-    Ok(converted)
+    Ok(0)
 }
 
 pub fn bundled_lab_scenario_asset_build_sha() -> &'static str {
@@ -946,14 +659,6 @@ fn safe_scenario_tag(value: &str) -> bool {
         && value
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
-}
-
-fn normalize_team_id(player_id: u32, team_id: TeamId) -> TeamId {
-    if team_id == 0 {
-        player_id
-    } else {
-        team_id
-    }
 }
 
 fn lab_error_text(err: &LabError) -> String {
@@ -1001,24 +706,6 @@ mod tests {
         dir
     }
 
-    fn legacy_protocol_scenario_from_loaded(loaded: &LoadedLabScenario) -> LabScenarioV1 {
-        let game = loaded
-            .build_game()
-            .expect("loaded scenario should restore for legacy fixture export");
-        let mut value =
-            serde_json::to_value(game.export_lab_scenario()).expect("legacy scenario JSON");
-        value
-            .get_mut("metadata")
-            .and_then(|metadata| metadata.as_object_mut())
-            .expect("legacy scenario metadata")
-            .insert(
-                "lab".to_string(),
-                serde_json::to_value(lab_scenario_payload_lab_metadata(&loaded.scenario).clone())
-                    .expect("lab metadata JSON"),
-            );
-        serde_json::from_value(value).expect("legacy protocol scenario")
-    }
-
     #[test]
     fn bundled_lab_scenario_catalog_loads_bundled_scenarios_and_restores() {
         let catalog = load_lab_scenario_catalog().expect("bundled lab catalog should load");
@@ -1044,13 +731,13 @@ mod tests {
             game.snapshot_full_for(1),
             checkpoint_game.snapshot_full_for(1)
         );
-        let scenario = game.export_lab_scenario();
-        assert_eq!(scenario.seed, 3_566_641_871);
-        assert_eq!(scenario.players.len(), 2);
-        assert_eq!(scenario.entities.len(), 227);
+        let snapshot = game.snapshot_full_for(1);
+        assert_eq!(game.seed(), 3_566_641_871);
+        assert_eq!(game.start_payload().players.len(), 2);
+        assert_eq!(game.perf_entity_counts().entities, 227);
         let tile_size = rts_rules::balance::TILE_SIZE as f32;
         let mut oil_tiles = Vec::new();
-        for entity in scenario
+        for entity in snapshot
             .entities
             .iter()
             .filter(|entity| entity.kind == "oil")
@@ -1092,12 +779,12 @@ mod tests {
         let game = loaded
             .build_game()
             .expect("render-preview scenario should restore through lab APIs");
-        let scenario = game.export_lab_scenario();
-        assert_eq!(scenario.seed, 126_097_607);
-        assert_eq!(scenario.players.len(), 2);
+        let snapshot = game.snapshot_full_for(1);
+        assert_eq!(game.seed(), 126_097_607);
+        assert_eq!(game.start_payload().players.len(), 2);
         assert_eq!(game.lab_god_mode_players(), vec![1, 2]);
 
-        let render_kinds: HashSet<_> = scenario
+        let render_kinds: HashSet<_> = snapshot
             .entities
             .iter()
             .map(|entity| entity.kind.as_str())
@@ -1130,7 +817,7 @@ mod tests {
                 "render-preview scenario should include {kind} render coverage"
             );
         }
-        let panzerfaust_count = scenario
+        let panzerfaust_count = snapshot
             .entities
             .iter()
             .filter(|entity| entity.kind == "panzerfaust")
@@ -1149,7 +836,7 @@ mod tests {
             .build_game()
             .expect("render-preview scenario should restore through lab APIs");
         let anti_tank_gun_ids: HashSet<_> = game
-            .export_lab_scenario()
+            .snapshot_full_for(1)
             .entities
             .into_iter()
             .filter(|entity| entity.kind == "anti_tank_gun")
@@ -1261,58 +948,10 @@ mod tests {
     }
 
     #[test]
-    fn lab_scenario_authoring_validation_rejects_entity_cap_before_restore() {
-        let loaded =
-            load_lab_scenario_by_id("lategame").expect("bundled lategame scenario should load");
-        let mut scenario = legacy_protocol_scenario_from_loaded(&loaded);
-        let template = scenario
-            .entities
-            .first()
-            .expect("lategame should include entities")
-            .clone();
-        let mut next_id = scenario
-            .entities
-            .iter()
-            .map(|entity| entity.id)
-            .max()
-            .unwrap_or(0)
-            + 1;
-        while scenario.entities.len() <= MAX_AUTHORING_SCENARIO_ENTITIES {
-            let mut entity = template.clone();
-            entity.id = next_id;
-            next_id += 1;
-            scenario.entities.push(entity);
-        }
-
-        let err = validate_lab_scenario_authoring(
-            LabScenarioAuthoringMetadata {
-                slug: "too-many-entities".to_string(),
-                name: "Too Many Entities".to_string(),
-                title: "Too Many Entities".to_string(),
-                description: "Exercises the authoring entity cap.".to_string(),
-                tags: vec!["test".to_string()],
-                review_notes: None,
-            },
-            LabScenarioPayload::Legacy(scenario),
-        )
-        .expect_err("authoring should reject scenarios over the entity cap");
-
-        assert!(
-            err.contains("setup has too many entities"),
-            "unexpected error: {err}"
-        );
-    }
-
-    #[test]
     fn lab_scenario_authoring_validation_rejects_oversized_checkpoint_json() {
         let loaded =
             load_lab_scenario_by_id("lategame").expect("bundled lategame scenario should load");
-        let mut scenario = match loaded.scenario {
-            LabScenarioPayload::Checkpoint(scenario) => scenario,
-            LabScenarioPayload::Legacy(_) => {
-                panic!("bundled scenarios should be checkpoint-backed")
-            }
-        };
+        let LabScenarioPayload::Checkpoint(mut scenario) = loaded.scenario;
         scenario.checkpoint_payload.push('\n');
         scenario
             .checkpoint_payload
@@ -1342,10 +981,7 @@ mod tests {
     }
 
     #[test]
-    fn lab_scenario_catalog_still_loads_legacy_v1_files() {
-        let loaded =
-            load_lab_scenario_by_id("lategame").expect("bundled lategame scenario should load");
-        let legacy = legacy_protocol_scenario_from_loaded(&loaded);
+    fn lab_scenario_catalog_rejects_legacy_v1_files() {
         let dir = temp_catalog_dir("legacy-v1");
         std::fs::write(
             dir.join(LAB_SCENARIO_MANIFEST),
@@ -1358,13 +994,25 @@ mod tests {
         .unwrap();
         std::fs::write(
             dir.join("legacy-v1.json"),
-            serde_json::to_string_pretty(&legacy).unwrap(),
+            r#"{
+              "schemaVersion": 1,
+              "kind": "labScenario",
+              "name": "Legacy V1",
+              "seed": 1,
+              "map": {"name": "Default", "schemaVersion": 2, "contentHash": "legacy"},
+              "players": [],
+              "entities": [],
+              "metadata": {"exportedTick": 0, "lab": {"vision": {"mode": "fullWorld"}}}
+            }"#,
         )
         .unwrap();
 
-        let catalog =
-            load_lab_scenario_catalog_from_dir(&dir).expect("legacy V1 fixture should load");
-        assert_eq!(catalog[0].id, "legacy-v1");
+        let err =
+            load_lab_scenario_catalog_from_dir(&dir).expect_err("legacy V1 fixture should reject");
+        assert!(
+            err.contains("invalid lab setup") || err.contains("labCheckpointScenario"),
+            "unexpected error: {err}"
+        );
         let _ = std::fs::remove_dir_all(dir);
     }
 

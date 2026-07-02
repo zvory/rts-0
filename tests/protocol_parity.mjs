@@ -19,7 +19,6 @@ import {
   KIND_CODE,
   LAB_CHECKPOINT_SCENARIO,
   LAB_REPLAY,
-  LAB_SCENARIO,
   LAB_ROLE,
   LAB_VISION,
   LOBBY_KIND,
@@ -413,9 +412,9 @@ assert(
   "lab setup export compatibility builder must emit the exact wire shape",
 );
 assert(
-  JSON.stringify(msg.labImportScenario(15, { schemaVersion: LAB_SCENARIO.SCHEMA_VERSION, kind: LAB_SCENARIO.KIND })) ===
-    JSON.stringify({ t: "lab", requestId: 15, op: { op: "importScenario", scenario: { schemaVersion: 1, kind: "labScenario" } } }),
-  "legacy lab scenario import compatibility builder must emit the exact wire shape",
+  JSON.stringify(msg.labImportScenario(15, { schemaVersion: LAB_CHECKPOINT_SCENARIO.SCHEMA_VERSION, kind: LAB_CHECKPOINT_SCENARIO.KIND })) ===
+    JSON.stringify({ t: "lab", requestId: 15, op: { op: "importScenario", scenario: { schemaVersion: 1, kind: "labCheckpointScenario" } } }),
+  "lab checkpoint setup import builder must emit the exact wire shape",
 );
 assert(
   JSON.stringify(msg.labValidateScenario(16, { slug: "new-lab", name: "New Lab", title: "New Lab", description: "Ready", tags: ["test"] })) ===
@@ -448,14 +447,8 @@ assert(
     rust.includes("SubmitScenario") &&
     rust.includes("LabScenarioPayload") &&
     rust.includes("LabCheckpointScenarioV1") &&
-    rust.includes("LabScenarioV1") &&
-    rust.includes("set_up") &&
-    rust.includes("weapon_facing") &&
-    rust.includes("setup_facing") &&
-    rust.includes("queued_orders") &&
+    !rust.includes("LabScenarioV1") &&
     rust.includes("god_mode_players") &&
-    LAB_SCENARIO.KIND === "labScenario" &&
-    LAB_SCENARIO.SCHEMA_VERSION === 1 &&
     LAB_CHECKPOINT_SCENARIO.KIND === "labCheckpointScenario" &&
     LAB_CHECKPOINT_SCENARIO.SCHEMA_VERSION === 1 &&
     LAB_REPLAY.SCHEMA === "rts.labReplay" &&
@@ -474,20 +467,14 @@ assert(
     protocolDoc.includes("LabCheckpointScenarioV1") &&
     protocolDoc.includes("LabReplayArtifactV1") &&
     protocolDoc.includes("checkpoint-backed setup") &&
-    protocolDoc.includes("legacy scenario compatibility") &&
+    protocolDoc.includes("Legacy labScenario JSON is rejected") &&
     protocolDoc.includes("Lab replay import validates") &&
     protocolDoc.includes("rts.labReplay") &&
     protocolDoc.includes("labReplay") &&
     protocolDoc.includes("issueCommandAs") &&
     protocolDoc.includes("setVision") &&
-    protocolDoc.includes("LabScenarioV1") &&
-    protocolDoc.includes("LabScenarioOrder") &&
-    protocolDoc.includes("setUp") &&
-    protocolDoc.includes("facing") &&
-    protocolDoc.includes("weaponFacing") &&
-    protocolDoc.includes("setupFacing") &&
-    protocolDoc.includes("setupTarget") &&
-    protocolDoc.includes("queuedOrders") &&
+    !protocolDoc.includes("LabScenarioV1") &&
+    !protocolDoc.includes("LabScenarioOrder") &&
     protocolDoc.includes("godModePlayers") &&
     protocolDoc.includes("validateScenario") &&
     protocolDoc.includes("submitScenario"),

@@ -4,6 +4,7 @@ use crate::lab_scenario_submission::{
     ScenarioPrBackend, ScenarioPrFuture, LAB_SCENARIO_SUBMISSION_MANIFEST_PATH,
 };
 use rts_rules::{faction::CURRENT_CATALOG, EntityKind};
+use rts_sim::game::lab::LabOp;
 use std::sync::{Arc, Mutex as StdMutex};
 
 #[derive(Clone)]
@@ -129,29 +130,30 @@ fn lab_start_payload_can_use_bundled_lategame_scenario() {
     let Phase::InGame(game) = &task.phase else {
         panic!("lategame lab should start immediately");
     };
-    let scenario = game.export_lab_scenario();
-    assert_eq!(scenario.seed, 3_566_641_871);
-    assert_eq!(scenario.players.len(), 2);
-    assert_eq!(scenario.entities.len(), 227);
-    assert_eq!(scenario.players[0].resources.steel, 99_999);
-    assert_eq!(scenario.players[0].resources.oil, 99_999);
-    assert_eq!(scenario.players[1].resources.steel, 99_999);
-    assert_eq!(scenario.players[1].resources.oil, 99_999);
+    assert_eq!(game.seed(), 3_566_641_871);
+    assert_eq!(game.start_payload().players.len(), 2);
+    assert_eq!(game.perf_entity_counts().entities, 227);
+    let snapshot = game.snapshot_full_for(1);
+    let resources = |player_id| {
+        snapshot
+            .player_resources
+            .iter()
+            .find(|resources| resources.id == player_id)
+            .expect("player resources should be projected")
+    };
+    assert_eq!(resources(1).steel, 99_999);
+    assert_eq!(resources(1).oil, 99_999);
+    assert_eq!(resources(2).steel, 99_999);
+    assert_eq!(resources(2).oil, 99_999);
     let mut all_research = CURRENT_CATALOG.researchable_upgrades(EntityKind::TrainingCentre);
     all_research.extend(CURRENT_CATALOG.researchable_upgrades(EntityKind::ResearchComplex));
     all_research.sort_unstable();
-    for player in &scenario.players {
-        let mut completed_research = player
-            .research
-            .completed
-            .iter()
-            .map(String::as_str)
-            .collect::<Vec<_>>();
+    for player_id in [1, 2] {
+        let mut completed_research = game.snapshot_full_for(player_id).upgrades;
         completed_research.sort_unstable();
         assert_eq!(
             completed_research, all_research,
-            "player {} should have all current Kriegsia research",
-            player.id
+            "player {player_id} should have all current Kriegsia research"
         );
     }
     assert_eq!(
@@ -637,7 +639,7 @@ fn launch_event(snapshot: &Snapshot, mortar_id: u32) -> Option<Event> {
         .cloned()
 }
 
-fn import_lab_scenario_with_deployed_entity(
+fn import_lab_checkpoint_with_deployed_entity(
     task: &mut RoomTask,
     entity_id: u32,
     target: (f32, f32),
@@ -645,23 +647,37 @@ fn import_lab_scenario_with_deployed_entity(
     let Phase::InGame(game) = &mut task.phase else {
         panic!("lab should be running");
     };
-    let mut scenario = game.export_lab_scenario();
-    let entity = scenario
-        .entities
+    let mut scenario = game
+        .export_lab_checkpoint_scenario("deployed test setup".to_string(), "room-task-test")
+        .expect("checkpoint setup should export");
+    let mut payload: serde_json::Value =
+        serde_json::from_str(&scenario.checkpoint_payload).expect("checkpoint payload JSON");
+    let entities = payload["entities"]["entities"]
+        .as_array_mut()
+        .expect("checkpoint entities array");
+    let entity = entities
         .iter_mut()
-        .find(|entity| entity.id == entity_id)
-        .expect("exported scenario should include spawned entity");
-    entity.set_up = true;
-    entity.setup_target = Some(rts_sim::game::lab::LabScenarioPoint {
-        x: target.0,
-        y: target.1,
-    });
+        .find(|entity| entity["id"].as_u64() == Some(entity_id as u64))
+        .expect("checkpoint should include spawned entity");
+    let x = entity["pos_x"].as_f64().expect("entity x") as f32;
+    let y = entity["pos_y"].as_f64().expect("entity y") as f32;
+    let facing = (target.1 - y).atan2(target.0 - x);
+    let combat = entity["combat"].as_object_mut().expect("entity combat");
+    combat.insert("setup".to_string(), serde_json::json!("Deployed"));
+    combat.insert("weapon_facing".to_string(), serde_json::json!(facing));
+    combat.insert(
+        "desired_weapon_facing".to_string(),
+        serde_json::json!(facing),
+    );
+    combat.insert("emplacement_facing".to_string(), serde_json::json!(facing));
+    scenario.checkpoint_payload =
+        serde_json::to_string(&payload).expect("checkpoint payload should serialize");
 
     let outcome = game
-        .restore_lab_scenario(scenario)
-        .expect("scenario restore should succeed");
+        .apply_lab_op(LabOp::RestoreCheckpointScenario(Box::new(scenario)))
+        .expect("checkpoint restore should succeed");
     let rts_sim::game::lab::LabOpOutcome::ScenarioRestored(restore) = outcome else {
-        panic!("scenario restore should return entity id map");
+        panic!("checkpoint restore should return entity id map");
     };
     restore
         .entity_id_map
@@ -727,7 +743,7 @@ fn prepare_player_two_lab_mortar(
         crate::protocol::kinds::RIFLEMAN,
         target_position,
     );
-    let mortar_id = import_lab_scenario_with_deployed_entity(task, mortar_id, target_position);
+    let mortar_id = import_lab_checkpoint_with_deployed_entity(task, mortar_id, target_position);
     (mortar_id, target_position)
 }
 

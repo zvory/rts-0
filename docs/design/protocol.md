@@ -540,12 +540,8 @@ and a tick-zero `GameCheckpointV1` text payload, plus ordered `players[]` with e
 loadoutId, startingSteel, startingOil }` record per player. Replay reconstruction restores the
 start `Game` from the checkpoint payload and then applies the authoritative `commandLog[]` on the
 recorded ticks. The compatibility `winnerId`, optional `winnerTeamId`, `durationTicks`, and
-`finalScores[]` with each row's `teamId` remain part of the artifact. Legacy schema 2 artifacts
-have no `startState`; they still load by reconstructing from map, seed, players, and
-`playerLoadouts[]`. Missing `players[].faction_id`, missing/mismatched `playerLoadouts[]`, or
-artifact schema version 1 payloads are rejected. Missing `players[].team_id`,
-`finalScores[].teamId`, or `winnerTeamId` in older singleton-FFA-compatible schema-2 fixtures
-defaults through the documented singleton team behavior; new captures always include explicit
+`finalScores[]` with each row's `teamId` remain part of the artifact. Artifact schema 2 and older
+payloads are rejected with the unsupported-schema error; new captures always include explicit
 nonzero player and score team ids, required player faction ids, required player loadout records,
 `startState`, and `winnerTeamId` when there is a winning team.
 
@@ -1132,9 +1128,8 @@ the larger bounded lab command window instead of the ordinary live-player unit-i
 damage, while resources keep normal damage behavior. The current enabled player ids are mirrored in
 `start.lab.godModePlayers` and `labState.godModePlayers`.
 
-`LabScenarioPayload` accepts the current checkpoint-backed setup container or a legacy
-`LabScenarioV1` compatibility file. New setup exports, validation previews, submissions, and
-bundled catalog assets use `LabCheckpointScenarioV1`:
+`LabScenarioPayload` accepts only the current checkpoint-backed setup container. Setup exports,
+validation previews, submissions, imports, and bundled catalog assets use `LabCheckpointScenarioV1`:
 ```
 {
   schemaVersion: 1,
@@ -1156,7 +1151,6 @@ bundled catalog assets use `LabCheckpointScenarioV1`:
   metadata: {
     exportedTick: u32,
     lab: { vision: LabVisionMode, godModePlayers?: u32[] },
-    sourceScenario?: { kind: string, schemaVersion: u32 },
     sourceEntityIdMap?: [{ oldId: u32, newId: u32 }]
   },
   checkpointPayload: string // GameCheckpointV1 JSON text
@@ -1167,56 +1161,15 @@ The map body is a setup-container sibling of the checkpoint payload, not part of
 checkpoint `mapBinding`, player/team/resource/research/entity/count bounds, lab metadata,
 checkpoint byte limits, `metadata.lab.godModePlayers`, and a one-to-one `sourceEntityIdMap` whose
 `newId` values reference restored entities before replacing the live lab game. `sourceEntityIdMap`
-is returned as `outcome.entityIdMap` on checkpoint import so converted legacy files and fresh
-exports preserve existing id-remap callers.
+is returned as `outcome.entityIdMap` on checkpoint import so imports and fresh exports preserve
+existing id-remap callers. Legacy labScenario JSON is rejected by the checkpoint-only payload parser
+before it can mutate a lab room.
 
-`LabScenarioV1` remains readable during the transition only as legacy scenario compatibility. It is
-versioned lab setup JSON with stable command intent, not a full saved snapshot:
-```
-{
-  schemaVersion: 1,
-  kind: "labScenario",
-  name: string,
-  seed: u32,
-  map: { name: string, schemaVersion: u32, contentHash: string },
-  players: [{
-    id: u32, teamId: u32, factionId: string, name: string, color: string, isAi: bool,
-    resources: { steel: u32, oil: u32 },
-    research: { completed: string[] }
-  }],
-  entities: [{
-    id: u32, owner: u32, kind: string, x: f32, y: f32, hp: u32, completed: bool,
-    constructionProgress?: u32, constructionTotal?: u32, resourceRemaining?: u32,
-    facing?: f32, weaponFacing?: f32,
-    setUp?: bool, setupFacing?: f32, setupTarget?: { x: f32, y: f32 },
-    order?: LabScenarioOrder,
-    queuedOrders?: LabScenarioOrder[]
-  }],
-  metadata: { exportedTick: u32, lab: { vision: LabVisionMode, godModePlayers?: u32[] } }
-}
-```
-`LabScenarioOrder` stores replayable command intent only:
-```
-{
-  kind: "idle" | "holdPosition" | "move" | "attackMove" | "attack" | "gather" |
-        "build" | "deconstruct" | "worldAbility" | "selfAbility" |
-        "setupAntiTankGuns" | "pointFire" | "blanketFire",
-  x?: f32, y?: f32,
-  target?: u32,       // scenario entity id, remapped on import
-  entityKind?: string, tileX?: u32, tileY?: u32,
-  ability?: string,
-  stagingX?: f32, stagingY?: f32
-}
-```
 Setup export returns `{ scenario: LabCheckpointScenarioV1 }` in `labResult.outcome` using the requesting
 operator's current lab vision in `metadata.lab.vision` and the current room god-mode player ids in
-`metadata.lab.godModePlayers`. Legacy `LabScenarioV1` import validates the schema, map metadata,
-player/team/resource/research/entity/order fields, restores through the public lab `Game` API,
-remaps target ids inside active and queued order intents, applies scenario vision to the requester
-and future join default without overwriting already connected collaborators, restores
-`godModePlayers` as room state, and returns an entity id remap in `outcome.entityIdMap`.
-Checkpoint-backed import applies scenario vision the same way, restores god mode from the embedded
-checkpoint payload, and returns the container `sourceEntityIdMap`.
+`metadata.lab.godModePlayers`. Checkpoint-backed import applies setup vision to the requester and
+future join default without overwriting already connected collaborators, restores god mode from the
+embedded checkpoint payload, and returns the container `sourceEntityIdMap`.
 `validateScenario` exports the current authoritative lab `Game` as a checkpoint-backed setup,
 applies authoring metadata, pretty formats the setup JSON, checks duplicate catalog
 ids/filenames, id-matched filenames, manifest limits, setup entity count, and setup JSON byte

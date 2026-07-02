@@ -1,6 +1,6 @@
 # Phase 4 - Retire Compatibility And Final Cleanup
 
-Status: Not started.
+Status: Done.
 
 ## Scope
 

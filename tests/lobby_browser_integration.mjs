@@ -18,10 +18,7 @@ import {
 const assertions = createAssertions();
 const { ok } = assertions;
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const REPLAY_FIXTURE = path.join(
-  REPO_ROOT,
-  "docs/network-incident-examples/2026-06-24-beta-alex-command-jitter/match-89-replay.json",
-);
+const LAB_SETUP_FIXTURE = path.join(REPO_ROOT, "server/assets/lab-scenarios/lategame.json");
 const SAFE_REPLAY_LOBBY_ROW_KEYS = [
   "createdAtUnixMs",
   "hostName",
@@ -55,8 +52,57 @@ function installReplayLobbyFixture() {
   const dir = path.join(REPO_ROOT, "server", "target", "selfplay-artifacts", name);
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
-  fs.copyFileSync(REPLAY_FIXTURE, path.join(dir, "replay.json"));
+  fs.writeFileSync(
+    path.join(dir, "replay.json"),
+    `${JSON.stringify(schemaThreeReplayFixture(), null, 2)}\n`,
+  );
   return { name, dir };
+}
+
+function schemaThreeReplayFixture() {
+  const setup = JSON.parse(fs.readFileSync(LAB_SETUP_FIXTURE, "utf8"));
+  const checkpoint = JSON.parse(setup.checkpointPayload);
+  const players = checkpoint.players.map((player) => ({
+    id: player.id,
+    team_id: player.teamId,
+    faction_id: player.factionId,
+    name: player.name,
+    color: player.color,
+    is_ai: !!player.isAi,
+  }));
+  return {
+    artifactSchemaVersion: 3,
+    serverBuildSha: "live-node-fixture",
+    mapName: setup.map.name,
+    mapSchemaVersion: setup.map.schemaVersion,
+    mapContentHash: setup.map.contentHash,
+    seed: setup.seed,
+    playerLoadouts: checkpoint.startingLoadouts,
+    players,
+    startState: {
+      mapName: setup.map.name,
+      mapSchemaVersion: setup.map.schemaVersion,
+      mapContentHash: setup.map.contentHash,
+      seed: setup.seed,
+      checkpointPayload: setup.checkpointPayload,
+    },
+    durationTicks: 120,
+    commandLog: [],
+    winnerId: null,
+    winnerTeamId: null,
+    finalScores: checkpoint.players.map((player) => ({
+      id: player.id,
+      teamId: player.teamId,
+      name: player.name,
+      color: player.color,
+      unitScore: player.score?.unitScore ?? 0,
+      structureScore: player.score?.structureScore ?? 0,
+      unitsKilled: player.score?.unitsKilled ?? 0,
+      unitsLost: player.score?.unitsLost ?? 0,
+      buildingsKilled: player.score?.buildingsKilled ?? 0,
+      buildingsLost: player.score?.buildingsLost ?? 0,
+    })),
+  };
 }
 
 async function createLobby(room) {

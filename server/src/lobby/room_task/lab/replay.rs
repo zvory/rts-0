@@ -19,8 +19,8 @@ use crate::lab_scenarios::{
     export_lab_checkpoint_scenario_for_protocol, lab_scenario_payload_to_lab_op,
 };
 use crate::protocol::{
-    lab_replay_artifact_from_slice, Command, LabCheckpointScenarioSource, LabCheckpointScenarioV1,
-    LabReplayArtifactV1, LabReplayAuthoringMetadata, LabReplayOperation, LabReplayOperationEntry,
+    lab_replay_artifact_from_slice, Command, LabCheckpointScenarioV1, LabReplayArtifactV1,
+    LabReplayAuthoringMetadata, LabReplayOperation, LabReplayOperationEntry,
     LabReplayTimelineMetadata, LabResult, LabScenarioLabMetadata, LabScenarioPayload,
     LabVisionMode, RoomTimeState, ServerMessage, LAB_REPLAY_ARTIFACT_KIND,
     LAB_REPLAY_ARTIFACT_SCHEMA, LAB_REPLAY_ARTIFACT_SCHEMA_VERSION,
@@ -29,12 +29,6 @@ use crate::protocol::{
 
 pub(super) enum LabReplayRebaseSource {
     Checkpoint(Box<LabCheckpointScenarioV1>),
-    Legacy {
-        name: String,
-        kind: String,
-        schema_version: u32,
-        lab: LabScenarioLabMetadata,
-    },
 }
 
 pub(super) fn lab_op_to_replay_operation(op: &LabOp) -> Option<LabReplayOperation> {
@@ -74,7 +68,7 @@ pub(super) fn lab_op_to_replay_operation(op: &LabOp) -> Option<LabReplayOperatio
             upgrade: input.upgrade.to_protocol_str().to_string(),
             completed: input.completed,
         }),
-        LabOp::RestoreScenario(_) | LabOp::RestoreCheckpointScenario(_) => None,
+        LabOp::RestoreCheckpointScenario(_) => None,
     }
 }
 
@@ -328,41 +322,10 @@ impl RoomTask {
     pub(super) fn lab_replay_initial_setup_for_rebase(
         &self,
         source: LabReplayRebaseSource,
-        outcome: &LabOpOutcome,
+        _outcome: &LabOpOutcome,
     ) -> Result<LabCheckpointScenarioV1, String> {
         match source {
             LabReplayRebaseSource::Checkpoint(scenario) => Ok(*scenario),
-            LabReplayRebaseSource::Legacy {
-                name,
-                kind,
-                schema_version,
-                lab,
-            } => {
-                let Some(game) = self.live_game() else {
-                    return Err("lab game is not running".to_string());
-                };
-                let mut scenario = export_lab_checkpoint_scenario_for_protocol(
-                    game,
-                    name,
-                    lab,
-                    crate::build_info::build_id(),
-                )?;
-                scenario.metadata.source_scenario = Some(LabCheckpointScenarioSource {
-                    kind,
-                    schema_version,
-                });
-                if let LabOpOutcome::ScenarioRestored(restore) = outcome {
-                    scenario.metadata.source_entity_id_map = restore
-                        .entity_id_map
-                        .iter()
-                        .map(|remap| crate::protocol::LabScenarioEntityIdRemap {
-                            old_id: remap.old_id,
-                            new_id: remap.new_id,
-                        })
-                        .collect();
-                }
-                Ok(scenario)
-            }
         }
     }
 
