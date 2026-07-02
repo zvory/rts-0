@@ -686,7 +686,7 @@ function writeRenderLagComparisonSummary(results, outputRoot, args) {
     })),
     notes: [
       "Warnings are advisory and machine-local; compare branches on the same machine.",
-      "Keep beta Matt/Alex per-player reports separate from local replay and dev-scenario measurements.",
+      "Keep beta Matt/Alex per-player reports separate from local harness measurements.",
       "Detailed timing and trace artifacts stay under target/client-perf and are ignored by git.",
     ],
   };

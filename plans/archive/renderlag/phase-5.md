@@ -65,7 +65,7 @@ can add GC pressure during selected-unit, replay, and spectator views.
 - relevant HUD or command-card tests selected by `node tests/select-suites.mjs --from=origin/main`
 - `node scripts/check-client-architecture.mjs`
 - `node scripts/client-perf-harness.mjs --workload vehicle-wall-stress --seconds 10`
-- `node scripts/client-perf-harness.mjs --workload vehicle-wall-stress --seconds 10`
+- `node scripts/client-perf-harness.mjs --workload selected-unit-hud-stress --seconds 10`
 - `git diff --check`
 
 If client design docs change, also run:

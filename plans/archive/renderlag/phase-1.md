@@ -57,7 +57,7 @@ the terrain tile loop should not run on every `requestAnimationFrame`.
 - `node tests/client_contracts.mjs`
 - `node scripts/check-client-architecture.mjs`
 - `node scripts/client-perf-harness.mjs --workload vehicle-wall-stress --seconds 10`
-- `node scripts/client-perf-harness.mjs --workload vehicle-wall-stress --seconds 10`
+- `node scripts/client-perf-harness.mjs --workload selected-unit-hud-stress --seconds 10`
 - `git diff --check`
 
 If docs change, also run:
