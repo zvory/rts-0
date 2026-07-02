@@ -1223,9 +1223,9 @@ selection rings):
   the next snapshot.
 
 ### 4.2 Rendering & look (PixiJS, SVG rigs — neutral PS1 field-command style)
-- Layers (back→front): terrain → ground decals → trench terrain → resource nodes → building shadows → buildings →
+- Layers (back→front): terrain → ground decals → trench terrain → local visual samples → resource nodes → building shadows → buildings →
   building overlays → unit shadows → units → smoke/ability ground effects → selection rings →
-  health bars → fog overlay → shot-revealed units → command/hover feedback → placement ghost →
+  health bars → fog overlay → local visual-sample labels → shot-revealed units → command/hover feedback → placement ghost →
   selection drag-box → (HUD is DOM, not Pixi). Selected unit range rings, minimum-range rings, and
   support-weapon field-of-fire overlays use higher-opacity rendering for readability.
 - `/renderer_preview.html` is a standalone dev entry point linked from the index Dev links menu; it
@@ -1306,6 +1306,10 @@ selection rings):
   click targeting.
 - Terrain: muted grass/field/mud, rock, and water tiles with deterministic coarse dithering
   so movement is readable and the map has a PlayStation 1-era low-resolution texture feel.
+- Local lab visual profiles may pass renderer-only static samples to `Renderer.render`. Static
+  trench samples draw on the local visual-samples layer, labels draw as world-anchored Pixi text
+  above the fog overlay, and neither path writes to `GameState`, snapshots, fog-source entity lists,
+  selection, command targeting, minimap blips, or scenario authoring data.
 - Fog: unexplored = 80% dark overlay so terrain remains faintly readable; explored-but-not-visible =
   48% dark overlay; visible = clear. Use a single overlay sprite/graphics updated from `fog`
   grids; soften edges if cheap.

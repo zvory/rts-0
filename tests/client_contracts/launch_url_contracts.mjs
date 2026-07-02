@@ -234,6 +234,10 @@ async function testVisualProfileRegistry() {
       "trench profile exposes staticSamples for the renderer-only Phase 2 read model",
     );
     assert(
+      resolved.profile.staticSamples.length >= 5,
+      "trench profile includes several checked-in static sample candidates",
+    );
+    assert(
       Number.isFinite(resolved.profile.initialCamera?.x) &&
         Number.isFinite(resolved.profile.initialCamera?.y) &&
         Number.isFinite(resolved.profile.initialCamera?.zoom),

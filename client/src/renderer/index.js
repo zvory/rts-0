@@ -4,9 +4,9 @@
 // positioned/scaled from the Camera each frame, plus a screen-space overlay layer
 // for the drag selection box. Layers are drawn back-to-front in this order:
 //
-//   terrain → decals → trenches → resources → building-shadows → buildings → building-overlays
-//   → unit-shadows → units → selection-rings → hp-bars → fog → shot-reveals
-//   → feedback → placement-ghost → drag-box
+//   terrain → decals → trenches → visual-samples → resources → building-shadows → buildings
+//   → building-overlays → unit-shadows → units → selection-rings → hp-bars → fog
+//   → visual-sample-labels → shot-reveals → feedback → placement-ghost → drag-box
 //
 // Terrain is drawn once into a cached RenderTexture (it never changes mid-match).
 // Snapshot-backed ground decals and trench terrain stamp into persistent textures.
@@ -62,6 +62,7 @@ import { buildRendererFeedbackView } from "./feedback_view_model.js";
 import { LAYERS, _sweep } from "./layers.js";
 import { GroundDecalLayer, _drawGroundDecals, _initGroundDecalsForMap } from "./decals.js";
 import { TrenchDecalLayer, _drawTrenches, _initTrenchesForMap } from "./trenches.js";
+import { VisualSampleLayer, _drawVisualSamples } from "./visual_samples.js";
 import { createLiveRigDefinitions } from "./rigs/live_routing.js";
 import { createLivePngRigAtlases, loadPngRigAtlasTexture } from "./rigs/png_routing.js";
 import { createBuildingRigDefinitions } from "./rigs/building_routing.js";
@@ -129,6 +130,13 @@ export class Renderer {
       pixi: PIXI,
       getDocument: () => (typeof document !== "undefined" ? document : null),
       recordDiagnostic: (label, amount) => this._recordRenderDiagnostic(label, amount),
+    });
+    this._visualSamples = new VisualSampleLayer({
+      sampleLayer: this.layers.visualSamples,
+      labelLayer: this.layers.visualSampleLabels,
+      pixi: PIXI,
+      recordDiagnostic: (label, amount) => this._recordRenderDiagnostic(label, amount),
+      recordError: (label, err) => this._recordRenderError(label, err),
     });
 
     // Long-lived single Graphics for the bulk overlays / per-frame vector draws.
@@ -246,7 +254,12 @@ export class Renderer {
    * @param {import("./fog.js").Fog} fog
    * @param {number} alpha interpolation factor 0..1 between the two latest snapshots
    */
-  render(state, camera, fog, alpha, { clientIntent = null, frameViews = null, profiler = null } = {}) {
+  render(state, camera, fog, alpha, {
+    clientIntent = null,
+    frameViews = null,
+    profiler = null,
+    visualSamples = null,
+  } = {}) {
     this._profiler = profiler || null;
     const time = (label, fn) => profiler ? profiler.time(label, fn) : fn();
     // Drive the world container from the camera (single transform for all layers).
@@ -299,6 +312,9 @@ export class Renderer {
     });
     time("renderer.trenches", () => {
       this._drawSafely("trenches", () => this._drawTrenches(state));
+    });
+    time("renderer.visualSamples", () => {
+      this._drawSafely("visualSamples", () => this._drawVisualSamples(visualSamples, { state, camera }));
     });
 
     // Nodes currently being mined: any worker latched to them. Used by
@@ -454,6 +470,17 @@ export class Renderer {
       textureWidth: 0,
       textureHeight: 0,
       downsample: 0,
+      layerChildCount: 0,
+    };
+  }
+
+  visualSampleDiagnostics() {
+    return this._visualSamples?.diagnostics?.() || {
+      visibleSamples: 0,
+      invalidSamples: 0,
+      totalRendered: 0,
+      sampleDisplayObjects: 0,
+      labelDisplayObjects: 0,
       layerChildCount: 0,
     };
   }
@@ -693,6 +720,8 @@ export class Renderer {
     this._groundDecals = null;
     this._trenchDecals?.destroy();
     this._trenchDecals = null;
+    this._visualSamples?.destroy();
+    this._visualSamples = null;
 
     // Cached terrain sprite + its generated texture.
     if (this._terrainSprite) {
@@ -714,6 +743,7 @@ Object.assign(Renderer.prototype, {
   _initTrenchesForMap,
   _drawGroundDecals,
   _drawTrenches,
+  _drawVisualSamples,
   _ownerColors,
   _tintFor,
   _deployedWeaponSetupVisual,
