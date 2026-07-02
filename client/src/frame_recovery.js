@@ -74,6 +74,7 @@ function runMatchFrame(match, now) {
         frameViews,
         profiler: match.frameProfiler,
         visualSamples: match.visualProfile?.staticSamples || null,
+        visualUnitOverrides: match.visualProfile?.unitOverrides || null,
       });
     });
     time("match.hud", () => match.hud.update(frameViews, { profiler: match.frameProfiler }));

@@ -5,7 +5,13 @@ import { assert, assertApprox } from "./assertions.mjs";
 import { buildFrameEntityViews } from "../../client/src/frame_entity_views.js";
 import { KIND } from "../../client/src/protocol.js";
 import { Renderer } from "../../client/src/renderer/index.js";
+import {
+  VISUAL_UNIT_RIG_CANDIDATE_SOURCES,
+  compileVisualUnitRigCandidates,
+  visualUnitRigCandidateIds,
+} from "../../client/src/renderer/rigs/visual_override_rigs.js";
 import { normalizeStaticVisualSamples } from "../../client/src/renderer/visual_samples.js";
+import { resolveVisualUnitOverrides } from "../../client/src/renderer/visual_unit_overrides.js";
 import { getVisualProfile } from "../../client/src/visual_profiles.js";
 import { installFakePixi } from "./pixi_fakes.mjs";
 
@@ -53,6 +59,87 @@ const NOOP_RENDERER_OVERLAYS = [
       Number.isFinite(sample.x) &&
       Number.isFinite(sample.y)),
     "trench visual samples are renderer-only checked-in descriptors",
+  );
+}
+
+{
+  const profile = getVisualProfile("unit-rig-overrides-1");
+  assert(profile, "real-unit visual override profile is registered");
+  assert(profile.unitOverrides.length >= 3, "unit override profile compares multiple same-kind units");
+  assert(
+    profile.unitOverrides.some((rule) => rule.selector?.entityId === 126) &&
+      profile.unitOverrides.some((rule) => rule.selector?.kind === KIND.TANK && rule.selector?.ordinal === 2) &&
+      profile.unitOverrides.some((rule) => rule.selector?.kind === KIND.TANK && rule.selector?.nearest),
+    "unit override profile covers entity id, kind ordinal, and kind nearest selector forms",
+  );
+  for (const rule of profile.unitOverrides) {
+    assert(
+      visualUnitRigCandidateIds().includes(rule.candidateId),
+      `unit override candidate ${rule.candidateId} is registered through the checked-in rig registry`,
+    );
+  }
+}
+
+{
+  const compiled = compileVisualUnitRigCandidates();
+  const ids = visualUnitRigCandidateIds();
+  assert(ids.length >= 3, "checked-in visual rig registry exposes multiple tank candidates");
+  for (const id of ids) {
+    const candidate = compiled.definitions.get(id);
+    assert(candidate?.kind === KIND.TANK, `${id} compiles as a Tank candidate`);
+    assert(candidate.definition?.id === id, `${id} keeps its registered candidate id after import`);
+  }
+  assert(compiled.errors.size === 0, "checked-in visual rig candidates compile without importer errors");
+}
+
+{
+  const profile = getVisualProfile("unit-rig-overrides-1");
+  const compiled = compileVisualUnitRigCandidates();
+  const entities = [
+    { id: 126, owner: 1, kind: KIND.TANK, x: 1887.97, y: 1860.91, facing: 0, weaponFacing: 0 },
+    { id: 127, owner: 1, kind: KIND.TANK, x: 1883.97, y: 1944.91, facing: 0, weaponFacing: 0 },
+    { id: 128, owner: 1, kind: KIND.TANK, x: 1883.97, y: 2031.91, facing: 0, weaponFacing: 0 },
+    { id: 140, owner: 1, kind: KIND.RIFLEMAN, x: 2000, y: 1900, facing: 0, weaponFacing: 0 },
+  ];
+
+  const resolved = resolveVisualUnitOverrides(profile.unitOverrides, entities, compiled.definitions);
+  assert(resolved.errors.length === 0, "unit override selectors resolve cleanly for render-preview tanks");
+  assert(resolved.overrides.size === 3, "unit override profile assigns three real units");
+  assert(resolved.overrides.get(126)?.candidateId === "tank-low-profile", "entity-id selector targets tank 126");
+  assert(resolved.overrides.get(127)?.candidateId === "tank-wide-turret", "kind ordinal selector targets the second tank");
+  assert(resolved.overrides.get(128)?.candidateId === "tank-long-cannon", "nearest selector targets the intended tank");
+  assert(entities.every((entity) => entity.kind === KIND.TANK || entity.kind === KIND.RIFLEMAN),
+    "visual override resolution does not mutate real entity kinds");
+}
+
+{
+  const brokenSvg = `<svg viewBox="-10 -10 20 20" data-rts-rig-kind="${KIND.TANK}" data-rts-rig-version="1" data-rts-origin="center">
+    <script id="part.bad"></script>
+    <circle id="anchor.origin" cx="0" cy="0" r="1" />
+    <circle id="anchor.selection" cx="0" cy="0" r="1" />
+    <circle id="anchor.hp" cx="0" cy="-8" r="1" />
+  </svg>`;
+  const compiled = compileVisualUnitRigCandidates([
+    ...VISUAL_UNIT_RIG_CANDIDATE_SOURCES,
+    { id: "broken-tank-candidate", label: "Broken", kind: KIND.TANK, svgText: brokenSvg },
+  ]);
+  const entities = [
+    { id: 1, owner: 1, kind: KIND.TANK, x: 0, y: 0 },
+    { id: 2, owner: 1, kind: KIND.TANK, x: 20, y: 0 },
+  ];
+  const resolved = resolveVisualUnitOverrides([
+    { id: "missing-unit", candidateId: "tank-low-profile", selector: { entityId: 999 } },
+    { id: "ambiguous-tank", candidateId: "tank-low-profile", selector: { kind: KIND.TANK, owner: 1 } },
+    { id: "invalid-candidate", candidateId: "broken-tank-candidate", selector: { entityId: 1 } },
+  ], entities, compiled.definitions, { candidateErrors: compiled.errors });
+
+  assert(compiled.errors.has("broken-tank-candidate"), "invalid checked-in SVG candidates fail importer validation");
+  assert(resolved.overrides.size === 0, "broken visual override rules do not produce renderer overrides");
+  assert(
+    resolved.errors.some((error) => error.reason === "selector-no-match") &&
+      resolved.errors.some((error) => error.reason === "selector-ambiguous") &&
+      resolved.errors.some((error) => error.reason === "invalid-candidate"),
+    "visual override diagnostics distinguish no-match, ambiguous selector, and invalid candidate failures",
   );
 }
 
@@ -199,6 +286,122 @@ const NOOP_RENDERER_OVERLAYS = [
   } finally {
     console.error = priorConsoleError;
     delete globalThis.__rtsVisualSampleErrors;
+    delete globalThis.__rtsRenderErrors;
+    restorePixi();
+  }
+}
+
+{
+  const restorePixi = installFakePixi();
+  try {
+    const renderer = new Renderer(fakeParent());
+    for (const name of NOOP_RENDERER_OVERLAYS) renderer[name] = () => {};
+    renderer._drawGroundDecals = () => 0;
+    renderer._drawTrenches = () => 0;
+    const profile = getVisualProfile("unit-rig-overrides-1");
+    const tankA = { id: 126, owner: 1, kind: KIND.TANK, x: 1887.97, y: 1860.91, hp: 180, maxHp: 180, facing: 0, weaponFacing: 0 };
+    const tankB = { id: 127, owner: 1, kind: KIND.TANK, x: 1883.97, y: 1944.91, hp: 180, maxHp: 180, facing: 0.2, weaponFacing: 0.5 };
+    const tankC = { id: 128, owner: 1, kind: KIND.TANK, x: 1883.97, y: 2031.91, hp: 180, maxHp: 180, facing: 0.4, weaponFacing: 0.8 };
+    const state = {
+      playerId: 1,
+      players: [{ id: 1, color: "#4878c8" }],
+      resources: { oil: 10 },
+      selection: new Set([tankB.id]),
+      rememberedBuildings: [],
+      map: { tileSize: 32 },
+      trenches: [],
+      entitiesInterpolated() {
+        return [tankA, tankB, tankC];
+      },
+      selectedEntities() {
+        return [tankB];
+      },
+      weaponRecoil(entityId) {
+        return entityId === tankC.id ? 0.5 : 0;
+      },
+    };
+    const beforeKeys = Object.keys(state).sort().join(",");
+
+    renderer.render(state, { x: 0, y: 0, zoom: 1 }, null, 1, {
+      visualUnitOverrides: profile.unitOverrides,
+    });
+
+    const diagnostics = renderer.visualUnitOverrideDiagnostics();
+    assert(diagnostics.activeOverrides === 3, "renderer resolves three real-unit visual overrides");
+    assert(diagnostics.errors === 0, "valid unit override profile has no selector diagnostics");
+    assert(renderer._liveRigPools.liveUnitRigs.get(tankA.id)?.definition.id === "tank-low-profile",
+      "entity-id override routes tank A through the candidate SVG rig");
+    assert(renderer._liveRigPools.liveUnitRigs.get(tankB.id)?.definition.id === "tank-wide-turret",
+      "kind ordinal override routes tank B through the candidate SVG rig");
+    assert(renderer._liveRigPools.liveUnitRigs.get(tankC.id)?.definition.id === "tank-long-cannon",
+      "nearest override routes tank C through the candidate SVG rig");
+    assert(renderer._pools.selectionRings.has(tankB.id), "selection rings still use real selected entity ids");
+    assert(renderer._pools.hpBars.size === 1, "HP overlays still come from real entity state");
+    assert(Object.keys(state).sort().join(",") === beforeKeys, "unit override rendering does not add GameState fields");
+    assert(state.selection.has(tankB.id), "unit override rendering does not mutate selection");
+    assert(!globalThis.__rtsVisualUnitOverrideErrors, "valid unit override rendering does not publish errors");
+
+    renderer.destroy();
+  } finally {
+    delete globalThis.__rtsVisualUnitOverrideErrors;
+    delete globalThis.__rtsRenderErrors;
+    restorePixi();
+  }
+}
+
+{
+  const restorePixi = installFakePixi();
+  try {
+    const renderer = new Renderer(fakeParent());
+    for (const name of NOOP_RENDERER_OVERLAYS) renderer[name] = () => {};
+    renderer._drawGroundDecals = () => 0;
+    renderer._drawTrenches = () => 0;
+    const profile = getVisualProfile("unit-rig-overrides-1");
+    const now = performance.now();
+    const reveal = {
+      id: 126,
+      owner: 1,
+      kind: KIND.TANK,
+      x: 1887.97,
+      y: 1860.91,
+      hp: 180,
+      maxHp: 180,
+      facing: 0,
+      weaponFacing: 0,
+      shotReveal: true,
+      shotRevealCreatedAt: now - 100,
+      shotRevealExpiresAt: now + 900,
+    };
+    const state = {
+      playerId: 1,
+      players: [{ id: 1, color: "#4878c8" }],
+      resources: { oil: 10 },
+      selection: new Set(),
+      rememberedBuildings: [],
+      map: { tileSize: 32 },
+      trenches: [],
+      entitiesInterpolated() {
+        return [reveal];
+      },
+      selectedEntities() {
+        return [];
+      },
+      weaponRecoil() {
+        return 0;
+      },
+    };
+
+    renderer.render(state, { x: 0, y: 0, zoom: 1 }, null, 1, {
+      visualUnitOverrides: [profile.unitOverrides[0]],
+    });
+
+    assert(renderer.visualUnitOverrideDiagnostics().activeOverrides === 1,
+      "shot-reveal-only frame can still resolve an entity-id unit override");
+    assert(renderer._liveRigPools.liveShotRevealRigs.get(reveal.id)?.definition.id === "tank-low-profile",
+      "shot reveal rendering uses the same visual override candidate when the reveal id matches");
+    renderer.destroy();
+  } finally {
+    delete globalThis.__rtsVisualUnitOverrideErrors;
     delete globalThis.__rtsRenderErrors;
     restorePixi();
   }

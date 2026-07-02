@@ -484,6 +484,49 @@ test("default Tank draw uses live SVG rig with separate turret and hull parts", 
   assert.equal(unit.parts.get("part.fuelCue.box").display.visible, false);
 });
 
+test("visual unit override draws a real Tank through candidate SVG art without changing kind", () => {
+  const defaultDefinition = compileFixture("rig-vehicle.svg", KIND.TANK);
+  const candidate = compileSvgRig(TANK_RIG_SVG.replaceAll("33.2", "39.2"), {
+    id: "tank-visual-test",
+    expectedKind: KIND.TANK,
+  });
+  assert.equal(candidate.ok, true, JSON.stringify(candidate.errors));
+  const entity = {
+    id: 43,
+    kind: KIND.TANK,
+    owner: 1,
+    x: 32,
+    y: 44,
+    facing: 0,
+    weaponFacing: Math.PI / 2,
+    state: STATE.IDLE,
+  };
+  const renderer = makeRigRenderer();
+  renderer._liveRigDefinitionsByKind = new Map([[KIND.TANK, defaultDefinition]]);
+  renderer._livePngRigAtlasesByKind = new Map([[KIND.TANK, { ...TANK_PNG_RIG_ATLAS, enabled: true }]]);
+  renderer._livePngRigAtlasTextures = new Map([[KIND.TANK, fakeAtlasTexture()]]);
+
+  renderer._drawUnit(entity, new Map([[1, 0x336699]]), {
+    playerId: 1,
+    selection: new Set([entity.id]),
+    resources: { oil: 10 },
+    weaponRecoil: () => 0,
+  }, {
+    visualOverride: {
+      candidateId: "tank-visual-test",
+      kind: KIND.TANK,
+      definition: candidate.definition,
+    },
+  });
+
+  const unit = renderer._liveRigPools.liveUnitRigs.get(entity.id);
+  const effects = renderer._liveRigPools.liveUnitRigEffects.get(entity.id);
+  assert.equal(entity.kind, KIND.TANK, "override rendering keeps the authoritative unit kind");
+  assert.equal(unit.definition.id, "tank-visual-test");
+  assert.equal(typeof unit.matchesPngAtlasRig, "undefined", "visual overrides bypass the production Tank PNG atlas");
+  assert.equal(effects.definition.id, "tank-visual-test", "override effects use the same candidate definition");
+});
+
 test("tank PNG atlas route splits omitted shadow and fuel cue back to SVG", () => {
   const definition = compileFixture("rig-vehicle.svg", KIND.TANK);
   const [shadowRoute, unitRoute, effectRoute] = liveRigRoutesFor(KIND.TANK);

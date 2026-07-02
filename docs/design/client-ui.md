@@ -246,6 +246,15 @@ Ekat. Missing or invalid unit rig definitions fail through the renderer's soft m
 rather than falling back to a procedural unit branch. Shadow and body parts route through separate
 live pools so normal unit and shot-reveal layer ordering stays intact.
 
+Local lab visual profiles may supply per-entity unit rig overrides to `Renderer.render` through
+`visualUnitOverrides`. The renderer resolves those rules against the current frame's real unit
+entities with local-only selectors, validates candidate ids through the checked-in
+`renderer/rigs/visual_override_rigs.js` registry, and then passes the candidate SVG rig definition
+through the same `renderLiveUnitRig` runtime path. Overrides never change `entity.kind`, snapshots,
+selection ids, command targeting, HP bars, fog, minimap inputs, or scenario authoring data; broken
+selectors or candidate rigs publish local diagnostics and fall back to the normal live rig for that
+unit.
+
 SVG unit art workflow:
 - Author the SVG under the approved importer subset: root rig metadata, stable `part.*` ids,
   `anchor.*` ids for at least `origin`, `selection`, and `hp`, semantic `bounds.*`, direct hex
@@ -1310,6 +1319,11 @@ selection rings):
   trench samples draw on the local visual-samples layer, labels draw as world-anchored Pixi text
   above the fog overlay, and neither path writes to `GameState`, snapshots, fog-source entity lists,
   selection, command targeting, minimap blips, or scenario authoring data.
+- Local lab visual profiles may also pass per-instance real-unit visual overrides to
+  `Renderer.render`. These override only the candidate SVG rig definition used by real unit drawing,
+  keep runtime inputs such as movement, facing, weapon facing, recoil, setup state, occupied-trench
+  tint, selection, HP bars, fog, and shot reveals on the real entity, and are resolved from checked-in
+  profile/candidate registries rather than URL-provided assets.
 - Fog: unexplored = 80% dark overlay so terrain remains faintly readable; explored-but-not-visible =
   48% dark overlay; visible = clear. Use a single overlay sprite/graphics updated from `fog`
   grids; soften edges if cheap.
