@@ -3,6 +3,10 @@ import { TANK_RIG_SVG } from "./tank_svg.js";
 import { compileSvgRig } from "./svg_importer.js";
 
 const CANDIDATE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+const TANK_CANNON_BARREL_LENGTH = 33.2;
+const TANK_CANNON_FLASH_LEAD = 8.8;
+const TANK_CANNON_RECOIL_SCALE = "-0.0301204819";
+const LONG_CANNON_BARREL_LENGTH = 39.2;
 
 export const VISUAL_UNIT_RIG_CANDIDATE_SOURCES = Object.freeze([
   Object.freeze({
@@ -104,14 +108,29 @@ function tankWideTurretSvg() {
 }
 
 function tankLongCannonSvg() {
-  return TANK_RIG_SVG
-    .replaceAll("33.2", "39.2")
-    .replaceAll("weaponFacingCos:transform.x:42:0", "weaponFacingCos:transform.x:48:0")
-    .replaceAll("weaponFacingSin:transform.y:42:0", "weaponFacingSin:transform.y:48:0");
+  const longCannonLength = formatRigNumber(LONG_CANNON_BARREL_LENGTH);
+  const baseFlashCenter = formatRigNumber(TANK_CANNON_BARREL_LENGTH + TANK_CANNON_FLASH_LEAD);
+  const longFlashCenter = formatRigNumber(LONG_CANNON_BARREL_LENGTH + TANK_CANNON_FLASH_LEAD);
+  let svg = TANK_RIG_SVG;
+  svg = replaceOnce(svg, `x2="${formatRigNumber(TANK_CANNON_BARREL_LENGTH)}"`, `x2="${longCannonLength}"`);
+  svg = replaceOnce(
+    svg,
+    `recoilPx:transform.scaleX:${TANK_CANNON_RECOIL_SCALE}:0`,
+    `recoilPx:transform.scaleX:${formatRigNumber(-1 / LONG_CANNON_BARREL_LENGTH)}:0`,
+  );
+  svg = replaceOnce(svg, `id="anchor.muzzle" cx="${formatRigNumber(TANK_CANNON_BARREL_LENGTH)}"`, `id="anchor.muzzle" cx="${longCannonLength}"`);
+  svg = svg
+    .replaceAll(`weaponFacingCos:transform.x:${baseFlashCenter}:0`, `weaponFacingCos:transform.x:${longFlashCenter}:0`)
+    .replaceAll(`weaponFacingSin:transform.y:${baseFlashCenter}:0`, `weaponFacingSin:transform.y:${longFlashCenter}:0`);
+  return svg;
 }
 
 function replaceOnce(source, needle, replacement) {
   return source.includes(needle) ? source.replace(needle, replacement) : source;
+}
+
+function formatRigNumber(value) {
+  return Number(value.toFixed(12)).toString();
 }
 
 function candidateError(code, path, message) {
