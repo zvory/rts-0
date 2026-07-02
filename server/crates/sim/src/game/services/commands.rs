@@ -1481,7 +1481,11 @@ fn try_fire_artillery(
                 to: unit,
                 reveal: Some(reveal.clone()),
                 to_pos: None,
-                weapon_kind: Some(rules::combat::WeaponKind::ArtilleryGun.stable_id().to_string()),
+                weapon_kind: Some(
+                    rules::combat::WeaponKind::ArtilleryGun
+                        .stable_id()
+                        .to_string(),
+                ),
             });
         }
     }
@@ -1754,6 +1758,19 @@ fn order_train(
     if !rules::economy::train_requirement_met_for_faction(&faction_id, unit, &owned_complete) {
         notice(events, player, "Requirement not met");
         return;
+    }
+    if unit == EntityKind::ScoutPlane {
+        match scout_plane::production_limit(entities, player) {
+            Some(scout_plane::ScoutPlaneProductionLimit::Active) => {
+                notice(events, player, "Scout Plane already active");
+                return;
+            }
+            Some(scout_plane::ScoutPlaneProductionLimit::InProduction) => {
+                notice(events, player, "Scout Plane already in production");
+                return;
+            }
+            None => {}
+        }
     }
     let stats = match config::unit_stats(unit) {
         Some(s) => s,

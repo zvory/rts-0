@@ -39,6 +39,7 @@ src/
   sound_manifest.js # Stable sound ids and asset URLs
   hud.js          # HUD: resources/supply bar, selected panel, command card (build/train)
   hud_command_card.js # Command-card descriptors, faction command ids, and grid hotkeys
+  hud_train_card_helpers.js # Train/research command-card slotting, affordability, and one-unit limits
   hud_selection_panel.js # Selected-unit strip/details panel
   hud_unit_commands.js # Unit tactical command descriptors
   hotkey_profiles.js # Local hotkey presets, custom profile storage, import/export
@@ -946,7 +947,7 @@ export function noticeSoundId(msg)
 `hud.js`
 ```js
 export class HUD {
-  constructor(rootEl, state, commandIssuer, audio?, hotkeyProfiles?, clientIntent?, controlPolicy?)
+  constructor(rootEl, state, commandIssuer, audio?, hotkeyProfiles?, clientIntent?, controlPolicy?, camera?)
   update(frameViews?)                    // refresh resources/supply, selected panel, command card
   // command card buttons call commandIssuer.issueCommand(...) or ClientIntent facade methods
 }
@@ -957,7 +958,10 @@ multi-building selection spreads queued units across its producers. Train and pr
 hotkeys honor native keyboard repeat: after the OS repeat delay, repeated `keydown` events activate
 only those repeatable command-card buttons. Research buttons that unlock production appear directly
 below the production button they unlock and disappear once complete. Cancel walks selected producing
-buildings in reverse round-robin order for the displayed producer type.
+buildings in reverse round-robin order for the displayed producer type. The Scout Plane City Centre
+button is pinned to the `Z` grid slot, unlocks after either completed Gun Works or completed Vehicle
+Works, and changes to a select-and-pan action while the player already has an active Scout Plane;
+while a Scout Plane is in production it stays disabled instead of issuing another train command.
 Command identities are stable and split by scope: global tactical/navigation/production-control
 buttons remain un-namespaced, while build, train, research, and ability buttons emitted for a
 faction catalog use the local player's faction id as the command-id prefix.

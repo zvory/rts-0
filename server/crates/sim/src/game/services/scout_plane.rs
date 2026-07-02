@@ -7,6 +7,35 @@ use crate::game::map::Map;
 const TWO_PI: f32 = std::f32::consts::PI * 2.0;
 const ORBIT_PHASE_EPS: f32 = 0.001;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ScoutPlaneProductionLimit {
+    Active,
+    InProduction,
+}
+
+pub(crate) fn production_limit(
+    entities: &EntityStore,
+    owner: u32,
+) -> Option<ScoutPlaneProductionLimit> {
+    if entities
+        .iter()
+        .any(|plane| plane.kind == EntityKind::ScoutPlane && plane.owner == owner && plane.hp > 0)
+    {
+        return Some(ScoutPlaneProductionLimit::Active);
+    }
+    if entities.iter().any(|building| {
+        building.kind == EntityKind::CityCentre
+            && building.owner == owner
+            && building
+                .prod_queue()
+                .iter()
+                .any(|item| item.unit == EntityKind::ScoutPlane)
+    }) {
+        return Some(ScoutPlaneProductionLimit::InProduction);
+    }
+    None
+}
+
 pub(crate) fn launch_from_building(
     map: &Map,
     entities: &mut EntityStore,

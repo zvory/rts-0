@@ -47,7 +47,7 @@ pub struct NodeDef {
     pub amount: u32,
 }
 
-const WORKER_ONLY: &[EntityKind] = &[EntityKind::Worker];
+const CITY_CENTRE_UNITS: &[EntityKind] = &[EntityKind::Worker, EntityKind::ScoutPlane];
 const GOLEM_ONLY: &[EntityKind] = &[EntityKind::Golem];
 const BARRACKS_UNITS: &[EntityKind] = &[
     EntityKind::Rifleman,
@@ -71,6 +71,8 @@ const TRAINING_CENTRE_REQUIRED: &[EntityKind] = &[EntityKind::TrainingCentre];
 const CITY_CENTRE_AND_TRAINING_CENTRE_REQUIRED: &[EntityKind] =
     &[EntityKind::CityCentre, EntityKind::TrainingCentre];
 const STEELWORKS_REQUIRED: &[EntityKind] = &[EntityKind::Steelworks];
+pub const SCOUT_PLANE_UNLOCK_BUILDINGS: &[EntityKind] =
+    &[EntityKind::Steelworks, EntityKind::Factory];
 const FACTORY_BUILDING_REQUIRED: &[EntityKind] = &[EntityKind::Factory];
 const FACTORY_REQUIRED: &[EntityKind] = &[EntityKind::CityCentre, EntityKind::TrainingCentre];
 
@@ -292,9 +294,8 @@ pub const UNITS: &[UnitDef] = &[
         },
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::None,
-        // Hidden until Phase 6 adds the City Centre production path and any-of tech unlock.
-        trained_at: None,
-        train_requires: &[],
+        trained_at: Some(EntityKind::CityCentre),
+        train_requires: SCOUT_PLANE_UNLOCK_BUILDINGS,
     },
     UnitDef {
         kind: EntityKind::CommandCar,
@@ -356,7 +357,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
         },
         armor_class: ArmorClass::Armored,
         weapon: WeaponClass::None,
-        trains: WORKER_ONLY,
+        trains: CITY_CENTRE_UNITS,
         build_requires: &[],
     },
     BuildingDef {
@@ -652,7 +653,7 @@ mod tests {
 
         assert_eq!(
             building_def(EntityKind::CityCentre).unwrap().trains,
-            WORKER_ONLY
+            CITY_CENTRE_UNITS
         );
         assert_eq!(
             building_def(EntityKind::Barracks).unwrap().trains,

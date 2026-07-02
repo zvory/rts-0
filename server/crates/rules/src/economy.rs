@@ -73,6 +73,11 @@ pub fn train_requirement_met(
     unit_kind: EntityKind,
     owned_complete_building_kinds: &[EntityKind],
 ) -> bool {
+    if unit_kind == EntityKind::ScoutPlane {
+        return defs::SCOUT_PLANE_UNLOCK_BUILDINGS
+            .iter()
+            .any(|req| owned_complete_building_kinds.contains(req));
+    }
     defs::unit_def(unit_kind)
         .map(|d| requirements_met(d.train_requires, owned_complete_building_kinds))
         .unwrap_or(true)
@@ -198,7 +203,7 @@ mod tests {
         assert_eq!(DEFAULT_FACTION_ID, "kriegsia");
         assert_eq!(
             trainable_units(EntityKind::CityCentre),
-            &[EntityKind::Worker]
+            &[EntityKind::Worker, EntityKind::ScoutPlane]
         );
         assert_eq!(trainable_units(EntityKind::Zamok), &[EntityKind::Golem]);
         assert_eq!(
@@ -234,6 +239,7 @@ mod tests {
         assert!(!train_requirement_met(EntityKind::AntiTankGun, &[]));
         assert!(!train_requirement_met(EntityKind::Tank, &[]));
         assert!(!train_requirement_met(EntityKind::Artillery, &[]));
+        assert!(!train_requirement_met(EntityKind::ScoutPlane, &[]));
         assert!(train_requirement_met(
             EntityKind::MachineGunner,
             &[EntityKind::TrainingCentre]
@@ -261,6 +267,18 @@ mod tests {
         assert!(train_requirement_met(
             EntityKind::Tank,
             &[EntityKind::Factory]
+        ));
+        assert!(train_requirement_met(
+            EntityKind::ScoutPlane,
+            &[EntityKind::Steelworks]
+        ));
+        assert!(train_requirement_met(
+            EntityKind::ScoutPlane,
+            &[EntityKind::Factory]
+        ));
+        assert!(!train_requirement_met(
+            EntityKind::ScoutPlane,
+            &[EntityKind::TrainingCentre]
         ));
 
         assert!(!build_requirement_met(EntityKind::TrainingCentre, &[]));
@@ -322,7 +340,7 @@ mod tests {
         assert_eq!(
             defs::unit_def(EntityKind::ScoutPlane).map(|d| d.stats.radius),
             Some(0.0),
-            "Scout Plane should not reserve or block ground collision in the hidden contract"
+            "Scout Plane should not reserve or block ground collision"
         );
         assert_eq!(
             defs::unit_def(EntityKind::ScoutPlane).map(|d| d.stats.sight_tiles),

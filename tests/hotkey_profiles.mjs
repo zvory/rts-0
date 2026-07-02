@@ -68,6 +68,18 @@ function workerBuildCard(factionId = "kriegsia") {
   });
 }
 
+function cityCentreTrainCard() {
+  const cityCentre = { id: 21, owner: 1, kind: KIND.CITY_CENTRE, buildProgress: null };
+  return buildCommandCardDescriptors({
+    playerId: 1,
+    selection: [cityCentre],
+    resources: { steel: 1000, oil: 1000, supplyUsed: 0, supplyCap: 20 },
+    upgrades: [],
+    playerHasCompleteKind: (kind) => kind === KIND.STEELWORKS,
+    groupCooldownClocks: () => [],
+  });
+}
+
 {
   const catalog = buildHotkeyCommandCatalog(buildCommandCardContextCatalog());
   assert(
@@ -77,6 +89,13 @@ function workerBuildCard(factionId = "kriegsia") {
     ),
     "hotkey command catalog includes the exposed Panzerfaust train command in the E slot",
   );
+  assert(
+    catalog.commands.some((command) =>
+      command.commandId === kriegsiaCommandId("train", KIND.SCOUT_PLANE) &&
+        command.slotIndex === 6
+    ),
+    "hotkey command catalog includes the exposed Scout Plane train command in the Z slot",
+  );
 }
 
 {
@@ -84,6 +103,12 @@ function workerBuildCard(factionId = "kriegsia") {
   assert(Object.isFrozen(hotkeys.profileById(HOTKEY_PRESET_GRID)), "Grid preset is immutable");
   assert(Object.isFrozen(hotkeys.profileById(HOTKEY_PRESET_CLASSIC).bindings), "Classic preset bindings are immutable");
   assert.equal(hotkeys.getActiveProfile().id, HOTKEY_PRESET_GRID, "Grid is the default active profile");
+  hotkeys.setActiveProfile(HOTKEY_PRESET_CLASSIC);
+  assert.equal(
+    hotkeys.resolveCard(cityCentreTrainCard()).slots[6].hotkey,
+    "S",
+    "Classic RTS preset binds Scout Plane production to S",
+  );
 }
 
 {

@@ -19,6 +19,7 @@ pub const BALLISTIC_TABLES_UPGRADE: &str = "ballistic_tables";
 pub const TANK_UNLOCK_UPGRADE: &str = "tank_unlock";
 pub const COMMAND_CAR_UNLOCK_UPGRADE: &str = "command_car_unlock";
 pub const MORTAR_AUTOCAST_UPGRADE: &str = "mortar_autocast";
+pub use crate::defs::SCOUT_PLANE_UNLOCK_BUILDINGS;
 
 pub const SMOKE_ABILITY: &str = "smoke";
 pub const MORTAR_FIRE_ABILITY: &str = "mortarFire";
@@ -117,6 +118,7 @@ const DEFAULT_UNITS: &[EntityKind] = &[
     EntityKind::Artillery,
     EntityKind::Tank,
     EntityKind::ScoutCar,
+    EntityKind::ScoutPlane,
     EntityKind::CommandCar,
 ];
 
@@ -144,8 +146,6 @@ const DEFAULT_WORKER_BUILDABLES: &[EntityKind] = &[
 ];
 
 const ARTILLERY_ABILITY_CARRIERS: &[EntityKind] = &[EntityKind::Artillery];
-pub const SCOUT_PLANE_UNLOCK_BUILDINGS: &[EntityKind] =
-    &[EntityKind::Steelworks, EntityKind::Factory];
 
 const DEFAULT_UPGRADES: &[UpgradeCatalogEntry] = &[
     UpgradeCatalogEntry {
@@ -680,11 +680,11 @@ mod tests {
 
         assert_eq!(
             catalog.trainable_units(EntityKind::CityCentre),
-            vec![EntityKind::Worker]
+            vec![EntityKind::Worker, EntityKind::ScoutPlane]
         );
         assert!(
-            !catalog.allows_unit(EntityKind::ScoutPlane),
-            "Scout Plane stays hidden from normal production until its runtime/UI phases"
+            catalog.allows_unit(EntityKind::ScoutPlane),
+            "Scout Plane is exposed through Kriegsia City Centre production"
         );
         assert_eq!(
             catalog.trainable_units(EntityKind::Barracks),
