@@ -36,6 +36,21 @@ pub(crate) fn production_limit(
     None
 }
 
+pub(crate) fn train_notice(
+    unit: EntityKind,
+    entities: &EntityStore,
+    owner: u32,
+) -> Option<&'static str> {
+    if unit != EntityKind::ScoutPlane {
+        return None;
+    }
+    match production_limit(entities, owner) {
+        Some(ScoutPlaneProductionLimit::Active) => Some("Scout Plane already active"),
+        Some(ScoutPlaneProductionLimit::InProduction) => Some("Scout Plane already in production"),
+        None => None,
+    }
+}
+
 pub(crate) fn launch_from_building(
     map: &Map,
     entities: &mut EntityStore,
