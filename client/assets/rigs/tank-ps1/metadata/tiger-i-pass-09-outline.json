@@ -1,0 +1,39 @@
+{
+  "candidate": "tiger-i-pass-09-outline",
+  "status": "active-experiment",
+  "sourceSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-09-outline-input-sheet.png",
+  "sourceSheetSvg": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-09-outline-input-sheet.svg",
+  "prompt": "client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-09-outline.md",
+  "builtInImageGenSource": "/Users/az/.codex/generated_images/019f2492-10dd-73b3-8d83-ad9d31bb5026/ig_0fe9db550015d073016a46eec7e310819e82e2dfc45e0d6c44.png",
+  "candidateSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-09-outline.png",
+  "candidateAlphaSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-09-outline-alpha.png",
+  "runtimeSourceAlphaSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-09-outline-alpha-barrel-flipped.png",
+  "runtimeAlphaSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-09-outline-runtime-alpha.png",
+  "activeAtlas": "client/assets/rigs/tank-ps1/tank-atlas.png",
+  "activeAtlasUrl": "/assets/rigs/tank-ps1/tank-atlas.png?v=pass09-outline",
+  "alphaConversion": {
+    "keyColor": "#ff00ff",
+    "autoKey": "none",
+    "softMatte": true,
+    "transparentThreshold": 18,
+    "opaqueThreshold": 220,
+    "despill": true
+  },
+  "pipelineOptions": {
+    "blankCells": ["reference.full", "sprite.track", "unused.blank"],
+    "normalizeVisibleBounds": true,
+    "ignoreGuideBounds": true,
+    "guideMaskFuzz": 12,
+    "guideMaskAlphaThreshold": 20,
+    "guideMaskLineWidth": 12,
+    "guideMaskMorphology": "Square:5",
+    "clearCellEdgeAlpha": 16,
+    "visiblePadding": 0,
+    "brightness": 115,
+    "saturation": 105,
+    "hue": 100,
+    "imageVersion": "pass09-outline"
+  },
+  "runtimeNotes": "The active PNG atlas covers track parts with transparent sprites, exposes hull as sprite.hull, turret/coax as sprite.turret, and main cannon as sprite.barrel. The barrel sprite uses tintSlot team, matching the hull's full owner-color tint while preserving part.barrel recoil. The generated barrel cell was flipped horizontally before atlas writing so the runtime pivot and muzzle orientation match the SVG rig.",
+  "notes": "Regenerated from the separated 2x3 no-track sheet with the attached top-down Tiger I reference used only for silhouette guidance. This pass asks for less detail, a non-perfect-rectangular stepped/chamfered hull, black RTS-readable outlines, and a full team-tinted barrel. Not final art: inspect the side armor blocks in-game because they may still read like track guards."
+}

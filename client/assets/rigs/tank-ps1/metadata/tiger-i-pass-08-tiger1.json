@@ -1,6 +1,6 @@
 {
   "candidate": "tiger-i-pass-08-tiger1",
-  "status": "active-experiment",
+  "status": "saved-experiment",
   "sourceSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-08-tiger1-input-sheet.png",
   "sourceSheetSvg": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-08-tiger1-input-sheet.svg",
   "prompt": "client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-08-tiger1.md",
