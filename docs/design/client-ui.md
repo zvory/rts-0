@@ -67,6 +67,7 @@ src/
   lab_panel.js   # LabPanel: app-owned lab controls/status UI mounted around Match
   lab_panel_window.js # draggable/resizable chrome helper for the app-owned LabPanel
   lab_control_policy.js # Lab control collaborator placeholder injected into Match
+  visual_profiles.js # Lab-scoped visual experimentation profile registry and resolver
   settings_container.js # Reusable settings shell: opener, tabs, focus, teardown
   settings_panels.js # Portable settings tab panel descriptors
   main.js         # Entry point: starts App
@@ -1332,7 +1333,8 @@ Current areas:
   `match_net_reporter.js`, `match_settings_context.js`, `match_settings_toggles.js`, `client_perf_report.js`, `match_health.js`,
   `frame_profiler.js`, `frame_recovery.js`, `frame_entity_views.js`, `live_pause_overlay.js`,
   `observer_analysis_overlay.js`, `observer_analysis_signatures.js`, `replay_controls.js`,
-  `room_time_panel.js`, `replay_viewer.js`, `lab_control_policy.js`, `room_capabilities.js`. App's browser leave confirmation is scoped to active running live-player matches; spectator, Lab, replay, and resolved/stopped sessions leave without the prompt.
+  `room_time_panel.js`, `replay_viewer.js`, `lab_control_policy.js`, `room_capabilities.js`,
+  `visual_profiles.js`. App's browser leave confirmation is scoped to active running live-player matches; spectator, Lab, replay, and resolved/stopped sessions leave without the prompt.
 - `model`: `state.js`, `state_queries.js`, `state_visual_effects.js`, `client_intent.js`,
   `command_budget.js`, `command_composer.js`, `progress_extrapolator.js`,
   `prediction_controller.js`, `prediction_compatibility.js`, `sim_wasm_adapter.js`.
@@ -1350,8 +1352,8 @@ Current areas:
   command-free camera gesture helper for live input and replay/observer wrappers. Locked native-cursor routing sends clicks through both settings chrome and the game screen, and preserves pressed-button state across macOS drag events for routed pointer moves and gameplay selection drags.
 - `renderer`: `renderer/`.
 - `platform`: bootstrap, including the lobby Open Lab entry point to bare `/lab`, `/lab` catalog
-  route detection, direct launch URL parsing for scenario/map/seed, audio, combat audio, alerts,
-  fog, camera, prediction settings, unit range settings,
+  route detection, direct launch URL parsing for scenario/map/seed and sanitized lab visual profile
+  ids, audio, combat audio, alerts, fog, camera, prediction settings, unit range settings,
   `report_window_aggregate.js`.
 
 Import rules:
