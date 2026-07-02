@@ -243,6 +243,10 @@ async function testVisualProfileRegistry() {
       getVisualProfile("trench-variants-1") === resolved.profile,
       "direct registry lookup returns the checked-in profile object",
     );
+    assert(
+      getVisualProfile("constructor") === null,
+      "registry lookup must not resolve inherited object prototype names",
+    );
 
     let lookupCount = 0;
     const invalid = resolveVisualProfileLaunch(
@@ -262,6 +266,13 @@ async function testVisualProfileRegistry() {
     assert(unknown.profile === null, "unknown safe visual profile ids should not resolve");
     assert(unknown.error?.code === "unknown", "unknown safe visual profile ids should surface a local error");
     assert(lookupCount === 1, "unknown safe visual profile ids perform only registry lookup");
+
+    const inheritedName = resolveVisualProfileLaunch({ visualProfileId: "toString" });
+    assert(inheritedName.profile === null, "object prototype property names are not profiles");
+    assert(
+      inheritedName.error?.code === "unknown",
+      "prototype property names should report the same local unknown-profile error",
+    );
   } finally {
     if (priorFetch === undefined) delete globalThis.fetch;
     else globalThis.fetch = priorFetch;

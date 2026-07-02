@@ -3,15 +3,17 @@ const VISUAL_PROFILE_ERROR_MESSAGES = Object.freeze({
   unknown: "Unknown visualProfile.",
 });
 
-const VISUAL_PROFILES = Object.freeze({
-  "trench-variants-1": Object.freeze({
+const VISUAL_PROFILE_ENTRIES = Object.freeze([
+  Object.freeze({
     id: "trench-variants-1",
     label: "Trench variants 1",
     description: "Initial checked-in profile for local entrenchment visual candidates.",
     initialCamera: Object.freeze({ x: 960, y: 640, zoom: 0.9 }),
     staticSamples: Object.freeze([]),
   }),
-});
+]);
+
+const VISUAL_PROFILE_BY_ID = new Map(VISUAL_PROFILE_ENTRIES.map((profile) => [profile.id, profile]));
 
 function visualProfileError(code, profileId = "") {
   const message = code === "unknown" && profileId
@@ -21,11 +23,11 @@ function visualProfileError(code, profileId = "") {
 }
 
 export function visualProfileIds() {
-  return Object.keys(VISUAL_PROFILES);
+  return VISUAL_PROFILE_ENTRIES.map((profile) => profile.id);
 }
 
 export function getVisualProfile(id) {
-  return VISUAL_PROFILES[id] || null;
+  return VISUAL_PROFILE_BY_ID.get(id) || null;
 }
 
 export function resolveVisualProfileLaunch(labLaunch, lookupProfile = getVisualProfile) {
