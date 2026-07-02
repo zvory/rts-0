@@ -159,6 +159,10 @@ function neutralOwner(state, owner) {
     : Number(owner) === 0;
 }
 
+function usesVehicleSelectionBody(kind) {
+  return kind === KIND.SCOUT_PLANE || isVehicleBodyKind(kind);
+}
+
 export function _ringRadius(e) {
   const stat = STATS[e.kind] || {};
   if (isBuilding(e.kind)) {
@@ -167,7 +171,7 @@ export function _ringRadius(e) {
     const h = (stat.footH || 2) * ts;
     return { rx: w * 0.6, ry: h * 0.42, cy: 0 };
   }
-  if (isVehicleBodyKind(e.kind)) {
+  if (usesVehicleSelectionBody(e.kind)) {
     const body = tankBodyVisual(stat);
     return { rx: body.halfLen + 4, ry: body.halfWidth + 5, cy: 2 };
   }
@@ -188,7 +192,7 @@ export function _hpBar(g, e, status = null) {
     halfW = Math.min(w * 0.45, 28);
     topY = e.y - h / 2 - 8;
   } else {
-    if (isVehicleBodyKind(e.kind)) {
+    if (usesVehicleSelectionBody(e.kind)) {
       const body = tankBodyVisual(stat);
       halfW = body.halfLen * 0.8;
       topY = e.y - body.shadowRadius - 8;

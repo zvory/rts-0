@@ -2,7 +2,19 @@
 
 ## Phase Status
 
-Status: pending.
+Status: done.
+
+Completion notes:
+
+- Client-side Scout Plane owner-state parsing and compact protocol vocabulary were already present
+  from earlier phases; this phase added the hidden dismiss command builder and UI dispatch.
+- The selected Scout Plane command card exposes only move/retarget and Dismiss. Mixed selections
+  keep ordinary land-unit commands scoped to land units while Scout Planes receive retarget/dismiss
+  commands only.
+- Lab unit spawning now exposes the hidden Scout Plane for inspection without adding it to City
+  Centre production. Phase 6 still owns normal production exposure.
+- The shipped visual is a rough client-native SVG live rig: a team-tinted, FW 189-inspired
+  twin-boom silhouette with a separate shadow and distinct minimap blip. No audio was added.
 
 ## Objective
 

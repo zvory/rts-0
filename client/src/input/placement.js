@@ -104,6 +104,14 @@ function pointInsideRect(x, y, minX, minY, maxX, maxY) {
 }
 
 export function entityIntersectsRect(e, minX, minY, maxX, maxY, tileSize) {
+  return entityIntersectsRectWithBodyPolicy(e, minX, minY, maxX, maxY, tileSize, isVehicleBodyKind);
+}
+
+export function selectionEntityIntersectsRect(e, minX, minY, maxX, maxY, tileSize) {
+  return entityIntersectsRectWithBodyPolicy(e, minX, minY, maxX, maxY, tileSize, hasOrientedSelectionBody);
+}
+
+function entityIntersectsRectWithBodyPolicy(e, minX, minY, maxX, maxY, tileSize, orientedBodyKind) {
   const stat = STATS[e.kind];
   if (!stat) return false;
   let halfW;
@@ -114,7 +122,7 @@ export function entityIntersectsRect(e, minX, minY, maxX, maxY, tileSize) {
     return e.x + halfW > minX && e.x - halfW < maxX && e.y + halfH > minY && e.y - halfH < maxY;
   } else {
     if (e.kind === KIND.ANTI_TANK_GUN) return bodyCircleIntersectsRect(e, minX, minY, maxX, maxY, 0);
-    if (isVehicleBodyKind(e.kind)) return orientedVehicleIntersectsRect(e, minX, minY, maxX, maxY, 0);
+    if (orientedBodyKind(e.kind)) return orientedVehicleIntersectsRect(e, minX, minY, maxX, maxY, 0);
     const radius = stat.size ? stat.size : 0;
     const nearestX = Math.min(Math.max(e.x, minX), maxX);
     const nearestY = Math.min(Math.max(e.y, minY), maxY);
@@ -292,6 +300,10 @@ export function isVehicleBodyKind(kind) {
     kind === KIND.TANK ||
     kind === KIND.SCOUT_CAR ||
     kind === KIND.COMMAND_CAR;
+}
+
+export function hasOrientedSelectionBody(kind) {
+  return kind === KIND.SCOUT_PLANE || isVehicleBodyKind(kind);
 }
 
 export function orientedBoxIntersectsRect(body, minX, minY, maxX, maxY) {

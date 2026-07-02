@@ -466,6 +466,71 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     const renderer = new Renderer(parent);
     renderer._map = { tileSize: 32 };
     const entity = {
+      id: 507,
+      owner: 1,
+      kind: KIND.SCOUT_PLANE,
+      x: 260,
+      y: 160,
+      facing: 0.25,
+      hp: 40,
+      maxHp: 40,
+      state: "move",
+      scoutPlane: {
+        orbitCenter: [320, 320],
+        fuelOil: 8,
+        fuelCapacityOil: 8,
+        upkeepOil: 1,
+        upkeepIntervalTicks: 20,
+      },
+    };
+
+    renderer._drawUnit(entity, new Map([[1, 0x4878c8]]), {
+      playerId: 1,
+      selection: new Set([entity.id]),
+      resources: { oil: 100 },
+    });
+
+    const unitRig = renderer._liveRigPools.liveUnitRigs.get(entity.id);
+    const shadowRig = renderer._liveRigPools.liveUnitRigShadows.get(entity.id);
+    const ring = renderer._ringRadius(entity);
+    const bounds = unitRig?.definition?.bounds?.selection;
+    assert(unitRig?.parts.has("part.wing"), "Scout Plane live rig includes a wing silhouette");
+    assert(unitRig?.parts.has("part.fuselage"), "Scout Plane live rig includes a fuselage silhouette");
+    assert(shadowRig?.parts.has("part.shadow"), "Scout Plane live rig includes a separate shadow route");
+    assert(
+      ring.rx === 28 && ring.ry === 22 && ring.cy === 2,
+      "Scout Plane selection ring uses the mirrored 48x34 aircraft body",
+    );
+    assert(
+      bounds?.width <= 52 && bounds?.height <= 36,
+      "Scout Plane authored rig stays aligned with the mirrored aircraft selection body",
+    );
+    assert(
+      renderer.layers.units.children.includes(unitRig.container) &&
+        renderer.layers.unitShadows.children.includes(shadowRig.container),
+      "Scout Plane live rig renders through the normal unit and shadow layers",
+    );
+  } finally {
+    restorePixi();
+  }
+}
+
+{
+  const restorePixi = installFakePixi();
+  try {
+    const parent = {
+      clientWidth: 640,
+      clientHeight: 480,
+      appendChild(view) {
+        view.parentNode = this;
+      },
+      removeChild(view) {
+        view.parentNode = null;
+      },
+    };
+    const renderer = new Renderer(parent);
+    renderer._map = { tileSize: 32 };
+    const entity = {
       id: 506,
       owner: 1,
       kind: KIND.RIFLEMAN,

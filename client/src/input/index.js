@@ -5,7 +5,7 @@
 //   - Left-click / left-drag selection box (own units preferred; buildings as a
 //     fallback when no units are captured). Shift adds to the current selection.
 //   - Context-sensitive right-click on a selection of own units:
-//       enemy entity   -> cmd.attack
+//       attackable enemy entity -> cmd.attack
 //       resource node (+ workers in selection) -> cmd.gather
 //       otherwise      -> cmd.move (to a world point)
 //   - Build placement mode (started by the HUD via ClientIntent): track the
@@ -62,6 +62,8 @@ import {
   _refreshResourceMiningPreview,
   _selectedGathererIds,
   _selectedOwnAntiTankGunIds,
+  _selectedOwnLandUnitIds,
+  _selectedOwnScoutPlaneIds,
   _selectedOwnUnitIds,
   _selectedProducerBuildingIds,
   _selectedWorkerIds,
@@ -930,6 +932,8 @@ Object.assign(Input.prototype, {
   _issueTargetedCommand,
   _quickCastCommandTarget,
   _selectedOwnUnitIds,
+  _selectedOwnLandUnitIds,
+  _selectedOwnScoutPlaneIds,
   _selectedProducerBuildingIds,
   _selectedGathererIds,
   _selectedWorkerIds,

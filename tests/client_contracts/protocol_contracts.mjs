@@ -465,6 +465,15 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
       blanketFireCommand.queued === true,
     "blanketFire command builder emits targeted ability wire shape",
   );
+  const dismissScoutPlaneCommand = cmd.dismissScoutPlane([90, 91]);
+  assert(
+    dismissScoutPlaneCommand.c === "useAbility" &&
+      dismissScoutPlaneCommand.ability === ABILITY.DISMISS_SCOUT_PLANE &&
+      dismissScoutPlaneCommand.units.join(",") === "90,91" &&
+      dismissScoutPlaneCommand.x === undefined &&
+      dismissScoutPlaneCommand.y === undefined,
+    "dismissScoutPlane command builder emits hidden Scout Plane ability wire shape",
+  );
 
   assertThrows(
     () => decodeServerMessage({ t: "snapshot", v: COMPACT_SNAPSHOT_VERSION, s: [1], e: [] }),

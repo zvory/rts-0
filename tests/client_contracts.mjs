@@ -36,6 +36,7 @@ await import("./client_contracts/replay_branch_contracts.mjs");
 await import("./client_contracts/config_contracts.mjs");
 await import("./client_contracts/state_trench_contracts.mjs");
 await import("./client_contracts/state_input_contracts.mjs");
+await import("./client_contracts/scout_plane_input_contracts.mjs");
 await import("./client_contracts/weapon_feedback_contracts.mjs");
 await import("./client_contracts/command_composer_contracts.mjs");
 await import("./client_contracts/camera_fog_contracts.mjs");
