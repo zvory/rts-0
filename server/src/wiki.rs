@@ -186,7 +186,7 @@ fn unit_stats_table() -> StatsTable {
                     format!("{:?}", def.armor_class),
                     format!("{:?}", def.weapon),
                     optional_kind(def.trained_at),
-                    kind_list(def.train_requires),
+                    train_requirement_text(def.train_requirement),
                 ]
             })
             .collect(),
@@ -482,6 +482,23 @@ fn kind_list(kinds: &[EntityKind]) -> String {
 
 fn kind_vec(kinds: &[EntityKind]) -> String {
     kind_list(kinds)
+}
+
+fn train_requirement_text(requirement: defs::TechRequirement) -> String {
+    match requirement {
+        defs::TechRequirement::All(kinds) => kind_list(kinds),
+        defs::TechRequirement::Any(kinds) => {
+            if kinds.is_empty() {
+                "None".to_string()
+            } else {
+                kinds
+                    .iter()
+                    .map(|kind| kind_label(*kind))
+                    .collect::<Vec<_>>()
+                    .join(" or ")
+            }
+        }
+    }
 }
 
 fn optional_kind(kind: Option<EntityKind>) -> String {
@@ -858,7 +875,28 @@ mod tests {
             format!("{:?}", tank.armor_class),
             format!("{:?}", tank.weapon),
             optional_kind(tank.trained_at),
-            kind_list(tank.train_requires),
+            train_requirement_text(tank.train_requirement),
+        ]));
+
+        let scout_plane = defs::unit_def(EntityKind::ScoutPlane).expect("scout plane def");
+        assert!(units.rows.contains(&vec![
+            "Scout Plane".to_string(),
+            EntityKind::ScoutPlane.stable_id().to_string(),
+            scout_plane.stats.hp.to_string(),
+            scout_plane.stats.dmg.to_string(),
+            scout_plane.stats.range_tiles.to_string(),
+            scout_plane.stats.cooldown.to_string(),
+            format_float(scout_plane.stats.speed),
+            scout_plane.stats.sight_tiles.to_string(),
+            scout_plane.stats.cost_steel.to_string(),
+            scout_plane.stats.cost_oil.to_string(),
+            scout_plane.stats.supply.to_string(),
+            scout_plane.stats.build_ticks.to_string(),
+            format_float(scout_plane.stats.radius),
+            format!("{:?}", scout_plane.armor_class),
+            format!("{:?}", scout_plane.weapon),
+            optional_kind(scout_plane.trained_at),
+            "Gun Works or Vehicle Works".to_string(),
         ]));
 
         assert_eq!(buildings.rows.len(), defs::BUILDINGS.len());
