@@ -337,6 +337,11 @@ Phase 7 release audit for the ownership sequence:
   `sourceEntityIdMap` preserves existing import remap callers. Old `LabScenarioV1` setup files
   remain accepted as compatibility inputs and are converted through the same restore path because
   user-supplied scenario JSON and historical fixtures can still arrive on the public lab surface.
+  Portable lab sessions use the protocol-owned `LabReplayArtifactV1` contract: an initial
+  checkpoint-backed lab setup plus ordered replayable lab mutations and issue-as commands. The
+  portable stream is not `LabSession.operation_log` and not retained `LabTimeline` keyframes;
+  `setVision` stays per-viewer session metadata, while checkpoint setup import rebases the
+  artifact by replacing the initial setup and clearing prior operation entries.
 - Projection privacy remains enforced by normal snapshot/event projection tests plus
   checkpoint/privacy coverage; checkpoint helpers must not expose fog-hidden entity ids, positions,
   targets, ability payloads, remembered occupants, or private events.
@@ -734,7 +739,10 @@ branch seed.
   records a baseline keyframe after lab `Game` creation or scenario import, records accepted lab
   world mutations and issue-as commands in authoritative room order, stores periodic cloned `Game`
   keyframes, rebuilds lab seeks from the nearest retained keyframe, and truncates future history
-  after a past seek plus a new accepted lab operation or issue-as command.
+  after a past seek plus a new accepted lab operation or issue-as command. Portable
+  `LabReplayArtifactV1` files rebuild this room-local timeline from their initial checkpoint setup
+  and durable operation entries after load; the retained keyframes remain a seek cache, not a
+  persisted artifact source of truth.
 - `projection.rs` owns snapshot projection and observer-analysis decisions for client fanout. Live
   active players get player fog, live spectators get active-seat union fog, replay viewers get their
   selected perspective from vision selection, lab viewers get their room-owned per-operator lab vision,
