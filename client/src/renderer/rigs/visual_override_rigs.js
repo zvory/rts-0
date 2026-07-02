@@ -104,7 +104,10 @@ function tankWideTurretSvg() {
 }
 
 function tankLongCannonSvg() {
-  return TANK_RIG_SVG.replaceAll("33.2", "39.2");
+  return TANK_RIG_SVG
+    .replaceAll("33.2", "39.2")
+    .replaceAll("weaponFacingCos:transform.x:42:0", "weaponFacingCos:transform.x:48:0")
+    .replaceAll("weaponFacingSin:transform.y:42:0", "weaponFacingSin:transform.y:48:0");
 }
 
 function replaceOnce(source, needle, replacement) {

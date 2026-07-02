@@ -143,11 +143,18 @@ test("tank rig adds a half-scale artillery-style muzzle flare on cannon recoil",
     now: fixedNow,
     state: { weaponRecoil: () => 1 },
   }));
+  const recoiledMuzzle = transformedRigAnchorPoint(definition, entity, "muzzle", {
+    now: fixedNow,
+    state: { weaponRecoil: () => 1 },
+  });
   const cone = firing.parts["part.tank.flashCone"];
   const core = firing.parts["part.tank.flashCore"];
   const glow = firing.parts["part.tank.flashGlow"];
-  assert.ok(Math.abs(cone.transform.x - 16.55) < 0.001);
+  assert.ok(Math.abs(cone.transform.x - 25.35) < 0.001);
   assert.ok(Math.abs(cone.transform.y) < 0.001);
+  assert.ok(recoiledMuzzle);
+  const recoiledMuzzleLocalX = recoiledMuzzle.x - entity.x;
+  assert.ok(Math.abs(cone.transform.x - recoiledMuzzleLocalX - 8.8) < 0.001);
   assert.ok(Math.abs(cone.geometryScale.x - 4) < 0.001);
   assert.ok(Math.abs(cone.geometryScale.y - 3.533333333329) < 0.001);
   assert.ok(Math.abs(core.geometryScale.x - 3.4) < 0.001);
