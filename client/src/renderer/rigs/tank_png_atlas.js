@@ -11,7 +11,7 @@ function deepFreeze(value) {
 export const TANK_PNG_RIG_ATLAS = deepFreeze({
   "enabled": true,
   "unit": "tank",
-  "image": "/assets/rigs/tank-ps1/tank-atlas.png?v=pass07-separated",
+  "image": "/assets/rigs/tank-ps1/tank-atlas.png?v=pass08-tiger1",
   "viewBox": {
     "x": -40,
     "y": -32,
@@ -23,9 +23,9 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
     "rows": 3,
     "layout": "tight",
     "profile": "semantic",
-    "width": 1145,
-    "height": 1373,
-    "sourceSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-07-separated-alpha.png",
+    "width": 1405,
+    "height": 1120,
+    "sourceSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-08-tiger1-alpha.png",
     "cells": [
       "reference.full",
       "sprite.track",
@@ -74,13 +74,14 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
         "unused.blank"
       ],
       "ignoreGuideBounds": true,
-      "guideMaskFuzz": 30,
-      "guideMaskAlphaThreshold": 45,
-      "guideMaskLineWidth": 12
+      "guideMaskFuzz": 12,
+      "guideMaskAlphaThreshold": 20,
+      "guideMaskLineWidth": 12,
+      "guideMaskMorphology": "Square:5"
     },
-    "imageVersion": "pass07-separated",
+    "imageVersion": "pass08-tiger1",
     "colorAdjustment": {
-      "brightness": 120,
+      "brightness": 115,
       "saturation": 105,
       "hue": 100
     }
@@ -106,14 +107,14 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
       "tintSlot": "fixed",
       "drawOrder": 10,
       "frame": {
-        "x": 573,
+        "x": 703,
         "y": 0,
-        "w": 572,
-        "h": 458,
-        "originX": 290.5675415896488,
-        "originY": 319.58957486136785,
-        "pixelsPerUnitX": 7.6125693160813315,
-        "pixelsPerUnitY": 7.6125693160813315
+        "w": 702,
+        "h": 373,
+        "originX": 356.6056192236599,
+        "originY": 297.6781146025878,
+        "pixelsPerUnitX": 9.342698706099815,
+        "pixelsPerUnitY": 9.342698706099815
       }
     },
     {
@@ -135,14 +136,14 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
       "tintSlot": "fixed",
       "drawOrder": 11,
       "frame": {
-        "x": 573,
+        "x": 703,
         "y": 0,
-        "w": 572,
-        "h": 458,
-        "originX": 290.5675415896488,
-        "originY": 138.41042513863215,
-        "pixelsPerUnitX": 7.6125693160813315,
-        "pixelsPerUnitY": 7.6125693160813315
+        "w": 702,
+        "h": 373,
+        "originX": 356.6056192236599,
+        "originY": 75.32188539741219,
+        "pixelsPerUnitX": 9.342698706099815,
+        "pixelsPerUnitY": 9.342698706099815
       }
     },
     {
@@ -159,20 +160,20 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
       "drawOrder": 20,
       "sourceCell": "sprite.hull",
       "frame": {
-        "x": 91,
-        "y": 590,
-        "w": 384,
-        "h": 193,
+        "x": 103,
+        "y": 472,
+        "w": 419,
+        "h": 178,
         "visibleBounds": {
-          "x": 93,
-          "y": 592,
-          "w": 380,
-          "h": 189
+          "x": 105,
+          "y": 474,
+          "w": 415,
+          "h": 174
         },
-        "originX": 192,
-        "originY": 96.5,
-        "pixelsPerUnitX": 7.183364839319471,
-        "pixelsPerUnitY": 7.470355731225296
+        "originX": 209.5,
+        "originY": 89,
+        "pixelsPerUnitX": 7.844990548204159,
+        "pixelsPerUnitY": 6.877470355731225
       }
     },
     {
@@ -186,20 +187,20 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
       "drawOrder": 30,
       "sourceCell": "sprite.turret",
       "frame": {
-        "x": 735,
-        "y": 601,
-        "w": 192,
-        "h": 172,
+        "x": 945,
+        "y": 475,
+        "w": 225,
+        "h": 174,
         "visibleBounds": {
-          "x": 737,
-          "y": 603,
-          "w": 188,
-          "h": 168
+          "x": 947,
+          "y": 477,
+          "w": 221,
+          "h": 170
         },
-        "originX": 68.22758722214043,
-        "originY": 86,
-        "pixelsPerUnitX": 6.918887089651111,
-        "pixelsPerUnitY": 10.526315789473683
+        "originX": 79.85264242602679,
+        "originY": 87,
+        "pixelsPerUnitX": 8.133372589430296,
+        "pixelsPerUnitY": 10.651629072681704
       }
     },
     {
@@ -208,24 +209,24 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
       "sourceParts": [
         "part.barrel"
       ],
-      "tintSlot": "fixed",
+      "tintSlot": "team-light",
       "drawOrder": 29,
       "sourceCell": "sprite.barrel",
       "frame": {
-        "x": 160,
-        "y": 1099,
-        "w": 282,
-        "h": 67,
+        "x": 181,
+        "y": 892,
+        "w": 342,
+        "h": 38,
         "visibleBounds": {
-          "x": 162,
-          "y": 1101,
-          "w": 278,
-          "h": 63
+          "x": 183,
+          "y": 894,
+          "w": 338,
+          "h": 34
         },
-        "originX": 23.27551020408163,
-        "originY": 33.5,
-        "pixelsPerUnitX": 7.091836734693877,
-        "pixelsPerUnitY": 10.5
+        "originX": 27.867346938775505,
+        "originY": 19,
+        "pixelsPerUnitX": 8.622448979591836,
+        "pixelsPerUnitY": 5.666666666666667
       }
     }
   ]

@@ -155,7 +155,7 @@
       "sourceParts": [
         "part.barrel"
       ],
-      "tintSlot": "fixed",
+      "tintSlot": "team-light",
       "drawOrder": 29
     }
   ],

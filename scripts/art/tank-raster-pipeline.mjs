@@ -32,9 +32,10 @@ const GUIDE_BORDER_COLOR = "#00e5ff";
 const GUIDE_MINOR_COLOR = "#80f6ff";
 const GUIDE_CENTER_COLOR = "#fff4a3";
 const GUIDE_MASK_COLORS = Object.freeze([GUIDE_BORDER_COLOR, GUIDE_MINOR_COLOR, GUIDE_CENTER_COLOR, DEFAULT_KEY]);
-const DEFAULT_GUIDE_MASK_FUZZ = 30;
-const DEFAULT_GUIDE_MASK_ALPHA_THRESHOLD = 45;
+const DEFAULT_GUIDE_MASK_FUZZ = 12;
+const DEFAULT_GUIDE_MASK_ALPHA_THRESHOLD = 20;
 const DEFAULT_GUIDE_MASK_LINE_WIDTH = 12;
+const DEFAULT_GUIDE_MASK_MORPHOLOGY = "Square:5";
 
 function main() {
   const [command, ...rest] = process.argv.slice(2);
@@ -177,6 +178,7 @@ function writeAtlas(args) {
   const guideMaskFuzz = percentArg(args["guide-mask-fuzz"], DEFAULT_GUIDE_MASK_FUZZ);
   const guideMaskAlphaThreshold = percentArg(args["guide-mask-alpha-threshold"], DEFAULT_GUIDE_MASK_ALPHA_THRESHOLD);
   const guideMaskLineWidth = nonNegativeInteger(args["guide-mask-line-width"], DEFAULT_GUIDE_MASK_LINE_WIDTH);
+  const guideMaskMorphology = morphologyArg(args["guide-mask-morphology"], DEFAULT_GUIDE_MASK_MORPHOLOGY);
   const imageVersion = safeVersionArg(args["image-version"]);
   const promptFile = args["prompt-file"] ? path.resolve(repoRoot, String(args["prompt-file"])) : promptPath;
   const brightness = percentArg(args.brightness, 100);
@@ -212,6 +214,7 @@ function writeAtlas(args) {
       fuzz: guideMaskFuzz,
       alphaThreshold: guideMaskAlphaThreshold,
       lineWidth: guideMaskLineWidth,
+      morphology: guideMaskMorphology,
     })
     : null;
   const sprites = profile === "semantic"
@@ -267,6 +270,7 @@ function writeAtlas(args) {
         guideMaskFuzz: ignoreGuideBounds ? guideMaskFuzz : null,
         guideMaskAlphaThreshold: ignoreGuideBounds ? guideMaskAlphaThreshold : null,
         guideMaskLineWidth: ignoreGuideBounds ? guideMaskLineWidth : null,
+        guideMaskMorphology: ignoreGuideBounds ? guideMaskMorphology : null,
       },
       imageVersion,
       colorAdjustment: {
@@ -302,17 +306,17 @@ function writePrompt() {
   ensureDirs();
   const prompt = `Use case: stylized-concept
 Asset type: top-down RTS unit raster atlas for Bewegungskrieg
-Primary request: Restyle this guided semantic tank contact sheet into a coherent, strict top-down, World War II plausible RTS tank with every grouped component preserved in its same grid cell.
+Primary request: Restyle this guided semantic tank contact sheet into a coherent, strict top-down 1940s German Tiger I heavy tank, Panzerkampfwagen VI Tiger Ausf. E, with every grouped component preserved in its same grid cell.
 Input image role: edit target and layout reference. The sheet has exactly six boxed cells in a 2x3 grid: assembled no-track reference tank, empty no-track placeholder, hull assembly, turret/coax assembly, separate main barrel, and one unused empty cell. The visible guide boxes, subgrid lines, and center marks are alignment guides only.
-Style/medium: clean RTS-readable PlayStation 1 era raster art, low-resolution textured/pixely surfaces, grounded proportions, not cartoonish.
+Style/medium: clean RTS-readable PlayStation 1 era raster art, low-resolution textured/pixely surfaces, grounded Tiger I proportions, not cartoonish.
 Composition/framing: preserve the exact 2x3 grid, exact six-cell count, exact cell order, boxed cell boundaries, centered component framing, relative component silhouette, and top-down orientation. Use the smaller guide grid inside each cell to keep scale and center alignment stable. Keep each component isolated inside its original cell.
-Color/materials: bright neutral gray team-colorable armor on parts that are currently blue, dull steel barrel, subtle broad panel shading, very light grime, no glossy modern materials.
+Color/materials: bright neutral gray-blue team-colorable armor on hull, turret, and barrel; the barrel should be tintable neutral armor/steel, not black fixed metal. Subtle broad panel shading, very light grime, no glossy modern materials.
 Background: perfectly flat solid ${DEFAULT_KEY} chroma-key background in every cell.
 Empty cells: leave the no-track placeholder cell and the unused final cell as flat ${DEFAULT_KEY} only, with no tank art.
-Hull cell: generate only the no-track hull/body armor silhouette, centered and matching the reference scale.
-Turret cell: generate only the turret body and tiny coax detail, with no main cannon barrel attached.
-Barrel cell: generate only the main cannon barrel as a separate straight centered component, long axis left-to-right, with enough thickness to read at RTS scale.
-Constraints: strict top-down orthographic view; no tracks anywhere; no perspective tilt; no drop shadow; no text, labels, numbers, watermarks, arrows, or extra UI; no merged cells; no fuel warning/no-oil indicator; do not add missing parts; do not remove any required hull/turret/barrel art part; leave empty background areas empty. Keep guide lines thin and separate from the sprite art; do not turn the guide grid into armor seams or detail.
+Hull cell: generate only the no-track Tiger I hull/body armor silhouette, centered and matching the reference scale; boxy vertical armor, flat deck, rectangular heavy-tank body, no modern sloped MBT shape.
+Turret cell: generate only the Tiger I turret body and tiny coax detail, with no main cannon barrel attached; compact angular turret, not a modern rounded turret.
+Barrel cell: generate only the separate Tiger I 88mm main cannon barrel as a straight centered component, long axis left-to-right, tintable neutral gray-blue, readable thickness, no turret attached.
+Constraints: strict top-down orthographic view; no tracks anywhere; no perspective tilt; no drop shadow; no text, labels, numbers, watermarks, arrows, Balkenkreuz, swastikas, insignia, or extra UI; no merged cells; no fuel warning/no-oil indicator; do not add missing parts; do not remove any required hull/turret/barrel art part; leave empty background areas empty. Keep guide lines thin and separate from the sprite art; do not turn the guide grid into armor seams or detail.
 Avoid: tracks, treads, wheels, sprockets, gears, extra hatches, extra barrels, fuel icons, warning symbols, thick cartoon outlines, toy proportions, oversized turret/barrel, painterly blur, photorealistic perspective, dramatic lighting, gradients in the background, camouflage that hides the silhouette.
 `;
   fs.writeFileSync(promptPath, prompt);
@@ -514,7 +518,7 @@ function semanticSprites(partIds) {
       id: "sprite.barrel",
       animationPart: "part.barrel",
       sourceParts: ["part.barrel"],
-      tintSlot: "fixed",
+      tintSlot: "team-light",
       drawOrder: 29,
     },
   ].map((sprite) => ({
@@ -594,7 +598,7 @@ function atlasSpritesForSemanticProfile(definition, cells, columns, rows, width,
   }).filter(Boolean);
 }
 
-function makeGuideBoundsMask(file, cells, columns, rows, width, height, { fuzz, alphaThreshold, lineWidth }) {
+function makeGuideBoundsMask(file, cells, columns, rows, width, height, { fuzz, alphaThreshold, lineWidth, morphology }) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "tank-raster-bounds-"));
   const out = path.join(dir, "guide-bounds-mask.png");
   const args = [
@@ -612,6 +616,7 @@ function makeGuideBoundsMask(file, cells, columns, rows, width, height, { fuzz, 
   ];
   run("magick", args);
   clearAtlasGuideAlpha(out, cells, columns, rows, width, height, lineWidth);
+  morphAtlasAlpha(out, { alphaThreshold, morphology });
   return out;
 }
 
@@ -862,6 +867,29 @@ function clearAtlasAlpha(file, drawOps) {
   ]);
 }
 
+function morphAtlasAlpha(file, { alphaThreshold, morphology }) {
+  if (!morphology) return;
+  run("magick", [
+    file,
+    "(",
+    "+clone",
+    "-alpha",
+    "extract",
+    "-threshold",
+    `${alphaThreshold}%`,
+    "-morphology",
+    "Open",
+    morphology,
+    ")",
+    "-alpha",
+    "off",
+    "-compose",
+    "CopyOpacity",
+    "-composite",
+    file,
+  ]);
+}
+
 function modulateAtlasColor(file, { brightness, saturation, hue }) {
   run("magick", [
     file,
@@ -918,6 +946,16 @@ function percentArg(value, fallback) {
   return parsed;
 }
 
+function morphologyArg(value, fallback) {
+  if (value == null || value === true) return fallback;
+  const out = String(value).trim();
+  if (!out || out === "none") return "";
+  if (!/^[A-Za-z]+:[0-9]+$/.test(out)) {
+    throw new Error(`invalid morphology ${JSON.stringify(value)}; expected Kernel:N such as Square:5, or none`);
+  }
+  return out;
+}
+
 function parseListArg(value) {
   if (value == null || value === true) return [];
   return String(value)
@@ -972,7 +1010,7 @@ function rel(file) {
 function usage() {
   console.error(`Usage:
   node scripts/art/tank-raster-pipeline.mjs make-sheet [--scale 3] [--columns 2] [--layout tight] [--profile semantic] [--key #ff00ff]
-  node scripts/art/tank-raster-pipeline.mjs write-atlas --sheet <png> [--columns 2] [--layout tight] [--profile semantic] [--transparent-key #ff00ff] [--disabled] [--blank-cells cell[,cell]] [--normalize-visible-bounds] [--ignore-guide-bounds] [--guide-mask-fuzz 30] [--guide-mask-alpha-threshold 45] [--guide-mask-line-width 12] [--clear-cell-edge-alpha 16] [--visible-padding 2] [--brightness 120] [--saturation 100] [--hue 100] [--image-version pass-id] [--prompt-file metadata/prompt.md]
+  node scripts/art/tank-raster-pipeline.mjs write-atlas --sheet <png> [--columns 2] [--layout tight] [--profile semantic] [--transparent-key #ff00ff] [--disabled] [--blank-cells cell[,cell]] [--normalize-visible-bounds] [--ignore-guide-bounds] [--guide-mask-fuzz 12] [--guide-mask-alpha-threshold 20] [--guide-mask-line-width 12] [--guide-mask-morphology Square:5] [--clear-cell-edge-alpha 16] [--visible-padding 2] [--brightness 120] [--saturation 100] [--hue 100] [--image-version pass-id] [--prompt-file metadata/prompt.md]
   node scripts/art/tank-raster-pipeline.mjs write-prompt`);
 }
 

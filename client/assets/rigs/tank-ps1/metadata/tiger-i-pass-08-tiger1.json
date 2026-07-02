@@ -1,0 +1,38 @@
+{
+  "candidate": "tiger-i-pass-08-tiger1",
+  "status": "active-experiment",
+  "sourceSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-08-tiger1-input-sheet.png",
+  "sourceSheetSvg": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-08-tiger1-input-sheet.svg",
+  "prompt": "client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-08-tiger1.md",
+  "builtInImageGenSource": "/Users/az/.codex/generated_images/019f2492-10dd-73b3-8d83-ad9d31bb5026/ig_0d981a9b2592ff7b016a46e125c5b4819780be437492c3a886.png",
+  "candidateSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-08-tiger1.png",
+  "candidateAlphaSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-08-tiger1-alpha.png",
+  "runtimeAlphaSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-08-tiger1-runtime-alpha.png",
+  "activeAtlas": "client/assets/rigs/tank-ps1/tank-atlas.png",
+  "activeAtlasUrl": "/assets/rigs/tank-ps1/tank-atlas.png?v=pass08-tiger1",
+  "alphaConversion": {
+    "keyColor": "#ff00ff",
+    "autoKey": "none",
+    "softMatte": true,
+    "transparentThreshold": 18,
+    "opaqueThreshold": 220,
+    "despill": true
+  },
+  "pipelineOptions": {
+    "blankCells": ["reference.full", "sprite.track", "unused.blank"],
+    "normalizeVisibleBounds": true,
+    "ignoreGuideBounds": true,
+    "guideMaskFuzz": 12,
+    "guideMaskAlphaThreshold": 20,
+    "guideMaskLineWidth": 12,
+    "guideMaskMorphology": "Square:5",
+    "clearCellEdgeAlpha": 16,
+    "visiblePadding": 2,
+    "brightness": 115,
+    "saturation": 105,
+    "hue": 100,
+    "imageVersion": "pass08-tiger1"
+  },
+  "runtimeNotes": "The active PNG atlas covers track parts with transparent sprites, exposes hull as sprite.hull, turret/coax as sprite.turret, and main cannon as sprite.barrel. The barrel sprite uses tintSlot team-light, so it receives the same owner-color tint family as the turret while still animating against part.barrel recoil.",
+  "notes": "Regenerated from the separated 2x3 no-track sheet with an explicit 1940s Tiger I / Panzerkampfwagen VI Tiger Ausf. E prompt. More Tiger I-specific than pass 07, but still includes heavy side armor shapes in the generated hull that should be watched in-game because they may read like track guards."
+}
