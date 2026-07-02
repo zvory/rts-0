@@ -1,0 +1,11 @@
+{
+  "candidate": "tiger-i-pass-03",
+  "status": "candidate-not-active",
+  "sourceSheet": "client/assets/rigs/tank-ps1/tank-contact-sheet.png",
+  "prompt": "client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-03.md",
+  "builtInImageGenSource": "/Users/az/.codex/generated_images/019f2034-197e-75f0-a333-07b665044b85/ig_0cfb5fda0352dc1d016a45c16005a08197a7c64e864700198b.png",
+  "candidateSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-03.png",
+  "candidateAlphaSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-03-alpha.png",
+  "preview": "/tmp/tank-tiger-i-pass-03-preview.png",
+  "notes": "Generated from the semantic 3x2 tank sheet using the realism-focused raster prompt. Stronger realistic Tiger I read and smoother raster edges, but component scale/position drifted more than pass 02, so it is not wired as the active runtime atlas."
+}

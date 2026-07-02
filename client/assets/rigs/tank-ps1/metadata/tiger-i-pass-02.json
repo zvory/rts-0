@@ -1,0 +1,11 @@
+{
+  "candidate": "tiger-i-pass-02",
+  "status": "candidate-not-active",
+  "sourceSheet": "client/assets/rigs/tank-ps1/tank-contact-sheet.png",
+  "prompt": "client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-02.md",
+  "builtInImageGenSource": "/Users/az/.codex/generated_images/019f2034-197e-75f0-a333-07b665044b85/ig_015ed36bddd58301016a45c04b5cec8196baa76fb70e12b430.png",
+  "candidateSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-02.png",
+  "candidateAlphaSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-02-alpha.png",
+  "preview": "/tmp/tank-tiger-i-pass-02-preview.png",
+  "notes": "Generated from the semantic 3x2 tank sheet using the simplified polygonal Tiger I prompt. Preserves six cells, removes visible cast/drop shadow, and emphasizes silhouette over surface texture. Not wired as the active runtime atlas yet."
+}

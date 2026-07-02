@@ -63,6 +63,7 @@ import { LAYERS, _sweep } from "./layers.js";
 import { GroundDecalLayer, _drawGroundDecals, _initGroundDecalsForMap } from "./decals.js";
 import { TrenchDecalLayer, _drawTrenches, _initTrenchesForMap } from "./trenches.js";
 import { createLiveRigDefinitions } from "./rigs/live_routing.js";
+import { createLivePngRigAtlases, loadPngRigAtlasTexture } from "./rigs/png_routing.js";
 import { createBuildingRigDefinitions } from "./rigs/building_routing.js";
 import { _drawResource } from "./resources.js";
 import { buildStaticMap } from "./terrain.js";
@@ -176,6 +177,9 @@ export class Renderer {
     // Live SVG rig instances are routed per unit kind. Invalid or missing
     // definitions fail through the renderer's missing-texture guard.
     this._liveRigDefinitionsByKind = createLiveRigDefinitions();
+    this._livePngRigAtlasesByKind = createLivePngRigAtlases();
+    this._livePngRigAtlasTextures = new Map();
+    this._loadLivePngRigAtlases();
     this._buildingRigDefinitions = createBuildingRigDefinitions();
     this._liveRigPools = {
       liveUnitRigShadows: new Map(),
@@ -197,6 +201,18 @@ export class Renderer {
 
     /** Map metadata captured by buildStaticMap (tileSize, width, height in tiles). */
     this._map = null;
+  }
+
+  _loadLivePngRigAtlases() {
+    for (const [kind, atlas] of this._livePngRigAtlasesByKind || []) {
+      loadPngRigAtlasTexture(PIXI, atlas)
+        .then((texture) => {
+          if (texture) this._livePngRigAtlasTextures.set(kind, texture);
+        })
+        .catch((err) => {
+          console.warn(`RTS PNG rig atlas disabled for ${kind}: ${err?.message || err}`);
+        });
+    }
   }
 
   /**

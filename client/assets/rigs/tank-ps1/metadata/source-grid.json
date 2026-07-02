@@ -1,0 +1,166 @@
+{
+  "unit": "tank",
+  "columns": 3,
+  "rows": 2,
+  "scale": 3,
+  "key": "#ff00ff",
+  "layout": "tight",
+  "profile": "semantic",
+  "viewBox": {
+    "x": -40,
+    "y": -32,
+    "width": 80,
+    "height": 64
+  },
+  "cells": [
+    "reference.full",
+    "sprite.track.left",
+    "sprite.track.right",
+    "sprite.hull",
+    "sprite.turret",
+    "sprite.fuelCue"
+  ],
+  "partIds": [
+    "part.shadow",
+    "part.track.left",
+    "part.track.right",
+    "part.tread.left.0",
+    "part.tread.left.1",
+    "part.tread.left.2",
+    "part.tread.left.3",
+    "part.tread.left.4",
+    "part.tread.left.5",
+    "part.tread.left.6",
+    "part.tread.left.7",
+    "part.tread.left.8",
+    "part.tread.right.0",
+    "part.tread.right.1",
+    "part.tread.right.2",
+    "part.tread.right.3",
+    "part.tread.right.4",
+    "part.tread.right.5",
+    "part.tread.right.6",
+    "part.tread.right.7",
+    "part.tread.right.8",
+    "part.hull",
+    "part.hull.shadow",
+    "part.hull.nose",
+    "part.hull.noseShadow",
+    "part.barrel",
+    "part.coaxBarrel",
+    "part.turret",
+    "part.noseTick",
+    "part.fuelCue.box",
+    "part.fuelCue.x1",
+    "part.fuelCue.x2"
+  ],
+  "frameSources": {
+    "part.shadow": "part.shadow",
+    "part.track.left": "part.track.left",
+    "part.track.right": "part.track.right",
+    "part.tread.left.0": "part.tread.left.0",
+    "part.tread.left.1": "part.tread.left.1",
+    "part.tread.left.2": "part.tread.left.2",
+    "part.tread.left.3": "part.tread.left.3",
+    "part.tread.left.4": "part.tread.left.4",
+    "part.tread.left.5": "part.tread.left.5",
+    "part.tread.left.6": "part.tread.left.6",
+    "part.tread.left.7": "part.tread.left.7",
+    "part.tread.left.8": "part.tread.left.8",
+    "part.tread.right.0": "part.tread.right.0",
+    "part.tread.right.1": "part.tread.right.1",
+    "part.tread.right.2": "part.tread.right.2",
+    "part.tread.right.3": "part.tread.right.3",
+    "part.tread.right.4": "part.tread.right.4",
+    "part.tread.right.5": "part.tread.right.5",
+    "part.tread.right.6": "part.tread.right.6",
+    "part.tread.right.7": "part.tread.right.7",
+    "part.tread.right.8": "part.tread.right.8",
+    "part.hull": "part.hull",
+    "part.hull.shadow": "part.hull.shadow",
+    "part.hull.nose": "part.hull.nose",
+    "part.hull.noseShadow": "part.hull.noseShadow",
+    "part.barrel": "part.barrel",
+    "part.coaxBarrel": "part.coaxBarrel",
+    "part.turret": "part.turret",
+    "part.noseTick": "part.noseTick",
+    "part.fuelCue.box": "part.fuelCue.box",
+    "part.fuelCue.x1": "part.fuelCue.x1",
+    "part.fuelCue.x2": "part.fuelCue.x2"
+  },
+  "semanticSprites": [
+    {
+      "id": "sprite.track.left",
+      "animationPart": "part.track.left",
+      "sourceParts": [
+        "part.track.left",
+        "part.tread.left.0",
+        "part.tread.left.1",
+        "part.tread.left.2",
+        "part.tread.left.3",
+        "part.tread.left.4",
+        "part.tread.left.5",
+        "part.tread.left.6",
+        "part.tread.left.7",
+        "part.tread.left.8"
+      ],
+      "tintSlot": "fixed",
+      "drawOrder": 10
+    },
+    {
+      "id": "sprite.track.right",
+      "animationPart": "part.track.right",
+      "sourceParts": [
+        "part.track.right",
+        "part.tread.right.0",
+        "part.tread.right.1",
+        "part.tread.right.2",
+        "part.tread.right.3",
+        "part.tread.right.4",
+        "part.tread.right.5",
+        "part.tread.right.6",
+        "part.tread.right.7",
+        "part.tread.right.8"
+      ],
+      "tintSlot": "fixed",
+      "drawOrder": 11
+    },
+    {
+      "id": "sprite.hull",
+      "animationPart": "part.hull",
+      "sourceParts": [
+        "part.hull",
+        "part.hull.shadow",
+        "part.hull.nose",
+        "part.hull.noseShadow",
+        "part.noseTick"
+      ],
+      "tintSlot": "team",
+      "drawOrder": 20
+    },
+    {
+      "id": "sprite.turret",
+      "animationPart": "part.turret",
+      "sourceParts": [
+        "part.barrel",
+        "part.coaxBarrel",
+        "part.turret"
+      ],
+      "tintSlot": "team-light",
+      "drawOrder": 30
+    },
+    {
+      "id": "sprite.fuelCue",
+      "animationPart": "part.fuelCue.box",
+      "sourceParts": [
+        "part.fuelCue.box",
+        "part.fuelCue.x1",
+        "part.fuelCue.x2"
+      ],
+      "tintSlot": "fixed",
+      "drawOrder": 40
+    }
+  ],
+  "sourceSvg": "client/assets/rigs/tank-ps1/tank-contact-sheet.svg",
+  "sourcePng": "client/assets/rigs/tank-ps1/tank-contact-sheet.png"
+}
