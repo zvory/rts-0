@@ -168,12 +168,13 @@ node scripts/art/tank-raster-pipeline.mjs write-atlas \
   --normalize-visible-bounds \
   --clear-cell-edge-alpha 0 \
   --visible-padding 0 \
+  --world-scale 1.2 \
   --brightness 115 \
   --saturation 105 \
   --image-version pass10-noguide-ref \
   --prompt-file client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-10-noguide-ref.md \
   --model "built-in image generation + ImageMagick brightness pass" \
-  --notes "Experimental Tiger I no-track no-guide raster pass 10."
+  --notes "Experimental Tiger I no-track no-guide raster pass 10 with 1.2x world-scale compensation."
 ```
 
 Only omit `--disabled` for a local experiment after the validation checklist passes. Do not commit
@@ -281,7 +282,8 @@ cheap checks before any generated atlas can be enabled.
   horizontally before atlas writing so the muzzle and pivot match the original rig. Not final art:
   the side armor blocks should be inspected in-game because they may still read like track guards.
 - `tank-tiger-i-pass-10-noguide-ref.png`: active experiment. Regenerated from a no-guide 2x3 sheet
-  and the attached top-down Tiger I reference as the subject input. The runtime atlas uses
+  and the attached top-down Tiger I reference as the subject input. The runtime atlas uses 1.2x
+  world-scale compensation so the no-track raster art recovers the old SVG tank's visual mass, uses
   visible-alpha normalization only, with no guide masking or cell-edge clearing. This pass validates
   the pipeline direction because guide artifacts are gone, but it is not final art: the generated
   hull still carries rear/side fixtures from the reference that may read as unwanted track hardware.

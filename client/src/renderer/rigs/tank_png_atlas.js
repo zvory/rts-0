@@ -77,7 +77,8 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
       "guideMaskFuzz": null,
       "guideMaskAlphaThreshold": null,
       "guideMaskLineWidth": null,
-      "guideMaskMorphology": null
+      "guideMaskMorphology": null,
+      "worldScale": 1.2
     },
     "imageVersion": "pass10-noguide-ref",
     "colorAdjustment": {
@@ -113,8 +114,8 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
         "h": 458,
         "originX": 290.5675415896488,
         "originY": 319.58957486136785,
-        "pixelsPerUnitX": 7.6125693160813315,
-        "pixelsPerUnitY": 7.6125693160813315
+        "pixelsPerUnitX": 6.343807763401109,
+        "pixelsPerUnitY": 6.343807763401109
       }
     },
     {
@@ -142,8 +143,8 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
         "h": 458,
         "originX": 290.5675415896488,
         "originY": 138.41042513863215,
-        "pixelsPerUnitX": 7.6125693160813315,
-        "pixelsPerUnitY": 7.6125693160813315
+        "pixelsPerUnitX": 6.343807763401109,
+        "pixelsPerUnitY": 6.343807763401109
       }
     },
     {
@@ -172,8 +173,8 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
         },
         "originX": 260,
         "originY": 158,
-        "pixelsPerUnitX": 9.829867674858223,
-        "pixelsPerUnitY": 12.490118577075098
+        "pixelsPerUnitX": 8.191556395715185,
+        "pixelsPerUnitY": 10.408432147562582
       }
     },
     {
@@ -200,8 +201,8 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
         },
         "originX": 154,
         "originY": 122.5,
-        "pixelsPerUnitX": 11.335197997939055,
-        "pixelsPerUnitY": 15.350877192982455
+        "pixelsPerUnitX": 9.445998331615879,
+        "pixelsPerUnitY": 12.792397660818713
       }
     },
     {
@@ -226,8 +227,8 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
         },
         "originX": 36.045918367346935,
         "originY": 41.5,
-        "pixelsPerUnitX": 12.015306122448978,
-        "pixelsPerUnitY": 13.833333333333334
+        "pixelsPerUnitX": 10.012755102040815,
+        "pixelsPerUnitY": 11.527777777777779
       }
     }
   ]
