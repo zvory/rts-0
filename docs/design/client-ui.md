@@ -1241,7 +1241,7 @@ selection rings):
 
 ### 4.2 Rendering & look (PixiJS, SVG rigs — neutral PS1 field-command style)
 - Layers (back→front): terrain → ground decals → trench terrain → local visual samples → resource nodes → building shadows → buildings →
-  building overlays → unit shadows → units → smoke/ability ground effects → selection rings →
+  building overlays → unit shadows → occupied-trench shadows → occupied-trench lips → units → smoke/ability ground effects → selection rings →
   health bars → fog overlay → local visual-sample labels → shot-revealed units → command/hover feedback → placement ghost →
   selection drag-box → (HUD is DOM, not Pixi). Selected unit range rings, minimum-range rings, and
   support-weapon field-of-fire overlays use higher-opacity rendering for readability.

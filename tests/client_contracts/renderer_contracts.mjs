@@ -175,10 +175,10 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
       "renderer mounts trench ground above decals and below resources/units");
     assert(
       unitShadowsIndex < occupantShadowsIndex &&
-        occupantShadowsIndex < unitsIndex &&
-        unitsIndex < occupantLipsIndex &&
-        occupantLipsIndex < selectionIndex,
-      "occupied-trench lip layers sit around units but below selection feedback",
+        occupantShadowsIndex < occupantLipsIndex &&
+        occupantLipsIndex < unitsIndex &&
+        unitsIndex < selectionIndex,
+      "occupied-trench berm layers sit below unit art and selection feedback",
     );
     assert(renderer.layers.trenches.children.length === 1, "renderer owns one persistent trench decal sprite");
     renderer.destroy();
@@ -597,7 +597,7 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     );
     assert(
       occupantLip?.calls.some((call) => call[0] === "beginFill" && call[1] === COLORS.trenchRim),
-      "occupied trench overlay draws a foreground berm above the unit",
+      "occupied trench overlay draws a berm graphic for occupied infantry",
     );
     const wrapPolygon = polygonAfterLineStyle(occupantShadow?.calls || [], COLORS.trenchRim);
     const wrapXs = polygonAxisValues(wrapPolygon, 0);
