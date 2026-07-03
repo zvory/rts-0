@@ -1007,6 +1007,25 @@ mod tests {
     }
 
     #[test]
+    fn lab_scenario_import_rejects_initial_camera_outside_map() {
+        let loaded =
+            load_lab_scenario_by_id("lategame").expect("bundled lategame scenario should load");
+        let LabScenarioPayload::Checkpoint(mut scenario) = loaded.scenario;
+        scenario.metadata.lab.initial_camera = Some(InitialCamera {
+            center_x: u32::MAX,
+            center_y: 0,
+        });
+
+        let err = lab_scenario_payload_to_lab_op(LabScenarioPayload::Checkpoint(scenario))
+            .expect_err("out-of-bounds initialCamera should reject");
+
+        assert!(
+            err.contains("initialCamera center must be inside the map world bounds"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
     fn lab_scenario_catalog_rejects_legacy_v1_files() {
         let dir = temp_catalog_dir("legacy-v1");
         std::fs::write(
