@@ -184,6 +184,7 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
         "part.turret"
       ],
       "tintSlot": "team-light",
+      "originMode": "visible-center",
       "drawOrder": 30,
       "sourceCell": "sprite.turret",
       "frame": {
@@ -197,7 +198,7 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
           "w": 308,
           "h": 245
         },
-        "originX": 108.50051523627262,
+        "originX": 154,
         "originY": 122.5,
         "pixelsPerUnitX": 11.335197997939055,
         "pixelsPerUnitY": 15.350877192982455

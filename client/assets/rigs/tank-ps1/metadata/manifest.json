@@ -1,6 +1,6 @@
 {
   "pipelineVersion": 1,
-  "generatedAt": "2026-07-03T01:28:48.903Z",
+  "generatedAt": "2026-07-03T11:27:01.266Z",
   "sourceSvgModule": "client/src/renderer/rigs/tank_svg.js",
   "sourceSvgRuntimeKind": "tank",
   "promptFile": "client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-10-noguide-ref.md",

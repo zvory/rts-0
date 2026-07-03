@@ -575,6 +575,10 @@ test("tank PNG atlas route splits omitted shadow and fuel cue back to SVG", () =
   assert.equal(unitCoverage.coveredParts.includes("part.turret"), true);
   assert.deepEqual(unitCoverage.missingParts, ["part.fuelCue.box", "part.fuelCue.x1", "part.fuelCue.x2"]);
   assert.equal(TANK_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.barrel")?.tintSlot, "team");
+  const turretSprite = TANK_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.turret");
+  assert.equal(turretSprite?.originMode, "visible-center");
+  assert.ok(Math.abs(turretSprite.frame.originX - turretSprite.frame.w * 0.5) < 0.001);
+  assert.ok(Math.abs(turretSprite.frame.originY - turretSprite.frame.h * 0.5) < 0.001);
 
   const entity = {
     id: 41,

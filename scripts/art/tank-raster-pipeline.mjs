@@ -518,6 +518,7 @@ function semanticSprites(partIds) {
       animationPart: "part.turret",
       sourceParts: ["part.coaxBarrel", "part.turret"],
       tintSlot: "team-light",
+      originMode: "visible-center",
       drawOrder: 30,
     },
     {
@@ -588,7 +589,7 @@ function atlasSpritesForSemanticProfile(definition, cells, columns, rows, width,
       : null;
     const frame = visibleFrame || cell;
     const geometry = visibleFrame
-      ? normalizedVisibleFrameGeometry(parts, visibleFrame)
+      ? normalizedVisibleFrameGeometry(parts, visibleFrame, sprite.originMode)
       : groupFrameGeometry(parts, frame.w, frame.h, layout);
     return {
       ...sprite,
@@ -663,13 +664,21 @@ function visibleFrameForCell(file, cell, padding = 0) {
   };
 }
 
-function normalizedVisibleFrameGeometry(parts, frame) {
+function normalizedVisibleFrameGeometry(parts, frame, originMode = "svg-origin") {
   const bounds = unionBounds(parts.map(partBounds));
   const targetW = Math.max(1, bounds.maxX - bounds.minX);
   const targetH = Math.max(1, bounds.maxY - bounds.minY);
   const visible = frame.visibleBounds || frame;
   const pixelsPerUnitX = Math.max(1, visible.w) / targetW;
   const pixelsPerUnitY = Math.max(1, visible.h) / targetH;
+  if (originMode === "visible-center") {
+    return {
+      originX: visible.x - frame.x + visible.w * 0.5,
+      originY: visible.y - frame.y + visible.h * 0.5,
+      pixelsPerUnitX,
+      pixelsPerUnitY,
+    };
+  }
   return {
     originX: visible.x - frame.x - bounds.minX * pixelsPerUnitX,
     originY: visible.y - frame.y - bounds.minY * pixelsPerUnitY,

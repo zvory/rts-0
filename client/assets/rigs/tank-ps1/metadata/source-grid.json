@@ -156,6 +156,7 @@
         "part.turret"
       ],
       "tintSlot": "team-light",
+      "originMode": "visible-center",
       "drawOrder": 30
     },
     {
