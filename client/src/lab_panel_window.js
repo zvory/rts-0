@@ -199,13 +199,17 @@ export class LabPanelWindowChrome {
   }
 
   constrainToViewport() {
-    if (this.el.dataset.windowed !== "true") return;
     if (this.isMobileLayout()) {
       this.clearGeometryStyles();
       this.el.dataset.windowed = "false";
       return;
     }
-    this.applyGeometry(this.currentGeometry());
+    const geometry = this.el.dataset.windowed === "true" ? this.currentGeometry() : this.readGeometry();
+    if (!geometry) {
+      this.el.dataset.windowed = "false";
+      return;
+    }
+    this.applyGeometry(geometry);
     this.saveGeometry(this.currentGeometry());
   }
 
@@ -213,7 +217,10 @@ export class LabPanelWindowChrome {
     const saved = this.readStoredState();
     this.setCollapsed(saved?.collapsed === true, { save: false });
     if (saved?.geometry && !this.isMobileLayout()) this.applyGeometry(saved.geometry);
-    else this.el.dataset.windowed = "false";
+    else {
+      if (this.isMobileLayout()) this.clearGeometryStyles();
+      this.el.dataset.windowed = "false";
+    }
   }
 
   resetGeometry() {
@@ -363,6 +370,10 @@ export class LabPanelWindowChrome {
 
   saveGeometry(geometry) {
     try {
+      if (this.isMobileLayout()) {
+        this.saveCollapsedState();
+        return;
+      }
       const next = this.constrainGeometry(geometry);
       this.storage?.setItem?.(this.storageKey, JSON.stringify({
         schemaVersion: STORAGE_SCHEMA_VERSION,

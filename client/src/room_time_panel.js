@@ -227,7 +227,12 @@ export class FloatingRoomTimePanel {
   restorePosition() {
     const saved = this.readPosition();
     this.setCollapsed(saved?.collapsed === true, { save: false });
-    if (saved && !isMobilePanelViewport()) this.applyPosition(saved);
+    if (isMobilePanelViewport()) {
+      this.clearPositionStyles();
+      return;
+    }
+    const position = storedPanelPosition(saved);
+    if (position) this.applyPosition(position);
   }
 
   resetPosition() {
@@ -242,7 +247,9 @@ export class FloatingRoomTimePanel {
       this.clearPositionStyles();
       return;
     }
-    this.applyPosition(this.currentRect());
+    const position = this.hasPositionStyles() ? this.currentRect() : storedPanelPosition(this.readPosition());
+    if (!position) return;
+    this.applyPosition(position);
     this.savePosition(this.currentRect());
   }
 
@@ -288,6 +295,10 @@ export class FloatingRoomTimePanel {
     clearStyle(this.root, "transform");
   }
 
+  hasPositionStyles() {
+    return parsePixels(this.root?.style?.left) !== null || parsePixels(this.root?.style?.top) !== null;
+  }
+
   toggleCollapsed() {
     this.setCollapsed(!this.collapsed);
   }
@@ -318,6 +329,10 @@ export class FloatingRoomTimePanel {
 
   savePosition(position) {
     try {
+      if (isMobilePanelViewport()) {
+        this.saveCollapsedState();
+        return;
+      }
       const next = this.constrainPosition(position);
       globalThis.window?.localStorage?.setItem?.(ROOM_TIME_PANEL_STORAGE_KEY, JSON.stringify({
         schemaVersion: ROOM_TIME_PANEL_STORAGE_SCHEMA_VERSION,
@@ -327,6 +342,19 @@ export class FloatingRoomTimePanel {
       }));
     } catch {
       // Room-time panel position is a convenience only.
+    }
+  }
+
+  saveCollapsedState() {
+    try {
+      const storedPosition = storedPanelPosition(this.readPosition());
+      globalThis.window?.localStorage?.setItem?.(ROOM_TIME_PANEL_STORAGE_KEY, JSON.stringify({
+        schemaVersion: ROOM_TIME_PANEL_STORAGE_SCHEMA_VERSION,
+        ...(storedPosition || {}),
+        collapsed: this.collapsed,
+      }));
+    } catch {
+      // Ignore unavailable storage.
     }
   }
 
@@ -353,6 +381,12 @@ function panelViewport() {
 
 function isMobilePanelViewport() {
   return panelViewport().width <= ROOM_TIME_PANEL_MOBILE_MAX_WIDTH;
+}
+
+function storedPanelPosition(saved) {
+  return Number.isFinite(saved?.left) && Number.isFinite(saved?.top)
+    ? { left: saved.left, top: saved.top }
+    : null;
 }
 
 function arrowDelta(event) {

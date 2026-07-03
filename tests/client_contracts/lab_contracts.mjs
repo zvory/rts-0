@@ -1369,6 +1369,19 @@ await withFakeDocument(async () => {
   assert(!el.style.left && !el.style.top, "LabPanelWindowChrome leaves mobile panels on stylesheet positions");
   assert(el.dataset.collapsed === "true" && collapseButton.textContent === "Expand",
     "LabPanelWindowChrome preserves saved collapsed state without restoring overlapping geometry");
+  collapseButton.listeners.click();
+  assert(
+    JSON.parse(storage.values.get("test.lab.panel.mobile")).left === 620,
+    "LabPanelWindowChrome mobile collapse toggles preserve saved desktop geometry",
+  );
+  windowObj.innerWidth = 1000;
+  chrome.constrainToViewport();
+  assert(
+    el.dataset.windowed === "true" &&
+      el.style.left === "620px" &&
+      el.style.top === "58px",
+    "LabPanelWindowChrome restores saved desktop geometry after leaving mobile layout",
+  );
   chrome.destroy();
 });
 

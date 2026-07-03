@@ -739,8 +739,22 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
       mobileRoomTimeControls.querySelector(".room-time-panel-body").hidden === true,
     "room-time controls preserve saved collapsed state without restoring overlapping geometry",
   );
-  mobileRoomTimeUi.destroy();
+  mobileRoomTimeControls.querySelector(".room-time-panel-collapse")._listeners.get("click")({});
+  const mobileRoomTimeStored = JSON.parse(localStorageValues.get("rts.roomTimeControls.panel.v1"));
+  assert(
+    mobileRoomTimeStored.left === 260 &&
+      mobileRoomTimeStored.top === 70 &&
+      mobileRoomTimeStored.collapsed === false,
+    "room-time controls preserve saved desktop position when collapse is toggled on mobile",
+  );
   globalThis.window.innerWidth = 1000;
+  windowListeners.get("resize")();
+  assert(
+    mobileRoomTimeControls.style.left === "260px" &&
+      mobileRoomTimeControls.style.top === "70px",
+    "room-time controls restore saved desktop position after leaving mobile layout",
+  );
+  mobileRoomTimeUi.destroy();
 
   const visionSelectionOnlyControls = fakeEl("div");
   dom.roomTimeControls = visionSelectionOnlyControls;
