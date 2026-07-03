@@ -751,6 +751,12 @@ test("machine gunner PNG frame strip maps setup progress to deploy frames", () =
   entity.state = STATE.MOVE;
   assert.equal(frameStripFrameIndex(strip, entity, { setupVisual: { frameProgress: 0.75 } }), 10);
   assert.ok(Math.abs(frameStripVisualFacing(strip, entity) - (Math.PI / 2)) < 0.001);
+
+  entity.state = STATE.IDLE;
+  entity.setupState = SETUP.DEPLOYED;
+  entity.weaponFacing = undefined;
+  entity.facing = Math.PI;
+  assert.ok(Math.abs(frameStripVisualFacing(strip, entity) - (Math.PI / 2)) < 0.001);
 });
 
 test("tank PNG atlas SVG fallback is destroyed when same id no longer needs it", () => {

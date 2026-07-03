@@ -82,8 +82,10 @@ export function frameStripVisualFacing(stripOrEntity, maybeEntity = null) {
   if (strip?.packedFacing === "body" && setupState === SETUP.PACKED && Number.isFinite(entity?.facing)) {
     return entity.facing;
   }
-  if (strip && setupState !== SETUP.PACKED && Number.isFinite(entity?.weaponFacing)) {
-    return entity.weaponFacing - finite(strip.setupForwardAngle, 0);
+  if (strip && setupState !== SETUP.PACKED) {
+    const setupForwardAngle = finite(strip.setupForwardAngle, 0);
+    if (Number.isFinite(entity?.weaponFacing)) return entity.weaponFacing - setupForwardAngle;
+    if (Number.isFinite(entity?.facing)) return entity.facing - setupForwardAngle;
   }
   if (moving && Number.isFinite(entity?.facing)) return entity.facing;
   if (!moving && Number.isFinite(entity?.weaponFacing)) return entity.weaponFacing;
