@@ -16,6 +16,8 @@ should not be treated as final production art.
 
 ## What Still Needs Work
 
+- The generated sheet did not meet the square-cell layout target. It is six equal-width 362x724
+  cells, so do not treat it as a ready atlas without explicit cropping or normalization.
 - The frames are too similar to be a strong production run cycle without additional editing or a
   more controlled rig.
 - Some equipment and arm details vary frame to frame.
