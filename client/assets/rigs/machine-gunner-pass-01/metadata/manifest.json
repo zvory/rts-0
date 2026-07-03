@@ -1,0 +1,63 @@
+{
+  "pipelineVersion": 1,
+  "source": "built-in image_gen",
+  "status": "candidate-art-not-production",
+  "enabled": false,
+  "unit": "machine_gunner",
+  "prompt": "client/assets/rigs/machine-gunner-pass-01/metadata/prompt.md",
+  "styleReference": "client/assets/rigs/rifleman-pass-02/generated/rifleman-pass-02-source.png",
+  "builtInImageGenSource": "/Users/az/.codex/generated_images/019f2973-4859-7170-8fe3-817503530ff9/ig_01f2fc4600e011f8016a480d821cbc8193845a74f715056613.png",
+  "sourceSheet": "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-01-source.png",
+  "alphaSheet": "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-01-alpha.png",
+  "reviewStrip": "client/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png",
+  "previewWebp": "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-01-8fps-loop.webp",
+  "sourceLayout": {
+    "columnsRequested": 9,
+    "rowsRequested": 1,
+    "width": 2172,
+    "height": 724,
+    "notes": "The generated image contains nine visual poses on a 2172x724 contact sheet, but it is not laid out as nine exact equal square cells."
+  },
+  "reviewStripLayout": {
+    "columns": 9,
+    "rows": 1,
+    "frameWidth": 96,
+    "frameHeight": 96,
+    "frameCount": 9,
+    "frameGroups": {
+      "movementCarryFrames": [0, 1, 2, 3, 4, 5],
+      "setupTransitionFrames": [6, 7, 8]
+    },
+    "cropMethod": "Connected-component crops from the alpha sheet, resized to fit inside 88x88 and centered in 96x96 frames.",
+    "componentCrops": [
+      { "frame": 0, "sourceCrop": { "x": 27, "y": 253, "w": 244, "h": 201 } },
+      { "frame": 1, "sourceCrop": { "x": 281, "y": 246, "w": 242, "h": 194 } },
+      { "frame": 2, "sourceCrop": { "x": 541, "y": 249, "w": 242, "h": 198 } },
+      { "frame": 3, "sourceCrop": { "x": 793, "y": 247, "w": 242, "h": 204 } },
+      { "frame": 4, "sourceCrop": { "x": 1052, "y": 250, "w": 244, "h": 201 } },
+      { "frame": 5, "sourceCrop": { "x": 1305, "y": 264, "w": 226, "h": 177 } },
+      { "frame": 6, "sourceCrop": { "x": 1531, "y": 266, "w": 217, "h": 180 } },
+      { "frame": 7, "sourceCrop": { "x": 1742, "y": 261, "w": 212, "h": 182 } },
+      { "frame": 8, "sourceCrop": { "x": 1953, "y": 261, "w": 216, "h": 181 } }
+    ]
+  },
+  "chromaKey": {
+    "requestedKey": "#ff00ff",
+    "detectedKey": "#f504ee",
+    "helper": "/Users/az/.codex/skills/.system/imagegen/scripts/remove_chroma_key.py",
+    "options": [
+      "--auto-key border",
+      "--soft-matte",
+      "--transparent-threshold 12",
+      "--opaque-threshold 220",
+      "--despill",
+      "--edge-contract 1"
+    ]
+  },
+  "notes": [
+    "Frames 0-5 keep the machine gunner upright and carrying the machine gun across the body, with motion conveyed by torso, shoulder, backpack, and weapon bob.",
+    "Frames 6-8 transition toward a forward ready pose; frames 7-8 show a visible deployed bipod while the soldier remains standing.",
+    "The source sheet is good for visual review, but not a final runtime atlas because the nine poses are not evenly spaced in exact cells.",
+    "The 96px review strip is derived from component crops for easier comparison with the production rifleman strip and is not wired into renderer code."
+  ]
+}
