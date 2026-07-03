@@ -277,8 +277,8 @@ Prototype raster rig workflow:
   turret, and the barrel sprite uses the same full `team` tint slot as the hull. The active
   `pass10-noguide-ref` atlas applies ImageMagick brightness/saturation modulation after
   normalization. Pass 10 removes visible contact-sheet guides entirely, uses the attached top-down
-  Tiger I reference as the subject input, and relies on visible-alpha postprocessing to resize
-  generated components onto the SVG rig bounds. See
+  Tiger I reference as the subject input, and relies on visible-alpha postprocessing plus 1.2x
+  world-scale compensation to size generated components against the SVG rig bounds. See
   [raster-unit-art-handoff.md](raster-unit-art-handoff.md) for the methodology, rejected imagegen
   passes, and next validation work.
 - `scripts/art/tank-raster-pipeline.mjs` builds the tank contact sheet, records the exact prompt

@@ -189,6 +189,7 @@ function writeAtlas(args) {
   const brightness = percentArg(args.brightness, 100);
   const saturation = percentArg(args.saturation, 100);
   const hue = percentArg(args.hue, 100);
+  const worldScale = positiveNumber(args["world-scale"], 1);
   const compiled = compileTankRig();
   const partIds = compiled.definition.parts.map((part) => part.id);
   const sheetSpec = sheetForProfile(compiled.definition, profile);
@@ -228,6 +229,7 @@ function writeAtlas(args) {
       boundsAtlasPath: boundsMaskPath || atlasPath,
       normalizeVisibleBounds,
       visiblePadding,
+      worldScale,
     })
     : [];
   if (boundsMaskPath) fs.rmSync(path.dirname(boundsMaskPath), { recursive: true, force: true });
@@ -240,12 +242,13 @@ function writeAtlas(args) {
       const frame = cellFrame(index, columns, rows, width, height);
       const part = compiled.definition.parts.find((candidate) => candidate.id === partId);
       const geometry = frameGeometry(part, frame.w, frame.h, layout);
+      const scaledGeometry = scaleFrameGeometry(geometry, worldScale);
       frames[partId] = {
         ...frame,
-        originX: geometry.originX,
-        originY: geometry.originY,
-        pixelsPerUnitX: geometry.pixelsPerUnitX,
-        pixelsPerUnitY: geometry.pixelsPerUnitY,
+        originX: scaledGeometry.originX,
+        originY: scaledGeometry.originY,
+        pixelsPerUnitX: scaledGeometry.pixelsPerUnitX,
+        pixelsPerUnitY: scaledGeometry.pixelsPerUnitY,
         sourceCell: cellId,
       };
     }
@@ -276,6 +279,7 @@ function writeAtlas(args) {
         guideMaskAlphaThreshold: ignoreGuideBounds ? guideMaskAlphaThreshold : null,
         guideMaskLineWidth: ignoreGuideBounds ? guideMaskLineWidth : null,
         guideMaskMorphology: ignoreGuideBounds ? guideMaskMorphology : null,
+        worldScale,
       },
       imageVersion,
       colorAdjustment: {
@@ -591,18 +595,29 @@ function atlasSpritesForSemanticProfile(definition, cells, columns, rows, width,
     const geometry = visibleFrame
       ? normalizedVisibleFrameGeometry(parts, visibleFrame, sprite.originMode)
       : groupFrameGeometry(parts, frame.w, frame.h, layout);
+    const scaledGeometry = scaleFrameGeometry(geometry, options.worldScale);
     return {
       ...sprite,
       sourceCell: cellId,
       frame: {
         ...frame,
-        originX: geometry.originX,
-        originY: geometry.originY,
-        pixelsPerUnitX: geometry.pixelsPerUnitX,
-        pixelsPerUnitY: geometry.pixelsPerUnitY,
+        originX: scaledGeometry.originX,
+        originY: scaledGeometry.originY,
+        pixelsPerUnitX: scaledGeometry.pixelsPerUnitX,
+        pixelsPerUnitY: scaledGeometry.pixelsPerUnitY,
       },
     };
   }).filter(Boolean);
+}
+
+function scaleFrameGeometry(geometry, worldScale = 1) {
+  const scale = Number.isFinite(worldScale) && worldScale > 0 ? worldScale : 1;
+  if (scale === 1) return geometry;
+  return {
+    ...geometry,
+    pixelsPerUnitX: geometry.pixelsPerUnitX / scale,
+    pixelsPerUnitY: geometry.pixelsPerUnitY / scale,
+  };
 }
 
 function makeGuideBoundsMask(file, cells, columns, rows, width, height, { fuzz, alphaThreshold, lineWidth, morphology }) {
@@ -951,6 +966,15 @@ function positiveInteger(value, fallback) {
   return parsed;
 }
 
+function positiveNumber(value, fallback) {
+  if (value == null) return fallback;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 4) {
+    throw new Error(`expected positive number in (0, 4], got ${value}`);
+  }
+  return parsed;
+}
+
 function nonNegativeInteger(value, fallback) {
   if (value == null) return fallback;
   const parsed = Number(value);
@@ -1033,7 +1057,7 @@ function rel(file) {
 function usage() {
   console.error(`Usage:
   node scripts/art/tank-raster-pipeline.mjs make-sheet [--scale 3] [--columns 2] [--layout tight] [--profile semantic] [--guides none|full] [--key #ff00ff]
-  node scripts/art/tank-raster-pipeline.mjs write-atlas --sheet <png> [--columns 2] [--layout tight] [--profile semantic] [--transparent-key #ff00ff] [--disabled] [--blank-cells cell[,cell]] [--normalize-visible-bounds] [--ignore-guide-bounds] [--guide-mask-fuzz 12] [--guide-mask-alpha-threshold 20] [--guide-mask-line-width 12] [--guide-mask-morphology Square:5] [--clear-cell-edge-alpha 16] [--visible-padding 2] [--brightness 120] [--saturation 100] [--hue 100] [--image-version pass-id] [--prompt-file metadata/prompt.md]
+  node scripts/art/tank-raster-pipeline.mjs write-atlas --sheet <png> [--columns 2] [--layout tight] [--profile semantic] [--transparent-key #ff00ff] [--disabled] [--blank-cells cell[,cell]] [--normalize-visible-bounds] [--ignore-guide-bounds] [--guide-mask-fuzz 12] [--guide-mask-alpha-threshold 20] [--guide-mask-line-width 12] [--guide-mask-morphology Square:5] [--clear-cell-edge-alpha 16] [--visible-padding 2] [--world-scale 1.2] [--brightness 120] [--saturation 100] [--hue 100] [--image-version pass-id] [--prompt-file metadata/prompt.md]
   node scripts/art/tank-raster-pipeline.mjs write-prompt`);
 }
 

@@ -1,6 +1,6 @@
 {
   "pipelineVersion": 1,
-  "generatedAt": "2026-07-03T11:27:01.266Z",
+  "generatedAt": "2026-07-03T14:00:24.154Z",
   "sourceSvgModule": "client/src/renderer/rigs/tank_svg.js",
   "sourceSvgRuntimeKind": "tank",
   "promptFile": "client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-10-noguide-ref.md",
@@ -15,6 +15,6 @@
   "atlasModule": "client/src/renderer/rigs/tank_png_atlas.js",
   "prompt": "client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-10-noguide-ref.md",
   "model": "built-in image generation + ImageMagick brightness pass",
-  "notes": "Experimental Tiger I no-track raster pass 10. Uses a no-guide contact sheet, the attached Tiger I reference as subject input, and visible-alpha normalization instead of guide-based sizing. The prompt asks the model to decompose and simplify the reference into hull, turret, and separate team-tinted barrel components.",
+  "notes": "Experimental Tiger I no-track no-guide raster pass 10 with 1.2x world-scale compensation.",
   "enabled": true
 }
