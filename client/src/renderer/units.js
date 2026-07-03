@@ -31,18 +31,19 @@ export function _deployedWeaponSetupVisual(e) {
   const durationMs = e.kind === KIND.ARTILLERY
     ? ARTILLERY_DEPLOYED_WEAPON_ANIM_MS
     : DEPLOYED_WEAPON_ANIM_MS;
-  const t = smoothstep01(elapsed / durationMs);
+  const progress = clamp01(elapsed / durationMs);
+  const t = smoothstep01(progress);
 
   if (setupState === SETUP.SETTING_UP) {
-    return { prongFactor: t, barrel: false };
+    return { prongFactor: t, frameProgress: progress, barrel: false };
   }
   if (setupState === SETUP.TEARING_DOWN) {
-    return { prongFactor: 1 - t, barrel: false };
+    return { prongFactor: 1 - t, frameProgress: 1 - progress, barrel: false };
   }
   if (setupState === SETUP.DEPLOYED) {
-    return { prongFactor: 1, barrel: e.state !== STATE.MOVE };
+    return { prongFactor: 1, frameProgress: 1, barrel: e.state !== STATE.MOVE };
   }
-  return { prongFactor: 0, barrel: false };
+  return { prongFactor: 0, frameProgress: 0, barrel: false };
 }
 
 export function _sweepSetupVisuals(liveIds) {

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { KIND, STATE } from "../client/src/protocol.js";
+import { KIND, SETUP, STATE } from "../client/src/protocol.js";
 import {
   _drawUnit,
   _rigRenderContextFor,
@@ -25,6 +25,7 @@ import {
   frameStripFrameIndex,
   frameStripVisualFacing,
 } from "../client/src/renderer/rigs/frame_strip_runtime.js";
+import { MACHINE_GUNNER_PNG_FRAME_STRIP } from "../client/src/renderer/rigs/machine_gunner_png_strip.js";
 import { RIFLEMAN_PNG_FRAME_STRIP } from "../client/src/renderer/rigs/rifleman_png_strip.js";
 import {
   pngAtlasCanRenderRoute,
@@ -711,6 +712,41 @@ test("rifleman PNG frame strip uses idle frame and movement cycle", () => {
   assert.equal(frameStripVisualFacing(entity), entity.facing);
   assert.equal(stripInstance.container.rotation, entity.facing);
   assert.equal(stripInstance.parts, undefined);
+});
+
+test("machine gunner PNG frame strip maps setup progress to deploy frames", () => {
+  const strip = { ...MACHINE_GUNNER_PNG_FRAME_STRIP, enabled: true };
+  const entity = {
+    id: 48,
+    kind: KIND.MACHINE_GUNNER,
+    owner: 1,
+    x: 32,
+    y: 44,
+    facing: 0.4,
+    weaponFacing: Math.PI,
+    setupState: SETUP.PACKED,
+    state: STATE.IDLE,
+  };
+
+  assert.equal(frameStripFrameIndex(strip, entity, { setupVisual: { frameProgress: 0 } }), strip.idleFrame);
+  assert.equal(frameStripVisualFacing(strip, entity), entity.facing);
+
+  entity.state = STATE.MOVE;
+  assert.equal(frameStripFrameIndex(strip, entity, 0), strip.movementFrames[0]);
+  assert.equal(frameStripVisualFacing(strip, entity), entity.facing);
+
+  entity.state = STATE.IDLE;
+  entity.setupState = SETUP.SETTING_UP;
+  assert.equal(frameStripFrameIndex(strip, entity, { setupVisual: { frameProgress: 0 } }), 6);
+  assert.equal(frameStripFrameIndex(strip, entity, { setupVisual: { frameProgress: 0.5 } }), 9);
+  assert.equal(frameStripFrameIndex(strip, entity, { setupVisual: { frameProgress: 0.999 } }), 11);
+  assert.ok(Math.abs(frameStripVisualFacing(strip, entity) - (Math.PI / 2)) < 0.001);
+
+  entity.setupState = SETUP.DEPLOYED;
+  assert.equal(frameStripFrameIndex(strip, entity, { setupVisual: { frameProgress: 1 } }), strip.deployedFrame);
+
+  entity.setupState = SETUP.TEARING_DOWN;
+  assert.equal(frameStripFrameIndex(strip, entity, { setupVisual: { frameProgress: 0.25 } }), 7);
 });
 
 test("tank PNG atlas SVG fallback is destroyed when same id no longer needs it", () => {

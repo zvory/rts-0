@@ -1,4 +1,4 @@
-import { STATE } from "../../protocol.js";
+import { SETUP, STATE } from "../../protocol.js";
 import { hexToInt, lightenColor } from "../shared.js";
 
 const OCCUPIED_TRENCH_UNIT_SCALE = 0.85;
@@ -42,10 +42,15 @@ export function renderFrameStripUnit(renderer, entity, strip, texture, options =
   return instance;
 }
 
-export function frameStripFrameIndex(strip, entity, now = 0) {
+export function frameStripFrameIndex(strip, entity, nowOrContext = 0) {
   const idleFrame = validFrame(strip, strip?.idleFrame ?? 0);
-  if (entity?.state !== STATE.MOVE) return idleFrame;
-  const frames = Array.isArray(strip?.movementFrames) ? strip.movementFrames : [];
+  const renderContext = typeof nowOrContext === "object" && nowOrContext !== null ? nowOrContext : {};
+  const now = typeof nowOrContext === "number" ? nowOrContext : renderContext.now;
+  if (entity?.state !== STATE.MOVE) {
+    const setupFrame = frameStripSetupFrameIndex(strip, entity, renderContext, idleFrame);
+    return setupFrame ?? idleFrame;
+  }
+  const frames = validFrameList(strip, strip?.movementFrames);
   if (frames.length === 0) return idleFrame;
   const fps = Math.max(1, finite(strip?.fps, 12));
   const frameDurationMs = 1000 / fps;
@@ -54,9 +59,32 @@ export function frameStripFrameIndex(strip, entity, now = 0) {
   return validFrame(strip, frames[(timeIndex + idOffset) % frames.length], idleFrame);
 }
 
-export function frameStripVisualFacing(entity) {
+function frameStripSetupFrameIndex(strip, entity, renderContext = {}, idleFrame = 0) {
+  const setupFrames = validFrameList(strip, strip?.setupFrames);
+  if (setupFrames.length === 0) return null;
+  const setupState = entity?.setupState || SETUP.PACKED;
+  if (setupState === SETUP.DEPLOYED) {
+    return validFrame(strip, strip?.deployedFrame ?? setupFrames[setupFrames.length - 1], idleFrame);
+  }
+  if (setupState !== SETUP.SETTING_UP && setupState !== SETUP.TEARING_DOWN) return null;
+  const setupVisual = renderContext?.setupVisual ?? {};
+  const progress = clamp01(finite(setupVisual.frameProgress, finite(setupVisual.prongFactor, 0)));
+  const index = Math.min(setupFrames.length - 1, Math.floor(progress * setupFrames.length));
+  return setupFrames[index];
+}
+
+export function frameStripVisualFacing(stripOrEntity, maybeEntity = null) {
+  const strip = maybeEntity ? stripOrEntity : null;
+  const entity = maybeEntity ?? stripOrEntity;
   const moving = entity?.state === STATE.MOVE;
   if (moving && Number.isFinite(entity?.facing)) return entity.facing;
+  const setupState = entity?.setupState || SETUP.PACKED;
+  if (strip?.packedFacing === "body" && setupState === SETUP.PACKED && Number.isFinite(entity?.facing)) {
+    return entity.facing;
+  }
+  if (strip && setupState !== SETUP.PACKED && Number.isFinite(entity?.weaponFacing)) {
+    return entity.weaponFacing - finite(strip.setupForwardAngle, 0);
+  }
   if (!moving && Number.isFinite(entity?.weaponFacing)) return entity.weaponFacing;
   return finite(entity?.facing, 0);
 }
@@ -107,9 +135,9 @@ class FrameStripUnitInstance {
     setPoint(this.container.position, finite(entity.x, 0), finite(entity.y, 0));
     const occupiedScale = renderContext.occupiedTrench ? OCCUPIED_TRENCH_UNIT_SCALE : 1;
     setPoint(this.container.scale, occupiedScale, occupiedScale);
-    this.container.rotation = frameStripVisualFacing(entity);
+    this.container.rotation = frameStripVisualFacing(this.strip, entity);
 
-    const frameIndex = frameStripFrameIndex(this.strip, entity, renderContext.now);
+    const frameIndex = frameStripFrameIndex(this.strip, entity, renderContext);
     if (frameIndex !== this._frameIndex) {
       this.sprite.texture = this.frameTextures[frameIndex] ?? this.frameTextures[0];
       this._frameIndex = frameIndex;
@@ -148,6 +176,22 @@ function validFrame(strip, frame, fallback = 0) {
   const value = Math.trunc(finite(frame, fallback));
   if (value < 0 || value >= count) return Math.trunc(finite(fallback, 0));
   return value;
+}
+
+function validFrameList(strip, frames) {
+  if (!Array.isArray(frames)) return [];
+  const count = Math.max(1, Math.trunc(finite(strip?.frameCount, 1)));
+  const out = [];
+  for (const frame of frames) {
+    if (!Number.isFinite(frame)) continue;
+    const value = Math.trunc(frame);
+    if (value >= 0 && value < count) out.push(value);
+  }
+  return out;
+}
+
+function clamp01(value) {
+  return Math.max(0, Math.min(1, finite(value, 0)));
 }
 
 function setPoint(point, x, y) {

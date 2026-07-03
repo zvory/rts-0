@@ -1,7 +1,9 @@
 import { KIND } from "../../protocol.js";
+import { MACHINE_GUNNER_PNG_FRAME_STRIP } from "./machine_gunner_png_strip.js";
 import { RIFLEMAN_PNG_FRAME_STRIP } from "./rifleman_png_strip.js";
 
 const LIVE_FRAME_STRIPS = Object.freeze([
+  [KIND.MACHINE_GUNNER, MACHINE_GUNNER_PNG_FRAME_STRIP],
   [KIND.RIFLEMAN, RIFLEMAN_PNG_FRAME_STRIP],
 ]);
 
