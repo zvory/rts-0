@@ -1,0 +1,23 @@
+{
+  "candidate": "tiger-i-pass-06-bright",
+  "status": "saved-experiment",
+  "baseCandidate": "tiger-i-pass-06-lowpoly",
+  "sourceSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-06-lowpoly-alpha.png",
+  "prompt": "client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-06-lowpoly.md",
+  "candidateAlphaSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-06-lowpoly-alpha.png",
+  "runtimeAlphaSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-06-lowpoly-bright-body-turret-alpha.png",
+  "activeAtlas": "client/assets/rigs/tank-ps1/tank-atlas.png",
+  "activeAtlasUrl": "/assets/rigs/tank-ps1/tank-atlas.png?v=pass06-bright",
+  "pipelineOptions": {
+    "blankCells": ["reference.full", "sprite.track"],
+    "normalizeVisibleBounds": true,
+    "clearCellEdgeAlpha": 16,
+    "visiblePadding": 2,
+    "brightness": 130,
+    "saturation": 105,
+    "hue": 100,
+    "imageVersion": "pass06-bright"
+  },
+  "runtimeNotes": "No new image generation. The active atlas is derived from pass-06 lowpoly by blanking reference/track cells, normalizing visible hull/body and turret/barrel bounds, and applying ImageMagick brightness/saturation modulation. The transparent track frame still covers track source parts, so SVG tracks do not render.",
+  "notes": "Brighter no-imagegen follow-up intended to improve readability against the map/background while preserving the pass-06 silhouette and component split."
+}

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -25,11 +26,17 @@ const DEFAULT_SCALE = 3;
 const DEFAULT_KEY = "#ff00ff";
 const DEFAULT_LAYOUT = "tight";
 const DEFAULT_PROFILE = "semantic";
+const DEFAULT_GUIDES = "none";
 const TIGHT_CELL_FILL = 0.72;
 const GUIDE_SUBDIVISIONS = 8;
 const GUIDE_BORDER_COLOR = "#00e5ff";
 const GUIDE_MINOR_COLOR = "#80f6ff";
 const GUIDE_CENTER_COLOR = "#fff4a3";
+const GUIDE_MASK_COLORS = Object.freeze([GUIDE_BORDER_COLOR, GUIDE_MINOR_COLOR, GUIDE_CENTER_COLOR, DEFAULT_KEY]);
+const DEFAULT_GUIDE_MASK_FUZZ = 12;
+const DEFAULT_GUIDE_MASK_ALPHA_THRESHOLD = 20;
+const DEFAULT_GUIDE_MASK_LINE_WIDTH = 12;
+const DEFAULT_GUIDE_MASK_MORPHOLOGY = "Square:5";
 
 function main() {
   const [command, ...rest] = process.argv.slice(2);
@@ -57,6 +64,7 @@ function makeSheet(args) {
   const key = String(args.key || DEFAULT_KEY);
   const layout = layoutArg(args.layout);
   const profile = profileArg(args.profile);
+  const guides = guidesArg(args.guides);
   const compiled = compileTankRig();
   const partIds = compiled.definition.parts.map((part) => part.id);
   const sheet = sheetForProfile(compiled.definition, profile);
@@ -72,11 +80,13 @@ function makeSheet(args) {
 
   const body = [];
   body.push(`<rect x="0" y="0" width="${sheetW}" height="${sheetH}" fill="${key}" />`);
-  cells.forEach((_cellId, index) => {
-    const col = index % columns;
-    const row = Math.floor(index / columns);
-    appendCellGuides(body, col * cellW, row * cellH, cellW, cellH);
-  });
+  if (guides === "full") {
+    cells.forEach((_cellId, index) => {
+      const col = index % columns;
+      const row = Math.floor(index / columns);
+      appendCellGuides(body, col * cellW, row * cellH, cellW, cellH);
+    });
+  }
   cells.forEach((cellId, index) => {
     const col = index % columns;
     const row = Math.floor(index / columns);
@@ -141,12 +151,13 @@ function makeSheet(args) {
     semanticSprites: sheet.sprites,
     semanticSheetElements: sheet.sheetElements,
     guides: {
-      outerCellBox: true,
-      subdivisions: GUIDE_SUBDIVISIONS,
-      centerLines: true,
-      borderColor: GUIDE_BORDER_COLOR,
-      minorColor: GUIDE_MINOR_COLOR,
-      centerColor: GUIDE_CENTER_COLOR,
+      mode: guides,
+      outerCellBox: guides === "full",
+      subdivisions: guides === "full" ? GUIDE_SUBDIVISIONS : 0,
+      centerLines: guides === "full",
+      borderColor: guides === "full" ? GUIDE_BORDER_COLOR : null,
+      minorColor: guides === "full" ? GUIDE_MINOR_COLOR : null,
+      centerColor: guides === "full" ? GUIDE_CENTER_COLOR : null,
     },
     sourceSvg: rel(sourceSvgPath),
     sourcePng: rel(sourcePngPath),
@@ -164,6 +175,20 @@ function writeAtlas(args) {
   const profile = profileArg(args.profile);
   const transparentKey = args["transparent-key"];
   const enabled = !args.disabled && args.enabled !== "false";
+  const blankCells = parseListArg(args["blank-cells"]);
+  const normalizeVisibleBounds = Boolean(args["normalize-visible-bounds"]);
+  const clearCellEdgeAlpha = nonNegativeInteger(args["clear-cell-edge-alpha"], normalizeVisibleBounds ? 16 : 0);
+  const visiblePadding = nonNegativeInteger(args["visible-padding"], normalizeVisibleBounds ? 2 : 0);
+  const ignoreGuideBounds = Boolean(args["ignore-guide-bounds"]);
+  const guideMaskFuzz = percentArg(args["guide-mask-fuzz"], DEFAULT_GUIDE_MASK_FUZZ);
+  const guideMaskAlphaThreshold = percentArg(args["guide-mask-alpha-threshold"], DEFAULT_GUIDE_MASK_ALPHA_THRESHOLD);
+  const guideMaskLineWidth = nonNegativeInteger(args["guide-mask-line-width"], DEFAULT_GUIDE_MASK_LINE_WIDTH);
+  const guideMaskMorphology = morphologyArg(args["guide-mask-morphology"], DEFAULT_GUIDE_MASK_MORPHOLOGY);
+  const imageVersion = safeVersionArg(args["image-version"]);
+  const promptFile = args["prompt-file"] ? path.resolve(repoRoot, String(args["prompt-file"])) : promptPath;
+  const brightness = percentArg(args.brightness, 100);
+  const saturation = percentArg(args.saturation, 100);
+  const hue = percentArg(args.hue, 100);
   const compiled = compileTankRig();
   const partIds = compiled.definition.parts.map((part) => part.id);
   const sheetSpec = sheetForProfile(compiled.definition, profile);
@@ -179,10 +204,33 @@ function writeAtlas(args) {
   }
 
   const { width, height } = identifyImage(atlasPath);
+  if (blankCells.length > 0) {
+    clearAtlasCellAlpha(atlasPath, blankCells, cells, columns, rows, width, height);
+  }
+  if (clearCellEdgeAlpha > 0) {
+    clearAtlasCellEdgeAlpha(atlasPath, cells, columns, rows, width, height, clearCellEdgeAlpha);
+  }
+  if (brightness !== 100 || saturation !== 100 || hue !== 100) {
+    modulateAtlasColor(atlasPath, { brightness, saturation, hue });
+  }
   const frames = {};
+  const boundsMaskPath = normalizeVisibleBounds && ignoreGuideBounds
+    ? makeGuideBoundsMask(atlasPath, cells, columns, rows, width, height, {
+      fuzz: guideMaskFuzz,
+      alphaThreshold: guideMaskAlphaThreshold,
+      lineWidth: guideMaskLineWidth,
+      morphology: guideMaskMorphology,
+    })
+    : null;
   const sprites = profile === "semantic"
-    ? atlasSpritesForSemanticProfile(compiled.definition, cells, columns, rows, width, height, layout)
+    ? atlasSpritesForSemanticProfile(compiled.definition, cells, columns, rows, width, height, layout, {
+      atlasPath,
+      boundsAtlasPath: boundsMaskPath || atlasPath,
+      normalizeVisibleBounds,
+      visiblePadding,
+    })
     : [];
+  if (boundsMaskPath) fs.rmSync(path.dirname(boundsMaskPath), { recursive: true, force: true });
   if (profile !== "semantic") {
     const frameSources = sheetSpec.frameSources;
     for (const partId of partIds) {
@@ -206,7 +254,7 @@ function writeAtlas(args) {
   const atlas = {
     enabled,
     unit: "tank",
-    image: "/assets/rigs/tank-ps1/tank-atlas.png",
+    image: `/assets/rigs/tank-ps1/tank-atlas.png${imageVersion ? `?v=${imageVersion}` : ""}`,
     viewBox: VIEW_BOX,
     grid: {
       columns,
@@ -218,6 +266,23 @@ function writeAtlas(args) {
       sourceSheet: rel(sheet),
       cells,
       frameSources: sheetSpec.frameSources,
+      normalization: {
+        visibleBounds: normalizeVisibleBounds,
+        visiblePadding,
+        clearCellEdgeAlpha,
+        blankCells,
+        ignoreGuideBounds,
+        guideMaskFuzz: ignoreGuideBounds ? guideMaskFuzz : null,
+        guideMaskAlphaThreshold: ignoreGuideBounds ? guideMaskAlphaThreshold : null,
+        guideMaskLineWidth: ignoreGuideBounds ? guideMaskLineWidth : null,
+        guideMaskMorphology: ignoreGuideBounds ? guideMaskMorphology : null,
+      },
+      imageVersion,
+      colorAdjustment: {
+        brightness,
+        saturation,
+        hue,
+      },
     },
     frames,
     sprites,
@@ -233,7 +298,8 @@ function writeAtlas(args) {
     sourceSheet: rel(sheet),
     atlas: rel(atlasPath),
     atlasModule: rel(atlasModulePath),
-    prompt: rel(promptPath),
+    promptFile: rel(promptFile),
+    prompt: rel(promptFile),
     model: args.model || "built-in image_gen",
     notes: args.notes || "Prototype tank-only PNG rig atlas. SVG rig remains the source for anchors and animation.",
     enabled,
@@ -245,15 +311,19 @@ function writePrompt() {
   ensureDirs();
   const prompt = `Use case: stylized-concept
 Asset type: top-down RTS unit raster atlas for Bewegungskrieg
-Primary request: Restyle this guided semantic tank contact sheet into a coherent, strict top-down, World War II plausible RTS tank with every grouped component preserved in its same grid cell.
-Input image role: edit target and layout reference. The sheet has exactly four boxed cells in a 2x2 grid: assembled reference tank, one reusable track-link strip, hull assembly, and turret/barrel assembly. The visible guide boxes, subgrid lines, and center marks are alignment guides only.
-Style/medium: clean RTS-readable PlayStation 1 era raster art, low-resolution textured/pixely surfaces, grounded proportions, not cartoonish.
-Composition/framing: preserve the exact 2x2 grid, exact four-cell count, exact cell order, boxed cell boundaries, centered component framing, relative component silhouette, and top-down orientation. Use the smaller guide grid inside each cell to keep scale and center alignment stable. Keep each component isolated inside its original cell.
-Color/materials: neutral grayscale team-colorable armor on parts that are currently blue, dark rubber/track metal, dull steel barrels, subtle chipped paint, grime, panel texture, no glossy modern materials.
-Background: perfectly flat solid ${DEFAULT_KEY} chroma-key background in every cell.
-Track cell: generate only one straight reusable track-link strip or short collection of repeatable track links. It should work as a seamless scrolling/rotating texture segment when reused for both tank sides. Do not draw a closed track assembly, end cap, perimeter contour, sprocket, wheel, or outline around the whole strip.
-Constraints: strict top-down orthographic view; no perspective tilt; no drop shadow; no text, labels, numbers, watermarks, arrows, or extra UI; no merged cells; no fuel warning/no-oil indicator; do not add missing parts; do not remove any required art part; leave empty background areas empty. Keep guide lines thin and separate from the sprite art; do not turn the guide grid into armor seams or track detail.
-Avoid: invented sprockets, gears, road wheels, extra hatches, extra barrels, fuel icons, warning symbols, closed track loops, track end contours, thick cartoon outlines, toy proportions, oversized turret/barrel, painterly blur, photorealistic perspective, dramatic lighting, gradients in the background, camouflage that hides the silhouette.
+Primary request: Decompose and simplify the attached strict top-down Tiger I reference into this semantic no-guide contact sheet, preserving each grouped component in its same 2x3 position.
+Input image roles: use the contact sheet as the edit target and layout carrier; use the attached Tiger I reference as the subject/silhouette reference. The sheet has exactly six invisible cell zones in a 2x3 layout: assembled no-track reference tank, empty no-track placeholder, hull assembly, turret/coax assembly, separate main barrel, and one unused empty zone.
+Style/medium: clean RTS-readable pre-PlayStation / early low-poly raster art, flat-shaded low-resolution surfaces, grounded Tiger I proportions, not cartoonish. Simpler than concept art: broad slabs, very few small hatches, very few bolts, no dense top-deck clutter.
+Composition/framing: preserve the exact 2x3 layout, exact six-zone count, exact zone order, centered component framing, relative component silhouette, and top-down orientation. Do not add visible cell boxes, guide lines, subgrids, crosshairs, labels, or dividers; leave layout sizing to post-processing.
+Color/materials: bright neutral gray-blue team-colorable armor on hull, turret, and barrel; the barrel should be the same tintable team-color armor value as the hull, not black fixed metal. Subtle broad panel shading, very light grime, no glossy modern materials.
+Outline: add a clean dark/black RTS-readable outline around the hull, turret, coax detail, and separate main barrel. Keep the outline crisp and simple, not a thick cartoon border.
+Background: perfectly flat solid ${DEFAULT_KEY} chroma-key background in every empty area.
+Empty zones: leave the no-track placeholder zone and the unused final zone as flat ${DEFAULT_KEY} only, with no tank art.
+Hull cell: generate only the no-track Tiger I hull/body armor silhouette, centered and matching the reference scale. Keep the hull mostly boxy and rectangular like a Tiger I, with only subtle stepped/chamfered front corners and a slight rear inset; do not exaggerate chamfers, side blocks, side skirts, or track-guard shapes. Keep it simplified and readable, with no tracks.
+Turret cell: generate only the Tiger I turret body and tiny coax detail, with no main cannon barrel attached; compact angular turret with a clear black outline, not a modern rounded turret.
+Barrel cell: generate only the separate Tiger I 88mm main cannon barrel as a straight centered component, long axis left-to-right, same team-color neutral gray-blue as the hull, readable thickness, crisp black outline, no turret attached.
+Constraints: strict top-down orthographic view; no tracks anywhere; no perspective tilt; no drop shadow; no text, labels, numbers, watermarks, arrows, Balkenkreuz, swastikas, insignia, or extra UI; no merged zones; no fuel warning/no-oil indicator; do not add missing parts; do not remove any required hull/turret/barrel art part; leave empty background areas empty.
+Avoid: visible guide boxes, visible grid lines, perfect square slab silhouette, over-chamfered hull, tracks, treads, wheels, sprockets, gears, dense top-deck detail, extra hatches, extra barrels, fuel icons, warning symbols, thick cartoon outlines, toy proportions, oversized turret/barrel, painterly blur, photorealistic perspective, dramatic lighting, gradients in the background, camouflage that hides the silhouette.
 `;
   fs.writeFileSync(promptPath, prompt);
   console.log(`wrote ${rel(promptPath)}`);
@@ -305,9 +375,13 @@ function sourceElementsById(svgText) {
 }
 
 function prepSourceElement(element, { stripTransform }) {
+  const sourceId = element.match(/\sid="([^"]+)"/)?.[1] || "";
   let out = element
     .replace(/\sdata-rts-[a-z-]+="[^"]*"/g, "")
     .replace(/\sid="([^"]+)"/, ' id="source.$1"');
+  if (sourceId === "part.barrel") {
+    out = out.replace(/\sstroke="[^"]*"/, ' stroke="#d8d0b0"');
+  }
   if (stripTransform) out = out.replace(/\stransform="[^"]*"/g, "");
   return out;
 }
@@ -384,7 +458,7 @@ function sheetForProfile(definition, profile) {
     const sprites = semanticSprites(partIds);
     const sheetElements = semanticSheetElements(partIds);
     return {
-      cells: ["reference.full", ...sheetElements.map((element) => element.id)],
+      cells: ["reference.full", ...sheetElements.map((element) => element.id), "unused.blank"],
       frameSources: semanticFrameSources(sprites),
       sprites,
       sheetElements,
@@ -401,7 +475,13 @@ function sheetForProfile(definition, profile) {
 
 function referencePartsForProfile(partIds, profile) {
   if (profile === "semantic") {
-    return partIds.filter((partId) => partId !== "part.shadow" && !partId.startsWith("part.fuelCue."));
+    return partIds.filter((partId) => (
+      partId !== "part.shadow" &&
+      !partId.startsWith("part.fuelCue.") &&
+      !partId.startsWith("part.tank.flash") &&
+      !partId.startsWith("part.track.") &&
+      !partId.startsWith("part.tread.")
+    ));
   }
   return partIds;
 }
@@ -436,9 +516,17 @@ function semanticSprites(partIds) {
     {
       id: "sprite.turret",
       animationPart: "part.turret",
-      sourceParts: ["part.barrel", "part.coaxBarrel", "part.turret"],
+      sourceParts: ["part.coaxBarrel", "part.turret"],
       tintSlot: "team-light",
+      originMode: "visible-center",
       drawOrder: 30,
+    },
+    {
+      id: "sprite.barrel",
+      animationPart: "part.barrel",
+      sourceParts: ["part.barrel"],
+      tintSlot: "team",
+      drawOrder: 29,
     },
   ].map((sprite) => ({
     ...sprite,
@@ -449,13 +537,12 @@ function semanticSprites(partIds) {
 function semanticSheetElements(partIds) {
   const leftTreads = partIds.filter((partId) => /^part\.tread\.left\./.test(partId));
   const trackSourceParts = ["part.track.left", ...leftTreads].filter((partId) => partIds.includes(partId));
-  const trackRenderParts = leftTreads.filter((partId) => partIds.includes(partId));
   return [
     {
       id: "sprite.track",
       sourceParts: trackSourceParts,
-      renderParts: trackRenderParts.length > 0 ? trackRenderParts : trackSourceParts,
-      description: "single reusable track-link strip; no closed track assembly or end contour",
+      renderParts: [],
+      description: "empty no-track placeholder used only to suppress SVG track parts",
     },
     {
       id: "sprite.hull",
@@ -464,8 +551,13 @@ function semanticSheetElements(partIds) {
     },
     {
       id: "sprite.turret",
-      sourceParts: ["part.barrel", "part.coaxBarrel", "part.turret"],
-      description: "turret and barrel assembly",
+      sourceParts: ["part.coaxBarrel", "part.turret"],
+      description: "turret and coax assembly, excluding the main barrel",
+    },
+    {
+      id: "sprite.barrel",
+      sourceParts: ["part.barrel"],
+      description: "separate main cannon barrel",
     },
   ].map((element) => ({
     ...element,
@@ -483,16 +575,22 @@ function semanticFrameSources(sprites) {
   return sources;
 }
 
-function atlasSpritesForSemanticProfile(definition, cells, columns, rows, width, height, layout) {
+function atlasSpritesForSemanticProfile(definition, cells, columns, rows, width, height, layout, options = {}) {
   return semanticSprites(definition.parts.map((part) => part.id)).map((sprite) => {
     const cellId = sprite.sourceCell || sprite.id;
     const index = cells.indexOf(cellId);
     if (index < 0) return null;
-    const frame = cellFrame(index, columns, rows, width, height);
+    const cell = cellFrame(index, columns, rows, width, height);
     const parts = sprite.sourceParts
       .map((partId) => definition.parts.find((part) => part.id === partId))
       .filter(Boolean);
-    const geometry = groupFrameGeometry(parts, frame.w, frame.h, layout);
+    const visibleFrame = options.normalizeVisibleBounds
+      ? visibleFrameForCell(options.boundsAtlasPath || options.atlasPath, cell, options.visiblePadding)
+      : null;
+    const frame = visibleFrame || cell;
+    const geometry = visibleFrame
+      ? normalizedVisibleFrameGeometry(parts, visibleFrame, sprite.originMode)
+      : groupFrameGeometry(parts, frame.w, frame.h, layout);
     return {
       ...sprite,
       sourceCell: cellId,
@@ -505,6 +603,88 @@ function atlasSpritesForSemanticProfile(definition, cells, columns, rows, width,
       },
     };
   }).filter(Boolean);
+}
+
+function makeGuideBoundsMask(file, cells, columns, rows, width, height, { fuzz, alphaThreshold, lineWidth, morphology }) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "tank-raster-bounds-"));
+  const out = path.join(dir, "guide-bounds-mask.png");
+  const args = [
+    file,
+    "-fuzz",
+    `${fuzz}%`,
+    ...GUIDE_MASK_COLORS.flatMap((color) => ["-transparent", color]),
+    "+fuzz",
+    "-channel",
+    "A",
+    "-threshold",
+    `${alphaThreshold}%`,
+    "+channel",
+    out,
+  ];
+  run("magick", args);
+  clearAtlasGuideAlpha(out, cells, columns, rows, width, height, lineWidth);
+  morphAtlasAlpha(out, { alphaThreshold, morphology });
+  return out;
+}
+
+function visibleFrameForCell(file, cell, padding = 0) {
+  if (!file) return null;
+  const result = run("magick", [
+    file,
+    "-crop",
+    `${cell.w}x${cell.h}+${cell.x}+${cell.y}`,
+    "+repage",
+    "-alpha",
+    "extract",
+    "-trim",
+    "-format",
+    "%w %h %X %Y",
+    "info:",
+  ], { capture: true, allowFailure: true });
+  if (result.status !== 0 || /geometry does not contain image/i.test(result.stderr || "")) return null;
+  const [w, h, offsetX, offsetY] = result.stdout.trim().split(/\s+/).map(Number);
+  if (!Number.isFinite(w) || !Number.isFinite(h) || !Number.isFinite(offsetX) || !Number.isFinite(offsetY)) return null;
+  if (w <= 0 || h <= 0 || offsetX < 0 || offsetY < 0) return null;
+  const pad = Math.max(0, Math.floor(padding));
+  const x = Math.max(cell.x, cell.x + offsetX - pad);
+  const y = Math.max(cell.y, cell.y + offsetY - pad);
+  const right = Math.min(cell.x + cell.w, cell.x + offsetX + w + pad);
+  const bottom = Math.min(cell.y + cell.h, cell.y + offsetY + h + pad);
+  return {
+    x,
+    y,
+    w: Math.max(1, right - x),
+    h: Math.max(1, bottom - y),
+    visibleBounds: {
+      x: cell.x + offsetX,
+      y: cell.y + offsetY,
+      w,
+      h,
+    },
+  };
+}
+
+function normalizedVisibleFrameGeometry(parts, frame, originMode = "svg-origin") {
+  const bounds = unionBounds(parts.map(partBounds));
+  const targetW = Math.max(1, bounds.maxX - bounds.minX);
+  const targetH = Math.max(1, bounds.maxY - bounds.minY);
+  const visible = frame.visibleBounds || frame;
+  const pixelsPerUnitX = Math.max(1, visible.w) / targetW;
+  const pixelsPerUnitY = Math.max(1, visible.h) / targetH;
+  if (originMode === "visible-center") {
+    return {
+      originX: visible.x - frame.x + visible.w * 0.5,
+      originY: visible.y - frame.y + visible.h * 0.5,
+      pixelsPerUnitX,
+      pixelsPerUnitY,
+    };
+  }
+  return {
+    originX: visible.x - frame.x - bounds.minX * pixelsPerUnitX,
+    originY: visible.y - frame.y - bounds.minY * pixelsPerUnitY,
+    pixelsPerUnitX,
+    pixelsPerUnitY,
+  };
 }
 
 function cellFrame(index, columns, rows, width, height) {
@@ -598,6 +778,14 @@ function profileArg(value) {
   return profile;
 }
 
+function guidesArg(value) {
+  const guides = String(value || DEFAULT_GUIDES);
+  if (guides !== "none" && guides !== "full") {
+    throw new Error(`unsupported guides ${JSON.stringify(guides)}; expected none or full`);
+  }
+  return guides;
+}
+
 function round(value) {
   return Number(value.toFixed(6));
 }
@@ -609,6 +797,143 @@ function identifyImage(file) {
     throw new Error(`failed to identify image dimensions for ${file}: ${result.stdout}`);
   }
   return { width, height };
+}
+
+function clearAtlasCellAlpha(file, cellIds, cells, columns, rows, width, height) {
+  const wanted = new Set(cellIds);
+  const drawOps = [];
+  cells.forEach((cellId, index) => {
+    if (!wanted.has(cellId)) return;
+    const frame = cellFrame(index, columns, rows, width, height);
+    drawOps.push(rectangleDrawOp(frame.x, frame.y, frame.x + frame.w, frame.y + frame.h));
+  });
+  if (drawOps.length === 0) return;
+  clearAtlasAlpha(file, drawOps);
+}
+
+function clearAtlasCellEdgeAlpha(file, cells, columns, rows, width, height, inset) {
+  const amount = Math.max(0, Math.floor(inset));
+  if (amount <= 0) return;
+  const drawOps = [];
+  cells.forEach((_cellId, index) => {
+    const frame = cellFrame(index, columns, rows, width, height);
+    const right = frame.x + frame.w;
+    const bottom = frame.y + frame.h;
+    const x2 = Math.min(right, frame.x + amount);
+    const y2 = Math.min(bottom, frame.y + amount);
+    const x1 = Math.max(frame.x, right - amount);
+    const y1 = Math.max(frame.y, bottom - amount);
+    drawOps.push(
+      rectangleDrawOp(frame.x, frame.y, x2, bottom),
+      rectangleDrawOp(x1, frame.y, right, bottom),
+      rectangleDrawOp(frame.x, frame.y, right, y2),
+      rectangleDrawOp(frame.x, y1, right, bottom),
+    );
+  });
+  clearAtlasAlpha(file, drawOps);
+}
+
+function clearAtlasGuideAlpha(file, cells, columns, rows, width, height, lineWidth) {
+  const amount = Math.max(0, Math.floor(lineWidth));
+  if (amount <= 0) return;
+  const drawOps = [];
+  cells.forEach((_cellId, index) => {
+    const frame = cellFrame(index, columns, rows, width, height);
+    for (let i = 1; i < GUIDE_SUBDIVISIONS; i += 1) {
+      const x = frame.x + (frame.w * i) / GUIDE_SUBDIVISIONS;
+      const y = frame.y + (frame.h * i) / GUIDE_SUBDIVISIONS;
+      drawOps.push(verticalLineDrawOp(x, frame.y, frame.y + frame.h, amount));
+      drawOps.push(horizontalLineDrawOp(y, frame.x, frame.x + frame.w, amount));
+    }
+
+    drawOps.push(
+      verticalLineDrawOp(frame.x + 1, frame.y, frame.y + frame.h, amount),
+      verticalLineDrawOp(frame.x + frame.w - 1, frame.y, frame.y + frame.h, amount),
+      horizontalLineDrawOp(frame.y + 1, frame.x, frame.x + frame.w, amount),
+      horizontalLineDrawOp(frame.y + frame.h - 1, frame.x, frame.x + frame.w, amount),
+    );
+
+    const insetX = frame.w * 0.25;
+    const insetY = frame.h * 0.25;
+    const x0 = frame.x + insetX;
+    const x1 = frame.x + frame.w - insetX;
+    const y0 = frame.y + insetY;
+    const y1 = frame.y + frame.h - insetY;
+    drawOps.push(
+      verticalLineDrawOp(x0, y0, y1, amount),
+      verticalLineDrawOp(x1, y0, y1, amount),
+      horizontalLineDrawOp(y0, x0, x1, amount),
+      horizontalLineDrawOp(y1, x0, x1, amount),
+    );
+  });
+  clearAtlasAlpha(file, drawOps);
+}
+
+function clearAtlasAlpha(file, drawOps) {
+  run("magick", [
+    file,
+    "(",
+    "+clone",
+    "-alpha",
+    "extract",
+    "-fill",
+    "black",
+    "-draw",
+    drawOps.join(" "),
+    ")",
+    "-alpha",
+    "off",
+    "-compose",
+    "CopyOpacity",
+    "-composite",
+    file,
+  ]);
+}
+
+function morphAtlasAlpha(file, { alphaThreshold, morphology }) {
+  if (!morphology) return;
+  run("magick", [
+    file,
+    "(",
+    "+clone",
+    "-alpha",
+    "extract",
+    "-threshold",
+    `${alphaThreshold}%`,
+    "-morphology",
+    "Open",
+    morphology,
+    ")",
+    "-alpha",
+    "off",
+    "-compose",
+    "CopyOpacity",
+    "-composite",
+    file,
+  ]);
+}
+
+function modulateAtlasColor(file, { brightness, saturation, hue }) {
+  run("magick", [
+    file,
+    "-modulate",
+    `${brightness},${saturation},${hue}`,
+    file,
+  ]);
+}
+
+function rectangleDrawOp(x0, y0, x1, y1) {
+  return `rectangle ${Math.round(x0)},${Math.round(y0)} ${Math.round(x1)},${Math.round(y1)}`;
+}
+
+function verticalLineDrawOp(x, y0, y1, width) {
+  const half = Math.max(0.5, width / 2);
+  return rectangleDrawOp(x - half, y0, x + half, y1);
+}
+
+function horizontalLineDrawOp(y, x0, x1, width) {
+  const half = Math.max(0.5, width / 2);
+  return rectangleDrawOp(x0, y - half, x1, y + half);
 }
 
 function ensureDirs() {
@@ -624,6 +949,52 @@ function positiveInteger(value, fallback) {
     throw new Error(`expected positive integer, got ${value}`);
   }
   return parsed;
+}
+
+function nonNegativeInteger(value, fallback) {
+  if (value == null) return fallback;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new Error(`expected non-negative integer, got ${value}`);
+  }
+  return parsed;
+}
+
+function percentArg(value, fallback) {
+  if (value == null) return fallback;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 400) {
+    throw new Error(`expected percentage in (0, 400], got ${value}`);
+  }
+  return parsed;
+}
+
+function morphologyArg(value, fallback) {
+  if (value == null || value === true) return fallback;
+  const out = String(value).trim();
+  if (!out || out === "none") return "";
+  if (!/^[A-Za-z]+:[0-9]+$/.test(out)) {
+    throw new Error(`invalid morphology ${JSON.stringify(value)}; expected Kernel:N such as Square:5, or none`);
+  }
+  return out;
+}
+
+function parseListArg(value) {
+  if (value == null || value === true) return [];
+  return String(value)
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function safeVersionArg(value) {
+  if (value == null || value === true) return "";
+  const version = String(value).trim();
+  if (!version) return "";
+  if (!/^[A-Za-z0-9._-]{1,80}$/.test(version)) {
+    throw new Error(`invalid image version ${JSON.stringify(value)}; use letters, numbers, dot, underscore, or dash`);
+  }
+  return version;
 }
 
 function parseArgs(args) {
@@ -649,7 +1020,7 @@ function run(cmd, args, options = {}) {
     encoding: "utf8",
     stdio: options.capture ? ["ignore", "pipe", "pipe"] : "inherit",
   });
-  if (result.status !== 0) {
+  if (result.status !== 0 && !options.allowFailure) {
     throw new Error(`${cmd} ${args.join(" ")} failed\n${result.stderr || ""}`);
   }
   return result;
@@ -661,8 +1032,8 @@ function rel(file) {
 
 function usage() {
   console.error(`Usage:
-  node scripts/art/tank-raster-pipeline.mjs make-sheet [--scale 3] [--columns 2] [--layout tight] [--profile semantic] [--key #ff00ff]
-  node scripts/art/tank-raster-pipeline.mjs write-atlas --sheet <png> [--columns 2] [--layout tight] [--profile semantic] [--transparent-key #ff00ff] [--disabled]
+  node scripts/art/tank-raster-pipeline.mjs make-sheet [--scale 3] [--columns 2] [--layout tight] [--profile semantic] [--guides none|full] [--key #ff00ff]
+  node scripts/art/tank-raster-pipeline.mjs write-atlas --sheet <png> [--columns 2] [--layout tight] [--profile semantic] [--transparent-key #ff00ff] [--disabled] [--blank-cells cell[,cell]] [--normalize-visible-bounds] [--ignore-guide-bounds] [--guide-mask-fuzz 12] [--guide-mask-alpha-threshold 20] [--guide-mask-line-width 12] [--guide-mask-morphology Square:5] [--clear-cell-edge-alpha 16] [--visible-padding 2] [--brightness 120] [--saturation 100] [--hue 100] [--image-version pass-id] [--prompt-file metadata/prompt.md]
   node scripts/art/tank-raster-pipeline.mjs write-prompt`);
 }
 

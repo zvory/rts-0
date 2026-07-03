@@ -574,6 +574,11 @@ test("tank PNG atlas route splits omitted shadow and fuel cue back to SVG", () =
   assert.equal(unitCoverage.coveredParts.includes("part.hull"), true);
   assert.equal(unitCoverage.coveredParts.includes("part.turret"), true);
   assert.deepEqual(unitCoverage.missingParts, ["part.fuelCue.box", "part.fuelCue.x1", "part.fuelCue.x2"]);
+  assert.equal(TANK_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.barrel")?.tintSlot, "team");
+  const turretSprite = TANK_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.turret");
+  assert.equal(turretSprite?.originMode, "visible-center");
+  assert.ok(Math.abs(turretSprite.frame.originX - turretSprite.frame.w * 0.5) < 0.001);
+  assert.ok(Math.abs(turretSprite.frame.originY - turretSprite.frame.h * 0.5) < 0.001);
 
   const entity = {
     id: 41,
@@ -609,10 +614,42 @@ test("tank PNG atlas route splits omitted shadow and fuel cue back to SVG", () =
   assert.equal(typeof effects.matches, "function");
   assert.equal(unit.parts.has("sprite.hull"), true);
   assert.equal(unit.parts.has("sprite.turret"), true);
+  assert.equal(unit.parts.has("sprite.barrel"), true);
   assert.equal(unit.parts.has("sprite.fuelCue"), false);
   assert.equal(overlay.parts.get("part.fuelCue.box").display.visible, false);
   assert.equal(effects.parts.get("part.tank.flashCore").display.alpha, 0);
   assert.equal(unit.parts.get("sprite.turret").display.rotation, Math.PI / 2);
+  assert.equal(unit.parts.get("sprite.barrel").display.rotation, Math.PI / 2);
+});
+
+test("tank PNG atlas keeps cannon recoil on the generated barrel sprite", () => {
+  const definition = compileFixture("rig-vehicle.svg", KIND.TANK);
+  const entity = {
+    id: 43,
+    kind: KIND.TANK,
+    owner: 1,
+    x: 32,
+    y: 44,
+    facing: 0,
+    weaponFacing: 0,
+    state: STATE.IDLE,
+  };
+  const renderer = makeRigRenderer();
+  renderer._liveRigDefinitionsByKind = new Map([[KIND.TANK, definition]]);
+  renderer._livePngRigAtlasesByKind = new Map([[KIND.TANK, { ...TANK_PNG_RIG_ATLAS, enabled: true }]]);
+  renderer._livePngRigAtlasTextures = new Map([[KIND.TANK, fakeAtlasTexture()]]);
+
+  renderer._drawUnit(entity, new Map([[1, 0x336699]]), { playerId: 1, resources: { oil: 10 }, weaponRecoil: () => 0 });
+  const unit = renderer._liveRigPools.liveUnitRigs.get(entity.id);
+  const barrelScaleStill = unit.parts.get("sprite.barrel").display.scaleX;
+  const turretScaleStill = unit.parts.get("sprite.turret").display.scaleX;
+
+  renderer._drawUnit(entity, new Map([[1, 0x336699]]), { playerId: 1, resources: { oil: 10 }, weaponRecoil: () => 1 });
+  const barrelScaleRecoiling = unit.parts.get("sprite.barrel").display.scaleX;
+  const turretScaleRecoiling = unit.parts.get("sprite.turret").display.scaleX;
+
+  assert.equal(barrelScaleRecoiling < barrelScaleStill, true);
+  assert.equal(turretScaleRecoiling, turretScaleStill);
 });
 
 test("tank PNG atlas SVG fallback is destroyed when same id no longer needs it", () => {

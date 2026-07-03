@@ -1,3 +1,5 @@
+- [ ] TODO: Tiger raster pass: hull/turret alignment is off; the turret appears to rotate around an offset point instead of its visual center. Fix the PNG rig pivot/anchor alignment later.
+
 - [ ] TODO: download an FW 189 scout plane sound effect
 
 jeffrye playtest 2

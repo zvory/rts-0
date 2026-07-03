@@ -9,9 +9,9 @@ function deepFreeze(value) {
 }
 
 export const TANK_PNG_RIG_ATLAS = deepFreeze({
-  "enabled": false,
+  "enabled": true,
   "unit": "tank",
-  "image": "/assets/rigs/tank-ps1/tank-atlas.png",
+  "image": "/assets/rigs/tank-ps1/tank-atlas.png?v=pass10-noguide-ref",
   "viewBox": {
     "x": -40,
     "y": -32,
@@ -20,17 +20,19 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
   },
   "grid": {
     "columns": 2,
-    "rows": 2,
+    "rows": 3,
     "layout": "tight",
     "profile": "semantic",
-    "width": 480,
-    "height": 384,
-    "sourceSheet": "client/assets/rigs/tank-ps1/tank-contact-sheet.png",
+    "width": 1145,
+    "height": 1373,
+    "sourceSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-10-noguide-ref-alpha.png",
     "cells": [
       "reference.full",
       "sprite.track",
       "sprite.hull",
-      "sprite.turret"
+      "sprite.turret",
+      "sprite.barrel",
+      "unused.blank"
     ],
     "frameSources": {
       "part.track.left": "sprite.track",
@@ -58,9 +60,30 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
       "part.hull.nose": "sprite.hull",
       "part.hull.noseShadow": "sprite.hull",
       "part.noseTick": "sprite.hull",
-      "part.barrel": "sprite.turret",
       "part.coaxBarrel": "sprite.turret",
-      "part.turret": "sprite.turret"
+      "part.turret": "sprite.turret",
+      "part.barrel": "sprite.barrel"
+    },
+    "normalization": {
+      "visibleBounds": true,
+      "visiblePadding": 0,
+      "clearCellEdgeAlpha": 0,
+      "blankCells": [
+        "reference.full",
+        "sprite.track",
+        "unused.blank"
+      ],
+      "ignoreGuideBounds": false,
+      "guideMaskFuzz": null,
+      "guideMaskAlphaThreshold": null,
+      "guideMaskLineWidth": null,
+      "guideMaskMorphology": null
+    },
+    "imageVersion": "pass10-noguide-ref",
+    "colorAdjustment": {
+      "brightness": 115,
+      "saturation": 105,
+      "hue": 100
     }
   },
   "frames": {},
@@ -84,14 +107,14 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
       "tintSlot": "fixed",
       "drawOrder": 10,
       "frame": {
-        "x": 240,
+        "x": 573,
         "y": 0,
-        "w": 240,
-        "h": 192,
-        "originX": 121.91645101663586,
-        "originY": 134.00961182994456,
-        "pixelsPerUnitX": 3.1940850277264325,
-        "pixelsPerUnitY": 3.1940850277264325
+        "w": 572,
+        "h": 458,
+        "originX": 290.5675415896488,
+        "originY": 319.58957486136785,
+        "pixelsPerUnitX": 7.6125693160813315,
+        "pixelsPerUnitY": 7.6125693160813315
       }
     },
     {
@@ -113,14 +136,14 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
       "tintSlot": "fixed",
       "drawOrder": 11,
       "frame": {
-        "x": 240,
+        "x": 573,
         "y": 0,
-        "w": 240,
-        "h": 192,
-        "originX": 121.91645101663586,
-        "originY": 57.99038817005545,
-        "pixelsPerUnitX": 3.1940850277264325,
-        "pixelsPerUnitY": 3.1940850277264325
+        "w": 572,
+        "h": 458,
+        "originX": 290.5675415896488,
+        "originY": 138.41042513863215,
+        "pixelsPerUnitX": 7.6125693160813315,
+        "pixelsPerUnitY": 7.6125693160813315
       }
     },
     {
@@ -137,36 +160,74 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
       "drawOrder": 20,
       "sourceCell": "sprite.hull",
       "frame": {
-        "x": 0,
-        "y": 192,
-        "w": 240,
-        "h": 192,
-        "originX": 120,
-        "originY": 96,
-        "pixelsPerUnitX": 3.266540642722117,
-        "pixelsPerUnitY": 3.266540642722117
+        "x": 53,
+        "y": 580,
+        "w": 520,
+        "h": 316,
+        "visibleBounds": {
+          "x": 53,
+          "y": 580,
+          "w": 520,
+          "h": 316
+        },
+        "originX": 260,
+        "originY": 158,
+        "pixelsPerUnitX": 9.829867674858223,
+        "pixelsPerUnitY": 12.490118577075098
       }
     },
     {
       "id": "sprite.turret",
       "animationPart": "part.turret",
       "sourceParts": [
-        "part.barrel",
         "part.coaxBarrel",
         "part.turret"
       ],
       "tintSlot": "team-light",
+      "originMode": "visible-center",
       "drawOrder": 30,
       "sourceCell": "sprite.turret",
       "frame": {
-        "x": 240,
-        "y": 192,
-        "w": 240,
-        "h": 192,
-        "originX": 69.73653762125318,
-        "originY": 96,
-        "pixelsPerUnitX": 3.775233767368696,
-        "pixelsPerUnitY": 3.775233767368696
+        "x": 721,
+        "y": 605,
+        "w": 308,
+        "h": 245,
+        "visibleBounds": {
+          "x": 721,
+          "y": 605,
+          "w": 308,
+          "h": 245
+        },
+        "originX": 154,
+        "originY": 122.5,
+        "pixelsPerUnitX": 11.335197997939055,
+        "pixelsPerUnitY": 15.350877192982455
+      }
+    },
+    {
+      "id": "sprite.barrel",
+      "animationPart": "part.barrel",
+      "sourceParts": [
+        "part.barrel"
+      ],
+      "tintSlot": "team",
+      "drawOrder": 29,
+      "sourceCell": "sprite.barrel",
+      "frame": {
+        "x": 102,
+        "y": 1116,
+        "w": 471,
+        "h": 83,
+        "visibleBounds": {
+          "x": 102,
+          "y": 1116,
+          "w": 471,
+          "h": 83
+        },
+        "originX": 36.045918367346935,
+        "originY": 41.5,
+        "pixelsPerUnitX": 12.015306122448978,
+        "pixelsPerUnitY": 13.833333333333334
       }
     }
   ]

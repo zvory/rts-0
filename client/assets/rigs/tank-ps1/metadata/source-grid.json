@@ -1,11 +1,20 @@
 {
   "unit": "tank",
   "columns": 2,
-  "rows": 2,
+  "rows": 3,
   "scale": 3,
   "key": "#ff00ff",
   "layout": "tight",
   "profile": "semantic",
+  "guides": {
+    "mode": "none",
+    "outerCellBox": false,
+    "subdivisions": 0,
+    "centerLines": false,
+    "borderColor": null,
+    "minorColor": null,
+    "centerColor": null
+  },
   "viewBox": {
     "x": -40,
     "y": -32,
@@ -16,7 +25,9 @@
     "reference.full",
     "sprite.track",
     "sprite.hull",
-    "sprite.turret"
+    "sprite.turret",
+    "sprite.barrel",
+    "unused.blank"
   ],
   "partIds": [
     "part.shadow",
@@ -48,6 +59,9 @@
     "part.coaxBarrel",
     "part.turret",
     "part.noseTick",
+    "part.tank.flashCone",
+    "part.tank.flashCore",
+    "part.tank.flashGlow",
     "part.fuelCue.box",
     "part.fuelCue.x1",
     "part.fuelCue.x2"
@@ -78,9 +92,9 @@
     "part.hull.nose": "sprite.hull",
     "part.hull.noseShadow": "sprite.hull",
     "part.noseTick": "sprite.hull",
-    "part.barrel": "sprite.turret",
     "part.coaxBarrel": "sprite.turret",
-    "part.turret": "sprite.turret"
+    "part.turret": "sprite.turret",
+    "part.barrel": "sprite.barrel"
   },
   "semanticSprites": [
     {
@@ -138,12 +152,21 @@
       "id": "sprite.turret",
       "animationPart": "part.turret",
       "sourceParts": [
-        "part.barrel",
         "part.coaxBarrel",
         "part.turret"
       ],
       "tintSlot": "team-light",
+      "originMode": "visible-center",
       "drawOrder": 30
+    },
+    {
+      "id": "sprite.barrel",
+      "animationPart": "part.barrel",
+      "sourceParts": [
+        "part.barrel"
+      ],
+      "tintSlot": "team",
+      "drawOrder": 29
     }
   ],
   "semanticSheetElements": [
@@ -161,18 +184,8 @@
         "part.tread.left.7",
         "part.tread.left.8"
       ],
-      "renderParts": [
-        "part.tread.left.0",
-        "part.tread.left.1",
-        "part.tread.left.2",
-        "part.tread.left.3",
-        "part.tread.left.4",
-        "part.tread.left.5",
-        "part.tread.left.6",
-        "part.tread.left.7",
-        "part.tread.left.8"
-      ],
-      "description": "single reusable track-link strip; no closed track assembly or end contour"
+      "renderParts": [],
+      "description": "empty no-track placeholder used only to suppress SVG track parts"
     },
     {
       "id": "sprite.hull",
@@ -188,21 +201,19 @@
     {
       "id": "sprite.turret",
       "sourceParts": [
-        "part.barrel",
         "part.coaxBarrel",
         "part.turret"
       ],
-      "description": "turret and barrel assembly"
+      "description": "turret and coax assembly, excluding the main barrel"
+    },
+    {
+      "id": "sprite.barrel",
+      "sourceParts": [
+        "part.barrel"
+      ],
+      "description": "separate main cannon barrel"
     }
   ],
-  "guides": {
-    "outerCellBox": true,
-    "subdivisions": 8,
-    "centerLines": true,
-    "borderColor": "#00e5ff",
-    "minorColor": "#80f6ff",
-    "centerColor": "#fff4a3"
-  },
   "sourceSvg": "client/assets/rigs/tank-ps1/tank-contact-sheet.svg",
   "sourcePng": "client/assets/rigs/tank-ps1/tank-contact-sheet.png"
 }

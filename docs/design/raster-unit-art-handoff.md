@@ -1,8 +1,9 @@
 # Raster unit art handoff
 
-Status: experimental handoff only. The checked-in tank PNG rig path is deliberately disabled, and
-the current generated images are not final game art. This note records what worked, what failed, and
-how to reproduce the next experiment without rediscovering the same traps.
+Status: active visual experiment only. The checked-in tank PNG rig path is enabled for a pass-10
+Tiger I no-track hull/turret/barrel experiment, but the generated images are not final game art. This note records
+what worked, what failed, and how to reproduce the next experiment without rediscovering the same
+traps.
 
 ## Goal
 
@@ -18,8 +19,11 @@ The intended workflow is:
    pivots, recoil, facing, selection anchors, and route split.
 
 The current tank prototype proves the shape of this pipeline but does not yet produce an acceptable
-asset. The imagegen outputs still fail component consistency and alignment checks, so the atlas must
-remain inactive until a later pass fixes those problems.
+asset. Pass 10 is enabled only as a local visual experiment; it keeps the separate turret/barrel
+structure, maps `sprite.barrel` to the full `team` tint slot, removes visible guide boxes from the
+imagegen input, uses the attached Tiger I reference as the subject input, and relies on visible-alpha
+postprocessing for runtime sizing. It still needs component cleanup and alignment review before it
+should be treated as accepted art.
 
 ## Current files
 
@@ -29,32 +33,42 @@ remain inactive until a later pass fixes those problems.
   `client/assets/rigs/tank-ps1/tank-contact-sheet.png` are the current semantic source sheet.
 - `client/assets/rigs/tank-ps1/metadata/source-grid.json` records the cell order, source parts, and
   semantic sprite grouping.
-- `client/assets/rigs/tank-ps1/metadata/prompt*.md` records the base prompt and the four Tiger I
-  prompt iterations.
+- `client/assets/rigs/tank-ps1/metadata/prompt*.md` records the base prompt and Tiger I prompt
+  iterations.
 - `client/assets/rigs/tank-ps1/generated/` keeps generated candidates and alpha-converted copies.
-- `client/assets/rigs/tank-ps1/tank-atlas.png` is currently just the disabled semantic source atlas,
-  not a final generated art pass.
+- `client/assets/rigs/tank-ps1/tank-atlas.png` is the enabled pass-10 runtime atlas. It uses only
+  the generated hull/body, turret/coax, and separate main-barrel cells; the reference, track
+  placeholder, and unused cells are transparent so generated/default tracks are not rendered during
+  this experiment. The current active variant is `pass10-noguide-ref`, which applies ImageMagick
+  brightness/saturation modulation after normalization and tints the generated barrel with the
+  same full `team` tint slot as the hull. The runtime sprite frames are normalized to visible
+  component alpha bounds, not the full generated cell bounds.
 - `client/src/renderer/rigs/tank_png_atlas.js` is generated metadata. Its `enabled` field is
-  currently `false`.
-- `client/src/renderer/rigs/png_runtime.js` and `png_routing.js` are the disabled runtime path that
-  can render atlas sprites in place of SVG pixels when an atlas is enabled and loaded.
+  currently `true` for the pass-10 experiment.
+- `client/src/renderer/rigs/png_runtime.js` and `png_routing.js` render atlas sprites in place of
+  SVG pixels when an atlas is enabled and loaded.
 
-## Current guided semantic sheet
+## Current no-guide semantic sheet
 
-The current tank sheet uses a 2x2 grid. Every cell has an outer guide box, an 8x8 internal guide
-grid, and center marks to give imagegen stronger alignment and scale cues:
+The current tank sheet uses a 2x3 layout with no visible guide boxes, subgrid lines, center marks,
+or dividers. The cell order is metadata-driven and the model sees only the magenta background plus
+the component art:
 
-1. `reference.full` - assembled tank reference, with the SVG drop shadow and fuel cue removed.
-2. `sprite.track` - one reusable straight track-link strip, rendered from the left tread blocks only
-   so the model does not draw a closed track assembly or an end contour.
+1. `reference.full` - assembled no-track tank reference, with the SVG drop shadow, tracks, fuel
+   cue, and muzzle-flash effect parts removed.
+2. `sprite.track` - empty no-track placeholder used only so transparent PNG sprites can cover the
+   SVG track/tread parts and suppress fallback track rendering.
 3. `sprite.hull` - hull, nose, hull shading parts, and nose tick.
-4. `sprite.turret` - turret, main barrel, and coax barrel.
+4. `sprite.turret` - turret and coax barrel, excluding the main barrel.
+5. `sprite.barrel` - separate main barrel mapped to `part.barrel`, preserving the original SVG
+   barrel recoil scale.
+6. `unused.blank` - empty zone to keep the contact sheet rectangular.
 
 The runtime atlas metadata still exposes `sprite.track.left` and `sprite.track.right`, but both
-sprites point at the same `sprite.track` source cell with different rig origins. This keeps the
-contact sheet to one track art element while preserving left/right tank placement when the disabled
-PNG path is tested locally. The fuel/no-oil cue is intentionally omitted from the PNG atlas and
-remains SVG-only through a separate overlay route.
+sprites point at the same `sprite.track` source cell with different rig origins. That cell is
+intentionally blank in pass 10: it preserves PNG coverage for track source parts while suppressing
+both generated tracks and fallback SVG tracks. The fuel/no-oil cue is intentionally omitted from the
+PNG atlas and remains SVG-only through a separate overlay route.
 
 The SVG is annotated with stable `part.*` ids, but those ids are not enough for image generation.
 Many individual SVG parts are rectangles, lines, or tiny treads with no independent semantic
@@ -79,7 +93,8 @@ node scripts/art/tank-raster-pipeline.mjs make-sheet \
   --scale 3 \
   --columns 2 \
   --layout tight \
-  --profile semantic
+  --profile semantic \
+  --guides none
 ```
 
 Refresh the base prompt:
@@ -100,39 +115,65 @@ detail than concept art.
 Save each generated candidate with a pass number, for example:
 
 ```text
-client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-06.png
-client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-06.md
-client/assets/rigs/tank-ps1/metadata/tiger-i-pass-06.json
+client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-10-noguide-ref.png
+client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-10-noguide-ref.md
+client/assets/rigs/tank-ps1/metadata/tiger-i-pass-10-noguide-ref.json
 ```
 
 Convert the chroma-key background to alpha before atlas wiring:
 
 ```bash
 python "${CODEX_HOME:-$HOME/.codex}/skills/.system/imagegen/scripts/remove_chroma_key.py" \
-  --input client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-06.png \
-  --out client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-06-alpha.png \
+  --input client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-10-noguide-ref.png \
+  --out client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-10-noguide-ref-alpha.png \
   --key-color '#ff00ff' \
   --auto-key none \
   --soft-matte \
-  --transparent-threshold 12 \
+  --transparent-threshold 58 \
   --opaque-threshold 220 \
   --despill
 ```
 
-Use an explicit `#ff00ff` key while the guide boxes touch the sheet border. Border auto-key can
-sample the cyan guide line instead of the background.
+Use an explicit `#ff00ff` key when the generated background has mild magenta variation. Wider
+thresholds may be needed because the model sometimes adds subtle background gradients even when
+asked for a flat chroma key.
 
-Write atlas metadata disabled while evaluating:
+Write atlas metadata disabled while evaluating. For no-guide sheets, use visible-alpha
+normalization so runtime scale comes from the generated component bounds rather than the whole cell:
 
 ```bash
 node scripts/art/tank-raster-pipeline.mjs write-atlas \
-  --sheet client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-06-alpha.png \
+  --sheet client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-10-noguide-ref-alpha.png \
   --columns 2 \
   --layout tight \
   --profile semantic \
+  --normalize-visible-bounds \
+  --clear-cell-edge-alpha 0 \
+  --visible-padding 0 \
   --disabled \
   --model "built-in image generation" \
   --notes "Candidate Tiger I raster pass; disabled pending alignment and component consistency review."
+```
+
+For a local no-track experiment like pass 10, also blank the reference, track-placeholder, and
+unused cells, then add an image version so a browser reload fetches the updated atlas:
+
+```bash
+node scripts/art/tank-raster-pipeline.mjs write-atlas \
+  --sheet client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-10-noguide-ref-alpha.png \
+  --columns 2 \
+  --layout tight \
+  --profile semantic \
+  --blank-cells reference.full,sprite.track,unused.blank \
+  --normalize-visible-bounds \
+  --clear-cell-edge-alpha 0 \
+  --visible-padding 0 \
+  --brightness 115 \
+  --saturation 105 \
+  --image-version pass10-noguide-ref \
+  --prompt-file client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-10-noguide-ref.md \
+  --model "built-in image generation + ImageMagick brightness pass" \
+  --notes "Experimental Tiger I no-track no-guide raster pass 10."
 ```
 
 Only omit `--disabled` for a local experiment after the validation checklist passes. Do not commit
@@ -146,19 +187,18 @@ scratches, bolts, and independent redesigns. The better direction is:
 - strict top-down orthographic view
 - Tiger I silhouette first
 - long rectangular hull
-- wide straight parallel tracks
+- no tracks in the active no-track experiment
 - square flat-sided turret
-- long centered barrel
+- long centered barrel as a separate component cell, not merged into the turret
 - very early low-end 3D raster graphics
 - anti-aliased raster shapes, not pixel art
 - only a few broad shade values per part
 - no shadows of any kind
 - no labels, text, insignia, loose parts, or extra cells
-- preserve grid, cell order, centers, scale, and orientation
-- preserve the guide boxes as alignment only; do not turn guide lines into armor seams or track
-  detail
-- the track cell is one reusable strip/segment of track links, not left and right full track
-  assemblies
+- preserve cell order, centers, scale, and orientation
+- do not show guide boxes or grid lines to the model; keep sizing and anchoring in metadata and
+  postprocessing
+- for no-track passes, the track cell is an empty runtime suppressor, not track art
 
 The prompt must say that the complete tank cell is a reference only. Runtime truth should come from
 the component cells. A generated complete tank that does not match the generated components should
@@ -180,6 +220,10 @@ the drop shadow and the fuel cue.
 The model treated the complete tank and the components as separately designed objects. Several
 passes had a plausible full tank in the top-left cell, but the generated component cells would not
 assemble into that tank. This is the main unsolved issue.
+
+Visible guide boxes helped layout but hurt the art. They repeatedly came back as baked guide-color
+slivers, black frame remnants, or grid-inspired seams. Pass 10 removes visible guides from the
+imagegen input and lets atlas postprocessing do the sizing.
 
 Detailed prompts produced too much detail. Tiger I pass 01 and pass 03 had a better tank read, but
 they were closer to detailed concept sprites than the requested simple low-end raster look.
@@ -206,6 +250,41 @@ cheap checks before any generated atlas can be enabled.
 - `tank-tiger-i-pass-05-guided.png`: preserved the guided 2x2 sheet, removed the fuel/no-oil cue,
   and generated one reusable track-link strip. Rejected for activation because it retained guide
   lines in the alpha output and was still more detailed than the intended low-end raster style.
+- `tank-tiger-i-pass-06-lowpoly.png`: saved experiment. Recognizable Tiger I low-poly direction
+  with separate hull/body and turret/barrel cells. The raw generated sheet included tracks, but the
+  runtime alpha sheet blanks the top row so no generated or fallback tracks render. The atlas
+  writer now clears generated guide-edge alpha and normalizes frames to visible alpha bounds, which
+  fixes the earlier too-small render and black cell-box artifacts. Not final art: the hull has an
+  open turret-ring hole and component alignment still needs review.
+- `tank-tiger-i-pass-06-lowpoly-bright-body-turret-alpha.png`: saved no-imagegen brightness pass.
+  Derived from pass 06 with `--brightness 130 --saturation 105`, retaining the same normalized
+  component frames and no-track behavior while making the tank read more clearly on the map.
+- `tank-tiger-i-pass-06-lowpoly-brighter-body-turret-alpha.png`: saved no-imagegen brightness pass.
+  Derived from pass 06 with `--brightness 145 --saturation 108` immediately before restarting the
+  contact sheet around a separate barrel cell.
+- `tank-tiger-i-pass-07-separated.png`: saved experiment. Regenerated from a no-track 2x3 sheet
+  with separate hull/body, turret/coax, and main-barrel cells. The active runtime atlas blanks the
+  reference, track placeholder, and unused cells; uses `--ignore-guide-bounds` so guide boxes do not
+  drive sprite scale; and maps `sprite.barrel` to `part.barrel`, restoring the original barrel recoil
+  scaling. Not final art: some guide-line edge artifacts are baked into the generated cell imagery,
+  and component alignment still needs review.
+- `tank-tiger-i-pass-08-tiger1.png`: saved experiment. Regenerated from the separated 2x3 no-track
+  sheet with a prompt explicitly naming a 1940s Tiger I / Panzerkampfwagen VI Tiger Ausf. E and a
+  separate 88mm barrel. The runtime atlas keeps transparent track coverage, maps `sprite.barrel` to
+  `part.barrel`, and changes the barrel tint slot to `team-light` so it tints with the turret. Not
+  final art: the generated hull has heavy side armor shapes that may read like track guards and
+  should be inspected in-game.
+- `tank-tiger-i-pass-09-outline.png`: saved experiment. Regenerated from the separated 2x3 no-track
+  sheet with the attached top-down Tiger I image used as silhouette reference only. The prompt asks
+  for less detail, a stepped/chamfered non-perfect-rectangular hull, black RTS-readable outlines,
+  and a barrel with the same team-color material as the hull. The generated barrel cell was flipped
+  horizontally before atlas writing so the muzzle and pivot match the original rig. Not final art:
+  the side armor blocks should be inspected in-game because they may still read like track guards.
+- `tank-tiger-i-pass-10-noguide-ref.png`: active experiment. Regenerated from a no-guide 2x3 sheet
+  and the attached top-down Tiger I reference as the subject input. The runtime atlas uses
+  visible-alpha normalization only, with no guide masking or cell-edge clearing. This pass validates
+  the pipeline direction because guide artifacts are gone, but it is not final art: the generated
+  hull still carries rear/side fixtures from the reference that may read as unwanted track hardware.
 
 These candidates are useful references for what to avoid. None should be treated as accepted art.
 
@@ -213,20 +292,23 @@ These candidates are useful references for what to avoid. None should be treated
 
 - The exact input contact sheet was shown to the user before imagegen, and the user explicitly
   confirmed that sheet before generation started.
-- The output keeps the exact 2x2 grid and cell order.
+- The output keeps the exact 2x3 grid and cell order.
 - Every cell has transparent or perfectly keyable background.
 - There is no drop shadow, cast shadow, contact shadow, ambient blob, floor, or ground plane.
 - The tank is strict top-down, not perspective or side-biased.
 - No invented loose gears, sprockets, road wheels, extra turrets, extra barrels, labels, fuel icons,
   warning symbols, or UI.
-- The single track cell is a reusable track-link strip with no closed end cap or perimeter contour.
+- In no-track passes, the track placeholder remains empty and transparent in the active atlas while
+  still covering track/tread source parts so SVG tracks do not fall back.
+- The main cannon is in its own component cell and maps to `part.barrel`, not `part.turret`.
+- The generated barrel sprite uses a team tint slot when the active art direction expects a tinted
+  barrel.
 - The component cells preserve source orientation, center, approximate footprint, and pivot meaning.
 - The component cells can be assembled into the complete tank reference.
 - The complete tank reference did not diverge into its own independent design.
 - The detail level is simple low-end raster art, not pixel art and not detailed concept art.
 - Team-colorable regions remain clean enough for runtime tinting or a future mask/chroma pass.
-- Guide lines are absent from any alpha sheet wired into `tank-atlas.png`, or removed before
-  activation without cutting through the component art.
+- Guide lines are absent from the source sheet and sampled runtime frames.
 - The generated atlas is inspected on a dark background after alpha conversion to catch fringes.
 
 ## Next work
@@ -236,8 +318,8 @@ These candidates are useful references for what to avoid. None should be treated
   non-authoritative so the model cannot redesign it independently.
 - Add a preview that reconstructs the tank from sliced component cells and compares it against the
   reference cell.
-- Add a guide-removal/deguide step or make the guides model-visible without preserving them in the
-  generated atlas.
+- Keep the no-guide sheet as the default. If guides are temporarily reintroduced for debugging, do
+  not use that sheet for image generation.
 - Add alignment normalization for generated components: rotation, scale, center, and alpha bounds.
 - Decide the team-color strategy. The runtime can tint atlas sprites by existing tint slots, but a
   final art pass may still need neutral grayscale masks or explicit chroma-key regions per part.
