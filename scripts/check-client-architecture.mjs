@@ -30,6 +30,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "lab_control_policy.js": "app-shell",
   "room_capabilities.js": "app-shell",
   "visual_profiles.js": "app-shell",
+  "camera_view_selection.js": "app-shell",
 
   "state.js": "model",
   "state_control_groups.js": "model",

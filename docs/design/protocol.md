@@ -444,6 +444,8 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
     operatorId: u32,
     role: "operator"|"readOnly",
     vision: { mode: "fullWorld" } | { mode: "team", teamId: u32 } | { mode: "teams", teamIds: u32[] }, // recipient's lab vision
+    godModePlayers?: u32[],
+    initialCamera?: { centerX: u32, centerY: u32 }, // optional world-pixel camera center from the selected setup
     dirty: bool,
     operationCount: u32
   },
@@ -491,7 +493,9 @@ omitted and live spectator capabilities/diagnostics applied for that recipient.
 
 Lab room start payloads set `lab` metadata and currently also set `spectator: true` with prediction
 metadata omitted. Labs use a hidden internal room id, a default two-team real `Game` template, and
-server-owned projection. `role` names the room-owned operator/read-only viewer classification.
+server-owned projection. `initialCamera`, when present, is a setup-authored world-pixel center
+point that the browser uses for the first Lab view instead of centering on the operator's home
+base. `role` names the room-owned operator/read-only viewer classification.
 Direct lab URL joiners currently receive `operator`; `readOnly` remains available for future
 explicit viewer modes. `operatorId` identifies the original lab joiner for compatibility metadata,
 not the sole authority for privileged lab operations. Lab room-time controls are shared room state:
@@ -1150,7 +1154,11 @@ validation previews, submissions, imports, and bundled catalog assets use `LabCh
   },
   metadata: {
     exportedTick: u32,
-    lab: { vision: LabVisionMode, godModePlayers?: u32[] },
+    lab: {
+      vision: LabVisionMode,
+      godModePlayers?: u32[],
+      initialCamera?: { centerX: u32, centerY: u32 }
+    },
     sourceEntityIdMap?: [{ oldId: u32, newId: u32 }]
   },
   checkpointPayload: string // GameCheckpointV1 JSON text
@@ -1159,11 +1167,12 @@ validation previews, submissions, imports, and bundled catalog assets use `LabCh
 The map body is a setup-container sibling of the checkpoint payload, not part of
 `GameCheckpointV1`. Import validates the setup map data and materialized hash, the embedded
 checkpoint `mapBinding`, player/team/resource/research/entity/count bounds, lab metadata,
-checkpoint byte limits, `metadata.lab.godModePlayers`, and a one-to-one `sourceEntityIdMap` whose
-`newId` values reference restored entities before replacing the live lab game. `sourceEntityIdMap`
-is returned as `outcome.entityIdMap` on checkpoint import so imports and fresh exports preserve
-existing id-remap callers. Legacy labScenario JSON is rejected by the checkpoint-only payload parser
-before it can mutate a lab room.
+checkpoint byte limits, `metadata.lab.godModePlayers`, optional `metadata.lab.initialCamera`
+inside the restored map's world bounds, and a one-to-one `sourceEntityIdMap` whose `newId` values
+reference restored entities before replacing the live lab game. `sourceEntityIdMap` is returned as
+`outcome.entityIdMap` on checkpoint import so imports and fresh exports preserve existing id-remap
+callers. Legacy labScenario JSON is rejected by the checkpoint-only payload parser before it can
+mutate a lab room.
 
 Setup export returns `{ scenario: LabCheckpointScenarioV1 }` in `labResult.outcome` using the requesting
 operator's current lab vision in `metadata.lab.vision` and the current room god-mode player ids in

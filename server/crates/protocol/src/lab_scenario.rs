@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use rts_contract::LabVisionMode;
+use rts_contract::{InitialCamera, LabVisionMode};
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -90,4 +90,6 @@ pub struct LabScenarioLabMetadata {
     pub vision: LabVisionMode,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub god_mode_players: Vec<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub initial_camera: Option<InitialCamera>,
 }

@@ -350,6 +350,7 @@ assert(
 assert(
   rustContract.includes("LabStartMetadata") &&
     rustContract.includes("operator_id") &&
+    rustContract.includes("initial_camera") &&
     rustContract.includes("operation_count") &&
     LAB_ROLE.OPERATOR === "operator" &&
     LAB_ROLE.READ_ONLY === "readOnly" &&
@@ -449,6 +450,7 @@ assert(
     rust.includes("LabCheckpointScenarioV1") &&
     !rust.includes("LabScenarioV1") &&
     rust.includes("god_mode_players") &&
+    rust.includes("initial_camera") &&
     LAB_CHECKPOINT_SCENARIO.KIND === "labCheckpointScenario" &&
     LAB_CHECKPOINT_SCENARIO.SCHEMA_VERSION === 1 &&
     LAB_REPLAY.SCHEMA === "rts.labReplay" &&
@@ -476,6 +478,7 @@ assert(
     !protocolDoc.includes("LabScenarioV1") &&
     !protocolDoc.includes("LabScenarioOrder") &&
     protocolDoc.includes("godModePlayers") &&
+    protocolDoc.includes("initialCamera") &&
     protocolDoc.includes("validateScenario") &&
     protocolDoc.includes("submitScenario"),
   "lab setup/replay protocol surface must be documented and mirrored",

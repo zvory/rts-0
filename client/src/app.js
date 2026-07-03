@@ -35,6 +35,7 @@ import { readUnitRangesEnabled, writeUnitRangesEnabled } from "./unit_range_sett
 import { createObserverAnalysisOverlayPreferences } from "./observer_analysis_overlay.js";
 import { ReplayViewer } from "./replay_viewer.js";
 import { createRoomCapabilities } from "./room_capabilities.js";
+import { selectInitialCameraView } from "./camera_view_selection.js";
 import { formatTeamLabel, scoreRowIsWinner } from "./scoreboard.js";
 import { StatusBadge } from "./status_badge.js";
 import {
@@ -337,11 +338,14 @@ export class App {
     const labMetadata = payload?.lab || null;
     const visualProfile = labMetadata ? this.labVisualProfileState?.profile || null : null;
     const visualProfileError = labMetadata ? this.labVisualProfileState?.error || null : null;
+    const scenarioInitialCamera = labMetadata?.initialCamera || null;
 
-    const carriedCamera = this.takeMatchCameraView() ||
-      this.pendingCameraView ||
-      visualProfile?.initialCamera ||
-      null;
+    const carriedCamera = selectInitialCameraView({
+      currentView: this.takeMatchCameraView(),
+      pendingView: this.pendingCameraView,
+      visualProfileView: visualProfile?.initialCamera,
+      scenarioView: scenarioInitialCamera,
+    });
     this.pendingCameraView = null;
 
     // If a previous match somehow lingers, tear it down first.

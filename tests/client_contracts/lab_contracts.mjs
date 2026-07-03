@@ -96,6 +96,13 @@ import { textWithin } from "./dom_text.mjs";
       fs.readFileSync(new URL(`../../server/assets/lab-scenarios/${filename}`, import.meta.url), "utf8"),
     );
     assert(scenario.kind === LAB_CHECKPOINT_SCENARIO.KIND, `${filename} uses checkpoint-backed lab setup shape`);
+    if (filename === "render-preview.json") {
+      assertDeepEqual(
+        scenario.metadata?.lab?.initialCamera,
+        { centerX: 2016, centerY: 2016 },
+        "render-preview lab setup starts the camera at the map center",
+      );
+    }
     const checkpoint = JSON.parse(scenario.checkpointPayload);
     assert(checkpoint.players?.length === 2, `${filename} remains a two-player bundled lab setup`);
     for (const player of checkpoint.players) {

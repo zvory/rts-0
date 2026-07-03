@@ -1102,6 +1102,7 @@ mod tests {
                 lab: LabScenarioLabMetadata {
                     vision: LabVisionMode::FullWorld,
                     god_mode_players: Vec::new(),
+                    initial_camera: None,
                 },
                 source_scenario: None,
                 source_entity_id_map: entity_ids

@@ -308,12 +308,17 @@ impl RoomTask {
             .as_ref()
             .map(|session| session.default_vision.clone())
             .unwrap_or(LabVisionMode::FullWorld);
+        let initial_camera = self
+            .lab_session
+            .as_ref()
+            .and_then(|session| session.initial_camera);
         export_lab_checkpoint_scenario_for_protocol(
             game,
             name,
             LabScenarioLabMetadata {
                 vision,
                 god_mode_players: game.lab_god_mode_players(),
+                initial_camera,
             },
             crate::build_info::build_id(),
         )
@@ -498,6 +503,7 @@ impl RoomTask {
             .unwrap_or_else(|| "Untitled lab replay".to_string());
         let mut initial_setup = timeline.initial_setup().clone();
         initial_setup.metadata.lab.vision = session.vision_for(operator_id);
+        initial_setup.metadata.lab.initial_camera = session.initial_camera;
         let artifact = LabReplayArtifactV1 {
             schema: LAB_REPLAY_ARTIFACT_SCHEMA.to_string(),
             schema_version: LAB_REPLAY_ARTIFACT_SCHEMA_VERSION,
@@ -539,6 +545,7 @@ impl RoomTask {
         self.lab_timeline = Some(timeline);
         if let Some(session) = &mut self.lab_session {
             session.import_vision_for(operator_id, artifact.initial_setup.metadata.lab.vision);
+            session.initial_camera = artifact.initial_setup.metadata.lab.initial_camera;
             session.dirty = false;
             session.operation_log.clear();
         }
