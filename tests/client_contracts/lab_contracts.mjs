@@ -1348,6 +1348,23 @@ await withFakeDocument(async () => {
     stopPropagation() {},
   });
   assert(el.dataset.collapsed === "false", "LabPanelWindowChrome ignores the click synthesized after touch collapse");
+  collapseButton.listeners.pointerdown({
+    button: 0,
+    isPrimary: true,
+    pointerId: 10,
+    pointerType: "touch",
+  });
+  collapseButton.listeners.pointerleave({
+    pointerId: 10,
+    pointerType: "touch",
+  });
+  collapseButton.listeners.pointerup({
+    pointerId: 10,
+    pointerType: "touch",
+    preventDefault() {},
+    stopPropagation() {},
+  });
+  assert(el.dataset.collapsed === "false", "LabPanelWindowChrome cancels touch collapse when the pointer leaves");
 
   dragHandle.listeners.keydown({
     key: "Home",

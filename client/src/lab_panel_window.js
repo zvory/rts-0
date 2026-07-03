@@ -1,3 +1,5 @@
+import { createImmediateTouchButtonActivation } from "./panel_touch_activation.js";
+
 const DEFAULT_STORAGE_KEY = "rts.labPanel.window.v1";
 const DEFAULT_MARGIN = 12;
 const DEFAULT_TOP = 58;
@@ -25,8 +27,7 @@ export class LabPanelWindowChrome {
     this.collapsed = false;
     this.collapseButton = null;
     this.collapseLabel = "panel";
-    this.collapsePressPointerId = null;
-    this.lastTouchCollapseAt = 0;
+    this.collapseActivation = createImmediateTouchButtonActivation(() => this.toggleCollapsed());
 
     this.restoreGeometry();
     this.listenWindow("resize", () => this.constrainToViewport());
@@ -34,6 +35,7 @@ export class LabPanelWindowChrome {
 
   renderHeader({ kicker = "Lab", title = "", collapseLabel = "panel" } = {}) {
     this.clearRenderListeners();
+    this.collapseActivation.reset();
     this.collapseButton = null;
     this.collapseLabel = collapseLabel || "panel";
 
@@ -77,10 +79,11 @@ export class LabPanelWindowChrome {
 
     this.listenRender(dragHandle, "pointerdown", (event) => this.beginInteraction("move", event));
     this.listenRender(dragHandle, "keydown", (event) => this.handleMoveKey(event));
-    this.listenRender(collapse, "pointerdown", (event) => this.beginCollapsePress(event));
-    this.listenRender(collapse, "pointerup", (event) => this.finishCollapsePress(event));
-    this.listenRender(collapse, "pointercancel", (event) => this.cancelCollapsePress(event));
-    this.listenRender(collapse, "click", (event) => this.handleCollapseClick(event));
+    this.listenRender(collapse, "pointerdown", this.collapseActivation.pointerdown);
+    this.listenRender(collapse, "pointerup", this.collapseActivation.pointerup);
+    this.listenRender(collapse, "pointercancel", this.collapseActivation.pointercancel);
+    this.listenRender(collapse, "pointerleave", this.collapseActivation.pointerleave);
+    this.listenRender(collapse, "click", this.collapseActivation.click);
 
     const actions = document.createElement("div");
     actions.className = "lab-panel-titlebar-actions";
@@ -104,6 +107,7 @@ export class LabPanelWindowChrome {
 
   destroy() {
     this.finishInteraction(false);
+    this.collapseActivation.reset();
     this.clearRenderListeners();
     for (const [target, type, handler] of this.windowListeners) {
       target.removeEventListener?.(type, handler);
@@ -201,34 +205,6 @@ export class LabPanelWindowChrome {
       height: rect.height + delta.y,
     });
     this.saveGeometry(this.currentGeometry());
-  }
-
-  beginCollapsePress(event) {
-    if (!isTouchPointer(event) || !isPrimaryPointer(event)) return;
-    this.collapsePressPointerId = event.pointerId ?? null;
-  }
-
-  finishCollapsePress(event) {
-    if (!isTouchPointer(event) || this.collapsePressPointerId == null || !samePointerId(this.collapsePressPointerId, event)) return;
-    this.collapsePressPointerId = null;
-    this.lastTouchCollapseAt = Date.now();
-    event.preventDefault?.();
-    event.stopPropagation?.();
-    this.toggleCollapsed();
-  }
-
-  cancelCollapsePress(event) {
-    if (this.collapsePressPointerId == null || !samePointerId(this.collapsePressPointerId, event)) return;
-    this.collapsePressPointerId = null;
-  }
-
-  handleCollapseClick(event) {
-    if (Date.now() - this.lastTouchCollapseAt < 750) {
-      event?.preventDefault?.();
-      event?.stopPropagation?.();
-      return;
-    }
-    this.toggleCollapsed();
   }
 
   constrainToViewport() {
@@ -478,15 +454,6 @@ function isPrimaryPointer(event) {
 
 function samePointer(active, event) {
   return active.pointerId == null || event?.pointerId == null || active.pointerId === event.pointerId;
-}
-
-function samePointerId(pointerId, event) {
-  return pointerId == null || event?.pointerId == null || pointerId === event.pointerId;
-}
-
-function isTouchPointer(event) {
-  const pointerType = String(event?.pointerType || "");
-  return pointerType === "touch" || pointerType === "pen";
 }
 
 function parsePixels(value) {
