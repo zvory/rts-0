@@ -164,7 +164,7 @@ export function _drawOccupiedTrenches(entities, state) {
   for (const entity of entities || []) {
     const trenchId = occupiedTrenchId(entity);
     if (trenchId == null) continue;
-    const trench = trenchById.get(trenchId) || fallbackOccupiedTrench(entity, trenchId, tileSize);
+    const trench = trenchById.get(trenchId);
     if (!trench) continue;
     const seed = occupiedTrenchSeed(entity, trench);
 
@@ -304,16 +304,6 @@ export function stampTrenchDecal(ctx, trench, downsample = TRENCH_DECAL_TEXTURE_
 function occupiedTrenchId(entity) {
   const id = Number(entity?.occupiedTrenchId);
   return Number.isInteger(id) && id > 0 ? id : null;
-}
-
-function fallbackOccupiedTrench(entity, trenchId, tileSize) {
-  if (!finiteNumber(entity?.x) || !finiteNumber(entity?.y)) return null;
-  return {
-    id: trenchId,
-    x: entity.x,
-    y: entity.y,
-    radius: Math.max(TRENCH_MIN_RADIUS_PX, ENTRENCHMENT_TRENCH_RADIUS_TILES * tileSize),
-  };
 }
 
 function occupiedTrenchSeed(entity, trench) {

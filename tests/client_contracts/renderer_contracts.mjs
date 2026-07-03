@@ -599,6 +599,17 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
       occupantLip?.calls.some((call) => call[0] === "beginFill" && call[1] === COLORS.trenchRim),
       "occupied trench overlay draws a foreground berm above the unit",
     );
+    const missingTrenchEntity = { ...entity, id: 4310, occupiedTrenchId: 999, x: 310, y: 210 };
+    const missingTrenchDrawn = _drawOccupiedTrenches.call(renderer, [missingTrenchEntity], {
+      map: { tileSize: 32 },
+      trenches: [],
+    });
+    assert(missingTrenchDrawn === 0, "occupied trench overlay requires authoritative trench terrain");
+    assert(
+      !renderer._pools.trenchOccupantLips.has(missingTrenchEntity.id) &&
+        !renderer._pools.trenchOccupantShadows.has(missingTrenchEntity.id),
+      "missing trench ids do not create client-only trench display objects",
+    );
 
     delete entity.occupiedTrenchId;
     renderer._drawUnit(entity, colorByOwner, state);

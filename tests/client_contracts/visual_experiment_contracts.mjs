@@ -2,6 +2,7 @@
 // Contracts for local lab visual experimentation renderer-only samples.
 
 import { assert, assertApprox } from "./assertions.mjs";
+import { COLORS } from "../../client/src/config.js";
 import { buildFrameEntityViews } from "../../client/src/frame_entity_views.js";
 import { KIND } from "../../client/src/protocol.js";
 import { Renderer } from "../../client/src/renderer/index.js";
@@ -274,7 +275,7 @@ const NOOP_RENDERER_OVERLAYS = [
     assert(sampleDisplay.calls.some((call) => call[0] === "drawPolygon"),
       "trench static samples draw procedural candidate geometry");
     assert(
-      sampleDisplay.calls.some((call) => call[0] === "beginFill" && call[1] === 0x3f2919 && call[2] === 0.94),
+      sampleDisplay.calls.some((call) => call[0] === "beginFill" && call[1] === COLORS.trenchRim && call[2] === 0.94),
       "occupied static samples draw the checked-in foreground trench lip",
     );
     assert(labelDisplay.text === "Valid", "static sample labels identify each candidate");
