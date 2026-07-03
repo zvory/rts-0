@@ -1,0 +1,22 @@
+{
+  "pipelineVersion": 1,
+  "source": "built-in image_gen",
+  "status": "archival-experiment-not-production",
+  "enabled": false,
+  "unit": "rifleman",
+  "prompt": "client/assets/rigs/rifleman-backpack-hidden-legs/metadata/prompt.md",
+  "sourceSheet": "client/assets/rigs/rifleman-backpack-hidden-legs/generated/rifleman-backpack-hidden-legs-pass-01-source.png",
+  "alphaSheet": "client/assets/rigs/rifleman-backpack-hidden-legs/generated/rifleman-backpack-hidden-legs-pass-01-alpha.png",
+  "previewWebm": "client/assets/rigs/rifleman-backpack-hidden-legs/generated/rifleman-backpack-hidden-legs-pass-01-12fps.webm",
+  "previewWebp": "client/assets/rigs/rifleman-backpack-hidden-legs/generated/rifleman-backpack-hidden-legs-pass-01-12fps-loop.webp",
+  "columns": 6,
+  "rows": 1,
+  "width": 2172,
+  "height": 724,
+  "frameWidth": 362,
+  "frameHeight": 724,
+  "frameCount": 6,
+  "previewFps": 12,
+  "webpLoopCount": 0,
+  "notes": "This pass documents prompt lessons for rotation-safe top-down rifleman art. It is intentionally not referenced by client runtime code. The generated frames are six equal-width 362x724 cells, not the square cells requested in the prompt."
+}
