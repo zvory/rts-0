@@ -60,6 +60,10 @@ const NOOP_RENDERER_OVERLAYS = [
       Number.isFinite(sample.y)),
     "trench visual samples are renderer-only checked-in descriptors",
   );
+  assert(
+    profile.staticSamples.some((sample) => sample.occupied === true),
+    "trench visual profile includes occupied-lip samples for comparison",
+  );
 }
 
 {
@@ -154,6 +158,7 @@ const NOOP_RENDERER_OVERLAYS = [
         y: 120,
         radiusTiles: 0.375,
         variant: "basin",
+        occupied: true,
       },
       {
         id: "bad-variant",
@@ -176,6 +181,7 @@ const NOOP_RENDERER_OVERLAYS = [
 
   assert(normalized.samples.length === 1, "visual sample normalizer keeps valid candidates");
   assert(normalized.samples[0].id === "valid-trench", "normalizer preserves the valid candidate id");
+  assert(normalized.samples[0].occupied === true, "normalizer preserves occupied trench sample state");
   assert(normalized.errors.length === 2, "visual sample normalizer reports invalid candidates");
   assert(
     normalized.errors.some((error) => error.reason === "unknown-variant") &&
@@ -241,6 +247,7 @@ const NOOP_RENDERER_OVERLAYS = [
           y: 120,
           radiusTiles: 0.375,
           variant: "basin",
+          occupied: true,
         },
         {
           id: "bad-variant",
@@ -266,6 +273,10 @@ const NOOP_RENDERER_OVERLAYS = [
     assert(renderer.layers.visualSampleLabels.children.length === 1, "static labels use renderer-owned Pixi text");
     assert(sampleDisplay.calls.some((call) => call[0] === "drawPolygon"),
       "trench static samples draw procedural candidate geometry");
+    assert(
+      sampleDisplay.calls.some((call) => call[0] === "beginFill" && call[1] === 0x3f2919 && call[2] === 0.94),
+      "occupied static samples draw the checked-in foreground trench lip",
+    );
     assert(labelDisplay.text === "Valid", "static sample labels identify each candidate");
     assertApprox(labelDisplay.x, 100, 0.001, "static sample labels stay anchored to world x");
     assertApprox(labelDisplay.y, 96, 0.001, "static sample labels stay anchored above the sample");

@@ -1,9 +1,7 @@
-import { COLORS } from "../../config.js";
 import { hexToInt, lightenColor } from "../shared.js";
 import { sampleRigAnimation } from "./animation.js";
 
 const OCCUPIED_TRENCH_UNIT_SCALE = 0.85;
-const OCCUPIED_TRENCH_ALPHA = 0.78;
 
 export function renderPngUnitRig(renderer, entity, colorByOwner, state, definition, options = {}) {
   const atlas = options.atlas;
@@ -171,7 +169,7 @@ function applySpriteState(display, part, frame, state, context, diagnostics = nu
 
   const transform = displayTransform(state, frame);
   applyDisplayTransform(display, transform);
-  display.alpha = state.alpha * occupiedTrenchAlpha(context, part);
+  display.alpha = state.alpha;
   display.tint = tintForSlot(state.tintSlot, context, part);
   diagnostics?.("renderer.pngRig.redraw.completed");
 }
@@ -230,9 +228,6 @@ function applyDisplayTransform(display, transform) {
 }
 
 function tintForSlot(slot, context, part) {
-  if (context.occupiedTrench && part?.id !== "part.shadow" && !String(part?.id || "").includes(".shadow")) {
-    return COLORS.trenchDirt;
-  }
   const team = context.teamColor ?? 0x6d89b8;
   if (slot === "team") return team;
   if (slot === "team-light") return lightenColor(team, 0.18);
@@ -240,12 +235,6 @@ function tintForSlot(slot, context, part) {
   if (slot === "team-fill-stroke") return team;
   if (typeof slot === "string" && /^#[0-9a-f]{6}$/i.test(slot)) return hexToInt(slot);
   return 0xffffff;
-}
-
-function occupiedTrenchAlpha(context, part) {
-  if (!context.occupiedTrench) return 1;
-  if (part?.id === "part.shadow" || String(part?.id || "").includes(".shadow")) return 1;
-  return OCCUPIED_TRENCH_ALPHA;
 }
 
 function rotateOffset(offset, rotation) {

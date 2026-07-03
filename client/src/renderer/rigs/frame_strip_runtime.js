@@ -1,9 +1,7 @@
-import { COLORS } from "../../config.js";
 import { STATE } from "../../protocol.js";
 import { hexToInt, lightenColor } from "../shared.js";
 
 const OCCUPIED_TRENCH_UNIT_SCALE = 0.85;
-const OCCUPIED_TRENCH_ALPHA = 0.78;
 
 export function renderFrameStripUnit(renderer, entity, strip, texture, options = {}) {
   if (!strip || !texture || !options.poolName || !options.layerName) return null;
@@ -119,7 +117,7 @@ class FrameStripUnitInstance {
 
     const worldScale = Math.max(0.01, finite(this.strip.worldScale, 1));
     setPoint(this.sprite.scale, worldScale, worldScale);
-    this.sprite.alpha = renderContext.occupiedTrench ? OCCUPIED_TRENCH_ALPHA : 1;
+    this.sprite.alpha = 1;
     this.sprite.tint = tintForSlot(this.strip.tintSlot, renderContext);
     this.sprite.visible = true;
     options.diagnostics?.("renderer.frameStrip.redraw.completed");
@@ -137,7 +135,6 @@ class FrameStripUnitInstance {
 }
 
 function tintForSlot(slot, context) {
-  if (context.occupiedTrench) return COLORS.trenchDirt;
   const team = Number.isFinite(context.teamColor) ? context.teamColor : hexToInt(context.teamColor);
   if (slot === "team") return team;
   if (slot === "team-light") return lightenColor(team, 0.18);
