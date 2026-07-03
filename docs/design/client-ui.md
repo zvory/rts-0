@@ -1267,8 +1267,9 @@ selection rings):
   field-of-fire overlays. In Lab scenario authoring, deployed Anti-Tank Gun and artillery
   field-of-fire wedges remain visible for the currently selected owner even when the broad unit
   range overlay is off.
-  Distinct silhouette per kind (engineer: compact block; rifleman / machine gunner / Panzerfaust:
-  shared infantry body with oversized role weapons; Panzerfaust specifically carries a short
+  Distinct silhouette per kind (engineer: compact block; rifleman: enabled PNG frame-strip
+  experiment with frame 0 idle and frames 1-4 moving; machine gunner / Panzerfaust:
+  shared SVG infantry body with oversized role weapons; Panzerfaust specifically carries a short
   one-shot launcher tube while loaded; Anti-Tank Gun: wheeled gun; mortar team: crewless
   M1938-inspired small wheeled mortar that travels low and deploys upright; scout car: boxy
   WW2-style truck silhouette with enclosed wheels and a rear-top machine-gunner; tank: chunky
@@ -1280,8 +1281,8 @@ selection rings):
   carriage, two wheels, and animated deployment bracing, and machine gunners carry an MG42-style
   long machine gun across the body while packed that extends forward with bracing during
   setup/deployment. Units that fire from outside current vision are shown briefly above the fog
-  as semi-transparent silhouettes with the same recoil animation and a yellow tracer to the hit
-  point.
+  as semi-transparent silhouettes with their normal art path, rig-authored recoil where available,
+  and a yellow tracer to the hit point.
   Attack `weaponKind` selects feedback scale and rig muzzle origin; TankCoax uses a small
   machine-gun flash/tracer/tail from the authored coax muzzle anchor and no Tank recoil, while
   TankCannon or default Tank attacks use a direct tracer from the main muzzle anchor plus the

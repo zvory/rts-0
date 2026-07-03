@@ -1,0 +1,37 @@
+{
+  "unit": "rifleman",
+  "status": "enabled visual experiment; not final production art",
+  "source": {
+    "builtInImageGenSource": "/Users/az/.codex/generated_images/019f283d-1009-79f0-850d-760b24c9709a/ig_02037e9961595927016a47e2ea0c8481a2871b17a3982769e1.png",
+    "sourceSheet": "client/assets/rigs/rifleman-pass-02/generated/rifleman-pass-02-source.png",
+    "alphaSheet": "client/assets/rigs/rifleman-pass-02/generated/rifleman-pass-02-alpha.png",
+    "runtimeStrip": "client/assets/rigs/rifleman-pass-02/rifleman-pass-02-strip.png",
+    "prompt": "client/assets/rigs/rifleman-pass-02/metadata/prompt.md"
+  },
+  "runtime": {
+    "module": "client/src/renderer/rigs/rifleman_png_strip.js",
+    "stripImageUrl": "/assets/rigs/rifleman-pass-02/rifleman-pass-02-strip.png?v=pass02-balanced",
+    "frameWidth": 96,
+    "frameHeight": 96,
+    "frameCount": 6,
+    "idleFrame": 0,
+    "movementFrames": [1, 2, 3, 4],
+    "unusedFrames": [5],
+    "fps": 12,
+    "worldScale": 0.34,
+    "tintSlot": "team-light",
+    "colorAdjustment": {
+      "brightness": 170,
+      "saturation": 118,
+      "hue": 100
+    }
+  },
+  "notes": [
+    "Frame 0 is used for idle/standing riflemen.",
+    "Frames 1-4 cycle only while the authoritative client entity state is move.",
+    "Frame 5 is retained from the generated recoil source but is not used yet.",
+    "The old SVG rifleman rig remains available for the shadow route and fallback while the PNG texture loads.",
+    "No firing or recoil animation is wired for this pass.",
+    "The runtime strip is a no-imagegen brightness pass from the first pass-02 strip, using ImageMagick -modulate 170,118,100."
+  ]
+}
