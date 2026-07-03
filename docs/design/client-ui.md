@@ -271,15 +271,14 @@ Prototype raster rig workflow:
   `png_routing.js`, and `png_runtime.js`. The SVG rig remains authoritative for anchors,
   animation bindings, part ids, recoil, facing, and route split; the PNG atlas only supplies
   pixels for those sampled parts. The current tank atlas is an enabled visual experiment, not final
-  art: it uses the pass-09 Tiger I hull/body, turret/coax, and separate main-barrel cells while
+  art: it uses the pass-10 Tiger I hull/body, turret/coax, and separate main-barrel cells while
   transparent track frames suppress track rendering. The separate barrel cell maps to `part.barrel`,
   so the PNG rig keeps the original SVG cannon recoil scale instead of merging that motion into the
   turret, and the barrel sprite uses the same full `team` tint slot as the hull. The active
-  `pass09-outline` atlas applies ImageMagick brightness/saturation modulation after normalization.
-  Pass 09 uses the attached top-down Tiger I reference only for silhouette guidance, simplifies
-  surface detail, restores dark RTS-readable outlines, and avoids a perfect rectangular hull.
-  The atlas metadata is normalized to guide-masked visible alpha bounds so generated cell padding
-  and guide boxes do not affect in-game scale. See
+  `pass10-noguide-ref` atlas applies ImageMagick brightness/saturation modulation after
+  normalization. Pass 10 removes visible contact-sheet guides entirely, uses the attached top-down
+  Tiger I reference as the subject input, and relies on visible-alpha postprocessing to resize
+  generated components onto the SVG rig bounds. See
   [raster-unit-art-handoff.md](raster-unit-art-handoff.md) for the methodology, rejected imagegen
   passes, and next validation work.
 - `scripts/art/tank-raster-pipeline.mjs` builds the tank contact sheet, records the exact prompt

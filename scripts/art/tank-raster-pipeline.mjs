@@ -26,6 +26,7 @@ const DEFAULT_SCALE = 3;
 const DEFAULT_KEY = "#ff00ff";
 const DEFAULT_LAYOUT = "tight";
 const DEFAULT_PROFILE = "semantic";
+const DEFAULT_GUIDES = "none";
 const TIGHT_CELL_FILL = 0.72;
 const GUIDE_SUBDIVISIONS = 8;
 const GUIDE_BORDER_COLOR = "#00e5ff";
@@ -63,6 +64,7 @@ function makeSheet(args) {
   const key = String(args.key || DEFAULT_KEY);
   const layout = layoutArg(args.layout);
   const profile = profileArg(args.profile);
+  const guides = guidesArg(args.guides);
   const compiled = compileTankRig();
   const partIds = compiled.definition.parts.map((part) => part.id);
   const sheet = sheetForProfile(compiled.definition, profile);
@@ -78,11 +80,13 @@ function makeSheet(args) {
 
   const body = [];
   body.push(`<rect x="0" y="0" width="${sheetW}" height="${sheetH}" fill="${key}" />`);
-  cells.forEach((_cellId, index) => {
-    const col = index % columns;
-    const row = Math.floor(index / columns);
-    appendCellGuides(body, col * cellW, row * cellH, cellW, cellH);
-  });
+  if (guides === "full") {
+    cells.forEach((_cellId, index) => {
+      const col = index % columns;
+      const row = Math.floor(index / columns);
+      appendCellGuides(body, col * cellW, row * cellH, cellW, cellH);
+    });
+  }
   cells.forEach((cellId, index) => {
     const col = index % columns;
     const row = Math.floor(index / columns);
@@ -147,12 +151,13 @@ function makeSheet(args) {
     semanticSprites: sheet.sprites,
     semanticSheetElements: sheet.sheetElements,
     guides: {
-      outerCellBox: true,
-      subdivisions: GUIDE_SUBDIVISIONS,
-      centerLines: true,
-      borderColor: GUIDE_BORDER_COLOR,
-      minorColor: GUIDE_MINOR_COLOR,
-      centerColor: GUIDE_CENTER_COLOR,
+      mode: guides,
+      outerCellBox: guides === "full",
+      subdivisions: guides === "full" ? GUIDE_SUBDIVISIONS : 0,
+      centerLines: guides === "full",
+      borderColor: guides === "full" ? GUIDE_BORDER_COLOR : null,
+      minorColor: guides === "full" ? GUIDE_MINOR_COLOR : null,
+      centerColor: guides === "full" ? GUIDE_CENTER_COLOR : null,
     },
     sourceSvg: rel(sourceSvgPath),
     sourcePng: rel(sourcePngPath),
@@ -306,19 +311,19 @@ function writePrompt() {
   ensureDirs();
   const prompt = `Use case: stylized-concept
 Asset type: top-down RTS unit raster atlas for Bewegungskrieg
-Primary request: Restyle this guided semantic tank contact sheet into a coherent, strict top-down 1940s German Tiger I heavy tank, Panzerkampfwagen VI Tiger Ausf. E, with every grouped component preserved in its same grid cell.
-Input image role: edit target and layout reference. The sheet has exactly six boxed cells in a 2x3 grid: assembled no-track reference tank, empty no-track placeholder, hull assembly, turret/coax assembly, separate main barrel, and one unused empty cell. The visible guide boxes, subgrid lines, and center marks are alignment guides only.
-Style/medium: clean RTS-readable PlayStation 1 era raster art, low-resolution textured/pixely surfaces, grounded Tiger I proportions, not cartoonish. Simpler than concept art: broad slabs, very few small hatches, very few bolts, no dense top-deck clutter.
-Composition/framing: preserve the exact 2x3 grid, exact six-cell count, exact cell order, boxed cell boundaries, centered component framing, relative component silhouette, and top-down orientation. Use the smaller guide grid inside each cell to keep scale and center alignment stable. Keep each component isolated inside its original cell.
+Primary request: Decompose and simplify the attached strict top-down Tiger I reference into this semantic no-guide contact sheet, preserving each grouped component in its same 2x3 position.
+Input image roles: use the contact sheet as the edit target and layout carrier; use the attached Tiger I reference as the subject/silhouette reference. The sheet has exactly six invisible cell zones in a 2x3 layout: assembled no-track reference tank, empty no-track placeholder, hull assembly, turret/coax assembly, separate main barrel, and one unused empty zone.
+Style/medium: clean RTS-readable pre-PlayStation / early low-poly raster art, flat-shaded low-resolution surfaces, grounded Tiger I proportions, not cartoonish. Simpler than concept art: broad slabs, very few small hatches, very few bolts, no dense top-deck clutter.
+Composition/framing: preserve the exact 2x3 layout, exact six-zone count, exact zone order, centered component framing, relative component silhouette, and top-down orientation. Do not add visible cell boxes, guide lines, subgrids, crosshairs, labels, or dividers; leave layout sizing to post-processing.
 Color/materials: bright neutral gray-blue team-colorable armor on hull, turret, and barrel; the barrel should be the same tintable team-color armor value as the hull, not black fixed metal. Subtle broad panel shading, very light grime, no glossy modern materials.
 Outline: add a clean dark/black RTS-readable outline around the hull, turret, coax detail, and separate main barrel. Keep the outline crisp and simple, not a thick cartoon border.
-Background: perfectly flat solid ${DEFAULT_KEY} chroma-key background in every cell.
-Empty cells: leave the no-track placeholder cell and the unused final cell as flat ${DEFAULT_KEY} only, with no tank art.
-Hull cell: generate only the no-track Tiger I hull/body armor silhouette, centered and matching the reference scale. The hull must not be a perfect rectangle: use a simple Tiger I top-view plan with stepped/chamfered front corners, slight inset/stepped rear plate, and subtle side skirt/block breaks. Keep it simplified and readable, with no tracks.
+Background: perfectly flat solid ${DEFAULT_KEY} chroma-key background in every empty area.
+Empty zones: leave the no-track placeholder zone and the unused final zone as flat ${DEFAULT_KEY} only, with no tank art.
+Hull cell: generate only the no-track Tiger I hull/body armor silhouette, centered and matching the reference scale. Keep the hull mostly boxy and rectangular like a Tiger I, with only subtle stepped/chamfered front corners and a slight rear inset; do not exaggerate chamfers, side blocks, side skirts, or track-guard shapes. Keep it simplified and readable, with no tracks.
 Turret cell: generate only the Tiger I turret body and tiny coax detail, with no main cannon barrel attached; compact angular turret with a clear black outline, not a modern rounded turret.
 Barrel cell: generate only the separate Tiger I 88mm main cannon barrel as a straight centered component, long axis left-to-right, same team-color neutral gray-blue as the hull, readable thickness, crisp black outline, no turret attached.
-Constraints: strict top-down orthographic view; no tracks anywhere; no perspective tilt; no drop shadow; no text, labels, numbers, watermarks, arrows, Balkenkreuz, swastikas, insignia, or extra UI; no merged cells; no fuel warning/no-oil indicator; do not add missing parts; do not remove any required hull/turret/barrel art part; leave empty background areas empty. Keep guide lines thin and separate from the sprite art; do not turn the guide grid into armor seams or detail.
-Avoid: perfect rectangular hull, tracks, treads, wheels, sprockets, gears, dense top-deck detail, extra hatches, extra barrels, fuel icons, warning symbols, thick cartoon outlines, toy proportions, oversized turret/barrel, painterly blur, photorealistic perspective, dramatic lighting, gradients in the background, camouflage that hides the silhouette.
+Constraints: strict top-down orthographic view; no tracks anywhere; no perspective tilt; no drop shadow; no text, labels, numbers, watermarks, arrows, Balkenkreuz, swastikas, insignia, or extra UI; no merged zones; no fuel warning/no-oil indicator; do not add missing parts; do not remove any required hull/turret/barrel art part; leave empty background areas empty.
+Avoid: visible guide boxes, visible grid lines, perfect square slab silhouette, over-chamfered hull, tracks, treads, wheels, sprockets, gears, dense top-deck detail, extra hatches, extra barrels, fuel icons, warning symbols, thick cartoon outlines, toy proportions, oversized turret/barrel, painterly blur, photorealistic perspective, dramatic lighting, gradients in the background, camouflage that hides the silhouette.
 `;
   fs.writeFileSync(promptPath, prompt);
   console.log(`wrote ${rel(promptPath)}`);
@@ -764,6 +769,14 @@ function profileArg(value) {
   return profile;
 }
 
+function guidesArg(value) {
+  const guides = String(value || DEFAULT_GUIDES);
+  if (guides !== "none" && guides !== "full") {
+    throw new Error(`unsupported guides ${JSON.stringify(guides)}; expected none or full`);
+  }
+  return guides;
+}
+
 function round(value) {
   return Number(value.toFixed(6));
 }
@@ -1010,7 +1023,7 @@ function rel(file) {
 
 function usage() {
   console.error(`Usage:
-  node scripts/art/tank-raster-pipeline.mjs make-sheet [--scale 3] [--columns 2] [--layout tight] [--profile semantic] [--key #ff00ff]
+  node scripts/art/tank-raster-pipeline.mjs make-sheet [--scale 3] [--columns 2] [--layout tight] [--profile semantic] [--guides none|full] [--key #ff00ff]
   node scripts/art/tank-raster-pipeline.mjs write-atlas --sheet <png> [--columns 2] [--layout tight] [--profile semantic] [--transparent-key #ff00ff] [--disabled] [--blank-cells cell[,cell]] [--normalize-visible-bounds] [--ignore-guide-bounds] [--guide-mask-fuzz 12] [--guide-mask-alpha-threshold 20] [--guide-mask-line-width 12] [--guide-mask-morphology Square:5] [--clear-cell-edge-alpha 16] [--visible-padding 2] [--brightness 120] [--saturation 100] [--hue 100] [--image-version pass-id] [--prompt-file metadata/prompt.md]
   node scripts/art/tank-raster-pipeline.mjs write-prompt`);
 }

@@ -6,6 +6,15 @@
   "key": "#ff00ff",
   "layout": "tight",
   "profile": "semantic",
+  "guides": {
+    "mode": "none",
+    "outerCellBox": false,
+    "subdivisions": 0,
+    "centerLines": false,
+    "borderColor": null,
+    "minorColor": null,
+    "centerColor": null
+  },
   "viewBox": {
     "x": -40,
     "y": -32,
@@ -204,14 +213,6 @@
       "description": "separate main cannon barrel"
     }
   ],
-  "guides": {
-    "outerCellBox": true,
-    "subdivisions": 8,
-    "centerLines": true,
-    "borderColor": "#00e5ff",
-    "minorColor": "#80f6ff",
-    "centerColor": "#fff4a3"
-  },
   "sourceSvg": "client/assets/rigs/tank-ps1/tank-contact-sheet.svg",
   "sourcePng": "client/assets/rigs/tank-ps1/tank-contact-sheet.png"
 }

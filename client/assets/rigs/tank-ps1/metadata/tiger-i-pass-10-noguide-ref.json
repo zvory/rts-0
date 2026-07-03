@@ -1,0 +1,35 @@
+{
+  "candidate": "tiger-i-pass-10-noguide-ref",
+  "status": "active-experiment",
+  "sourceSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-10-noguide-ref-input-sheet.png",
+  "sourceSheetSvg": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-10-noguide-ref-input-sheet.svg",
+  "prompt": "client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-10-noguide-ref.md",
+  "builtInImageGenSource": "/Users/az/.codex/generated_images/019f2492-10dd-73b3-8d83-ad9d31bb5026/ig_01aa8f7d47cbcb61016a470fac19988190bf26b95d75885464.png",
+  "candidateSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-10-noguide-ref.png",
+  "candidateAlphaSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-10-noguide-ref-alpha.png",
+  "runtimeAlphaSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-10-noguide-ref-runtime-alpha.png",
+  "activeAtlas": "client/assets/rigs/tank-ps1/tank-atlas.png",
+  "activeAtlasUrl": "/assets/rigs/tank-ps1/tank-atlas.png?v=pass10-noguide-ref",
+  "alphaConversion": {
+    "keyColor": "#ff00ff",
+    "autoKey": "none",
+    "softMatte": true,
+    "transparentThreshold": 58,
+    "opaqueThreshold": 220,
+    "despill": true
+  },
+  "pipelineOptions": {
+    "sourceSheetGuides": "none",
+    "blankCells": ["reference.full", "sprite.track", "unused.blank"],
+    "normalizeVisibleBounds": true,
+    "ignoreGuideBounds": false,
+    "clearCellEdgeAlpha": 0,
+    "visiblePadding": 0,
+    "brightness": 115,
+    "saturation": 105,
+    "hue": 100,
+    "imageVersion": "pass10-noguide-ref"
+  },
+  "runtimeNotes": "The active PNG atlas covers track parts with transparent sprites, exposes hull as sprite.hull, turret/coax as sprite.turret, and main cannon as sprite.barrel. The barrel sprite uses tintSlot team, matching the hull's full owner-color tint while preserving part.barrel recoil. Unlike pass 09, the source sheet has no visible guide boxes or grid lines, and atlas sizing comes from visible alpha bounds only.",
+  "notes": "Regenerated from a no-guide 2x3 sheet using the attached top-down Tiger I reference as the subject input. This pass validates the no-guide pipeline and avoids baked guide artifacts, but it is not final art: the generated hull still carries rear/side fixtures from the reference that may read as unwanted track hardware in-game."
+}
