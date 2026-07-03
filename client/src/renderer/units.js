@@ -1,8 +1,10 @@
 import { STATS } from "../config.js";
 import { KIND, SETUP, STATE } from "../protocol.js";
 import { liveRigDefinitionFor, liveRigRoutesFor } from "./rigs/live_routing.js";
+import { liveFrameStripFor } from "./rigs/frame_strip_routing.js";
 import { livePngRigAtlasFor } from "./rigs/png_routing.js";
 import { createRigRenderContext } from "./rigs/animation.js";
+import { renderFrameStripUnit } from "./rigs/frame_strip_runtime.js";
 import { pngAtlasRouteCoverage, renderPngUnitRig } from "./rigs/png_runtime.js";
 import { renderLiveUnitRig } from "./rigs/runtime.js";
 import {
@@ -110,6 +112,34 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
   const routes = liveRigRoutesFor(e.kind, pools);
   if (routes.length === 0) {
     throw new Error(`missing live SVG rig route for unit kind ${e.kind}`);
+  }
+
+  const frameStrip = visualOverride ? null : liveFrameStripFor(this._liveFrameStripsByKind, e.kind);
+  const frameStripTexture = this._liveFrameStripTextures?.get?.(e.kind) ?? null;
+  if (frameStrip && frameStripTexture) {
+    const renderContext = this._rigRenderContextFor?.(e, colorByOwner, state) ?? {};
+    const rendered = [];
+    const activePoolNames = new Set();
+    const shadowRoute = routes.find((route) => route.parts?.includes?.("part.shadow"));
+    if (shadowRoute) {
+      activePoolNames.add(shadowRoute.poolName);
+      rendered.push(...(renderLiveUnitRig(this, e, colorByOwner, state, definition, {
+        routes: [shadowRoute],
+        alpha: pools.alpha,
+        renderContext,
+      }) || []));
+    }
+    const poolName = pools.liveRigUnit || "liveUnitRigs";
+    activePoolNames.add(poolName);
+    const stripInstance = renderFrameStripUnit(this, e, frameStrip, frameStripTexture, {
+      poolName,
+      layerName: pools.unit || "units",
+      alpha: pools.alpha,
+      renderContext,
+    });
+    if (stripInstance) rendered.push(stripInstance);
+    destroyInactiveLiveRigInstances(this, e.id, activePoolNames);
+    return rendered;
   }
 
   const pngAtlas = visualOverride ? null : livePngRigAtlasFor(this._livePngRigAtlasesByKind, e.kind);

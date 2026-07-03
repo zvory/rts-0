@@ -1,9 +1,9 @@
 # Raster unit art handoff
 
 Status: active visual experiment only. The checked-in tank PNG rig path is enabled for a pass-10
-Tiger I no-track hull/turret/barrel experiment, but the generated images are not final game art. This note records
-what worked, what failed, and how to reproduce the next experiment without rediscovering the same
-traps.
+Tiger I no-track hull/turret/barrel experiment, and Rifleman pass 02 is enabled as a full-frame PNG
+strip. The generated images are not final game art. This note records what worked, what failed, and
+how to reproduce the next experiment without rediscovering the same traps.
 
 ## Goal
 
@@ -24,6 +24,16 @@ structure, maps `sprite.barrel` to the full `team` tint slot, removes visible gu
 imagegen input, uses the attached Tiger I reference as the subject input, and relies on visible-alpha
 postprocessing for runtime sizing. It still needs component cleanup and alignment review before it
 should be treated as accepted art.
+
+Rifleman pass 02 deliberately does not use component slicing yet. It ships as a compact six-frame
+full-body strip because the useful experiment is testing whether a generated infantry token reads at
+RTS scale in-game. Runtime frame 0 is the idle standing frame. Frames 1-4 cycle at 12 FPS only while
+the authoritative client entity state is `move`. Frame 5 is retained from the generated post-shot
+source but is not wired; firing and recoil remain future work. The old SVG rifleman rig still
+provides the shadow route and fallback while the PNG texture loads. The active strip is a
+no-imagegen brightness pass from the initial pass-02 strip, with ImageMagick `-modulate
+170,118,100`, and uses the brighter `team-light` tint slot so blue and orange owners read on dark
+terrain.
 
 ## Current files
 
@@ -47,6 +57,11 @@ should be treated as accepted art.
   currently `true` for the pass-10 experiment.
 - `client/src/renderer/rigs/png_runtime.js` and `png_routing.js` render atlas sprites in place of
   SVG pixels when an atlas is enabled and loaded.
+- `client/assets/rigs/rifleman-pass-02/` keeps the enabled rifleman pass-02 source sheet, alpha
+  conversion, compact runtime strip, prompt, and manifest.
+- `client/src/renderer/rigs/rifleman_png_strip.js` records the enabled frame-strip metadata.
+- `client/src/renderer/rigs/frame_strip_runtime.js` and `frame_strip_routing.js` render full-frame
+  unit strips. This path is currently used only by Rifleman.
 
 ## Current no-guide semantic sheet
 
@@ -287,6 +302,12 @@ cheap checks before any generated atlas can be enabled.
   visible-alpha normalization only, with no guide masking or cell-edge clearing. This pass validates
   the pipeline direction because guide artifacts are gone, but it is not final art: the generated
   hull still carries rear/side fixtures from the reference that may read as unwanted track hardware.
+- `rifleman-pass-02`: active experiment. Generated as the best of five one-shot full-frame
+  rifleman strips after simplifying the prompt around strict nadir view, hidden legs, shoulder-line
+  rifle pose, and RTS-scale detail. It is enabled as a full-frame strip rather than a semantic
+  component atlas. The active runtime strip is brightened from the generated pass using
+  `-modulate 170,118,100` and `team-light` tint. Not final art: the anatomy and weapon hold still
+  need another art pass, and the current runtime has no firing/recoil frame.
 
 These candidates are useful references for what to avoid. None should be treated as accepted art.
 

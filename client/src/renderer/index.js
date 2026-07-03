@@ -70,6 +70,7 @@ import {
   resolveVisualUnitOverrides,
 } from "./visual_unit_overrides.js";
 import { createLivePngRigAtlases, loadPngRigAtlasTexture } from "./rigs/png_routing.js";
+import { createLiveFrameStrips, loadFrameStripTexture } from "./rigs/frame_strip_routing.js";
 import { createBuildingRigDefinitions } from "./rigs/building_routing.js";
 import { _drawResource } from "./resources.js";
 import { buildStaticMap } from "./terrain.js";
@@ -200,6 +201,9 @@ export class Renderer {
     this._livePngRigAtlasesByKind = createLivePngRigAtlases();
     this._livePngRigAtlasTextures = new Map();
     this._loadLivePngRigAtlases();
+    this._liveFrameStripsByKind = createLiveFrameStrips();
+    this._liveFrameStripTextures = new Map();
+    this._loadLiveFrameStrips();
     this._buildingRigDefinitions = createBuildingRigDefinitions();
     this._liveRigPools = {
       liveUnitRigShadows: new Map(),
@@ -239,6 +243,18 @@ export class Renderer {
         })
         .catch((err) => {
           console.warn(`RTS PNG rig atlas disabled for ${kind}: ${err?.message || err}`);
+        });
+    }
+  }
+
+  _loadLiveFrameStrips() {
+    for (const [kind, strip] of this._liveFrameStripsByKind || []) {
+      loadFrameStripTexture(PIXI, strip)
+        .then((texture) => {
+          if (texture) this._liveFrameStripTextures.set(kind, texture);
+        })
+        .catch((err) => {
+          console.warn(`RTS frame strip disabled for ${kind}: ${err?.message || err}`);
         });
     }
   }

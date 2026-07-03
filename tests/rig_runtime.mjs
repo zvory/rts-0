@@ -22,6 +22,11 @@ import {
   renderLiveUnitRig,
 } from "../client/src/renderer/rigs/runtime.js";
 import {
+  frameStripFrameIndex,
+  frameStripVisualFacing,
+} from "../client/src/renderer/rigs/frame_strip_runtime.js";
+import { RIFLEMAN_PNG_FRAME_STRIP } from "../client/src/renderer/rigs/rifleman_png_strip.js";
+import {
   pngAtlasCanRenderRoute,
   pngAtlasRouteCoverage,
 } from "../client/src/renderer/rigs/png_runtime.js";
@@ -656,6 +661,58 @@ test("tank PNG atlas keeps cannon recoil on the generated barrel sprite", () => 
   assert.equal(turretScaleRecoiling, turretScaleStill);
 });
 
+test("rifleman PNG frame strip uses idle frame and movement cycle", () => {
+  const definition = compileFixture("rig-rifleman.svg", KIND.RIFLEMAN);
+  const strip = { ...RIFLEMAN_PNG_FRAME_STRIP, enabled: true };
+  const entity = {
+    id: 40,
+    kind: KIND.RIFLEMAN,
+    owner: 1,
+    x: 32,
+    y: 44,
+    facing: 0.25,
+    weaponFacing: 1.5,
+    state: STATE.IDLE,
+  };
+  const renderer = makeRigRenderer();
+  let renderNow = 0;
+  renderer._liveRigDefinitionsByKind = new Map([[KIND.RIFLEMAN, definition]]);
+  renderer._liveFrameStripsByKind = new Map([[KIND.RIFLEMAN, strip]]);
+  renderer._liveFrameStripTextures = new Map([[KIND.RIFLEMAN, fakeFrameStripTexture()]]);
+  renderer._rigRenderContextFor = function(entityArg, colorByOwnerArg, stateArg) {
+    return createRigRenderContext(entityArg, {
+      state: stateArg,
+      colorByOwner: colorByOwnerArg,
+      now: renderNow,
+      setupVisual: this._deployedWeaponSetupVisual(entityArg),
+      selected: stateArg.selection?.has?.(entityArg.id) ?? false,
+      map: this._map,
+    });
+  };
+
+  renderer._drawUnit(entity, new Map([[1, 0x336699]]), { playerId: 1, resources: {}, weaponRecoil: () => 0 });
+
+  const shadow = renderer._liveRigPools.liveUnitRigShadows.get(entity.id);
+  const stripInstance = renderer._liveRigPools.liveUnitRigs.get(entity.id);
+  assert.equal(typeof stripInstance.matchesFrameStripUnit, "function");
+  assert.equal(shadow.parts.get("part.shadow").display.visible, true);
+  assert.equal(stripInstance.sprite.texture.frame.x, 0);
+  assert.equal(stripInstance.container.rotation, entity.weaponFacing);
+  assert.equal(stripInstance.sprite.scaleX, strip.worldScale);
+  assert.equal(stripInstance.sprite.tint, 0x6194c7);
+
+  renderNow = 1000 / strip.fps;
+  entity.state = STATE.MOVE;
+  renderer._drawUnit(entity, new Map([[1, 0x336699]]), { playerId: 1, resources: {}, weaponRecoil: () => 0 });
+
+  const expectedFrame = frameStripFrameIndex(strip, entity, renderNow);
+  assert.equal(expectedFrame, 2);
+  assert.equal(stripInstance.sprite.texture.frame.x, strip.frameWidth * expectedFrame);
+  assert.equal(frameStripVisualFacing(entity), entity.facing);
+  assert.equal(stripInstance.container.rotation, entity.facing);
+  assert.equal(stripInstance.parts, undefined);
+});
+
 test("tank PNG atlas SVG fallback is destroyed when same id no longer needs it", () => {
   const tankDefinition = compileFixture("rig-vehicle.svg", KIND.TANK);
   const workerDefinition = compileFixture("rig-worker.svg", KIND.WORKER);
@@ -794,6 +851,8 @@ function compileFixture(file, expectedKind) {
 function makeRigRenderer() {
   return {
     _liveRigDefinitionsByKind: new Map(),
+    _liveFrameStripsByKind: new Map(),
+    _liveFrameStripTextures: new Map(),
     _liveRigPools: {
       liveUnitRigShadows: new Map(),
       liveUnitRigs: new Map(),
@@ -891,6 +950,10 @@ function createInspectionPngPixiFactory() {
 
 function fakeAtlasTexture() {
   return { baseTexture: { id: "fake-tank-atlas" } };
+}
+
+function fakeFrameStripTexture() {
+  return { baseTexture: { id: "fake-rifleman-strip" } };
 }
 
 function assertAtlasSpriteUsesWorldScale(definition, atlas, spriteId) {
