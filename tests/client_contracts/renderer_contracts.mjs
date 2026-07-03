@@ -599,6 +599,14 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
       occupantLip?.calls.some((call) => call[0] === "beginFill" && call[1] === COLORS.trenchRim),
       "occupied trench overlay draws a foreground berm above the unit",
     );
+    const rimPolygon = polygonAfterFill(occupantLip?.calls || [], COLORS.trenchRim);
+    const rimXs = polygonAxisValues(rimPolygon, 0);
+    const rimYs = polygonAxisValues(rimPolygon, 1);
+    assert(
+      Math.min(...rimXs) < -8 && Math.max(...rimXs) > 8 &&
+        Math.min(...rimYs) < -8 && Math.max(...rimYs) > 8,
+      "occupied trench foreground berm wraps around all sides of the unit",
+    );
     const missingTrenchEntity = { ...entity, id: 4310, occupiedTrenchId: 999, x: 310, y: 210 };
     const missingTrenchDrawn = _drawOccupiedTrenches.call(renderer, [missingTrenchEntity], {
       map: { tileSize: 32 },
@@ -636,6 +644,21 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
   } finally {
     restorePixi();
   }
+}
+
+function polygonAfterFill(calls, fillColor) {
+  for (let i = 0; i < calls.length - 1; i += 1) {
+    if (calls[i][0] === "beginFill" && calls[i][1] === fillColor && calls[i + 1][0] === "drawPolygon") {
+      return Array.isArray(calls[i + 1][1]) ? calls[i + 1][1] : [];
+    }
+  }
+  return [];
+}
+
+function polygonAxisValues(points, offset) {
+  const out = [];
+  for (let i = offset; i < points.length; i += 2) out.push(points[i]);
+  return out;
 }
 
 {

@@ -233,39 +233,39 @@ export function drawOccupiedTrenchLip(g, radius, seed = 1) {
   const r = Math.max(TRENCH_MIN_RADIUS_PX, radius);
 
   g.beginFill?.(COLORS.trenchRim, 0.94);
-  g.drawPolygon?.(arcBandPolygon(r * 1.1, r * 0.5, Math.PI * 0.06, Math.PI * 0.94, {
-    points: OCCUPIED_LIP_POINTS,
+  g.drawPolygon?.(ringBandPolygon(r * 1.1, r * 0.7, {
+    points: OCCUPIED_LIP_POINTS + 6,
     jitter: 0.12,
     rng,
-    offsetY: r * 0.08,
+    offsetY: r * 0.02,
   }));
   g.endFill?.();
 
   g.beginFill?.(COLORS.trenchDirt, 0.92);
-  g.drawPolygon?.(arcBandPolygon(r * 0.98, r * 0.58, Math.PI * 0.11, Math.PI * 0.89, {
-    points: OCCUPIED_LIP_POINTS - 2,
+  g.drawPolygon?.(ringBandPolygon(r * 0.98, r * 0.75, {
+    points: OCCUPIED_LIP_POINTS + 4,
     jitter: 0.1,
     rng,
-    offsetY: r * 0.09,
+    offsetY: r * 0.025,
   }));
   g.endFill?.();
 
   g.beginFill?.(COLORS.trenchShadow, 0.34);
-  g.drawPolygon?.(arcBandPolygon(r * 0.7, r * 0.5, Math.PI * 0.12, Math.PI * 0.88, {
-    points: OCCUPIED_LIP_POINTS - 3,
+  g.drawPolygon?.(ringBandPolygon(r * 0.84, r * 0.66, {
+    points: OCCUPIED_LIP_POINTS + 2,
     jitter: 0.08,
     rng,
-    offsetY: r * 0.06,
+    offsetY: r * 0.03,
   }));
   g.endFill?.();
 
   g.lineStyle?.(2, COLORS.trenchDirtLight, 0.42);
-  for (let i = 0; i < 4; i += 1) {
-    const angle = Math.PI * (0.18 + rng() * 0.64);
-    const inner = r * (0.6 + rng() * 0.08);
+  for (let i = 0; i < 7; i += 1) {
+    const angle = rng() * Math.PI * 2;
+    const inner = r * (0.7 + rng() * 0.08);
     const outer = r * (0.96 + rng() * 0.1);
-    g.moveTo?.(Math.cos(angle) * inner, Math.sin(angle) * inner + r * 0.08);
-    g.lineTo?.(Math.cos(angle) * outer, Math.sin(angle) * outer + r * 0.08);
+    g.moveTo?.(Math.cos(angle) * inner, Math.sin(angle) * inner + r * 0.02);
+    g.lineTo?.(Math.cos(angle) * outer, Math.sin(angle) * outer + r * 0.02);
   }
 }
 
@@ -332,7 +332,7 @@ function irregularLocalPolygon(radius, {
   return out;
 }
 
-function arcBandPolygon(outerRadius, innerRadius, startAngle, endAngle, {
+function ringBandPolygon(outerRadius, innerRadius, {
   points,
   jitter,
   rng,
@@ -341,13 +341,13 @@ function arcBandPolygon(outerRadius, innerRadius, startAngle, endAngle, {
   const out = [];
   for (let i = 0; i <= points; i += 1) {
     const t = i / points;
-    const angle = startAngle + (endAngle - startAngle) * t;
+    const angle = Math.PI * 2 * t;
     const radius = outerRadius * (1 + (rng() - 0.5) * jitter);
     out.push(Math.cos(angle) * radius, Math.sin(angle) * radius + offsetY);
   }
   for (let i = points; i >= 0; i -= 1) {
     const t = i / points;
-    const angle = startAngle + (endAngle - startAngle) * t;
+    const angle = Math.PI * 2 * t;
     const radius = innerRadius * (1 + (rng() - 0.5) * jitter);
     out.push(Math.cos(angle) * radius, Math.sin(angle) * radius + offsetY);
   }
