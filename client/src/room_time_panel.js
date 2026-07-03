@@ -1,3 +1,5 @@
+import { createImmediateTouchButtonActivation } from "./panel_touch_activation.js";
+
 const ROOM_TIME_PANEL_STORAGE_KEY = "rts.roomTimeControls.panel.v1";
 const ROOM_TIME_PANEL_MARGIN = 12;
 const ROOM_TIME_PANEL_DEFAULT_LEFT = 12;
@@ -20,6 +22,7 @@ export class FloatingRoomTimePanel {
     this.drag = null;
     this.collapsed = false;
     this.collapseButton = null;
+    this.collapseActivation = createImmediateTouchButtonActivation(() => this.toggleCollapsed());
   }
 
   mount() {
@@ -74,7 +77,11 @@ export class FloatingRoomTimePanel {
     this.contentEl = body;
     this.listenRender(dragHandle, "pointerdown", (event) => this.beginDrag(event));
     this.listenRender(dragHandle, "keydown", (event) => this.handleKeyDown(event));
-    this.listenRender(collapse, "click", () => this.toggleCollapsed());
+    this.listenRender(collapse, "pointerdown", this.collapseActivation.pointerdown);
+    this.listenRender(collapse, "pointerup", this.collapseActivation.pointerup);
+    this.listenRender(collapse, "pointercancel", this.collapseActivation.pointercancel);
+    this.listenRender(collapse, "pointerleave", this.collapseActivation.pointerleave);
+    this.listenRender(collapse, "click", this.collapseActivation.click);
     this.listenWindow("resize", () => this.constrainToViewport());
     this.restorePosition();
     return this.contentEl;
@@ -99,6 +106,7 @@ export class FloatingRoomTimePanel {
 
   destroy() {
     this.finishDrag(false);
+    this.collapseActivation.reset();
     this.clearRenderListeners();
     this.clearWindowListeners();
     const body = this.root?.querySelector(".room-time-panel-body");

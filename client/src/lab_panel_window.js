@@ -1,3 +1,5 @@
+import { createImmediateTouchButtonActivation } from "./panel_touch_activation.js";
+
 const DEFAULT_STORAGE_KEY = "rts.labPanel.window.v1";
 const DEFAULT_MARGIN = 12;
 const DEFAULT_TOP = 58;
@@ -25,6 +27,7 @@ export class LabPanelWindowChrome {
     this.collapsed = false;
     this.collapseButton = null;
     this.collapseLabel = "panel";
+    this.collapseActivation = createImmediateTouchButtonActivation(() => this.toggleCollapsed());
 
     this.restoreGeometry();
     this.listenWindow("resize", () => this.constrainToViewport());
@@ -32,6 +35,7 @@ export class LabPanelWindowChrome {
 
   renderHeader({ kicker = "Lab", title = "", collapseLabel = "panel" } = {}) {
     this.clearRenderListeners();
+    this.collapseActivation.reset();
     this.collapseButton = null;
     this.collapseLabel = collapseLabel || "panel";
 
@@ -75,7 +79,11 @@ export class LabPanelWindowChrome {
 
     this.listenRender(dragHandle, "pointerdown", (event) => this.beginInteraction("move", event));
     this.listenRender(dragHandle, "keydown", (event) => this.handleMoveKey(event));
-    this.listenRender(collapse, "click", () => this.toggleCollapsed());
+    this.listenRender(collapse, "pointerdown", this.collapseActivation.pointerdown);
+    this.listenRender(collapse, "pointerup", this.collapseActivation.pointerup);
+    this.listenRender(collapse, "pointercancel", this.collapseActivation.pointercancel);
+    this.listenRender(collapse, "pointerleave", this.collapseActivation.pointerleave);
+    this.listenRender(collapse, "click", this.collapseActivation.click);
 
     const actions = document.createElement("div");
     actions.className = "lab-panel-titlebar-actions";
@@ -99,6 +107,7 @@ export class LabPanelWindowChrome {
 
   destroy() {
     this.finishInteraction(false);
+    this.collapseActivation.reset();
     this.clearRenderListeners();
     for (const [target, type, handler] of this.windowListeners) {
       target.removeEventListener?.(type, handler);

@@ -1325,6 +1325,46 @@ await withFakeDocument(async () => {
       JSON.parse(storage.values.get("test.lab.panel.window")).collapsed === true,
     "LabPanelWindowChrome persists collapsed panel state",
   );
+  collapseButton.listeners.pointerdown({
+    button: 0,
+    isPrimary: true,
+    pointerId: 8,
+    pointerType: "touch",
+  });
+  collapseButton.listeners.pointerup({
+    pointerId: 8,
+    pointerType: "touch",
+    preventDefault() {},
+    stopPropagation() {},
+  });
+  assert(
+    el.dataset.collapsed === "false" &&
+      collapseButton.textContent === "Collapse" &&
+      JSON.parse(storage.values.get("test.lab.panel.window")).collapsed === false,
+    "LabPanelWindowChrome touch release toggles collapse without waiting for a synthesized click",
+  );
+  collapseButton.listeners.click({
+    preventDefault() {},
+    stopPropagation() {},
+  });
+  assert(el.dataset.collapsed === "false", "LabPanelWindowChrome ignores the click synthesized after touch collapse");
+  collapseButton.listeners.pointerdown({
+    button: 0,
+    isPrimary: true,
+    pointerId: 10,
+    pointerType: "touch",
+  });
+  collapseButton.listeners.pointerleave({
+    pointerId: 10,
+    pointerType: "touch",
+  });
+  collapseButton.listeners.pointerup({
+    pointerId: 10,
+    pointerType: "touch",
+    preventDefault() {},
+    stopPropagation() {},
+  });
+  assert(el.dataset.collapsed === "false", "LabPanelWindowChrome cancels touch collapse when the pointer leaves");
 
   dragHandle.listeners.keydown({
     key: "Home",
@@ -1369,10 +1409,21 @@ await withFakeDocument(async () => {
   assert(!el.style.left && !el.style.top, "LabPanelWindowChrome leaves mobile panels on stylesheet positions");
   assert(el.dataset.collapsed === "true" && collapseButton.textContent === "Expand",
     "LabPanelWindowChrome preserves saved collapsed state without restoring overlapping geometry");
-  collapseButton.listeners.click();
+  collapseButton.listeners.pointerdown({
+    button: 0,
+    isPrimary: true,
+    pointerId: 9,
+    pointerType: "touch",
+  });
+  collapseButton.listeners.pointerup({
+    pointerId: 9,
+    pointerType: "touch",
+    preventDefault() {},
+    stopPropagation() {},
+  });
   assert(
     JSON.parse(storage.values.get("test.lab.panel.mobile")).left === 620,
-    "LabPanelWindowChrome mobile collapse toggles preserve saved desktop geometry",
+    "LabPanelWindowChrome mobile touch collapse toggles preserve saved desktop geometry",
   );
   windowObj.innerWidth = 1000;
   chrome.constrainToViewport();
