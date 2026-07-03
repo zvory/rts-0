@@ -155,6 +155,61 @@ import {
   assertApprox(zooms[0].y, 70, 0.001, "pinch zoom anchors at midpoint y");
 }
 
+{
+  const pans = [];
+  const zooms = [];
+  const viewportTarget = { viewport: true };
+  const outsideTarget = { viewport: false };
+  const dom = {
+    clientWidth: 320,
+    clientHeight: 240,
+    contains(target) {
+      return !!target?.viewport;
+    },
+    getBoundingClientRect() {
+      return { left: 0, top: 0, width: 320, height: 240 };
+    },
+  };
+  const camera = {
+    zoom: 1,
+    panByScreenDelta(dx, dy) {
+      pans.push({ dx, dy });
+    },
+    setZoom(zoom, x, y) {
+      this.zoom = zoom;
+      zooms.push({ zoom, x, y });
+    },
+  };
+  const nav = new CameraNavigationInput(dom, camera);
+  const touch = (identifier, clientX, clientY, target = viewportTarget) => ({
+    identifier,
+    clientX,
+    clientY,
+    target,
+  });
+  const event = (touches, changedTouches = touches) => ({ touches, changedTouches, preventDefault() {} });
+
+  const viewportStart = touch(1, 80, 80);
+  nav.handleTouchStart(event([viewportStart], [viewportStart]));
+  const outsideStart = touch(2, 180, 80, outsideTarget);
+  nav.handleTouchStart(event([viewportStart, outsideStart], [outsideStart]));
+  nav.handleTouchMove(event([
+    touch(1, 110, 100),
+    touch(2, 240, 100, outsideTarget),
+  ], [
+    touch(1, 110, 100),
+    touch(2, 240, 100, outsideTarget),
+  ]));
+
+  assert(pans.length === 1, "touch gestures ignore touches that did not start on the viewport");
+  assertApprox(pans[0].dx, 30, 0.001, "mixed touch pan keeps the viewport-started finger delta");
+  assertApprox(pans[0].dy, 20, 0.001, "mixed touch pan keeps the viewport-started finger y delta");
+  assert(zooms.length === 0, "outside touches are not folded into viewport pinch zoom");
+
+  nav.handleTouchEnd(event([touch(2, 240, 100, outsideTarget)], [touch(1, 110, 100)]));
+  assert(nav.touchGesture === null, "releasing the viewport touch ends the camera gesture");
+}
+
 // ---------------------------------------------------------------------------
 // Match input router
 // ---------------------------------------------------------------------------

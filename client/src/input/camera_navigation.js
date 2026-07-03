@@ -37,6 +37,7 @@ export class CameraNavigationInput {
     this.spacePan = false;
     this.panDrag = null;
     this.touchGesture = null;
+    this.touchIds = new Set();
     this.suppressMouseUntil = 0;
     this._installed = false;
 
@@ -143,7 +144,8 @@ export class CameraNavigationInput {
 
   handleTouchStart(ev) {
     if (!this.camera) return false;
-    const points = this.touchPoints(ev.touches);
+    this.trackStartedTouches(ev);
+    const points = this.touchPoints(ev.touches, { activeOnly: true });
     if (points.length <= 0) return false;
     this.suppressSyntheticMouse();
     this.startTouchGesture(points);
@@ -153,7 +155,7 @@ export class CameraNavigationInput {
 
   handleTouchMove(ev) {
     if (!this.touchGesture) return false;
-    const points = this.touchPoints(ev.touches);
+    const points = this.touchPoints(ev.touches, { activeOnly: true });
     this.suppressSyntheticMouse();
     if (points.length <= 0) {
       this.finishTouchGesture();
@@ -166,7 +168,8 @@ export class CameraNavigationInput {
 
   handleTouchEnd(ev) {
     if (!this.touchGesture) return false;
-    const points = this.touchPoints(ev.touches);
+    this.releaseChangedTouches(ev);
+    const points = this.touchPoints(ev.touches, { activeOnly: true });
     this.suppressSyntheticMouse();
     if (points.length > 0) this.startTouchGesture(points);
     else this.finishTouchGesture();
@@ -213,6 +216,7 @@ export class CameraNavigationInput {
     this.spacePan = false;
     this.panDrag = null;
     this.touchGesture = null;
+    this.touchIds.clear();
   }
 
   screenPos(ev) {
@@ -303,12 +307,41 @@ export class CameraNavigationInput {
   finishTouchGesture() {
     this.touchGesture = null;
     this.mouse = null;
+    this.touchIds.clear();
   }
 
-  touchPoints(touches) {
-    return Array.from(touches || [], (touch) => this.screenPos(touch)).filter(
-      (point) => Number.isFinite(point.x) && Number.isFinite(point.y),
-    );
+  trackStartedTouches(ev) {
+    const started = touchArray(ev.changedTouches);
+    const touches = started.length > 0 ? started : touchArray(ev.touches);
+    for (let i = 0; i < touches.length; i += 1) {
+      const touch = touches[i];
+      if (this.touchStartedInViewport(touch)) {
+        this.touchIds.add(touchIdentifier(touch, i));
+      }
+    }
+  }
+
+  releaseChangedTouches(ev) {
+    const ended = touchArray(ev.changedTouches);
+    for (let i = 0; i < ended.length; i += 1) {
+      this.touchIds.delete(touchIdentifier(ended[i], i));
+    }
+    if (ended.length === 0 && touchArray(ev.touches).length === 0) {
+      this.touchIds.clear();
+    }
+  }
+
+  touchStartedInViewport(touch) {
+    const target = touch?.target;
+    if (!target || typeof this.domElement.contains !== "function") return true;
+    return target === this.domElement || this.domElement.contains(target);
+  }
+
+  touchPoints(touches, { activeOnly = false } = {}) {
+    return touchArray(touches)
+      .filter((touch, index) => !activeOnly || this.touchIds.has(touchIdentifier(touch, index)))
+      .map((touch) => this.screenPos(touch))
+      .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
   }
 
   suppressSyntheticMouse() {
@@ -328,6 +361,14 @@ function midpoint(a, b) {
 
 function distance(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function touchArray(touches) {
+  return Array.from(touches || []);
+}
+
+function touchIdentifier(touch, fallback) {
+  return Number.isFinite(touch?.identifier) ? touch.identifier : fallback;
 }
 
 function nowMs() {
