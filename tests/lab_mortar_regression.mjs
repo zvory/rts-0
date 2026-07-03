@@ -147,33 +147,27 @@ async function waitForMortarLaunchBeforeImpact(client, mortarId, startMessageInd
   let launch = null;
   let impact = null;
   let cursor = startMessageIndex;
+  const deadline = Date.now() + SNAPSHOT_TIMEOUT_MS;
 
-  while (!impact) {
-    let snapshot = null;
+  while (!impact && Date.now() < deadline) {
     while (cursor < client.msgs.length) {
       const msg = client.msgs[cursor++];
-      if (msg.t === "snapshot") {
-        snapshot = msg;
-        break;
-      }
-    }
-    if (!snapshot) {
-      snapshot = await client.waitNext(
-        (msg) => msg.t === "snapshot",
-        SNAPSHOT_TIMEOUT_MS,
-        "snapshot containing mortar launch/impact events",
-      );
-      cursor = client.msgs.length;
-    }
-    for (const event of snapshot.events || []) {
-      if (event?.e === EVENT.MORTAR_LAUNCH && event.from === mortarId) {
-        launch = { event, tick: snapshot.tick };
-      } else if (event?.e === EVENT.MORTAR_IMPACT) {
-        if (launch) {
-          impact = { event, tick: snapshot.tick };
+      if (msg.t !== "snapshot") continue;
+      for (const event of msg.events || []) {
+        if (event?.e === EVENT.MORTAR_LAUNCH && event.from === mortarId) {
+          launch = { event, tick: msg.tick };
+        } else if (event?.e === EVENT.MORTAR_IMPACT) {
+          if (launch) {
+            impact = { event, tick: msg.tick };
+          }
         }
       }
     }
+    if (!impact) await sleep(20);
+  }
+
+  if (!impact) {
+    throw new Error("[lab-mortar] timeout waiting for snapshot containing mortar launch/impact events");
   }
 
   requireCondition(launch, "P2 lab mortarLaunch reaches the lab operator");

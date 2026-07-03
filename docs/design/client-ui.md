@@ -1268,9 +1268,9 @@ selection rings):
   field-of-fire wedges remain visible for the currently selected owner even when the broad unit
   range overlay is off.
   Distinct silhouette per kind (engineer: compact block; rifleman: enabled PNG frame-strip
-  experiment with frame 0 idle and frames 1-4 moving; machine gunner / Panzerfaust:
-  shared SVG infantry body with oversized role weapons; Panzerfaust specifically carries a short
-  one-shot launcher tube while loaded; Anti-Tank Gun: wheeled gun; mortar team: crewless
+  experiment with frame 0 idle and frames 1-4 moving; machine gunner: enabled PNG frame-strip
+  experiment with carried movement frames and setup/deployed frames; Panzerfaust: shared SVG
+  infantry body with a short one-shot launcher tube while loaded; Anti-Tank Gun: wheeled gun; mortar team: crewless
   M1938-inspired small wheeled mortar that travels low and deploys upright; scout car: boxy
   WW2-style truck silhouette with enclosed wheels and a rear-top machine-gunner; tank: chunky
   flat-shaded armor with movement-facing tracks, hull, nose, and shadow plus weapon-facing turret,
