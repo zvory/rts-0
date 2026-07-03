@@ -10,6 +10,7 @@ const MIN_HEIGHT = 220;
 const KEYBOARD_STEP = 24;
 const KEYBOARD_LARGE_STEP = 72;
 const STORAGE_SCHEMA_VERSION = 1;
+const MOBILE_LAYOUT_MAX_WIDTH = 720;
 
 export class LabPanelWindowChrome {
   constructor(el, options = {}) {
@@ -198,16 +199,28 @@ export class LabPanelWindowChrome {
   }
 
   constrainToViewport() {
-    if (this.el.dataset.windowed !== "true") return;
-    this.applyGeometry(this.currentGeometry());
+    if (this.isMobileLayout()) {
+      this.clearGeometryStyles();
+      this.el.dataset.windowed = "false";
+      return;
+    }
+    const geometry = this.el.dataset.windowed === "true" ? this.currentGeometry() : this.readGeometry();
+    if (!geometry) {
+      this.el.dataset.windowed = "false";
+      return;
+    }
+    this.applyGeometry(geometry);
     this.saveGeometry(this.currentGeometry());
   }
 
   restoreGeometry() {
     const saved = this.readStoredState();
     this.setCollapsed(saved?.collapsed === true, { save: false });
-    if (saved?.geometry) this.applyGeometry(saved.geometry);
-    else this.el.dataset.windowed = "false";
+    if (saved?.geometry && !this.isMobileLayout()) this.applyGeometry(saved.geometry);
+    else {
+      if (this.isMobileLayout()) this.clearGeometryStyles();
+      this.el.dataset.windowed = "false";
+    }
   }
 
   resetGeometry() {
@@ -302,6 +315,10 @@ export class LabPanelWindowChrome {
     };
   }
 
+  isMobileLayout() {
+    return this.viewport().width <= MOBILE_LAYOUT_MAX_WIDTH;
+  }
+
   listenRender(target, type, handler) {
     target.addEventListener(type, handler);
     this.renderListeners.push([target, type, handler]);
@@ -353,6 +370,10 @@ export class LabPanelWindowChrome {
 
   saveGeometry(geometry) {
     try {
+      if (this.isMobileLayout()) {
+        this.saveCollapsedState();
+        return;
+      }
       const next = this.constrainGeometry(geometry);
       this.storage?.setItem?.(this.storageKey, JSON.stringify({
         schemaVersion: STORAGE_SCHEMA_VERSION,

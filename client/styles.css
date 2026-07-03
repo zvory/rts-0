@@ -2263,9 +2263,21 @@ input[type="text"]:focus {
   color: #bde6ba;
 }
 @media (max-width: 720px) {
-  .lab-tools-window {
-    top: 274px;
+  .lab-options-window {
+    top: 232px;
     right: 12px;
+  }
+
+  .lab-tools-window {
+    top: 326px;
+    right: 12px;
+  }
+
+  .lab-panel-collapse,
+  .room-time-panel-collapse {
+    min-height: 36px;
+    padding: 7px 10px;
+    touch-action: manipulation;
   }
 }
 
