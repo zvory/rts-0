@@ -72,6 +72,27 @@ import { textWithin } from "./dom_text.mjs";
 }
 
 {
+  const styles = fs.readFileSync(new URL("../../client/styles.css", import.meta.url), "utf8");
+  const labMobileStart = styles.indexOf("@media (max-width: 720px) {", styles.indexOf(".lab-result[data-state=\"ok\"]"));
+  const labMobileEnd = styles.indexOf("/* --- Settings menu --- */", labMobileStart);
+  const labMobileStyles = labMobileStart >= 0 && labMobileEnd > labMobileStart
+    ? styles.slice(labMobileStart, labMobileEnd)
+    : "";
+  assert(
+    /\.lab-options-window\s*\{[^}]*top:\s*232px\b/s.test(labMobileStyles),
+    "lab mobile CSS moves the Options window below expanded room-time controls",
+  );
+  assert(
+    /\.lab-tools-window\s*\{[^}]*top:\s*326px\b/s.test(labMobileStyles),
+    "lab mobile CSS keeps the Tools window header on a separate tap row",
+  );
+  assert(
+    /\.lab-panel-collapse,\s*\.room-time-panel-collapse\s*\{[^}]*min-height:\s*36px\b[^}]*touch-action:\s*manipulation\b/s.test(labMobileStyles),
+    "lab mobile CSS gives floating-panel collapse buttons a touch-friendly hit target",
+  );
+}
+
+{
   const normalized = normalizeLabScenarioEntry({
     id: "lategame",
     title: "Lategame Arsenal",
@@ -1315,6 +1336,40 @@ await withFakeDocument(async () => {
   assert(!storage.values.has("test.lab.panel.window"), "LabPanelWindowChrome reset clears stored geometry");
   chrome.destroy();
   assert(!windowListeners.has("resize"), "LabPanelWindowChrome removes global listeners on destroy");
+});
+
+await withFakeDocument(async () => {
+  const el = document.createElement("aside");
+  const storage = fakeStorage({
+    "test.lab.panel.mobile": JSON.stringify({
+      schemaVersion: 1,
+      collapsed: true,
+      left: 620,
+      top: 58,
+      width: 320,
+      height: 432,
+    }),
+  });
+  const windowObj = {
+    innerWidth: 390,
+    innerHeight: 844,
+    localStorage: storage,
+    addEventListener() {},
+    removeEventListener() {},
+  };
+  const chrome = new LabPanelWindowChrome(el, {
+    windowObj,
+    storage,
+    storageKey: "test.lab.panel.mobile",
+  });
+  const header = chrome.renderHeader({ kicker: "Options", collapseLabel: "options panel" });
+  const collapseButton = header.children[1].children[0];
+
+  assert(el.dataset.windowed === "false", "LabPanelWindowChrome ignores saved desktop geometry on mobile widths");
+  assert(!el.style.left && !el.style.top, "LabPanelWindowChrome leaves mobile panels on stylesheet positions");
+  assert(el.dataset.collapsed === "true" && collapseButton.textContent === "Expand",
+    "LabPanelWindowChrome preserves saved collapsed state without restoring overlapping geometry");
+  chrome.destroy();
 });
 
 // ---------------------------------------------------------------------------

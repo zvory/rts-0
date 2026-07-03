@@ -7,6 +7,7 @@ const ROOM_TIME_PANEL_KEY_STEP_LARGE = 72;
 const ROOM_TIME_PANEL_DEFAULT_WIDTH = 420;
 const ROOM_TIME_PANEL_DEFAULT_HEIGHT = 120;
 const ROOM_TIME_PANEL_STORAGE_SCHEMA_VERSION = 1;
+const ROOM_TIME_PANEL_MOBILE_MAX_WIDTH = 720;
 
 export class FloatingRoomTimePanel {
   constructor({ root, label }) {
@@ -226,7 +227,7 @@ export class FloatingRoomTimePanel {
   restorePosition() {
     const saved = this.readPosition();
     this.setCollapsed(saved?.collapsed === true, { save: false });
-    if (saved) this.applyPosition(saved);
+    if (saved && !isMobilePanelViewport()) this.applyPosition(saved);
   }
 
   resetPosition() {
@@ -237,6 +238,10 @@ export class FloatingRoomTimePanel {
 
   constrainToViewport() {
     if (!this.root || this.root.hidden) return;
+    if (isMobilePanelViewport()) {
+      this.clearPositionStyles();
+      return;
+    }
     this.applyPosition(this.currentRect());
     this.savePosition(this.currentRect());
   }
@@ -344,6 +349,10 @@ function panelViewport() {
       finitePositive(documentElement?.clientHeight) ||
       900,
   };
+}
+
+function isMobilePanelViewport() {
+  return panelViewport().width <= ROOM_TIME_PANEL_MOBILE_MAX_WIDTH;
 }
 
 function arrowDelta(event) {

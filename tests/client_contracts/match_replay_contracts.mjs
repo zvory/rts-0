@@ -708,6 +708,40 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   assert(replayControls.children.includes(seekBack), "destroy unwraps static room-time controls back onto the root");
   assert(replayControls._listeners.size === 0, "destroy removes room-time click listener");
 
+  localStorageValues.set("rts.roomTimeControls.panel.v1", JSON.stringify({
+    schemaVersion: 1,
+    left: 260,
+    top: 70,
+    collapsed: true,
+  }));
+  globalThis.window.innerWidth = 390;
+  const mobileRoomTimeControls = fakeEl("div");
+  const mobileSpeed = fakeEl("button");
+  mobileSpeed.className = "spd-btn";
+  mobileSpeed.dataset.speed = "1";
+  mobileRoomTimeControls.appendChild(mobileSpeed);
+  dom.roomTimeControls = mobileRoomTimeControls;
+  const mobileRoomTimeUi = new RoomTimeControls({
+    net: replayNet,
+    state: roomTimeState,
+    capabilities: createRoomCapabilities({
+      startPayload: {
+        capabilities: {
+          roomTime: { available: true, setSpeed: true },
+        },
+      },
+    }),
+  });
+  assert(!mobileRoomTimeControls.style.left && !mobileRoomTimeControls.style.top,
+    "room-time controls ignore saved desktop panel position on mobile widths");
+  assert(
+    mobileRoomTimeControls.dataset.collapsed === "true" &&
+      mobileRoomTimeControls.querySelector(".room-time-panel-body").hidden === true,
+    "room-time controls preserve saved collapsed state without restoring overlapping geometry",
+  );
+  mobileRoomTimeUi.destroy();
+  globalThis.window.innerWidth = 1000;
+
   const visionSelectionOnlyControls = fakeEl("div");
   dom.roomTimeControls = visionSelectionOnlyControls;
   const visionSelectionOnlyUi = new ReplayControls({

@@ -10,6 +10,7 @@ const MIN_HEIGHT = 220;
 const KEYBOARD_STEP = 24;
 const KEYBOARD_LARGE_STEP = 72;
 const STORAGE_SCHEMA_VERSION = 1;
+const MOBILE_LAYOUT_MAX_WIDTH = 720;
 
 export class LabPanelWindowChrome {
   constructor(el, options = {}) {
@@ -199,6 +200,11 @@ export class LabPanelWindowChrome {
 
   constrainToViewport() {
     if (this.el.dataset.windowed !== "true") return;
+    if (this.isMobileLayout()) {
+      this.clearGeometryStyles();
+      this.el.dataset.windowed = "false";
+      return;
+    }
     this.applyGeometry(this.currentGeometry());
     this.saveGeometry(this.currentGeometry());
   }
@@ -206,7 +212,7 @@ export class LabPanelWindowChrome {
   restoreGeometry() {
     const saved = this.readStoredState();
     this.setCollapsed(saved?.collapsed === true, { save: false });
-    if (saved?.geometry) this.applyGeometry(saved.geometry);
+    if (saved?.geometry && !this.isMobileLayout()) this.applyGeometry(saved.geometry);
     else this.el.dataset.windowed = "false";
   }
 
@@ -300,6 +306,10 @@ export class LabPanelWindowChrome {
         finitePositive(documentElement?.clientHeight) ||
         900,
     };
+  }
+
+  isMobileLayout() {
+    return this.viewport().width <= MOBILE_LAYOUT_MAX_WIDTH;
   }
 
   listenRender(target, type, handler) {
