@@ -1,0 +1,16 @@
+{
+  "pipelineVersion": 1,
+  "source": "built-in image_gen",
+  "status": "archival-experiment-not-production",
+  "unit": "rifleman",
+  "prompt": "client/assets/rigs/rifleman-backpack-hidden-legs/metadata/prompt.md",
+  "sourceSheet": "client/assets/rigs/rifleman-backpack-hidden-legs/generated/rifleman-backpack-hidden-legs-pass-01-source.png",
+  "alphaSheet": "client/assets/rigs/rifleman-backpack-hidden-legs/generated/rifleman-backpack-hidden-legs-pass-01-alpha.png",
+  "previewWebm": "client/assets/rigs/rifleman-backpack-hidden-legs/generated/rifleman-backpack-hidden-legs-pass-01-12fps.webm",
+  "previewWebp": "client/assets/rigs/rifleman-backpack-hidden-legs/generated/rifleman-backpack-hidden-legs-pass-01-12fps-loop.webp",
+  "frameCount": 6,
+  "previewFps": 12,
+  "webpLoopCount": 0,
+  "runtimeEnabled": false,
+  "notes": "This pass documents prompt lessons for rotation-safe top-down rifleman art. It is intentionally not referenced by client runtime code."
+}
