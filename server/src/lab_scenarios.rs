@@ -15,8 +15,8 @@ use rts_sim::game::Game;
 use serde::{Deserialize, Serialize};
 
 use crate::protocol::{
-    LabCheckpointScenarioV1, LabScenarioAuthoringMetadata, LabScenarioLabMetadata,
-    LabScenarioPayload, LabVisionMode, TeamId,
+    InitialCamera, LabCheckpointScenarioV1, LabScenarioAuthoringMetadata, LabScenarioLabMetadata,
+    LabScenarioPayload, LabVisionMode, MapInfo, TeamId,
 };
 
 const LAB_SCENARIO_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/lab-scenarios");
@@ -490,7 +490,7 @@ fn validate_checkpoint_lab_metadata_matches_game(
         .iter()
         .map(|player| (player.id, player.team_id))
         .collect();
-    validate_lab_metadata_for_player_facts(lab, &player_facts)?;
+    validate_lab_metadata_for_player_facts(lab, &player_facts, &start.map)?;
     let expected: HashSet<_> = game.lab_god_mode_players().into_iter().collect();
     let actual: HashSet<_> = lab.god_mode_players.iter().copied().collect();
     if actual != expected {
@@ -504,9 +504,35 @@ fn validate_checkpoint_lab_metadata_matches_game(
 fn validate_lab_metadata_for_player_facts(
     lab: &LabScenarioLabMetadata,
     players: &[(u32, TeamId)],
+    map: &MapInfo,
 ) -> Result<(), String> {
     validate_lab_scenario_vision(&lab.vision, players)?;
-    validate_lab_scenario_god_mode_players(&lab.god_mode_players, players)
+    validate_lab_scenario_god_mode_players(&lab.god_mode_players, players)?;
+    validate_lab_scenario_initial_camera(lab.initial_camera.as_ref(), map)
+}
+
+fn validate_lab_scenario_initial_camera(
+    initial_camera: Option<&InitialCamera>,
+    map: &MapInfo,
+) -> Result<(), String> {
+    let Some(initial_camera) = initial_camera else {
+        return Ok(());
+    };
+    let world_w = map
+        .width
+        .checked_mul(map.tile_size)
+        .ok_or_else(|| "initialCamera map width overflows".to_string())?;
+    let world_h = map
+        .height
+        .checked_mul(map.tile_size)
+        .ok_or_else(|| "initialCamera map height overflows".to_string())?;
+    if world_w == 0 || world_h == 0 {
+        return Err("initialCamera requires a non-empty map".to_string());
+    }
+    if initial_camera.center_x >= world_w || initial_camera.center_y >= world_h {
+        return Err("initialCamera center must be inside the map world bounds".to_string());
+    }
+    Ok(())
 }
 
 fn validate_lab_scenario_vision(

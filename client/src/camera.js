@@ -64,6 +64,12 @@ export class Camera {
     if (Number.isFinite(zoom)) {
       this.zoom = Math.max(CAMERA.minZoom, Math.min(CAMERA.maxZoom, zoom));
     }
+    const centerX = Number(view.centerX);
+    const centerY = Number(view.centerY);
+    if (Number.isFinite(centerX) && Number.isFinite(centerY)) {
+      this.centerOn(centerX, centerY);
+      return;
+    }
     const x = Number(view.x);
     const y = Number(view.y);
     if (Number.isFinite(x)) this.x = x;

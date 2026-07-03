@@ -186,6 +186,13 @@ fn lab_start_payload_uses_bundled_render_preview_god_mode() {
     assert_eq!(starts.len(), 1);
     let lab = starts[0].lab.as_ref().expect("lab metadata");
     assert_eq!(lab.god_mode_players, vec![1, 2]);
+    assert_eq!(
+        lab.initial_camera,
+        Some(crate::protocol::InitialCamera {
+            center_x: 2016,
+            center_y: 2016,
+        })
+    );
     let Phase::InGame(game) = &task.phase else {
         panic!("render preview lab should start immediately");
     };

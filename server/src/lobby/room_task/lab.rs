@@ -27,8 +27,9 @@ use crate::lab_scenarios::{
     lab_scenario_payload_to_lab_op, load_lab_scenario_by_id, validate_lab_scenario_authoring,
 };
 use crate::protocol::{
-    Event, LabClientOp, LabResult, LabScenarioLabMetadata, LabScenarioPayload, LabStartMetadata,
-    LabStartRole, LabState, LabVisionMode, ServerMessage, TeamId, DEFAULT_FACTION_ID,
+    Event, InitialCamera, LabClientOp, LabResult, LabScenarioLabMetadata, LabScenarioPayload,
+    LabStartMetadata, LabStartRole, LabState, LabVisionMode, ServerMessage, TeamId,
+    DEFAULT_FACTION_ID,
 };
 use crate::structured_log::{self, MatchStartedLog};
 use rts_sim::game::{Game, PlayerInit};
@@ -44,6 +45,7 @@ pub(super) struct LabSession {
     pub(super) viewer_roles: HashMap<u32, LabStartRole>,
     pub(super) viewer_visions: HashMap<u32, LabVisionMode>,
     pub(super) default_vision: LabVisionMode,
+    pub(super) initial_camera: Option<InitialCamera>,
     pub(super) dirty: bool,
     pub(super) operation_log: Vec<LabOperationLogEntry>,
     pub(super) view_player_id: u32,
@@ -67,6 +69,7 @@ struct LabLaunch {
     player_count: usize,
     participants: Vec<String>,
     default_vision: Option<LabVisionMode>,
+    initial_camera: Option<InitialCamera>,
     god_mode_players: Vec<u32>,
 }
 
@@ -83,6 +86,7 @@ impl LabSession {
             viewer_roles,
             viewer_visions,
             default_vision,
+            initial_camera: None,
             dirty: false,
             operation_log: Vec::new(),
             view_player_id: LAB_PLAYER_ONE_ID,
@@ -139,6 +143,7 @@ impl LabSession {
             role: self.role_for(player_id),
             vision: self.vision_for(player_id),
             god_mode_players,
+            initial_camera: self.initial_camera,
             dirty: self.dirty,
             operation_count: self.operation_log.len() as u32,
         }
@@ -456,6 +461,9 @@ impl RoomTask {
                 session.import_vision_for(session.operator_id, vision);
             }
         }
+        if let Some(session) = &mut self.lab_session {
+            session.initial_camera = launch.initial_camera;
+        }
         let launch_god_mode_players = launch.god_mode_players.clone();
         let game = launch.game;
         let initial_setup =
@@ -542,6 +550,7 @@ impl RoomTask {
         let (seed, map_name) = match &loaded.scenario {
             LabScenarioPayload::Checkpoint(scenario) => (scenario.seed, scenario.map.name.clone()),
         };
+        let lab_metadata = lab_scenario_payload_lab_metadata(&loaded.scenario);
         Ok(LabLaunch {
             game,
             seed,
@@ -552,11 +561,8 @@ impl RoomTask {
                 .iter()
                 .map(|player| player.name.clone())
                 .collect(),
-            default_vision: Some(
-                lab_scenario_payload_lab_metadata(&loaded.scenario)
-                    .vision
-                    .clone(),
-            ),
+            default_vision: Some(lab_metadata.vision.clone()),
+            initial_camera: lab_metadata.initial_camera,
             god_mode_players,
         })
     }
@@ -586,6 +592,7 @@ impl RoomTask {
             player_count: inits.len(),
             participants: inits.iter().map(|player| player.name.clone()).collect(),
             default_vision: None,
+            initial_camera: None,
             god_mode_players: Vec::new(),
         })
     }
@@ -986,6 +993,7 @@ impl RoomTask {
             LabScenarioLabMetadata {
                 vision: session.vision_for(operator_id),
                 god_mode_players: game.lab_god_mode_players(),
+                initial_camera: session.initial_camera,
             },
             crate::build_info::build_id(),
         )?;
@@ -1010,6 +1018,12 @@ impl RoomTask {
         let imported_vision = match &op {
             LabClientOp::ImportScenario { scenario } => {
                 Some(lab_scenario_payload_lab_metadata(scenario).vision.clone())
+            }
+            _ => None,
+        };
+        let imported_initial_camera = match &op {
+            LabClientOp::ImportScenario { scenario } => {
+                lab_scenario_payload_lab_metadata(scenario).initial_camera
             }
             _ => None,
         };
@@ -1103,6 +1117,9 @@ impl RoomTask {
             session.dirty = true;
             if let Some(vision) = imported_vision {
                 session.import_vision_for(operator_id, vision);
+            }
+            if resets_timeline {
+                session.initial_camera = imported_initial_camera;
             }
             if log_operations {
                 session.operation_log.push(LabOperationLogEntry {

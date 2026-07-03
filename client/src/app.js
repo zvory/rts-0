@@ -337,9 +337,11 @@ export class App {
     const labMetadata = payload?.lab || null;
     const visualProfile = labMetadata ? this.labVisualProfileState?.profile || null : null;
     const visualProfileError = labMetadata ? this.labVisualProfileState?.error || null : null;
+    const scenarioInitialCamera = labMetadata?.initialCamera || null;
 
     const carriedCamera = this.takeMatchCameraView() ||
       this.pendingCameraView ||
+      scenarioInitialCamera ||
       visualProfile?.initialCamera ||
       null;
     this.pendingCameraView = null;

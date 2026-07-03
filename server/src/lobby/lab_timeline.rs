@@ -417,6 +417,7 @@ mod tests {
             LabScenarioLabMetadata {
                 vision: LabVisionMode::FullWorld,
                 god_mode_players: game.lab_god_mode_players(),
+                initial_camera: None,
             },
             "test-build",
         )

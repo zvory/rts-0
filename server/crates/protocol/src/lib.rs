@@ -31,7 +31,7 @@ pub use messagepack_frame::MESSAGEPACK_SNAPSHOT_FRAME_MAGIC;
 pub use rts_contract::{
     AbilityCooldownView, AbilityObjectOwnerStateView, AbilityObjectView, ActionCapabilities,
     AttackReveal, CommandCapabilities, DebugPathPoint, DebugPathView, DiagnosticCapabilities,
-    EntityView, Event, LabStartMetadata, LabStartRole, LabVisionMode, MapInfo,
+    EntityView, Event, InitialCamera, LabStartMetadata, LabStartRole, LabVisionMode, MapInfo,
     MatchControlCapabilities, MovementPathDiagnosticScope, NoticeSeverity, OrderPlanMarker,
     PlayerResourceSnapshot, PlayerScore, PlayerStart, RememberedBuildingView, ReplayStartMetadata,
     ResourceDelta, ResourceNode, RoomCapabilities, RoomTimeCapabilities, RoomTimeState,

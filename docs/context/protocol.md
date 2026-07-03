@@ -32,7 +32,8 @@ Use when adding, removing, or changing any field on a client↔server message, s
 - `lobby` carries `map` (selected stable map name) and `maps[]` (`{name, description}` catalog
   rows). Replay start metadata separately uses `mapName`.
 - Lab start payloads carry `lab` metadata with the public lab id, original operator id, recipient
-  role, that recipient's current lab vision mode, dirty flag, and operation count.
+  role, that recipient's current lab vision mode, optional setup-authored initial camera center,
+  dirty flag, and operation count.
 - Start payloads carry recipient-scoped `capabilities` metadata for shared room-time,
   vision-selection, and gameplay-command affordances. The client parser must not infer these from
   replay/dev/lab mode names. Lab timeline controls use neutral room-time speed, pause, step,
@@ -51,7 +52,8 @@ Use when adding, removing, or changing any field on a client↔server message, s
   disabled-by-default draft PR service. `submitScenario` returns one async `labResult` and never
   accepts client-supplied setup JSON, branch names, paths, or credentials. Validation and submission
   recheck catalog duplicates, id-matched filenames, entity/payload caps, map binding, and the
-  setup-plus-manifest path allowlist before any GitHub side effect.
+  setup-plus-manifest path allowlist before any GitHub side effect. Checkpoint setup metadata can
+  include `metadata.lab.initialCamera` as a world-pixel center for the browser's first Lab view.
 
 ## Invariants
 - **Mirror.** Every protocol change touches both files **and**

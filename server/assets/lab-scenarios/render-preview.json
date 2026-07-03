@@ -15927,7 +15927,11 @@
       "godModePlayers": [
         1,
         2
-      ]
+      ],
+      "initialCamera": {
+        "centerX": 2016,
+        "centerY": 2016
+      }
     },
     "sourceEntityIdMap": [
       {

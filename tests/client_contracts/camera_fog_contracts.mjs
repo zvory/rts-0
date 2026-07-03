@@ -40,6 +40,10 @@ import { KIND, TERRAIN } from "../../client/src/protocol.js";
   assertApprox(cam.x, 120, 0.001, "Camera.setView restores x");
   assertApprox(cam.y, 140, 0.001, "Camera.setView restores y");
   assertApprox(cam.zoom, 1.25, 0.001, "Camera.setView restores zoom");
+
+  cam.setView({ centerX: 500, centerY: 400, zoom: 1 });
+  assertApprox(cam.x + cam.viewW / (2 * cam.zoom), 500, 0.001, "Camera.setView centers centerX");
+  assertApprox(cam.y + cam.viewH / (2 * cam.zoom), 400, 0.001, "Camera.setView centers centerY");
 }
 
 // ---------------------------------------------------------------------------

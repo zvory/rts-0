@@ -179,6 +179,13 @@ impl MovementPathDiagnosticScope {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct InitialCamera {
+    pub center_x: u32,
+    pub center_y: u32,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LabStartMetadata {
@@ -188,6 +195,8 @@ pub struct LabStartMetadata {
     pub vision: LabVisionMode,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub god_mode_players: Vec<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub initial_camera: Option<InitialCamera>,
     pub dirty: bool,
     pub operation_count: u32,
 }

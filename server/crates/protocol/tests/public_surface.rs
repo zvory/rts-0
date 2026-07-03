@@ -5,7 +5,7 @@ use rts_protocol::{
     AbilityObjectView, ActionCapabilities, AttackReveal, AvailableMap, BranchStagingOccupant,
     BranchStagingSeat, ClientMessage, ClientNetReport, Command, CommandCapabilities,
     CompactSlotSchemas, DebugPathPoint, DebugPathView, DiagnosticCapabilities, EntityView, Event,
-    LabClientOp, LabReplayArtifactV1, LabReplayAuthoringMetadata, LabReplayOperation,
+    InitialCamera, LabClientOp, LabReplayArtifactV1, LabReplayAuthoringMetadata, LabReplayOperation,
     LabReplayOperationEntry, LabReplayTimelineMetadata, LabReplayValidationError, LabResult,
     LabCheckpointScenarioMap, LabCheckpointScenarioMapData, LabCheckpointScenarioMetadata,
     LabCheckpointScenarioSource, LabCheckpointScenarioV1, LabScenarioEntityIdRemap,
@@ -50,6 +50,7 @@ fn stable_rust_public_surface_compiles() {
     assert_type::<DiagnosticCapabilities>();
     assert_type::<EntityView>();
     assert_type::<Event>();
+    assert_type::<InitialCamera>();
     assert_type::<LabClientOp>();
     assert_type::<LabReplayArtifactV1>();
     assert_type::<LabReplayAuthoringMetadata>();
