@@ -5,9 +5,9 @@
 // for the drag selection box. Layers are drawn back-to-front in this order:
 //
 //   terrain → decals → trenches → visual-samples → resources → building-shadows → buildings
-//   → building-overlays → unit-shadows → trench-occupant-shadows → units
-//   → trench-occupant-lips → selection-rings → hp-bars → fog → visual-sample-labels
-//   → shot-reveals → feedback → placement-ghost → drag-box
+//   → building-overlays → unit-shadows → trench-occupant-shadows → trench-occupant-lips
+//   → units → smokes → selection-rings → hp-bars → fog → visual-sample-labels
+//   → shot-reveal-shadows → shot-reveals → feedback → placement-ghost → drag-box
 //
 // Terrain is drawn once into a cached RenderTexture (it never changes mid-match).
 // Snapshot-backed ground decals and trench terrain stamp into persistent textures.
