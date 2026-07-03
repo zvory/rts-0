@@ -20,6 +20,8 @@ export class FloatingRoomTimePanel {
     this.drag = null;
     this.collapsed = false;
     this.collapseButton = null;
+    this.collapsePressPointerId = null;
+    this.lastTouchCollapseAt = 0;
   }
 
   mount() {
@@ -74,7 +76,10 @@ export class FloatingRoomTimePanel {
     this.contentEl = body;
     this.listenRender(dragHandle, "pointerdown", (event) => this.beginDrag(event));
     this.listenRender(dragHandle, "keydown", (event) => this.handleKeyDown(event));
-    this.listenRender(collapse, "click", () => this.toggleCollapsed());
+    this.listenRender(collapse, "pointerdown", (event) => this.beginCollapsePress(event));
+    this.listenRender(collapse, "pointerup", (event) => this.finishCollapsePress(event));
+    this.listenRender(collapse, "pointercancel", (event) => this.cancelCollapsePress(event));
+    this.listenRender(collapse, "click", (event) => this.handleCollapseClick(event));
     this.listenWindow("resize", () => this.constrainToViewport());
     this.restorePosition();
     return this.contentEl;
@@ -222,6 +227,34 @@ export class FloatingRoomTimePanel {
       top: rect.top + delta.y,
     });
     this.savePosition(this.currentRect());
+  }
+
+  beginCollapsePress(event) {
+    if (!isTouchPointer(event) || !isPrimaryPointer(event)) return;
+    this.collapsePressPointerId = event.pointerId ?? null;
+  }
+
+  finishCollapsePress(event) {
+    if (!isTouchPointer(event) || this.collapsePressPointerId == null || !samePointerId(this.collapsePressPointerId, event)) return;
+    this.collapsePressPointerId = null;
+    this.lastTouchCollapseAt = Date.now();
+    event.preventDefault?.();
+    event.stopPropagation?.();
+    this.toggleCollapsed();
+  }
+
+  cancelCollapsePress(event) {
+    if (this.collapsePressPointerId == null || !samePointerId(this.collapsePressPointerId, event)) return;
+    this.collapsePressPointerId = null;
+  }
+
+  handleCollapseClick(event) {
+    if (Date.now() - this.lastTouchCollapseAt < 750) {
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      return;
+    }
+    this.toggleCollapsed();
   }
 
   restorePosition() {
@@ -412,6 +445,15 @@ function isPrimaryPointer(event) {
 
 function samePointer(active, event) {
   return active.pointerId == null || event?.pointerId == null || active.pointerId === event.pointerId;
+}
+
+function samePointerId(pointerId, event) {
+  return pointerId == null || event?.pointerId == null || pointerId === event.pointerId;
+}
+
+function isTouchPointer(event) {
+  const pointerType = String(event?.pointerType || "");
+  return pointerType === "touch" || pointerType === "pen";
 }
 
 function parsePixels(value) {

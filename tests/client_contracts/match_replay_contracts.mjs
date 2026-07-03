@@ -644,6 +644,28 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
       replayControls.querySelector(".room-time-panel-body").hidden === false,
     "reset expands the floating room-time panel",
   );
+  collapsePanel._listeners.get("pointerdown")({
+    button: 0,
+    isPrimary: true,
+    pointerId: 8,
+    pointerType: "touch",
+  });
+  collapsePanel._listeners.get("pointerup")({
+    pointerId: 8,
+    pointerType: "touch",
+    preventDefault() {},
+    stopPropagation() {},
+  });
+  assert(
+    replayControls.dataset.collapsed === "true" &&
+      replayControls.querySelector(".room-time-panel-body").hidden === true,
+    "room-time touch release toggles collapse without waiting for a synthesized click",
+  );
+  collapsePanel._listeners.get("click")({
+    preventDefault() {},
+    stopPropagation() {},
+  });
+  assert(replayControls.dataset.collapsed === "true", "room-time controls ignore the click synthesized after touch collapse");
   const pauseReplay = replayControls.querySelector(".replay-pause-btn");
   assert(pauseReplay?.textContent === "Pause", "replay viewer builds a pause button");
   const branchReplay = replayControls.querySelector(".replay-branch-btn");
@@ -739,13 +761,25 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
       mobileRoomTimeControls.querySelector(".room-time-panel-body").hidden === true,
     "room-time controls preserve saved collapsed state without restoring overlapping geometry",
   );
-  mobileRoomTimeControls.querySelector(".room-time-panel-collapse")._listeners.get("click")({});
+  const mobileCollapse = mobileRoomTimeControls.querySelector(".room-time-panel-collapse");
+  mobileCollapse._listeners.get("pointerdown")({
+    button: 0,
+    isPrimary: true,
+    pointerId: 9,
+    pointerType: "touch",
+  });
+  mobileCollapse._listeners.get("pointerup")({
+    pointerId: 9,
+    pointerType: "touch",
+    preventDefault() {},
+    stopPropagation() {},
+  });
   const mobileRoomTimeStored = JSON.parse(localStorageValues.get("rts.roomTimeControls.panel.v1"));
   assert(
     mobileRoomTimeStored.left === 260 &&
       mobileRoomTimeStored.top === 70 &&
       mobileRoomTimeStored.collapsed === false,
-    "room-time controls preserve saved desktop position when collapse is toggled on mobile",
+    "room-time controls preserve saved desktop position when touch collapse is toggled on mobile",
   );
   globalThis.window.innerWidth = 1000;
   windowListeners.get("resize")();
