@@ -8,19 +8,23 @@
     "carrySource": "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-01-carry-source.png",
     "carryAlpha": "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-01-carry-alpha.png",
     "deploySource": "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-01-deploy-source.png",
-    "deployAlpha": "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-01-deploy-alpha.png"
+    "deployAlpha": "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-01-deploy-alpha.png",
+    "fireRecoilSource": "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-01-fire-recoil-source.png",
+    "fireRecoilAlpha": "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-01-fire-recoil-alpha.png",
+    "fireRecoilStrip": "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-01-fire-recoil-strip.png"
   },
   "runtime": {
     "module": "client/src/renderer/rigs/machine_gunner_png_strip.js",
-    "stripImageUrl": "/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png?v=pass01-setup",
+    "stripImageUrl": "/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png?v=pass01-setup-recoil",
     "runtimeStrip": "client/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png",
     "frameWidth": 128,
     "frameHeight": 128,
-    "frameCount": 12,
+    "frameCount": 15,
     "idleFrame": 0,
     "movementFrames": [0, 1, 2, 3, 4, 5],
     "setupFrames": [6, 7, 8, 9, 10, 11],
     "deployedFrame": 11,
+    "firingFrames": [12, 13, 14],
     "fps": 12,
     "worldScale": 0.42,
     "movementWorldScale": 0.34,
@@ -40,13 +44,15 @@
   },
   "originalGeneratedSources": {
     "carrySource": "/Users/az/.codex/generated_images/019f2973-4859-7170-8fe3-817503530ff9/ig_0e67faab3db9aa42016a481df88be081959c92aeed9f10071c.png",
-    "deploySource": "/Users/az/.codex/generated_images/019f2973-4859-7170-8fe3-817503530ff9/ig_0c8f42032db30baf016a481ef78f5c819397218f423577d071.png"
+    "deploySource": "/Users/az/.codex/generated_images/019f2973-4859-7170-8fe3-817503530ff9/ig_0c8f42032db30baf016a481ef78f5c819397218f423577d071.png",
+    "fireRecoilSource": "/Users/az/.codex/generated_images/019f2a3c-aaaa-7f80-81eb-6fd4691bd5aa/ig_01b10883b95849de016a48412d1b388194a5038e5a343996b4.png"
   },
   "notes": [
     "Frames 0-5 come from the edited rifleman carry sheet and cycle while the Machine Gunner is moving; runtime rotates only those movement frames 90 degrees left and renders them at the smaller movementWorldScale.",
     "Frame 6 reuses a carry frame so setup starts from the same carried MG pose.",
     "Frames 7-11 come from the deploy-only generation and are selected over the client setup animation duration.",
     "The checked-in runtime strip keeps the raw generated color; the client applies the shared frame-strip color target at texture load time.",
+    "Frames 12-14 are a three-frame no-muzzle-flare firing recoil strip; frames 12 and 14 reuse deployed frame 11 so the animation resets to the exact held pose.",
     "The deployed source points south/down in the sheet; runtime subtracts PI/2 from weaponFacing for setup/deployed frame-strip rotation."
   ]
 }

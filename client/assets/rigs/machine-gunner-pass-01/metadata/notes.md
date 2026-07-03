@@ -13,6 +13,8 @@ used as the reference for the deploy-only generation.
   south-facing deployed pose with the bipod open.
 - The frame-strip renderer maps `setting_up` and `tearing_down` progress onto frames 6-11. A fully
   `deployed` Machine Gunner holds frame 11.
+- Frames 12-14 are a no-muzzle-flare firing recoil strip. Frames 12 and 14 are exact copies of the
+  fully deployed frame 11, while frame 13 is the ImageGen-derived recoil peak.
 - The deployed art points down/south in the sheet, so runtime setup/deployed rendering applies a
   `PI/2` forward-angle offset to align that sprite direction with authoritative `weaponFacing`.
 
@@ -22,3 +24,5 @@ used as the reference for the deploy-only generation.
   front-facing boots and standing character art.
 - The setup pass works better when generated separately from movement. Do not ask for movement,
   setup, and final deployed frames in one prompt unless there is a stronger reference sheet.
+- For firing recoil, keep the first and last frame anchored to frame 11 so the deployed idle pose
+  does not pop when the recoil clip starts or finishes.

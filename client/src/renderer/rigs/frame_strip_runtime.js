@@ -65,6 +65,8 @@ function frameStripSetupFrameIndex(strip, entity, renderContext = {}, idleFrame 
   if (setupFrames.length === 0) return null;
   const setupState = entity?.setupState || SETUP.PACKED;
   if (setupState === SETUP.DEPLOYED) {
+    const firingFrame = frameStripFiringFrameIndex(strip, entity, renderContext, idleFrame);
+    if (firingFrame != null) return firingFrame;
     return validFrame(strip, strip?.deployedFrame ?? setupFrames[setupFrames.length - 1], idleFrame);
   }
   if (setupState !== SETUP.SETTING_UP && setupState !== SETUP.TEARING_DOWN) return null;
@@ -72,6 +74,16 @@ function frameStripSetupFrameIndex(strip, entity, renderContext = {}, idleFrame 
   const progress = clamp01(finite(setupVisual.frameProgress, finite(setupVisual.prongFactor, 0)));
   const index = Math.min(setupFrames.length - 1, Math.floor(progress * setupFrames.length));
   return setupFrames[index];
+}
+
+function frameStripFiringFrameIndex(strip, entity, renderContext = {}, fallback = 0) {
+  if (entity?.state === STATE.MOVE) return null;
+  const firingFrames = validFrameList(strip, strip?.firingFrames);
+  if (firingFrames.length === 0) return null;
+  if (clamp01(finite(renderContext.recoilProgress, 0)) <= 0) return null;
+  const phase = clamp01(finite(renderContext.recoilPhase, 0));
+  const index = Math.min(firingFrames.length - 1, Math.floor(phase * firingFrames.length));
+  return validFrame(strip, firingFrames[index], fallback);
 }
 
 export function frameStripVisualFacing(stripOrEntity, maybeEntity = null) {
