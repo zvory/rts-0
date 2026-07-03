@@ -503,6 +503,7 @@ impl RoomTask {
             .unwrap_or_else(|| "Untitled lab replay".to_string());
         let mut initial_setup = timeline.initial_setup().clone();
         initial_setup.metadata.lab.vision = session.vision_for(operator_id);
+        initial_setup.metadata.lab.initial_camera = session.initial_camera;
         let artifact = LabReplayArtifactV1 {
             schema: LAB_REPLAY_ARTIFACT_SCHEMA.to_string(),
             schema_version: LAB_REPLAY_ARTIFACT_SCHEMA_VERSION,

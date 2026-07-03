@@ -7,6 +7,7 @@ import {
   assertHasMethod,
 } from "./assertions.mjs";
 import { Camera } from "../../client/src/camera.js";
+import { selectInitialCameraView } from "../../client/src/camera_view_selection.js";
 import { Fog } from "../../client/src/fog.js";
 import { KIND, TERRAIN } from "../../client/src/protocol.js";
 
@@ -44,6 +45,34 @@ import { KIND, TERRAIN } from "../../client/src/protocol.js";
   cam.setView({ centerX: 500, centerY: 400, zoom: 1 });
   assertApprox(cam.x + cam.viewW / (2 * cam.zoom), 500, 0.001, "Camera.setView centers centerX");
   assertApprox(cam.y + cam.viewH / (2 * cam.zoom), 400, 0.001, "Camera.setView centers centerY");
+}
+
+{
+  const currentView = { x: 1, y: 2, zoom: 1 };
+  const pendingView = { x: 3, y: 4, zoom: 1 };
+  const visualProfileView = { x: 5, y: 6, zoom: 0.9 };
+  const scenarioView = { centerX: 7, centerY: 8 };
+  assert(
+    selectInitialCameraView({
+      currentView,
+      pendingView,
+      visualProfileView,
+      scenarioView,
+    }) === currentView,
+    "active match camera is preserved before launch defaults",
+  );
+  assert(
+    selectInitialCameraView({ pendingView, visualProfileView, scenarioView }) === pendingView,
+    "pending branch camera is preserved before launch defaults",
+  );
+  assert(
+    selectInitialCameraView({ visualProfileView, scenarioView }) === visualProfileView,
+    "visual profile camera overrides the scenario default camera",
+  );
+  assert(
+    selectInitialCameraView({ scenarioView }) === scenarioView,
+    "scenario camera is used as the lab launch default",
+  );
 }
 
 // ---------------------------------------------------------------------------
