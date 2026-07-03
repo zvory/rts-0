@@ -599,6 +599,20 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
       occupantLip?.calls.some((call) => call[0] === "beginFill" && call[1] === COLORS.trenchRim),
       "occupied trench overlay draws a foreground berm above the unit",
     );
+    const wrapPolygon = polygonAfterLineStyle(occupantShadow?.calls || [], COLORS.trenchRim);
+    const wrapXs = polygonAxisValues(wrapPolygon, 0);
+    const wrapYs = polygonAxisValues(wrapPolygon, 1);
+    assert(
+      Math.min(...wrapXs) < -8 && Math.max(...wrapXs) > 8 &&
+        Math.min(...wrapYs) < -8 && Math.max(...wrapYs) > 8,
+      "occupied trench back berm wraps around all sides below the unit",
+    );
+    const foregroundRimPolygon = polygonAfterFill(occupantLip?.calls || [], COLORS.trenchRim);
+    const foregroundRimYs = polygonAxisValues(foregroundRimPolygon, 1);
+    assert(
+      Math.min(...foregroundRimYs) > 0,
+      "occupied trench foreground lip stays on the front half instead of covering the unit center",
+    );
     const missingTrenchEntity = { ...entity, id: 4310, occupiedTrenchId: 999, x: 310, y: 210 };
     const missingTrenchDrawn = _drawOccupiedTrenches.call(renderer, [missingTrenchEntity], {
       map: { tileSize: 32 },
@@ -636,6 +650,30 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
   } finally {
     restorePixi();
   }
+}
+
+function polygonAfterFill(calls, fillColor) {
+  for (let i = 0; i < calls.length - 1; i += 1) {
+    if (calls[i][0] === "beginFill" && calls[i][1] === fillColor && calls[i + 1][0] === "drawPolygon") {
+      return Array.isArray(calls[i + 1][1]) ? calls[i + 1][1] : [];
+    }
+  }
+  return [];
+}
+
+function polygonAfterLineStyle(calls, lineColor) {
+  for (let i = 0; i < calls.length - 1; i += 1) {
+    if (calls[i][0] === "lineStyle" && calls[i][2] === lineColor && calls[i + 1][0] === "drawPolygon") {
+      return Array.isArray(calls[i + 1][1]) ? calls[i + 1][1] : [];
+    }
+  }
+  return [];
+}
+
+function polygonAxisValues(points, offset) {
+  const out = [];
+  for (let i = offset; i < points.length; i += 2) out.push(points[i]);
+  return out;
 }
 
 {

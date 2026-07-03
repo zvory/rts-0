@@ -225,6 +225,22 @@ export function drawOccupiedTrenchShadow(g, radius, seed = 1) {
   g.beginFill?.(COLORS.shadow, 0.2);
   g.drawEllipse?.(0, r * 0.16, r * 0.68, r * 0.34);
   g.endFill?.();
+
+  g.lineStyle?.(Math.max(2, r * 0.22), COLORS.trenchRim, 0.6);
+  g.drawPolygon?.(irregularLocalPolygon(r * 0.96, {
+    points: OCCUPIED_LIP_POINTS + 6,
+    jitter: 0.1,
+    rng,
+    offsetY: r * 0.02,
+  }));
+
+  g.lineStyle?.(Math.max(1.5, r * 0.13), COLORS.trenchDirt, 0.54);
+  g.drawPolygon?.(irregularLocalPolygon(r * 0.86, {
+    points: OCCUPIED_LIP_POINTS + 4,
+    jitter: 0.08,
+    rng,
+    offsetY: r * 0.025,
+  }));
 }
 
 export function drawOccupiedTrenchLip(g, radius, seed = 1) {
