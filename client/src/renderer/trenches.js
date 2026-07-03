@@ -6,6 +6,7 @@ export const TRENCH_DECAL_TEXTURE_WORLD_SCALE = 4;
 const TRENCH_MIN_RADIUS_PX = 4;
 const TRENCH_POLYGON_POINTS = 22;
 const TRENCH_FACET_COUNT = 5;
+const OCCUPIED_LIP_POINTS = 12;
 
 export class TrenchDecalLayer {
   constructor({
@@ -154,6 +155,37 @@ export function _drawTrenches(state) {
   return layer.drawSnapshot(state?.trenches, { tileSize });
 }
 
+export function _drawOccupiedTrenches(entities, state) {
+  const tileSize = (this._map && this._map.tileSize) || state?.map?.tileSize || 32;
+  const trenches = normalizedTrenches(state?.trenches, tileSize);
+  const trenchById = new Map(trenches.map((trench) => [trench.id, trench]));
+  let drawn = 0;
+
+  for (const entity of entities || []) {
+    const trenchId = occupiedTrenchId(entity);
+    if (trenchId == null) continue;
+    const trench = trenchById.get(trenchId);
+    if (!trench) continue;
+    const seed = occupiedTrenchSeed(entity, trench);
+
+    const shadow = this._slot?.("trenchOccupantShadows", entity.id);
+    if (shadow) {
+      shadow.position?.set?.(trench.x, trench.y);
+      drawOccupiedTrenchShadow(shadow, trench.radius, seed);
+    }
+
+    const lip = this._slot?.("trenchOccupantLips", entity.id);
+    if (lip) {
+      lip.position?.set?.(trench.x, trench.y);
+      drawOccupiedTrenchLip(lip, trench.radius, seed);
+    }
+    drawn += 1;
+  }
+
+  this._recordRenderDiagnostic?.("renderer.trenchOccupants.visible", drawn);
+  return drawn;
+}
+
 export function normalizedTrenches(trenches, tileSize = 32) {
   if (!Array.isArray(trenches)) return [];
   const fallbackRadius = ENTRENCHMENT_TRENCH_RADIUS_TILES * tileSize;
@@ -173,6 +205,68 @@ export function normalizedTrenches(trenches, tileSize = 32) {
   }
   out.sort((a, b) => a.id - b.id);
   return out;
+}
+
+export function drawOccupiedTrenchShadow(g, radius, seed = 1) {
+  if (!g || !finiteNumber(radius) || radius <= 0) return;
+  const rng = mulberry32(seed >>> 0);
+  const r = Math.max(TRENCH_MIN_RADIUS_PX, radius);
+
+  g.beginFill?.(COLORS.trenchShadow, 0.5);
+  g.drawPolygon?.(irregularLocalPolygon(r * 0.76, {
+    points: 18,
+    jitter: 0.18,
+    rng,
+    offsetX: r * 0.03,
+    offsetY: r * 0.08,
+  }));
+  g.endFill?.();
+
+  g.beginFill?.(COLORS.shadow, 0.2);
+  g.drawEllipse?.(0, r * 0.16, r * 0.68, r * 0.34);
+  g.endFill?.();
+}
+
+export function drawOccupiedTrenchLip(g, radius, seed = 1) {
+  if (!g || !finiteNumber(radius) || radius <= 0) return;
+  const rng = mulberry32((seed ^ 0x9e3779b9) >>> 0);
+  const r = Math.max(TRENCH_MIN_RADIUS_PX, radius);
+
+  g.beginFill?.(COLORS.trenchRim, 0.94);
+  g.drawPolygon?.(arcBandPolygon(r * 1.1, r * 0.5, Math.PI * 0.06, Math.PI * 0.94, {
+    points: OCCUPIED_LIP_POINTS,
+    jitter: 0.12,
+    rng,
+    offsetY: r * 0.08,
+  }));
+  g.endFill?.();
+
+  g.beginFill?.(COLORS.trenchDirt, 0.92);
+  g.drawPolygon?.(arcBandPolygon(r * 0.98, r * 0.58, Math.PI * 0.11, Math.PI * 0.89, {
+    points: OCCUPIED_LIP_POINTS - 2,
+    jitter: 0.1,
+    rng,
+    offsetY: r * 0.09,
+  }));
+  g.endFill?.();
+
+  g.beginFill?.(COLORS.trenchShadow, 0.34);
+  g.drawPolygon?.(arcBandPolygon(r * 0.7, r * 0.5, Math.PI * 0.12, Math.PI * 0.88, {
+    points: OCCUPIED_LIP_POINTS - 3,
+    jitter: 0.08,
+    rng,
+    offsetY: r * 0.06,
+  }));
+  g.endFill?.();
+
+  g.lineStyle?.(2, COLORS.trenchDirtLight, 0.42);
+  for (let i = 0; i < 4; i += 1) {
+    const angle = Math.PI * (0.18 + rng() * 0.64);
+    const inner = r * (0.6 + rng() * 0.08);
+    const outer = r * (0.96 + rng() * 0.1);
+    g.moveTo?.(Math.cos(angle) * inner, Math.sin(angle) * inner + r * 0.08);
+    g.lineTo?.(Math.cos(angle) * outer, Math.sin(angle) * outer + r * 0.08);
+  }
 }
 
 export function stampTrenchDecal(ctx, trench, downsample = TRENCH_DECAL_TEXTURE_WORLD_SCALE) {
@@ -205,6 +299,59 @@ export function stampTrenchDecal(ctx, trench, downsample = TRENCH_DECAL_TEXTURE_
     drawDirtFacet(ctx, x, y, r, rng, i);
   }
   return true;
+}
+
+function occupiedTrenchId(entity) {
+  const id = Number(entity?.occupiedTrenchId);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+function occupiedTrenchSeed(entity, trench) {
+  let seed = trenchSeed(trench);
+  seed = fnvStep(seed, Number(entity?.id) | 0);
+  return seed || 1;
+}
+
+function irregularLocalPolygon(radius, {
+  points,
+  jitter,
+  rng,
+  offsetX = 0,
+  offsetY = 0,
+}) {
+  const out = [];
+  const start = rng() * Math.PI * 2;
+  for (let i = 0; i < points; i += 1) {
+    const angle = start + (Math.PI * 2 * i) / points;
+    const localRadius = radius * (1 + (rng() - 0.5) * jitter);
+    out.push(
+      offsetX + Math.cos(angle) * localRadius,
+      offsetY + Math.sin(angle) * localRadius,
+    );
+  }
+  return out;
+}
+
+function arcBandPolygon(outerRadius, innerRadius, startAngle, endAngle, {
+  points,
+  jitter,
+  rng,
+  offsetY = 0,
+}) {
+  const out = [];
+  for (let i = 0; i <= points; i += 1) {
+    const t = i / points;
+    const angle = startAngle + (endAngle - startAngle) * t;
+    const radius = outerRadius * (1 + (rng() - 0.5) * jitter);
+    out.push(Math.cos(angle) * radius, Math.sin(angle) * radius + offsetY);
+  }
+  for (let i = points; i >= 0; i -= 1) {
+    const t = i / points;
+    const angle = startAngle + (endAngle - startAngle) * t;
+    const radius = innerRadius * (1 + (rng() - 0.5) * jitter);
+    out.push(Math.cos(angle) * radius, Math.sin(angle) * radius + offsetY);
+  }
+  return out;
 }
 
 function trenchSnapshotSignature(trenches) {

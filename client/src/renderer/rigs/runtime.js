@@ -1,9 +1,7 @@
 import { sampleRigAnimation } from "./animation.js";
 import { hexToInt, lightenColor } from "../shared.js";
-import { COLORS } from "../../config.js";
 
 const OCCUPIED_TRENCH_UNIT_SCALE = 0.85;
-const OCCUPIED_TRENCH_TINT_ALPHA = 0.34;
 
 export function createDefaultPixiFactory(pixi = globalThis.PIXI) {
   return {
@@ -116,8 +114,7 @@ function applyPartState(display, part, state, context, diagnostics = null) {
 
   applyDisplayTransform(display, displayTransform(state));
   const tint = tintForSlot(state.tintSlot, context);
-  const overlay = occupiedTrenchOverlay(context, part);
-  const drawKey = partDrawKey(state, tint, overlay);
+  const drawKey = partDrawKey(state, tint);
   diagnostics?.("renderer.rig.redraw.attempted");
   if (display.rtsRigDrawKey === drawKey) {
     diagnostics?.("renderer.rig.redraw.skipped.unchanged");
@@ -126,7 +123,7 @@ function applyPartState(display, part, state, context, diagnostics = null) {
 
   display.clear?.();
   diagnostics?.("renderer.graphics.clear.liveRigPart");
-  drawPart(display, part.geometry, part.paint, tint, state.geometryScale, overlay);
+  drawPart(display, part.geometry, part.paint, tint, state.geometryScale);
   display.rtsRigDrawKey = drawKey;
   diagnostics?.("renderer.rig.redraw.completed");
 }
@@ -175,7 +172,7 @@ function rotateOffset(offset, rotation) {
   };
 }
 
-function drawPart(g, geometry, paint, tint, geometryScale = null, overlay = null) {
+function drawPart(g, geometry, paint, tint, geometryScale = null) {
   const fill = paint.fill == null ? null : tint?.fill ?? hexToInt(paint.fill);
   const stroke = paint.stroke == null ? null : tint?.stroke ?? hexToInt(paint.stroke);
   if (stroke !== null) g.lineStyle?.(paint.strokeWidth ?? 1, stroke, paint.strokeOpacity ?? 1);
@@ -183,42 +180,16 @@ function drawPart(g, geometry, paint, tint, geometryScale = null, overlay = null
   if (fill !== null) g.beginFill?.(fill, paint.fillOpacity ?? 1);
   drawGeometry(g, geometry, geometryScale);
   if (fill !== null) g.endFill?.();
-  drawOccupiedTrenchOverlay(g, geometry, paint, geometryScale, overlay);
 }
 
-function partDrawKey(state, tint, overlay = null) {
+function partDrawKey(state, tint) {
   const geometryScale = state.geometryScale || {};
   return [
     tint?.fill ?? "",
     tint?.stroke ?? "",
     geometryScale.x ?? 1,
     geometryScale.y ?? 1,
-    overlay?.color ?? "",
-    overlay?.alpha ?? "",
   ].join("|");
-}
-
-function occupiedTrenchOverlay(context, part) {
-  if (!context.occupiedTrench) return null;
-  if (part?.id === "part.shadow" || String(part?.id || "").includes(".shadow")) return null;
-  return {
-    color: COLORS.trenchDirt,
-    alpha: OCCUPIED_TRENCH_TINT_ALPHA,
-  };
-}
-
-function drawOccupiedTrenchOverlay(g, geometry, paint, geometryScale = null, overlay = null) {
-  if (!overlay) return;
-  const fillOpacity = paint.fill == null ? null : paint.fillOpacity ?? 1;
-  const strokeOpacity = paint.stroke == null ? null : paint.strokeOpacity ?? 1;
-  if (strokeOpacity !== null) {
-    g.lineStyle?.(paint.strokeWidth ?? 1, overlay.color, overlay.alpha * strokeOpacity);
-  } else {
-    g.lineStyle?.(0, 0, 0);
-  }
-  if (fillOpacity !== null) g.beginFill?.(overlay.color, overlay.alpha * fillOpacity);
-  drawGeometry(g, geometry, geometryScale);
-  if (fillOpacity !== null) g.endFill?.();
 }
 
 function drawGeometry(g, geometry, geometryScale = null) {

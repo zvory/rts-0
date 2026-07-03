@@ -1,5 +1,6 @@
 import { COLORS, ENTRENCHMENT_TRENCH_RADIUS_TILES } from "../config.js";
 import { finiteNumber } from "./shared.js";
+import { drawOccupiedTrenchLip, drawOccupiedTrenchShadow } from "./trenches.js";
 
 const SAMPLE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const LABEL_MAX_LENGTH = 28;
@@ -203,6 +204,10 @@ export class VisualSampleLayer {
     g.endFill();
 
     drawFacets(g, sample.radius, variant, rng);
+    if (sample.occupied) {
+      drawOccupiedTrenchShadow(g, sample.radius, seed);
+      drawOccupiedTrenchLip(g, sample.radius, seed);
+    }
   }
 
   drawLabel(sample, camera) {
@@ -349,6 +354,7 @@ function normalizeStaticVisualSample(raw, { index, tileSize, seenIds }) {
       radius,
       radiusTiles,
       variant,
+      occupied: Boolean(raw?.occupied),
       alpha: clamp(finiteNumber(raw?.alpha) ? Number(raw.alpha) : 1, 0.05, 1),
       labelOffsetY: clamp(finiteNumber(raw?.labelOffsetY) ? Number(raw.labelOffsetY) : 12, 0, 80),
     },

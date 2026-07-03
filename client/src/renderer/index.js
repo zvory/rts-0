@@ -5,8 +5,9 @@
 // for the drag selection box. Layers are drawn back-to-front in this order:
 //
 //   terrain → decals → trenches → visual-samples → resources → building-shadows → buildings
-//   → building-overlays → unit-shadows → units → selection-rings → hp-bars → fog
-//   → visual-sample-labels → shot-reveals → feedback → placement-ghost → drag-box
+//   → building-overlays → unit-shadows → trench-occupant-shadows → units
+//   → trench-occupant-lips → selection-rings → hp-bars → fog → visual-sample-labels
+//   → shot-reveals → feedback → placement-ghost → drag-box
 //
 // Terrain is drawn once into a cached RenderTexture (it never changes mid-match).
 // Snapshot-backed ground decals and trench terrain stamp into persistent textures.
@@ -61,7 +62,12 @@ import { _drawFog, _fogLevel } from "./fog.js";
 import { buildRendererFeedbackView } from "./feedback_view_model.js";
 import { LAYERS, _sweep } from "./layers.js";
 import { GroundDecalLayer, _drawGroundDecals, _initGroundDecalsForMap } from "./decals.js";
-import { TrenchDecalLayer, _drawTrenches, _initTrenchesForMap } from "./trenches.js";
+import {
+  TrenchDecalLayer,
+  _drawOccupiedTrenches,
+  _drawTrenches,
+  _initTrenchesForMap,
+} from "./trenches.js";
 import { VisualSampleLayer, _drawVisualSamples } from "./visual_samples.js";
 import { createLiveRigDefinitions } from "./rigs/live_routing.js";
 import { compileVisualUnitRigCandidates } from "./rigs/visual_override_rigs.js";
@@ -178,7 +184,9 @@ export class Renderer {
       buildings: new Map(),
       buildingOverlays: new Map(),
       unitShadows: new Map(),
+      trenchOccupantShadows: new Map(),
       units: new Map(),
+      trenchOccupantLips: new Map(),
       selectionRings: new Map(),
       hpBars: new Map(),
       shotRevealShadows: new Map(),
@@ -348,6 +356,9 @@ export class Renderer {
     let visualUnitOverrideMap = new Map();
     time("renderer.visualUnitOverrides", () => {
       visualUnitOverrideMap = this._resolveVisualUnitOverridesSafely(visualUnitOverrides, entities).overrides;
+    });
+    time("renderer.trenchOccupants", () => {
+      this._drawSafely("trenchOccupants", () => this._drawOccupiedTrenches(regularEntities, state));
     });
 
     // Nodes currently being mined: any worker latched to them. Used by
@@ -864,6 +875,7 @@ Object.assign(Renderer.prototype, {
   _initTrenchesForMap,
   _drawGroundDecals,
   _drawTrenches,
+  _drawOccupiedTrenches,
   _drawVisualSamples,
   _ownerColors,
   _tintFor,

@@ -51,6 +51,35 @@ const TRENCH_VARIANTS_1_STATIC_SAMPLES = Object.freeze([
     radiusTiles: 0.375,
     variant: "compact_dark",
   }),
+  Object.freeze({
+    id: "trench-f-empty-live",
+    kind: "trench",
+    label: "F Empty",
+    x: 850,
+    y: 730,
+    radiusTiles: 0.375,
+    variant: "basin",
+  }),
+  Object.freeze({
+    id: "trench-g-occupied-lip",
+    kind: "trench",
+    label: "G Occupied",
+    x: 940,
+    y: 730,
+    radiusTiles: 0.375,
+    variant: "basin",
+    occupied: true,
+  }),
+  Object.freeze({
+    id: "trench-h-occupied-wide",
+    kind: "trench",
+    label: "H Wide Occ",
+    x: 1030,
+    y: 730,
+    radiusTiles: 0.375,
+    variant: "wide_shadow",
+    occupied: true,
+  }),
 ]);
 
 const UNIT_RIG_OVERRIDES_1 = Object.freeze([
@@ -83,8 +112,8 @@ const VISUAL_PROFILE_ENTRIES = Object.freeze([
   Object.freeze({
     id: "trench-variants-1",
     label: "Trench variants 1",
-    description: "Initial checked-in profile for local entrenchment visual candidates.",
-    initialCamera: Object.freeze({ x: 960, y: 640, zoom: 0.9 }),
+    description: "Checked-in profile for comparing empty and occupied entrenchment visuals.",
+    initialCamera: Object.freeze({ x: 960, y: 690, zoom: 0.9 }),
     staticSamples: TRENCH_VARIANTS_1_STATIC_SAMPLES,
   }),
   Object.freeze({

@@ -6,7 +6,7 @@ import { FrameProfiler } from "../../client/src/frame_profiler.js";
 import { COLORS } from "../../client/src/config.js";
 import { KIND } from "../../client/src/protocol.js";
 import { GROUND_DECAL_TEXTURE_WORLD_SCALE } from "../../client/src/renderer/decals.js";
-import { TrenchDecalLayer, _drawTrenches } from "../../client/src/renderer/trenches.js";
+import { TrenchDecalLayer, _drawOccupiedTrenches, _drawTrenches } from "../../client/src/renderer/trenches.js";
 import { Renderer } from "../../client/src/renderer/index.js";
 import {
   _drawAbilityObjects,
@@ -165,9 +165,21 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     const terrainIndex = renderer.world.children.indexOf(renderer.layers.terrain);
     const decalsIndex = renderer.world.children.indexOf(renderer.layers.decals);
     const trenchesIndex = renderer.world.children.indexOf(renderer.layers.trenches);
+    const unitShadowsIndex = renderer.world.children.indexOf(renderer.layers.unitShadows);
+    const occupantShadowsIndex = renderer.world.children.indexOf(renderer.layers.trenchOccupantShadows);
+    const unitsIndex = renderer.world.children.indexOf(renderer.layers.units);
+    const occupantLipsIndex = renderer.world.children.indexOf(renderer.layers.trenchOccupantLips);
+    const selectionIndex = renderer.world.children.indexOf(renderer.layers.selectionRings);
     const resourcesIndex = renderer.world.children.indexOf(renderer.layers.resources);
     assert(terrainIndex < decalsIndex && decalsIndex < trenchesIndex && trenchesIndex < resourcesIndex,
       "renderer mounts trench ground above decals and below resources/units");
+    assert(
+      unitShadowsIndex < occupantShadowsIndex &&
+        occupantShadowsIndex < unitsIndex &&
+        unitsIndex < occupantLipsIndex &&
+        occupantLipsIndex < selectionIndex,
+      "occupied-trench lip layers sit around units but below selection feedback",
+    );
     assert(renderer.layers.trenches.children.length === 1, "renderer owns one persistent trench decal sprite");
     renderer.destroy();
     assert(renderer.layers.trenches.children.length === 0, "renderer teardown removes the trench decal sprite");
@@ -560,16 +572,51 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     assert(shadowRig?.container.scaleX === 0.85 && shadowRig.container.scaleY === 0.85,
       "occupied infantry shadow scales with the unit rig");
     assert(
-      bodyCalls.some((call) => call[0] === "beginFill" && call[1] === COLORS.trenchDirt && Math.abs(call[2] - 0.34) < 0.0001),
-      "occupied infantry rig draws a dirt tint overlay on visible body parts",
+      bodyCalls.some((call) => call[0] === "beginFill" && call[1] === 0x4878c8),
+      "occupied infantry rig keeps the team-colored body fill",
+    );
+    assert(
+      !bodyCalls.some((call) => call[0] === "beginFill" && call[1] === COLORS.trenchDirt),
+      "occupied infantry rig does not draw a dirt tint overlay on visible body parts",
     );
     assert(
       !shadowCalls.some((call) => call[0] === "beginFill" && call[1] === COLORS.trenchDirt),
       "occupied infantry rig does not tint the separate shadow route",
     );
 
+    const occupiedDrawn = _drawOccupiedTrenches.call(renderer, [entity], {
+      map: { tileSize: 32 },
+      trenches: [{ id: 80, x: 260, y: 160, radiusTiles: 0.375 }],
+    });
+    const occupantShadow = renderer._pools.trenchOccupantShadows.get(entity.id);
+    const occupantLip = renderer._pools.trenchOccupantLips.get(entity.id);
+    assert(occupiedDrawn === 1, "occupied infantry draws one occupied-trench overlay");
+    assert(
+      occupantShadow?.calls.some((call) => call[0] === "beginFill" && call[1] === COLORS.trenchShadow),
+      "occupied trench overlay darkens the trench basin below the unit",
+    );
+    assert(
+      occupantLip?.calls.some((call) => call[0] === "beginFill" && call[1] === COLORS.trenchRim),
+      "occupied trench overlay draws a foreground berm above the unit",
+    );
+    const missingTrenchEntity = { ...entity, id: 4310, occupiedTrenchId: 999, x: 310, y: 210 };
+    const missingTrenchDrawn = _drawOccupiedTrenches.call(renderer, [missingTrenchEntity], {
+      map: { tileSize: 32 },
+      trenches: [],
+    });
+    assert(missingTrenchDrawn === 0, "occupied trench overlay requires authoritative trench terrain");
+    assert(
+      !renderer._pools.trenchOccupantLips.has(missingTrenchEntity.id) &&
+        !renderer._pools.trenchOccupantShadows.has(missingTrenchEntity.id),
+      "missing trench ids do not create client-only trench display objects",
+    );
+
     delete entity.occupiedTrenchId;
     renderer._drawUnit(entity, colorByOwner, state);
+    const emptyDrawn = _drawOccupiedTrenches.call(renderer, [entity], {
+      map: { tileSize: 32 },
+      trenches: [{ id: 80, x: 260, y: 160, radiusTiles: 0.375 }],
+    });
 
     let lastClearIndex = -1;
     for (let i = bodyCalls.length - 1; i >= 0; i -= 1) {
@@ -585,6 +632,7 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
       !latestBodyCalls.some((call) => call[0] === "beginFill" && call[1] === COLORS.trenchDirt),
       "infantry rig clears the dirt tint overlay after leaving a trench",
     );
+    assert(emptyDrawn === 0, "empty trenches do not draw the occupied berm overlay");
   } finally {
     restorePixi();
   }
