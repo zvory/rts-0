@@ -46,9 +46,10 @@ export function frameStripFrameIndex(strip, entity, nowOrContext = 0) {
   const idleFrame = validFrame(strip, strip?.idleFrame ?? 0);
   const renderContext = typeof nowOrContext === "object" && nowOrContext !== null ? nowOrContext : {};
   const now = typeof nowOrContext === "number" ? nowOrContext : renderContext.now;
+  const setupFrame = frameStripSetupFrameIndex(strip, entity, renderContext, idleFrame);
+  if (setupFrame != null) return setupFrame;
   if (entity?.state !== STATE.MOVE) {
-    const setupFrame = frameStripSetupFrameIndex(strip, entity, renderContext, idleFrame);
-    return setupFrame ?? idleFrame;
+    return idleFrame;
   }
   const frames = validFrameList(strip, strip?.movementFrames);
   if (frames.length === 0) return idleFrame;
@@ -77,7 +78,6 @@ export function frameStripVisualFacing(stripOrEntity, maybeEntity = null) {
   const strip = maybeEntity ? stripOrEntity : null;
   const entity = maybeEntity ?? stripOrEntity;
   const moving = entity?.state === STATE.MOVE;
-  if (moving && Number.isFinite(entity?.facing)) return entity.facing;
   const setupState = entity?.setupState || SETUP.PACKED;
   if (strip?.packedFacing === "body" && setupState === SETUP.PACKED && Number.isFinite(entity?.facing)) {
     return entity.facing;
@@ -85,6 +85,7 @@ export function frameStripVisualFacing(stripOrEntity, maybeEntity = null) {
   if (strip && setupState !== SETUP.PACKED && Number.isFinite(entity?.weaponFacing)) {
     return entity.weaponFacing - finite(strip.setupForwardAngle, 0);
   }
+  if (moving && Number.isFinite(entity?.facing)) return entity.facing;
   if (!moving && Number.isFinite(entity?.weaponFacing)) return entity.weaponFacing;
   return finite(entity?.facing, 0);
 }
