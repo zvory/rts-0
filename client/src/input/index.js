@@ -21,6 +21,8 @@
 //   - Arrow-key pan state is OWNED here and exposed via `this.keys` so the camera can
 //     read it in Camera.update(dt, input) — see the `keys` field documentation below.
 //   - Middle-drag or Space+left-drag pans the camera without using build hotkeys.
+//   - Touch drag/pinch pans and zooms the camera for mobile viewing; viewport
+//     touches do not issue gameplay commands.
 //   - Optional pointer-lock mode traps the browser cursor and drives a visible
 //     virtual cursor so multi-monitor players can still edge-pan and click.
 //
@@ -128,6 +130,7 @@ import {
 export { footprintValidAgainstEntities };
 
 const CONTEXT_MENU_EVENT_OPTIONS = { capture: true };
+const TOUCH_EVENT_OPTIONS = { passive: false };
 const CONTEXT_MENU_SUPPRESS_MS = 500;
 
 function isMacPlatform() {
@@ -236,6 +239,10 @@ export class Input {
     this._onContextMenu = this._handleContextMenu.bind(this);
     this._onAuxClick = this._handleAuxClick.bind(this);
     this._onWheel = this._handleWheel.bind(this);
+    this._onTouchStart = this._handleTouchStart.bind(this);
+    this._onTouchMove = this._handleTouchMove.bind(this);
+    this._onTouchEnd = this._handleTouchEnd.bind(this);
+    this._onTouchCancel = this._handleTouchCancel.bind(this);
     this._onKeyDown = this._handleKeyDown.bind(this);
     this._onKeyUp = this._handleKeyUp.bind(this);
     this._onBlur = this._handleBlur.bind(this);
@@ -265,6 +272,10 @@ export class Input {
     el.addEventListener("contextmenu", this._onContextMenu, CONTEXT_MENU_EVENT_OPTIONS);
     el.addEventListener("auxclick", this._onAuxClick);
     el.addEventListener("wheel", this._onWheel, { passive: false });
+    el.addEventListener("touchstart", this._onTouchStart, TOUCH_EVENT_OPTIONS);
+    window.addEventListener("touchmove", this._onTouchMove, TOUCH_EVENT_OPTIONS);
+    window.addEventListener("touchend", this._onTouchEnd, TOUCH_EVENT_OPTIONS);
+    window.addEventListener("touchcancel", this._onTouchCancel, TOUCH_EVENT_OPTIONS);
     window.addEventListener("keydown", this._onKeyDown);
     window.addEventListener("keyup", this._onKeyUp);
     window.addEventListener("blur", this._onBlur);
@@ -285,6 +296,10 @@ export class Input {
     el.removeEventListener("contextmenu", this._onContextMenu, CONTEXT_MENU_EVENT_OPTIONS);
     el.removeEventListener("auxclick", this._onAuxClick);
     el.removeEventListener("wheel", this._onWheel);
+    el.removeEventListener("touchstart", this._onTouchStart, TOUCH_EVENT_OPTIONS);
+    window.removeEventListener("touchmove", this._onTouchMove, TOUCH_EVENT_OPTIONS);
+    window.removeEventListener("touchend", this._onTouchEnd, TOUCH_EVENT_OPTIONS);
+    window.removeEventListener("touchcancel", this._onTouchCancel, TOUCH_EVENT_OPTIONS);
     window.removeEventListener("keydown", this._onKeyDown);
     window.removeEventListener("keyup", this._onKeyUp);
     window.removeEventListener("blur", this._onBlur);
@@ -598,6 +613,7 @@ export class Input {
   // --- Mouse: press / move / release --------------------------------------
 
   _handleMouseDown(ev) {
+    if (this.cameraNavigation?.shouldSuppressMouseEvent?.(ev)) return;
     const p = this._eventScreenPos(ev);
     if (!this.pointerLocked) this._trackMouse(p);
     if (this.pointerLocked && ev.button === 2) {
@@ -633,6 +649,7 @@ export class Input {
   }
 
   _handleMouseMove(ev) {
+    if (this.cameraNavigation?.shouldSuppressMouseEvent?.(ev)) return;
     let p;
     if (this.pointerLocked) {
       const delta = this._lockedMovementDelta(ev);
@@ -677,6 +694,7 @@ export class Input {
   }
 
   _handleMouseUp(ev) {
+    if (this.cameraNavigation?.shouldSuppressMouseEvent?.(ev)) return;
     if (this.cameraNavigation ? this.cameraNavigation.handleMouseUp(ev) : this._handleCameraPanMouseUpFallback(ev)) {
       return;
     }
@@ -721,6 +739,10 @@ export class Input {
   }
 
   _handleContextMenu(ev) {
+    if (this.cameraNavigation?.shouldSuppressMouseEvent?.(ev)) {
+      ev.stopPropagation();
+      return;
+    }
     clearPostQuickCastSelectionGuard(this);
     // Always suppress the native menu over the viewport; treat as a right-click.
     ev.preventDefault();
@@ -738,6 +760,33 @@ export class Input {
 
   _handleAuxClick(ev) {
     if (ev.button === 1) ev.preventDefault();
+  }
+
+  _handleTouchStart(ev) {
+    this._cancelTouchGameplayState();
+    this.cameraNavigation?.handleTouchStart(ev);
+  }
+
+  _handleTouchMove(ev) {
+    this.cameraNavigation?.handleTouchMove(ev);
+  }
+
+  _handleTouchEnd(ev) {
+    this.cameraNavigation?.handleTouchEnd(ev);
+  }
+
+  _handleTouchCancel(ev) {
+    this._cancelTouchGameplayState();
+    this.cameraNavigation?.handleTouchCancel(ev);
+  }
+
+  _cancelTouchGameplayState() {
+    if (this._drag) {
+      this._drag = null;
+      this._dragging = false;
+      this.renderer.drawSelectionBox(null);
+    }
+    this._placementDrag = null;
   }
 
   // --- Left-button logic --------------------------------------------------

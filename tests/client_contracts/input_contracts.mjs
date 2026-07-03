@@ -1,7 +1,7 @@
 // tests/client_contracts/input_contracts.mjs
 // Domain contract assertions imported by ../client_contracts.mjs.
 
-import { assert } from "./assertions.mjs";
+import { assert, assertApprox } from "./assertions.mjs";
 import { ClientIntent } from "../../client/src/client_intent.js";
 import { HUD } from "../../client/src/hud.js";
 import { Input } from "../../client/src/input/index.js";
@@ -64,6 +64,150 @@ import {
     ),
     "Windows browser control-group save requires a clean Alt modifier",
   );
+}
+
+// ---------------------------------------------------------------------------
+// Shared camera navigation gestures
+// ---------------------------------------------------------------------------
+{
+  const pans = [];
+  const zooms = [];
+  const dom = {
+    clientWidth: 300,
+    clientHeight: 200,
+    getBoundingClientRect() {
+      return { left: 10, top: 20, width: 300, height: 200 };
+    },
+  };
+  const camera = {
+    zoom: 1,
+    panByScreenDelta(dx, dy) {
+      pans.push({ dx, dy });
+    },
+    setZoom(zoom, x, y) {
+      this.zoom = zoom;
+      zooms.push({ zoom, x, y });
+    },
+  };
+  const nav = new CameraNavigationInput(dom, camera);
+  const touch = (identifier, clientX, clientY) => ({ identifier, clientX, clientY });
+  let prevented = 0;
+  const event = (touches) => ({
+    touches,
+    preventDefault() {
+      prevented += 1;
+    },
+  });
+
+  assert(nav.handleTouchStart(event([touch(1, 110, 120)])), "touchstart begins a camera pan gesture");
+  nav.handleTouchMove(event([touch(1, 135, 150)]));
+  assert(pans.length === 1, "one-finger touch drag pans the camera");
+  assertApprox(pans[0].dx, 25, 0.001, "touch pan screen dx");
+  assertApprox(pans[0].dy, 30, 0.001, "touch pan screen dy");
+  assert(nav.handleTouchEnd(event([])), "touchend releases the camera gesture");
+  assert(nav.touchGesture === null, "touchend clears shared touch gesture state");
+  assert(prevented >= 3, "touch camera gestures suppress native page gestures");
+  assert(
+    nav.shouldSuppressMouseEvent({ preventDefault() { prevented += 1; } }),
+    "touch camera gestures suppress follow-up synthetic mouse events",
+  );
+}
+
+{
+  const pans = [];
+  const zooms = [];
+  const dom = {
+    clientWidth: 320,
+    clientHeight: 240,
+    getBoundingClientRect() {
+      return { left: 0, top: 0, width: 320, height: 240 };
+    },
+  };
+  const camera = {
+    zoom: 2,
+    panByScreenDelta(dx, dy) {
+      pans.push({ dx, dy });
+    },
+    setZoom(zoom, x, y) {
+      this.zoom = zoom;
+      zooms.push({ zoom, x, y });
+    },
+  };
+  const nav = new CameraNavigationInput(dom, camera);
+  const touch = (identifier, clientX, clientY) => ({ identifier, clientX, clientY });
+  const event = (touches) => ({ touches, preventDefault() {} });
+
+  nav.handleTouchStart(event([
+    touch(1, 50, 50),
+    touch(2, 150, 50),
+  ]));
+  nav.handleTouchMove(event([
+    touch(1, 70, 70),
+    touch(2, 230, 70),
+  ]));
+
+  assert(pans.length === 1, "pinch movement pans by the midpoint delta");
+  assertApprox(pans[0].dx, 50, 0.001, "pinch midpoint pan dx");
+  assertApprox(pans[0].dy, 20, 0.001, "pinch midpoint pan dy");
+  assert(zooms.length === 1, "pinch movement zooms the camera");
+  assertApprox(zooms[0].zoom, 3.2, 0.001, "pinch zoom factor uses distance ratio");
+  assertApprox(zooms[0].x, 150, 0.001, "pinch zoom anchors at midpoint x");
+  assertApprox(zooms[0].y, 70, 0.001, "pinch zoom anchors at midpoint y");
+}
+
+{
+  const pans = [];
+  const zooms = [];
+  const viewportTarget = { viewport: true };
+  const outsideTarget = { viewport: false };
+  const dom = {
+    clientWidth: 320,
+    clientHeight: 240,
+    contains(target) {
+      return !!target?.viewport;
+    },
+    getBoundingClientRect() {
+      return { left: 0, top: 0, width: 320, height: 240 };
+    },
+  };
+  const camera = {
+    zoom: 1,
+    panByScreenDelta(dx, dy) {
+      pans.push({ dx, dy });
+    },
+    setZoom(zoom, x, y) {
+      this.zoom = zoom;
+      zooms.push({ zoom, x, y });
+    },
+  };
+  const nav = new CameraNavigationInput(dom, camera);
+  const touch = (identifier, clientX, clientY, target = viewportTarget) => ({
+    identifier,
+    clientX,
+    clientY,
+    target,
+  });
+  const event = (touches, changedTouches = touches) => ({ touches, changedTouches, preventDefault() {} });
+
+  const viewportStart = touch(1, 80, 80);
+  nav.handleTouchStart(event([viewportStart], [viewportStart]));
+  const outsideStart = touch(2, 180, 80, outsideTarget);
+  nav.handleTouchStart(event([viewportStart, outsideStart], [outsideStart]));
+  nav.handleTouchMove(event([
+    touch(1, 110, 100),
+    touch(2, 240, 100, outsideTarget),
+  ], [
+    touch(1, 110, 100),
+    touch(2, 240, 100, outsideTarget),
+  ]));
+
+  assert(pans.length === 1, "touch gestures ignore touches that did not start on the viewport");
+  assertApprox(pans[0].dx, 30, 0.001, "mixed touch pan keeps the viewport-started finger delta");
+  assertApprox(pans[0].dy, 20, 0.001, "mixed touch pan keeps the viewport-started finger y delta");
+  assert(zooms.length === 0, "outside touches are not folded into viewport pinch zoom");
+
+  nav.handleTouchEnd(event([touch(2, 240, 100, outsideTarget)], [touch(1, 110, 100)]));
+  assert(nav.touchGesture === null, "releasing the viewport touch ends the camera gesture");
 }
 
 // ---------------------------------------------------------------------------

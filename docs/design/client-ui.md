@@ -894,7 +894,8 @@ export class CameraNavigationInput {
   constructor(domElement, camera, options?)
   // shared command-free camera gesture state for live input and replay/observer wrappers:
   // viewport mouse tracking, mouse-wheel cursor-anchored zoom, configured pan keys,
-  // middle-mouse drag panning, optional Space+left-drag panning, blur release, and teardown.
+  // middle-mouse drag panning, optional Space+left-drag panning, touch drag/pinch
+  // pan/zoom for mobile viewing, blur release, and teardown.
   // exposes keys + mouse for Camera.update(dt, input)
   static replayPanKeyCodes()
   install()
@@ -905,10 +906,10 @@ Live `Input` composes `CameraNavigationInput` for camera gestures, then layers p
 selection, placement, command-card targeting, command hotkeys, minimap routing, and gameplay command
 issuance on top. Replay viewers use the same helper through `ReplayCameraInput`, with replay WASD
 pan-key aliases and no gameplay command issuer API. Replay middle-drag and Space+left-drag pan
-through `Camera.panByScreenDelta`; mouse-wheel zoom, keyboard pan state, edge scroll state, and blur
-release are shared observer navigation behavior. Live spectators still use the live `Input` path so
-read-only selection inspection remains available while command emission stays gated by local-owner
-checks.
+through `Camera.panByScreenDelta`; touch drag/pinch pan and zoom the camera without emitting
+gameplay commands. Mouse-wheel zoom, keyboard pan state, edge scroll state, and blur release are
+shared observer navigation behavior. Live spectators still use the live `Input` path so read-only
+selection inspection remains available while command emission stays gated by local-owner checks.
 
 Shift-right-click appends queued orders only for selected units: move, attack-move, attack,
 gather, build/resume, Tank Trap deconstruct, and placement build commands set `queued: true` and
