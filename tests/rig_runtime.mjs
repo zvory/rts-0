@@ -59,6 +59,11 @@ import { GOLEM_RIG_SVG, WORKER_RIG_SVG } from "../client/src/renderer/rigs/worke
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixturesDir = path.join(__dirname, "fixtures/svg");
+const machineGunnerPngManifestPath = path.join(
+  __dirname,
+  "..",
+  "client/assets/rigs/machine-gunner-pass-01/metadata/manifest.json",
+);
 const fixedNow = 12_345;
 
 function main() {
@@ -793,6 +798,65 @@ test("frame-strip color adjustment brightens raw pixels without changing alpha",
   assert.equal(pixels[2] > 60, true);
 });
 
+test("machine gunner PNG frame strip mirrors asset manifest runtime metadata", () => {
+  const manifest = readMachineGunnerPngManifest();
+  const runtime = manifest.runtime;
+  const strip = MACHINE_GUNNER_PNG_FRAME_STRIP;
+
+  assert.deepEqual(Object.keys(runtime).sort(), [
+    "bakedColorAdjustment",
+    "deployedFrame",
+    "firingFrames",
+    "fps",
+    "frameCount",
+    "frameHeight",
+    "frameWidth",
+    "idleFrame",
+    "imageVersion",
+    "module",
+    "movementFacingOffsetRadians",
+    "movementFrames",
+    "movementWorldScale",
+    "packedFacing",
+    "runtimeStrip",
+    "setupForwardAngleRadians",
+    "setupFrames",
+    "stripImageUrl",
+    "targetColorAdjustment",
+    "tintSlot",
+    "worldScale",
+  ].sort());
+  assert.equal(runtime.module, "client/src/renderer/rigs/machine_gunner_png_strip.js");
+  assert.equal(strip.enabled, manifest.enabled);
+  assert.equal(strip.unit, manifest.unit);
+  assert.equal(strip.image, runtime.stripImageUrl);
+  assert.equal(strip.imageVersion, runtime.imageVersion);
+  assert.equal(strip.frameWidth, runtime.frameWidth);
+  assert.equal(strip.frameHeight, runtime.frameHeight);
+  assert.equal(strip.frameCount, runtime.frameCount);
+  assert.equal(strip.idleFrame, runtime.idleFrame);
+  assert.deepEqual(strip.movementFrames, runtime.movementFrames);
+  assert.deepEqual(strip.setupFrames, runtime.setupFrames);
+  assert.equal(strip.deployedFrame, runtime.deployedFrame);
+  assert.deepEqual(strip.firingFrames, runtime.firingFrames);
+  assert.equal(strip.fps, runtime.fps);
+  assert.equal(strip.worldScale, runtime.worldScale);
+  assert.equal(strip.movementWorldScale, runtime.movementWorldScale);
+  assert.equal(strip.movementFacingOffset, runtime.movementFacingOffsetRadians);
+  assert.equal(strip.tintSlot, runtime.tintSlot);
+  assert.deepEqual(strip.bakedColorAdjustment, runtime.bakedColorAdjustment);
+  assert.equal(
+    runtime.targetColorAdjustment,
+    "client/src/renderer/rigs/frame_strip_color_profile.js FRAME_STRIP_TARGET_COLOR_ADJUSTMENT",
+  );
+  assert.equal(strip.packedFacing, runtime.packedFacing);
+  assert.equal(strip.setupForwardAngle, runtime.setupForwardAngleRadians);
+  assert.deepEqual(strip.source, {
+    ...manifest.sourceSheets,
+    runtimeStrip: runtime.runtimeStrip,
+  });
+});
+
 test("tank PNG atlas SVG fallback is destroyed when same id no longer needs it", () => {
   const tankDefinition = compileFixture("rig-vehicle.svg", KIND.TANK);
   const workerDefinition = compileFixture("rig-worker.svg", KIND.WORKER);
@@ -926,6 +990,10 @@ function compileFixture(file, expectedKind) {
   const result = compileSvgRig(fs.readFileSync(path.join(fixturesDir, file), "utf8"), { expectedKind });
   assert.equal(result.ok, true, JSON.stringify(result.errors));
   return result.definition;
+}
+
+function readMachineGunnerPngManifest() {
+  return JSON.parse(fs.readFileSync(machineGunnerPngManifestPath, "utf8"));
 }
 
 function makeRigRenderer() {
