@@ -345,28 +345,19 @@ export class VisualEffectBuffers {
   }
 
   weaponRecoil(id, kind, now, weaponKind) {
-    if (typeof now !== "number") {
-      now = kind;
-      kind = undefined;
-      weaponKind = undefined;
-    }
-    const record = this.weaponRecoilById.get(id);
-    const startedAt = typeof record === "number" ? record : record?.startedAt;
-    if (typeof startedAt !== "number") return 0;
-    const recoilWeaponKind = normalizedWeaponKind(weaponKind) || normalizedWeaponKind(record?.weaponKind);
-    if (recoilWeaponKind === WEAPON_KIND.TANK_COAX) return 0;
-    const ttlMs = recoilMsFor(kind, recoilWeaponKind);
-    const age = now - startedAt;
-    if (age < 0) return 1;
-    if (age > ttlMs) {
-      this.weaponRecoilById.delete(id);
-      return 0;
-    }
-    const t = age / ttlMs;
-    return recoilCurve(t);
+    const sample = this._weaponRecoilSample(id, kind, now, weaponKind);
+    if (!sample) return 0;
+    if (sample.age < 0) return 1;
+    return recoilCurve(sample.age / sample.ttlMs);
   }
 
   weaponRecoilPhase(id, kind, now, weaponKind) {
+    const sample = this._weaponRecoilSample(id, kind, now, weaponKind);
+    if (!sample || sample.age < 0) return 0;
+    return clamp01(sample.age / sample.ttlMs);
+  }
+
+  _weaponRecoilSample(id, kind, now, weaponKind) {
     if (typeof now !== "number") {
       now = kind;
       kind = undefined;
@@ -374,17 +365,16 @@ export class VisualEffectBuffers {
     }
     const record = this.weaponRecoilById.get(id);
     const startedAt = typeof record === "number" ? record : record?.startedAt;
-    if (typeof startedAt !== "number") return 0;
+    if (typeof startedAt !== "number") return null;
     const recoilWeaponKind = normalizedWeaponKind(weaponKind) || normalizedWeaponKind(record?.weaponKind);
-    if (recoilWeaponKind === WEAPON_KIND.TANK_COAX) return 0;
+    if (recoilWeaponKind === WEAPON_KIND.TANK_COAX) return null;
     const ttlMs = recoilMsFor(kind, recoilWeaponKind);
     const age = now - startedAt;
-    if (age < 0) return 0;
     if (age > ttlMs) {
       this.weaponRecoilById.delete(id);
-      return 0;
+      return null;
     }
-    return clamp01(age / ttlMs);
+    return { age, ttlMs };
   }
 
   shotRevealEntityViews(now, visibleIds) {
