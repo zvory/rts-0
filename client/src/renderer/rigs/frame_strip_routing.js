@@ -44,18 +44,21 @@ async function loadAdjustedFrameStripTexture(pixi, strip, adjustment) {
   if (!doc?.createElement || !globalThis.Image || !pixi.Texture?.from) {
     return loadRawFrameStripTexture(pixi, strip);
   }
-  const image = await loadImage(strip.image);
-  const width = Math.max(1, image.naturalWidth || image.width || strip.frameWidth || 1);
-  const height = Math.max(1, image.naturalHeight || image.height || strip.frameHeight || 1);
-  const canvas = doc.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext?.("2d", { willReadFrequently: true });
-  if (!ctx) return loadRawFrameStripTexture(pixi, strip);
-  ctx.imageSmoothingEnabled = false;
-  ctx.clearRect(0, 0, width, height);
-  ctx.drawImage(image, 0, 0, width, height);
   try {
+    const image = await loadImage(strip.image);
+    const frameWidth = positiveDimension(strip.frameWidth, 1);
+    const frameHeight = positiveDimension(strip.frameHeight, 1);
+    const frameCount = Math.max(1, Math.trunc(positiveDimension(strip.frameCount, 1)));
+    const width = positiveDimension(image.naturalWidth, positiveDimension(image.width, frameWidth * frameCount));
+    const height = positiveDimension(image.naturalHeight, positiveDimension(image.height, frameHeight));
+    const canvas = doc.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext?.("2d", { willReadFrequently: true });
+    if (!ctx) return loadRawFrameStripTexture(pixi, strip);
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, width, height);
+    ctx.drawImage(image, 0, 0, width, height);
     const imageData = ctx.getImageData(0, 0, width, height);
     applyFrameStripColorAdjustmentToRgba(imageData.data, adjustment);
     ctx.putImageData(imageData, 0, 0);
@@ -73,4 +76,8 @@ function loadImage(src) {
     image.onerror = () => reject(new Error(`failed to load frame strip image ${src}`));
     image.src = src;
   });
+}
+
+function positiveDimension(value, fallback) {
+  return Number.isFinite(value) && value > 0 ? value : fallback;
 }
