@@ -85,6 +85,7 @@ const start = {
   });
   assert(state.liveMuzzleFlashes(performance.now())[0]?.weaponKind === WEAPON_KIND.TANK_COAX, "tank coax weapon hint is retained on muzzle feedback");
   assert(state.weaponRecoil(15, KIND.TANK, performance.now()) === 0, "tank coax attack events do not start Tank cannon recoil");
+  assert(state.weaponRecoilPhase(15, KIND.TANK, performance.now()) === 0, "tank coax attack events do not start a recoil phase");
 }
 
 {
@@ -113,11 +114,20 @@ const start = {
 
 {
   const state = new GameState(start);
-  state.weaponRecoilById.set(91, performance.now() - 500);
+  const now = performance.now();
+  state.weaponRecoilById.set(91, now - 500);
   assert(
-    state.weaponRecoil(91, KIND.RIFLEMAN, performance.now(), WEAPON_KIND.ARTILLERY_GUN) > 0,
+    state.weaponRecoil(91, KIND.RIFLEMAN, now, WEAPON_KIND.ARTILLERY_GUN) > 0,
     "explicit weapon hint can extend recoil timing through the GameState facade",
   );
+  const hintedPhase = state.weaponRecoilPhase(91, KIND.RIFLEMAN, now, WEAPON_KIND.ARTILLERY_GUN);
+  assert(
+    hintedPhase > 0.5 && hintedPhase < 0.52,
+    "explicit weapon hint also drives the linear recoil phase",
+  );
+  state.weaponRecoilById.set(92, now - 421);
+  assert(state.weaponRecoilPhase(92, KIND.RIFLEMAN, now) === 0, "expired recoil phase returns zero");
+  assert(!state.weaponRecoilById.has(92), "expired recoil phase prunes stale recoil records");
 }
 
 {
