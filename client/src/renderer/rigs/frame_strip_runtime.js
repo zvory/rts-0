@@ -79,7 +79,7 @@ export function frameStripVisualFacing(stripOrEntity, maybeEntity = null) {
   const entity = maybeEntity ?? stripOrEntity;
   const moving = entity?.state === STATE.MOVE;
   const setupState = entity?.setupState || SETUP.PACKED;
-  if (strip?.packedFacing === "body" && setupState === SETUP.PACKED && Number.isFinite(entity?.facing)) {
+  if (strip?.packedFacing === "body" && setupState === SETUP.PACKED && !moving && Number.isFinite(entity?.facing)) {
     return entity.facing;
   }
   if (strip && setupState !== SETUP.PACKED) {
@@ -87,9 +87,19 @@ export function frameStripVisualFacing(stripOrEntity, maybeEntity = null) {
     if (Number.isFinite(entity?.weaponFacing)) return entity.weaponFacing - setupForwardAngle;
     if (Number.isFinite(entity?.facing)) return entity.facing - setupForwardAngle;
   }
-  if (moving && Number.isFinite(entity?.facing)) return entity.facing;
+  if (frameStripUsesMovementFrames(strip, entity) && Number.isFinite(entity?.facing)) {
+    return entity.facing + finite(strip?.movementFacingOffset, 0);
+  }
   if (!moving && Number.isFinite(entity?.weaponFacing)) return entity.weaponFacing;
   return finite(entity?.facing, 0);
+}
+
+export function frameStripWorldScale(strip, entity) {
+  const baseScale = Math.max(0.01, finite(strip?.worldScale, 1));
+  if (frameStripUsesMovementFrames(strip, entity)) {
+    return Math.max(0.01, finite(strip?.movementWorldScale, baseScale));
+  }
+  return baseScale;
 }
 
 function createDefaultFrameStripPixiFactory(pixi = globalThis.PIXI) {
@@ -146,7 +156,7 @@ class FrameStripUnitInstance {
       this._frameIndex = frameIndex;
     }
 
-    const worldScale = Math.max(0.01, finite(this.strip.worldScale, 1));
+    const worldScale = frameStripWorldScale(this.strip, entity);
     setPoint(this.sprite.scale, worldScale, worldScale);
     this.sprite.alpha = 1;
     this.sprite.tint = tintForSlot(this.strip.tintSlot, renderContext);
@@ -191,6 +201,16 @@ function validFrameList(strip, frames) {
     if (value >= 0 && value < count) out.push(value);
   }
   return out;
+}
+
+function frameStripUsesMovementFrames(strip, entity) {
+  if (entity?.state !== STATE.MOVE) return false;
+  const movementFrames = validFrameList(strip, strip?.movementFrames);
+  if (movementFrames.length === 0) return false;
+  const setupFrames = validFrameList(strip, strip?.setupFrames);
+  if (setupFrames.length === 0) return true;
+  const setupState = entity?.setupState || SETUP.PACKED;
+  return setupState !== SETUP.DEPLOYED && setupState !== SETUP.SETTING_UP && setupState !== SETUP.TEARING_DOWN;
 }
 
 function clamp01(value) {

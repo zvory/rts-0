@@ -24,6 +24,7 @@ import {
 import {
   frameStripFrameIndex,
   frameStripVisualFacing,
+  frameStripWorldScale,
 } from "../client/src/renderer/rigs/frame_strip_runtime.js";
 import { MACHINE_GUNNER_PNG_FRAME_STRIP } from "../client/src/renderer/rigs/machine_gunner_png_strip.js";
 import { RIFLEMAN_PNG_FRAME_STRIP } from "../client/src/renderer/rigs/rifleman_png_strip.js";
@@ -730,10 +731,17 @@ test("machine gunner PNG frame strip maps setup progress to deploy frames", () =
 
   assert.equal(frameStripFrameIndex(strip, entity, { setupVisual: { frameProgress: 0 } }), strip.idleFrame);
   assert.equal(frameStripVisualFacing(strip, entity), entity.facing);
+  assert.equal(frameStripWorldScale(strip, entity), strip.worldScale);
 
   entity.state = STATE.MOVE;
   assert.equal(frameStripFrameIndex(strip, entity, 0), strip.movementFrames[0]);
-  assert.equal(frameStripVisualFacing(strip, entity), entity.facing);
+  assert.ok(Math.abs(frameStripVisualFacing(strip, entity) - (entity.facing + strip.movementFacingOffset)) < 0.001);
+  assert.equal(frameStripWorldScale(strip, entity), strip.movementWorldScale);
+
+  const idleOnlyStrip = { ...strip, movementFrames: [] };
+  assert.equal(frameStripFrameIndex(idleOnlyStrip, entity, 0), idleOnlyStrip.idleFrame);
+  assert.equal(frameStripVisualFacing(idleOnlyStrip, entity), entity.facing);
+  assert.equal(frameStripWorldScale(idleOnlyStrip, entity), idleOnlyStrip.worldScale);
 
   entity.state = STATE.IDLE;
   entity.setupState = SETUP.SETTING_UP;
@@ -751,6 +759,7 @@ test("machine gunner PNG frame strip maps setup progress to deploy frames", () =
   entity.state = STATE.MOVE;
   assert.equal(frameStripFrameIndex(strip, entity, { setupVisual: { frameProgress: 0.75 } }), 10);
   assert.ok(Math.abs(frameStripVisualFacing(strip, entity) - (Math.PI / 2)) < 0.001);
+  assert.equal(frameStripWorldScale(strip, entity), strip.worldScale);
 
   entity.state = STATE.IDLE;
   entity.setupState = SETUP.DEPLOYED;
