@@ -23,6 +23,8 @@
     "deployedFrame": 11,
     "fps": 12,
     "worldScale": 0.42,
+    "movementWorldScale": 0.34,
+    "movementFacingOffsetRadians": -1.5707963267948966,
     "tintSlot": "team-light",
     "setupForwardAngleRadians": 1.5707963267948966
   },
@@ -35,7 +37,7 @@
     "deploySource": "/Users/az/.codex/generated_images/019f2973-4859-7170-8fe3-817503530ff9/ig_0c8f42032db30baf016a481ef78f5c819397218f423577d071.png"
   },
   "notes": [
-    "Frames 0-5 come from the edited rifleman carry sheet and cycle while the Machine Gunner is moving.",
+    "Frames 0-5 come from the edited rifleman carry sheet and cycle while the Machine Gunner is moving; runtime rotates only those movement frames 90 degrees left and renders them at the smaller movementWorldScale.",
     "Frame 6 reuses a carry frame so setup starts from the same carried MG pose.",
     "Frames 7-11 come from the deploy-only generation and are selected over the client setup animation duration.",
     "The deployed source points south/down in the sheet; runtime subtracts PI/2 from weaponFacing for setup/deployed frame-strip rotation."

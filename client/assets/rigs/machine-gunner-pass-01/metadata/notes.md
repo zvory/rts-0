@@ -7,7 +7,8 @@ used as the reference for the deploy-only generation.
 ## Runtime Behavior
 
 - Frames 0-5 are movement frames: the gunner carries an oversized MG42-style weapon across the
-  body with a bulkier pack.
+  body with a bulkier pack. Runtime rotates only these movement frames 90 degrees left and renders
+  them at the smaller `movementWorldScale`.
 - Frames 6-11 are setup/deployed frames: setup starts from a carry pose, then rotates the MG into a
   south-facing deployed pose with the bipod open.
 - The frame-strip renderer maps `setting_up` and `tearing_down` progress onto frames 6-11. A fully
