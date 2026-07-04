@@ -30,10 +30,12 @@ full-body strip because the useful experiment is testing whether a generated inf
 RTS scale in-game. Runtime frame 0 is the idle standing frame. Frames 1-4 cycle at 12 FPS only while
 the authoritative client entity state is `move`. Frame 5 is retained from the generated post-shot
 source but is not wired; firing and recoil remain future work. The old SVG rifleman rig still
-provides the shadow route and fallback while the PNG texture loads. The active strip is a
-no-imagegen brightness pass from the initial pass-02 strip, with ImageMagick `-modulate
-170,118,100`, and uses the brighter `team-light` tint slot so blue and orange owners read on dark
-terrain.
+provides the shadow route and fallback while the PNG texture loads. Frame-strip art uses the shared
+`FRAME_STRIP_TARGET_COLOR_ADJUSTMENT` in `client/src/renderer/rigs/frame_strip_color_profile.js`
+(`brightness: 170`, `saturation: 118`, `hue: 100`) and the brighter `team-light` tint slot so blue
+and orange owners read on dark terrain. Rifleman pass 02 already has that baseline baked into its
+checked-in runtime strip; raw frame strips such as Machine Gunner pass 01 receive the missing
+delta once at client texture-load time, preserving the original generated source sheets.
 
 ## Current files
 
@@ -59,9 +61,12 @@ terrain.
   SVG pixels when an atlas is enabled and loaded.
 - `client/assets/rigs/rifleman-pass-02/` keeps the enabled rifleman pass-02 source sheet, alpha
   conversion, compact runtime strip, prompt, and manifest.
-- `client/src/renderer/rigs/rifleman_png_strip.js` records the enabled frame-strip metadata.
+- `client/src/renderer/rigs/rifleman_png_strip.js` and
+  `client/src/renderer/rigs/machine_gunner_png_strip.js` record the enabled frame-strip metadata,
+  including any color adjustment already baked into the checked-in runtime strip.
 - `client/src/renderer/rigs/frame_strip_runtime.js` and `frame_strip_routing.js` render full-frame
-  unit strips. This path is currently used only by Rifleman.
+  unit strips. `frame_strip_color_profile.js` owns the shared brightness/saturation target applied
+  at texture-load time when a strip is not already baked to that baseline.
 
 ## Current no-guide semantic sheet
 
@@ -306,8 +311,12 @@ cheap checks before any generated atlas can be enabled.
   rifleman strips after simplifying the prompt around strict nadir view, hidden legs, shoulder-line
   rifle pose, and RTS-scale detail. It is enabled as a full-frame strip rather than a semantic
   component atlas. The active runtime strip is brightened from the generated pass using
-  `-modulate 170,118,100` and `team-light` tint. Not final art: the anatomy and weapon hold still
-  need another art pass, and the current runtime has no firing/recoil frame.
+  the shared frame-strip target and `team-light` tint. Not final art: the anatomy and weapon hold
+  still need another art pass, and the current runtime has no firing/recoil frame.
+- `machine-gunner-pass-01`: active experiment. Generated carry and setup/deployed sheets are kept
+  in raw color, and the client applies the shared frame-strip target at texture-load time so its
+  runtime brightness tracks Rifleman and future frame-strip units without destructively rewriting
+  the source art.
 
 These candidates are useful references for what to avoid. None should be treated as accepted art.
 

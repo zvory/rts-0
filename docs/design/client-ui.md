@@ -1284,6 +1284,10 @@ selection rings):
   setup/deployment. Units that fire from outside current vision are shown briefly above the fog
   as semi-transparent silhouettes with their normal art path, rig-authored recoil where available,
   and a yellow tracer to the hit point.
+  PNG frame-strip units use a shared load-time color profile target in
+  `renderer/rigs/frame_strip_color_profile.js`; each strip records any brightness/saturation already
+  baked into its checked-in runtime PNG, and raw strips receive the missing delta once when the
+  texture loads.
   Attack `weaponKind` selects feedback scale and rig muzzle origin; TankCoax uses a small
   machine-gun flash/tracer/tail from the authored coax muzzle anchor and no Tank recoil, while
   TankCannon or default Tank attacks use a direct tracer from the main muzzle anchor plus the

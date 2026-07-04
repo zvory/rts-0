@@ -18,6 +18,11 @@ export const RIFLEMAN_PNG_FRAME_STRIP = deepFreeze({
   fps: 12,
   worldScale: 0.34,
   tintSlot: "team-light",
+  bakedColorAdjustment: {
+    brightness: 170,
+    saturation: 118,
+    hue: 100,
+  },
   source: {
     generatedSource: "client/assets/rigs/rifleman-pass-02/generated/rifleman-pass-02-source.png",
     alphaSource: "client/assets/rigs/rifleman-pass-02/generated/rifleman-pass-02-alpha.png",

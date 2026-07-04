@@ -24,6 +24,12 @@
     "fps": 12,
     "worldScale": 0.42,
     "tintSlot": "team-light",
+    "bakedColorAdjustment": {
+      "brightness": 100,
+      "saturation": 100,
+      "hue": 100
+    },
+    "targetColorAdjustment": "client/src/renderer/rigs/frame_strip_color_profile.js FRAME_STRIP_TARGET_COLOR_ADJUSTMENT",
     "setupForwardAngleRadians": 1.5707963267948966
   },
   "previews": {
@@ -38,6 +44,7 @@
     "Frames 0-5 come from the edited rifleman carry sheet and cycle while the Machine Gunner is moving.",
     "Frame 6 reuses a carry frame so setup starts from the same carried MG pose.",
     "Frames 7-11 come from the deploy-only generation and are selected over the client setup animation duration.",
+    "The checked-in runtime strip keeps the raw generated color; the client applies the shared frame-strip color target at texture load time.",
     "The deployed source points south/down in the sheet; runtime subtracts PI/2 from weaponFacing for setup/deployed frame-strip rotation."
   ]
 }

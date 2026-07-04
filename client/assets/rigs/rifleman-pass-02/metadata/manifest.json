@@ -20,11 +20,12 @@
     "fps": 12,
     "worldScale": 0.34,
     "tintSlot": "team-light",
-    "colorAdjustment": {
+    "bakedColorAdjustment": {
       "brightness": 170,
       "saturation": 118,
       "hue": 100
-    }
+    },
+    "targetColorAdjustment": "client/src/renderer/rigs/frame_strip_color_profile.js FRAME_STRIP_TARGET_COLOR_ADJUSTMENT"
   },
   "notes": [
     "Frame 0 is used for idle/standing riflemen.",
@@ -32,6 +33,6 @@
     "Frame 5 is retained from the generated recoil source but is not used yet.",
     "The old SVG rifleman rig remains available for the shadow route and fallback while the PNG texture loads.",
     "No firing or recoil animation is wired for this pass.",
-    "The runtime strip is a no-imagegen brightness pass from the first pass-02 strip, using ImageMagick -modulate 170,118,100."
+    "The runtime strip already has the shared frame-strip baseline baked in, equivalent to ImageMagick -modulate 170,118,100, so the client load-time color-profile delta is identity for this pass."
   ]
 }
