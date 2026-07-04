@@ -741,6 +741,7 @@ test("machine gunner PNG frame strip maps setup progress to deploy frames", () =
 
   entity.state = STATE.MOVE;
   assert.equal(frameStripFrameIndex(strip, entity, 0), strip.movementFrames[0]);
+  assert.equal(strip.movementWorldScale, 0.306);
   assert.ok(Math.abs(frameStripVisualFacing(strip, entity) - (entity.facing + strip.movementFacingOffset)) < 0.001);
   assert.equal(frameStripWorldScale(strip, entity), strip.movementWorldScale);
 

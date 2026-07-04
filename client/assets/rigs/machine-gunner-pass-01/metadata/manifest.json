@@ -27,7 +27,7 @@
     "firingFrames": [12, 13, 14],
     "fps": 12,
     "worldScale": 0.42,
-    "movementWorldScale": 0.34,
+    "movementWorldScale": 0.306,
     "movementFacingOffsetRadians": -1.5707963267948966,
     "tintSlot": "team-light",
     "bakedColorAdjustment": {

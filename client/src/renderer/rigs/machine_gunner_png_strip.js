@@ -20,7 +20,7 @@ export const MACHINE_GUNNER_PNG_FRAME_STRIP = deepFreeze({
   firingFrames: [12, 13, 14],
   fps: 12,
   worldScale: 0.42,
-  movementWorldScale: 0.34,
+  movementWorldScale: 0.306,
   movementFacingOffset: -Math.PI / 2,
   tintSlot: "team-light",
   bakedColorAdjustment: {
