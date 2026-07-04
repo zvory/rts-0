@@ -87,7 +87,7 @@ export function frameStripVisualFacing(stripOrEntity, maybeEntity = null) {
     if (Number.isFinite(entity?.weaponFacing)) return entity.weaponFacing - setupForwardAngle;
     if (Number.isFinite(entity?.facing)) return entity.facing - setupForwardAngle;
   }
-  if (moving && Number.isFinite(entity?.facing)) {
+  if (frameStripUsesMovementFrames(strip, entity) && Number.isFinite(entity?.facing)) {
     return entity.facing + finite(strip?.movementFacingOffset, 0);
   }
   if (!moving && Number.isFinite(entity?.weaponFacing)) return entity.weaponFacing;
@@ -205,6 +205,8 @@ function validFrameList(strip, frames) {
 
 function frameStripUsesMovementFrames(strip, entity) {
   if (entity?.state !== STATE.MOVE) return false;
+  const movementFrames = validFrameList(strip, strip?.movementFrames);
+  if (movementFrames.length === 0) return false;
   const setupFrames = validFrameList(strip, strip?.setupFrames);
   if (setupFrames.length === 0) return true;
   const setupState = entity?.setupState || SETUP.PACKED;

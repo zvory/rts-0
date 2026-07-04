@@ -738,6 +738,11 @@ test("machine gunner PNG frame strip maps setup progress to deploy frames", () =
   assert.ok(Math.abs(frameStripVisualFacing(strip, entity) - (entity.facing + strip.movementFacingOffset)) < 0.001);
   assert.equal(frameStripWorldScale(strip, entity), strip.movementWorldScale);
 
+  const idleOnlyStrip = { ...strip, movementFrames: [] };
+  assert.equal(frameStripFrameIndex(idleOnlyStrip, entity, 0), idleOnlyStrip.idleFrame);
+  assert.equal(frameStripVisualFacing(idleOnlyStrip, entity), entity.facing);
+  assert.equal(frameStripWorldScale(idleOnlyStrip, entity), idleOnlyStrip.worldScale);
+
   entity.state = STATE.IDLE;
   entity.setupState = SETUP.SETTING_UP;
   assert.equal(frameStripFrameIndex(strip, entity, { setupVisual: { frameProgress: 0 } }), 6);
