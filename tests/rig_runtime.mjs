@@ -26,6 +26,12 @@ import {
   frameStripVisualFacing,
   frameStripWorldScale,
 } from "../client/src/renderer/rigs/frame_strip_runtime.js";
+import {
+  applyFrameStripColorAdjustmentToRgba,
+  FRAME_STRIP_TARGET_COLOR_ADJUSTMENT,
+  frameStripRuntimeColorAdjustment,
+  isNeutralFrameStripColorAdjustment,
+} from "../client/src/renderer/rigs/frame_strip_color_profile.js";
 import { MACHINE_GUNNER_PNG_FRAME_STRIP } from "../client/src/renderer/rigs/machine_gunner_png_strip.js";
 import { RIFLEMAN_PNG_FRAME_STRIP } from "../client/src/renderer/rigs/rifleman_png_strip.js";
 import {
@@ -766,6 +772,25 @@ test("machine gunner PNG frame strip maps setup progress to deploy frames", () =
   entity.weaponFacing = undefined;
   entity.facing = Math.PI;
   assert.ok(Math.abs(frameStripVisualFacing(strip, entity) - (Math.PI / 2)) < 0.001);
+});
+
+test("frame-strip color profile applies the shared target only when not already baked", () => {
+  assert.equal(isNeutralFrameStripColorAdjustment(frameStripRuntimeColorAdjustment(RIFLEMAN_PNG_FRAME_STRIP)), true);
+  assert.deepEqual(frameStripRuntimeColorAdjustment(MACHINE_GUNNER_PNG_FRAME_STRIP), FRAME_STRIP_TARGET_COLOR_ADJUSTMENT);
+  assert.deepEqual(frameStripRuntimeColorAdjustment({}), FRAME_STRIP_TARGET_COLOR_ADJUSTMENT);
+});
+
+test("frame-strip color adjustment brightens raw pixels without changing alpha", () => {
+  const pixels = new Uint8ClampedArray([
+    40, 50, 60, 255,
+    200, 210, 220, 0,
+  ]);
+  applyFrameStripColorAdjustmentToRgba(pixels, FRAME_STRIP_TARGET_COLOR_ADJUSTMENT);
+  assert.equal(pixels[3], 255);
+  assert.equal(pixels[7], 0);
+  assert.equal(pixels[0] > 40, true);
+  assert.equal(pixels[1] > 50, true);
+  assert.equal(pixels[2] > 60, true);
 });
 
 test("tank PNG atlas SVG fallback is destroyed when same id no longer needs it", () => {
