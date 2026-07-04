@@ -803,10 +803,34 @@ test("machine gunner PNG frame strip mirrors asset manifest runtime metadata", (
   const runtime = manifest.runtime;
   const strip = MACHINE_GUNNER_PNG_FRAME_STRIP;
 
+  assert.deepEqual(Object.keys(runtime).sort(), [
+    "bakedColorAdjustment",
+    "deployedFrame",
+    "firingFrames",
+    "fps",
+    "frameCount",
+    "frameHeight",
+    "frameWidth",
+    "idleFrame",
+    "imageVersion",
+    "module",
+    "movementFacingOffsetRadians",
+    "movementFrames",
+    "movementWorldScale",
+    "packedFacing",
+    "runtimeStrip",
+    "setupForwardAngleRadians",
+    "setupFrames",
+    "stripImageUrl",
+    "targetColorAdjustment",
+    "tintSlot",
+    "worldScale",
+  ].sort());
   assert.equal(runtime.module, "client/src/renderer/rigs/machine_gunner_png_strip.js");
   assert.equal(strip.enabled, manifest.enabled);
   assert.equal(strip.unit, manifest.unit);
   assert.equal(strip.image, runtime.stripImageUrl);
+  assert.equal(strip.imageVersion, runtime.imageVersion);
   assert.equal(strip.frameWidth, runtime.frameWidth);
   assert.equal(strip.frameHeight, runtime.frameHeight);
   assert.equal(strip.frameCount, runtime.frameCount);
@@ -814,12 +838,18 @@ test("machine gunner PNG frame strip mirrors asset manifest runtime metadata", (
   assert.deepEqual(strip.movementFrames, runtime.movementFrames);
   assert.deepEqual(strip.setupFrames, runtime.setupFrames);
   assert.equal(strip.deployedFrame, runtime.deployedFrame);
+  assert.deepEqual(strip.firingFrames, runtime.firingFrames);
   assert.equal(strip.fps, runtime.fps);
   assert.equal(strip.worldScale, runtime.worldScale);
   assert.equal(strip.movementWorldScale, runtime.movementWorldScale);
   assert.equal(strip.movementFacingOffset, runtime.movementFacingOffsetRadians);
   assert.equal(strip.tintSlot, runtime.tintSlot);
   assert.deepEqual(strip.bakedColorAdjustment, runtime.bakedColorAdjustment);
+  assert.equal(
+    runtime.targetColorAdjustment,
+    "client/src/renderer/rigs/frame_strip_color_profile.js FRAME_STRIP_TARGET_COLOR_ADJUSTMENT",
+  );
+  assert.equal(strip.packedFacing, runtime.packedFacing);
   assert.equal(strip.setupForwardAngle, runtime.setupForwardAngleRadians);
   assert.deepEqual(strip.source, {
     ...manifest.sourceSheets,

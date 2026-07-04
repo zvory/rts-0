@@ -16,6 +16,7 @@
   "runtime": {
     "module": "client/src/renderer/rigs/machine_gunner_png_strip.js",
     "stripImageUrl": "/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png?v=pass01-setup-recoil",
+    "imageVersion": "pass01-setup-recoil",
     "runtimeStrip": "client/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png",
     "frameWidth": 128,
     "frameHeight": 128,
@@ -36,6 +37,7 @@
       "hue": 100
     },
     "targetColorAdjustment": "client/src/renderer/rigs/frame_strip_color_profile.js FRAME_STRIP_TARGET_COLOR_ADJUSTMENT",
+    "packedFacing": "body",
     "setupForwardAngleRadians": 1.5707963267948966
   },
   "previews": {
