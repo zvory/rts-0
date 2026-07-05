@@ -11,7 +11,7 @@ function deepFreeze(value) {
 const PPU = 17.8;
 const TEAM_TINT_ADJUSTMENT = Object.freeze({ brightness: 78, saturation: 92 });
 
-const WHEEL_NAMES = Object.freeze([
+const WHEEL_LEFT_NAMES = Object.freeze([
   "wheel.left.body",
   "wheel.left.tread.0",
   "wheel.left.tread.1",
@@ -19,6 +19,9 @@ const WHEEL_NAMES = Object.freeze([
   "wheel.left.cross.1",
   "wheel.left.cross.2",
   "wheel.left.hub",
+]);
+
+const WHEEL_RIGHT_NAMES = Object.freeze([
   "wheel.right.body",
   "wheel.right.tread.0",
   "wheel.right.tread.1",
@@ -26,6 +29,11 @@ const WHEEL_NAMES = Object.freeze([
   "wheel.right.cross.1",
   "wheel.right.cross.2",
   "wheel.right.hub",
+]);
+
+const WHEEL_NAMES = Object.freeze([
+  ...WHEEL_LEFT_NAMES,
+  ...WHEEL_RIGHT_NAMES,
 ]);
 
 const CARRIAGE_NAMES = Object.freeze([
@@ -114,8 +122,8 @@ function carriageCropFrame(x, y, w, h) {
   });
 }
 
-const TOP_TIRE_FRAME = carriageCropFrame(1072, 164, 146, 52);
-const BOTTOM_TIRE_FRAME = carriageCropFrame(1072, 472, 146, 56);
+const LEFT_TIRE_FRAME = carriageCropFrame(1072, 164, 146, 52);
+const RIGHT_TIRE_FRAME = carriageCropFrame(1072, 472, 146, 56);
 
 export const MORTAR_TEAM_PNG_RIG_ATLAS = deepFreeze({
   enabled: true,
@@ -148,18 +156,18 @@ export const MORTAR_TEAM_PNG_RIG_ATLAS = deepFreeze({
       { tintSlot: "team-light", tintAdjustment: TEAM_TINT_ADJUSTMENT }
     ),
     sprite(
-      "sprite.mortar.tire.top.packed",
+      "sprite.mortar.tire.left.packed",
       mortarPart("axle", "packed"),
-      mortarParts(WHEEL_NAMES, "packed"),
+      mortarParts(WHEEL_LEFT_NAMES, "packed"),
       22,
-      TOP_TIRE_FRAME
+      LEFT_TIRE_FRAME
     ),
     sprite(
-      "sprite.mortar.tire.bottom.packed",
+      "sprite.mortar.tire.right.packed",
       mortarPart("axle", "packed"),
-      mortarParts(WHEEL_NAMES, "packed"),
+      mortarParts(WHEEL_RIGHT_NAMES, "packed"),
       23,
-      BOTTOM_TIRE_FRAME
+      RIGHT_TIRE_FRAME
     ),
     sprite(
       "sprite.mortar.carriage.deployed",
@@ -170,18 +178,18 @@ export const MORTAR_TEAM_PNG_RIG_ATLAS = deepFreeze({
       { tintSlot: "team-light", tintAdjustment: TEAM_TINT_ADJUSTMENT }
     ),
     sprite(
-      "sprite.mortar.tire.top.deployed",
+      "sprite.mortar.tire.left.deployed",
       mortarPart("axle", "deployed"),
-      mortarParts(WHEEL_NAMES, "deployed"),
+      mortarParts(WHEEL_LEFT_NAMES, "deployed"),
       24,
-      TOP_TIRE_FRAME
+      LEFT_TIRE_FRAME
     ),
     sprite(
-      "sprite.mortar.tire.bottom.deployed",
+      "sprite.mortar.tire.right.deployed",
       mortarPart("axle", "deployed"),
-      mortarParts(WHEEL_NAMES, "deployed"),
+      mortarParts(WHEEL_RIGHT_NAMES, "deployed"),
       25,
-      BOTTOM_TIRE_FRAME
+      RIGHT_TIRE_FRAME
     ),
     sprite(
       "sprite.mortar.tube.packed",
