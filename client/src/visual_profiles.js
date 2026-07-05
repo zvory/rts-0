@@ -198,6 +198,12 @@ const VISUAL_PROFILE_ENTRIES = Object.freeze([
     description: "Local checked-in profile for previewing the Scout Car PNG body and rear machine gun in the render-preview lab scenario.",
     initialCamera: Object.freeze({ x: 2052, y: 1874, zoom: 2.4 }),
   }),
+  Object.freeze({
+    id: "mortar-png-1",
+    label: "Mortar PNG 1",
+    description: "Local checked-in profile for previewing the wheeled Mortar Team PNG carriage/tube atlas in the render-preview lab scenario.",
+    initialCamera: Object.freeze({ x: 2052, y: 1952, zoom: 2.5 }),
+  }),
 ]);
 
 const VISUAL_PROFILE_BY_ID = new Map(VISUAL_PROFILE_ENTRIES.map((profile) => [profile.id, profile]));
