@@ -164,7 +164,7 @@ the projection strategy for projectile visuals, and the exact files Phase 1 shou
   and `server/crates/sim/src/rules/projection.rs` for command validation, stale caster behavior,
   tick expiry, snapshot sorting, owner-only state, and fog privacy.
 - Client contract coverage should extend `tests/client_contracts.mjs` for snapshot decoding, command
-  builders, command-card affordances, state storage, and renderer preview behavior.
+  builders, command-card affordances, state storage, and renderer feedback behavior.
 - Protocol parity belongs in `tests/protocol_parity.mjs` whenever compact codes or mirror constants
   change.
 - Client architecture boundaries are checked by `scripts/check-client-architecture.mjs`; new client
@@ -278,7 +278,7 @@ the projection strategy for projectile visuals, and the exact files Phase 1 shou
 - Phase 9 should edit first:
   - Ekat line projectile launch code
   - anchor lookup in the ability runtime
-  - client preview origins in `client/src/input/commands.js` and renderer preview code.
+  - client preview origins in `client/src/input/commands.js` and renderer feedback code.
 - Phase 10 should edit first:
   - `docs/design/server-sim.md`
   - `docs/design/protocol.md`
