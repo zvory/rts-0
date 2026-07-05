@@ -265,7 +265,7 @@ SVG unit art workflow:
   architecture tests rather than static design previews.
 
 Prototype raster rig workflow:
-- Support-weapon and vehicle rendering may opt into PNG atlases through `renderer/rigs/*_png_atlas.js`,
+- Tank rendering may opt into a PNG atlas through `renderer/rigs/tank_png_atlas.js`,
   `png_routing.js`, and `png_runtime.js`. The SVG rig remains authoritative for anchors,
   animation bindings, part ids, recoil, facing, and route split; the PNG atlas only supplies
   pixels for those sampled parts. The current tank atlas is an enabled visual experiment, not final
@@ -276,10 +276,7 @@ Prototype raster rig workflow:
   it keeps the no-guide semantic sheet, bakes 30% lower brightness and 20% lower saturation, relies
   on visible-alpha postprocessing plus 1.2x world-scale compensation to size generated components
   against the SVG rig bounds, and intentionally applies runtime team tint over the dimmed white base
-  using the semantic atlas tint slots. Mortar Team rendering uses a generated three-cell M2
-  4.2-inch-inspired wheeled mortar sheet: assembled reference, team-tinted carriage/frame/wheels, and
-  fixed dark tube. The carriage sprite follows the SVG carriage recoil binding while the separate
-  tube sprite follows the stronger weapon recoil binding. See
+  using the semantic atlas tint slots. See
   [raster-unit-art-handoff.md](raster-unit-art-handoff.md) for the methodology, rejected imagegen
   passes, and next validation work.
 - `scripts/art/tank-raster-pipeline.mjs` builds the tank contact sheet, records the exact prompt
@@ -1299,8 +1296,7 @@ selection rings):
   compresses near launch and impact and stretches near mid-flight so it reads as an overhead round
   rather than a flat tracer. Mortar impacts draw a larger, denser, longer-lived dust cloud with an
   orange-yellow blast core that fades before the dust so battlefield state remains readable. Mortar
-  Team art uses the enabled PNG wheeled-mortar atlas with a team-tinted carriage/frame/wheels and
-  separate fixed dark tube for recoil.
+  Team art uses a small upright tube, slim pill-shaped wheels, and team-colored support legs.
   Mortar impact events that include a shooter reveal show the mortar briefly above fog for players
   whose units or buildings were hit by indirect fire.
   Entities marked `visionOnly` by the server are drawn on the ordinary building/unit layers below
