@@ -40,6 +40,14 @@ checked-in runtime strip; raw frame strips such as Machine Gunner pass 01 receiv
 delta once at client texture-load time, preserving the original generated source sheets. A strip can
 override the target when that generated unit needs its own brightness match.
 
+Default color strategy for future generated PNG unit sprites: generate team-colorable paint,
+uniform, and armor regions as weathered matte white or off-white source art, not blue, gray-blue, or
+any final owner color. Keep dark outlines, panel seams, equipment details, and light gray shading so
+the white base stays readable before tinting. Runtime tint slots, color-profile adjustments, or
+future masks then apply owner color over the neutral white base. Fixed non-team materials such as
+rubber, dark weapon metal, wood, skin, and transparent chroma-key background can keep their normal
+material colors; the `#ff00ff` key remains only the background key, never the unit paint.
+
 ## Current files
 
 - `scripts/art/tank-raster-pipeline.mjs` builds the tank contact sheet, writes prompts, and writes
@@ -223,6 +231,8 @@ scratches, bolts, and independent redesigns. The better direction is:
 - very early low-end 3D raster graphics
 - anti-aliased raster shapes, not pixel art
 - only a few broad shade values per part
+- team-colorable unit paint, uniforms, and armor generated as matte white or off-white source art,
+  not blue/gray-blue or final owner color
 - no shadows of any kind
 - no labels, text, insignia, loose parts, or extra cells
 - preserve cell order, centers, scale, and orientation
@@ -358,7 +368,8 @@ These candidates are useful references for what to avoid. None should be treated
 - The component cells can be assembled into the complete tank reference.
 - The complete tank reference did not diverge into its own independent design.
 - The detail level is simple low-end raster art, not pixel art and not detailed concept art.
-- Team-colorable regions remain clean enough for runtime tinting or a future mask/chroma pass.
+- Team-colorable regions use a clean matte white/off-white base with gray shading so runtime tinting
+  or a future mask/chroma pass can recolor them predictably.
 - Guide lines are absent from the source sheet and sampled runtime frames.
 - The generated atlas is inspected on a dark background after alpha conversion to catch fringes.
 
@@ -372,8 +383,9 @@ These candidates are useful references for what to avoid. None should be treated
 - Keep the no-guide sheet as the default. If guides are temporarily reintroduced for debugging, do
   not use that sheet for image generation.
 - Add alignment normalization for generated components: rotation, scale, center, and alpha bounds.
-- Decide the team-color strategy. The runtime can tint atlas sprites by existing tint slots, but a
-  final art pass may still need neutral grayscale masks or explicit chroma-key regions per part.
+- Keep the white-source team-color strategy as the default. The runtime can tint atlas sprites by
+  existing tint slots, but a final art pass may still need neutral masks or explicit chroma-key
+  regions per part for finer color separation.
 - Keep shadows out of unit sprites. If a final art direction needs shadows, render them as a
   separate deterministic game layer, not inside generated component art.
 - Do another imagegen pass using the pass-04 direction but with stronger constraints that the
