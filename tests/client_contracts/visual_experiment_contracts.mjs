@@ -203,6 +203,58 @@ const PANZERFAUST_MANIFEST_URL = new URL(
 }
 
 {
+  const profile = getVisualProfile("mortar-png-1");
+  assert(profile, "mortar PNG visual profile is registered");
+  assert(profile.initialCamera?.zoom > 2, "mortar PNG profile opens zoomed in on the render-preview mortars");
+  assert(
+    !profile.unitOverrides && !profile.frameStripOverrides && !profile.staticSamples,
+    "mortar PNG profile is camera-only because the atlas is the normal Mortar Team art path",
+  );
+}
+
+{
+  const atlas = createLivePngRigAtlases().get(KIND.MORTAR_TEAM);
+  assert(atlas?.enabled, "mortar PNG atlas is registered for live rendering");
+  assert(
+    atlas.image.includes("/assets/rigs/mortar-png-pass-01/generated/mortar-m2-wheeled-pass-01-alpha.png"),
+    "mortar PNG atlas uses the checked-in generated alpha asset",
+  );
+  const imageSize = readPngDimensions(atlas.image);
+  assert(
+    imageSize.width >= atlas.grid?.components?.tube?.x + atlas.grid?.components?.tube?.w &&
+      imageSize.height >= atlas.grid?.components?.carriage?.y + atlas.grid?.components?.carriage?.h,
+    "mortar PNG atlas frame coordinates fit inside the generated three-cell sheet",
+  );
+  const carriageSprite = atlas.sprites.find((sprite) => sprite.id === "sprite.mortar.carriage.packed");
+  const tubeSprite = atlas.sprites.find((sprite) => sprite.id === "sprite.mortar.tube.packed");
+  assert(
+    carriageSprite?.tintSlot === "team-light" &&
+      carriageSprite.tintAdjustment?.brightness === 78 &&
+      carriageSprite.tintAdjustment?.saturation === 92,
+    "mortar PNG carriage keeps the off-white frame team-tinted in lab render preview",
+  );
+  assert(tubeSprite?.tintSlot === "fixed", "mortar PNG tube remains fixed dark metal for recoil separation");
+  const definitions = createLiveRigDefinitions();
+  const definition = liveRigDefinitionFor(definitions, KIND.MORTAR_TEAM);
+  const routes = liveRigRoutesFor(KIND.MORTAR_TEAM);
+  const unitRoute = routes.find((route) => route.layerName === "units");
+  const shadowRoute = routes.find((route) => route.layerName === "unitShadows");
+  const unitCoverage = pngAtlasRouteCoverage(definition, atlas, unitRoute);
+  const shadowCoverage = pngAtlasRouteCoverage(definition, atlas, shadowRoute);
+  assert(unitCoverage.missingParts.length === 0, "mortar PNG atlas covers every unit-route part");
+  assert(
+    unitCoverage.coveredParts.includes("part.mortar.body.packed") &&
+      unitCoverage.coveredParts.includes("part.mortar.tube.packed"),
+    "mortar PNG atlas replaces both carriage/body and tube SVG parts",
+  );
+  assert(
+    shadowCoverage.coveredParts.length === 0 &&
+      shadowCoverage.missingParts.includes("part.shadow"),
+    "mortar PNG atlas leaves the existing SVG shadow route in place",
+  );
+}
+
+{
   const compiled = compileVisualUnitRigCandidates();
   const ids = visualUnitRigCandidateIds();
   assert(ids.length >= 3, "checked-in visual rig registry exposes multiple tank candidates");
