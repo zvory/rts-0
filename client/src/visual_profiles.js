@@ -137,6 +137,32 @@ const RIFLEMAN_RECOIL_FRAME_STRIP_OVERRIDES_1 = Object.freeze([
   }),
 ]);
 
+const PANZERFAUST_LONG_FRAME_STRIP_OVERRIDES_1 = Object.freeze([
+  Object.freeze({
+    id: "panzerfaust-long-base-carry",
+    label: "Panzerfaust long base carry",
+    kind: KIND.PANZERFAUST,
+    strip: Object.freeze({
+      enabled: true,
+      unit: "panzerfaust",
+      image: "/assets/rigs/panzerfaust-pass-01/generated/panzerfaust-pass-01-base-carry-long-alpha-trimmed.png?v=pass01-long-alpha-trimmed-scale03174-bright69-sat83-team",
+      imageVersion: "pass01-long-alpha-trimmed-scale03174-bright69-sat83-team",
+      frameWidth: 1210,
+      frameHeight: 571,
+      frameCount: 1,
+      idleFrame: 0,
+      fps: 12,
+      worldScale: 0.03174,
+      tintSlot: "team-light",
+      targetColorAdjustment: {
+        brightness: 69,
+        saturation: 83,
+        hue: 100,
+      },
+    }),
+  }),
+]);
+
 const VISUAL_PROFILE_ENTRIES = Object.freeze([
   Object.freeze({
     id: "trench-variants-1",
@@ -158,6 +184,13 @@ const VISUAL_PROFILE_ENTRIES = Object.freeze([
     description: "Local checked-in profile for previewing Rifleman firing recoil frames in the render-preview lab scenario.",
     initialCamera: Object.freeze({ x: 2050, y: 1930, zoom: 2.1 }),
     frameStripOverrides: RIFLEMAN_RECOIL_FRAME_STRIP_OVERRIDES_1,
+  }),
+  Object.freeze({
+    id: "panzerfaust-long-preview-1",
+    label: "Panzerfaust long preview 1",
+    description: "Local checked-in profile for previewing the generated long Panzerfaust carrier in the render-preview lab scenario.",
+    initialCamera: Object.freeze({ x: 2060, y: 2225, zoom: 2.25 }),
+    frameStripOverrides: PANZERFAUST_LONG_FRAME_STRIP_OVERRIDES_1,
   }),
   Object.freeze({
     id: "scout-car-png-1",
