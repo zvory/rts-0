@@ -48,8 +48,17 @@ export function frameStripFrameIndex(strip, entity, nowOrContext = 0) {
   const now = typeof nowOrContext === "number" ? nowOrContext : renderContext.now;
   const setupFrame = frameStripSetupFrameIndex(strip, entity, renderContext, idleFrame);
   if (setupFrame != null) return setupFrame;
+  const setupFrames = validFrameList(strip, strip?.setupFrames);
   if (entity?.state !== STATE.MOVE) {
+    if (setupFrames.length === 0) {
+      const firingFrame = frameStripFiringFrameIndex(strip, entity, renderContext, idleFrame);
+      if (firingFrame != null) return firingFrame;
+    }
     return idleFrame;
+  }
+  if (setupFrames.length === 0) {
+    const firingFrame = frameStripFiringFrameIndex(strip, entity, renderContext, idleFrame);
+    if (firingFrame != null) return firingFrame;
   }
   const frames = validFrameList(strip, strip?.movementFrames);
   if (frames.length === 0) return idleFrame;
@@ -77,12 +86,14 @@ function frameStripSetupFrameIndex(strip, entity, renderContext = {}, idleFrame 
 }
 
 function frameStripFiringFrameIndex(strip, entity, renderContext = {}, fallback = 0) {
-  if (entity?.state === STATE.MOVE) return null;
   const firingFrames = validFrameList(strip, strip?.firingFrames);
   if (firingFrames.length === 0) return null;
   if (clamp01(finite(renderContext.recoilProgress, 0)) <= 0) return null;
   const phase = clamp01(finite(renderContext.recoilPhase, 0));
-  const index = Math.min(firingFrames.length - 1, Math.floor(phase * firingFrames.length));
+  const holdPhase = finite(strip?.firingFrameHoldPhase, 0);
+  const framePhase = holdPhase > 0 && holdPhase < 1 ? phase / holdPhase : phase;
+  if (holdPhase > 0 && holdPhase < 1 && phase >= holdPhase) return null;
+  const index = Math.min(firingFrames.length - 1, Math.floor(framePhase * firingFrames.length));
   return validFrame(strip, firingFrames[index], fallback);
 }
 

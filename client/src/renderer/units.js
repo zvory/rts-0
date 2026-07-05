@@ -115,8 +115,9 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
     throw new Error(`missing live SVG rig route for unit kind ${e.kind}`);
   }
 
-  const frameStrip = visualOverride ? null : liveFrameStripFor(this._liveFrameStripsByKind, e.kind);
-  const frameStripTexture = this._liveFrameStripTextures?.get?.(e.kind) ?? null;
+  const visualFrameStrip = !visualOverride ? pools.visualFrameStrip || null : null;
+  const frameStrip = visualFrameStrip?.strip || (visualOverride ? null : liveFrameStripFor(this._liveFrameStripsByKind, e.kind));
+  const frameStripTexture = visualFrameStrip?.texture || this._liveFrameStripTextures?.get?.(e.kind) || null;
   if (frameStrip && frameStripTexture) {
     const renderContext = this._rigRenderContextFor?.(e, colorByOwner, state) ?? {};
     const rendered = [];
@@ -255,6 +256,7 @@ export function _drawShotRevealUnit(e, colorByOwner, state, pools = {}) {
   const alpha = 0.82 * (1 - smoothstep01(Math.max(0, t - 0.62) / 0.38));
   this._drawUnit(e, colorByOwner, state, {
     visualOverride: pools.visualOverride || null,
+    visualFrameStrip: pools.visualFrameStrip || null,
     shadow: "shotRevealShadows",
     unit: "shotReveals",
     effects: "shotReveals",

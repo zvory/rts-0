@@ -1269,7 +1269,7 @@ selection rings):
   field-of-fire wedges remain visible for the currently selected owner even when the broad unit
   range overlay is off.
   Distinct silhouette per kind (engineer: compact block; rifleman: enabled PNG frame-strip
-  experiment with frame 0 idle and frames 1-4 moving; machine gunner: enabled PNG frame-strip
+  experiment with frame 0 idle, frames 1-4 moving, and frame 5 standing recoil; machine gunner: enabled PNG frame-strip
   experiment with carried movement frames and setup/deployed frames; Panzerfaust: shared SVG
   infantry body with a short one-shot launcher tube while loaded; Anti-Tank Gun: wheeled gun; mortar team: crewless
   M1938-inspired small wheeled mortar that travels low and deploys upright; scout car: boxy
@@ -1338,6 +1338,9 @@ selection rings):
   keep runtime inputs such as movement, facing, weapon facing, recoil, setup state, occupied-trench
   tint, selection, HP bars, fog, and shot reveals on the real entity, and are resolved from checked-in
   profile/candidate registries rather than URL-provided assets.
+- Local lab visual profiles may pass checked-in frame-strip overrides by unit kind. These swap the
+  PNG strip texture/configuration used for matching real units in that lab session only, while the
+  entity ids, server state, selection, fog, HP bars, and fallback SVG shadow route remain unchanged.
 - Fog: unexplored = 80% dark overlay so terrain remains faintly readable; explored-but-not-visible =
   48% dark overlay; visible = clear. Use a single overlay sprite/graphics updated from `fog`
   grids; soften edges if cheap.
