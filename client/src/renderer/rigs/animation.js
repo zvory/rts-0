@@ -45,7 +45,7 @@ export function createRigRenderContext(entity, {
     : entity.kind === KIND.ARTILLERY
       ? 0.65
       : entity.kind === KIND.ANTI_TANK_GUN
-        ? 0.42
+        ? 0
         : entity.kind === KIND.MORTAR_TEAM
           ? 0.28
           : 0;
