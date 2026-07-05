@@ -1,8 +1,10 @@
 import { KIND } from "../../protocol.js";
 import { loadColorAdjustedTexture } from "./color_adjusted_texture.js";
+import { SCOUT_CAR_PNG_RIG_ATLAS } from "./scout_car_png_atlas.js";
 import { TANK_PNG_RIG_ATLAS } from "./tank_png_atlas.js";
 
 const LIVE_PNG_RIG_ATLASES = Object.freeze([
+  [KIND.SCOUT_CAR, SCOUT_CAR_PNG_RIG_ATLAS],
   [KIND.TANK, TANK_PNG_RIG_ATLAS],
 ]);
 

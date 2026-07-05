@@ -1268,7 +1268,7 @@ selection rings):
   experiment with carried movement frames and setup/deployed frames; Panzerfaust: shared SVG
   infantry body with a short one-shot launcher tube while loaded; Anti-Tank Gun: wheeled gun; mortar team: crewless
   M1938-inspired small wheeled mortar that travels low and deploys upright; scout car: boxy
-  WW2-style truck silhouette with enclosed wheels and a rear-top machine-gunner; tank: chunky
+  WW2-style truck silhouette with enclosed wheels and a rear-top machine gun; tank: chunky
   flat-shaded armor with movement-facing tracks, hull, nose, and shadow plus weapon-facing turret,
   main barrel, coax barrel, recoil, nose tick, and low-oil/oil-starved fuel cues; artillery: SVG-authored
   support-weapon rig routed through the live renderer).

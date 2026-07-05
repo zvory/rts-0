@@ -2,10 +2,17 @@
 // Contracts for local lab visual experimentation renderer-only samples.
 
 import { assert, assertApprox } from "./assertions.mjs";
-import { COLORS } from "../../client/src/config.js";
+import { COLORS, PLAYER_PALETTE } from "../../client/src/config.js";
 import { buildFrameEntityViews } from "../../client/src/frame_entity_views.js";
 import { KIND, STATE } from "../../client/src/protocol.js";
 import { Renderer } from "../../client/src/renderer/index.js";
+import { createLivePngRigAtlases } from "../../client/src/renderer/rigs/png_routing.js";
+import { pngAtlasRouteCoverage } from "../../client/src/renderer/rigs/png_runtime.js";
+import {
+  createLiveRigDefinitions,
+  liveRigDefinitionFor,
+  liveRigRoutesFor,
+} from "../../client/src/renderer/rigs/live_routing.js";
 import {
   VISUAL_UNIT_RIG_CANDIDATE_SOURCES,
   compileVisualUnitRigCandidates,
@@ -100,6 +107,59 @@ const NOOP_RENDERER_OVERLAYS = [
       override.strip.frameHeight === 96 &&
       override.strip.frameCount === 7,
     "rifleman recoil strip exposes the seven-cell Rifleman atlas geometry",
+  );
+}
+
+{
+  const profile = getVisualProfile("scout-car-png-1");
+  assert(profile, "scout car PNG visual profile is registered");
+  assert(profile.initialCamera?.zoom > 2, "scout car PNG profile opens zoomed in on the render-preview scout cars");
+  assert(
+    !profile.unitOverrides && !profile.frameStripOverrides && !profile.staticSamples,
+    "scout car PNG profile is camera-only because the atlas is the normal Scout Car art path",
+  );
+}
+
+{
+  const atlas = createLivePngRigAtlases().get(KIND.SCOUT_CAR);
+  assert(atlas?.enabled, "scout car PNG atlas is registered for live rendering");
+  assert(
+    atlas.image.includes("/assets/rigs/scout-car-pass-02-team/generated/scout-car-pass-02-team-atlas.png"),
+    "scout car PNG atlas uses the checked-in pass-02 team-color asset",
+  );
+  assert(
+    atlas.runtimeColorAdjustment?.brightness === 90 &&
+      atlas.runtimeColorAdjustment?.saturation === 90 &&
+      atlas.runtimeColorAdjustment?.hue === 100,
+    "scout car PNG atlas applies a subtle global dampening pass over pre-colored team frames",
+  );
+  assert(
+    JSON.stringify(atlas.grid?.palette) === JSON.stringify(PLAYER_PALETTE),
+    "scout car PNG atlas maps its palette frames to the normal player palette",
+  );
+  assert(
+    atlas.sprites.every((sprite) =>
+      sprite.tintSlot === "fixed" &&
+      JSON.stringify(Object.keys(sprite.paletteFrames || {})) === JSON.stringify(PLAYER_PALETTE)),
+    "scout car PNG body and rear gun both provide fixed-tint frames for every player color",
+  );
+  const definitions = createLiveRigDefinitions();
+  const definition = liveRigDefinitionFor(definitions, KIND.SCOUT_CAR);
+  const routes = liveRigRoutesFor(KIND.SCOUT_CAR);
+  const unitRoute = routes.find((route) => route.layerName === "units");
+  const shadowRoute = routes.find((route) => route.layerName === "unitShadows");
+  const unitCoverage = pngAtlasRouteCoverage(definition, atlas, unitRoute);
+  const shadowCoverage = pngAtlasRouteCoverage(definition, atlas, shadowRoute);
+  assert(unitCoverage.missingParts.length === 0, "scout car PNG atlas covers every unit-route part");
+  assert(
+    unitCoverage.coveredParts.includes("part.gunnerHead") &&
+      unitCoverage.coveredParts.includes("part.gunnerBarrel"),
+    "scout car PNG gun sprite replaces the old crew/gun SVG parts",
+  );
+  assert(
+    shadowCoverage.coveredParts.length === 0 &&
+      shadowCoverage.missingParts.includes("part.shadow"),
+    "scout car PNG atlas leaves the existing SVG shadow route in place",
   );
 }
 
