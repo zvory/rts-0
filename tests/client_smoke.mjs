@@ -23,6 +23,7 @@ const TEST_URL = (() => {
 const CHROME = process.env.CHROME ||
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const consoleErrors = [];
+const responseErrors = [];
 const pageErrors = [];
 let failures = 0;
 const VERBOSE = !!process.env.RTS_VERBOSE;
@@ -42,6 +43,11 @@ try {
   page.on("console", (m) => { if (m.type() === "error") consoleErrors.push(m.text()); });
   page.on("pageerror", (e) => pageErrors.push(e.message));
   page.on("requestfailed", (r) => { if (!r.url().includes("favicon")) consoleErrors.push("requestfailed: " + r.url()); });
+  page.on("response", (response) => {
+    const status = response.status();
+    if (status < 400 || response.url().includes("favicon")) return;
+    responseErrors.push(`${status}: ${response.url()}`);
+  });
 
   await page.goto(TEST_URL, { waitUntil: "networkidle2", timeout: 15000 });
   await page.waitForSelector("#lobby-screen", { visible: true, timeout: 5000 });
@@ -433,6 +439,7 @@ try {
   ok(consoleErrors.length === 0, `no console errors (${consoleErrors.length})`);
   if (pageErrors.length) console.log("  -- pageErrors:\n" + pageErrors.map((e) => "     " + e).join("\n"));
   if (consoleErrors.length) console.log("  -- consoleErrors:\n" + consoleErrors.slice(0, 12).map((e) => "     " + e).join("\n"));
+  if (responseErrors.length) console.log("  -- responseErrors:\n" + responseErrors.slice(0, 12).map((e) => "     " + e).join("\n"));
 } finally {
   await browser.close();
 }

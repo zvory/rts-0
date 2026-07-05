@@ -11,6 +11,7 @@ export class ReplayViewer extends Match {
       unitRangesEnabled: options.unitRangesEnabled,
       onUnitRangesEnabledChange: options.onUnitRangesEnabledChange,
       capabilities: options.capabilities,
+      cameraMaxZoom: options.cameraMaxZoom,
       observerAnalysisOverlayPreferences: options.observerAnalysisOverlayPreferences,
     });
   }
