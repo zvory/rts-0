@@ -225,6 +225,12 @@ const VISUAL_PROFILE_ENTRIES = Object.freeze([
     initialCamera: Object.freeze({ x: 2052, y: 1874, zoom: 2.4 }),
   }),
   Object.freeze({
+    id: "mortar-png-1",
+    label: "Mortar PNG 1",
+    description: "Local checked-in profile for previewing the wheeled Mortar Team PNG carriage/tube atlas in the render-preview lab scenario.",
+    initialCamera: Object.freeze({ x: 2052, y: 1952, zoom: 2.5 }),
+  }),
+  Object.freeze({
     id: "scout-plane-fw189-pass-01",
     label: "Scout Plane Fw 189 pass 01",
     description: "Local profile for previewing the generated detailed Fw 189 Scout Plane PNG with team tint in the render-preview lab scenario.",

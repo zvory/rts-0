@@ -39,6 +39,7 @@ import {
   pngAtlasRouteCoverage,
 } from "../client/src/renderer/rigs/png_runtime.js";
 import { ANTI_TANK_GUN_PNG_RIG_ATLAS } from "../client/src/renderer/rigs/anti_tank_gun_png_atlas.js";
+import { MORTAR_TEAM_PNG_RIG_ATLAS } from "../client/src/renderer/rigs/mortar_team_png_atlas.js";
 import { TANK_PNG_RIG_ATLAS } from "../client/src/renderer/rigs/tank_png_atlas.js";
 import {
   MACHINE_GUNNER_RIG_SVG,
@@ -778,6 +779,84 @@ test("anti-tank gun PNG atlas covers the unit route and keeps barrel recoil spli
   assert.equal(packedCarriage.alpha, 1);
   assert.equal(leftTrail.alpha, 0);
   assert.equal(rightTrail.alpha, 0);
+});
+
+test("mortar PNG atlas covers unit route with tinted carriage, tinted tube, and fixed tires", () => {
+  const result = compileSvgRig(MORTAR_TEAM_RIG_SVG, { expectedKind: KIND.MORTAR_TEAM });
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  const definition = result.definition;
+  const [, unitRoute] = liveRigRoutesFor(KIND.MORTAR_TEAM);
+  const coverage = pngAtlasRouteCoverage(definition, MORTAR_TEAM_PNG_RIG_ATLAS, unitRoute);
+  assert.deepEqual(coverage.missingParts, []);
+  assert.equal(pngAtlasCanRenderRoute(definition, MORTAR_TEAM_PNG_RIG_ATLAS, unitRoute), true);
+
+  const packedCarriageSprite = MORTAR_TEAM_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.mortar.carriage.packed");
+  const packedTubeSprite = MORTAR_TEAM_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.mortar.tube.packed");
+  const packedLeftTireSprite = MORTAR_TEAM_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.mortar.tire.left.packed");
+  const packedRightTireSprite = MORTAR_TEAM_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.mortar.tire.right.packed");
+  for (const sprite of [packedCarriageSprite, packedTubeSprite, packedLeftTireSprite, packedRightTireSprite]) assert.ok(sprite);
+  assert.deepEqual(
+    [packedCarriageSprite, packedTubeSprite, packedLeftTireSprite, packedRightTireSprite].map((sprite) => sprite.tintSlot),
+    ["team-light", "team-light", "fixed", "fixed"],
+  );
+  assert.ok(packedCarriageSprite.sourceParts.includes("part.mortar.body.packed"));
+  assert.ok(packedCarriageSprite.sourceParts.includes("part.mortar.wheel.left.body.packed"));
+  assert.ok(packedLeftTireSprite.sourceParts.includes("part.mortar.wheel.left.body.packed"));
+  assert.equal(packedLeftTireSprite.sourceParts.includes("part.mortar.wheel.right.body.packed"), false);
+  assert.ok(packedRightTireSprite.sourceParts.includes("part.mortar.wheel.right.body.packed"));
+  assert.equal(packedRightTireSprite.sourceParts.includes("part.mortar.wheel.left.body.packed"), false);
+  assert.ok(packedTubeSprite.sourceParts.includes("part.mortar.tube.packed"));
+  assert.equal(packedTubeSprite.sourceParts.includes("part.mortar.body.packed"), false);
+
+  const entity = {
+    id: 46,
+    kind: KIND.MORTAR_TEAM,
+    owner: 1,
+    x: 32,
+    y: 44,
+    facing: 0,
+    weaponFacing: 0,
+    setupState: SETUP.DEPLOYED,
+    state: STATE.ATTACK,
+  };
+  const renderer = makeRigRenderer();
+  renderer._liveRigDefinitionsByKind = new Map([[KIND.MORTAR_TEAM, definition]]);
+  renderer._livePngRigAtlasesByKind = new Map([[KIND.MORTAR_TEAM, { ...MORTAR_TEAM_PNG_RIG_ATLAS, enabled: true }]]);
+  renderer._livePngRigAtlasTextures = new Map([[KIND.MORTAR_TEAM, fakeAtlasTexture()]]);
+  renderer._deployedWeaponSetupVisual = () => ({ prongFactor: 1, frameProgress: 1, barrel: true });
+
+  renderer._drawUnit(entity, new Map([[1, 0x336699]]), { playerId: 1, selection: new Set(), weaponRecoil: () => 1 });
+
+  const unit = renderer._liveRigPools.liveUnitRigs.get(entity.id);
+  assert.equal(typeof unit.matchesPngAtlasRig, "function");
+  const carriage = unit.parts.get("sprite.mortar.carriage.deployed").display;
+  const tube = unit.parts.get("sprite.mortar.tube.deployed").display;
+  const leftTire = unit.parts.get("sprite.mortar.tire.left.deployed").display;
+  const rightTire = unit.parts.get("sprite.mortar.tire.right.deployed").display;
+  for (const display of [carriage, tube, leftTire, rightTire]) {
+    assert.equal(display.visible, true);
+    assert.equal(display.alpha, 1);
+  }
+  assert.notEqual(carriage.tint, 0xffffff);
+  assert.notEqual(tube.tint, 0xffffff);
+  assert.equal(leftTire.tint, 0xffffff);
+  assert.equal(rightTire.tint, 0xffffff);
+  assert.ok(Math.abs(tube.x) > Math.abs(carriage.x) * 2);
+
+  renderer._deployedWeaponSetupVisual = () => ({ prongFactor: 0, frameProgress: 0, barrel: false });
+  renderer._drawUnit({ ...entity, setupState: SETUP.PACKED, state: STATE.IDLE }, new Map([[1, 0x336699]]), {
+    playerId: 1,
+    selection: new Set(),
+    weaponRecoil: () => 0,
+  });
+  const packedCarriage = unit.parts.get("sprite.mortar.carriage.packed").display;
+  const packedLeftTire = unit.parts.get("sprite.mortar.tire.left.packed").display;
+  const packedRightTire = unit.parts.get("sprite.mortar.tire.right.packed").display;
+  for (const display of [packedCarriage, packedLeftTire, packedRightTire]) {
+    assert.equal(display.visible, true);
+    assert.equal(display.alpha, 1);
+  }
+  for (const display of [carriage, tube, leftTire, rightTire]) assert.equal(display.alpha, 0);
 });
 
 test("rifleman PNG frame strip uses idle frame and movement cycle", () => {
