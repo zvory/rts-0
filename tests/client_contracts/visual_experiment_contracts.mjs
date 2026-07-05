@@ -1,6 +1,7 @@
 // tests/client_contracts/visual_experiment_contracts.mjs
 // Contracts for local lab visual experimentation renderer-only samples.
 
+import fs from "node:fs";
 import { assert, assertApprox } from "./assertions.mjs";
 import { COLORS, PLAYER_PALETTE } from "../../client/src/config.js";
 import { buildFrameEntityViews } from "../../client/src/frame_entity_views.js";
@@ -51,6 +52,11 @@ const NOOP_RENDERER_OVERLAYS = [
   "_drawMuzzleFlashes",
   "_drawPlacement",
 ];
+
+const PANZERFAUST_MANIFEST_URL = new URL(
+  "../../client/assets/rigs/panzerfaust-pass-01/metadata/manifest.json",
+  import.meta.url,
+);
 
 {
   const profile = getVisualProfile("trench-variants-1");
@@ -108,6 +114,32 @@ const NOOP_RENDERER_OVERLAYS = [
       override.strip.frameCount === 7,
     "rifleman recoil strip exposes the seven-cell Rifleman atlas geometry",
   );
+}
+
+{
+  const manifest = JSON.parse(fs.readFileSync(PANZERFAUST_MANIFEST_URL, "utf8"));
+  const runtime = manifest.runtime;
+  const profile = getVisualProfile("panzerfaust-long-preview-1");
+  assert(profile, "Panzerfaust long frame-strip visual profile is registered");
+  assert(profile.frameStripOverrides.length === 1, "Panzerfaust long profile has one frame-strip override");
+  const override = profile.frameStripOverrides[0];
+  const strip = override.strip;
+  assert(override.kind === KIND.PANZERFAUST, "Panzerfaust long profile targets Panzerfaust units");
+  assert(strip.image === runtime.stripImageUrl, "Panzerfaust profile uses the manifest runtime asset URL");
+  assert(strip.imageVersion === runtime.imageVersion, "Panzerfaust profile mirrors the manifest image version");
+  assert(strip.frameWidth === runtime.frameWidth, "Panzerfaust profile mirrors the manifest frame width");
+  assert(strip.frameHeight === runtime.frameHeight, "Panzerfaust profile mirrors the manifest frame height");
+  assert(strip.frameCount === runtime.frameCount, "Panzerfaust profile mirrors the manifest frame count");
+  assert(strip.worldScale === runtime.worldScale, "Panzerfaust profile mirrors the manifest world scale");
+  assert(strip.tintSlot === runtime.tintSlot, "Panzerfaust profile mirrors the manifest tint slot");
+  assert(
+    JSON.stringify(strip.targetColorAdjustment) === JSON.stringify(runtime.targetColorAdjustment),
+    "Panzerfaust profile mirrors the manifest runtime color target",
+  );
+  const imageSize = readPngDimensions(strip.image);
+  assert(imageSize.width === runtime.frameWidth * runtime.frameCount,
+    "Panzerfaust strip PNG width matches runtime atlas geometry");
+  assert(imageSize.height === runtime.frameHeight, "Panzerfaust strip PNG height matches runtime atlas geometry");
 }
 
 {
@@ -640,5 +672,16 @@ function fakeParent() {
     removeChild(view) {
       view.parentNode = null;
     },
+  };
+}
+
+function readPngDimensions(assetUrl) {
+  const assetPath = assetUrl.split("?")[0];
+  const buffer = fs.readFileSync(new URL(`../../client${assetPath}`, import.meta.url));
+  assert(buffer.toString("hex", 0, 8) === "89504e470d0a1a0a", "visual profile asset is a PNG");
+  assert(buffer.toString("ascii", 12, 16) === "IHDR", "visual profile PNG has an IHDR chunk");
+  return {
+    width: buffer.readUInt32BE(16),
+    height: buffer.readUInt32BE(20),
   };
 }
