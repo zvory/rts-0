@@ -158,6 +158,9 @@ Visuals can be rough in the first implementation, but every rough or missing ass
 - [ ] Facing, turret, barrel, projectile, tracer, recoil, muzzle flash, impact, and area indicators
       are specified if relevant.
 - [ ] Selection, hover, health, range, ability radius, and targeting affordances are specified.
+- [ ] Generated PNG unit sprites specify team-colorable paint, uniform, and armor regions as matte
+      white/off-white source art, not blue or another final team color, so runtime recoloring stays
+      easy to tune.
 - [ ] Fog, occlusion, minimap, and team-color readability are checked.
 - [ ] Placeholder art is clearly labeled if final art is deferred.
 
