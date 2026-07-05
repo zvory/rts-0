@@ -1287,7 +1287,10 @@ selection rings):
   PNG frame-strip units use a shared load-time color profile target in
   `renderer/rigs/frame_strip_color_profile.js`; each strip records any brightness/saturation already
   baked into its checked-in runtime PNG, and raw strips receive the missing delta once when the
-  texture loads.
+  texture loads. Individual strips can set a lower or higher target when their generated source art
+  needs unit-specific visual matching.
+  PNG atlas rigs can also declare a small `runtimeColorAdjustment` so generated vehicle art can be
+  matched in-game without rewriting the atlas source PNG.
   Attack `weaponKind` selects feedback scale and rig muzzle origin; TankCoax uses a small
   machine-gun flash/tracer/tail from the authored coax muzzle anchor and no Tank recoil, while
   TankCannon or default Tank attacks use a direct tracer from the main muzzle anchor plus the

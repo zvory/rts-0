@@ -9,6 +9,7 @@ import { GROUND_DECAL_TEXTURE_WORLD_SCALE } from "../../client/src/renderer/deca
 import { TrenchDecalLayer, _drawOccupiedTrenches, _drawTrenches } from "../../client/src/renderer/trenches.js";
 import { Renderer } from "../../client/src/renderer/index.js";
 import { loadFrameStripTexture } from "../../client/src/renderer/rigs/frame_strip_routing.js";
+import { loadPngRigAtlasTexture } from "../../client/src/renderer/rigs/png_routing.js";
 import {
   _drawAbilityObjects,
   _drawAbilityTargetPreview,
@@ -96,6 +97,87 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     assert(rawLoads.length === 1, "adjusted strip fallback loads the raw source once");
     assert(canvases[0]?.width === 48, "frame-strip canvas fallback width covers every frame");
     assert(canvases[0]?.height === 8, "frame-strip canvas fallback height uses frame metadata");
+  } finally {
+    if (priorDocument === undefined) delete globalThis.document;
+    else globalThis.document = priorDocument;
+    if (priorImage === undefined) delete globalThis.Image;
+    else globalThis.Image = priorImage;
+  }
+}
+
+{
+  const priorDocument = globalThis.document;
+  const priorImage = globalThis.Image;
+  const rawLoads = [];
+  const canvases = [];
+  globalThis.document = {
+    createElement(tag) {
+      assert(tag === "canvas", "PNG atlas color loader creates a canvas");
+      const canvas = {
+        width: 0,
+        height: 0,
+        getContext(type) {
+          assert(type === "2d", "PNG atlas color loader requests a 2D canvas context");
+          return {
+            imageSmoothingEnabled: true,
+            clearRect() {},
+            drawImage() {},
+            getImageData() {
+              return { data: new Uint8ClampedArray(canvas.width * canvas.height * 4) };
+            },
+            putImageData() {},
+          };
+        },
+      };
+      canvases.push(canvas);
+      return canvas;
+    },
+  };
+  globalThis.Image = class FakeImage {
+    constructor() {
+      this.naturalWidth = 0;
+      this.width = 0;
+      this.naturalHeight = 0;
+      this.height = 0;
+      this.onload = null;
+      this.onerror = null;
+    }
+
+    set src(value) {
+      this._src = value;
+      queueMicrotask(() => this.onload?.());
+    }
+  };
+
+  try {
+    const texture = await loadPngRigAtlasTexture(
+      {
+        Assets: {
+          load: async (src) => {
+            rawLoads.push(src);
+            return { fallbackSrc: src };
+          },
+        },
+        Texture: {
+          from() {
+            throw new Error("canvas texture unavailable");
+          },
+        },
+      },
+      {
+        image: "/assets/rigs/test-atlas.png?v=contract",
+        grid: { width: 32, height: 24 },
+        runtimeColorAdjustment: { brightness: 105, saturation: 100, hue: 100 },
+      },
+    );
+
+    assert(
+      texture?.fallbackSrc === "/assets/rigs/test-atlas.png?v=contract",
+      "adjusted atlas falls back to raw texture load when canvas texture creation fails",
+    );
+    assert(rawLoads.length === 1, "adjusted atlas fallback loads the raw source once");
+    assert(canvases[0]?.width === 32, "PNG atlas canvas fallback width uses atlas metadata");
+    assert(canvases[0]?.height === 24, "PNG atlas canvas fallback height uses atlas metadata");
   } finally {
     if (priorDocument === undefined) delete globalThis.document;
     else globalThis.document = priorDocument;
