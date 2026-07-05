@@ -30,12 +30,13 @@ full-body strip because the useful experiment is testing whether a generated inf
 RTS scale in-game. Runtime frame 0 is the idle standing frame. Frames 1-4 cycle at 12 FPS only while
 the authoritative client entity state is `move`. Frame 5 is retained from the generated post-shot
 source but is not wired; firing and recoil remain future work. The old SVG rifleman rig still
-provides the shadow route and fallback while the PNG texture loads. Frame-strip art uses the shared
+provides the shadow route and fallback while the PNG texture loads. Frame-strip art uses the shared default
 `FRAME_STRIP_TARGET_COLOR_ADJUSTMENT` in `client/src/renderer/rigs/frame_strip_color_profile.js`
 (`brightness: 170`, `saturation: 118`, `hue: 100`) and the brighter `team-light` tint slot so blue
 and orange owners read on dark terrain. Rifleman pass 02 already has that baseline baked into its
 checked-in runtime strip; raw frame strips such as Machine Gunner pass 01 receive the missing
-delta once at client texture-load time, preserving the original generated source sheets.
+delta once at client texture-load time, preserving the original generated source sheets. A strip can
+override the target when that generated unit needs its own brightness match.
 
 ## Current files
 
@@ -53,8 +54,10 @@ delta once at client texture-load time, preserving the original generated source
   placeholder, and unused cells are transparent so generated/default tracks are not rendered during
   this experiment. The current active variant is `pass10-noguide-ref`, which applies ImageMagick
   brightness/saturation modulation after normalization and tints the generated barrel with the
-  same full `team` tint slot as the hull. The runtime sprite frames are normalized to visible
-  component alpha bounds, not the full generated cell bounds.
+  same full `team` tint slot as the hull. The checked-in atlas keeps that baked pass, and the client
+  applies a small `brightness: 105` runtime adjustment at texture-load time for in-game matching.
+  The runtime sprite frames are normalized to visible component alpha bounds, not the full generated
+  cell bounds.
 - `client/src/renderer/rigs/tank_png_atlas.js` is generated metadata. Its `enabled` field is
   currently `true` for the pass-10 experiment.
 - `client/src/renderer/rigs/png_runtime.js` and `png_routing.js` render atlas sprites in place of
@@ -304,9 +307,10 @@ cheap checks before any generated atlas can be enabled.
 - `tank-tiger-i-pass-10-noguide-ref.png`: active experiment. Regenerated from a no-guide 2x3 sheet
   and the attached top-down Tiger I reference as the subject input. The runtime atlas uses 1.2x
   world-scale compensation so the no-track raster art recovers the old SVG tank's visual mass, uses
-  visible-alpha normalization only, with no guide masking or cell-edge clearing. This pass validates
-  the pipeline direction because guide artifacts are gone, but it is not final art: the generated
-  hull still carries rear/side fixtures from the reference that may read as unwanted track hardware.
+  visible-alpha normalization only, with no guide masking or cell-edge clearing. The client applies
+  an additional non-destructive 5% runtime brightness lift. This pass validates the pipeline
+  direction because guide artifacts are gone, but it is not final art: the generated hull still
+  carries rear/side fixtures from the reference that may read as unwanted track hardware.
 - `rifleman-pass-02`: active experiment. Generated as the best of five one-shot full-frame
   rifleman strips after simplifying the prompt around strict nadir view, hidden legs, shoulder-line
   rifle pose, and RTS-scale detail. It is enabled as a full-frame strip rather than a semantic
@@ -314,9 +318,9 @@ cheap checks before any generated atlas can be enabled.
   the shared frame-strip target and `team-light` tint. Not final art: the anatomy and weapon hold
   still need another art pass, and the current runtime has no firing/recoil frame.
 - `machine-gunner-pass-01`: active experiment. Generated carry and setup/deployed sheets are kept
-  in raw color, and the client applies the shared frame-strip target at texture-load time so its
-  runtime brightness tracks Rifleman and future frame-strip units without destructively rewriting
-  the source art.
+  in raw color, and the client applies a per-unit `brightness: 145`, `saturation: 118`, `hue: 100`
+  frame-strip target at texture-load time so its runtime brightness can be tuned against Rifleman
+  and Tank without destructively rewriting the source art.
 
 These candidates are useful references for what to avoid. None should be treated as accepted art.
 

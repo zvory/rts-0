@@ -9,6 +9,7 @@ import { GROUND_DECAL_TEXTURE_WORLD_SCALE } from "../../client/src/renderer/deca
 import { TrenchDecalLayer, _drawOccupiedTrenches, _drawTrenches } from "../../client/src/renderer/trenches.js";
 import { Renderer } from "../../client/src/renderer/index.js";
 import { loadFrameStripTexture } from "../../client/src/renderer/rigs/frame_strip_routing.js";
+import { loadPngRigAtlasTexture } from "../../client/src/renderer/rigs/png_routing.js";
 import {
   _drawAbilityObjects,
   _drawAbilityTargetPreview,
@@ -101,6 +102,128 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     else globalThis.document = priorDocument;
     if (priorImage === undefined) delete globalThis.Image;
     else globalThis.Image = priorImage;
+  }
+}
+
+{
+  const priorDocument = globalThis.document;
+  const priorImage = globalThis.Image;
+  const rawLoads = [];
+  const canvases = [];
+  globalThis.document = {
+    createElement(tag) {
+      assert(tag === "canvas", "PNG atlas color loader creates a canvas");
+      const canvas = {
+        width: 0,
+        height: 0,
+        getContext(type) {
+          assert(type === "2d", "PNG atlas color loader requests a 2D canvas context");
+          return {
+            imageSmoothingEnabled: true,
+            clearRect() {},
+            drawImage() {},
+            getImageData() {
+              return { data: new Uint8ClampedArray(canvas.width * canvas.height * 4) };
+            },
+            putImageData() {},
+          };
+        },
+      };
+      canvases.push(canvas);
+      return canvas;
+    },
+  };
+  globalThis.Image = class FakeImage {
+    constructor() {
+      this.naturalWidth = 0;
+      this.width = 0;
+      this.naturalHeight = 0;
+      this.height = 0;
+      this.onload = null;
+      this.onerror = null;
+    }
+
+    set src(value) {
+      this._src = value;
+      queueMicrotask(() => this.onload?.());
+    }
+  };
+
+  try {
+    const texture = await loadPngRigAtlasTexture(
+      {
+        Assets: {
+          load: async (src) => {
+            rawLoads.push(src);
+            return { fallbackSrc: src };
+          },
+        },
+        Texture: {
+          from() {
+            throw new Error("canvas texture unavailable");
+          },
+        },
+      },
+      {
+        image: "/assets/rigs/test-atlas.png?v=contract",
+        grid: { width: 32, height: 24 },
+        runtimeColorAdjustment: { brightness: 105, saturation: 100, hue: 100 },
+      },
+    );
+
+    assert(
+      texture?.fallbackSrc === "/assets/rigs/test-atlas.png?v=contract",
+      "adjusted atlas falls back to raw texture load when canvas texture creation fails",
+    );
+    assert(rawLoads.length === 1, "adjusted atlas fallback loads the raw source once");
+    assert(canvases[0]?.width === 32, "PNG atlas canvas fallback width uses atlas metadata");
+    assert(canvases[0]?.height === 24, "PNG atlas canvas fallback height uses atlas metadata");
+  } finally {
+    if (priorDocument === undefined) delete globalThis.document;
+    else globalThis.document = priorDocument;
+    if (priorImage === undefined) delete globalThis.Image;
+    else globalThis.Image = priorImage;
+  }
+}
+
+{
+  const restorePixi = installFakePixi();
+  try {
+    const parent = {
+      clientWidth: 640,
+      clientHeight: 480,
+      appendChild(view) {
+        view.parentNode = this;
+      },
+      removeChild(view) {
+        view.parentNode = null;
+      },
+    };
+    const renderer = new Renderer(parent);
+    const adjustedTexture = PIXI.Texture.from("adjusted-atlas");
+    adjustedTexture.rtsRendererOwnedTexture = true;
+    const rawTexture = PIXI.Texture.from("raw-strip");
+    renderer._livePngRigAtlasTextures.set(KIND.TANK, adjustedTexture);
+    renderer._liveFrameStripTextures.set(KIND.RIFLEMAN, rawTexture);
+    renderer._visualFrameStripTextures.set("rifleman:test", adjustedTexture);
+    renderer._visualFrameStripTextureLoads.set("rifleman:test", Promise.resolve(adjustedTexture));
+
+    renderer.destroy();
+
+    assert(renderer._livePngRigAtlasTextures.size === 0, "renderer teardown clears live PNG atlas textures");
+    assert(renderer._liveFrameStripTextures.size === 0, "renderer teardown clears live frame-strip textures");
+    assert(renderer._visualFrameStripTextures.size === 0, "renderer teardown clears visual frame-strip textures");
+    assert(renderer._visualFrameStripTextureLoads.size === 0, "renderer teardown clears pending visual strip loads");
+    assert(adjustedTexture.destroyed, "renderer-owned adjusted textures are destroyed on teardown");
+    assert(rawTexture.destroyed === false, "shared raw Pixi asset textures stay owned by the asset cache");
+
+    const lateTexture = PIXI.Texture.from("late-adjusted");
+    lateTexture.rtsRendererOwnedTexture = true;
+    renderer._storeLoadedTexture(renderer._livePngRigAtlasTextures, KIND.TANK, lateTexture);
+    assert(renderer._livePngRigAtlasTextures.size === 0, "late texture loads are not cached after teardown");
+    assert(lateTexture.destroyed, "late renderer-owned texture loads are destroyed after teardown");
+  } finally {
+    restorePixi();
   }
 }
 

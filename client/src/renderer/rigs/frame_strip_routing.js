@@ -1,9 +1,6 @@
 import { KIND } from "../../protocol.js";
-import {
-  applyFrameStripColorAdjustmentToRgba,
-  frameStripRuntimeColorAdjustment,
-  isNeutralFrameStripColorAdjustment,
-} from "./frame_strip_color_profile.js";
+import { loadColorAdjustedTexture } from "./color_adjusted_texture.js";
+import { frameStripRuntimeColorAdjustment } from "./frame_strip_color_profile.js";
 import { MACHINE_GUNNER_PNG_FRAME_STRIP } from "./machine_gunner_png_strip.js";
 import { RIFLEMAN_PNG_FRAME_STRIP } from "./rifleman_png_strip.js";
 
@@ -27,55 +24,23 @@ export function liveFrameStripFor(strips, kind) {
 export function loadFrameStripTexture(pixi, strip) {
   if (!pixi || !strip?.image) return Promise.resolve(null);
   const adjustment = frameStripRuntimeColorAdjustment(strip);
-  if (!isNeutralFrameStripColorAdjustment(adjustment)) {
-    return loadAdjustedFrameStripTexture(pixi, strip, adjustment);
-  }
-  return loadRawFrameStripTexture(pixi, strip);
+  const frameWidth = positiveDimension(strip.frameWidth, 1);
+  const frameHeight = positiveDimension(strip.frameHeight, 1);
+  const frameCount = Math.max(1, Math.trunc(positiveDimension(strip.frameCount, 1)));
+  return loadColorAdjustedTexture(pixi, {
+    image: strip.image,
+    adjustment,
+    widthFallbacks: [frameWidth * frameCount],
+    heightFallbacks: [frameHeight],
+    rawLoad: () => loadRawFrameStripTexture(pixi, strip),
+    errorLabel: "frame strip image",
+  });
 }
 
 function loadRawFrameStripTexture(pixi, strip) {
   if (pixi.Assets?.load) return pixi.Assets.load(strip.image);
   const texture = pixi.Texture?.from?.(strip.image) ?? null;
   return Promise.resolve(texture);
-}
-
-async function loadAdjustedFrameStripTexture(pixi, strip, adjustment) {
-  const doc = globalThis.document;
-  if (!doc?.createElement || !globalThis.Image || !pixi.Texture?.from) {
-    return loadRawFrameStripTexture(pixi, strip);
-  }
-  try {
-    const image = await loadImage(strip.image);
-    const frameWidth = positiveDimension(strip.frameWidth, 1);
-    const frameHeight = positiveDimension(strip.frameHeight, 1);
-    const frameCount = Math.max(1, Math.trunc(positiveDimension(strip.frameCount, 1)));
-    const width = positiveDimension(image.naturalWidth, positiveDimension(image.width, frameWidth * frameCount));
-    const height = positiveDimension(image.naturalHeight, positiveDimension(image.height, frameHeight));
-    const canvas = doc.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext?.("2d", { willReadFrequently: true });
-    if (!ctx) return loadRawFrameStripTexture(pixi, strip);
-    ctx.imageSmoothingEnabled = false;
-    ctx.clearRect(0, 0, width, height);
-    ctx.drawImage(image, 0, 0, width, height);
-    const imageData = ctx.getImageData(0, 0, width, height);
-    applyFrameStripColorAdjustmentToRgba(imageData.data, adjustment);
-    ctx.putImageData(imageData, 0, 0);
-    return pixi.Texture.from(canvas);
-  } catch (_err) {
-    return loadRawFrameStripTexture(pixi, strip);
-  }
-}
-
-function loadImage(src) {
-  return new Promise((resolve, reject) => {
-    const image = new globalThis.Image();
-    image.decoding = "async";
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error(`failed to load frame strip image ${src}`));
-    image.src = src;
-  });
 }
 
 function positiveDimension(value, fallback) {

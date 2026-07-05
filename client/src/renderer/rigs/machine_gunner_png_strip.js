@@ -28,6 +28,11 @@ export const MACHINE_GUNNER_PNG_FRAME_STRIP = deepFreeze({
     saturation: 100,
     hue: 100,
   },
+  targetColorAdjustment: {
+    brightness: 145,
+    saturation: 118,
+    hue: 100,
+  },
   packedFacing: "body",
   setupForwardAngle: Math.PI / 2,
   source: {

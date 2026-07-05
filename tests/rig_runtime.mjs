@@ -779,9 +779,13 @@ test("machine gunner PNG frame strip maps setup progress to deploy frames", () =
   assert.ok(Math.abs(frameStripVisualFacing(strip, entity) - (Math.PI / 2)) < 0.001);
 });
 
-test("frame-strip color profile applies the shared target only when not already baked", () => {
+test("frame-strip color profile applies shared and per-strip targets only when not already baked", () => {
   assert.equal(isNeutralFrameStripColorAdjustment(frameStripRuntimeColorAdjustment(RIFLEMAN_PNG_FRAME_STRIP)), true);
-  assert.deepEqual(frameStripRuntimeColorAdjustment(MACHINE_GUNNER_PNG_FRAME_STRIP), FRAME_STRIP_TARGET_COLOR_ADJUSTMENT);
+  assert.deepEqual(frameStripRuntimeColorAdjustment(MACHINE_GUNNER_PNG_FRAME_STRIP), {
+    brightness: 145,
+    saturation: FRAME_STRIP_TARGET_COLOR_ADJUSTMENT.saturation,
+    hue: FRAME_STRIP_TARGET_COLOR_ADJUSTMENT.hue,
+  });
   assert.deepEqual(frameStripRuntimeColorAdjustment({}), FRAME_STRIP_TARGET_COLOR_ADJUSTMENT);
 });
 
@@ -845,10 +849,7 @@ test("machine gunner PNG frame strip mirrors asset manifest runtime metadata", (
   assert.equal(strip.movementFacingOffset, runtime.movementFacingOffsetRadians);
   assert.equal(strip.tintSlot, runtime.tintSlot);
   assert.deepEqual(strip.bakedColorAdjustment, runtime.bakedColorAdjustment);
-  assert.equal(
-    runtime.targetColorAdjustment,
-    "client/src/renderer/rigs/frame_strip_color_profile.js FRAME_STRIP_TARGET_COLOR_ADJUSTMENT",
-  );
+  assert.deepEqual(strip.targetColorAdjustment, runtime.targetColorAdjustment);
   assert.equal(strip.packedFacing, runtime.packedFacing);
   assert.equal(strip.setupForwardAngle, runtime.setupForwardAngleRadians);
   assert.deepEqual(strip.source, {
