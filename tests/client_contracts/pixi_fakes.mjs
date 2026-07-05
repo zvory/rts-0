@@ -156,12 +156,22 @@ export function installFakePixi() {
     }
   }
 
+  class FakeRectangle {
+    constructor(x = 0, y = 0, width = 0, height = 0) {
+      this.x = x;
+      this.y = y;
+      this.width = width;
+      this.height = height;
+    }
+  }
+
   class FakeSprite {
     constructor(texture) {
       this.texture = texture;
       this.visible = true;
       this.scale = { set: (x = 1, y = x) => { this.scaleX = x; this.scaleY = y; } };
       this.position = { set: (x = 0, y = 0) => { this.x = x; this.y = y; } };
+      this.anchor = { set: (x = 0, y = x) => { this.anchorX = x; this.anchorY = y; } };
     }
     destroy(options) {
       this.destroyed = true;
@@ -184,6 +194,7 @@ export function installFakePixi() {
     Graphics: PixiGraphics,
     Text: FakeText,
     Texture: FakeTexture,
+    Rectangle: FakeRectangle,
     Sprite: FakeSprite,
     SCALE_MODES: { NEAREST: "nearest" },
     settings: {},

@@ -10,13 +10,14 @@
   },
   "runtime": {
     "module": "client/src/renderer/rigs/rifleman_png_strip.js",
-    "stripImageUrl": "/assets/rigs/rifleman-pass-02/rifleman-pass-02-strip.png?v=pass02-balanced",
+    "stripImageUrl": "/assets/rigs/rifleman-pass-02/rifleman-pass-02-strip.png?v=pass02-two-recoil-v3",
     "frameWidth": 96,
     "frameHeight": 96,
-    "frameCount": 6,
+    "frameCount": 7,
     "idleFrame": 0,
     "movementFrames": [1, 2, 3, 4],
-    "unusedFrames": [5],
+    "firingFrames": [5, 6],
+    "firingFrameHoldPhase": 0.28,
     "fps": 12,
     "worldScale": 0.34,
     "tintSlot": "team-light",
@@ -30,9 +31,8 @@
   "notes": [
     "Frame 0 is used for idle/standing riflemen.",
     "Frames 1-4 cycle only while the authoritative client entity state is move.",
-    "Frame 5 is retained from the generated recoil source but is not used yet.",
+    "Frame 5 is the firing recoil peak and frame 6 is a partial recovery pose; both are held only for the opening slice of weapon recoil.",
     "The old SVG rifleman rig remains available for the shadow route and fallback while the PNG texture loads.",
-    "No firing or recoil animation is wired for this pass.",
     "The runtime strip already has the shared frame-strip baseline baked in, equivalent to ImageMagick -modulate 170,118,100, so the client load-time color-profile delta is identity for this pass."
   ]
 }
