@@ -225,15 +225,38 @@ const PANZERFAUST_MANIFEST_URL = new URL(
       imageSize.height >= atlas.grid?.components?.carriage?.y + atlas.grid?.components?.carriage?.h,
     "mortar PNG atlas frame coordinates fit inside the generated three-cell sheet",
   );
+  for (const sprite of atlas.sprites) {
+    assert(
+      imageSize.width >= sprite.frame?.x + sprite.frame?.w &&
+        imageSize.height >= sprite.frame?.y + sprite.frame?.h,
+      `mortar PNG atlas sprite frame ${sprite.id} fits inside the generated sheet`,
+    );
+  }
   const carriageSprite = atlas.sprites.find((sprite) => sprite.id === "sprite.mortar.carriage.packed");
   const tubeSprite = atlas.sprites.find((sprite) => sprite.id === "sprite.mortar.tube.packed");
+  const leftTireSprite = atlas.sprites.find((sprite) => sprite.id === "sprite.mortar.tire.left.packed");
+  const rightTireSprite = atlas.sprites.find((sprite) => sprite.id === "sprite.mortar.tire.right.packed");
   assert(
     carriageSprite?.tintSlot === "team-light" &&
       carriageSprite.tintAdjustment?.brightness === 78 &&
       carriageSprite.tintAdjustment?.saturation === 92,
     "mortar PNG carriage keeps the off-white frame team-tinted in lab render preview",
   );
-  assert(tubeSprite?.tintSlot === "fixed", "mortar PNG tube remains fixed dark metal for recoil separation");
+  assert(
+    tubeSprite?.tintSlot === "team-light" &&
+      tubeSprite.tintAdjustment?.brightness === 78 &&
+      tubeSprite.tintAdjustment?.saturation === 92,
+    "mortar PNG tube and barrel assembly are team-tinted in lab render preview",
+  );
+  assert(
+    leftTireSprite?.tintSlot === "fixed" &&
+      leftTireSprite.drawOrder > carriageSprite?.drawOrder &&
+      leftTireSprite.drawOrder < tubeSprite?.drawOrder &&
+      rightTireSprite?.tintSlot === "fixed" &&
+      rightTireSprite.drawOrder > carriageSprite?.drawOrder &&
+      rightTireSprite.drawOrder < tubeSprite?.drawOrder,
+    "mortar PNG tire overlays remain fixed-color above the team-tinted carriage",
+  );
   const definitions = createLiveRigDefinitions();
   const definition = liveRigDefinitionFor(definitions, KIND.MORTAR_TEAM);
   const routes = liveRigRoutesFor(KIND.MORTAR_TEAM);
