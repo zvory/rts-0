@@ -143,6 +143,31 @@ const PANZERFAUST_MANIFEST_URL = new URL(
 }
 
 {
+  const profile = getVisualProfile("scout-plane-fw189-pass-01");
+  assert(profile, "Scout Plane Fw 189 frame-strip visual profile is registered");
+  assert(profile.frameStripOverrides.length === 1, "Scout Plane Fw 189 profile has one frame-strip override");
+  const override = profile.frameStripOverrides[0];
+  const strip = override.strip;
+  assert(override.kind === KIND.SCOUT_PLANE, "Scout Plane Fw 189 profile targets Scout Plane units");
+  assert(
+    strip.image.includes("/assets/rigs/scout-plane-fw189-pass-01/generated/scout-plane-fw189-pass-01-alpha.png"),
+    "Scout Plane Fw 189 profile uses the generated alpha strip asset",
+  );
+  assert(
+    strip.frameWidth === 942 &&
+      strip.frameHeight === 1163 &&
+      strip.frameCount === 1,
+    "Scout Plane Fw 189 strip exposes the generated one-frame atlas geometry",
+  );
+  const imageSize = readPngDimensions(strip.image);
+  assert(
+    imageSize.width === strip.frameWidth * strip.frameCount,
+    "Scout Plane Fw 189 strip PNG width matches runtime atlas geometry",
+  );
+  assert(imageSize.height === strip.frameHeight, "Scout Plane Fw 189 strip PNG height matches runtime atlas geometry");
+}
+
+{
   const profile = getVisualProfile("scout-car-png-1");
   assert(profile, "scout car PNG visual profile is registered");
   assert(profile.initialCamera?.zoom > 2, "scout car PNG profile opens zoomed in on the render-preview scout cars");

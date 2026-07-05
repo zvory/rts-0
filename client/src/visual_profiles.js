@@ -1,4 +1,5 @@
 import { KIND } from "./protocol.js";
+import { SCOUT_PLANE_PNG_FRAME_STRIP } from "./renderer/rigs/scout_plane_png_strip.js";
 
 const VISUAL_PROFILE_ERROR_MESSAGES = Object.freeze({
   invalid: "Invalid visualProfile. Use letters, numbers, underscores, or dashes, up to 48 characters.",
@@ -163,6 +164,15 @@ const PANZERFAUST_LONG_FRAME_STRIP_OVERRIDES_1 = Object.freeze([
   }),
 ]);
 
+const SCOUT_PLANE_FW189_FRAME_STRIP_OVERRIDES_1 = Object.freeze([
+  Object.freeze({
+    id: "scout-plane-fw189-pass-01",
+    label: "Scout Plane Fw 189 pass 01",
+    kind: KIND.SCOUT_PLANE,
+    strip: SCOUT_PLANE_PNG_FRAME_STRIP,
+  }),
+]);
+
 const VISUAL_PROFILE_ENTRIES = Object.freeze([
   Object.freeze({
     id: "trench-variants-1",
@@ -203,6 +213,13 @@ const VISUAL_PROFILE_ENTRIES = Object.freeze([
     label: "Mortar PNG 1",
     description: "Local checked-in profile for previewing the wheeled Mortar Team PNG carriage/tube atlas in the render-preview lab scenario.",
     initialCamera: Object.freeze({ x: 2052, y: 1952, zoom: 2.5 }),
+  }),
+  Object.freeze({
+    id: "scout-plane-fw189-pass-01",
+    label: "Scout Plane Fw 189 pass 01",
+    description: "Local profile for previewing the generated detailed Fw 189 Scout Plane PNG with team tint in the render-preview lab scenario.",
+    initialCamera: Object.freeze({ x: 2050, y: 1730, zoom: 2.8 }),
+    frameStripOverrides: SCOUT_PLANE_FW189_FRAME_STRIP_OVERRIDES_1,
   }),
 ]);
 

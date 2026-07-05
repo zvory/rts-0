@@ -3,10 +3,12 @@ import { loadColorAdjustedTexture } from "./color_adjusted_texture.js";
 import { frameStripRuntimeColorAdjustment } from "./frame_strip_color_profile.js";
 import { MACHINE_GUNNER_PNG_FRAME_STRIP } from "./machine_gunner_png_strip.js";
 import { RIFLEMAN_PNG_FRAME_STRIP } from "./rifleman_png_strip.js";
+import { SCOUT_PLANE_PNG_FRAME_STRIP } from "./scout_plane_png_strip.js";
 
 const LIVE_FRAME_STRIPS = Object.freeze([
   [KIND.MACHINE_GUNNER, MACHINE_GUNNER_PNG_FRAME_STRIP],
   [KIND.RIFLEMAN, RIFLEMAN_PNG_FRAME_STRIP],
+  [KIND.SCOUT_PLANE, SCOUT_PLANE_PNG_FRAME_STRIP],
 ]);
 
 export function createLiveFrameStrips() {
