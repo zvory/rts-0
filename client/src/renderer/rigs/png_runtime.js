@@ -102,12 +102,12 @@ class PngAtlasRigInstance {
     for (const sprite of atlasSprites(definition, atlas)) {
       const frame = sprite.frame;
       if (!frame) continue;
-      const rectangle = pixiFactory.createRectangle(frame.x, frame.y, frame.w, frame.h);
-      const texture = pixiFactory.createTexture(baseTexture, rectangle);
-      const display = pixiFactory.createSprite(texture);
+      const baseFrame = createFrameRecord(frame, baseTexture, pixiFactory);
+      const paletteFrames = createPaletteFrameRecords(sprite.paletteFrames, baseTexture, pixiFactory);
+      const display = pixiFactory.createSprite(baseFrame.texture);
       display.rtsRigPartId = sprite.id;
       display.anchor?.set?.(0, 0);
-      this.parts.set(sprite.id, { sprite, display, frame });
+      this.parts.set(sprite.id, { sprite, display, baseFrame, paletteFrames });
       this.container.addChild(display);
     }
   }
@@ -144,7 +144,9 @@ class PngAtlasRigInstance {
         options.diagnostics?.("renderer.pngRig.redraw.skipped.hidden");
         continue;
       }
-      applySpriteState(rec.display, rec.sprite, rec.frame, partState, sampled.context, options.diagnostics);
+      const frameRecord = frameRecordForContext(rec, sampled.context);
+      if (rec.display.texture !== frameRecord.texture) rec.display.texture = frameRecord.texture;
+      applySpriteState(rec.display, rec.sprite, frameRecord.frame, partState, sampled.context, options.diagnostics);
     }
   }
 
@@ -152,12 +154,38 @@ class PngAtlasRigInstance {
     if (this._destroyed) return;
     this._destroyed = true;
     this.container.parent?.removeChild?.(this.container);
-    for (const { display } of this.parts.values()) {
-      display.destroy?.({ texture: true, baseTexture: false });
+    for (const rec of this.parts.values()) {
+      rec.display.destroy?.({ texture: false, baseTexture: false });
+      rec.baseFrame.texture?.destroy?.(false);
+      for (const frame of rec.paletteFrames?.values?.() || []) frame.texture?.destroy?.(false);
     }
     this.parts.clear();
     this.container.destroy?.({ children: true });
   }
+}
+
+function createFrameRecord(frame, baseTexture, pixiFactory) {
+  const rectangle = pixiFactory.createRectangle(frame.x, frame.y, frame.w, frame.h);
+  return {
+    frame,
+    texture: pixiFactory.createTexture(baseTexture, rectangle),
+  };
+}
+
+function createPaletteFrameRecords(paletteFrames, baseTexture, pixiFactory) {
+  if (!paletteFrames || typeof paletteFrames !== "object") return null;
+  const records = new Map();
+  for (const [key, frame] of Object.entries(paletteFrames)) {
+    const colorKey = normalizedColorKey(key);
+    if (!colorKey || !frame) continue;
+    records.set(colorKey, createFrameRecord(frame, baseTexture, pixiFactory));
+  }
+  return records.size > 0 ? records : null;
+}
+
+function frameRecordForContext(rec, context) {
+  const colorKey = normalizedColorKey(context?.teamColor);
+  return colorKey && rec.paletteFrames?.get(colorKey) ? rec.paletteFrames.get(colorKey) : rec.baseFrame;
 }
 
 function applySpriteState(display, part, frame, state, context, diagnostics = null) {
@@ -170,7 +198,7 @@ function applySpriteState(display, part, frame, state, context, diagnostics = nu
   const transform = displayTransform(state, frame);
   applyDisplayTransform(display, transform);
   display.alpha = state.alpha;
-  display.tint = tintForSlot(state.tintSlot, context, part);
+  display.tint = tintForSlot(part.tintSlot ?? state.tintSlot, context, part);
   diagnostics?.("renderer.pngRig.redraw.completed");
 }
 
@@ -184,6 +212,7 @@ function atlasSprites(definition, atlas) {
         sourceParts: Array.isArray(sprite.sourceParts) ? sprite.sourceParts : [sprite.animationPart],
         tintSlot: sprite.tintSlot ?? "fixed",
         frame: sprite.frame,
+        paletteFrames: sprite.paletteFrames,
         drawOrder: sprite.drawOrder ?? 0,
       }))
       .sort((a, b) => a.drawOrder - b.drawOrder || a.id.localeCompare(b.id));
@@ -195,6 +224,7 @@ function atlasSprites(definition, atlas) {
       sourceParts: [part.id],
       tintSlot: part.tintSlot,
       frame: atlas.frames?.[part.id],
+      paletteFrames: atlas.paletteFrames?.[part.id],
       drawOrder: part.drawOrder ?? 0,
     }))
     .filter((sprite) => sprite.frame);
@@ -235,6 +265,12 @@ function tintForSlot(slot, context, part) {
   if (slot === "team-fill-stroke") return team;
   if (typeof slot === "string" && /^#[0-9a-f]{6}$/i.test(slot)) return hexToInt(slot);
   return 0xffffff;
+}
+
+function normalizedColorKey(color) {
+  const value = typeof color === "string" || typeof color === "number" ? hexToInt(color) : null;
+  if (!Number.isFinite(value)) return null;
+  return `#${(value & 0xffffff).toString(16).padStart(6, "0").toLowerCase()}`;
 }
 
 function rotateOffset(offset, rotation) {
