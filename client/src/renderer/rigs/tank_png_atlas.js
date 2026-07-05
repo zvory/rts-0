@@ -11,12 +11,7 @@ function deepFreeze(value) {
 export const TANK_PNG_RIG_ATLAS = deepFreeze({
   "enabled": true,
   "unit": "tank",
-  "image": "/assets/rigs/tank-ps1/tank-atlas.png?v=pass10-noguide-ref",
-  "runtimeColorAdjustment": {
-    "brightness": 105,
-    "saturation": 100,
-    "hue": 100
-  },
+  "image": "/assets/rigs/tank-ps1/tank-atlas.png?v=pass11-white-dim30",
   "viewBox": {
     "x": -40,
     "y": -32,
@@ -30,7 +25,7 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
     "profile": "semantic",
     "width": 1145,
     "height": 1373,
-    "sourceSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-10-noguide-ref-alpha.png",
+    "sourceSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-11-white-alpha.png",
     "cells": [
       "reference.full",
       "sprite.track",
@@ -85,10 +80,10 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
       "guideMaskMorphology": null,
       "worldScale": 1.2
     },
-    "imageVersion": "pass10-noguide-ref",
+    "imageVersion": "pass11-white-dim30",
     "colorAdjustment": {
-      "brightness": 115,
-      "saturation": 105,
+      "brightness": 70,
+      "saturation": 80,
       "hue": 100
     }
   },
@@ -162,24 +157,24 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
         "part.hull.noseShadow",
         "part.noseTick"
       ],
-      "tintSlot": "team",
+      "tintSlot": "fixed",
       "drawOrder": 20,
       "sourceCell": "sprite.hull",
       "frame": {
-        "x": 53,
-        "y": 580,
-        "w": 520,
-        "h": 316,
+        "x": 54,
+        "y": 581,
+        "w": 519,
+        "h": 315,
         "visibleBounds": {
-          "x": 53,
-          "y": 580,
-          "w": 520,
-          "h": 316
+          "x": 54,
+          "y": 581,
+          "w": 519,
+          "h": 315
         },
-        "originX": 260,
-        "originY": 158,
-        "pixelsPerUnitX": 8.191556395715185,
-        "pixelsPerUnitY": 10.408432147562582
+        "originX": 259.5,
+        "originY": 157.5,
+        "pixelsPerUnitX": 8.175803402646505,
+        "pixelsPerUnitY": 10.375494071146246
       }
     },
     {
@@ -189,25 +184,25 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
         "part.coaxBarrel",
         "part.turret"
       ],
-      "tintSlot": "team-light",
+      "tintSlot": "fixed",
       "originMode": "visible-center",
       "drawOrder": 30,
       "sourceCell": "sprite.turret",
       "frame": {
-        "x": 721,
-        "y": 605,
+        "x": 720,
+        "y": 606,
         "w": 308,
-        "h": 245,
+        "h": 244,
         "visibleBounds": {
-          "x": 721,
-          "y": 605,
+          "x": 720,
+          "y": 606,
           "w": 308,
-          "h": 245
+          "h": 244
         },
         "originX": 154,
-        "originY": 122.5,
+        "originY": 122,
         "pixelsPerUnitX": 9.445998331615879,
-        "pixelsPerUnitY": 12.792397660818713
+        "pixelsPerUnitY": 12.740183792815372
       }
     },
     {
@@ -216,7 +211,7 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
       "sourceParts": [
         "part.barrel"
       ],
-      "tintSlot": "team",
+      "tintSlot": "fixed",
       "drawOrder": 29,
       "sourceCell": "sprite.barrel",
       "frame": {
