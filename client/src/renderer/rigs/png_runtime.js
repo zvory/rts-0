@@ -195,7 +195,7 @@ function applySpriteState(display, part, frame, state, context, diagnostics = nu
     return;
   }
 
-  const transform = displayTransform(state, frame);
+  const transform = displayTransform(state, frame, part);
   applyDisplayTransform(display, transform);
   display.alpha = state.alpha;
   display.tint = tintForSlot(part.tintSlot ?? state.tintSlot, context, part);
@@ -212,6 +212,13 @@ function atlasSprites(definition, atlas) {
         sourceParts: Array.isArray(sprite.sourceParts) ? sprite.sourceParts : [sprite.animationPart],
         tintSlot: sprite.tintSlot ?? "fixed",
         frame: sprite.frame,
+        rotationOffset: sprite.rotationOffset ?? 0,
+        rotationPivotX: sprite.rotationPivotX ?? null,
+        rotationPivotY: sprite.rotationPivotY ?? null,
+        rotationPivotReferenceOffset: sprite.rotationPivotReferenceOffset ?? 0,
+        positionOffsetX: sprite.positionOffsetX ?? 0,
+        positionOffsetY: sprite.positionOffsetY ?? 0,
+        tintAdjustment: sprite.tintAdjustment ?? null,
         paletteFrames: sprite.paletteFrames,
         drawOrder: sprite.drawOrder ?? 0,
       }))
@@ -235,18 +242,34 @@ function spriteMatchesRoute(sprite, includeParts) {
   return sprite.sourceParts.some((partId) => includeParts.has(partId));
 }
 
-function displayTransform(state, frame) {
+function displayTransform(state, frame, part = null) {
   const pixelsPerUnitX = frame.pixelsPerUnitX || frame.pixelsPerUnit || 1;
   const pixelsPerUnitY = frame.pixelsPerUnitY || frame.pixelsPerUnit || 1;
   const localOffset = rotateOffset(state.localOffset, state.transform.rotation);
+  const defaultPivotX = frame.originX + state.pivot.x * pixelsPerUnitX;
+  const defaultPivotY = frame.originY + state.pivot.y * pixelsPerUnitY;
+  const pivotX = part?.rotationPivotX ?? frame.rotationPivotX ?? defaultPivotX;
+  const pivotY = part?.rotationPivotY ?? frame.rotationPivotY ?? defaultPivotY;
+  const spriteOffset = rotateOffset({
+    x: part?.positionOffsetX ?? frame.positionOffsetX ?? 0,
+    y: part?.positionOffsetY ?? frame.positionOffsetY ?? 0,
+  }, state.transform.rotation);
+  const pivotReferenceRotation = state.transform.rotation + (
+    part?.rotationPivotReferenceOffset ?? frame.rotationPivotReferenceOffset ?? 0
+  );
+  const pivotOffset = rotateOffset({
+    x: (pivotX - defaultPivotX) / pixelsPerUnitX,
+    y: (pivotY - defaultPivotY) / pixelsPerUnitY,
+  }, pivotReferenceRotation);
+  const rotation = state.transform.rotation + (part?.rotationOffset ?? frame.rotationOffset ?? 0);
   return {
-    x: state.transform.x + localOffset.x,
-    y: state.transform.y + localOffset.y,
-    pivotX: frame.originX + state.pivot.x * pixelsPerUnitX,
-    pivotY: frame.originY + state.pivot.y * pixelsPerUnitY,
+    x: state.transform.x + localOffset.x + spriteOffset.x + pivotOffset.x,
+    y: state.transform.y + localOffset.y + spriteOffset.y + pivotOffset.y,
+    pivotX,
+    pivotY,
     scaleX: (state.transform.scaleX * (state.geometryScale?.x ?? 1)) / pixelsPerUnitX,
     scaleY: (state.transform.scaleY * (state.geometryScale?.y ?? 1)) / pixelsPerUnitY,
-    rotation: state.transform.rotation,
+    rotation,
   };
 }
 
@@ -259,12 +282,38 @@ function applyDisplayTransform(display, transform) {
 
 function tintForSlot(slot, context, part) {
   const team = context.teamColor ?? 0x6d89b8;
-  if (slot === "team") return team;
-  if (slot === "team-light") return lightenColor(team, 0.18);
-  if (slot === "team-light-soft") return lightenColor(team, 0.1);
-  if (slot === "team-fill-stroke") return team;
-  if (typeof slot === "string" && /^#[0-9a-f]{6}$/i.test(slot)) return hexToInt(slot);
-  return 0xffffff;
+  let color = 0xffffff;
+  if (slot === "team") color = team;
+  else if (slot === "team-light") color = lightenColor(team, 0.18);
+  else if (slot === "team-light-soft") color = lightenColor(team, 0.1);
+  else if (slot === "team-fill-stroke") color = team;
+  else if (typeof slot === "string" && /^#[0-9a-f]{6}$/i.test(slot)) color = hexToInt(slot);
+  return adjustTintColor(color, part?.tintAdjustment);
+}
+
+function adjustTintColor(color, adjustment) {
+  if (!adjustment || typeof adjustment !== "object") return color;
+  const saturation = Number.isFinite(adjustment.saturation) ? adjustment.saturation / 100 : 1;
+  const brightness = Number.isFinite(adjustment.brightness) ? adjustment.brightness / 100 : 1;
+  let r = (color >> 16) & 0xff;
+  let g = (color >> 8) & 0xff;
+  let b = color & 0xff;
+  if (saturation !== 1) {
+    const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    r = luma + (r - luma) * saturation;
+    g = luma + (g - luma) * saturation;
+    b = luma + (b - luma) * saturation;
+  }
+  if (brightness !== 1) {
+    r *= brightness;
+    g *= brightness;
+    b *= brightness;
+  }
+  return (clampByte(r) << 16) | (clampByte(g) << 8) | clampByte(b);
+}
+
+function clampByte(value) {
+  return Math.max(0, Math.min(255, Math.round(value)));
 }
 
 function normalizedColorKey(color) {

@@ -38,6 +38,7 @@ import {
   pngAtlasCanRenderRoute,
   pngAtlasRouteCoverage,
 } from "../client/src/renderer/rigs/png_runtime.js";
+import { ANTI_TANK_GUN_PNG_RIG_ATLAS } from "../client/src/renderer/rigs/anti_tank_gun_png_atlas.js";
 import { TANK_PNG_RIG_ATLAS } from "../client/src/renderer/rigs/tank_png_atlas.js";
 import {
   MACHINE_GUNNER_RIG_SVG,
@@ -672,6 +673,108 @@ test("tank PNG atlas keeps cannon recoil on the generated barrel sprite", () => 
 
   assert.equal(barrelScaleRecoiling < barrelScaleStill, true);
   assert.equal(turretScaleRecoiling, turretScaleStill);
+});
+
+test("anti-tank gun recoil moves the barrel much farther than the carriage", () => {
+  const result = compileSvgRig(ANTI_TANK_GUN_RIG_SVG, { expectedKind: KIND.ANTI_TANK_GUN });
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  const definition = result.definition;
+  const entity = {
+    id: 44,
+    kind: KIND.ANTI_TANK_GUN,
+    owner: 1,
+    x: 32,
+    y: 44,
+    facing: 0,
+    weaponFacing: 0,
+    setupState: SETUP.DEPLOYED,
+    state: STATE.ATTACK,
+  };
+  const sampled = sampleRigAnimation(definition, entity, createRigRenderContext(entity, {
+    now: fixedNow,
+    setupVisual: { prongFactor: 1, barrel: true },
+    state: { weaponRecoil: () => 1 },
+  }));
+
+  const carriage = sampled.parts["part.at.axle.deployed"];
+  const barrel = sampled.parts["part.at.barrel.deployed"];
+  assert.ok(carriage, "deployed carriage part should exist");
+  assert.ok(barrel, "deployed barrel part should exist");
+  assert.ok(Math.abs(carriage.transform.x + 3.12) < 0.001);
+  assert.ok(Math.abs(carriage.transform.y) < 0.001);
+  assert.ok(Math.abs(barrel.transform.x + 26) < 0.001);
+  assert.ok(Math.abs(barrel.transform.y) < 0.001);
+  assert.ok(Math.abs(barrel.transform.x) > Math.abs(carriage.transform.x) * 8);
+});
+
+test("anti-tank gun PNG atlas covers the unit route and keeps barrel recoil split", () => {
+  const result = compileSvgRig(ANTI_TANK_GUN_RIG_SVG, { expectedKind: KIND.ANTI_TANK_GUN });
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  const definition = result.definition;
+  const [, unitRoute] = liveRigRoutesFor(KIND.ANTI_TANK_GUN);
+  const coverage = pngAtlasRouteCoverage(definition, ANTI_TANK_GUN_PNG_RIG_ATLAS, unitRoute);
+  assert.deepEqual(coverage.missingParts, []);
+  assert.equal(pngAtlasCanRenderRoute(definition, ANTI_TANK_GUN_PNG_RIG_ATLAS, unitRoute), true);
+  const packedCarriageSprite = ANTI_TANK_GUN_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.at.carriage.packed");
+  const deployedLeftTrailSprite = ANTI_TANK_GUN_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.at.leftTrail.deployed");
+  const deployedRightTrailSprite = ANTI_TANK_GUN_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.at.rightTrail.deployed");
+  assert.ok(packedCarriageSprite);
+  assert.ok(deployedLeftTrailSprite);
+  assert.ok(deployedRightTrailSprite);
+  assert.ok(packedCarriageSprite.sourceParts.includes("part.at.trail.left.packed"));
+  assert.ok(packedCarriageSprite.sourceParts.includes("part.at.trail.right.packed"));
+  assert.equal(deployedLeftTrailSprite.sourceParts.includes("part.at.trail.left.packed"), false);
+  assert.equal(deployedRightTrailSprite.sourceParts.includes("part.at.trail.right.packed"), false);
+
+  const entity = {
+    id: 45,
+    kind: KIND.ANTI_TANK_GUN,
+    owner: 1,
+    x: 32,
+    y: 44,
+    facing: 0,
+    weaponFacing: 0,
+    setupState: SETUP.DEPLOYED,
+    state: STATE.ATTACK,
+  };
+  const renderer = makeRigRenderer();
+  renderer._liveRigDefinitionsByKind = new Map([[KIND.ANTI_TANK_GUN, definition]]);
+  renderer._livePngRigAtlasesByKind = new Map([[KIND.ANTI_TANK_GUN, { ...ANTI_TANK_GUN_PNG_RIG_ATLAS, enabled: true }]]);
+  renderer._livePngRigAtlasTextures = new Map([[KIND.ANTI_TANK_GUN, fakeAtlasTexture()]]);
+  renderer._deployedWeaponSetupVisual = () => ({ prongFactor: 1, frameProgress: 1, barrel: true });
+
+  renderer._drawUnit(entity, new Map([[1, 0x336699]]), { playerId: 1, weaponRecoil: () => 1 });
+
+  const unit = renderer._liveRigPools.liveUnitRigs.get(entity.id);
+  assert.equal(typeof unit.matchesPngAtlasRig, "function");
+  const carriage = unit.parts.get("sprite.at.carriage.deployed").display;
+  const barrel = unit.parts.get("sprite.at.barrelAssembly.deployed").display;
+  const leftTrail = unit.parts.get("sprite.at.leftTrail.deployed").display;
+  const rightTrail = unit.parts.get("sprite.at.rightTrail.deployed").display;
+  assert.equal(carriage.visible, true);
+  assert.equal(barrel.visible, true);
+  assert.equal(leftTrail.visible, true);
+  assert.equal(rightTrail.visible, true);
+  assert.ok(Math.abs(carriage.x + 3.12) < 0.001);
+  assert.ok(Math.abs(barrel.x + 26) < 0.001);
+  assert.notEqual(carriage.tint, 0xffffff);
+  assert.notEqual(barrel.tint, 0xffffff);
+  assert.notEqual(carriage.tint, barrel.tint);
+  assert.equal(Math.sign(leftTrail.scaleX), -1);
+  assert.equal(Math.sign(leftTrail.scaleY), -1);
+  assert.equal(Math.sign(rightTrail.scaleX), 1);
+  assert.equal(Math.sign(rightTrail.scaleY), 1);
+
+  renderer._deployedWeaponSetupVisual = () => ({ prongFactor: 0, frameProgress: 0, barrel: false });
+  renderer._drawUnit({ ...entity, setupState: SETUP.PACKED, state: STATE.IDLE }, new Map([[1, 0x336699]]), {
+    playerId: 1,
+    weaponRecoil: () => 0,
+  });
+  const packedCarriage = unit.parts.get("sprite.at.carriage.packed").display;
+  assert.equal(packedCarriage.visible, true);
+  assert.equal(packedCarriage.alpha, 1);
+  assert.equal(leftTrail.alpha, 0);
+  assert.equal(rightTrail.alpha, 0);
 });
 
 test("rifleman PNG frame strip uses idle frame and movement cycle", () => {
