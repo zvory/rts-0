@@ -85,7 +85,8 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
       "brightness": 70,
       "saturation": 80,
       "hue": 100
-    }
+    },
+    "semanticPaintTintSlot": "fixed"
   },
   "frames": {},
   "sprites": [

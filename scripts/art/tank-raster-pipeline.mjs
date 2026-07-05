@@ -37,6 +37,8 @@ const DEFAULT_GUIDE_MASK_FUZZ = 12;
 const DEFAULT_GUIDE_MASK_ALPHA_THRESHOLD = 20;
 const DEFAULT_GUIDE_MASK_LINE_WIDTH = 12;
 const DEFAULT_GUIDE_MASK_MORPHOLOGY = "Square:5";
+const SEMANTIC_PAINT_SPRITE_IDS = new Set(["sprite.hull", "sprite.turret", "sprite.barrel"]);
+const SEMANTIC_TINT_SLOTS = new Set(["fixed", "team", "team-light"]);
 
 function main() {
   const [command, ...rest] = process.argv.slice(2);
@@ -190,6 +192,7 @@ function writeAtlas(args) {
   const saturation = percentArg(args.saturation, 100);
   const hue = percentArg(args.hue, 100);
   const worldScale = positiveNumber(args["world-scale"], 1);
+  const semanticPaintTintSlot = semanticTintSlotArg(args["semantic-paint-tint-slot"]);
   const compiled = compileTankRig();
   const partIds = compiled.definition.parts.map((part) => part.id);
   const sheetSpec = sheetForProfile(compiled.definition, profile);
@@ -230,6 +233,7 @@ function writeAtlas(args) {
       normalizeVisibleBounds,
       visiblePadding,
       worldScale,
+      semanticPaintTintSlot,
     })
     : [];
   if (boundsMaskPath) fs.rmSync(path.dirname(boundsMaskPath), { recursive: true, force: true });
@@ -287,6 +291,7 @@ function writeAtlas(args) {
         saturation,
         hue,
       },
+      semanticPaintTintSlot,
     },
     frames,
     sprites,
@@ -580,7 +585,8 @@ function semanticFrameSources(sprites) {
 }
 
 function atlasSpritesForSemanticProfile(definition, cells, columns, rows, width, height, layout, options = {}) {
-  return semanticSprites(definition.parts.map((part) => part.id)).map((sprite) => {
+  return semanticSprites(definition.parts.map((part) => part.id)).map((sourceSprite) => {
+    const sprite = applySemanticSpriteOptions(sourceSprite, options);
     const cellId = sprite.sourceCell || sprite.id;
     const index = cells.indexOf(cellId);
     if (index < 0) return null;
@@ -608,6 +614,14 @@ function atlasSpritesForSemanticProfile(definition, cells, columns, rows, width,
       },
     };
   }).filter(Boolean);
+}
+
+function applySemanticSpriteOptions(sprite, options = {}) {
+  if (!options.semanticPaintTintSlot || !SEMANTIC_PAINT_SPRITE_IDS.has(sprite.id)) return sprite;
+  return {
+    ...sprite,
+    tintSlot: options.semanticPaintTintSlot,
+  };
 }
 
 function scaleFrameGeometry(geometry, worldScale = 1) {
@@ -993,6 +1007,16 @@ function percentArg(value, fallback) {
   return parsed;
 }
 
+function semanticTintSlotArg(value) {
+  if (value == null || value === true) return undefined;
+  const slot = String(value).trim();
+  if (!slot || slot === "default") return undefined;
+  if (!SEMANTIC_TINT_SLOTS.has(slot)) {
+    throw new Error(`unsupported semantic paint tint slot ${JSON.stringify(value)}; expected fixed, team, or team-light`);
+  }
+  return slot;
+}
+
 function morphologyArg(value, fallback) {
   if (value == null || value === true) return fallback;
   const out = String(value).trim();
@@ -1057,7 +1081,7 @@ function rel(file) {
 function usage() {
   console.error(`Usage:
   node scripts/art/tank-raster-pipeline.mjs make-sheet [--scale 3] [--columns 2] [--layout tight] [--profile semantic] [--guides none|full] [--key #ff00ff]
-  node scripts/art/tank-raster-pipeline.mjs write-atlas --sheet <png> [--columns 2] [--layout tight] [--profile semantic] [--transparent-key #ff00ff] [--disabled] [--blank-cells cell[,cell]] [--normalize-visible-bounds] [--ignore-guide-bounds] [--guide-mask-fuzz 12] [--guide-mask-alpha-threshold 20] [--guide-mask-line-width 12] [--guide-mask-morphology Square:5] [--clear-cell-edge-alpha 16] [--visible-padding 2] [--world-scale 1.2] [--brightness 120] [--saturation 100] [--hue 100] [--image-version pass-id] [--prompt-file metadata/prompt.md]
+  node scripts/art/tank-raster-pipeline.mjs write-atlas --sheet <png> [--columns 2] [--layout tight] [--profile semantic] [--transparent-key #ff00ff] [--disabled] [--blank-cells cell[,cell]] [--normalize-visible-bounds] [--ignore-guide-bounds] [--guide-mask-fuzz 12] [--guide-mask-alpha-threshold 20] [--guide-mask-line-width 12] [--guide-mask-morphology Square:5] [--clear-cell-edge-alpha 16] [--visible-padding 2] [--world-scale 1.2] [--brightness 120] [--saturation 100] [--hue 100] [--image-version pass-id] [--semantic-paint-tint-slot fixed|team|team-light] [--prompt-file metadata/prompt.md]
   node scripts/art/tank-raster-pipeline.mjs write-prompt`);
 }
 

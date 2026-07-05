@@ -28,7 +28,8 @@
     "brightness": 70,
     "saturation": 80,
     "hue": 100,
-    "imageVersion": "pass11-white-dim30"
+    "imageVersion": "pass11-white-dim30",
+    "semanticPaintTintSlot": "fixed"
   },
   "runtimeNotes": "This pass repaints the pass-10 generated tank armor as weathered white, then bakes 30% lower brightness and 20% lower saturation into the active atlas. The active PNG atlas covers track parts with transparent sprites, exposes hull as sprite.hull, turret/coax as sprite.turret, and main cannon as sprite.barrel. Hull, turret, and barrel sprites intentionally use tintSlot fixed so runtime team tint does not recolor the white paint.",
   "notes": "Imagegen edit of the pass-10 sheet preserving the no-guide 2x3 layout, with magenta chroma-key cleanup before atlas writing and ImageMagick modulation at brightness 70 / saturation 80. Player team color is no longer baked into the tank body for this active experiment, so owner readability relies on selection/health/UI affordances until a separate team marking pass is chosen."

@@ -199,15 +199,16 @@ node scripts/art/tank-raster-pipeline.mjs write-atlas \
   --brightness 70 \
   --saturation 80 \
   --image-version pass11-white-dim30 \
+  --semantic-paint-tint-slot fixed \
   --prompt-file client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-11-white.md \
   --model "built-in image generation + chroma-key cleanup + ImageMagick dimming pass" \
   --notes "Experimental Tiger I white-painted no-track no-guide raster pass 11 with 1.2x world-scale compensation, 30% lower brightness, and 20% lower saturation."
 ```
 
 Only omit `--disabled` for a local experiment after the validation checklist passes. For a white
-paint pass, change the visible hull, turret, and barrel atlas sprite `tintSlot` values to `fixed`
-after writing the atlas so runtime team tint does not recolor the generated white paint. Do not
-commit an enabled atlas unless the component cells can actually reconstruct the tank.
+paint pass, use `--semantic-paint-tint-slot fixed` so runtime team tint does not recolor the
+generated white paint. Do not commit an enabled atlas unless the component cells can actually
+reconstruct the tank.
 
 ## Prompt lessons
 
