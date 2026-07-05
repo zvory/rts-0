@@ -58,6 +58,14 @@ const PANZERFAUST_MANIFEST_URL = new URL(
   import.meta.url,
 );
 
+const M2_MORTAR_WHITE_TEST_ASSET_URL = "/assets/generated/m2-42-inch-mortar-white-test.png";
+
+{
+  const imageSize = readPngDimensions(M2_MORTAR_WHITE_TEST_ASSET_URL);
+  assert(imageSize.width === 1536, "M2 mortar white test PNG keeps the reviewed source width");
+  assert(imageSize.height === 1024, "M2 mortar white test PNG keeps the reviewed source height");
+}
+
 {
   const profile = getVisualProfile("trench-variants-1");
   assert(profile, "trench visual profile is registered");
