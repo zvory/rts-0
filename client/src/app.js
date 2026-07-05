@@ -36,6 +36,7 @@ import { createObserverAnalysisOverlayPreferences } from "./observer_analysis_ov
 import { ReplayViewer } from "./replay_viewer.js";
 import { createRoomCapabilities } from "./room_capabilities.js";
 import { selectInitialCameraView } from "./camera_view_selection.js";
+import { CAMERA } from "./config.js";
 import { formatTeamLabel, scoreRowIsWinner } from "./scoreboard.js";
 import { StatusBadge } from "./status_badge.js";
 import {
@@ -394,6 +395,7 @@ export class App {
         onUnitRangesEnabledChange: (enabled) => this.setUnitRangesEnabled(enabled),
         observerAnalysisOverlayPreferences: this.observerAnalysisOverlayPreferences,
         capabilities,
+        cameraMaxZoom: labMetadata ? CAMERA.labMaxZoom : undefined,
         labMetadata,
         labClient: this.labClient,
         labControlPolicy: this.labControlPolicy,

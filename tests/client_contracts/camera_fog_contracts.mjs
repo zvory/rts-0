@@ -8,6 +8,7 @@ import {
 } from "./assertions.mjs";
 import { Camera } from "../../client/src/camera.js";
 import { selectInitialCameraView } from "../../client/src/camera_view_selection.js";
+import { CAMERA } from "../../client/src/config.js";
 import { Fog } from "../../client/src/fog.js";
 import { KIND, TERRAIN } from "../../client/src/protocol.js";
 
@@ -45,6 +46,24 @@ import { KIND, TERRAIN } from "../../client/src/protocol.js";
   cam.setView({ centerX: 500, centerY: 400, zoom: 1 });
   assertApprox(cam.x + cam.viewW / (2 * cam.zoom), 500, 0.001, "Camera.setView centers centerX");
   assertApprox(cam.y + cam.viewH / (2 * cam.zoom), 400, 0.001, "Camera.setView centers centerY");
+
+  cam.setZoom(99, 400, 300);
+  assertApprox(cam.zoom, CAMERA.maxZoom, 0.001, "Camera default zoom caps at the live-match limit");
+
+  const labCam = new Camera(800, 600, { maxZoom: CAMERA.labMaxZoom });
+  labCam.setBounds(1000, 800, 800, 600);
+  labCam.setZoom(99, 400, 300);
+  assertApprox(labCam.zoom, CAMERA.labMaxZoom, 0.001, "Camera accepts the higher lab zoom limit");
+  labCam.setView({ x: 0, y: 0, zoom: 99 });
+  assertApprox(labCam.zoom, CAMERA.labMaxZoom, 0.001, "Camera.setView respects the higher lab zoom limit");
+
+  const invalidLimitCam = new Camera(800, 600, { maxZoom: "invalid" });
+  invalidLimitCam.setZoom(99, 400, 300);
+  assertApprox(invalidLimitCam.zoom, CAMERA.maxZoom, 0.001, "Camera falls back to the live-match cap for invalid limits");
+
+  const nullOptionsCam = new Camera(800, 600, null);
+  nullOptionsCam.setZoom(99, 400, 300);
+  assertApprox(nullOptionsCam.zoom, CAMERA.maxZoom, 0.001, "Camera tolerates null options");
 }
 
 {
