@@ -40,6 +40,7 @@ import {
 } from "../client/src/renderer/rigs/png_runtime.js";
 import { ANTI_TANK_GUN_PNG_RIG_ATLAS } from "../client/src/renderer/rigs/anti_tank_gun_png_atlas.js";
 import { TANK_PNG_RIG_ATLAS } from "../client/src/renderer/rigs/tank_png_atlas.js";
+import { SCOUT_PLANE_PARTS, SCOUT_PLANE_RIG_SVG } from "../client/src/renderer/rigs/aircraft_svg.js";
 import {
   MACHINE_GUNNER_RIG_SVG,
   PANZERFAUST_RIG_SVG,
@@ -418,12 +419,36 @@ test("live rig definitions compile production SVG sources", () => {
   assert.equal(definitions.get(KIND.PANZERFAUST).id, "panzerfaust.authored");
   assert.equal(definitions.has(KIND.SCOUT_CAR), true);
   assert.equal(definitions.get(KIND.SCOUT_CAR).id, "scout-car.authored");
+  assert.equal(definitions.has(KIND.SCOUT_PLANE), true);
+  assert.equal(definitions.get(KIND.SCOUT_PLANE).id, "scout-plane.authored");
   assert.equal(definitions.has(KIND.COMMAND_CAR), true);
   assert.equal(definitions.get(KIND.COMMAND_CAR).id, "command-car.authored");
   assert.equal(definitions.has(KIND.EKAT), true);
   assert.equal(definitions.get(KIND.EKAT).id, "ekat.authored");
   assert.equal(definitions.has(KIND.TANK), true);
   assert.equal(definitions.get(KIND.TANK).id, "tank.authored");
+});
+
+test("scout plane rig keeps ownership tint and body-aligned art", () => {
+  const result = compileSvgRig(SCOUT_PLANE_RIG_SVG, { expectedKind: KIND.SCOUT_PLANE });
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  const definition = result.definition;
+  const partById = new Map(definition.parts.map((part) => [part.id, part]));
+  const expectedPartIds = [...SCOUT_PLANE_PARTS.shadow, ...SCOUT_PLANE_PARTS.unit].sort();
+  assert.deepEqual(definition.parts.map((part) => part.id).sort(), expectedPartIds);
+  assert.equal(partById.get("part.wing")?.tintSlot, "team-light-24");
+  assert.equal(partById.get("part.boom.left")?.tintSlot, "team-light-soft");
+  assert.equal(partById.get("part.engine.left")?.tintSlot, "team-light-08");
+  assert.equal(partById.get("part.fuselage")?.tintSlot, "team-light-14");
+  assert.equal(partById.get("part.cockpit")?.tintSlot, "fixed");
+  assert.equal(partById.get("part.prop.left")?.tintSlot, "fixed");
+
+  const selection = definition.bounds.selection;
+  const artBounds = unionPartBounds(definition, SCOUT_PLANE_PARTS.unit);
+  assert.ok(artBounds.minX >= selection.x - 0.25, `Scout Plane art minX ${artBounds.minX} exceeds selection bounds`);
+  assert.ok(artBounds.maxX <= selection.x + selection.width + 0.25, `Scout Plane art maxX ${artBounds.maxX} exceeds selection bounds`);
+  assert.ok(artBounds.minY >= selection.y - 0.25, `Scout Plane art minY ${artBounds.minY} exceeds selection bounds`);
+  assert.ok(artBounds.maxY <= selection.y + selection.height + 0.25, `Scout Plane art maxY ${artBounds.maxY} exceeds selection bounds`);
 });
 
 test("live rig routes expose kind-specific production part groups", () => {
@@ -463,6 +488,11 @@ test("live rig routes expose kind-specific production part groups", () => {
   assert.deepEqual(scoutCarRoutes[0].parts, ["part.shadow"]);
   assert.equal(scoutCarRoutes[1].parts.includes("part.gunnerBarrel"), true);
   assert.equal(scoutCarRoutes[1].parts.includes("part.noseTick"), true);
+
+  const scoutPlaneRoutes = liveRigRoutesFor(KIND.SCOUT_PLANE);
+  assert.deepEqual(scoutPlaneRoutes[0].parts, ["part.shadow"]);
+  assert.equal(scoutPlaneRoutes[1].parts.includes("part.engine.left"), true);
+  assert.equal(scoutPlaneRoutes[1].parts.includes("part.prop.right"), true);
 
   const commandCarRoutes = liveRigRoutesFor(KIND.COMMAND_CAR);
   assert.deepEqual(commandCarRoutes[0].parts, ["part.shadow"]);
