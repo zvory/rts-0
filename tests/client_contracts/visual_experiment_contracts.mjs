@@ -227,13 +227,25 @@ const PANZERFAUST_MANIFEST_URL = new URL(
   );
   const carriageSprite = atlas.sprites.find((sprite) => sprite.id === "sprite.mortar.carriage.packed");
   const tubeSprite = atlas.sprites.find((sprite) => sprite.id === "sprite.mortar.tube.packed");
+  const tireSprite = atlas.sprites.find((sprite) => sprite.id === "sprite.mortar.tire.top.packed");
   assert(
     carriageSprite?.tintSlot === "team-light" &&
       carriageSprite.tintAdjustment?.brightness === 78 &&
       carriageSprite.tintAdjustment?.saturation === 92,
     "mortar PNG carriage keeps the off-white frame team-tinted in lab render preview",
   );
-  assert(tubeSprite?.tintSlot === "fixed", "mortar PNG tube remains fixed dark metal for recoil separation");
+  assert(
+    tubeSprite?.tintSlot === "team-light" &&
+      tubeSprite.tintAdjustment?.brightness === 78 &&
+      tubeSprite.tintAdjustment?.saturation === 92,
+    "mortar PNG tube and barrel assembly are team-tinted in lab render preview",
+  );
+  assert(
+    tireSprite?.tintSlot === "fixed" &&
+      tireSprite.drawOrder > carriageSprite?.drawOrder &&
+      tireSprite.drawOrder < tubeSprite?.drawOrder,
+    "mortar PNG tire overlays remain fixed-color above the team-tinted carriage",
+  );
   const definitions = createLiveRigDefinitions();
   const definition = liveRigDefinitionFor(definitions, KIND.MORTAR_TEAM);
   const routes = liveRigRoutesFor(KIND.MORTAR_TEAM);

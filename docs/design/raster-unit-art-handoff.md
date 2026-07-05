@@ -348,10 +348,10 @@ cheap checks before any generated atlas can be enabled.
   and Tank without destructively rewriting the source art.
 - `mortar-png-pass-01`: active experiment. Generated as a three-cell M2 4.2-inch-inspired wheeled
   mortar sheet: assembled reference, carriage/frame/wheels component, and separate tube component.
-  The checked-in alpha source is routed through `mortar_team_png_atlas.js`; the carriage component
-  receives runtime `team-light` tint with a dimmed saturation/brightness adjustment, while the dark
-  tube remains fixed so it can follow the stronger SVG weapon recoil binding independently from the
-  carriage recoil.
+  The checked-in alpha source is routed through `mortar_team_png_atlas.js`; the carriage and tube
+  components receive runtime `team-light` tint with a dimmed saturation/brightness adjustment, tire
+  overlays remain fixed-color, and the tube still follows the stronger SVG weapon recoil binding
+  independently from the carriage recoil.
 
 These candidates are useful references for what to avoid. None should be treated as accepted art.
 

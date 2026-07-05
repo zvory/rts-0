@@ -781,7 +781,7 @@ test("anti-tank gun PNG atlas covers the unit route and keeps barrel recoil spli
   assert.equal(rightTrail.alpha, 0);
 });
 
-test("mortar PNG atlas covers unit route with tinted carriage and recoiling tube", () => {
+test("mortar PNG atlas covers unit route with tinted carriage, tinted tube, and fixed tires", () => {
   const result = compileSvgRig(MORTAR_TEAM_RIG_SVG, { expectedKind: KIND.MORTAR_TEAM });
   assert.equal(result.ok, true, JSON.stringify(result.errors));
   const definition = result.definition;
@@ -792,12 +792,16 @@ test("mortar PNG atlas covers unit route with tinted carriage and recoiling tube
 
   const packedCarriageSprite = MORTAR_TEAM_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.mortar.carriage.packed");
   const packedTubeSprite = MORTAR_TEAM_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.mortar.tube.packed");
+  const packedTireSprite = MORTAR_TEAM_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.mortar.tire.top.packed");
   assert.ok(packedCarriageSprite);
   assert.ok(packedTubeSprite);
+  assert.ok(packedTireSprite);
   assert.equal(packedCarriageSprite.tintSlot, "team-light");
-  assert.equal(packedTubeSprite.tintSlot, "fixed");
+  assert.equal(packedTubeSprite.tintSlot, "team-light");
+  assert.equal(packedTireSprite.tintSlot, "fixed");
   assert.ok(packedCarriageSprite.sourceParts.includes("part.mortar.body.packed"));
   assert.ok(packedCarriageSprite.sourceParts.includes("part.mortar.wheel.left.body.packed"));
+  assert.ok(packedTireSprite.sourceParts.includes("part.mortar.wheel.left.body.packed"));
   assert.ok(packedTubeSprite.sourceParts.includes("part.mortar.tube.packed"));
   assert.equal(packedTubeSprite.sourceParts.includes("part.mortar.body.packed"), false);
 
@@ -824,12 +828,16 @@ test("mortar PNG atlas covers unit route with tinted carriage and recoiling tube
   assert.equal(typeof unit.matchesPngAtlasRig, "function");
   const carriage = unit.parts.get("sprite.mortar.carriage.deployed").display;
   const tube = unit.parts.get("sprite.mortar.tube.deployed").display;
+  const topTire = unit.parts.get("sprite.mortar.tire.top.deployed").display;
   assert.equal(carriage.visible, true);
   assert.equal(tube.visible, true);
+  assert.equal(topTire.visible, true);
   assert.equal(carriage.alpha, 1);
   assert.equal(tube.alpha, 1);
+  assert.equal(topTire.alpha, 1);
   assert.notEqual(carriage.tint, 0xffffff);
-  assert.equal(tube.tint, 0xffffff);
+  assert.notEqual(tube.tint, 0xffffff);
+  assert.equal(topTire.tint, 0xffffff);
   assert.ok(Math.abs(tube.x) > Math.abs(carriage.x) * 2);
 
   renderer._deployedWeaponSetupVisual = () => ({ prongFactor: 0, frameProgress: 0, barrel: false });
@@ -839,10 +847,14 @@ test("mortar PNG atlas covers unit route with tinted carriage and recoiling tube
     weaponRecoil: () => 0,
   });
   const packedCarriage = unit.parts.get("sprite.mortar.carriage.packed").display;
+  const packedTopTire = unit.parts.get("sprite.mortar.tire.top.packed").display;
   assert.equal(packedCarriage.visible, true);
+  assert.equal(packedTopTire.visible, true);
   assert.equal(packedCarriage.alpha, 1);
+  assert.equal(packedTopTire.alpha, 1);
   assert.equal(carriage.alpha, 0);
   assert.equal(tube.alpha, 0);
+  assert.equal(topTire.alpha, 0);
 });
 
 test("rifleman PNG frame strip uses idle frame and movement cycle", () => {

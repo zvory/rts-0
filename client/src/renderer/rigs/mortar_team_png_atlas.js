@@ -101,6 +101,22 @@ const TUBE_FRAME = Object.freeze({
   pixelsPerUnitY: PPU,
 });
 
+function carriageCropFrame(x, y, w, h) {
+  return Object.freeze({
+    x,
+    y,
+    w,
+    h,
+    originX: CARRIAGE_FRAME.originX - (x - CARRIAGE_FRAME.x),
+    originY: CARRIAGE_FRAME.originY - (y - CARRIAGE_FRAME.y),
+    pixelsPerUnitX: PPU,
+    pixelsPerUnitY: PPU,
+  });
+}
+
+const TOP_TIRE_FRAME = carriageCropFrame(1072, 164, 146, 52);
+const BOTTOM_TIRE_FRAME = carriageCropFrame(1072, 472, 146, 56);
+
 export const MORTAR_TEAM_PNG_RIG_ATLAS = deepFreeze({
   enabled: true,
   unit: "mortar_team",
@@ -132,6 +148,20 @@ export const MORTAR_TEAM_PNG_RIG_ATLAS = deepFreeze({
       { tintSlot: "team-light", tintAdjustment: TEAM_TINT_ADJUSTMENT }
     ),
     sprite(
+      "sprite.mortar.tire.top.packed",
+      mortarPart("axle", "packed"),
+      mortarParts(WHEEL_NAMES, "packed"),
+      22,
+      TOP_TIRE_FRAME
+    ),
+    sprite(
+      "sprite.mortar.tire.bottom.packed",
+      mortarPart("axle", "packed"),
+      mortarParts(WHEEL_NAMES, "packed"),
+      23,
+      BOTTOM_TIRE_FRAME
+    ),
+    sprite(
       "sprite.mortar.carriage.deployed",
       mortarPart("axle", "deployed"),
       mortarParts(CARRIAGE_NAMES, "deployed"),
@@ -140,18 +170,34 @@ export const MORTAR_TEAM_PNG_RIG_ATLAS = deepFreeze({
       { tintSlot: "team-light", tintAdjustment: TEAM_TINT_ADJUSTMENT }
     ),
     sprite(
+      "sprite.mortar.tire.top.deployed",
+      mortarPart("axle", "deployed"),
+      mortarParts(WHEEL_NAMES, "deployed"),
+      24,
+      TOP_TIRE_FRAME
+    ),
+    sprite(
+      "sprite.mortar.tire.bottom.deployed",
+      mortarPart("axle", "deployed"),
+      mortarParts(WHEEL_NAMES, "deployed"),
+      25,
+      BOTTOM_TIRE_FRAME
+    ),
+    sprite(
       "sprite.mortar.tube.packed",
       mortarPart("tube", "packed"),
       mortarParts(TUBE_NAMES, "packed"),
       30,
-      TUBE_FRAME
+      TUBE_FRAME,
+      { tintSlot: "team-light", tintAdjustment: TEAM_TINT_ADJUSTMENT }
     ),
     sprite(
       "sprite.mortar.tube.deployed",
       mortarPart("tube", "deployed"),
       mortarParts(TUBE_NAMES, "deployed"),
       31,
-      TUBE_FRAME
+      TUBE_FRAME,
+      { tintSlot: "team-light", tintAdjustment: TEAM_TINT_ADJUSTMENT }
     ),
   ],
 });
