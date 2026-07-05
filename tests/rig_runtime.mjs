@@ -715,6 +715,16 @@ test("anti-tank gun PNG atlas covers the unit route and keeps barrel recoil spli
   const coverage = pngAtlasRouteCoverage(definition, ANTI_TANK_GUN_PNG_RIG_ATLAS, unitRoute);
   assert.deepEqual(coverage.missingParts, []);
   assert.equal(pngAtlasCanRenderRoute(definition, ANTI_TANK_GUN_PNG_RIG_ATLAS, unitRoute), true);
+  const packedCarriageSprite = ANTI_TANK_GUN_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.at.carriage.packed");
+  const deployedLeftTrailSprite = ANTI_TANK_GUN_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.at.leftTrail.deployed");
+  const deployedRightTrailSprite = ANTI_TANK_GUN_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.at.rightTrail.deployed");
+  assert.ok(packedCarriageSprite);
+  assert.ok(deployedLeftTrailSprite);
+  assert.ok(deployedRightTrailSprite);
+  assert.ok(packedCarriageSprite.sourceParts.includes("part.at.trail.left.packed"));
+  assert.ok(packedCarriageSprite.sourceParts.includes("part.at.trail.right.packed"));
+  assert.equal(deployedLeftTrailSprite.sourceParts.includes("part.at.trail.left.packed"), false);
+  assert.equal(deployedRightTrailSprite.sourceParts.includes("part.at.trail.right.packed"), false);
 
   const entity = {
     id: 45,
@@ -754,6 +764,17 @@ test("anti-tank gun PNG atlas covers the unit route and keeps barrel recoil spli
   assert.equal(Math.sign(leftTrail.scaleY), -1);
   assert.equal(Math.sign(rightTrail.scaleX), 1);
   assert.equal(Math.sign(rightTrail.scaleY), 1);
+
+  renderer._deployedWeaponSetupVisual = () => ({ prongFactor: 0, frameProgress: 0, barrel: false });
+  renderer._drawUnit({ ...entity, setupState: SETUP.PACKED, state: STATE.IDLE }, new Map([[1, 0x336699]]), {
+    playerId: 1,
+    weaponRecoil: () => 0,
+  });
+  const packedCarriage = unit.parts.get("sprite.at.carriage.packed").display;
+  assert.equal(packedCarriage.visible, true);
+  assert.equal(packedCarriage.alpha, 1);
+  assert.equal(leftTrail.alpha, 0);
+  assert.equal(rightTrail.alpha, 0);
 });
 
 test("rifleman PNG frame strip uses idle frame and movement cycle", () => {

@@ -32,12 +32,18 @@ const WHEEL_NAMES = Object.freeze([
   "wheel.right.hub",
 ]);
 
-const CARRIAGE_NAMES = Object.freeze([
+const CARRIAGE_BASE_NAMES = Object.freeze([
   "axle",
   ...WHEEL_NAMES,
   // Covered here to suppress the old shield SVG parts for this no-shield pass.
   "shield",
   "shieldStripe",
+]);
+
+const CARRIAGE_PACKED_NAMES = Object.freeze([
+  ...CARRIAGE_BASE_NAMES,
+  "trail.left",
+  "trail.right",
 ]);
 
 const BARREL_ASSEMBLY_NAMES = Object.freeze([
@@ -139,7 +145,6 @@ export const ANTI_TANK_GUN_PNG_RIG_ATLAS = deepFreeze({
       "sprite.at.leftTrail.deployed",
       atPart("trail.left", "deployed"),
       [
-        atPart("trail.left", "packed"),
         atPart("trail.left", "deployed"),
         atPart("brace.left", "deployed"),
       ],
@@ -160,7 +165,6 @@ export const ANTI_TANK_GUN_PNG_RIG_ATLAS = deepFreeze({
       "sprite.at.rightTrail.deployed",
       atPart("trail.right", "deployed"),
       [
-        atPart("trail.right", "packed"),
         atPart("trail.right", "deployed"),
         atPart("brace.right", "deployed"),
       ],
@@ -180,7 +184,7 @@ export const ANTI_TANK_GUN_PNG_RIG_ATLAS = deepFreeze({
     sprite(
       "sprite.at.carriage.packed",
       atPart("axle", "packed"),
-      atParts(CARRIAGE_NAMES, "packed"),
+      atParts(CARRIAGE_PACKED_NAMES, "packed"),
       20,
       CARRIAGE_FRAME,
       { tintSlot: "team-light", tintAdjustment: TEAM_TINT_ADJUSTMENT }
@@ -188,7 +192,7 @@ export const ANTI_TANK_GUN_PNG_RIG_ATLAS = deepFreeze({
     sprite(
       "sprite.at.carriage.deployed",
       atPart("axle", "deployed"),
-      atParts(CARRIAGE_NAMES, "deployed"),
+      atParts(CARRIAGE_BASE_NAMES, "deployed"),
       21,
       CARRIAGE_FRAME,
       { tintSlot: "team-light", tintAdjustment: TEAM_TINT_ADJUSTMENT }
