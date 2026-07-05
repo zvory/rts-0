@@ -429,19 +429,21 @@ test("live rig definitions compile production SVG sources", () => {
   assert.equal(definitions.get(KIND.TANK).id, "tank.authored");
 });
 
-test("scout plane rig keeps ownership tint and body-aligned art", () => {
+test("scout plane rig keeps fixed white paint and body-aligned art", () => {
   const result = compileSvgRig(SCOUT_PLANE_RIG_SVG, { expectedKind: KIND.SCOUT_PLANE });
   assert.equal(result.ok, true, JSON.stringify(result.errors));
   const definition = result.definition;
   const partById = new Map(definition.parts.map((part) => [part.id, part]));
   const expectedPartIds = [...SCOUT_PLANE_PARTS.shadow, ...SCOUT_PLANE_PARTS.unit].sort();
   assert.deepEqual(definition.parts.map((part) => part.id).sort(), expectedPartIds);
-  assert.equal(partById.get("part.wing")?.tintSlot, "team-light-24");
-  assert.equal(partById.get("part.boom.left")?.tintSlot, "team-light-soft");
-  assert.equal(partById.get("part.engine.left")?.tintSlot, "team-light-08");
-  assert.equal(partById.get("part.fuselage")?.tintSlot, "team-light-14");
-  assert.equal(partById.get("part.cockpit")?.tintSlot, "fixed");
-  assert.equal(partById.get("part.prop.left")?.tintSlot, "fixed");
+  for (const partId of SCOUT_PLANE_PARTS.unit) {
+    assert.equal(partById.get(partId)?.tintSlot, "fixed", `${partId} should keep authored white paint`);
+  }
+  assert.equal(partById.get("part.wing")?.paint.fill, "#f5f1e6");
+  assert.equal(partById.get("part.tail.left")?.paint.fill, "#f2efe3");
+  assert.equal(partById.get("part.boom.left")?.paint.fill, "#eeeadd");
+  assert.equal(partById.get("part.fuselage")?.paint.fill, "#fffdf3");
+  assert.equal(partById.get("part.nose")?.paint.fill, "#ffffff");
 
   const selection = definition.bounds.selection;
   const artBounds = unionPartBounds(definition, SCOUT_PLANE_PARTS.unit);
