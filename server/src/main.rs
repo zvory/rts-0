@@ -1,15 +1,12 @@
 //! Bewegungskrieg server entry point. See `docs/design/architecture.md` and
 //! `docs/design/server-sim.md`.
 //!
-//! Responsibilities of this binary:
-//! - Serve the static JS/HTML client (so `cargo run` + open a browser is the whole dev loop).
-//! - Upgrade `GET /ws` to a WebSocket and run one connection task per socket.
-//! - Own a single shared [`Lobby`]; route each connection's messages to the right room.
-//!
-//! The simulation itself lives behind the `game` module's public API and is driven entirely by
-//! the per-room task in `lobby`. This file never touches a `Game` directly.
+//! Serves the static client, upgrades `/ws`, and owns the shared [`Lobby`]. The simulation itself
+//! lives behind the `game` module's public API and is driven entirely by the per-room task in
+//! `lobby`.
 
 use std::net::SocketAddr;
+use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
@@ -24,8 +21,7 @@ use tokio::sync::mpsc;
 use tower_http::services::ServeDir;
 use tracing_subscriber::EnvFilter;
 
-use std::sync::Arc;
-
+mod client_optional_assets;
 mod dev_replay_pages;
 mod dev_scenario_pages;
 #[cfg(test)]
@@ -304,6 +300,9 @@ async fn index_handler(State(state): State<AppState>) -> impl IntoResponse {
 }
 
 async fn client_spa_fallback_handler(uri: Uri, State(state): State<AppState>) -> impl IntoResponse {
+    if let Some(response) = client_optional_assets::fallback(uri.path()) {
+        return response;
+    }
     if is_client_asset_path(uri.path()) {
         return (StatusCode::NOT_FOUND, "static asset not found").into_response();
     }
