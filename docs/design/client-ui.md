@@ -269,14 +269,14 @@ Prototype raster rig workflow:
   `png_routing.js`, and `png_runtime.js`. The SVG rig remains authoritative for anchors,
   animation bindings, part ids, recoil, facing, and route split; the PNG atlas only supplies
   pixels for those sampled parts. The current tank atlas is an enabled visual experiment, not final
-  art: it uses the pass-10 Tiger I hull/body, turret/coax, and separate main-barrel cells while
-  transparent track frames suppress track rendering. The separate barrel cell maps to `part.barrel`,
-  so the PNG rig keeps the original SVG cannon recoil scale instead of merging that motion into the
-  turret, and the barrel sprite uses the same full `team` tint slot as the hull. The active
-  `pass10-noguide-ref` atlas applies ImageMagick brightness/saturation modulation after
-  normalization. Pass 10 removes visible contact-sheet guides entirely, uses the attached top-down
-  Tiger I reference as the subject input, and relies on visible-alpha postprocessing plus 1.2x
-  world-scale compensation to size generated components against the SVG rig bounds. See
+  art: it uses the pass-11 white-painted Tiger I hull/body, turret/coax, and separate main-barrel
+  cells while transparent track frames suppress track rendering. The separate barrel cell maps to
+  `part.barrel`, so the PNG rig keeps the original SVG cannon recoil scale instead of merging that
+  motion into the turret. The active `pass11-white-dim30` atlas is an imagegen repaint of pass 10;
+  it keeps the no-guide semantic sheet, bakes 30% lower brightness and 20% lower saturation, relies
+  on visible-alpha postprocessing plus 1.2x world-scale compensation to size generated components
+  against the SVG rig bounds, and intentionally uses fixed-color tint slots for the visible tank
+  sprites so runtime team tint does not recolor the white paint. See
   [raster-unit-art-handoff.md](raster-unit-art-handoff.md) for the methodology, rejected imagegen
   passes, and next validation work.
 - `scripts/art/tank-raster-pipeline.mjs` builds the tank contact sheet, records the exact prompt

@@ -1,9 +1,9 @@
 # Raster unit art handoff
 
-Status: active visual experiment only. The checked-in tank PNG rig path is enabled for a pass-10
-Tiger I no-track hull/turret/barrel experiment, and Rifleman pass 02 is enabled as a full-frame PNG
-strip. The generated images are not final game art. This note records what worked, what failed, and
-how to reproduce the next experiment without rediscovering the same traps.
+Status: active visual experiment only. The checked-in tank PNG rig path is enabled for a pass-11
+white-painted Tiger I no-track hull/turret/barrel experiment, and Rifleman pass 02 is enabled as a
+full-frame PNG strip. The generated images are not final game art. This note records what worked,
+what failed, and how to reproduce the next experiment without rediscovering the same traps.
 
 ## Goal
 
@@ -19,11 +19,13 @@ The intended workflow is:
    pivots, recoil, facing, selection anchors, and route split.
 
 The current tank prototype proves the shape of this pipeline but does not yet produce an acceptable
-asset. Pass 10 is enabled only as a local visual experiment; it keeps the separate turret/barrel
-structure, maps `sprite.barrel` to the full `team` tint slot, removes visible guide boxes from the
-imagegen input, uses the attached Tiger I reference as the subject input, and relies on visible-alpha
-postprocessing for runtime sizing. It still needs component cleanup and alignment review before it
-should be treated as accepted art.
+asset. Pass 11 is enabled only as a local visual experiment; it repaints the pass-10 no-guide Tiger
+I sheet as weathered matte white, bakes 30% lower brightness and 20% lower saturation, keeps the
+separate turret/barrel structure, maps `sprite.barrel` to the original barrel animation, removes
+visible guide boxes from the imagegen input, and relies on visible-alpha postprocessing for runtime
+sizing. The visible tank sprites intentionally use fixed tint slots so runtime team tint does not
+recolor the white paint. It still needs component cleanup, alignment review, and a final owner-color
+strategy before it should be treated as accepted art.
 
 Rifleman pass 02 deliberately does not use component slicing yet. It ships as a compact six-frame
 full-body strip because the useful experiment is testing whether a generated infantry token reads at
@@ -49,17 +51,16 @@ override the target when that generated unit needs its own brightness match.
 - `client/assets/rigs/tank-ps1/metadata/prompt*.md` records the base prompt and Tiger I prompt
   iterations.
 - `client/assets/rigs/tank-ps1/generated/` keeps generated candidates and alpha-converted copies.
-- `client/assets/rigs/tank-ps1/tank-atlas.png` is the enabled pass-10 runtime atlas. It uses only
+- `client/assets/rigs/tank-ps1/tank-atlas.png` is the enabled pass-11 runtime atlas. It uses only
   the generated hull/body, turret/coax, and separate main-barrel cells; the reference, track
   placeholder, and unused cells are transparent so generated/default tracks are not rendered during
-  this experiment. The current active variant is `pass10-noguide-ref`, which applies ImageMagick
-  brightness/saturation modulation after normalization and tints the generated barrel with the
-  same full `team` tint slot as the hull. The checked-in atlas keeps that baked pass, and the client
-  applies a small `brightness: 105` runtime adjustment at texture-load time for in-game matching.
-  The runtime sprite frames are normalized to visible component alpha bounds, not the full generated
-  cell bounds.
+  this experiment. The current active variant is `pass11-white-dim30`, an imagegen repaint of the
+  pass-10 no-guide sheet with baked `brightness: 70` and `saturation: 80` modulation. Hull, turret,
+  and barrel sprites intentionally use fixed tint slots so owner team tint does not recolor the
+  white paint. The runtime sprite frames are normalized to visible component alpha bounds, not the
+  full generated cell bounds.
 - `client/src/renderer/rigs/tank_png_atlas.js` is generated metadata. Its `enabled` field is
-  currently `true` for the pass-10 experiment.
+  currently `true` for the pass-11 experiment.
 - `client/src/renderer/rigs/png_runtime.js` and `png_routing.js` render atlas sprites in place of
   SVG pixels when an atlas is enabled and loaded.
 - `client/assets/rigs/rifleman-pass-02/` keeps the enabled rifleman pass-02 source sheet, alpha
@@ -89,7 +90,7 @@ the component art:
 
 The runtime atlas metadata still exposes `sprite.track.left` and `sprite.track.right`, but both
 sprites point at the same `sprite.track` source cell with different rig origins. That cell is
-intentionally blank in pass 10: it preserves PNG coverage for track source parts while suppressing
+intentionally blank in pass 11: it preserves PNG coverage for track source parts while suppressing
 both generated tracks and fallback SVG tracks. The fuel/no-oil cue is intentionally omitted from the
 PNG atlas and remains SVG-only through a separate overlay route.
 
@@ -130,25 +131,28 @@ Before any image generation pass, present the exact contact sheet image to the u
 explicit confirmation. Do not start imagegen from a new, edited, cropped, or regenerated sheet until
 the user has seen that specific sheet and approved it as the input.
 
-Use `client/assets/rigs/tank-ps1/tank-contact-sheet.png` as the input image. Start from the latest
-short prompt direction rather than the most detailed prompt: strict top-down Tiger I, no shadows,
-very simple low-end 3D raster rendering, anti-aliased raster shapes, not pixel art, and much less
-detail than concept art.
+Use `client/assets/rigs/tank-ps1/tank-contact-sheet.png` as the input image for a new structural
+generation pass. For a repaint pass like `pass11-white`, use the prior generated sheet
+(`client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-10-noguide-ref.png`) as the edit target
+and constrain the model to preserve the existing 2x3 layout. Start from the latest short prompt
+direction rather than the most detailed prompt: strict top-down Tiger I, no shadows, very simple
+low-end 3D raster rendering, anti-aliased raster shapes, not pixel art, and much less detail than
+concept art.
 
 Save each generated candidate with a pass number, for example:
 
 ```text
-client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-10-noguide-ref.png
-client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-10-noguide-ref.md
-client/assets/rigs/tank-ps1/metadata/tiger-i-pass-10-noguide-ref.json
+client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-11-white.png
+client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-11-white.md
+client/assets/rigs/tank-ps1/metadata/tiger-i-pass-11-white.json
 ```
 
 Convert the chroma-key background to alpha before atlas wiring:
 
 ```bash
 python "${CODEX_HOME:-$HOME/.codex}/skills/.system/imagegen/scripts/remove_chroma_key.py" \
-  --input client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-10-noguide-ref.png \
-  --out client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-10-noguide-ref-alpha.png \
+  --input client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-11-white.png \
+  --out client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-11-white-alpha.png \
   --key-color '#ff00ff' \
   --auto-key none \
   --soft-matte \
@@ -166,7 +170,7 @@ normalization so runtime scale comes from the generated component bounds rather 
 
 ```bash
 node scripts/art/tank-raster-pipeline.mjs write-atlas \
-  --sheet client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-10-noguide-ref-alpha.png \
+  --sheet client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-11-white-alpha.png \
   --columns 2 \
   --layout tight \
   --profile semantic \
@@ -178,12 +182,12 @@ node scripts/art/tank-raster-pipeline.mjs write-atlas \
   --notes "Candidate Tiger I raster pass; disabled pending alignment and component consistency review."
 ```
 
-For a local no-track experiment like pass 10, also blank the reference, track-placeholder, and
+For a local no-track experiment like pass 11, also blank the reference, track-placeholder, and
 unused cells, then add an image version so a browser reload fetches the updated atlas:
 
 ```bash
 node scripts/art/tank-raster-pipeline.mjs write-atlas \
-  --sheet client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-10-noguide-ref-alpha.png \
+  --sheet client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-11-white-alpha.png \
   --columns 2 \
   --layout tight \
   --profile semantic \
@@ -192,16 +196,19 @@ node scripts/art/tank-raster-pipeline.mjs write-atlas \
   --clear-cell-edge-alpha 0 \
   --visible-padding 0 \
   --world-scale 1.2 \
-  --brightness 115 \
-  --saturation 105 \
-  --image-version pass10-noguide-ref \
-  --prompt-file client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-10-noguide-ref.md \
-  --model "built-in image generation + ImageMagick brightness pass" \
-  --notes "Experimental Tiger I no-track no-guide raster pass 10 with 1.2x world-scale compensation."
+  --brightness 70 \
+  --saturation 80 \
+  --image-version pass11-white-dim30 \
+  --semantic-paint-tint-slot fixed \
+  --prompt-file client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-11-white.md \
+  --model "built-in image generation + chroma-key cleanup + ImageMagick dimming pass" \
+  --notes "Experimental Tiger I white-painted no-track no-guide raster pass 11 with 1.2x world-scale compensation, 30% lower brightness, and 20% lower saturation."
 ```
 
-Only omit `--disabled` for a local experiment after the validation checklist passes. Do not commit
-an enabled atlas unless the component cells can actually reconstruct the tank.
+Only omit `--disabled` for a local experiment after the validation checklist passes. For a white
+paint pass, use `--semantic-paint-tint-slot fixed` so runtime team tint does not recolor the
+generated white paint. Do not commit an enabled atlas unless the component cells can actually
+reconstruct the tank.
 
 ## Prompt lessons
 
@@ -304,13 +311,22 @@ cheap checks before any generated atlas can be enabled.
   and a barrel with the same team-color material as the hull. The generated barrel cell was flipped
   horizontally before atlas writing so the muzzle and pivot match the original rig. Not final art:
   the side armor blocks should be inspected in-game because they may still read like track guards.
-- `tank-tiger-i-pass-10-noguide-ref.png`: active experiment. Regenerated from a no-guide 2x3 sheet
+- `tank-tiger-i-pass-10-noguide-ref.png`: saved experiment and source for pass 11. Regenerated from
+  a no-guide 2x3 sheet
   and the attached top-down Tiger I reference as the subject input. The runtime atlas uses 1.2x
   world-scale compensation so the no-track raster art recovers the old SVG tank's visual mass, uses
   visible-alpha normalization only, with no guide masking or cell-edge clearing. The client applies
   an additional non-destructive 5% runtime brightness lift. This pass validates the pipeline
   direction because guide artifacts are gone, but it is not final art: the generated hull still
   carries rear/side fixtures from the reference that may read as unwanted track hardware.
+- `tank-tiger-i-pass-11-white.png`: active experiment. Imagegen repaint of the pass-10 no-guide
+  sheet that preserves the 2x3 component layout while changing the armor to weathered matte white.
+  The active runtime atlas version is `pass11-white-dim30`, with 30% lower brightness and 20% lower
+  saturation baked in. It still uses 1.2x world-scale compensation, visible-alpha
+  normalization only, and transparent reference/track/unused cells. Hull, turret, and barrel sprites
+  use fixed tint slots so Pixi team tint does not recolor the white paint. Not final art: owner
+  readability needs a chosen team-marking strategy if white-painted tanks stay active beyond local
+  preview.
 - `rifleman-pass-02`: active experiment. Generated as the best of five one-shot full-frame
   rifleman strips after simplifying the prompt around strict nadir view, hidden legs, shoulder-line
   rifle pose, and RTS-scale detail. It is enabled as a full-frame strip rather than a semantic
@@ -338,7 +354,8 @@ These candidates are useful references for what to avoid. None should be treated
   still covering track/tread source parts so SVG tracks do not fall back.
 - The main cannon is in its own component cell and maps to `part.barrel`, not `part.turret`.
 - The generated barrel sprite uses a team tint slot when the active art direction expects a tinted
-  barrel.
+  barrel, or a fixed tint slot when the art direction expects baked paint such as pass 11's white
+  tank.
 - The component cells preserve source orientation, center, approximate footprint, and pivot meaning.
 - The component cells can be assembled into the complete tank reference.
 - The complete tank reference did not diverge into its own independent design.

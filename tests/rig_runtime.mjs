@@ -597,7 +597,14 @@ test("tank PNG atlas route splits omitted shadow and fuel cue back to SVG", () =
   assertAtlasSpriteUsesWorldScale(definition, TANK_PNG_RIG_ATLAS, "sprite.hull");
   assertAtlasSpriteUsesWorldScale(definition, TANK_PNG_RIG_ATLAS, "sprite.turret");
   assertAtlasSpriteUsesWorldScale(definition, TANK_PNG_RIG_ATLAS, "sprite.barrel");
-  assert.equal(TANK_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.barrel")?.tintSlot, "team");
+  assert.equal(TANK_PNG_RIG_ATLAS.grid?.semanticPaintTintSlot, "fixed");
+  for (const spriteId of ["sprite.hull", "sprite.turret", "sprite.barrel"]) {
+    assert.equal(
+      TANK_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === spriteId)?.tintSlot,
+      "fixed",
+      `${spriteId} keeps the pass-11 baked white paint out of runtime team tinting`,
+    );
+  }
   const turretSprite = TANK_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.turret");
   assert.equal(turretSprite?.originMode, "visible-center");
   assert.ok(Math.abs(turretSprite.frame.originX - turretSprite.frame.w * 0.5) < 0.001);
