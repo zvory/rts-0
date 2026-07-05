@@ -60,7 +60,13 @@ async function loadAdjustedTexture(pixi, {
     const imageData = ctx.getImageData(0, 0, width, height);
     applyColorAdjustmentToRgba(imageData.data, adjustment);
     ctx.putImageData(imageData, 0, 0);
-    return pixi.Texture.from(canvas);
+    const texture = pixi.Texture.from(canvas);
+    try {
+      if (texture && typeof texture === "object") texture.rtsRendererOwnedTexture = true;
+    } catch (_err) {
+      // The adjusted texture is still usable if this implementation disallows custom properties.
+    }
+    return texture;
   } catch (_err) {
     return rawLoad();
   }

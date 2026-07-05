@@ -249,9 +249,10 @@ export class Renderer {
     for (const [kind, atlas] of this._livePngRigAtlasesByKind || []) {
       loadPngRigAtlasTexture(PIXI, atlas)
         .then((texture) => {
-          if (texture) this._livePngRigAtlasTextures.set(kind, texture);
+          this._storeLoadedTexture(this._livePngRigAtlasTextures, kind, texture);
         })
         .catch((err) => {
+          if (this._destroyed) return;
           console.warn(`RTS PNG rig atlas disabled for ${kind}: ${err?.message || err}`);
         });
     }
@@ -261,12 +262,22 @@ export class Renderer {
     for (const [kind, strip] of this._liveFrameStripsByKind || []) {
       loadFrameStripTexture(PIXI, strip)
         .then((texture) => {
-          if (texture) this._liveFrameStripTextures.set(kind, texture);
+          this._storeLoadedTexture(this._liveFrameStripTextures, kind, texture);
         })
         .catch((err) => {
+          if (this._destroyed) return;
           console.warn(`RTS frame strip disabled for ${kind}: ${err?.message || err}`);
         });
     }
+  }
+
+  _storeLoadedTexture(map, key, texture) {
+    if (this._destroyed) {
+      destroyRendererOwnedTexture(texture);
+      return null;
+    }
+    if (texture) map?.set?.(key, texture);
+    return texture || null;
   }
 
   /**
@@ -648,10 +659,10 @@ export class Renderer {
     if (!this._visualFrameStripTextureLoads.has(key)) {
       const load = loadFrameStripTexture(PIXI, strip)
         .then((texture) => {
-          this._visualFrameStripTextures.set(key, texture || null);
-          return texture || null;
+          return this._storeLoadedTexture(this._visualFrameStripTextures, key, texture);
         })
         .catch((err) => {
+          if (this._destroyed) return null;
           this._visualFrameStripTextures.set(key, null);
           console.warn(`RTS visual frame strip disabled for ${kind}: ${err?.message || err}`);
           return null;
@@ -883,6 +894,10 @@ export class Renderer {
         pool.clear();
       }
     }
+    destroyRendererTextureMap(this._livePngRigAtlasTextures);
+    destroyRendererTextureMap(this._liveFrameStripTextures);
+    destroyRendererTextureMap(this._visualFrameStripTextures);
+    this._visualFrameStripTextureLoads?.clear?.();
     this._lineProjectileTrails.clear();
 
     // Long-lived single Graphics.
@@ -911,6 +926,19 @@ export class Renderer {
     if (view && view.parentNode) view.parentNode.removeChild(view);
     this.app.destroy(true, { children: true, texture: true, baseTexture: true });
   }
+}
+
+function destroyRendererTextureMap(map) {
+  if (!map) return;
+  for (const texture of map.values()) destroyRendererOwnedTexture(texture);
+  map.clear?.();
+}
+
+function destroyRendererOwnedTexture(texture) {
+  if (!texture?.rtsRendererOwnedTexture) return;
+  if (texture.destroyed) return;
+  texture.destroy?.(true);
+  texture.baseTexture?.destroy?.();
 }
 
 Object.assign(Renderer.prototype, {

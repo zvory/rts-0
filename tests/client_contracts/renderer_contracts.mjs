@@ -188,6 +188,47 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
 
 {
   const restorePixi = installFakePixi();
+  try {
+    const parent = {
+      clientWidth: 640,
+      clientHeight: 480,
+      appendChild(view) {
+        view.parentNode = this;
+      },
+      removeChild(view) {
+        view.parentNode = null;
+      },
+    };
+    const renderer = new Renderer(parent);
+    const adjustedTexture = PIXI.Texture.from("adjusted-atlas");
+    adjustedTexture.rtsRendererOwnedTexture = true;
+    const rawTexture = PIXI.Texture.from("raw-strip");
+    renderer._livePngRigAtlasTextures.set(KIND.TANK, adjustedTexture);
+    renderer._liveFrameStripTextures.set(KIND.RIFLEMAN, rawTexture);
+    renderer._visualFrameStripTextures.set("rifleman:test", adjustedTexture);
+    renderer._visualFrameStripTextureLoads.set("rifleman:test", Promise.resolve(adjustedTexture));
+
+    renderer.destroy();
+
+    assert(renderer._livePngRigAtlasTextures.size === 0, "renderer teardown clears live PNG atlas textures");
+    assert(renderer._liveFrameStripTextures.size === 0, "renderer teardown clears live frame-strip textures");
+    assert(renderer._visualFrameStripTextures.size === 0, "renderer teardown clears visual frame-strip textures");
+    assert(renderer._visualFrameStripTextureLoads.size === 0, "renderer teardown clears pending visual strip loads");
+    assert(adjustedTexture.destroyed, "renderer-owned adjusted textures are destroyed on teardown");
+    assert(rawTexture.destroyed === false, "shared raw Pixi asset textures stay owned by the asset cache");
+
+    const lateTexture = PIXI.Texture.from("late-adjusted");
+    lateTexture.rtsRendererOwnedTexture = true;
+    renderer._storeLoadedTexture(renderer._livePngRigAtlasTextures, KIND.TANK, lateTexture);
+    assert(renderer._livePngRigAtlasTextures.size === 0, "late texture loads are not cached after teardown");
+    assert(lateTexture.destroyed, "late renderer-owned texture loads are destroyed after teardown");
+  } finally {
+    restorePixi();
+  }
+}
+
+{
+  const restorePixi = installFakePixi();
   const priorConsoleError = console.error;
   const consoleErrors = [];
   console.error = (...args) => consoleErrors.push(args);
