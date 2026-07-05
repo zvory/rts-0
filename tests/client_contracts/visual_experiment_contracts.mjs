@@ -4,7 +4,7 @@
 import { assert, assertApprox } from "./assertions.mjs";
 import { COLORS } from "../../client/src/config.js";
 import { buildFrameEntityViews } from "../../client/src/frame_entity_views.js";
-import { KIND } from "../../client/src/protocol.js";
+import { KIND, STATE } from "../../client/src/protocol.js";
 import { Renderer } from "../../client/src/renderer/index.js";
 import {
   VISUAL_UNIT_RIG_CANDIDATE_SOURCES,
@@ -86,6 +86,24 @@ const NOOP_RENDERER_OVERLAYS = [
 }
 
 {
+  const profile = getVisualProfile("rifleman-recoil-strip-1");
+  assert(profile, "rifleman recoil frame-strip visual profile is registered");
+  assert(profile.frameStripOverrides.length === 1, "rifleman recoil profile has one frame-strip override");
+  const override = profile.frameStripOverrides[0];
+  assert(override.kind === KIND.RIFLEMAN, "rifleman recoil profile targets Rifleman units");
+  assert(
+    override.strip.image.includes("/assets/rigs/rifleman-pass-02/generated/rifleman-pass-02-recoil-strip.png"),
+    "rifleman recoil profile uses the generated recoil strip asset",
+  );
+  assert(
+    override.strip.frameWidth === 96 &&
+      override.strip.frameHeight === 96 &&
+      override.strip.frameCount === 7,
+    "rifleman recoil strip exposes the seven-cell Rifleman atlas geometry",
+  );
+}
+
+{
   const compiled = compileVisualUnitRigCandidates();
   const ids = visualUnitRigCandidateIds();
   assert(ids.length >= 3, "checked-in visual rig registry exposes multiple tank candidates");
@@ -115,6 +133,72 @@ const NOOP_RENDERER_OVERLAYS = [
   assert(resolved.overrides.get(128)?.candidateId === "tank-long-cannon", "nearest selector targets the intended tank");
   assert(entities.every((entity) => entity.kind === KIND.TANK || entity.kind === KIND.RIFLEMAN),
     "visual override resolution does not mutate real entity kinds");
+}
+
+{
+  const restorePixi = installFakePixi();
+  try {
+    const renderer = new Renderer(fakeParent());
+    for (const name of NOOP_RENDERER_OVERLAYS) renderer[name] = () => {};
+    renderer._drawGroundDecals = () => 0;
+    renderer._drawTrenches = () => 0;
+    const profile = getVisualProfile("rifleman-recoil-strip-1");
+    const override = profile.frameStripOverrides[0];
+    renderer._visualFrameStripTextures.set(
+      `${KIND.RIFLEMAN}:${override.strip.imageVersion}`,
+      PIXI.Texture.from("rifleman-recoil-test-texture"),
+    );
+    const rifleman = {
+      id: 115,
+      owner: 1,
+      kind: KIND.RIFLEMAN,
+      x: 2003.97,
+      y: 1837.91,
+      hp: 45,
+      maxHp: 45,
+      state: STATE.IDLE,
+      facing: -1.7406152,
+      weaponFacing: -1.7406152,
+    };
+    const state = {
+      playerId: 1,
+      players: [{ id: 1, color: "#4878c8" }],
+      resources: { oil: 10 },
+      selection: new Set([rifleman.id]),
+      rememberedBuildings: [],
+      map: { tileSize: 32 },
+      trenches: [],
+      entitiesInterpolated() {
+        return [rifleman];
+      },
+      selectedEntities() {
+        return [rifleman];
+      },
+      weaponRecoil() {
+        return 0;
+      },
+    };
+    const beforeKeys = Object.keys(state).sort().join(",");
+
+    renderer.render(state, { x: 0, y: 0, zoom: 1 }, null, 1, {
+      visualFrameStripOverrides: profile.frameStripOverrides,
+    });
+
+    const instance = renderer._liveRigPools.liveUnitRigs.get(rifleman.id);
+    assert(instance?.strip?.imageVersion === override.strip.imageVersion,
+      "visual frame-strip profile routes Rifleman rendering through the recoil strip");
+    assert(renderer._liveRigPools.liveUnitRigShadows.has(rifleman.id),
+      "frame-strip overrides keep the normal SVG shadow route");
+    assert(renderer._pools.selectionRings.has(rifleman.id), "selection rings still use the real Rifleman entity id");
+    assert(renderer._pools.hpBars.has(rifleman.id), "selected-unit HP overlays still use the real Rifleman entity id");
+    assert(Object.keys(state).sort().join(",") === beforeKeys, "frame-strip override rendering does not add GameState fields");
+    assert(state.selection.has(rifleman.id), "frame-strip override rendering does not mutate selection");
+
+    renderer.destroy();
+  } finally {
+    delete globalThis.__rtsRenderErrors;
+    restorePixi();
+  }
 }
 
 {

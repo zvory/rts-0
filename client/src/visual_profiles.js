@@ -108,6 +108,35 @@ const UNIT_RIG_OVERRIDES_1 = Object.freeze([
   }),
 ]);
 
+const RIFLEMAN_RECOIL_FRAME_STRIP_OVERRIDES_1 = Object.freeze([
+  Object.freeze({
+    id: "rifleman-recoil-strip",
+    label: "Rifleman recoil strip",
+    kind: KIND.RIFLEMAN,
+    strip: Object.freeze({
+      enabled: true,
+      unit: "rifleman",
+      image: "/assets/rigs/rifleman-pass-02/generated/rifleman-pass-02-recoil-strip.png?v=pass02-recoil-two-frame-v3",
+      imageVersion: "pass02-recoil-two-frame-v3",
+      frameWidth: 96,
+      frameHeight: 96,
+      frameCount: 7,
+      idleFrame: 0,
+      movementFrames: [1, 2, 3, 4],
+      firingFrames: [5, 6],
+      firingFrameHoldPhase: 0.28,
+      fps: 12,
+      worldScale: 0.34,
+      tintSlot: "team-light",
+      bakedColorAdjustment: {
+        brightness: 170,
+        saturation: 118,
+        hue: 100,
+      },
+    }),
+  }),
+]);
+
 const VISUAL_PROFILE_ENTRIES = Object.freeze([
   Object.freeze({
     id: "trench-variants-1",
@@ -122,6 +151,13 @@ const VISUAL_PROFILE_ENTRIES = Object.freeze([
     description: "Local checked-in profile for comparing real Tank rig candidates in the render-preview lab scenario.",
     initialCamera: Object.freeze({ x: 2040, y: 1950, zoom: 0.9 }),
     unitOverrides: UNIT_RIG_OVERRIDES_1,
+  }),
+  Object.freeze({
+    id: "rifleman-recoil-strip-1",
+    label: "Rifleman recoil strip 1",
+    description: "Local checked-in profile for previewing Rifleman firing recoil frames in the render-preview lab scenario.",
+    initialCamera: Object.freeze({ x: 2050, y: 1930, zoom: 2.1 }),
+    frameStripOverrides: RIFLEMAN_RECOIL_FRAME_STRIP_OVERRIDES_1,
   }),
 ]);
 

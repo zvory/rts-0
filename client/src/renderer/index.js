@@ -212,6 +212,8 @@ export class Renderer {
     this._liveFrameStripsByKind = createLiveFrameStrips();
     this._liveFrameStripTextures = new Map();
     this._loadLiveFrameStrips();
+    this._visualFrameStripTextures = new Map();
+    this._visualFrameStripTextureLoads = new Map();
     this._buildingRigDefinitions = createBuildingRigDefinitions();
     this._liveRigPools = {
       liveUnitRigShadows: new Map(),
@@ -296,6 +298,7 @@ export class Renderer {
     profiler = null,
     visualSamples = null,
     visualUnitOverrides = null,
+    visualFrameStripOverrides = null,
   } = {}) {
     this._profiler = profiler || null;
     const time = (label, fn) => profiler ? profiler.time(label, fn) : fn();
@@ -357,6 +360,10 @@ export class Renderer {
     time("renderer.visualUnitOverrides", () => {
       visualUnitOverrideMap = this._resolveVisualUnitOverridesSafely(visualUnitOverrides, entities).overrides;
     });
+    let visualFrameStripOverrideMap = new Map();
+    time("renderer.visualFrameStripOverrides", () => {
+      visualFrameStripOverrideMap = this._resolveVisualFrameStripOverrides(visualFrameStripOverrides);
+    });
     time("renderer.trenchOccupants", () => {
       this._drawSafely("trenchOccupants", () => this._drawOccupiedTrenches(regularEntities, state));
     });
@@ -395,6 +402,7 @@ export class Renderer {
           this._drawEntitySafely("unit", e, "units", () => {
             this._drawUnit(e, colorByOwner, state, {
               visualOverride: visualUnitOverrideMap.get(e.id) || null,
+              visualFrameStrip: visualFrameStripOverrideMap.get(e.kind) || null,
             });
           });
         }
@@ -415,6 +423,7 @@ export class Renderer {
         this._drawEntitySafely("shotReveal", e, "shotReveals", () => {
           this._drawShotRevealUnit(e, colorByOwner, state, {
             visualOverride: visualUnitOverrideMap.get(e.id) || null,
+            visualFrameStrip: visualFrameStripOverrideMap.get(e.kind) || null,
           });
         });
       }
@@ -615,6 +624,41 @@ export class Renderer {
     this._recordRenderDiagnostic("renderer.visualUnitOverrides.active", resolved.overrides.size);
     this._recordRenderDiagnostic("renderer.visualUnitOverrides.invalid", resolved.errors.length);
     return resolved;
+  }
+
+  _resolveVisualFrameStripOverrides(entries) {
+    const resolved = new Map();
+    const list = Array.isArray(entries) ? entries : [];
+    for (const entry of list) {
+      const kind = typeof entry?.kind === "string" ? entry.kind : "";
+      const strip = entry?.strip || null;
+      if (!kind || !strip?.enabled || !strip?.image) continue;
+      const texture = this._visualFrameStripTextureFor(kind, strip);
+      if (texture) resolved.set(kind, { strip, texture });
+    }
+    this._recordRenderDiagnostic("renderer.visualFrameStripOverrides.active", resolved.size);
+    return resolved;
+  }
+
+  _visualFrameStripTextureFor(kind, strip) {
+    const key = `${kind}:${strip.imageVersion || strip.image}`;
+    if (this._visualFrameStripTextures.has(key)) {
+      return this._visualFrameStripTextures.get(key);
+    }
+    if (!this._visualFrameStripTextureLoads.has(key)) {
+      const load = loadFrameStripTexture(PIXI, strip)
+        .then((texture) => {
+          this._visualFrameStripTextures.set(key, texture || null);
+          return texture || null;
+        })
+        .catch((err) => {
+          this._visualFrameStripTextures.set(key, null);
+          console.warn(`RTS visual frame strip disabled for ${kind}: ${err?.message || err}`);
+          return null;
+        });
+      this._visualFrameStripTextureLoads.set(key, load);
+    }
+    return null;
   }
 
   _drawMissingTexture(entity, poolName) {

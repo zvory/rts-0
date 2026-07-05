@@ -1306,7 +1306,8 @@ export function _drawMuzzleFlashes(state) {
     }
 
     const rigOwnsTankCannonFlash = attacker.kind === KIND.TANK && f.weaponKind !== WEAPON_KIND.TANK_COAX;
-    if (!rigOwnsTankCannonFlash) {
+    const suppressCircularFlash = feedbackKind === KIND.RIFLEMAN;
+    if (!rigOwnsTankCannonFlash && !suppressCircularFlash) {
       // Flash: bright core that scales up slightly then fades.
       const r = baseR * (0.7 + 0.45 * t);
       g.lineStyle(0);
