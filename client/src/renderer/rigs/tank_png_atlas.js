@@ -85,8 +85,7 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
       "brightness": 70,
       "saturation": 80,
       "hue": 100
-    },
-    "semanticPaintTintSlot": "fixed"
+    }
   },
   "frames": {},
   "sprites": [
@@ -158,7 +157,7 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
         "part.hull.noseShadow",
         "part.noseTick"
       ],
-      "tintSlot": "fixed",
+      "tintSlot": "team",
       "drawOrder": 20,
       "sourceCell": "sprite.hull",
       "frame": {
@@ -185,7 +184,7 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
         "part.coaxBarrel",
         "part.turret"
       ],
-      "tintSlot": "fixed",
+      "tintSlot": "team-light",
       "originMode": "visible-center",
       "drawOrder": 30,
       "sourceCell": "sprite.turret",
@@ -212,7 +211,7 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
       "sourceParts": [
         "part.barrel"
       ],
-      "tintSlot": "fixed",
+      "tintSlot": "team",
       "drawOrder": 29,
       "sourceCell": "sprite.barrel",
       "frame": {

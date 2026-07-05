@@ -275,8 +275,8 @@ Prototype raster rig workflow:
   motion into the turret. The active `pass11-white-dim30` atlas is an imagegen repaint of pass 10;
   it keeps the no-guide semantic sheet, bakes 30% lower brightness and 20% lower saturation, relies
   on visible-alpha postprocessing plus 1.2x world-scale compensation to size generated components
-  against the SVG rig bounds, and intentionally uses fixed-color tint slots for the visible tank
-  sprites so runtime team tint does not recolor the white paint. See
+  against the SVG rig bounds, and intentionally applies runtime team tint over the dimmed white base
+  using the semantic atlas tint slots. See
   [raster-unit-art-handoff.md](raster-unit-art-handoff.md) for the methodology, rejected imagegen
   passes, and next validation work.
 - `scripts/art/tank-raster-pipeline.mjs` builds the tank contact sheet, records the exact prompt
