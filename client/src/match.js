@@ -194,7 +194,7 @@ export class Match {
     this.desktopCursorAutoLockFailures = 0;
     this.onDesktopCursorAutoLockSignal = this.handleDesktopCursorAutoLockSignal.bind(this);
 
-    // --- Build the module graph from the static start payload (docs/design/client-ui.md §4.1). ---
+    // --- Build the module graph. ---
     this.state = this._timeInit("match.state", () => new GameState(payload));
     applyInitialUnitRanges(this.state, options.unitRangesEnabled);
     this.state.controlPolicy = this.labControlPolicy;
@@ -203,7 +203,9 @@ export class Match {
       () => new MatchCombatAudio({ audio: this.audio, state: this.state }),
     );
     this.clientIntent = this._timeInit("match.clientIntent", () => new ClientIntent());
-    this.camera = this._timeInit("match.camera", () => new Camera());
+    this.camera = this._timeInit("match.camera", () => new Camera(0, 0, {
+      maxZoom: options.cameraMaxZoom,
+    }));
     this.renderer = this._timeInit("match.renderer", () => new Renderer(dom.viewport));
     this.fog = this._timeInit(
       "match.fog",
