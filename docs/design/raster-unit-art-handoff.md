@@ -23,9 +23,9 @@ asset. Pass 11 is enabled only as a local visual experiment; it repaints the pas
 I sheet as weathered matte white, bakes 30% lower brightness and 20% lower saturation, keeps the
 separate turret/barrel structure, maps `sprite.barrel` to the original barrel animation, removes
 visible guide boxes from the imagegen input, and relies on visible-alpha postprocessing for runtime
-sizing. The visible tank sprites intentionally use fixed tint slots so runtime team tint does not
-recolor the white paint. It still needs component cleanup, alignment review, and a final owner-color
-strategy before it should be treated as accepted art.
+sizing. Runtime owner color intentionally tints the dimmed white source art through the semantic
+atlas tint slots. It still needs component cleanup and alignment review before it should be treated
+as accepted art.
 
 Rifleman pass 02 deliberately does not use component slicing yet. It ships as a compact six-frame
 full-body strip because the useful experiment is testing whether a generated infantry token reads at
@@ -55,9 +55,9 @@ override the target when that generated unit needs its own brightness match.
   the generated hull/body, turret/coax, and separate main-barrel cells; the reference, track
   placeholder, and unused cells are transparent so generated/default tracks are not rendered during
   this experiment. The current active variant is `pass11-white-dim30`, an imagegen repaint of the
-  pass-10 no-guide sheet with baked `brightness: 70` and `saturation: 80` modulation. Hull, turret,
-  and barrel sprites intentionally use fixed tint slots so owner team tint does not recolor the
-  white paint. The runtime sprite frames are normalized to visible component alpha bounds, not the
+  pass-10 no-guide sheet with baked `brightness: 70` and `saturation: 80` modulation. Hull and
+  barrel use `team` tint while turret uses `team-light`, so owner team tint applies over the dimmed
+  white base. The runtime sprite frames are normalized to visible component alpha bounds, not the
   full generated cell bounds.
 - `client/src/renderer/rigs/tank_png_atlas.js` is generated metadata. Its `enabled` field is
   currently `true` for the pass-11 experiment.
@@ -199,16 +199,15 @@ node scripts/art/tank-raster-pipeline.mjs write-atlas \
   --brightness 70 \
   --saturation 80 \
   --image-version pass11-white-dim30 \
-  --semantic-paint-tint-slot fixed \
   --prompt-file client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-11-white.md \
   --model "built-in image generation + chroma-key cleanup + ImageMagick dimming pass" \
-  --notes "Experimental Tiger I white-painted no-track no-guide raster pass 11 with 1.2x world-scale compensation, 30% lower brightness, and 20% lower saturation."
+  --notes "Experimental Tiger I white-painted no-track no-guide raster pass 11 with 1.2x world-scale compensation, 30% lower brightness, and 20% lower saturation, using runtime team tint over the white base."
 ```
 
-Only omit `--disabled` for a local experiment after the validation checklist passes. For a white
-paint pass, use `--semantic-paint-tint-slot fixed` so runtime team tint does not recolor the
-generated white paint. Do not commit an enabled atlas unless the component cells can actually
-reconstruct the tank.
+Only omit `--disabled` for a local experiment after the validation checklist passes. Omit
+`--semantic-paint-tint-slot` when the white source art should still receive owner team tint; reserve
+the option for a future pass that deliberately bakes final paint colors into the generated image.
+Do not commit an enabled atlas unless the component cells can actually reconstruct the tank.
 
 ## Prompt lessons
 
@@ -323,9 +322,9 @@ cheap checks before any generated atlas can be enabled.
   sheet that preserves the 2x3 component layout while changing the armor to weathered matte white.
   The active runtime atlas version is `pass11-white-dim30`, with 30% lower brightness and 20% lower
   saturation baked in. It still uses 1.2x world-scale compensation, visible-alpha
-  normalization only, and transparent reference/track/unused cells. Hull, turret, and barrel sprites
-  use fixed tint slots so Pixi team tint does not recolor the white paint. Not final art: owner
-  readability needs a chosen team-marking strategy if white-painted tanks stay active beyond local
+  normalization only, and transparent reference/track/unused cells. Runtime owner tint applies over
+  the dimmed white source art through the semantic hull, turret, and barrel tint slots. Not final
+  art: component alignment and readability still need inspection if this stays active beyond local
   preview.
 - `rifleman-pass-02`: active experiment. Generated as the best of five one-shot full-frame
   rifleman strips after simplifying the prompt around strict nadir view, hidden legs, shoulder-line
@@ -353,9 +352,8 @@ These candidates are useful references for what to avoid. None should be treated
 - In no-track passes, the track placeholder remains empty and transparent in the active atlas while
   still covering track/tread source parts so SVG tracks do not fall back.
 - The main cannon is in its own component cell and maps to `part.barrel`, not `part.turret`.
-- The generated barrel sprite uses a team tint slot when the active art direction expects a tinted
-  barrel, or a fixed tint slot when the art direction expects baked paint such as pass 11's white
-  tank.
+- The generated barrel sprite uses a team tint slot when the active art direction expects owner tint
+  over the generated base, or a fixed tint slot when the art direction expects baked final paint.
 - The component cells preserve source orientation, center, approximate footprint, and pivot meaning.
 - The component cells can be assembled into the complete tank reference.
 - The complete tank reference did not diverge into its own independent design.
