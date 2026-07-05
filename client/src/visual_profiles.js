@@ -1,4 +1,5 @@
 import { KIND } from "./protocol.js";
+import { SCOUT_PLANE_PNG_FRAME_STRIP } from "./renderer/rigs/scout_plane_png_strip.js";
 
 const VISUAL_PROFILE_ERROR_MESSAGES = Object.freeze({
   invalid: "Invalid visualProfile. Use letters, numbers, underscores, or dashes, up to 48 characters.",
@@ -168,24 +169,7 @@ const SCOUT_PLANE_FW189_FRAME_STRIP_OVERRIDES_1 = Object.freeze([
     id: "scout-plane-fw189-pass-01",
     label: "Scout Plane Fw 189 pass 01",
     kind: KIND.SCOUT_PLANE,
-    strip: Object.freeze({
-      enabled: true,
-      unit: "scout_plane",
-      image: "/assets/rigs/scout-plane-fw189-pass-01/generated/scout-plane-fw189-pass-01-alpha.png?v=pass01-fw189-detailed-team-tint-b69-s73",
-      imageVersion: "pass01-fw189-detailed-team-tint-b69-s73",
-      frameWidth: 942,
-      frameHeight: 1163,
-      frameCount: 1,
-      idleFrame: 0,
-      fps: 12,
-      worldScale: 0.065,
-      tintSlot: "team-light",
-      targetColorAdjustment: {
-        brightness: 69,
-        saturation: 73,
-        hue: 100,
-      },
-    }),
+    strip: SCOUT_PLANE_PNG_FRAME_STRIP,
   }),
 ]);
 

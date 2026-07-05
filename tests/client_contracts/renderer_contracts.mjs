@@ -684,6 +684,8 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     };
     const renderer = new Renderer(parent);
     renderer._map = { tileSize: 32 };
+    const stripTexture = PIXI.Texture.from("scout-plane-strip-test-texture");
+    renderer._liveFrameStripTextures.set(KIND.SCOUT_PLANE, stripTexture);
     const entity = {
       id: 507,
       owner: 1,
@@ -709,25 +711,24 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
       resources: { oil: 100 },
     });
 
-    const unitRig = renderer._liveRigPools.liveUnitRigs.get(entity.id);
+    const unitStrip = renderer._liveRigPools.liveUnitRigs.get(entity.id);
     const shadowRig = renderer._liveRigPools.liveUnitRigShadows.get(entity.id);
     const ring = renderer._ringRadius(entity);
-    const bounds = unitRig?.definition?.bounds?.selection;
-    assert(unitRig?.parts.has("part.wing"), "Scout Plane live rig includes a wing silhouette");
-    assert(unitRig?.parts.has("part.fuselage"), "Scout Plane live rig includes a fuselage silhouette");
-    assert(shadowRig?.parts.has("part.shadow"), "Scout Plane live rig includes a separate shadow route");
+    assert(unitStrip?.strip?.unit === KIND.SCOUT_PLANE, "Scout Plane live rendering uses the PNG frame strip");
+    assert(unitStrip?.texture === stripTexture, "Scout Plane frame-strip renderer uses the preloaded strip texture");
+    assert(
+      unitStrip?.frameTextures?.length === unitStrip?.strip?.frameCount,
+      "Scout Plane frame strip exposes one runtime texture per declared frame",
+    );
+    assert(shadowRig?.parts.has("part.shadow"), "Scout Plane frame-strip rendering keeps the separate SVG shadow route");
     assert(
       ring.rx === 28 && ring.ry === 22 && ring.cy === 2,
       "Scout Plane selection ring uses the mirrored 48x34 aircraft body",
     );
     assert(
-      bounds?.width <= 52 && bounds?.height <= 36,
-      "Scout Plane authored rig stays aligned with the mirrored aircraft selection body",
-    );
-    assert(
-      renderer.layers.units.children.includes(unitRig.container) &&
+      renderer.layers.units.children.includes(unitStrip.container) &&
         renderer.layers.unitShadows.children.includes(shadowRig.container),
-      "Scout Plane live rig renders through the normal unit and shadow layers",
+      "Scout Plane frame strip renders through the normal unit and shadow layers",
     );
   } finally {
     restorePixi();
