@@ -15,8 +15,8 @@
   },
   "runtime": {
     "module": "client/src/renderer/rigs/machine_gunner_png_strip.js",
-    "stripImageUrl": "/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png?v=pass01-setup-recoil",
-    "imageVersion": "pass01-setup-recoil",
+    "stripImageUrl": "/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png?v=pass01-setup-15pct-shrink",
+    "imageVersion": "pass01-setup-15pct-shrink",
     "runtimeStrip": "client/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png",
     "frameWidth": 128,
     "frameHeight": 128,
@@ -51,8 +51,8 @@
   },
   "notes": [
     "Frames 0-5 come from the edited rifleman carry sheet and cycle while the Machine Gunner is moving; runtime rotates only those movement frames 90 degrees left and renders them at the smaller movementWorldScale.",
-    "Frame 6 reuses a carry frame so setup starts from the same carried MG pose.",
-    "Frames 7-11 come from the deploy-only generation and are selected over the client setup animation duration.",
+    "Frame 6 reuses a carry frame so setup starts from the same carried MG pose. The runtime strip scales frames 6-8 to 84% around the cell center to smooth the visual size transition into the deployed poses, then scales all setup frames 6-11 to 85% of that state so the setup animation matches the movement sprite scale more closely.",
+    "Frames 7-11 come from the deploy-only generation and are selected over the client setup animation duration. Frames 7 and 8 have isolated left-edge crop artifacts cleared from the runtime strip.",
     "The checked-in runtime strip keeps the raw generated color; the client applies the shared frame-strip color target at texture load time.",
     "Frames 12-14 are a three-frame no-muzzle-flare firing recoil strip; frames 12 and 14 reuse deployed frame 11 so the animation resets to the exact held pose.",
     "The deployed source points south/down in the sheet; runtime subtracts PI/2 from weaponFacing for setup/deployed frame-strip rotation."

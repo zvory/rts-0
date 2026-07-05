@@ -58,10 +58,10 @@ import {
 import { GOLEM_RIG_SVG, WORKER_RIG_SVG } from "../client/src/renderer/rigs/worker_svg.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.join(__dirname, "..");
 const fixturesDir = path.join(__dirname, "fixtures/svg");
 const machineGunnerPngManifestPath = path.join(
-  __dirname,
-  "..",
+  repoRoot,
   "client/assets/rigs/machine-gunner-pass-01/metadata/manifest.json",
 );
 const fixedNow = 12_345;
@@ -855,6 +855,10 @@ test("machine gunner PNG frame strip mirrors asset manifest runtime metadata", (
     ...manifest.sourceSheets,
     runtimeStrip: runtime.runtimeStrip,
   });
+
+  const runtimeStripSize = readPngDimensions(runtime.runtimeStrip);
+  assert.equal(runtimeStripSize.width, runtime.frameWidth * runtime.frameCount);
+  assert.equal(runtimeStripSize.height, runtime.frameHeight);
 });
 
 test("tank PNG atlas SVG fallback is destroyed when same id no longer needs it", () => {
@@ -994,6 +998,16 @@ function compileFixture(file, expectedKind) {
 
 function readMachineGunnerPngManifest() {
   return JSON.parse(fs.readFileSync(machineGunnerPngManifestPath, "utf8"));
+}
+
+function readPngDimensions(repoRelativePath) {
+  const buffer = fs.readFileSync(path.join(repoRoot, repoRelativePath));
+  assert.equal(buffer.toString("hex", 0, 8), "89504e470d0a1a0a");
+  assert.equal(buffer.toString("ascii", 12, 16), "IHDR");
+  return {
+    width: buffer.readUInt32BE(16),
+    height: buffer.readUInt32BE(20),
+  };
 }
 
 function makeRigRenderer() {
