@@ -8,8 +8,8 @@ function deepFreeze(value) {
 export const MACHINE_GUNNER_PNG_FRAME_STRIP = deepFreeze({
   enabled: true,
   unit: "machine_gunner",
-  image: "/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png?v=pass01-setup-15pct-shrink",
-  imageVersion: "pass01-setup-15pct-shrink",
+  image: "/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png?v=pass01-setup-15pct-shrink-recoil85-north5",
+  imageVersion: "pass01-setup-15pct-shrink-recoil85-north5",
   frameWidth: 128,
   frameHeight: 128,
   frameCount: 15,
