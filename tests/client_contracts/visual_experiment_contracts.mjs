@@ -137,11 +137,18 @@ const NOOP_RENDERER_OVERLAYS = [
     JSON.stringify(atlas.grid?.palette) === JSON.stringify(PLAYER_PALETTE),
     "scout car PNG atlas maps its palette frames to the normal player palette",
   );
+  const bodySprite = atlas.sprites.find((sprite) => sprite.id === "sprite.body");
+  const gunSprite = atlas.sprites.find((sprite) => sprite.id === "sprite.rearMachineGun");
   assert(
-    atlas.sprites.every((sprite) =>
-      sprite.tintSlot === "fixed" &&
-      JSON.stringify(Object.keys(sprite.paletteFrames || {})) === JSON.stringify(PLAYER_PALETTE)),
-    "scout car PNG body and rear gun both provide fixed-tint frames for every player color",
+    bodySprite?.tintSlot === "fixed" &&
+      JSON.stringify(Object.keys(bodySprite.paletteFrames || {})) === JSON.stringify(PLAYER_PALETTE),
+    "scout car PNG body keeps fixed pre-colored frames for every player color",
+  );
+  assert(
+    gunSprite?.tintSlot === "fixed" &&
+      !gunSprite.paletteFrames &&
+      gunSprite.frame,
+    "scout car PNG rear machine gun uses one neutral fixed-tint frame",
   );
   const definitions = createLiveRigDefinitions();
   const definition = liveRigDefinitionFor(definitions, KIND.SCOUT_CAR);
