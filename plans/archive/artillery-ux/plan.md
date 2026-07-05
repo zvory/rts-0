@@ -109,7 +109,7 @@ Each phase should run the smallest relevant subset of:
 - Focused Rust tests for command admission, order queue promotion, artillery setup/redeploy,
   target locking, deterministic Blanket Fire sampling, and shell execution.
 - Focused client contract tests for command-card buttons, hotkeys, input targeting, minimap
-  targeting, command feedback, and renderer preview view-model behavior.
+  targeting, command feedback, and renderer feedback view-model behavior.
 - `node scripts/check-client-architecture.mjs` after client module or wiring changes.
 - `cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture` after
   sim service boundary or dependency changes.

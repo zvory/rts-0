@@ -159,6 +159,12 @@ const VISUAL_PROFILE_ENTRIES = Object.freeze([
     initialCamera: Object.freeze({ x: 2050, y: 1930, zoom: 2.1 }),
     frameStripOverrides: RIFLEMAN_RECOIL_FRAME_STRIP_OVERRIDES_1,
   }),
+  Object.freeze({
+    id: "scout-car-png-1",
+    label: "Scout car PNG 1",
+    description: "Local checked-in profile for previewing the Scout Car PNG body and rear machine gun in the render-preview lab scenario.",
+    initialCamera: Object.freeze({ x: 2052, y: 1874, zoom: 2.4 }),
+  }),
 ]);
 
 const VISUAL_PROFILE_BY_ID = new Map(VISUAL_PROFILE_ENTRIES.map((profile) => [profile.id, profile]));

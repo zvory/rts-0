@@ -963,6 +963,17 @@ test("machine gunner PNG frame strip mirrors asset manifest runtime metadata", (
   const runtimeStripSize = readPngDimensions(runtime.runtimeStrip);
   assert.equal(runtimeStripSize.width, runtime.frameWidth * runtime.frameCount);
   assert.equal(runtimeStripSize.height, runtime.frameHeight);
+
+  const recoilStripSize = readPngDimensions(manifest.sourceSheets.fireRecoilStrip);
+  assert.equal(recoilStripSize.width, runtime.frameWidth * runtime.firingFrames.length);
+  assert.equal(recoilStripSize.height, runtime.frameHeight);
+  assert.deepEqual(
+    runtime.firingFrames,
+    Array.from(
+      { length: runtime.firingFrames.length },
+      (_, index) => runtime.frameCount - runtime.firingFrames.length + index,
+    ),
+  );
 });
 
 test("tank PNG atlas SVG fallback is destroyed when same id no longer needs it", () => {

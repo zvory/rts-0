@@ -6,8 +6,6 @@ PixiJS is loaded globally from CDN as `PIXI`.
 ```
 index.html        # PINNED — CDN + #app + module entry + screens markup
 map-editor.html   # standalone handcrafted-map editor; loads/saves server map JSON
-renderer_preview.html / renderer_preview.js
-                  # standalone Renderer preview linked from the Dev links menu
 styles.css        # HUD, lobby, menus, command card
 assets/decals/    # SVG alpha-mask sources for client-only permanent ground decals
 src/
@@ -1246,9 +1244,6 @@ selection rings):
   health bars → fog overlay → local visual-sample labels → shot-revealed units → command/hover feedback → placement ghost →
   selection drag-box → (HUD is DOM, not Pixi). Selected unit range rings, minimum-range rings, and
   support-weapon field-of-fire overlays use higher-opacity rendering for readability.
-- `/renderer_preview.html` is a standalone dev entry point linked from the index Dev links menu; it
-  mounts the real Renderer on a synthetic grass map to preview all unit and building visuals with
-  zoom, team color, and animation controls outside a full match.
 - Spatial combat audio keeps full volume for nearby emitters, uses stronger attenuation after the
   listener reference distance for distant emitters, and keeps the same hard drop distance.
   Panzerfaust launch and impact events use dedicated low-gain spatial cues with coarse cooldown
@@ -1273,7 +1268,7 @@ selection rings):
   experiment with carried movement frames and setup/deployed frames; Panzerfaust: shared SVG
   infantry body with a short one-shot launcher tube while loaded; Anti-Tank Gun: wheeled gun; mortar team: crewless
   M1938-inspired small wheeled mortar that travels low and deploys upright; scout car: boxy
-  WW2-style truck silhouette with enclosed wheels and a rear-top machine-gunner; tank: chunky
+  WW2-style truck silhouette with enclosed wheels and a rear-top machine gun; tank: chunky
   flat-shaded armor with movement-facing tracks, hull, nose, and shadow plus weapon-facing turret,
   main barrel, coax barrel, recoil, nose tick, and low-oil/oil-starved fuel cues; artillery: SVG-authored
   support-weapon rig routed through the live renderer).
