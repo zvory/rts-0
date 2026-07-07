@@ -339,6 +339,16 @@ fn outcome_for(
         };
     }
 
+    if result.completed_by_elimination {
+        return ArenaOutcome {
+            winner_profile: None,
+            candidate_won: false,
+            baseline_won: false,
+            tick_cap: false,
+            army_tiebreak_winner: None,
+        };
+    }
+
     let candidate_army = player_army_value(result, candidate_player_id);
     let baseline_army = player_army_value(result, baseline_player_id);
     let army_tiebreak_winner = match candidate_army.cmp(&baseline_army) {
@@ -521,6 +531,9 @@ fn result_text(outcome: &ArenaOutcome, candidate: &str, baseline: &str) -> Strin
         }
         return format!("baseline `{baseline}` won by elimination");
     }
+    if !outcome.tick_cap {
+        return "unresolved elimination draw".to_string();
+    }
     "unresolved tick-cap draw".to_string()
 }
 
@@ -669,6 +682,79 @@ mod tests {
         assert_eq!(config.candidate, DEFAULT_CANDIDATE);
         assert_eq!(config.baseline, DEFAULT_BASELINE);
         assert_eq!(config.seeds, DEFAULT_SEEDS);
+    }
+
+    #[test]
+    fn no_winner_elimination_is_not_scored_as_tick_cap_tiebreak() {
+        let result = ProfileMatchupResult {
+            profile_a: DEFAULT_CANDIDATE.to_string(),
+            profile_b: DEFAULT_BASELINE.to_string(),
+            seed: 0,
+            max_ticks: 120,
+            ticks: 80,
+            completed_by_elimination: true,
+            winner: None,
+            players: vec![
+                crate::selfplay::ProfileMatchupPlayerResult {
+                    player_id: 1,
+                    profile: DEFAULT_CANDIDATE.to_string(),
+                    alive: false,
+                    army_value: 200,
+                    building_value: 0,
+                    worker_count: 0,
+                    command_count: 0,
+                    attack_command_count: 0,
+                    damage_dealt_events: 0,
+                    death_count: 0,
+                    first_attack_command_tick: None,
+                    first_rifleman_attack_command_tick: None,
+                    first_scout_car_tick: None,
+                    first_scout_car_harass_command_tick: None,
+                    first_expansion_city_centre_planned_tick: None,
+                    first_expansion_city_centre_completed_tick: None,
+                    first_tank_tick: None,
+                    final_counts: BTreeMap::new(),
+                },
+                crate::selfplay::ProfileMatchupPlayerResult {
+                    player_id: 2,
+                    profile: DEFAULT_BASELINE.to_string(),
+                    alive: false,
+                    army_value: 100,
+                    building_value: 0,
+                    worker_count: 0,
+                    command_count: 0,
+                    attack_command_count: 0,
+                    damage_dealt_events: 0,
+                    death_count: 0,
+                    first_attack_command_tick: None,
+                    first_rifleman_attack_command_tick: None,
+                    first_scout_car_tick: None,
+                    first_scout_car_harass_command_tick: None,
+                    first_expansion_city_centre_planned_tick: None,
+                    first_expansion_city_centre_completed_tick: None,
+                    first_tank_tick: None,
+                    final_counts: BTreeMap::new(),
+                },
+            ],
+            first_damage_tick: None,
+            attack_events: 0,
+            death_events: 0,
+            event_count: 0,
+            replay_verified: false,
+            replay_artifact: None,
+            ai_trace_tail: Vec::new(),
+        };
+
+        let outcome = outcome_for(&result, DEFAULT_CANDIDATE, DEFAULT_BASELINE, 1, 2);
+
+        assert!(!outcome.tick_cap);
+        assert!(!outcome.candidate_won);
+        assert!(!outcome.baseline_won);
+        assert_eq!(outcome.army_tiebreak_winner, None);
+        assert_eq!(
+            result_text(&outcome, DEFAULT_CANDIDATE, DEFAULT_BASELINE),
+            "unresolved elimination draw"
+        );
     }
 
     #[test]

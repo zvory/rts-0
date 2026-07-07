@@ -202,20 +202,26 @@ pub(crate) fn construction_system(
                     kind: crate::protocol::kind_to_wire(kind).to_string(),
                 });
             }
-            defensively_eject_worker_from_static_overlap(map, entities, worker);
-            clear_build_orders_for_site(entities, site);
+            let builders = builders_for_site(entities, site);
+            for builder in &builders {
+                defensively_eject_worker_from_static_overlap(map, entities, *builder);
+            }
+            clear_build_orders(entities, &builders);
         }
     }
 }
 
-fn clear_build_orders_for_site(entities: &mut EntityStore, site: u32) {
-    let builders: Vec<u32> = entities
+fn builders_for_site(entities: &EntityStore, site: u32) -> Vec<u32> {
+    entities
         .iter()
-        .filter(|entity| entity.hp > 0 && entity.order().build_site() == Some(site))
+        .filter(|entity| entity.hp > 0 && entity.is_unit() && entity.order().build_site() == Some(site))
         .map(|entity| entity.id)
-        .collect();
+        .collect()
+}
+
+fn clear_build_orders(entities: &mut EntityStore, builders: &[u32]) {
     for builder in builders {
-        if let Some(worker) = entities.get_mut(builder) {
+        if let Some(worker) = entities.get_mut(*builder) {
             worker.clear_active_order();
         }
     }
@@ -792,6 +798,20 @@ mod tests {
                     Order::Idle
                 ),
                 "all workers that targeted the completed site should clear Build orders"
+            );
+        }
+        let occ = Occupancy::build(&map, &entities);
+        for worker in [finishing_worker, helper_worker] {
+            let worker = entities.get(worker).expect("worker should survive");
+            assert!(
+                standability::unit_static_standable(
+                    &map,
+                    &occ,
+                    worker.kind,
+                    worker.pos_x,
+                    worker.pos_y,
+                ),
+                "released builders must be ejected from completed building footprint overlap"
             );
         }
     }

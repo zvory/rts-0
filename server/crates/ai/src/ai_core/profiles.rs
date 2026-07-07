@@ -47,7 +47,7 @@ pub(crate) struct AiProfile {
     pub(crate) tech_transition: Option<TechTransitionPolicy>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug)]
 pub(crate) struct AiProfileSpec {
     pub(crate) id: &'static str,
     pub(crate) label: &'static str,
@@ -69,48 +69,17 @@ impl AiProfileSpec {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug)]
 pub(crate) struct AiProfileOverlay {
     pub(crate) id: &'static str,
     pub(crate) summary: &'static str,
-    pub(crate) patch: AiProfilePatch,
+    pub(crate) apply: fn(&mut AiProfile),
 }
 
 impl AiProfileOverlay {
     fn apply(self, profile: &mut AiProfile) {
-        match self.patch {
-            AiProfilePatch::Workers(policy) => profile.workers = policy,
-            AiProfilePatch::Supply(policy) => profile.supply = policy,
-            AiProfilePatch::Buildings(policy) => profile.buildings = policy,
-            AiProfilePatch::ExtraFactories(policy) => profile.extra_factories = policy,
-            AiProfilePatch::Production(policy) => profile.production = policy,
-            AiProfilePatch::Attack(policy) => profile.attack = policy,
-            AiProfilePatch::Resources(policy) => profile.resources = policy,
-            AiProfilePatch::Expansion(policy) => profile.expansion = policy,
-            AiProfilePatch::DefensiveMachineGunners(policy) => {
-                profile.defensive_machine_gunners = policy
-            }
-            AiProfilePatch::FrontalWave(policy) => profile.frontal_wave = policy,
-            AiProfilePatch::RecoveryTransition(policy) => profile.recovery_transition = policy,
-            AiProfilePatch::TechTransition(policy) => profile.tech_transition = policy,
-        }
+        (self.apply)(profile);
     }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) enum AiProfilePatch {
-    Workers(WorkerPolicy),
-    Supply(SupplyPolicy),
-    Buildings(BuildingPolicy),
-    ExtraFactories(Option<ExtraFactoryPolicy>),
-    Production(ProductionPolicy),
-    Attack(AttackPolicy),
-    Resources(ResourcePolicy),
-    Expansion(Option<ExpansionPolicy>),
-    DefensiveMachineGunners(Option<DefensiveMachineGunnerPolicy>),
-    FrontalWave(FrontalWavePolicy),
-    RecoveryTransition(Option<RecoveryTransitionPolicy>),
-    TechTransition(Option<TechTransitionPolicy>),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -923,12 +892,16 @@ const AI_2_0_OVERLAYS: [AiProfileOverlay; 1] = [
     AiProfileOverlay {
         id: "agent_wave_cohorts",
         summary: "Uses AI 1.2-style line staging and launched-unit exclusion for post-rush combat groups.",
-        patch: AiProfilePatch::FrontalWave(FrontalWavePolicy {
-            exclude_launched_ticks: Some(AI_1_2_FRONTAL_COHORT_TICKS),
-            line_staging: true,
-        }),
+        apply: apply_agent_wave_cohorts,
     },
 ];
+
+fn apply_agent_wave_cohorts(profile: &mut AiProfile) {
+    profile.frontal_wave = FrontalWavePolicy {
+        exclude_launched_ticks: Some(AI_1_2_FRONTAL_COHORT_TICKS),
+        line_staging: true,
+    };
+}
 
 pub(crate) static AI_2_0_AGENT_RUSH_SPEC: AiProfileSpec = AiProfileSpec {
     id: AI_2_0_AGENT_RUSH_ID,
