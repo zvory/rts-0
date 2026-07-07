@@ -956,6 +956,7 @@ mod tests {
     use crate::DEFAULT_LIVE_PROFILE_ID;
     use rts_sim::game::command::SimCommand;
     use rts_sim::game::entity::EntityKind;
+    use rts_sim::game::{Game, PlayerInit};
     use rts_sim::protocol::kinds;
     use rts_sim::protocol::{EntityView, Event, Snapshot, SnapshotNetStatus};
 
@@ -1121,6 +1122,53 @@ mod tests {
             .ai_trace_tail
             .iter()
             .any(|entry| entry.lines.iter().any(|line| line.contains("goal=Economy"))));
+    }
+
+    #[test]
+    fn starting_city_centre_objective_tracks_destroyed_start() {
+        let players = vec![
+            PlayerInit {
+                id: 1,
+                team_id: 1,
+                faction_id: "kriegsia".to_string(),
+                name: AI_1_0_TECH_ID.to_string(),
+                color: "#4cc9f0".to_string(),
+                is_ai: true,
+            },
+            PlayerInit {
+                id: 2,
+                team_id: 2,
+                faction_id: "kriegsia".to_string(),
+                name: AI_1_1_TANK_MG_ID.to_string(),
+                color: "#f72585".to_string(),
+                is_ai: true,
+            },
+        ];
+        let mut game = Game::new_without_ai_controllers(&players, 7);
+        let start = game.start_payload();
+        let mut objective =
+            super::StartingCityCentreObjective::capture(&game, &start, &players)
+                .expect("starting City Centres should be captured");
+
+        assert_eq!(objective.alive_player_ids(), vec![1, 2]);
+        assert!(objective.winner().is_none());
+        assert!(objective.results().iter().all(|centre| centre.alive));
+
+        game.eliminate(2);
+        let snapshot = game.snapshot_full_for(1);
+        assert!(objective.observe_snapshot(42, &snapshot));
+
+        let winner = objective.winner().expect("player 1 should win");
+        assert_eq!(winner.player_id, 1);
+        assert_eq!(winner.profile, AI_1_0_TECH_ID);
+        assert_eq!(
+            objective.end_reason(),
+            super::ProfileMatchupEndReason::StartingCityCentreKilled
+        );
+        assert_eq!(objective.alive_player_ids(), vec![1]);
+        assert!(objective.results().iter().any(|centre| {
+            centre.player_id == 2 && !centre.alive && centre.death_tick == Some(42)
+        }));
     }
 
     fn snapshot(entities: Vec<EntityView>) -> Snapshot {
