@@ -1533,6 +1533,7 @@ input[type="text"]:focus {
 #game-screen.branch-background #selection-area,
 #game-screen.branch-background #command-card,
 #game-screen.branch-background .replay-analysis-overlay,
+#game-screen.branch-background .ai-diagnostics-panel-host,
 #game-screen.branch-background #room-time-controls {
   opacity: 0;
   pointer-events: none;
@@ -3734,32 +3735,6 @@ input[type="text"]:focus {
   content: "x";
   color: var(--ink-dim);
 }
-.replay-ai-diagnostics-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  color: var(--ink-faint);
-  font-size: 10px;
-  font-weight: 800;
-}
-.replay-ai-diagnostics-meta span {
-  min-width: 0;
-  max-width: 100%;
-  overflow-wrap: anywhere;
-}
-.replay-ai-diagnostics-lines {
-  display: grid;
-  gap: 3px;
-  margin-bottom: 4px;
-  padding-left: 6px;
-  border-left: 1px solid rgba(231, 223, 197, 0.16);
-}
-.replay-ai-diagnostics-line {
-  color: var(--ink-dim);
-  font-size: 10px;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
-}
 .replay-army-value-empty {
   color: var(--ink-dim);
 }
@@ -3807,6 +3782,299 @@ input[type="text"]:focus {
   width: min(180px, calc(100vw - 24px));
 }
 .replay-analysis-overlay.is-collapsed .replay-analysis-header {
+  margin-bottom: 0;
+}
+
+/* --- AI diagnostics panel --- */
+.ai-diagnostics-panel-host {
+  --ai-accent: #8fb8d0;
+  --ai-accent-soft: rgba(143, 184, 208, 0.16);
+  position: absolute;
+  top: 306px;
+  right: 12px;
+  bottom: calc(var(--bottom-hud-height) + 12px);
+  z-index: 23;
+  width: min(420px, calc(100vw - 24px));
+  min-height: 132px;
+  color: var(--ink);
+  pointer-events: none;
+}
+.ai-diagnostics-panel {
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  padding: 10px;
+  border-color: rgba(91, 105, 118, 0.78);
+  pointer-events: auto;
+}
+.ai-diagnostics-header,
+.ai-diagnostics-actions {
+  display: flex;
+  align-items: center;
+}
+.ai-diagnostics-header {
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.ai-diagnostics-header h2 {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ai-accent);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.ai-diagnostics-actions {
+  flex: 0 0 auto;
+  gap: 4px;
+}
+.ai-diagnostics-actions button,
+.ai-diagnostics-show {
+  appearance: none;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius-sm);
+  background: rgba(17, 17, 15, 0.9);
+  color: var(--ink-faint);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0;
+  line-height: 1;
+}
+.ai-diagnostics-show {
+  width: 34px;
+  pointer-events: auto;
+  margin-left: auto;
+}
+.ai-diagnostics-actions button:hover,
+.ai-diagnostics-show:hover,
+.ai-diagnostics-actions button:focus-visible,
+.ai-diagnostics-show:focus-visible {
+  border-color: var(--ai-accent);
+  color: var(--ink);
+  outline: none;
+}
+.ai-diagnostics-body {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 8px;
+  border-top: 1px solid rgba(231, 223, 197, 0.14);
+  padding-top: 8px;
+  overflow: hidden;
+}
+.ai-diagnostics-body[hidden] {
+  display: none;
+}
+.ai-diagnostics-status {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.ai-diagnostics-status-item {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  padding: 6px 7px;
+  border: 1px solid rgba(143, 184, 208, 0.18);
+  border-radius: var(--radius-sm);
+  background: rgba(17, 17, 15, 0.56);
+}
+.ai-diagnostics-status-label {
+  overflow: hidden;
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.ai-diagnostics-status-value {
+  overflow: hidden;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 850;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ai-diagnostics-empty {
+  min-height: 58px;
+  display: grid;
+  place-items: center;
+  padding: 10px;
+  border: 1px dashed rgba(143, 184, 208, 0.28);
+  border-radius: var(--radius-sm);
+  color: var(--ink-dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  text-align: center;
+}
+.ai-diagnostics-player-list {
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  overflow: auto;
+  padding-right: 2px;
+}
+.ai-diagnostics-player {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid rgba(143, 184, 208, 0.22);
+  border-radius: var(--radius);
+  background: rgba(17, 17, 15, 0.48);
+}
+.ai-diagnostics-player-header {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+.ai-diagnostics-player-swatch {
+  width: 9px;
+  height: 28px;
+  border: 1px solid rgba(231, 223, 197, 0.38);
+  border-radius: 2px;
+}
+.ai-diagnostics-player-identity {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.ai-diagnostics-player-identity h3 {
+  margin: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ai-diagnostics-player-identity span {
+  overflow: hidden;
+  color: var(--ai-accent);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ai-diagnostics-player-tick {
+  justify-self: end;
+  padding: 4px 6px;
+  border: 1px solid rgba(231, 223, 197, 0.16);
+  border-radius: var(--radius-sm);
+  background: rgba(17, 17, 15, 0.72);
+  color: var(--ink-dim);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+.ai-diagnostics-trace {
+  display: grid;
+  gap: 5px;
+}
+.ai-diagnostics-trace-row {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 7px;
+  align-items: start;
+}
+.ai-diagnostics-trace-index {
+  padding-top: 4px;
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-align: right;
+}
+.ai-diagnostics-trace-content {
+  min-width: 0;
+  padding: 5px 6px;
+  border-left: 2px solid rgba(143, 184, 208, 0.34);
+  background: rgba(17, 17, 15, 0.34);
+}
+.ai-diagnostics-trace-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.ai-diagnostics-field {
+  min-width: 0;
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  max-width: 100%;
+  border: 1px solid rgba(231, 223, 197, 0.14);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: 10px;
+}
+.ai-diagnostics-field-key,
+.ai-diagnostics-field-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  padding: 2px 5px;
+}
+.ai-diagnostics-field-key {
+  background: rgba(143, 184, 208, 0.12);
+  color: var(--ai-accent);
+  font-weight: 850;
+}
+.ai-diagnostics-field-value {
+  color: var(--ink);
+  font-weight: 750;
+}
+.ai-diagnostics-trace-raw {
+  color: var(--ink-dim);
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.ai-diagnostics-trace-fields + .ai-diagnostics-trace-raw {
+  margin-top: 4px;
+}
+.ai-diagnostics-panel-host:not(.is-hidden) .ai-diagnostics-show {
+  display: none;
+}
+.ai-diagnostics-panel-host.is-hidden .ai-diagnostics-panel {
+  display: none;
+}
+.ai-diagnostics-panel-host.is-collapsed {
+  bottom: auto;
+  width: min(210px, calc(100vw - 24px));
+  min-height: 0;
+}
+.ai-diagnostics-panel-host.is-collapsed .ai-diagnostics-panel {
+  height: auto;
+}
+.ai-diagnostics-panel-host.is-collapsed .ai-diagnostics-header {
   margin-bottom: 0;
 }
 
@@ -4147,6 +4415,15 @@ input[type="text"]:focus {
     right: 58px;
     width: min(290px, calc(100vw - 70px));
   }
+  .ai-diagnostics-panel-host {
+    top: 258px;
+    right: 58px;
+    bottom: calc(var(--bottom-hud-height) + 12px);
+    width: min(360px, calc(100vw - 70px));
+  }
+  .ai-diagnostics-status {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
   .cmd-btn .cmd-icon {
     font-size: 20px;
   }
@@ -4177,6 +4454,16 @@ input[type="text"]:focus {
   .score-table th,
   .score-table td {
     padding: 5px 6px;
+  }
+}
+
+@media (max-width: 720px) {
+  .ai-diagnostics-panel-host {
+    left: 12px;
+    right: 12px;
+    top: 332px;
+    bottom: calc(var(--bottom-hud-height) + 12px);
+    width: auto;
   }
 }
 
