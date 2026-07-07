@@ -160,7 +160,6 @@ impl AiMapAnalysis {
         let resource_clusters = build_resource_clusters(
             &start.map,
             &start.players,
-            &passable,
             &clearance,
             &component_by_tile,
         );
@@ -230,6 +229,7 @@ struct ResourcePoint {
     kind: ResourcePointKind,
     x: f32,
     y: f32,
+    component_id: Option<u32>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -365,16 +365,17 @@ fn build_start_mappings(
         .into_iter()
         .map(|player| {
             let start_tile = AiTile::new(player.start_tile_x, player.start_tile_y);
+            let component_id = component_id_for_tile(width, height, component_by_tile, start_tile);
             let idx = tile_index(width, height, start_tile.x, start_tile.y);
             let (nearest_resource_cluster_id, nearest_resource_cluster_distance2) =
-                nearest_cluster(start_tile, resource_clusters)
+                nearest_cluster(start_tile, component_id, resource_clusters)
                     .map(|(id, distance2)| (Some(id), Some(distance2)))
                     .unwrap_or((None, None));
             AiStartMapping {
                 player_id: player.id,
                 team_id: player.team_id,
                 start_tile,
-                component_id: idx.and_then(|idx| component_by_tile.get(idx).copied().flatten()),
+                component_id,
                 clearance_tiles: idx.and_then(|idx| clearance.get(idx).copied()).unwrap_or(0),
                 nearest_resource_cluster_id,
                 nearest_resource_cluster_distance2,
@@ -386,11 +387,14 @@ fn build_start_mappings(
 fn build_resource_clusters(
     map: &MapInfo,
     players: &[PlayerStart],
-    passable: &[bool],
     clearance: &[u16],
     component_by_tile: &[Option<u32>],
 ) -> Vec<AiResourceCluster> {
-    let mut resources: Vec<_> = map.resources.iter().filter_map(resource_point).collect();
+    let mut resources: Vec<_> = map
+        .resources
+        .iter()
+        .filter_map(|resource| resource_point(map, component_by_tile, resource))
+        .collect();
     resources.sort_by_key(|resource| resource.id);
     if resources.is_empty() {
         return Vec::new();
@@ -408,12 +412,12 @@ fn build_resource_clusters(
     while remaining > 0 {
         let Some(candidate) = best_resource_cluster_candidate(
             map,
-            passable,
             clearance,
             &resources,
             &unassigned,
             radius2,
             expected_cluster_size,
+            component_by_tile,
         ) else {
             break;
         };
@@ -442,15 +446,17 @@ fn build_resource_clusters(
             .iter()
             .filter(|idx| resources[**idx].kind == ResourcePointKind::Oil)
             .count() as u16;
-        let component_id = tile_index(
-            map.width,
-            map.height,
-            candidate.center.x,
-            candidate.center.y,
-        )
-        .and_then(|idx| component_by_tile.get(idx).copied().flatten());
+        let component_id =
+            component_id_for_tile(map.width, map.height, component_by_tile, candidate.center);
         let (nearest_start_player_id, nearest_start_distance2) =
-            nearest_start(candidate.center, players)
+            nearest_start(
+                candidate.center,
+                component_id,
+                players,
+                map.width,
+                map.height,
+                component_by_tile,
+            )
                 .map(|(id, distance2)| (Some(id), Some(distance2)))
                 .unwrap_or((None, None));
 
@@ -478,12 +484,12 @@ fn build_resource_clusters(
 
 fn best_resource_cluster_candidate(
     map: &MapInfo,
-    passable: &[bool],
     clearance: &[u16],
     resources: &[ResourcePoint],
     unassigned: &[bool],
     radius2: f32,
     expected_cluster_size: usize,
+    component_by_tile: &[Option<u32>],
 ) -> Option<ClusterCandidate> {
     let mut best = None;
     for y in 0..map.height {
@@ -491,13 +497,22 @@ fn best_resource_cluster_candidate(
             let Some(idx) = tile_index(map.width, map.height, x, y) else {
                 continue;
             };
-            if passable.get(idx).copied() != Some(true) {
+            let center = AiTile::new(x, y);
+            let center_component_id = component_id_for_tile(
+                map.width,
+                map.height,
+                component_by_tile,
+                center,
+            );
+            if center_component_id.is_none() {
                 continue;
             }
-            let center = AiTile::new(x, y);
             let mut resource_indices = Vec::new();
             for (resource_idx, resource) in resources.iter().enumerate() {
                 if unassigned.get(resource_idx).copied() != Some(true) {
+                    continue;
+                }
+                if !same_component_or_unknown(center_component_id, resource.component_id) {
                     continue;
                 }
                 if distance2_to_tile_center(map, center, resource) <= radius2 {
@@ -547,23 +562,53 @@ fn cluster_candidate_better(
             && (candidate.center.y, candidate.center.x) < (incumbent.center.y, incumbent.center.x))
 }
 
-fn resource_point(resource: &ResourceNode) -> Option<ResourcePoint> {
+fn resource_point(
+    map: &MapInfo,
+    component_by_tile: &[Option<u32>],
+    resource: &ResourceNode,
+) -> Option<ResourcePoint> {
     let kind = match resource.kind.as_str() {
         kinds::STEEL => ResourcePointKind::Steel,
         kinds::OIL => ResourcePointKind::Oil,
         _ => return None,
     };
+    let component_id = resource_tile(map, resource)
+        .and_then(|tile| component_id_for_tile(map.width, map.height, component_by_tile, tile));
     Some(ResourcePoint {
         id: resource.id,
         kind,
         x: resource.x,
         y: resource.y,
+        component_id,
     })
 }
 
-fn nearest_cluster(tile: AiTile, clusters: &[AiResourceCluster]) -> Option<(u32, u32)> {
+fn nearest_cluster(
+    tile: AiTile,
+    component_id: Option<u32>,
+    clusters: &[AiResourceCluster],
+) -> Option<(u32, u32)> {
+    if let Some(component_id) = component_id {
+        if let Some(nearest) = nearest_cluster_matching(tile, clusters, |cluster| {
+            cluster.component_id == Some(component_id)
+        }) {
+            return Some(nearest);
+        }
+    }
+    nearest_cluster_matching(tile, clusters, |_| true)
+}
+
+fn nearest_cluster_matching<F>(
+    tile: AiTile,
+    clusters: &[AiResourceCluster],
+    mut accepts: F,
+) -> Option<(u32, u32)>
+where
+    F: FnMut(&AiResourceCluster) -> bool,
+{
     clusters
         .iter()
+        .filter(|cluster| accepts(cluster))
         .map(|cluster| {
             (
                 cluster.id,
@@ -575,15 +620,73 @@ fn nearest_cluster(tile: AiTile, clusters: &[AiResourceCluster]) -> Option<(u32,
         .map(|(id, distance2, _)| (id, distance2))
 }
 
-fn nearest_start(tile: AiTile, players: &[PlayerStart]) -> Option<(u32, u32)> {
+fn nearest_start(
+    tile: AiTile,
+    component_id: Option<u32>,
+    players: &[PlayerStart],
+    width: u32,
+    height: u32,
+    component_by_tile: &[Option<u32>],
+) -> Option<(u32, u32)> {
+    if let Some(component_id) = component_id {
+        if let Some(nearest) = nearest_start_matching(tile, players, |player| {
+            let start_tile = AiTile::new(player.start_tile_x, player.start_tile_y);
+            component_id_for_tile(width, height, component_by_tile, start_tile)
+                == Some(component_id)
+        }) {
+            return Some(nearest);
+        }
+    }
+    nearest_start_matching(tile, players, |_| true)
+}
+
+fn nearest_start_matching<F>(
+    tile: AiTile,
+    players: &[PlayerStart],
+    mut accepts: F,
+) -> Option<(u32, u32)>
+where
+    F: FnMut(&PlayerStart) -> bool,
+{
     players
         .iter()
+        .filter(|player| accepts(player))
         .map(|player| {
             let start_tile = AiTile::new(player.start_tile_x, player.start_tile_y);
             (player.id, tile_distance2(tile, start_tile), start_tile)
         })
         .min_by_key(|(id, distance2, start_tile)| (*distance2, start_tile.y, start_tile.x, *id))
         .map(|(id, distance2, _)| (id, distance2))
+}
+
+fn same_component_or_unknown(a: Option<u32>, b: Option<u32>) -> bool {
+    match (a, b) {
+        (Some(a), Some(b)) => a == b,
+        _ => true,
+    }
+}
+
+fn component_id_for_tile(
+    width: u32,
+    height: u32,
+    component_by_tile: &[Option<u32>],
+    tile: AiTile,
+) -> Option<u32> {
+    tile_index(width, height, tile.x, tile.y)
+        .and_then(|idx| component_by_tile.get(idx).copied().flatten())
+}
+
+fn resource_tile(map: &MapInfo, resource: &ResourceNode) -> Option<AiTile> {
+    if map.tile_size == 0 || !resource.x.is_finite() || !resource.y.is_finite() {
+        return None;
+    }
+    let tile_size = map.tile_size as f32;
+    let x = (resource.x / tile_size).floor();
+    let y = (resource.y / tile_size).floor();
+    if x < 0.0 || y < 0.0 || x >= map.width as f32 || y >= map.height as f32 {
+        return None;
+    }
+    Some(AiTile::new(x as u32, y as u32))
 }
 
 fn passable_neighbors(width: u32, height: u32, passable: &[bool], tile: AiTile) -> Vec<AiTile> {
@@ -759,6 +862,16 @@ mod tests {
         AiMapAnalysis::analyze(&game.start_payload()).debug_snapshot()
     }
 
+    fn resource_at(id: u32, kind: &str, tile_x: u32, tile_y: u32) -> ResourceNode {
+        let tile_size = config::TILE_SIZE as f32;
+        ResourceNode {
+            id,
+            kind: kind.to_string(),
+            x: (tile_x as f32 + 0.5) * tile_size,
+            y: (tile_y as f32 + 0.5) * tile_size,
+        }
+    }
+
     #[test]
     fn no_terrain_fixture_is_one_clear_component() {
         let debug = fixture_analysis("No Terrain");
@@ -898,6 +1011,90 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn resource_mappings_prefer_reachable_components_over_cross_wall_distance() {
+        let width = 40;
+        let height = 10;
+        let mut terrain = vec![terrain::GRASS; (width * height) as usize];
+        for y in 0..height {
+            terrain[(y * width + 20) as usize] = terrain::ROCK;
+        }
+        let start = StartPayload {
+            player_id: 1,
+            spectator: false,
+            prediction_build_id: None,
+            prediction_version: 0,
+            match_run_id: None,
+            capabilities: Default::default(),
+            diagnostics: Default::default(),
+            replay: None,
+            lab: None,
+            tick: 0,
+            map: MapInfo {
+                width,
+                height,
+                tile_size: config::TILE_SIZE,
+                terrain,
+                resources: vec![
+                    resource_at(1, kinds::STEEL, 2, 5),
+                    resource_at(2, kinds::STEEL, 21, 5),
+                ],
+            },
+            players: vec![
+                PlayerStart {
+                    id: 1,
+                    team_id: 1,
+                    faction_id: "kriegsia".to_string(),
+                    name: "P1".to_string(),
+                    color: "#111".to_string(),
+                    start_tile_x: 19,
+                    start_tile_y: 5,
+                },
+                PlayerStart {
+                    id: 2,
+                    team_id: 2,
+                    faction_id: "kriegsia".to_string(),
+                    name: "P2".to_string(),
+                    color: "#222".to_string(),
+                    start_tile_x: 39,
+                    start_tile_y: 5,
+                },
+            ],
+        };
+
+        let debug = AiMapAnalysis::analyze(&start).debug_snapshot();
+        let p1 = debug
+            .starts
+            .iter()
+            .find(|start| start.player_id == 1)
+            .expect("player 1 start should be present");
+        let p2 = debug
+            .starts
+            .iter()
+            .find(|start| start.player_id == 2)
+            .expect("player 2 start should be present");
+        assert_ne!(p1.component_id, p2.component_id);
+
+        let p1_cluster = debug
+            .resource_clusters
+            .iter()
+            .find(|cluster| Some(cluster.id) == p1.nearest_resource_cluster_id)
+            .expect("player 1 should have a nearest cluster");
+        assert_eq!(p1_cluster.component_id, p1.component_id);
+        assert!(
+            p1_cluster.resource_ids.contains(&1),
+            "player 1 should map to the same-component resource, not the closer cross-wall one"
+        );
+
+        let right_cluster = debug
+            .resource_clusters
+            .iter()
+            .find(|cluster| cluster.resource_ids.contains(&2))
+            .expect("right-side resource should be clustered");
+        assert_eq!(right_cluster.component_id, p2.component_id);
+        assert_eq!(right_cluster.nearest_start_player_id, Some(2));
     }
 
     #[test]
