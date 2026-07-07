@@ -168,8 +168,13 @@ results include army value, building value, final worker count, final unit count
 attack command count, damage events dealt, deduplicated deaths, first attack command, first
 Rifleman attack command, first Scout Car completion, first legacy Scout Car harassment-style `Move`
 command, first expansion City Centre planned/completed, and first Tank completion. Match-level results include
-winner or tick-cap status, first damage, attack events, death events, replay verification status,
-and optional replay artifact path. Compact baseline scenario metadata for AI 1.0 early production,
+the captured starting City Centre objective ids/death ticks, winner or draw status, first damage,
+attack events, death events, replay verification status, and optional replay artifact path.
+AI-vs-AI profile matchups declare a winner only when a profile destroys the enemy's starting City
+Centre first; if no starting City Centre winner exists by the default 25,000-tick fixed horizon,
+the matchup is a draw.
+Material, army, building, worker, damage, and survival metrics are diagnostics only, never
+tiebreakers. Compact baseline scenario metadata for AI 1.0 early production,
 tech-blocked production, Scout Car unlock, and Tank unlock lives in
 `server/crates/ai/src/selfplay/scenarios.rs` so later AI changes can compare the same authored
 fixtures without rewriting the harness.

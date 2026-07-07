@@ -21,7 +21,7 @@ use rts_sim::game::replay::{
     ReplayStartComposition,
 };
 use rts_sim::game::{Game, PlayerInit};
-use rts_sim::protocol::{kinds, Command as WireCommand, Event, Snapshot};
+use rts_sim::protocol::{kinds, Command as WireCommand, Event, Snapshot, StartPayload};
 
 const PROFILE_MATCHUP_TRACE_TAIL: usize = 24;
 
@@ -102,8 +102,9 @@ pub struct ProfileMatchupResult {
     pub seed: u32,
     pub max_ticks: u32,
     pub ticks: u32,
-    pub completed_by_elimination: bool,
+    pub end_reason: ProfileMatchupEndReason,
     pub winner: Option<ProfileMatchupWinner>,
+    pub starting_city_centres: Vec<ProfileMatchupStartingCityCentreResult>,
     pub players: Vec<ProfileMatchupPlayerResult>,
     pub first_damage_tick: Option<u32>,
     pub attack_events: usize,
@@ -114,11 +115,29 @@ pub struct ProfileMatchupResult {
     pub ai_trace_tail: Vec<ProfileMatchupTraceEntry>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProfileMatchupEndReason {
+    StartingCityCentreKilled,
+    StartingCityCentresDestroyed,
+    TickCap,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProfileMatchupWinner {
     pub player_id: u32,
     pub profile: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProfileMatchupStartingCityCentreResult {
+    pub player_id: u32,
+    pub profile: String,
+    pub entity_id: u32,
+    pub alive: bool,
+    pub death_tick: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -151,6 +170,151 @@ pub struct ProfileMatchupTraceEntry {
     pub player_id: u32,
     pub profile: String,
     pub lines: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+struct StartingCityCentreObjective {
+    centres: Vec<StartingCityCentreState>,
+}
+
+#[derive(Debug, Clone)]
+struct StartingCityCentreState {
+    player_id: u32,
+    profile: String,
+    entity_id: u32,
+    death_tick: Option<u32>,
+}
+
+impl StartingCityCentreObjective {
+    fn capture(game: &Game, start: &StartPayload, players: &[PlayerInit]) -> Result<Self, String> {
+        let viewer = players
+            .first()
+            .map(|player| player.id)
+            .ok_or_else(|| "profile matchup requires at least one player".to_string())?;
+        let snapshot = game.snapshot_full_for(viewer);
+        let mut centres = Vec::with_capacity(players.len());
+        for player in players {
+            let start_player = start
+                .players
+                .iter()
+                .find(|start_player| start_player.id == player.id)
+                .ok_or_else(|| format!("missing start payload row for player {}", player.id))?;
+            let tile_size = start.map.tile_size as f32;
+            let start_x = start_player.start_tile_x as f32 * tile_size + tile_size * 0.5;
+            let start_y = start_player.start_tile_y as f32 * tile_size + tile_size * 0.5;
+            let centre = snapshot
+                .entities
+                .iter()
+                .filter(|entity| {
+                    entity.owner == player.id
+                        && entity.kind == kinds::CITY_CENTRE
+                        && entity.build_progress.is_none()
+                        && entity.hp > 0
+                })
+                .min_by(|a, b| {
+                    distance_sq(a.x, a.y, start_x, start_y)
+                        .total_cmp(&distance_sq(b.x, b.y, start_x, start_y))
+                })
+                .ok_or_else(|| {
+                    format!(
+                        "missing completed starting City Centre for player {}",
+                        player.id
+                    )
+                })?;
+            centres.push(StartingCityCentreState {
+                player_id: player.id,
+                profile: player.name.clone(),
+                entity_id: centre.id,
+                death_tick: None,
+            });
+        }
+        Ok(Self { centres })
+    }
+
+    fn alive_player_ids(&self) -> Vec<u32> {
+        self.centres
+            .iter()
+            .filter(|centre| centre.death_tick.is_none())
+            .map(|centre| centre.player_id)
+            .collect()
+    }
+
+    fn observe_snapshot(&mut self, tick: u32, snapshot: &Snapshot) -> bool {
+        let mut changed = false;
+        for centre in self
+            .centres
+            .iter_mut()
+            .filter(|centre| centre.death_tick.is_none())
+        {
+            let alive = snapshot.entities.iter().any(|entity| {
+                entity.id == centre.entity_id
+                    && entity.owner == centre.player_id
+                    && entity.kind == kinds::CITY_CENTRE
+                    && entity.hp > 0
+            });
+            if !alive {
+                centre.death_tick = Some(tick);
+                changed = true;
+            }
+        }
+        changed
+    }
+
+    fn winner(&self) -> Option<ProfileMatchupWinner> {
+        let alive = self
+            .centres
+            .iter()
+            .filter(|centre| centre.death_tick.is_none())
+            .collect::<Vec<_>>();
+        let destroyed = self
+            .centres
+            .iter()
+            .filter(|centre| centre.death_tick.is_some())
+            .count();
+        if alive.len() == 1 && destroyed == self.centres.len().saturating_sub(1) {
+            let centre = alive[0];
+            Some(ProfileMatchupWinner {
+                player_id: centre.player_id,
+                profile: centre.profile.clone(),
+            })
+        } else {
+            None
+        }
+    }
+
+    fn end_reason(&self) -> ProfileMatchupEndReason {
+        let destroyed = self
+            .centres
+            .iter()
+            .filter(|centre| centre.death_tick.is_some())
+            .count();
+        if destroyed == 0 {
+            ProfileMatchupEndReason::TickCap
+        } else if destroyed == self.centres.len() {
+            ProfileMatchupEndReason::StartingCityCentresDestroyed
+        } else {
+            ProfileMatchupEndReason::StartingCityCentreKilled
+        }
+    }
+
+    fn results(&self) -> Vec<ProfileMatchupStartingCityCentreResult> {
+        self.centres
+            .iter()
+            .map(|centre| ProfileMatchupStartingCityCentreResult {
+                player_id: centre.player_id,
+                profile: centre.profile.clone(),
+                entity_id: centre.entity_id,
+                alive: centre.death_tick.is_none(),
+                death_tick: centre.death_tick,
+            })
+            .collect()
+    }
+}
+
+fn distance_sq(ax: f32, ay: f32, bx: f32, by: f32) -> f32 {
+    let dx = ax - bx;
+    let dy = ay - by;
+    dx * dx + dy * dy
 }
 
 pub fn available_profile_ids() -> Vec<&'static str> {
@@ -208,6 +372,7 @@ pub fn run_profile_matchup_result(
     let mut game = Game::new_without_ai_controllers(&players, options.seed);
     let replay_start = ReplayStartComposition::capture(&game, server_build_sha())?;
     let start = game.start_payload();
+    let mut objective = StartingCityCentreObjective::capture(&game, &start, &players)?;
     let mut scripts: Vec<Box<dyn ScriptedPlayer>> = vec![
         Box::new(ProfileBackedScript::new(1, profile_a.id)),
         Box::new(ProfileBackedScript::new(2, profile_b.id)),
@@ -220,11 +385,7 @@ pub fn run_profile_matchup_result(
     let mut ai_trace_tail = Vec::new();
 
     while game.tick_count() < options.max_ticks {
-        let alive = game.alive_players();
-        if alive.len() <= 1 {
-            break;
-        }
-
+        let objective_alive = objective.alive_player_ids();
         let tick = game.tick_count();
         let mut commands = Vec::new();
         for script in &mut scripts {
@@ -236,7 +397,7 @@ pub fn run_profile_matchup_result(
                 tick,
                 start: &start,
                 snapshot: &snapshot,
-                alive_player_ids: &alive,
+                alive_player_ids: &objective_alive,
             };
             for command in script.commands(view) {
                 commands.push((player_id, command));
@@ -292,6 +453,9 @@ pub fn run_profile_matchup_result(
                 });
             }
         }
+        if objective.observe_snapshot(event_tick, &full_snapshot) {
+            break;
+        }
     }
 
     let replay_verified = if options.verify_replay {
@@ -312,19 +476,9 @@ pub fn run_profile_matchup_result(
     };
 
     let alive = game.alive_players();
-    let winner = if alive.len() == 1 {
-        let player_id = alive[0];
-        Some(ProfileMatchupWinner {
-            player_id,
-            profile: if player_id == 1 {
-                profile_a.id.to_string()
-            } else {
-                profile_b.id.to_string()
-            },
-        })
-    } else {
-        None
-    };
+    let winner = objective.winner();
+    let end_reason = objective.end_reason();
+    let starting_city_centres = objective.results();
     let final_counts = final_unit_counts(&game, &players);
     let final_values = final_material_values(&game, &players);
     let command_stats = command_stats_by_player(game.command_log());
@@ -385,8 +539,9 @@ pub fn run_profile_matchup_result(
         seed: options.seed,
         max_ticks: options.max_ticks,
         ticks: game.tick_count(),
-        completed_by_elimination: alive.len() <= 1,
+        end_reason,
         winner,
+        starting_city_centres,
         players,
         first_damage_tick,
         attack_events,
@@ -955,6 +1110,13 @@ mod tests {
 
         assert!(!result.ai_trace_tail.is_empty());
         assert!(result.ai_trace_tail.len() <= super::PROFILE_MATCHUP_TRACE_TAIL);
+        assert_eq!(result.end_reason, super::ProfileMatchupEndReason::TickCap);
+        assert!(result.winner.is_none());
+        assert_eq!(result.starting_city_centres.len(), 2);
+        assert!(result
+            .starting_city_centres
+            .iter()
+            .all(|centre| centre.alive && centre.death_tick.is_none()));
         assert!(result
             .ai_trace_tail
             .iter()
