@@ -428,8 +428,9 @@ import { textWithin } from "./dom_text.mjs";
     const aiDiagnosticsText = textWithin(root);
     assert(
       aiDiagnosticsText.includes("AI Diagnostics")
-        && aiDiagnosticsText.includes("Observer tick")
-        && aiDiagnosticsText.includes("45")
+        && aiDiagnosticsText.includes("AI players")
+        && aiDiagnosticsText.includes("Trace lines")
+        && aiDiagnosticsText.includes("2")
         && aiDiagnosticsText.includes("ai_1_2_wave_cohorts")
         && aiDiagnosticsText.includes("tick 36")
         && aiDiagnosticsText.includes("goal")
@@ -437,6 +438,30 @@ import { textWithin } from "./dom_text.mjs";
         && aiDiagnosticsText.includes("intents")
         && aiDiagnosticsText.includes("train:Rifleman"),
       "AI diagnostics panel renders status, profile, trace tick, and parsed decision fields",
+    );
+    const aiDiagnosticsBody = root.querySelector(".ai-diagnostics-body");
+    const stableTraceRenderCount = aiDiagnosticsBody.replaceChildrenCount;
+    panel.applyObserverAnalysis({
+      tick: 46,
+      players: [
+        {
+          id: 1,
+          units: [],
+          production: [],
+          aiDiagnostics: {
+            profileId: "ai_1_2_wave_cohorts",
+            traceTick: 36,
+            lines: [
+              "profile=ai_1_2_wave_cohorts tick=36",
+              "goal=Production status=Selected blockers=- intents=train:Rifleman",
+            ],
+          },
+        },
+      ],
+    });
+    assert(
+      aiDiagnosticsBody.replaceChildrenCount === stableTraceRenderCount,
+      "AI diagnostics panel skips DOM replacement for observer tick-only updates",
     );
 
     const panelRoot = root.children[0];

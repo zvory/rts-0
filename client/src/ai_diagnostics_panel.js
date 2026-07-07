@@ -123,7 +123,8 @@ export class AiDiagnosticsPanel {
 
   applyObserverAnalysis(payload) {
     this.analysis = normalizeAiDiagnosticsPanelPayload(payload, this.getPlayers());
-    this.render();
+    if (!this.bodyEl || this.bodyEl.hidden) return;
+    this.renderBody();
   }
 
   render() {
@@ -175,19 +176,12 @@ export class AiDiagnosticsPanel {
   renderStatus(analysis) {
     const status = document.createElement("div");
     status.className = "ai-diagnostics-status";
-    if (!analysis) {
-      status.append(
-        renderStatusItem("Observer", "Waiting"),
-        renderStatusItem("Traces", "0"),
-        renderStatusItem("Latest trace", "-"),
-      );
-      return status;
-    }
-
+    const rows = analysis?.rows || [];
+    const lineCount = rows.reduce((total, row) => total + row.aiDiagnostics.lines.length, 0);
     status.append(
-      renderStatusItem("Observer tick", formatValue(analysis.tick)),
-      renderStatusItem("Traces", formatValue(analysis.rows.length)),
-      renderStatusItem("Latest trace", analysis.latestTraceTick == null ? "-" : formatValue(analysis.latestTraceTick)),
+      renderStatusItem("AI players", analysis ? formatValue(rows.length) : "Waiting"),
+      renderStatusItem("Trace lines", formatValue(lineCount)),
+      renderStatusItem("Latest trace", analysis?.latestTraceTick == null ? "-" : formatValue(analysis.latestTraceTick)),
     );
     return status;
   }
@@ -217,7 +211,6 @@ export function normalizeAiDiagnosticsPanelPayload(payload, players = []) {
   ), null);
 
   return {
-    tick: Math.max(0, Math.trunc(Number(payload.tick) || 0)),
     rows,
     latestTraceTick,
   };
@@ -394,7 +387,6 @@ function parseTraceFields(lineText) {
 function aiDiagnosticsBodySignature(analysis) {
   if (!analysis) return "waiting";
   return [
-    analysis.tick,
     analysis.latestTraceTick ?? "",
     ...analysis.rows.map((row) => [
       row.id,
