@@ -22,6 +22,9 @@ use rts_sim::game::command::SimCommand;
 use rts_sim::protocol::{Snapshot, StartPayload};
 
 const DECISION_INTERVAL: u32 = 9;
+const LIVE_DECISION_TRACE_MAX_LINES: usize = 24;
+const LIVE_DECISION_TRACE_MAX_LINE_CHARS: usize = 256;
+const LIVE_DECISION_TRACE_TRUNCATED_LINE: &str = "trace_truncated=true";
 
 /// Default live-lobby profile. Keep this on the stable promoted live AI unless intentionally
 /// rolling the ordinary Add AI path forward.
@@ -57,6 +60,14 @@ pub struct AiThinkContext<'a> {
     pub retreat_commands: Vec<SimCommand>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AiDecisionTraceSnapshot {
+    pub player_id: u32,
+    pub profile_id: &'static str,
+    pub trace_tick: u32,
+    pub lines: Vec<String>,
+}
+
 /// Drives a single AI-controlled player by emitting ordinary commands each think.
 pub struct AiController {
     player: u32,
@@ -65,6 +76,7 @@ pub struct AiController {
     pending_builds: PendingBuildTracker,
     staged_units: BTreeSet<u32>,
     active_attack_units: BTreeMap<u32, u32>,
+    last_decision_trace: Option<AiDecisionTraceSnapshot>,
 }
 
 impl AiController {
@@ -81,6 +93,7 @@ impl AiController {
             pending_builds: PendingBuildTracker::default(),
             staged_units: BTreeSet::new(),
             active_attack_units: BTreeMap::new(),
+            last_decision_trace: None,
         }
     }
 
@@ -90,6 +103,10 @@ impl AiController {
 
     pub fn profile_id(&self) -> &'static str {
         self.profile_id
+    }
+
+    pub fn latest_decision_trace(&self) -> Option<AiDecisionTraceSnapshot> {
+        self.last_decision_trace.clone()
     }
 
     fn profile(&self) -> &'static AiProfile {
@@ -152,6 +169,12 @@ impl AiController {
         );
         debug_assert_eq!(decision.profile_id, self.profile_id);
 
+        self.last_decision_trace = Some(AiDecisionTraceSnapshot {
+            player_id: self.player,
+            profile_id: self.profile_id,
+            trace_tick: tick,
+            lines: bounded_decision_trace_lines(decision.trace.format_lines()),
+        });
         commands.extend(self.filter_repeated_stage_commands(
             tick,
             &decision.intents,
@@ -240,6 +263,30 @@ fn default_live_profile() -> &'static AiProfile {
     profile_by_id(DEFAULT_LIVE_PROFILE_ID).unwrap_or(&AI_1_0_TECH)
 }
 
+fn bounded_decision_trace_lines(lines: Vec<String>) -> Vec<String> {
+    let mut iter = lines.into_iter();
+    let mut bounded = Vec::new();
+    for _ in 0..LIVE_DECISION_TRACE_MAX_LINES {
+        let Some(line) = iter.next() else {
+            return bounded;
+        };
+        bounded.push(truncate_decision_trace_line(line));
+    }
+    if iter.next().is_some() {
+        if let Some(last) = bounded.last_mut() {
+            *last = LIVE_DECISION_TRACE_TRUNCATED_LINE.to_string();
+        }
+    }
+    bounded
+}
+
+fn truncate_decision_trace_line(mut line: String) -> String {
+    if let Some((index, _)) = line.char_indices().nth(LIVE_DECISION_TRACE_MAX_LINE_CHARS) {
+        line.truncate(index);
+    }
+    line
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -251,6 +298,24 @@ mod tests {
 
         assert_eq!(ai.player_id(), 2);
         assert_eq!(ai.profile_id(), AI_1_2_WAVE_COHORTS_ID);
+        assert_eq!(ai.latest_decision_trace(), None);
+    }
+
+    #[test]
+    fn live_decision_trace_snapshot_is_bounded() {
+        let long_line = "x".repeat(LIVE_DECISION_TRACE_MAX_LINE_CHARS + 8);
+        let lines = std::iter::once(long_line)
+            .chain((1..(LIVE_DECISION_TRACE_MAX_LINES + 3)).map(|index| format!("line={index}")))
+            .collect();
+
+        let bounded = bounded_decision_trace_lines(lines);
+
+        assert_eq!(bounded.len(), LIVE_DECISION_TRACE_MAX_LINES);
+        assert_eq!(bounded[0].len(), LIVE_DECISION_TRACE_MAX_LINE_CHARS);
+        assert_eq!(
+            bounded.last().map(String::as_str),
+            Some(LIVE_DECISION_TRACE_TRUNCATED_LINE)
+        );
     }
 
     #[test]

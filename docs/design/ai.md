@@ -155,9 +155,10 @@ The aliases `ai_2_0` and `ai20` resolve to `ai_2_0_agent_rush` in developer tool
 `ai_1_0`, `ai_1_0_tech`, and `ai1` resolve to `ai_1_0_tech`; `ai` and `default` resolve to the
 live default.
 The live lobby AI uses this shared core through `AiController`, which only owns live identity,
-profile id, cadence, and persistent decision memory. Unknown live profile ids resolve to the
-promoted live default, currently `ai_1_2_wave_cohorts`. The ordinary lobby exposes AI 1.0, AI 1.1,
-AI 1.2, and AI 2.0. AI 1.2 is the live lobby default.
+profile id, cadence, persistent decision memory, and its latest bounded decision trace for
+spectator-only observer diagnostics. Unknown live profile ids resolve to the promoted live default,
+currently `ai_1_2_wave_cohorts`. The ordinary lobby exposes AI 1.0, AI 1.1, AI 1.2, and AI 2.0. AI
+1.2 is the live lobby default.
 Panzerfaust is trainable for Kriegsia players after a completed Training Centre, and Scout Plane is
 trainable from City Centre after completed Gun Works or Vehicle Works, but current AI production
 profiles intentionally omit both units in the first pass. AI-owned Panzerfaust or Scout Plane units

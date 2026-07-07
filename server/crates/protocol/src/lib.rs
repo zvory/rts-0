@@ -12,6 +12,7 @@ mod contract_metadata;
 mod lab_replay;
 mod lab_scenario;
 mod messagepack_frame;
+mod observer_analysis;
 pub use client_net_report::{
     ClientFramePhaseReport, ClientNetReport, ClientRenderCounterReport, CommandLifecycleExemplar,
 };
@@ -28,6 +29,7 @@ use contract_metadata::{ability_code, kind_code};
 pub use lab_replay::*;
 pub use lab_scenario::*;
 pub use messagepack_frame::MESSAGEPACK_SNAPSHOT_FRAME_MAGIC;
+pub use observer_analysis::*;
 pub use rts_contract::{
     AbilityCooldownView, AbilityObjectOwnerStateView, AbilityObjectView, ActionCapabilities,
     AttackReveal, CommandCapabilities, DebugPathPoint, DebugPathView, DiagnosticCapabilities,
@@ -522,52 +524,6 @@ pub struct LabResult {
     pub error: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub outcome: Option<serde_json::Value>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct ObserverAnalysisPayload {
-    pub tick: u32,
-    pub players: Vec<ObserverAnalysisPlayer>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct ObserverAnalysisPlayer {
-    pub id: u32,
-    pub units: Vec<ObserverAnalysisKindCount>,
-    pub production: Vec<ObserverAnalysisProduction>,
-    pub units_lost: Vec<ObserverAnalysisKindCount>,
-    pub resources_lost: ObserverAnalysisResourcesLost,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct ObserverAnalysisKindCount {
-    pub kind: String,
-    pub count: u32,
-    pub steel_value: u32,
-    pub oil_value: u32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct ObserverAnalysisProduction {
-    pub building_id: u32,
-    pub building_kind: String,
-    pub item_kind: String,
-    /// `"unit"` or `"upgrade"`.
-    pub item_type: String,
-    /// 0.0..1.0 completion of the front queued item.
-    pub progress: f32,
-    pub queue_depth: u32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct ObserverAnalysisResourcesLost {
-    pub steel: u32,
-    pub oil: u32,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1255,6 +1211,15 @@ mod tests {
                     oil_value: 0,
                 }],
                 resources_lost: ObserverAnalysisResourcesLost { steel: 50, oil: 0 },
+                ai_diagnostics: Some(ObserverAnalysisAiDiagnostics {
+                    profile_id: "ai_1_2_wave_cohorts".to_string(),
+                    trace_tick: 72,
+                    lines: vec![
+                        "profile=ai_1_2_wave_cohorts tick=72".to_string(),
+                        "goal=Production status=Selected blockers=- intents=Train:Rifleman"
+                            .to_string(),
+                    ],
+                }),
             }],
         });
         let json = serde_json::to_value(msg).expect("observer analysis should serialize");
@@ -1270,6 +1235,15 @@ mod tests {
         assert_eq!(json["players"][0]["production"][0]["queueDepth"], 2);
         assert_eq!(json["players"][0]["unitsLost"][0]["kind"], "worker");
         assert_eq!(json["players"][0]["resourcesLost"]["steel"], 50);
+        assert_eq!(
+            json["players"][0]["aiDiagnostics"]["profileId"],
+            "ai_1_2_wave_cohorts"
+        );
+        assert_eq!(json["players"][0]["aiDiagnostics"]["traceTick"], 72);
+        assert_eq!(
+            json["players"][0]["aiDiagnostics"]["lines"][1],
+            "goal=Production status=Selected blockers=- intents=Train:Rifleman"
+        );
     }
 
     #[test]

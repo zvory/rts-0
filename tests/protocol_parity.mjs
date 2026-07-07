@@ -56,10 +56,12 @@ const repoRoot = path.resolve(__dirname, "..");
 const rustProtocolPath = path.join(repoRoot, "server/crates/protocol/src/lib.rs");
 const rustProtocolLabReplayPath = path.join(repoRoot, "server/crates/protocol/src/lab_replay.rs");
 const rustProtocolLabScenarioPath = path.join(repoRoot, "server/crates/protocol/src/lab_scenario.rs");
+const rustProtocolObserverAnalysisPath = path.join(repoRoot, "server/crates/protocol/src/observer_analysis.rs");
 const rust = [
   fs.readFileSync(rustProtocolPath, "utf8"),
   fs.readFileSync(rustProtocolLabReplayPath, "utf8"),
   fs.readFileSync(rustProtocolLabScenarioPath, "utf8"),
+  fs.readFileSync(rustProtocolObserverAnalysisPath, "utf8"),
 ].join("\n");
 const rustClientNetReport = fs.readFileSync(
   path.join(repoRoot, "server/crates/protocol/src/client_net_report.rs"),
@@ -607,7 +609,16 @@ assert(
   S.OBSERVER_ANALYSIS === "observerAnalysis",
   "observerAnalysis server message tag must match Rust",
 );
-for (const field of ["units_lost", "resources_lost", "steel_value", "oil_value", "queue_depth"]) {
+for (const field of [
+  "units_lost",
+  "resources_lost",
+  "steel_value",
+  "oil_value",
+  "queue_depth",
+  "ai_diagnostics",
+  "profile_id",
+  "trace_tick",
+]) {
   assert(rust.includes(field), `observerAnalysis Rust contract is missing ${field}`);
 }
 const observerAnalysis = decodeServerMessage({
@@ -619,8 +630,17 @@ const observerAnalysis = decodeServerMessage({
     production: [{ buildingId: 7, buildingKind: "city_centre", itemKind: "worker", itemType: "unit", progress: 0.25, queueDepth: 1 }],
     unitsLost: [],
     resourcesLost: { steel: 0, oil: 0 },
+    aiDiagnostics: {
+      profileId: "ai_1_2_wave_cohorts",
+      traceTick: 9,
+      lines: ["profile=ai_1_2_wave_cohorts tick=9"],
+    },
   }],
 });
 assert(observerAnalysis.t === "observerAnalysis" && observerAnalysis.players[0].production[0].queueDepth === 1, "observerAnalysis passes through decode");
+assert(
+  observerAnalysis.players[0].aiDiagnostics?.profileId === "ai_1_2_wave_cohorts",
+  "observerAnalysis preserves AI diagnostics rows",
+);
 
 console.log("✅ protocol_parity.mjs: Rust protocol contract dump matches JS mirror");

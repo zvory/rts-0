@@ -3734,6 +3734,32 @@ input[type="text"]:focus {
   content: "x";
   color: var(--ink-dim);
 }
+.replay-ai-diagnostics-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  color: var(--ink-faint);
+  font-size: 10px;
+  font-weight: 800;
+}
+.replay-ai-diagnostics-meta span {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.replay-ai-diagnostics-lines {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 4px;
+  padding-left: 6px;
+  border-left: 1px solid rgba(231, 223, 197, 0.16);
+}
+.replay-ai-diagnostics-line {
+  color: var(--ink-dim);
+  font-size: 10px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
 .replay-army-value-empty {
   color: var(--ink-dim);
 }

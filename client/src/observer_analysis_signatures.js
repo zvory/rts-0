@@ -29,6 +29,8 @@ export function renderObserverAnalysisBody(overlay, tab, frameViews, ids, { prof
     replace(analysisSig, () => overlay.renderUnitsLost(overlay.analysis));
   } else if (tab.id === ids.resourcesLost) {
     replace(analysisSig, () => overlay.renderResourcesLost(overlay.analysis));
+  } else if (tab.id === ids.aiDiagnostics) {
+    replace(analysisSig, () => overlay.renderAiDiagnostics(overlay.analysis));
   } else {
     replace("placeholder", () => overlay.renderPlaceholder(tab));
   }

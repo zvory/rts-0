@@ -1347,7 +1347,12 @@ not receive this message.
         }
       ],
       unitsLost: [{ kind: string, count: u32, steelValue: u32, oilValue: u32 }],
-      resourcesLost: { steel: u32, oil: u32 }
+      resourcesLost: { steel: u32, oil: u32 },
+      aiDiagnostics?: {
+        profileId: string,
+        traceTick: u32,
+        lines: string[]
+      }
     }
   ]
 }
@@ -1359,6 +1364,9 @@ is the front item's completion fraction and `queueDepth` is that queue's total i
 costs. `unitsLost` is the authoritative unit-death count by kind. `resourcesLost` is intentionally
 narrow: the spent steel/oil value of units that died, matching `unitsLost`; it does not include
 buildings, current spending, cancelled production, refunds, harvesting, or stockpile deltas.
+`aiDiagnostics`, when present, contains the latest bounded live AI decision trace for that player:
+the selected profile id, the AI observation tick that produced the trace, and the formatted trace
+lines from the AI decision manager.
 
 Observer analysis uses an all-player spectator policy independent of each viewer's vision selection
 selection. It is observer-only data for analysis overlays, not an active-player information surface.

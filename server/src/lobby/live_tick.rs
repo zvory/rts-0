@@ -6,7 +6,9 @@ use super::projection::{ObserverAnalysisAudience, ProjectionPolicy, RecipientRol
 use super::room_task::{PendingClientCommandAck, RoomPlayer};
 use super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::snapshots::union_events;
-use crate::protocol::{Event, PlayerScore, ServerMessage};
+use crate::protocol::{
+    Event, ObserverAnalysisAiDiagnostics, ObserverAnalysisPayload, PlayerScore, ServerMessage,
+};
 use rts_ai::{AiController, AiThinkContext};
 use rts_sim::game::replay::ReplayStartComposition;
 use rts_sim::game::Game;
@@ -244,13 +246,35 @@ impl LiveTickDriver<'_> {
             return;
         }
 
-        let msg = ServerMessage::ObserverAnalysis(game.observer_analysis());
+        let msg = ServerMessage::ObserverAnalysis(self.observer_analysis_with_ai_diagnostics(game));
         for id in spectator_ids {
             let Some(player) = self.players.get(&id) else {
                 continue;
             };
             send_or_log(self.room, id, &player.msg_tx, msg.clone());
         }
+    }
+
+    fn observer_analysis_with_ai_diagnostics(&self, game: &Game) -> ObserverAnalysisPayload {
+        let mut analysis = game.observer_analysis();
+        for controller in self.ai_controllers.iter() {
+            let Some(trace) = controller.latest_decision_trace() else {
+                continue;
+            };
+            let Some(player) = analysis
+                .players
+                .iter_mut()
+                .find(|player| player.id == trace.player_id)
+            else {
+                continue;
+            };
+            player.ai_diagnostics = Some(ObserverAnalysisAiDiagnostics {
+                profile_id: trace.profile_id.to_string(),
+                trace_tick: trace.trace_tick,
+                lines: trace.lines,
+            });
+        }
+        analysis
     }
 
     fn send_new_defeats(&mut self, game: &Game, alive: &[u32]) {

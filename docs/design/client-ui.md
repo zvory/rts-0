@@ -51,6 +51,8 @@ src/
   scoreboard.js   # Shared score/result formatting helpers
   status_badge.js # Build/network/frame status badge with copyable diagnostics
   observer_analysis_overlay.js # replay/live spectator analysis overlay
+  observer_analysis_ai.js # AI decision trace rows for observer analysis
+  observer_analysis_rows.js # observer analysis player row metadata joiner
   observer_analysis_signatures.js # dirty-body signatures for observer analysis DOM updates
   client_perf_report.js # bounded client frame-profiler upload field shaping
   match_health.js # match network/render health reporter
@@ -381,6 +383,9 @@ client-side and viewport-specific; Production, Units, Units Lost, and Resources 
 latest server-authored `observerAnalysis` payload. Resources Lost follows the protocol's narrow
 definition: spent steel/oil value of units that died, excluding buildings, stockpile changes,
 harvesting, refunds, and cancelled queues.
+The AI tab renders optional per-player `aiDiagnostics` rows from live observer-analysis payloads,
+showing the selected AI profile, trace tick, and formatted decision trace lines for spectator-only
+AI-vs-AI debugging.
 
 `frame_entity_views.js`
 ```js
