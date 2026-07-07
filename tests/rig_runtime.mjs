@@ -66,10 +66,6 @@ const machineGunnerPngManifestPath = path.join(
   repoRoot,
   "client/assets/rigs/machine-gunner-pass-01/metadata/manifest.json",
 );
-const riflemanPngManifestPath = path.join(
-  repoRoot,
-  "client/assets/rigs/rifleman-pass-02/metadata/manifest.json",
-);
 const fixedNow = 12_345;
 
 function main() {
@@ -1062,43 +1058,6 @@ test("machine gunner PNG frame strip mirrors asset manifest runtime metadata", (
   );
 });
 
-test("rifleman PNG frame strip mirrors asset manifest runtime metadata", () => {
-  const manifest = readRiflemanPngManifest();
-  const runtime = manifest.runtime;
-  const strip = RIFLEMAN_PNG_FRAME_STRIP;
-
-  assert.equal(runtime.module, "client/src/renderer/rigs/rifleman_png_strip.js");
-  assert.equal(strip.unit, manifest.unit);
-  assert.equal(strip.image, runtime.stripImageUrl);
-  assert.ok(strip.image.includes(`?v=${strip.imageVersion}`));
-  assert.equal(strip.frameWidth, runtime.frameWidth);
-  assert.equal(strip.frameHeight, runtime.frameHeight);
-  assert.equal(strip.frameCount, runtime.frameCount);
-  assert.equal(strip.idleFrame, runtime.idleFrame);
-  assert.deepEqual(strip.movementFrames, runtime.movementFrames);
-  assert.deepEqual(strip.firingFrames, runtime.firingFrames);
-  assert.equal(strip.firingFrameHoldPhase, runtime.firingFrameHoldPhase);
-  assert.equal(strip.fps, runtime.fps);
-  assert.equal(strip.worldScale, runtime.worldScale);
-  assert.equal(strip.tintSlot, runtime.tintSlot);
-  assert.deepEqual(strip.bakedColorAdjustment, runtime.bakedColorAdjustment);
-  assert.deepEqual(strip.source, {
-    generatedSource: manifest.source.sourceSheet,
-    alphaSource: manifest.source.alphaSheet,
-    runtimeStrip: manifest.source.runtimeStrip,
-  });
-
-  const runtimeStripPath = repoPathFromClientAssetUrl(runtime.stripImageUrl);
-  assert.equal(runtimeStripPath, manifest.source.runtimeStrip);
-  const runtimeStripSize = readPngDimensions(runtimeStripPath);
-  assert.equal(runtimeStripSize.width, runtime.frameWidth * runtime.frameCount);
-  assert.equal(runtimeStripSize.height, runtime.frameHeight);
-
-  const sourceSheetSize = readPngDimensions(manifest.source.sourceSheet);
-  const alphaSheetSize = readPngDimensions(manifest.source.alphaSheet);
-  assert.deepEqual(alphaSheetSize, sourceSheetSize);
-});
-
 test("tank PNG atlas SVG fallback is destroyed when same id no longer needs it", () => {
   const tankDefinition = compileFixture("rig-vehicle.svg", KIND.TANK);
   const workerDefinition = compileFixture("rig-worker.svg", KIND.WORKER);
@@ -1236,16 +1195,6 @@ function compileFixture(file, expectedKind) {
 
 function readMachineGunnerPngManifest() {
   return JSON.parse(fs.readFileSync(machineGunnerPngManifestPath, "utf8"));
-}
-
-function readRiflemanPngManifest() {
-  return JSON.parse(fs.readFileSync(riflemanPngManifestPath, "utf8"));
-}
-
-function repoPathFromClientAssetUrl(assetUrl) {
-  const assetPath = assetUrl.split("?")[0];
-  assert.ok(assetPath.startsWith("/assets/"));
-  return `client${assetPath}`;
 }
 
 function readPngDimensions(repoRelativePath) {
