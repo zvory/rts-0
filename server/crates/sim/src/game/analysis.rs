@@ -14,6 +14,7 @@ impl Game {
     pub fn observer_analysis(&self) -> ObserverAnalysisPayload {
         ObserverAnalysisPayload {
             tick: self.tick_count(),
+            map_analysis: None,
             players: self.state.players
                 .iter()
                 .map(|player| ObserverAnalysisPlayer {

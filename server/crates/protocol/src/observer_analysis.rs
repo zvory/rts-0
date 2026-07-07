@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 pub struct ObserverAnalysisPayload {
     pub tick: u32,
     pub players: Vec<ObserverAnalysisPlayer>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub map_analysis: Option<ObserverMapAnalysisDiagnostics>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -54,4 +56,49 @@ pub struct ObserverAnalysisProduction {
 pub struct ObserverAnalysisResourcesLost {
     pub steel: u32,
     pub oil: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ObserverMapAnalysisDiagnostics {
+    pub map_width: u32,
+    pub map_height: u32,
+    pub tile_size: u32,
+    pub layers: Vec<ObserverMapAnalysisLayer>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ObserverMapAnalysisLayer {
+    pub id: String,
+    pub label: String,
+    pub default_visible: bool,
+    pub primitives: Vec<ObserverMapAnalysisPrimitive>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub enum ObserverMapAnalysisPrimitive {
+    TileRect {
+        id: String,
+        tile_x: u32,
+        tile_y: u32,
+        tile_w: u32,
+        tile_h: u32,
+        fill: String,
+        stroke: String,
+        alpha: f32,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        label: Option<String>,
+    },
+    Marker {
+        id: String,
+        x: f32,
+        y: f32,
+        radius: f32,
+        shape: String,
+        color: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        label: Option<String>,
+    },
 }

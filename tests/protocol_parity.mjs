@@ -618,6 +618,11 @@ for (const field of [
   "ai_diagnostics",
   "profile_id",
   "trace_tick",
+  "map_analysis",
+  "map_width",
+  "default_visible",
+  "TileRect",
+  "Marker",
 ]) {
   assert(rust.includes(field), `observerAnalysis Rust contract is missing ${field}`);
 }
@@ -636,11 +641,37 @@ const observerAnalysis = decodeServerMessage({
       lines: ["profile=ai_1_2_wave_cohorts tick=9"],
     },
   }],
+  mapAnalysis: {
+    mapWidth: 126,
+    mapHeight: 126,
+    tileSize: 32,
+    layers: [{
+      id: "components",
+      label: "Components",
+      defaultVisible: true,
+      primitives: [{
+        kind: "tileRect",
+        id: "component:0",
+        tileX: 0,
+        tileY: 0,
+        tileW: 10,
+        tileH: 8,
+        fill: "#3da5d9",
+        stroke: "#3da5d9",
+        alpha: 0.12,
+        label: "C0 80t clr8",
+      }],
+    }],
+  },
 });
 assert(observerAnalysis.t === "observerAnalysis" && observerAnalysis.players[0].production[0].queueDepth === 1, "observerAnalysis passes through decode");
 assert(
   observerAnalysis.players[0].aiDiagnostics?.profileId === "ai_1_2_wave_cohorts",
   "observerAnalysis preserves AI diagnostics rows",
+);
+assert(
+  observerAnalysis.mapAnalysis?.layers?.[0]?.primitives?.[0]?.kind === "tileRect",
+  "observerAnalysis preserves map-analysis overlay primitives",
 );
 
 console.log("✅ protocol_parity.mjs: Rust protocol contract dump matches JS mirror");

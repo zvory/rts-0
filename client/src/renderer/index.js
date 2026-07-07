@@ -62,6 +62,7 @@ import { _drawFog, _fogLevel } from "./fog.js";
 import { buildRendererFeedbackView } from "./feedback_view_model.js";
 import { LAYERS, _sweep } from "./layers.js";
 import { GroundDecalLayer, _drawGroundDecals, _initGroundDecalsForMap } from "./decals.js";
+import { _drawObserverMapAnalysisOverlay } from "./observer_map_analysis.js";
 import {
   TrenchDecalLayer,
   _drawOccupiedTrenches,
@@ -164,6 +165,11 @@ export class Renderer {
     this._terrainSprite = null; // PIXI.Sprite of the cached terrain RenderTexture
     this._fogGfx = new PIXI.Graphics();
     this.layers.fog.addChild(this._fogGfx);
+    this._observerMapAnalysisGfx = new PIXI.Graphics();
+    this._observerMapAnalysisLabels = new PIXI.Container();
+    this._observerMapAnalysisLabelPool = new Map();
+    this.layers.feedback.addChild(this._observerMapAnalysisGfx);
+    this.layers.feedback.addChild(this._observerMapAnalysisLabels);
     this._feedbackGfx = new PIXI.Graphics();
     this.layers.feedback.addChild(this._feedbackGfx);
     this._smokeGfx = new PIXI.Graphics();
@@ -315,6 +321,7 @@ export class Renderer {
     visualSamples = null,
     visualUnitOverrides = null,
     visualFrameStripOverrides = null,
+    observerMapAnalysis = null,
   } = {}) {
     this._profiler = profiler || null;
     const time = (label, fn) => profiler ? profiler.time(label, fn) : fn();
@@ -462,6 +469,12 @@ export class Renderer {
       this._drawSafely("smokes", () => this._drawSmokes(feedbackView));
     });
     time("renderer.fogDraw", () => this._drawSafely("fog", () => this._drawFog(fog)));
+    time("renderer.observerMapAnalysis", () => {
+      this._drawSafely(
+        "observerMapAnalysis",
+        () => this._drawObserverMapAnalysisOverlay(observerMapAnalysis, { camera }),
+      );
+    });
     time("renderer.feedbackOverlays", () => {
       this._drawSafely("smokeCanisters", () => this._drawSmokeCanisters(feedbackView));
       this._drawSafely("commandFeedback", () => this._drawCommandFeedback(feedbackView));
@@ -909,6 +922,9 @@ export class Renderer {
     // Long-lived single Graphics.
     this._fogGfx.destroy();
     this._feedbackGfx.destroy();
+    this._observerMapAnalysisGfx.destroy();
+    this._observerMapAnalysisLabels.destroy({ children: true });
+    this._observerMapAnalysisLabelPool.clear();
     this._smokeGfx.destroy();
     this._abilityObjectGfx.destroy();
     this._placementGfx.destroy();
@@ -952,6 +968,7 @@ Object.assign(Renderer.prototype, {
   _initGroundDecalsForMap,
   _initTrenchesForMap,
   _drawGroundDecals,
+  _drawObserverMapAnalysisOverlay,
   _drawTrenches,
   _drawOccupiedTrenches,
   _drawVisualSamples,

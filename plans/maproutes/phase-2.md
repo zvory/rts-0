@@ -1,6 +1,6 @@
 # Phase 2: Spectator diagnostics transport and overlay shell
 
-Status: Pending
+Status: Done
 
 ## Goal
 

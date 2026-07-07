@@ -11,6 +11,8 @@ export class MatchObserverDiagnostics {
     getCameraBounds = () => null,
     getPlayers = () => [],
   }) {
+    this.latestMapAnalysis = null;
+    this.mapLayerVisibility = {};
     this.observerAnalysisOverlay = shouldMountObserverAnalysisOverlay({ capabilities })
       ? new ObserverAnalysisOverlay({
         root,
@@ -25,13 +27,26 @@ export class MatchObserverDiagnostics {
         root,
         preferences: aiDiagnosticsPanelPreferences || undefined,
         getPlayers,
+        onMapLayerVisibilityChange: (visibility) => {
+          this.mapLayerVisibility = { ...(visibility || {}) };
+        },
       })
       : null;
   }
 
   applyObserverAnalysis(payload) {
+    this.latestMapAnalysis = payload?.mapAnalysis || null;
     this.observerAnalysisOverlay?.applyObserverAnalysis(payload);
     this.aiDiagnosticsPanel?.applyObserverAnalysis(payload);
+  }
+
+  mapOverlayModel() {
+    return this.latestMapAnalysis
+      ? {
+        analysis: this.latestMapAnalysis,
+        visibleLayers: this.aiDiagnosticsPanel?.mapLayerVisibility?.() || this.mapLayerVisibility,
+      }
+      : null;
   }
 
   update(frameViews = null, { profiler = null } = {}) {
@@ -43,5 +58,7 @@ export class MatchObserverDiagnostics {
     this.aiDiagnosticsPanel?.destroy();
     this.observerAnalysisOverlay = null;
     this.aiDiagnosticsPanel = null;
+    this.latestMapAnalysis = null;
+    this.mapLayerVisibility = {};
   }
 }

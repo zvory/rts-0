@@ -2,6 +2,14 @@ import { LabPanelWindowChrome } from "./lab_panel_window.js";
 
 const STORAGE_KEY = "rts.aiDiagnosticsPanel";
 const WINDOW_STORAGE_KEY = "rts.aiDiagnosticsPanel.window.v1";
+const MAP_LABELS_LAYER_ID = "labels";
+const MAP_LAYER_ID_RE = /^[A-Za-z0-9:_-]{1,64}$/;
+const DEFAULT_MAP_LAYER_VISIBILITY = Object.freeze({
+  components: true,
+  bases: true,
+  resources: true,
+  [MAP_LABELS_LAYER_ID]: true,
+});
 
 export function shouldMountAiDiagnosticsPanel({ capabilities } = {}) {
   return capabilities?.diagnostics?.observerAnalysis === true;
@@ -12,6 +20,7 @@ export function createAiDiagnosticsPanelPreferences(storage = safeLocalStorage()
     visible: true,
     collapsed: false,
     selectedPlayerId: null,
+    mapLayers: { ...DEFAULT_MAP_LAYER_VISIBILITY },
   };
   const state = { ...fallback, ...readStoredPreferences(storage) };
   normalizePreferences(state);
@@ -38,8 +47,19 @@ export function createAiDiagnosticsPanelPreferences(storage = safeLocalStorage()
       state.selectedPlayerId = normalizeSelectedPlayerId(value);
       writeStoredPreferences(storage, state);
     },
+    mapLayerVisibility(layerIds = []) {
+      ensureKnownMapLayers(state, layerIds);
+      return { ...state.mapLayers };
+    },
+    setMapLayerVisible(layerId, visible) {
+      const id = normalizeMapLayerId(layerId);
+      if (!id) return;
+      state.mapLayers = normalizeMapLayerVisibility(state.mapLayers);
+      state.mapLayers[id] = visible === true;
+      writeStoredPreferences(storage, state);
+    },
     snapshot() {
-      return { ...state };
+      return { ...state, mapLayers: { ...state.mapLayers } };
     },
   };
 }
@@ -49,10 +69,12 @@ export class AiDiagnosticsPanel {
     root,
     preferences = createAiDiagnosticsPanelPreferences(),
     getPlayers = () => [],
+    onMapLayerVisibilityChange = null,
   }) {
     this.root = root;
     this.preferences = preferences;
     this.getPlayers = getPlayers;
+    this.onMapLayerVisibilityChange = onMapLayerVisibilityChange;
     this.analysis = null;
     this.el = null;
     this.bodyEl = null;
@@ -64,6 +86,7 @@ export class AiDiagnosticsPanel {
     this.onTabKeydown = (ev) => this.handleTabKeydown(ev);
     this.onShowClick = (ev) => this.show(ev);
     this.mount();
+    this.publishMapLayerVisibility();
   }
 
   mount() {
@@ -135,6 +158,13 @@ export class AiDiagnosticsPanel {
       ev.preventDefault();
       ev.stopPropagation();
       this.selectPlayerTab(btn.dataset.aiDiagnosticsTab);
+      return;
+    }
+
+    if (btn.dataset.aiMapLayer) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      this.toggleMapLayer(btn.dataset.aiMapLayer);
     }
   }
 
@@ -185,6 +215,7 @@ export class AiDiagnosticsPanel {
 
   applyObserverAnalysis(payload) {
     this.analysis = normalizeAiDiagnosticsPanelPayload(payload, this.getPlayers());
+    this.publishMapLayerVisibility();
     if (!this.bodyEl || !this.preferences.visible) return;
     this.renderBody();
   }
@@ -211,7 +242,10 @@ export class AiDiagnosticsPanel {
     const scrollState = snapshotAiDiagnosticsScroll(this.bodyEl, previousPlayerId);
     this.bodySignature = signature;
 
-    const body = [this.renderStatus(this.analysis)];
+    const body = [
+      this.renderStatus(this.analysis),
+      this.renderMapSection(this.analysis?.mapAnalysis || null),
+    ];
 
     if (!this.analysis) {
       body.push(renderEmptyState("Waiting for observer analysis"));
@@ -235,12 +269,60 @@ export class AiDiagnosticsPanel {
     status.className = "ai-diagnostics-status";
     const rows = analysis?.rows || [];
     const lineCount = rows.reduce((total, row) => total + row.aiDiagnostics.lines.length, 0);
+    const mapLayerCount = analysis?.mapAnalysis?.layers?.length || 0;
     status.append(
       renderStatusItem("AI players", analysis ? formatValue(rows.length) : "Waiting"),
       renderStatusItem("Trace lines", formatValue(lineCount)),
       renderStatusItem("Latest trace", analysis?.latestTraceTick == null ? "-" : formatValue(analysis.latestTraceTick)),
+      renderStatusItem("Map layers", analysis ? formatValue(mapLayerCount) : "Waiting"),
     );
     return status;
+  }
+
+  renderMapSection(mapAnalysis) {
+    const section = document.createElement("section");
+    section.className = "ai-diagnostics-map";
+
+    const header = document.createElement("div");
+    header.className = "ai-diagnostics-map-header";
+    const title = document.createElement("h3");
+    title.textContent = "Map analysis";
+    const summary = document.createElement("span");
+    summary.textContent = mapAnalysis
+      ? `${formatValue(mapAnalysis.primitives)} primitives`
+      : "Waiting";
+    header.append(title, summary);
+    section.appendChild(header);
+
+    const toggles = document.createElement("div");
+    toggles.className = "ai-diagnostics-map-toggles";
+    const layers = mapAnalysis?.layers || defaultMapLayerRows();
+    const visibility = this.preferences.mapLayerVisibility?.(layers.map((layer) => layer.id)) || {};
+    for (const layer of layers) {
+      toggles.appendChild(renderMapLayerToggle(layer, visibility[layer.id] !== false));
+    }
+    section.appendChild(toggles);
+    return section;
+  }
+
+  toggleMapLayer(layerId) {
+    const id = normalizeMapLayerId(layerId);
+    if (!id) return;
+    const layers = this.analysis?.mapAnalysis?.layers?.map((layer) => layer.id) || [];
+    const visibility = this.preferences.mapLayerVisibility?.(layers) || {};
+    this.preferences.setMapLayerVisible?.(id, visibility[id] === false);
+    this.publishMapLayerVisibility();
+    this.bodySignature = "";
+    this.renderBody();
+  }
+
+  mapLayerVisibility() {
+    const layers = this.analysis?.mapAnalysis?.layers?.map((layer) => layer.id) || [];
+    return this.preferences.mapLayerVisibility?.(layers) || { ...DEFAULT_MAP_LAYER_VISIBILITY };
+  }
+
+  publishMapLayerVisibility() {
+    this.onMapLayerVisibilityChange?.(this.mapLayerVisibility());
   }
 
   destroy() {
@@ -276,6 +358,7 @@ export function normalizeAiDiagnosticsPanelPayload(payload, players = []) {
   return {
     rows,
     latestTraceTick,
+    mapAnalysis: normalizeMapAnalysisSummary(payload.mapAnalysis),
   };
 }
 
@@ -290,6 +373,40 @@ export function normalizeAiDiagnostics(diagnostics) {
     profileId,
     traceTick: Math.max(0, Math.trunc(Number(diagnostics.traceTick) || 0)),
     lines,
+  };
+}
+
+export function normalizeMapAnalysisSummary(mapAnalysis) {
+  if (!mapAnalysis || typeof mapAnalysis !== "object") return null;
+  const layers = Array.isArray(mapAnalysis.layers)
+    ? mapAnalysis.layers.map(normalizeMapLayerSummary).filter(Boolean)
+    : [];
+  const primitives = layers.reduce((total, layer) => total + layer.primitives, 0);
+  return {
+    mapWidth: Math.max(0, Math.trunc(Number(mapAnalysis.mapWidth) || 0)),
+    mapHeight: Math.max(0, Math.trunc(Number(mapAnalysis.mapHeight) || 0)),
+    tileSize: Math.max(0, Math.trunc(Number(mapAnalysis.tileSize) || 0)),
+    layers: [
+      ...layers,
+      {
+        id: MAP_LABELS_LAYER_ID,
+        label: "Labels",
+        primitives,
+        defaultVisible: true,
+      },
+    ],
+    primitives,
+  };
+}
+
+function normalizeMapLayerSummary(layer) {
+  const id = normalizeMapLayerId(layer?.id);
+  if (!id) return null;
+  return {
+    id,
+    label: String(layer?.label || id).slice(0, 24),
+    primitives: Array.isArray(layer?.primitives) ? layer.primitives.length : 0,
+    defaultVisible: layer?.defaultVisible !== false,
   };
 }
 
@@ -337,6 +454,31 @@ function renderStatusItem(label, value) {
   valueEl.textContent = value;
   item.append(labelEl, valueEl);
   return item;
+}
+
+function renderMapLayerToggle(layer, visible) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "ai-diagnostics-map-toggle";
+  button.dataset.aiMapLayer = layer.id;
+  button.setAttribute("role", "switch");
+  button.setAttribute("aria-checked", String(visible));
+  button.classList.toggle("active", visible);
+
+  const indicator = document.createElement("span");
+  indicator.className = "ai-diagnostics-map-toggle-indicator";
+  indicator.setAttribute("aria-hidden", "true");
+
+  const label = document.createElement("span");
+  label.className = "ai-diagnostics-map-toggle-label";
+  label.textContent = layer.label || layer.id;
+
+  const count = document.createElement("span");
+  count.className = "ai-diagnostics-map-toggle-count";
+  count.textContent = formatValue(layer.primitives || 0);
+
+  button.append(indicator, label, count);
+  return button;
 }
 
 function renderEmptyState(text) {
@@ -507,6 +649,7 @@ function aiDiagnosticsBodySignature(analysis, activePlayerId) {
   return [
     analysis.latestTraceTick ?? "",
     activePlayerId ?? "",
+    mapAnalysisSignature(analysis.mapAnalysis),
     ...analysis.rows.map((row) => [
       row.id,
       row.name,
@@ -554,6 +697,25 @@ function formatValue(value) {
   return String(Math.max(0, Math.round(Number(value) || 0)));
 }
 
+function defaultMapLayerRows() {
+  return [
+    { id: "components", label: "Components", primitives: 0, defaultVisible: true },
+    { id: "bases", label: "Bases", primitives: 0, defaultVisible: true },
+    { id: "resources", label: "Resources", primitives: 0, defaultVisible: true },
+    { id: MAP_LABELS_LAYER_ID, label: "Labels", primitives: 0, defaultVisible: true },
+  ];
+}
+
+function mapAnalysisSignature(mapAnalysis) {
+  if (!mapAnalysis) return "map:waiting";
+  return [
+    mapAnalysis.mapWidth,
+    mapAnalysis.mapHeight,
+    mapAnalysis.tileSize,
+    ...mapAnalysis.layers.map((layer) => `${layer.id}:${layer.label}:${layer.primitives}:${layer.defaultVisible}`),
+  ].join("|");
+}
+
 function safeCssColor(color) {
   return typeof color === "string" && /^#[0-9a-fA-F]{3,8}$/.test(color) ? color : "#e7dfc5";
 }
@@ -562,11 +724,43 @@ function normalizePreferences(state) {
   state.visible = state.visible !== false;
   state.collapsed = state.collapsed === true;
   state.selectedPlayerId = normalizeSelectedPlayerId(state.selectedPlayerId);
+  state.mapLayers = normalizeMapLayerVisibility(state.mapLayers);
 }
 
 function normalizeSelectedPlayerId(value) {
   const playerId = Math.trunc(Number(value));
   return Number.isFinite(playerId) && playerId > 0 ? playerId : null;
+}
+
+function normalizeMapLayerVisibility(value) {
+  const normalized = { ...DEFAULT_MAP_LAYER_VISIBILITY };
+  if (value && typeof value === "object") {
+    for (const [key, visible] of Object.entries(value)) {
+      const id = normalizeMapLayerId(key);
+      if (id) normalized[id] = visible === true;
+    }
+  }
+  return normalized;
+}
+
+function ensureKnownMapLayers(state, layerIds = []) {
+  state.mapLayers = normalizeMapLayerVisibility(state.mapLayers);
+  for (const layerId of layerIds) {
+    const id = normalizeMapLayerId(layerId);
+    if (id && !hasOwn(state.mapLayers, id)) state.mapLayers[id] = true;
+  }
+  if (!hasOwn(state.mapLayers, MAP_LABELS_LAYER_ID)) {
+    state.mapLayers[MAP_LABELS_LAYER_ID] = true;
+  }
+}
+
+function normalizeMapLayerId(value) {
+  const id = String(value || "").trim();
+  return MAP_LAYER_ID_RE.test(id) ? id : "";
+}
+
+function hasOwn(object, key) {
+  return Object.prototype.hasOwnProperty.call(object, key);
 }
 
 function safeLocalStorage() {

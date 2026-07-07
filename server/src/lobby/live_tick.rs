@@ -257,6 +257,10 @@ impl LiveTickDriver<'_> {
 
     fn observer_analysis_with_ai_diagnostics(&self, game: &Game) -> ObserverAnalysisPayload {
         let mut analysis = game.observer_analysis();
+        analysis.map_analysis = self
+            .ai_controllers
+            .iter()
+            .find_map(|controller| controller.latest_map_analysis_diagnostics());
         for controller in self.ai_controllers.iter() {
             let Some(trace) = controller.latest_decision_trace() else {
                 continue;

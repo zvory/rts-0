@@ -1189,6 +1189,27 @@ mod tests {
     fn observer_analysis_serializes_contract_shape() {
         let msg = ServerMessage::ObserverAnalysis(ObserverAnalysisPayload {
             tick: 77,
+            map_analysis: Some(ObserverMapAnalysisDiagnostics {
+                map_width: 126,
+                map_height: 126,
+                tile_size: 32,
+                layers: vec![ObserverMapAnalysisLayer {
+                    id: "components".to_string(),
+                    label: "Components".to_string(),
+                    default_visible: true,
+                    primitives: vec![ObserverMapAnalysisPrimitive::TileRect {
+                        id: "component:0".to_string(),
+                        tile_x: 2,
+                        tile_y: 3,
+                        tile_w: 10,
+                        tile_h: 8,
+                        fill: "#3da5d9".to_string(),
+                        stroke: "#3da5d9".to_string(),
+                        alpha: 0.12,
+                        label: Some("C0 80t clr8".to_string()),
+                    }],
+                }],
+            }),
             players: vec![ObserverAnalysisPlayer {
                 id: 1,
                 units: vec![ObserverAnalysisKindCount {
@@ -1227,6 +1248,16 @@ mod tests {
 
         assert_eq!(json["t"], "observerAnalysis");
         assert_eq!(json["tick"], 77);
+        assert_eq!(json["mapAnalysis"]["mapWidth"], 126);
+        assert_eq!(json["mapAnalysis"]["layers"][0]["id"], "components");
+        assert_eq!(
+            json["mapAnalysis"]["layers"][0]["primitives"][0]["kind"],
+            "tileRect"
+        );
+        assert_eq!(
+            json["mapAnalysis"]["layers"][0]["primitives"][0]["tileW"],
+            10
+        );
         assert_eq!(json["players"][0]["id"], 1);
         assert_eq!(json["players"][0]["units"][0]["kind"], "rifleman");
         assert_eq!(json["players"][0]["units"][0]["count"], 3);

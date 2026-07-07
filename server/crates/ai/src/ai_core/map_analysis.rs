@@ -6,10 +6,16 @@
 use std::collections::VecDeque;
 
 use crate::config;
+use rts_protocol::{
+    ObserverMapAnalysisDiagnostics, ObserverMapAnalysisLayer, ObserverMapAnalysisPrimitive,
+};
 use rts_sim::protocol::{kinds, terrain, MapInfo, PlayerStart, ResourceNode, StartPayload};
 
 const MAX_CLEARANCE_TILES: u16 = 16;
 const RESOURCE_CLUSTER_RADIUS_MARGIN_TILES: f32 = 0.75;
+const MAP_ANALYSIS_COMPONENT_COLORS: [&str; 8] = [
+    "#3da5d9", "#f2a541", "#7ac74f", "#c77dff", "#ef476f", "#ffd166", "#06d6a0", "#8fb8d0",
+];
 const FNV_OFFSET_BASIS: u64 = 0xcbf2_9ce4_8422_2325;
 const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
 const NEIGHBORS: [(i32, i32); 8] = [
@@ -220,6 +226,124 @@ impl AiMapAnalysis {
             starts: self.starts.clone(),
             resource_clusters: self.resource_clusters.clone(),
         }
+    }
+
+    pub(crate) fn debug_overlay(&self) -> ObserverMapAnalysisDiagnostics {
+        ObserverMapAnalysisDiagnostics {
+            map_width: self.width,
+            map_height: self.height,
+            tile_size: self.tile_size,
+            layers: vec![
+                ObserverMapAnalysisLayer {
+                    id: "components".to_string(),
+                    label: "Components".to_string(),
+                    default_visible: true,
+                    primitives: self.component_overlay_primitives(),
+                },
+                ObserverMapAnalysisLayer {
+                    id: "bases".to_string(),
+                    label: "Bases".to_string(),
+                    default_visible: true,
+                    primitives: self.base_overlay_primitives(),
+                },
+                ObserverMapAnalysisLayer {
+                    id: "resources".to_string(),
+                    label: "Resources".to_string(),
+                    default_visible: true,
+                    primitives: self.resource_overlay_primitives(),
+                },
+            ],
+        }
+    }
+
+    fn component_overlay_primitives(&self) -> Vec<ObserverMapAnalysisPrimitive> {
+        self.components
+            .iter()
+            .map(|component| {
+                let fill = component_color(component.id).to_string();
+                ObserverMapAnalysisPrimitive::TileRect {
+                    id: format!("component:{}", component.id),
+                    tile_x: component.bounds.min.x,
+                    tile_y: component.bounds.min.y,
+                    tile_w: component
+                        .bounds
+                        .max
+                        .x
+                        .saturating_sub(component.bounds.min.x)
+                        .saturating_add(1),
+                    tile_h: component
+                        .bounds
+                        .max
+                        .y
+                        .saturating_sub(component.bounds.min.y)
+                        .saturating_add(1),
+                    stroke: fill.clone(),
+                    fill,
+                    alpha: component_fill_alpha(component.tile_count),
+                    label: Some(format!(
+                        "C{} {}t clr{}",
+                        component.id, component.tile_count, component.max_clearance_tiles
+                    )),
+                }
+            })
+            .collect()
+    }
+
+    fn base_overlay_primitives(&self) -> Vec<ObserverMapAnalysisPrimitive> {
+        self.starts
+            .iter()
+            .map(|start| {
+                let (x, y) = tile_center_world(start.start_tile, self.tile_size);
+                let color = start
+                    .component_id
+                    .map(component_color)
+                    .unwrap_or("#e7dfc5")
+                    .to_string();
+                ObserverMapAnalysisPrimitive::Marker {
+                    id: format!("base:{}", start.player_id),
+                    x,
+                    y,
+                    radius: (self.tile_size as f32 * 0.62).max(8.0),
+                    shape: "diamond".to_string(),
+                    color,
+                    label: Some(format!(
+                        "P{} T{} {}",
+                        start.player_id,
+                        start.team_id,
+                        component_label(start.component_id)
+                    )),
+                }
+            })
+            .collect()
+    }
+
+    fn resource_overlay_primitives(&self) -> Vec<ObserverMapAnalysisPrimitive> {
+        self.resource_clusters
+            .iter()
+            .map(|cluster| {
+                let (x, y) = tile_center_world(cluster.center_tile, self.tile_size);
+                let color = cluster
+                    .component_id
+                    .map(component_color)
+                    .unwrap_or("#e7dfc5")
+                    .to_string();
+                ObserverMapAnalysisPrimitive::Marker {
+                    id: format!("resourceCluster:{}", cluster.id),
+                    x,
+                    y,
+                    radius: (self.tile_size as f32 * 0.5).max(7.0),
+                    shape: "circle".to_string(),
+                    color,
+                    label: Some(format!(
+                        "R{} {}S/{}O {}",
+                        cluster.id,
+                        cluster.steel_nodes,
+                        cluster.oil_nodes,
+                        component_label(cluster.component_id)
+                    )),
+                }
+            })
+            .collect()
     }
 }
 
@@ -770,6 +894,37 @@ fn tile_count(width: u32, height: u32) -> Option<usize> {
     width
         .checked_mul(height)
         .and_then(|count| usize::try_from(count).ok())
+}
+
+fn component_color(component_id: u32) -> &'static str {
+    MAP_ANALYSIS_COMPONENT_COLORS
+        .get(component_id as usize % MAP_ANALYSIS_COMPONENT_COLORS.len())
+        .copied()
+        .unwrap_or("#8fb8d0")
+}
+
+fn component_fill_alpha(tile_count: u32) -> f32 {
+    if tile_count >= 1_000 {
+        0.12
+    } else if tile_count >= 100 {
+        0.16
+    } else {
+        0.22
+    }
+}
+
+fn component_label(component_id: Option<u32>) -> String {
+    component_id
+        .map(|id| format!("C{id}"))
+        .unwrap_or_else(|| "C?".to_string())
+}
+
+fn tile_center_world(tile: AiTile, tile_size: u32) -> (f32, f32) {
+    let tile_size = tile_size as f32;
+    (
+        tile.x as f32 * tile_size + tile_size * 0.5,
+        tile.y as f32 * tile_size + tile_size * 0.5,
+    )
 }
 
 fn hash_player_starts(players: &[PlayerStart]) -> u64 {

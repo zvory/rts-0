@@ -3870,7 +3870,7 @@ input[type="text"]:focus {
 .ai-diagnostics-body {
   min-height: 0;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   gap: 8px;
   border-top: 1px solid rgba(231, 223, 197, 0.14);
   padding-top: 8px;
@@ -3881,7 +3881,7 @@ input[type="text"]:focus {
 }
 .ai-diagnostics-status {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
 }
 .ai-diagnostics-status-item {
@@ -3925,6 +3925,95 @@ input[type="text"]:focus {
   font-family: var(--mono);
   font-size: 11px;
   text-align: center;
+}
+.ai-diagnostics-map {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  padding: 7px;
+  border: 1px solid rgba(143, 184, 208, 0.18);
+  border-radius: var(--radius-sm);
+  background: rgba(17, 17, 15, 0.42);
+}
+.ai-diagnostics-map-header {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: baseline;
+}
+.ai-diagnostics-map-header h3 {
+  margin: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 820;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ai-diagnostics-map-header span {
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+.ai-diagnostics-map-toggles {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+}
+.ai-diagnostics-map-toggle {
+  appearance: none;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  gap: 5px;
+  align-items: center;
+  border: 1px solid rgba(143, 184, 208, 0.2);
+  border-radius: var(--radius-sm);
+  background: rgba(17, 17, 15, 0.55);
+  color: var(--ink-dim);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
+  padding: 5px 6px;
+}
+.ai-diagnostics-map-toggle:hover,
+.ai-diagnostics-map-toggle:focus-visible,
+.ai-diagnostics-map-toggle.active {
+  border-color: var(--ai-accent);
+  color: var(--ink);
+  outline: none;
+}
+.ai-diagnostics-map-toggle.active {
+  background: rgba(31, 44, 48, 0.78);
+}
+.ai-diagnostics-map-toggle-indicator {
+  width: 10px;
+  height: 10px;
+  border: 1px solid rgba(231, 223, 197, 0.38);
+  border-radius: 999px;
+  background: rgba(143, 184, 208, 0.12);
+}
+.ai-diagnostics-map-toggle.active .ai-diagnostics-map-toggle-indicator {
+  background: var(--ai-accent);
+}
+.ai-diagnostics-map-toggle-label,
+.ai-diagnostics-map-toggle-count {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ai-diagnostics-map-toggle-count {
+  color: var(--ink-faint);
 }
 .ai-diagnostics-tabs {
   min-height: 0;
@@ -4458,6 +4547,9 @@ input[type="text"]:focus {
   }
   .ai-diagnostics-status {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .ai-diagnostics-map-toggles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .cmd-btn .cmd-icon {
     font-size: 20px;
