@@ -43,6 +43,15 @@ pub fn canonical_live_profile_id(input: &str) -> Option<&'static str> {
     }
 }
 
+pub fn live_profile_label(profile_id: &str) -> &'static str {
+    match canonical_live_profile_id(profile_id) {
+        Some(AI_1_0_TECH_ID) => "AI 1.0",
+        Some(AI_1_1_TANK_MG_ID) => "AI 1.1",
+        Some(AI_1_2_WAVE_COHORTS_ID) => "AI 1.2",
+        _ => "AI",
+    }
+}
+
 pub fn random_live_profile_id(rng: &mut impl Rng) -> &'static str {
     LIVE_PROFILE_IDS[rng.gen_range(0..LIVE_PROFILE_IDS.len())]
 }
@@ -362,5 +371,14 @@ mod tests {
         assert_eq!(canonical_live_profile_id("ai20"), None);
         assert_eq!(canonical_live_profile_id("ai_2_0_agent_rush"), None);
         assert_eq!(canonical_live_profile_id("rifle_flood_fast"), None);
+    }
+
+    #[test]
+    fn live_profile_labels_match_lobby_selector_names() {
+        assert_eq!(live_profile_label(AI_1_0_TECH_ID), "AI 1.0");
+        assert_eq!(live_profile_label(AI_1_1_TANK_MG_ID), "AI 1.1");
+        assert_eq!(live_profile_label(AI_1_2_WAVE_COHORTS_ID), "AI 1.2");
+        assert_eq!(live_profile_label("default"), "AI 1.2");
+        assert_eq!(live_profile_label("unknown"), "AI");
     }
 }
