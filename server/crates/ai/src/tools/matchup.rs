@@ -318,6 +318,8 @@ fn print_profiles() {
     println!("  ai11 -> ai_1_1_tank_mg");
     println!("  ai_1_2 -> ai_1_2_wave_cohorts");
     println!("  ai12 -> ai_1_2_wave_cohorts");
+    println!("  ai_2_0 -> ai_2_0_agent_rush");
+    println!("  ai20 -> ai_2_0_agent_rush");
 }
 
 fn print_usage() {
@@ -341,6 +343,7 @@ Examples:
   cargo run --bin ai-matchup -- ai ai
   cargo run --bin ai-matchup -- ai_1_1 ai_1_0_tech --seed 7 --ticks 3000 --json
   cargo run --bin ai-matchup -- ai_1_2 ai_1_1 --seed 7 --ticks 3000 --json
+  cargo run --bin ai-matchup -- ai_2_0 ai --seed 7 --ticks 20000 --json
   cargo run --bin ai-matchup -- default ai_1_0_tech --seed 7 --ticks 20000 --json
 "
     );

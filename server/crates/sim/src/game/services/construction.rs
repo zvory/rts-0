@@ -203,9 +203,20 @@ pub(crate) fn construction_system(
                 });
             }
             defensively_eject_worker_from_static_overlap(map, entities, worker);
-            if let Some(w) = entities.get_mut(worker) {
-                w.clear_active_order();
-            }
+            clear_build_orders_for_site(entities, site);
+        }
+    }
+}
+
+fn clear_build_orders_for_site(entities: &mut EntityStore, site: u32) {
+    let builders: Vec<u32> = entities
+        .iter()
+        .filter(|entity| entity.hp > 0 && entity.order().build_site() == Some(site))
+        .map(|entity| entity.id)
+        .collect();
+    for builder in builders {
+        if let Some(worker) = entities.get_mut(builder) {
+            worker.clear_active_order();
         }
     }
 }
@@ -727,6 +738,62 @@ mod tests {
             1,
             "build completion must leave queued handoff orders intact for promotion"
         );
+    }
+
+    #[test]
+    fn build_completion_clears_all_workers_constructing_same_site() {
+        let map = flat_map(16);
+        let mut entities = EntityStore::new();
+        let (sx, sy) = footprint_center(&map, EntityKind::Depot, 4, 4);
+        let site = entities
+            .spawn_building(1, EntityKind::Depot, sx, sy, false)
+            .expect("scaffold should spawn");
+        if let Some(b) = entities.get_mut(site) {
+            if let Some(progress) = b.construction.as_ref().map(|c| c.total.saturating_sub(1)) {
+                b.set_construction_progress(progress);
+            }
+        }
+        let finishing_worker = entities
+            .spawn_unit(1, EntityKind::Worker, sx, sy)
+            .expect("worker should spawn");
+        let helper_worker = entities
+            .spawn_unit(1, EntityKind::Worker, sx + 8.0, sy)
+            .expect("helper worker should spawn");
+        for worker in [finishing_worker, helper_worker] {
+            let w = entities.get_mut(worker).expect("worker should exist");
+            w.set_order(Order::build(EntityKind::Depot, 4, 4));
+            w.mark_build_phase(BuildPhase::Constructing { site });
+            w.set_target_id(Some(site));
+        }
+        let mut players = vec![player_state(1)];
+        let mut events = HashMap::new();
+
+        let fog = Fog::new(map.size);
+        let mut active_sites = BTreeSet::new();
+        construction_system(
+            &map,
+            &mut entities,
+            &mut players,
+            &mut events,
+            &fog,
+            &mut active_sites,
+        );
+
+        assert!(
+            entities
+                .get(site)
+                .is_some_and(|entity| !entity.under_construction()),
+            "scaffold should complete"
+        );
+        for worker in [finishing_worker, helper_worker] {
+            assert!(
+                matches!(
+                    entities.get(worker).expect("worker should survive").order(),
+                    Order::Idle
+                ),
+                "all workers that targeted the completed site should clear Build orders"
+            );
+        }
     }
 
     #[test]

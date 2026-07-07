@@ -58,6 +58,12 @@ combat target selection, and blockers such as waiting for units, waiting for a r
 waiting for Methamphetamines, and cadence. Final command emission still goes through
 `AiActionContext` and `ai_core::actions`.
 
+Profile experiments can be described as `AiProfileSpec`s: a stable profile id, a base profile, and
+a small ordered set of overlays or feature modules. The resolver validates every spec, produces the
+concrete `AiProfile`, and records a profile identity with base id, overlay ids, module names, and a
+fingerprint for arena artifacts. This keeps experimental variants inspectable without forking the
+whole decision tree or changing the live lobby contract.
+
 The economy plan is backed by an AI-owned resource availability model derived only from the
 fog-filtered observation, public start-payload resource positions, completed own City Centres,
 visible resource deltas, current worker latches, and AI-owned reservations. The model keeps
@@ -135,20 +141,28 @@ avoiding a single rally point. Local defense still selects any eligible local co
 units that are excluded from outbound wave formation. AI 1.2 also targets a second Vehicle Works once
 its bank is above 600 steel and 400 oil, while still using the normal build placement, prerequisite,
 pending-build, expansion-save, and defensive-panic gates.
-The aliases `ai_1_2` and `ai12` resolve to `ai_1_2_wave_cohorts`; `ai_1_1` and
-`ai11` resolve to `ai_1_1_tank_mg`; `ai_1_0`, `ai_1_0_tech`, and `ai1` resolve to
-`ai_1_0_tech`; `ai` and `default` resolve to the live default.
+
+AI 2.0's first agent-facing profile is `ai_2_0_agent_rush`. It is a developer-arena profile, not a
+live lobby option. The profile composes the full-saturation Rifleman pressure base with the
+AI 1.2 wave-cohort overlay, early expansion behavior, bounded decision traces, and a later Tank
+pivot. Its purpose is to prove the AI 2.0 loop: agents can inspect the profile's module stack and
+fingerprint, run side-swapped arena comparisons, and read per-run summaries before opening a replay.
+
+The aliases `ai_2_0` and `ai20` resolve to `ai_2_0_agent_rush` in developer tooling; `ai_1_2` and
+`ai12` resolve to `ai_1_2_wave_cohorts`; `ai_1_1` and `ai11` resolve to `ai_1_1_tank_mg`;
+`ai_1_0`, `ai_1_0_tech`, and `ai1` resolve to `ai_1_0_tech`; `ai` and `default` resolve to the
+live default.
 The live lobby AI uses this shared core through `AiController`, which only owns live identity,
 profile id, cadence, and persistent decision memory. Unknown live profile ids resolve to the
 highest supported live AI version, currently `ai_1_2_wave_cohorts`. The ordinary lobby exposes
-AI 1.0, AI 1.1, and AI 1.2; older experimental profile ids are no longer listed or accepted by
-developer tooling. AI 1.2 is the live lobby default.
+AI 1.0, AI 1.1, and AI 1.2 only; AI 2.0 profiles are listed and accepted by profile-backed
+developer tools but are not offered as live seats. AI 1.2 is the live lobby default.
 Panzerfaust is trainable for Kriegsia players after a completed Training Centre, and Scout Plane is
 trainable from City Centre after completed Gun Works or Vehicle Works, but current AI production
 profiles intentionally omit both units in the first pass. AI-owned Panzerfaust or Scout Plane units
 spawned by lab/dev setup still use their normal simulation behavior.
 
-**Self-play scorecards.** The `ai-matchup` and `ai-balance-matrix` developer tools emit
+**Self-play scorecards.** The `ai-matchup`, `ai-arena`, and `ai-balance-matrix` developer tools emit
 profile-agnostic baseline scorecards from public self-play commands and snapshots. Per-player
 results include army value, building value, final worker count, final unit counts, command count,
 attack command count, damage events dealt, deduplicated deaths, first attack command, first
@@ -162,6 +176,10 @@ fixtures without rewriting the harness.
 Profile matchup JSON also includes a bounded `aiTraceTail` of compact trace entries for recent
 profile-backed thinks. The tail is diagnostic output only; deterministic replay artifacts continue
 to use the command log as the source of player intent.
+Arena runs wrap the same profile matchup result in agent-facing sidecars: `manifest.json` records
+git, seed, side, profile identities, aliases, and module fingerprints; `summary.json` stores the
+machine-readable result row; `decision-trace.jsonl` indexes compact trace labels by tick and
+player; and `brief.md` gives a short textual match brief with replay and trace pointers.
 
 Spectators never count toward win/elimination and receive a neutral final scoreboard result.
 
