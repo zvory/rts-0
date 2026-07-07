@@ -243,6 +243,12 @@ fn run_arena(config: &CliConfig) -> Result<ArenaReport, String> {
             BASELINE_SELECTOR,
         )
         .ok_or_else(|| format!("unknown baseline request {}", config.baseline))?;
+        if candidate_profile == baseline_profile {
+            return Err(format!(
+                "candidate request {} and baseline request {} both resolve to profile {} for seed {}",
+                config.candidate, config.baseline, candidate_profile, job.seed
+            ));
+        }
         let (profile_a, profile_b) = match job.side {
             ArenaSide::CandidatePlayerOne => {
                 (candidate_profile.to_string(), baseline_profile.to_string())
@@ -725,6 +731,28 @@ mod tests {
         assert_eq!(config.candidate, DEFAULT_CANDIDATE);
         assert_eq!(config.baseline, DEFAULT_BASELINE);
         assert_eq!(config.seeds, DEFAULT_SEEDS);
+    }
+
+    #[test]
+    fn arena_rejects_different_requests_that_resolve_to_the_same_profile() {
+        let out_dir = std::env::temp_dir().join(format!(
+            "rts-ai-arena-same-profile-test-{}",
+            process::id()
+        ));
+        let config = CliConfig {
+            candidate: "ai_2_0".to_string(),
+            baseline: "ai_2_0_tank_pressure".to_string(),
+            seeds: 1,
+            seed_start: 0,
+            ticks: 1,
+            out_dir: out_dir.clone(),
+            verify_replay: false,
+        };
+
+        let err = run_arena(&config).expect_err("same concrete profile should be rejected");
+
+        assert!(err.contains("both resolve to profile ai_2_0_tank_pressure"));
+        let _ = std::fs::remove_dir_all(out_dir);
     }
 
     #[test]

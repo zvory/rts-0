@@ -36,22 +36,22 @@ pub const DEFAULT_LIVE_PROFILE_ID: &str = AI_1_2_WAVE_COHORTS_ID;
 pub const DEFAULT_LIVE_PROFILE_REQUEST_ID: &str = AI_1_2_SUITE_ID;
 
 /// Profile or suite requests available to ordinary lobby AI opponents.
-pub const LIVE_PROFILE_IDS: [&str; 4] = [
+pub const LIVE_PROFILE_REQUEST_IDS: [&str; 4] = [
     AI_1_0_SUITE_ID,
     AI_1_1_SUITE_ID,
     AI_1_2_SUITE_ID,
     AI_2_0_SUITE_ID,
 ];
 
-pub fn canonical_live_profile_id(input: &str) -> Option<&'static str> {
+pub fn canonical_live_profile_request_id(input: &str) -> Option<&'static str> {
     match input {
         "ai" | "default" => Some(DEFAULT_LIVE_PROFILE_REQUEST_ID),
         value => canonical_profile_request_id(value),
     }
 }
 
-pub fn live_profile_label(profile_id: &str) -> &'static str {
-    match canonical_live_profile_id(profile_id) {
+pub fn live_profile_label(profile_or_request_id: &str) -> &'static str {
+    match canonical_live_profile_request_id(profile_or_request_id) {
         Some(AI_1_0_SUITE_ID) | Some(AI_1_0_TECH_ID) => "AI 1.0",
         Some(AI_1_1_SUITE_ID) | Some(AI_1_1_TANK_MG_ID) => "AI 1.1",
         Some(AI_1_2_SUITE_ID) | Some(AI_1_2_WAVE_COHORTS_ID) => "AI 1.2",
@@ -60,8 +60,8 @@ pub fn live_profile_label(profile_id: &str) -> &'static str {
     }
 }
 
-pub fn random_live_profile_id(rng: &mut impl Rng) -> &'static str {
-    LIVE_PROFILE_IDS[rng.gen_range(0..LIVE_PROFILE_IDS.len())]
+pub fn random_live_profile_request_id(rng: &mut impl Rng) -> &'static str {
+    LIVE_PROFILE_REQUEST_IDS[rng.gen_range(0..LIVE_PROFILE_REQUEST_IDS.len())]
 }
 
 pub fn resolve_live_profile_id_for_match(
@@ -69,7 +69,8 @@ pub fn resolve_live_profile_id_for_match(
     seed: u32,
     player_id: u32,
 ) -> &'static str {
-    let request_id = canonical_live_profile_id(request_id).unwrap_or(DEFAULT_LIVE_PROFILE_REQUEST_ID);
+    let request_id =
+        canonical_live_profile_request_id(request_id).unwrap_or(DEFAULT_LIVE_PROFILE_REQUEST_ID);
     resolve_profile_request_id(request_id, seed, u64::from(player_id)).unwrap_or(DEFAULT_LIVE_PROFILE_ID)
 }
 
@@ -339,9 +340,9 @@ mod tests {
     }
 
     #[test]
-    fn live_profile_pool_exposes_supported_lobby_profiles() {
+    fn live_profile_request_pool_exposes_supported_lobby_choices() {
         assert_eq!(
-            LIVE_PROFILE_IDS,
+            LIVE_PROFILE_REQUEST_IDS,
             [
                 AI_1_0_SUITE_ID,
                 AI_1_1_SUITE_ID,
@@ -355,15 +356,15 @@ mod tests {
     fn live_default_stays_on_stable_promoted_profile() {
         assert_eq!(DEFAULT_LIVE_PROFILE_ID, AI_1_2_WAVE_COHORTS_ID);
         assert_eq!(DEFAULT_LIVE_PROFILE_REQUEST_ID, AI_1_2_SUITE_ID);
-        assert!(LIVE_PROFILE_IDS.contains(&AI_2_0_SUITE_ID));
+        assert!(LIVE_PROFILE_REQUEST_IDS.contains(&AI_2_0_SUITE_ID));
     }
 
     #[test]
-    fn random_live_profile_selection_uses_live_pool() {
+    fn random_live_profile_request_selection_uses_live_pool() {
         let mut rng = rand::rngs::SmallRng::seed_from_u64(0xA1);
         for _ in 0..32 {
-            let selected = random_live_profile_id(&mut rng);
-            assert!(LIVE_PROFILE_IDS.contains(&selected));
+            let selected = random_live_profile_request_id(&mut rng);
+            assert!(LIVE_PROFILE_REQUEST_IDS.contains(&selected));
         }
     }
 
@@ -375,47 +376,50 @@ mod tests {
     }
 
     #[test]
-    fn live_profile_aliases_are_bounded_to_supported_profiles() {
+    fn live_profile_request_aliases_are_bounded_to_supported_profiles() {
         assert_eq!(
-            canonical_live_profile_id("ai"),
+            canonical_live_profile_request_id("ai"),
             Some(DEFAULT_LIVE_PROFILE_REQUEST_ID)
         );
         assert_eq!(
-            canonical_live_profile_id("default"),
+            canonical_live_profile_request_id("default"),
             Some(DEFAULT_LIVE_PROFILE_REQUEST_ID)
         );
-        assert_eq!(canonical_live_profile_id("ai_1_0"), Some(AI_1_0_SUITE_ID));
         assert_eq!(
-            canonical_live_profile_id("ai_1_0_tech"),
+            canonical_live_profile_request_id("ai_1_0"),
+            Some(AI_1_0_SUITE_ID)
+        );
+        assert_eq!(
+            canonical_live_profile_request_id("ai_1_0_tech"),
             Some(AI_1_0_TECH_ID)
         );
         assert_eq!(
-            canonical_live_profile_id("ai_1_1"),
+            canonical_live_profile_request_id("ai_1_1"),
             Some(AI_1_1_SUITE_ID)
         );
         assert_eq!(
-            canonical_live_profile_id("ai_1_1_tank_mg"),
+            canonical_live_profile_request_id("ai_1_1_tank_mg"),
             Some(AI_1_1_TANK_MG_ID)
         );
         assert_eq!(
-            canonical_live_profile_id("ai_1_2"),
+            canonical_live_profile_request_id("ai_1_2"),
             Some(AI_1_2_SUITE_ID)
         );
         assert_eq!(
-            canonical_live_profile_id("ai_1_2_wave_cohorts"),
+            canonical_live_profile_request_id("ai_1_2_wave_cohorts"),
             Some(AI_1_2_WAVE_COHORTS_ID)
         );
         assert_eq!(
-            canonical_live_profile_id("ai_2_0"),
+            canonical_live_profile_request_id("ai_2_0"),
             Some(AI_2_0_SUITE_ID)
         );
         assert_eq!(
-            canonical_live_profile_id("ai20"),
+            canonical_live_profile_request_id("ai20"),
             Some(AI_2_0_SUITE_ID)
         );
-        assert_eq!(canonical_live_profile_id("ai_2_0_agent_rush"), None);
-        assert_eq!(canonical_live_profile_id("ai_2_0_rifle_tank"), None);
-        assert_eq!(canonical_live_profile_id("rifle_flood_fast"), None);
+        assert_eq!(canonical_live_profile_request_id("ai_2_0_agent_rush"), None);
+        assert_eq!(canonical_live_profile_request_id("ai_2_0_rifle_tank"), None);
+        assert_eq!(canonical_live_profile_request_id("rifle_flood_fast"), None);
     }
 
     #[test]

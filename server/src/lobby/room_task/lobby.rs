@@ -469,7 +469,7 @@ impl RoomTask {
         let id = next_player_id();
         let profile_request_id = requested_profile_id
             .as_deref()
-            .and_then(rts_ai::canonical_live_profile_id)
+            .and_then(rts_ai::canonical_live_profile_request_id)
             .unwrap_or(DEFAULT_LIVE_PROFILE_REQUEST_ID);
         let team_id = if let Some(team_id) = requested_team_id {
             if !self.team_move_allowed(id, team_id) {
@@ -510,7 +510,8 @@ impl RoomTask {
         if self.is_replay_staging_lobby() {
             return;
         }
-        let Some(profile_request_id) = rts_ai::canonical_live_profile_id(&requested_profile_id)
+        let Some(profile_request_id) =
+            rts_ai::canonical_live_profile_request_id(&requested_profile_id)
         else {
             crate::log_debug!(
                 room = %self.room,
