@@ -46,6 +46,17 @@ const { ok } = assertions;
   ok(ai && ai.factionId === DEFAULT_FACTION_ID, `AI defaults to ${DEFAULT_FACTION_ID}`);
   ok(ai && ai.aiProfileId === DEFAULT_AI_PROFILE_ID, `AI defaults to ${DEFAULT_AI_PROFILE_ID}`);
 
+  A.send({ t: "setAiProfile", id: ai.id, aiProfileId: "ai_2_0_agent_rush" });
+  const withAi2 = await A.waitNext(
+    (m) => m.t === "lobby" && m.players.some((p) => p.id === ai.id && p.aiProfileId === "ai_2_0_agent_rush"),
+    3000,
+    "lobby with AI 2.0 selected",
+  );
+  ok(
+    withAi2.players.some((p) => p.id === ai.id && p.aiProfileId === "ai_2_0_agent_rush"),
+    "host can select AI 2.0 for an AI seat",
+  );
+
   // Send a hand-built future faction field. Phase 3 keeps addAi team-only, so the server may
   // ignore or reject the unsupported request, but it must never create a non-Kriegsia AI seat.
   const beforeHandBuiltIds = new Set(withAi.players.map((player) => player.id));
