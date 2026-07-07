@@ -48,6 +48,12 @@ shared action layer prevents it from over-committing resources/supply it does no
 
 **Shared AI core.** `rts_ai::ai_core` has deterministic profile data (`profiles.rs`) and a generic
 ranked decision loop (`decision.rs`) that emits ordinary `SimCommand`s through shared action helpers.
+It also owns static map analysis (`map_analysis.rs`) built only from `StartPayload.map`,
+start tiles, and static resource nodes. `AiController` caches that analysis by a stable
+map/start/resource identity, and the scaffold records terrain passability, centered clearance,
+passable components, start-to-component/resource mappings, and resource clusters for diagnostics
+and future route reasoning. Current decision code does not consume this analysis yet, so it is a
+read-only foundation rather than a gameplay behavior change.
 The decision loop also emits manager traces: every think records typed strategic goals for economy,
 supply, expansion, tech, production, local defense, frontal attack, and harassment, plus stable
 blocker labels, high-level intent labels, command labels emitted through `AiActionContext`, and

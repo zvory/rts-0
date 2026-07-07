@@ -7,6 +7,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::ai_core::decision::{decide_profile, AiDecisionMemory};
+use crate::ai_core::map_analysis::{AiMapAnalysis, AiMapAnalysisKey};
 use crate::ai_core::observation::AiObservation;
 use crate::ai_core::profile_suites::{
     canonical_profile_request_id, resolve_profile_request_id, AI_1_0_SUITE_ID, AI_1_1_SUITE_ID,
@@ -71,7 +72,8 @@ pub fn resolve_live_profile_id_for_match(
 ) -> &'static str {
     let request_id =
         canonical_live_profile_request_id(request_id).unwrap_or(DEFAULT_LIVE_PROFILE_REQUEST_ID);
-    resolve_profile_request_id(request_id, seed, u64::from(player_id)).unwrap_or(DEFAULT_LIVE_PROFILE_ID)
+    resolve_profile_request_id(request_id, seed, u64::from(player_id))
+        .unwrap_or(DEFAULT_LIVE_PROFILE_ID)
 }
 
 pub struct AiThinkContext<'a> {
@@ -94,10 +96,17 @@ pub struct AiController {
     player: u32,
     profile_id: &'static str,
     memory: AiDecisionMemory,
+    map_analysis_cache: Option<AiMapAnalysisCache>,
     pending_builds: PendingBuildTracker,
     staged_units: BTreeSet<u32>,
     active_attack_units: BTreeMap<u32, u32>,
     last_decision_trace: Option<AiDecisionTraceSnapshot>,
+}
+
+#[derive(Clone, Debug)]
+struct AiMapAnalysisCache {
+    key: AiMapAnalysisKey,
+    analysis: AiMapAnalysis,
 }
 
 impl AiController {
@@ -111,6 +120,7 @@ impl AiController {
             player,
             profile_id: profile.id,
             memory: AiDecisionMemory::for_profile(profile),
+            map_analysis_cache: None,
             pending_builds: PendingBuildTracker::default(),
             staged_units: BTreeSet::new(),
             active_attack_units: BTreeMap::new(),
@@ -134,6 +144,24 @@ impl AiController {
         profile_by_id(self.profile_id).unwrap_or_else(default_live_profile)
     }
 
+    fn static_map_analysis(&mut self, start: &StartPayload) -> Option<&AiMapAnalysis> {
+        let key = AiMapAnalysisKey::from_start(start);
+        let refresh = self
+            .map_analysis_cache
+            .as_ref()
+            .map(|cache| cache.key != key)
+            .unwrap_or(true);
+        if refresh {
+            self.map_analysis_cache = Some(AiMapAnalysisCache {
+                key,
+                analysis: AiMapAnalysis::analyze_with_key(start, key),
+            });
+        }
+        self.map_analysis_cache
+            .as_ref()
+            .map(|cache| &cache.analysis)
+    }
+
     pub fn think(&mut self, context: AiThinkContext<'_>) -> Vec<SimCommand> {
         let mut commands = context.retreat_commands;
         let tick = context.snapshot.tick;
@@ -143,6 +171,7 @@ impl AiController {
         {
             return commands;
         }
+        let _ = self.static_map_analysis(context.start);
 
         let view = PlayerView {
             player_id: self.player,
@@ -312,6 +341,43 @@ fn truncate_decision_trace_line(mut line: String) -> String {
 mod tests {
     use super::*;
     use rand::SeedableRng;
+    use rts_sim::protocol::{terrain, MapInfo, PlayerStart, ResourceNode};
+
+    fn cache_test_start_payload() -> StartPayload {
+        StartPayload {
+            player_id: 1,
+            spectator: false,
+            prediction_build_id: None,
+            prediction_version: 0,
+            match_run_id: None,
+            capabilities: Default::default(),
+            diagnostics: Default::default(),
+            replay: None,
+            lab: None,
+            tick: 0,
+            map: MapInfo {
+                width: 8,
+                height: 8,
+                tile_size: crate::config::TILE_SIZE,
+                terrain: vec![terrain::GRASS; 8 * 8],
+                resources: vec![ResourceNode {
+                    id: 10,
+                    kind: rts_sim::protocol::kinds::STEEL.to_string(),
+                    x: crate::config::TILE_SIZE as f32 * 5.5,
+                    y: crate::config::TILE_SIZE as f32 * 1.5,
+                }],
+            },
+            players: vec![PlayerStart {
+                id: 1,
+                team_id: 1,
+                faction_id: "kriegsia".to_string(),
+                name: "P1".to_string(),
+                color: "#111".to_string(),
+                start_tile_x: 1,
+                start_tile_y: 1,
+            }],
+        }
+    }
 
     #[test]
     fn live_controller_uses_default_profile_id() {
@@ -320,6 +386,39 @@ mod tests {
         assert_eq!(ai.player_id(), 2);
         assert_eq!(ai.profile_id(), AI_1_2_WAVE_COHORTS_ID);
         assert_eq!(ai.latest_decision_trace(), None);
+    }
+
+    #[test]
+    fn live_controller_caches_static_map_analysis_by_start_identity() {
+        let mut ai = AiController::new(1);
+        let start = cache_test_start_payload();
+
+        let first_key = ai
+            .static_map_analysis(&start)
+            .map(|analysis| analysis.key())
+            .expect("analysis should be cached");
+        let second_key = ai
+            .static_map_analysis(&start)
+            .map(|analysis| analysis.key())
+            .expect("analysis should remain cached");
+        assert_eq!(second_key, first_key);
+        assert_eq!(
+            ai.map_analysis_cache.as_ref().map(|cache| cache.key),
+            Some(first_key)
+        );
+
+        let mut moved_start = start.clone();
+        moved_start.players[0].start_tile_x = 2;
+        let moved_key = ai
+            .static_map_analysis(&moved_start)
+            .map(|analysis| analysis.key())
+            .expect("changed static identity should still analyze");
+
+        assert_ne!(moved_key, first_key);
+        assert_eq!(
+            ai.map_analysis_cache.as_ref().map(|cache| cache.key),
+            Some(moved_key)
+        );
     }
 
     #[test]

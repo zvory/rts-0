@@ -88,46 +88,6 @@ pub(super) fn build_search_for_kind(
     build_search
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn short_search() -> ai_shared::BuildSearch {
-        ai_shared::BuildSearch {
-            min_radius: 2,
-            max_radius: 6,
-            prefer_away_from_center: true,
-            prefer_toward_center: false,
-        }
-    }
-
-    #[test]
-    fn vehicle_and_gun_works_use_modest_forward_build_search() {
-        for kind in [EntityKind::Factory, EntityKind::Steelworks] {
-            let search = build_search_for_kind(short_search(), kind);
-            assert_eq!(
-                search.max_radius,
-                ai_shared::FORWARD_PRODUCTION_BUILD_SEARCH_MAX_RADIUS
-            );
-            assert_eq!(
-                search.max_radius,
-                ai_shared::DEFAULT_BUILD_SEARCH_MAX_RADIUS + 2
-            );
-            assert!(!search.prefer_away_from_center);
-            assert!(search.prefer_toward_center);
-        }
-    }
-
-    #[test]
-    fn ordinary_buildings_keep_their_requested_search_band() {
-        let search = build_search_for_kind(short_search(), EntityKind::Barracks);
-
-        assert_eq!(search.max_radius, 6);
-        assert!(search.prefer_away_from_center);
-        assert!(!search.prefer_toward_center);
-    }
-}
-
 pub(super) fn should_save_for_first_tech_unit(
     facts: &AiFacts,
     production: ProductionPolicy,
@@ -226,4 +186,44 @@ pub(super) fn unit_counts_for_priorities(
         .copied()
         .map(|unit| (unit, counts.get(&unit).copied().unwrap_or(0)))
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn short_search() -> ai_shared::BuildSearch {
+        ai_shared::BuildSearch {
+            min_radius: 2,
+            max_radius: 6,
+            prefer_away_from_center: true,
+            prefer_toward_center: false,
+        }
+    }
+
+    #[test]
+    fn vehicle_and_gun_works_use_modest_forward_build_search() {
+        for kind in [EntityKind::Factory, EntityKind::Steelworks] {
+            let search = build_search_for_kind(short_search(), kind);
+            assert_eq!(
+                search.max_radius,
+                ai_shared::FORWARD_PRODUCTION_BUILD_SEARCH_MAX_RADIUS
+            );
+            assert_eq!(
+                search.max_radius,
+                ai_shared::DEFAULT_BUILD_SEARCH_MAX_RADIUS + 2
+            );
+            assert!(!search.prefer_away_from_center);
+            assert!(search.prefer_toward_center);
+        }
+    }
+
+    #[test]
+    fn ordinary_buildings_keep_their_requested_search_band() {
+        let search = build_search_for_kind(short_search(), EntityKind::Barracks);
+
+        assert_eq!(search.max_radius, 6);
+        assert!(search.prefer_away_from_center);
+        assert!(!search.prefer_toward_center);
+    }
 }

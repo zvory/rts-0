@@ -7,6 +7,7 @@
 pub(crate) mod actions;
 pub(crate) mod decision;
 pub(crate) mod facts;
+pub(crate) mod map_analysis;
 pub(crate) mod observation;
 pub(crate) mod profile_manifest;
 pub(crate) mod profile_suites;

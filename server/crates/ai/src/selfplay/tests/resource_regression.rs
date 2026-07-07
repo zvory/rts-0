@@ -65,13 +65,16 @@ fn resource_remaining(start: &StartPayload, snapshot: &Snapshot, node: u32) -> u
         .find(|delta| delta.id == node)
         .map(|delta| delta.remaining)
         .unwrap_or_else(|| {
-            start
+            if start
                 .map
                 .resources
                 .iter()
                 .any(|resource| resource.id == node)
-                .then_some(1)
-                .unwrap_or(0)
+            {
+                1
+            } else {
+                0
+            }
         })
 }
 
