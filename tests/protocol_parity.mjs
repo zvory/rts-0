@@ -607,7 +607,16 @@ assert(
   S.OBSERVER_ANALYSIS === "observerAnalysis",
   "observerAnalysis server message tag must match Rust",
 );
-for (const field of ["units_lost", "resources_lost", "steel_value", "oil_value", "queue_depth"]) {
+for (const field of [
+  "units_lost",
+  "resources_lost",
+  "steel_value",
+  "oil_value",
+  "queue_depth",
+  "ai_diagnostics",
+  "profile_id",
+  "trace_tick",
+]) {
   assert(rust.includes(field), `observerAnalysis Rust contract is missing ${field}`);
 }
 const observerAnalysis = decodeServerMessage({
@@ -619,8 +628,17 @@ const observerAnalysis = decodeServerMessage({
     production: [{ buildingId: 7, buildingKind: "city_centre", itemKind: "worker", itemType: "unit", progress: 0.25, queueDepth: 1 }],
     unitsLost: [],
     resourcesLost: { steel: 0, oil: 0 },
+    aiDiagnostics: {
+      profileId: "ai_1_2_wave_cohorts",
+      traceTick: 9,
+      lines: ["profile=ai_1_2_wave_cohorts tick=9"],
+    },
   }],
 });
 assert(observerAnalysis.t === "observerAnalysis" && observerAnalysis.players[0].production[0].queueDepth === 1, "observerAnalysis passes through decode");
+assert(
+  observerAnalysis.players[0].aiDiagnostics?.profileId === "ai_1_2_wave_cohorts",
+  "observerAnalysis preserves AI diagnostics rows",
+);
 
 console.log("✅ protocol_parity.mjs: Rust protocol contract dump matches JS mirror");

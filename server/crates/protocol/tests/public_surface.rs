@@ -11,8 +11,9 @@ use rts_protocol::{
     LabCheckpointScenarioSource, LabCheckpointScenarioV1, LabScenarioEntityIdRemap,
     LabScenarioLabMetadata, LabScenarioPayload, LabScenarioTile, LabStartMetadata, LabStartRole,
     LabState, LabVisionMode, LivePauseState, LobbyPlayer, MapInfo, MatchControlCapabilities,
-    MovementPathDiagnosticScope, NoticeSeverity, ObserverAnalysisKindCount, ObserverAnalysisPayload,
-    ObserverAnalysisPlayer, ObserverAnalysisProduction, ObserverAnalysisResourcesLost,
+    MovementPathDiagnosticScope, NoticeSeverity, ObserverAnalysisAiDiagnostics,
+    ObserverAnalysisKindCount, ObserverAnalysisPayload, ObserverAnalysisPlayer,
+    ObserverAnalysisProduction, ObserverAnalysisResourcesLost,
     OrderPlanMarker, PlayerResourceSnapshot, PlayerScore, PlayerStart, ProtocolCompactCodes,
     ProtocolContract, ProtocolMessageTags, ProtocolVocabularies, RememberedBuildingView,
     ReplayBranchSeat, ReplayStartMetadata, ResourceDelta, ResourceNode, RoomCapabilities,
@@ -79,6 +80,7 @@ fn stable_rust_public_surface_compiles() {
     assert_type::<MovementPathDiagnosticScope>();
     assert_type::<NoticeSeverity>();
     assert_type::<ObserverAnalysisKindCount>();
+    assert_type::<ObserverAnalysisAiDiagnostics>();
     assert_type::<ObserverAnalysisPayload>();
     assert_type::<ObserverAnalysisPlayer>();
     assert_type::<ObserverAnalysisProduction>();

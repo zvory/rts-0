@@ -339,6 +339,39 @@ import { textWithin } from "./dom_text.mjs";
       "resources lost tab renders per-player killed unit value",
     );
 
+    restored.selectedTab = "ai-diagnostics";
+    overlay.render();
+    assert(
+      textWithin(root).includes("No AI diagnostics"),
+      "AI diagnostics tab handles analysis without AI trace rows cleanly",
+    );
+    overlay.applyObserverAnalysis({
+      tick: 45,
+      players: [
+        {
+          id: 1,
+          units: [],
+          production: [],
+          aiDiagnostics: {
+            profileId: "ai_1_2_wave_cohorts",
+            traceTick: 36,
+            lines: [
+              "profile=ai_1_2_wave_cohorts tick=36",
+              "goal=Production status=Selected blockers=- intents=train:Rifleman",
+            ],
+          },
+        },
+      ],
+    });
+    const aiDiagnosticsText = textWithin(root);
+    assert(
+      aiDiagnosticsText.includes("Latest decisions")
+        && aiDiagnosticsText.includes("ai_1_2_wave_cohorts")
+        && aiDiagnosticsText.includes("tick 36")
+        && aiDiagnosticsText.includes("goal=Production"),
+      "AI diagnostics tab renders profile, trace tick, and decision trace lines",
+    );
+
     const tabButtons = root.querySelectorAll(".replay-analysis-tab");
     const firstTab = tabButtons[0];
     overlayRoot.listeners.keydown?.({
@@ -347,7 +380,7 @@ import { textWithin } from "./dom_text.mjs";
       preventDefault() {},
       stopPropagation() {},
     });
-    assert(restored.selectedTab === "resources-lost", "observer analysis keyboard End selects the last tab");
+    assert(restored.selectedTab === "ai-diagnostics", "observer analysis keyboard End selects the last tab");
     assert(tabButtons[tabButtons.length - 1].focused === true, "observer analysis keyboard navigation focuses the selected tab");
 
     overlay.destroy();
