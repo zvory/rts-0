@@ -1,6 +1,6 @@
 # Phase 1: Static analysis scaffold
 
-Status: Pending
+Status: Done
 
 ## Goal
 
