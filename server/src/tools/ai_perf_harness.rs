@@ -453,7 +453,10 @@ fn live_ai_controllers(players: &[PlayerInit], seed: u32) -> Vec<AiController> {
         .iter()
         .filter(|player| player.is_ai)
         .map(|player| {
-            AiController::with_profile_id(player.id, rts_ai::random_live_profile_id(&mut rng))
+            let profile_request_id = rts_ai::random_live_profile_id(&mut rng);
+            let profile_id =
+                rts_ai::resolve_live_profile_id_for_match(profile_request_id, seed, player.id);
+            AiController::with_profile_id(player.id, profile_id)
         })
         .collect()
 }

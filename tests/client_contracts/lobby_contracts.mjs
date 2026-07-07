@@ -53,7 +53,7 @@ import { textWithin } from "./dom_text.mjs";
     "lobby faction selector labels the ekat faction as Ekat",
   );
   assert(
-    AI_PROFILES.some((entry) => entry.id === "ai_2_0_agent_rush" && entry.label === "AI 2.0"),
+    AI_PROFILES.some((entry) => entry.id === "ai_2_0" && entry.label === "AI 2.0"),
     "lobby AI profile selector lists AI 2.0",
   );
   assert(
@@ -158,7 +158,7 @@ import { textWithin } from "./dom_text.mjs";
           ready: true,
           teamId: 2,
           isAi: true,
-          aiProfileId: "ai_2_0_agent_rush",
+          aiProfileId: "ai_2_0",
         },
       ],
       myId: 1,
@@ -177,19 +177,19 @@ import { textWithin } from "./dom_text.mjs";
       (el) => el.tagName === "SELECT" && el.className === "player-ai-profile-select",
     )[0];
     assert(!!select, "host lobby renders an AI profile selector");
-    assert(select.value === "ai_2_0_agent_rush", "AI 2.0 profile state is selected in the lobby");
+    assert(select.value === "ai_2_0", "AI 2.0 profile state is selected in the lobby");
     assert(
       select.children.some(
-        (option) => option.value === "ai_2_0_agent_rush" && option.textContent === "AI 2.0",
+        (option) => option.value === "ai_2_0" && option.textContent === "AI 2.0",
       ),
       "AI profile selector includes the AI 2.0 option",
     );
 
-    select.value = "ai_1_2_wave_cohorts";
+    select.value = "ai_1_2";
     select.listeners.change?.();
     assertDeepEqual(
       selectedProfile,
-      { id: 2, profileId: "ai_1_2_wave_cohorts" },
+      { id: 2, profileId: "ai_1_2" },
       "AI profile selector emits profile changes",
     );
   });

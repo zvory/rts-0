@@ -3,13 +3,13 @@
 
 export const MAX_LOBBY_TEAMS = 4;
 export const AI_PROFILES = Object.freeze([
-  { id: "ai_1_0_tech", label: "AI 1.0" },
-  { id: "ai_1_1_tank_mg", label: "AI 1.1" },
-  { id: "ai_1_2_wave_cohorts", label: "AI 1.2" },
-  { id: "ai_2_0_agent_rush", label: "AI 2.0" },
+  { id: "ai_1_0", label: "AI 1.0" },
+  { id: "ai_1_1", label: "AI 1.1" },
+  { id: "ai_1_2", label: "AI 1.2" },
+  { id: "ai_2_0", label: "AI 2.0" },
 ]);
 
-const STABLE_DEFAULT_AI_PROFILE_ID = "ai_1_2_wave_cohorts";
+const STABLE_DEFAULT_AI_PROFILE_ID = "ai_1_2";
 export const DEFAULT_AI_PROFILE_ID =
   AI_PROFILES.some((entry) => entry.id === STABLE_DEFAULT_AI_PROFILE_ID)
     ? STABLE_DEFAULT_AI_PROFILE_ID

@@ -10,11 +10,15 @@ use serde::Serialize;
 use super::player_view::PlayerView;
 use super::scripts::{ProfileBackedScript, ScriptedPlayer};
 use super::SELFPLAY_ARTIFACT_DIR;
+use crate::ai_core::profile_suites::{
+    available_profile_request_ids as suite_profile_request_ids, canonical_profile_request_id,
+    resolve_profile_request_id as resolve_profile_or_suite_request_id,
+};
 use crate::ai_core::profiles::{
     profile_by_id, required_profiles, AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID,
     AI_1_2_WAVE_COHORTS_ID, AI_2_0_AGENT_RUSH_ID,
 };
-use crate::live::DEFAULT_LIVE_PROFILE_ID;
+use crate::live::{DEFAULT_LIVE_PROFILE_ID, DEFAULT_LIVE_PROFILE_REQUEST_ID};
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::replay::{
     replay_commands, CommandLogEntry, EventLogEntry, PlayerSnapshot, ReplayOutcome,
@@ -324,6 +328,10 @@ pub fn available_profile_ids() -> Vec<&'static str> {
         .collect()
 }
 
+pub fn available_profile_request_ids() -> Vec<&'static str> {
+    suite_profile_request_ids()
+}
+
 pub fn canonical_profile_id(input: &str) -> Option<&'static str> {
     match input {
         "ai" | "default" => Some(DEFAULT_LIVE_PROFILE_ID),
@@ -333,6 +341,21 @@ pub fn canonical_profile_id(input: &str) -> Option<&'static str> {
         "ai_2_0" | "ai20" => Some(AI_2_0_AGENT_RUSH_ID),
         id => profile_by_id(id).map(|profile| profile.id),
     }
+}
+
+pub fn canonical_profile_request_id_for_match(input: &str) -> Option<&'static str> {
+    match input {
+        "ai" | "default" => Some(DEFAULT_LIVE_PROFILE_REQUEST_ID),
+        value => canonical_profile_request_id(value),
+    }
+}
+
+pub fn resolve_profile_request_id_for_match(
+    request_id: &str,
+    seed: u32,
+    selector: u64,
+) -> Option<&'static str> {
+    resolve_profile_or_suite_request_id(request_id, seed, selector)
 }
 
 pub fn run_profile_matchup_result(
@@ -947,11 +970,16 @@ fn final_material_values(game: &Game, players: &[PlayerInit]) -> BTreeMap<u32, M
 #[cfg(test)]
 mod tests {
     use super::{
-        available_profile_ids, canonical_profile_id, run_profile_matchup_result,
-        ProfileMatchupOptions, ScorecardCollector,
+        available_profile_ids, available_profile_request_ids, canonical_profile_id,
+        canonical_profile_request_id_for_match, resolve_profile_request_id_for_match,
+        run_profile_matchup_result, ProfileMatchupOptions, ScorecardCollector,
     };
     use crate::ai_core::profiles::{
         AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID, AI_1_2_WAVE_COHORTS_ID, AI_2_0_AGENT_RUSH_ID,
+        AI_2_0_RIFLE_TANK_ID, AI_2_0_TANK_PRESSURE_ID,
+    };
+    use crate::ai_core::profile_suites::{
+        AI_1_0_SUITE_ID, AI_1_1_SUITE_ID, AI_1_2_SUITE_ID, AI_2_0_SUITE_ID,
     };
     use crate::DEFAULT_LIVE_PROFILE_ID;
     use rts_sim::game::command::SimCommand;
@@ -973,6 +1001,8 @@ mod tests {
                 AI_1_1_TANK_MG_ID,
                 AI_1_2_WAVE_COHORTS_ID,
                 AI_2_0_AGENT_RUSH_ID,
+                AI_2_0_RIFLE_TANK_ID,
+                AI_2_0_TANK_PRESSURE_ID,
             ]
         );
         assert_eq!(
@@ -995,6 +1025,39 @@ mod tests {
         );
         assert_eq!(canonical_profile_id("rifle_flood_full_saturation"), None);
         assert_eq!(canonical_profile_id("saturation"), None);
+    }
+
+    #[test]
+    fn profile_request_aliases_can_resolve_suites_for_seeded_matchups() {
+        assert_eq!(
+            available_profile_request_ids()[0..4],
+            [
+                AI_1_0_SUITE_ID,
+                AI_1_1_SUITE_ID,
+                AI_1_2_SUITE_ID,
+                AI_2_0_SUITE_ID,
+            ]
+        );
+        assert_eq!(
+            canonical_profile_request_id_for_match("ai_2_0"),
+            Some(AI_2_0_SUITE_ID)
+        );
+        assert_eq!(
+            canonical_profile_request_id_for_match("ai"),
+            Some(AI_1_2_SUITE_ID)
+        );
+        assert_eq!(
+            resolve_profile_request_id_for_match(AI_2_0_SUITE_ID, 0, 0),
+            Some(AI_2_0_RIFLE_TANK_ID)
+        );
+        assert_eq!(
+            resolve_profile_request_id_for_match(AI_2_0_SUITE_ID, 1, 0),
+            Some(AI_2_0_TANK_PRESSURE_ID)
+        );
+        assert_eq!(
+            resolve_profile_request_id_for_match(AI_2_0_AGENT_RUSH_ID, 1, 0),
+            Some(AI_2_0_AGENT_RUSH_ID)
+        );
     }
 
     #[test]

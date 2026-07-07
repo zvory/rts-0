@@ -101,8 +101,8 @@ export class Net {
   setTeamPreset(preset)                  // deprecated compatibility command; server ignores it
   setTeam(id, teamId)                    // host-only scripted lobby team assignment
   setFaction(factionId)
-  addAi(teamId?, aiProfileId?)
-  setAiProfile(id, aiProfileId)
+  addAi(teamId?, aiProfileId?)           // AI profile or suite request
+  setAiProfile(id, aiProfileId)          // AI profile or suite request
   removeAi(id)
   setSpectator(spectator, id?)
   command(cmd, clientSeq)                // lower-level sequenced gameplay command envelope

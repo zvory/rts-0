@@ -4,7 +4,8 @@ use serde::Serialize;
 
 use super::profiles::{
     profile_by_id, profile_spec_by_id, AiProfile, AiProfileSpec, AI_1_0_TECH_ID,
-    AI_1_1_TANK_MG_ID, AI_1_2_WAVE_COHORTS_ID,
+    AI_1_1_TANK_MG_ID, AI_1_2_WAVE_COHORTS_ID, AI_2_0_RIFLE_TANK_ID,
+    AI_2_0_TANK_PRESSURE_ID,
 };
 #[cfg(test)]
 use super::profiles::required_profiles;
@@ -152,6 +153,31 @@ fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'sta
                 "second_factory",
             ],
         ),
+        AI_2_0_RIFLE_TANK_ID => (
+            "AI 2.0 Rifle Tank",
+            "AI 2.0 suite member with Rifleman pressure, earlier two-base economy, defensive MGs, and Tank-led mixed waves.",
+            vec![
+                "full_steel_saturation",
+                "early_expansion",
+                "rifle_pressure",
+                "defensive_machine_gunners",
+                "earlier_factory_tank_unlock",
+                "tank_led_mixed_waves",
+                "second_factory",
+            ],
+        ),
+        AI_2_0_TANK_PRESSURE_ID => (
+            "AI 2.0 Tank Pressure",
+            "AI 2.0 suite member with earlier Factory unlock, two Factories, defensive MGs, and faster mixed Tank pressure.",
+            vec![
+                "full_steel_saturation",
+                "early_expansion",
+                "defensive_machine_gunners",
+                "earlier_factory_tank_unlock",
+                "mixed_tank_pressure",
+                "second_factory",
+            ],
+        ),
         _ => (
             "AI Profile",
             "Developer AI profile resolved through the shared profile registry.",
@@ -194,7 +220,9 @@ fn fnv1a64(bytes: &[u8]) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ai_core::profiles::AI_2_0_AGENT_RUSH_ID;
+    use crate::ai_core::profiles::{
+        AI_2_0_AGENT_RUSH_ID, AI_2_0_RIFLE_TANK_ID, AI_2_0_TANK_PRESSURE_ID,
+    };
 
     #[test]
     fn profile_identities_are_complete_and_valid() {
@@ -225,7 +253,24 @@ mod tests {
                 .iter()
                 .map(|overlay| overlay.id.as_str())
                 .collect::<Vec<_>>(),
-            vec!["agent_wave_cohorts"]
+            vec!["agent_rifle_tank_cohorts"]
         );
+    }
+
+    #[test]
+    fn ai_2_0_suite_members_have_specific_manifest_metadata() {
+        let rifle_tank =
+            profile_identity_by_id(AI_2_0_RIFLE_TANK_ID).expect("rifle tank identity");
+        let tank_pressure =
+            profile_identity_by_id(AI_2_0_TANK_PRESSURE_ID).expect("tank pressure identity");
+
+        assert_eq!(rifle_tank.label, "AI 2.0 Rifle Tank");
+        assert!(rifle_tank
+            .modules
+            .contains(&"tank_led_mixed_waves".to_string()));
+        assert_eq!(tank_pressure.label, "AI 2.0 Tank Pressure");
+        assert!(tank_pressure
+            .modules
+            .contains(&"mixed_tank_pressure".to_string()));
     }
 }

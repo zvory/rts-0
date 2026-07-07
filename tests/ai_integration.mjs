@@ -46,14 +46,14 @@ const { ok } = assertions;
   ok(ai && ai.factionId === DEFAULT_FACTION_ID, `AI defaults to ${DEFAULT_FACTION_ID}`);
   ok(ai && ai.aiProfileId === DEFAULT_AI_PROFILE_ID, `AI defaults to ${DEFAULT_AI_PROFILE_ID}`);
 
-  A.send({ t: "setAiProfile", id: ai.id, aiProfileId: "ai_2_0_agent_rush" });
+  A.send({ t: "setAiProfile", id: ai.id, aiProfileId: "ai_2_0" });
   const withAi2 = await A.waitNext(
-    (m) => m.t === "lobby" && m.players.some((p) => p.id === ai.id && p.aiProfileId === "ai_2_0_agent_rush"),
+    (m) => m.t === "lobby" && m.players.some((p) => p.id === ai.id && p.aiProfileId === "ai_2_0"),
     3000,
     "lobby with AI 2.0 selected",
   );
   ok(
-    withAi2.players.some((p) => p.id === ai.id && p.aiProfileId === "ai_2_0_agent_rush"),
+    withAi2.players.some((p) => p.id === ai.id && p.aiProfileId === "ai_2_0"),
     "host can select AI 2.0 for an AI seat",
   );
 
