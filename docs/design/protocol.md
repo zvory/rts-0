@@ -463,9 +463,10 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
 }
 ```
 Units/buildings arrive via snapshots (so they obey fog), including the player's own starting
-loadout from the validated faction catalog. Normal solo starts may skip countdown because they are
-solo rooms, but they still use ordinary starting resources and ordinary faction loadouts. Dev
-scenario start payloads may advertise `diagnostics.movementPaths: "all"` because those rooms
+loadout from the validated faction catalog. Normal live starts may skip countdown when there are
+one or zero active human seats, including one-human-vs-AI and AI-only rooms, but they still use
+ordinary starting resources and ordinary faction loadouts. Dev scenario start payloads may
+advertise `diagnostics.movementPaths: "all"` because those rooms
 intentionally use full-world diagnostic projection. Replay viewers and live spectators receive
 `diagnostics.observerAnalysis: true` only
 when room projection policy will send observer-analysis payloads to that recipient.
