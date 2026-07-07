@@ -1,7 +1,5 @@
 #![allow(dead_code)]
 
-use std::sync::OnceLock;
-
 use rts_sim::game::entity::EntityKind;
 
 pub(crate) const RIFLE_FLOOD_FAST_ID: &str = "rifle_flood_fast";
@@ -11,7 +9,6 @@ pub(crate) const STEEL_EXPANSION_TANKS_ID: &str = "steel_expansion_tanks";
 pub(crate) const AI_1_0_TECH_ID: &str = "ai_1_0_tech";
 pub(crate) const AI_1_1_TANK_MG_ID: &str = "ai_1_1_tank_mg";
 pub(crate) const AI_1_2_WAVE_COHORTS_ID: &str = "ai_1_2_wave_cohorts";
-pub(crate) const AI_2_0_AGENT_RUSH_ID: &str = "ai_2_0_agent_rush";
 pub(crate) const AI_2_0_RIFLE_TANK_ID: &str = "ai_2_0_rifle_tank";
 pub(crate) const AI_2_0_TANK_PRESSURE_ID: &str = "ai_2_0_tank_pressure";
 
@@ -59,41 +56,6 @@ pub(crate) struct AiProfile {
     pub(crate) frontal_wave: FrontalWavePolicy,
     pub(crate) recovery_transition: Option<RecoveryTransitionPolicy>,
     pub(crate) tech_transition: Option<TechTransitionPolicy>,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct AiProfileSpec {
-    pub(crate) id: &'static str,
-    pub(crate) label: &'static str,
-    pub(crate) base_profile_id: &'static str,
-    pub(crate) base_profile: &'static AiProfile,
-    pub(crate) overlays: &'static [AiProfileOverlay],
-    pub(crate) modules: &'static [&'static str],
-    pub(crate) summary: &'static str,
-}
-
-impl AiProfileSpec {
-    pub(crate) fn resolve(self) -> AiProfile {
-        let mut profile = *self.base_profile;
-        profile.id = self.id;
-        for overlay in self.overlays {
-            overlay.apply(&mut profile);
-        }
-        profile
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct AiProfileOverlay {
-    pub(crate) id: &'static str,
-    pub(crate) summary: &'static str,
-    pub(crate) apply: fn(&mut AiProfile),
-}
-
-impl AiProfileOverlay {
-    fn apply(self, profile: &mut AiProfile) {
-        (self.apply)(profile);
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -311,7 +273,6 @@ const TANK_AND_RIFLE: [EntityKind; 2] = [EntityKind::Tank, EntityKind::Rifleman]
 const TANK_SCOUT_RIFLE: [EntityKind; 3] =
     [EntityKind::Tank, EntityKind::ScoutCar, EntityKind::Rifleman];
 const TANK_ONLY: [EntityKind; 1] = [EntityKind::Tank];
-const TANK_RIFLE: [EntityKind; 2] = [EntityKind::Tank, EntityKind::Rifleman];
 const SUPPORT_WEAPONS: [EntityKind; 2] = [EntityKind::MachineGunner, EntityKind::AntiTankGun];
 const SUPPORT_WEAPONS_AND_RIFLE: [EntityKind; 3] = [
     EntityKind::MachineGunner,
@@ -955,7 +916,7 @@ pub(crate) static AI_2_0_TANK_PRESSURE: AiProfile = AiProfile {
         required_tech_path: &AI_1_0_TANK_TECH_PATH,
         production: ProductionPolicy {
             queue_depth: 3,
-            unit_priorities: &TANK_RIFLE,
+            unit_priorities: &TANK_AND_RIFLE,
             save_for_first_tech_unit: None,
             balance_unit_priorities: false,
         },
@@ -965,7 +926,7 @@ pub(crate) static AI_2_0_TANK_PRESSURE: AiProfile = AiProfile {
             regroup_reset_ticks: 480,
             reissue_cadence_ticks: 120,
             stage_distance_tiles: 8.0,
-            unit_kinds: &TANK_RIFLE,
+            unit_kinds: &TANK_AND_RIFLE,
             required_unit: None,
         },
     }),
@@ -994,7 +955,7 @@ pub(crate) static AI_2_0_RIFLE_TANK: AiProfile = AiProfile {
         required_tech_path: &AI_1_0_TANK_TECH_PATH,
         production: ProductionPolicy {
             queue_depth: 2,
-            unit_priorities: &TANK_RIFLE,
+            unit_priorities: &TANK_AND_RIFLE,
             save_for_first_tech_unit: Some(EntityKind::Tank),
             balance_unit_priorities: false,
         },
@@ -1004,90 +965,17 @@ pub(crate) static AI_2_0_RIFLE_TANK: AiProfile = AiProfile {
             regroup_reset_ticks: 480,
             reissue_cadence_ticks: 120,
             stage_distance_tiles: 8.0,
-            unit_kinds: &TANK_RIFLE,
+            unit_kinds: &TANK_AND_RIFLE,
             required_unit: Some(EntityKind::Tank),
         },
     }),
 };
 
-const AI_2_0_MODULES: [&str; 7] = [
-    "full_steel_saturation",
-    "early_expansion",
-    "bounded_decision_trace",
-    "rifle_pressure",
-    "defensive_machine_gunners",
-    "earlier_factory_tank_unlock",
-    "tank_pivot",
-];
-
-const AI_2_0_OVERLAYS: [AiProfileOverlay; 1] = [
-    AiProfileOverlay {
-        id: "agent_rifle_tank_cohorts",
-        summary: "Uses cohort staging, a small defensive MG screen, and an earlier Factory tank pivot.",
-        apply: apply_agent_wave_cohorts,
-    },
-];
-
-fn apply_agent_wave_cohorts(profile: &mut AiProfile) {
-    profile.defensive_machine_gunners = Some(DefensiveMachineGunnerPolicy { target_count: 2 });
-    profile.extra_factories = Some(ExtraFactoryPolicy {
-        target_count: 2,
-        resource_float: AI_2_0_SECOND_FACTORY_FLOAT_THRESHOLD,
-    });
-    profile.frontal_wave = FrontalWavePolicy {
-        exclude_launched_ticks: Some(AI_1_2_FRONTAL_COHORT_TICKS),
-        line_staging: true,
-    };
-    profile.tech_transition = Some(TechTransitionPolicy {
-        resource_float: AI_2_0_RIFLE_TANK_FLOAT_THRESHOLD,
-        required_tech_path: &AI_1_0_TANK_TECH_PATH,
-        production: ProductionPolicy {
-            queue_depth: 2,
-            unit_priorities: &TANK_AND_RIFLE,
-            save_for_first_tech_unit: Some(EntityKind::Tank),
-            balance_unit_priorities: false,
-        },
-        attack: AttackPolicy {
-            first_attack_size: 2,
-            wave_growth: 1,
-            regroup_reset_ticks: 480,
-            reissue_cadence_ticks: 120,
-            stage_distance_tiles: 8.0,
-            unit_kinds: &TANK_AND_RIFLE,
-            required_unit: Some(EntityKind::Tank),
-        },
-    });
-}
-
-pub(crate) static AI_2_0_AGENT_RUSH_SPEC: AiProfileSpec = AiProfileSpec {
-    id: AI_2_0_AGENT_RUSH_ID,
-    label: "AI 2.0 Agent Rush",
-    base_profile_id: RIFLE_FLOOD_FULL_SATURATION_ID,
-    base_profile: &RIFLE_FLOOD_FULL_SATURATION,
-    overlays: &AI_2_0_OVERLAYS,
-    modules: &AI_2_0_MODULES,
-    summary: "Agent-legible saturation Rifleman pressure that records its module stack, expands early, and uses cohort staging while it pivots to tanks.",
-};
-
-static AI_2_0_AGENT_RUSH: OnceLock<AiProfile> = OnceLock::new();
-
-pub(crate) fn ai_2_0_agent_rush() -> &'static AiProfile {
-    AI_2_0_AGENT_RUSH.get_or_init(|| AI_2_0_AGENT_RUSH_SPEC.resolve())
-}
-
-pub(crate) fn profile_spec_by_id(id: &str) -> Option<&'static AiProfileSpec> {
-    match id {
-        AI_2_0_AGENT_RUSH_ID => Some(&AI_2_0_AGENT_RUSH_SPEC),
-        _ => None,
-    }
-}
-
-pub(crate) fn required_profiles() -> [&'static AiProfile; 6] {
+pub(crate) fn required_profiles() -> [&'static AiProfile; 5] {
     [
         &AI_1_0_TECH,
         &AI_1_1_TANK_MG,
         &AI_1_2_WAVE_COHORTS,
-        ai_2_0_agent_rush(),
         &AI_2_0_RIFLE_TANK,
         &AI_2_0_TANK_PRESSURE,
     ]
@@ -1113,7 +1001,6 @@ mod tests {
                 AI_1_0_TECH_ID,
                 AI_1_1_TANK_MG_ID,
                 AI_1_2_WAVE_COHORTS_ID,
-                AI_2_0_AGENT_RUSH_ID,
                 AI_2_0_RIFLE_TANK_ID,
                 AI_2_0_TANK_PRESSURE_ID,
             ]
@@ -1126,10 +1013,6 @@ mod tests {
         assert_eq!(
             profile_by_id(AI_1_2_WAVE_COHORTS_ID).unwrap().id,
             AI_1_2_WAVE_COHORTS_ID
-        );
-        assert_eq!(
-            profile_by_id(AI_2_0_AGENT_RUSH_ID).unwrap().id,
-            AI_2_0_AGENT_RUSH_ID
         );
         assert_eq!(
             profile_by_id(AI_2_0_RIFLE_TANK_ID).unwrap().id,
@@ -1153,7 +1036,6 @@ mod tests {
             &AI_1_0_TECH,
             &AI_1_1_TANK_MG,
             &AI_1_2_WAVE_COHORTS,
-            ai_2_0_agent_rush(),
             &AI_2_0_RIFLE_TANK,
             &AI_2_0_TANK_PRESSURE,
         ] {
@@ -1182,57 +1064,8 @@ mod tests {
     }
 
     #[test]
-    fn ai_2_0_resolves_from_agent_legible_overlay_spec() {
-        let resolved = AI_2_0_AGENT_RUSH_SPEC.resolve();
-        let profile = ai_2_0_agent_rush();
-
-        assert_eq!(&resolved, profile);
-        assert_eq!(profile.id, AI_2_0_AGENT_RUSH_ID);
-        assert_eq!(
-            AI_2_0_AGENT_RUSH_SPEC.base_profile_id,
-            RIFLE_FLOOD_FULL_SATURATION_ID
-        );
-        assert_eq!(
-            AI_2_0_AGENT_RUSH_SPEC
-                .overlays
-                .iter()
-                .map(|overlay| overlay.id)
-                .collect::<Vec<_>>(),
-            vec!["agent_rifle_tank_cohorts"]
-        );
-        assert_eq!(profile.production, RIFLE_FLOOD_FULL_SATURATION.production);
-        assert_eq!(profile.workers, RIFLE_FLOOD_FULL_SATURATION.workers);
-        assert_eq!(
-            profile.defensive_machine_gunners,
-            Some(DefensiveMachineGunnerPolicy { target_count: 2 })
-        );
-        assert_eq!(
-            profile.extra_factories,
-            Some(ExtraFactoryPolicy {
-                target_count: 2,
-                resource_float: AI_2_0_SECOND_FACTORY_FLOAT_THRESHOLD,
-            })
-        );
-        assert_eq!(
-            profile.frontal_wave,
-            FrontalWavePolicy {
-                exclude_launched_ticks: Some(AI_1_2_FRONTAL_COHORT_TICKS),
-                line_staging: true,
-            }
-        );
-        assert_eq!(
-            profile.tech_transition.unwrap().required_tech_path,
-            &[
-                EntityKind::Barracks,
-                EntityKind::TrainingCentre,
-                EntityKind::ResearchComplex,
-                EntityKind::Factory
-            ]
-        );
-        assert_eq!(
-            profile.tech_transition.unwrap().resource_float,
-            AI_2_0_RIFLE_TANK_FLOAT_THRESHOLD
-        );
+    fn retired_ai_2_0_agent_rush_profile_id_is_not_registered() {
+        assert!(profile_by_id("ai_2_0_agent_rush").is_none());
     }
 
     #[test]
@@ -1296,8 +1129,11 @@ mod tests {
             AI_2_0_RIFLE_TANK.defensive_machine_gunners,
             Some(DefensiveMachineGunnerPolicy { target_count: 3 })
         );
-        assert_eq!(transition.production.unit_priorities, &TANK_RIFLE);
-        assert_eq!(transition.production.save_for_first_tech_unit, Some(EntityKind::Tank));
+        assert_eq!(transition.production.unit_priorities, &TANK_AND_RIFLE);
+        assert_eq!(
+            transition.production.save_for_first_tech_unit,
+            Some(EntityKind::Tank)
+        );
         assert_eq!(transition.attack.first_attack_size, 3);
         assert_eq!(transition.attack.required_unit, Some(EntityKind::Tank));
     }

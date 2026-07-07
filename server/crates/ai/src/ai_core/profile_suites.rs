@@ -2,8 +2,6 @@ use super::profiles::{
     profile_by_id, AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID, AI_1_2_WAVE_COHORTS_ID,
     AI_2_0_RIFLE_TANK_ID, AI_2_0_TANK_PRESSURE_ID,
 };
-#[cfg(test)]
-use super::profiles::AI_2_0_AGENT_RUSH_ID;
 
 pub(crate) const AI_1_0_SUITE_ID: &str = "ai_1_0";
 pub(crate) const AI_1_1_SUITE_ID: &str = "ai_1_1";
@@ -109,10 +107,8 @@ mod tests {
         assert_eq!(canonical_profile_request_id("ai_1_1"), Some(AI_1_1_SUITE_ID));
         assert_eq!(canonical_profile_request_id("ai12"), Some(AI_1_2_SUITE_ID));
         assert_eq!(canonical_profile_request_id("ai_2_0"), Some(AI_2_0_SUITE_ID));
-        assert_eq!(
-            canonical_profile_request_id(AI_2_0_AGENT_RUSH_ID),
-            Some(AI_2_0_AGENT_RUSH_ID)
-        );
+        assert_eq!(canonical_profile_request_id(AI_2_0_RIFLE_TANK_ID), Some(AI_2_0_RIFLE_TANK_ID));
+        assert_eq!(canonical_profile_request_id("ai_2_0_agent_rush"), None);
         assert_eq!(canonical_profile_request_id("missing"), None);
     }
 

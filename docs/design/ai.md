@@ -59,11 +59,9 @@ combat target selection, and blockers such as waiting for units, waiting for a r
 waiting for Methamphetamines, and cadence. Final command emission still goes through
 `AiActionContext` and `ai_core::actions`.
 
-Profile experiments can be described as `AiProfileSpec`s: a stable profile id, a base profile, and
-a small ordered set of overlays or feature modules. The resolver validates every spec, produces the
-concrete `AiProfile`, and records a profile identity with base id, overlay ids, module names, and a
-fingerprint for arena artifacts. This keeps experimental variants inspectable without forking the
-whole decision tree or changing the live lobby contract.
+Profile experiments are registered as concrete `AiProfile` entries with stable ids and manifest
+metadata. The manifest records module names and a fingerprint for arena artifacts, keeping promoted
+variants inspectable without changing the live lobby contract.
 
 The economy plan is backed by an AI-owned resource availability model derived only from the
 fog-filtered observation, public start-payload resource positions, completed own City Centres,
@@ -149,8 +147,8 @@ Tank-led mixed waves, and `ai_2_0_tank_pressure`, which pivots earlier into fast
 Tank/Rifleman pressure. Both members expand off the shared two-base economy plan, reserve defensive
 Machine Gunners, unlock Factory production earlier than AI 1.2, and target a second Factory once the
 economy can support it. Exact concrete profile ids remain registered for arena pinning, replay
-debugging, and profile-manifest fingerprints; `ai_2_0_agent_rush` remains available as an exact
-agent-legible experiment but is not the promoted suite request.
+debugging, and profile-manifest fingerprints. The retired `ai_2_0_agent_rush` profile remains
+rejected.
 
 The suite aliases `ai_2_0` and `ai20` resolve to the AI 2.0 suite request in live and arena-style
 tooling; `ai_1_2` and `ai12` resolve to the AI 1.2 suite request; `ai_1_1` and `ai11` resolve to

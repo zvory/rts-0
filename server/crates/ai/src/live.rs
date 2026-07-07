@@ -16,7 +16,7 @@ use crate::ai_core::profiles::{
     profile_by_id, AiProfile, AI_1_0_TECH, AI_1_2_WAVE_COHORTS_ID,
 };
 #[cfg(test)]
-use crate::ai_core::profiles::{AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID, AI_2_0_AGENT_RUSH_ID};
+use crate::ai_core::profiles::{AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID};
 use crate::ai_shared;
 use crate::selfplay::pending_build::PendingBuildTracker;
 use crate::selfplay::player_view::{
@@ -404,10 +404,7 @@ mod tests {
             canonical_live_profile_id("ai20"),
             Some(AI_2_0_SUITE_ID)
         );
-        assert_eq!(
-            canonical_live_profile_id("ai_2_0_agent_rush"),
-            Some(AI_2_0_AGENT_RUSH_ID)
-        );
+        assert_eq!(canonical_live_profile_id("ai_2_0_agent_rush"), None);
         assert_eq!(canonical_live_profile_id("rifle_flood_fast"), None);
     }
 
@@ -421,9 +418,5 @@ mod tests {
             resolve_live_profile_id_for_match(AI_2_0_SUITE_ID, 8, 2),
             "ai_2_0_rifle_tank" | "ai_2_0_tank_pressure"
         ));
-        assert_eq!(
-            resolve_live_profile_id_for_match(AI_2_0_AGENT_RUSH_ID, 8, 2),
-            AI_2_0_AGENT_RUSH_ID
-        );
     }
 }

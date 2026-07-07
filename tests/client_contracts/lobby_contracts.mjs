@@ -52,9 +52,15 @@ import { textWithin } from "./dom_text.mjs";
     PLAYABLE_FACTIONS.find((entry) => entry.id === "ekat")?.label === "Ekat",
     "lobby faction selector labels the ekat faction as Ekat",
   );
-  assert(
-    AI_PROFILES.some((entry) => entry.id === "ai_2_0" && entry.label === "AI 2.0"),
-    "lobby AI profile selector lists AI 2.0",
+  assertDeepEqual(
+    AI_PROFILES,
+    [
+      { id: "ai_1_0", label: "AI 1.0" },
+      { id: "ai_1_1", label: "AI 1.1" },
+      { id: "ai_1_2", label: "AI 1.2" },
+      { id: "ai_2_0", label: "AI 2.0" },
+    ],
+    "lobby AI profile selector lists supported AI suites",
   );
   assert(
     betaFactionSelectEnabledForLocation({ hostname: "rts-0-zvorygin-beta.fly.dev", pathname: "/" }),
