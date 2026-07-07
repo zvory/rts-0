@@ -52,9 +52,14 @@ import { textWithin } from "./dom_text.mjs";
     PLAYABLE_FACTIONS.find((entry) => entry.id === "ekat")?.label === "Ekat",
     "lobby faction selector labels the ekat faction as Ekat",
   );
-  assert(
-    AI_PROFILES.some((entry) => entry.id === "ai_2_0_agent_rush" && entry.label === "AI 2.0"),
-    "lobby AI profile selector lists AI 2.0",
+  assertDeepEqual(
+    AI_PROFILES,
+    [
+      { id: "ai_1_0_tech", label: "AI 1.0" },
+      { id: "ai_1_1_tank_mg", label: "AI 1.1" },
+      { id: "ai_1_2_wave_cohorts", label: "AI 1.2" },
+    ],
+    "lobby AI profile selector lists supported AI profiles",
   );
   assert(
     betaFactionSelectEnabledForLocation({ hostname: "rts-0-zvorygin-beta.fly.dev", pathname: "/" }),
@@ -158,7 +163,7 @@ import { textWithin } from "./dom_text.mjs";
           ready: true,
           teamId: 2,
           isAi: true,
-          aiProfileId: "ai_2_0_agent_rush",
+          aiProfileId: "ai_1_1_tank_mg",
         },
       ],
       myId: 1,
@@ -177,12 +182,12 @@ import { textWithin } from "./dom_text.mjs";
       (el) => el.tagName === "SELECT" && el.className === "player-ai-profile-select",
     )[0];
     assert(!!select, "host lobby renders an AI profile selector");
-    assert(select.value === "ai_2_0_agent_rush", "AI 2.0 profile state is selected in the lobby");
+    assert(select.value === "ai_1_1_tank_mg", "AI 1.1 profile state is selected in the lobby");
     assert(
       select.children.some(
-        (option) => option.value === "ai_2_0_agent_rush" && option.textContent === "AI 2.0",
+        (option) => option.value === "ai_1_1_tank_mg" && option.textContent === "AI 1.1",
       ),
-      "AI profile selector includes the AI 2.0 option",
+      "AI profile selector includes the AI 1.1 option",
     );
 
     select.value = "ai_1_2_wave_cohorts";

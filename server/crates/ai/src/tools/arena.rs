@@ -15,14 +15,14 @@ use crate::ai_core::profile_manifest::{
     profile_identity_by_id, validate_profile_identity, AiProfileIdentity,
 };
 use crate::selfplay::{
-    canonical_profile_id, run_profile_matchup_result, server_build_sha, ProfileMatchupOptions,
-    ProfileMatchupEndReason, ProfileMatchupResult, ProfileMatchupTraceEntry,
+    canonical_profile_id, run_profile_matchup_result, server_build_sha, ProfileMatchupEndReason,
+    ProfileMatchupOptions, ProfileMatchupResult, ProfileMatchupTraceEntry,
 };
 
 const DEFAULT_TICKS: u32 = 25_000;
 const DEFAULT_SEEDS: u32 = 3;
-const DEFAULT_CANDIDATE: &str = "ai_2_0_agent_rush";
-const DEFAULT_BASELINE: &str = "ai_1_2_wave_cohorts";
+const DEFAULT_CANDIDATE: &str = "ai_1_2_wave_cohorts";
+const DEFAULT_BASELINE: &str = "ai_1_1_tank_mg";
 const ARENA_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug)]
@@ -229,7 +229,8 @@ fn run_arena(config: &CliConfig) -> Result<ArenaReport, String> {
             ArenaSide::CandidatePlayerOne => (config.candidate.clone(), config.baseline.clone()),
             ArenaSide::CandidatePlayerTwo => (config.baseline.clone(), config.candidate.clone()),
         };
-        let replay_name = run_artifact_name(&config.candidate, &config.baseline, job.seed, job.side);
+        let replay_name =
+            run_artifact_name(&config.candidate, &config.baseline, job.seed, job.side);
         let result = run_profile_matchup_result(ProfileMatchupOptions {
             profile_a,
             profile_b,
@@ -284,8 +285,8 @@ fn write_run_sidecars(
     let baseline_player_id = if candidate_player_id == 1 { 2 } else { 1 };
     let candidate_identity = profile_identity_by_id(candidate)
         .ok_or_else(|| format!("unknown candidate profile {candidate}"))?;
-    let baseline_identity =
-        profile_identity_by_id(baseline).ok_or_else(|| format!("unknown baseline profile {baseline}"))?;
+    let baseline_identity = profile_identity_by_id(baseline)
+        .ok_or_else(|| format!("unknown baseline profile {baseline}"))?;
     validate_profile_identity(&candidate_identity)?;
     validate_profile_identity(&baseline_identity)?;
 
@@ -315,7 +316,10 @@ fn write_run_sidecars(
     };
     write_json(artifact_dir.join("manifest.json"), &run.manifest)?;
     write_json(artifact_dir.join("summary.json"), &run)?;
-    write_trace_jsonl(artifact_dir.join("decision-trace.jsonl"), &result.ai_trace_tail)?;
+    write_trace_jsonl(
+        artifact_dir.join("decision-trace.jsonl"),
+        &result.ai_trace_tail,
+    )?;
     std::fs::write(artifact_dir.join("brief.md"), brief_markdown(&run))
         .map_err(|err| err.to_string())?;
     Ok(run)
@@ -440,10 +444,7 @@ fn brief_markdown(run: &ArenaRunSummary) -> String {
     ));
     text.push_str(&format!(
         "- Replay: {}\n\n",
-        result
-            .replay_artifact
-            .as_deref()
-            .unwrap_or("not saved")
+        result.replay_artifact.as_deref().unwrap_or("not saved")
     ));
     text.push_str("## Profiles\n\n");
     for identity in run.manifest.profiles.values() {
@@ -651,8 +652,7 @@ mod tests {
     #[test]
     fn trace_labels_are_searchable() {
         let labels = trace_labels(&[
-            "goal=Economy status=Selected blockers=- intents=Train:Worker,Gather:Steel"
-                .to_string(),
+            "goal=Economy status=Selected blockers=- intents=Train:Worker,Gather:Steel".to_string(),
             "goal=FrontalAttack status=Skipped blockers=WaitingForUnits,AttackCadence intents=-"
                 .to_string(),
             "command=Train:Rifleman".to_string(),
@@ -665,7 +665,7 @@ mod tests {
     }
 
     #[test]
-    fn default_arena_parse_uses_ai_2_0_candidate_and_current_default_baseline() {
+    fn default_arena_parse_uses_current_profile_candidate_and_previous_baseline() {
         let config = parse_args(Vec::<String>::new())
             .expect("default args should parse")
             .expect("default args should produce config");
@@ -677,7 +677,12 @@ mod tests {
 
     #[test]
     fn tick_cap_draw_is_not_scored_by_army_value() {
-        let result = profile_result(crate::selfplay::ProfileMatchupEndReason::TickCap, None, 200, 100);
+        let result = profile_result(
+            crate::selfplay::ProfileMatchupEndReason::TickCap,
+            None,
+            200,
+            100,
+        );
 
         let outcome = outcome_for(&result, 1, 2);
 
@@ -745,7 +750,10 @@ mod tests {
         }
     }
 
-    fn player_result(player_id: u32, army_value: u32) -> crate::selfplay::ProfileMatchupPlayerResult {
+    fn player_result(
+        player_id: u32,
+        army_value: u32,
+    ) -> crate::selfplay::ProfileMatchupPlayerResult {
         crate::selfplay::ProfileMatchupPlayerResult {
             player_id,
             profile: profile_for_player(player_id).to_string(),

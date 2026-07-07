@@ -10,7 +10,7 @@ use crate::ai_core::decision::{decide_profile, AiDecisionMemory};
 use crate::ai_core::observation::AiObservation;
 use crate::ai_core::profiles::{
     profile_by_id, AiProfile, AI_1_0_TECH, AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID,
-    AI_1_2_WAVE_COHORTS_ID, AI_2_0_AGENT_RUSH_ID,
+    AI_1_2_WAVE_COHORTS_ID,
 };
 use crate::ai_shared;
 use crate::selfplay::pending_build::PendingBuildTracker;
@@ -31,12 +31,7 @@ const LIVE_DECISION_TRACE_TRUNCATED_LINE: &str = "trace_truncated=true";
 pub const DEFAULT_LIVE_PROFILE_ID: &str = AI_1_2_WAVE_COHORTS_ID;
 
 /// Profiles available to ordinary lobby AI opponents.
-pub const LIVE_PROFILE_IDS: [&str; 4] = [
-    AI_1_0_TECH_ID,
-    AI_1_1_TANK_MG_ID,
-    AI_1_2_WAVE_COHORTS_ID,
-    AI_2_0_AGENT_RUSH_ID,
-];
+pub const LIVE_PROFILE_IDS: [&str; 3] = [AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID, AI_1_2_WAVE_COHORTS_ID];
 
 pub fn canonical_live_profile_id(input: &str) -> Option<&'static str> {
     match input {
@@ -44,7 +39,6 @@ pub fn canonical_live_profile_id(input: &str) -> Option<&'static str> {
         "ai1" | "ai_1_0" | "ai_1_0_tech" => Some(AI_1_0_TECH_ID),
         "ai_1_1" | "ai11" | "ai_1_1_tank_mg" => Some(AI_1_1_TANK_MG_ID),
         "ai_1_2" | "ai12" | "ai_1_2_wave_cohorts" => Some(AI_1_2_WAVE_COHORTS_ID),
-        "ai_2_0" | "ai20" | "ai_2_0_agent_rush" => Some(AI_2_0_AGENT_RUSH_ID),
         _ => None,
     }
 }
@@ -322,19 +316,14 @@ mod tests {
     fn live_profile_pool_exposes_supported_lobby_profiles() {
         assert_eq!(
             LIVE_PROFILE_IDS,
-            [
-                AI_1_0_TECH_ID,
-                AI_1_1_TANK_MG_ID,
-                AI_1_2_WAVE_COHORTS_ID,
-                AI_2_0_AGENT_RUSH_ID,
-            ]
+            [AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID, AI_1_2_WAVE_COHORTS_ID,]
         );
     }
 
     #[test]
     fn live_default_stays_on_stable_promoted_profile() {
         assert_eq!(DEFAULT_LIVE_PROFILE_ID, AI_1_2_WAVE_COHORTS_ID);
-        assert!(LIVE_PROFILE_IDS.contains(&AI_2_0_AGENT_RUSH_ID));
+        assert!(LIVE_PROFILE_IDS.contains(&DEFAULT_LIVE_PROFILE_ID));
     }
 
     #[test]
@@ -355,32 +344,21 @@ mod tests {
 
     #[test]
     fn live_profile_aliases_are_bounded_to_supported_profiles() {
-        assert_eq!(canonical_live_profile_id("ai"), Some(DEFAULT_LIVE_PROFILE_ID));
+        assert_eq!(
+            canonical_live_profile_id("ai"),
+            Some(DEFAULT_LIVE_PROFILE_ID)
+        );
         assert_eq!(
             canonical_live_profile_id("default"),
             Some(DEFAULT_LIVE_PROFILE_ID)
         );
         assert_eq!(canonical_live_profile_id("ai_1_0"), Some(AI_1_0_TECH_ID));
-        assert_eq!(
-            canonical_live_profile_id("ai_1_1"),
-            Some(AI_1_1_TANK_MG_ID)
-        );
+        assert_eq!(canonical_live_profile_id("ai_1_1"), Some(AI_1_1_TANK_MG_ID));
         assert_eq!(
             canonical_live_profile_id("ai_1_2"),
             Some(AI_1_2_WAVE_COHORTS_ID)
         );
-        assert_eq!(
-            canonical_live_profile_id("ai_2_0"),
-            Some(AI_2_0_AGENT_RUSH_ID)
-        );
-        assert_eq!(
-            canonical_live_profile_id("ai20"),
-            Some(AI_2_0_AGENT_RUSH_ID)
-        );
-        assert_eq!(
-            canonical_live_profile_id("ai_2_0_agent_rush"),
-            Some(AI_2_0_AGENT_RUSH_ID)
-        );
+        assert_eq!(canonical_live_profile_id("retired_profile"), None);
         assert_eq!(canonical_live_profile_id("rifle_flood_fast"), None);
     }
 }

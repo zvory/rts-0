@@ -1,7 +1,5 @@
 #![allow(dead_code)]
 
-use std::sync::OnceLock;
-
 use rts_sim::game::entity::EntityKind;
 
 pub(crate) const RIFLE_FLOOD_FAST_ID: &str = "rifle_flood_fast";
@@ -11,7 +9,6 @@ pub(crate) const STEEL_EXPANSION_TANKS_ID: &str = "steel_expansion_tanks";
 pub(crate) const AI_1_0_TECH_ID: &str = "ai_1_0_tech";
 pub(crate) const AI_1_1_TANK_MG_ID: &str = "ai_1_1_tank_mg";
 pub(crate) const AI_1_2_WAVE_COHORTS_ID: &str = "ai_1_2_wave_cohorts";
-pub(crate) const AI_2_0_AGENT_RUSH_ID: &str = "ai_2_0_agent_rush";
 
 const AI_1_2_FRONTAL_COHORT_TICKS: u32 = 3_600;
 const TANK_TECH_FLOAT_THRESHOLD: ResourceFloatThreshold = ResourceFloatThreshold {
@@ -880,59 +877,12 @@ pub(crate) static AI_1_2_WAVE_COHORTS: AiProfile = AiProfile {
     tech_transition: AI_1_1_TANK_MG.tech_transition,
 };
 
-const AI_2_0_MODULES: [&str; 5] = [
-    "full_steel_saturation",
-    "early_expansion",
-    "bounded_decision_trace",
-    "rifle_pressure",
-    "tank_pivot",
-];
-
-const AI_2_0_OVERLAYS: [AiProfileOverlay; 1] = [
-    AiProfileOverlay {
-        id: "agent_wave_cohorts",
-        summary: "Uses AI 1.2-style line staging and launched-unit exclusion for post-rush combat groups.",
-        apply: apply_agent_wave_cohorts,
-    },
-];
-
-fn apply_agent_wave_cohorts(profile: &mut AiProfile) {
-    profile.frontal_wave = FrontalWavePolicy {
-        exclude_launched_ticks: Some(AI_1_2_FRONTAL_COHORT_TICKS),
-        line_staging: true,
-    };
+pub(crate) fn profile_spec_by_id(_id: &str) -> Option<&'static AiProfileSpec> {
+    None
 }
 
-pub(crate) static AI_2_0_AGENT_RUSH_SPEC: AiProfileSpec = AiProfileSpec {
-    id: AI_2_0_AGENT_RUSH_ID,
-    label: "AI 2.0 Agent Rush",
-    base_profile_id: RIFLE_FLOOD_FULL_SATURATION_ID,
-    base_profile: &RIFLE_FLOOD_FULL_SATURATION,
-    overlays: &AI_2_0_OVERLAYS,
-    modules: &AI_2_0_MODULES,
-    summary: "Agent-legible saturation Rifleman pressure that records its module stack, expands early, and uses cohort staging while it pivots to tanks.",
-};
-
-static AI_2_0_AGENT_RUSH: OnceLock<AiProfile> = OnceLock::new();
-
-pub(crate) fn ai_2_0_agent_rush() -> &'static AiProfile {
-    AI_2_0_AGENT_RUSH.get_or_init(|| AI_2_0_AGENT_RUSH_SPEC.resolve())
-}
-
-pub(crate) fn profile_spec_by_id(id: &str) -> Option<&'static AiProfileSpec> {
-    match id {
-        AI_2_0_AGENT_RUSH_ID => Some(&AI_2_0_AGENT_RUSH_SPEC),
-        _ => None,
-    }
-}
-
-pub(crate) fn required_profiles() -> [&'static AiProfile; 4] {
-    [
-        &AI_1_0_TECH,
-        &AI_1_1_TANK_MG,
-        &AI_1_2_WAVE_COHORTS,
-        ai_2_0_agent_rush(),
-    ]
+pub(crate) fn required_profiles() -> [&'static AiProfile; 3] {
+    [&AI_1_0_TECH, &AI_1_1_TANK_MG, &AI_1_2_WAVE_COHORTS]
 }
 
 pub(crate) fn profile_by_id(id: &str) -> Option<&'static AiProfile> {
@@ -951,12 +901,7 @@ mod tests {
 
         assert_eq!(
             profiles.map(|profile| profile.id),
-            [
-                AI_1_0_TECH_ID,
-                AI_1_1_TANK_MG_ID,
-                AI_1_2_WAVE_COHORTS_ID,
-                AI_2_0_AGENT_RUSH_ID,
-            ]
+            [AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID, AI_1_2_WAVE_COHORTS_ID,]
         );
         assert_eq!(profile_by_id(AI_1_0_TECH_ID).unwrap().id, AI_1_0_TECH_ID);
         assert_eq!(
@@ -966,10 +911,6 @@ mod tests {
         assert_eq!(
             profile_by_id(AI_1_2_WAVE_COHORTS_ID).unwrap().id,
             AI_1_2_WAVE_COHORTS_ID
-        );
-        assert_eq!(
-            profile_by_id(AI_2_0_AGENT_RUSH_ID).unwrap().id,
-            AI_2_0_AGENT_RUSH_ID
         );
         assert!(profile_by_id("tech_tree").is_none());
     }
@@ -985,7 +926,6 @@ mod tests {
             &AI_1_0_TECH,
             &AI_1_1_TANK_MG,
             &AI_1_2_WAVE_COHORTS,
-            ai_2_0_agent_rush(),
         ] {
             for unit in omitted_units {
                 assert!(
@@ -1012,42 +952,9 @@ mod tests {
     }
 
     #[test]
-    fn ai_2_0_resolves_from_agent_legible_overlay_spec() {
-        let resolved = AI_2_0_AGENT_RUSH_SPEC.resolve();
-        let profile = ai_2_0_agent_rush();
-
-        assert_eq!(&resolved, profile);
-        assert_eq!(profile.id, AI_2_0_AGENT_RUSH_ID);
-        assert_eq!(
-            AI_2_0_AGENT_RUSH_SPEC.base_profile_id,
-            RIFLE_FLOOD_FULL_SATURATION_ID
-        );
-        assert_eq!(
-            AI_2_0_AGENT_RUSH_SPEC
-                .overlays
-                .iter()
-                .map(|overlay| overlay.id)
-                .collect::<Vec<_>>(),
-            vec!["agent_wave_cohorts"]
-        );
-        assert_eq!(profile.extra_factories, RIFLE_FLOOD_FULL_SATURATION.extra_factories);
-        assert_eq!(profile.production, RIFLE_FLOOD_FULL_SATURATION.production);
-        assert_eq!(profile.workers, RIFLE_FLOOD_FULL_SATURATION.workers);
-        assert_eq!(
-            profile.defensive_machine_gunners,
-            RIFLE_FLOOD_FULL_SATURATION.defensive_machine_gunners
-        );
-        assert_eq!(
-            profile.frontal_wave,
-            FrontalWavePolicy {
-                exclude_launched_ticks: Some(AI_1_2_FRONTAL_COHORT_TICKS),
-                line_staging: true,
-            }
-        );
-        assert_eq!(
-            profile.tech_transition,
-            RIFLE_FLOOD_FULL_SATURATION.tech_transition
-        );
+    fn retired_profile_ids_are_not_registered() {
+        assert!(profile_by_id("retired_profile").is_none());
+        assert!(profile_spec_by_id("retired_profile").is_none());
     }
 
     #[test]
