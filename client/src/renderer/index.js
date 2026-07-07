@@ -84,7 +84,9 @@ import {
   _deployedWeaponSetupVisual,
   _drawShotRevealUnit,
   _drawUnit,
+  _frameStripMovementVisual,
   _rigRenderContextFor,
+  _sweepFrameStripMotion,
   _sweepSetupVisuals,
   _sweepTankMotion,
   _tankMotionVisual,
@@ -203,6 +205,9 @@ export class Renderer {
     // Local visual-only track phase for tanks. The server owns movement; this
     // just turns interpolated distance/facing deltas into tread offsets.
     this._tankMotion = new Map();
+    // Local frame-strip motion state. Sprite strips animate only when their
+    // authoritative or predicted render position is actually changing.
+    this._frameStripMotion = new Map();
     // Live SVG rig instances are routed per unit kind. Invalid or missing
     // definitions fail through the renderer's missing-texture guard.
     this._liveRigDefinitionsByKind = createLiveRigDefinitions();
@@ -444,6 +449,7 @@ export class Renderer {
       this._sweep();
       this._sweepSetupVisuals(liveIds);
       this._sweepTankMotion(liveIds);
+      this._sweepFrameStripMotion(liveIds);
     });
 
     // Overlays.
@@ -955,9 +961,11 @@ Object.assign(Renderer.prototype, {
   _slot,
   _shadow,
   _vehicleShadow,
+  _sweepFrameStripMotion,
   _sweepSetupVisuals,
   _sweepTankMotion,
   _tankMotionVisual,
+  _frameStripMovementVisual,
   _drawUnit,
   _rigRenderContextFor,
   _drawShotRevealUnit,

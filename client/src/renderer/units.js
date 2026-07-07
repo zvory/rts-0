@@ -58,6 +58,12 @@ export function _sweepTankMotion(liveIds) {
   }
 }
 
+export function _sweepFrameStripMotion(liveIds) {
+  for (const id of [...this._frameStripMotion.keys()]) {
+    if (!liveIds.has(id)) this._frameStripMotion.delete(id);
+  }
+}
+
 export function _tankMotionVisual(e, facing, state, body) {
   const prev = this._tankMotion.get(e.id);
   let leftPhase = prev ? prev.leftPhase : 0;
@@ -98,6 +104,20 @@ export function _tankMotionVisual(e, facing, state, body) {
   return { leftPhase, rightPhase, leftDir, rightDir, activity, lowOil, oilStarved };
 }
 
+export function _frameStripMovementVisual(e, state) {
+  const snapshotMoving = snapshotMovementChanged(e, state);
+  const renderMoving = renderedPositionChanged(e, this._frameStripMotion);
+  if (this._frameStripMotion) {
+    this._frameStripMotion.set(e.id, { x: finite(e.x, 0), y: finite(e.y, 0) });
+  }
+  const moving = snapshotMoving === false && renderMoving ? true : snapshotMoving;
+  const active = moving == null ? e?.state === STATE.MOVE : moving;
+  return {
+    moving: Boolean(active),
+    activity: active ? 1 : 0,
+  };
+}
+
 function unitVehicleBody(kind, stat) {
   if (kind === KIND.ARTILLERY) return tankBodyVisual(stat);
   return isVehicleBodyKind(kind) ? tankBodyVisual(stat) : null;
@@ -120,6 +140,11 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
   const frameStripTexture = visualFrameStrip?.texture || this._liveFrameStripTextures?.get?.(e.kind) || null;
   if (frameStrip && frameStripTexture) {
     const renderContext = this._rigRenderContextFor?.(e, colorByOwner, state) ?? {};
+    const frameStripMovement = this._frameStripMovementVisual?.(e, state);
+    if (frameStripMovement) {
+      renderContext.frameStripMoving = frameStripMovement.moving;
+      renderContext.frameStripMovementActivity = frameStripMovement.activity;
+    }
     const rendered = [];
     const activePoolNames = new Set();
     const shadowRoute = routes.find((route) => route.parts?.includes?.("part.shadow"));
@@ -232,7 +257,7 @@ export function _rigRenderContextFor(e, colorByOwner, state) {
   const facing = typeof e.facing === "number" ? e.facing : 0;
   const stat = STATS[e.kind] || {};
   const body = unitVehicleBody(e.kind, stat);
-  return createRigRenderContext(e, {
+  const context = createRigRenderContext(e, {
     state,
     colorByOwner,
     setupVisual: this._deployedWeaponSetupVisual(e),
@@ -241,11 +266,36 @@ export function _rigRenderContextFor(e, colorByOwner, state) {
     map: this._map,
     occupiedTrench: hasOccupiedTrench(e),
   });
+  return context;
 }
 
 function hasOccupiedTrench(entity) {
   const id = Number(entity?.occupiedTrenchId);
   return Number.isInteger(id) && id > 0;
+}
+
+function snapshotMovementChanged(entity, state) {
+  const current = state?._curById?.get?.(entity?.id);
+  const previous = state?._prevById?.get?.(entity?.id);
+  if (!current || !previous) return null;
+  if (!Number.isFinite(current.x) || !Number.isFinite(current.y)) return null;
+  if (!Number.isFinite(previous.x) || !Number.isFinite(previous.y)) return null;
+  return distanceSq(current.x - previous.x, current.y - previous.y) > 0.0025;
+}
+
+function renderedPositionChanged(entity, motion) {
+  const previous = motion?.get?.(entity?.id);
+  if (!previous) return false;
+  if (!Number.isFinite(entity?.x) || !Number.isFinite(entity?.y)) return false;
+  return distanceSq(entity.x - previous.x, entity.y - previous.y) > 0.0025;
+}
+
+function distanceSq(dx, dy) {
+  return dx * dx + dy * dy;
+}
+
+function finite(value, fallback) {
+  return Number.isFinite(value) ? value : fallback;
 }
 
 export function _drawShotRevealUnit(e, colorByOwner, state, pools = {}) {
