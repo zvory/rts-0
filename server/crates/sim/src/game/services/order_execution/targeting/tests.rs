@@ -4,7 +4,7 @@ const TILE: f32 = 32.0;
 const WORLD: f32 = 64.0 * TILE;
 const ORIGIN: (f32, f32) = (32.0 * TILE, 32.0 * TILE);
 const MIN: f32 = 25.0 * TILE;
-const MAX: f32 = 55.0 * TILE;
+const MAX: f32 = 65.0 * TILE;
 
 fn lock(raw_click: (f32, f32)) -> LockedArtilleryFireTarget {
     lock_artillery_fire_target(WORLD, ORIGIN, Some(0.0), 0.0, MIN, MAX, raw_click)

@@ -820,7 +820,7 @@ feed support-weapon setup previews and commands from minimap world coordinates f
 and Artillery. HUD command-target arming preserves Shift, and input hover previews track Shift so
 queued previews match the command that will be issued. Armed Point Fire and Blanket Fire previews
 compute advisory per-artillery locked effective points from the current gun origin, the authoritative
-or local pending planned origin, the 25-to-55 tile range band, the current or planned setup facing
+or local pending planned origin, the 25-to-65 tile range band, the current or planned setup facing
 fallback, and same-ray map clamping when map bounds are available; command feedback marks those
 locked points when the client can compute them while the server still receives and authoritatively
 validates the raw clicked point. Local planned setup/fire stages are reconciled on snapshots using
