@@ -439,6 +439,42 @@ fn ai_only_start_skips_match_countdown() {
 }
 
 #[test]
+fn two_active_humans_with_ai_start_uses_match_countdown() {
+    let drain = DrainHandle::default();
+    let host_id = 99;
+    let guest_id = 100;
+    let mut task = RoomTask::new(
+        "two-human-ai-countdown".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        drain.clone(),
+    );
+    task.host_id = Some(host_id);
+    let mut writer = add_test_room_player(&mut task, host_id, false);
+    add_test_room_player(&mut task, guest_id, false);
+    task.assign_missing_team_for(host_id);
+    task.assign_missing_team_for(guest_id);
+    task.assign_missing_faction_for(host_id);
+    task.assign_missing_faction_for(guest_id);
+    task.on_add_ai(host_id, Some(3), None);
+    task.on_ready(host_id, true);
+    task.on_ready(guest_id, true);
+
+    while writer.reliable_rx.try_recv().is_ok() {}
+    task.on_start_request(host_id);
+
+    let messages: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
+    assert!(messages
+        .iter()
+        .any(|msg| matches!(msg, ServerMessage::MatchCountdown { .. })));
+    assert!(!messages
+        .iter()
+        .any(|msg| matches!(msg, ServerMessage::Start(_))));
+    assert_eq!(drain.active_matches(), 0);
+}
+
+#[test]
 fn lobby_phase_ignores_gameplay_commands() {
     let mut task = RoomTask::new(
         "lobby-command-readonly-test".to_string(),
