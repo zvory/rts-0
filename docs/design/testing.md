@@ -69,14 +69,15 @@ that explicit safe artifact name instead.
 
 **Profile matchup CLI.** The `ai-matchup` binary is the manual fixed-horizon matchup facility for
 profile-vs-profile runs. It composes the same self-play adapter and `Game` seam as the tests, runs
-one directed match to elimination or a tick cap, optionally verifies deterministic replay, and can
-write a replay artifact:
+one directed match until a starting City Centre objective win or the tick cap, optionally verifies
+deterministic replay, and can write a replay artifact. No winner by the default 25,000-tick horizon
+is a draw; army value and other material metrics are diagnostics, not tiebreakers:
 
 ```bash
 cd server
 cargo run --bin ai-matchup -- ai ai
 cargo run --bin ai-matchup -- ai_1_2 ai_1_1 --seed 7 --ticks 3000 --json
-cargo run --bin ai-matchup -- default ai_1_0_tech --seed 7 --ticks 20000 --json
+cargo run --bin ai-matchup -- default ai_1_0_tech --seed 7 --ticks 25000 --json
 cargo run --bin ai-matchup -- --list-profiles
 ```
 

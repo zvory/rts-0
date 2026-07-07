@@ -1,8 +1,7 @@
 //! Command-line AI profile balance matrix runner.
 //!
 //! This developer tool runs unordered profile pairs across a configurable number of seeds,
-//! writes every replay artifact, and aggregates elimination wins plus army-value-resolved
-//! tick-cap draws.
+//! writes every replay artifact, and aggregates starting-City-Centre wins plus draws.
 #![allow(dead_code)]
 
 use std::path::PathBuf;
@@ -15,7 +14,7 @@ use crate::selfplay::{
 use rayon::prelude::*;
 
 const DEFAULT_SEEDS: u32 = 5;
-const DEFAULT_TICKS: u32 = 20_000;
+const DEFAULT_TICKS: u32 = 25_000;
 
 #[derive(Debug)]
 struct CliConfig {
@@ -35,11 +34,6 @@ struct MatchupAggregate {
     wins_a: u32,
     wins_b: u32,
     unresolved_draws: u32,
-    raw_draws: u32,
-    army_tiebreaks_a: u32,
-    army_tiebreaks_b: u32,
-    eliminations_a: u32,
-    eliminations_b: u32,
     army_a_total: u64,
     army_b_total: u64,
     buildings_a_total: u64,
@@ -228,27 +222,11 @@ impl MatchupAggregate {
         if let Some(winner) = &result.winner {
             if winner.player_id == 1 {
                 self.wins_a = self.wins_a.saturating_add(1);
-                self.eliminations_a = self.eliminations_a.saturating_add(1);
             } else if winner.player_id == 2 {
                 self.wins_b = self.wins_b.saturating_add(1);
-                self.eliminations_b = self.eliminations_b.saturating_add(1);
             }
-            return;
-        }
-
-        self.raw_draws = self.raw_draws.saturating_add(1);
-        match player_a.army_value.cmp(&player_b.army_value) {
-            std::cmp::Ordering::Greater => {
-                self.wins_a = self.wins_a.saturating_add(1);
-                self.army_tiebreaks_a = self.army_tiebreaks_a.saturating_add(1);
-            }
-            std::cmp::Ordering::Less => {
-                self.wins_b = self.wins_b.saturating_add(1);
-                self.army_tiebreaks_b = self.army_tiebreaks_b.saturating_add(1);
-            }
-            std::cmp::Ordering::Equal => {
-                self.unresolved_draws = self.unresolved_draws.saturating_add(1);
-            }
+        } else {
+            self.unresolved_draws = self.unresolved_draws.saturating_add(1);
         }
     }
 }
@@ -386,15 +364,12 @@ fn replay_name(profile_a: &str, profile_b: &str, seed: u32) -> String {
 
 fn print_table(aggregates: &[MatchupAggregate]) {
     println!(
-        "{:<72} {:>4} {:>3} {:>3} {:>3} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>5} {:>5} {:>5} {:>5} {:>5} {:>5} {:>7} {:>7} {:>7} {:>7}",
+        "{:<72} {:>4} {:>3} {:>3} {:>3} {:>7} {:>7} {:>7} {:>7} {:>5} {:>5} {:>5} {:>5} {:>5} {:>5} {:>7} {:>7} {:>7} {:>7}",
         "matchup",
         "runs",
         "W",
         "L",
         "D",
-        "rawD",
-        "tbW",
-        "tbL",
         "armyA",
         "bldgA",
         "armyB",
@@ -413,15 +388,12 @@ fn print_table(aggregates: &[MatchupAggregate]) {
     for aggregate in aggregates {
         let runs = aggregate.runs.max(1) as u64;
         println!(
-            "{:<72} {:>4} {:>3} {:>3} {:>3} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>5} {:>5} {:>5} {:>5} {:>5} {:>5} {:>7} {:>7} {:>7} {:>7}",
+            "{:<72} {:>4} {:>3} {:>3} {:>3} {:>7} {:>7} {:>7} {:>7} {:>5} {:>5} {:>5} {:>5} {:>5} {:>5} {:>7} {:>7} {:>7} {:>7}",
             format!("{} vs {}", aggregate.profile_a, aggregate.profile_b),
             aggregate.runs,
             aggregate.wins_a,
             aggregate.wins_b,
             aggregate.unresolved_draws,
-            aggregate.raw_draws,
-            aggregate.army_tiebreaks_a,
-            aggregate.army_tiebreaks_b,
             aggregate.army_a_total / runs,
             aggregate.buildings_a_total / runs,
             aggregate.army_b_total / runs,
@@ -439,9 +411,9 @@ fn print_table(aggregates: &[MatchupAggregate]) {
         );
     }
     println!();
-    println!("W/L/D are from the left profile's perspective.");
-    println!("Tick-cap draws are counted in rawD; non-tied army value resolves them into W or L.");
-    println!("army/bldg/wrk/dmg are per-run averages; tank/exp are average first ticks, or '-' if never seen.");
+    println!("W/L/D are from the left profile's perspective and use only starting City Centre kills.");
+    println!("Runs with no starting City Centre winner by the tick cap are draws.");
+    println!("army/bldg/wrk/dmg are diagnostic per-run averages, not tiebreakers; tank/exp are average first ticks, or '-' if never seen.");
 }
 
 fn average_tick_text(total: u64, count: u32) -> String {
@@ -480,14 +452,21 @@ Options:
 #[cfg(test)]
 mod tests {
     use super::{default_profiles, ensure_distinct_profiles, parse_args};
+    use crate::selfplay::{
+        ProfileMatchupEndReason, ProfileMatchupPlayerResult, ProfileMatchupResult,
+        ProfileMatchupStartingCityCentreResult, ProfileMatchupWinner,
+    };
+    use std::collections::BTreeMap;
 
     #[test]
     fn default_profile_selection_uses_all_available_profiles() {
-    let config = parse_args(Vec::<String>::new())
+        let config = parse_args(Vec::<String>::new())
             .expect("default args should parse")
             .expect("default args should return config");
 
         assert_eq!(config.profiles, default_profiles());
+        assert_eq!(config.ticks, super::DEFAULT_TICKS);
+        assert_eq!(config.ticks, 25_000);
     }
 
     #[test]
@@ -511,5 +490,111 @@ mod tests {
         .expect("single profile should return config");
 
         assert_eq!(config.profiles, vec!["ai_1_0_tech".to_string()]);
+    }
+
+    #[test]
+    fn tick_cap_draw_is_not_resolved_by_army_value() {
+        let mut aggregate = super::MatchupAggregate::new("left".to_string(), "right".to_string());
+        aggregate.record(&profile_result(ProfileMatchupEndReason::TickCap, None, 1_000, 10));
+
+        assert_eq!(aggregate.runs, 1);
+        assert_eq!(aggregate.wins_a, 0);
+        assert_eq!(aggregate.wins_b, 0);
+        assert_eq!(aggregate.unresolved_draws, 1);
+    }
+
+    #[test]
+    fn starting_city_centre_winner_counts_even_with_lower_army_value() {
+        let mut aggregate = super::MatchupAggregate::new("left".to_string(), "right".to_string());
+        aggregate.record(&profile_result(
+            ProfileMatchupEndReason::StartingCityCentreKilled,
+            Some(2),
+            1_000,
+            10,
+        ));
+
+        assert_eq!(aggregate.runs, 1);
+        assert_eq!(aggregate.wins_a, 0);
+        assert_eq!(aggregate.wins_b, 1);
+        assert_eq!(aggregate.unresolved_draws, 0);
+    }
+
+    fn profile_result(
+        end_reason: ProfileMatchupEndReason,
+        winner_player_id: Option<u32>,
+        player_one_army: u32,
+        player_two_army: u32,
+    ) -> ProfileMatchupResult {
+        ProfileMatchupResult {
+            profile_a: "left".to_string(),
+            profile_b: "right".to_string(),
+            seed: 0,
+            max_ticks: 120,
+            ticks: 120,
+            end_reason,
+            winner: winner_player_id.map(|player_id| ProfileMatchupWinner {
+                player_id,
+                profile: profile_for_player(player_id).to_string(),
+            }),
+            starting_city_centres: vec![
+                starting_city_centre(1, (winner_player_id == Some(2)).then_some(120)),
+                starting_city_centre(2, (winner_player_id == Some(1)).then_some(120)),
+            ],
+            players: vec![
+                player_result(1, player_one_army),
+                player_result(2, player_two_army),
+            ],
+            first_damage_tick: None,
+            attack_events: 0,
+            death_events: 0,
+            event_count: 0,
+            replay_verified: false,
+            replay_artifact: None,
+            ai_trace_tail: Vec::new(),
+        }
+    }
+
+    fn player_result(player_id: u32, army_value: u32) -> ProfileMatchupPlayerResult {
+        ProfileMatchupPlayerResult {
+            player_id,
+            profile: profile_for_player(player_id).to_string(),
+            alive: true,
+            army_value,
+            building_value: 0,
+            worker_count: 0,
+            command_count: 0,
+            attack_command_count: 0,
+            damage_dealt_events: 0,
+            death_count: 0,
+            first_attack_command_tick: None,
+            first_rifleman_attack_command_tick: None,
+            first_scout_car_tick: None,
+            first_scout_car_harass_command_tick: None,
+            first_expansion_city_centre_planned_tick: None,
+            first_expansion_city_centre_completed_tick: None,
+            first_tank_tick: None,
+            final_counts: BTreeMap::new(),
+        }
+    }
+
+    fn starting_city_centre(
+        player_id: u32,
+        death_tick: Option<u32>,
+    ) -> ProfileMatchupStartingCityCentreResult {
+        ProfileMatchupStartingCityCentreResult {
+            player_id,
+            profile: profile_for_player(player_id).to_string(),
+            entity_id: player_id * 100,
+            alive: death_tick.is_none(),
+            death_tick,
+        }
+    }
+
+    fn profile_for_player(player_id: u32) -> &'static str {
+        if player_id == 1 {
+            "left"
+        } else {
+            "right"
+        }
     }
 }

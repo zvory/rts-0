@@ -27,8 +27,8 @@ pub use replay::{
 #[allow(unused_imports)]
 pub use replay::{
     available_profile_ids, canonical_profile_id, run_profile_matchup_result, ProfileMatchupOptions,
-    ProfileMatchupPlayerResult, ProfileMatchupResult, ProfileMatchupTraceEntry,
-    ProfileMatchupWinner,
+    ProfileMatchupEndReason, ProfileMatchupPlayerResult, ProfileMatchupResult,
+    ProfileMatchupStartingCityCentreResult, ProfileMatchupTraceEntry, ProfileMatchupWinner,
 };
 pub use scenarios::{available_baseline_scenarios, BaselineScenario};
 

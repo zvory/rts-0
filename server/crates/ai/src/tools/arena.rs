@@ -16,10 +16,10 @@ use crate::ai_core::profile_manifest::{
 };
 use crate::selfplay::{
     canonical_profile_id, run_profile_matchup_result, server_build_sha, ProfileMatchupOptions,
-    ProfileMatchupResult, ProfileMatchupTraceEntry,
+    ProfileMatchupEndReason, ProfileMatchupResult, ProfileMatchupTraceEntry,
 };
 
-const DEFAULT_TICKS: u32 = 20_000;
+const DEFAULT_TICKS: u32 = 25_000;
 const DEFAULT_SEEDS: u32 = 3;
 const DEFAULT_CANDIDATE: &str = "ai_2_0_agent_rush";
 const DEFAULT_BASELINE: &str = "ai_1_2_wave_cohorts";
@@ -90,7 +90,7 @@ struct ArenaOutcome {
     candidate_won: bool,
     baseline_won: bool,
     tick_cap: bool,
-    army_tiebreak_winner: Option<String>,
+    end_reason: ProfileMatchupEndReason,
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -100,8 +100,7 @@ struct ArenaAggregate {
     candidate_wins: u32,
     baseline_wins: u32,
     unresolved_draws: u32,
-    eliminations: u32,
-    army_tiebreaks: u32,
+    starting_city_centre_wins: u32,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -305,7 +304,7 @@ fn write_run_sidecars(
         profiles,
         replay_artifact: result.replay_artifact.clone(),
     };
-    let outcome = outcome_for(result, candidate, baseline, candidate_player_id, baseline_player_id);
+    let outcome = outcome_for(result, candidate_player_id, baseline_player_id);
     let run = ArenaRunSummary {
         manifest,
         result: result.clone(),
@@ -324,8 +323,6 @@ fn write_run_sidecars(
 
 fn outcome_for(
     result: &ProfileMatchupResult,
-    candidate: &str,
-    baseline: &str,
     candidate_player_id: u32,
     baseline_player_id: u32,
 ) -> ArenaOutcome {
@@ -335,43 +332,17 @@ fn outcome_for(
             candidate_won: winner.player_id == candidate_player_id,
             baseline_won: winner.player_id == baseline_player_id,
             tick_cap: false,
-            army_tiebreak_winner: None,
+            end_reason: result.end_reason,
         };
     }
 
-    if result.completed_by_elimination {
-        return ArenaOutcome {
-            winner_profile: None,
-            candidate_won: false,
-            baseline_won: false,
-            tick_cap: false,
-            army_tiebreak_winner: None,
-        };
-    }
-
-    let candidate_army = player_army_value(result, candidate_player_id);
-    let baseline_army = player_army_value(result, baseline_player_id);
-    let army_tiebreak_winner = match candidate_army.cmp(&baseline_army) {
-        std::cmp::Ordering::Greater => Some(candidate.to_string()),
-        std::cmp::Ordering::Less => Some(baseline.to_string()),
-        std::cmp::Ordering::Equal => None,
-    };
     ArenaOutcome {
         winner_profile: None,
-        candidate_won: army_tiebreak_winner.as_deref() == Some(candidate),
-        baseline_won: army_tiebreak_winner.as_deref() == Some(baseline),
-        tick_cap: true,
-        army_tiebreak_winner,
+        candidate_won: false,
+        baseline_won: false,
+        tick_cap: result.end_reason == ProfileMatchupEndReason::TickCap,
+        end_reason: result.end_reason,
     }
-}
-
-fn player_army_value(result: &ProfileMatchupResult, player_id: u32) -> u32 {
-    result
-        .players
-        .iter()
-        .find(|player| player.player_id == player_id)
-        .map(|player| player.army_value)
-        .unwrap_or_default()
 }
 
 fn aggregate_runs(runs: &[ArenaRunSummary]) -> ArenaAggregate {
@@ -387,11 +358,9 @@ fn aggregate_runs(runs: &[ArenaRunSummary]) -> ArenaAggregate {
         } else {
             aggregate.unresolved_draws = aggregate.unresolved_draws.saturating_add(1);
         }
-        if run.result.completed_by_elimination {
-            aggregate.eliminations = aggregate.eliminations.saturating_add(1);
-        }
-        if run.outcome.army_tiebreak_winner.is_some() {
-            aggregate.army_tiebreaks = aggregate.army_tiebreaks.saturating_add(1);
+        if run.outcome.candidate_won || run.outcome.baseline_won {
+            aggregate.starting_city_centre_wins =
+                aggregate.starting_city_centre_wins.saturating_add(1);
         }
     }
     aggregate
@@ -466,6 +435,10 @@ fn brief_markdown(run: &ArenaRunSummary) -> String {
         result_text(&run.outcome, candidate, baseline)
     ));
     text.push_str(&format!(
+        "- Starting City Centres: {}\n",
+        starting_city_centre_text(&result.starting_city_centres)
+    ));
+    text.push_str(&format!(
         "- Replay: {}\n\n",
         result
             .replay_artifact
@@ -520,21 +493,39 @@ fn brief_markdown(run: &ArenaRunSummary) -> String {
 
 fn result_text(outcome: &ArenaOutcome, candidate: &str, baseline: &str) -> String {
     if outcome.candidate_won {
-        if outcome.army_tiebreak_winner.is_some() {
-            return format!("candidate `{candidate}` led by army value at tick cap");
-        }
-        return format!("candidate `{candidate}` won by elimination");
+        return format!("candidate `{candidate}` killed the baseline starting City Centre");
     }
     if outcome.baseline_won {
-        if outcome.army_tiebreak_winner.is_some() {
-            return format!("baseline `{baseline}` led by army value at tick cap");
-        }
-        return format!("baseline `{baseline}` won by elimination");
+        return format!("baseline `{baseline}` killed the candidate starting City Centre");
     }
-    if !outcome.tick_cap {
-        return "unresolved elimination draw".to_string();
+    if outcome.tick_cap {
+        return "draw at tick cap".to_string();
     }
-    "unresolved tick-cap draw".to_string()
+    if outcome.end_reason == ProfileMatchupEndReason::StartingCityCentresDestroyed {
+        return "draw: both starting City Centres were destroyed".to_string();
+    }
+    "draw without a starting City Centre winner".to_string()
+}
+
+fn starting_city_centre_text(
+    centres: &[crate::selfplay::ProfileMatchupStartingCityCentreResult],
+) -> String {
+    if centres.is_empty() {
+        return "-".to_string();
+    }
+    centres
+        .iter()
+        .map(|centre| {
+            format!(
+                "player {} `{}` id={} death={}",
+                centre.player_id,
+                centre.profile,
+                centre.entity_id,
+                tick_text(centre.death_tick)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("; ")
 }
 
 fn player_timeline(label: &str, player: &crate::selfplay::ProfileMatchupPlayerResult) -> String {
@@ -685,56 +676,64 @@ mod tests {
     }
 
     #[test]
-    fn no_winner_elimination_is_not_scored_as_tick_cap_tiebreak() {
-        let result = ProfileMatchupResult {
+    fn tick_cap_draw_is_not_scored_by_army_value() {
+        let result = profile_result(crate::selfplay::ProfileMatchupEndReason::TickCap, None, 200, 100);
+
+        let outcome = outcome_for(&result, 1, 2);
+
+        assert!(outcome.tick_cap);
+        assert!(!outcome.candidate_won);
+        assert!(!outcome.baseline_won);
+        assert_eq!(
+            result_text(&outcome, DEFAULT_CANDIDATE, DEFAULT_BASELINE),
+            "draw at tick cap"
+        );
+    }
+
+    #[test]
+    fn starting_city_centre_winner_is_not_overridden_by_army_value() {
+        let result = profile_result(
+            crate::selfplay::ProfileMatchupEndReason::StartingCityCentreKilled,
+            Some(2),
+            300,
+            50,
+        );
+
+        let outcome = outcome_for(&result, 1, 2);
+
+        assert!(!outcome.tick_cap);
+        assert!(!outcome.candidate_won);
+        assert!(outcome.baseline_won);
+        assert_eq!(
+            result_text(&outcome, DEFAULT_CANDIDATE, DEFAULT_BASELINE),
+            format!("baseline `{DEFAULT_BASELINE}` killed the candidate starting City Centre")
+        );
+    }
+
+    fn profile_result(
+        end_reason: crate::selfplay::ProfileMatchupEndReason,
+        winner_player_id: Option<u32>,
+        player_one_army: u32,
+        player_two_army: u32,
+    ) -> ProfileMatchupResult {
+        ProfileMatchupResult {
             profile_a: DEFAULT_CANDIDATE.to_string(),
             profile_b: DEFAULT_BASELINE.to_string(),
             seed: 0,
             max_ticks: 120,
-            ticks: 80,
-            completed_by_elimination: true,
-            winner: None,
+            ticks: 120,
+            end_reason,
+            winner: winner_player_id.map(|player_id| crate::selfplay::ProfileMatchupWinner {
+                player_id,
+                profile: profile_for_player(player_id).to_string(),
+            }),
+            starting_city_centres: vec![
+                starting_city_centre(1, (winner_player_id == Some(2)).then_some(80)),
+                starting_city_centre(2, (winner_player_id == Some(1)).then_some(80)),
+            ],
             players: vec![
-                crate::selfplay::ProfileMatchupPlayerResult {
-                    player_id: 1,
-                    profile: DEFAULT_CANDIDATE.to_string(),
-                    alive: false,
-                    army_value: 200,
-                    building_value: 0,
-                    worker_count: 0,
-                    command_count: 0,
-                    attack_command_count: 0,
-                    damage_dealt_events: 0,
-                    death_count: 0,
-                    first_attack_command_tick: None,
-                    first_rifleman_attack_command_tick: None,
-                    first_scout_car_tick: None,
-                    first_scout_car_harass_command_tick: None,
-                    first_expansion_city_centre_planned_tick: None,
-                    first_expansion_city_centre_completed_tick: None,
-                    first_tank_tick: None,
-                    final_counts: BTreeMap::new(),
-                },
-                crate::selfplay::ProfileMatchupPlayerResult {
-                    player_id: 2,
-                    profile: DEFAULT_BASELINE.to_string(),
-                    alive: false,
-                    army_value: 100,
-                    building_value: 0,
-                    worker_count: 0,
-                    command_count: 0,
-                    attack_command_count: 0,
-                    damage_dealt_events: 0,
-                    death_count: 0,
-                    first_attack_command_tick: None,
-                    first_rifleman_attack_command_tick: None,
-                    first_scout_car_tick: None,
-                    first_scout_car_harass_command_tick: None,
-                    first_expansion_city_centre_planned_tick: None,
-                    first_expansion_city_centre_completed_tick: None,
-                    first_tank_tick: None,
-                    final_counts: BTreeMap::new(),
-                },
+                player_result(1, player_one_army),
+                player_result(2, player_two_army),
             ],
             first_damage_tick: None,
             attack_events: 0,
@@ -743,18 +742,51 @@ mod tests {
             replay_verified: false,
             replay_artifact: None,
             ai_trace_tail: Vec::new(),
-        };
+        }
+    }
 
-        let outcome = outcome_for(&result, DEFAULT_CANDIDATE, DEFAULT_BASELINE, 1, 2);
+    fn player_result(player_id: u32, army_value: u32) -> crate::selfplay::ProfileMatchupPlayerResult {
+        crate::selfplay::ProfileMatchupPlayerResult {
+            player_id,
+            profile: profile_for_player(player_id).to_string(),
+            alive: true,
+            army_value,
+            building_value: 0,
+            worker_count: 0,
+            command_count: 0,
+            attack_command_count: 0,
+            damage_dealt_events: 0,
+            death_count: 0,
+            first_attack_command_tick: None,
+            first_rifleman_attack_command_tick: None,
+            first_scout_car_tick: None,
+            first_scout_car_harass_command_tick: None,
+            first_expansion_city_centre_planned_tick: None,
+            first_expansion_city_centre_completed_tick: None,
+            first_tank_tick: None,
+            final_counts: BTreeMap::new(),
+        }
+    }
 
-        assert!(!outcome.tick_cap);
-        assert!(!outcome.candidate_won);
-        assert!(!outcome.baseline_won);
-        assert_eq!(outcome.army_tiebreak_winner, None);
-        assert_eq!(
-            result_text(&outcome, DEFAULT_CANDIDATE, DEFAULT_BASELINE),
-            "unresolved elimination draw"
-        );
+    fn starting_city_centre(
+        player_id: u32,
+        death_tick: Option<u32>,
+    ) -> crate::selfplay::ProfileMatchupStartingCityCentreResult {
+        crate::selfplay::ProfileMatchupStartingCityCentreResult {
+            player_id,
+            profile: profile_for_player(player_id).to_string(),
+            entity_id: player_id * 100,
+            alive: death_tick.is_none(),
+            death_tick,
+        }
+    }
+
+    fn profile_for_player(player_id: u32) -> &'static str {
+        if player_id == 1 {
+            DEFAULT_CANDIDATE
+        } else {
+            DEFAULT_BASELINE
+        }
     }
 
     #[test]

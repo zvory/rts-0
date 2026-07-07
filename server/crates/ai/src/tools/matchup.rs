@@ -1,7 +1,7 @@
 //! Command-line profile matchup runner.
 //!
-//! This is a developer/test tool. It runs one directed self-play profile matchup to either
-//! elimination or a fixed tick cap and prints the result.
+//! This is a developer/test tool. It runs one directed self-play profile matchup until one
+//! starting City Centre dies or a fixed tick cap is reached, then prints the result.
 #![allow(dead_code)]
 
 use std::path::PathBuf;
@@ -9,10 +9,10 @@ use std::process;
 
 use crate::selfplay::{
     available_profile_ids, canonical_profile_id, run_profile_matchup_result, ProfileMatchupOptions,
-    ProfileMatchupResult,
+    ProfileMatchupEndReason, ProfileMatchupResult,
 };
 
-const DEFAULT_TICKS: u32 = 20_000;
+const DEFAULT_TICKS: u32 = 25_000;
 const DEFAULT_SEED: u32 = 0;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -219,6 +219,10 @@ fn print_table(result: &ProfileMatchupResult) {
             "skipped"
         }
     );
+    println!(
+        "starting City Centres: {}",
+        starting_city_centre_text(&result.starting_city_centres)
+    );
     if let Some(path) = &result.replay_artifact {
         println!("replay artifact: {path}");
     }
@@ -269,12 +273,19 @@ fn print_table(result: &ProfileMatchupResult) {
 
 fn winner_text(result: &ProfileMatchupResult) -> String {
     if let Some(winner) = &result.winner {
-        return format!("{} won as player {}", winner.profile, winner.player_id);
+        return format!(
+            "{} won by killing the enemy starting City Centre as player {}",
+            winner.profile, winner.player_id
+        );
     }
-    if result.completed_by_elimination {
-        "no players alive".to_string()
-    } else {
-        "no winner at tick cap".to_string()
+    match result.end_reason {
+        ProfileMatchupEndReason::TickCap => "draw at tick cap".to_string(),
+        ProfileMatchupEndReason::StartingCityCentresDestroyed => {
+            "draw: both starting City Centres were destroyed".to_string()
+        }
+        ProfileMatchupEndReason::StartingCityCentreKilled => {
+            "draw: starting City Centre destroyed without a surviving objective winner".to_string()
+        }
     }
 }
 
@@ -290,6 +301,27 @@ fn planned_completed_tick_text(planned: Option<u32>, completed: Option<u32>) -> 
         (None, Some(completed)) => format!("-/{completed}"),
         (None, None) => "-".to_string(),
     }
+}
+
+fn starting_city_centre_text(
+    centres: &[crate::selfplay::ProfileMatchupStartingCityCentreResult],
+) -> String {
+    if centres.is_empty() {
+        return "-".to_string();
+    }
+    centres
+        .iter()
+        .map(|centre| {
+            format!(
+                "player {} `{}` id={} death={}",
+                centre.player_id,
+                centre.profile,
+                centre.entity_id,
+                tick_text(centre.death_tick)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("; ")
 }
 
 fn format_counts(counts: &std::collections::BTreeMap<String, u32>) -> String {
@@ -343,8 +375,122 @@ Examples:
   cargo run --bin ai-matchup -- ai ai
   cargo run --bin ai-matchup -- ai_1_1 ai_1_0_tech --seed 7 --ticks 3000 --json
   cargo run --bin ai-matchup -- ai_1_2 ai_1_1 --seed 7 --ticks 3000 --json
-  cargo run --bin ai-matchup -- ai_2_0 ai --seed 7 --ticks 20000 --json
-  cargo run --bin ai-matchup -- default ai_1_0_tech --seed 7 --ticks 20000 --json
+  cargo run --bin ai-matchup -- ai_2_0 ai --seed 7 --ticks 25000 --json
+  cargo run --bin ai-matchup -- default ai_1_0_tech --seed 7 --ticks 25000 --json
 "
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_args, winner_text, DEFAULT_TICKS};
+    use crate::selfplay::{
+        ProfileMatchupEndReason, ProfileMatchupPlayerResult, ProfileMatchupResult,
+        ProfileMatchupStartingCityCentreResult, ProfileMatchupWinner,
+    };
+    use std::collections::BTreeMap;
+
+    #[test]
+    fn default_tick_cap_is_twenty_five_thousand() {
+        let config = parse_args(vec!["ai_1_0_tech".to_string(), "ai_1_1".to_string()])
+            .expect("default args should parse")
+            .expect("default args should return config");
+
+        assert_eq!(DEFAULT_TICKS, 25_000);
+        assert_eq!(config.ticks, 25_000);
+    }
+
+    #[test]
+    fn tick_cap_result_is_reported_as_draw() {
+        let result = profile_result(ProfileMatchupEndReason::TickCap, None);
+
+        assert_eq!(winner_text(&result), "draw at tick cap");
+    }
+
+    #[test]
+    fn starting_city_centre_result_is_reported_as_objective_win() {
+        let result = profile_result(
+            ProfileMatchupEndReason::StartingCityCentreKilled,
+            Some(2),
+        );
+
+        assert_eq!(
+            winner_text(&result),
+            "right won by killing the enemy starting City Centre as player 2"
+        );
+    }
+
+    fn profile_result(
+        end_reason: ProfileMatchupEndReason,
+        winner_player_id: Option<u32>,
+    ) -> ProfileMatchupResult {
+        ProfileMatchupResult {
+            profile_a: "left".to_string(),
+            profile_b: "right".to_string(),
+            seed: 0,
+            max_ticks: 120,
+            ticks: 120,
+            end_reason,
+            winner: winner_player_id.map(|player_id| ProfileMatchupWinner {
+                player_id,
+                profile: profile_for_player(player_id).to_string(),
+            }),
+            starting_city_centres: vec![
+                starting_city_centre(1, (winner_player_id == Some(2)).then_some(120)),
+                starting_city_centre(2, (winner_player_id == Some(1)).then_some(120)),
+            ],
+            players: vec![player_result(1), player_result(2)],
+            first_damage_tick: None,
+            attack_events: 0,
+            death_events: 0,
+            event_count: 0,
+            replay_verified: false,
+            replay_artifact: None,
+            ai_trace_tail: Vec::new(),
+        }
+    }
+
+    fn player_result(player_id: u32) -> ProfileMatchupPlayerResult {
+        ProfileMatchupPlayerResult {
+            player_id,
+            profile: profile_for_player(player_id).to_string(),
+            alive: true,
+            army_value: 0,
+            building_value: 0,
+            worker_count: 0,
+            command_count: 0,
+            attack_command_count: 0,
+            damage_dealt_events: 0,
+            death_count: 0,
+            first_attack_command_tick: None,
+            first_rifleman_attack_command_tick: None,
+            first_scout_car_tick: None,
+            first_scout_car_harass_command_tick: None,
+            first_expansion_city_centre_planned_tick: None,
+            first_expansion_city_centre_completed_tick: None,
+            first_tank_tick: None,
+            final_counts: BTreeMap::new(),
+        }
+    }
+
+    fn starting_city_centre(
+        player_id: u32,
+        death_tick: Option<u32>,
+    ) -> ProfileMatchupStartingCityCentreResult {
+        ProfileMatchupStartingCityCentreResult {
+            player_id,
+            profile: profile_for_player(player_id).to_string(),
+            entity_id: player_id * 100,
+            alive: death_tick.is_none(),
+            death_tick,
+        }
+    }
+
+    fn profile_for_player(player_id: u32) -> &'static str {
+        if player_id == 1 {
+            "left"
+        } else {
+            "right"
+        }
+    }
 }
