@@ -102,3 +102,102 @@ pub enum ObserverMapAnalysisPrimitive {
         label: Option<String>,
     },
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{kinds, ServerMessage};
+
+    #[test]
+    fn observer_analysis_serializes_contract_shape() {
+        let msg = ServerMessage::ObserverAnalysis(ObserverAnalysisPayload {
+            tick: 77,
+            map_analysis: Some(ObserverMapAnalysisDiagnostics {
+                map_width: 126,
+                map_height: 126,
+                tile_size: 32,
+                layers: vec![ObserverMapAnalysisLayer {
+                    id: "components".to_string(),
+                    label: "Components".to_string(),
+                    default_visible: true,
+                    primitives: vec![ObserverMapAnalysisPrimitive::TileRect {
+                        id: "component:0".to_string(),
+                        tile_x: 2,
+                        tile_y: 3,
+                        tile_w: 10,
+                        tile_h: 8,
+                        fill: "#3da5d9".to_string(),
+                        stroke: "#3da5d9".to_string(),
+                        alpha: 0.12,
+                        label: Some("C0 80t clr8".to_string()),
+                    }],
+                }],
+            }),
+            players: vec![ObserverAnalysisPlayer {
+                id: 1,
+                units: vec![ObserverAnalysisKindCount {
+                    kind: kinds::RIFLEMAN.to_string(),
+                    count: 3,
+                    steel_value: 180,
+                    oil_value: 0,
+                }],
+                production: vec![ObserverAnalysisProduction {
+                    building_id: 10,
+                    building_kind: kinds::BARRACKS.to_string(),
+                    item_kind: kinds::MACHINE_GUNNER.to_string(),
+                    item_type: "unit".to_string(),
+                    progress: 0.5,
+                    queue_depth: 2,
+                }],
+                units_lost: vec![ObserverAnalysisKindCount {
+                    kind: kinds::WORKER.to_string(),
+                    count: 1,
+                    steel_value: 50,
+                    oil_value: 0,
+                }],
+                resources_lost: ObserverAnalysisResourcesLost { steel: 50, oil: 0 },
+                ai_diagnostics: Some(ObserverAnalysisAiDiagnostics {
+                    profile_id: "ai_1_2_wave_cohorts".to_string(),
+                    trace_tick: 72,
+                    lines: vec![
+                        "profile=ai_1_2_wave_cohorts tick=72".to_string(),
+                        "goal=Production status=Selected blockers=- intents=Train:Rifleman"
+                            .to_string(),
+                    ],
+                }),
+            }],
+        });
+        let json = serde_json::to_value(msg).expect("observer analysis should serialize");
+
+        assert_eq!(json["t"], "observerAnalysis");
+        assert_eq!(json["tick"], 77);
+        assert_eq!(json["mapAnalysis"]["mapWidth"], 126);
+        assert_eq!(json["mapAnalysis"]["layers"][0]["id"], "components");
+        assert_eq!(
+            json["mapAnalysis"]["layers"][0]["primitives"][0]["kind"],
+            "tileRect"
+        );
+        assert_eq!(
+            json["mapAnalysis"]["layers"][0]["primitives"][0]["tileW"],
+            10
+        );
+        assert_eq!(json["players"][0]["id"], 1);
+        assert_eq!(json["players"][0]["units"][0]["kind"], "rifleman");
+        assert_eq!(json["players"][0]["units"][0]["count"], 3);
+        assert_eq!(json["players"][0]["units"][0]["steelValue"], 180);
+        assert_eq!(json["players"][0]["production"][0]["buildingId"], 10);
+        assert_eq!(json["players"][0]["production"][0]["itemType"], "unit");
+        assert_eq!(json["players"][0]["production"][0]["queueDepth"], 2);
+        assert_eq!(json["players"][0]["unitsLost"][0]["kind"], "worker");
+        assert_eq!(json["players"][0]["resourcesLost"]["steel"], 50);
+        assert_eq!(
+            json["players"][0]["aiDiagnostics"]["profileId"],
+            "ai_1_2_wave_cohorts"
+        );
+        assert_eq!(json["players"][0]["aiDiagnostics"]["traceTick"], 72);
+        assert_eq!(
+            json["players"][0]["aiDiagnostics"]["lines"][1],
+            "goal=Production status=Selected blockers=- intents=Train:Rifleman"
+        );
+    }
+}
