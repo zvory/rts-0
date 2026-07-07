@@ -9,7 +9,6 @@ pub(crate) const STEEL_EXPANSION_TANKS_ID: &str = "steel_expansion_tanks";
 pub(crate) const AI_1_0_TECH_ID: &str = "ai_1_0_tech";
 pub(crate) const AI_1_1_TANK_MG_ID: &str = "ai_1_1_tank_mg";
 pub(crate) const AI_1_2_WAVE_COHORTS_ID: &str = "ai_1_2_wave_cohorts";
-pub(crate) const AI_2_0_RIFLE_TANK_ID: &str = "ai_2_0_rifle_tank";
 pub(crate) const AI_2_0_TANK_PRESSURE_ID: &str = "ai_2_0_tank_pressure";
 
 const AI_1_2_FRONTAL_COHORT_TICKS: u32 = 3_600;
@@ -28,10 +27,6 @@ const LATE_TANK_TECH_FLOAT_THRESHOLD: ResourceFloatThreshold = ResourceFloatThre
 const AI_1_2_SECOND_FACTORY_FLOAT_THRESHOLD: ResourceFloatThreshold = ResourceFloatThreshold {
     steel: 600,
     oil: 400,
-};
-const AI_2_0_RIFLE_TANK_FLOAT_THRESHOLD: ResourceFloatThreshold = ResourceFloatThreshold {
-    steel: 300,
-    oil: 125,
 };
 const AI_2_0_TANK_PRESSURE_FLOAT_THRESHOLD: ResourceFloatThreshold = ResourceFloatThreshold {
     steel: 275,
@@ -932,51 +927,11 @@ pub(crate) static AI_2_0_TANK_PRESSURE: AiProfile = AiProfile {
     }),
 };
 
-pub(crate) static AI_2_0_RIFLE_TANK: AiProfile = AiProfile {
-    id: AI_2_0_RIFLE_TANK_ID,
-    workers: AI_2_0_TANK_PRESSURE.workers,
-    supply: AI_2_0_TANK_PRESSURE.supply,
-    buildings: AI_2_0_TANK_PRESSURE.buildings,
-    extra_factories: AI_2_0_TANK_PRESSURE.extra_factories,
-    production: ProductionPolicy {
-        queue_depth: 3,
-        unit_priorities: &RIFLE_ONLY,
-        save_for_first_tech_unit: None,
-        balance_unit_priorities: false,
-    },
-    attack: AI_1_0_TECH.attack,
-    resources: AI_2_0_TANK_PRESSURE.resources,
-    expansion: AI_2_0_TANK_PRESSURE.expansion,
-    defensive_machine_gunners: Some(DefensiveMachineGunnerPolicy { target_count: 3 }),
-    frontal_wave: AI_2_0_TANK_PRESSURE.frontal_wave,
-    recovery_transition: None,
-    tech_transition: Some(TechTransitionPolicy {
-        resource_float: AI_2_0_RIFLE_TANK_FLOAT_THRESHOLD,
-        required_tech_path: &AI_1_0_TANK_TECH_PATH,
-        production: ProductionPolicy {
-            queue_depth: 2,
-            unit_priorities: &TANK_AND_RIFLE,
-            save_for_first_tech_unit: Some(EntityKind::Tank),
-            balance_unit_priorities: false,
-        },
-        attack: AttackPolicy {
-            first_attack_size: 3,
-            wave_growth: 1,
-            regroup_reset_ticks: 480,
-            reissue_cadence_ticks: 120,
-            stage_distance_tiles: 8.0,
-            unit_kinds: &TANK_AND_RIFLE,
-            required_unit: Some(EntityKind::Tank),
-        },
-    }),
-};
-
-pub(crate) fn required_profiles() -> [&'static AiProfile; 5] {
+pub(crate) fn required_profiles() -> [&'static AiProfile; 4] {
     [
         &AI_1_0_TECH,
         &AI_1_1_TANK_MG,
         &AI_1_2_WAVE_COHORTS,
-        &AI_2_0_RIFLE_TANK,
         &AI_2_0_TANK_PRESSURE,
     ]
 }
@@ -1001,7 +956,6 @@ mod tests {
                 AI_1_0_TECH_ID,
                 AI_1_1_TANK_MG_ID,
                 AI_1_2_WAVE_COHORTS_ID,
-                AI_2_0_RIFLE_TANK_ID,
                 AI_2_0_TANK_PRESSURE_ID,
             ]
         );
@@ -1013,10 +967,6 @@ mod tests {
         assert_eq!(
             profile_by_id(AI_1_2_WAVE_COHORTS_ID).unwrap().id,
             AI_1_2_WAVE_COHORTS_ID
-        );
-        assert_eq!(
-            profile_by_id(AI_2_0_RIFLE_TANK_ID).unwrap().id,
-            AI_2_0_RIFLE_TANK_ID
         );
         assert_eq!(
             profile_by_id(AI_2_0_TANK_PRESSURE_ID).unwrap().id,
@@ -1036,7 +986,6 @@ mod tests {
             &AI_1_0_TECH,
             &AI_1_1_TANK_MG,
             &AI_1_2_WAVE_COHORTS,
-            &AI_2_0_RIFLE_TANK,
             &AI_2_0_TANK_PRESSURE,
         ] {
             for unit in omitted_units {
@@ -1066,6 +1015,11 @@ mod tests {
     #[test]
     fn retired_ai_2_0_agent_rush_profile_id_is_not_registered() {
         assert!(profile_by_id("ai_2_0_agent_rush").is_none());
+    }
+
+    #[test]
+    fn retired_ai_2_0_rifle_tank_profile_id_is_not_registered() {
+        assert!(profile_by_id("ai_2_0_rifle_tank").is_none());
     }
 
     #[test]
@@ -1111,31 +1065,6 @@ mod tests {
             AI_2_0_TANK_PRESSURE.defensive_machine_gunners,
             Some(DefensiveMachineGunnerPolicy { target_count: 4 })
         );
-    }
-
-    #[test]
-    fn ai_2_0_rifle_tank_adds_a_tank_led_mixed_wave_member() {
-        let transition = AI_2_0_RIFLE_TANK.tech_transition.unwrap();
-
-        assert_eq!(AI_2_0_RIFLE_TANK.id, AI_2_0_RIFLE_TANK_ID);
-        assert_eq!(AI_2_0_RIFLE_TANK.workers, AI_2_0_TANK_PRESSURE.workers);
-        assert_eq!(
-            AI_2_0_RIFLE_TANK.buildings.barracks_curve,
-            AI_2_0_TANK_PRESSURE.buildings.barracks_curve
-        );
-        assert_eq!(AI_2_0_RIFLE_TANK.attack.first_attack_size, 4);
-        assert_eq!(AI_2_0_RIFLE_TANK.production.queue_depth, 3);
-        assert_eq!(
-            AI_2_0_RIFLE_TANK.defensive_machine_gunners,
-            Some(DefensiveMachineGunnerPolicy { target_count: 3 })
-        );
-        assert_eq!(transition.production.unit_priorities, &TANK_AND_RIFLE);
-        assert_eq!(
-            transition.production.save_for_first_tech_unit,
-            Some(EntityKind::Tank)
-        );
-        assert_eq!(transition.attack.first_attack_size, 3);
-        assert_eq!(transition.attack.required_unit, Some(EntityKind::Tank));
     }
 
     #[test]

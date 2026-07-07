@@ -14,7 +14,7 @@ use crate::ai_core::profile_suites::{
 };
 use crate::ai_core::profiles::{
     profile_by_id, AiProfile, AI_1_0_TECH, AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID,
-    AI_1_2_WAVE_COHORTS_ID, AI_2_0_RIFLE_TANK_ID, AI_2_0_TANK_PRESSURE_ID,
+    AI_1_2_WAVE_COHORTS_ID, AI_2_0_TANK_PRESSURE_ID,
 };
 use crate::ai_shared;
 use crate::selfplay::pending_build::PendingBuildTracker;
@@ -55,9 +55,7 @@ pub fn live_profile_label(profile_id: &str) -> &'static str {
         Some(AI_1_0_SUITE_ID) | Some(AI_1_0_TECH_ID) => "AI 1.0",
         Some(AI_1_1_SUITE_ID) | Some(AI_1_1_TANK_MG_ID) => "AI 1.1",
         Some(AI_1_2_SUITE_ID) | Some(AI_1_2_WAVE_COHORTS_ID) => "AI 1.2",
-        Some(AI_2_0_SUITE_ID) | Some(AI_2_0_RIFLE_TANK_ID) | Some(AI_2_0_TANK_PRESSURE_ID) => {
-            "AI 2.0"
-        }
+        Some(AI_2_0_SUITE_ID) | Some(AI_2_0_TANK_PRESSURE_ID) => "AI 2.0",
         _ => "AI",
     }
 }
@@ -416,6 +414,7 @@ mod tests {
             Some(AI_2_0_SUITE_ID)
         );
         assert_eq!(canonical_live_profile_id("ai_2_0_agent_rush"), None);
+        assert_eq!(canonical_live_profile_id("ai_2_0_rifle_tank"), None);
         assert_eq!(canonical_live_profile_id("rifle_flood_fast"), None);
     }
 
@@ -425,10 +424,10 @@ mod tests {
             resolve_live_profile_id_for_match(AI_1_2_SUITE_ID, 8, 2),
             AI_1_2_WAVE_COHORTS_ID
         );
-        assert!(matches!(
+        assert_eq!(
             resolve_live_profile_id_for_match(AI_2_0_SUITE_ID, 8, 2),
-            "ai_2_0_rifle_tank" | "ai_2_0_tank_pressure"
-        ));
+            AI_2_0_TANK_PRESSURE_ID
+        );
     }
 
     #[test]
@@ -437,7 +436,7 @@ mod tests {
         assert_eq!(live_profile_label(AI_1_1_TANK_MG_ID), "AI 1.1");
         assert_eq!(live_profile_label(AI_1_2_WAVE_COHORTS_ID), "AI 1.2");
         assert_eq!(live_profile_label(AI_2_0_SUITE_ID), "AI 2.0");
-        assert_eq!(live_profile_label(AI_2_0_RIFLE_TANK_ID), "AI 2.0");
+        assert_eq!(live_profile_label(AI_2_0_TANK_PRESSURE_ID), "AI 2.0");
         assert_eq!(live_profile_label("default"), "AI 1.2");
         assert_eq!(live_profile_label("unknown"), "AI");
     }

@@ -46,7 +46,7 @@ use self::frontal::{issue_frontal_wave, plan_frontal_wave};
 use self::geometry::tile_center;
 use self::policies::{
     active_attack_policy, active_barracks_curve, active_production_policy,
-    active_required_tech_path, recovery_delay_ticks,
+    active_required_tech_path, active_tech_transition, recovery_delay_ticks,
 };
 use self::production::{
     production_building_order, production_uses_building, should_save_for_first_tech_unit,
@@ -317,7 +317,8 @@ where
         .then(|| defensive_panic_plan(defensive_panic.response, &facts));
     let recovery_active =
         !defensive_panic.active && memory.recovery_active(profile, &facts, observation.tick);
-    let required_tech_path = if defensive_panic.active {
+    let active_tech_transition = active_tech_transition(observation, profile);
+    let required_tech_path = if defensive_panic.active && active_tech_transition.is_none() {
         panic_plan
             .map(|plan| plan.required_tech_path)
             .unwrap_or(&DEFENSIVE_PANIC_RIFLE_TECH_PATH)

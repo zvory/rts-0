@@ -1,6 +1,6 @@
 use super::profiles::{
     profile_by_id, AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID, AI_1_2_WAVE_COHORTS_ID,
-    AI_2_0_RIFLE_TANK_ID, AI_2_0_TANK_PRESSURE_ID,
+    AI_2_0_TANK_PRESSURE_ID,
 };
 
 pub(crate) const AI_1_0_SUITE_ID: &str = "ai_1_0";
@@ -11,7 +11,7 @@ pub(crate) const AI_2_0_SUITE_ID: &str = "ai_2_0";
 const AI_1_0_MEMBERS: [&str; 1] = [AI_1_0_TECH_ID];
 const AI_1_1_MEMBERS: [&str; 1] = [AI_1_1_TANK_MG_ID];
 const AI_1_2_MEMBERS: [&str; 1] = [AI_1_2_WAVE_COHORTS_ID];
-const AI_2_0_MEMBERS: [&str; 2] = [AI_2_0_RIFLE_TANK_ID, AI_2_0_TANK_PRESSURE_ID];
+const AI_2_0_MEMBERS: [&str; 1] = [AI_2_0_TANK_PRESSURE_ID];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct AiProfileSuite {
@@ -43,7 +43,7 @@ pub(crate) const AI_PROFILE_SUITES: [AiProfileSuite; 4] = [
     AiProfileSuite {
         id: AI_2_0_SUITE_ID,
         label: "AI 2.0",
-        summary: "AI 2.0 suite that rotates between promoted tank-pressure and tank-led mixed-wave profiles.",
+        summary: "AI 2.0 suite currently pinned to the promoted tank-pressure profile.",
         members: &AI_2_0_MEMBERS,
     },
 ];
@@ -107,7 +107,7 @@ mod tests {
         assert_eq!(canonical_profile_request_id("ai_1_1"), Some(AI_1_1_SUITE_ID));
         assert_eq!(canonical_profile_request_id("ai12"), Some(AI_1_2_SUITE_ID));
         assert_eq!(canonical_profile_request_id("ai_2_0"), Some(AI_2_0_SUITE_ID));
-        assert_eq!(canonical_profile_request_id(AI_2_0_RIFLE_TANK_ID), Some(AI_2_0_RIFLE_TANK_ID));
+        assert_eq!(canonical_profile_request_id("ai_2_0_rifle_tank"), None);
         assert_eq!(canonical_profile_request_id("ai_2_0_agent_rush"), None);
         assert_eq!(canonical_profile_request_id("missing"), None);
     }
@@ -116,7 +116,7 @@ mod tests {
     fn suite_resolution_is_seeded_and_keeps_exact_profiles_exact() {
         assert_eq!(
             resolve_profile_request_id(AI_2_0_SUITE_ID, 0, 0),
-            Some(AI_2_0_RIFLE_TANK_ID)
+            Some(AI_2_0_TANK_PRESSURE_ID)
         );
         assert_eq!(
             resolve_profile_request_id(AI_2_0_SUITE_ID, 1, 0),

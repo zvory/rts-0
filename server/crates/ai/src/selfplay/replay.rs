@@ -975,7 +975,7 @@ mod tests {
         run_profile_matchup_result, ProfileMatchupOptions, ScorecardCollector,
     };
     use crate::ai_core::profiles::{
-        AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID, AI_1_2_WAVE_COHORTS_ID, AI_2_0_RIFLE_TANK_ID,
+        AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID, AI_1_2_WAVE_COHORTS_ID,
         AI_2_0_TANK_PRESSURE_ID,
     };
     use crate::ai_core::profile_suites::{
@@ -1000,7 +1000,6 @@ mod tests {
                 AI_1_0_TECH_ID,
                 AI_1_1_TANK_MG_ID,
                 AI_1_2_WAVE_COHORTS_ID,
-                AI_2_0_RIFLE_TANK_ID,
                 AI_2_0_TANK_PRESSURE_ID,
             ]
         );
@@ -1019,10 +1018,7 @@ mod tests {
         assert_eq!(canonical_profile_id("ai_2_0"), None);
         assert_eq!(canonical_profile_id("ai20"), None);
         assert_eq!(canonical_profile_id("ai_2_0_agent_rush"), None);
-        assert_eq!(
-            canonical_profile_id(AI_2_0_RIFLE_TANK_ID),
-            Some(AI_2_0_RIFLE_TANK_ID)
-        );
+        assert_eq!(canonical_profile_id("ai_2_0_rifle_tank"), None);
         assert_eq!(canonical_profile_id("rifle_flood_full_saturation"), None);
         assert_eq!(canonical_profile_id("saturation"), None);
     }
@@ -1048,19 +1044,19 @@ mod tests {
         );
         assert_eq!(
             resolve_profile_request_id_for_match(AI_2_0_SUITE_ID, 0, 0),
-            Some(AI_2_0_RIFLE_TANK_ID)
+            Some(AI_2_0_TANK_PRESSURE_ID)
         );
         assert_eq!(
             resolve_profile_request_id_for_match("ai20", 0, 0),
-            Some(AI_2_0_RIFLE_TANK_ID)
+            Some(AI_2_0_TANK_PRESSURE_ID)
         );
         assert_eq!(
             resolve_profile_request_id_for_match(AI_2_0_SUITE_ID, 1, 0),
             Some(AI_2_0_TANK_PRESSURE_ID)
         );
         assert_eq!(
-            resolve_profile_request_id_for_match(AI_2_0_RIFLE_TANK_ID, 1, 0),
-            Some(AI_2_0_RIFLE_TANK_ID)
+            resolve_profile_request_id_for_match("ai_2_0_rifle_tank", 1, 0),
+            None
         );
         assert_eq!(
             canonical_profile_request_id_for_match("ai_2_0_agent_rush"),
