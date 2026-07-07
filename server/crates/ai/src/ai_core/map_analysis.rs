@@ -6,8 +6,7 @@
 use std::collections::VecDeque;
 
 use crate::config;
-use rts_sim::game::entity::EntityKind;
-use rts_sim::protocol::{terrain, MapInfo, PlayerStart, ResourceNode, StartPayload};
+use rts_sim::protocol::{kinds, terrain, MapInfo, PlayerStart, ResourceNode, StartPayload};
 
 const MAX_CLEARANCE_TILES: u16 = 16;
 const RESOURCE_CLUSTER_RADIUS_MARGIN_TILES: f32 = 0.75;
@@ -228,9 +227,15 @@ impl AiMapAnalysis {
 #[derive(Clone, Debug)]
 struct ResourcePoint {
     id: u32,
-    kind: EntityKind,
+    kind: ResourcePointKind,
     x: f32,
     y: f32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ResourcePointKind {
+    Steel,
+    Oil,
 }
 
 #[derive(Clone, Debug)]
@@ -431,11 +436,11 @@ fn build_resource_clusters(
             .collect();
         let steel_nodes = resource_indices
             .iter()
-            .filter(|idx| resources[**idx].kind == EntityKind::Steel)
+            .filter(|idx| resources[**idx].kind == ResourcePointKind::Steel)
             .count() as u16;
         let oil_nodes = resource_indices
             .iter()
-            .filter(|idx| resources[**idx].kind == EntityKind::Oil)
+            .filter(|idx| resources[**idx].kind == ResourcePointKind::Oil)
             .count() as u16;
         let component_id = tile_index(
             map.width,
@@ -543,8 +548,12 @@ fn cluster_candidate_better(
 }
 
 fn resource_point(resource: &ResourceNode) -> Option<ResourcePoint> {
-    let kind: EntityKind = resource.kind.parse().ok()?;
-    kind.is_node().then_some(ResourcePoint {
+    let kind = match resource.kind.as_str() {
+        kinds::STEEL => ResourcePointKind::Steel,
+        kinds::OIL => ResourcePointKind::Oil,
+        _ => return None,
+    };
+    Some(ResourcePoint {
         id: resource.id,
         kind,
         x: resource.x,
