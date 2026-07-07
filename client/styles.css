@@ -1534,6 +1534,7 @@ input[type="text"]:focus {
 #game-screen.branch-background #command-card,
 #game-screen.branch-background .replay-analysis-overlay,
 #game-screen.branch-background .ai-diagnostics-panel-host,
+#game-screen.branch-background .ai-diagnostics-show,
 #game-screen.branch-background #room-time-controls {
   opacity: 0;
   pointer-events: none;
@@ -3789,57 +3790,64 @@ input[type="text"]:focus {
 .ai-diagnostics-panel-host {
   --ai-accent: #8fb8d0;
   --ai-accent-soft: rgba(143, 184, 208, 0.16);
-  position: absolute;
   top: 306px;
   right: 12px;
   bottom: calc(var(--bottom-hud-height) + 12px);
   z-index: 23;
   width: min(420px, calc(100vw - 24px));
-  min-height: 132px;
-  color: var(--ink);
-  pointer-events: none;
+  min-height: min(220px, calc(100vh - 24px));
+  max-height: max(220px, calc(100vh - var(--bottom-hud-height) - 318px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+.ai-diagnostics-panel-host[hidden] {
+  display: none;
+}
+.ai-diagnostics-panel-host[data-windowed="true"] {
+  max-height: none;
+}
+.ai-diagnostics-panel-host[data-collapsed="true"] {
+  bottom: auto;
+  height: auto !important;
+  min-height: 0;
+  max-height: none;
+  overflow: hidden;
+  width: min(260px, calc(100vw - 24px));
+}
+.ai-diagnostics-panel-host[data-collapsed="true"] .ai-diagnostics-body,
+.ai-diagnostics-panel-host[data-collapsed="true"] .lab-panel-resize-handle {
+  display: none;
+}
+.ai-diagnostics-panel-host .lab-panel-titlebar {
+  flex: 0 0 auto;
+}
+.ai-diagnostics-panel-host .lab-panel-kicker,
+.ai-diagnostics-panel-host .lab-panel h2,
+.ai-diagnostics-panel-host .lab-panel-title h2 {
+  color: var(--ai-accent);
+}
+.ai-diagnostics-panel-host .lab-panel-titlebar-actions {
+  gap: 5px;
+}
+.ai-diagnostics-panel-host .lab-panel-collapse,
+.ai-diagnostics-hide {
+  min-height: 28px;
+  padding: 4px 7px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 850;
 }
 .ai-diagnostics-panel {
-  height: 100%;
-  min-height: 0;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  padding: 10px;
   border-color: rgba(91, 105, 118, 0.78);
-  pointer-events: auto;
 }
-.ai-diagnostics-header,
-.ai-diagnostics-actions {
-  display: flex;
-  align-items: center;
-}
-.ai-diagnostics-header {
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-.ai-diagnostics-header h2 {
-  margin: 0;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--ai-accent);
-  font-family: var(--mono);
-  font-size: 12px;
-  font-weight: 850;
-  letter-spacing: 0;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-.ai-diagnostics-actions {
-  flex: 0 0 auto;
-  gap: 4px;
-}
-.ai-diagnostics-actions button,
 .ai-diagnostics-show {
   appearance: none;
-  width: 26px;
-  height: 26px;
+  position: absolute;
+  top: 306px;
+  right: 12px;
+  z-index: 23;
+  width: 40px;
+  height: 30px;
   display: grid;
   place-items: center;
   border: 1px solid var(--panel-edge);
@@ -3853,14 +3861,7 @@ input[type="text"]:focus {
   letter-spacing: 0;
   line-height: 1;
 }
-.ai-diagnostics-show {
-  width: 34px;
-  pointer-events: auto;
-  margin-left: auto;
-}
-.ai-diagnostics-actions button:hover,
 .ai-diagnostics-show:hover,
-.ai-diagnostics-actions button:focus-visible,
 .ai-diagnostics-show:focus-visible {
   border-color: var(--ai-accent);
   color: var(--ink);
@@ -3869,7 +3870,7 @@ input[type="text"]:focus {
 .ai-diagnostics-body {
   min-height: 0;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: 8px;
   border-top: 1px solid rgba(231, 223, 197, 0.14);
   padding-top: 8px;
@@ -3925,22 +3926,69 @@ input[type="text"]:focus {
   font-size: 11px;
   text-align: center;
 }
-.ai-diagnostics-player-list {
+.ai-diagnostics-tabs {
   min-height: 0;
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.ai-diagnostics-tab {
+  appearance: none;
+  min-width: min(132px, 52%);
+  max-width: 190px;
   display: grid;
-  align-content: start;
-  gap: 8px;
-  overflow: auto;
-  padding-right: 2px;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+  border: 1px solid rgba(143, 184, 208, 0.2);
+  border-radius: var(--radius-sm);
+  background: rgba(17, 17, 15, 0.58);
+  color: var(--ink-dim);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 820;
+  letter-spacing: 0;
+  padding: 5px 6px;
+}
+.ai-diagnostics-tab:hover,
+.ai-diagnostics-tab:focus-visible,
+.ai-diagnostics-tab.active {
+  border-color: var(--ai-accent);
+  color: var(--ink);
+  outline: none;
+}
+.ai-diagnostics-tab.active {
+  background: rgba(31, 44, 48, 0.88);
+}
+.ai-diagnostics-tab-swatch {
+  width: 7px;
+  height: 18px;
+  border: 1px solid rgba(231, 223, 197, 0.34);
+  border-radius: 2px;
+}
+.ai-diagnostics-tab-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ai-diagnostics-tab-tick {
+  color: var(--ink-faint);
+  white-space: nowrap;
 }
 .ai-diagnostics-player {
   min-width: 0;
+  min-height: 0;
   display: grid;
+  align-content: start;
   gap: 8px;
   padding: 8px;
   border: 1px solid rgba(143, 184, 208, 0.22);
   border-radius: var(--radius);
   background: rgba(17, 17, 15, 0.48);
+  overflow: auto;
 }
 .ai-diagnostics-player-header {
   display: grid;
@@ -3995,6 +4043,7 @@ input[type="text"]:focus {
 }
 .ai-diagnostics-trace {
   display: grid;
+  align-content: start;
   gap: 5px;
 }
 .ai-diagnostics-trace-row {
@@ -4060,24 +4109,6 @@ input[type="text"]:focus {
 .ai-diagnostics-trace-fields + .ai-diagnostics-trace-raw {
   margin-top: 4px;
 }
-.ai-diagnostics-panel-host:not(.is-hidden) .ai-diagnostics-show {
-  display: none;
-}
-.ai-diagnostics-panel-host.is-hidden .ai-diagnostics-panel {
-  display: none;
-}
-.ai-diagnostics-panel-host.is-collapsed {
-  bottom: auto;
-  width: min(210px, calc(100vw - 24px));
-  min-height: 0;
-}
-.ai-diagnostics-panel-host.is-collapsed .ai-diagnostics-panel {
-  height: auto;
-}
-.ai-diagnostics-panel-host.is-collapsed .ai-diagnostics-header {
-  margin-bottom: 0;
-}
-
 .room-time-timeline {
   flex-basis: 100%;
   display: flex;
@@ -4421,6 +4452,10 @@ input[type="text"]:focus {
     bottom: calc(var(--bottom-hud-height) + 12px);
     width: min(360px, calc(100vw - 70px));
   }
+  .ai-diagnostics-show {
+    top: 258px;
+    right: 58px;
+  }
   .ai-diagnostics-status {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -4464,6 +4499,10 @@ input[type="text"]:focus {
     top: 332px;
     bottom: calc(var(--bottom-hud-height) + 12px);
     width: auto;
+  }
+  .ai-diagnostics-show {
+    top: 332px;
+    right: 12px;
   }
 }
 

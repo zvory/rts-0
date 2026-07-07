@@ -27,6 +27,7 @@ export class LabPanelWindowChrome {
     this.collapsed = false;
     this.collapseButton = null;
     this.collapseLabel = "panel";
+    this.onCollapsedChange = typeof options.onCollapsedChange === "function" ? options.onCollapsedChange : null;
     this.collapseActivation = createImmediateTouchButtonActivation(() => this.toggleCollapsed());
 
     this.restoreGeometry();
@@ -114,6 +115,7 @@ export class LabPanelWindowChrome {
     }
     this.windowListeners = [];
     this.collapseButton = null;
+    this.onCollapsedChange = null;
   }
 
   beginInteraction(mode, event) {
@@ -299,6 +301,7 @@ export class LabPanelWindowChrome {
     this.el.dataset.collapsed = this.collapsed ? "true" : "false";
     this.syncCollapseButton();
     if (options.save !== false) this.saveCollapsedState();
+    this.onCollapsedChange?.(this.collapsed);
   }
 
   syncCollapseButton() {

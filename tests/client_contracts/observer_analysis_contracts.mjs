@@ -392,7 +392,9 @@ import { textWithin } from "./dom_text.mjs";
       preferences: restoredAiPrefs,
       getPlayers: () => players,
     });
-    assert(root.children.length === 1, "AI diagnostics panel mounts generated DOM");
+    assert(root.children.length === 2, "AI diagnostics panel mounts generated DOM plus a show affordance");
+    assert(root.querySelector(".lab-panel-drag-handle"), "AI diagnostics panel uses the shared movable lab window titlebar");
+    assert(root.querySelector(".lab-panel-resize-handle"), "AI diagnostics panel uses the shared resizable lab window handle");
     assert(
       textWithin(root).includes("Waiting for observer analysis"),
       "AI diagnostics panel shows a factual waiting state before analysis arrives",
@@ -423,6 +425,18 @@ import { textWithin } from "./dom_text.mjs";
             ],
           },
         },
+        {
+          id: 2,
+          units: [],
+          production: [],
+          aiDiagnostics: {
+            profileId: "ai_2_pressure",
+            traceTick: 72,
+            lines: [
+              "goal=Harass status=Moving intents=attackMove",
+            ],
+          },
+        },
       ],
     });
     const aiDiagnosticsText = textWithin(root);
@@ -439,6 +453,21 @@ import { textWithin } from "./dom_text.mjs";
         && aiDiagnosticsText.includes("train:Rifleman"),
       "AI diagnostics panel renders status, profile, trace tick, and parsed decision fields",
     );
+    const aiTabs = root.querySelectorAll(".ai-diagnostics-tab");
+    assert(aiTabs.length === 2, "AI diagnostics panel renders one tab for each AI diagnostics row");
+    assert(
+      !textWithin(root).includes("Harass"),
+      "AI diagnostics panel shows one selected AI trace at a time",
+    );
+    const secondTab = aiTabs[1];
+    root.children[0].listeners.click?.({ target: secondTab, preventDefault() {}, stopPropagation() {} });
+    assert(restoredAiPrefs.selectedPlayerId === 2, "AI diagnostics tab clicks persist the selected AI");
+    assert(
+      textWithin(root).includes("Harass") && !textWithin(root).includes("Production"),
+      "AI diagnostics panel switches trace content when selecting another AI tab",
+    );
+    const firstTab = root.querySelectorAll(".ai-diagnostics-tab")[0];
+    root.children[0].listeners.click?.({ target: firstTab, preventDefault() {}, stopPropagation() {} });
     const aiDiagnosticsBody = root.querySelector(".ai-diagnostics-body");
     const stableTraceRenderCount = aiDiagnosticsBody.replaceChildrenCount;
     panel.applyObserverAnalysis({
@@ -457,6 +486,18 @@ import { textWithin } from "./dom_text.mjs";
             ],
           },
         },
+        {
+          id: 2,
+          units: [],
+          production: [],
+          aiDiagnostics: {
+            profileId: "ai_2_pressure",
+            traceTick: 72,
+            lines: [
+              "goal=Harass status=Moving intents=attackMove",
+            ],
+          },
+        },
       ],
     });
     assert(
@@ -470,7 +511,7 @@ import { textWithin } from "./dom_text.mjs";
     assert(restoredAiPrefs.visible === false, "AI diagnostics hide action updates shared preferences");
 
     const show = root.querySelector(".ai-diagnostics-show");
-    panelRoot.listeners.click?.({ target: show, preventDefault() {}, stopPropagation() {} });
+    show.listeners.click?.({ target: show, preventDefault() {}, stopPropagation() {} });
     assert(restoredAiPrefs.visible === true, "AI diagnostics show action updates shared preferences");
     assert(restoredAiPrefs.collapsed === false, "AI diagnostics show expands the panel");
 
