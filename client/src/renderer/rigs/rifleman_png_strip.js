@@ -8,10 +8,10 @@ function deepFreeze(value) {
 export const RIFLEMAN_PNG_FRAME_STRIP = deepFreeze({
   enabled: true,
   unit: "rifleman",
-  image: "/assets/rigs/rifleman-pass-02/rifleman-pass-02-strip.png?v=pass02-two-recoil-v3",
-  imageVersion: "pass02-two-recoil-v3",
-  frameWidth: 96,
-  frameHeight: 96,
+  image: "/assets/rigs/rifleman-pass-02/generated/rifleman-down-rifle-iteration/rifleman-down-rifle-strip.png?v=down-rifle-iteration-3-backward-recoil",
+  imageVersion: "down-rifle-iteration-3-backward-recoil",
+  frameWidth: 160,
+  frameHeight: 112,
   frameCount: 7,
   idleFrame: 0,
   movementFrames: [1, 2, 3, 4],
@@ -26,8 +26,8 @@ export const RIFLEMAN_PNG_FRAME_STRIP = deepFreeze({
     hue: 100,
   },
   source: {
-    generatedSource: "client/assets/rigs/rifleman-pass-02/generated/rifleman-pass-02-source.png",
-    alphaSource: "client/assets/rigs/rifleman-pass-02/generated/rifleman-pass-02-alpha.png",
-    runtimeStrip: "client/assets/rigs/rifleman-pass-02/rifleman-pass-02-strip.png",
+    generatedSource: "client/assets/rigs/rifleman-pass-02/generated/rifleman-down-rifle-iteration/rifleman-down-rifle-source-imagegen.png",
+    alphaSource: "client/assets/rigs/rifleman-pass-02/generated/rifleman-down-rifle-iteration/rifleman-down-rifle-alpha.png",
+    runtimeStrip: "client/assets/rigs/rifleman-pass-02/generated/rifleman-down-rifle-iteration/rifleman-down-rifle-strip.png",
   },
 });

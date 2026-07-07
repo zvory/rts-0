@@ -2,17 +2,18 @@
   "unit": "rifleman",
   "status": "enabled visual experiment; not final production art",
   "source": {
-    "builtInImageGenSource": "/Users/az/.codex/generated_images/019f283d-1009-79f0-850d-760b24c9709a/ig_02037e9961595927016a47e2ea0c8481a2871b17a3982769e1.png",
-    "sourceSheet": "client/assets/rigs/rifleman-pass-02/generated/rifleman-pass-02-source.png",
-    "alphaSheet": "client/assets/rigs/rifleman-pass-02/generated/rifleman-pass-02-alpha.png",
-    "runtimeStrip": "client/assets/rigs/rifleman-pass-02/rifleman-pass-02-strip.png",
-    "prompt": "client/assets/rigs/rifleman-pass-02/metadata/prompt.md"
+    "builtInImageGenSource": "/Users/az/.codex/generated_images/019f3e6a-5f5a-7870-be08-8d46569673f8/ig_091e11a10d09f554016a4d8062e8788195a7615cc6ae21b76e.png",
+    "sourceSheet": "client/assets/rigs/rifleman-pass-02/generated/rifleman-down-rifle-iteration/rifleman-down-rifle-source-imagegen.png",
+    "alphaSheet": "client/assets/rigs/rifleman-pass-02/generated/rifleman-down-rifle-iteration/rifleman-down-rifle-alpha.png",
+    "runtimeStrip": "client/assets/rigs/rifleman-pass-02/generated/rifleman-down-rifle-iteration/rifleman-down-rifle-strip.png",
+    "prompt": "client/assets/rigs/rifleman-pass-02/metadata/prompt-down-rifle-iteration.md"
   },
   "runtime": {
     "module": "client/src/renderer/rigs/rifleman_png_strip.js",
-    "stripImageUrl": "/assets/rigs/rifleman-pass-02/rifleman-pass-02-strip.png?v=pass02-two-recoil-v3",
-    "frameWidth": 96,
-    "frameHeight": 96,
+    "stripImageUrl": "/assets/rigs/rifleman-pass-02/generated/rifleman-down-rifle-iteration/rifleman-down-rifle-strip.png?v=down-rifle-iteration-3-backward-recoil",
+    "imageVersion": "down-rifle-iteration-3-backward-recoil",
+    "frameWidth": 160,
+    "frameHeight": 112,
     "frameCount": 7,
     "idleFrame": 0,
     "movementFrames": [1, 2, 3, 4],
@@ -31,7 +32,8 @@
   "notes": [
     "Frame 0 is used for idle/standing riflemen.",
     "Frames 1-4 cycle only while the authoritative client entity state is move.",
-    "Frame 5 is the firing recoil peak and frame 6 is a partial recovery pose; both are held only for the opening slice of weapon recoil.",
+    "The source sheet was generated with the rifleman facing south to preserve the long rifle silhouette, then the runtime frames were rotated 90 degrees left so the existing frame-strip renderer can continue treating source art as east-facing.",
+    "Frame 5 is the firing recoil peak and frame 6 is a partial recovery pose; both are derived from the idle frame and shifted backward along the rifle axis.",
     "The old SVG rifleman rig remains available for the shadow route and fallback while the PNG texture loads.",
     "The runtime strip already has the shared frame-strip baseline baked in, equivalent to ImageMagick -modulate 170,118,100, so the client load-time color-profile delta is identity for this pass."
   ]
