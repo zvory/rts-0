@@ -399,8 +399,10 @@ export class AiDiagnosticsPanel {
 observer-analysis diagnostics. The panel consumes the same server-authored `observerAnalysis`
 payload, but normalizes and renders `aiDiagnostics` separately so high-churn AI trace lines do not
 dirty-update the general replay/spectator analysis tabs. It owns its generated DOM, persists
-visible/collapsed state under `rts.aiDiagnosticsPanel`, and renders per-player sections with
-profile id, trace tick, status metrics, and bounded decision trace lines for AI-vs-AI debugging.
+visible/collapsed/selected-AI state under `rts.aiDiagnosticsPanel`, uses the shared lab-panel
+window chrome for drag, resize, collapse, keyboard nudge, and viewport clamping, and renders one
+tab per AI diagnostics row with profile id, trace tick, status metrics, and bounded decision trace
+lines for AI-vs-AI debugging.
 `match_observer_diagnostics.js` composes both observer surfaces for `Match`, forwards
 `observerAnalysis` messages to each mounted panel, updates the viewport-dependent observer analysis
 frame surface, and centralizes teardown.

@@ -1,4 +1,7 @@
+import { LabPanelWindowChrome } from "./lab_panel_window.js";
+
 const STORAGE_KEY = "rts.aiDiagnosticsPanel";
+const WINDOW_STORAGE_KEY = "rts.aiDiagnosticsPanel.window.v1";
 
 export function shouldMountAiDiagnosticsPanel({ capabilities } = {}) {
   return capabilities?.diagnostics?.observerAnalysis === true;
@@ -8,6 +11,7 @@ export function createAiDiagnosticsPanelPreferences(storage = safeLocalStorage()
   const fallback = {
     visible: true,
     collapsed: false,
+    selectedPlayerId: null,
   };
   const state = { ...fallback, ...readStoredPreferences(storage) };
   normalizePreferences(state);
@@ -27,6 +31,13 @@ export function createAiDiagnosticsPanelPreferences(storage = safeLocalStorage()
       state.collapsed = value === true;
       writeStoredPreferences(storage, state);
     },
+    get selectedPlayerId() {
+      return state.selectedPlayerId;
+    },
+    set selectedPlayerId(value) {
+      state.selectedPlayerId = normalizeSelectedPlayerId(value);
+      writeStoredPreferences(storage, state);
+    },
     snapshot() {
       return { ...state };
     },
@@ -44,11 +55,13 @@ export class AiDiagnosticsPanel {
     this.getPlayers = getPlayers;
     this.analysis = null;
     this.el = null;
-    this.panel = null;
     this.bodyEl = null;
     this.showButton = null;
+    this.windowChrome = null;
     this.bodySignature = "";
-    this.onClick = (ev) => this.handleClick(ev);
+    this.onPanelClick = (ev) => this.handlePanelClick(ev);
+    this.onTabKeydown = (ev) => this.handleTabKeydown(ev);
+    this.onShowClick = (ev) => this.show(ev);
     this.mount();
   }
 
@@ -56,38 +69,40 @@ export class AiDiagnosticsPanel {
     if (!this.root || this.el) return;
 
     this.el = document.createElement("aside");
-    this.el.className = "ai-diagnostics-panel-host";
+    this.el.className = "ai-diagnostics-panel-host ai-diagnostics-panel lab-panel";
     this.el.setAttribute("aria-label", "AI diagnostics");
-    this.el.addEventListener("click", this.onClick);
+    this.el.addEventListener("click", this.onPanelClick);
+    this.el.addEventListener("keydown", this.onTabKeydown);
 
-    this.panel = document.createElement("section");
-    this.panel.className = "ai-diagnostics-panel hud-panel";
+    this.windowChrome = new LabPanelWindowChrome(this.el, {
+      storageKey: WINDOW_STORAGE_KEY,
+    });
+    const storedWindowState = this.windowChrome.readStoredState?.();
+    if (!storedWindowState && this.preferences.collapsed === true) {
+      this.windowChrome.setCollapsed(true, { save: false });
+    }
+    this.windowChrome.onCollapsedChange = (collapsed) => {
+      this.preferences.collapsed = collapsed;
+    };
+    this.preferences.collapsed = this.windowChrome.collapsed;
 
-    const header = document.createElement("div");
-    header.className = "ai-diagnostics-header";
-
-    const title = document.createElement("h2");
-    title.textContent = "AI Diagnostics";
-    header.appendChild(title);
-
-    const actions = document.createElement("div");
-    actions.className = "ai-diagnostics-actions";
-    actions.append(
-      this.buildIconButton("Collapse AI diagnostics", "ai-diagnostics-collapse", "-", { collapse: "1" }),
-      this.buildIconButton("Hide AI diagnostics", "ai-diagnostics-hide", "x", { hide: "1" }),
-    );
-    header.appendChild(actions);
+    const header = this.windowChrome.renderHeader({
+      kicker: "AI",
+      title: "Diagnostics",
+      collapseLabel: "AI diagnostics panel",
+    });
+    const actions = header.querySelector(".lab-panel-titlebar-actions");
+    actions?.appendChild(this.buildIconButton("Hide AI diagnostics", "ai-diagnostics-hide lab-btn", "Hide", { hide: "1" }));
 
     this.bodyEl = document.createElement("div");
-    this.bodyEl.className = "ai-diagnostics-body";
+    this.bodyEl.className = "ai-diagnostics-body lab-panel-body";
 
-    this.panel.append(header, this.bodyEl);
-    this.el.appendChild(this.panel);
+    this.el.append(header, this.bodyEl, this.windowChrome.renderResizeHandle());
 
     this.showButton = this.buildIconButton("Show AI diagnostics", "ai-diagnostics-show", "AI", { show: "1" });
-    this.el.appendChild(this.showButton);
+    this.showButton.addEventListener("click", this.onShowClick);
 
-    this.root.appendChild(this.el);
+    this.root.append(this.el, this.showButton);
     this.render();
   }
 
@@ -102,56 +117,93 @@ export class AiDiagnosticsPanel {
     return btn;
   }
 
-  handleClick(ev) {
+  handlePanelClick(ev) {
     const target = ev.target instanceof Element ? ev.target : null;
     const btn = target?.closest("button");
     if (!btn || !this.el?.contains(btn)) return;
+
+    if (btn.dataset.hide) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      this.preferences.visible = false;
+      this.render();
+      return;
+    }
+
+    if (btn.dataset.aiDiagnosticsTab) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      this.selectPlayerTab(btn.dataset.aiDiagnosticsTab);
+    }
+  }
+
+  handleTabKeydown(ev) {
+    const target = ev.target instanceof Element ? ev.target : null;
+    const tab = target?.closest(".ai-diagnostics-tab");
+    if (!tab || !this.el?.contains(tab)) return;
+    const key = ev.key;
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(key)) return;
+
+    const tabs = Array.from(this.el.querySelectorAll(".ai-diagnostics-tab"));
+    const index = tabs.indexOf(tab);
+    if (index < 0 || tabs.length === 0) return;
+
     ev.preventDefault();
     ev.stopPropagation();
+    const nextIndex = key === "Home"
+      ? 0
+      : key === "End"
+        ? tabs.length - 1
+        : key === "ArrowLeft"
+          ? (index + tabs.length - 1) % tabs.length
+          : (index + 1) % tabs.length;
+    this.selectPlayerTab(tabs[nextIndex]?.dataset.aiDiagnosticsTab, { focus: true });
+  }
 
-    if (btn.dataset.collapse) {
-      this.preferences.collapsed = !this.preferences.collapsed;
-      if (!this.preferences.visible) this.preferences.visible = true;
-    } else if (btn.dataset.hide) {
-      this.preferences.visible = false;
-    } else if (btn.dataset.show) {
-      this.preferences.visible = true;
-      this.preferences.collapsed = false;
-    }
+  show(ev) {
+    ev?.preventDefault?.();
+    ev?.stopPropagation?.();
+    this.preferences.visible = true;
+    this.windowChrome?.setCollapsed(false);
+    this.preferences.collapsed = false;
     this.render();
+  }
+
+  selectPlayerTab(playerId, { focus = false } = {}) {
+    const selectedPlayerId = normalizeSelectedPlayerId(playerId);
+    if (selectedPlayerId == null) return;
+    this.preferences.selectedPlayerId = selectedPlayerId;
+    this.bodySignature = "";
+    this.renderBody();
+    if (focus) {
+      const tab = Array.from(this.el?.querySelectorAll(".ai-diagnostics-tab") || [])
+        .find((candidate) => Number(candidate.dataset.aiDiagnosticsTab) === selectedPlayerId);
+      tab?.focus?.();
+    }
   }
 
   applyObserverAnalysis(payload) {
     this.analysis = normalizeAiDiagnosticsPanelPayload(payload, this.getPlayers());
-    if (!this.bodyEl || this.bodyEl.hidden) return;
+    if (!this.bodyEl || !this.preferences.visible) return;
     this.renderBody();
   }
 
   render() {
-    if (!this.el || !this.panel || !this.bodyEl || !this.showButton) return;
+    if (!this.el || !this.bodyEl || !this.showButton) return;
     const visible = this.preferences.visible !== false;
-    const collapsed = this.preferences.collapsed === true;
 
     this.el.classList.toggle("is-hidden", !visible);
-    this.el.classList.toggle("is-collapsed", visible && collapsed);
-    this.panel.hidden = !visible;
+    this.el.hidden = !visible;
     this.showButton.hidden = visible;
-    this.bodyEl.hidden = !visible || collapsed;
+    this.bodyEl.hidden = !visible;
 
-    const collapse = this.panel.querySelector(".ai-diagnostics-collapse");
-    if (collapse) {
-      collapse.textContent = collapsed ? "+" : "-";
-      collapse.title = collapsed ? "Expand AI diagnostics" : "Collapse AI diagnostics";
-      collapse.setAttribute("aria-label", collapse.title);
-      collapse.setAttribute("aria-expanded", String(!collapsed));
-    }
-
-    if (visible && !collapsed) this.renderBody();
+    if (visible) this.renderBody();
   }
 
   renderBody() {
     if (!this.bodyEl) return;
-    const signature = aiDiagnosticsBodySignature(this.analysis);
+    const activeRow = activeAiRow(this.analysis, this.preferences.selectedPlayerId);
+    const signature = aiDiagnosticsBodySignature(this.analysis, activeRow?.id);
     if (signature === this.bodySignature) return;
     this.bodySignature = signature;
 
@@ -162,12 +214,11 @@ export class AiDiagnosticsPanel {
     } else if (!this.analysis.rows.length) {
       body.push(renderEmptyState("No AI diagnostics"));
     } else {
-      const list = document.createElement("div");
-      list.className = "ai-diagnostics-player-list";
-      for (const row of this.analysis.rows) {
-        list.appendChild(renderPlayerSection(row));
+      if (activeRow && this.preferences.selectedPlayerId !== activeRow.id) {
+        this.preferences.selectedPlayerId = activeRow.id;
       }
-      body.push(list);
+      body.push(renderPlayerTabs(this.analysis.rows, activeRow?.id));
+      body.push(renderPlayerSection(activeRow));
     }
 
     this.bodyEl.replaceChildren(...body);
@@ -187,14 +238,20 @@ export class AiDiagnosticsPanel {
   }
 
   destroy() {
+    this.windowChrome?.destroy();
     if (this.el) {
-      this.el.removeEventListener("click", this.onClick);
+      this.el.removeEventListener("click", this.onPanelClick);
+      this.el.removeEventListener("keydown", this.onTabKeydown);
       this.el.remove();
     }
+    if (this.showButton) {
+      this.showButton.removeEventListener("click", this.onShowClick);
+      this.showButton.remove();
+    }
     this.el = null;
-    this.panel = null;
     this.bodyEl = null;
     this.showButton = null;
+    this.windowChrome = null;
   }
 }
 
@@ -222,7 +279,7 @@ export function normalizeAiDiagnostics(diagnostics) {
   const lines = Array.isArray(diagnostics.lines)
     ? diagnostics.lines.map((line) => String(line || "").trim()).filter(Boolean)
     : [];
-  if (!profileId || lines.length === 0) return null;
+  if (!profileId) return null;
   return {
     profileId,
     traceTick: Math.max(0, Math.trunc(Number(diagnostics.traceTick) || 0)),
@@ -234,13 +291,17 @@ function normalizeAiDiagnosticsPlayer(player, metadata) {
   const id = Number(player?.id);
   if (!Number.isFinite(id) || id <= 0) return null;
   const aiDiagnostics = normalizeAiDiagnostics(player.aiDiagnostics);
-  if (!aiDiagnostics) return null;
   const meta = metadata.get(id) || {};
+  if (!aiDiagnostics && !meta.isAi) return null;
   return {
     id,
     name: meta.name || `Player ${id}`,
     color: safeCssColor(meta.color || "#e7dfc5"),
-    aiDiagnostics,
+    aiDiagnostics: aiDiagnostics || {
+      profileId: meta.aiProfileId || "AI",
+      traceTick: 0,
+      lines: [],
+    },
   };
 }
 
@@ -252,6 +313,8 @@ function playerMetadata(players) {
     metadata.set(id, {
       name: player?.name || `Player ${id}`,
       color: player?.color || "#e7dfc5",
+      isAi: player?.isAi === true || player?.is_ai === true || Boolean(player?.aiProfileId || player?.ai_profile_id),
+      aiProfileId: String(player?.aiProfileId || player?.ai_profile_id || "").trim(),
     });
   }
   return metadata;
@@ -277,9 +340,47 @@ function renderEmptyState(text) {
   return empty;
 }
 
+function renderPlayerTabs(rows, activePlayerId) {
+  const tabs = document.createElement("div");
+  tabs.className = "ai-diagnostics-tabs";
+  tabs.setAttribute("role", "tablist");
+  tabs.setAttribute("aria-label", "AI players");
+
+  for (const row of rows) {
+    const selected = row.id === activePlayerId;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "ai-diagnostics-tab";
+    button.dataset.aiDiagnosticsTab = String(row.id);
+    button.setAttribute("role", "tab");
+    button.setAttribute("aria-selected", String(selected));
+    button.tabIndex = selected ? 0 : -1;
+    if (selected) button.classList.add("active");
+
+    const swatch = document.createElement("span");
+    swatch.className = "ai-diagnostics-tab-swatch";
+    swatch.setAttribute("style", `background:${safeCssColor(row.color)};`);
+    swatch.setAttribute("aria-hidden", "true");
+
+    const label = document.createElement("span");
+    label.className = "ai-diagnostics-tab-label";
+    label.textContent = row.name;
+
+    const tick = document.createElement("span");
+    tick.className = "ai-diagnostics-tab-tick";
+    tick.textContent = `t${formatValue(row.aiDiagnostics.traceTick)}`;
+
+    button.append(swatch, label, tick);
+    tabs.appendChild(button);
+  }
+
+  return tabs;
+}
+
 function renderPlayerSection(row) {
   const section = document.createElement("section");
   section.className = "ai-diagnostics-player";
+  section.setAttribute("role", "tabpanel");
 
   const header = document.createElement("div");
   header.className = "ai-diagnostics-player-header";
@@ -306,9 +407,13 @@ function renderPlayerSection(row) {
 
   const trace = document.createElement("div");
   trace.className = "ai-diagnostics-trace";
-  row.aiDiagnostics.lines.forEach((line, index) => {
-    trace.appendChild(renderTraceLine(line, index));
-  });
+  if (row.aiDiagnostics.lines.length > 0) {
+    row.aiDiagnostics.lines.forEach((line, index) => {
+      trace.appendChild(renderTraceLine(line, index));
+    });
+  } else {
+    trace.appendChild(renderEmptyState("No trace lines for this AI"));
+  }
   section.appendChild(trace);
 
   return section;
@@ -384,10 +489,18 @@ function parseTraceFields(lineText) {
   return { fields, rest: rest.join(" ") };
 }
 
-function aiDiagnosticsBodySignature(analysis) {
+function activeAiRow(analysis, selectedPlayerId) {
+  const rows = analysis?.rows || [];
+  if (rows.length === 0) return null;
+  const selected = normalizeSelectedPlayerId(selectedPlayerId);
+  return rows.find((row) => row.id === selected) || rows[0];
+}
+
+function aiDiagnosticsBodySignature(analysis, activePlayerId) {
   if (!analysis) return "waiting";
   return [
     analysis.latestTraceTick ?? "",
+    activePlayerId ?? "",
     ...analysis.rows.map((row) => [
       row.id,
       row.name,
@@ -410,6 +523,12 @@ function safeCssColor(color) {
 function normalizePreferences(state) {
   state.visible = state.visible !== false;
   state.collapsed = state.collapsed === true;
+  state.selectedPlayerId = normalizeSelectedPlayerId(state.selectedPlayerId);
+}
+
+function normalizeSelectedPlayerId(value) {
+  const playerId = Math.trunc(Number(value));
+  return Number.isFinite(playerId) && playerId > 0 ? playerId : null;
 }
 
 function safeLocalStorage() {
