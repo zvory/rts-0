@@ -63,6 +63,31 @@ fn live_spectator_receives_observer_analysis_but_active_players_do_not() {
 }
 
 #[test]
+fn selected_lobby_ai_profile_is_used_by_live_controller() {
+    let mut task = RoomTask::new(
+        "live-ai-profile-selection-test".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let host_id = next_player_id();
+    task.host_id = Some(host_id);
+    add_test_room_player(&mut task, host_id, true);
+
+    task.on_add_ai(host_id, Some(2), Some("ai_2_0_agent_rush".to_string()));
+    assert_eq!(
+        task.ai_players.first().map(|ai| ai.profile_id),
+        Some("ai_2_0_agent_rush")
+    );
+
+    task.start_match();
+
+    assert_eq!(task.ai_controllers.len(), 1);
+    assert_eq!(task.ai_controllers[0].profile_id(), "ai_2_0_agent_rush");
+}
+
+#[test]
 fn normal_live_player_commands_use_connection_authority_and_ack_sequence() {
     let mut task = RoomTask::new(
         "live-command-authority-test".to_string(),
