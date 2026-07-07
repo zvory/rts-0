@@ -50,10 +50,11 @@ src/
   match_history.js # Lobby match-history table and replay launch affordance
   scoreboard.js   # Shared score/result formatting helpers
   status_badge.js # Build/network/frame status badge with copyable diagnostics
+  ai_diagnostics_panel.js # dedicated live/replay AI decision diagnostics panel
   observer_analysis_overlay.js # replay/live spectator analysis overlay
-  observer_analysis_ai.js # AI decision trace rows for observer analysis
   observer_analysis_rows.js # observer analysis player row metadata joiner
   observer_analysis_signatures.js # dirty-body signatures for observer analysis DOM updates
+  match_observer_diagnostics.js # Match-owned observer/AI diagnostics surface composer
   client_perf_report.js # bounded client frame-profiler upload field shaping
   match_health.js # match network/render health reporter
   frame_profiler.js # bounded client frame phase profiler and debug summary API
@@ -383,9 +384,26 @@ client-side and viewport-specific; Production, Units, Units Lost, and Resources 
 latest server-authored `observerAnalysis` payload. Resources Lost follows the protocol's narrow
 definition: spent steel/oil value of units that died, excluding buildings, stockpile changes,
 harvesting, refunds, and cancelled queues.
-The AI tab renders optional per-player `aiDiagnostics` rows from live observer-analysis payloads,
-showing the selected AI profile, trace tick, and formatted decision trace lines for spectator-only
-AI-vs-AI debugging.
+
+`ai_diagnostics_panel.js`
+```js
+shouldMountAiDiagnosticsPanel({ capabilities })
+createAiDiagnosticsPanelPreferences(storage?)
+export class AiDiagnosticsPanel {
+  constructor({ root, preferences, getPlayers })
+  applyObserverAnalysis(payload)          // renders optional per-player aiDiagnostics trace rows
+  destroy()
+}
+```
+`Match` mounts the AI diagnostics panel beside the observer analysis overlay when the room advertises
+observer-analysis diagnostics. The panel consumes the same server-authored `observerAnalysis`
+payload, but normalizes and renders `aiDiagnostics` separately so high-churn AI trace lines do not
+dirty-update the general replay/spectator analysis tabs. It owns its generated DOM, persists
+visible/collapsed state under `rts.aiDiagnosticsPanel`, and renders per-player sections with
+profile id, trace tick, status metrics, and bounded decision trace lines for AI-vs-AI debugging.
+`match_observer_diagnostics.js` composes both observer surfaces for `Match`, forwards
+`observerAnalysis` messages to each mounted panel, updates the viewport-dependent observer analysis
+frame surface, and centralizes teardown.
 
 `frame_entity_views.js`
 ```js
@@ -1373,9 +1391,9 @@ update methods; use injected `ClientIntent` or a renderer read model instead.
 
 Current areas:
 - `app-shell`: `main.js`, `app.js`, `match.js`, `match_combat_audio.js`,
-  `match_net_reporter.js`, `match_settings_context.js`, `match_settings_toggles.js`, `client_perf_report.js`, `match_health.js`,
+  `match_net_reporter.js`, `match_observer_diagnostics.js`, `match_settings_context.js`, `match_settings_toggles.js`, `client_perf_report.js`, `match_health.js`,
   `frame_profiler.js`, `frame_recovery.js`, `frame_entity_views.js`, `live_pause_overlay.js`,
-  `observer_analysis_overlay.js`, `observer_analysis_signatures.js`, `replay_controls.js`,
+  `ai_diagnostics_panel.js`, `observer_analysis_overlay.js`, `observer_analysis_signatures.js`, `replay_controls.js`,
   `room_time_panel.js`, `replay_viewer.js`, `lab_control_policy.js`, `room_capabilities.js`,
   `visual_profiles.js`. App's browser leave confirmation is scoped to active running live-player matches; spectator, Lab, replay, and resolved/stopped sessions leave without the prompt.
 - `model`: `state.js`, `state_queries.js`, `state_visual_effects.js`, `client_intent.js`,

@@ -1032,7 +1032,7 @@ function polygonAxisValues(points, offset) {
       renderer: { render() {} },
       hud: { update() {} },
       minimap: { render() {} },
-      observerAnalysisOverlay: null,
+      observerDiagnostics: null,
     });
 
     match.frame(1016);

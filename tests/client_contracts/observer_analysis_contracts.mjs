@@ -12,6 +12,11 @@ import {
   UPGRADE,
 } from "../../client/src/protocol.js";
 import {
+  AiDiagnosticsPanel,
+  createAiDiagnosticsPanelPreferences,
+  shouldMountAiDiagnosticsPanel,
+} from "../../client/src/ai_diagnostics_panel.js";
+import {
   OBSERVER_ANALYSIS_TABS,
   ObserverAnalysisOverlay,
   calculateViewportArmyValue,
@@ -126,6 +131,30 @@ import { textWithin } from "./dom_text.mjs";
       }),
     }),
     "observer analysis does not mount from replay identity alone",
+  );
+
+  const aiStorage = fakeStorage();
+  const aiPrefs = createAiDiagnosticsPanelPreferences(aiStorage);
+  aiPrefs.visible = false;
+  aiPrefs.collapsed = true;
+  const restoredAiPrefs = createAiDiagnosticsPanelPreferences(aiStorage);
+  assert(restoredAiPrefs.visible === false, "AI diagnostics visible state persists");
+  assert(restoredAiPrefs.collapsed === true, "AI diagnostics collapsed state persists");
+  assert(
+    shouldMountAiDiagnosticsPanel({
+      capabilities: createRoomCapabilities({
+        startPayload: { spectator: true, diagnostics: { observerAnalysis: true } },
+      }),
+    }),
+    "AI diagnostics panel mounts from observer-analysis diagnostic capability",
+  );
+  assert(
+    !shouldMountAiDiagnosticsPanel({
+      capabilities: createRoomCapabilities({
+        startPayload: { spectator: true, diagnostics: { observerAnalysis: false } },
+      }),
+    }),
+    "AI diagnostics panel stays hidden without observer-analysis diagnostic capability",
   );
 
   withFakeOverlayDocument(({ FakeElement }) => {
@@ -339,13 +368,46 @@ import { textWithin } from "./dom_text.mjs";
       "resources lost tab renders per-player killed unit value",
     );
 
-    restored.selectedTab = "ai-diagnostics";
-    overlay.render();
+    const tabButtons = root.querySelectorAll(".replay-analysis-tab");
+    const firstTab = tabButtons[0];
+    overlayRoot.listeners.keydown?.({
+      target: firstTab,
+      key: "End",
+      preventDefault() {},
+      stopPropagation() {},
+    });
+    assert(restored.selectedTab === "resources-lost", "observer analysis keyboard End selects the last tab");
+    assert(tabButtons[tabButtons.length - 1].focused === true, "observer analysis keyboard navigation focuses the selected tab");
+
+    overlay.destroy();
+    assert(root.children.length === 0, "observer analysis overlay removes generated DOM on destroy");
+  });
+
+  withFakeOverlayDocument(({ FakeElement }) => {
+    const root = new FakeElement("section");
+    restoredAiPrefs.visible = true;
+    restoredAiPrefs.collapsed = false;
+    const panel = new AiDiagnosticsPanel({
+      root,
+      preferences: restoredAiPrefs,
+      getPlayers: () => players,
+    });
+    assert(root.children.length === 1, "AI diagnostics panel mounts generated DOM");
+    assert(
+      textWithin(root).includes("Waiting for observer analysis"),
+      "AI diagnostics panel shows a factual waiting state before analysis arrives",
+    );
+
+    panel.applyObserverAnalysis({
+      tick: 40,
+      players: [{ id: 1, units: [], production: [] }],
+    });
     assert(
       textWithin(root).includes("No AI diagnostics"),
-      "AI diagnostics tab handles analysis without AI trace rows cleanly",
+      "AI diagnostics panel handles observer analysis without AI trace rows cleanly",
     );
-    overlay.applyObserverAnalysis({
+
+    panel.applyObserverAnalysis({
       tick: 45,
       players: [
         {
@@ -365,25 +427,29 @@ import { textWithin } from "./dom_text.mjs";
     });
     const aiDiagnosticsText = textWithin(root);
     assert(
-      aiDiagnosticsText.includes("Latest decisions")
+      aiDiagnosticsText.includes("AI Diagnostics")
+        && aiDiagnosticsText.includes("Observer tick")
+        && aiDiagnosticsText.includes("45")
         && aiDiagnosticsText.includes("ai_1_2_wave_cohorts")
         && aiDiagnosticsText.includes("tick 36")
-        && aiDiagnosticsText.includes("goal=Production"),
-      "AI diagnostics tab renders profile, trace tick, and decision trace lines",
+        && aiDiagnosticsText.includes("goal")
+        && aiDiagnosticsText.includes("Production")
+        && aiDiagnosticsText.includes("intents")
+        && aiDiagnosticsText.includes("train:Rifleman"),
+      "AI diagnostics panel renders status, profile, trace tick, and parsed decision fields",
     );
 
-    const tabButtons = root.querySelectorAll(".replay-analysis-tab");
-    const firstTab = tabButtons[0];
-    overlayRoot.listeners.keydown?.({
-      target: firstTab,
-      key: "End",
-      preventDefault() {},
-      stopPropagation() {},
-    });
-    assert(restored.selectedTab === "ai-diagnostics", "observer analysis keyboard End selects the last tab");
-    assert(tabButtons[tabButtons.length - 1].focused === true, "observer analysis keyboard navigation focuses the selected tab");
+    const panelRoot = root.children[0];
+    const hide = root.querySelector(".ai-diagnostics-hide");
+    panelRoot.listeners.click?.({ target: hide, preventDefault() {}, stopPropagation() {} });
+    assert(restoredAiPrefs.visible === false, "AI diagnostics hide action updates shared preferences");
 
-    overlay.destroy();
-    assert(root.children.length === 0, "observer analysis overlay removes generated DOM on destroy");
+    const show = root.querySelector(".ai-diagnostics-show");
+    panelRoot.listeners.click?.({ target: show, preventDefault() {}, stopPropagation() {} });
+    assert(restoredAiPrefs.visible === true, "AI diagnostics show action updates shared preferences");
+    assert(restoredAiPrefs.collapsed === false, "AI diagnostics show expands the panel");
+
+    panel.destroy();
+    assert(root.children.length === 0, "AI diagnostics panel removes generated DOM on destroy");
   });
 }

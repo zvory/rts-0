@@ -13,6 +13,7 @@ export class ReplayViewer extends Match {
       capabilities: options.capabilities,
       cameraMaxZoom: options.cameraMaxZoom,
       observerAnalysisOverlayPreferences: options.observerAnalysisOverlayPreferences,
+      aiDiagnosticsPanelPreferences: options.aiDiagnosticsPanelPreferences,
     });
   }
 }

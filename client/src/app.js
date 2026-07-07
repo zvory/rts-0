@@ -33,6 +33,7 @@ import { applyMatchUnitRanges } from "./match_settings_toggles.js";
 import { readPredictionEnabled, writePredictionEnabled } from "./prediction_settings.js";
 import { readUnitRangesEnabled, writeUnitRangesEnabled } from "./unit_range_settings.js";
 import { createObserverAnalysisOverlayPreferences } from "./observer_analysis_overlay.js";
+import { createAiDiagnosticsPanelPreferences } from "./ai_diagnostics_panel.js";
 import { ReplayViewer } from "./replay_viewer.js";
 import { createRoomCapabilities } from "./room_capabilities.js";
 import { selectInitialCameraView } from "./camera_view_selection.js";
@@ -145,6 +146,7 @@ export class App {
     this.predictionEnabled = readPredictionEnabled();
     this.unitRangesEnabled = readUnitRangesEnabled();
     this.observerAnalysisOverlayPreferences = createObserverAnalysisOverlayPreferences();
+    this.aiDiagnosticsPanelPreferences = createAiDiagnosticsPanelPreferences();
     this.mountLobbySettings();
     if (this.labCatalogLaunch) this.lobby.hide();
   }
@@ -394,6 +396,7 @@ export class App {
         onPredictionEnabledChange: (enabled) => this.setPredictionEnabled(enabled),
         onUnitRangesEnabledChange: (enabled) => this.setUnitRangesEnabled(enabled),
         observerAnalysisOverlayPreferences: this.observerAnalysisOverlayPreferences,
+        aiDiagnosticsPanelPreferences: this.aiDiagnosticsPanelPreferences,
         capabilities,
         cameraMaxZoom: labMetadata ? CAMERA.labMaxZoom : undefined,
         labMetadata,
