@@ -49,7 +49,7 @@ export function frameStripFrameIndex(strip, entity, nowOrContext = 0) {
   const setupFrame = frameStripSetupFrameIndex(strip, entity, renderContext, idleFrame);
   if (setupFrame != null) return setupFrame;
   const setupFrames = validFrameList(strip, strip?.setupFrames);
-  if (entity?.state !== STATE.MOVE) {
+  if (!frameStripEntityIsMoving(entity, renderContext)) {
     if (setupFrames.length === 0) {
       const firingFrame = frameStripFiringFrameIndex(strip, entity, renderContext, idleFrame);
       if (firingFrame != null) return firingFrame;
@@ -97,10 +97,10 @@ function frameStripFiringFrameIndex(strip, entity, renderContext = {}, fallback 
   return validFrame(strip, firingFrames[index], fallback);
 }
 
-export function frameStripVisualFacing(stripOrEntity, maybeEntity = null) {
+export function frameStripVisualFacing(stripOrEntity, maybeEntity = null, renderContext = null) {
   const strip = maybeEntity ? stripOrEntity : null;
   const entity = maybeEntity ?? stripOrEntity;
-  const moving = entity?.state === STATE.MOVE;
+  const moving = frameStripEntityIsMoving(entity, renderContext);
   const setupState = entity?.setupState || SETUP.PACKED;
   if (strip?.packedFacing === "body" && setupState === SETUP.PACKED && !moving && Number.isFinite(entity?.facing)) {
     return entity.facing;
@@ -110,16 +110,16 @@ export function frameStripVisualFacing(stripOrEntity, maybeEntity = null) {
     if (Number.isFinite(entity?.weaponFacing)) return entity.weaponFacing - setupForwardAngle;
     if (Number.isFinite(entity?.facing)) return entity.facing - setupForwardAngle;
   }
-  if (frameStripUsesMovementFrames(strip, entity) && Number.isFinite(entity?.facing)) {
+  if (frameStripUsesMovementFrames(strip, entity, renderContext) && Number.isFinite(entity?.facing)) {
     return entity.facing + finite(strip?.movementFacingOffset, 0);
   }
   if (!moving && Number.isFinite(entity?.weaponFacing)) return entity.weaponFacing;
   return finite(entity?.facing, 0);
 }
 
-export function frameStripWorldScale(strip, entity) {
+export function frameStripWorldScale(strip, entity, renderContext = null) {
   const baseScale = Math.max(0.01, finite(strip?.worldScale, 1));
-  if (frameStripUsesMovementFrames(strip, entity)) {
+  if (frameStripUsesMovementFrames(strip, entity, renderContext)) {
     return Math.max(0.01, finite(strip?.movementWorldScale, baseScale));
   }
   return baseScale;
@@ -171,7 +171,7 @@ class FrameStripUnitInstance {
     setPoint(this.container.position, finite(entity.x, 0), finite(entity.y, 0));
     const occupiedScale = renderContext.occupiedTrench ? OCCUPIED_TRENCH_UNIT_SCALE : 1;
     setPoint(this.container.scale, occupiedScale, occupiedScale);
-    this.container.rotation = frameStripVisualFacing(this.strip, entity);
+    this.container.rotation = frameStripVisualFacing(this.strip, entity, renderContext);
 
     const frameIndex = frameStripFrameIndex(this.strip, entity, renderContext);
     if (frameIndex !== this._frameIndex) {
@@ -179,7 +179,7 @@ class FrameStripUnitInstance {
       this._frameIndex = frameIndex;
     }
 
-    const worldScale = frameStripWorldScale(this.strip, entity);
+    const worldScale = frameStripWorldScale(this.strip, entity, renderContext);
     setPoint(this.sprite.scale, worldScale, worldScale);
     this.sprite.alpha = 1;
     this.sprite.tint = tintForSlot(this.strip.tintSlot, renderContext);
@@ -226,14 +226,23 @@ function validFrameList(strip, frames) {
   return out;
 }
 
-function frameStripUsesMovementFrames(strip, entity) {
-  if (entity?.state !== STATE.MOVE) return false;
+function frameStripUsesMovementFrames(strip, entity, renderContext = null) {
+  if (!frameStripEntityIsMoving(entity, renderContext)) return false;
   const movementFrames = validFrameList(strip, strip?.movementFrames);
   if (movementFrames.length === 0) return false;
   const setupFrames = validFrameList(strip, strip?.setupFrames);
   if (setupFrames.length === 0) return true;
   const setupState = entity?.setupState || SETUP.PACKED;
   return setupState !== SETUP.DEPLOYED && setupState !== SETUP.SETTING_UP && setupState !== SETUP.TEARING_DOWN;
+}
+
+function frameStripEntityIsMoving(entity, renderContext = null) {
+  if (entity?.state !== STATE.MOVE) return false;
+  if (typeof renderContext?.frameStripMoving === "boolean") return renderContext.frameStripMoving;
+  if (Number.isFinite(renderContext?.frameStripMovementActivity)) {
+    return renderContext.frameStripMovementActivity > 0.01;
+  }
+  return true;
 }
 
 function clamp01(value) {

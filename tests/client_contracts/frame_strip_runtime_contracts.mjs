@@ -1,6 +1,11 @@
 import { assert } from "./assertions.mjs";
 import { KIND, SETUP, STATE } from "../../client/src/protocol.js";
-import { frameStripFrameIndex } from "../../client/src/renderer/rigs/frame_strip_runtime.js";
+import {
+  frameStripFrameIndex,
+  frameStripVisualFacing,
+  frameStripWorldScale,
+} from "../../client/src/renderer/rigs/frame_strip_runtime.js";
+import { _frameStripMovementVisual } from "../../client/src/renderer/units.js";
 import { MACHINE_GUNNER_PNG_FRAME_STRIP } from "../../client/src/renderer/rigs/machine_gunner_png_strip.js";
 import { RIFLEMAN_PNG_FRAME_STRIP } from "../../client/src/renderer/rigs/rifleman_png_strip.js";
 
@@ -93,3 +98,89 @@ const postRecoilFrame = frameStripFrameIndex(
 );
 assert(postRecoilFrame !== 5 && postRecoilFrame !== 6,
   "moving Rifleman returns to movement frames after the brief firing hold");
+
+const stationaryMoveContext = { now: 1000, frameStripMoving: false };
+
+assert(
+  frameStripFrameIndex(
+    RIFLEMAN_PNG_FRAME_STRIP,
+    { id: 11, kind: KIND.RIFLEMAN, state: STATE.MOVE, weaponFacing: 1.2 },
+    stationaryMoveContext,
+  ) === RIFLEMAN_PNG_FRAME_STRIP.idleFrame,
+  "Rifleman in move state holds idle frame when its position is not changing",
+);
+
+assert(
+  frameStripVisualFacing(
+    RIFLEMAN_PNG_FRAME_STRIP,
+    { id: 11, kind: KIND.RIFLEMAN, state: STATE.MOVE, facing: 0.4, weaponFacing: 1.2 },
+    stationaryMoveContext,
+  ) === 1.2,
+  "stationary Rifleman in move state uses standing weapon-facing art",
+);
+
+const stationaryMachineGunner = {
+  id: 12,
+  kind: KIND.MACHINE_GUNNER,
+  state: STATE.MOVE,
+  setupState: SETUP.PACKED,
+  facing: 0.3,
+  weaponFacing: 1.1,
+};
+
+assert(
+  frameStripFrameIndex(MACHINE_GUNNER_PNG_FRAME_STRIP, stationaryMachineGunner, stationaryMoveContext) ===
+    MACHINE_GUNNER_PNG_FRAME_STRIP.idleFrame,
+  "Machine Gunner in move state holds idle frame when its position is not changing",
+);
+
+assert(
+  frameStripVisualFacing(MACHINE_GUNNER_PNG_FRAME_STRIP, stationaryMachineGunner, stationaryMoveContext) ===
+    stationaryMachineGunner.facing,
+  "stationary packed Machine Gunner in move state keeps body-facing idle art",
+);
+
+assert(
+  frameStripWorldScale(MACHINE_GUNNER_PNG_FRAME_STRIP, stationaryMachineGunner, stationaryMoveContext) ===
+    MACHINE_GUNNER_PNG_FRAME_STRIP.worldScale,
+  "stationary Machine Gunner in move state does not use carried-movement scale",
+);
+
+const stationaryMoveEntity = {
+  id: 20,
+  kind: KIND.RIFLEMAN,
+  state: STATE.MOVE,
+  x: 40,
+  y: 50,
+};
+
+assert(
+  frameStripMovementFor(stationaryMoveEntity, stationaryMoveEntity, stationaryMoveEntity).moving === false,
+  "renderer marks move-state frame-strip units stationary when current and previous snapshots did not move",
+);
+
+assert(
+  frameStripMovementFor(stationaryMoveEntity, { ...stationaryMoveEntity, x: 38 }, stationaryMoveEntity).moving === true,
+  "renderer marks frame-strip units moving when authoritative snapshot positions changed",
+);
+
+assert(
+  frameStripMovementFor(
+    stationaryMoveEntity,
+    stationaryMoveEntity,
+    stationaryMoveEntity,
+    new Map([[stationaryMoveEntity.id, { x: 36, y: 50 }]]),
+  ).moving === true,
+  "renderer keeps frame-strip movement active for predicted render-position changes",
+);
+
+function frameStripMovementFor(entity, previous, current, motion = new Map()) {
+  return _frameStripMovementVisual.call(
+    { _frameStripMotion: motion },
+    entity,
+    {
+      _prevById: new Map([[entity.id, previous]]),
+      _curById: new Map([[entity.id, current]]),
+    },
+  );
+}
