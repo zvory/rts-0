@@ -2,12 +2,11 @@ use std::collections::BTreeSet;
 
 use serde::Serialize;
 
-use super::profiles::{
-    profile_by_id, profile_spec_by_id, AiProfile, AiProfileSpec, AI_1_0_TECH_ID,
-    AI_1_1_TANK_MG_ID, AI_1_2_WAVE_COHORTS_ID,
-};
 #[cfg(test)]
 use super::profiles::required_profiles;
+use super::profiles::{
+    profile_by_id, AiProfile, AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID, AI_1_2_WAVE_COHORTS_ID,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -29,10 +28,6 @@ pub(crate) struct AiOverlayIdentity {
 }
 
 pub(crate) fn profile_identity(profile: &AiProfile) -> AiProfileIdentity {
-    if let Some(spec) = profile_spec_by_id(profile.id) {
-        return identity_from_spec(profile, spec);
-    }
-
     let (label, summary, modules) = baseline_metadata(profile.id);
     let overlays = Vec::new();
     let base_profile_id = None;
@@ -43,14 +38,7 @@ pub(crate) fn profile_identity(profile: &AiProfile) -> AiProfileIdentity {
         summary: summary.to_string(),
         modules: modules.iter().map(|module| module.to_string()).collect(),
         overlays,
-        fingerprint: profile_fingerprint(
-            profile,
-            label,
-            None,
-            summary,
-            modules.as_slice(),
-            &[],
-        ),
+        fingerprint: profile_fingerprint(profile, label, None, summary, modules.as_slice(), &[]),
     }
 }
 
@@ -89,37 +77,6 @@ pub(crate) fn validate_profile_identity(identity: &AiProfileIdentity) -> Result<
         }
     }
     Ok(())
-}
-
-fn identity_from_spec(profile: &AiProfile, spec: &'static AiProfileSpec) -> AiProfileIdentity {
-    let overlays = spec
-        .overlays
-        .iter()
-        .map(|overlay| AiOverlayIdentity {
-            id: overlay.id.to_string(),
-            summary: overlay.summary.to_string(),
-        })
-        .collect::<Vec<_>>();
-    AiProfileIdentity {
-        profile_id: spec.id.to_string(),
-        label: spec.label.to_string(),
-        base_profile_id: Some(spec.base_profile_id.to_string()),
-        summary: spec.summary.to_string(),
-        modules: spec
-            .modules
-            .iter()
-            .map(|module| module.to_string())
-            .collect(),
-        fingerprint: profile_fingerprint(
-            profile,
-            spec.label,
-            Some(spec.base_profile_id),
-            spec.summary,
-            spec.modules,
-            &overlays,
-        ),
-        overlays,
-    }
 }
 
 fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'static str>) {
@@ -194,15 +151,12 @@ fn fnv1a64(bytes: &[u8]) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ai_core::profiles::AI_2_0_AGENT_RUSH_ID;
 
     #[test]
     fn profile_identities_are_complete_and_valid() {
         let identities = required_profile_identities();
 
-        assert!(identities
-            .iter()
-            .any(|identity| identity.profile_id == AI_2_0_AGENT_RUSH_ID));
+        assert_eq!(identities.len(), 3);
         for identity in identities {
             validate_profile_identity(&identity).expect("identity should validate");
             assert!(!identity.fingerprint.is_empty());
@@ -211,21 +165,14 @@ mod tests {
     }
 
     #[test]
-    fn ai_2_0_identity_records_base_and_overlays() {
-        let identity = profile_identity_by_id(AI_2_0_AGENT_RUSH_ID).expect("AI 2.0 identity");
+    fn ai_1_2_identity_records_wave_cohort_modules() {
+        let identity = profile_identity_by_id(AI_1_2_WAVE_COHORTS_ID).expect("AI 1.2 identity");
 
-        assert_eq!(
-            identity.base_profile_id,
-            Some("rifle_flood_full_saturation".to_string())
-        );
-        assert!(identity.modules.contains(&"bounded_decision_trace".to_string()));
-        assert_eq!(
-            identity
-                .overlays
-                .iter()
-                .map(|overlay| overlay.id.as_str())
-                .collect::<Vec<_>>(),
-            vec!["agent_wave_cohorts"]
-        );
+        assert_eq!(identity.base_profile_id, None);
+        assert!(identity
+            .modules
+            .contains(&"frontal_wave_cohorts".to_string()));
+        assert!(identity.modules.contains(&"second_factory".to_string()));
+        assert!(identity.overlays.is_empty());
     }
 }

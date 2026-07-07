@@ -33,8 +33,8 @@ instead of reaching into entity stores from the server layer.
 (`DECISION_INTERVAL` ticks), builds a constrained snapshot-backed `AiObservation` and delegates RTS
 decisions to `rts_ai::ai_core::decision::decide_profile`. Live lobby AIs use the promoted
 `ai_1_2_wave_cohorts` profile by default and keep that profile for the whole match. Hosts can select
-`ai_1_0_tech`, `ai_1_1_tank_mg`, `ai_1_2_wave_cohorts`, or `ai_2_0_agent_rush` per AI seat from
-the lobby before countdown/start; unsupported
+`ai_1_0_tech`, `ai_1_1_tank_mg`, or `ai_1_2_wave_cohorts` per AI seat from the lobby before
+countdown/start; unsupported
 profile ids are ignored or defaulted to the promoted live default. Team relationships are observation-only safety
 inputs: player summaries carry `teamId`, visible allied entities are classified separately from
 `visible_enemies`, public base targeting ignores allied starts, and live decisions receive the
@@ -58,11 +58,10 @@ combat target selection, and blockers such as waiting for units, waiting for a r
 waiting for Methamphetamines, and cadence. Final command emission still goes through
 `AiActionContext` and `ai_core::actions`.
 
-Profile experiments can be described as `AiProfileSpec`s: a stable profile id, a base profile, and
-a small ordered set of overlays or feature modules. The resolver validates every spec, produces the
-concrete `AiProfile`, and records a profile identity with base id, overlay ids, module names, and a
-fingerprint for arena artifacts. This keeps experimental variants inspectable without forking the
-whole decision tree or changing the live lobby contract.
+Arena tooling records profile identities for each registered profile: stable id, label, module
+names, and a fingerprint derived from the concrete `AiProfile`. The identity schema keeps
+base-profile and overlay fields for artifact compatibility, but the current supported profiles are
+registered directly rather than through a separate overlay resolver.
 
 The economy plan is backed by an AI-owned resource availability model derived only from the
 fog-filtered observation, public start-payload resource positions, completed own City Centres,
@@ -142,23 +141,15 @@ units that are excluded from outbound wave formation. AI 1.2 also targets a seco
 its bank is above 600 steel and 400 oil, while still using the normal build placement, prerequisite,
 pending-build, expansion-save, and defensive-panic gates.
 
-AI 2.0's first agent-facing profile is `ai_2_0_agent_rush`. It is selectable for live lobby AI
-seats, but the ordinary Add AI default remains AI 1.2 until AI 2.0 is intentionally promoted. The
-profile composes the full-saturation Rifleman pressure base with the
-AI 1.2 wave-cohort overlay, early expansion behavior, bounded decision traces, and a later Tank
-pivot. Its purpose is to prove the AI 2.0 loop in both live seats and developer tooling: agents can
-inspect the profile's module stack and fingerprint, run side-swapped arena comparisons, and read
-per-run summaries before opening a replay.
-
-The aliases `ai_2_0` and `ai20` resolve to `ai_2_0_agent_rush` in developer tooling; `ai_1_2` and
-`ai12` resolve to `ai_1_2_wave_cohorts`; `ai_1_1` and `ai11` resolve to `ai_1_1_tank_mg`;
+The aliases `ai_1_2` and `ai12` resolve to `ai_1_2_wave_cohorts`; `ai_1_1` and
+`ai11` resolve to `ai_1_1_tank_mg`;
 `ai_1_0`, `ai_1_0_tech`, and `ai1` resolve to `ai_1_0_tech`; `ai` and `default` resolve to the
 live default.
 The live lobby AI uses this shared core through `AiController`, which only owns live identity,
 profile id, cadence, persistent decision memory, and its latest bounded decision trace for
 spectator-only observer diagnostics. Unknown live profile ids resolve to the promoted live default,
-currently `ai_1_2_wave_cohorts`. The ordinary lobby exposes AI 1.0, AI 1.1, AI 1.2, and AI 2.0. AI
-1.2 is the live lobby default.
+currently `ai_1_2_wave_cohorts`. The ordinary lobby exposes AI 1.0, AI 1.1, and AI 1.2. AI 1.2 is
+the live lobby default.
 Panzerfaust is trainable for Kriegsia players after a completed Training Centre, and Scout Plane is
 trainable from City Centre after completed Gun Works or Vehicle Works, but current AI production
 profiles intentionally omit both units in the first pass. AI-owned Panzerfaust or Scout Plane units

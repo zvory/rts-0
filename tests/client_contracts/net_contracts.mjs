@@ -4,6 +4,7 @@
 import { CLIENT_NET_REPORT_FIELDS } from "../client_net_report_fields.mjs";
 import {
   assert,
+  assertDeepEqual,
   assertHasGetter,
   assertHasMethod,
   assertThrows,
@@ -211,9 +212,10 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   assert(msg.setTeam(7, 2).teamId === 2, "team assignment builder payload");
   assert(msg.setFaction("ekat").factionId === "ekat", "faction selection builder payload");
   assert(DEFAULT_AI_PROFILE_ID === "ai_1_2_wave_cohorts", "lobby defaults to the stable live AI profile");
-  assert(
-    AI_PROFILES.some((profile) => profile.id === "ai_2_0_agent_rush" && profile.label === "AI 2.0"),
-    "lobby exposes AI 2.0 as a selectable profile",
+  assertDeepEqual(
+    AI_PROFILES.map((profile) => profile.id),
+    ["ai_1_0_tech", "ai_1_1_tank_mg", "ai_1_2_wave_cohorts"],
+    "lobby exposes only supported AI profiles",
   );
   assert(msg.addAi(2).teamId === 2, "addAi builder can include teamId");
   assert(
@@ -221,8 +223,8 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
     "addAi builder can include default aiProfileId",
   );
   assert(
-    msg.addAi(2, "ai_2_0_agent_rush").aiProfileId === "ai_2_0_agent_rush",
-    "addAi builder can request AI 2.0 explicitly",
+    msg.addAi(2, "ai_1_1_tank_mg").aiProfileId === "ai_1_1_tank_mg",
+    "addAi builder can request a supported AI profile explicitly",
   );
   assert(msg.requestBranchFromTick().t === "requestBranchFromTick", "replay branch builder tag");
   assert(msg.claimBranchSeat(7).t === "claimBranchSeat", "branch seat claim builder tag");

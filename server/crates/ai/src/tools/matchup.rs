@@ -8,8 +8,8 @@ use std::path::PathBuf;
 use std::process;
 
 use crate::selfplay::{
-    available_profile_ids, canonical_profile_id, run_profile_matchup_result, ProfileMatchupOptions,
-    ProfileMatchupEndReason, ProfileMatchupResult,
+    available_profile_ids, canonical_profile_id, run_profile_matchup_result,
+    ProfileMatchupEndReason, ProfileMatchupOptions, ProfileMatchupResult,
 };
 
 const DEFAULT_TICKS: u32 = 25_000;
@@ -350,8 +350,6 @@ fn print_profiles() {
     println!("  ai11 -> ai_1_1_tank_mg");
     println!("  ai_1_2 -> ai_1_2_wave_cohorts");
     println!("  ai12 -> ai_1_2_wave_cohorts");
-    println!("  ai_2_0 -> ai_2_0_agent_rush");
-    println!("  ai20 -> ai_2_0_agent_rush");
 }
 
 fn print_usage() {
@@ -375,7 +373,7 @@ Examples:
   cargo run --bin ai-matchup -- ai ai
   cargo run --bin ai-matchup -- ai_1_1 ai_1_0_tech --seed 7 --ticks 3000 --json
   cargo run --bin ai-matchup -- ai_1_2 ai_1_1 --seed 7 --ticks 3000 --json
-  cargo run --bin ai-matchup -- ai_2_0 ai --seed 7 --ticks 25000 --json
+  cargo run --bin ai-matchup -- ai_1_2 ai_1_1 --seed 7 --ticks 25000 --json
   cargo run --bin ai-matchup -- default ai_1_0_tech --seed 7 --ticks 25000 --json
 "
     );
@@ -409,10 +407,7 @@ mod tests {
 
     #[test]
     fn starting_city_centre_result_is_reported_as_objective_win() {
-        let result = profile_result(
-            ProfileMatchupEndReason::StartingCityCentreKilled,
-            Some(2),
-        );
+        let result = profile_result(ProfileMatchupEndReason::StartingCityCentreKilled, Some(2));
 
         assert_eq!(
             winner_text(&result),

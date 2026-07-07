@@ -75,16 +75,16 @@ fn selected_lobby_ai_profile_is_used_by_live_controller() {
     task.host_id = Some(host_id);
     add_test_room_player(&mut task, host_id, true);
 
-    task.on_add_ai(host_id, Some(2), Some("ai_2_0_agent_rush".to_string()));
+    task.on_add_ai(host_id, Some(2), Some("ai_1_1_tank_mg".to_string()));
     assert_eq!(
         task.ai_players.first().map(|ai| ai.profile_id),
-        Some("ai_2_0_agent_rush")
+        Some("ai_1_1_tank_mg")
     );
 
     task.start_match();
 
     assert_eq!(task.ai_controllers.len(), 1);
-    assert_eq!(task.ai_controllers[0].profile_id(), "ai_2_0_agent_rush");
+    assert_eq!(task.ai_controllers[0].profile_id(), "ai_1_1_tank_mg");
 }
 
 #[test]
