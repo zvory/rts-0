@@ -2,11 +2,12 @@ use std::collections::BTreeSet;
 
 use serde::Serialize;
 
-#[cfg(test)]
-use super::profiles::required_profiles;
 use super::profiles::{
     profile_by_id, AiProfile, AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID, AI_1_2_WAVE_COHORTS_ID,
+    AI_2_0_TANK_PRESSURE_ID,
 };
+#[cfg(test)]
+use super::profiles::required_profiles;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -38,7 +39,14 @@ pub(crate) fn profile_identity(profile: &AiProfile) -> AiProfileIdentity {
         summary: summary.to_string(),
         modules: modules.iter().map(|module| module.to_string()).collect(),
         overlays,
-        fingerprint: profile_fingerprint(profile, label, None, summary, modules.as_slice(), &[]),
+        fingerprint: profile_fingerprint(
+            profile,
+            label,
+            None,
+            summary,
+            modules.as_slice(),
+            &[],
+        ),
     }
 }
 
@@ -109,6 +117,18 @@ fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'sta
                 "second_factory",
             ],
         ),
+        AI_2_0_TANK_PRESSURE_ID => (
+            "AI 2.0 Tank Pressure",
+            "AI 2.0 suite member with earlier Factory unlock, two Factories, defensive MGs, and faster mixed Tank pressure.",
+            vec![
+                "full_steel_saturation",
+                "early_expansion",
+                "defensive_machine_gunners",
+                "earlier_factory_tank_unlock",
+                "mixed_tank_pressure",
+                "second_factory",
+            ],
+        ),
         _ => (
             "AI Profile",
             "Developer AI profile resolved through the shared profile registry.",
@@ -151,12 +171,13 @@ fn fnv1a64(bytes: &[u8]) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ai_core::profiles::AI_2_0_TANK_PRESSURE_ID;
 
     #[test]
     fn profile_identities_are_complete_and_valid() {
         let identities = required_profile_identities();
 
-        assert_eq!(identities.len(), 3);
+        assert_eq!(identities.len(), 4);
         for identity in identities {
             validate_profile_identity(&identity).expect("identity should validate");
             assert!(!identity.fingerprint.is_empty());
@@ -165,14 +186,13 @@ mod tests {
     }
 
     #[test]
-    fn ai_1_2_identity_records_wave_cohort_modules() {
-        let identity = profile_identity_by_id(AI_1_2_WAVE_COHORTS_ID).expect("AI 1.2 identity");
+    fn ai_2_0_tank_pressure_has_specific_manifest_metadata() {
+        let tank_pressure =
+            profile_identity_by_id(AI_2_0_TANK_PRESSURE_ID).expect("tank pressure identity");
 
-        assert_eq!(identity.base_profile_id, None);
-        assert!(identity
+        assert_eq!(tank_pressure.label, "AI 2.0 Tank Pressure");
+        assert!(tank_pressure
             .modules
-            .contains(&"frontal_wave_cohorts".to_string()));
-        assert!(identity.modules.contains(&"second_factory".to_string()));
-        assert!(identity.overlays.is_empty());
+            .contains(&"mixed_tank_pressure".to_string()));
     }
 }

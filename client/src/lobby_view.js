@@ -3,12 +3,20 @@
 
 export const MAX_LOBBY_TEAMS = 4;
 export const AI_PROFILES = Object.freeze([
-  { id: "ai_1_0_tech", label: "AI 1.0" },
-  { id: "ai_1_1_tank_mg", label: "AI 1.1" },
-  { id: "ai_1_2_wave_cohorts", label: "AI 1.2" },
+  { id: "ai_1_0", label: "AI 1.0" },
+  { id: "ai_1_1", label: "AI 1.1" },
+  { id: "ai_1_2", label: "AI 1.2" },
+  { id: "ai_2_0", label: "AI 2.0" },
 ]);
 
-const STABLE_DEFAULT_AI_PROFILE_ID = "ai_1_2_wave_cohorts";
+const AI_PROFILE_ALIASES = Object.freeze({
+  ai_1_0_tech: "ai_1_0",
+  ai_1_1_tank_mg: "ai_1_1",
+  ai_1_2_wave_cohorts: "ai_1_2",
+  ai_2_0_tank_pressure: "ai_2_0",
+});
+
+const STABLE_DEFAULT_AI_PROFILE_ID = "ai_1_2";
 export const DEFAULT_AI_PROFILE_ID =
   AI_PROFILES.some((entry) => entry.id === STABLE_DEFAULT_AI_PROFILE_ID)
     ? STABLE_DEFAULT_AI_PROFILE_ID
@@ -494,12 +502,20 @@ function tag(kind, text) {
 }
 
 function playableAiProfileId(id) {
-  return AI_PROFILES.some((entry) => entry.id === id) ? id : DEFAULT_AI_PROFILE_ID;
+  const canonicalId = AI_PROFILE_ALIASES[id] || id;
+  return AI_PROFILES.some((entry) => entry.id === canonicalId)
+    ? canonicalId
+    : DEFAULT_AI_PROFILE_ID;
 }
 
 function aiProfileLabel(id) {
-  const fallback = AI_PROFILES.find((entry) => entry.id === DEFAULT_AI_PROFILE_ID) || AI_PROFILES[0];
-  return AI_PROFILES.find((entry) => entry.id === id)?.label || fallback?.label || "AI";
+  const fallback =
+    AI_PROFILES.find((entry) => entry.id === DEFAULT_AI_PROFILE_ID) || AI_PROFILES[0];
+  return (
+    AI_PROFILES.find((entry) => entry.id === playableAiProfileId(id))?.label ||
+    fallback?.label ||
+    "AI"
+  );
 }
 
 export const PLAYABLE_FACTIONS = Object.freeze([

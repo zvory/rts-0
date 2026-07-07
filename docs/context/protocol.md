@@ -43,8 +43,8 @@ Use when adding, removing, or changing any field on a client↔server message, s
   movement-path overlays or observer analysis. Do not infer those affordances from room mode names.
 - The active protocol has no quickstart/debug lobby command or start-payload flag. Normal live
   countdown skipping for rooms with one or zero active humans is not a debug preset.
-- `LobbyPlayer` carries `teamId`, `factionId`, `aiProfileId?`, and `isSpectator`; spectators are
-  lobby members but not active match players.
+- `LobbyPlayer` carries `teamId`, `factionId`, `aiProfileId?` (profile or suite request), and
+  `isSpectator`; spectators are lobby members but not active match players.
 - Lab setup import/export uses the compatibility-named `LabScenarioPayload`; the only accepted
   payload is a checkpoint-backed `LabCheckpointScenarioV1` container. Legacy `kind:"labScenario"`
   JSON is rejected before it can mutate a lab room. Setup

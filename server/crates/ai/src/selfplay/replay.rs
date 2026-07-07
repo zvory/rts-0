@@ -10,10 +10,15 @@ use serde::Serialize;
 use super::player_view::PlayerView;
 use super::scripts::{ProfileBackedScript, ScriptedPlayer};
 use super::SELFPLAY_ARTIFACT_DIR;
-use crate::ai_core::profiles::{
-    profile_by_id, required_profiles, AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID, AI_1_2_WAVE_COHORTS_ID,
+use crate::ai_core::profile_suites::{
+    available_profile_request_ids as suite_profile_request_ids, canonical_profile_request_id,
+    resolve_profile_request_id as resolve_profile_or_suite_request_id,
 };
-use crate::live::DEFAULT_LIVE_PROFILE_ID;
+use crate::ai_core::profiles::{
+    profile_by_id, required_profiles, AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID,
+    AI_1_2_WAVE_COHORTS_ID,
+};
+use crate::live::{DEFAULT_LIVE_PROFILE_ID, DEFAULT_LIVE_PROFILE_REQUEST_ID};
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::replay::{
     replay_commands, CommandLogEntry, EventLogEntry, PlayerSnapshot, ReplayOutcome,
@@ -323,6 +328,10 @@ pub fn available_profile_ids() -> Vec<&'static str> {
         .collect()
 }
 
+pub fn available_profile_request_ids() -> Vec<&'static str> {
+    suite_profile_request_ids()
+}
+
 pub fn canonical_profile_id(input: &str) -> Option<&'static str> {
     match input {
         "ai" | "default" => Some(DEFAULT_LIVE_PROFILE_ID),
@@ -331,6 +340,22 @@ pub fn canonical_profile_id(input: &str) -> Option<&'static str> {
         "ai_1_2" | "ai12" => Some(AI_1_2_WAVE_COHORTS_ID),
         id => profile_by_id(id).map(|profile| profile.id),
     }
+}
+
+pub fn canonical_profile_request_id_for_match(input: &str) -> Option<&'static str> {
+    match input {
+        "ai" | "default" => Some(DEFAULT_LIVE_PROFILE_REQUEST_ID),
+        value => canonical_profile_request_id(value),
+    }
+}
+
+pub fn resolve_profile_request_id_for_match(
+    request_id: &str,
+    seed: u32,
+    selector: u64,
+) -> Option<&'static str> {
+    let request_id = canonical_profile_request_id_for_match(request_id)?;
+    resolve_profile_or_suite_request_id(request_id, seed, selector)
 }
 
 pub fn run_profile_matchup_result(
@@ -945,10 +970,17 @@ fn final_material_values(game: &Game, players: &[PlayerInit]) -> BTreeMap<u32, M
 #[cfg(test)]
 mod tests {
     use super::{
-        available_profile_ids, canonical_profile_id, run_profile_matchup_result,
-        ProfileMatchupOptions, ScorecardCollector,
+        available_profile_ids, available_profile_request_ids, canonical_profile_id,
+        canonical_profile_request_id_for_match, resolve_profile_request_id_for_match,
+        run_profile_matchup_result, ProfileMatchupOptions, ScorecardCollector,
     };
-    use crate::ai_core::profiles::{AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID, AI_1_2_WAVE_COHORTS_ID};
+    use crate::ai_core::profiles::{
+        AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID, AI_1_2_WAVE_COHORTS_ID,
+        AI_2_0_TANK_PRESSURE_ID,
+    };
+    use crate::ai_core::profile_suites::{
+        AI_1_0_SUITE_ID, AI_1_1_SUITE_ID, AI_1_2_SUITE_ID, AI_2_0_SUITE_ID,
+    };
     use crate::DEFAULT_LIVE_PROFILE_ID;
     use rts_sim::game::command::SimCommand;
     use rts_sim::game::entity::EntityKind;
@@ -957,17 +989,19 @@ mod tests {
     use rts_sim::protocol::{EntityView, Event, Snapshot, SnapshotNetStatus};
 
     #[test]
-    fn profile_aliases_resolve_only_supported_profiles() {
+    fn highest_ai_version_is_default_while_ai_1_0_is_selectable() {
         assert_eq!(canonical_profile_id("ai"), Some(DEFAULT_LIVE_PROFILE_ID));
         assert_eq!(canonical_profile_id("ai1"), Some(AI_1_0_TECH_ID));
         assert_eq!(canonical_profile_id("ai_1_0"), Some(AI_1_0_TECH_ID));
-        assert_eq!(
-            canonical_profile_id("default"),
-            Some(DEFAULT_LIVE_PROFILE_ID)
-        );
+        assert_eq!(canonical_profile_id("default"), Some(DEFAULT_LIVE_PROFILE_ID));
         assert_eq!(
             available_profile_ids(),
-            vec![AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID, AI_1_2_WAVE_COHORTS_ID,]
+            vec![
+                AI_1_0_TECH_ID,
+                AI_1_1_TANK_MG_ID,
+                AI_1_2_WAVE_COHORTS_ID,
+                AI_2_0_TANK_PRESSURE_ID,
+            ]
         );
         assert_eq!(
             canonical_profile_id("ai_1_1_tank_mg"),
@@ -984,8 +1018,50 @@ mod tests {
         assert_eq!(canonical_profile_id("ai_2_0"), None);
         assert_eq!(canonical_profile_id("ai20"), None);
         assert_eq!(canonical_profile_id("ai_2_0_agent_rush"), None);
+        assert_eq!(canonical_profile_id("ai_2_0_rifle_tank"), None);
         assert_eq!(canonical_profile_id("rifle_flood_full_saturation"), None);
         assert_eq!(canonical_profile_id("saturation"), None);
+    }
+
+    #[test]
+    fn profile_request_aliases_can_resolve_suites_for_seeded_matchups() {
+        assert_eq!(
+            available_profile_request_ids()[0..4],
+            [
+                AI_1_0_SUITE_ID,
+                AI_1_1_SUITE_ID,
+                AI_1_2_SUITE_ID,
+                AI_2_0_SUITE_ID,
+            ]
+        );
+        assert_eq!(
+            canonical_profile_request_id_for_match("ai_2_0"),
+            Some(AI_2_0_SUITE_ID)
+        );
+        assert_eq!(
+            canonical_profile_request_id_for_match("ai"),
+            Some(AI_1_2_SUITE_ID)
+        );
+        assert_eq!(
+            resolve_profile_request_id_for_match(AI_2_0_SUITE_ID, 0, 0),
+            Some(AI_2_0_TANK_PRESSURE_ID)
+        );
+        assert_eq!(
+            resolve_profile_request_id_for_match("ai20", 0, 0),
+            Some(AI_2_0_TANK_PRESSURE_ID)
+        );
+        assert_eq!(
+            resolve_profile_request_id_for_match(AI_2_0_SUITE_ID, 1, 0),
+            Some(AI_2_0_TANK_PRESSURE_ID)
+        );
+        assert_eq!(
+            resolve_profile_request_id_for_match("ai_2_0_rifle_tank", 1, 0),
+            None
+        );
+        assert_eq!(
+            canonical_profile_request_id_for_match("ai_2_0_agent_rush"),
+            None
+        );
     }
 
     #[test]
@@ -1137,8 +1213,9 @@ mod tests {
         ];
         let mut game = Game::new_without_ai_controllers(&players, 7);
         let start = game.start_payload();
-        let mut objective = super::StartingCityCentreObjective::capture(&game, &start, &players)
-            .expect("starting City Centres should be captured");
+        let mut objective =
+            super::StartingCityCentreObjective::capture(&game, &start, &players)
+                .expect("starting City Centres should be captured");
 
         assert_eq!(objective.alive_player_ids(), vec![1, 2]);
         assert!(objective.winner().is_none());

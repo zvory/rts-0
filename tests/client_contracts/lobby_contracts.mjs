@@ -55,11 +55,12 @@ import { textWithin } from "./dom_text.mjs";
   assertDeepEqual(
     AI_PROFILES,
     [
-      { id: "ai_1_0_tech", label: "AI 1.0" },
-      { id: "ai_1_1_tank_mg", label: "AI 1.1" },
-      { id: "ai_1_2_wave_cohorts", label: "AI 1.2" },
+      { id: "ai_1_0", label: "AI 1.0" },
+      { id: "ai_1_1", label: "AI 1.1" },
+      { id: "ai_1_2", label: "AI 1.2" },
+      { id: "ai_2_0", label: "AI 2.0" },
     ],
-    "lobby AI profile selector lists supported AI profiles",
+    "lobby AI profile selector lists supported AI suites",
   );
   assert(
     betaFactionSelectEnabledForLocation({ hostname: "rts-0-zvorygin-beta.fly.dev", pathname: "/" }),
@@ -163,7 +164,7 @@ import { textWithin } from "./dom_text.mjs";
           ready: true,
           teamId: 2,
           isAi: true,
-          aiProfileId: "ai_1_1_tank_mg",
+          aiProfileId: "ai_2_0",
         },
       ],
       myId: 1,
@@ -182,20 +183,77 @@ import { textWithin } from "./dom_text.mjs";
       (el) => el.tagName === "SELECT" && el.className === "player-ai-profile-select",
     )[0];
     assert(!!select, "host lobby renders an AI profile selector");
-    assert(select.value === "ai_1_1_tank_mg", "AI 1.1 profile state is selected in the lobby");
+    assert(select.value === "ai_2_0", "AI 2.0 profile state is selected in the lobby");
     assert(
       select.children.some(
-        (option) => option.value === "ai_1_1_tank_mg" && option.textContent === "AI 1.1",
+        (option) => option.value === "ai_2_0" && option.textContent === "AI 2.0",
       ),
-      "AI profile selector includes the AI 1.1 option",
+      "AI profile selector includes the AI 2.0 option",
     );
 
-    select.value = "ai_1_2_wave_cohorts";
+    select.value = "ai_1_2";
     select.listeners.change?.();
     assertDeepEqual(
       selectedProfile,
-      { id: 2, profileId: "ai_1_2_wave_cohorts" },
+      { id: 2, profileId: "ai_1_2" },
       "AI profile selector emits profile changes",
+    );
+
+    const aliasRoot = document.createElement("div");
+    const aliasView = new LobbyRosterView(aliasRoot);
+    aliasView.render({
+      players: [
+        {
+          id: 2,
+          name: "Computer",
+          color: "#d55e00",
+          ready: true,
+          teamId: 2,
+          isAi: true,
+          aiProfileId: "ai_2_0_tank_pressure",
+        },
+      ],
+      myId: 1,
+      hostId: 1,
+      isHost: true,
+      countdownActive: false,
+      playerCount: 1,
+      maxPlayers: 4,
+    });
+
+    const aliasSelect = findFakes(
+      aliasRoot,
+      (el) => el.tagName === "SELECT" && el.className === "player-ai-profile-select",
+    )[0];
+    assert(
+      aliasSelect.value === "ai_2_0",
+      "concrete AI 2.0 profile ids select their suite option",
+    );
+
+    const labelRoot = document.createElement("div");
+    const labelView = new LobbyRosterView(labelRoot);
+    labelView.render({
+      players: [
+        {
+          id: 2,
+          name: "Computer",
+          color: "#d55e00",
+          ready: true,
+          teamId: 2,
+          isAi: true,
+          aiProfileId: "ai_2_0_tank_pressure",
+        },
+      ],
+      myId: 3,
+      hostId: 1,
+      isHost: false,
+      countdownActive: false,
+      playerCount: 1,
+      maxPlayers: 4,
+    });
+    assert(
+      textWithin(labelRoot).includes("AI 2.0"),
+      "concrete AI 2.0 profile ids display their suite label",
     );
   });
 }

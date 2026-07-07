@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use rts_ai::DEFAULT_LIVE_PROFILE_ID;
+use rts_ai::DEFAULT_LIVE_PROFILE_REQUEST_ID;
 use rts_sim::game::map::Map;
 
 use super::super::connection::{send_or_log, ConnectionSink};
@@ -467,10 +467,10 @@ impl RoomTask {
             return;
         }
         let id = next_player_id();
-        let profile_id = requested_profile_id
+        let profile_request_id = requested_profile_id
             .as_deref()
-            .and_then(rts_ai::canonical_live_profile_id)
-            .unwrap_or(DEFAULT_LIVE_PROFILE_ID);
+            .and_then(rts_ai::canonical_live_profile_request_id)
+            .unwrap_or(DEFAULT_LIVE_PROFILE_REQUEST_ID);
         let team_id = if let Some(team_id) = requested_team_id {
             if !self.team_move_allowed(id, team_id) {
                 crate::log_debug!(room = %self.room, team_id, "ignoring invalid AI team assignment");
@@ -484,13 +484,14 @@ impl RoomTask {
             id,
             team_id,
             faction_id: default_faction_id_for(FactionRequestContext::AiSeat),
-            profile_id,
+            profile_request_id,
         });
         crate::log_debug!(room = %self.room, ai_id = id, "AI opponent added");
         self.broadcast_lobby();
     }
 
-    /// Host-only: select which supported live AI profile an AI opponent will use next match.
+    /// Host-only: select which supported live AI profile or suite request an AI opponent will use
+    /// next match.
     pub(super) fn on_set_ai_profile(
         &mut self,
         player_id: u32,
@@ -509,7 +510,9 @@ impl RoomTask {
         if self.is_replay_staging_lobby() {
             return;
         }
-        let Some(profile_id) = rts_ai::canonical_live_profile_id(&requested_profile_id) else {
+        let Some(profile_request_id) =
+            rts_ai::canonical_live_profile_request_id(&requested_profile_id)
+        else {
             crate::log_debug!(
                 room = %self.room,
                 target,
@@ -521,14 +524,14 @@ impl RoomTask {
         let Some(ai) = self.ai_players.iter_mut().find(|ai| ai.id == target) else {
             return;
         };
-        if ai.profile_id == profile_id {
+        if ai.profile_request_id == profile_request_id {
             return;
         }
-        ai.profile_id = profile_id;
+        ai.profile_request_id = profile_request_id;
         crate::log_debug!(
             room = %self.room,
             ai_id = target,
-            ai_profile_id = %profile_id,
+            ai_profile_id = %profile_request_id,
             "AI profile selected"
         );
         self.broadcast_lobby();
@@ -560,16 +563,17 @@ impl RoomTask {
     pub(super) fn ai_slot_display_names(&self) -> Vec<String> {
         let mut profile_counts: HashMap<&'static str, usize> = HashMap::new();
         for ai in &self.ai_players {
-            *profile_counts.entry(ai.profile_id).or_default() += 1;
+            let label = rts_ai::live_profile_label(ai.profile_request_id);
+            *profile_counts.entry(label).or_default() += 1;
         }
 
         let mut profile_seen: HashMap<&'static str, usize> = HashMap::new();
         self.ai_players
             .iter()
             .map(|ai| {
-                let label = rts_ai::live_profile_label(ai.profile_id);
-                if profile_counts.get(ai.profile_id).copied().unwrap_or(0) > 1 {
-                    let seen = profile_seen.entry(ai.profile_id).or_default();
+                let label = rts_ai::live_profile_label(ai.profile_request_id);
+                if profile_counts.get(label).copied().unwrap_or(0) > 1 {
+                    let seen = profile_seen.entry(label).or_default();
                     *seen += 1;
                     format!("{label} {seen}")
                 } else {
@@ -892,7 +896,7 @@ impl RoomTask {
                 ready: true,
                 color: self.ai_color(seat),
                 is_ai: true,
-                ai_profile_id: Some(ai.profile_id.to_string()),
+                ai_profile_id: Some(ai.profile_request_id.to_string()),
                 is_spectator: false,
             });
         }

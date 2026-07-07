@@ -8,8 +8,9 @@ use std::path::PathBuf;
 use std::process;
 
 use crate::selfplay::{
-    available_profile_ids, canonical_profile_id, run_profile_matchup_result,
-    ProfileMatchupEndReason, ProfileMatchupOptions, ProfileMatchupResult,
+    available_profile_request_ids, canonical_profile_request_id_for_match,
+    resolve_profile_request_id_for_match, run_profile_matchup_result, ProfileMatchupOptions,
+    ProfileMatchupEndReason, ProfileMatchupResult,
 };
 
 const DEFAULT_TICKS: u32 = 25_000;
@@ -36,10 +37,16 @@ pub fn run_from_env() {
     let Some(config) = parse_args_or_exit() else {
         return;
     };
+    let profile_a = resolve_profile_request_id_for_match(&config.profile_a, config.seed, 0)
+        .unwrap_or(&config.profile_a)
+        .to_string();
+    let profile_b = resolve_profile_request_id_for_match(&config.profile_b, config.seed, 1)
+        .unwrap_or(&config.profile_b)
+        .to_string();
 
     let result = run_profile_matchup_result(ProfileMatchupOptions {
-        profile_a: config.profile_a,
-        profile_b: config.profile_b,
+        profile_a,
+        profile_b,
         seed: config.seed,
         max_ticks: config.ticks,
         verify_replay: config.verify_replay,
@@ -186,12 +193,12 @@ fn parse_u32_flag(flag: &str, args: &mut impl Iterator<Item = String>) -> Result
 }
 
 fn resolve_profile_arg(value: &str) -> Result<String, String> {
-    canonical_profile_id(value)
+    canonical_profile_request_id_for_match(value)
         .map(str::to_string)
         .ok_or_else(|| {
             format!(
-                "unknown profile {value:?}; known profiles: {}",
-                available_profile_ids().join(", ")
+                "unknown profile or suite {value:?}; known requests: {}",
+                available_profile_request_ids().join(", ")
             )
         })
 }
@@ -336,26 +343,28 @@ fn format_counts(counts: &std::collections::BTreeMap<String, u32>) -> String {
 }
 
 fn print_profiles() {
-    println!("profiles:");
-    for profile in available_profile_ids() {
+    println!("profile and suite requests:");
+    for profile in available_profile_request_ids() {
         println!("  {profile}");
     }
     println!();
     println!("aliases:");
-    println!("  ai -> ai_1_2_wave_cohorts");
-    println!("  ai1 -> ai_1_0_tech");
-    println!("  ai_1_0 -> ai_1_0_tech");
-    println!("  default -> ai_1_2_wave_cohorts");
-    println!("  ai_1_1 -> ai_1_1_tank_mg");
-    println!("  ai11 -> ai_1_1_tank_mg");
-    println!("  ai_1_2 -> ai_1_2_wave_cohorts");
-    println!("  ai12 -> ai_1_2_wave_cohorts");
+    println!("  ai -> ai_1_2");
+    println!("  ai1 -> ai_1_0");
+    println!("  ai_1_0 -> ai_1_0");
+    println!("  default -> ai_1_2");
+    println!("  ai_1_1 -> ai_1_1");
+    println!("  ai11 -> ai_1_1");
+    println!("  ai_1_2 -> ai_1_2");
+    println!("  ai12 -> ai_1_2");
+    println!("  ai_2_0 -> ai_2_0");
+    println!("  ai20 -> ai_2_0");
 }
 
 fn print_usage() {
     println!(
         "Usage:
-  cargo run --bin ai-matchup -- <profile-a> <profile-b> [options]
+  cargo run --bin ai-matchup -- <profile-or-suite-a> <profile-or-suite-b> [options]
   cargo run --bin ai-matchup -- --profile-a <id> --profile-b <id> [options]
 
 Options:
@@ -373,7 +382,7 @@ Examples:
   cargo run --bin ai-matchup -- ai ai
   cargo run --bin ai-matchup -- ai_1_1 ai_1_0_tech --seed 7 --ticks 3000 --json
   cargo run --bin ai-matchup -- ai_1_2 ai_1_1 --seed 7 --ticks 3000 --json
-  cargo run --bin ai-matchup -- ai_1_2 ai_1_1 --seed 7 --ticks 25000 --json
+  cargo run --bin ai-matchup -- ai_2_0 ai --seed 7 --ticks 25000 --json
   cargo run --bin ai-matchup -- default ai_1_0_tech --seed 7 --ticks 25000 --json
 "
     );
@@ -407,7 +416,10 @@ mod tests {
 
     #[test]
     fn starting_city_centre_result_is_reported_as_objective_win() {
-        let result = profile_result(ProfileMatchupEndReason::StartingCityCentreKilled, Some(2));
+        let result = profile_result(
+            ProfileMatchupEndReason::StartingCityCentreKilled,
+            Some(2),
+        );
 
         assert_eq!(
             winner_text(&result),

@@ -34,10 +34,11 @@ instead of reaching into entity stores from the server layer.
 **Strategy.** Each controller, on a staggered cadence
 (`DECISION_INTERVAL` ticks), builds a constrained snapshot-backed `AiObservation` and delegates RTS
 decisions to `rts_ai::ai_core::decision::decide_profile`. Live lobby AIs use the promoted
-`ai_1_2_wave_cohorts` profile by default and keep that profile for the whole match. Hosts can select
-`ai_1_0_tech`, `ai_1_1_tank_mg`, or `ai_1_2_wave_cohorts` per AI seat from the lobby before
-countdown/start; unsupported
-profile ids are ignored or defaulted to the promoted live default. Team relationships are observation-only safety
+AI 1.2 suite by default and keep the resolved concrete profile for the whole match. Hosts can
+select the `ai_1_0`, `ai_1_1`, `ai_1_2`, or `ai_2_0` profile suites per AI seat from the lobby
+before countdown/start; exact concrete profile ids remain accepted for developer compatibility.
+Unsupported profile or suite ids are ignored or defaulted to the promoted live default request.
+Team relationships are observation-only safety
 inputs: player summaries carry `teamId`, visible allied entities are classified separately from
 `visible_enemies`, public base targeting ignores allied starts, and live decisions receive the
 current living player set so attack waves keep choosing living enemies. AI teammates still do not
@@ -60,10 +61,9 @@ combat target selection, and blockers such as waiting for units, waiting for a r
 waiting for Methamphetamines, and cadence. Final command emission still goes through
 `AiActionContext` and `ai_core::actions`.
 
-Arena tooling records profile identities for each registered profile: stable id, label, module
-names, and a fingerprint derived from the concrete `AiProfile`. The identity schema keeps
-base-profile and overlay fields for artifact compatibility, but the current supported profiles are
-registered directly rather than through a separate overlay resolver.
+Profile experiments are registered as concrete `AiProfile` entries with stable ids and manifest
+metadata. The manifest records module names and a fingerprint for arena artifacts, keeping promoted
+variants inspectable without changing the live lobby contract.
 
 The economy plan is backed by an AI-owned resource availability model derived only from the
 fog-filtered observation, public start-payload resource positions, completed own City Centres,
@@ -143,15 +143,24 @@ units that are excluded from outbound wave formation. AI 1.2 also targets a seco
 its bank is above 600 steel and 400 oil, while still using the normal build placement, prerequisite,
 pending-build, expansion-save, and defensive-panic gates.
 
-The aliases `ai_1_2` and `ai12` resolve to `ai_1_2_wave_cohorts`; `ai_1_1` and
-`ai11` resolve to `ai_1_1_tank_mg`;
-`ai_1_0`, `ai_1_0_tech`, and `ai1` resolve to `ai_1_0_tech`; `ai` and `default` resolve to the
-live default.
+AI 2.0 is exposed as the `ai_2_0` suite rather than a single inspectable lobby target. The promoted
+suite is currently pinned to `ai_2_0_tank_pressure`, which pivots earlier into faster mixed
+Tank/Rifleman pressure. It expands off the shared two-base economy plan, reserves defensive Machine
+Gunners, unlocks Factory production earlier than AI 1.2, and targets a second Factory once the
+economy can support it. Exact concrete profile ids remain registered for arena pinning, replay
+debugging, and profile-manifest fingerprints. The retired `ai_2_0_agent_rush` and
+`ai_2_0_rifle_tank` profile ids remain rejected.
+
+The suite aliases `ai_2_0` and `ai20` resolve to the AI 2.0 suite request in live and arena-style
+tooling; `ai_1_2` and `ai12` resolve to the AI 1.2 suite request; `ai_1_1` and `ai11` resolve to
+the AI 1.1 suite request; `ai_1_0` and `ai1` resolve to the AI 1.0 suite request. Exact profile ids
+such as `ai_1_2_wave_cohorts` or `ai_2_0_tank_pressure` pin one concrete member. `ai` and
+`default` resolve to the promoted live default request.
 The live lobby AI uses this shared core through `AiController`, which only owns live identity,
 profile id, cadence, persistent decision memory, and its latest bounded decision trace for
 spectator-only observer diagnostics. Unknown live profile ids resolve to the promoted live default,
-currently `ai_1_2_wave_cohorts`. The ordinary lobby exposes AI 1.0, AI 1.1, and AI 1.2. AI 1.2 is
-the live lobby default.
+currently `ai_1_2`, which resolves to `ai_1_2_wave_cohorts`. The ordinary lobby exposes AI 1.0,
+AI 1.1, AI 1.2, and AI 2.0 as suite requests. AI 1.2 is the live lobby default.
 Panzerfaust is trainable for Kriegsia players after a completed Training Centre, and Scout Plane is
 trainable from City Centre after completed Gun Works or Vehicle Works, but current AI production
 profiles intentionally omit both units in the first pass. AI-owned Panzerfaust or Scout Plane units
@@ -177,9 +186,10 @@ Profile matchup JSON also includes a bounded `aiTraceTail` of compact trace entr
 profile-backed thinks. The tail is diagnostic output only; deterministic replay artifacts continue
 to use the command log as the source of player intent.
 Arena runs wrap the same profile matchup result in agent-facing sidecars: `manifest.json` records
-git, seed, side, profile identities, aliases, and module fingerprints; `summary.json` stores the
-machine-readable result row; `decision-trace.jsonl` indexes compact trace labels by tick and
-player; and `brief.md` gives a short textual match brief with replay and trace pointers.
+git, seed, side, requested profile/suite ids, resolved concrete profile identities, and module
+fingerprints; `summary.json` stores the machine-readable result row; `decision-trace.jsonl` indexes
+compact trace labels by tick and player; and `brief.md` gives a short textual match brief with
+replay and trace pointers.
 
 Spectators never count toward win/elimination and receive a neutral final scoreboard result.
 
