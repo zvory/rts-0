@@ -23,15 +23,15 @@ a final audit and review-readiness pass, not a place to add new gameplay behavio
 - Audit [requirements.md](requirements.md) against the landed implementation and mark factual status,
   deferred items, or follow-up needs without rewriting approved behavior casually.
 - Confirm contract docs are current:
-  - [docs/design/protocol.md](../../docs/design/protocol.md) for any wire, snapshot, command,
+  - [docs/design/protocol.md](../../../docs/design/protocol.md) for any wire, snapshot, command,
     projection, replay, lab, or compact transport changes.
-  - [docs/design/balance.md](../../docs/design/balance.md) for visible cost, build time, sight,
+  - [docs/design/balance.md](../../../docs/design/balance.md) for visible cost, build time, sight,
     speed, upkeep, active limit, and catalog surfaces.
-  - [docs/design/server-sim.md](../../docs/design/server-sim.md) for `Game` state ownership,
+  - [docs/design/server-sim.md](../../../docs/design/server-sim.md) for `Game` state ownership,
     checkpoint/replay state, fog rules, or `Game` API changes.
-  - [docs/design/client-ui.md](../../docs/design/client-ui.md) for HUD, input, rendering, lab,
+  - [docs/design/client-ui.md](../../../docs/design/client-ui.md) for HUD, input, rendering, lab,
     teardown, or module export contract changes.
-  - [docs/design/ai.md](../../docs/design/ai.md) if AI exclusion or encounter behavior needed
+  - [docs/design/ai.md](../../../docs/design/ai.md) if AI exclusion or encounter behavior needed
     documentation.
 - Refresh context capsule section lists only if design-doc structure shifted.
 - Update generated or reference surfaces as needed:

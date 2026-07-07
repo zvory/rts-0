@@ -2,19 +2,19 @@
 
 > [!WARNING]
 > **POTENTIALLY STALE - DO NOT IMPLEMENT.**
-> This plan predates the completed `plans/game-state/` ownership work and is superseded by the
-> active `plans/checkpoint/plan.md` roadmap for checkpoint serialization, replay migration, and lab
+> This plan predates the completed `plans/archive/game-state/` ownership work and is superseded by the
+> archived `plans/archive/checkpoint/plan.md` roadmap for checkpoint serialization, replay migration, and lab
 > scenario migration. Treat this directory as historical reference only.
 
 ## Status
 
 **POTENTIALLY STALE / deprecated draft.** Do not execute this plan or any `plans/lab-replay/`
-phase files as the current roadmap; use `plans/checkpoint/plan.md` instead.
+phase files as the current roadmap; use `plans/archive/checkpoint/plan.md` instead.
 
 This plan captured an earlier checkpoint-first lab replay program, but it is no longer the active
 source of truth. The game-state ownership work has now landed, and the fresh executable roadmap is
-`plans/checkpoint/plan.md`. Lab replay, lab save, and checkpoint-backed replay work should be
-planned or executed from that newer roadmap.
+archived at `plans/archive/checkpoint/plan.md`. Lab replay, lab save, and checkpoint-backed replay
+work should be planned or executed from a new active roadmap.
 
 ## Purpose
 

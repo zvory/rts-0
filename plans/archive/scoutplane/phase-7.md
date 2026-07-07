@@ -27,7 +27,7 @@ without adding new product behavior or balance tuning.
 
 ## Scope
 
-- Read [docs/context/testing.md](../../docs/context/testing.md) before deciding the final suite set.
+- Read [docs/context/testing.md](../../../docs/context/testing.md) before deciding the final suite set.
 - Audit the implementation against every bullet in [requirements.md](requirements.md).
 - Add or tighten focused tests for:
   - City Centre button lock/unlock and disabled reason.

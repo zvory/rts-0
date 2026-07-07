@@ -14,7 +14,7 @@ one at a time only after explicit approval to proceed beyond that requirements g
 
 - [requirements.md](requirements.md) is the active Scout Plane brief, rules, balance, testing, patch
   note, and non-goal source.
-- [docs/new-unit-checklist.md](../../docs/new-unit-checklist.md) remains the workflow checklist for
+- [docs/new-unit-checklist.md](../../../docs/new-unit-checklist.md) remains the workflow checklist for
   adding the unit.
 
 ## Phase Summaries
@@ -113,10 +113,10 @@ intentionally deferred without reconstructing the feature from code.
   [requirements.md](requirements.md) or stop for product review.
 - Keep protocol mirrors synchronized across `server/crates/protocol/src/lib.rs`,
   `server/src/protocol.rs`, `server/crates/sim/src/protocol.rs`, `client/src/protocol.js`, compact
-  snapshot metadata if touched, and [docs/design/protocol.md](../../docs/design/protocol.md).
+  snapshot metadata if touched, and [docs/design/protocol.md](../../../docs/design/protocol.md).
 - Keep balance and catalog mirrors synchronized across Rust rules, faction catalog exports,
   `client/src/config.js` and its internal mirrors, generated wiki/stats surfaces, and
-  [docs/design/balance.md](../../docs/design/balance.md).
+  [docs/design/balance.md](../../../docs/design/balance.md).
 - Respect client architecture. New client state, renderer, HUD, input, hotkey, lab, and audio paths
   should use existing dependency-injection patterns and must clean up listeners, timers, textures,
   sounds, and GPU resources.

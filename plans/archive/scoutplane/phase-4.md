@@ -12,8 +12,8 @@ and projection rules before any normal player can train the plane.
 
 ## Scope
 
-- Read [docs/context/server-sim.md](../../docs/context/server-sim.md) and
-  [docs/context/protocol.md](../../docs/context/protocol.md) before changing fog, projection,
+- Read [docs/context/server-sim.md](../../../docs/context/server-sim.md) and
+  [docs/context/protocol.md](../../../docs/context/protocol.md) before changing fog, projection,
   snapshots, events, checkpoint, replay, or commands.
 - Implement oil upkeep:
   - Upkeep starts immediately when the plane launches.

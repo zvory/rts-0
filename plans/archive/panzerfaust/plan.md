@@ -13,7 +13,7 @@ explicit approval to proceed beyond that gate.
 
 - [checklist.md](checklist.md) is the active Panzerfaust brief, rules, balance, and deferred-item
   source.
-- [docs/new-unit-checklist.md](../../docs/new-unit-checklist.md) remains the workflow checklist for
+- [docs/new-unit-checklist.md](../../../docs/new-unit-checklist.md) remains the workflow checklist for
   adding the unit.
 
 ## Phase Summaries
@@ -108,10 +108,10 @@ deferred without reconstructing the feature from code.
   conversion state, death events, and feedback events must not reveal hidden entities or positions.
 - Keep protocol mirrors synchronized across `server/crates/protocol/src/lib.rs`,
   `server/src/protocol.rs`, `server/crates/sim/src/protocol.rs`, `client/src/protocol.js`, compact
-  snapshot metadata if touched, and [docs/design/protocol.md](../../docs/design/protocol.md).
+  snapshot metadata if touched, and [docs/design/protocol.md](../../../docs/design/protocol.md).
 - Keep balance and catalog mirrors synchronized across Rust rules, faction catalog exports,
   `client/src/config.js` and its internal mirrors, generated wiki/stats surfaces, and
-  [docs/design/balance.md](../../docs/design/balance.md).
+  [docs/design/balance.md](../../../docs/design/balance.md).
 - Respect client architecture. New client state, renderer, HUD, audio, and lab inspection paths
   should use existing dependency-injection patterns and must clean up listeners, timers, textures,
   sounds, and GPU resources.
