@@ -1,7 +1,7 @@
 use super::support::*;
 
-fn ai_slot_names(task: &RoomTask) -> Vec<&str> {
-    task.ai_players.iter().map(|ai| ai.name.as_str()).collect()
+fn ai_slot_names(task: &RoomTask) -> Vec<String> {
+    task.ai_slot_display_names()
 }
 
 #[test]
@@ -84,10 +84,7 @@ fn selected_lobby_ai_profile_is_used_by_live_controller() {
         task.ai_players.first().map(|ai| ai.profile_id),
         Some("ai_1_1_tank_mg")
     );
-    assert_eq!(
-        task.ai_players.first().map(|ai| ai.name.as_str()),
-        Some("AI 1.1")
-    );
+    assert_eq!(ai_slot_names(&task), vec!["AI 1.1"]);
 
     task.start_match();
 

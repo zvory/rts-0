@@ -482,12 +482,10 @@ impl RoomTask {
         };
         self.ai_players.push(AiSlot {
             id,
-            name: String::new(),
             team_id,
             faction_id: default_faction_id_for(FactionRequestContext::AiSeat),
             profile_id,
         });
-        self.refresh_ai_slot_names();
         crate::log_debug!(room = %self.room, ai_id = id, "AI opponent added");
         self.broadcast_lobby();
     }
@@ -527,7 +525,6 @@ impl RoomTask {
             return;
         }
         ai.profile_id = profile_id;
-        self.refresh_ai_slot_names();
         crate::log_debug!(
             room = %self.room,
             ai_id = target,
@@ -555,29 +552,31 @@ impl RoomTask {
         let before = self.ai_players.len();
         self.ai_players.retain(|a| a.id != target);
         if self.ai_players.len() != before {
-            self.refresh_ai_slot_names();
             crate::log_debug!(room = %self.room, ai_id = target, "AI opponent removed");
             self.broadcast_lobby();
         }
     }
 
-    fn refresh_ai_slot_names(&mut self) {
+    pub(super) fn ai_slot_display_names(&self) -> Vec<String> {
         let mut profile_counts: HashMap<&'static str, usize> = HashMap::new();
         for ai in &self.ai_players {
             *profile_counts.entry(ai.profile_id).or_default() += 1;
         }
 
         let mut profile_seen: HashMap<&'static str, usize> = HashMap::new();
-        for ai in &mut self.ai_players {
-            let label = rts_ai::live_profile_label(ai.profile_id);
-            if profile_counts.get(ai.profile_id).copied().unwrap_or(0) > 1 {
-                let seen = profile_seen.entry(ai.profile_id).or_default();
-                *seen += 1;
-                ai.name = format!("{label} {seen}");
-            } else {
-                ai.name = label.to_string();
-            }
-        }
+        self.ai_players
+            .iter()
+            .map(|ai| {
+                let label = rts_ai::live_profile_label(ai.profile_id);
+                if profile_counts.get(ai.profile_id).copied().unwrap_or(0) > 1 {
+                    let seen = profile_seen.entry(ai.profile_id).or_default();
+                    *seen += 1;
+                    format!("{label} {seen}")
+                } else {
+                    label.to_string()
+                }
+            })
+            .collect()
     }
 
     /// Host-only: select a map by name. Ignored outside the lobby or from non-hosts.
@@ -883,12 +882,13 @@ impl RoomTask {
                 })
             })
             .collect();
-        for (seat, ai) in self.ai_players.iter().enumerate() {
+        let ai_names = self.ai_slot_display_names();
+        for ((seat, ai), name) in self.ai_players.iter().enumerate().zip(ai_names) {
             players.push(LobbyPlayer {
                 id: ai.id,
                 team_id: ai.team_id,
                 faction_id: ai.faction_id.clone(),
-                name: ai.name.clone(),
+                name,
                 ready: true,
                 color: self.ai_color(seat),
                 is_ai: true,
