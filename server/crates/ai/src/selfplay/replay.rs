@@ -12,7 +12,7 @@ use super::scripts::{ProfileBackedScript, ScriptedPlayer};
 use super::SELFPLAY_ARTIFACT_DIR;
 use crate::ai_core::profiles::{
     profile_by_id, required_profiles, AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID,
-    AI_1_2_WAVE_COHORTS_ID,
+    AI_1_2_WAVE_COHORTS_ID, AI_2_0_AGENT_RUSH_ID,
 };
 use crate::live::DEFAULT_LIVE_PROFILE_ID;
 use rts_sim::game::entity::EntityKind;
@@ -166,6 +166,7 @@ pub fn canonical_profile_id(input: &str) -> Option<&'static str> {
         "ai1" | "ai_1_0" | "ai_1_0_tech" => Some(AI_1_0_TECH_ID),
         "ai_1_1" | "ai11" => Some(AI_1_1_TANK_MG_ID),
         "ai_1_2" | "ai12" => Some(AI_1_2_WAVE_COHORTS_ID),
+        "ai_2_0" | "ai20" => Some(AI_2_0_AGENT_RUSH_ID),
         id => profile_by_id(id).map(|profile| profile.id),
     }
 }
@@ -795,7 +796,7 @@ mod tests {
         ProfileMatchupOptions, ScorecardCollector,
     };
     use crate::ai_core::profiles::{
-        AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID, AI_1_2_WAVE_COHORTS_ID,
+        AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID, AI_1_2_WAVE_COHORTS_ID, AI_2_0_AGENT_RUSH_ID,
     };
     use crate::DEFAULT_LIVE_PROFILE_ID;
     use rts_sim::game::command::SimCommand;
@@ -814,7 +815,8 @@ mod tests {
             vec![
                 AI_1_0_TECH_ID,
                 AI_1_1_TANK_MG_ID,
-                AI_1_2_WAVE_COHORTS_ID
+                AI_1_2_WAVE_COHORTS_ID,
+                AI_2_0_AGENT_RUSH_ID,
             ]
         );
         assert_eq!(
@@ -829,6 +831,12 @@ mod tests {
         );
         assert_eq!(canonical_profile_id("ai_1_2"), Some(AI_1_2_WAVE_COHORTS_ID));
         assert_eq!(canonical_profile_id("ai12"), Some(AI_1_2_WAVE_COHORTS_ID));
+        assert_eq!(canonical_profile_id("ai_2_0"), Some(AI_2_0_AGENT_RUSH_ID));
+        assert_eq!(canonical_profile_id("ai20"), Some(AI_2_0_AGENT_RUSH_ID));
+        assert_eq!(
+            canonical_profile_id("ai_2_0_agent_rush"),
+            Some(AI_2_0_AGENT_RUSH_ID)
+        );
         assert_eq!(canonical_profile_id("rifle_flood_full_saturation"), None);
         assert_eq!(canonical_profile_id("saturation"), None);
     }
