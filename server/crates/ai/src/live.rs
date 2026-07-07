@@ -10,7 +10,7 @@ use crate::ai_core::decision::{decide_profile, AiDecisionMemory};
 use crate::ai_core::observation::AiObservation;
 use crate::ai_core::profiles::{
     profile_by_id, AiProfile, AI_1_0_TECH, AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID,
-    AI_1_2_WAVE_COHORTS_ID,
+    AI_1_2_WAVE_COHORTS_ID, AI_2_0_AGENT_RUSH_ID,
 };
 use crate::ai_shared;
 use crate::selfplay::pending_build::PendingBuildTracker;
@@ -23,14 +23,16 @@ use rts_sim::protocol::{Snapshot, StartPayload};
 
 const DECISION_INTERVAL: u32 = 9;
 
-/// Default live-lobby profile. Keep this on the highest supported live AI version.
+/// Default live-lobby profile. Keep this on the stable promoted live AI unless intentionally
+/// rolling the ordinary Add AI path forward.
 pub const DEFAULT_LIVE_PROFILE_ID: &str = AI_1_2_WAVE_COHORTS_ID;
 
 /// Profiles available to ordinary lobby AI opponents.
-pub const LIVE_PROFILE_IDS: [&str; 3] = [
+pub const LIVE_PROFILE_IDS: [&str; 4] = [
     AI_1_0_TECH_ID,
     AI_1_1_TANK_MG_ID,
     AI_1_2_WAVE_COHORTS_ID,
+    AI_2_0_AGENT_RUSH_ID,
 ];
 
 pub fn canonical_live_profile_id(input: &str) -> Option<&'static str> {
@@ -39,6 +41,7 @@ pub fn canonical_live_profile_id(input: &str) -> Option<&'static str> {
         "ai1" | "ai_1_0" | "ai_1_0_tech" => Some(AI_1_0_TECH_ID),
         "ai_1_1" | "ai11" | "ai_1_1_tank_mg" => Some(AI_1_1_TANK_MG_ID),
         "ai_1_2" | "ai12" | "ai_1_2_wave_cohorts" => Some(AI_1_2_WAVE_COHORTS_ID),
+        "ai_2_0" | "ai20" | "ai_2_0_agent_rush" => Some(AI_2_0_AGENT_RUSH_ID),
         _ => None,
     }
 }
@@ -257,20 +260,16 @@ mod tests {
             [
                 AI_1_0_TECH_ID,
                 AI_1_1_TANK_MG_ID,
-                AI_1_2_WAVE_COHORTS_ID
+                AI_1_2_WAVE_COHORTS_ID,
+                AI_2_0_AGENT_RUSH_ID,
             ]
         );
     }
 
     #[test]
-    fn live_default_tracks_highest_semantic_profile_version() {
-        let highest = LIVE_PROFILE_IDS
-            .iter()
-            .copied()
-            .max_by_key(|profile_id| semantic_version_parts(profile_id))
-            .unwrap();
-
-        assert_eq!(DEFAULT_LIVE_PROFILE_ID, highest);
+    fn live_default_stays_on_stable_promoted_profile() {
+        assert_eq!(DEFAULT_LIVE_PROFILE_ID, AI_1_2_WAVE_COHORTS_ID);
+        assert!(LIVE_PROFILE_IDS.contains(&AI_2_0_AGENT_RUSH_ID));
     }
 
     #[test]
@@ -305,16 +304,18 @@ mod tests {
             canonical_live_profile_id("ai_1_2"),
             Some(AI_1_2_WAVE_COHORTS_ID)
         );
+        assert_eq!(
+            canonical_live_profile_id("ai_2_0"),
+            Some(AI_2_0_AGENT_RUSH_ID)
+        );
+        assert_eq!(
+            canonical_live_profile_id("ai20"),
+            Some(AI_2_0_AGENT_RUSH_ID)
+        );
+        assert_eq!(
+            canonical_live_profile_id("ai_2_0_agent_rush"),
+            Some(AI_2_0_AGENT_RUSH_ID)
+        );
         assert_eq!(canonical_live_profile_id("rifle_flood_fast"), None);
-    }
-
-    fn semantic_version_parts(profile_id: &str) -> Vec<u32> {
-        let Some(rest) = profile_id.strip_prefix("ai_") else {
-            return vec![0];
-        };
-        rest.split('_')
-            .take_while(|part| part.chars().all(|ch| ch.is_ascii_digit()))
-            .map(|part| part.parse::<u32>().unwrap_or(0))
-            .collect()
     }
 }

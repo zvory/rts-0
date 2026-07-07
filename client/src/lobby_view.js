@@ -6,9 +6,14 @@ export const AI_PROFILES = Object.freeze([
   { id: "ai_1_0_tech", label: "AI 1.0" },
   { id: "ai_1_1_tank_mg", label: "AI 1.1" },
   { id: "ai_1_2_wave_cohorts", label: "AI 1.2" },
+  { id: "ai_2_0_agent_rush", label: "AI 2.0" },
 ]);
 
-export const DEFAULT_AI_PROFILE_ID = highestSemanticAiProfile(AI_PROFILES).id;
+const STABLE_DEFAULT_AI_PROFILE_ID = "ai_1_2_wave_cohorts";
+export const DEFAULT_AI_PROFILE_ID =
+  AI_PROFILES.some((entry) => entry.id === STABLE_DEFAULT_AI_PROFILE_ID)
+    ? STABLE_DEFAULT_AI_PROFILE_ID
+    : AI_PROFILES[0].id;
 
 export function teamSlotsForLobby(players = []) {
   const seatedPlayers = players.filter((player) => !player.isSpectator);
@@ -496,30 +501,6 @@ function playableAiProfileId(id) {
 function aiProfileLabel(id) {
   const fallback = AI_PROFILES.find((entry) => entry.id === DEFAULT_AI_PROFILE_ID) || AI_PROFILES[0];
   return AI_PROFILES.find((entry) => entry.id === id)?.label || fallback?.label || "AI";
-}
-
-function highestSemanticAiProfile(profiles) {
-  return profiles.reduce((best, candidate) => {
-    if (!best) return candidate;
-    return compareAiProfileVersion(candidate, best) > 0 ? candidate : best;
-  }, null) || profiles[0];
-}
-
-function compareAiProfileVersion(a, b) {
-  const aVersion = aiProfileVersionParts(a);
-  const bVersion = aiProfileVersionParts(b);
-  const length = Math.max(aVersion.length, bVersion.length);
-  for (let idx = 0; idx < length; idx += 1) {
-    const delta = (aVersion[idx] || 0) - (bVersion[idx] || 0);
-    if (delta !== 0) return delta;
-  }
-  return 0;
-}
-
-function aiProfileVersionParts(profile) {
-  const text = `${profile?.label || ""} ${profile?.id || ""}`;
-  const match = text.match(/\bAI\s+(\d+(?:[._]\d+)*)\b/i) || text.match(/\bai[_-]?(\d+(?:[._]\d+)*)\b/i);
-  return match ? match[1].split(/[._]/).map((part) => Number(part) || 0) : [0];
 }
 
 export const PLAYABLE_FACTIONS = Object.freeze([

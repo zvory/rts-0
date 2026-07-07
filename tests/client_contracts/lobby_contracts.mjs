@@ -33,7 +33,7 @@ import {
   suggestLobbyName,
   validateLobbyName,
 } from "../../client/src/lobby_browser_view.js";
-import { LobbyRosterView } from "../../client/src/lobby_view.js";
+import { AI_PROFILES, LobbyRosterView } from "../../client/src/lobby_view.js";
 
 import { textWithin } from "./dom_text.mjs";
 
@@ -51,6 +51,10 @@ import { textWithin } from "./dom_text.mjs";
   assert(
     PLAYABLE_FACTIONS.find((entry) => entry.id === "ekat")?.label === "Ekat",
     "lobby faction selector labels the ekat faction as Ekat",
+  );
+  assert(
+    AI_PROFILES.some((entry) => entry.id === "ai_2_0_agent_rush" && entry.label === "AI 2.0"),
+    "lobby AI profile selector lists AI 2.0",
   );
   assert(
     betaFactionSelectEnabledForLocation({ hostname: "rts-0-zvorygin-beta.fly.dev", pathname: "/" }),
@@ -137,6 +141,58 @@ import { textWithin } from "./dom_text.mjs";
     }),
     "team drop is host-only",
   );
+}
+
+{
+  withFakeDocument(() => {
+    const root = document.createElement("div");
+    const view = new LobbyRosterView(root);
+    let selectedProfile = null;
+    view.render({
+      players: [
+        { id: 1, name: "Host", color: "#0072b2", ready: false, teamId: 1 },
+        {
+          id: 2,
+          name: "Computer 1",
+          color: "#d55e00",
+          ready: true,
+          teamId: 2,
+          isAi: true,
+          aiProfileId: "ai_2_0_agent_rush",
+        },
+      ],
+      myId: 1,
+      hostId: 1,
+      isHost: true,
+      countdownActive: false,
+      playerCount: 2,
+      maxPlayers: 4,
+      onSetAiProfile: (id, profileId) => {
+        selectedProfile = { id, profileId };
+      },
+    });
+
+    const select = findFakes(
+      root,
+      (el) => el.tagName === "SELECT" && el.className === "player-ai-profile-select",
+    )[0];
+    assert(!!select, "host lobby renders an AI profile selector");
+    assert(select.value === "ai_2_0_agent_rush", "AI 2.0 profile state is selected in the lobby");
+    assert(
+      select.children.some(
+        (option) => option.value === "ai_2_0_agent_rush" && option.textContent === "AI 2.0",
+      ),
+      "AI profile selector includes the AI 2.0 option",
+    );
+
+    select.value = "ai_1_2_wave_cohorts";
+    select.listeners.change?.();
+    assertDeepEqual(
+      selectedProfile,
+      { id: 2, profileId: "ai_1_2_wave_cohorts" },
+      "AI profile selector emits profile changes",
+    );
+  });
 }
 
 {
