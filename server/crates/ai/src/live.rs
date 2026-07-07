@@ -54,6 +54,14 @@ pub struct AiThinkContext<'a> {
     pub retreat_commands: Vec<SimCommand>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AiDecisionTraceSnapshot {
+    pub player_id: u32,
+    pub profile_id: &'static str,
+    pub trace_tick: u32,
+    pub lines: Vec<String>,
+}
+
 /// Drives a single AI-controlled player by emitting ordinary commands each think.
 pub struct AiController {
     player: u32,
@@ -62,6 +70,7 @@ pub struct AiController {
     pending_builds: PendingBuildTracker,
     staged_units: BTreeSet<u32>,
     active_attack_units: BTreeMap<u32, u32>,
+    last_decision_trace: Option<AiDecisionTraceSnapshot>,
 }
 
 impl AiController {
@@ -78,6 +87,7 @@ impl AiController {
             pending_builds: PendingBuildTracker::default(),
             staged_units: BTreeSet::new(),
             active_attack_units: BTreeMap::new(),
+            last_decision_trace: None,
         }
     }
 
@@ -87,6 +97,10 @@ impl AiController {
 
     pub fn profile_id(&self) -> &'static str {
         self.profile_id
+    }
+
+    pub fn latest_decision_trace(&self) -> Option<AiDecisionTraceSnapshot> {
+        self.last_decision_trace.clone()
     }
 
     fn profile(&self) -> &'static AiProfile {
@@ -149,6 +163,12 @@ impl AiController {
         );
         debug_assert_eq!(decision.profile_id, self.profile_id);
 
+        self.last_decision_trace = Some(AiDecisionTraceSnapshot {
+            player_id: self.player,
+            profile_id: self.profile_id,
+            trace_tick: tick,
+            lines: decision.trace.format_lines(),
+        });
         commands.extend(self.filter_repeated_stage_commands(
             tick,
             &decision.intents,
@@ -248,6 +268,7 @@ mod tests {
 
         assert_eq!(ai.player_id(), 2);
         assert_eq!(ai.profile_id(), AI_1_2_WAVE_COHORTS_ID);
+        assert_eq!(ai.latest_decision_trace(), None);
     }
 
     #[test]

@@ -539,6 +539,16 @@ pub struct ObserverAnalysisPlayer {
     pub production: Vec<ObserverAnalysisProduction>,
     pub units_lost: Vec<ObserverAnalysisKindCount>,
     pub resources_lost: ObserverAnalysisResourcesLost,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ai_diagnostics: Option<ObserverAnalysisAiDiagnostics>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ObserverAnalysisAiDiagnostics {
+    pub profile_id: String,
+    pub trace_tick: u32,
+    pub lines: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -1255,6 +1265,15 @@ mod tests {
                     oil_value: 0,
                 }],
                 resources_lost: ObserverAnalysisResourcesLost { steel: 50, oil: 0 },
+                ai_diagnostics: Some(ObserverAnalysisAiDiagnostics {
+                    profile_id: "ai_1_2_wave_cohorts".to_string(),
+                    trace_tick: 72,
+                    lines: vec![
+                        "profile=ai_1_2_wave_cohorts tick=72".to_string(),
+                        "goal=Production status=Selected blockers=- intents=Train:Rifleman"
+                            .to_string(),
+                    ],
+                }),
             }],
         });
         let json = serde_json::to_value(msg).expect("observer analysis should serialize");
@@ -1270,6 +1289,15 @@ mod tests {
         assert_eq!(json["players"][0]["production"][0]["queueDepth"], 2);
         assert_eq!(json["players"][0]["unitsLost"][0]["kind"], "worker");
         assert_eq!(json["players"][0]["resourcesLost"]["steel"], 50);
+        assert_eq!(
+            json["players"][0]["aiDiagnostics"]["profileId"],
+            "ai_1_2_wave_cohorts"
+        );
+        assert_eq!(json["players"][0]["aiDiagnostics"]["traceTick"], 72);
+        assert_eq!(
+            json["players"][0]["aiDiagnostics"]["lines"][1],
+            "goal=Production status=Selected blockers=- intents=Train:Rifleman"
+        );
     }
 
     #[test]

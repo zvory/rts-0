@@ -441,6 +441,64 @@ fn ai_only_live_start_payload_advertises_speed_controls_without_seek() {
 }
 
 #[test]
+fn ai_only_live_spectator_observer_analysis_includes_ai_decision_diagnostics() {
+    let mut task = RoomTask::new(
+        "ai-only-live-ai-diagnostics-test".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let mut writer = add_test_room_spectator(&mut task, 1);
+    task.host_id = Some(1);
+    task.on_add_ai(1, Some(1), None);
+    task.on_add_ai(1, Some(2), None);
+    while writer.reliable_rx.try_recv().is_ok() {}
+
+    task.start_match();
+    while writer.reliable_rx.try_recv().is_ok() {}
+
+    for _ in 0..10 {
+        task.on_tick(TokioInstant::now());
+    }
+
+    let analyses: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok())
+        .filter_map(|msg| match msg {
+            ServerMessage::ObserverAnalysis(analysis) => Some(analysis),
+            _ => None,
+        })
+        .collect();
+    let analysis = analyses
+        .last()
+        .expect("AI-only spectator should receive observer analysis");
+    let ai_rows: Vec<_> = analysis
+        .players
+        .iter()
+        .filter_map(|player| {
+            player
+                .ai_diagnostics
+                .as_ref()
+                .map(|diagnostics| (player.id, diagnostics))
+        })
+        .collect();
+
+    assert_eq!(
+        ai_rows.len(),
+        2,
+        "both AI players should expose decision diagnostics"
+    );
+    for (_player_id, diagnostics) in ai_rows {
+        assert!(!diagnostics.profile_id.is_empty());
+        assert!(diagnostics.trace_tick <= analysis.tick);
+        assert!(diagnostics
+            .lines
+            .iter()
+            .any(|line| line.contains("profile=")));
+        assert!(diagnostics.lines.iter().any(|line| line.contains("goal=")));
+    }
+}
+
+#[test]
 fn ai_only_live_room_time_speed_and_pause_control_tick_rate_without_seek() {
     let mut task = RoomTask::new(
         "ai-only-live-speed-control-test".to_string(),

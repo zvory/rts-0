@@ -1,5 +1,7 @@
 import { STATS, UPGRADES } from "./config.js";
 import { isUnit } from "./protocol.js";
+import { normalizeAiDiagnostics, renderAiDiagnosticsMetric } from "./observer_analysis_ai.js";
+import { playerAnalysisRows } from "./observer_analysis_rows.js";
 import { renderObserverAnalysisBody } from "./observer_analysis_signatures.js";
 import { resourceValueElement } from "./resource_icons.js";
 
@@ -10,6 +12,7 @@ const PRODUCTION_TAB_ID = "production";
 const UNITS_TAB_ID = "units";
 const UNITS_LOST_TAB_ID = "units-lost";
 const RESOURCES_LOST_TAB_ID = "resources-lost";
+const AI_DIAGNOSTICS_TAB_ID = "ai-diagnostics";
 
 export const OBSERVER_ANALYSIS_TABS = Object.freeze([
   { id: ARMY_VALUE_TAB_ID, label: "Army value" },
@@ -17,6 +20,7 @@ export const OBSERVER_ANALYSIS_TABS = Object.freeze([
   { id: "units", label: "Units" },
   { id: "units-lost", label: "Units lost" },
   { id: "resources-lost", label: "Resources lost" },
+  { id: "ai-diagnostics", label: "AI" },
 ]);
 
 export function shouldMountObserverAnalysisOverlay({ capabilities } = {}) {
@@ -257,6 +261,7 @@ export class ObserverAnalysisOverlay {
       || selected === UNITS_TAB_ID
       || selected === UNITS_LOST_TAB_ID
       || selected === RESOURCES_LOST_TAB_ID
+      || selected === AI_DIAGNOSTICS_TAB_ID
     ) {
       const tab = OBSERVER_ANALYSIS_TABS.find((item) => item.id === selected);
       this.renderBody(tab);
@@ -270,6 +275,7 @@ export class ObserverAnalysisOverlay {
       units: UNITS_TAB_ID,
       unitsLost: UNITS_LOST_TAB_ID,
       resourcesLost: RESOURCES_LOST_TAB_ID,
+      aiDiagnostics: AI_DIAGNOSTICS_TAB_ID,
       calculateViewportArmyValue,
     }, { profiler });
     profiler?.recordDiagnosticCounter?.(
@@ -498,6 +504,13 @@ export class ObserverAnalysisOverlay {
     return wrap;
   }
 
+  renderAiDiagnostics(analysis) {
+    return renderAiDiagnosticsMetric({
+      analysis,
+      rows: playerAnalysisRows({ analysis, players: this.getPlayers() }),
+    });
+  }
+
   renderAnalysisMetric(className, headingText) {
     const wrap = document.createElement("div");
     wrap.className = `replay-analysis-metric ${className}`;
@@ -573,6 +586,7 @@ function normalizeAnalysisPlayer(player) {
       steel: Math.max(0, Math.trunc(Number(player.resourcesLost?.steel) || 0)),
       oil: Math.max(0, Math.trunc(Number(player.resourcesLost?.oil) || 0)),
     },
+    aiDiagnostics: normalizeAiDiagnostics(player.aiDiagnostics),
   };
 }
 
@@ -596,35 +610,6 @@ function normalizeProductionRows(rows) {
     progress: clamp01(Number(row?.progress) || 0),
     queueDepth: Math.max(0, Math.trunc(Number(row?.queueDepth) || 0)),
   })).filter((row) => row.buildingKind && row.itemKind);
-}
-
-function playerAnalysisRows({ analysis, players }) {
-  const metadata = new Map();
-  for (const player of players || []) {
-    const id = Number(player?.id);
-    if (!Number.isFinite(id) || id <= 0) continue;
-    metadata.set(id, {
-      id,
-      name: player?.name || `Player ${id}`,
-      color: player?.color || "#e7dfc5",
-    });
-  }
-
-  const rows = [];
-  for (const player of analysis?.players || []) {
-    const meta = metadata.get(player.id) || {};
-    rows.push({
-      id: player.id,
-      name: meta.name || `Player ${player.id}`,
-      color: meta.color || "#e7dfc5",
-      units: player.units,
-      production: player.production,
-      unitsLost: player.unitsLost,
-      resourcesLost: player.resourcesLost,
-    });
-  }
-  rows.sort((a, b) => a.id - b.id);
-  return rows;
 }
 
 function renderEmptyMetric(text) {
