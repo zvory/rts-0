@@ -143,20 +143,19 @@ units that are excluded from outbound wave formation. AI 1.2 also targets a seco
 its bank is above 600 steel and 400 oil, while still using the normal build placement, prerequisite,
 pending-build, expansion-save, and defensive-panic gates.
 
-AI 2.0 is exposed as the `ai_2_0` suite rather than a single inspectable target. The promoted suite
-currently rotates between `ai_2_0_rifle_tank`, which keeps Rifleman pressure but waits for
-Tank-led mixed waves, and `ai_2_0_tank_pressure`, which pivots earlier into faster mixed
-Tank/Rifleman pressure. Both members expand off the shared two-base economy plan, reserve defensive
-Machine Gunners, unlock Factory production earlier than AI 1.2, and target a second Factory once the
+AI 2.0 is exposed as the `ai_2_0` suite rather than a single inspectable lobby target. The promoted
+suite is currently pinned to `ai_2_0_tank_pressure`, which pivots earlier into faster mixed
+Tank/Rifleman pressure. It expands off the shared two-base economy plan, reserves defensive Machine
+Gunners, unlocks Factory production earlier than AI 1.2, and targets a second Factory once the
 economy can support it. Exact concrete profile ids remain registered for arena pinning, replay
-debugging, and profile-manifest fingerprints. The retired `ai_2_0_agent_rush` profile remains
-rejected.
+debugging, and profile-manifest fingerprints. The retired `ai_2_0_agent_rush` and
+`ai_2_0_rifle_tank` profile ids remain rejected.
 
 The suite aliases `ai_2_0` and `ai20` resolve to the AI 2.0 suite request in live and arena-style
 tooling; `ai_1_2` and `ai12` resolve to the AI 1.2 suite request; `ai_1_1` and `ai11` resolve to
 the AI 1.1 suite request; `ai_1_0` and `ai1` resolve to the AI 1.0 suite request. Exact profile ids
-such as `ai_1_2_wave_cohorts`, `ai_2_0_rifle_tank`, or `ai_2_0_tank_pressure` pin one concrete
-member. `ai` and `default` resolve to the promoted live default request.
+such as `ai_1_2_wave_cohorts` or `ai_2_0_tank_pressure` pin one concrete member. `ai` and
+`default` resolve to the promoted live default request.
 The live lobby AI uses this shared core through `AiController`, which only owns live identity,
 profile id, cadence, persistent decision memory, and its latest bounded decision trace for
 spectator-only observer diagnostics. Unknown live profile ids resolve to the promoted live default,

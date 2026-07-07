@@ -89,10 +89,7 @@ fn selected_lobby_ai_profile_is_used_by_live_controller() {
     task.start_match();
 
     assert_eq!(task.ai_controllers.len(), 1);
-    assert!(matches!(
-        task.ai_controllers[0].profile_id(),
-        "ai_2_0_rifle_tank" | "ai_2_0_tank_pressure"
-    ));
+    assert_eq!(task.ai_controllers[0].profile_id(), "ai_2_0_tank_pressure");
 }
 
 #[test]
@@ -118,7 +115,7 @@ fn lobby_ai_names_follow_profile_labels_and_duplicate_counts() {
     task.on_set_ai_profile(host_id, first_ai_id, "ai_1_1_tank_mg".to_string());
     assert_eq!(ai_slot_names(&task), vec!["AI 1.1", "AI 1.2"]);
 
-    task.on_add_ai(host_id, Some(4), Some("ai_1_1_tank_mg".to_string()));
+    task.on_add_ai(host_id, Some(4), Some("ai_1_1".to_string()));
     assert_eq!(ai_slot_names(&task), vec!["AI 1.1 1", "AI 1.2", "AI 1.1 2"]);
 
     task.on_remove_ai(host_id, first_ai_id);

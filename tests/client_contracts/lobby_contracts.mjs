@@ -198,6 +198,63 @@ import { textWithin } from "./dom_text.mjs";
       { id: 2, profileId: "ai_1_2" },
       "AI profile selector emits profile changes",
     );
+
+    const aliasRoot = document.createElement("div");
+    const aliasView = new LobbyRosterView(aliasRoot);
+    aliasView.render({
+      players: [
+        {
+          id: 2,
+          name: "Computer",
+          color: "#d55e00",
+          ready: true,
+          teamId: 2,
+          isAi: true,
+          aiProfileId: "ai_2_0_tank_pressure",
+        },
+      ],
+      myId: 1,
+      hostId: 1,
+      isHost: true,
+      countdownActive: false,
+      playerCount: 1,
+      maxPlayers: 4,
+    });
+
+    const aliasSelect = findFakes(
+      aliasRoot,
+      (el) => el.tagName === "SELECT" && el.className === "player-ai-profile-select",
+    )[0];
+    assert(
+      aliasSelect.value === "ai_2_0",
+      "concrete AI 2.0 profile ids select their suite option",
+    );
+
+    const labelRoot = document.createElement("div");
+    const labelView = new LobbyRosterView(labelRoot);
+    labelView.render({
+      players: [
+        {
+          id: 2,
+          name: "Computer",
+          color: "#d55e00",
+          ready: true,
+          teamId: 2,
+          isAi: true,
+          aiProfileId: "ai_2_0_tank_pressure",
+        },
+      ],
+      myId: 3,
+      hostId: 1,
+      isHost: false,
+      countdownActive: false,
+      playerCount: 1,
+      maxPlayers: 4,
+    });
+    assert(
+      textWithin(labelRoot).includes("AI 2.0"),
+      "concrete AI 2.0 profile ids display their suite label",
+    );
   });
 }
 

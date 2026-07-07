@@ -562,7 +562,8 @@ impl RoomTask {
     pub(super) fn ai_slot_display_names(&self) -> Vec<String> {
         let mut profile_counts: HashMap<&'static str, usize> = HashMap::new();
         for ai in &self.ai_players {
-            *profile_counts.entry(ai.profile_request_id).or_default() += 1;
+            let label = rts_ai::live_profile_label(ai.profile_request_id);
+            *profile_counts.entry(label).or_default() += 1;
         }
 
         let mut profile_seen: HashMap<&'static str, usize> = HashMap::new();
@@ -570,13 +571,8 @@ impl RoomTask {
             .iter()
             .map(|ai| {
                 let label = rts_ai::live_profile_label(ai.profile_request_id);
-                if profile_counts
-                    .get(ai.profile_request_id)
-                    .copied()
-                    .unwrap_or(0)
-                    > 1
-                {
-                    let seen = profile_seen.entry(ai.profile_request_id).or_default();
+                if profile_counts.get(label).copied().unwrap_or(0) > 1 {
+                    let seen = profile_seen.entry(label).or_default();
                     *seen += 1;
                     format!("{label} {seen}")
                 } else {

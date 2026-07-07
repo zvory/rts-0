@@ -866,7 +866,7 @@ pub(crate) static AI_2_0_TANK_PRESSURE: AiProfile = AiProfile {
     },
     buildings: BuildingPolicy {
         barracks_curve: AI_1_1_TANK_MG.buildings.barracks_curve,
-        factory_target: 2,
+        factory_target: 1,
         proxy_barracks: None,
         required_tech_path: AI_1_1_TANK_MG.buildings.required_tech_path,
         max_pending_per_kind: AI_1_1_TANK_MG.buildings.max_pending_per_kind,
@@ -1029,7 +1029,7 @@ mod tests {
 
         assert_eq!(AI_2_0_TANK_PRESSURE.id, AI_2_0_TANK_PRESSURE_ID);
         assert_eq!(AI_2_0_TANK_PRESSURE.buildings.barracks_curve, AI_1_1_TANK_MG.buildings.barracks_curve);
-        assert_eq!(AI_2_0_TANK_PRESSURE.buildings.factory_target, 2);
+        assert_eq!(AI_2_0_TANK_PRESSURE.buildings.factory_target, 1);
         assert_eq!(
             AI_2_0_TANK_PRESSURE.extra_factories,
             Some(ExtraFactoryPolicy {
