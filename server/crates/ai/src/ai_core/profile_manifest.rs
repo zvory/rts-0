@@ -5,8 +5,7 @@ use serde::Serialize;
 #[cfg(test)]
 use super::profiles::required_profiles;
 use super::profiles::{
-    profile_by_id, profile_spec_by_id, AiProfile, AiProfileSpec, AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID,
-    AI_1_2_WAVE_COHORTS_ID,
+    profile_by_id, AiProfile, AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID, AI_1_2_WAVE_COHORTS_ID,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -29,10 +28,6 @@ pub(crate) struct AiOverlayIdentity {
 }
 
 pub(crate) fn profile_identity(profile: &AiProfile) -> AiProfileIdentity {
-    if let Some(spec) = profile_spec_by_id(profile.id) {
-        return identity_from_spec(profile, spec);
-    }
-
     let (label, summary, modules) = baseline_metadata(profile.id);
     let overlays = Vec::new();
     let base_profile_id = None;
@@ -82,37 +77,6 @@ pub(crate) fn validate_profile_identity(identity: &AiProfileIdentity) -> Result<
         }
     }
     Ok(())
-}
-
-fn identity_from_spec(profile: &AiProfile, spec: &'static AiProfileSpec) -> AiProfileIdentity {
-    let overlays = spec
-        .overlays
-        .iter()
-        .map(|overlay| AiOverlayIdentity {
-            id: overlay.id.to_string(),
-            summary: overlay.summary.to_string(),
-        })
-        .collect::<Vec<_>>();
-    AiProfileIdentity {
-        profile_id: spec.id.to_string(),
-        label: spec.label.to_string(),
-        base_profile_id: Some(spec.base_profile_id.to_string()),
-        summary: spec.summary.to_string(),
-        modules: spec
-            .modules
-            .iter()
-            .map(|module| module.to_string())
-            .collect(),
-        fingerprint: profile_fingerprint(
-            profile,
-            spec.label,
-            Some(spec.base_profile_id),
-            spec.summary,
-            spec.modules,
-            &overlays,
-        ),
-        overlays,
-    }
 }
 
 fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'static str>) {

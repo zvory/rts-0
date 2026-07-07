@@ -957,7 +957,7 @@ mod tests {
     use rts_sim::protocol::{EntityView, Event, Snapshot, SnapshotNetStatus};
 
     #[test]
-    fn highest_ai_version_is_default_while_ai_1_0_is_selectable() {
+    fn profile_aliases_resolve_only_supported_profiles() {
         assert_eq!(canonical_profile_id("ai"), Some(DEFAULT_LIVE_PROFILE_ID));
         assert_eq!(canonical_profile_id("ai1"), Some(AI_1_0_TECH_ID));
         assert_eq!(canonical_profile_id("ai_1_0"), Some(AI_1_0_TECH_ID));
@@ -981,7 +981,9 @@ mod tests {
         );
         assert_eq!(canonical_profile_id("ai_1_2"), Some(AI_1_2_WAVE_COHORTS_ID));
         assert_eq!(canonical_profile_id("ai12"), Some(AI_1_2_WAVE_COHORTS_ID));
-        assert_eq!(canonical_profile_id("retired_profile"), None);
+        assert_eq!(canonical_profile_id("ai_2_0"), None);
+        assert_eq!(canonical_profile_id("ai20"), None);
+        assert_eq!(canonical_profile_id("ai_2_0_agent_rush"), None);
         assert_eq!(canonical_profile_id("rifle_flood_full_saturation"), None);
         assert_eq!(canonical_profile_id("saturation"), None);
     }

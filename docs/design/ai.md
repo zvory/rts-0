@@ -58,11 +58,10 @@ combat target selection, and blockers such as waiting for units, waiting for a r
 waiting for Methamphetamines, and cadence. Final command emission still goes through
 `AiActionContext` and `ai_core::actions`.
 
-Profile experiments can be described as `AiProfileSpec`s: a stable profile id, a base profile, and
-a small ordered set of overlays or feature modules. The resolver validates every spec, produces the
-concrete `AiProfile`, and records a profile identity with base id, overlay ids, module names, and a
-fingerprint for arena artifacts. This keeps experimental variants inspectable without forking the
-whole decision tree or changing the live lobby contract.
+Arena tooling records profile identities for each registered profile: stable id, label, module
+names, and a fingerprint derived from the concrete `AiProfile`. The identity schema keeps
+base-profile and overlay fields for artifact compatibility, but the current supported profiles are
+registered directly rather than through a separate overlay resolver.
 
 The economy plan is backed by an AI-owned resource availability model derived only from the
 fog-filtered observation, public start-payload resource positions, completed own City Centres,

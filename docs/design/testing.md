@@ -82,13 +82,13 @@ cargo run --bin ai-matchup -- --list-profiles
 ```
 
 The `ai-arena` binary is the agent-facing profile comparison layer. It runs side-swapped seed pairs
-around the same profile matchup result, defaults to `ai_2_0_agent_rush` against the live default,
-and writes a top-level `arena-summary.json` plus per-run sidecars:
+around the same profile matchup result, defaults to `ai_1_2_wave_cohorts` against
+`ai_1_1_tank_mg`, and writes a top-level `arena-summary.json` plus per-run sidecars:
 
 ```bash
 cd server
-cargo run --bin ai-arena -- --candidate ai_2_0 --baseline ai --seeds 3 --ticks 9000
-cargo run --bin ai-arena -- --candidate ai_2_0_agent_rush --baseline ai_1_2 --out-dir target/ai2-arena
+cargo run --bin ai-arena -- --candidate ai_1_2 --baseline ai_1_1 --seeds 3 --ticks 9000
+cargo run --bin ai-arena -- --candidate ai_1_2_wave_cohorts --baseline ai_1_1_tank_mg --out-dir target/ai-arena
 ```
 
 Each run directory contains a deterministic `replay.json` plus `manifest.json`, `summary.json`,

@@ -44,41 +44,6 @@ pub(crate) struct AiProfile {
     pub(crate) tech_transition: Option<TechTransitionPolicy>,
 }
 
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct AiProfileSpec {
-    pub(crate) id: &'static str,
-    pub(crate) label: &'static str,
-    pub(crate) base_profile_id: &'static str,
-    pub(crate) base_profile: &'static AiProfile,
-    pub(crate) overlays: &'static [AiProfileOverlay],
-    pub(crate) modules: &'static [&'static str],
-    pub(crate) summary: &'static str,
-}
-
-impl AiProfileSpec {
-    pub(crate) fn resolve(self) -> AiProfile {
-        let mut profile = *self.base_profile;
-        profile.id = self.id;
-        for overlay in self.overlays {
-            overlay.apply(&mut profile);
-        }
-        profile
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct AiProfileOverlay {
-    pub(crate) id: &'static str,
-    pub(crate) summary: &'static str,
-    pub(crate) apply: fn(&mut AiProfile),
-}
-
-impl AiProfileOverlay {
-    fn apply(self, profile: &mut AiProfile) {
-        (self.apply)(profile);
-    }
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct WorkerPolicy {
     pub(crate) steel_saturation_fraction: Ratio,
@@ -877,10 +842,6 @@ pub(crate) static AI_1_2_WAVE_COHORTS: AiProfile = AiProfile {
     tech_transition: AI_1_1_TANK_MG.tech_transition,
 };
 
-pub(crate) fn profile_spec_by_id(_id: &str) -> Option<&'static AiProfileSpec> {
-    None
-}
-
 pub(crate) fn required_profiles() -> [&'static AiProfile; 3] {
     [&AI_1_0_TECH, &AI_1_1_TANK_MG, &AI_1_2_WAVE_COHORTS]
 }
@@ -952,9 +913,10 @@ mod tests {
     }
 
     #[test]
-    fn retired_profile_ids_are_not_registered() {
-        assert!(profile_by_id("retired_profile").is_none());
-        assert!(profile_spec_by_id("retired_profile").is_none());
+    fn retired_ai_2_0_profile_id_is_not_registered() {
+        assert!(profile_by_id("ai_2_0_agent_rush").is_none());
+        assert!(profile_by_id("ai_2_0").is_none());
+        assert!(profile_by_id("ai20").is_none());
     }
 
     #[test]

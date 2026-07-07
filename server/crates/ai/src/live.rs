@@ -358,7 +358,9 @@ mod tests {
             canonical_live_profile_id("ai_1_2"),
             Some(AI_1_2_WAVE_COHORTS_ID)
         );
-        assert_eq!(canonical_live_profile_id("retired_profile"), None);
+        assert_eq!(canonical_live_profile_id("ai_2_0"), None);
+        assert_eq!(canonical_live_profile_id("ai20"), None);
+        assert_eq!(canonical_live_profile_id("ai_2_0_agent_rush"), None);
         assert_eq!(canonical_live_profile_id("rifle_flood_fast"), None);
     }
 }
