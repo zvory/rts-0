@@ -56,10 +56,12 @@ const repoRoot = path.resolve(__dirname, "..");
 const rustProtocolPath = path.join(repoRoot, "server/crates/protocol/src/lib.rs");
 const rustProtocolLabReplayPath = path.join(repoRoot, "server/crates/protocol/src/lab_replay.rs");
 const rustProtocolLabScenarioPath = path.join(repoRoot, "server/crates/protocol/src/lab_scenario.rs");
+const rustProtocolObserverAnalysisPath = path.join(repoRoot, "server/crates/protocol/src/observer_analysis.rs");
 const rust = [
   fs.readFileSync(rustProtocolPath, "utf8"),
   fs.readFileSync(rustProtocolLabReplayPath, "utf8"),
   fs.readFileSync(rustProtocolLabScenarioPath, "utf8"),
+  fs.readFileSync(rustProtocolObserverAnalysisPath, "utf8"),
 ].join("\n");
 const rustClientNetReport = fs.readFileSync(
   path.join(repoRoot, "server/crates/protocol/src/client_net_report.rs"),
