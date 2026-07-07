@@ -14,7 +14,11 @@ const strip = RIFLEMAN_PNG_FRAME_STRIP;
 assert(runtime.module === "client/src/renderer/rigs/rifleman_png_strip.js", "Rifleman manifest points at the runtime strip module");
 assert(strip.unit === manifest.unit, "Rifleman strip unit matches the manifest unit");
 assert(strip.image === runtime.stripImageUrl, "Rifleman strip URL matches the manifest runtime URL");
-assert(strip.image.includes(`?v=${strip.imageVersion}`), "Rifleman strip URL carries the image version cache key");
+assert(strip.imageVersion === runtime.imageVersion, "Rifleman strip image version matches the manifest");
+assert(
+  assetUrlVersion(runtime.stripImageUrl) === runtime.imageVersion,
+  "Rifleman strip URL carries the manifest image version cache key",
+);
 assert(strip.frameWidth === runtime.frameWidth, "Rifleman strip frame width matches the manifest");
 assert(strip.frameHeight === runtime.frameHeight, "Rifleman strip frame height matches the manifest");
 assert(strip.frameCount === runtime.frameCount, "Rifleman strip frame count matches the manifest");
@@ -46,6 +50,10 @@ function repoPathFromClientAssetUrl(assetUrl) {
   const assetPath = assetUrl.split("?")[0];
   assert(assetPath.startsWith("/assets/"), "asset URL is served from /assets");
   return `client${assetPath}`;
+}
+
+function assetUrlVersion(assetUrl) {
+  return new URL(assetUrl, "http://rts.local").searchParams.get("v");
 }
 
 function readPngDimensions(repoRelativePath) {
