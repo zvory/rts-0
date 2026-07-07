@@ -504,6 +504,57 @@ import { textWithin } from "./dom_text.mjs";
       aiDiagnosticsBody.replaceChildrenCount === stableTraceRenderCount,
       "AI diagnostics panel skips DOM replacement for observer tick-only updates",
     );
+    aiDiagnosticsBody.scrollTop = 11;
+    aiDiagnosticsBody.scrollLeft = 3;
+    const scrolledTabs = root.querySelector(".ai-diagnostics-tabs");
+    const scrolledPlayer = root.querySelector(".ai-diagnostics-player");
+    scrolledTabs.scrollLeft = 19;
+    scrolledPlayer.scrollTop = 81;
+    scrolledPlayer.scrollLeft = 5;
+    const traceUpdateRenderCount = aiDiagnosticsBody.replaceChildrenCount;
+    panel.applyObserverAnalysis({
+      tick: 47,
+      players: [
+        {
+          id: 1,
+          units: [],
+          production: [],
+          aiDiagnostics: {
+            profileId: "ai_1_2_wave_cohorts",
+            traceTick: 37,
+            lines: [
+              "profile=ai_1_2_wave_cohorts tick=37",
+              "goal=Production status=Selected blockers=- intents=train:Rifleman",
+              "queue=Rifleman count=2",
+            ],
+          },
+        },
+        {
+          id: 2,
+          units: [],
+          production: [],
+          aiDiagnostics: {
+            profileId: "ai_2_pressure",
+            traceTick: 72,
+            lines: [
+              "goal=Harass status=Moving intents=attackMove",
+            ],
+          },
+        },
+      ],
+    });
+    assert(
+      aiDiagnosticsBody.replaceChildrenCount === traceUpdateRenderCount + 1,
+      "AI diagnostics panel replaces DOM when the selected trace changes",
+    );
+    assert(
+      aiDiagnosticsBody.scrollTop === 11
+        && aiDiagnosticsBody.scrollLeft === 3
+        && root.querySelector(".ai-diagnostics-tabs").scrollLeft === 19
+        && root.querySelector(".ai-diagnostics-player").scrollTop === 81
+        && root.querySelector(".ai-diagnostics-player").scrollLeft === 5,
+      "AI diagnostics panel preserves scroll offsets across selected trace updates",
+    );
 
     const panelRoot = root.children[0];
     const hide = root.querySelector(".ai-diagnostics-hide");

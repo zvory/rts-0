@@ -59,6 +59,7 @@ export class AiDiagnosticsPanel {
     this.showButton = null;
     this.windowChrome = null;
     this.bodySignature = "";
+    this.renderedPlayerId = null;
     this.onPanelClick = (ev) => this.handlePanelClick(ev);
     this.onTabKeydown = (ev) => this.handleTabKeydown(ev);
     this.onShowClick = (ev) => this.show(ev);
@@ -205,6 +206,9 @@ export class AiDiagnosticsPanel {
     const activeRow = activeAiRow(this.analysis, this.preferences.selectedPlayerId);
     const signature = aiDiagnosticsBodySignature(this.analysis, activeRow?.id);
     if (signature === this.bodySignature) return;
+    const previousPlayerId = this.renderedPlayerId;
+    const nextPlayerId = activeRow?.id ?? null;
+    const scrollState = snapshotAiDiagnosticsScroll(this.bodyEl, previousPlayerId);
     this.bodySignature = signature;
 
     const body = [this.renderStatus(this.analysis)];
@@ -222,6 +226,8 @@ export class AiDiagnosticsPanel {
     }
 
     this.bodyEl.replaceChildren(...body);
+    this.renderedPlayerId = nextPlayerId;
+    restoreAiDiagnosticsScroll(this.bodyEl, scrollState, nextPlayerId);
   }
 
   renderStatus(analysis) {
@@ -510,6 +516,38 @@ function aiDiagnosticsBodySignature(analysis, activePlayerId) {
       row.aiDiagnostics.lines.join("\n"),
     ].join(":")),
   ].join("|");
+}
+
+function snapshotAiDiagnosticsScroll(bodyEl, activePlayerId) {
+  if (!bodyEl) return null;
+  const playerEl = bodyEl.querySelector?.(".ai-diagnostics-player");
+  const tabsEl = bodyEl.querySelector?.(".ai-diagnostics-tabs");
+  return {
+    activePlayerId: normalizeSelectedPlayerId(activePlayerId),
+    bodyTop: scrollNumber(bodyEl.scrollTop),
+    bodyLeft: scrollNumber(bodyEl.scrollLeft),
+    playerTop: scrollNumber(playerEl?.scrollTop),
+    playerLeft: scrollNumber(playerEl?.scrollLeft),
+    tabsLeft: scrollNumber(tabsEl?.scrollLeft),
+  };
+}
+
+function restoreAiDiagnosticsScroll(bodyEl, scrollState, activePlayerId) {
+  if (!bodyEl || !scrollState) return;
+  if (scrollState.activePlayerId !== normalizeSelectedPlayerId(activePlayerId)) return;
+  bodyEl.scrollTop = scrollState.bodyTop;
+  bodyEl.scrollLeft = scrollState.bodyLeft;
+  const playerEl = bodyEl.querySelector?.(".ai-diagnostics-player");
+  if (playerEl) {
+    playerEl.scrollTop = scrollState.playerTop;
+    playerEl.scrollLeft = scrollState.playerLeft;
+  }
+  const tabsEl = bodyEl.querySelector?.(".ai-diagnostics-tabs");
+  if (tabsEl) tabsEl.scrollLeft = scrollState.tabsLeft;
+}
+
+function scrollNumber(value) {
+  return Math.max(0, Number(value) || 0);
 }
 
 function formatValue(value) {
