@@ -80,7 +80,7 @@ function runMatchFrame(match, now) {
     });
     time("match.hud", () => match.hud.update(frameViews, { profiler: match.frameProfiler }));
     time("match.minimap", () => match.minimap.render(frameViews, { profiler: match.frameProfiler }));
-    time("match.observerAnalysis", () => match.observerAnalysisOverlay?.update(frameViews, { profiler: match.frameProfiler }));
+    time("match.observerAnalysis", () => match.observerDiagnostics?.update(frameViews, { profiler: match.frameProfiler }));
     time("match.healthPublish", () => match.health.publish());
   } finally {
     const frameSummary = match.frameProfiler?.endFrame({ context: collectMatchFrameContext(match) });

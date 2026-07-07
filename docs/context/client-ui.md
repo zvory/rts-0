@@ -11,7 +11,7 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 
 ## Code map
 - `app-shell`: `main.js`, `app.js`, `match.js`, `match_*.js`, diagnostics, observer analysis,
-  room-time controls, replay/spectator/lab wiring, `lab_control_policy.js`, and
+  AI diagnostics, room-time controls, replay/spectator/lab wiring, `lab_control_policy.js`, and
   `room_capabilities.js`.
 - `model`: `state.js`, `state_ground_decals.js`, `client_intent.js`, `command_budget.js`,
   `command_composer.js`, `progress_extrapolator.js`, prediction adapters, display state.

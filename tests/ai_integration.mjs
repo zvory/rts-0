@@ -4,21 +4,20 @@
 //   - the room can start with only the human ready (AIs don't gate readiness)
 //   - removeAi unseats an AI
 //   - addAi is host-only (a non-host's addAi is ignored)
-//   - a 1-human + 1-AI match starts as a real 2-player match (distinct start tiles) and stays
-//     live (snapshots keep flowing) — the AI's actual build/attack behavior is verified
+//   - a 1-human + 1-AI match skips the countdown, starts as a real 2-player match
+//     (distinct start tiles), and stays live — the AI's actual build/attack behavior is verified
 //     deterministically by the Rust unit test `game::tests::ai_builds_economy_and_attacks`.
 //
 // Usage: start the server (`cd server && cargo run`), then `node tests/ai_integration.mjs`.
 // Override the endpoint with RTS_WS (default ws://127.0.0.1:8081/ws).
 import {
   addAi,
-  assertCountdownProtocol,
   closeClients,
   connectClient,
   createAssertions,
   removeAi,
   sleep,
-  startMatch,
+  startMatchDirect,
   uniqueRoom,
 } from "./team_harness.mjs";
 import { DEFAULT_FACTION_ID } from "../client/src/protocol.js";
@@ -98,8 +97,8 @@ const { ok } = assertions;
   await A.waitNext((m) => m.t === "lobby" && m.canStart, 3000, "canStart with just host ready");
   ok(true, "match can start with one human ready + one AI");
 
-  const { countdowns, starts } = await startMatch(A, [A]);
-  assertCountdownProtocol(ok, countdowns[0]);
+  const starts = await startMatchDirect(A, [A]);
+  ok(!A.msgs.some((m) => m.t === "matchCountdown"), "1-human + AI start skips match countdown");
   const [start] = starts;
   ok(start.players.length === 2, `start lists 2 players (human + AI) (${start.players.length})`);
   ok(start.players.every((p) => p.factionId === DEFAULT_FACTION_ID), `start players carry ${DEFAULT_FACTION_ID}`);

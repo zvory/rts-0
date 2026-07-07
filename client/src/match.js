@@ -16,7 +16,7 @@ import { PredictionController } from "./prediction_controller.js";
 import { Renderer } from "./renderer/index.js";
 import { ARTILLERY_RIG_SVG } from "./renderer/rigs/support_svg.js";
 import { LivePauseOverlay } from "./live_pause_overlay.js";
-import { ObserverAnalysisOverlay, shouldMountObserverAnalysisOverlay } from "./observer_analysis_overlay.js";
+import { MatchObserverDiagnostics } from "./match_observer_diagnostics.js";
 import { ReplayCameraInput } from "./replay_camera_input.js";
 import { RoomTimeControls } from "./replay_controls.js";
 import { createRoomCapabilities } from "./room_capabilities.js";
@@ -116,10 +116,9 @@ export class Match {
     this.labToolBoxSelectionHandler = null;
     this.replayViewer = !!options.replayViewer;
     this.capabilities = options.capabilities || createRoomCapabilities({ startPayload: payload });
-    this.observerAnalysisOverlayPreferences = options.observerAnalysisOverlayPreferences || null;
     this.predictionStateMismatchLogged = false;
     this.roomTimeControls = null;
-    this.observerAnalysisOverlay = null;
+    this.observerDiagnostics = null;
     this.livePauseOverlay = null;
     this.livePauseState = {
       paused: false,
@@ -312,7 +311,7 @@ export class Match {
     this.onCommandReceipt = (m) => this.handleCommandReceipt(m);
     this.onRoomTimeState = (m) => this.applyRoomTimeState(m);
     this.onLivePauseState = (m) => this.applyLivePauseState(m);
-    this.onObserverAnalysis = (m) => this.observerAnalysisOverlay?.applyObserverAnalysis(m);
+    this.onObserverAnalysis = (m) => this.observerDiagnostics?.applyObserverAnalysis(m);
     this.onResize = this.handleResize.bind(this);
     this.onMenuKeyDown = this.handleMenuKeyDown.bind(this);
     this.onGiveUpOpen = this.openGiveUpConfirm.bind(this);
@@ -359,15 +358,15 @@ export class Match {
         capabilities: this.capabilities,
       });
     }
-    if (shouldMountObserverAnalysisOverlay({ capabilities: this.capabilities })) {
-      this.observerAnalysisOverlay = new ObserverAnalysisOverlay({
-        root: dom.gameScreen,
-        preferences: this.observerAnalysisOverlayPreferences || undefined,
-        getEntities: () => this.state.entitiesInterpolated(1, { includePrediction: false }),
-        getCameraBounds: () => this.cameraWorldBounds(),
-        getPlayers: () => this.state.players,
-      });
-    }
+    this.observerDiagnostics = new MatchObserverDiagnostics({
+      root: dom.gameScreen,
+      capabilities: this.capabilities,
+      observerAnalysisOverlayPreferences: options.observerAnalysisOverlayPreferences || null,
+      aiDiagnosticsPanelPreferences: options.aiDiagnosticsPanelPreferences || null,
+      getEntities: () => this.state.entitiesInterpolated(1, { includePrediction: false }),
+      getCameraBounds: () => this.cameraWorldBounds(),
+      getPlayers: () => this.state.players,
+    });
     if (this.capabilities.matchControls?.pause) {
       this.livePauseOverlay = new LivePauseOverlay({
         root: dom.gameScreen,
@@ -1219,7 +1218,7 @@ export class Match {
     this.net.off(S.OBSERVER_ANALYSIS, this.onObserverAnalysis);
     window.removeEventListener("keydown", this.onMenuKeyDown, true);
     this.roomTimeControls?.destroy();
-    this.observerAnalysisOverlay?.destroy();
+    this.observerDiagnostics?.destroy();
     this.livePauseOverlay?.destroy();
     this.cancelLabTool("freeze");
     this.predictionInitToken += 1;
@@ -1228,7 +1227,7 @@ export class Match {
       delete window.__rtsPerf;
     }
     this.roomTimeControls = null;
-    this.observerAnalysisOverlay = null;
+    this.observerDiagnostics = null;
     this.livePauseOverlay = null;
     if (this.input && typeof this.input.destroy === "function") {
       this.input.destroy();
@@ -1264,13 +1263,13 @@ export class Match {
       dom.giveUpConfirmButton?.removeEventListener("click", this.onGiveUpConfirm);
     }
     this.roomTimeControls?.destroy();
-    this.observerAnalysisOverlay?.destroy();
+    this.observerDiagnostics?.destroy();
     this.livePauseOverlay?.destroy();
     this.cancelLabTool("destroy");
     this.predictionInitToken += 1;
     this.predictionAdapter?.destroy();
     this.roomTimeControls = null;
-    this.observerAnalysisOverlay = null;
+    this.observerDiagnostics = null;
     this.livePauseOverlay = null;
     if (dom.selectionArea) dom.selectionArea.hidden = false;
     if (dom.commandCard) dom.commandCard.hidden = false;

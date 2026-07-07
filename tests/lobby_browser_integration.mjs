@@ -407,13 +407,8 @@ async function main() {
   await addAi(Host);
   await readyPlayers([Host]);
   Host.send({ t: "start" });
-  await Host.waitFor((msg) => msg.t === "matchCountdown", 3000, "browser countdown start");
-  await waitForLobbyRow(
-    lifecycleRoom,
-    (row) => row.joinState === "starting" && row.occupiedSlots === 2,
-    "countdown row is starting",
-  );
   await Host.waitFor((msg) => msg.t === "start", 6000, "browser lifecycle match start");
+  ok(!Host.msgs.some((msg) => msg.t === "matchCountdown"), "browser AI-assisted start skips countdown");
   const inGameRow = await waitForLobbyRow(
     lifecycleRoom,
     (row) => row.joinState === "inGame" && row.map === "No Terrain",
