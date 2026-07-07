@@ -849,7 +849,7 @@ impl RoomTask {
     }
 
     fn should_skip_match_countdown(&self) -> bool {
-        !self.session_policy().countdown_eligible || self.total_player_count() <= 1
+        !self.session_policy().countdown_eligible || self.active_human_count() <= 1
     }
 
     /// Build and broadcast the current `lobby` message to everyone in the room.
