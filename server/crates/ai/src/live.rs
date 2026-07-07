@@ -13,10 +13,9 @@ use crate::ai_core::profile_suites::{
     AI_1_2_SUITE_ID, AI_2_0_SUITE_ID,
 };
 use crate::ai_core::profiles::{
-    profile_by_id, AiProfile, AI_1_0_TECH, AI_1_2_WAVE_COHORTS_ID,
+    profile_by_id, AiProfile, AI_1_0_TECH, AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID,
+    AI_1_2_WAVE_COHORTS_ID, AI_2_0_RIFLE_TANK_ID, AI_2_0_TANK_PRESSURE_ID,
 };
-#[cfg(test)]
-use crate::ai_core::profiles::{AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID};
 use crate::ai_shared;
 use crate::selfplay::pending_build::PendingBuildTracker;
 use crate::selfplay::player_view::{
@@ -48,6 +47,18 @@ pub fn canonical_live_profile_id(input: &str) -> Option<&'static str> {
     match input {
         "ai" | "default" => Some(DEFAULT_LIVE_PROFILE_REQUEST_ID),
         value => canonical_profile_request_id(value),
+    }
+}
+
+pub fn live_profile_label(profile_id: &str) -> &'static str {
+    match canonical_live_profile_id(profile_id) {
+        Some(AI_1_0_SUITE_ID) | Some(AI_1_0_TECH_ID) => "AI 1.0",
+        Some(AI_1_1_SUITE_ID) | Some(AI_1_1_TANK_MG_ID) => "AI 1.1",
+        Some(AI_1_2_SUITE_ID) | Some(AI_1_2_WAVE_COHORTS_ID) => "AI 1.2",
+        Some(AI_2_0_SUITE_ID) | Some(AI_2_0_RIFLE_TANK_ID) | Some(AI_2_0_TANK_PRESSURE_ID) => {
+            "AI 2.0"
+        }
+        _ => "AI",
     }
 }
 
@@ -418,5 +429,16 @@ mod tests {
             resolve_live_profile_id_for_match(AI_2_0_SUITE_ID, 8, 2),
             "ai_2_0_rifle_tank" | "ai_2_0_tank_pressure"
         ));
+    }
+
+    #[test]
+    fn live_profile_labels_match_lobby_selector_names() {
+        assert_eq!(live_profile_label(AI_1_0_TECH_ID), "AI 1.0");
+        assert_eq!(live_profile_label(AI_1_1_TANK_MG_ID), "AI 1.1");
+        assert_eq!(live_profile_label(AI_1_2_WAVE_COHORTS_ID), "AI 1.2");
+        assert_eq!(live_profile_label(AI_2_0_SUITE_ID), "AI 2.0");
+        assert_eq!(live_profile_label(AI_2_0_RIFLE_TANK_ID), "AI 2.0");
+        assert_eq!(live_profile_label("default"), "AI 1.2");
+        assert_eq!(live_profile_label("unknown"), "AI");
     }
 }

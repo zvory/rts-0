@@ -434,12 +434,13 @@ impl RoomTask {
             .collect();
         // Seat AI opponents after the humans so colors match the lobby list and authored start
         // sites are assigned in the same order the lobby displays players.
-        for (seat, ai) in self.ai_players.iter().enumerate() {
+        let ai_names = self.ai_slot_display_names();
+        for ((seat, ai), name) in self.ai_players.iter().enumerate().zip(ai_names) {
             inits.push(PlayerInit {
                 id: ai.id,
                 team_id: ai.team_id,
                 faction_id: ai.faction_id.clone(),
-                name: ai.name.clone(),
+                name,
                 color: self.ai_color(seat),
                 is_ai: true,
             });

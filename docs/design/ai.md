@@ -9,6 +9,8 @@ as explicit lab presets or scenarios. They are capped with humans at
 AI players are seated after the humans in the lobby player list; their colors come
 from the tail of `PLAYER_PALETTE` so they never collide with human colors. They persist across rematches and are cleared only when the room
 empties of humans.
+Their display names use the selected live profile label (`AI 1.0`, `AI 1.1`, `AI 1.2`);
+multiple seats on the same profile receive deterministic numeric suffixes in lobby order.
 
 **Where it runs.** `rts-ai` owns one `AiController` per AI player, while `Game` remains AI-free.
 The room task invokes controllers before `game.tick()`, gives each controller the same
