@@ -34,11 +34,10 @@ pub(in crate::lobby) struct PendingClientCommandAck {
     pub(in crate::lobby) accepted_at: StdInstant,
 }
 
-/// A computer opponent seated in a room. Has an id (for the lobby list / removal) and a name, but
-/// no socket - it is materialized into an AI-driven player only when the match starts.
+/// A computer opponent seated in a room. Has an id for the lobby list / removal, but no socket -
+/// it is materialized into an AI-driven player only when the match starts.
 pub(super) struct AiSlot {
     pub(super) id: u32,
-    pub(super) name: String,
     pub(super) team_id: TeamId,
     pub(super) faction_id: String,
     pub(super) profile_id: &'static str,

@@ -158,7 +158,7 @@ import { textWithin } from "./dom_text.mjs";
         { id: 1, name: "Host", color: "#0072b2", ready: false, teamId: 1 },
         {
           id: 2,
-          name: "Computer 1",
+          name: "AI 1.1",
           color: "#d55e00",
           ready: true,
           teamId: 2,
