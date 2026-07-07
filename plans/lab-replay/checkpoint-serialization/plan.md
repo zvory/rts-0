@@ -3,7 +3,7 @@
 > [!WARNING]
 > **POTENTIALLY STALE SUBDIVISION - DO NOT IMPLEMENT YET.**
 > This lab-replay subdivision depends on assumptions that may change when
-> `plans/game-state/plan.md` lands. Re-evaluate this subplan and its phase files before
+> `plans/archive/game-state/plan.md` lands. Re-evaluate this subplan and its phase files before
 > implementation.
 
 ## Purpose

@@ -37,11 +37,11 @@ catch drift and package the completed feature clearly.
 
 - Review and align product/design docs:
   - [plans/panzerfaust/checklist.md](checklist.md).
-  - [docs/design/balance.md](../../docs/design/balance.md).
-  - [docs/design/protocol.md](../../docs/design/protocol.md).
-  - [docs/design/server-sim.md](../../docs/design/server-sim.md).
-  - [docs/design/client-ui.md](../../docs/design/client-ui.md).
-  - [docs/design/testing.md](../../docs/design/testing.md) if dev scenarios or test policy changed.
+  - [docs/design/balance.md](../../../docs/design/balance.md).
+  - [docs/design/protocol.md](../../../docs/design/protocol.md).
+  - [docs/design/server-sim.md](../../../docs/design/server-sim.md).
+  - [docs/design/client-ui.md](../../../docs/design/client-ui.md).
+  - [docs/design/testing.md](../../../docs/design/testing.md) if dev scenarios or test policy changed.
 - Verify generated and mirrored data surfaces:
   - Faction catalog exports.
   - Client config mirrors.

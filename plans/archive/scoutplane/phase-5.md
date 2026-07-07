@@ -25,7 +25,7 @@ does not offer unsupported commands.
 
 ## Scope
 
-- Read [docs/context/client-ui.md](../../docs/context/client-ui.md) before changing rendering, HUD,
+- Read [docs/context/client-ui.md](../../../docs/context/client-ui.md) before changing rendering, HUD,
   input, match modules, hotkeys, lab, or teardown behavior.
 - Parse all Scout Plane snapshot fields, command vocabulary, and public state added by Phases 2-4.
 - Add selection and control behavior for active friendly planes:

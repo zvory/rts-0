@@ -13,7 +13,7 @@ ignore collision without being exposed to normal players.
 
 ## Scope
 
-- Read [docs/context/server-sim.md](../../docs/context/server-sim.md) before changing sim state,
+- Read [docs/context/server-sim.md](../../../docs/context/server-sim.md) before changing sim state,
   services, orders, production, checkpoint, replay, or dev scenario behavior.
 - Add durable Scout Plane runtime state under the appropriate `GameState`/entity owner:
   - launch state or active orbit state as needed.

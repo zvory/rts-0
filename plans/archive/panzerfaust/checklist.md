@@ -4,10 +4,10 @@ Status: Phase 0 brief and Phase 1 rules/balance spec drafted with user-reviewed 
 Phases 2-8 have implemented hidden vocabulary, runtime/client inspection, normal Barracks
 production exposure, first-pass launch/impact audio feedback, final focused regression/dev
 inspection coverage, and the final review package.
-This file follows [docs/new-unit-checklist.md](../../docs/new-unit-checklist.md).
+This file follows [docs/new-unit-checklist.md](../../../docs/new-unit-checklist.md).
 
-Read: [docs/context/balance.md](../../docs/context/balance.md),
-[docs/design/balance.md](../../docs/design/balance.md).
+Read: [docs/context/balance.md](../../../docs/context/balance.md),
+[docs/design/balance.md](../../../docs/design/balance.md).
 
 ## Review Questions
 
