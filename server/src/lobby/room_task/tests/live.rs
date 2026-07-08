@@ -541,13 +541,15 @@ fn ai_only_live_spectator_observer_analysis_includes_ai_decision_diagnostics() {
         .map_analysis
         .as_ref()
         .expect("AI-only spectator analysis should include cached static map analysis");
-    assert!(
-        map_analysis
-            .layers
-            .iter()
-            .any(|layer| layer.id == "components" && !layer.primitives.is_empty()),
-        "map-analysis diagnostics should expose component primitives"
-    );
+    for expected_layer_id in ["regions", "chokes"] {
+        assert!(
+            map_analysis
+                .layers
+                .iter()
+                .any(|layer| layer.id == expected_layer_id && !layer.primitives.is_empty()),
+            "map-analysis diagnostics should expose {expected_layer_id} primitives"
+        );
+    }
     let ai_rows: Vec<_> = analysis
         .players
         .iter()
