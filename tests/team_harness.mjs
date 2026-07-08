@@ -4,6 +4,17 @@ export const URL = process.env.RTS_WS || "ws://127.0.0.1:8081/ws";
 
 export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const timeoutScaleRaw = process.env.RTS_TEST_TIMEOUT_SCALE
+  ?? (process.env.CI || process.env.GITHUB_ACTIONS ? "3" : "1");
+const timeoutScaleParsed = Number(timeoutScaleRaw);
+const TIMEOUT_SCALE = Number.isFinite(timeoutScaleParsed) && timeoutScaleParsed > 0
+  ? timeoutScaleParsed
+  : 1;
+
+function scaledTimeoutMs(timeoutMs) {
+  return Math.ceil(timeoutMs * TIMEOUT_SCALE);
+}
+
 export function uniqueRoom(prefix = "itest") {
   return `${prefix}-${Math.floor(performance.now())}-${Math.floor(Math.random() * 1_000_000)}`;
 }
@@ -79,9 +90,10 @@ export class Client {
 
   waitNext(test, timeoutMs = 5000, label = "message") {
     return new Promise((resolve, reject) => {
+      const effectiveTimeoutMs = scaledTimeoutMs(timeoutMs);
       const timeout = setTimeout(
         () => reject(new Error(`[${this.tag}] timeout waiting for ${label}`)),
-        timeoutMs,
+        effectiveTimeoutMs,
       );
       this.waiters.push({
         test,
