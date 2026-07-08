@@ -32,6 +32,81 @@ pub(super) struct OverlayTileRect {
     pub(super) tile_h: u32,
 }
 
+const GAMEPLAY_CHOKE_TARGET_COUNT: usize = 12;
+const GAMEPLAY_BROAD_CHOKE_COUNT: usize = 4;
+const GAMEPLAY_BASIN_CLEARANCE_TILES: u16 = 10;
+const GAMEPLAY_SADDLE_MIN_CLEARANCE_TILES: u16 = 4;
+const GAMEPLAY_BASIN_RADIUS_TILES: u32 = 10;
+const GAMEPLAY_BROAD_MIN_TILES: usize = 32;
+const GAMEPLAY_BROAD_MAX_TILES: usize = 700;
+const GAMEPLAY_GAP_MIN_TILES: u32 = 4;
+const GAMEPLAY_GAP_MAX_TILES: u32 = 24;
+const GAMEPLAY_CUT_MIN_SPACING_TILES: u32 = 8;
+const GAMEPLAY_LOCAL_CUT_PADDING_TILES: u32 = 14;
+const GAMEPLAY_LOCAL_CUT_MIN_SIDE_TILES: usize = 24;
+const GAMEPLAY_MIN_CUT_PADDING_TILES: u32 = 16;
+const GAMEPLAY_MIN_CUT_PROTECTED_CLEARANCE_TILES: u16 = 10;
+const GAMEPLAY_MIN_CUT_MAX_TILES: usize = 96;
+const GAMEPLAY_FLOW_INF: i32 = 1_000_000;
+
+#[derive(Clone, Debug)]
+struct ChokeCandidate {
+    center: AiTile,
+    bounds: AiTileBounds,
+    tiles: Vec<AiTile>,
+    score: i32,
+    basin_pair: Option<(u32, u32)>,
+}
+
+struct ChokeBuildContext<'a> {
+    width: u32,
+    height: u32,
+    passable: &'a [bool],
+    clearance: &'a [u16],
+    region_by_tile: &'a [Option<u32>],
+    regions: &'a [AiMapRegion],
+}
+
+#[derive(Clone, Copy, Debug)]
+struct LinearCutDirection {
+    dx: i32,
+    dy: i32,
+    normal_x: i32,
+    normal_y: i32,
+    thicken_diagonal: bool,
+}
+
+const LINEAR_CUT_DIRECTIONS: [LinearCutDirection; 4] = [
+    LinearCutDirection {
+        dx: 1,
+        dy: 0,
+        normal_x: 0,
+        normal_y: 1,
+        thicken_diagonal: false,
+    },
+    LinearCutDirection {
+        dx: 0,
+        dy: 1,
+        normal_x: 1,
+        normal_y: 0,
+        thicken_diagonal: false,
+    },
+    LinearCutDirection {
+        dx: 1,
+        dy: 1,
+        normal_x: -1,
+        normal_y: 1,
+        thicken_diagonal: true,
+    },
+    LinearCutDirection {
+        dx: 1,
+        dy: -1,
+        normal_x: 1,
+        normal_y: 1,
+        thicken_diagonal: true,
+    },
+];
+
 pub(super) fn build_regions(
     width: u32,
     height: u32,
@@ -196,6 +271,22 @@ pub(super) fn build_chokes(
     region_by_tile: &[Option<u32>],
     regions: &[AiMapRegion],
 ) -> Vec<AiMapChoke> {
+    let gameplay_chokes =
+        build_gameplay_chokes(width, height, passable, clearance, region_by_tile, regions);
+    if gameplay_chokes.len() >= GAMEPLAY_CHOKE_TARGET_COUNT {
+        return gameplay_chokes;
+    }
+    build_region_band_chokes(width, height, passable, clearance, region_by_tile, regions)
+}
+
+fn build_region_band_chokes(
+    width: u32,
+    height: u32,
+    passable: &[bool],
+    clearance: &[u16],
+    region_by_tile: &[Option<u32>],
+    regions: &[AiMapRegion],
+) -> Vec<AiMapChoke> {
     if regions.len() < 2 {
         return Vec::new();
     }
@@ -254,6 +345,1007 @@ pub(super) fn build_chokes(
     }
 
     chokes
+}
+
+fn build_gameplay_chokes(
+    width: u32,
+    height: u32,
+    passable: &[bool],
+    clearance: &[u16],
+    region_by_tile: &[Option<u32>],
+    regions: &[AiMapRegion],
+) -> Vec<AiMapChoke> {
+    if regions.len() < 2 {
+        return Vec::new();
+    }
+    let candidates = build_linear_graph_cut_candidates(width, height, passable, clearance);
+    if candidates.len() < GAMEPLAY_CHOKE_TARGET_COUNT {
+        return Vec::new();
+    }
+
+    let context = ChokeBuildContext {
+        width,
+        height,
+        passable,
+        clearance,
+        region_by_tile,
+        regions,
+    };
+    let mut chokes = Vec::new();
+    for candidate in candidates.iter().take(GAMEPLAY_CHOKE_TARGET_COUNT) {
+        let Some(choke) = choke_from_candidate(&context, candidate, chokes.len() as u32) else {
+            continue;
+        };
+        chokes.push(choke);
+    }
+    if chokes.len() >= GAMEPLAY_CHOKE_TARGET_COUNT {
+        chokes
+    } else {
+        Vec::new()
+    }
+}
+
+fn build_linear_graph_cut_candidates(
+    width: u32,
+    height: u32,
+    passable: &[bool],
+    clearance: &[u16],
+) -> Vec<ChokeCandidate> {
+    let broad_seeds = build_broad_saddle_candidates(width, height, passable, clearance);
+    if broad_seeds.len() < GAMEPLAY_BROAD_CHOKE_COUNT {
+        return Vec::new();
+    }
+
+    let mut candidates =
+        saddle_min_cut_candidates(width, height, passable, clearance, &broad_seeds);
+    candidates.extend(direct_linear_cut_candidates(
+        width, height, passable, clearance,
+    ));
+    non_max_choke_candidates(
+        candidates,
+        GAMEPLAY_CHOKE_TARGET_COUNT,
+        GAMEPLAY_CUT_MIN_SPACING_TILES,
+    )
+}
+
+fn build_broad_saddle_candidates(
+    width: u32,
+    height: u32,
+    passable: &[bool],
+    clearance: &[u16],
+) -> Vec<ChokeCandidate> {
+    let basins = high_clearance_components(
+        width,
+        height,
+        passable,
+        clearance,
+        GAMEPLAY_BASIN_CLEARANCE_TILES,
+    );
+    if basins.len() < 2 {
+        return Vec::new();
+    }
+    let nearest = nearest_basin_distances(
+        width,
+        height,
+        passable,
+        &basins,
+        GAMEPLAY_BASIN_RADIUS_TILES,
+    );
+    let mut by_pair: BTreeMap<(u32, u32), BTreeSet<AiTile>> = BTreeMap::new();
+    for y in 0..height {
+        for x in 0..width {
+            let Some(idx) = tile_index(width, height, x, y) else {
+                continue;
+            };
+            if passable.get(idx).copied() != Some(true) {
+                continue;
+            }
+            let tile_clearance = clearance.get(idx).copied().unwrap_or(0);
+            if !(GAMEPLAY_SADDLE_MIN_CLEARANCE_TILES..GAMEPLAY_BASIN_CLEARANCE_TILES)
+                .contains(&tile_clearance)
+            {
+                continue;
+            }
+            let Some(entries) = nearest.get(idx) else {
+                continue;
+            };
+            if entries.len() < 2 {
+                continue;
+            }
+            let pair = ordered_pair(entries[0].region_id, entries[1].region_id);
+            by_pair.entry(pair).or_default().insert(AiTile::new(x, y));
+        }
+    }
+
+    let mut candidates = Vec::new();
+    for (&pair, tiles) in &by_pair {
+        for group in connected_tile_groups_8(width, height, tiles) {
+            if group.len() < GAMEPLAY_BROAD_MIN_TILES || group.len() > GAMEPLAY_BROAD_MAX_TILES {
+                continue;
+            }
+            let score = group.len() as i32;
+            if let Some(mut candidate) = candidate_from_tiles(group, score) {
+                candidate.basin_pair = Some(pair);
+                candidates.push(candidate);
+            }
+        }
+    }
+    non_max_choke_candidates(candidates, GAMEPLAY_BROAD_CHOKE_COUNT, 18)
+}
+
+fn saddle_min_cut_candidates(
+    width: u32,
+    height: u32,
+    passable: &[bool],
+    clearance: &[u16],
+    broad_seeds: &[ChokeCandidate],
+) -> Vec<ChokeCandidate> {
+    let basins = high_clearance_components(
+        width,
+        height,
+        passable,
+        clearance,
+        GAMEPLAY_BASIN_CLEARANCE_TILES,
+    );
+    let mut candidates = Vec::new();
+    for seed in broad_seeds {
+        let Some((basin_a_id, basin_b_id)) = seed.basin_pair else {
+            continue;
+        };
+        let Some(basin_a) = basins.get(basin_a_id as usize) else {
+            continue;
+        };
+        let Some(basin_b) = basins.get(basin_b_id as usize) else {
+            continue;
+        };
+        let bounds = expanded_bounds(width, height, seed.bounds, GAMEPLAY_MIN_CUT_PADDING_TILES);
+        let cut_tiles = local_min_vertex_cut(width, height, passable, clearance, bounds, basin_a, basin_b);
+        if cut_tiles.len() < GAMEPLAY_GAP_MIN_TILES as usize
+            || cut_tiles.len() > GAMEPLAY_MIN_CUT_MAX_TILES
+        {
+            continue;
+        }
+        let score = 2_500_i32
+            .saturating_add((100_i32.saturating_sub(cut_tiles.len() as i32)).saturating_mul(6))
+            .saturating_add(linearity_score(&cut_tiles));
+        if let Some(mut candidate) = candidate_from_tiles(cut_tiles, score) {
+            candidate.basin_pair = seed.basin_pair;
+            candidates.push(candidate);
+        }
+    }
+    candidates
+}
+
+fn direct_linear_cut_candidates(
+    width: u32,
+    height: u32,
+    passable: &[bool],
+    clearance: &[u16],
+) -> Vec<ChokeCandidate> {
+    let mut candidates = Vec::new();
+    for direction in LINEAR_CUT_DIRECTIONS {
+        for start in linear_cut_starts(width, height, direction) {
+            let line = linear_cut_line(width, height, start, direction);
+            let mut cursor = 0_usize;
+            while cursor < line.len() {
+                let tile = line[cursor];
+                if !passable_at_tile(width, height, passable, tile.x as i32, tile.y as i32) {
+                    cursor = cursor.saturating_add(1);
+                    continue;
+                }
+                let run_start = cursor;
+                while cursor < line.len() {
+                    let tile = line[cursor];
+                    if !passable_at_tile(width, height, passable, tile.x as i32, tile.y as i32) {
+                        break;
+                    }
+                    cursor = cursor.saturating_add(1);
+                }
+                let run_end = cursor.saturating_sub(1);
+                let run_len = run_end.saturating_sub(run_start).saturating_add(1);
+                if run_len < GAMEPLAY_GAP_MIN_TILES as usize
+                    || run_len > GAMEPLAY_GAP_MAX_TILES as usize
+                {
+                    continue;
+                }
+                if line
+                    .get(run_start.saturating_sub(1))
+                    .filter(|_| run_start > 0)
+                    .is_some_and(|tile| {
+                        passable_at_tile(width, height, passable, tile.x as i32, tile.y as i32)
+                    })
+                {
+                    continue;
+                }
+                if line.get(run_end.saturating_add(1)).is_some_and(|tile| {
+                    passable_at_tile(width, height, passable, tile.x as i32, tile.y as i32)
+                }) {
+                    continue;
+                }
+
+                let cut_tiles = thicken_linear_cut(
+                    width,
+                    height,
+                    passable,
+                    &line[run_start..=run_end],
+                    direction,
+                );
+                let Some(split_score) = local_cut_split_score(
+                    width,
+                    height,
+                    passable,
+                    &cut_tiles,
+                    (direction.normal_x, direction.normal_y),
+                ) else {
+                    continue;
+                };
+                let Some(mut candidate) = candidate_from_tiles(cut_tiles, 0) else {
+                    continue;
+                };
+                if candidate_touches_map_edge(width, height, &candidate) {
+                    continue;
+                }
+                let length_score = (28_usize.saturating_sub(run_len) as i32).saturating_mul(8);
+                let clearance_score =
+                    low_clearance_score(width, height, clearance, &candidate.tiles);
+                candidate.score = split_score
+                    .saturating_add(length_score)
+                    .saturating_add(clearance_score)
+                    .saturating_add(direct_cut_score(width, height, &candidate));
+                candidates.push(candidate);
+            }
+        }
+    }
+    candidates
+}
+
+fn linear_cut_starts(
+    width: u32,
+    height: u32,
+    direction: LinearCutDirection,
+) -> Vec<AiTile> {
+    if width == 0 || height == 0 {
+        return Vec::new();
+    }
+    if direction.dx == 1 && direction.dy == 0 {
+        return (0..height).map(|y| AiTile::new(0, y)).collect();
+    }
+    if direction.dx == 0 && direction.dy == 1 {
+        return (0..width).map(|x| AiTile::new(x, 0)).collect();
+    }
+    if direction.dx == 1 && direction.dy == 1 {
+        let mut starts: Vec<_> = (0..width).map(|x| AiTile::new(x, 0)).collect();
+        starts.extend((1..height).map(|y| AiTile::new(0, y)));
+        return starts;
+    }
+    let mut starts: Vec<_> = (0..width)
+        .map(|x| AiTile::new(x, height.saturating_sub(1)))
+        .collect();
+    starts.extend((0..height.saturating_sub(1)).rev().map(|y| AiTile::new(0, y)));
+    starts
+}
+
+fn linear_cut_line(
+    width: u32,
+    height: u32,
+    start: AiTile,
+    direction: LinearCutDirection,
+) -> Vec<AiTile> {
+    let mut out = Vec::new();
+    let mut x = start.x as i32;
+    let mut y = start.y as i32;
+    while x >= 0 && y >= 0 && x < width as i32 && y < height as i32 {
+        out.push(AiTile::new(x as u32, y as u32));
+        x += direction.dx;
+        y += direction.dy;
+    }
+    out
+}
+
+fn thicken_linear_cut(
+    width: u32,
+    height: u32,
+    passable: &[bool],
+    run: &[AiTile],
+    direction: LinearCutDirection,
+) -> Vec<AiTile> {
+    let mut tiles = BTreeSet::new();
+    for &tile in run {
+        add_passable_cut_tile(width, height, passable, tile.x as i32, tile.y as i32, &mut tiles);
+        if direction.thicken_diagonal {
+            add_passable_cut_tile(
+                width,
+                height,
+                passable,
+                tile.x as i32 + direction.normal_x,
+                tile.y as i32 + direction.normal_y,
+                &mut tiles,
+            );
+        }
+    }
+    tiles.into_iter().collect()
+}
+
+fn add_passable_cut_tile(
+    width: u32,
+    height: u32,
+    passable: &[bool],
+    x: i32,
+    y: i32,
+    out: &mut BTreeSet<AiTile>,
+) {
+    if passable_at_tile(width, height, passable, x, y) {
+        out.insert(AiTile::new(x as u32, y as u32));
+    }
+}
+
+fn low_clearance_score(
+    width: u32,
+    height: u32,
+    clearance: &[u16],
+    tiles: &[AiTile],
+) -> i32 {
+    tiles
+        .iter()
+        .map(|tile| {
+            tile_index(width, height, tile.x, tile.y)
+                .and_then(|idx| clearance.get(idx).copied())
+                .map(|value| (12_i32 - i32::from(value)).max(0))
+                .unwrap_or(0)
+        })
+        .sum()
+}
+
+fn high_clearance_components(
+    width: u32,
+    height: u32,
+    passable: &[bool],
+    clearance: &[u16],
+    min_clearance: u16,
+) -> Vec<Vec<AiTile>> {
+    let mut visited = vec![false; passable.len()];
+    let mut components = Vec::new();
+    let mut queue = VecDeque::new();
+    for y in 0..height {
+        for x in 0..width {
+            let Some(start_idx) = tile_index(width, height, x, y) else {
+                continue;
+            };
+            if visited.get(start_idx).copied() == Some(true)
+                || passable.get(start_idx).copied() != Some(true)
+                || clearance.get(start_idx).copied().unwrap_or(0) < min_clearance
+            {
+                continue;
+            }
+            let start = AiTile::new(x, y);
+            visited[start_idx] = true;
+            queue.push_back(start);
+            let mut tiles = Vec::new();
+            while let Some(tile) = queue.pop_front() {
+                tiles.push(tile);
+                for neighbor in cardinal_neighbors(width, height, tile) {
+                    let Some(neighbor_idx) = tile_index(width, height, neighbor.x, neighbor.y)
+                    else {
+                        continue;
+                    };
+                    if visited.get(neighbor_idx).copied() == Some(true)
+                        || passable.get(neighbor_idx).copied() != Some(true)
+                        || clearance.get(neighbor_idx).copied().unwrap_or(0) < min_clearance
+                    {
+                        continue;
+                    }
+                    visited[neighbor_idx] = true;
+                    queue.push_back(neighbor);
+                }
+            }
+            if tiles.len() as u32 >= REGION_MIN_CORE_TILES {
+                components.push(tiles);
+            }
+        }
+    }
+    components
+}
+
+fn nearest_basin_distances(
+    width: u32,
+    height: u32,
+    passable: &[bool],
+    basins: &[Vec<AiTile>],
+    max_distance: u32,
+) -> Vec<Vec<RegionDistance>> {
+    let mut nearest = vec![Vec::new(); passable.len()];
+    let mut queue = VecDeque::new();
+    for (basin_id, tiles) in basins.iter().enumerate() {
+        let basin_id = basin_id as u32;
+        for &tile in tiles {
+            let Some(idx) = tile_index(width, height, tile.x, tile.y) else {
+                continue;
+            };
+            record_nearest_distance(&mut nearest[idx], basin_id, 0);
+            queue.push_back((tile, basin_id, 0_u32));
+        }
+    }
+    while let Some((tile, basin_id, distance)) = queue.pop_front() {
+        if distance >= max_distance {
+            continue;
+        }
+        for neighbor in cardinal_neighbors(width, height, tile) {
+            let Some(neighbor_idx) = tile_index(width, height, neighbor.x, neighbor.y) else {
+                continue;
+            };
+            if passable.get(neighbor_idx).copied() != Some(true) {
+                continue;
+            }
+            let next_distance = distance.saturating_add(1);
+            if record_nearest_distance(&mut nearest[neighbor_idx], basin_id, next_distance) {
+                queue.push_back((neighbor, basin_id, next_distance));
+            }
+        }
+    }
+    for entries in &mut nearest {
+        entries.sort_unstable_by_key(|entry| (entry.distance, entry.region_id));
+        entries.truncate(2);
+    }
+    nearest
+}
+
+fn record_nearest_distance(entries: &mut Vec<RegionDistance>, region_id: u32, distance: u32) -> bool {
+    if let Some(existing) = entries.iter_mut().find(|entry| entry.region_id == region_id) {
+        if distance >= existing.distance {
+            return false;
+        }
+        existing.distance = distance;
+        entries.sort_unstable_by_key(|entry| (entry.distance, entry.region_id));
+        return true;
+    }
+    if entries.len() >= 2
+        && entries
+            .last()
+            .is_some_and(|entry| distance >= entry.distance)
+    {
+        return false;
+    }
+    entries.push(RegionDistance {
+        region_id,
+        distance,
+    });
+    entries.sort_unstable_by_key(|entry| (entry.distance, entry.region_id));
+    entries.truncate(2);
+    true
+}
+
+fn candidate_touches_map_edge(width: u32, height: u32, candidate: &ChokeCandidate) -> bool {
+    candidate.bounds.min.x == 0
+        || candidate.bounds.min.y == 0
+        || candidate.bounds.max.x >= width.saturating_sub(1)
+        || candidate.bounds.max.y >= height.saturating_sub(1)
+}
+
+fn local_cut_split_score(
+    width: u32,
+    height: u32,
+    passable: &[bool],
+    cut_tiles: &[AiTile],
+    normal: (i32, i32),
+) -> Option<i32> {
+    let cut_set: BTreeSet<_> = cut_tiles.iter().copied().collect();
+    let bounds = expanded_bounds(
+        width,
+        height,
+        bounds_for_candidate_tiles(cut_tiles)?,
+        GAMEPLAY_LOCAL_CUT_PADDING_TILES,
+    );
+    let mut component_by_tile: BTreeMap<AiTile, usize> = BTreeMap::new();
+    let mut component_sizes = Vec::new();
+    let mut queue = VecDeque::new();
+
+    for y in bounds.min.y..=bounds.max.y {
+        for x in bounds.min.x..=bounds.max.x {
+            let tile = AiTile::new(x, y);
+            let Some(idx) = tile_index(width, height, x, y) else {
+                continue;
+            };
+            if passable.get(idx).copied() != Some(true)
+                || cut_set.contains(&tile)
+                || component_by_tile.contains_key(&tile)
+            {
+                continue;
+            }
+
+            let component_id = component_sizes.len();
+            let mut component_size = 0_usize;
+            component_by_tile.insert(tile, component_id);
+            queue.push_back(tile);
+            while let Some(current) = queue.pop_front() {
+                component_size = component_size.saturating_add(1);
+                for neighbor in passable_neighbors(width, height, passable, current) {
+                    if !tile_in_bounds(neighbor, bounds)
+                        || cut_set.contains(&neighbor)
+                        || component_by_tile.contains_key(&neighbor)
+                    {
+                        continue;
+                    }
+                    component_by_tile.insert(neighbor, component_id);
+                    queue.push_back(neighbor);
+                }
+            }
+            component_sizes.push(component_size);
+        }
+    }
+
+    let side_a = best_adjacent_component(
+        width,
+        height,
+        passable,
+        cut_tiles,
+        &component_by_tile,
+        &component_sizes,
+        normal,
+    )?;
+    let side_b = best_adjacent_component(
+        width,
+        height,
+        passable,
+        cut_tiles,
+        &component_by_tile,
+        &component_sizes,
+        (-normal.0, -normal.1),
+    )?;
+    if side_a.0 == side_b.0
+        || side_a.1 < GAMEPLAY_LOCAL_CUT_MIN_SIDE_TILES
+        || side_b.1 < GAMEPLAY_LOCAL_CUT_MIN_SIDE_TILES
+    {
+        return None;
+    }
+
+    let balance = side_a.1.min(side_b.1);
+    let total = side_a.1.saturating_add(side_b.1);
+    let score = balance
+        .saturating_mul(2)
+        .saturating_add(total / 5)
+        .min(balance.saturating_mul(2).saturating_add(120));
+    Some(score.min(i32::MAX as usize) as i32)
+}
+
+fn best_adjacent_component(
+    width: u32,
+    height: u32,
+    passable: &[bool],
+    cut_tiles: &[AiTile],
+    component_by_tile: &BTreeMap<AiTile, usize>,
+    component_sizes: &[usize],
+    direction: (i32, i32),
+) -> Option<(usize, usize)> {
+    let mut contacts: BTreeMap<usize, usize> = BTreeMap::new();
+    for &tile in cut_tiles {
+        for step in 1..=3_i32 {
+            let x = tile.x as i32 + direction.0.saturating_mul(step);
+            let y = tile.y as i32 + direction.1.saturating_mul(step);
+            if !passable_at_tile(width, height, passable, x, y) {
+                continue;
+            }
+            let neighbor = AiTile::new(x as u32, y as u32);
+            let Some(&component_id) = component_by_tile.get(&neighbor) else {
+                continue;
+            };
+            *contacts.entry(component_id).or_default() += 1;
+            break;
+        }
+    }
+    contacts
+        .into_iter()
+        .filter_map(|(component_id, contact_count)| {
+            component_sizes
+                .get(component_id)
+                .copied()
+                .map(|size| (component_id, contact_count, size))
+        })
+        .max_by_key(|(component_id, contact_count, size)| (*contact_count, *size, usize::MAX - *component_id))
+        .map(|(component_id, _, size)| (component_id, size))
+}
+
+fn direct_cut_score(width: u32, height: u32, candidate: &ChokeCandidate) -> i32 {
+    let edge_penalty = if candidate.center.x < 15
+        || candidate.center.x > width.saturating_sub(15)
+        || candidate.center.y < 10
+        || candidate.center.y > height.saturating_sub(10)
+    {
+        -180
+    } else {
+        0
+    };
+    let candidate_width = candidate
+        .bounds
+        .max
+        .x
+        .saturating_sub(candidate.bounds.min.x)
+        .saturating_add(1);
+    let candidate_height = candidate
+        .bounds
+        .max
+        .y
+        .saturating_sub(candidate.bounds.min.y)
+        .saturating_add(1);
+    let side_mouth =
+        candidate.center.x < width.saturating_mul(3) / 10
+            || candidate.center.x > width.saturating_mul(7) / 10;
+    let orientation_score = if side_mouth && candidate_height >= candidate_width {
+        40
+    } else {
+        0
+    };
+    edge_penalty + orientation_score
+}
+
+fn local_min_vertex_cut(
+    width: u32,
+    height: u32,
+    passable: &[bool],
+    clearance: &[u16],
+    bounds: AiTileBounds,
+    source_tiles: &[AiTile],
+    sink_tiles: &[AiTile],
+) -> Vec<AiTile> {
+    let source_set: BTreeSet<_> = source_tiles
+        .iter()
+        .copied()
+        .filter(|tile| tile_in_bounds(*tile, bounds))
+        .collect();
+    let sink_set: BTreeSet<_> = sink_tiles
+        .iter()
+        .copied()
+        .filter(|tile| tile_in_bounds(*tile, bounds))
+        .collect();
+    if source_set.is_empty() || sink_set.is_empty() {
+        return Vec::new();
+    }
+
+    let mut passable_tiles = Vec::new();
+    let mut local_by_tile = BTreeMap::new();
+    for y in bounds.min.y..=bounds.max.y {
+        for x in bounds.min.x..=bounds.max.x {
+            let Some(idx) = tile_index(width, height, x, y) else {
+                continue;
+            };
+            if passable.get(idx).copied() != Some(true) {
+                continue;
+            }
+            let tile = AiTile::new(x, y);
+            local_by_tile.insert(tile, passable_tiles.len());
+            passable_tiles.push(tile);
+        }
+    }
+    if passable_tiles.is_empty() {
+        return Vec::new();
+    }
+
+    let source = passable_tiles.len().saturating_mul(2);
+    let sink = source.saturating_add(1);
+    let mut flow = Dinic::new(sink.saturating_add(1));
+    for (local_idx, &tile) in passable_tiles.iter().enumerate() {
+        let in_node = local_idx.saturating_mul(2);
+        let out_node = in_node.saturating_add(1);
+        let tile_clearance = tile_index(width, height, tile.x, tile.y)
+            .and_then(|idx| clearance.get(idx).copied())
+            .unwrap_or(0);
+        let protected_tile = source_set.contains(&tile)
+            || sink_set.contains(&tile)
+            || tile_clearance >= GAMEPLAY_MIN_CUT_PROTECTED_CLEARANCE_TILES;
+        flow.add_edge(
+            in_node,
+            out_node,
+            if protected_tile { GAMEPLAY_FLOW_INF } else { 1 },
+        );
+        if source_set.contains(&tile) {
+            flow.add_edge(source, in_node, GAMEPLAY_FLOW_INF);
+        }
+        if sink_set.contains(&tile) {
+            flow.add_edge(out_node, sink, GAMEPLAY_FLOW_INF);
+        }
+        for neighbor in passable_neighbors(width, height, passable, tile) {
+            if !tile_in_bounds(neighbor, bounds) {
+                continue;
+            }
+            let Some(&neighbor_idx) = local_by_tile.get(&neighbor) else {
+                continue;
+            };
+            flow.add_edge(out_node, neighbor_idx.saturating_mul(2), GAMEPLAY_FLOW_INF);
+        }
+    }
+
+    let max_flow = flow.max_flow(source, sink);
+    if max_flow <= 0 || max_flow >= GAMEPLAY_FLOW_INF {
+        return Vec::new();
+    }
+    let reachable = flow.reachable_from(source);
+    passable_tiles
+        .into_iter()
+        .enumerate()
+        .filter_map(|(local_idx, tile)| {
+            let in_node = local_idx.saturating_mul(2);
+            let out_node = in_node.saturating_add(1);
+            (reachable.get(in_node).copied() == Some(true)
+                && reachable.get(out_node).copied() != Some(true))
+            .then_some(tile)
+        })
+        .collect()
+}
+
+fn linearity_score(tiles: &[AiTile]) -> i32 {
+    if tiles.len() < 2 {
+        return 0;
+    }
+    let len = tiles.len() as f64;
+    let mean_x = tiles.iter().map(|tile| f64::from(tile.x)).sum::<f64>() / len;
+    let mean_y = tiles.iter().map(|tile| f64::from(tile.y)).sum::<f64>() / len;
+    let mut xx = 0.0_f64;
+    let mut yy = 0.0_f64;
+    let mut xy = 0.0_f64;
+    for tile in tiles {
+        let dx = f64::from(tile.x) - mean_x;
+        let dy = f64::from(tile.y) - mean_y;
+        xx += dx * dx;
+        yy += dy * dy;
+        xy += dx * dy;
+    }
+    let trace = xx + yy;
+    let determinant = xx * yy - xy * xy;
+    let root = (trace * trace - 4.0 * determinant).max(0.0).sqrt();
+    let major = (trace + root) / 2.0;
+    let minor = (trace - root) / 2.0;
+    if major <= 0.0 {
+        return 0;
+    }
+    (100.0 * (1.0 - minor / major)).round() as i32
+}
+
+fn tile_in_bounds(tile: AiTile, bounds: AiTileBounds) -> bool {
+    tile.x >= bounds.min.x
+        && tile.x <= bounds.max.x
+        && tile.y >= bounds.min.y
+        && tile.y <= bounds.max.y
+}
+
+#[derive(Clone, Debug)]
+struct FlowEdge {
+    to: usize,
+    rev: usize,
+    cap: i32,
+}
+
+#[derive(Clone, Debug)]
+struct Dinic {
+    graph: Vec<Vec<FlowEdge>>,
+}
+
+impl Dinic {
+    fn new(size: usize) -> Self {
+        Self {
+            graph: vec![Vec::new(); size],
+        }
+    }
+
+    fn add_edge(&mut self, from: usize, to: usize, cap: i32) {
+        if from >= self.graph.len() || to >= self.graph.len() {
+            return;
+        }
+        let fwd = FlowEdge {
+            to,
+            rev: self.graph[to].len(),
+            cap,
+        };
+        let rev = FlowEdge {
+            to: from,
+            rev: self.graph[from].len(),
+            cap: 0,
+        };
+        self.graph[from].push(fwd);
+        self.graph[to].push(rev);
+    }
+
+    fn max_flow(&mut self, source: usize, sink: usize) -> i32 {
+        let mut total = 0_i32;
+        loop {
+            let levels = self.levels(source);
+            if levels.get(sink).copied().unwrap_or(-1) < 0 {
+                return total;
+            }
+            let mut iters = vec![0_usize; self.graph.len()];
+            loop {
+                let pushed = self.dfs(source, sink, GAMEPLAY_FLOW_INF, &levels, &mut iters);
+                if pushed <= 0 {
+                    break;
+                }
+                total = total.saturating_add(pushed);
+            }
+        }
+    }
+
+    fn levels(&self, source: usize) -> Vec<i32> {
+        let mut levels = vec![-1_i32; self.graph.len()];
+        if source >= self.graph.len() {
+            return levels;
+        }
+        let mut queue = VecDeque::from([source]);
+        levels[source] = 0;
+        while let Some(node) = queue.pop_front() {
+            for edge in &self.graph[node] {
+                if edge.cap <= 0 || levels.get(edge.to).copied().unwrap_or(0) >= 0 {
+                    continue;
+                }
+                levels[edge.to] = levels[node].saturating_add(1);
+                queue.push_back(edge.to);
+            }
+        }
+        levels
+    }
+
+    fn dfs(
+        &mut self,
+        node: usize,
+        sink: usize,
+        pushed: i32,
+        levels: &[i32],
+        iters: &mut [usize],
+    ) -> i32 {
+        if node == sink {
+            return pushed;
+        }
+        while iters[node] < self.graph[node].len() {
+            let edge_idx = iters[node];
+            let edge = &self.graph[node][edge_idx];
+            let to = edge.to;
+            let cap = edge.cap;
+            let rev = edge.rev;
+            if cap > 0 && levels[node] < levels[to] {
+                let next = self.dfs(to, sink, pushed.min(cap), levels, iters);
+                if next > 0 {
+                    self.graph[node][edge_idx].cap -= next;
+                    self.graph[to][rev].cap += next;
+                    return next;
+                }
+            }
+            iters[node] = iters[node].saturating_add(1);
+        }
+        0
+    }
+
+    fn reachable_from(&self, source: usize) -> Vec<bool> {
+        let mut seen = vec![false; self.graph.len()];
+        if source >= self.graph.len() {
+            return seen;
+        }
+        let mut queue = VecDeque::from([source]);
+        seen[source] = true;
+        while let Some(node) = queue.pop_front() {
+            for edge in &self.graph[node] {
+                if edge.cap <= 0 || seen.get(edge.to).copied() == Some(true) {
+                    continue;
+                }
+                seen[edge.to] = true;
+                queue.push_back(edge.to);
+            }
+        }
+        seen
+    }
+}
+
+fn non_max_choke_candidates(
+    mut candidates: Vec<ChokeCandidate>,
+    max: usize,
+    min_spacing: u32,
+) -> Vec<ChokeCandidate> {
+    candidates.sort_by_key(|candidate| (-candidate.score, candidate.center.y, candidate.center.x));
+    let mut kept = Vec::new();
+    for candidate in candidates {
+        if kept.iter().any(|other: &ChokeCandidate| {
+            tile_distance2(other.center, candidate.center) < min_spacing * min_spacing
+        }) {
+            continue;
+        }
+        kept.push(candidate);
+        if kept.len() >= max {
+            break;
+        }
+    }
+    kept
+}
+
+fn choke_from_candidate(
+    context: &ChokeBuildContext<'_>,
+    candidate: &ChokeCandidate,
+    id: u32,
+) -> Option<AiMapChoke> {
+    let (region_a_id, region_b_id, approach_a_tile, approach_b_tile) = candidate_region_pair(
+        context,
+        candidate,
+    )?;
+    if region_a_id == region_b_id {
+        return None;
+    }
+    let (bounds, min_clearance_tiles, max_clearance_tiles) =
+        choke_tile_stats(context.width, context.height, context.clearance, &candidate.tiles);
+    let (endpoint_a_tile, endpoint_b_tile, width_tiles) = choke_segment_geometry(
+        &candidate.tiles,
+        candidate.center,
+        approach_a_tile,
+        approach_b_tile,
+        bounds,
+    );
+    Some(AiMapChoke {
+        id,
+        region_a_id,
+        region_b_id,
+        center_tile: candidate.center,
+        endpoint_a_tile,
+        endpoint_b_tile,
+        approach_a_tile,
+        approach_b_tile,
+        width_tiles,
+        tile_count: candidate.tiles.len() as u32,
+        tiles: candidate.tiles.clone(),
+        bounds,
+        min_clearance_tiles,
+        max_clearance_tiles,
+    })
+}
+
+fn candidate_region_pair(
+    context: &ChokeBuildContext<'_>,
+    candidate: &ChokeCandidate,
+) -> Option<(u32, u32, AiTile, AiTile)> {
+    let contacts = choke_contacts(
+        context.width,
+        context.height,
+        context.passable,
+        context.region_by_tile,
+        &candidate.tiles,
+    );
+    let mut ranked_contacts: Vec<_> = contacts
+        .iter()
+        .filter_map(|(&region_id, contacts)| {
+            best_region_contact(contacts, candidate.center).map(|contact| (region_id, contact))
+        })
+        .collect();
+    ranked_contacts.sort_by_key(|(region_id, contact)| {
+        (
+            tile_distance2(contact.portal_tile, candidate.center),
+            tile_distance2(contact.region_tile, candidate.center),
+            *region_id,
+        )
+    });
+    if ranked_contacts.len() >= 2 {
+        return Some((
+            ranked_contacts[0].0,
+            ranked_contacts[1].0,
+            ranked_contacts[0].1.region_tile,
+            ranked_contacts[1].1.region_tile,
+        ));
+    }
+
+    let mut nearest_regions: Vec<_> = context
+        .regions
+        .iter()
+        .map(|region| {
+            (
+                region.id,
+                region.representative,
+                tile_distance2(region.representative, candidate.center),
+            )
+        })
+        .collect();
+    nearest_regions.sort_by_key(|(region_id, representative, distance)| {
+        (*distance, representative.y, representative.x, *region_id)
+    });
+    if nearest_regions.len() < 2 {
+        return None;
+    }
+    Some((
+        nearest_regions[0].0,
+        nearest_regions[1].0,
+        nearest_regions[0].1,
+        nearest_regions[1].1,
+    ))
 }
 
 fn build_chokes_for_band(
@@ -547,6 +1639,117 @@ fn connected_tile_groups(
         (center.y, center.x, group.len())
     });
     groups
+}
+
+fn connected_tile_groups_8(
+    width: u32,
+    height: u32,
+    tiles: &BTreeSet<AiTile>,
+) -> Vec<Vec<AiTile>> {
+    let mut groups = Vec::new();
+    let mut remaining = tiles.clone();
+    let mut queue = VecDeque::new();
+
+    while let Some(&start) = remaining.iter().next() {
+        remaining.remove(&start);
+        let mut group = Vec::new();
+        queue.push_back(start);
+        while let Some(tile) = queue.pop_front() {
+            group.push(tile);
+            for neighbor in all_neighbors(width, height, tile) {
+                if remaining.remove(&neighbor) {
+                    queue.push_back(neighbor);
+                }
+            }
+        }
+        group.sort_unstable_by_key(|tile| (tile.y, tile.x));
+        groups.push(group);
+    }
+
+    groups.sort_by_key(|group| {
+        let center = center_tile_for_tiles(group);
+        (center.y, center.x, group.len())
+    });
+    groups
+}
+
+fn all_neighbors(width: u32, height: u32, tile: AiTile) -> Vec<AiTile> {
+    let mut out = Vec::with_capacity(8);
+    let x = tile.x as i32;
+    let y = tile.y as i32;
+    for dy in -1..=1 {
+        for dx in -1..=1 {
+            if dx == 0 && dy == 0 {
+                continue;
+            }
+            let nx = x + dx;
+            let ny = y + dy;
+            if nx < 0 || ny < 0 || nx as u32 >= width || ny as u32 >= height {
+                continue;
+            }
+            out.push(AiTile::new(nx as u32, ny as u32));
+        }
+    }
+    out
+}
+
+fn candidate_from_tiles(mut tiles: Vec<AiTile>, score: i32) -> Option<ChokeCandidate> {
+    tiles.sort_unstable_by_key(|tile| (tile.y, tile.x));
+    tiles.dedup();
+    let bounds = bounds_for_candidate_tiles(&tiles)?;
+    let center = nearest_tile_to(
+        &tiles,
+        AiTile::new(
+            (bounds.min.x.saturating_add(bounds.max.x)) / 2,
+            (bounds.min.y.saturating_add(bounds.max.y)) / 2,
+        ),
+    );
+    Some(ChokeCandidate {
+        center,
+        bounds,
+        tiles,
+        score,
+        basin_pair: None,
+    })
+}
+
+fn bounds_for_candidate_tiles(tiles: &[AiTile]) -> Option<AiTileBounds> {
+    let (&first, rest) = tiles.split_first()?;
+    let mut bounds = AiTileBounds::new(first);
+    for &tile in rest {
+        bounds.include(tile);
+    }
+    Some(bounds)
+}
+
+fn expanded_bounds(width: u32, height: u32, bounds: AiTileBounds, amount: u32) -> AiTileBounds {
+    AiTileBounds {
+        min: AiTile::new(
+            bounds.min.x.saturating_sub(amount),
+            bounds.min.y.saturating_sub(amount),
+        ),
+        max: AiTile::new(
+            bounds
+                .max
+                .x
+                .saturating_add(amount)
+                .min(width.saturating_sub(1)),
+            bounds
+                .max
+                .y
+                .saturating_add(amount)
+                .min(height.saturating_sub(1)),
+        ),
+    }
+}
+
+fn passable_at_tile(width: u32, height: u32, passable: &[bool], x: i32, y: i32) -> bool {
+    if x < 0 || y < 0 {
+        return false;
+    }
+    tile_index(width, height, x as u32, y as u32)
+        .and_then(|idx| passable.get(idx).copied())
+        .unwrap_or(false)
 }
 
 fn choke_tile_stats(

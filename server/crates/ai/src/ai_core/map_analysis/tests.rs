@@ -1,4 +1,5 @@
 use super::*;
+use std::collections::{BTreeSet, VecDeque};
 use rts_sim::game::map::Map;
 use rts_sim::game::{Game, MapMetadata, PlayerInit};
 
@@ -234,14 +235,14 @@ fn bundled_fixture_region_and_choke_counts_are_legible() {
         ExpectedRegionFixture {
             name: "Default",
             regions: 5,
-            chokes_min: 8,
-            chokes_max: 8,
+            chokes_min: 12,
+            chokes_max: 12,
         },
         ExpectedRegionFixture {
             name: "Low Econ",
             regions: 5,
-            chokes_min: 8,
-            chokes_max: 8,
+            chokes_min: 12,
+            chokes_max: 12,
         },
         ExpectedRegionFixture {
             name: "No Terrain",
@@ -292,6 +293,12 @@ fn bundled_fixture_region_and_choke_counts_are_legible() {
                 fixture.name,
                 choke.id
             );
+            assert!(
+                tiles_are_cardinally_connected(&choke.tiles),
+                "{} choke {:?} tiles should not bridge disconnected passable fragments",
+                fixture.name,
+                choke.id
+            );
             assert_ne!(
                 choke.region_a_id, choke.region_b_id,
                 "{} choke {:?} must connect distinct regions",
@@ -312,6 +319,101 @@ fn bundled_fixture_region_and_choke_counts_are_legible() {
             );
         }
     }
+}
+
+fn tiles_are_cardinally_connected(tiles: &[AiTile]) -> bool {
+    let Some(&start) = tiles.first() else {
+        return false;
+    };
+    let all: BTreeSet<_> = tiles.iter().copied().collect();
+    let mut seen = BTreeSet::new();
+    let mut queue = VecDeque::from([start]);
+    while let Some(tile) = queue.pop_front() {
+        if !seen.insert(tile) {
+            continue;
+        }
+        for (dx, dy) in [(1_i32, 0_i32), (-1, 0), (0, 1), (0, -1)] {
+            let nx = tile.x as i32 + dx;
+            let ny = tile.y as i32 + dy;
+            if nx < 0 || ny < 0 {
+                continue;
+            }
+            let neighbor = AiTile::new(nx as u32, ny as u32);
+            if all.contains(&neighbor) && !seen.contains(&neighbor) {
+                queue.push_back(neighbor);
+            }
+        }
+    }
+    seen.len() == all.len()
+}
+
+#[derive(Clone, Copy, Debug)]
+struct TargetBox {
+    id: &'static str,
+    min_x: u32,
+    min_y: u32,
+    max_x: u32,
+    max_y: u32,
+}
+
+#[test]
+fn default_chokes_cover_marked_gameplay_passages() {
+    let debug = fixture_analysis("Default");
+    let targets = [
+        TargetBox { id: "T0", min_x: 66, min_y: 12, max_x: 81, max_y: 28 },
+        TargetBox { id: "T1", min_x: 52, min_y: 13, max_x: 64, max_y: 28 },
+        TargetBox { id: "T2", min_x: 24, min_y: 29, max_x: 54, max_y: 53 },
+        TargetBox { id: "T3", min_x: 74, min_y: 30, max_x: 97, max_y: 54 },
+        TargetBox { id: "T4", min_x: 13, min_y: 46, max_x: 29, max_y: 58 },
+        TargetBox { id: "T5", min_x: 101, min_y: 52, max_x: 114, max_y: 62 },
+        TargetBox { id: "T6", min_x: 11, min_y: 61, max_x: 29, max_y: 72 },
+        TargetBox { id: "T7", min_x: 100, min_y: 63, max_x: 113, max_y: 73 },
+        TargetBox { id: "T8", min_x: 75, min_y: 72, max_x: 101, max_y: 97 },
+        TargetBox { id: "T9", min_x: 26, min_y: 73, max_x: 54, max_y: 99 },
+        TargetBox { id: "T10", min_x: 65, min_y: 98, max_x: 78, max_y: 113 },
+        TargetBox { id: "T11", min_x: 52, min_y: 99, max_x: 63, max_y: 115 },
+    ];
+
+    let missing: Vec<_> = targets
+        .iter()
+        .filter(|target| {
+            !debug
+                .chokes
+                .iter()
+                .any(|choke| choke_covers_target(choke, **target))
+        })
+        .map(|target| target.id)
+        .collect();
+
+    assert!(
+        missing.is_empty(),
+        "Default gameplay chokes should cover marked passages; missing {missing:?}; chokes {:?}",
+        debug
+            .chokes
+            .iter()
+            .map(|choke| (
+                choke.id,
+                choke.center_tile,
+                choke.bounds.min,
+                choke.bounds.max
+            ))
+            .collect::<Vec<_>>()
+    );
+}
+
+fn choke_covers_target(choke: &AiMapChoke, target: TargetBox) -> bool {
+    choke
+        .tiles
+        .iter()
+        .copied()
+        .any(|tile| point_in_target(tile, target))
+}
+
+fn point_in_target(tile: AiTile, target: TargetBox) -> bool {
+    tile.x >= target.min_x
+        && tile.x <= target.max_x
+        && tile.y >= target.min_y
+        && tile.y <= target.max_y
 }
 
 #[test]
