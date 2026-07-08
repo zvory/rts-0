@@ -568,7 +568,7 @@ pub(super) fn region_tile_rects(
 
 pub(super) fn tile_rects_for_tiles(tiles: &[AiTile]) -> Vec<OverlayTileRect> {
     let mut sorted = tiles.to_vec();
-    sorted.sort_unstable();
+    sorted.sort_unstable_by_key(|tile| (tile.y, tile.x));
     sorted.dedup();
 
     let mut rects: Vec<OverlayTileRect> = Vec::new();
@@ -604,4 +604,29 @@ pub(super) fn tile_rects_for_tiles(tiles: &[AiTile]) -> Vec<OverlayTileRect> {
     }
 
     rects
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tile_rects_for_tiles_compacts_scrambled_tiles_row_major() {
+        let rects = tile_rects_for_tiles(&[
+            AiTile::new(5, 4),
+            AiTile::new(3, 3),
+            AiTile::new(4, 3),
+            AiTile::new(3, 4),
+            AiTile::new(4, 4),
+            AiTile::new(4, 4),
+            AiTile::new(8, 4),
+            AiTile::new(8, 5),
+        ]);
+
+        let actual: Vec<_> = rects
+            .iter()
+            .map(|rect| (rect.tile_x, rect.tile_y, rect.tile_w, rect.tile_h))
+            .collect();
+        assert_eq!(actual, vec![(3, 3, 2, 1), (3, 4, 3, 1), (8, 4, 1, 2)]);
+    }
 }
