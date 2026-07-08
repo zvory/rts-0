@@ -2,4 +2,5 @@
 
 pub mod arena;
 pub mod balance_matrix;
+pub mod map_analysis_debug;
 pub mod matchup;

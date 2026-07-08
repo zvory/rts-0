@@ -52,13 +52,17 @@ It also owns static map analysis (`map_analysis.rs`) built only from `StartPaylo
 start tiles, and static resource nodes. `AiController` caches that analysis by a stable
 map/start/resource identity. The analyzer records terrain passability, centered clearance, passable
 components, 10-clearance open-region seeds grown to 5-clearance shoulders, region assignments for
-starts/resources, and <=4-clearance choke bands that connect distinct regions. Default and Low Econ
-currently stabilize at five meaningful open regions and eight choke portals each; No Terrain
-stabilizes at one region and no chokes. Current decision code does not consume this analysis yet,
-so it is a read-only foundation rather than a gameplay behavior change.
+starts/resources, <=4-clearance choke bands split into region-pair corridors from contact-front
+distances, and a diagnostic Voronoi-style medial-axis skeleton over passable terrain. The skeleton
+uses opposing terrain/map-edge boundary sites to visualize corridor centerlines; it is exposed for
+debugging the gameplay choke definition and is not yet consumed by AI command decisions.
+Default and Low Econ currently stabilize at five meaningful open regions and eight choke portals
+each; No Terrain stabilizes at one region and no chokes. Current decision code does not consume
+this analysis yet, so it is a read-only foundation rather than a gameplay behavior change.
 Live spectator observer diagnostics can expose this cached analysis as `observerAnalysis.mapAnalysis`
-overlay primitives: region tile-rect fills, choke segment bands with approach markers, base markers,
-resource-cluster markers, and labels. That payload is derived from the same AI-owned cache and
+overlay primitives: region tile-rect fills, choke segment bands with approach markers, Voronoi
+skeleton tile-rects, base markers, resource-cluster markers, and labels. That payload is derived
+from the same AI-owned cache and
 remains spectator-only; active players and AI command logic do not receive a new authority surface
 from it.
 The decision loop also emits manager traces: every think records typed strategic goals for economy,
