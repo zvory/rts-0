@@ -74,6 +74,7 @@ src/
   settings_panels.js # Portable settings tab panel descriptors
   main.js         # Entry point: starts App
   app.js          # Lobby/app shell lifecycle and persistent Net/Audio ownership
+  launch_url.js   # Namespaced rtsLaunch URL parsing and pure lobby automation decisions
   match.js        # Match lifecycle, module dependency wiring, render loop, transient events
   match_combat_audio.js # Match-owned combat sound routing and machine-gunner sound cleanup
   match_live_pause.js # live pause state actions and prediction visual suspension
@@ -1472,3 +1473,28 @@ selects `client-architecture`, `js-protocol-contracts`, `node-minimap-input-cont
 Architecture-policy files such as `scripts/check-client-architecture.mjs`,
 `tests/select-suites.mjs`, and `plans/archive/client-arch/*` select `client-architecture`.
 Docs-only changes select `docs-only` unless another rule applies.
+
+### 4.4 Launch URL conventions
+
+App-owned launch URLs use the `rtsLaunch` query parameter as the mode switch. `rtsLaunch=match`
+drives a normal live lobby through existing lobby messages rather than introducing a debug protocol:
+the browser joins the requested room, applies safe setup options, and starts only after ordinary
+server `lobby.canStart` is true. The convention is intentionally namespaced so future launch modes
+can coexist with replay, lab, and dev-scenario URLs.
+
+Supported match-launch parameters:
+- `rtsRoom=<room>` optional public room name. If omitted, the client generates a safe AI self-play
+  room name. Reserved internal room prefixes are rejected.
+- `rtsRole=spectator|player` defaults to `spectator`.
+- `rtsName=<display name>` defaults to `Spectator` or `Commander` from the selected role.
+- `rtsMap=<map display name>` optionally selects a server-advertised lobby map before seating AIs.
+- Repeated `rtsAi=<team>:<profile>` entries seat AI opponents in order, for example
+  `rtsAi=1:ai_1_2&rtsAi=2:ai_2_0`. A profile-only entry such as `rtsAi=ai_2_0` uses the next team
+  slot. If omitted, the launch defaults to two AI 1.2 seats on teams 1 and 2.
+- `rtsStart=1|0` defaults to `1`. `0` prepares the lobby without pressing Start.
+
+Example spectator self-play URL:
+
+```text
+/?rtsLaunch=match&rtsRoom=agent-ai-selfplay&rtsRole=spectator&rtsAi=1:ai_1_2&rtsAi=2:ai_2_0&rtsStart=1
+```

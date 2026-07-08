@@ -37,6 +37,7 @@ import { createAiDiagnosticsPanelPreferences } from "./ai_diagnostics_panel.js";
 import { ReplayViewer } from "./replay_viewer.js";
 import { createRoomCapabilities } from "./room_capabilities.js";
 import { selectInitialCameraView } from "./camera_view_selection.js";
+import { matchLaunchConfig, nextMatchLaunchAction } from "./launch_url.js";
 import { CAMERA } from "./config.js";
 import { formatTeamLabel, scoreRowIsWinner } from "./scoreboard.js";
 import { StatusBadge } from "./status_badge.js";
@@ -93,6 +94,7 @@ export class App {
     this.labLaunch = labLaunchConfig();
     this.labVisualProfileState = resolveVisualProfileLaunch(this.labLaunch || this.labCatalogLaunch);
     this.replayLaunch = replayLaunchConfig();
+    this.matchLaunch = matchLaunchConfig();
     /**
      * Audio engine. Long-lived across matches: the AudioContext is unlocked
      * by the user's first gesture (anywhere in the page), and we want that
@@ -138,6 +140,7 @@ export class App {
     this.onGameOverOverlayClick = this.onGameOverOverlayClick.bind(this);
     this.onOpen = this.onOpen.bind(this);
     this.onClose = this.onClose.bind(this);
+    this.onLobbyForMatchLaunch = this.onLobbyForMatchLaunch.bind(this);
     this.onBranchFromTickCreated = this.onBranchFromTickCreated.bind(this);
     this.onBeforeUnload = this.onBeforeUnload.bind(this);
     this.inReplayPlayback = false;
@@ -147,6 +150,8 @@ export class App {
     this.unitRangesEnabled = readUnitRangesEnabled();
     this.observerAnalysisOverlayPreferences = createObserverAnalysisOverlayPreferences();
     this.aiDiagnosticsPanelPreferences = createAiDiagnosticsPanelPreferences();
+    this.matchLaunchDone = false;
+    this.matchLaunchFailed = false;
     this.mountLobbySettings();
     if (this.labCatalogLaunch) this.lobby.hide();
   }
@@ -158,6 +163,7 @@ export class App {
     this.net.on(S.GAME_OVER, this.onGameOver);
     this.net.on(S.BRANCH_FROM_TICK_CREATED, this.onBranchFromTickCreated);
     this.net.on(S.SHUTDOWN_WARNING, this.onShutdownWarning);
+    this.net.on(S.LOBBY, this.onLobbyForMatchLaunch);
     this.net.on("open", this.onOpen);
     this.net.on("close", this.onClose);
     dom.gameOverButton.addEventListener("click", this.onBackToLobby);
@@ -179,6 +185,7 @@ export class App {
       if (this.replayLaunch) this.maybeAutoJoinReplay();
       else if (this.labLaunch) this.maybeAutoJoinLab();
       else if (this.labCatalogLaunch) this.labCatalog?.setConnected(true);
+      else if (this.matchLaunch) this.maybeAutoJoinMatchLaunch();
       else this.maybeAutoJoinDevWatch();
     } catch (err) {
       this.showConnectionWarning();
@@ -227,6 +234,83 @@ export class App {
     if (this.labCatalogLaunch) this.labCatalog?.setStatus("Starting lab...");
     else this.lobby.setStatus("Starting lab...");
     this.showLabVisualProfileNotice();
+  }
+
+  maybeAutoJoinMatchLaunch() {
+    if (!this.matchLaunch) return;
+    if (this.matchLaunch.errors?.length) {
+      this.failMatchLaunch(`Launch URL invalid: ${this.matchLaunch.errors.join(" ")}`);
+      return;
+    }
+    if (this.lobby?.elName) this.lobby.elName.value = this.matchLaunch.name;
+    if (this.lobby?.elRoom) this.lobby.elRoom.value = this.matchLaunch.room;
+    this.net.join(
+      this.matchLaunch.name,
+      this.matchLaunch.room,
+      this.matchLaunch.spectator,
+      false,
+    );
+    this.lobby.setStatus(`Preparing AI self-play "${this.matchLaunch.room}"...`);
+  }
+
+  onLobbyForMatchLaunch(payload) {
+    if (!this.matchLaunch || this.matchLaunchDone || this.matchLaunchFailed) return;
+    const action = nextMatchLaunchAction(this.matchLaunch, payload, this.net.playerId);
+    this.applyMatchLaunchAction(action);
+  }
+
+  applyMatchLaunchAction(action) {
+    switch (action?.type) {
+      case "none":
+        return;
+      case "wait":
+        this.lobby?.setStatus(action.message || "Preparing AI self-play...");
+        return;
+      case "fail":
+        this.failMatchLaunch(action.message || "Launch URL automation failed.");
+        return;
+      case "setSpectator":
+        this.lobby?.setStatus("Setting observer role...");
+        this.net.setSpectator(!!action.spectator);
+        return;
+      case "selectMap":
+        this.lobby?.setStatus(`Selecting map "${action.map}"...`);
+        this.net.selectMap(action.map);
+        return;
+      case "addAi":
+        this.lobby?.setStatus("Adding AI opponent...");
+        this.net.addAi(action.teamId, action.aiProfileId);
+        return;
+      case "setTeam":
+        this.lobby?.setStatus("Assigning AI team...");
+        this.net.setTeam(action.id, action.teamId);
+        return;
+      case "setAiProfile":
+        this.lobby?.setStatus("Selecting AI profile...");
+        this.net.setAiProfile(action.id, action.aiProfileId);
+        return;
+      case "ready":
+        this.lobby?.setStatus("Ready check...");
+        this.net.ready(!!action.ready);
+        return;
+      case "start":
+        this.matchLaunchDone = true;
+        this.lobby?.setStatus("Starting AI self-play...");
+        this.net.start();
+        return;
+      case "done":
+        this.matchLaunchDone = true;
+        this.lobby?.setStatus(action.message || "Launch lobby is ready.");
+        return;
+      default:
+        return;
+    }
+  }
+
+  failMatchLaunch(message) {
+    this.matchLaunchFailed = true;
+    this.lobby?.setStatus(message, true);
+    this.showToast(message, 10000);
   }
 
   showLabVisualProfileNotice() {
@@ -567,7 +651,7 @@ export class App {
 
   /** "Back to lobby" button: tear down the match and restore the lobby. */
   onBackToLobby() {
-    if (this.replayLaunch || this.labLaunch) {
+    if (this.replayLaunch || this.labLaunch || this.matchLaunch) {
       if (this.match) {
         this.match.destroy();
         this.match = null;

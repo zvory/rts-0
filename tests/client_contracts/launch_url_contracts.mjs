@@ -208,6 +208,171 @@ async function testLabLaunchConfig() {
   }
 }
 
+async function testMatchLaunchConfig() {
+  const {
+    matchLaunchConfig,
+  } = await import("../../client/src/launch_url.js");
+
+  let config = matchLaunchConfig(new URL(
+    "http://localhost/?rtsLaunch=match&rtsRoom=agent-ai-selfplay&rtsRole=spectator&rtsAi=1:ai_1_2&rtsAi=2:ai_2_0&rtsStart=1&rtsMap=No%20Terrain",
+  ));
+  assert(config, "match launch URL should be recognized");
+  assert(config.errors.length === 0, `match launch URL should be valid (${config.errors.join(" ")})`);
+  assert(config.room === "agent-ai-selfplay", "match launch keeps the requested room");
+  assert(config.name === "Spectator", "spectator match launch uses the spectator display name");
+  assert(config.spectator === true, "match launch can join as spectator");
+  assert(config.start === true, "match launch defaults to starting when requested");
+  assert(config.map === "No Terrain", "match launch keeps a safe map display name");
+  assert(
+    JSON.stringify(config.ai) === JSON.stringify([
+      { teamId: 1, aiProfileId: "ai_1_2" },
+      { teamId: 2, aiProfileId: "ai_2_0" },
+    ]),
+    "match launch parses repeated AI team/profile entries",
+  );
+
+  config = matchLaunchConfig(
+    new URL("http://localhost/?rtsLaunch=match"),
+    { now: 0 },
+  );
+  assert(config.room === "ai-selfplay-0", "match launch generates a safe room when omitted");
+  assert(
+    JSON.stringify(config.ai) === JSON.stringify([
+      { teamId: 1, aiProfileId: "ai_1_2" },
+      { teamId: 2, aiProfileId: "ai_1_2" },
+    ]),
+    "match launch defaults to a two-team AI 1.2 self-play",
+  );
+
+  config = matchLaunchConfig(new URL(
+    "http://localhost/?rtsLaunch=match&rtsRoom=agent-ai-selfplay&rtsAi=ai_2_0",
+  ));
+  assert(
+    JSON.stringify(config.ai) === JSON.stringify([{ teamId: 1, aiProfileId: "ai_2_0" }]),
+    "profile-only AI entries use the next team slot",
+  );
+
+  config = matchLaunchConfig(new URL("http://localhost/?rtsLaunch=match&rtsRoom=bad%0Aroom"));
+  assert(config.errors.some((error) => error.includes("unsupported characters")),
+    "match launch rejects control characters in room names");
+
+  config = matchLaunchConfig(new URL("http://localhost/?rtsLaunch=match&rtsRoom=__lab__:bad"));
+  assert(config.errors.some((error) => error.includes("reserved")),
+    "match launch rejects reserved server room prefixes");
+
+  config = matchLaunchConfig(new URL(
+    "http://localhost/?rtsLaunch=match&rtsRole=player&rtsAi=1&rtsAi=2&rtsAi=3&rtsAi=4",
+  ));
+  assert(config.errors.some((error) => error.includes("4-player match limit")),
+    "player launches cannot overfill the four-seat match limit");
+
+  assert(
+    matchLaunchConfig(new URL("http://localhost/?rtsLaunch=replay")) === null,
+    "unknown launch modes do not claim the page",
+  );
+}
+
+async function testMatchLaunchActions() {
+  const {
+    matchLaunchConfig,
+    nextMatchLaunchAction,
+  } = await import("../../client/src/launch_url.js");
+  const config = matchLaunchConfig(new URL(
+    "http://localhost/?rtsLaunch=match&rtsRoom=agent-ai-selfplay&rtsRole=spectator&rtsAi=1:ai_1_2&rtsAi=2:ai_2_0&rtsStart=1",
+  ));
+  const spectator = { id: 7, isAi: false, isSpectator: true, ready: false };
+
+  let action = nextMatchLaunchAction(config, {
+    room: "agent-ai-selfplay",
+    hostId: 7,
+    map: "Default",
+    maps: [{ name: "Default" }],
+    players: [spectator],
+    canStart: false,
+  }, 7);
+  assert(
+    JSON.stringify(action) === JSON.stringify({ type: "addAi", teamId: 1, aiProfileId: "ai_1_2" }),
+    "empty spectator-hosted launch lobby adds the first requested AI",
+  );
+
+  action = nextMatchLaunchAction(config, {
+    room: "agent-ai-selfplay",
+    hostId: 7,
+    map: "Default",
+    maps: [{ name: "Default" }],
+    players: [
+      spectator,
+      { id: 20, isAi: true, isSpectator: false, teamId: 1, aiProfileId: "ai_1_2" },
+    ],
+    canStart: false,
+  }, 7);
+  assert(
+    JSON.stringify(action) === JSON.stringify({ type: "addAi", teamId: 2, aiProfileId: "ai_2_0" }),
+    "launch action adds the second requested AI after the first one appears",
+  );
+
+  action = nextMatchLaunchAction(config, {
+    room: "agent-ai-selfplay",
+    hostId: 7,
+    map: "Default",
+    maps: [{ name: "Default" }],
+    players: [
+      spectator,
+      { id: 20, isAi: true, isSpectator: false, teamId: 1, aiProfileId: "ai_1_2" },
+      { id: 21, isAi: true, isSpectator: false, teamId: 2, aiProfileId: "ai_1_0" },
+    ],
+    canStart: true,
+  }, 7);
+  assert(
+    JSON.stringify(action) === JSON.stringify({ type: "setAiProfile", id: 21, aiProfileId: "ai_2_0" }),
+    "launch action corrects existing AI profile mismatches before start",
+  );
+
+  action = nextMatchLaunchAction(config, {
+    room: "agent-ai-selfplay",
+    hostId: 7,
+    map: "Default",
+    maps: [{ name: "Default" }],
+    players: [
+      spectator,
+      { id: 20, isAi: true, isSpectator: false, teamId: 1, aiProfileId: "ai_1_2" },
+      { id: 21, isAi: true, isSpectator: false, teamId: 2, aiProfileId: "ai_2_0" },
+    ],
+    canStart: true,
+  }, 7);
+  assert(action.type === "start", "launch action starts once the requested AI lobby is startable");
+
+  const mapConfig = matchLaunchConfig(new URL(
+    "http://localhost/?rtsLaunch=match&rtsRoom=agent-ai-selfplay&rtsMap=No%20Terrain",
+  ));
+  action = nextMatchLaunchAction(mapConfig, {
+    room: "agent-ai-selfplay",
+    hostId: 7,
+    map: "Default",
+    maps: [{ name: "Default" }, { name: "No Terrain" }],
+    players: [spectator],
+    canStart: false,
+  }, 7);
+  assert(
+    JSON.stringify(action) === JSON.stringify({ type: "selectMap", map: "No Terrain" }),
+    "launch action selects the requested available map before seating AIs",
+  );
+
+  action = nextMatchLaunchAction(config, {
+    room: "agent-ai-selfplay",
+    hostId: 7,
+    map: "Default",
+    maps: [{ name: "Default" }],
+    players: [
+      spectator,
+      { id: 8, isAi: false, isSpectator: false, ready: false },
+    ],
+    canStart: false,
+  }, 7);
+  assert(action.type === "fail" && action.message.includes("active human seats"),
+    "spectator self-play launch refuses to start over existing active human seats");
+}
+
 async function testVisualProfileRegistry() {
   const priorFetch = globalThis.fetch;
   globalThis.fetch = () => {
@@ -286,4 +451,6 @@ async function testVisualProfileRegistry() {
 await testDevWatchScenarioConfig();
 await testReplayArtifactLaunchConfig();
 await testLabLaunchConfig();
+await testMatchLaunchConfig();
+await testMatchLaunchActions();
 await testVisualProfileRegistry();
