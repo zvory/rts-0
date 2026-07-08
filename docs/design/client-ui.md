@@ -31,6 +31,7 @@ src/
   renderer/decals/ # SVG decal atlas manifest, loader, and deterministic stamp selection
   renderer/trenches.js # Authoritative trench terrain pass and deterministic nearby-trench connectors
   renderer/feedback_view_model.js # Builder for renderer feedback's narrow per-frame read model
+  renderer/observer_map_analysis.js # Observer-only static AI map-analysis world overlay drawer
   fog.js          # Fog overlay: accumulate explored, compute visible from own entities
   input/          # lifecycle facade plus selection, commands, placement, shared camera navigation, UI input routing
   audio.js        # Audio: Web Audio context, buses, one-shots, spatialization
@@ -390,8 +391,9 @@ harvesting, refunds, and cancelled queues.
 shouldMountAiDiagnosticsPanel({ capabilities })
 createAiDiagnosticsPanelPreferences(storage?)
 export class AiDiagnosticsPanel {
-  constructor({ root, preferences, getPlayers })
+  constructor({ root, preferences, getPlayers, onMapLayerVisibilityChange })
   applyObserverAnalysis(payload)          // renders optional per-player aiDiagnostics trace rows
+  mapLayerVisibility()                    // current map-analysis overlay layer switches
   destroy()
 }
 ```
@@ -399,13 +401,27 @@ export class AiDiagnosticsPanel {
 observer-analysis diagnostics. The panel consumes the same server-authored `observerAnalysis`
 payload, but normalizes and renders `aiDiagnostics` separately so high-churn AI trace lines do not
 dirty-update the general replay/spectator analysis tabs. It owns its generated DOM, persists
-visible/collapsed/selected-AI state under `rts.aiDiagnosticsPanel`, uses the shared lab-panel
-window chrome for drag, resize, collapse, keyboard nudge, and viewport clamping, and renders one
-tab per AI diagnostics row with profile id, trace tick, status metrics, and bounded decision trace
-lines for AI-vs-AI debugging.
+visible/collapsed/selected-AI state plus map-analysis layer toggles under
+`rts.aiDiagnosticsPanel`, uses the shared lab-panel window chrome for drag, resize, collapse,
+keyboard nudge, and viewport clamping, and renders one tab per AI diagnostics row with profile id,
+trace tick, status metrics, and bounded decision trace lines for AI-vs-AI debugging. When
+`observerAnalysis.mapAnalysis` is present, the panel also shows component/base/resource/label
+switches that drive the passive world overlay without writing to `GameState`, command targeting,
+selection, prediction, or fog.
 `match_observer_diagnostics.js` composes both observer surfaces for `Match`, forwards
-`observerAnalysis` messages to each mounted panel, updates the viewport-dependent observer analysis
-frame surface, and centralizes teardown.
+`observerAnalysis` messages to each mounted panel, retains the latest optional map-analysis payload
+for renderer consumption, updates the viewport-dependent observer analysis frame surface, and
+centralizes teardown.
+
+`renderer/observer_map_analysis.js`
+```js
+_drawObserverMapAnalysisOverlay(model, { camera })
+```
+The renderer draws server-provided observer map-analysis primitives on a dedicated Graphics/Text
+pair mounted below ordinary command feedback but above fog. It supports tile-rect component fills,
+base/resource markers, labels, and per-layer visibility from the AI diagnostics panel. The overlay
+is observer-only visual state and does not contribute to hit testing, entity pools, minimap blips,
+local fog sources, or game state.
 
 `frame_entity_views.js`
 ```js
@@ -1270,7 +1286,7 @@ selection rings):
 ### 4.2 Rendering & look (PixiJS, SVG rigs — neutral PS1 field-command style)
 - Layers (back→front): terrain → ground decals → trench terrain → local visual samples → resource nodes → building shadows → buildings →
   building overlays → unit shadows → occupied-trench shadows → occupied-trench lips → units → smoke/ability ground effects → selection rings →
-  health bars → fog overlay → local visual-sample labels → shot-revealed units → command/hover feedback → placement ghost →
+  health bars → fog overlay → local visual-sample labels → shot-revealed units → observer map-analysis diagnostics → command/hover feedback → placement ghost →
   selection drag-box → (HUD is DOM, not Pixi). Selected unit range rings, minimum-range rings, and
   support-weapon field-of-fire overlays use higher-opacity rendering for readability.
 - Spatial combat audio keeps full volume for nearby emitters, uses stronger attenuation after the

@@ -14,6 +14,7 @@ import {
 import {
   AiDiagnosticsPanel,
   createAiDiagnosticsPanelPreferences,
+  normalizeMapAnalysisSummary,
   shouldMountAiDiagnosticsPanel,
 } from "../../client/src/ai_diagnostics_panel.js";
 import {
@@ -137,9 +138,28 @@ import { textWithin } from "./dom_text.mjs";
   const aiPrefs = createAiDiagnosticsPanelPreferences(aiStorage);
   aiPrefs.visible = false;
   aiPrefs.collapsed = true;
+  aiPrefs.setMapLayerVisible("components", false);
   const restoredAiPrefs = createAiDiagnosticsPanelPreferences(aiStorage);
   assert(restoredAiPrefs.visible === false, "AI diagnostics visible state persists");
   assert(restoredAiPrefs.collapsed === true, "AI diagnostics collapsed state persists");
+  assert(
+    restoredAiPrefs.mapLayerVisibility(["components"]).components === false,
+    "AI diagnostics map layer visibility persists",
+  );
+  const mapSummary = normalizeMapAnalysisSummary({
+    mapWidth: 126,
+    mapHeight: 126,
+    tileSize: 32,
+    layers: [
+      { id: "components", label: "Components", primitives: [{ kind: "tileRect" }, { kind: "tileRect" }] },
+      { id: "bases", label: "Bases", primitives: [{ kind: "marker" }] },
+    ],
+  });
+  assert(
+    mapSummary.primitives === 3
+      && mapSummary.layers.some((layer) => layer.id === "labels" && layer.primitives === 3),
+    "AI diagnostics summarizes map-analysis layers and synthetic labels toggle",
+  );
   assert(
     shouldMountAiDiagnosticsPanel({
       capabilities: createRoomCapabilities({
@@ -387,14 +407,19 @@ import { textWithin } from "./dom_text.mjs";
     const root = new FakeElement("section");
     restoredAiPrefs.visible = true;
     restoredAiPrefs.collapsed = false;
+    let latestMapLayers = null;
     const panel = new AiDiagnosticsPanel({
       root,
       preferences: restoredAiPrefs,
       getPlayers: () => players,
+      onMapLayerVisibilityChange: (layers) => {
+        latestMapLayers = layers;
+      },
     });
     assert(root.children.length === 2, "AI diagnostics panel mounts generated DOM plus a show affordance");
     assert(root.querySelector(".lab-panel-drag-handle"), "AI diagnostics panel uses the shared movable lab window titlebar");
     assert(root.querySelector(".lab-panel-resize-handle"), "AI diagnostics panel uses the shared resizable lab window handle");
+    assert(latestMapLayers?.components === false, "AI diagnostics publishes persisted map layer visibility on mount");
     assert(
       textWithin(root).includes("Waiting for observer analysis"),
       "AI diagnostics panel shows a factual waiting state before analysis arrives",
@@ -409,6 +434,25 @@ import { textWithin } from "./dom_text.mjs";
       "AI diagnostics panel handles observer analysis without AI trace rows cleanly",
     );
 
+    const mapAnalysisPayload = {
+      mapWidth: 126,
+      mapHeight: 126,
+      tileSize: 32,
+      layers: [
+        {
+          id: "components",
+          label: "Components",
+          defaultVisible: true,
+          primitives: [{ kind: "tileRect", id: "component:0", tileX: 1, tileY: 2, tileW: 3, tileH: 4 }],
+        },
+        {
+          id: "bases",
+          label: "Bases",
+          defaultVisible: true,
+          primitives: [{ kind: "marker", id: "base:1", x: 64, y: 96, radius: 14 }],
+        },
+      ],
+    };
     panel.applyObserverAnalysis({
       tick: 45,
       players: [
@@ -438,12 +482,16 @@ import { textWithin } from "./dom_text.mjs";
           },
         },
       ],
+      mapAnalysis: mapAnalysisPayload,
     });
     const aiDiagnosticsText = textWithin(root);
     assert(
       aiDiagnosticsText.includes("AI Diagnostics")
         && aiDiagnosticsText.includes("AI players")
         && aiDiagnosticsText.includes("Trace lines")
+        && aiDiagnosticsText.includes("Map layers")
+        && aiDiagnosticsText.includes("Map analysis")
+        && aiDiagnosticsText.includes("Components")
         && aiDiagnosticsText.includes("2")
         && aiDiagnosticsText.includes("ai_1_2_wave_cohorts")
         && aiDiagnosticsText.includes("tick 36")
@@ -452,6 +500,17 @@ import { textWithin } from "./dom_text.mjs";
         && aiDiagnosticsText.includes("intents")
         && aiDiagnosticsText.includes("train:Rifleman"),
       "AI diagnostics panel renders status, profile, trace tick, and parsed decision fields",
+    );
+    const componentToggle = findFakes(root, (el) =>
+      el.classList.contains("ai-diagnostics-map-toggle")
+      && el.dataset.aiMapLayer === "components",
+    )[0];
+    assert(componentToggle?.getAttribute("aria-checked") === "false", "AI diagnostics renders persisted map toggle state");
+    root.children[0].listeners.click?.({ target: componentToggle, preventDefault() {}, stopPropagation() {} });
+    assert(
+      restoredAiPrefs.mapLayerVisibility(["components"]).components === true
+        && latestMapLayers?.components === true,
+      "AI diagnostics map layer toggles update preferences and renderer visibility",
     );
     const aiTabs = root.querySelectorAll(".ai-diagnostics-tab");
     assert(aiTabs.length === 2, "AI diagnostics panel renders one tab for each AI diagnostics row");
@@ -499,6 +558,7 @@ import { textWithin } from "./dom_text.mjs";
           },
         },
       ],
+      mapAnalysis: mapAnalysisPayload,
     });
     assert(
       aiDiagnosticsBody.replaceChildrenCount === stableTraceRenderCount,
@@ -542,6 +602,7 @@ import { textWithin } from "./dom_text.mjs";
           },
         },
       ],
+      mapAnalysis: mapAnalysisPayload,
     });
     assert(
       aiDiagnosticsBody.replaceChildrenCount === traceUpdateRenderCount + 1,

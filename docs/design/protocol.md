@@ -1355,7 +1355,42 @@ not receive this message.
         lines: string[]
       }
     }
-  ]
+  ],
+  mapAnalysis?: {
+    mapWidth: u32,
+    mapHeight: u32,
+    tileSize: u32,
+    layers: [
+      {
+        id: string,
+        label: string,
+        defaultVisible: bool,
+        primitives: [
+          {
+            kind: "tileRect",
+            id: string,
+            tileX: u32,
+            tileY: u32,
+            tileW: u32,
+            tileH: u32,
+            fill: "#rrggbb",
+            stroke: "#rrggbb",
+            alpha: f32,
+            label?: string
+          } | {
+            kind: "marker",
+            id: string,
+            x: f32,
+            y: f32,
+            radius: f32,
+            shape: "circle" | "diamond" | "square",
+            color: "#rrggbb",
+            label?: string
+          }
+        ]
+      }
+    ]
+  }
 }
 ```
 `players` lists every active observed player. `units` is the current living unit inventory by kind.
@@ -1368,6 +1403,10 @@ buildings, current spending, cancelled production, refunds, harvesting, or stock
 `aiDiagnostics`, when present, contains the latest bounded live AI decision trace for that player:
 the selected profile id, the AI observation tick that produced the trace, and the formatted trace
 lines from the AI decision manager.
+`mapAnalysis`, when present, contains static AI-owned map-analysis overlay primitives built from
+public start-payload terrain, starts, and resource nodes. Live AI-vs-AI spectator diagnostics use it
+to draw component fills, base markers, resource-cluster markers, and labels. It is optional because
+replay analysis and non-AI live rooms do not currently own an AI controller cache for this data.
 
 Observer analysis uses an all-player spectator policy independent of each viewer's vision selection
 selection. It is observer-only data for analysis overlays, not an active-player information surface.

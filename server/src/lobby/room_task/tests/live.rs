@@ -537,6 +537,17 @@ fn ai_only_live_spectator_observer_analysis_includes_ai_decision_diagnostics() {
     let analysis = analyses
         .last()
         .expect("AI-only spectator should receive observer analysis");
+    let map_analysis = analysis
+        .map_analysis
+        .as_ref()
+        .expect("AI-only spectator analysis should include cached static map analysis");
+    assert!(
+        map_analysis
+            .layers
+            .iter()
+            .any(|layer| layer.id == "components" && !layer.primitives.is_empty()),
+        "map-analysis diagnostics should expose component primitives"
+    );
     let ai_rows: Vec<_> = analysis
         .players
         .iter()

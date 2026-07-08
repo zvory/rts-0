@@ -23,6 +23,7 @@ use crate::selfplay::player_view::{
     footprint_placeable_from_snapshot, occupied_tiles_from_snapshot, PlayerView,
 };
 use rand::Rng;
+use rts_protocol::ObserverMapAnalysisDiagnostics;
 use rts_sim::game::command::SimCommand;
 use rts_sim::protocol::{Snapshot, StartPayload};
 
@@ -140,6 +141,12 @@ impl AiController {
         self.last_decision_trace.clone()
     }
 
+    pub fn latest_map_analysis_diagnostics(&self) -> Option<ObserverMapAnalysisDiagnostics> {
+        self.map_analysis_cache
+            .as_ref()
+            .map(|cache| cache.analysis.debug_overlay())
+    }
+
     fn profile(&self) -> &'static AiProfile {
         profile_by_id(self.profile_id).unwrap_or_else(default_live_profile)
     }
@@ -165,13 +172,13 @@ impl AiController {
     pub fn think(&mut self, context: AiThinkContext<'_>) -> Vec<SimCommand> {
         let mut commands = context.retreat_commands;
         let tick = context.snapshot.tick;
+        let _ = self.static_map_analysis(context.start);
         if !tick
             .wrapping_add(self.player)
             .is_multiple_of(DECISION_INTERVAL)
         {
             return commands;
         }
-        let _ = self.static_map_analysis(context.start);
 
         let view = PlayerView {
             player_id: self.player,

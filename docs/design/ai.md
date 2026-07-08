@@ -54,6 +54,10 @@ map/start/resource identity, and the scaffold records terrain passability, cente
 passable components, start-to-component/resource mappings, and resource clusters for diagnostics
 and future route reasoning. Current decision code does not consume this analysis yet, so it is a
 read-only foundation rather than a gameplay behavior change.
+Live spectator observer diagnostics can expose this cached analysis as `observerAnalysis.mapAnalysis`
+overlay primitives: component tile-rect fills, base markers, resource-cluster markers, and labels.
+That payload is derived from the same AI-owned cache and remains spectator-only; active players and
+AI command logic do not receive a new authority surface from it.
 The decision loop also emits manager traces: every think records typed strategic goals for economy,
 supply, expansion, tech, production, local defense, frontal attack, and harassment, plus stable
 blocker labels, high-level intent labels, command labels emitted through `AiActionContext`, and
