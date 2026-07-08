@@ -295,6 +295,7 @@ pub(super) fn build_chokes(
                         approach_b_tile: contact_b.region_tile,
                         width_tiles,
                         tile_count: tiles.len() as u32,
+                        tiles: tiles.clone(),
                         bounds,
                         min_clearance_tiles,
                         max_clearance_tiles,
@@ -562,5 +563,45 @@ pub(super) fn region_tile_rects(
             });
         }
     }
+    rects
+}
+
+pub(super) fn tile_rects_for_tiles(tiles: &[AiTile]) -> Vec<OverlayTileRect> {
+    let mut sorted = tiles.to_vec();
+    sorted.sort_unstable();
+    sorted.dedup();
+
+    let mut rects: Vec<OverlayTileRect> = Vec::new();
+    let mut idx = 0;
+    while idx < sorted.len() {
+        let y = sorted[idx].y;
+        let start_x = sorted[idx].x;
+        let mut end_x = start_x;
+        idx += 1;
+
+        while idx < sorted.len() && sorted[idx].y == y && sorted[idx].x == end_x.saturating_add(1)
+        {
+            end_x = sorted[idx].x;
+            idx += 1;
+        }
+
+        let tile_w = end_x.saturating_sub(start_x).saturating_add(1);
+        if let Some(last) = rects.last_mut() {
+            if last.tile_x == start_x
+                && last.tile_w == tile_w
+                && last.tile_y.saturating_add(last.tile_h) == y
+            {
+                last.tile_h = last.tile_h.saturating_add(1);
+                continue;
+            }
+        }
+        rects.push(OverlayTileRect {
+            tile_x: start_x,
+            tile_y: y,
+            tile_w,
+            tile_h: 1,
+        });
+    }
+
     rects
 }

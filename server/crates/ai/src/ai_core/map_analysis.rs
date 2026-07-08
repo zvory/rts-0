@@ -12,7 +12,10 @@ use rts_protocol::{
 use rts_sim::protocol::{kinds, terrain, MapInfo, PlayerStart, ResourceNode, StartPayload};
 
 mod regions;
-use regions::{build_chokes, build_regions, nearest_region, region_id_for_tile, region_tile_rects};
+use regions::{
+    build_chokes, build_regions, nearest_region, region_id_for_tile, region_tile_rects,
+    tile_rects_for_tiles,
+};
 
 const MAX_CLEARANCE_TILES: u16 = 16;
 const RESOURCE_CLUSTER_RADIUS_MARGIN_TILES: f32 = 0.75;
@@ -132,6 +135,7 @@ pub(crate) struct AiMapChoke {
     pub(crate) approach_b_tile: AiTile,
     pub(crate) width_tiles: u16,
     pub(crate) tile_count: u32,
+    pub(crate) tiles: Vec<AiTile>,
     pub(crate) bounds: AiTileBounds,
     pub(crate) min_clearance_tiles: u16,
     pub(crate) max_clearance_tiles: u16,
@@ -393,27 +397,28 @@ impl AiMapAnalysis {
     fn choke_overlay_primitives(&self) -> Vec<ObserverMapAnalysisPrimitive> {
         let mut primitives = Vec::new();
         for choke in &self.chokes {
-            let tile_w = choke
-                .bounds
-                .max
-                .x
-                .saturating_sub(choke.bounds.min.x)
-                .saturating_add(1);
-            let tile_h = choke
-                .bounds
-                .max
-                .y
-                .saturating_sub(choke.bounds.min.y)
-                .saturating_add(1);
-            primitives.push(ObserverMapAnalysisPrimitive::TileRect {
-                id: format!("choke:{}", choke.id),
-                tile_x: choke.bounds.min.x,
-                tile_y: choke.bounds.min.y,
-                tile_w,
-                tile_h,
-                fill: MAP_ANALYSIS_CHOKE_COLOR.to_string(),
-                stroke: MAP_ANALYSIS_CHOKE_COLOR.to_string(),
-                alpha: 0.28,
+            for (idx, rect) in tile_rects_for_tiles(&choke.tiles).into_iter().enumerate() {
+                primitives.push(ObserverMapAnalysisPrimitive::TileRect {
+                    id: format!("choke:{}:{}", choke.id, idx),
+                    tile_x: rect.tile_x,
+                    tile_y: rect.tile_y,
+                    tile_w: rect.tile_w,
+                    tile_h: rect.tile_h,
+                    fill: MAP_ANALYSIS_CHOKE_COLOR.to_string(),
+                    stroke: MAP_ANALYSIS_CHOKE_COLOR.to_string(),
+                    alpha: 0.28,
+                    label: None,
+                });
+            }
+
+            let (x, y) = tile_center_world(choke.center_tile, self.tile_size);
+            primitives.push(ObserverMapAnalysisPrimitive::Marker {
+                id: format!("chokeLabel:{}", choke.id),
+                x,
+                y,
+                radius: (self.tile_size as f32 * 0.3).max(6.0),
+                shape: "square".to_string(),
+                color: MAP_ANALYSIS_CHOKE_COLOR.to_string(),
                 label: Some(format!(
                     "K{} R{}-R{} W{}",
                     choke.id, choke.region_a_id, choke.region_b_id, choke.width_tiles

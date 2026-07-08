@@ -264,6 +264,22 @@ fn bundled_fixture_region_and_choke_counts_are_legible() {
             );
         }
         for choke in &debug.chokes {
+            assert_eq!(
+                choke.tiles.len(),
+                choke.tile_count as usize,
+                "{} choke {:?} tile list must match tile count",
+                fixture.name,
+                choke.id
+            );
+            assert!(
+                choke.tiles.iter().all(|tile| tile.x >= choke.bounds.min.x
+                    && tile.x <= choke.bounds.max.x
+                    && tile.y >= choke.bounds.min.y
+                    && tile.y <= choke.bounds.max.y),
+                "{} choke {:?} has a tile outside its bounds",
+                fixture.name,
+                choke.id
+            );
             assert_ne!(
                 choke.region_a_id, choke.region_b_id,
                 "{} choke {:?} must connect distinct regions",
