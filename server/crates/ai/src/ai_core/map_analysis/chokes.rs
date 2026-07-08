@@ -3,7 +3,9 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use super::*;
 
 mod min_cut;
+mod region_pair;
 use min_cut::{linearity_score, local_min_vertex_cut, tile_in_bounds};
+use region_pair::candidate_split_region_pair;
 
 #[derive(Clone, Copy, Debug)]
 struct RegionContact {
@@ -201,11 +203,14 @@ fn build_gameplay_chokes(
         regions,
     };
     let mut chokes = Vec::new();
-    for candidate in candidates.iter().take(GAMEPLAY_CHOKE_TARGET_COUNT) {
+    for candidate in &candidates {
         let Some(choke) = choke_from_candidate(&context, candidate, chokes.len() as u32) else {
             continue;
         };
         chokes.push(choke);
+        if chokes.len() >= GAMEPLAY_CHOKE_TARGET_COUNT {
+            break;
+        }
     }
     if chokes.len() >= GAMEPLAY_CHOKE_TARGET_COUNT {
         chokes
@@ -899,28 +904,24 @@ fn candidate_region_pair(
         ));
     }
 
-    let mut nearest_regions: Vec<_> = context
+    if let Some(pair) = candidate_split_region_pair(context, candidate) {
+        return Some(pair);
+    }
+
+    let (basin_a_id, basin_b_id) = candidate.basin_pair?;
+    let region_a = context
         .regions
         .iter()
-        .map(|region| {
-            (
-                region.id,
-                region.representative,
-                tile_distance2(region.representative, candidate.center),
-            )
-        })
-        .collect();
-    nearest_regions.sort_by_key(|(region_id, representative, distance)| {
-        (*distance, representative.y, representative.x, *region_id)
-    });
-    if nearest_regions.len() < 2 {
-        return None;
-    }
+        .find(|region| region.id == basin_a_id)?;
+    let region_b = context
+        .regions
+        .iter()
+        .find(|region| region.id == basin_b_id)?;
     Some((
-        nearest_regions[0].0,
-        nearest_regions[1].0,
-        nearest_regions[0].1,
-        nearest_regions[1].1,
+        region_a.id,
+        region_b.id,
+        region_a.representative,
+        region_b.representative,
     ))
 }
 
