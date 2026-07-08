@@ -405,7 +405,7 @@ visible/collapsed/selected-AI state plus map-analysis layer toggles under
 `rts.aiDiagnosticsPanel`, uses the shared lab-panel window chrome for drag, resize, collapse,
 keyboard nudge, and viewport clamping, and renders one tab per AI diagnostics row with profile id,
 trace tick, status metrics, and bounded decision trace lines for AI-vs-AI debugging. When
-`observerAnalysis.mapAnalysis` is present, the panel also shows component/base/resource/label
+`observerAnalysis.mapAnalysis` is present, the panel also shows region/choke/base/resource/label
 switches that drive the passive world overlay without writing to `GameState`, command targeting,
 selection, prediction, or fog.
 `match_observer_diagnostics.js` composes both observer surfaces for `Match`, forwards
@@ -418,10 +418,10 @@ centralizes teardown.
 _drawObserverMapAnalysisOverlay(model, { camera })
 ```
 The renderer draws server-provided observer map-analysis primitives on a dedicated Graphics/Text
-pair mounted below ordinary command feedback but above fog. It supports tile-rect component fills,
-base/resource markers, labels, and per-layer visibility from the AI diagnostics panel. The overlay
-is observer-only visual state and does not contribute to hit testing, entity pools, minimap blips,
-local fog sources, or game state.
+pair mounted below ordinary command feedback but above fog. It supports tile-rect region fills,
+choke segment bands, base/resource/approach markers, labels, and per-layer visibility from the AI
+diagnostics panel. The overlay is observer-only visual state and does not contribute to hit testing,
+entity pools, minimap blips, local fog sources, or game state.
 
 `frame_entity_views.js`
 ```js

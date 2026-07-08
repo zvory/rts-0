@@ -138,12 +138,12 @@ import { textWithin } from "./dom_text.mjs";
   const aiPrefs = createAiDiagnosticsPanelPreferences(aiStorage);
   aiPrefs.visible = false;
   aiPrefs.collapsed = true;
-  aiPrefs.setMapLayerVisible("components", false);
+  aiPrefs.setMapLayerVisible("regions", false);
   const restoredAiPrefs = createAiDiagnosticsPanelPreferences(aiStorage);
   assert(restoredAiPrefs.visible === false, "AI diagnostics visible state persists");
   assert(restoredAiPrefs.collapsed === true, "AI diagnostics collapsed state persists");
   assert(
-    restoredAiPrefs.mapLayerVisibility(["components"]).components === false,
+    restoredAiPrefs.mapLayerVisibility(["regions"]).regions === false,
     "AI diagnostics map layer visibility persists",
   );
   const mapSummary = normalizeMapAnalysisSummary({
@@ -151,13 +151,14 @@ import { textWithin } from "./dom_text.mjs";
     mapHeight: 126,
     tileSize: 32,
     layers: [
-      { id: "components", label: "Components", primitives: [{ kind: "tileRect" }, { kind: "tileRect" }] },
+      { id: "regions", label: "Regions", primitives: [{ kind: "tileRect" }, { kind: "marker" }] },
+      { id: "chokes", label: "Chokes", primitives: [{ kind: "tileRect" }] },
       { id: "bases", label: "Bases", primitives: [{ kind: "marker" }] },
     ],
   });
   assert(
-    mapSummary.primitives === 3
-      && mapSummary.layers.some((layer) => layer.id === "labels" && layer.primitives === 3),
+    mapSummary.primitives === 4
+      && mapSummary.layers.some((layer) => layer.id === "labels" && layer.primitives === 4),
     "AI diagnostics summarizes map-analysis layers and synthetic labels toggle",
   );
   assert(
@@ -419,7 +420,7 @@ import { textWithin } from "./dom_text.mjs";
     assert(root.children.length === 2, "AI diagnostics panel mounts generated DOM plus a show affordance");
     assert(root.querySelector(".lab-panel-drag-handle"), "AI diagnostics panel uses the shared movable lab window titlebar");
     assert(root.querySelector(".lab-panel-resize-handle"), "AI diagnostics panel uses the shared resizable lab window handle");
-    assert(latestMapLayers?.components === false, "AI diagnostics publishes persisted map layer visibility on mount");
+    assert(latestMapLayers?.regions === false, "AI diagnostics publishes persisted map layer visibility on mount");
     assert(
       textWithin(root).includes("Waiting for observer analysis"),
       "AI diagnostics panel shows a factual waiting state before analysis arrives",
@@ -440,10 +441,16 @@ import { textWithin } from "./dom_text.mjs";
       tileSize: 32,
       layers: [
         {
-          id: "components",
-          label: "Components",
+          id: "regions",
+          label: "Regions",
           defaultVisible: true,
-          primitives: [{ kind: "tileRect", id: "component:0", tileX: 1, tileY: 2, tileW: 3, tileH: 4 }],
+          primitives: [{ kind: "tileRect", id: "region:0:0", tileX: 1, tileY: 2, tileW: 3, tileH: 4 }],
+        },
+        {
+          id: "chokes",
+          label: "Chokes",
+          defaultVisible: true,
+          primitives: [{ kind: "tileRect", id: "choke:0", tileX: 5, tileY: 6, tileW: 1, tileH: 4 }],
         },
         {
           id: "bases",
@@ -491,7 +498,8 @@ import { textWithin } from "./dom_text.mjs";
         && aiDiagnosticsText.includes("Trace lines")
         && aiDiagnosticsText.includes("Map layers")
         && aiDiagnosticsText.includes("Map analysis")
-        && aiDiagnosticsText.includes("Components")
+        && aiDiagnosticsText.includes("Regions")
+        && aiDiagnosticsText.includes("Chokes")
         && aiDiagnosticsText.includes("2")
         && aiDiagnosticsText.includes("ai_1_2_wave_cohorts")
         && aiDiagnosticsText.includes("tick 36")
@@ -501,15 +509,15 @@ import { textWithin } from "./dom_text.mjs";
         && aiDiagnosticsText.includes("train:Rifleman"),
       "AI diagnostics panel renders status, profile, trace tick, and parsed decision fields",
     );
-    const componentToggle = findFakes(root, (el) =>
+    const regionToggle = findFakes(root, (el) =>
       el.classList.contains("ai-diagnostics-map-toggle")
-      && el.dataset.aiMapLayer === "components",
+      && el.dataset.aiMapLayer === "regions",
     )[0];
-    assert(componentToggle?.getAttribute("aria-checked") === "false", "AI diagnostics renders persisted map toggle state");
-    root.children[0].listeners.click?.({ target: componentToggle, preventDefault() {}, stopPropagation() {} });
+    assert(regionToggle?.getAttribute("aria-checked") === "false", "AI diagnostics renders persisted map toggle state");
+    root.children[0].listeners.click?.({ target: regionToggle, preventDefault() {}, stopPropagation() {} });
     assert(
-      restoredAiPrefs.mapLayerVisibility(["components"]).components === true
-        && latestMapLayers?.components === true,
+      restoredAiPrefs.mapLayerVisibility(["regions"]).regions === true
+        && latestMapLayers?.regions === true,
       "AI diagnostics map layer toggles update preferences and renderer visibility",
     );
     const aiTabs = root.querySelectorAll(".ai-diagnostics-tab");

@@ -1,7 +1,7 @@
 //! AI-owned static map analysis built only from public start-payload data.
 //!
-//! This is intentionally a scaffold: it records stable terrain, component, start, and resource
-//! facts for later route analysis without feeding them into command decisions yet.
+//! This records stable terrain, region, choke, start, and resource facts for later route analysis
+//! without feeding them into command decisions yet.
 
 use std::collections::VecDeque;
 
@@ -11,8 +11,22 @@ use rts_protocol::{
 };
 use rts_sim::protocol::{kinds, terrain, MapInfo, PlayerStart, ResourceNode, StartPayload};
 
+mod regions;
+use regions::{build_chokes, build_regions, nearest_region, region_id_for_tile, region_tile_rects};
+
 const MAX_CLEARANCE_TILES: u16 = 16;
 const RESOURCE_CLUSTER_RADIUS_MARGIN_TILES: f32 = 0.75;
+// Region seeds require a 10-tile centered open square so Default/Low Econ ignore obstacle-edge
+// ripples and expose only broad maneuver areas. The lower body threshold lets regions fill their
+// shoulders while leaving <=4-clearance necks available for choke extraction.
+const REGION_CORE_CLEARANCE_TILES: u16 = 10;
+const REGION_BODY_CLEARANCE_TILES: u16 = 5;
+const REGION_MIN_CORE_TILES: u32 = 24;
+const CHOKE_CONTACT_RADIUS_TILES: u16 = 8;
+const CHOKE_MAX_BAND_TILES: u32 = 512;
+const CHOKE_MAX_ADJACENT_REGIONS: usize = 4;
+const MAP_ANALYSIS_CHOKE_COLOR: &str = "#ff6b35";
+const MAP_ANALYSIS_APPROACH_COLOR: &str = "#f7d774";
 const MAP_ANALYSIS_COMPONENT_COLORS: [&str; 8] = [
     "#3da5d9", "#f2a541", "#7ac74f", "#c77dff", "#ef476f", "#ffd166", "#06d6a0", "#8fb8d0",
 ];
@@ -96,11 +110,40 @@ pub(crate) struct AiMapComponent {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct AiMapRegion {
+    pub(crate) id: u32,
+    pub(crate) component_id: Option<u32>,
+    pub(crate) tile_count: u32,
+    pub(crate) core_tile_count: u32,
+    pub(crate) bounds: AiTileBounds,
+    pub(crate) representative: AiTile,
+    pub(crate) max_clearance_tiles: u16,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct AiMapChoke {
+    pub(crate) id: u32,
+    pub(crate) region_a_id: u32,
+    pub(crate) region_b_id: u32,
+    pub(crate) center_tile: AiTile,
+    pub(crate) endpoint_a_tile: AiTile,
+    pub(crate) endpoint_b_tile: AiTile,
+    pub(crate) approach_a_tile: AiTile,
+    pub(crate) approach_b_tile: AiTile,
+    pub(crate) width_tiles: u16,
+    pub(crate) tile_count: u32,
+    pub(crate) bounds: AiTileBounds,
+    pub(crate) min_clearance_tiles: u16,
+    pub(crate) max_clearance_tiles: u16,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct AiStartMapping {
     pub(crate) player_id: u32,
     pub(crate) team_id: u32,
     pub(crate) start_tile: AiTile,
     pub(crate) component_id: Option<u32>,
+    pub(crate) region_id: Option<u32>,
     pub(crate) clearance_tiles: u16,
     pub(crate) nearest_resource_cluster_id: Option<u32>,
     pub(crate) nearest_resource_cluster_distance2: Option<u32>,
@@ -111,6 +154,7 @@ pub(crate) struct AiResourceCluster {
     pub(crate) id: u32,
     pub(crate) center_tile: AiTile,
     pub(crate) component_id: Option<u32>,
+    pub(crate) region_id: Option<u32>,
     pub(crate) resource_ids: Vec<u32>,
     pub(crate) steel_nodes: u16,
     pub(crate) oil_nodes: u16,
@@ -128,6 +172,9 @@ pub(crate) struct AiMapAnalysis {
     clearance: Vec<u16>,
     component_by_tile: Vec<Option<u32>>,
     components: Vec<AiMapComponent>,
+    region_by_tile: Vec<Option<u32>>,
+    regions: Vec<AiMapRegion>,
+    chokes: Vec<AiMapChoke>,
     starts: Vec<AiStartMapping>,
     resource_clusters: Vec<AiResourceCluster>,
 }
@@ -145,6 +192,10 @@ pub(crate) struct AiMapAnalysisDebugSnapshot {
     pub(crate) component_count: usize,
     pub(crate) largest_component_tiles: u32,
     pub(crate) components: Vec<AiMapComponent>,
+    pub(crate) region_count: usize,
+    pub(crate) choke_count: usize,
+    pub(crate) regions: Vec<AiMapRegion>,
+    pub(crate) chokes: Vec<AiMapChoke>,
     pub(crate) starts: Vec<AiStartMapping>,
     pub(crate) resource_clusters: Vec<AiResourceCluster>,
 }
@@ -163,11 +214,23 @@ impl AiMapAnalysis {
         let clearance = build_clearance(width, height, &passable);
         let (component_by_tile, components) =
             build_components(width, height, &passable, &clearance);
+        let (region_by_tile, regions) =
+            build_regions(width, height, &passable, &clearance, &component_by_tile);
+        let chokes = build_chokes(
+            width,
+            height,
+            &passable,
+            &clearance,
+            &region_by_tile,
+            &regions,
+        );
         let resource_clusters = build_resource_clusters(
             &start.map,
             &start.players,
             &clearance,
             &component_by_tile,
+            &region_by_tile,
+            &regions,
         );
         let starts = build_start_mappings(
             &start.players,
@@ -175,6 +238,8 @@ impl AiMapAnalysis {
             height,
             &clearance,
             &component_by_tile,
+            &region_by_tile,
+            &regions,
             &resource_clusters,
         );
 
@@ -187,6 +252,9 @@ impl AiMapAnalysis {
             clearance,
             component_by_tile,
             components,
+            region_by_tile,
+            regions,
+            chokes,
             starts,
             resource_clusters,
         }
@@ -201,6 +269,12 @@ impl AiMapAnalysis {
     pub(crate) fn component_id_at(&self, tile: AiTile) -> Option<u32> {
         tile_index(self.width, self.height, tile.x, tile.y)
             .and_then(|idx| self.component_by_tile.get(idx).copied().flatten())
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn region_id_at(&self, tile: AiTile) -> Option<u32> {
+        tile_index(self.width, self.height, tile.x, tile.y)
+            .and_then(|idx| self.region_by_tile.get(idx).copied().flatten())
     }
 
     #[allow(dead_code)]
@@ -223,6 +297,10 @@ impl AiMapAnalysis {
                 .max()
                 .unwrap_or(0),
             components: self.components.clone(),
+            region_count: self.regions.len(),
+            choke_count: self.chokes.len(),
+            regions: self.regions.clone(),
+            chokes: self.chokes.clone(),
             starts: self.starts.clone(),
             resource_clusters: self.resource_clusters.clone(),
         }
@@ -235,10 +313,16 @@ impl AiMapAnalysis {
             tile_size: self.tile_size,
             layers: vec![
                 ObserverMapAnalysisLayer {
-                    id: "components".to_string(),
-                    label: "Components".to_string(),
+                    id: "regions".to_string(),
+                    label: "Regions".to_string(),
                     default_visible: true,
-                    primitives: self.component_overlay_primitives(),
+                    primitives: self.region_overlay_primitives(),
+                },
+                ObserverMapAnalysisLayer {
+                    id: "chokes".to_string(),
+                    label: "Chokes".to_string(),
+                    default_visible: true,
+                    primitives: self.choke_overlay_primitives(),
                 },
                 ObserverMapAnalysisLayer {
                     id: "bases".to_string(),
@@ -256,37 +340,92 @@ impl AiMapAnalysis {
         }
     }
 
-    fn component_overlay_primitives(&self) -> Vec<ObserverMapAnalysisPrimitive> {
-        self.components
-            .iter()
-            .map(|component| {
-                let fill = component_color(component.id).to_string();
-                ObserverMapAnalysisPrimitive::TileRect {
-                    id: format!("component:{}", component.id),
-                    tile_x: component.bounds.min.x,
-                    tile_y: component.bounds.min.y,
-                    tile_w: component
-                        .bounds
-                        .max
-                        .x
-                        .saturating_sub(component.bounds.min.x)
-                        .saturating_add(1),
-                    tile_h: component
-                        .bounds
-                        .max
-                        .y
-                        .saturating_sub(component.bounds.min.y)
-                        .saturating_add(1),
+    fn region_overlay_primitives(&self) -> Vec<ObserverMapAnalysisPrimitive> {
+        let mut primitives = Vec::new();
+        for region in &self.regions {
+            let fill = component_color(region.id).to_string();
+            for (idx, rect) in
+                region_tile_rects(self.width, self.height, &self.region_by_tile, region.id)
+                    .into_iter()
+                    .enumerate()
+            {
+                primitives.push(ObserverMapAnalysisPrimitive::TileRect {
+                    id: format!("region:{}:{}", region.id, idx),
+                    tile_x: rect.tile_x,
+                    tile_y: rect.tile_y,
+                    tile_w: rect.tile_w,
+                    tile_h: rect.tile_h,
                     stroke: fill.clone(),
-                    fill,
-                    alpha: component_fill_alpha(component.tile_count),
-                    label: Some(format!(
-                        "C{} {}t clr{}",
-                        component.id, component.tile_count, component.max_clearance_tiles
-                    )),
-                }
-            })
-            .collect()
+                    fill: fill.clone(),
+                    alpha: region_fill_alpha(region.tile_count),
+                    label: None,
+                });
+            }
+
+            let (x, y) = tile_center_world(region.representative, self.tile_size);
+            primitives.push(ObserverMapAnalysisPrimitive::Marker {
+                id: format!("regionLabel:{}", region.id),
+                x,
+                y,
+                radius: (self.tile_size as f32 * 0.34).max(6.0),
+                shape: "square".to_string(),
+                color: fill,
+                label: Some(format!(
+                    "R{} {}t core{} clr{}",
+                    region.id,
+                    region.tile_count,
+                    region.core_tile_count,
+                    region.max_clearance_tiles
+                )),
+            });
+        }
+        primitives
+    }
+
+    fn choke_overlay_primitives(&self) -> Vec<ObserverMapAnalysisPrimitive> {
+        let mut primitives = Vec::new();
+        for choke in &self.chokes {
+            let tile_w = choke
+                .bounds
+                .max
+                .x
+                .saturating_sub(choke.bounds.min.x)
+                .saturating_add(1);
+            let tile_h = choke
+                .bounds
+                .max
+                .y
+                .saturating_sub(choke.bounds.min.y)
+                .saturating_add(1);
+            primitives.push(ObserverMapAnalysisPrimitive::TileRect {
+                id: format!("choke:{}", choke.id),
+                tile_x: choke.bounds.min.x,
+                tile_y: choke.bounds.min.y,
+                tile_w,
+                tile_h,
+                fill: MAP_ANALYSIS_CHOKE_COLOR.to_string(),
+                stroke: MAP_ANALYSIS_CHOKE_COLOR.to_string(),
+                alpha: 0.28,
+                label: Some(format!(
+                    "K{} R{}-R{} W{}",
+                    choke.id, choke.region_a_id, choke.region_b_id, choke.width_tiles
+                )),
+            });
+
+            for (suffix, tile) in [("a", choke.approach_a_tile), ("b", choke.approach_b_tile)] {
+                let (x, y) = tile_center_world(tile, self.tile_size);
+                primitives.push(ObserverMapAnalysisPrimitive::Marker {
+                    id: format!("choke:{}:approach:{}", choke.id, suffix),
+                    x,
+                    y,
+                    radius: (self.tile_size as f32 * 0.25).max(5.0),
+                    shape: "diamond".to_string(),
+                    color: MAP_ANALYSIS_APPROACH_COLOR.to_string(),
+                    label: None,
+                });
+            }
+        }
+        primitives
     }
 
     fn base_overlay_primitives(&self) -> Vec<ObserverMapAnalysisPrimitive> {
@@ -295,8 +434,9 @@ impl AiMapAnalysis {
             .map(|start| {
                 let (x, y) = tile_center_world(start.start_tile, self.tile_size);
                 let color = start
-                    .component_id
+                    .region_id
                     .map(component_color)
+                    .or_else(|| start.component_id.map(component_color))
                     .unwrap_or("#e7dfc5")
                     .to_string();
                 ObserverMapAnalysisPrimitive::Marker {
@@ -307,10 +447,11 @@ impl AiMapAnalysis {
                     shape: "diamond".to_string(),
                     color,
                     label: Some(format!(
-                        "P{} T{} {}",
+                        "P{} T{} {} {}",
                         start.player_id,
                         start.team_id,
-                        component_label(start.component_id)
+                        component_label(start.component_id),
+                        region_label(start.region_id)
                     )),
                 }
             })
@@ -323,8 +464,9 @@ impl AiMapAnalysis {
             .map(|cluster| {
                 let (x, y) = tile_center_world(cluster.center_tile, self.tile_size);
                 let color = cluster
-                    .component_id
+                    .region_id
                     .map(component_color)
+                    .or_else(|| cluster.component_id.map(component_color))
                     .unwrap_or("#e7dfc5")
                     .to_string();
                 ObserverMapAnalysisPrimitive::Marker {
@@ -335,11 +477,12 @@ impl AiMapAnalysis {
                     shape: "circle".to_string(),
                     color,
                     label: Some(format!(
-                        "R{} {}S/{}O {}",
+                        "R{} {}S/{}O {} {}",
                         cluster.id,
                         cluster.steel_nodes,
                         cluster.oil_nodes,
-                        component_label(cluster.component_id)
+                        component_label(cluster.component_id),
+                        region_label(cluster.region_id)
                     )),
                 }
             })
@@ -481,6 +624,8 @@ fn build_start_mappings(
     height: u32,
     clearance: &[u16],
     component_by_tile: &[Option<u32>],
+    region_by_tile: &[Option<u32>],
+    regions: &[AiMapRegion],
     resource_clusters: &[AiResourceCluster],
 ) -> Vec<AiStartMapping> {
     let mut starts: Vec<_> = players.iter().collect();
@@ -490,6 +635,8 @@ fn build_start_mappings(
         .map(|player| {
             let start_tile = AiTile::new(player.start_tile_x, player.start_tile_y);
             let component_id = component_id_for_tile(width, height, component_by_tile, start_tile);
+            let region_id = region_id_for_tile(width, height, region_by_tile, start_tile)
+                .or_else(|| nearest_region(start_tile, component_id, regions).map(|(id, _)| id));
             let idx = tile_index(width, height, start_tile.x, start_tile.y);
             let (nearest_resource_cluster_id, nearest_resource_cluster_distance2) =
                 nearest_cluster(start_tile, component_id, resource_clusters)
@@ -500,6 +647,7 @@ fn build_start_mappings(
                 team_id: player.team_id,
                 start_tile,
                 component_id,
+                region_id,
                 clearance_tiles: idx.and_then(|idx| clearance.get(idx).copied()).unwrap_or(0),
                 nearest_resource_cluster_id,
                 nearest_resource_cluster_distance2,
@@ -513,6 +661,8 @@ fn build_resource_clusters(
     players: &[PlayerStart],
     clearance: &[u16],
     component_by_tile: &[Option<u32>],
+    region_by_tile: &[Option<u32>],
+    regions: &[AiMapRegion],
 ) -> Vec<AiResourceCluster> {
     let mut resources: Vec<_> = map
         .resources
@@ -572,17 +722,18 @@ fn build_resource_clusters(
             .count() as u16;
         let component_id =
             component_id_for_tile(map.width, map.height, component_by_tile, candidate.center);
-        let (nearest_start_player_id, nearest_start_distance2) =
-            nearest_start(
-                candidate.center,
-                component_id,
-                players,
-                map.width,
-                map.height,
-                component_by_tile,
-            )
-                .map(|(id, distance2)| (Some(id), Some(distance2)))
-                .unwrap_or((None, None));
+        let region_id = region_id_for_tile(map.width, map.height, region_by_tile, candidate.center)
+            .or_else(|| nearest_region(candidate.center, component_id, regions).map(|(id, _)| id));
+        let (nearest_start_player_id, nearest_start_distance2) = nearest_start(
+            candidate.center,
+            component_id,
+            players,
+            map.width,
+            map.height,
+            component_by_tile,
+        )
+        .map(|(id, distance2)| (Some(id), Some(distance2)))
+        .unwrap_or((None, None));
 
         for idx in resource_indices {
             if unassigned.get(idx).copied() == Some(true) {
@@ -595,6 +746,7 @@ fn build_resource_clusters(
             id,
             center_tile: candidate.center,
             component_id,
+            region_id,
             resource_ids,
             steel_nodes,
             oil_nodes,
@@ -622,12 +774,8 @@ fn best_resource_cluster_candidate(
                 continue;
             };
             let center = AiTile::new(x, y);
-            let center_component_id = component_id_for_tile(
-                map.width,
-                map.height,
-                component_by_tile,
-                center,
-            );
+            let center_component_id =
+                component_id_for_tile(map.width, map.height, component_by_tile, center);
             if center_component_id.is_none() {
                 continue;
             }
@@ -903,13 +1051,13 @@ fn component_color(component_id: u32) -> &'static str {
         .unwrap_or("#8fb8d0")
 }
 
-fn component_fill_alpha(tile_count: u32) -> f32 {
+fn region_fill_alpha(tile_count: u32) -> f32 {
     if tile_count >= 1_000 {
-        0.12
+        0.10
     } else if tile_count >= 100 {
-        0.16
+        0.14
     } else {
-        0.22
+        0.20
     }
 }
 
@@ -917,6 +1065,12 @@ fn component_label(component_id: Option<u32>) -> String {
     component_id
         .map(|id| format!("C{id}"))
         .unwrap_or_else(|| "C?".to_string())
+}
+
+fn region_label(region_id: Option<u32>) -> String {
+    region_id
+        .map(|id| format!("R{id}"))
+        .unwrap_or_else(|| "R?".to_string())
 }
 
 fn tile_center_world(tile: AiTile, tile_size: u32) -> (f32, f32) {
@@ -965,331 +1119,4 @@ fn fnv_bytes(mut hash: u64, bytes: &[u8]) -> u64 {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use rts_sim::game::map::Map;
-    use rts_sim::game::{Game, MapMetadata, PlayerInit};
-
-    const FIXTURE_SEED: u32 = 0x1234_5678;
-
-    #[derive(Clone, Copy)]
-    struct ExpectedFixture {
-        name: &'static str,
-        component_count: usize,
-        passable_tiles: u32,
-        blocked_tiles: u32,
-        largest_component_tiles: u32,
-        resource_clusters: usize,
-    }
-
-    fn player_inits(count: u32) -> Vec<PlayerInit> {
-        (1..=count)
-            .map(|id| PlayerInit {
-                id,
-                team_id: id,
-                faction_id: "kriegsia".to_string(),
-                name: format!("P{id}"),
-                color: format!("#{id}{id}{id}"),
-                is_ai: true,
-            })
-            .collect()
-    }
-
-    fn fixture_analysis(map_name: &str) -> AiMapAnalysisDebugSnapshot {
-        let players = player_inits(2);
-        let player_slots: Vec<_> = players
-            .iter()
-            .map(|player| (player.id, player.team_id))
-            .collect();
-        let map = Map::load_for_players(map_name, &player_slots, FIXTURE_SEED)
-            .expect("fixture map should load");
-        let metadata = Map::metadata_for_name(map_name).unwrap_or_else(|_| MapMetadata {
-            name: map_name.to_string(),
-            schema_version: rts_sim::game::map::CURRENT_MAP_VERSION,
-            content_hash: "test".to_string(),
-        });
-        let game = Game::new_with_random_ai_profiles_and_map_metadata(
-            &players,
-            FIXTURE_SEED,
-            map,
-            metadata,
-        );
-        AiMapAnalysis::analyze(&game.start_payload()).debug_snapshot()
-    }
-
-    fn resource_at(id: u32, kind: &str, tile_x: u32, tile_y: u32) -> ResourceNode {
-        let tile_size = config::TILE_SIZE as f32;
-        ResourceNode {
-            id,
-            kind: kind.to_string(),
-            x: (tile_x as f32 + 0.5) * tile_size,
-            y: (tile_y as f32 + 0.5) * tile_size,
-        }
-    }
-
-    #[test]
-    fn no_terrain_fixture_is_one_clear_component() {
-        let debug = fixture_analysis("No Terrain");
-
-        assert_eq!(debug.map_width, 126);
-        assert_eq!(debug.map_height, 126);
-        assert_eq!(debug.passable_tiles, 126 * 126);
-        assert_eq!(debug.blocked_tiles, 0);
-        assert_eq!(debug.component_count, 1);
-        assert_eq!(debug.largest_component_tiles, 126 * 126);
-        assert_eq!(debug.max_clearance_tiles, MAX_CLEARANCE_TILES);
-        assert!(debug.starts.iter().all(|start| {
-            start.component_id == Some(0) && start.clearance_tiles == MAX_CLEARANCE_TILES
-        }));
-    }
-
-    #[test]
-    fn bundled_fixture_counts_are_deterministic() {
-        let expected = [
-            ExpectedFixture {
-                name: "Default",
-                component_count: 43,
-                passable_tiles: 14_634,
-                blocked_tiles: 1_242,
-                largest_component_tiles: 14_476,
-                resource_clusters: 6,
-            },
-            ExpectedFixture {
-                name: "Low Econ",
-                component_count: 45,
-                passable_tiles: 14_615,
-                blocked_tiles: 1_261,
-                largest_component_tiles: 14_451,
-                resource_clusters: 4,
-            },
-            ExpectedFixture {
-                name: "No Terrain",
-                component_count: 1,
-                passable_tiles: 126 * 126,
-                blocked_tiles: 0,
-                largest_component_tiles: 126 * 126,
-                resource_clusters: 4,
-            },
-        ];
-
-        for fixture in expected {
-            let debug = fixture_analysis(fixture.name);
-
-            assert_eq!(
-                debug.component_count, fixture.component_count,
-                "{} component count changed",
-                fixture.name
-            );
-            assert_eq!(
-                debug.passable_tiles, fixture.passable_tiles,
-                "{} passable tile count changed",
-                fixture.name
-            );
-            assert_eq!(
-                debug.blocked_tiles, fixture.blocked_tiles,
-                "{} blocked tile count changed",
-                fixture.name
-            );
-            assert_eq!(
-                debug.largest_component_tiles, fixture.largest_component_tiles,
-                "{} largest component size changed",
-                fixture.name
-            );
-            assert_eq!(
-                debug.resource_clusters.len(),
-                fixture.resource_clusters,
-                "{} resource cluster count changed",
-                fixture.name
-            );
-            assert_eq!(debug.passable_tiles + debug.blocked_tiles, 126 * 126);
-        }
-    }
-
-    #[test]
-    fn resource_clusters_cover_all_static_nodes_with_expected_base_shape() {
-        let expected_nodes_per_cluster =
-            (config::STEEL_PATCHES_PER_BASE + config::OIL_PATCHES_PER_BASE) as usize;
-
-        for map_name in ["Default", "Low Econ", "No Terrain"] {
-            let debug = fixture_analysis(map_name);
-            let total_clustered_nodes: usize = debug
-                .resource_clusters
-                .iter()
-                .map(|cluster| cluster.resource_ids.len())
-                .sum();
-
-            assert_eq!(
-                total_clustered_nodes,
-                debug.resource_clusters.len() * expected_nodes_per_cluster,
-                "{map_name} should assign every static resource to full base clusters"
-            );
-            for cluster in &debug.resource_clusters {
-                assert_eq!(
-                    cluster.resource_ids.len(),
-                    expected_nodes_per_cluster,
-                    "{map_name} cluster {:?} should keep one base resource group",
-                    cluster.id
-                );
-                assert_eq!(cluster.steel_nodes, config::STEEL_PATCHES_PER_BASE as u16);
-                assert_eq!(cluster.oil_nodes, config::OIL_PATCHES_PER_BASE as u16);
-                assert!(
-                    cluster.component_id.is_some(),
-                    "{map_name} cluster {:?} should map to passable terrain",
-                    cluster.id
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn player_starts_map_to_components_and_nearby_resource_clusters() {
-        for map_name in ["Default", "Low Econ", "No Terrain"] {
-            let debug = fixture_analysis(map_name);
-
-            assert_eq!(debug.starts.len(), 2);
-            for start in &debug.starts {
-                assert!(
-                    start.component_id.is_some(),
-                    "{map_name} player {} start should map to a passable component",
-                    start.player_id
-                );
-                assert!(
-                    start.clearance_tiles >= 8,
-                    "{map_name} player {} start clearance was {}",
-                    start.player_id,
-                    start.clearance_tiles
-                );
-                assert!(
-                    start.nearest_resource_cluster_id.is_some(),
-                    "{map_name} player {} should have a nearest resource cluster",
-                    start.player_id
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn resource_mappings_prefer_reachable_components_over_cross_wall_distance() {
-        let width = 40;
-        let height = 10;
-        let mut terrain = vec![terrain::GRASS; (width * height) as usize];
-        for y in 0..height {
-            terrain[(y * width + 20) as usize] = terrain::ROCK;
-        }
-        let start = StartPayload {
-            player_id: 1,
-            spectator: false,
-            prediction_build_id: None,
-            prediction_version: 0,
-            match_run_id: None,
-            capabilities: Default::default(),
-            diagnostics: Default::default(),
-            replay: None,
-            lab: None,
-            tick: 0,
-            map: MapInfo {
-                width,
-                height,
-                tile_size: config::TILE_SIZE,
-                terrain,
-                resources: vec![
-                    resource_at(1, kinds::STEEL, 2, 5),
-                    resource_at(2, kinds::STEEL, 21, 5),
-                ],
-            },
-            players: vec![
-                PlayerStart {
-                    id: 1,
-                    team_id: 1,
-                    faction_id: "kriegsia".to_string(),
-                    name: "P1".to_string(),
-                    color: "#111".to_string(),
-                    start_tile_x: 19,
-                    start_tile_y: 5,
-                },
-                PlayerStart {
-                    id: 2,
-                    team_id: 2,
-                    faction_id: "kriegsia".to_string(),
-                    name: "P2".to_string(),
-                    color: "#222".to_string(),
-                    start_tile_x: 39,
-                    start_tile_y: 5,
-                },
-            ],
-        };
-
-        let debug = AiMapAnalysis::analyze(&start).debug_snapshot();
-        let p1 = debug
-            .starts
-            .iter()
-            .find(|start| start.player_id == 1)
-            .expect("player 1 start should be present");
-        let p2 = debug
-            .starts
-            .iter()
-            .find(|start| start.player_id == 2)
-            .expect("player 2 start should be present");
-        assert_ne!(p1.component_id, p2.component_id);
-
-        let p1_cluster = debug
-            .resource_clusters
-            .iter()
-            .find(|cluster| Some(cluster.id) == p1.nearest_resource_cluster_id)
-            .expect("player 1 should have a nearest cluster");
-        assert_eq!(p1_cluster.component_id, p1.component_id);
-        assert!(
-            p1_cluster.resource_ids.contains(&1),
-            "player 1 should map to the same-component resource, not the closer cross-wall one"
-        );
-
-        let right_cluster = debug
-            .resource_clusters
-            .iter()
-            .find(|cluster| cluster.resource_ids.contains(&2))
-            .expect("right-side resource should be clustered");
-        assert_eq!(right_cluster.component_id, p2.component_id);
-        assert_eq!(right_cluster.nearest_start_player_id, Some(2));
-    }
-
-    #[test]
-    fn analysis_key_tracks_static_map_start_and_resource_identity() {
-        let mut start = StartPayload {
-            player_id: 1,
-            spectator: false,
-            prediction_build_id: None,
-            prediction_version: 0,
-            match_run_id: None,
-            capabilities: Default::default(),
-            diagnostics: Default::default(),
-            replay: None,
-            lab: None,
-            tick: 0,
-            map: MapInfo {
-                width: 4,
-                height: 4,
-                tile_size: config::TILE_SIZE,
-                terrain: vec![terrain::GRASS; 16],
-                resources: Vec::new(),
-            },
-            players: vec![PlayerStart {
-                id: 1,
-                team_id: 1,
-                faction_id: "kriegsia".to_string(),
-                name: "P1".to_string(),
-                color: "#111".to_string(),
-                start_tile_x: 1,
-                start_tile_y: 1,
-            }],
-        };
-
-        let original = AiMapAnalysisKey::from_start(&start);
-        start.players[0].start_tile_x = 2;
-        let moved_start = AiMapAnalysisKey::from_start(&start);
-        start.map.terrain[0] = terrain::ROCK;
-        let changed_terrain = AiMapAnalysisKey::from_start(&start);
-
-        assert_ne!(original, moved_start);
-        assert_ne!(moved_start, changed_terrain);
-    }
-}
+mod tests;

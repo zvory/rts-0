@@ -1405,8 +1405,9 @@ the selected profile id, the AI observation tick that produced the trace, and th
 lines from the AI decision manager.
 `mapAnalysis`, when present, contains static AI-owned map-analysis overlay primitives built from
 public start-payload terrain, starts, and resource nodes. Live AI-vs-AI spectator diagnostics use it
-to draw component fills, base markers, resource-cluster markers, and labels. It is optional because
-replay analysis and non-AI live rooms do not currently own an AI controller cache for this data.
+to draw region fills, choke bands with approach markers, base markers, resource-cluster markers,
+and labels. It is optional because replay analysis and non-AI live rooms do not currently own an AI
+controller cache for this data.
 
 Observer analysis uses an all-player spectator policy independent of each viewer's vision selection
 selection. It is observer-only data for analysis overlays, not an active-player information surface.
