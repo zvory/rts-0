@@ -11,11 +11,12 @@ use rts_protocol::{
 };
 use rts_sim::protocol::{kinds, terrain, MapInfo, PlayerStart, ResourceNode, StartPayload};
 
+mod chokes;
 mod regions;
 mod voronoi;
+use chokes::build_chokes;
 use regions::{
-    build_chokes, build_regions, nearest_region, region_id_for_tile, region_tile_rects,
-    tile_rects_for_tiles,
+    build_regions, nearest_region, region_id_for_tile, region_tile_rects, tile_rects_for_tiles,
 };
 use voronoi::build_voronoi_skeleton;
 
