@@ -501,7 +501,7 @@ function tag(kind, text) {
   return el;
 }
 
-function playableAiProfileId(id) {
+export function playableAiProfileId(id) {
   const canonicalId = AI_PROFILE_ALIASES[id] || id;
   return AI_PROFILES.some((entry) => entry.id === canonicalId)
     ? canonicalId

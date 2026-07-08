@@ -10,7 +10,7 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 - §4.3 Client architecture workflow
 
 ## Code map
-- `app-shell`: `main.js`, `app.js`, `match.js`, `match_*.js`, diagnostics, observer analysis,
+- `app-shell`: `main.js`, `app.js`, `launch_url.js`, `match.js`, `match_*.js`, diagnostics, observer analysis,
   AI diagnostics, room-time controls, replay/spectator/lab wiring, `lab_control_policy.js`, and
   `room_capabilities.js`.
 - `model`: `state.js`, `state_ground_decals.js`, `client_intent.js`, `command_budget.js`,
