@@ -13,12 +13,8 @@ use rts_sim::protocol::{kinds, terrain, MapInfo, PlayerStart, ResourceNode, Star
 
 mod chokes;
 mod regions;
-mod voronoi;
 use chokes::build_chokes;
-use regions::{
-    build_regions, nearest_region, region_id_for_tile, region_tile_rects, tile_rects_for_tiles,
-};
-use voronoi::build_voronoi_skeleton;
+use regions::{build_regions, nearest_region, region_id_for_tile, tile_rects_for_tiles};
 
 const MAX_CLEARANCE_TILES: u16 = 16;
 const RESOURCE_CLUSTER_RADIUS_MARGIN_TILES: f32 = 0.75;
@@ -34,7 +30,6 @@ const CHOKE_MIN_BAND_TILES: u32 = 4;
 const CHOKE_MAX_BAND_TILES: u32 = 1_024;
 const MAP_ANALYSIS_CHOKE_COLOR: &str = "#ff6b35";
 const MAP_ANALYSIS_APPROACH_COLOR: &str = "#f7d774";
-const MAP_ANALYSIS_VORONOI_COLOR: &str = "#8df7ff";
 const MAP_ANALYSIS_COMPONENT_COLORS: [&str; 8] = [
     "#3da5d9", "#f2a541", "#7ac74f", "#c77dff", "#ef476f", "#ffd166", "#06d6a0", "#8fb8d0",
 ];
@@ -147,13 +142,6 @@ pub(crate) struct AiMapChoke {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct AiMapVoronoiTile {
-    pub(crate) tile: AiTile,
-    pub(crate) clearance_tiles: u16,
-    pub(crate) boundary_distance_tiles: u16,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct AiStartMapping {
     pub(crate) player_id: u32,
     pub(crate) team_id: u32,
@@ -191,7 +179,6 @@ pub(crate) struct AiMapAnalysis {
     region_by_tile: Vec<Option<u32>>,
     regions: Vec<AiMapRegion>,
     chokes: Vec<AiMapChoke>,
-    voronoi_tiles: Vec<AiMapVoronoiTile>,
     starts: Vec<AiStartMapping>,
     resource_clusters: Vec<AiResourceCluster>,
 }
@@ -211,10 +198,8 @@ pub(crate) struct AiMapAnalysisDebugSnapshot {
     pub(crate) components: Vec<AiMapComponent>,
     pub(crate) region_count: usize,
     pub(crate) choke_count: usize,
-    pub(crate) voronoi_tile_count: usize,
     pub(crate) regions: Vec<AiMapRegion>,
     pub(crate) chokes: Vec<AiMapChoke>,
-    pub(crate) voronoi_tiles: Vec<AiMapVoronoiTile>,
     pub(crate) starts: Vec<AiStartMapping>,
     pub(crate) resource_clusters: Vec<AiResourceCluster>,
 }
@@ -252,7 +237,6 @@ impl AiMapAnalysis {
             &region_by_tile,
             &regions,
         );
-        let voronoi_tiles = build_voronoi_skeleton(width, height, &passable, &clearance);
         let resource_clusters = build_resource_clusters(
             &start.map,
             &start.players,
@@ -283,7 +267,6 @@ impl AiMapAnalysis {
             region_by_tile,
             regions,
             chokes,
-            voronoi_tiles,
             starts,
             resource_clusters,
         }
@@ -330,8 +313,6 @@ impl AiMapAnalysis {
             choke_count: self.chokes.len(),
             regions: self.regions.clone(),
             chokes: self.chokes.clone(),
-            voronoi_tile_count: self.voronoi_tiles.len(),
-            voronoi_tiles: self.voronoi_tiles.clone(),
             starts: self.starts.clone(),
             resource_clusters: self.resource_clusters.clone(),
         }
@@ -344,22 +325,10 @@ impl AiMapAnalysis {
             tile_size: self.tile_size,
             layers: vec![
                 ObserverMapAnalysisLayer {
-                    id: "regions".to_string(),
-                    label: "Regions".to_string(),
-                    default_visible: true,
-                    primitives: self.region_overlay_primitives(),
-                },
-                ObserverMapAnalysisLayer {
                     id: "chokes".to_string(),
                     label: "Chokes".to_string(),
                     default_visible: true,
                     primitives: self.choke_overlay_primitives(),
-                },
-                ObserverMapAnalysisLayer {
-                    id: "voronoi".to_string(),
-                    label: "Voronoi".to_string(),
-                    default_visible: false,
-                    primitives: self.voronoi_overlay_primitives(),
                 },
                 ObserverMapAnalysisLayer {
                     id: "bases".to_string(),
@@ -375,48 +344,6 @@ impl AiMapAnalysis {
                 },
             ],
         }
-    }
-
-    fn region_overlay_primitives(&self) -> Vec<ObserverMapAnalysisPrimitive> {
-        let mut primitives = Vec::new();
-        for region in &self.regions {
-            let fill = component_color(region.id).to_string();
-            for (idx, rect) in
-                region_tile_rects(self.width, self.height, &self.region_by_tile, region.id)
-                    .into_iter()
-                    .enumerate()
-            {
-                primitives.push(ObserverMapAnalysisPrimitive::TileRect {
-                    id: format!("region:{}:{}", region.id, idx),
-                    tile_x: rect.tile_x,
-                    tile_y: rect.tile_y,
-                    tile_w: rect.tile_w,
-                    tile_h: rect.tile_h,
-                    stroke: fill.clone(),
-                    fill: fill.clone(),
-                    alpha: region_fill_alpha(region.tile_count),
-                    label: None,
-                });
-            }
-
-            let (x, y) = tile_center_world(region.representative, self.tile_size);
-            primitives.push(ObserverMapAnalysisPrimitive::Marker {
-                id: format!("regionLabel:{}", region.id),
-                x,
-                y,
-                radius: (self.tile_size as f32 * 0.34).max(6.0),
-                shape: "square".to_string(),
-                color: fill,
-                label: Some(format!(
-                    "R{} {}t core{} clr{}",
-                    region.id,
-                    region.tile_count,
-                    region.core_tile_count,
-                    region.max_clearance_tiles
-                )),
-            });
-        }
-        primitives
     }
 
     fn choke_overlay_primitives(&self) -> Vec<ObserverMapAnalysisPrimitive> {
@@ -464,29 +391,6 @@ impl AiMapAnalysis {
             }
         }
         primitives
-    }
-
-    fn voronoi_overlay_primitives(&self) -> Vec<ObserverMapAnalysisPrimitive> {
-        let tiles: Vec<_> = self
-            .voronoi_tiles
-            .iter()
-            .map(|entry| entry.tile)
-            .collect();
-        tile_rects_for_tiles(&tiles)
-            .into_iter()
-            .enumerate()
-            .map(|(idx, rect)| ObserverMapAnalysisPrimitive::TileRect {
-                id: format!("voronoi:{idx}"),
-                tile_x: rect.tile_x,
-                tile_y: rect.tile_y,
-                tile_w: rect.tile_w,
-                tile_h: rect.tile_h,
-                fill: MAP_ANALYSIS_VORONOI_COLOR.to_string(),
-                stroke: MAP_ANALYSIS_VORONOI_COLOR.to_string(),
-                alpha: 0.22,
-                label: None,
-            })
-            .collect()
     }
 
     fn base_overlay_primitives(&self) -> Vec<ObserverMapAnalysisPrimitive> {
@@ -1119,16 +1023,6 @@ fn component_color(component_id: u32) -> &'static str {
         .get(component_id as usize % MAP_ANALYSIS_COMPONENT_COLORS.len())
         .copied()
         .unwrap_or("#8fb8d0")
-}
-
-fn region_fill_alpha(tile_count: u32) -> f32 {
-    if tile_count >= 1_000 {
-        0.10
-    } else if tile_count >= 100 {
-        0.14
-    } else {
-        0.20
-    }
 }
 
 fn component_label(component_id: Option<u32>) -> String {

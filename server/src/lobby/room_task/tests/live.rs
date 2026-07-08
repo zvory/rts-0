@@ -541,13 +541,22 @@ fn ai_only_live_spectator_observer_analysis_includes_ai_decision_diagnostics() {
         .map_analysis
         .as_ref()
         .expect("AI-only spectator analysis should include cached static map analysis");
-    for expected_layer_id in ["regions", "chokes"] {
+    for expected_layer_id in ["chokes", "bases", "resources"] {
         assert!(
             map_analysis
                 .layers
                 .iter()
                 .any(|layer| layer.id == expected_layer_id && !layer.primitives.is_empty()),
             "map-analysis diagnostics should expose {expected_layer_id} primitives"
+        );
+    }
+    for retired_layer_id in ["regions", "voronoi"] {
+        assert!(
+            map_analysis
+                .layers
+                .iter()
+                .all(|layer| layer.id != retired_layer_id),
+            "map-analysis diagnostics should not expose retired {retired_layer_id} primitives"
         );
     }
     let ai_rows: Vec<_> = analysis

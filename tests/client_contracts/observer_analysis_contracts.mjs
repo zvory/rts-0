@@ -138,22 +138,41 @@ import { textWithin } from "./dom_text.mjs";
   const aiPrefs = createAiDiagnosticsPanelPreferences(aiStorage);
   aiPrefs.visible = false;
   aiPrefs.collapsed = true;
-  aiPrefs.setMapLayerVisible("regions", false);
+  aiPrefs.setMapLayerVisible("chokes", false);
   const restoredAiPrefs = createAiDiagnosticsPanelPreferences(aiStorage);
   assert(restoredAiPrefs.visible === false, "AI diagnostics visible state persists");
   assert(restoredAiPrefs.collapsed === true, "AI diagnostics collapsed state persists");
   assert(
-    restoredAiPrefs.mapLayerVisibility(["regions"]).regions === false,
+    restoredAiPrefs.mapLayerVisibility(["chokes"]).chokes === false,
     "AI diagnostics map layer visibility persists",
+  );
+  const staleAiStorage = fakeStorage();
+  staleAiStorage.setItem("rts.aiDiagnosticsPanel", JSON.stringify({
+    mapLayers: { regions: false, voronoi: true, chokes: false, futureRoutes: false },
+  }));
+  const staleAiPrefs = createAiDiagnosticsPanelPreferences(staleAiStorage);
+  const staleMapLayers = staleAiPrefs.mapLayerVisibility(["chokes", "futureRoutes"]);
+  assert(
+    staleMapLayers.chokes === false
+      && staleMapLayers.futureRoutes === false
+      && !Object.hasOwn(staleMapLayers, "regions")
+      && !Object.hasOwn(staleMapLayers, "voronoi"),
+    "AI diagnostics drops retired map-analysis layers without losing current layer preferences",
+  );
+  staleAiPrefs.setMapLayerVisible("regions", true);
+  const retiredLayerIds = staleAiPrefs.mapLayerVisibility(["regions", "voronoi"]);
+  assert(
+    !Object.hasOwn(retiredLayerIds, "regions") && !Object.hasOwn(retiredLayerIds, "voronoi"),
+    "AI diagnostics rejects retired map-analysis layer ids from current payloads and direct toggles",
   );
   const mapSummary = normalizeMapAnalysisSummary({
     mapWidth: 126,
     mapHeight: 126,
     tileSize: 32,
     layers: [
-      { id: "regions", label: "Regions", primitives: [{ kind: "tileRect" }, { kind: "marker" }] },
-      { id: "chokes", label: "Chokes", primitives: [{ kind: "tileRect" }] },
+      { id: "chokes", label: "Chokes", primitives: [{ kind: "tileRect" }, { kind: "marker" }] },
       { id: "bases", label: "Bases", primitives: [{ kind: "marker" }] },
+      { id: "resources", label: "Resources", primitives: [{ kind: "marker" }] },
     ],
   });
   assert(
@@ -420,7 +439,7 @@ import { textWithin } from "./dom_text.mjs";
     assert(root.children.length === 2, "AI diagnostics panel mounts generated DOM plus a show affordance");
     assert(root.querySelector(".lab-panel-drag-handle"), "AI diagnostics panel uses the shared movable lab window titlebar");
     assert(root.querySelector(".lab-panel-resize-handle"), "AI diagnostics panel uses the shared resizable lab window handle");
-    assert(latestMapLayers?.regions === false, "AI diagnostics publishes persisted map layer visibility on mount");
+    assert(latestMapLayers?.chokes === false, "AI diagnostics publishes persisted map layer visibility on mount");
     assert(
       textWithin(root).includes("Waiting for observer analysis"),
       "AI diagnostics panel shows a factual waiting state before analysis arrives",
@@ -441,12 +460,6 @@ import { textWithin } from "./dom_text.mjs";
       tileSize: 32,
       layers: [
         {
-          id: "regions",
-          label: "Regions",
-          defaultVisible: true,
-          primitives: [{ kind: "tileRect", id: "region:0:0", tileX: 1, tileY: 2, tileW: 3, tileH: 4 }],
-        },
-        {
           id: "chokes",
           label: "Chokes",
           defaultVisible: true,
@@ -457,6 +470,12 @@ import { textWithin } from "./dom_text.mjs";
           label: "Bases",
           defaultVisible: true,
           primitives: [{ kind: "marker", id: "base:1", x: 64, y: 96, radius: 14 }],
+        },
+        {
+          id: "resources",
+          label: "Resources",
+          defaultVisible: true,
+          primitives: [{ kind: "marker", id: "resource:0", x: 96, y: 128, radius: 10 }],
         },
       ],
     };
@@ -498,7 +517,6 @@ import { textWithin } from "./dom_text.mjs";
         && aiDiagnosticsText.includes("Trace lines")
         && aiDiagnosticsText.includes("Map layers")
         && aiDiagnosticsText.includes("Map analysis")
-        && aiDiagnosticsText.includes("Regions")
         && aiDiagnosticsText.includes("Chokes")
         && aiDiagnosticsText.includes("2")
         && aiDiagnosticsText.includes("ai_1_2_wave_cohorts")
@@ -509,15 +527,15 @@ import { textWithin } from "./dom_text.mjs";
         && aiDiagnosticsText.includes("train:Rifleman"),
       "AI diagnostics panel renders status, profile, trace tick, and parsed decision fields",
     );
-    const regionToggle = findFakes(root, (el) =>
+    const chokeToggle = findFakes(root, (el) =>
       el.classList.contains("ai-diagnostics-map-toggle")
-      && el.dataset.aiMapLayer === "regions",
+      && el.dataset.aiMapLayer === "chokes",
     )[0];
-    assert(regionToggle?.getAttribute("aria-checked") === "false", "AI diagnostics renders persisted map toggle state");
-    root.children[0].listeners.click?.({ target: regionToggle, preventDefault() {}, stopPropagation() {} });
+    assert(chokeToggle?.getAttribute("aria-checked") === "false", "AI diagnostics renders persisted map toggle state");
+    root.children[0].listeners.click?.({ target: chokeToggle, preventDefault() {}, stopPropagation() {} });
     assert(
-      restoredAiPrefs.mapLayerVisibility(["regions"]).regions === true
-        && latestMapLayers?.regions === true,
+      restoredAiPrefs.mapLayerVisibility(["chokes"]).chokes === true
+        && latestMapLayers?.chokes === true,
       "AI diagnostics map layer toggles update preferences and renderer visibility",
     );
     const aiTabs = root.querySelectorAll(".ai-diagnostics-tab");
