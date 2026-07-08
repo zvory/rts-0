@@ -52,8 +52,10 @@ It also owns static map analysis (`map_analysis.rs`) built only from `StartPaylo
 start tiles, and static resource nodes. `AiController` caches that analysis by a stable
 map/start/resource identity. The analyzer records terrain passability, centered clearance, passable
 components, 10-clearance open-region seeds grown to 5-clearance shoulders, region assignments for
-starts/resources, and <=4-clearance choke bands that connect distinct regions. Default and Low Econ
-currently stabilize at five meaningful open regions and eight choke portals each; No Terrain
+starts/resources, and <=4-clearance choke bands split into region-pair corridors from contact-front
+distances so long passages keep their middle tiles and alternate exits survive independently.
+Default and Low Econ currently stabilize at five meaningful open regions and eight choke portals
+each; No Terrain
 stabilizes at one region and no chokes. Current decision code does not consume this analysis yet,
 so it is a read-only foundation rather than a gameplay behavior change.
 Live spectator observer diagnostics can expose this cached analysis as `observerAnalysis.mapAnalysis`

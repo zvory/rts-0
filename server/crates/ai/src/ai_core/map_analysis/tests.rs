@@ -114,6 +114,18 @@ fn set_rock(terrain: &mut [u8], width: u32, x: u32, y: u32) {
     terrain[(y * width + x) as usize] = terrain::ROCK;
 }
 
+fn set_grass(terrain: &mut [u8], width: u32, x: u32, y: u32) {
+    terrain[(y * width + x) as usize] = terrain::GRASS;
+}
+
+fn fill_grass_rect(terrain: &mut [u8], width: u32, x: u32, y: u32, w: u32, h: u32) {
+    for ty in y..y.saturating_add(h) {
+        for tx in x..x.saturating_add(w) {
+            set_grass(terrain, width, tx, ty);
+        }
+    }
+}
+
 fn add_vertical_wall_with_gaps(
     terrain: &mut [u8],
     width: u32,
@@ -339,6 +351,37 @@ fn single_gap_wall_extracts_one_choke_between_two_regions() {
         choke
     );
     assert!(debug.starts.iter().all(|start| start.region_id.is_some()));
+}
+
+#[test]
+fn long_corridor_choke_keeps_middle_tiles_between_regions() {
+    let width = 80;
+    let height = 40;
+    let mut terrain = vec![terrain::ROCK; (width * height) as usize];
+    fill_grass_rect(&mut terrain, width, 0, 0, 24, height);
+    fill_grass_rect(&mut terrain, width, 56, 0, 24, height);
+    fill_grass_rect(&mut terrain, width, 24, 18, 32, 4);
+    let start = start_payload_for_terrain(width, height, terrain, &[(12, 20), (68, 20)]);
+    let debug = AiMapAnalysis::analyze(&start).debug_snapshot();
+
+    assert_eq!(debug.region_count, 2);
+    assert_eq!(debug.choke_count, 1);
+    let choke = &debug.chokes[0];
+    assert!(
+        choke.tiles.contains(&AiTile::new(40, 19)),
+        "long choke should include the corridor middle, not just the ends: {:?}",
+        choke
+    );
+    assert!(
+        choke.tile_count > u32::from(CHOKE_CONTACT_RADIUS_TILES) * 2,
+        "long choke should retain a full passage band: {:?}",
+        choke
+    );
+    assert!(
+        choke.width_tiles <= 6,
+        "corridor width should be measured by cross-section, not bounds: {:?}",
+        choke
+    );
 }
 
 #[test]

@@ -39,7 +39,7 @@ export function _drawObserverMapAnalysisOverlay(model, { camera = null } = {}) {
 
     for (const primitive of layer.primitives) {
       if (primitive.kind === "tileRect") {
-        drawTileRect(gfx, primitive, analysis.tileSize, lineWidth);
+        drawTileRect(gfx, primitive, analysis.tileSize, lineWidth, layer.id);
         primitiveCount += 1;
         if (showLabels && primitive.label) {
           const x = (primitive.tileX + primitive.tileW * 0.5) * analysis.tileSize;
@@ -71,14 +71,16 @@ export function _drawObserverMapAnalysisOverlay(model, { camera = null } = {}) {
   return primitiveCount;
 }
 
-function drawTileRect(g, primitive, tileSize, lineWidth) {
+function drawTileRect(g, primitive, tileSize, lineWidth, layerId) {
   const x = primitive.tileX * tileSize;
   const y = primitive.tileY * tileSize;
   const w = primitive.tileW * tileSize;
   const h = primitive.tileH * tileSize;
   const fill = hexToInt(primitive.fill, DEFAULT_COMPONENT_FILL);
   const stroke = hexToInt(primitive.stroke, fill);
-  g.lineStyle(lineWidth, stroke, 0.72);
+  const strokeAlpha = layerId === "regions" ? 0.16 : 0.72;
+  const strokeWidth = layerId === "regions" ? Math.max(0.5, lineWidth * 0.45) : lineWidth;
+  g.lineStyle(strokeWidth, stroke, strokeAlpha);
   g.beginFill(fill, clamp(primitive.alpha, 0.04, 0.32));
   g.drawRect(x, y, w, h);
   g.endFill();

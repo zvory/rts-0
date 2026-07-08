@@ -339,9 +339,11 @@ fn render_layer(
                 let y = tile_y.saturating_mul(tile_px);
                 let w = tile_w.saturating_mul(tile_px);
                 let h = tile_h.saturating_mul(tile_px);
+                let stroke_opacity = if layer.id == "regions" { 0.16 } else { 0.92 };
+                let stroke_width = if layer.id == "regions" { 0.6 } else { 1.4 };
                 writeln!(
                     out,
-                    r#"<rect id="{}" x="{x}" y="{y}" width="{w}" height="{h}" fill="{}" fill-opacity="{:.3}" stroke="{}" stroke-opacity="0.92" stroke-width="1.4"/>"#,
+                    r#"<rect id="{}" x="{x}" y="{y}" width="{w}" height="{h}" fill="{}" fill-opacity="{:.3}" stroke="{}" stroke-opacity="{stroke_opacity:.2}" stroke-width="{stroke_width:.1}"/>"#,
                     escape_xml(id),
                     escape_xml(fill),
                     alpha.clamp(0.0, 1.0),

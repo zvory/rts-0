@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use super::*;
 
@@ -16,6 +16,12 @@ struct RegionSeed {
 struct RegionContact {
     region_tile: AiTile,
     portal_tile: AiTile,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct RegionDistance {
+    region_id: u32,
+    distance: u32,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -205,34 +211,20 @@ pub(super) fn build_chokes(
             };
             let start_tile = AiTile::new(x, y);
             if visited.get(start_idx).copied() == Some(true)
-                || !is_choke_seed_tile(
-                    width,
-                    height,
-                    passable,
-                    region_by_tile,
-                    start_idx,
-                    start_tile,
-                )
+                || !is_choke_band_tile(passable, region_by_tile, start_idx)
             {
                 continue;
             }
 
-            let mut tiles = Vec::new();
-            let mut bounds = AiTileBounds::new(start_tile);
-            let mut min_clearance_tiles = u16::MAX;
-            let mut max_clearance_tiles = 0;
+            let mut band_tiles = Vec::new();
 
             visited[start_idx] = true;
             queue.push_back(start_tile);
             while let Some(tile) = queue.pop_front() {
-                let Some(idx) = tile_index(width, height, tile.x, tile.y) else {
+                if tile_index(width, height, tile.x, tile.y).is_none() {
                     continue;
-                };
-                let tile_clearance = clearance.get(idx).copied().unwrap_or(0);
-                bounds.include(tile);
-                min_clearance_tiles = min_clearance_tiles.min(tile_clearance);
-                max_clearance_tiles = max_clearance_tiles.max(tile_clearance);
-                tiles.push(tile);
+                }
+                band_tiles.push(tile);
 
                 for neighbor in cardinal_neighbors(width, height, tile) {
                     let Some(neighbor_idx) = tile_index(width, height, neighbor.x, neighbor.y)
@@ -240,14 +232,7 @@ pub(super) fn build_chokes(
                         continue;
                     };
                     if visited.get(neighbor_idx).copied() == Some(true)
-                        || !is_choke_seed_tile(
-                            width,
-                            height,
-                            passable,
-                            region_by_tile,
-                            neighbor_idx,
-                            neighbor,
-                        )
+                        || !is_choke_band_tile(passable, region_by_tile, neighbor_idx)
                     {
                         continue;
                     }
@@ -256,56 +241,133 @@ pub(super) fn build_chokes(
                 }
             }
 
-            if tiles.len() as u32 > CHOKE_MAX_BAND_TILES {
-                continue;
-            }
-
-            let contacts = choke_contacts(width, height, passable, region_by_tile, &tiles);
-            if contacts.len() < 2 || contacts.len() > CHOKE_MAX_ADJACENT_REGIONS {
-                continue;
-            }
-
-            let center_tile = center_tile_for_tiles(&tiles);
-            let (endpoint_a_tile, endpoint_b_tile, width_tiles) =
-                choke_segment_endpoints(&tiles, bounds);
-            let adjacent_regions: Vec<_> = contacts.keys().copied().collect();
-            for (idx, &region_a_id) in adjacent_regions.iter().enumerate() {
-                for &region_b_id in adjacent_regions.iter().skip(idx + 1) {
-                    let Some(contact_a) = contacts
-                        .get(&region_a_id)
-                        .and_then(|items| best_region_contact(items, center_tile))
-                    else {
-                        continue;
-                    };
-                    let Some(contact_b) = contacts
-                        .get(&region_b_id)
-                        .and_then(|items| best_region_contact(items, center_tile))
-                    else {
-                        continue;
-                    };
-                    let id = chokes.len() as u32;
-                    chokes.push(AiMapChoke {
-                        id,
-                        region_a_id,
-                        region_b_id,
-                        center_tile,
-                        endpoint_a_tile,
-                        endpoint_b_tile,
-                        approach_a_tile: contact_a.region_tile,
-                        approach_b_tile: contact_b.region_tile,
-                        width_tiles,
-                        tile_count: tiles.len() as u32,
-                        tiles: tiles.clone(),
-                        bounds,
-                        min_clearance_tiles,
-                        max_clearance_tiles,
-                    });
-                }
-            }
+            build_chokes_for_band(
+                width,
+                height,
+                passable,
+                clearance,
+                region_by_tile,
+                &band_tiles,
+                &mut chokes,
+            );
         }
     }
 
     chokes
+}
+
+fn build_chokes_for_band(
+    width: u32,
+    height: u32,
+    passable: &[bool],
+    clearance: &[u16],
+    region_by_tile: &[Option<u32>],
+    band_tiles: &[AiTile],
+    chokes: &mut Vec<AiMapChoke>,
+) {
+    let contacts = choke_contacts(width, height, passable, region_by_tile, band_tiles);
+    if contacts.len() < 2 {
+        return;
+    }
+
+    let band_index = band_tile_index(band_tiles);
+    let region_distances: BTreeMap<_, _> = contacts
+        .iter()
+        .map(|(&region_id, contacts)| {
+            let sources = contact_portal_tiles(contacts);
+            (
+                region_id,
+                band_distances(width, height, &band_index, band_tiles.len(), &sources),
+            )
+        })
+        .collect();
+    let mut pair_tiles: BTreeMap<(u32, u32), Vec<(AiTile, u32)>> = BTreeMap::new();
+    for (tile_idx, &tile) in band_tiles.iter().enumerate() {
+        let Some((region_a, region_b, pair_distance)) =
+            nearest_region_pair_for_band_tile(&region_distances, tile_idx)
+        else {
+            continue;
+        };
+        pair_tiles
+            .entry(ordered_pair(region_a, region_b))
+            .or_default()
+            .push((tile, pair_distance));
+    }
+
+    for ((region_a_id, region_b_id), tiles_with_distance) in pair_tiles {
+        let distance_by_tile: BTreeMap<_, _> = tiles_with_distance.into_iter().collect();
+        let pair_tile_set: BTreeSet<_> = distance_by_tile.keys().copied().collect();
+        for pair_group in connected_tile_groups(width, height, &pair_tile_set) {
+            let Some(shortest_pair_distance) = pair_group
+                .iter()
+                .filter_map(|tile| distance_by_tile.get(tile).copied())
+                .min()
+            else {
+                continue;
+            };
+            let corridor_tiles: BTreeSet<_> = pair_group
+                .into_iter()
+                .filter(|tile| {
+                    distance_by_tile.get(tile).copied().is_some_and(|distance| {
+                        distance
+                            <= shortest_pair_distance.saturating_add(CHOKE_PAIR_PATH_SLACK_TILES)
+                    })
+                })
+                .collect();
+            if corridor_tiles.is_empty() {
+                continue;
+            }
+
+            for tiles in connected_tile_groups(width, height, &corridor_tiles) {
+                if tiles.len() as u32 > CHOKE_MAX_BAND_TILES
+                    || (tiles.len() as u32) < CHOKE_MIN_BAND_TILES
+                {
+                    continue;
+                }
+
+                let contacts = choke_contacts(width, height, passable, region_by_tile, &tiles);
+                let Some(contact_a) = contacts
+                    .get(&region_a_id)
+                    .and_then(|items| best_region_contact(items, center_tile_for_tiles(&tiles)))
+                else {
+                    continue;
+                };
+                let center_tile = center_tile_for_tiles(&tiles);
+                let Some(contact_b) = contacts
+                    .get(&region_b_id)
+                    .and_then(|items| best_region_contact(items, center_tile))
+                else {
+                    continue;
+                };
+                let (bounds, min_clearance_tiles, max_clearance_tiles) =
+                    choke_tile_stats(width, height, clearance, &tiles);
+                let (endpoint_a_tile, endpoint_b_tile, width_tiles) = choke_segment_geometry(
+                    &tiles,
+                    center_tile,
+                    contact_a.region_tile,
+                    contact_b.region_tile,
+                    bounds,
+                );
+                let id = chokes.len() as u32;
+                chokes.push(AiMapChoke {
+                    id,
+                    region_a_id,
+                    region_b_id,
+                    center_tile,
+                    endpoint_a_tile,
+                    endpoint_b_tile,
+                    approach_a_tile: contact_a.region_tile,
+                    approach_b_tile: contact_b.region_tile,
+                    width_tiles,
+                    tile_count: tiles.len() as u32,
+                    tiles,
+                    bounds,
+                    min_clearance_tiles,
+                    max_clearance_tiles,
+                });
+            }
+        }
+    }
 }
 
 pub(super) fn region_id_for_tile(
@@ -358,16 +420,156 @@ fn is_choke_band_tile(passable: &[bool], region_by_tile: &[Option<u32>], idx: us
     passable.get(idx).copied() == Some(true) && region_by_tile.get(idx).copied().flatten().is_none()
 }
 
-fn is_choke_seed_tile(
+fn band_tile_index(tiles: &[AiTile]) -> BTreeMap<AiTile, usize> {
+    tiles
+        .iter()
+        .copied()
+        .enumerate()
+        .map(|(idx, tile)| (tile, idx))
+        .collect()
+}
+
+fn contact_portal_tiles(contacts: &[RegionContact]) -> Vec<AiTile> {
+    let mut portals: Vec<_> = contacts.iter().map(|contact| contact.portal_tile).collect();
+    portals.sort_unstable_by_key(|tile| (tile.y, tile.x));
+    portals.dedup();
+    portals
+}
+
+fn band_distances(
     width: u32,
     height: u32,
-    passable: &[bool],
-    region_by_tile: &[Option<u32>],
-    idx: usize,
-    tile: AiTile,
-) -> bool {
-    is_choke_band_tile(passable, region_by_tile, idx)
-        && nearby_region_contacts(width, height, passable, region_by_tile, tile).len() >= 2
+    band_index: &BTreeMap<AiTile, usize>,
+    tile_count: usize,
+    sources: &[AiTile],
+) -> Vec<Option<u32>> {
+    let mut distances: Vec<Option<u32>> = vec![None; tile_count];
+    let mut queue = VecDeque::new();
+
+    for &source in sources {
+        let Some(&source_idx) = band_index.get(&source) else {
+            continue;
+        };
+        if distances[source_idx].is_some() {
+            continue;
+        }
+        distances[source_idx] = Some(0);
+        queue.push_back(source);
+    }
+
+    while let Some(tile) = queue.pop_front() {
+        let Some(&tile_idx) = band_index.get(&tile) else {
+            continue;
+        };
+        let Some(distance) = distances[tile_idx] else {
+            continue;
+        };
+        for neighbor in cardinal_neighbors(width, height, tile) {
+            let Some(&neighbor_idx) = band_index.get(&neighbor) else {
+                continue;
+            };
+            if distances[neighbor_idx].is_some() {
+                continue;
+            }
+            distances[neighbor_idx] = Some(distance.saturating_add(1));
+            queue.push_back(neighbor);
+        }
+    }
+
+    distances
+}
+
+fn nearest_region_pair_for_band_tile(
+    region_distances: &BTreeMap<u32, Vec<Option<u32>>>,
+    tile_idx: usize,
+) -> Option<(u32, u32, u32)> {
+    let mut nearest: Vec<_> = region_distances
+        .iter()
+        .filter_map(|(&region_id, distances)| {
+            distances
+                .get(tile_idx)
+                .copied()
+                .flatten()
+                .map(|distance| RegionDistance {
+                    region_id,
+                    distance,
+                })
+        })
+        .collect();
+    if nearest.len() < 2 {
+        return None;
+    }
+    nearest.sort_unstable_by_key(|entry| (entry.distance, entry.region_id));
+    let a = nearest[0];
+    let b = nearest[1];
+    Some((
+        a.region_id,
+        b.region_id,
+        a.distance.saturating_add(b.distance),
+    ))
+}
+
+fn ordered_pair(a: u32, b: u32) -> (u32, u32) {
+    if a <= b {
+        (a, b)
+    } else {
+        (b, a)
+    }
+}
+
+fn connected_tile_groups(
+    width: u32,
+    height: u32,
+    tiles: &BTreeSet<AiTile>,
+) -> Vec<Vec<AiTile>> {
+    let mut groups = Vec::new();
+    let mut remaining = tiles.clone();
+    let mut queue = VecDeque::new();
+
+    while let Some(&start) = remaining.iter().next() {
+        remaining.remove(&start);
+        let mut group = Vec::new();
+        queue.push_back(start);
+        while let Some(tile) = queue.pop_front() {
+            group.push(tile);
+            for neighbor in cardinal_neighbors(width, height, tile) {
+                if remaining.remove(&neighbor) {
+                    queue.push_back(neighbor);
+                }
+            }
+        }
+        group.sort_unstable_by_key(|tile| (tile.y, tile.x));
+        groups.push(group);
+    }
+
+    groups.sort_by_key(|group| {
+        let center = center_tile_for_tiles(group);
+        (center.y, center.x, group.len())
+    });
+    groups
+}
+
+fn choke_tile_stats(
+    width: u32,
+    height: u32,
+    clearance: &[u16],
+    tiles: &[AiTile],
+) -> (AiTileBounds, u16, u16) {
+    let Some((&first, rest)) = tiles.split_first() else {
+        return (AiTileBounds::new(AiTile::new(0, 0)), 0, 0);
+    };
+    let mut bounds = AiTileBounds::new(first);
+    let mut min_clearance_tiles = u16::MAX;
+    let mut max_clearance_tiles = 0;
+    for &tile in std::iter::once(&first).chain(rest.iter()) {
+        bounds.include(tile);
+        let tile_clearance = tile_index(width, height, tile.x, tile.y)
+            .and_then(|idx| clearance.get(idx).copied())
+            .unwrap_or(0);
+        min_clearance_tiles = min_clearance_tiles.min(tile_clearance);
+        max_clearance_tiles = max_clearance_tiles.max(tile_clearance);
+    }
+    (bounds, min_clearance_tiles, max_clearance_tiles)
 }
 
 fn choke_contacts(
@@ -477,24 +679,76 @@ fn center_tile_for_tiles(tiles: &[AiTile]) -> AiTile {
     nearest_tile_to(tiles, target)
 }
 
-fn choke_segment_endpoints(tiles: &[AiTile], bounds: AiTileBounds) -> (AiTile, AiTile, u16) {
-    let span_x = bounds.max.x.saturating_sub(bounds.min.x).saturating_add(1);
-    let span_y = bounds.max.y.saturating_sub(bounds.min.y).saturating_add(1);
-    if span_x >= span_y {
-        let x = bounds.min.x + span_x / 2;
-        (
-            nearest_tile_to(tiles, AiTile::new(x, bounds.min.y)),
-            nearest_tile_to(tiles, AiTile::new(x, bounds.max.y)),
-            span_y.min(u32::from(u16::MAX)) as u16,
-        )
-    } else {
-        let y = bounds.min.y + span_y / 2;
-        (
-            nearest_tile_to(tiles, AiTile::new(bounds.min.x, y)),
-            nearest_tile_to(tiles, AiTile::new(bounds.max.x, y)),
-            span_x.min(u32::from(u16::MAX)) as u16,
-        )
+fn choke_segment_geometry(
+    tiles: &[AiTile],
+    center_tile: AiTile,
+    approach_a_tile: AiTile,
+    approach_b_tile: AiTile,
+    bounds: AiTileBounds,
+) -> (AiTile, AiTile, u16) {
+    let endpoint_a_tile = nearest_tile_to(tiles, approach_a_tile);
+    let endpoint_b_tile = nearest_tile_to(tiles, approach_b_tile);
+    let width_tiles = choke_cross_section_width(tiles, center_tile, approach_a_tile, approach_b_tile)
+        .unwrap_or_else(|| {
+            let span_x = bounds.max.x.saturating_sub(bounds.min.x).saturating_add(1);
+            let span_y = bounds.max.y.saturating_sub(bounds.min.y).saturating_add(1);
+            span_x.min(span_y).min(u32::from(u16::MAX)) as u16
+        });
+    (endpoint_a_tile, endpoint_b_tile, width_tiles)
+}
+
+fn choke_cross_section_width(
+    tiles: &[AiTile],
+    center_tile: AiTile,
+    approach_a_tile: AiTile,
+    approach_b_tile: AiTile,
+) -> Option<u16> {
+    if tiles.is_empty() {
+        return None;
     }
+    let dx = approach_a_tile.x.abs_diff(approach_b_tile.x);
+    let dy = approach_a_tile.y.abs_diff(approach_b_tile.y);
+    if dx >= dy {
+        let x = tiles
+            .iter()
+            .map(|tile| tile.x)
+            .min_by_key(|x| x.abs_diff(center_tile.x))?;
+        let values: Vec<_> = tiles
+            .iter()
+            .filter_map(|tile| (tile.x == x).then_some(tile.y))
+            .collect();
+        longest_contiguous_span(values)
+    } else {
+        let y = tiles
+            .iter()
+            .map(|tile| tile.y)
+            .min_by_key(|y| y.abs_diff(center_tile.y))?;
+        let values: Vec<_> = tiles
+            .iter()
+            .filter_map(|tile| (tile.y == y).then_some(tile.x))
+            .collect();
+        longest_contiguous_span(values)
+    }
+}
+
+fn longest_contiguous_span(mut values: Vec<u32>) -> Option<u16> {
+    values.sort_unstable();
+    values.dedup();
+    let (&first, rest) = values.split_first()?;
+    let mut best = 1_u32;
+    let mut current = 1_u32;
+    let mut previous = first;
+    for value in rest {
+        if *value == previous.saturating_add(1) {
+            current = current.saturating_add(1);
+        } else {
+            best = best.max(current);
+            current = 1;
+        }
+        previous = *value;
+    }
+    best = best.max(current);
+    Some(best.min(u32::from(u16::MAX)) as u16)
 }
 
 fn nearest_tile_to(tiles: &[AiTile], target: AiTile) -> AiTile {
