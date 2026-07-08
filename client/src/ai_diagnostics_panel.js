@@ -4,6 +4,7 @@ const STORAGE_KEY = "rts.aiDiagnosticsPanel";
 const WINDOW_STORAGE_KEY = "rts.aiDiagnosticsPanel.window.v1";
 const MAP_LABELS_LAYER_ID = "labels";
 const MAP_LAYER_ID_RE = /^[A-Za-z0-9:_-]{1,64}$/;
+const RETIRED_MAP_LAYER_IDS = new Set(["regions", "voronoi"]);
 const DEFAULT_MAP_LAYER_VISIBILITY = Object.freeze({
   chokes: true,
   bases: true,
@@ -53,7 +54,7 @@ export function createAiDiagnosticsPanelPreferences(storage = safeLocalStorage()
     },
     setMapLayerVisible(layerId, visible) {
       const id = normalizeMapLayerId(layerId);
-      if (!id) return;
+      if (!id || isRetiredMapLayerId(id)) return;
       state.mapLayers = normalizeMapLayerVisibility(state.mapLayers);
       state.mapLayers[id] = visible === true;
       writeStoredPreferences(storage, state);
@@ -736,7 +737,7 @@ function normalizeMapLayerVisibility(value, layerIds = []) {
   const knownIds = new Set(Object.keys(DEFAULT_MAP_LAYER_VISIBILITY));
   for (const layerId of layerIds) {
     const id = normalizeMapLayerId(layerId);
-    if (id) knownIds.add(id);
+    if (id && !isRetiredMapLayerId(id)) knownIds.add(id);
   }
 
   const normalized = { ...DEFAULT_MAP_LAYER_VISIBILITY };
@@ -746,7 +747,8 @@ function normalizeMapLayerVisibility(value, layerIds = []) {
   if (value && typeof value === "object") {
     for (const [key, visible] of Object.entries(value)) {
       const id = normalizeMapLayerId(key);
-      if (id && knownIds.has(id)) normalized[id] = visible === true;
+      if (!id || isRetiredMapLayerId(id)) continue;
+      normalized[id] = visible === true;
     }
   }
   return normalized;
@@ -762,6 +764,10 @@ function ensureKnownMapLayers(state, layerIds = []) {
 function normalizeMapLayerId(value) {
   const id = String(value || "").trim();
   return MAP_LAYER_ID_RE.test(id) ? id : "";
+}
+
+function isRetiredMapLayerId(id) {
+  return RETIRED_MAP_LAYER_IDS.has(id);
 }
 
 function hasOwn(object, key) {

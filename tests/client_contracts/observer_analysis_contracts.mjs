@@ -148,15 +148,22 @@ import { textWithin } from "./dom_text.mjs";
   );
   const staleAiStorage = fakeStorage();
   staleAiStorage.setItem("rts.aiDiagnosticsPanel", JSON.stringify({
-    mapLayers: { regions: false, voronoi: true, chokes: false },
+    mapLayers: { regions: false, voronoi: true, chokes: false, futureRoutes: false },
   }));
   const staleAiPrefs = createAiDiagnosticsPanelPreferences(staleAiStorage);
-  const staleMapLayers = staleAiPrefs.mapLayerVisibility(["chokes"]);
+  const staleMapLayers = staleAiPrefs.mapLayerVisibility(["chokes", "futureRoutes"]);
   assert(
     staleMapLayers.chokes === false
+      && staleMapLayers.futureRoutes === false
       && !Object.hasOwn(staleMapLayers, "regions")
       && !Object.hasOwn(staleMapLayers, "voronoi"),
-    "AI diagnostics drops unshipped map-analysis layers from stored preferences",
+    "AI diagnostics drops retired map-analysis layers without losing current layer preferences",
+  );
+  staleAiPrefs.setMapLayerVisible("regions", true);
+  const retiredLayerIds = staleAiPrefs.mapLayerVisibility(["regions", "voronoi"]);
+  assert(
+    !Object.hasOwn(retiredLayerIds, "regions") && !Object.hasOwn(retiredLayerIds, "voronoi"),
+    "AI diagnostics rejects retired map-analysis layer ids from current payloads and direct toggles",
   );
   const mapSummary = normalizeMapAnalysisSummary({
     mapWidth: 126,
