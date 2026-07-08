@@ -108,6 +108,7 @@ pub struct AiController {
 struct AiMapAnalysisCache {
     key: AiMapAnalysisKey,
     analysis: AiMapAnalysis,
+    diagnostics: ObserverMapAnalysisDiagnostics,
 }
 
 impl AiController {
@@ -144,7 +145,7 @@ impl AiController {
     pub fn latest_map_analysis_diagnostics(&self) -> Option<ObserverMapAnalysisDiagnostics> {
         self.map_analysis_cache
             .as_ref()
-            .map(|cache| cache.analysis.debug_overlay())
+            .map(|cache| cache.diagnostics.clone())
     }
 
     fn profile(&self) -> &'static AiProfile {
@@ -159,9 +160,12 @@ impl AiController {
             .map(|cache| cache.key != key)
             .unwrap_or(true);
         if refresh {
+            let analysis = AiMapAnalysis::analyze_with_key(start, key);
+            let diagnostics = analysis.debug_overlay();
             self.map_analysis_cache = Some(AiMapAnalysisCache {
                 key,
-                analysis: AiMapAnalysis::analyze_with_key(start, key),
+                analysis,
+                diagnostics,
             });
         }
         self.map_analysis_cache

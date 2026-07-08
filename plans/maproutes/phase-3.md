@@ -1,6 +1,6 @@
 # Phase 3: Region and choke extraction
 
-Status: Pending
+Status: Done
 
 ## Goal
 
