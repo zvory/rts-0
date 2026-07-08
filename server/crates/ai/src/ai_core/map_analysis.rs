@@ -200,6 +200,15 @@ pub(crate) struct AiMapAnalysisDebugSnapshot {
     pub(crate) resource_clusters: Vec<AiResourceCluster>,
 }
 
+struct AiMapTileLookups<'a> {
+    width: u32,
+    height: u32,
+    clearance: &'a [u16],
+    component_by_tile: &'a [Option<u32>],
+    region_by_tile: &'a [Option<u32>],
+    regions: &'a [AiMapRegion],
+}
+
 impl AiMapAnalysis {
     #[allow(dead_code)]
     pub(crate) fn analyze(start: &StartPayload) -> Self {
@@ -232,16 +241,15 @@ impl AiMapAnalysis {
             &region_by_tile,
             &regions,
         );
-        let starts = build_start_mappings(
-            &start.players,
+        let tile_lookups = AiMapTileLookups {
             width,
             height,
-            &clearance,
-            &component_by_tile,
-            &region_by_tile,
-            &regions,
-            &resource_clusters,
-        );
+            clearance: &clearance,
+            component_by_tile: &component_by_tile,
+            region_by_tile: &region_by_tile,
+            regions: &regions,
+        };
+        let starts = build_start_mappings(&start.players, tile_lookups, &resource_clusters);
 
         Self {
             key,
@@ -620,12 +628,7 @@ fn build_components(
 
 fn build_start_mappings(
     players: &[PlayerStart],
-    width: u32,
-    height: u32,
-    clearance: &[u16],
-    component_by_tile: &[Option<u32>],
-    region_by_tile: &[Option<u32>],
-    regions: &[AiMapRegion],
+    lookups: AiMapTileLookups<'_>,
     resource_clusters: &[AiResourceCluster],
 ) -> Vec<AiStartMapping> {
     let mut starts: Vec<_> = players.iter().collect();
@@ -634,10 +637,22 @@ fn build_start_mappings(
         .into_iter()
         .map(|player| {
             let start_tile = AiTile::new(player.start_tile_x, player.start_tile_y);
-            let component_id = component_id_for_tile(width, height, component_by_tile, start_tile);
-            let region_id = region_id_for_tile(width, height, region_by_tile, start_tile)
-                .or_else(|| nearest_region(start_tile, component_id, regions).map(|(id, _)| id));
-            let idx = tile_index(width, height, start_tile.x, start_tile.y);
+            let component_id = component_id_for_tile(
+                lookups.width,
+                lookups.height,
+                lookups.component_by_tile,
+                start_tile,
+            );
+            let region_id = region_id_for_tile(
+                lookups.width,
+                lookups.height,
+                lookups.region_by_tile,
+                start_tile,
+            )
+            .or_else(|| {
+                nearest_region(start_tile, component_id, lookups.regions).map(|(id, _)| id)
+            });
+            let idx = tile_index(lookups.width, lookups.height, start_tile.x, start_tile.y);
             let (nearest_resource_cluster_id, nearest_resource_cluster_distance2) =
                 nearest_cluster(start_tile, component_id, resource_clusters)
                     .map(|(id, distance2)| (Some(id), Some(distance2)))
@@ -648,7 +663,9 @@ fn build_start_mappings(
                 start_tile,
                 component_id,
                 region_id,
-                clearance_tiles: idx.and_then(|idx| clearance.get(idx).copied()).unwrap_or(0),
+                clearance_tiles: idx
+                    .and_then(|idx| lookups.clearance.get(idx).copied())
+                    .unwrap_or(0),
                 nearest_resource_cluster_id,
                 nearest_resource_cluster_distance2,
             }
