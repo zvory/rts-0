@@ -233,56 +233,6 @@ fn region_representative_better(
             && (tile.y, tile.x) < (representative.y, representative.x))
 }
 
-pub(super) fn region_tile_rects(
-    width: u32,
-    height: u32,
-    region_by_tile: &[Option<u32>],
-    region_id: u32,
-) -> Vec<OverlayTileRect> {
-    let mut rects: Vec<OverlayTileRect> = Vec::new();
-    for y in 0..height {
-        let mut x = 0;
-        while x < width {
-            let Some(idx) = tile_index(width, height, x, y) else {
-                x = x.saturating_add(1);
-                continue;
-            };
-            if region_by_tile.get(idx).copied().flatten() != Some(region_id) {
-                x = x.saturating_add(1);
-                continue;
-            }
-
-            let start_x = x;
-            while x < width {
-                let Some(idx) = tile_index(width, height, x, y) else {
-                    break;
-                };
-                if region_by_tile.get(idx).copied().flatten() != Some(region_id) {
-                    break;
-                }
-                x = x.saturating_add(1);
-            }
-            let tile_w = x.saturating_sub(start_x);
-            if let Some(last) = rects.last_mut() {
-                if last.tile_x == start_x
-                    && last.tile_w == tile_w
-                    && last.tile_y.saturating_add(last.tile_h) == y
-                {
-                    last.tile_h = last.tile_h.saturating_add(1);
-                    continue;
-                }
-            }
-            rects.push(OverlayTileRect {
-                tile_x: start_x,
-                tile_y: y,
-                tile_w,
-                tile_h: 1,
-            });
-        }
-    }
-    rects
-}
-
 pub(super) fn tile_rects_for_tiles(tiles: &[AiTile]) -> Vec<OverlayTileRect> {
     let mut sorted = tiles.to_vec();
     sorted.sort_unstable_by_key(|tile| (tile.y, tile.x));

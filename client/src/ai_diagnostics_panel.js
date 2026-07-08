@@ -5,9 +5,7 @@ const WINDOW_STORAGE_KEY = "rts.aiDiagnosticsPanel.window.v1";
 const MAP_LABELS_LAYER_ID = "labels";
 const MAP_LAYER_ID_RE = /^[A-Za-z0-9:_-]{1,64}$/;
 const DEFAULT_MAP_LAYER_VISIBILITY = Object.freeze({
-  regions: true,
   chokes: true,
-  voronoi: false,
   bases: true,
   resources: true,
   [MAP_LABELS_LAYER_ID]: true,
@@ -701,9 +699,7 @@ function formatValue(value) {
 
 function defaultMapLayerRows() {
   return [
-    { id: "regions", label: "Regions", primitives: 0, defaultVisible: true },
     { id: "chokes", label: "Chokes", primitives: 0, defaultVisible: true },
-    { id: "voronoi", label: "Voronoi", primitives: 0, defaultVisible: false },
     { id: "bases", label: "Bases", primitives: 0, defaultVisible: true },
     { id: "resources", label: "Resources", primitives: 0, defaultVisible: true },
     { id: MAP_LABELS_LAYER_ID, label: "Labels", primitives: 0, defaultVisible: true },
@@ -736,23 +732,28 @@ function normalizeSelectedPlayerId(value) {
   return Number.isFinite(playerId) && playerId > 0 ? playerId : null;
 }
 
-function normalizeMapLayerVisibility(value) {
+function normalizeMapLayerVisibility(value, layerIds = []) {
+  const knownIds = new Set(Object.keys(DEFAULT_MAP_LAYER_VISIBILITY));
+  for (const layerId of layerIds) {
+    const id = normalizeMapLayerId(layerId);
+    if (id) knownIds.add(id);
+  }
+
   const normalized = { ...DEFAULT_MAP_LAYER_VISIBILITY };
+  for (const id of knownIds) {
+    if (!hasOwn(normalized, id)) normalized[id] = true;
+  }
   if (value && typeof value === "object") {
     for (const [key, visible] of Object.entries(value)) {
       const id = normalizeMapLayerId(key);
-      if (id) normalized[id] = visible === true;
+      if (id && knownIds.has(id)) normalized[id] = visible === true;
     }
   }
   return normalized;
 }
 
 function ensureKnownMapLayers(state, layerIds = []) {
-  state.mapLayers = normalizeMapLayerVisibility(state.mapLayers);
-  for (const layerId of layerIds) {
-    const id = normalizeMapLayerId(layerId);
-    if (id && !hasOwn(state.mapLayers, id)) state.mapLayers[id] = true;
-  }
+  state.mapLayers = normalizeMapLayerVisibility(state.mapLayers, layerIds);
   if (!hasOwn(state.mapLayers, MAP_LABELS_LAYER_ID)) {
     state.mapLayers[MAP_LABELS_LAYER_ID] = true;
   }
