@@ -33,6 +33,9 @@
   `/dev/replay-artifact?replay=<artifact_name>` route redirects to that canonical URL. Scenario
   rooms stream **full-world** snapshots for authored local debugging; saved self-play artifacts use
   the same replay viewer runtime as post-match and match-history replays.
+- App-owned launch URLs use the namespaced `rtsLaunch` query parameter for setup automation. The
+  initial live-match mode is `/?rtsLaunch=match...`, which joins a normal lobby and drives existing
+  lobby messages for spectator AI self-play setup instead of adding a special server protocol.
 - The same server exposes a lightweight documentation wiki at `/wiki`. It renders only allowlisted
   Markdown under `docs/context` and `docs/design`, rewrites relative Markdown doc links into
   `/wiki/...` links, rejects traversal or unsupported paths, and serves `/wiki/stats` from
