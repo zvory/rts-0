@@ -7,6 +7,7 @@ const MAP_LAYER_ID_RE = /^[A-Za-z0-9:_-]{1,64}$/;
 const DEFAULT_MAP_LAYER_VISIBILITY = Object.freeze({
   regions: true,
   chokes: true,
+  voronoi: false,
   bases: true,
   resources: true,
   [MAP_LABELS_LAYER_ID]: true,
@@ -702,6 +703,7 @@ function defaultMapLayerRows() {
   return [
     { id: "regions", label: "Regions", primitives: 0, defaultVisible: true },
     { id: "chokes", label: "Chokes", primitives: 0, defaultVisible: true },
+    { id: "voronoi", label: "Voronoi", primitives: 0, defaultVisible: false },
     { id: "bases", label: "Bases", primitives: 0, defaultVisible: true },
     { id: "resources", label: "Resources", primitives: 0, defaultVisible: true },
     { id: MAP_LABELS_LAYER_ID, label: "Labels", primitives: 0, defaultVisible: true },

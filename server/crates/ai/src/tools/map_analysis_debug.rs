@@ -52,12 +52,13 @@ pub fn run_from_env() {
     match render_map_analysis_svg(&config) {
         Ok(report) => {
             println!(
-                "AI map analysis: map={} players={} seed={} regions={} chokes={}",
+                "AI map analysis: map={} players={} seed={} regions={} chokes={} voronoi={}",
                 report.map_name,
                 report.players,
                 report.seed,
                 report.debug.region_count,
-                report.debug.choke_count
+                report.debug.choke_count,
+                report.debug.voronoi_tile_count
             );
             println!("svg: {}", report.out.display());
         }
@@ -150,7 +151,7 @@ fn print_usage() {
            --seed <n|0xhex>    deterministic map seed (default: 0x12345678)\n\
            --out <path>        SVG output path (default: /tmp/rts-map-analysis/...svg)\n\
            --tile-px <n>       rendered pixels per map tile (default: 7)\n\
-           --layers <list>     all, or comma-list of regions,chokes,bases,resources\n\
+           --layers <list>     all, or comma-list of regions,chokes,voronoi,bases,resources\n\
            --no-grid           omit tile grid lines"
     );
 }
@@ -243,12 +244,13 @@ fn render_svg(
     writeln!(out, r##"<rect width="100%" height="100%" fill="#0b0d10"/>"##).unwrap();
     writeln!(
         out,
-        r#"<text x="8" y="22" fill="{TEXT_FILL}" font-family="monospace" font-size="16" font-weight="700">{} players={} seed={} regions={} chokes={} passable={} blocked={}</text>"#,
+        r#"<text x="8" y="22" fill="{TEXT_FILL}" font-family="monospace" font-size="16" font-weight="700">{} players={} seed={} regions={} chokes={} voronoi={} passable={} blocked={}</text>"#,
         escape_xml(&config.map_name),
         config.players,
         config.seed,
         debug.region_count,
         debug.choke_count,
+        debug.voronoi_tile_count,
         debug.passable_tiles,
         debug.blocked_tiles
     )
@@ -464,7 +466,7 @@ fn parse_layers(value: &str) -> Result<LayerSelection, String> {
         if id.is_empty() {
             continue;
         }
-        if !matches!(id, "regions" | "chokes" | "bases" | "resources") {
+        if !matches!(id, "regions" | "chokes" | "voronoi" | "bases" | "resources") {
             return Err(format!("unknown map-analysis layer: {id}"));
         }
         ids.insert(id.to_string());
@@ -553,7 +555,7 @@ mod tests {
             "--seed".to_string(),
             "0x10".to_string(),
             "--layers".to_string(),
-            "chokes,bases".to_string(),
+            "chokes,voronoi,bases".to_string(),
         ])
         .expect("args should parse")
         .expect("help should not be requested");
@@ -561,6 +563,7 @@ mod tests {
         assert_eq!(config.map_name, "Low Econ");
         assert_eq!(config.seed, 16);
         assert!(config.layers.includes("chokes"));
+        assert!(config.layers.includes("voronoi"));
         assert!(config.layers.includes("bases"));
         assert!(!config.layers.includes("regions"));
     }
@@ -573,7 +576,7 @@ mod tests {
             seed: DEFAULT_SEED,
             out: PathBuf::from("/tmp/not-written.svg"),
             tile_px: 2,
-            layers: parse_layers("chokes").unwrap(),
+            layers: parse_layers("chokes,voronoi").unwrap(),
             show_grid: false,
         };
         let start = start_payload_for_map(&config.map_name, config.players, config.seed)
@@ -585,6 +588,7 @@ mod tests {
 
         assert!(svg.contains("Default"));
         assert!(svg.contains("layer-chokes"));
+        assert!(svg.contains("layer-voronoi"));
         assert!(svg.contains("K0"));
     }
 }
