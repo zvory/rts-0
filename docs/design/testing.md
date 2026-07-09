@@ -295,8 +295,8 @@ set. WASM-backed tri-state groups also stay opt-in unless `RTS_RUN_WASM_TRI_STAT
 Changed-file detection classifies PRs and `main` pushes as `docs_only`, `client_only`, or `full`
 from the PR base/head range or the push before/after range. `docs_only` keeps the same check
 contexts green but exits before expensive suites. `client_only` is limited to conservative
-`client/` paths and skips Rust format, nextest, lint, and Rust architecture work while still
-building the server and running live Node plus browser coverage. Contract-adjacent client paths
+`client/` paths and skips Rust nextest, lint, and Rust architecture work while still building the
+server and running live Node plus browser coverage. Contract-adjacent client paths
 such as `client/src/config.js`, `client/src/protocol.js`, `client/src/net.js`,
 `client/src/lobby_view.js`, and generated sim-WASM assets fall back to `full`. Branch protection
 should require this single aggregate full-gate check unless a plan phase explicitly changes the
@@ -315,6 +315,12 @@ status. When the branch diff against `origin/main` contains only `.md` files, in
 files outside `docs/`, it skips the Codex adversarial quality pass but still pushes the branch, posts
 a successful `adversarial-quality-pass` status, and writes a docs-only skip report into the PR body.
 Any non-Markdown changed file keeps the normal adversarial quality pass requirement.
+
+Rust formatting is intentionally not a CI test gate. The repository pins Rust and rustfmt in
+`rust-toolchain.toml`; the final quality pass invoked by `scripts/agent-pr.sh` runs
+`scripts/format-touched-rust.sh` after review and before committing/pushing. It formats only Rust
+files changed by the branch or quality pass, so an owned PR carries its own formatting without a
+workspace-wide formatter pass or an unrelated formatter failure.
 
 The old standalone `Rust` and `Integration` workflows are retired. Their package, architecture,
 live Node, and browser coverage is owned by the split `Main test gate` jobs under the required

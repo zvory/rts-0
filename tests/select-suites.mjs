@@ -121,6 +121,7 @@ function isQualityPassWorkflowPath(pathname) {
     pathname === "scripts/adversarial-quality-pass.mjs" ||
     pathname === "scripts/adversarial-quality-pass.schema.json" ||
     pathname === "scripts/agent-pr.sh" ||
+    pathname === "scripts/format-touched-rust.sh" ||
     pathname === "tests/adversarial_quality_pass.mjs" ||
     pathname === "tests/run-all.sh"
   );
@@ -458,6 +459,7 @@ function verify() {
     [["scripts/adversarial-quality-pass.mjs"], ["agent-workflow-quality-pass"]],
     [["scripts/adversarial-quality-pass.schema.json"], ["agent-workflow-quality-pass"]],
     [["scripts/agent-pr.sh"], ["agent-workflow-quality-pass"]],
+    [["scripts/format-touched-rust.sh"], ["agent-workflow-quality-pass"]],
     [["tests/run-all.sh"], ["agent-workflow-phase-runner", "agent-workflow-quality-pass"]],
     [["server/crates/rules/src/faction.rs"], ["nextest-rules", "nextest-sim", "faction-assumptions", "faction-catalog-parity"]],
     [["client/src/lobby_view.js"], ["client-architecture", "faction-assumptions", "faction-catalog-parity", "js-protocol-contracts"]],

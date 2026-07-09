@@ -4,11 +4,10 @@
 #
 # What it runs, in order:
 #   1. Architecture/contract policy (source file sizes + crate boundaries + sim/client/lobby architecture + faction guardrails + test-selector self-check)
-#   2. Rust formatting              (cargo fmt --check)
-#   3. Rust nextest fast scripted tests (deterministic, in-process, no server)
-#   4. Rust lint                    (cargo clippy)
-#   5. Node API suites              (protocol/UI units, live API batch, then serialized lab_mortar_regression)
-#   6. Headless browser suites      (client_smoke, plus tri-state lag scenarios in CI or when opted in; needs Chrome)
+#   2. Rust nextest fast scripted tests (deterministic, in-process, no server)
+#   3. Rust lint                    (cargo clippy)
+#   4. Node API suites              (protocol/UI units, live API batch, then serialized lab_mortar_regression)
+#   5. Headless browser suites      (client_smoke, plus tri-state lag scenarios in CI or when opted in; needs Chrome)
 #
 # The server is built in debug (overflow checks ON — the hardening regression tests rely on a
 # bad Build coord being caught, not silently wrapped) and booted on a private free port. The
@@ -20,9 +19,9 @@
 #   tests/run-all.sh                 # local gate (silent unless failing)
 #   tests/run-all.sh --full-ai       # also run long AI self-play/simulation coverage
 #   tests/run-all.sh -v              # verbose: print headers and pass lines; timings are always summarized
-#   tests/run-all.sh --no-rust       # skip Rust fmt/test/lint
+#   tests/run-all.sh --no-rust       # skip Rust test/lint
 #   tests/run-all.sh --no-client     # skip the headless-browser smoke test
-#   tests/run-all.sh --only-rust     # run architecture policy + Rust fmt/test/lint only
+#   tests/run-all.sh --only-rust     # run architecture policy + Rust test/lint only
 #   tests/run-all.sh --only-live-node # run JS contracts + live Node API suites only
 #   tests/run-all.sh --only-browser  # run browser suites only
 #   tests/run-all.sh --with-tri-state-browser  # run latency-sensitive browser tri-state scenarios locally
@@ -622,8 +621,6 @@ run_rust_suites_bg() {
       node "$SCRIPT_DIR/phase_runner_agents.mjs"
     run_suite_bg "Agent workflow: quality pass helper" \
       node "$SCRIPT_DIR/adversarial_quality_pass.mjs"
-    run_suite_bg "Rust format (cargo fmt --check)" \
-      cargo fmt --manifest-path "$SERVER_DIR/Cargo.toml" --check
     run_nextest_tests_bg
     if [ "$RUN_FULL_AI" != "1" ]; then
       SKIPPED+=("Rust nextest full AI coverage (--full-ai not set)")
@@ -632,7 +629,6 @@ run_rust_suites_bg() {
       cargo clippy --manifest-path "$SERVER_DIR/Cargo.toml" -- -D warnings
   else
     SKIPPED+=("Architecture policy checks (--no-rust)")
-    SKIPPED+=("Rust format (--no-rust)")
     SKIPPED+=("Rust nextest fast scripted tests (--no-rust)")
     SKIPPED+=("Rust lint (--no-rust)")
     SKIPPED+=("Rust nextest full AI coverage (--no-rust)")

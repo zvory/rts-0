@@ -391,6 +391,10 @@ class Runner {
     return true;
   }
 
+  formatTouchedRust(repoRoot, baseRef) {
+    this.runInherit(path.join(repoRoot, "scripts", "format-touched-rust.sh"), ["--base", baseRef], { cwd: repoRoot });
+  }
+
   postStatus(options, headSha, report) {
     const args = [
       "api",
@@ -459,6 +463,7 @@ class Runner {
       throw new Error(`quality pass did not write report file: ${reportFile}`);
     }
     const report = normalizeReport(fs.readFileSync(reportFile, "utf8"));
+    this.formatTouchedRust(repoRoot, options.baseRef);
     const autoCommitted = this.commitDirtyFinalState(repoRoot, report);
     const finalHead = this.git(["rev-parse", "HEAD"], repoRoot);
     if (autoCommitted) {

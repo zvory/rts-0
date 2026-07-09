@@ -88,8 +88,8 @@ Common commands:
 # Run the game.
 ./runserver
 
-# Build, lint, and format the Rust crate.
-cd server && cargo build && cargo clippy && cargo fmt
+# Build and lint the Rust crate.
+cd server && cargo build && cargo clippy
 
 # Run the full test orchestrator from the repo root.
 tests/run-all.sh

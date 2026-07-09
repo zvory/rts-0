@@ -189,12 +189,14 @@ function copyWorkflowScripts(targetRepo) {
     "agent-pr.sh",
     "adversarial-quality-pass.mjs",
     "adversarial-quality-pass.schema.json",
+    "format-touched-rust.sh",
   ]) {
     fs.copyFileSync(path.join(repoRoot, "scripts", script), path.join(targetScripts, script));
   }
   fs.copyFileSync(path.join(repoRoot, "tests", "select-suites.mjs"), path.join(targetTests, "select-suites.mjs"));
   fs.chmodSync(path.join(targetScripts, "agent-pr.sh"), 0o755);
   fs.chmodSync(path.join(targetScripts, "adversarial-quality-pass.mjs"), 0o755);
+  fs.chmodSync(path.join(targetScripts, "format-touched-rust.sh"), 0o755);
 }
 
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "rts-agent-pr-quality-report-"));
@@ -287,6 +289,17 @@ echo "unexpected gh invocation: $*" >&2
 exit 1
 `,
   );
+  writeExecutable(
+    path.join(binPath, "rustfmt"),
+    `#!/usr/bin/env bash
+set -euo pipefail
+for argument in "$@"; do
+  case "$argument" in
+    *.rs) perl -0pi -e 's/fn main\\(\\)\\{\\}/fn main() {}/g' "$argument" ;;
+  esac
+done
+`,
+  );
 
   run("git", ["init", "--bare", originPath]);
   fs.mkdirSync(workPath);
@@ -303,7 +316,9 @@ exit 1
   run("git", ["checkout", "-b", "zvorygin/quality-report-body"], { cwd: workPath });
   fs.appendFileSync(path.join(workPath, "README.md"), "implementation branch docs change\n");
   fs.writeFileSync(path.join(workPath, "--implementation.rs"), "branch change\n");
-  run("git", ["add", "--", "README.md", "--implementation.rs"], { cwd: workPath });
+  fs.mkdirSync(path.join(workPath, "server", "src"), { recursive: true });
+  fs.writeFileSync(path.join(workPath, "server", "src", "branch.rs"), "fn main(){}\n");
+  run("git", ["add", "--", "README.md", "--implementation.rs", "server/src/branch.rs"], { cwd: workPath });
   run("git", ["commit", "-m", "Change branch"], { cwd: workPath });
 
   run("scripts/agent-pr.sh", ["--owner", "tester", "--title", "Quality report body", "--verification", "workflow fixture"], {
@@ -325,6 +340,8 @@ exit 1
   assert.match(body, /Captured report body\./);
   assert.match(body, /- embedded the quality-pass report/);
   assert.match(fs.readFileSync(codexCalledMarker, "utf8"), /codex called/);
+  assert.equal(fs.readFileSync(path.join(workPath, "server", "src", "branch.rs"), "utf8"), "fn main() {}\n");
+  assert.match(run("git", ["log", "-1", "--format=%s"], { cwd: workPath }).stdout, /Run adversarial quality pass/);
 
   run("git", ["checkout", "main"], { cwd: workPath });
   run("git", ["checkout", "-b", "zvorygin/docs-only-quality-skip"], { cwd: workPath });
