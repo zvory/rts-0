@@ -144,6 +144,50 @@ fn turtle_machine_gunner_training_stops_at_choke_line_target() {
 }
 
 #[test]
+fn turtle_spends_large_float_on_second_support_producers() {
+    let mut owned = vec![
+        building(10, EntityKind::CityCentre, Some(0)),
+        building(11, EntityKind::CityCentre, Some(0)),
+        building(12, EntityKind::Barracks, Some(0)),
+        building(13, EntityKind::TrainingCentre, None),
+        building(14, EntityKind::ResearchComplex, None),
+        building(15, EntityKind::Steelworks, Some(0)),
+        worker(20, AiEntityState::Idle),
+        worker(21, AiEntityState::Idle),
+    ];
+    owned.extend((0..3).map(|i| combat(30 + i, EntityKind::Rifleman)));
+    let mut observation = observation(
+        AiEconomy {
+            steel: 1_200,
+            oil: 600,
+            supply_used: 20,
+            supply_cap: 80,
+        },
+        owned,
+    );
+    observation.upgrades = vec![UpgradeKind::Entrenchment, UpgradeKind::AntiTankGunUnlock];
+
+    let decision = decide(
+        &observation,
+        &AI_TURTLE_CHOKES,
+        &mut AiDecisionMemory::for_profile(&AI_TURTLE_CHOKES),
+    );
+
+    for kind in [EntityKind::Barracks, EntityKind::Steelworks] {
+        assert!(
+            decision.intents.contains(&AiIntent::Build { kind }),
+            "the Turtle should spend its large float on a second {kind:?}"
+        );
+        assert!(decision.commands.iter().any(|command| {
+            matches!(
+                command,
+                Command::Build { building, .. } if *building == kind
+            )
+        }));
+    }
+}
+
+#[test]
 fn each_required_profile_emits_a_starting_state_command() {
     let mut owned = vec![building(10, EntityKind::CityCentre, Some(0))];
     owned.extend((0..4).map(|i| worker(20 + i, AiEntityState::Idle)));
