@@ -76,7 +76,7 @@ use self::turtle::{
     stage_turtle_choke_defense, turtle_machine_gunner_lines_staffed, turtle_observer_debug_layers,
 };
 
-use super::profiles::AI_2_1_ECONOMY_MANAGER_ID;
+use super::profiles::{AI_2_1_ECONOMY_MANAGER_ID, AI_TURTLE_CHOKES_ID};
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct AiDecision {
@@ -1057,7 +1057,10 @@ fn turtle_opening_pending(profile: &AiProfile, memory: &AiDecisionMemory) -> boo
 }
 
 fn uses_economy_manager(profile: &AiProfile) -> bool {
-    profile.id == AI_2_1_ECONOMY_MANAGER_ID
+    matches!(
+        profile.id,
+        AI_2_1_ECONOMY_MANAGER_ID | AI_TURTLE_CHOKES_ID
+    )
 }
 
 fn oil_demand_signal(

@@ -4,7 +4,16 @@ use crate::ai_core::decision::economy_manager::{
     propose_economy, EconomyManagerInput, EconomyManagerSignals, EconomyProposal, OilDemandSignal,
 };
 use crate::ai_core::decision::expansion::ExpansionPlan;
-use crate::ai_core::profiles::{AI_2_0_TANK_PRESSURE, AI_2_1_ECONOMY_MANAGER};
+use crate::ai_core::profiles::{
+    AI_2_0_TANK_PRESSURE, AI_2_1_ECONOMY_MANAGER, AI_TURTLE_CHOKES,
+};
+
+#[test]
+fn turtle_profile_routes_economy_through_proposal_manager() {
+    assert!(uses_economy_manager(&AI_2_1_ECONOMY_MANAGER));
+    assert!(uses_economy_manager(&AI_TURTLE_CHOKES));
+    assert!(!uses_economy_manager(&AI_2_0_TANK_PRESSURE));
+}
 
 fn assert_ai_2_1_matches_ai_2_0_decision(label: &str, observation: &AiObservation) {
     let ai_2_0 = decide(
