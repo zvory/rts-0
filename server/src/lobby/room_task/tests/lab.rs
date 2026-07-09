@@ -335,9 +335,10 @@ async fn lab_scenario_submission_dispatches_authoritative_export_and_rate_limits
 
     let result = tokio::time::timeout(Duration::from_secs(1), async {
         loop {
-            match writer.reliable_rx.recv().await.expect("lab result message") {
-                ServerMessage::LabResult(result) => break result,
-                _ => {}
+            if let ServerMessage::LabResult(result) =
+                writer.reliable_rx.recv().await.expect("lab result message")
+            {
+                break result;
             }
         }
     })
