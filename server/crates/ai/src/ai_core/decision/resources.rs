@@ -124,12 +124,8 @@ pub(super) fn plan_economy(
         .copied()
         .unwrap_or(0);
     let current_oil_workers = resource_counts.get(&EntityKind::Oil).copied().unwrap_or(0);
-    let max_worker_resource_distance_px = max_worker_resource_assignment_distance_px(
-        observation,
-        facts,
-        profile,
-        recovery_active,
-    );
+    let max_worker_resource_distance_px =
+        max_worker_resource_assignment_distance_px(observation, facts, profile, recovery_active);
     EconomyPlan {
         target_steel_workers,
         desired_oil_workers,
@@ -370,7 +366,10 @@ mod tests {
         }
     }
 
-    fn observation(owned: Vec<AiEntitySummary>, resources: Vec<AiResourceSummary>) -> AiObservation {
+    fn observation(
+        owned: Vec<AiEntitySummary>,
+        resources: Vec<AiResourceSummary>,
+    ) -> AiObservation {
         let tile_size = config::TILE_SIZE;
         AiObservation {
             player_id: 1,

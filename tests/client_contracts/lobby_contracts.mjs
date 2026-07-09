@@ -59,6 +59,7 @@ import { textWithin } from "./dom_text.mjs";
       { id: "ai_1_1", label: "AI 1.1" },
       { id: "ai_1_2", label: "AI 1.2" },
       { id: "ai_2_0", label: "AI 2.0" },
+      { id: "ai_turtle", label: "AI Turtle" },
     ],
     "lobby AI profile selector lists supported AI suites",
   );

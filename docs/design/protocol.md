@@ -1395,7 +1395,8 @@ not receive this message.
             fill: "#rrggbb",
             stroke: "#rrggbb",
             alpha: f32,
-            label?: string
+            label?: string,
+            tooltip?: string
           } | {
             kind: "marker",
             id: string,
@@ -1404,7 +1405,20 @@ not receive this message.
             radius: f32,
             shape: "circle" | "diamond" | "square",
             color: "#rrggbb",
-            label?: string
+            label?: string,
+            tooltip?: string
+          } | {
+            kind: "line",
+            id: string,
+            x1: f32,
+            y1: f32,
+            x2: f32,
+            y2: f32,
+            color: "#rrggbb",
+            alpha: f32,
+            width: f32,
+            label?: string,
+            tooltip?: string
           }
         ]
       }
@@ -1428,10 +1442,13 @@ excluded.
 the selected profile id, the AI observation tick that produced the trace, and the formatted trace
 lines from the AI decision manager.
 `mapAnalysis`, when present, contains static AI-owned map-analysis overlay primitives built from
-public start-payload terrain, starts, and resource nodes. Live AI-vs-AI spectator diagnostics use it
-to draw region fills, choke bands with approach markers, base markers, resource-cluster markers,
-and labels. It is optional because replay analysis and non-AI live rooms do not currently own an AI
-controller cache for this data.
+public start-payload terrain, starts, and resource nodes, plus optional live AI plan overlays for
+spectators. Live AI-vs-AI spectator diagnostics use it to draw region fills, choke bands with
+approach markers, base markers, resource-cluster markers, and AI intent lines/markers such as turtle
+defended choke lines, Machine Gunner slots, Anti-Tank Gun backlines, and setup-facing rays. `label`
+is short always-visible overlay text; `tooltip` is longer human-readable hover text explaining what
+the primitive represents. `mapAnalysis` is optional because replay analysis and non-AI live rooms do
+not currently own an AI controller cache for this data.
 
 Observer analysis uses an all-player spectator policy independent of each viewer's vision selection
 selection. It is observer-only data for analysis overlays, not an active-player information surface.

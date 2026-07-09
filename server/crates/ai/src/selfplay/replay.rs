@@ -15,8 +15,7 @@ use crate::ai_core::profile_suites::{
     resolve_profile_request_id as resolve_profile_or_suite_request_id,
 };
 use crate::ai_core::profiles::{
-    profile_by_id, required_profiles, AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID,
-    AI_1_2_WAVE_COHORTS_ID,
+    profile_by_id, required_profiles, AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID, AI_1_2_WAVE_COHORTS_ID,
 };
 use crate::live::{DEFAULT_LIVE_PROFILE_ID, DEFAULT_LIVE_PROFILE_REQUEST_ID};
 use rts_sim::game::entity::EntityKind;
@@ -974,12 +973,12 @@ mod tests {
         canonical_profile_request_id_for_match, resolve_profile_request_id_for_match,
         run_profile_matchup_result, ProfileMatchupOptions, ScorecardCollector,
     };
-    use crate::ai_core::profiles::{
-        AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID, AI_1_2_WAVE_COHORTS_ID,
-        AI_2_0_TANK_PRESSURE_ID,
-    };
     use crate::ai_core::profile_suites::{
-        AI_1_0_SUITE_ID, AI_1_1_SUITE_ID, AI_1_2_SUITE_ID, AI_2_0_SUITE_ID,
+        AI_1_0_SUITE_ID, AI_1_1_SUITE_ID, AI_1_2_SUITE_ID, AI_2_0_SUITE_ID, AI_TURTLE_SUITE_ID,
+    };
+    use crate::ai_core::profiles::{
+        AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID, AI_1_2_WAVE_COHORTS_ID, AI_2_0_TANK_PRESSURE_ID,
+        AI_TURTLE_CHOKES_ID,
     };
     use crate::DEFAULT_LIVE_PROFILE_ID;
     use rts_sim::game::command::SimCommand;
@@ -993,7 +992,10 @@ mod tests {
         assert_eq!(canonical_profile_id("ai"), Some(DEFAULT_LIVE_PROFILE_ID));
         assert_eq!(canonical_profile_id("ai1"), Some(AI_1_0_TECH_ID));
         assert_eq!(canonical_profile_id("ai_1_0"), Some(AI_1_0_TECH_ID));
-        assert_eq!(canonical_profile_id("default"), Some(DEFAULT_LIVE_PROFILE_ID));
+        assert_eq!(
+            canonical_profile_id("default"),
+            Some(DEFAULT_LIVE_PROFILE_ID)
+        );
         assert_eq!(
             available_profile_ids(),
             vec![
@@ -1001,6 +1003,7 @@ mod tests {
                 AI_1_1_TANK_MG_ID,
                 AI_1_2_WAVE_COHORTS_ID,
                 AI_2_0_TANK_PRESSURE_ID,
+                AI_TURTLE_CHOKES_ID,
             ]
         );
         assert_eq!(
@@ -1026,17 +1029,22 @@ mod tests {
     #[test]
     fn profile_request_aliases_can_resolve_suites_for_seeded_matchups() {
         assert_eq!(
-            available_profile_request_ids()[0..4],
+            available_profile_request_ids()[0..5],
             [
                 AI_1_0_SUITE_ID,
                 AI_1_1_SUITE_ID,
                 AI_1_2_SUITE_ID,
                 AI_2_0_SUITE_ID,
+                AI_TURTLE_SUITE_ID,
             ]
         );
         assert_eq!(
             canonical_profile_request_id_for_match("ai_2_0"),
             Some(AI_2_0_SUITE_ID)
+        );
+        assert_eq!(
+            canonical_profile_request_id_for_match("turtle"),
+            Some(AI_TURTLE_SUITE_ID)
         );
         assert_eq!(
             canonical_profile_request_id_for_match("ai"),
@@ -1213,9 +1221,8 @@ mod tests {
         ];
         let mut game = Game::new_without_ai_controllers(&players, 7);
         let start = game.start_payload();
-        let mut objective =
-            super::StartingCityCentreObjective::capture(&game, &start, &players)
-                .expect("starting City Centres should be captured");
+        let mut objective = super::StartingCityCentreObjective::capture(&game, &start, &players)
+            .expect("starting City Centres should be captured");
 
         assert_eq!(objective.alive_player_ids(), vec![1, 2]);
         assert!(objective.winner().is_none());

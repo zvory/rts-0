@@ -7,8 +7,9 @@ use super::player_view::{
 };
 use super::{ATTACK_REISSUE_TICKS, SELFPLAY_ATTACK_STAGE_SUPPRESSION_TICKS, THINK_INTERVAL};
 use crate::ai_core::actions::{self, AiActionContext, ResourceAssignmentPolicy, SpendBudget};
-use crate::ai_core::decision::{decide_profile, AiDecisionMemory, AiIntent};
+use crate::ai_core::decision::{decide_profile_with_analysis, AiDecisionMemory, AiIntent};
 use crate::ai_core::facts::AiFacts;
+use crate::ai_core::map_analysis::AiStaticMapContextCache;
 use crate::ai_core::observation::AiObservation;
 use crate::ai_core::profiles::{profile_by_id, AiProfile, AI_1_0_TECH, AI_1_0_TECH_ID};
 use crate::ai_core::resource_availability::ResourceAvailability;
@@ -29,6 +30,7 @@ pub(super) struct ProfileBackedScript {
     player_id: u32,
     profile: &'static AiProfile,
     memory: AiDecisionMemory,
+    static_map_context: AiStaticMapContextCache,
     pending_builds: PendingBuildTracker,
     staged_units: BTreeSet<u32>,
     active_attack_units: BTreeMap<u32, u32>,
@@ -57,6 +59,7 @@ impl ProfileBackedScript {
             player_id,
             profile,
             memory: AiDecisionMemory::for_profile(profile),
+            static_map_context: AiStaticMapContextCache::default(),
             pending_builds: PendingBuildTracker::default(),
             staged_units: BTreeSet::new(),
             active_attack_units: BTreeMap::new(),
@@ -97,10 +100,15 @@ impl ScriptedPlayer for ProfileBackedScript {
 
         let occupied = occupied_tiles_from_snapshot(&view.start.map, view.snapshot);
         let failed_builds = &self.pending_builds;
-        let decision = decide_profile(
+        let map_analysis = self
+            .static_map_context
+            .get_or_analyze(view.start)
+            .analysis();
+        let decision = decide_profile_with_analysis(
             &observation,
             self.profile,
             &mut self.memory,
+            map_analysis,
             ai_shared::BuildSearch::default(),
             |building, tile_x, tile_y| {
                 !failed_builds.failed(building, tile_x, tile_y)
@@ -206,6 +214,7 @@ impl ProfileBackedScript {
         }
 
         let mut filtered = Vec::new();
+        let mut freshly_staged = BTreeSet::new();
         for command in commands {
             match command {
                 Command::AttackMove {
@@ -220,8 +229,52 @@ impl ProfileBackedScript {
                         .filter(|id| !self.active_attack_units.contains_key(id))
                         .collect();
                     self.staged_units.extend(fresh.iter().copied());
+                    freshly_staged.extend(fresh.iter().copied());
                     if !fresh.is_empty() {
                         filtered.push(Command::AttackMove {
+                            units: fresh,
+                            x,
+                            y,
+                            queued,
+                        });
+                    }
+                }
+                Command::Move {
+                    units,
+                    x,
+                    y,
+                    queued,
+                } if units.iter().any(|id| staging.contains(id)) => {
+                    let fresh: Vec<u32> = units
+                        .into_iter()
+                        .filter(|id| !self.staged_units.contains(id))
+                        .filter(|id| !self.active_attack_units.contains_key(id))
+                        .collect();
+                    self.staged_units.extend(fresh.iter().copied());
+                    freshly_staged.extend(fresh.iter().copied());
+                    if !fresh.is_empty() {
+                        filtered.push(Command::Move {
+                            units: fresh,
+                            x,
+                            y,
+                            queued,
+                        });
+                    }
+                }
+                Command::SetupAntiTankGuns {
+                    units,
+                    x,
+                    y,
+                    queued,
+                } if units.iter().any(|id| staging.contains(id)) => {
+                    let fresh: Vec<u32> = units
+                        .into_iter()
+                        .filter(|id| !self.active_attack_units.contains_key(id))
+                        .filter(|id| !self.staged_units.contains(id) || freshly_staged.contains(id))
+                        .collect();
+                    self.staged_units.extend(fresh.iter().copied());
+                    if !fresh.is_empty() {
+                        filtered.push(Command::SetupAntiTankGuns {
                             units: fresh,
                             x,
                             y,

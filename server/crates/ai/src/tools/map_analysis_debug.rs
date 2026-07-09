@@ -53,10 +53,7 @@ pub fn run_from_env() {
         Ok(report) => {
             println!(
                 "AI map analysis: map={} players={} seed={} chokes={}",
-                report.map_name,
-                report.players,
-                report.seed,
-                report.debug.choke_count
+                report.map_name, report.players, report.seed, report.debug.choke_count
             );
             println!("svg: {}", report.out.display());
         }
@@ -170,7 +167,11 @@ fn render_map_analysis_svg(config: &CliConfig) -> Result<RenderReport, String> {
     let overlay = analysis.debug_overlay();
     let svg = render_svg(config, &start, &debug, &overlay.layers)?;
 
-    if let Some(parent) = config.out.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+    if let Some(parent) = config
+        .out
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
         std::fs::create_dir_all(parent).map_err(|err| err.to_string())?;
     }
     std::fs::write(&config.out, svg).map_err(|err| err.to_string())?;
@@ -196,7 +197,8 @@ fn start_payload_for_map(map_name: &str, players: u32, seed: u32) -> Result<Star
         schema_version: CURRENT_MAP_VERSION,
         content_hash: "debug".to_string(),
     });
-    let game = Game::new_with_random_ai_profiles_and_map_metadata(&player_inits, seed, map, metadata);
+    let game =
+        Game::new_with_random_ai_profiles_and_map_metadata(&player_inits, seed, map, metadata);
     Ok(game.start_payload())
 }
 
@@ -239,7 +241,11 @@ fn render_svg(
         r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {map_w} {svg_h}" width="{map_w}" height="{svg_h}" shape-rendering="crispEdges">"#
     )
     .unwrap();
-    writeln!(out, r##"<rect width="100%" height="100%" fill="#0b0d10"/>"##).unwrap();
+    writeln!(
+        out,
+        r##"<rect width="100%" height="100%" fill="#0b0d10"/>"##
+    )
+    .unwrap();
     writeln!(
         out,
         r#"<text x="8" y="22" fill="{TEXT_FILL}" font-family="monospace" font-size="16" font-weight="700">{} players={} seed={} chokes={} passable={} blocked={}</text>"#,
@@ -292,7 +298,11 @@ fn render_terrain(out: &mut String, map: &MapInfo, tile_px: u32, show_grid: bool
     }
 
     if show_grid {
-        writeln!(out, r#"<g stroke="{GRID_STROKE}" stroke-width="0.35" opacity="0.26">"#).unwrap();
+        writeln!(
+            out,
+            r#"<g stroke="{GRID_STROKE}" stroke-width="0.35" opacity="0.26">"#
+        )
+        .unwrap();
         for x in 0..=map.width {
             let px = x.saturating_mul(tile_px);
             writeln!(
@@ -303,11 +313,7 @@ fn render_terrain(out: &mut String, map: &MapInfo, tile_px: u32, show_grid: bool
         }
         for y in 0..=map.height {
             let py = y.saturating_mul(tile_px);
-            writeln!(
-                out,
-                r#"<line x1="0" y1="{py}" x2="{width_px}" y2="{py}"/>"#
-            )
-            .unwrap();
+            writeln!(out, r#"<line x1="0" y1="{py}" x2="{width_px}" y2="{py}"/>"#).unwrap();
         }
         writeln!(out, "</g>").unwrap();
     }
@@ -332,6 +338,7 @@ fn render_layer(
                 stroke,
                 alpha,
                 label,
+                tooltip: _,
             } => {
                 let x = tile_x.saturating_mul(tile_px);
                 let y = tile_y.saturating_mul(tile_px);
@@ -366,6 +373,7 @@ fn render_layer(
                 shape,
                 color,
                 label,
+                tooltip: _,
             } => {
                 let px = world_to_render_px(*x, world_tile_size, tile_px);
                 let py = world_to_render_px(*y, world_tile_size, tile_px);
@@ -375,12 +383,49 @@ fn render_layer(
                     render_text_label(out, label, px, py - r - 3.0, 11);
                 }
             }
+            ObserverMapAnalysisPrimitive::Line {
+                id,
+                x1,
+                y1,
+                x2,
+                y2,
+                color,
+                alpha,
+                width,
+                label,
+                tooltip: _,
+            } => {
+                let px1 = world_to_render_px(*x1, world_tile_size, tile_px);
+                let py1 = world_to_render_px(*y1, world_tile_size, tile_px);
+                let px2 = world_to_render_px(*x2, world_tile_size, tile_px);
+                let py2 = world_to_render_px(*y2, world_tile_size, tile_px);
+                writeln!(
+                    out,
+                    r#"<line id="{}" x1="{px1:.2}" y1="{py1:.2}" x2="{px2:.2}" y2="{py2:.2}" stroke="{}" stroke-opacity="{:.3}" stroke-width="{:.2}" stroke-linecap="round"/>"#,
+                    escape_xml(id),
+                    escape_xml(color),
+                    alpha.clamp(0.0, 1.0),
+                    width.max(1.0)
+                )
+                .unwrap();
+                if let Some(label) = label {
+                    render_text_label(out, label, (px1 + px2) * 0.5, (py1 + py2) * 0.5, 11);
+                }
+            }
         }
     }
     writeln!(out, "</g>").unwrap();
 }
 
-fn render_marker(out: &mut String, id: &str, x: f32, y: f32, radius: f32, shape: &str, color: &str) {
+fn render_marker(
+    out: &mut String,
+    id: &str,
+    x: f32,
+    y: f32,
+    radius: f32,
+    shape: &str,
+    color: &str,
+) {
     let color = escape_xml(color);
     let id = escape_xml(id);
     match shape {

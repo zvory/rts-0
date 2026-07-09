@@ -750,6 +750,44 @@ pub(crate) fn move_units_with_queue(
     Some(units)
 }
 
+pub(crate) fn setup_anti_tank_guns(
+    ctx: &mut AiActionContext<'_>,
+    units: impl IntoIterator<Item = u32>,
+    x: f32,
+    y: f32,
+    queued: bool,
+) -> Option<Vec<u32>> {
+    let mut units: Vec<u32> = units.into_iter().collect();
+    units.sort_unstable();
+    units.dedup();
+    if units.is_empty() {
+        return None;
+    }
+    ctx.emit_command(Command::SetupAntiTankGuns {
+        units: units.clone(),
+        x,
+        y,
+        queued,
+    });
+    Some(units)
+}
+
+pub(crate) fn hold_position_units(
+    ctx: &mut AiActionContext<'_>,
+    units: impl IntoIterator<Item = u32>,
+) -> Option<Vec<u32>> {
+    let mut units: Vec<u32> = units.into_iter().collect();
+    units.sort_unstable();
+    units.dedup();
+    if units.is_empty() {
+        return None;
+    }
+    ctx.emit_command(Command::HoldPosition {
+        units: units.clone(),
+    });
+    Some(units)
+}
+
 pub(crate) fn attack_units(
     ctx: &mut AiActionContext<'_>,
     units: impl IntoIterator<Item = u32>,

@@ -34,10 +34,12 @@ instead of reaching into entity stores from the server layer.
 
 **Strategy.** Each controller, on a staggered cadence
 (`DECISION_INTERVAL` ticks), builds a constrained snapshot-backed `AiObservation` and delegates RTS
-decisions to `rts_ai::ai_core::decision::decide_profile`. Live lobby AIs use the promoted
+decisions to `rts_ai::ai_core::decision::decide_profile_with_analysis`, which requires the
+AI-owned static map analysis for production callers. Live lobby AIs use the promoted
 AI 1.2 suite by default and keep the resolved concrete profile for the whole match. Hosts can
-select the `ai_1_0`, `ai_1_1`, `ai_1_2`, or `ai_2_0` profile suites per AI seat from the lobby
-before countdown/start; exact concrete profile ids remain accepted for developer compatibility.
+select the `ai_1_0`, `ai_1_1`, `ai_1_2`, `ai_2_0`, or `ai_turtle` profile suites per AI seat
+from the lobby before countdown/start; exact concrete profile ids remain accepted for developer
+compatibility.
 Unsupported profile or suite ids are ignored or defaulted to the promoted live default request.
 Team relationships are observation-only safety
 inputs: player summaries carry `teamId`, visible allied entities are classified separately from
@@ -50,18 +52,26 @@ shared action layer prevents it from over-committing resources/supply it does no
 **Shared AI core.** `rts_ai::ai_core` has deterministic profile data (`profiles.rs`) and a generic
 ranked decision loop (`decision.rs`) that emits ordinary `SimCommand`s through shared action helpers.
 It also owns static map analysis (`map_analysis.rs`) built only from `StartPayload.map`,
-start tiles, and static resource nodes. `AiController` caches that analysis by a stable
-map/start/resource identity. The analyzer records terrain passability, centered clearance, passable
-components, 10-clearance open-region seeds grown to 5-clearance shoulders, region assignments for
-starts/resources, and <=4-clearance choke bands split into region-pair corridors from contact-front
-distances. Regions are an internal implementation detail for assigning starts/resources and
-connecting choke cuts; observer diagnostics intentionally do not expose them as map layers. The
+start tiles, and static resource nodes. `AiStaticMapContextCache` is the shared cache used by
+live AI and self-play scripts, keyed by a stable map/start/resource identity, so profile decisions
+do not have to remember to pass optional choke data separately. The analyzer records terrain
+passability, centered clearance, passable components, 10-clearance open-region seeds grown to
+5-clearance shoulders, region assignments for starts/resources, and <=4-clearance choke bands split
+into region-pair corridors from contact-front distances. Regions are an internal implementation
+detail for assigning starts/resources and
+connecting choke cuts. Each published choke exposes one generated endpoint-to-endpoint line over
+the full passable choke band, including stepped or diagonal bands, while retaining the underlying
+tiles only as analyzer evidence/statistics; observer diagnostics intentionally do not expose
+the tile evidence band or regions as map layers. The
 previous Voronoi-style diagnostic layer was removed because it did not match the gameplay choke
-definition and no AI command decision consumed it. Current decision code does not consume this
-analysis yet, so it is a read-only foundation rather than a gameplay behavior change.
+definition. The turtle profile consumes the cached choke geometry to choose public, static
+own-base defensive lines; other promoted profiles still use the analysis only for diagnostics.
 Live spectator observer diagnostics can expose this cached analysis as `observerAnalysis.mapAnalysis`
-overlay primitives: choke segment bands with approach markers, base markers, resource-cluster
-markers, and labels. That payload is derived from the same AI-owned cache and
+overlay primitives: generated choke lines with approach markers, base markers, resource-cluster
+markers, and labels. Turtle profiles also append live spectator-only plan
+layers showing the defended choke lines, Machine Gunner coverage slots, Anti-Tank Gun backlines, and
+setup-facing rays that their current decision code is using, with short labels and hover
+explanations. That payload is derived from the same AI-owned cache and
 remains spectator-only; active players and AI command logic do not receive a new authority surface
 from it.
 The decision loop also emits manager traces: every think records typed strategic goals for economy,
@@ -167,16 +177,52 @@ economy can support it. Exact concrete profile ids remain registered for arena p
 debugging, and profile-manifest fingerprints. The retired `ai_2_0_agent_rush` and
 `ai_2_0_rifle_tank` profile ids remain rejected.
 
+The `ai_turtle` suite is pinned to `ai_turtle_chokes`, a first-pass turtle profile for visual
+matchups and tuning. It keeps the existing economy/supply managers first, targets full main-base
+worker saturation, opens one Barracks, builds Training Centre, then stays on one Barracks while it
+accelerates Research Complex / Steelworks R&D for Anti-Tank Guns. It queues Entrenchment from
+Training Centre before Machine Gunner production, starts the R&D chain once Entrenchment is queued,
+and prioritizes the Anti-Tank Gun unlock before downstream construction spend when Research Complex
+is ready. Its opening combat plan trains exactly three Riflemen from the first Barracks and sends
+them to a compact defensive line in front of the main steel cluster, while delaying oil assignment
+and tech buildings beyond Barracks until those opening Riflemen have been ordered. After that
+opening, it starts oil earlier than ordinary
+full-steel saturation, techs to Training Centre, queues Entrenchment, then can begin Research
+Complex and Steelworks before Entrenchment completes. It uses the same two-City-Centre expansion
+cadence as AI 2.0 after Training Centre and its three-Rifleman opening are online, capping pre-expand
+steel workers at 18 and lifting the post-expand steel target toward 36 so both City Centres can keep
+producing workers. Its post-opening production is pure Machine Gunners from Barracks plus priority
+Anti-Tank Guns from Steelworks; Riflemen are not replenished after the three-unit opening. Machine
+Gunner production pauses once the first two enemy-facing choke lines each have four staffed Machine
+Gunners, and resumes if either line falls below four; those Machine Gunners use a wider three-tile
+slot spacing around each choke line. When idle and not handling a local visible threat, it selects up
+to three chokes adjacent to its own start region from cached static map analysis, uses each choke's
+generated full-band line endpoints as the defended line, orders those exits by direct distance from
+each choke line to the public enemy start, and treats the closest line as the main choke. Cross spawns staff
+only that main enemy-facing choke early, while close spawns staff the first two enemy-facing own-base
+chokes. Once
+Entrenchment is researched and two Machine Gunners are holding the main choke, fresh Machine Gunners
+and Anti-Tank Guns can reinforce all configured active chokes by current under-staffing and width
+proportion, so replacements flow toward emptied lines before already-staffed ones. Machine Gunners
+occupy coverage slots along the full choke line at roughly three-tile gaps: the first slot is seeded
+from the sector where the public enemy-start to own-start route crosses or comes closest to that
+choke line, then later slots maximize empty space from already chosen sectors. They switch to Hold
+Position after reaching their assigned slot. Riflemen do not staff chokes; they stay on the main
+steel-line screen as a fallback against missed routes. Anti-Tank Guns use the same coverage-slot
+selection on a line ten tiles behind the averaged choke line on the own-start side, then set up
+facing orthogonally down the enemy approach lane. It does not launch ordinary frontal waves.
+
 The suite aliases `ai_2_0` and `ai20` resolve to the AI 2.0 suite request in live and arena-style
 tooling; `ai_1_2` and `ai12` resolve to the AI 1.2 suite request; `ai_1_1` and `ai11` resolve to
-the AI 1.1 suite request; `ai_1_0` and `ai1` resolve to the AI 1.0 suite request. Exact profile ids
-such as `ai_1_2_wave_cohorts` or `ai_2_0_tank_pressure` pin one concrete member. `ai` and
-`default` resolve to the promoted live default request.
+the AI 1.1 suite request; `ai_1_0` and `ai1` resolve to the AI 1.0 suite request; `ai_turtle` and
+`turtle` resolve to the turtle suite request. Exact profile ids such as `ai_1_2_wave_cohorts`,
+`ai_2_0_tank_pressure`, or `ai_turtle_chokes` pin one concrete member. `ai` and `default` resolve
+to the promoted live default request.
 The live lobby AI uses this shared core through `AiController`, which only owns live identity,
 profile id, cadence, persistent decision memory, and its latest bounded decision trace for
 spectator-only observer diagnostics. Unknown live profile ids resolve to the promoted live default,
 currently `ai_1_2`, which resolves to `ai_1_2_wave_cohorts`. The ordinary lobby exposes AI 1.0,
-AI 1.1, AI 1.2, and AI 2.0 as suite requests. AI 1.2 is the live lobby default.
+AI 1.1, AI 1.2, AI 2.0, and AI Turtle as suite requests. AI 1.2 is the live lobby default.
 Panzerfaust is trainable for Kriegsia players after a completed Training Centre, and Scout Plane is
 trainable from City Centre after completed Gun Works or Vehicle Works, but current AI production
 profiles intentionally omit both units in the first pass. AI-owned Panzerfaust or Scout Plane units

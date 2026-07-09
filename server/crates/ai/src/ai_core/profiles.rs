@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use rts_sim::game::entity::EntityKind;
+use rts_sim::game::upgrade::UpgradeKind;
 
 pub(crate) const RIFLE_FLOOD_FAST_ID: &str = "rifle_flood_fast";
 pub(crate) const RIFLE_FLOOD_FULL_SATURATION_ID: &str = "rifle_flood_full_saturation";
@@ -10,6 +11,7 @@ pub(crate) const AI_1_0_TECH_ID: &str = "ai_1_0_tech";
 pub(crate) const AI_1_1_TANK_MG_ID: &str = "ai_1_1_tank_mg";
 pub(crate) const AI_1_2_WAVE_COHORTS_ID: &str = "ai_1_2_wave_cohorts";
 pub(crate) const AI_2_0_TANK_PRESSURE_ID: &str = "ai_2_0_tank_pressure";
+pub(crate) const AI_TURTLE_CHOKES_ID: &str = "ai_turtle_chokes";
 
 const AI_1_2_FRONTAL_COHORT_TICKS: u32 = 3_600;
 const TANK_TECH_FLOAT_THRESHOLD: ResourceFloatThreshold = ResourceFloatThreshold {
@@ -44,10 +46,12 @@ pub(crate) struct AiProfile {
     pub(crate) buildings: BuildingPolicy,
     pub(crate) extra_factories: Option<ExtraFactoryPolicy>,
     pub(crate) production: ProductionPolicy,
+    pub(crate) upgrade_priorities: &'static [UpgradeKind],
     pub(crate) attack: AttackPolicy,
     pub(crate) resources: ResourcePolicy,
     pub(crate) expansion: Option<ExpansionPolicy>,
     pub(crate) defensive_machine_gunners: Option<DefensiveMachineGunnerPolicy>,
+    pub(crate) turtle_defense: Option<TurtleDefensePolicy>,
     pub(crate) frontal_wave: FrontalWavePolicy,
     pub(crate) recovery_transition: Option<RecoveryTransitionPolicy>,
     pub(crate) tech_transition: Option<TechTransitionPolicy>,
@@ -208,6 +212,20 @@ pub(crate) struct DefensiveMachineGunnerPolicy {
     pub(crate) target_count: usize,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct TurtleDefensePolicy {
+    pub(crate) max_chokes: usize,
+    pub(crate) anti_tank_back_tiles: f32,
+    pub(crate) opening_riflemen: usize,
+    pub(crate) support_barracks_target: usize,
+    pub(crate) main_machine_gunner_target: usize,
+    pub(crate) machine_gunner_target_chokes: usize,
+    pub(crate) machine_gunners_per_choke: usize,
+    pub(crate) machine_gunner_slot_gap_tiles: f32,
+    pub(crate) slot_gap_tiles: f32,
+    pub(crate) anti_tank_kinds: &'static [EntityKind],
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct FrontalWavePolicy {
     pub(crate) exclude_launched_ticks: Option<u32>,
@@ -274,6 +292,15 @@ const SUPPORT_WEAPONS_AND_RIFLE: [EntityKind; 3] = [
     EntityKind::AntiTankGun,
     EntityKind::Rifleman,
 ];
+const TURTLE_UNITS: [EntityKind; 3] = [
+    EntityKind::AntiTankGun,
+    EntityKind::MachineGunner,
+    EntityKind::Rifleman,
+];
+const TURTLE_ANTI_TANK: [EntityKind; 1] = [EntityKind::AntiTankGun];
+const NO_UPGRADES: [UpgradeKind; 0] = [];
+const TURTLE_UPGRADES: [UpgradeKind; 2] =
+    [UpgradeKind::Entrenchment, UpgradeKind::AntiTankGunUnlock];
 
 const FAST_TECH_PATH: [EntityKind; 1] = [EntityKind::Barracks];
 const FULL_TECH_PATH: [EntityKind; 1] = [EntityKind::Barracks];
@@ -291,6 +318,12 @@ const AI_1_0_TANK_TECH_PATH: [EntityKind; 4] = [
     EntityKind::Factory,
 ];
 const SUPPORT_TECH_PATH: [EntityKind; 4] = [
+    EntityKind::Barracks,
+    EntityKind::TrainingCentre,
+    EntityKind::ResearchComplex,
+    EntityKind::Steelworks,
+];
+const TURTLE_TECH_PATH: [EntityKind; 4] = [
     EntityKind::Barracks,
     EntityKind::TrainingCentre,
     EntityKind::ResearchComplex,
@@ -333,6 +366,7 @@ pub(crate) static RIFLE_FLOOD_FAST: AiProfile = AiProfile {
         save_for_first_tech_unit: None,
         balance_unit_priorities: false,
     },
+    upgrade_priorities: &NO_UPGRADES,
     attack: AttackPolicy {
         first_attack_size: 1,
         wave_growth: 0,
@@ -362,6 +396,7 @@ pub(crate) static RIFLE_FLOOD_FAST: AiProfile = AiProfile {
         remote_worker_assignment_fallback: false,
     }),
     defensive_machine_gunners: None,
+    turtle_defense: None,
     frontal_wave: FrontalWavePolicy::DEFAULT,
     recovery_transition: Some(RecoveryTransitionPolicy {
         completed_building: EntityKind::Barracks,
@@ -473,6 +508,7 @@ pub(crate) static RIFLE_FLOOD_FULL_SATURATION: AiProfile = AiProfile {
         save_for_first_tech_unit: None,
         balance_unit_priorities: false,
     },
+    upgrade_priorities: &NO_UPGRADES,
     attack: AttackPolicy {
         first_attack_size: 3,
         wave_growth: 2,
@@ -502,6 +538,7 @@ pub(crate) static RIFLE_FLOOD_FULL_SATURATION: AiProfile = AiProfile {
         remote_worker_assignment_fallback: true,
     }),
     defensive_machine_gunners: None,
+    turtle_defense: None,
     frontal_wave: FrontalWavePolicy::DEFAULT,
     recovery_transition: None,
     tech_transition: Some(TechTransitionPolicy {
@@ -543,10 +580,10 @@ pub(crate) static TECH_TO_TANKS: AiProfile = AiProfile {
     buildings: BuildingPolicy {
         barracks_curve: BarracksCurve {
             before_steel_saturation: 1,
-            after_steel_saturation: 1,
+            after_steel_saturation: 2,
             banked_steel_threshold: 0,
             banked_steel_step: 0,
-            max: 1,
+            max: 2,
         },
         factory_target: 1,
         proxy_barracks: None,
@@ -560,6 +597,7 @@ pub(crate) static TECH_TO_TANKS: AiProfile = AiProfile {
         save_for_first_tech_unit: Some(EntityKind::Tank),
         balance_unit_priorities: false,
     },
+    upgrade_priorities: &NO_UPGRADES,
     attack: AttackPolicy {
         first_attack_size: 1,
         wave_growth: 1,
@@ -570,7 +608,7 @@ pub(crate) static TECH_TO_TANKS: AiProfile = AiProfile {
         required_unit: Some(EntityKind::Tank),
     },
     resources: ResourcePolicy {
-        oil_after_steel_workers: 8,
+        oil_after_steel_workers: 6,
         oil_after_full_steel_saturation: false,
         tank_adaptive: None,
     },
@@ -589,6 +627,7 @@ pub(crate) static TECH_TO_TANKS: AiProfile = AiProfile {
         remote_worker_assignment_fallback: false,
     }),
     defensive_machine_gunners: None,
+    turtle_defense: None,
     frontal_wave: FrontalWavePolicy::DEFAULT,
     recovery_transition: None,
     tech_transition: None,
@@ -627,6 +666,7 @@ pub(crate) static STEEL_EXPANSION_TANKS: AiProfile = AiProfile {
         save_for_first_tech_unit: Some(EntityKind::MachineGunner),
         balance_unit_priorities: true,
     },
+    upgrade_priorities: &NO_UPGRADES,
     attack: AttackPolicy {
         first_attack_size: usize::MAX,
         wave_growth: 0,
@@ -637,7 +677,7 @@ pub(crate) static STEEL_EXPANSION_TANKS: AiProfile = AiProfile {
         required_unit: None,
     },
     resources: ResourcePolicy {
-        oil_after_steel_workers: 8,
+        oil_after_steel_workers: 6,
         oil_after_full_steel_saturation: false,
         tank_adaptive: None,
     },
@@ -656,6 +696,7 @@ pub(crate) static STEEL_EXPANSION_TANKS: AiProfile = AiProfile {
         remote_worker_assignment_fallback: false,
     }),
     defensive_machine_gunners: None,
+    turtle_defense: None,
     frontal_wave: FrontalWavePolicy::DEFAULT,
     recovery_transition: None,
     tech_transition: Some(TechTransitionPolicy {
@@ -712,6 +753,7 @@ pub(crate) static AI_1_0_TECH: AiProfile = AiProfile {
         save_for_first_tech_unit: None,
         balance_unit_priorities: false,
     },
+    upgrade_priorities: &NO_UPGRADES,
     attack: AttackPolicy {
         first_attack_size: 4,
         wave_growth: 2,
@@ -722,7 +764,7 @@ pub(crate) static AI_1_0_TECH: AiProfile = AiProfile {
         required_unit: None,
     },
     resources: ResourcePolicy {
-        oil_after_steel_workers: 8,
+        oil_after_steel_workers: 6,
         oil_after_full_steel_saturation: false,
         tank_adaptive: None,
     },
@@ -741,6 +783,7 @@ pub(crate) static AI_1_0_TECH: AiProfile = AiProfile {
         remote_worker_assignment_fallback: true,
     }),
     defensive_machine_gunners: None,
+    turtle_defense: None,
     frontal_wave: FrontalWavePolicy::DEFAULT,
     recovery_transition: None,
     tech_transition: Some(TechTransitionPolicy {
@@ -789,6 +832,7 @@ pub(crate) static AI_1_1_TANK_MG: AiProfile = AiProfile {
     },
     extra_factories: None,
     production: AI_1_0_TECH.production,
+    upgrade_priorities: &NO_UPGRADES,
     attack: AI_1_0_TECH.attack,
     resources: AI_1_0_TECH.resources,
     expansion: Some(ExpansionPolicy {
@@ -806,6 +850,7 @@ pub(crate) static AI_1_1_TANK_MG: AiProfile = AiProfile {
         remote_worker_assignment_fallback: true,
     }),
     defensive_machine_gunners: Some(DefensiveMachineGunnerPolicy { target_count: 4 }),
+    turtle_defense: None,
     frontal_wave: FrontalWavePolicy::DEFAULT,
     recovery_transition: None,
     tech_transition: Some(TechTransitionPolicy {
@@ -839,10 +884,12 @@ pub(crate) static AI_1_2_WAVE_COHORTS: AiProfile = AiProfile {
         resource_float: AI_1_2_SECOND_FACTORY_FLOAT_THRESHOLD,
     }),
     production: AI_1_1_TANK_MG.production,
+    upgrade_priorities: &NO_UPGRADES,
     attack: AI_1_1_TANK_MG.attack,
     resources: AI_1_1_TANK_MG.resources,
     expansion: AI_1_1_TANK_MG.expansion,
     defensive_machine_gunners: AI_1_1_TANK_MG.defensive_machine_gunners,
+    turtle_defense: None,
     frontal_wave: FrontalWavePolicy {
         exclude_launched_ticks: Some(AI_1_2_FRONTAL_COHORT_TICKS),
         line_staging: true,
@@ -876,6 +923,7 @@ pub(crate) static AI_2_0_TANK_PRESSURE: AiProfile = AiProfile {
         resource_float: AI_2_0_SECOND_FACTORY_FLOAT_THRESHOLD,
     }),
     production: AI_1_0_TECH.production,
+    upgrade_priorities: &NO_UPGRADES,
     attack: AI_1_0_TECH.attack,
     resources: ResourcePolicy {
         oil_after_steel_workers: 5,
@@ -901,6 +949,7 @@ pub(crate) static AI_2_0_TANK_PRESSURE: AiProfile = AiProfile {
         remote_worker_assignment_fallback: true,
     }),
     defensive_machine_gunners: Some(DefensiveMachineGunnerPolicy { target_count: 4 }),
+    turtle_defense: None,
     frontal_wave: FrontalWavePolicy {
         exclude_launched_ticks: Some(AI_1_2_FRONTAL_COHORT_TICKS),
         line_staging: true,
@@ -927,12 +976,93 @@ pub(crate) static AI_2_0_TANK_PRESSURE: AiProfile = AiProfile {
     }),
 };
 
-pub(crate) fn required_profiles() -> [&'static AiProfile; 4] {
+pub(crate) static AI_TURTLE_CHOKES: AiProfile = AiProfile {
+    id: AI_TURTLE_CHOKES_ID,
+    workers: WorkerPolicy {
+        steel_saturation_fraction: Ratio::new(1, 1),
+        steel_worker_cap: None,
+        extra_oil_workers: 6,
+        pressure_worker_cap: None,
+        pressure_until_complete: None,
+    },
+    supply: SupplyPolicy {
+        free_supply_buffer: 10,
+        emergency_depot_threshold: 4,
+    },
+    buildings: BuildingPolicy {
+        barracks_curve: BarracksCurve {
+            before_steel_saturation: 1,
+            after_steel_saturation: 1,
+            banked_steel_threshold: 0,
+            banked_steel_step: 0,
+            max: 1,
+        },
+        factory_target: 0,
+        proxy_barracks: None,
+        required_tech_path: &TURTLE_TECH_PATH,
+        max_pending_per_kind: 1,
+    },
+    extra_factories: None,
+    production: ProductionPolicy {
+        queue_depth: 3,
+        unit_priorities: &TURTLE_UNITS,
+        save_for_first_tech_unit: None,
+        balance_unit_priorities: false,
+    },
+    upgrade_priorities: &TURTLE_UPGRADES,
+    attack: AttackPolicy {
+        first_attack_size: usize::MAX,
+        wave_growth: 0,
+        regroup_reset_ticks: 540,
+        reissue_cadence_ticks: 120,
+        stage_distance_tiles: 0.0,
+        unit_kinds: &TURTLE_UNITS,
+        required_unit: None,
+    },
+    resources: ResourcePolicy {
+        oil_after_steel_workers: 6,
+        oil_after_full_steel_saturation: false,
+        tank_adaptive: None,
+    },
+    expansion: Some(ExpansionPolicy {
+        target_city_centres: 2,
+        required_complete_building: EntityKind::TrainingCentre,
+        defensive_unit: EntityKind::Rifleman,
+        defensive_unit_count: 3,
+        pre_expansion_steel_worker_cap: 18,
+        post_expansion_steel_worker_cap: Some(36),
+        search_radius_tiles: 6,
+        trigger_steel: 350,
+        trigger_supply_used: 30,
+        blocks_tech_path: false,
+        oil_before_steel_in_expansion: true,
+        remote_worker_assignment_fallback: true,
+    }),
+    defensive_machine_gunners: None,
+    turtle_defense: Some(TurtleDefensePolicy {
+        max_chokes: 3,
+        anti_tank_back_tiles: 10.0,
+        opening_riflemen: 3,
+        support_barracks_target: 1,
+        main_machine_gunner_target: 2,
+        machine_gunner_target_chokes: 2,
+        machine_gunners_per_choke: 4,
+        machine_gunner_slot_gap_tiles: 3.0,
+        slot_gap_tiles: 2.0,
+        anti_tank_kinds: &TURTLE_ANTI_TANK,
+    }),
+    frontal_wave: FrontalWavePolicy::DEFAULT,
+    recovery_transition: None,
+    tech_transition: None,
+};
+
+pub(crate) fn required_profiles() -> [&'static AiProfile; 5] {
     [
         &AI_1_0_TECH,
         &AI_1_1_TANK_MG,
         &AI_1_2_WAVE_COHORTS,
         &AI_2_0_TANK_PRESSURE,
+        &AI_TURTLE_CHOKES,
     ]
 }
 
@@ -957,6 +1087,7 @@ mod tests {
                 AI_1_1_TANK_MG_ID,
                 AI_1_2_WAVE_COHORTS_ID,
                 AI_2_0_TANK_PRESSURE_ID,
+                AI_TURTLE_CHOKES_ID,
             ]
         );
         assert_eq!(profile_by_id(AI_1_0_TECH_ID).unwrap().id, AI_1_0_TECH_ID);
@@ -971,6 +1102,10 @@ mod tests {
         assert_eq!(
             profile_by_id(AI_2_0_TANK_PRESSURE_ID).unwrap().id,
             AI_2_0_TANK_PRESSURE_ID
+        );
+        assert_eq!(
+            profile_by_id(AI_TURTLE_CHOKES_ID).unwrap().id,
+            AI_TURTLE_CHOKES_ID
         );
         assert!(profile_by_id("tech_tree").is_none());
     }
@@ -987,6 +1122,7 @@ mod tests {
             &AI_1_1_TANK_MG,
             &AI_1_2_WAVE_COHORTS,
             &AI_2_0_TANK_PRESSURE,
+            &AI_TURTLE_CHOKES,
         ] {
             for unit in omitted_units {
                 assert!(
@@ -1028,7 +1164,10 @@ mod tests {
         let expansion = AI_2_0_TANK_PRESSURE.expansion.unwrap();
 
         assert_eq!(AI_2_0_TANK_PRESSURE.id, AI_2_0_TANK_PRESSURE_ID);
-        assert_eq!(AI_2_0_TANK_PRESSURE.buildings.barracks_curve, AI_1_1_TANK_MG.buildings.barracks_curve);
+        assert_eq!(
+            AI_2_0_TANK_PRESSURE.buildings.barracks_curve,
+            AI_1_1_TANK_MG.buildings.barracks_curve
+        );
         assert_eq!(AI_2_0_TANK_PRESSURE.buildings.factory_target, 1);
         assert_eq!(
             AI_2_0_TANK_PRESSURE.extra_factories,
@@ -1052,7 +1191,10 @@ mod tests {
             EntityKind::TrainingCentre
         );
         assert_eq!(expansion.defensive_unit, EntityKind::Rifleman);
-        assert_eq!(transition.resource_float, AI_2_0_TANK_PRESSURE_FLOAT_THRESHOLD);
+        assert_eq!(
+            transition.resource_float,
+            AI_2_0_TANK_PRESSURE_FLOAT_THRESHOLD
+        );
         assert_eq!(transition.required_tech_path, &AI_1_0_TANK_TECH_PATH);
         assert_eq!(
             transition.production.unit_priorities,

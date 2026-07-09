@@ -8,6 +8,7 @@ use crate::ai_core::actions::{
     TrainUnitsRequest,
 };
 use crate::ai_core::facts::{AiFacts, EnemyBaseFact};
+use crate::ai_core::map_analysis::AiMapAnalysis;
 use crate::ai_core::observation::{
     AiEntityState, AiEntitySummary, AiMapSummary, AiObservation, AiResourceSummary,
 };
@@ -17,6 +18,7 @@ use crate::ai_core::profiles::{
 };
 use crate::ai_shared;
 use crate::config;
+use rts_protocol::ObserverMapAnalysisLayer;
 use rts_rules;
 use rts_sim::game::command::SimCommand as Command;
 use rts_sim::game::entity::EntityKind;
@@ -32,6 +34,7 @@ mod proxy;
 mod raids;
 mod resources;
 mod trace;
+mod turtle;
 
 use self::defense::{
     defensive_machine_gunner_units, defensive_panic_barracks_target, defensive_panic_plan,
@@ -49,8 +52,8 @@ use self::policies::{
     active_required_tech_path, active_tech_transition, recovery_delay_ticks,
 };
 use self::production::{
-    production_building_order, production_uses_building, should_save_for_first_tech_unit,
-    should_save_for_required_tech_building, should_build_extra_factory, try_build_kind,
+    production_building_order, production_uses_building, should_build_extra_factory,
+    should_save_for_first_tech_unit, should_save_for_required_tech_building, try_build_kind,
     unit_counts_for_priorities, wants_depot,
 };
 use self::proxy::{should_use_proxy_barracks, try_proxy_barracks};
@@ -63,6 +66,9 @@ use self::resources::plan_economy;
 #[cfg(test)]
 use self::resources::{desired_oil_workers, target_steel_workers_for_profile};
 use self::trace::{build_manager_trace, ManagerOutputTrace, TraceInput};
+use self::turtle::{
+    stage_turtle_choke_defense, turtle_machine_gunner_lines_staffed, turtle_observer_debug_layers,
+};
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct AiDecision {
@@ -98,6 +104,17 @@ pub(crate) enum AiIntent {
     },
 }
 
+pub(crate) fn observer_debug_map_layers_for_profile(
+    observation: &AiObservation,
+    map_analysis: &AiMapAnalysis,
+    profile: &'static AiProfile,
+) -> Vec<ObserverMapAnalysisLayer> {
+    let Some(policy) = profile.turtle_defense else {
+        return Vec::new();
+    };
+    turtle_observer_debug_layers(observation, map_analysis, policy)
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct AiDecisionMemory {
     profile_id: Option<&'static str>,
@@ -112,6 +129,7 @@ pub(crate) struct AiDecisionMemory {
     defensive_panic_response: DefensivePanicResponse,
     pending_upgrades: BTreeSet<UpgradeKind>,
     launched_frontal_units: BTreeMap<u32, u32>,
+    turtle_opening_riflemen_ordered: usize,
 }
 
 impl AiDecisionMemory {
@@ -129,6 +147,7 @@ impl AiDecisionMemory {
             defensive_panic_response: DefensivePanicResponse::Riflemen,
             pending_upgrades: BTreeSet::new(),
             launched_frontal_units: BTreeMap::new(),
+            turtle_opening_riflemen_ordered: 0,
         }
     }
 
@@ -193,6 +212,7 @@ impl AiDecisionMemory {
         self.defensive_panic_response = DefensivePanicResponse::Riflemen;
         self.pending_upgrades.clear();
         self.launched_frontal_units.clear();
+        self.turtle_opening_riflemen_ordered = 0;
     }
 
     fn ensure_attack_policy(&mut self, profile: &AiProfile, attack: AttackPolicy) {
@@ -281,12 +301,77 @@ impl AiDecisionMemory {
         self.recovery_active
     }
 
+    fn sync_turtle_opening(&mut self, profile: &AiProfile, observation: &AiObservation) {
+        let Some(policy) = profile.turtle_defense else {
+            self.turtle_opening_riflemen_ordered = 0;
+            return;
+        };
+        self.turtle_opening_riflemen_ordered = self
+            .turtle_opening_riflemen_ordered
+            .max(unit_and_queue_count(observation, EntityKind::Rifleman))
+            .min(policy.opening_riflemen);
+    }
+
+    fn note_turtle_train(&mut self, profile: &AiProfile, unit: EntityKind) {
+        let Some(policy) = profile.turtle_defense else {
+            return;
+        };
+        if unit == EntityKind::Rifleman {
+            self.turtle_opening_riflemen_ordered = self
+                .turtle_opening_riflemen_ordered
+                .saturating_add(1)
+                .min(policy.opening_riflemen);
+        }
+    }
 }
 
-pub(crate) fn decide_profile<F>(
+#[cfg(test)]
+pub(crate) fn decide_profile_without_static_map_for_tests<F>(
     observation: &AiObservation,
     profile: &'static AiProfile,
     memory: &mut AiDecisionMemory,
+    build_search: ai_shared::BuildSearch,
+    mut placeable: F,
+) -> AiDecision
+where
+    F: FnMut(EntityKind, u32, u32) -> bool,
+{
+    decide_profile_inner(
+        observation,
+        profile,
+        memory,
+        None,
+        build_search,
+        &mut placeable,
+    )
+}
+
+pub(crate) fn decide_profile_with_analysis<F>(
+    observation: &AiObservation,
+    profile: &'static AiProfile,
+    memory: &mut AiDecisionMemory,
+    map_analysis: &AiMapAnalysis,
+    build_search: ai_shared::BuildSearch,
+    mut placeable: F,
+) -> AiDecision
+where
+    F: FnMut(EntityKind, u32, u32) -> bool,
+{
+    decide_profile_inner(
+        observation,
+        profile,
+        memory,
+        Some(map_analysis),
+        build_search,
+        &mut placeable,
+    )
+}
+
+fn decide_profile_inner<F>(
+    observation: &AiObservation,
+    profile: &'static AiProfile,
+    memory: &mut AiDecisionMemory,
+    map_analysis: Option<&AiMapAnalysis>,
     build_search: ai_shared::BuildSearch,
     mut placeable: F,
 ) -> AiDecision
@@ -299,6 +384,7 @@ where
         .retain(|upgrade| !observation.upgrades.contains(upgrade));
 
     let facts = AiFacts::from_observation(observation);
+    memory.sync_turtle_opening(profile, observation);
     let budget = SpendBudget::with_committed_steel(
         observation.economy.steel,
         observation.economy.oil,
@@ -407,13 +493,16 @@ where
     let save_for_unplanned_expansion =
         save_for_expansion && planned_in_intents(&intents, EntityKind::CityCentre) == 0;
 
-    let economy_plan = plan_economy(
+    let mut economy_plan = plan_economy(
         observation,
         &facts,
         profile,
         recovery_active,
         panic_plan.map(|plan| plan.oil_workers),
     );
+    if turtle_opening_pending(profile, memory) {
+        economy_plan.desired_oil_workers = economy_plan.current_oil_workers;
+    }
     let save_worker_training_for_tech = defensive_panic.active;
     for trained in actions::train_units(
         &mut actions,
@@ -432,8 +521,18 @@ where
         intents.push(AiIntent::Train { kind: trained.unit });
     }
 
+    if profile.turtle_defense.is_some() {
+        queue_profile_upgrades(&mut actions, &facts, memory, &mut intents, profile);
+    }
+
     for kind in required_tech_path {
         if proxy_barracks_active && *kind == EntityKind::Barracks {
+            continue;
+        }
+        if turtle_should_delay_tech_for_opening(profile, memory, *kind) {
+            continue;
+        }
+        if turtle_should_delay_tech_for_entrenchment(profile, memory, &facts, *kind) {
             continue;
         }
         if expansion_blocks_tech_path || save_for_unplanned_expansion {
@@ -467,6 +566,7 @@ where
             economy_plan.target_steel_workers,
         )
     };
+    let target_barracks = turtle_barracks_target(profile, &facts, target_barracks);
     if production_uses_building(production_policy, EntityKind::Barracks)
         && facts.building_count(EntityKind::Barracks)
             + planned_in_intents(&intents, EntityKind::Barracks)
@@ -559,9 +659,20 @@ where
             UpgradeKind::Methamphetamines,
         );
     }
+    if profile.turtle_defense.is_none() {
+        queue_profile_upgrades(&mut actions, &facts, memory, &mut intents, profile);
+    }
     let effective_unit_priorities = effective_unit_priorities_for_upgrades(
         production_policy.unit_priorities,
         facts.completed_upgrades(),
+    );
+    let effective_unit_priorities = effective_unit_priorities_for_turtle(
+        profile,
+        memory,
+        &facts,
+        observation,
+        map_analysis,
+        &effective_unit_priorities,
     );
     let effective_unit_priorities = effective_unit_priorities_for_defensive_machine_gunners(
         profile,
@@ -577,7 +688,7 @@ where
     );
     let production_unit_counts =
         unit_counts_for_priorities(observation, &facts, &effective_unit_priorities);
-    let defensive_machine_gunner_max_counts = defensive_machine_gunner_max_counts(profile);
+    let production_max_counts = production_max_counts(profile);
     for building_kind in production_building_order(&effective_unit_priorities) {
         let buildings = facts.production_buildings(building_kind);
         if buildings.is_empty() {
@@ -601,11 +712,12 @@ where
                 max_queue_depth: production_policy.queue_depth,
                 save_for_tech,
                 current_counts: &production_unit_counts,
-                max_counts: &defensive_machine_gunner_max_counts,
+                max_counts: &production_max_counts,
                 balance_unit_priorities: production_policy.balance_unit_priorities,
             },
         );
         for trained in trained_units {
+            memory.note_turtle_train(profile, trained.unit);
             intents.push(AiIntent::Train { kind: trained.unit });
         }
     }
@@ -768,9 +880,25 @@ where
             .copied()
             .filter(|id| !local_defense_assigned.contains(id))
             .collect();
+        let turtle_defense_active = profile.turtle_defense.is_some();
+
+        if !handled_local_defense && !handled_raid_target && turtle_defense_active {
+            if let Some(policy) = profile.turtle_defense {
+                if let Some(units) = stage_turtle_choke_defense(
+                    &mut actions,
+                    observation,
+                    map_analysis,
+                    policy,
+                    &local_defense_assigned,
+                ) {
+                    intents.push(AiIntent::Stage { units });
+                }
+            }
+        }
 
         if !handled_local_defense
             && !handled_raid_target
+            && !turtle_defense_active
             && !defensive_machine_gunners_available.is_empty()
         {
             if let Some(enemy_base) = facts.nearest_public_enemy_base {
@@ -785,7 +913,11 @@ where
             }
         }
 
-        if !handled_local_defense && !handled_raid_target && !frontal_wave.ready_units.is_empty() {
+        if !handled_local_defense
+            && !handled_raid_target
+            && !turtle_defense_active
+            && !frontal_wave.ready_units.is_empty()
+        {
             if let Some(enemy_base) = facts.nearest_public_enemy_base {
                 if rifle_raid_policy && frontal_wave.should_attack() {
                     let attack_units = {
@@ -806,12 +938,7 @@ where
                         enemy_base,
                     ) {
                         if let AiIntent::Attack { units } = &intent {
-                            memory.note_attack_for(
-                                profile,
-                                attack_policy,
-                                observation.tick,
-                                units,
-                            );
+                            memory.note_attack_for(profile, attack_policy, observation.tick, units);
                         }
                         intents.push(intent);
                     }
@@ -868,6 +995,68 @@ fn planned_train_in_intents(intents: &[AiIntent], kind: EntityKind) -> bool {
         .any(|intent| matches!(intent, AiIntent::Train { kind: trained } if *trained == kind))
 }
 
+fn turtle_opening_pending(profile: &AiProfile, memory: &AiDecisionMemory) -> bool {
+    profile
+        .turtle_defense
+        .map(|policy| memory.turtle_opening_riflemen_ordered < policy.opening_riflemen)
+        .unwrap_or(false)
+}
+
+fn turtle_should_delay_tech_for_opening(
+    profile: &AiProfile,
+    memory: &AiDecisionMemory,
+    kind: EntityKind,
+) -> bool {
+    kind != EntityKind::Barracks && turtle_opening_pending(profile, memory)
+}
+
+fn turtle_should_delay_tech_for_entrenchment(
+    profile: &AiProfile,
+    memory: &AiDecisionMemory,
+    facts: &AiFacts,
+    kind: EntityKind,
+) -> bool {
+    if profile.turtle_defense.is_none() {
+        return false;
+    }
+    if matches!(kind, EntityKind::Barracks | EntityKind::TrainingCentre) {
+        return false;
+    }
+    if facts.complete_building_count(EntityKind::TrainingCentre) == 0 {
+        return true;
+    }
+    if !turtle_entrenchment_started_or_done(memory, facts) {
+        return true;
+    }
+    false
+}
+
+fn turtle_barracks_target(profile: &AiProfile, facts: &AiFacts, base_target: usize) -> usize {
+    let Some(policy) = profile.turtle_defense else {
+        return base_target;
+    };
+    if facts.complete_building_count(EntityKind::TrainingCentre) == 0 {
+        return base_target.min(1);
+    }
+    base_target.max(policy.support_barracks_target)
+}
+
+fn unit_and_queue_count(observation: &AiObservation, kind: EntityKind) -> usize {
+    let units = observation
+        .owned
+        .iter()
+        .filter(|entity| entity.kind == kind)
+        .count();
+    let queued = observation
+        .owned
+        .iter()
+        .filter(|entity| entity.is_complete)
+        .filter(|entity| entity.production_kind == Some(kind))
+        .map(|entity| entity.production_queue_len.unwrap_or(0))
+        .sum::<usize>();
+    units.saturating_add(queued)
+}
+
 fn effective_unit_priorities_for_upgrades(
     unit_priorities: &[EntityKind],
     completed_upgrades: &[UpgradeKind],
@@ -878,6 +1067,42 @@ fn effective_unit_priorities_for_upgrades(
         .copied()
         .filter(|unit| *unit != EntityKind::Tank || methamphetamines_ready)
         .collect()
+}
+
+fn effective_unit_priorities_for_turtle(
+    profile: &AiProfile,
+    memory: &AiDecisionMemory,
+    facts: &AiFacts,
+    observation: &AiObservation,
+    map_analysis: Option<&AiMapAnalysis>,
+    unit_priorities: &[EntityKind],
+) -> Vec<EntityKind> {
+    let Some(policy) = profile.turtle_defense else {
+        return unit_priorities.to_vec();
+    };
+    let opening_done = memory.turtle_opening_riflemen_ordered >= policy.opening_riflemen;
+    let entrenchment_started_or_done = turtle_entrenchment_started_or_done(memory, facts);
+    let machine_gunner_lines_staffed =
+        turtle_machine_gunner_lines_staffed(observation, map_analysis, policy);
+    unit_priorities
+        .iter()
+        .copied()
+        .filter(|unit| match *unit {
+            EntityKind::Rifleman => !opening_done,
+            EntityKind::MachineGunner => {
+                opening_done && entrenchment_started_or_done && !machine_gunner_lines_staffed
+            }
+            EntityKind::AntiTankGun => opening_done && entrenchment_started_or_done,
+            _ => true,
+        })
+        .collect()
+}
+
+fn turtle_entrenchment_started_or_done(memory: &AiDecisionMemory, facts: &AiFacts) -> bool {
+    facts
+        .completed_upgrades()
+        .contains(&UpgradeKind::Entrenchment)
+        || memory.pending_upgrades.contains(&UpgradeKind::Entrenchment)
 }
 
 fn effective_unit_priorities_for_defensive_machine_gunners(
@@ -904,11 +1129,15 @@ fn effective_unit_priorities_for_defensive_machine_gunners(
     priorities
 }
 
-fn defensive_machine_gunner_max_counts(profile: &AiProfile) -> Vec<(EntityKind, usize)> {
-    profile
+fn production_max_counts(profile: &AiProfile) -> Vec<(EntityKind, usize)> {
+    let mut counts = profile
         .defensive_machine_gunners
         .map(|policy| vec![(EntityKind::MachineGunner, policy.target_count)])
-        .unwrap_or_default()
+        .unwrap_or_default();
+    if let Some(policy) = profile.turtle_defense {
+        counts.push((EntityKind::Rifleman, policy.opening_riflemen));
+    }
+    counts
 }
 
 fn can_train_pre_tank_defensive_machine_gunner(
@@ -952,6 +1181,18 @@ fn queue_upgrade_if_available(
         intents.push(AiIntent::Research {
             upgrade: researched.upgrade,
         });
+    }
+}
+
+fn queue_profile_upgrades(
+    actions: &mut AiActionContext<'_>,
+    facts: &AiFacts,
+    memory: &mut AiDecisionMemory,
+    intents: &mut Vec<AiIntent>,
+    profile: &AiProfile,
+) {
+    for upgrade in profile.upgrade_priorities {
+        queue_upgrade_if_available(actions, facts, memory, intents, *upgrade);
     }
 }
 

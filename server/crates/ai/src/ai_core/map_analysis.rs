@@ -14,7 +14,7 @@ use rts_sim::protocol::{kinds, terrain, MapInfo, PlayerStart, ResourceNode, Star
 mod chokes;
 mod regions;
 use chokes::build_chokes;
-use regions::{build_regions, nearest_region, region_id_for_tile, tile_rects_for_tiles};
+use regions::{build_regions, nearest_region, region_id_for_tile};
 
 const MAX_CLEARANCE_TILES: u16 = 16;
 const RESOURCE_CLUSTER_RADIUS_MARGIN_TILES: f32 = 0.75;
@@ -141,6 +141,17 @@ pub(crate) struct AiMapChoke {
     pub(crate) max_clearance_tiles: u16,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct AiBaseChoke {
+    pub(crate) id: u32,
+    pub(crate) width_tiles: u16,
+    pub(crate) center_world: (f32, f32),
+    pub(crate) endpoint_a_world: (f32, f32),
+    pub(crate) endpoint_b_world: (f32, f32),
+    pub(crate) own_approach_world: (f32, f32),
+    pub(crate) enemy_approach_world: (f32, f32),
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct AiStartMapping {
     pub(crate) player_id: u32,
@@ -202,6 +213,62 @@ pub(crate) struct AiMapAnalysisDebugSnapshot {
     pub(crate) chokes: Vec<AiMapChoke>,
     pub(crate) starts: Vec<AiStartMapping>,
     pub(crate) resource_clusters: Vec<AiResourceCluster>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct AiStaticMapContext {
+    key: AiMapAnalysisKey,
+    analysis: AiMapAnalysis,
+    diagnostics: ObserverMapAnalysisDiagnostics,
+}
+
+impl AiStaticMapContext {
+    fn analyze_with_key(start: &StartPayload, key: AiMapAnalysisKey) -> Self {
+        let analysis = AiMapAnalysis::analyze_with_key(start, key);
+        let diagnostics = analysis.debug_overlay();
+        Self {
+            key,
+            analysis,
+            diagnostics,
+        }
+    }
+
+    pub(crate) fn key(&self) -> AiMapAnalysisKey {
+        self.key
+    }
+
+    pub(crate) fn analysis(&self) -> &AiMapAnalysis {
+        &self.analysis
+    }
+
+    pub(crate) fn diagnostics(&self) -> &ObserverMapAnalysisDiagnostics {
+        &self.diagnostics
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+pub(crate) struct AiStaticMapContextCache {
+    context: Option<AiStaticMapContext>,
+}
+
+impl AiStaticMapContextCache {
+    pub(crate) fn get_or_analyze(&mut self, start: &StartPayload) -> &AiStaticMapContext {
+        let key = AiMapAnalysisKey::from_start(start);
+        let refresh = self
+            .context
+            .as_ref()
+            .map(|context| context.key() != key)
+            .unwrap_or(true);
+        if refresh {
+            self.context = None;
+        }
+        self.context
+            .get_or_insert_with(|| AiStaticMapContext::analyze_with_key(start, key))
+    }
+
+    pub(crate) fn current(&self) -> Option<&AiStaticMapContext> {
+        self.context.as_ref()
+    }
 }
 
 struct AiMapTileLookups<'a> {
@@ -289,6 +356,71 @@ impl AiMapAnalysis {
             .and_then(|idx| self.region_by_tile.get(idx).copied().flatten())
     }
 
+    pub(crate) fn base_chokes_for_player(&self, player_id: u32, limit: usize) -> Vec<AiBaseChoke> {
+        if limit == 0 {
+            return Vec::new();
+        }
+        let Some(start) = self
+            .starts
+            .iter()
+            .find(|start| start.player_id == player_id)
+        else {
+            return Vec::new();
+        };
+        let Some(start_region_id) = start.region_id else {
+            return Vec::new();
+        };
+        let mut chokes = self
+            .chokes
+            .iter()
+            .filter_map(|choke| {
+                let own_is_a = choke.region_a_id == start_region_id;
+                let own_is_b = choke.region_b_id == start_region_id;
+                if !own_is_a && !own_is_b {
+                    return None;
+                }
+                let own_approach_tile = if own_is_a {
+                    choke.approach_a_tile
+                } else {
+                    choke.approach_b_tile
+                };
+                let enemy_approach_tile = if own_is_a {
+                    choke.approach_b_tile
+                } else {
+                    choke.approach_a_tile
+                };
+                let (endpoint_a_world, endpoint_b_world) = choke_line_world_endpoints(
+                    choke,
+                    self.tile_size,
+                    self.width,
+                    self.height,
+                );
+                Some((
+                    tile_distance2(choke.center_tile, start.start_tile),
+                    choke.id,
+                    AiBaseChoke {
+                        id: choke.id,
+                        width_tiles: choke.width_tiles.max(1),
+                        center_world: tile_center_world(choke.center_tile, self.tile_size),
+                        endpoint_a_world,
+                        endpoint_b_world,
+                        own_approach_world: tile_center_world(own_approach_tile, self.tile_size),
+                        enemy_approach_world: tile_center_world(
+                            enemy_approach_tile,
+                            self.tile_size,
+                        ),
+                    },
+                ))
+            })
+            .collect::<Vec<_>>();
+        chokes.sort_by_key(|(distance2, id, _)| (*distance2, *id));
+        chokes
+            .into_iter()
+            .take(limit)
+            .map(|(_, _, choke)| choke)
+            .collect()
+    }
+
     #[allow(dead_code)]
     pub(crate) fn debug_snapshot(&self) -> AiMapAnalysisDebugSnapshot {
         let passable_tiles = self.passable.iter().filter(|passable| **passable).count() as u32;
@@ -349,19 +481,50 @@ impl AiMapAnalysis {
     fn choke_overlay_primitives(&self) -> Vec<ObserverMapAnalysisPrimitive> {
         let mut primitives = Vec::new();
         for choke in &self.chokes {
-            for (idx, rect) in tile_rects_for_tiles(&choke.tiles).into_iter().enumerate() {
-                primitives.push(ObserverMapAnalysisPrimitive::TileRect {
-                    id: format!("choke:{}:{}", choke.id, idx),
-                    tile_x: rect.tile_x,
-                    tile_y: rect.tile_y,
-                    tile_w: rect.tile_w,
-                    tile_h: rect.tile_h,
-                    fill: MAP_ANALYSIS_CHOKE_COLOR.to_string(),
-                    stroke: MAP_ANALYSIS_CHOKE_COLOR.to_string(),
-                    alpha: 0.28,
-                    label: None,
-                });
-            }
+            let ((x1, y1), (x2, y2)) =
+                choke_line_world_endpoints(choke, self.tile_size, self.width, self.height);
+            primitives.push(ObserverMapAnalysisPrimitive::Line {
+                id: format!("chokeLine:{}", choke.id),
+                x1,
+                y1,
+                x2,
+                y2,
+                color: MAP_ANALYSIS_CHOKE_COLOR.to_string(),
+                alpha: 1.0,
+                width: 6.0,
+                label: Some(format!("K{} generated line", choke.id)),
+                tooltip: Some(format!(
+                    "Static map-analysis choke K{} line: generated from the full passable choke band between regions R{} and R{}, estimated width {} tiles.",
+                    choke.id, choke.region_a_id, choke.region_b_id, choke.width_tiles
+                )),
+            });
+            primitives.extend(generated_line_strip_markers(
+                format!("chokeLineStrip:{}", choke.id),
+                (x1, y1),
+                (x2, y2),
+                self.tile_size,
+                MAP_ANALYSIS_CHOKE_COLOR,
+                Some(format!(
+                    "Generated static map-analysis choke K{} line strip.",
+                    choke.id
+                )),
+            ));
+
+            let midpoint_x = (x1 + x2) * 0.5;
+            let midpoint_y = (y1 + y2) * 0.5;
+            primitives.push(ObserverMapAnalysisPrimitive::Marker {
+                id: format!("chokeLineMid:{}", choke.id),
+                x: midpoint_x,
+                y: midpoint_y,
+                radius: (self.tile_size as f32 * 0.22).max(6.0),
+                shape: "diamond".to_string(),
+                color: MAP_ANALYSIS_CHOKE_COLOR.to_string(),
+                label: Some(format!("K{} line", choke.id)),
+                tooltip: Some(format!(
+                    "Midpoint of generated static map-analysis choke K{} line.",
+                    choke.id
+                )),
+            });
 
             let (x, y) = tile_center_world(choke.center_tile, self.tile_size);
             primitives.push(ObserverMapAnalysisPrimitive::Marker {
@@ -373,6 +536,10 @@ impl AiMapAnalysis {
                 color: MAP_ANALYSIS_CHOKE_COLOR.to_string(),
                 label: Some(format!(
                     "K{} R{}-R{} W{}",
+                    choke.id, choke.region_a_id, choke.region_b_id, choke.width_tiles
+                )),
+                tooltip: Some(format!(
+                    "Static map-analysis choke K{}: one generated choke line over the passable band between regions R{} and R{}, estimated width {} tiles.",
                     choke.id, choke.region_a_id, choke.region_b_id, choke.width_tiles
                 )),
             });
@@ -387,6 +554,10 @@ impl AiMapAnalysis {
                     shape: "diamond".to_string(),
                     color: MAP_ANALYSIS_APPROACH_COLOR.to_string(),
                     label: None,
+                    tooltip: Some(format!(
+                        "Static map-analysis approach marker {suffix} for choke K{}.",
+                        choke.id
+                    )),
                 });
             }
         }
@@ -413,6 +584,13 @@ impl AiMapAnalysis {
                     color,
                     label: Some(format!(
                         "P{} T{} {} {}",
+                        start.player_id,
+                        start.team_id,
+                        component_label(start.component_id),
+                        region_label(start.region_id)
+                    )),
+                    tooltip: Some(format!(
+                        "Player {} start: team {}, component {}, region {}.",
                         start.player_id,
                         start.team_id,
                         component_label(start.component_id),
@@ -449,10 +627,57 @@ impl AiMapAnalysis {
                         component_label(cluster.component_id),
                         region_label(cluster.region_id)
                     )),
+                    tooltip: Some(format!(
+                        "Resource cluster {}: {} steel nodes, {} oil nodes, component {}, region {}.",
+                        cluster.id,
+                        cluster.steel_nodes,
+                        cluster.oil_nodes,
+                        component_label(cluster.component_id),
+                        region_label(cluster.region_id)
+                    )),
                 }
             })
             .collect()
     }
+}
+
+fn generated_line_strip_markers(
+    id_prefix: String,
+    start: (f32, f32),
+    end: (f32, f32),
+    tile_size: u32,
+    color: &str,
+    tooltip: Option<String>,
+) -> Vec<ObserverMapAnalysisPrimitive> {
+    let dx = end.0 - start.0;
+    let dy = end.1 - start.1;
+    let len = (dx * dx + dy * dy).sqrt();
+    if !len.is_finite() || len <= f32::EPSILON {
+        return Vec::new();
+    }
+    let tile = tile_size.max(1) as f32;
+    let spacing = (tile * 0.38).max(8.0);
+    let radius = (tile * 0.24).max(6.0);
+    let count = ((len / spacing).ceil() as usize).clamp(2, 40);
+    (0..count)
+        .map(|index| {
+            let t = if count <= 1 {
+                0.5
+            } else {
+                index as f32 / (count - 1) as f32
+            };
+            ObserverMapAnalysisPrimitive::Marker {
+                id: format!("{id_prefix}:{index}"),
+                x: start.0 + dx * t,
+                y: start.1 + dy * t,
+                radius,
+                shape: "square".to_string(),
+                color: color.to_string(),
+                label: None,
+                tooltip: tooltip.clone(),
+            }
+        })
+        .collect()
 }
 
 #[derive(Clone, Debug)]
@@ -1042,6 +1267,41 @@ fn tile_center_world(tile: AiTile, tile_size: u32) -> (f32, f32) {
     (
         tile.x as f32 * tile_size + tile_size * 0.5,
         tile.y as f32 * tile_size + tile_size * 0.5,
+    )
+}
+
+fn choke_line_world_endpoints(
+    choke: &AiMapChoke,
+    tile_size: u32,
+    map_width: u32,
+    map_height: u32,
+) -> ((f32, f32), (f32, f32)) {
+    let mut start = tile_center_world(choke.endpoint_a_tile, tile_size);
+    let mut end = tile_center_world(choke.endpoint_b_tile, tile_size);
+    let dx = end.0 - start.0;
+    let dy = end.1 - start.1;
+    let len = (dx * dx + dy * dy).sqrt();
+    if len.is_finite() && len > f32::EPSILON {
+        let ux = dx / len;
+        let uy = dy / len;
+        let tile_size = tile_size.max(1) as f32;
+        let edge_distance = (tile_size * 0.5) / ux.abs().max(uy.abs()).max(0.001);
+        start.0 -= ux * edge_distance;
+        start.1 -= uy * edge_distance;
+        end.0 += ux * edge_distance;
+        end.1 += uy * edge_distance;
+        start = clamp_world_to_map(start, tile_size, map_width, map_height);
+        end = clamp_world_to_map(end, tile_size, map_width, map_height);
+    }
+    (start, end)
+}
+
+fn clamp_world_to_map(point: (f32, f32), tile_size: f32, map_width: u32, map_height: u32) -> (f32, f32) {
+    let max_x = map_width as f32 * tile_size;
+    let max_y = map_height as f32 * tile_size;
+    (
+        point.0.clamp(0.0, max_x),
+        point.1.clamp(0.0, max_y),
     )
 }
 

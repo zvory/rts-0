@@ -12,6 +12,7 @@ struct RegionSeed {
     max_clearance_tiles: u16,
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug)]
 pub(super) struct OverlayTileRect {
     pub(super) tile_x: u32,
@@ -233,6 +234,7 @@ fn region_representative_better(
             && (tile.y, tile.x) < (representative.y, representative.x))
 }
 
+#[cfg(test)]
 pub(super) fn tile_rects_for_tiles(tiles: &[AiTile]) -> Vec<OverlayTileRect> {
     let mut sorted = tiles.to_vec();
     sorted.sort_unstable_by_key(|tile| (tile.y, tile.x));
@@ -246,8 +248,7 @@ pub(super) fn tile_rects_for_tiles(tiles: &[AiTile]) -> Vec<OverlayTileRect> {
         let mut end_x = start_x;
         idx += 1;
 
-        while idx < sorted.len() && sorted[idx].y == y && sorted[idx].x == end_x.saturating_add(1)
-        {
+        while idx < sorted.len() && sorted[idx].y == y && sorted[idx].x == end_x.saturating_add(1) {
             end_x = sorted[idx].x;
             idx += 1;
         }

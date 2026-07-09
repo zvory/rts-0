@@ -152,7 +152,7 @@ fn decide(observation: &AiObservation) -> AiDecision {
 fn decide_with_profile(observation: &AiObservation, profile: &'static AiProfile) -> AiDecision {
     let width = observation.map.width;
     let height = observation.map.height;
-    decide_profile(
+    decide_profile_without_static_map_for_tests(
         observation,
         profile,
         &mut AiDecisionMemory::for_profile(profile),
@@ -210,7 +210,7 @@ fn places_first_factory_in_shorter_forward_band() {
 
     let width = observation.map.width;
     let height = observation.map.height;
-    let decision = decide_profile(
+    let decision = decide_profile_without_static_map_for_tests(
         &observation,
         &AI_1_1_TANK_MG,
         &mut AiDecisionMemory::for_profile(&AI_1_1_TANK_MG),

@@ -120,27 +120,26 @@ pub(super) fn issue_frontal_wave(
         return None;
     }
 
-    let staged = if stages_expansion_defensive_line(profile, attack)
-        || profile.frontal_wave.line_staging
-    {
-        stage_main_steel_defensive_line(
-            actions,
-            observation,
-            &plan.ready_units,
-            enemy_base,
-            attack.stage_distance_tiles,
-        )
-    } else {
-        let own_base = tile_center(observation.own_start_tile, observation.map.tile_size);
-        actions::stage_units_toward(
-            actions,
-            plan.ready_units.clone(),
-            own_base,
-            (enemy_base.x, enemy_base.y),
-            observation.map.tile_size,
-            attack.stage_distance_tiles,
-        )
-    };
+    let staged =
+        if stages_expansion_defensive_line(profile, attack) || profile.frontal_wave.line_staging {
+            stage_main_steel_defensive_line(
+                actions,
+                observation,
+                &plan.ready_units,
+                enemy_base,
+                attack.stage_distance_tiles,
+            )
+        } else {
+            let own_base = tile_center(observation.own_start_tile, observation.map.tile_size);
+            actions::stage_units_toward(
+                actions,
+                plan.ready_units.clone(),
+                own_base,
+                (enemy_base.x, enemy_base.y),
+                observation.map.tile_size,
+                attack.stage_distance_tiles,
+            )
+        };
     staged.map(|units| AiIntent::Stage { units })
 }
 

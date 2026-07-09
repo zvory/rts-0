@@ -197,9 +197,7 @@ fn goal_trace(goal: StrategicGoal, input: TraceInput<'_>) -> GoalTrace {
     let intents = match goal {
         StrategicGoal::LocalDefense if !input.local_threat_active => Vec::new(),
         StrategicGoal::FrontalAttack if input.rifle_raid_policy => Vec::new(),
-        StrategicGoal::Harassment if !input.rifle_raid_policy => {
-            Vec::new()
-        }
+        StrategicGoal::Harassment if !input.rifle_raid_policy => Vec::new(),
         _ => intents_for_goal(goal, input.intents),
     };
     let selected = match goal {
