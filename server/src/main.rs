@@ -969,8 +969,10 @@ mod tests {
 /// Layout (see `docs/design/server-sim.md` §3.2):
 /// - Split the socket into a sink (writer) and a stream (reader).
 /// - Spawn a dedicated **writer task** that drains reliable messages and latest-only snapshots
-///   to the sink. The room sends through the matching connection sink via [`RoomEvent::Join`],
-///   so a slow socket only backs up its own outbound state — it never blocks the room.
+///   to the sink. Observer analysis uses its own latest-only lane behind snapshots, so diagnostic
+///   panel updates cannot starve world-state delivery. The room sends through the matching
+///   connection sink via [`RoomEvent::Join`], so a slow socket only backs up its own outbound state
+///   — it never blocks the room.
 /// - On this task, send `welcome`, then read `ClientMessage`s and translate them to
 ///   [`RoomEvent`]s for whichever room the client joins.
 /// - On stream close (or any fatal read error) emit a final [`RoomEvent::Leave`].
@@ -985,7 +987,8 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
     let (conn_tx, writer_rx) = lobby::ConnectionSink::new();
 
     let writer = tokio::spawn(async move {
-        let (mut reliable_rx, snapshots, mut writer_stats) = writer_rx.into_parts();
+        let (mut reliable_rx, snapshots, observer_analysis, mut writer_stats) =
+            writer_rx.into_parts();
         let mut reliable_closed = false;
 
         'write_loop: loop {
@@ -1024,6 +1027,14 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
                 continue;
             }
 
+            if let Some(msg) = observer_analysis.take() {
+                let (keep_writing, _) = send_server_message(player_id, &mut sink, msg).await;
+                if !keep_writing {
+                    break 'write_loop;
+                }
+                continue;
+            }
+
             if reliable_closed {
                 break;
             }
@@ -1045,6 +1056,7 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
                     }
                 }
                 _ = snapshots.notified() => {}
+                _ = observer_analysis.notified() => {}
             }
         }
 

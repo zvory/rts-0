@@ -1335,14 +1335,16 @@ setup import/export and validation remain usable.
 
 ### 2.7 Observer analysis state
 
-`observerAnalysis` is the wire tag for reliable observer analysis overlay/tab data that
-cannot be derived safely from the browser's current projected snapshot. In replay playback it is
-sent to replay viewers after replay `start`/`roomTimeState`, after accepted seeks, after vision
-selection changes, and during replay playback ticks. Live matches send the same payload every server
-tick, at the normal snapshot cadence, only when at least one spectator connection is present. The
-server computes the live payload once per tick and sends it only to connections whose room player
-state is `spectator: true`; active-player connections, including claimed branch-live seats, must
-not receive this message.
+`observerAnalysis` is the wire tag for latest-only observer analysis overlay/tab data that cannot
+be derived safely from the browser's current projected snapshot. The server delivers it on a
+separate latest-only outbound lane behind snapshots; stale unsent observer-analysis payloads may be
+replaced by newer payloads and must never block world-state snapshot delivery. In replay playback it
+is sent to replay viewers after replay `start`/`roomTimeState`, after accepted seeks, after vision
+selection changes, and during replay playback ticks. Live matches produce the same payload every
+server tick, at the normal snapshot cadence, only when at least one spectator connection is present.
+The server computes the live payload once per tick and sends it only to connections whose room
+player state is `spectator: true`; active-player connections, including claimed branch-live seats,
+must not receive this message.
 ```
 {
   t: "observerAnalysis",

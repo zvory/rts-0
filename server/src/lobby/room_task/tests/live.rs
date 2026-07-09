@@ -52,18 +52,18 @@ fn live_spectator_receives_observer_analysis_but_active_players_do_not() {
 
     task.on_tick(TokioInstant::now());
 
-    let spectator_messages: Vec<_> =
-        std::iter::from_fn(|| writer_spectator.reliable_rx.try_recv().ok()).collect();
-    assert!(spectator_messages.iter().any(|msg| matches!(
-        msg,
-        ServerMessage::ObserverAnalysis(analysis) if analysis.tick == 1 && analysis.players.len() == 2
-    )));
-    let mut active_messages: Vec<_> =
-        std::iter::from_fn(|| writer_a.reliable_rx.try_recv().ok()).collect();
-    active_messages.extend(std::iter::from_fn(|| writer_b.reliable_rx.try_recv().ok()));
-    assert!(!active_messages
-        .iter()
-        .any(|msg| matches!(msg, ServerMessage::ObserverAnalysis(_))));
+    let spectator_analysis = match writer_spectator
+        .observer_analysis
+        .take()
+        .expect("spectator observer analysis")
+    {
+        ServerMessage::ObserverAnalysis(analysis) => analysis,
+        other => panic!("expected observer analysis, got {other:?}"),
+    };
+    assert_eq!(spectator_analysis.tick, 1);
+    assert_eq!(spectator_analysis.players.len(), 2);
+    assert!(writer_a.observer_analysis.take().is_none());
+    assert!(writer_b.observer_analysis.take().is_none());
 }
 
 #[test]
@@ -528,15 +528,14 @@ fn ai_only_live_spectator_observer_analysis_includes_ai_decision_diagnostics() {
         task.on_tick(TokioInstant::now());
     }
 
-    let analyses: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok())
-        .filter_map(|msg| match msg {
-            ServerMessage::ObserverAnalysis(analysis) => Some(analysis),
-            _ => None,
-        })
-        .collect();
-    let analysis = analyses
-        .last()
-        .expect("AI-only spectator should receive observer analysis");
+    let analysis = match writer
+        .observer_analysis
+        .take()
+        .expect("AI-only spectator should receive observer analysis")
+    {
+        ServerMessage::ObserverAnalysis(analysis) => analysis,
+        other => panic!("expected observer analysis, got {other:?}"),
+    };
     let map_analysis = analysis
         .map_analysis
         .as_ref()
