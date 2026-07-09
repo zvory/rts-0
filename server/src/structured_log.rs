@@ -90,7 +90,13 @@ pub const NET_REPORT_SERVER_SNAPSHOT_WRITER_SEND_ISSUE_MS: u32 = 10;
 pub fn new_match_run_id(room: &str) -> String {
     let seq = NEXT_MATCH_RUN_ID.fetch_add(1, Ordering::Relaxed);
     let millis = chrono::Utc::now().timestamp_millis();
-    format!("{}-{millis}-{seq:06x}", sanitize_id_segment(room))
+    // The sequence disambiguates one server process; the random suffix keeps this durable
+    // observation/replay join key unique across concurrently deployed instances as well.
+    let nonce = rand::random::<u64>();
+    format!(
+        "{}-{millis}-{seq:06x}-{nonce:016x}",
+        sanitize_id_segment(room)
+    )
 }
 
 pub fn log_client_net_report(

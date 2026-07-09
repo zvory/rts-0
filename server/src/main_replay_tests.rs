@@ -1,11 +1,22 @@
 use super::*;
 use rts_rules::faction::{DEFAULT_FACTION_ID, EMPTY_FIXTURE_FACTION_ID};
 
+#[test]
+fn observation_run_id_validation_is_bounded_and_uses_log_safe_characters() {
+    assert!(valid_observation_run_id("ai-selfplay-1740000000000-000001"));
+    assert!(valid_observation_run_id("observer_run-42"));
+    assert!(!valid_observation_run_id(""));
+    assert!(!valid_observation_run_id("has space"));
+    assert!(!valid_observation_run_id("has/slash"));
+    assert!(!valid_observation_run_id(&"a".repeat(97)));
+}
+
 fn replay_summary_for(
     meta: Option<rts_server::db::ReplaySummaryMetadata>,
 ) -> rts_server::db::MatchSummary {
     rts_server::db::MatchSummary {
         id: 1,
+        match_run_id: None,
         started_at: chrono::Utc::now(),
         ended_at: chrono::Utc::now(),
         duration_ms: 1_000,

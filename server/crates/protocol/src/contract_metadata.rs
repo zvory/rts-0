@@ -486,6 +486,7 @@ pub fn protocol_contract() -> ProtocolContract {
                 ("LAB_STATE", "labState"),
                 ("LAB_RESULT", "labResult"),
                 ("SHUTDOWN_WARNING", "shutdownWarning"),
+                ("OBSERVATION_READY", "observationReady"),
                 ("GAME_OVER", "gameOver"),
                 ("PONG", "pong"),
                 ("COMMAND_RECEIPT", "commandReceipt"),

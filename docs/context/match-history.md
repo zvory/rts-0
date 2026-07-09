@@ -8,8 +8,9 @@ scope, or the lobby front-page table.
 
 ## Code seams
 - `server/src/db.rs` — pool, migrations, `record_match`, `recent_matches`,
-  `replay_artifact_for_match`.
-- `server/src/main.rs` — env loading, `/api/matches`, `POST /api/matches/{id}/replay`,
+  `observation_by_run_id`, `replay_artifact_for_match`.
+- `server/src/main.rs` — env loading, `/api/matches`, `GET /api/observations/{matchRunId}`,
+  `POST /api/matches/{id}/replay`,
   replay compatibility checks, `RTS_RECORD_MATCHES` public/local scope.
 - `server/src/lobby/mod.rs` — `Lobby::with_match_history()` injects pool/scope into rooms;
   replay launch creates spectator replay rooms.
@@ -45,6 +46,9 @@ scope, or the lobby front-page table.
   the replay compatibility checks. Summaries and launch strictly check supported artifact schema,
   map schema, map hash, and faction/loadout validity. Build-SHA mismatches stay launchable with a
   warning because replay playback is attempted across build drift.
+- **AI observations.** Normal live all-AI matches resolve at tick 25,000 unless a primary-base
+  winner is determined first. Their score screen exposes `matchRunId`; look up the hidden row with
+  `GET /api/observations/{matchRunId}`, then launch its replay through the returned numeric id.
 - **TLS to Supabase.** `DATABASE_URL` must include `?sslmode=require`.
 - **Drain-abort audit trail.** Interrupted deploy validation should find the forced-abort room log,
   aggregate forced-finalization result, `match recorded` with `outcome=aborted`/`replay=true`, and

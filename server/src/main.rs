@@ -211,6 +211,7 @@ async fn main() {
             get(lobbies_handler).post(create_lobby_handler),
         )
         .route("/api/matches", get(matches_handler))
+        .route("/api/observations/{match_run_id}", get(observation_handler))
         .route(
             "/api/matches/{id}/replay",
             post(match_replay_launch_handler),
@@ -420,6 +421,66 @@ async fn matches_handler(
                 .into_response()
         }
     }
+}
+
+/// GET /api/observations/{match_run_id} — recover the hidden AI-only match row associated with
+/// the run id shown at the end of a watched matchup. The returned `id` can be passed to the
+/// existing replay-launch endpoint; structured logs use the same run id.
+async fn observation_handler(
+    State(state): State<AppState>,
+    ConnectInfo(remote): ConnectInfo<SocketAddr>,
+    Path(match_run_id): Path<String>,
+) -> impl IntoResponse {
+    if !valid_observation_run_id(&match_run_id) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(ApiError {
+                error: "Invalid observation id.".to_string(),
+            }),
+        )
+            .into_response();
+    }
+    let Some(db) = state.db else {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(ApiError {
+                error: "Observation history is not configured.".to_string(),
+            }),
+        )
+            .into_response();
+    };
+    let include_local = request_allows_local_match_history(&remote);
+    match db.observation_by_run_id(&match_run_id, include_local).await {
+        Ok(Some(mut row)) => {
+            apply_replay_summary_compatibility(&mut row, &state.version);
+            Json(row).into_response()
+        }
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(ApiError {
+                error: "Observation not found. It may still be saving its replay.".to_string(),
+            }),
+        )
+            .into_response(),
+        Err(err) => {
+            rts_server::log_warn!(%err, match_run_id = %match_run_id, "AI observation query failed");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ApiError {
+                    error: "Observation history is unavailable.".to_string(),
+                }),
+            )
+                .into_response()
+        }
+    }
+}
+
+fn valid_observation_run_id(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 96
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
 }
 
 #[derive(Serialize)]
