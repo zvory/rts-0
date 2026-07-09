@@ -35,6 +35,27 @@ pub(super) fn should_build_extra_factory(
         < policy.target_count
 }
 
+pub(super) fn should_build_extra_turtle_gun_works(
+    observation: &AiObservation,
+    facts: &AiFacts,
+    profile: &AiProfile,
+    planned_gun_works: usize,
+) -> bool {
+    let Some(policy) = profile.turtle_defense else {
+        return false;
+    };
+    if observation.economy.steel <= policy.gun_works_resource_float.steel
+        || observation.economy.oil <= policy.gun_works_resource_float.oil
+    {
+        return false;
+    }
+    facts.complete_building_count(EntityKind::Steelworks) > 0
+        && facts
+            .building_count(EntityKind::Steelworks)
+            .saturating_add(planned_gun_works)
+            < policy.gun_works_target
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(super) fn try_build_kind<F>(
     observation: &AiObservation,

@@ -43,6 +43,11 @@ const AI_2_0_SECOND_FACTORY_FLOAT_THRESHOLD: ResourceFloatThreshold = ResourceFl
     steel: 500,
     oil: 325,
 };
+const TURTLE_SECOND_BARRACKS_STEEL_THRESHOLD: u32 = 450;
+const TURTLE_SECOND_GUN_WORKS_FLOAT_THRESHOLD: ResourceFloatThreshold = ResourceFloatThreshold {
+    steel: 600,
+    oil: 250,
+};
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct AiProfile {
     pub(crate) id: &'static str,
@@ -224,6 +229,8 @@ pub(crate) struct TurtleDefensePolicy {
     pub(crate) anti_tank_back_tiles: f32,
     pub(crate) opening_riflemen: usize,
     pub(crate) support_barracks_target: usize,
+    pub(crate) gun_works_target: usize,
+    pub(crate) gun_works_resource_float: ResourceFloatThreshold,
     pub(crate) main_machine_gunner_target: usize,
     pub(crate) machine_gunner_target_chokes: usize,
     pub(crate) machine_gunners_per_choke: usize,
@@ -1014,9 +1021,9 @@ pub(crate) static AI_TURTLE_CHOKES: AiProfile = AiProfile {
         barracks_curve: BarracksCurve {
             before_steel_saturation: 1,
             after_steel_saturation: 1,
-            banked_steel_threshold: 0,
-            banked_steel_step: 0,
-            max: 1,
+            banked_steel_threshold: TURTLE_SECOND_BARRACKS_STEEL_THRESHOLD,
+            banked_steel_step: TURTLE_SECOND_BARRACKS_STEEL_THRESHOLD,
+            max: 2,
         },
         factory_target: 0,
         proxy_barracks: None,
@@ -1065,6 +1072,8 @@ pub(crate) static AI_TURTLE_CHOKES: AiProfile = AiProfile {
         anti_tank_back_tiles: 10.0,
         opening_riflemen: 3,
         support_barracks_target: 1,
+        gun_works_target: 2,
+        gun_works_resource_float: TURTLE_SECOND_GUN_WORKS_FLOAT_THRESHOLD,
         main_machine_gunner_target: 2,
         machine_gunner_target_chokes: 2,
         machine_gunners_per_choke: 4,
@@ -1482,6 +1491,27 @@ mod tests {
         );
         assert_eq!(transition.attack.first_attack_size, 3);
         assert_eq!(transition.attack.unit_kinds, &[EntityKind::Tank]);
+    }
+
+    #[test]
+    fn turtle_adds_support_producers_only_after_their_float_thresholds() {
+        let barracks = AI_TURTLE_CHOKES.buildings.barracks_curve;
+        let turtle = AI_TURTLE_CHOKES.turtle_defense.unwrap();
+
+        assert_eq!(
+            barracks.target(TURTLE_SECOND_BARRACKS_STEEL_THRESHOLD, 0, 18),
+            1
+        );
+        assert_eq!(
+            barracks.target(TURTLE_SECOND_BARRACKS_STEEL_THRESHOLD + 1, 0, 18),
+            2
+        );
+        assert_eq!(barracks.max, 2);
+        assert_eq!(turtle.gun_works_target, 2);
+        assert_eq!(
+            turtle.gun_works_resource_float,
+            TURTLE_SECOND_GUN_WORKS_FLOAT_THRESHOLD
+        );
     }
 
     #[test]
