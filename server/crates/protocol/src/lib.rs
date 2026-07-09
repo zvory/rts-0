@@ -31,7 +31,6 @@ pub use lab_replay::*;
 pub use lab_scenario::*;
 pub use messagepack_frame::MESSAGEPACK_SNAPSHOT_FRAME_MAGIC;
 pub use observer_analysis::*;
-pub use server_message::ServerMessage;
 pub use rts_contract::{
     AbilityCooldownView, AbilityObjectOwnerStateView, AbilityObjectView, ActionCapabilities,
     AttackReveal, CommandCapabilities, DebugPathPoint, DebugPathView, DiagnosticCapabilities,
@@ -42,6 +41,7 @@ pub use rts_contract::{
     ScoutPlaneStateView, SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload, TeamId,
     TrenchView, VisibilityCapabilities, DEFAULT_FACTION_ID,
 };
+pub use server_message::ServerMessage;
 
 fn is_false(value: &bool) -> bool {
     !*value
