@@ -7,7 +7,7 @@ use super::super::connection::{send_or_log, ConnectionSink};
 use super::super::faction_validation::{
     default_faction_id_for, validate_faction_request, FactionRequestContext, FactionValidation,
 };
-use super::super::participants::{self, CommandIssuer, Participants};
+use super::super::participants::{CommandIssuer, Participants};
 use super::super::{
     map_catalog, next_player_id, LobbyJoinState, LobbySummary, LobbySummaryPhase, MAX_PLAYERS,
     PLAYER_PALETTE,
@@ -606,15 +606,7 @@ impl RoomTask {
             return;
         }
         self.selected_map = map;
-        participants::trim_active_slots_to_cap(
-            self.active_human_ids().collect(),
-            self.host_id,
-            cap,
-            &mut self.ai_players,
-            &mut self.players,
-            &mut self.human_team_assignments,
-            &mut self.human_faction_assignments,
-        );
+        self.trim_active_slots_to_cap(cap);
         crate::log_debug!(room = %self.room, map = %self.selected_map, "map selected");
         self.broadcast_lobby();
     }
@@ -641,12 +633,7 @@ impl RoomTask {
             return;
         }
         if spectator {
-            participants::demote_human_to_spectator(
-                &mut self.players,
-                &mut self.human_team_assignments,
-                &mut self.human_faction_assignments,
-                target,
-            );
+            self.demote_human_to_spectator(target);
         } else {
             if self.total_player_count() >= map_catalog::active_slot_cap(&self.selected_map) {
                 crate::log_debug!(room = %self.room, player_id, target, "ignoring player role switch; room full");
@@ -662,6 +649,32 @@ impl RoomTask {
             self.assign_missing_faction_for(target);
         }
         self.broadcast_lobby();
+    }
+
+    fn demote_human_to_spectator(&mut self, target: u32) {
+        if let Some(player) = self.players.get_mut(&target) {
+            player.spectator = true;
+            player.ready = false;
+            player.color = "#6f8fa8".to_string();
+        }
+        self.human_team_assignments.remove(&target);
+        self.human_faction_assignments.remove(&target);
+    }
+
+    fn trim_active_slots_to_cap(&mut self, cap: usize) {
+        let mut active_humans: Vec<u32> = self.active_human_ids().collect();
+        while active_humans.len() + self.ai_players.len() > cap {
+            if self.ai_players.pop().is_some() {
+                continue;
+            }
+            let Some(index) = active_humans
+                .iter()
+                .rposition(|id| Some(*id) != self.host_id)
+            else {
+                return;
+            };
+            self.demote_human_to_spectator(active_humans.remove(index));
+        }
     }
 
     pub(super) fn total_player_count(&self) -> usize {

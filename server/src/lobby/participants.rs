@@ -1,8 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::protocol::TeamId;
-
-use super::room_task::{AiSlot, RoomPlayer};
+use super::room_task::RoomPlayer;
 
 pub(super) struct Participants<'a> {
     order: &'a [u32],
@@ -105,45 +103,5 @@ impl<'a> Participants<'a> {
             .get(&connection_id)
             .map(|player| !player.spectator)
             .unwrap_or(false)
-    }
-}
-
-pub(super) fn demote_human_to_spectator(
-    players: &mut HashMap<u32, RoomPlayer>,
-    team_assignments: &mut HashMap<u32, TeamId>,
-    faction_assignments: &mut HashMap<u32, String>,
-    target: u32,
-) {
-    if let Some(player) = players.get_mut(&target) {
-        player.spectator = true;
-        player.ready = false;
-        player.color = "#6f8fa8".to_string();
-    }
-    team_assignments.remove(&target);
-    faction_assignments.remove(&target);
-}
-
-pub(super) fn trim_active_slots_to_cap(
-    mut active_humans: Vec<u32>,
-    host_id: Option<u32>,
-    cap: usize,
-    ai_players: &mut Vec<AiSlot>,
-    players: &mut HashMap<u32, RoomPlayer>,
-    team_assignments: &mut HashMap<u32, TeamId>,
-    faction_assignments: &mut HashMap<u32, String>,
-) {
-    while active_humans.len() + ai_players.len() > cap {
-        if ai_players.pop().is_some() {
-            continue;
-        }
-        let Some(index) = active_humans.iter().rposition(|id| Some(*id) != host_id) else {
-            return;
-        };
-        demote_human_to_spectator(
-            players,
-            team_assignments,
-            faction_assignments,
-            active_humans.remove(index),
-        );
     }
 }

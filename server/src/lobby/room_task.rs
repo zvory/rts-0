@@ -42,8 +42,7 @@ pub(super) use helpers::{
 #[cfg(test)]
 use helpers::{LAB_PLAYER_ONE_ID, LAB_PLAYER_TWO_ID};
 use lab::LabSession;
-pub(in crate::lobby) use types::AiSlot;
-use types::Phase;
+use types::{AiSlot, Phase};
 pub(super) use types::{
     DevScenarioConfig, DevScenarioId, LabRoomConfig, PendingClientCommandAck, RoomMode, RoomPlayer,
 };
