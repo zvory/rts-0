@@ -1049,7 +1049,7 @@ pub(crate) static AI_TURTLE_CHOKES: AiProfile = AiProfile {
         target_city_centres: 2,
         required_complete_building: EntityKind::TrainingCentre,
         defensive_unit: EntityKind::Rifleman,
-        defensive_unit_count: 3,
+        defensive_unit_count: 0,
         pre_expansion_steel_worker_cap: 18,
         post_expansion_steel_worker_cap: Some(36),
         search_radius_tiles: 6,
@@ -1242,7 +1242,10 @@ mod tests {
         assert_eq!(AI_2_1_ECONOMY_MANAGER.id, AI_2_1_ECONOMY_MANAGER_ID);
         assert_eq!(AI_2_1_ECONOMY_MANAGER.workers, AI_2_0_TANK_PRESSURE.workers);
         assert_eq!(AI_2_1_ECONOMY_MANAGER.supply, AI_2_0_TANK_PRESSURE.supply);
-        assert_eq!(AI_2_1_ECONOMY_MANAGER.buildings, AI_2_0_TANK_PRESSURE.buildings);
+        assert_eq!(
+            AI_2_1_ECONOMY_MANAGER.buildings,
+            AI_2_0_TANK_PRESSURE.buildings
+        );
         assert_eq!(
             AI_2_1_ECONOMY_MANAGER.extra_factories,
             AI_2_0_TANK_PRESSURE.extra_factories

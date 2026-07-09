@@ -3,6 +3,38 @@ use super::*;
 use crate::ai_core::profiles::AI_TURTLE_CHOKES;
 
 #[test]
+fn turtle_expansion_ignores_opening_rifleman_losses() {
+    let ts = config::TILE_SIZE as f32;
+    let observation = with_expansion_resources(observation(
+        AiEconomy {
+            steel: 500,
+            oil: 0,
+            supply_used: 30,
+            supply_cap: 60,
+        },
+        vec![
+            building_at(10, EntityKind::CityCentre, Some(0), 8.5 * ts, 8.5 * ts),
+            building(11, EntityKind::TrainingCentre, None),
+        ],
+    ));
+    let facts = AiFacts::from_observation(&observation);
+
+    let plan = super::super::expansion::plan_expansion(
+        &observation,
+        &facts,
+        &AI_TURTLE_CHOKES,
+        false,
+        false,
+    );
+
+    assert!(
+        plan.should_save,
+        "Turtle should save for its second City Centre even after its opening Riflemen die"
+    );
+    assert!(plan.blockers.is_empty());
+}
+
+#[test]
 fn turtle_opening_does_not_train_workers_for_held_oil_assignments() {
     let mut owned = vec![
         building(10, EntityKind::CityCentre, Some(0)),
@@ -26,9 +58,9 @@ fn turtle_opening_does_not_train_workers_for_held_oil_assignments() {
     );
 
     assert!(
-        !decision
-            .intents
-            .contains(&AiIntent::Train { kind: EntityKind::Worker }),
+        !decision.intents.contains(&AiIntent::Train {
+            kind: EntityKind::Worker
+        }),
         "the Turtle opening should not train workers toward oil while oil assignments are held"
     );
 }
@@ -101,7 +133,10 @@ fn turtle_machine_gunner_training_stops_at_choke_line_target() {
         !decision.commands.iter().any(|command| {
             matches!(
                 command,
-                Command::Train { unit: EntityKind::MachineGunner, .. }
+                Command::Train {
+                    unit: EntityKind::MachineGunner,
+                    ..
+                }
             )
         }),
         "the turtle profile should not queue surplus Machine Gunners before they reach the line"

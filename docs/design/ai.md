@@ -203,13 +203,14 @@ opening Riflemen have been ordered. After that opening, it starts oil earlier th
 full-steel saturation, techs to Training Centre, queues Entrenchment, then can begin Research
 Complex and Steelworks before Entrenchment completes. Its Steelworks uses a city-center-facing
 nine-tile search band (half the ordinary forward production range) and keeps two clear tiles from
-other buildings, because its support weapons are mobile. It uses the same two-City-Centre expansion
-cadence as AI 2.0 after Training Centre and its three-Rifleman opening are online, capping pre-expand
-steel workers at 18 and lifting the post-expand steel target toward 36 so both City Centres can keep
-producing workers. Its post-opening production is pure Machine Gunners from Barracks plus priority
-Anti-Tank Guns from Steelworks; Riflemen are not replenished after the three-unit opening. Machine
-Gunner production pauses once the first two enemy-facing choke lines each have four staffed Machine
-Gunners, and resumes if either line falls below four; those Machine Gunners use a wider three-tile
+other buildings, because its support weapons are mobile. Its economy-manager two-City-Centre
+expansion flow activates after Training Centre and the normal steel-or-supply trigger are met,
+regardless of opening Rifleman attrition, capping pre-expand steel workers at 18 and lifting the
+post-expand steel target toward 36 so both City Centres can keep producing workers. Its post-opening
+production is pure Machine Gunners from Barracks plus priority Anti-Tank Guns from Steelworks;
+Riflemen are not replenished after the three-unit opening. Machine Gunner production pauses once the
+first two enemy-facing choke lines each have four staffed Machine Gunners, and resumes if either line
+falls below four; those Machine Gunners use a wider three-tile
 slot spacing around each choke line. When idle and not handling a local visible threat, it selects up
 to three chokes adjacent to its own start region from cached static map analysis, uses each choke's
 generated full-band line endpoints as the defended line, orders those exits by direct distance from
