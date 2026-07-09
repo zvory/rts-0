@@ -120,7 +120,7 @@ pub mod weapons {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 32;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 33;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -343,6 +343,7 @@ const EVENT_CODES: &[(&str, u8)] = &[
     ("panzerfaustLaunch", 12),
     ("panzerfaustImpact", 13),
     ("panzerfaustConversion", 14),
+    ("miss", 15),
 ];
 
 const ORDER_STAGE_CODES: &[(&str, u8)] = &[
@@ -616,6 +617,7 @@ fn event_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("PANZERFAUST_LAUNCH", "panzerfaustLaunch"),
         ("PANZERFAUST_IMPACT", "panzerfaustImpact"),
         ("PANZERFAUST_CONVERSION", "panzerfaustConversion"),
+        ("MISS", "miss"),
     ])
 }
 

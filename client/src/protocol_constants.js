@@ -197,6 +197,7 @@ export const EVENT = Object.freeze({
   PANZERFAUST_IMPACT: "panzerfaustImpact",
   PANZERFAUST_CONVERSION: "panzerfaustConversion",
   OVERPENETRATION: "overpenetration",
+  MISS: "miss",
 });
 
 export const ABILITY_OBJECT_KIND = Object.freeze({
@@ -260,7 +261,7 @@ export const MOVEMENT_PATH_DIAGNOSTICS = Object.freeze({
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";
-export const COMPACT_SNAPSHOT_VERSION = 32;
+export const COMPACT_SNAPSHOT_VERSION = 33;
 export const SNAPSHOT_CODEC_VERSION = 1;
 export const SNAPSHOT_CODEC = Object.freeze({
   COMPACT_JSON: "compact-json",
@@ -370,6 +371,7 @@ export const EVENT_CODE = Object.freeze({
   [EVENT.PANZERFAUST_LAUNCH]: 12,
   [EVENT.PANZERFAUST_IMPACT]: 13,
   [EVENT.PANZERFAUST_CONVERSION]: 14,
+  [EVENT.MISS]: 15,
 });
 
 export const ORDER_STAGE = Object.freeze({

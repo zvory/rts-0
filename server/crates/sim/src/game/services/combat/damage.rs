@@ -14,7 +14,7 @@ use crate::rules::terrain::TerrainKind;
 use rand::Rng;
 
 use super::events::{
-    attack_reveal_for, emit_attack_event, push_under_attack_notice,
+    attack_reveal_for, emit_attack_event, emit_miss_event, push_under_attack_notice,
     push_under_attack_notices_for_visible_attack,
 };
 use super::projection::{resolve_shot_victim, shot_blocker_intersection};
@@ -73,7 +73,7 @@ pub(super) fn apply_damage(
     let victim_facing = victim.map(|e| e.facing());
     let victim_entrenched = victim.is_some_and(entrenchment_combat::is_actively_entrenched);
     let victim_owner = entities.get(shot_victim).map(|e| e.owner).unwrap_or(0);
-    emit_attack_event(
+    let attack_recipients = emit_attack_event(
         events,
         fog,
         teams,
@@ -92,6 +92,7 @@ pub(super) fn apply_damage(
     if let Some(v) = entities.get(shot_victim) {
         let mc = entrenchment_combat::direct_miss_chance(weapon_profile, v, extra_miss_chance);
         if mc > 0.0 && rng.gen::<f32>() < mc {
+            emit_miss_event(events, &attack_recipients, shot_victim);
             return Some(victim_owner);
         }
     }

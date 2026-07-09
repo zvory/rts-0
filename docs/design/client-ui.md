@@ -1288,7 +1288,7 @@ selection rings):
 ### 4.2 Rendering & look (PixiJS, SVG rigs — neutral PS1 field-command style)
 - Layers (back→front): terrain → ground decals → trench terrain → local visual samples → resource nodes → building shadows → buildings →
   building overlays → unit shadows → occupied-trench shadows → occupied-trench lips → units → smoke/ability ground effects → selection rings →
-  health bars → fog overlay → local visual-sample labels → shot-revealed units → observer map-analysis diagnostics → command/hover feedback → placement ghost →
+  health bars → fog overlay → local visual-sample labels → shot-revealed units → observer map-analysis diagnostics → command/hover feedback and miss toasts → placement ghost →
   selection drag-box → (HUD is DOM, not Pixi). Selected unit range rings, minimum-range rings, and
   support-weapon field-of-fire overlays use higher-opacity rendering for readability.
 - Spatial combat audio keeps full volume for nearby emitters, uses stronger attenuation after the
@@ -1337,6 +1337,9 @@ selection rings):
   machine-gun flash/tracer/tail from the authored coax muzzle anchor and no Tank recoil, while
   TankCannon or default Tank attacks use a direct tracer from the main muzzle anchor plus the
   tank rig's half-scale artillery-style muzzle flare.
+  Direct-shot `miss` events draw a tiny `Miss!` Pixi text toast above and to the right of the
+  receiving unit on the feedback layer. The client anchors it only to the current projected entity,
+  so hidden or no-longer-visible targets do not gain inferred positions.
   Mortar launch events draw launch dust/recoil for recipients that can see the mortar, a black
   shell arcing from the mortar to the impact point, and a darker red dotted line/crosshair warning
   that lasts until the reported shell delay elapses or the impact event arrives. The shell

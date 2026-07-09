@@ -199,6 +199,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
     ev: [
       [EVENT_CODE[EVENT.ATTACK], 1, 7],
       [EVENT_CODE[EVENT.OVERPENETRATION], 22],
+      [EVENT_CODE[EVENT.MISS], 7],
       [EVENT_CODE[EVENT.DEATH], 200, 64, 96, KIND_CODE[KIND.STEEL]],
       [EVENT_CODE[EVENT.BUILD], 3, KIND_CODE[KIND.CITY_CENTRE]],
       [EVENT_CODE[EVENT.NOTICE], "Not enough steel"],
@@ -350,57 +351,58 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
     decoded.events[1].e === EVENT.OVERPENETRATION && decoded.events[1].to === 22,
     "overpenetration event decodes",
   );
-  assert(decoded.events[2].kind === KIND.STEEL, "death event kind decodes");
-  assert(decoded.events[4].msg === "Not enough steel", "notice event decodes");
-  assert(decoded.events[4].severity === NOTICE_SEVERITY.INFO, "legacy notice defaults to info");
-  assert(decoded.events[5].severity === NOTICE_SEVERITY.ALERT, "notice severity decodes");
-  assert(decoded.events[5].x === 512 && decoded.events[5].y === 768, "notice position decodes");
+  assert(decoded.events[2].e === EVENT.MISS && decoded.events[2].to === 7, "miss event decodes");
+  assert(decoded.events[3].kind === KIND.STEEL, "death event kind decodes");
+  assert(decoded.events[5].msg === "Not enough steel", "notice event decodes");
+  assert(decoded.events[5].severity === NOTICE_SEVERITY.INFO, "legacy notice defaults to info");
+  assert(decoded.events[6].severity === NOTICE_SEVERITY.ALERT, "notice severity decodes");
+  assert(decoded.events[6].x === 512 && decoded.events[6].y === 768, "notice position decodes");
   assert(
-    decoded.events[6].e === EVENT.MORTAR_LAUNCH &&
-      decoded.events[6].from === 9 &&
-      decoded.events[6].fromX === 256 &&
-      decoded.events[6].toY === 352 &&
-      decoded.events[6].delayTicks === 68,
+    decoded.events[7].e === EVENT.MORTAR_LAUNCH &&
+      decoded.events[7].from === 9 &&
+      decoded.events[7].fromX === 256 &&
+      decoded.events[7].toY === 352 &&
+      decoded.events[7].delayTicks === 68,
     "mortar launch event decodes",
   );
   assert(
-    decoded.events[7].e === EVENT.ARTILLERY_TARGET &&
-      decoded.events[7].from === 10 &&
-      decoded.events[7].delayTicks === ARTILLERY_SHELL_DELAY_TICKS &&
-      decoded.events[7].radiusTiles === 3,
+    decoded.events[8].e === EVENT.ARTILLERY_TARGET &&
+      decoded.events[8].from === 10 &&
+      decoded.events[8].delayTicks === ARTILLERY_SHELL_DELAY_TICKS &&
+      decoded.events[8].radiusTiles === 3,
     "artillery target event decodes",
   );
   assert(
-    decoded.events[8].e === EVENT.ARTILLERY_FIRING &&
-      decoded.events[8].owner === 1 &&
-      decoded.events[8].x === 288 &&
-      decoded.events[8].facing === 0.25,
+    decoded.events[9].e === EVENT.ARTILLERY_FIRING &&
+      decoded.events[9].owner === 1 &&
+      decoded.events[9].x === 288 &&
+      decoded.events[9].facing === 0.25,
     "artillery firing minimap event decodes",
   );
   assert(
-    decoded.events[9].e === EVENT.ARTILLERY_IMPACT &&
-      decoded.events[9].x === 336 &&
-      decoded.events[9].y === 368,
+    decoded.events[10].e === EVENT.ARTILLERY_IMPACT &&
+      decoded.events[10].x === 336 &&
+      decoded.events[10].y === 368,
     "artillery impact event decodes",
   );
   assert(
-    decoded.events[10].e === EVENT.PANZERFAUST_LAUNCH &&
-      decoded.events[10].from === 11 &&
-      decoded.events[10].fromX === 360 &&
-      decoded.events[10].toX === 416 &&
-      decoded.events[10].delayTicks === 15,
+    decoded.events[11].e === EVENT.PANZERFAUST_LAUNCH &&
+      decoded.events[11].from === 11 &&
+      decoded.events[11].fromX === 360 &&
+      decoded.events[11].toX === 416 &&
+      decoded.events[11].delayTicks === 15,
     "panzerfaust launch event decodes without target id",
   );
   assert(
-    decoded.events[11].e === EVENT.PANZERFAUST_IMPACT &&
-      decoded.events[11].x === 416 &&
-      decoded.events[11].y === 384,
+    decoded.events[12].e === EVENT.PANZERFAUST_IMPACT &&
+      decoded.events[12].x === 416 &&
+      decoded.events[12].y === 384,
     "panzerfaust impact event decodes",
   );
   assert(
-    decoded.events[12].e === EVENT.PANZERFAUST_CONVERSION &&
-      decoded.events[12].id === 11 &&
-      decoded.events[12].toKind === KIND.RIFLEMAN,
+    decoded.events[13].e === EVENT.PANZERFAUST_CONVERSION &&
+      decoded.events[13].id === 11 &&
+      decoded.events[13].toKind === KIND.RIFLEMAN,
     "panzerfaust same-id conversion event decodes",
   );
 

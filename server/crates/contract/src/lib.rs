@@ -675,6 +675,9 @@ pub enum Event {
     Overpenetration {
         to: u32,
     },
+    Miss {
+        to: u32,
+    },
     Death {
         id: u32,
         x: f32,
