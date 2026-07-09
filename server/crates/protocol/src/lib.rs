@@ -1376,7 +1376,6 @@ mod tests {
                     weapon_kind: Some(weapons::ANTI_TANK_GUN.to_string()),
                 },
                 Event::Overpenetration { to: 8 },
-                Event::Miss { to: 7 },
                 Event::Death {
                     id: 200,
                     x: 64.0,

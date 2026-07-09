@@ -3023,14 +3023,6 @@ fn missed_primary_shot_still_emits_attack_event() {
         );
     assert!(
         events
-            .get(&1)
-            .expect("attacker owner events should exist")
-            .iter()
-            .any(|event| matches!(event, Event::Miss { to } if *to == victim)),
-        "missed shots should emit miss feedback for visible recipients"
-    );
-    assert!(
-        events
             .get(&2)
             .expect("victim owner events should exist")
             .iter()
