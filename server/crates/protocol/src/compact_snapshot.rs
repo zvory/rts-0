@@ -897,6 +897,12 @@ impl Serialize for CompactEvent<'_> {
                 seq.serialize_element(to)?;
                 seq.end()
             }
+            Event::Miss { to } => {
+                let mut seq = serializer.serialize_seq(Some(2))?;
+                seq.serialize_element(&event_code("miss"))?;
+                seq.serialize_element(to)?;
+                seq.end()
+            }
             Event::Death { id, x, y, kind } => {
                 let mut seq = serializer.serialize_seq(Some(5))?;
                 seq.serialize_element(&event_code("death"))?;

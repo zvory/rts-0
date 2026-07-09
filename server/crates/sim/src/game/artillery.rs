@@ -295,9 +295,14 @@ mod tests {
         resolve_shell(&mut entities, &teams, &fog, &mut events, &shell, 10);
 
         let after = entities.get(victim).expect("victim should survive").hp;
+        let expected_damage = combat::area_damage_after_entrenchment(
+            EntityKind::Rifleman,
+            config::ARTILLERY_INNER_DAMAGE,
+            true,
+        );
         assert_eq!(
             before - after,
-            45,
+            expected_damage,
             "entrenched infantry should take 30% of inner artillery splash"
         );
     }

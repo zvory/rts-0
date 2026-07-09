@@ -69,6 +69,15 @@ pub(super) fn emit_attack_event(
     recipients
 }
 
+pub(super) fn emit_miss_event(events: &mut HashMap<u32, Vec<Event>>, recipients: &[u32], to: u32) {
+    for pid in recipients {
+        events
+            .entry(*pid)
+            .or_default()
+            .push(Event::Miss { to });
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(super) fn push_under_attack_notices_for_visible_attack(
     events: &mut HashMap<u32, Vec<Event>>,

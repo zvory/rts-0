@@ -36,6 +36,7 @@ export function buildRendererFeedbackView(
   const panzerfaustShots = liveArray(state, "livePanzerfaustShots", now);
   const panzerfaustImpacts = liveArray(state, "livePanzerfaustImpacts", now);
   const muzzleFlashes = liveArray(state, "liveMuzzleFlashes", now);
+  const missToasts = liveArray(state, "liveMissToasts", now);
 
   return {
     playerId: state?.playerId,
@@ -67,6 +68,7 @@ export function buildRendererFeedbackView(
     panzerfaustImpacts,
     resourceMiningPreview: intent?.resourceMiningPreview || null,
     muzzleFlashes,
+    missToasts,
     liveCommandFeedback: () => commandFeedback,
     liveSmokeCanisters: () => smokeCanisters,
     liveMortarLaunches: () => mortarLaunches,
@@ -79,6 +81,7 @@ export function buildRendererFeedbackView(
     livePanzerfaustShots: () => panzerfaustShots,
     livePanzerfaustImpacts: () => panzerfaustImpacts,
     liveMuzzleFlashes: () => muzzleFlashes,
+    liveMissToasts: () => missToasts,
     entityById(id) {
       return entityLookup.get(id);
     },

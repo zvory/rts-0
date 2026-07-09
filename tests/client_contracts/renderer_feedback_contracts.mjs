@@ -32,6 +32,7 @@ import {
   _drawRallyPoints,
   _drawResourceMiningPreview,
 } from "../../client/src/renderer/feedback.js";
+import { _drawMissToasts } from "../../client/src/renderer/miss_toasts.js";
 import {
   _drawPanzerfaustImpacts,
   _drawPanzerfaustShots,
@@ -39,7 +40,7 @@ import {
 import { _drawSelectedUnitRanges } from "../../client/src/renderer/unit_ranges.js";
 import { muzzleFeedbackStyle } from "../../client/src/renderer/weapon_feedback_style.js";
 
-import { RecordingGraphics } from "./pixi_fakes.mjs";
+import { RecordingGraphics, installFakePixi } from "./pixi_fakes.mjs";
 
 function polygonCenter(points) {
   let x = 0;
@@ -54,6 +55,59 @@ function polygonCenter(points) {
 
 function nearPoint(call, point, epsilon = 0.001) {
   return Math.abs(call[1] - point.x) <= epsilon && Math.abs(call[2] - point.y) <= epsilon;
+}
+
+{
+  const restorePixi = installFakePixi();
+  const priorNow = performance.now;
+  const fixedNow = 5000;
+  performance.now = () => fixedNow;
+  try {
+    const target = { id: 81, owner: 2, kind: KIND.RIFLEMAN, x: 160, y: 120 };
+    const context = {
+      _missToastPool: new Map(),
+      layers: { feedback: new PIXI.Container() },
+      _ringRadius() {
+        return { rx: 12, ry: 8, cy: 3 };
+      },
+      _recordRenderDiagnostic() {},
+    };
+    _drawMissToasts.call(context, {
+      entityById(id) {
+        return id === target.id ? target : null;
+      },
+      liveMissToasts(now) {
+        assertApprox(now, fixedNow, 0.001, "miss toast renderer samples current frame time");
+        return [{ id: 1, to: target.id, createdAt: fixedNow }];
+      },
+    });
+    const label = context.layers.feedback.children[0];
+    assert(label?.text === "Miss!", "miss toast renders the Miss! label");
+    assertApprox(label.style.fontSize, 4.5, 0.001, "miss toast text is half the original size");
+    assertApprox(label.style.strokeThickness, 1, 0.001, "miss toast stroke scales down with the text");
+    assertApprox(label.x, target.x + 14, 0.001, "miss toast sits close to the receiving unit's right edge");
+    assertApprox(label.y, target.y - 8, 0.001, "miss toast sits close to the receiving unit's top edge");
+    assert(label.x > target.x, "miss toast appears to the right of the receiving unit");
+    assert(label.y < target.y, "miss toast appears above the receiving unit");
+
+    _drawMissToasts.call(context, {
+      entityById() {
+        return null;
+      },
+      liveMissToasts() {
+        return [];
+      },
+    });
+    assert(context._missToastPool.size === 0, "expired miss toast labels are destroyed");
+    assert(
+      context.layers.feedback.children.length === 0,
+      "expired miss toast labels are detached from the feedback layer",
+    );
+    assert(label.destroyed === true, "expired miss toast label display objects are destroyed");
+  } finally {
+    performance.now = priorNow;
+    restorePixi();
+  }
 }
 
 {

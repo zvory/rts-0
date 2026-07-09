@@ -645,7 +645,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 32. `client/src/net.js` calls
+`messagepack-compact`, codec version 1, compact snapshot version 33. `client/src/net.js` calls
 `parseServerFrame`; the binary frame parser in `client/src/protocol_frame.js` returns the raw
 compact snapshot object, then `decodeCompactSnapshot` expands it back into the semantic object above
 before dispatching `S.SNAPSHOT`.
@@ -671,7 +671,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 32,
+  "v": 33,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
@@ -709,7 +709,7 @@ Compact numeric codes:
 | `upgrade` | 1 `methamphetamines`, 2 `anti_tank_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock` (legacy decode only), 5 `mortar_autocast`, 6 `command_car_unlock`, 7 `ballistic_tables`, 8 `entrenchment`, 9 `smoke_plus` |
 | `weaponKind` | 1 `worker_tools`, 2 `golem_fists`, 3 `rifleman_rifle`, 4 `machine_gunner_mg`, 5 `scout_car_mg`, 6 `anti_tank_gun`, 7 `panzerfaust_loaded_shot`, 8 `mortar_team_mortar`, 9 `artillery_gun`, 10 `tank_cannon`, 11 `tank_coax` |
 | `notice.severity` | 1 `info`, 2 `warn`, 3 `alert` |
-| `EventRecord` | `[1, from, to]` attack, `[1, from, to, reveal?, toPos?]` legacy attack with optional shooter reveal and target position, `[1, from, to, revealOrNull, toPosOrNull, weaponKind]` attack with compact weapon hint, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice, `[5, [fromX, fromY], [toX, toY], delayTicks]` smoke launch, `[6, x, y, radiusTiles]` mortar impact/marker, `[6, x, y, radiusTiles, from?, reveal?]` mortar impact with optional shooter reveal, `[7, from, [x, y], radiusTiles, delayTicks]` artillery target marker, `[8, x, y, radiusTiles]` artillery impact, `[9, from, [fromX, fromY], [toX, toY], radiusTiles, delayTicks]` mortar launch, `[10, to]` overpenetration damage, `[11, owner, x, y, facing]` global artillery firing minimap marker, `[12, from, [fromX, fromY], [toX, toY], delayTicks]` Panzerfaust launch, `[13, x, y]` Panzerfaust impact, `[14, id, toKind]` Panzerfaust same-id conversion |
+| `EventRecord` | `[1, from, to]` attack, `[1, from, to, reveal?, toPos?]` legacy attack with optional shooter reveal and target position, `[1, from, to, revealOrNull, toPosOrNull, weaponKind]` attack with compact weapon hint, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice, `[5, [fromX, fromY], [toX, toY], delayTicks]` smoke launch, `[6, x, y, radiusTiles]` mortar impact/marker, `[6, x, y, radiusTiles, from?, reveal?]` mortar impact with optional shooter reveal, `[7, from, [x, y], radiusTiles, delayTicks]` artillery target marker, `[8, x, y, radiusTiles]` artillery impact, `[9, from, [fromX, fromY], [toX, toY], radiusTiles, delayTicks]` mortar launch, `[10, to]` overpenetration damage, `[11, owner, x, y, facing]` global artillery firing minimap marker, `[12, from, [fromX, fromY], [toX, toY], delayTicks]` Panzerfaust launch, `[13, x, y]` Panzerfaust impact, `[14, id, toKind]` Panzerfaust same-id conversion, `[15, to]` missed direct shot |
 
 #### 2.4.1 Boundary inventory
 
@@ -919,6 +919,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   toPos?: [f32, f32],
   weaponKind?: "worker_tools"|"golem_fists"|"rifleman_rifle"|"machine_gunner_mg"|"scout_car_mg"|"anti_tank_gun"|"panzerfaust_loaded_shot"|"mortar_team_mortar"|"artillery_gun"|"tank_cannon"|"tank_coax" } // feedback hint; unknown/missing hints fall back to attacker kind
 { e: "overpenetration", to: u32 }               // secondary penetration damage; no tracer/audio
+{ e: "miss", to: u32 }                          // direct shot missed the target; no position
 { e: "death",  id: u32, x: f32, y: f32, kind } // for death poofs
 { e: "build",  id: u32, kind: string }         // building completed
 { e: "smokeLaunch", fromX: f32, fromY: f32, toX: f32, toY: f32, delayTicks: u32 }
@@ -940,7 +941,10 @@ alert feedback but suppress notice alert audio. `alert:under_attack` is emitted 
 unit's position to the victim owner only; same-team recipients may still see the attack event through
 shared vision, but they do not receive teammate under-attack alerts. Same-team friendly-fire damage
 does not emit under-attack alerts. Unit attack events are sent to the attacker's team and to enemy
-recipients whose team can currently see the shooter or target point. They include `reveal` so a shooter
+recipients whose team can currently see the shooter or target point. A missed direct shot
+additionally emits a `miss` event to the same recipient set, carrying only the receiving entity id;
+clients anchor the tiny text feedback to the already projected entity and ignore the event if the
+target is absent. Attack events include `reveal` so a shooter
 that fires from fog can be rendered briefly as a semi-transparent, non-interactive silhouette above
 the fog overlay; Anti-Tank Gun reveals additionally become the actionable snapshot visibility
 described in §2.4. `toPos` lets tracers draw even when the hit target is no longer in the snapshot.
