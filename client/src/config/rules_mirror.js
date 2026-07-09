@@ -54,6 +54,8 @@ export const SMOKE_ABILITY_RANGE_TILES = 9;
 export const SMOKE_LAUNCH_MAX_DELAY_MS = 100;
 export const SMOKE_CLOUD_RADIUS_TILES = 2;
 export const SMOKE_CLOUD_DURATION_TICKS = TICK_HZ * 5;
+export const SMOKE_PLUS_CLOUD_RADIUS_TILES = SMOKE_CLOUD_RADIUS_TILES * 2;
+export const SMOKE_PLUS_CLOUD_DURATION_TICKS = SMOKE_CLOUD_DURATION_TICKS * 2;
 export const SMOKE_ABILITY_COOLDOWN_TICKS = 0;
 export const SCOUT_CAR_SMOKE_USES = 2;
 export const SMOKE_ABILITY_COST = Object.freeze({ steel: 0, oil: 0 });
@@ -212,6 +214,8 @@ export const ABILITIES = Object.freeze({
     cost: SMOKE_ABILITY_COST,
     radiusTiles: SMOKE_CLOUD_RADIUS_TILES,
     durationTicks: SMOKE_CLOUD_DURATION_TICKS,
+    upgradedRadiusTiles: SMOKE_PLUS_CLOUD_RADIUS_TILES,
+    upgradedDurationTicks: SMOKE_PLUS_CLOUD_DURATION_TICKS,
     queued: true,
     queuePolicy: "skipIfNotReady",
   }),

@@ -3,6 +3,7 @@
 
 import { assert } from "./assertions.mjs";
 import {
+  ABILITIES,
   SMOKE_CLOUD_RADIUS_TILES,
 } from "../../client/src/config.js";
 import {
@@ -35,8 +36,10 @@ import { Input } from "../../client/src/input/index.js";
   smokeInput.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.SMOKE });
   smokeInput._worldAt = (x, y) => ({ x, y });
   smokeInput._refreshAbilityTargetPreview();
+  const upgradedRadiusTiles = ABILITIES[ABILITY.SMOKE].upgradedRadiusTiles;
   assert(
-    smokeInput.clientIntent.abilityTargetPreview?.radiusPx === SMOKE_CLOUD_RADIUS_TILES * 2 * 32,
+    smokeInput.clientIntent.abilityTargetPreview?.radiusPx === upgradedRadiusTiles * 32 &&
+      upgradedRadiusTiles === SMOKE_CLOUD_RADIUS_TILES * 2,
     "Smoke Plus targeting preview uses the command owner's upgraded cloud radius",
   );
 }

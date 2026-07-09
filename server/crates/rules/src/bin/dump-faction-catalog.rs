@@ -589,10 +589,12 @@ fn print_upgrade(
 
 fn print_ability_effects(indent: &str) {
     println!(
-        "{indent}    \"{}\": {{\"radiusTiles\":{},\"durationTicks\":{}}},",
+        "{indent}    \"{}\": {{\"radiusTiles\":{},\"durationTicks\":{},\"upgradedRadiusTiles\":{},\"upgradedDurationTicks\":{}}},",
         faction::SMOKE_ABILITY,
         json_f32(balance::SMOKE_CLOUD_RADIUS_TILES),
         balance::SMOKE_CLOUD_DURATION_TICKS,
+        json_f32(balance::SMOKE_PLUS_CLOUD_RADIUS_TILES),
+        balance::SMOKE_PLUS_CLOUD_DURATION_TICKS,
     );
     println!(
         "{indent}    \"{}\": {{\"radiusTiles\":{}}},",

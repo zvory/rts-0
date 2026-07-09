@@ -75,16 +75,19 @@ fn smoke_plus_doubles_scout_car_smoke_radius_and_duration() {
         .iter()
         .next()
         .expect("upgraded smoke should spawn immediately at zero launch distance");
-    assert_eq!(cloud.radius_tiles, config::SMOKE_CLOUD_RADIUS_TILES * 2.0);
+    assert_eq!(cloud.radius_tiles, config::SMOKE_PLUS_CLOUD_RADIUS_TILES);
     assert_eq!(
         cloud.expires_in(game.state.tick),
-        (config::SMOKE_CLOUD_DURATION_TICKS * 2) as u16
+        config::SMOKE_PLUS_CLOUD_DURATION_TICKS as u16
     );
     let snapshot = game.snapshot_full_for(1);
-    assert_eq!(snapshot.smokes[0].radius_tiles, config::SMOKE_CLOUD_RADIUS_TILES * 2.0);
+    assert_eq!(
+        snapshot.smokes[0].radius_tiles,
+        config::SMOKE_PLUS_CLOUD_RADIUS_TILES
+    );
     assert_eq!(
         snapshot.smokes[0].expires_in,
-        (config::SMOKE_CLOUD_DURATION_TICKS * 2) as u16
+        config::SMOKE_PLUS_CLOUD_DURATION_TICKS as u16
     );
 }
 

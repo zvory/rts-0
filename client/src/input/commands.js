@@ -699,7 +699,7 @@ function fallbackEnemyOwner(commandOwner, owner) {
 function abilityTargetRadiusTiles(definition, ability, state) {
   const baseRadius = definition?.radiusTiles || 0;
   if (ability === ABILITY.SMOKE && commandUpgrades(state).includes(UPGRADE.SMOKE_PLUS)) {
-    return baseRadius * 2;
+    return definition?.upgradedRadiusTiles || baseRadius;
   }
   return baseRadius;
 }

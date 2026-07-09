@@ -209,16 +209,16 @@ pub(crate) fn launch_world_ability(
             if !preserve_active_order {
                 e.clear_active_order();
             }
-            let smoke_plus_researched = ps.has_upgrade(UpgradeKind::SmokePlus);
-            let radius_tiles = if smoke_plus_researched {
-                config::SMOKE_CLOUD_RADIUS_TILES * 2.0
+            let (radius_tiles, duration_ticks) = if ps.has_upgrade(UpgradeKind::SmokePlus) {
+                (
+                    config::SMOKE_PLUS_CLOUD_RADIUS_TILES,
+                    config::SMOKE_PLUS_CLOUD_DURATION_TICKS,
+                )
             } else {
-                config::SMOKE_CLOUD_RADIUS_TILES
-            };
-            let duration_ticks = if smoke_plus_researched {
-                config::SMOKE_CLOUD_DURATION_TICKS.saturating_mul(2)
-            } else {
-                config::SMOKE_CLOUD_DURATION_TICKS
+                (
+                    config::SMOKE_CLOUD_RADIUS_TILES,
+                    config::SMOKE_CLOUD_DURATION_TICKS,
+                )
             };
             smokes.schedule(
                 x,

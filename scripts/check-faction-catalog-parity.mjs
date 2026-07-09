@@ -236,7 +236,12 @@ const EXPECTED_BUILDING_STAT_FIELDS = Object.freeze([
 const EXPECTED_BODY_FIELDS = Object.freeze(["clearance", "length", "width"]);
 const EXPECTED_UPGRADE_FIELDS = Object.freeze(["cost", "researchTicks", "requiresUpgrade"]);
 const EXPECTED_ABILITY_EFFECT_FIELDS_BY_ID = Object.freeze({
-  [ABILITY.SMOKE]: Object.freeze(["durationTicks", "radiusTiles"]),
+  [ABILITY.SMOKE]: Object.freeze([
+    "durationTicks",
+    "radiusTiles",
+    "upgradedDurationTicks",
+    "upgradedRadiusTiles",
+  ]),
   [ABILITY.MORTAR_FIRE]: Object.freeze(["radiusTiles"]),
   [ABILITY.POINT_FIRE]: Object.freeze(["delayTicks", "radiusTiles"]),
   [ABILITY.BLANKET_FIRE]: Object.freeze(["radiusTiles"]),
