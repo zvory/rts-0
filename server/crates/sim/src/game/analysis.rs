@@ -23,6 +23,7 @@ impl Game {
                     production: self.current_production(player.id),
                     units_lost: unit_loss_rows(&player.score.units_lost_by_kind),
                     resources_lost: resources_lost(&player.score.units_lost_by_kind),
+                    resources: player.observer_analysis_resources(self.tick_count()),
                     ai_diagnostics: None,
                 })
                 .collect(),

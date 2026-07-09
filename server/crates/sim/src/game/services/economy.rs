@@ -22,6 +22,7 @@ pub(crate) fn gather_system(
     occ: &Occupancy,
     _spatial: &SpatialIndex,
     coordinator: &mut MoveCoordinator<'_>,
+    tick: u32,
 ) {
     for id in entities.ids() {
         let node = match entities.get(id) {
@@ -42,14 +43,20 @@ pub(crate) fn gather_system(
             GatherPhase::ToNode | GatherPhase::ToHome => {
                 gather_to_node(map, entities, occ, coordinator, id, node)
             }
-            GatherPhase::Harvesting => {
-                gather_harvesting(map, entities, players, coordinator, id, node)
-            }
+            GatherPhase::Harvesting => gather_harvesting(
+                map,
+                entities,
+                players,
+                coordinator,
+                id,
+                node,
+                tick,
+            ),
         }
     }
     for payout in pump_jack::tick(entities) {
         if let Some(ps) = players.iter_mut().find(|p| p.id == payout.owner) {
-            ps.add_gathered_resources(EntityKind::Oil, payout.oil);
+            ps.add_gathered_resources(EntityKind::Oil, payout.oil, tick);
         }
     }
 }
@@ -251,6 +258,7 @@ fn gather_harvesting(
     coordinator: &mut MoveCoordinator<'_>,
     id: u32,
     node: u32,
+    tick: u32,
 ) {
     let (owner, gatherer_kind) = match entities.get(id) {
         Some(e) => (e.owner, e.kind),
@@ -306,7 +314,7 @@ fn gather_harvesting(
 
     if taken > 0 {
         if let Some(ps) = players.iter_mut().find(|p| p.id == owner) {
-            ps.add_gathered_resources(node_kind_amount.0, taken);
+            ps.add_gathered_resources(node_kind_amount.0, taken, tick);
         }
     }
 

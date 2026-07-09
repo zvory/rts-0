@@ -392,6 +392,56 @@ import { textWithin } from "./dom_text.mjs";
       "units lost tab renders per-kind loss rows for multiple players",
     );
 
+    restored.selectedTab = "resources";
+    overlay.render();
+    overlay.applyObserverAnalysis({
+      tick: 36,
+      players: [
+        {
+          id: 1,
+          units: [],
+          production: [],
+          resourcesLost: { steel: 400, oil: 150 },
+          resources: {
+            lifetime: { steel: 120, oil: 30 },
+            last5s: { steel: 40, oil: 10 },
+            lastMinute: { steel: 100, oil: 25 },
+          },
+        },
+        {
+          id: 2,
+          units: [],
+          production: [],
+          resourcesLost: { steel: 150, oil: 0 },
+          resources: {
+            lifetime: { steel: 55, oil: 5 },
+            last5s: { steel: 0, oil: 0 },
+            lastMinute: { steel: 20, oil: 5 },
+          },
+        },
+      ],
+    });
+    const resourcesText = textWithin(root);
+    assert(
+      resourcesText.includes("Mined resources")
+        && resourcesText.includes("Lifetime")
+        && resourcesText.includes("Last 5s")
+        && resourcesText.includes("Last 1m")
+        && resourcesText.includes("Total")
+        && resourcesText.includes("175")
+        && resourcesText.includes("35")
+        && resourcesText.includes("120")
+        && resourcesText.includes("30"),
+      "resources tab renders lifetime, short-window, and minute mined-resource totals",
+    );
+    assert(
+      findFakes(root, (el) => el.classList.contains("replay-resources-steel"))
+        .some((cell) => cell.querySelector(".steel"))
+        && findFakes(root, (el) => el.classList.contains("replay-resources-oil"))
+          .some((cell) => cell.querySelector(".oil")),
+      "resources tab uses shared steel and oil icons",
+    );
+
     restored.selectedTab = "resources-lost";
     overlay.render();
     const resourcesLostText = textWithin(root);

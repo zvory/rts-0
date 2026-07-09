@@ -30,4 +30,6 @@ pub(super) struct ScoreStateV1 {
     buildings_killed: u32,
     buildings_lost: u32,
     units_lost_by_kind: BTreeMap<super::super::entity::EntityKind, u32>,
+    resources_mined: super::super::ResourceTotals,
+    resource_income_history: Vec<super::super::ResourceIncomeRecord>,
 }

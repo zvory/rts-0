@@ -294,6 +294,7 @@ pub(crate) fn run_tick(
             &post_movement.occupancy,
             &post_movement.spatial,
             &mut coordinator,
+            tick,
         );
     });
     crate::perf::timed(perf.as_deref_mut(), "production", || {

@@ -17,6 +17,7 @@ pub struct ObserverAnalysisPlayer {
     pub production: Vec<ObserverAnalysisProduction>,
     pub units_lost: Vec<ObserverAnalysisKindCount>,
     pub resources_lost: ObserverAnalysisResourcesLost,
+    pub resources: ObserverAnalysisResources,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ai_diagnostics: Option<ObserverAnalysisAiDiagnostics>,
 }
@@ -56,6 +57,22 @@ pub struct ObserverAnalysisProduction {
 pub struct ObserverAnalysisResourcesLost {
     pub steel: u32,
     pub oil: u32,
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ObserverAnalysisResourceTotals {
+    pub steel: u32,
+    pub oil: u32,
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ObserverAnalysisResources {
+    pub lifetime: ObserverAnalysisResourceTotals,
+    #[serde(rename = "last5s")]
+    pub last_5s: ObserverAnalysisResourceTotals,
+    pub last_minute: ObserverAnalysisResourceTotals,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -156,6 +173,11 @@ mod tests {
                     oil_value: 0,
                 }],
                 resources_lost: ObserverAnalysisResourcesLost { steel: 50, oil: 0 },
+                resources: ObserverAnalysisResources {
+                    lifetime: ObserverAnalysisResourceTotals { steel: 120, oil: 20 },
+                    last_5s: ObserverAnalysisResourceTotals { steel: 40, oil: 10 },
+                    last_minute: ObserverAnalysisResourceTotals { steel: 120, oil: 20 },
+                },
                 ai_diagnostics: Some(ObserverAnalysisAiDiagnostics {
                     profile_id: "ai_1_2_wave_cohorts".to_string(),
                     trace_tick: 72,
@@ -190,6 +212,9 @@ mod tests {
         assert_eq!(json["players"][0]["production"][0]["queueDepth"], 2);
         assert_eq!(json["players"][0]["unitsLost"][0]["kind"], "worker");
         assert_eq!(json["players"][0]["resourcesLost"]["steel"], 50);
+        assert_eq!(json["players"][0]["resources"]["lifetime"]["steel"], 120);
+        assert_eq!(json["players"][0]["resources"]["last5s"]["oil"], 10);
+        assert_eq!(json["players"][0]["resources"]["lastMinute"]["steel"], 120);
         assert_eq!(
             json["players"][0]["aiDiagnostics"]["profileId"],
             "ai_1_2_wave_cohorts"

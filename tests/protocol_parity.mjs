@@ -612,6 +612,10 @@ assert(
 for (const field of [
   "units_lost",
   "resources_lost",
+  "resources",
+  "lifetime",
+  "last_5s",
+  "last_minute",
   "steel_value",
   "oil_value",
   "queue_depth",
@@ -635,6 +639,11 @@ const observerAnalysis = decodeServerMessage({
     production: [{ buildingId: 7, buildingKind: "city_centre", itemKind: "worker", itemType: "unit", progress: 0.25, queueDepth: 1 }],
     unitsLost: [],
     resourcesLost: { steel: 0, oil: 0 },
+    resources: {
+      lifetime: { steel: 100, oil: 20 },
+      last5s: { steel: 40, oil: 0 },
+      lastMinute: { steel: 100, oil: 20 },
+    },
     aiDiagnostics: {
       profileId: "ai_1_2_wave_cohorts",
       traceTick: 9,
@@ -668,6 +677,10 @@ assert(observerAnalysis.t === "observerAnalysis" && observerAnalysis.players[0].
 assert(
   observerAnalysis.players[0].aiDiagnostics?.profileId === "ai_1_2_wave_cohorts",
   "observerAnalysis preserves AI diagnostics rows",
+);
+assert(
+  observerAnalysis.players[0].resources?.last5s?.steel === 40,
+  "observerAnalysis preserves mined-resource windows",
 );
 assert(
   observerAnalysis.mapAnalysis?.layers?.[0]?.primitives?.[0]?.kind === "tileRect",

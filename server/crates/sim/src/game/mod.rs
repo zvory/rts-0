@@ -152,6 +152,23 @@ pub(crate) struct ScoreState {
     buildings_killed: u32,
     buildings_lost: u32,
     units_lost_by_kind: BTreeMap<EntityKind, u32>,
+    resources_mined: ResourceTotals,
+    resource_income_history: Vec<ResourceIncomeRecord>,
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ResourceTotals {
+    steel: u32,
+    oil: u32,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ResourceIncomeRecord {
+    tick: u32,
+    steel: u32,
+    oil: u32,
 }
 
 /// The authoritative match state.
