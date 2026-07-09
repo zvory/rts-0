@@ -3,6 +3,10 @@
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::upgrade::UpgradeKind;
 
+mod economy;
+
+use self::economy::EconomyPolicy;
+
 pub(crate) const RIFLE_FLOOD_FAST_ID: &str = "rifle_flood_fast";
 pub(crate) const RIFLE_FLOOD_FULL_SATURATION_ID: &str = "rifle_flood_full_saturation";
 pub(crate) const TECH_TO_TANKS_ID: &str = "tech_to_tanks";
@@ -57,19 +61,6 @@ pub(crate) struct AiProfile {
     pub(crate) frontal_wave: FrontalWavePolicy,
     pub(crate) recovery_transition: Option<RecoveryTransitionPolicy>,
     pub(crate) tech_transition: Option<TechTransitionPolicy>,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) enum EconomyPolicy {
-    #[default]
-    Direct,
-    ProposalManager,
-}
-
-impl AiProfile {
-    pub(crate) fn uses_proposal_economy_manager(&self) -> bool {
-        self.economy == EconomyPolicy::ProposalManager
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
