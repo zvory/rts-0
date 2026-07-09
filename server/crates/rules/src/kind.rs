@@ -181,6 +181,8 @@ pub fn movement_body_class(kind: EntityKind) -> MovementBodyClass {
 pub fn static_blocker_class(kind: EntityKind) -> StaticBlockerClass {
     if kind == EntityKind::TankTrap {
         StaticBlockerClass::VehicleBodyOnly
+    } else if kind == EntityKind::PumpJack {
+        StaticBlockerClass::None
     } else if kind.is_building() {
         StaticBlockerClass::AllGround
     } else {
@@ -251,7 +253,7 @@ mod tests {
         );
         assert_eq!(
             static_blocker_class(EntityKind::PumpJack),
-            StaticBlockerClass::AllGround
+            StaticBlockerClass::None
         );
         assert_eq!(
             static_blocker_class(EntityKind::Worker),
