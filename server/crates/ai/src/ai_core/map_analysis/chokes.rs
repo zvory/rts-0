@@ -861,6 +861,7 @@ fn choke_from_candidate(
     );
     let (endpoint_a_tile, endpoint_b_tile, width_tiles) = choke_line_geometry(
         &candidate.tiles,
+        candidate.center,
         approach_a_tile,
         approach_b_tile,
         bounds,
@@ -1024,6 +1025,7 @@ fn build_chokes_for_band(
                     choke_tile_stats(width, height, clearance, &tiles);
                 let (endpoint_a_tile, endpoint_b_tile, width_tiles) = choke_line_geometry(
                     &tiles,
+                    center_tile,
                     contact_a.region_tile,
                     contact_b.region_tile,
                     bounds,
@@ -1418,19 +1420,31 @@ fn center_tile_for_tiles(tiles: &[AiTile]) -> AiTile {
 
 fn choke_line_geometry(
     tiles: &[AiTile],
+    center_tile: AiTile,
     approach_a_tile: AiTile,
     approach_b_tile: AiTile,
     bounds: AiTileBounds,
 ) -> (AiTile, AiTile, u16) {
+    let width_tiles = choke_cross_section_width(tiles, center_tile, approach_a_tile, approach_b_tile)
+        .unwrap_or_else(|| {
+            let span_x = bounds.max.x.saturating_sub(bounds.min.x).saturating_add(1);
+            let span_y = bounds.max.y.saturating_sub(bounds.min.y).saturating_add(1);
+            span_x.min(span_y).min(u32::from(u16::MAX)).max(1) as u16
+        });
+
     if let Some(geometry) = projected_choke_line_geometry(tiles, approach_a_tile, approach_b_tile) {
-        return geometry;
+        return (geometry.0, geometry.1, width_tiles);
     }
 
-    bounds_choke_line_geometry(tiles, bounds).unwrap_or_else(|| {
+    if let Some((endpoint_a_tile, endpoint_b_tile, _)) = bounds_choke_line_geometry(tiles, bounds) {
+        return (endpoint_a_tile, endpoint_b_tile, width_tiles);
+    }
+
+    {
         let endpoint_a_tile = nearest_tile_to(tiles, approach_a_tile);
         let endpoint_b_tile = nearest_tile_to(tiles, approach_b_tile);
-        (endpoint_a_tile, endpoint_b_tile, 1)
-    })
+        (endpoint_a_tile, endpoint_b_tile, width_tiles)
+    }
 }
 
 fn projected_choke_line_geometry(
@@ -1465,6 +1479,60 @@ fn bounds_choke_line_geometry(
     } else {
         projected_line_for_axis(tiles, (0.0, 1.0))
     }
+}
+
+fn choke_cross_section_width(
+    tiles: &[AiTile],
+    center_tile: AiTile,
+    approach_a_tile: AiTile,
+    approach_b_tile: AiTile,
+) -> Option<u16> {
+    if tiles.is_empty() {
+        return None;
+    }
+    let dx = approach_a_tile.x.abs_diff(approach_b_tile.x);
+    let dy = approach_a_tile.y.abs_diff(approach_b_tile.y);
+    if dx >= dy {
+        let x = tiles
+            .iter()
+            .map(|tile| tile.x)
+            .min_by_key(|x| x.abs_diff(center_tile.x))?;
+        let values: Vec<_> = tiles
+            .iter()
+            .filter_map(|tile| (tile.x == x).then_some(tile.y))
+            .collect();
+        longest_contiguous_span(values)
+    } else {
+        let y = tiles
+            .iter()
+            .map(|tile| tile.y)
+            .min_by_key(|y| y.abs_diff(center_tile.y))?;
+        let values: Vec<_> = tiles
+            .iter()
+            .filter_map(|tile| (tile.y == y).then_some(tile.x))
+            .collect();
+        longest_contiguous_span(values)
+    }
+}
+
+fn longest_contiguous_span(mut values: Vec<u32>) -> Option<u16> {
+    values.sort_unstable();
+    values.dedup();
+    let (&first, rest) = values.split_first()?;
+    let mut best = 1_u32;
+    let mut current = 1_u32;
+    let mut previous = first;
+    for value in rest {
+        if *value == previous.saturating_add(1) {
+            current = current.saturating_add(1);
+        } else {
+            best = best.max(current);
+            current = 1;
+        }
+        previous = *value;
+    }
+    best = best.max(current);
+    Some(best.min(u32::from(u16::MAX)) as u16)
 }
 
 #[derive(Clone, Copy, Debug)]

@@ -580,10 +580,10 @@ pub(crate) static TECH_TO_TANKS: AiProfile = AiProfile {
     buildings: BuildingPolicy {
         barracks_curve: BarracksCurve {
             before_steel_saturation: 1,
-            after_steel_saturation: 2,
+            after_steel_saturation: 1,
             banked_steel_threshold: 0,
             banked_steel_step: 0,
-            max: 2,
+            max: 1,
         },
         factory_target: 1,
         proxy_barracks: None,
@@ -608,7 +608,7 @@ pub(crate) static TECH_TO_TANKS: AiProfile = AiProfile {
         required_unit: Some(EntityKind::Tank),
     },
     resources: ResourcePolicy {
-        oil_after_steel_workers: 6,
+        oil_after_steel_workers: 8,
         oil_after_full_steel_saturation: false,
         tank_adaptive: None,
     },
@@ -677,7 +677,7 @@ pub(crate) static STEEL_EXPANSION_TANKS: AiProfile = AiProfile {
         required_unit: None,
     },
     resources: ResourcePolicy {
-        oil_after_steel_workers: 6,
+        oil_after_steel_workers: 8,
         oil_after_full_steel_saturation: false,
         tank_adaptive: None,
     },
@@ -764,7 +764,7 @@ pub(crate) static AI_1_0_TECH: AiProfile = AiProfile {
         required_unit: None,
     },
     resources: ResourcePolicy {
-        oil_after_steel_workers: 6,
+        oil_after_steel_workers: 8,
         oil_after_full_steel_saturation: false,
         tank_adaptive: None,
     },

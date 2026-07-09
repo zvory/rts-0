@@ -14,7 +14,7 @@ use crate::ai_core::observation::{
     AiResourceSummary,
 };
 use crate::ai_core::profiles::{
-    AI_1_0_TECH, AI_1_1_TANK_MG, AI_1_2_WAVE_COHORTS, RIFLE_FLOOD_FAST,
+    AI_1_0_TECH, AI_1_1_TANK_MG, AI_1_2_WAVE_COHORTS, AI_TURTLE_CHOKES, RIFLE_FLOOD_FAST,
     RIFLE_FLOOD_FULL_SATURATION, STEEL_EXPANSION_TANKS, TECH_TO_TANKS,
 };
 mod steel_line_tests;
@@ -4286,6 +4286,81 @@ fn attack_memory_uses_profile_thresholds_and_growth() {
         AiIntent::Stage { units } if units.as_slice() == [30]
     )));
     assert_eq!(fast_memory.desired_attack_size(&RIFLE_FLOOD_FAST, 91), 1);
+}
+
+#[test]
+fn turtle_rifle_opening_reports_stage_intent_for_steel_line() {
+    let ts = config::TILE_SIZE as f32;
+    let observation = observation(
+        AiEconomy {
+            steel: 0,
+            oil: 0,
+            supply_used: 3,
+            supply_cap: 20,
+        },
+        vec![
+            building(10, EntityKind::CityCentre, Some(0)),
+            combat_at(30, EntityKind::Rifleman, 8.5 * ts, 8.5 * ts),
+            combat_at(31, EntityKind::Rifleman, 9.0 * ts, 8.5 * ts),
+            combat_at(32, EntityKind::Rifleman, 9.5 * ts, 8.5 * ts),
+        ],
+    );
+
+    let decision = decide(
+        &observation,
+        &AI_TURTLE_CHOKES,
+        &mut AiDecisionMemory::for_profile(&AI_TURTLE_CHOKES),
+    );
+
+    assert!(decision.intents.iter().any(|intent| {
+        matches!(
+            intent,
+            AiIntent::Stage { units } if units.as_slice() == [30, 31, 32]
+        )
+    }));
+}
+
+#[test]
+fn turtle_machine_gunner_training_stops_at_choke_line_target() {
+    let mut owned = vec![
+        building(10, EntityKind::CityCentre, Some(0)),
+        building(11, EntityKind::Barracks, Some(0)),
+        building(12, EntityKind::TrainingCentre, None),
+    ];
+    owned.extend((0..3).map(|i| combat(30 + i, EntityKind::Rifleman)));
+    owned.extend((0..8).map(|i| combat(40 + i, EntityKind::MachineGunner)));
+    let mut observation = observation(
+        AiEconomy {
+            steel: 1_000,
+            oil: 1_000,
+            supply_used: 15,
+            supply_cap: 40,
+        },
+        owned,
+    );
+    observation.upgrades.push(UpgradeKind::Entrenchment);
+
+    let decision = decide(
+        &observation,
+        &AI_TURTLE_CHOKES,
+        &mut AiDecisionMemory::for_profile(&AI_TURTLE_CHOKES),
+    );
+
+    assert!(
+        !decision.intents.contains(&AiIntent::Train {
+            kind: EntityKind::MachineGunner
+        }),
+        "the turtle profile should count existing Machine Gunners against its line staffing cap"
+    );
+    assert!(
+        !decision.commands.iter().any(|command| {
+            matches!(
+                command,
+                Command::Train { unit: EntityKind::MachineGunner, .. }
+            )
+        }),
+        "the turtle profile should not queue surplus Machine Gunners before they reach the line"
+    );
 }
 
 #[test]

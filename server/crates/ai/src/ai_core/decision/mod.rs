@@ -688,7 +688,7 @@ where
     );
     let production_unit_counts =
         unit_counts_for_priorities(observation, &facts, &effective_unit_priorities);
-    let production_max_counts = production_max_counts(profile);
+    let production_max_counts = production_max_counts(profile, observation, map_analysis);
     for building_kind in production_building_order(&effective_unit_priorities) {
         let buildings = facts.production_buildings(building_kind);
         if buildings.is_empty() {
@@ -1129,13 +1129,29 @@ fn effective_unit_priorities_for_defensive_machine_gunners(
     priorities
 }
 
-fn production_max_counts(profile: &AiProfile) -> Vec<(EntityKind, usize)> {
+fn production_max_counts(
+    profile: &AiProfile,
+    observation: &AiObservation,
+    map_analysis: Option<&AiMapAnalysis>,
+) -> Vec<(EntityKind, usize)> {
     let mut counts = profile
         .defensive_machine_gunners
         .map(|policy| vec![(EntityKind::MachineGunner, policy.target_count)])
         .unwrap_or_default();
     if let Some(policy) = profile.turtle_defense {
         counts.push((EntityKind::Rifleman, policy.opening_riflemen));
+        let target_chokes = map_analysis
+            .map(|analysis| {
+                analysis
+                    .base_chokes_for_player(observation.player_id, policy.max_chokes)
+                    .len()
+                    .min(policy.machine_gunner_target_chokes)
+            })
+            .unwrap_or(policy.machine_gunner_target_chokes);
+        counts.push((
+            EntityKind::MachineGunner,
+            target_chokes.saturating_mul(policy.machine_gunners_per_choke),
+        ));
     }
     counts
 }

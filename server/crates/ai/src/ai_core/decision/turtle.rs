@@ -55,7 +55,7 @@ pub(super) fn stage_turtle_choke_defense(
         &TURTLE_RIFLEMAN_KIND,
         excluded_units,
     );
-    stage_riflemen_steel_line(actions, observation, &riflemen);
+    stage_riflemen_steel_line(actions, observation, &riflemen, &mut staged);
 
     let Some(chokes) = prioritized_base_chokes(observation, analysis, policy) else {
         return (!staged.is_empty()).then_some(staged);
@@ -426,6 +426,7 @@ fn stage_riflemen_steel_line(
     actions: &mut AiActionContext<'_>,
     observation: &AiObservation,
     units: &[u32],
+    staged: &mut Vec<u32>,
 ) {
     let mut riflemen = unit_ids_with_kinds(observation, units, &TURTLE_RIFLEMAN_KIND);
     riflemen.sort_unstable();
@@ -475,10 +476,14 @@ fn stage_riflemen_steel_line(
             observation.map,
         );
         if dist2(unit.x, unit.y, target.0, target.1) <= close_enough2 {
-            let _ = actions::hold_position_units(actions, [unit_id]);
+            if let Some(units) = actions::hold_position_units(actions, [unit_id]) {
+                staged.extend(units);
+            }
             continue;
         }
-        let _ = actions::attack_move_units(actions, [unit_id], target.0, target.1);
+        if let Some(units) = actions::attack_move_units(actions, [unit_id], target.0, target.1) {
+            staged.extend(units);
+        }
     }
 }
 
