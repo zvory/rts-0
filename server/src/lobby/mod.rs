@@ -50,6 +50,7 @@ mod faction_validation;
 mod lab_timeline;
 mod launch;
 mod live_tick;
+mod map_catalog;
 mod match_history_writes;
 mod participants;
 mod projection;

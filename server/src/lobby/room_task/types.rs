@@ -16,7 +16,7 @@ use crate::protocol::{DiagnosticCapabilities, TeamId};
 pub(in crate::lobby) struct RoomPlayer {
     pub(super) name: String,
     pub(in crate::lobby) color: String,
-    pub(super) ready: bool,
+    pub(in crate::lobby) ready: bool,
     pub(in crate::lobby) spectator: bool,
     pub(in crate::lobby) msg_tx: ConnectionSink,
     pub(in crate::lobby) head_of_line_count: u32,
@@ -36,7 +36,7 @@ pub(in crate::lobby) struct PendingClientCommandAck {
 
 /// A computer opponent seated in a room. Has an id for the lobby list / removal, but no socket -
 /// it is materialized into an AI-driven player only when the match starts.
-pub(super) struct AiSlot {
+pub(in crate::lobby) struct AiSlot {
     pub(super) id: u32,
     pub(super) team_id: TeamId,
     pub(super) faction_id: String,

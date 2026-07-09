@@ -455,11 +455,7 @@ fn validate_command(
                 validate_finite_point(*x, *y, "command.useAbility")?;
             }
         }
-        Command::RecastAbility {
-            units,
-            target_object_id: _,
-            ..
-        } => {
+        Command::RecastAbility { units, .. } => {
             validate_unit_list(units, unit_cap, "command.units", state)?;
         }
         Command::Gather { units, node, .. } => {

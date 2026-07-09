@@ -7,14 +7,15 @@ use super::super::connection::{send_or_log, ConnectionSink};
 use super::super::faction_validation::{
     default_faction_id_for, validate_faction_request, FactionRequestContext, FactionValidation,
 };
-use super::super::participants::{CommandIssuer, Participants};
+use super::super::participants::{self, CommandIssuer, Participants};
 use super::super::{
-    next_player_id, LobbyJoinState, LobbySummary, LobbySummaryPhase, MAX_PLAYERS, PLAYER_PALETTE,
+    map_catalog, next_player_id, LobbyJoinState, LobbySummary, LobbySummaryPhase, MAX_PLAYERS,
+    PLAYER_PALETTE,
 };
 use super::helpers::DRAINING_NEW_MATCHES_DISABLED_MSG;
 use super::types::{AiSlot, Phase, RoomPlayer, MAX_LOBBY_TEAMS};
 use super::RoomTask;
-use crate::protocol::{AvailableMap, LobbyKind, LobbyPlayer, ServerMessage, TeamId};
+use crate::protocol::{LobbyKind, LobbyPlayer, ServerMessage, TeamId};
 
 impl RoomTask {
     pub(super) fn is_replay_staging_lobby(&self) -> bool {
@@ -58,15 +59,15 @@ impl RoomTask {
         } else {
             match &self.phase {
                 Phase::Lobby => {
+                    let map = self.lobby_map_name();
                     let join_state = if kind == LobbyKind::Replay
-                        || self.total_player_count()
-                            >= Self::map_active_slot_cap_for_name(&self.lobby_map_name())
+                        || self.total_player_count() >= map_catalog::active_slot_cap(&map)
                     {
                         LobbyJoinState::FullSpectatorOnly
                     } else {
                         LobbyJoinState::Open
                     };
-                    (LobbySummaryPhase::Lobby, join_state, self.lobby_map_name())
+                    (LobbySummaryPhase::Lobby, join_state, map)
                 }
                 Phase::InGame(_) => (
                     LobbySummaryPhase::InGame,
@@ -79,7 +80,7 @@ impl RoomTask {
         let max_slots = if kind == LobbyKind::Replay {
             0
         } else {
-            Self::map_active_slot_cap_for_name(&map)
+            map_catalog::active_slot_cap(&map)
         };
         Some(LobbySummary {
             room: self.room.clone(),
@@ -184,7 +185,9 @@ impl RoomTask {
             let _ = ack.send(false);
             return;
         }
-        if !spectator && self.total_player_count() >= self.selected_map_active_slot_cap() {
+        if !spectator
+            && self.total_player_count() >= map_catalog::active_slot_cap(&self.selected_map)
+        {
             send_or_log(
                 &self.room,
                 player_id,
@@ -465,7 +468,7 @@ impl RoomTask {
         if self.is_replay_staging_lobby() {
             return;
         }
-        if self.total_player_count() >= self.selected_map_active_slot_cap() {
+        if self.total_player_count() >= map_catalog::active_slot_cap(&self.selected_map) {
             crate::log_debug!(room = %self.room, "ignoring add-ai; room full");
             return;
         }
@@ -586,45 +589,42 @@ impl RoomTask {
             .collect()
     }
 
-    /// Host-only: select a map by name. Ignored outside the lobby or from non-hosts.
     pub(super) fn on_select_map(&mut self, player_id: u32, map: String) {
-        if self.is_dev_watch() {
+        if self.is_dev_watch()
+            || self.match_countdown_deadline.is_some()
+            || !matches!(self.phase, Phase::Lobby)
+            || self.host_id != Some(player_id)
+            || self.is_replay_staging_lobby()
+        {
             return;
         }
-        if self.match_countdown_deadline.is_some() {
-            return;
-        }
-        if !matches!(self.phase, Phase::Lobby) || self.host_id != Some(player_id) {
-            return;
-        }
-        if self.is_replay_staging_lobby() {
-            return;
-        }
-        let Some(entry) = Self::map_catalog_entry(&map) else {
+        let Some((map, cap)) = map_catalog::selectable_map(&map) else {
             crate::log_debug!(room = %self.room, map = %map, "ignoring unknown map selection");
             return;
         };
-        if self.selected_map == entry.name {
+        if self.selected_map == map {
             return;
         }
-        let cap = Self::map_active_slot_cap(&entry);
-        self.selected_map = entry.name;
-        self.trim_active_slots_to_cap(cap);
+        self.selected_map = map;
+        participants::trim_active_slots_to_cap(
+            self.active_human_ids().collect(),
+            self.host_id,
+            cap,
+            &mut self.ai_players,
+            &mut self.players,
+            &mut self.human_team_assignments,
+            &mut self.human_faction_assignments,
+        );
         crate::log_debug!(room = %self.room, map = %self.selected_map, "map selected");
         self.broadcast_lobby();
     }
 
     pub(super) fn on_set_spectator(&mut self, player_id: u32, target: u32, spectator: bool) {
-        if self.is_dev_watch() {
-            return;
-        }
-        if self.match_countdown_deadline.is_some() {
-            return;
-        }
-        if !matches!(self.phase, Phase::Lobby) {
-            return;
-        }
-        if self.is_replay_staging_lobby() {
+        if self.is_dev_watch()
+            || self.match_countdown_deadline.is_some()
+            || !matches!(self.phase, Phase::Lobby)
+            || self.is_replay_staging_lobby()
+        {
             return;
         }
         if target != player_id && self.host_id != Some(player_id) {
@@ -641,15 +641,14 @@ impl RoomTask {
             return;
         }
         if spectator {
-            if let Some(player) = self.players.get_mut(&target) {
-                player.spectator = true;
-                player.ready = false;
-                player.color = "#6f8fa8".to_string();
-            }
-            self.human_team_assignments.remove(&target);
-            self.human_faction_assignments.remove(&target);
+            participants::demote_human_to_spectator(
+                &mut self.players,
+                &mut self.human_team_assignments,
+                &mut self.human_faction_assignments,
+                target,
+            );
         } else {
-            if self.total_player_count() >= self.selected_map_active_slot_cap() {
+            if self.total_player_count() >= map_catalog::active_slot_cap(&self.selected_map) {
                 crate::log_debug!(room = %self.room, player_id, target, "ignoring player role switch; room full");
                 return;
             }
@@ -665,58 +664,8 @@ impl RoomTask {
         self.broadcast_lobby();
     }
 
-    /// Total seated players: connected humans plus AI opponents.
     pub(super) fn total_player_count(&self) -> usize {
         self.active_human_count() + self.ai_players.len()
-    }
-
-    fn selected_map_active_slot_cap(&self) -> usize {
-        Self::map_active_slot_cap_for_name(&self.selected_map)
-    }
-
-    fn map_active_slot_cap_for_name(map_name: &str) -> usize {
-        Self::map_catalog_entry(map_name)
-            .map(|entry| Self::map_active_slot_cap(&entry))
-            .unwrap_or(MAX_PLAYERS)
-    }
-
-    fn map_catalog_entry(map_name: &str) -> Option<AvailableMap> {
-        Map::list_available()
-            .into_iter()
-            .find(|entry| entry.name == map_name)
-    }
-
-    fn map_active_slot_cap(entry: &AvailableMap) -> usize {
-        (entry.max_players as usize).clamp(1, MAX_PLAYERS)
-    }
-
-    fn trim_active_slots_to_cap(&mut self, cap: usize) {
-        while self.total_player_count() > cap {
-            if self.ai_players.pop().is_some() {
-                continue;
-            }
-            let active_humans: Vec<_> = self.active_human_ids().collect();
-            let target = active_humans
-                .iter()
-                .rev()
-                .copied()
-                .find(|&id| Some(id) != self.host_id)
-                .or_else(|| active_humans.last().copied());
-            let Some(target) = target else {
-                return;
-            };
-            self.move_active_human_to_spectator(target);
-        }
-    }
-
-    fn move_active_human_to_spectator(&mut self, target: u32) {
-        if let Some(player) = self.players.get_mut(&target) {
-            player.spectator = true;
-            player.ready = false;
-            player.color = "#6f8fa8".to_string();
-        }
-        self.human_team_assignments.remove(&target);
-        self.human_faction_assignments.remove(&target);
     }
 
     pub(super) fn active_human_count(&self) -> usize {
@@ -813,7 +762,9 @@ impl RoomTask {
 
     fn team_composition_valid(&self) -> bool {
         let active_ids = self.active_seat_ids();
-        if active_ids.is_empty() || active_ids.len() > self.selected_map_active_slot_cap() {
+        if active_ids.is_empty()
+            || active_ids.len() > map_catalog::active_slot_cap(&self.selected_map)
+        {
             return false;
         }
         for id in active_ids {
