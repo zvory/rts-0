@@ -9,7 +9,7 @@ use super::super::faction_validation::{
 };
 use super::super::participants::{CommandIssuer, Participants};
 use super::super::{
-    map_catalog::{self, active_slot_cap},
+    map_catalog::{self, active_slot_bounds, active_slot_cap},
     next_player_id, LobbyJoinState, LobbySummary, LobbySummaryPhase, MAX_PLAYERS, PLAYER_PALETTE,
 };
 use super::helpers::DRAINING_NEW_MATCHES_DISABLED_MSG;
@@ -595,7 +595,7 @@ impl RoomTask {
         {
             return;
         }
-        let Some((map, cap)) = map_catalog::selectable_map(&map) else {
+        let Some((map, bounds)) = map_catalog::selectable_map(&map) else {
             crate::log_debug!(room = %self.room, map = %map, "ignoring unknown map selection");
             return;
         };
@@ -603,7 +603,7 @@ impl RoomTask {
             return;
         }
         self.selected_map = map;
-        self.trim_active_slots_to_cap(cap);
+        self.trim_active_slots_to_cap(bounds.max);
         crate::log_debug!(room = %self.room, map = %self.selected_map, "map selected");
         self.broadcast_lobby();
     }
@@ -767,7 +767,8 @@ impl RoomTask {
 
     fn team_composition_valid(&self) -> bool {
         let active_ids = self.active_seat_ids();
-        if active_ids.is_empty() || active_ids.len() > active_slot_cap(&self.selected_map) {
+        let bounds = active_slot_bounds(&self.selected_map);
+        if active_ids.len() < bounds.min || active_ids.len() > bounds.max {
             return false;
         }
         for id in active_ids {

@@ -23,6 +23,7 @@ export const DEFAULT_AI_PROFILE_ID =
     : AI_PROFILES[0].id;
 
 export function teamSlotsForLobby(players = [], maxPlayers = MAX_LOBBY_TEAMS) {
+  const slotLimit = lobbyTeamSlotLimit(maxPlayers);
   const seatedPlayers = players.filter((player) => !player.isSpectator);
   const occupied = [];
   for (let teamId = 1; teamId <= MAX_LOBBY_TEAMS; teamId += 1) {
@@ -30,12 +31,18 @@ export function teamSlotsForLobby(players = [], maxPlayers = MAX_LOBBY_TEAMS) {
       occupied.push({ id: teamId, isNew: false });
     }
   }
-  if (occupied.length < MAX_LOBBY_TEAMS) {
+  if (occupied.length < slotLimit) {
     const emptyId = Array.from({ length: MAX_LOBBY_TEAMS }, (_, idx) => idx + 1)
       .find((teamId) => !occupied.some((slot) => slot.id === teamId));
     if (emptyId != null) occupied.push({ id: emptyId, isNew: true });
   }
   return occupied;
+}
+
+function lobbyTeamSlotLimit(maxPlayers) {
+  const value = Number(maxPlayers);
+  if (!Number.isFinite(value)) return MAX_LOBBY_TEAMS;
+  return Math.min(MAX_LOBBY_TEAMS, Math.max(1, Math.trunc(value)));
 }
 
 export function splitLobbyPlayers(players = []) {

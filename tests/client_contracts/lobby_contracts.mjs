@@ -105,6 +105,12 @@ import { textWithin } from "./dom_text.mjs";
   ], 2);
   assert(fullDuelSlots.length === 2 && fullDuelSlots[0].id === 1 && fullDuelSlots[1].id === 2 && fullDuelSlots[1].isNew,
     "full capped lobbies keep one empty team target for active-player reassignment");
+  const splitDuelSlots = teamSlotsForLobby([
+    { id: 1, teamId: 1 },
+    { id: 2, teamId: 2 },
+  ], 2);
+  assert(splitDuelSlots.length === 2 && splitDuelSlots.every((slot) => !slot.isNew),
+    "full capped lobbies omit extra empty team targets once occupied teams reach the cap");
   assert(
     shouldAcceptSpectatorDrop({
       draggedPlayer: { id: 2, teamId: 2 },
