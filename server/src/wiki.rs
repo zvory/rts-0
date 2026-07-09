@@ -27,7 +27,7 @@ html { background: var(--wiki-bg); }
 body { max-width: 960px; margin: 0 auto; padding: 32px 20px; font: 16px/1.55 system-ui, sans-serif; color: var(--wiki-text); background: var(--wiki-bg); }
 body.wiki-stats { max-width: 1120px; }
 nav { margin: 0 0 14px; color: var(--wiki-muted); }
-main { background: var(--wiki-panel); border: 1px solid var(--wiki-border); border-radius: 8px; padding: 24px; box-shadow: 0 18px 48px rgba(0, 0, 0, 0.24); }
+main { background: var(--wiki-panel); border: 1px solid var(--wiki-border); border-radius: 8px; padding: 24px; overflow-x: auto; box-shadow: 0 18px 48px rgba(0, 0, 0, 0.24); }
 a { color: var(--wiki-link); }
 a:hover, a:focus-visible { color: var(--wiki-link-hover); }
 code, pre { background: var(--wiki-code-bg); color: var(--wiki-code-text); border-radius: 4px; }
@@ -80,8 +80,28 @@ fn wiki_response_for(route_path: &str) -> Response {
 }
 
 fn wiki_html(route_path: &str, markdown: &str) -> impl IntoResponse {
-    let title = page_title(route_path, markdown);
+    let title = raw_page_title(route_path, markdown);
     let body = render_markdown(route_path, markdown);
+    wiki_shell_html(&title, "wiki-doc", &body)
+}
+
+fn is_stats_route(route_path: &str) -> bool {
+    matches!(route_path.trim_matches('/'), "stats" | "stats.html")
+}
+
+fn stats_page_html() -> impl IntoResponse {
+    let tables = render_stats_tables(&build_stats_tables());
+    let body = format!(
+        r#"<h1>Gameplay Stats</h1>
+<p class="scope-note">Unit and building damage, range, cooldown, and weapon columns list primary/default weapon stats. Secondary weapons such as the Tank coaxial machine gun are documented in the balance design notes until generated secondary-weapon rows are supported.</p>
+{tables}"#
+    );
+    wiki_shell_html("Gameplay Stats", "wiki-stats", &body)
+}
+
+fn wiki_shell_html(title: &str, body_class: &str, body: &str) -> impl IntoResponse {
+    let title = escape_text(title);
+    let body_class = escape_text(body_class);
     let html = format!(
         r#"<!doctype html>
 <html lang="en">
@@ -93,45 +113,9 @@ fn wiki_html(route_path: &str, markdown: &str) -> impl IntoResponse {
 {WIKI_DARK_STYLE}
 </style>
 </head>
-<body class="wiki-doc">
+<body class="{body_class}">
 <nav><a href="/wiki">Wiki index</a></nav>
 <main>
-{body}
-</main>
-</body>
-</html>"#
-    );
-    (
-        [
-            (header::CONTENT_TYPE, "text/html; charset=utf-8"),
-            (header::CACHE_CONTROL, "no-cache"),
-        ],
-        Html(html),
-    )
-}
-
-fn is_stats_route(route_path: &str) -> bool {
-    matches!(route_path.trim_matches('/'), "stats" | "stats.html")
-}
-
-fn stats_page_html() -> impl IntoResponse {
-    let body = render_stats_tables(&build_stats_tables());
-    let html = format!(
-        r#"<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Gameplay Stats - Bewegungskrieg Wiki</title>
-<style>
-{WIKI_DARK_STYLE}
-</style>
-</head>
-<body class="wiki-stats">
-<nav><a href="/wiki">Wiki index</a></nav>
-<main>
-<h1>Gameplay Stats</h1>
-<p class="scope-note">Unit and building damage, range, cooldown, and weapon columns list primary/default weapon stats. Secondary weapons such as the Tank coaxial machine gun are documented in the balance design notes until generated secondary-weapon rows are supported.</p>
 {body}
 </main>
 </body>
@@ -766,10 +750,6 @@ fn format_doc_link(route_path: &Path) -> std::io::Result<String> {
         escape_markdown_link_text(&title),
         route_path
     ))
-}
-
-fn page_title(route_path: &str, markdown: &str) -> String {
-    escape_text(&raw_page_title(route_path, markdown))
 }
 
 fn raw_page_title(route_path: &str, markdown: &str) -> String {
