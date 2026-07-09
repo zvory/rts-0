@@ -317,6 +317,13 @@ impl GameCheckpointV1 {
             &player_ids,
             &entity_ids,
         )?;
+        validate_panzerfaust_shots(
+            &self.panzerfaust_shots,
+            &player_ids,
+            self.entities.next_id,
+            map,
+            self.tick,
+        )?;
         validate_id_set(
             "activeConstructionSites",
             &self.active_construction_sites,

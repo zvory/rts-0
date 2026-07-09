@@ -67,6 +67,72 @@ fn checkpoint_payload_backfills_legacy_panzerfaust_shot_in_flight() {
 }
 
 #[test]
+fn checkpoint_payload_rejects_invalid_panzerfaust_shot_state() {
+    let (mut game, panzerfaust, tank) = panzerfaust_fixture();
+    enqueue_attack(&mut game, panzerfaust, tank, false);
+    tick_until_panzerfaust_launch(&mut game);
+    let text = checkpoint_payload_text_for(&game, "invalid panzerfaust shot payload fixture");
+
+    let stale_owner = mutate_payload(&text, |value| {
+        value["panzerfaustShots"]["shots"][0]["owner"] = serde_json::json!(999);
+    });
+    assert!(matches!(
+        Game::restore_checkpoint_payload_text_for_test(
+            &stale_owner,
+            game.state.map.clone(),
+            game.map_metadata().clone(),
+        ),
+        Err(CheckpointPayloadError::InvalidReference {
+            field: "panzerfaustShots.owner",
+            id: 999
+        })
+    ));
+
+    let stale_target = mutate_payload(&text, |value| {
+        value["panzerfaustShots"]["shots"][0]["target"] = serde_json::json!(999);
+    });
+    assert!(matches!(
+        Game::restore_checkpoint_payload_text_for_test(
+            &stale_target,
+            game.state.map.clone(),
+            game.map_metadata().clone(),
+        ),
+        Err(CheckpointPayloadError::InvalidReference {
+            field: "panzerfaustShots.target",
+            id: 999
+        })
+    ));
+
+    let out_of_world_impact = mutate_payload(&text, |value| {
+        value["panzerfaustShots"]["shots"][0]["impact_x"] = serde_json::json!(-1.0);
+    });
+    assert!(matches!(
+        Game::restore_checkpoint_payload_text_for_test(
+            &out_of_world_impact,
+            game.state.map.clone(),
+            game.map_metadata().clone(),
+        ),
+        Err(CheckpointPayloadError::InvalidValue {
+            field: "panzerfaustShots.impact",
+        })
+    ));
+
+    let already_due = mutate_payload(&text, |value| {
+        value["panzerfaustShots"]["shots"][0]["impact_tick"] = value["tick"].clone();
+    });
+    assert!(matches!(
+        Game::restore_checkpoint_payload_text_for_test(
+            &already_due,
+            game.state.map.clone(),
+            game.map_metadata().clone(),
+        ),
+        Err(CheckpointPayloadError::InvalidValue {
+            field: "panzerfaustShots.impactTick",
+        })
+    ));
+}
+
+#[test]
 fn checkpoint_payload_serializes_entities_in_stable_id_order() {
     let game = Game::new_for_replay(&human_vs_ai_players(), 0x5150_2006);
     let text = checkpoint_payload_text_for(&game, "stable entity ordering fixture");

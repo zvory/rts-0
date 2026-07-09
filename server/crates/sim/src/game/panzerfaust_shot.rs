@@ -33,6 +33,24 @@ impl PanzerfaustShotStore {
         self.shots.len()
     }
 
+    #[allow(clippy::type_complexity)]
+    pub(in crate::game) fn checkpoint_entries(
+        &self,
+    ) -> impl Iterator<Item = (u32, u32, u32, f32, f32, f32, f32, u32)> + '_ {
+        self.shots.iter().map(|shot| {
+            (
+                shot.owner,
+                shot.attacker,
+                shot.target,
+                shot.source_x,
+                shot.source_y,
+                shot.impact_x,
+                shot.impact_y,
+                shot.impact_tick,
+            )
+        })
+    }
+
     pub(in crate::game) fn backfill_legacy_in_flight(
         mut self,
         entities: &EntityStore,
