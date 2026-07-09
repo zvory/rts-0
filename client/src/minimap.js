@@ -30,6 +30,15 @@ const IMPASSABLE_FOG_SCALE = 0.56;
 const ARTILLERY_MINIMAP_MARKER_MS = 2200;
 const ARTILLERY_MINIMAP_ICON_W = 30;
 const ARTILLERY_MINIMAP_ICON_H = 24;
+const MINIMAP_BLIP_SCALE = 1.6;
+const MINIMAP_OWNED_ENTITY_BLIP_RADIUS = 1.6 * MINIMAP_BLIP_SCALE;
+const MINIMAP_STATIC_ENTITY_BLIP_RADIUS = 2.2;
+const MINIMAP_PLAYER_BLIP_OUTLINE_COLOR = "rgba(255,255,255,0.92)";
+const MINIMAP_PLAYER_BLIP_OUTLINE_OFFSETS = Object.freeze([
+  [0, -1],
+  [-1, 0], [1, 0],
+  [0, 1],
+]);
 const TWO_PI = Math.PI * 2;
 
 // Convert one of the 0xRRGGBB palette ints into a CSS color string.
@@ -177,6 +186,8 @@ export class Minimap {
     this._fogLayer = null;
     this._fogLayerCtx = null;
     this._fogLayerSignature = null;
+    this._playerBlipMaskLayer = null;
+    this._playerBlipMaskLayerCtx = null;
 
     this._dragging = false;
     this._pings = [];
@@ -284,10 +295,13 @@ export class Minimap {
 
     if (!this._ensureTransform()) return;
 
+    const entities = this._minimapEntities(frameViews);
     this._drawTerrainLayer();
-    this._drawEntities(frameViews);
+    this._drawEntities(entities, { deferPlayerOwned: true });
     this._drawFog();
     this._drawResourceLayer();
+    this._drawPlayerOwnedEntityOutline(entities);
+    this._drawEntities(entities, { playerOwnedOnly: true });
     const now = performance.now();
     this._drawArtilleryFiringMarkers(now);
     this._drawViewport();
@@ -372,7 +386,7 @@ export class Minimap {
   }
 
   _paintResources(ctx, map) {
-    const r = 2.2;
+    const r = MINIMAP_STATIC_ENTITY_BLIP_RADIUS;
     for (const node of map.resources || []) {
       if (node.remaining === 0) continue;
       const p = this._worldToCanvas(node.x, node.y);
@@ -430,8 +444,27 @@ export class Minimap {
     return ctx ? { canvas, ctx } : null;
   }
 
+  _ensurePlayerBlipMaskLayer() {
+    if (!this._playerBlipMaskLayer) {
+      this._playerBlipMaskLayer = this._createDynamicCanvas();
+    }
+    const canvas = this._playerBlipMaskLayer;
+    if (!canvas) return null;
+    if (canvas.width !== this.size) canvas.width = this.size;
+    if (canvas.height !== this.size) canvas.height = this.size;
+    if (!this._playerBlipMaskLayerCtx) {
+      this._playerBlipMaskLayerCtx = canvas.getContext?.("2d") || null;
+    }
+    const ctx = this._playerBlipMaskLayerCtx;
+    return ctx ? { canvas, ctx } : null;
+  }
+
   _createStaticCanvas() {
     if (this._staticCanvasFactory) return this._staticCanvasFactory();
+    return this._createDynamicCanvas();
+  }
+
+  _createDynamicCanvas() {
     if (typeof OffscreenCanvas !== "undefined") return new OffscreenCanvas(1, 1);
     const doc = this.canvas?.ownerDocument || (typeof document !== "undefined" ? document : null);
     return doc?.createElement ? doc.createElement("canvas") : null;
@@ -603,9 +636,7 @@ export class Minimap {
     };
   }
 
-  /** Draw a colored blip for each visible entity (own/enemy/neutral). */
-  _drawEntities(frameViews = null) {
-    const ctx = this.ctx;
+  _minimapEntities(frameViews = null) {
     this._recordMinimapDiagnostic(
       Array.isArray(frameViews?.currentEntities)
         ? "entityViews.cache.hit.minimap.current"
@@ -615,34 +646,78 @@ export class Minimap {
       ? frameViews.currentEntities
       : this.state.entitiesInterpolated(1);
     this._recordMinimapDiagnostic("minimap.entities.blips", entities.length);
+    return entities;
+  }
+
+  /** Draw colored blips for visible entities. Player-owned blips can be drawn last over resources. */
+  _drawEntities(entities, { deferPlayerOwned = false, playerOwnedOnly = false } = {}) {
+    const ctx = this.ctx;
+    if (!Array.isArray(entities)) return;
     for (const e of entities) {
-      const p = this._worldToCanvas(e.x, e.y);
+      const playerOwned = this._isPlayerOwnedMinimapEntity(e);
+      if (playerOwnedOnly && !playerOwned) continue;
+      if (deferPlayerOwned && playerOwned) continue;
       const color = this._blipColor(e);
-      ctx.fillStyle = color;
-      if (e.kind === KIND.SCOUT_PLANE) {
-        this._drawScoutPlaneBlip(p.x, p.y, color);
-        continue;
-      }
-      // Buildings/resources read a touch larger than units so bases stand out.
-      const r = e.owner !== 0 && !isResource(e.kind) ? 1.6 : 2.2;
-      ctx.fillRect(p.x - r, p.y - r, r * 2, r * 2);
+      this._drawEntityBlip(ctx, e, color, playerOwned);
     }
   }
 
-  _drawScoutPlaneBlip(cx, cy, color) {
+  _isPlayerOwnedMinimapEntity(e) {
+    const owner = Number(e?.owner);
+    return Number.isFinite(owner) && owner !== 0 && !isResource(e?.kind);
+  }
+
+  _drawPlayerOwnedEntityOutline(entities) {
+    if (!Array.isArray(entities)) return;
+    const layer = this._ensurePlayerBlipMaskLayer();
+    if (!layer) return;
+
+    const { canvas, ctx: maskCtx } = layer;
+    maskCtx.clearRect(0, 0, this.size, this.size);
+
+    let drewMask = false;
+    for (const e of entities) {
+      if (!this._isPlayerOwnedMinimapEntity(e)) continue;
+      this._drawEntityBlip(maskCtx, e, MINIMAP_PLAYER_BLIP_OUTLINE_COLOR, true, { scoutStroke: false });
+      drewMask = true;
+    }
+    if (!drewMask) return;
+
     const ctx = this.ctx;
+    ctx.save();
+    for (const [dx, dy] of MINIMAP_PLAYER_BLIP_OUTLINE_OFFSETS) {
+      ctx.drawImage(canvas, dx, dy);
+    }
+    ctx.restore();
+  }
+
+  _drawEntityBlip(ctx, e, color, playerOwned, { scoutStroke = true } = {}) {
+    const p = this._worldToCanvas(e.x, e.y);
+    ctx.fillStyle = color;
+    if (e.kind === KIND.SCOUT_PLANE) {
+      this._drawScoutPlaneBlip(ctx, p.x, p.y, color, { stroke: scoutStroke });
+      return;
+    }
+    const r = playerOwned
+      ? MINIMAP_OWNED_ENTITY_BLIP_RADIUS
+      : MINIMAP_STATIC_ENTITY_BLIP_RADIUS;
+    ctx.fillRect(p.x - r, p.y - r, r * 2, r * 2);
+  }
+
+  _drawScoutPlaneBlip(ctx, cx, cy, color, { stroke = true } = {}) {
+    const s = MINIMAP_BLIP_SCALE;
     ctx.save();
     ctx.strokeStyle = "#101010";
     ctx.fillStyle = color;
     ctx.lineWidth = 0.8;
     ctx.beginPath();
-    ctx.moveTo(cx + 2.7, cy);
-    ctx.lineTo(cx - 1.8, cy - 2.2);
-    ctx.lineTo(cx - 0.9, cy);
-    ctx.lineTo(cx - 1.8, cy + 2.2);
+    ctx.moveTo(cx + 2.7 * s, cy);
+    ctx.lineTo(cx - 1.8 * s, cy - 2.2 * s);
+    ctx.lineTo(cx - 0.9 * s, cy);
+    ctx.lineTo(cx - 1.8 * s, cy + 2.2 * s);
     ctx.closePath();
     ctx.fill();
-    ctx.stroke();
+    if (stroke) ctx.stroke();
     ctx.restore();
   }
 

@@ -697,13 +697,13 @@ function lockedEvent(clientX, clientY, button = 0, extra = {}) {
   );
   minimap.render();
   assert(
-    hasCallWithApproxArgs(canvas.context, "moveTo", [10.7, 8]),
+    hasCallWithApproxArgs(canvas.context, "moveTo", [12.32, 8]),
     "Scout Plane blip starts an aircraft path at the plane canvas position",
   );
   assert(
-    hasCallWithApproxArgs(canvas.context, "lineTo", [6.2, 5.8])
-      && hasCallWithApproxArgs(canvas.context, "lineTo", [7.1, 8])
-      && hasCallWithApproxArgs(canvas.context, "lineTo", [6.2, 10.2]),
+    hasCallWithApproxArgs(canvas.context, "lineTo", [5.12, 4.48])
+      && hasCallWithApproxArgs(canvas.context, "lineTo", [6.56, 8])
+      && hasCallWithApproxArgs(canvas.context, "lineTo", [5.12, 11.52]),
     "Scout Plane blip draws the expected multi-point aircraft silhouette",
   );
   assert(
@@ -711,11 +711,11 @@ function lockedEvent(clientX, clientY, button = 0, extra = {}) {
     "Scout Plane blip includes an outline for readability",
   );
   assert(
-    hasCallWithApproxArgs(canvas.context, "fillRect", [10.4, 6.4, 3.2, 3.2]),
+    hasCallWithApproxArgs(canvas.context, "fillRect", [9.44, 5.44, 5.12, 5.12]),
     "ordinary ground units still draw square minimap blips at their canvas position",
   );
   assert(
-    !hasCallWithApproxArgs(canvas.context, "fillRect", [6.4, 6.4, 3.2, 3.2]),
+    !hasCallWithApproxArgs(canvas.context, "fillRect", [5.44, 5.44, 5.12, 5.12]),
     "Scout Plane blips should not also use the ordinary square unit marker",
   );
   minimap.destroy();
