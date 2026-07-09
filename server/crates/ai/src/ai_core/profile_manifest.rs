@@ -137,7 +137,7 @@ fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'sta
         ),
         AI_TURTLE_CHOKES_ID => (
             "AI Turtle Chokes",
-            "Support-weapon turtle profile that uses the proposal-based economy manager to fast expand on the AI 2.0 economy cadence, opens three Riflemen on a main steel-line screen, queues Entrenchment before capped four-per-line Machine Gunner production, fast-techs Anti-Tank Guns, prioritizes enemy-facing chokes, and stages Machine Gunners plus guns on own-base choke lines.",
+            "Support-weapon turtle profile that uses the proposal-based economy manager to fast expand on the AI 2.0 economy cadence, opens three Riflemen on a main steel-line screen, queues Entrenchment before capped four-per-line Machine Gunner production, fast-techs Anti-Tank Guns from a compact Gun Works site, prioritizes enemy-facing chokes, and stages Machine Gunners plus guns on own-base choke lines.",
             vec![
                 "economy_manager",
                 "full_steel_saturation",
@@ -150,6 +150,7 @@ fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'sta
                 "four_machine_gunners_per_main_choke",
                 "wider_machine_gunner_spacing",
                 "fast_anti_tank_gun_tech",
+                "compact_gun_works_placement",
                 "main_choke_first",
                 "nearest_enemy_choke_priority",
                 "base_route_sector_priority",
