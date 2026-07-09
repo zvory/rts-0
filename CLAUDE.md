@@ -1,182 +1,84 @@
-# CLAUDE.md
+# Repository guidance
 
-Guidance for working in this repo. **Read only the relevant context capsule first** —
-`docs/context/` has small, task-scoped capsules (server-sim, client-ui, protocol, balance,
-testing, deployment) that point into the relevant `docs/design/` file and code you actually need.
-See [docs/context/README.md](docs/context/README.md) for the capsule index.
+This is a server-authoritative Bewegungskrieg game. The Rust server in `server/` owns the 30 Hz
+simulation and serves the plain JavaScript/PixiJS client in `client/`. Clients send commands; the
+server sends per-player, fog-filtered snapshots.
 
-**Read only the relevant design file when you are changing a cross-file contract** — the wire
-protocol (server ⇄ client), the `Game` API seam, the balance mirror, fog rules, or the hardening
-surface. `docs/design/*.md` are the source of truth by contract area; capsules are pointers, not
-copies. Keep the relevant design file updated in the same change whenever you alter a contract, and
-refresh the capsule's section list if structure shifts.
+## Start with relevant context
 
-A server-authoritative Bewegungskrieg server (`server/`, axum + tokio) runs the one authoritative
-simulation and also serves the **HTML/CSS/JS + PixiJS** client (`client/`). Clients send commands;
-the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
+Read the smallest relevant capsule in `docs/context/` before exploring broadly. The index covers
+server simulation, client UI, protocol, balance, testing, deployment, planning, and match history:
+`docs/context/README.md`.
 
-## Completion Summary
+When changing a cross-file contract, read and update its source-of-truth file in `docs/design/`.
+This applies to the wire protocol, `Game` API seam, balance mirror, fog rules, and hardening surface.
+Refresh a capsule's section pointers when the design document's structure changes.
 
-- Once you're done a task, explain in plain language what you've done and the gameplay impact.
+## Scope and evidence
 
-## Evidence and Scope
+- For requests to investigate, review, audit, scout, or confirm, inspect and report. Keep the pass
+  read-only unless the user also requests a change.
+- For requests to build, change, or fix, make the in-scope local edits and run focused,
+  non-destructive validation.
+- Base claims about current gameplay, balance, deployments, CI, PRs, and merged state on current
+  repository, runtime, Git, GitHub, or Fly evidence rather than agent memory.
+- Require confirmation for destructive actions, direct pushes to `main`, or material scope
+  expansion. GitHub delivery follows the workflow below when the user asks for the change to be
+  delivered or merged.
 
-- If the user asks to investigate, scout, audit, confirm, or explicitly says not to fix or change
-  behavior, keep the pass read-only unless the user later authorizes edits.
-- For current gameplay, balance, deployment, PR, CI, or merged-state questions, answer from current
-  repo/runtime/git evidence such as `origin/main`, targeted source/tests, `/version`, Fly logs, or
-  PR status. Do not use private agent memory as a source of truth.
+## Editing and Git workflow
 
-## Balance and Gameplay Patch Notes
-
-- For balance or gameplay changes, collect patch-note bullets as you work so the final summary,
-  commit message, and any release notes can explain player-facing impact clearly.
-- Patch notes should call out changed unit/building stats, economy tuning, combat behavior, UI
-  affordances that affect play, and any expected strategic impact.
-- Keep patch notes factual and evidence-backed. If the impact is uncertain, say what changed and
-  what should be watched in playtests instead of guessing.
-
-## New Unit Workflow
-
-- New-unit work is requirements-gated. If a task references the new unit checklist or asks to start a
-  new unit, begin with Phase 0 and Phase 1 only.
-- Do not implement Rust, JS, protocol, balance, art, tests, or other implementation files until the
-  unit brief and rules/balance spec are complete and the user explicitly authorizes implementation.
-- Before that gate, only edit planning, checklist, and design documents. Stop after the brief/spec
-  handoff unless the user explicitly says to proceed with implementation code.
-
-## Parallel Worktrees
-
-- For parallel feature work (which is always the case), each terminal/agent must work in its own
-  git worktree. Do not run two coding agents in the same checkout.
-- Always make a worktree.
-- Before making changes, verify the checkout and branch:
-
-  ```bash
-  git rev-parse --show-toplevel
-  git branch --show-current
-  git status --short
-  ```
-
-- Use one branch per worktree. Branch names must start with `zvorygin/`.
-- Create project worktrees under `/tmp/rts-worktrees` to keep the repo directory clean. Fetch first,
-  then branch from `origin/main` so the new worktree includes recently merged agent PRs even when
-  the local `main` checkout has not been pulled yet. Use a descriptive directory name that matches
-  the branch:
-
-  ```bash
-  mkdir -p /tmp/rts-worktrees
-  git fetch origin main
-  git worktree add /tmp/rts-worktrees/my-feature -b zvorygin/my-feature origin/main
-  ```
-
-- Agents must only edit files inside their assigned worktree. Do not edit the original checkout or
-  another agent's worktree.
-- Coordinate write ownership before starting. If another agent owns a file or module, do not edit it
-  unless explicitly told to. Avoid parallel edits to shared contracts such as protocol, config,
-  generated files, or design docs.
-- If `playtest_notes.md` is dirty, ignore it and continue operating from `main` as usual. It is the
-  developer's notes document; do not edit, stage, revert, or otherwise manage it.
-- Stage and commit only files belonging to the current task. Never revert unrelated changes.
-- When the task is ready for review, push the worktree branch, open an owned PR, arm auto-merge,
-  then wait for the PR to merge before claiming completion. Use `scripts/agent-pr.sh` for the
-  standard owned-PR body, labels, and auto-merge setup, then `scripts/wait-pr.sh <pr>` to wait until
-  GitHub reports the PR merged and the head SHA is reachable from `origin/main`.
-- Do not merge, rebase, delete, or otherwise alter another agent's branch/worktree unless explicitly
-  asked.
-- If running local servers, use different ports per worktree or stop the other server first.
-
-## Git / GitHub
-
-- The default branch is `main`.
-- `main` is protected in GitHub: normal updates require a PR, an up-to-date branch, and the required
-  `./tests/run-all.sh` check from the `Main test gate` workflow. Admin bypass is reserved for emergency repair and
-  explicitly authorized migration work only.
-- Ordinary commits run cheap local hooks, currently staged whitespace checks through
-  `git diff --cached --check`, excluding the human-owned `playtest_notes.md`. The hooks do not run
-  the full local suite by default.
-- During development, run only targeted tests that match the files or contracts changed. Use
-  GitHub Actions as the authoritative full gate through the PR lifecycle.
-- If a cheap local hook fails, fix the staged diff instead of bypassing it unless the task is
-  explicitly docs-only and the failure is conclusively unrelated.
-- Commit messages should be detailed. Use a clear subject and include a body when the change has
-  gameplay impact, contract changes, testing nuance, or non-obvious reasoning.
-- Use one `zvorygin/` branch per worktree.
-- When work is complete, stage and commit only files that belong to the current task.
-- Push the branch to `origin`, open an owned PR, and arm auto-merge. The PR body or labels must make
-  ownership, lifecycle mode, auto-merge state, focused verification, and any blockers clear enough
-  for another agent to audit. The standard command is:
-
-  ```bash
-  scripts/agent-pr.sh --verification "focused check command(s) passed"
-  ```
-
-  `scripts/agent-pr.sh` writes the `rts-agent-pr:v1` metadata block, applies `agent-owned` plus
-  `automerge` or `needs-human`, and runs `gh pr merge --auto --merge`. If the branch needs human
-  input, pass `--no-auto-merge` and explain the blocker in the PR body or handoff.
-- After `scripts/agent-pr.sh` opens or updates the PR, run `scripts/wait-pr.sh <pr>`. Do not report
-  the task complete until that command confirms GitHub merged the PR and the head SHA is reachable
-  from `origin/main`.
-- Normal completion states are: merged to `main`; or blocked with the PR link plus the exact failing
-  check, merge conflict, GitHub/API failure, or human decision needed. A PR that is merely opened,
-  owned, and auto-merge armed is a pending handoff, not completion.
-- For serial phase work, do not start the next phase from an assumed merge. Use the same
-  `scripts/wait-pr.sh <pr>` gate after opening each PR; it exits successfully only after GitHub
-  reports the PR merged and the phase head SHA is reachable from `origin/main`.
-- For unattended serial phase execution, use `scripts/phase-runner.sh --pr --wait`. That script is
-  the stable compatibility entrypoint for the maintained Node runner in
-  `scripts/phase-runner-agents.mjs`. Use `scripts/phase-runner.sh --pr` only when intentionally
-  stopping after the first owned PR is opened and auto-merge is armed; treat that result as a
-  pending handoff until `scripts/wait-pr.sh <pr>` confirms the merge.
-- To audit outstanding agent PRs, run `scripts/pr-sweep.sh`. It lists open `agent-owned` and
-  `zvorygin/*` PRs with owner, age, head SHA, auto-merge state, checks, and flags for stale,
-  failed, conflicted, missing-owner, or needs-human states.
-- For recovery from failed CI, stale branches, missing auto-merge, closed PRs, GitHub API outages,
-  emergency direct pushes, cleanup, canaries, or alternate runners, see
-  `docs/pr-first-workflow.md`.
-- Do not merge, push to `main`, or bypass branch protection unless the user explicitly authorizes
-  emergency or migration repair work.
-
-## Commands
+Read-only inspection may use the current checkout. Before editing, work in a clean task-specific
+worktree based on current `origin/main`; parallel writers must use separate worktrees and branches.
 
 ```bash
-# Run (serves client + /ws on the configured RTS_ADDR; open the printed URL)
-cd server && cargo run            # add --release for the fast build
+git rev-parse --show-toplevel
+git branch --show-current
+git status --short
+mkdir -p /tmp/rts-worktrees
+git fetch origin main
+git worktree add /tmp/rts-worktrees/<task> -b zvorygin/<task> origin/main
+```
 
-# Build / lint / format
+- Branch names start with `zvorygin/`. Edit only the assigned worktree and coordinate ownership of
+  shared contracts, generated files, and design documents.
+- Preserve unrelated user changes. Ignore a dirty `playtest_notes.md`; never edit, stage, revert, or
+  otherwise manage it.
+- Stage and commit only task files. Use a clear commit subject and add a body for gameplay impact,
+  contract changes, testing nuance, or non-obvious reasoning.
+- Use focused local checks during development. GitHub's `Main test gate` is the authoritative full
+  suite for PR delivery.
+- When GitHub delivery is authorized, run
+  `scripts/agent-pr.sh --verification "focused check command(s) passed"`, then
+  `scripts/wait-pr.sh <pr>`. Completion means the PR merged and its head is reachable from
+  `origin/main`, or a reported blocker identifies the exact failed check, conflict, API failure, or
+  human decision needed.
+- See `docs/pr-first-workflow.md` for recovery, serial phases, PR audits, and exceptional workflows.
+
+## Focused commands
+
+```bash
+# Run the server and client
+cd server && cargo run
+
+# Build, lint, format, and check the simulation seam
 cd server && cargo build && cargo clippy && cargo fmt
 cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture
 
-# Targeted tests — start the server first for live Node suites, then (from repo root):
-node tests/server_integration.mjs     # dep-free, full server pipeline
-node tests/regression.mjs             # dep-free, hardening/DoS/robustness guards
-node tests/ai_integration.mjs         # dep-free, AI opponent lobby flow (add/remove/start)
-tests/run-all.sh --no-rust            # live Node suites + headless-Chrome smoke with shared deps
+# Live Node suites require a running server on the runner's private port
+node tests/server_integration.mjs
+node tests/regression.mjs
+node tests/ai_integration.mjs
+tests/run-all.sh --no-rust
 
-# Simulation behavior, including scripted self-play (no running server needed):
+# Simulation and scripted self-play; no running server required
 cargo nextest run --config-file .config/nextest.toml --manifest-path server/Cargo.toml --profile default
 ```
 
-Do not run broad test bundles by default. Pick the smallest relevant target for the changed area
-(for example a focused Rust test, one live Node suite for touched server/client behavior, or an
-architecture check for seam changes), then rely on the PR `./tests/run-all.sh`
-check for full-suite coverage.
+Choose the smallest check that covers the changed area. There is no JavaScript build step; PixiJS
+is loaded from the CDN, and `cargo run` from `server/` serves the client.
 
-There is **no JS build step** (plain ES modules + PixiJS from CDN). The client is served from
-`../client` relative to the server crate, so `cargo run` from `server/` is the whole dev loop.
-
-## Deployed Log Checks
-
-- When investigating behavior that may differ on beta/mainline, including post-deploy regressions,
-  WebSocket/lobby failures, match-history recording, server crashes, restarts, or performance
-  spikes, check Fly logs early with `scripts/fly-logs.sh beta recent` or
-  `scripts/fly-logs.sh mainline recent`.
-- For live reproduction, bound tailing so it cannot stream forever:
-  `timeout 30 scripts/fly-logs.sh beta tail`.
-- `scripts/fly-logs.sh` reads `FLY_API_TOKEN` from the environment, this worktree's ignored
-  `.env`, or the main worktree's ignored `.env`. Never commit, print, or paste the token.
-
-## Invariants — do not break these
+## Contract invariants
 
 - **Wire protocol is mirrored.** `server/crates/protocol/src/lib.rs` ⇄ `server/src/protocol.rs`
   ⇄ `client/src/protocol.js` must agree on every tag, field name, and shape. Change them together
@@ -202,7 +104,7 @@ There is **no JS build step** (plain ES modules + PixiJS from CDN). The client i
   write on `end_match` — never block the room task on the DB. See
   `docs/design/match-history.md`.
 
-## Conventions
+## Code conventions
 
 - **Rust:** edition 2021, `cargo fmt`, keep warnings low. Prefer small pure helpers in
   `game/services/`. `systems.rs` is the thin orchestrator that calls services in order. The room
@@ -219,20 +121,20 @@ There is **no JS build step** (plain ES modules + PixiJS from CDN). The client i
 - **Coordinates:** world pixels on the wire everywhere; tiles only where a field name ends in
   `Tile`.
 
-## Gotchas
+## Specialized workflows
 
-- Debug builds have overflow checks **on** (a bad `Build` coord can panic in `cargo run` but
-  silently wrap in `--release`) — that's why placement math is `checked_*`. Keep it that way.
-- Live Node tests need a **running** server on the test runner's private port; they are live
-  integration scripts, not Rust test binaries. Run only the suite that matches the changed area
-  unless the user explicitly asks for broader local coverage.
-- If a self-play test fails and the reason is not immediately obvious, do **not** sink time into
-  speculative debugging first. Start a fresh server on its own port, then use
-  the macOS `open` command to open a local saved self-play replay so the user can inspect the
-  failure state directly. Do
-  **not** use the Browser skill for this flow. Use
-  `open "http://localhost:<port>/?replayArtifact=<artifact_name>"` (for example
-  `open "http://localhost:<port>/?replayArtifact=manual_worker_rush_latest"`), not the in-app
-  browser.
-- A 1-player match is a never-ending sandbox; only 2+ player matches resolve to a winner. Empty
-  rooms reset to lobby so a room name is never stuck mid-match.
+- Balance or gameplay changes: collect factual patch-note bullets covering changed stats, economy,
+  combat behavior, UI affordances, and what should be watched in playtests.
+- New units: complete Phase 0 and Phase 1 (unit brief and rules/balance specification) before
+  implementation. Until the user explicitly authorizes implementation, edit only planning,
+  checklist, and design documents.
+- Deployed behavior: use the `fly-logs` skill early for beta/mainline differences, WebSocket or lobby
+  failures, match history, crashes, restarts, and performance spikes.
+- Planned implementation phases: use the `phase-runner` skill only for an existing phase file.
+- Testing and self-play: follow `docs/context/testing.md`, including its replay-inspection workflow.
+
+## Completion
+
+Lead with the outcome. Include the evidence needed to support it, material caveats, and the next
+action. For gameplay-affecting changes, explain the player-facing impact. Omit filler and repeated
+process narration.
