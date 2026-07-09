@@ -2,8 +2,8 @@ import { clamp01, finiteNumber, smoothstep01 } from "./shared.js";
 
 const MISS_TOAST_TEXT = "Miss!";
 const MISS_TOAST_TTL_MS = 760;
-const MISS_TOAST_FONT_SIZE = 4.5;
-const MISS_TOAST_STROKE_THICKNESS = 1;
+const MISS_TOAST_FONT_SIZE = 6.75;
+const MISS_TOAST_STROKE_THICKNESS = 1.5;
 const MISS_TOAST_OFFSET_X = 2;
 const MISS_TOAST_OFFSET_Y = 3;
 const MISS_TOAST_FLOAT_Y = 5;
