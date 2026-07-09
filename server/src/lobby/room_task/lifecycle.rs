@@ -16,8 +16,6 @@ use crate::structured_log::{self, MatchEndedLog};
 use rts_sim::game::replay::ReplayArtifactV1;
 use rts_sim::game::Game;
 
-pub(super) const AI_OBSERVATION_TICK_LIMIT: u32 = 25_000;
-
 impl RoomTask {
     pub(super) fn new_live_session_blocked_by_drain(&self) -> bool {
         self.drain.is_draining()
@@ -387,7 +385,6 @@ impl RoomTask {
     ) {
         self.match_player_count = player_count;
         self.match_human_count = human_count;
-        self.match_tick_limit = self.ai_observation_tick_limit(player_count, human_count);
         self.match_started_at = Some(chrono::Utc::now());
         self.match_run_id = Some(structured_log::new_match_run_id(&self.room));
         self.match_map_name = map_name;
@@ -395,17 +392,9 @@ impl RoomTask {
         self.outcome_sent.clear();
     }
 
-    fn ai_observation_tick_limit(&self, player_count: usize, human_count: usize) -> Option<u32> {
-        (matches!(self.mode, super::types::RoomMode::Normal)
-            && player_count >= 2
-            && human_count == 0)
-            .then_some(AI_OBSERVATION_TICK_LIMIT)
-    }
-
     pub(super) fn reset_after_live_match_for_room_phase(&mut self) {
         self.match_player_count = 0;
         self.match_human_count = 0;
-        self.match_tick_limit = None;
         self.outcome_sent.clear();
         self.branch_live_seat_by_connection.clear();
         self.pending_recipient_notices.clear();
@@ -421,7 +410,6 @@ impl RoomTask {
     fn clear_finished_match_identity(&mut self) {
         self.match_started_at = None;
         self.match_run_id = None;
-        self.match_tick_limit = None;
         self.match_map_name.clear();
         self.match_participants.clear();
         self.replay_start = None;
@@ -433,7 +421,6 @@ impl RoomTask {
         self.match_countdown_deadline = None;
         self.match_player_count = 0;
         self.match_human_count = 0;
-        self.match_tick_limit = None;
         self.outcome_sent.clear();
         self.branch_live_seat_by_connection.clear();
         self.pending_recipient_notices.clear();

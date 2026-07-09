@@ -40,7 +40,6 @@ pub(super) struct LiveTickDriver<'a> {
     pub(super) tick_budget: Duration,
     pub(super) match_run_id: Option<&'a str>,
     pub(super) match_player_count: usize,
-    pub(super) match_tick_limit: Option<u32>,
     pub(super) ai_player_count: usize,
     pub(super) players: &'a mut HashMap<u32, RoomPlayer>,
     pub(super) order: &'a [u32],
@@ -89,6 +88,7 @@ impl LiveTickDriver<'_> {
         let alive = self.outcome_alive_players(&game);
         let alive_teams = alive_team_ids_for(&game, &alive);
         if self.match_player_count >= 2 && alive_teams.len() <= 1 {
+            self.send_observation_ready();
             if let Some(perf) = perf.as_mut() {
                 perf.record_phase("outcome_checks", outcome_start.elapsed());
             }
@@ -106,7 +106,11 @@ impl LiveTickDriver<'_> {
         // A watched AI-only matchup needs a stable conclusion even when neither strategy can
         // finish its opponent. A decisive base kill on this tick still wins; otherwise the
         // horizon resolves the run as a normal draw and finalizes its replay.
-        if match_tick_limit_reached(game.tick_count(), self.match_tick_limit) {
+        if match_tick_limit_reached(
+            game.tick_count(),
+            ai_observation_tick_limit(self.match_player_count, self.ai_player_count),
+        ) {
+            self.send_observation_ready();
             if let Some(perf) = perf.as_mut() {
                 perf.record_phase("outcome_checks", outcome_start.elapsed());
             }
@@ -183,6 +187,28 @@ impl LiveTickDriver<'_> {
             game.primary_base_alive_players()
         } else {
             game.alive_players()
+        }
+    }
+
+    fn send_observation_ready(&self) {
+        if !ai_only_match(self.match_player_count, self.ai_player_count) {
+            return;
+        }
+        let Some(match_run_id) = self.match_run_id else {
+            return;
+        };
+        for id in self.order {
+            let Some(player) = self.players.get(id) else {
+                continue;
+            };
+            send_or_log(
+                self.room,
+                *id,
+                &player.msg_tx,
+                ServerMessage::ObservationReady {
+                    match_run_id: match_run_id.to_string(),
+                },
+            );
         }
     }
 
@@ -423,6 +449,13 @@ fn ai_only_match(match_player_count: usize, ai_player_count: usize) -> bool {
     match_player_count >= 2 && match_player_count == ai_player_count
 }
 
+pub(super) fn ai_observation_tick_limit(
+    match_player_count: usize,
+    ai_player_count: usize,
+) -> Option<u32> {
+    ai_only_match(match_player_count, ai_player_count).then_some(25_000)
+}
+
 fn match_tick_limit_reached(tick: u32, tick_limit: Option<u32>) -> bool {
     tick_limit.is_some_and(|limit| tick >= limit)
 }
@@ -452,7 +485,7 @@ fn first_alive_player_on_team(game: &Game, alive: &[u32], team_id: u32) -> Optio
 
 #[cfg(test)]
 mod tests {
-    use super::match_tick_limit_reached;
+    use super::{ai_observation_tick_limit, match_tick_limit_reached};
 
     #[test]
     fn match_tick_limit_resolves_on_its_exact_tick_only() {
@@ -460,5 +493,12 @@ mod tests {
         assert!(match_tick_limit_reached(25_000, Some(25_000)));
         assert!(match_tick_limit_reached(25_001, Some(25_000)));
         assert!(!match_tick_limit_reached(25_000, None));
+    }
+
+    #[test]
+    fn only_all_ai_matchups_get_the_observation_horizon() {
+        assert_eq!(ai_observation_tick_limit(2, 2), Some(25_000));
+        assert_eq!(ai_observation_tick_limit(2, 1), None);
+        assert_eq!(ai_observation_tick_limit(1, 1), None);
     }
 }

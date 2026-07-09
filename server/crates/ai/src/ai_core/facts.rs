@@ -430,7 +430,6 @@ mod tests {
             prediction_build_id: None,
             prediction_version: 0,
             match_run_id: None,
-            observation_tick_limit: None,
             capabilities: Default::default(),
             diagnostics: Default::default(),
             replay: None,

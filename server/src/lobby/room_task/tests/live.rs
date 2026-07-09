@@ -411,7 +411,6 @@ fn normal_live_start_payloads_stamp_active_players_and_spectators() {
     assert!(!player_payload.capabilities.room_time.available);
     assert!(!player_payload.capabilities.visibility.vision_selection);
     assert!(!player_payload.capabilities.actions.branch_from_tick);
-    assert!(player_payload.observation_tick_limit.is_none());
     assert!(player_payload.replay.is_none());
     assert!(player_payload.lab.is_none());
     assert!(player_payload.diagnostics.is_empty());
@@ -474,10 +473,6 @@ fn ai_only_live_start_payload_advertises_speed_controls_without_seek() {
     assert!(!payload.capabilities.room_time.seek_relative);
     assert!(!payload.capabilities.room_time.seek_absolute);
     assert!(!payload.capabilities.room_time.timeline);
-    assert_eq!(
-        payload.observation_tick_limit,
-        Some(super::super::lifecycle::AI_OBSERVATION_TICK_LIMIT)
-    );
     assert_eq!(
         payload.diagnostics.movement_paths,
         MovementPathDiagnosticScope::None

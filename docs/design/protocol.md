@@ -338,6 +338,7 @@ transport/browser/prediction/render behavior, not as gameplay authority.
 | `branchFromTickCreated` | `branchRoom: string`, `sourceTick: u32`, `seats: ReplayBranchSeat[]` — a separate practice branch room has been created from the source replay's current authoritative tick. |
 | `branchStaging` | `room: string`, `sourceTick: u32`, `hostId: u32`, `seats: BranchStagingSeat[]`, `occupants: BranchStagingOccupant[]`, `canStart: bool` — reliable current state for a replay branch staging room. Sent after joins, leaves, claims, and releases. |
 | `shutdownWarning` | `deadlineUnixMs: u64`, `secondsRemaining: u64` — deploy/termination drain has started; active matches may continue until the deadline, but new match starts are disabled. |
+| `observationReady` | `matchRunId: string` — a watched all-AI match has resolved; this id retrieves its saved replay and joins its structured server logs. |
 | `gameOver` | `winnerId: u32 | null`, `winnerTeamId: u32 | null`, `you: "won" | "lost" | "draw"`, `scores: PlayerScore[]` |
 | `pong`     | `ts: number` (echo of the ping ts) |
 | `commandReceipt` | `clientSeq: u32`, `serverTick: u32`, `accepted: bool`, `reason?: string` — reliable diagnostics-only room receipt. Does not reconcile prediction. |
@@ -415,7 +416,6 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
   predictionBuildId?: string,    // live active players only; server/client bundle id
   predictionVersion?: u32,       // live active players only; currently 1
   matchRunId?: string,           // live match correlation id for log joins
-  observationTickLimit?: u32,    // all-AI watched-match draw horizon; currently 25,000
   capabilities?: {               // explicit recipient-scoped shared room affordances
     roomTime?: {
       available?: bool,
@@ -496,9 +496,6 @@ Spectator start payloads keep the spectator connection's `playerId`, set `specta
 list only active match players in `players`. Late live spectator joins receive the same live start
 payload shape stamped from the current `Game::start_payload()` tick, with prediction metadata
 omitted and live spectator capabilities/diagnostics applied for that recipient.
-All-AI observation sessions additionally carry `observationTickLimit: 25000`; clients may use it
-only to label the run and must not attempt to control or extend the authoritative limit.
-
 Lab room start payloads set `lab` metadata and currently also set `spectator: true` with prediction
 metadata omitted. Labs use a hidden internal room id, a default two-team real `Game` template, and
 server-owned projection. `initialCamera`, when present, is a setup-authored world-pixel center

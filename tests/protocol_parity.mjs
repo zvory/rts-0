@@ -57,11 +57,13 @@ const rustProtocolPath = path.join(repoRoot, "server/crates/protocol/src/lib.rs"
 const rustProtocolLabReplayPath = path.join(repoRoot, "server/crates/protocol/src/lab_replay.rs");
 const rustProtocolLabScenarioPath = path.join(repoRoot, "server/crates/protocol/src/lab_scenario.rs");
 const rustProtocolObserverAnalysisPath = path.join(repoRoot, "server/crates/protocol/src/observer_analysis.rs");
+const rustProtocolServerMessagePath = path.join(repoRoot, "server/crates/protocol/src/server_message.rs");
 const rust = [
   fs.readFileSync(rustProtocolPath, "utf8"),
   fs.readFileSync(rustProtocolLabReplayPath, "utf8"),
   fs.readFileSync(rustProtocolLabScenarioPath, "utf8"),
   fs.readFileSync(rustProtocolObserverAnalysisPath, "utf8"),
+  fs.readFileSync(rustProtocolServerMessagePath, "utf8"),
 ].join("\n");
 const rustClientNetReport = fs.readFileSync(
   path.join(repoRoot, "server/crates/protocol/src/client_net_report.rs"),
@@ -344,12 +346,16 @@ assert(
 assert(
   // Temporary source-text allowlist: start payload field-shape assertions are contract DTO checks,
   // not part of this phase's structured protocol export.
-  rustContract.includes("prediction_build_id") &&
+    rustContract.includes("prediction_build_id") &&
     rustContract.includes("prediction_version") &&
-    rustContract.includes("match_run_id") &&
-    rustContract.includes("observation_tick_limit") &&
-    protocolDoc.includes("observationTickLimit"),
+    rustContract.includes("match_run_id"),
   "start payload must expose prediction compatibility metadata",
+);
+assert(
+  S.OBSERVATION_READY === "observationReady" &&
+    rust.includes("ObservationReady") &&
+    protocolDoc.includes("observationReady"),
+  "AI observation completion message must be mirrored in Rust and docs",
 );
 assert(
   rustContract.includes("LabStartMetadata") &&

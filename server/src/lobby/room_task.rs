@@ -74,9 +74,6 @@ pub(super) struct RoomTask {
     match_player_count: usize,
     /// Number of human (non-AI) players the in-progress match started with. `0` outside a match.
     match_human_count: usize,
-    /// Fixed simulation horizon for AI-only observation matches. Human-played games remain
-    /// open-ended; an all-AI match concludes as a draw at this tick when nobody has won first.
-    match_tick_limit: Option<u32>,
     /// Connected human players who already received a terminal score screen for the active match.
     outcome_sent: HashSet<u32>,
     /// In replay branch live matches, connected ids differ from original replay player ids.
@@ -148,7 +145,6 @@ impl RoomTask {
             phase: Phase::Lobby,
             match_player_count: 0,
             match_human_count: 0,
-            match_tick_limit: None,
             outcome_sent: HashSet::new(),
             branch_live_seat_by_connection: HashMap::new(),
             live_paused: false,

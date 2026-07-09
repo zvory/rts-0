@@ -161,10 +161,11 @@ by the automatic in-memory post-match replay. Unlike a human match, it has a fix
 horizon: a winning primary-base elimination on tick 25,000 wins; otherwise the match records a
 draw at that tick. This prevents an inconclusive strategy matchup from running indefinitely.
 
-At live start the server assigns `match_run_id`; the browser retains it through the automatic
-post-match replay and prints it as **Observation ID** in the score screen. Persisted rows store the
-same value in `matches.match_run_id`, and `GET /api/observations/{matchRunId}` returns that hidden
-AI-only row. The returned numeric match id launches the replay with
+At live start the server assigns `match_run_id`. Once the watched match resolves, it sends
+`observationReady` before the normal score/replay transition; the browser retains that id through
+automatic post-match replay and prints it as **Observation ID** in the score screen. Persisted rows
+store the same value in `matches.match_run_id`, and `GET /api/observations/{matchRunId}` returns
+that hidden AI-only row. The returned numeric match id launches the replay with
 `POST /api/matches/{id}/replay`; Fly/server logs can be filtered by the identical
 `match_run_id`. This is intentionally a narrow lookup rather than adding all AI-only rows to the
 player-facing Recent Matches table.
