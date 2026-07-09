@@ -1,4 +1,5 @@
 use super::geometry::{dist2, squared, tile_center};
+use super::resources::forward_steel_cluster_center;
 use super::*;
 
 pub(super) const RIFLE_RAID_DEEPEN_TILES: f32 = 7.0;
@@ -156,22 +157,13 @@ pub(super) fn enemy_main_steel_center(
     let tile_size = observation.map.tile_size as f32;
     let search_radius_px = (config::CC_RESOURCE_MAX_DIST_TILES + 0.5) * tile_size;
     let search_radius2 = squared(search_radius_px);
-    let mut sum_x = 0.0;
-    let mut sum_y = 0.0;
-    let mut count = 0usize;
-    for resource in observation
-        .resources
-        .iter()
-        .filter(|r| r.kind == EntityKind::Steel)
-    {
-        if dist2(resource.x, resource.y, enemy_base.x, enemy_base.y) > search_radius2 {
-            continue;
-        }
-        sum_x += resource.x;
-        sum_y += resource.y;
-        count += 1;
-    }
-    (count > 0).then(|| (sum_x / count as f32, sum_y / count as f32))
+    forward_steel_cluster_center(
+        observation.resources.iter().filter(|resource| {
+            dist2(resource.x, resource.y, enemy_base.x, enemy_base.y) <= search_radius2
+        }),
+        (enemy_base.x, enemy_base.y),
+        observation.map,
+    )
 }
 
 pub(super) fn rifle_raid_move_target(

@@ -17,7 +17,7 @@ use crate::ai_core::profiles::{
     AI_1_0_TECH, AI_1_1_TANK_MG, AI_1_2_WAVE_COHORTS, RIFLE_FLOOD_FAST,
     RIFLE_FLOOD_FULL_SATURATION, STEEL_EXPANSION_TANKS, TECH_TO_TANKS,
 };
-
+mod steel_line_tests;
 fn worker(id: u32, state: AiEntityState) -> AiEntitySummary {
     AiEntitySummary {
         id,
@@ -288,29 +288,29 @@ fn enemy_base_fact(observation: &AiObservation) -> EnemyBaseFact {
 
 fn base_site_resources(first_id: u32, site: (u32, u32), map_size: u32) -> Vec<AiResourceSummary> {
     let ts = config::TILE_SIZE as f32;
-    let hx = site.0 as f32 + 0.5;
-    let hy = site.1 as f32 + 0.5;
+    let (hx, hy) = (site.0 as f32 + 0.5, site.1 as f32 + 0.5);
     let map_center = map_size as f32 * 0.5;
     let base_angle = (map_center - hy).atan2(map_center - hx);
-
-    let block_cx = hx + config::STEEL_BLOCK_DIST_TILES * base_angle.cos();
-    let block_cy = hy + config::STEEL_BLOCK_DIST_TILES * base_angle.sin();
-    let perp_x = -base_angle.sin();
-    let perp_y = base_angle.cos();
-    let rows = config::STEEL_PATCHES_PER_BASE.div_ceil(6);
-    let row_center = (rows - 1) as f32 / 2.0;
+    let (perp_x, perp_y) = (-base_angle.sin(), base_angle.cos());
     let mut resources = Vec::new();
-    for i in 0..config::STEEL_PATCHES_PER_BASE {
-        let col = (i % 6) as f32;
-        let row = (i / 6) as f32;
-        let off_x = col - 2.5;
-        let off_y = row - row_center;
-        resources.push(resource(
-            first_id + i,
-            EntityKind::Steel,
-            (block_cx + off_x * perp_x + off_y * base_angle.cos()) * ts,
-            (block_cy + off_x * perp_y + off_y * base_angle.sin()) * ts,
-        ));
+    let mut steel_index = 0;
+    for (side, field_patches) in [
+        (1.0, config::STEEL_PATCHES_PER_BASE.div_ceil(2)),
+        (-1.0, config::STEEL_PATCHES_PER_BASE / 2),
+    ] {
+        let block_cx = hx + side * config::STEEL_BLOCK_DIST_TILES * base_angle.cos();
+        let block_cy = hy + side * config::STEEL_BLOCK_DIST_TILES * base_angle.sin();
+        let row_center = field_patches.div_ceil(6).saturating_sub(1) as f32 / 2.0;
+        for i in 0..field_patches {
+            let (off_x, off_y) = ((i % 6) as f32 - 2.5, (i / 6) as f32 - row_center);
+            resources.push(resource(
+                first_id + steel_index,
+                EntityKind::Steel,
+                (block_cx + off_x * perp_x + off_y * base_angle.cos()) * ts,
+                (block_cy + off_x * perp_y + off_y * base_angle.sin()) * ts,
+            ));
+            steel_index += 1;
+        }
     }
 
     let oil_angle = base_angle + std::f32::consts::FRAC_PI_2;
