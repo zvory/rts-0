@@ -24,14 +24,13 @@ export const DEFAULT_AI_PROFILE_ID =
 
 export function teamSlotsForLobby(players = [], maxPlayers = MAX_LOBBY_TEAMS) {
   const seatedPlayers = players.filter((player) => !player.isSpectator);
-  const activeSeatCap = boundedSeatCap(maxPlayers);
   const occupied = [];
   for (let teamId = 1; teamId <= MAX_LOBBY_TEAMS; teamId += 1) {
     if (seatedPlayers.some((player) => Number(player.teamId) === teamId)) {
       occupied.push({ id: teamId, isNew: false });
     }
   }
-  if (occupied.length < MAX_LOBBY_TEAMS && seatedPlayers.length < activeSeatCap) {
+  if (occupied.length < MAX_LOBBY_TEAMS) {
     const emptyId = Array.from({ length: MAX_LOBBY_TEAMS }, (_, idx) => idx + 1)
       .find((teamId) => !occupied.some((slot) => slot.id === teamId));
     if (emptyId != null) occupied.push({ id: emptyId, isNew: true });
@@ -517,12 +516,6 @@ function tag(kind, text) {
   el.className = `tag ${kind}`;
   el.textContent = text;
   return el;
-}
-
-function boundedSeatCap(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return MAX_LOBBY_TEAMS;
-  return Math.min(MAX_LOBBY_TEAMS, Math.max(1, Math.trunc(n)));
 }
 
 export function playableAiProfileId(id) {
