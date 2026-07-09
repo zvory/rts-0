@@ -9,6 +9,7 @@ mod dev_scenarios;
 
 const LIVE_PATHING_DEFAULT_BUDGET: usize = 32_768;
 const LIVE_PATHING_CACHE_CAPACITY: usize = 256;
+const STEEL_FIELD_COLUMNS: u32 = 6;
 
 impl Game {
     #[allow(dead_code)]
@@ -445,32 +446,40 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
     let dy = center - hy;
     let base_angle = dy.atan2(dx);
 
-    let block_dist = config::STEEL_BLOCK_DIST_TILES * ts;
-    let block_cx = hx + block_dist * base_angle.cos();
-    let block_cy = hy + block_dist * base_angle.sin();
     let perp_x = -base_angle.sin();
     let perp_y = base_angle.cos();
 
     let patches = config::STEEL_PATCHES_PER_BASE;
-    let cols = 6u32;
-    let rows = patches.div_ceil(cols);
-    let row_center = (rows - 1) as f32 / 2.0;
-    for i in 0..patches {
-        let col = (i % cols) as f32;
-        let row = (i / cols) as f32;
-        let off_x = (col - 2.5) * ts;
-        let off_y = (row - row_center) * ts;
-        let px = block_cx + off_x * perp_x + off_y * base_angle.cos();
-        let py = block_cy + off_x * perp_y + off_y * base_angle.sin();
-        let dist_tiles = ((px - hx).powi(2) + (py - hy).powi(2)).sqrt() / ts;
-        debug_assert!(
-            (config::CC_RESOURCE_MIN_DIST_TILES..=config::CC_RESOURCE_MAX_DIST_TILES)
-                .contains(&dist_tiles),
-            "steel patch {i} at {dist_tiles:.2} tiles from City Centre is out of [{:.1}, {:.1}] bounds",
-            config::CC_RESOURCE_MIN_DIST_TILES,
-            config::CC_RESOURCE_MAX_DIST_TILES
-        );
-        entities.spawn_node(EntityKind::Steel, px, py);
+    let field_counts = [patches.div_ceil(2), patches / 2];
+    let mut patch_index = 0;
+    for (side, field_patches) in [1.0, -1.0].into_iter().zip(field_counts) {
+        if field_patches == 0 {
+            continue;
+        }
+        let block_dist = side * config::STEEL_BLOCK_DIST_TILES * ts;
+        let block_cx = hx + block_dist * base_angle.cos();
+        let block_cy = hy + block_dist * base_angle.sin();
+        let rows = field_patches.div_ceil(STEEL_FIELD_COLUMNS);
+        let row_center = (rows - 1) as f32 / 2.0;
+        let col_center = (STEEL_FIELD_COLUMNS - 1) as f32 / 2.0;
+        for i in 0..field_patches {
+            let col = (i % STEEL_FIELD_COLUMNS) as f32;
+            let row = (i / STEEL_FIELD_COLUMNS) as f32;
+            let off_x = (col - col_center) * ts;
+            let off_y = (row - row_center) * ts;
+            let px = block_cx + off_x * perp_x + off_y * base_angle.cos();
+            let py = block_cy + off_x * perp_y + off_y * base_angle.sin();
+            let dist_tiles = ((px - hx).powi(2) + (py - hy).powi(2)).sqrt() / ts;
+            debug_assert!(
+                (config::CC_RESOURCE_MIN_DIST_TILES..=config::CC_RESOURCE_MAX_DIST_TILES)
+                    .contains(&dist_tiles),
+                "steel patch {patch_index} at {dist_tiles:.2} tiles from City Centre is out of [{:.1}, {:.1}] bounds",
+                config::CC_RESOURCE_MIN_DIST_TILES,
+                config::CC_RESOURCE_MAX_DIST_TILES
+            );
+            entities.spawn_node(EntityKind::Steel, px, py);
+            patch_index += 1;
+        }
     }
 
     let oil_angle = base_angle + std::f32::consts::FRAC_PI_2;

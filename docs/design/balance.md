@@ -327,7 +327,7 @@ folded into default targeting.
   Its body length, width, clearance, and selection radius match the Tank; its exposed carriage,
   long barrel, large wheels, and deployed spades carry the visual distinction instead of a larger
   footprint. Impacts deal
-  150 armor-piercing damage within 1 tile and non-armor-piercing falloff down to 10 damage at
+  75 armor-piercing damage within 1 tile and non-armor-piercing falloff down to 5 damage at
   3 tiles, including friendly fire.
 - `TANK_OIL_COST_PER_PX = 20 / (96 * TILE_SIZE)`: tank movement still uses the original
   96-tile calibration, so driving the wider 126-tile map costs proportionally more oil than
@@ -460,8 +460,9 @@ folded into default targeting.
   Its JSON uses row strings (`.` grass, `#` rock, `~` water), named `sites`, and authored
   player-count-specific spawn `layouts`.
 - Start: `STARTING_STEEL = 75`, `STARTING_OIL = 0`, `STARTING_WORKERS = 4`,
-  one City Centre at the player's start tile, 12 steel patches with 1,250 steel each + 3 oil
-  patches with 3,333 oil each nearby.
+  one City Centre at the player's start tile, 12 steel patches with 1,250 steel each split into
+  two six-wide fields four tiles out on opposite sides of the base + 3 oil patches with 3,333 oil
+  each nearby.
 - Supply: City Centre and Zamok each give `+10`; Depots give `+8`; hard cap `200`.
 - Attached steel mining: gatherers walk to a steel patch, latch onto it, and mine in place.
   Every `HARVEST_TICKS = 40` the base load (`STEEL_LOAD = 2`) is deposited directly into the
@@ -506,7 +507,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | panzerfaust     | 45  | 100 one-shot, 50% AP vs Tanks / full vs Scout Cars (default attack disabled) | 3 | 15 windup / 15 travel / 15 recovery | 1.6 | 8 | 60 | 15 | 1 | 400 (~13s); trained at Barracks after completed Training Centre |
 | mortar_team     | 75  | 40 outer / 100 inner AOE | 20 | 60 | 1.6 | 7 | 100 | 50 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
 | anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 72 | 1.6 | 6     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and Heavy Guns (`anti_tank_gun_unlock`) researched in R&D Complex |
-| artillery       | 150 | 150 AP inner / 150-10 outer AOE | 25-55 artillery fire | 90 | 1.3 | 4 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind) and Heavy Guns (`anti_tank_gun_unlock`) researched in R&D Complex; tank-sized footprint |
+| artillery       | 150 | 75 AP inner / 75-5 outer AOE | 25-55 artillery fire | 90 | 1.3 | 4 | 150 | 50 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind) and Heavy Guns (`anti_tank_gun_unlock`) researched in R&D Complex; tank-sized footprint |
 | scout_car       | 100 | 6   | 5     | 6  | 2.35  | 14    | 125 | 50  | 3   | 480 (~16s) |
 | scout_plane     | 40  | 0   | 0     | 0  | 2.0   | 12    | 50  | 50  | 0   | 600 (~20s); trained at City Centre after completed Gun Works or Vehicle Works; one active or in-production per player; non-combat recon with 4-tile orbit radius, 1 oil per 20 ticks upkeep, 8 oil reserve, no ground collision reservation, and 48x34 px client render/selection body |
 | tank            | 292 | 60 cannon; 4 coax | 5 moving / 14 fully stationary cannon; 6 coax | 72 cannon; 6 coax | 2.0   | 6     | 425 | 150 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex; coax is a secondary small-arms weapon that fires through the current turret arc |
