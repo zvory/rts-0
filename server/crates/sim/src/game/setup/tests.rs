@@ -259,6 +259,44 @@ fn spawned_resource_sites(map: &Map) -> EntityStore {
 }
 
 #[test]
+fn base_steel_patches_split_across_both_sides_of_city_centre() {
+    let players = [
+        (1, super::teams::normalize_team_id(1, 1)),
+        (2, super::teams::normalize_team_id(2, 2)),
+    ];
+    let map = Map::generate_for_players(&players, 9);
+    let start = map.starts[0];
+    let (hx, hy) = map.tile_center(start.0, start.1);
+    let center = map.world_size_px() * 0.5;
+    let dir_x = center - hx;
+    let dir_y = center - hy;
+    let len = (dir_x * dir_x + dir_y * dir_y).sqrt();
+    assert!(len > f32::EPSILON);
+    let dir_x = dir_x / len;
+    let dir_y = dir_y / len;
+
+    let mut entities = EntityStore::new();
+    spawn_base_resources(&mut entities, &map, start);
+
+    let mut toward_center = 0;
+    let mut away_from_center = 0;
+    for steel in entities
+        .iter()
+        .filter(|entity| entity.kind == EntityKind::Steel)
+    {
+        let projection = (steel.pos_x - hx) * dir_x + (steel.pos_y - hy) * dir_y;
+        if projection > config::TILE_SIZE as f32 {
+            toward_center += 1;
+        } else if projection < -(config::TILE_SIZE as f32) {
+            away_from_center += 1;
+        }
+    }
+
+    assert_eq!(toward_center, config::STEEL_PATCHES_PER_BASE.div_ceil(2));
+    assert_eq!(away_from_center, config::STEEL_PATCHES_PER_BASE / 2);
+}
+
+#[test]
 fn bundled_oil_patches_have_buildable_pump_jack_sites() {
     for available_map in Map::list_available() {
         for player_count in 1..=4 {
