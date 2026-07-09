@@ -54,12 +54,35 @@ struct FormationGoal {
     trench_id: Option<u32>,
 }
 
-struct FormationGoalContext<'a> {
-    map: &'a Map,
-    occ: &'a Occupancy<'a>,
-    known_trenches: &'a [KnownTrench],
-    occupied_trenches: &'a BTreeSet<u32>,
-    assigned: &'a [FormationAssignment],
+#[derive(Clone, Copy)]
+struct FormationInputContext<'state> {
+    map: &'state Map,
+    occ: &'state Occupancy<'state>,
+    known_trenches: &'state [KnownTrench],
+    occupied_trenches: &'state BTreeSet<u32>,
+}
+
+struct FormationGoalContext<'state, 'assigned> {
+    map: &'state Map,
+    occ: &'state Occupancy<'state>,
+    known_trenches: &'state [KnownTrench],
+    occupied_trenches: &'state BTreeSet<u32>,
+    assigned: &'assigned [FormationAssignment],
+}
+
+impl<'state> FormationInputContext<'state> {
+    fn with_assigned<'assigned>(
+        &self,
+        assigned: &'assigned [FormationAssignment],
+    ) -> FormationGoalContext<'state, 'assigned> {
+        FormationGoalContext {
+            map: self.map,
+            occ: self.occ,
+            known_trenches: self.known_trenches,
+            occupied_trenches: self.occupied_trenches,
+            assigned,
+        }
+    }
 }
 
 pub(super) fn known_trenches_from_views(views: Vec<TrenchView>) -> Vec<KnownTrench> {
@@ -121,16 +144,19 @@ pub(super) fn formation_goals_with_known_trenches_and_reachability<F>(
 where
     F: FnMut(&FormationUnit, (u32, u32)) -> bool,
 {
+    let inputs = FormationInputContext {
+        map,
+        occ,
+        known_trenches,
+        occupied_trenches,
+    };
     if units.len() <= 1 {
         let anchor = map.tile_of(goal.0, goal.1);
         return spread_goals_with_known_trenches(
-            map,
-            occ,
+            inputs,
             units,
             anchor,
             goal,
-            known_trenches,
-            occupied_trenches,
             &mut is_goal_reachable,
         );
     }
@@ -161,13 +187,7 @@ where
             (goal.1 + offset.1 * formation_scale).clamp(0.0, max),
         );
         let anchor = map.tile_of(desired.0, desired.1);
-        let context = FormationGoalContext {
-            map,
-            occ,
-            known_trenches,
-            occupied_trenches,
-            assigned: &assigned,
-        };
+        let context = inputs.with_assigned(&assigned);
         if let Some(formation_goal) =
             assign_formation_goal(&context, unit, anchor, desired, goal, &mut is_goal_reachable)
         {
@@ -186,13 +206,10 @@ where
 }
 
 fn spread_goals_with_known_trenches<F>(
-    map: &Map,
-    occ: &Occupancy,
+    inputs: FormationInputContext<'_>,
     units: &[FormationUnit],
     anchor: (u32, u32),
     desired: (f32, f32),
-    known_trenches: &[KnownTrench],
-    occupied_trenches: &BTreeSet<u32>,
     is_goal_reachable: &mut F,
 ) -> Vec<(f32, f32)>
 where
@@ -202,13 +219,7 @@ where
     let mut assigned: Vec<FormationAssignment> = Vec::new();
 
     for unit in units {
-        let context = FormationGoalContext {
-            map,
-            occ,
-            known_trenches,
-            occupied_trenches,
-            assigned: &assigned,
-        };
+        let context = inputs.with_assigned(&assigned);
         if let Some(formation_goal) =
             assign_formation_goal(&context, unit, anchor, desired, desired, is_goal_reachable)
         {
@@ -227,7 +238,7 @@ where
 }
 
 fn assign_formation_goal<F>(
-    context: &FormationGoalContext<'_>,
+    context: &FormationGoalContext<'_, '_>,
     unit: &FormationUnit,
     anchor: (u32, u32),
     desired: (f32, f32),
@@ -238,13 +249,9 @@ where
     F: FnMut(&FormationUnit, (u32, u32)) -> bool,
 {
     if let Some(goal) = find_preferred_trench_goal(
-        context.map,
-        context.occ,
+        context,
         unit,
         desired,
-        context.known_trenches,
-        context.occupied_trenches,
-        context.assigned,
         is_goal_reachable,
     ) {
         return Some(goal);
@@ -266,13 +273,9 @@ where
 }
 
 fn find_preferred_trench_goal<F>(
-    map: &Map,
-    occ: &Occupancy,
+    context: &FormationGoalContext<'_, '_>,
     unit: &FormationUnit,
     desired: (f32, f32),
-    known_trenches: &[KnownTrench],
-    occupied_trenches: &BTreeSet<u32>,
-    assigned: &[FormationAssignment],
     is_goal_reachable: &mut F,
 ) -> Option<FormationGoal>
 where
@@ -282,9 +285,10 @@ where
         return None;
     }
     let mut best: Option<(f32, u32, FormationGoal)> = None;
-    for trench in known_trenches.iter().copied() {
-        if occupied_trenches.contains(&trench.id)
-            || assigned
+    for trench in context.known_trenches.iter().copied() {
+        if context.occupied_trenches.contains(&trench.id)
+            || context
+                .assigned
                 .iter()
                 .any(|assignment| assignment.trench_id == Some(trench.id))
         {
@@ -300,10 +304,10 @@ where
         if dist_sq > max_dist * max_dist {
             continue;
         }
-        if !formation_goal_point_free(map, occ, unit, point, assigned) {
+        if !formation_goal_point_free(context.map, context.occ, unit, point, context.assigned) {
             continue;
         }
-        let tile = map.tile_of(point.0, point.1);
+        let tile = context.map.tile_of(point.0, point.1);
         if !is_goal_reachable(unit, tile) {
             continue;
         }
