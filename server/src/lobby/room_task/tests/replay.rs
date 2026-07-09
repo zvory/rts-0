@@ -245,10 +245,12 @@ fn replay_join_and_seek_emit_authoritative_analysis() {
     task.send_room_time_state_to(99);
     task.send_observer_analysis_to(99);
     let join_messages: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
-    assert!(join_messages.iter().any(|msg| matches!(
-        msg,
-        ServerMessage::ObserverAnalysis(analysis) if analysis.tick == 3 && analysis.players.len() == 2
-    )));
+    assert!(join_messages
+        .iter()
+        .any(|msg| matches!(msg, ServerMessage::Start(_))));
+    let join_analysis = take_observer_analysis(&writer, "replay join");
+    assert_eq!(join_analysis.tick, 3);
+    assert_eq!(join_analysis.players.len(), 2);
 
     task.on_seek_room_time_to(99, 1);
     let seek_messages: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
@@ -259,10 +261,9 @@ fn replay_join_and_seek_emit_authoritative_analysis() {
                 && payload.capabilities.room_time.seek_absolute
                 && payload.capabilities.visibility.vision_selection
     )));
-    assert!(seek_messages.iter().any(|msg| matches!(
-        msg,
-        ServerMessage::ObserverAnalysis(analysis) if analysis.tick == 1 && analysis.players.len() == 2
-    )));
+    let seek_analysis = take_observer_analysis(&writer, "replay seek");
+    assert_eq!(seek_analysis.tick, 1);
+    assert_eq!(seek_analysis.players.len(), 2);
 }
 
 #[test]
@@ -627,11 +628,9 @@ fn persisted_replay_room_host_start_begins_replay_viewer() {
         writer.reliable_rx.try_recv().unwrap(),
         ServerMessage::RoomTimeState(_)
     ));
-    assert!(matches!(
-        writer.reliable_rx.try_recv().unwrap(),
-        ServerMessage::ObserverAnalysis(analysis)
-            if analysis.tick == 0 && analysis.players.len() == players.len()
-    ));
+    let start_analysis = take_observer_analysis(&writer, "confirmed replay start");
+    assert_eq!(start_analysis.tick, 0);
+    assert_eq!(start_analysis.players.len(), players.len());
 
     task.on_tick_replay_viewer(TokioInstant::now());
     let snapshot = writer.snapshots.take().expect("replay viewer snapshot");
@@ -642,12 +641,9 @@ fn persisted_replay_room_host_start_begins_replay_viewer() {
     let expected = session.game.snapshot_for_spectator(&visible_players);
     assert_eq!(snapshot.tick, expected.tick);
     assert_eq!(snapshot.visible_tiles, expected.visible_tiles);
-    let tick_messages: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
-    assert!(tick_messages.iter().any(|msg| matches!(
-        msg,
-        ServerMessage::ObserverAnalysis(analysis)
-            if analysis.tick == expected.tick && analysis.players.len() == players.len()
-    )));
+    let tick_analysis = take_observer_analysis(&writer, "confirmed replay tick");
+    assert_eq!(tick_analysis.tick, expected.tick);
+    assert_eq!(tick_analysis.players.len(), players.len());
 }
 
 #[test]

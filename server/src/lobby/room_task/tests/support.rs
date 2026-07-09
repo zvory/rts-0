@@ -2,7 +2,7 @@ pub(super) use super::super::super::lab_timeline::LabTimelineEntryKind;
 pub(super) use super::super::super::replay_branch::BranchStagingState;
 pub(super) use super::super::*;
 use crate::lobby::{CommandLifecycleFamily, CommandLifecycleTiming};
-pub(super) use crate::protocol::{NoticeSeverity, DEFAULT_FACTION_ID};
+pub(super) use crate::protocol::{NoticeSeverity, ObserverAnalysisPayload, DEFAULT_FACTION_ID};
 pub(super) use rts_rules::faction::{EKAT_FACTION_ID, EMPTY_FIXTURE_FACTION_ID};
 pub(super) use rts_sim::game::command::SimCommand;
 pub(super) use rts_sim::game::map::Map;
@@ -231,6 +231,15 @@ pub(super) fn room_time_states(writer: &mut ConnectionWriter) -> Vec<RoomTimeSta
             _ => None,
         })
         .collect()
+}
+
+pub(super) fn take_observer_analysis(
+    writer: &ConnectionWriter,
+    context: &str,
+) -> ObserverAnalysisPayload {
+    writer.observer_analysis.take().unwrap_or_else(|| {
+        panic!("expected observer analysis for {context}");
+    })
 }
 
 pub(super) fn branch_staging_messages(writer: &mut ConnectionWriter) -> Vec<ServerMessage> {

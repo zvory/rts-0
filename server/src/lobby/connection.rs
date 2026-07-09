@@ -1,17 +1,18 @@
 #![cfg_attr(test, allow(dead_code))]
 
 use super::*;
-use crate::protocol::SnapshotPayloadDiagnostics;
+use crate::protocol::{ObserverAnalysisPayload, SnapshotPayloadDiagnostics};
 use std::collections::{BTreeMap, VecDeque};
 use std::time::Instant as StdInstant;
 
 /// Outbound connection handle shared with the room task. Reliable messages keep FIFO ordering;
-/// snapshots share a single latest-only slot because older unsent snapshots are superseded by
-/// newer full-state snapshots.
+/// snapshots and observer analysis use separate latest-only slots because older unsent live-state
+/// messages are superseded by newer full-state messages.
 #[derive(Clone)]
 pub struct ConnectionSink {
     reliable_tx: mpsc::Sender<ServerMessage>,
     snapshots: Arc<LatestSnapshotSlot>,
+    observer_analysis: Arc<LatestObserverAnalysisSlot>,
     stats: Arc<ConnectionReportCounters>,
 }
 
@@ -24,6 +25,7 @@ impl std::fmt::Debug for ConnectionSink {
 pub struct ConnectionWriter {
     pub reliable_rx: mpsc::Receiver<ServerMessage>,
     pub snapshots: Arc<LatestSnapshotSlot>,
+    pub observer_analysis: Arc<LatestObserverAnalysisSlot>,
     stats: Arc<ConnectionReportCounters>,
 }
 
@@ -35,6 +37,11 @@ pub struct LatestSnapshotSlot {
 pub(crate) struct PendingSnapshot {
     snapshot: Snapshot,
     enqueued_at: StdInstant,
+}
+
+pub struct LatestObserverAnalysisSlot {
+    pending: StdMutex<Option<ObserverAnalysisPayload>>,
+    notify: Notify,
 }
 
 pub struct ConnectionSnapshotSend {
@@ -291,17 +298,26 @@ pub(crate) enum SnapshotSendStatus {
     Closed,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LatestOnlySendStatus {
+    Stored,
+    Replaced,
+    Closed,
+}
+
 impl ConnectionWriter {
     pub fn into_parts(
         self,
     ) -> (
         mpsc::Receiver<ServerMessage>,
         Arc<LatestSnapshotSlot>,
+        Arc<LatestObserverAnalysisSlot>,
         ConnectionWriterStats,
     ) {
         (
             self.reliable_rx,
             self.snapshots,
+            self.observer_analysis,
             ConnectionWriterStats::new(self.stats),
         )
     }
@@ -315,15 +331,21 @@ impl ConnectionSink {
             pending: StdMutex::new(None),
             notify: Notify::new(),
         });
+        let observer_analysis = Arc::new(LatestObserverAnalysisSlot {
+            pending: StdMutex::new(None),
+            notify: Notify::new(),
+        });
         (
             ConnectionSink {
                 reliable_tx,
                 snapshots: snapshots.clone(),
+                observer_analysis: observer_analysis.clone(),
                 stats: stats.clone(),
             },
             ConnectionWriter {
                 reliable_rx,
                 snapshots,
+                observer_analysis,
                 stats,
             },
         )
@@ -393,12 +415,28 @@ impl ConnectionSink {
         }
     }
 
+    pub(crate) fn try_send_observer_analysis(
+        &self,
+        payload: ObserverAnalysisPayload,
+    ) -> LatestOnlySendStatus {
+        if self.reliable_tx.is_closed() {
+            return LatestOnlySendStatus::Closed;
+        }
+        let replaced = self.observer_analysis.store(payload);
+        if replaced {
+            LatestOnlySendStatus::Replaced
+        } else {
+            LatestOnlySendStatus::Stored
+        }
+    }
+
     pub(crate) fn has_pending_snapshot(&self) -> bool {
         self.snapshots.has_pending()
     }
 
     pub(crate) fn clear_pending_snapshot(&self) {
         self.snapshots.clear();
+        self.observer_analysis.clear();
     }
 
     pub fn consume_report_stats(&self) -> ConnectionReportStats {
@@ -472,6 +510,36 @@ impl LatestSnapshotSlot {
 
     fn clear(&self) {
         self.lock_pending().take();
+    }
+
+    pub async fn notified(&self) {
+        self.notify.notified().await;
+    }
+}
+
+impl LatestObserverAnalysisSlot {
+    fn lock_pending(&self) -> std::sync::MutexGuard<'_, Option<ObserverAnalysisPayload>> {
+        match self.pending.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        }
+    }
+
+    pub fn take(&self) -> Option<ObserverAnalysisPayload> {
+        self.lock_pending().take()
+    }
+
+    fn clear(&self) {
+        self.lock_pending().take();
+    }
+
+    fn store(&self, payload: ObserverAnalysisPayload) -> bool {
+        let mut pending = self.lock_pending();
+        let replaced = pending.is_some();
+        *pending = Some(payload);
+        drop(pending);
+        self.notify.notify_one();
+        replaced
     }
 
     pub async fn notified(&self) {
@@ -986,12 +1054,95 @@ impl CommandTimingWindow {
     }
 }
 
+fn fetch_max(target: &AtomicU32, value: u32) {
+    let mut current = target.load(Ordering::Relaxed);
+    while value > current {
+        match target.compare_exchange_weak(current, value, Ordering::Relaxed, Ordering::Relaxed) {
+            Ok(_) => break,
+            Err(next) => current = next,
+        }
+    }
+}
+
+fn duration_since_ms_u32(start: StdInstant) -> u32 {
+    start.elapsed().as_millis().min(u32::MAX as u128) as u32
+}
+
+fn merge_resource_deltas(snapshot: &mut Snapshot, previous: &[ResourceDelta]) {
+    if previous.is_empty() {
+        return;
+    }
+    for old in previous {
+        if !snapshot.resource_deltas.iter().any(|d| d.id == old.id) {
+            snapshot.resource_deltas.push(old.clone());
+        }
+    }
+    snapshot.resource_deltas.sort_by_key(|d| d.id);
+}
+
+/// Send to one player's sink without ever blocking the room task. Reliable messages use a bounded
+/// FIFO; snapshots and observer analysis use replaceable latest-only slots.
+pub(super) fn send_or_log(
+    room: &str,
+    player_id: u32,
+    tx: &ConnectionSink,
+    msg: ServerMessage,
+) -> Option<SnapshotSendStatus> {
+    match msg {
+        ServerMessage::Snapshot(snapshot) => match tx.try_send_snapshot(snapshot) {
+            SnapshotSendStatus::Stored => Some(SnapshotSendStatus::Stored),
+            SnapshotSendStatus::Replaced => {
+                crate::log_debug!(room = %room, player_id, "coalesced pending snapshot");
+                Some(SnapshotSendStatus::Replaced)
+            }
+            SnapshotSendStatus::Closed => {
+                crate::log_debug!(room = %room, player_id, "snapshot sink closed; client gone");
+                Some(SnapshotSendStatus::Closed)
+            }
+        },
+        ServerMessage::ObserverAnalysis(payload) => {
+            match tx.try_send_observer_analysis(payload) {
+                LatestOnlySendStatus::Stored => {}
+                LatestOnlySendStatus::Replaced => {
+                    crate::log_debug!(room = %room, player_id, "coalesced pending observer analysis");
+                }
+                LatestOnlySendStatus::Closed => {
+                    crate::log_debug!(room = %room, player_id, "observer analysis sink closed; client gone");
+                }
+            }
+            None
+        }
+        reliable => {
+            if let Err(err) = tx.try_send_reliable(reliable) {
+                match err {
+                    mpsc::error::TrySendError::Full(_) => {
+                        crate::log_warn!(room = %room, player_id, "reliable outbound queue full; dropping message");
+                    }
+                    mpsc::error::TrySendError::Closed(_) => {
+                        crate::log_debug!(room = %room, player_id, "reliable outbound channel closed; client gone");
+                    }
+                }
+            }
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::protocol::{
-        SnapshotPayloadEntityKindDiagnostics, SnapshotPayloadSectionDiagnostics,
+        ObserverAnalysisPayload, SnapshotPayloadEntityKindDiagnostics,
+        SnapshotPayloadSectionDiagnostics,
     };
+
+    fn observer_analysis_payload(tick: u32) -> ObserverAnalysisPayload {
+        ObserverAnalysisPayload {
+            tick,
+            players: Vec::new(),
+            map_analysis: None,
+        }
+    }
 
     #[test]
     fn command_lifecycle_p95_uses_max_for_overflow_bucket() {
@@ -1073,66 +1224,80 @@ mod tests {
         assert!(reset.snapshot_lifecycle.sections.is_empty());
         assert!(reset.snapshot_lifecycle.entity_kinds.is_empty());
     }
-}
 
-fn fetch_max(target: &AtomicU32, value: u32) {
-    let mut current = target.load(Ordering::Relaxed);
-    while value > current {
-        match target.compare_exchange_weak(current, value, Ordering::Relaxed, Ordering::Relaxed) {
-            Ok(_) => break,
-            Err(next) => current = next,
-        }
+    #[test]
+    fn observer_analysis_uses_latest_only_slot() {
+        let (sink, writer) = ConnectionSink::new();
+
+        assert_eq!(
+            sink.try_send_observer_analysis(observer_analysis_payload(10)),
+            LatestOnlySendStatus::Stored
+        );
+        assert_eq!(
+            sink.try_send_observer_analysis(observer_analysis_payload(11)),
+            LatestOnlySendStatus::Replaced
+        );
+
+        let latest = writer.observer_analysis.take().expect("observer analysis");
+        assert_eq!(latest.tick, 11);
+        assert!(writer.observer_analysis.take().is_none());
     }
-}
 
-fn duration_since_ms_u32(start: StdInstant) -> u32 {
-    start.elapsed().as_millis().min(u32::MAX as u128) as u32
-}
+    #[test]
+    fn send_or_log_routes_observer_analysis_outside_reliable_fifo() {
+        let (sink, mut writer) = ConnectionSink::new();
 
-fn merge_resource_deltas(snapshot: &mut Snapshot, previous: &[ResourceDelta]) {
-    if previous.is_empty() {
-        return;
+        send_or_log(
+            "test-room",
+            7,
+            &sink,
+            ServerMessage::ObserverAnalysis(observer_analysis_payload(20)),
+        );
+        send_or_log(
+            "test-room",
+            7,
+            &sink,
+            ServerMessage::ObserverAnalysis(observer_analysis_payload(21)),
+        );
+
+        assert!(writer.reliable_rx.try_recv().is_err());
+        let latest = writer.observer_analysis.take().expect("observer analysis");
+        assert_eq!(latest.tick, 21);
     }
-    for old in previous {
-        if !snapshot.resource_deltas.iter().any(|d| d.id == old.id) {
-            snapshot.resource_deltas.push(old.clone());
-        }
-    }
-    snapshot.resource_deltas.sort_by_key(|d| d.id);
-}
 
-/// Send to one player's sink without ever blocking the room task. Reliable messages use a bounded
-/// FIFO and snapshots use a replaceable latest-only slot.
-pub(super) fn send_or_log(
-    room: &str,
-    player_id: u32,
-    tx: &ConnectionSink,
-    msg: ServerMessage,
-) -> Option<SnapshotSendStatus> {
-    match msg {
-        ServerMessage::Snapshot(snapshot) => match tx.try_send_snapshot(snapshot) {
-            SnapshotSendStatus::Stored => Some(SnapshotSendStatus::Stored),
-            SnapshotSendStatus::Replaced => {
-                crate::log_debug!(room = %room, player_id, "coalesced pending snapshot");
-                Some(SnapshotSendStatus::Replaced)
-            }
-            SnapshotSendStatus::Closed => {
-                crate::log_debug!(room = %room, player_id, "snapshot sink closed; client gone");
-                Some(SnapshotSendStatus::Closed)
-            }
-        },
-        reliable => {
-            if let Err(err) = tx.try_send_reliable(reliable) {
-                match err {
-                    mpsc::error::TrySendError::Full(_) => {
-                        crate::log_warn!(room = %room, player_id, "reliable outbound queue full; dropping message");
-                    }
-                    mpsc::error::TrySendError::Closed(_) => {
-                        crate::log_debug!(room = %room, player_id, "reliable outbound channel closed; client gone");
-                    }
-                }
-            }
-            None
-        }
+    #[test]
+    fn clearing_pending_snapshot_also_clears_observer_analysis() {
+        let (sink, writer) = ConnectionSink::new();
+
+        assert_eq!(
+            sink.try_send_snapshot(Snapshot {
+                tick: 1,
+                steel: 0,
+                oil: 0,
+                supply_used: 0,
+                supply_cap: 0,
+                entities: Vec::new(),
+                resource_deltas: Vec::new(),
+                smokes: Vec::new(),
+                trenches: Vec::new(),
+                ability_objects: Vec::new(),
+                visible_tiles: Vec::new(),
+                remembered_buildings: Vec::new(),
+                events: Vec::new(),
+                upgrades: Vec::new(),
+                player_resources: Vec::new(),
+                net_status: crate::protocol::SnapshotNetStatus::default(),
+            }),
+            SnapshotSendStatus::Stored
+        );
+        assert_eq!(
+            sink.try_send_observer_analysis(observer_analysis_payload(30)),
+            LatestOnlySendStatus::Stored
+        );
+
+        sink.clear_pending_snapshot();
+
+        assert!(writer.snapshots.take().is_none());
+        assert!(writer.observer_analysis.take().is_none());
     }
 }

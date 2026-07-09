@@ -225,7 +225,7 @@ fn lab_seek_rebuilds_world_and_resends_authoritative_reset_state() {
                 ServerMessage::RoomTimeState(state)
                     if state.current_tick == 0
                         && state.duration_ticks == 1
-                        && state.keyframe_ticks.as_slice() == &[0]
+                        && state.keyframe_ticks.as_slice() == [0]
                         && state.controller_id == Some(100)
             )
         }));
@@ -390,7 +390,7 @@ fn lab_replay_export_reopens_process_cold_from_serialized_artifact() {
             player_id: LAB_PLAYER_ONE_ID,
             cmd: Command::Move { units, .. },
             ignore_command_limits: false,
-        } if units.as_slice() == &[worker]
+        } if units.as_slice() == [worker]
     ));
 
     let json = serde_json::to_string(&artifact).expect("artifact JSON");
@@ -539,7 +539,7 @@ fn lab_timeline_truncates_future_after_past_seek_and_new_operation() {
             ServerMessage::RoomTimeState(state)
                 if state.current_tick == 0
                     && state.duration_ticks == 0
-                    && state.keyframe_ticks.as_slice() == &[0]
+                    && state.keyframe_ticks.as_slice() == [0]
         )
     }));
 }
@@ -851,7 +851,7 @@ fn lab_timeline_resets_on_scenario_import() {
             ServerMessage::RoomTimeState(state)
                 if state.current_tick == 0
                     && state.duration_ticks == 0
-                    && state.keyframe_ticks.as_slice() == &[0]
+                    && state.keyframe_ticks.as_slice() == [0]
         )
     }));
     let timeline = task.lab_timeline.as_ref().expect("lab timeline");
