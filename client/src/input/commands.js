@@ -8,6 +8,7 @@ import {
   isResource,
   KIND,
   ORDER_STAGE,
+  UPGRADE,
 } from "../protocol.js";
 import { ABILITIES, MINING_CC_RANGE_TILES, STATS, TANK_BODY, isProducerBuilding } from "../config.js";
 import { DEFAULT_HIT_RADIUS, DEFAULT_TILE_SIZE, HIT_PAD_PX, OWN_HIT_BONUS, ZOOM_STEP } from "./constants.js";
@@ -87,6 +88,7 @@ export function _issueTargetedCommand(p, ev = {}) {
         ? cmd.blanketFire(units, world.x, world.y, queued)
         : cmd.useAbility(ability, units, world.x, world.y, queued);
     const selectedCarriers = this.state.selectedEntities().filter((e) => units.includes(e.id));
+    const radiusTiles = abilityTargetRadiusTiles(definition, ability, this.state);
     const artilleryLocks = isArtilleryFireAbility(ability)
       ? buildArtilleryTargetLocks({
         ability,
@@ -102,14 +104,14 @@ export function _issueTargetedCommand(p, ev = {}) {
     this._issueCommand(command);
     if (isArtilleryFireAbility(ability)) {
       for (const lock of artilleryLocks) {
-        this._addCommandFeedback("artillery", lock.x, lock.y, queued, definition?.radiusTiles);
+        this._addCommandFeedback("artillery", lock.x, lock.y, queued, radiusTiles);
       }
       return;
     }
     const feedbackKind = ability === ABILITY.MORTAR_FIRE
       ? "mortar"
       : "attack";
-    this._addCommandFeedback(feedbackKind, world.x, world.y, queued, definition?.radiusTiles);
+    this._addCommandFeedback(feedbackKind, world.x, world.y, queued, radiusTiles);
     return;
   }
   if (commandTarget === "move") {
@@ -517,6 +519,7 @@ export function _refreshAbilityTargetPreview() {
     radiusPx: Math.max(5, (STATS[carrier.kind]?.size || 8) * 0.45),
   }));
   const primaryLock = artilleryLocks[0] || null;
+  const radiusTiles = abilityTargetRadiusTiles(definition, target.ability, this.state);
   intent?.updateAbilityTargetPreview?.({
     ability: target.ability,
     mouseX: primaryLock?.x ?? world.x,
@@ -532,7 +535,7 @@ export function _refreshAbilityTargetPreview() {
     returnMarkers,
     rangePx,
     minRangePx,
-    radiusPx: (definition.radiusTiles || 0) * tileSize,
+    radiusPx: radiusTiles * tileSize,
     hoverInRange,
     hoverInsideMinRange,
   });
@@ -691,6 +694,22 @@ function fallbackEnemyOwner(commandOwner, owner) {
     Number.isInteger(ownerId) &&
     ownerId > 0 &&
     ownerId !== commandOwnerId;
+}
+
+function abilityTargetRadiusTiles(definition, ability, state) {
+  const baseRadius = definition?.radiusTiles || 0;
+  if (ability === ABILITY.SMOKE && commandUpgrades(state).includes(UPGRADE.SMOKE_PLUS)) {
+    return baseRadius * 2;
+  }
+  return baseRadius;
+}
+
+function commandUpgrades(state) {
+  if (typeof state?.controlPolicy?.commandUpgrades === "function") {
+    const upgrades = state.controlPolicy.commandUpgrades(state);
+    return Array.isArray(upgrades) ? upgrades : [];
+  }
+  return Array.isArray(state?.upgrades) ? state.upgrades : [];
 }
 
 export function _activateCommandHotkey(ev) {

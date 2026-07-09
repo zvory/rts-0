@@ -14,6 +14,7 @@ import {
   COLORS,
   BASE_COMMAND_SUPPLY_CAP,
   RESOURCE_AMOUNTS,
+  SMOKE_CLOUD_RADIUS_TILES,
   STATS,
 } from "../../client/src/config.js";
 import { commandWithinBudget } from "../../client/src/command_budget.js";
@@ -36,6 +37,7 @@ import {
   SETUP,
   STATE,
   TERRAIN,
+  UPGRADE,
   cmd,
 } from "../../client/src/protocol.js";
 import {
@@ -1917,6 +1919,32 @@ function buttonByLabel(card, label) {
     "Tank Trap placement confirmation preserves spacing when preview sites contain a gap",
   );
   assert(trapPlacementEnded === 0, "Shift Tank Trap placement preserves placement mode without changing overflow queueing");
+
+  const smokeInput = Object.create(Input.prototype);
+  smokeInput.mouse = { x: 164, y: 100 };
+  smokeInput.state = {
+    playerId: 1,
+    map: { tileSize: 32 },
+    upgrades: [],
+    controlPolicy: {
+      kind: "lab",
+      isCommandOwner(owner) {
+        return Number(owner) === 2;
+      },
+      commandUpgrades() {
+        return [UPGRADE.SMOKE_PLUS];
+      },
+    },
+    selectedEntities: () => [{ id: 77, owner: 2, kind: KIND.SCOUT_CAR, x: 100, y: 100 }],
+  };
+  smokeInput.clientIntent = new ClientIntent();
+  smokeInput.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.SMOKE });
+  smokeInput._worldAt = (x, y) => ({ x, y });
+  smokeInput._refreshAbilityTargetPreview();
+  assert(
+    smokeInput.clientIntent.abilityTargetPreview?.radiusPx === SMOKE_CLOUD_RADIUS_TILES * 2 * 32,
+    "Smoke Plus targeting preview uses the command owner's upgraded cloud radius",
+  );
 
   const ekatEntity = { id: 88, owner: 1, kind: KIND.EKAT, x: 200, y: 220 };
   const ekatInput = Object.create(Input.prototype);
