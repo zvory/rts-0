@@ -95,6 +95,11 @@ function nearPoint(call, point, epsilon = 0.001) {
       },
     });
     assert(context._missToastPool.size === 0, "expired miss toast labels are destroyed");
+    assert(
+      context.layers.feedback.children.length === 0,
+      "expired miss toast labels are detached from the feedback layer",
+    );
+    assert(label.destroyed === true, "expired miss toast label display objects are destroyed");
   } finally {
     performance.now = priorNow;
     restorePixi();

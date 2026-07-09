@@ -55,6 +55,7 @@ export function _drawMissToasts(state) {
 
   for (const [key, label] of this._missToastPool) {
     if (live.has(key)) continue;
+    label.parent?.removeChild?.(label);
     label.destroy();
     this._missToastPool.delete(key);
   }
