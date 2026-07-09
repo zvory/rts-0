@@ -215,6 +215,10 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
     AI_PROFILES.some((profile) => profile.id === "ai_2_0" && profile.label === "AI 2.0"),
     "lobby exposes AI 2.0 as a selectable suite",
   );
+  assert(
+    AI_PROFILES.some((profile) => profile.id === "ai_2_1" && profile.label === "AI 2.1"),
+    "lobby exposes AI 2.1 as a selectable suite",
+  );
   assert(msg.addAi(2).teamId === 2, "addAi builder can include teamId");
   assert(
     msg.addAi(2, DEFAULT_AI_PROFILE_ID).aiProfileId === DEFAULT_AI_PROFILE_ID,
@@ -223,6 +227,10 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   assert(
     msg.addAi(2, "ai_2_0").aiProfileId === "ai_2_0",
     "addAi builder can request AI 2.0 explicitly",
+  );
+  assert(
+    msg.addAi(2, "ai_2_1").aiProfileId === "ai_2_1",
+    "addAi builder can request AI 2.1 explicitly",
   );
   assert(msg.requestBranchFromTick().t === "requestBranchFromTick", "replay branch builder tag");
   assert(msg.claimBranchSeat(7).t === "claimBranchSeat", "branch seat claim builder tag");

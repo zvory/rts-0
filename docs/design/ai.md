@@ -37,7 +37,7 @@ instead of reaching into entity stores from the server layer.
 decisions to `rts_ai::ai_core::decision::decide_profile_with_analysis`, which requires the
 AI-owned static map analysis for production callers. Live lobby AIs use the promoted
 AI 1.2 suite by default and keep the resolved concrete profile for the whole match. Hosts can
-select the `ai_1_0`, `ai_1_1`, `ai_1_2`, `ai_2_0`, or `ai_turtle` profile suites per AI seat
+select the `ai_1_0`, `ai_1_1`, `ai_1_2`, `ai_2_0`, `ai_2_1`, or `ai_turtle` profile suites per AI seat
 from the lobby before countdown/start; exact concrete profile ids remain accepted for developer
 compatibility.
 Unsupported profile or suite ids are ignored or defaulted to the promoted live default request.
@@ -177,6 +177,18 @@ economy can support it. Exact concrete profile ids remain registered for arena p
 debugging, and profile-manifest fingerprints. The retired `ai_2_0_agent_rush` and
 `ai_2_0_rifle_tank` profile ids remain rejected.
 
+AI 2.1 is exposed as the `ai_2_1` suite and is currently pinned to
+`ai_2_1_economy_manager`. It intentionally keeps AI 2.0's worker, supply, expansion, oil,
+production, defensive Machine Gunner, frontal-wave, and tech-transition policy values, but routes
+economy decisions through the proposal-based economy manager. The manager consumes the ordinary
+fog-filtered observation, `AiFacts`, active profile policy, expansion plan, and owner-provided
+signals such as defensive-panic oil demand or temporary oil holds. It returns economic proposals
+for supply, expansion, worker training, oil assignment/Pump Jacks, and steel assignment; the owner
+decision loop still executes or rejects those proposals through `AiActionContext`, shared budgets,
+worker/resource reservations, placement validation, and ordinary `SimCommand` emission. AI 2.1 is a
+parity refactor target for AI 2.0 rather than an intended balance upgrade until matchup evidence and
+human review say otherwise.
+
 The `ai_turtle` suite is pinned to `ai_turtle_chokes`, a first-pass turtle profile for visual
 matchups and tuning. It keeps the existing economy/supply managers first, targets full main-base
 worker saturation, opens one Barracks, builds Training Centre, then stays on one Barracks while it
@@ -212,17 +224,18 @@ steel-line screen as a fallback against missed routes. Anti-Tank Guns use the sa
 selection on a line ten tiles behind the averaged choke line on the own-start side, then set up
 facing orthogonally down the enemy approach lane. It does not launch ordinary frontal waves.
 
-The suite aliases `ai_2_0` and `ai20` resolve to the AI 2.0 suite request in live and arena-style
-tooling; `ai_1_2` and `ai12` resolve to the AI 1.2 suite request; `ai_1_1` and `ai11` resolve to
-the AI 1.1 suite request; `ai_1_0` and `ai1` resolve to the AI 1.0 suite request; `ai_turtle` and
-`turtle` resolve to the turtle suite request. Exact profile ids such as `ai_1_2_wave_cohorts`,
-`ai_2_0_tank_pressure`, or `ai_turtle_chokes` pin one concrete member. `ai` and `default` resolve
+The suite aliases `ai_2_1` and `ai21` resolve to the AI 2.1 suite request, `ai_2_0` and `ai20`
+resolve to the AI 2.0 suite request in live and arena-style tooling; `ai_1_2` and `ai12` resolve
+to the AI 1.2 suite request; `ai_1_1` and `ai11` resolve to the AI 1.1 suite request; `ai_1_0` and
+`ai1` resolve to the AI 1.0 suite request; `ai_turtle` and `turtle` resolve to the turtle suite
+request. Exact profile ids such as `ai_1_2_wave_cohorts`, `ai_2_0_tank_pressure`,
+`ai_2_1_economy_manager`, or `ai_turtle_chokes` pin one concrete member. `ai` and `default` resolve
 to the promoted live default request.
 The live lobby AI uses this shared core through `AiController`, which only owns live identity,
 profile id, cadence, persistent decision memory, and its latest bounded decision trace for
 spectator-only observer diagnostics. Unknown live profile ids resolve to the promoted live default,
 currently `ai_1_2`, which resolves to `ai_1_2_wave_cohorts`. The ordinary lobby exposes AI 1.0,
-AI 1.1, AI 1.2, AI 2.0, and AI Turtle as suite requests. AI 1.2 is the live lobby default.
+AI 1.1, AI 1.2, AI 2.0, AI 2.1, and AI Turtle as suite requests. AI 1.2 is the live lobby default.
 Panzerfaust is trainable for Kriegsia players after a completed Training Centre, and Scout Plane is
 trainable from City Centre after completed Gun Works or Vehicle Works, but current AI production
 profiles intentionally omit both units in the first pass. AI-owned Panzerfaust or Scout Plane units

@@ -974,11 +974,12 @@ mod tests {
         run_profile_matchup_result, ProfileMatchupOptions, ScorecardCollector,
     };
     use crate::ai_core::profile_suites::{
-        AI_1_0_SUITE_ID, AI_1_1_SUITE_ID, AI_1_2_SUITE_ID, AI_2_0_SUITE_ID, AI_TURTLE_SUITE_ID,
+        AI_1_0_SUITE_ID, AI_1_1_SUITE_ID, AI_1_2_SUITE_ID, AI_2_0_SUITE_ID, AI_2_1_SUITE_ID,
+        AI_TURTLE_SUITE_ID,
     };
     use crate::ai_core::profiles::{
         AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID, AI_1_2_WAVE_COHORTS_ID, AI_2_0_TANK_PRESSURE_ID,
-        AI_TURTLE_CHOKES_ID,
+        AI_2_1_ECONOMY_MANAGER_ID, AI_TURTLE_CHOKES_ID,
     };
     use crate::DEFAULT_LIVE_PROFILE_ID;
     use rts_sim::game::command::SimCommand;
@@ -1003,6 +1004,7 @@ mod tests {
                 AI_1_1_TANK_MG_ID,
                 AI_1_2_WAVE_COHORTS_ID,
                 AI_2_0_TANK_PRESSURE_ID,
+                AI_2_1_ECONOMY_MANAGER_ID,
                 AI_TURTLE_CHOKES_ID,
             ]
         );
@@ -1020,6 +1022,12 @@ mod tests {
         assert_eq!(canonical_profile_id("ai12"), Some(AI_1_2_WAVE_COHORTS_ID));
         assert_eq!(canonical_profile_id("ai_2_0"), None);
         assert_eq!(canonical_profile_id("ai20"), None);
+        assert_eq!(canonical_profile_id("ai_2_1"), None);
+        assert_eq!(canonical_profile_id("ai21"), None);
+        assert_eq!(
+            canonical_profile_id("ai_2_1_economy_manager"),
+            Some(AI_2_1_ECONOMY_MANAGER_ID)
+        );
         assert_eq!(canonical_profile_id("ai_2_0_agent_rush"), None);
         assert_eq!(canonical_profile_id("ai_2_0_rifle_tank"), None);
         assert_eq!(canonical_profile_id("rifle_flood_full_saturation"), None);
@@ -1029,18 +1037,23 @@ mod tests {
     #[test]
     fn profile_request_aliases_can_resolve_suites_for_seeded_matchups() {
         assert_eq!(
-            available_profile_request_ids()[0..5],
+            available_profile_request_ids()[0..6],
             [
                 AI_1_0_SUITE_ID,
                 AI_1_1_SUITE_ID,
                 AI_1_2_SUITE_ID,
                 AI_2_0_SUITE_ID,
+                AI_2_1_SUITE_ID,
                 AI_TURTLE_SUITE_ID,
             ]
         );
         assert_eq!(
             canonical_profile_request_id_for_match("ai_2_0"),
             Some(AI_2_0_SUITE_ID)
+        );
+        assert_eq!(
+            canonical_profile_request_id_for_match("ai_2_1"),
+            Some(AI_2_1_SUITE_ID)
         );
         assert_eq!(
             canonical_profile_request_id_for_match("turtle"),
@@ -1059,8 +1072,16 @@ mod tests {
             Some(AI_2_0_TANK_PRESSURE_ID)
         );
         assert_eq!(
+            resolve_profile_request_id_for_match("ai21", 0, 0),
+            Some(AI_2_1_ECONOMY_MANAGER_ID)
+        );
+        assert_eq!(
             resolve_profile_request_id_for_match(AI_2_0_SUITE_ID, 1, 0),
             Some(AI_2_0_TANK_PRESSURE_ID)
+        );
+        assert_eq!(
+            resolve_profile_request_id_for_match(AI_2_1_SUITE_ID, 1, 0),
+            Some(AI_2_1_ECONOMY_MANAGER_ID)
         );
         assert_eq!(
             resolve_profile_request_id_for_match("ai_2_0_rifle_tank", 1, 0),
