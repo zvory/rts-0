@@ -58,7 +58,6 @@ function labControlGroupEntities(state, ids, seen = new Set()) {
     const owner = Number(entity?.owner);
     if (!entity || !Number.isInteger(owner) || owner <= 0) continue;
     if (entity.shotReveal || entity.visionOnly) continue;
-    if (entity.kind === KIND.SCOUT_PLANE) continue;
     if (!isUnit(entity.kind) && !isBuilding(entity.kind)) continue;
     out.push(entity);
     seen.add(id);

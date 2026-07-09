@@ -4,8 +4,9 @@
 import { assert } from "./assertions.mjs";
 import { ClientIntent } from "../../client/src/client_intent.js";
 import { Input } from "../../client/src/input/index.js";
+import { createLabControlPolicy } from "../../client/src/lab_control_policy.js";
 import { Minimap } from "../../client/src/minimap.js";
-import { KIND, STATE } from "../../client/src/protocol.js";
+import { KIND, LAB_ROLE, STATE } from "../../client/src/protocol.js";
 import { GameState } from "../../client/src/state.js";
 
 function startInfo() {
@@ -88,6 +89,40 @@ function commandInput(selected, entities) {
   assert(Array.from(selectionState.selection).length === 0, "direct selection admission rejects Scout Plane ids");
   selectionState.setControlGroup(3, [scoutPlane.id]);
   assert(selectionState.controlGroups[3].length === 0, "Scout Plane cannot be stored in a control group");
+}
+
+{
+  const scoutPlane = {
+    id: 5600,
+    owner: 2,
+    kind: KIND.SCOUT_PLANE,
+    x: 96,
+    y: 96,
+    hp: 40,
+    maxHp: 40,
+    state: STATE.IDLE,
+  };
+  const labState = new GameState({ ...startInfo(), spectator: true });
+  labState.controlPolicy = createLabControlPolicy({ metadata: { role: LAB_ROLE.OPERATOR } });
+  labState.applySnapshot({
+    tick: 0,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 0,
+    supplyCap: 10,
+    entities: [scoutPlane],
+    events: [],
+  });
+  const labInput = inputForState(labState);
+  labInput._commitClickSelection({ x: 96, y: 96 }, false, false);
+  assert(Array.from(labState.selection).join(",") === "5600", "lab operator can still click-select a Scout Plane for inspection");
+  labState.clearSelection();
+  labInput._commitBoxSelection({ x0: 70, y0: 70, x1: 120, y1: 120 }, false);
+  assert(Array.from(labState.selection).join(",") === "5600", "lab operator can still box-select a Scout Plane for inspection");
+  labState.setSelection([scoutPlane.id]);
+  assert(Array.from(labState.selection).join(",") === "5600", "lab selection admission preserves Scout Plane ids");
+  labState.setControlGroup(3, [scoutPlane.id]);
+  assert(labState.controlGroups[3].join(",") === "5600", "lab control groups can store inspectable Scout Planes");
 }
 
 {
