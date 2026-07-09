@@ -7,6 +7,41 @@ use pulldown_cmark::{html, CowStr, Event, Options, Parser, Tag};
 use rts_rules::{defs, faction, EntityKind};
 
 const REPO_ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/..");
+const WIKI_DARK_STYLE: &str = r#"
+:root {
+  color-scheme: dark;
+  --wiki-bg: #101214;
+  --wiki-panel: #181a1d;
+  --wiki-panel-elevated: #202328;
+  --wiki-border: #363a40;
+  --wiki-border-strong: #4c525b;
+  --wiki-text: #ece7dc;
+  --wiki-muted: #b8b0a3;
+  --wiki-link: #8ed8ff;
+  --wiki-link-hover: #b7e7ff;
+  --wiki-code-bg: #24272c;
+  --wiki-code-text: #ffe0a8;
+}
+* { box-sizing: border-box; }
+html { background: var(--wiki-bg); }
+body { max-width: 960px; margin: 0 auto; padding: 32px 20px; font: 16px/1.55 system-ui, sans-serif; color: var(--wiki-text); background: var(--wiki-bg); }
+body.wiki-stats { max-width: 1120px; }
+nav { margin: 0 0 14px; color: var(--wiki-muted); }
+main { background: var(--wiki-panel); border: 1px solid var(--wiki-border); border-radius: 8px; padding: 24px; box-shadow: 0 18px 48px rgba(0, 0, 0, 0.24); }
+a { color: var(--wiki-link); }
+a:hover, a:focus-visible { color: var(--wiki-link-hover); }
+code, pre { background: var(--wiki-code-bg); color: var(--wiki-code-text); border-radius: 4px; }
+code { padding: 0.1em 0.25em; }
+pre { padding: 12px; overflow-x: auto; border: 1px solid var(--wiki-border); }
+pre code { padding: 0; border-radius: 0; }
+blockquote { color: var(--wiki-muted); border-left: 3px solid var(--wiki-border-strong); margin-left: 0; padding-left: 16px; }
+table { border-collapse: collapse; }
+body.wiki-stats table { width: 100%; margin: 16px 0 28px; font-size: 14px; }
+th, td { border: 1px solid var(--wiki-border); padding: 4px 8px; text-align: left; vertical-align: top; }
+th { background: var(--wiki-panel-elevated); color: var(--wiki-text); }
+td.numeric { text-align: right; font-variant-numeric: tabular-nums; }
+.scope-note { max-width: 820px; color: var(--wiki-muted); }
+"#;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum WikiPathError {
@@ -55,16 +90,10 @@ fn wiki_html(route_path: &str, markdown: &str) -> impl IntoResponse {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{title} - Bewegungskrieg Wiki</title>
 <style>
-body {{ max-width: 960px; margin: 0 auto; padding: 32px 20px; font: 16px/1.55 system-ui, sans-serif; color: #1c1f23; background: #f8f7f3; }}
-main {{ background: #fff; border: 1px solid #ddd7cc; padding: 24px; }}
-a {{ color: #0b5e86; }}
-code, pre {{ background: #f1eee6; }}
-pre {{ padding: 12px; overflow-x: auto; }}
-table {{ border-collapse: collapse; }}
-th, td {{ border: 1px solid #d8d2c7; padding: 4px 8px; }}
+{WIKI_DARK_STYLE}
 </style>
 </head>
-<body>
+<body class="wiki-doc">
 <nav><a href="/wiki">Wiki index</a></nav>
 <main>
 {body}
@@ -95,17 +124,10 @@ fn stats_page_html() -> impl IntoResponse {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Gameplay Stats - Bewegungskrieg Wiki</title>
 <style>
-body {{ max-width: 1120px; margin: 0 auto; padding: 32px 20px; font: 16px/1.55 system-ui, sans-serif; color: #1c1f23; background: #f8f7f3; }}
-main {{ background: #fff; border: 1px solid #ddd7cc; padding: 24px; }}
-a {{ color: #0b5e86; }}
-table {{ border-collapse: collapse; width: 100%; margin: 16px 0 28px; font-size: 14px; }}
-th, td {{ border: 1px solid #d8d2c7; padding: 4px 8px; text-align: left; vertical-align: top; }}
-th {{ background: #f1eee6; }}
-td.numeric {{ text-align: right; font-variant-numeric: tabular-nums; }}
-.scope-note {{ max-width: 820px; }}
+{WIKI_DARK_STYLE}
 </style>
 </head>
-<body>
+<body class="wiki-stats">
 <nav><a href="/wiki">Wiki index</a></nav>
 <main>
 <h1>Gameplay Stats</h1>
@@ -1088,6 +1110,8 @@ mod tests {
             assert!(body.contains(r#"href="/wiki/docs/design/balance.md""#));
             assert!(body.contains(r#"href="/wiki/stats""#));
             assert!(body.contains("<main>"));
+            assert!(body.contains("color-scheme: dark;"));
+            assert!(body.contains(r#"<body class="wiki-doc">"#));
         }
     }
 
@@ -1196,6 +1220,8 @@ mod tests {
             .unwrap();
         let body = String::from_utf8(body.to_vec()).unwrap();
         assert!(body.contains("<title>Gameplay Stats - Bewegungskrieg Wiki</title>"));
+        assert!(body.contains("color-scheme: dark;"));
+        assert!(body.contains(r#"<body class="wiki-stats">"#));
         assert!(body.contains("primary/default weapon stats"));
         assert!(body.contains("Tank coaxial machine gun"));
         assert!(body.contains("<h2>Units</h2>"));
