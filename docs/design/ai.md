@@ -273,6 +273,14 @@ replay and trace pointers.
 
 Spectators never count toward win/elimination and receive a neutral final scoreboard result.
 
+**Observed live match horizon.** A normal live room with two or more AI seats and no active human
+seats is treated as an AI observation session. The live stream stays interactive for spectators and
+continues to use the normal post-match replay path, but it must resolve no later than tick 25,000.
+If a starting primary base is eliminated on that tick, the normal winner takes precedence;
+otherwise the server records a draw. The score screen shows the generated Observation ID, which
+matches the persisted replay lookup and structured server lag logs so a reported behavior can be
+reconstructed after the watcher leaves.
+
 **Win/elimination.** AI players count as match players: a 1-human + N-AI match is a real match
 (it resolves to a winner), while a lone human with no AI remains a never-ending sandbox. AI-only
 live matches use the same strategic objective as profile-vs-profile tooling: a player loses when

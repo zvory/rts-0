@@ -40,6 +40,7 @@ pub(super) struct LiveTickDriver<'a> {
     pub(super) tick_budget: Duration,
     pub(super) match_run_id: Option<&'a str>,
     pub(super) match_player_count: usize,
+    pub(super) match_tick_limit: Option<u32>,
     pub(super) ai_player_count: usize,
     pub(super) players: &'a mut HashMap<u32, RoomPlayer>,
     pub(super) order: &'a [u32],
@@ -99,6 +100,21 @@ impl LiveTickDriver<'_> {
                 scores: game.scores(),
                 game,
                 winner_id,
+            };
+        }
+
+        // A watched AI-only matchup needs a stable conclusion even when neither strategy can
+        // finish its opponent. A decisive base kill on this tick still wins; otherwise the
+        // horizon resolves the run as a normal draw and finalizes its replay.
+        if match_tick_limit_reached(game.tick_count(), self.match_tick_limit) {
+            if let Some(perf) = perf.as_mut() {
+                perf.record_phase("outcome_checks", outcome_start.elapsed());
+            }
+            self.finish_perf_tick(perf.as_ref(), &game, scheduler_lag, tick_start);
+            return LiveTickResult::EndMatch {
+                scores: game.scores(),
+                game,
+                winner_id: None,
             };
         }
 
@@ -407,6 +423,10 @@ fn ai_only_match(match_player_count: usize, ai_player_count: usize) -> bool {
     match_player_count >= 2 && match_player_count == ai_player_count
 }
 
+fn match_tick_limit_reached(tick: u32, tick_limit: Option<u32>) -> bool {
+    tick_limit.is_some_and(|limit| tick >= limit)
+}
+
 fn alive_team_ids_for(game: &Game, alive: &[u32]) -> Vec<u32> {
     let mut teams = Vec::new();
     for player_id in alive {
@@ -428,4 +448,17 @@ fn first_alive_player_on_team(game: &Game, alive: &[u32], team_id: u32) -> Optio
         .iter()
         .copied()
         .find(|player_id| game.team_of_player(*player_id) == Some(team_id))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::match_tick_limit_reached;
+
+    #[test]
+    fn match_tick_limit_resolves_on_its_exact_tick_only() {
+        assert!(!match_tick_limit_reached(24_999, Some(25_000)));
+        assert!(match_tick_limit_reached(25_000, Some(25_000)));
+        assert!(match_tick_limit_reached(25_001, Some(25_000)));
+        assert!(!match_tick_limit_reached(25_000, None));
+    }
 }

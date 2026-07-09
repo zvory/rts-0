@@ -71,6 +71,25 @@ fn match_history_persistence_allows_ai_only_but_skips_test_matches() {
 }
 
 #[test]
+fn ai_only_normal_matches_get_the_observation_horizon() {
+    let mut normal = RoomTask::new(
+        "ai-observation-horizon-test".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    normal.record_live_match_started(2, 0, "Default".to_string(), Vec::new());
+    assert_eq!(
+        normal.match_tick_limit,
+        Some(super::super::lifecycle::AI_OBSERVATION_TICK_LIMIT)
+    );
+
+    normal.record_live_match_started(2, 1, "Default".to_string(), Vec::new());
+    assert_eq!(normal.match_tick_limit, None);
+}
+
+#[test]
 fn empty_live_room_clears_lifecycle_bookkeeping_and_drain_tracking() {
     let drain = DrainHandle::default();
     let mut task = RoomTask::new(

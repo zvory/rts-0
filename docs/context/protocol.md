@@ -42,6 +42,7 @@ Use when adding, removing, or changing any field on a client↔server message, s
   absolute seek, and `roomTimeState` keyframe metadata; they are not `LabClientOp` messages.
 - Start payloads carry recipient-scoped `diagnostics` metadata when projection policy enables
   movement-path overlays or observer analysis. Do not infer those affordances from room mode names.
+- All-AI starts include `observationTickLimit: 25000`.
 - The active protocol has no quickstart/debug lobby command or start-payload flag. Normal live
   countdown skipping for rooms with one or zero active humans is not a debug preset.
 - `LobbyPlayer` carries `teamId`, `factionId`, `aiProfileId?` (profile or suite request), and

@@ -22,6 +22,7 @@ Supabase Postgres. Schema in `server/migrations/`. Match summaries live in `matc
 | `started_at`    | `timestamptz`   | Wall clock captured at `start_match`.           |
 | `ended_at`      | `timestamptz`   | Wall clock at `end_match`. Default `now()`.     |
 | `duration_ms`   | `integer`       | Server-computed, clamped to non-negative i32.   |
+| `match_run_id`  | `text` nullable | Stable live-match/log correlation id; set for newly recorded matches. |
 | `map_name`      | `text`          | `selected_map` at match start.                  |
 | `winner_name`   | `text` nullable | Winner display name for wins only; `null` for draws and aborted matches. |
 | `outcome`       | `text`          | `'win'`, `'draw'`, or `'aborted'` (CHECK constraint). |
@@ -92,12 +93,18 @@ Migrations are versioned SQL files run by `sqlx::migrate!` at server boot. Never
   Build-SHA mismatches log a warning and remain launchable. Schema, map, faction/loadout, or
   missing replay failures return a clear JSON `{ "error": "..." }` instead of trying partial
   playback.
+- **AI observation lookup**: `GET /api/observations/{matchRunId}` — read-only recovery for an
+  AI-only watched match that is intentionally hidden from Recent Matches. The run id is shown on
+  the completed-match score screen and is the exact `match_run_id` in the structured server logs.
+  The response is a normal `MatchSummary`; use its `id` with the existing replay-launch endpoint.
+  The id accepts only `[A-Za-z0-9_-]` and is bounded to 96 bytes. A just-completed observation can
+  return 404 briefly while the detached history/replay write finishes.
 - **Write**: none. Clients cannot write history. Period.
 
 ## Code seams
 
 - `server/src/db.rs` — `Db` (pool + migrate), `record_match`, `recent_matches`,
-  `replay_artifact_for_match`, `MatchRecord`, `MatchSummary`.
+  `observation_by_run_id`, `replay_artifact_for_match`, `MatchRecord`, `MatchSummary`.
 - `server/src/main.rs` — `.env` loading, pool construction, `/api/matches` handler, the
   `POST /api/matches/{id}/replay` launch handler, replay compatibility checks, and the
   `RTS_RECORD_MATCHES` gate.
@@ -146,6 +153,22 @@ match rows: if a match row is skipped, no replay row is written. Stored historic
 AI-only rows, plus solo sandbox rows, are filtered from `/api/matches`, but the replay row remains
 linked to the owning `matches` row.
 
+## AI observation sessions
+
+An all-AI normal-room match with at least two active seats is an observation session. It is still
+the ordinary server-authoritative live game, so the watcher sees the normal live stream followed
+by the automatic in-memory post-match replay. Unlike a human match, it has a fixed 25,000-tick
+horizon: a winning primary-base elimination on tick 25,000 wins; otherwise the match records a
+draw at that tick. This prevents an inconclusive strategy matchup from running indefinitely.
+
+At live start the server assigns `match_run_id`; the browser retains it through the automatic
+post-match replay and prints it as **Observation ID** in the score screen. Persisted rows store the
+same value in `matches.match_run_id`, and `GET /api/observations/{matchRunId}` returns that hidden
+AI-only row. The returned numeric match id launches the replay with
+`POST /api/matches/{id}/replay`; Fly/server logs can be filtered by the identical
+`match_run_id`. This is intentionally a narrow lookup rather than adding all AI-only rows to the
+player-facing Recent Matches table.
+
 Outcome vocabulary:
 
 - `win`: normal match resolution produced a winner; `winner_name` is the display name of the first
@@ -192,7 +215,7 @@ include historical local-only rows from the request peer address. Only loopback 
 - **Migration fails at boot**: `Db::connect` returns `Err`, server runs without history. Check
   `migrations/` filenames are timestamp-prefixed and sequential.
 - **Slow write**: tracked detached task means the room is unblocked. Worst case the row appears
-  seconds later in `/api/matches`. During graceful shutdown, the 295 second drain budget reserves
+  seconds later in `/api/matches` or the run-id observation lookup. During graceful shutdown, the 295 second drain budget reserves
   20 seconds for writes after the forced-abort phase. Logs distinguish all writes completing from
   timeout with the remaining pending count.
 - **Deploy drain overran natural completion**: after 260 seconds of natural drain, the lobby asks

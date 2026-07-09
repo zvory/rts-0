@@ -152,6 +152,8 @@ export class App {
     this.aiDiagnosticsPanelPreferences = createAiDiagnosticsPanelPreferences();
     this.matchLaunchDone = false;
     this.matchLaunchFailed = false;
+    /** AI observation id retained through immediate post-match replay playback. */
+    this.lastObservationRunId = "";
     this.mountLobbySettings();
     if (this.labCatalogLaunch) this.lobby.hide();
   }
@@ -420,6 +422,13 @@ export class App {
       spectator: payload?.spectator,
     });
     const startsReplay = !!payload?.replay;
+    if (!startsReplay) {
+      const tickLimit = Number(payload?.observationTickLimit);
+      this.lastObservationRunId = Number.isInteger(tickLimit) && tickLimit > 0 &&
+        typeof payload?.matchRunId === "string"
+        ? payload.matchRunId
+        : "";
+    }
     const preserveScorePanel = startsReplay && !dom.gameOver.hidden;
     const capabilities = createRoomCapabilities({ startPayload: payload });
     const labMetadata = payload?.lab || null;
@@ -562,6 +571,7 @@ export class App {
       m?.winnerId ?? null,
       m?.winnerTeamId ?? null,
     );
+    this.renderObservationId(this.lastObservationRunId);
     dom.gameOver.hidden = false;
     // Freeze the loop but keep the final frame visible behind the overlay.
     if (this.match) this.match.stop();
@@ -647,6 +657,16 @@ export class App {
     if (!dom.gameOverScores) return;
     dom.gameOverScores.replaceChildren();
     dom.gameOverScores.hidden = true;
+    this.renderObservationId("");
+  }
+
+  renderObservationId(matchRunId) {
+    if (!dom.gameOverObservation) return;
+    const id = typeof matchRunId === "string" ? matchRunId.trim() : "";
+    dom.gameOverObservation.hidden = !id;
+    dom.gameOverObservation.textContent = id
+      ? `Observation ID: ${id}. Share it to retrieve this replay and its server lag logs.`
+      : "";
   }
 
   /** "Back to lobby" button: tear down the match and restore the lobby. */
@@ -668,6 +688,7 @@ export class App {
     }
     this.destroyLabShell();
     this.inReplayPlayback = false;
+    this.lastObservationRunId = "";
     this.statusBadge.clearMatchMetrics();
     dom.gameOver.hidden = true;
     this.clearScoreboard();

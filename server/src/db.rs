@@ -18,6 +18,8 @@ use rts_sim::game::replay::ReplayArtifactV1;
 /// One match-history row to insert.
 #[derive(Debug, Clone)]
 pub struct MatchRecord {
+    /// Stable live-match correlation id used to join a persisted AI observation to its logs.
+    pub match_run_id: Option<String>,
     pub started_at: DateTime<Utc>,
     pub ended_at: DateTime<Utc>,
     pub duration_ms: i32,
@@ -93,6 +95,8 @@ impl MatchReplayRecord {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MatchSummary {
     pub id: i64,
+    #[serde(rename = "matchRunId", skip_serializing_if = "Option::is_none")]
+    pub match_run_id: Option<String>,
     #[serde(rename = "startedAt")]
     pub started_at: DateTime<Utc>,
     #[serde(rename = "endedAt")]
@@ -159,13 +163,14 @@ impl Db {
             let match_id: i64 = sqlx::query_scalar(
                 r#"
             insert into matches
-                (started_at, ended_at, duration_ms, map_name,
+                (match_run_id, started_at, ended_at, duration_ms, map_name,
                  winner_name, outcome, participants, score_screen,
                  human_count, debug_mode, local_only)
-            values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             returning id
             "#,
             )
+            .bind(rec.match_run_id.as_deref())
             .bind(rec.started_at)
             .bind(rec.ended_at)
             .bind(rec.duration_ms)
@@ -208,6 +213,7 @@ impl Db {
         match result {
             Ok(_) => {
                 crate::log_info!(
+                    match_run_id = rec.match_run_id.as_deref().unwrap_or(""),
                     map = %rec.map_name,
                     outcome = outcome,
                     local_only = rec.local_only,
@@ -215,7 +221,12 @@ impl Db {
                     "match recorded"
                 )
             }
-            Err(err) => crate::log_error!(%err, map = %rec.map_name, "failed to record match"),
+            Err(err) => crate::log_error!(
+                %err,
+                match_run_id = rec.match_run_id.as_deref().unwrap_or(""),
+                map = %rec.map_name,
+                "failed to record match"
+            ),
         }
     }
 
@@ -229,6 +240,7 @@ impl Db {
         let rows = sqlx::query(
             r#"
             select matches.id as id,
+                   matches.match_run_id as match_run_id,
                    matches.started_at as started_at,
                    matches.ended_at as ended_at,
                    matches.duration_ms as duration_ms,
@@ -277,6 +289,50 @@ impl Db {
         Ok(rows.into_iter().map(row_to_summary).collect())
     }
 
+    /// Return one AI-only observation by its match-run id. These rows deliberately stay out of
+    /// the public Recent Matches feed, but the run id shown after a watched match is enough to
+    /// recover the replay and the matching structured server logs.
+    pub async fn observation_by_run_id(
+        &self,
+        match_run_id: &str,
+        include_local: bool,
+    ) -> Result<Option<MatchSummary>, sqlx::Error> {
+        let row = sqlx::query(
+            r#"
+            select matches.id as id,
+                   matches.match_run_id as match_run_id,
+                   matches.started_at as started_at,
+                   matches.ended_at as ended_at,
+                   matches.duration_ms as duration_ms,
+                   matches.map_name as map_name,
+                   matches.winner_name as winner_name,
+                   matches.outcome as outcome,
+                   matches.participants as participants,
+                   matches.score_screen as score_screen,
+                   matches.human_count as human_count,
+                   matches.debug_mode as debug_mode,
+                   matches.local_only as local_only,
+                   r.artifact_schema_version as replay_artifact_schema_version,
+                   r.build_sha as replay_build_sha,
+                   r.map_name as replay_map_name,
+                   r.map_schema_version as replay_map_schema_version,
+                   r.map_hash as replay_map_hash
+            from matches
+            left join match_replays r on r.match_id = matches.id
+            where matches.match_run_id = $1
+              and matches.human_count = 0
+              and not matches.debug_mode
+              and ($2 or not matches.local_only)
+            "#,
+        )
+        .bind(match_run_id)
+        .bind(include_local)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.map(row_to_summary))
+    }
+
     /// Load a persisted replay artifact for a match visible to this request scope.
     pub async fn replay_artifact_for_match(
         &self,
@@ -321,6 +377,7 @@ fn row_to_summary(row: PgRow) -> MatchSummary {
         });
     MatchSummary {
         id: row.get("id"),
+        match_run_id: row.get("match_run_id"),
         started_at: row.get("started_at"),
         ended_at: row.get("ended_at"),
         duration_ms: row.get("duration_ms"),
@@ -382,6 +439,7 @@ mod tests {
 
     fn record_with_outcome(outcome: MatchOutcome) -> MatchRecord {
         MatchRecord {
+            match_run_id: None,
             started_at: chrono::Utc::now(),
             ended_at: chrono::Utc::now(),
             duration_ms: 1_000,
@@ -421,6 +479,7 @@ mod tests {
     fn match_summary_serializes_aborted_outcome() {
         let summary = MatchSummary {
             id: 1,
+            match_run_id: Some("ai-observation-123".to_string()),
             started_at: chrono::Utc::now(),
             ended_at: chrono::Utc::now(),
             duration_ms: 1_000,
@@ -440,5 +499,6 @@ mod tests {
         let value = serde_json::to_value(summary).expect("summary serializes");
         assert_eq!(value["winnerName"], serde_json::Value::Null);
         assert_eq!(value["outcome"], "aborted");
+        assert_eq!(value["matchRunId"], "ai-observation-123");
     }
 }

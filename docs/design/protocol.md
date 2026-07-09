@@ -415,6 +415,7 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
   predictionBuildId?: string,    // live active players only; server/client bundle id
   predictionVersion?: u32,       // live active players only; currently 1
   matchRunId?: string,           // live match correlation id for log joins
+  observationTickLimit?: u32,    // all-AI watched-match draw horizon; currently 25,000
   capabilities?: {               // explicit recipient-scoped shared room affordances
     roomTime?: {
       available?: bool,
@@ -495,6 +496,8 @@ Spectator start payloads keep the spectator connection's `playerId`, set `specta
 list only active match players in `players`. Late live spectator joins receive the same live start
 payload shape stamped from the current `Game::start_payload()` tick, with prediction metadata
 omitted and live spectator capabilities/diagnostics applied for that recipient.
+All-AI observation sessions additionally carry `observationTickLimit: 25000`; clients may use it
+only to label the run and must not attempt to control or extend the authoritative limit.
 
 Lab room start payloads set `lab` metadata and currently also set `spectator: true` with prediction
 metadata omitted. Labs use a hidden internal room id, a default two-team real `Game` template, and

@@ -63,6 +63,7 @@ impl RoomTask {
             }
         };
         payload.match_run_id = self.match_run_id.clone();
+        payload.observation_tick_limit = self.match_tick_limit;
 
         let notice_recipients = self.late_spectator_notice_recipient_ids();
         let notice_name = late_spectator_notice_name(&name);
@@ -510,6 +511,7 @@ impl RoomTask {
         );
         let mut payload = game.start_payload();
         payload.match_run_id = self.match_run_id.clone();
+        payload.observation_tick_limit = self.match_tick_limit;
         self.ai_controllers = live_ai_controllers(&inits, &self.ai_players, seed);
 
         let projection_policy = self.projection_policy_for_phase(SessionPhase::LiveMatch);
@@ -618,6 +620,7 @@ impl RoomTask {
         };
         let tick_budget = self.current_tick_interval();
         let match_run_id = self.match_run_id.as_deref();
+        let match_tick_limit = self.match_tick_limit;
         let ai_player_count = self.ai_players.len();
         let spectator_visible_players = self.spectator_visible_player_ids();
         let lab_snapshot_projections = self.lab_snapshot_projections(&game);
@@ -628,6 +631,7 @@ impl RoomTask {
             tick_budget,
             match_run_id,
             match_player_count: self.match_player_count,
+            match_tick_limit,
             ai_player_count,
             players: &mut self.players,
             order: &self.order,

@@ -346,7 +346,9 @@ assert(
   // not part of this phase's structured protocol export.
   rustContract.includes("prediction_build_id") &&
     rustContract.includes("prediction_version") &&
-    rustContract.includes("match_run_id"),
+    rustContract.includes("match_run_id") &&
+    rustContract.includes("observation_tick_limit") &&
+    protocolDoc.includes("observationTickLimit"),
   "start payload must expose prediction compatibility metadata",
 );
 assert(

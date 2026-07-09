@@ -77,6 +77,7 @@ impl RoomTask {
             None
         };
         crate::db::MatchRecord {
+            match_run_id: self.match_run_id.clone(),
             started_at: input.started_at,
             ended_at: input.ended_at,
             duration_ms: input.duration_ms,

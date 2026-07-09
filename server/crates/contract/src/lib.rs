@@ -28,6 +28,10 @@ pub struct StartPayload {
     /// Room-scoped live match correlation id used only for diagnostics/log joins.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub match_run_id: Option<String>,
+    /// Fixed horizon for an all-AI observation session. Absent for ordinary live matches,
+    /// replays, branches, labs, and dev scenarios.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub observation_tick_limit: Option<u32>,
     #[serde(default, skip_serializing_if = "RoomCapabilities::is_empty")]
     pub capabilities: RoomCapabilities,
     #[serde(default, skip_serializing_if = "DiagnosticCapabilities::is_empty")]
