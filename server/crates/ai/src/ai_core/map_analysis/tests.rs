@@ -1,7 +1,7 @@
 use super::*;
-use std::collections::{BTreeSet, VecDeque};
 use rts_sim::game::map::Map;
 use rts_sim::game::{Game, MapMetadata, PlayerInit};
+use std::collections::{BTreeSet, VecDeque};
 
 const FIXTURE_SEED: u32 = 0x1234_5678;
 
@@ -360,18 +360,90 @@ struct TargetBox {
 fn default_chokes_cover_marked_gameplay_passages() {
     let debug = fixture_analysis("Default");
     let targets = [
-        TargetBox { id: "T0", min_x: 66, min_y: 12, max_x: 81, max_y: 28 },
-        TargetBox { id: "T1", min_x: 52, min_y: 13, max_x: 64, max_y: 28 },
-        TargetBox { id: "T2", min_x: 24, min_y: 29, max_x: 54, max_y: 53 },
-        TargetBox { id: "T3", min_x: 74, min_y: 30, max_x: 97, max_y: 54 },
-        TargetBox { id: "T4", min_x: 13, min_y: 46, max_x: 29, max_y: 58 },
-        TargetBox { id: "T5", min_x: 101, min_y: 52, max_x: 114, max_y: 62 },
-        TargetBox { id: "T6", min_x: 11, min_y: 61, max_x: 29, max_y: 72 },
-        TargetBox { id: "T7", min_x: 100, min_y: 63, max_x: 113, max_y: 73 },
-        TargetBox { id: "T8", min_x: 75, min_y: 72, max_x: 101, max_y: 97 },
-        TargetBox { id: "T9", min_x: 26, min_y: 73, max_x: 54, max_y: 99 },
-        TargetBox { id: "T10", min_x: 65, min_y: 98, max_x: 78, max_y: 113 },
-        TargetBox { id: "T11", min_x: 52, min_y: 99, max_x: 63, max_y: 115 },
+        TargetBox {
+            id: "T0",
+            min_x: 66,
+            min_y: 12,
+            max_x: 81,
+            max_y: 28,
+        },
+        TargetBox {
+            id: "T1",
+            min_x: 52,
+            min_y: 13,
+            max_x: 64,
+            max_y: 28,
+        },
+        TargetBox {
+            id: "T2",
+            min_x: 24,
+            min_y: 29,
+            max_x: 54,
+            max_y: 53,
+        },
+        TargetBox {
+            id: "T3",
+            min_x: 74,
+            min_y: 30,
+            max_x: 97,
+            max_y: 54,
+        },
+        TargetBox {
+            id: "T4",
+            min_x: 13,
+            min_y: 46,
+            max_x: 29,
+            max_y: 58,
+        },
+        TargetBox {
+            id: "T5",
+            min_x: 101,
+            min_y: 52,
+            max_x: 114,
+            max_y: 62,
+        },
+        TargetBox {
+            id: "T6",
+            min_x: 11,
+            min_y: 61,
+            max_x: 29,
+            max_y: 72,
+        },
+        TargetBox {
+            id: "T7",
+            min_x: 100,
+            min_y: 63,
+            max_x: 113,
+            max_y: 73,
+        },
+        TargetBox {
+            id: "T8",
+            min_x: 75,
+            min_y: 72,
+            max_x: 101,
+            max_y: 97,
+        },
+        TargetBox {
+            id: "T9",
+            min_x: 26,
+            min_y: 73,
+            max_x: 54,
+            max_y: 99,
+        },
+        TargetBox {
+            id: "T10",
+            min_x: 65,
+            min_y: 98,
+            max_x: 78,
+            max_y: 113,
+        },
+        TargetBox {
+            id: "T11",
+            min_x: 52,
+            min_y: 99,
+            max_x: 63,
+            max_y: 115,
+        },
     ];
 
     let missing: Vec<_> = targets

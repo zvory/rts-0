@@ -50,7 +50,8 @@ pub(super) fn plan_expansion(
     };
 
     let building_count = facts.building_count(EntityKind::CityCentre);
-    let blocks_tech_path = expansion.blocks_tech_path && building_count < expansion.target_city_centres;
+    let blocks_tech_path =
+        expansion.blocks_tech_path && building_count < expansion.target_city_centres;
     let mut blockers = Vec::new();
     if building_count >= expansion.target_city_centres {
         blockers.push(ExpansionBlocker::AlreadyAtTarget);

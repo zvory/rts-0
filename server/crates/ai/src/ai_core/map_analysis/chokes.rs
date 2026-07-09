@@ -2,8 +2,10 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use super::*;
 
+mod geometry;
 mod min_cut;
 mod region_pair;
+use geometry::choke_line_geometry;
 use min_cut::{linearity_score, local_min_vertex_cut, tile_in_bounds};
 use region_pair::candidate_split_region_pair;
 
@@ -333,7 +335,8 @@ fn saddle_min_cut_candidates(
             continue;
         };
         let bounds = expanded_bounds(width, height, seed.bounds, GAMEPLAY_MIN_CUT_PADDING_TILES);
-        let cut_tiles = local_min_vertex_cut(width, height, passable, clearance, bounds, basin_a, basin_b);
+        let cut_tiles =
+            local_min_vertex_cut(width, height, passable, clearance, bounds, basin_a, basin_b);
         if cut_tiles.len() < GAMEPLAY_GAP_MIN_TILES as usize
             || cut_tiles.len() > GAMEPLAY_MIN_CUT_MAX_TILES
         {
@@ -433,11 +436,7 @@ fn direct_linear_cut_candidates(
     candidates
 }
 
-fn linear_cut_starts(
-    width: u32,
-    height: u32,
-    direction: LinearCutDirection,
-) -> Vec<AiTile> {
+fn linear_cut_starts(width: u32, height: u32, direction: LinearCutDirection) -> Vec<AiTile> {
     if width == 0 || height == 0 {
         return Vec::new();
     }
@@ -455,7 +454,11 @@ fn linear_cut_starts(
     let mut starts: Vec<_> = (0..width)
         .map(|x| AiTile::new(x, height.saturating_sub(1)))
         .collect();
-    starts.extend((0..height.saturating_sub(1)).rev().map(|y| AiTile::new(0, y)));
+    starts.extend(
+        (0..height.saturating_sub(1))
+            .rev()
+            .map(|y| AiTile::new(0, y)),
+    );
     starts
 }
 
@@ -485,7 +488,14 @@ fn thicken_linear_cut(
 ) -> Vec<AiTile> {
     let mut tiles = BTreeSet::new();
     for &tile in run {
-        add_passable_cut_tile(width, height, passable, tile.x as i32, tile.y as i32, &mut tiles);
+        add_passable_cut_tile(
+            width,
+            height,
+            passable,
+            tile.x as i32,
+            tile.y as i32,
+            &mut tiles,
+        );
         if direction.thicken_diagonal {
             add_passable_cut_tile(
                 width,
@@ -513,12 +523,7 @@ fn add_passable_cut_tile(
     }
 }
 
-fn low_clearance_score(
-    width: u32,
-    height: u32,
-    clearance: &[u16],
-    tiles: &[AiTile],
-) -> i32 {
+fn low_clearance_score(width: u32, height: u32, clearance: &[u16], tiles: &[AiTile]) -> i32 {
     tiles
         .iter()
         .map(|tile| {
@@ -623,8 +628,15 @@ fn nearest_basin_distances(
     nearest
 }
 
-fn record_nearest_distance(entries: &mut Vec<RegionDistance>, region_id: u32, distance: u32) -> bool {
-    if let Some(existing) = entries.iter_mut().find(|entry| entry.region_id == region_id) {
+fn record_nearest_distance(
+    entries: &mut Vec<RegionDistance>,
+    region_id: u32,
+    distance: u32,
+) -> bool {
+    if let Some(existing) = entries
+        .iter_mut()
+        .find(|entry| entry.region_id == region_id)
+    {
         if distance >= existing.distance {
             return false;
         }
@@ -774,7 +786,9 @@ fn best_adjacent_component(
                 .copied()
                 .map(|size| (component_id, contact_count, size))
         })
-        .max_by_key(|(component_id, contact_count, size)| (*contact_count, *size, usize::MAX - *component_id))
+        .max_by_key(|(component_id, contact_count, size)| {
+            (*contact_count, *size, usize::MAX - *component_id)
+        })
         .map(|(component_id, _, size)| (component_id, size))
 }
 
@@ -800,9 +814,8 @@ fn direct_cut_score(width: u32, height: u32, candidate: &ChokeCandidate) -> i32 
         .y
         .saturating_sub(candidate.bounds.min.y)
         .saturating_add(1);
-    let side_mouth =
-        candidate.center.x < width.saturating_mul(3) / 10
-            || candidate.center.x > width.saturating_mul(7) / 10;
+    let side_mouth = candidate.center.x < width.saturating_mul(3) / 10
+        || candidate.center.x > width.saturating_mul(7) / 10;
     let orientation_score = if side_mouth && candidate_height >= candidate_width {
         40
     } else {
@@ -837,16 +850,18 @@ fn choke_from_candidate(
     candidate: &ChokeCandidate,
     id: u32,
 ) -> Option<AiMapChoke> {
-    let (region_a_id, region_b_id, approach_a_tile, approach_b_tile) = candidate_region_pair(
-        context,
-        candidate,
-    )?;
+    let (region_a_id, region_b_id, approach_a_tile, approach_b_tile) =
+        candidate_region_pair(context, candidate)?;
     if region_a_id == region_b_id {
         return None;
     }
-    let (bounds, min_clearance_tiles, max_clearance_tiles) =
-        choke_tile_stats(context.width, context.height, context.clearance, &candidate.tiles);
-    let (endpoint_a_tile, endpoint_b_tile, width_tiles) = choke_segment_geometry(
+    let (bounds, min_clearance_tiles, max_clearance_tiles) = choke_tile_stats(
+        context.width,
+        context.height,
+        context.clearance,
+        &candidate.tiles,
+    );
+    let (endpoint_a_tile, endpoint_b_tile, width_tiles) = choke_line_geometry(
         &candidate.tiles,
         candidate.center,
         approach_a_tile,
@@ -1010,7 +1025,7 @@ fn build_chokes_for_band(
                 };
                 let (bounds, min_clearance_tiles, max_clearance_tiles) =
                     choke_tile_stats(width, height, clearance, &tiles);
-                let (endpoint_a_tile, endpoint_b_tile, width_tiles) = choke_segment_geometry(
+                let (endpoint_a_tile, endpoint_b_tile, width_tiles) = choke_line_geometry(
                     &tiles,
                     center_tile,
                     contact_a.region_tile,
@@ -1140,11 +1155,7 @@ fn ordered_pair(a: u32, b: u32) -> (u32, u32) {
     }
 }
 
-fn connected_tile_groups(
-    width: u32,
-    height: u32,
-    tiles: &BTreeSet<AiTile>,
-) -> Vec<Vec<AiTile>> {
+fn connected_tile_groups(width: u32, height: u32, tiles: &BTreeSet<AiTile>) -> Vec<Vec<AiTile>> {
     let mut groups = Vec::new();
     let mut remaining = tiles.clone();
     let mut queue = VecDeque::new();
@@ -1172,11 +1183,7 @@ fn connected_tile_groups(
     groups
 }
 
-fn connected_tile_groups_8(
-    width: u32,
-    height: u32,
-    tiles: &BTreeSet<AiTile>,
-) -> Vec<Vec<AiTile>> {
+fn connected_tile_groups_8(width: u32, height: u32, tiles: &BTreeSet<AiTile>) -> Vec<Vec<AiTile>> {
     let mut groups = Vec::new();
     let mut remaining = tiles.clone();
     let mut queue = VecDeque::new();
@@ -1411,78 +1418,6 @@ fn center_tile_for_tiles(tiles: &[AiTile]) -> AiTile {
     let len = tiles.len() as u64;
     let target = AiTile::new((sum_x / len) as u32, (sum_y / len) as u32);
     nearest_tile_to(tiles, target)
-}
-
-fn choke_segment_geometry(
-    tiles: &[AiTile],
-    center_tile: AiTile,
-    approach_a_tile: AiTile,
-    approach_b_tile: AiTile,
-    bounds: AiTileBounds,
-) -> (AiTile, AiTile, u16) {
-    let endpoint_a_tile = nearest_tile_to(tiles, approach_a_tile);
-    let endpoint_b_tile = nearest_tile_to(tiles, approach_b_tile);
-    let width_tiles = choke_cross_section_width(tiles, center_tile, approach_a_tile, approach_b_tile)
-        .unwrap_or_else(|| {
-            let span_x = bounds.max.x.saturating_sub(bounds.min.x).saturating_add(1);
-            let span_y = bounds.max.y.saturating_sub(bounds.min.y).saturating_add(1);
-            span_x.min(span_y).min(u32::from(u16::MAX)) as u16
-        });
-    (endpoint_a_tile, endpoint_b_tile, width_tiles)
-}
-
-fn choke_cross_section_width(
-    tiles: &[AiTile],
-    center_tile: AiTile,
-    approach_a_tile: AiTile,
-    approach_b_tile: AiTile,
-) -> Option<u16> {
-    if tiles.is_empty() {
-        return None;
-    }
-    let dx = approach_a_tile.x.abs_diff(approach_b_tile.x);
-    let dy = approach_a_tile.y.abs_diff(approach_b_tile.y);
-    if dx >= dy {
-        let x = tiles
-            .iter()
-            .map(|tile| tile.x)
-            .min_by_key(|x| x.abs_diff(center_tile.x))?;
-        let values: Vec<_> = tiles
-            .iter()
-            .filter_map(|tile| (tile.x == x).then_some(tile.y))
-            .collect();
-        longest_contiguous_span(values)
-    } else {
-        let y = tiles
-            .iter()
-            .map(|tile| tile.y)
-            .min_by_key(|y| y.abs_diff(center_tile.y))?;
-        let values: Vec<_> = tiles
-            .iter()
-            .filter_map(|tile| (tile.y == y).then_some(tile.x))
-            .collect();
-        longest_contiguous_span(values)
-    }
-}
-
-fn longest_contiguous_span(mut values: Vec<u32>) -> Option<u16> {
-    values.sort_unstable();
-    values.dedup();
-    let (&first, rest) = values.split_first()?;
-    let mut best = 1_u32;
-    let mut current = 1_u32;
-    let mut previous = first;
-    for value in rest {
-        if *value == previous.saturating_add(1) {
-            current = current.saturating_add(1);
-        } else {
-            best = best.max(current);
-            current = 1;
-        }
-        previous = *value;
-    }
-    best = best.max(current);
-    Some(best.min(u32::from(u16::MAX)) as u16)
 }
 
 fn nearest_tile_to(tiles: &[AiTile], target: AiTile) -> AiTile {

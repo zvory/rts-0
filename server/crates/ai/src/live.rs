@@ -6,16 +6,18 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::ai_core::decision::{decide_profile, AiDecisionMemory};
-use crate::ai_core::map_analysis::{AiMapAnalysis, AiMapAnalysisKey};
+use crate::ai_core::decision::{
+    decide_profile_with_analysis, observer_debug_map_layers_for_profile, AiDecisionMemory,
+};
+use crate::ai_core::map_analysis::AiStaticMapContextCache;
 use crate::ai_core::observation::AiObservation;
 use crate::ai_core::profile_suites::{
     canonical_profile_request_id, resolve_profile_request_id, AI_1_0_SUITE_ID, AI_1_1_SUITE_ID,
-    AI_1_2_SUITE_ID, AI_2_0_SUITE_ID,
+    AI_1_2_SUITE_ID, AI_2_0_SUITE_ID, AI_TURTLE_SUITE_ID,
 };
 use crate::ai_core::profiles::{
     profile_by_id, AiProfile, AI_1_0_TECH, AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID,
-    AI_1_2_WAVE_COHORTS_ID, AI_2_0_TANK_PRESSURE_ID,
+    AI_1_2_WAVE_COHORTS_ID, AI_2_0_TANK_PRESSURE_ID, AI_TURTLE_CHOKES_ID,
 };
 use crate::ai_shared;
 use crate::selfplay::pending_build::PendingBuildTracker;
@@ -23,7 +25,7 @@ use crate::selfplay::player_view::{
     footprint_placeable_from_snapshot, occupied_tiles_from_snapshot, PlayerView,
 };
 use rand::Rng;
-use rts_protocol::ObserverMapAnalysisDiagnostics;
+use rts_protocol::{ObserverMapAnalysisDiagnostics, ObserverMapAnalysisLayer};
 use rts_sim::game::command::SimCommand;
 use rts_sim::protocol::{Snapshot, StartPayload};
 
@@ -38,11 +40,12 @@ pub const DEFAULT_LIVE_PROFILE_ID: &str = AI_1_2_WAVE_COHORTS_ID;
 pub const DEFAULT_LIVE_PROFILE_REQUEST_ID: &str = AI_1_2_SUITE_ID;
 
 /// Profile or suite requests available to ordinary lobby AI opponents.
-pub const LIVE_PROFILE_REQUEST_IDS: [&str; 4] = [
+pub const LIVE_PROFILE_REQUEST_IDS: [&str; 5] = [
     AI_1_0_SUITE_ID,
     AI_1_1_SUITE_ID,
     AI_1_2_SUITE_ID,
     AI_2_0_SUITE_ID,
+    AI_TURTLE_SUITE_ID,
 ];
 
 pub fn canonical_live_profile_request_id(input: &str) -> Option<&'static str> {
@@ -58,6 +61,7 @@ pub fn live_profile_label(profile_or_request_id: &str) -> &'static str {
         Some(AI_1_1_SUITE_ID) | Some(AI_1_1_TANK_MG_ID) => "AI 1.1",
         Some(AI_1_2_SUITE_ID) | Some(AI_1_2_WAVE_COHORTS_ID) => "AI 1.2",
         Some(AI_2_0_SUITE_ID) | Some(AI_2_0_TANK_PRESSURE_ID) => "AI 2.0",
+        Some(AI_TURTLE_SUITE_ID) | Some(AI_TURTLE_CHOKES_ID) => "AI Turtle",
         _ => "AI",
     }
 }
@@ -97,18 +101,13 @@ pub struct AiController {
     player: u32,
     profile_id: &'static str,
     memory: AiDecisionMemory,
-    map_analysis_cache: Option<AiMapAnalysisCache>,
+    static_map_context: AiStaticMapContextCache,
     pending_builds: PendingBuildTracker,
     staged_units: BTreeSet<u32>,
+    held_stage_units: BTreeSet<u32>,
     active_attack_units: BTreeMap<u32, u32>,
     last_decision_trace: Option<AiDecisionTraceSnapshot>,
-}
-
-#[derive(Clone, Debug)]
-struct AiMapAnalysisCache {
-    key: AiMapAnalysisKey,
-    analysis: AiMapAnalysis,
-    diagnostics: ObserverMapAnalysisDiagnostics,
+    last_debug_map_layers: Vec<ObserverMapAnalysisLayer>,
 }
 
 impl AiController {
@@ -122,11 +121,13 @@ impl AiController {
             player,
             profile_id: profile.id,
             memory: AiDecisionMemory::for_profile(profile),
-            map_analysis_cache: None,
+            static_map_context: AiStaticMapContextCache::default(),
             pending_builds: PendingBuildTracker::default(),
             staged_units: BTreeSet::new(),
+            held_stage_units: BTreeSet::new(),
             active_attack_units: BTreeMap::new(),
             last_decision_trace: None,
+            last_debug_map_layers: Vec::new(),
         }
     }
 
@@ -143,40 +144,23 @@ impl AiController {
     }
 
     pub fn latest_map_analysis_diagnostics(&self) -> Option<ObserverMapAnalysisDiagnostics> {
-        self.map_analysis_cache
-            .as_ref()
-            .map(|cache| cache.diagnostics.clone())
+        self.static_map_context
+            .current()
+            .map(|context| context.diagnostics().clone())
+    }
+
+    pub fn latest_debug_map_layers(&self) -> Vec<ObserverMapAnalysisLayer> {
+        self.last_debug_map_layers.clone()
     }
 
     fn profile(&self) -> &'static AiProfile {
         profile_by_id(self.profile_id).unwrap_or_else(default_live_profile)
     }
 
-    fn static_map_analysis(&mut self, start: &StartPayload) -> Option<&AiMapAnalysis> {
-        let key = AiMapAnalysisKey::from_start(start);
-        let refresh = self
-            .map_analysis_cache
-            .as_ref()
-            .map(|cache| cache.key != key)
-            .unwrap_or(true);
-        if refresh {
-            let analysis = AiMapAnalysis::analyze_with_key(start, key);
-            let diagnostics = analysis.debug_overlay();
-            self.map_analysis_cache = Some(AiMapAnalysisCache {
-                key,
-                analysis,
-                diagnostics,
-            });
-        }
-        self.map_analysis_cache
-            .as_ref()
-            .map(|cache| &cache.analysis)
-    }
-
     pub fn think(&mut self, context: AiThinkContext<'_>) -> Vec<SimCommand> {
         let mut commands = context.retreat_commands;
         let tick = context.snapshot.tick;
-        let _ = self.static_map_analysis(context.start);
+        self.static_map_context.get_or_analyze(context.start);
         if !tick
             .wrapping_add(self.player)
             .is_multiple_of(DECISION_INTERVAL)
@@ -206,10 +190,17 @@ impl AiController {
         let profile = self.profile();
         let occupied = occupied_tiles_from_snapshot(&context.start.map, context.snapshot);
         let failed_builds = &self.pending_builds;
-        let decision = decide_profile(
+        let map_analysis = self
+            .static_map_context
+            .get_or_analyze(context.start)
+            .analysis();
+        self.last_debug_map_layers =
+            observer_debug_map_layers_for_profile(&observation, map_analysis, profile);
+        let decision = decide_profile_with_analysis(
             &observation,
             profile,
             &mut self.memory,
+            map_analysis,
             ai_shared::BuildSearch {
                 min_radius: 2,
                 max_radius: ai_shared::DEFAULT_BUILD_SEARCH_MAX_RADIUS,
@@ -248,6 +239,7 @@ impl AiController {
     fn prune_combat_memory(&mut self, observation: &AiObservation, tick: u32) {
         let owned: BTreeSet<u32> = observation.owned.iter().map(|entity| entity.id).collect();
         self.staged_units.retain(|id| owned.contains(id));
+        self.held_stage_units.retain(|id| owned.contains(id));
         let suppress_ticks = self
             .profile()
             .attack
@@ -283,6 +275,7 @@ impl AiController {
         }
         for id in &attacking {
             self.staged_units.remove(id);
+            self.held_stage_units.remove(id);
             self.active_attack_units.insert(*id, tick);
         }
         if staging.is_empty() {
@@ -290,6 +283,8 @@ impl AiController {
         }
 
         let mut filtered = Vec::new();
+        let mut freshly_staged = BTreeSet::new();
+        let command_stages_units = |units: &[u32]| units.iter().any(|id| staging.contains(id));
         for command in commands {
             match command {
                 SimCommand::AttackMove {
@@ -297,15 +292,77 @@ impl AiController {
                     x,
                     y,
                     queued,
-                } if units.iter().any(|id| staging.contains(id)) => {
+                } if command_stages_units(&units) => {
                     let fresh: Vec<u32> = units
                         .into_iter()
                         .filter(|id| !self.staged_units.contains(id))
                         .filter(|id| !self.active_attack_units.contains_key(id))
                         .collect();
                     self.staged_units.extend(fresh.iter().copied());
+                    for id in &fresh {
+                        self.held_stage_units.remove(id);
+                    }
+                    freshly_staged.extend(fresh.iter().copied());
                     if !fresh.is_empty() {
                         filtered.push(SimCommand::AttackMove {
+                            units: fresh,
+                            x,
+                            y,
+                            queued,
+                        });
+                    }
+                }
+                SimCommand::Move {
+                    units,
+                    x,
+                    y,
+                    queued,
+                } if command_stages_units(&units) => {
+                    let fresh: Vec<u32> = units
+                        .into_iter()
+                        .filter(|id| !self.staged_units.contains(id))
+                        .filter(|id| !self.active_attack_units.contains_key(id))
+                        .collect();
+                    self.staged_units.extend(fresh.iter().copied());
+                    for id in &fresh {
+                        self.held_stage_units.remove(id);
+                    }
+                    freshly_staged.extend(fresh.iter().copied());
+                    if !fresh.is_empty() {
+                        filtered.push(SimCommand::Move {
+                            units: fresh,
+                            x,
+                            y,
+                            queued,
+                        });
+                    }
+                }
+                SimCommand::HoldPosition { units } if command_stages_units(&units) => {
+                    let fresh: Vec<u32> = units
+                        .into_iter()
+                        .filter(|id| !self.active_attack_units.contains_key(id))
+                        .filter(|id| !self.held_stage_units.contains(id))
+                        .collect();
+                    self.staged_units.extend(fresh.iter().copied());
+                    self.held_stage_units.extend(fresh.iter().copied());
+                    if !fresh.is_empty() {
+                        filtered.push(SimCommand::HoldPosition { units: fresh });
+                    }
+                }
+                SimCommand::SetupAntiTankGuns {
+                    units,
+                    x,
+                    y,
+                    queued,
+                } if command_stages_units(&units) => {
+                    let fresh: Vec<u32> = units
+                        .into_iter()
+                        .filter(|id| !self.active_attack_units.contains_key(id))
+                        .filter(|id| !self.staged_units.contains(id) || freshly_staged.contains(id))
+                        .collect();
+                    self.staged_units.extend(fresh.iter().copied());
+                    if !fresh.is_empty() {
+                        filtered.push(SimCommand::SetupAntiTankGuns {
                             units: fresh,
                             x,
                             y,
@@ -404,30 +461,21 @@ mod tests {
         let mut ai = AiController::new(1);
         let start = cache_test_start_payload();
 
-        let first_key = ai
-            .static_map_analysis(&start)
-            .map(|analysis| analysis.key())
-            .expect("analysis should be cached");
-        let second_key = ai
-            .static_map_analysis(&start)
-            .map(|analysis| analysis.key())
-            .expect("analysis should remain cached");
+        let first_key = ai.static_map_context.get_or_analyze(&start).key();
+        let second_key = ai.static_map_context.get_or_analyze(&start).key();
         assert_eq!(second_key, first_key);
         assert_eq!(
-            ai.map_analysis_cache.as_ref().map(|cache| cache.key),
+            ai.static_map_context.current().map(|context| context.key()),
             Some(first_key)
         );
 
         let mut moved_start = start.clone();
         moved_start.players[0].start_tile_x = 2;
-        let moved_key = ai
-            .static_map_analysis(&moved_start)
-            .map(|analysis| analysis.key())
-            .expect("changed static identity should still analyze");
+        let moved_key = ai.static_map_context.get_or_analyze(&moved_start).key();
 
         assert_ne!(moved_key, first_key);
         assert_eq!(
-            ai.map_analysis_cache.as_ref().map(|cache| cache.key),
+            ai.static_map_context.current().map(|context| context.key()),
             Some(moved_key)
         );
     }
@@ -450,6 +498,19 @@ mod tests {
     }
 
     #[test]
+    fn live_stage_filter_sends_hold_position_once_per_staged_unit() {
+        let mut ai = AiController::new(1);
+        let intents = [crate::ai_core::decision::AiIntent::Stage { units: vec![42] }];
+        let hold = SimCommand::HoldPosition { units: vec![42] };
+
+        let first = ai.filter_repeated_stage_commands(10, &intents, vec![hold.clone()]);
+        let second = ai.filter_repeated_stage_commands(16, &intents, vec![hold]);
+
+        assert_eq!(first, vec![SimCommand::HoldPosition { units: vec![42] }]);
+        assert!(second.is_empty());
+    }
+
+    #[test]
     fn live_profile_request_pool_exposes_supported_lobby_choices() {
         assert_eq!(
             LIVE_PROFILE_REQUEST_IDS,
@@ -458,6 +519,7 @@ mod tests {
                 AI_1_1_SUITE_ID,
                 AI_1_2_SUITE_ID,
                 AI_2_0_SUITE_ID,
+                AI_TURTLE_SUITE_ID,
             ]
         );
     }
@@ -467,6 +529,7 @@ mod tests {
         assert_eq!(DEFAULT_LIVE_PROFILE_ID, AI_1_2_WAVE_COHORTS_ID);
         assert_eq!(DEFAULT_LIVE_PROFILE_REQUEST_ID, AI_1_2_SUITE_ID);
         assert!(LIVE_PROFILE_REQUEST_IDS.contains(&AI_2_0_SUITE_ID));
+        assert!(LIVE_PROFILE_REQUEST_IDS.contains(&AI_TURTLE_SUITE_ID));
     }
 
     #[test]
@@ -527,6 +590,14 @@ mod tests {
             canonical_live_profile_request_id("ai20"),
             Some(AI_2_0_SUITE_ID)
         );
+        assert_eq!(
+            canonical_live_profile_request_id("ai_turtle"),
+            Some(AI_TURTLE_SUITE_ID)
+        );
+        assert_eq!(
+            canonical_live_profile_request_id("turtle"),
+            Some(AI_TURTLE_SUITE_ID)
+        );
         assert_eq!(canonical_live_profile_request_id("ai_2_0_agent_rush"), None);
         assert_eq!(canonical_live_profile_request_id("ai_2_0_rifle_tank"), None);
         assert_eq!(canonical_live_profile_request_id("rifle_flood_fast"), None);
@@ -542,6 +613,10 @@ mod tests {
             resolve_live_profile_id_for_match(AI_2_0_SUITE_ID, 8, 2),
             AI_2_0_TANK_PRESSURE_ID
         );
+        assert_eq!(
+            resolve_live_profile_id_for_match(AI_TURTLE_SUITE_ID, 8, 2),
+            AI_TURTLE_CHOKES_ID
+        );
     }
 
     #[test]
@@ -551,6 +626,8 @@ mod tests {
         assert_eq!(live_profile_label(AI_1_2_WAVE_COHORTS_ID), "AI 1.2");
         assert_eq!(live_profile_label(AI_2_0_SUITE_ID), "AI 2.0");
         assert_eq!(live_profile_label(AI_2_0_TANK_PRESSURE_ID), "AI 2.0");
+        assert_eq!(live_profile_label(AI_TURTLE_SUITE_ID), "AI Turtle");
+        assert_eq!(live_profile_label(AI_TURTLE_CHOKES_ID), "AI Turtle");
         assert_eq!(live_profile_label("default"), "AI 1.2");
         assert_eq!(live_profile_label("unknown"), "AI");
     }

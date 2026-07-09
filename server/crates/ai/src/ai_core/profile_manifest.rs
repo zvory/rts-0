@@ -2,12 +2,12 @@ use std::collections::BTreeSet;
 
 use serde::Serialize;
 
-use super::profiles::{
-    profile_by_id, AiProfile, AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID, AI_1_2_WAVE_COHORTS_ID,
-    AI_2_0_TANK_PRESSURE_ID,
-};
 #[cfg(test)]
 use super::profiles::required_profiles;
+use super::profiles::{
+    profile_by_id, AiProfile, AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID, AI_1_2_WAVE_COHORTS_ID,
+    AI_2_0_TANK_PRESSURE_ID, AI_TURTLE_CHOKES_ID,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -39,14 +39,7 @@ pub(crate) fn profile_identity(profile: &AiProfile) -> AiProfileIdentity {
         summary: summary.to_string(),
         modules: modules.iter().map(|module| module.to_string()).collect(),
         overlays,
-        fingerprint: profile_fingerprint(
-            profile,
-            label,
-            None,
-            summary,
-            modules.as_slice(),
-            &[],
-        ),
+        fingerprint: profile_fingerprint(profile, label, None, summary, modules.as_slice(), &[]),
     }
 }
 
@@ -129,6 +122,31 @@ fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'sta
                 "second_factory",
             ],
         ),
+        AI_TURTLE_CHOKES_ID => (
+            "AI Turtle Chokes",
+            "Support-weapon turtle profile that opens three Riflemen on a main steel-line screen, fast expands on the AI 2.0 economy cadence, queues Entrenchment before capped four-per-line Machine Gunner production, fast-techs Anti-Tank Guns, prioritizes enemy-facing chokes, and stages Machine Gunners plus guns on own-base choke lines.",
+            vec![
+                "full_steel_saturation",
+                "early_expansion",
+                "three_rifle_opening",
+                "support_tech",
+                "entrenchment_research",
+                "entrenchment_before_machine_gunners",
+                "one_barracks_machine_gunner_core",
+                "four_machine_gunners_per_main_choke",
+                "wider_machine_gunner_spacing",
+                "fast_anti_tank_gun_tech",
+                "main_choke_first",
+                "nearest_enemy_choke_priority",
+                "base_route_sector_priority",
+                "full_choke_line_coverage_slots",
+                "anti_tank_coverage_emplacements",
+                "close_spawn_two_chokes",
+                "steel_line_rifle_screen",
+                "machine_gunner_choke_line_staging",
+                "anti_tank_emplacements",
+            ],
+        ),
         _ => (
             "AI Profile",
             "Developer AI profile resolved through the shared profile registry.",
@@ -177,7 +195,7 @@ mod tests {
     fn profile_identities_are_complete_and_valid() {
         let identities = required_profile_identities();
 
-        assert_eq!(identities.len(), 4);
+        assert_eq!(identities.len(), 5);
         for identity in identities {
             validate_profile_identity(&identity).expect("identity should validate");
             assert!(!identity.fingerprint.is_empty());

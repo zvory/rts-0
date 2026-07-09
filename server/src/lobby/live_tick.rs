@@ -269,6 +269,15 @@ impl LiveTickDriver<'_> {
             .ai_controllers
             .iter()
             .find_map(|controller| controller.latest_map_analysis_diagnostics());
+        if let Some(map_analysis) = analysis.map_analysis.as_mut() {
+            for layer in self
+                .ai_controllers
+                .iter()
+                .flat_map(|controller| controller.latest_debug_map_layers())
+            {
+                map_analysis.layers.push(layer);
+            }
+        }
         for controller in self.ai_controllers.iter() {
             let Some(trace) = controller.latest_decision_trace() else {
                 continue;

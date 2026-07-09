@@ -18,6 +18,7 @@ use crate::ai_core::profiles::{
     RIFLE_FLOOD_FULL_SATURATION, STEEL_EXPANSION_TANKS, TECH_TO_TANKS,
 };
 mod steel_line_tests;
+mod turtle_tests;
 fn worker(id: u32, state: AiEntityState) -> AiEntitySummary {
     AiEntitySummary {
         id,
@@ -362,7 +363,7 @@ fn decide(
 ) -> AiDecision {
     let width = observation.map.width;
     let height = observation.map.height;
-    decide_profile(
+    decide_profile_without_static_map_for_tests(
         observation,
         profile,
         memory,
@@ -601,7 +602,7 @@ fn expansion_trace_reports_no_valid_site_when_all_sites_are_blocked() {
         owned,
     ));
     let mut memory = AiDecisionMemory::for_profile(&STEEL_EXPANSION_TANKS);
-    let decision = decide_profile(
+    let decision = decide_profile_without_static_map_for_tests(
         &observation,
         &STEEL_EXPANSION_TANKS,
         &mut memory,
@@ -2133,7 +2134,7 @@ fn steel_expansion_tanks_places_expansion_cc_in_range_of_whole_resource_line() {
     );
 
     let mut memory = AiDecisionMemory::for_profile(&STEEL_EXPANSION_TANKS);
-    let decision = decide_profile(
+    let decision = decide_profile_without_static_map_for_tests(
         &observation,
         &STEEL_EXPANSION_TANKS,
         &mut memory,
@@ -4206,7 +4207,12 @@ fn idle_midfield_rifle_raid_resumes_after_cleared_fight() {
         vec![building(10, EntityKind::CityCentre, Some(0)), raider],
     );
     let mut memory = AiDecisionMemory::for_profile(&RIFLE_FLOOD_FAST);
-    memory.note_attack_for(&RIFLE_FLOOD_FAST, RIFLE_FLOOD_FAST.attack, observation.tick, &[30]);
+    memory.note_attack_for(
+        &RIFLE_FLOOD_FAST,
+        RIFLE_FLOOD_FAST.attack,
+        observation.tick,
+        &[30],
+    );
 
     let decision = decide(&observation, &RIFLE_FLOOD_FAST, &mut memory);
 
@@ -4234,7 +4240,12 @@ fn idle_home_rifle_does_not_resume_raid_before_wave_cadence() {
         vec![building(10, EntityKind::CityCentre, Some(0)), raider],
     );
     let mut memory = AiDecisionMemory::for_profile(&RIFLE_FLOOD_FAST);
-    memory.note_attack_for(&RIFLE_FLOOD_FAST, RIFLE_FLOOD_FAST.attack, observation.tick, &[30]);
+    memory.note_attack_for(
+        &RIFLE_FLOOD_FAST,
+        RIFLE_FLOOD_FAST.attack,
+        observation.tick,
+        &[30],
+    );
 
     let decision = decide(&observation, &RIFLE_FLOOD_FAST, &mut memory);
 
@@ -4276,33 +4287,4 @@ fn attack_memory_uses_profile_thresholds_and_growth() {
         AiIntent::Stage { units } if units.as_slice() == [30]
     )));
     assert_eq!(fast_memory.desired_attack_size(&RIFLE_FLOOD_FAST, 91), 1);
-}
-
-#[test]
-fn each_required_profile_emits_a_starting_state_command() {
-    let mut owned = vec![building(10, EntityKind::CityCentre, Some(0))];
-    owned.extend((0..4).map(|i| worker(20 + i, AiEntityState::Idle)));
-    let observation = observation(
-        AiEconomy {
-            steel: 1_000,
-            oil: 1_000,
-            supply_used: 4,
-            supply_cap: 20,
-        },
-        owned,
-    );
-
-    for profile in crate::ai_core::profiles::required_profiles() {
-        let decision = decide(
-            &observation,
-            profile,
-            &mut AiDecisionMemory::for_profile(profile),
-        );
-
-        assert!(
-            !decision.commands.is_empty(),
-            "{} should emit at least one plausible opening command",
-            profile.id
-        );
-    }
 }

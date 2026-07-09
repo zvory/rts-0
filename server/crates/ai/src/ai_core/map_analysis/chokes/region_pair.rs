@@ -44,12 +44,9 @@ pub(super) fn candidate_split_region_pair(
 
             while let Some(tile) = queue.pop_front() {
                 tile_count = tile_count.saturating_add(1);
-                if let Some(region_id) = region_id_for_tile(
-                    context.width,
-                    context.height,
-                    context.region_by_tile,
-                    tile,
-                ) {
+                if let Some(region_id) =
+                    region_id_for_tile(context.width, context.height, context.region_by_tile, tile)
+                {
                     let distance2 = tile_distance2(tile, candidate.center);
                     let replace = best_region
                         .map(|(best_id, best_tile, best_distance2)| {

@@ -94,7 +94,11 @@ pub struct ObserverMapAnalysisLayer {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum ObserverMapAnalysisPrimitive {
     TileRect {
         id: String,
@@ -107,6 +111,8 @@ pub enum ObserverMapAnalysisPrimitive {
         alpha: f32,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         label: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tooltip: Option<String>,
     },
     Marker {
         id: String,
@@ -117,6 +123,22 @@ pub enum ObserverMapAnalysisPrimitive {
         color: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         label: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tooltip: Option<String>,
+    },
+    Line {
+        id: String,
+        x1: f32,
+        y1: f32,
+        x2: f32,
+        y2: f32,
+        color: String,
+        alpha: f32,
+        width: f32,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        label: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tooltip: Option<String>,
     },
 }
 
@@ -137,17 +159,34 @@ mod tests {
                     id: "components".to_string(),
                     label: "Components".to_string(),
                     default_visible: true,
-                    primitives: vec![ObserverMapAnalysisPrimitive::TileRect {
-                        id: "component:0".to_string(),
-                        tile_x: 2,
-                        tile_y: 3,
-                        tile_w: 10,
-                        tile_h: 8,
-                        fill: "#3da5d9".to_string(),
-                        stroke: "#3da5d9".to_string(),
-                        alpha: 0.12,
-                        label: Some("C0 80t clr8".to_string()),
-                    }],
+                    primitives: vec![
+                        ObserverMapAnalysisPrimitive::TileRect {
+                            id: "component:0".to_string(),
+                            tile_x: 2,
+                            tile_y: 3,
+                            tile_w: 10,
+                            tile_h: 8,
+                            fill: "#3da5d9".to_string(),
+                            stroke: "#3da5d9".to_string(),
+                            alpha: 0.12,
+                            label: Some("C0 80t clr8".to_string()),
+                            tooltip: Some(
+                                "Static map-analysis component tile rectangle".to_string(),
+                            ),
+                        },
+                        ObserverMapAnalysisPrimitive::Line {
+                            id: "line:debug".to_string(),
+                            x1: 16.0,
+                            y1: 32.0,
+                            x2: 96.0,
+                            y2: 32.0,
+                            color: "#00d4ff".to_string(),
+                            alpha: 0.8,
+                            width: 3.0,
+                            label: Some("debug line".to_string()),
+                            tooltip: Some("Line primitive with hover text".to_string()),
+                        },
+                    ],
                 }],
             }),
             players: vec![ObserverAnalysisPlayer {
@@ -202,6 +241,14 @@ mod tests {
         assert_eq!(
             json["mapAnalysis"]["layers"][0]["primitives"][0]["tileW"],
             10
+        );
+        assert_eq!(
+            json["mapAnalysis"]["layers"][0]["primitives"][1]["kind"],
+            "line"
+        );
+        assert_eq!(
+            json["mapAnalysis"]["layers"][0]["primitives"][1]["tooltip"],
+            "Line primitive with hover text"
         );
         assert_eq!(json["players"][0]["id"], 1);
         assert_eq!(json["players"][0]["units"][0]["kind"], "rifleman");

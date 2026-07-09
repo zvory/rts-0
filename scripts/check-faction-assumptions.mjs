@@ -206,6 +206,8 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/ai/src/ai_core/decision/raids.rs",
   "server/crates/ai/src/ai_core/decision/resources.rs",
   "server/crates/ai/src/ai_core/decision/trace.rs",
+  // Turtle AI is a Kriegsia-only current-roster profile until AI faction catalog routing exists.
+  "server/crates/ai/src/ai_core/decision/turtle.rs",
   "server/crates/ai/src/ai_core/facts.rs",
   "server/crates/ai/src/ai_core/observation.rs",
   "server/crates/ai/src/ai_core/profiles.rs",

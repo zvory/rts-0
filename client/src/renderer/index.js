@@ -167,10 +167,26 @@ export class Renderer {
     this._fogGfx = new PIXI.Graphics();
     this.layers.fog.addChild(this._fogGfx);
     this._observerMapAnalysisGfx = new PIXI.Graphics();
+    this._observerMapAnalysisHitLayer = new PIXI.Container();
     this._observerMapAnalysisLabels = new PIXI.Container();
     this._observerMapAnalysisLabelPool = new Map();
+    this._observerMapAnalysisHitPool = new Map();
+    this._observerMapAnalysisTooltip = new PIXI.Text("", {
+      fontFamily: "Inter, system-ui, sans-serif",
+      fontSize: 13,
+      fontWeight: "700",
+      fill: 0xfff3c4,
+      stroke: 0x0f1115,
+      strokeThickness: 4,
+      wordWrap: true,
+      wordWrapWidth: 320,
+    });
+    this._observerMapAnalysisTooltip.visible = false;
+    this._observerMapAnalysisTooltip.anchor?.set?.(0.5, 1);
     this.layers.feedback.addChild(this._observerMapAnalysisGfx);
+    this.layers.feedback.addChild(this._observerMapAnalysisHitLayer);
     this.layers.feedback.addChild(this._observerMapAnalysisLabels);
+    this.layers.feedback.addChild(this._observerMapAnalysisTooltip);
     this._feedbackGfx = new PIXI.Graphics();
     this.layers.feedback.addChild(this._feedbackGfx);
     this._missToastPool = new Map();
@@ -930,8 +946,11 @@ export class Renderer {
     this._fogGfx.destroy();
     this._feedbackGfx.destroy();
     this._observerMapAnalysisGfx.destroy();
+    this._observerMapAnalysisHitLayer.destroy({ children: true });
     this._observerMapAnalysisLabels.destroy({ children: true });
+    this._observerMapAnalysisTooltip.destroy();
     this._observerMapAnalysisLabelPool.clear();
+    this._observerMapAnalysisHitPool.clear();
     this._smokeGfx.destroy();
     this._abilityObjectGfx.destroy();
     this._placementGfx.destroy();

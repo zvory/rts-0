@@ -9,8 +9,8 @@ use std::process;
 
 use crate::selfplay::{
     available_profile_request_ids, canonical_profile_request_id_for_match,
-    resolve_profile_request_id_for_match, run_profile_matchup_result, ProfileMatchupOptions,
-    ProfileMatchupEndReason, ProfileMatchupResult,
+    resolve_profile_request_id_for_match, run_profile_matchup_result, ProfileMatchupEndReason,
+    ProfileMatchupOptions, ProfileMatchupResult,
 };
 
 const DEFAULT_TICKS: u32 = 25_000;
@@ -359,6 +359,8 @@ fn print_profiles() {
     println!("  ai12 -> ai_1_2");
     println!("  ai_2_0 -> ai_2_0");
     println!("  ai20 -> ai_2_0");
+    println!("  ai_turtle -> ai_turtle");
+    println!("  turtle -> ai_turtle");
 }
 
 fn print_usage() {
@@ -416,10 +418,7 @@ mod tests {
 
     #[test]
     fn starting_city_centre_result_is_reported_as_objective_win() {
-        let result = profile_result(
-            ProfileMatchupEndReason::StartingCityCentreKilled,
-            Some(2),
-        );
+        let result = profile_result(ProfileMatchupEndReason::StartingCityCentreKilled, Some(2));
 
         assert_eq!(
             winner_text(&result),
