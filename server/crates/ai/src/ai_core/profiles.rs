@@ -11,6 +11,7 @@ pub(crate) const AI_1_0_TECH_ID: &str = "ai_1_0_tech";
 pub(crate) const AI_1_1_TANK_MG_ID: &str = "ai_1_1_tank_mg";
 pub(crate) const AI_1_2_WAVE_COHORTS_ID: &str = "ai_1_2_wave_cohorts";
 pub(crate) const AI_2_0_TANK_PRESSURE_ID: &str = "ai_2_0_tank_pressure";
+pub(crate) const AI_2_1_ECONOMY_MANAGER_ID: &str = "ai_2_1_economy_manager";
 pub(crate) const AI_TURTLE_CHOKES_ID: &str = "ai_turtle_chokes";
 
 const AI_1_2_FRONTAL_COHORT_TICKS: u32 = 3_600;
@@ -976,6 +977,11 @@ pub(crate) static AI_2_0_TANK_PRESSURE: AiProfile = AiProfile {
     }),
 };
 
+pub(crate) static AI_2_1_ECONOMY_MANAGER: AiProfile = AiProfile {
+    id: AI_2_1_ECONOMY_MANAGER_ID,
+    ..AI_2_0_TANK_PRESSURE
+};
+
 pub(crate) static AI_TURTLE_CHOKES: AiProfile = AiProfile {
     id: AI_TURTLE_CHOKES_ID,
     workers: WorkerPolicy {
@@ -1056,12 +1062,13 @@ pub(crate) static AI_TURTLE_CHOKES: AiProfile = AiProfile {
     tech_transition: None,
 };
 
-pub(crate) fn required_profiles() -> [&'static AiProfile; 5] {
+pub(crate) fn required_profiles() -> [&'static AiProfile; 6] {
     [
         &AI_1_0_TECH,
         &AI_1_1_TANK_MG,
         &AI_1_2_WAVE_COHORTS,
         &AI_2_0_TANK_PRESSURE,
+        &AI_2_1_ECONOMY_MANAGER,
         &AI_TURTLE_CHOKES,
     ]
 }
@@ -1087,6 +1094,7 @@ mod tests {
                 AI_1_1_TANK_MG_ID,
                 AI_1_2_WAVE_COHORTS_ID,
                 AI_2_0_TANK_PRESSURE_ID,
+                AI_2_1_ECONOMY_MANAGER_ID,
                 AI_TURTLE_CHOKES_ID,
             ]
         );
@@ -1102,6 +1110,10 @@ mod tests {
         assert_eq!(
             profile_by_id(AI_2_0_TANK_PRESSURE_ID).unwrap().id,
             AI_2_0_TANK_PRESSURE_ID
+        );
+        assert_eq!(
+            profile_by_id(AI_2_1_ECONOMY_MANAGER_ID).unwrap().id,
+            AI_2_1_ECONOMY_MANAGER_ID
         );
         assert_eq!(
             profile_by_id(AI_TURTLE_CHOKES_ID).unwrap().id,
@@ -1122,6 +1134,7 @@ mod tests {
             &AI_1_1_TANK_MG,
             &AI_1_2_WAVE_COHORTS,
             &AI_2_0_TANK_PRESSURE,
+            &AI_2_1_ECONOMY_MANAGER,
             &AI_TURTLE_CHOKES,
         ] {
             for unit in omitted_units {
@@ -1206,6 +1219,34 @@ mod tests {
         assert_eq!(
             AI_2_0_TANK_PRESSURE.defensive_machine_gunners,
             Some(DefensiveMachineGunnerPolicy { target_count: 4 })
+        );
+    }
+
+    #[test]
+    fn ai_2_1_keeps_ai_2_0_policy_values_for_manager_refactor_baseline() {
+        assert_eq!(AI_2_1_ECONOMY_MANAGER.id, AI_2_1_ECONOMY_MANAGER_ID);
+        assert_eq!(AI_2_1_ECONOMY_MANAGER.workers, AI_2_0_TANK_PRESSURE.workers);
+        assert_eq!(AI_2_1_ECONOMY_MANAGER.supply, AI_2_0_TANK_PRESSURE.supply);
+        assert_eq!(AI_2_1_ECONOMY_MANAGER.buildings, AI_2_0_TANK_PRESSURE.buildings);
+        assert_eq!(
+            AI_2_1_ECONOMY_MANAGER.extra_factories,
+            AI_2_0_TANK_PRESSURE.extra_factories
+        );
+        assert_eq!(
+            AI_2_1_ECONOMY_MANAGER.production,
+            AI_2_0_TANK_PRESSURE.production
+        );
+        assert_eq!(
+            AI_2_1_ECONOMY_MANAGER.resources,
+            AI_2_0_TANK_PRESSURE.resources
+        );
+        assert_eq!(
+            AI_2_1_ECONOMY_MANAGER.expansion,
+            AI_2_0_TANK_PRESSURE.expansion
+        );
+        assert_eq!(
+            AI_2_1_ECONOMY_MANAGER.tech_transition,
+            AI_2_0_TANK_PRESSURE.tech_transition
         );
     }
 

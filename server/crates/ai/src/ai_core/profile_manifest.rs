@@ -6,7 +6,7 @@ use serde::Serialize;
 use super::profiles::required_profiles;
 use super::profiles::{
     profile_by_id, AiProfile, AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID, AI_1_2_WAVE_COHORTS_ID,
-    AI_2_0_TANK_PRESSURE_ID, AI_TURTLE_CHOKES_ID,
+    AI_2_0_TANK_PRESSURE_ID, AI_2_1_ECONOMY_MANAGER_ID, AI_TURTLE_CHOKES_ID,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -122,6 +122,19 @@ fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'sta
                 "second_factory",
             ],
         ),
+        AI_2_1_ECONOMY_MANAGER_ID => (
+            "AI 2.1 Economy Manager",
+            "AI 2.1 suite member that keeps AI 2.0 strategy values while routing economy decisions through proposal-based economy management.",
+            vec![
+                "economy_manager",
+                "full_steel_saturation",
+                "early_expansion",
+                "defensive_machine_gunners",
+                "earlier_factory_tank_unlock",
+                "mixed_tank_pressure",
+                "second_factory",
+            ],
+        ),
         AI_TURTLE_CHOKES_ID => (
             "AI Turtle Chokes",
             "Support-weapon turtle profile that opens three Riflemen on a main steel-line screen, fast expands on the AI 2.0 economy cadence, queues Entrenchment before capped four-per-line Machine Gunner production, fast-techs Anti-Tank Guns, prioritizes enemy-facing chokes, and stages Machine Gunners plus guns on own-base choke lines.",
@@ -189,13 +202,13 @@ fn fnv1a64(bytes: &[u8]) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ai_core::profiles::AI_2_0_TANK_PRESSURE_ID;
+    use crate::ai_core::profiles::{AI_2_0_TANK_PRESSURE_ID, AI_2_1_ECONOMY_MANAGER_ID};
 
     #[test]
     fn profile_identities_are_complete_and_valid() {
         let identities = required_profile_identities();
 
-        assert_eq!(identities.len(), 5);
+        assert_eq!(identities.len(), 6);
         for identity in identities {
             validate_profile_identity(&identity).expect("identity should validate");
             assert!(!identity.fingerprint.is_empty());
@@ -212,5 +225,14 @@ mod tests {
         assert!(tank_pressure
             .modules
             .contains(&"mixed_tank_pressure".to_string()));
+    }
+
+    #[test]
+    fn ai_2_1_economy_manager_has_specific_manifest_metadata() {
+        let identity = profile_identity_by_id(AI_2_1_ECONOMY_MANAGER_ID)
+            .expect("AI 2.1 economy manager identity");
+
+        assert_eq!(identity.label, "AI 2.1 Economy Manager");
+        assert!(identity.modules.contains(&"economy_manager".to_string()));
     }
 }

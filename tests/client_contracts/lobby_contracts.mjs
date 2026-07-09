@@ -59,6 +59,7 @@ import { textWithin } from "./dom_text.mjs";
       { id: "ai_1_1", label: "AI 1.1" },
       { id: "ai_1_2", label: "AI 1.2" },
       { id: "ai_2_0", label: "AI 2.0" },
+      { id: "ai_2_1", label: "AI 2.1" },
       { id: "ai_turtle", label: "AI Turtle" },
     ],
     "lobby AI profile selector lists supported AI suites",
@@ -213,6 +214,12 @@ import { textWithin } from "./dom_text.mjs";
       ),
       "AI profile selector includes the AI 2.0 option",
     );
+    assert(
+      select.children.some(
+        (option) => option.value === "ai_2_1" && option.textContent === "AI 2.1",
+      ),
+      "AI profile selector includes the AI 2.1 option",
+    );
 
     select.value = "ai_1_2";
     select.listeners.change?.();
@@ -277,6 +284,36 @@ import { textWithin } from "./dom_text.mjs";
     assert(
       textWithin(labelRoot).includes("AI 2.0"),
       "concrete AI 2.0 profile ids display their suite label",
+    );
+
+    const managerAliasRoot = document.createElement("div");
+    const managerAliasView = new LobbyRosterView(managerAliasRoot);
+    managerAliasView.render({
+      players: [
+        {
+          id: 2,
+          name: "Computer",
+          color: "#d55e00",
+          ready: true,
+          teamId: 2,
+          isAi: true,
+          aiProfileId: "ai_2_1_economy_manager",
+        },
+      ],
+      myId: 1,
+      hostId: 1,
+      isHost: true,
+      countdownActive: false,
+      playerCount: 1,
+      maxPlayers: 4,
+    });
+    const managerAliasSelect = findFakes(
+      managerAliasRoot,
+      (el) => el.tagName === "SELECT" && el.className === "player-ai-profile-select",
+    )[0];
+    assert(
+      managerAliasSelect.value === "ai_2_1",
+      "concrete AI 2.1 profile ids select their suite option",
     );
   });
 }

@@ -7,6 +7,7 @@ export const AI_PROFILES = Object.freeze([
   { id: "ai_1_1", label: "AI 1.1" },
   { id: "ai_1_2", label: "AI 1.2" },
   { id: "ai_2_0", label: "AI 2.0" },
+  { id: "ai_2_1", label: "AI 2.1" },
   { id: "ai_turtle", label: "AI Turtle" },
 ]);
 
@@ -15,6 +16,7 @@ const AI_PROFILE_ALIASES = Object.freeze({
   ai_1_1_tank_mg: "ai_1_1",
   ai_1_2_wave_cohorts: "ai_1_2",
   ai_2_0_tank_pressure: "ai_2_0",
+  ai_2_1_economy_manager: "ai_2_1",
   ai_turtle_chokes: "ai_turtle",
 });
 

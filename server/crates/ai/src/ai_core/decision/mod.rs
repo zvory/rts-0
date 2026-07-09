@@ -25,6 +25,7 @@ use rts_sim::game::entity::EntityKind;
 use rts_sim::game::upgrade::{self, UpgradeKind};
 
 mod defense;
+mod economy_manager;
 mod expansion;
 mod frontal;
 mod geometry;
@@ -40,8 +41,13 @@ use self::defense::{
     defensive_machine_gunner_units, defensive_panic_barracks_target, defensive_panic_plan,
     defensive_panic_response, local_defense_target, local_defense_units,
     stage_defensive_machine_gunner_perimeter, stage_main_steel_defensive_line,
-    stages_expansion_defensive_line, DefensivePanic, DefensivePanicResponse, ALL_COMBAT_UNITS,
-    DEFENSIVE_PANIC_GRACE_TICKS, DEFENSIVE_PANIC_RIFLE_TECH_PATH, DEFENSIVE_PANIC_SUSTAINED_TICKS,
+    stages_expansion_defensive_line, DefensivePanic, DefensivePanicPlan, DefensivePanicResponse,
+    ALL_COMBAT_UNITS, DEFENSIVE_PANIC_GRACE_TICKS, DEFENSIVE_PANIC_RIFLE_TECH_PATH,
+    DEFENSIVE_PANIC_SUSTAINED_TICKS,
+};
+use self::economy_manager::{
+    propose_economy, EconomyManagerInput, EconomyManagerOutput, EconomyManagerSignals,
+    EconomyProposal, OilDemandSignal,
 };
 use self::expansion::{plan_expansion, try_build_expansion_city_centre, ExpansionBlocker};
 use self::frontal::{issue_frontal_wave, plan_frontal_wave};
@@ -69,6 +75,8 @@ use self::trace::{build_manager_trace, ManagerOutputTrace, TraceInput};
 use self::turtle::{
     stage_turtle_choke_defense, turtle_machine_gunner_lines_staffed, turtle_observer_debug_layers,
 };
+
+use super::profiles::AI_2_1_ECONOMY_MANAGER_ID;
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct AiDecision {
@@ -437,6 +445,23 @@ where
     let save_for_expansion = expansion_plan.should_save;
     let proxy_barracks_active =
         !defensive_panic.active && should_use_proxy_barracks(&facts, profile);
+    let economy_manager_output = if uses_economy_manager(profile) {
+        Some(propose_economy(EconomyManagerInput {
+            observation,
+            facts: &facts,
+            profile,
+            expansion_plan: &expansion_plan,
+            signals: EconomyManagerSignals {
+                recovery_active,
+                oil_demand: oil_demand_signal(profile, memory, panic_plan),
+                defer_supply_for_tech: save_for_required_tech_building,
+                emergency_supply: facts.free_supply <= profile.supply.emergency_depot_threshold,
+                defer_worker_training_for_tech: defensive_panic.active,
+            },
+        }))
+    } else {
+        None
+    };
 
     if proxy_barracks_active {
         if let Some(intent) = try_proxy_barracks(
@@ -451,9 +476,12 @@ where
         }
     }
 
-    if wants_depot(&facts, profile)
-        && (!save_for_required_tech_building
-            || facts.free_supply <= profile.supply.emergency_depot_threshold)
+    if should_build_depot_from_economy_manager(&economy_manager_output)
+        .unwrap_or_else(|| {
+            wants_depot(&facts, profile)
+                && (!save_for_required_tech_building
+                    || facts.free_supply <= profile.supply.emergency_depot_threshold)
+        })
         && try_build_kind(
             observation,
             &facts,
@@ -471,7 +499,9 @@ where
         });
     }
 
-    if save_for_expansion {
+    if should_build_expansion_from_economy_manager(&economy_manager_output)
+        .unwrap_or(save_for_expansion)
+    {
         if try_build_expansion_city_centre(
             observation,
             &facts,
@@ -493,32 +523,44 @@ where
     let save_for_unplanned_expansion =
         save_for_expansion && planned_in_intents(&intents, EntityKind::CityCentre) == 0;
 
-    let mut economy_plan = plan_economy(
-        observation,
-        &facts,
-        profile,
-        recovery_active,
-        panic_plan.map(|plan| plan.oil_workers),
-    );
-    if turtle_opening_pending(profile, memory) {
-        economy_plan.desired_oil_workers = economy_plan.current_oil_workers;
-    }
+    let economy_plan = economy_manager_output
+        .as_ref()
+        .map(|output| output.plan.clone())
+        .unwrap_or_else(|| {
+            let mut plan = plan_economy(
+                observation,
+                &facts,
+                profile,
+                recovery_active,
+                panic_plan.map(|plan| plan.oil_workers),
+            );
+            if turtle_opening_pending(profile, memory) {
+                plan.desired_oil_workers = plan.current_oil_workers;
+            }
+            plan
+        });
     let save_worker_training_for_tech = defensive_panic.active;
-    for trained in actions::train_units(
-        &mut actions,
-        TrainUnitsRequest {
-            buildings: facts.production_buildings(EntityKind::CityCentre),
-            unit_priorities: &[EntityKind::Worker],
-            completed_building_kinds: facts.complete_building_kinds(),
-            completed_upgrades: facts.completed_upgrades(),
-            max_queue_depth: 1,
-            save_for_tech: save_worker_training_for_tech,
-            current_counts: &[(EntityKind::Worker, facts.worker_count)],
-            max_counts: &[(EntityKind::Worker, economy_plan.target_workers)],
-            balance_unit_priorities: false,
-        },
-    ) {
-        intents.push(AiIntent::Train { kind: trained.unit });
+    let should_train_workers = economy_manager_output
+        .as_ref()
+        .map(|output| output.proposes(EconomyProposal::TrainWorker))
+        .unwrap_or(true);
+    if should_train_workers {
+        for trained in actions::train_units(
+            &mut actions,
+            TrainUnitsRequest {
+                buildings: facts.production_buildings(EntityKind::CityCentre),
+                unit_priorities: &[EntityKind::Worker],
+                completed_building_kinds: facts.complete_building_kinds(),
+                completed_upgrades: facts.completed_upgrades(),
+                max_queue_depth: 1,
+                save_for_tech: save_worker_training_for_tech,
+                current_counts: &[(EntityKind::Worker, facts.worker_count)],
+                max_counts: &[(EntityKind::Worker, economy_plan.target_workers)],
+                balance_unit_priorities: false,
+            },
+        ) {
+            intents.push(AiIntent::Train { kind: trained.unit });
+        }
     }
 
     if profile.turtle_defense.is_some() {
@@ -736,7 +778,13 @@ where
     } else {
         facts.idle_workers.as_slice()
     };
-    if economy_plan.desired_oil_workers > economy_plan.current_oil_workers {
+    let should_assign_oil_workers = economy_manager_output
+        .as_ref()
+        .map(|output| output.proposes(EconomyProposal::AssignOilWorkers))
+        .unwrap_or_else(|| economy_plan.desired_oil_workers > economy_plan.current_oil_workers);
+    if should_assign_oil_workers
+        && economy_plan.desired_oil_workers > economy_plan.current_oil_workers
+    {
         let assigned = actions::assign_workers_to_resource(
             &mut actions,
             ResourceAssignmentPolicy {
@@ -764,7 +812,13 @@ where
         }
     }
 
-    if economy_plan.target_steel_workers > economy_plan.current_steel_workers {
+    let should_assign_steel_workers = economy_manager_output
+        .as_ref()
+        .map(|output| output.proposes(EconomyProposal::AssignSteelWorkers))
+        .unwrap_or_else(|| economy_plan.target_steel_workers > economy_plan.current_steel_workers);
+    if should_assign_steel_workers
+        && economy_plan.target_steel_workers > economy_plan.current_steel_workers
+    {
         let assigned = actions::assign_workers_to_resource(
             &mut actions,
             ResourceAssignmentPolicy {
@@ -1000,6 +1054,39 @@ fn turtle_opening_pending(profile: &AiProfile, memory: &AiDecisionMemory) -> boo
         .turtle_defense
         .map(|policy| memory.turtle_opening_riflemen_ordered < policy.opening_riflemen)
         .unwrap_or(false)
+}
+
+fn uses_economy_manager(profile: &AiProfile) -> bool {
+    profile.id == AI_2_1_ECONOMY_MANAGER_ID
+}
+
+fn oil_demand_signal(
+    profile: &AiProfile,
+    memory: &AiDecisionMemory,
+    panic_plan: Option<DefensivePanicPlan>,
+) -> OilDemandSignal {
+    if turtle_opening_pending(profile, memory) {
+        return OilDemandSignal::HoldCurrent;
+    }
+    panic_plan
+        .map(|plan| OilDemandSignal::ExactWorkers(plan.oil_workers))
+        .unwrap_or(OilDemandSignal::ProfileDefault)
+}
+
+fn should_build_depot_from_economy_manager(
+    output: &Option<EconomyManagerOutput>,
+) -> Option<bool> {
+    output
+        .as_ref()
+        .map(|output| output.proposes(EconomyProposal::BuildSupplyDepot))
+}
+
+fn should_build_expansion_from_economy_manager(
+    output: &Option<EconomyManagerOutput>,
+) -> Option<bool> {
+    output
+        .as_ref()
+        .map(|output| output.proposes(EconomyProposal::BuildExpansionCityCentre))
 }
 
 fn turtle_should_delay_tech_for_opening(
