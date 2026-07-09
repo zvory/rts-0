@@ -94,16 +94,10 @@ impl Map {
     /// lobby.
     pub fn list_available() -> Vec<AvailableMap> {
         let Some(dir) = bundled_maps_dir() else {
-            return vec![AvailableMap {
-                name: DEFAULT_MAP_NAME.to_string(),
-                description: DEFAULT_MAP_NAME.to_string(),
-            }];
+            return vec![default_available_map()];
         };
         let Ok(entries) = std::fs::read_dir(dir) else {
-            return vec![AvailableMap {
-                name: DEFAULT_MAP_NAME.to_string(),
-                description: DEFAULT_MAP_NAME.to_string(),
-            }];
+            return vec![default_available_map()];
         };
         let mut paths: Vec<_> = entries
             .filter_map(|e| e.ok())
@@ -121,33 +115,12 @@ impl Map {
             let Some(json) = std::fs::read_to_string(&path).ok() else {
                 continue;
             };
-            let Ok(v) = serde_json::from_str::<serde_json::Value>(&json) else {
-                continue;
-            };
-            // Skip maps that do not declare the current schema version.
-            let version = v.get("version").and_then(|v| v.as_u64()).unwrap_or(0);
-            if version != CURRENT_MAP_VERSION as u64 {
-                continue;
-            }
-            let name = v
-                .get("name")
-                .and_then(|n| n.as_str())
-                .unwrap_or(&stem)
-                .to_string();
-            let description = v
-                .get("description")
-                .and_then(|d| d.as_str())
-                .unwrap_or(&name)
-                .to_string();
-            if !name.is_empty() {
-                out.push(AvailableMap { name, description });
+            if let Some(entry) = available_map_from_json(&stem, &json) {
+                out.push(entry);
             }
         }
         if out.is_empty() {
-            out.push(AvailableMap {
-                name: DEFAULT_MAP_NAME.to_string(),
-                description: DEFAULT_MAP_NAME.to_string(),
-            });
+            out.push(default_available_map());
         }
         out
     }
@@ -327,6 +300,40 @@ fn stable_content_hash(content: &str) -> String {
     format!("{:016x}", fnv_bytes(FNV_OFFSET_BASIS, content.as_bytes()))
 }
 
+fn default_available_map() -> AvailableMap {
+    available_map_from_json(DEFAULT_MAP_NAME, DEFAULT_MAP_JSON).unwrap_or_else(|| AvailableMap {
+        name: DEFAULT_MAP_NAME.to_string(),
+        description: DEFAULT_MAP_NAME.to_string(),
+        min_players: 1,
+        max_players: 4,
+    })
+}
+
+fn available_map_from_json(stem: &str, json: &str) -> Option<AvailableMap> {
+    let v = serde_json::from_str::<serde_json::Value>(json).ok()?;
+    let version = v.get("version").and_then(|v| v.as_u64()).unwrap_or(0);
+    if version != CURRENT_MAP_VERSION as u64 {
+        return None;
+    }
+    let name = v
+        .get("name")
+        .and_then(|n| n.as_str())
+        .unwrap_or(stem)
+        .to_string();
+    let description = v
+        .get("description")
+        .and_then(|d| d.as_str())
+        .unwrap_or(&name)
+        .to_string();
+    let (min_players, max_players) = authored::player_count_bounds(json).ok()?;
+    (!name.is_empty()).then_some(AvailableMap {
+        name,
+        description,
+        min_players,
+        max_players,
+    })
+}
+
 fn fnv_usize(hash: u64, value: usize) -> u64 {
     fnv_bytes(hash, &(value as u64).to_le_bytes())
 }
@@ -392,6 +399,7 @@ mod tests {
         assert!(names.contains(&"Default"), "got: {names:?}");
         assert!(names.contains(&"Low Econ"), "got: {names:?}");
         assert!(names.contains(&"No Terrain"), "got: {names:?}");
+        assert!(names.contains(&"1v1 No Terrain"), "got: {names:?}");
         // Every entry must have a non-empty description.
         for entry in &available {
             assert!(
@@ -399,12 +407,34 @@ mod tests {
                 "missing description on {}",
                 entry.name
             );
+            assert!(
+                entry.min_players >= 1 && entry.min_players <= entry.max_players,
+                "bad player bounds on {}: {}..={}",
+                entry.name,
+                entry.min_players,
+                entry.max_players
+            );
         }
 
         let map = Map::load("Default", 2, 0x1234_5678)
             .expect("default handcrafted map should load from bundled assets");
         assert_eq!(map.size, 126);
         assert_eq!(map.starts.len(), 2);
+
+        let one_v_one = available
+            .iter()
+            .find(|entry| entry.name == "1v1 No Terrain")
+            .expect("1v1 no-terrain scaffold should be listed");
+        assert_eq!(one_v_one.min_players, 1);
+        assert_eq!(one_v_one.max_players, 2);
+        assert!(
+            Map::load("1v1 No Terrain", 2, 0x1234_5678).is_ok(),
+            "1v1 No Terrain should load for two active players"
+        );
+        assert!(
+            Map::load("1v1 No Terrain", 3, 0x1234_5678).is_err(),
+            "1v1 No Terrain should not expose a three-player layout"
+        );
     }
 
     #[test]

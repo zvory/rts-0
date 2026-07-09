@@ -14,7 +14,7 @@ use super::super::{
 use super::helpers::DRAINING_NEW_MATCHES_DISABLED_MSG;
 use super::types::{AiSlot, Phase, RoomPlayer, MAX_LOBBY_TEAMS};
 use super::RoomTask;
-use crate::protocol::{LobbyKind, LobbyPlayer, ServerMessage, TeamId};
+use crate::protocol::{AvailableMap, LobbyKind, LobbyPlayer, ServerMessage, TeamId};
 
 impl RoomTask {
     pub(super) fn is_replay_staging_lobby(&self) -> bool {
@@ -58,12 +58,14 @@ impl RoomTask {
         } else {
             match &self.phase {
                 Phase::Lobby => {
-                    let join_state =
-                        if kind == LobbyKind::Replay || self.total_player_count() >= MAX_PLAYERS {
-                            LobbyJoinState::FullSpectatorOnly
-                        } else {
-                            LobbyJoinState::Open
-                        };
+                    let join_state = if kind == LobbyKind::Replay
+                        || self.total_player_count()
+                            >= Self::map_active_slot_cap_for_name(&self.lobby_map_name())
+                    {
+                        LobbyJoinState::FullSpectatorOnly
+                    } else {
+                        LobbyJoinState::Open
+                    };
                     (LobbySummaryPhase::Lobby, join_state, self.lobby_map_name())
                 }
                 Phase::InGame(_) => (
@@ -73,6 +75,11 @@ impl RoomTask {
                 ),
                 Phase::ReplayViewer(_) | Phase::BranchStaging(_) => return None,
             }
+        };
+        let max_slots = if kind == LobbyKind::Replay {
+            0
+        } else {
+            Self::map_active_slot_cap_for_name(&map)
         };
         Some(LobbySummary {
             room: self.room.clone(),
@@ -85,11 +92,7 @@ impl RoomTask {
             } else {
                 self.total_player_count()
             },
-            max_slots: if kind == LobbyKind::Replay {
-                0
-            } else {
-                MAX_PLAYERS
-            },
+            max_slots,
             spectator_count: self
                 .players
                 .values()
@@ -181,7 +184,7 @@ impl RoomTask {
             let _ = ack.send(false);
             return;
         }
-        if !spectator && self.total_player_count() >= MAX_PLAYERS {
+        if !spectator && self.total_player_count() >= self.selected_map_active_slot_cap() {
             send_or_log(
                 &self.room,
                 player_id,
@@ -443,7 +446,7 @@ impl RoomTask {
     }
 
     /// Host-only: seat a computer opponent. Ignored outside the lobby, from non-hosts, or once
-    /// the room is full (humans + AI == [`MAX_PLAYERS`]).
+    /// the selected map's active seat cap is full.
     pub(super) fn on_add_ai(
         &mut self,
         player_id: u32,
@@ -462,7 +465,7 @@ impl RoomTask {
         if self.is_replay_staging_lobby() {
             return;
         }
-        if self.total_player_count() >= MAX_PLAYERS {
+        if self.total_player_count() >= self.selected_map_active_slot_cap() {
             crate::log_debug!(room = %self.room, "ignoring add-ai; room full");
             return;
         }
@@ -597,11 +600,18 @@ impl RoomTask {
         if self.is_replay_staging_lobby() {
             return;
         }
-        if self.selected_map != map {
-            self.selected_map = map;
-            crate::log_debug!(room = %self.room, map = %self.selected_map, "map selected");
-            self.broadcast_lobby();
+        let Some(entry) = Self::map_catalog_entry(&map) else {
+            crate::log_debug!(room = %self.room, map = %map, "ignoring unknown map selection");
+            return;
+        };
+        if self.selected_map == entry.name {
+            return;
         }
+        let cap = Self::map_active_slot_cap(&entry);
+        self.selected_map = entry.name;
+        self.trim_active_slots_to_cap(cap);
+        crate::log_debug!(room = %self.room, map = %self.selected_map, "map selected");
+        self.broadcast_lobby();
     }
 
     pub(super) fn on_set_spectator(&mut self, player_id: u32, target: u32, spectator: bool) {
@@ -639,7 +649,7 @@ impl RoomTask {
             self.human_team_assignments.remove(&target);
             self.human_faction_assignments.remove(&target);
         } else {
-            if self.total_player_count() >= MAX_PLAYERS {
+            if self.total_player_count() >= self.selected_map_active_slot_cap() {
                 crate::log_debug!(room = %self.room, player_id, target, "ignoring player role switch; room full");
                 return;
             }
@@ -658,6 +668,55 @@ impl RoomTask {
     /// Total seated players: connected humans plus AI opponents.
     pub(super) fn total_player_count(&self) -> usize {
         self.active_human_count() + self.ai_players.len()
+    }
+
+    fn selected_map_active_slot_cap(&self) -> usize {
+        Self::map_active_slot_cap_for_name(&self.selected_map)
+    }
+
+    fn map_active_slot_cap_for_name(map_name: &str) -> usize {
+        Self::map_catalog_entry(map_name)
+            .map(|entry| Self::map_active_slot_cap(&entry))
+            .unwrap_or(MAX_PLAYERS)
+    }
+
+    fn map_catalog_entry(map_name: &str) -> Option<AvailableMap> {
+        Map::list_available()
+            .into_iter()
+            .find(|entry| entry.name == map_name)
+    }
+
+    fn map_active_slot_cap(entry: &AvailableMap) -> usize {
+        (entry.max_players as usize).clamp(1, MAX_PLAYERS)
+    }
+
+    fn trim_active_slots_to_cap(&mut self, cap: usize) {
+        while self.total_player_count() > cap {
+            if self.ai_players.pop().is_some() {
+                continue;
+            }
+            let active_humans: Vec<_> = self.active_human_ids().collect();
+            let target = active_humans
+                .iter()
+                .rev()
+                .copied()
+                .find(|&id| Some(id) != self.host_id)
+                .or_else(|| active_humans.last().copied());
+            let Some(target) = target else {
+                return;
+            };
+            self.move_active_human_to_spectator(target);
+        }
+    }
+
+    fn move_active_human_to_spectator(&mut self, target: u32) {
+        if let Some(player) = self.players.get_mut(&target) {
+            player.spectator = true;
+            player.ready = false;
+            player.color = "#6f8fa8".to_string();
+        }
+        self.human_team_assignments.remove(&target);
+        self.human_faction_assignments.remove(&target);
     }
 
     pub(super) fn active_human_count(&self) -> usize {
@@ -754,7 +813,7 @@ impl RoomTask {
 
     fn team_composition_valid(&self) -> bool {
         let active_ids = self.active_seat_ids();
-        if active_ids.is_empty() || active_ids.len() > MAX_PLAYERS {
+        if active_ids.is_empty() || active_ids.len() > self.selected_map_active_slot_cap() {
             return false;
         }
         for id in active_ids {

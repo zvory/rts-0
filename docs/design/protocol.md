@@ -350,9 +350,11 @@ present only for computer opponents and identifies the live AI profile or suite 
 will resolve when the match starts. `isSpectator` is true for human observers; they do not consume active map starts,
 block readiness, or count toward win/loss.
 
-`AvailableMap`: `{ name: string, description: string }`. `name` is the stable value sent back in
-`selectMap`; `description` is display text for the lobby selector. Lobby `map` is the current
-selected map name and is distinct from replay start metadata `mapName`.
+`AvailableMap`: `{ name: string, description: string, minPlayers: u32, maxPlayers: u32 }`.
+`name` is the stable value sent back in `selectMap`; `description` is display text for the lobby
+selector; `minPlayers` and `maxPlayers` are derived from the authored spawn-layout player counts
+for that map. Lobby `map` is the current selected map name and is distinct from replay start
+metadata `mapName`.
 
 `LobbyKind`: `"normal"` for ordinary public lobbies/live rooms, `"replay"` for persisted
 match-history replay staging lobbies. Replay lobbies carry only spectator `LobbyPlayer` rows,
@@ -375,9 +377,11 @@ those team slots. The normal lobby UI shows occupied teams plus one "New team" d
 fewer than four teams are occupied, plus a bottom spectator drop target for host-managed observer
 moves. Spectator lobby rows carry `teamId: 0` because they are not match players. In normal
 lobbies, `canStart` is false until there is at least one active seat, every active human is ready,
-every active seat has a team in `1..=4`, and the active seat count is at or below the four-player
-map-start cap. In replay staging lobbies, `canStart` is true when a host spectator is present and
-the server is not blocking new sessions for deploy drain.
+every active seat has a team in `1..=4`, and the active seat count is at or below the selected
+map's `maxPlayers` cap and the server's hard four-player cap. Selecting a lower-capacity map
+removes overflow AI seats first, then moves overflow humans to spectators. In replay staging
+lobbies, `canStart` is true when a host spectator is present and the server is not blocking new
+sessions for deploy drain.
 
 `PlayerScore`: `{ id: u32, teamId: u32, name: string, color: string, unitScore: u32, structureScore: u32,
 unitsKilled: u32, unitsLost: u32, buildingsKilled: u32, buildingsLost: u32 }`. `scores` is a

@@ -5,7 +5,8 @@ Computer opponents are **opt-in**: a room has none unless the host adds them fro
 scripted team setup; when omitted, the server seats the AI into the next deterministic slot for
 the current preset. Use lab rooms for player-facing experimentation until debug-style starts return
 as explicit lab presets or scenarios. They are capped with humans at
-`MAX_PLAYERS = 4` (the bundled maps have v2 spawn layouts for one through four active players).
+`MAX_PLAYERS = 4`, and the selected authored map may impose a lower active-seat cap through its
+available spawn-layout player counts.
 AI players are seated after the humans in the lobby player list; their colors come
 from the tail of `PLAYER_PALETTE` so they never collide with human colors. They persist across rematches and are cleared only when the room
 empties of humans.

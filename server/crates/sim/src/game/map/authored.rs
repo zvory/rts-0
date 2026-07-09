@@ -16,6 +16,31 @@ pub(super) fn schema_version(json: &str) -> Result<u32, String> {
     Ok(authored.version)
 }
 
+pub(super) fn player_count_bounds(json: &str) -> Result<(u32, u32), String> {
+    let authored: AuthoredMap =
+        serde_json::from_str(json).map_err(|err| format!("map JSON parse error: {err}"))?;
+    if authored.version != CURRENT_MAP_VERSION {
+        return Err(format!(
+            "map schema version {} is not supported; server requires version {CURRENT_MAP_VERSION}",
+            authored.version
+        ));
+    }
+
+    let mut min_players = u32::MAX;
+    let mut max_players = 0;
+    for layout in &authored.layouts {
+        if layout.player_count == 0 {
+            continue;
+        }
+        min_players = min_players.min(layout.player_count);
+        max_players = max_players.max(layout.player_count);
+    }
+    if max_players == 0 {
+        return Err("layouts must contain at least one positive playerCount".to_string());
+    }
+    Ok((min_players, max_players))
+}
+
 pub(super) fn load(player_count: usize, json: &str, seed: u32) -> Result<Map, String> {
     let players: Vec<_> = (1..=player_count)
         .map(|id| StartAssignmentPlayer {

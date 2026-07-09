@@ -344,17 +344,17 @@ pub enum LabClientOp {
     },
 }
 
-// ---------------------------------------------------------------------------
 // Server -> Client
-// ---------------------------------------------------------------------------
 
-/// A map entry sent to clients in `ServerMessage::Lobby`. `name` is the stable key used for map
-/// selection; `description` is the text shown in the lobby selector.
+/// A lobby map catalog row. `name` is the stable selector key; `description` is display text;
+/// `min_players`/`max_players` describe authored active-player layout bounds.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AvailableMap {
     pub name: String,
     pub description: String,
+    pub min_players: u32,
+    pub max_players: u32,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
