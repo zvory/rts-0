@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn tank_trap_build_order_requires_completed_training_centre() {
+fn tank_trap_build_order_is_rejected_while_disabled() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
     let worker = entities
@@ -9,34 +9,11 @@ fn tank_trap_build_order_requires_completed_training_centre() {
         .expect("worker should spawn");
     let mut players = vec![player_state(1), player_state(2)];
 
-    let locked_events = apply_with_players(
-        &map,
-        &mut entities,
-        &mut players,
-        vec![(
-            1,
-            SimCommand::Build {
-                units: vec![worker],
-                building: EntityKind::TankTrap,
-                tile_x: 6,
-                tile_y: 6,
-                queued: false,
-            },
-        )],
-    );
-    assert!(
-        matches!(
-            locked_events.get(&1).and_then(|events| events.first()),
-            Some(Event::Notice { msg, .. }) if msg == "Requirement not met"
-        ),
-        "Tank Trap should be locked before Training Centre"
-    );
-
     let (tx, ty) = footprint_center(&map, EntityKind::TrainingCentre, 3, 3);
     entities
         .spawn_building(1, EntityKind::TrainingCentre, tx, ty, true)
         .expect("training centre should spawn");
-    let unlocked_events = apply_with_players(
+    let events = apply_with_players(
         &map,
         &mut entities,
         &mut players,
@@ -53,12 +30,15 @@ fn tank_trap_build_order_requires_completed_training_centre() {
     );
 
     assert!(
-        unlocked_events.get(&1).is_none_or(Vec::is_empty),
-        "valid Tank Trap command should not emit a rejection notice: {unlocked_events:?}"
+        matches!(
+            events.get(&1).and_then(|events| events.first()),
+            Some(Event::Notice { msg, .. }) if msg == "Building unavailable"
+        ),
+        "Tank Trap build commands remain rejected after the former Training Centre requirement"
     );
     assert!(matches!(
         entities.get(worker).map(|entity| entity.order()),
-        Some(Order::Build(order)) if order.intent.kind == EntityKind::TankTrap
+        Some(Order::Idle)
     ));
 }
 

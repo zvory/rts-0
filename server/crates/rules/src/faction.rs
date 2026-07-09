@@ -131,7 +131,6 @@ const DEFAULT_BUILDINGS: &[EntityKind] = &[
     EntityKind::Factory,
     EntityKind::ResearchComplex,
     EntityKind::Steelworks,
-    EntityKind::TankTrap,
     EntityKind::PumpJack,
 ];
 
@@ -143,7 +142,6 @@ const DEFAULT_WORKER_BUILDABLES: &[EntityKind] = &[
     EntityKind::ResearchComplex,
     EntityKind::Factory,
     EntityKind::Steelworks,
-    EntityKind::TankTrap,
 ];
 
 const ARTILLERY_ABILITY_CARRIERS: &[EntityKind] = &[EntityKind::Artillery];
@@ -753,8 +751,11 @@ mod tests {
         assert!(catalog.allows_research(MORTAR_AUTOCAST_UPGRADE, research_complex));
         assert!(catalog.allows_research(SMOKE_PLUS_UPGRADE, research_complex));
         assert!(!catalog.allows_research(TANK_UNLOCK_UPGRADE, EntityKind::TrainingCentre));
-        assert!(catalog.allows_building(EntityKind::TankTrap));
-        assert!(catalog.can_build(EntityKind::Worker, EntityKind::TankTrap));
+        assert!(
+            !catalog.allows_building(EntityKind::TankTrap),
+            "Tank Traps stay implemented but are temporarily unavailable to the playable faction"
+        );
+        assert!(!catalog.can_build(EntityKind::Worker, EntityKind::TankTrap));
         assert!(catalog.allows_building(EntityKind::PumpJack));
         assert!(
             !catalog.can_build(EntityKind::Worker, EntityKind::PumpJack),

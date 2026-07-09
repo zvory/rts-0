@@ -51,7 +51,6 @@ export const FACTION_CATALOGS = Object.freeze({
       KIND.FACTORY,
       KIND.RESEARCH_COMPLEX,
       KIND.STEELWORKS,
-      KIND.TANK_TRAP,
       KIND.PUMP_JACK,
     ],
     buildables: WORKER_BUILDABLE,

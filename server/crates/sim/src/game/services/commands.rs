@@ -1665,7 +1665,12 @@ fn order_build(
     let worker_kind = entities.get(worker).map(|e| e.kind);
     if !matches!(worker_kind, Some(kind) if rules::economy::can_build_for_faction(&faction_id, kind, building))
     {
-        notice(events, player, "Only workers can build");
+        let msg = if worker_kind == Some(EntityKind::Worker) {
+            "Building unavailable"
+        } else {
+            "Only workers can build"
+        };
+        notice(events, player, msg);
         return;
     }
     if is_constructing(entities, worker) {
