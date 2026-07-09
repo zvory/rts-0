@@ -193,8 +193,10 @@ The `ai_turtle` suite is pinned to `ai_turtle_chokes`, a first-pass turtle profi
 matchups and tuning. It uses the proposal-based economy manager to keep its supply, worker-training,
 resource-assignment, and two-City-Centre expansion behavior aligned with AI 2.0 while preserving
 its three-Rifleman opening oil hold. It targets full main-base worker saturation, opens one Barracks,
-builds Training Centre, then stays on one Barracks while it accelerates Research Complex / Steelworks
-R&D for Anti-Tank Guns. It queues Entrenchment from Training Centre before Machine Gunner production,
+builds Training Centre, then adds a second Barracks once steel exceeds 450 while it accelerates
+Research Complex / Steelworks R&D for Anti-Tank Guns. After its first completed Gun Works, it adds a
+second once the bank exceeds 600 steel and 250 oil. It queues Entrenchment from Training Centre
+before Machine Gunner production,
 starts the R&D chain once Entrenchment is queued, and prioritizes the Anti-Tank Gun unlock before
 downstream construction spend when Research Complex is ready. Its opening combat plan trains exactly
 three Riflemen from the first Barracks and sends them to a compact defensive line in front of the
@@ -207,7 +209,8 @@ other buildings, because its support weapons are mobile. Its economy-manager two
 expansion flow activates after Training Centre and the normal steel-or-supply trigger are met,
 regardless of opening Rifleman attrition, capping pre-expand steel workers at 18 and lifting the
 post-expand steel target toward 36 so both City Centres can keep producing workers. Its post-opening
-production is pure Machine Gunners from Barracks plus priority Anti-Tank Guns from Steelworks;
+production is pure Machine Gunners from up to two Barracks plus priority Anti-Tank Guns from up to
+two Steelworks;
 Riflemen are not replenished after the three-unit opening. Machine Gunner production pauses once the
 first two enemy-facing choke lines each have four staffed Machine Gunners, and resumes if either line
 falls below four; those Machine Gunners use a wider three-tile
