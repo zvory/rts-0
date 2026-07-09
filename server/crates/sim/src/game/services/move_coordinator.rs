@@ -13,7 +13,7 @@
 //! - repath throttling,
 //! - spawn-point search around buildings.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::time::{Duration, Instant};
 
 use crate::config;
@@ -262,13 +262,32 @@ impl<'a> MoveCoordinator<'a> {
         for trench_id in occupied_trench_ids_for_units(entities, &selected_units) {
             occupied_trenches.remove(&trench_id);
         }
-        let goals = formation::formation_goals_with_known_trenches(
-            self.map,
-            self.occ,
+        let known_trenches = self.known_trenches_for_player(player).to_vec();
+        let map = self.map;
+        let occ = self.occ;
+        let teams = &self.teams;
+        let mut reachability_pathing = self.pathing.clone();
+        let mut reachability_cache = BTreeMap::new();
+        let goals = formation::formation_goals_with_known_trenches_and_reachability(
+            map,
+            occ,
             &units,
             goal,
-            self.known_trenches_for_player(player),
+            &known_trenches,
             &occupied_trenches,
+            |unit, tile| {
+                *reachability_cache.entry((unit.id, tile)).or_insert_with(|| {
+                    formation_goal_tile_reachable(
+                        &mut reachability_pathing,
+                        map,
+                        occ,
+                        teams,
+                        player,
+                        unit,
+                        tile,
+                    )
+                })
+            },
         );
 
         for (unit, g) in units.iter().zip(goals.iter()) {
@@ -1049,6 +1068,39 @@ fn occupied_trench_ids_for_units(
         .collect()
 }
 
+fn formation_goal_tile_reachable(
+    pathing: &mut PathingService,
+    map: &Map,
+    occ: &Occupancy,
+    teams: &TeamRelations,
+    player: u32,
+    unit: &formation::FormationUnit,
+    tile: (u32, u32),
+) -> bool {
+    let start = map.tile_of(unit.pos.0, unit.pos.1);
+    if start == tile {
+        return true;
+    }
+    let route_shape = if uses_oriented_vehicle_body(unit.kind) {
+        RouteShape::VehicleClearance
+    } else {
+        RouteShape::Normal
+    };
+    let req = PathRequest {
+        relation: StaticPathingRelation::for_player(player, teams),
+        kind: unit.kind,
+        start: (start.0 as i32, start.1 as i32),
+        goal: (tile.0 as i32, tile.1 as i32),
+        radius_tiles: config::unit_radius_tiles(unit.kind),
+        route_shape,
+        budget: None,
+    };
+    let (tile_path, _) = pathing.request_tile_path_with_diagnostics(map, occ, req);
+    // Empty here means the unit could not make useful progress at all; keep the legacy goal so
+    // the ordinary path phase can surface PathFailed instead of turning the order into a no-op.
+    tile_path.is_empty() || tile_path.last().copied() == Some((tile.0 as i32, tile.1 as i32))
+}
+
 fn pathing_source_from_order(order: &Order) -> PathingRequestSource {
     match order {
         Order::Move(_) => PathingRequestSource::Move,
@@ -1605,6 +1657,61 @@ mod tests {
         );
         assert!(map.is_passable(first_tile.0 as i32, first_tile.1 as i32));
         assert!(occ.passable(first_tile.0 as i32, first_tile.1 as i32));
+    }
+
+    #[test]
+    fn unreachable_formation_slot_collapses_toward_center() {
+        let mut map = flat_map(80);
+        let isolated_tile = (56, 50);
+        for ty in (isolated_tile.1 - 1)..=(isolated_tile.1 + 1) {
+            for tx in (isolated_tile.0 - 1)..=(isolated_tile.0 + 1) {
+                let idx = map.index(tx, ty);
+                map.terrain[idx] = terrain::WATER;
+            }
+        }
+        set_passable(&mut map, isolated_tile.0, isolated_tile.1);
+
+        let mut entities = EntityStore::new();
+        let left_pos = map.tile_center(5, 20);
+        let left = entities
+            .spawn_unit(1, EntityKind::Rifleman, left_pos.0, left_pos.1)
+            .expect("left rifleman should spawn");
+        let right_pos = map.tile_center(45, 20);
+        let right = entities
+            .spawn_unit(1, EntityKind::Rifleman, right_pos.0, right_pos.1)
+            .expect("right rifleman should spawn");
+        let occ = Occupancy::build(&map, &entities);
+        let mut pathing = PathingService::new(8_192, 256);
+        pathing.advance_tick(1);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+        let click = map.tile_center(60, 50);
+
+        coordinator.order_group_move(&mut entities, 1, &[left, right], click, false);
+
+        let left_goal = entities
+            .get(left)
+            .and_then(|entity| entity.path_goal())
+            .expect("left rifleman should receive a path goal");
+        let left_tile = map.tile_of(left_goal.0, left_goal.1);
+
+        assert_ne!(
+            left_tile, isolated_tile,
+            "formation assignment should reject an isolated but locally passable slot"
+        );
+        assert_eq!(
+            left_tile,
+            (58, 50),
+            "unreachable offset should collapse inward toward the formation center"
+        );
+        let dist_sq = |a: (f32, f32), b: (f32, f32)| {
+            let dx = a.0 - b.0;
+            let dy = a.1 - b.1;
+            dx * dx + dy * dy
+        };
+        assert!(
+            dist_sq(left_goal, click) < dist_sq(map.tile_center(isolated_tile.0, isolated_tile.1), click),
+            "fallback goal should be closer to the formation center"
+        );
     }
 
     #[test]

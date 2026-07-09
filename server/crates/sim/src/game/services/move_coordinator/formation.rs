@@ -6,6 +6,8 @@ use crate::game::entity::{uses_oriented_vehicle_body, EntityKind};
 use crate::game::map::Map;
 use crate::protocol::TrenchView;
 
+mod goal_search;
+
 const FORMATION_NEAR_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 4.0;
 const FORMATION_FAR_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 18.0;
 const FORMATION_MAX_OFFSET_PX: f32 = config::TILE_SIZE as f32 * 4.0;
@@ -80,6 +82,7 @@ pub(super) fn formation_goals(
 
 /// Assign formation-aware path goals in the same order as `units`, preferring nearby known
 /// unoccupied trench terrain for trench-eligible infantry.
+#[cfg(test)]
 pub(super) fn formation_goals_with_known_trenches(
     map: &Map,
     occ: &Occupancy,
@@ -88,6 +91,31 @@ pub(super) fn formation_goals_with_known_trenches(
     known_trenches: &[KnownTrench],
     occupied_trenches: &BTreeSet<u32>,
 ) -> Vec<(f32, f32)> {
+    formation_goals_with_known_trenches_and_reachability(
+        map,
+        occ,
+        units,
+        goal,
+        known_trenches,
+        occupied_trenches,
+        |_, _| true,
+    )
+}
+
+/// Assign formation-aware path goals, rejecting candidate tiles that cannot be exactly reached
+/// from the assigned unit.
+pub(super) fn formation_goals_with_known_trenches_and_reachability<F>(
+    map: &Map,
+    occ: &Occupancy,
+    units: &[FormationUnit],
+    goal: (f32, f32),
+    known_trenches: &[KnownTrench],
+    occupied_trenches: &BTreeSet<u32>,
+    mut is_goal_reachable: F,
+) -> Vec<(f32, f32)>
+where
+    F: FnMut(&FormationUnit, (u32, u32)) -> bool,
+{
     if units.len() <= 1 {
         let anchor = map.tile_of(goal.0, goal.1);
         return spread_goals_with_known_trenches(
@@ -98,6 +126,7 @@ pub(super) fn formation_goals_with_known_trenches(
             goal,
             known_trenches,
             occupied_trenches,
+            &mut is_goal_reachable,
         );
     }
 
@@ -134,7 +163,9 @@ pub(super) fn formation_goals_with_known_trenches(
             occupied_trenches,
             assigned: &assigned,
         };
-        if let Some(formation_goal) = assign_formation_goal(&context, unit, anchor, desired) {
+        if let Some(formation_goal) =
+            assign_formation_goal(&context, unit, anchor, desired, goal, &mut is_goal_reachable)
+        {
             assigned.push(FormationAssignment {
                 kind: unit.kind,
                 tile: formation_goal.tile,
@@ -149,7 +180,7 @@ pub(super) fn formation_goals_with_known_trenches(
     out
 }
 
-fn spread_goals_with_known_trenches(
+fn spread_goals_with_known_trenches<F>(
     map: &Map,
     occ: &Occupancy,
     units: &[FormationUnit],
@@ -157,7 +188,11 @@ fn spread_goals_with_known_trenches(
     desired: (f32, f32),
     known_trenches: &[KnownTrench],
     occupied_trenches: &BTreeSet<u32>,
-) -> Vec<(f32, f32)> {
+    is_goal_reachable: &mut F,
+) -> Vec<(f32, f32)>
+where
+    F: FnMut(&FormationUnit, (u32, u32)) -> bool,
+{
     let mut out = Vec::with_capacity(units.len());
     let mut assigned: Vec<FormationAssignment> = Vec::new();
 
@@ -169,7 +204,9 @@ fn spread_goals_with_known_trenches(
             occupied_trenches,
             assigned: &assigned,
         };
-        if let Some(formation_goal) = assign_formation_goal(&context, unit, anchor, desired) {
+        if let Some(formation_goal) =
+            assign_formation_goal(&context, unit, anchor, desired, desired, is_goal_reachable)
+        {
             assigned.push(FormationAssignment {
                 kind: unit.kind,
                 tile: formation_goal.tile,
@@ -184,12 +221,17 @@ fn spread_goals_with_known_trenches(
     out
 }
 
-fn assign_formation_goal(
+fn assign_formation_goal<F>(
     context: &FormationGoalContext<'_>,
     unit: &FormationUnit,
     anchor: (u32, u32),
     desired: (f32, f32),
-) -> Option<FormationGoal> {
+    formation_center: (f32, f32),
+    is_goal_reachable: &mut F,
+) -> Option<FormationGoal>
+where
+    F: FnMut(&FormationUnit, (u32, u32)) -> bool,
+{
     if let Some(goal) = find_preferred_trench_goal(
         context.map,
         context.occ,
@@ -198,19 +240,27 @@ fn assign_formation_goal(
         context.known_trenches,
         context.occupied_trenches,
         context.assigned,
+        is_goal_reachable,
     ) {
         return Some(goal);
     }
-    find_unique_tile_near(context.map, context.occ, unit, anchor, context.assigned).map(|tile| {
-        FormationGoal {
-            point: context.map.tile_center(tile.0, tile.1),
-            tile,
-            trench_id: None,
-        }
+    goal_search::find_unique_tile_near(
+        context.map,
+        context.occ,
+        unit,
+        anchor,
+        context.assigned,
+        formation_center,
+        is_goal_reachable,
+    )
+    .map(|tile| FormationGoal {
+        point: context.map.tile_center(tile.0, tile.1),
+        tile,
+        trench_id: None,
     })
 }
 
-fn find_preferred_trench_goal(
+fn find_preferred_trench_goal<F>(
     map: &Map,
     occ: &Occupancy,
     unit: &FormationUnit,
@@ -218,7 +268,11 @@ fn find_preferred_trench_goal(
     known_trenches: &[KnownTrench],
     occupied_trenches: &BTreeSet<u32>,
     assigned: &[FormationAssignment],
-) -> Option<FormationGoal> {
+    is_goal_reachable: &mut F,
+) -> Option<FormationGoal>
+where
+    F: FnMut(&FormationUnit, (u32, u32)) -> bool,
+{
     if !config::is_entrenchment_eligible_infantry(unit.kind) {
         return None;
     }
@@ -245,6 +299,9 @@ fn find_preferred_trench_goal(
             continue;
         }
         let tile = map.tile_of(point.0, point.1);
+        if !is_goal_reachable(unit, tile) {
+            continue;
+        }
         let goal = FormationGoal {
             point,
             tile,
@@ -311,55 +368,6 @@ fn clamp_offset(dx: f32, dy: f32, max_len: f32) -> (f32, f32) {
     }
     let scale = max_len / len;
     (dx * scale, dy * scale)
-}
-
-/// Search outward from `anchor` in deterministic ring order and return the first body-standable
-/// tile not already assigned. Some unit kinds prefer additional spacing and get a strict first
-/// pass before falling back to the ordinary unique-tile rule.
-fn find_unique_tile_near(
-    map: &Map,
-    occ: &Occupancy,
-    unit: &FormationUnit,
-    anchor: (u32, u32),
-    assigned: &[FormationAssignment],
-) -> Option<(u32, u32)> {
-    if let Some(tile) = find_unique_tile_near_with_spacing(map, occ, unit, anchor, assigned, true) {
-        return Some(tile);
-    }
-    find_unique_tile_near_with_spacing(map, occ, unit, anchor, assigned, false)
-}
-
-fn find_unique_tile_near_with_spacing(
-    map: &Map,
-    occ: &Occupancy,
-    unit: &FormationUnit,
-    anchor: (u32, u32),
-    assigned: &[FormationAssignment],
-    require_preferred_spacing: bool,
-) -> Option<(u32, u32)> {
-    if is_free_goal(map, occ, unit, anchor, assigned, require_preferred_spacing) {
-        return Some(anchor);
-    }
-    for r in 1i32..=6 {
-        for dy in -r..=r {
-            for dx in -r..=r {
-                if dx.abs().max(dy.abs()) != r {
-                    continue;
-                }
-                let tx = anchor.0 as i32 + dx;
-                let ty = anchor.1 as i32 + dy;
-                if tx < 0 || ty < 0 {
-                    continue;
-                }
-                let t = (tx as u32, ty as u32);
-                if is_free_goal(map, occ, unit, t, assigned, require_preferred_spacing) {
-                    return Some(t);
-                }
-            }
-        }
-    }
-
-    None
 }
 
 pub(super) fn is_free_goal(
