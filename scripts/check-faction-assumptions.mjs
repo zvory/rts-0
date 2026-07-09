@@ -297,6 +297,9 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/services/occupancy.rs",
   "server/crates/sim/src/game/services/pathing.rs",
   "server/crates/sim/src/game/services/production.rs",
+  // Scout Plane sorties are intentionally anchored to the current City Centre / Scout Plane
+  // runtime kinds until catalog roles express command-center launch points.
+  "server/crates/sim/src/game/services/scout_plane.rs",
   "server/crates/sim/src/game/services/standability.rs",
   // Pump Jack placement is deliberately constrained to current oil resource nodes.
   "server/crates/sim/src/game/services/standability/pump_jack.rs",
@@ -336,8 +339,9 @@ const approvedSpecialCaseBudgets = new Map([
   // Tank Trap phases add current-catalog construction eligibility and gameplay command handling
   // for a default-faction obstacle before a broader catalog API can absorb obstacle placement.
   // Artillery Fire Control adds one R&D catalog entry for the current Kriegsia tech tree.
+  // Scout Plane ability adds a Command Car carrier and City Centre tech gate to the catalog.
   // Entrenchment Phase 1 adds one Training Centre research entry and its negative Ekat assertion.
-  ["server/crates/rules/src/faction.rs", 93],
+  ["server/crates/rules/src/faction.rs", 96],
   ["server/crates/rules/src/economy.rs", 109],
   ["server/crates/sim/src/game/setup.rs", 30],
   ["server/crates/sim/src/game/services/ability_orders.rs", 18],
