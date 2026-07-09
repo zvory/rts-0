@@ -2,6 +2,11 @@ import { clamp01, finiteNumber, smoothstep01 } from "./shared.js";
 
 const MISS_TOAST_TEXT = "Miss!";
 const MISS_TOAST_TTL_MS = 760;
+const MISS_TOAST_FONT_SIZE = 4.5;
+const MISS_TOAST_STROKE_THICKNESS = 1;
+const MISS_TOAST_OFFSET_X = 2;
+const MISS_TOAST_OFFSET_Y = 3;
+const MISS_TOAST_FLOAT_Y = 5;
 
 export function _drawMissToasts(state) {
   if (!state || typeof state.liveMissToasts !== "function") return;
@@ -21,12 +26,12 @@ export function _drawMissToasts(state) {
     if (!label) {
       label = new PIXI.Text(MISS_TOAST_TEXT, {
         fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
-        fontSize: 9,
+        fontSize: MISS_TOAST_FONT_SIZE,
         fill: 0xfff1a8,
         align: "center",
         fontWeight: "700",
         stroke: 0x20160c,
-        strokeThickness: 2,
+        strokeThickness: MISS_TOAST_STROKE_THICKNESS,
       });
       label.anchor.set(0, 0.5);
       this._missToastPool.set(key, label);
@@ -50,7 +55,10 @@ export function _drawMissToasts(state) {
     label.visible = true;
     label.alpha = 0.95 * fade;
     label.scale.set(1);
-    label.position.set(target.x + rx + 5, target.y + cy - ry - 8 - t * 10);
+    label.position.set(
+      target.x + rx + MISS_TOAST_OFFSET_X,
+      target.y + cy - ry - MISS_TOAST_OFFSET_Y - t * MISS_TOAST_FLOAT_Y,
+    );
   }
 
   for (const [key, label] of this._missToastPool) {
