@@ -79,8 +79,8 @@ export const ENTRENCHMENT_RANGE_BONUS_TILES = 1;
 export const ENTRENCHMENT_DIRECT_MISS_CHANCE = 0.70;
 export const ENTRENCHMENT_AREA_DAMAGE_REDUCTION = 0.70;
 export const ENTRENCHMENT_TRENCH_RADIUS_TILES = 0.375;
-export const ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
-export const ARTILLERY_UNLOCK_RESEARCH_TICKS = TICK_HZ * 30;
+export const ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS = TICK_HZ * 10;
+export const ARTILLERY_UNLOCK_RESEARCH_TICKS = TICK_HZ * 25;
 export const BALLISTIC_TABLES_RESEARCH_TICKS = TICK_HZ * 20;
 export const TANK_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
 export const COMMAND_CAR_UNLOCK_RESEARCH_TICKS = TICK_HZ * 30;
@@ -136,7 +136,7 @@ export const STATS = Object.freeze({
   [KIND.ARTILLERY]: { label: "Artillery", icon: "AR", size: 18, sight: 4, body: ARTILLERY_BODY,
     rangeTiles: ARTILLERY_MAX_RANGE_TILES, minRangeTiles: ARTILLERY_MIN_RANGE_TILES,
     cost: { steel: 150, oil: 50 }, supply: 5, buildTicks: 750,
-    requires: KIND.STEELWORKS, upgradeRequires: UPGRADE.ANTI_TANK_GUN_UNLOCK,
+    requires: KIND.STEELWORKS, upgradeRequires: UPGRADE.ARTILLERY_UNLOCK,
     upgradeRequiresText: "Requires research in R&D Complex" },
   [KIND.SCOUT_CAR]: { label: "Scout Car", icon: "SC", size: 14.4, sight: 14, body: SCOUT_CAR_BODY,
     rangeTiles: 5, cost: { steel: 125, oil: 50 }, supply: 3, buildTicks: 480 },
@@ -178,6 +178,7 @@ export const STATS = Object.freeze({
       UPGRADE.COMMAND_CAR_UNLOCK,
       UPGRADE.MORTAR_AUTOCAST,
       UPGRADE.SMOKE_PLUS,
+      UPGRADE.ARTILLERY_UNLOCK,
     ],
     requires: [KIND.CITY_CENTRE, KIND.TRAINING_CENTRE] },
   [KIND.FACTORY]: { label: "Vehicle Works", icon: "VW", footW: 3, footH: 3, sight: 1,
@@ -371,12 +372,24 @@ export const UPGRADES = Object.freeze({
   }),
   [UPGRADE.ANTI_TANK_GUN_UNLOCK]: Object.freeze({
     upgrade: UPGRADE.ANTI_TANK_GUN_UNLOCK,
+    label: "Medium Guns",
+    icon: "MD+",
+    cost: Object.freeze({ steel: 100, oil: 50 }),
+    researchTicks: ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS,
+    description: "Unlock Anti-Tank Gun training",
+    researchedAt: KIND.RESEARCH_COMPLEX,
+  }),
+  [UPGRADE.ARTILLERY_UNLOCK]: Object.freeze({
+    upgrade: UPGRADE.ARTILLERY_UNLOCK,
     label: "Heavy Guns",
     icon: "HG+",
-    cost: Object.freeze({ steel: 200, oil: 75 }),
-    researchTicks: ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS,
-    description: "Unlock Anti-Tank Gun and Artillery training",
+    cost: Object.freeze({ steel: 200, oil: 100 }),
+    researchTicks: ARTILLERY_UNLOCK_RESEARCH_TICKS,
+    description: "Unlock Artillery training",
     researchedAt: KIND.RESEARCH_COMPLEX,
+    requiresUpgrade: UPGRADE.ANTI_TANK_GUN_UNLOCK,
+    requiresText: "Requires Medium Guns",
+    replacesUpgrade: UPGRADE.ANTI_TANK_GUN_UNLOCK,
   }),
   [UPGRADE.TANK_UNLOCK]: Object.freeze({
     upgrade: UPGRADE.TANK_UNLOCK,
@@ -395,7 +408,7 @@ export const UPGRADES = Object.freeze({
     researchTicks: BALLISTIC_TABLES_RESEARCH_TICKS,
     description: "Artillery fire tightens over repeated shots",
     researchedAt: KIND.RESEARCH_COMPLEX,
-    requiresUpgrade: UPGRADE.ANTI_TANK_GUN_UNLOCK,
+    requiresUpgrade: UPGRADE.ARTILLERY_UNLOCK,
     requiresText: "Requires Heavy Guns",
   }),
   [UPGRADE.COMMAND_CAR_UNLOCK]: Object.freeze({

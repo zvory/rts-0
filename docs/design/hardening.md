@@ -224,10 +224,12 @@ The server treats every client as potentially hostile. Limits live next to the c
   use the moving-fire rifleman model permanently, move at tank speed, and attack 25% faster.
   Legacy `charge` commands remain decodable but have no eligible carriers, cooldown, or runtime
   status.
-- **Advanced research locks**: R&D Complex can queue `anti_tank_gun_unlock` for 200 steel / 75 oil
-  over 600 ticks, unlocking Anti-Tank Gun and Artillery training at Gun Works for that player;
+- **Advanced research locks**: R&D Complex can queue `anti_tank_gun_unlock` for 100 steel / 50 oil
+  over 300 ticks, unlocking Anti-Tank Gun training at Gun Works for that player;
+  `artillery_unlock` for 200 steel / 100 oil over 750 ticks after completed
+  `anti_tank_gun_unlock`, unlocking Artillery training at Gun Works;
   `ballistic_tables` for 150 steel / 100 oil over 600 ticks after completed
-  `anti_tank_gun_unlock`, tightening repeated Artillery point-fire shots;
+  `artillery_unlock`, tightening repeated Artillery point-fire shots;
   `tank_unlock` for 150 steel / 100 oil over 600 ticks, unlocking Tank training at Vehicle Works;
   `command_car_unlock` for 150 steel / 150 oil over 900 ticks after completed `tank_unlock`,
   unlocking Command Car training at Vehicle Works; and `mortar_autocast` for 150 steel / 150 oil

@@ -181,6 +181,10 @@ const DEFAULT_UPGRADES: &[UpgradeCatalogEntry] = &[
         id: SMOKE_PLUS_UPGRADE,
         researched_at: EntityKind::ResearchComplex,
     },
+    UpgradeCatalogEntry {
+        id: ARTILLERY_UNLOCK_UPGRADE,
+        researched_at: EntityKind::ResearchComplex,
+    },
 ];
 
 const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
@@ -719,8 +723,8 @@ mod tests {
         assert!(catalog.allows_research(METHAMPHETAMINES_UPGRADE, EntityKind::TrainingCentre));
         assert!(catalog.allows_research(ENTRENCHMENT_UPGRADE, EntityKind::TrainingCentre));
         assert!(catalog.allows_research(ANTI_TANK_GUN_UNLOCK_UPGRADE, research_complex));
-        assert!(!catalog.allows_research(ARTILLERY_UNLOCK_UPGRADE, research_complex));
         assert!(catalog.allows_research(BALLISTIC_TABLES_UPGRADE, research_complex));
+        assert!(catalog.allows_research(ARTILLERY_UNLOCK_UPGRADE, research_complex));
         assert!(catalog.allows_research(TANK_UNLOCK_UPGRADE, research_complex));
         assert!(catalog.allows_research(COMMAND_CAR_UNLOCK_UPGRADE, research_complex));
         assert!(catalog.allows_research(MORTAR_AUTOCAST_UPGRADE, research_complex));
