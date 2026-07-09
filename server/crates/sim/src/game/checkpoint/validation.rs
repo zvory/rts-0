@@ -15,6 +15,8 @@ use super::{
     MAX_COMPLETED_UPGRADES_PER_PLAYER, MAX_UNITS_PER_CHECKPOINT_COMMAND,
 };
 
+const MAX_RESOURCE_INCOME_HISTORY_PER_PLAYER: usize = (config::TICK_HZ as usize * 60) + 1;
+
 pub(super) fn validate_supplied_map(map: &Map) -> Result<(), CheckpointPayloadError> {
     if map.size == 0 {
         return Err(CheckpointPayloadError::InvalidValue { field: "map.size" });
@@ -44,6 +46,7 @@ pub(super) fn validate_count(
 
 pub(super) fn validate_players(
     players: &[PlayerStateV1],
+    tick: u32,
 ) -> Result<BTreeSet<u32>, CheckpointPayloadError> {
     let mut ids = BTreeSet::new();
     for player in players {
@@ -62,6 +65,25 @@ pub(super) fn validate_players(
             return Err(CheckpointPayloadError::InvalidValue {
                 field: "players.supplyCap",
             });
+        }
+        validate_count(
+            "players.score.resourceIncomeHistory",
+            player.resource_income_history_len(),
+            MAX_RESOURCE_INCOME_HISTORY_PER_PLAYER,
+        )?;
+        let mut income_ticks = BTreeSet::new();
+        for income_tick in player.resource_income_history_ticks() {
+            if income_tick > tick {
+                return Err(CheckpointPayloadError::InvalidValue {
+                    field: "players.score.resourceIncomeHistory.tick",
+                });
+            }
+            if !income_ticks.insert(income_tick) {
+                return Err(CheckpointPayloadError::DuplicateId {
+                    field: "players.score.resourceIncomeHistory",
+                    id: income_tick,
+                });
+            }
         }
     }
     Ok(ids)

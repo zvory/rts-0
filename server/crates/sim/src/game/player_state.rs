@@ -67,27 +67,19 @@ impl PlayerState {
         }
         self.score.resources_mined.steel = self.score.resources_mined.steel.saturating_add(steel);
         self.score.resources_mined.oil = self.score.resources_mined.oil.saturating_add(oil);
-        self.score.resource_income_history.push(super::ResourceIncomeRecord {
-            tick,
-            steel,
-            oil,
-        });
-        prune_resource_income_history(&mut self.score.resource_income_history, tick);
+        record_resource_income(&mut self.score.resource_income_history, tick, steel, oil);
+        let cutoff = tick.saturating_sub(RESOURCE_WINDOW_MINUTE_TICKS);
+        self.score
+            .resource_income_history
+            .retain(|entry| entry.tick >= cutoff);
     }
 
     pub(crate) fn observer_analysis_resources(&self, current_tick: u32) -> ObserverAnalysisResources {
+        let history = &self.score.resource_income_history;
         ObserverAnalysisResources {
             lifetime: observer_resource_totals(self.score.resources_mined),
-            last_5s: resource_income_in_window(
-                &self.score.resource_income_history,
-                current_tick,
-                RESOURCE_WINDOW_5S_TICKS,
-            ),
-            last_minute: resource_income_in_window(
-                &self.score.resource_income_history,
-                current_tick,
-                RESOURCE_WINDOW_MINUTE_TICKS,
-            ),
+            last_5s: resource_income_in_window(history, current_tick, RESOURCE_WINDOW_5S_TICKS),
+            last_minute: resource_income_in_window(history, current_tick, RESOURCE_WINDOW_MINUTE_TICKS),
         }
     }
 
@@ -120,9 +112,29 @@ impl PlayerState {
     }
 }
 
-fn prune_resource_income_history(history: &mut Vec<super::ResourceIncomeRecord>, current_tick: u32) {
-    let cutoff = current_tick.saturating_sub(config::TICK_HZ * 60);
-    history.retain(|entry| entry.tick >= cutoff);
+fn record_resource_income(
+    history: &mut Vec<super::ResourceIncomeRecord>,
+    tick: u32,
+    steel: u32,
+    oil: u32,
+) {
+    if let Some(last) = history.last_mut() {
+        if last.tick == tick {
+            last.steel = last.steel.saturating_add(steel);
+            last.oil = last.oil.saturating_add(oil);
+            return;
+        }
+        if last.tick < tick {
+            history.push(super::ResourceIncomeRecord { tick, steel, oil });
+            return;
+        }
+    }
+    if let Some(entry) = history.iter_mut().find(|entry| entry.tick == tick) {
+        entry.steel = entry.steel.saturating_add(steel);
+        entry.oil = entry.oil.saturating_add(oil);
+        return;
+    }
+    history.push(super::ResourceIncomeRecord { tick, steel, oil });
 }
 
 fn resource_income_in_window(
@@ -143,8 +155,5 @@ fn resource_income_in_window(
 }
 
 fn observer_resource_totals(totals: super::ResourceTotals) -> ObserverAnalysisResourceTotals {
-    ObserverAnalysisResourceTotals {
-        steel: totals.steel,
-        oil: totals.oil,
-    }
+    ObserverAnalysisResourceTotals { steel: totals.steel, oil: totals.oil }
 }
