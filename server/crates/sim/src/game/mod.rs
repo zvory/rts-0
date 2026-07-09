@@ -76,6 +76,16 @@ pub use teams::TeamId;
 
 const AI_WORKER_RETREAT_TILES: f32 = 5.0;
 
+fn primary_base_kind(kind: EntityKind) -> bool {
+    matches!(kind, EntityKind::CityCentre | EntityKind::Zamok)
+}
+
+fn primary_base_distance_sq(ax: f32, ay: f32, bx: f32, by: f32) -> f32 {
+    let dx = ax - bx;
+    let dy = ay - by;
+    dx * dx + dy * dy
+}
+
 /// Lobby-supplied identity for a player joining a match.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PlayerInit {
@@ -370,6 +380,35 @@ impl Game {
             })
             .map(|p| p.id)
             .collect()
+    }
+
+    /// Player ids whose starting main base is still alive.
+    ///
+    /// This is an objective query for AI-vs-AI matches and diagnostics. It intentionally does
+    /// not replace the normal match elimination rule in [`Game::alive_players`].
+    pub fn primary_base_alive_players(&self) -> Vec<u32> {
+        self.state
+            .players
+            .iter()
+            .filter(|player| self.primary_base_alive_for(player.id, player.start_tile))
+            .map(|player| player.id)
+            .collect()
+    }
+
+    fn primary_base_alive_for(&self, player_id: u32, start_tile: (u32, u32)) -> bool {
+        let (start_x, start_y) = self
+            .state
+            .map
+            .tile_center(start_tile.0, start_tile.1);
+        let max_dist = config::TILE_SIZE as f32 * 0.5;
+        let max_dist_sq = max_dist * max_dist;
+        services::world_query::owned_buildings(&self.state.entities, player_id).any(|entity| {
+            primary_base_kind(entity.kind)
+                && entity.hp > 0
+                && !entity.under_construction()
+                && primary_base_distance_sq(entity.pos_x, entity.pos_y, start_x, start_y)
+                    <= max_dist_sq
+        })
     }
 
     /// Remove every entity owned by `player` (e.g. on disconnect) so the match can resolve.

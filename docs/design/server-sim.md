@@ -161,6 +161,10 @@ impl Game {
     /// Player ids still alive. Humans need at least one building; AI players also need a unit.
     pub fn alive_players(&self) -> Vec<u32>;
 
+    /// Player ids whose starting main base is still alive. AI-only live outcome checks use this
+    /// objective query instead of the normal elimination rule.
+    pub fn primary_base_alive_players(&self) -> Vec<u32>;
+
     /// Team ids with at least one alive member, in stable start/lobby order.
     pub fn alive_team_ids(&self) -> Vec<TeamId>;
 

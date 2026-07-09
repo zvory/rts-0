@@ -210,9 +210,11 @@ replay and trace pointers.
 Spectators never count toward win/elimination and receive a neutral final scoreboard result.
 
 **Win/elimination.** AI players count as match players: a 1-human + N-AI match is a real match
-(it resolves to a winner), while a lone human with no AI remains a never-ending sandbox. They have
-one special elimination rule: an AI with no units left is defeated even if it still owns buildings,
-because it has no player input path back into the game. The lobby's `match_player_count` is humans
-**+** AIs.
+(it resolves to a winner), while a lone human with no AI remains a never-ending sandbox. AI-only
+live matches use the same strategic objective as profile-vs-profile tooling: a player loses when
+its starting main base is gone, so a surviving expansion City Centre or other base does not keep
+that AI alive. Mixed human/AI matches keep the ordinary live elimination rule; there, an AI with no
+units left is defeated even if it still owns buildings, because it has no player input path back
+into the game. The lobby's `match_player_count` is humans **+** AIs.
 
 ---

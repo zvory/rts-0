@@ -1,5 +1,5 @@
 {
-  "reason": "GameState owns durable PlayerState rows",
+  "reason": "add Game primary-base objective query for AI-only live outcomes",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -1795,7 +1795,7 @@
     },
     {
       "path": "mod.rs",
-      "count": 35
+      "count": 36
     },
     {
       "path": "mortar.rs",

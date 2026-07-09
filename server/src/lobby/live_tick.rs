@@ -85,8 +85,8 @@ impl LiveTickDriver<'_> {
         self.broadcast_observer_analysis(&game);
 
         let outcome_start = StdInstant::now();
-        let alive = game.alive_players();
-        let alive_teams = game.alive_team_ids();
+        let alive = self.outcome_alive_players(&game);
+        let alive_teams = alive_team_ids_for(&game, &alive);
         if self.match_player_count >= 2 && alive_teams.len() <= 1 {
             if let Some(perf) = perf.as_mut() {
                 perf.record_phase("outcome_checks", outcome_start.elapsed());
@@ -94,7 +94,7 @@ impl LiveTickDriver<'_> {
             self.finish_perf_tick(perf.as_ref(), &game, scheduler_lag, tick_start);
             let winner_id = alive_teams
                 .first()
-                .and_then(|team_id| game.first_alive_player_on_team(*team_id));
+                .and_then(|team_id| first_alive_player_on_team(&game, &alive, *team_id));
             return LiveTickResult::EndMatch {
                 scores: game.scores(),
                 game,
@@ -136,7 +136,7 @@ impl LiveTickDriver<'_> {
                 return;
             }
             let start = game.start_payload();
-            let alive_player_ids = game.alive_players();
+            let alive_player_ids = self.outcome_alive_players(game);
             let mut commands = Vec::new();
             for controller in self.ai_controllers.iter_mut() {
                 let player_id = controller.player_id();
@@ -160,6 +160,14 @@ impl LiveTickDriver<'_> {
                 game.enqueue(player_id, command);
             }
         });
+    }
+
+    fn outcome_alive_players(&self, game: &Game) -> Vec<u32> {
+        if ai_only_match(self.match_player_count, self.ai_player_count) {
+            game.primary_base_alive_players()
+        } else {
+            game.alive_players()
+        }
     }
 
     fn fan_out_snapshots(
@@ -384,4 +392,31 @@ impl LiveTickDriver<'_> {
 
 fn duration_ms_u32(duration: Duration) -> u32 {
     duration.as_millis().min(u32::MAX as u128) as u32
+}
+
+fn ai_only_match(match_player_count: usize, ai_player_count: usize) -> bool {
+    match_player_count >= 2 && match_player_count == ai_player_count
+}
+
+fn alive_team_ids_for(game: &Game, alive: &[u32]) -> Vec<u32> {
+    let mut teams = Vec::new();
+    for player_id in alive {
+        let Some(team_id) = game.team_of_player(*player_id) else {
+            continue;
+        };
+        if team_id != 0 && !teams.contains(&team_id) {
+            teams.push(team_id);
+        }
+    }
+    teams
+}
+
+fn first_alive_player_on_team(game: &Game, alive: &[u32], team_id: u32) -> Option<u32> {
+    if team_id == 0 {
+        return None;
+    }
+    alive
+        .iter()
+        .copied()
+        .find(|player_id| game.team_of_player(*player_id) == Some(team_id))
 }
