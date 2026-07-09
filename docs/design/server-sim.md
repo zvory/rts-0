@@ -842,7 +842,7 @@ projectile, Magic Anchor placement, Golem consumption, and the intentionally one
 point-fire path. The hook receives the owning player's faction id at execution time through the
 normal command/order helpers, so wrong-faction ability use fails before effects, resource spending,
 cooldowns, or events are applied. Artillery point fire locks each raw click to the issuing gun's
-valid 25-to-65 tile range band, stores that effective point, and owns any needed in-place setup or
+valid 25-to-55 tile range band, stores that effective point, and owns any needed in-place setup or
 redeploy before the first shot. It records temporary live-fog firing reveal sources for enemy
 players when a shell launches, using the firing-cycle-plus-half-second lifetime and smoke
 suppression used by other actionable firing reveals. The hook is deliberately not a generic script engine. Phase 11 signature abilities
