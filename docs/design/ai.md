@@ -201,7 +201,9 @@ three Riflemen from the first Barracks and sends them to a compact defensive lin
 main steel cluster, while delaying oil assignment and tech buildings beyond Barracks until those
 opening Riflemen have been ordered. After that opening, it starts oil earlier than ordinary
 full-steel saturation, techs to Training Centre, queues Entrenchment, then can begin Research
-Complex and Steelworks before Entrenchment completes. It uses the same two-City-Centre expansion
+Complex and Steelworks before Entrenchment completes. Its Steelworks uses a city-center-facing
+nine-tile search band (half the ordinary forward production range) and keeps two clear tiles from
+other buildings, because its support weapons are mobile. It uses the same two-City-Centre expansion
 cadence as AI 2.0 after Training Centre and its three-Rifleman opening are online, capping pre-expand
 steel workers at 18 and lifting the post-expand steel target toward 36 so both City Centres can keep
 producing workers. Its post-opening production is pure Machine Gunners from Barracks plus priority

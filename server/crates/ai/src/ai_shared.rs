@@ -10,8 +10,12 @@ use rts_sim::protocol::{MapInfo, Snapshot};
 pub(crate) const DEFAULT_BUILD_SEARCH_MIN_RADIUS: i32 = 3;
 pub(crate) const DEFAULT_BUILD_SEARCH_MAX_RADIUS: i32 = 16;
 pub(crate) const FORWARD_PRODUCTION_BUILD_SEARCH_MAX_RADIUS: i32 = 18;
+/// Turtle Gun Works only need a compact forward site: their mobile support units do not need the
+/// same far-forward construction band as vehicle production.
+pub(crate) const TURTLE_GUN_WORKS_BUILD_SEARCH_MAX_RADIUS: i32 =
+    FORWARD_PRODUCTION_BUILD_SEARCH_MAX_RADIUS / 2;
 pub(crate) const AI_DEFAULT_BUILDING_CLEARANCE_TILES: i32 = 1;
-pub(crate) const AI_FACTORY_CLEARANCE_TILES: i32 = 2;
+pub(crate) const AI_PRODUCTION_BUILDING_CLEARANCE_TILES: i32 = 2;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct BuildSearch {
@@ -34,7 +38,7 @@ impl Default for BuildSearch {
 
 pub(crate) fn building_clearance_tiles(kind: EntityKind) -> i32 {
     match kind {
-        EntityKind::Factory => AI_FACTORY_CLEARANCE_TILES,
+        EntityKind::Factory | EntityKind::Steelworks => AI_PRODUCTION_BUILDING_CLEARANCE_TILES,
         _ => AI_DEFAULT_BUILDING_CLEARANCE_TILES,
     }
 }
@@ -369,23 +373,25 @@ mod tests {
     }
 
     #[test]
-    fn factory_spacing_requires_two_clear_tiles() {
-        assert!(!footprints_respect_clearance(
-            EntityKind::Factory,
-            10,
-            10,
-            EntityKind::Depot,
-            14,
-            10,
-        ));
-        assert!(footprints_respect_clearance(
-            EntityKind::Factory,
-            10,
-            10,
-            EntityKind::Depot,
-            15,
-            10,
-        ));
+    fn production_buildings_require_two_clear_tiles() {
+        for kind in [EntityKind::Factory, EntityKind::Steelworks] {
+            assert!(!footprints_respect_clearance(
+                kind,
+                10,
+                10,
+                EntityKind::Depot,
+                14,
+                10,
+            ));
+            assert!(footprints_respect_clearance(
+                kind,
+                10,
+                10,
+                EntityKind::Depot,
+                15,
+                10,
+            ));
+        }
     }
 
     #[test]

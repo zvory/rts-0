@@ -57,7 +57,7 @@ where
     if counts.incomplete + counts.intended >= profile.buildings.max_pending_per_kind {
         return None;
     }
-    let build_search = build_search_for_kind(build_search, kind);
+    let build_search = build_search_for_kind(build_search, profile, kind);
     let empty = BTreeSet::new();
     actions::try_build(
         actions,
@@ -76,14 +76,29 @@ where
 
 pub(super) fn build_search_for_kind(
     mut build_search: ai_shared::BuildSearch,
+    profile: &AiProfile,
     kind: EntityKind,
 ) -> ai_shared::BuildSearch {
-    if matches!(kind, EntityKind::Factory | EntityKind::Steelworks) {
-        build_search.max_radius = build_search
-            .max_radius
-            .max(ai_shared::FORWARD_PRODUCTION_BUILD_SEARCH_MAX_RADIUS);
-        build_search.prefer_away_from_center = false;
-        build_search.prefer_toward_center = true;
+    match kind {
+        EntityKind::Steelworks if profile.turtle_defense.is_some() => {
+            build_search.min_radius = build_search
+                .min_radius
+                .min(ai_shared::TURTLE_GUN_WORKS_BUILD_SEARCH_MAX_RADIUS);
+            build_search.max_radius = build_search
+                .max_radius
+                .min(ai_shared::TURTLE_GUN_WORKS_BUILD_SEARCH_MAX_RADIUS)
+                .max(build_search.min_radius);
+            build_search.prefer_away_from_center = false;
+            build_search.prefer_toward_center = true;
+        }
+        EntityKind::Factory | EntityKind::Steelworks => {
+            build_search.max_radius = build_search
+                .max_radius
+                .max(ai_shared::FORWARD_PRODUCTION_BUILD_SEARCH_MAX_RADIUS);
+            build_search.prefer_away_from_center = false;
+            build_search.prefer_toward_center = true;
+        }
+        _ => {}
     }
     build_search
 }
@@ -191,6 +206,7 @@ pub(super) fn unit_counts_for_priorities(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ai_core::profiles::{AI_1_1_TANK_MG, AI_TURTLE_CHOKES};
 
     fn short_search() -> ai_shared::BuildSearch {
         ai_shared::BuildSearch {
@@ -202,9 +218,9 @@ mod tests {
     }
 
     #[test]
-    fn vehicle_and_gun_works_use_modest_forward_build_search() {
+    fn vehicle_and_standard_gun_works_use_modest_forward_build_search() {
         for kind in [EntityKind::Factory, EntityKind::Steelworks] {
-            let search = build_search_for_kind(short_search(), kind);
+            let search = build_search_for_kind(short_search(), &AI_1_1_TANK_MG, kind);
             assert_eq!(
                 search.max_radius,
                 ai_shared::FORWARD_PRODUCTION_BUILD_SEARCH_MAX_RADIUS
@@ -219,8 +235,33 @@ mod tests {
     }
 
     #[test]
+    fn turtle_gun_works_use_a_half_range_forward_build_search() {
+        let search = build_search_for_kind(
+            ai_shared::BuildSearch {
+                min_radius: 2,
+                max_radius: ai_shared::DEFAULT_BUILD_SEARCH_MAX_RADIUS,
+                prefer_away_from_center: false,
+                prefer_toward_center: false,
+            },
+            &AI_TURTLE_CHOKES,
+            EntityKind::Steelworks,
+        );
+
+        assert_eq!(
+            search.max_radius,
+            ai_shared::TURTLE_GUN_WORKS_BUILD_SEARCH_MAX_RADIUS
+        );
+        assert_eq!(
+            search.max_radius * 2,
+            ai_shared::FORWARD_PRODUCTION_BUILD_SEARCH_MAX_RADIUS
+        );
+        assert!(!search.prefer_away_from_center);
+        assert!(search.prefer_toward_center);
+    }
+
+    #[test]
     fn ordinary_buildings_keep_their_requested_search_band() {
-        let search = build_search_for_kind(short_search(), EntityKind::Barracks);
+        let search = build_search_for_kind(short_search(), &AI_1_1_TANK_MG, EntityKind::Barracks);
 
         assert_eq!(search.max_radius, 6);
         assert!(search.prefer_away_from_center);
