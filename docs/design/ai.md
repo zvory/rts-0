@@ -190,15 +190,16 @@ parity refactor target for AI 2.0 rather than an intended balance upgrade until 
 human review say otherwise.
 
 The `ai_turtle` suite is pinned to `ai_turtle_chokes`, a first-pass turtle profile for visual
-matchups and tuning. It keeps the existing economy/supply managers first, targets full main-base
-worker saturation, opens one Barracks, builds Training Centre, then stays on one Barracks while it
-accelerates Research Complex / Steelworks R&D for Anti-Tank Guns. It queues Entrenchment from
-Training Centre before Machine Gunner production, starts the R&D chain once Entrenchment is queued,
-and prioritizes the Anti-Tank Gun unlock before downstream construction spend when Research Complex
-is ready. Its opening combat plan trains exactly three Riflemen from the first Barracks and sends
-them to a compact defensive line in front of the main steel cluster, while delaying oil assignment
-and tech buildings beyond Barracks until those opening Riflemen have been ordered. After that
-opening, it starts oil earlier than ordinary
+matchups and tuning. It uses the proposal-based economy manager to keep its supply, worker-training,
+resource-assignment, and two-City-Centre expansion behavior aligned with AI 2.0 while preserving
+its three-Rifleman opening oil hold. It targets full main-base worker saturation, opens one Barracks,
+builds Training Centre, then stays on one Barracks while it accelerates Research Complex / Steelworks
+R&D for Anti-Tank Guns. It queues Entrenchment from Training Centre before Machine Gunner production,
+starts the R&D chain once Entrenchment is queued, and prioritizes the Anti-Tank Gun unlock before
+downstream construction spend when Research Complex is ready. Its opening combat plan trains exactly
+three Riflemen from the first Barracks and sends them to a compact defensive line in front of the
+main steel cluster, while delaying oil assignment and tech buildings beyond Barracks until those
+opening Riflemen have been ordered. After that opening, it starts oil earlier than ordinary
 full-steel saturation, techs to Training Centre, queues Entrenchment, then can begin Research
 Complex and Steelworks before Entrenchment completes. It uses the same two-City-Centre expansion
 cadence as AI 2.0 after Training Centre and its three-Rifleman opening are online, capping pre-expand

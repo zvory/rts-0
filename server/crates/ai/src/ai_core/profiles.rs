@@ -3,6 +3,10 @@
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::upgrade::UpgradeKind;
 
+mod economy;
+
+use self::economy::EconomyPolicy;
+
 pub(crate) const RIFLE_FLOOD_FAST_ID: &str = "rifle_flood_fast";
 pub(crate) const RIFLE_FLOOD_FULL_SATURATION_ID: &str = "rifle_flood_full_saturation";
 pub(crate) const TECH_TO_TANKS_ID: &str = "tech_to_tanks";
@@ -42,6 +46,7 @@ const AI_2_0_SECOND_FACTORY_FLOAT_THRESHOLD: ResourceFloatThreshold = ResourceFl
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct AiProfile {
     pub(crate) id: &'static str,
+    pub(crate) economy: EconomyPolicy,
     pub(crate) workers: WorkerPolicy,
     pub(crate) supply: SupplyPolicy,
     pub(crate) buildings: BuildingPolicy,
@@ -333,6 +338,7 @@ const TURTLE_TECH_PATH: [EntityKind; 4] = [
 
 pub(crate) static RIFLE_FLOOD_FAST: AiProfile = AiProfile {
     id: RIFLE_FLOOD_FAST_ID,
+    economy: EconomyPolicy::Direct,
     workers: WorkerPolicy {
         steel_saturation_fraction: Ratio::new(1, 2),
         steel_worker_cap: Some(5),
@@ -478,6 +484,7 @@ pub(crate) static RIFLE_FLOOD_FAST: AiProfile = AiProfile {
 
 pub(crate) static RIFLE_FLOOD_FULL_SATURATION: AiProfile = AiProfile {
     id: RIFLE_FLOOD_FULL_SATURATION_ID,
+    economy: EconomyPolicy::Direct,
     workers: WorkerPolicy {
         steel_saturation_fraction: Ratio::new(1, 1),
         steel_worker_cap: None,
@@ -567,6 +574,7 @@ pub(crate) static RIFLE_FLOOD_FULL_SATURATION: AiProfile = AiProfile {
 
 pub(crate) static TECH_TO_TANKS: AiProfile = AiProfile {
     id: TECH_TO_TANKS_ID,
+    economy: EconomyPolicy::Direct,
     workers: WorkerPolicy {
         steel_saturation_fraction: Ratio::new(2, 3),
         steel_worker_cap: Some(12),
@@ -636,6 +644,7 @@ pub(crate) static TECH_TO_TANKS: AiProfile = AiProfile {
 
 pub(crate) static STEEL_EXPANSION_TANKS: AiProfile = AiProfile {
     id: STEEL_EXPANSION_TANKS_ID,
+    economy: EconomyPolicy::Direct,
     workers: WorkerPolicy {
         steel_saturation_fraction: Ratio::new(1, 1),
         steel_worker_cap: Some(24),
@@ -723,6 +732,7 @@ pub(crate) static STEEL_EXPANSION_TANKS: AiProfile = AiProfile {
 
 pub(crate) static AI_1_0_TECH: AiProfile = AiProfile {
     id: AI_1_0_TECH_ID,
+    economy: EconomyPolicy::Direct,
     workers: WorkerPolicy {
         steel_saturation_fraction: Ratio::new(1, 1),
         steel_worker_cap: Some(18),
@@ -810,6 +820,7 @@ pub(crate) static AI_1_0_TECH: AiProfile = AiProfile {
 
 pub(crate) static AI_1_1_TANK_MG: AiProfile = AiProfile {
     id: AI_1_1_TANK_MG_ID,
+    economy: EconomyPolicy::Direct,
     workers: WorkerPolicy {
         steel_saturation_fraction: Ratio::new(1, 1),
         steel_worker_cap: None,
@@ -877,6 +888,7 @@ pub(crate) static AI_1_1_TANK_MG: AiProfile = AiProfile {
 
 pub(crate) static AI_1_2_WAVE_COHORTS: AiProfile = AiProfile {
     id: AI_1_2_WAVE_COHORTS_ID,
+    economy: EconomyPolicy::Direct,
     workers: AI_1_1_TANK_MG.workers,
     supply: AI_1_1_TANK_MG.supply,
     buildings: AI_1_1_TANK_MG.buildings,
@@ -901,6 +913,7 @@ pub(crate) static AI_1_2_WAVE_COHORTS: AiProfile = AiProfile {
 
 pub(crate) static AI_2_0_TANK_PRESSURE: AiProfile = AiProfile {
     id: AI_2_0_TANK_PRESSURE_ID,
+    economy: EconomyPolicy::Direct,
     workers: WorkerPolicy {
         steel_saturation_fraction: Ratio::new(1, 1),
         steel_worker_cap: None,
@@ -979,11 +992,13 @@ pub(crate) static AI_2_0_TANK_PRESSURE: AiProfile = AiProfile {
 
 pub(crate) static AI_2_1_ECONOMY_MANAGER: AiProfile = AiProfile {
     id: AI_2_1_ECONOMY_MANAGER_ID,
+    economy: EconomyPolicy::ProposalManager,
     ..AI_2_0_TANK_PRESSURE
 };
 
 pub(crate) static AI_TURTLE_CHOKES: AiProfile = AiProfile {
     id: AI_TURTLE_CHOKES_ID,
+    economy: EconomyPolicy::ProposalManager,
     workers: WorkerPolicy {
         steel_saturation_fraction: Ratio::new(1, 1),
         steel_worker_cap: None,
