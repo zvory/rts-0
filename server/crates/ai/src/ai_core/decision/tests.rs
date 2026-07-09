@@ -288,32 +288,21 @@ fn enemy_base_fact(observation: &AiObservation) -> EnemyBaseFact {
 
 fn base_site_resources(first_id: u32, site: (u32, u32), map_size: u32) -> Vec<AiResourceSummary> {
     let ts = config::TILE_SIZE as f32;
-    let hx = site.0 as f32 + 0.5;
-    let hy = site.1 as f32 + 0.5;
+    let (hx, hy) = (site.0 as f32 + 0.5, site.1 as f32 + 0.5);
     let map_center = map_size as f32 * 0.5;
     let base_angle = (map_center - hy).atan2(map_center - hx);
-
-    let perp_x = -base_angle.sin();
-    let perp_y = base_angle.cos();
-    let field_counts = [
-        config::STEEL_PATCHES_PER_BASE.div_ceil(2),
-        config::STEEL_PATCHES_PER_BASE / 2,
-    ];
+    let (perp_x, perp_y) = (-base_angle.sin(), base_angle.cos());
     let mut resources = Vec::new();
     let mut steel_index = 0;
-    for (side, field_patches) in [1.0, -1.0].into_iter().zip(field_counts) {
-        if field_patches == 0 {
-            continue;
-        }
+    for (side, field_patches) in [
+        (1.0, config::STEEL_PATCHES_PER_BASE.div_ceil(2)),
+        (-1.0, config::STEEL_PATCHES_PER_BASE / 2),
+    ] {
         let block_cx = hx + side * config::STEEL_BLOCK_DIST_TILES * base_angle.cos();
         let block_cy = hy + side * config::STEEL_BLOCK_DIST_TILES * base_angle.sin();
-        let rows = field_patches.div_ceil(6);
-        let row_center = (rows - 1) as f32 / 2.0;
+        let row_center = field_patches.div_ceil(6).saturating_sub(1) as f32 / 2.0;
         for i in 0..field_patches {
-            let col = (i % 6) as f32;
-            let row = (i / 6) as f32;
-            let off_x = col - 2.5;
-            let off_y = row - row_center;
+            let (off_x, off_y) = ((i % 6) as f32 - 2.5, (i / 6) as f32 - row_center);
             resources.push(resource(
                 first_id + steel_index,
                 EntityKind::Steel,
