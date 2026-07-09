@@ -15,6 +15,7 @@ pub enum AbilityKind {
     PointFire,
     BlanketFire,
     Breakthrough,
+    ScoutPlane,
     DismissScoutPlane,
     EkatTeleport,
     EkatLineShot,
@@ -31,6 +32,7 @@ impl AbilityKind {
             AbilityKind::PointFire => protocol::abilities::POINT_FIRE,
             AbilityKind::BlanketFire => protocol::abilities::BLANKET_FIRE,
             AbilityKind::Breakthrough => protocol::abilities::BREAKTHROUGH,
+            AbilityKind::ScoutPlane => protocol::abilities::SCOUT_PLANE,
             AbilityKind::DismissScoutPlane => protocol::abilities::DISMISS_SCOUT_PLANE,
             AbilityKind::EkatTeleport => protocol::abilities::EKAT_TELEPORT,
             AbilityKind::EkatLineShot => protocol::abilities::EKAT_LINE_SHOT,
@@ -52,6 +54,7 @@ impl AbilityKind {
             AbilityKind::EkatConsumeGolem => 8,
             AbilityKind::BlanketFire => 9,
             AbilityKind::DismissScoutPlane => 10,
+            AbilityKind::ScoutPlane => 11,
         }
     }
 
@@ -68,6 +71,7 @@ impl AbilityKind {
             8 => Some(AbilityKind::EkatConsumeGolem),
             9 => Some(AbilityKind::BlanketFire),
             10 => Some(AbilityKind::DismissScoutPlane),
+            11 => Some(AbilityKind::ScoutPlane),
             _ => None,
         }
     }
@@ -84,6 +88,7 @@ impl FromStr for AbilityKind {
             protocol::abilities::POINT_FIRE => Ok(AbilityKind::PointFire),
             protocol::abilities::BLANKET_FIRE => Ok(AbilityKind::BlanketFire),
             protocol::abilities::BREAKTHROUGH => Ok(AbilityKind::Breakthrough),
+            protocol::abilities::SCOUT_PLANE => Ok(AbilityKind::ScoutPlane),
             protocol::abilities::DISMISS_SCOUT_PLANE => Ok(AbilityKind::DismissScoutPlane),
             protocol::abilities::EKAT_TELEPORT => Ok(AbilityKind::EkatTeleport),
             protocol::abilities::EKAT_LINE_SHOT => Ok(AbilityKind::EkatLineShot),
@@ -111,6 +116,7 @@ pub enum AbilityEffectHook {
     LineProjectile,
     MagicAnchor,
     ConsumeGolem,
+    ScoutPlane,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -165,6 +171,7 @@ pub fn effect_hook(kind: AbilityKind) -> AbilityEffectHook {
         AbilityKind::Smoke | AbilityKind::MortarFire => AbilityEffectHook::DelayedWorld,
         AbilityKind::PointFire | AbilityKind::BlanketFire => AbilityEffectHook::ArtilleryPointFire,
         AbilityKind::Breakthrough => AbilityEffectHook::OwnedAreaStatus,
+        AbilityKind::ScoutPlane => AbilityEffectHook::ScoutPlane,
         AbilityKind::DismissScoutPlane => AbilityEffectHook::ReservedNoop,
         AbilityKind::EkatTeleport => AbilityEffectHook::DashReturn,
         AbilityKind::EkatLineShot => AbilityEffectHook::LineProjectile,
@@ -202,6 +209,10 @@ mod tests {
         assert_eq!(
             definition(AbilityKind::Breakthrough).effect_hook,
             AbilityEffectHook::OwnedAreaStatus
+        );
+        assert_eq!(
+            definition(AbilityKind::ScoutPlane).effect_hook,
+            AbilityEffectHook::ScoutPlane
         );
         assert_eq!(
             definition(AbilityKind::DismissScoutPlane).effect_hook,

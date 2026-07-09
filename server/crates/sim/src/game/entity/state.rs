@@ -35,11 +35,15 @@ pub(in crate::game) struct ScoutPlaneState {
     pub(in crate::game) orbit_phase: f32,
     /// Whether the plane has reached the orbit area for `orbit_center`.
     pub(in crate::game) orbiting: bool,
-    /// Integer oil reserve. Drained only when scheduled oil upkeep cannot be paid.
-    pub(in crate::game) fuel_oil: u8,
-    /// Active-flight ticks until the next upkeep payment or reserve drain.
-    #[serde(default = "default_scout_plane_upkeep_ticks_until_due")]
-    pub(in crate::game) upkeep_ticks_until_due: u16,
+    /// City Centre this sortie should return to after station time expires.
+    #[serde(default)]
+    pub(in crate::game) home_city_centre: Option<u32>,
+    /// Ticks remaining on station after reaching the orbit area.
+    #[serde(default = "default_scout_plane_station_ticks")]
+    pub(in crate::game) station_ticks_remaining: u16,
+    /// Whether the plane is flying back to its launch City Centre.
+    #[serde(default)]
+    pub(in crate::game) returning: bool,
 }
 
 impl ScoutPlaneState {
@@ -48,18 +52,17 @@ impl ScoutPlaneState {
             orbit_center: (x, y),
             orbit_phase: 0.0,
             orbiting: false,
-            fuel_oil: config::SCOUT_PLANE_FUEL_RESERVE_OIL,
-            upkeep_ticks_until_due: config::SCOUT_PLANE_UPKEEP_INTERVAL_TICKS,
+            home_city_centre: None,
+            station_ticks_remaining: config::SCOUT_PLANE_ORBIT_DURATION_TICKS,
+            returning: false,
         }
     }
 
-    pub(in crate::game) fn retarget(&mut self, x: f32, y: f32) -> bool {
-        if !x.is_finite() || !y.is_finite() {
-            return false;
+    pub(in crate::game) fn launched_from(home_city_centre: u32, x: f32, y: f32) -> Self {
+        Self {
+            home_city_centre: Some(home_city_centre),
+            ..Self::launched_at(x, y)
         }
-        self.orbit_center = (x, y);
-        self.orbiting = false;
-        true
     }
 
     pub(in crate::game) fn update_runtime(
@@ -78,8 +81,8 @@ impl ScoutPlaneState {
     }
 }
 
-fn default_scout_plane_upkeep_ticks_until_due() -> u16 {
-    config::SCOUT_PLANE_UPKEEP_INTERVAL_TICKS
+fn default_scout_plane_station_ticks() -> u16 {
+    config::SCOUT_PLANE_ORBIT_DURATION_TICKS
 }
 
 /// Reserved for future round-trip harvesting if attached mining is replaced.

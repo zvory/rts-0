@@ -17,7 +17,6 @@ import {
 } from "./hud_ability_affordance.js";
 import {
   attackDescriptor,
-  dismissScoutPlaneDescriptor,
   holdDescriptor,
   moveDescriptor,
   stopDescriptor,
@@ -27,7 +26,6 @@ import {
   researchAvailability,
   researchDisabledReason,
   researchSlotForUpgrade,
-  scoutPlaneTrainLimit,
   selectedProducerBuildingsForUnit,
   selectedProducingBuildingsForKind,
   trainAvailability,
@@ -147,7 +145,10 @@ export function buildCommandCardContextCatalog() {
     id: 15,
     owner: playerId,
     kind: KIND.COMMAND_CAR,
-    abilities: [{ ability: ABILITY.BREAKTHROUGH, cooldownLeft: 0, remainingUses: null }],
+    abilities: [
+      { ability: ABILITY.BREAKTHROUGH, cooldownLeft: 0, remainingUses: null },
+      { ability: ABILITY.SCOUT_PLANE, cooldownLeft: 0, remainingUses: null },
+    ],
   };
   const scoutPlane = {
     id: 16,
@@ -155,10 +156,6 @@ export function buildCommandCardContextCatalog() {
     kind: KIND.SCOUT_PLANE,
     scoutPlane: {
       orbitCenter: [256, 256],
-      fuelOil: 8,
-      fuelCapacityOil: 8,
-      upkeepOil: 1,
-      upkeepIntervalTicks: 20,
     },
   };
   const allEntities = [...baseEntities, worker, rifleman, scoutCar, mortar, artillery, commandCar, scoutPlane];
@@ -166,6 +163,7 @@ export function buildCommandCardContextCatalog() {
     playerId,
     factionId: DEFAULT_FACTION_ID,
     selection,
+    entities: allEntities,
     resources: { steel: 1000, oil: 1000 },
     upgrades: [
       UPGRADE.METHAMPHETAMINES,
@@ -186,8 +184,9 @@ export function buildCommandCardContextCatalog() {
     { id: "worker-main", card: buildCommandCardDescriptors(ctx([worker])) },
     { id: "worker-build", card: buildCommandCardDescriptors(ctx([worker], { commandCardMode: "workerBuild" })) },
     { id: "mixed-army-support", card: buildCommandCardDescriptors(ctx([rifleman, scoutCar, mortar, artillery, commandCar])) },
-    { id: "scout-plane", card: buildCommandCardDescriptors(ctx([scoutPlane])) },
-    { id: "mixed-worker-scout-plane", card: buildCommandCardDescriptors(ctx([worker, scoutPlane])) },
+    { id: "command-car", card: buildCommandCardDescriptors(ctx([commandCar], {
+      entities: allEntities.filter((e) => e.id !== scoutPlane.id),
+    })) },
     { id: "city-centre-train", card: buildCommandCardDescriptors(ctx([baseEntities[0]])) },
     { id: "barracks-train", card: buildCommandCardDescriptors(ctx([baseEntities[1]])) },
     { id: "factory-train", card: buildCommandCardDescriptors(ctx([baseEntities[4]])) },
@@ -277,23 +276,18 @@ export function buildUnitCard(ctx, selection) {
   const factionId = commandFactionId(ctx);
   const ownUnits = selectedOwnUnits(ctx, selection);
   const unitIds = ownUnits.map((e) => e.id);
-  const scoutPlaneIds = ownUnits
-    .filter((e) => e.kind === KIND.SCOUT_PLANE)
-    .map((e) => e.id);
-  const landUnits = ownUnits.filter((e) => e.kind !== KIND.SCOUT_PLANE);
-  const landUnitIds = landUnits.map((e) => e.id);
-  const setupGunIds = landUnits
+  const setupGunIds = ownUnits
     .filter((e) => e.kind === KIND.ANTI_TANK_GUN || e.kind === KIND.ARTILLERY)
     .map((e) => e.id);
-  const abilityAffordances = selectedAbilityAffordances(ctx, landUnits);
-  const hasArmyUnit = landUnits.some((e) => e.kind !== KIND.WORKER);
-  const workerSelected = !hasArmyUnit && landUnits.some((e) => e.kind === KIND.WORKER);
+  const abilityAffordances = selectedAbilityAffordances(ctx, ownUnits);
+  const hasArmyUnit = ownUnits.some((e) => e.kind !== KIND.WORKER);
+  const workerSelected = !hasArmyUnit && ownUnits.some((e) => e.kind === KIND.WORKER);
   const signature =
     `units|${unitIds.join(".")}|target:${commandTargetSig(ctx.commandTarget)}|` +
     `|setup:${setupGunIds.join(".")}|` +
-    `|scoutPlanes:${scoutPlaneIds.join(".")}|` +
     `|abilities:${abilityAffordances.map((affordance) =>
       `${affordance.definition.ability}:${affordance.unlocked ? 1 : 0}:${affordance.affordable ? 1 : 0}:` +
+      `${affordance.activeBlock ? 1 : 0}:` +
       `${affordance.depletedCount}:` +
       `${affordance.readyIds.join(".")}:` +
       `${affordance.queueAdmissibleIds.join(".")}:` +
@@ -305,10 +299,10 @@ export function buildUnitCard(ctx, selection) {
   if (workerSelected) {
     return card("unit", signature, [
         moveDescriptor(ctx, unitIds),
-        holdDescriptor(landUnitIds),
+        holdDescriptor(unitIds),
         null,
-        attackDescriptor(ctx, landUnitIds),
-        stopDescriptor(landUnitIds),
+        attackDescriptor(ctx, unitIds),
+        stopDescriptor(unitIds),
         null,
         {
           id: "worker:build-menu",
@@ -319,19 +313,19 @@ export function buildUnitCard(ctx, selection) {
           icon: "BLD",
           label: "Build",
           title: "Open worker build menu",
-          enabled: landUnitIds.length > 0,
+          enabled: unitIds.length > 0,
         },
         null,
-        scoutPlaneIds.length > 0 ? dismissScoutPlaneDescriptor(scoutPlaneIds) : null,
+        null,
       ], { abilityAffordances });
   }
 
   const slots = new Array(9).fill(null);
   slots[0] = moveDescriptor(ctx, unitIds);
-  if (landUnitIds.length > 0) {
-    slots[1] = holdDescriptor(landUnitIds);
-    slots[3] = attackDescriptor(ctx, landUnitIds);
-    slots[4] = stopDescriptor(landUnitIds);
+  if (unitIds.length > 0) {
+    slots[1] = holdDescriptor(unitIds);
+    slots[3] = attackDescriptor(ctx, unitIds);
+    slots[4] = stopDescriptor(unitIds);
   }
 
   let sequentialSlot = 6;
@@ -344,7 +338,6 @@ export function buildUnitCard(ctx, selection) {
   };
 
   for (const affordance of abilityAffordances) {
-    if (!affordance.unlocked) continue;
     const definition = affordance.definition;
     const recastActive = affordance.recastTargetObjectId != null;
     const readyCount = recastActive ? affordance.recastReadyIds.length : affordance.readyIds.length;
@@ -374,8 +367,8 @@ export function buildUnitCard(ctx, selection) {
       label: definition.label,
       title: abilityDisabledReason(ctx, affordance),
       ability: definition.ability,
-      enabled: commandableCount > 0 && affordance.affordable,
-      unaffordable: commandableCount > 0 && !affordance.affordable,
+      enabled: affordance.unlocked && commandableCount > 0 && affordance.affordable,
+      unaffordable: affordance.unlocked && commandableCount > 0 && !affordance.affordable,
       countBadge: showReadyCount ? `${readyCount}` : "",
       cooldownClocks: affordance.cooldownClocks,
       cost: definition.cost,
@@ -413,13 +406,6 @@ export function buildUnitCard(ctx, selection) {
     }
   }
 
-  if (scoutPlaneIds.length > 0) {
-    const dismissSlot = firstOpenCommandSlot(slots, 8);
-    if (dismissSlot >= 0) {
-      slots[dismissSlot] = dismissScoutPlaneDescriptor(scoutPlaneIds);
-    }
-  }
-
   return card("unit", signature, slots, { abilityAffordances });
 }
 
@@ -447,16 +433,12 @@ export function buildTrainCard(ctx, building) {
     const slot = firstOpenCommandSlot(slots, trainSlotForUnit(building.kind, unit, trains), cancelSlot);
     if (slot < 0) continue;
     const availability = trainAvailability(ctx, unit, resources, isOwn);
-    const scoutLimit = scoutPlaneTrainLimit(ctx, unit, isOwn);
-    const selectActive = scoutLimit.status === "active" && scoutLimit.active;
     slots[slot] = {
       id: `train:${unit}`,
       commandId: factionCommandId(factionId, "train", unit),
       kind: "button",
-      action: selectActive ? "selectActiveScoutPlane" : "train",
-      intent: selectActive
-        ? { type: "selectActiveScoutPlane", unitId: scoutLimit.active.id }
-        : { type: "train", unit },
+      action: "train",
+      intent: { type: "train", unit },
       icon: st.icon,
       label: st.label,
       cost: st.cost,
@@ -522,8 +504,11 @@ export function selectedAbilityAffordances(ctx, selection) {
       if (carriers.length === 0) return null;
       const unlocked = abilityUnlocked(ctx, definition);
       const canAfford = affordable(definition.cost, resources);
-      const readyUnits = carriers.filter((e) => abilityUnitReady(e, definition));
-      const queueAdmissibleUnits = carriers.filter((e) => abilityUnitQueueAdmissible(e, definition));
+      const activeBlock = definition.ability === ABILITY.SCOUT_PLANE && activeOwnScoutPlane(ctx);
+      const readyUnits = activeBlock ? [] : carriers.filter((e) => abilityUnitReady(e, definition));
+      const queueAdmissibleUnits = activeBlock
+        ? []
+        : carriers.filter((e) => abilityUnitQueueAdmissible(e, definition));
       const recastUnits = carriers.filter((e) => abilityActiveObjectId(e, definition.ability) != null);
       const cooldowns = carriers.map((e) =>
         abilityCooldownLeft(e, definition.ability),
@@ -538,6 +523,7 @@ export function selectedAbilityAffordances(ctx, selection) {
         definition,
         unlocked,
         affordable: canAfford,
+        activeBlock,
         depletedCount,
         carrierIds: carriers.map((e) => e.id),
         readyIds: readyUnits.map((e) => e.id),
@@ -611,7 +597,8 @@ function isOwn(ctx, e) {
 }
 
 function selectedOwnUnits(ctx, selection) {
-  return (selection || []).filter((e) => isOwn(ctx, e) && isUnit(e.kind));
+  return (selection || []).filter((e) =>
+    isOwn(ctx, e) && isUnit(e.kind) && e.kind !== KIND.SCOUT_PLANE);
 }
 
 function workerOnlySelection(ctx, selection) {
@@ -723,6 +710,7 @@ function abilityDisabledReason(ctx, affordance) {
       .find((req) => !playerHasCompleteKind(ctx, req));
     if (missing) return `Requires ${STATS[missing]?.label || missing}`;
   }
+  if (affordance.activeBlock) return "Scout Plane already active";
   if (affordance.depletedCount === affordance.carrierIds.length) return "Depleted";
   if (!affordance.affordable) return "Not enough resources";
   if (
@@ -730,4 +718,17 @@ function abilityDisabledReason(ctx, affordance) {
     affordance.definition.queuePolicy !== "waitUntilReady"
   ) return "On cooldown";
   return affordance.definition.title || "";
+}
+
+function currentEntitiesOf(ctx) {
+  if (Array.isArray(ctx?.currentEntities)) return ctx.currentEntities;
+  if (Array.isArray(ctx?.entities)) return ctx.entities;
+  if (typeof ctx?.state?.entitiesInterpolated === "function") {
+    return ctx.state.entitiesInterpolated(1) || [];
+  }
+  return ctx?.selection || [];
+}
+
+function activeOwnScoutPlane(ctx) {
+  return currentEntitiesOf(ctx).some((e) => isOwn(ctx, e) && e.kind === KIND.SCOUT_PLANE && e.hp !== 0);
 }

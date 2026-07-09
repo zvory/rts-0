@@ -108,7 +108,7 @@ the transport envelope only and is intentionally absent from replay/simulation c
 | `setupAntiTankGuns` | `units: u32[]`, `x: f32`, `y: f32`, `queued?: bool` | Manually emplace owned anti-tank guns and artillery toward a world point. When `queued` is true, append a future setup-facing intent for owned completed Anti-Tank Guns and artillery only; the stored point is evaluated from the unit's position when the stage promotes. Immediate setup clears movement/target state, records the setup facing, and enters `setting_up`. Other selected units are ignored. |
 | `tearDownAntiTankGuns` | `units: u32[]` | Pack up owned anti-tank guns that are `setting_up` or `deployed`. Other selected units are ignored. |
 | `charge`     | `units: u32[]` | Legacy Rifleman Charge activation. Preserved for old clients/replays as a parseable no-op; it has no eligible carriers, cooldown, or runtime status. |
-| `useAbility` | `ability: "charge"|"smoke"|"mortarFire"|"pointFire"|"blanketFire"|"breakthrough"|"dismissScoutPlane"|"ekatTeleport"|"ekatLineShot"|"ekatMagicAnchor"|"ekatConsumeGolem"`, `units: u32[]`, `x?: f32`, `y?: f32`, `queued?: bool` | Generic ability command. Ability ids, carriers, target mode, cost, cooldown, finite uses, queueability, queue policy, autocast support, and command-card exposure are mirrored from the Rust faction ability registry. `charge` is legacy/no-op with no carriers or runtime effect; `dismissScoutPlane` is runtime vocabulary for manually dismissing owned active Scout Planes, has no normal faction carriers or catalog-backed command-card descriptor, is emitted by the selected-plane Dismiss affordance, and ignores stale, non-owned, or queued submissions. `smoke`, `mortarFire`, Artillery `pointFire`, Artillery `blanketFire`, Ekat `ekatTeleport`, `ekatLineShot`, and `ekatMagicAnchor` target a world point. Command Car `breakthrough` and Ekat `ekatConsumeGolem` are self-targeted and ignore `x`/`y`. Smoke command execution is phased separately from the authoritative smoke world-state/LOS model; mortar fire schedules a delayed area impact. Registry queue policy differentiates non-queued, skip-if-not-ready, and wait-until-ready abilities; queued Mortar Fire waits for ability cooldown/weapon reload and then fires once per queued click. Artillery Point Fire and Blanket Fire lock the submitted point to each gun's 25-to-55 tile range band along that gun's origin-to-click ray, store that effective point as the point-fire target or blanket center, and can auto-set-up or redeploy the gun in place before firing. Queued artillery fire locks from the best authoritative future queued position when available and is terminal in the unit order queue: once accepted, later queued unit orders are not appended after Point Fire or Blanket Fire for that gun. Blanket Fire samples deterministic impacts uniformly within its 15-tile blanket radius around the stored center; sampled impacts are not re-clamped to the cone or range band. Point Fire and Blanket Fire are separate command-card affordances. Ekat dash and line shot clamp out-of-range world targets to their max range instead of walking Ekat into range; queued Ekat ability commands append future dash, line shot, or Magic Anchor intents. Ekat dash moves her within the target range if the landing point is statically standable and leaves an authoritative return marker at the original position; Ekat line shot spawns a projected out-and-back line projectile that damages enemy targetables on each swept leg, and an active Magic Anchor adds a second projectile from the anchor toward the same point; Magic Anchor places one replacement-style, non-blocking, non-attackable 10-second pull field. Ekat Consume is non-queued; it permanently removes the nearest owned living Golem within 2 tiles and heals Ekat to full HP. |
+| `useAbility` | `ability: "charge"|"smoke"|"mortarFire"|"pointFire"|"blanketFire"|"breakthrough"|"scoutPlane"|"dismissScoutPlane"|"ekatTeleport"|"ekatLineShot"|"ekatMagicAnchor"|"ekatConsumeGolem"`, `units: u32[]`, `x?: f32`, `y?: f32`, `queued?: bool` | Generic ability command. Ability ids, carriers, target mode, cost, cooldown, finite uses, queueability, queue policy, autocast support, and command-card exposure are mirrored from the Rust faction ability registry. `charge` is legacy/no-op with no carriers or runtime effect; `dismissScoutPlane` is reserved legacy vocabulary with no carriers or command-card descriptor. `smoke`, `scoutPlane`, `mortarFire`, Artillery `pointFire`, Artillery `blanketFire`, Ekat `ekatTeleport`, `ekatLineShot`, and `ekatMagicAnchor` target a world point. Command Car `breakthrough` and Ekat `ekatConsumeGolem` are self-targeted and ignore `x`/`y`. Command Car `scoutPlane` spends 50 steel and 50 oil, launches one active Scout Plane globally for that player from the nearest owned completed City Centre to the clicked point, starts a 30-second player cooldown, orbits for 10 seconds after arrival, then returns to the launch City Centre or despawns if that City Centre died. Smoke command execution is phased separately from the authoritative smoke world-state/LOS model; mortar fire schedules a delayed area impact. Registry queue policy differentiates non-queued, skip-if-not-ready, and wait-until-ready abilities; queued Mortar Fire waits for ability cooldown/weapon reload and then fires once per queued click. Artillery Point Fire and Blanket Fire lock the submitted point to each gun's 25-to-55 tile range band along that gun's origin-to-click ray, store that effective point as the point-fire target or blanket center, and can auto-set-up or redeploy the gun in place before firing. Queued artillery fire locks from the best authoritative future queued position when available and is terminal in the unit order queue: once accepted, later queued unit orders are not appended after Point Fire or Blanket Fire for that gun. Blanket Fire samples deterministic impacts uniformly within its 15-tile blanket radius around the stored center; sampled impacts are not re-clamped to the cone or range band. Point Fire and Blanket Fire are separate command-card affordances. Ekat dash and line shot clamp out-of-range world targets to their max range instead of walking Ekat into range; queued Ekat ability commands append future dash, line shot, or Magic Anchor intents. Ekat dash moves her within the target range if the landing point is statically standable and leaves an authoritative return marker at the original position; Ekat line shot spawns a projected out-and-back line projectile that damages enemy targetables on each swept leg, and an active Magic Anchor adds a second projectile from the anchor toward the same point; Magic Anchor places one replacement-style, non-blocking, non-attackable 10-second pull field. Ekat Consume is non-queued; it permanently removes the nearest owned living Golem within 2 tiles and heals Ekat to full HP. |
 | `recastAbility` | `ability: "ekatTeleport"`, `units: u32[]`, `targetObjectId?: u32`, `queued?: bool` | Explicit second activation for an existing per-caster ability state. The server does not infer recast from missing `x`/`y`; it validates ownership, live caster eligibility, matching active return marker state, the no-instant-return availability tick, and destination standability, then returns Ekat to the marker and consumes it. |
 | `setAutocast` | `ability: "mortarFire"`, `units: u32[]`, `enabled: bool` | Toggle server-authoritative autocast for owned Mortar Teams. Other unit/ability combinations are ignored. |
 | `gather`     | `units: u32[]`, `node: u32`, `queued?: bool` | Send gather-capable units to harvest a direct-mineable resource node. Oil nodes are not direct-mineable; workers extract oil by building Pump Jacks with the `build` command. When `queued` is true, store future gather intent instead of replacing the active order. |
@@ -617,7 +617,7 @@ team. A defeated/disconnected teammate stops contributing live sight; if that pl
 has a living member, their own connection continues to receive the surviving team's current
 visibility. Allied non-resource entities visible through team current fog expose full read-only
 inspection details: hp/state/facing/setup state, production or research kind/progress/queue length,
-Scout Plane queue presence, construction progress, gatherer latched node, active Breakthrough
+legacy Scout Plane queue presence, construction progress, gatherer latched node, active Breakthrough
 status, and safe combat tracers.
 Combat `targetId` and `weaponFacing` for allied units are sent only when the target is visible in
 the recipient's team-current actionable fog, so allied units attacking hidden enemies do not reveal
@@ -649,7 +649,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 34. `client/src/net.js` calls
+`messagepack-compact`, codec version 1, compact snapshot version 35. `client/src/net.js` calls
 `parseServerFrame`; the binary frame parser in `client/src/protocol_frame.js` returns the raw
 compact snapshot object, then `decodeCompactSnapshot` expands it back into the semantic object above
 before dispatching `S.SNAPSHOT`.
@@ -675,7 +675,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 34,
+  "v": 35,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
@@ -708,8 +708,8 @@ Compact numeric codes:
 | `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `city_centre`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `research_complex`, 18 `command_car`, 19 `ekat`, 20 `zamok`, 21 `tank_trap`, 22 `golem`, 23 `pump_jack`, 24 `panzerfaust`, 25 `scout_plane` |
 | `state` | 1 `idle`, 2 `move`, 3 `attack`, 4 `gather`, 5 `build`, 6 `train`, 7 `construct`, 8 `dead` |
 | `setupState` | 1 `packed`, 2 `setting_up`, 3 `deployed`, 4 `tearing_down` |
-| `orderStage` | 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`, 6 `smoke`, 7 `setupAntiTankGuns`, 8 `charge`, 9 `mortarFire`, 10 `pointFire`, 11 `breakthrough`, 12 `ekatTeleport`, 13 `ekatLineShot`, 14 `ekatMagicAnchor`, 15 `deconstruct`, 16 `ekatConsumeGolem`, 17 `blanketFire`, 18 `dismissScoutPlane` |
-| `ability` | 1 `charge`, 2 `smoke`, 3 `mortarFire`, 4 `pointFire`, 5 `breakthrough`, 6 `ekatTeleport`, 7 `ekatLineShot`, 8 `ekatMagicAnchor`, 9 `ekatConsumeGolem`, 10 `blanketFire`, 11 `dismissScoutPlane` |
+| `orderStage` | 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`, 6 `smoke`, 7 `setupAntiTankGuns`, 8 `charge`, 9 `mortarFire`, 10 `pointFire`, 11 `breakthrough`, 12 `ekatTeleport`, 13 `ekatLineShot`, 14 `ekatMagicAnchor`, 15 `deconstruct`, 16 `ekatConsumeGolem`, 17 `blanketFire`, 18 `dismissScoutPlane`, 19 `scoutPlane` |
+| `ability` | 1 `charge`, 2 `smoke`, 3 `mortarFire`, 4 `pointFire`, 5 `breakthrough`, 6 `ekatTeleport`, 7 `ekatLineShot`, 8 `ekatMagicAnchor`, 9 `ekatConsumeGolem`, 10 `blanketFire`, 11 `dismissScoutPlane`, 12 `scoutPlane` |
 | `abilityObject.kind` | 1 `returnMarker`, 2 `magicAnchor`, 3 `lineProjectile` |
 | `upgrade` | 1 `methamphetamines`, 2 `anti_tank_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock`, 5 `mortar_autocast`, 6 `command_car_unlock`, 7 `ballistic_tables`, 8 `entrenchment`, 9 `smoke_plus` |
 | `weaponKind` | 1 `worker_tools`, 2 `golem_fists`, 3 `rifleman_rifle`, 4 `machine_gunner_mg`, 5 `scout_car_mg`, 6 `anti_tank_gun`, 7 `panzerfaust_loaded_shot`, 8 `mortar_team_mortar`, 9 `artillery_gun`, 10 `tank_cannon`, 11 `tank_coax` |
@@ -783,10 +783,9 @@ while the unit is digging in, slotting is unavailable, merely near a trench, or 
 projectile is in flight or the unit is reloading, so the client can hide the warhead from unit art;
 omitted values should be treated as loaded for older data and non-Panzerfaust entities.
 `scoutPlane` is owner/full-world diagnostic private state for `scout_plane` entities. It carries
-the current orbit center plus fuel/upkeep accounting fields; enemy projections that can see the
-plane omit this state so queued retargeting and resource reserve information do not leak through
-fog. Orbit retargeting uses the existing `move` command vocabulary; runtime dismissal uses
-the existing `dismissScoutPlane` ability vocabulary and removes only owned active Scout Planes.
+the current orbit center; enemy projections that can see the plane omit this state. Scout Plane
+entities are not selectable or commandable by normal clients, and runtime movement is driven by the
+server-side Command Car ability lifecycle.
 `visionOnly` is a legacy/special projection flag for non-owned units/buildings that are sent as
 render-only intel rather than normal visibility. Current lingering death sight is ordinary
 temporary team sight and does not set `visionOnly`. Clients must not select `visionOnly` entities.
@@ -883,11 +882,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   occupiedTrenchId?: u32,        // visible eligible infantry only while actively stopped in a trench
   panzerfaustLoaded?: bool,       // Panzerfaust only; false while projectile is missing/reloading
   scoutPlane?: {                 // owner/full-world diagnostics only; enemies omit this private state
-    orbitCenter?: [f32, f32],
-    fuelOil: u8,
-    fuelCapacityOil: u8,
-    upkeepOil: u8,
-    upkeepIntervalTicks: u16
+    orbitCenter?: [f32, f32]
   },
   setupState?: string,           // machine_gunner/anti_tank_gun/mortar_team/artillery only:
                                   // "packed","setting_up","deployed","tearing_down"
@@ -900,11 +895,11 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   oilUsed?: f32,                 // lifetime oil burned by movement, in resource units
   setupFacing?: f32,             // anti_tank_gun/artillery only: owner/allied deployed arc center; appended after oilUsed in compact snapshots
   orderPlan?: [                  // current + queued order stages; owner-private except full-world diagnostics
-    { kind: "move"|"attackMove"|"attack"|"gather"|"build"|"deconstruct"|"smoke"|"mortarFire"|"pointFire"|"blanketFire"|"breakthrough"|"dismissScoutPlane"|"ekatTeleport"|"ekatLineShot"|"ekatMagicAnchor"|"ekatConsumeGolem"|"setupAntiTankGuns", x: f32, y: f32 }
+    { kind: "move"|"attackMove"|"attack"|"gather"|"build"|"deconstruct"|"smoke"|"mortarFire"|"pointFire"|"blanketFire"|"breakthrough"|"scoutPlane"|"dismissScoutPlane"|"ekatTeleport"|"ekatLineShot"|"ekatMagicAnchor"|"ekatConsumeGolem"|"setupAntiTankGuns", x: f32, y: f32 }
   ],
   chargeCooldownLeft?: u16,      // legacy; no longer projected by current server
   abilities?: [                  // owner-only ability affordance/cooldown data
-    { ability: "smoke"|"mortarFire"|"pointFire"|"blanketFire"|"breakthrough"|"dismissScoutPlane"|"ekatTeleport"|"ekatLineShot"|"ekatMagicAnchor"|"ekatConsumeGolem",
+    { ability: "smoke"|"mortarFire"|"pointFire"|"blanketFire"|"breakthrough"|"scoutPlane"|"dismissScoutPlane"|"ekatTeleport"|"ekatLineShot"|"ekatMagicAnchor"|"ekatConsumeGolem",
       cooldownLeft: u16, remainingUses?: u16, autocastEnabled?: bool,
       activeObjectId?: u32, availableTick?: u32, lockoutUntilTick?: u32, expiresIn?: u16 }
   ],

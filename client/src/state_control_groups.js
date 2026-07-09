@@ -1,5 +1,5 @@
 import { admitSelectionIds } from "./command_budget.js";
-import { isBuilding, isUnit } from "./protocol.js";
+import { KIND, isBuilding, isUnit } from "./protocol.js";
 
 export function admitControlGroupIds(state, ids, { baseIds = [] } = {}) {
   if (state?.controlPolicy?.kind === "lab") {
@@ -17,6 +17,7 @@ function ownControllableIds(state, ids) {
     if (seen.has(id)) continue;
     const entity = state?._curById?.get(id);
     if (!entity || entity.owner !== state.playerId) continue;
+    if (entity.kind === KIND.SCOUT_PLANE) continue;
     if (!isUnit(entity.kind) && !isBuilding(entity.kind)) continue;
     out.push(id);
     seen.add(id);
@@ -57,6 +58,7 @@ function labControlGroupEntities(state, ids, seen = new Set()) {
     const owner = Number(entity?.owner);
     if (!entity || !Number.isInteger(owner) || owner <= 0) continue;
     if (entity.shotReveal || entity.visionOnly) continue;
+    if (entity.kind === KIND.SCOUT_PLANE) continue;
     if (!isUnit(entity.kind) && !isBuilding(entity.kind)) continue;
     out.push(entity);
     seen.add(id);

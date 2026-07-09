@@ -131,11 +131,10 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "RESOURCE_AMOUNTS",
   "SCOUT_CAR_BODY",
   "SCOUT_CAR_SMOKE_USES",
+  "SCOUT_PLANE_ABILITY_COOLDOWN_TICKS",
   "SCOUT_PLANE_BODY",
-  "SCOUT_PLANE_FUEL_RESERVE_OIL",
+  "SCOUT_PLANE_ORBIT_DURATION_TICKS",
   "SCOUT_PLANE_ORBIT_RADIUS_TILES",
-  "SCOUT_PLANE_UPKEEP_INTERVAL_TICKS",
-  "SCOUT_PLANE_UPKEEP_OIL",
   "SMOKE_ABILITY_COOLDOWN_TICKS",
   "SMOKE_ABILITY_COST",
   "SMOKE_ABILITY_RANGE_TILES",
@@ -187,18 +186,20 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     STATS[KIND.SCOUT_PLANE].cost.steel === 50 &&
       STATS[KIND.SCOUT_PLANE].cost.oil === 50 &&
       STATS[KIND.SCOUT_PLANE].supply === 0 &&
+      STATS[KIND.SCOUT_PLANE].buildTicks === 0 &&
       STATS[KIND.SCOUT_PLANE].body.length === 48 &&
       STATS[KIND.SCOUT_PLANE].blocksGroundPlacement === false,
-    "Scout Plane stats mirror the approved production contract",
+    "Scout Plane stats mirror the approved ability-launched unit contract",
   );
   assert(
-    STATS[KIND.CITY_CENTRE].trains[1] === KIND.SCOUT_PLANE &&
-      configExports.trainableUnitsForFaction("kriegsia", KIND.CITY_CENTRE)[1] === KIND.SCOUT_PLANE &&
-      STATS[KIND.SCOUT_PLANE].requiresAny.includes(KIND.STEELWORKS) &&
-      STATS[KIND.SCOUT_PLANE].requiresAny.includes(KIND.FACTORY) &&
-      STATS[KIND.SCOUT_PLANE].requiresAnyText === "Requires Gun Works or Vehicle Works." &&
-      STATS[KIND.SCOUT_PLANE].trainSlot === 6,
-    "City Centre command card exposes Scout Plane with the approved any-path unlock and Z slot",
+    !STATS[KIND.CITY_CENTRE].trains.includes(KIND.SCOUT_PLANE) &&
+      !configExports.trainableUnitsForFaction("kriegsia", KIND.CITY_CENTRE).includes(KIND.SCOUT_PLANE) &&
+      ABILITIES[ABILITY.SCOUT_PLANE].carriers.includes(KIND.COMMAND_CAR) &&
+      ABILITIES[ABILITY.SCOUT_PLANE].hotkey === "C" &&
+      ABILITIES[ABILITY.SCOUT_PLANE].requires === KIND.CITY_CENTRE &&
+      ABILITIES[ABILITY.SCOUT_PLANE].cost.steel === 50 &&
+      ABILITIES[ABILITY.SCOUT_PLANE].cost.oil === 50,
+    "Command Car command card exposes Scout Plane as the C-slot ability",
   );
   assert(
     Array.isArray(STATS[KIND.TRAINING_CENTRE].requires),

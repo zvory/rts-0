@@ -698,13 +698,11 @@ impl Entity {
         self.scout_plane.as_mut()
     }
 
-    pub(crate) fn scout_plane_private_details(&self) -> Option<((f32, f32), u8)> {
+    pub(crate) fn scout_plane_private_details(&self) -> Option<(f32, f32)> {
         if self.kind != EntityKind::ScoutPlane {
             return None;
         }
-        self.scout_plane
-            .as_ref()
-            .map(|state| (state.orbit_center, state.fuel_oil))
+        self.scout_plane.as_ref().map(|state| state.orbit_center)
     }
 
     pub(in crate::game) fn ensure_scout_plane_state(&mut self) {
@@ -726,16 +724,6 @@ impl Entity {
             return false;
         };
         state.update_runtime(orbit_center, orbit_phase, orbiting)
-    }
-
-    pub(in crate::game) fn retarget_scout_plane(&mut self, x: f32, y: f32) -> bool {
-        if self.kind != EntityKind::ScoutPlane {
-            return false;
-        }
-        let Some(state) = self.scout_plane.as_mut() else {
-            return false;
-        };
-        state.retarget(x, y)
     }
 
     pub fn set_facing(&mut self, facing: f32) {

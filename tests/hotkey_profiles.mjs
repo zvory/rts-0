@@ -14,7 +14,7 @@ import {
   buildCommandCardDescriptors,
   factionCommandId,
 } from "../client/src/hud_command_card.js";
-import { KIND, UPGRADE } from "../client/src/protocol.js";
+import { ABILITY, KIND, UPGRADE } from "../client/src/protocol.js";
 
 const kriegsiaCommandId = (family, subject) => factionCommandId("kriegsia", family, subject);
 const ekatCommandId = (family, subject) => factionCommandId("ekat", family, subject);
@@ -68,14 +68,24 @@ function workerBuildCard(factionId = "kriegsia") {
   });
 }
 
-function cityCentreTrainCard() {
+function commandCarCard() {
   const cityCentre = { id: 21, owner: 1, kind: KIND.CITY_CENTRE, buildProgress: null };
+  const commandCar = {
+    id: 22,
+    owner: 1,
+    kind: KIND.COMMAND_CAR,
+    abilities: [
+      { ability: ABILITY.BREAKTHROUGH, cooldownLeft: 0, remainingUses: null },
+      { ability: ABILITY.SCOUT_PLANE, cooldownLeft: 0, remainingUses: null },
+    ],
+  };
   return buildCommandCardDescriptors({
     playerId: 1,
-    selection: [cityCentre],
+    selection: [commandCar],
+    entities: [cityCentre, commandCar],
     resources: { steel: 1000, oil: 1000, supplyUsed: 0, supplyCap: 20 },
     upgrades: [],
-    playerHasCompleteKind: (kind) => kind === KIND.STEELWORKS,
+    playerHasCompleteKind: (kind) => kind === KIND.CITY_CENTRE,
     groupCooldownClocks: () => [],
   });
 }
@@ -91,10 +101,10 @@ function cityCentreTrainCard() {
   );
   assert(
     catalog.commands.some((command) =>
-      command.commandId === kriegsiaCommandId("train", KIND.SCOUT_PLANE) &&
-        command.slotIndex === 6
+      command.commandId === kriegsiaCommandId("ability", ABILITY.SCOUT_PLANE) &&
+        command.slotIndex === 8
     ),
-    "hotkey command catalog includes the exposed Scout Plane train command in the Z slot",
+    "hotkey command catalog includes the exposed Scout Plane Command Car ability in the C slot",
   );
   assert(
     catalog.commands.some((command) =>
@@ -113,9 +123,9 @@ function cityCentreTrainCard() {
   assert.equal(hotkeys.getActiveProfile().id, HOTKEY_PRESET_GRID, "Grid is the default active profile");
   hotkeys.setActiveProfile(HOTKEY_PRESET_CLASSIC);
   assert.equal(
-    hotkeys.resolveCard(cityCentreTrainCard()).slots[6].hotkey,
-    "S",
-    "Classic RTS preset binds Scout Plane production to S",
+    hotkeys.resolveCard(commandCarCard()).slots[8].hotkey,
+    "C",
+    "Classic RTS preset binds Scout Plane ability to C",
   );
 }
 

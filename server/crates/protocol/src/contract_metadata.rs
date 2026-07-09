@@ -66,6 +66,7 @@ pub mod abilities {
     pub const POINT_FIRE: &str = "pointFire";
     pub const BLANKET_FIRE: &str = "blanketFire";
     pub const BREAKTHROUGH: &str = "breakthrough";
+    pub const SCOUT_PLANE: &str = "scoutPlane";
     pub const DISMISS_SCOUT_PLANE: &str = "dismissScoutPlane";
     pub const EKAT_TELEPORT: &str = "ekatTeleport";
     pub const EKAT_LINE_SHOT: &str = "ekatLineShot";
@@ -120,7 +121,7 @@ pub mod weapons {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 34;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 35;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -365,6 +366,7 @@ const ORDER_STAGE_CODES: &[(&str, u8)] = &[
     (abilities::EKAT_CONSUME_GOLEM, 16),
     (abilities::BLANKET_FIRE, 17),
     (abilities::DISMISS_SCOUT_PLANE, 18),
+    (abilities::SCOUT_PLANE, 19),
 ];
 
 const ABILITY_CODES: &[(&str, u8)] = &[
@@ -379,6 +381,7 @@ const ABILITY_CODES: &[(&str, u8)] = &[
     (abilities::EKAT_CONSUME_GOLEM, 9),
     (abilities::BLANKET_FIRE, 10),
     (abilities::DISMISS_SCOUT_PLANE, 11),
+    (abilities::SCOUT_PLANE, 12),
 ];
 
 const ABILITY_OBJECT_KIND_CODES: &[(&str, u8)] = &[
@@ -629,6 +632,7 @@ fn ability_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("POINT_FIRE", abilities::POINT_FIRE),
         ("BLANKET_FIRE", abilities::BLANKET_FIRE),
         ("BREAKTHROUGH", abilities::BREAKTHROUGH),
+        ("SCOUT_PLANE", abilities::SCOUT_PLANE),
         ("DISMISS_SCOUT_PLANE", abilities::DISMISS_SCOUT_PLANE),
         ("EKAT_TELEPORT", abilities::EKAT_TELEPORT),
         ("EKAT_LINE_SHOT", abilities::EKAT_LINE_SHOT),
@@ -700,6 +704,7 @@ fn order_stage_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("POINT_FIRE", abilities::POINT_FIRE),
         ("BLANKET_FIRE", abilities::BLANKET_FIRE),
         ("BREAKTHROUGH", abilities::BREAKTHROUGH),
+        ("SCOUT_PLANE", abilities::SCOUT_PLANE),
         ("DISMISS_SCOUT_PLANE", abilities::DISMISS_SCOUT_PLANE),
         ("EKAT_TELEPORT", abilities::EKAT_TELEPORT),
         ("EKAT_LINE_SHOT", abilities::EKAT_LINE_SHOT),

@@ -18,6 +18,8 @@ pub(super) struct PlayerStateV1 {
     pub(super) is_ai: bool,
     pub(super) score: ScoreStateV1,
     pub(super) upgrades: BTreeSet<super::super::upgrade::UpgradeKind>,
+    #[serde(default)]
+    pub(super) ability_cooldowns: BTreeMap<super::super::ability::AbilityKind, u16>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

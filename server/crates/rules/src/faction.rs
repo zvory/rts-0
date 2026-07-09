@@ -20,13 +20,13 @@ pub const TANK_UNLOCK_UPGRADE: &str = "tank_unlock";
 pub const COMMAND_CAR_UNLOCK_UPGRADE: &str = "command_car_unlock";
 pub const MORTAR_AUTOCAST_UPGRADE: &str = "mortar_autocast";
 pub const SMOKE_PLUS_UPGRADE: &str = "smoke_plus";
-pub use crate::defs::SCOUT_PLANE_UNLOCK_BUILDINGS;
 
 pub const SMOKE_ABILITY: &str = "smoke";
 pub const MORTAR_FIRE_ABILITY: &str = "mortarFire";
 pub const POINT_FIRE_ABILITY: &str = "pointFire";
 pub const BLANKET_FIRE_ABILITY: &str = "blanketFire";
 pub const BREAKTHROUGH_ABILITY: &str = "breakthrough";
+pub const SCOUT_PLANE_ABILITY: &str = "scoutPlane";
 pub const DISMISS_SCOUT_PLANE_ABILITY: &str = "dismissScoutPlane";
 pub const CHARGE_ABILITY: &str = "charge";
 pub const EKAT_TELEPORT_ABILITY: &str = "ekatTeleport";
@@ -310,6 +310,29 @@ const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
         command_card: true,
         protocol_code: 5,
         order_stage_code: 11,
+    },
+    AbilityCatalogEntry {
+        id: SCOUT_PLANE_ABILITY,
+        label: "Scout Plane",
+        icon: "SP",
+        hotkey: Some("C"),
+        title: "Launch a scout plane from the nearest City Centre",
+        carriers: &[EntityKind::CommandCar],
+        target_mode: AbilityTargetMode::WorldPoint,
+        range_tiles: None,
+        min_range_tiles: None,
+        cooldown_ticks: balance::SCOUT_PLANE_ABILITY_COOLDOWN_TICKS,
+        charges: None,
+        cost: ResourceCost::new(
+            balance::SCOUT_PLANE_COST_STEEL,
+            balance::SCOUT_PLANE_COST_OIL,
+        ),
+        tech_requirement: Some(EntityKind::CityCentre),
+        queue_policy: AbilityQueuePolicy::QueueSkipIfNotReady,
+        autocast: false,
+        command_card: true,
+        protocol_code: 12,
+        order_stage_code: 19,
     },
     AbilityCatalogEntry {
         id: DISMISS_SCOUT_PLANE_ABILITY,
@@ -689,11 +712,11 @@ mod tests {
 
         assert_eq!(
             catalog.trainable_units(EntityKind::CityCentre),
-            vec![EntityKind::Worker, EntityKind::ScoutPlane]
+            vec![EntityKind::Worker]
         );
         assert!(
             catalog.allows_unit(EntityKind::ScoutPlane),
-            "Scout Plane is exposed through Kriegsia City Centre production"
+            "Scout Plane remains in the catalog for ability-launched mission entities"
         );
         assert_eq!(
             catalog.trainable_units(EntityKind::Barracks),
@@ -742,6 +765,7 @@ mod tests {
         assert!(catalog.allows_ability(SMOKE_ABILITY, EntityKind::ScoutCar));
         assert!(catalog.allows_ability(POINT_FIRE_ABILITY, ARTILLERY_ABILITY_CARRIERS[0]));
         assert!(catalog.allows_ability(BLANKET_FIRE_ABILITY, ARTILLERY_ABILITY_CARRIERS[0]));
+        assert!(catalog.allows_ability(SCOUT_PLANE_ABILITY, EntityKind::CommandCar));
         assert!(!catalog.allows_ability(CHARGE_ABILITY, EntityKind::Rifleman));
         assert!(!catalog.allows_ability(DISMISS_SCOUT_PLANE_ABILITY, EntityKind::ScoutPlane));
         assert!(!catalog.allows_ability(SMOKE_ABILITY, EntityKind::Worker));

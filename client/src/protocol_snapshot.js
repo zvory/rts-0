@@ -273,17 +273,12 @@ function assignRallyPlan(target, fields, index) {
   );
 }
 
-/** Decode owner-only Scout Plane fuel/orbit telemetry into `entity.scoutPlane`. */
+/** Decode owner-only Scout Plane orbit telemetry into `entity.scoutPlane`. */
 function assignScoutPlane(target, fields, index) {
   if (index >= fields.length || fields[index] == null) return;
-  const record = readArray(fields[index], "entity.scoutPlane", 5);
-  if (record.length !== 5) throw new Error("entity.scoutPlane field count mismatch");
-  target.scoutPlane = {
-    fuelOil: readU32(record[1], "entity.scoutPlane.fuelOil"),
-    fuelCapacityOil: readU32(record[2], "entity.scoutPlane.fuelCapacityOil"),
-    upkeepOil: readU32(record[3], "entity.scoutPlane.upkeepOil"),
-    upkeepIntervalTicks: readU32(record[4], "entity.scoutPlane.upkeepIntervalTicks"),
-  };
+  const record = readArray(fields[index], "entity.scoutPlane", 1);
+  if (record.length !== 1) throw new Error("entity.scoutPlane field count mismatch");
+  target.scoutPlane = {};
   if (record[0] != null) {
     target.scoutPlane.orbitCenter = decodeCompactPoint(record[0], "entity.scoutPlane.orbitCenter");
   }

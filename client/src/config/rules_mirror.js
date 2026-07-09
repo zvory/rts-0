@@ -105,9 +105,8 @@ export const EKAT_MAGIC_ANCHOR_PULL_TOWARD_MULTIPLIER = 1.35;
 export const BASE_COMMAND_SUPPLY_CAP = 24;
 export const COMMAND_CAR_SUPPLY_CAP_BONUS = 20;
 export const SCOUT_PLANE_ORBIT_RADIUS_TILES = 4;
-export const SCOUT_PLANE_UPKEEP_OIL = 1;
-export const SCOUT_PLANE_UPKEEP_INTERVAL_TICKS = 20;
-export const SCOUT_PLANE_FUEL_RESERVE_OIL = 8;
+export const SCOUT_PLANE_ORBIT_DURATION_TICKS = TICK_HZ * 10;
+export const SCOUT_PLANE_ABILITY_COOLDOWN_TICKS = TICK_HZ * 30;
 
 // Per-kind UI / render info. `size` is the render radius (units) or half-extent hint.
 // `sight` (tiles) drives the local fog overlay. `rangeTiles` mirrors weapon range for visuals.
@@ -142,10 +141,7 @@ export const STATS = Object.freeze({
     rangeTiles: 5, cost: { steel: 125, oil: 50 }, supply: 3, buildTicks: 480 },
   [KIND.SCOUT_PLANE]: { label: "Scout Plane", icon: "SP", size: 17, sight: 12, body: SCOUT_PLANE_BODY,
     blocksGroundPlacement: false,
-    rangeTiles: 0, cost: { steel: 50, oil: 50 }, supply: 0, buildTicks: TICK_HZ * 20,
-    requiresAny: [KIND.STEELWORKS, KIND.FACTORY],
-    requiresAnyText: "Requires Gun Works or Vehicle Works.",
-    trainSlot: 6 },
+    rangeTiles: 0, cost: { steel: 50, oil: 50 }, supply: 0, buildTicks: 0 },
   [KIND.TANK]: { label: "Tank", icon: "TK", size: 18, sight: 6, body: TANK_BODY,
     rangeTiles: 5, cost: { steel: 425, oil: 150 }, supply: 8, buildTicks: 750,
     requires: KIND.FACTORY, upgradeRequires: UPGRADE.TANK_UNLOCK,
@@ -158,7 +154,7 @@ export const STATS = Object.freeze({
     rangeTiles: 0, cost: { steel: 0, oil: 0 }, supply: 0, buildTicks: 0 },
 
   [KIND.CITY_CENTRE]: { label: "City Centre", icon: "CC", footW: 3, footH: 3, sight: 1,
-    cost: { steel: 225, oil: 0 }, buildTicks: 550, trains: [KIND.WORKER, KIND.SCOUT_PLANE] },
+    cost: { steel: 225, oil: 0 }, buildTicks: 550, trains: [KIND.WORKER] },
   [KIND.ZAMOK]: { label: "Zamok", icon: "ZK", footW: 3, footH: 3, sight: 1,
     cost: { steel: 0, oil: 0 }, buildTicks: 0, trains: [KIND.GOLEM] },
   [KIND.DEPOT]: { label: "Supply Depot", icon: "SD", footW: 2, footH: 2, sight: 1,
@@ -282,6 +278,24 @@ export const ABILITIES = Object.freeze({
     cost: Object.freeze({ steel: 0, oil: 0 }),
     radiusTiles: BREAKTHROUGH_RADIUS_TILES,
     durationTicks: BREAKTHROUGH_DURATION_TICKS,
+    queued: true,
+    queuePolicy: "skipIfNotReady",
+  }),
+  [ABILITY.SCOUT_PLANE]: Object.freeze({
+    ability: ABILITY.SCOUT_PLANE,
+    label: "Scout Plane",
+    icon: "SP",
+    hotkey: "C",
+    title: "Launch a scout plane from the nearest City Centre",
+    carriers: Object.freeze([KIND.COMMAND_CAR]),
+    targetMode: "worldPoint",
+    rangeTiles: null,
+    cooldownTicks: SCOUT_PLANE_ABILITY_COOLDOWN_TICKS,
+    cost: Object.freeze({ steel: 50, oil: 50 }),
+    techRequirement: KIND.CITY_CENTRE,
+    requires: KIND.CITY_CENTRE,
+    radiusTiles: SCOUT_PLANE_ORBIT_RADIUS_TILES,
+    durationTicks: SCOUT_PLANE_ORBIT_DURATION_TICKS,
     queued: true,
     queuePolicy: "skipIfNotReady",
   }),

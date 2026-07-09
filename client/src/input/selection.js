@@ -10,7 +10,7 @@ import {
 export function _commitClickSelection(p, additive, ctrl) {
   const world = this._worldAt(p.x, p.y);
   const hit = this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ true);
-  if (!hit) {
+  if (!hit || hit.kind === KIND.SCOUT_PLANE) {
     if (!additive) clearSelection(this);
     return;
   }
@@ -189,6 +189,7 @@ function ownOwner(state, owner) {
 }
 
 export function selectableEntity(state, entity, spectator) {
+  if (entity?.kind === KIND.SCOUT_PLANE) return false;
   if (state?.controlPolicy?.kind === "lab") return state.controlPolicy.canSelectEntity(entity, state);
   if (!spectator) return ownOwner(state, entity.owner);
   return entity.owner !== 0;

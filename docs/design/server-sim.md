@@ -258,7 +258,7 @@ architecture failures.
 | Field | Category | Checkpoint policy | Evidence and notes |
 | --- | --- | --- | --- |
 | `map` | `authoritative/serialized` | Internal cold checkpoints serialize the full live `Map` value. Public `GameCheckpointV1` payloads do not embed a map body; they carry `mapBinding` facts and import only with the exact container-supplied `Map`. See §3.1.3. | `Game::new_inner_with_map` stores the generated or supplied map; `systems::run_tick`, pathing, fog, placement, resource setup, and `start_payload` all read it. Runtime ownership and external artifact composition are intentionally separate contracts. |
-| `entities` | `authoritative/serialized` | Serialize the full `EntityStore`, including stable entity ids, allocator/high-water state, HP, orders, queues, movement state, selected waypoints, path goals, cooldowns, combat state, production/build progress, rally plans, Scout Plane orbit/fuel/upkeep timer runtime state, resource reservations, body/weapon/setup facing, and entity flags. | `systems::run_tick` mutates the store every tick; snapshots, score, survival, command validation, replay determinism tests, and the Phase 0.5 comparator all treat entity state as semantic authority. Chosen movement paths and aerial orbit state live on entities, not in `pathing`. |
+| `entities` | `authoritative/serialized` | Serialize the full `EntityStore`, including stable entity ids, allocator/high-water state, HP, orders, queues, movement state, selected waypoints, path goals, cooldowns, combat state, production/build progress, rally plans, Scout Plane orbit/return runtime state, resource reservations, body/weapon/setup facing, and entity flags. | `systems::run_tick` mutates the store every tick; snapshots, score, survival, command validation, replay determinism tests, and the Phase 0.5 comparator all treat entity state as semantic authority. Chosen movement paths and aerial orbit state live on entities, not in `pathing`. |
 | `fog` | `authoritative/serialized` | Serialize current live visibility grids for now. A later phase may reclassify live fog as rebuildable only after proving an exact deterministic rebuild before every command, combat, and snapshot surface. | `systems::run_tick` receives `&self.state.fog` for command/combat visibility decisions, snapshots project through current team fog, and Phase 0.5 compares per-player visible tiles as semantic state. |
 | `building_memory` | `authoritative/serialized` | Serialize remembered enemy-building entries per player. | `BuildingMemory::refresh` records last-seen enemy building state and only removes hidden destroyed entries after the footprint is scouted again; spectator/player snapshots project remembered buildings while fogged. |
 | `players` | `authoritative/serialized` | Serialize all `PlayerState` rows, including id/team/faction/name/color/start tile, current Steel/Oil, supply, AI flag, score counters, mined-resource lifetime totals, rolling mined-resource income history, and completed upgrades. | Economy, command authority, team relations, alive checks, scores, observer-analysis resource income, faction-specific tech, and snapshot resource rows are all read from `players`. |
@@ -513,7 +513,7 @@ Field map for Phase 2 DTO conversion:
 | Runtime field | `GameCheckpointV1` strategy |
 | --- | --- |
 | `map` | Excluded as a body; represented by `mapBinding`. Import writes the exact container-supplied `Map` into `GameState.map` only after binding validation succeeds. |
-| `entities` | `EntityStoreV1` with allocator/high-water state and explicit entity DTOs. Entity DTOs must cover stable ids, owners, kind, HP, flags, construction/production/resource state, combat cooldowns and targets, body/weapon/setup facing, entity-local active orders, queued order intents, selected movement paths, selected waypoints, path goals, rally plans, Scout Plane orbit/fuel runtime state, reservations, occupants/transport-like references if added later, and all entity-local timers. |
+| `entities` | `EntityStoreV1` with allocator/high-water state and explicit entity DTOs. Entity DTOs must cover stable ids, owners, kind, HP, flags, construction/production/resource state, combat cooldowns and targets, body/weapon/setup facing, entity-local active orders, queued order intents, selected movement paths, selected waypoints, path goals, rally plans, Scout Plane orbit/return runtime state, reservations, occupants/transport-like references if added later, and all entity-local timers. |
 | `fog` | `FogStateV1` live visibility grids per player/team. It is serialized for version 1; a later rebuild-only policy needs a proof before changing this row. |
 | `building_memory` | `BuildingMemoryV1` remembered enemy-building entries per player, including last-seen state and footprint facts needed for projection after restore. |
 | `players` | `PlayerStateV1` rows with id, team id, faction id, name, color, start tile, resources, supply, AI slot flag, score counters, mined-resource lifetime totals, rolling mined-resource income history, and completed upgrades. |
@@ -1046,15 +1046,15 @@ into tick-system helpers are named one by one in the role allowlist; there is no
 adapter exception. New command/order service edges therefore need both an exact import allowlist
 entry and a role-matrix justification.
 
-`services::scout_plane` is a mutation helper for the Scout Plane aerial unit. Production calls it
-when a City Centre completes a Scout Plane so the unit launches from the building position toward
-the first rally point; command admission calls it to translate immediate and queued move clicks into
-orbit retargets and runtime dismiss commands into safe removals; movement calls it before ground
-pathing so planes fly directly and do not reserve or block occupancy; the tick orchestrator calls it
-after economy/production so Pump Jack income can pay or refill the plane's 1 Oil per 20 ticks
-upkeep before zero-fuel automatic dismissal. Live fog recompute stamps Scout Plane sight as team
-aerial vision that ignores terrain and building line-of-sight blockers while still using active
-smoke clouds as blockers.
+`services::scout_plane` is a mutation helper for the Scout Plane aerial unit. Command admission
+calls it from the Command Car `scoutPlane` ability after validating a selected owned Command Car,
+player resources, global player cooldown, the one-active-plane limit, and a completed owned City
+Centre launch anchor. The helper spawns the plane at the completed owned City Centre nearest the
+clicked target, flies it to the clicked point, starts the 10-second orbit timer only after arrival,
+then returns it to the launch City Centre and despawns it. If the launch City Centre is gone when
+orbiting ends, or dies while the plane is returning, the plane is removed instead of retargeted to a
+new anchor. Live fog recompute stamps Scout Plane sight as team aerial vision that ignores terrain
+and building line-of-sight blockers while still using active smoke clouds as blockers.
 
 `game::systems::run_tick` owns the tick pipeline and the lifecycle of tick-scoped derived state.
 It rebuilds named phase state at explicit boundaries: pre-command state for command validation,
@@ -1143,10 +1143,9 @@ General rules:
 - `HoldPosition` clears each selected unit's active order and queued intents, then marks the unit as
   held. Held units do not voluntarily move or chase targets, but they keep normal collision behavior
   and may fire at enemies already inside current weapon range.
-- Scout Plane entities are non-combat aerial units. Immediate move commands retarget their orbit
-  center, queued move commands append future orbit centers using the normal queue cap, and attack,
-  attack-move, hold-position, gather/build/repair/setup, rally, train, and research semantics are
-  filtered away for planes.
+- Scout Plane entities are non-combat aerial units. Normal selection and command surfaces filter
+  them out; direct move, attack, attack-move, hold-position, gather/build/repair/setup, rally,
+  train, and research semantics are ignored for planes.
 - Direct attack orders against visible enemies keep the explicit target when a friendly or enemy
   hard blocker would absorb the current shot; mobile attackers then use the existing chase path to
   seek a fireable position. Shared line-of-sight raycasts stop as reached when a grid-corner side

@@ -755,12 +755,8 @@ impl Serialize for CompactScoutPlaneState<'_> {
         S: Serializer,
     {
         let state = self.0;
-        let mut seq = serializer.serialize_seq(Some(5))?;
+        let mut seq = serializer.serialize_seq(Some(1))?;
         seq.serialize_element(&state.orbit_center)?;
-        seq.serialize_element(&state.fuel_oil)?;
-        seq.serialize_element(&state.fuel_capacity_oil)?;
-        seq.serialize_element(&state.upkeep_oil)?;
-        seq.serialize_element(&state.upkeep_interval_ticks)?;
         seq.end()
     }
 }

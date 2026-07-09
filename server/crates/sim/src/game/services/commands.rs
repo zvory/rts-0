@@ -31,7 +31,7 @@ use crate::game::services::order_execution::{
     start_artillery_fire_command_order, ArtilleryFireMode, FutureOrderMode,
 };
 use crate::game::services::order_planner as planner;
-use crate::game::services::scout_plane::{self, train_notice};
+use crate::game::services::scout_plane::{self, ScoutPlaneLaunchError};
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::standability;
 use crate::game::services::world_query::{self, owns_unit};
@@ -54,7 +54,7 @@ mod planner_facts;
 use self::artillery_scatter::artillery_error_tiles;
 use self::artillery_scatter::{artillery_blanket_point, artillery_scattered_point};
 use self::guards::{
-    dedupe_cap_units, is_constructing, is_scout_plane, player_is_ai, rally_intent_for_map,
+    dedupe_cap_units, is_constructing, player_is_ai, rally_intent_for_map,
     unit_can_accept_ground_command, unit_can_accept_player_command,
 };
 use self::planner_facts::{planner_config, planner_facts, AbilityFactInput};
@@ -684,14 +684,8 @@ mod planned_actions {
                 planner::PlannedAction::ReplaceActive { unit, intent } => match intent {
                     planner::OrderIntent::Move(point) => {
                         if immediate_unit_can_replace(entities, player, unit) {
-                            if is_scout_plane(entities, unit) {
-                                let _ = scout_plane::retarget(
-                                    map, entities, unit, point.x, point.y, true,
-                                );
-                            } else {
-                                move_goal = Some((point.x, point.y));
-                                move_units.push(unit);
-                            }
+                            move_goal = Some((point.x, point.y));
+                            move_units.push(unit);
                         }
                     }
                     planner::OrderIntent::AttackMove(point) => {
@@ -862,14 +856,6 @@ mod planned_actions {
                         }
                     }
                     if let Some(intent) = entity_order_intent_from_planner(intent) {
-                        if let OrderIntent::Move(point) = intent {
-                            if is_scout_plane(entities, unit) {
-                                let _ = scout_plane::append_queued_retarget(
-                                    map, entities, unit, point.x, point.y,
-                                );
-                                continue;
-                            }
-                        }
                         match &intent {
                             OrderIntent::Attack(attack)
                                 if !attack_target_valid(
@@ -1159,17 +1145,75 @@ fn use_ability(
     let tick = ctx.tick;
 
     let ability = request.ability;
-    if ability == AbilityKind::DismissScoutPlane {
-        if !request.queued {
-            scout_plane::dismiss_selected(entities, player, &request.units);
-        }
-        return;
-    }
     let definition = ability::definition(ability);
     if request.queued && !definition.may_queue {
         return;
     }
     if definition.effect_hook == AbilityEffectHook::ReservedNoop {
+        return;
+    }
+    if ability == AbilityKind::ScoutPlane {
+        let Some(x) = request.x else {
+            return;
+        };
+        let Some(y) = request.y else {
+            return;
+        };
+        if definition.target_mode != AbilityTargetMode::WorldPoint
+            || !tech_requirement_met(entities, player, ability)
+        {
+            return;
+        }
+        let caster = dedupe_cap_units(request.units, request.max_units_per_command)
+            .into_iter()
+            .find(|unit| {
+                caster_can_accept_order(entities, player, *unit, ability)
+                    && ability_orders::caster_allowed_by_faction(entities, &faction_id, *unit, ability)
+            });
+        let Some(caster) = caster else {
+            return;
+        };
+        let Some(ps) = players.iter_mut().find(|p| p.id == player) else {
+            return;
+        };
+        if ps.ability_cooldowns.get(&ability).copied().unwrap_or(0) > 0 {
+            return;
+        }
+        if !ps.spend_cost(definition.cost) {
+            notice(
+                events,
+                player,
+                rules::economy::resource_shortage_notice_for_cost(
+                    ps.steel,
+                    ps.oil,
+                    definition.cost,
+                ),
+            );
+            return;
+        }
+        match scout_plane::launch_ability(map, entities, player, x, y) {
+            Ok(_) => {
+                if definition.cooldown_ticks == 0 {
+                    ps.ability_cooldowns.remove(&ability);
+                } else {
+                    ps.ability_cooldowns
+                        .insert(ability, definition.cooldown_ticks);
+                }
+                if let Some(caster) = entities.get_mut(caster) {
+                    caster.clear_active_order();
+                    caster.set_path_goal(None);
+                }
+                notice_positioned(events, player, "Scout Plane", NoticeSeverity::Info, x, y);
+            }
+            Err(ScoutPlaneLaunchError::Active) => {
+                ps.refund_cost(definition.cost);
+                notice(events, player, "Scout Plane already active");
+            }
+            Err(ScoutPlaneLaunchError::NoCityCentre) => {
+                ps.refund_cost(definition.cost);
+                notice(events, player, "Requires City Centre");
+            }
+        }
         return;
     }
     if let Some(mode) = artillery_fire_mode_for(ability) {
@@ -1755,7 +1799,6 @@ fn order_train(
         notice(events, player, "Requirement not met");
         return;
     }
-    if let Some(msg) = train_notice(unit, entities, player) { notice(events, player, msg); return; }
     let stats = match config::unit_stats(unit) {
         Some(s) => s,
         None => {

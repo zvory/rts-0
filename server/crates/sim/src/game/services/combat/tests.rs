@@ -135,6 +135,7 @@ fn player_state(id: u32, is_ai: bool) -> PlayerState {
         is_ai,
         score: ScoreState::default(),
         upgrades: Default::default(),
+        ability_cooldowns: Default::default(),
     }
 }
 

@@ -46,7 +46,6 @@ export function _issueTargetedCommand(p, ev = {}) {
   const commandTarget = intent?.commandTarget;
   const ownUnits = this._selectedOwnUnitIds();
   const landUnits = selectedOwnLandUnitIds(this, ownUnits);
-  const scoutPlanes = selectedOwnScoutPlaneIds(this);
   const producers = ownUnits.length === 0 ? this._selectedProducerBuildingIds() : [];
   const world = this._worldAt(p.x, p.y);
   if (ownUnits.length === 0) {
@@ -122,23 +121,22 @@ export function _issueTargetedCommand(p, ev = {}) {
 
   const target = this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ false);
   if (explicitAttackCommandTarget(this.state, target)) {
-    const issuedAttack = issueTargetAttackForLandAndScoutPlanes(this, landUnits, scoutPlanes, target, !!ev.shiftKey);
+    const issuedAttack = issueTargetAttackForLandUnits(this, landUnits, target, !!ev.shiftKey);
     if (issuedAttack) {
-      this._addCommandFeedback(landUnits.length > 0 ? "attack" : "move", target.x, target.y, !!ev.shiftKey);
+      this._addCommandFeedback("attack", target.x, target.y, !!ev.shiftKey);
     }
     return;
   }
 
-  const issuedAttackMove = issueAttackMoveForLandAndScoutPlanes(this, landUnits, scoutPlanes, world.x, world.y, !!ev.shiftKey);
+  const issuedAttackMove = issueAttackMoveForLandUnits(this, landUnits, world.x, world.y, !!ev.shiftKey);
   if (issuedAttackMove) {
-    this._addCommandFeedback(landUnits.length > 0 ? "attack" : "move", world.x, world.y, !!ev.shiftKey);
+    this._addCommandFeedback("attack", world.x, world.y, !!ev.shiftKey);
   }
 }
 
 function normalRightClickAction(input, p) {
   const ownUnits = input._selectedOwnUnitIds();
   const landUnits = selectedOwnLandUnitIds(input, ownUnits);
-  const scoutPlanes = selectedOwnScoutPlaneIds(input);
   const world = input._worldAt(p.x, p.y);
   if (ownUnits.length === 0) {
     // No units selected: a buildings-only selection sets a rally point on any
@@ -187,19 +185,9 @@ function normalRightClickAction(input, p) {
     };
   }
   if (target && enemyOwner(input.state, target.owner) && isAttackableEntityTarget(target)) {
-    if (landUnits.length === 0 && scoutPlanes.length > 0) {
-      return {
-        kind: "move",
-        units: scoutPlanes,
-        x: target.x,
-        y: target.y,
-        feedback: rightClickFeedback("move", target.x, target.y),
-      };
-    }
     return {
       kind: "attack",
       units: landUnits,
-      planeUnits: scoutPlanes,
       target,
       feedback: rightClickFeedback("attack", target.x, target.y),
     };
@@ -262,9 +250,6 @@ function issueNormalRightClickAction(input, action, queued) {
       if (action.units.length > 0) {
         input._issueCommand(cmd.attack(action.units, action.target.id, queued));
       }
-      if (Array.isArray(action.planeUnits) && action.planeUnits.length > 0) {
-        input._issueCommand(cmd.move(action.planeUnits, action.target.x, action.target.y, queued));
-      }
       break;
     case "move":
       input._issueCommand(cmd.move(action.units, action.x, action.y, queued));
@@ -277,30 +262,20 @@ function issueNormalRightClickAction(input, action, queued) {
   }
 }
 
-function issueTargetAttackForLandAndScoutPlanes(input, landUnits, scoutPlanes, target, queued) {
-  let issued = false;
+function issueTargetAttackForLandUnits(input, landUnits, target, queued) {
   if (landUnits.length > 0) {
     input._issueCommand(cmd.attack(landUnits, target.id, queued));
-    issued = true;
+    return true;
   }
-  if (scoutPlanes.length > 0) {
-    input._issueCommand(cmd.move(scoutPlanes, target.x, target.y, queued));
-    issued = true;
-  }
-  return issued;
+  return false;
 }
 
-function issueAttackMoveForLandAndScoutPlanes(input, landUnits, scoutPlanes, x, y, queued) {
-  let issued = false;
+function issueAttackMoveForLandUnits(input, landUnits, x, y, queued) {
   if (landUnits.length > 0) {
     input._issueCommand(cmd.attackMove(landUnits, x, y, queued));
-    issued = true;
+    return true;
   }
-  if (scoutPlanes.length > 0) {
-    input._issueCommand(cmd.move(scoutPlanes, x, y, queued));
-    issued = true;
-  }
-  return issued;
+  return false;
 }
 
 function rightClickFeedback(kind, x, y) {
@@ -329,16 +304,12 @@ function attackTargetPreviewForRightClickAction(action) {
 
 export function _selectedOwnUnitIds() {
   return selectedEntities(this.state)
-    .filter((e) => ownOwner(this.state, e.owner) && isUnit(e.kind))
+    .filter((e) => ownOwner(this.state, e.owner) && isUnit(e.kind) && e.kind !== KIND.SCOUT_PLANE)
     .map((e) => e.id);
 }
 
 export function _selectedOwnLandUnitIds() {
   return selectedOwnLandUnitIds(this, this._selectedOwnUnitIds?.() || []);
-}
-
-export function _selectedOwnScoutPlaneIds() {
-  return selectedOwnScoutPlaneIds(this);
 }
 
 export function _selectedProducerBuildingIds() {
@@ -372,21 +343,14 @@ function selectedEntities(state) {
 }
 
 function selectedOwnUnitEntities(input) {
-  return selectedEntities(input.state).filter((e) => ownOwner(input.state, e.owner) && isUnit(e.kind));
+  return selectedEntities(input.state).filter((e) =>
+    ownOwner(input.state, e.owner) && isUnit(e.kind) && e.kind !== KIND.SCOUT_PLANE);
 }
 
 function selectedOwnLandUnitIds(input, fallbackUnitIds = []) {
   const units = selectedOwnUnitEntities(input);
   if (units.length === 0) return fallbackUnitIds.slice();
-  return units
-    .filter((e) => e.kind !== KIND.SCOUT_PLANE)
-    .map((e) => e.id);
-}
-
-function selectedOwnScoutPlaneIds(input) {
-  return selectedOwnUnitEntities(input)
-    .filter((e) => e.kind === KIND.SCOUT_PLANE)
-    .map((e) => e.id);
+  return units.map((e) => e.id);
 }
 
 function _isOwnIncompleteBuilding(target) {

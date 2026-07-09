@@ -175,7 +175,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
         40,
         STATE_CODE[STATE.IDLE],
         ...Array(25).fill(null),
-        [[512, 544], 8, 8, 1, 20],
+        [[512, 544]],
       ],
       [
         6,
@@ -301,11 +301,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   assert(decoded.entities[4].kind === KIND.SCOUT_PLANE, "Scout Plane kind code decodes");
   assert(
     decoded.entities[4].scoutPlane.orbitCenter[0] === 512 &&
-      decoded.entities[4].scoutPlane.orbitCenter[1] === 544 &&
-      decoded.entities[4].scoutPlane.fuelOil === 8 &&
-      decoded.entities[4].scoutPlane.fuelCapacityOil === 8 &&
-      decoded.entities[4].scoutPlane.upkeepOil === 1 &&
-      decoded.entities[4].scoutPlane.upkeepIntervalTicks === 20,
+      decoded.entities[4].scoutPlane.orbitCenter[1] === 544,
     "Scout Plane compact owner state decodes",
   );
   assert(decoded.entities[5].panzerfaustLoaded === false, "entity Panzerfaust loaded flag decodes");
@@ -486,16 +482,6 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
       blanketFireCommand.queued === true,
     "blanketFire command builder emits targeted ability wire shape",
   );
-  const dismissScoutPlaneCommand = cmd.dismissScoutPlane([90, 91]);
-  assert(
-    dismissScoutPlaneCommand.c === "useAbility" &&
-      dismissScoutPlaneCommand.ability === ABILITY.DISMISS_SCOUT_PLANE &&
-      dismissScoutPlaneCommand.units.join(",") === "90,91" &&
-      dismissScoutPlaneCommand.x === undefined &&
-      dismissScoutPlaneCommand.y === undefined,
-    "dismissScoutPlane command builder emits hidden Scout Plane ability wire shape",
-  );
-
   assertThrows(
     () => decodeServerMessage({ t: "snapshot", v: COMPACT_SNAPSHOT_VERSION, s: [1], e: [] }),
     "compact snapshot rejects malformed scalar count",

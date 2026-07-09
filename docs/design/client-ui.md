@@ -1044,14 +1044,13 @@ multi-building selection spreads queued units across its producers. Train and pr
 hotkeys honor native keyboard repeat: after the OS repeat delay, repeated `keydown` events activate
 only those repeatable command-card buttons. Research buttons that unlock production appear directly
 below the production button they unlock and disappear once complete. Cancel walks selected producing
-buildings in reverse round-robin order for the displayed producer type. The Scout Plane City Centre
-button is pinned to the `Z` grid slot, unlocks after either completed Gun Works or completed Vehicle
-Works, and changes to a select-and-pan action while the player already has an active Scout Plane;
-while a Scout Plane is in production it stays disabled instead of issuing another train command.
-Selected Scout Planes use ordinary selection and control-group flows, but their unit command card
-keeps only Move/retarget and Dismiss plane affordances for the plane; mixed selections keep land-unit
-attack/hold/stop commands scoped to land units while Scout Planes receive only aerial retarget or
-dismiss commands.
+buildings in reverse round-robin order for the displayed producer type. The Scout Plane affordance
+is a Command Car world-point ability on the `C` grid slot, beside Breakthrough. It costs 50 steel
+and 50 oil, requires a completed owned City Centre, disables while the player has an active Scout
+Plane or the global 30-second cooldown is running, and issues immediately rather than entering a
+building production queue. Scout Planes are hit-testable for hover/readout purposes but normal
+selection, box selection, control groups, right-click commands, and command-card descriptors filter
+them out, so they are unselectable and uncontrollable in live play.
 Command identities are stable and split by scope: global tactical/navigation/production-control
 buttons remain un-namespaced, while build, train, research, and ability buttons emitted for a
 faction catalog use the local player's faction id as the command-id prefix.

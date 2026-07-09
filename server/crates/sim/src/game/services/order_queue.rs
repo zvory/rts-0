@@ -759,6 +759,7 @@ mod tests {
             is_ai: false,
             score: ScoreState::default(),
             upgrades: Default::default(),
+            ability_cooldowns: Default::default(),
         }
     }
 
@@ -792,6 +793,7 @@ mod tests {
                 is_ai: p.is_ai,
                 score: p.score.clone(),
                 upgrades: p.upgrades.clone(),
+                ability_cooldowns: p.ability_cooldowns.clone(),
             })
             .collect();
         let occ = Occupancy::build(map, entities);

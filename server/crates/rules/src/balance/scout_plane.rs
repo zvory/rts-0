@@ -1,11 +1,7 @@
-//! Hidden Scout Plane contract constants.
-//!
-//! Phase 2 makes these values mirrorable before normal production exposure. Hidden server runtime,
-//! upkeep, and fog stamping land before later command-card and normal production exposure.
+//! Scout Plane contract constants.
 
 use super::TICK_HZ;
 
-pub const SCOUT_PLANE_BUILD_TICKS: u32 = TICK_HZ * 20;
 pub const SCOUT_PLANE_HP: u32 = 40;
 pub const SCOUT_PLANE_SIGHT_TILES: u32 = 12;
 pub const SCOUT_PLANE_SPEED_PX_PER_TICK: f32 = 2.0;
@@ -13,9 +9,8 @@ pub const SCOUT_PLANE_COST_STEEL: u32 = 50;
 pub const SCOUT_PLANE_COST_OIL: u32 = 50;
 pub const SCOUT_PLANE_SUPPLY: u32 = 0;
 pub const SCOUT_PLANE_ORBIT_RADIUS_TILES: u32 = 4;
-pub const SCOUT_PLANE_UPKEEP_OIL: u8 = 1;
-pub const SCOUT_PLANE_UPKEEP_INTERVAL_TICKS: u16 = 20;
-pub const SCOUT_PLANE_FUEL_RESERVE_OIL: u8 = 8;
+pub const SCOUT_PLANE_ORBIT_DURATION_TICKS: u16 = (TICK_HZ * 10) as u16;
+pub const SCOUT_PLANE_ABILITY_COOLDOWN_TICKS: u16 = (TICK_HZ * 30) as u16;
 
 // Client render/selection body only. The authoritative movement/collision body stays zero-radius
 // in `defs.rs` until aerial movement owns its own non-blocking runtime path.

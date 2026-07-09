@@ -1,4 +1,4 @@
-import { KIND, STATE, isBuilding } from "./protocol.js";
+import { STATE, isBuilding } from "./protocol.js";
 import { STATS, UPGRADES } from "./config.js";
 
 export function selectedProducerBuildingsForUnit(ctx, unit, isOwn, factionTrainsOf) {
@@ -25,8 +25,6 @@ export function selectedProducingBuildingsForKind(ctx, kind, isOwn) {
 export function trainAvailability(ctx, unit, resources, isOwn) {
   const st = STATS[unit];
   if (!st) return "locked";
-  const scoutLimit = scoutPlaneTrainLimit(ctx, unit, isOwn);
-  if (scoutLimit.status !== "none") return scoutLimit.status;
   if (requirementsOf(st).some((req) => !playerHasCompleteKind(ctx, req))) return "locked";
   if (!playerHasAnyCompleteKind(ctx, requirementsAnyOf(st))) return "locked";
   if (st.upgradeRequires && !(ctx.upgrades || []).includes(st.upgradeRequires)) return "locked";
@@ -36,9 +34,6 @@ export function trainAvailability(ctx, unit, resources, isOwn) {
 export function trainDisabledReason(ctx, unit, resources, isOwn) {
   const st = STATS[unit];
   if (!st) return "";
-  const scoutLimit = scoutPlaneTrainLimit(ctx, unit, isOwn);
-  if (scoutLimit.status === "active") return "Select active Scout Plane";
-  if (scoutLimit.status === "inProduction") return "Scout Plane already in production";
   const missing = requirementsOf(st).find((req) => !playerHasCompleteKind(ctx, req));
   if (missing) return `Requires ${STATS[missing]?.label || missing}`;
   if (!playerHasAnyCompleteKind(ctx, requirementsAnyOf(st))) {
@@ -82,18 +77,8 @@ export function researchDisabledReason(ctx, upgrade, resources, isOwn) {
   return "";
 }
 
-export function scoutPlaneTrainLimit(ctx, unit, isOwn) {
-  if (unit !== KIND.SCOUT_PLANE) return { status: "none", active: null, signature: "" };
-  const active = activeScoutPlane(ctx, isOwn);
-  if (active) return { status: "active", active, signature: `active:${active.id}` };
-  if (scoutPlaneInProduction(ctx, isOwn)) {
-    return { status: "inProduction", active: null, signature: "inProduction" };
-  }
-  return { status: "none", active: null, signature: "" };
-}
-
 export function trainLimitSignature(ctx, unit, isOwn) {
-  return scoutPlaneTrainLimit(ctx, unit, isOwn).signature;
+  return "";
 }
 
 export function researchSlotForUpgrade(buildingKind, upgrade, trains) {
@@ -135,34 +120,6 @@ function requirementsOf(definition) {
 function requirementsAnyOf(definition) {
   if (!definition || !definition.requiresAny) return [];
   return Array.isArray(definition.requiresAny) ? definition.requiresAny : [definition.requiresAny];
-}
-
-function currentEntitiesOf(ctx) {
-  if (Array.isArray(ctx?.currentEntities)) return ctx.currentEntities;
-  if (Array.isArray(ctx?.entities)) return ctx.entities;
-  if (typeof ctx?.state?.entitiesInterpolated === "function") {
-    return ctx.state.entitiesInterpolated(1) || [];
-  }
-  return ctx?.selection || [];
-}
-
-function activeScoutPlane(ctx, isOwn) {
-  return currentEntitiesOf(ctx)
-    .filter((e) => isOwn(ctx, e) && e.kind === KIND.SCOUT_PLANE && e.hp !== 0)
-    .sort((a, b) => (a.id ?? 0) - (b.id ?? 0))[0] || null;
-}
-
-function scoutPlaneInProduction(ctx, isOwn) {
-  if ((ctx.optimisticProduction || []).some((entry) => entry?.unit === KIND.SCOUT_PLANE)) {
-    return true;
-  }
-  return currentEntitiesOf(ctx).some((e) =>
-    isOwn(ctx, e) &&
-      isBuilding(e.kind) &&
-      e.buildProgress == null &&
-      (e.prodScoutPlaneQueued === true || e.prodKind === KIND.SCOUT_PLANE) &&
-      ((e.prodQueue ?? 1) > 0 || e.state === STATE.TRAIN)
-  );
 }
 
 function playerHasCompleteKind(ctx, kind) {

@@ -298,6 +298,7 @@ impl Game {
                 is_ai: p.is_ai,
                 score: ScoreState::default(),
                 upgrades: Default::default(),
+                ability_cooldowns: Default::default(),
             };
             if let Some(loadout) = loadout {
                 spawn_player_start(&mut entities, &map, &mut ps, start, loadout);
