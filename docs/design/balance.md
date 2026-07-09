@@ -398,6 +398,9 @@ folded into default targeting.
   150 oil and takes 600 ticks (~20s). Mortar Team autocast is unavailable before completion. Once
   complete, all current and future Mortar Teams for that player start with autocast enabled; players
   can still turn autocast off per selected Mortar Team.
+- **Smoke Plus** (R&D Complex research, protocol id `smoke_plus`): costs 150 steel / 150 oil and
+  takes 600 ticks (~20s). Once complete, future Scout Car Smoke casts by that player use a 4-tile
+  cloud radius and last 10 seconds instead of the base 2-tile radius and 5-second duration.
 - Ability metadata is Rust-authoritative in `server/crates/rules/src/faction.rs`. The faction
   catalog records carriers, target mode, ranges, cooldowns, charges, Steel/Oil cost, queueability,
   autocast support, and command-card affordances; `client/src/config.js` is mechanically checked
@@ -432,7 +435,8 @@ folded into default targeting.
   depleted, that car cannot use Smoke again. Smoke has no steel or oil cost. Target range: 14 tiles
   from the caster. Launch delay: up to 100 ms at max range, scaling down for closer targets. Cloud
   radius: 2 tiles. Cloud duration: 5 seconds. No cooldown; one Scout Car can spend both smoke uses
-  back-to-back immediately.
+  back-to-back immediately. After Smoke Plus research, future casts by that player use a 4-tile
+  radius and 10-second duration.
   Expected role: an offensive tool for closing on long-range defenses; push a scout car forward,
   place smoke between the advance and the anti-tank gun / machine-gun nest, then move mobile units through
   the resulting dead zone. Active smoke is neutral world state: it blocks authoritative fog and
@@ -520,7 +524,7 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 | depot                      | Supply Depot       | 110 | 1     | 100 | 2x2  | 300       | +8 supply |
 | barracks                   | Barracks           | 165 | 1     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, and panzerfaust; Panzerfaust and Machine Gunner require completed Training Centre; requires a City Centre |
 | training_centre            | Training Centre    | 300 | 1     | 100 steel + 50 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner and panzerfaust training at barracks and researches Methamphetamines and Entrenchment; requires a City Centre and Barracks |
-| research_complex           | R&D Complex        | 165 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Heavy Guns, Artillery Fire Control, Tank Production, Command Car, and Mortar Autocast; requires a City Centre and Training Centre |
+| research_complex           | R&D Complex        | 165 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Heavy Guns, Artillery Fire Control, Tank Production, Command Car, Mortar Autocast, and Smoke Plus; requires a City Centre and Training Centre |
 | factory                    | Vehicle Works      | 360 | 1     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, trains tank after Tank Production research, and trains command_car after Command Car research; requires a City Centre and Training Centre |
 | steelworks                 | Gun Works          | 300 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately and trains Anti-Tank Guns/Artillery after R&D Complex research; requires a City Centre and Training Centre |
 | tank_trap                  | Tank Trap          | 120 | 0     | 15 steel + 0 oil | 1x1  | 300       | engineer-built vehicle obstacle; workers deconstruct completed traps in 150 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building; requires a completed Training Centre |

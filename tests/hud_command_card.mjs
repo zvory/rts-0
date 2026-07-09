@@ -60,12 +60,14 @@ function buttonSlots(card) {
   assert.equal(ids[2], `research:${UPGRADE.TANK_UNLOCK}`);
   assert.equal(ids[3], `research:${UPGRADE.COMMAND_CAR_UNLOCK}`);
   assert.equal(ids[4], `research:${UPGRADE.MORTAR_AUTOCAST}`);
-  assert.deepEqual(slotCommandIds(rAndDCard()).slice(0, 5), [
+  assert.equal(ids[5], `research:${UPGRADE.SMOKE_PLUS}`);
+  assert.deepEqual(slotCommandIds(rAndDCard()).slice(0, 6), [
     kriegsiaCommandId("research", UPGRADE.ANTI_TANK_GUN_UNLOCK),
     kriegsiaCommandId("research", UPGRADE.BALLISTIC_TABLES),
     kriegsiaCommandId("research", UPGRADE.TANK_UNLOCK),
     kriegsiaCommandId("research", UPGRADE.COMMAND_CAR_UNLOCK),
     kriegsiaCommandId("research", UPGRADE.MORTAR_AUTOCAST),
+    kriegsiaCommandId("research", UPGRADE.SMOKE_PLUS),
   ]);
   assert.equal(rAndDCard().slots[1].enabled, false);
   assert.equal(rAndDCard().slots[1].title, "Requires Heavy Guns");
@@ -81,6 +83,7 @@ function buttonSlots(card) {
   assert.equal(ids[2], `research:${UPGRADE.TANK_UNLOCK}`);
   assert.equal(ids[3], `research:${UPGRADE.COMMAND_CAR_UNLOCK}`);
   assert.equal(ids[4], `research:${UPGRADE.MORTAR_AUTOCAST}`);
+  assert.equal(ids[5], `research:${UPGRADE.SMOKE_PLUS}`);
   assert.equal(card.slots[1].enabled, true);
 }
 
@@ -91,6 +94,7 @@ function buttonSlots(card) {
   assert.equal(ids[2], null);
   assert.equal(ids[3], `research:${UPGRADE.COMMAND_CAR_UNLOCK}`);
   assert.equal(ids[4], `research:${UPGRADE.MORTAR_AUTOCAST}`);
+  assert.equal(ids[5], `research:${UPGRADE.SMOKE_PLUS}`);
 }
 
 {

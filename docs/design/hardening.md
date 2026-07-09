@@ -231,7 +231,9 @@ The server treats every client as potentially hostile. Limits live next to the c
   `tank_unlock` for 150 steel / 100 oil over 600 ticks, unlocking Tank training at Vehicle Works;
   `command_car_unlock` for 150 steel / 150 oil over 900 ticks after completed `tank_unlock`,
   unlocking Command Car training at Vehicle Works; and `mortar_autocast` for 150 steel / 150 oil
-  over 600 ticks, enabling Mortar Team autocast for current and future owned Mortar Teams.
+  over 600 ticks, enabling Mortar Team autocast for current and future owned Mortar Teams; and
+  `smoke_plus` for 150 steel / 150 oil over 600 ticks, doubling future Scout Car Smoke radius and
+  duration.
   Server-side research validation checks the research building and prerequisite upgrades, while
   train validation checks both the producer kind and completed player upgrade set, so clients cannot
   bypass these locks by sending `research` or `train` commands directly.

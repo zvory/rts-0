@@ -96,6 +96,7 @@ pub mod upgrades {
     pub const BALLISTIC_TABLES: &str = "ballistic_tables";
     pub const COMMAND_CAR_UNLOCK: &str = "command_car_unlock";
     pub const MORTAR_AUTOCAST: &str = "mortar_autocast";
+    pub const SMOKE_PLUS: &str = "smoke_plus";
 }
 
 /// Closed `Event::Attack.weaponKind` values.
@@ -394,6 +395,7 @@ const UPGRADE_CODES: &[(&str, u8)] = &[
     (upgrades::COMMAND_CAR_UNLOCK, 6),
     (upgrades::BALLISTIC_TABLES, 7),
     (upgrades::ENTRENCHMENT, 8),
+    (upgrades::SMOKE_PLUS, 9),
 ];
 
 const WEAPON_KIND_CODES: &[(&str, u8)] = &[
@@ -658,6 +660,7 @@ fn upgrade_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("BALLISTIC_TABLES", upgrades::BALLISTIC_TABLES),
         ("COMMAND_CAR_UNLOCK", upgrades::COMMAND_CAR_UNLOCK),
         ("MORTAR_AUTOCAST", upgrades::MORTAR_AUTOCAST),
+        ("SMOKE_PLUS", upgrades::SMOKE_PLUS),
     ])
 }
 

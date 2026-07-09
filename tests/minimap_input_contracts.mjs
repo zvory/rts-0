@@ -6,10 +6,11 @@ import { ClientIntent } from "../client/src/client_intent.js";
 import { createLabControlPolicy } from "../client/src/lab_control_policy.js";
 import { Minimap } from "../client/src/minimap.js";
 import {
+  ABILITIES,
   ARTILLERY_BLANKET_RADIUS_TILES,
   ARTILLERY_MIN_RANGE_TILES,
 } from "../client/src/config.js";
-import { ABILITY, cmd, KIND, LAB_ROLE, ORDER_STAGE, SETUP, TERRAIN } from "../client/src/protocol.js";
+import { ABILITY, cmd, KIND, LAB_ROLE, ORDER_STAGE, SETUP, TERRAIN, UPGRADE } from "../client/src/protocol.js";
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg || "Assertion failed");
@@ -188,6 +189,7 @@ function minimapHarness({
   commandTarget = null,
   commandsEnabled = true,
   controlPolicy = null,
+  upgrades = [],
   legacySender = false,
   explicitClientIntent = true,
 } = {}) {
@@ -213,6 +215,7 @@ function minimapHarness({
     selectedEntities() {
       return selected;
     },
+    upgrades,
     entitiesInterpolated() {
       return [];
     },
@@ -398,6 +401,29 @@ function lockedEvent(clientX, clientY, button = 0, extra = {}) {
       h.clientIntent.commandFeedback[0].y === artillery.y &&
       h.clientIntent.commandFeedback[0].radiusTiles === ARTILLERY_BLANKET_RADIUS_TILES,
     "minimap Blanket Fire feedback uses the locked artillery center and blanket radius",
+  );
+  h.minimap.destroy();
+}
+
+// Smoke Plus minimap targeting uses the upgraded cloud radius in local feedback.
+{
+  const scoutCar = { id: 21, owner: 1, kind: KIND.SCOUT_CAR, x: 100, y: 100 };
+  const h = minimapHarness({
+    selected: [scoutCar],
+    commandTarget: { kind: "ability", ability: ABILITY.SMOKE },
+    upgrades: [UPGRADE.SMOKE_PLUS],
+  });
+  h.minimap._issueOrder(120, 100, false);
+  assert(
+    h.net.sent[0]?.c === "useAbility" &&
+      h.net.sent[0].ability === ABILITY.SMOKE &&
+      h.net.sent[0].x === 120,
+    "minimap Smoke targeting sends the ability command",
+  );
+  const upgradedRadiusTiles = ABILITIES[ABILITY.SMOKE].upgradedRadiusTiles;
+  assert(
+    h.clientIntent.commandFeedback[0]?.radiusTiles === upgradedRadiusTiles,
+    "minimap Smoke feedback uses the upgraded Smoke Plus radius",
   );
   h.minimap.destroy();
 }

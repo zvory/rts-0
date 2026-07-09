@@ -19,6 +19,7 @@ pub const BALLISTIC_TABLES_UPGRADE: &str = "ballistic_tables";
 pub const TANK_UNLOCK_UPGRADE: &str = "tank_unlock";
 pub const COMMAND_CAR_UNLOCK_UPGRADE: &str = "command_car_unlock";
 pub const MORTAR_AUTOCAST_UPGRADE: &str = "mortar_autocast";
+pub const SMOKE_PLUS_UPGRADE: &str = "smoke_plus";
 pub use crate::defs::SCOUT_PLANE_UNLOCK_BUILDINGS;
 
 pub const SMOKE_ABILITY: &str = "smoke";
@@ -174,6 +175,10 @@ const DEFAULT_UPGRADES: &[UpgradeCatalogEntry] = &[
     },
     UpgradeCatalogEntry {
         id: MORTAR_AUTOCAST_UPGRADE,
+        researched_at: EntityKind::ResearchComplex,
+    },
+    UpgradeCatalogEntry {
+        id: SMOKE_PLUS_UPGRADE,
         researched_at: EntityKind::ResearchComplex,
     },
 ];
@@ -717,6 +722,9 @@ mod tests {
         assert!(!catalog.allows_research(ARTILLERY_UNLOCK_UPGRADE, research_complex));
         assert!(catalog.allows_research(BALLISTIC_TABLES_UPGRADE, research_complex));
         assert!(catalog.allows_research(TANK_UNLOCK_UPGRADE, research_complex));
+        assert!(catalog.allows_research(COMMAND_CAR_UNLOCK_UPGRADE, research_complex));
+        assert!(catalog.allows_research(MORTAR_AUTOCAST_UPGRADE, research_complex));
+        assert!(catalog.allows_research(SMOKE_PLUS_UPGRADE, research_complex));
         assert!(!catalog.allows_research(TANK_UNLOCK_UPGRADE, EntityKind::TrainingCentre));
         assert!(catalog.allows_building(EntityKind::TankTrap));
         assert!(catalog.can_build(EntityKind::Worker, EntityKind::TankTrap));

@@ -8,7 +8,7 @@
 // non-square maps stay centered and undistorted.
 
 import { cmd } from "./protocol.js";
-import { KIND, ORDER_STAGE, TERRAIN, isResource, isUnit } from "./protocol.js";
+import { ABILITY, KIND, ORDER_STAGE, TERRAIN, UPGRADE, isResource, isUnit } from "./protocol.js";
 import {
   ABILITIES,
   COLORS,
@@ -1116,14 +1116,15 @@ export class Minimap {
           queued,
         })
         : [];
+      const radiusTiles = abilityTargetRadiusTiles(definition, ability, this.state);
       this._issueCommand(cmd.useAbility(ability, abilityUnits, wx, wy, queued));
       if (isArtilleryFireAbility(ability)) {
         for (const lock of artilleryLocks) {
-          this._addCommandFeedback("artillery", lock.x, lock.y, queued, definition?.radiusTiles);
+          this._addCommandFeedback("artillery", lock.x, lock.y, queued, radiusTiles);
         }
         return;
       }
-      this._addCommandFeedback("attack", wx, wy, queued);
+      this._addCommandFeedback("attack", wx, wy, queued, radiusTiles);
       return;
     }
     this._issueCommand(cmd.move(unitIds, wx, wy, queued));
@@ -1190,6 +1191,22 @@ function commandFeedbackOwner(state) {
   }
   const ownerId = Number(state?.playerId);
   return Number.isInteger(ownerId) && ownerId > 0 ? ownerId : null;
+}
+
+function abilityTargetRadiusTiles(definition, ability, state) {
+  const baseRadius = definition?.radiusTiles || 0;
+  if (ability === ABILITY.SMOKE && commandUpgrades(state).includes(UPGRADE.SMOKE_PLUS)) {
+    return definition?.upgradedRadiusTiles || baseRadius;
+  }
+  return baseRadius;
+}
+
+function commandUpgrades(state) {
+  if (typeof state?.controlPolicy?.commandUpgrades === "function") {
+    const upgrades = state.controlPolicy.commandUpgrades(state);
+    return Array.isArray(upgrades) ? upgrades : [];
+  }
+  return Array.isArray(state?.upgrades) ? state.upgrades : [];
 }
 
 function issueGameplayCommand(sender, command) {

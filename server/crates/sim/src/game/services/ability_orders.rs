@@ -18,6 +18,7 @@ use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::world_query;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
+use crate::game::upgrade::UpgradeKind;
 use crate::game::PlayerState;
 use crate::protocol::Event;
 use crate::rules;
@@ -208,11 +209,22 @@ pub(crate) fn launch_world_ability(
             if !preserve_active_order {
                 e.clear_active_order();
             }
+            let (radius_tiles, duration_ticks) = if ps.has_upgrade(UpgradeKind::SmokePlus) {
+                (
+                    config::SMOKE_PLUS_CLOUD_RADIUS_TILES,
+                    config::SMOKE_PLUS_CLOUD_DURATION_TICKS,
+                )
+            } else {
+                (
+                    config::SMOKE_CLOUD_RADIUS_TILES,
+                    config::SMOKE_CLOUD_DURATION_TICKS,
+                )
+            };
             smokes.schedule(
                 x,
                 y,
-                config::SMOKE_CLOUD_RADIUS_TILES,
-                config::SMOKE_CLOUD_DURATION_TICKS,
+                radius_tiles,
+                duration_ticks,
                 tick.saturating_add(delay_ticks),
             );
             for pid in events.keys().copied().collect::<Vec<_>>() {

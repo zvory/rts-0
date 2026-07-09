@@ -557,6 +557,15 @@ fn print_upgrades(indent: &str) {
         balance::MORTAR_AUTOCAST_COST_OIL,
         balance::MORTAR_AUTOCAST_RESEARCH_TICKS,
         None,
+        true,
+    );
+    print_upgrade(
+        indent,
+        faction::SMOKE_PLUS_UPGRADE,
+        balance::SMOKE_PLUS_COST_STEEL,
+        balance::SMOKE_PLUS_COST_OIL,
+        balance::SMOKE_PLUS_RESEARCH_TICKS,
+        None,
         false,
     );
     println!("{indent}  }},");
@@ -580,10 +589,12 @@ fn print_upgrade(
 
 fn print_ability_effects(indent: &str) {
     println!(
-        "{indent}    \"{}\": {{\"radiusTiles\":{},\"durationTicks\":{}}},",
+        "{indent}    \"{}\": {{\"radiusTiles\":{},\"durationTicks\":{},\"upgradedRadiusTiles\":{},\"upgradedDurationTicks\":{}}},",
         faction::SMOKE_ABILITY,
         json_f32(balance::SMOKE_CLOUD_RADIUS_TILES),
         balance::SMOKE_CLOUD_DURATION_TICKS,
+        json_f32(balance::SMOKE_PLUS_CLOUD_RADIUS_TILES),
+        balance::SMOKE_PLUS_CLOUD_DURATION_TICKS,
     );
     println!(
         "{indent}    \"{}\": {{\"radiusTiles\":{}}},",

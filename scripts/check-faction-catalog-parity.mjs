@@ -65,6 +65,7 @@ import {
   SCOUT_PLANE_ORBIT_RADIUS_TILES,
   SCOUT_PLANE_UPKEEP_INTERVAL_TICKS,
   SCOUT_PLANE_UPKEEP_OIL,
+  SMOKE_PLUS_RESEARCH_TICKS,
   SMOKE_ABILITY_COOLDOWN_TICKS,
   SMOKE_ABILITY_COST,
   SMOKE_ABILITY_RANGE_TILES,
@@ -235,7 +236,12 @@ const EXPECTED_BUILDING_STAT_FIELDS = Object.freeze([
 const EXPECTED_BODY_FIELDS = Object.freeze(["clearance", "length", "width"]);
 const EXPECTED_UPGRADE_FIELDS = Object.freeze(["cost", "researchTicks", "requiresUpgrade"]);
 const EXPECTED_ABILITY_EFFECT_FIELDS_BY_ID = Object.freeze({
-  [ABILITY.SMOKE]: Object.freeze(["durationTicks", "radiusTiles"]),
+  [ABILITY.SMOKE]: Object.freeze([
+    "durationTicks",
+    "radiusTiles",
+    "upgradedDurationTicks",
+    "upgradedRadiusTiles",
+  ]),
   [ABILITY.MORTAR_FIRE]: Object.freeze(["radiusTiles"]),
   [ABILITY.POINT_FIRE]: Object.freeze(["delayTicks", "radiusTiles"]),
   [ABILITY.BLANKET_FIRE]: Object.freeze(["radiusTiles"]),
@@ -687,6 +693,7 @@ const clientUpgradeResearchTicks = {
   [UPGRADE.TANK_UNLOCK]: TANK_UNLOCK_RESEARCH_TICKS,
   [UPGRADE.COMMAND_CAR_UNLOCK]: COMMAND_CAR_UNLOCK_RESEARCH_TICKS,
   [UPGRADE.MORTAR_AUTOCAST]: MORTAR_AUTOCAST_RESEARCH_TICKS,
+  [UPGRADE.SMOKE_PLUS]: SMOKE_PLUS_RESEARCH_TICKS,
 };
 assertSortedObjectKeys(
   rustClientConfig.upgrades,

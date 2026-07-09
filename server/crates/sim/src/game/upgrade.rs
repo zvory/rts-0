@@ -11,6 +11,7 @@ const BALLISTIC_TABLES: &str = "ballistic_tables";
 const TANK_UNLOCK: &str = "tank_unlock";
 const COMMAND_CAR_UNLOCK: &str = "command_car_unlock";
 const MORTAR_AUTOCAST: &str = "mortar_autocast";
+const SMOKE_PLUS: &str = "smoke_plus";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum UpgradeKind {
@@ -22,6 +23,7 @@ pub enum UpgradeKind {
     TankUnlock,
     CommandCarUnlock,
     MortarAutocast,
+    SmokePlus,
 }
 
 impl UpgradeKind {
@@ -35,6 +37,7 @@ impl UpgradeKind {
             UpgradeKind::TankUnlock => TANK_UNLOCK,
             UpgradeKind::CommandCarUnlock => COMMAND_CAR_UNLOCK,
             UpgradeKind::MortarAutocast => MORTAR_AUTOCAST,
+            UpgradeKind::SmokePlus => SMOKE_PLUS,
         }
     }
 }
@@ -52,6 +55,7 @@ impl FromStr for UpgradeKind {
             TANK_UNLOCK => Ok(UpgradeKind::TankUnlock),
             COMMAND_CAR_UNLOCK => Ok(UpgradeKind::CommandCarUnlock),
             MORTAR_AUTOCAST => Ok(UpgradeKind::MortarAutocast),
+            SMOKE_PLUS => Ok(UpgradeKind::SmokePlus),
             _ => Err(()),
         }
     }
@@ -77,6 +81,7 @@ pub const ALL: &[UpgradeKind] = &[
     UpgradeKind::TankUnlock,
     UpgradeKind::CommandCarUnlock,
     UpgradeKind::MortarAutocast,
+    UpgradeKind::SmokePlus,
 ];
 
 const CURRENT_RESEARCHABLE: &[UpgradeKind] = &[
@@ -87,6 +92,7 @@ const CURRENT_RESEARCHABLE: &[UpgradeKind] = &[
     UpgradeKind::TankUnlock,
     UpgradeKind::CommandCarUnlock,
     UpgradeKind::MortarAutocast,
+    UpgradeKind::SmokePlus,
 ];
 
 pub fn researchable_upgrades(building: EntityKind) -> Vec<UpgradeKind> {
@@ -163,6 +169,14 @@ pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
             cost_oil: crate::config::MORTAR_AUTOCAST_COST_OIL,
             research_ticks: crate::config::MORTAR_AUTOCAST_RESEARCH_TICKS,
         },
+        UpgradeKind::SmokePlus => UpgradeDefinition {
+            kind,
+            researched_at: EntityKind::ResearchComplex,
+            requires_upgrade: None,
+            cost_steel: crate::config::SMOKE_PLUS_COST_STEEL,
+            cost_oil: crate::config::SMOKE_PLUS_COST_OIL,
+            research_ticks: crate::config::SMOKE_PLUS_RESEARCH_TICKS,
+        },
     }
 }
 
@@ -194,6 +208,7 @@ mod tests {
                 UpgradeKind::TankUnlock,
                 UpgradeKind::CommandCarUnlock,
                 UpgradeKind::MortarAutocast,
+                UpgradeKind::SmokePlus,
             ]
         );
         assert!(ALL.contains(&UpgradeKind::ArtilleryUnlock));
