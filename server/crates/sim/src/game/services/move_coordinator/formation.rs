@@ -7,6 +7,9 @@ use crate::game::map::Map;
 use crate::protocol::TrenchView;
 
 mod goal_search;
+mod reachability;
+
+pub(super) use reachability::FormationReachability;
 
 const FORMATION_NEAR_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 4.0;
 const FORMATION_FAR_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 18.0;

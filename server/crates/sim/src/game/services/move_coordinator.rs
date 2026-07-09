@@ -13,7 +13,7 @@
 //! - repath throttling,
 //! - spawn-point search around buildings.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 
 use crate::config;
@@ -263,31 +263,17 @@ impl<'a> MoveCoordinator<'a> {
             occupied_trenches.remove(&trench_id);
         }
         let known_trenches = self.known_trenches_for_player(player).to_vec();
-        let map = self.map;
-        let occ = self.occ;
-        let teams = &self.teams;
-        let mut reachability_pathing = self.pathing.clone();
-        let mut reachability_cache = BTreeMap::new();
+        let relation = StaticPathingRelation::for_player(player, &self.teams);
+        let mut reachability =
+            formation::FormationReachability::new(self.map, self.occ, relation);
         let goals = formation::formation_goals_with_known_trenches_and_reachability(
-            map,
-            occ,
+            self.map,
+            self.occ,
             &units,
             goal,
             &known_trenches,
             &occupied_trenches,
-            |unit, tile| {
-                *reachability_cache.entry((unit.id, tile)).or_insert_with(|| {
-                    formation_goal_tile_reachable(
-                        &mut reachability_pathing,
-                        map,
-                        occ,
-                        teams,
-                        player,
-                        unit,
-                        tile,
-                    )
-                })
-            },
+            |unit, tile| reachability.can_reach(unit, tile),
         );
 
         for (unit, g) in units.iter().zip(goals.iter()) {
@@ -1066,39 +1052,6 @@ fn occupied_trench_ids_for_units(
         .filter(|entity| unit_ids.contains(&entity.id))
         .filter_map(active_trench_occupation)
         .collect()
-}
-
-fn formation_goal_tile_reachable(
-    pathing: &mut PathingService,
-    map: &Map,
-    occ: &Occupancy,
-    teams: &TeamRelations,
-    player: u32,
-    unit: &formation::FormationUnit,
-    tile: (u32, u32),
-) -> bool {
-    let start = map.tile_of(unit.pos.0, unit.pos.1);
-    if start == tile {
-        return true;
-    }
-    let route_shape = if uses_oriented_vehicle_body(unit.kind) {
-        RouteShape::VehicleClearance
-    } else {
-        RouteShape::Normal
-    };
-    let req = PathRequest {
-        relation: StaticPathingRelation::for_player(player, teams),
-        kind: unit.kind,
-        start: (start.0 as i32, start.1 as i32),
-        goal: (tile.0 as i32, tile.1 as i32),
-        radius_tiles: config::unit_radius_tiles(unit.kind),
-        route_shape,
-        budget: None,
-    };
-    let (tile_path, _) = pathing.request_tile_path_with_diagnostics(map, occ, req);
-    // Empty here means the unit could not make useful progress at all; keep the legacy goal so
-    // the ordinary path phase can surface PathFailed instead of turning the order into a no-op.
-    tile_path.is_empty() || tile_path.last().copied() == Some((tile.0 as i32, tile.1 as i32))
 }
 
 fn pathing_source_from_order(order: &Order) -> PathingRequestSource {
