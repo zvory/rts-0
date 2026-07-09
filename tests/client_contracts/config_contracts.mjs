@@ -323,8 +323,8 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     "Panzerfaust command-card metadata exposes its Training Centre requirement and approved tooltip copy",
   );
   assert(
-    STATS[KIND.ARTILLERY].cost.steel === 300 &&
-      STATS[KIND.ARTILLERY].cost.oil === 100 &&
+    STATS[KIND.ARTILLERY].cost.steel === 150 &&
+      STATS[KIND.ARTILLERY].cost.oil === 50 &&
       STATS[KIND.ARTILLERY].supply === 5,
     "Artillery cost and supply mirror server",
   );
