@@ -483,7 +483,17 @@ function buttonSlots(card) {
     "factory-train",
     "gun-works-train",
     "research-complex",
+    "research-complex-medium-guns",
   ]);
+  assert(
+    catalog.some((entry) =>
+      entry.id === "research-complex-medium-guns" &&
+        entry.card.slots.some((slot) =>
+          slot?.commandId === kriegsiaCommandId("research", UPGRADE.ARTILLERY_UNLOCK)
+        )
+    ),
+    "command-card context catalog samples Heavy Guns after Medium Guns so direct hotkeys can discover it",
+  );
   assert.deepEqual(WORKER_BUILDABLE, [
     KIND.CITY_CENTRE,
     KIND.DEPOT,

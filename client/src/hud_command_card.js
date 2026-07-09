@@ -170,6 +170,7 @@ export function buildCommandCardContextCatalog() {
     upgrades: [
       UPGRADE.METHAMPHETAMINES,
       UPGRADE.ANTI_TANK_GUN_UNLOCK,
+      UPGRADE.ARTILLERY_UNLOCK,
       UPGRADE.BALLISTIC_TABLES,
       UPGRADE.TANK_UNLOCK,
       UPGRADE.COMMAND_CAR_UNLOCK,
@@ -192,6 +193,12 @@ export function buildCommandCardContextCatalog() {
     { id: "factory-train", card: buildCommandCardDescriptors(ctx([baseEntities[4]])) },
     { id: "gun-works-train", card: buildCommandCardDescriptors(ctx([baseEntities[5]])) },
     { id: "research-complex", card: buildCommandCardDescriptors(ctx([baseEntities[3]], { upgrades: [] })) },
+    {
+      id: "research-complex-medium-guns",
+      card: buildCommandCardDescriptors(ctx([baseEntities[3]], {
+        upgrades: [UPGRADE.ANTI_TANK_GUN_UNLOCK],
+      })),
+    },
   ];
 }
 

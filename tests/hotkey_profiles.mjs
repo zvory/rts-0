@@ -14,7 +14,7 @@ import {
   buildCommandCardDescriptors,
   factionCommandId,
 } from "../client/src/hud_command_card.js";
-import { KIND } from "../client/src/protocol.js";
+import { KIND, UPGRADE } from "../client/src/protocol.js";
 
 const kriegsiaCommandId = (family, subject) => factionCommandId("kriegsia", family, subject);
 const ekatCommandId = (family, subject) => factionCommandId("ekat", family, subject);
@@ -95,6 +95,14 @@ function cityCentreTrainCard() {
         command.slotIndex === 6
     ),
     "hotkey command catalog includes the exposed Scout Plane train command in the Z slot",
+  );
+  assert(
+    catalog.commands.some((command) =>
+      command.commandId === kriegsiaCommandId("research", UPGRADE.ARTILLERY_UNLOCK) &&
+        command.label === "Heavy Guns" &&
+        command.slotIndex === 0
+    ),
+    "hotkey command catalog includes Heavy Guns research after Medium Guns unlocks its replacement slot",
   );
 }
 
