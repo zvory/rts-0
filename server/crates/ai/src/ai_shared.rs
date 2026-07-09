@@ -199,7 +199,6 @@ pub(crate) fn find_build_spot_near_start_with(
     }
 
     for radius in search.min_radius..=search.max_radius {
-
         if !search.prefer_away_from_center {
             for dy in -radius..=radius {
                 for dx in -radius..=radius {
