@@ -498,7 +498,7 @@ pub fn run_profile_matchup_result(
         None => None,
     };
 
-    let alive = game.alive_players();
+    let alive = objective.alive_player_ids();
     let winner = objective.winner();
     let end_reason = objective.end_reason();
     let starting_city_centres = objective.results();
