@@ -309,6 +309,7 @@
         "scripts/phase-runner*.mjs",
         "scripts/phase-runner.sh",
         "scripts/agent-pr.sh",
+        "scripts/format-touched-rust.sh",
         "scripts/adversarial-quality-pass.mjs",
         "scripts/adversarial-quality-pass.schema.json",
         "scripts/wait-pr.sh",

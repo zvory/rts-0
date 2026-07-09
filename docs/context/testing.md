@@ -18,7 +18,7 @@ Use for tests, CI/hooks, or focused verification.
 - `node tests/minimap_input_contracts.mjs` — dep-free minimap/router pointer-lock contracts.
 - `tests/run-all.sh --no-rust` — live Node suites plus browser smoke with shared dependencies.
 - `tests/run-all.sh --with-tri-state-browser --no-rust` — opt into tri-state browser scenarios.
-- `tests/run-all.sh --only-rust` — architecture policy plus Rust format, nextest, and lint only.
+- `tests/run-all.sh --only-rust` — architecture policy plus Rust nextest and lint only.
 - `tests/run-all.sh --only-live-node` — JS contracts plus live Node API suites only.
 - `tests/run-all.sh --only-browser` — browser smoke plus configured tri-state browser suites only.
 - `cargo nextest run --config-file .config/nextest.toml --manifest-path server/Cargo.toml --profile
@@ -45,7 +45,8 @@ Use for tests, CI/hooks, or focused verification.
   `cd server && cargo run` first for individual Node suites.
 - Installed hooks run staged whitespace checks, excluding `playtest_notes.md`, plus docs health.
   They do not run `tests/run-all.sh`; GitHub Actions owns the full-suite gate.
-- `scripts/agent-pr.sh` skips Codex only for pure `.md` diffs; status/body skip report still posts.
+- `scripts/agent-pr.sh` skips Codex only for pure `.md` diffs; otherwise it formats touched Rust
+  with the pinned toolchain before the final push.
 - Browser smoke dependencies are cached under `${RTS_NODE_DEPS_CACHE_DIR:-/tmp/rts-node-deps}`.
 - Local `tests/run-all.sh` uses per-worktree Cargo target dirs under `/tmp/rts-cargo-target/`.
   Override with `CARGO_TARGET_DIR` only when a task needs a specific target location.

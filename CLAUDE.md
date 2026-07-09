@@ -61,8 +61,8 @@ git worktree add /tmp/rts-worktrees/<task> -b zvorygin/<task> origin/main
 # Run the server and client
 cd server && cargo run
 
-# Build, lint, format, and check the simulation seam
-cd server && cargo build && cargo clippy && cargo fmt
+# Build, lint, and check the simulation seam
+cd server && cargo build && cargo clippy
 cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture
 
 # Live Node suites require a running server on the runner's private port
@@ -106,7 +106,8 @@ is loaded from the CDN, and `cargo run` from `server/` serves the client.
 
 ## Code conventions
 
-- **Rust:** edition 2021, `cargo fmt`, keep warnings low. Prefer small pure helpers in
+- **Rust:** edition 2021; the owned-PR lifecycle formats only branch-touched Rust files with the
+  pinned toolchain. Keep warnings low. Prefer small pure helpers in
   `game/services/`. `systems.rs` is the thin orchestrator that calls services in order. The room
   task is the single owner of its `Game` — no locks around it. Don't panic on the network or tick
   paths; handle errors and keep the room alive.

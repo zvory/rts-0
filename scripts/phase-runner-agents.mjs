@@ -278,9 +278,8 @@ This is an executor pass only:
 - You may commit with --no-verify only for pure documentation changes or when you have conclusively
   confirmed the only failing hook check is unrelated to this phase. Document that evidence in the
   JSON handoff verification or notes.
-- Avoid broad formatting commands such as workspace-wide cargo fmt unless they are required for the
-  phase diff. If formatting is needed, keep any formatter drift outside the phase scope out of the
-  final diff.
+- Do not run workspace-wide cargo fmt. The owned-PR lifecycle formats only branch-touched Rust
+  files after the final quality pass, keeping unrelated formatter drift out of the final diff.
 - Prefer plain filesystem renames/moves over git mv inside this sandboxed executor session.
 - If the phase is ambiguous, too broad, blocked by failing verification or commit-hook failure you
   cannot repair, or needs human design/product input, stop and report status "blocked".

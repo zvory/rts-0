@@ -3,7 +3,7 @@
 ## Run everything (one command)
 
 `run-all.sh` builds the server in debug (overflow checks **on**, which the hardening regression
-tests rely on), boots it, polls `GET /` until healthy, runs Rust formatting/lint/fast scripted
+tests rely on), boots it, polls `GET /` until healthy, runs Rust lint/fast scripted
 tests and all the live-server suites, tears the server down, and exits non-zero if **any** suite
 fails. The private server runs with `RTS_TEST_TICK_MS=5` by default, so live-server tests wait on
 simulated progress instead of real-time 30 Hz wall clock; normal `cargo run` remains 30 Hz.
@@ -13,7 +13,7 @@ This command is the portable local full gate. GitHub Actions runs the same cover
 parallel jobs and keeps the required aggregate PR check named `./tests/run-all.sh`. Run focused local
 verification for the files or contracts you changed, then rely on that aggregate check before merge.
 The CI changed-file classifier keeps docs-only PRs and post-merge `main` pushes cheap, and lets
-conservative client-only PRs and pushes skip Rust format, nextest, lint, and Rust architecture work
+conservative client-only PRs and pushes skip Rust nextest, lint, and Rust architecture work
 while still running server-build, live Node, and browser coverage. Contract-adjacent client files
 fall back to the full gate. The CI
 Rust/architecture job installs `cargo-nextest` and invokes `tests/run-all.sh --only-rust`, so the
@@ -27,11 +27,11 @@ The `Main test gate` workflow cancels superseded runs for the same PR and cancel
 deploys; only a successful push run for `main` can do that.
 
 ```bash
-tests/run-all.sh                 # local gate: cargo fmt --check + cargo nextest + clippy + API suites + client smoke
+tests/run-all.sh                 # local gate: cargo nextest + clippy + API suites + client smoke
 tests/run-all.sh --full-ai       # local gate plus long AI self-play/simulation coverage
-tests/run-all.sh --no-rust       # skip Rust fmt/test/lint
+tests/run-all.sh --no-rust       # skip Rust test/lint
 tests/run-all.sh --no-client     # skip the headless-browser smoke test
-tests/run-all.sh --only-rust     # architecture policy + Rust fmt/test/lint only
+tests/run-all.sh --only-rust     # architecture policy + Rust test/lint only
 tests/run-all.sh --only-live-node # JS contracts + live Node API suites only
 tests/run-all.sh --only-browser  # browser smoke + configured tri-state browser suites only
 tests/run-all.sh --with-tri-state-browser  # include latency-sensitive tri-state browser scenarios locally

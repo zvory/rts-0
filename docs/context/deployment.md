@@ -9,7 +9,7 @@ Use when changing server bind/config, the build pipeline, or the input-hardening
 ```bash
 cd server && cargo run            # serves client + /ws on RTS_ADDR; open the printed URL
 cd server && cargo run --release  # fast build
-cd server && cargo build && cargo clippy && cargo fmt
+cd server && cargo build && cargo clippy
 node scripts/check-wiki.mjs       # wiki routes, generated stats, and catalog parity
 node scripts/check-crate-boundaries.mjs
 ```
