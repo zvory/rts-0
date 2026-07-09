@@ -10,7 +10,7 @@ use crate::game::ability;
 use crate::game::ability_runtime::{AbilityObjectPayload, AbilityRuntime};
 use crate::game::entity::{
     active_trench_occupation, fires_while_moving, tank_trap_deconstruction_ticks, Entity,
-    EntityKind, EntityStore, GatherPhase, Order, OrderIntent,
+    EntityKind, EntityStore, GatherPhase, Order, OrderIntent, PanzerfaustState,
 };
 use crate::game::fog::Fog;
 use crate::game::smoke::SmokeCloudStore;
@@ -255,6 +255,13 @@ pub fn project_entity(
         if let Some(stats) = config::unit_stats(entity.kind) {
             view.weapon_range_tiles = Some(tank_weapon_range_tiles(entity, stats.range_tiles as f32));
         }
+    }
+    if entity.kind == EntityKind::Panzerfaust {
+        view.panzerfaust_loaded = entity
+            .combat
+            .as_ref()
+            .and_then(|combat| combat.panzerfaust)
+            .map(|state| matches!(state, PanzerfaustState::Loaded | PanzerfaustState::Windup { .. }));
     }
     let active_combat_target = matches!(entity.order(), Order::Attack(_) | Order::AttackMove(_))
         || (fires_while_moving(entity.kind) && entity.target_id().is_some())

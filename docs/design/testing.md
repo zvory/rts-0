@@ -143,8 +143,8 @@ Current scenario ids:
   `explicit_infantry_attack`.
 - `entrenchment_inspection` — seeded neutral trenches, researched friendly infantry, friendly and
   enemy eligible trench reusers, and a Machine Gunner for crowded slotting/rendering checks.
-- `panzerfaust_duel` — one loaded Panzerfaust versus one Tank for launch, impact, damage, and
-  same-id conversion inspection.
+- `panzerfaust_duel` — one loaded Panzerfaust versus one Tank for launch, impact, damage, reload,
+  and repeated-fire inspection.
 - `panzerfaust_windup_cancel` — starts a Panzerfaust attack, then issues movement during windup to
   inspect cancellation without shot consumption.
 - `panzerfaust_target_death` — pairs normal and boosted Panzerfausts against one low-health Tank so
@@ -152,7 +152,7 @@ Current scenario ids:
 - `panzerfaust_entrenched_range` — compares occupied-trench and exposed Panzerfausts holding
   position against Tanks at four-tile range.
 - `panzerfaust_methamphetamines` — compares normal and Methamphetamines Panzerfaust firing and
-  conversion timing side by side.
+  reload timing side by side.
 - `tank_coax_inspection` — one held Tank with its cannon cooldown delayed faces infantry-priority
   targets, support weapons, Ekat/Golem units, armored fallback targets, blockers, resources, smoke,
   and buildings around the coax arc for secondary-machine-gun inspection.

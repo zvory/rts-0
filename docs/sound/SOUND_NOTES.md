@@ -180,6 +180,6 @@ Samples reviewed:
 ## Out of scope — first pass
 
 - **Explosions**: explicitly deferred. No explosion SFX for v1. Death events for vehicles will play nothing or a generic hit sound; revisit after first pass ships.
-- **Panzerfaust travel/conversion audio**: deliberately silent in Phase 6. The visual tracer,
-  impact cue, and same-id Rifleman conversion are the intended first-pass feedback; add travel or
-  conversion sounds only after playtests show they improve clarity without adding spam.
+- **Panzerfaust travel/reload audio**: deliberately silent in Phase 6. The visual tracer, impact
+  cue, and missing-warhead reload state are the intended first-pass feedback; add travel or reload
+  sounds only after playtests show they improve clarity without adding spam.

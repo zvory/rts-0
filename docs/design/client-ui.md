@@ -1294,8 +1294,9 @@ selection rings):
 - Spatial combat audio keeps full volume for nearby emitters, uses stronger attenuation after the
   listener reference distance for distant emitters, and keeps the same hard drop distance.
   Panzerfaust launch and impact events use dedicated low-gain spatial cues with coarse cooldown
-  buckets; generic Panzerfaust attack events, projectile travel, and conversion stay silent so the
-  one-shot weapon does not reuse Tank/Rifleman/artillery sounds or spam clustered fights.
+  buckets; generic Panzerfaust attack events, projectile travel, reload, and legacy conversion
+  events stay silent so the weapon does not reuse Tank/Rifleman/artillery sounds or spam clustered
+  fights.
   Tank coax `weaponKind` feedback uses machine-gun burst audio instead of Tank cannon audio, and it
   does not register as a sustained Machine Gunner loop.
 - Buildings: SVG-authored rig definitions are compiled at Renderer startup and rendered on the
@@ -1313,7 +1314,7 @@ selection rings):
   Distinct silhouette per kind (engineer: compact block; rifleman: enabled PNG frame-strip
   experiment with frame 0 idle, frames 1-4 moving, and frame 5 standing recoil; machine gunner: enabled PNG frame-strip
   experiment with carried movement frames and setup/deployed frames; Panzerfaust: shared SVG
-  infantry body with a short one-shot launcher tube while loaded; Anti-Tank Gun: wheeled gun; mortar team: crewless
+  infantry body with a launcher tube whose warhead is hidden while reloading; Anti-Tank Gun: wheeled gun; mortar team: crewless
   M1938-inspired small wheeled mortar that travels low and deploys upright; scout car: boxy
   WW2-style truck silhouette with enclosed wheels and a rear-top machine gun; tank: chunky
   flat-shaded armor with movement-facing tracks, hull, nose, and shadow plus weapon-facing turret,

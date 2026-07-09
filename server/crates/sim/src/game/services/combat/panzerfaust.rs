@@ -1,8 +1,5 @@
 use crate::config;
-use crate::game::entity::{
-    convert_panzerfaust_to_rifleman as convert_panzerfaust_entity, AttackPhase, Entity, EntityKind,
-    EntityStore, Order, PanzerfaustState,
-};
+use crate::game::entity::{AttackPhase, Entity, EntityKind, EntityStore, Order, PanzerfaustState};
 use crate::game::entrenchment_combat;
 use crate::game::services::world_query;
 
@@ -294,10 +291,6 @@ fn set_panzerfaust_state(entity: &mut Entity, state: PanzerfaustState) {
     if let Some(combat) = entity.combat.as_mut() {
         combat.panzerfaust = Some(state);
     }
-}
-
-fn convert_panzerfaust_to_rifleman(entity: &mut Entity) -> bool {
-    convert_panzerfaust_entity(entity)
 }
 
 fn panzerfaust_range_tiles(attacker: &Entity) -> f32 {

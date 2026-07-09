@@ -802,7 +802,7 @@ const DEV_SCENARIOS: [DevScenarioSpec; 17] = [
     DevScenarioSpec {
         id: "panzerfaust_duel",
         title: "Panzerfaust Duel",
-        description: "One loaded Panzerfaust starts in range of one enemy Tank for checking launch, impact, damage, and same-id conversion.",
+        description: "One loaded Panzerfaust starts in range of one enemy Tank for checking launch, impact, damage, reload, and repeated fire.",
         launches: &PANZERFAUST_DUEL_LAUNCHES,
     },
     DevScenarioSpec {
@@ -826,7 +826,7 @@ const DEV_SCENARIOS: [DevScenarioSpec; 17] = [
     DevScenarioSpec {
         id: "panzerfaust_methamphetamines",
         title: "Panzerfaust Methamphetamines Timing",
-        description: "Normal and Methamphetamines Panzerfausts fire side by side so launch and conversion timing can be compared.",
+        description: "Normal and Methamphetamines Panzerfausts fire side by side so launch and reload timing can be compared.",
         launches: &PANZERFAUST_METHAMPHETAMINES_LAUNCHES,
     },
     DevScenarioSpec {
@@ -890,10 +890,9 @@ pub fn parse_dev_scenario_room(raw: &str) -> Option<DevScenarioLaunch> {
         for part in suffix.split(':') {
             if let Some(value) = part.strip_prefix("blocker=") {
                 blocker = Some(value);
-            } else if let Some(value) = part.strip_prefix("case=") {
-                case = Some(value);
             } else {
-                return None;
+                let value = part.strip_prefix("case=")?;
+                case = Some(value);
             }
         }
     }

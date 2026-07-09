@@ -4,6 +4,8 @@
 import { assert } from "./assertions.mjs";
 import { GameState } from "../../client/src/state.js";
 import { EVENT, KIND, STATE } from "../../client/src/protocol.js";
+import { createLiveRigDefinitions } from "../../client/src/renderer/rigs/live_routing.js";
+import { createRigRenderContext, sampleRigAnimation } from "../../client/src/renderer/rigs/animation.js";
 
 const start = {
   playerId: 1,
@@ -74,12 +76,35 @@ const start = {
     oil: 0,
     supplyUsed: 1,
     supplyCap: 10,
-    entities: [{ id: 41, owner: 1, kind: KIND.RIFLEMAN, x: 96, y: 96, hp: 30, maxHp: 45, state: STATE.IDLE }],
-    events: [{ e: EVENT.PANZERFAUST_CONVERSION, id: 41, toKind: KIND.RIFLEMAN }],
+    entities: [{ id: 41, owner: 1, kind: KIND.PANZERFAUST, x: 96, y: 96, hp: 30, maxHp: 45, state: STATE.IDLE, panzerfaustLoaded: false }],
+    events: [],
   });
 
-  assert(state.selection.has(41), "same-id Panzerfaust conversion preserves client selection");
-  assert(state.selectedEntities()[0]?.kind === KIND.RIFLEMAN, "same-id Panzerfaust conversion updates selected entity kind in place");
-  assert(state.controlGroups[0].join(",") === "41", "same-id Panzerfaust conversion preserves local control groups");
-  assert(state.controlGroupEntities(0)[0]?.kind === KIND.RIFLEMAN, "control-group recall resolves the converted Rifleman in place");
+  assert(state.selection.has(41), "Panzerfaust reload preserves client selection");
+  assert(state.selectedEntities()[0]?.kind === KIND.PANZERFAUST, "reloading Panzerfaust keeps its unit kind");
+  assert(state.selectedEntities()[0]?.panzerfaustLoaded === false, "reloading Panzerfaust keeps projectile-loaded state");
+  assert(state.controlGroups[0].join(",") === "41", "Panzerfaust reload preserves local control groups");
+  assert(state.controlGroupEntities(0)[0]?.kind === KIND.PANZERFAUST, "control-group recall resolves the reloading Panzerfaust in place");
+}
+
+{
+  const definitions = createLiveRigDefinitions();
+  const definition = definitions.get(KIND.PANZERFAUST);
+  const loadedEntity = {
+    id: 51,
+    owner: 1,
+    kind: KIND.PANZERFAUST,
+    x: 100,
+    y: 100,
+    hp: 45,
+    maxHp: 45,
+    state: STATE.IDLE,
+    panzerfaustLoaded: true,
+  };
+  const unloadedEntity = { ...loadedEntity, panzerfaustLoaded: false };
+  const loaded = sampleRigAnimation(definition, loadedEntity, createRigRenderContext(loadedEntity));
+  const unloaded = sampleRigAnimation(definition, unloadedEntity, createRigRenderContext(unloadedEntity));
+
+  assert(loaded.parts["part.pzf.warhead"].visible === true, "loaded Panzerfaust rig shows the warhead");
+  assert(unloaded.parts["part.pzf.warhead"].visible === false, "reloading Panzerfaust rig hides the warhead");
 }

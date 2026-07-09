@@ -338,7 +338,7 @@ assert(
   );
   assert(
     panzerfaustFeedbackSoundId(EVENT.PANZERFAUST_CONVERSION) === null,
-    "Panzerfaust conversion stays silent in the first polish pass",
+    "Legacy Panzerfaust conversion stays silent",
   );
   assert(
     ![
@@ -444,7 +444,7 @@ assert(
 
   const playCount = plays.length;
   combatAudio.playPointFireSound({ e: EVENT.PANZERFAUST_CONVERSION, id: 31 });
-  assert(plays.length === playCount, "Panzerfaust conversion does not play a combat cue");
+  assert(plays.length === playCount, "Legacy Panzerfaust conversion does not play a combat cue");
 }
 
 // ---------------------------------------------------------------------------

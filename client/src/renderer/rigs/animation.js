@@ -97,6 +97,7 @@ export function createRigRenderContext(entity, {
     lowOil,
     oilStarved,
     fuelCueVisible: lowOil || oilStarved,
+    panzerfaustLoaded: entity.panzerfaustLoaded !== false,
   };
   Object.defineProperty(context, RIG_CONTEXT_READY, { value: true });
   return context;

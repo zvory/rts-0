@@ -4,7 +4,6 @@ use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::entity::{
     BuildPhase, Entity, EntityKind, EntityStore, MovePhase, Order, OrderIntent, MAX_QUEUED_ORDERS,
 };
-use crate::game::entrenchment_combat;
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::mortar::MortarShellStore;
@@ -14,8 +13,6 @@ use crate::game::services::ability_orders::{
     order_or_launch_world_ability, world_ability_facing_ready,
 };
 use crate::game::services::construction::resumable_site_for_build_intent;
-use crate::game::services::dist2;
-use crate::game::services::line_of_sight::LineOfSight;
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::movement::angle_delta;
 use crate::game::services::order_execution::targeting::{
@@ -33,8 +30,12 @@ use crate::game::PlayerState;
 use crate::protocol::{Event, NoticeSeverity};
 use crate::rules;
 use std::collections::BTreeMap;
+
+use self::attack::{attack_can_fire_now, panzerfaust_attack_cycle_active};
+
+mod attack;
+
 const ATTACK_UNREACHABLE_PROMOTION_CHECKS: u16 = 3;
-const ATTACK_RANGE_SLACK_PX: f32 = 4.0;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 struct PointPromotionKey {
     owner: u32,
@@ -586,39 +587,11 @@ fn attack_order_complete(
     ) {
         return true;
     }
+    if panzerfaust_attack_cycle_active(attacker) {
+        return false;
+    }
     attacker.attack_unreachable_checks() >= ATTACK_UNREACHABLE_PROMOTION_CHECKS
         && !attack_can_fire_now(map, entities, attacker, target)
-}
-
-fn attack_can_fire_now(map: &Map, entities: &EntityStore, attacker: &Entity, target: u32) -> bool {
-    let Some(target) = entities.get(target) else {
-        return false;
-    };
-    let Some(stats) = config::unit_stats(attacker.kind) else {
-        return false;
-    };
-    let dmg = if attacker.kind == EntityKind::Panzerfaust {
-        config::PANZERFAUST_DAMAGE
-    } else {
-        stats.dmg
-    };
-    if dmg == 0 {
-        return false;
-    }
-    let range_tiles = if attacker.kind == EntityKind::Panzerfaust {
-        entrenchment_combat::attack_range_tiles(attacker, config::PANZERFAUST_RANGE_TILES as f32)
-    } else {
-        stats.range_tiles as f32
-    };
-    let range_px =
-        range_tiles * config::TILE_SIZE as f32 + attacker.radius() + ATTACK_RANGE_SLACK_PX;
-    if dist2(attacker.pos_x, attacker.pos_y, target.pos_x, target.pos_y) > range_px * range_px {
-        return false;
-    }
-    LineOfSight::new(map).clear_between_world_points(
-        (attacker.pos_x, attacker.pos_y),
-        (target.pos_x, target.pos_y),
-    )
 }
 
 fn deployed_anti_tank_gun_target_outside_arc(entities: &EntityStore, id: u32, target: u32) -> bool {

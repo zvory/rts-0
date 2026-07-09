@@ -13,7 +13,7 @@ fn player(id: u32, team_id: u32, name: &str, color: &str) -> PlayerInit {
     }
 }
 
-fn panzerfaust_players() -> [PlayerInit; 3] {
+pub(super) fn panzerfaust_players() -> [PlayerInit; 3] {
     [
         player(1, 1, "One", "#fff"),
         player(2, 2, "Two", "#000"),
@@ -21,14 +21,14 @@ fn panzerfaust_players() -> [PlayerInit; 3] {
     ]
 }
 
-fn refresh_world(game: &mut Game) {
+pub(super) fn refresh_world(game: &mut Game) {
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
     game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
 }
 
-fn spawn_unit_on_tile(
+pub(super) fn spawn_unit_on_tile(
     game: &mut Game,
     owner: u32,
     kind: EntityKind,
@@ -42,7 +42,26 @@ fn spawn_unit_on_tile(
         .expect("unit should spawn")
 }
 
-fn make_invulnerable(game: &mut Game, id: u32) {
+pub(super) fn spawn_building_on_tile(
+    game: &mut Game,
+    owner: u32,
+    kind: EntityKind,
+    tile_x: u32,
+    tile_y: u32,
+) -> u32 {
+    let pos = crate::game::services::occupancy::footprint_center(
+        &game.state.map,
+        kind,
+        tile_x,
+        tile_y,
+    );
+    game.state
+        .entities
+        .spawn_building(owner, kind, pos.0, pos.1, true)
+        .expect("building should spawn")
+}
+
+pub(super) fn make_invulnerable(game: &mut Game, id: u32) {
     game.state
         .entities
         .get_mut(id)
@@ -106,26 +125,36 @@ pub(super) fn panzerfaust_damage_to(victim_kind: EntityKind) -> u32 {
 }
 
 #[test]
-fn spawned_panzerfaust_direct_attack_damages_tank_and_converts_same_id() {
+fn spawned_panzerfaust_direct_attack_damages_tank_reloads_and_fires_again() {
     let (mut game, panzerfaust, tank) = panzerfaust_fixture();
     let tank_hp = game.state.entities.get(tank).expect("tank exists").hp;
     enqueue_attack(&mut game, panzerfaust, tank, false);
 
-    let mut owner_saw_launch = false;
+    let mut owner_launch_ticks = Vec::new();
     let mut owner_saw_impact = false;
     let mut owner_saw_conversion = false;
     let mut uninvolved_saw_panzerfaust_event = false;
     let mut tank_hp_on_impact = None;
-    for _ in 0..70 {
+    let mut snapshot_reported_unloaded = false;
+    for tick in 1..160 {
         let events = game.tick();
-        owner_saw_launch |= player_events(&events, 1).iter().any(
+        if player_events(&events, 1).iter().any(
             |event| matches!(event, Event::PanzerfaustLaunch { from, .. } if *from == panzerfaust),
-        );
+        ) {
+            owner_launch_ticks.push(tick);
+        }
         let impact_this_tick = player_events(&events, 1)
             .iter()
             .any(|event| matches!(event, Event::PanzerfaustImpact { .. }));
         if impact_this_tick && tank_hp_on_impact.is_none() {
             tank_hp_on_impact = game.state.entities.get(tank).map(|tank| tank.hp);
+            snapshot_reported_unloaded = game
+                .snapshot_for(1)
+                .entities
+                .iter()
+                .find(|entity| entity.id == panzerfaust)
+                .and_then(|entity| entity.panzerfaust_loaded)
+                == Some(false);
         }
         owner_saw_impact |= impact_this_tick;
         owner_saw_conversion |= player_events(&events, 1).iter().any(|event| {
@@ -146,24 +175,32 @@ fn spawned_panzerfaust_direct_attack_damages_tank_and_converts_same_id() {
         tank_hp_on_impact,
         Some(tank_hp.saturating_sub(panzerfaust_damage_to(EntityKind::Tank)))
     );
-    let converted = game.state.entities
+    let reloading = game.state.entities
         .get(panzerfaust)
         .expect("same entity id should remain");
-    assert_eq!(converted.kind, EntityKind::Rifleman);
-    assert_eq!(converted.owner, 1);
-    assert_eq!(converted.hp, 45);
-    assert_eq!(
-        converted
+    assert_eq!(reloading.kind, EntityKind::Panzerfaust);
+    assert_eq!(reloading.owner, 1);
+    assert_eq!(reloading.hp, 45);
+    assert!(
+        reloading
             .combat
             .as_ref()
-            .expect("converted Rifleman should have combat state")
-            .panzerfaust,
-        None,
-        "same-id conversion must clear loaded Panzerfaust timers and target filters"
+            .expect("Panzerfaust should have combat state")
+            .panzerfaust
+            .is_some(),
+        "Panzerfaust should keep its loaded-shot runtime instead of converting"
     );
-    assert!(owner_saw_launch);
+    assert!(owner_launch_ticks.len() >= 2);
+    assert!(
+        owner_launch_ticks[1]
+            > owner_launch_ticks[0]
+                + config::PANZERFAUST_TRAVEL_TICKS
+                + u32::from(config::PANZERFAUST_RECOVERY_TICKS),
+        "second launch should wait for projectile travel plus the full reload"
+    );
     assert!(owner_saw_impact);
-    assert!(owner_saw_conversion);
+    assert!(!owner_saw_conversion);
+    assert!(snapshot_reported_unloaded);
     assert!(!uninvolved_saw_panzerfaust_event);
 }
 
@@ -211,7 +248,7 @@ fn panzerfaust_direct_attack_can_damage_owned_tank_targets() {
 }
 
 #[test]
-fn direct_attack_conversion_completes_consumed_order_and_promotes_queued_move() {
+fn direct_attack_reload_keeps_attack_order_and_delays_queued_move() {
     let (mut game, panzerfaust, tank) = panzerfaust_fixture();
     let start = game.state.entities
         .get(panzerfaust)
@@ -229,26 +266,30 @@ fn direct_attack_conversion_completes_consumed_order_and_promotes_queued_move() 
         },
     );
 
-    let mut saw_conversion = false;
     for _ in 0..120 {
-        let events = game.tick();
-        saw_conversion |= player_events(&events, 1).iter().any(
-            |event| matches!(event, Event::PanzerfaustConversion { id, .. } if *id == panzerfaust),
-        );
+        game.tick();
     }
 
-    let converted = game.state.entities
+    let reloading = game.state.entities
         .get(panzerfaust)
         .expect("same entity id should remain");
-    assert!(saw_conversion);
-    assert_eq!(converted.kind, EntityKind::Rifleman);
+    assert_eq!(reloading.kind, EntityKind::Panzerfaust);
     assert!(
-        !matches!(converted.order(), Order::Attack(_)),
-        "the consumed loaded shot should not leave a direct attack order active"
+        matches!(reloading.order(), Order::Attack(_)),
+        "reloadable Panzerfaust should keep the direct attack until the target is gone"
+    );
+    assert_eq!(
+        reloading.queued_orders().len(),
+        1,
+        "queued movement should remain queued while the direct attack is active"
     );
     assert!(
-        distance_sq((converted.pos_x, converted.pos_y), start) > 4.0,
-        "queued movement should resume after same-id conversion"
+        reloading.path_is_empty(),
+        "queued movement should not start pathing while the direct attack remains active"
+    );
+    assert!(
+        distance_sq((reloading.pos_x, reloading.pos_y), start) < 16.0,
+        "direct attack should only allow incidental combat-position drift before the queued move starts"
     );
 }
 
@@ -274,7 +315,7 @@ fn spawned_panzerfaust_rejects_direct_attack_on_non_loaded_shot_target() {
 }
 
 #[test]
-fn spawned_panzerfaust_direct_attack_damages_scout_car_and_converts_same_id() {
+fn spawned_panzerfaust_direct_attack_damages_scout_car_and_reloads() {
     let players = panzerfaust_players();
     let mut game = empty_flat_game(&players);
     let panzerfaust = spawn_unit_on_tile(&mut game, 1, EntityKind::Panzerfaust, 8, 8);
@@ -310,128 +351,17 @@ fn spawned_panzerfaust_direct_attack_damages_scout_car_and_converts_same_id() {
         game.state.entities.get(scout).is_none(),
         "Scout Car should be a legal Panzerfaust target and die to the hit"
     );
-    let converted = game.state.entities
+    let reloading = game.state.entities
         .get(panzerfaust)
         .expect("same entity id should remain");
-    assert_eq!(converted.kind, EntityKind::Rifleman);
+    assert_eq!(reloading.kind, EntityKind::Panzerfaust);
     assert!(owner_saw_launch);
     assert!(owner_saw_scout_death);
 }
 
 #[test]
-fn attack_move_acquires_tanks_but_plain_move_does_not_auto_fire() {
-    let (mut moving_game, moving_panzerfaust, moving_tank) = panzerfaust_fixture();
-    let moving_tank_hp = moving_game
-        .state.entities
-        .get(moving_tank)
-        .expect("tank exists")
-        .hp;
-    let move_goal = moving_game.state.map.tile_center(20, 8);
-    moving_game.enqueue(
-        1,
-        Command::Move {
-            units: vec![moving_panzerfaust],
-            x: move_goal.0,
-            y: move_goal.1,
-            queued: false,
-        },
-    );
-    let mut move_launched = false;
-    for _ in 0..50 {
-        let events = moving_game.tick();
-        move_launched |= player_events(&events, 1)
-            .iter()
-            .any(|event| matches!(event, Event::PanzerfaustLaunch { .. }));
-    }
-    assert_eq!(
-        moving_game
-            .state.entities
-            .get(moving_tank)
-            .expect("tank exists")
-            .hp,
-        moving_tank_hp
-    );
-    assert!(!move_launched);
-
-    let (mut attack_move_game, attack_move_panzerfaust, attack_move_tank) = panzerfaust_fixture();
-    let attack_move_tank_hp = attack_move_game
-        .state.entities
-        .get(attack_move_tank)
-        .expect("tank exists")
-        .hp;
-    let attack_move_goal = attack_move_game.state.map.tile_center(20, 8);
-    attack_move_game.enqueue(
-        1,
-        Command::AttackMove {
-            units: vec![attack_move_panzerfaust],
-            x: attack_move_goal.0,
-            y: attack_move_goal.1,
-            queued: false,
-        },
-    );
-    let mut attack_move_impact_hp = None;
-    for _ in 0..70 {
-        let events = attack_move_game.tick();
-        let impact_this_tick = player_events(&events, 1)
-            .iter()
-            .any(|event| matches!(event, Event::PanzerfaustImpact { .. }));
-        if impact_this_tick && attack_move_impact_hp.is_none() {
-            attack_move_impact_hp = attack_move_game
-                .state.entities
-                .get(attack_move_tank)
-                .map(|tank| tank.hp);
-        }
-    }
-    assert_eq!(
-        attack_move_impact_hp,
-        Some(attack_move_tank_hp.saturating_sub(panzerfaust_damage_to(EntityKind::Tank)))
-    );
-}
-
-#[test]
-fn attack_move_acquires_scout_cars() {
-    let players = panzerfaust_players();
-    let mut game = empty_flat_game(&players);
-    let panzerfaust = spawn_unit_on_tile(&mut game, 1, EntityKind::Panzerfaust, 8, 8);
-    let scout = spawn_unit_on_tile(&mut game, 2, EntityKind::ScoutCar, 11, 8);
-    make_invulnerable(&mut game, panzerfaust);
-    refresh_world(&mut game);
-
-    let attack_move_goal = game.state.map.tile_center(20, 8);
-    game.enqueue(
-        1,
-        Command::AttackMove {
-            units: vec![panzerfaust],
-            x: attack_move_goal.0,
-            y: attack_move_goal.1,
-            queued: false,
-        },
-    );
-
-    let mut owner_saw_launch = false;
-    let mut owner_saw_scout_death = false;
-    for _ in 0..70 {
-        let events = game.tick();
-        owner_saw_launch |= player_events(&events, 1).iter().any(
-            |event| matches!(event, Event::PanzerfaustLaunch { from, .. } if *from == panzerfaust),
-        );
-        owner_saw_scout_death |= player_events(&events, 1).iter().any(|event| {
-            matches!(event, Event::Death { id, kind, .. }
-                if *id == scout && kind == crate::protocol::kinds::SCOUT_CAR)
-        });
-    }
-
-    assert!(owner_saw_launch);
-    assert!(owner_saw_scout_death);
-    assert!(
-        game.state.entities.get(scout).is_none(),
-        "attack-move Panzerfaust should auto-acquire Scout Cars"
-    );
-}
-
-#[test]
-fn methamphetamines_shortens_windup_and_recovery_timing() {
-    fn conversion_tick(has_methamphetamines: bool) -> u32 {
+fn methamphetamines_shortens_windup_but_not_reload_timing() {
+    fn launch_tick(has_methamphetamines: bool) -> u32 {
         let (mut game, panzerfaust, tank) = panzerfaust_fixture();
         if has_methamphetamines {
             game.state.players
@@ -446,24 +376,25 @@ fn methamphetamines_shortens_windup_and_recovery_timing() {
             let events = game.tick();
             if player_events(&events, 1)
                 .iter()
-                .any(|event| matches!(event, Event::PanzerfaustConversion { id, .. } if *id == panzerfaust))
+                .any(|event| matches!(event, Event::PanzerfaustLaunch { from, .. } if *from == panzerfaust))
             {
                 return tick;
             }
         }
-        panic!("Panzerfaust did not convert within test window");
+        panic!("Panzerfaust did not launch within test window");
     }
 
-    let normal = conversion_tick(false);
-    let boosted = conversion_tick(true);
+    let normal = launch_tick(false);
+    let boosted = launch_tick(true);
     assert_eq!(
         normal - boosted,
         u32::from(
             config::PANZERFAUST_WINDUP_TICKS - config::METHAMPHETAMINES_PANZERFAUST_WINDUP_TICKS
-        ) + u32::from(
-            config::PANZERFAUST_RECOVERY_TICKS
-                - config::METHAMPHETAMINES_PANZERFAUST_RECOVERY_TICKS
         )
+    );
+    assert_eq!(
+        config::PANZERFAUST_RECOVERY_TICKS,
+        config::METHAMPHETAMINES_PANZERFAUST_RECOVERY_TICKS
     );
 }
 
@@ -562,19 +493,19 @@ fn hold_position_uses_only_current_entrenched_panzerfaust_range() {
         entrenched_impact_hp,
         Some(entrenched_tank_hp.saturating_sub(panzerfaust_damage_to(EntityKind::Tank)))
     );
-    let converted = entrenched_game
+    let reloading = entrenched_game
         .state.entities
         .get(entrenched_panzerfaust)
         .expect("entrenched Panzerfaust should keep the same id");
-    assert!(saw_entrenched_conversion);
-    assert_eq!(converted.kind, EntityKind::Rifleman);
+    assert!(!saw_entrenched_conversion);
+    assert_eq!(reloading.kind, EntityKind::Panzerfaust);
     assert_eq!(
-        converted
+        reloading
             .movement
             .as_ref()
             .and_then(|movement| movement.occupied_trench_id),
         Some(trench),
-        "same-id conversion should preserve active trench occupation"
+        "reload should preserve active trench occupation"
     );
 }
 
@@ -641,7 +572,7 @@ fn target_death_during_windup_cancels_without_spending_shot() {
 }
 
 #[test]
-fn panzerfaust_killed_during_windup_does_not_launch_or_convert() {
+fn panzerfaust_killed_during_windup_does_not_launch() {
     let (mut game, panzerfaust, tank) = panzerfaust_fixture();
     game.state.entities
         .get_mut(panzerfaust)
@@ -678,11 +609,11 @@ fn panzerfaust_killed_during_windup_does_not_launch_or_convert() {
 
     assert!(
         game.state.entities.get(panzerfaust).is_none(),
-        "dead Panzerfaust should be removed instead of converting"
+        "dead Panzerfaust should be removed"
     );
     assert!(
         !saw_panzerfaust_combat_event,
-        "dead Panzerfaust windup must not leak launch, impact, or conversion events"
+        "dead Panzerfaust windup must not leak launch, impact, or legacy conversion events"
     );
     assert!(
         saw_death_as_panzerfaust,
@@ -691,7 +622,7 @@ fn panzerfaust_killed_during_windup_does_not_launch_or_convert() {
 }
 
 #[test]
-fn panzerfaust_killed_during_recovery_does_not_convert_after_death() {
+fn panzerfaust_killed_during_reload_does_not_emit_conversion_after_death() {
     let (mut game, panzerfaust, _tank) = panzerfaust_fixture();
     {
         let entity = game.state.entities
@@ -715,19 +646,19 @@ fn panzerfaust_killed_during_recovery_does_not_convert_after_death() {
         player_events(&events, 1)
             .iter()
             .all(|event| !matches!(event, Event::PanzerfaustConversion { .. })),
-        "recovery should not convert after the entity has already died"
+        "reload should not emit conversion after the entity has already died"
     );
     assert!(
         player_events(&events, 1).iter().any(|event| {
             matches!(event, Event::Death { id, kind, .. }
                 if *id == panzerfaust && kind == crate::protocol::kinds::PANZERFAUST)
         }),
-        "death cleanup should retain the Panzerfaust kind rather than converting first"
+        "death cleanup should retain the Panzerfaust kind"
     );
 }
 
 #[test]
-fn replacing_order_after_launch_spends_shot_and_resumes_after_conversion() {
+fn replacing_order_after_launch_spends_shot_and_resumes_movement_during_reload() {
     let (mut game, panzerfaust, tank) = panzerfaust_fixture();
     let start = game.state.entities
         .get(panzerfaust)
@@ -782,14 +713,14 @@ fn replacing_order_after_launch_spends_shot_and_resumes_after_conversion() {
         impact_hp,
         Some(tank_hp.saturating_sub(panzerfaust_damage_to(EntityKind::Tank)))
     );
-    let converted = game.state.entities
+    let reloading = game.state.entities
         .get(panzerfaust)
         .expect("same entity id should remain");
-    assert!(saw_conversion);
-    assert_eq!(converted.kind, EntityKind::Rifleman);
+    assert!(!saw_conversion);
+    assert_eq!(reloading.kind, EntityKind::Panzerfaust);
     assert!(
-        distance_sq((converted.pos_x, converted.pos_y), start) > 4.0,
-        "replacement movement should resume after the spent shot completes"
+        distance_sq((reloading.pos_x, reloading.pos_y), start) > 4.0,
+        "replacement movement should resume while the spent shot reloads"
     );
 }
 
@@ -854,7 +785,7 @@ fn impact_visual_uses_launch_endpoint_after_target_leaves_visibility() {
 }
 
 #[test]
-fn target_death_during_travel_spends_shot_and_still_converts() {
+fn target_death_during_travel_spends_shot_and_reloads() {
     let (mut game, panzerfaust, tank) = panzerfaust_fixture();
     enqueue_attack(&mut game, panzerfaust, tank, false);
 
@@ -880,7 +811,7 @@ fn target_death_during_travel_spends_shot_and_still_converts() {
 
     let mut saw_impact = false;
     let mut saw_conversion = false;
-    for _ in 0..60 {
+    for _ in 0..120 {
         let events = game.tick();
         saw_impact |= player_events(&events, 1)
             .iter()
@@ -896,8 +827,12 @@ fn target_death_during_travel_spends_shot_and_still_converts() {
             .get(panzerfaust)
             .expect("panzerfaust id should remain")
             .kind,
-        EntityKind::Rifleman
+        EntityKind::Panzerfaust
     );
     assert!(saw_impact);
-    assert!(saw_conversion);
+    assert!(!saw_conversion);
+    assert_eq!(
+        panzerfaust_state_of(&game, panzerfaust),
+        Some(PanzerfaustState::Loaded)
+    );
 }
