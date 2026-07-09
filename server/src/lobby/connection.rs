@@ -1054,6 +1054,80 @@ impl CommandTimingWindow {
     }
 }
 
+fn fetch_max(target: &AtomicU32, value: u32) {
+    let mut current = target.load(Ordering::Relaxed);
+    while value > current {
+        match target.compare_exchange_weak(current, value, Ordering::Relaxed, Ordering::Relaxed) {
+            Ok(_) => break,
+            Err(next) => current = next,
+        }
+    }
+}
+
+fn duration_since_ms_u32(start: StdInstant) -> u32 {
+    start.elapsed().as_millis().min(u32::MAX as u128) as u32
+}
+
+fn merge_resource_deltas(snapshot: &mut Snapshot, previous: &[ResourceDelta]) {
+    if previous.is_empty() {
+        return;
+    }
+    for old in previous {
+        if !snapshot.resource_deltas.iter().any(|d| d.id == old.id) {
+            snapshot.resource_deltas.push(old.clone());
+        }
+    }
+    snapshot.resource_deltas.sort_by_key(|d| d.id);
+}
+
+/// Send to one player's sink without ever blocking the room task. Reliable messages use a bounded
+/// FIFO; snapshots and observer analysis use replaceable latest-only slots.
+pub(super) fn send_or_log(
+    room: &str,
+    player_id: u32,
+    tx: &ConnectionSink,
+    msg: ServerMessage,
+) -> Option<SnapshotSendStatus> {
+    match msg {
+        ServerMessage::Snapshot(snapshot) => match tx.try_send_snapshot(snapshot) {
+            SnapshotSendStatus::Stored => Some(SnapshotSendStatus::Stored),
+            SnapshotSendStatus::Replaced => {
+                crate::log_debug!(room = %room, player_id, "coalesced pending snapshot");
+                Some(SnapshotSendStatus::Replaced)
+            }
+            SnapshotSendStatus::Closed => {
+                crate::log_debug!(room = %room, player_id, "snapshot sink closed; client gone");
+                Some(SnapshotSendStatus::Closed)
+            }
+        },
+        ServerMessage::ObserverAnalysis(payload) => {
+            match tx.try_send_observer_analysis(payload) {
+                LatestOnlySendStatus::Stored => {}
+                LatestOnlySendStatus::Replaced => {
+                    crate::log_debug!(room = %room, player_id, "coalesced pending observer analysis");
+                }
+                LatestOnlySendStatus::Closed => {
+                    crate::log_debug!(room = %room, player_id, "observer analysis sink closed; client gone");
+                }
+            }
+            None
+        }
+        reliable => {
+            if let Err(err) = tx.try_send_reliable(reliable) {
+                match err {
+                    mpsc::error::TrySendError::Full(_) => {
+                        crate::log_warn!(room = %room, player_id, "reliable outbound queue full; dropping message");
+                    }
+                    mpsc::error::TrySendError::Closed(_) => {
+                        crate::log_debug!(room = %room, player_id, "reliable outbound channel closed; client gone");
+                    }
+                }
+            }
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1225,79 +1299,5 @@ mod tests {
 
         assert!(writer.snapshots.take().is_none());
         assert!(writer.observer_analysis.take().is_none());
-    }
-}
-
-fn fetch_max(target: &AtomicU32, value: u32) {
-    let mut current = target.load(Ordering::Relaxed);
-    while value > current {
-        match target.compare_exchange_weak(current, value, Ordering::Relaxed, Ordering::Relaxed) {
-            Ok(_) => break,
-            Err(next) => current = next,
-        }
-    }
-}
-
-fn duration_since_ms_u32(start: StdInstant) -> u32 {
-    start.elapsed().as_millis().min(u32::MAX as u128) as u32
-}
-
-fn merge_resource_deltas(snapshot: &mut Snapshot, previous: &[ResourceDelta]) {
-    if previous.is_empty() {
-        return;
-    }
-    for old in previous {
-        if !snapshot.resource_deltas.iter().any(|d| d.id == old.id) {
-            snapshot.resource_deltas.push(old.clone());
-        }
-    }
-    snapshot.resource_deltas.sort_by_key(|d| d.id);
-}
-
-/// Send to one player's sink without ever blocking the room task. Reliable messages use a bounded
-/// FIFO; snapshots and observer analysis use replaceable latest-only slots.
-pub(super) fn send_or_log(
-    room: &str,
-    player_id: u32,
-    tx: &ConnectionSink,
-    msg: ServerMessage,
-) -> Option<SnapshotSendStatus> {
-    match msg {
-        ServerMessage::Snapshot(snapshot) => match tx.try_send_snapshot(snapshot) {
-            SnapshotSendStatus::Stored => Some(SnapshotSendStatus::Stored),
-            SnapshotSendStatus::Replaced => {
-                crate::log_debug!(room = %room, player_id, "coalesced pending snapshot");
-                Some(SnapshotSendStatus::Replaced)
-            }
-            SnapshotSendStatus::Closed => {
-                crate::log_debug!(room = %room, player_id, "snapshot sink closed; client gone");
-                Some(SnapshotSendStatus::Closed)
-            }
-        },
-        ServerMessage::ObserverAnalysis(payload) => {
-            match tx.try_send_observer_analysis(payload) {
-                LatestOnlySendStatus::Stored => {}
-                LatestOnlySendStatus::Replaced => {
-                    crate::log_debug!(room = %room, player_id, "coalesced pending observer analysis");
-                }
-                LatestOnlySendStatus::Closed => {
-                    crate::log_debug!(room = %room, player_id, "observer analysis sink closed; client gone");
-                }
-            }
-            None
-        }
-        reliable => {
-            if let Err(err) = tx.try_send_reliable(reliable) {
-                match err {
-                    mpsc::error::TrySendError::Full(_) => {
-                        crate::log_warn!(room = %room, player_id, "reliable outbound queue full; dropping message");
-                    }
-                    mpsc::error::TrySendError::Closed(_) => {
-                        crate::log_debug!(room = %room, player_id, "reliable outbound channel closed; client gone");
-                    }
-                }
-            }
-            None
-        }
     }
 }
