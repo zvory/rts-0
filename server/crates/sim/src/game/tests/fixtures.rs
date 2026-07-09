@@ -227,8 +227,8 @@ pub(super) fn smoke_command_fixture() -> (Game, u32, (f32, f32), (f32, f32)) {
     }
 
     let scout_pos = game.state.map.tile_center(8, 8);
-    let target = game.state.map.tile_center(20, 8);
-    let second_target = game.state.map.tile_center(21, 10);
+    let target = game.state.map.tile_center(24, 8);
+    let second_target = game.state.map.tile_center(25, 10);
     let scout = game.state.entities
         .spawn_unit(1, EntityKind::ScoutCar, scout_pos.0, scout_pos.1)
         .expect("scout car should spawn");
