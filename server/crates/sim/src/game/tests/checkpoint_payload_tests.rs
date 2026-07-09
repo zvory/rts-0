@@ -1,8 +1,9 @@
 use super::checkpoint_helpers::{
     assert_equivalent_games, checkpoint_payload_text_for, restore_checkpoint_and_assert_equivalent,
-    tick_pair_and_assert_equivalent,
+    tick_pair_and_assert_equivalent, tick_pair_for,
 };
 use super::fixtures::human_vs_ai_players;
+use super::panzerfaust_tests::{enqueue_attack, panzerfaust_fixture, player_events};
 use super::*;
 use crate::game::checkpoint::CheckpointPayloadError;
 
@@ -18,6 +19,117 @@ fn checkpoint_payload_round_trips_through_text_and_normalizes_output() {
         &mut restored,
         "basic payload continuation after text import",
     );
+}
+
+#[test]
+fn checkpoint_payload_round_trips_panzerfaust_shot_in_flight() {
+    let (mut baseline, panzerfaust, tank) = panzerfaust_fixture();
+    enqueue_attack(&mut baseline, panzerfaust, tank, false);
+    tick_until_panzerfaust_launch(&mut baseline);
+
+    let mut restored =
+        restore_checkpoint_and_assert_equivalent(&baseline, "panzerfaust in-flight round trip");
+    tick_pair_for(
+        &mut baseline,
+        &mut restored,
+        crate::config::PANZERFAUST_TRAVEL_TICKS + 5,
+        "panzerfaust in-flight continuation",
+    );
+}
+
+#[test]
+fn checkpoint_payload_backfills_legacy_panzerfaust_shot_in_flight() {
+    let (mut baseline, panzerfaust, tank) = panzerfaust_fixture();
+    enqueue_attack(&mut baseline, panzerfaust, tank, false);
+    tick_until_panzerfaust_launch(&mut baseline);
+
+    let text = checkpoint_payload_text_for(&baseline, "legacy panzerfaust in-flight fixture");
+    let legacy_text = mutate_payload(&text, |value| {
+        value
+            .as_object_mut()
+            .expect("checkpoint payload should be an object")
+            .remove("panzerfaustShots");
+    });
+    let mut restored = Game::restore_checkpoint_payload_text_for_test(
+        &legacy_text,
+        baseline.state.map.clone(),
+        baseline.map_metadata().clone(),
+    )
+    .expect("legacy payload without panzerfaustShots should restore");
+
+    assert_equivalent_games(&baseline, &restored, "legacy panzerfaust backfill");
+    tick_pair_for(
+        &mut baseline,
+        &mut restored,
+        crate::config::PANZERFAUST_TRAVEL_TICKS + 5,
+        "legacy panzerfaust in-flight continuation",
+    );
+}
+
+#[test]
+fn checkpoint_payload_rejects_invalid_panzerfaust_shot_state() {
+    let (mut game, panzerfaust, tank) = panzerfaust_fixture();
+    enqueue_attack(&mut game, panzerfaust, tank, false);
+    tick_until_panzerfaust_launch(&mut game);
+    let text = checkpoint_payload_text_for(&game, "invalid panzerfaust shot payload fixture");
+
+    let stale_owner = mutate_payload(&text, |value| {
+        value["panzerfaustShots"]["shots"][0]["owner"] = serde_json::json!(999);
+    });
+    assert!(matches!(
+        Game::restore_checkpoint_payload_text_for_test(
+            &stale_owner,
+            game.state.map.clone(),
+            game.map_metadata().clone(),
+        ),
+        Err(CheckpointPayloadError::InvalidReference {
+            field: "panzerfaustShots.owner",
+            id: 999
+        })
+    ));
+
+    let stale_target = mutate_payload(&text, |value| {
+        value["panzerfaustShots"]["shots"][0]["target"] = serde_json::json!(999);
+    });
+    assert!(matches!(
+        Game::restore_checkpoint_payload_text_for_test(
+            &stale_target,
+            game.state.map.clone(),
+            game.map_metadata().clone(),
+        ),
+        Err(CheckpointPayloadError::InvalidReference {
+            field: "panzerfaustShots.target",
+            id: 999
+        })
+    ));
+
+    let out_of_world_impact = mutate_payload(&text, |value| {
+        value["panzerfaustShots"]["shots"][0]["impact_x"] = serde_json::json!(-1.0);
+    });
+    assert!(matches!(
+        Game::restore_checkpoint_payload_text_for_test(
+            &out_of_world_impact,
+            game.state.map.clone(),
+            game.map_metadata().clone(),
+        ),
+        Err(CheckpointPayloadError::InvalidValue {
+            field: "panzerfaustShots.impact",
+        })
+    ));
+
+    let already_due = mutate_payload(&text, |value| {
+        value["panzerfaustShots"]["shots"][0]["impact_tick"] = value["tick"].clone();
+    });
+    assert!(matches!(
+        Game::restore_checkpoint_payload_text_for_test(
+            &already_due,
+            game.state.map.clone(),
+            game.map_metadata().clone(),
+        ),
+        Err(CheckpointPayloadError::InvalidValue {
+            field: "panzerfaustShots.impactTick",
+        })
+    ));
 }
 
 #[test]
@@ -326,4 +438,17 @@ fn mutate_payload(text: &str, mutate: impl FnOnce(&mut serde_json::Value)) -> St
     let mut value: serde_json::Value = serde_json::from_str(text).expect("valid checkpoint JSON");
     mutate(&mut value);
     serde_json::to_string(&value).expect("mutated checkpoint JSON")
+}
+
+fn tick_until_panzerfaust_launch(game: &mut Game) {
+    for _ in 0..30 {
+        let events = game.tick();
+        if player_events(&events, 1)
+            .iter()
+            .any(|event| matches!(event, Event::PanzerfaustLaunch { .. }))
+        {
+            return;
+        }
+    }
+    panic!("test setup should reach Panzerfaust launch before checkpointing");
 }

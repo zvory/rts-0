@@ -20,7 +20,7 @@
     },
     {
       "path": "server/crates/archcheck/src/lib.rs",
-      "lines": 2461,
+      "lines": 2459,
       "reason": "Checkpoint Phase 7 expands the existing oversized architecture checker with state-owner checkpoint policy/evidence enforcement; keep ratcheting until archcheck scanners and tests are split into modules."
     },
     {
@@ -30,8 +30,8 @@
     },
     {
       "path": "server/crates/sim/src/game/services/combat/tests.rs",
-      "lines": 3718,
-      "reason": "Tank target priority regression coverage extended the existing oversized sim combat test module; keep ratcheting until combat tests are split."
+      "lines": 3722,
+      "reason": "Panzerfaust shot persistence adds detached shot-store plumbing to the existing oversized sim combat test harness; keep ratcheting until combat tests are split."
     },
     {
       "path": "server/crates/sim/src/game/services/commands.rs",
@@ -60,7 +60,7 @@
     },
     {
       "path": "server/src/main.rs",
-      "lines": 1846,
+      "lines": 1845,
       "reason": "Snapshot lifecycle diagnostics added writer serialization/send timing to the existing oversized server shell; keep ratcheting until connection writer handling is split."
     },
     {

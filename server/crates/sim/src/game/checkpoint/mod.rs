@@ -11,6 +11,7 @@ use super::firing_reveal::FiringRevealSource;
 use super::fog::{Fog, LingeringSightSource};
 use super::map::Map;
 use super::mortar::MortarShellStore;
+use super::panzerfaust_shot::PanzerfaustShotStore;
 use super::replay::CommandLogEntry;
 use super::setup::StartingLoadout;
 use super::smoke::SmokeCloudStore;
@@ -56,6 +57,7 @@ const MAX_SMOKE_CLOUDS: usize = 256;
 const MAX_TRENCHES: usize = 4_096;
 const MAX_SCHEDULED_MORTAR_SHELLS: usize = 4_096;
 const MAX_SCHEDULED_ARTILLERY_SHELLS: usize = 4_096;
+const MAX_SCHEDULED_PANZERFAUST_SHOTS: usize = 4_096;
 const MAX_COMPLETED_UPGRADES_PER_PLAYER: usize = 32;
 const MAX_UNITS_PER_CHECKPOINT_COMMAND: usize = 4_096;
 
@@ -136,6 +138,8 @@ struct GameCheckpointV1 {
     ability_runtime: AbilityRuntime,
     mortar_shells: MortarShellStore,
     artillery_shells: ArtilleryShellStore,
+    #[serde(default)]
+    panzerfaust_shots: PanzerfaustShotStore,
     active_construction_sites: BTreeSet<u32>,
     lab_god_mode_players: BTreeSet<u32>,
 }
@@ -173,6 +177,7 @@ impl GameCheckpointV1 {
             ability_runtime: state.ability_runtime.clone(),
             mortar_shells: state.mortar_shells.clone(),
             artillery_shells: state.artillery_shells.clone(),
+            panzerfaust_shots: state.panzerfaust_shots.clone(),
             active_construction_sites: state.active_construction_sites.clone(),
             lab_god_mode_players: state.lab_god_mode_players.clone(),
         };
@@ -209,9 +214,13 @@ impl GameCheckpointV1 {
         map_metadata: MapMetadata,
     ) -> Result<GameState, CheckpointPayloadError> {
         self.validate_against(&map, &map_metadata)?;
+        let entities = self.entities.into_store();
+        let panzerfaust_shots = self
+            .panzerfaust_shots
+            .backfill_legacy_in_flight(&entities, self.tick);
         Ok(GameState {
             map,
-            entities: self.entities.into_store(),
+            entities,
             fog: self.fog.into_fog(),
             building_memory: self.building_memory.into_memory(),
             players: serde_convert(&self.players)?,
@@ -225,6 +234,7 @@ impl GameCheckpointV1 {
             ability_runtime: self.ability_runtime,
             mortar_shells: self.mortar_shells,
             artillery_shells: self.artillery_shells,
+            panzerfaust_shots,
             seed: self.seed,
             starting_loadouts: self.starting_loadouts,
             map_metadata,
@@ -285,6 +295,11 @@ impl GameCheckpointV1 {
             self.artillery_shells.checkpoint_len(),
             MAX_SCHEDULED_ARTILLERY_SHELLS,
         )?;
+        validate_count(
+            "panzerfaustShots",
+            self.panzerfaust_shots.checkpoint_len(),
+            MAX_SCHEDULED_PANZERFAUST_SHOTS,
+        )?;
 
         let player_ids = validate_players(&self.players, self.tick)?;
         let entity_ids = validate_entities(&self.entities, &player_ids, map)?;
@@ -301,6 +316,13 @@ impl GameCheckpointV1 {
             self.tick,
             &player_ids,
             &entity_ids,
+        )?;
+        validate_panzerfaust_shots(
+            &self.panzerfaust_shots,
+            &player_ids,
+            self.entities.next_id,
+            map,
+            self.tick,
         )?;
         validate_id_set(
             "activeConstructionSites",

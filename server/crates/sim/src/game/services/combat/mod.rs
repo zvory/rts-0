@@ -15,6 +15,7 @@ use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::mortar::{rotate_mortar_for_fire, MortarShellStore};
 use crate::game::mortar_scatter::predicted_mortar_impact;
+use crate::game::panzerfaust_shot::PanzerfaustShotStore;
 use crate::game::services::dist2;
 use crate::game::services::line_of_sight::LineOfSight;
 use crate::game::services::move_coordinator::MoveCoordinator;
@@ -128,6 +129,7 @@ pub(in crate::game) fn combat_system(
     fog: &Fog,
     smokes: &SmokeCloudStore,
     mortar_shells: &mut MortarShellStore,
+    panzerfaust_shots: &mut PanzerfaustShotStore,
     rng: &mut impl Rng,
     events: &mut HashMap<u32, Vec<Event>>,
     firing_reveals: &mut Vec<FiringRevealSource>,
@@ -148,6 +150,7 @@ pub(in crate::game) fn combat_system(
         methamphetamines_researched,
         fog,
         smokes,
+        panzerfaust_shots,
         events,
         tick,
     );

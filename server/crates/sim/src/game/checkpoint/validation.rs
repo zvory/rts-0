@@ -6,6 +6,7 @@ use crate::game::entity::{Entity, MAX_QUEUED_ORDERS};
 use crate::game::firing_reveal::FiringRevealSource;
 use crate::game::fog::LingeringSightSource;
 use crate::game::map::Map;
+use crate::game::panzerfaust_shot::PanzerfaustShotStore;
 use crate::game::replay::CommandLogEntry;
 use crate::game::SimCommand;
 use crate::rules;
@@ -329,6 +330,44 @@ pub(super) fn validate_active_sources(
     Ok(())
 }
 
+pub(super) fn validate_panzerfaust_shots(
+    shots: &PanzerfaustShotStore,
+    player_ids: &BTreeSet<u32>,
+    next_entity_id: u32,
+    map: &Map,
+    tick: u32,
+) -> Result<(), CheckpointPayloadError> {
+    for (owner, attacker, target, source_x, source_y, impact_x, impact_y, impact_tick) in
+        shots.checkpoint_entries()
+    {
+        if !player_ids.contains(&owner) {
+            return Err(CheckpointPayloadError::InvalidReference {
+                field: "panzerfaustShots.owner",
+                id: owner,
+            });
+        }
+        validate_allocated_entity_ref("panzerfaustShots.attacker", attacker, next_entity_id)?;
+        validate_allocated_entity_ref("panzerfaustShots.target", target, next_entity_id)?;
+        let world = map.world_size_px();
+        if !in_world(source_x, source_y, world) {
+            return Err(CheckpointPayloadError::InvalidValue {
+                field: "panzerfaustShots.source",
+            });
+        }
+        if !in_world(impact_x, impact_y, world) {
+            return Err(CheckpointPayloadError::InvalidValue {
+                field: "panzerfaustShots.impact",
+            });
+        }
+        if impact_tick <= tick {
+            return Err(CheckpointPayloadError::InvalidValue {
+                field: "panzerfaustShots.impactTick",
+            });
+        }
+    }
+    Ok(())
+}
+
 pub(super) fn validate_id_set(
     field: &'static str,
     ids: &BTreeSet<u32>,
@@ -340,6 +379,18 @@ pub(super) fn validate_id_set(
         }
     }
     Ok(())
+}
+
+fn validate_allocated_entity_ref(
+    field: &'static str,
+    id: u32,
+    next_entity_id: u32,
+) -> Result<(), CheckpointPayloadError> {
+    if id == 0 || id >= next_entity_id {
+        Err(CheckpointPayloadError::InvalidReference { field, id })
+    } else {
+        Ok(())
+    }
 }
 
 fn validate_command_units(command: &SimCommand) -> Result<(), CheckpointPayloadError> {

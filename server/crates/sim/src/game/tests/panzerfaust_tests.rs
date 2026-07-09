@@ -60,11 +60,11 @@ fn panzerfaust_fixture_at_tank_tile(tank_tile_x: u32) -> (Game, u32, u32) {
     (game, panzerfaust, tank)
 }
 
-fn panzerfaust_fixture() -> (Game, u32, u32) {
+pub(super) fn panzerfaust_fixture() -> (Game, u32, u32) {
     panzerfaust_fixture_at_tank_tile(11)
 }
 
-fn enqueue_attack(game: &mut Game, panzerfaust: u32, target: u32, queued: bool) {
+pub(super) fn enqueue_attack(game: &mut Game, panzerfaust: u32, target: u32, queued: bool) {
     game.enqueue(
         1,
         Command::Attack {
@@ -75,7 +75,7 @@ fn enqueue_attack(game: &mut Game, panzerfaust: u32, target: u32, queued: bool) 
     );
 }
 
-fn player_events(events: &[(u32, Vec<Event>)], player: u32) -> &[Event] {
+pub(super) fn player_events(events: &[(u32, Vec<Event>)], player: u32) -> &[Event] {
     events
         .iter()
         .find(|(id, _)| *id == player)
@@ -96,7 +96,7 @@ fn panzerfaust_state_of(game: &Game, id: u32) -> Option<PanzerfaustState> {
         .and_then(|combat| combat.panzerfaust)
 }
 
-fn panzerfaust_damage_to(victim_kind: EntityKind) -> u32 {
+pub(super) fn panzerfaust_damage_to(victim_kind: EntityKind) -> u32 {
     crate::rules::combat::effective_damage(
         EntityKind::Panzerfaust,
         victim_kind,

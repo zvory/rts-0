@@ -29,6 +29,7 @@ pub mod lab;
 pub mod map;
 mod mortar;
 mod mortar_scatter;
+mod panzerfaust_shot;
 mod pathfinding;
 mod player_state;
 pub mod replay;
@@ -253,6 +254,7 @@ impl Game {
             &mut self.state.ability_runtime,
             &mut self.state.mortar_shells,
             &mut self.state.artillery_shells,
+            &mut self.state.panzerfaust_shots,
             &mut self.state.active_construction_sites,
             pending,
             &mut events,

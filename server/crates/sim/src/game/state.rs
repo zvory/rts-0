@@ -1,7 +1,6 @@
 use std::collections::BTreeSet;
 
-use rand::rngs::SmallRng;
-use rand::{Error as RngError, RngCore, SeedableRng};
+use rand::{rngs::SmallRng, Error as RngError, RngCore, SeedableRng};
 
 use super::{
     ability_runtime::AbilityRuntime, artillery::ArtilleryShellStore, building_memory::BuildingMemory,
@@ -27,6 +26,7 @@ pub(in crate::game) struct GameState {
     pub(in crate::game) ability_runtime: AbilityRuntime,
     pub(in crate::game) mortar_shells: MortarShellStore,
     pub(in crate::game) artillery_shells: ArtilleryShellStore,
+    pub(in crate::game) panzerfaust_shots: super::panzerfaust_shot::PanzerfaustShotStore,
     pub(in crate::game) seed: u32,
     pub(in crate::game) starting_loadouts: Vec<PlayerStartingLoadout>,
     pub(in crate::game) map_metadata: MapMetadata,
@@ -126,6 +126,7 @@ impl GameState {
             ability_runtime: AbilityRuntime::new(),
             mortar_shells: MortarShellStore::default(),
             artillery_shells: ArtilleryShellStore::default(),
+            panzerfaust_shots: super::panzerfaust_shot::PanzerfaustShotStore::default(),
             seed,
             starting_loadouts,
             map_metadata,

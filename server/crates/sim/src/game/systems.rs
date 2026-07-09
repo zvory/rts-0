@@ -30,6 +30,7 @@ use crate::game::firing_reveal::FiringRevealSource;
 use crate::game::fog::{Fog, LingeringSightSource};
 use crate::game::map::Map;
 use crate::game::mortar::MortarShellStore;
+use crate::game::panzerfaust_shot::PanzerfaustShotStore;
 use crate::game::services;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::pathing::PathingService;
@@ -126,6 +127,7 @@ pub(crate) fn run_tick(
     ability_runtime: &mut AbilityRuntime,
     mortar_shells: &mut MortarShellStore,
     artillery_shells: &mut ArtilleryShellStore,
+    panzerfaust_shots: &mut PanzerfaustShotStore,
     active_construction_sites: &mut BTreeSet<u32>,
     pending: Vec<crate::game::commands::PendingCommand>,
     events: &mut HashMap<u32, Vec<Event>>,
@@ -268,6 +270,7 @@ pub(crate) fn run_tick(
             fog,
             smokes,
             mortar_shells,
+            panzerfaust_shots,
             rng,
             events,
             firing_reveals,
@@ -461,6 +464,7 @@ mod tests {
         let mut ability_runtime = AbilityRuntime::new();
         let mut mortar_shells = MortarShellStore::default();
         let mut artillery_shells = ArtilleryShellStore::default();
+        let mut panzerfaust_shots = PanzerfaustShotStore::default();
         let mut active_construction_sites = BTreeSet::new();
         let active_vision_players = BTreeSet::new();
 
@@ -495,6 +499,7 @@ mod tests {
             &mut ability_runtime,
             &mut mortar_shells,
             &mut artillery_shells,
+            &mut panzerfaust_shots,
             &mut active_construction_sites,
             Vec::new(),
             &mut events,
