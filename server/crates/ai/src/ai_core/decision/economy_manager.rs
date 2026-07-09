@@ -7,7 +7,6 @@ use super::*;
 pub(super) enum OilDemandSignal {
     ProfileDefault,
     ExactWorkers(usize),
-    AtLeastWorkers(usize),
     HoldCurrent,
 }
 
@@ -63,11 +62,6 @@ pub(super) fn propose_economy(input: EconomyManagerInput<'_>) -> EconomyManagerO
     );
     match input.signals.oil_demand {
         OilDemandSignal::ProfileDefault | OilDemandSignal::ExactWorkers(_) => {}
-        OilDemandSignal::AtLeastWorkers(workers) => {
-            if !plan.mineable_oil_nodes.is_empty() {
-                plan.desired_oil_workers = plan.desired_oil_workers.max(workers);
-            }
-        }
         OilDemandSignal::HoldCurrent => {
             plan.desired_oil_workers = plan.current_oil_workers;
         }

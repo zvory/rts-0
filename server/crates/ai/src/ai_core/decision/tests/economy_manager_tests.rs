@@ -56,7 +56,7 @@ fn economy_manager_outputs_action_proposals() {
         expansion_plan: &expansion_plan,
         signals: EconomyManagerSignals {
             recovery_active: false,
-            oil_demand: OilDemandSignal::AtLeastWorkers(1),
+            oil_demand: OilDemandSignal::ExactWorkers(1),
             defer_supply_for_tech: false,
             emergency_supply: false,
             defer_worker_training_for_tech: false,
