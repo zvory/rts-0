@@ -31,7 +31,6 @@ use crate::game::services::order_execution::{
     start_artillery_fire_command_order, ArtilleryFireMode, FutureOrderMode,
 };
 use crate::game::services::order_planner as planner;
-use crate::game::services::scout_plane::{self, ScoutPlaneLaunchError};
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::standability;
 use crate::game::services::world_query::{self, owns_unit};
@@ -50,6 +49,7 @@ const MAX_RALLY_STAGES: usize = 4;
 mod artillery_scatter;
 mod guards;
 mod planner_facts;
+mod scout_plane_ability;
 #[cfg(test)]
 use self::artillery_scatter::artillery_error_tiles;
 use self::artillery_scatter::{artillery_blanket_point, artillery_scattered_point};
@@ -1153,63 +1153,7 @@ fn use_ability(
         return;
     }
     if ability == AbilityKind::ScoutPlane {
-        let Some(x) = request.x else {
-            return;
-        };
-        let Some(y) = request.y else {
-            return;
-        };
-        if definition.target_mode != AbilityTargetMode::WorldPoint
-            || !tech_requirement_met(entities, player, ability)
-        {
-            return;
-        }
-        let caster = dedupe_cap_units(request.units, request.max_units_per_command)
-            .into_iter()
-            .find(|unit| {
-                caster_can_accept_order(entities, player, *unit, ability)
-                    && ability_orders::caster_allowed_by_faction(entities, &faction_id, *unit, ability)
-            });
-        if caster.is_none() {
-            return;
-        }
-        let Some(ps) = players.iter_mut().find(|p| p.id == player) else {
-            return;
-        };
-        if ps.ability_cooldowns.get(&ability).copied().unwrap_or(0) > 0 {
-            return;
-        }
-        if !ps.spend_cost(definition.cost) {
-            notice(
-                events,
-                player,
-                rules::economy::resource_shortage_notice_for_cost(
-                    ps.steel,
-                    ps.oil,
-                    definition.cost,
-                ),
-            );
-            return;
-        }
-        match scout_plane::launch_ability(map, entities, player, x, y) {
-            Ok(_) => {
-                if definition.cooldown_ticks == 0 {
-                    ps.ability_cooldowns.remove(&ability);
-                } else {
-                    ps.ability_cooldowns
-                        .insert(ability, definition.cooldown_ticks);
-                }
-                notice_positioned(events, player, "Scout Plane", NoticeSeverity::Info, x, y);
-            }
-            Err(ScoutPlaneLaunchError::Active) => {
-                ps.refund_cost(definition.cost);
-                notice(events, player, "Scout Plane already active");
-            }
-            Err(ScoutPlaneLaunchError::NoCityCentre) => {
-                ps.refund_cost(definition.cost);
-                notice(events, player, "Requires City Centre");
-            }
-        }
+        scout_plane_ability::use_ability(map, entities, players, events, player, &faction_id, request);
         return;
     }
     if let Some(mode) = artillery_fire_mode_for(ability) {

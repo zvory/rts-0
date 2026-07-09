@@ -767,11 +767,9 @@ mod tests {
         let players = vec![player_state(1)];
         promote_with_players(map, entities, &players);
     }
-
     fn promote_with_players(map: &Map, entities: &mut EntityStore, players: &[PlayerState]) {
         let _ = promote_with_players_events(map, entities, players);
     }
-
     fn promote_with_players_events(
         map: &Map,
         entities: &mut EntityStore,
