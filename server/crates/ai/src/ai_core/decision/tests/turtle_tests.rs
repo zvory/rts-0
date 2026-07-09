@@ -13,13 +13,7 @@ fn turtle_expansion_ignores_opening_rifleman_losses() {
             supply_cap: 60,
         },
         vec![
-            building_at(
-                10,
-                EntityKind::CityCentre,
-                Some(0),
-                8.5 * ts,
-                8.5 * ts,
-            ),
+            building_at(10, EntityKind::CityCentre, Some(0), 8.5 * ts, 8.5 * ts),
             building(11, EntityKind::TrainingCentre, None),
         ],
     ));
@@ -64,9 +58,9 @@ fn turtle_opening_does_not_train_workers_for_held_oil_assignments() {
     );
 
     assert!(
-        !decision
-            .intents
-            .contains(&AiIntent::Train { kind: EntityKind::Worker }),
+        !decision.intents.contains(&AiIntent::Train {
+            kind: EntityKind::Worker
+        }),
         "the Turtle opening should not train workers toward oil while oil assignments are held"
     );
 }
@@ -139,7 +133,10 @@ fn turtle_machine_gunner_training_stops_at_choke_line_target() {
         !decision.commands.iter().any(|command| {
             matches!(
                 command,
-                Command::Train { unit: EntityKind::MachineGunner, .. }
+                Command::Train {
+                    unit: EntityKind::MachineGunner,
+                    ..
+                }
             )
         }),
         "the turtle profile should not queue surplus Machine Gunners before they reach the line"
