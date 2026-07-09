@@ -1,5 +1,9 @@
 use super::*;
 
+use crate::ai_core::decision::economy_manager::{
+    propose_economy, EconomyManagerInput, EconomyManagerSignals, EconomyProposal, OilDemandSignal,
+};
+use crate::ai_core::decision::expansion::ExpansionPlan;
 use crate::ai_core::profiles::{AI_2_0_TANK_PRESSURE, AI_2_1_ECONOMY_MANAGER};
 
 fn assert_ai_2_1_matches_ai_2_0_decision(label: &str, observation: &AiObservation) {
@@ -16,6 +20,98 @@ fn assert_ai_2_1_matches_ai_2_0_decision(label: &str, observation: &AiObservatio
 
     assert_eq!(ai_2_1.intents, ai_2_0.intents, "{label}: intents");
     assert_eq!(ai_2_1.commands, ai_2_0.commands, "{label}: commands");
+}
+
+#[test]
+fn economy_manager_outputs_action_proposals() {
+    let mut owned = vec![building_at(
+        1,
+        EntityKind::CityCentre,
+        Some(0),
+        8.0 * config::TILE_SIZE as f32,
+        8.0 * config::TILE_SIZE as f32,
+    )];
+    owned.push(worker(2, AiEntityState::Idle));
+    let observation = observation(
+        AiEconomy {
+            steel: 500,
+            oil: 0,
+            supply_used: 4,
+            supply_cap: 12,
+        },
+        owned,
+    );
+    let facts = AiFacts::from_observation(&observation);
+    let expansion_plan = ExpansionPlan {
+        policy: AI_2_1_ECONOMY_MANAGER.expansion,
+        should_save: true,
+        blocks_tech_path: false,
+        blockers: Vec::new(),
+    };
+
+    let output = propose_economy(EconomyManagerInput {
+        observation: &observation,
+        facts: &facts,
+        profile: &AI_2_1_ECONOMY_MANAGER,
+        expansion_plan: &expansion_plan,
+        signals: EconomyManagerSignals {
+            recovery_active: false,
+            oil_demand: OilDemandSignal::AtLeastWorkers(1),
+            defer_supply_for_tech: false,
+            emergency_supply: false,
+            defer_worker_training_for_tech: false,
+        },
+    });
+
+    assert!(output.proposes(EconomyProposal::BuildExpansionCityCentre));
+    assert!(output.proposes(EconomyProposal::TrainWorker));
+    assert!(output.proposes(EconomyProposal::AssignOilWorkers));
+    assert!(output.proposes(EconomyProposal::AssignSteelWorkers));
+}
+
+#[test]
+fn economy_manager_signals_can_hold_oil_at_current_assignment() {
+    let mut owned = vec![building_at(
+        1,
+        EntityKind::CityCentre,
+        Some(0),
+        8.0 * config::TILE_SIZE as f32,
+        8.0 * config::TILE_SIZE as f32,
+    )];
+    owned.push(worker(2, AiEntityState::Idle));
+    let observation = observation(
+        AiEconomy {
+            steel: 500,
+            oil: 0,
+            supply_used: 4,
+            supply_cap: 12,
+        },
+        owned,
+    );
+    let facts = AiFacts::from_observation(&observation);
+    let expansion_plan = ExpansionPlan {
+        policy: None,
+        should_save: false,
+        blocks_tech_path: false,
+        blockers: Vec::new(),
+    };
+
+    let output = propose_economy(EconomyManagerInput {
+        observation: &observation,
+        facts: &facts,
+        profile: &AI_2_1_ECONOMY_MANAGER,
+        expansion_plan: &expansion_plan,
+        signals: EconomyManagerSignals {
+            recovery_active: false,
+            oil_demand: OilDemandSignal::HoldCurrent,
+            defer_supply_for_tech: false,
+            emergency_supply: false,
+            defer_worker_training_for_tech: false,
+        },
+    });
+
+    assert_eq!(output.plan.desired_oil_workers, output.plan.current_oil_workers);
+    assert!(!output.proposes(EconomyProposal::AssignOilWorkers));
 }
 
 #[test]
