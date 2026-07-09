@@ -52,14 +52,8 @@ fn live_spectator_receives_observer_analysis_but_active_players_do_not() {
 
     task.on_tick(TokioInstant::now());
 
-    let spectator_analysis = match writer_spectator
-        .observer_analysis
-        .take()
-        .expect("spectator observer analysis")
-    {
-        ServerMessage::ObserverAnalysis(analysis) => analysis,
-        other => panic!("expected observer analysis, got {other:?}"),
-    };
+    let spectator_analysis =
+        take_observer_analysis(&writer_spectator, "live spectator observer analysis");
     assert_eq!(spectator_analysis.tick, 1);
     assert_eq!(spectator_analysis.players.len(), 2);
     assert!(writer_a.observer_analysis.take().is_none());
@@ -528,14 +522,7 @@ fn ai_only_live_spectator_observer_analysis_includes_ai_decision_diagnostics() {
         task.on_tick(TokioInstant::now());
     }
 
-    let analysis = match writer
-        .observer_analysis
-        .take()
-        .expect("AI-only spectator should receive observer analysis")
-    {
-        ServerMessage::ObserverAnalysis(analysis) => analysis,
-        other => panic!("expected observer analysis, got {other:?}"),
-    };
+    let analysis = take_observer_analysis(&writer, "AI-only spectator observer analysis");
     let map_analysis = analysis
         .map_analysis
         .as_ref()
@@ -748,13 +735,9 @@ fn late_spectator_join_gets_pause_control_and_read_only_snapshot() {
     assert_eq!(snapshot.player_resources, expected.player_resources);
     assert_eq!(snapshot.net_status.prediction_version, 0);
     assert_eq!(snapshot.net_status.last_sim_consumed_client_seq, 0);
-    let tick_messages: Vec<_> =
-        std::iter::from_fn(|| writer_spectator.reliable_rx.try_recv().ok()).collect();
-    assert!(tick_messages.iter().any(|msg| matches!(
-        msg,
-        ServerMessage::ObserverAnalysis(analysis)
-            if analysis.tick == expected.tick && !analysis.players.is_empty()
-    )));
+    let analysis = take_observer_analysis(&writer_spectator, "late live spectator tick");
+    assert_eq!(analysis.tick, expected.tick);
+    assert!(!analysis.players.is_empty());
 }
 
 #[test]

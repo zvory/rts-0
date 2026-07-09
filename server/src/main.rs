@@ -1027,8 +1027,13 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
                 continue;
             }
 
-            if let Some(msg) = observer_analysis.take() {
-                let (keep_writing, _) = send_server_message(player_id, &mut sink, msg).await;
+            if let Some(payload) = observer_analysis.take() {
+                let (keep_writing, _) = send_server_message(
+                    player_id,
+                    &mut sink,
+                    ServerMessage::ObserverAnalysis(payload),
+                )
+                .await;
                 if !keep_writing {
                     break 'write_loop;
                 }

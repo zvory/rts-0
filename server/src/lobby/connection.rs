@@ -1,7 +1,7 @@
 #![cfg_attr(test, allow(dead_code))]
 
 use super::*;
-use crate::protocol::SnapshotPayloadDiagnostics;
+use crate::protocol::{ObserverAnalysisPayload, SnapshotPayloadDiagnostics};
 use std::collections::{BTreeMap, VecDeque};
 use std::time::Instant as StdInstant;
 
@@ -40,7 +40,7 @@ pub(crate) struct PendingSnapshot {
 }
 
 pub struct LatestObserverAnalysisSlot {
-    pending: StdMutex<Option<ServerMessage>>,
+    pending: StdMutex<Option<ObserverAnalysisPayload>>,
     notify: Notify,
 }
 
@@ -415,11 +415,14 @@ impl ConnectionSink {
         }
     }
 
-    pub(crate) fn try_send_observer_analysis(&self, msg: ServerMessage) -> LatestOnlySendStatus {
+    pub(crate) fn try_send_observer_analysis(
+        &self,
+        payload: ObserverAnalysisPayload,
+    ) -> LatestOnlySendStatus {
         if self.reliable_tx.is_closed() {
             return LatestOnlySendStatus::Closed;
         }
-        let replaced = self.observer_analysis.store(msg);
+        let replaced = self.observer_analysis.store(payload);
         if replaced {
             LatestOnlySendStatus::Replaced
         } else {
@@ -515,14 +518,14 @@ impl LatestSnapshotSlot {
 }
 
 impl LatestObserverAnalysisSlot {
-    fn lock_pending(&self) -> std::sync::MutexGuard<'_, Option<ServerMessage>> {
+    fn lock_pending(&self) -> std::sync::MutexGuard<'_, Option<ObserverAnalysisPayload>> {
         match self.pending.lock() {
             Ok(guard) => guard,
             Err(poisoned) => poisoned.into_inner(),
         }
     }
 
-    pub fn take(&self) -> Option<ServerMessage> {
+    pub fn take(&self) -> Option<ObserverAnalysisPayload> {
         self.lock_pending().take()
     }
 
@@ -530,11 +533,10 @@ impl LatestObserverAnalysisSlot {
         self.lock_pending().take();
     }
 
-    fn store(&self, msg: ServerMessage) -> bool {
-        debug_assert!(matches!(msg, ServerMessage::ObserverAnalysis(_)));
+    fn store(&self, payload: ObserverAnalysisPayload) -> bool {
         let mut pending = self.lock_pending();
         let replaced = pending.is_some();
-        *pending = Some(msg);
+        *pending = Some(payload);
         drop(pending);
         self.notify.notify_one();
         replaced
@@ -1060,18 +1062,11 @@ mod tests {
         SnapshotPayloadSectionDiagnostics,
     };
 
-    fn observer_analysis_msg(tick: u32) -> ServerMessage {
-        ServerMessage::ObserverAnalysis(ObserverAnalysisPayload {
+    fn observer_analysis_payload(tick: u32) -> ObserverAnalysisPayload {
+        ObserverAnalysisPayload {
             tick,
             players: Vec::new(),
             map_analysis: None,
-        })
-    }
-
-    fn observer_analysis_tick(msg: ServerMessage) -> u32 {
-        match msg {
-            ServerMessage::ObserverAnalysis(payload) => payload.tick,
-            other => panic!("expected observer analysis, got {other:?}"),
         }
     }
 
@@ -1161,16 +1156,16 @@ mod tests {
         let (sink, writer) = ConnectionSink::new();
 
         assert_eq!(
-            sink.try_send_observer_analysis(observer_analysis_msg(10)),
+            sink.try_send_observer_analysis(observer_analysis_payload(10)),
             LatestOnlySendStatus::Stored
         );
         assert_eq!(
-            sink.try_send_observer_analysis(observer_analysis_msg(11)),
+            sink.try_send_observer_analysis(observer_analysis_payload(11)),
             LatestOnlySendStatus::Replaced
         );
 
         let latest = writer.observer_analysis.take().expect("observer analysis");
-        assert_eq!(observer_analysis_tick(latest), 11);
+        assert_eq!(latest.tick, 11);
         assert!(writer.observer_analysis.take().is_none());
     }
 
@@ -1178,12 +1173,22 @@ mod tests {
     fn send_or_log_routes_observer_analysis_outside_reliable_fifo() {
         let (sink, mut writer) = ConnectionSink::new();
 
-        send_or_log("test-room", 7, &sink, observer_analysis_msg(20));
-        send_or_log("test-room", 7, &sink, observer_analysis_msg(21));
+        send_or_log(
+            "test-room",
+            7,
+            &sink,
+            ServerMessage::ObserverAnalysis(observer_analysis_payload(20)),
+        );
+        send_or_log(
+            "test-room",
+            7,
+            &sink,
+            ServerMessage::ObserverAnalysis(observer_analysis_payload(21)),
+        );
 
         assert!(writer.reliable_rx.try_recv().is_err());
         let latest = writer.observer_analysis.take().expect("observer analysis");
-        assert_eq!(observer_analysis_tick(latest), 21);
+        assert_eq!(latest.tick, 21);
     }
 
     #[test]
@@ -1212,7 +1217,7 @@ mod tests {
             SnapshotSendStatus::Stored
         );
         assert_eq!(
-            sink.try_send_observer_analysis(observer_analysis_msg(30)),
+            sink.try_send_observer_analysis(observer_analysis_payload(30)),
             LatestOnlySendStatus::Stored
         );
 
@@ -1269,8 +1274,8 @@ pub(super) fn send_or_log(
                 Some(SnapshotSendStatus::Closed)
             }
         },
-        observer @ ServerMessage::ObserverAnalysis(_) => {
-            match tx.try_send_observer_analysis(observer) {
+        ServerMessage::ObserverAnalysis(payload) => {
+            match tx.try_send_observer_analysis(payload) {
                 LatestOnlySendStatus::Stored => {}
                 LatestOnlySendStatus::Replaced => {
                     crate::log_debug!(room = %room, player_id, "coalesced pending observer analysis");
