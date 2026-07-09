@@ -17,6 +17,7 @@ use crate::ai_core::profiles::{
     AI_1_0_TECH, AI_1_1_TANK_MG, AI_1_2_WAVE_COHORTS, RIFLE_FLOOD_FAST,
     RIFLE_FLOOD_FULL_SATURATION, STEEL_EXPANSION_TANKS, TECH_TO_TANKS,
 };
+mod economy_manager_tests;
 mod steel_line_tests;
 mod turtle_tests;
 fn worker(id: u32, state: AiEntityState) -> AiEntitySummary {
