@@ -138,6 +138,7 @@ struct GameCheckpointV1 {
     ability_runtime: AbilityRuntime,
     mortar_shells: MortarShellStore,
     artillery_shells: ArtilleryShellStore,
+    #[serde(default)]
     panzerfaust_shots: PanzerfaustShotStore,
     active_construction_sites: BTreeSet<u32>,
     lab_god_mode_players: BTreeSet<u32>,
@@ -213,9 +214,13 @@ impl GameCheckpointV1 {
         map_metadata: MapMetadata,
     ) -> Result<GameState, CheckpointPayloadError> {
         self.validate_against(&map, &map_metadata)?;
+        let entities = self.entities.into_store();
+        let panzerfaust_shots = self
+            .panzerfaust_shots
+            .backfill_legacy_in_flight(&entities, self.tick);
         Ok(GameState {
             map,
-            entities: self.entities.into_store(),
+            entities,
             fog: self.fog.into_fog(),
             building_memory: self.building_memory.into_memory(),
             players: serde_convert(&self.players)?,
@@ -229,7 +234,7 @@ impl GameCheckpointV1 {
             ability_runtime: self.ability_runtime,
             mortar_shells: self.mortar_shells,
             artillery_shells: self.artillery_shells,
-            panzerfaust_shots: self.panzerfaust_shots,
+            panzerfaust_shots,
             seed: self.seed,
             starting_loadouts: self.starting_loadouts,
             map_metadata,

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::config;
-use crate::game::entity::{EntityKind, EntityStore};
+use crate::game::entity::{EntityKind, EntityStore, PanzerfaustState};
 use crate::game::fog::Fog;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
@@ -31,6 +31,49 @@ pub(crate) struct PanzerfaustShotStore {
 impl PanzerfaustShotStore {
     pub(in crate::game) fn checkpoint_len(&self) -> usize {
         self.shots.len()
+    }
+
+    pub(in crate::game) fn backfill_legacy_in_flight(
+        mut self,
+        entities: &EntityStore,
+        tick: u32,
+    ) -> Self {
+        if !self.shots.is_empty() {
+            return self;
+        }
+        for entity in entities.iter() {
+            let Some(PanzerfaustState::InFlight {
+                target,
+                impact_x,
+                impact_y,
+                ticks_remaining,
+            }) = entity.combat.as_ref().and_then(|combat| combat.panzerfaust)
+            else {
+                continue;
+            };
+            if entity.kind != EntityKind::Panzerfaust
+                || entity.owner == 0
+                || entity.hp == 0
+                || target == 0
+                || !entity.pos_x.is_finite()
+                || !entity.pos_y.is_finite()
+                || !impact_x.is_finite()
+                || !impact_y.is_finite()
+            {
+                continue;
+            }
+            self.shots.push(PanzerfaustShot {
+                owner: entity.owner,
+                attacker: entity.id,
+                target,
+                source_x: entity.pos_x,
+                source_y: entity.pos_y,
+                impact_x,
+                impact_y,
+                impact_tick: tick.saturating_add(ticks_remaining),
+            });
+        }
+        self
     }
 
     pub(in crate::game) fn schedule(
