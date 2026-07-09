@@ -1,4 +1,5 @@
-use super::geometry::{dist2, forward_steel_cluster_center, squared, tile_center};
+use super::geometry::{dist2, squared, tile_center};
+use super::resources::forward_steel_cluster_center;
 use super::*;
 
 pub(super) const RIFLE_RAID_DEEPEN_TILES: f32 = 7.0;

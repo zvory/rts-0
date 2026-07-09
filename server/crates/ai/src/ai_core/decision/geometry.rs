@@ -82,61 +82,6 @@ pub(super) fn tile_center(tile: (u32, u32), tile_size: u32) -> (f32, f32) {
     )
 }
 
-// Starting steel is split across both sides of a base; AI staging still treats the map-center side
-// as the exposed resource line that existed before the split.
-pub(super) fn forward_steel_cluster_center<'a>(
-    resources: impl IntoIterator<Item = &'a AiResourceSummary>,
-    base_center: (f32, f32),
-    map: AiMapSummary,
-) -> Option<(f32, f32)> {
-    let steel: Vec<&AiResourceSummary> = resources
-        .into_iter()
-        .filter(|resource| resource.kind == EntityKind::Steel && resource.remaining > 0)
-        .collect();
-    if steel.is_empty() {
-        return None;
-    }
-
-    let tile_size = map.tile_size as f32;
-    if tile_size <= 0.0 {
-        return average_resource_center(&steel);
-    }
-    let map_center = (
-        map.width as f32 * tile_size * 0.5,
-        map.height as f32 * tile_size * 0.5,
-    );
-    let Some((dir_x, dir_y)) = normalized_direction(base_center, map_center) else {
-        return average_resource_center(&steel);
-    };
-
-    let forward: Vec<&AiResourceSummary> = steel
-        .iter()
-        .copied()
-        .filter(|resource| {
-            (resource.x - base_center.0) * dir_x + (resource.y - base_center.1) * dir_y > 0.0
-        })
-        .collect();
-    if forward.is_empty() {
-        average_resource_center(&steel)
-    } else {
-        average_resource_center(&forward)
-    }
-}
-
-fn average_resource_center(resources: &[&AiResourceSummary]) -> Option<(f32, f32)> {
-    let count = resources.len().min(config::STEEL_PATCHES_PER_BASE as usize);
-    if count == 0 {
-        return None;
-    }
-    let (sum_x, sum_y) = resources
-        .iter()
-        .take(count)
-        .fold((0.0, 0.0), |(sum_x, sum_y), resource| {
-            (sum_x + resource.x, sum_y + resource.y)
-        });
-    Some((sum_x / count as f32, sum_y / count as f32))
-}
-
 pub(super) fn dist2(ax: f32, ay: f32, bx: f32, by: f32) -> f32 {
     let dx = ax - bx;
     let dy = ay - by;

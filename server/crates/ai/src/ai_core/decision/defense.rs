@@ -1,6 +1,5 @@
-use super::geometry::{
-    clamp_to_map, dist2, forward_steel_cluster_center, normalized_direction, squared, tile_center,
-};
+use super::geometry::{clamp_to_map, dist2, normalized_direction, squared, tile_center};
+use super::resources::forward_steel_cluster_center;
 use super::*;
 
 pub(super) const LOCAL_DEFENSE_RADIUS_TILES: f32 = 12.0;
