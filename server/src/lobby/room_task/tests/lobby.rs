@@ -375,6 +375,62 @@ fn default_ai_team_appends_after_occupied_teams_when_possible() {
 }
 
 #[test]
+fn selecting_two_player_map_trims_excess_active_seats() {
+    let mut task = summary_task("two-player-map-cap");
+    for id in 2..=3 {
+        add_test_room_player(&mut task, id, true);
+        task.assign_missing_team_for(id);
+        task.assign_missing_faction_for(id);
+    }
+    add_test_room_spectator(&mut task, 4);
+    task.on_add_ai(1, Some(4), None);
+    assert_eq!(task.total_player_count(), 4);
+
+    task.on_select_map(1, "1v1 No Terrain".to_string());
+
+    assert_eq!(task.selected_map, "1v1 No Terrain");
+    assert!(
+        task.ai_players.is_empty(),
+        "overflow AI seats are removed first"
+    );
+    assert_eq!(task.total_player_count(), 2);
+    assert!(
+        !task.players.get(&1).unwrap().spectator,
+        "host stays active"
+    );
+    assert!(
+        !task.players.get(&2).unwrap().spectator,
+        "earlier active human stays active"
+    );
+    assert!(
+        task.players.get(&3).unwrap().spectator,
+        "latest excess human becomes spectator"
+    );
+    assert_eq!(task.players.get(&3).unwrap().color, "#6f8fa8");
+    assert!(!task.human_team_assignments.contains_key(&3));
+    assert!(!task.human_faction_assignments.contains_key(&3));
+
+    let summary = task
+        .lobby_summary()
+        .expect("normal hosted lobby should be summarized");
+    assert_eq!(summary.occupied_slots, 2);
+    assert_eq!(summary.max_slots, 2);
+    assert_eq!(summary.join_state, LobbyJoinState::FullSpectatorOnly);
+
+    task.on_add_ai(1, Some(3), None);
+    assert!(
+        task.ai_players.is_empty(),
+        "full 1v1 map rejects more AI seats"
+    );
+
+    task.on_set_spectator(1, 4, false);
+    assert!(
+        task.players.get(&4).unwrap().spectator,
+        "full 1v1 map rejects spectator return to active play"
+    );
+}
+
+#[test]
 fn one_active_human_with_ai_start_skips_match_countdown() {
     let drain = DrainHandle::default();
     let host_id = 99;

@@ -28,7 +28,7 @@ import {
 
 const NAME_STORAGE_KEY = "rts.playerName";
 
-const MAX_PLAYERS = 4;
+const DEFAULT_MAX_PLAYERS = 4;
 const COUNTDOWN_SOUND_BY_WORD = Object.freeze({
   "3": "countdown_drei",
   three: "countdown_drei",
@@ -506,7 +506,7 @@ export class Lobby {
       countdownActive: this._countdownActive,
       spectatorOnly: this._isReplayLobby(),
       playerCount: this._playerCount,
-      maxPlayers: MAX_PLAYERS,
+      maxPlayers: this._selectedMapMaxPlayers(),
       betaFactionSelect: this._betaFactionSelectEnabled(),
       onAddAi: (teamId) => this.net.addAi(teamId, DEFAULT_AI_PROFILE_ID),
       onRemoveAi: (id) => this.net.removeAi(id),
@@ -519,6 +519,10 @@ export class Lobby {
 
   _betaFactionSelectEnabled() {
     return betaFactionSelectEnabledForLocation(window.location);
+  }
+
+  _selectedMapMaxPlayers() {
+    return mapMaxPlayers(this._availableMaps.find((entry) => entry.name === this._selectedMap));
   }
 
   /** Render the map selector in the summary row for hosts, or the map name for non-hosts. */
@@ -539,7 +543,7 @@ export class Lobby {
     }
     if (this.selMap) {
       // Rebuild the option list only when the available maps have changed.
-      // Each entry is {name, description}; name is the stable key, description is display text.
+      // Each entry is {name, description, minPlayers, maxPlayers}; name is the stable key.
       const currentOptions = Array.from(this.selMap.options).map((o) => o.value);
       const mapsChanged =
         currentOptions.length !== this._availableMaps.length ||
@@ -703,7 +707,7 @@ export class Lobby {
     if (this.elMapSummary) this.elMapSummary.textContent = mapLabel;
     if (this.elSeatsSummary) this.elSeatsSummary.textContent = this._isReplayLobby()
       ? ""
-      : `${seatedPlayers.length} / ${MAX_PLAYERS}`;
+      : `${seatedPlayers.length} / ${this._selectedMapMaxPlayers()}`;
     if (this.elSeatsSummaryCell) this.elSeatsSummaryCell.hidden = this._isReplayLobby();
     if (this.elObserversSummary) this.elObserversSummary.textContent = String(spectatorPlayers.length);
   }
@@ -963,6 +967,12 @@ export class Lobby {
 
 function normalizeLobbyKind(kind) {
   return kind === LOBBY_KIND.REPLAY ? LOBBY_KIND.REPLAY : LOBBY_KIND.NORMAL;
+}
+
+function mapMaxPlayers(entry) {
+  const value = Number(entry?.maxPlayers);
+  if (!Number.isFinite(value)) return DEFAULT_MAX_PLAYERS;
+  return Math.min(DEFAULT_MAX_PLAYERS, Math.max(1, Math.trunc(value)));
 }
 
 async function readLobbyApiError(response) {

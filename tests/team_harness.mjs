@@ -226,6 +226,12 @@ export function assertLobbyProtocol(ok, lobby, { expectedPlayers, hostId } = {})
   if (expectedPlayers != null) ok(lobby.players.length === expectedPlayers, `LOBBY: lists ${expectedPlayers} participants`);
   ok(Array.isArray(lobby.maps) && lobby.maps.length >= 1, `LOBBY: exposes selectable maps (${lobby.maps?.length})`);
   ok(lobby.maps.some((map) => map.name === lobby.map), `LOBBY: selected map is present (${lobby.map})`);
+  for (const map of lobby.maps) {
+    ok(typeof map.minPlayers === "number" && map.minPlayers >= 1,
+      `LOBBY: map minPlayers is valid for ${map.name} (${map.minPlayers})`);
+    ok(typeof map.maxPlayers === "number" && map.maxPlayers >= map.minPlayers,
+      `LOBBY: map maxPlayers is valid for ${map.name} (${map.maxPlayers})`);
+  }
   for (const player of lobby.players) {
     ok(typeof player.id === "number", `LOBBY: player id is numeric (${player.name}/${player.id})`);
     ok(typeof player.teamId === "number", `LOBBY: teamId is numeric for ${player.name} (${player.teamId})`);

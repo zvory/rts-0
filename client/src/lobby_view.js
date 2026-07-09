@@ -22,7 +22,8 @@ export const DEFAULT_AI_PROFILE_ID =
     ? STABLE_DEFAULT_AI_PROFILE_ID
     : AI_PROFILES[0].id;
 
-export function teamSlotsForLobby(players = []) {
+export function teamSlotsForLobby(players = [], maxPlayers = MAX_LOBBY_TEAMS) {
+  const slotLimit = lobbyTeamSlotLimit(maxPlayers);
   const seatedPlayers = players.filter((player) => !player.isSpectator);
   const occupied = [];
   for (let teamId = 1; teamId <= MAX_LOBBY_TEAMS; teamId += 1) {
@@ -30,12 +31,18 @@ export function teamSlotsForLobby(players = []) {
       occupied.push({ id: teamId, isNew: false });
     }
   }
-  if (occupied.length < MAX_LOBBY_TEAMS) {
+  if (occupied.length < slotLimit) {
     const emptyId = Array.from({ length: MAX_LOBBY_TEAMS }, (_, idx) => idx + 1)
       .find((teamId) => !occupied.some((slot) => slot.id === teamId));
     if (emptyId != null) occupied.push({ id: emptyId, isNew: true });
   }
   return occupied;
+}
+
+function lobbyTeamSlotLimit(maxPlayers) {
+  const value = Number(maxPlayers);
+  if (!Number.isFinite(value)) return MAX_LOBBY_TEAMS;
+  return Math.min(MAX_LOBBY_TEAMS, Math.max(1, Math.trunc(value)));
 }
 
 export function splitLobbyPlayers(players = []) {
@@ -63,8 +70,19 @@ export function shouldAcceptTeamDrop({
   draggedPlayer,
   isHost,
   countdownActive,
+  playerCount,
+  maxPlayers,
 } = {}) {
-  return !!isHost && !countdownActive && !!draggedPlayer;
+  if (!isHost || countdownActive || !draggedPlayer) return false;
+  if (
+    draggedPlayer.isSpectator &&
+    Number.isFinite(Number(playerCount)) &&
+    Number.isFinite(Number(maxPlayers)) &&
+    Number(playerCount) >= Number(maxPlayers)
+  ) {
+    return false;
+  }
+  return true;
 }
 
 export class LobbyRosterView {
@@ -95,7 +113,7 @@ export class LobbyRosterView {
 
     const { seatedPlayers, spectatorPlayers } = splitLobbyPlayers(players);
     if (!spectatorOnly) {
-      const slots = teamSlotsForLobby(seatedPlayers);
+      const slots = teamSlotsForLobby(seatedPlayers, maxPlayers);
       const occupiedSlotCount = slots.filter((slot) => !slot.isNew).length;
       for (const slot of slots) {
         const teamPlayers = seatedPlayers.filter((player) => Number(player.teamId) === Number(slot.id));
@@ -168,7 +186,13 @@ export class LobbyRosterView {
         const draggedId = Number(ev.dataTransfer?.getData("application/x-rts-player-id"));
         if (!draggedId) return;
         const dragged = allPlayers.find((player) => player.id === draggedId);
-        if (!shouldAcceptTeamDrop({ draggedPlayer: dragged, isHost, countdownActive })) return;
+        if (!shouldAcceptTeamDrop({
+          draggedPlayer: dragged,
+          isHost,
+          countdownActive,
+          playerCount,
+          maxPlayers,
+        })) return;
         if (dragged && Number(dragged.teamId) === Number(slot.id)) return;
         if (dragged?.isSpectator) onSetSpectator?.(draggedId, false);
         onSetTeam?.(draggedId, Number(slot.id));

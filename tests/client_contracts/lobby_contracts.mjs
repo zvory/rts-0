@@ -99,6 +99,18 @@ import { textWithin } from "./dom_text.mjs";
   ]);
   assert(fullSlots.length === 4 && fullSlots.every((slot) => !slot.isNew),
     "lobby omits the new-team slot when all four teams are occupied");
+  const fullDuelSlots = teamSlotsForLobby([
+    { id: 1, teamId: 1 },
+    { id: 2, teamId: 1 },
+  ], 2);
+  assert(fullDuelSlots.length === 2 && fullDuelSlots[0].id === 1 && fullDuelSlots[1].id === 2 && fullDuelSlots[1].isNew,
+    "full capped lobbies keep one empty team target for active-player reassignment");
+  const splitDuelSlots = teamSlotsForLobby([
+    { id: 1, teamId: 1 },
+    { id: 2, teamId: 2 },
+  ], 2);
+  assert(splitDuelSlots.length === 2 && splitDuelSlots.every((slot) => !slot.isNew),
+    "full capped lobbies omit extra empty team targets once occupied teams reach the cap");
   assert(
     shouldAcceptSpectatorDrop({
       draggedPlayer: { id: 2, teamId: 2 },
@@ -138,6 +150,16 @@ import { textWithin } from "./dom_text.mjs";
       countdownActive: false,
     }),
     "host can drag a spectator back into a team slot",
+  );
+  assert(
+    !shouldAcceptTeamDrop({
+      draggedPlayer: { id: 3, isSpectator: true },
+      isHost: true,
+      countdownActive: false,
+      playerCount: 2,
+      maxPlayers: 2,
+    }),
+    "team drop rejects spectator return when the selected map is full",
   );
   assert(
     !shouldAcceptTeamDrop({
@@ -429,6 +451,83 @@ import { textWithin } from "./dom_text.mjs";
   assert(lobby.elObserversSummary.textContent === "1", "joined replay lobbies count spectator occupants only");
   assert(rosterArgs?.spectatorOnly === true, "joined replay lobbies render the roster in spectator-only mode");
   assert(stoppedPolling === 1 && statusText === "", "joined replay lobby render clears pending browser state");
+}
+
+{
+  let rosterArgs = null;
+  let stoppedPolling = 0;
+  const root = { hidden: false, classList: fakeClassList() };
+  const lobby = Object.assign(Object.create(Lobby.prototype), {
+    root,
+    net: { playerId: 7 },
+    roomBlock: { hidden: true },
+    elSetupKicker: { textContent: "" },
+    elSetupTitle: { textContent: "" },
+    elPlayers: { innerHTML: "" },
+    elRoomDisplay: { textContent: "" },
+    elMapSummary: { textContent: "", hidden: true },
+    elSeatsSummary: { textContent: "" },
+    elSeatsSummaryCell: { hidden: false },
+    elObserversSummary: { textContent: "" },
+    btnReady: {
+      hidden: false,
+      textContent: "",
+      disabled: false,
+      classList: fakeClassList(),
+      setAttribute(name, value) {
+        this[name] = String(value);
+      },
+    },
+    btnStart: { disabled: true, textContent: "", classList: fakeClassList() },
+    selMap: null,
+    rosterView: {
+      render(args) {
+        rosterArgs = args;
+      },
+    },
+    browserView: null,
+    _joined: false,
+    _ready: false,
+    _spectator: false,
+    _countdownActive: false,
+    _browserActionPending: false,
+    _pendingBrowserJoinRoom: "",
+    _stopLobbyBrowserPolling() {
+      stoppedPolling += 1;
+    },
+    _reflectTeamPreset() {},
+    _reflectCreateButton() {},
+    _betaFactionSelectEnabled() {
+      return false;
+    },
+    setStatus() {},
+  });
+
+  lobby._renderLobby({
+    room: "duel",
+    kind: "normal",
+    hostId: 7,
+    players: [
+      { id: 7, name: "Host", color: "#0072b2", teamId: 1, ready: true, isSpectator: false },
+      { id: 8, name: "Guest", color: "#d55e00", teamId: 2, ready: true, isSpectator: false },
+    ],
+    canStart: true,
+    teamPreset: "custom",
+    map: "1v1 No Terrain",
+    maps: [
+      {
+        name: "1v1 No Terrain",
+        description: "Two-player no-terrain map scaffold for 1v1 terrain editing.",
+        minPlayers: 1,
+        maxPlayers: 2,
+      },
+    ],
+  });
+
+  assert(lobby.elSeatsSummary.textContent === "2 / 2",
+    "joined lobby summary uses selected map capacity");
+  assert(rosterArgs?.maxPlayers === 2, "lobby roster receives selected map capacity");
+  assert(stoppedPolling === 1, "normal lobby render clears pending browser polling");
 }
 
 // ---------------------------------------------------------------------------

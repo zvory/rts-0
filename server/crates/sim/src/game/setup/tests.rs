@@ -299,14 +299,17 @@ fn base_steel_patches_split_across_both_sides_of_city_centre() {
 #[test]
 fn bundled_oil_patches_have_buildable_pump_jack_sites() {
     for available_map in Map::list_available() {
-        for player_count in 1..=4 {
+        for player_count in available_map.min_players..=available_map.max_players {
             for seed in 0..32 {
-                let map = Map::load(&available_map.name, player_count, seed).unwrap_or_else(|err| {
-                    panic!(
-                        "map {} should load for player_count={player_count} seed={seed}: {err}",
-                        available_map.name
-                    )
-                });
+                let map =
+                    Map::load(&available_map.name, player_count as usize, seed).unwrap_or_else(
+                        |err| {
+                            panic!(
+                                "map {} should load for player_count={player_count} seed={seed}: {err}",
+                                available_map.name
+                            )
+                        },
+                    );
                 let entities = spawned_resource_sites(&map);
 
                 for oil in entities

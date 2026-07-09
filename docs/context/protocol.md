@@ -29,8 +29,9 @@ Use when adding, removing, or changing any field on a client↔server message, s
 
 ## Current lobby fields to remember
 - `selectMap { map }` is the host-only map selector command.
-- `lobby` carries `map` (selected stable map name) and `maps[]` (`{name, description}` catalog
-  rows). Replay start metadata separately uses `mapName`.
+- `lobby` carries `map` (selected stable map name) and `maps[]`
+  (`{name, description, minPlayers, maxPlayers}` catalog rows). Replay start metadata separately
+  uses `mapName`.
 - Lab start payloads carry `lab` metadata with the public lab id, original operator id, recipient
   role, that recipient's current lab vision mode, optional setup-authored initial camera center,
   dirty flag, and operation count.
