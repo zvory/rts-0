@@ -133,6 +133,9 @@ is loaded from the CDN, and `cargo run` from `server/` serves the client.
   failures, match history, crashes, restarts, and performance spikes.
 - Planned implementation phases: use the `phase-runner` skill only for an existing phase file.
 - Testing and self-play: follow `docs/context/testing.md`, including its replay-inspection workflow.
+  For a user-requested live AI-vs-AI demo, run the matchup setup and local server with `--release`
+  so debug-only simulation invariants do not interrupt play; use a replay only when requested or
+  when the release match cannot run.
 
 ## Completion
 
