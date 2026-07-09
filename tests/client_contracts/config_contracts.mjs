@@ -29,6 +29,7 @@ import {
   TICK_HZ,
   UPGRADES,
   WORKER_BUILDABLE,
+  SMOKE_PLUS_RESEARCH_TICKS,
 } from "../../client/src/config.js";
 import {
   HUD,
@@ -135,6 +136,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "SMOKE_CLOUD_DURATION_TICKS",
   "SMOKE_CLOUD_RADIUS_TILES",
   "SMOKE_LAUNCH_MAX_DELAY_MS",
+  "SMOKE_PLUS_RESEARCH_TICKS",
   "SNAPSHOT_INTERP_DELAY_TICKS",
   "SNAPSHOT_MS",
   "STATS",
@@ -264,6 +266,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   assert(UPGRADE_CODE[UPGRADE.COMMAND_CAR_UNLOCK] === 6, "Command Car unlock compact upgrade code should be reserved");
   assert(UPGRADE_CODE[UPGRADE.BALLISTIC_TABLES] === 7, "Artillery Fire Control compact upgrade code should be reserved");
   assert(UPGRADE_CODE[UPGRADE.ENTRENCHMENT] === 8, "Entrenchment compact upgrade code should be reserved");
+  assert(UPGRADE_CODE[UPGRADE.SMOKE_PLUS] === 9, "Smoke Plus compact upgrade code should be reserved");
   assert(
     STATS[KIND.COMMAND_CAR].cost.steel === 150 &&
       STATS[KIND.COMMAND_CAR].cost.oil === 75 &&
@@ -397,8 +400,9 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       UPGRADE.TANK_UNLOCK,
       UPGRADE.COMMAND_CAR_UNLOCK,
       UPGRADE.MORTAR_AUTOCAST,
+      UPGRADE.SMOKE_PLUS,
     ],
-    "R&D Complex should expose Heavy Guns, Artillery Fire Control, Tank, Command Car, and Mortar Autocast research",
+    "R&D Complex should expose Heavy Guns, Artillery Fire Control, Tank, Command Car, Mortar Autocast, and Smoke Plus research",
   );
   assert(!ABILITIES[ABILITY.CHARGE], "client no longer exposes Rifleman Charge as a command-card ability");
   assert(
@@ -435,6 +439,13 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       UPGRADES[UPGRADE.MORTAR_AUTOCAST].cost.oil === 150 &&
       UPGRADES[UPGRADE.MORTAR_AUTOCAST].researchTicks === 600,
     "Mortar Autocast research cost and time mirror server",
+  );
+  assert(
+    UPGRADES[UPGRADE.SMOKE_PLUS].cost.steel === 150 &&
+      UPGRADES[UPGRADE.SMOKE_PLUS].cost.oil === 150 &&
+      UPGRADES[UPGRADE.SMOKE_PLUS].researchTicks === SMOKE_PLUS_RESEARCH_TICKS &&
+      SMOKE_PLUS_RESEARCH_TICKS === TICK_HZ * 20,
+    "Smoke Plus research cost and time mirror server",
   );
   assert(
     UPGRADES[UPGRADE.BALLISTIC_TABLES].cost.steel === 150 &&
@@ -1042,11 +1053,13 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     const rdTankResearchButton = renderedButtons.find((button) => button.innerHTML.includes("TK+"));
     const rdCommandCarResearchButton = renderedButtons.find((button) => button.innerHTML.includes("CC+"));
     const rdMortarAutocastButton = renderedButtons.find((button) => button.innerHTML.includes("MT+"));
+    const rdSmokePlusButton = renderedButtons.find((button) => button.innerHTML.includes("SMK+"));
     assert(rdArtilleryFireControlButton?.dataset.hotkey === "W", "Artillery Fire Control research should appear in R&D Complex");
     assert(rdHeavyGunsResearchButton?.dataset.hotkey === "Q", "Heavy Guns research should appear in R&D Complex");
     assert(rdTankResearchButton?.dataset.hotkey === "E", "Tank Production research should appear in R&D Complex");
     assert(rdCommandCarResearchButton?.dataset.hotkey === "A", "Command Car research should appear in R&D Complex");
     assert(rdMortarAutocastButton?.dataset.hotkey === "S", "Mortar Autocast research should appear in R&D Complex");
+    assert(rdSmokePlusButton?.dataset.hotkey === "D", "Smoke Plus research should appear in R&D Complex");
     assert(rdCommandCarResearchButton?.disabled, "Command Car research should be disabled before Tank Production");
     assert(rdCommandCarResearchButton?.title === "Requires Tank Production", "Command Car research should name Tank prerequisite");
     assert(rdArtilleryFireControlButton?.disabled, "Artillery Fire Control research should be disabled before Heavy Guns");

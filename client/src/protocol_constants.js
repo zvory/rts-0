@@ -326,6 +326,7 @@ export const UPGRADE = Object.freeze({
   BALLISTIC_TABLES: "ballistic_tables",
   COMMAND_CAR_UNLOCK: "command_car_unlock",
   MORTAR_AUTOCAST: "mortar_autocast",
+  SMOKE_PLUS: "smoke_plus",
 });
 
 export const UPGRADE_CODE = Object.freeze({
@@ -337,6 +338,7 @@ export const UPGRADE_CODE = Object.freeze({
   [UPGRADE.COMMAND_CAR_UNLOCK]: 6,
   [UPGRADE.BALLISTIC_TABLES]: 7,
   [UPGRADE.ENTRENCHMENT]: 8,
+  [UPGRADE.SMOKE_PLUS]: 9,
 });
 
 export const WEAPON_KIND_CODE = Object.freeze({

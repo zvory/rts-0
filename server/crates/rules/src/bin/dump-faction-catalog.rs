@@ -557,6 +557,15 @@ fn print_upgrades(indent: &str) {
         balance::MORTAR_AUTOCAST_COST_OIL,
         balance::MORTAR_AUTOCAST_RESEARCH_TICKS,
         None,
+        true,
+    );
+    print_upgrade(
+        indent,
+        faction::SMOKE_PLUS_UPGRADE,
+        balance::SMOKE_PLUS_COST_STEEL,
+        balance::SMOKE_PLUS_COST_OIL,
+        balance::SMOKE_PLUS_RESEARCH_TICKS,
+        None,
         false,
     );
     println!("{indent}  }},");

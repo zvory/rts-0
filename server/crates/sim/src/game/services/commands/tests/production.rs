@@ -71,6 +71,7 @@ fn advanced_unlocks_research_only_at_research_complex() {
         (EntityKind::Steelworks, UpgradeKind::BallisticTables),
         (EntityKind::Factory, UpgradeKind::TankUnlock),
         (EntityKind::Steelworks, UpgradeKind::MortarAutocast),
+        (EntityKind::Steelworks, UpgradeKind::SmokePlus),
     ] {
         let mut entities = EntityStore::new();
         let (wrong_x, wrong_y) = footprint_center(&map, wrong_building_kind, 4, 4);

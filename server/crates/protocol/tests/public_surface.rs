@@ -145,6 +145,7 @@ fn stable_rust_public_surface_compiles() {
     assert_eq!(ability_object_kinds::RETURN_MARKER, "returnMarker");
     assert_eq!(upgrades::METHAMPHETAMINES, "methamphetamines");
     assert_eq!(upgrades::ENTRENCHMENT, "entrenchment");
+    assert_eq!(upgrades::SMOKE_PLUS, "smoke_plus");
 
     assert_eq!(PREDICTION_PROTOCOL_VERSION, 1);
     assert_eq!(DEFAULT_FACTION_ID, "kriegsia");

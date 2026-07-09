@@ -83,6 +83,7 @@ export const BALLISTIC_TABLES_RESEARCH_TICKS = TICK_HZ * 20;
 export const TANK_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
 export const COMMAND_CAR_UNLOCK_RESEARCH_TICKS = TICK_HZ * 30;
 export const MORTAR_AUTOCAST_RESEARCH_TICKS = TICK_HZ * 20;
+export const SMOKE_PLUS_RESEARCH_TICKS = TICK_HZ * 20;
 export const BREAKTHROUGH_RADIUS_TILES = 9;
 export const BREAKTHROUGH_DURATION_TICKS = TICK_HZ * 6;
 export const BREAKTHROUGH_COOLDOWN_TICKS = TICK_HZ * 25;
@@ -174,6 +175,7 @@ export const STATS = Object.freeze({
       UPGRADE.TANK_UNLOCK,
       UPGRADE.COMMAND_CAR_UNLOCK,
       UPGRADE.MORTAR_AUTOCAST,
+      UPGRADE.SMOKE_PLUS,
     ],
     requires: [KIND.CITY_CENTRE, KIND.TRAINING_CENTRE] },
   [KIND.FACTORY]: { label: "Vehicle Works", icon: "VW", footW: 3, footH: 3, sight: 1,
@@ -410,6 +412,15 @@ export const UPGRADES = Object.freeze({
     cost: Object.freeze({ steel: 150, oil: 150 }),
     researchTicks: MORTAR_AUTOCAST_RESEARCH_TICKS,
     description: "Enable Mortar Team autocast by default",
+    researchedAt: KIND.RESEARCH_COMPLEX,
+  }),
+  [UPGRADE.SMOKE_PLUS]: Object.freeze({
+    upgrade: UPGRADE.SMOKE_PLUS,
+    label: "Smoke Plus",
+    icon: "SMK+",
+    cost: Object.freeze({ steel: 150, oil: 150 }),
+    researchTicks: SMOKE_PLUS_RESEARCH_TICKS,
+    description: "Double Scout Car Smoke radius and duration",
     researchedAt: KIND.RESEARCH_COMPLEX,
   }),
 });

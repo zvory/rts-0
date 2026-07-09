@@ -45,6 +45,50 @@ fn scout_car_smoke_requires_no_steelworks() {
 }
 
 #[test]
+fn smoke_plus_doubles_scout_car_smoke_radius_and_duration() {
+    let (mut game, scout, _target, _) = smoke_command_fixture();
+    game.state.players[0]
+        .upgrades
+        .insert(crate::game::upgrade::UpgradeKind::SmokePlus);
+    let target = game
+        .state
+        .entities
+        .get(scout)
+        .map(|entity| (entity.pos_x, entity.pos_y))
+        .expect("scout should exist");
+
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::Smoke,
+            units: vec![scout],
+            x: Some(target.0),
+            y: Some(target.1),
+            queued: false,
+        },
+    );
+    game.tick();
+
+    let cloud = game
+        .state
+        .smokes
+        .iter()
+        .next()
+        .expect("upgraded smoke should spawn immediately at zero launch distance");
+    assert_eq!(cloud.radius_tiles, config::SMOKE_CLOUD_RADIUS_TILES * 2.0);
+    assert_eq!(
+        cloud.expires_in(game.state.tick),
+        (config::SMOKE_CLOUD_DURATION_TICKS * 2) as u16
+    );
+    let snapshot = game.snapshot_full_for(1);
+    assert_eq!(snapshot.smokes[0].radius_tiles, config::SMOKE_CLOUD_RADIUS_TILES * 2.0);
+    assert_eq!(
+        snapshot.smokes[0].expires_in,
+        (config::SMOKE_CLOUD_DURATION_TICKS * 2) as u16
+    );
+}
+
+#[test]
 fn command_car_requires_rd_unlock_then_trains_at_factory() {
     let players = [PlayerInit {
         id: 1,
