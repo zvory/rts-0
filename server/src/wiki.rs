@@ -898,7 +898,7 @@ mod tests {
             format!("{:?}", scout_plane.armor_class),
             format!("{:?}", scout_plane.weapon),
             optional_kind(scout_plane.trained_at),
-            "Gun Works or Vehicle Works".to_string(),
+            train_requirement_text(scout_plane.train_requirement),
         ]));
 
         assert_eq!(buildings.rows.len(), defs::BUILDINGS.len());

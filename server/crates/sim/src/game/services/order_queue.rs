@@ -759,6 +759,7 @@ mod tests {
             is_ai: false,
             score: ScoreState::default(),
             upgrades: Default::default(),
+            ability_cooldowns: Default::default(),
         }
     }
 
@@ -766,11 +767,9 @@ mod tests {
         let players = vec![player_state(1)];
         promote_with_players(map, entities, &players);
     }
-
     fn promote_with_players(map: &Map, entities: &mut EntityStore, players: &[PlayerState]) {
         let _ = promote_with_players_events(map, entities, players);
     }
-
     fn promote_with_players_events(
         map: &Map,
         entities: &mut EntityStore,
@@ -792,6 +791,7 @@ mod tests {
                 is_ai: p.is_ai,
                 score: p.score.clone(),
                 upgrades: p.upgrades.clone(),
+                ability_cooldowns: p.ability_cooldowns.clone(),
             })
             .collect();
         let occ = Occupancy::build(map, entities);

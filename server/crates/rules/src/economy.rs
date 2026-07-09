@@ -198,7 +198,7 @@ mod tests {
         assert_eq!(DEFAULT_FACTION_ID, "kriegsia");
         assert_eq!(
             trainable_units(EntityKind::CityCentre),
-            &[EntityKind::Worker, EntityKind::ScoutPlane]
+            &[EntityKind::Worker]
         );
         assert_eq!(trainable_units(EntityKind::Zamok), &[EntityKind::Golem]);
         assert_eq!(
@@ -234,7 +234,10 @@ mod tests {
         assert!(!train_requirement_met(EntityKind::AntiTankGun, &[]));
         assert!(!train_requirement_met(EntityKind::Tank, &[]));
         assert!(!train_requirement_met(EntityKind::Artillery, &[]));
-        assert!(!train_requirement_met(EntityKind::ScoutPlane, &[]));
+        assert!(
+            train_requirement_met(EntityKind::ScoutPlane, &[]),
+            "Scout Plane has no train prerequisite because it is launched by ability, not trained"
+        );
         assert!(train_requirement_met(
             EntityKind::MachineGunner,
             &[EntityKind::TrainingCentre]
@@ -263,18 +266,11 @@ mod tests {
             EntityKind::Tank,
             &[EntityKind::Factory]
         ));
-        assert!(train_requirement_met(
-            EntityKind::ScoutPlane,
-            &[defs::SCOUT_PLANE_UNLOCK_BUILDINGS[0]]
-        ));
-        assert!(train_requirement_met(
-            EntityKind::ScoutPlane,
-            &[defs::SCOUT_PLANE_UNLOCK_BUILDINGS[1]]
-        ));
-        assert!(!train_requirement_met(
-            EntityKind::ScoutPlane,
-            &[EntityKind::ScoutPlane]
-        ));
+        assert_eq!(
+            defs::unit_def(EntityKind::ScoutPlane).and_then(|d| d.trained_at),
+            None,
+            "Scout Plane is not exposed through any production building"
+        );
 
         assert!(!build_requirement_met(EntityKind::TrainingCentre, &[]));
         assert!(!build_requirement_met(

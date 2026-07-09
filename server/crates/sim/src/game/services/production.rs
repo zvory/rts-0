@@ -1,7 +1,6 @@
 use crate::game::entity::{EntityStore, OrderIntent, RallyIntent, RallyKind};
 use crate::game::map::Map;
 use crate::game::services::move_coordinator::MoveCoordinator;
-use crate::game::services::scout_plane;
 use crate::game::upgrade::UpgradeKind;
 use crate::game::PlayerState;
 use crate::game::{ability::AbilityKind, entity::EntityKind};
@@ -11,7 +10,7 @@ use crate::game::{ability::AbilityKind, entity::EntityKind};
 /// item queued and retry next tick. Supply was already reserved on enqueue, so spawning does not
 /// re-charge it. Cost was charged at enqueue too.
 pub(crate) fn production_system(
-    map: &Map,
+    _map: &Map,
     entities: &mut EntityStore,
     players: &mut [PlayerState],
     coordinator: &mut MoveCoordinator<'_>,
@@ -82,17 +81,6 @@ pub(crate) fn production_system(
             // Prefer the spawn exit closest to the first rally stage (if any), so units leave from
             // the side of the building facing the rally plan.
             let rally_plan = entities.get(id).map(|b| b.rally_plan()).unwrap_or_default();
-            if unit == EntityKind::ScoutPlane {
-                if scout_plane::launch_from_building(map, entities, owner, id).is_some() {
-                    if let Some(b) = entities.get_mut(id) {
-                        b.remove_front_production();
-                    }
-                    if let Some(player) = players.iter_mut().find(|p| p.id == owner) {
-                        player.record_entity_created(unit);
-                    }
-                }
-                continue;
-            }
             let first_rally = rally_plan.first().map(|r| (r.point.x, r.point.y));
             let Some((sx, sy)) = coordinator.find_spawn_point(entities, id, unit, first_rally)
             else {
@@ -684,6 +672,7 @@ mod tests {
             is_ai: false,
             score: ScoreState::default(),
             upgrades: Default::default(),
+            ability_cooldowns: Default::default(),
         }
     }
 

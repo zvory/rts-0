@@ -9,7 +9,7 @@
 //!   6. combat
 //!   7. gather progression
 //!   8. production progression + spawning
-//!   9. Scout Plane upkeep, fuel refill/drain, and dismissal
+//!   9. player-global ability cooldown progression
 //!   10. construction progression
 //!   11. deconstruction progression
 //!   12. ability projectile/runtime progression
@@ -303,24 +303,13 @@ pub(crate) fn run_tick(
     crate::perf::timed(perf.as_deref_mut(), "production", || {
         services::production::production_system(map, entities, players, &mut coordinator, events);
     });
-    crate::perf::timed(perf.as_deref_mut(), "scout_plane_upkeep", || {
-        services::scout_plane::upkeep_system(entities, |owner, request| {
-            let player = players.iter_mut().find(|player| player.id == owner)?;
-            match request {
-                services::scout_plane::FuelAccountRequest::CheckAccount => Some(0),
-                services::scout_plane::FuelAccountRequest::PayUpkeep(oil) => {
-                    Some(if player.spend_resources(0, oil) { oil } else { 0 })
-                }
-                services::scout_plane::FuelAccountRequest::RefillReserveUpTo(max_oil) => {
-                    let refill = max_oil.min(player.oil);
-                    Some(if player.spend_resources(0, refill) {
-                        refill
-                    } else {
-                        0
-                    })
-                }
-            }
-        });
+    crate::perf::timed(perf.as_deref_mut(), "player_ability_cooldowns", || {
+        for player in players.iter_mut() {
+            player.ability_cooldowns.retain(|_, ticks| {
+                *ticks = ticks.saturating_sub(1);
+                *ticks > 0
+            });
+        }
     });
     crate::perf::timed(perf.as_deref_mut(), "construction", || {
         services::construction::construction_system(
@@ -446,6 +435,7 @@ mod tests {
             is_ai: false,
             score: crate::game::ScoreState::default(),
             upgrades: Default::default(),
+            ability_cooldowns: Default::default(),
         }
     }
 

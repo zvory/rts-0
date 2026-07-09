@@ -103,10 +103,15 @@ function uniqueLiveSelectionEntities(state, ids, seen = new Set()) {
     if (!Number.isInteger(id) || seen.has(id)) continue;
     const entity = typeof state?.entityById === "function" ? state.entityById(id) : null;
     if (!entity || entity.shotReveal || entity.visionOnly) continue;
+    if (entity.kind === KIND.SCOUT_PLANE && !allowsScoutPlaneInspection(state)) continue;
     seen.add(id);
     out.push(entity);
   }
   return out;
+}
+
+function allowsScoutPlaneInspection(state) {
+  return state?.controlPolicy?.kind === "lab" || !!state?.spectator;
 }
 
 function shouldBudgetSelection(state, base, candidates) {

@@ -343,16 +343,12 @@ fn print_client_constants(indent: &str) {
         balance::SCOUT_PLANE_ORBIT_RADIUS_TILES
     );
     println!(
-        "{indent}    \"scoutPlaneUpkeepOil\": {},",
-        balance::SCOUT_PLANE_UPKEEP_OIL
+        "{indent}    \"scoutPlaneOrbitDurationTicks\": {},",
+        balance::SCOUT_PLANE_ORBIT_DURATION_TICKS
     );
     println!(
-        "{indent}    \"scoutPlaneUpkeepIntervalTicks\": {},",
-        balance::SCOUT_PLANE_UPKEEP_INTERVAL_TICKS
-    );
-    println!(
-        "{indent}    \"scoutPlaneFuelReserveOil\": {},",
-        balance::SCOUT_PLANE_FUEL_RESERVE_OIL
+        "{indent}    \"scoutPlaneAbilityCooldownTicks\": {},",
+        balance::SCOUT_PLANE_ABILITY_COOLDOWN_TICKS
     );
     println!(
         "{indent}    \"smokeAbilityCost\": {{\"steel\":{},\"oil\":{}}},",

@@ -55,17 +55,3 @@ export function stopDescriptor(unitIds) {
     enabled: unitIds.length > 0,
   };
 }
-
-export function dismissScoutPlaneDescriptor(unitIds) {
-  return {
-    id: "unit:dismissScoutPlane",
-    commandId: "unit.dismissScoutPlane",
-    kind: "button",
-    action: "dismissScoutPlane",
-    intent: { type: "dismissScoutPlane", unitIds },
-    icon: "RTB",
-    label: "Dismiss",
-    title: "Dismiss selected Scout Planes",
-    enabled: unitIds.length > 0,
-  };
-}

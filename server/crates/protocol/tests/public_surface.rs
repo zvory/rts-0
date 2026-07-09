@@ -140,6 +140,7 @@ fn stable_rust_public_surface_compiles() {
     assert_eq!(states::IDLE, "idle");
     assert_eq!(states::ATTACK, "attack");
     assert_eq!(abilities::SMOKE, "smoke");
+    assert_eq!(abilities::SCOUT_PLANE, "scoutPlane");
     assert_eq!(abilities::DISMISS_SCOUT_PLANE, "dismissScoutPlane");
     assert_eq!(abilities::EKAT_MAGIC_ANCHOR, "ekatMagicAnchor");
     assert_eq!(ability_object_kinds::RETURN_MARKER, "returnMarker");
@@ -149,7 +150,7 @@ fn stable_rust_public_surface_compiles() {
 
     assert_eq!(PREDICTION_PROTOCOL_VERSION, 1);
     assert_eq!(DEFAULT_FACTION_ID, "kriegsia");
-    assert_eq!(COMPACT_SNAPSHOT_VERSION, 34);
+    assert_eq!(COMPACT_SNAPSHOT_VERSION, 35);
     assert_eq!(SNAPSHOT_CODEC_VERSION, 1);
     assert_eq!(COMPACT_UNKNOWN_CODE, 255);
     assert_eq!(LAB_REPLAY_ARTIFACT_SCHEMA, "rts.labReplay");
@@ -203,10 +204,6 @@ fn compact_snapshot_encodes_scout_plane_owner_state() {
     );
     plane.scout_plane = Some(ScoutPlaneStateView {
         orbit_center: Some([512.0, 544.0]),
-        fuel_oil: 8,
-        fuel_capacity_oil: 8,
-        upkeep_oil: 1,
-        upkeep_interval_ticks: 20,
     });
 
     let snapshot = Snapshot {
@@ -241,8 +238,5 @@ fn compact_snapshot_encodes_scout_plane_owner_state() {
     let compact = serialize_compact_snapshot(&snapshot).unwrap();
     let value: serde_json::Value = serde_json::from_str(&compact).unwrap();
     assert_eq!(value["e"][0][2], serde_json::json!(25));
-    assert_eq!(
-        value["e"][0][33],
-        serde_json::json!([[512.0, 544.0], 8, 8, 1, 20])
-    );
+    assert_eq!(value["e"][0][33], serde_json::json!([[512.0, 544.0]]));
 }

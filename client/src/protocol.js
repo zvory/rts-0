@@ -281,7 +281,6 @@ export const cmd = Object.freeze({
     withQueued({ c: CMD.USE_ABILITY, ability: ABILITY.POINT_FIRE, units, x, y }, queued),
   blanketFire: (units, x, y, queued = false) =>
     withQueued({ c: CMD.USE_ABILITY, ability: ABILITY.BLANKET_FIRE, units, x, y }, queued),
-  dismissScoutPlane: (units) => ({ c: CMD.USE_ABILITY, ability: ABILITY.DISMISS_SCOUT_PLANE, units }),
   gather: (units, node, queued = false) =>
     withQueued({ c: CMD.GATHER, units, node }, queued),
   build: (units, building, tileX, tileY, queued = false) =>

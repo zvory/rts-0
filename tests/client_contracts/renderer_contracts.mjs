@@ -698,10 +698,6 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
       state: "move",
       scoutPlane: {
         orbitCenter: [320, 320],
-        fuelOil: 8,
-        fuelCapacityOil: 8,
-        upkeepOil: 1,
-        upkeepIntervalTicks: 20,
       },
     };
 

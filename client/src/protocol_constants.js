@@ -219,6 +219,7 @@ export const ABILITY = Object.freeze({
   POINT_FIRE: "pointFire",
   BLANKET_FIRE: "blanketFire",
   BREAKTHROUGH: "breakthrough",
+  SCOUT_PLANE: "scoutPlane",
   EKAT_TELEPORT: "ekatTeleport",
   EKAT_LINE_SHOT: "ekatLineShot",
   EKAT_MAGIC_ANCHOR: "ekatMagicAnchor",
@@ -261,7 +262,7 @@ export const MOVEMENT_PATH_DIAGNOSTICS = Object.freeze({
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";
-export const COMPACT_SNAPSHOT_VERSION = 34;
+export const COMPACT_SNAPSHOT_VERSION = 35;
 export const SNAPSHOT_CODEC_VERSION = 1;
 export const SNAPSHOT_CODEC = Object.freeze({
   COMPACT_JSON: "compact-json",
@@ -387,6 +388,7 @@ export const ORDER_STAGE = Object.freeze({
   POINT_FIRE: "pointFire",
   BLANKET_FIRE: "blanketFire",
   BREAKTHROUGH: "breakthrough",
+  SCOUT_PLANE: "scoutPlane",
   EKAT_TELEPORT: "ekatTeleport",
   EKAT_LINE_SHOT: "ekatLineShot",
   EKAT_MAGIC_ANCHOR: "ekatMagicAnchor",
@@ -414,6 +416,7 @@ export const ORDER_STAGE_CODE = Object.freeze({
   [ORDER_STAGE.EKAT_CONSUME_GOLEM]: 16,
   [ORDER_STAGE.BLANKET_FIRE]: 17,
   [ORDER_STAGE.DISMISS_SCOUT_PLANE]: 18,
+  [ORDER_STAGE.SCOUT_PLANE]: 19,
 });
 
 export const ABILITY_CODE = Object.freeze({
@@ -428,6 +431,7 @@ export const ABILITY_CODE = Object.freeze({
   [ABILITY.EKAT_CONSUME_GOLEM]: 9,
   [ABILITY.BLANKET_FIRE]: 10,
   [ABILITY.DISMISS_SCOUT_PLANE]: 11,
+  [ABILITY.SCOUT_PLANE]: 12,
 });
 
 export const ABILITY_OBJECT_KIND_CODE = Object.freeze({

@@ -93,9 +93,9 @@ fn player_with_oil(id: u32, oil: u32) -> PlayerState {
         is_ai: false,
         score: ScoreState::default(),
         upgrades: Default::default(),
+        ability_cooldowns: Default::default(),
     }
 }
-
 #[derive(Debug, Clone, Copy)]
 struct TankMovementBaseline {
     travel_ticks: u32,

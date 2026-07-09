@@ -135,13 +135,13 @@ fn player_state(id: u32, is_ai: bool) -> PlayerState {
         is_ai,
         score: ScoreState::default(),
         upgrades: Default::default(),
+        ability_cooldowns: Default::default(),
     }
 }
 
 fn default_team_relations() -> TeamRelations {
     TeamRelations::from_player_teams([(1, 1), (2, 2)])
 }
-
 fn team_relations(assignments: &[(u32, u32)]) -> TeamRelations {
     TeamRelations::from_player_teams(assignments.iter().copied())
 }

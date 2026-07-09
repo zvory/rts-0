@@ -1135,18 +1135,14 @@ export class Minimap {
       }
       return;
     }
-    const unitIds = [];
     const landUnitIds = [];
-    const scoutPlaneIds = [];
     for (const e of sel) {
       // Only own, controllable units take move orders (skip buildings/resources/enemies).
-      if (ownOwner(this.state, e.owner) && isUnit(e.kind)) {
-        unitIds.push(e.id);
-        if (e.kind === KIND.SCOUT_PLANE) scoutPlaneIds.push(e.id);
-        else landUnitIds.push(e.id);
+      if (ownOwner(this.state, e.owner) && isUnit(e.kind) && e.kind !== KIND.SCOUT_PLANE) {
+        landUnitIds.push(e.id);
       }
     }
-    if (unitIds.length === 0) {
+    if (landUnitIds.length === 0) {
       const producers = sel
         .filter((e) => ownOwner(this.state, e.owner) && isProducerBuilding(e.kind))
         .map((e) => e.id);
@@ -1162,11 +1158,8 @@ export class Minimap {
       if (landUnitIds.length > 0) {
         this._issueCommand(cmd.attackMove(landUnitIds, wx, wy, queued));
       }
-      if (scoutPlaneIds.length > 0) {
-        this._issueCommand(cmd.move(scoutPlaneIds, wx, wy, queued));
-      }
-      if (landUnitIds.length > 0 || scoutPlaneIds.length > 0) {
-        this._addCommandFeedback(landUnitIds.length > 0 ? "attack" : "move", wx, wy, queued);
+      if (landUnitIds.length > 0) {
+        this._addCommandFeedback("attack", wx, wy, queued);
       }
       return;
     }
@@ -1178,7 +1171,7 @@ export class Minimap {
         ? sel
             .filter((e) => ownOwner(this.state, e.owner) && carriers.includes(e.kind))
             .map((e) => e.id)
-        : unitIds;
+        : landUnitIds;
       if (abilityUnits.length === 0) return;
       const selectedCarriers = sel
         .filter((e) => abilityUnits.includes(e.id))
@@ -1206,7 +1199,7 @@ export class Minimap {
       this._addCommandFeedback("attack", wx, wy, queued, radiusTiles);
       return;
     }
-    this._issueCommand(cmd.move(unitIds, wx, wy, queued));
+    this._issueCommand(cmd.move(landUnitIds, wx, wy, queued));
     this._addCommandFeedback("move", wx, wy, queued);
   }
 }

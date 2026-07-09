@@ -31,7 +31,6 @@ use crate::game::services::order_execution::{
     start_artillery_fire_command_order, ArtilleryFireMode, FutureOrderMode,
 };
 use crate::game::services::order_planner as planner;
-use crate::game::services::scout_plane::{self, train_notice};
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::standability;
 use crate::game::services::world_query::{self, owns_unit};
@@ -50,11 +49,12 @@ const MAX_RALLY_STAGES: usize = 4;
 mod artillery_scatter;
 mod guards;
 mod planner_facts;
+mod scout_plane_ability;
 #[cfg(test)]
 use self::artillery_scatter::artillery_error_tiles;
 use self::artillery_scatter::{artillery_blanket_point, artillery_scattered_point};
 use self::guards::{
-    dedupe_cap_units, is_constructing, is_scout_plane, player_is_ai, rally_intent_for_map,
+    dedupe_cap_units, is_constructing, player_is_ai, rally_intent_for_map,
     unit_can_accept_ground_command, unit_can_accept_player_command,
 };
 use self::planner_facts::{planner_config, planner_facts, AbilityFactInput};
@@ -684,14 +684,8 @@ mod planned_actions {
                 planner::PlannedAction::ReplaceActive { unit, intent } => match intent {
                     planner::OrderIntent::Move(point) => {
                         if immediate_unit_can_replace(entities, player, unit) {
-                            if is_scout_plane(entities, unit) {
-                                let _ = scout_plane::retarget(
-                                    map, entities, unit, point.x, point.y, true,
-                                );
-                            } else {
-                                move_goal = Some((point.x, point.y));
-                                move_units.push(unit);
-                            }
+                            move_goal = Some((point.x, point.y));
+                            move_units.push(unit);
                         }
                     }
                     planner::OrderIntent::AttackMove(point) => {
@@ -862,14 +856,6 @@ mod planned_actions {
                         }
                     }
                     if let Some(intent) = entity_order_intent_from_planner(intent) {
-                        if let OrderIntent::Move(point) = intent {
-                            if is_scout_plane(entities, unit) {
-                                let _ = scout_plane::append_queued_retarget(
-                                    map, entities, unit, point.x, point.y,
-                                );
-                                continue;
-                            }
-                        }
                         match &intent {
                             OrderIntent::Attack(attack)
                                 if !attack_target_valid(
@@ -1159,17 +1145,15 @@ fn use_ability(
     let tick = ctx.tick;
 
     let ability = request.ability;
-    if ability == AbilityKind::DismissScoutPlane {
-        if !request.queued {
-            scout_plane::dismiss_selected(entities, player, &request.units);
-        }
-        return;
-    }
     let definition = ability::definition(ability);
     if request.queued && !definition.may_queue {
         return;
     }
     if definition.effect_hook == AbilityEffectHook::ReservedNoop {
+        return;
+    }
+    if ability == AbilityKind::ScoutPlane {
+        scout_plane_ability::use_ability(map, entities, players, events, player, &faction_id, request);
         return;
     }
     if let Some(mode) = artillery_fire_mode_for(ability) {
@@ -1755,7 +1739,6 @@ fn order_train(
         notice(events, player, "Requirement not met");
         return;
     }
-    if let Some(msg) = train_notice(unit, entities, player) { notice(events, player, msg); return; }
     let stats = match config::unit_stats(unit) {
         Some(s) => s,
         None => {

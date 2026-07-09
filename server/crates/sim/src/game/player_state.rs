@@ -17,6 +17,7 @@ impl PlayerState {
         self.supply_cap = 0;
         self.score = Default::default();
         self.upgrades.clear();
+        self.ability_cooldowns.clear();
     }
 
     pub(crate) fn can_afford(&self, steel: u32, oil: u32) -> bool {

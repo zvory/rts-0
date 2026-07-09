@@ -10,7 +10,7 @@ import {
 export function _commitClickSelection(p, additive, ctrl) {
   const world = this._worldAt(p.x, p.y);
   const hit = this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ true);
-  if (!hit) {
+  if (!hit || (hit.kind === KIND.SCOUT_PLANE && !scoutPlaneInspectable(this.state))) {
     if (!additive) clearSelection(this);
     return;
   }
@@ -190,8 +190,13 @@ function ownOwner(state, owner) {
 
 export function selectableEntity(state, entity, spectator) {
   if (state?.controlPolicy?.kind === "lab") return state.controlPolicy.canSelectEntity(entity, state);
+  if (entity?.kind === KIND.SCOUT_PLANE) return scoutPlaneInspectable(state);
   if (!spectator) return ownOwner(state, entity.owner);
   return entity.owner !== 0;
+}
+
+function scoutPlaneInspectable(state) {
+  return state?.controlPolicy?.kind === "lab" || !!state?.spectator;
 }
 
 function closeCommandCardMenu(input) {

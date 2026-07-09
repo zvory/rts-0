@@ -495,16 +495,12 @@ pub struct AbilityCooldownView {
 }
 
 /// Owner/spectator-only Scout Plane state. Enemy snapshots that can see the plane still omit this
-/// private state so orbit/fuel intent does not leak through fog.
+/// private state so orbit intent does not leak through fog.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ScoutPlaneStateView {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub orbit_center: Option<[f32; 2]>,
-    pub fuel_oil: u8,
-    pub fuel_capacity_oil: u8,
-    pub upkeep_oil: u8,
-    pub upkeep_interval_ticks: u16,
 }
 
 /// One entity as seen by one player. Optional fields are omitted when not applicable.

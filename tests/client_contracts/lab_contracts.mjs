@@ -479,7 +479,7 @@ await withFakeDocument(async () => {
   );
   assert(
     labSpawnUnitKindsForFaction(DEFAULT_FACTION_ID).includes(KIND.SCOUT_PLANE),
-    "LabPanel spawn palette includes trainable Kriegsia Scout Plane",
+    "LabPanel spawn palette includes Kriegsia Scout Plane for direct lab spawning",
   );
   assert(
     STATS[KIND.BARRACKS].trains.includes(KIND.PANZERFAUST),

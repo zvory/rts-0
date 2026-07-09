@@ -237,10 +237,11 @@ profile id, cadence, persistent decision memory, and its latest bounded decision
 spectator-only observer diagnostics. Unknown live profile ids resolve to the promoted live default,
 currently `ai_1_2`, which resolves to `ai_1_2_wave_cohorts`. The ordinary lobby exposes AI 1.0,
 AI 1.1, AI 1.2, AI 2.0, AI 2.1, and AI Turtle as suite requests. AI 1.2 is the live lobby default.
-Panzerfaust is trainable for Kriegsia players after a completed Training Centre, and Scout Plane is
-trainable from City Centre after completed Gun Works or Vehicle Works, but current AI production
-profiles intentionally omit both units in the first pass. AI-owned Panzerfaust or Scout Plane units
-spawned by lab/dev setup still use their normal simulation behavior.
+Panzerfaust is trainable for Kriegsia players after a completed Training Centre. Scout Plane is a
+Command Car world-point ability that launches from an owned completed City Centre, but current AI
+profiles intentionally omit Panzerfaust training and Scout Plane ability usage in the first pass.
+AI-owned Panzerfaust or Scout Plane units spawned by lab/dev setup still use their normal simulation
+behavior.
 
 **Self-play scorecards.** The `ai-matchup`, `ai-arena`, and `ai-balance-matrix` developer tools emit
 profile-agnostic baseline scorecards from public self-play commands and snapshots. Per-player

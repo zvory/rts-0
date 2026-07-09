@@ -1,150 +1,59 @@
 use std::collections::BTreeSet;
 
 use crate::config;
-use crate::game::entity::{EntityKind, EntityStore, OrderIntent, MAX_QUEUED_ORDERS};
+use crate::game::entity::{EntityKind, EntityStore, ScoutPlaneState};
 use crate::game::map::Map;
+use crate::game::services::dist2;
 
 const TWO_PI: f32 = std::f32::consts::PI * 2.0;
 const ORBIT_PHASE_EPS: f32 = 0.001;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum ScoutPlaneProductionLimit {
+pub(crate) enum ScoutPlaneLaunchError {
     Active,
-    InProduction,
+    NoCityCentre,
 }
 
-pub(crate) fn production_limit(
-    entities: &EntityStore,
-    owner: u32,
-) -> Option<ScoutPlaneProductionLimit> {
-    if entities
-        .iter()
-        .any(|plane| plane.kind == EntityKind::ScoutPlane && plane.owner == owner && plane.hp > 0)
-    {
-        return Some(ScoutPlaneProductionLimit::Active);
-    }
-    if entities.iter().any(|building| {
-        building.owner == owner
-            && building
-                .prod_queue()
-                .iter()
-                .any(|item| item.unit == EntityKind::ScoutPlane)
-    }) {
-        return Some(ScoutPlaneProductionLimit::InProduction);
-    }
-    None
-}
-
-pub(crate) fn train_notice(
-    unit: EntityKind,
-    entities: &EntityStore,
-    owner: u32,
-) -> Option<&'static str> {
-    if unit != EntityKind::ScoutPlane {
-        return None;
-    }
-    match production_limit(entities, owner) {
-        Some(ScoutPlaneProductionLimit::Active) => Some("Scout Plane already active"),
-        Some(ScoutPlaneProductionLimit::InProduction) => Some("Scout Plane already in production"),
-        None => None,
-    }
-}
-
-pub(crate) fn launch_from_building(
+pub(crate) fn launch_ability(
     map: &Map,
     entities: &mut EntityStore,
     owner: u32,
-    building: u32,
-) -> Option<u32> {
-    let (launch_x, launch_y, target) = {
-        let building = entities.get(building)?;
-        let launch = (building.pos_x, building.pos_y);
-        let target = building
-            .rally_plan()
-            .first()
-            .map(|rally| (rally.point.x, rally.point.y))
-            .unwrap_or(launch);
-        (launch.0, launch.1, target)
+    x: f32,
+    y: f32,
+) -> Result<u32, ScoutPlaneLaunchError> {
+    if active_scout_plane(entities, owner).is_some() {
+        return Err(ScoutPlaneLaunchError::Active);
+    }
+    let Some((target_x, target_y)) = clamp_world_point(map, x, y) else {
+        return Err(ScoutPlaneLaunchError::NoCityCentre);
     };
-
-    let target = clamp_world_point(map, target.0, target.1).unwrap_or((launch_x, launch_y));
-    let spawned = entities.spawn_unit(owner, EntityKind::ScoutPlane, launch_x, launch_y)?;
+    let Some((home_id, launch_x, launch_y)) =
+        nearest_owned_completed_city_centre(entities, owner, target_x, target_y)
+    else {
+        return Err(ScoutPlaneLaunchError::NoCityCentre);
+    };
+    let spawned = entities
+        .spawn_unit(owner, EntityKind::ScoutPlane, launch_x, launch_y)
+        .ok_or(ScoutPlaneLaunchError::NoCityCentre)?;
     if let Some(plane) = entities.get_mut(spawned) {
-        let _ = plane.retarget_scout_plane(target.0, target.1);
+        if let Some(state) = plane.scout_plane_state_mut() {
+            *state = ScoutPlaneState::launched_from(home_id, target_x, target_y);
+        }
     }
-    Some(spawned)
+    Ok(spawned)
 }
 
-pub(crate) fn retarget(
-    map: &Map,
-    entities: &mut EntityStore,
-    unit: u32,
-    x: f32,
-    y: f32,
-    clear_queued: bool,
-) -> bool {
-    let Some((x, y)) = clamp_world_point(map, x, y) else {
-        return false;
-    };
-    let Some(plane) = entities.get_mut(unit) else {
-        return false;
-    };
-    if plane.kind != EntityKind::ScoutPlane || plane.hp == 0 {
-        return false;
-    }
-    if clear_queued {
-        plane.clear_queued_orders();
-    }
-    plane.clear_path();
-    plane.set_path_goal(None);
-    plane.clear_active_order();
-    plane.retarget_scout_plane(x, y)
-}
-
-pub(crate) fn append_queued_retarget(
-    map: &Map,
-    entities: &mut EntityStore,
-    unit: u32,
-    x: f32,
-    y: f32,
-) -> bool {
-    let Some((x, y)) = clamp_world_point(map, x, y) else {
-        return false;
-    };
-    let Some(plane) = entities.get_mut(unit) else {
-        return false;
-    };
-    if plane.kind != EntityKind::ScoutPlane || plane.hp == 0 {
-        return false;
-    }
-    plane.append_queued_order(OrderIntent::move_to(x, y))
-}
-
-pub(in crate::game::services) fn dismiss(
-    entities: &mut EntityStore,
-    owner: u32,
-    unit: u32,
-) -> bool {
-    let Some(plane) = entities.get(unit) else {
-        return false;
-    };
-    if plane.kind != EntityKind::ScoutPlane || plane.owner != owner {
-        return false;
-    }
-    entities.remove(unit).is_some()
-}
-
-pub(in crate::game::services) fn dismiss_selected(
-    entities: &mut EntityStore,
-    owner: u32,
-    units: &[u32],
-) {
-    for unit in units {
-        let _ = dismiss(entities, owner, *unit);
-    }
+pub(crate) fn active_scout_plane(entities: &EntityStore, owner: u32) -> Option<u32> {
+    entities
+        .iter()
+        .filter(|plane| plane.kind == EntityKind::ScoutPlane && plane.owner == owner && plane.hp > 0)
+        .map(|plane| plane.id)
+        .min()
 }
 
 pub(crate) fn advance_scout_planes(map: &Map, entities: &mut EntityStore) {
+    dismiss_inactive_or_duplicate_planes(entities);
+
     let world_max = (map.world_size_px() - 0.01).max(0.0);
     let speed = config::unit_stats(EntityKind::ScoutPlane)
         .map(|stats| stats.speed)
@@ -155,70 +64,75 @@ pub(crate) fn advance_scout_planes(map: &Map, entities: &mut EntityStore) {
         return;
     }
 
+    let mut removals = Vec::new();
     for id in entities.ids() {
         ensure_state(entities, id);
-        let Some(snapshot) = scout_plane_snapshot(map, entities, id) else {
+        let Some(snapshot) = scout_plane_runtime_snapshot(map, entities, id) else {
             continue;
         };
-        let step = advance_one(snapshot, speed, orbit_radius, world_max);
+
+        if snapshot.returning {
+            let Some(home) = snapshot.home_position else {
+                removals.push(id);
+                continue;
+            };
+            let step = advance_return(snapshot.flight.x, snapshot.flight.y, home, speed, world_max);
+            if let Some(plane) = entities.get_mut(id) {
+                plane.clear_path();
+                plane.set_path_goal(None);
+                plane.set_position(step.x, step.y);
+                plane.set_movement_delta(step.x - snapshot.flight.x, step.y - snapshot.flight.y);
+                if let Some(facing) = step.facing {
+                    plane.set_facing(facing);
+                }
+            }
+            if step.arrived {
+                removals.push(id);
+            }
+            continue;
+        }
+
+        let step = advance_one(snapshot.flight, speed, orbit_radius, world_max);
+        let mut station_expired = false;
         if let Some(plane) = entities.get_mut(id) {
             plane.clear_path();
             plane.set_path_goal(None);
             plane.set_position(step.x, step.y);
-            plane.set_movement_delta(step.x - snapshot.x, step.y - snapshot.y);
+            plane.set_movement_delta(step.x - snapshot.flight.x, step.y - snapshot.flight.y);
             if let Some(facing) = step.facing {
                 plane.set_facing(facing);
             }
             let _ = plane.update_scout_plane_runtime(step.center, step.phase, step.orbiting);
-        }
-        if step.orbiting {
-            promote_next_queued_center(map, entities, id);
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(in crate::game) enum FuelAccountRequest {
-    CheckAccount,
-    PayUpkeep(u32),
-    RefillReserveUpTo(u32),
-}
-
-pub(in crate::game) fn upkeep_system(
-    entities: &mut EntityStore,
-    mut account_fuel: impl FnMut(u32, FuelAccountRequest) -> Option<u32>,
-) {
-    dismiss_inactive_or_duplicate_planes(entities);
-    for (id, owner) in active_scout_planes(entities) {
-        if account_fuel(owner, FuelAccountRequest::CheckAccount).is_none() {
-            let _ = entities.remove(id);
-            continue;
-        }
-        if scout_plane_fuel(entities, id).is_some_and(|fuel| fuel == 0) {
-            let _ = entities.remove(id);
-            continue;
-        }
-        if tick_upkeep_timer(entities, id) {
-            let upkeep = config::SCOUT_PLANE_UPKEEP_OIL as u32;
-            let Some(paid) = account_fuel(owner, FuelAccountRequest::PayUpkeep(upkeep)) else {
-                let _ = entities.remove(id);
-                continue;
-            };
-            if paid < upkeep && drain_fuel(entities, id) {
-                let _ = entities.remove(id);
-                continue;
+            if step.orbiting {
+                let just_arrived = !snapshot.flight.orbiting;
+                if let Some(state) = plane.scout_plane_state_mut() {
+                    if !just_arrived {
+                        state.station_ticks_remaining =
+                            state.station_ticks_remaining.saturating_sub(1);
+                    }
+                    station_expired = state.station_ticks_remaining == 0;
+                }
             }
         }
-        let missing = missing_fuel_oil(entities, id);
-        let Some(refill) = account_fuel(owner, FuelAccountRequest::RefillReserveUpTo(missing))
-        else {
-            let _ = entities.remove(id);
-            continue;
-        };
-        let refill = refill.min(missing);
-        if refill > 0 {
-            refill_fuel(entities, id, refill as u8);
+
+        if station_expired {
+            match snapshot.home_position {
+                Some(home) => {
+                    if let Some(plane) = entities.get_mut(id) {
+                        if let Some(state) = plane.scout_plane_state_mut() {
+                            state.returning = true;
+                            state.orbiting = false;
+                            state.orbit_center = home;
+                        }
+                    }
+                }
+                None => removals.push(id),
+            }
         }
+    }
+
+    for id in removals {
+        let _ = entities.remove(id);
     }
 }
 
@@ -232,10 +146,7 @@ fn dismiss_inactive_or_duplicate_planes(entities: &mut EntityStore) {
         if plane.kind != EntityKind::ScoutPlane {
             continue;
         }
-        let empty_fuel = plane
-            .scout_plane_state()
-            .is_some_and(|state| state.fuel_oil == 0);
-        if plane.hp == 0 || plane.owner == 0 || empty_fuel || !seen_owners.insert(plane.owner) {
+        if plane.hp == 0 || plane.owner == 0 || !seen_owners.insert(plane.owner) {
             dismissals.push(id);
         }
     }
@@ -244,82 +155,18 @@ fn dismiss_inactive_or_duplicate_planes(entities: &mut EntityStore) {
     }
 }
 
-fn active_scout_planes(entities: &EntityStore) -> Vec<(u32, u32)> {
-    entities
-        .iter()
-        .filter(|plane| plane.kind == EntityKind::ScoutPlane && plane.hp > 0 && plane.owner != 0)
-        .map(|plane| (plane.id, plane.owner))
-        .collect()
-}
-
-fn tick_upkeep_timer(entities: &mut EntityStore, id: u32) -> bool {
-    let Some(plane) = entities.get_mut(id) else {
-        return false;
-    };
-    let Some(state) = plane.scout_plane_state_mut() else {
-        return false;
-    };
-    let interval = config::SCOUT_PLANE_UPKEEP_INTERVAL_TICKS.max(1);
-    if state.upkeep_ticks_until_due == 0 {
-        state.upkeep_ticks_until_due = interval;
-    }
-    state.upkeep_ticks_until_due = state.upkeep_ticks_until_due.saturating_sub(1);
-    if state.upkeep_ticks_until_due == 0 {
-        state.upkeep_ticks_until_due = interval;
-        true
-    } else {
-        false
-    }
-}
-
-fn scout_plane_fuel(entities: &EntityStore, id: u32) -> Option<u8> {
-    entities
-        .get(id)?
-        .scout_plane_state()
-        .map(|state| state.fuel_oil)
-}
-
-fn drain_fuel(entities: &mut EntityStore, id: u32) -> bool {
-    let Some(plane) = entities.get_mut(id) else {
-        return true;
-    };
-    let Some(state) = plane.scout_plane_state_mut() else {
-        return true;
-    };
-    state.fuel_oil = state
-        .fuel_oil
-        .saturating_sub(config::SCOUT_PLANE_UPKEEP_OIL);
-    state.fuel_oil == 0
-}
-
-fn missing_fuel_oil(entities: &EntityStore, id: u32) -> u32 {
-    let Some(fuel) = scout_plane_fuel(entities, id) else {
-        return 0;
-    };
-    config::SCOUT_PLANE_FUEL_RESERVE_OIL.saturating_sub(fuel) as u32
-}
-
-fn refill_fuel(entities: &mut EntityStore, id: u32, amount: u8) {
-    if amount == 0 {
-        return;
-    }
-    let Some(plane) = entities.get_mut(id) else {
-        return;
-    };
-    let Some(state) = plane.scout_plane_state_mut() else {
-        return;
-    };
-    state.fuel_oil = state
-        .fuel_oil
-        .saturating_add(amount)
-        .min(config::SCOUT_PLANE_FUEL_RESERVE_OIL);
-}
-
 fn ensure_state(entities: &mut EntityStore, id: u32) {
     let Some(plane) = entities.get_mut(id) else {
         return;
     };
     plane.ensure_scout_plane_state();
+}
+
+#[derive(Clone, Copy)]
+struct ScoutPlaneRuntimeSnapshot {
+    flight: ScoutPlaneSnapshot,
+    home_position: Option<(f32, f32)>,
+    returning: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -331,7 +178,11 @@ struct ScoutPlaneSnapshot {
     orbiting: bool,
 }
 
-fn scout_plane_snapshot(map: &Map, entities: &EntityStore, id: u32) -> Option<ScoutPlaneSnapshot> {
+fn scout_plane_runtime_snapshot(
+    map: &Map,
+    entities: &EntityStore,
+    id: u32,
+) -> Option<ScoutPlaneRuntimeSnapshot> {
     let plane = entities.get(id)?;
     if plane.kind != EntityKind::ScoutPlane || plane.hp == 0 {
         return None;
@@ -344,12 +195,19 @@ fn scout_plane_snapshot(map: &Map, entities: &EntityStore, id: u32) -> Option<Sc
     } else {
         0.0
     };
-    Some(ScoutPlaneSnapshot {
-        x: plane.pos_x,
-        y: plane.pos_y,
-        center,
-        phase,
-        orbiting: state.orbiting,
+    let home_position = state
+        .home_city_centre
+        .and_then(|home| home_position(entities, plane.owner, home));
+    Some(ScoutPlaneRuntimeSnapshot {
+        flight: ScoutPlaneSnapshot {
+            x: plane.pos_x,
+            y: plane.pos_y,
+            center,
+            phase,
+            orbiting: state.orbiting,
+        },
+        home_position,
+        returning: state.returning,
     })
 }
 
@@ -441,21 +299,78 @@ fn advance_one(
     }
 }
 
-fn promote_next_queued_center(map: &Map, entities: &mut EntityStore, id: u32) {
-    for _ in 0..MAX_QUEUED_ORDERS {
-        let Some(intent) = entities
-            .get_mut(id)
-            .and_then(|plane| plane.pop_promoted_intent())
-        else {
-            return;
+#[derive(Clone, Copy)]
+struct ReturnStep {
+    x: f32,
+    y: f32,
+    facing: Option<f32>,
+    arrived: bool,
+}
+
+fn advance_return(
+    x: f32,
+    y: f32,
+    target: (f32, f32),
+    speed: f32,
+    world_max: f32,
+) -> ReturnStep {
+    let x = x.clamp(0.0, world_max);
+    let y = y.clamp(0.0, world_max);
+    let target = (target.0.clamp(0.0, world_max), target.1.clamp(0.0, world_max));
+    let dx = target.0 - x;
+    let dy = target.1 - y;
+    let dist = (dx * dx + dy * dy).sqrt();
+    if !dist.is_finite() || dist <= speed.max(0.0) + ORBIT_PHASE_EPS {
+        return ReturnStep {
+            x: target.0,
+            y: target.1,
+            facing: (dist > ORBIT_PHASE_EPS).then_some(dy.atan2(dx)),
+            arrived: true,
         };
-        let OrderIntent::Move(point) = intent else {
-            continue;
-        };
-        if retarget(map, entities, id, point.x, point.y, false) {
-            return;
-        }
     }
+    let travel = speed.max(0.0);
+    let inv = 1.0 / dist;
+    ReturnStep {
+        x: (x + dx * inv * travel).clamp(0.0, world_max),
+        y: (y + dy * inv * travel).clamp(0.0, world_max),
+        facing: Some(dy.atan2(dx)),
+        arrived: false,
+    }
+}
+
+fn nearest_owned_completed_city_centre(
+    entities: &EntityStore,
+    owner: u32,
+    x: f32,
+    y: f32,
+) -> Option<(u32, f32, f32)> {
+    entities
+        .iter()
+        .filter(|candidate| {
+            candidate.owner == owner
+                && candidate.kind == EntityKind::CityCentre
+                && candidate.hp > 0
+                && !candidate.under_construction()
+        })
+        .map(|candidate| {
+            (
+                candidate.id,
+                candidate.pos_x,
+                candidate.pos_y,
+                dist2(x, y, candidate.pos_x, candidate.pos_y),
+            )
+        })
+        .min_by(|a, b| a.3.total_cmp(&b.3).then_with(|| a.0.cmp(&b.0)))
+        .map(|(id, pos_x, pos_y, _)| (id, pos_x, pos_y))
+}
+
+fn home_position(entities: &EntityStore, owner: u32, home: u32) -> Option<(f32, f32)> {
+    let building = entities.get(home)?;
+    (building.owner == owner
+        && building.kind == EntityKind::CityCentre
+        && building.hp > 0
+        && !building.under_construction())
+    .then_some((building.pos_x, building.pos_y))
 }
 
 fn clamp_world_point(map: &Map, x: f32, y: f32) -> Option<(f32, f32)> {

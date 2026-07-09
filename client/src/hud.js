@@ -487,14 +487,6 @@ export class HUD {
         this._issueCommand(cmd.holdPosition(intent.unitIds || []));
         this._intent()?.endCommandTarget?.();
         return;
-      case "dismissScoutPlane":
-        this._issueCommand(cmd.dismissScoutPlane(intent.unitIds || []));
-        this._intent()?.endCommandTarget?.();
-        return;
-      case "selectActiveScoutPlane":
-        this._selectAndPanToEntity(intent.unitId);
-        this._intent()?.endCommandTarget?.();
-        return;
       case "train":
         this._issueTrain(intent.unit);
         return;

@@ -62,7 +62,7 @@ impl TechRequirement {
     }
 }
 
-const CITY_CENTRE_UNITS: &[EntityKind] = &[EntityKind::Worker, EntityKind::ScoutPlane];
+const CITY_CENTRE_UNITS: &[EntityKind] = &[EntityKind::Worker];
 const GOLEM_ONLY: &[EntityKind] = &[EntityKind::Golem];
 const BARRACKS_UNITS: &[EntityKind] = &[
     EntityKind::Rifleman,
@@ -86,8 +86,6 @@ const TRAINING_CENTRE_REQUIRED: &[EntityKind] = &[EntityKind::TrainingCentre];
 const CITY_CENTRE_AND_TRAINING_CENTRE_REQUIRED: &[EntityKind] =
     &[EntityKind::CityCentre, EntityKind::TrainingCentre];
 const STEELWORKS_REQUIRED: &[EntityKind] = &[EntityKind::Steelworks];
-pub const SCOUT_PLANE_UNLOCK_BUILDINGS: &[EntityKind] =
-    &[EntityKind::Steelworks, EntityKind::Factory];
 const FACTORY_BUILDING_REQUIRED: &[EntityKind] = &[EntityKind::Factory];
 const FACTORY_REQUIRED: &[EntityKind] = &[EntityKind::CityCentre, EntityKind::TrainingCentre];
 
@@ -304,13 +302,13 @@ pub const UNITS: &[UnitDef] = &[
             cost_steel: balance::SCOUT_PLANE_COST_STEEL,
             cost_oil: balance::SCOUT_PLANE_COST_OIL,
             supply: balance::SCOUT_PLANE_SUPPLY,
-            build_ticks: balance::SCOUT_PLANE_BUILD_TICKS,
+            build_ticks: 0,
             radius: 0.0,
         },
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::None,
-        trained_at: Some(EntityKind::CityCentre),
-        train_requirement: TechRequirement::Any(SCOUT_PLANE_UNLOCK_BUILDINGS),
+        trained_at: None,
+        train_requirement: TechRequirement::All(&[]),
     },
     UnitDef {
         kind: EntityKind::CommandCar,

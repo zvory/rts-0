@@ -973,6 +973,7 @@ mod tests {
             is_ai: false,
             score: ScoreState::default(),
             upgrades: Default::default(),
+            ability_cooldowns: Default::default(),
         }
     }
 }

@@ -129,8 +129,6 @@ impl SnapshotOptions {
     }
 }
 
-/// Per-player economy and bookkeeping carried for the whole match. Visible to `systems` (the
-/// only other module that mutates economy), but not part of the public API.
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PlayerState {
@@ -149,6 +147,8 @@ pub(crate) struct PlayerState {
     pub(crate) is_ai: bool,
     pub(crate) score: ScoreState,
     pub(crate) upgrades: BTreeSet<upgrade::UpgradeKind>,
+    #[serde(default)]
+    pub(crate) ability_cooldowns: BTreeMap<ability::AbilityKind, u16>,
 }
 
 /// Per-player score-screen counters. Values are accumulated from authoritative entity lifecycle

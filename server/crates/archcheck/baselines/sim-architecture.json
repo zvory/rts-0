@@ -1,5 +1,5 @@
 {
-  "reason": "add Game primary-base objective query for AI-only live outcomes",
+  "reason": "Extract Scout Plane command ability handler from oversized command service",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -701,6 +701,12 @@
     },
     {
       "source": "commands",
+      "target": "ability_orders",
+      "path": "services/commands/scout_plane_ability.rs",
+      "line": 6
+    },
+    {
+      "source": "commands",
       "target": "construction",
       "path": "services/commands.rs",
       "line": 21
@@ -746,6 +752,12 @@
       "target": "scout_plane",
       "path": "services/commands.rs",
       "line": 34
+    },
+    {
+      "source": "commands",
+      "target": "scout_plane",
+      "path": "services/commands/scout_plane_ability.rs",
+      "line": 9
     },
     {
       "source": "commands",
@@ -1095,6 +1107,11 @@
       "name": "apply_commands"
     },
     {
+      "path": "services/commands/scout_plane_ability.rs",
+      "line": 17,
+      "name": "use_ability"
+    },
+    {
       "path": "services/commands.rs",
       "line": 1492,
       "name": "artillery_point_fire_system"
@@ -1319,6 +1336,16 @@
     {
       "path": "services/commands.rs",
       "line": 40,
+      "code": "use crate::game::PlayerState;"
+    },
+    {
+      "path": "services/commands/scout_plane_ability.rs",
+      "line": 20,
+      "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/commands/scout_plane_ability.rs",
+      "line": 10,
       "code": "use crate::game::PlayerState;"
     },
     {

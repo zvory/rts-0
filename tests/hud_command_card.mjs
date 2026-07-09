@@ -226,7 +226,7 @@ function buttonSlots(card) {
 
 {
   const cityCentre = { id: 27, owner: 1, kind: KIND.CITY_CENTRE, buildProgress: null };
-  const scoutPlaneCard = buildCommandCardDescriptors({
+  const cityCentreCard = buildCommandCardDescriptors({
     playerId: 1,
     selection: [cityCentre],
     resources: { steel: 1000, oil: 1000, supplyUsed: 0, supplyCap: 20 },
@@ -235,15 +235,11 @@ function buttonSlots(card) {
     groupCooldownClocks: () => [],
   });
   const scoutPlaneCommandId = kriegsiaCommandId("train", KIND.SCOUT_PLANE);
-  assert.deepEqual(commandCardActivationCandidates(scoutPlaneCard, scoutPlaneCommandId), [{
-    commandId: scoutPlaneCommandId,
-    slotIndex: 6,
-    hotkey: "Z",
-    label: "Scout Plane",
-    enabled: true,
-  }], "City Centre exposes Scout Plane production in the Z slot");
-  assert.equal(scoutPlaneCard.slots[6].cost.steel, 50);
-  assert.equal(scoutPlaneCard.slots[6].cost.oil, 50);
+  assert.deepEqual(
+    commandCardActivationCandidates(cityCentreCard, scoutPlaneCommandId),
+    [],
+    "City Centre no longer exposes Scout Plane production",
+  );
 }
 
 {
@@ -356,7 +352,10 @@ function buttonSlots(card) {
     { commandId: kriegsiaCommandId("ability", ABILITY.BREAKTHROUGH), slotIndex: 2, hotkey: "E" },
     { commandId: "unit.attack", slotIndex: 3, hotkey: "A" },
     { commandId: "unit.stop", slotIndex: 4, hotkey: "S" },
+    { commandId: kriegsiaCommandId("ability", ABILITY.SCOUT_PLANE), slotIndex: 8, hotkey: "C" },
   ]);
+  assert.equal(commandCarCard.slots[8].cost.steel, 50);
+  assert.equal(commandCarCard.slots[8].cost.oil, 50);
 }
 
 {
@@ -476,8 +475,7 @@ function buttonSlots(card) {
     "worker-main",
     "worker-build",
     "mixed-army-support",
-    "scout-plane",
-    "mixed-worker-scout-plane",
+    "command-car",
     "city-centre-train",
     "barracks-train",
     "factory-train",
