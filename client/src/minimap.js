@@ -297,11 +297,11 @@ export class Minimap {
 
     const entities = this._minimapEntities(frameViews);
     this._drawTerrainLayer();
-    this._drawEntities(entities, { deferPlayerOwned: true });
+    this._drawEntities(entities, { deferForegroundPlayer: true });
     this._drawFog();
     this._drawResourceLayer();
     this._drawPlayerOwnedEntityOutline(entities);
-    this._drawEntities(entities, { playerOwnedOnly: true });
+    this._drawEntities(entities, { foregroundPlayerOnly: true });
     const now = performance.now();
     this._drawArtilleryFiringMarkers(now);
     this._drawViewport();
@@ -649,14 +649,15 @@ export class Minimap {
     return entities;
   }
 
-  /** Draw colored blips for visible entities. Player-owned blips can be drawn last over resources. */
-  _drawEntities(entities, { deferPlayerOwned = false, playerOwnedOnly = false } = {}) {
+  /** Draw colored blips for visible entities. Foreground player blips draw last over resources. */
+  _drawEntities(entities, { deferForegroundPlayer = false, foregroundPlayerOnly = false } = {}) {
     const ctx = this.ctx;
     if (!Array.isArray(entities)) return;
     for (const e of entities) {
       const playerOwned = this._isPlayerOwnedMinimapEntity(e);
-      if (playerOwnedOnly && !playerOwned) continue;
-      if (deferPlayerOwned && playerOwned) continue;
+      const foregroundPlayer = this._isForegroundPlayerMinimapEntity(e);
+      if (foregroundPlayerOnly && !foregroundPlayer) continue;
+      if (deferForegroundPlayer && foregroundPlayer) continue;
       const color = this._blipColor(e);
       this._drawEntityBlip(ctx, e, color, playerOwned);
     }
@@ -667,21 +668,24 @@ export class Minimap {
     return Number.isFinite(owner) && owner !== 0 && !isResource(e?.kind);
   }
 
+  _isForegroundPlayerMinimapEntity(e) {
+    return this._isPlayerOwnedMinimapEntity(e) && !e?.visionOnly;
+  }
+
   _drawPlayerOwnedEntityOutline(entities) {
     if (!Array.isArray(entities)) return;
+    if (!entities.some((e) => this._isForegroundPlayerMinimapEntity(e))) return;
+
     const layer = this._ensurePlayerBlipMaskLayer();
     if (!layer) return;
 
     const { canvas, ctx: maskCtx } = layer;
     maskCtx.clearRect(0, 0, this.size, this.size);
 
-    let drewMask = false;
     for (const e of entities) {
-      if (!this._isPlayerOwnedMinimapEntity(e)) continue;
+      if (!this._isForegroundPlayerMinimapEntity(e)) continue;
       this._drawEntityBlip(maskCtx, e, MINIMAP_PLAYER_BLIP_OUTLINE_COLOR, true, { scoutStroke: false });
-      drewMask = true;
     }
-    if (!drewMask) return;
 
     const ctx = this.ctx;
     ctx.save();
