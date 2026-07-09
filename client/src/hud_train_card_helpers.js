@@ -58,6 +58,7 @@ export function trainDisabledReason(ctx, unit, resources, isOwn) {
 export function researchAvailability(ctx, upgrade, resources, isOwn) {
   const def = UPGRADES[upgrade];
   if (!def) return "locked";
+  if (def.replacesUpgrade && !(ctx.upgrades || []).includes(def.replacesUpgrade)) return "locked";
   if ((ctx.upgrades || []).includes(upgrade)) return "locked";
   if (selectedProducingBuildingsForKind(ctx, def.researchedAt, isOwn)
     .some((e) => e.prodUpgrade === upgrade)) return "locked";
@@ -68,6 +69,9 @@ export function researchAvailability(ctx, upgrade, resources, isOwn) {
 export function researchDisabledReason(ctx, upgrade, resources, isOwn) {
   const def = UPGRADES[upgrade];
   if (!def) return "";
+  if (def.replacesUpgrade && !(ctx.upgrades || []).includes(def.replacesUpgrade)) {
+    return def.requiresText || `Requires ${UPGRADES[def.replacesUpgrade]?.label || def.replacesUpgrade}`;
+  }
   if ((ctx.upgrades || []).includes(upgrade)) return "Researched";
   if (selectedProducingBuildingsForKind(ctx, def.researchedAt, isOwn)
     .some((e) => e.prodUpgrade === upgrade)) return "Researching";
@@ -93,6 +97,8 @@ export function trainLimitSignature(ctx, unit, isOwn) {
 }
 
 export function researchSlotForUpgrade(buildingKind, upgrade, trains) {
+  const replacedUpgrade = UPGRADES[upgrade]?.replacesUpgrade;
+  if (replacedUpgrade) return researchSlotForUpgrade(buildingKind, replacedUpgrade, trains);
   const unitIndex = trains.findIndex((unit) => STATS[unit]?.upgradeRequires === upgrade);
   if (unitIndex >= 0) return unitIndex + 3;
   const researchIndex = researchesOf(buildingKind).indexOf(upgrade);

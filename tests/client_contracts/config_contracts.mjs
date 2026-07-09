@@ -28,6 +28,8 @@ import {
   ENTRENCHMENT_RANGE_BONUS_TILES,
   ENTRENCHMENT_RESEARCH_TICKS,
   ENTRENCHMENT_TRENCH_RADIUS_TILES,
+  ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS,
+  ARTILLERY_UNLOCK_RESEARCH_TICKS,
   ABILITIES,
   STATS,
   TICK_HZ,
@@ -331,7 +333,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     "Artillery cost and supply mirror server",
   );
   assert(
-    STATS[KIND.ARTILLERY].upgradeRequires === UPGRADE.ANTI_TANK_GUN_UNLOCK,
+    STATS[KIND.ARTILLERY].upgradeRequires === UPGRADE.ARTILLERY_UNLOCK,
     "Artillery training requires Heavy Guns",
   );
   assert(
@@ -410,8 +412,9 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       UPGRADE.COMMAND_CAR_UNLOCK,
       UPGRADE.MORTAR_AUTOCAST,
       UPGRADE.SMOKE_PLUS,
+      UPGRADE.ARTILLERY_UNLOCK,
     ],
-    "R&D Complex should expose Heavy Guns, Artillery Fire Control, Tank, Command Car, Mortar Autocast, and Smoke Plus research",
+    "R&D Complex should expose Medium Guns, Artillery Fire Control, Tank, Command Car, Mortar Autocast, Smoke Plus, and Heavy Guns research",
   );
   assert(!ABILITIES[ABILITY.CHARGE], "client no longer exposes Rifleman Charge as a command-card ability");
   assert(
@@ -464,6 +467,28 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     "Smoke Plus ability effect values mirror the base Smoke cloud upgrade",
   );
   assert(
+    UPGRADES[UPGRADE.ANTI_TANK_GUN_UNLOCK].label === "Medium Guns" &&
+      UPGRADES[UPGRADE.ANTI_TANK_GUN_UNLOCK].cost.steel === 100 &&
+      UPGRADES[UPGRADE.ANTI_TANK_GUN_UNLOCK].cost.oil === 50 &&
+      UPGRADES[UPGRADE.ANTI_TANK_GUN_UNLOCK].researchTicks === ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS &&
+      ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS === TICK_HZ * 10,
+    "Medium Guns research cost and time mirror server",
+  );
+  assert(
+    UPGRADES[UPGRADE.ARTILLERY_UNLOCK].label === "Heavy Guns" &&
+      UPGRADES[UPGRADE.ARTILLERY_UNLOCK].cost.steel === 200 &&
+      UPGRADES[UPGRADE.ARTILLERY_UNLOCK].cost.oil === 100 &&
+      UPGRADES[UPGRADE.ARTILLERY_UNLOCK].researchTicks === ARTILLERY_UNLOCK_RESEARCH_TICKS &&
+      ARTILLERY_UNLOCK_RESEARCH_TICKS === TICK_HZ * 25,
+    "Heavy Guns research cost and time mirror server",
+  );
+  assert(
+    UPGRADES[UPGRADE.ARTILLERY_UNLOCK].requiresUpgrade === UPGRADE.ANTI_TANK_GUN_UNLOCK &&
+      UPGRADES[UPGRADE.ARTILLERY_UNLOCK].requiresText === "Requires Medium Guns" &&
+      UPGRADES[UPGRADE.ARTILLERY_UNLOCK].replacesUpgrade === UPGRADE.ANTI_TANK_GUN_UNLOCK,
+    "Heavy Guns research replaces Medium Guns and keeps its prerequisite explicit",
+  );
+  assert(
     UPGRADES[UPGRADE.BALLISTIC_TABLES].cost.steel === 150 &&
       UPGRADES[UPGRADE.BALLISTIC_TABLES].cost.oil === 100 &&
       UPGRADES[UPGRADE.BALLISTIC_TABLES].researchTicks === 600,
@@ -475,7 +500,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     "Artillery Fire Control research uses the renamed client label and icon",
   );
   assert(
-    UPGRADES[UPGRADE.BALLISTIC_TABLES].requiresUpgrade === UPGRADE.ANTI_TANK_GUN_UNLOCK &&
+    UPGRADES[UPGRADE.BALLISTIC_TABLES].requiresUpgrade === UPGRADE.ARTILLERY_UNLOCK &&
       UPGRADES[UPGRADE.BALLISTIC_TABLES].requiresText === "Requires Heavy Guns",
     "Artillery Fire Control research should mirror its Heavy Guns prerequisite",
   );
@@ -1063,6 +1088,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     rdHud._cancelRoundRobin = new Map();
     rdHud._resourceIcons = {};
     renderCommandCard(rdHud);
+    const rdMediumGunsResearchButton = renderedButtons.find((button) => button.innerHTML.includes("MD+"));
     const rdHeavyGunsResearchButton = renderedButtons.find((button) => button.innerHTML.includes("HG+"));
     const rdArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
     const rdArtilleryFireControlButton = renderedButtons.find((button) => button.innerHTML.includes("AFC"));
@@ -1071,7 +1097,8 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     const rdMortarAutocastButton = renderedButtons.find((button) => button.innerHTML.includes("MT+"));
     const rdSmokePlusButton = renderedButtons.find((button) => button.innerHTML.includes("SMK+"));
     assert(rdArtilleryFireControlButton?.dataset.hotkey === "W", "Artillery Fire Control research should appear in R&D Complex");
-    assert(rdHeavyGunsResearchButton?.dataset.hotkey === "Q", "Heavy Guns research should appear in R&D Complex");
+    assert(rdMediumGunsResearchButton?.dataset.hotkey === "Q", "Medium Guns research should appear in R&D Complex");
+    assert(!rdHeavyGunsResearchButton, "Heavy Guns research should be hidden before Medium Guns");
     assert(rdTankResearchButton?.dataset.hotkey === "E", "Tank Production research should appear in R&D Complex");
     assert(rdCommandCarResearchButton?.dataset.hotkey === "A", "Command Car research should appear in R&D Complex");
     assert(rdMortarAutocastButton?.dataset.hotkey === "S", "Mortar Autocast research should appear in R&D Complex");
@@ -1084,6 +1111,16 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
 
     renderedButtons.length = 0;
     rdHud.state.upgrades = [UPGRADE.ANTI_TANK_GUN_UNLOCK];
+    rdHud._cardSig = null;
+    renderCommandCard(rdHud);
+    const unlockedHeavyGunsResearchButton = renderedButtons.find((button) => button.innerHTML.includes("HG+"));
+    const mediumUnlockedArtilleryFireControlButton = renderedButtons.find((button) => button.innerHTML.includes("AFC"));
+    assert(unlockedHeavyGunsResearchButton?.dataset.hotkey === "Q", "Heavy Guns should replace Medium Guns in the Q slot");
+    assert(unlockedHeavyGunsResearchButton && !unlockedHeavyGunsResearchButton.disabled, "Heavy Guns should enable after Medium Guns");
+    assert(mediumUnlockedArtilleryFireControlButton?.disabled, "Artillery Fire Control should still require Heavy Guns after Medium Guns");
+
+    renderedButtons.length = 0;
+    rdHud.state.upgrades = [UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.ARTILLERY_UNLOCK];
     rdHud._cardSig = null;
     renderCommandCard(rdHud);
     const unlockedArtilleryFireControlButton = renderedButtons.find((button) => button.innerHTML.includes("AFC"));

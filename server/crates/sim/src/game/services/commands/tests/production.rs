@@ -13,7 +13,7 @@ fn support_weapon_and_tank_training_require_finished_unlock_upgrades() {
         (
             EntityKind::Steelworks,
             EntityKind::Artillery,
-            UpgradeKind::AntiTankGunUnlock,
+            UpgradeKind::ArtilleryUnlock,
             None,
         ),
         (
@@ -68,6 +68,7 @@ fn advanced_unlocks_research_only_at_research_complex() {
     let map = flat_map(24);
     for (wrong_building_kind, upgrade) in [
         (EntityKind::Steelworks, UpgradeKind::AntiTankGunUnlock),
+        (EntityKind::Steelworks, UpgradeKind::ArtilleryUnlock),
         (EntityKind::Steelworks, UpgradeKind::BallisticTables),
         (EntityKind::Factory, UpgradeKind::TankUnlock),
         (EntityKind::Steelworks, UpgradeKind::MortarAutocast),
@@ -83,8 +84,10 @@ fn advanced_unlocks_research_only_at_research_complex() {
             .spawn_building(1, EntityKind::ResearchComplex, rd_x, rd_y, true)
             .expect("research complex should spawn");
         let mut players = vec![player_state(1), player_state(2)];
-        if upgrade == UpgradeKind::BallisticTables {
+        if upgrade == UpgradeKind::ArtilleryUnlock {
             players[0].upgrades.insert(UpgradeKind::AntiTankGunUnlock);
+        } else if upgrade == UpgradeKind::BallisticTables {
+            players[0].upgrades.insert(UpgradeKind::ArtilleryUnlock);
         }
         let events = apply_with_players(
             &map,
@@ -450,7 +453,7 @@ fn fixture_faction_rejects_global_build_train_and_research_commands() {
 }
 
 #[test]
-fn legacy_artillery_unlock_is_not_current_faction_research() {
+fn heavy_guns_research_requires_medium_guns() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
     let (rd_x, rd_y) = footprint_center(&map, EntityKind::ResearchComplex, 6, 6);
@@ -476,20 +479,17 @@ fn legacy_artillery_unlock_is_not_current_faction_research() {
         .is_empty());
     assert!(matches!(
         events.get(&1).and_then(|events| events.first()),
-        Some(Event::Notice { msg, .. }) if msg == "Cannot research that here"
+        Some(Event::Notice { msg, .. }) if msg == "Requirement not met"
     ));
 
     players[0].upgrades.insert(UpgradeKind::AntiTankGunUnlock);
-    let events = apply_with_players(&map, &mut entities, &mut players, vec![(1, command)]);
+    apply_with_players(&map, &mut entities, &mut players, vec![(1, command)]);
     let queue = entities
         .get(research_complex)
         .expect("research complex")
         .research_queue();
-    assert!(queue.is_empty());
-    assert!(matches!(
-        events.get(&1).and_then(|events| events.first()),
-        Some(Event::Notice { msg, .. }) if msg == "Cannot research that here"
-    ));
+    assert_eq!(queue.len(), 1);
+    assert_eq!(queue[0].upgrade, UpgradeKind::ArtilleryUnlock);
 }
 
 #[test]
@@ -523,6 +523,18 @@ fn ballistic_tables_research_requires_heavy_guns() {
     ));
 
     players[0].upgrades.insert(UpgradeKind::AntiTankGunUnlock);
+    let events = apply_with_players(&map, &mut entities, &mut players, vec![(1, command.clone())]);
+    assert!(entities
+        .get(research_complex)
+        .expect("research complex")
+        .research_queue()
+        .is_empty());
+    assert!(matches!(
+        events.get(&1).and_then(|events| events.first()),
+        Some(Event::Notice { msg, .. }) if msg == "Requirement not met"
+    ));
+
+    players[0].upgrades.insert(UpgradeKind::ArtilleryUnlock);
     apply_with_players(&map, &mut entities, &mut players, vec![(1, command)]);
     let queue = entities
         .get(research_complex)

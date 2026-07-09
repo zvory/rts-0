@@ -73,28 +73,40 @@ function buttonSlots(card) {
   assert.equal(rAndDCard().slots[1].title, "Requires Heavy Guns");
   assert.equal(rAndDCard().slots[1].label, "Artillery Fire Control");
   assert.equal(rAndDCard().slots[1].icon, "AFC");
+  assert(!ids.includes(`research:${UPGRADE.ARTILLERY_UNLOCK}`));
 }
 
 {
   const card = rAndDCard([UPGRADE.ANTI_TANK_GUN_UNLOCK]);
   const ids = slotIds(card);
-  assert.equal(ids[0], null);
+  assert.equal(ids[0], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
   assert.equal(ids[1], `research:${UPGRADE.BALLISTIC_TABLES}`);
   assert.equal(ids[2], `research:${UPGRADE.TANK_UNLOCK}`);
   assert.equal(ids[3], `research:${UPGRADE.COMMAND_CAR_UNLOCK}`);
   assert.equal(ids[4], `research:${UPGRADE.MORTAR_AUTOCAST}`);
   assert.equal(ids[5], `research:${UPGRADE.SMOKE_PLUS}`);
-  assert.equal(card.slots[1].enabled, true);
+  assert.equal(card.slots[0].label, "Heavy Guns");
+  assert.equal(card.slots[0].enabled, true);
+  assert.equal(card.slots[1].enabled, false);
+  assert.equal(card.slots[1].title, "Requires Heavy Guns");
 }
 
 {
   const ids = slotIds(rAndDCard([UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.TANK_UNLOCK]));
-  assert.equal(ids[0], null);
+  assert.equal(ids[0], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
   assert.equal(ids[1], `research:${UPGRADE.BALLISTIC_TABLES}`);
   assert.equal(ids[2], null);
   assert.equal(ids[3], `research:${UPGRADE.COMMAND_CAR_UNLOCK}`);
   assert.equal(ids[4], `research:${UPGRADE.MORTAR_AUTOCAST}`);
   assert.equal(ids[5], `research:${UPGRADE.SMOKE_PLUS}`);
+}
+
+{
+  const card = rAndDCard([UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.ARTILLERY_UNLOCK]);
+  const ids = slotIds(card);
+  assert.equal(ids[0], null);
+  assert.equal(ids[1], `research:${UPGRADE.BALLISTIC_TABLES}`);
+  assert.equal(card.slots[1].enabled, true);
 }
 
 {
@@ -471,7 +483,17 @@ function buttonSlots(card) {
     "factory-train",
     "gun-works-train",
     "research-complex",
+    "research-complex-medium-guns",
   ]);
+  assert(
+    catalog.some((entry) =>
+      entry.id === "research-complex-medium-guns" &&
+        entry.card.slots.some((slot) =>
+          slot?.commandId === kriegsiaCommandId("research", UPGRADE.ARTILLERY_UNLOCK)
+        )
+    ),
+    "command-card context catalog samples Heavy Guns after Medium Guns so direct hotkeys can discover it",
+  );
   assert.deepEqual(WORKER_BUILDABLE, [
     KIND.CITY_CENTRE,
     KIND.DEPOT,

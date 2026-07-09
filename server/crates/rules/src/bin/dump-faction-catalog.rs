@@ -529,6 +529,15 @@ fn print_upgrades(indent: &str) {
         balance::BALLISTIC_TABLES_COST_STEEL,
         balance::BALLISTIC_TABLES_COST_OIL,
         balance::BALLISTIC_TABLES_RESEARCH_TICKS,
+        Some(faction::ARTILLERY_UNLOCK_UPGRADE),
+        true,
+    );
+    print_upgrade(
+        indent,
+        faction::ARTILLERY_UNLOCK_UPGRADE,
+        balance::ARTILLERY_UNLOCK_COST_STEEL,
+        balance::ARTILLERY_UNLOCK_COST_OIL,
+        balance::ARTILLERY_UNLOCK_RESEARCH_TICKS,
         Some(faction::ANTI_TANK_GUN_UNLOCK_UPGRADE),
         true,
     );

@@ -962,6 +962,7 @@ function fakeHudRootWithoutResourceSpans() {
   const antiTankGun = buttonByLabel(upgradeCard, "Anti-Tank Gun");
   assert(antiTankGun && !antiTankGun.enabled, "upgrade-gated unit should be disabled before research");
   assert(antiTankGun.title === "Requires research in R&D Complex", "upgrade-gated unit tooltip should name R&D research");
+  assert(!buttonByLabel(upgradeCard, "Medium Guns"), "Gun Works should not expose R&D research");
   assert(!buttonByLabel(upgradeCard, "Heavy Guns"), "Gun Works should not expose R&D research");
 
   const researchComplex = { id: 53, owner: 1, kind: KIND.RESEARCH_COMPLEX, buildProgress: null };
@@ -974,11 +975,27 @@ function fakeHudRootWithoutResourceSpans() {
     ],
     resources: { steel: 200, oil: 200 },
   }));
-  const heavyGuns = buttonByLabel(researchCard, "Heavy Guns");
-  assert(heavyGuns && heavyGuns.enabled, "available affordable upgrade should be enabled");
-  assert(heavyGuns.commandId === defaultFactionCommandId("research", UPGRADE.ANTI_TANK_GUN_UNLOCK), "research button should expose stable research identity");
-  assert(heavyGuns.intent.type === "research", "upgrade button should carry research intent");
+  const mediumGuns = buttonByLabel(researchCard, "Medium Guns");
+  assert(mediumGuns && mediumGuns.enabled, "available affordable upgrade should be enabled");
+  assert(mediumGuns.commandId === defaultFactionCommandId("research", UPGRADE.ANTI_TANK_GUN_UNLOCK), "research button should expose stable research identity");
+  assert(mediumGuns.intent.type === "research", "upgrade button should carry research intent");
+  assert(!buttonByLabel(researchCard, "Heavy Guns"), "R&D should hide Heavy Guns until Medium Guns is researched");
   assert(!buttonByLabel(researchCard, "Unlock Artillery"), "R&D should not expose a separate Artillery unlock");
+
+  const heavyGunsCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [researchComplex],
+    entities: [
+      { id: 51, owner: 1, kind: KIND.CITY_CENTRE },
+      { id: 52, owner: 1, kind: KIND.TRAINING_CENTRE },
+      researchComplex,
+    ],
+    resources: { steel: 500, oil: 500 },
+    upgrades: [UPGRADE.ANTI_TANK_GUN_UNLOCK],
+  }));
+  const heavyGuns = buttonByLabel(heavyGunsCard, "Heavy Guns");
+  assert(heavyGuns && heavyGuns.enabled, "Heavy Guns should replace Medium Guns after Medium is researched");
+  assert(heavyGuns.slotIndex === mediumGuns.slotIndex, "Heavy Guns should reuse the Medium Guns button slot");
+  assert(heavyGuns.commandId === defaultFactionCommandId("research", UPGRADE.ARTILLERY_UNLOCK), "Heavy Guns should use the artillery unlock identity");
 
   const catalog = buildCommandCardContextCatalog();
   assert(catalog.some((entry) => entry.id === "worker-build"), "command-card context catalog includes worker build context");

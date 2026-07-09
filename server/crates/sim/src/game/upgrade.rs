@@ -93,6 +93,7 @@ const CURRENT_RESEARCHABLE: &[UpgradeKind] = &[
     UpgradeKind::CommandCarUnlock,
     UpgradeKind::MortarAutocast,
     UpgradeKind::SmokePlus,
+    UpgradeKind::ArtilleryUnlock,
 ];
 
 pub fn researchable_upgrades(building: EntityKind) -> Vec<UpgradeKind> {
@@ -140,7 +141,7 @@ pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
         UpgradeKind::BallisticTables => UpgradeDefinition {
             kind,
             researched_at: EntityKind::ResearchComplex,
-            requires_upgrade: Some(UpgradeKind::AntiTankGunUnlock),
+            requires_upgrade: Some(UpgradeKind::ArtilleryUnlock),
             cost_steel: crate::config::BALLISTIC_TABLES_COST_STEEL,
             cost_oil: crate::config::BALLISTIC_TABLES_COST_OIL,
             research_ticks: crate::config::BALLISTIC_TABLES_RESEARCH_TICKS,
@@ -183,7 +184,7 @@ pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
 pub fn required_for_unit(unit: EntityKind) -> Option<UpgradeKind> {
     match unit {
         EntityKind::AntiTankGun => Some(UpgradeKind::AntiTankGunUnlock),
-        EntityKind::Artillery => Some(UpgradeKind::AntiTankGunUnlock),
+        EntityKind::Artillery => Some(UpgradeKind::ArtilleryUnlock),
         EntityKind::Tank => Some(UpgradeKind::TankUnlock),
         EntityKind::CommandCar => Some(UpgradeKind::CommandCarUnlock),
         _ => None,
@@ -195,7 +196,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn researchable_upgrades_exclude_legacy_artillery_unlock() {
+    fn researchable_upgrades_include_current_gun_unlocks() {
         assert_eq!(
             researchable_upgrades(EntityKind::TrainingCentre),
             vec![UpgradeKind::Methamphetamines, UpgradeKind::Entrenchment]
@@ -209,10 +210,11 @@ mod tests {
                 UpgradeKind::CommandCarUnlock,
                 UpgradeKind::MortarAutocast,
                 UpgradeKind::SmokePlus,
+                UpgradeKind::ArtilleryUnlock,
             ]
         );
         assert!(ALL.contains(&UpgradeKind::ArtilleryUnlock));
-        assert!(!researchable_upgrades(EntityKind::ResearchComplex)
+        assert!(researchable_upgrades(EntityKind::ResearchComplex)
             .contains(&UpgradeKind::ArtilleryUnlock));
     }
 
