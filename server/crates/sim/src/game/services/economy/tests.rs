@@ -55,6 +55,7 @@ fn entering_harvesting_clears_pending_queued_orders() {
         &occ,
         &spatial,
         &mut coordinator,
+        1,
     );
 
     let w = entities.get(worker).expect("worker should exist");
@@ -103,6 +104,7 @@ fn worker_direct_oil_gather_order_is_idled() {
         &occ,
         &spatial,
         &mut coordinator,
+        1,
     );
 
     let w = entities.get(worker).expect("worker should exist");
@@ -262,6 +264,7 @@ fn occupied_resource_arrival_redirects_to_nearest_same_resource_node() {
         &occ,
         &spatial,
         &mut coordinator,
+        1,
     );
 
     let w = entities.get(bouncer).expect("worker should exist");
@@ -319,6 +322,7 @@ fn occupied_resource_without_free_neighbor_moves_worker_to_open_grass_and_stops_
         &occ,
         &spatial,
         &mut coordinator,
+        1,
     );
 
     let w = entities.get(bouncer).expect("worker should exist");

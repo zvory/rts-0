@@ -53,6 +53,7 @@ src/
   status_badge.js # Build/network/frame status badge with copyable diagnostics
   ai_diagnostics_panel.js # dedicated live/replay AI decision diagnostics panel
   observer_analysis_overlay.js # replay/live spectator analysis overlay
+  observer_analysis_resources.js # resources tab renderer and wire normalization for observer analysis
   observer_analysis_rows.js # observer analysis player row metadata joiner
   observer_analysis_signatures.js # dirty-body signatures for observer analysis DOM updates
   match_observer_diagnostics.js # Match-owned observer/AI diagnostics surface composer

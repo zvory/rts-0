@@ -1,5 +1,5 @@
 use super::checkpoint_helpers::{
-    checkpoint_payload_text_for, restore_checkpoint_and_assert_equivalent,
+    assert_equivalent_games, checkpoint_payload_text_for, restore_checkpoint_and_assert_equivalent,
     tick_pair_and_assert_equivalent,
 };
 use super::fixtures::human_vs_ai_players;
@@ -198,6 +198,80 @@ fn checkpoint_payload_rejects_invalid_coordinates_and_queue_caps() {
         Err(CheckpointPayloadError::CountCapExceeded {
             field: "pendingCommands",
             ..
+        })
+    ));
+}
+
+#[test]
+fn checkpoint_payload_accepts_legacy_score_rows_without_resource_income_fields() {
+    let game = Game::new_for_replay(&human_vs_ai_players(), 0x5150_2007);
+    let text = checkpoint_payload_text_for(&game, "legacy score resource income fixture");
+    let legacy_text = mutate_payload(&text, |value| {
+        for player in value["players"].as_array_mut().expect("players array") {
+            let score = player["score"].as_object_mut().expect("score object");
+            score.remove("resourcesMined");
+            score.remove("resourceIncomeHistory");
+        }
+    });
+
+    let restored = Game::restore_checkpoint_payload_text_for_test(
+        &legacy_text,
+        game.state.map.clone(),
+        game.map_metadata().clone(),
+    )
+    .expect("legacy score payload should default new resource-income fields");
+
+    assert_equivalent_games(&game, &restored, "legacy score resource-income defaults");
+    assert!(restored
+        .observer_analysis()
+        .players
+        .iter()
+        .all(|player| player.resources.lifetime.steel == 0
+            && player.resources.lifetime.oil == 0
+            && player.resources.last_5s.steel == 0
+            && player.resources.last_5s.oil == 0
+            && player.resources.last_minute.steel == 0
+            && player.resources.last_minute.oil == 0));
+}
+
+#[test]
+fn checkpoint_payload_rejects_invalid_resource_income_history() {
+    let game = Game::new_for_replay(&human_vs_ai_players(), 0x5150_2008);
+    let text = checkpoint_payload_text_for(&game, "invalid resource income history fixture");
+
+    let future_income = mutate_payload(&text, |value| {
+        value["players"][0]["score"]["resourceIncomeHistory"] = serde_json::json!([{
+            "tick": game.tick_count().saturating_add(1),
+            "steel": 1,
+            "oil": 0
+        }]);
+    });
+    assert!(matches!(
+        Game::restore_checkpoint_payload_text_for_test(
+            &future_income,
+            game.state.map.clone(),
+            game.map_metadata().clone(),
+        ),
+        Err(CheckpointPayloadError::InvalidValue {
+            field: "players.score.resourceIncomeHistory.tick",
+        })
+    ));
+
+    let duplicate_income_tick = mutate_payload(&text, |value| {
+        value["players"][0]["score"]["resourceIncomeHistory"] = serde_json::json!([
+            { "tick": 0, "steel": 1, "oil": 0 },
+            { "tick": 0, "steel": 0, "oil": 1 }
+        ]);
+    });
+    assert!(matches!(
+        Game::restore_checkpoint_payload_text_for_test(
+            &duplicate_income_tick,
+            game.state.map.clone(),
+            game.map_metadata().clone(),
+        ),
+        Err(CheckpointPayloadError::DuplicateId {
+            field: "players.score.resourceIncomeHistory",
+            id: 0
         })
     ));
 }

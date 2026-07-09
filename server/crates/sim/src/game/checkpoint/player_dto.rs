@@ -30,4 +30,21 @@ pub(super) struct ScoreStateV1 {
     buildings_killed: u32,
     buildings_lost: u32,
     units_lost_by_kind: BTreeMap<super::super::entity::EntityKind, u32>,
+    #[serde(default)]
+    resources_mined: super::super::ResourceTotals,
+    #[serde(default)]
+    resource_income_history: Vec<super::super::ResourceIncomeRecord>,
+}
+
+impl PlayerStateV1 {
+    pub(super) fn resource_income_history_len(&self) -> usize {
+        self.score.resource_income_history.len()
+    }
+
+    pub(super) fn resource_income_history_ticks(&self) -> impl Iterator<Item = u32> + '_ {
+        self.score
+            .resource_income_history
+            .iter()
+            .map(|record| record.tick)
+    }
 }
