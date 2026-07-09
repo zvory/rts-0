@@ -45,7 +45,7 @@ fn scout_car_smoke_requires_no_steelworks() {
 }
 
 #[test]
-fn smoke_plus_doubles_scout_car_smoke_radius_and_duration() {
+fn smoke_plus_increases_scout_car_smoke_radius_by_half_and_doubles_duration() {
     let (mut game, scout, _target, _) = smoke_command_fixture();
     game.state.players[0]
         .upgrades
@@ -75,6 +75,11 @@ fn smoke_plus_doubles_scout_car_smoke_radius_and_duration() {
         .iter()
         .next()
         .expect("upgraded smoke should spawn immediately at zero launch distance");
+    assert_eq!(
+        config::SMOKE_PLUS_CLOUD_RADIUS_TILES,
+        config::SMOKE_CLOUD_RADIUS_TILES * 1.5,
+        "Smoke Plus should increase smoke radius by 50%"
+    );
     assert_eq!(cloud.radius_tiles, config::SMOKE_PLUS_CLOUD_RADIUS_TILES);
     assert_eq!(
         cloud.expires_in(game.state.tick),

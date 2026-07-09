@@ -39,7 +39,7 @@ import { Input } from "../../client/src/input/index.js";
   const upgradedRadiusTiles = ABILITIES[ABILITY.SMOKE].upgradedRadiusTiles;
   assert(
     smokeInput.clientIntent.abilityTargetPreview?.radiusPx === upgradedRadiusTiles * 32 &&
-      upgradedRadiusTiles === SMOKE_CLOUD_RADIUS_TILES * 2,
+      upgradedRadiusTiles === SMOKE_CLOUD_RADIUS_TILES * 1.5,
     "Smoke Plus targeting preview uses the command owner's upgraded cloud radius",
   );
 }
