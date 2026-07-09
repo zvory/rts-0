@@ -475,21 +475,23 @@ where
         }
     }
 
-    if should_build_depot_from_economy_manager(&economy_manager_output).unwrap_or_else(|| {
-        wants_depot(&facts, profile)
-            && (!save_for_required_tech_building
-                || facts.free_supply <= profile.supply.emergency_depot_threshold)
-    }) && try_build_kind(
-        observation,
-        &facts,
-        &mut actions,
-        &builder_pools,
-        profile,
-        EntityKind::Depot,
-        build_search,
-        &mut placeable,
-    )
-    .is_some()
+    if should_build_depot_from_economy_manager(&economy_manager_output)
+        .unwrap_or_else(|| {
+            wants_depot(&facts, profile)
+                && (!save_for_required_tech_building
+                    || facts.free_supply <= profile.supply.emergency_depot_threshold)
+        })
+        && try_build_kind(
+            observation,
+            &facts,
+            &mut actions,
+            &builder_pools,
+            profile,
+            EntityKind::Depot,
+            build_search,
+            &mut placeable,
+        )
+        .is_some()
     {
         intents.push(AiIntent::Build {
             kind: EntityKind::Depot,
@@ -1092,7 +1094,9 @@ fn oil_demand_signal(
         .unwrap_or(OilDemandSignal::ProfileDefault)
 }
 
-fn should_build_depot_from_economy_manager(output: &Option<EconomyManagerOutput>) -> Option<bool> {
+fn should_build_depot_from_economy_manager(
+    output: &Option<EconomyManagerOutput>,
+) -> Option<bool> {
     output
         .as_ref()
         .map(|output| output.proposes(EconomyProposal::BuildSupplyDepot))
