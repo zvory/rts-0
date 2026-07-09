@@ -711,6 +711,42 @@ mod tests {
     }
 
     #[test]
+    fn pump_jack_occupancy_blocks_no_unit_body() {
+        let map = flat_test_map(12);
+        let empty = EntityStore::new();
+        let before = Occupancy::build(&map, &empty);
+        let mut entities = EntityStore::new();
+        let (x, y) = footprint_center(&map, EntityKind::PumpJack, 5, 5);
+        entities
+            .spawn_building(1, EntityKind::PumpJack, x, y, true)
+            .expect("pump jack should spawn");
+        let after = Occupancy::build(&map, &entities);
+
+        for kind in [
+            EntityKind::Worker,
+            EntityKind::Rifleman,
+            EntityKind::AntiTankGun,
+            EntityKind::MortarTeam,
+            EntityKind::Artillery,
+            EntityKind::ScoutCar,
+            EntityKind::Tank,
+            EntityKind::CommandCar,
+        ] {
+            assert!(after.passable_for_kind(5, 5, kind), "{kind:?}");
+        }
+        assert_eq!(
+            before.static_fingerprint(),
+            after.static_fingerprint(),
+            "pump jack should not change infantry/all-ground static pathing"
+        );
+        assert_eq!(
+            before.static_fingerprint_for_kind(EntityKind::Tank),
+            after.static_fingerprint_for_kind(EntityKind::Tank),
+            "pump jack should not change vehicle-body static pathing"
+        );
+    }
+
+    #[test]
     fn enemy_tank_traps_are_breachable_for_vehicle_pathing_only() {
         let map = flat_test_map(12);
         let mut entities = EntityStore::new();

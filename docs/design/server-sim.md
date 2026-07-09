@@ -1411,6 +1411,9 @@ body `facing`, configured length/width, and a small clearance margin, building b
 axis-aligned rectangles derived from footprint tiles, and resource node bodies are circles for
 build-site blocking. `services::occupancy` separates terrain, all-ground static blockers, physical
 vehicle-body-only blockers, and the owner-aware path-planning view of vehicle-body-only blockers.
+Pump Jacks remain buildings for placement, targeting, economy, and fog memory, but they do not
+populate static occupancy layers, so units and vehicles can stand on and path through their
+footprints.
 Tank Trap pairs exactly two tiles apart close the single tile between them for physical vehicle body
 legality while remaining infantry-passable and shot-transparent. Vehicle path planning keeps own and
 allied Tank Traps in the static blocker layer but treats enemy Tank Traps as breachable obstacles, so

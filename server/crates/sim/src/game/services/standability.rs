@@ -493,13 +493,7 @@ mod tests {
             .expect("tank trap should spawn");
         let occ = Occupancy::build(&map, &entities);
 
-        assert!(unit_static_standable(
-            &map,
-            &occ,
-            EntityKind::Worker,
-            x,
-            y,
-        ));
+        assert!(unit_static_standable(&map, &occ, EntityKind::Worker, x, y,));
         assert!(unit_static_standable(
             &map,
             &occ,
@@ -532,20 +526,39 @@ mod tests {
             .expect("tank trap scaffold should spawn");
         let occ = Occupancy::build(&map, &entities);
 
-        assert!(unit_static_standable(
-            &map,
-            &occ,
+        assert!(unit_static_standable(&map, &occ, EntityKind::Worker, x, y,));
+        assert!(!unit_static_standable(&map, &occ, EntityKind::Tank, x, y,));
+    }
+
+    #[test]
+    fn all_ground_unit_bodies_can_stand_on_pump_jack() {
+        let map = flat_map(12);
+        let mut entities = EntityStore::new();
+        let (x, y) = footprint_center(&map, EntityKind::PumpJack, 5, 5);
+        entities
+            .spawn_building(1, EntityKind::PumpJack, x, y, true)
+            .expect("pump jack should spawn");
+        let occ = Occupancy::build(&map, &entities);
+
+        for kind in [
             EntityKind::Worker,
-            x,
-            y,
-        ));
-        assert!(!unit_static_standable(
-            &map,
-            &occ,
+            EntityKind::Golem,
+            EntityKind::Rifleman,
+            EntityKind::MachineGunner,
+            EntityKind::Panzerfaust,
+            EntityKind::AntiTankGun,
+            EntityKind::MortarTeam,
+            EntityKind::Artillery,
+            EntityKind::ScoutCar,
             EntityKind::Tank,
-            x,
-            y,
-        ));
+            EntityKind::CommandCar,
+            EntityKind::Ekat,
+        ] {
+            assert!(
+                unit_static_standable(&map, &occ, kind, x, y),
+                "{kind:?} should ignore Pump Jack footprint for standability"
+            );
+        }
     }
 
     #[test]
