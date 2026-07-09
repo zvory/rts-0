@@ -51,7 +51,8 @@ fn parse_lab_room(raw: &str) -> Option<LabRoomConfig> {
             map_name = map.to_string();
         } else if let Some(raw_seed) = part.strip_prefix("seed=") {
             seed = Some(raw_seed.parse::<u32>().ok()?);
-        } else if let Some(raw_scenario) = part.strip_prefix("scenario=") {
+        } else {
+            let raw_scenario = part.strip_prefix("scenario=")?;
             if raw_scenario == "blank" {
                 scenario = None;
             } else {
@@ -63,8 +64,6 @@ fn parse_lab_room(raw: &str) -> Option<LabRoomConfig> {
                 }
                 scenario = Some(raw_scenario.to_string());
             }
-        } else {
-            return None;
         }
     }
     Some(LabRoomConfig {
