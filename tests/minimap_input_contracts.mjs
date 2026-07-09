@@ -173,6 +173,25 @@ function staticCanvasFactory(layers) {
   };
 }
 
+function dynamicCanvasOwnerDocument(layers) {
+  return {
+    createElement() {
+      const label = `dynamic-${layers.length}`;
+      const context = recordingContext(label);
+      const canvas = {
+        label,
+        width: 1,
+        height: 1,
+        getContext() {
+          return context;
+        },
+      };
+      layers.push({ canvas, context });
+      return canvas;
+    },
+  };
+}
+
 function countCalls(context, op) {
   return context.calls.filter((call) => call.op === op).length;
 }
@@ -661,6 +680,135 @@ function lockedEvent(clientX, clientY, button = 0, extra = {}) {
   minimap.destroy();
 }
 
+// Foreground player minimap blips draw above resource marks and get a merged outline mask.
+{
+  installWindowStub();
+  const staticLayers = [];
+  const dynamicLayers = [];
+  const canvas = fakeRenderableCanvas({ width: 16, height: 16 });
+  const previousOffscreenCanvas = globalThis.OffscreenCanvas;
+  globalThis.OffscreenCanvas = undefined;
+  canvas.ownerDocument = dynamicCanvasOwnerDocument(dynamicLayers);
+  const state = {
+    playerId: 1,
+    map: {
+      width: 4,
+      height: 4,
+      tileSize: 1,
+      terrain: new Array(16).fill(TERRAIN.GRASS),
+      resources: [{ id: 10, kind: "steel", x: 2, y: 2, remaining: 100 }],
+    },
+    selectedEntities() {
+      return [];
+    },
+    entitiesInterpolated() {
+      return [{ id: 501, owner: 1, kind: KIND.RIFLEMAN, x: 2, y: 2 }];
+    },
+    players: [],
+  };
+  const minimap = new Minimap(
+    canvas,
+    state,
+    { x: 0, y: 0, zoom: 1, viewW: 4, viewH: 4 },
+    null,
+    { issueCommand() {} },
+    null,
+    { staticCanvasFactory: staticCanvasFactory(staticLayers) },
+  );
+  try {
+    minimap.render();
+  } finally {
+    minimap.destroy();
+    globalThis.OffscreenCanvas = previousOffscreenCanvas;
+  }
+
+  assert(staticLayers.length === 2, "resource test creates terrain and resource static layers");
+  assert(dynamicLayers.length === 1, "player blip outline uses a dynamic mask layer");
+  const resourceLayer = staticLayers[1];
+  const maskLayer = dynamicLayers[0];
+  const resourceDrawIndex = canvas.context.calls.findIndex((call) =>
+    call.op === "drawImage" && call.source === resourceLayer.canvas.label,
+  );
+  const playerDrawIndex = canvas.context.calls.findIndex((call) =>
+    hasCallWithApproxArgs({ calls: [call] }, "fillRect", [5.44, 5.44, 5.12, 5.12]),
+  );
+  const outlineDrawIndexes = canvas.context.calls.flatMap((call, index) =>
+    call.op === "drawImage" && call.source === maskLayer.canvas.label ? [index] : [],
+  );
+  assert(resourceDrawIndex >= 0, "resource layer draws before foreground player blips");
+  assert(playerDrawIndex > resourceDrawIndex, "foreground player blip draws above the resource layer");
+  assert(outlineDrawIndexes.length === 4, "foreground player outline draws one mask pass per cardinal offset");
+  assert(
+    outlineDrawIndexes.every((index) => index > resourceDrawIndex && index < playerDrawIndex),
+    "foreground player outline is layered between resources and the final blip fill",
+  );
+  assert(
+    hasCallWithApproxArgs(maskLayer.context, "fillRect", [5.44, 5.44, 5.12, 5.12]),
+    "outline mask uses the scaled player blip footprint",
+  );
+}
+
+// Legacy vision-only intel remains below fog while keeping the scaled player marker size.
+{
+  installWindowStub();
+  const staticLayers = [];
+  const dynamicLayers = [];
+  const canvas = fakeRenderableCanvas({ width: 16, height: 16 });
+  const previousOffscreenCanvas = globalThis.OffscreenCanvas;
+  globalThis.OffscreenCanvas = undefined;
+  canvas.ownerDocument = dynamicCanvasOwnerDocument(dynamicLayers);
+  const state = {
+    playerId: 1,
+    map: {
+      width: 4,
+      height: 4,
+      tileSize: 1,
+      terrain: new Array(16).fill(TERRAIN.GRASS),
+      resources: [],
+    },
+    selectedEntities() {
+      return [];
+    },
+    entitiesInterpolated() {
+      return [{ id: 601, owner: 2, kind: KIND.RIFLEMAN, x: 2, y: 2, visionOnly: true }];
+    },
+    players: [],
+  };
+  const fog = {
+    isVisible() {
+      return false;
+    },
+    isExplored() {
+      return false;
+    },
+  };
+  const minimap = new Minimap(
+    canvas,
+    state,
+    { x: 0, y: 0, zoom: 1, viewW: 4, viewH: 4 },
+    fog,
+    { issueCommand() {} },
+    null,
+    { staticCanvasFactory: staticCanvasFactory(staticLayers) },
+  );
+  try {
+    minimap.render();
+  } finally {
+    minimap.destroy();
+    globalThis.OffscreenCanvas = previousOffscreenCanvas;
+  }
+
+  const visionBlipIndex = canvas.context.calls.findIndex((call) =>
+    hasCallWithApproxArgs({ calls: [call] }, "fillRect", [5.44, 5.44, 5.12, 5.12]),
+  );
+  const fogIndex = canvas.context.calls.findIndex((call, index) =>
+    index > visionBlipIndex && call.op === "fillRect" && call.args[2] > 10,
+  );
+  assert(visionBlipIndex >= 0, "vision-only player intel uses the scaled player blip footprint");
+  assert(fogIndex > visionBlipIndex, "vision-only player intel is drawn before the fog overlay");
+  assert(dynamicLayers.length === 0, "vision-only player intel does not create a foreground outline mask");
+}
+
 // Scout Planes draw as aircraft-shaped minimap blips instead of square ground-unit dots.
 {
   installWindowStub();
@@ -697,13 +845,13 @@ function lockedEvent(clientX, clientY, button = 0, extra = {}) {
   );
   minimap.render();
   assert(
-    hasCallWithApproxArgs(canvas.context, "moveTo", [10.7, 8]),
+    hasCallWithApproxArgs(canvas.context, "moveTo", [12.32, 8]),
     "Scout Plane blip starts an aircraft path at the plane canvas position",
   );
   assert(
-    hasCallWithApproxArgs(canvas.context, "lineTo", [6.2, 5.8])
-      && hasCallWithApproxArgs(canvas.context, "lineTo", [7.1, 8])
-      && hasCallWithApproxArgs(canvas.context, "lineTo", [6.2, 10.2]),
+    hasCallWithApproxArgs(canvas.context, "lineTo", [5.12, 4.48])
+      && hasCallWithApproxArgs(canvas.context, "lineTo", [6.56, 8])
+      && hasCallWithApproxArgs(canvas.context, "lineTo", [5.12, 11.52]),
     "Scout Plane blip draws the expected multi-point aircraft silhouette",
   );
   assert(
@@ -711,11 +859,11 @@ function lockedEvent(clientX, clientY, button = 0, extra = {}) {
     "Scout Plane blip includes an outline for readability",
   );
   assert(
-    hasCallWithApproxArgs(canvas.context, "fillRect", [10.4, 6.4, 3.2, 3.2]),
+    hasCallWithApproxArgs(canvas.context, "fillRect", [9.44, 5.44, 5.12, 5.12]),
     "ordinary ground units still draw square minimap blips at their canvas position",
   );
   assert(
-    !hasCallWithApproxArgs(canvas.context, "fillRect", [6.4, 6.4, 3.2, 3.2]),
+    !hasCallWithApproxArgs(canvas.context, "fillRect", [5.44, 5.44, 5.12, 5.12]),
     "Scout Plane blips should not also use the ordinary square unit marker",
   );
   minimap.destroy();
