@@ -213,8 +213,8 @@ pub struct CombatState {
     /// Set when tank movement reset the range this tick, so combat does not immediately re-add one
     /// stationary tick after the movement phase.
     pub tank_stationary_range_reset_this_tick: bool,
-    /// Loaded Panzerfaust one-shot runtime. Only Panzerfaust entities carry this; conversion to
-    /// Rifleman replaces the combat state and clears it.
+    /// Panzerfaust loaded-shot runtime. Only Panzerfaust entities carry this; the projectile is
+    /// hidden while in flight or reloading, then restored when the state returns to Loaded.
     pub panzerfaust: Option<PanzerfaustState>,
 }
 

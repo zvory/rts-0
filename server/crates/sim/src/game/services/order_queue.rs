@@ -2,7 +2,8 @@ use crate::config;
 use crate::game::ability::{self, AbilityKind, AbilityQueuePolicy};
 use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::entity::{
-    BuildPhase, Entity, EntityKind, EntityStore, MovePhase, Order, OrderIntent, MAX_QUEUED_ORDERS,
+    BuildPhase, Entity, EntityKind, EntityStore, MovePhase, Order, OrderIntent, PanzerfaustState,
+    MAX_QUEUED_ORDERS,
 };
 use crate::game::entrenchment_combat;
 use crate::game::fog::Fog;
@@ -586,8 +587,23 @@ fn attack_order_complete(
     ) {
         return true;
     }
+    if panzerfaust_attack_cycle_active(attacker) {
+        return false;
+    }
     attacker.attack_unreachable_checks() >= ATTACK_UNREACHABLE_PROMOTION_CHECKS
         && !attack_can_fire_now(map, entities, attacker, target)
+}
+
+fn panzerfaust_attack_cycle_active(attacker: &Entity) -> bool {
+    attacker.kind == EntityKind::Panzerfaust
+        && matches!(
+            attacker.combat.as_ref().and_then(|combat| combat.panzerfaust),
+            Some(
+                PanzerfaustState::Windup { .. }
+                    | PanzerfaustState::InFlight { .. }
+                    | PanzerfaustState::Recovery { .. }
+            )
+        )
 }
 
 fn attack_can_fire_now(map: &Map, entities: &EntityStore, attacker: &Entity, target: u32) -> bool {

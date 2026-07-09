@@ -305,10 +305,10 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       PANZERFAUST_ARMOR_PENETRATION === 0.5 &&
       PANZERFAUST_WINDUP_TICKS === 15 &&
       PANZERFAUST_TRAVEL_TICKS === 15 &&
-      PANZERFAUST_RECOVERY_TICKS === 15 &&
+      PANZERFAUST_RECOVERY_TICKS === 60 &&
       METHAMPHETAMINES_PANZERFAUST_WINDUP_TICKS === 12 &&
-      METHAMPHETAMINES_PANZERFAUST_RECOVERY_TICKS === 12,
-    "Panzerfaust stats and one-shot timing mirror server",
+      METHAMPHETAMINES_PANZERFAUST_RECOVERY_TICKS === 60,
+    "Panzerfaust stats and reload timing mirror server",
   );
   assert(
     STATS[KIND.BARRACKS].trains[2] === KIND.PANZERFAUST &&
@@ -317,9 +317,11 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   );
   assert(
     STATS[KIND.PANZERFAUST].requires === KIND.TRAINING_CENTRE &&
-      STATS[KIND.PANZERFAUST].description.includes("Fires once at Tanks or Scout Cars") &&
+      STATS[KIND.PANZERFAUST].description.includes("Prioritizes visible Tanks") &&
+      STATS[KIND.PANZERFAUST].description.includes("vehicles and buildings") &&
       STATS[KIND.PANZERFAUST].description.includes("50% armor penetration") &&
-      STATS[KIND.PANZERFAUST].description.includes("Methamphetamines shortens windup and recovery"),
+      STATS[KIND.PANZERFAUST].description.includes("cannot attack for 2.5 seconds after firing") &&
+      STATS[KIND.PANZERFAUST].description.includes("Methamphetamines shortens windup"),
     "Panzerfaust command-card metadata exposes its Training Centre requirement and approved tooltip copy",
   );
   assert(

@@ -28,6 +28,7 @@ mod mortar_manual_fire_tests;
 mod movement_replay_tests;
 mod panzerfaust_death_tests;
 mod panzerfaust_tests;
+mod panzerfaust_targeting_tests;
 mod replay_artifact_tests;
 mod resources_mining_tests;
 mod scoring_projection_tests;

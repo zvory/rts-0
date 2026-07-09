@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 
 use crate::config;
-use crate::game::entity::EntityKind;
-use crate::protocol::{self, Event};
+use crate::protocol::Event;
 use crate::rules::projection as projection_rules;
 
 use super::{Fog, SmokeCloudStore, TeamRelations};
@@ -57,29 +56,5 @@ pub(super) fn emit_launch(
                 to_y: endpoint.1,
                 delay_ticks: config::PANZERFAUST_TRAVEL_TICKS,
             });
-    }
-}
-
-pub(super) fn emit_conversion(
-    events: &mut HashMap<u32, Vec<Event>>,
-    fog: &Fog,
-    smokes: &SmokeCloudStore,
-    teams: &TeamRelations,
-    owner: u32,
-    id: u32,
-    pos: (f32, f32),
-) {
-    for player_id in events.keys().copied().collect::<Vec<_>>() {
-        if projection_rules::event_visible_to_team_with_smoke(
-            player_id, pos.0, pos.1, owner, fog, teams, smokes,
-        ) {
-            events
-                .entry(player_id)
-                .or_default()
-                .push(Event::PanzerfaustConversion {
-                    id,
-                    to_kind: protocol::kind_to_wire(EntityKind::Rifleman).to_string(),
-                });
-        }
     }
 }

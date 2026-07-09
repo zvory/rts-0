@@ -179,7 +179,11 @@ pub(super) fn resolve_target(
     let attacker = entities.get(self_id)?;
     let context = AttackPriorityContext {
         attacker_is_unit: attacker.is_unit(),
-        attacker_weapon_class: combat_rules::weapon_class(attacker.kind),
+        attacker_weapon_class: if attacker.kind == EntityKind::Panzerfaust {
+            crate::rules::defs::WeaponClass::AntiTank
+        } else {
+            combat_rules::weapon_class(attacker.kind)
+        },
         policy_id: combat_rules::default_target_priority_policy(attacker.kind),
         can_retain_moving_target: attacker_can_fire_while_moving,
     };

@@ -389,10 +389,13 @@ pub fn target_threat_role(kind: EntityKind) -> TargetThreatRole {
     }
 }
 
-/// First-pass loaded Panzerfaust target filter. The runtime consumes this separately from
-/// default weapon ranking because loaded Panzerfausts do not have a repeat-fire default attack.
+/// Loaded Panzerfaust target filter. The runtime consumes this separately from default weapon
+/// ranking because Panzerfausts do not have a normal default attack profile.
 pub fn is_panzerfaust_loaded_shot_target(kind: EntityKind) -> bool {
-    matches!(kind, EntityKind::ScoutCar | EntityKind::Tank)
+    matches!(
+        kind,
+        EntityKind::ScoutCar | EntityKind::Tank | EntityKind::CommandCar
+    ) || kind.is_building()
 }
 
 /// Pure default-weapon fit vocabulary for target ranking.
@@ -1034,11 +1037,14 @@ mod tests {
     }
 
     #[test]
-    fn panzerfaust_loaded_shot_targets_light_and_heavy_vehicles_with_half_penetration() {
+    fn panzerfaust_loaded_shot_targets_vehicles_and_buildings_with_half_penetration() {
         for kind in EntityKind::ALL {
             assert_eq!(
                 is_panzerfaust_loaded_shot_target(kind),
-                matches!(kind, EntityKind::ScoutCar | EntityKind::Tank),
+                matches!(
+                    kind,
+                    EntityKind::ScoutCar | EntityKind::Tank | EntityKind::CommandCar
+                ) || kind.is_building(),
                 "{kind:?}"
             );
         }

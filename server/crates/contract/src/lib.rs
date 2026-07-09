@@ -527,6 +527,8 @@ pub struct EntityView {
     pub weapon_facing: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub weapon_range_tiles: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub panzerfaust_loaded: Option<bool>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prod_kind: Option<String>,
@@ -613,6 +615,7 @@ impl EntityView {
             facing: None,
             weapon_facing: None,
             weapon_range_tiles: None,
+            panzerfaust_loaded: None,
             prod_kind: None,
             prod_upgrade: None,
             prod_progress: None,

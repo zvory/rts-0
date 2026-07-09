@@ -645,7 +645,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 33. `client/src/net.js` calls
+`messagepack-compact`, codec version 1, compact snapshot version 34. `client/src/net.js` calls
 `parseServerFrame`; the binary frame parser in `client/src/protocol_frame.js` returns the raw
 compact snapshot object, then `decodeCompactSnapshot` expands it back into the semantic object above
 before dispatching `S.SNAPSHOT`.
@@ -671,7 +671,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 33,
+  "v": 34,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
@@ -680,7 +680,8 @@ adds an explicit application compression envelope.
       buildProgress?, latchedNode?, targetId?, setupState?, remaining?, rally?, oilUsed?,
       setupFacing?, orderPlan?, chargeCooldownLeft?, abilities?, breakthroughTicks?,
       visionOnly?, debugPath?, rallyPlan?, prodUpgrade?, buildActive?, deconstructProgress?,
-      weaponRangeTiles?, occupiedTrenchId?, scoutPlane?, prodScoutPlaneQueued?
+      weaponRangeTiles?, occupiedTrenchId?, scoutPlane?, prodScoutPlaneQueued?,
+      panzerfaustLoaded?
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
@@ -709,7 +710,7 @@ Compact numeric codes:
 | `upgrade` | 1 `methamphetamines`, 2 `anti_tank_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock` (legacy decode only), 5 `mortar_autocast`, 6 `command_car_unlock`, 7 `ballistic_tables`, 8 `entrenchment`, 9 `smoke_plus` |
 | `weaponKind` | 1 `worker_tools`, 2 `golem_fists`, 3 `rifleman_rifle`, 4 `machine_gunner_mg`, 5 `scout_car_mg`, 6 `anti_tank_gun`, 7 `panzerfaust_loaded_shot`, 8 `mortar_team_mortar`, 9 `artillery_gun`, 10 `tank_cannon`, 11 `tank_coax` |
 | `notice.severity` | 1 `info`, 2 `warn`, 3 `alert` |
-| `EventRecord` | `[1, from, to]` attack, `[1, from, to, reveal?, toPos?]` legacy attack with optional shooter reveal and target position, `[1, from, to, revealOrNull, toPosOrNull, weaponKind]` attack with compact weapon hint, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice, `[5, [fromX, fromY], [toX, toY], delayTicks]` smoke launch, `[6, x, y, radiusTiles]` mortar impact/marker, `[6, x, y, radiusTiles, from?, reveal?]` mortar impact with optional shooter reveal, `[7, from, [x, y], radiusTiles, delayTicks]` artillery target marker, `[8, x, y, radiusTiles]` artillery impact, `[9, from, [fromX, fromY], [toX, toY], radiusTiles, delayTicks]` mortar launch, `[10, to]` overpenetration damage, `[11, owner, x, y, facing]` global artillery firing minimap marker, `[12, from, [fromX, fromY], [toX, toY], delayTicks]` Panzerfaust launch, `[13, x, y]` Panzerfaust impact, `[14, id, toKind]` Panzerfaust same-id conversion, `[15, to]` missed direct shot |
+| `EventRecord` | `[1, from, to]` attack, `[1, from, to, reveal?, toPos?]` legacy attack with optional shooter reveal and target position, `[1, from, to, revealOrNull, toPosOrNull, weaponKind]` attack with compact weapon hint, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice, `[5, [fromX, fromY], [toX, toY], delayTicks]` smoke launch, `[6, x, y, radiusTiles]` mortar impact/marker, `[6, x, y, radiusTiles, from?, reveal?]` mortar impact with optional shooter reveal, `[7, from, [x, y], radiusTiles, delayTicks]` artillery target marker, `[8, x, y, radiusTiles]` artillery impact, `[9, from, [fromX, fromY], [toX, toY], radiusTiles, delayTicks]` mortar launch, `[10, to]` overpenetration damage, `[11, owner, x, y, facing]` global artillery firing minimap marker, `[12, from, [fromX, fromY], [toX, toY], delayTicks]` Panzerfaust launch, `[13, x, y]` Panzerfaust impact, `[14, id, toKind]` legacy Panzerfaust same-id conversion, `[15, to]` missed direct shot |
 
 #### 2.4.1 Boundary inventory
 
@@ -774,6 +775,9 @@ range remains the fallback for render-only range overlays.
 `occupiedTrenchId` is present while a visible eligible infantry unit is actively stopped in a
 trench. It names the neutral trench terrain id already projected through `trenches`; it is omitted
 while the unit is digging in, slotting is unavailable, merely near a trench, or moving out.
+`panzerfaustLoaded` is present for visible Panzerfaust units. It is `false` while the fired
+projectile is in flight or the unit is reloading, so the client can hide the warhead from unit art;
+omitted values should be treated as loaded for older data and non-Panzerfaust entities.
 `scoutPlane` is owner/full-world diagnostic private state for `scout_plane` entities. It carries
 the current orbit center plus fuel/upkeep accounting fields; enemy projections that can see the
 plane omit this state so queued retargeting and resource reserve information do not leak through
@@ -873,6 +877,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   targetId?: u32,                // current attack target, for drawing tracers
   weaponRangeTiles?: f32,        // owner/allied Tanks only; current authoritative weapon range
   occupiedTrenchId?: u32,        // visible eligible infantry only while actively stopped in a trench
+  panzerfaustLoaded?: bool,       // Panzerfaust only; false while projectile is missing/reloading
   scoutPlane?: {                 // owner/full-world diagnostics only; enemies omit this private state
     orbitCenter?: [f32, f32],
     fuelOil: u8,
@@ -1004,16 +1009,16 @@ recipients whose team currently sees the impact point; they do not reveal terrai
 exploration, or carry entity visibility. Artillery impact damage follows the same support-fire
 friendly-fire attribution rule as mortar splash: owned and allied entities in the radius can take
 damage, but same-team damage does not produce hostile reveal, under-attack, or score attribution.
-Panzerfaust launch events are emitted by the one-shot anti-tank runtime. They carry the loaded unit
-id, launch point, intended visual endpoint, and travel delay, but never carry the target entity id.
+Panzerfaust launch events are emitted by the reloadable anti-tank runtime. They carry the firing
+unit id, launch point, intended visual endpoint, and travel delay, but never carry the target entity id.
 Launch events are sent to the firing team and to enemy recipients whose
 team-current fog can see the shooter or launch point; the endpoint must be withheld unless it is
 visible to that recipient or otherwise already safe through the recipient's projection. Panzerfaust
 impact events carry only the impact point and are sent to the firing team and to enemy recipients
 whose team-current fog can see that point; they do not imply damage, target identity, terrain
-reveal, or exploration. Panzerfaust conversion events carry only the same entity id and resulting
-kind, and must be projected only to recipients that can see that entity through ordinary snapshot
-visibility or owner/team projection on the conversion tick.
+reveal, or exploration. Panzerfaust conversion events are legacy replay data from the previous
+one-shot implementation; current gameplay keeps the same Panzerfaust entity and uses
+`panzerfaustLoaded` plus the launch/impact events to show reload state.
 Events are best-effort visual flavor; the client must not depend on receiving them.
 
 #### 2.5.1 Projection contract summary
