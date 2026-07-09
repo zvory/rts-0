@@ -376,15 +376,8 @@ fn default_ai_team_appends_after_occupied_teams_when_possible() {
 
 #[test]
 fn selecting_two_player_map_trims_excess_active_seats() {
-    let mut task = RoomTask::new(
-        "two-player-map-cap".to_string(),
-        RoomMode::Normal,
-        None,
-        false,
-        DrainHandle::default(),
-    );
-    task.host_id = Some(1);
-    for id in 1..=3 {
+    let mut task = summary_task("two-player-map-cap");
+    for id in 2..=3 {
         add_test_room_player(&mut task, id, true);
         task.assign_missing_team_for(id);
         task.assign_missing_faction_for(id);
@@ -396,9 +389,8 @@ fn selecting_two_player_map_trims_excess_active_seats() {
     task.on_select_map(1, "1v1 No Terrain".to_string());
 
     assert_eq!(task.selected_map, "1v1 No Terrain");
-    assert_eq!(
-        task.ai_players.len(),
-        0,
+    assert!(
+        task.ai_players.is_empty(),
         "overflow AI seats are removed first"
     );
     assert_eq!(task.total_player_count(), 2);
@@ -426,9 +418,8 @@ fn selecting_two_player_map_trims_excess_active_seats() {
     assert_eq!(summary.join_state, LobbyJoinState::FullSpectatorOnly);
 
     task.on_add_ai(1, Some(3), None);
-    assert_eq!(
-        task.ai_players.len(),
-        0,
+    assert!(
+        task.ai_players.is_empty(),
         "full 1v1 map rejects more AI seats"
     );
 
