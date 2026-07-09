@@ -776,11 +776,11 @@ mod tests {
             *tile = crate::protocol::terrain::GRASS;
         }
 
-        let (bx, by) = footprint_center(&game.state.map, EntityKind::Depot, 10, 10);
+        let (bx, by) = footprint_center(&game.state.map, EntityKind::Depot, 20, 20);
         game.state.entities
             .spawn_building(99, EntityKind::Depot, bx, by, true)
             .expect("building spawn");
-        let rect = building_rect_for_footprint(EntityKind::Depot, 10, 10).expect("depot rect");
+        let rect = building_rect_for_footprint(EntityKind::Depot, 20, 20).expect("depot rect");
         let radius = config::unit_stats(EntityKind::Tank)
             .expect("tank stats")
             .radius;
@@ -852,11 +852,11 @@ mod tests {
             *tile = crate::protocol::terrain::GRASS;
         }
 
-        let (bx, by) = footprint_center(&game.state.map, EntityKind::Depot, 10, 10);
+        let (bx, by) = footprint_center(&game.state.map, EntityKind::Depot, 20, 20);
         game.state.entities
             .spawn_building(99, EntityKind::Depot, bx, by, true)
             .expect("building spawn");
-        let rect = building_rect_for_footprint(EntityKind::Depot, 10, 10).expect("depot rect");
+        let rect = building_rect_for_footprint(EntityKind::Depot, 20, 20).expect("depot rect");
         game.state.entities
             .spawn_node(
                 EntityKind::Steel,
@@ -890,7 +890,7 @@ mod tests {
             *tile = crate::protocol::terrain::GRASS;
         }
 
-        let (x, y) = footprint_center(&game.state.map, EntityKind::PumpJack, 10, 10);
+        let (x, y) = footprint_center(&game.state.map, EntityKind::PumpJack, 20, 20);
         let oil_kind = EntityKind::from_str("oil").expect("oil kind");
         game.state.entities
             .spawn_node(oil_kind, x, y)

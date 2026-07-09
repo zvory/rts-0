@@ -1,4 +1,5 @@
 use super::geometry::{clamp_to_map, dist2, normalized_direction, squared, tile_center};
+use super::resources::forward_steel_cluster_center;
 use super::*;
 
 pub(super) const LOCAL_DEFENSE_RADIUS_TILES: f32 = 12.0;
@@ -380,32 +381,14 @@ pub(super) fn main_steel_cluster_center(observation: &AiObservation) -> Option<(
     let own_base = tile_center(observation.own_start_tile, observation.map.tile_size);
     let radius = (config::CC_RESOURCE_MAX_DIST_TILES + 1.5) * observation.map.tile_size as f32;
     let radius2 = squared(radius);
-    steel_cluster_center(
+    forward_steel_cluster_center(
         observation
             .resources
             .iter()
             .filter(|resource| dist2(resource.x, resource.y, own_base.0, own_base.1) <= radius2),
+        own_base,
+        observation.map,
     )
-}
-
-pub(super) fn steel_cluster_center<'a>(
-    resources: impl IntoIterator<Item = &'a AiResourceSummary>,
-) -> Option<(f32, f32)> {
-    let steel: Vec<&AiResourceSummary> = resources
-        .into_iter()
-        .filter(|resource| resource.kind == EntityKind::Steel && resource.remaining > 0)
-        .collect();
-    let count = steel.len().min(config::STEEL_PATCHES_PER_BASE as usize);
-    if count == 0 {
-        return None;
-    }
-    let (sum_x, sum_y) = steel
-        .iter()
-        .take(count)
-        .fold((0.0, 0.0), |(sum_x, sum_y), resource| {
-            (sum_x + resource.x, sum_y + resource.y)
-        });
-    Some((sum_x / count as f32, sum_y / count as f32))
 }
 
 pub(super) fn local_defense_target(observation: &AiObservation) -> Option<u32> {
