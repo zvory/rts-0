@@ -8,6 +8,8 @@ use crate::protocol::TrenchView;
 
 mod goal_search;
 mod reachability;
+#[cfg(test)]
+mod tests;
 
 pub(super) use reachability::FormationReachability;
 
