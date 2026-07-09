@@ -50,8 +50,8 @@
     },
     {
       "path": "server/crates/sim/src/game/services/order_queue.rs",
-      "lines": 1556,
-      "reason": "Panzerfaust Phase 3 extends queued attack promotion with shared loaded-shot legality, smoke-aware target validation, and current-range completion checks in the existing oversized order adapter; keep ratcheting until queue validation is extracted."
+      "lines": 1529,
+      "reason": "Panzerfaust reload extracted queued attack promotion helpers from the existing oversized order adapter; keep ratcheting until queue validation is fully split."
     },
     {
       "path": "server/crates/sim/src/game/services/pathing.rs",
