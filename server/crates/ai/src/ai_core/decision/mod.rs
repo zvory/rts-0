@@ -76,8 +76,6 @@ use self::turtle::{
     stage_turtle_choke_defense, turtle_machine_gunner_lines_staffed, turtle_observer_debug_layers,
 };
 
-use super::profiles::{AI_2_1_ECONOMY_MANAGER_ID, AI_TURTLE_CHOKES_ID};
-
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct AiDecision {
     pub(crate) profile_id: &'static str,
@@ -445,7 +443,7 @@ where
     let save_for_expansion = expansion_plan.should_save;
     let proxy_barracks_active =
         !defensive_panic.active && should_use_proxy_barracks(&facts, profile);
-    let economy_manager_output = if uses_economy_manager(profile) {
+    let economy_manager_output = if profile.uses_proposal_economy_manager() {
         Some(propose_economy(EconomyManagerInput {
             observation,
             facts: &facts,
@@ -1054,13 +1052,6 @@ fn turtle_opening_pending(profile: &AiProfile, memory: &AiDecisionMemory) -> boo
         .turtle_defense
         .map(|policy| memory.turtle_opening_riflemen_ordered < policy.opening_riflemen)
         .unwrap_or(false)
-}
-
-fn uses_economy_manager(profile: &AiProfile) -> bool {
-    matches!(
-        profile.id,
-        AI_2_1_ECONOMY_MANAGER_ID | AI_TURTLE_CHOKES_ID
-    )
 }
 
 fn oil_demand_signal(

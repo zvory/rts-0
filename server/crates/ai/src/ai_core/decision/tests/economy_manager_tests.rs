@@ -10,9 +10,9 @@ use crate::ai_core::profiles::{
 
 #[test]
 fn turtle_profile_routes_economy_through_proposal_manager() {
-    assert!(uses_economy_manager(&AI_2_1_ECONOMY_MANAGER));
-    assert!(uses_economy_manager(&AI_TURTLE_CHOKES));
-    assert!(!uses_economy_manager(&AI_2_0_TANK_PRESSURE));
+    assert!(AI_2_1_ECONOMY_MANAGER.uses_proposal_economy_manager());
+    assert!(AI_TURTLE_CHOKES.uses_proposal_economy_manager());
+    assert!(!AI_2_0_TANK_PRESSURE.uses_proposal_economy_manager());
 }
 
 fn assert_ai_2_1_matches_ai_2_0_decision(label: &str, observation: &AiObservation) {

@@ -3,6 +3,37 @@ use super::*;
 use crate::ai_core::profiles::AI_TURTLE_CHOKES;
 
 #[test]
+fn turtle_opening_does_not_train_workers_for_held_oil_assignments() {
+    let mut owned = vec![
+        building(10, EntityKind::CityCentre, Some(0)),
+        building(11, EntityKind::Barracks, Some(0)),
+    ];
+    owned.extend((0..18).map(|i| steel_worker(20 + i, 100 + i)));
+    let observation = observation(
+        AiEconomy {
+            steel: 1_000,
+            oil: 0,
+            supply_used: 18,
+            supply_cap: 40,
+        },
+        owned,
+    );
+
+    let decision = decide(
+        &observation,
+        &AI_TURTLE_CHOKES,
+        &mut AiDecisionMemory::for_profile(&AI_TURTLE_CHOKES),
+    );
+
+    assert!(
+        !decision
+            .intents
+            .contains(&AiIntent::Train { kind: EntityKind::Worker }),
+        "the Turtle opening should not train workers toward oil while oil assignments are held"
+    );
+}
+
+#[test]
 fn turtle_rifle_opening_reports_stage_intent_for_steel_line() {
     let ts = config::TILE_SIZE as f32;
     let observation = observation(
