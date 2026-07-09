@@ -890,10 +890,9 @@ pub fn parse_dev_scenario_room(raw: &str) -> Option<DevScenarioLaunch> {
         for part in suffix.split(':') {
             if let Some(value) = part.strip_prefix("blocker=") {
                 blocker = Some(value);
-            } else if let Some(value) = part.strip_prefix("case=") {
-                case = Some(value);
             } else {
-                return None;
+                let value = part.strip_prefix("case=")?;
+                case = Some(value);
             }
         }
     }
