@@ -268,6 +268,7 @@ architecture failures.
 | `ability_runtime` | `authoritative/serialized` | Serialize active ability runtime state, object ids, world objects, projectiles, cooldown-linked runtime payloads, and expiry/return data. | `AbilityRuntime` owns deterministic active instances and non-entity world objects; systems and snapshots read it for Ekat return markers, line projectiles, anchors, and owner/enemy projection. |
 | `mortar_shells` | `authoritative/serialized` | Serialize all scheduled mortar impacts with owner, attacker, impact point, and impact tick. | `MortarShellStore::schedule` records delayed impacts; later ticks resolve area damage/events even if the firing mortar dies before impact. |
 | `artillery_shells` | `authoritative/serialized` | Serialize all scheduled artillery impacts with their owners, source data, impact points, and impact ticks. | The artillery store mirrors the delayed-shell contract used by the tick pipeline; dropping it would cancel future area damage and reveal/event output. |
+| `panzerfaust_shots` | `authoritative/serialized` | Serialize all launched Panzerfaust loaded shots with owner/source facts, locked target id, launch-safe impact point, and impact tick. | `PanzerfaustShotStore::schedule` records detached loaded-shot impacts; later ticks resolve the direct damage/event even if the firing Panzerfaust dies before impact. |
 | `seed` | `compatibility metadata` | Serialize the original match seed as setup/replay metadata. Do not use it as a substitute for `rng`. | Constructors and replay artifacts expose `seed`; the current map is stored separately and the current random stream lives in `rng`. |
 | `starting_loadouts` | `compatibility metadata` | Serialize per-player starting loadout records for replay/setup compatibility. | Replay constructors and artifacts persist these records so mixed faction/resource starts can be reconstructed without a global resource pair. |
 | `map_metadata` | `compatibility metadata` | Serialize stable authored map identity/version metadata alongside the map. | Replay/lab setup paths expose map metadata; it identifies the authored map but is not the live terrain grid used by systems. |
@@ -461,6 +462,7 @@ Top-level shape:
   "abilityRuntime": {},
   "mortarShells": [],
   "artilleryShells": [],
+  "panzerfaustShots": [],
   "activeConstructionSites": [],
   "labGodModePlayers": []
 }
@@ -518,6 +520,7 @@ Field map for Phase 2 DTO conversion:
 | `ability_runtime` | `AbilityRuntimeV1` with active ability instance ids, cooldown-linked runtime payloads, world objects, projectiles, return/expiry data, owner facts, and any visibility-relevant projection state. |
 | `mortar_shells` | `MortarShellStoreV1` scheduled impacts with owner, attacker/source, impact point, damage/reveal facts, and impact tick. |
 | `artillery_shells` | `ArtilleryShellStoreV1` scheduled impacts with owner/source, scatter/impact point, damage/reveal facts, and impact tick. |
+| `panzerfaust_shots` | `PanzerfaustShotStoreV1` scheduled loaded-shot impacts with owner/source facts, locked target id, launch-safe impact point, and impact tick. |
 | `seed` | Top-level `seed` compatibility value. It is retained for setup/replay metadata and for `rng.seed`, but it is never enough to restore current RNG state by itself. |
 | `starting_loadouts` | `startingLoadouts` compatibility records, preserving per-player faction/loadout/resource start facts. |
 | `map_metadata` | Folded into `mapBinding.name`, `schemaVersion`, and `contentHash`; not duplicated as an independent state body. |
@@ -545,8 +548,8 @@ Validation model and bounds:
 - Count caps for version 1: at most 8 players, 2,000 entities, 1,024 pending commands, 200,000
   command-log entries when a replay container explicitly allows command history, 256 total active
   plus pending smoke clouds, 4,096 trenches, 512 ability runtime world objects/projectiles, 4,096
-  scheduled mortar shells, 4,096 scheduled artillery shells, 32 completed upgrades per player, and
-  8 queued orders per entity.
+  scheduled mortar shells, 4,096 scheduled artillery shells, 4,096 scheduled Panzerfaust shots, 32
+  completed upgrades per player, and 8 queued orders per entity.
 - Numeric validation rejects non-finite coordinates/facing values, out-of-map world positions,
   invalid tile coordinates, overflowing footprint math, negative or overflowing timers after JSON
   conversion, supply/resources above configured caps unless a documented lab/debug adapter allows
@@ -1212,9 +1215,10 @@ General rules:
   promotion, idle acquisition, hold-position acquisition, and attack-move acquisition all share the
   visible-enemy target predicate for Tanks and Scout Cars. Plain `Move` does not auto-fire. Windup
   cancels without spending the shot if the order changes or the target stops being legal, visible,
-  in range, or fireable; after launch, the shot is spent, impact applies 100 base damage with 50%
-  armor penetration only to the locked live Tank or Scout Car target, recovery completes, and the
-  same entity id converts into a Rifleman.
+  in range, or fireable; after launch, the shot is spent and recorded as a detached
+  `panzerfaust_shots` impact that survives the firing entity's death. Impact applies 100 base damage
+  with 50% armor penetration only to the locked live Tank or Scout Car target. If the Panzerfaust
+  survives recovery, the same entity id converts into a Rifleman.
 - Resource costs are paid at execution time, not queue time. Queued abilities that become
   unaffordable at promotion are skipped or rejected, but queued and immediate build orders do not
   require current affordability at issue or promotion time. Build promotion checks the worker,

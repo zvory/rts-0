@@ -60,29 +60,6 @@ pub(super) fn emit_launch(
     }
 }
 
-pub(super) fn emit_impact(
-    events: &mut HashMap<u32, Vec<Event>>,
-    fog: &Fog,
-    smokes: &SmokeCloudStore,
-    teams: &TeamRelations,
-    owner: u32,
-    impact: (f32, f32),
-) {
-    for player_id in events.keys().copied().collect::<Vec<_>>() {
-        if projection_rules::event_visible_to_team_with_smoke(
-            player_id, impact.0, impact.1, owner, fog, teams, smokes,
-        ) {
-            events
-                .entry(player_id)
-                .or_default()
-                .push(Event::PanzerfaustImpact {
-                    x: impact.0,
-                    y: impact.1,
-                });
-        }
-    }
-}
-
 pub(super) fn emit_conversion(
     events: &mut HashMap<u32, Vec<Event>>,
     fog: &Fog,

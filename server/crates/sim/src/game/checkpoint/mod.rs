@@ -11,6 +11,7 @@ use super::firing_reveal::FiringRevealSource;
 use super::fog::{Fog, LingeringSightSource};
 use super::map::Map;
 use super::mortar::MortarShellStore;
+use super::panzerfaust_shot::PanzerfaustShotStore;
 use super::replay::CommandLogEntry;
 use super::setup::StartingLoadout;
 use super::smoke::SmokeCloudStore;
@@ -56,6 +57,7 @@ const MAX_SMOKE_CLOUDS: usize = 256;
 const MAX_TRENCHES: usize = 4_096;
 const MAX_SCHEDULED_MORTAR_SHELLS: usize = 4_096;
 const MAX_SCHEDULED_ARTILLERY_SHELLS: usize = 4_096;
+const MAX_SCHEDULED_PANZERFAUST_SHOTS: usize = 4_096;
 const MAX_COMPLETED_UPGRADES_PER_PLAYER: usize = 32;
 const MAX_UNITS_PER_CHECKPOINT_COMMAND: usize = 4_096;
 
@@ -136,6 +138,7 @@ struct GameCheckpointV1 {
     ability_runtime: AbilityRuntime,
     mortar_shells: MortarShellStore,
     artillery_shells: ArtilleryShellStore,
+    panzerfaust_shots: PanzerfaustShotStore,
     active_construction_sites: BTreeSet<u32>,
     lab_god_mode_players: BTreeSet<u32>,
 }
@@ -173,6 +176,7 @@ impl GameCheckpointV1 {
             ability_runtime: state.ability_runtime.clone(),
             mortar_shells: state.mortar_shells.clone(),
             artillery_shells: state.artillery_shells.clone(),
+            panzerfaust_shots: state.panzerfaust_shots.clone(),
             active_construction_sites: state.active_construction_sites.clone(),
             lab_god_mode_players: state.lab_god_mode_players.clone(),
         };
@@ -225,6 +229,7 @@ impl GameCheckpointV1 {
             ability_runtime: self.ability_runtime,
             mortar_shells: self.mortar_shells,
             artillery_shells: self.artillery_shells,
+            panzerfaust_shots: self.panzerfaust_shots,
             seed: self.seed,
             starting_loadouts: self.starting_loadouts,
             map_metadata,
@@ -284,6 +289,11 @@ impl GameCheckpointV1 {
             "artilleryShells",
             self.artillery_shells.checkpoint_len(),
             MAX_SCHEDULED_ARTILLERY_SHELLS,
+        )?;
+        validate_count(
+            "panzerfaustShots",
+            self.panzerfaust_shots.checkpoint_len(),
+            MAX_SCHEDULED_PANZERFAUST_SHOTS,
         )?;
 
         let player_ids = validate_players(&self.players, self.tick)?;
