@@ -154,7 +154,7 @@ async fn send_server_message(
             let send_start = Instant::now();
             if sink.send(frame.into_message()).await.is_err() {
                 let send_duration = send_start.elapsed();
-                log_writer_message(
+                log_writer_message(WriterMessageLog {
                     player_id,
                     message_kind,
                     snapshot_codec,
@@ -163,11 +163,11 @@ async fn send_server_message(
                     serialize_duration,
                     send_duration,
                     bytes,
-                );
+                });
                 return (false, None);
             }
             let send_duration = send_start.elapsed();
-            log_writer_message(
+            log_writer_message(WriterMessageLog {
                 player_id,
                 message_kind,
                 snapshot_codec,
@@ -176,7 +176,7 @@ async fn send_server_message(
                 serialize_duration,
                 send_duration,
                 bytes,
-            );
+            });
             let snapshot_stats = snapshot_payload.map(|payload| lobby::SnapshotWriterSendStats {
                 serialize_ms: saturating_duration_ms_u32(serialize_duration),
                 send_ms: saturating_duration_ms_u32(send_duration),
@@ -192,25 +192,27 @@ async fn send_server_message(
     }
 }
 
-fn log_writer_message(
+struct WriterMessageLog {
     player_id: u32,
     message_kind: &'static str,
     snapshot_codec: &'static str,
     snapshot_codec_version: u16,
     frame_kind: &'static str,
-    serialize: Duration,
-    send: Duration,
+    serialize_duration: Duration,
+    send_duration: Duration,
     bytes: usize,
-) {
+}
+
+fn log_writer_message(log: WriterMessageLog) {
     perf::log_writer_message(perf::WriterMessageTiming {
-        player_id,
-        message_kind,
-        snapshot_codec,
-        snapshot_codec_version,
-        frame_kind,
-        serialize,
-        send,
-        bytes,
+        player_id: log.player_id,
+        message_kind: log.message_kind,
+        snapshot_codec: log.snapshot_codec,
+        snapshot_codec_version: log.snapshot_codec_version,
+        frame_kind: log.frame_kind,
+        serialize: log.serialize_duration,
+        send: log.send_duration,
+        bytes: log.bytes,
     });
 }
 
