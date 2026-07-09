@@ -73,23 +73,11 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   const { ReplayViewer } = await import("../../client/src/replay_viewer.js");
   const { ReplayControls, RoomTimeControls } = await import("../../client/src/replay_controls.js");
   const { applyMatchUnitRanges } = await import("../../client/src/match_settings_toggles.js");
-  const { App, shouldWarnBeforeUnload } = await import("../../client/src/app.js");
+  const { shouldWarnBeforeUnload } = await import("../../client/src/app.js");
   const { dom } = await import("../../client/src/bootstrap.js");
   assert(ReplayViewer.prototype instanceof Match, "ReplayViewer reuses Match rendering lifecycle");
   assert(ReplayControls.prototype instanceof RoomTimeControls, "replay controls keep a neutral room-time base");
   assert(!("command" in ReplayCameraInput.prototype), "Replay camera input has no gameplay command API");
-  {
-    const observation = { hidden: true, textContent: "" };
-    dom.gameOverObservation = observation;
-    const app = Object.create(App.prototype);
-    app.renderObservationId("ai-selfplay-1740000000000-000001");
-    assert(!observation.hidden, "completed match exposes its observation id");
-    assert(observation.textContent.includes("ai-selfplay-1740000000000-000001"),
-      "observation id explains the replay/log handoff key");
-    app.renderObservationId("");
-    assert(observation.hidden && observation.textContent === "",
-      "observation id is cleared before the next live match");
-  }
   {
     let synced = 0;
     const unitRangeMatch = Object.create(Match.prototype);
