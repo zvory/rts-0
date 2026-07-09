@@ -639,8 +639,7 @@ fn choose_preferred_open_slot(
     if let Some(slot) = preferred_slots
         .iter()
         .copied()
-        .filter(|slot| *slot < capacity && !used_slots.contains(slot))
-        .next()
+        .find(|slot| *slot < capacity && !used_slots.contains(slot))
     {
         return slot;
     }
@@ -702,19 +701,18 @@ fn coverage_preferred_slots(
 
     while selected.len() < target {
         let used_slots: BTreeSet<usize> = selected.iter().copied().collect();
+        let context = CoverageSlotContext {
+            choke,
+            capacity,
+            zone,
+            map,
+            slot_bias,
+            used_slots: &used_slots,
+        };
         let Some(next) = (0..capacity)
             .filter(|slot| !used_slots.contains(slot))
             .max_by(|left, right| {
-                compare_coverage_slots(
-                    choke,
-                    capacity,
-                    zone,
-                    map,
-                    slot_bias,
-                    &used_slots,
-                    *left,
-                    *right,
-                )
+                compare_coverage_slots(&context, *left, *right)
             })
         else {
             break;
@@ -755,25 +753,48 @@ fn seed_coverage_slot(
         .unwrap_or(0)
 }
 
-fn compare_coverage_slots(
+struct CoverageSlotContext<'a> {
     choke: AiBaseChoke,
     capacity: usize,
     zone: TurtleSlotZone,
     map: AiMapSummary,
     slot_bias: Option<(f32, f32)>,
-    used_slots: &BTreeSet<usize>,
+    used_slots: &'a BTreeSet<usize>,
+}
+
+fn compare_coverage_slots(
+    context: &CoverageSlotContext<'_>,
     left: usize,
     right: usize,
 ) -> std::cmp::Ordering {
-    nearest_used_slot_gap(left, used_slots, capacity)
-        .cmp(&nearest_used_slot_gap(right, used_slots, capacity))
+    nearest_used_slot_gap(left, context.used_slots, context.capacity)
+        .cmp(&nearest_used_slot_gap(
+            right,
+            context.used_slots,
+            context.capacity,
+        ))
         .then_with(|| {
-            if let Some(bias) = slot_bias {
-                let left_bias = slot_bias_distance2(choke, left, capacity, zone, map, bias);
-                let right_bias = slot_bias_distance2(choke, right, capacity, zone, map, bias);
+            if let Some(bias) = context.slot_bias {
+                let left_bias = slot_bias_distance2(
+                    context.choke,
+                    left,
+                    context.capacity,
+                    context.zone,
+                    context.map,
+                    bias,
+                );
+                let right_bias = slot_bias_distance2(
+                    context.choke,
+                    right,
+                    context.capacity,
+                    context.zone,
+                    context.map,
+                    bias,
+                );
                 right_bias.total_cmp(&left_bias)
             } else {
-                center_distance(right, capacity).cmp(&center_distance(left, capacity))
+                center_distance(right, context.capacity)
+                    .cmp(&center_distance(left, context.capacity))
             }
         })
         .then_with(|| right.cmp(&left))

@@ -7,6 +7,14 @@ const TURTLE_DEBUG_MG_SLOT_COLOR: &str = "#5eead4";
 const TURTLE_DEBUG_AT_LINE_COLOR: &str = "#ffb000";
 const TURTLE_DEBUG_AT_FACE_COLOR: &str = "#ff5d73";
 
+struct DebugLineStyle<'a> {
+    color: &'a str,
+    alpha: f32,
+    width: f32,
+    label: Option<String>,
+    tooltip: Option<String>,
+}
+
 pub(in crate::ai_core::decision) fn turtle_observer_debug_layers(
     observation: &AiObservation,
     analysis: &AiMapAnalysis,
@@ -75,22 +83,24 @@ pub(in crate::ai_core::decision) fn turtle_observer_debug_layers(
             format!("p{}:choke:{}:line", observation.player_id, choke.id),
             choke.endpoint_a_world,
             choke.endpoint_b_world,
-            color,
-            if active { 0.96 } else { 0.38 },
-            if active { 8.0 } else { 4.0 },
-            Some(format!(
-                "P{} K{} generated {}",
-                observation.player_id, choke.id, role
-            )),
-            Some(format!(
-                "AI Turtle P{} thinks K{} is the {role} choke line. This uses the static analyzer's full generated choke line for Machine Gunner slots. Width {} tiles, slot capacity {}, MGs currently near line {}/{}.",
-                observation.player_id,
-                choke.id,
-                choke.width_tiles,
-                mg_capacity,
-                mg_count,
-                policy.machine_gunners_per_choke
-            )),
+            DebugLineStyle {
+                color,
+                alpha: if active { 0.96 } else { 0.38 },
+                width: if active { 8.0 } else { 4.0 },
+                label: Some(format!(
+                    "P{} K{} generated {}",
+                    observation.player_id, choke.id, role
+                )),
+                tooltip: Some(format!(
+                    "AI Turtle P{} thinks K{} is the {role} choke line. This uses the static analyzer's full generated choke line for Machine Gunner slots. Width {} tiles, slot capacity {}, MGs currently near line {}/{}.",
+                    observation.player_id,
+                    choke.id,
+                    choke.width_tiles,
+                    mg_capacity,
+                    mg_count,
+                    policy.machine_gunners_per_choke
+                )),
+            },
         ));
         let line_midpoint = (
             (choke.endpoint_a_world.0 + choke.endpoint_b_world.0) * 0.5,
@@ -225,18 +235,20 @@ pub(in crate::ai_core::decision) fn turtle_observer_debug_layers(
                 format!("p{}:choke:{}:at-line", observation.player_id, choke.id),
                 start,
                 end,
-                TURTLE_DEBUG_AT_LINE_COLOR,
-                0.9,
-                3.0,
-                Some(format!("AT line K{}", choke.id)),
-                Some(format!(
-                    "AI Turtle P{} thinks Anti-Tank Guns for K{} should set up on this backline, {:.1} tiles behind the choke on the own-base side. AT guns currently near line: {}; coverage slots shown: {}.",
-                    observation.player_id,
-                    choke.id,
-                    policy.anti_tank_back_tiles,
-                    at_count,
-                    slots.len()
-                )),
+                DebugLineStyle {
+                    color: TURTLE_DEBUG_AT_LINE_COLOR,
+                    alpha: 0.9,
+                    width: 3.0,
+                    label: Some(format!("AT line K{}", choke.id)),
+                    tooltip: Some(format!(
+                        "AI Turtle P{} thinks Anti-Tank Guns for K{} should set up on this backline, {:.1} tiles behind the choke on the own-base side. AT guns currently near line: {}; coverage slots shown: {}.",
+                        observation.player_id,
+                        choke.id,
+                        policy.anti_tank_back_tiles,
+                        at_count,
+                        slots.len()
+                    )),
+                },
             ));
         }
 
@@ -293,16 +305,18 @@ pub(in crate::ai_core::decision) fn turtle_observer_debug_layers(
                 ),
                 emplacement,
                 face_toward,
-                TURTLE_DEBUG_AT_FACE_COLOR,
-                0.55,
-                1.5,
-                None,
-                Some(format!(
-                    "Anti-Tank Gun slot {} for AI Turtle P{} on K{} sets up facing along this line toward the choke/approach lane.",
-                    slot_order + 1,
-                    observation.player_id,
-                    choke.id
-                )),
+                DebugLineStyle {
+                    color: TURTLE_DEBUG_AT_FACE_COLOR,
+                    alpha: 0.55,
+                    width: 1.5,
+                    label: None,
+                    tooltip: Some(format!(
+                        "Anti-Tank Gun slot {} for AI Turtle P{} on K{} sets up facing along this line toward the choke/approach lane.",
+                        slot_order + 1,
+                        observation.player_id,
+                        choke.id
+                    )),
+                },
             ));
         }
     }
@@ -327,11 +341,7 @@ fn debug_line(
     id: String,
     start: (f32, f32),
     end: (f32, f32),
-    color: &str,
-    alpha: f32,
-    width: f32,
-    label: Option<String>,
-    tooltip: Option<String>,
+    style: DebugLineStyle<'_>,
 ) -> ObserverMapAnalysisPrimitive {
     ObserverMapAnalysisPrimitive::Line {
         id,
@@ -339,11 +349,11 @@ fn debug_line(
         y1: start.1,
         x2: end.0,
         y2: end.1,
-        color: color.to_string(),
-        alpha,
-        width,
-        label,
-        tooltip,
+        color: style.color.to_string(),
+        alpha: style.alpha,
+        width: style.width,
+        label: style.label,
+        tooltip: style.tooltip,
     }
 }
 
