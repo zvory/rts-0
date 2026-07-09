@@ -135,10 +135,7 @@ pub(in crate::ai_core::decision) fn turtle_observer_debug_layers(
                 observation.player_id, choke.id
             )),
         ));
-        for (suffix, point) in [
-            ("a", choke.endpoint_a_world),
-            ("b", choke.endpoint_b_world),
-        ] {
+        for (suffix, point) in [("a", choke.endpoint_a_world), ("b", choke.endpoint_b_world)] {
             choke_primitives.push(debug_marker(
                 format!(
                     "p{}:choke:{}:generated-line-end:{}",

@@ -56,11 +56,8 @@ fn enemy_main_steel_center_uses_forward_split_field() {
 
     let steel_center =
         enemy_main_steel_center(&observation, enemy_base).expect("enemy steel should be found");
-    let projection = map_center_projection_tiles(
-        observation.map,
-        (enemy_base.x, enemy_base.y),
-        steel_center,
-    );
+    let projection =
+        map_center_projection_tiles(observation.map, (enemy_base.x, enemy_base.y), steel_center);
 
     assert!(
         (config::STEEL_BLOCK_DIST_TILES - 0.25..=config::STEEL_BLOCK_DIST_TILES + 0.25)

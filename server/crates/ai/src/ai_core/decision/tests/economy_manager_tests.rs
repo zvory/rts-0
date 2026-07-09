@@ -4,9 +4,7 @@ use crate::ai_core::decision::economy_manager::{
     propose_economy, EconomyManagerInput, EconomyManagerSignals, EconomyProposal, OilDemandSignal,
 };
 use crate::ai_core::decision::expansion::ExpansionPlan;
-use crate::ai_core::profiles::{
-    AI_2_0_TANK_PRESSURE, AI_2_1_ECONOMY_MANAGER, AI_TURTLE_CHOKES,
-};
+use crate::ai_core::profiles::{AI_2_0_TANK_PRESSURE, AI_2_1_ECONOMY_MANAGER, AI_TURTLE_CHOKES};
 
 #[test]
 fn turtle_profile_routes_economy_through_proposal_manager() {
@@ -119,7 +117,10 @@ fn economy_manager_signals_can_hold_oil_at_current_assignment() {
         },
     });
 
-    assert_eq!(output.plan.desired_oil_workers, output.plan.current_oil_workers);
+    assert_eq!(
+        output.plan.desired_oil_workers,
+        output.plan.current_oil_workers
+    );
     assert!(!output.proposes(EconomyProposal::AssignOilWorkers));
 }
 
