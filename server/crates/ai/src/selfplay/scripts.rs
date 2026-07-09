@@ -33,6 +33,7 @@ pub(super) struct ProfileBackedScript {
     static_map_context: AiStaticMapContextCache,
     pending_builds: PendingBuildTracker,
     staged_units: BTreeSet<u32>,
+    held_stage_units: BTreeSet<u32>,
     active_attack_units: BTreeMap<u32, u32>,
     allow_combat_commands: bool,
     script_name: &'static str,
@@ -62,6 +63,7 @@ impl ProfileBackedScript {
             static_map_context: AiStaticMapContextCache::default(),
             pending_builds: PendingBuildTracker::default(),
             staged_units: BTreeSet::new(),
+            held_stage_units: BTreeSet::new(),
             active_attack_units: BTreeMap::new(),
             allow_combat_commands,
             script_name,
@@ -176,6 +178,7 @@ impl ProfileBackedScript {
     fn prune_combat_memory(&mut self, observation: &AiObservation, tick: u32) {
         let owned: BTreeSet<u32> = observation.owned.iter().map(|entity| entity.id).collect();
         self.staged_units.retain(|id| owned.contains(id));
+        self.held_stage_units.retain(|id| owned.contains(id));
         let suppress_ticks = self
             .profile
             .attack
@@ -207,6 +210,7 @@ impl ProfileBackedScript {
         }
         for id in &attacking {
             self.staged_units.remove(id);
+            self.held_stage_units.remove(id);
             self.active_attack_units.insert(*id, tick);
         }
         if staging.is_empty() {
@@ -215,6 +219,7 @@ impl ProfileBackedScript {
 
         let mut filtered = Vec::new();
         let mut freshly_staged = BTreeSet::new();
+        let command_stages_units = |units: &[u32]| units.iter().any(|id| staging.contains(id));
         for command in commands {
             match command {
                 Command::AttackMove {
@@ -222,13 +227,16 @@ impl ProfileBackedScript {
                     x,
                     y,
                     queued,
-                } if units.iter().any(|id| staging.contains(id)) => {
+                } if command_stages_units(&units) => {
                     let fresh: Vec<u32> = units
                         .into_iter()
                         .filter(|id| !self.staged_units.contains(id))
                         .filter(|id| !self.active_attack_units.contains_key(id))
                         .collect();
                     self.staged_units.extend(fresh.iter().copied());
+                    for id in &fresh {
+                        self.held_stage_units.remove(id);
+                    }
                     freshly_staged.extend(fresh.iter().copied());
                     if !fresh.is_empty() {
                         filtered.push(Command::AttackMove {
@@ -244,13 +252,16 @@ impl ProfileBackedScript {
                     x,
                     y,
                     queued,
-                } if units.iter().any(|id| staging.contains(id)) => {
+                } if command_stages_units(&units) => {
                     let fresh: Vec<u32> = units
                         .into_iter()
                         .filter(|id| !self.staged_units.contains(id))
                         .filter(|id| !self.active_attack_units.contains_key(id))
                         .collect();
                     self.staged_units.extend(fresh.iter().copied());
+                    for id in &fresh {
+                        self.held_stage_units.remove(id);
+                    }
                     freshly_staged.extend(fresh.iter().copied());
                     if !fresh.is_empty() {
                         filtered.push(Command::Move {
@@ -261,12 +272,24 @@ impl ProfileBackedScript {
                         });
                     }
                 }
+                Command::HoldPosition { units } if command_stages_units(&units) => {
+                    let fresh: Vec<u32> = units
+                        .into_iter()
+                        .filter(|id| !self.active_attack_units.contains_key(id))
+                        .filter(|id| !self.held_stage_units.contains(id))
+                        .collect();
+                    self.staged_units.extend(fresh.iter().copied());
+                    self.held_stage_units.extend(fresh.iter().copied());
+                    if !fresh.is_empty() {
+                        filtered.push(Command::HoldPosition { units: fresh });
+                    }
+                }
                 Command::SetupAntiTankGuns {
                     units,
                     x,
                     y,
                     queued,
-                } if units.iter().any(|id| staging.contains(id)) => {
+                } if command_stages_units(&units) => {
                     let fresh: Vec<u32> = units
                         .into_iter()
                         .filter(|id| !self.active_attack_units.contains_key(id))
@@ -454,5 +477,23 @@ impl ScriptedPlayer for MineOnlyScript {
         assign_steel_workers(&observation, &mut actions, self.initial_gather_sent);
         self.initial_gather_sent = true;
         actions.into_commands()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn profile_stage_filter_sends_hold_position_once_per_staged_unit() {
+        let mut script = ProfileBackedScript::new(1, AI_1_0_TECH_ID);
+        let intents = [AiIntent::Stage { units: vec![42] }];
+        let hold = Command::HoldPosition { units: vec![42] };
+
+        let first = script.filter_repeated_stage_commands(10, &intents, vec![hold.clone()]);
+        let second = script.filter_repeated_stage_commands(16, &intents, vec![hold]);
+
+        assert_eq!(first, vec![Command::HoldPosition { units: vec![42] }]);
+        assert!(second.is_empty());
     }
 }

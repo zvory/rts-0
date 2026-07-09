@@ -104,6 +104,7 @@ pub struct AiController {
     static_map_context: AiStaticMapContextCache,
     pending_builds: PendingBuildTracker,
     staged_units: BTreeSet<u32>,
+    held_stage_units: BTreeSet<u32>,
     active_attack_units: BTreeMap<u32, u32>,
     last_decision_trace: Option<AiDecisionTraceSnapshot>,
     last_debug_map_layers: Vec<ObserverMapAnalysisLayer>,
@@ -123,6 +124,7 @@ impl AiController {
             static_map_context: AiStaticMapContextCache::default(),
             pending_builds: PendingBuildTracker::default(),
             staged_units: BTreeSet::new(),
+            held_stage_units: BTreeSet::new(),
             active_attack_units: BTreeMap::new(),
             last_decision_trace: None,
             last_debug_map_layers: Vec::new(),
@@ -237,6 +239,7 @@ impl AiController {
     fn prune_combat_memory(&mut self, observation: &AiObservation, tick: u32) {
         let owned: BTreeSet<u32> = observation.owned.iter().map(|entity| entity.id).collect();
         self.staged_units.retain(|id| owned.contains(id));
+        self.held_stage_units.retain(|id| owned.contains(id));
         let suppress_ticks = self
             .profile()
             .attack
@@ -272,6 +275,7 @@ impl AiController {
         }
         for id in &attacking {
             self.staged_units.remove(id);
+            self.held_stage_units.remove(id);
             self.active_attack_units.insert(*id, tick);
         }
         if staging.is_empty() {
@@ -280,6 +284,7 @@ impl AiController {
 
         let mut filtered = Vec::new();
         let mut freshly_staged = BTreeSet::new();
+        let command_stages_units = |units: &[u32]| units.iter().any(|id| staging.contains(id));
         for command in commands {
             match command {
                 SimCommand::AttackMove {
@@ -287,13 +292,16 @@ impl AiController {
                     x,
                     y,
                     queued,
-                } if units.iter().any(|id| staging.contains(id)) => {
+                } if command_stages_units(&units) => {
                     let fresh: Vec<u32> = units
                         .into_iter()
                         .filter(|id| !self.staged_units.contains(id))
                         .filter(|id| !self.active_attack_units.contains_key(id))
                         .collect();
                     self.staged_units.extend(fresh.iter().copied());
+                    for id in &fresh {
+                        self.held_stage_units.remove(id);
+                    }
                     freshly_staged.extend(fresh.iter().copied());
                     if !fresh.is_empty() {
                         filtered.push(SimCommand::AttackMove {
@@ -309,13 +317,16 @@ impl AiController {
                     x,
                     y,
                     queued,
-                } if units.iter().any(|id| staging.contains(id)) => {
+                } if command_stages_units(&units) => {
                     let fresh: Vec<u32> = units
                         .into_iter()
                         .filter(|id| !self.staged_units.contains(id))
                         .filter(|id| !self.active_attack_units.contains_key(id))
                         .collect();
                     self.staged_units.extend(fresh.iter().copied());
+                    for id in &fresh {
+                        self.held_stage_units.remove(id);
+                    }
                     freshly_staged.extend(fresh.iter().copied());
                     if !fresh.is_empty() {
                         filtered.push(SimCommand::Move {
@@ -326,12 +337,24 @@ impl AiController {
                         });
                     }
                 }
+                SimCommand::HoldPosition { units } if command_stages_units(&units) => {
+                    let fresh: Vec<u32> = units
+                        .into_iter()
+                        .filter(|id| !self.active_attack_units.contains_key(id))
+                        .filter(|id| !self.held_stage_units.contains(id))
+                        .collect();
+                    self.staged_units.extend(fresh.iter().copied());
+                    self.held_stage_units.extend(fresh.iter().copied());
+                    if !fresh.is_empty() {
+                        filtered.push(SimCommand::HoldPosition { units: fresh });
+                    }
+                }
                 SimCommand::SetupAntiTankGuns {
                     units,
                     x,
                     y,
                     queued,
-                } if units.iter().any(|id| staging.contains(id)) => {
+                } if command_stages_units(&units) => {
                     let fresh: Vec<u32> = units
                         .into_iter()
                         .filter(|id| !self.active_attack_units.contains_key(id))
@@ -472,6 +495,19 @@ mod tests {
             bounded.last().map(String::as_str),
             Some(LIVE_DECISION_TRACE_TRUNCATED_LINE)
         );
+    }
+
+    #[test]
+    fn live_stage_filter_sends_hold_position_once_per_staged_unit() {
+        let mut ai = AiController::new(1);
+        let intents = [crate::ai_core::decision::AiIntent::Stage { units: vec![42] }];
+        let hold = SimCommand::HoldPosition { units: vec![42] };
+
+        let first = ai.filter_repeated_stage_commands(10, &intents, vec![hold.clone()]);
+        let second = ai.filter_repeated_stage_commands(16, &intents, vec![hold]);
+
+        assert_eq!(first, vec![SimCommand::HoldPosition { units: vec![42] }]);
+        assert!(second.is_empty());
     }
 
     #[test]
