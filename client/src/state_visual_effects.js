@@ -1,6 +1,7 @@
 import { EVENT, KIND, STATE, WEAPON_KIND, isUnit } from "./protocol.js";
 
 const SHOT_REVEAL_MS = 1500;
+const MISS_TOAST_MS = 760;
 const WEAPON_RECOIL_MS = Object.freeze({
   [KIND.RIFLEMAN]: 420,
   [KIND.MACHINE_GUNNER]: 160,
@@ -28,6 +29,8 @@ export class VisualEffectBuffers {
     this.smokeCanisters = [];
     /** @type {Array<{from:number,to:number,targetPos?:object,weaponKind?:string,createdAt:number}>} */
     this.muzzleFlashes = [];
+    /** @type {Array<{id:number,to:number,createdAt:number}>} */
+    this.missToasts = [];
     /** @type {Array<{x:number,y:number,createdAt:number}>} */
     this.mortarLaunches = [];
     /** @type {Array<{fromX:number,fromY:number,toX:number,toY:number,radiusTiles:number,durationMs:number,seed:number,createdAt:number}>} */
@@ -52,6 +55,7 @@ export class VisualEffectBuffers {
     this.pendingMortarTargets = [];
     /** @type {Map<number, object>} attacker id -> temporary fog reveal entity. */
     this.shotRevealsById = new Map();
+    this._nextMissToastId = 1;
   }
 
   pruneRecoilForSnapshot(curById) {
@@ -91,6 +95,12 @@ export class VisualEffectBuffers {
         if (ev.weaponKind !== WEAPON_KIND.TANK_COAX) {
           this.weaponRecoilById.set(ev.from, recoilRecord(now, ev.weaponKind));
         }
+      } else if (ev && ev.e === EVENT.MISS && typeof ev.to === "number") {
+        this.missToasts.push({
+          id: this._nextMissToastId++,
+          to: ev.to,
+          createdAt: now,
+        });
       } else if (ev && ev.e === EVENT.SMOKE_LAUNCH) {
         this.addSmokeCanister(ev, now);
       } else if (ev && ev.e === EVENT.MORTAR_LAUNCH) {
@@ -344,6 +354,11 @@ export class VisualEffectBuffers {
     return this.muzzleFlashes;
   }
 
+  liveMissToasts(now) {
+    this.missToasts = this.missToasts.filter((f) => now - f.createdAt <= MISS_TOAST_MS);
+    return this.missToasts;
+  }
+
   weaponRecoil(id, kind, now, weaponKind) {
     const sample = this._weaponRecoilSample(id, kind, now, weaponKind);
     if (!sample) return 0;
@@ -420,6 +435,7 @@ export class VisualEffectBuffers {
 
   _trimQueues() {
     trimHead(this.muzzleFlashes, 256);
+    trimHead(this.missToasts, 96);
     trimHead(this.smokeCanisters, 64);
     trimHead(this.mortarLaunches, 32);
     trimHead(this.mortarShells, 32);
@@ -443,6 +459,8 @@ export class VisualEffectBackedState {
   set smokeCanisters(value) { this.visualEffects.smokeCanisters = Array.isArray(value) ? value : []; }
   get muzzleFlashes() { return this.visualEffects.muzzleFlashes; }
   set muzzleFlashes(value) { this.visualEffects.muzzleFlashes = Array.isArray(value) ? value : []; }
+  get missToasts() { return this.visualEffects.missToasts; }
+  set missToasts(value) { this.visualEffects.missToasts = Array.isArray(value) ? value : []; }
   get mortarLaunches() { return this.visualEffects.mortarLaunches; }
   set mortarLaunches(value) { this.visualEffects.mortarLaunches = Array.isArray(value) ? value : []; }
   get mortarShells() { return this.visualEffects.mortarShells; }
@@ -489,6 +507,7 @@ export class VisualEffectBackedState {
   livePanzerfaustShots(now) { return this.visualEffects.livePanzerfaustShots(now); }
   livePanzerfaustImpacts(now) { return this.visualEffects.livePanzerfaustImpacts(now); }
   liveMuzzleFlashes(now) { return this.visualEffects.liveMuzzleFlashes(now); }
+  liveMissToasts(now) { return this.visualEffects.liveMissToasts(now); }
   weaponRecoil(id, kind, now, weaponKind) {
     return this.visualEffects.weaponRecoil(id, kind, now, weaponKind);
   }

@@ -308,6 +308,20 @@ function buttonByLabel(card, label) {
   assert(overpenEventState.liveMuzzleFlashes(performance.now()).length === 0, "overpenetration event does not draw a tracer");
   assert(overpenEventState.weaponRecoil(22, KIND.WORKER, performance.now()) === 0, "overpenetration event does not trigger weapon recoil");
 
+  const missEventState = new GameState({ ...start, map: { ...start.map, resources: [] } });
+  missEventState.applySnapshot({
+    tick: 13,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 0,
+    supplyCap: 10,
+    entities: [{ id: 23, owner: 2, kind: KIND.RIFLEMAN, x: 180, y: 116, hp: 35, maxHp: 40, state: STATE.IDLE }],
+    events: [{ e: EVENT.MISS, to: 23 }],
+  });
+  assert(missEventState.liveMissToasts(performance.now())[0]?.to === 23, "miss event creates a live miss toast");
+  assert(missEventState.liveMuzzleFlashes(performance.now()).length === 0, "miss event does not draw a tracer");
+  assert(missEventState.weaponRecoil(23, KIND.RIFLEMAN, performance.now()) === 0, "miss event does not trigger target recoil");
+
   // Interpolation clamps alpha to [0,1]
   const entsNeg = state.entitiesInterpolated(-0.5);
   const entsOver = state.entitiesInterpolated(1.5);

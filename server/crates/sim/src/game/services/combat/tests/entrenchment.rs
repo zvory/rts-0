@@ -266,6 +266,14 @@ fn entrenched_direct_shot_seeded_miss_keeps_victim_undamaged() {
     );
     assert!(
         events
+            .get(&1)
+            .expect("attacker owner events should exist")
+            .iter()
+            .any(|event| matches!(event, Event::Miss { to } if *to == victim)),
+        "missed entrenched shots should emit miss feedback"
+    );
+    assert!(
+        events
             .get(&2)
             .expect("victim owner events should exist")
             .iter()

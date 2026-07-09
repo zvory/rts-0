@@ -7,7 +7,7 @@
 //   terrain → decals → trenches → visual-samples → resources → building-shadows → buildings
 //   → building-overlays → unit-shadows → trench-occupant-shadows → trench-occupant-lips
 //   → units → smokes → selection-rings → hp-bars → fog → visual-sample-labels
-//   → shot-reveal-shadows → shot-reveals → feedback → placement-ghost → drag-box
+//   → shot-reveal-shadows → shot-reveals → feedback/miss-toasts → placement-ghost → drag-box
 //
 // Terrain is drawn once into a cached RenderTexture (it never changes mid-match).
 // Snapshot-backed ground decals and trench terrain stamp into persistent textures.
@@ -57,6 +57,7 @@ import {
   drawSelectionBox,
 } from "./feedback.js";
 import { _drawPanzerfaustImpacts, _drawPanzerfaustShots } from "./panzerfaust_feedback.js";
+import { _drawMissToasts } from "./miss_toasts.js";
 import { _drawSelectedMortarRanges, _drawSelectedUnitRanges } from "./unit_ranges.js";
 import { _drawFog, _fogLevel } from "./fog.js";
 import { buildRendererFeedbackView } from "./feedback_view_model.js";
@@ -172,6 +173,7 @@ export class Renderer {
     this.layers.feedback.addChild(this._observerMapAnalysisLabels);
     this._feedbackGfx = new PIXI.Graphics();
     this.layers.feedback.addChild(this._feedbackGfx);
+    this._missToastPool = new Map();
     this._smokeGfx = new PIXI.Graphics();
     this.layers.smokes.addChild(this._smokeGfx);
     this._abilityObjectGfx = new PIXI.Graphics();
@@ -497,6 +499,7 @@ export class Renderer {
       this._drawSafely("rallyPoints", () => this._drawRallyPoints(feedbackView));
       this._drawSafely("resourceMiningPreview", () => this._drawResourceMiningPreview(feedbackView));
       this._drawSafely("muzzleFlashes", () => this._drawMuzzleFlashes(feedbackView));
+      this._drawSafely("missToasts", () => this._drawMissToasts(feedbackView));
     });
     time("renderer.placement", () => this._drawSafely("placement", () => this._drawPlacement(feedbackView, fog)));
   }
@@ -904,6 +907,10 @@ export class Renderer {
       for (const t of this._queueLabelPool.values()) t.destroy();
       this._queueLabelPool.clear();
     }
+    if (this._missToastPool) {
+      for (const t of this._missToastPool.values()) t.destroy();
+      this._missToastPool.clear();
+    }
     this._unseen.clear();
     this._setupVisuals.clear();
     this._tankMotion.clear();
@@ -1016,6 +1023,7 @@ Object.assign(Renderer.prototype, {
   _drawRallyPoints,
   _drawResourceMiningPreview,
   _drawMuzzleFlashes,
+  _drawMissToasts,
   _drawMortarLaunches,
   _drawMortarTargets,
   _drawMortarShells,
