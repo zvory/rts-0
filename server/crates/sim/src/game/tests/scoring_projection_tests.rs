@@ -95,6 +95,18 @@ fn observer_analysis_reports_authoritative_inventory_production_and_losses() {
         },
     );
     game.tick();
+    game.state.tick = config::TICK_HZ * 10;
+    let current_tick = game.tick_count();
+    {
+        let player = game
+            .state
+            .players
+            .iter_mut()
+            .find(|player| player.id == 1)
+            .expect("player one should exist");
+        player.add_gathered_resources(EntityKind::Steel, 80, current_tick);
+        player.add_gathered_resources(EntityKind::Oil, 30, current_tick - config::TICK_HZ * 10);
+    }
 
     let victim_unit = game.state.entities
         .iter()
@@ -141,6 +153,12 @@ fn observer_analysis_reports_authoritative_inventory_production_and_losses() {
             && row.queue_depth == 1
             && row.progress > 0.0
     }));
+    assert_eq!(player_one.resources.lifetime.steel, 80);
+    assert_eq!(player_one.resources.lifetime.oil, 30);
+    assert_eq!(player_one.resources.last_5s.steel, 80);
+    assert_eq!(player_one.resources.last_5s.oil, 0);
+    assert_eq!(player_one.resources.last_minute.steel, 80);
+    assert_eq!(player_one.resources.last_minute.oil, 30);
     let player_two = analysis
         .players
         .iter()

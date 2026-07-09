@@ -286,7 +286,7 @@ impl GameCheckpointV1 {
             MAX_SCHEDULED_ARTILLERY_SHELLS,
         )?;
 
-        let player_ids = validate_players(&self.players)?;
+        let player_ids = validate_players(&self.players, self.tick)?;
         let entity_ids = validate_entities(&self.entities, &player_ids, map)?;
         validate_player_supply(&self.players, &self.entities)?;
         validate_fog(&self.fog, &player_ids, map)?;

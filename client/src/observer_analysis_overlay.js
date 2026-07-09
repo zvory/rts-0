@@ -1,6 +1,7 @@
 import { STATS, UPGRADES } from "./config.js";
 import { isUnit } from "./protocol.js";
 import { playerAnalysisRows } from "./observer_analysis_rows.js";
+import { normalizeResourceWindows, renderResourcesMetric } from "./observer_analysis_resources.js";
 import { renderObserverAnalysisBody } from "./observer_analysis_signatures.js";
 import { resourceValueElement } from "./resource_icons.js";
 
@@ -9,6 +10,7 @@ const LEGACY_STORAGE_KEY = "rts.replayAnalysisOverlay";
 const ARMY_VALUE_TAB_ID = "army-value";
 const PRODUCTION_TAB_ID = "production";
 const UNITS_TAB_ID = "units";
+const RESOURCES_TAB_ID = "resources";
 const UNITS_LOST_TAB_ID = "units-lost";
 const RESOURCES_LOST_TAB_ID = "resources-lost";
 
@@ -16,6 +18,7 @@ export const OBSERVER_ANALYSIS_TABS = Object.freeze([
   { id: ARMY_VALUE_TAB_ID, label: "Army value" },
   { id: "production", label: "Production" },
   { id: "units", label: "Units" },
+  { id: "resources", label: "Resources" },
   { id: "units-lost", label: "Units lost" },
   { id: "resources-lost", label: "Resources lost" },
 ]);
@@ -256,6 +259,7 @@ export class ObserverAnalysisOverlay {
     if (
       selected === PRODUCTION_TAB_ID
       || selected === UNITS_TAB_ID
+      || selected === RESOURCES_TAB_ID
       || selected === UNITS_LOST_TAB_ID
       || selected === RESOURCES_LOST_TAB_ID
     ) {
@@ -269,6 +273,7 @@ export class ObserverAnalysisOverlay {
       armyValue: ARMY_VALUE_TAB_ID,
       production: PRODUCTION_TAB_ID,
       units: UNITS_TAB_ID,
+      resources: RESOURCES_TAB_ID,
       unitsLost: UNITS_LOST_TAB_ID,
       resourcesLost: RESOURCES_LOST_TAB_ID,
       calculateViewportArmyValue,
@@ -409,6 +414,10 @@ export class ObserverAnalysisOverlay {
       }
     }
     return wrap;
+  }
+
+  renderResources(analysis) {
+    return renderResourcesMetric({ analysis, players: this.getPlayers() });
   }
 
   renderUnitsLost(analysis) {
@@ -574,6 +583,7 @@ function normalizeAnalysisPlayer(player) {
       steel: Math.max(0, Math.trunc(Number(player.resourcesLost?.steel) || 0)),
       oil: Math.max(0, Math.trunc(Number(player.resourcesLost?.oil) || 0)),
     },
+    resources: normalizeResourceWindows(player.resources),
   };
 }
 

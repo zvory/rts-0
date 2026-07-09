@@ -21,6 +21,7 @@ export function playerAnalysisRows({ analysis, players }) {
       production: player.production,
       unitsLost: player.unitsLost,
       resourcesLost: player.resourcesLost,
+      resources: player.resources,
       aiDiagnostics: player.aiDiagnostics,
     });
   }

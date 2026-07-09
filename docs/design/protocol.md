@@ -1349,6 +1349,11 @@ not receive this message.
       ],
       unitsLost: [{ kind: string, count: u32, steelValue: u32, oilValue: u32 }],
       resourcesLost: { steel: u32, oil: u32 },
+      resources: {
+        lifetime: { steel: u32, oil: u32 },
+        last5s: { steel: u32, oil: u32 },
+        lastMinute: { steel: u32, oil: u32 }
+      },
       aiDiagnostics?: {
         profileId: string,
         traceTick: u32,
@@ -1400,6 +1405,11 @@ is the front item's completion fraction and `queueDepth` is that queue's total i
 costs. `unitsLost` is the authoritative unit-death count by kind. `resourcesLost` is intentionally
 narrow: the spent steel/oil value of units that died, matching `unitsLost`; it does not include
 buildings, current spending, cancelled production, refunds, harvesting, or stockpile deltas.
+`resources` is authoritative mined income: `lifetime` counts all worker/golem harvest and Pump Jack
+payouts for that player, `last5s` counts payouts in the most recent five simulated seconds, and
+`lastMinute` counts payouts in the most recent sixty simulated seconds. Starting resources, lab
+resource edits, refunds, deconstruction refunds, spending, and current stockpile deltas are
+excluded.
 `aiDiagnostics`, when present, contains the latest bounded live AI decision trace for that player:
 the selected profile id, the AI observation tick that produced the trace, and the formatted trace
 lines from the AI decision manager.

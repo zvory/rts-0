@@ -214,7 +214,7 @@ of the world:
 | `pathing.rs` | `PathingService::request`, `advance_tick`, cached tile paths | Medium | Stateful cache and per-tick budgeting, but isolated from combat/economy rules. |
 | `movement/` | `movement_system_with_events`, `resolve_collisions` | Medium to high | Owns waypoint advancement, vehicle steering, smoke movement status, cooldown ticks, and collision cleanup. |
 | `combat/` | `combat_system(...)` | High | Needs teams, LOS, fog, smoke, spatial index, move coordinator, ability runtime, mortar shells, RNG, and events. |
-| `economy.rs` | `gather_system(map, entities, players, occ, spatial, coordinator)` | Medium | Focused on gatherers/resources, but mutates gatherers, resources, player stockpiles, and paths. |
+| `economy.rs` | `gather_system(map, entities, players, occ, spatial, coordinator, tick)` | Medium | Focused on gatherers/resources, but mutates gatherers, resources, player stockpiles, mined-income counters, and paths. |
 | `production.rs` | `production_system(map, entities, players, coordinator, events)` | Medium | Advances queues, spends completed production, and asks coordinator for spawn/rally positions. |
 | `construction.rs` | `construction_system(map, entities, players, events, fog, active_sites)` | Medium to high | Tied to build orders, placement legality, faction/economy rules, progress, and notices. |
 | `ability_orders.rs` | `order_or_launch_world_ability`, `launch_world_ability`, `launch_self_ability`, predicates | High | Ability legality and effects span commands, queued orders, resources, cooldowns, smoke, runtime stores, and events. |
