@@ -108,6 +108,48 @@ fn command_car_scout_plane_ability_spends_resources_and_uses_nearest_city_centre
 }
 
 #[test]
+fn command_car_scout_plane_ability_does_not_interrupt_caster_orders() {
+    let map = flat_map(32);
+    let mut entities = EntityStore::new();
+    let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 8, 8);
+    entities
+        .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
+        .expect("city centre should spawn");
+    let command_car = entities
+        .spawn_unit(1, EntityKind::CommandCar, 128.0, 128.0)
+        .expect("command car should spawn");
+    {
+        let caster = entities
+            .get_mut(command_car)
+            .expect("command car should exist");
+        caster.set_order(Order::move_to(640.0, 640.0));
+        caster.append_queued_order(OrderIntent::move_to(672.0, 672.0));
+    }
+    let mut players = vec![player_state(1), player_state(2)];
+
+    let events = apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(1, scout_plane_command(vec![command_car], 512.0, 512.0))],
+    );
+
+    let caster = entities
+        .get(command_car)
+        .expect("command car should survive launch");
+    assert!(
+        matches!(caster.order(), Order::Move(_)),
+        "Scout Plane launch should not replace the Command Car's active order"
+    );
+    assert_eq!(
+        caster.queued_orders().len(),
+        1,
+        "Scout Plane launch should not clear the Command Car's queued orders"
+    );
+    assert_notice(&events, 1, "Scout Plane");
+}
+
+#[test]
 fn command_car_scout_plane_ability_rejects_active_plane_before_spending() {
     let map = flat_map(32);
     let mut entities = EntityStore::new();

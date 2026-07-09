@@ -1170,9 +1170,9 @@ fn use_ability(
                 caster_can_accept_order(entities, player, *unit, ability)
                     && ability_orders::caster_allowed_by_faction(entities, &faction_id, *unit, ability)
             });
-        let Some(caster) = caster else {
+        if caster.is_none() {
             return;
-        };
+        }
         let Some(ps) = players.iter_mut().find(|p| p.id == player) else {
             return;
         };
@@ -1198,10 +1198,6 @@ fn use_ability(
                 } else {
                     ps.ability_cooldowns
                         .insert(ability, definition.cooldown_ticks);
-                }
-                if let Some(caster) = entities.get_mut(caster) {
-                    caster.clear_active_order();
-                    caster.set_path_goal(None);
                 }
                 notice_positioned(events, player, "Scout Plane", NoticeSeverity::Info, x, y);
             }
