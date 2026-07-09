@@ -83,8 +83,8 @@ function nearPoint(call, point, epsilon = 0.001) {
     });
     const label = context.layers.feedback.children[0];
     assert(label?.text === "Miss!", "miss toast renders the Miss! label");
-    assertApprox(label.style.fontSize, 4.5, 0.001, "miss toast text is half the original size");
-    assertApprox(label.style.strokeThickness, 1, 0.001, "miss toast stroke scales down with the text");
+    assertApprox(label.style.fontSize, 6.75, 0.001, "miss toast text is 1.5x larger than the prior tiny size");
+    assertApprox(label.style.strokeThickness, 1.5, 0.001, "miss toast stroke scales with the text");
     assertApprox(label.x, target.x + 14, 0.001, "miss toast sits close to the receiving unit's right edge");
     assertApprox(label.y, target.y - 8, 0.001, "miss toast sits close to the receiving unit's top edge");
     assert(label.x > target.x, "miss toast appears to the right of the receiving unit");
