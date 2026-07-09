@@ -5,8 +5,7 @@ use rayon::prelude::*;
 use rts_rules::faction::DEFAULT_FACTION_ID;
 
 fn owned_kind_count(game: &Game, owner: u32, kind: EntityKind) -> usize {
-    game.state
-        .entities
+    game.state.entities
         .iter()
         .filter(|e| e.owner == owner && e.kind == kind)
         .count()
@@ -22,7 +21,12 @@ fn assert_units_do_not_intersect_buildings(game: &Game) {
                 .map(|rect| (entity.id, entity.kind, rect))
         })
         .collect();
-    for unit in game.state.entities.iter().filter(|entity| entity.is_unit()) {
+    for unit in game
+        .state
+        .entities
+        .iter()
+        .filter(|entity| entity.is_unit())
+    {
         let Some(body) = crate::game::services::geometry::unit_body_for_entity(unit) else {
             continue;
         };
@@ -195,8 +199,7 @@ fn describe_vehicle_small_block_state(game: &Game, units: &[u32]) -> Vec<String>
 
 fn vehicle_small_block_vehicles_clear(game: &Game, units: &[u32]) -> bool {
     units.iter().all(|&id| {
-        game.state
-            .entities
+        game.state.entities
             .get(id)
             .is_some_and(|e| e.move_phase().is_none() && e.path_is_empty())
     })
@@ -204,8 +207,7 @@ fn vehicle_small_block_vehicles_clear(game: &Game, units: &[u32]) -> bool {
 
 fn dev_scenario_units_clear(game: &Game, units: &[u32]) -> bool {
     units.iter().all(|&id| {
-        game.state
-            .entities
+        game.state.entities
             .get(id)
             .is_some_and(|e| e.move_phase().is_none() && e.path_is_empty())
     })
@@ -337,9 +339,7 @@ fn direct_reverse_order_scenario_faces_unit_east_and_orders_goal_behind() {
             .expect("scenario setup should succeed");
         let unit_id = *setup.units.first().expect("scenario should spawn one unit");
         let entity = setup
-            .game
-            .state
-            .entities
+            .game.state.entities
             .get(unit_id)
             .expect("scenario unit should exist");
         let goal_delta_x = entity.pos_x - setup.goal.0;
@@ -408,9 +408,7 @@ fn panzerfaust_dev_scenarios_seed_final_inspection_cases() {
     assert_eq!(owned_kind_count(&duel.game, 1, EntityKind::Panzerfaust), 1);
     assert_eq!(owned_kind_count(&duel.game, 2, EntityKind::Tank), 1);
     let duel_target = duel
-        .game
-        .state
-        .entities
+        .game.state.entities
         .get(duel.units[0])
         .expect("duel Panzerfaust should exist")
         .order()
@@ -431,9 +429,7 @@ fn panzerfaust_dev_scenarios_seed_final_inspection_cases() {
     assert_eq!(cancel.issue_after_ticks, config::TICK_HZ / 6);
     assert_eq!(cancel.units.len(), 1);
     assert!(cancel
-        .game
-        .state
-        .entities
+        .game.state.entities
         .get(cancel.units[0])
         .expect("cancel Panzerfaust should exist")
         .order()
@@ -459,17 +455,13 @@ fn panzerfaust_dev_scenarios_seed_final_inspection_cases() {
         1
     );
     let low_health_tank = target_death
-        .game
-        .state
-        .entities
+        .game.state.entities
         .iter()
         .find(|entity| entity.owner == 2 && entity.kind == EntityKind::Tank)
         .expect("target-death scenario should seed one enemy Tank");
     assert_eq!(low_health_tank.hp, 63);
     assert!(target_death
-        .game
-        .state
-        .players
+        .game.state.players
         .iter()
         .find(|player| player.id == 3)
         .expect("boosted ally player should exist")
@@ -488,25 +480,19 @@ fn panzerfaust_dev_scenarios_seed_final_inspection_cases() {
     assert_eq!(entrenched.units.len(), 2);
     assert_eq!(entrenched.game.state.trenches.all().len(), 1);
     assert!(entrenched
-        .game
-        .state
-        .entities
+        .game.state.entities
         .get(entrenched.units[0])
         .and_then(|entity| entity.movement.as_ref())
         .and_then(|movement| movement.occupied_trench_id)
         .is_some());
     assert!(entrenched
-        .game
-        .state
-        .entities
+        .game.state.entities
         .get(entrenched.units[1])
         .and_then(|entity| entity.movement.as_ref())
         .and_then(|movement| movement.occupied_trench_id)
         .is_none());
     assert!(entrenched
-        .game
-        .state
-        .players
+        .game.state.players
         .iter()
         .find(|player| player.id == entrenched.player_id)
         .expect("scenario player should exist")
@@ -524,9 +510,7 @@ fn panzerfaust_dev_scenarios_seed_final_inspection_cases() {
     assert_eq!(meth.issue_after_ticks, u32::MAX);
     assert_eq!(meth.units.len(), 2);
     assert!(meth
-        .game
-        .state
-        .players
+        .game.state.players
         .iter()
         .find(|player| player.id == 3)
         .expect("boosted ally player should exist")
@@ -561,12 +545,7 @@ fn tank_coax_inspection_scenario_sets_up_static_mixed_targets() {
     assert_eq!(owned_kind_count(&setup.game, 0, EntityKind::Oil), 1);
     assert_eq!(setup.game.state.smokes.iter().count(), 1);
     let tank_id = setup.units[0];
-    let tank = setup
-        .game
-        .state
-        .entities
-        .get(tank_id)
-        .expect("tank should exist");
+    let tank = setup.game.state.entities.get(tank_id).expect("tank should exist");
     assert_eq!(tank.weapon_facing(), Some(0.0));
     assert_eq!(
         tank.weapon_cooldown(crate::rules::combat::WeaponKind::TankCannon),
@@ -587,11 +566,7 @@ fn tank_coax_inspection_scenario_sets_up_static_mixed_targets() {
     let enemy_hp_before = enemy_hp_total(&setup.game);
     let mut ticked = setup.game.clone();
     ticked.tick();
-    let ticked_tank = ticked
-        .state
-        .entities
-        .get(tank_id)
-        .expect("tank should survive first tick");
+    let ticked_tank = ticked.state.entities.get(tank_id).expect("tank should survive first tick");
     assert_eq!(
         ticked_tank.weapon_cooldown(WeaponKind::TankCannon),
         config::TICK_HZ * 4 - 1,
@@ -609,7 +584,8 @@ fn tank_coax_inspection_scenario_sets_up_static_mixed_targets() {
         "inspection scenario should place at least one enemy target inside the coax arc"
     );
     assert_eq!(
-        ticked_tank.hp, tank_hp_before,
+        ticked_tank.hp,
+        tank_hp_before,
         "static inspection targets should not fire back on the first tick"
     );
     assert_dev_scenario_starts_as_kriegsia(&setup);
@@ -634,9 +610,7 @@ fn entrenchment_inspection_scenario_seeds_research_trenches_and_reuse_units() {
     assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::Rifleman), 1);
     assert_eq!(setup.game.state.trenches.all().len(), 3);
     assert!(setup
-        .game
-        .state
-        .players
+        .game.state.players
         .iter()
         .find(|player| player.id == 1)
         .expect("scenario player should exist")
@@ -684,9 +658,7 @@ fn tank_trap_line_build_scenarios_start_with_builders_tech_and_test_units() {
                 || owned_kind_count(&setup.game, 1, EntityKind::Tank) == 1
         );
         let player = setup
-            .game
-            .state
-            .players
+            .game.state.players
             .iter()
             .find(|p| p.id == setup.player_id)
             .expect("scenario player should exist");
@@ -727,9 +699,7 @@ fn tank_trap_pathing_scenarios_spawn_prebuilt_walls_and_expected_units() {
         assert_eq!(owned_kind_count(&setup.game, 1, unit), 1);
         assert_eq!(
             setup
-                .game
-                .state
-                .entities
+                .game.state.entities
                 .iter()
                 .filter(|entity| entity.kind == EntityKind::TankTrap)
                 .count(),
@@ -738,9 +708,7 @@ fn tank_trap_pathing_scenarios_spawn_prebuilt_walls_and_expected_units() {
         );
         assert_eq!(
             setup
-                .game
-                .state
-                .entities
+                .game.state.entities
                 .iter()
                 .filter(|entity| entity.is_building())
                 .count(),
@@ -765,12 +733,9 @@ fn tank_trap_friendly_reroute_wall_mixes_own_and_allied_blockers() {
     assert!(owned_kind_count(&setup.game, 1, EntityKind::TankTrap) > 0);
     assert!(owned_kind_count(&setup.game, 2, EntityKind::TankTrap) > 0);
 
-    let occ =
-        services::occupancy::Occupancy::build(&setup.game.state.map, &setup.game.state.entities);
+    let occ = services::occupancy::Occupancy::build(&setup.game.state.map, &setup.game.state.entities);
     let trap = setup
-        .game
-        .state
-        .entities
+        .game.state.entities
         .iter()
         .find(|entity| entity.kind == EntityKind::TankTrap)
         .expect("scenario should spawn Tank Traps");
@@ -798,12 +763,9 @@ fn tank_trap_enemy_breach_scenario_closes_sparse_vehicle_gaps() {
     assert_eq!(setup.game.team_of_player(2), Some(2));
     assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::TankTrap), 7);
 
-    let occ =
-        services::occupancy::Occupancy::build(&setup.game.state.map, &setup.game.state.entities);
+    let occ = services::occupancy::Occupancy::build(&setup.game.state.map, &setup.game.state.entities);
     let mut enemy_trap_tiles: Vec<_> = setup
-        .game
-        .state
-        .entities
+        .game.state.entities
         .iter()
         .filter(|entity| entity.owner == 2 && entity.kind == EntityKind::TankTrap)
         .map(|entity| setup.game.state.map.tile_of(entity.pos_x, entity.pos_y))
@@ -840,9 +802,7 @@ fn tank_trap_infantry_move_orders_cross_enemy_wall_without_auto_attacks() {
                 .expect("scenario setup should succeed");
         let mut game = setup.game;
         let unit_id = setup.units[0];
-        let wall_x = game
-            .state
-            .entities
+        let wall_x = game.state.entities
             .iter()
             .find(|entity| entity.owner == 2 && entity.kind == EntityKind::TankTrap)
             .expect("enemy trap should exist")
@@ -864,9 +824,7 @@ fn tank_trap_infantry_move_orders_cross_enemy_wall_without_auto_attacks() {
                 .iter()
                 .flat_map(|(_, events)| events.iter())
                 .any(|event| matches!(event, Event::Attack { from, .. } if *from == unit_id));
-            if game
-                .state
-                .entities
+            if game.state.entities
                 .get(unit_id)
                 .is_some_and(|entity| entity.pos_x > wall_x + config::TILE_SIZE as f32)
             {
@@ -874,11 +832,7 @@ fn tank_trap_infantry_move_orders_cross_enemy_wall_without_auto_attacks() {
             }
         }
 
-        let entity = game
-            .state
-            .entities
-            .get(unit_id)
-            .expect("unit should survive");
+        let entity = game.state.entities.get(unit_id).expect("unit should survive");
         assert!(
             entity.pos_x > wall_x + config::TILE_SIZE as f32,
             "{unit} should cross the enemy Tank Trap wall on a normal move order"
@@ -902,9 +856,7 @@ fn tank_trap_explicit_rifleman_attack_order_remains_valid() {
     .expect("scenario setup should succeed");
     let mut game = setup.game;
     let rifleman = setup.units[0];
-    let trap = game
-        .state
-        .entities
+    let trap = game.state.entities
         .iter()
         .find(|entity| entity.owner == 2 && entity.kind == EntityKind::TankTrap)
         .expect("enemy Tank Trap should exist")
@@ -931,9 +883,7 @@ fn tank_trap_explicit_rifleman_attack_order_remains_valid() {
         }
     }
 
-    let entity = game
-        .state
-        .entities
+    let entity = game.state.entities
         .get(rifleman)
         .expect("rifleman should survive");
     assert_eq!(entity.order().attack_target(), Some(trap));
@@ -986,9 +936,7 @@ fn vehicle_corner_wall_scenario_matches_authored_layout() {
 
     let ts = config::TILE_SIZE as f32;
     let lead = setup
-        .game
-        .state
-        .entities
+        .game.state.entities
         .get(setup.units[0])
         .expect("lead tank should exist");
     let lead_x = wall_left_x as f32 * ts - ts;
@@ -1009,9 +957,7 @@ fn vehicle_corner_wall_scenario_matches_authored_layout() {
     ];
     for (unit_id, (expected_x, expected_y)) in setup.units.iter().zip(expected) {
         let entity = setup
-            .game
-            .state
-            .entities
+            .game.state.entities
             .get(*unit_id)
             .expect("scenario tank should exist");
         assert_eq!(entity.kind, EntityKind::Tank);
@@ -1052,18 +998,14 @@ fn factory_zero_gap_perpendicular_scenario_matches_authored_layout() {
         assert_eq!(owned_kind_count(&setup.game, 1, unit), 1);
 
         let factory = setup
-            .game
-            .state
-            .entities
+            .game.state.entities
             .iter()
             .find(|e| e.kind == EntityKind::Factory)
             .expect("factory should exist");
         let rect = services::geometry::building_rect_for_entity(&setup.game.state.map, factory)
             .expect("factory rect should exist");
         let unit_entity = setup
-            .game
-            .state
-            .entities
+            .game.state.entities
             .get(setup.units[0])
             .expect("scenario unit should exist");
         let body = services::geometry::unit_body_for_entity(unit_entity)
@@ -1239,9 +1181,7 @@ fn assert_vehicle_small_block_baseline_setup(
         .iter()
         .map(|id| {
             let entity = setup
-                .game
-                .state
-                .entities
+                .game.state.entities
                 .get(*id)
                 .expect("scenario vehicle should exist");
             assert_eq!(entity.kind, vehicle);
@@ -1256,9 +1196,7 @@ fn assert_vehicle_small_block_baseline_setup(
     vehicle_positions.sort_by(|a, b| a.0.total_cmp(&b.0));
 
     let mut blocker_positions: Vec<(f32, f32)> = setup
-        .game
-        .state
-        .entities
+        .game.state.entities
         .iter()
         .filter(|e| e.owner == 1 && Some(e.kind) == blocker)
         .map(|e| (e.pos_x, e.pos_y))

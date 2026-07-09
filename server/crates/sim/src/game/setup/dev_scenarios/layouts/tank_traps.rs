@@ -63,18 +63,18 @@ impl TankTrapPathingLayout {
                     2
                 }
             }
-            Self::EnemyVehicleBreach | Self::InfantryPassThrough | Self::ExplicitInfantryAttack => {
-                2
-            }
+            Self::EnemyVehicleBreach
+            | Self::InfantryPassThrough
+            | Self::ExplicitInfantryAttack => 2,
         }
     }
 
     pub(in crate::game::setup::dev_scenarios) fn player_teams(self) -> [(u32, u32); 2] {
         match self {
             Self::FriendlyVehicleReroute => [(1, 1), (2, 1)],
-            Self::EnemyVehicleBreach | Self::InfantryPassThrough | Self::ExplicitInfantryAttack => {
-                [(1, 1), (2, 2)]
-            }
+            Self::EnemyVehicleBreach
+            | Self::InfantryPassThrough
+            | Self::ExplicitInfantryAttack => [(1, 1), (2, 2)],
         }
     }
 }
@@ -125,7 +125,10 @@ pub(in crate::game::setup::dev_scenarios) fn tank_trap_line_build_map(
             )
         }
         TankTrapLineLayout::Diagonal => {
-            let start = ((center.0 as f32 - 6.0) * ts, (center.1 as f32 - 6.0) * ts);
+            let start = (
+                (center.0 as f32 - 6.0) * ts,
+                (center.1 as f32 - 6.0) * ts,
+            );
             (
                 vec![start, (start.0, start.1 + vehicle_gap * 2.0)],
                 ((center.0 as f32 + 4.0) * ts, (center.1 as f32 + 4.0) * ts),
@@ -203,23 +206,9 @@ pub(in crate::game::setup::dev_scenarios) fn tank_trap_pathing_map(
             | TankTrapPathingLayout::InfantryPassThrough
             | TankTrapPathingLayout::ExplicitInfantryAttack
     )
-    .then(|| {
-        services::occupancy::footprint_center(
-            &map,
-            EntityKind::CityCentre,
-            center.0 + 18,
-            center.1 - 18,
-        )
-    });
+    .then(|| services::occupancy::footprint_center(&map, EntityKind::CityCentre, center.0 + 18, center.1 - 18));
 
-    (
-        map,
-        (center.0 - 10, center.1),
-        unit_start,
-        traps,
-        enemy_base,
-        goal,
-    )
+    (map, (center.0 - 10, center.1), unit_start, traps, enemy_base, goal)
 }
 
 pub(in crate::game::setup::dev_scenarios) fn spawn_tank_trap_line_test_units(
@@ -287,7 +276,9 @@ pub(in crate::game::setup::dev_scenarios) fn spawn_tank_trap_line_workers(
 
 fn vehicle_line_start_gap(unit: EntityKind) -> f32 {
     match unit {
-        EntityKind::AntiTankGun | EntityKind::MortarTeam => config::ANTI_TANK_GUN_BODY_LENGTH_PX,
+        EntityKind::AntiTankGun | EntityKind::MortarTeam => {
+            config::ANTI_TANK_GUN_BODY_LENGTH_PX
+        }
         EntityKind::Artillery => config::ARTILLERY_BODY_LENGTH_PX,
         EntityKind::ScoutCar => config::SCOUT_CAR_BODY_LENGTH_PX,
         EntityKind::Tank => config::TANK_BODY_LENGTH_PX,
