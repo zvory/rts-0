@@ -11,10 +11,11 @@ export function createImmediateTouchButtonActivation(onActivate, options = {}) {
   function activateFromTouch(event) {
     if (!isTouchPointer(event) || activePointerId == null || !samePointerId(activePointerId, event)) return;
     activePointerId = null;
+    if (!releasedInside(event)) return;
     lastTouchActivateAt = now();
     event.preventDefault?.();
     event.stopPropagation?.();
-    activate();
+    activate(event);
   }
 
   function cancelTouch(event) {
@@ -36,13 +37,20 @@ export function createImmediateTouchButtonActivation(onActivate, options = {}) {
         event?.stopPropagation?.();
         return;
       }
-      activate();
+      activate(event);
     },
     reset() {
       activePointerId = null;
       lastTouchActivateAt = 0;
     },
   };
+}
+
+function releasedInside(event) {
+  const target = event?.target;
+  const currentTarget = event?.currentTarget;
+  if (!target || !currentTarget?.contains) return true;
+  return target === currentTarget || currentTarget.contains(target);
 }
 
 function isPrimaryPointer(event) {

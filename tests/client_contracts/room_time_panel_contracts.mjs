@@ -1,4 +1,5 @@
 import { FloatingRoomTimePanel } from "../../client/src/room_time_panel.js";
+import { createImmediateTouchButtonActivation } from "../../client/src/panel_touch_activation.js";
 import { assert } from "./assertions.mjs";
 
 const priorDocument = globalThis.document;
@@ -86,6 +87,24 @@ try {
   });
   assert(root.dataset.collapsed === "true", "FloatingRoomTimePanel cancels touch collapse when the pointer leaves");
   panel.destroy();
+
+  let activations = 0;
+  let now = 100;
+  const activation = createImmediateTouchButtonActivation(() => { activations += 1; }, { now: () => now });
+  activation.pointerdown({ button: 0, isPrimary: true, pointerId: 1, pointerType: "pen" });
+  activation.pointerup({ pointerId: 1, pointerType: "pen", preventDefault() {}, stopPropagation() {} });
+  assert(activations === 1, "touch activation accepts a primary pen release");
+  activation.click({ preventDefault() {}, stopPropagation() {} });
+  assert(activations === 1, "touch activation suppresses the pen's synthesized duplicate click");
+
+  now += 1_000;
+  activation.pointerdown({ button: 0, isPrimary: true, pointerId: 2, pointerType: "touch" });
+  activation.pointerup({ pointerId: 3, pointerType: "touch", preventDefault() {}, stopPropagation() {} });
+  activation.pointercancel({ pointerId: 2, pointerType: "touch" });
+  assert(activations === 1, "touch activation ignores a mismatched pointer and cancellation");
+
+  activation.click({});
+  assert(activations === 2, "touch activation preserves the native mouse and keyboard click path");
 } finally {
   if (priorDocument === undefined) delete globalThis.document;
   else globalThis.document = priorDocument;
