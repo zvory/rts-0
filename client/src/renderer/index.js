@@ -240,6 +240,7 @@ export class Renderer {
     this._assetReadiness = new Map();
     this._missingTextureEntityIds = new Set();
     this._renderFrameCount = 0;
+    this._lastRenderErrorFrame = -1;
     this._loadLivePngRigAtlases();
     this._liveFrameStripsByKind = createLiveFrameStrips();
     this._liveFrameStripTextures = new Map();
@@ -345,11 +346,13 @@ export class Renderer {
         message: this._groundDecals?.assetLoadError?.message || null,
       });
     }
-    const renderErrors = [...this._renderErrors.entries()].map(([label, value]) => ({
-      label,
-      count: value.count,
-      message: value.lastMessage || "",
-    }));
+    const renderErrors = this._lastRenderErrorFrame === this._renderFrameCount
+      ? [...this._renderErrors.entries()].map(([label, value]) => ({
+        label,
+        count: value.count,
+        message: value.lastMessage || "",
+      }))
+      : [];
     const missingTextureSubjectIds = [...this._missingTextureEntityIds].filter((id) => ids.has(id));
     return {
       frame: this._renderFrameCount,
@@ -403,7 +406,7 @@ export class Renderer {
     visualFrameStripOverrides = null,
     observerMapAnalysis = null,
   } = {}) {
-    this._renderFrameCount += 1;
+    this._beginRenderFrame();
     this._profiler = profiler || null;
     const time = (label, fn) => profiler ? profiler.time(label, fn) : fn();
     // Drive the world container from the camera (single transform for all layers).
@@ -581,6 +584,14 @@ export class Renderer {
       this._drawSafely("missToasts", () => this._drawMissToasts(feedbackView));
     });
     time("renderer.placement", () => this._drawSafely("placement", () => this._drawPlacement(feedbackView, fog)));
+  }
+
+  _beginRenderFrame() {
+    this._renderFrameCount += 1;
+    // Capture readiness is a property of the current rendered frame. A texture can
+    // legitimately be unavailable while an atlas is loading, then render normally
+    // once it resolves; do not keep that transient fallback pinned forever.
+    this._missingTextureEntityIds.clear();
   }
 
   _drawSafely(label, draw) {
@@ -796,6 +807,7 @@ export class Renderer {
   }
 
   _recordRenderError(label, err) {
+    this._lastRenderErrorFrame = this._renderFrameCount;
     const now = typeof performance !== "undefined" && typeof performance.now === "function"
       ? performance.now()
       : Date.now();

@@ -347,8 +347,11 @@ export class AgentLabBridge {
       throw bridgeError("invalidPresentation", "presentation.mode must be clean or default.");
     }
     const { match } = this.session();
-    this.app?.setCleanPresentation?.(mode === "clean");
-    match.handleResize?.();
+    if (typeof this.app?.setCleanPresentation === "function") {
+      this.app.setCleanPresentation(mode === "clean");
+    } else {
+      match.handleResize?.();
+    }
     await animationFrames(2);
     return {
       mode,
