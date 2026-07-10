@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   DEFAULT_IDLE_MS, IPC_VERSION, STARTUP_GRACE_MS, configuredIdleMs, prepareRuntime,
-  processAlive, readStartupLock, reclaimStaleStartupLock, removeOwnedStartupLock,
+  processAlive, readStartupLock, reclaimStaleStartupLock,
   runtimePaths, sleep, startupLockStale,
 } from "../scripts/lab-interact/runtime.mjs";
 
@@ -195,9 +195,7 @@ assert.notEqual(duplicate.status, 0, "a duplicate daemon cannot bind the owned w
 const afterDuplicate = JSON.parse(fs.readFileSync(paths.state, "utf8"));
 assert.equal(afterDuplicate.daemonId, winningState.daemonId, "duplicate startup cannot delete or replace the winner runtime");
 assert.equal(fs.existsSync(paths.socket), true, "duplicate bind failure cannot unlink the winner socket");
-const duplicateLock = readStartupLock(paths);
-assert.equal(duplicateLock?.nonce, duplicateNonce, "duplicate bind loser leaves only its own claimed startup lock");
-assert.equal(removeOwnedStartupLock(paths, duplicateNonce, duplicateLock.pid, "daemon"), true, "test cleanup removes the duplicate loser's lock by nonce ownership");
+assert.equal(readStartupLock(paths), null, "duplicate bind loser removes its own claimed startup lock");
 assert.equal(call("status").ok, true, "the winning daemon remains reachable after a duplicate startup");
 
 const savedStateText = fs.readFileSync(paths.state, "utf8");
