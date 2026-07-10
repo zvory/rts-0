@@ -20,6 +20,7 @@ enabled_tools = [
   "lab_time",
   "lab_inspect",
   "lab_camera",
+  "lab_screenshot",
 ]
 default_tools_approval_mode = "auto"
 

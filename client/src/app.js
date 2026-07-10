@@ -59,6 +59,7 @@ import { SettingsContainer } from "./settings_container.js";
 import { buildSettingsTabs } from "./settings_panels.js";
 import { resolveVisualProfileLaunch } from "./visual_profiles.js";
 import { AgentLabBridge, agentLabLaunchEnabled } from "./agent_lab_bridge.js";
+import { CleanPresentation } from "./clean_presentation.js";
 
 /**
  * App-level heartbeat interval (ms). The server drops connections idle for 40s,
@@ -127,6 +128,7 @@ export class App {
     this.labPanel = null;
     this.labMapEditorSession = null;
     this.labControlPolicy = null;
+    this.cleanPresentation = new CleanPresentation({ root: dom.app });
     this.agentLabBridge = agentLabLaunchEnabled() ? new AgentLabBridge({ app: this }) : null;
     /** @type {number|undefined} pending toast hide timer. */
     this.toastTimer = undefined;
@@ -428,6 +430,7 @@ export class App {
       players: payload?.players?.length,
       spectator: payload?.spectator,
     });
+    this.setCleanPresentation(false);
     const startsReplay = !!payload?.replay;
     if (!startsReplay) this.lastObservationRunId = "";
     const preserveScorePanel = startsReplay && !dom.gameOver.hidden;
@@ -742,6 +745,7 @@ export class App {
   }
 
   destroyLabShell() {
+    this.setCleanPresentation(false);
     this.labPanel?.destroy();
     this.labClient?.destroy();
     this.labControlPolicy?.destroy?.();
@@ -753,6 +757,14 @@ export class App {
   destroyAgentLabBridge() {
     this.agentLabBridge?.destroy();
     this.agentLabBridge = null;
+  }
+
+  setCleanPresentation(enabled) {
+    const active = this.cleanPresentation?.set(enabled) || false;
+    // Lab panels are overlays, but a real resize may accompany a headless capture
+    // viewport override. Reapply bounds after the chrome state has reached the DOM.
+    this.match?.handleResize?.();
+    return active;
   }
 
   mountLobbySettings() {

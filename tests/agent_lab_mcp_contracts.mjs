@@ -40,7 +40,7 @@ const tools = await client.listTools();
 const names = tools.tools.map((tool) => tool.name).sort();
 assert.deepEqual(names, [
   "lab_camera", "lab_catalog", "lab_close", "lab_inspect", "lab_open", "lab_order",
-  "lab_remove", "lab_reset", "lab_spawn", "lab_time", "lab_update",
+  "lab_remove", "lab_reset", "lab_screenshot", "lab_spawn", "lab_time", "lab_update",
 ], "MCP server exposes exactly the Phase 2 tool allowlist");
 for (const tool of tools.tools) {
   assert.ok(tool.inputSchema && tool.outputSchema, `${tool.name} publishes both input and structured output schemas`);
@@ -83,6 +83,21 @@ await call("lab_time", { sessionId, control: { action: "step", ticks: 2 } });
 const inspected = await call("lab_inspect", { sessionId, refs: ["shooter", "target"], cameraViewport: true, limit: 2 });
 assert.deepEqual(inspected.entities.map((entity) => entity.alias).sort(), ["shooter", "target"], "inspect returns both numeric entities and their resolved aliases");
 await call("lab_camera", { sessionId, camera: { action: "focus", refs: ["shooter", "target"], padding: 32 } });
+const screenshotResult = await client.callTool({
+  name: "lab_screenshot",
+  arguments: {
+    sessionId,
+    name: "contract_scene",
+    presentation: "clean",
+    viewport: { width: 1000, height: 700, deviceScaleFactor: 1 },
+    subjects: ["shooter", "target"],
+  },
+});
+assert.equal(screenshotResult.isError, undefined, "lab_screenshot returns a successful bounded capture");
+assert.equal(screenshotResult.structuredContent.image.mimeType, "image/png", "screenshot structured result identifies PNG content");
+assert.equal(screenshotResult.structuredContent.image.width, 1000, "screenshot preserves the requested bounded viewport width");
+assert.ok(screenshotResult.content.some((item) => item.type === "image" && item.mimeType === "image/png"), "screenshot returns MCP image content");
+await expectRejected("lab_screenshot", { sessionId, name: "../escape" }, /name must be a safe artifact token/);
 await call("lab_spawn", { sessionId, spawns: [{ owner: 2, kind: "rifleman", x: 1312, y: 960, alias: "doomed" }] });
 await call("lab_order", { sessionId, playerId: 1, command: { c: "deconstruct", units: ["shooter"], target: "doomed" } });
 const stale = await client.callTool({ name: "lab_inspect", arguments: { sessionId, refs: ["doomed"] } });

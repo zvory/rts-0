@@ -12,7 +12,7 @@ import {
 } from "./lab_spawn_catalog.js";
 
 export const AGENT_LAB_BRIDGE_KEY = "__rtsAgentLab";
-export const AGENT_LAB_BRIDGE_VERSION = 1;
+export const AGENT_LAB_BRIDGE_VERSION = 2;
 export const AGENT_LAB_LIMITS = Object.freeze({
   inspectEntities: 100,
   inspectPlayers: 16,
@@ -21,6 +21,7 @@ export const AGENT_LAB_LIMITS = Object.freeze({
   stepTicks: 100,
   seekTick: 1_000_000,
   waitMs: 8_000,
+  captureSubjects: 20,
 });
 
 export function agentLabLaunchEnabled(locationLike = globalThis.location) {
@@ -113,6 +114,8 @@ export class AgentLabBridge {
       case "inspect": return this.inspect(input);
       case "camera": return this.camera(input);
       case "reset": return this.reset();
+      case "presentation": return this.presentation(input);
+      case "captureReadiness": return this.captureReadiness(input);
       default: throw bridgeError("unknownMethod", `Unknown Agent Lab bridge method ${JSON.stringify(method)}.`);
     }
   }
@@ -338,6 +341,65 @@ export class AgentLabBridge {
     return this.time({ action: "seek", tick: 0 });
   }
 
+  async presentation(input = {}) {
+    const mode = String(input?.mode || "");
+    if (mode !== "clean" && mode !== "default") {
+      throw bridgeError("invalidPresentation", "presentation.mode must be clean or default.");
+    }
+    const { match } = this.session();
+    if (typeof this.app?.setCleanPresentation === "function") {
+      this.app.setCleanPresentation(mode === "clean");
+    } else {
+      match.handleResize?.();
+    }
+    await animationFrames(2);
+    return {
+      mode,
+      viewport: projectViewport(),
+      camera: projectCamera(match.camera),
+    };
+  }
+
+  captureReadiness(input = {}) {
+    const { match } = this.session();
+    const subjectIds = optionalBoundedIds(input?.subjectIds, AGENT_LAB_LIMITS.captureSubjects);
+    const subjectEntities = subjectIds.map((id) => match.state.entityById(id)).filter(Boolean);
+    if (subjectEntities.length !== subjectIds.length) {
+      throw bridgeError("unknownEntity", "captureReadiness contains an entity that is not in the current snapshot.");
+    }
+    const renderer = match.renderer;
+    const rendererReadiness = renderer?.captureReadiness?.({
+      subjectIds,
+      subjectKinds: subjectEntities.map((entity) => entity.kind),
+    }) || {
+      frame: 0,
+      assets: [],
+      ready: false,
+      failedAssets: [],
+      pendingAssets: [],
+      renderErrors: [{ label: "rendererUnavailable", count: 1, message: "Renderer is unavailable." }],
+      missingTextureSubjectIds: [],
+    };
+    const fonts = documentFontsStatus();
+    const frameErrors = Number(match.frameErrors?.count) || 0;
+    const ready = rendererReadiness.ready && fonts.status === "ready" &&
+      frameErrors === 0 && rendererReadiness.renderErrors.length === 0 &&
+      rendererReadiness.missingTextureSubjectIds.length === 0;
+    return {
+      ...rendererReadiness,
+      ready,
+      frame: rendererReadiness.frame,
+      snapshotTick: match.state.tick,
+      roomTime: projectRoomTime(match.roomTimeControls?.roomTimeState),
+      viewport: projectViewport(),
+      camera: projectCamera(match.camera),
+      visualProfileId: match.visualProfile?.id || null,
+      subjects: subjectEntities.map(projectEntity),
+      fonts,
+      frameErrors: frameErrors > 0 ? [{ count: frameErrors, message: match.frameErrors?.lastMessage || "" }] : [],
+    };
+  }
+
   async mutate(send, observed) {
     const { match } = this.session();
     const before = snapshotSequence(match);
@@ -498,6 +560,27 @@ function projectRoomTime(roomTime) {
   };
 }
 
+function projectViewport() {
+  const viewport = typeof document !== "undefined" ? document.getElementById("viewport") : null;
+  const rect = viewport?.getBoundingClientRect?.();
+  return {
+    x: finiteOrNull(rect?.x),
+    y: finiteOrNull(rect?.y),
+    width: finiteOrNull(rect?.width),
+    height: finiteOrNull(rect?.height),
+    devicePixelRatio: finiteOrNull(globalThis.devicePixelRatio),
+  };
+}
+
+function documentFontsStatus() {
+  const fonts = typeof document !== "undefined" ? document.fonts : null;
+  if (!fonts) return { status: "ready", supported: false };
+  return {
+    status: fonts.status === "loaded" ? "ready" : "pending",
+    supported: true,
+  };
+}
+
 function projectLabResult(result) {
   return {
     op: result.op || "",
@@ -607,4 +690,17 @@ function bridgeError(code, message) {
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function animationFrames(count) {
+  if (typeof requestAnimationFrame !== "function") return Promise.resolve();
+  let remaining = count;
+  return new Promise((resolve) => {
+    const next = () => {
+      remaining -= 1;
+      if (remaining <= 0) resolve();
+      else requestAnimationFrame(next);
+    };
+    requestAnimationFrame(next);
+  });
 }

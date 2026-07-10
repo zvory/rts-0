@@ -31,10 +31,11 @@ export const AGENT_LAB_MCP_LIMITS = Object.freeze({
   maxInspectRefs: 100,
   maxInspectResults: 100,
   maxFocusRefs: 20,
+  maxScreenshotSubjects: 20,
 });
 
 export const AGENT_LAB_MCP_INSTRUCTIONS = [
-  "Open a private lab with lab_open, inspect lab_catalog, use short session-local aliases, keep scenes small, confirm authoritative lab_inspect results after mutations, and lab_close when finished. These tools affect only an ephemeral local lab session; they never edit repository files, send arbitrary protocol data, or control deployed rooms.",
+  "Open a private lab with lab_open, inspect lab_catalog, use short session-local aliases, keep scenes small, confirm authoritative lab_inspect results after mutations, set a camera with lab_camera, capture a clean Pixi image with lab_screenshot, inspect its returned image once, and lab_close when finished. These tools affect only an ephemeral local lab session; they never edit repository files, send arbitrary protocol data, or control deployed rooms.",
   "Pass the returned sessionId to every later tool. Numeric ids are accepted where entity references are accepted, but aliases must be unique and are never guessed. Use lab_reset to restore the setup baseline; it preserves an alias only when an exact unique authoritative match remains after a reset.",
 ].join(" ");
 
@@ -169,6 +170,18 @@ const labCameraInputSchema = z.object({
   ]),
 }).strict();
 
+const labScreenshotInputSchema = z.object({
+  sessionId: sessionIdSchema,
+  name: z.string().regex(/^[A-Za-z0-9_-]{1,48}$/, "name must be a safe artifact token.").optional(),
+  presentation: z.enum(["clean", "normal"]).optional(),
+  viewport: z.object({
+    width: z.number().int().min(320).max(2048),
+    height: z.number().int().min(240).max(2048),
+    deviceScaleFactor: z.number().finite().positive().max(4).optional(),
+  }).strict().optional(),
+  subjects: z.array(entityReferenceSchema).max(AGENT_LAB_MCP_LIMITS.maxScreenshotSubjects).optional(),
+}).strict();
+
 const sessionOutputSchema = z.object({
   sessionId: sessionIdSchema,
   workspace: z.object({ root: z.string(), branch: z.string(), head: z.string() }).strict(),
@@ -220,6 +233,19 @@ const inspectOutputSchema = z.object({
   totalMatching: z.number().int(),
 }).strict();
 const cameraOutputSchema = z.object({ sessionId: sessionIdSchema, camera: z.unknown() }).strict();
+const screenshotOutputSchema = z.object({
+  sessionId: sessionIdSchema,
+  pngPath: z.string(),
+  manifestPath: z.string(),
+  presentation: z.enum(["clean", "normal"]),
+  image: z.object({
+    mimeType: z.literal("image/png"),
+    bytes: z.number().int().positive(),
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+  }).strict(),
+  readiness: z.unknown(),
+}).strict();
 
 export class AgentLabMcpError extends Error {
   constructor(code, message, details = {}) {
@@ -545,15 +571,58 @@ export function createAgentLabMcpServer(options = {}) {
     return { sessionId, camera: response.camera || response };
   }));
 
+  registerTool(server, "lab_screenshot", {
+    title: "Capture Agent Lab Screenshot",
+    description: "Capture the visible normal Pixi viewport after a bounded readiness barrier. A clean capture hides only DOM chrome, returns PNG image content, and writes a PNG plus manifest below target/agent-lab for this private session.",
+    inputSchema: labScreenshotInputSchema,
+    outputSchema: screenshotOutputSchema,
+    annotations: mutationAnnotations(false),
+  }, async ({ sessionId, name, presentation = "clean", viewport, subjects }) => manager.use(sessionId, async (session) => {
+    const resolved = subjects ? await resolveEntityReferences(session, subjects) : [];
+    const inspected = resolved.length
+      ? await session.driver.inspect({ ids: resolved.map((entry) => entry.id), limit: resolved.length })
+      : { entities: [] };
+    const entitiesById = new Map((inspected.entities || []).map((entity) => [entity.id, entity]));
+    const subjectSummaries = resolved.map((entry) => decorateEntity(entitiesById.get(entry.id), session.aliases));
+    const capture = await session.driver.screenshot({
+      sessionId,
+      name: name || "scene",
+      presentation,
+      viewport,
+      subjectIds: resolved.map((entry) => entry.id),
+      subjectSummaries,
+      request: { tool: "lab_screenshot", sessionId, name: name || "scene", presentation, viewport, subjects: resolved },
+    });
+    const structuredContent = {
+      sessionId,
+      pngPath: capture.pngPath,
+      manifestPath: capture.manifestPath,
+      presentation: capture.presentation,
+      image: {
+        mimeType: capture.image.mimeType,
+        bytes: capture.image.bytes,
+        width: capture.image.width,
+        height: capture.image.height,
+      },
+      readiness: capture.readiness,
+    };
+    return imageToolResult(structuredContent, capture.image);
+  }));
+
   return { server, manager };
 }
 
 function registerTool(server, name, config, handler) {
   server.registerTool(name, config, async (input) => {
     try {
-      const structuredContent = await handler(input);
+      const result = await handler(input);
+      const structuredContent = result?.__agentLabToolResult ? result.structuredContent : result;
+      const image = result?.__agentLabToolResult ? result.image : null;
       return {
-        content: [{ type: "text", text: boundedText(structuredContent) }],
+        content: [
+          { type: "text", text: boundedText(structuredContent) },
+          ...(image ? [{ type: "image", data: image.data, mimeType: image.mimeType }] : []),
+        ],
         structuredContent,
       };
     } catch (error) {
@@ -564,6 +633,10 @@ function registerTool(server, name, config, handler) {
       };
     }
   });
+}
+
+function imageToolResult(structuredContent, image) {
+  return { __agentLabToolResult: true, structuredContent, image };
 }
 
 function readOnlyAnnotations() {

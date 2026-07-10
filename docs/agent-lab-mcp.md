@@ -28,13 +28,18 @@ cache has not been hydrated. Chrome/Chromium remains a local driver requirement;
    accept either those aliases or numeric ids.
 4. Keep the scene to a few entities. Use `lab_order`, `lab_time`, and `lab_inspect` to confirm the
    authoritative result, then use `lab_camera` to set up a later capture.
-5. Call `lab_close` when finished. It is idempotent and stops the owned browser/server processes.
+5. Call `lab_screenshot` with a safe name, normally `presentation: "clean"`, a bounded viewport, and
+   optional subject aliases. It hides only DOM chrome, waits for subject assets/fonts/two error-free
+   render frames, returns MCP PNG image content, and writes the PNG plus manifest below
+   `target/agent-lab/<session-id>/captures/`.
+6. Inspect the returned image once, share its absolute `pngPath` if requested, and call `lab_close`.
+   Close is idempotent and stops the owned browser/server processes.
 
-The initial tool surface is `lab_open`, `lab_close`, `lab_reset`, `lab_catalog`, `lab_spawn`,
-`lab_update`, `lab_remove`, `lab_order`, `lab_time`, `lab_inspect`, and `lab_camera`. It deliberately
-does not provide screenshots, video, filesystem access, generic evaluation, arbitrary WebSocket
-messages, raw checkpoint editing, or arbitrary command JSON. Screenshot/artifact tooling belongs to
-the next phase.
+The tool surface is `lab_open`, `lab_close`, `lab_reset`, `lab_catalog`, `lab_spawn`, `lab_update`,
+`lab_remove`, `lab_order`, `lab_time`, `lab_inspect`, `lab_camera`, and `lab_screenshot`. Capture paths
+are generated beneath the ignored Agent Lab target root; callers cannot select an arbitrary path.
+The server deliberately does not provide video, generic evaluation, arbitrary WebSocket messages, raw
+checkpoint editing, or arbitrary command JSON.
 
 ## Bounds and alias rules
 
@@ -56,6 +61,10 @@ the next phase.
 | `unknownAlias` / `staleAlias` | Use `lab_inspect`, then use a current numeric id or create a new alias. |
 | `invalidKind`, `invalidUpgrade`, or `invalidAbility` | Query `lab_catalog` and use an id exposed by that session. |
 | `chromeUnavailable` | Install Chrome/Chromium locally or set `CHROME` to its executable. |
+| tools missing after configuration change | Reload Codex or start a fresh trusted task so the project-scoped MCP configuration is discovered. |
+| `assetLoadFailed`, `captureRenderError`, or `captureTimeout` | Read the concise failure, fix the asset/render issue, and retry; no fallback screenshot is returned. |
+| `captureTooLarge` | Use a smaller bounded viewport or DPR. |
+| `occupied` / `labRejected` | Select a clear position, confirm it with `lab_inspect`, then retry the spawn or order. |
 | `snapshotTimeout` / `labRejected` | Inspect the concise error, correct the request, and retry; the server remains authoritative. |
 
 ## Focused verification
@@ -64,6 +73,7 @@ the next phase.
 npm --prefix tests ci --ignore-scripts --no-audit --fund=false
 node tests/agent_lab_mcp_contracts.mjs
 node tests/agent_lab_mcp_smoke.mjs
+node tests/agent_lab_driver_smoke.mjs
 ```
 
 The contract harness starts the real stdio entry point with a deterministic driver fixture and checks

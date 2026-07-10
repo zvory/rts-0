@@ -38,7 +38,7 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 - **Lab UI stays app-owned.** `App` owns `LabClient` and `LabPanel`; `Match` receives injected lab
   metadata/control policy and must not import the lab transport or panel modules directly.
 - **Agent Lab bridge.** Only `/lab?...&agentLab=1` installs its API; it returns no app, match,
-  transport, renderer, or state references. `scripts/agent-lab/` is its Phase 1 caller.
+  transport, renderer, or state references. `scripts/agent-lab/` is its local caller.
 - **Setup authoring flow.** `/lab` opens catalog or blank setups; the app-owned panel validates
   authoritative state before draft-PR submission, with setup JSON export/import as the disabled
   fallback.

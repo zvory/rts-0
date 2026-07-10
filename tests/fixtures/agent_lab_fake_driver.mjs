@@ -20,6 +20,7 @@ const CATALOG = Object.freeze({
   ],
   abilities: ["charge", "smoke"],
 });
+const ONE_PIXEL_PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLGCQAAAABJRU5ErkJggg==";
 
 export async function openAgentLabDriver(options) {
   let nextId = 100;
@@ -113,6 +114,29 @@ export async function openAgentLabDriver(options) {
         camera.y = rows.reduce((sum, entity) => sum + entity.y, 0) / rows.length;
       }
       return { camera: { ...camera } };
+    },
+    async screenshot({ sessionId, name, presentation, viewport, subjectSummaries, request }) {
+      const width = viewport?.width || 1;
+      const height = viewport?.height || 1;
+      return {
+        pngPath: `${options.workspaceRoot}/target/agent-lab/${sessionId}/captures/${name}.png`,
+        manifestPath: `${options.workspaceRoot}/target/agent-lab/${sessionId}/captures/${name}.json`,
+        image: {
+          mimeType: "image/png",
+          data: ONE_PIXEL_PNG,
+          bytes: Buffer.from(ONE_PIXEL_PNG, "base64").length,
+          width,
+          height,
+        },
+        presentation,
+        readiness: {
+          ready: true,
+          frame: 2,
+          snapshotTick: tick,
+          subjects: subjectSummaries || [],
+          request,
+        },
+      };
     },
     async reset() {
       entities = [];

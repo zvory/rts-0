@@ -65,6 +65,7 @@ src/
   branch_staging.js # replay branch staging panel
   lab_catalog.js # LabCatalogScreen: app-owned `/lab` setup/blank selector
   agent_lab_bridge.js # AgentLabBridge: launch-gated narrow local automation facade
+  clean_presentation.js # app-shell reversible DOM chrome mode for Agent Lab capture
   lab_client.js  # LabClient: lab request ids, pending results, state/result subscriptions
   lab_scenario_authoring.js # pure lab setup metadata defaults, slugging, and local validation
   lab_scenario_submission_capability.js # HTTP capability probe with transient-failure retry
@@ -558,7 +559,7 @@ and auto-join for compatibility.
 export const AGENT_LAB_BRIDGE_KEY = "__rtsAgentLab"
 export class AgentLabBridge {
   status()                            // readiness only; no internal references
-  call(method, input)                 // status/catalog/spawn/update/remove/order/time/inspect/camera/reset
+  call(method, input)                 // status/catalog/spawn/update/remove/order/time/inspect/camera/reset/presentation/captureReadiness
   destroy()
 }
 export function agentLabLaunchEnabled(locationLike?)
@@ -570,8 +571,13 @@ camera, and `GameState` projection seams. Catalog includes the mirrored command 
 inspection can restrict results to the current camera viewport, while camera focus accepts bounded
 padding and returns world bounds. Mutation/order calls wait for a new authoritative snapshot and,
 when room time is paused, request one bounded tick so accepted state is observed before success.
+`presentation` calls the app-owned `CleanPresentation` helper, which hides only DOM chrome and never
+hides Pixi world layers; it is removed on capture completion, rematch, and app teardown. `captureReadiness`
+reports bounded live PNG/frame-strip/profile/decal asset status, font status, render frames, frame-loop
+errors, renderer errors, and subject missing-texture fallbacks without exposing renderer references.
 The local `scripts/agent-lab/driver.mjs` owns the selected-worktree server, headless browser, logs,
-and profile cleanup; its project-local MCP adapter owns aliases, schemas, stdio, and session lifetime.
+clean viewport clipping, readiness wait, PNG/JSON artifacts, and profile cleanup; its project-local MCP
+adapter owns aliases, schemas, stdio, session lifetime, and the `lab_screenshot` image-content result.
 
 `lab_scenario_authoring.js`
 ```js
@@ -950,6 +956,7 @@ export class Renderer {
   resize(w,h)
   buildStaticMap(map)                    // draw terrain once into a cached layer
   render(state, camera, fog, alpha, options?) // per-frame; draws entities, fog, selection, placement, Tank Traps
+  captureReadiness({subjectIds?, subjectKinds?}) // bounded visual asset/error state for Agent Lab capture
   app                                    // the PIXI.Application (for ticker/stage if needed)
   // exposes screen->world hit info if helpful; selection box drawing lives here too:
   drawSelectionBox(rectOrNull)
