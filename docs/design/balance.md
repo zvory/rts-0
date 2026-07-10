@@ -314,8 +314,8 @@ folded into default targeting.
   and 1.7x rear.
 - Artillery uses `ARTILLERY_MIN_RANGE_TILES = 25`, `ARTILLERY_MAX_RANGE_TILES = 55`,
   `ARTILLERY_FIELD_OF_FIRE_RAD = 20 degrees total`, `ARTILLERY_RELOAD_TICKS = 90` (~3s),
-  `ARTILLERY_SETUP_TICKS = 90` (~3s), `ARTILLERY_SHELL_DELAY_TICKS = 150` (~5s), and
-  `ARTILLERY_AMMO_COST_STEEL = 10`.
+  `ARTILLERY_SETUP_TICKS = 180` (~6s setup or teardown), `ARTILLERY_SHELL_DELAY_TICKS = 150` (~5s), and
+  `ARTILLERY_AMMO_COST_STEEL = 10`. It moves at the Anti-Tank Gun's 1.6 px/tick speed.
   Blanket Fire uses `ARTILLERY_BLANKET_RADIUS_TILES = 15` around the stored locked center for
   deterministic uniform impact sampling and appears as a separate Artillery command-card ability.
   Unupgraded artillery error scales by shot range, from `ARTILLERY_MIN_RANGE_ERROR_TILES = 3.0`
@@ -510,7 +510,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | panzerfaust     | 45  | 100 reloadable, 50% AP vs vehicles/buildings; Tanks prioritized (default attack disabled) | 3 | 15 windup / 15 travel / 60 recovery; 75 ticks hidden/unarmed after launch | 1.6 | 8 | 60 | 15 | 1 | 400 (~13s); trained at Barracks after completed Training Centre |
 | mortar_team     | 75  | 40 outer / 100 inner AOE | 20 | 60 | 1.6 | 7 | 100 | 50 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
 | anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 72 | 1.6 | 6     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and Medium Guns (`anti_tank_gun_unlock`) researched in R&D Complex |
-| artillery       | 150 | 75 AP inner / 75-5 outer AOE | 25-55 artillery fire | 90 | 1.3 | 4 | 150 | 50 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind) and Heavy Guns (`artillery_unlock`) researched in R&D Complex; tank-sized footprint |
+| artillery       | 150 | 75 AP inner / 75-5 outer AOE | 25-55 artillery fire | 90 | 1.6 | 4 | 150 | 50 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind) and Heavy Guns (`artillery_unlock`) researched in R&D Complex; tank-sized footprint |
 | scout_car       | 100 | 6   | 5     | 6  | 2.35  | 14    | 125 | 50  | 3   | 480 (~16s) |
 | scout_plane     | 40  | 0   | 0     | 0  | 2.0   | 12    | 50  | 50  | 0   | 0; launched instantly by Command Car ability from the nearest owned completed City Centre; one active per player; non-combat recon with 4-tile orbit radius, 10-second orbit after arrival, 30-second global cooldown, no ground collision reservation, and 48x34 px client render body |
 | tank            | 292 | 60 cannon; 4 coax | 5 moving / 14 fully stationary cannon; 6 coax | 72 cannon; 6 coax | 2.0   | 6     | 425 | 150 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex; coax is a secondary small-arms weapon that fires through the current turret arc |

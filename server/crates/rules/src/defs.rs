@@ -237,7 +237,7 @@ pub const UNITS: &[UnitDef] = &[
             dmg: 0,
             range_tiles: balance::ARTILLERY_MAX_RANGE_TILES,
             cooldown: balance::ARTILLERY_RELOAD_TICKS,
-            speed: 1.3,
+            speed: 1.6,
             sight_tiles: 4,
             cost_steel: 150,
             cost_oil: 50,
@@ -711,6 +711,20 @@ mod tests {
         let tank_speed = unit_def(EntityKind::Tank).expect("tank def").stats.speed;
 
         assert_eq!(worker_speed, tank_speed);
+    }
+
+    #[test]
+    fn artillery_moves_at_anti_tank_gun_speed() {
+        let artillery_speed = unit_def(EntityKind::Artillery)
+            .expect("artillery def")
+            .stats
+            .speed;
+        let anti_tank_gun_speed = unit_def(EntityKind::AntiTankGun)
+            .expect("anti-tank gun def")
+            .stats
+            .speed;
+
+        assert_eq!(artillery_speed, anti_tank_gun_speed);
     }
 
     #[test]
