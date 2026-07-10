@@ -134,7 +134,7 @@ export const STATS = Object.freeze({
     description: "Indirect fire, extremely inaccurate without vision. Upgrade auto cast in R&D." },
   [KIND.ARTILLERY]: { label: "Artillery", icon: "AR", size: 18, sight: 4, body: ARTILLERY_BODY,
     rangeTiles: ARTILLERY_MAX_RANGE_TILES, minRangeTiles: ARTILLERY_MIN_RANGE_TILES,
-    cost: { steel: 150, oil: 50 }, supply: 5, buildTicks: 750,
+    cost: { steel: 300, oil: 100 }, supply: 5, buildTicks: 750,
     requires: KIND.STEELWORKS, upgradeRequires: UPGRADE.ARTILLERY_UNLOCK,
     upgradeRequiresText: "Requires research in R&D Complex" },
   [KIND.SCOUT_CAR]: { label: "Scout Car", icon: "SC", size: 14.4, sight: 14, body: SCOUT_CAR_BODY,
