@@ -957,8 +957,8 @@ remain authoritative and may move or chase the unit out of the trench; command a
 moves clear active occupation before later combat decisions use it.
 
 Incoming direct-fire miss policy uses the highest applicable independent chance. Existing
-Anti-Tank Gun infantry miss chance is 65%; entrenched eligible infantry add a 70% miss chance, so
-an Anti-Tank Gun firing at an entrenched Rifleman, Machine Gunner, or Panzerfaust rolls 70%, not a
+Anti-Tank Gun infantry miss chance is 65%; entrenched eligible infantry add a 50% miss chance, so
+an Anti-Tank Gun firing at an entrenched Rifleman, Machine Gunner, or Panzerfaust rolls 65%, not a
 composed probability. Area effects call `entrenchment_combat::reduce_area_damage` after their
 normal falloff and armor calculations, so Mortar and Artillery splash deal 30% of their current
 post-formula damage to actively entrenched eligible infantry. Direct-fire over-penetration stops at

@@ -336,7 +336,7 @@ function fakeHudRootWithoutResourceSpans() {
     assert(panzerfaustStatus?.value === "Hold still 3s to dig", "HUD status includes Panzerfaust eligibility");
     assert(
       occupiedStatus?.value.includes("+1 range") &&
-        occupiedStatus.value.includes("70% miss") &&
+        occupiedStatus.value.includes("50% miss") &&
         occupiedStatus.value.includes("-70% blast"),
       "HUD status summarizes occupied-trench combat benefits",
     );
