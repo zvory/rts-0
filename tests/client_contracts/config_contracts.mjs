@@ -490,9 +490,9 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     "Heavy Guns research replaces Medium Guns and keeps its prerequisite explicit",
   );
   assert(
-    UPGRADES[UPGRADE.BALLISTIC_TABLES].cost.steel === 150 &&
-      UPGRADES[UPGRADE.BALLISTIC_TABLES].cost.oil === 100 &&
-      UPGRADES[UPGRADE.BALLISTIC_TABLES].researchTicks === 600,
+    UPGRADES[UPGRADE.BALLISTIC_TABLES].cost.steel === 300 &&
+      UPGRADES[UPGRADE.BALLISTIC_TABLES].cost.oil === 200 &&
+      UPGRADES[UPGRADE.BALLISTIC_TABLES].researchTicks === 1200,
     "Artillery Fire Control research cost and time mirror server",
   );
   assert(

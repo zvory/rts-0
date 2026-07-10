@@ -387,8 +387,8 @@ folded into default targeting.
 - **Heavy Guns** (R&D Complex research, protocol id `artillery_unlock`): costs 200 steel / 100 oil
   and takes 750 ticks (~25s). It requires completed Medium Guns research. Once complete, that
   player can train Artillery from Gun Works.
-- **Artillery Fire Control** (R&D Complex research, protocol id `ballistic_tables`): costs 150 steel /
-  100 oil and takes 600 ticks (~20s). It requires completed Heavy Guns research. Once
+- **Artillery Fire Control** (R&D Complex research, protocol id `ballistic_tables`): costs 300 steel /
+  200 oil and takes 1,200 ticks (~40s). It requires completed Heavy Guns research. Once
   complete, that player's deployed Artillery tightens repeated point-fire shots from the
   range-scaled starting error down to three tiles over the existing five-shot accuracy period.
 - **Tank Production** (R&D Complex research, protocol id `tank_unlock`): costs 150 steel /

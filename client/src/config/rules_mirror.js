@@ -81,7 +81,7 @@ export const ENTRENCHMENT_AREA_DAMAGE_REDUCTION = 0.70;
 export const ENTRENCHMENT_TRENCH_RADIUS_TILES = 0.375;
 export const ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS = TICK_HZ * 10;
 export const ARTILLERY_UNLOCK_RESEARCH_TICKS = TICK_HZ * 25;
-export const BALLISTIC_TABLES_RESEARCH_TICKS = TICK_HZ * 20;
+export const BALLISTIC_TABLES_RESEARCH_TICKS = TICK_HZ * 40;
 export const TANK_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
 export const COMMAND_CAR_UNLOCK_RESEARCH_TICKS = TICK_HZ * 30;
 export const MORTAR_AUTOCAST_RESEARCH_TICKS = TICK_HZ * 20;
@@ -418,7 +418,7 @@ export const UPGRADES = Object.freeze({
     upgrade: UPGRADE.BALLISTIC_TABLES,
     label: "Artillery Fire Control",
     icon: "AFC",
-    cost: Object.freeze({ steel: 150, oil: 100 }),
+    cost: Object.freeze({ steel: 300, oil: 200 }),
     researchTicks: BALLISTIC_TABLES_RESEARCH_TICKS,
     description: "Artillery fire tightens over repeated shots",
     researchedAt: KIND.RESEARCH_COMPLEX,
