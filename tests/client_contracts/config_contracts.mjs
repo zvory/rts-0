@@ -436,13 +436,13 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     UPGRADES[UPGRADE.ENTRENCHMENT].cost.steel === 100 &&
       UPGRADES[UPGRADE.ENTRENCHMENT].cost.oil === 0 &&
       UPGRADES[UPGRADE.ENTRENCHMENT].researchTicks === ENTRENCHMENT_RESEARCH_TICKS &&
-      ENTRENCHMENT_RESEARCH_TICKS === TICK_HZ * 10,
+      ENTRENCHMENT_RESEARCH_TICKS === TICK_HZ * 20,
     "Entrenchment research cost and time mirror server",
   );
   assert(
     ENTRENCHMENT_DIG_IN_TICKS === TICK_HZ * 3 &&
       ENTRENCHMENT_RANGE_BONUS_TILES === 1 &&
-      ENTRENCHMENT_DIRECT_MISS_CHANCE === 0.70 &&
+      ENTRENCHMENT_DIRECT_MISS_CHANCE === 0.50 &&
       ENTRENCHMENT_AREA_DAMAGE_REDUCTION === 0.70 &&
       ENTRENCHMENT_TRENCH_RADIUS_TILES === 0.375,
     "Entrenchment constants mirror server",

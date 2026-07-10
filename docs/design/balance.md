@@ -363,7 +363,7 @@ folded into default targeting.
   their setup and teardown timers from 30 ticks to 15. It also boosts Panzerfaust movement by the
   same 1.25x multiplier as Riflemen, from 1.6 px/tick to 2.0 px/tick.
 - **Entrenchment** (Training Centre research, protocol id `entrenchment`): costs 100 steel / 0 oil
-  and takes 300 ticks (~10s). The rules surface defines Riflemen, Machine Gunners, and Panzerfausts
+  and takes 600 ticks (~20s). The rules surface defines Riflemen, Machine Gunners, and Panzerfausts
   as eligible entrenchment infantry; Engineers/Workers, Mortar Teams, Ekat, Golems,
   Ekat-faction units, vehicles, buildings, support weapons other than Machine Gunners, and
   non-infantry entities are excluded.
@@ -372,10 +372,10 @@ folded into default targeting.
   existing empty trench while stopped in its footprint. A trench can actively hold only one
   infantry unit, so nearby eligible infantry dig their own adjacent trenches instead of sharing one.
   Active occupation grants +1 tile weapon range, suppresses idle aggressive chase like Hold
-  Position, gives incoming direct shots a 70% miss chance, reduces incoming area damage by 70%
+  Position, gives incoming direct shots a 50% miss chance, reduces incoming area damage by 70%
   after existing falloff/armor rules, and suppresses over-penetration through or into the
   entrenched unit. Direct-shot miss sources use the highest applicable chance, not composed
-  probability, so an Anti-Tank Gun's 65% infantry miss chance becomes 70% against entrenched
+  probability, so an Anti-Tank Gun's 65% infantry miss chance remains 65% against entrenched
   eligible infantry. The trench radius is 0.375 tile. The client
   renders neutral trench terrain as brown ground and marks occupied eligible infantry with a small
   brown rim. The selected-unit panel reports existing-trench reuse, researched dig-in availability,

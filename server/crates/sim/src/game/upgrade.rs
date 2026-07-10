@@ -231,6 +231,6 @@ mod tests {
         assert_eq!(definition.requires_upgrade, None);
         assert_eq!(definition.cost_steel, 100);
         assert_eq!(definition.cost_oil, 0);
-        assert_eq!(definition.research_ticks, crate::config::TICK_HZ * 10);
+        assert_eq!(definition.research_ticks, crate::config::TICK_HZ * 20);
     }
 }
