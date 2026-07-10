@@ -435,6 +435,18 @@ mod tests {
             Map::load("1v1 No Terrain", 3, 0x1234_5678).is_err(),
             "1v1 No Terrain should not expose a three-player layout"
         );
+
+        for seed in 0..32 {
+            let mut starts = Map::load("1v1 No Terrain", 2, seed)
+                .expect("1v1 No Terrain should load for two active players")
+                .starts;
+            starts.sort_unstable();
+            assert_eq!(
+                starts,
+                vec![(25, 25), (100, 100)],
+                "1v1 No Terrain must only use its two opposing spawn slots for seed {seed}"
+            );
+        }
     }
 
     #[test]
