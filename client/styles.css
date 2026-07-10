@@ -77,6 +77,18 @@ body {
   width: 100vw;
 }
 
+/* Agent Lab captures use the normal game screen and Pixi world. Only app-shell
+   DOM chrome is hidden, and the attribute is always removed after a capture. */
+#app[data-clean-presentation="true"] > :not(#game-screen) {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+#app[data-clean-presentation="true"] #game-screen > :not(#viewport) {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 #version {
   position: absolute;
   top: 8px;

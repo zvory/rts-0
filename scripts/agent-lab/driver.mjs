@@ -17,6 +17,8 @@ const MAX_TIMEOUT_MS = 60_000;
 const MAX_STARTUP_TIMEOUT_MS = 120_000;
 const LOG_TAIL_LINES = 80;
 const MAX_PAGE_ERRORS = 80;
+const MAX_CAPTURE_BYTES = 16 * 1024 * 1024;
+const MAX_CAPTURE_VIEWPORT = 2048;
 const AGENT_LAB_ROOT = path.join("target", "agent-lab");
 
 export const DRIVER_STATES = Object.freeze({
@@ -75,6 +77,7 @@ export class AgentLabDriver {
     this.server = null;
     this.serverLogPath = "";
     this.browser = null;
+    this.browserVersion = "";
     this.page = null;
     this.profileDir = "";
     this.pageConsoleErrors = [];
@@ -126,6 +129,7 @@ export class AgentLabDriver {
       throw new AgentLabDriverError("sessionClosed", "Agent Lab driver was closed during browser startup.");
     }
     this.browser = browser;
+    this.browserVersion = await browser.version().catch(() => "");
     const page = await browser.newPage();
     if (this.state !== DRIVER_STATES.OPENING) {
       await page.close().catch(() => {});
@@ -197,6 +201,26 @@ export class AgentLabDriver {
     return this.call("reset", {});
   }
 
+  async screenshot({
+    sessionId,
+    name = "scene",
+    presentation = "clean",
+    viewport = null,
+    subjectIds = [],
+    subjectSummaries = [],
+    request = {},
+  } = {}) {
+    return this.enqueue(() => this.captureScreenshot({
+      sessionId,
+      name,
+      presentation,
+      viewport,
+      subjectIds,
+      subjectSummaries,
+      request,
+    }));
+  }
+
   diagnostics() {
     return {
       sessionDir: this.sessionDir,
@@ -208,27 +232,144 @@ export class AgentLabDriver {
   }
 
   async call(method, input) {
-    return this.enqueue(async () => {
-      if (this.state !== DRIVER_STATES.OPEN || !this.page) {
-        throw new AgentLabDriverError("sessionClosed", "Agent Lab driver session is not open.");
-      }
-      const result = await withTimeout(
-        this.page.evaluate(
-          ({ method: bridgeMethod, input: bridgeInput }) => window.__rtsAgentLab.call(bridgeMethod, bridgeInput),
-          { method, input },
-        ),
-        this.options.timeoutMs,
-        `Agent Lab ${method}`,
+    return this.enqueue(() => this.callBridge(method, input));
+  }
+
+  async callBridge(method, input) {
+    if (this.state !== DRIVER_STATES.OPEN || !this.page) {
+      throw new AgentLabDriverError("sessionClosed", "Agent Lab driver session is not open.");
+    }
+    const result = await withTimeout(
+      this.page.evaluate(
+        ({ method: bridgeMethod, input: bridgeInput }) => window.__rtsAgentLab.call(bridgeMethod, bridgeInput),
+        { method, input },
+      ),
+      this.options.timeoutMs,
+      `Agent Lab ${method}`,
+    );
+    if (!result?.ok) {
+      throw new AgentLabDriverError(
+        result?.error?.code || "bridgeError",
+        result?.error?.message || `Agent Lab ${method} failed.`,
+        { method },
       );
-      if (!result?.ok) {
-        throw new AgentLabDriverError(
-          result?.error?.code || "bridgeError",
-          result?.error?.message || `Agent Lab ${method} failed.`,
-          { method },
-        );
+    }
+    return result.value;
+  }
+
+  async captureScreenshot({ sessionId, name, presentation, viewport, subjectIds, subjectSummaries, request }) {
+    if (presentation !== "clean" && presentation !== "normal") {
+      throw new AgentLabDriverError("invalidPresentation", "presentation must be clean or normal.");
+    }
+    const normalizedSessionId = safeCaptureSessionId(sessionId);
+    const artifactName = safeArtifactName(name);
+    const normalizedViewport = viewport ? normalizeCaptureViewport(viewport) : null;
+    const originalViewport = this.page.viewport?.() || null;
+    const requestedSubjectIds = boundedEntityIds(subjectIds);
+    try {
+      if (normalizedViewport) await this.page.setViewport(normalizedViewport);
+      await this.callBridge("presentation", { mode: presentation === "clean" ? "clean" : "default" });
+      await this.page.evaluate(() => document.fonts?.ready || Promise.resolve());
+      const readiness = await this.waitForCaptureReadiness(requestedSubjectIds);
+      const clip = await this.page.evaluate(() => {
+        const viewportEl = document.getElementById("viewport");
+        const rect = viewportEl?.getBoundingClientRect?.();
+        return rect ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height } : null;
+      });
+      if (!validClip(clip)) throw new AgentLabDriverError("viewportUnavailable", "The Pixi viewport is not available for capture.");
+
+      const captureDir = path.join(this.workspace.root, AGENT_LAB_ROOT, normalizedSessionId, "captures");
+      fs.mkdirSync(captureDir, { recursive: true });
+      const suffix = new Date().toISOString().replace(/[:.]/g, "-");
+      const baseName = `${artifactName}-${suffix}`;
+      const pngPath = path.join(captureDir, `${baseName}.png`);
+      const manifestPath = path.join(captureDir, `${baseName}.json`);
+      const screenshot = await this.page.screenshot({ type: "png", clip, path: pngPath });
+      const png = Buffer.from(screenshot || []);
+      if (png.length === 0) {
+        throw new AgentLabDriverError("captureEmpty", "Chrome returned an empty Pixi screenshot.");
       }
-      return result.value;
-    });
+      if (png.length > MAX_CAPTURE_BYTES) {
+        fs.rmSync(pngPath, { force: true });
+        throw new AgentLabDriverError("captureTooLarge", `Screenshot exceeds the ${MAX_CAPTURE_BYTES} byte response bound.`);
+      }
+      const dimensions = readPngDimensions(png);
+      const diagnostics = this.diagnostics();
+      const manifest = {
+        schemaVersion: 1,
+        createdAt: new Date().toISOString(),
+        workspace: this.workspace,
+        serverBuild: this.server?.build || { reused: true, baseUrl: this.server?.baseUrl || null },
+        url: this.launchUrl(),
+        map: this.options.map,
+        scenario: this.options.scenario,
+        seed: this.options.seed || null,
+        authoritative: {
+          tick: readiness.snapshotTick,
+          roomTime: readiness.roomTime,
+        },
+        viewport: {
+          requested: normalizedViewport,
+          clip,
+          output: dimensions,
+        },
+        camera: readiness.camera,
+        subjects: Array.isArray(subjectSummaries) ? subjectSummaries.slice(0, 20) : [],
+        visualProfileId: readiness.visualProfileId || null,
+        assetReadiness: readiness.assets,
+        errors: {
+          pageConsole: diagnostics.pageConsoleErrors,
+          page: diagnostics.pageErrors,
+          requestFailures: diagnostics.requestFailures,
+          frame: readiness.frameErrors,
+          render: readiness.renderErrors,
+          missingTextureSubjectIds: readiness.missingTextureSubjectIds,
+        },
+        presentation,
+        request: boundedRequestMetadata(request),
+        browser: {
+          chrome: this.browserVersion || null,
+          puppeteer: await this.page.evaluate(() => navigator.userAgent),
+        },
+      };
+      fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+      return {
+        pngPath,
+        manifestPath,
+        image: {
+          mimeType: "image/png",
+          data: png.toString("base64"),
+          bytes: png.length,
+          width: dimensions.width,
+          height: dimensions.height,
+        },
+        presentation,
+        readiness,
+      };
+    } finally {
+      if (originalViewport) await this.page.setViewport(originalViewport).catch(() => {});
+      await this.callBridge("presentation", { mode: "default" }).catch(() => {});
+    }
+  }
+
+  async waitForCaptureReadiness(subjectIds) {
+    const deadline = Date.now() + this.options.timeoutMs;
+    let initialFrame = null;
+    let last = null;
+    while (Date.now() < deadline) {
+      const readiness = await this.callBridge("captureReadiness", { subjectIds });
+      if (initialFrame == null) initialFrame = Number(readiness.frame) || 0;
+      last = readiness;
+      const errors = readiness.frameErrors?.length || readiness.renderErrors?.length ||
+        readiness.missingTextureSubjectIds?.length || this.pageErrors.length || this.pageConsoleErrors.length;
+      if (errors) throw new AgentLabDriverError("captureRenderError", captureReadinessMessage(readiness, this.diagnostics()));
+      if (readiness.failedAssets?.length) {
+        throw new AgentLabDriverError("assetLoadFailed", captureReadinessMessage(readiness, this.diagnostics()));
+      }
+      if (readiness.ready && Number(readiness.frame) >= initialFrame + 2) return readiness;
+      await sleep(25);
+    }
+    throw new AgentLabDriverError("captureTimeout", captureReadinessMessage(last, this.diagnostics()));
   }
 
   enqueue(operation) {
@@ -368,6 +509,70 @@ export function safeToken(value, fallback = "session", maxLength = 64) {
   return /^[A-Za-z0-9_-]+$/.test(token) && token.length <= maxLength ? token : fallback;
 }
 
+export function safeArtifactName(value, fallback = "scene") {
+  return safeToken(value, fallback, 48);
+}
+
+function safeCaptureSessionId(value) {
+  const sessionId = String(value || "").trim();
+  if (!/^lab_[a-f0-9]{32}$/.test(sessionId)) {
+    throw new AgentLabDriverError("invalidSession", "sessionId must be a valid Agent Lab session id.");
+  }
+  return sessionId;
+}
+
+function normalizeCaptureViewport(viewport) {
+  const normalized = normalizeViewport(viewport);
+  if (normalized.width > MAX_CAPTURE_VIEWPORT || normalized.height > MAX_CAPTURE_VIEWPORT) {
+    throw new AgentLabDriverError("invalidViewport", `capture viewport width and height must be at most ${MAX_CAPTURE_VIEWPORT}.`);
+  }
+  return normalized;
+}
+
+function boundedEntityIds(values) {
+  if (!Array.isArray(values) || values.length > 20) {
+    throw new AgentLabDriverError("invalidSubjects", "subjectIds must contain at most 20 positive entity ids.");
+  }
+  const ids = [...new Set(values.map(Number))];
+  if (!ids.every((id) => Number.isInteger(id) && id > 0)) {
+    throw new AgentLabDriverError("invalidSubjects", "subjectIds must contain positive integer entity ids.");
+  }
+  return ids;
+}
+
+function validClip(clip) {
+  return Number.isFinite(clip?.x) && Number.isFinite(clip?.y) &&
+    Number.isFinite(clip?.width) && Number.isFinite(clip?.height) &&
+    clip.width >= 1 && clip.height >= 1 &&
+    clip.width <= MAX_CAPTURE_VIEWPORT && clip.height <= MAX_CAPTURE_VIEWPORT;
+}
+
+function boundedRequestMetadata(request) {
+  const text = JSON.stringify(request && typeof request === "object" ? request : {});
+  if (text.length > 4000) return { truncated: true };
+  return JSON.parse(text);
+}
+
+function captureReadinessMessage(readiness, diagnostics) {
+  const failures = [
+    ...(readiness?.failedAssets || []).map((asset) => `${asset.id}: ${asset.message || "failed"}`),
+    ...(readiness?.pendingAssets || []).map((asset) => `${asset.id}: pending`),
+    ...(readiness?.frameErrors || []).map((error) => `frame: ${error.message || "failed"}`),
+    ...(readiness?.renderErrors || []).map((error) => `render ${error.label}: ${error.message || "failed"}`),
+    ...(readiness?.missingTextureSubjectIds || []).map((id) => `subject ${id}: missing texture fallback`),
+    ...(diagnostics?.pageErrors || []).map((error) => `page: ${error}`),
+    ...(diagnostics?.pageConsoleErrors || []).map((error) => `console: ${error}`),
+  ];
+  return failures.length ? `Screenshot readiness failed: ${failures.slice(0, 12).join("; ")}` : "Screenshot did not become ready before the timeout.";
+}
+
+function readPngDimensions(buffer) {
+  if (buffer.length < 24 || buffer.toString("ascii", 1, 4) !== "PNG") {
+    throw new AgentLabDriverError("invalidCapture", "Chrome did not return a PNG image.");
+  }
+  return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
+}
+
 export function generatedRoomId(head = "") {
   const suffix = crypto.randomBytes(6).toString("hex");
   return safeToken(`agentlab-${safeToken(head.slice(0, 8), "head", 8)}-${process.pid}-${suffix}`, "agentlab", 40);
@@ -413,7 +618,13 @@ async function startOrReusePrivateServer({ workspace, sessionDir, startupTimeout
     const normalized = privateLoopbackUrl(baseUrl);
     if (await isHealthy(normalized)) {
       if (!isOpening()) throw new AgentLabDriverError("sessionClosed", "Agent Lab driver was closed during server startup.");
-      return { baseUrl: normalized, reused: true, logPath: "", close: async () => {} };
+      return {
+        baseUrl: normalized,
+        reused: true,
+        logPath: "",
+        build: { reused: true, binary: null, head: workspace.head },
+        close: async () => {},
+      };
     }
     throw new AgentLabDriverError("unhealthyServer", `Requested private server is not healthy: ${normalized}`);
   }
@@ -458,7 +669,18 @@ async function startOrReusePrivateServer({ workspace, sessionDir, startupTimeout
         await stopChild(child);
         throw new AgentLabDriverError("sessionClosed", "Agent Lab driver was closed during server startup.");
       }
-      return { baseUrl: url, reused: false, logPath, close: async () => stopChild(child) };
+      return {
+        baseUrl: url,
+        reused: false,
+        logPath,
+        build: {
+          reused: false,
+          binary,
+          head: workspace.head,
+          modifiedAt: fs.statSync(binary).mtime.toISOString(),
+        },
+        close: async () => stopChild(child),
+      };
     }
     await sleep(150);
   }

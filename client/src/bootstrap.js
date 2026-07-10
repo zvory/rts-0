@@ -231,6 +231,7 @@ export function replayLaunchConfig() {
 
 /** Cached DOM handles for the pinned ids in index.html (see its DOM contract). */
 export const dom = {
+  app: document.getElementById("app"),
   version: document.getElementById("version"),
   lobbyScreen: document.getElementById("lobby-screen"),
   labEntryScreen: document.getElementById("lab-entry-screen"),

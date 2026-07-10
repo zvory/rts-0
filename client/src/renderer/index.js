@@ -237,6 +237,9 @@ export class Renderer {
     this._liveRigDefinitionsByKind = createLiveRigDefinitions();
     this._livePngRigAtlasesByKind = createLivePngRigAtlases();
     this._livePngRigAtlasTextures = new Map();
+    this._assetReadiness = new Map();
+    this._missingTextureEntityIds = new Set();
+    this._renderFrameCount = 0;
     this._loadLivePngRigAtlases();
     this._liveFrameStripsByKind = createLiveFrameStrips();
     this._liveFrameStripTextures = new Map();
@@ -276,28 +279,87 @@ export class Renderer {
 
   _loadLivePngRigAtlases() {
     for (const [kind, atlas] of this._livePngRigAtlasesByKind || []) {
-      loadPngRigAtlasTexture(PIXI, atlas)
+      this._trackVisualAsset(`live-png:${kind}`, loadPngRigAtlasTexture(PIXI, atlas)
         .then((texture) => {
-          this._storeLoadedTexture(this._livePngRigAtlasTextures, kind, texture);
+          return this._storeLoadedTexture(this._livePngRigAtlasTextures, kind, texture);
         })
         .catch((err) => {
           if (this._destroyed) return;
           console.warn(`RTS PNG rig atlas disabled for ${kind}: ${err?.message || err}`);
-        });
+          throw err;
+        }), { kind, source: "livePngAtlas" });
     }
   }
 
   _loadLiveFrameStrips() {
     for (const [kind, strip] of this._liveFrameStripsByKind || []) {
-      loadFrameStripTexture(PIXI, strip)
+      this._trackVisualAsset(`live-frame-strip:${kind}`, loadFrameStripTexture(PIXI, strip)
         .then((texture) => {
-          this._storeLoadedTexture(this._liveFrameStripTextures, kind, texture);
+          return this._storeLoadedTexture(this._liveFrameStripTextures, kind, texture);
         })
         .catch((err) => {
           if (this._destroyed) return;
           console.warn(`RTS frame strip disabled for ${kind}: ${err?.message || err}`);
-        });
+          throw err;
+        }), { kind, source: "liveFrameStrip" });
     }
+  }
+
+  _trackVisualAsset(id, promise, { kind = "", source = "asset" } = {}) {
+    const record = { id, kind, source, status: "pending", message: "" };
+    this._assetReadiness.set(id, record);
+    record.promise = Promise.resolve(promise).then(
+      (value) => {
+        record.status = value ? "ready" : "failed";
+        if (!value) record.message = `${source} did not produce a texture.`;
+        return value;
+      },
+      (error) => {
+        record.status = "failed";
+        record.message = error?.message || String(error);
+        return null;
+      },
+    );
+    return record.promise;
+  }
+
+  captureReadiness({ subjectIds = [], subjectKinds = [] } = {}) {
+    const ids = new Set(subjectIds.filter(Number.isInteger));
+    const kinds = new Set(subjectKinds.filter((kind) => typeof kind === "string" && kind));
+    const assets = [...this._assetReadiness.values()]
+      .filter((asset) => !asset.kind || kinds.size === 0 || kinds.has(asset.kind))
+      .map((asset) => ({
+        id: asset.id,
+        kind: asset.kind || null,
+        source: asset.source,
+        status: asset.status,
+        message: asset.message || null,
+      }));
+    const decal = this.groundDecalDiagnostics();
+    if (decal.assetStatus !== "idle") {
+      assets.push({
+        id: "ground-decals",
+        kind: null,
+        source: "groundDecalAtlas",
+        status: decal.assetStatus === "ready" ? "ready" : decal.assetStatus,
+        message: this._groundDecals?.assetLoadError?.message || null,
+      });
+    }
+    const renderErrors = [...this._renderErrors.entries()].map(([label, value]) => ({
+      label,
+      count: value.count,
+      message: value.lastMessage || "",
+    }));
+    const missingTextureSubjectIds = [...this._missingTextureEntityIds].filter((id) => ids.has(id));
+    return {
+      frame: this._renderFrameCount,
+      assets,
+      ready: assets.every((asset) => asset.status === "ready" || asset.status === "idle"),
+      failedAssets: assets.filter((asset) => asset.status === "failed"),
+      pendingAssets: assets.filter((asset) => asset.status === "pending"),
+      renderErrors,
+      missingTextureSubjectIds,
+    };
   }
 
   _storeLoadedTexture(map, key, texture) {
@@ -341,6 +403,7 @@ export class Renderer {
     visualFrameStripOverrides = null,
     observerMapAnalysis = null,
   } = {}) {
+    this._renderFrameCount += 1;
     this._profiler = profiler || null;
     const time = (label, fn) => profiler ? profiler.time(label, fn) : fn();
     // Drive the world container from the camera (single transform for all layers).
@@ -695,7 +758,7 @@ export class Renderer {
       return this._visualFrameStripTextures.get(key);
     }
     if (!this._visualFrameStripTextureLoads.has(key)) {
-      const load = loadFrameStripTexture(PIXI, strip)
+      const load = this._trackVisualAsset(`visual-frame-strip:${key}`, loadFrameStripTexture(PIXI, strip)
         .then((texture) => {
           return this._storeLoadedTexture(this._visualFrameStripTextures, key, texture);
         })
@@ -703,8 +766,8 @@ export class Renderer {
           if (this._destroyed) return null;
           this._visualFrameStripTextures.set(key, null);
           console.warn(`RTS visual frame strip disabled for ${kind}: ${err?.message || err}`);
-          return null;
-        });
+          throw err;
+        }), { kind, source: "visualFrameStrip" });
       this._visualFrameStripTextureLoads.set(key, load);
     }
     return null;
@@ -712,6 +775,7 @@ export class Renderer {
 
   _drawMissingTexture(entity, poolName) {
     if (!entity || entity.id == null || !this._pools?.[poolName]) return;
+    if (Number.isInteger(entity.id)) this._missingTextureEntityIds.add(entity.id);
     const g = this._slot(poolName, entity.id);
     const x = Number.isFinite(entity.x) ? entity.x : 0;
     const y = Number.isFinite(entity.y) ? entity.y : 0;
@@ -929,6 +993,8 @@ export class Renderer {
     }
     this._unseen.clear();
     this._setupVisuals.clear();
+    this._assetReadiness?.clear?.();
+    this._missingTextureEntityIds?.clear?.();
     this._tankMotion.clear();
     if (this._liveRigPools) {
       for (const pool of Object.values(this._liveRigPools)) {
