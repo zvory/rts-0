@@ -2,7 +2,7 @@
 // It deliberately exposes typed scene operations only; callers never receive App,
 // Match, transport, renderer, or GameState references.
 
-import { ABILITY, CMD, LAB_ROLE } from "./protocol.js";
+import { ABILITY, CMD, LAB_ROLE, isUnit } from "./protocol.js";
 import { factionCatalog } from "./config.js";
 import {
   labBuildingSpawnFactionOptions,
@@ -23,6 +23,9 @@ export const AGENT_LAB_LIMITS = Object.freeze({
   waitMs: 8_000,
   captureSubjects: 20,
 });
+
+const AGENT_LAB_DEFAULT_FOCUS_PADDING = 48;
+const AGENT_LAB_SINGLE_SUBJECT_FOCUS_PADDING = 32;
 
 export function agentLabLaunchEnabled(locationLike = globalThis.location) {
   try {
@@ -319,7 +322,10 @@ export class AgentLabBridge {
       const ids = boundedIds(input?.entityIds, "camera.entityIds", AGENT_LAB_LIMITS.focusEntities);
       const entities = ids.map((id) => match.state.entityById(id)).filter(Boolean);
       if (entities.length !== ids.length) throw bridgeError("unknownEntity", "camera.focus contains an entity that is not in the current snapshot.");
-      const padding = boundedNonNegativeNumber(input?.padding ?? 48, "camera.padding", 1024);
+      const defaultPadding = entities.length === 1 && isUnit(entities[0].kind)
+        ? AGENT_LAB_SINGLE_SUBJECT_FOCUS_PADDING
+        : AGENT_LAB_DEFAULT_FOCUS_PADDING;
+      const padding = boundedNonNegativeNumber(input?.padding ?? defaultPadding, "camera.padding", 1024);
       const minX = Math.min(...entities.map((entity) => entity.x));
       const maxX = Math.max(...entities.map((entity) => entity.x));
       const minY = Math.min(...entities.map((entity) => entity.y));

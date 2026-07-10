@@ -9,7 +9,7 @@ Use the project-scoped `agent_lab` MCP server from a fresh trusted task attached
 
 1. Call `lab_open`, retain `sessionId`, then call `lab_catalog` before choosing players or kinds.
 2. Keep the scene small: usually one stationary subject, or two opposing units. Use short aliases in `lab_spawn`; confirm changes with `lab_inspect`.
-3. Use `lab_time` to pause or step authoritative state. Position the view with `lab_camera` rather than screenshot options.
+3. Use `lab_time` to pause or step authoritative state. Position the view with `lab_camera` rather than screenshot options. For one-unit detail captures, call camera `focus` without padding (the 32-world-pixel default is intentionally close). Multi-subject and non-unit focus keep their 48-world-pixel default; use explicit padding when the composition needs a different amount of context.
 4. Call `lab_screenshot` with a safe name, normally `presentation: "clean"`, a bounded viewport such as 1000×700 at DPR 1, and any subject aliases. It waits for authoritative state, fonts, relevant visual assets, two frames, and error-free rendering.
 5. Inspect the returned PNG image once. Share its `pngPath` with the user along with the concise scene result; the adjacent JSON manifest contains reproduction facts.
 6. Call `lab_close` even after a failed capture. It is idempotent and cleans up the private browser and server.
