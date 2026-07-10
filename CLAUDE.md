@@ -137,6 +137,19 @@ is loaded from the CDN, and `cargo run` from `server/` serves the client.
   For a user-requested live AI-vs-AI demo, run the matchup setup and local server with `--release`
   so debug-only simulation invariants do not interrupt play; use a replay only when requested or
   when the release match cannot run.
+- Mobile inspection through Tailscale: when a user is on a Tailscale-connected phone and asks to
+  view local work, expose the already-running local server privately rather than deploying beta.
+  Verify `tailscale status --json`, start the server with `RTS_ADDR=0.0.0.0:8080 cargo run --release`
+  if port 8080 is not already served, then provide an `http://<Tailscale-IP>:8080/...` link. For a
+  live spectator AI matchup, use the existing launch convention with a fresh room name, for example
+  `/?rtsLaunch=match&rtsRoom=mobile-ai-<unique>&rtsRole=spectator&rtsAi=1:ai_2_1&rtsAi=2:ai_turtle&rtsStart=1`.
+  This starts an ordinary authoritative AI-vs-AI room; it is not a beta deployment. Prefer a
+  Tailscale Serve HTTPS URL only when `tailscale serve status` already reports a working endpoint;
+  do not block a mobile demo on the one-time tailnet Serve enablement. Never enable Tailscale Funnel
+  or another public tunnel unless the user explicitly requests public sharing. For deterministic,
+  seekable mobile review, run `cargo run --release --bin ai-matchup -- ai_2_1 ai_turtle --seed <n>
+  --save-replay <name>` from `server/`, then share `/?replayArtifact=<name>` through the same local
+  server. Do not kill or replace an existing listener merely to create a preview link.
 
 ## Completion
 
