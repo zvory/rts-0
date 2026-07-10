@@ -436,7 +436,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     UPGRADES[UPGRADE.ENTRENCHMENT].cost.steel === 100 &&
       UPGRADES[UPGRADE.ENTRENCHMENT].cost.oil === 0 &&
       UPGRADES[UPGRADE.ENTRENCHMENT].researchTicks === ENTRENCHMENT_RESEARCH_TICKS &&
-      ENTRENCHMENT_RESEARCH_TICKS === TICK_HZ * 10,
+      ENTRENCHMENT_RESEARCH_TICKS === TICK_HZ * 30,
     "Entrenchment research cost and time mirror server",
   );
   assert(
