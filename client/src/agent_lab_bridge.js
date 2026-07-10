@@ -25,7 +25,9 @@ export const AGENT_LAB_LIMITS = Object.freeze({
 
 export function agentLabLaunchEnabled(locationLike = globalThis.location) {
   try {
-    return new URLSearchParams(locationLike?.search || "").get("agentLab") === "1";
+    const pathname = locationLike?.pathname || "";
+    return (pathname === "/lab" || pathname === "/lab/") &&
+      new URLSearchParams(locationLike?.search || "").get("agentLab") === "1";
   } catch {
     return false;
   }
@@ -261,10 +263,12 @@ export class AgentLabBridge {
       const tick = boundedNonNegativeInt(input?.tick, "time.tick", AGENT_LAB_LIMITS.seekTick);
       match.net.seekRoomTimeTo(tick);
       // Lab seek rebuilds the authoritative game and intentionally sends a fresh start payload.
-      // Follow the app-owned replacement Match instead of retaining the pre-seek instance.
+      // Follow the app-owned replacement Match instead of retaining the pre-seek instance. The
+      // server clamps a valid target to retained history, so report its observed tick rather than
+      // timing out waiting for the caller's unclamped value.
       await this.waitFor(() => {
         const active = this.app?.match;
-        return active && active !== match && active.state?.currRecvTime != null && active.state.tick === tick;
+        return active && active !== match && active.state?.currRecvTime != null;
       }, `room time seek to ${tick}`);
     } else {
       throw bridgeError("invalidTime", "time.action must be pause, resume, speed, step, or seek.");

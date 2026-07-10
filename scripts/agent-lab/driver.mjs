@@ -8,12 +8,13 @@ import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 
-const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_VIEWPORT = Object.freeze({ width: 1440, height: 900, deviceScaleFactor: 1 });
 const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_STARTUP_TIMEOUT_MS = 60_000;
+const MAX_TIMEOUT_MS = 60_000;
+const MAX_STARTUP_TIMEOUT_MS = 120_000;
 const LOG_TAIL_LINES = 80;
 const MAX_PAGE_ERRORS = 80;
 const AGENT_LAB_ROOT = path.join("target", "agent-lab");
@@ -57,7 +58,17 @@ export class AgentLabDriver {
     chrome = process.env.CHROME || "",
     baseUrl = "",
   } = {}) {
-    this.options = { workspaceRoot, map, seed, scenario, viewport, timeoutMs, startupTimeoutMs, chrome, baseUrl };
+    this.options = {
+      workspaceRoot,
+      map,
+      seed,
+      scenario,
+      viewport,
+      timeoutMs: boundedTimeout(timeoutMs, "timeoutMs", MAX_TIMEOUT_MS),
+      startupTimeoutMs: boundedTimeout(startupTimeoutMs, "startupTimeoutMs", MAX_STARTUP_TIMEOUT_MS),
+      chrome,
+      baseUrl,
+    };
     this.state = DRIVER_STATES.OPENING;
     this.workspace = null;
     this.sessionDir = "";
@@ -72,24 +83,34 @@ export class AgentLabDriver {
     this.operationTail = Promise.resolve();
     this.closePromise = null;
     this.signalHandlers = [];
+    this.openStarted = false;
   }
 
   async open() {
+    if (this.openStarted || this.state !== DRIVER_STATES.OPENING) {
+      throw new AgentLabDriverError("invalidLifecycle", "Agent Lab driver can only be opened once.");
+    }
+    this.openStarted = true;
     this.workspace = validateWorkspaceRoot(this.options.workspaceRoot);
     this.sessionDir = createSessionDirectory(this.workspace.root, this.options.map);
     this.writeManifest({ status: DRIVER_STATES.OPENING });
+    this.installCleanupHandlers();
     this.server = await startOrReusePrivateServer({
       workspace: this.workspace,
       sessionDir: this.sessionDir,
       startupTimeoutMs: this.options.startupTimeoutMs,
       baseUrl: this.options.baseUrl,
+      isOpening: () => this.state === DRIVER_STATES.OPENING,
     });
     this.serverLogPath = this.server.logPath || "";
 
     const puppeteer = await loadPuppeteer(this.workspace.root);
+    if (this.state !== DRIVER_STATES.OPENING) {
+      throw new AgentLabDriverError("sessionClosed", "Agent Lab driver was closed during browser startup.");
+    }
     const chrome = findChrome(this.options.chrome);
     this.profileDir = fs.mkdtempSync(path.join(this.sessionDir, "chrome-profile-"));
-    this.browser = await puppeteer.launch({
+    const browser = await puppeteer.launch({
       executablePath: chrome,
       headless: "new",
       defaultViewport: normalizeViewport(this.options.viewport),
@@ -100,14 +121,29 @@ export class AgentLabDriver {
         `--user-data-dir=${this.profileDir}`,
       ],
     });
-    this.page = await this.browser.newPage();
+    if (this.state !== DRIVER_STATES.OPENING) {
+      await browser.close().catch(() => {});
+      throw new AgentLabDriverError("sessionClosed", "Agent Lab driver was closed during browser startup.");
+    }
+    this.browser = browser;
+    const page = await browser.newPage();
+    if (this.state !== DRIVER_STATES.OPENING) {
+      await page.close().catch(() => {});
+      throw new AgentLabDriverError("sessionClosed", "Agent Lab driver was closed during page startup.");
+    }
+    this.page = page;
     this.attachPageDiagnostics();
     await this.page.goto(this.launchUrl(), { waitUntil: "domcontentloaded", timeout: this.options.startupTimeoutMs });
     await this.page.waitForFunction(
       () => window.__rtsAgentLab?.status?.().ready === true,
       { timeout: this.options.startupTimeoutMs },
     );
-    this.installCleanupHandlers();
+    if (this.state !== DRIVER_STATES.OPENING) {
+      throw new AgentLabDriverError("sessionClosed", "Agent Lab driver was closed during page startup.");
+    }
+    if (this.pageErrors.length > 0) {
+      throw new AgentLabDriverError("pageError", "Agent Lab page reported an error before readiness.");
+    }
     this.transition("opened");
     this.writeManifest({
       status: this.state,
@@ -119,7 +155,10 @@ export class AgentLabDriver {
   }
 
   async status() {
-    return this.call("status", {});
+    const status = await this.call("status", {});
+    return this.pageErrors.length === 0
+      ? status
+      : { ...status, ready: false, reason: "pageError" };
   }
 
   async catalog(query = {}) {
@@ -227,9 +266,15 @@ export class AgentLabDriver {
       process.once(signal, closeOnSignal);
       this.signalHandlers.push([signal, closeOnSignal]);
     }
-    const closeOnException = () => { void this.close(); };
-    process.once("uncaughtExceptionMonitor", closeOnException);
-    this.signalHandlers.push(["uncaughtExceptionMonitor", closeOnException]);
+    const closeOnException = (error) => {
+      // `uncaughtExceptionMonitor` cannot wait for async teardown. Hold the fatal exception
+      // until the browser and private server have stopped, then restore normal process failure.
+      void this.close().finally(() => {
+        process.nextTick(() => { throw error; });
+      });
+    };
+    process.once("uncaughtException", closeOnException);
+    this.signalHandlers.push(["uncaughtException", closeOnException]);
   }
 
   removeCleanupHandlers() {
@@ -362,22 +407,27 @@ function createSessionDirectory(workspaceRoot, map) {
   return directory;
 }
 
-async function startOrReusePrivateServer({ workspace, sessionDir, startupTimeoutMs, baseUrl }) {
+async function startOrReusePrivateServer({ workspace, sessionDir, startupTimeoutMs, baseUrl, isOpening }) {
+  if (!isOpening()) throw new AgentLabDriverError("sessionClosed", "Agent Lab driver was closed during server startup.");
   if (baseUrl) {
     const normalized = privateLoopbackUrl(baseUrl);
-    if (await isHealthy(normalized)) return { baseUrl: normalized, reused: true, logPath: "", close: async () => {} };
+    if (await isHealthy(normalized)) {
+      if (!isOpening()) throw new AgentLabDriverError("sessionClosed", "Agent Lab driver was closed during server startup.");
+      return { baseUrl: normalized, reused: true, logPath: "", close: async () => {} };
+    }
     throw new AgentLabDriverError("unhealthyServer", `Requested private server is not healthy: ${normalized}`);
   }
   const port = await allocatePort();
+  if (!isOpening()) throw new AgentLabDriverError("sessionClosed", "Agent Lab driver was closed during server startup.");
   const targetDir = path.join(workspace.root, AGENT_LAB_ROOT, "cargo");
   const binary = path.join(targetDir, "debug", "rts-server");
-  if (!fs.existsSync(binary)) {
-    runOrThrow("cargo", ["build", "--manifest-path", path.join(workspace.root, "server", "Cargo.toml")], {
-      cwd: workspace.root,
-      env: { ...process.env, CARGO_TARGET_DIR: targetDir },
-      stdio: "inherit",
-    });
-  }
+  // The target directory is only a build cache. Always let Cargo check the selected worktree so
+  // a prior Agent Lab session cannot silently serve an old server binary.
+  runOrThrow("cargo", ["build", "--manifest-path", path.join(workspace.root, "server", "Cargo.toml")], {
+    cwd: workspace.root,
+    env: { ...process.env, CARGO_TARGET_DIR: targetDir },
+    stdio: "inherit",
+  });
   if (!fs.existsSync(binary)) throw new AgentLabDriverError("serverBuild", "Agent Lab server binary was not produced.");
 
   const logPath = path.join(sessionDir, "server.log");
@@ -396,10 +446,18 @@ async function startOrReusePrivateServer({ workspace, sessionDir, startupTimeout
   const url = `http://127.0.0.1:${port}/`;
   const deadline = Date.now() + startupTimeoutMs;
   while (Date.now() < deadline) {
+    if (!isOpening()) {
+      await stopChild(child);
+      throw new AgentLabDriverError("sessionClosed", "Agent Lab driver was closed during server startup.");
+    }
     if (child.exitCode != null) {
       throw new AgentLabDriverError("serverExited", `Private server exited during startup; see ${logPath}`);
     }
     if (await isHealthy(url)) {
+      if (!isOpening()) {
+        await stopChild(child);
+        throw new AgentLabDriverError("sessionClosed", "Agent Lab driver was closed during server startup.");
+      }
       return { baseUrl: url, reused: false, logPath, close: async () => stopChild(child) };
     }
     await sleep(150);
@@ -416,6 +474,14 @@ function normalizeViewport(viewport) {
     throw new AgentLabDriverError("invalidViewport", "viewport must have bounded width, height, and DPR.");
   }
   return { width, height, deviceScaleFactor };
+}
+
+function boundedTimeout(value, label, maximum) {
+  const timeoutMs = Number(value);
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > maximum) {
+    throw new AgentLabDriverError("invalidTimeout", `${label} must be an integer from 1 to ${maximum}ms.`);
+  }
+  return timeoutMs;
 }
 
 async function loadPuppeteer(workspaceRoot) {

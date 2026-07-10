@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 
 import {
+  AgentLabDriver,
   AgentLabDriverError,
   DRIVER_STATES,
   generatedRoomId,
@@ -51,6 +52,20 @@ await assert.rejects(
   (error) => error?.code === "timeout",
   "driver normalizes timeouts",
 );
+assert.throws(
+  () => new AgentLabDriver({ workspaceRoot: root, timeoutMs: 60_001 }),
+  (error) => error?.code === "invalidTimeout",
+  "driver bounds per-operation waits",
+);
+const pageErrorDriver = new AgentLabDriver({ workspaceRoot: root });
+pageErrorDriver.state = DRIVER_STATES.OPEN;
+pageErrorDriver.page = { evaluate: async () => ({ ok: true, value: { ready: true, reason: "ready" } }) };
+pageErrorDriver.pageErrors.push("frame failed");
+assert.deepEqual(
+  await pageErrorDriver.status(),
+  { ready: false, reason: "pageError" },
+  "driver does not report readiness after a page error",
+);
 
 const inspection = normalizeInspectionQuery({
   ids: Array.from({ length: 150 }, (_, index) => index + 1),
@@ -63,8 +78,9 @@ assert.deepEqual([...inspection.owners], [1, 2], "inspection owner filters are d
 assert.equal(inspection.kinds.size, 2, "inspection kind filters are bounded and deduplicated");
 assert.equal(inspection.limit, 100, "inspection result limits remain bounded");
 
-assert.equal(agentLabLaunchEnabled({ search: "?agentLab=1" }), true, "explicit Agent Lab URL enables the bridge");
-assert.equal(agentLabLaunchEnabled({ search: "?agentLab=0" }), false, "normal Lab URLs do not expose the bridge");
+assert.equal(agentLabLaunchEnabled({ pathname: "/lab", search: "?agentLab=1" }), true, "explicit Agent Lab URL enables the bridge");
+assert.equal(agentLabLaunchEnabled({ pathname: "/lab", search: "?agentLab=0" }), false, "normal Lab URLs do not expose the bridge");
+assert.equal(agentLabLaunchEnabled({ pathname: "/", search: "?agentLab=1" }), false, "non-Lab URLs never expose the bridge");
 const windowLike = {};
 const bridge = new AgentLabBridge({
   enabled: true,
@@ -90,5 +106,26 @@ const faction = catalog.value.factions.find((entry) => entry.id === DEFAULT_FACT
 assert.deepEqual(faction.units, labSpawnUnitKindsForFaction(DEFAULT_FACTION_ID), "bridge catalog matches the human Lab spawn palette");
 bridge.destroy();
 assert.equal(windowLike[AGENT_LAB_BRIDGE_KEY], undefined, "bridge teardown removes the launch-gated global");
+
+const replacementMatch = {
+  state: { currRecvTime: 2, tick: 3 },
+  capabilities: { roomTime: { available: true } },
+  roomTimeControls: { roomTimeState: { currentTick: 3, speed: 0, paused: true } },
+};
+const seekApp = {
+  net: { ws: { readyState: 1 } },
+  labClient: { state: { role: LAB_ROLE.OPERATOR, room: "contract" } },
+  match: null,
+};
+seekApp.match = {
+  state: { currRecvTime: 1, tick: 7 },
+  capabilities: { roomTime: { available: true } },
+  roomTimeControls: { roomTimeState: { currentTick: 7, speed: 0, paused: true } },
+  net: { seekRoomTimeTo: () => { seekApp.match = replacementMatch; } },
+};
+const seekBridge = new AgentLabBridge({ enabled: true, app: seekApp, windowLike: {}, sleep: async () => {} });
+const seek = await seekBridge.time({ action: "seek", tick: 999 });
+assert.equal(seek.snapshotTick, 3, "bridge returns the server-observed tick when a seek is clamped to retained history");
+seekBridge.destroy();
 
 console.log("✅ agent_lab_driver_contracts.mjs: all contract assertions passed");

@@ -33,6 +33,10 @@ try {
   await driver.time({ action: "step", ticks: 3 });
   const afterOrder = await driver.inspect({ ids: [firstId], limit: 1 });
   assert.equal(afterOrder.entities[0]?.id, firstId, "normal issueCommandAs order leaves the unit observable");
+  assert.ok(
+    afterOrder.entities[0]?.orderPlan.some((stage) => stage.kind === "move" && stage.x === 1088 && stage.y === 1088),
+    "authoritative inspection exposes the issued move order",
+  );
 
   const camera = await driver.camera({ action: "focus", entityIds: [firstId, secondId] });
   assert.ok(Number.isFinite(camera.camera.x) && Number.isFinite(camera.camera.zoom), "camera focus returns bounded camera state");
