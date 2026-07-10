@@ -88,9 +88,11 @@ pub(super) fn apply_damage(
         Some(weapon_profile.id.stable_id()),
     );
 
-    // Roll for miss before computing damage.
+    // Resolve weapon-specific accuracy before computing damage. Entrenchment is deterministic
+    // damage reduction, not another miss source.
     if let Some(v) = entities.get(shot_victim) {
-        let mc = entrenchment_combat::direct_miss_chance(weapon_profile, v, extra_miss_chance);
+        let mc = combat_rules::miss_chance_for_weapon(weapon_profile, v.kind)
+            .max(extra_miss_chance.clamp(0.0, 1.0));
         if mc > 0.0 && rng.gen::<f32>() < mc {
             emit_miss_event(events, &attack_recipients, shot_victim);
             return Some(victim_owner);
@@ -108,6 +110,10 @@ pub(super) fn apply_damage(
         ),
         _ => dmg,
     };
+    let effective_dmg = entities
+        .get(shot_victim)
+        .map(|victim| entrenchment_combat::reduce_direct_damage(victim, effective_dmg))
+        .unwrap_or(effective_dmg);
     let damaged = if let Some(v) = entities.get_mut(shot_victim) {
         let attribution = teams.is_enemy_owner(attacker_owner, v.owner).then_some((
             attacker_owner,

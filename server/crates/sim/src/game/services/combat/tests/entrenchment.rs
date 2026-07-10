@@ -223,7 +223,7 @@ fn entrenched_meth_rifleman_keeps_faster_attack_cooldown() {
 }
 
 #[test]
-fn entrenched_direct_shot_seeded_miss_keeps_victim_undamaged() {
+fn entrenched_direct_shot_halves_damage_without_emitting_a_miss() {
     let mut entities = EntityStore::new();
     let attacker = entities
         .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
@@ -253,8 +253,8 @@ fn entrenched_direct_shot_seeded_miss_keeps_victim_undamaged() {
 
     assert_eq!(
         entities.get(victim).expect("victim should exist").hp,
-        victim_hp,
-        "seeded direct shot should miss an actively entrenched infantry target"
+        victim_hp - 5,
+        "actively entrenched infantry should take half direct damage"
     );
     assert!(
         events
@@ -262,30 +262,20 @@ fn entrenched_direct_shot_seeded_miss_keeps_victim_undamaged() {
             .expect("attacker owner events should exist")
             .iter()
             .any(|event| matches!(event, Event::Attack { from, to, .. } if *from == attacker && *to == victim)),
-        "missed entrenched shots should still emit attack feedback"
+        "reduced-damage entrenched shots should still emit attack feedback"
     );
     assert!(
         events
             .get(&1)
             .expect("attacker owner events should exist")
             .iter()
-            .any(|event| matches!(event, Event::Miss { to } if *to == victim)),
-        "missed entrenched shots should emit miss feedback"
-    );
-    assert!(
-        events
-            .get(&2)
-            .expect("victim owner events should exist")
-            .iter()
-            .all(
-                |event| !matches!(event, Event::Notice { msg, .. } if msg == "alert:under_attack")
-            ),
-        "missed entrenched shots should not emit damage alerts"
+            .all(|event| !matches!(event, Event::Miss { to } if *to == victim)),
+        "entrenchment should not turn direct shots into miss feedback"
     );
 }
 
 #[test]
-fn direct_shots_against_buildings_ignore_entrenchment_miss_policy() {
+fn direct_shots_against_buildings_ignore_entrenchment_damage_reduction() {
     let mut entities = EntityStore::new();
     let attacker = entities
         .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
@@ -314,7 +304,7 @@ fn direct_shots_against_buildings_ignore_entrenchment_miss_policy() {
 
     assert!(
         entities.get(depot).expect("depot should exist").hp < depot_hp,
-        "entrenchment miss policy should not affect buildings"
+        "entrenchment damage reduction should not affect buildings"
     );
 }
 
@@ -372,7 +362,7 @@ fn entrenched_primary_victim_stops_overpenetration_after_a_hit() {
         );
         return;
     }
-    panic!("expected to find a deterministic hit seed for entrenched miss policy");
+    panic!("expected an entrenched primary victim to take deterministic direct damage");
 }
 
 #[test]

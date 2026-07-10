@@ -3,7 +3,7 @@ import {
   COMMAND_CAR_SUPPLY_CAP_BONUS,
   ENTRENCHMENT_AREA_DAMAGE_REDUCTION,
   ENTRENCHMENT_DIG_IN_TICKS,
-  ENTRENCHMENT_DIRECT_MISS_CHANCE,
+  ENTRENCHMENT_DIRECT_DAMAGE_REDUCTION,
   ENTRENCHMENT_RANGE_BONUS_TILES,
   STATS,
   TICK_HZ,
@@ -328,7 +328,7 @@ export function entrenchmentSelectionStatus(entity, state = null) {
     return {
       label: "Trench",
       value: `Occupied: +${ENTRENCHMENT_RANGE_BONUS_TILES} range, ` +
-        `${percent(ENTRENCHMENT_DIRECT_MISS_CHANCE)} miss, ` +
+        `-${percent(ENTRENCHMENT_DIRECT_DAMAGE_REDUCTION)} direct, ` +
         `-${percent(ENTRENCHMENT_AREA_DAMAGE_REDUCTION)} blast`,
     };
   }
