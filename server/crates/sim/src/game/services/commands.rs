@@ -1153,7 +1153,15 @@ fn use_ability(
         return;
     }
     if ability == AbilityKind::ScoutPlane {
-        scout_plane_ability::use_ability(map, entities, players, events, player, &faction_id, request);
+        scout_plane_ability::use_ability(
+            map,
+            entities,
+            players,
+            events,
+            player,
+            &faction_id,
+            request,
+        );
         return;
     }
     if let Some(mode) = artillery_fire_mode_for(ability) {

@@ -428,7 +428,10 @@ fn build_order_rejects_pump_jack_off_oil() {
 
     assert!(
         !matches!(
-            entities.get(worker).expect("worker should remain alive").order(),
+            entities
+                .get(worker)
+                .expect("worker should remain alive")
+                .order(),
             Order::Build(_)
         ),
         "Pump Jack build orders must be rejected away from live oil patches"
