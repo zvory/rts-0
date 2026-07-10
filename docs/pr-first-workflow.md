@@ -17,10 +17,12 @@ The normal agent lifecycle is:
    head SHA reachable from `origin/main`.
 
 GitHub Actions owns the full-suite merge gate through the aggregate `./tests/run-all.sh` check in
-the `Main test gate` workflow. The workflow runs split coverage jobs for server build,
-Rust/architecture, live Node, and browser/tri-state suites, then fails the aggregate check if any
-required coverage job fails. The Rust/architecture job installs `cargo-nextest` and runs
-`./tests/run-all.sh --only-rust`, matching the local nextest-backed Rust command path. Local hooks
+the `Main test gate` workflow. The workflow runs split coverage jobs for server build, Rust
+policy/lint, two complementary Rust nextest partitions, live Node, and two browser/tri-state shards,
+then fails the aggregate check if any required coverage job fails. The nextest shards install
+`cargo-nextest` and run `./tests/run-all.sh --only-nextest` with complementary `slice:1/2` and
+`slice:2/2` partitions, matching the local nextest-backed Rust command path without dropping tests.
+Local hooks
 are intentionally cheap; they catch staged whitespace errors outside the human-owned
 `playtest_notes.md`, run `node scripts/check-docs-health.mjs`, and run opportunistic cleanup on
 `main`. Branch protection requires the `adversarial-quality-pass` status alongside

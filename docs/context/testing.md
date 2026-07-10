@@ -14,13 +14,14 @@ Use for tests, CI/hooks, or focused verification.
 - `node tests/server_integration.mjs` — full server pipeline; needs a running server.
 - `node tests/regression.mjs` — hardening/DoS/robustness guards; needs a running server.
 - `node tests/ai_integration.mjs` — dep-free AI opponent lobby flow; needs a running server.
-- `node tests/lab_mortar_regression.mjs` — lab P2 mortar event regression; needs a server.
-- `node tests/minimap_input_contracts.mjs` — dep-free minimap/router pointer-lock contracts.
-- `tests/run-all.sh --no-rust` — live Node suites plus browser smoke with shared dependencies.
-- `tests/run-all.sh --with-tri-state-browser --no-rust` — opt into tri-state browser scenarios.
+- `node tests/lab_mortar_regression.mjs` — mortar event regression; needs a server.
+- `node tests/minimap_input_contracts.mjs` — minimap/router pointer-lock contracts.
 - `tests/run-all.sh --only-rust` — architecture policy plus Rust nextest and lint only.
+- `tests/run-all.sh --only-rust-checks` — policy plus lint, without nextest.
+- `RTS_NEXTEST_PARTITION=slice:1/2 tests/run-all.sh --only-nextest` — one CI partition.
 - `tests/run-all.sh --only-live-node` — JS contracts plus live Node API suites only.
 - `tests/run-all.sh --only-browser` — browser smoke plus configured tri-state browser suites only.
+- `tests/run-all.sh --only-browser-scenarios=smoke,phase-0.5` — browser shard.
 - `cargo nextest run --config-file .config/nextest.toml --manifest-path server/Cargo.toml --profile
   default` — sim behavior plus fast scripted self-play; no server needed.
 - `RTS_FULL_AI_TESTS=1 cargo nextest run --config-file .config/nextest.toml --manifest-path
@@ -30,15 +31,16 @@ Use for tests, CI/hooks, or focused verification.
 - `node scripts/check-docs-health.mjs` — docs map, capsule cap, and Markdown links.
 - `node scripts/check-wiki.mjs` — wiki route hardening, generated stats, and faction catalog
   parity.
-- Render perf: `node scripts/client-perf-harness.mjs --render-lag-suite --seconds 10`; add `--stress-matrix`.
-- `node scripts/check-source-file-sizes.mjs` — enforce the 1500-line Rust/JS/MJS cap.
-- `node scripts/check-crate-boundaries.mjs` — enforce crate dependency direction.
+- Render perf: `node scripts/client-perf-harness.mjs --render-lag-suite --seconds 10`.
+- `node scripts/check-source-file-sizes.mjs` — enforce the 1500-line source cap.
+- `node scripts/check-crate-boundaries.mjs` — enforce crate direction.
 - `cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture` —
   enforce `rts-sim::game` internal architecture ratchets.
 
 ## Invariants
 - The required PR gate is `./tests/run-all.sh` in `Main test gate`. Split CI covers server build,
-  Rust/architecture, live Node, browser, and tri-state; docs-only still runs cheap policy checks.
+  Rust policy/lint plus complementary nextest partitions, live Node, and complementary browser
+  smoke/tri-state shards; docs-only still runs cheap policy checks.
 - `tests/run-all.sh` uses nextest for Rust tests and prints timing summaries. Missing nextest is a
   local gate failure with an install hint.
 - Live Node suites need a running server. Use `tests/run-all.sh` to boot a private one, or start

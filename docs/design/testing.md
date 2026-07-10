@@ -283,12 +283,15 @@ changed-file mapping selects the skipped behavior.
 ## 12. PR CI contract
 
 The canonical required PR check context is `./tests/run-all.sh` in the `Main test gate` workflow.
-It is an aggregate check over split coverage jobs for server binary build, Rust/architecture, live
-Node, and browser/tri-state coverage on pull requests targeting `main` and on pushes to `main`.
-The split jobs run `tests/run-all.sh` sub-modes under CI so the required aggregate gate preserves
-client smoke plus tri-state browser coverage without serializing every suite in one runner. The
-server-build job uploads generated sim-WASM browser assets, and the split browser job downloads them
-into `client/vendor/sim-wasm` before client smoke runs from its clean checkout. Local
+It is an aggregate check over split coverage jobs for server binary build, Rust policy/lint, two
+complementary Rust nextest partitions, live Node, and two complementary browser/tri-state shards on
+pull requests targeting `main` and on pushes to `main`. The two nextest jobs use `slice:1/2` and
+`slice:2/2`, so their union runs the same Rust test set as the local gate. The browser shards divide
+the current PR coverage into client smoke plus phase 0.5, and phases 2.5 plus 5; each shard gets an
+isolated prebuilt server. The split jobs run `tests/run-all.sh` sub-modes under CI so the required
+aggregate gate preserves client smoke plus tri-state browser coverage without serializing every suite
+in one runner. The server-build job uploads generated sim-WASM browser assets, and both browser
+shards download them into `client/vendor/sim-wasm` before client smoke runs from its clean checkout. Local
 `tests/run-all.sh` runs keep client smoke in the default browser gate but skip the latency-sensitive
 tri-state browser scenarios unless `--with-tri-state-browser` or `RTS_RUN_TRI_STATE_BROWSER=1` is
 set. WASM-backed tri-state groups also stay opt-in unless `RTS_RUN_WASM_TRI_STATE=1` is set.

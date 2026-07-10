@@ -153,10 +153,10 @@ jobs:
             client/vendor/sim-wasm/rts_sim_wasm_bg.wasm.d.ts
           if-no-files-found: error
 
-  rust:
-    name: CI / rust and architecture
+  rust-checks:
+    name: CI / Rust checks
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     needs: changed-files
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/server/target
@@ -166,9 +166,9 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Skip Rust and architecture suites
+      - name: Skip Rust checks
         if: needs.changed-files.outputs.run_rust != 'true'
-        run: echo "CI class '${{ needs.changed-files.outputs.ci_class }}' does not need Rust nextest, lint, or Rust architecture suites."
+        run: echo "CI class '${{ needs.changed-files.outputs.ci_class }}' does not need Rust policy or lint checks."
 
       - name: Set up Rust
         if: needs.changed-files.outputs.run_rust == 'true'
@@ -182,7 +182,57 @@ jobs:
 
       - name: Cache Cargo registry and target
         if: needs.changed-files.outputs.run_rust == 'true'
-        id: rust-cargo-cache
+        id: rust-checks-cargo-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            server/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('server/Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Run Rust policy and lint checks
+        if: needs.changed-files.outputs.run_rust == 'true'
+        env:
+          RTS_SUITE_TIMING_DETAILS: "1"
+        run: ./tests/run-all.sh --only-rust-checks
+
+  rust-nextest:
+    name: CI / Rust tests (${{ matrix.shard }}/2)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: changed-files
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/server/target
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Skip Rust nextest shard
+        if: needs.changed-files.outputs.run_rust != 'true'
+        run: echo "CI class '${{ needs.changed-files.outputs.ci_class }}' does not need Rust nextest."
+
+      - name: Set up Rust
+        if: needs.changed-files.outputs.run_rust == 'true'
+        uses: dtolnay/rust-toolchain@1.97.0
+
+      - name: Set up Node
+        if: needs.changed-files.outputs.run_rust == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Cache Cargo registry and target
+        if: needs.changed-files.outputs.run_rust == 'true'
+        id: rust-nextest-cargo-cache
         uses: actions/cache@v4
         with:
           path: |
@@ -201,27 +251,30 @@ jobs:
         if: needs.changed-files.outputs.run_rust == 'true'
         shell: bash
         env:
-          CARGO_CACHE_HIT: ${{ steps.rust-cargo-cache.outputs.cache-hit }}
+          CARGO_CACHE_HIT: ${{ steps.rust-nextest-cargo-cache.outputs.cache-hit }}
+          RTS_NEXTEST_PARTITION: "slice:${{ matrix.shard }}/2"
         run: |
           printf 'Rust test context:\n'
           printf '  CARGO_TARGET_DIR=%s\n' "$CARGO_TARGET_DIR"
           printf '  rustc: %s\n' "$(rustc --version)"
           printf '  cargo: %s\n' "$(cargo --version)"
           printf '  cargo-nextest: %s\n' "$(cargo nextest --version)"
+          printf '  nextest partition: %s\n' "$RTS_NEXTEST_PARTITION"
           printf '  cargo cache exact hit: %s\n' "${CARGO_CACHE_HIT:-false}"
 
-      - name: Run Rust and architecture suites
+      - name: Run Rust nextest shard
         if: needs.changed-files.outputs.run_rust == 'true'
         env:
           RTS_NEXTEST_JUNIT_SUMMARY: "1"
+          RTS_NEXTEST_PARTITION: "slice:${{ matrix.shard }}/2"
           RTS_SUITE_TIMING_DETAILS: "1"
-        run: ./tests/run-all.sh --only-rust
+        run: ./tests/run-all.sh --only-nextest
 
       - name: Upload nextest JUnit report
         if: always() && needs.changed-files.outputs.run_rust == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: nextest-junit
+          name: nextest-junit-${{ matrix.shard }}
           path: server/target/nextest/default/junit.xml
           if-no-files-found: warn
           retention-days: 7
@@ -268,20 +321,28 @@ jobs:
           chmod +x .ci-server/rts-server
           RTS_SERVER_BIN="$PWD/.ci-server/rts-server" ./tests/run-all.sh --only-live-node
 
-  browser:
-    name: CI / browser and tri-state
+  browser-shards:
+    name: CI / browser (${{ matrix.label }})
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
     needs:
       - changed-files
       - server-build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: smoke + phase 0.5
+            scenarios: smoke,phase-0.5
+          - label: phases 2.5 + 5
+            scenarios: phase-2.5,phase-5
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Skip browser suites
+      - name: Skip browser shard
         if: needs.changed-files.outputs.run_browser != 'true'
         run: echo "CI class '${{ needs.changed-files.outputs.ci_class }}' does not need browser suites."
 
@@ -305,14 +366,15 @@ jobs:
           name: rts-sim-wasm-assets
           path: client/vendor/sim-wasm
 
-      - name: Run browser and tri-state suites
+      - name: Run browser shard
         if: needs.changed-files.outputs.run_browser == 'true'
         env:
+          BROWSER_SCENARIOS: ${{ matrix.scenarios }}
           CHROME: /usr/bin/google-chrome-stable
           RTS_RUN_WASM_TRI_STATE: "0"
         run: |
           chmod +x .ci-server/rts-server
-          RTS_SERVER_BIN="$PWD/.ci-server/rts-server" ./tests/run-all.sh --only-browser
+          RTS_SERVER_BIN="$PWD/.ci-server/rts-server" ./tests/run-all.sh --only-browser-scenarios="$BROWSER_SCENARIOS"
 
   aggregate:
     name: ./tests/run-all.sh
@@ -320,28 +382,32 @@ jobs:
     timeout-minutes: 5
     needs:
       - server-build
-      - rust
+      - rust-checks
+      - rust-nextest
       - live-node
-      - browser
+      - browser-shards
     if: always()
     steps:
       - name: Verify split full gate
         env:
           SERVER_BUILD_RESULT: ${{ needs.server-build.result }}
-          RUST_RESULT: ${{ needs.rust.result }}
+          RUST_CHECKS_RESULT: ${{ needs.rust-checks.result }}
+          RUST_NEXTEST_RESULT: ${{ needs.rust-nextest.result }}
           LIVE_NODE_RESULT: ${{ needs.live-node.result }}
-          BROWSER_RESULT: ${{ needs.browser.result }}
+          BROWSER_SHARDS_RESULT: ${{ needs.browser-shards.result }}
         shell: bash
         run: |
           printf 'Split full gate results:\n'
           printf '  server binary: %s\n' "$SERVER_BUILD_RESULT"
-          printf '  rust and architecture: %s\n' "$RUST_RESULT"
+          printf '  rust policy and lint: %s\n' "$RUST_CHECKS_RESULT"
+          printf '  rust nextest shards: %s\n' "$RUST_NEXTEST_RESULT"
           printf '  live Node suites: %s\n' "$LIVE_NODE_RESULT"
-          printf '  browser and tri-state: %s\n' "$BROWSER_RESULT"
+          printf '  browser shards: %s\n' "$BROWSER_SHARDS_RESULT"
 
           if [ "$SERVER_BUILD_RESULT" != "success" ] ||
-             [ "$RUST_RESULT" != "success" ] ||
+             [ "$RUST_CHECKS_RESULT" != "success" ] ||
+             [ "$RUST_NEXTEST_RESULT" != "success" ] ||
              [ "$LIVE_NODE_RESULT" != "success" ] ||
-             [ "$BROWSER_RESULT" != "success" ]; then
+             [ "$BROWSER_SHARDS_RESULT" != "success" ]; then
             exit 1
           fi
