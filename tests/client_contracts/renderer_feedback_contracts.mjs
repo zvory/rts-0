@@ -11,6 +11,7 @@ import {
   ORDER_STAGE,
   SETUP,
   STATE,
+  TERRAIN,
   WEAPON_KIND,
 } from "../../client/src/protocol.js";
 import { createLabControlPolicy } from "../../client/src/lab_control_policy.js";
@@ -32,6 +33,7 @@ import {
   _drawRallyPoints,
   _drawResourceMiningPreview,
 } from "../../client/src/renderer/feedback.js";
+import { drawLabToolPreview } from "../../client/src/renderer/lab_tool_preview.js";
 import { _drawMissToasts } from "../../client/src/renderer/miss_toasts.js";
 import {
   _drawPanzerfaustImpacts,
@@ -836,5 +838,67 @@ function nearPoint(call, point, epsilon = 0.001) {
   assert(
     fills.some((call) => call[1] === COLORS.placeOk) && fills.some((call) => call[1] === COLORS.placeBad),
     "Tank Trap line placement preview distinguishes valid and invalid sites",
+  );
+}
+
+{
+  const unitPreview = new RecordingGraphics();
+  drawLabToolPreview(unitPreview, {
+    kind: "spawnEntity",
+    payload: { kind: KIND.RIFLEMAN, owner: 2 },
+    x: 96,
+    y: 128,
+  }, 32);
+  assert(
+    unitPreview.calls.some((call) => call[0] === "drawCircle" && call[1] === 96 && call[2] === 128),
+    "armed Lab unit tools draw a unit ghost directly beneath the cursor",
+  );
+
+  const buildingPreview = new RecordingGraphics();
+  drawLabToolPreview(buildingPreview, {
+    kind: "spawnEntity",
+    payload: { kind: KIND.CITY_CENTRE, owner: 1 },
+    x: 160,
+    y: 160,
+  }, 32);
+  assert(
+    buildingPreview.calls.some((call) => call[0] === "drawRoundedRect"),
+    "armed Lab building tools draw their snapped footprint ghost",
+  );
+
+  const terrainPreview = new RecordingGraphics();
+  drawLabToolPreview(terrainPreview, {
+    kind: "editMapTerrain",
+    payload: { terrain: TERRAIN.WATER },
+    x: 79,
+    y: 97,
+  }, 32);
+  assert(
+    terrainPreview.calls.some((call) => call[0] === "drawRect" && call[1] === 64 && call[2] === 96),
+    "armed Lab terrain tools draw the selected tile ghost beneath the cursor",
+  );
+
+  const removePreview = new RecordingGraphics();
+  drawLabToolPreview(removePreview, {
+    kind: "removeSelectableUnits",
+    x: 224,
+    y: 192,
+  }, 32);
+  assert(
+    removePreview.calls.filter((call) => call[0] === "lineTo").length === 2,
+    "armed Lab remove tools draw a clear X beneath the cursor",
+  );
+
+  const feedbackView = buildRendererFeedbackView(
+    { map: { width: 8, height: 8, tileSize: 32 } },
+    {
+      clientIntent: {
+        labToolPreview: { toolId: "lab-tool-1", kind: "removeSelectableUnits", x: 224, y: 192 },
+      },
+    },
+  );
+  assert(
+    feedbackView.labToolPreview?.kind === "removeSelectableUnits",
+    "renderer feedback view carries the active Lab tool preview across the intent boundary",
   );
 }

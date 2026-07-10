@@ -3,7 +3,6 @@ import {
   FOG_EXPLORED_ALPHA,
   FOG_UNEXPLORED_ALPHA,
   STATS,
-  PLAYER_PALETTE,
   RESOURCE_AMOUNTS,
   ANTI_TANK_GUN_DEPLOYED_RANGE_TILES,
   ANTI_TANK_GUN_FIELD_OF_FIRE_RAD,
@@ -44,6 +43,7 @@ import {
   attackFeedbackOriginForWeapon,
 } from "./attack_feedback_origin.js";
 import { muzzleFeedbackStyle } from "./weapon_feedback_style.js";
+import { drawLabToolPreview } from "./lab_tool_preview.js";
 import {
   angleDelta,
   clamp01,
@@ -61,7 +61,6 @@ import {
   drawTankTracks,
   finiteNumber,
   hash2,
-  hexToInt,
   isImpassableAt,
   normRect,
   polar,
@@ -69,8 +68,6 @@ import {
   rectEdgePointTowardCenter,
   smoothstep01,
   tankBodyVisual,
-  terrainColor,
-  terrainOverlayColor,
   weaponRecoilOffset,
 } from "./shared.js";
 
@@ -85,9 +82,14 @@ export function _drawPlacement(view, fog) {
   const g = this._placementGfx;
   this._recordRenderDiagnostic?.("renderer.graphics.clear.placement");
   g.clear();
-  const p = view.placement;
-  if (!p) return;
   const ts = (this._map && this._map.tileSize) || 32;
+  const p = view?.placement;
+  if (p) drawBuildPlacementPreview(g, view, p, ts);
+  drawLabToolPreview(g, view?.labToolPreview, ts);
+  void fog;
+}
+
+function drawBuildPlacementPreview(g, view, p, ts) {
   const stat = STATS[p.building] || {};
   const footW = stat.footW || 2;
   const footH = stat.footH || 2;

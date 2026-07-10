@@ -65,8 +65,8 @@
     },
     {
       "path": "tests/client_contracts/state_input_contracts.mjs",
-      "lines": 2065,
-      "reason": "Artillery targeting contracts were split into a focused client contract file; keep ratcheting until remaining state/input fixtures are split."
+      "lines": 1890,
+      "reason": "Lab tool pointer contracts were extracted beside their setup-tool behavior; keep ratcheting until remaining state/input fixtures are split."
     }
   ]
 }

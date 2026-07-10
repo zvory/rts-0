@@ -2297,6 +2297,42 @@ input[type="text"]:focus {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
 }
+.lab-map-terrain-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.lab-terrain-icon {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.34);
+}
+.lab-terrain-icon[data-terrain="grass"] {
+  background:
+    radial-gradient(circle at 25% 30%, rgba(181, 190, 108, 0.55) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 70% 65%, rgba(53, 76, 40, 0.68) 0 1px, transparent 1.5px),
+    #65784b;
+  background-size: 6px 6px, 7px 7px, auto;
+}
+.lab-terrain-icon[data-terrain="stone"] {
+  background:
+    linear-gradient(135deg, transparent 42%, rgba(52, 52, 48, 0.62) 43% 52%, transparent 53%),
+    linear-gradient(45deg, rgba(162, 158, 141, 0.42) 25%, transparent 26% 74%, rgba(68, 67, 61, 0.5) 75%),
+    #777568;
+  background-size: 8px 8px, 9px 9px, auto;
+}
+.lab-terrain-icon[data-terrain="water"] {
+  background:
+    repeating-linear-gradient(160deg, rgba(143, 205, 211, 0.55) 0 1px, transparent 1px 4px),
+    #356c7b;
+}
+.lab-terrain-label {
+  min-width: 0;
+}
 .lab-map-site-list {
   grid-column: 1 / -1;
   display: grid;

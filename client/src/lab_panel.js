@@ -3,6 +3,7 @@ import { DEFAULT_FACTION_ID, KIND, LAB_ROLE, msg } from "./protocol.js";
 import { factionCatalog, PLAYER_PALETTE, STATS, UPGRADES } from "./config.js";
 import { LabPanelWindowChrome } from "./lab_panel_window.js";
 import { LabMapEditorPanel } from "./lab_map_editor_panel.js";
+import { labToolDetailText } from "./lab_tool_detail.js";
 import { createLabScenarioAuthoringState, slugifyLabScenario } from "./lab_scenario_authoring.js";
 import {
   captureLabScenarioAuthoringFields,
@@ -766,6 +767,7 @@ export class LabPanel {
         payload: { ...payload },
         label: `Spawn ${KIND_LABELS[kind] || kind}`,
         keepArmedOnWorldClick: true,
+        paintOnDrag: true,
       },
       { onWorldClick: (event) => this.spawnEntityAt(event) },
     );
@@ -1443,19 +1445,6 @@ function labToolLabel(tool) {
   if (tool?.kind === "moveSelected") return "Move selected";
   if (tool?.kind === "removeSelectableUnits") return "Remove entities";
   return "Setup tool";
-}
-
-function labToolDetailText(tool) {
-  const clickRepeatedly = !!tool?.keepArmedOnWorldClick;
-  const boxApplies = !!tool?.consumeBoxSelection;
-  const boxRepeatedly = !!tool?.keepArmedOnBoxSelection;
-  if (boxApplies) {
-    const cadence = clickRepeatedly || boxRepeatedly ? " repeatedly" : "";
-    return `Click or drag-select to apply${cadence}. Right-click or Esc cancels.`;
-  }
-  return clickRepeatedly
-    ? "Click the map to apply repeatedly. Drag-select, right-click, or Esc cancels."
-    : "Click the map to apply. Drag-select, right-click, or Esc cancels.";
 }
 
 function shouldSurfaceToolCancellation(reason) {

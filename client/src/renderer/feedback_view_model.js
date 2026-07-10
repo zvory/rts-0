@@ -45,6 +45,7 @@ export function buildRendererFeedbackView(
     issueAsOwnerId: controlOwner.issueAsOwnerId,
     map: state?.map || null,
     placement: intent?.placement || null,
+    labToolPreview: intent?.labToolPreview || null,
     commandFeedback,
     attackTargetPreview: intent?.attackTargetPreview || null,
     selectedEntities: () => selected,

@@ -34,6 +34,7 @@ await import("./client_contracts/net_contracts.mjs");
 await import("./client_contracts/lab_contracts.mjs");
 await import("./client_contracts/lab_control_group_contracts.mjs");
 await import("./client_contracts/lab_input_ownership_contracts.mjs");
+await import("./client_contracts/lab_tool_input_contracts.mjs");
 await import("./client_contracts/lab_map_editor_contracts.mjs");
 await import("./client_contracts/command_budget_contracts.mjs");
 await import("./client_contracts/prediction_controller_contracts.mjs");

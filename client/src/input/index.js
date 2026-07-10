@@ -98,6 +98,8 @@ import {
   _consumeLabToolWorldClick,
   _finishLabToolBoxSelection,
   _finishLabToolClick,
+  _paintLabToolStroke,
+  _refreshLabToolPreview,
 } from "./lab_tools.js";
 import {
   _handleNativeCursorEvent,
@@ -370,6 +372,15 @@ export class Input {
   update(dt) {
     void dt;
     this._flushPointerLockCursor();
+    if (this._labTool()) {
+      this._intent()?.updateAttackTargetPreview?.(null);
+      this._intent()?.updateResourceMiningPreview?.(null);
+      this._intent()?.updateAntiTankGunSetupPreview?.(null);
+      this._intent()?.updateAbilityTargetPreview?.(null);
+      this._refreshLabToolPreview();
+      return;
+    }
+    this._intent()?.updateLabToolPreview?.(null);
     if (this._placement()) {
       this._intent()?.updateAttackTargetPreview?.(null);
       this._intent()?.updateResourceMiningPreview?.(null);
@@ -677,14 +688,20 @@ export class Input {
       // Promote to a real box once the cursor has moved past a small threshold.
       if (!this._dragging && this._dragDistance() >= DRAG_THRESHOLD_PX) {
         this._dragging = true;
-        this._cancelLabToolForBoxSelect();
-        if (this._drag.suppressPostQuickCastSelection) {
-          this._drag.suppressPostQuickCastSelection = false;
-          clearPostQuickCastSelectionGuard(this);
+        if (!this._drag.labToolPaintsOnDrag) {
+          this._cancelLabToolForBoxSelect();
+          if (this._drag.suppressPostQuickCastSelection) {
+            this._drag.suppressPostQuickCastSelection = false;
+            clearPostQuickCastSelectionGuard(this);
+          }
         }
       }
       if (this._dragging) {
-        this.renderer.drawSelectionBox(this._normalizedDragRect());
+        if (this._drag.labToolPaintsOnDrag) {
+          this._paintLabToolStroke(this._drag, p, ev);
+        } else {
+          this.renderer.drawSelectionBox(this._normalizedDragRect());
+        }
       }
     }
 
@@ -720,6 +737,10 @@ export class Input {
 
     if (wasDragging) {
       this._lastClick = null;
+      if (drag.labToolPaintsOnDrag) {
+        this._paintLabToolStroke(drag, p, ev);
+        return;
+      }
       if (drag.labToolId && this._finishLabToolBoxSelection(drag, ev)) return;
       this._commitBoxSelection(drag, ev.shiftKey);
     } else if (drag.labToolId) {
@@ -1007,6 +1028,8 @@ Object.assign(Input.prototype, {
   _consumeLabToolWorldClick,
   _finishLabToolBoxSelection,
   _finishLabToolClick,
+  _paintLabToolStroke,
+  _refreshLabToolPreview,
   _installNativeCursorBridge,
   _nativeCursorBounds,
   configureNativeCursorBounds,
