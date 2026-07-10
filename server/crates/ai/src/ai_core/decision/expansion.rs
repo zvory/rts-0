@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use super::geometry::{
     building_center, dist2, footprint_top_left_for_center, squared, tile_center,
 };
@@ -29,7 +31,6 @@ pub(super) fn plan_expansion(
     observation: &AiObservation,
     facts: &AiFacts,
     profile: &AiProfile,
-    recovery_active: bool,
     defensive_panic_active: bool,
 ) -> ExpansionPlan {
     if defensive_panic_active {
@@ -40,7 +41,7 @@ pub(super) fn plan_expansion(
             blockers: vec![ExpansionBlocker::DefensivePanic],
         };
     }
-    let Some(expansion) = active_expansion(observation, profile, recovery_active) else {
+    let Some(expansion) = active_expansion(observation, profile) else {
         return ExpansionPlan {
             policy: None,
             should_save: false,
@@ -90,9 +91,8 @@ pub(super) fn plan_expansion(
 pub(super) fn active_expansion(
     observation: &AiObservation,
     profile: &AiProfile,
-    recovery_active: bool,
 ) -> Option<ExpansionPolicy> {
-    let expansion = active_expansion_policy(profile, recovery_active)?;
+    let expansion = active_expansion_policy(profile)?;
     if observation.economy.steel >= expansion.trigger_steel
         || observation.economy.supply_used >= expansion.trigger_supply_used
     {
@@ -106,9 +106,8 @@ pub(super) fn expansion_blocks_tech_path(
     observation: &AiObservation,
     facts: &AiFacts,
     profile: &AiProfile,
-    recovery_active: bool,
 ) -> bool {
-    let Some(expansion) = active_expansion(observation, profile, recovery_active) else {
+    let Some(expansion) = active_expansion(observation, profile) else {
         return false;
     };
     expansion.blocks_tech_path
@@ -119,9 +118,8 @@ pub(super) fn should_save_for_expansion(
     observation: &AiObservation,
     facts: &AiFacts,
     profile: &AiProfile,
-    recovery_active: bool,
 ) -> bool {
-    let Some(expansion) = active_expansion(observation, profile, recovery_active) else {
+    let Some(expansion) = active_expansion(observation, profile) else {
         return false;
     };
     facts.building_count(EntityKind::CityCentre) < expansion.target_city_centres
@@ -140,13 +138,12 @@ pub(super) fn try_build_expansion_city_centre<F>(
     actions: &mut AiActionContext<'_>,
     builder_pools: &[&[u32]],
     profile: &AiProfile,
-    recovery_active: bool,
     placeable: &mut F,
 ) -> Option<actions::BuildAction>
 where
     F: FnMut(EntityKind, u32, u32) -> bool,
 {
-    let expansion = active_expansion(observation, profile, recovery_active)?;
+    let expansion = active_expansion(observation, profile)?;
     let kind = EntityKind::CityCentre;
     config::building_stats(kind)?;
     if !rts_rules::economy::build_requirement_met(kind, facts.complete_building_kinds()) {

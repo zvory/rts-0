@@ -40,7 +40,7 @@ pub(super) struct AiSlot {
     pub(super) id: u32,
     pub(super) team_id: TeamId,
     pub(super) faction_id: String,
-    pub(super) profile_request_id: &'static str,
+    pub(super) profile_id: &'static str,
 }
 
 pub(super) const MAX_LOBBY_TEAMS: TeamId = 4;

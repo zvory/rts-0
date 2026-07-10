@@ -4,11 +4,8 @@
 export const MAX_LOBBY_TEAMS = 4;
 export const AI_PROFILES = Object.freeze([
   { id: "ai_2_1", label: "AI 2.1" },
+  { id: "ai_turtle", label: "AI Turtle" },
 ]);
-
-const AI_PROFILE_ALIASES = Object.freeze({
-  ai_2_1_economy_manager: "ai_2_1",
-});
 
 export const DEFAULT_AI_PROFILE_ID = "ai_2_1";
 
@@ -92,6 +89,7 @@ export class LobbyRosterView {
     betaFactionSelect,
     onAddAi,
     onRemoveAi,
+    onSetAiProfile,
     onSetTeam,
     onSetSpectator,
     onSetFaction,
@@ -120,6 +118,7 @@ export class LobbyRosterView {
           betaFactionSelect,
           onAddAi,
           onRemoveAi,
+          onSetAiProfile,
           onSetTeam,
           onSetSpectator,
           onSetFaction,
@@ -153,6 +152,7 @@ export class LobbyRosterView {
     betaFactionSelect,
     onAddAi,
     onRemoveAi,
+    onSetAiProfile,
     onSetTeam,
     onSetSpectator,
     onSetFaction,
@@ -228,6 +228,7 @@ export class LobbyRosterView {
         countdownActive,
         betaFactionSelect,
         onRemoveAi,
+        onSetAiProfile,
         onSetFaction,
       }));
     }
@@ -250,6 +251,7 @@ export class LobbyRosterView {
     countdownActive,
     betaFactionSelect,
     onRemoveAi,
+    onSetAiProfile,
     onSetFaction,
   }) {
     const row = document.createElement("div");
@@ -307,10 +309,35 @@ export class LobbyRosterView {
 
     const controls = document.createElement("div");
     controls.className = "lobby-seat-controls";
+    if (player.isAi && isHost) {
+      controls.appendChild(this._buildAiProfileControl({
+        player,
+        countdownActive,
+        onSetAiProfile,
+      }));
+    }
     controls.appendChild(this._buildReadyState(player, isHost, onRemoveAi));
 
     row.append(swatch, body, controls);
     return row;
+  }
+
+  _buildAiProfileControl({ player, countdownActive, onSetAiProfile }) {
+    const select = document.createElement("select");
+    select.className = "player-ai-profile-select";
+    select.setAttribute("aria-label", `${player.name || "AI"} profile`);
+    for (const entry of AI_PROFILES) {
+      const option = document.createElement("option");
+      option.value = entry.id;
+      option.textContent = entry.label;
+      select.appendChild(option);
+    }
+    select.value = playableAiProfileId(player.aiProfileId);
+    select.disabled = countdownActive;
+    select.addEventListener("change", () => {
+      if (!select.disabled) onSetAiProfile?.(player.id, select.value);
+    });
+    return select;
   }
 
   _buildFactionControl({ player, myId, countdownActive, onSetFaction }) {
@@ -485,9 +512,8 @@ function tag(kind, text) {
 }
 
 export function playableAiProfileId(id) {
-  const canonicalId = AI_PROFILE_ALIASES[id] || id;
-  return AI_PROFILES.some((entry) => entry.id === canonicalId)
-    ? canonicalId
+  return AI_PROFILES.some((entry) => entry.id === id)
+    ? id
     : DEFAULT_AI_PROFILE_ID;
 }
 

@@ -224,10 +224,10 @@ mod tests {
                     },
                 },
                 ai_diagnostics: Some(ObserverAnalysisAiDiagnostics {
-                    profile_id: "ai_2_1_economy_manager".to_string(),
+                    profile_id: "ai_2_1".to_string(),
                     trace_tick: 72,
                     lines: vec![
-                        "profile=ai_2_1_economy_manager tick=72".to_string(),
+                        "profile=ai_2_1 tick=72".to_string(),
                         "goal=Production status=Selected blockers=- intents=Train:Rifleman"
                             .to_string(),
                     ],
@@ -268,10 +268,7 @@ mod tests {
         assert_eq!(json["players"][0]["resources"]["lifetime"]["steel"], 120);
         assert_eq!(json["players"][0]["resources"]["last5s"]["oil"], 10);
         assert_eq!(json["players"][0]["resources"]["lastMinute"]["steel"], 120);
-        assert_eq!(
-            json["players"][0]["aiDiagnostics"]["profileId"],
-            "ai_2_1_economy_manager"
-        );
+        assert_eq!(json["players"][0]["aiDiagnostics"]["profileId"], "ai_2_1");
         assert_eq!(json["players"][0]["aiDiagnostics"]["traceTick"], 72);
         assert_eq!(
             json["players"][0]["aiDiagnostics"]["lines"][1],

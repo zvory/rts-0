@@ -118,8 +118,8 @@ export class Net {
   setTeamPreset(preset)                  // deprecated compatibility command; server ignores it
   setTeam(id, teamId)                    // host-only scripted lobby team assignment
   setFaction(factionId)
-  addAi(teamId?, aiProfileId?)           // AI profile or suite request
-  setAiProfile(id, aiProfileId)          // AI profile or suite request
+  addAi(teamId?, aiProfileId?)           // AI profile id
+  setAiProfile(id, aiProfileId)          // AI profile id
   removeAi(id)
   setSpectator(spectator, id?)
   command(cmd, clientSeq)                // lower-level sequenced gameplay command envelope
@@ -1534,15 +1534,16 @@ Supported match-launch parameters:
 - `rtsName=<display name>` defaults to `Spectator` or `Commander` from the selected role.
 - `rtsMap=<map display name>` optionally selects a server-advertised lobby map before seating AIs.
 - Repeated `rtsAi=<team>:<profile>` entries seat AI opponents in order, for example
-  `rtsAi=1:ai_2_1&rtsAi=2:ai_2_1`. A profile-only entry such as `rtsAi=ai_2_1` uses the next team
-  slot. Retired profile ids normalize to AI 2.1; if omitted, the launch defaults to two AI 2.1
-  seats on teams 1 and 2.
+  `rtsAi=1:ai_2_1&rtsAi=2:ai_turtle`. The supported profile ids are `ai_2_1` and
+  `ai_turtle`. A profile-only entry such as `rtsAi=ai_turtle` uses the next team slot.
+  Unsupported values normalize to AI 2.1; if omitted, the launch defaults to two AI 2.1 seats on
+  teams 1 and 2.
 - `rtsStart=1|0` defaults to `1`. `0` prepares the lobby without pressing Start.
 
 Example spectator self-play URL:
 
 ```text
-/?rtsLaunch=match&rtsRoom=agent-ai-selfplay&rtsRole=spectator&rtsAi=1:ai_2_1&rtsAi=2:ai_2_1&rtsStart=1
+/?rtsLaunch=match&rtsRoom=agent-ai-selfplay&rtsRole=spectator&rtsAi=1:ai_2_1&rtsAi=2:ai_turtle&rtsStart=1
 ```
 
 When that launch produces an all-AI live match, the score screen retains the live `matchRunId`

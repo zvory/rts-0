@@ -411,7 +411,9 @@ fn print_table(aggregates: &[MatchupAggregate]) {
         );
     }
     println!();
-    println!("W/L/D are from the left profile's perspective and use only starting City Centre kills.");
+    println!(
+        "W/L/D are from the left profile's perspective and use only starting City Centre kills."
+    );
     println!("Runs with no starting City Centre winner by the tick cap are draws.");
     println!("army/bldg/wrk/dmg are diagnostic per-run averages, not tiebreakers; tank/exp are average first ticks, or '-' if never seen.");
 }
@@ -471,31 +473,30 @@ mod tests {
 
     #[test]
     fn duplicate_profile_selection_is_rejected() {
-        let err = ensure_distinct_profiles(vec![
-            "ai_1_0_tech".to_string(),
-            "ai_1_0_tech".to_string(),
-        ])
-        .expect_err("duplicate profiles should fail");
+        let err = ensure_distinct_profiles(vec!["ai_2_1".to_string(), "ai_2_1".to_string()])
+            .expect_err("duplicate profiles should fail");
 
         assert!(err.contains("duplicate profile"));
     }
 
     #[test]
     fn single_profile_selection_is_allowed() {
-        let config = parse_args(vec![
-            "--profiles".to_string(),
-            "ai_1_0_tech".to_string(),
-        ])
-        .expect("single profile should parse")
-        .expect("single profile should return config");
+        let config = parse_args(vec!["--profiles".to_string(), "ai_2_1".to_string()])
+            .expect("single profile should parse")
+            .expect("single profile should return config");
 
-        assert_eq!(config.profiles, vec!["ai_1_0_tech".to_string()]);
+        assert_eq!(config.profiles, vec!["ai_2_1".to_string()]);
     }
 
     #[test]
     fn tick_cap_draw_is_not_resolved_by_army_value() {
         let mut aggregate = super::MatchupAggregate::new("left".to_string(), "right".to_string());
-        aggregate.record(&profile_result(ProfileMatchupEndReason::TickCap, None, 1_000, 10));
+        aggregate.record(&profile_result(
+            ProfileMatchupEndReason::TickCap,
+            None,
+            1_000,
+            10,
+        ));
 
         assert_eq!(aggregate.runs, 1);
         assert_eq!(aggregate.wins_a, 0);

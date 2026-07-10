@@ -46,20 +46,34 @@ const { ok } = assertions;
   ok(ai && ai.aiProfileId === DEFAULT_AI_PROFILE_ID, `AI defaults to ${DEFAULT_AI_PROFILE_ID}`);
   ok(ai && ai.name === "AI 2.1", `AI uses the default profile label as its name (${ai?.name})`);
 
-  const lobbyCountBeforeRetiredSelection = A.msgs.filter((m) => m.t === "lobby").length;
-  A.send({ t: "setAiProfile", id: ai.id, aiProfileId: "ai_2_0" });
+  const lobbyCountBeforeTurtleSelection = A.msgs.filter((m) => m.t === "lobby").length;
+  A.send({ t: "setAiProfile", id: ai.id, aiProfileId: "ai_turtle" });
   await sleep(400);
-  const withAi2 = A.msgs.filter((m) => m.t === "lobby").at(-1);
-  const ai2 = withAi2.players.find((p) => p.id === ai.id);
+  const withTurtle = A.msgs.filter((m) => m.t === "lobby").at(-1);
+  const turtleAi = withTurtle.players.find((p) => p.id === ai.id);
   ok(
-    ai2 && ai2.aiProfileId === DEFAULT_AI_PROFILE_ID,
-    "host cannot select a retired AI profile for an AI seat",
+    turtleAi && turtleAi.aiProfileId === "ai_turtle",
+    "host can select AI Turtle for an AI seat",
   );
   ok(
-    A.msgs.filter((m) => m.t === "lobby").length === lobbyCountBeforeRetiredSelection,
-    "retired AI profile selection does not mutate the lobby",
+    A.msgs.filter((m) => m.t === "lobby").length > lobbyCountBeforeTurtleSelection,
+    "AI Turtle selection updates the lobby",
   );
-  ok(ai2 && ai2.name === "AI 2.1", `AI seat keeps the AI 2.1 label (${ai2?.name})`);
+  ok(turtleAi && turtleAi.name === "AI Turtle", `AI seat uses the AI Turtle label (${turtleAi?.name})`);
+
+  const lobbyCountBeforeUnsupportedSelection = A.msgs.filter((m) => m.t === "lobby").length;
+  A.send({ t: "setAiProfile", id: ai.id, aiProfileId: "unsupported_profile" });
+  await sleep(400);
+  const afterUnsupportedSelection = A.msgs.filter((m) => m.t === "lobby").at(-1);
+  const afterUnsupportedAi = afterUnsupportedSelection.players.find((p) => p.id === ai.id);
+  ok(
+    afterUnsupportedAi && afterUnsupportedAi.aiProfileId === "ai_turtle",
+    "unsupported AI profile selection leaves the existing profile unchanged",
+  );
+  ok(
+    A.msgs.filter((m) => m.t === "lobby").length === lobbyCountBeforeUnsupportedSelection,
+    "unsupported AI profile selection does not mutate the lobby",
+  );
 
   // Send a hand-built future faction field. Phase 3 keeps addAi team-only, so the server may
   // ignore or reject the unsupported request, but it must never create a non-Kriegsia AI seat.

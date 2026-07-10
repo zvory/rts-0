@@ -510,6 +510,7 @@ export class Lobby {
       betaFactionSelect: this._betaFactionSelectEnabled(),
       onAddAi: (teamId) => this.net.addAi(teamId, DEFAULT_AI_PROFILE_ID),
       onRemoveAi: (id) => this.net.removeAi(id),
+      onSetAiProfile: (id, aiProfileId) => this.net.setAiProfile(id, aiProfileId),
       onSetTeam: (id, teamId) => this.net.setTeam(id, teamId),
       onSetSpectator: (id, spectator) => this.net.setSpectator(spectator, id),
       onSetFaction: (factionId) => this.net.setFaction(factionId),

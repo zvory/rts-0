@@ -67,8 +67,8 @@ lobby/config dump replaces the source scrape.
 | `setTeamPreset` | `preset: string` | Deprecated compatibility command. The server ignores it; lobby teams are host-managed slots. |
 | `setTeam` | `id: u32`, `teamId: u32` | Host assigns an active human or AI lobby seat to team `1..=4` (lobby phase only, host-only). Unknown ids, spectators, team id `0`, and team ids outside the supported range are ignored. |
 | `setFaction` | `factionId: string` | Active human players select their own playable lobby faction (lobby phase only). Unknown ids, fixture ids, spectators, countdown, and in-game requests are ignored. The normal client only exposes this during the beta UI rollout. |
-| `addAi`    | `teamId?: u32`, `aiProfileId?: string` | Host adds a computer opponent to the room (lobby phase only, host-only). When `teamId` is provided it must be in `1..=4`; otherwise the server assigns the first empty team slot. `aiProfileId` may be one of the supported live AI profile or suite requests; omitted or unknown values default to the promoted live default request. |
-| `setAiProfile` | `id: u32`, `aiProfileId: string` | Host selects the live AI profile or suite request for an existing AI lobby seat (lobby phase only, host-only). Unknown AI ids and unsupported profile/suite ids are ignored. |
+| `addAi`    | `teamId?: u32`, `aiProfileId?: string` | Host adds a computer opponent to the room (lobby phase only, host-only). When `teamId` is provided it must be in `1..=4`; otherwise the server assigns the first empty team slot. `aiProfileId` may be `ai_2_1` or `ai_turtle`; omitted or unknown values default to `ai_2_1`. |
+| `setAiProfile` | `id: u32`, `aiProfileId: string` | Host selects `ai_2_1` or `ai_turtle` for an existing AI lobby seat (lobby phase only, host-only). Unknown AI ids and unsupported profile ids are ignored. |
 | `removeAi` | `id: u32` | Host removes a previously-added AI opponent by id (lobby phase only, host-only). |
 | `setSpectator` | `spectator: bool`, `id?: u32` | Switch between active player and spectator role while still in the lobby. When `id` is omitted, the sender switches their own role. The host may include another connected human player's id to move that lobby player into or out of spectators; non-host targeted requests, AI ids, and unknown ids are ignored. Ignored after the match starts; switching to active player is ignored if the active seats are full. |
 | `command`  | `clientSeq: u32`, `cmd: Command` | Issue a gameplay command (see below). Ignored unless in-game. `clientSeq` is a browser-local, per-match, per-connection sequence id for prediction/reconciliation and diagnostics-only command receipts. |
@@ -347,8 +347,8 @@ transport/browser/prediction/render behavior, not as gameplay authority.
 `LobbyPlayer`: `{ id: u32, teamId: u32, factionId: string, name: string, ready: bool, color: string, isAi: bool, aiProfileId?: string, isSpectator: bool }`. `isAi` is
 true for computer opponents (always shown ready; the client renders an "AI" tag, a host-only
 profile selector, and a host-only remove control instead of a ready toggle). `aiProfileId` is
-present only for computer opponents and identifies the live AI profile or suite request that seat
-will resolve when the match starts. `isSpectator` is true for human observers; they do not consume active map starts,
+present only for computer opponents and identifies the canonical live AI profile selected for that
+seat. `isSpectator` is true for human observers; they do not consume active map starts,
 block readiness, or count toward win/loss.
 
 `AvailableMap`: `{ name: string, description: string, minPlayers: u32, maxPlayers: u32 }`.

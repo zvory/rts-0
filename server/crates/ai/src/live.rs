@@ -11,10 +11,7 @@ use crate::ai_core::decision::{
 };
 use crate::ai_core::map_analysis::AiStaticMapContextCache;
 use crate::ai_core::observation::AiObservation;
-use crate::ai_core::profile_suites::{resolve_profile_request_id, AI_2_1_SUITE_ID};
-use crate::ai_core::profiles::{
-    profile_by_id, AiProfile, AI_2_1_ECONOMY_MANAGER, AI_2_1_ECONOMY_MANAGER_ID,
-};
+use crate::ai_core::profiles::{profile_by_id, AiProfile, AI_2_1, AI_2_1_ID, AI_TURTLE_ID};
 use crate::ai_shared;
 use crate::selfplay::pending_build::PendingBuildTracker;
 use crate::selfplay::player_view::{
@@ -30,41 +27,34 @@ const LIVE_DECISION_TRACE_MAX_LINES: usize = 24;
 const LIVE_DECISION_TRACE_MAX_LINE_CHARS: usize = 256;
 const LIVE_DECISION_TRACE_TRUNCATED_LINE: &str = "trace_truncated=true";
 
-/// The sole live-lobby profile and request id.
-pub const DEFAULT_LIVE_PROFILE_ID: &str = AI_2_1_ECONOMY_MANAGER_ID;
-pub const DEFAULT_LIVE_PROFILE_REQUEST_ID: &str = AI_2_1_SUITE_ID;
+/// The default live-lobby profile id.
+pub const DEFAULT_LIVE_PROFILE_ID: &str = AI_2_1_ID;
 
-/// The only profile request accepted for ordinary lobby AI opponents.
-pub const LIVE_PROFILE_REQUEST_IDS: [&str; 1] = [AI_2_1_SUITE_ID];
+/// Canonical profile ids accepted for ordinary lobby AI opponents.
+pub const LIVE_PROFILE_IDS: [&str; 2] = [AI_2_1_ID, AI_TURTLE_ID];
 
-pub fn canonical_live_profile_request_id(input: &str) -> Option<&'static str> {
+pub fn canonical_live_profile_id(input: &str) -> Option<&'static str> {
     match input {
-        "ai" | "default" | "ai21" | AI_2_1_SUITE_ID | AI_2_1_ECONOMY_MANAGER_ID => {
-            Some(DEFAULT_LIVE_PROFILE_REQUEST_ID)
-        }
+        "ai" | "default" | AI_2_1_ID => Some(AI_2_1_ID),
+        AI_TURTLE_ID => Some(AI_TURTLE_ID),
         _ => None,
     }
 }
 
-pub fn live_profile_label(profile_or_request_id: &str) -> &'static str {
-    canonical_live_profile_request_id(profile_or_request_id)
-        .map(|_| "AI 2.1")
-        .unwrap_or("AI")
+pub fn live_profile_label(profile_id: &str) -> &'static str {
+    match canonical_live_profile_id(profile_id) {
+        Some(AI_2_1_ID) => "AI 2.1",
+        Some(AI_TURTLE_ID) => "AI Turtle",
+        _ => "AI",
+    }
 }
 
-pub fn random_live_profile_request_id(rng: &mut impl Rng) -> &'static str {
-    LIVE_PROFILE_REQUEST_IDS[rng.gen_range(0..LIVE_PROFILE_REQUEST_IDS.len())]
+pub fn random_live_profile_id(rng: &mut impl Rng) -> &'static str {
+    LIVE_PROFILE_IDS[rng.gen_range(0..LIVE_PROFILE_IDS.len())]
 }
 
-pub fn resolve_live_profile_id_for_match(
-    request_id: &str,
-    seed: u32,
-    player_id: u32,
-) -> &'static str {
-    let request_id =
-        canonical_live_profile_request_id(request_id).unwrap_or(DEFAULT_LIVE_PROFILE_REQUEST_ID);
-    resolve_profile_request_id(request_id, seed, u64::from(player_id))
-        .unwrap_or(DEFAULT_LIVE_PROFILE_ID)
+pub fn resolve_live_profile_id_for_match(profile_id: &str) -> &'static str {
+    canonical_live_profile_id(profile_id).unwrap_or(DEFAULT_LIVE_PROFILE_ID)
 }
 
 pub struct AiThinkContext<'a> {
@@ -365,7 +355,7 @@ impl AiController {
 }
 
 fn default_live_profile() -> &'static AiProfile {
-    profile_by_id(DEFAULT_LIVE_PROFILE_ID).unwrap_or(&AI_2_1_ECONOMY_MANAGER)
+    profile_by_id(DEFAULT_LIVE_PROFILE_ID).unwrap_or(&AI_2_1)
 }
 
 fn bounded_decision_trace_lines(lines: Vec<String>) -> Vec<String> {
@@ -439,7 +429,7 @@ mod tests {
         let ai = AiController::new(2);
 
         assert_eq!(ai.player_id(), 2);
-        assert_eq!(ai.profile_id(), AI_2_1_ECONOMY_MANAGER_ID);
+        assert_eq!(ai.profile_id(), AI_2_1_ID);
         assert_eq!(ai.latest_decision_trace(), None);
     }
 
@@ -508,22 +498,21 @@ mod tests {
     }
 
     #[test]
-    fn live_profile_request_pool_exposes_supported_lobby_choices() {
-        assert_eq!(LIVE_PROFILE_REQUEST_IDS, [AI_2_1_SUITE_ID]);
+    fn live_profile_pool_exposes_supported_lobby_choices() {
+        assert_eq!(LIVE_PROFILE_IDS, [AI_2_1_ID, AI_TURTLE_ID]);
     }
 
     #[test]
     fn live_default_is_ai_2_1() {
-        assert_eq!(DEFAULT_LIVE_PROFILE_ID, AI_2_1_ECONOMY_MANAGER_ID);
-        assert_eq!(DEFAULT_LIVE_PROFILE_REQUEST_ID, AI_2_1_SUITE_ID);
+        assert_eq!(DEFAULT_LIVE_PROFILE_ID, AI_2_1_ID);
     }
 
     #[test]
-    fn random_live_profile_request_selection_uses_live_pool() {
+    fn random_live_profile_selection_uses_live_pool() {
         let mut rng = rand::rngs::SmallRng::seed_from_u64(0xA1);
         for _ in 0..32 {
-            let selected = random_live_profile_request_id(&mut rng);
-            assert!(LIVE_PROFILE_REQUEST_IDS.contains(&selected));
+            let selected = random_live_profile_id(&mut rng);
+            assert!(LIVE_PROFILE_IDS.contains(&selected));
         }
     }
 
@@ -535,63 +524,35 @@ mod tests {
     }
 
     #[test]
-    fn live_profile_request_aliases_are_bounded_to_supported_profiles() {
+    fn live_profile_aliases_are_bounded_to_supported_profiles() {
         assert_eq!(
-            canonical_live_profile_request_id("ai"),
-            Some(DEFAULT_LIVE_PROFILE_REQUEST_ID)
+            canonical_live_profile_id("ai"),
+            Some(DEFAULT_LIVE_PROFILE_ID)
         );
         assert_eq!(
-            canonical_live_profile_request_id("default"),
-            Some(DEFAULT_LIVE_PROFILE_REQUEST_ID)
+            canonical_live_profile_id("default"),
+            Some(DEFAULT_LIVE_PROFILE_ID)
         );
-        assert_eq!(
-            canonical_live_profile_request_id("ai_2_1"),
-            Some(AI_2_1_SUITE_ID)
-        );
-        assert_eq!(
-            canonical_live_profile_request_id("ai21"),
-            Some(AI_2_1_SUITE_ID)
-        );
-        assert_eq!(
-            canonical_live_profile_request_id(AI_2_1_ECONOMY_MANAGER_ID),
-            Some(AI_2_1_SUITE_ID)
-        );
-        assert_eq!(canonical_live_profile_request_id("ai_1_0"), None);
-        assert_eq!(canonical_live_profile_request_id("ai_1_0_tech"), None);
-        assert_eq!(canonical_live_profile_request_id("ai_1_1"), None);
-        assert_eq!(canonical_live_profile_request_id("ai_1_1_tank_mg"), None);
-        assert_eq!(canonical_live_profile_request_id("ai_1_2"), None);
-        assert_eq!(
-            canonical_live_profile_request_id("ai_1_2_wave_cohorts"),
-            None
-        );
-        assert_eq!(canonical_live_profile_request_id("ai_2_0"), None);
-        assert_eq!(canonical_live_profile_request_id("ai20"), None);
-        assert_eq!(canonical_live_profile_request_id("ai_turtle"), None);
-        assert_eq!(canonical_live_profile_request_id("turtle"), None);
-        assert_eq!(canonical_live_profile_request_id("ai_2_0_agent_rush"), None);
-        assert_eq!(canonical_live_profile_request_id("ai_2_0_rifle_tank"), None);
-        assert_eq!(canonical_live_profile_request_id("rifle_flood_fast"), None);
+        assert_eq!(canonical_live_profile_id(AI_2_1_ID), Some(AI_2_1_ID));
+        assert_eq!(canonical_live_profile_id(AI_TURTLE_ID), Some(AI_TURTLE_ID));
+        assert_eq!(canonical_live_profile_id("unsupported_profile"), None);
     }
 
     #[test]
-    fn live_suite_requests_resolve_to_concrete_match_profiles() {
+    fn live_profile_ids_resolve_to_their_canonical_match_profiles() {
+        assert_eq!(resolve_live_profile_id_for_match(AI_2_1_ID), AI_2_1_ID);
         assert_eq!(
-            resolve_live_profile_id_for_match(AI_2_1_SUITE_ID, 8, 2),
-            AI_2_1_ECONOMY_MANAGER_ID
-        );
-        assert_eq!(
-            resolve_live_profile_id_for_match("ai_2_0", 8, 2),
-            AI_2_1_ECONOMY_MANAGER_ID
+            resolve_live_profile_id_for_match(AI_TURTLE_ID),
+            AI_TURTLE_ID
         );
     }
 
     #[test]
     fn live_profile_labels_match_lobby_selector_names() {
-        assert_eq!(live_profile_label(AI_2_1_SUITE_ID), "AI 2.1");
-        assert_eq!(live_profile_label(AI_2_1_ECONOMY_MANAGER_ID), "AI 2.1");
+        assert_eq!(live_profile_label(AI_2_1_ID), "AI 2.1");
+        assert_eq!(live_profile_label(AI_TURTLE_ID), "AI Turtle");
         assert_eq!(live_profile_label("default"), "AI 2.1");
-        assert_eq!(live_profile_label("ai_2_0"), "AI");
+        assert_eq!(live_profile_label("unsupported_profile"), "AI");
         assert_eq!(live_profile_label("unknown"), "AI");
     }
 }

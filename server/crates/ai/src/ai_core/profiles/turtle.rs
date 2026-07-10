@@ -20,18 +20,16 @@ const TURTLE_TECH_PATH: [EntityKind; 4] = [
     EntityKind::Steelworks,
 ];
 
-pub(crate) static AI_TURTLE_CHOKES: AiProfile = AiProfile {
-    id: AI_TURTLE_CHOKES_ID,
-    economy: EconomyPolicy::ProposalManager,
-    // Keep Turtle on the AI 2.0/2.1 economy cadence.  Its opening and defensive
+pub(crate) static AI_TURTLE: AiProfile = AiProfile {
+    id: AI_TURTLE_ID,
+    // Keep Turtle on the AI 2.1 economy cadence. Its opening and defensive
     // production differ, but worker, oil, supply, and first-Barracks spending must
     // not put it behind the pressure profile before support weapons come online.
-    workers: AI_2_1_ECONOMY_MANAGER.workers,
-    supply: AI_2_1_ECONOMY_MANAGER.supply,
+    workers: AI_2_1.workers,
+    supply: AI_2_1.supply,
     buildings: BuildingPolicy {
-        barracks_curve: AI_2_1_ECONOMY_MANAGER.buildings.barracks_curve,
+        barracks_curve: AI_2_1.buildings.barracks_curve,
         factory_target: 0,
-        proxy_barracks: None,
         required_tech_path: &TURTLE_TECH_PATH,
         max_pending_per_kind: 1,
     },
@@ -52,7 +50,7 @@ pub(crate) static AI_TURTLE_CHOKES: AiProfile = AiProfile {
         unit_kinds: &TURTLE_UNITS,
         required_unit: None,
     },
-    resources: AI_2_1_ECONOMY_MANAGER.resources,
+    resources: AI_2_1.resources,
     expansion: Some(ExpansionPolicy {
         target_city_centres: 2,
         required_complete_building: EntityKind::TrainingCentre,
@@ -86,7 +84,6 @@ pub(crate) static AI_TURTLE_CHOKES: AiProfile = AiProfile {
         anti_tank_kinds: &TURTLE_ANTI_TANK,
     }),
     frontal_wave: FrontalWavePolicy::DEFAULT,
-    recovery_transition: None,
     tech_transition: None,
 };
 
@@ -95,20 +92,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn turtle_keeps_ai_2_economy_cadence_and_defers_only_second_gun_works() {
-        let ai2 = AI_2_1_ECONOMY_MANAGER;
-        let turtle = AI_TURTLE_CHOKES.turtle_defense.unwrap();
+    fn turtle_keeps_ai_2_1_economy_cadence_and_defers_only_second_gun_works() {
+        let ai2 = AI_2_1;
+        let turtle = AI_TURTLE.turtle_defense.unwrap();
 
-        assert_eq!(AI_TURTLE_CHOKES.workers, ai2.workers);
-        assert_eq!(AI_TURTLE_CHOKES.supply, ai2.supply);
-        assert_eq!(AI_TURTLE_CHOKES.resources, ai2.resources);
+        assert_eq!(AI_TURTLE.workers, ai2.workers);
+        assert_eq!(AI_TURTLE.supply, ai2.supply);
+        assert_eq!(AI_TURTLE.resources, ai2.resources);
         assert_eq!(
-            AI_TURTLE_CHOKES.buildings.barracks_curve,
+            AI_TURTLE.buildings.barracks_curve,
             ai2.buildings.barracks_curve
         );
         assert_eq!(turtle.opening_riflemen, 2);
         assert_eq!(
-            AI_TURTLE_CHOKES.expansion.unwrap().trigger_steel,
+            AI_TURTLE.expansion.unwrap().trigger_steel,
             TURTLE_EXPANSION_STEEL_TRIGGER
         );
         assert_eq!(turtle.gun_works_target, 2);

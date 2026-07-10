@@ -403,7 +403,7 @@ pub enum RoomEvent {
         team_id: Option<TeamId>,
         ai_profile_id: Option<String>,
     },
-    /// The host selected a live AI profile or suite request for one AI opponent.
+    /// The host selected a live AI profile for one AI opponent.
     SetAiProfile {
         player_id: u32,
         target: u32,

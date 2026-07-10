@@ -180,10 +180,6 @@ impl<'a> AiActionContext<'a> {
         }
         None
     }
-
-    pub(crate) fn reserve_worker(&mut self, worker: u32) -> bool {
-        self.reservations.reserve_worker(worker)
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

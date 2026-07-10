@@ -56,8 +56,9 @@ import { textWithin } from "./dom_text.mjs";
     AI_PROFILES,
     [
       { id: "ai_2_1", label: "AI 2.1" },
+      { id: "ai_turtle", label: "AI Turtle" },
     ],
-    "lobby AI profile selector exposes only AI 2.1",
+    "lobby AI profile selector exposes the two supported profiles",
   );
   assert(
     betaFactionSelectEnabledForLocation({ hostname: "rts-0-zvorygin-beta.fly.dev", pathname: "/" }),
@@ -172,6 +173,7 @@ import { textWithin } from "./dom_text.mjs";
   withFakeDocument(() => {
     const root = document.createElement("div");
     const view = new LobbyRosterView(root);
+    let selectedProfile = null;
     view.render({
       players: [
         { id: 1, name: "Host", color: "#0072b2", ready: false, teamId: 1 },
@@ -191,27 +193,40 @@ import { textWithin } from "./dom_text.mjs";
       countdownActive: false,
       playerCount: 2,
       maxPlayers: 4,
+      onSetAiProfile: (id, aiProfileId) => {
+        selectedProfile = { id, aiProfileId };
+      },
     });
 
     const profileSelectors = findFakes(
       root,
       (el) => el.tagName === "SELECT" && el.className === "player-ai-profile-select",
     );
-    assert(profileSelectors.length === 0, "host lobby omits a profile control with no selectable alternatives");
+    assert(
+      profileSelectors.length === 1 && profileSelectors[0].value === "ai_2_1",
+      "host lobby exposes an AI 2.1 profile selector",
+    );
     assert(textWithin(root).includes("AI 2.1"), "host lobby labels AI seats as AI 2.1");
+    profileSelectors[0].value = "ai_turtle";
+    profileSelectors[0].listeners.change?.();
+    assertDeepEqual(
+      selectedProfile,
+      { id: 2, aiProfileId: "ai_turtle" },
+      "host lobby sends a selected canonical AI profile",
+    );
 
-    const aliasRoot = document.createElement("div");
-    const aliasView = new LobbyRosterView(aliasRoot);
-    aliasView.render({
+    const turtleRoot = document.createElement("div");
+    const turtleView = new LobbyRosterView(turtleRoot);
+    turtleView.render({
       players: [
         {
           id: 2,
-          name: "Computer",
+          name: "AI Turtle",
           color: "#d55e00",
           ready: true,
           teamId: 2,
           isAi: true,
-          aiProfileId: "ai_2_0_tank_pressure",
+          aiProfileId: "ai_turtle",
         },
       ],
       myId: 1,
@@ -223,60 +238,8 @@ import { textWithin } from "./dom_text.mjs";
     });
 
     assert(
-      textWithin(aliasRoot).includes("AI 2.1"),
-      "retired concrete profile ids use the AI 2.1 lobby label",
-    );
-
-    const labelRoot = document.createElement("div");
-    const labelView = new LobbyRosterView(labelRoot);
-    labelView.render({
-      players: [
-        {
-          id: 2,
-          name: "Computer",
-          color: "#d55e00",
-          ready: true,
-          teamId: 2,
-          isAi: true,
-          aiProfileId: "ai_2_0_tank_pressure",
-        },
-      ],
-      myId: 3,
-      hostId: 1,
-      isHost: false,
-      countdownActive: false,
-      playerCount: 1,
-      maxPlayers: 4,
-    });
-    assert(
-      textWithin(labelRoot).includes("AI 2.1"),
-      "retired concrete profile ids display the AI 2.1 fallback label",
-    );
-
-    const managerAliasRoot = document.createElement("div");
-    const managerAliasView = new LobbyRosterView(managerAliasRoot);
-    managerAliasView.render({
-      players: [
-        {
-          id: 2,
-          name: "Computer",
-          color: "#d55e00",
-          ready: true,
-          teamId: 2,
-          isAi: true,
-          aiProfileId: "ai_2_1_economy_manager",
-        },
-      ],
-      myId: 1,
-      hostId: 1,
-      isHost: true,
-      countdownActive: false,
-      playerCount: 1,
-      maxPlayers: 4,
-    });
-    assert(
-      textWithin(managerAliasRoot).includes("AI 2.1"),
-      "concrete AI 2.1 profile ids use the live suite label",
+      textWithin(turtleRoot).includes("AI Turtle"),
+      "host lobby labels Turtle AI seats as AI Turtle",
     );
   });
 }

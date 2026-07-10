@@ -192,7 +192,7 @@ export class Net {
     this._send(msg.addAi(teamId, aiProfileId));
   }
 
-  /** Select the live AI profile or suite request for an existing AI opponent (host-only). */
+  /** Select the live AI profile for an existing AI opponent (host-only). */
   setAiProfile(id, aiProfileId) {
     this._send(msg.setAiProfile(id, aiProfileId));
   }

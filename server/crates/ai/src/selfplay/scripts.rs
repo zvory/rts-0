@@ -11,7 +11,7 @@ use crate::ai_core::decision::{decide_profile_with_analysis, AiDecisionMemory, A
 use crate::ai_core::facts::AiFacts;
 use crate::ai_core::map_analysis::AiStaticMapContextCache;
 use crate::ai_core::observation::AiObservation;
-use crate::ai_core::profiles::{profile_by_id, AiProfile, AI_1_0_TECH, AI_1_0_TECH_ID};
+use crate::ai_core::profiles::{profile_by_id, AiProfile, AI_2_1, AI_2_1_ID};
 use crate::ai_core::resource_availability::ResourceAvailability;
 use crate::ai_shared;
 use rts_sim::game::command::SimCommand as Command;
@@ -46,7 +46,7 @@ impl ProfileBackedScript {
     }
 
     pub(super) fn economy_only(player_id: u32) -> Self {
-        Self::with_combat(player_id, AI_1_0_TECH_ID, false, "profile-economy")
+        Self::with_combat(player_id, AI_2_1_ID, false, "profile-economy")
     }
 
     fn with_combat(
@@ -55,7 +55,7 @@ impl ProfileBackedScript {
         allow_combat_commands: bool,
         script_name: &'static str,
     ) -> Self {
-        let profile = profile_by_id(profile_id).unwrap_or(&AI_1_0_TECH);
+        let profile = profile_by_id(profile_id).unwrap_or(&AI_2_1);
         Self {
             player_id,
             profile,
@@ -487,7 +487,7 @@ mod tests {
 
     #[test]
     fn profile_stage_filter_sends_hold_position_once_per_staged_unit() {
-        let mut script = ProfileBackedScript::new(1, AI_1_0_TECH_ID);
+        let mut script = ProfileBackedScript::new(1, AI_2_1_ID);
         let intents = [AiIntent::Stage { units: vec![42] }];
         let hold = Command::HoldPosition { units: vec![42] };
 

@@ -76,25 +76,25 @@ is a draw; army value and other material metrics are diagnostics, not tiebreaker
 ```bash
 cd server
 cargo run --bin ai-matchup -- ai ai
-cargo run --bin ai-matchup -- ai_1_2 ai_1_1 --seed 7 --ticks 3000 --json
-cargo run --bin ai-matchup -- default ai_1_0_tech --seed 7 --ticks 25000 --json
+cargo run --bin ai-matchup -- ai_2_1 ai_turtle --seed 7 --ticks 3000 --json
+cargo run --bin ai-matchup -- default ai_turtle --seed 7 --ticks 25000 --json
 cargo run --bin ai-matchup -- --list-profiles
 ```
 
 The `ai-arena` binary is the agent-facing profile comparison layer. It runs side-swapped seed pairs
-around the same profile matchup result, defaults to the `ai_2_0` suite request against the
-`ai_1_2` suite request, and writes a top-level `arena-summary.json` plus per-run sidecars:
+around the same profile matchup result, defaults to AI 2.1 against AI Turtle, and writes a
+top-level `arena-summary.json` plus per-run sidecars:
 
 ```bash
 cd server
-cargo run --bin ai-arena -- --candidate ai_2_0 --baseline ai --seeds 3 --ticks 9000
-cargo run --bin ai-arena -- --candidate ai_2_0_tank_pressure --baseline ai_1_2 --out-dir target/ai2-arena
+cargo run --bin ai-arena -- --candidate ai_2_1 --baseline ai_turtle --seeds 3 --ticks 9000
+cargo run --bin ai-arena -- --candidate ai_turtle --baseline ai_2_1 --out-dir target/ai-arena
 ```
 
 Each run directory contains a deterministic `replay.json` plus `manifest.json`, `summary.json`,
-`decision-trace.jsonl`, and `brief.md`. The manifest records the requested profile/suite ids, the
-resolved concrete profile identities, and fingerprints; the brief is the first artifact agents
-should read before opening the replay or searching trace labels.
+`decision-trace.jsonl`, and `brief.md`. The manifest records canonical profile identities and
+fingerprints; the brief is the first artifact agents should read before opening the replay or
+searching trace labels.
 
 Keep fast invariant-style milestone coverage in `cargo nextest run`; use
 `RTS_FULL_AI_TESTS=1 cargo nextest run --config-file .config/nextest.toml --manifest-path

@@ -14,9 +14,9 @@ mod config {
 mod live;
 
 pub use live::{
-    canonical_live_profile_request_id, live_profile_label, random_live_profile_request_id,
+    canonical_live_profile_id, live_profile_label, random_live_profile_id,
     resolve_live_profile_id_for_match, AiController, AiDecisionTraceSnapshot, AiThinkContext,
-    DEFAULT_LIVE_PROFILE_ID, DEFAULT_LIVE_PROFILE_REQUEST_ID, LIVE_PROFILE_REQUEST_IDS,
+    DEFAULT_LIVE_PROFILE_ID, LIVE_PROFILE_IDS,
 };
 
 #[cfg(test)]

@@ -71,13 +71,12 @@ pub(super) fn live_ai_controllers(
         .iter()
         .filter(|player| player.is_ai)
         .map(|player| {
-            let profile_request_id = ai_slots
+            let profile_id = ai_slots
                 .iter()
                 .find(|ai| ai.id == player.id)
-                .map(|ai| ai.profile_request_id)
-                .unwrap_or_else(|| rts_ai::random_live_profile_request_id(&mut rng));
-            let profile_id =
-                rts_ai::resolve_live_profile_id_for_match(profile_request_id, seed, player.id);
+                .map(|ai| ai.profile_id)
+                .unwrap_or_else(|| rts_ai::random_live_profile_id(&mut rng));
+            let profile_id = rts_ai::resolve_live_profile_id_for_match(profile_id);
             AiController::with_profile_id(player.id, profile_id)
         })
         .collect()

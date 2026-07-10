@@ -8,11 +8,10 @@ use std::path::PathBuf;
 use std::process;
 
 use crate::selfplay::{
-    available_profile_request_ids, canonical_profile_request_id_for_match,
-    resolve_profile_request_id_for_match, run_profile_matchup_result, ProfileMatchupEndReason,
-    ProfileMatchupOptions, ProfileMatchupResult,
+    available_profile_ids, canonical_profile_id, run_profile_matchup_result,
+    ProfileMatchupEndReason, ProfileMatchupOptions, ProfileMatchupResult,
 };
-use crate::DEFAULT_LIVE_PROFILE_REQUEST_ID;
+use crate::DEFAULT_LIVE_PROFILE_ID;
 
 const DEFAULT_TICKS: u32 = 25_000;
 const DEFAULT_SEED: u32 = 0;
@@ -38,25 +37,29 @@ pub fn run_from_env() {
     let Some(config) = parse_args_or_exit() else {
         return;
     };
-    let profile_a = resolve_profile_request_id_for_match(&config.profile_a, config.seed, 0)
-        .unwrap_or(&config.profile_a)
-        .to_string();
-    let profile_b = resolve_profile_request_id_for_match(&config.profile_b, config.seed, 1)
-        .unwrap_or(&config.profile_b)
-        .to_string();
+    let CliConfig {
+        profile_a,
+        profile_b,
+        seed,
+        ticks,
+        verify_replay,
+        save_replay_name,
+        replay_dir,
+        output_format,
+    } = config;
 
     let result = run_profile_matchup_result(ProfileMatchupOptions {
         profile_a,
         profile_b,
-        seed: config.seed,
-        max_ticks: config.ticks,
-        verify_replay: config.verify_replay,
-        save_replay_name: config.save_replay_name,
-        replay_dir: config.replay_dir,
+        seed,
+        max_ticks: ticks,
+        verify_replay,
+        save_replay_name,
+        replay_dir,
     });
 
     match result {
-        Ok(result) => match config.output_format {
+        Ok(result) => match output_format {
             OutputFormat::Table => print_table(&result),
             OutputFormat::Json => {
                 let json = serde_json::to_string_pretty(&result).unwrap_or_else(|err| {
@@ -194,12 +197,12 @@ fn parse_u32_flag(flag: &str, args: &mut impl Iterator<Item = String>) -> Result
 }
 
 fn resolve_profile_arg(value: &str) -> Result<String, String> {
-    canonical_profile_request_id_for_match(value)
+    canonical_profile_id(value)
         .map(str::to_string)
         .ok_or_else(|| {
             format!(
-                "unknown profile or suite {value:?}; known requests: {}",
-                available_profile_request_ids().join(", ")
+                "unknown profile {value:?}; known profile ids: {}",
+                available_profile_ids().join(", ")
             )
         })
 }
@@ -344,32 +347,20 @@ fn format_counts(counts: &std::collections::BTreeMap<String, u32>) -> String {
 }
 
 fn print_profiles() {
-    println!("profile and suite requests:");
-    for profile in available_profile_request_ids() {
+    println!("profile ids:");
+    for profile in available_profile_ids() {
         println!("  {profile}");
     }
     println!();
     println!("aliases:");
-    println!("  ai -> {DEFAULT_LIVE_PROFILE_REQUEST_ID}");
-    println!("  ai1 -> ai_1_0");
-    println!("  ai_1_0 -> ai_1_0");
-    println!("  default -> {DEFAULT_LIVE_PROFILE_REQUEST_ID}");
-    println!("  ai_1_1 -> ai_1_1");
-    println!("  ai11 -> ai_1_1");
-    println!("  ai_1_2 -> ai_1_2");
-    println!("  ai12 -> ai_1_2");
-    println!("  ai_2_0 -> ai_2_0");
-    println!("  ai20 -> ai_2_0");
-    println!("  ai_2_1 -> ai_2_1");
-    println!("  ai21 -> ai_2_1");
-    println!("  ai_turtle -> ai_turtle");
-    println!("  turtle -> ai_turtle");
+    println!("  ai -> {DEFAULT_LIVE_PROFILE_ID}");
+    println!("  default -> {DEFAULT_LIVE_PROFILE_ID}");
 }
 
 fn print_usage() {
     println!(
         "Usage:
-  cargo run --bin ai-matchup -- <profile-or-suite-a> <profile-or-suite-b> [options]
+  cargo run --bin ai-matchup -- <profile-a> <profile-b> [options]
   cargo run --bin ai-matchup -- --profile-a <id> --profile-b <id> [options]
 
 Options:
@@ -385,11 +376,8 @@ Options:
 
 Examples:
   cargo run --bin ai-matchup -- ai ai
-  cargo run --bin ai-matchup -- ai_1_1 ai_1_0_tech --seed 7 --ticks 3000 --json
-  cargo run --bin ai-matchup -- ai_1_2 ai_1_1 --seed 7 --ticks 3000 --json
-  cargo run --bin ai-matchup -- ai_2_0 ai --seed 7 --ticks 25000 --json
-  cargo run --bin ai-matchup -- ai_2_1 ai_2_0 --seed 7 --ticks 25000 --json
-  cargo run --bin ai-matchup -- default ai_1_0_tech --seed 7 --ticks 25000 --json
+  cargo run --bin ai-matchup -- ai_2_1 ai_turtle --seed 7 --ticks 3000 --json
+  cargo run --bin ai-matchup -- default ai_turtle --seed 7 --ticks 25000 --json
 "
     );
 }
@@ -405,7 +393,7 @@ mod tests {
 
     #[test]
     fn default_tick_cap_is_twenty_five_thousand() {
-        let config = parse_args(vec!["ai_1_0_tech".to_string(), "ai_1_1".to_string()])
+        let config = parse_args(vec!["ai_2_1".to_string(), "ai_turtle".to_string()])
             .expect("default args should parse")
             .expect("default args should return config");
 
