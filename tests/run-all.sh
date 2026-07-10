@@ -22,8 +22,11 @@
 #   tests/run-all.sh --no-rust       # skip Rust test/lint
 #   tests/run-all.sh --no-client     # skip the headless-browser smoke test
 #   tests/run-all.sh --only-rust     # run architecture policy + Rust test/lint only
+#   tests/run-all.sh --only-rust-checks # run Rust architecture policy + lint, without nextest
+#   tests/run-all.sh --only-nextest  # run Rust nextest only (honors RTS_NEXTEST_PARTITION)
 #   tests/run-all.sh --only-live-node # run JS contracts + live Node API suites only
 #   tests/run-all.sh --only-browser  # run browser suites only
+#   tests/run-all.sh --only-browser-scenarios=smoke,phase-0.5  # run an explicit browser shard
 #   tests/run-all.sh --with-tri-state-browser  # run latency-sensitive browser tri-state scenarios locally
 #   PORT=8090 tests/run-all.sh       # use a different port
 #   RTS_MATCH_SEED=123 tests/run-all.sh  # use a different deterministic map seed
@@ -32,6 +35,7 @@
 #   RTS_NODE_DEPS_CACHE_DIR=/tmp/rts-node-deps tests/run-all.sh
 #   RTS_RUN_TRI_STATE_BROWSER=1 tests/run-all.sh  # env-form local opt-in for tri-state browser scenarios
 #   RTS_RUN_WASM_TRI_STATE=0 tests/run-all.sh     # skip WASM-backed tri-state groups even when assets exist
+#   RTS_NEXTEST_PARTITION=slice:1/2 tests/run-all.sh --only-nextest  # run one nextest shard
 #   CHROME=/path/to/chrome tests/run-all.sh
 set -uo pipefail
 
@@ -54,7 +58,8 @@ SERVER_BIN="${RTS_SERVER_BIN:-$CARGO_TARGET_DIR/debug/rts-server}"
 
 # --- Options --------------------------------------------------------------------------------
 PORT="${PORT:-}"
-RUN_RUST=1
+RUN_RUST_CHECKS=1
+RUN_RUST_NEXTEST=1
 RUN_SOURCE_SIZE=1
 RUN_STATIC_JS=1
 RUN_LIVE_NODE=1
@@ -62,6 +67,7 @@ RUN_CLIENT=1
 RUN_FULL_AI=0
 RUN_TRI_STATE_BROWSER=0
 RUN_WASM_TRI_STATE="${RTS_RUN_WASM_TRI_STATE:-1}"
+BROWSER_SCENARIOS="smoke,phase-0.5,phase-2.5,phase-5,phase-3.5,phase-4.5,phase-6"
 VERBOSE=0
 case "${RTS_RUN_TRI_STATE_BROWSER:-}" in
   1|true|TRUE|yes|YES|on|ON) RUN_TRI_STATE_BROWSER=1 ;;
@@ -72,11 +78,14 @@ if [ -n "${GITHUB_ACTIONS:-}" ] || [ -n "${CI:-}" ]; then
 fi
 for arg in "$@"; do
   case "$arg" in
-    --no-rust)   RUN_RUST=0 ;;
+    --no-rust)   RUN_RUST_CHECKS=0; RUN_RUST_NEXTEST=0 ;;
     --no-client) RUN_CLIENT=0 ;;
-    --only-rust) RUN_RUST=1; RUN_SOURCE_SIZE=1; RUN_STATIC_JS=0; RUN_LIVE_NODE=0; RUN_CLIENT=0 ;;
-    --only-live-node) RUN_RUST=0; RUN_SOURCE_SIZE=1; RUN_STATIC_JS=1; RUN_LIVE_NODE=1; RUN_CLIENT=0 ;;
-    --only-browser) RUN_RUST=0; RUN_SOURCE_SIZE=0; RUN_STATIC_JS=0; RUN_LIVE_NODE=0; RUN_CLIENT=1 ;;
+    --only-rust) RUN_RUST_CHECKS=1; RUN_RUST_NEXTEST=1; RUN_SOURCE_SIZE=1; RUN_STATIC_JS=0; RUN_LIVE_NODE=0; RUN_CLIENT=0 ;;
+    --only-rust-checks) RUN_RUST_CHECKS=1; RUN_RUST_NEXTEST=0; RUN_SOURCE_SIZE=1; RUN_STATIC_JS=0; RUN_LIVE_NODE=0; RUN_CLIENT=0 ;;
+    --only-nextest) RUN_RUST_CHECKS=0; RUN_RUST_NEXTEST=1; RUN_SOURCE_SIZE=0; RUN_STATIC_JS=0; RUN_LIVE_NODE=0; RUN_CLIENT=0 ;;
+    --only-live-node) RUN_RUST_CHECKS=0; RUN_RUST_NEXTEST=0; RUN_SOURCE_SIZE=1; RUN_STATIC_JS=1; RUN_LIVE_NODE=1; RUN_CLIENT=0 ;;
+    --only-browser) RUN_RUST_CHECKS=0; RUN_RUST_NEXTEST=0; RUN_SOURCE_SIZE=0; RUN_STATIC_JS=0; RUN_LIVE_NODE=0; RUN_CLIENT=1 ;;
+    --only-browser-scenarios=*) RUN_RUST_CHECKS=0; RUN_RUST_NEXTEST=0; RUN_SOURCE_SIZE=0; RUN_STATIC_JS=0; RUN_LIVE_NODE=0; RUN_CLIENT=1; RUN_TRI_STATE_BROWSER=1; BROWSER_SCENARIOS="${arg#*=}" ;;
     --with-tri-state-browser|--with-tri-state) RUN_TRI_STATE_BROWSER=1 ;;
     --full-ai|--full-selfplay) RUN_FULL_AI=1 ;;
     --port) echo "use --port=N or PORT=N" >&2; exit 2 ;;
@@ -86,6 +95,28 @@ for arg in "$@"; do
     *) echo "unknown arg: $arg" >&2; exit 2 ;;
   esac
 done
+
+SELECTED_BROWSER_SCENARIOS=()
+IFS=',' read -r -a SELECTED_BROWSER_SCENARIOS <<< "$BROWSER_SCENARIOS"
+if [ "${#SELECTED_BROWSER_SCENARIOS[@]}" -eq 0 ] || [ -z "${SELECTED_BROWSER_SCENARIOS[0]:-}" ]; then
+  echo "browser scenario shard must include at least one scenario" >&2
+  exit 2
+fi
+for scenario in "${SELECTED_BROWSER_SCENARIOS[@]}"; do
+  case "$scenario" in
+    smoke|phase-0.5|phase-2.5|phase-5|phase-3.5|phase-4.5|phase-6) ;;
+    *) echo "unknown browser scenario: $scenario" >&2; exit 2 ;;
+  esac
+done
+
+browser_scenario_selected() {
+  local wanted="$1"
+  local scenario
+  for scenario in "${SELECTED_BROWSER_SCENARIOS[@]}"; do
+    [ "$scenario" = "$wanted" ] && return 0
+  done
+  return 1
+}
 
 if [ "$RUN_FULL_AI" = "1" ]; then
   echo "running all tests, including full AI coverage, silently; this can take several minutes"
@@ -163,7 +194,9 @@ rust_tool_version() {
 }
 
 print_rust_test_context() {
-  [ "$RUN_RUST" = "1" ] || return 0
+  if [ "$RUN_RUST_CHECKS" != "1" ] && [ "$RUN_RUST_NEXTEST" != "1" ]; then
+    return 0
+  fi
   printf '\nRust test context:\n'
   printf '  CARGO_TARGET_DIR=%s\n' "$CARGO_TARGET_DIR"
   printf '  rustc: %s\n' "$(rust_tool_version rustc rustc --version)"
@@ -545,10 +578,15 @@ Then rerun the local Rust gate.
 EOF
     return 2
   fi
-  cargo nextest run \
-    --config-file "$REPO_ROOT/.config/nextest.toml" \
-    --manifest-path "$SERVER_DIR/Cargo.toml" \
+  local args=(
+    --config-file "$REPO_ROOT/.config/nextest.toml"
+    --manifest-path "$SERVER_DIR/Cargo.toml"
     --profile default
+  )
+  if [ -n "${RTS_NEXTEST_PARTITION:-}" ]; then
+    args+=(--partition "$RTS_NEXTEST_PARTITION")
+  fi
+  cargo nextest run "${args[@]}"
 }
 
 run_nextest_tests_full_ai() {
@@ -587,6 +625,9 @@ run_nextest_tests_bg() {
   else
     name="Rust nextest fast scripted tests"
   fi
+  if [ -n "${RTS_NEXTEST_PARTITION:-}" ]; then
+    name="$name ($RTS_NEXTEST_PARTITION)"
+  fi
 
   if [ "$RUN_FULL_AI" = "1" ]; then
     run_suite_bg "$name" run_nextest_tests_full_ai
@@ -596,7 +637,7 @@ run_nextest_tests_bg() {
 }
 
 run_rust_suites_bg() {
-  if [ "$RUN_RUST" = "1" ]; then
+  if [ "$RUN_RUST_CHECKS" = "1" ]; then
     run_suite_bg "Architecture: crate boundaries" \
       node "$REPO_ROOT/scripts/check-crate-boundaries.mjs"
     run_suite_bg "Architecture: sim game internals" \
@@ -621,17 +662,21 @@ run_rust_suites_bg() {
       node "$SCRIPT_DIR/phase_runner_agents.mjs"
     run_suite_bg "Agent workflow: quality pass helper" \
       node "$SCRIPT_DIR/adversarial_quality_pass.mjs"
+    run_suite_bg "Rust lint (cargo clippy)" \
+      cargo clippy --manifest-path "$SERVER_DIR/Cargo.toml" -- -D warnings
+  else
+    SKIPPED+=("Architecture policy checks (not selected)")
+    SKIPPED+=("Rust lint (not selected)")
+  fi
+
+  if [ "$RUN_RUST_NEXTEST" = "1" ]; then
     run_nextest_tests_bg
     if [ "$RUN_FULL_AI" != "1" ]; then
       SKIPPED+=("Rust nextest full AI coverage (--full-ai not set)")
     fi
-    run_suite_bg "Rust lint (cargo clippy)" \
-      cargo clippy --manifest-path "$SERVER_DIR/Cargo.toml" -- -D warnings
   else
-    SKIPPED+=("Architecture policy checks (--no-rust)")
-    SKIPPED+=("Rust nextest fast scripted tests (--no-rust)")
-    SKIPPED+=("Rust lint (--no-rust)")
-    SKIPPED+=("Rust nextest full AI coverage (--no-rust)")
+    SKIPPED+=("Rust nextest fast scripted tests (not selected)")
+    SKIPPED+=("Rust nextest full AI coverage (not selected)")
   fi
 }
 
@@ -736,31 +781,39 @@ if [ "${SERVER_HEALTHY:-0}" = "1" ]; then
         info "${RED}${#FAILED[@]} suite(s) failed ❌${RST}"
         exit 1
       fi
-      CHROME="$CHROME" run_suite "Client smoke (headless Chrome)" node "$SCRIPT_DIR/client_smoke.mjs"
+      if browser_scenario_selected smoke; then
+        CHROME="$CHROME" run_suite "Client smoke (headless Chrome)" node "$SCRIPT_DIR/client_smoke.mjs"
+      else
+        SKIPPED+=("Client smoke (not selected for this browser shard)")
+      fi
       if [ "$RUN_TRI_STATE_BROWSER" = "1" ]; then
-        CHROME="$CHROME" run_suite "Tri-state scenarios: phase 0.5" \
-          node "$SCRIPT_DIR/tri_state/run.mjs" --scenario phase-0.5
-        CHROME="$CHROME" run_suite "Tri-state scenarios: phase 2.5" \
-          node "$SCRIPT_DIR/tri_state/run.mjs" --scenario phase-2.5
-        CHROME="$CHROME" run_suite "Tri-state scenarios: phase 5" \
-          node "$SCRIPT_DIR/tri_state/run.mjs" --scenario phase-5
+        for scenario in phase-0.5 phase-2.5 phase-5; do
+          if browser_scenario_selected "$scenario"; then
+            CHROME="$CHROME" run_suite "Tri-state scenarios: ${scenario/phase-/phase }" \
+              node "$SCRIPT_DIR/tri_state/run.mjs" --scenario "$scenario"
+          fi
+        done
         if [ "$RUN_WASM_TRI_STATE" != "1" ]; then
           info "skipping WASM-backed tri-state scenarios: RTS_RUN_WASM_TRI_STATE=$RUN_WASM_TRI_STATE"
-          SKIPPED+=("Tri-state scenarios: phase 3.5 (RTS_RUN_WASM_TRI_STATE=$RUN_WASM_TRI_STATE)")
-          SKIPPED+=("Tri-state scenarios: phase 4.5 (RTS_RUN_WASM_TRI_STATE=$RUN_WASM_TRI_STATE)")
-          SKIPPED+=("Tri-state scenarios: phase 6 (RTS_RUN_WASM_TRI_STATE=$RUN_WASM_TRI_STATE)")
+          for scenario in phase-3.5 phase-4.5 phase-6; do
+            if browser_scenario_selected "$scenario"; then
+              SKIPPED+=("Tri-state scenarios: ${scenario/phase-/phase } (RTS_RUN_WASM_TRI_STATE=$RUN_WASM_TRI_STATE)")
+            fi
+          done
         elif [ -f "$REPO_ROOT/client/vendor/sim-wasm/rts_sim_wasm.js" ] && [ -f "$REPO_ROOT/client/vendor/sim-wasm/rts_sim_wasm_bg.wasm" ]; then
-          CHROME="$CHROME" run_suite "Tri-state scenarios: phase 3.5" \
-            node "$SCRIPT_DIR/tri_state/run.mjs" --scenario phase-3.5
-          CHROME="$CHROME" run_suite "Tri-state scenarios: phase 4.5" \
-            node "$SCRIPT_DIR/tri_state/run.mjs" --scenario phase-4.5
-          CHROME="$CHROME" run_suite "Tri-state scenarios: phase 6" \
-            node "$SCRIPT_DIR/tri_state/run.mjs" --scenario phase-6
+          for scenario in phase-3.5 phase-4.5 phase-6; do
+            if browser_scenario_selected "$scenario"; then
+              CHROME="$CHROME" run_suite "Tri-state scenarios: ${scenario/phase-/phase }" \
+                node "$SCRIPT_DIR/tri_state/run.mjs" --scenario "$scenario"
+            fi
+          done
         else
           info "skipping WASM-backed tri-state scenarios: generated sim-wasm assets missing"
-          SKIPPED+=("Tri-state scenarios: phase 3.5 (missing sim-wasm assets)")
-          SKIPPED+=("Tri-state scenarios: phase 4.5 (missing sim-wasm assets)")
-          SKIPPED+=("Tri-state scenarios: phase 6 (missing sim-wasm assets)")
+          for scenario in phase-3.5 phase-4.5 phase-6; do
+            if browser_scenario_selected "$scenario"; then
+              SKIPPED+=("Tri-state scenarios: ${scenario/phase-/phase } (missing sim-wasm assets)")
+            fi
+          done
         fi
       else
         info "skipping tri-state browser scenarios locally; use --with-tri-state-browser or RTS_RUN_TRI_STATE_BROWSER=1 to include them"
