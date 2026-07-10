@@ -72,7 +72,7 @@ src/
   lab_tool_detail.js # Pure armed-tool instruction text for LabPanel status
   lab_panel_window.js # draggable/resizable chrome helper for the app-owned LabPanel
   lab_map_editor_session.js # persistent 25-state authored-map draft and undo/redo history
-  lab_map_editor_panel.js # floating live-lab terrain/base/slot editing and map JSON export
+  lab_map_editor_panel.js # floating live-lab built-in map loading, terrain/base/slot editing, and map JSON export
   lab_control_policy.js # Lab control collaborator placeholder injected into Match
   lab_map_reset.js # in-place authoritative Lab map/player/fog/terrain refresh collaborator
   visual_profiles.js # Lab-scoped visual experimentation profile registry and resolver
@@ -639,11 +639,15 @@ window. `App` retains one `LabMapEditorSession` while edits are applied, so neit
 nor a base-layout reset loses the selected editor tool or the bounded 25-state undo/redo history.
 The requesting client consumes the authoritative map/player payload from `labResult` through the
 app-owned `applyLabMapReset` collaborator, replacing static `GameState`, fog, minimap inputs, and the
-cached terrain texture in place instead of tearing down and rebuilding the whole match. The window paints
-one terrain tile at a time by click or drag stroke; its grass, stone, and water controls carry matching
-terrain swatches instead of a brush-size selector. It edits
-main/natural sites and the current player-slot layout, saves a browser-local draft, and exports the
-normal authored map JSON schema. Applying terrain-only drafts updates the authoritative map and
+cached terrain texture in place instead of tearing down and rebuilding the whole match. The window can
+load built-in authored maps from `/maps/catalog` (with the standard maps retained as a fallback) and then
+fetches the selected JSON from `/maps/<file>`. It selects a layout that matches the active Lab's player
+count, rejects maps with a different map size, preserves every authored layout in the draft/export, and
+applies the selected layout to the live battle. The window paints one terrain tile at a time by click or
+drag stroke; its grass, stone, and water controls carry matching terrain swatches instead of a brush-size
+selector. It edits main/natural sites and the selected compatible player-slot layout, saves a
+browser-local draft, and exports the normal authored map JSON schema. Applying terrain-only drafts
+updates the authoritative map and
 derived pathing/fog state without resetting the simulation tick or live entities. Changing starts,
 naturals, or player slots rebuilds the battle so starting bases and resource nodes match the edited
 layout; ordinary lab unit/building palettes remain the playtest setup surface.

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 
 import { TERRAIN } from "../../client/src/protocol.js";
 import { Fog } from "../../client/src/fog.js";
@@ -30,6 +31,37 @@ function startPayload() {
   };
 }
 
+function authoredMap(size = 32) {
+  return {
+    version: 2,
+    name: "No Terrain",
+    description: "All grass for editor loading tests.",
+    _design: "Test fixture.",
+    terrain: Array.from({ length: size }, () => ".".repeat(size)),
+    sites: [
+      { id: "main_nw", kind: "main", x: 8, y: 8 },
+      { id: "natural_nw", kind: "natural", x: 12, y: 8 },
+      { id: "main_se", kind: "main", x: 23, y: 23 },
+      { id: "natural_se", kind: "natural", x: 19, y: 23 },
+    ],
+    layouts: [
+      { id: "solo", playerCount: 1, slots: [{ main: "main_nw", naturals: ["natural_nw"] }] },
+      {
+        id: "duel",
+        playerCount: 2,
+        slots: [
+          { main: "main_nw", naturals: ["natural_nw"] },
+          { main: "main_se", naturals: ["natural_se"] },
+        ],
+      },
+    ],
+  };
+}
+
+const noTerrainMap = JSON.parse(
+  fs.readFileSync(new URL("../../server/assets/maps/no-terrain.json", import.meta.url), "utf8"),
+);
+
 {
   const session = new LabMapEditorSession({ storage: null });
   assert.equal(session.initializeFromStart(startPayload(), { name: "POC" }), true);
@@ -60,6 +92,32 @@ function startPayload() {
   assert.equal(exported.name, session.draft.name);
 }
 
+{
+  const session = new LabMapEditorSession({ storage: null });
+  session.initializeFromStart(startPayload());
+  assert.equal(session.loadAuthoredMap(authoredMap(), { expectedSize: 32, playerCount: 2 }), true);
+  assert.equal(session.selectedLayoutId, "duel", "loaded maps select a layout compatible with the live lab");
+  assert.equal(session.activeLayout.id, "duel");
+  assert.deepEqual(session.materialized().starts, [{ x: 8, y: 8 }, { x: 23, y: 23 }]);
+  assert.equal(session.exportMap().layouts.length, 2, "loading preserves every authored layout for export");
+  assert.throws(
+    () => session.loadAuthoredMap(authoredMap(33), { expectedSize: 32, playerCount: 2 }),
+    /This lab uses a 32 × 32 map/,
+    "loading rejects a map whose size cannot be applied to the current lab",
+  );
+}
+
+{
+  const session = new LabMapEditorSession({ storage: null });
+  assert.equal(session.loadAuthoredMap(noTerrainMap, { expectedSize: 126, playerCount: 2 }), true);
+  assert.equal(session.activeLayout.slots.length, 2, "the real No Terrain map selects a two-player layout");
+  assert.equal(
+    session.exportMap().layouts.length,
+    noTerrainMap.layouts.length,
+    "the real No Terrain map keeps every authored layout after loading",
+  );
+}
+
 withFakeDocument(() => {
   const root = document.createElement("div");
   const session = new LabMapEditorSession({ storage: null });
@@ -79,6 +137,7 @@ withFakeDocument(() => {
     },
     startPayload: startPayload(),
     applyLabMapReset: () => true,
+    fetchImpl: null,
   });
   const terrainGroup = findFakes(panel.el, (el) => (
     el.tagName === "FIELDSET" && textWithin(el).includes("Terrain paint")
@@ -102,6 +161,58 @@ withFakeDocument(() => {
 
   panel.paintWorldClick({ x: 4, y: 4, tool: { payload: { terrain: TERRAIN.WATER } } });
   assert.equal(session.materialized().terrain[0], TERRAIN.WATER, "terrain paint changes exactly the clicked tile");
+  panel.destroy();
+});
+
+await withFakeDocument(async () => {
+  const root = document.createElement("div");
+  const session = new LabMapEditorSession({ storage: null });
+  const requests = [];
+  const applied = [];
+  const panel = new LabMapEditorPanel({
+    root,
+    session,
+    labClient: {
+      exportScenario: async () => ({ ok: false }),
+      applyMapDraft: async (draft) => {
+        applied.push(draft);
+        return { ok: true, outcome: { battleReset: true } };
+      },
+    },
+    match: { armLabTool() {} },
+    startPayload: startPayload(),
+    applyLabMapReset: () => true,
+    fetchImpl: async (url) => {
+      requests.push(url);
+      if (url === "/maps/catalog") {
+        return {
+          ok: true,
+          json: async () => ({
+            maps: [{
+              file: "no-terrain.json",
+              name: "No Terrain",
+              description: "All grass.",
+            }],
+          }),
+        };
+      }
+      if (url === "/maps/no-terrain.json") {
+        return { ok: true, json: async () => authoredMap() };
+      }
+      return { ok: false, status: 404, json: async () => ({}) };
+    },
+  });
+  await panel.loadMapCatalog();
+  const loader = findFakes(panel.el, (el) => (
+    el.tagName === "FIELDSET" && textWithin(el).includes("Load map")
+  ))[0];
+  assert.ok(loader, "the Lab map editor exposes a built-in map loader");
+  assert.equal(await panel.loadCatalogMap("no-terrain.json"), true);
+  assert.deepEqual(requests, ["/maps/catalog", "/maps/no-terrain.json"]);
+  assert.equal(session.draft.name, "No Terrain");
+  assert.equal(session.selectedLayoutId, "duel");
+  assert.equal(session.exportMap().layouts.length, 2, "catalog loads keep non-active authored layouts");
+  assert.deepEqual(applied[0].starts, [{ x: 8, y: 8 }, { x: 23, y: 23 }]);
   panel.destroy();
 });
 
