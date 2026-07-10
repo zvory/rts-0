@@ -17,7 +17,6 @@ pub(crate) enum StrategicGoal {
     Production,
     LocalDefense,
     FrontalAttack,
-    Harassment,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -166,8 +165,6 @@ pub(super) struct TraceInput<'a> {
     pub(super) attack_size: usize,
     pub(super) attack_due: bool,
     pub(super) frontal_wave_blockers: &'a [FrontalWaveBlocker],
-    pub(super) rifle_raid_policy: bool,
-    pub(super) rifle_raid_units: usize,
     pub(super) required_tech_path: &'a [EntityKind],
 }
 
@@ -180,7 +177,6 @@ pub(super) fn build_manager_trace(input: TraceInput<'_>) -> ManagerOutputTrace {
         goal_trace(StrategicGoal::Production, input),
         goal_trace(StrategicGoal::LocalDefense, input),
         goal_trace(StrategicGoal::FrontalAttack, input),
-        goal_trace(StrategicGoal::Harassment, input),
     ];
     goals.sort_by_key(|goal| goal.goal);
     ManagerOutputTrace {
@@ -196,8 +192,6 @@ pub(super) fn build_manager_trace(input: TraceInput<'_>) -> ManagerOutputTrace {
 fn goal_trace(goal: StrategicGoal, input: TraceInput<'_>) -> GoalTrace {
     let intents = match goal {
         StrategicGoal::LocalDefense if !input.local_threat_active => Vec::new(),
-        StrategicGoal::FrontalAttack if input.rifle_raid_policy => Vec::new(),
-        StrategicGoal::Harassment if !input.rifle_raid_policy => Vec::new(),
         _ => intents_for_goal(goal, input.intents),
     };
     let selected = match goal {
@@ -228,19 +222,10 @@ fn goal_trace(goal: StrategicGoal, input: TraceInput<'_>) -> GoalTrace {
                     .iter()
                     .any(|intent| matches!(intent, AiIntent::Attack { .. }))
         }
-        StrategicGoal::FrontalAttack => {
-            !input.rifle_raid_policy
-                && input.intents.iter().any(|intent| {
-                    matches!(intent, AiIntent::Attack { .. } | AiIntent::Stage { .. })
-                })
-        }
-        StrategicGoal::Harassment => {
-            input.rifle_raid_policy
-                && input
-                    .intents
-                    .iter()
-                    .any(|intent| matches!(intent, AiIntent::Attack { .. } | AiIntent::Move { .. }))
-        }
+        StrategicGoal::FrontalAttack => input
+            .intents
+            .iter()
+            .any(|intent| matches!(intent, AiIntent::Attack { .. } | AiIntent::Stage { .. })),
     };
     let mut blockers = blockers_for_goal(goal, input, selected);
     blockers.sort();
@@ -264,7 +249,6 @@ fn blockers_for_goal(
 ) -> Vec<GoalBlocker> {
     if selected {
         if goal == StrategicGoal::FrontalAttack
-            && !input.rifle_raid_policy
             && input
                 .intents
                 .iter()
@@ -341,27 +325,12 @@ fn blockers_for_goal(
                 blockers.push(GoalBlocker::NoReadyUnits);
             }
         }
-        StrategicGoal::FrontalAttack => {
-            if input.rifle_raid_policy {
-                blockers.push(GoalBlocker::MissingPrerequisite("raid_policy_active"));
-            } else {
-                blockers.extend(
-                    input
-                        .frontal_wave_blockers
-                        .iter()
-                        .map(frontal_wave_blocker_trace),
-                );
-            }
-        }
-        StrategicGoal::Harassment => {
-            if !input.rifle_raid_policy {
-                blockers.push(GoalBlocker::MissingPrerequisite(
-                    "harassment_policy_inactive",
-                ));
-            } else if input.rifle_raid_units == 0 {
-                blockers.push(GoalBlocker::NoReadyUnits);
-            }
-        }
+        StrategicGoal::FrontalAttack => blockers.extend(
+            input
+                .frontal_wave_blockers
+                .iter()
+                .map(frontal_wave_blocker_trace),
+        ),
     }
     if blockers.is_empty() {
         blockers.push(GoalBlocker::MissingPrerequisite("not_due"));
@@ -449,9 +418,6 @@ fn intent_matches_goal(goal: StrategicGoal, intent: &AiIntent) -> bool {
         }
         StrategicGoal::LocalDefense | StrategicGoal::FrontalAttack => {
             matches!(intent, AiIntent::Attack { .. } | AiIntent::Stage { .. })
-        }
-        StrategicGoal::Harassment => {
-            matches!(intent, AiIntent::Attack { .. } | AiIntent::Move { .. })
         }
     }
 }

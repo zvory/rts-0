@@ -80,9 +80,8 @@ impl SelfPlayRunner {
         milestones: Milestones,
     ) -> Self {
         let resource_kinds = resource_kinds_from_start(&start);
-        let replay_start =
-            ReplayStartComposition::capture(&game, super::server_build_sha())
-                .expect("self-play replay start should export");
+        let replay_start = ReplayStartComposition::capture(&game, super::server_build_sha())
+            .expect("self-play replay start should export");
         SelfPlayRunner {
             test_name,
             max_ticks,
@@ -336,7 +335,9 @@ impl SelfPlayRunner {
 
     fn write_artifact_dir(&self, dir: &Path, failure: Option<String>) -> Result<(), String> {
         fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-        let artifact = self.replay_start.finalize(&self.game, None, self.game.scores());
+        let artifact = self
+            .replay_start
+            .finalize(&self.game, None, self.game.scores());
         let json = serde_json::to_vec_pretty(&artifact).map_err(|e| e.to_string())?;
         fs::write(dir.join("replay.json"), json).map_err(|e| e.to_string())?;
         let diagnostic = self.diagnostic_payload(failure);

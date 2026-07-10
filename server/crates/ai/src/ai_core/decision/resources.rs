@@ -81,35 +81,17 @@ pub(super) fn plan_economy(
     observation: &AiObservation,
     facts: &AiFacts,
     profile: &AiProfile,
-    recovery_active: bool,
     panic_oil_workers: Option<usize>,
 ) -> EconomyPlan {
-    let worker_policy = active_worker_policy(profile, recovery_active);
+    let worker_policy = active_worker_policy(profile);
     let availability = resource_availability(observation);
-    let complete_gate_count = worker_policy
-        .pressure_until_complete
-        .map(|kind| facts.complete_building_count(kind))
-        .unwrap_or(usize::MAX);
-    let base_steel_target = worker_policy.target_steel_workers(
-        availability.current_steel_saturation_target(),
-        complete_gate_count,
-    );
-    let target_steel_workers = target_steel_workers_for_profile(
-        observation,
-        facts,
-        profile,
-        recovery_active,
-        base_steel_target,
-    );
+    let base_steel_target =
+        worker_policy.target_steel_workers(availability.current_steel_saturation_target());
+    let target_steel_workers =
+        target_steel_workers_for_profile(observation, facts, profile, base_steel_target);
     let desired_oil_workers = if availability.has_free_mineable_oil() {
         panic_oil_workers.unwrap_or_else(|| {
-            desired_oil_workers(
-                observation,
-                facts,
-                profile,
-                recovery_active,
-                target_steel_workers,
-            )
+            desired_oil_workers(observation, facts, profile, target_steel_workers)
         })
     } else {
         0
@@ -125,7 +107,7 @@ pub(super) fn plan_economy(
         .unwrap_or(0);
     let current_oil_workers = resource_counts.get(&EntityKind::Oil).copied().unwrap_or(0);
     let max_worker_resource_distance_px =
-        max_worker_resource_assignment_distance_px(observation, facts, profile, recovery_active);
+        max_worker_resource_assignment_distance_px(observation, facts, profile);
     EconomyPlan {
         target_steel_workers,
         desired_oil_workers,
@@ -138,7 +120,7 @@ pub(super) fn plan_economy(
         mineable_oil_nodes: availability.free_mineable_node_ids(EntityKind::Oil),
         max_worker_resource_distance_px,
         remote_worker_assignment_fallback: max_worker_resource_distance_px.is_some()
-            && active_expansion(observation, profile, recovery_active)
+            && active_expansion(observation, profile)
                 .map(|expansion| expansion.remote_worker_assignment_fallback)
                 .unwrap_or(false),
     }
@@ -148,10 +130,9 @@ pub(super) fn target_steel_workers_for_profile(
     observation: &AiObservation,
     facts: &AiFacts,
     profile: &AiProfile,
-    recovery_active: bool,
     base_target: usize,
 ) -> usize {
-    let Some(expansion) = active_expansion(observation, profile, recovery_active) else {
+    let Some(expansion) = active_expansion(observation, profile) else {
         return base_target;
     };
     if facts.complete_building_count(EntityKind::CityCentre) < expansion.target_city_centres {
@@ -173,9 +154,8 @@ pub(super) fn max_worker_resource_assignment_distance_px(
     observation: &AiObservation,
     facts: &AiFacts,
     profile: &AiProfile,
-    recovery_active: bool,
 ) -> Option<f32> {
-    let expansion = active_expansion(observation, profile, recovery_active)?;
+    let expansion = active_expansion(observation, profile)?;
     if facts.complete_building_count(EntityKind::CityCentre) < expansion.target_city_centres {
         return None;
     }
@@ -186,11 +166,10 @@ pub(super) fn desired_oil_workers(
     observation: &AiObservation,
     facts: &AiFacts,
     profile: &AiProfile,
-    recovery_active: bool,
     target_steel_workers: usize,
 ) -> usize {
-    let worker_policy = active_worker_policy(profile, recovery_active);
-    let resource_policy = active_resource_policy(profile, recovery_active);
+    let worker_policy = active_worker_policy(profile);
+    let resource_policy = active_resource_policy(profile);
     let availability = resource_availability(observation);
 
     if worker_policy.extra_oil_workers == 0 {
@@ -199,21 +178,19 @@ pub(super) fn desired_oil_workers(
     if !availability.has_free_mineable_oil() {
         return 0;
     }
-    if expansion_blocks_tech_path(observation, facts, profile, recovery_active) {
+    if expansion_blocks_tech_path(observation, facts, profile) {
         return 0;
     }
     let current_steel_workers = resource_worker_counts(observation)
         .get(&EntityKind::Steel)
         .copied()
         .unwrap_or(0);
-    let expansion_oil_first = active_expansion(observation, profile, recovery_active)
+    let expansion_oil_first = active_expansion(observation, profile)
         .filter(|e| e.oil_before_steel_in_expansion)
         .map(|e| facts.complete_building_count(EntityKind::CityCentre) >= e.target_city_centres)
         .unwrap_or(false);
     let oil_steel_floor = if expansion_oil_first {
         0
-    } else if resource_policy.oil_after_full_steel_saturation {
-        target_steel_workers
     } else {
         target_steel_workers.min(resource_policy.oil_after_steel_workers)
     };
@@ -326,7 +303,7 @@ mod tests {
         AiEconomy, AiEntityState, AiEntitySummary, AiMapSummary, AiObservation, AiPlayerSummary,
         AiResourceSummary,
     };
-    use crate::ai_core::profiles::TECH_TO_TANKS;
+    use crate::ai_core::profiles::AI_2_1;
 
     fn entity(id: u32, kind: EntityKind, x: f32, y: f32) -> AiEntitySummary {
         AiEntitySummary {
@@ -427,7 +404,7 @@ mod tests {
         );
         let facts = AiFacts::from_observation(&observation);
 
-        let plan = plan_economy(&observation, &facts, &TECH_TO_TANKS, false, Some(3));
+        let plan = plan_economy(&observation, &facts, &AI_2_1, Some(3));
 
         assert_eq!(plan.desired_oil_workers, 3);
         assert_eq!(
@@ -444,7 +421,7 @@ mod tests {
         pump_jack.is_complete = true;
         pump_jack.state = AiEntityState::Idle;
         let facts = AiFacts::from_observation(&observation);
-        let plan = plan_economy(&observation, &facts, &TECH_TO_TANKS, false, Some(3));
+        let plan = plan_economy(&observation, &facts, &AI_2_1, Some(3));
         assert_eq!(plan.current_oil_workers, 1);
 
         observation
@@ -454,7 +431,7 @@ mod tests {
             .expect("first oil should exist")
             .remaining = 0;
         let facts = AiFacts::from_observation(&observation);
-        let plan = plan_economy(&observation, &facts, &TECH_TO_TANKS, false, Some(3));
+        let plan = plan_economy(&observation, &facts, &AI_2_1, Some(3));
         assert_eq!(
             plan.current_oil_workers, 0,
             "completed Pump Jacks on depleted oil must not satisfy current oil demand"

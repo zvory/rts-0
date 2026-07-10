@@ -653,9 +653,9 @@ const observerAnalysis = decodeServerMessage({
       lastMinute: { steel: 100, oil: 20 },
     },
     aiDiagnostics: {
-      profileId: "ai_2_1_economy_manager",
+      profileId: "ai_2_1",
       traceTick: 9,
-      lines: ["profile=ai_2_1_economy_manager tick=9"],
+      lines: ["profile=ai_2_1 tick=9"],
     },
   }],
   mapAnalysis: {
@@ -683,7 +683,7 @@ const observerAnalysis = decodeServerMessage({
 });
 assert(observerAnalysis.t === "observerAnalysis" && observerAnalysis.players[0].production[0].queueDepth === 1, "observerAnalysis passes through decode");
 assert(
-  observerAnalysis.players[0].aiDiagnostics?.profileId === "ai_2_1_economy_manager",
+  observerAnalysis.players[0].aiDiagnostics?.profileId === "ai_2_1",
   "observerAnalysis preserves AI diagnostics rows",
 );
 assert(

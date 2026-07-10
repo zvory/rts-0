@@ -389,12 +389,8 @@ impl AiMapAnalysis {
                 } else {
                     choke.approach_a_tile
                 };
-                let (endpoint_a_world, endpoint_b_world) = choke_line_world_endpoints(
-                    choke,
-                    self.tile_size,
-                    self.width,
-                    self.height,
-                );
+                let (endpoint_a_world, endpoint_b_world) =
+                    choke_line_world_endpoints(choke, self.tile_size, self.width, self.height);
                 Some((
                     tile_distance2(choke.center_tile, start.start_tile),
                     choke.id,
@@ -1296,13 +1292,15 @@ fn choke_line_world_endpoints(
     (start, end)
 }
 
-fn clamp_world_to_map(point: (f32, f32), tile_size: f32, map_width: u32, map_height: u32) -> (f32, f32) {
+fn clamp_world_to_map(
+    point: (f32, f32),
+    tile_size: f32,
+    map_width: u32,
+    map_height: u32,
+) -> (f32, f32) {
     let max_x = map_width as f32 * tile_size;
     let max_y = map_height as f32 * tile_size;
-    (
-        point.0.clamp(0.0, max_x),
-        point.1.clamp(0.0, max_y),
-    )
+    (point.0.clamp(0.0, max_x), point.1.clamp(0.0, max_y))
 }
 
 fn hash_player_starts(players: &[PlayerStart]) -> u64 {

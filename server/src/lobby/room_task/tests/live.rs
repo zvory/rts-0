@@ -61,7 +61,7 @@ fn live_spectator_receives_observer_analysis_but_active_players_do_not() {
 }
 
 #[test]
-fn lobby_ai_slots_resolve_to_ai_2_1() {
+fn lobby_ai_slots_keep_selected_canonical_profile() {
     let mut task = RoomTask::new(
         "live-ai-profile-selection-test".to_string(),
         RoomMode::Normal,
@@ -73,20 +73,17 @@ fn lobby_ai_slots_resolve_to_ai_2_1() {
     task.host_id = Some(host_id);
     add_test_room_player(&mut task, host_id, true);
 
-    task.on_add_ai(host_id, Some(2), Some("ai_2_0".to_string()));
+    task.on_add_ai(host_id, Some(2), Some("ai_turtle".to_string()));
     assert_eq!(
-        task.ai_players.first().map(|ai| ai.profile_request_id),
-        Some("ai_2_1")
+        task.ai_players.first().map(|ai| ai.profile_id),
+        Some("ai_turtle")
     );
-    assert_eq!(ai_slot_names(&task), vec!["AI 2.1"]);
+    assert_eq!(ai_slot_names(&task), vec!["AI Turtle"]);
 
     task.start_match();
 
     assert_eq!(task.ai_controllers.len(), 1);
-    assert_eq!(
-        task.ai_controllers[0].profile_id(),
-        "ai_2_1_economy_manager"
-    );
+    assert_eq!(task.ai_controllers[0].profile_id(), "ai_turtle");
 }
 
 #[test]
@@ -109,17 +106,17 @@ fn lobby_ai_names_follow_profile_labels_and_duplicate_counts() {
     task.on_add_ai(host_id, Some(3), None);
     assert_eq!(ai_slot_names(&task), vec!["AI 2.1 1", "AI 2.1 2"]);
 
-    task.on_set_ai_profile(host_id, first_ai_id, "ai_1_1_tank_mg".to_string());
-    assert_eq!(ai_slot_names(&task), vec!["AI 2.1 1", "AI 2.1 2"]);
+    task.on_set_ai_profile(host_id, first_ai_id, "ai_turtle".to_string());
+    assert_eq!(ai_slot_names(&task), vec!["AI Turtle", "AI 2.1"]);
 
-    task.on_add_ai(host_id, Some(4), Some("ai_1_1".to_string()));
+    task.on_add_ai(host_id, Some(4), Some("ai_turtle".to_string()));
     assert_eq!(
         ai_slot_names(&task),
-        vec!["AI 2.1 1", "AI 2.1 2", "AI 2.1 3"]
+        vec!["AI Turtle 1", "AI 2.1", "AI Turtle 2"]
     );
 
     task.on_remove_ai(host_id, first_ai_id);
-    assert_eq!(ai_slot_names(&task), vec!["AI 2.1 1", "AI 2.1 2"]);
+    assert_eq!(ai_slot_names(&task), vec!["AI 2.1", "AI Turtle"]);
 }
 
 #[test]

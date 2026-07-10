@@ -45,7 +45,7 @@ Use when adding, removing, or changing any field on a client↔server message, s
 - Resolved AI matches send `observationReady` (replay/log lookup).
 - The active protocol has no quickstart/debug lobby command or start-payload flag. Normal live
   countdown skipping for rooms with one or zero active humans is not a debug preset.
-- `LobbyPlayer` carries `teamId`, `factionId`, `aiProfileId?` (profile or suite request), and
+- `LobbyPlayer` carries `teamId`, `factionId`, `aiProfileId?` (canonical AI profile id), and
   `isSpectator`; spectators are lobby members but not active match players.
 - Lab setup import/export uses the compatibility-named `LabScenarioPayload`; the only accepted
   payload is a checkpoint-backed `LabCheckpointScenarioV1` container. Legacy `kind:"labScenario"`

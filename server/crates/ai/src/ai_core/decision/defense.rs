@@ -249,10 +249,6 @@ pub(super) fn defensive_threat_dps(enemy: &AiEntitySummary) -> f32 {
     profile.dmg as f32 / profile.cooldown as f32
 }
 
-pub(super) fn stages_expansion_defensive_line(profile: &AiProfile, attack: AttackPolicy) -> bool {
-    profile.expansion.is_some() && attack.first_attack_size == usize::MAX
-}
-
 pub(super) fn stage_main_steel_defensive_line(
     actions: &mut AiActionContext<'_>,
     observation: &AiObservation,

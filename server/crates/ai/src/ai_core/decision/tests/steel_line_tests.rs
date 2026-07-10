@@ -40,31 +40,3 @@ fn main_steel_cluster_center_uses_forward_split_field() {
         "main steel center should stay on the forward split field, got {projection:.2} tiles"
     );
 }
-
-#[test]
-fn enemy_main_steel_center_uses_forward_split_field() {
-    let observation = with_enemy_main_resources(observation(
-        AiEconomy {
-            steel: 0,
-            oil: 0,
-            supply_used: 0,
-            supply_cap: 10,
-        },
-        Vec::new(),
-    ));
-    let enemy_base = enemy_base_fact(&observation);
-
-    let steel_center =
-        enemy_main_steel_center(&observation, enemy_base).expect("enemy steel should be found");
-    let projection = map_center_projection_tiles(
-        observation.map,
-        (enemy_base.x, enemy_base.y),
-        steel_center,
-    );
-
-    assert!(
-        (config::STEEL_BLOCK_DIST_TILES - 0.25..=config::STEEL_BLOCK_DIST_TILES + 0.25)
-            .contains(&projection),
-        "enemy steel center should stay on the forward split field, got {projection:.2} tiles"
-    );
-}

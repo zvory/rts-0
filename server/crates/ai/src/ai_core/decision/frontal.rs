@@ -120,26 +120,25 @@ pub(super) fn issue_frontal_wave(
         return None;
     }
 
-    let staged =
-        if stages_expansion_defensive_line(profile, attack) || profile.frontal_wave.line_staging {
-            stage_main_steel_defensive_line(
-                actions,
-                observation,
-                &plan.ready_units,
-                enemy_base,
-                attack.stage_distance_tiles,
-            )
-        } else {
-            let own_base = tile_center(observation.own_start_tile, observation.map.tile_size);
-            actions::stage_units_toward(
-                actions,
-                plan.ready_units.clone(),
-                own_base,
-                (enemy_base.x, enemy_base.y),
-                observation.map.tile_size,
-                attack.stage_distance_tiles,
-            )
-        };
+    let staged = if profile.frontal_wave.line_staging {
+        stage_main_steel_defensive_line(
+            actions,
+            observation,
+            &plan.ready_units,
+            enemy_base,
+            attack.stage_distance_tiles,
+        )
+    } else {
+        let own_base = tile_center(observation.own_start_tile, observation.map.tile_size);
+        actions::stage_units_toward(
+            actions,
+            plan.ready_units.clone(),
+            own_base,
+            (enemy_base.x, enemy_base.y),
+            observation.map.tile_size,
+            attack.stage_distance_tiles,
+        )
+    };
     staged.map(|units| AiIntent::Stage { units })
 }
 
@@ -179,4 +178,15 @@ fn outbound_wave_target_priority(kind: EntityKind) -> u8 {
         EntityKind::Rifleman | EntityKind::ScoutCar => 2,
         _ => 3,
     }
+}
+
+fn group_center(observation: &AiObservation, unit_ids: &[u32]) -> Option<(f32, f32)> {
+    let (sum_x, sum_y, count) = observation
+        .owned
+        .iter()
+        .filter(|entity| unit_ids.contains(&entity.id))
+        .fold((0.0, 0.0, 0usize), |(sum_x, sum_y, count), entity| {
+            (sum_x + entity.x, sum_y + entity.y, count + 1)
+        });
+    (count > 0).then_some((sum_x / count as f32, sum_y / count as f32))
 }

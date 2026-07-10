@@ -167,8 +167,8 @@ not tiebreakers.
 ```bash
 cd server
 cargo run --bin ai-matchup -- ai ai
-cargo run --bin ai-matchup -- ai_1_2 ai_1_1 --seed 7 --ticks 3000 --json
-cargo run --bin ai-matchup -- default ai_1_0_tech --seed 7 --ticks 25000 --json
+cargo run --bin ai-matchup -- ai_2_1 ai_turtle --seed 7 --ticks 3000 --json
+cargo run --bin ai-matchup -- default ai_turtle --seed 7 --ticks 25000 --json
 cargo run --bin ai-matchup -- --list-profiles
 ```
 

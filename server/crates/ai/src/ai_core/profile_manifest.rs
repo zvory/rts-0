@@ -4,10 +4,7 @@ use serde::Serialize;
 
 #[cfg(test)]
 use super::profiles::required_profiles;
-use super::profiles::{
-    profile_by_id, AiProfile, AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID, AI_1_2_WAVE_COHORTS_ID,
-    AI_2_0_TANK_PRESSURE_ID, AI_2_1_ECONOMY_MANAGER_ID, AI_TURTLE_CHOKES_ID,
-};
+use super::profiles::{profile_by_id, AiProfile, AI_2_1_ID, AI_TURTLE_ID};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -82,49 +79,9 @@ pub(crate) fn validate_profile_identity(identity: &AiProfileIdentity) -> Result<
 
 fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'static str>) {
     match profile_id {
-        AI_1_0_TECH_ID => (
-            "AI 1.0 Tech",
-            "Legacy technology profile with economy, expansion, and tank transition goals.",
-            vec!["economy", "expansion", "tech_transition", "frontal_attack"],
-        ),
-        AI_1_1_TANK_MG_ID => (
-            "AI 1.1 Tank MG",
-            "AI 1.0 fork with Tank-only transition pressure and defensive Machine Gunners.",
-            vec![
-                "economy",
-                "expansion",
-                "defensive_machine_gunners",
-                "tank_transition",
-                "frontal_attack",
-            ],
-        ),
-        AI_1_2_WAVE_COHORTS_ID => (
-            "AI 1.2 Wave Cohorts",
-            "AI 1.1 fork with launched-unit exclusion, line staging, and a second Factory.",
-            vec![
-                "economy",
-                "expansion",
-                "defensive_machine_gunners",
-                "tank_transition",
-                "frontal_wave_cohorts",
-                "second_factory",
-            ],
-        ),
-        AI_2_0_TANK_PRESSURE_ID => (
-            "AI 2.0 Tank Pressure",
-            "AI 2.0 suite member with earlier Factory unlock, two Factories, defensive MGs, and faster mixed Tank pressure.",
-            vec![
-                "full_steel_saturation",
-                "early_expansion",
-                "defensive_machine_gunners",
-                "earlier_factory_tank_unlock",
-                "mixed_tank_pressure",
-                "second_factory",
-            ],
-        ),
-        AI_2_1_ECONOMY_MANAGER_ID => (
-            "AI 2.1 Economy Manager",
-            "AI 2.1 suite member that keeps AI 2.0 strategy values while routing economy decisions through proposal-based economy management.",
+        AI_2_1_ID => (
+            "AI 2.1",
+            "Pressure profile with proposal-based economy management, defensive Machine Gunners, mixed Tank pressure, and a second Factory.",
             vec![
                 "economy_manager",
                 "full_steel_saturation",
@@ -135,18 +92,17 @@ fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'sta
                 "second_factory",
             ],
         ),
-        AI_TURTLE_CHOKES_ID => (
-            "AI Turtle Chokes",
-            "Support-weapon turtle profile that uses the proposal-based economy manager to fast expand on the AI 2.0 economy cadence, opens three Riflemen on a main steel-line screen, queues Entrenchment before capped four-per-line Machine Gunner production, adds second Barracks and Gun Works capacity on resource floats, prioritizes enemy-facing chokes, and stages Machine Gunners plus guns on own-base choke lines.",
+        AI_TURTLE_ID => (
+            "AI Turtle",
+            "Support-weapon turtle profile with proposal-based economy management, Entrenchment, and Machine Gunner plus Anti-Tank Gun choke defense.",
             vec![
                 "economy_manager",
                 "full_steel_saturation",
                 "early_expansion",
-                "three_rifle_opening",
+                "two_rifle_opening",
                 "support_tech",
                 "entrenchment_research",
                 "entrenchment_before_machine_gunners",
-                "floated_second_barracks",
                 "floated_second_gun_works",
                 "four_machine_gunners_per_main_choke",
                 "wider_machine_gunner_spacing",
@@ -205,13 +161,13 @@ fn fnv1a64(bytes: &[u8]) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ai_core::profiles::{AI_2_0_TANK_PRESSURE_ID, AI_2_1_ECONOMY_MANAGER_ID};
+    use crate::ai_core::profiles::{AI_2_1_ID, AI_TURTLE_ID};
 
     #[test]
     fn profile_identities_are_complete_and_valid() {
         let identities = required_profile_identities();
 
-        assert_eq!(identities.len(), 6);
+        assert_eq!(identities.len(), 2);
         for identity in identities {
             validate_profile_identity(&identity).expect("identity should validate");
             assert!(!identity.fingerprint.is_empty());
@@ -220,22 +176,13 @@ mod tests {
     }
 
     #[test]
-    fn ai_2_0_tank_pressure_has_specific_manifest_metadata() {
-        let tank_pressure =
-            profile_identity_by_id(AI_2_0_TANK_PRESSURE_ID).expect("tank pressure identity");
+    fn canonical_profile_manifest_metadata_uses_short_names() {
+        let identity = profile_identity_by_id(AI_2_1_ID).expect("AI 2.1 identity");
 
-        assert_eq!(tank_pressure.label, "AI 2.0 Tank Pressure");
-        assert!(tank_pressure
-            .modules
-            .contains(&"mixed_tank_pressure".to_string()));
-    }
-
-    #[test]
-    fn ai_2_1_economy_manager_has_specific_manifest_metadata() {
-        let identity = profile_identity_by_id(AI_2_1_ECONOMY_MANAGER_ID)
-            .expect("AI 2.1 economy manager identity");
-
-        assert_eq!(identity.label, "AI 2.1 Economy Manager");
+        assert_eq!(identity.label, "AI 2.1");
         assert!(identity.modules.contains(&"economy_manager".to_string()));
+
+        let turtle = profile_identity_by_id(AI_TURTLE_ID).expect("AI Turtle identity");
+        assert_eq!(turtle.label, "AI Turtle");
     }
 }

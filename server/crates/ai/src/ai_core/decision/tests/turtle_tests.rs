@@ -1,6 +1,6 @@
 use super::*;
 
-use crate::ai_core::profiles::AI_TURTLE_CHOKES;
+use crate::ai_core::profiles::AI_TURTLE;
 
 #[test]
 fn turtle_expansion_ignores_opening_rifleman_losses() {
@@ -19,13 +19,7 @@ fn turtle_expansion_ignores_opening_rifleman_losses() {
     ));
     let facts = AiFacts::from_observation(&observation);
 
-    let plan = super::super::expansion::plan_expansion(
-        &observation,
-        &facts,
-        &AI_TURTLE_CHOKES,
-        false,
-        false,
-    );
+    let plan = super::super::expansion::plan_expansion(&observation, &facts, &AI_TURTLE, false);
 
     assert!(
         plan.should_save,
@@ -55,8 +49,8 @@ fn turtle_opening_starts_one_pump_jack_without_stalling_worker_training() {
 
     let decision = decide(
         &observation,
-        &AI_TURTLE_CHOKES,
-        &mut AiDecisionMemory::for_profile(&AI_TURTLE_CHOKES),
+        &AI_TURTLE,
+        &mut AiDecisionMemory::for_profile(&AI_TURTLE),
     );
 
     assert!(
@@ -103,8 +97,8 @@ fn turtle_rifle_opening_reports_stage_intent_for_steel_line() {
 
     let decision = decide(
         &observation,
-        &AI_TURTLE_CHOKES,
-        &mut AiDecisionMemory::for_profile(&AI_TURTLE_CHOKES),
+        &AI_TURTLE,
+        &mut AiDecisionMemory::for_profile(&AI_TURTLE),
     );
 
     assert!(decision.intents.iter().any(|intent| {
@@ -137,8 +131,8 @@ fn turtle_machine_gunner_training_stops_at_choke_line_target() {
 
     let decision = decide(
         &observation,
-        &AI_TURTLE_CHOKES,
-        &mut AiDecisionMemory::for_profile(&AI_TURTLE_CHOKES),
+        &AI_TURTLE,
+        &mut AiDecisionMemory::for_profile(&AI_TURTLE),
     );
 
     assert!(
@@ -187,8 +181,8 @@ fn turtle_spends_large_float_on_second_gun_works_not_a_second_barracks() {
 
     let decision = decide(
         &observation,
-        &AI_TURTLE_CHOKES,
-        &mut AiDecisionMemory::for_profile(&AI_TURTLE_CHOKES),
+        &AI_TURTLE,
+        &mut AiDecisionMemory::for_profile(&AI_TURTLE),
     );
 
     assert!(

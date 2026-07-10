@@ -15,19 +15,15 @@ use crate::ai_core::profile_manifest::{
     profile_identity_by_id, validate_profile_identity, AiProfileIdentity,
 };
 use crate::selfplay::{
-    available_profile_request_ids, canonical_profile_request_id_for_match,
-    resolve_profile_request_id_for_match, run_profile_matchup_result, server_build_sha,
-    ProfileMatchupOptions, ProfileMatchupEndReason, ProfileMatchupResult,
-    ProfileMatchupTraceEntry,
+    available_profile_ids, canonical_profile_id, run_profile_matchup_result, server_build_sha,
+    ProfileMatchupEndReason, ProfileMatchupOptions, ProfileMatchupResult, ProfileMatchupTraceEntry,
 };
 
 const DEFAULT_TICKS: u32 = 25_000;
 const DEFAULT_SEEDS: u32 = 3;
-const DEFAULT_CANDIDATE: &str = "ai_2_0";
-const DEFAULT_BASELINE: &str = "ai_1_2";
+const DEFAULT_CANDIDATE: &str = "ai_2_1";
+const DEFAULT_BASELINE: &str = "ai_turtle";
 const ARENA_SCHEMA_VERSION: u32 = 1;
-const CANDIDATE_SELECTOR: u64 = 0;
-const BASELINE_SELECTOR: u64 = 1;
 
 #[derive(Debug)]
 struct CliConfig {
@@ -74,8 +70,6 @@ struct ArenaRunManifest {
     seed: u32,
     max_ticks: u32,
     side: ArenaSide,
-    candidate_request_id: String,
-    baseline_request_id: String,
     candidate_profile_id: String,
     baseline_profile_id: String,
     profiles: BTreeMap<String, AiProfileIdentity>,
@@ -229,26 +223,13 @@ fn run_arena(config: &CliConfig) -> Result<ArenaReport, String> {
     std::fs::create_dir_all(&replay_dir).map_err(|err| err.to_string())?;
 
     let jobs = side_swapped_jobs(config.seed_start, config.seeds);
+    if config.candidate == config.baseline {
+        return Err("candidate and baseline must be different profiles".to_string());
+    }
     let mut runs = Vec::with_capacity(jobs.len());
     for job in jobs {
-        let candidate_profile = resolve_profile_request_id_for_match(
-            &config.candidate,
-            job.seed,
-            CANDIDATE_SELECTOR,
-        )
-        .ok_or_else(|| format!("unknown candidate request {}", config.candidate))?;
-        let baseline_profile = resolve_profile_request_id_for_match(
-            &config.baseline,
-            job.seed,
-            BASELINE_SELECTOR,
-        )
-        .ok_or_else(|| format!("unknown baseline request {}", config.baseline))?;
-        if candidate_profile == baseline_profile {
-            return Err(format!(
-                "candidate request {} and baseline request {} both resolve to profile {} for seed {}",
-                config.candidate, config.baseline, candidate_profile, job.seed
-            ));
-        }
+        let candidate_profile = config.candidate.as_str();
+        let baseline_profile = config.baseline.as_str();
         let (profile_a, profile_b) = match job.side {
             ArenaSide::CandidatePlayerOne => {
                 (candidate_profile.to_string(), baseline_profile.to_string())
@@ -257,14 +238,8 @@ fn run_arena(config: &CliConfig) -> Result<ArenaReport, String> {
                 (baseline_profile.to_string(), candidate_profile.to_string())
             }
         };
-        let replay_name = run_artifact_name(
-            &config.candidate,
-            candidate_profile,
-            &config.baseline,
-            baseline_profile,
-            job.seed,
-            job.side,
-        );
+        let replay_name =
+            run_artifact_name(candidate_profile, baseline_profile, job.seed, job.side);
         let result = run_profile_matchup_result(ProfileMatchupOptions {
             profile_a,
             profile_b,
@@ -281,9 +256,7 @@ fn run_arena(config: &CliConfig) -> Result<ArenaReport, String> {
             .ok_or_else(|| "arena run did not save a replay artifact".to_string())?;
         let run = write_run_sidecars(
             &artifact_dir,
-            &config.candidate,
             candidate_profile,
-            &config.baseline,
             baseline_profile,
             job.side,
             &result,
@@ -309,9 +282,7 @@ fn run_arena(config: &CliConfig) -> Result<ArenaReport, String> {
 
 fn write_run_sidecars(
     artifact_dir: &Path,
-    candidate_request: &str,
     candidate_profile: &str,
-    baseline_request: &str,
     baseline_profile: &str,
     side: ArenaSide,
     result: &ProfileMatchupResult,
@@ -323,9 +294,8 @@ fn write_run_sidecars(
     let baseline_player_id = if candidate_player_id == 1 { 2 } else { 1 };
     let candidate_identity = profile_identity_by_id(candidate_profile)
         .ok_or_else(|| format!("unknown candidate profile {candidate_profile}"))?;
-    let baseline_identity =
-        profile_identity_by_id(baseline_profile)
-            .ok_or_else(|| format!("unknown baseline profile {baseline_profile}"))?;
+    let baseline_identity = profile_identity_by_id(baseline_profile)
+        .ok_or_else(|| format!("unknown baseline profile {baseline_profile}"))?;
     validate_profile_identity(&candidate_identity)?;
     validate_profile_identity(&baseline_identity)?;
 
@@ -339,8 +309,6 @@ fn write_run_sidecars(
         seed: result.seed,
         max_ticks: result.max_ticks,
         side,
-        candidate_request_id: candidate_request.to_string(),
-        baseline_request_id: baseline_request.to_string(),
         candidate_profile_id: candidate_profile.to_string(),
         baseline_profile_id: baseline_profile.to_string(),
         profiles,
@@ -357,7 +325,10 @@ fn write_run_sidecars(
     };
     write_json(artifact_dir.join("manifest.json"), &run.manifest)?;
     write_json(artifact_dir.join("summary.json"), &run)?;
-    write_trace_jsonl(artifact_dir.join("decision-trace.jsonl"), &result.ai_trace_tail)?;
+    write_trace_jsonl(
+        artifact_dir.join("decision-trace.jsonl"),
+        &result.ai_trace_tail,
+    )?;
     std::fs::write(artifact_dir.join("brief.md"), brief_markdown(&run))
         .map_err(|err| err.to_string())?;
     Ok(run)
@@ -452,8 +423,6 @@ fn trace_labels(lines: &[String]) -> Vec<String> {
 
 fn brief_markdown(run: &ArenaRunSummary) -> String {
     let result = &run.result;
-    let candidate_request = &run.manifest.candidate_request_id;
-    let baseline_request = &run.manifest.baseline_request_id;
     let candidate = &run.manifest.candidate_profile_id;
     let baseline = &run.manifest.baseline_profile_id;
     let candidate_player = result
@@ -467,7 +436,7 @@ fn brief_markdown(run: &ArenaRunSummary) -> String {
     let mut text = String::new();
     text.push_str("# AI Arena Brief\n\n");
     text.push_str(&format!(
-        "- Matchup: `{candidate_request}` -> `{candidate}` as player {} vs `{baseline_request}` -> `{baseline}` as player {}\n",
+        "- Matchup: `{candidate}` as player {} vs `{baseline}` as player {}\n",
         run.candidate_player_id, run.baseline_player_id
     ));
     text.push_str(&format!(
@@ -484,10 +453,7 @@ fn brief_markdown(run: &ArenaRunSummary) -> String {
     ));
     text.push_str(&format!(
         "- Replay: {}\n\n",
-        result
-            .replay_artifact
-            .as_deref()
-            .unwrap_or("not saved")
+        result.replay_artifact.as_deref().unwrap_or("not saved")
     ));
     text.push_str("## Profiles\n\n");
     for identity in run.manifest.profiles.values() {
@@ -624,9 +590,7 @@ fn side_swapped_jobs(seed_start: u32, seeds: u32) -> Vec<ArenaJob> {
 }
 
 fn run_artifact_name(
-    candidate_request: &str,
     candidate_profile: &str,
-    baseline_request: &str,
     baseline_profile: &str,
     seed: u32,
     side: ArenaSide,
@@ -635,9 +599,7 @@ fn run_artifact_name(
         ArenaSide::CandidatePlayerOne => "candidate_p1",
         ArenaSide::CandidatePlayerTwo => "candidate_p2",
     };
-    format!(
-        "arena__{candidate_request}_as_{candidate_profile}__vs__{baseline_request}_as_{baseline_profile}__seed_{seed}__{side}"
-    )
+    format!("arena__{candidate_profile}__vs__{baseline_profile}__seed_{seed}__{side}")
 }
 
 fn write_json(path: PathBuf, value: &impl Serialize) -> Result<(), String> {
@@ -646,12 +608,12 @@ fn write_json(path: PathBuf, value: &impl Serialize) -> Result<(), String> {
 }
 
 fn resolve_profile_arg(value: &str) -> Result<String, String> {
-    canonical_profile_request_id_for_match(value)
+    canonical_profile_id(value)
         .map(str::to_string)
         .ok_or_else(|| {
             format!(
-                "unknown profile or suite {value:?}; known requests: {}",
-                available_profile_request_ids().join(", ")
+                "unknown profile {value:?}; known profile ids: {}",
+                available_profile_ids().join(", ")
             )
         })
 }
@@ -678,8 +640,8 @@ fn print_usage() {
   ai-arena [options]
 
 Options:
-  --candidate <id>       Candidate profile or suite request (default: {DEFAULT_CANDIDATE})
-  --baseline <id>        Baseline profile or suite request (default: {DEFAULT_BASELINE})
+  --candidate <id>       Candidate profile id (default: {DEFAULT_CANDIDATE})
+  --baseline <id>        Baseline profile id (default: {DEFAULT_BASELINE})
   --seeds <u32>          Number of seeds to run, side-swapped (default: {DEFAULT_SEEDS})
   --seed-start <u32>     First seed to run (default: 0)
   --ticks <u32>          Tick cap per run (default: {DEFAULT_TICKS})
@@ -709,8 +671,7 @@ mod tests {
     #[test]
     fn trace_labels_are_searchable() {
         let labels = trace_labels(&[
-            "goal=Economy status=Selected blockers=- intents=Train:Worker,Gather:Steel"
-                .to_string(),
+            "goal=Economy status=Selected blockers=- intents=Train:Worker,Gather:Steel".to_string(),
             "goal=FrontalAttack status=Skipped blockers=WaitingForUnits,AttackCadence intents=-"
                 .to_string(),
             "command=Train:Rifleman".to_string(),
@@ -723,7 +684,7 @@ mod tests {
     }
 
     #[test]
-    fn default_arena_parse_uses_ai_2_0_candidate_and_current_default_baseline() {
+    fn default_arena_parse_uses_canonical_profiles() {
         let config = parse_args(Vec::<String>::new())
             .expect("default args should parse")
             .expect("default args should produce config");
@@ -734,14 +695,12 @@ mod tests {
     }
 
     #[test]
-    fn arena_rejects_different_requests_that_resolve_to_the_same_profile() {
-        let out_dir = std::env::temp_dir().join(format!(
-            "rts-ai-arena-same-profile-test-{}",
-            process::id()
-        ));
+    fn arena_rejects_the_same_profile_on_both_sides() {
+        let out_dir =
+            std::env::temp_dir().join(format!("rts-ai-arena-same-profile-test-{}", process::id()));
         let config = CliConfig {
-            candidate: "ai_2_0".to_string(),
-            baseline: "ai_2_0_tank_pressure".to_string(),
+            candidate: "ai_2_1".to_string(),
+            baseline: "ai_2_1".to_string(),
             seeds: 1,
             seed_start: 0,
             ticks: 1,
@@ -749,15 +708,20 @@ mod tests {
             verify_replay: false,
         };
 
-        let err = run_arena(&config).expect_err("same concrete profile should be rejected");
+        let err = run_arena(&config).expect_err("same canonical profile should be rejected");
 
-        assert!(err.contains("both resolve to profile ai_2_0_tank_pressure"));
+        assert!(err.contains("candidate and baseline must be different profiles"));
         let _ = std::fs::remove_dir_all(out_dir);
     }
 
     #[test]
     fn tick_cap_draw_is_not_scored_by_army_value() {
-        let result = profile_result(crate::selfplay::ProfileMatchupEndReason::TickCap, None, 200, 100);
+        let result = profile_result(
+            crate::selfplay::ProfileMatchupEndReason::TickCap,
+            None,
+            200,
+            100,
+        );
 
         let outcome = outcome_for(&result, 1, 2);
 
@@ -825,7 +789,10 @@ mod tests {
         }
     }
 
-    fn player_result(player_id: u32, army_value: u32) -> crate::selfplay::ProfileMatchupPlayerResult {
+    fn player_result(
+        player_id: u32,
+        army_value: u32,
+    ) -> crate::selfplay::ProfileMatchupPlayerResult {
         crate::selfplay::ProfileMatchupPlayerResult {
             player_id,
             profile: profile_for_player(player_id).to_string(),

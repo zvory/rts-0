@@ -711,9 +711,7 @@ fn coverage_preferred_slots(
         };
         let Some(next) = (0..capacity)
             .filter(|slot| !used_slots.contains(slot))
-            .max_by(|left, right| {
-                compare_coverage_slots(&context, *left, *right)
-            })
+            .max_by(|left, right| compare_coverage_slots(&context, *left, *right))
         else {
             break;
         };

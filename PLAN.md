@@ -277,8 +277,7 @@ Depends on:
 - [ ] Follow [plans/ai/plan.md](plans/ai/plan.md) for the detailed dependency chain and rollout order.
 - [ ] Use the AI phase table in [plans/ai/plan.md](plans/ai/plan.md) as the serial implementation handoff plan.
 - [ ] Keep one shared AI knowledge and action layer used by both live AI and self-play.
-- [ ] Add at least three simple strategy profiles:
-  `rifle_flood_fast`, `rifle_flood_full_saturation`, and `tech_to_tanks`.
+- [ ] Maintain the supported AI 2.1 and AI Turtle profiles as data-driven policy variations.
 - [ ] Keep strategy differences mostly in priorities and thresholds, not duplicated mechanics.
 - [ ] Make AI reason from shared definitions, tech availability, economy, army composition, and
   command results rather than duplicated constants.

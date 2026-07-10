@@ -92,7 +92,7 @@ pub enum ClientMessage {
         #[serde(default)]
         ai_profile_id: Option<String>,
     },
-    /// Host selects the live AI profile or suite request for one AI lobby seat.
+    /// Host selects the live AI profile for one AI lobby seat.
     SetAiProfile {
         id: u32,
         #[serde(rename = "aiProfileId")]
@@ -473,7 +473,7 @@ pub struct LobbyPlayer {
     /// True for computer opponents (no socket). The client uses this to label the row and show a
     /// host-only "remove" control instead of a ready indicator.
     pub is_ai: bool,
-    /// Live AI profile or suite request id for computer opponents. Omitted for human players and
+    /// Canonical live AI profile id for computer opponents. Omitted for human players and
     /// spectators.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ai_profile_id: Option<String>,

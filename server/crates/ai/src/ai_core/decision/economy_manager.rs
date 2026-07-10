@@ -12,7 +12,6 @@ pub(super) enum OilDemandSignal {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct EconomyManagerSignals {
-    pub(super) recovery_active: bool,
     pub(super) oil_demand: OilDemandSignal,
     pub(super) defer_supply_for_tech: bool,
     pub(super) emergency_supply: bool,
@@ -53,13 +52,7 @@ pub(super) fn propose_economy(input: EconomyManagerInput<'_>) -> EconomyManagerO
         OilDemandSignal::ExactWorkers(workers) => Some(workers),
         _ => None,
     };
-    let mut plan = plan_economy(
-        input.observation,
-        input.facts,
-        input.profile,
-        input.signals.recovery_active,
-        oil_override,
-    );
+    let mut plan = plan_economy(input.observation, input.facts, input.profile, oil_override);
     match input.signals.oil_demand {
         OilDemandSignal::ProfileDefault | OilDemandSignal::ExactWorkers(_) => {}
         OilDemandSignal::HoldCurrent => {

@@ -227,7 +227,7 @@ pub(super) fn unit_counts_for_priorities(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ai_core::profiles::{AI_1_1_TANK_MG, AI_TURTLE_CHOKES};
+    use crate::ai_core::profiles::{AI_2_1, AI_TURTLE};
 
     fn short_search() -> ai_shared::BuildSearch {
         ai_shared::BuildSearch {
@@ -241,7 +241,7 @@ mod tests {
     #[test]
     fn vehicle_and_standard_gun_works_use_modest_forward_build_search() {
         for kind in [EntityKind::Factory, EntityKind::Steelworks] {
-            let search = build_search_for_kind(short_search(), &AI_1_1_TANK_MG, kind);
+            let search = build_search_for_kind(short_search(), &AI_2_1, kind);
             assert_eq!(
                 search.max_radius,
                 ai_shared::FORWARD_PRODUCTION_BUILD_SEARCH_MAX_RADIUS
@@ -264,7 +264,7 @@ mod tests {
                 prefer_away_from_center: false,
                 prefer_toward_center: false,
             },
-            &AI_TURTLE_CHOKES,
+            &AI_TURTLE,
             EntityKind::Steelworks,
         );
 
@@ -282,7 +282,7 @@ mod tests {
 
     #[test]
     fn ordinary_buildings_keep_their_requested_search_band() {
-        let search = build_search_for_kind(short_search(), &AI_1_1_TANK_MG, EntityKind::Barracks);
+        let search = build_search_for_kind(short_search(), &AI_2_1, EntityKind::Barracks);
 
         assert_eq!(search.max_radius, 6);
         assert!(search.prefer_away_from_center);

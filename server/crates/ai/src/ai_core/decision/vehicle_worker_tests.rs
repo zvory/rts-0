@@ -3,7 +3,7 @@ use super::*;
 use crate::ai_core::observation::{
     AiEconomy, AiEntityState, AiEntitySummary, AiMapSummary, AiPlayerSummary, AiResourceSummary,
 };
-use crate::ai_core::profiles::{AiProfile, AI_1_1_TANK_MG, AI_1_2_WAVE_COHORTS};
+use crate::ai_core::profiles::{AiProfile, AI_2_1};
 
 fn worker(id: u32, state: AiEntityState) -> AiEntitySummary {
     AiEntitySummary {
@@ -148,7 +148,7 @@ fn with_expansion_resources(mut observation: AiObservation) -> AiObservation {
 }
 
 fn decide(observation: &AiObservation) -> AiDecision {
-    decide_with_profile(observation, &AI_1_1_TANK_MG)
+    decide_with_profile(observation, &AI_2_1)
 }
 
 fn decide_with_profile(observation: &AiObservation, profile: &'static AiProfile) -> AiDecision {
@@ -214,8 +214,8 @@ fn places_first_factory_in_shorter_forward_band() {
     let height = observation.map.height;
     let decision = decide_profile_without_static_map_for_tests(
         &observation,
-        &AI_1_1_TANK_MG,
-        &mut AiDecisionMemory::for_profile(&AI_1_1_TANK_MG),
+        &AI_2_1,
+        &mut AiDecisionMemory::for_profile(&AI_2_1),
         ai_shared::BuildSearch {
             min_radius: 2,
             max_radius: 6,
@@ -246,43 +246,10 @@ fn places_first_factory_in_shorter_forward_band() {
 }
 
 #[test]
-fn does_not_build_second_factory_for_tank_production() {
-    let ts = config::TILE_SIZE as f32;
-    let mut observation = with_expansion_resources(observation(
-        AiEconomy {
-            steel: 1_500,
-            oil: 800,
-            supply_used: 54,
-            supply_cap: 120,
-        },
-        vec![
-            building_at(10, EntityKind::CityCentre, Some(0), 8.5 * ts, 8.5 * ts),
-            building_at(11, EntityKind::CityCentre, Some(0), 23.5 * ts, 36.5 * ts),
-            building(12, EntityKind::Barracks, Some(0)),
-            building(13, EntityKind::TrainingCentre, None),
-            building(14, EntityKind::ResearchComplex, None),
-            building(15, EntityKind::Factory, Some(0)),
-            worker(60, AiEntityState::Idle),
-        ],
-    ));
-    observation.upgrades.push(UpgradeKind::TankUnlock);
-    observation.upgrades.push(UpgradeKind::Methamphetamines);
+fn ai_2_1_builds_second_factory_above_resource_float() {
+    let observation = second_factory_observation(501, 326);
 
-    let decision = decide(&observation);
-
-    assert!(
-        !decision.intents.contains(&AiIntent::Build {
-            kind: EntityKind::Factory
-        }),
-        "AI 1.1 should stay capped at one Factory"
-    );
-}
-
-#[test]
-fn ai_1_2_builds_second_factory_above_resource_float() {
-    let observation = second_factory_observation(601, 401);
-
-    let decision = decide_with_profile(&observation, &AI_1_2_WAVE_COHORTS);
+    let decision = decide_with_profile(&observation, &AI_2_1);
 
     assert!(decision.intents.contains(&AiIntent::Build {
         kind: EntityKind::Factory
@@ -293,21 +260,10 @@ fn ai_1_2_builds_second_factory_above_resource_float() {
 }
 
 #[test]
-fn ai_1_2_waits_until_above_second_factory_resource_float() {
-    let observation = second_factory_observation(600, 400);
+fn ai_2_1_waits_until_above_second_factory_resource_float() {
+    let observation = second_factory_observation(500, 325);
 
-    let decision = decide_with_profile(&observation, &AI_1_2_WAVE_COHORTS);
-
-    assert!(!decision.intents.contains(&AiIntent::Build {
-        kind: EntityKind::Factory
-    }));
-}
-
-#[test]
-fn ai_1_1_does_not_build_second_factory_at_ai_1_2_float() {
-    let observation = second_factory_observation(601, 401);
-
-    let decision = decide(&observation);
+    let decision = decide_with_profile(&observation, &AI_2_1);
 
     assert!(!decision.intents.contains(&AiIntent::Build {
         kind: EntityKind::Factory

@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 
-use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::ai_core::actions::{
@@ -13,8 +12,8 @@ use crate::ai_core::observation::{
     AiEntityState, AiEntitySummary, AiMapSummary, AiObservation, AiResourceSummary,
 };
 use crate::ai_core::profiles::{
-    AiProfile, AttackPolicy, BarracksCurve, ExpansionPolicy, ProductionPolicy, ProxyBarracksPolicy,
-    RecoveryTransitionPolicy, ResourcePolicy, TechTransitionPolicy, WorkerPolicy,
+    AiProfile, AttackPolicy, BarracksCurve, ExpansionPolicy, ProductionPolicy, ResourcePolicy,
+    TechTransitionPolicy, WorkerPolicy,
 };
 use crate::ai_shared;
 use crate::config;
@@ -31,8 +30,6 @@ mod frontal;
 mod geometry;
 mod policies;
 mod production;
-mod proxy;
-mod raids;
 mod resources;
 mod trace;
 mod turtle;
@@ -40,10 +37,9 @@ mod turtle;
 use self::defense::{
     defensive_machine_gunner_units, defensive_panic_barracks_target, defensive_panic_plan,
     defensive_panic_response, local_defense_target, local_defense_units,
-    stage_defensive_machine_gunner_perimeter, stage_main_steel_defensive_line,
-    stages_expansion_defensive_line, DefensivePanic, DefensivePanicPlan, DefensivePanicResponse,
-    ALL_COMBAT_UNITS, DEFENSIVE_PANIC_GRACE_TICKS, DEFENSIVE_PANIC_RIFLE_TECH_PATH,
-    DEFENSIVE_PANIC_SUSTAINED_TICKS,
+    stage_defensive_machine_gunner_perimeter, stage_main_steel_defensive_line, DefensivePanic,
+    DefensivePanicPlan, DefensivePanicResponse, ALL_COMBAT_UNITS, DEFENSIVE_PANIC_GRACE_TICKS,
+    DEFENSIVE_PANIC_RIFLE_TECH_PATH, DEFENSIVE_PANIC_SUSTAINED_TICKS,
 };
 use self::economy_manager::{
     propose_economy, EconomyManagerInput, EconomyManagerOutput, EconomyManagerSignals,
@@ -52,11 +48,9 @@ use self::economy_manager::{
 use self::expansion::{plan_expansion, try_build_expansion_city_centre, ExpansionBlocker};
 use self::frontal::{issue_frontal_wave, plan_frontal_wave};
 use self::geometry::footprint_top_left_for_center;
-#[cfg(test)]
-use self::geometry::tile_center;
 use self::policies::{
     active_attack_policy, active_barracks_curve, active_production_policy,
-    active_required_tech_path, active_tech_transition, recovery_delay_ticks,
+    active_required_tech_path, active_tech_transition,
 };
 use self::production::{
     production_building_order, production_uses_building, should_build_extra_factory,
@@ -64,15 +58,6 @@ use self::production::{
     should_save_for_required_tech_building, try_build_kind, unit_counts_for_priorities,
     wants_depot,
 };
-use self::proxy::{should_use_proxy_barracks, try_proxy_barracks};
-use self::raids::{
-    group_center, is_rifle_raid_policy, rifle_raid_building_fallback_target,
-    rifle_raid_move_target, rifle_raid_unit_target, rifle_raid_units_to_resume,
-    select_rifle_raid_units,
-};
-use self::resources::plan_economy;
-#[cfg(test)]
-use self::resources::{desired_oil_workers, target_steel_workers_for_profile};
 use self::trace::{build_manager_trace, ManagerOutputTrace, TraceInput};
 use self::turtle::{
     stage_turtle_choke_defense, turtle_machine_gunner_lines_staffed, turtle_observer_debug_layers,
@@ -140,9 +125,6 @@ pub(crate) struct AiDecisionMemory {
     attack_first_size: Option<usize>,
     next_attack_size: usize,
     last_attack_tick: Option<u32>,
-    proxy_worker_id: Option<u32>,
-    recovery_gate_completed_tick: Option<u32>,
-    recovery_active: bool,
     defensive_panic_started_tick: Option<u32>,
     defensive_panic_last_tick: Option<u32>,
     defensive_panic_response: DefensivePanicResponse,
@@ -159,9 +141,6 @@ impl AiDecisionMemory {
             attack_first_size: Some(profile.attack.first_attack_size),
             next_attack_size: profile.attack.first_attack_size,
             last_attack_tick: None,
-            proxy_worker_id: None,
-            recovery_gate_completed_tick: None,
-            recovery_active: false,
             defensive_panic_started_tick: None,
             defensive_panic_last_tick: None,
             defensive_panic_response: DefensivePanicResponse::Riflemen,
@@ -225,9 +204,6 @@ impl AiDecisionMemory {
         self.attack_first_size = Some(profile.attack.first_attack_size);
         self.next_attack_size = profile.attack.first_attack_size;
         self.last_attack_tick = None;
-        self.proxy_worker_id = None;
-        self.recovery_gate_completed_tick = None;
-        self.recovery_active = false;
         self.defensive_panic_started_tick = None;
         self.defensive_panic_last_tick = None;
         self.defensive_panic_response = DefensivePanicResponse::Riflemen;
@@ -299,28 +275,6 @@ impl AiDecisionMemory {
             sustained,
             response: self.defensive_panic_response,
         }
-    }
-
-    fn recovery_active(&mut self, profile: &AiProfile, facts: &AiFacts, tick: u32) -> bool {
-        let Some(policy) = profile.recovery_transition else {
-            self.recovery_gate_completed_tick = None;
-            self.recovery_active = false;
-            return false;
-        };
-        if self.recovery_active {
-            return true;
-        }
-        if facts.complete_building_count(policy.completed_building) == 0 {
-            return false;
-        }
-        let completed_tick = *self.recovery_gate_completed_tick.get_or_insert(tick);
-        let Some(delay_ticks) = recovery_delay_ticks(policy) else {
-            return false;
-        };
-        if tick.saturating_sub(completed_tick) >= delay_ticks {
-            self.recovery_active = true;
-        }
-        self.recovery_active
     }
 
     fn sync_turtle_opening(&mut self, profile: &AiProfile, observation: &AiObservation) {
@@ -460,24 +414,22 @@ where
     let panic_plan = defensive_panic
         .active
         .then(|| defensive_panic_plan(defensive_panic.response, &facts));
-    let recovery_active =
-        !defensive_panic.active && memory.recovery_active(profile, &facts, observation.tick);
     let active_tech_transition = active_tech_transition(observation, profile);
     let required_tech_path = if defensive_panic.active && active_tech_transition.is_none() {
         panic_plan
             .map(|plan| plan.required_tech_path)
             .unwrap_or(&DEFENSIVE_PANIC_RIFLE_TECH_PATH)
     } else {
-        active_required_tech_path(observation, profile, recovery_active)
+        active_required_tech_path(observation, profile)
     };
     let production_policy = if defensive_panic.active {
         panic_plan.map(|plan| plan.production).unwrap_or_else(|| {
             defensive_panic_plan(DefensivePanicResponse::Riflemen, &facts).production
         })
     } else {
-        active_production_policy(observation, profile, recovery_active)
+        active_production_policy(observation, profile)
     };
-    let attack_policy = active_attack_policy(observation, profile, recovery_active);
+    let attack_policy = active_attack_policy(observation, profile);
     let mut idle_builders = facts.idle_workers.clone();
     let mut gathering_builders = facts.gathering_workers.clone();
     idle_builders.sort_unstable();
@@ -500,54 +452,23 @@ where
     }
     let save_for_required_tech_building =
         should_save_for_required_tech_building(&facts, required_tech_path, production_policy);
-    let mut expansion_plan = plan_expansion(
-        observation,
-        &facts,
-        profile,
-        recovery_active,
-        defensive_panic.active,
-    );
+    let mut expansion_plan = plan_expansion(observation, &facts, profile, defensive_panic.active);
     let expansion_blocks_tech_path = expansion_plan.blocks_tech_path;
     let save_for_expansion = expansion_plan.should_save;
-    let proxy_barracks_active =
-        !defensive_panic.active && should_use_proxy_barracks(&facts, profile);
-    let economy_manager_output = if profile.uses_proposal_economy_manager() {
-        Some(propose_economy(EconomyManagerInput {
-            observation,
-            facts: &facts,
-            profile,
-            expansion_plan: &expansion_plan,
-            signals: EconomyManagerSignals {
-                recovery_active,
-                oil_demand: oil_demand_signal(profile, memory, panic_plan),
-                defer_supply_for_tech: save_for_required_tech_building,
-                emergency_supply: facts.free_supply <= profile.supply.emergency_depot_threshold,
-                defer_worker_training_for_tech: defensive_panic.active,
-            },
-        }))
-    } else {
-        None
-    };
-
-    if proxy_barracks_active {
-        if let Some(intent) = try_proxy_barracks(
-            observation,
-            &facts,
-            &mut actions,
-            memory,
-            profile,
-            &mut placeable,
-        ) {
-            intents.push(intent);
-        }
-    }
+    let economy_manager_output = propose_economy(EconomyManagerInput {
+        observation,
+        facts: &facts,
+        profile,
+        expansion_plan: &expansion_plan,
+        signals: EconomyManagerSignals {
+            oil_demand: oil_demand_signal(profile, memory, panic_plan),
+            defer_supply_for_tech: save_for_required_tech_building,
+            emergency_supply: facts.free_supply <= profile.supply.emergency_depot_threshold,
+            defer_worker_training_for_tech: defensive_panic.active,
+        },
+    });
 
     if should_build_depot_from_economy_manager(&economy_manager_output)
-        .unwrap_or_else(|| {
-            wants_depot(&facts, profile)
-                && (!save_for_required_tech_building
-                    || facts.free_supply <= profile.supply.emergency_depot_threshold)
-        })
         && try_build_kind(
             observation,
             &facts,
@@ -565,16 +486,13 @@ where
         });
     }
 
-    if should_build_expansion_from_economy_manager(&economy_manager_output)
-        .unwrap_or(save_for_expansion)
-    {
+    if should_build_expansion_from_economy_manager(&economy_manager_output) {
         if try_build_expansion_city_centre(
             observation,
             &facts,
             &mut actions,
             &builder_pools,
             profile,
-            recovery_active,
             &mut placeable,
         )
         .is_some()
@@ -589,27 +507,9 @@ where
     let save_for_unplanned_expansion =
         save_for_expansion && planned_in_intents(&intents, EntityKind::CityCentre) == 0;
 
-    let economy_plan = economy_manager_output
-        .as_ref()
-        .map(|output| output.plan.clone())
-        .unwrap_or_else(|| {
-            let mut plan = plan_economy(
-                observation,
-                &facts,
-                profile,
-                recovery_active,
-                panic_plan.map(|plan| plan.oil_workers),
-            );
-            if turtle_opening_pending(profile, memory) {
-                plan.desired_oil_workers = plan.current_oil_workers;
-            }
-            plan
-        });
+    let economy_plan = economy_manager_output.plan.clone();
     let save_worker_training_for_tech = defensive_panic.active;
-    let should_train_workers = economy_manager_output
-        .as_ref()
-        .map(|output| output.proposes(EconomyProposal::TrainWorker))
-        .unwrap_or(true);
+    let should_train_workers = economy_manager_output.proposes(EconomyProposal::TrainWorker);
     if should_train_workers {
         for trained in actions::train_units(
             &mut actions,
@@ -634,9 +534,6 @@ where
     }
 
     for kind in required_tech_path {
-        if proxy_barracks_active && *kind == EntityKind::Barracks {
-            continue;
-        }
         if turtle_should_delay_tech_for_entrenchment(profile, memory, &facts, *kind) {
             continue;
         }
@@ -665,7 +562,7 @@ where
     let target_barracks = if defensive_panic.active {
         defensive_panic_barracks_target(defensive_panic)
     } else {
-        active_barracks_curve(profile, recovery_active).target(
+        active_barracks_curve(profile).target(
             observation.economy.steel,
             facts.worker_count,
             economy_plan.target_steel_workers,
@@ -676,7 +573,6 @@ where
         && facts.building_count(EntityKind::Barracks)
             + planned_in_intents(&intents, EntityKind::Barracks)
             < target_barracks
-        && !(proxy_barracks_active && facts.building_count(EntityKind::Barracks) == 0)
         && !expansion_blocks_tech_path
         && !save_for_unplanned_expansion
         && planned_in_intents(&intents, EntityKind::Barracks) == 0
@@ -867,10 +763,8 @@ where
     } else {
         facts.idle_workers.as_slice()
     };
-    let should_assign_oil_workers = economy_manager_output
-        .as_ref()
-        .map(|output| output.proposes(EconomyProposal::AssignOilWorkers))
-        .unwrap_or_else(|| economy_plan.desired_oil_workers > economy_plan.current_oil_workers);
+    let should_assign_oil_workers =
+        economy_manager_output.proposes(EconomyProposal::AssignOilWorkers);
     if should_assign_oil_workers
         && economy_plan.desired_oil_workers > economy_plan.current_oil_workers
     {
@@ -901,10 +795,8 @@ where
         }
     }
 
-    let should_assign_steel_workers = economy_manager_output
-        .as_ref()
-        .map(|output| output.proposes(EconomyProposal::AssignSteelWorkers))
-        .unwrap_or_else(|| economy_plan.target_steel_workers > economy_plan.current_steel_workers);
+    let should_assign_steel_workers =
+        economy_manager_output.proposes(EconomyProposal::AssignSteelWorkers);
     if should_assign_steel_workers
         && economy_plan.target_steel_workers > economy_plan.current_steel_workers
     {
@@ -950,20 +842,12 @@ where
     let attack_due = frontal_wave.attack_due;
     let local_ready_units =
         actions::select_ready_combat_units(&observation.owned, &ALL_COMBAT_UNITS);
-    let rifle_raid_policy = is_rifle_raid_policy(attack_policy);
-    let rifle_raid_units = if rifle_raid_policy {
-        select_rifle_raid_units(observation)
-    } else {
-        Vec::new()
-    };
     if !frontal_wave.ready_units.is_empty()
         || !local_ready_units.is_empty()
-        || !rifle_raid_units.is_empty()
         || !defensive_machine_gunners.is_empty()
     {
         let mut handled_local_defense = false;
         let mut local_defense_assigned = BTreeSet::new();
-        let mut local_defense_targets = BTreeSet::new();
         if let Some(target) = local_defense_target(observation) {
             if let Some(units) = actions::attack_units(
                 &mut actions,
@@ -971,50 +855,8 @@ where
                 target,
             ) {
                 local_defense_assigned.extend(units.iter().copied());
-                local_defense_targets.extend(defense::local_defense_targets(observation));
                 intents.push(AiIntent::Attack { units });
                 handled_local_defense = true;
-            }
-        }
-
-        let mut handled_raid_target = false;
-        let raid_units_available: Vec<u32> = rifle_raid_units
-            .iter()
-            .copied()
-            .filter(|id| !local_defense_assigned.contains(id))
-            .collect();
-        if rifle_raid_policy && !raid_units_available.is_empty() {
-            if let Some(enemy_base) = facts.nearest_public_enemy_base {
-                if let Some(target) = rifle_raid_unit_target(
-                    observation,
-                    &raid_units_available,
-                    &local_defense_targets,
-                )
-                .or_else(|| {
-                    rifle_raid_building_fallback_target(
-                        observation,
-                        &raid_units_available,
-                        &local_defense_targets,
-                        enemy_base,
-                    )
-                }) {
-                    if let Some(units) =
-                        actions::attack_units(&mut actions, raid_units_available.clone(), target)
-                    {
-                        intents.push(AiIntent::Attack { units });
-                        handled_raid_target = true;
-                    }
-                } else {
-                    let (x, y) = rifle_raid_move_target(observation, enemy_base);
-                    let resume_units =
-                        rifle_raid_units_to_resume(observation, &raid_units_available, (x, y));
-                    if !resume_units.is_empty() {
-                        if let Some(units) = actions::move_units(&mut actions, resume_units, x, y) {
-                            intents.push(AiIntent::Move { units });
-                            handled_raid_target = true;
-                        }
-                    }
-                }
             }
         }
 
@@ -1025,7 +867,7 @@ where
             .collect();
         let turtle_defense_active = profile.turtle_defense.is_some();
 
-        if !handled_local_defense && !handled_raid_target && turtle_defense_active {
+        if !handled_local_defense && turtle_defense_active {
             if let Some(policy) = profile.turtle_defense {
                 if let Some(units) = stage_turtle_choke_defense(
                     &mut actions,
@@ -1040,7 +882,6 @@ where
         }
 
         if !handled_local_defense
-            && !handled_raid_target
             && !turtle_defense_active
             && !defensive_machine_gunners_available.is_empty()
         {
@@ -1056,35 +897,21 @@ where
             }
         }
 
-        if !handled_local_defense
-            && !handled_raid_target
-            && !turtle_defense_active
-            && !frontal_wave.ready_units.is_empty()
+        if !handled_local_defense && !turtle_defense_active && !frontal_wave.ready_units.is_empty()
         {
             if let Some(enemy_base) = facts.nearest_public_enemy_base {
-                if rifle_raid_policy && frontal_wave.should_attack() {
-                    let attack_units = {
-                        let (x, y) = rifle_raid_move_target(observation, enemy_base);
-                        actions::move_units(&mut actions, frontal_wave.ready_units.clone(), x, y)
-                    };
-                    if let Some(units) = attack_units {
-                        memory.note_attack_for(profile, attack_policy, observation.tick, &units);
-                        intents.push(AiIntent::Attack { units });
+                if let Some(intent) = issue_frontal_wave(
+                    &mut actions,
+                    observation,
+                    profile,
+                    attack_policy,
+                    &frontal_wave,
+                    enemy_base,
+                ) {
+                    if let AiIntent::Attack { units } = &intent {
+                        memory.note_attack_for(profile, attack_policy, observation.tick, units);
                     }
-                } else if !rifle_raid_policy {
-                    if let Some(intent) = issue_frontal_wave(
-                        &mut actions,
-                        observation,
-                        profile,
-                        attack_policy,
-                        &frontal_wave,
-                        enemy_base,
-                    ) {
-                        if let AiIntent::Attack { units } = &intent {
-                            memory.note_attack_for(profile, attack_policy, observation.tick, units);
-                        }
-                        intents.push(intent);
-                    }
+                    intents.push(intent);
                 }
             }
         }
@@ -1112,8 +939,6 @@ where
         attack_size,
         attack_due,
         frontal_wave_blockers: &frontal_wave.blockers,
-        rifle_raid_policy,
-        rifle_raid_units: rifle_raid_units.len(),
         required_tech_path,
     });
 
@@ -1221,20 +1046,12 @@ fn oil_demand_signal(
         .unwrap_or(OilDemandSignal::ProfileDefault)
 }
 
-fn should_build_depot_from_economy_manager(
-    output: &Option<EconomyManagerOutput>,
-) -> Option<bool> {
-    output
-        .as_ref()
-        .map(|output| output.proposes(EconomyProposal::BuildSupplyDepot))
+fn should_build_depot_from_economy_manager(output: &EconomyManagerOutput) -> bool {
+    output.proposes(EconomyProposal::BuildSupplyDepot)
 }
 
-fn should_build_expansion_from_economy_manager(
-    output: &Option<EconomyManagerOutput>,
-) -> Option<bool> {
-    output
-        .as_ref()
-        .map(|output| output.proposes(EconomyProposal::BuildExpansionCityCentre))
+fn should_build_expansion_from_economy_manager(output: &EconomyManagerOutput) -> bool {
+    output.proposes(EconomyProposal::BuildExpansionCityCentre)
 }
 
 fn turtle_should_delay_tech_for_entrenchment(
