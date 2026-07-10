@@ -27,11 +27,12 @@ Use for tests, CI/hooks, or focused verification.
 - `RTS_FULL_AI_TESTS=1 cargo nextest run --config-file .config/nextest.toml --manifest-path
   server/Cargo.toml --profile default` — long AI self-play/simulation coverage.
 - `tests/run-all.sh --full-ai` — full orchestrator plus long AI coverage.
-- `node tests/select-suites.mjs --from=<base-ref>` — list expected suites for changed files.
+- `node tests/select-suites.mjs --from=<base-ref>` — suites.
 - `node scripts/check-docs-health.mjs` — docs map, capsule cap, and Markdown links.
 - `node scripts/check-wiki.mjs` — wiki route hardening, generated stats, and faction catalog
   parity.
-- Render perf: `node scripts/client-perf-harness.mjs --render-lag-suite --seconds 10`.
+- `node scripts/client-perf-harness.mjs --render-lag-suite --seconds 10`.
+- Agent Lab: `node tests/agent_lab_driver_smoke.mjs`.
 - `node scripts/check-source-file-sizes.mjs` — enforce the 1500-line source cap.
 - `node scripts/check-crate-boundaries.mjs` — enforce crate direction.
 - `cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture` —

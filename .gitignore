@@ -4,6 +4,7 @@
 /desktop/maccursor-shell/src-tauri/gen
 /desktop/maccursor-shell/src-tauri/target
 /target/client-perf
+/target/agent-lab
 **/*.rs.bk
 Cargo.lock.orig
 

@@ -58,6 +58,7 @@ import {
 import { SettingsContainer } from "./settings_container.js";
 import { buildSettingsTabs } from "./settings_panels.js";
 import { resolveVisualProfileLaunch } from "./visual_profiles.js";
+import { AgentLabBridge, agentLabLaunchEnabled } from "./agent_lab_bridge.js";
 
 /**
  * App-level heartbeat interval (ms). The server drops connections idle for 40s,
@@ -126,6 +127,7 @@ export class App {
     this.labPanel = null;
     this.labMapEditorSession = null;
     this.labControlPolicy = null;
+    this.agentLabBridge = agentLabLaunchEnabled() ? new AgentLabBridge({ app: this }) : null;
     /** @type {number|undefined} pending toast hide timer. */
     this.toastTimer = undefined;
     /** @type {number|undefined} heartbeat interval id while connected. */
@@ -709,6 +711,7 @@ export class App {
         this.match = null;
       }
       this.destroyLabShell();
+      this.destroyAgentLabBridge();
       this.allowUnloadWithoutWarning = true;
       window.location.assign(new URL("/", window.location.href).toString());
       return;
@@ -719,6 +722,7 @@ export class App {
       this.match = null;
     }
     this.destroyLabShell();
+    this.destroyAgentLabBridge();
     this.inReplayPlayback = false;
     this.lastObservationRunId = "";
     this.statusBadge.clearMatchMetrics();
@@ -744,6 +748,11 @@ export class App {
     this.labPanel = null;
     this.labClient = null;
     this.labControlPolicy = null;
+  }
+
+  destroyAgentLabBridge() {
+    this.agentLabBridge?.destroy();
+    this.agentLabBridge = null;
   }
 
   mountLobbySettings() {

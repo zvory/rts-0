@@ -1,7 +1,12 @@
-import { PLAYABLE_FACTIONS } from "./lobby_view.js";
-import { DEFAULT_FACTION_ID, KIND, LAB_ROLE, msg } from "./protocol.js";
-import { factionCatalog, PLAYER_PALETTE, STATS, UPGRADES } from "./config.js";
+import { DEFAULT_FACTION_ID, LAB_ROLE, msg } from "./protocol.js";
+import { PLAYER_PALETTE, STATS, UPGRADES } from "./config.js";
 import { LabPanelWindowChrome } from "./lab_panel_window.js";
+import {
+  labBuildingSpawnFactionOptions,
+  labSpawnBuildingKindsForFaction,
+  labSpawnFactionOptions,
+  labSpawnUnitKindsForFaction,
+} from "./lab_spawn_catalog.js";
 import { LabMapEditorPanel } from "./lab_map_editor_panel.js";
 import { labToolDetailText } from "./lab_tool_detail.js";
 import { createLabScenarioAuthoringState, slugifyLabScenario } from "./lab_scenario_authoring.js";
@@ -26,9 +31,6 @@ const labVision = Object.freeze({
 const GIVE_ALL_RESOURCE_AMOUNT = 99999;
 const OPTIONS_PANEL_STORAGE_KEY = "rts.labPanel.options.window.v1";
 const TOOLS_PANEL_STORAGE_KEY = "rts.labPanel.tools.window.v1";
-const LAB_ONLY_UNIT_SPAWNS_BY_FACTION = Object.freeze({
-  [DEFAULT_FACTION_ID]: Object.freeze([KIND.PANZERFAUST, KIND.SCOUT_PLANE]),
-});
 
 export class LabPanel {
   constructor({
@@ -1306,25 +1308,12 @@ const KIND_LABELS = Object.fromEntries(
   Object.entries(STATS).map(([kind, st]) => [kind, st.label || kind]),
 );
 
-export function labSpawnFactionOptions() {
-  return PLAYABLE_FACTIONS.filter((entry) => labSpawnUnitKindsForFaction(entry.id).length > 0);
-}
-
-export function labSpawnUnitKindsForFaction(factionId) {
-  const catalogUnits = factionCatalog(factionId).units;
-  const labOnlyUnits = LAB_ONLY_UNIT_SPAWNS_BY_FACTION[factionId] || [];
-  return [...catalogUnits, ...labOnlyUnits].filter((kind, index, units) =>
-    STATS[kind] && units.indexOf(kind) === index
-  );
-}
-
-export function labBuildingSpawnFactionOptions() {
-  return PLAYABLE_FACTIONS.filter((entry) => labSpawnBuildingKindsForFaction(entry.id).length > 0);
-}
-
-export function labSpawnBuildingKindsForFaction(factionId) {
-  return factionCatalog(factionId).buildings.filter((kind) => STATS[kind]);
-}
+export {
+  labBuildingSpawnFactionOptions,
+  labSpawnBuildingKindsForFaction,
+  labSpawnFactionOptions,
+  labSpawnUnitKindsForFaction,
+};
 
 function factionLabel(factionId, options = labSpawnFactionOptions()) {
   return options.find((entry) => entry.id === factionId)?.label || String(factionId || "");
