@@ -326,26 +326,36 @@ export class Net {
     return this.ws?.bufferedAmount || 0;
   }
 
-  /** Set room-controlled time speed. 0 pauses rooms whose clock allows pause. */
+  /**
+   * Set room-controlled time speed. 0 pauses rooms whose clock allows pause.
+   * @returns {boolean} true when the WebSocket accepted the outgoing frame
+   */
   setRoomTimeSpeed(speed) {
-    this._send(msg.setRoomTimeSpeed(speed));
+    return this._send(msg.setRoomTimeSpeed(speed));
   }
 
-  /** Advance room-controlled time by one authoritative simulation tick where allowed. */
+  /**
+   * Advance room-controlled time by one authoritative simulation tick where allowed.
+   * @returns {boolean} true when the WebSocket accepted the outgoing frame
+   */
   stepRoomTime() {
-    this._send(msg.stepRoomTime());
+    return this._send(msg.stepRoomTime());
   }
 
   /**
    * Rewind room-controlled time by `ticksBack` ticks. Pass a large value
    * (e.g. 2**31 - 1) to reset to the start.
    * @param {number} ticksBack
+   * @returns {boolean} true when the WebSocket accepted the outgoing frame
    */
   seekRoomTime(ticksBack) {
     return this._send(msg.seekRoomTime(ticksBack));
   }
 
-  /** Seek room-controlled time to an absolute simulation tick where allowed. */
+  /**
+   * Seek room-controlled time to an absolute simulation tick where allowed.
+   * @returns {boolean} true when the WebSocket accepted the outgoing frame
+   */
   seekRoomTimeTo(tick) {
     return this._send(msg.seekRoomTimeTo(tick));
   }
@@ -416,8 +426,18 @@ export class Net {
     }
     if (obj?.t === "ping") this.diagnostics?.count(label, { bytes: json.length });
     else this.diagnostics?.mark(label, { bytes: json.length });
-    this.ws.send(json);
-    return true;
+    try {
+      this.ws.send(json);
+      return true;
+    } catch (error) {
+      this.diagnostics?.mark(`${label}.blocked`, {
+        readyState: this.ws?.readyState ?? null,
+        bytes: json.length,
+        reason: "send_failed",
+        errorName: error?.name || "Error",
+      });
+      return false;
+    }
   }
 
   /**

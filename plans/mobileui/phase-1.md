@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done. Physical-device manual validation remains required before release.
 
 ## Objective
 
@@ -44,12 +44,12 @@ Make the existing room-time/replay control surface reliable on touch, pen, mouse
 
 ## Implementation Checklist
 
-- [ ] Record the current event/send/roomTimeState sequence for the reported speed-control case.
-- [ ] Add reliable, de-duplicated touch/pen activation for every eligible room-time action.
-- [ ] Add truthful pending, confirmation, failed-send, and no-confirmation presentation using the current authority message.
-- [ ] Add focused coverage for touch, pen, mouse, keyboard, duplicate synthetic click, cancellation, blocked socket send, and authoritative confirmation.
+- [x] Record the current event/send/roomTimeState sequence for the reported speed-control case.
+- [x] Add reliable, de-duplicated touch/pen activation for every eligible room-time action.
+- [x] Add truthful pending, confirmation, failed-send, and no-confirmation presentation using the current authority message.
+- [x] Add focused coverage for touch, pen, mouse, keyboard, duplicate synthetic click, cancellation, blocked socket send, and authoritative confirmation.
 - [ ] Complete desktop preservation checks and a real iPhone Safari or Android Chrome replay pass.
-- [ ] Mark this phase done in this file in the implementation commit.
+- [x] Mark this phase done in this file in the implementation commit.
 
 ## Verification
 

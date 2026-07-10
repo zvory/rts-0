@@ -4438,6 +4438,11 @@ input[type="text"]:focus {
   color: var(--accent);
   background: rgba(17, 17, 15, 0.95);
 }
+#room-time-controls[data-room-time-pending="true"] .spd-btn:disabled,
+#room-time-controls[data-room-time-pending="true"] .room-time-timeline-track:disabled {
+  cursor: wait;
+  opacity: 0.66;
+}
 .spd-sep {
   display: inline-block;
   width: 1px;

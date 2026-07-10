@@ -77,6 +77,16 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   assert(sent[1].t === "pauseGame" && sent[2].t === "unpauseGame", "Net live pause helpers send exact tags");
   net.lab(12, { op: "setVision", vision: msg.labVisionFullWorld() });
   assert(sent[3].t === "lab" && sent[3].requestId === 12, "Net.lab sends lab request envelopes");
+  assert(net.setRoomTimeSpeed(2) === true, "Net reports a successful room-time speed send");
+  assert(net.stepRoomTime() === true, "Net reports a successful room-time step send");
+  net.ws.readyState = WebSocket.CLOSED;
+  assert(net.setRoomTimeSpeed(2) === false, "Net reports a blocked room-time speed send");
+  assert(net.stepRoomTime() === false, "Net reports a blocked room-time step send");
+  net.ws.readyState = WebSocket.OPEN;
+  const workingSend = net.ws.send;
+  net.ws.send = () => { throw new Error("socket closed during send"); };
+  assert(net.setRoomTimeSpeed(2) === false, "Net reports a synchronous WebSocket send failure");
+  net.ws.send = workingSend;
   assert(
     msg.labExportScenario(13, "saved").op.name === "saved",
     "lab setup export builder includes a name",

@@ -1,6 +1,9 @@
 import { dom } from "./bootstrap.js";
+import { createImmediateTouchButtonActivation } from "./panel_touch_activation.js";
 import { VISION_SELECTION } from "./protocol.js";
 import { FloatingRoomTimePanel } from "./room_time_panel.js";
+
+const ROOM_TIME_CONFIRMATION_TIMEOUT_MS = 3_000;
 
 export class RoomTimeControls {
   constructor({ net, state, replayViewer = false, capabilities = null, label = null }) {
@@ -16,7 +19,12 @@ export class RoomTimeControls {
     this.roomTimeState = null;
     this.roomTimeSeekPending = false;
     this.roomTimeSeekTargetTick = null;
-    this.roomTimeHandler = null;
+    this.roomTimePending = null;
+    this.roomTimePendingTimer = null;
+    this.roomTimeTimedOutAction = null;
+    this.roomTimeNotice = "";
+    this.controlActivationBindings = [];
+    this.roomTimeAccessDenied = state?.controlPolicy?.kind === "lab" && state.controlPolicy.isOperator?.() === false;
     this.lastRoomTimeSpeed = 2;
     this.floatingPanel = null;
 
@@ -41,65 +49,107 @@ export class RoomTimeControls {
     for (const btn of dom.roomTimeControls.querySelectorAll(".room-time-step-btn")) {
       btn.hidden = !this.roomTime.step;
     }
-    this.roomTimeHandler = (e) => this.onRoomTimeControlClick(e);
-    dom.roomTimeControls.addEventListener("click", this.roomTimeHandler);
-    this.setRoomTimeSpeedActive(this.replayViewer ? 2 : null);
+    this.bindStaticRoomTimeActivations();
+    this.setRoomTimeSpeedActive(null);
     if (this.replayViewer && this.roomTime.pause) this.buildReplayPauseControl();
     if (this.replayViewer && this.actions.branchFromTick) this.buildBranchFromTickControl();
     if (this.visibility.visionSelection) this.buildVisionSelectionControls();
     this.buildRoomTimeStatus();
     if (this.roomTime.timeline && this.roomTime.seekAbsolute) this.buildRoomTimeTimeline();
+    this.syncRoomTimePendingPresentation();
     this.updateRoomTimePauseButton();
+    this.updateRoomTimeStatus();
   }
 
   roomTimeControlSurface() {
     return this.floatingPanel?.contentEl || dom.roomTimeControls?.querySelector(".room-time-panel-body") || dom.roomTimeControls;
   }
 
+  bindStaticRoomTimeActivations() {
+    for (const btn of dom.roomTimeControls?.querySelectorAll(".spd-btn") || []) {
+      this.bindRoomTimeActivation(btn, (event) => this.onRoomTimeControlClick({ target: btn, originalEvent: event }));
+    }
+  }
+
+  bindRoomTimeActivation(button, onActivate) {
+    if (!button || this.controlActivationBindings.some(([bound]) => bound === button)) return;
+    const activation = createImmediateTouchButtonActivation(onActivate);
+    const listeners = [
+      ["pointerdown", activation.pointerdown],
+      ["pointerup", activation.pointerup],
+      ["pointercancel", activation.pointercancel],
+      ["pointerleave", activation.pointerleave],
+      ["click", activation.click],
+    ];
+    for (const [type, handler] of listeners) button.addEventListener(type, handler);
+    this.controlActivationBindings.push([button, activation, listeners]);
+  }
+
+  clearRoomTimeActivations() {
+    for (const [button, activation, listeners] of this.controlActivationBindings) {
+      activation.reset();
+      for (const [type, handler] of listeners) button.removeEventListener(type, handler);
+    }
+    this.controlActivationBindings = [];
+  }
+
   onRoomTimeControlClick(e) {
     const btn = e.target.closest(".spd-btn");
-    if (!btn || btn.hidden || btn.disabled) return;
+    if (!btn || btn.hidden || btn.disabled || this.roomTimeAccessDenied) return;
     if (btn.dataset.stepRoomTime !== undefined) {
       if (!this.roomTime.step) return;
-      this.net.stepRoomTime();
+      const currentTick = Number.isFinite(this.roomTimeState?.currentTick) ? this.roomTimeState.currentTick : null;
+      this.requestRoomTimeAction(
+        { kind: "step", baselineTick: currentTick },
+        () => this.net.stepRoomTime(),
+      );
       return;
     }
     if (btn.dataset.seekBack !== undefined) {
       if (!this.roomTime.seekRelative) return;
       const ticksBack = parseInt(btn.dataset.seekBack, 10);
       if (!isFinite(ticksBack) || ticksBack <= 0) return;
-      this.setRoomTimeConcluded(false);
       const currentTick = Number.isFinite(this.roomTimeState?.currentTick) ? this.roomTimeState.currentTick : 0;
-      this.setRoomTimeSeekPending(Math.max(0, currentTick - ticksBack));
-      this.net.seekRoomTime(ticksBack);
+      this.requestRoomTimeAction(
+        {
+          kind: "seek",
+          mode: "relative",
+          baselineTick: currentTick,
+          expectedTick: Math.max(0, currentTick - ticksBack),
+        },
+        () => this.net.seekRoomTime(ticksBack),
+      );
       return;
     }
     if (btn.dataset.roomTimePauseToggle !== undefined || btn.classList.contains("room-time-pause-btn")) {
       if (!this.roomTime.pause) return;
       const speed = this.isRoomTimePaused() ? this.lastRoomTimeSpeed : 0;
-      this.net.setRoomTimeSpeed(speed);
-      this.roomTimeState = { ...(this.roomTimeState || {}), speed, paused: speed === 0 };
-      this.setRoomTimeSpeedActive(speed);
-      this.updateRoomTimePauseButton();
-      this.updateRoomTimeStatus();
+      this.requestRoomTimeAction({ kind: "speed", expectedSpeed: speed }, () => this.net.setRoomTimeSpeed(speed));
       return;
     }
     const speed = parseFloat(btn.dataset.speed);
     if (!isFinite(speed)) return;
     if (speed === 0 && !this.roomTime.pause) return;
     if (speed > 0 && !this.roomTime.setSpeed) return;
-    if (speed > 0) this.lastRoomTimeSpeed = speed;
-    this.net.setRoomTimeSpeed(speed);
-    this.roomTimeState = { ...(this.roomTimeState || {}), speed, paused: speed === 0 };
-    this.setRoomTimeSpeedActive(speed);
-    this.updateRoomTimePauseButton();
-    this.updateRoomTimeStatus();
+    this.requestRoomTimeAction({ kind: "speed", expectedSpeed: speed }, () => this.net.setRoomTimeSpeed(speed));
   }
 
   applyRoomTimeState(state) {
     this.roomTimeState = state || null;
-    this.setRoomTimeSeekPending(null, false);
+    const pending = this.roomTimePending;
+    if (pending && this.roomTimeActionConfirmed(pending, state)) {
+      this.clearRoomTimePending();
+      this.roomTimeNotice = "";
+    } else if (
+      !pending &&
+      this.roomTimeTimedOutAction &&
+      this.roomTimeActionConfirmed(this.roomTimeTimedOutAction, state)
+    ) {
+      this.roomTimeTimedOutAction = null;
+      this.roomTimeNotice = "";
+    }
     if (Number.isFinite(state?.speed) && state.speed > 0) this.lastRoomTimeSpeed = state.speed;
+    this.syncRoomTimePendingPresentation();
     const ended =
       state?.ended === true ||
       (Number.isFinite(state?.currentTick) &&
@@ -113,9 +163,102 @@ export class RoomTimeControls {
     this.updateRoomTimeTimeline();
   }
 
+  requestRoomTimeAction(pending, send) {
+    if (this.roomTimePending) return false;
+    this.roomTimeTimedOutAction = null;
+    const sent = send?.() === true;
+    if (!sent) {
+      this.roomTimeNotice = "Room time command was not sent.";
+      this.updateRoomTimeStatus();
+      return false;
+    }
+
+    this.roomTimeNotice = "";
+    this.roomTimePending = Number.isFinite(this.net?.playerId)
+      ? { ...pending, controllerId: this.net.playerId }
+      : pending;
+    if (this.roomTimePending.kind === "seek") {
+      this.roomTimeSeekPending = true;
+      this.roomTimeSeekTargetTick = this.roomTimePending.expectedTick;
+      this.setRoomTimeConcluded(false);
+    }
+    this.syncRoomTimePendingPresentation();
+    this.updateRoomTimeStatus();
+    this.updateRoomTimeTimeline();
+    this.roomTimePendingTimer = typeof globalThis.setTimeout === "function"
+      ? globalThis.setTimeout(() => this.expireRoomTimePending(), ROOM_TIME_CONFIRMATION_TIMEOUT_MS)
+      : null;
+    return true;
+  }
+
+  roomTimeActionConfirmed(pending, state) {
+    if (!state) return false;
+    if (pending.kind === "speed") {
+      return Number.isFinite(state.speed) && Math.abs(state.speed - pending.expectedSpeed) < 0.001;
+    }
+    if (pending.kind === "seek") {
+      if (!Number.isFinite(state.currentTick) || !Number.isFinite(pending.expectedTick)) return false;
+      if (Number.isFinite(pending.controllerId) && state.controllerId !== pending.controllerId) return false;
+      if (state.currentTick === pending.expectedTick) return true;
+      if (!Number.isFinite(pending.baselineTick)) return false;
+      if (pending.mode === "relative") return state.currentTick < pending.baselineTick;
+      return (
+        Math.abs(state.currentTick - pending.expectedTick) <
+        Math.abs(pending.baselineTick - pending.expectedTick)
+      );
+    }
+    if (pending.kind === "step") {
+      if (
+        Number.isFinite(pending.controllerId) &&
+        Number.isFinite(state.controllerId) &&
+        state.controllerId !== pending.controllerId
+      ) return false;
+      return (
+        Number.isFinite(pending.baselineTick) &&
+        Number.isFinite(state.currentTick) &&
+        state.currentTick > pending.baselineTick
+      );
+    }
+    return false;
+  }
+
+  expireRoomTimePending() {
+    if (!this.roomTimePending) return;
+    this.roomTimeTimedOutAction = this.roomTimePending;
+    this.clearRoomTimePending();
+    this.roomTimeNotice = "Room time unavailable or unchanged — check connection or permissions.";
+    this.updateRoomTimeStatus();
+  }
+
+  clearRoomTimePending() {
+    if (this.roomTimePendingTimer != null) globalThis.clearTimeout?.(this.roomTimePendingTimer);
+    this.roomTimePendingTimer = null;
+    this.roomTimePending = null;
+    this.roomTimeSeekPending = false;
+    this.roomTimeSeekTargetTick = null;
+    this.syncRoomTimePendingPresentation();
+  }
+
+  syncRoomTimePendingPresentation() {
+    const root = dom.roomTimeControls;
+    if (!root) return;
+    const pending = !!this.roomTimePending;
+    root.dataset.roomTimePending = pending ? "true" : "false";
+    root.setAttribute("aria-busy", pending ? "true" : "false");
+    const awaitingAuthority = !this.roomTimeState;
+    for (const btn of root.querySelectorAll(".spd-btn")) {
+      btn.disabled = pending || this.roomTimeAccessDenied || awaitingAuthority;
+    }
+    const timeline = root.querySelector(".room-time-timeline-track");
+    if (timeline) timeline.disabled = pending || this.roomTimeAccessDenied || awaitingAuthority;
+    root.dataset.roomTimeAccessDenied = this.roomTimeAccessDenied ? "true" : "false";
+    root.dataset.roomTimeAwaitingAuthority = awaitingAuthority ? "true" : "false";
+  }
+
   noteSnapshotTick(tick) {
     if (!this.roomTime.available || !Number.isFinite(tick)) return;
-    this.roomTimeState = { ...(this.roomTimeState || {}), currentTick: tick };
+    if (!this.roomTimeState) return;
+    this.roomTimeState = { ...this.roomTimeState, currentTick: tick };
     this.updateRoomTimeStatus();
     this.updateRoomTimeTimeline();
   }
@@ -163,6 +306,7 @@ export class RoomTimeControls {
     pause.dataset.roomTimePauseToggle = "1";
     pause.textContent = "Pause";
     pause.title = "Pause replay playback.";
+    this.bindRoomTimeActivation(pause, (event) => this.onRoomTimeControlClick({ target: pause, originalEvent: event }));
     surface.appendChild(pause);
   }
 
@@ -175,7 +319,9 @@ export class RoomTimeControls {
     resume.className = "spd-btn replay-branch-btn";
     resume.textContent = "Resume play from here";
     resume.title = "Create a practice branch from the current replay tick.";
-    resume.addEventListener("click", () => this.net.requestBranchFromTick());
+    this.bindRoomTimeActivation(resume, () => {
+      if (!resume.hidden && !resume.disabled) this.net.requestBranchFromTick();
+    });
     surface.appendChild(resume);
   }
 
@@ -195,6 +341,12 @@ export class RoomTimeControls {
     all.dataset.vision = "all";
     all.textContent = "All vision";
     all.title = "Show the union of all players' fog perspectives.";
+    this.bindRoomTimeActivation(all, (event) => this.onVisionSelectionClick({
+      target: all,
+      shiftKey: event?.shiftKey,
+      metaKey: event?.metaKey,
+      ctrlKey: event?.ctrlKey,
+    }));
     group.appendChild(all);
 
     for (const player of this.state.players) {
@@ -205,10 +357,15 @@ export class RoomTimeControls {
       btn.textContent = player.name || `P${player.id}`;
       btn.title = "Click for this player. Shift-click to combine players.";
       btn.style.setProperty("--player-color", player.color || "#aaa");
+      this.bindRoomTimeActivation(btn, (event) => this.onVisionSelectionClick({
+        target: btn,
+        shiftKey: event?.shiftKey,
+        metaKey: event?.metaKey,
+        ctrlKey: event?.ctrlKey,
+      }));
       group.appendChild(btn);
     }
 
-    group.addEventListener("click", (ev) => this.onVisionSelectionClick(ev));
     surface.appendChild(group);
   }
 
@@ -236,7 +393,10 @@ export class RoomTimeControls {
     track.className = "room-time-timeline-track";
     track.setAttribute("aria-label", `Seek ${this.label.toLowerCase()} timeline`);
     track.title = `Click to seek ${this.label.toLowerCase()}`;
-    track.addEventListener("click", (ev) => this.onRoomTimeTimelineClick(ev));
+    this.bindRoomTimeActivation(track, (event) => this.onRoomTimeTimelineClick({
+      currentTarget: track,
+      clientX: event?.clientX,
+    }));
 
     const progress = document.createElement("span");
     progress.className = "room-time-timeline-progress";
@@ -254,22 +414,18 @@ export class RoomTimeControls {
   onRoomTimeTimelineClick(ev) {
     if (!this.roomTime.timeline || !this.roomTime.seekAbsolute) return;
     const track = ev.currentTarget;
+    if (track?.disabled || this.roomTimeAccessDenied) return;
     const duration = Number.isFinite(this.roomTimeState?.durationTicks) ? this.roomTimeState.durationTicks : 0;
     if (!track || duration <= 0) return;
     const rect = track.getBoundingClientRect();
     if (!rect.width) return;
     const ratio = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
     const tick = Math.round(ratio * duration);
-    this.setRoomTimeConcluded(false);
-    this.setRoomTimeSeekPending(tick);
-    this.net.seekRoomTimeTo(tick);
-  }
-
-  setRoomTimeSeekPending(targetTick, pending = true) {
-    this.roomTimeSeekPending = !!pending;
-    this.roomTimeSeekTargetTick = this.roomTimeSeekPending && Number.isFinite(targetTick) ? targetTick : null;
-    this.updateRoomTimeStatus();
-    this.updateRoomTimeTimeline();
+    const baselineTick = Number.isFinite(this.roomTimeState?.currentTick) ? this.roomTimeState.currentTick : null;
+    this.requestRoomTimeAction(
+      { kind: "seek", mode: "absolute", baselineTick, expectedTick: tick },
+      () => this.net.seekRoomTimeTo(tick),
+    );
   }
 
   updateRoomTimeTimeline() {
@@ -303,7 +459,7 @@ export class RoomTimeControls {
 
   onVisionSelectionClick(ev) {
     const btn = ev.target.closest(".vision-btn");
-    if (!btn) return;
+    if (!btn || btn.hidden || btn.disabled) return;
     if (btn.dataset.vision === "all") {
       this.visionSelection.clear();
       this.net.setVisionSelection({ mode: VISION_SELECTION.ALL });
@@ -352,21 +508,33 @@ export class RoomTimeControls {
   updateRoomTimeStatus() {
     const status = dom.roomTimeControls?.querySelector(".room-time-tick-status");
     if (!status) return;
+    if (this.roomTimeAccessDenied) {
+      status.textContent = `${this.label} unavailable — operator access required.`;
+      return;
+    }
+    if (!this.roomTimeState) {
+      const pending = this.roomTimePending ? " · Waiting for confirmation..." : "";
+      const notice = this.roomTimeNotice ? ` · ${this.roomTimeNotice}` : "";
+      status.textContent = `${this.label} awaiting authoritative state${pending}${notice}`;
+      return;
+    }
     const current = Number.isFinite(this.roomTimeState?.currentTick) ? this.roomTimeState.currentTick : 0;
     const duration = Number.isFinite(this.roomTimeState?.durationTicks) ? this.roomTimeState.durationTicks : 0;
     const speed = Number.isFinite(this.roomTimeState?.speed) ? this.roomTimeState.speed : this.lastRoomTimeSpeed;
-    const seeking = this.roomTimeSeekPending
-      ? ` · Seeking${Number.isFinite(this.roomTimeSeekTargetTick) ? ` ${this.roomTimeSeekTargetTick}` : ""}...`
+    const pending = this.roomTimePending
+      ? this.roomTimeSeekPending
+        ? ` · Seeking${Number.isFinite(this.roomTimeSeekTargetTick) ? ` ${this.roomTimeSeekTargetTick}` : ""}...`
+        : " · Waiting for confirmation..."
       : "";
-    status.textContent = `${this.label} ${current} / ${duration} @ ${speed}x${seeking}`;
+    const notice = this.roomTimeNotice ? ` · ${this.roomTimeNotice}` : "";
+    status.textContent = `${this.label} ${current} / ${duration} @ ${speed}x${pending}${notice}`;
   }
 
   destroy() {
     if (!dom.roomTimeControls) return;
-    if (this.roomTimeHandler) {
-      dom.roomTimeControls.removeEventListener("click", this.roomTimeHandler);
-      this.roomTimeHandler = null;
-    }
+    this.clearRoomTimePending();
+    this.roomTimeTimedOutAction = null;
+    this.clearRoomTimeActivations();
     dom.roomTimeControls.hidden = true;
     this.setRoomTimeConcluded(false);
     for (const btn of dom.roomTimeControls.querySelectorAll(".spd-btn")) {
@@ -382,6 +550,11 @@ export class RoomTimeControls {
         btn.classList.remove("active");
       }
     }
+    for (const btn of dom.roomTimeControls.querySelectorAll(".spd-btn")) btn.disabled = false;
+    delete dom.roomTimeControls.dataset.roomTimePending;
+    delete dom.roomTimeControls.dataset.roomTimeAccessDenied;
+    delete dom.roomTimeControls.dataset.roomTimeAwaitingAuthority;
+    dom.roomTimeControls.removeAttribute?.("aria-busy");
     dom.roomTimeControls.classList.remove("replay-viewer-controls");
     dom.roomTimeControls.classList.remove("room-time-controls");
     dom.roomTimeControls.removeAttribute?.("aria-label");
