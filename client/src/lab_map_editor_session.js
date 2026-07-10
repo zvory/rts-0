@@ -24,12 +24,17 @@ export class LabMapEditorSession {
     this.redoStack = [];
     this.subscribers = new Set();
     this.desiredTool = null;
+    this.selectedLayoutId = "";
     this.lastAction = "";
     this.testedDraftFingerprint = "";
   }
 
   get initialized() {
     return !!this.draft;
+  }
+
+  get activeLayout() {
+    return layoutById(this.draft, this.selectedLayoutId);
   }
 
   initializeFromStart(startPayload, { name = "Lab map" } = {}) {
@@ -49,6 +54,7 @@ export class LabMapEditorSession {
       starts,
       expansionSites: [],
     });
+    this.ensureSelectedLayout();
     this.markCurrentDraftAsTested({ notify: false });
     this.notify("initialized");
     return true;
@@ -66,10 +72,46 @@ export class LabMapEditorSession {
       starts: data.starts,
       expansionSites: data.expansionSites,
     });
+    this.ensureSelectedLayout();
     this.undoStack = [];
     this.redoStack = [];
     this.markCurrentDraftAsTested({ notify: false });
     this.notify("initialized");
+    return true;
+  }
+
+  loadAuthoredMap(source, { expectedSize = null, playerCount = null } = {}) {
+    const draft = clone(source);
+    normalizeDraft(draft);
+    const requiredSize = positiveInteger(expectedSize);
+    if (requiredSize && draft.terrain.length !== requiredSize) {
+      throw new Error(
+        `This lab uses a ${requiredSize} × ${requiredSize} map; ${draft.name} is ${draft.terrain.length} × ${draft.terrain.length}.`,
+      );
+    }
+    const requiredPlayers = positiveInteger(playerCount);
+    const compatibleLayouts = requiredPlayers
+      ? draft.layouts.filter((layout) => layout.slots.length === requiredPlayers)
+      : draft.layouts;
+    if (compatibleLayouts.length === 0) {
+      throw new Error(`${draft.name} has no ${requiredPlayers}-player layout for this lab.`);
+    }
+
+    this.draft = draft;
+    this.selectedLayoutId = compatibleLayouts[0].id;
+    this.undoStack = [];
+    this.redoStack = [];
+    this.lastAction = `Loaded ${draft.name}`;
+    this.notify("loaded");
+    return true;
+  }
+
+  selectLayout(layoutId) {
+    const layout = this.draft?.layouts?.find((candidate) => candidate.id === layoutId) || null;
+    if (!layout || layout.id === this.selectedLayoutId) return false;
+    this.selectedLayoutId = layout.id;
+    this.lastAction = `Selected ${layout.id} layout`;
+    this.notify("layout");
     return true;
   }
 
@@ -87,6 +129,7 @@ export class LabMapEditorSession {
       undoDepth: this.undoStack.length,
       redoDepth: this.redoStack.length,
       desiredTool: this.desiredTool,
+      selectedLayoutId: this.selectedLayoutId,
       lastAction: this.lastAction,
       hasUnappliedChanges: this.hasUnappliedChanges,
     };
@@ -103,6 +146,7 @@ export class LabMapEditorSession {
     if (this.undoStack.length > this.historyLimit) this.undoStack.shift();
     this.redoStack = [];
     this.draft = next;
+    this.ensureSelectedLayout();
     this.lastAction = String(label || "Edited map");
     this.notify("changed");
     return true;
@@ -114,6 +158,7 @@ export class LabMapEditorSession {
     this.redoStack.push(clone(this.draft));
     if (this.redoStack.length > this.historyLimit) this.redoStack.shift();
     this.draft = previous;
+    this.ensureSelectedLayout();
     this.lastAction = "Undo";
     this.notify("undo");
     return true;
@@ -125,6 +170,7 @@ export class LabMapEditorSession {
     this.undoStack.push(clone(this.draft));
     if (this.undoStack.length > this.historyLimit) this.undoStack.shift();
     this.draft = next;
+    this.ensureSelectedLayout();
     this.lastAction = "Redo";
     this.notify("redo");
     return true;
@@ -136,20 +182,20 @@ export class LabMapEditorSession {
   }
 
   get hasUnappliedChanges() {
-    return !!this.draft && draftFingerprint(this.draft) !== this.testedDraftFingerprint;
+    return !!this.draft && draftFingerprint(this.draft, this.selectedLayoutId) !== this.testedDraftFingerprint;
   }
 
-  /** Mark the current authored draft as the map currently under test. */
+  /** Mark the current authored draft and selected layout as the map currently under test. */
   markCurrentDraftAsTested({ notify = true } = {}) {
     if (!this.draft) return false;
-    this.testedDraftFingerprint = draftFingerprint(this.draft);
+    this.testedDraftFingerprint = draftFingerprint(this.draft, this.selectedLayoutId);
     if (notify) this.notify("tested");
     return true;
   }
 
-  /** A player-centred read model for the map authoring UI and map overlay. */
+  /** A player-centred read model for the active authored layout and map overlay. */
   playerSlots() {
-    return draftPlayerSlots(this.draft);
+    return draftPlayerSlots(this.draft, this.selectedLayoutId);
   }
 
   /** Persistent, browser-local markers for authored starts and natural bases. */
@@ -185,6 +231,7 @@ export class LabMapEditorSession {
     }
     if (!this.draft) {
       this.draft = parsed;
+      this.ensureSelectedLayout();
       this.lastAction = "Loaded local draft";
       this.notify("loaded");
       return true;
@@ -196,7 +243,8 @@ export class LabMapEditorSession {
     if (!this.draft) throw new Error("Map draft is not initialized.");
     const draft = clone(this.draft);
     normalizeDraft(draft);
-    const layout = draft.layouts[0];
+    const layout = layoutById(draft, this.selectedLayoutId);
+    if (!layout) throw new Error("Map draft needs a player layout.");
     const byId = new Map(draft.sites.map((site) => [site.id, site]));
     const starts = layout.slots.map((slot) => tileForSite(byId, slot.main, "main"));
     const expansionSites = [];
@@ -228,6 +276,10 @@ export class LabMapEditorSession {
     const snapshot = { ...this.snapshot(), reason };
     for (const handler of this.subscribers) handler(snapshot);
   }
+
+  ensureSelectedLayout() {
+    this.selectedLayoutId = this.activeLayout?.id || this.draft?.layouts?.[0]?.id || "";
+  }
 }
 
 export function paintDraftRect(draft, rect, terrainCode) {
@@ -258,9 +310,23 @@ export function protectDraftBaseTerrain(draft) {
   }
 }
 
+/** Compatibility helper for authored-map import tooling; the draft UI is player-centred. */
+export function placeDraftSite(draft, { kind, x, y, layoutId = "" }) {
+  const normalizedKind = kind === "natural" ? "natural" : "main";
+  const existing = siteAt(draft, x, y);
+  if (existing) return existing.id;
+  const id = uniqueDraftSiteId(draft, normalizedKind);
+  draft.sites.push({ id, kind: normalizedKind, x, y });
+  if (normalizedKind === "main") {
+    const slot = layoutById(draft, layoutId)?.slots.find((candidate) => !candidate.main);
+    if (slot) slot.main = id;
+  }
+  return id;
+}
+
 /** Move one player's start instead of exposing an anonymous "main" site. */
-export function moveDraftPlayerStart(draft, playerIndex, tile) {
-  const slot = draftSlotAt(draft, playerIndex);
+export function moveDraftPlayerStart(draft, playerIndex, tile, layoutId = "") {
+  const slot = draftSlotAt(draft, playerIndex, layoutId);
   const target = normalizedDraftTile(draft, tile);
   if (!slot || !target) return draftEditError("Choose a valid player and map tile.");
   const current = siteById(draft, slot.main);
@@ -280,8 +346,8 @@ export function moveDraftPlayerStart(draft, playerIndex, tile) {
 }
 
 /** Add a natural directly to one player's setup, capped at three per player. */
-export function addDraftPlayerNatural(draft, playerIndex, tile) {
-  const slot = draftSlotAt(draft, playerIndex);
+export function addDraftPlayerNatural(draft, playerIndex, tile, layoutId = "") {
+  const slot = draftSlotAt(draft, playerIndex, layoutId);
   const target = normalizedDraftTile(draft, tile);
   if (!slot || !target) return draftEditError("Choose a valid player and map tile.");
   if (slot.naturals.length >= LAB_MAP_MAX_NATURALS_PER_PLAYER) {
@@ -298,8 +364,8 @@ export function addDraftPlayerNatural(draft, playerIndex, tile) {
 }
 
 /** Move a named natural that already belongs to the selected player. */
-export function moveDraftPlayerNatural(draft, playerIndex, naturalId, tile) {
-  const slot = draftSlotAt(draft, playerIndex);
+export function moveDraftPlayerNatural(draft, playerIndex, naturalId, tile, layoutId = "") {
+  const slot = draftSlotAt(draft, playerIndex, layoutId);
   const target = normalizedDraftTile(draft, tile);
   const natural = siteById(draft, naturalId);
   if (!slot || !target || natural?.kind !== "natural" || !slot.naturals.includes(naturalId)) {
@@ -315,8 +381,8 @@ export function moveDraftPlayerNatural(draft, playerIndex, naturalId, tile) {
 }
 
 /** Remove a natural while keeping all player starts intact. */
-export function removeDraftPlayerNatural(draft, playerIndex, naturalId) {
-  const slot = draftSlotAt(draft, playerIndex);
+export function removeDraftPlayerNatural(draft, playerIndex, naturalId, layoutId = "") {
+  const slot = draftSlotAt(draft, playerIndex, layoutId);
   const natural = siteById(draft, naturalId);
   if (!slot || natural?.kind !== "natural" || !slot.naturals.includes(naturalId)) {
     return draftEditError("That natural base is no longer part of this player's setup.");
@@ -325,11 +391,13 @@ export function removeDraftPlayerNatural(draft, playerIndex, naturalId) {
   return { ok: true, id: naturalId };
 }
 
-function removeDraftSite(draft, siteId) {
+export function removeDraftSite(draft, siteId) {
   draft.sites = draft.sites.filter((site) => site.id !== siteId);
-  for (const slot of draft.layouts[0].slots) {
-    if (slot.main === siteId) slot.main = "";
-    slot.naturals = slot.naturals.filter((id) => id !== siteId);
+  for (const layout of draft.layouts || []) {
+    for (const slot of layout.slots || []) {
+      if (slot.main === siteId) slot.main = "";
+      slot.naturals = slot.naturals.filter((id) => id !== siteId);
+    }
   }
 }
 
@@ -404,16 +472,21 @@ function normalizeDraft(draft) {
   if (!Array.isArray(draft.layouts) || draft.layouts.length === 0) {
     throw new Error("Map draft needs a player layout.");
   }
-  const layout = draft.layouts[0];
-  layout.id = String(layout.id || "lab-layout");
-  layout.slots = Array.isArray(layout.slots) ? layout.slots : [];
-  layout.playerCount = layout.slots.length;
-  for (const slot of layout.slots) {
-    slot.main = String(slot.main || "");
-    slot.naturals = Array.from(new Set(Array.isArray(slot.naturals) ? slot.naturals.map(String) : []))
-      .slice(0, LAB_MAP_MAX_NATURALS_PER_PLAYER);
-  }
-  draft.layouts = [layout];
+  const layoutIds = new Set();
+  draft.layouts = draft.layouts.map((layout, index) => {
+    if (!layout || typeof layout !== "object") throw new Error("Map layouts must be objects.");
+    layout.id = String(layout.id || `lab-layout-${index + 1}`).trim();
+    if (!layout.id || layoutIds.has(layout.id)) throw new Error("Map layout ids must be unique.");
+    layoutIds.add(layout.id);
+    layout.slots = Array.isArray(layout.slots) ? layout.slots : [];
+    layout.playerCount = layout.slots.length;
+    for (const slot of layout.slots) {
+      slot.main = String(slot.main || "");
+      slot.naturals = Array.from(new Set(Array.isArray(slot.naturals) ? slot.naturals.map(String) : []))
+        .slice(0, LAB_MAP_MAX_NATURALS_PER_PLAYER);
+    }
+    return layout;
+  });
 }
 
 function tileForSite(byId, id, expectedKind) {
@@ -441,8 +514,8 @@ function clampTile(value, size) {
   return Math.max(0, Math.min(size - 1, Math.trunc(Number(value)) || 0));
 }
 
-function draftPlayerSlots(draft) {
-  const slots = draft?.layouts?.[0]?.slots;
+function draftPlayerSlots(draft, layoutId) {
+  const slots = layoutById(draft, layoutId)?.slots;
   if (!Array.isArray(slots)) return [];
   return slots.map((slot, playerIndex) => ({
     playerIndex,
@@ -458,9 +531,9 @@ function cloneSiteForPlayer(site, expectedKind) {
   return { id: site.id, kind: site.kind, x: site.x, y: site.y };
 }
 
-function draftSlotAt(draft, playerIndex) {
+function draftSlotAt(draft, playerIndex, layoutId) {
   const index = Number(playerIndex);
-  const slots = draft?.layouts?.[0]?.slots;
+  const slots = layoutById(draft, layoutId)?.slots;
   return Number.isInteger(index) && index >= 0 && Array.isArray(slots) ? slots[index] || null : null;
 }
 
@@ -489,8 +562,18 @@ function draftEditError(error) {
   return { ok: false, error };
 }
 
-function draftFingerprint(draft) {
-  return JSON.stringify(draft || null);
+function draftFingerprint(draft, selectedLayoutId) {
+  return JSON.stringify({ draft: draft || null, selectedLayoutId: selectedLayoutId || "" });
+}
+
+function positiveInteger(value) {
+  const number = Math.trunc(Number(value));
+  return Number.isInteger(number) && number > 0 ? number : 0;
+}
+
+function layoutById(draft, layoutId) {
+  const layouts = Array.isArray(draft?.layouts) ? draft.layouts : [];
+  return layouts.find((layout) => layout.id === layoutId) || layouts[0] || null;
 }
 
 function storageKey(key) {

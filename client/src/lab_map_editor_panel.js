@@ -1,5 +1,5 @@
-import { TERRAIN } from "./protocol.js";
 import { PLAYER_PALETTE } from "./config.js";
+import { TERRAIN } from "./protocol.js";
 import { LabPanelWindowChrome } from "./lab_panel_window.js";
 import {
   LAB_MAP_MAX_NATURALS_PER_PLAYER,
@@ -12,6 +12,24 @@ import {
 } from "./lab_map_editor_session.js";
 
 const MAP_PANEL_STORAGE_KEY = "rts.labPanel.mapEditor.window.v1";
+const MAP_CATALOG_URL = "/maps/catalog";
+const FALLBACK_MAPS = Object.freeze([
+  {
+    file: "default-handcrafted.json",
+    name: "Default",
+    description: "Four-player three-base map with safer in-base naturals and contested naturals.",
+  },
+  {
+    file: "low-econ.json",
+    name: "Low Econ",
+    description: "Four-player map with one natural expansion per spawn.",
+  },
+  {
+    file: "no-terrain.json",
+    name: "No Terrain",
+    description: "All-grass map with the standard spawn layouts.",
+  },
+]);
 
 export class LabMapEditorPanel {
   constructor({
@@ -24,6 +42,7 @@ export class LabMapEditorPanel {
     applyLabMapReset = null,
     setLabMapDraftOverlay = null,
     setLabMapDraftTerrainPreview = null,
+    fetchImpl = globalThis.fetch?.bind(globalThis),
   }) {
     this.root = root;
     this.session = session;
@@ -34,6 +53,7 @@ export class LabMapEditorPanel {
     this.applyLabMapReset = applyLabMapReset;
     this.setLabMapDraftOverlay = setLabMapDraftOverlay;
     this.setLabMapDraftTerrainPreview = setLabMapDraftTerrainPreview;
+    this.fetchImpl = fetchImpl;
     this.destroyed = false;
     this.selectedTerrain = TERRAIN.ROCK;
     this.selectedPlayerIndex = 0;
@@ -43,6 +63,12 @@ export class LabMapEditorPanel {
     this.lastStatusError = false;
     this.applyPending = false;
     this.terrainPreviewSignature = null;
+    this.mapCatalog = FALLBACK_MAPS.slice();
+    this.mapCatalogError = "";
+    this.mapCatalogLoading = false;
+    this.mapCatalogRequest = null;
+    this.mapLoadPending = false;
+    this.selectedMapFile = this.mapCatalog[0]?.file || "";
 
     this.el = document.createElement("aside");
     this.el.className = "lab-panel lab-map-window";
@@ -61,8 +87,10 @@ export class LabMapEditorPanel {
       this.render();
     });
     this.session.initializeFromStart(startPayload, { name: mapName });
+    this.ensureCompatibleLayout();
     this.hydrateInitialMap();
     this.restoreDesiredTool();
+    void this.loadMapCatalog();
   }
 
   async hydrateInitialMap() {
@@ -71,6 +99,7 @@ export class LabMapEditorPanel {
     if (this.destroyed || !result?.ok || !result?.outcome?.scenario) return;
     if (this.session.undoStack.length > 0 || this.session.lastAction) return;
     if (this.session.initializeFromScenario(result.outcome.scenario, { force: true })) {
+      this.ensureCompatibleLayout();
       this.lastStatus = "Loaded the current Lab map as a draft.";
       this.render();
     }
@@ -86,6 +115,7 @@ export class LabMapEditorPanel {
       body.appendChild(readout("Loading current map…"));
     } else {
       body.append(
+        this.renderMapLoader(),
         this.renderHistory(),
         this.renderMetadata(),
         this.renderTerrainTools(),
@@ -95,6 +125,46 @@ export class LabMapEditorPanel {
       );
     }
     this.el.append(body, this.chrome.renderResizeHandle());
+  }
+
+  renderMapLoader() {
+    const fieldset = group("Load map");
+    const selected = this.mapCatalog.find((entry) => entry.file === this.selectedMapFile)
+      || this.mapCatalog[0]
+      || null;
+    const label = document.createElement("label");
+    label.className = "lab-field";
+    const text = document.createElement("span");
+    text.textContent = "Built-in map";
+    const select = document.createElement("select");
+    for (const entry of this.mapCatalog) {
+      const option = document.createElement("option");
+      option.value = entry.file;
+      option.textContent = entry.name;
+      option.title = entry.description;
+      select.appendChild(option);
+    }
+    select.value = selected?.file || "";
+    select.disabled = this.mapLoadPending;
+    select.addEventListener("change", () => {
+      this.selectedMapFile = select.value;
+      this.render();
+    });
+    label.append(text, select);
+    fieldset.append(
+      label,
+      button("Load selected map", () => {
+        this.selectedMapFile = select.value;
+        void this.loadCatalogMap(select.value);
+      }, { disabled: !selected || this.mapLoadPending || this.applyPending }),
+      button(this.mapCatalogLoading ? "Refreshing maps…" : "Refresh maps", () => {
+        void this.loadMapCatalog();
+      }, { disabled: this.mapCatalogLoading || this.mapLoadPending }),
+      readout(selected?.description || "No built-in maps are available."),
+      readout(`Loading a built-in map replaces only this draft. Its ${this.labPlayerCount()}-player layout will be selected; restart the test to use it.`),
+    );
+    if (this.mapCatalogError) fieldset.appendChild(readout(this.mapCatalogError));
+    return fieldset;
   }
 
   renderHistory() {
@@ -145,9 +215,22 @@ export class LabMapEditorPanel {
 
   renderPlayerSetup() {
     const fieldset = group("Player starts and natural bases");
+    const layouts = this.compatibleLayouts();
+    const layout = layouts.find((candidate) => candidate.id === this.session.selectedLayoutId) || null;
+    if (!layout) {
+      fieldset.appendChild(readout(`No ${this.labPlayerCount()}-player layout is available for this Lab test.`));
+      return fieldset;
+    }
+    if (layouts.length > 1) {
+      fieldset.append(layoutSelectField("Test layout", layouts, layout.id, (layoutId) => {
+        if (!this.session.selectLayout(layoutId)) return;
+        this.selectedPlayerIndex = 0;
+        this.setStatus(`Selected ${layoutId} for the draft. The test has not changed.`);
+      }));
+    }
     const players = this.session.playerSlots();
     if (!players.length) {
-      fieldset.appendChild(readout("The draft does not yet contain player slots."));
+      fieldset.appendChild(readout("The selected layout does not yet contain player slots."));
       return fieldset;
     }
     this.selectedPlayerIndex = Math.max(0, Math.min(players.length - 1, this.selectedPlayerIndex));
@@ -180,10 +263,10 @@ export class LabMapEditorPanel {
     for (const [index, natural] of selected.naturals.entries()) {
       const row = document.createElement("div");
       row.className = "lab-map-natural";
-      const label = document.createElement("span");
-      label.textContent = `Natural ${index + 1}: ${natural.x}, ${natural.y}`;
+      const naturalLabel = document.createElement("span");
+      naturalLabel.textContent = `Natural ${index + 1}: ${natural.x}, ${natural.y}`;
       row.append(
-        label,
+        naturalLabel,
         button("Move", () => this.armPlayerNaturalTool(natural.id)),
         button("Remove", () => this.removePlayerNatural(natural.id)),
       );
@@ -213,7 +296,7 @@ export class LabMapEditorPanel {
         ? "This draft has changes that are not in the current Lab test."
         : "This draft matches the current Lab test."),
       button("Restart test with this draft", () => this.restartTestWithDraft(), {
-        disabled: this.applyPending,
+        disabled: this.applyPending || this.mapLoadPending,
         title: "Replace the current Lab test with a fresh test using this map draft",
       }),
       readout("Restarting the test clears its current units, orders, resources, and elapsed time."),
@@ -305,7 +388,7 @@ export class LabMapEditorPanel {
     if (!tile) return;
     const playerIndex = Number(event?.tool?.payload?.playerIndex);
     this.commitDraft(`Moved Player ${playerIndex + 1} start`, (draft) => {
-      const result = moveDraftPlayerStart(draft, playerIndex, tile);
+      const result = moveDraftPlayerStart(draft, playerIndex, tile, this.session.selectedLayoutId);
       if (result.ok) protectDraftBaseTerrain(draft);
       return result;
     });
@@ -320,8 +403,8 @@ export class LabMapEditorPanel {
       naturalId ? `Moved Player ${playerIndex + 1} natural base` : `Added natural for Player ${playerIndex + 1}`,
       (draft) => {
         const result = naturalId
-          ? moveDraftPlayerNatural(draft, playerIndex, naturalId, tile)
-          : addDraftPlayerNatural(draft, playerIndex, tile);
+          ? moveDraftPlayerNatural(draft, playerIndex, naturalId, tile, this.session.selectedLayoutId)
+          : addDraftPlayerNatural(draft, playerIndex, tile, this.session.selectedLayoutId);
         if (result.ok) protectDraftBaseTerrain(draft);
         return result;
       },
@@ -331,7 +414,7 @@ export class LabMapEditorPanel {
   removePlayerNatural(naturalId) {
     const playerIndex = this.selectedPlayerIndex;
     this.commitDraft(`Removed Player ${playerIndex + 1} natural base`, (draft) => (
-      removeDraftPlayerNatural(draft, playerIndex, naturalId)
+      removeDraftPlayerNatural(draft, playerIndex, naturalId, this.session.selectedLayoutId)
     ));
   }
 
@@ -361,9 +444,7 @@ export class LabMapEditorPanel {
   }
 
   async restartTestWithDraft() {
-    if (this.applyPending) {
-      return null;
-    }
+    if (this.applyPending) return null;
     let materialized;
     try {
       materialized = this.session.materialized();
@@ -376,7 +457,7 @@ export class LabMapEditorPanel {
     const result = await this.labClient.applyMapDraft(materialized);
     this.applyPending = false;
     if (!result?.ok) {
-      this.setStatus(result?.error || "Map apply failed.", true);
+      this.setStatus(result?.error || "Map restart failed.", true);
       return result;
     }
     if (!this.applyLabMapReset?.(result.outcome)) {
@@ -386,6 +467,69 @@ export class LabMapEditorPanel {
     this.session.markCurrentDraftAsTested();
     this.setStatus("Test restarted with this map draft. Keep editing the draft without changing the test.");
     return result;
+  }
+
+  loadMapCatalog() {
+    if (this.mapCatalogRequest) return this.mapCatalogRequest;
+    if (!this.fetchImpl) {
+      this.mapCatalogError = "Map catalog unavailable; standard maps are still available.";
+      this.render();
+      return Promise.resolve(false);
+    }
+    this.mapCatalogLoading = true;
+    this.mapCatalogError = "";
+    this.render();
+    this.mapCatalogRequest = (async () => {
+      try {
+        const response = await this.fetchImpl(MAP_CATALOG_URL, { cache: "no-store" });
+        if (!response?.ok) throw new Error(`HTTP ${response?.status || "network"}`);
+        const data = await response.json();
+        const catalog = normalizeMapCatalog(data?.maps);
+        if (catalog.length === 0) throw new Error("no compatible maps");
+        this.mapCatalog = catalog;
+        if (!catalog.some((entry) => entry.file === this.selectedMapFile)) {
+          this.selectedMapFile = catalog[0].file;
+        }
+        return true;
+      } catch {
+        this.mapCatalogError = "Map catalog unavailable; standard maps are still available.";
+        return false;
+      } finally {
+        this.mapCatalogLoading = false;
+        this.mapCatalogRequest = null;
+        this.render();
+      }
+    })();
+    return this.mapCatalogRequest;
+  }
+
+  async loadCatalogMap(file) {
+    if (this.mapLoadPending) return false;
+    const entry = this.mapCatalog.find((candidate) => candidate.file === file);
+    if (!entry || !this.fetchImpl) {
+      this.setStatus("That built-in map is unavailable.", true);
+      return false;
+    }
+    this.mapLoadPending = true;
+    this.setStatus(`Loading ${entry.name}…`);
+    try {
+      const response = await this.fetchImpl(`/maps/${encodeURIComponent(entry.file)}`, { cache: "no-store" });
+      if (!response?.ok) throw new Error(`HTTP ${response?.status || "network"}`);
+      const map = await response.json();
+      this.session.loadAuthoredMap(map, {
+        expectedSize: this.mapSize(),
+        playerCount: this.labPlayerCount(),
+      });
+      this.selectedPlayerIndex = 0;
+      this.setStatus(`Loaded ${entry.name} as a map draft. Restart the test to use it.`);
+      return true;
+    } catch (error) {
+      this.setStatus(`Map load failed: ${error.message || String(error)}`, true);
+      return false;
+    } finally {
+      this.mapLoadPending = false;
+      this.render();
+    }
   }
 
   undo() {
@@ -405,9 +549,16 @@ export class LabMapEditorPanel {
 
   loadLocal() {
     const ok = this.session.loadLocal(this.mapStorageKey());
-    this.setStatus(ok
-      ? "Loaded a saved map draft. Restart the test to use it."
-      : "No compatible saved map draft was found.", !ok);
+    if (!ok) {
+      this.setStatus("No compatible saved map draft was found.", true);
+      return;
+    }
+    if (!this.ensureCompatibleLayout()) {
+      this.setStatus(`The saved draft has no ${this.labPlayerCount()}-player layout for this Lab test.`, true);
+      return;
+    }
+    this.selectedPlayerIndex = 0;
+    this.setStatus("Loaded a saved map draft. Restart the test to use it.");
   }
 
   exportJson() {
@@ -430,6 +581,31 @@ export class LabMapEditorPanel {
 
   mapStorageKey() {
     return this.startPayload?.lab?.room || this.mapName || "default";
+  }
+
+  mapSize() {
+    const size = Number(this.startPayload?.map?.width);
+    return Number.isInteger(size) && size > 0 ? size : null;
+  }
+
+  labPlayerCount() {
+    const players = this.startPayload?.players;
+    return Array.isArray(players) && players.length > 0 ? players.length : 0;
+  }
+
+  compatibleLayouts() {
+    const layouts = this.session.draft?.layouts || [];
+    const playerCount = this.labPlayerCount();
+    return playerCount > 0 ? layouts.filter((layout) => layout.slots.length === playerCount) : layouts;
+  }
+
+  ensureCompatibleLayout() {
+    const layouts = this.compatibleLayouts();
+    if (layouts.length === 0) return false;
+    if (!layouts.some((layout) => layout.id === this.session.selectedLayoutId)) {
+      this.session.selectLayout(layouts[0].id);
+    }
+    return true;
   }
 
   handleKeyDown(event) {
@@ -555,6 +731,42 @@ function textField(labelText, value, onChange) {
   input.addEventListener("change", () => onChange(input.value));
   label.append(text, input);
   return label;
+}
+
+function layoutSelectField(labelText, layouts, selected, onChange) {
+  const label = document.createElement("label");
+  label.className = "lab-field";
+  const text = document.createElement("span");
+  text.textContent = labelText;
+  const select = document.createElement("select");
+  for (const layout of layouts) {
+    const option = document.createElement("option");
+    option.value = layout.id;
+    option.textContent = `${layout.id} (${layout.slots.length} players)`;
+    option.selected = layout.id === selected;
+    select.appendChild(option);
+  }
+  select.value = selected;
+  select.addEventListener("change", () => onChange(select.value));
+  label.append(text, select);
+  return label;
+}
+
+function normalizeMapCatalog(entries) {
+  if (!Array.isArray(entries)) return [];
+  const files = new Set();
+  return entries.flatMap((entry) => {
+    const file = String(entry?.file || "").trim();
+    if (!safeMapFile(file) || files.has(file)) return [];
+    files.add(file);
+    const name = String(entry?.name || file.replace(/\.json$/i, "")).trim() || file;
+    const description = String(entry?.description || name).trim() || name;
+    return [{ file, name, description }];
+  });
+}
+
+function safeMapFile(file) {
+  return /^[a-z0-9][a-z0-9._-]*\.json$/i.test(file) && !file.includes("..");
 }
 
 function readout(text) {

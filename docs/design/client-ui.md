@@ -71,8 +71,8 @@ src/
   lab_panel.js   # LabPanel: app-owned lab controls/status UI mounted around Match
   lab_tool_detail.js # Pure armed-tool instruction text for LabPanel status
   lab_panel_window.js # draggable/resizable chrome helper for the app-owned LabPanel
-  lab_map_editor_session.js # persistent 25-state authored-map draft, player-owned bases, and undo/redo history
-  lab_map_editor_panel.js # floating draft-first Lab map editor, explicit test restart, and map JSON export
+  lab_map_editor_session.js # persistent 25-state authored-map draft, compatible layouts, player-owned bases, and undo/redo history
+  lab_map_editor_panel.js # floating draft-first Lab map editor, built-in map loading, explicit test restart, and map JSON export
   lab_control_policy.js # Lab control collaborator placeholder injected into Match
   lab_map_reset.js # in-place authoritative Lab map/player/fog/terrain refresh collaborator
   visual_profiles.js # Lab-scoped visual experimentation profile registry and resolver
@@ -613,6 +613,7 @@ export const LAB_MAP_HISTORY_LIMIT       // 25
 export class LabMapEditorSession {
   initializeFromStart(startPayload, options?)
   initializeFromScenario(scenario, options?)
+  loadAuthoredMap(source, options?), selectLayout(layoutId)
   mutate(label, mutation), undo(), redo()
   materialized(), exportMap(), saveLocal(key), loadLocal(key)
   markCurrentDraftAsTested(), playerSlots(), mapOverlay()
@@ -636,13 +637,16 @@ disabled. The lab replay controls are visually separate from setup checkpoint JS
 save/open uses the bounded lab replay artifact path instead of the legacy `exportScenario` and
 `importScenario` lab operations.
 For the Lab map-editor proof of concept, `LabPanel` also composes a third floating Map Editor window.
-It is draft-first: painting terrain, moving a player's start, and adding/moving/removing that player's
-natural bases change only the browser-local `LabMapEditorSession`. The editor exposes players and their
-base locations directly rather than anonymous main/natural site IDs and slot pickers. A persistent
-browser-local overlay draws each drafted start and natural in that player's colour, and a local terrain
-preview redraws the cached ground without touching the authoritative `GameState`; the live Lab test
-remains unchanged. Local draft save/load likewise does not alter the test; the normal authored-map JSON
-export remains portable.
+It is draft-first: the window can load built-in authored maps from `/maps/catalog` (with standard maps
+as a fallback) and fetch the selected JSON from `/maps/<file>`, but loading, terrain painting, and base
+editing all change only the browser-local `LabMapEditorSession`. A loaded map must match the active Lab
+map size; the editor selects a compatible player-count layout while preserving every authored layout for
+local save and normal map-JSON export. The editor exposes players and their base locations directly
+rather than anonymous main/natural site IDs and slot pickers. A persistent browser-local overlay draws
+each drafted start and natural in that player's colour, and a local terrain preview redraws cached ground
+without touching authoritative `GameState`; the live Lab test remains unchanged. The terrain controls
+paint one tile at a time by click or drag and use matching grass, stone, and water swatches. Local draft
+save/load likewise does not alter the test.
 
 `Restart test with this draft` is the one explicit draft-to-test transition. It creates a fresh Lab test
 at tick zero with the same players and seed, so it deliberately clears the prior test's units, orders,
