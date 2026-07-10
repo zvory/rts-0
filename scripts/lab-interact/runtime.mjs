@@ -29,6 +29,7 @@ export function runtimePaths(workspaceRoot, { tmpDir = os.tmpdir() } = {}) {
     socket: path.join(directory, "daemon.sock"),
     state: path.join(directory, "state.json"),
     lock: path.join(directory, "startup.lock"),
+    startupError: path.join(directory, "startup-error.json"),
   };
 }
 
@@ -57,6 +58,20 @@ export function writeState(paths, state) {
 export function readState(paths) {
   try {
     return JSON.parse(fs.readFileSync(paths.state, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+export function writeStartupError(paths, error) {
+  const temporary = `${paths.startupError}.${process.pid}.tmp`;
+  fs.writeFileSync(temporary, `${JSON.stringify(error)}\n`, { mode: 0o600 });
+  fs.renameSync(temporary, paths.startupError);
+}
+
+export function readStartupError(paths) {
+  try {
+    return JSON.parse(fs.readFileSync(paths.startupError, "utf8"));
   } catch {
     return null;
   }

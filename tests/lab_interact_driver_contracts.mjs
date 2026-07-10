@@ -67,13 +67,23 @@ assert.deepEqual(
   "driver does not report readiness after a page error",
 );
 
+assert.throws(
+  () => normalizeInspectionQuery({ ids: Array.from({ length: 150 }, (_, index) => index + 1) }),
+  (error) => error?.code === "invalidInput",
+  "oversized entity filters are rejected rather than broadening inspection",
+);
+assert.throws(
+  () => normalizeInspectionQuery({ ids: ["not-an-id"] }),
+  (error) => error?.code === "invalidInput",
+  "invalid entity filters are rejected rather than broadening inspection",
+);
 const inspection = normalizeInspectionQuery({
-  ids: Array.from({ length: 150 }, (_, index) => index + 1),
+  ids: [1, 1, 3],
   owners: [1, 1, 2],
   kinds: ["rifleman", "rifleman", "tank"],
   limit: 100,
 });
-assert.equal(inspection.ids.size, 0, "oversized entity filters are dropped rather than expanding inspection");
+assert.deepEqual([...inspection.ids], [1, 3], "inspection entity filters are deduplicated");
 assert.deepEqual([...inspection.owners], [1, 2], "inspection owner filters are deduplicated");
 assert.equal(inspection.kinds.size, 2, "inspection kind filters are bounded and deduplicated");
 assert.equal(inspection.limit, 100, "inspection result limits remain bounded");

@@ -16,6 +16,7 @@ export const LAB_INTERACT_BRIDGE_VERSION = 2;
 export const LAB_INTERACT_LIMITS = Object.freeze({
   inspectEntities: 100,
   inspectPlayers: 16,
+  inspectKinds: 32,
   removeEntities: 100,
   focusEntities: 20,
   stepTicks: 100,
@@ -368,7 +369,11 @@ export class LabInteractBridge {
 
   captureReadiness(input = {}) {
     const { match } = this.session();
-    const subjectIds = optionalBoundedIds(input?.subjectIds, LAB_INTERACT_LIMITS.captureSubjects);
+    const subjectIds = optionalBoundedIds(
+      input?.subjectIds,
+      "captureReadiness.subjectIds",
+      LAB_INTERACT_LIMITS.captureSubjects,
+    );
     const subjectEntities = subjectIds.map((id) => match.state.entityById(id)).filter(Boolean);
     if (subjectEntities.length !== subjectIds.length) {
       throw bridgeError("unknownEntity", "captureReadiness contains an entity that is not in the current snapshot.");
@@ -452,11 +457,18 @@ export class LabInteractBridge {
 }
 
 export function normalizeInspectionQuery(query = {}) {
-  const ids = optionalBoundedIds(query.ids, LAB_INTERACT_LIMITS.inspectEntities);
-  const owners = optionalBoundedIds(query.owners, LAB_INTERACT_LIMITS.inspectPlayers);
-  const kinds = Array.isArray(query.kinds)
-    ? [...new Set(query.kinds.filter((kind) => typeof kind === "string" && kind.length > 0 && kind.length <= 64))]
-    : [];
+  const ids = optionalBoundedIds(query.ids, "inspect.ids", LAB_INTERACT_LIMITS.inspectEntities);
+  const owners = optionalBoundedIds(query.owners, "inspect.owners", LAB_INTERACT_LIMITS.inspectPlayers);
+  let kinds = [];
+  if (query.kinds != null) {
+    if (!Array.isArray(query.kinds) || query.kinds.length > LAB_INTERACT_LIMITS.inspectKinds) {
+      throw bridgeError(
+        "invalidInput",
+        `inspect.kinds must contain at most ${LAB_INTERACT_LIMITS.inspectKinds} kind tokens.`,
+      );
+    }
+    kinds = [...new Set(query.kinds.map((kind) => safeKind(kind, "inspect.kinds")))];
+  }
   return {
     ids: new Set(ids),
     owners: new Set(owners),
@@ -643,10 +655,12 @@ function boundedIds(values, label, maximum) {
   return [...new Set(values.map((value) => positiveInt(value, label)))];
 }
 
-function optionalBoundedIds(values, maximum) {
+function optionalBoundedIds(values, label, maximum) {
   if (values == null) return [];
-  if (!Array.isArray(values) || values.length > maximum) return [];
-  return [...new Set(values.filter((value) => Number.isInteger(Number(value)) && Number(value) > 0).map(Number))];
+  if (!Array.isArray(values) || values.length > maximum) {
+    throw bridgeError("invalidInput", `${label} must contain at most ${maximum} positive ids.`);
+  }
+  return [...new Set(values.map((value) => positiveInt(value, label)))];
 }
 
 function boundedSpeed(value) {

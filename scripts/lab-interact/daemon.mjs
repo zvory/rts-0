@@ -1,12 +1,14 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import net from "node:net";
+import { performance } from "node:perf_hooks";
 import { pathToFileURL } from "node:url";
 
 import { LabInteractService, conciseError, loadDriverFactory, normalizeError, validateCommandInput } from "./command_service.mjs";
 import {
   IPC_VERSION, MAX_REQUEST_BYTES, REQUEST_TIMEOUT_MS, claimStartupLock, cleanupOwnedRuntime,
   configuredIdleMs, prepareRuntime, removeOwnedStartupLock, runtimePaths, startupLockOwned, writeState,
+  writeStartupError,
 } from "./runtime.mjs";
 
 export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = configuredIdleMs(), startupNonce = "" } = {}) {
@@ -25,6 +27,7 @@ export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = config
   const service = new LabInteractService({ workspaceRoot: paths.workspaceRoot, driverFactory });
   let activeRequests = 0;
   let lastInteractionAt = Date.now();
+  let lastInteractionMark = performance.now();
   let idleTimer = null;
   let stopping = false;
   let shutdownRequested = false;
@@ -47,6 +50,10 @@ export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = config
   const startedAt = new Date().toISOString();
 
   const cleanup = () => cleanupOwnedRuntime(paths, daemonId);
+  const recordInteraction = () => {
+    lastInteractionAt = Date.now();
+    lastInteractionMark = performance.now();
+  };
   const shutdown = async (reason) => {
     if (stopping) return;
     stopping = true;
@@ -60,7 +67,7 @@ export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = config
   const scheduleIdle = () => {
     clearTimeout(idleTimer);
     if (stopping || activeRequests > 0) return;
-    const remaining = Math.max(1, lastInteractionAt + idleMs - Date.now());
+    const remaining = Math.max(1, lastInteractionMark + idleMs - performance.now());
     idleTimer = setTimeout(() => { void shutdown("idleTimeout"); }, remaining);
   };
 
@@ -108,7 +115,7 @@ export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = config
       socket.setTimeout(REQUEST_TIMEOUT_MS + 5_000, () => socket.destroy());
       activeRequests += 1;
       admitted = true;
-      lastInteractionAt = Date.now();
+      recordInteraction();
       clearTimeout(idleTimer);
       writeState(paths, state());
       const result = await service.execute(command, request.input);
@@ -118,7 +125,7 @@ export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = config
       socket.end(`${JSON.stringify(errorEnvelope(normalized.code, normalized.message))}\n`);
     } finally {
       if (admitted) activeRequests -= 1;
-      if (admitted) lastInteractionAt = Date.now();
+      if (admitted) recordInteraction();
       if (shutdownRequested && activeRequests === 0) {
         socket.once("close", () => { void shutdown("explicit"); });
       } else if (admitted && !shutdownRequested) {
@@ -128,12 +135,11 @@ export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = config
     }
   };
 
-  server.on("error", async (error) => {
-    await service.shutdown("socketError").catch(() => {});
-    cleanup();
+  const handleRuntimeError = async (error) => {
+    await shutdown("socketError").catch(() => cleanup());
     process.stderr.write(`${JSON.stringify(errorEnvelope(error.code || "socketError", conciseError(error)))}\n`);
     process.exitCode = 1;
-  });
+  };
 
   await new Promise((resolve, reject) => {
     if (!startupLockOwned(paths, startupNonce, process.pid, "daemon")) {
@@ -146,19 +152,25 @@ export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = config
       resolve();
     });
   });
-  fs.chmodSync(paths.socket, 0o600);
-  const startupDelayMs = Number(process.env.RTS_LAB_INTERACT_TEST_STARTUP_DELAY_MS || 0);
-  if (Number.isInteger(startupDelayMs) && startupDelayMs > 0 && startupDelayMs <= 2_000) {
-    await new Promise((resolve) => setTimeout(resolve, startupDelayMs));
-  }
-  if (!startupLockOwned(paths, startupNonce, process.pid, "daemon")) {
+  try {
+    fs.chmodSync(paths.socket, 0o600);
+    const startupDelayMs = Number(process.env.RTS_LAB_INTERACT_TEST_STARTUP_DELAY_MS || 0);
+    if (Number.isInteger(startupDelayMs) && startupDelayMs > 0 && startupDelayMs <= 2_000) {
+      await new Promise((resolve) => setTimeout(resolve, startupDelayMs));
+    }
+    if (!startupLockOwned(paths, startupNonce, process.pid, "daemon")) {
+      throw new Error("Lab Interact startup lease was replaced before state publication.");
+    }
+    writeState(paths, state());
+    removeOwnedStartupLock(paths, startupNonce, process.pid, "daemon");
+  } catch (error) {
     for (const socket of sockets) socket.destroy();
     await new Promise((resolve) => server.close(resolve));
-    await service.shutdown("startupLeaseLost");
-    throw new Error("Lab Interact startup lease was replaced before state publication.");
+    await service.shutdown("startupFailed");
+    cleanup();
+    throw error;
   }
-  writeState(paths, state());
-  removeOwnedStartupLock(paths, startupNonce, process.pid, "daemon");
+  server.on("error", handleRuntimeError);
   scheduleIdle();
   for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
     process.once(signal, () => { void shutdown(signal); });
@@ -175,6 +187,16 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const workspaceRoot = process.argv[2];
   const startupNonce = process.argv[3] || "";
   runDaemon({ workspaceRoot, startupNonce }).catch((error) => {
+    try {
+      const paths = runtimePaths(workspaceRoot);
+      prepareRuntime(paths);
+      writeStartupError(paths, {
+        nonce: startupNonce,
+        code: error.code || "startupFailed",
+        message: conciseError(error),
+      });
+      removeOwnedStartupLock(paths, startupNonce, process.pid, "daemon");
+    } catch {}
     process.stderr.write(`${JSON.stringify(errorEnvelope(error.code || "startupFailed", conciseError(error)))}\n`);
     process.exitCode = 1;
   });

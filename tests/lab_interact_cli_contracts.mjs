@@ -35,6 +35,26 @@ assert.throws(() => configuredIdleMs({ RTS_LAB_INTERACT_IDLE_MS: "0" }), /must b
 shutdown(baseEnv);
 fs.rmSync(paths.directory, { recursive: true, force: true });
 
+const invalidConfiguration = spawnSync(process.execPath, [cli, "status", "{}"], {
+  cwd: root,
+  env: { ...baseEnv, RTS_LAB_INTERACT_IDLE_MS: "0" },
+  encoding: "utf8",
+});
+assert.notEqual(invalidConfiguration.status, 0, "invalid daemon configuration fails before spawning a child");
+assert.equal(JSON.parse(invalidConfiguration.stderr).error.code, "invalidConfiguration", "invalid daemon configuration stays actionable");
+assert.equal(fs.existsSync(paths.directory), false, "invalid daemon configuration creates no runtime lease");
+
+const brokenFactoryStartedAt = Date.now();
+const brokenFactory = spawnSync(process.execPath, [cli, "status", "{}"], {
+  cwd: root,
+  env: { ...baseEnv, RTS_LAB_INTERACT_DRIVER_FACTORY_MODULE: "tests/fixtures/missing_lab_interact_driver.mjs" },
+  encoding: "utf8",
+});
+assert.notEqual(brokenFactory.status, 0, "a pre-listen daemon startup failure reaches the CLI");
+assert.equal(JSON.parse(brokenFactory.stderr).error.code, "ERR_MODULE_NOT_FOUND", "the CLI preserves the corrective startup error");
+assert.ok(Date.now() - brokenFactoryStartedAt < 5_000, "a failed child is reported without waiting for the startup timeout");
+assert.equal(fs.existsSync(paths.lock), false, "a failed child releases its claimed startup lease");
+
 prepareRuntime(paths);
 const freshDeadLockAt = Date.now();
 fs.writeFileSync(paths.lock, `${JSON.stringify({ nonce: "d".repeat(32), role: "cli", pid: 99999999, createdAt: freshDeadLockAt })}\n`, { mode: 0o600 });

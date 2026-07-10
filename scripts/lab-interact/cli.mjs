@@ -9,8 +9,8 @@ import { fileURLToPath } from "node:url";
 
 import { LAB_INTERACT_COMMANDS } from "./command_service.mjs";
 import {
-  IPC_VERSION, REQUEST_TIMEOUT_MS, prepareRuntime, processAlive, readState,
-  reclaimStaleStartupLock, removeOwnedStartupLock, runtimePaths, sleep,
+  IPC_VERSION, REQUEST_TIMEOUT_MS, configuredIdleMs, prepareRuntime, processAlive,
+  readStartupError, readState, reclaimStaleStartupLock, removeOwnedStartupLock, runtimePaths, sleep,
 } from "./runtime.mjs";
 
 const STARTUP_TIMEOUT_MS = 15_000;
@@ -40,6 +40,11 @@ export async function runCli(argv = process.argv.slice(2), { cwd = process.cwd()
 }
 
 async function ensureDaemon(paths, env) {
+  try {
+    configuredIdleMs(env);
+  } catch (error) {
+    throw cliError("invalidConfiguration", error.message);
+  }
   prepareRuntime(paths);
   const deadline = Date.now() + STARTUP_TIMEOUT_MS;
   while (Date.now() < deadline) {
@@ -49,6 +54,8 @@ async function ensureDaemon(paths, env) {
       throw cliError("daemonUnreachable", "A live Lab Interact daemon owns this worktree runtime but did not answer a compatible request.");
     }
     let lock;
+    let child = null;
+    let childFailure = null;
     let spawned = false;
     const startupNonce = crypto.randomBytes(16).toString("hex");
     try {
@@ -73,11 +80,19 @@ async function ensureDaemon(paths, env) {
       // The startup lock is ours and an active probe proved that no process is listening.
       fs.rmSync(paths.socket, { force: true });
       fs.rmSync(paths.state, { force: true });
-      const child = spawn(process.execPath, [path.join(scriptDir, "daemon.mjs"), paths.workspaceRoot, startupNonce], {
+      fs.rmSync(paths.startupError, { force: true });
+      child = spawn(process.execPath, [path.join(scriptDir, "daemon.mjs"), paths.workspaceRoot, startupNonce], {
         cwd: paths.workspaceRoot,
         env,
         detached: true,
         stdio: "ignore",
+      });
+      child.once("error", (error) => { childFailure = error; });
+      child.once("exit", (code, signal) => {
+        childFailure ||= cliError(
+          "daemonStartup",
+          `Lab Interact daemon exited before readiness (${signal ? `signal ${signal}` : `code ${code}`}).`,
+        );
       });
       child.unref();
       spawned = true;
@@ -87,6 +102,17 @@ async function ensureDaemon(paths, env) {
     }
     while (Date.now() < deadline) {
       if (await daemonReady(paths)) return;
+      const startupError = readStartupError(paths);
+      if (startupError?.nonce === startupNonce || childFailure) {
+        removeOwnedStartupLock(paths, startupNonce, process.pid, "cli");
+        if (child?.pid) removeOwnedStartupLock(paths, startupNonce, child.pid, "daemon");
+        fs.rmSync(paths.startupError, { force: true });
+        try { fs.rmdirSync(paths.directory); } catch (error) { if (error?.code !== "ENOENT" && error?.code !== "ENOTEMPTY") throw error; }
+        throw cliError(
+          startupError?.code || childFailure?.code || "daemonStartup",
+          startupError?.message || childFailure?.message || "Lab Interact daemon exited before readiness.",
+        );
+      }
       const state = readState(paths);
       if (state && !processAlive(state.pid)) break;
       await sleep(25);
