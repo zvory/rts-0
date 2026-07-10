@@ -31,7 +31,10 @@ fn occupation_search_skips_nearest_trench_without_legal_slot() {
             distance((snapshot.pos_x, snapshot.pos_y), *candidate) <= SLOT_MAX_CORRECTION_PX
         })
         .collect::<Vec<_>>();
-    assert!(!blocking_slots.is_empty(), "fixture should have slots to block");
+    assert!(
+        !blocking_slots.is_empty(),
+        "fixture should have slots to block"
+    );
     for (x, y) in blocking_slots {
         entities
             .spawn_unit(2, EntityKind::Rifleman, x, y)
@@ -62,20 +65,22 @@ fn occupation_search_queries_only_local_trench_cells() {
     let nearby = trenches
         .create(&map, center.0, center.1)
         .expect("nearby trench should seed");
-    let search_radius = config::ENTRENCHMENT_TRENCH_RADIUS_TILES * config::TILE_SIZE as f32
-        + SLOT_EXTRA_RADIUS_PX;
+    let search_radius =
+        config::ENTRENCHMENT_TRENCH_RADIUS_TILES * config::TILE_SIZE as f32 + SLOT_EXTRA_RADIUS_PX;
     for ty in (2..94).step_by(8) {
         for tx in (2..94).step_by(8) {
             let position = map.tile_center(tx, ty);
-            if distance_sq(center, position) > (search_radius + config::TILE_SIZE as f32).powi(2)
-            {
+            if distance_sq(center, position) > (search_radius + config::TILE_SIZE as f32).powi(2) {
                 trenches
                     .create(&map, position.0, position.1)
                     .expect("distant trench should seed");
             }
         }
     }
-    assert!(trenches.all().len() > 100, "fixture needs a large trench field");
+    assert!(
+        trenches.all().len() > 100,
+        "fixture needs a large trench field"
+    );
 
     let mut entities = EntityStore::new();
     let rifleman = entities
@@ -86,7 +91,10 @@ fn occupation_search_queries_only_local_trench_cells() {
 
     let candidates = index.occupation_candidates(entity).collect::<Vec<_>>();
     assert_eq!(
-        candidates.iter().map(|trench| trench.id).collect::<Vec<_>>(),
+        candidates
+            .iter()
+            .map(|trench| trench.id)
+            .collect::<Vec<_>>(),
         vec![nearby],
         "distant trenches must not enter this unit's candidate work"
     );

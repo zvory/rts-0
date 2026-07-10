@@ -125,14 +125,7 @@ fn occupation_candidate(
     {
         return None;
     }
-    best_occupation_candidate(
-        map,
-        entities,
-        occ,
-        indexes,
-        occupied_trench_counts,
-        entity,
-    )
+    best_occupation_candidate(map, entities, occ, indexes, occupied_trench_counts, entity)
 }
 
 fn can_create_trench(has_entrenchment: &dyn Fn(u32) -> bool, entity: &Entity) -> bool {
@@ -172,7 +165,8 @@ fn holds_ground(entity: &Entity) -> bool {
         | Order::Build(_)
         | Order::Deconstruct(_)
         | Order::Ability(_)
-        | Order::ArtilleryPointFire(_) | Order::ArtilleryBlanketFire(_) => false,
+        | Order::ArtilleryPointFire(_)
+        | Order::ArtilleryBlanketFire(_) => false,
     }
 }
 
@@ -381,7 +375,12 @@ fn slot_intersects_building(
     else {
         return true;
     };
-    entity_index.ids_near(candidate.0, candidate.1, entity_index.building_query_radius(candidate_body))
+    entity_index
+        .ids_near(
+            candidate.0,
+            candidate.1,
+            entity_index.building_query_radius(candidate_body),
+        )
         .any(|other_id| {
             entities.get(other_id).is_some_and(|other| {
                 other.hp > 0
@@ -404,7 +403,11 @@ fn slot_overlaps_other_unit(
         return true;
     };
     entity_index
-        .ids_near(candidate.0, candidate.1, entity_index.unit_query_radius(candidate_body))
+        .ids_near(
+            candidate.0,
+            candidate.1,
+            entity_index.unit_query_radius(candidate_body),
+        )
         .any(|other_id| {
             other_id != entity.id
                 && entities.get(other_id).is_some_and(|other| {

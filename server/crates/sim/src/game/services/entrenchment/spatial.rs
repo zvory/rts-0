@@ -126,26 +126,22 @@ impl EntrenchmentEntityIndex {
                     .max(unit_body_for_entity(entity).map_or(0.0, UnitBody::bounding_radius));
             }
             if entity.hp > 0 && entity.is_building() {
-                index.max_building_reach_px = index.max_building_reach_px.max(
-                    building_rect_for_entity(map, entity).map_or(0.0, |rect| {
-                        (rect.min_x - entity.pos_x)
-                            .abs()
-                            .max((rect.max_x - entity.pos_x).abs())
-                            .max((rect.min_y - entity.pos_y).abs())
-                            .max((rect.max_y - entity.pos_y).abs())
-                    }),
-                );
+                index.max_building_reach_px =
+                    index
+                        .max_building_reach_px
+                        .max(building_rect_for_entity(map, entity).map_or(0.0, |rect| {
+                            (rect.min_x - entity.pos_x)
+                                .abs()
+                                .max((rect.max_x - entity.pos_x).abs())
+                                .max((rect.min_y - entity.pos_y).abs())
+                                .max((rect.max_y - entity.pos_y).abs())
+                        }));
             }
         }
         index
     }
 
-    pub(super) fn relocate(
-        &mut self,
-        id: u32,
-        old_position: (f32, f32),
-        new_position: (f32, f32),
-    ) {
+    pub(super) fn relocate(&mut self, id: u32, old_position: (f32, f32), new_position: (f32, f32)) {
         let old_cell = self.cell_for(old_position.0, old_position.1);
         let new_cell = self.cell_for(new_position.0, new_position.1);
         if old_cell == new_cell {
