@@ -6,7 +6,9 @@ fn scout_car_smoke_requires_no_steelworks() {
     let (mut game, scout, _target, _) = smoke_command_fixture();
     let target = game.state.map.tile_center(12, 8);
     assert!(
-        !game.state.entities
+        !game
+            .state
+            .entities
             .iter()
             .any(|e| e.owner == 1 && e.kind == EntityKind::Steelworks),
         "fixture should not contain Steelworks"
@@ -26,7 +28,8 @@ fn scout_car_smoke_requires_no_steelworks() {
 
     assert!(
         matches!(
-            game.state.entities
+            game.state
+                .entities
                 .get(scout)
                 .expect("scout should exist")
                 .ability_uses_remaining(ability::AbilityKind::Smoke),
@@ -35,7 +38,8 @@ fn scout_car_smoke_requires_no_steelworks() {
         "Scout Car smoke should be available before Steelworks and spend one use"
     );
     assert_eq!(
-        game.state.entities
+        game.state
+            .entities
             .get(scout)
             .expect("scout should exist")
             .ability_cooldown_ticks(ability::AbilityKind::Smoke),
@@ -114,7 +118,8 @@ fn command_car_requires_rd_unlock_then_trains_at_factory() {
     let city_centre_pos = game.state.map.tile_center(8, 12);
     let research_pos = game.state.map.tile_center(8, 8);
     let factory_pos = game.state.map.tile_center(12, 8);
-    game.state.entities
+    game.state
+        .entities
         .spawn_building(
             1,
             EntityKind::CityCentre,
@@ -123,7 +128,9 @@ fn command_car_requires_rd_unlock_then_trains_at_factory() {
             true,
         )
         .expect("city centre should spawn");
-    let research_complex = game.state.entities
+    let research_complex = game
+        .state
+        .entities
         .spawn_building(
             1,
             EntityKind::ResearchComplex,
@@ -132,7 +139,9 @@ fn command_car_requires_rd_unlock_then_trains_at_factory() {
             true,
         )
         .expect("research complex should spawn");
-    let factory = game.state.entities
+    let factory = game
+        .state
+        .entities
         .spawn_building(1, EntityKind::Factory, factory_pos.0, factory_pos.1, true)
         .expect("factory should spawn");
 
@@ -145,7 +154,8 @@ fn command_car_requires_rd_unlock_then_trains_at_factory() {
     );
     game.tick();
     assert!(
-        game.state.entities
+        game.state
+            .entities
             .get(research_complex)
             .expect("research complex")
             .research_queue()
@@ -182,7 +192,8 @@ fn command_car_requires_rd_unlock_then_trains_at_factory() {
     }
 
     assert!(
-        game.state.entities
+        game.state
+            .entities
             .iter()
             .any(|e| e.owner == 1 && e.kind == EntityKind::CommandCar),
         "Vehicle Works should train Command Cars after R&D unlock"
@@ -198,16 +209,24 @@ fn breakthrough_applies_owned_nonstacking_speed_status_and_cooldown() {
     let car_pos = game.state.map.tile_center(8, 8);
     let nearby_pos = game.state.map.tile_center(10, 8);
     let far_pos = game.state.map.tile_center(20, 8);
-    let command_car = game.state.entities
+    let command_car = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::CommandCar, car_pos.0, car_pos.1)
         .expect("command car should spawn");
-    let nearby = game.state.entities
+    let nearby = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::Rifleman, nearby_pos.0, nearby_pos.1)
         .expect("nearby rifle should spawn");
-    let nearby_command_car = game.state.entities
+    let nearby_command_car = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::CommandCar, nearby_pos.0 + 16.0, nearby_pos.1)
         .expect("nearby command car should spawn");
-    let far = game.state.entities
+    let far = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::Rifleman, far_pos.0, far_pos.1)
         .expect("far rifle should spawn");
     game.enqueue(
@@ -227,13 +246,16 @@ fn breakthrough_applies_owned_nonstacking_speed_status_and_cooldown() {
     assert!(car.breakthrough_ticks() > 0);
     assert!(car.breakthrough_aura_ticks() > 0);
     assert!(
-        game.state.entities
+        game.state
+            .entities
             .get(nearby)
             .expect("nearby unit")
             .breakthrough_ticks()
             > 0
     );
-    let nearby_car = game.state.entities
+    let nearby_car = game
+        .state
+        .entities
         .get(nearby_command_car)
         .expect("nearby command car");
     assert!(nearby_car.breakthrough_ticks() > 0);
@@ -243,7 +265,8 @@ fn breakthrough_applies_owned_nonstacking_speed_status_and_cooldown() {
         "nearby buffed Command Cars should not become aura origins"
     );
     assert_eq!(
-        game.state.entities
+        game.state
+            .entities
             .get(far)
             .expect("far unit")
             .breakthrough_ticks(),
@@ -280,7 +303,9 @@ fn breakthrough_applies_owned_nonstacking_speed_status_and_cooldown() {
         "buffed non-caster Command Cars should not project aura duration"
     );
 
-    let remaining = game.state.entities
+    let remaining = game
+        .state
+        .entities
         .get(nearby)
         .expect("nearby unit")
         .breakthrough_ticks();
@@ -288,7 +313,8 @@ fn breakthrough_applies_owned_nonstacking_speed_status_and_cooldown() {
         e.start_breakthrough(1);
     }
     assert_eq!(
-        game.state.entities
+        game.state
+            .entities
             .get(nearby)
             .expect("nearby unit")
             .breakthrough_ticks(),
@@ -307,10 +333,14 @@ fn breakthrough_smoke_synergy_speeds_units_more() {
     let smoke_pos = game.state.map.tile_center(8, 10);
     let goal_plain = game.state.map.tile_center(20, 5);
     let goal_smoke = game.state.map.tile_center(20, 10);
-    let plain = game.state.entities
+    let plain = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::Rifleman, plain_pos.0, plain_pos.1)
         .expect("plain rifle should spawn");
-    let smoked = game.state.entities
+    let smoked = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::Rifleman, smoke_pos.0, smoke_pos.1)
         .expect("smoked rifle should spawn");
     game.state.smokes.schedule(
