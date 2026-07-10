@@ -276,12 +276,13 @@ fn run_resource_regression_profile(max_ticks: u32) -> ResourceRegressionEvidence
                     ..
                 } = &command
                 {
-                    let Some(node) =
-                        pump_jack_build_target_oil_node(&start, player_one_snapshot, *tile_x, *tile_y)
-                    else {
-                        panic!(
-                            "Pump Jack build at tick {tick} did not overlap a live oil patch"
-                        );
+                    let Some(node) = pump_jack_build_target_oil_node(
+                        &start,
+                        player_one_snapshot,
+                        *tile_x,
+                        *tile_y,
+                    ) else {
+                        panic!("Pump Jack build at tick {tick} did not overlap a live oil patch");
                     };
                     assert!(
                         resource_mineable_by_completed_city_centre(

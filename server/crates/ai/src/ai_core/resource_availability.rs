@@ -73,17 +73,16 @@ impl ResourceAvailability {
                 } else {
                     0
                 };
-                let live_completed_extractor_count = if resource.kind == EntityKind::Oil
-                    && has_remaining
-                {
-                    pump_jacks
-                        .iter()
-                        .filter(|pump| pump.is_complete)
-                        .filter(|pump| pump_jack_overlaps_resource(pump, resource))
-                        .count()
-                } else {
-                    0
-                };
+                let live_completed_extractor_count =
+                    if resource.kind == EntityKind::Oil && has_remaining {
+                        pump_jacks
+                            .iter()
+                            .filter(|pump| pump.is_complete)
+                            .filter(|pump| pump_jack_overlaps_resource(pump, resource))
+                            .count()
+                    } else {
+                        0
+                    };
                 let occupied = latched_worker_count > 0 || extractor_count > 0;
                 if occupied {
                     *occupied_by_kind.entry(resource.kind).or_default() += 1;
@@ -246,10 +245,7 @@ fn active_pump_jacks(observation: &AiObservation) -> Vec<&AiEntitySummary> {
         .collect()
 }
 
-fn pump_jack_overlaps_resource(
-    pump: &AiEntitySummary,
-    resource: &AiResourceSummary,
-) -> bool {
+fn pump_jack_overlaps_resource(pump: &AiEntitySummary, resource: &AiResourceSummary) -> bool {
     let Some(stats) = config::building_stats(EntityKind::PumpJack) else {
         return false;
     };
@@ -512,7 +508,10 @@ mod tests {
         assert_eq!(adjacent_oil.extractor_count, 0);
         assert!(!adjacent_oil.occupied);
         assert_eq!(availability.extractor_count(EntityKind::Oil), 1);
-        assert_eq!(availability.live_completed_extractor_count(EntityKind::Oil), 0);
+        assert_eq!(
+            availability.live_completed_extractor_count(EntityKind::Oil),
+            0
+        );
         assert_eq!(availability.occupied_node_count(EntityKind::Oil), 1);
         assert_eq!(availability.occupied_node_ids(), BTreeSet::from([3]));
         assert!(availability.has_free_mineable_oil());
@@ -535,7 +534,10 @@ mod tests {
         let availability = ResourceAvailability::from_observation(&observation, &BTreeSet::new());
 
         assert_eq!(availability.extractor_count(EntityKind::Oil), 2);
-        assert_eq!(availability.live_completed_extractor_count(EntityKind::Oil), 1);
+        assert_eq!(
+            availability.live_completed_extractor_count(EntityKind::Oil),
+            1
+        );
         assert_eq!(availability.occupied_node_ids(), BTreeSet::from([3, 4]));
         assert_eq!(
             availability.free_mineable_node_ids(EntityKind::Oil),

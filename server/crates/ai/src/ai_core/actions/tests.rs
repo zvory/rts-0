@@ -106,10 +106,7 @@ fn budget_from_observation(observation: &AiObservation) -> SpendBudget {
     )
 }
 
-fn context_from_facts<'a>(
-    facts: &'a AiFacts,
-    observation: &AiObservation,
-) -> AiActionContext<'a> {
+fn context_from_facts<'a>(facts: &'a AiFacts, observation: &AiObservation) -> AiActionContext<'a> {
     AiActionContext::new(facts, budget_from_observation(observation))
 }
 

@@ -1,5 +1,5 @@
-use super::nearest_tile_to;
 use super::super::{tile_distance2, AiTile, AiTileBounds};
+use super::nearest_tile_to;
 
 pub(super) fn choke_line_geometry(
     tiles: &[AiTile],
@@ -8,12 +8,13 @@ pub(super) fn choke_line_geometry(
     approach_b_tile: AiTile,
     bounds: AiTileBounds,
 ) -> (AiTile, AiTile, u16) {
-    let width_tiles = choke_cross_section_width(tiles, center_tile, approach_a_tile, approach_b_tile)
-        .unwrap_or_else(|| {
-            let span_x = bounds.max.x.saturating_sub(bounds.min.x).saturating_add(1);
-            let span_y = bounds.max.y.saturating_sub(bounds.min.y).saturating_add(1);
-            span_x.min(span_y).min(u32::from(u16::MAX)).max(1) as u16
-        });
+    let width_tiles =
+        choke_cross_section_width(tiles, center_tile, approach_a_tile, approach_b_tile)
+            .unwrap_or_else(|| {
+                let span_x = bounds.max.x.saturating_sub(bounds.min.x).saturating_add(1);
+                let span_y = bounds.max.y.saturating_sub(bounds.min.y).saturating_add(1);
+                span_x.min(span_y).min(u32::from(u16::MAX)).max(1) as u16
+            });
 
     if let Some(geometry) = projected_choke_line_geometry(tiles, approach_a_tile, approach_b_tile) {
         return (geometry.0, geometry.1, width_tiles);
