@@ -48,8 +48,18 @@ export const VEHICLE_PAINT_DECAL_ASSETS = Object.freeze([
   asset("vehicle-paint-08", "vehicle-paint-08.svg", 72, 48),
 ]);
 
+export const MORTAR_BLAST_DECAL_ASSETS = Object.freeze([
+  asset("mortar-blast-01", "mortar-blast-01.svg", 112, 112),
+]);
+
+export const ARTILLERY_BLAST_DECAL_ASSETS = Object.freeze([
+  asset("artillery-blast-01", "artillery-blast-01.svg", 216, 216),
+]);
+
 export const GROUND_DECAL_ASSET_MANIFEST = Object.freeze({
   infantry: INFANTRY_DECAL_ASSETS,
   vehicleScorch: VEHICLE_SCORCH_DECAL_ASSETS,
   vehiclePaint: VEHICLE_PAINT_DECAL_ASSETS,
+  mortarBlast: MORTAR_BLAST_DECAL_ASSETS,
+  artilleryBlast: ARTILLERY_BLAST_DECAL_ASSETS,
 });

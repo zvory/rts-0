@@ -147,17 +147,21 @@ function makeDeathEvent(index) {
 function makeDecalBatch(baseId, count) {
   const out = [];
   for (let i = 0; i < count; i += 1) {
-    const infantry = i % 2 === 0;
+    const decalType = i % 4;
+    const infantry = decalType === 0;
+    const scorch = decalType === 1;
+    const mortar = decalType === 2;
     out.push({
       id: baseId + i,
-      kind: infantry ? KIND.WORKER : KIND.TANK,
-      decalClass: infantry ? "infantry" : "scorch",
+      kind: infantry ? KIND.WORKER : scorch ? KIND.TANK : mortar ? KIND.MORTAR_TEAM : KIND.ARTILLERY,
+      decalClass: infantry ? "infantry" : scorch ? "scorch" : mortar ? "mortarBlast" : "artilleryBlast",
       x: 16 + (i % 80) * 50,
       y: 24 + Math.floor(i / 80) * 240,
       owner: 1,
       color: infantry ? "#4878c8" : "#c85050",
       facing: (i % 32) * 0.12,
       weaponFacing: (i % 32) * 0.12,
+      radiusWorld: mortar ? 48 : decalType === 3 ? 96 : undefined,
       seed: 910000 + i,
       variant: i % 4,
     });

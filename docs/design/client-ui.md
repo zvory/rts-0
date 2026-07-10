@@ -20,7 +20,7 @@ src/
   unit_range_settings.js # localStorage-backed selected-unit range overlay toggle
   sim_wasm_adapter.js # optional WASM prediction adapter
   state.js        # GameState: holds prev+current snapshot, selection, control groups, display overlays
-  state_ground_decals.js # client-only death-event decal queue, classification, owner/facing recovery
+  state_ground_decals.js # client-only death/impact decal queue, classification, owner/facing recovery
   client_intent.js # ClientIntent: browser-local placement, command targeting, lab tools, previews, feedback
   command_budget.js # client mirror of command-supply selection admission and outgoing command guard
   progress_extrapolator.js # local display extrapolation for active construction progress
@@ -332,11 +332,12 @@ export class GroundDecalBuffer {
 }
 export function normalizeGroundDecalEvent(ev, context?)
 export function groundDecalClassForKind(kind)
+export function groundDecalClassForImpactEvent(eventKind)
 ```
-`GameState.applySnapshot` feeds fog-filtered transient death events into this browser-local buffer.
-The buffer dedupes by death id, recovers owner/facing from the prior visible entity snapshot when
-possible, falls back to neutral color/deterministic facing when needed, and never infers hidden
-deaths from missing entities.
+`GameState.applySnapshot` feeds fog-filtered transient death, mortar-impact, and artillery-impact
+events into this browser-local buffer. The buffer dedupes deaths by id and impact events by their
+received snapshot identity, recovers owner/facing from the prior visible entity snapshot only for
+death marks, and never infers a hidden death or impact from missing entities.
 
 `renderer/decals.js`
 ```js
@@ -350,8 +351,8 @@ export class GroundDecalLayer {
 }
 ```
 `GroundDecalLayer` owns one downsampled canvas-backed Pixi texture and one sprite on the `decals`
-world layer. New visible death decals are stamped into that texture in batches from SVG alpha-mask
-assets under `assets/decals/`; historical decals are pixels, not retained display objects or
+world layer. New visible death and impact decals are stamped into that texture in batches from SVG
+alpha-mask assets under `assets/decals/`; historical decals are pixels, not retained display objects or
 per-frame records. `diagnostics()` exposes total stamped decals, queued decals, texture update
 count, texture dimensions/downsample, child count, and asset-load status for stress checks. The
 renderer tears down the decal sprite, texture, canvas, tint scratch canvas, loaded atlas masks, and
@@ -1287,13 +1288,18 @@ overlay container as smoke clouds, below selection rings and HP bars):
 
 Ground decal rendering (`state_ground_decals.js`, `renderer/decals.js`; layer `decals` between
 terrain and resources):
-- Decals are client-only, best-effort visual state derived only from received fog-filtered `death`
-  events. They are not persisted in the protocol, replay artifacts, match history, or server sim.
+- Decals are client-only, best-effort visual state derived only from received fog-filtered `death`,
+  `mortarImpact`, and `artilleryImpact` events. They are not persisted in the protocol, replay
+  artifacts, match history, or server sim.
 - Infantry deaths stamp translucent player-tinted SVG paint masks. Vehicle and support-weapon
   deaths stamp neutral charcoal hull-shaped scorch masks with smaller, subdued player-colored paint
   fragments.
-- `GameState` queues only unpainted death ids and `Renderer` consumes the pending queue once per
-  frame. A skipped snapshot or reconnect may miss older decals; the client must not infer them.
+- Mortar impacts stamp a compact, air-burst-style starburst with a small dark center; artillery
+  impacts stamp a larger starburst scaled to their authoritative impact radius. Both are neutral
+  earth/charcoal marks, with no source owner or hidden-source recovery.
+- `GameState` queues only unpainted death ids and received impact records, and `Renderer` consumes
+  the pending queue once per frame. A skipped snapshot or reconnect may miss older decals; the
+  client must not infer them.
 - The renderer stamps each new-death batch into one downsampled texture, updates that texture once
   per stamped batch, and draws the accumulated marks as one sprite. Old decals are not iterated or
   redrawn during normal frames.
