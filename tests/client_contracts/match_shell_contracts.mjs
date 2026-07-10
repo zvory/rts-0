@@ -307,6 +307,63 @@ import {
   assert(labPlays[0].opts.category === "combat_self", "lab combat audio uses selected issue-as owner for self fire");
 }
 
+{
+  const plays = [];
+  const timers = [];
+  const cleared = [];
+  const entities = new Map([
+    [8, { id: 8, kind: KIND.ARTILLERY, owner: 1, x: 120, y: 160 }],
+  ]);
+  const combatAudio = new MatchCombatAudio({
+    state: {
+      playerId: 1,
+      entityById: (id) => entities.get(id) || null,
+    },
+    audio: {
+      play(id, opts) {
+        plays.push({ id, opts });
+        return true;
+      },
+      stopByKey() {},
+    },
+    setTimer(handler, delay) {
+      const timer = { handler, delay };
+      timers.push(timer);
+      return timer;
+    },
+    clearTimer(timer) {
+      cleared.push(timer);
+    },
+  });
+
+  combatAudio.playPointFireSound({
+    e: EVENT.ARTILLERY_TARGET,
+    from: 8,
+    x: 512,
+    y: 640,
+    delayTicks: 150,
+  });
+  assert(plays[0].id === "combat_artillery_fire_05", "artillery target still plays its firing cue immediately");
+  assert(timers.length === 1, "artillery target schedules one landing cue");
+  assert(
+    Math.abs(timers[0].delay - 2191.678) < 0.01,
+    "artillery landing starts 2.808 seconds before the authoritative five-second impact",
+  );
+  timers[0].handler();
+  assert(plays.at(-1).id === "combat_artillery_landing_01", "scheduled artillery landing uses its dedicated cue");
+  assert(plays.at(-1).opts.x === 512 && plays.at(-1).opts.y === 640, "landing cue is spatialized at the impact point");
+  assert(plays.at(-1).opts.category === "combat_self", "own artillery landing uses the self combat bus");
+  combatAudio.playPointFireSound({
+    e: EVENT.ARTILLERY_TARGET,
+    from: 8,
+    x: 704,
+    y: 768,
+    delayTicks: 150,
+  });
+  combatAudio.destroy();
+  assert(cleared.length === 1 && cleared[0] === timers[1], "teardown cancels a pending artillery landing");
+}
+
 // Match settings context collaborator
 // ---------------------------------------------------------------------------
 withFakeSettingsDocument(() => {

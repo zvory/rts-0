@@ -48,6 +48,7 @@ with licensed recordings before any commercial distribution.
 | `combat/combat_panzerfaust_impact_01.mp3` | Panzerfaust tank impact/miss-expire cue — generated first-pass cue; replace with reviewed recording before final audio pass | local procedural ffmpeg generation, Phase 6 | project-generated |
 | `combat/combat_mortar_launch_04.mp3` | Mortar launch — selected from CC0 examples; too long, trim before final polish | https://opengameart.org/content/25-cc0-bang-firework-sfx | CC0 |
 | `combat/combat_artillery_fire_05.mp3` | Artillery fire — selected from CC0 examples | https://opengameart.org/content/25-cc0-bang-firework-sfx | CC0 |
+| `combat/combat_artillery_landing_01.mp3` | Artillery incoming whistle and landing blast — user-selected focused-whistle mix, trimmed to 7.20 s after the audible decay | user-provided local source | unknown |
 | `combat/combat_tank_cannon_01.mp3` | Tank cannon (a bit loud) | unknown | unknown |
 | `combat/combat_tank_cannon_06.mp3` | Tank cannon primary — extracted from US Army video, some compression artifacts | https://freesound.org/people/qubodup/sounds/161343/ | CC0 |
 | `units/units_tank_engine_idle_03.mp3` | Tank engine idle primary — clean, long, authentic | https://freesound.org/people/C-V/sounds/565598/ | unknown |
