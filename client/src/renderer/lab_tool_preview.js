@@ -20,11 +20,31 @@ export function drawLabToolPreview(g, preview, tileSize = 32) {
     drawLabTerrainPreview(g, preview.x, preview.y, payload, tileSize);
     return;
   }
-  if (preview.kind === "editMapBase") {
-    drawLabBasePreview(g, preview.x, preview.y, payload, tileSize);
+  if (preview.kind === "editMapPlayerStart") {
+    drawLabPlayerSitePreview(g, preview.x, preview.y, payload, tileSize, "start");
+    return;
+  }
+  if (preview.kind === "editMapPlayerNatural") {
+    drawLabPlayerSitePreview(g, preview.x, preview.y, payload, tileSize, "natural");
     return;
   }
   if (preview.kind === "removeSelectableUnits") drawLabRemovePreview(g, preview.x, preview.y, tileSize);
+}
+
+/** Draw persistent, browser-local starts and naturals from an untested Lab map draft. */
+export function drawLabMapDraftOverlay(g, overlay, tileSize = 32) {
+  if (!Array.isArray(overlay?.players)) return;
+  for (const player of overlay.players) {
+    const color = labPreviewPlayerColor(player?.playerIndex);
+    const start = player?.start;
+    if (finiteTile(start)) {
+      drawDraftStartMarker(g, tileCenterX(start, tileSize), tileCenterY(start, tileSize), color, tileSize, 0.8);
+    }
+    for (const natural of Array.isArray(player?.naturals) ? player.naturals : []) {
+      if (!finiteTile(natural)) continue;
+      drawDraftNaturalMarker(g, tileCenterX(natural, tileSize), tileCenterY(natural, tileSize), color, tileSize, 0.8);
+    }
+  }
 }
 
 function drawLabSpawnPreview(g, x, y, payload, tileSize) {
@@ -94,12 +114,40 @@ function drawLabTerrainPreview(g, x, y, payload, tileSize) {
   }
 }
 
-function drawLabBasePreview(g, x, y, payload, tileSize) {
-  const radius = payload?.siteKind === "natural" ? tileSize * 0.34 : tileSize * 3;
-  g.lineStyle(2, 0xe5c56c, 0.92);
-  g.beginFill(0xe5c56c, 0.12);
-  g.drawCircle(x, y, radius);
+function drawLabPlayerSitePreview(g, x, y, payload, tileSize, kind) {
+  const color = labPreviewPlayerColor(payload?.playerIndex);
+  if (kind === "start") drawDraftStartMarker(g, x, y, color, tileSize, 1);
+  else drawDraftNaturalMarker(g, x, y, color, tileSize, 1);
+}
+
+function drawDraftStartMarker(g, x, y, color, tileSize, alpha) {
+  const markerRadius = Math.max(10, tileSize * 0.36);
+  const protectionRadius = tileSize * 3;
+  g.lineStyle(1, color, alpha * 0.35);
+  g.drawCircle(x, y, protectionRadius);
+  g.lineStyle(3, color, alpha);
+  g.beginFill(color, alpha * 0.22);
+  g.drawCircle(x, y, markerRadius);
   g.endFill();
+  g.lineStyle(1.5, color, alpha);
+  g.moveTo(x - markerRadius * 0.68, y);
+  g.lineTo(x + markerRadius * 0.68, y);
+  g.moveTo(x, y - markerRadius * 0.68);
+  g.lineTo(x, y + markerRadius * 0.68);
+}
+
+function drawDraftNaturalMarker(g, x, y, color, tileSize, alpha) {
+  const markerRadius = Math.max(7, tileSize * 0.25);
+  g.lineStyle(2.5, color, alpha);
+  g.beginFill(color, alpha * 0.2);
+  g.drawCircle(x, y, markerRadius);
+  g.endFill();
+  g.lineStyle(1.25, color, alpha);
+  g.moveTo(x, y - markerRadius * 1.35);
+  g.lineTo(x + markerRadius * 1.35, y);
+  g.lineTo(x, y + markerRadius * 1.35);
+  g.lineTo(x - markerRadius * 1.35, y);
+  g.lineTo(x, y - markerRadius * 1.35);
 }
 
 function drawLabRemovePreview(g, x, y, tileSize) {
@@ -113,6 +161,22 @@ function drawLabRemovePreview(g, x, y, tileSize) {
 }
 
 function labPreviewOwnerColor(owner) {
-  const index = Math.max(0, Math.trunc(Number(owner) || 1) - 1) % PLAYER_PALETTE.length;
+  return labPreviewPlayerColor(Math.max(0, Math.trunc(Number(owner) || 1) - 1));
+}
+
+function labPreviewPlayerColor(playerIndex) {
+  const index = Math.max(0, Math.trunc(Number(playerIndex) || 0)) % PLAYER_PALETTE.length;
   return hexToInt(PLAYER_PALETTE[index]) || COLORS.placeOk;
+}
+
+function finiteTile(tile) {
+  return Number.isFinite(tile?.x) && Number.isFinite(tile?.y);
+}
+
+function tileCenterX(tile, tileSize) {
+  return (Math.floor(tile.x) + 0.5) * tileSize;
+}
+
+function tileCenterY(tile, tileSize) {
+  return (Math.floor(tile.y) + 0.5) * tileSize;
 }

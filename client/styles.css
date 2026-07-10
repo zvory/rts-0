@@ -2337,44 +2337,66 @@ input[type="text"]:focus {
 .lab-terrain-label {
   min-width: 0;
 }
-.lab-map-site-list {
+.lab-map-player-picker {
   grid-column: 1 / -1;
   display: grid;
-  gap: 4px;
-  max-height: 132px;
-  overflow: auto;
+  grid-template-columns: 1fr;
+  gap: 6px;
 }
-.lab-map-site {
+.lab-map-player-picker .lab-btn {
+  position: relative;
   min-width: 0;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-sm);
-  background: rgba(9, 11, 12, 0.72);
-  color: var(--ink-dim);
-  padding: 5px 7px;
+  overflow: hidden;
+  padding-left: 25px;
   text-align: left;
-  font: 11px var(--mono);
-  cursor: pointer;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
 }
-.lab-map-site[data-active="true"] {
+.lab-map-player-picker .lab-btn[data-active="true"] {
   border-color: var(--accent);
   color: var(--ink);
 }
-.lab-map-slot {
+.lab-map-player-picker .lab-btn::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 8px;
+  width: 9px;
+  height: 9px;
+  transform: translateY(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: 50%;
+  background: var(--lab-map-player-color, #9aa0a8);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
+}
+.lab-map-natural-list {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: 58px minmax(0, 1fr) minmax(0, 1.25fr);
-  gap: 6px;
-  align-items: start;
-  padding-top: 6px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 5px;
 }
-.lab-map-slot strong {
-  padding-top: 6px;
+.lab-map-natural {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 5px;
+  align-items: center;
+  min-width: 0;
+  padding: 5px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  background: rgba(9, 11, 12, 0.58);
+}
+.lab-map-natural span {
+  overflow: hidden;
   color: var(--ink-dim);
-  font-size: 11px;
+  font: 11px var(--mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.lab-map-slot select[multiple] {
-  min-height: 54px;
+.lab-map-natural .lab-btn {
+  min-height: 26px;
+  padding: 4px 6px;
+  font-size: 10px;
 }
 @media (max-width: 720px) {
   .lab-options-window {

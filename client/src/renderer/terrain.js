@@ -29,7 +29,7 @@ function fillImpassableEdge(ctx, map, tx, ty, code, ts) {
   if (!isImpassableAt(map, tx + 1, ty)) ctx.fillRect(x + ts - edge, y, edge, ts);
 }
 
-export function buildStaticMap(map) {
+export function buildStaticMap(map, { preserveMapLayers = false } = {}) {
   this._map = { width: map.width, height: map.height, tileSize: map.tileSize, terrain: map.terrain };
   const ts = map.tileSize;
   const textureTileSize = Math.max(1, Math.round(ts / TERRAIN_TEXTURE_DOWNSAMPLE));
@@ -77,6 +77,13 @@ export function buildStaticMap(map) {
   const scale = ts / textureTileSize;
   this._terrainSprite.scale.set(scale);
   layer.addChild(this._terrainSprite);
-  this._initGroundDecalsForMap?.(map);
-  this._initTrenchesForMap?.(map);
+  if (!preserveMapLayers) {
+    this._initGroundDecalsForMap?.(map);
+    this._initTrenchesForMap?.(map);
+  }
+}
+
+/** Replace only the cached terrain pixels for a browser-local map-editor preview. */
+export function previewStaticTerrain(map) {
+  return buildStaticMap.call(this, map, { preserveMapLayers: true });
 }

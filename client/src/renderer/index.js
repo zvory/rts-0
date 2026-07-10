@@ -81,7 +81,7 @@ import { createLivePngRigAtlases, loadPngRigAtlasTexture } from "./rigs/png_rout
 import { createLiveFrameStrips, loadFrameStripTexture } from "./rigs/frame_strip_routing.js";
 import { createBuildingRigDefinitions } from "./rigs/building_routing.js";
 import { _drawResource } from "./resources.js";
-import { buildStaticMap } from "./terrain.js";
+import { buildStaticMap, previewStaticTerrain } from "./terrain.js";
 import {
   _deployedWeaponSetupVisual,
   _drawShotRevealUnit,
@@ -991,6 +991,7 @@ function destroyRendererOwnedTexture(texture) {
 
 Object.assign(Renderer.prototype, {
   buildStaticMap,
+  previewStaticTerrain,
   _initGroundDecalsForMap,
   _initTrenchesForMap,
   _drawGroundDecals,

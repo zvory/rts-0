@@ -509,6 +509,8 @@ export class App {
         match: this.match,
         mapEditorSession: this.labMapEditorSession,
         applyLabMapReset: (outcome) => applyLabMapReset(this.match, outcome),
+        setLabMapDraftOverlay: (overlay) => this.match?.clientIntent?.setLabMapDraftOverlay?.(overlay),
+        setLabMapDraftTerrainPreview: (draft) => this.previewLabMapDraftTerrain(draft),
         submissionCapability: this.fetchLabScenarioSubmissionCapability(),
         openWindow: (url) => window.open(url, "_blank", "noopener,noreferrer"),
       });
@@ -518,6 +520,29 @@ export class App {
 
   async fetchLabScenarioSubmissionCapability() {
     return fetchLabScenarioSubmissionCapabilityRequest();
+  }
+
+  previewLabMapDraftTerrain(draft) {
+    const renderer = this.match?.renderer;
+    const liveMap = this.match?.state?.map;
+    if (!renderer || !liveMap) return false;
+    try {
+      if (!draft) {
+        if (typeof renderer.buildStaticMap !== "function") return false;
+        renderer.buildStaticMap(liveMap);
+        return true;
+      }
+      if (typeof renderer.previewStaticTerrain !== "function") return false;
+      renderer.previewStaticTerrain({
+        ...liveMap,
+        width: draft.size,
+        height: draft.size,
+        terrain: draft.terrain,
+      });
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   onBranchFromTickCreated(m) {
