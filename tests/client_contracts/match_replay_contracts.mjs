@@ -725,16 +725,22 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   assert(replayNet.seekBacks.at(-1) === 90, "seek click sends net.seekRoomTime");
   replayUi.applyRoomTimeState({ currentTick: 120, durationTicks: 1_000, speed: 2, paused: false });
   assert(
-    replayControls.querySelector(".room-time-tick-status").textContent.includes("unchanged by the server"),
-    "a non-confirming authoritative update reverts pending seek presentation with an unchanged status",
+    replayControls.dataset.roomTimePending === "true" &&
+      replayControls.querySelector(".room-time-tick-status").textContent.includes("Seeking 30"),
+    "a stale non-confirming authoritative update does not reject a pending seek",
   );
-  seekBack._listeners.get("click")({});
   replayUi.applyRoomTimeState({ currentTick: 30, durationTicks: 1_000, speed: 2, paused: false });
+  assert(replayControls.dataset.roomTimePending === "false", "the matching authoritative seek state clears pending");
   speed2._listeners.get("click")({});
   replayUi.expireRoomTimePending();
   assert(
     replayControls.querySelector(".room-time-tick-status").textContent.includes("check connection or permissions"),
     "a missing room-time confirmation reverts pending presentation with an actionable status",
+  );
+  replayUi.applyRoomTimeState({ currentTick: 30, durationTicks: 1_000, speed: 2, paused: false });
+  assert(
+    !replayControls.querySelector(".room-time-tick-status").textContent.includes("check connection or permissions"),
+    "a late matching authoritative state clears the timeout notice",
   );
   Date.now = actualDateNow;
   const visionButtons = replayControls.querySelectorAll(".vision-btn");

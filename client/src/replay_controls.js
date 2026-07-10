@@ -21,6 +21,7 @@ export class RoomTimeControls {
     this.roomTimeSeekTargetTick = null;
     this.roomTimePending = null;
     this.roomTimePendingTimer = null;
+    this.roomTimeTimedOutAction = null;
     this.roomTimeNotice = "";
     this.controlActivationBindings = [];
     this.roomTimeAccessDenied = state?.controlPolicy?.kind === "lab" && state.controlPolicy.isOperator?.() === false;
@@ -131,10 +132,16 @@ export class RoomTimeControls {
   applyRoomTimeState(state) {
     this.roomTimeState = state || null;
     const pending = this.roomTimePending;
-    if (pending) {
-      const confirmed = this.roomTimeActionConfirmed(pending, state);
+    if (pending && this.roomTimeActionConfirmed(pending, state)) {
       this.clearRoomTimePending();
-      this.roomTimeNotice = confirmed ? "" : "Room time unchanged by the server.";
+      this.roomTimeNotice = "";
+    } else if (
+      !pending &&
+      this.roomTimeTimedOutAction &&
+      this.roomTimeActionConfirmed(this.roomTimeTimedOutAction, state)
+    ) {
+      this.roomTimeTimedOutAction = null;
+      this.roomTimeNotice = "";
     }
     if (Number.isFinite(state?.speed) && state.speed > 0) this.lastRoomTimeSpeed = state.speed;
     this.syncRoomTimePendingPresentation();
@@ -153,6 +160,7 @@ export class RoomTimeControls {
 
   requestRoomTimeAction(pending, send) {
     if (this.roomTimePending) return false;
+    this.roomTimeTimedOutAction = null;
     const sent = send?.() === true;
     if (!sent) {
       this.roomTimeNotice = "Room time command was not sent.";
@@ -196,6 +204,7 @@ export class RoomTimeControls {
 
   expireRoomTimePending() {
     if (!this.roomTimePending) return;
+    this.roomTimeTimedOutAction = this.roomTimePending;
     this.clearRoomTimePending();
     this.roomTimeNotice = "Room time unavailable or unchanged — check connection or permissions.";
     this.updateRoomTimeStatus();
@@ -507,6 +516,7 @@ export class RoomTimeControls {
   destroy() {
     if (!dom.roomTimeControls) return;
     this.clearRoomTimePending();
+    this.roomTimeTimedOutAction = null;
     this.clearRoomTimeActivations();
     dom.roomTimeControls.hidden = true;
     this.setRoomTimeConcluded(false);

@@ -103,6 +103,30 @@ try {
   activation.pointercancel({ pointerId: 2, pointerType: "touch" });
   assert(activations === 1, "touch activation ignores a mismatched pointer and cancellation");
 
+  now += 1_000;
+  const capturedButton = {
+    contains: () => true,
+    getBoundingClientRect: () => ({ left: 10, top: 10, right: 50, bottom: 50 }),
+  };
+  activation.pointerdown({ button: 0, isPrimary: true, pointerId: 4, pointerType: "touch" });
+  activation.pointerup({
+    pointerId: 4,
+    pointerType: "touch",
+    currentTarget: capturedButton,
+    target: capturedButton,
+    clientX: 70,
+    clientY: 30,
+    preventDefault() {},
+    stopPropagation() {},
+  });
+  assert(
+    activations === 1,
+    "touch activation rejects an outside release even when pointer capture keeps the button targeted",
+  );
+  activation.click({ preventDefault() {}, stopPropagation() {} });
+  assert(activations === 1, "touch activation suppresses the synthetic click after an outside release");
+
+  now += 1_000;
   activation.click({});
   assert(activations === 2, "touch activation preserves the native mouse and keyboard click path");
 } finally {
