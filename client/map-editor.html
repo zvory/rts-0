@@ -451,6 +451,7 @@
       let selectedTool = "grass";
       let selectedMode = "paint";
       let selectedSymmetry = "none";
+      let symmetryRepairCount = 0;
       let selectedSiteId = map.sites[0].id;
       let selectedLayoutId = map.layouts[0].id;
       let pointerDown = false;
@@ -595,19 +596,80 @@
         return "";
       }
 
+      function sourcePlacement(site, requireClearance) {
+        const size = map.terrain.length;
+        const anchor = mirroredTile(site);
+        if (!anchor) return null;
+        const r = siteRadius(site);
+        let best = null;
+        let bestDistance = Infinity;
+        for (let y = r; y < size - r; y++) {
+          for (let x = r; x < size - r; x++) {
+            const tile = { x: x, y: y };
+            if (!isSourceSide(tile) || siteAt(tile)) continue;
+            if (requireClearance && map.sites.some(function (other) {
+              return other.id !== site.id && isSourceSide(other) &&
+                Math.abs(other.x - x) <= siteRadius(other) + r &&
+                Math.abs(other.y - y) <= siteRadius(other) + r;
+            })) continue;
+            const distance = Math.abs(anchor.x - x) + Math.abs(anchor.y - y);
+            if (distance < bestDistance) {
+              best = tile;
+              bestDistance = distance;
+            }
+          }
+        }
+        return best;
+      }
+
+      function sourceLayoutToRepair() {
+        let best = null;
+        for (const layout of map.layouts) {
+          for (const slot of layout.slots) {
+            const sites = [siteById(slot.main)].concat(slot.naturals.map(siteById));
+            const targetSites = sites.filter(function (site) { return site && !isSourceSide(site); });
+            if (sites.length !== slot.naturals.length + 1 || targetSites.length === 0) continue;
+            if (!best || targetSites.length < best.targetSites.length) best = { sites: sites, targetSites: targetSites };
+          }
+        }
+        return best;
+      }
+
+      function repairSourceLayoutForSymmetry() {
+        const repair = sourceLayoutToRepair();
+        if (!repair) return 0;
+        for (const site of repair.targetSites) {
+          const placement = sourcePlacement(site, true) || sourcePlacement(site, false);
+          if (!placement) return 0;
+          site.x = placement.x;
+          site.y = placement.y;
+        }
+        map.sites.forEach(clearProtectedArea);
+        return repair.targetSites.length;
+      }
+
       function selectSymmetry(mode) {
         if (mode === selectedSymmetry) return false;
         const previousMap = cloneMapState();
         const previousSymmetry = selectedSymmetry;
+        symmetryRepairCount = 0;
         selectedSymmetry = mode;
         if (selectedSymmetry !== "none") {
           clearTargetSideForSymmetry();
           const error = symmetryAuthoringError();
           if (error) {
             map = previousMap;
-            selectedSymmetry = previousSymmetry;
-            setStatus(error, true);
-            return false;
+            const repairedSites = repairSourceLayoutForSymmetry();
+            if (repairedSites) {
+              clearTargetSideForSymmetry();
+              if (!symmetryAuthoringError()) symmetryRepairCount = repairedSites;
+            }
+            if (!symmetryRepairCount) {
+              map = previousMap;
+              selectedSymmetry = previousSymmetry;
+              setStatus("symmetry could not find room for a complete spawn slot on the kept side", true);
+              return false;
+            }
           }
         }
         return true;
@@ -1349,7 +1411,12 @@
         if (!selectSymmetry(button.dataset.symmetry)) return;
         syncSymmetryButtons();
         refresh();
-        if (selectedSymmetry !== "none") setStatus("cleared " + symmetryClearedSideLabel() + " side; edits now mirror from the remaining side");
+        if (selectedSymmetry !== "none") {
+          const repaired = symmetryRepairCount
+            ? "; moved " + symmetryRepairCount + " base " + (symmetryRepairCount === 1 ? "site" : "sites") + " to preserve a spawn setup"
+            : "";
+          setStatus("cleared " + symmetryClearedSideLabel() + " side" + repaired + "; edits now mirror from the remaining side");
+        }
       });
       canvas.addEventListener("pointerdown", function (event) {
         const tile = canvasTile(event);

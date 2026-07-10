@@ -128,13 +128,12 @@ function blankTerrainMap(size = 40) {
 
 {
   const editor = mapEditorRuntime();
-  const terrain = Array.from({ length: 40 }, () => ".".repeat(40));
   editor.setMap({
     version: 2,
-    name: "source-layout-required",
+    name: "source-layout-repair",
     description: "test",
     _design: "test",
-    terrain,
+    terrain: Array.from({ length: 40 }, () => ".".repeat(40)),
     sites: [
       { id: "main_left", kind: "main", x: 8, y: 12 },
       { id: "natural_right", kind: "natural", x: 31, y: 12 },
@@ -144,11 +143,50 @@ function blankTerrainMap(size = 40) {
     ],
   });
 
-  assert(!editor.setSymmetry("left-right"), "symmetry rejects a clear that would remove every complete spawn slot");
+  assert(editor.setSymmetry("left-right"), "symmetry repairs a split spawn layout instead of rejecting the selection");
   const map = editor.currentMap();
+  const main = map.sites.find((site) => site.id === "main_left");
+  const natural = map.sites.find((site) => site.id === "natural_right");
+  assert(main?.x === 8 && main.y === 12, "symmetry keeps an existing source-side main in place");
   assert(
-    map.sites.map((site) => site.id).join(",") === "main_left,natural_right" && map.layouts.length === 1,
-    "rejected symmetry selection leaves the map authorable",
+    natural && natural.x < 20 && (natural.x !== main.x || natural.y !== main.y),
+    "symmetry scoots a target-side natural to a free source-side tile",
+  );
+  assert(
+    map.layouts.length === 1 && map.layouts[0].playerCount === 1 && map.layouts[0].slots[0].naturals[0] === "natural_right",
+    "the repaired natural stays associated with its main slot",
+  );
+}
+
+{
+  const editor = mapEditorRuntime();
+  editor.setMap({
+    version: 2,
+    name: "target-layout-repair",
+    description: "test",
+    _design: "test",
+    terrain: Array.from({ length: 40 }, () => ".".repeat(40)),
+    sites: [
+      { id: "main_right", kind: "main", x: 31, y: 12 },
+      { id: "natural_right", kind: "natural", x: 31, y: 27 },
+    ],
+    layouts: [
+      { id: "one", playerCount: 1, slots: [{ main: "main_right", naturals: ["natural_right"] }] },
+    ],
+  });
+
+  assert(editor.setSymmetry("left-right"), "symmetry repairs a spawn layout that starts entirely on the target side");
+  const map = editor.currentMap();
+  const main = map.sites.find((site) => site.id === "main_right");
+  const natural = map.sites.find((site) => site.id === "natural_right");
+  assert(main && natural && main.x < 20 && natural.x < 20, "symmetry moves every required target-side base to the kept side");
+  assert(
+    main.x !== natural.x || main.y !== natural.y,
+    "automatic spawn repair keeps moved bases on separate tiles",
+  );
+  assert(
+    map.layouts.length === 1 && map.layouts[0].slots[0].main === "main_right",
+    "the fully repaired spawn layout remains available after symmetry clears the target side",
   );
 }
 
