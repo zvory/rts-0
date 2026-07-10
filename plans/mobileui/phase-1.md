@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [x] Implemented. Physical-device manual validation remains required before release.
+- [x] Done. Physical-device manual validation remains required before release.
 
 ## Objective
 
