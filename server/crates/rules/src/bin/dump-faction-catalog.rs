@@ -412,8 +412,8 @@ fn print_client_constants(indent: &str) {
         balance::ENTRENCHMENT_RANGE_BONUS_TILES
     );
     println!(
-        "{indent}    \"entrenchmentDirectMissChance\": {},",
-        json_f32(balance::ENTRENCHMENT_DIRECT_MISS_CHANCE)
+        "{indent}    \"entrenchmentDirectDamageReduction\": {},",
+        json_f32(balance::ENTRENCHMENT_DIRECT_DAMAGE_REDUCTION)
     );
     println!(
         "{indent}    \"entrenchmentAreaDamageReduction\": {},",

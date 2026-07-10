@@ -29,14 +29,14 @@ fn mark_entrenched(entities: &mut EntityStore, id: u32) {
 }
 
 #[test]
-fn mortar_area_damage_is_reduced_against_entrenched_infantry() {
+fn mortar_outer_area_damage_is_reduced_against_entrenched_infantry() {
     let map = open_map(20);
     let mut entities = EntityStore::new();
     let attacker = entities
         .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
         .expect("mortar should spawn");
     let victim = entities
-        .spawn_unit(2, EntityKind::Rifleman, 160.0, 160.0)
+        .spawn_unit(2, EntityKind::Rifleman, 200.0, 160.0)
         .expect("victim should spawn");
     mark_entrenched(&mut entities, victim);
     let before = entities.get(victim).expect("victim should exist").hp;
@@ -66,6 +66,6 @@ fn mortar_area_damage_is_reduced_against_entrenched_infantry() {
     assert_eq!(
         before - after,
         30,
-        "entrenched infantry should take 30% of inner mortar splash"
+        "entrenched infantry should take 75% of outer mortar splash"
     );
 }

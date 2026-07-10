@@ -274,11 +274,11 @@ mod tests {
     }
 
     #[test]
-    fn artillery_area_damage_is_reduced_against_entrenched_infantry() {
+    fn artillery_outer_area_damage_is_reduced_against_entrenched_infantry() {
         let map = open_map(20);
         let mut entities = EntityStore::new();
         let victim = entities
-            .spawn_unit(2, EntityKind::Rifleman, 160.0, 160.0)
+            .spawn_unit(2, EntityKind::Rifleman, 224.0, 160.0)
             .expect("victim should spawn");
         mark_entrenched(&mut entities, victim);
         let before = entities.get(victim).expect("victim should exist").hp;
@@ -295,15 +295,12 @@ mod tests {
         resolve_shell(&mut entities, &teams, &fog, &mut events, &shell, 10);
 
         let after = entities.get(victim).expect("victim should survive").hp;
-        let expected_damage = combat::area_damage_after_entrenchment(
-            EntityKind::Rifleman,
-            config::ARTILLERY_INNER_DAMAGE,
-            true,
-        );
+        let expected_damage =
+            combat::area_damage_after_entrenchment(EntityKind::Rifleman, 40, true);
         assert_eq!(
             before - after,
             expected_damage,
-            "entrenched infantry should take 30% of inner artillery splash"
+            "entrenched infantry should take 75% of outer artillery splash"
         );
     }
 
