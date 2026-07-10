@@ -326,10 +326,7 @@ fn section_for_compact_key(key: &str) -> &'static str {
     }
 }
 
-fn json_map_entry_len(
-    key: &str,
-    value: &serde_json::Value,
-) -> Result<usize, SnapshotEncodeError> {
+fn json_map_entry_len(key: &str, value: &serde_json::Value) -> Result<usize, SnapshotEncodeError> {
     let key_bytes = serde_json::to_string(key)?.len();
     let value_bytes = serde_json::to_string(value)?.len();
     Ok(key_bytes.saturating_add(1).saturating_add(value_bytes))
@@ -358,9 +355,9 @@ fn entity_kind_diagnostics(
     let mut kinds = counts
         .into_iter()
         .map(|(kind, count)| {
-            let approx_bytes =
-                ((entity_bytes as u64).saturating_mul(count as u64) / total_entities as u64)
-                    .min(u32::MAX as u64) as u32;
+            let approx_bytes = ((entity_bytes as u64).saturating_mul(count as u64)
+                / total_entities as u64)
+                .min(u32::MAX as u64) as u32;
             SnapshotPayloadEntityKindDiagnostics {
                 kind,
                 count,

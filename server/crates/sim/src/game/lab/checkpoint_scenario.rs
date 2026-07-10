@@ -2,11 +2,11 @@ use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize};
 
+use super::{LabEntityIdRemap, LabError};
 use crate::game::map::Map;
 use crate::game::Game;
 use crate::game::MapMetadata;
 use crate::protocol::terrain;
-use super::{LabEntityIdRemap, LabError};
 
 pub(super) const LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION: u32 = 1;
 pub(super) const LAB_CHECKPOINT_SCENARIO_KIND: &str = "labCheckpointScenario";
@@ -101,7 +101,11 @@ impl LabCheckpointScenarioMap {
         let map = Map {
             size: data.size,
             terrain: data.terrain,
-            starts: data.starts.into_iter().map(|tile| (tile.x, tile.y)).collect(),
+            starts: data
+                .starts
+                .into_iter()
+                .map(|tile| (tile.x, tile.y))
+                .collect(),
             expansion_sites: data
                 .expansion_sites
                 .into_iter()
@@ -157,9 +161,7 @@ impl LabCheckpointScenarioMap {
                 });
             }
         }
-        if self.data.starts.is_empty()
-            || self.data.starts.len() > MAX_LAB_CHECKPOINT_MAP_STARTS
-        {
+        if self.data.starts.is_empty() || self.data.starts.len() > MAX_LAB_CHECKPOINT_MAP_STARTS {
             return Err(LabError::InvalidMap {
                 name: self.name.clone(),
                 reason: "checkpoint scenario map start site count is invalid".to_string(),
@@ -201,8 +203,7 @@ fn validate_lab_checkpoint_scenario_shape(
             reason: "checkpoint scenario kind must be labCheckpointScenario".to_string(),
         });
     }
-    if scenario.name.trim().is_empty()
-        || scenario.name.len() > MAX_LAB_CHECKPOINT_SCENARIO_NAME_LEN
+    if scenario.name.trim().is_empty() || scenario.name.len() > MAX_LAB_CHECKPOINT_SCENARIO_NAME_LEN
     {
         return Err(LabError::InvalidScenario {
             reason: "checkpoint scenario name must be non-empty and at most 80 bytes".to_string(),
@@ -244,8 +245,9 @@ fn validate_lab_checkpoint_source_entity_id_map(
         }
         if !restored_ids.contains(&remap.new_id) {
             return Err(LabError::InvalidScenario {
-                reason: "checkpoint scenario sourceEntityIdMap newId must reference a restored entity"
-                    .to_string(),
+                reason:
+                    "checkpoint scenario sourceEntityIdMap newId must reference a restored entity"
+                        .to_string(),
             });
         }
     }
@@ -282,14 +284,11 @@ impl Game {
         validate_lab_checkpoint_scenario_shape(&scenario)?;
         let seed = scenario.seed;
         let (map, map_metadata) = scenario.map.into_map()?;
-        let game = Game::restore_checkpoint_payload_text(
-            &scenario.checkpoint_payload,
-            map,
-            map_metadata,
-        )
-        .map_err(|err| LabError::InvalidScenario {
-            reason: format!("checkpoint scenario payload is invalid: {err}"),
-        })?;
+        let game =
+            Game::restore_checkpoint_payload_text(&scenario.checkpoint_payload, map, map_metadata)
+                .map_err(|err| LabError::InvalidScenario {
+                    reason: format!("checkpoint scenario payload is invalid: {err}"),
+                })?;
         if game.seed() != seed {
             return Err(LabError::InvalidScenario {
                 reason: "checkpoint scenario seed does not match payload seed".to_string(),

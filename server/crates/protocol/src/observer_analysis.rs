@@ -213,9 +213,15 @@ mod tests {
                 }],
                 resources_lost: ObserverAnalysisResourcesLost { steel: 50, oil: 0 },
                 resources: ObserverAnalysisResources {
-                    lifetime: ObserverAnalysisResourceTotals { steel: 120, oil: 20 },
+                    lifetime: ObserverAnalysisResourceTotals {
+                        steel: 120,
+                        oil: 20,
+                    },
                     last_5s: ObserverAnalysisResourceTotals { steel: 40, oil: 10 },
-                    last_minute: ObserverAnalysisResourceTotals { steel: 120, oil: 20 },
+                    last_minute: ObserverAnalysisResourceTotals {
+                        steel: 120,
+                        oil: 20,
+                    },
                 },
                 ai_diagnostics: Some(ObserverAnalysisAiDiagnostics {
                     profile_id: "ai_1_2_wave_cohorts".to_string(),
