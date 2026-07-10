@@ -22,7 +22,7 @@ Make the existing in-game and replay UI usable for secondary mobile debugging an
 - Do not add a UI framework, a component library, a CSS reset, or a third-party dependency. Do not edit Lab catalog/panel/map-editor code or make Lab styling decisions. In-game AI diagnostics and observer analysis may receive narrowly scoped mobile-debug reachability fixes, but must not be used to refactor the Lab panel system.
 - Prefer native semantic controls and small behavior helpers over a new custom-element suite. A touch fallback must preserve native keyboard/click activation, handle cancel/outside release, and guarantee exactly one action for one tap.
 - Maintain teardown discipline for every new listener or timer. Keep client dependencies injected through the existing Match/App seams and run the architecture checker after client changes.
-- For every phase, capture a before/after desktop baseline at 1440x900 and 1366x768, then exercise mouse, keyboard, and right-click behavior relevant to the changed surface. When a phase changes minimap/canvas rendering, use the project Agent Lab capture workflow; do not commit capture bytes.
+- For every phase, capture a before/after desktop baseline at 1440x900 and 1366x768, then exercise mouse, keyboard, and right-click behavior relevant to the changed surface. When a phase changes minimap/canvas rendering, use the project Lab Interact capture workflow; do not commit capture bytes.
 - Every implementation phase gets its own zvorygin branch, owned PR, auto-merge, and definite merge verification before the next phase starts. The implementation commit marks the phase file done and the handoff names the next phase plus core manual tests.
 
 ## Phase Summaries

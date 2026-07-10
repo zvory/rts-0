@@ -36,7 +36,7 @@ Give the existing minimap a first-class, predictable Pointer Events path for mob
 ## Desktop Preservation Gate
 
 - At 1440x900 and 1366x768, manually verify minimap primary click, drag, right-click contextual order, Shift-right-click queued order, replay read-only minimap behavior, and pointer-lock routing.
-- If minimap rendering or canvas scaling changes, capture an authoritative Agent Lab scene and inspect it once; the capture is review evidence only and must not be committed.
+- If minimap rendering or canvas scaling changes, capture an authoritative Lab Interact scene and inspect it once; the capture is review evidence only and must not be committed.
 - A desktop mouse user must not see touch-specific affordances, altered minimap size, or changed command behavior.
 
 ## Implementation Checklist
@@ -64,4 +64,4 @@ On desktop, verify minimap camera movement and right-click orders are indistingu
 
 ## Handoff Expectations
 
-Describe the final touch/pen semantics and whether any browser required a compatibility fallback. Tell the Phase 3 agent which mobile dimensions or overlay collisions remain to resolve, and name the desktop minimap checks that passed. Include the local Agent Lab capture path if rendering changed.
+Describe the final touch/pen semantics and whether any browser required a compatibility fallback. Tell the Phase 3 agent which mobile dimensions or overlay collisions remain to resolve, and name the desktop minimap checks that passed. Include the local Lab Interact capture path if rendering changed.
