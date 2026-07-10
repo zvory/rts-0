@@ -36,7 +36,8 @@
                 #selected-panel, #command-card,
                 #game-menu, #settings-button, #settings-menu, #pointer-lock-toggle,
                 #give-up-open, #give-up-confirm, #give-up-cancel, #give-up-confirm-button,
-                #game-over, #game-over-text, #game-over-scores, #game-over-button
+                #game-over, #game-over-text, #game-over-observation, #game-over-scores,
+                #game-over-button
         App:    #toast
     -->
     <div id="app">
@@ -219,6 +220,7 @@
           <div class="game-over-box">
             <button id="game-over-close" class="game-over-close" type="button" aria-label="Close score screen">×</button>
             <h1 id="game-over-text">Victory</h1>
+            <p id="game-over-observation" class="game-over-observation" hidden></p>
             <div id="game-over-scores" class="scoreboard" hidden></div>
             <button id="game-over-button" class="btn primary">Back to lobby</button>
           </div>

@@ -6,14 +6,20 @@ import {
   panzerfaustFeedbackDedupKey,
   panzerfaustFeedbackSoundId,
 } from "./combat_audio.js";
+import { TICK_HZ } from "./config.js";
 import { EVENT, KIND } from "./protocol.js";
 
 const KAR98K_GAIN = 0.25;
 const MG_BURST_GAIN = 0.7;
 const MORTAR_LAUNCH_GAIN = 0.85;
 const ARTILLERY_FIRE_GAIN = 1.2;
+const ARTILLERY_LANDING_GAIN = 1;
 const PANZERFAUST_LAUNCH_GAIN = 0.52;
 const PANZERFAUST_IMPACT_GAIN = 0.42;
+
+// Measured from the decoded production asset's first impact transient. Keep the
+// cue's explosion aligned to the authoritative ARTILLERY_IMPACT event.
+const ARTILLERY_LANDING_LEAD_MS = 2808.322;
 
 const COMBAT_SOUNDS = Object.freeze({
   [KIND.TANK]: {
@@ -73,11 +79,14 @@ const POSITIONAL_EVENT_SOUNDS = Object.freeze({
 });
 
 export class MatchCombatAudio {
-  constructor({ audio, state }) {
+  constructor({ audio, state, setTimer = globalThis.setTimeout, clearTimer = globalThis.clearTimeout }) {
     this.audio = audio;
     this.state = state;
+    this.setTimer = setTimer;
+    this.clearTimer = clearTimer;
     this.missingCombatSoundKinds = new Set();
     this.activeMachineGunSoundKeys = new Map();
+    this.pendingArtilleryLandingTimers = new Set();
   }
 
   playAttackSound(ev) {
@@ -121,6 +130,7 @@ export class MatchCombatAudio {
 
   playPointFireSound(ev) {
     if (!this.audio) return;
+    if (ev?.e === EVENT.ARTILLERY_TARGET) this._scheduleArtilleryLanding(ev);
     const spec = POSITIONAL_EVENT_SOUNDS[ev.e];
     if (!spec) return;
     const pos = positionalEventSoundPosition(ev, this.state);
@@ -141,6 +151,26 @@ export class MatchCombatAudio {
       if (dedupKey) opts.dedupKey = dedupKey;
     }
     this.audio.play(spec.id, opts);
+  }
+
+  _scheduleArtilleryLanding(ev) {
+    if (!Number.isFinite(ev?.x) || !Number.isFinite(ev?.y)) return;
+    const delayTicks = Number.isFinite(ev.delayTicks) ? Math.max(0, ev.delayTicks) : 0;
+    const delayMs = Math.max(0, (delayTicks / TICK_HZ) * 1000 - ARTILLERY_LANDING_LEAD_MS);
+    const from = typeof ev.from === "number" ? this.state.entityById(ev.from) : null;
+    const category = from && audioSelfOwner(this.state, from.owner) ? "combat_self" : "combat_other";
+    let timer = null;
+    timer = this.setTimer(() => {
+      this.pendingArtilleryLandingTimers.delete(timer);
+      this.audio?.play("combat_artillery_landing_01", {
+        x: ev.x,
+        y: ev.y,
+        category,
+        priority: 5,
+        gain: ARTILLERY_LANDING_GAIN,
+      });
+    }, delayMs);
+    this.pendingArtilleryLandingTimers.add(timer);
   }
 
   hasPointFireSound(eventKind) {
@@ -165,6 +195,14 @@ export class MatchCombatAudio {
       this.audio.stopByKey(key);
     }
     this.activeMachineGunSoundKeys.clear();
+  }
+
+  destroy() {
+    this.stopAllMachineGunSounds();
+    for (const timer of this.pendingArtilleryLandingTimers) {
+      this.clearTimer(timer);
+    }
+    this.pendingArtilleryLandingTimers.clear();
   }
 }
 

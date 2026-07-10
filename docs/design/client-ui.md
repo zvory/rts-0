@@ -1502,3 +1502,8 @@ Example spectator self-play URL:
 ```text
 /?rtsLaunch=match&rtsRoom=agent-ai-selfplay&rtsRole=spectator&rtsAi=1:ai_1_2&rtsAi=2:ai_2_0&rtsStart=1
 ```
+
+When that launch produces an all-AI live match, the score screen retains the live `matchRunId`
+through automatic post-match replay playback and renders it as an Observation ID. The id is the
+handoff key for replay recovery and server lag-log inspection; it is not a player identity or a
+new gameplay control.

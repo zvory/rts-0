@@ -133,6 +133,7 @@ export class App {
     // Bind handlers once so we can off() them symmetrically.
     this.onStart = this.onStart.bind(this);
     this.onError = this.onError.bind(this);
+    this.onObservationReady = this.onObservationReady.bind(this);
     this.onGameOver = this.onGameOver.bind(this);
     this.onShutdownWarning = this.onShutdownWarning.bind(this);
     this.onBackToLobby = this.onBackToLobby.bind(this);
@@ -152,6 +153,8 @@ export class App {
     this.aiDiagnosticsPanelPreferences = createAiDiagnosticsPanelPreferences();
     this.matchLaunchDone = false;
     this.matchLaunchFailed = false;
+    /** AI observation id received at match resolution and retained through replay playback. */
+    this.lastObservationRunId = "";
     this.mountLobbySettings();
     if (this.labCatalogLaunch) this.lobby.hide();
   }
@@ -160,6 +163,7 @@ export class App {
   async start() {
     this.net.on(S.START, this.onStart);
     this.net.on(S.ERROR, this.onError);
+    this.net.on(S.OBSERVATION_READY, this.onObservationReady);
     this.net.on(S.GAME_OVER, this.onGameOver);
     this.net.on(S.BRANCH_FROM_TICK_CREATED, this.onBranchFromTickCreated);
     this.net.on(S.SHUTDOWN_WARNING, this.onShutdownWarning);
@@ -420,6 +424,7 @@ export class App {
       spectator: payload?.spectator,
     });
     const startsReplay = !!payload?.replay;
+    if (!startsReplay) this.lastObservationRunId = "";
     const preserveScorePanel = startsReplay && !dom.gameOver.hidden;
     const capabilities = createRoomCapabilities({ startPayload: payload });
     const labMetadata = payload?.lab || null;
@@ -562,9 +567,15 @@ export class App {
       m?.winnerId ?? null,
       m?.winnerTeamId ?? null,
     );
+    this.renderObservationId(this.lastObservationRunId);
     dom.gameOver.hidden = false;
     // Freeze the loop but keep the final frame visible behind the overlay.
     if (this.match) this.match.stop();
+  }
+
+  onObservationReady(m) {
+    this.lastObservationRunId = typeof m?.matchRunId === "string" ? m.matchRunId.trim() : "";
+    if (!dom.gameOver.hidden) this.renderObservationId(this.lastObservationRunId);
   }
 
   /**
@@ -647,6 +658,16 @@ export class App {
     if (!dom.gameOverScores) return;
     dom.gameOverScores.replaceChildren();
     dom.gameOverScores.hidden = true;
+    this.renderObservationId("");
+  }
+
+  renderObservationId(matchRunId) {
+    if (!dom.gameOverObservation) return;
+    const id = typeof matchRunId === "string" ? matchRunId.trim() : "";
+    dom.gameOverObservation.hidden = !id;
+    dom.gameOverObservation.textContent = id
+      ? `Observation ID: ${id}. Share it to retrieve this replay and its server lag logs.`
+      : "";
   }
 
   /** "Back to lobby" button: tear down the match and restore the lobby. */
@@ -668,6 +689,7 @@ export class App {
     }
     this.destroyLabShell();
     this.inReplayPlayback = false;
+    this.lastObservationRunId = "";
     this.statusBadge.clearMatchMetrics();
     dom.gameOver.hidden = true;
     this.clearScoreboard();

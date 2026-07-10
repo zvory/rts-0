@@ -4465,6 +4465,14 @@ input[type="text"]:focus {
 #game-over-text[data-verdict="draw"] {
   color: var(--supply);
 }
+.game-over-observation {
+  margin: -2px 0 14px;
+  color: var(--ink-dim);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
 .scoreboard {
   margin: 0 0 14px;
   overflow-x: auto;

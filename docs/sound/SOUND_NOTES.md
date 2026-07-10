@@ -21,6 +21,7 @@ Files that failed any of these were deleted immediately.
 |------|-------|--------|
 | combat/examples/combat_mortar_launch_04.mp3 | Keeper from the reviewed mortar launch batch. Almost good and preferred over 01/02/03/05, but too long; trim before integration. | https://opengameart.org/content/25-cc0-bang-firework-sfx |
 | combat/examples/combat_artillery_fire_05.mp3 | Keeper from the reviewed artillery fire batch. Good; use this over 01/02/03/04. | https://opengameart.org/content/25-cc0-bang-firework-sfx |
+| combat_artillery_landing_01.mp3 | User-selected focused-whistle artillery landing cue. The whizz is brighter than the source, the explosion begins 2.808 s into playback, and the inaudible tail is conservatively trimmed at 7.20 s. | user-provided local source |
 | combat_tank_cannon_01.mp3 | Fine. A bit loud. | unknown |
 | combat_kar98k_02.mp3 | Good. Keep as variation. | unknown |
 | combat_kar98k_03.mp3 | Primary. Trimmed to 1.35s — bolt action removed. Original retained as combat_kar98k_03_with_bolt_action.mp3. | unknown |

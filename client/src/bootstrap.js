@@ -241,6 +241,7 @@ export const dom = {
   toast: document.getElementById("toast"),
   gameOver: document.getElementById("game-over"),
   gameOverText: document.getElementById("game-over-text"),
+  gameOverObservation: document.getElementById("game-over-observation"),
   gameOverScores: document.getElementById("game-over-scores"),
   gameOverButton: document.getElementById("game-over-button"),
   gameOverClose: document.getElementById("game-over-close"),
