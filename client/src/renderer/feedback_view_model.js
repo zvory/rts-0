@@ -46,6 +46,7 @@ export function buildRendererFeedbackView(
     map: state?.map || null,
     placement: intent?.placement || null,
     labToolPreview: intent?.labToolPreview || null,
+    labMapDraftOverlay: intent?.labMapDraftOverlay || null,
     commandFeedback,
     attackTargetPreview: intent?.attackTargetPreview || null,
     selectedEntities: () => selected,

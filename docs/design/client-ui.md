@@ -31,7 +31,7 @@ src/
   renderer/decals/ # SVG decal atlas manifest, loader, and deterministic stamp selection
   renderer/trenches.js # Authoritative trench terrain pass and deterministic nearby-trench connectors
   renderer/feedback_view_model.js # Builder for renderer feedback's narrow per-frame read model
-  renderer/lab_tool_preview.js # Armed Lab tool cursor ghosts on the renderer placement layer
+  renderer/lab_tool_preview.js # Armed Lab tool cursor ghosts plus persistent local map-draft markers
   renderer/observer_map_analysis.js # Observer-only static AI map-analysis world overlay drawer
   fog.js          # Fog overlay: accumulate explored, compute visible from own entities
   input/          # lifecycle facade plus selection, commands, placement, shared camera navigation, UI input routing
@@ -71,8 +71,8 @@ src/
   lab_panel.js   # LabPanel: app-owned lab controls/status UI mounted around Match
   lab_tool_detail.js # Pure armed-tool instruction text for LabPanel status
   lab_panel_window.js # draggable/resizable chrome helper for the app-owned LabPanel
-  lab_map_editor_session.js # persistent 25-state authored-map draft and undo/redo history
-  lab_map_editor_panel.js # floating live-lab terrain/base/slot editing and map JSON export
+  lab_map_editor_session.js # persistent 25-state authored-map draft, player-owned bases, and undo/redo history
+  lab_map_editor_panel.js # floating draft-first Lab map editor, explicit test restart, and map JSON export
   lab_control_policy.js # Lab control collaborator placeholder injected into Match
   lab_map_reset.js # in-place authoritative Lab map/player/fog/terrain refresh collaborator
   visual_profiles.js # Lab-scoped visual experimentation profile registry and resolver
@@ -597,7 +597,7 @@ export function labSpawnUnitKindsForFaction(factionId)
 export function labBuildingSpawnFactionOptions()
 export function labSpawnBuildingKindsForFaction(factionId)
 export class LabPanel {
-  constructor({ root, labClient, launch, startPayload, match?, mapEditorSession?, applyLabMapReset?, submissionCapability?, openWindow? })
+  constructor({ root, labClient, launch, startPayload, match?, mapEditorSession?, applyLabMapReset?, setLabMapDraftOverlay?, setLabMapDraftTerrainPreview?, submissionCapability?, openWindow? })
   applyLabToolChange(change)             // syncs active/cancelled tool status from Match callbacks
   armSpawnPaletteTool(kind?)             // arms a Match-owned completed spawnEntity world-click tool
   armBuildingSpawnPaletteTool(kind?)     // arms a Match-owned completed building spawnEntity tool
@@ -615,6 +615,7 @@ export class LabMapEditorSession {
   initializeFromScenario(scenario, options?)
   mutate(label, mutation), undo(), redo()
   materialized(), exportMap(), saveLocal(key), loadLocal(key)
+  markCurrentDraftAsTested(), playerSlots(), mapOverlay()
 }
 ```
 `LabPanel` renders separate floating, collapsible Options and Tools windows. Options owns room
@@ -634,19 +635,22 @@ export/import remains the fallback for setup iteration and for deployments with 
 disabled. The lab replay controls are visually separate from setup checkpoint JSON controls; replay
 save/open uses the bounded lab replay artifact path instead of the legacy `exportScenario` and
 `importScenario` lab operations.
-For the live-map-editor proof of concept, `LabPanel` also composes a third floating Map Editor
-window. `App` retains one `LabMapEditorSession` while edits are applied, so neither a terrain update
-nor a base-layout reset loses the selected editor tool or the bounded 25-state undo/redo history.
-The requesting client consumes the authoritative map/player payload from `labResult` through the
-app-owned `applyLabMapReset` collaborator, replacing static `GameState`, fog, minimap inputs, and the
-cached terrain texture in place instead of tearing down and rebuilding the whole match. The window paints
-one terrain tile at a time by click or drag stroke; its grass, stone, and water controls carry matching
-terrain swatches instead of a brush-size selector. It edits
-main/natural sites and the current player-slot layout, saves a browser-local draft, and exports the
-normal authored map JSON schema. Applying terrain-only drafts updates the authoritative map and
-derived pathing/fog state without resetting the simulation tick or live entities. Changing starts,
-naturals, or player slots rebuilds the battle so starting bases and resource nodes match the edited
-layout; ordinary lab unit/building palettes remain the playtest setup surface.
+For the Lab map-editor proof of concept, `LabPanel` also composes a third floating Map Editor window.
+It is draft-first: painting terrain, moving a player's start, and adding/moving/removing that player's
+natural bases change only the browser-local `LabMapEditorSession`. The editor exposes players and their
+base locations directly rather than anonymous main/natural site IDs and slot pickers. A persistent
+browser-local overlay draws each drafted start and natural in that player's colour, and a local terrain
+preview redraws the cached ground without touching the authoritative `GameState`; the live Lab test
+remains unchanged. Local draft save/load likewise does not alter the test; the normal authored-map JSON
+export remains portable.
+
+`Restart test with this draft` is the one explicit draft-to-test transition. It creates a fresh Lab test
+at tick zero with the same players and seed, so it deliberately clears the prior test's units, orders,
+resources, and elapsed time even for terrain-only changes. The requesting client consumes the
+authoritative map/player payload from `labResult` through the app-owned `applyLabMapReset` collaborator,
+replacing static `GameState`, fog, minimap inputs, and the cached terrain texture in place instead of
+tearing down and rebuilding the whole match. Ordinary Lab unit/building palettes remain the playtest
+setup surface after that explicit restart.
 `lab_panel_window.js` owns local drag, resize, collapse/expand, reset, keyboard nudge,
 viewport-clamping, and localStorage geometry hints for those app-owned lab windows. It has no
 transport or match authority.
@@ -687,7 +691,7 @@ may ask `Match.armLabTool(tool, { onWorldClick, onBoxSelection })` to arm a tool
 `Input` consumes a completed left world click before selection, command targeting, or placement.
 Tools that opt into `paintOnDrag` sample and interpolate each crossed map tile, delivering repeated
 world-click callbacks without disarming the tool or falling through to selection; unit spawning,
-building spawning, and live terrain painting use that path. Other left drags normally promote to box
+building spawning, and draft terrain painting use that path. Other left drags normally promote to box
 selection and cancel the active lab tool, while tools that opt into `consumeBoxSelection` receive the
 selectable ids in the drag box instead. World-click callbacks receive the active tool payload, exact
 world coordinates, and any selectable hit entity id. `ClientIntent.labToolPreview` tracks the armed
@@ -825,7 +829,8 @@ export class ClientIntent {
   recordPlannedCommand(command, selectedEntities, result?)
   plannedOrderPlanForEntity(entity), entityWithPlannedOrder(entity)
   reconcilePlannedOrders(entities, options?), clearPlannedOrdersForUnits(ids), clearPlannedOrders()
-  activeLabTool, labToolPreview, beginLabTool(tool), updateLabToolPreview(preview), cancelLabTool(reason?)
+  activeLabTool, labToolPreview, labMapDraftOverlay
+  beginLabTool(tool), updateLabToolPreview(preview), setLabMapDraftOverlay(overlay), cancelLabTool(reason?)
 }
 ```
 
