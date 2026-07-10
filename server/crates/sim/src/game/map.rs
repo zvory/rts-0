@@ -683,8 +683,8 @@ mod tests {
             serde_json::to_string(&rows).unwrap()
         );
 
-        let err = Map::from_authored_json(1, &json, 0)
-            .expect_err("five-base map should be rejected");
+        let err =
+            Map::from_authored_json(1, &json, 0).expect_err("five-base map should be rejected");
 
         assert!(err.contains("at most 3 naturals"), "error was: {err}");
     }
