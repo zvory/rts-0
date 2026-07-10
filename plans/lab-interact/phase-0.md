@@ -1,6 +1,6 @@
 # Phase 0 - CLI Migration And Deep Rename
 
-Status: planned.
+Status: done.
 
 ## Goal
 
