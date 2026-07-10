@@ -55,7 +55,7 @@ function mapEditorRuntime() {
         selectSiteId: (id) => { selectedSiteId = id; },
         setMap: (next) => { map = normalizeMap(next); },
         setSelectedSite,
-        setSymmetry: (mode) => { selectedSymmetry = mode; },
+        setSymmetry: selectSymmetry,
       };
     `,
     context,
@@ -66,8 +66,199 @@ function mapEditorRuntime() {
 function blankTerrainMap(size = 40) {
   return {
     terrain: Array.from({ length: size }, () => ".".repeat(size)),
-    sites: [],
+    sites: [
+      { id: "main_source", kind: "main", x: 12, y: 12 },
+      { id: "natural_source", kind: "natural", x: 16, y: 12 },
+    ],
+    layouts: [
+      { id: "one", playerCount: 1, slots: [{ main: "main_source", naturals: ["natural_source"] }] },
+    ],
   };
+}
+
+{
+  const editor = mapEditorRuntime();
+  const clearChecks = [
+    ["left-right", { x: 8, y: 12 }, { x: 31, y: 12 }],
+    ["top-bottom", { x: 12, y: 8 }, { x: 12, y: 31 }],
+    ["radial", { x: 8, y: 12 }, { x: 31, y: 27 }],
+  ];
+  for (const [mode, source, target] of clearChecks) {
+    const terrain = Array.from({ length: 40 }, () => ".".repeat(40));
+    terrain[source.y] = terrain[source.y].slice(0, source.x) + "#" + terrain[source.y].slice(source.x + 1);
+    terrain[target.y] = terrain[target.y].slice(0, target.x) + "~" + terrain[target.y].slice(target.x + 1);
+    editor.setMap({
+      version: 2,
+      name: "clear-target-side",
+      description: "test",
+      _design: "test",
+      terrain,
+      sites: [
+        { id: "source_main", kind: "main", x: source.x, y: source.y },
+        { id: "source_natural", kind: "natural", x: source.x + 8, y: source.y },
+        { id: "legacy_main", kind: "main", x: target.x, y: target.y },
+        { id: "legacy_natural", kind: "natural", x: target.x - 8, y: target.y },
+      ],
+      layouts: [
+        {
+          id: "slots",
+          playerCount: 2,
+          slots: [
+            { main: "source_main", naturals: ["source_natural"] },
+            { main: "legacy_main", naturals: ["legacy_natural"] },
+          ],
+        },
+      ],
+    });
+    editor.setSymmetry(mode);
+
+    const map = editor.currentMap();
+    assert(map.terrain[source.y][source.x] === "#", mode + " symmetry keeps terrain on the authored side");
+    assert(map.terrain[target.y][target.x] === ".", mode + " symmetry clears legacy terrain on the target side");
+    assert(
+      map.sites.map((site) => site.id).join(",") === "source_main,source_natural",
+      mode + " symmetry removes legacy target-side bases",
+    );
+    assert(
+      map.layouts.length === 1 && map.layouts[0].playerCount === 1 && map.layouts[0].slots[0].main === "source_main",
+      mode + " symmetry removes spawn slots that referenced target-side bases",
+    );
+  }
+}
+
+{
+  const editor = mapEditorRuntime();
+  editor.setMap({
+    version: 2,
+    name: "source-layout-repair",
+    description: "test",
+    _design: "test",
+    terrain: Array.from({ length: 40 }, () => ".".repeat(40)),
+    sites: [
+      { id: "main_left", kind: "main", x: 8, y: 12 },
+      { id: "natural_right", kind: "natural", x: 31, y: 12 },
+    ],
+    layouts: [
+      { id: "one", playerCount: 1, slots: [{ main: "main_left", naturals: ["natural_right"] }] },
+    ],
+  });
+
+  assert(editor.setSymmetry("left-right"), "symmetry repairs a split spawn layout instead of rejecting the selection");
+  const map = editor.currentMap();
+  const main = map.sites.find((site) => site.id === "main_left");
+  const natural = map.sites.find((site) => site.id === "natural_right");
+  assert(main?.x === 8 && main.y === 12, "symmetry keeps an existing source-side main in place");
+  assert(
+    natural && natural.x < 20 && (natural.x !== main.x || natural.y !== main.y),
+    "symmetry scoots a target-side natural to a free source-side tile",
+  );
+  assert(
+    map.layouts.length === 1 && map.layouts[0].playerCount === 1 && map.layouts[0].slots[0].naturals[0] === "natural_right",
+    "the repaired natural stays associated with its main slot",
+  );
+}
+
+{
+  const editor = mapEditorRuntime();
+  editor.setMap({
+    version: 2,
+    name: "target-layout-repair",
+    description: "test",
+    _design: "test",
+    terrain: Array.from({ length: 40 }, () => ".".repeat(40)),
+    sites: [
+      { id: "main_right", kind: "main", x: 31, y: 12 },
+      { id: "natural_right", kind: "natural", x: 31, y: 27 },
+    ],
+    layouts: [
+      { id: "one", playerCount: 1, slots: [{ main: "main_right", naturals: ["natural_right"] }] },
+    ],
+  });
+
+  assert(editor.setSymmetry("left-right"), "symmetry repairs a spawn layout that starts entirely on the target side");
+  const map = editor.currentMap();
+  const main = map.sites.find((site) => site.id === "main_right");
+  const natural = map.sites.find((site) => site.id === "natural_right");
+  assert(main && natural && main.x < 20 && natural.x < 20, "symmetry moves every required target-side base to the kept side");
+  assert(
+    main.x !== natural.x || main.y !== natural.y,
+    "automatic spawn repair keeps moved bases on separate tiles",
+  );
+  assert(
+    map.layouts.length === 1 && map.layouts[0].slots[0].main === "main_right",
+    "the fully repaired spawn layout remains available after symmetry clears the target side",
+  );
+}
+
+{
+  const editor = mapEditorRuntime();
+  const occupiedSites = [];
+  for (let y = 4; y <= 19; y++) {
+    for (let x = 4; x <= 11; x++) {
+      if (x === 7 && y === 7) continue;
+      occupiedSites.push({ id: `occupied_${x}_${y}`, kind: "natural", x, y });
+    }
+  }
+  editor.setMap({
+    version: 2,
+    name: "failed-repair-rollback",
+    description: "test",
+    _design: "test",
+    terrain: Array.from({ length: 24 }, () => ".".repeat(24)),
+    sites: occupiedSites.concat([
+      { id: "target_main", kind: "main", x: 16, y: 7 },
+      { id: "target_natural", kind: "natural", x: 16, y: 16 },
+    ]),
+    layouts: [
+      { id: "one", playerCount: 1, slots: [{ main: "target_main", naturals: ["target_natural"] }] },
+    ],
+  });
+
+  assert(!editor.setSymmetry("left-right"), "symmetry rejects a repair when the kept side has insufficient room");
+  const map = editor.currentMap();
+  assert(
+    map.sites.find((site) => site.id === "target_main")?.x === 16 &&
+      map.sites.find((site) => site.id === "target_natural")?.x === 16,
+    "a rejected multi-site repair rolls back sites moved before the failure",
+  );
+}
+
+{
+  const editor = mapEditorRuntime();
+  const occupiedSites = [];
+  for (let y = 7; y <= 16; y++) {
+    for (let x = 7; x <= 11; x++) {
+      occupiedSites.push({
+        id: `occupied_${x}_${y}`,
+        kind: x === 7 && y === 7 ? "main" : "natural",
+        x,
+        y,
+      });
+    }
+  }
+  editor.setMap({
+    version: 2,
+    name: "alternate-layout-repair",
+    description: "test",
+    _design: "test",
+    terrain: Array.from({ length: 24 }, () => ".".repeat(24)),
+    sites: occupiedSites.concat([
+      { id: "target_main", kind: "main", x: 16, y: 7 },
+      { id: "target_natural", kind: "natural", x: 19, y: 4 },
+    ]),
+    layouts: [
+      { id: "blocked", playerCount: 1, slots: [{ main: "target_main", naturals: ["occupied_7_8"] }] },
+      { id: "repairable", playerCount: 1, slots: [{ main: "occupied_7_7", naturals: ["target_natural"] }] },
+    ],
+  });
+
+  assert(editor.setSymmetry("left-right"), "symmetry tries another split slot when the first cannot be repaired");
+  const map = editor.currentMap();
+  assert(
+    map.layouts.length === 1 && map.layouts[0].id === "repairable" &&
+      map.sites.find((site) => site.id === "target_natural")?.x === 4,
+    "symmetry preserves a feasible alternate spawn slot on the kept side",
+  );
 }
 
 {
@@ -105,7 +296,7 @@ function blankTerrainMap(size = 40) {
         { id: "main_left", kind: "main", x: 8, y: 8 },
         { id: "natural_a", kind: "natural", x: 16, y: 8 },
         { id: "natural_b", kind: "natural", x: 16, y: 20 },
-        { id: "natural_c", kind: "natural", x: 16, y: 32 },
+        { id: "natural_c", kind: "natural", x: 16, y: 24 },
       ],
       layouts: [
         { id: "one", playerCount: 1, slots: [{ main: "main_left", naturals: ["natural_a", "natural_b", "natural_c"] }] },

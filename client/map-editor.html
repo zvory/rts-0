@@ -377,9 +377,9 @@
       <h2>Symmetry</h2>
       <div class="mode-grid" id="symmetry-modes">
         <button class="active" type="button" data-symmetry="none">Off</button>
-        <button type="button" data-symmetry="left-right" title="Reflect across the vertical center line">Left ↔ Right</button>
-        <button type="button" data-symmetry="top-bottom" title="Reflect across the horizontal center line">Top ↔ Bottom</button>
-        <button type="button" data-symmetry="radial" title="Rotate edits 180 degrees around the map center">Rotate 180°</button>
+        <button type="button" data-symmetry="left-right" title="Keep the left half, clear the right half, then reflect edits across the vertical center line">Left ↔ Right</button>
+        <button type="button" data-symmetry="top-bottom" title="Keep the top half, clear the bottom half, then reflect edits across the horizontal center line">Top ↔ Bottom</button>
+        <button type="button" data-symmetry="radial" title="Keep the top half, clear the bottom half, then rotate edits 180 degrees around the map center">Rotate 180°</button>
       </div>
 
       <h2>Spawn Layout</h2>
@@ -451,6 +451,7 @@
       let selectedTool = "grass";
       let selectedMode = "paint";
       let selectedSymmetry = "none";
+      let symmetryRepairCount = 0;
       let selectedSiteId = map.sites[0].id;
       let selectedLayoutId = map.layouts[0].id;
       let pointerDown = false;
@@ -474,15 +475,15 @@
         };
       }
 
-      function cloneMapState() {
+      function cloneMapState(source = map) {
         return {
-          version: map.version,
-          name: map.name,
-          description: map.description,
-          _design: map._design,
-          terrain: map.terrain.slice(),
-          sites: map.sites.map(cloneSite),
-          layouts: map.layouts.map(cloneLayout),
+          version: source.version,
+          name: source.name,
+          description: source.description,
+          _design: source._design,
+          terrain: source.terrain.slice(),
+          sites: source.sites.map(cloneSite),
+          layouts: source.layouts.map(cloneLayout),
         };
       }
 
@@ -556,6 +557,130 @@
         if (selectedSymmetry === "top-bottom") return { x: tile.x, y: size - 1 - tile.y };
         if (selectedSymmetry === "radial") return { x: size - 1 - tile.x, y: size - 1 - tile.y };
         return null;
+      }
+
+      function isSourceSide(tile) {
+        const mirrored = mirroredTile(tile);
+        if (!mirrored) return true;
+        if (selectedSymmetry === "left-right") return tile.x <= mirrored.x;
+        if (selectedSymmetry === "top-bottom") return tile.y <= mirrored.y;
+        return tile.y < mirrored.y || (tile.y === mirrored.y && tile.x <= mirrored.x);
+      }
+
+      function clearTargetSideForSymmetry() {
+        map.terrain = map.terrain.map(function (row, y) {
+          return Array.from(row, function (ch, x) {
+            return isSourceSide({ x: x, y: y }) ? ch : TERRAIN.grass;
+          }).join("");
+        });
+        map.sites = map.sites.filter(isSourceSide);
+        const retainedSiteIds = new Set(map.sites.map(function (site) { return site.id; }));
+        map.layouts = map.layouts.map(function (layout) {
+          const slots = layout.slots.filter(function (slot) {
+            return retainedSiteIds.has(slot.main) && slot.naturals.every(function (naturalId) {
+              return retainedSiteIds.has(naturalId);
+            });
+          });
+          return { id: layout.id, playerCount: slots.length, slots: slots };
+        }).filter(function (layout) { return layout.slots.length > 0; });
+      }
+
+      function symmetryClearedSideLabel() {
+        return selectedSymmetry === "left-right" ? "right" : "bottom";
+      }
+
+      function symmetryAuthoringError() {
+        if (!mains().length) return "symmetry needs a main site on the kept side";
+        if (!naturals().length) return "symmetry needs a natural site on the kept side";
+        if (!map.layouts.length) return "symmetry needs a complete spawn slot on the kept side";
+        return "";
+      }
+
+      function sourcePlacement(site, requireClearance) {
+        const size = map.terrain.length;
+        const anchor = mirroredTile(site);
+        if (!anchor) return null;
+        const r = siteRadius(site);
+        let best = null;
+        let bestDistance = Infinity;
+        for (let y = r; y < size - r; y++) {
+          for (let x = r; x < size - r; x++) {
+            const tile = { x: x, y: y };
+            if (!isSourceSide(tile) || siteAt(tile)) continue;
+            if (requireClearance && map.sites.some(function (other) {
+              return other.id !== site.id && isSourceSide(other) &&
+                Math.abs(other.x - x) <= siteRadius(other) + r &&
+                Math.abs(other.y - y) <= siteRadius(other) + r;
+            })) continue;
+            const distance = Math.abs(anchor.x - x) + Math.abs(anchor.y - y);
+            if (distance < bestDistance) {
+              best = tile;
+              bestDistance = distance;
+            }
+          }
+        }
+        return best;
+      }
+
+      function sourceLayoutsToRepair() {
+        const repairs = [];
+        for (const layout of map.layouts) {
+          for (const slot of layout.slots) {
+            const sites = [siteById(slot.main)].concat(slot.naturals.map(siteById));
+            const targetSites = sites.filter(function (site) { return site && !isSourceSide(site); });
+            if (sites.some(function (site) { return !site; }) || targetSites.length === 0) continue;
+            repairs.push(targetSites.map(function (site) { return site.id; }));
+          }
+        }
+        return repairs.sort(function (a, b) { return a.length - b.length; });
+      }
+
+      function repairSourceLayoutForSymmetry() {
+        for (const targetSiteIds of sourceLayoutsToRepair()) {
+          const before = cloneMapState();
+          let repairedSites = 0;
+          for (const siteId of targetSiteIds) {
+            const site = siteById(siteId);
+            const placement = site && (sourcePlacement(site, true) || sourcePlacement(site, false));
+            if (!placement) break;
+            site.x = placement.x;
+            site.y = placement.y;
+            repairedSites++;
+          }
+          if (repairedSites === targetSiteIds.length) {
+            map.sites.forEach(clearProtectedArea);
+            return repairedSites;
+          }
+          map = before;
+        }
+        return 0;
+      }
+
+      function selectSymmetry(mode) {
+        if (mode === selectedSymmetry) return false;
+        const previousMap = cloneMapState();
+        const previousSymmetry = selectedSymmetry;
+        symmetryRepairCount = 0;
+        selectedSymmetry = mode;
+        if (selectedSymmetry !== "none") {
+          clearTargetSideForSymmetry();
+          const error = symmetryAuthoringError();
+          if (error) {
+            map = cloneMapState(previousMap);
+            const repairedSites = repairSourceLayoutForSymmetry();
+            if (repairedSites) {
+              clearTargetSideForSymmetry();
+              if (!symmetryAuthoringError()) symmetryRepairCount = repairedSites;
+            }
+            if (!symmetryRepairCount) {
+              map = previousMap;
+              selectedSymmetry = previousSymmetry;
+              setStatus("symmetry could not find room for a complete spawn slot on the kept side", true);
+              return false;
+            }
+          }
+        }
+        return true;
       }
 
       function sameTile(a, b) {
@@ -871,6 +996,9 @@
       function validationErrors() {
         const errors = [];
         const size = map.terrain.length;
+        if (!mains().length) errors.push("map needs at least one main site");
+        if (!naturals().length) errors.push("map needs at least one natural site");
+        if (!map.layouts.length) errors.push("map needs at least one spawn layout");
         const seenCoords = new Set();
         for (const site of map.sites) {
           const key = site.x + "," + site.y;
@@ -892,6 +1020,7 @@
         const mainIds = new Set(mains().map(function (site) { return site.id; }));
         const naturalIds = new Set(naturals().map(function (site) { return site.id; }));
         for (const layout of map.layouts) {
+          if (layout.playerCount < 1) errors.push(layout.id + " needs at least one slot");
           if (layout.slots.length !== layout.playerCount) errors.push(layout.id + " slot count mismatch");
           const usedMains = new Set();
           const usedNaturals = new Set();
@@ -1085,7 +1214,9 @@
         mapNameEl.textContent = map.name;
         sizeInput.value = String(map.terrain.length);
         if (!siteById(selectedSiteId) && map.sites[0]) selectedSiteId = map.sites[0].id;
-        if (!currentLayout() && map.layouts[0]) selectedLayoutId = map.layouts[0].id;
+        if (!map.layouts.some(function (layout) { return layout.id === selectedLayoutId; }) && map.layouts[0]) {
+          selectedLayoutId = map.layouts[0].id;
+        }
         renderBaseList();
         draw();
         updateStatus();
@@ -1285,9 +1416,15 @@
       document.getElementById("symmetry-modes").addEventListener("click", function (event) {
         const button = event.target.closest("[data-symmetry]");
         if (!button) return;
-        selectedSymmetry = button.dataset.symmetry;
+        if (!selectSymmetry(button.dataset.symmetry)) return;
         syncSymmetryButtons();
-        draw();
+        refresh();
+        if (selectedSymmetry !== "none") {
+          const repaired = symmetryRepairCount
+            ? "; moved " + symmetryRepairCount + " base " + (symmetryRepairCount === 1 ? "site" : "sites") + " to preserve a spawn setup"
+            : "";
+          setStatus("cleared " + symmetryClearedSideLabel() + " side" + repaired + "; edits now mirror from the remaining side");
+        }
       });
       canvas.addEventListener("pointerdown", function (event) {
         const tile = canvasTile(event);
