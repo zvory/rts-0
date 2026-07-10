@@ -64,8 +64,8 @@ src/
   live_pause_overlay.js # live-match pause state overlay and unpause affordance
   branch_staging.js # replay branch staging panel
   lab_catalog.js # LabCatalogScreen: app-owned `/lab` setup/blank selector
-  agent_lab_bridge.js # AgentLabBridge: launch-gated narrow local automation facade
-  clean_presentation.js # app-shell reversible DOM chrome mode for Agent Lab capture
+  lab_interact_bridge.js # LabInteractBridge: launch-gated narrow local automation facade
+  clean_presentation.js # app-shell reversible DOM chrome mode for Lab Interact capture
   lab_client.js  # LabClient: lab request ids, pending results, state/result subscriptions
   lab_scenario_authoring.js # pure lab setup metadata defaults, slugging, and local validation
   lab_scenario_submission_capability.js # HTTP capability probe with transient-failure retry
@@ -554,17 +554,17 @@ hidden `__lab__:<room>:map=<map>:scenario=<id>` join room and lets `App` start t
 Direct `/lab?scenario=lategame`, `/lab?scenario=blank`, map, and seed URLs still bypass the selector
 and auto-join for compatibility.
 
-`agent_lab_bridge.js`
+`lab_interact_bridge.js`
 ```js
-export const AGENT_LAB_BRIDGE_KEY = "__rtsAgentLab"
-export class AgentLabBridge {
+export const LAB_INTERACT_BRIDGE_KEY = "__rtsLabInteract"
+export class LabInteractBridge {
   status()                            // readiness only; no internal references
   call(method, input)                 // status/catalog/spawn/update/remove/order/time/inspect/camera/reset/presentation/captureReadiness
   destroy()
 }
-export function agentLabLaunchEnabled(locationLike?)
+export function labInteractLaunchEnabled(locationLike?)
 ```
-`App` composes this bridge only when the `/lab` URL includes `agentLab=1`. Its global surface is a
+`App` composes this bridge only when the `/lab` URL includes `labInteract=1`. Its global surface is a
 frozen `{version, status, call}` object; it never returns `App`, `Match`, `Net`, `Renderer`, or
 `GameState`. Calls delegate through existing `LabClient`, normal `issueCommandAs`, room-time,
 camera, and `GameState` projection seams. Catalog includes the mirrored command and ability ids;
@@ -577,9 +577,11 @@ when room time is paused, request one bounded tick so accepted state is observed
 hides Pixi world layers; it is removed on capture completion, rematch, and app teardown. `captureReadiness`
 reports bounded live PNG/frame-strip/profile/decal asset status, font status, render frames, frame-loop
 errors, renderer errors, and subject missing-texture fallbacks without exposing renderer references.
-The local `scripts/agent-lab/driver.mjs` owns the selected-worktree server, headless browser, logs,
-clean viewport clipping, readiness wait, PNG/JSON artifacts, and profile cleanup; its project-local MCP
-adapter owns aliases, schemas, stdio, session lifetime, and the `lab_screenshot` image-content result.
+The local `scripts/lab-interact/driver.mjs` owns the selected-worktree server, headless browser, logs,
+clean viewport clipping, readiness wait, PNG/JSON artifacts, and profile cleanup. The bounded command
+service owns aliases and exact input contracts. Its per-worktree daemon preserves that state across
+machine-readable CLI calls, expires after 30 idle minutes, and returns screenshot paths and metadata
+without embedding image content.
 
 `lab_scenario_authoring.js`
 ```js
@@ -958,7 +960,7 @@ export class Renderer {
   resize(w,h)
   buildStaticMap(map)                    // draw terrain once into a cached layer
   render(state, camera, fog, alpha, options?) // per-frame; draws entities, fog, selection, placement, Tank Traps
-  captureReadiness({subjectIds?, subjectKinds?}) // bounded visual asset/error state for Agent Lab capture
+  captureReadiness({subjectIds?, subjectKinds?}) // bounded visual asset/error state for Lab Interact capture
   app                                    // the PIXI.Application (for ticker/stage if needed)
   // exposes screen->world hit info if helpful; selection box drawing lives here too:
   drawSelectionBox(rectOrNull)

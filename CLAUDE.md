@@ -132,9 +132,9 @@ is loaded from the CDN, and `cargo run` from `server/` serves the client.
   checklist, and design documents.
 - Deployed behavior: use the `fly-logs` skill early for beta/mainline differences, WebSocket or lobby
   failures, match history, crashes, restarts, and performance spikes.
-- Graphics or rendering changes: use the project-local `agent-lab` skill to arrange one small
+- Graphics or rendering changes: use the project-local `lab-interact` skill to arrange one small
   authoritative scene, capture a clean Pixi PNG, inspect that returned artifact once, and share its
-  path. Keep captures under `target/agent-lab/`; do not use Browser/Computer Use, commit image bytes,
+  path. Keep captures under `target/lab-interact/`; do not use Browser/Computer Use, commit image bytes,
   or accept a missing-texture fallback as review evidence.
 - Planned implementation phases: use the `phase-runner` skill only for an existing phase file.
 - Testing and self-play: follow `docs/context/testing.md`, including its replay-inspection workflow.

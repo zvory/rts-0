@@ -58,7 +58,7 @@ import {
 import { SettingsContainer } from "./settings_container.js";
 import { buildSettingsTabs } from "./settings_panels.js";
 import { resolveVisualProfileLaunch } from "./visual_profiles.js";
-import { AgentLabBridge, agentLabLaunchEnabled } from "./agent_lab_bridge.js";
+import { LabInteractBridge, labInteractLaunchEnabled } from "./lab_interact_bridge.js";
 import { CleanPresentation } from "./clean_presentation.js";
 
 /**
@@ -129,7 +129,7 @@ export class App {
     this.labMapEditorSession = null;
     this.labControlPolicy = null;
     this.cleanPresentation = new CleanPresentation({ root: dom.app });
-    this.agentLabBridge = agentLabLaunchEnabled() ? new AgentLabBridge({ app: this }) : null;
+    this.labInteractBridge = labInteractLaunchEnabled() ? new LabInteractBridge({ app: this }) : null;
     /** @type {number|undefined} pending toast hide timer. */
     this.toastTimer = undefined;
     /** @type {number|undefined} heartbeat interval id while connected. */
@@ -448,8 +448,12 @@ export class App {
     });
     this.pendingCameraView = null;
 
-    // If a previous match somehow lingers, tear it down first.
-    if (this.match) this.match.destroy();
+    // If a previous match somehow lingers, tear it down first. Clear the reference before
+    // shell cleanup so presentation reset cannot resize an already-destroyed renderer.
+    if (this.match) {
+      this.match.destroy();
+      this.match = null;
+    }
     this.destroyLabShell();
     this.inReplayPlayback = startsReplay;
 
@@ -714,7 +718,7 @@ export class App {
         this.match = null;
       }
       this.destroyLabShell();
-      this.destroyAgentLabBridge();
+      this.destroyLabInteractBridge();
       this.allowUnloadWithoutWarning = true;
       window.location.assign(new URL("/", window.location.href).toString());
       return;
@@ -725,7 +729,7 @@ export class App {
       this.match = null;
     }
     this.destroyLabShell();
-    this.destroyAgentLabBridge();
+    this.destroyLabInteractBridge();
     this.inReplayPlayback = false;
     this.lastObservationRunId = "";
     this.statusBadge.clearMatchMetrics();
@@ -754,9 +758,9 @@ export class App {
     this.labControlPolicy = null;
   }
 
-  destroyAgentLabBridge() {
-    this.agentLabBridge?.destroy();
-    this.agentLabBridge = null;
+  destroyLabInteractBridge() {
+    this.labInteractBridge?.destroy();
+    this.labInteractBridge = null;
   }
 
   setCleanPresentation(enabled) {

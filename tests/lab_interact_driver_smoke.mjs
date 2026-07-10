@@ -1,15 +1,15 @@
-// Private-server Agent Lab smoke. Run directly; it owns and cleans up its browser and server.
+// Private-server Lab Interact smoke. Run directly; it owns and cleans up its browser and server.
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { AgentLabDriver } from "../scripts/agent-lab/driver.mjs";
+import { LabInteractDriver } from "../scripts/lab-interact/driver.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let driver;
 try {
-  driver = await AgentLabDriver.open({
+  driver = await LabInteractDriver.open({
     workspaceRoot: root,
     startupTimeoutMs: 90_000,
     viewport: { width: 1000, height: 700, deviceScaleFactor: 1 },
@@ -38,7 +38,7 @@ try {
     viewport: { width: 1000, height: 700, deviceScaleFactor: 1 },
     subjectIds: [firstId],
     subjectSummaries: [afterSpawn.entities.find((entity) => entity.id === firstId)],
-    request: { tool: "agent_lab_driver_smoke" },
+    request: { tool: "lab_interact_driver_smoke" },
   });
   assert.equal(capture.image.mimeType, "image/png", "capture returns PNG image content");
   assert.ok(capture.image.bytes > 4096, "capture contains nontrivial rendered PNG bytes");
@@ -68,15 +68,15 @@ try {
     viewport: { width: 1000, height: 700, deviceScaleFactor: 1 },
     subjectIds: [firstId, secondId],
     subjectSummaries: afterSpawn.entities,
-    request: { tool: "agent_lab_driver_smoke", fixture: "two-entity" },
+    request: { tool: "lab_interact_driver_smoke", fixture: "two-entity" },
   });
   assert.ok(fs.statSync(twoEntityCapture.pngPath).size > 4096, "second clean capture frames two selected authoritative entities");
   assert.deepEqual(twoEntityCapture.readiness.missingTextureSubjectIds, [], "second clean capture has no selected-subject texture fallback");
 
   const diagnostics = driver.diagnostics();
-  assert.deepEqual(diagnostics.pageConsoleErrors, [], "Agent Lab page has no console errors");
-  assert.deepEqual(diagnostics.pageErrors, [], "Agent Lab page has no frame errors");
-  console.log("✅ agent_lab_driver_smoke.mjs: private server, bridge, mutation, order, time, camera, two captures, and cleanup passed");
+  assert.deepEqual(diagnostics.pageConsoleErrors, [], "Lab Interact page has no console errors");
+  assert.deepEqual(diagnostics.pageErrors, [], "Lab Interact page has no frame errors");
+  console.log("✅ lab_interact_driver_smoke.mjs: private server, bridge, mutation, order, time, camera, two captures, and cleanup passed");
 } finally {
   await driver?.close();
 }
