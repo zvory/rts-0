@@ -20,6 +20,7 @@ const baseEnv = {
   ...process.env,
   RTS_LAB_INTERACT_DRIVER_FACTORY_MODULE: "tests/fixtures/lab_interact_fake_driver.mjs",
   RTS_LAB_INTERACT_IDLE_MS: "5000",
+  RTS_LAB_INTERACT_FAKE_OPEN_DELAY_MS: "75",
 };
 
 assert.equal(configuredIdleMs({}), DEFAULT_IDLE_MS, "the production idle default is exactly 30 minutes");
@@ -52,10 +53,24 @@ assert.equal(invalidEnvelope.error.code, "invalidRequest", "a wrong capability i
 assert.equal(JSON.parse(fs.readFileSync(paths.state, "utf8")).lastInteractionAt, interactionBeforeInvalid, "invalid envelopes do not extend idle lifetime");
 
 const opened = call("open");
-const sessionId = opened.result.sessionId;
-assert.match(sessionId, /^lab_[a-f0-9]{32}$/, "open returns a bounded opaque session id");
-const secondOpen = callFailure("open");
-assert.equal(secondOpen.error.code, "sessionLimit", "one worktree exposes only one authoritative session");
+const firstSessionId = opened.result.sessionId;
+assert.match(firstSessionId, /^lab_[a-f0-9]{32}$/, "open returns a bounded opaque session id");
+const repeatedOpen = call("open");
+assert.equal(repeatedOpen.result.sessionId, firstSessionId, "repeated open idempotently returns the active session");
+call("close", { sessionId: firstSessionId });
+const staleAfterClose = callFailure("inspect", { sessionId: firstSessionId });
+assert.equal(staleAfterClose.error.code, "unknownSession", "a closed session id becomes stale immediately");
+const concurrentOpen = await Promise.all([
+  execFileAsync(process.execPath, [cli, "open", "{}"], { cwd: root, env: baseEnv }),
+  execFileAsync(process.execPath, [cli, "open", "{}"], { cwd: root, env: baseEnv }),
+]);
+const concurrentIds = concurrentOpen.map(({ stdout, stderr }) => {
+  assert.equal(stderr, "", "concurrent open writes no stderr");
+  return JSON.parse(stdout).result.sessionId;
+});
+assert.equal(new Set(concurrentIds).size, 1, "concurrent opens coalesce on one driver and session");
+const sessionId = concurrentIds[0];
+assert.notEqual(sessionId, firstSessionId, "close followed by open creates a fresh session id");
 
 call("spawn", { sessionId, spawns: [
   { owner: 1, kind: "rifleman", x: 960, y: 960, alias: "shooter" },
@@ -89,18 +104,26 @@ assert.equal(explicit.result.shuttingDown, true, "shutdown acknowledges immediat
 await waitFor(() => !fs.existsSync(paths.directory), 2000, "shutdown removes socket, state, and runtime files");
 
 prepareStaleRuntime();
+const alreadyStopped = call("shutdown");
+assert.equal(alreadyStopped.result.alreadyStopped, true, "shutdown reports alreadyStopped only after proving stale runtime has no live owner");
+assert.equal(fs.existsSync(paths.directory), false, "alreadyStopped cleanup removes stale socket, state, lock, and runtime directory");
+
+prepareStaleRuntime();
 const recovered = call("status");
 assert.equal(recovered.ok, true, "a dead stale runtime is replaced automatically");
 assert.notEqual(JSON.parse(fs.readFileSync(paths.state, "utf8")).pid, 99999999, "stale pid state is replaced");
 shutdown(baseEnv);
 await waitFor(() => !fs.existsSync(paths.directory), 2000, "recovered daemon shuts down cleanly");
 
-const raceEnv = { ...baseEnv, RTS_LAB_INTERACT_IDLE_MS: "5000" };
-const race = await Promise.all([
-  execFileAsync(process.execPath, [cli, "status"], { cwd: root, env: raceEnv }),
-  execFileAsync(process.execPath, [cli, "status"], { cwd: root, env: raceEnv }),
-]);
+const raceEnv = { ...baseEnv, RTS_LAB_INTERACT_IDLE_MS: "5000", RTS_LAB_INTERACT_TEST_STARTUP_DELAY_MS: "250" };
+const firstRace = execFileAsync(process.execPath, [cli, "status"], { cwd: root, env: raceEnv });
+await waitFor(() => fs.existsSync(paths.lock), 1000, "first startup publishes its ownership lock");
+const secondRace = execFileAsync(process.execPath, [cli, "status"], { cwd: root, env: raceEnv });
+await waitFor(() => fs.existsSync(paths.socket), 1000, "forced startup race reaches a listening socket");
+assert.equal(fs.existsSync(paths.state), false, "startup state is deliberately delayed while the ownership lock remains held");
+const race = await Promise.all([firstRace, secondRace]);
 assert.ok(race.every(({ stdout, stderr }) => JSON.parse(stdout).ok && stderr === ""), "concurrent first commands share one startup race safely");
+assert.equal(fs.existsSync(paths.lock), false, "daemon releases startup lock only after publishing state");
 shutdown(raceEnv);
 await waitFor(() => !fs.existsSync(paths.directory), 2000, "race-started daemon cleans up");
 
@@ -113,6 +136,29 @@ assert.notEqual(duplicate.status, 0, "a duplicate daemon cannot bind the owned w
 const afterDuplicate = JSON.parse(fs.readFileSync(paths.state, "utf8"));
 assert.equal(afterDuplicate.daemonId, winningState.daemonId, "duplicate startup cannot delete or replace the winner runtime");
 assert.equal(call("status").ok, true, "the winning daemon remains reachable after a duplicate startup");
+
+const savedStateText = fs.readFileSync(paths.state, "utf8");
+fs.writeFileSync(paths.state, "{corrupt\n");
+const corruptState = callFailure("status");
+assert.equal(corruptState.error.code, "daemonStateUnavailable", "corrupt state cannot trigger replacement of a live daemon");
+assert.equal(fs.existsSync(paths.socket), true, "corrupt-state recovery never unlinks a live socket");
+assert.equal(processAlive(winningState.pid), true, "corrupt-state recovery leaves the live owner running");
+assert.equal(callFailure("shutdown").error.code, "daemonIdentity", "shutdown never reports a live corrupt-state owner as already stopped");
+fs.writeFileSync(paths.state, savedStateText, { mode: 0o600 });
+assert.equal(call("status").ok, true, "restoring authenticated state reconnects to the same daemon");
+
+fs.rmSync(paths.state);
+const missingState = callFailure("status");
+assert.equal(missingState.error.code, "daemonStateUnavailable", "missing state cannot trigger replacement of a live daemon");
+assert.equal(fs.existsSync(paths.socket), true, "missing-state recovery never unlinks a live socket");
+fs.writeFileSync(paths.state, savedStateText, { mode: 0o600 });
+
+const wrongCapability = { ...JSON.parse(savedStateText), capability: "0".repeat(64) };
+fs.writeFileSync(paths.state, `${JSON.stringify(wrongCapability)}\n`, { mode: 0o600 });
+const refusedShutdown = callFailure("shutdown");
+assert.equal(refusedShutdown.error.code, "invalidRequest", "shutdown does not report alreadyStopped when a live daemon rejects its handshake");
+assert.equal(processAlive(winningState.pid), true, "failed authenticated shutdown leaves the live daemon intact");
+fs.writeFileSync(paths.state, savedStateText, { mode: 0o600 });
 shutdown(baseEnv);
 await waitFor(() => !fs.existsSync(paths.directory), 2000, "duplicate-start test cleans up");
 

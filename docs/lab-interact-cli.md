@@ -25,7 +25,9 @@ envelope to stdout. Failure writes a concise JSON error to stderr and exits nonz
 has an exact, bounded input shape; arbitrary state patches, protocol messages, browser evaluation,
 and caller-selected artifact paths are not accepted.
 
-`open` returns the `sessionId` required by session commands. Optional aliases match
+`open` returns the `sessionId` required by session commands. It is idempotent: repeated or
+concurrent calls return the one active session instead of starting another browser. Run `close`
+before `open` when a fresh session or different launch options are required. Optional aliases match
 `[A-Za-z][A-Za-z0-9_-]{0,31}` and remain private to that session. Unknown, duplicate, stale, or
 cross-session aliases are rejected rather than guessed. Only one authoritative session may be open
 per worktree.
@@ -61,11 +63,10 @@ and non-unit focus defaults to 48 world pixels.
 | Error | Correction |
 | --- | --- |
 | `unknownSession` | Run `open` and use its current session id. |
-| `sessionLimit` | Close the current worktree session before opening another. |
 | `unknownAlias` / `staleAlias` | Inspect current state or create a new alias. |
 | `invalidKind`, `invalidUpgrade`, or `invalidAbility` | Query `catalog` and use an exposed id. |
 | `chromeUnavailable` | Install Chrome/Chromium or set `CHROME` before `open`. |
-| `daemonIncompatible` | Let the prior daemon exit or stop its recorded pid, then retry. |
+| `daemonStateUnavailable` / `daemonUnreachable` | Do not remove the socket; restore its owned state or stop the recorded daemon, then retry. |
 | `assetLoadFailed`, `captureRenderError`, or `captureTimeout` | Fix the reported source/render problem; do not accept a fallback capture. |
 
 ## Focused verification

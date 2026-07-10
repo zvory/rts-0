@@ -448,8 +448,12 @@ export class App {
     });
     this.pendingCameraView = null;
 
-    // If a previous match somehow lingers, tear it down first.
-    if (this.match) this.match.destroy();
+    // If a previous match somehow lingers, tear it down first. Clear the reference before
+    // shell cleanup so presentation reset cannot resize an already-destroyed renderer.
+    if (this.match) {
+      this.match.destroy();
+      this.match = null;
+    }
     this.destroyLabShell();
     this.inReplayPlayback = startsReplay;
 

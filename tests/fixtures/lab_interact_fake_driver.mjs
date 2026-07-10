@@ -23,6 +23,8 @@ const CATALOG = Object.freeze({
 const ONE_PIXEL_PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLGCQAAAABJRU5ErkJggg==";
 
 export async function openLabInteractDriver(options) {
+  const openDelayMs = Number(process.env.RTS_LAB_INTERACT_FAKE_OPEN_DELAY_MS || 0);
+  if (openDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, openDelayMs));
   let nextId = 100;
   let tick = 0;
   let closed = false;

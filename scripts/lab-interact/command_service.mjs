@@ -71,7 +71,8 @@ export class LabInteractService {
     this.maxSessions = LAB_INTERACT_LIMITS.maxSessions;
     this.log = log;
     this.sessions = new Map();
-    this.opening = 0;
+    this.openPromise = null;
+    this.closePromise = null;
     this.closed = false;
   }
 
@@ -89,18 +90,21 @@ export class LabInteractService {
 
   async open(input) {
     if (this.closed) throw new LabInteractError("serviceClosed", "Lab Interact is shutting down.");
-    if (this.sessions.size + this.opening >= this.maxSessions) {
-      throw new LabInteractError("sessionLimit", `Lab Interact allows at most ${this.maxSessions} concurrent sessions.`);
-    }
     const workspaceRoot = resolveRequestedWorkspace(input.workspaceRoot, this.workspaceRoot);
-    this.opening += 1;
-    try {
+    let existing = this.sessions.values().next().value;
+    if (existing) return this.use(existing.sessionId, (session) => this.describeSession(session));
+    await this.closePromise;
+    existing = this.sessions.values().next().value;
+    if (existing) return this.use(existing.sessionId, (session) => this.describeSession(session));
+    if (this.openPromise) return this.openPromise;
+    this.openPromise = (async () => {
       const driver = await this.driverFactory({
         workspaceRoot,
         map: input.map || "Default",
         seed: input.seed == null ? "" : String(input.seed),
         scenario: input.scenario || "blank",
         viewport: input.viewport,
+        baseUrl: process.env.RTS_LAB_INTERACT_BASE_URL || "",
       });
       if (this.closed) {
         await driver.close().catch(() => {});
@@ -110,26 +114,29 @@ export class LabInteractService {
       const session = { sessionId, driver, aliases: new Map(), operationTail: Promise.resolve() };
       this.sessions.set(sessionId, session);
       try {
-        const [status, catalog] = await Promise.all([driver.status(), driver.catalog()]);
-        return {
-          sessionId,
-          workspace: driver.workspace,
-          tick: Number.isInteger(status.snapshotTick) ? status.snapshotTick : null,
-          players: Array.isArray(catalog.players) ? catalog.players : [],
-          status,
-          capabilities: {
-            aliases: true,
-            catalogCategories: [...ALL_CATALOG_CATEGORIES],
-            maxSessions: this.maxSessions,
-          },
-        };
+        return await this.describeSession(session);
       } catch (error) {
         await this.close(sessionId, "openVerificationFailed");
         throw error;
       }
-    } finally {
-      this.opening -= 1;
-    }
+    })();
+    try { return await this.openPromise; } finally { this.openPromise = null; }
+  }
+
+  async describeSession(session) {
+    const [status, catalog] = await Promise.all([session.driver.status(), session.driver.catalog()]);
+    return {
+      sessionId: session.sessionId,
+      workspace: session.driver.workspace,
+      tick: Number.isInteger(status.snapshotTick) ? status.snapshotTick : null,
+      players: Array.isArray(catalog.players) ? catalog.players : [],
+      status,
+      capabilities: {
+        aliases: true,
+        catalogCategories: [...ALL_CATALOG_CATEGORIES],
+        maxSessions: this.maxSessions,
+      },
+    };
   }
 
   get(sessionId) {
@@ -149,16 +156,22 @@ export class LabInteractService {
     const session = this.sessions.get(sessionId);
     if (!session) return false;
     this.sessions.delete(sessionId);
-    await session.operationTail;
-    await session.driver.close().catch((error) => this.log("sessionCloseFailed", {
-      sessionId, reason, error: conciseError(error),
-    }));
-    return true;
+    const closing = (async () => {
+      await session.operationTail;
+      await session.driver.close().catch((error) => this.log("sessionCloseFailed", {
+        sessionId, reason, error: conciseError(error),
+      }));
+      return true;
+    })();
+    this.closePromise = closing;
+    try { return await closing; } finally { if (this.closePromise === closing) this.closePromise = null; }
   }
 
   async shutdown(reason = "shutdown") {
     if (this.closed) return;
     this.closed = true;
+    await this.openPromise?.catch(() => {});
+    await this.closePromise?.catch(() => {});
     await Promise.all([...this.sessions.keys()].map((sessionId) => this.close(sessionId, reason)));
   }
 

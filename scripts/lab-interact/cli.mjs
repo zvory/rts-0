@@ -23,9 +23,14 @@ export async function runCli(argv = process.argv.slice(2), { cwd = process.cwd()
   if (!input || typeof input !== "object" || Array.isArray(input)) throw cliError("invalidJson", "Input must be a JSON object.");
   const workspaceRoot = gitRoot(cwd);
   const paths = runtimePaths(workspaceRoot);
-  let response = await requestCurrent(paths, { command, input }).catch(() => null);
+  let response = null;
+  let requestError = null;
+  try { response = await requestCurrent(paths, { command, input }); } catch (error) { requestError = error; }
   if (!response) {
-    if (command === "shutdown") return { ok: true, result: { shuttingDown: false, alreadyStopped: true } };
+    if (command === "shutdown") {
+      await confirmStopped(paths, requestError);
+      return { ok: true, result: { shuttingDown: false, alreadyStopped: true } };
+    }
     await ensureDaemon(paths, env);
     response = await requestCurrent(paths, { command, input });
   }
@@ -39,9 +44,10 @@ async function ensureDaemon(paths, env) {
     if (await daemonReady(paths)) return;
     const existing = readState(paths);
     if (processAlive(existing?.pid)) {
-      throw cliError("daemonIncompatible", "A live but incompatible Lab Interact daemon owns this worktree runtime.");
+      throw cliError("daemonUnreachable", "A live Lab Interact daemon owns this worktree runtime but did not answer a compatible request.");
     }
     let lock;
+    let spawned = false;
     try {
       lock = fs.openSync(paths.lock, "wx", 0o600);
       fs.writeFileSync(lock, `${JSON.stringify({ pid: process.pid, createdAt: Date.now() })}\n`);
@@ -52,6 +58,16 @@ async function ensureDaemon(paths, env) {
       continue;
     }
     try {
+      if (await daemonReady(paths)) return;
+      const probe = await probeSocket(paths);
+      if (probe.live) {
+        throw cliError("daemonStateUnavailable", "A live Lab Interact daemon owns the socket, but its authenticated state is missing or incompatible.");
+      }
+      const owner = readState(paths);
+      if (processAlive(owner?.pid)) {
+        throw cliError("daemonUnreachable", "A live Lab Interact daemon owner is recorded but its socket is unavailable.");
+      }
+      // The startup lock is ours and an active probe proved that no process is listening.
       fs.rmSync(paths.socket, { force: true });
       fs.rmSync(paths.state, { force: true });
       const child = spawn(process.execPath, [path.join(scriptDir, "daemon.mjs"), paths.workspaceRoot], {
@@ -61,8 +77,10 @@ async function ensureDaemon(paths, env) {
         stdio: "ignore",
       });
       child.unref();
+      spawned = true;
     } finally {
       fs.closeSync(lock);
+      if (!spawned) removeOwnedStartupLock(paths);
     }
     while (Date.now() < deadline) {
       if (await daemonReady(paths)) return;
@@ -76,9 +94,17 @@ async function ensureDaemon(paths, env) {
 
 function staleStartup(paths) {
   let lock;
-  try { lock = JSON.parse(fs.readFileSync(paths.lock, "utf8")); } catch { return true; }
-  if (Date.now() - Number(lock.createdAt) > STARTUP_TIMEOUT_MS) return true;
+  try { lock = JSON.parse(fs.readFileSync(paths.lock, "utf8")); } catch {
+    try { return Date.now() - fs.statSync(paths.lock).mtimeMs > STARTUP_TIMEOUT_MS; } catch { return false; }
+  }
   return !processAlive(lock.pid);
+}
+
+function removeOwnedStartupLock(paths) {
+  try {
+    const lock = JSON.parse(fs.readFileSync(paths.lock, "utf8"));
+    if (lock.pid === process.pid) fs.rmSync(paths.lock, { force: true });
+  } catch {}
 }
 
 function requestCurrent(paths, payload, timeoutMs = REQUEST_TIMEOUT_MS) {
@@ -115,6 +141,58 @@ async function daemonReady(paths) {
     return response?.ok === true;
   } catch {
     return false;
+  }
+}
+
+async function probeSocket(paths) {
+  if (!fs.existsSync(paths.socket)) return { live: false, reason: "missing" };
+  try {
+    const response = await request(paths.socket, { protocolVersion: IPC_VERSION, probe: "lab-interact" }, 500);
+    if (response?.ok === true && response?.probe?.protocolVersion === IPC_VERSION) {
+      return { live: true, compatible: true, ...response.probe };
+    }
+    return { live: true, compatible: false, reason: "unexpectedResponse" };
+  } catch (error) {
+    if (["ECONNREFUSED", "ENOENT", "ENOTSOCK", "EINVAL"].includes(error?.code)) return { live: false, reason: error.code };
+    return { live: true, compatible: false, reason: error?.code || "probeFailed" };
+  }
+}
+
+async function confirmStopped(paths, requestError) {
+  if (!fs.existsSync(paths.directory)) return;
+  const state = readState(paths);
+  if (processAlive(state?.pid)) throw requestError || cliError("daemonUnreachable", "A live Lab Interact daemon is not accepting shutdown.");
+  const initialProbe = await probeSocket(paths);
+  if (initialProbe.live) throw requestError || cliError("daemonOccupied", "A live process still owns the Lab Interact socket.");
+  prepareRuntime(paths);
+  let lock;
+  let cleaned = false;
+  try {
+    lock = fs.openSync(paths.lock, "wx", 0o600);
+    fs.writeFileSync(lock, `${JSON.stringify({ pid: process.pid, createdAt: Date.now() })}\n`);
+  } catch (error) {
+    if (error?.code === "EEXIST" && staleStartup(paths)) {
+      fs.rmSync(paths.lock, { force: true });
+      return confirmStopped(paths, requestError);
+    }
+    if (error?.code === "EEXIST") throw requestError || cliError("daemonStarting", "Lab Interact startup is still in progress.");
+    throw error;
+  }
+  try {
+    const owner = readState(paths);
+    const probe = await probeSocket(paths);
+    if (processAlive(owner?.pid) || probe.live) {
+      throw requestError || cliError("daemonOccupied", "A live process still owns the Lab Interact runtime.");
+    }
+    fs.rmSync(paths.socket, { force: true });
+    fs.rmSync(paths.state, { force: true });
+    cleaned = true;
+  } finally {
+    fs.closeSync(lock);
+    removeOwnedStartupLock(paths);
+  }
+  if (cleaned) {
+    try { fs.rmdirSync(paths.directory); } catch (error) { if (error?.code !== "ENOENT" && error?.code !== "ENOTEMPTY") throw error; }
   }
 }
 

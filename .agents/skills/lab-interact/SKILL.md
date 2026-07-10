@@ -10,6 +10,8 @@ command starts that worktree's private daemon automatically. Lab mutations are e
 edit source files.
 
 1. Run `open`, retain `result.sessionId`, then run `catalog` before choosing players or kinds.
+   `open` is safe to repeat: it returns the active session. Run `close` first only when a fresh
+   session or different launch options are needed.
 2. Keep the scene small. Use short aliases in `spawn` and confirm changes with `inspect`.
 3. Use `time` to pause or step authoritative state. Position the view with `camera`. Single-unit
    focus without padding uses the intentionally close 32-world-pixel default.
@@ -29,4 +31,5 @@ not request arbitrary paths, add image bytes to Git, or use Lab Interact to play
 - `assetLoadFailed`, `captureRenderError`, or `captureTimeout`: fix the source asset/render issue;
   do not accept a fallback capture.
 - `occupied`/`labRejected`: choose a clear spawn location and confirm it with `inspect`.
-- interrupted work or `sessionLimit`: run `status`, then `close` the active session or `shutdown`.
+- interrupted work: run `open` to recover the active session id, or `status` to inspect it. Run
+  `close` followed by `open` only when the existing scene should be discarded.

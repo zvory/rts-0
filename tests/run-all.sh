@@ -7,7 +7,7 @@
 #   2. Rust nextest fast scripted tests (deterministic, in-process, no server)
 #   3. Rust lint                    (cargo clippy)
 #   4. Node API suites              (protocol/UI units, live API batch, then serialized lab_mortar_regression)
-#   5. Headless browser suites      (client_smoke, plus tri-state lag scenarios in CI or when opted in; needs Chrome)
+#   5. Headless browser suites      (client and Lab Interact smokes, plus opted-in tri-state scenarios; needs Chrome)
 #
 # The server is built in debug (overflow checks ON — the hardening regression tests rely on a
 # bad Build coord being caught, not silently wrapped) and booted on a private free port. The
@@ -765,6 +765,7 @@ if [ "${SERVER_HEALTHY:-0}" = "1" ]; then
     if [ -z "${CHROME:-}" ] || [ ! -x "$CHROME" ]; then
       info "skipping browser suites: no Chrome found (set CHROME=/path/to/chrome to override)"
       SKIPPED+=("Client smoke (no Chrome)")
+      SKIPPED+=("Lab Interact CLI smoke (no Chrome)")
       SKIPPED+=("Tri-state lag scenarios (no Chrome)")
     else
       deps_start=$SECONDS
@@ -783,8 +784,11 @@ if [ "${SERVER_HEALTHY:-0}" = "1" ]; then
       fi
       if browser_scenario_selected smoke; then
         CHROME="$CHROME" run_suite "Client smoke (headless Chrome)" node "$SCRIPT_DIR/client_smoke.mjs"
+        CHROME="$CHROME" RTS_LAB_INTERACT_BASE_URL="$RTS_URL" \
+          run_suite "Lab Interact CLI smoke (headless Chrome)" node "$SCRIPT_DIR/lab_interact_cli_smoke.mjs"
       else
         SKIPPED+=("Client smoke (not selected for this browser shard)")
+        SKIPPED+=("Lab Interact CLI smoke (not selected for this browser shard)")
       fi
       if [ "$RUN_TRI_STATE_BROWSER" = "1" ]; then
         for scenario in phase-0.5 phase-2.5 phase-5; do

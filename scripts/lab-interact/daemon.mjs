@@ -82,6 +82,10 @@ export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = config
     try {
       const request = JSON.parse(line);
       if (!request || typeof request !== "object" || Array.isArray(request)) throw Object.assign(new Error("Request must be a JSON object."), { code: "invalidRequest" });
+      if (Object.keys(request).length === 2 && request.protocolVersion === IPC_VERSION && request.probe === "lab-interact") {
+        socket.end(`${JSON.stringify({ ok: true, probe: { protocolVersion: IPC_VERSION, daemonId, pid: process.pid, workspaceRoot: paths.workspaceRoot } })}\n`);
+        return;
+      }
       const keys = Object.keys(request);
       if (keys.some((key) => !["protocolVersion", "daemonId", "capability", "command", "input"].includes(key)) ||
           request.protocolVersion !== IPC_VERSION || request.daemonId !== daemonId || request.capability !== capability ||
@@ -130,8 +134,12 @@ export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = config
     });
   });
   fs.chmodSync(paths.socket, 0o600);
-  fs.rmSync(paths.lock, { force: true });
+  const startupDelayMs = Number(process.env.RTS_LAB_INTERACT_TEST_STARTUP_DELAY_MS || 0);
+  if (Number.isInteger(startupDelayMs) && startupDelayMs > 0 && startupDelayMs <= 2_000) {
+    await new Promise((resolve) => setTimeout(resolve, startupDelayMs));
+  }
   writeState(paths, state());
+  fs.rmSync(paths.lock, { force: true });
   scheduleIdle();
   for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
     process.once(signal, () => { void shutdown(signal); });
