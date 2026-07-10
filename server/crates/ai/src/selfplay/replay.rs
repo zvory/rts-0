@@ -1061,7 +1061,7 @@ mod tests {
         );
         assert_eq!(
             canonical_profile_request_id_for_match("ai"),
-            Some(AI_1_2_SUITE_ID)
+            Some(AI_2_1_SUITE_ID)
         );
         assert_eq!(
             resolve_profile_request_id_for_match(AI_2_0_SUITE_ID, 0, 0),
