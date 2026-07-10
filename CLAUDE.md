@@ -18,13 +18,14 @@ Refresh a capsule's section pointers when the design document's structure change
 
 - For requests to investigate, review, audit, scout, or confirm, inspect and report. Keep the pass
   read-only unless the user also requests a change.
-- For requests to build, change, or fix, make the in-scope local edits and run focused,
-  non-destructive validation.
+- A request to build, change, or fix authorizes the complete normal delivery workflow: make the
+  in-scope edits, run focused non-destructive validation, commit and push the task branch, open an
+  owned PR, arm auto-merge, and wait for the PR to merge.
 - Base claims about current gameplay, balance, deployments, CI, PRs, and merged state on current
   repository, runtime, Git, GitHub, or Fly evidence rather than agent memory.
 - Require confirmation for destructive actions, direct pushes to `main`, or material scope
-  expansion. GitHub delivery follows the workflow below when the user asks for the change to be
-  delivered or merged.
+  expansion. Normal task-branch pushes, owned PR creation, and auto-merge do not require a separate
+  request or confirmation.
 
 ## Editing and Git workflow
 
@@ -48,7 +49,7 @@ git worktree add /tmp/rts-worktrees/<task> -b zvorygin/<task> origin/main
   contract changes, testing nuance, or non-obvious reasoning.
 - Use focused local checks during development. GitHub's `Main test gate` is the authoritative full
   suite for PR delivery.
-- When GitHub delivery is authorized, run
+- For every requested build, change, or fix, run
   `scripts/agent-pr.sh --verification "focused check command(s) passed"`, then
   `scripts/wait-pr.sh <pr>`. Completion means the PR merged and its head is reachable from
   `origin/main`, or a reported blocker identifies the exact failed check, conflict, API failure, or
