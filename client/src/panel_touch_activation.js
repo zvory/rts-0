@@ -6,12 +6,15 @@ export function createImmediateTouchButtonActivation(onActivate, options = {}) {
   const syntheticClickSuppressMs = finitePositive(options.syntheticClickSuppressMs) ||
     DEFAULT_SYNTHETIC_CLICK_SUPPRESS_MS;
   let activePointerId = null;
-  let lastTouchActivateAt = 0;
+  let pendingSyntheticClick = null;
 
   function activateFromTouch(event) {
     if (!isTouchPointer(event) || activePointerId == null || !samePointerId(activePointerId, event)) return;
     activePointerId = null;
-    lastTouchActivateAt = now();
+    pendingSyntheticClick = {
+      at: now(),
+      pointerType: String(event?.pointerType || ""),
+    };
     event.preventDefault?.();
     event.stopPropagation?.();
     if (!releasedInside(event)) return;
@@ -32,7 +35,8 @@ export function createImmediateTouchButtonActivation(onActivate, options = {}) {
     pointercancel: cancelTouch,
     pointerleave: cancelTouch,
     click(event) {
-      if (now() - lastTouchActivateAt < syntheticClickSuppressMs) {
+      if (isMatchingSyntheticClick(event, pendingSyntheticClick, now(), syntheticClickSuppressMs)) {
+        pendingSyntheticClick = null;
         event?.preventDefault?.();
         event?.stopPropagation?.();
         return;
@@ -41,9 +45,24 @@ export function createImmediateTouchButtonActivation(onActivate, options = {}) {
     },
     reset() {
       activePointerId = null;
-      lastTouchActivateAt = 0;
+      pendingSyntheticClick = null;
     },
   };
+}
+
+function isMatchingSyntheticClick(event, pending, currentTime, suppressMs) {
+  if (!pending) return false;
+  const elapsed = currentTime - pending.at;
+  if (!Number.isFinite(elapsed) || elapsed < 0 || elapsed >= suppressMs) return false;
+
+  const pointerType = String(event?.pointerType || "");
+  if (pointerType) return pointerType === pending.pointerType;
+  if (event?.sourceCapabilities?.firesTouchEvents === true) return true;
+  if (event?.sourceCapabilities?.firesTouchEvents === false) return false;
+  // Keyboard and programmatic button activation produce detail === 0. Older
+  // browsers may expose the compatibility click as a MouseEvent without a
+  // pointerType, in which case a positive detail is the best available signal.
+  return Number(event?.detail) > 0;
 }
 
 function releasedInside(event) {

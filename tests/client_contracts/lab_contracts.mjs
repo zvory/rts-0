@@ -1374,6 +1374,8 @@ await withFakeDocument(async () => {
     "LabPanelWindowChrome touch release toggles collapse without waiting for a synthesized click",
   );
   collapseButton.listeners.click({
+    pointerType: "touch",
+    detail: 1,
     preventDefault() {},
     stopPropagation() {},
   });

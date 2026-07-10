@@ -100,7 +100,7 @@ export class RoomTimeControls {
       if (!this.roomTime.step) return;
       const currentTick = Number.isFinite(this.roomTimeState?.currentTick) ? this.roomTimeState.currentTick : null;
       this.requestRoomTimeAction(
-        { kind: "step", expectedTick: currentTick == null ? null : currentTick + 1 },
+        { kind: "step", baselineTick: currentTick },
         () => this.net.stepRoomTime(),
       );
       return;
@@ -111,7 +111,12 @@ export class RoomTimeControls {
       if (!isFinite(ticksBack) || ticksBack <= 0) return;
       const currentTick = Number.isFinite(this.roomTimeState?.currentTick) ? this.roomTimeState.currentTick : 0;
       this.requestRoomTimeAction(
-        { kind: "seek", expectedTick: Math.max(0, currentTick - ticksBack) },
+        {
+          kind: "seek",
+          mode: "relative",
+          baselineTick: currentTick,
+          expectedTick: Math.max(0, currentTick - ticksBack),
+        },
         () => this.net.seekRoomTime(ticksBack),
       );
       return;
@@ -169,10 +174,12 @@ export class RoomTimeControls {
     }
 
     this.roomTimeNotice = "";
-    this.roomTimePending = pending;
-    if (pending.kind === "seek") {
+    this.roomTimePending = Number.isFinite(this.net?.playerId)
+      ? { ...pending, controllerId: this.net.playerId }
+      : pending;
+    if (this.roomTimePending.kind === "seek") {
       this.roomTimeSeekPending = true;
-      this.roomTimeSeekTargetTick = pending.expectedTick;
+      this.roomTimeSeekTargetTick = this.roomTimePending.expectedTick;
       this.setRoomTimeConcluded(false);
     }
     this.syncRoomTimePendingPresentation();
@@ -190,13 +197,26 @@ export class RoomTimeControls {
       return Number.isFinite(state.speed) && Math.abs(state.speed - pending.expectedSpeed) < 0.001;
     }
     if (pending.kind === "seek") {
-      return Number.isFinite(state.currentTick) && state.currentTick === pending.expectedTick;
+      if (!Number.isFinite(state.currentTick) || !Number.isFinite(pending.expectedTick)) return false;
+      if (Number.isFinite(pending.controllerId) && state.controllerId !== pending.controllerId) return false;
+      if (state.currentTick === pending.expectedTick) return true;
+      if (!Number.isFinite(pending.baselineTick)) return false;
+      if (pending.mode === "relative") return state.currentTick < pending.baselineTick;
+      return (
+        Math.abs(state.currentTick - pending.expectedTick) <
+        Math.abs(pending.baselineTick - pending.expectedTick)
+      );
     }
     if (pending.kind === "step") {
+      if (
+        Number.isFinite(pending.controllerId) &&
+        Number.isFinite(state.controllerId) &&
+        state.controllerId !== pending.controllerId
+      ) return false;
       return (
-        Number.isFinite(pending.expectedTick) &&
+        Number.isFinite(pending.baselineTick) &&
         Number.isFinite(state.currentTick) &&
-        state.currentTick === pending.expectedTick
+        state.currentTick > pending.baselineTick
       );
     }
     return false;
@@ -401,14 +421,11 @@ export class RoomTimeControls {
     if (!rect.width) return;
     const ratio = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
     const tick = Math.round(ratio * duration);
-    this.requestRoomTimeAction({ kind: "seek", expectedTick: tick }, () => this.net.seekRoomTimeTo(tick));
-  }
-
-  setRoomTimeSeekPending(targetTick, pending = true) {
-    this.roomTimeSeekPending = !!pending;
-    this.roomTimeSeekTargetTick = this.roomTimeSeekPending && Number.isFinite(targetTick) ? targetTick : null;
-    this.updateRoomTimeStatus();
-    this.updateRoomTimeTimeline();
+    const baselineTick = Number.isFinite(this.roomTimeState?.currentTick) ? this.roomTimeState.currentTick : null;
+    this.requestRoomTimeAction(
+      { kind: "seek", mode: "absolute", baselineTick, expectedTick: tick },
+      () => this.net.seekRoomTimeTo(tick),
+    );
   }
 
   updateRoomTimeTimeline() {

@@ -337,7 +337,7 @@ assert(
   replayNet.speeds.length === speedsBeforeTouch + 1 && replayControls.dataset.roomTimePending === "true",
   "a touch speed tap sends once and shows pending confirmation",
 );
-speed2._listeners.get("click")({ preventDefault() {}, stopPropagation() {} });
+speed2._listeners.get("click")({ pointerType: "touch", detail: 1, preventDefault() {}, stopPropagation() {} });
 assert(replayNet.speeds.length === speedsBeforeTouch + 1, "the synthesized touch click does not duplicate the speed request");
 replayUi.applyRoomTimeState({ currentTick: 120, durationTicks: 1_000, speed: 2, paused: false });
 
@@ -361,7 +361,7 @@ assert(replayNet.speeds.length === speedsBeforePen + 1, "a pen pause tap sends e
 assert(pauseReplay.textContent === "Pause", "pause waits for authoritative confirmation before changing its label");
 replayUi.applyRoomTimeState({ currentTick: 120, durationTicks: 1_000, speed: 0, paused: true });
 assert(pauseReplay.textContent === "Resume", "paused replay button switches to resume");
-pauseReplay._listeners.get("click")({ preventDefault() {}, stopPropagation() {} });
+pauseReplay._listeners.get("click")({ pointerType: "pen", detail: 1, preventDefault() {}, stopPropagation() {} });
 assert(replayNet.speeds.length === speedsBeforePen + 1, "the synthesized pen click does not duplicate pause");
 
 roomTimeNow += 1_000;
@@ -370,6 +370,7 @@ assert(replayNet.speeds.at(-1) === 2, "replay resume button restores the last no
 replayUi.applyRoomTimeState({ currentTick: 120, durationTicks: 1_000, speed: 2, paused: false });
 assert(pauseReplay.textContent === "Pause", "resumed replay button switches back to pause");
 
+replayNet.playerId = 41;
 seekBack._listeners.get("click")({});
 assert(replayNet.seekBacks.at(-1) === 90, "seek click sends net.seekRoomTime");
 replayUi.applyRoomTimeState({ currentTick: 120, durationTicks: 1_000, speed: 2, paused: false });
@@ -378,8 +379,17 @@ assert(
     replayControls.querySelector(".room-time-tick-status").textContent.includes("Seeking 30"),
   "a stale non-confirming authoritative update does not reject a pending seek",
 );
-replayUi.applyRoomTimeState({ currentTick: 30, durationTicks: 1_000, speed: 2, paused: false });
-assert(replayControls.dataset.roomTimePending === "false", "the matching authoritative seek state clears pending");
+replayUi.applyRoomTimeState({ currentTick: 34, durationTicks: 1_000, speed: 2, paused: false, controllerId: 99 });
+assert(
+  replayControls.dataset.roomTimePending === "true",
+  "another viewer's authoritative rewind does not confirm the local seek",
+);
+replayUi.applyRoomTimeState({ currentTick: 35, durationTicks: 1_000, speed: 2, paused: false, controllerId: 41 });
+assert(
+  replayControls.dataset.roomTimePending === "false",
+  "an authoritative rewind clears pending even when server progress makes the exact client prediction stale",
+);
+delete replayNet.playerId;
 speed2._listeners.get("click")({});
 replayUi.expireRoomTimePending();
 assert(
@@ -404,7 +414,7 @@ branchReplay._listeners.get("pointerup")({
   stopPropagation() {},
 });
 assert(replayNet.branches === 1, "a touch branch action invokes its request once");
-branchReplay._listeners.get("click")({ preventDefault() {}, stopPropagation() {} });
+branchReplay._listeners.get("click")({ pointerType: "touch", detail: 1, preventDefault() {}, stopPropagation() {} });
 assert(replayNet.branches === 1, "the synthesized touch click does not duplicate the branch request");
 
 visionButtons[1]._listeners.get("click")({});
@@ -582,7 +592,7 @@ assert(replayNet.speeds.at(-1) === 2, "scenario speed click sends net.setRoomTim
 scenarioUi.applyRoomTimeState({ currentTick: 0, durationTicks: 0, speed: 2, paused: false });
 scenarioStep._listeners.get("click")({});
 assert(replayNet.steps === 1, "scenario step sends net.stepRoomTime");
-scenarioUi.applyRoomTimeState({ currentTick: 1, durationTicks: 0, speed: 2, paused: false });
+scenarioUi.applyRoomTimeState({ currentTick: 3, durationTicks: 0, speed: 2, paused: false });
 scenarioSpeed0._listeners.get("click")({});
 assert(replayNet.speeds.at(-1) === 0, "scenario pause speed sends net.setRoomTimeSpeed");
 scenarioUi.destroy();
@@ -724,7 +734,11 @@ labUi.applyRoomTimeState({ currentTick: 90, durationTicks: 600, speed: 1, paused
 const labTimelineTrack = labControls.querySelector(".room-time-timeline-track");
 labUi.onRoomTimeTimelineClick({ currentTarget: labTimelineTrack, clientX: 100 });
 assert(replayNet.seekTargets.at(-1) === 300, "lab timeline click sends an absolute room-time seek");
-labUi.applyRoomTimeState({ currentTick: 300, durationTicks: 600, speed: 1, paused: false });
+labUi.applyRoomTimeState({ currentTick: 301, durationTicks: 600, speed: 1, paused: false });
+assert(
+  labControls.dataset.roomTimePending === "false",
+  "an absolute seek confirms when the authoritative tick moved toward a clamped or stale target",
+);
 labPause._listeners.get("click")({});
 assert(replayNet.speeds.at(-1) === 0, "lab pause sends net.setRoomTimeSpeed");
 labUi.applyRoomTimeState({ currentTick: 300, durationTicks: 600, speed: 0, paused: true });
@@ -834,4 +848,3 @@ noCapabilityUi.destroy();
   if (priorDocument === undefined) delete globalThis.document;
   else globalThis.document = priorDocument;
 }
-

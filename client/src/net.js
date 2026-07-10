@@ -426,8 +426,18 @@ export class Net {
     }
     if (obj?.t === "ping") this.diagnostics?.count(label, { bytes: json.length });
     else this.diagnostics?.mark(label, { bytes: json.length });
-    this.ws.send(json);
-    return true;
+    try {
+      this.ws.send(json);
+      return true;
+    } catch (error) {
+      this.diagnostics?.mark(`${label}.blocked`, {
+        readyState: this.ws?.readyState ?? null,
+        bytes: json.length,
+        reason: "send_failed",
+        errorName: error?.name || "Error",
+      });
+      return false;
+    }
   }
 
   /**

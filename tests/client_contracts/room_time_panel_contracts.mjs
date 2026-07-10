@@ -64,6 +64,8 @@ try {
   );
 
   collapse._listeners.get("click")({
+    pointerType: "touch",
+    detail: 1,
     preventDefault() {},
     stopPropagation() {},
   });
@@ -88,13 +90,30 @@ try {
   assert(root.dataset.collapsed === "true", "FloatingRoomTimePanel cancels touch collapse when the pointer leaves");
   panel.destroy();
 
+  let dedupeActivations = 0;
+  const dedupeNow = 100;
+  const dedupeActivation = createImmediateTouchButtonActivation(
+    () => { dedupeActivations += 1; },
+    { now: () => dedupeNow },
+  );
+  dedupeActivation.pointerdown({ button: 0, isPrimary: true, pointerId: 1, pointerType: "pen" });
+  dedupeActivation.pointerup({ pointerId: 1, pointerType: "pen", preventDefault() {}, stopPropagation() {} });
+  assert(dedupeActivations === 1, "touch activation accepts a primary pen release");
+  dedupeActivation.click({ detail: 0 });
+  dedupeActivation.click({ pointerType: "mouse", detail: 1 });
+  assert(dedupeActivations === 3, "touch activation preserves keyboard and mouse clicks during the de-duplication window");
+  dedupeActivation.click({ pointerType: "pen", detail: 1, preventDefault() {}, stopPropagation() {} });
+  assert(dedupeActivations === 3, "touch activation suppresses the pen's synthesized duplicate click");
+  dedupeActivation.click({ pointerType: "pen", detail: 1 });
+  assert(dedupeActivations === 4, "touch activation suppresses exactly one compatibility click");
+
   let activations = 0;
-  let now = 100;
+  let now = dedupeNow + 1_000;
   const activation = createImmediateTouchButtonActivation(() => { activations += 1; }, { now: () => now });
   activation.pointerdown({ button: 0, isPrimary: true, pointerId: 1, pointerType: "pen" });
   activation.pointerup({ pointerId: 1, pointerType: "pen", preventDefault() {}, stopPropagation() {} });
   assert(activations === 1, "touch activation accepts a primary pen release");
-  activation.click({ preventDefault() {}, stopPropagation() {} });
+  activation.click({ pointerType: "pen", detail: 1, preventDefault() {}, stopPropagation() {} });
   assert(activations === 1, "touch activation suppresses the pen's synthesized duplicate click");
 
   now += 1_000;
@@ -123,7 +142,7 @@ try {
     activations === 1,
     "touch activation rejects an outside release even when pointer capture keeps the button targeted",
   );
-  activation.click({ preventDefault() {}, stopPropagation() {} });
+  activation.click({ pointerType: "touch", detail: 1, preventDefault() {}, stopPropagation() {} });
   assert(activations === 1, "touch activation suppresses the synthetic click after an outside release");
 
   now += 1_000;

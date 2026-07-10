@@ -83,6 +83,10 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   assert(net.setRoomTimeSpeed(2) === false, "Net reports a blocked room-time speed send");
   assert(net.stepRoomTime() === false, "Net reports a blocked room-time step send");
   net.ws.readyState = WebSocket.OPEN;
+  const workingSend = net.ws.send;
+  net.ws.send = () => { throw new Error("socket closed during send"); };
+  assert(net.setRoomTimeSpeed(2) === false, "Net reports a synchronous WebSocket send failure");
+  net.ws.send = workingSend;
   assert(
     msg.labExportScenario(13, "saved").op.name === "saved",
     "lab setup export builder includes a name",
