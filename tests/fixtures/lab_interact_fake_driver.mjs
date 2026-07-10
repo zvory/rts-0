@@ -1,4 +1,4 @@
-// Test-only deterministic driver for the stdio MCP contract harness.
+// Test-only deterministic driver for the CLI and daemon contract harness.
 
 const CATALOG = Object.freeze({
   maps: [{ name: "Default", width: 64, height: 64, tileSize: 32 }],
@@ -22,7 +22,7 @@ const CATALOG = Object.freeze({
 });
 const ONE_PIXEL_PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLGCQAAAABJRU5ErkJggg==";
 
-export async function openAgentLabDriver(options) {
+export async function openLabInteractDriver(options) {
   let nextId = 100;
   let tick = 0;
   let closed = false;
@@ -58,6 +58,8 @@ export async function openAgentLabDriver(options) {
       return structuredClone(CATALOG);
     },
     async spawn(spec) {
+      const delayMs = Number(process.env.RTS_LAB_INTERACT_FAKE_DELAY_MS || 0);
+      if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
       const entity = { id: nextId++, kind: spec.kind, owner: spec.owner, x: spec.x, y: spec.y, hp: 100, maxHp: 100, state: "idle", orderPlan: [] };
       entities.push(entity);
       tick += 1;
@@ -119,8 +121,8 @@ export async function openAgentLabDriver(options) {
       const width = viewport?.width || 1;
       const height = viewport?.height || 1;
       return {
-        pngPath: `${options.workspaceRoot}/target/agent-lab/${sessionId}/captures/${name}.png`,
-        manifestPath: `${options.workspaceRoot}/target/agent-lab/${sessionId}/captures/${name}.json`,
+        pngPath: `${options.workspaceRoot}/target/lab-interact/${sessionId}/captures/${name}.png`,
+        manifestPath: `${options.workspaceRoot}/target/lab-interact/${sessionId}/captures/${name}.json`,
         image: {
           mimeType: "image/png",
           data: ONE_PIXEL_PNG,

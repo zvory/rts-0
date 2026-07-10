@@ -1,0 +1,4 @@
+interface:
+  display_name: "Lab Interact Capture"
+  short_description: "Arrange and capture authoritative Pixi scenes."
+  default_prompt: "Use the Lab Interact CLI to arrange a small authoritative scene and capture a clean screenshot."

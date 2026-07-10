@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { AgentLabBridge } from "../../client/src/agent_lab_bridge.js";
+import { LabInteractBridge } from "../../client/src/lab_interact_bridge.js";
 import { CleanPresentation, CLEAN_PRESENTATION_ATTRIBUTE } from "../../client/src/clean_presentation.js";
 import { Renderer } from "../../client/src/renderer/index.js";
 import { LAB_ROLE } from "../../client/src/protocol.js";
@@ -74,7 +74,7 @@ const camera = {
   screenToWorld(x, y) { return { x: this.x + x, y: this.y + y }; },
 };
 const subject = { id: 4, kind: "tank", owner: 1, x: 50, y: 60, hp: 100, maxHp: 100, state: "idle", orderPlan: [] };
-const captureBridge = new AgentLabBridge({
+const captureBridge = new LabInteractBridge({
   enabled: true,
   windowLike: {},
   app: {
@@ -118,4 +118,4 @@ await captureBridge.presentation({ mode: "default" });
 assert.equal(calls.at(-1), "presentation:false", "clean presentation exits after a capture without retaining hidden UI state");
 captureBridge.destroy();
 
-console.log("✅ agent_lab_capture_contracts.mjs: clean presentation and capture readiness contracts passed");
+console.log("✅ lab_interact_capture_contracts.mjs: clean presentation and capture readiness contracts passed");

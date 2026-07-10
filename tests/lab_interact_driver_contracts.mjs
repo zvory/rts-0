@@ -4,46 +4,46 @@ import os from "node:os";
 import path from "node:path";
 
 import {
-  AgentLabDriver,
-  AgentLabDriverError,
+  LabInteractDriver,
+  LabInteractDriverError,
   DRIVER_STATES,
   generatedRoomId,
   safeToken,
   transitionDriverState,
   validateWorkspaceRoot,
   withTimeout,
-} from "../scripts/agent-lab/driver.mjs";
+} from "../scripts/lab-interact/driver.mjs";
 import {
-  AGENT_LAB_BRIDGE_KEY,
-  AgentLabBridge,
-  agentLabLaunchEnabled,
+  LAB_INTERACT_BRIDGE_KEY,
+  LabInteractBridge,
+  labInteractLaunchEnabled,
   normalizeInspectionQuery,
-} from "../client/src/agent_lab_bridge.js";
+} from "../client/src/lab_interact_bridge.js";
 import { ABILITY, DEFAULT_FACTION_ID, KIND, LAB_ROLE } from "../client/src/protocol.js";
 import { labSpawnUnitKindsForFaction } from "../client/src/lab_spawn_catalog.js";
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const workspace = validateWorkspaceRoot(root);
-assert.equal(workspace.root, fs.realpathSync(root), "agent-lab validates the selected checkout top level");
-assert.match(workspace.head, /^[0-9a-f]{40}$/i, "agent-lab records a selected checkout SHA");
+assert.equal(workspace.root, fs.realpathSync(root), "lab-interact validates the selected checkout top level");
+assert.match(workspace.head, /^[0-9a-f]{40}$/i, "lab-interact records a selected checkout SHA");
 
-const junk = fs.mkdtempSync(path.join(os.tmpdir(), "rts-agent-lab-invalid-"));
+const junk = fs.mkdtempSync(path.join(os.tmpdir(), "rts-lab-interact-invalid-"));
 try {
   assert.throws(() => validateWorkspaceRoot(junk), (error) => error?.code === "invalidWorkspace");
 } finally {
   fs.rmSync(junk, { recursive: true, force: true });
 }
 
-assert.equal(safeToken("safe_room-2", "fallback"), "safe_room-2", "safe Agent Lab names are retained");
-assert.equal(safeToken("../escape", "fallback"), "fallback", "unsafe Agent Lab names are rejected");
-assert.match(generatedRoomId("0123456789abcdef"), /^agentlab-[A-Za-z0-9_-]+$/, "generated rooms stay protocol-safe");
+assert.equal(safeToken("safe_room-2", "fallback"), "safe_room-2", "safe Lab Interact names are retained");
+assert.equal(safeToken("../escape", "fallback"), "fallback", "unsafe Lab Interact names are rejected");
+assert.match(generatedRoomId("0123456789abcdef"), /^labinteract-[A-Za-z0-9_-]+$/, "generated rooms stay protocol-safe");
 
 assert.equal(transitionDriverState(DRIVER_STATES.OPENING, "opened"), DRIVER_STATES.OPEN, "driver opens once");
 assert.equal(transitionDriverState(DRIVER_STATES.OPEN, "closing"), DRIVER_STATES.CLOSING, "driver closes from open");
 assert.equal(transitionDriverState(DRIVER_STATES.CLOSING, "closed"), DRIVER_STATES.CLOSED, "driver reaches closed state");
 assert.throws(
   () => transitionDriverState(DRIVER_STATES.CLOSED, "opened"),
-  (error) => error instanceof AgentLabDriverError && error.code === "invalidLifecycle",
+  (error) => error instanceof LabInteractDriverError && error.code === "invalidLifecycle",
   "driver rejects invalid process transitions",
 );
 
@@ -53,11 +53,11 @@ await assert.rejects(
   "driver normalizes timeouts",
 );
 assert.throws(
-  () => new AgentLabDriver({ workspaceRoot: root, timeoutMs: 60_001 }),
+  () => new LabInteractDriver({ workspaceRoot: root, timeoutMs: 60_001 }),
   (error) => error?.code === "invalidTimeout",
   "driver bounds per-operation waits",
 );
-const pageErrorDriver = new AgentLabDriver({ workspaceRoot: root });
+const pageErrorDriver = new LabInteractDriver({ workspaceRoot: root });
 pageErrorDriver.state = DRIVER_STATES.OPEN;
 pageErrorDriver.page = { evaluate: async () => ({ ok: true, value: { ready: true, reason: "ready" } }) };
 pageErrorDriver.pageErrors.push("frame failed");
@@ -80,11 +80,11 @@ assert.equal(inspection.limit, 100, "inspection result limits remain bounded");
 assert.equal(inspection.cameraViewport, false, "inspection viewport filtering is opt-in");
 assert.equal(normalizeInspectionQuery({ cameraViewport: true }).cameraViewport, true, "inspection accepts the bounded camera viewport filter");
 
-assert.equal(agentLabLaunchEnabled({ pathname: "/lab", search: "?agentLab=1" }), true, "explicit Agent Lab URL enables the bridge");
-assert.equal(agentLabLaunchEnabled({ pathname: "/lab", search: "?agentLab=0" }), false, "normal Lab URLs do not expose the bridge");
-assert.equal(agentLabLaunchEnabled({ pathname: "/", search: "?agentLab=1" }), false, "non-Lab URLs never expose the bridge");
+assert.equal(labInteractLaunchEnabled({ pathname: "/lab", search: "?labInteract=1" }), true, "explicit Lab Interact URL enables the bridge");
+assert.equal(labInteractLaunchEnabled({ pathname: "/lab", search: "?labInteract=0" }), false, "normal Lab URLs do not expose the bridge");
+assert.equal(labInteractLaunchEnabled({ pathname: "/", search: "?labInteract=1" }), false, "non-Lab URLs never expose the bridge");
 const windowLike = {};
-const bridge = new AgentLabBridge({
+const bridge = new LabInteractBridge({
   enabled: true,
   windowLike,
   app: {
@@ -102,13 +102,13 @@ const bridge = new AgentLabBridge({
     },
   },
 });
-assert.deepEqual(Object.keys(windowLike[AGENT_LAB_BRIDGE_KEY]).sort(), ["call", "status", "version"], "bridge surface exposes no app internals");
-const catalog = await windowLike[AGENT_LAB_BRIDGE_KEY].call("catalog", {});
+assert.deepEqual(Object.keys(windowLike[LAB_INTERACT_BRIDGE_KEY]).sort(), ["call", "status", "version"], "bridge surface exposes no app internals");
+const catalog = await windowLike[LAB_INTERACT_BRIDGE_KEY].call("catalog", {});
 const faction = catalog.value.factions.find((entry) => entry.id === DEFAULT_FACTION_ID);
 assert.deepEqual(faction.units, labSpawnUnitKindsForFaction(DEFAULT_FACTION_ID), "bridge catalog matches the human Lab spawn palette");
-assert.deepEqual(catalog.value.abilities, Object.values(ABILITY), "bridge catalog exposes mirrored ability ids for the MCP command validator");
+assert.deepEqual(catalog.value.abilities, Object.values(ABILITY), "bridge catalog exposes mirrored ability ids for command validation");
 bridge.destroy();
-assert.equal(windowLike[AGENT_LAB_BRIDGE_KEY], undefined, "bridge teardown removes the launch-gated global");
+assert.equal(windowLike[LAB_INTERACT_BRIDGE_KEY], undefined, "bridge teardown removes the launch-gated global");
 
 const replacementMatch = {
   state: { currRecvTime: 2, tick: 3 },
@@ -126,7 +126,7 @@ seekApp.match = {
   roomTimeControls: { roomTimeState: { currentTick: 7, speed: 0, paused: true } },
   net: { seekRoomTimeTo: () => { seekApp.match = replacementMatch; } },
 };
-const seekBridge = new AgentLabBridge({ enabled: true, app: seekApp, windowLike: {}, sleep: async () => {} });
+const seekBridge = new LabInteractBridge({ enabled: true, app: seekApp, windowLike: {}, sleep: async () => {} });
 const seek = await seekBridge.time({ action: "seek", tick: 999 });
 assert.equal(seek.snapshotTick, 3, "bridge returns the server-observed tick when a seek is clamped to retained history");
 seekBridge.destroy();
@@ -147,7 +147,7 @@ const viewportEntities = [
   { id: 2, kind: "rifleman", owner: 2, x: 240, y: 240, hp: 100, maxHp: 100, state: "idle", orderPlan: [] },
   { id: 3, kind: KIND.CITY_CENTRE, owner: 1, x: 400, y: 400, hp: 100, maxHp: 100, state: "idle", orderPlan: [] },
 ];
-const viewportBridge = new AgentLabBridge({
+const viewportBridge = new LabInteractBridge({
   enabled: true,
   windowLike: {},
   app: {
@@ -181,4 +181,4 @@ const closeFocused = viewportBridge.camera({ action: "focus", entityIds: [1] });
 assert.equal(closeFocused.camera.zoom, 100 / 64, "bridge focus defaults to a 32-world-pixel close framing for readable single-subject captures");
 viewportBridge.destroy();
 
-console.log("✅ agent_lab_driver_contracts.mjs: all contract assertions passed");
+console.log("✅ lab_interact_driver_contracts.mjs: all contract assertions passed");

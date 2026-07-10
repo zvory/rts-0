@@ -1,6 +1,6 @@
-// Transport-independent local driver for the Agent Lab browser session.
-// MCP transport is intentionally a later concern; this module owns only the selected
-// worktree, private processes, narrow page bridge, and bounded local diagnostics.
+// Transport-independent local driver for the Lab Interact browser session.
+// This module owns only the selected worktree, private processes, narrow page bridge,
+// and bounded local diagnostics.
 
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -19,7 +19,7 @@ const LOG_TAIL_LINES = 80;
 const MAX_PAGE_ERRORS = 80;
 const MAX_CAPTURE_BYTES = 16 * 1024 * 1024;
 const MAX_CAPTURE_VIEWPORT = 2048;
-const AGENT_LAB_ROOT = path.join("target", "agent-lab");
+const LAB_INTERACT_ROOT = path.join("target", "lab-interact");
 
 export const DRIVER_STATES = Object.freeze({
   OPENING: "opening",
@@ -28,18 +28,18 @@ export const DRIVER_STATES = Object.freeze({
   CLOSED: "closed",
 });
 
-export class AgentLabDriverError extends Error {
+export class LabInteractDriverError extends Error {
   constructor(code, message, details = {}) {
     super(message);
-    this.name = "AgentLabDriverError";
+    this.name = "LabInteractDriverError";
     this.code = code;
     this.details = details;
   }
 }
 
-export class AgentLabDriver {
+export class LabInteractDriver {
   static async open(options = {}) {
-    const driver = new AgentLabDriver(options);
+    const driver = new LabInteractDriver(options);
     try {
       await driver.open();
       return driver;
@@ -91,7 +91,7 @@ export class AgentLabDriver {
 
   async open() {
     if (this.openStarted || this.state !== DRIVER_STATES.OPENING) {
-      throw new AgentLabDriverError("invalidLifecycle", "Agent Lab driver can only be opened once.");
+      throw new LabInteractDriverError("invalidLifecycle", "Lab Interact driver can only be opened once.");
     }
     this.openStarted = true;
     this.workspace = validateWorkspaceRoot(this.options.workspaceRoot);
@@ -109,7 +109,7 @@ export class AgentLabDriver {
 
     const puppeteer = await loadPuppeteer(this.workspace.root);
     if (this.state !== DRIVER_STATES.OPENING) {
-      throw new AgentLabDriverError("sessionClosed", "Agent Lab driver was closed during browser startup.");
+      throw new LabInteractDriverError("sessionClosed", "Lab Interact driver was closed during browser startup.");
     }
     const chrome = findChrome(this.options.chrome);
     this.profileDir = fs.mkdtempSync(path.join(this.sessionDir, "chrome-profile-"));
@@ -126,27 +126,27 @@ export class AgentLabDriver {
     });
     if (this.state !== DRIVER_STATES.OPENING) {
       await browser.close().catch(() => {});
-      throw new AgentLabDriverError("sessionClosed", "Agent Lab driver was closed during browser startup.");
+      throw new LabInteractDriverError("sessionClosed", "Lab Interact driver was closed during browser startup.");
     }
     this.browser = browser;
     this.browserVersion = await browser.version().catch(() => "");
     const page = await browser.newPage();
     if (this.state !== DRIVER_STATES.OPENING) {
       await page.close().catch(() => {});
-      throw new AgentLabDriverError("sessionClosed", "Agent Lab driver was closed during page startup.");
+      throw new LabInteractDriverError("sessionClosed", "Lab Interact driver was closed during page startup.");
     }
     this.page = page;
     this.attachPageDiagnostics();
     await this.page.goto(this.launchUrl(), { waitUntil: "domcontentloaded", timeout: this.options.startupTimeoutMs });
     await this.page.waitForFunction(
-      () => window.__rtsAgentLab?.status?.().ready === true,
+      () => window.__rtsLabInteract?.status?.().ready === true,
       { timeout: this.options.startupTimeoutMs },
     );
     if (this.state !== DRIVER_STATES.OPENING) {
-      throw new AgentLabDriverError("sessionClosed", "Agent Lab driver was closed during page startup.");
+      throw new LabInteractDriverError("sessionClosed", "Lab Interact driver was closed during page startup.");
     }
     if (this.pageErrors.length > 0) {
-      throw new AgentLabDriverError("pageError", "Agent Lab page reported an error before readiness.");
+      throw new LabInteractDriverError("pageError", "Lab Interact page reported an error before readiness.");
     }
     this.transition("opened");
     this.writeManifest({
@@ -237,20 +237,20 @@ export class AgentLabDriver {
 
   async callBridge(method, input) {
     if (this.state !== DRIVER_STATES.OPEN || !this.page) {
-      throw new AgentLabDriverError("sessionClosed", "Agent Lab driver session is not open.");
+      throw new LabInteractDriverError("sessionClosed", "Lab Interact driver session is not open.");
     }
     const result = await withTimeout(
       this.page.evaluate(
-        ({ method: bridgeMethod, input: bridgeInput }) => window.__rtsAgentLab.call(bridgeMethod, bridgeInput),
+        ({ method: bridgeMethod, input: bridgeInput }) => window.__rtsLabInteract.call(bridgeMethod, bridgeInput),
         { method, input },
       ),
       this.options.timeoutMs,
-      `Agent Lab ${method}`,
+      `Lab Interact ${method}`,
     );
     if (!result?.ok) {
-      throw new AgentLabDriverError(
+      throw new LabInteractDriverError(
         result?.error?.code || "bridgeError",
-        result?.error?.message || `Agent Lab ${method} failed.`,
+        result?.error?.message || `Lab Interact ${method} failed.`,
         { method },
       );
     }
@@ -259,7 +259,7 @@ export class AgentLabDriver {
 
   async captureScreenshot({ sessionId, name, presentation, viewport, subjectIds, subjectSummaries, request }) {
     if (presentation !== "clean" && presentation !== "normal") {
-      throw new AgentLabDriverError("invalidPresentation", "presentation must be clean or normal.");
+      throw new LabInteractDriverError("invalidPresentation", "presentation must be clean or normal.");
     }
     const normalizedSessionId = safeCaptureSessionId(sessionId);
     const artifactName = safeArtifactName(name);
@@ -276,9 +276,9 @@ export class AgentLabDriver {
         const rect = viewportEl?.getBoundingClientRect?.();
         return rect ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height } : null;
       });
-      if (!validClip(clip)) throw new AgentLabDriverError("viewportUnavailable", "The Pixi viewport is not available for capture.");
+      if (!validClip(clip)) throw new LabInteractDriverError("viewportUnavailable", "The Pixi viewport is not available for capture.");
 
-      const captureDir = path.join(this.workspace.root, AGENT_LAB_ROOT, normalizedSessionId, "captures");
+      const captureDir = path.join(this.workspace.root, LAB_INTERACT_ROOT, normalizedSessionId, "captures");
       fs.mkdirSync(captureDir, { recursive: true });
       const suffix = new Date().toISOString().replace(/[:.]/g, "-");
       const baseName = `${artifactName}-${suffix}`;
@@ -287,11 +287,11 @@ export class AgentLabDriver {
       const screenshot = await this.page.screenshot({ type: "png", clip, path: pngPath });
       const png = Buffer.from(screenshot || []);
       if (png.length === 0) {
-        throw new AgentLabDriverError("captureEmpty", "Chrome returned an empty Pixi screenshot.");
+        throw new LabInteractDriverError("captureEmpty", "Chrome returned an empty Pixi screenshot.");
       }
       if (png.length > MAX_CAPTURE_BYTES) {
         fs.rmSync(pngPath, { force: true });
-        throw new AgentLabDriverError("captureTooLarge", `Screenshot exceeds the ${MAX_CAPTURE_BYTES} byte response bound.`);
+        throw new LabInteractDriverError("captureTooLarge", `Screenshot exceeds the ${MAX_CAPTURE_BYTES} byte response bound.`);
       }
       const dimensions = readPngDimensions(png);
       const diagnostics = this.diagnostics();
@@ -362,14 +362,14 @@ export class AgentLabDriver {
       last = readiness;
       const errors = readiness.frameErrors?.length || readiness.renderErrors?.length ||
         readiness.missingTextureSubjectIds?.length || this.pageErrors.length || this.pageConsoleErrors.length;
-      if (errors) throw new AgentLabDriverError("captureRenderError", captureReadinessMessage(readiness, this.diagnostics()));
+      if (errors) throw new LabInteractDriverError("captureRenderError", captureReadinessMessage(readiness, this.diagnostics()));
       if (readiness.failedAssets?.length) {
-        throw new AgentLabDriverError("assetLoadFailed", captureReadinessMessage(readiness, this.diagnostics()));
+        throw new LabInteractDriverError("assetLoadFailed", captureReadinessMessage(readiness, this.diagnostics()));
       }
       if (readiness.ready && Number(readiness.frame) >= initialFrame + 2) return readiness;
       await sleep(25);
     }
-    throw new AgentLabDriverError("captureTimeout", captureReadinessMessage(last, this.diagnostics()));
+    throw new LabInteractDriverError("captureTimeout", captureReadinessMessage(last, this.diagnostics()));
   }
 
   enqueue(operation) {
@@ -384,7 +384,7 @@ export class AgentLabDriver {
     url.searchParams.set("map", safeToken(this.options.map, "Default", 48));
     if (this.options.seed !== "" && this.options.seed != null) url.searchParams.set("seed", String(this.options.seed));
     if (this.options.scenario) url.searchParams.set("scenario", safeToken(this.options.scenario, "blank", 48));
-    url.searchParams.set("agentLab", "1");
+    url.searchParams.set("labInteract", "1");
     url.searchParams.set("rtsNoAutoPointerLock", "1");
     return url.href;
   }
@@ -465,13 +465,13 @@ export class AgentLabDriver {
   }
 
   decorateError(error) {
-    if (error instanceof AgentLabDriverError && error.details?.diagnostics) return error;
+    if (error instanceof LabInteractDriverError && error.details?.diagnostics) return error;
     const diagnostics = this.diagnostics();
     const serverTail = diagnostics.serverLog ? readTail(diagnostics.serverLog, LOG_TAIL_LINES) : [];
-    const message = [error?.message || "Agent Lab driver failed."]
+    const message = [error?.message || "Lab Interact driver failed."]
       .concat(serverTail.length ? [`Server log tail:\n${serverTail.join("\n")}`] : [])
       .join("\n");
-    return new AgentLabDriverError(error?.code || "driverError", message, {
+    return new LabInteractDriverError(error?.code || "driverError", message, {
       ...error?.details,
       diagnostics: { ...diagnostics, serverTail },
     });
@@ -479,23 +479,23 @@ export class AgentLabDriver {
 }
 
 export function validateWorkspaceRoot(workspaceRoot) {
-  if (!workspaceRoot) throw new AgentLabDriverError("workspaceRequired", "workspaceRoot is required.");
+  if (!workspaceRoot) throw new LabInteractDriverError("workspaceRequired", "workspaceRoot is required.");
   let root;
   try {
     root = fs.realpathSync(workspaceRoot);
   } catch {
-    throw new AgentLabDriverError("invalidWorkspace", `Workspace does not exist: ${workspaceRoot}`);
+    throw new LabInteractDriverError("invalidWorkspace", `Workspace does not exist: ${workspaceRoot}`);
   }
   if (!fs.existsSync(path.join(root, "server", "Cargo.toml")) || !fs.existsSync(path.join(root, "client", "src", "main.js"))) {
-    throw new AgentLabDriverError("invalidWorkspace", "workspaceRoot is not a Bewegungskrieg checkout.");
+    throw new LabInteractDriverError("invalidWorkspace", "workspaceRoot is not a Bewegungskrieg checkout.");
   }
   const topLevel = git(root, ["rev-parse", "--show-toplevel"]);
   if (!topLevel || fs.realpathSync(topLevel) !== root) {
-    throw new AgentLabDriverError("invalidWorkspace", "workspaceRoot must be the Git checkout top level.");
+    throw new LabInteractDriverError("invalidWorkspace", "workspaceRoot must be the Git checkout top level.");
   }
   const head = git(root, ["rev-parse", "HEAD"]);
   if (!/^[0-9a-f]{40}$/i.test(head || "")) {
-    throw new AgentLabDriverError("invalidWorkspace", "workspaceRoot has no valid Git HEAD.");
+    throw new LabInteractDriverError("invalidWorkspace", "workspaceRoot has no valid Git HEAD.");
   }
   return {
     root,
@@ -516,7 +516,7 @@ export function safeArtifactName(value, fallback = "scene") {
 function safeCaptureSessionId(value) {
   const sessionId = String(value || "").trim();
   if (!/^lab_[a-f0-9]{32}$/.test(sessionId)) {
-    throw new AgentLabDriverError("invalidSession", "sessionId must be a valid Agent Lab session id.");
+    throw new LabInteractDriverError("invalidSession", "sessionId must be a valid Lab Interact session id.");
   }
   return sessionId;
 }
@@ -524,18 +524,18 @@ function safeCaptureSessionId(value) {
 function normalizeCaptureViewport(viewport) {
   const normalized = normalizeViewport(viewport);
   if (normalized.width > MAX_CAPTURE_VIEWPORT || normalized.height > MAX_CAPTURE_VIEWPORT) {
-    throw new AgentLabDriverError("invalidViewport", `capture viewport width and height must be at most ${MAX_CAPTURE_VIEWPORT}.`);
+    throw new LabInteractDriverError("invalidViewport", `capture viewport width and height must be at most ${MAX_CAPTURE_VIEWPORT}.`);
   }
   return normalized;
 }
 
 function boundedEntityIds(values) {
   if (!Array.isArray(values) || values.length > 20) {
-    throw new AgentLabDriverError("invalidSubjects", "subjectIds must contain at most 20 positive entity ids.");
+    throw new LabInteractDriverError("invalidSubjects", "subjectIds must contain at most 20 positive entity ids.");
   }
   const ids = [...new Set(values.map(Number))];
   if (!ids.every((id) => Number.isInteger(id) && id > 0)) {
-    throw new AgentLabDriverError("invalidSubjects", "subjectIds must contain positive integer entity ids.");
+    throw new LabInteractDriverError("invalidSubjects", "subjectIds must contain positive integer entity ids.");
   }
   return ids;
 }
@@ -568,14 +568,14 @@ function captureReadinessMessage(readiness, diagnostics) {
 
 function readPngDimensions(buffer) {
   if (buffer.length < 24 || buffer.toString("ascii", 1, 4) !== "PNG") {
-    throw new AgentLabDriverError("invalidCapture", "Chrome did not return a PNG image.");
+    throw new LabInteractDriverError("invalidCapture", "Chrome did not return a PNG image.");
   }
   return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
 }
 
 export function generatedRoomId(head = "") {
   const suffix = crypto.randomBytes(6).toString("hex");
-  return safeToken(`agentlab-${safeToken(head.slice(0, 8), "head", 8)}-${process.pid}-${suffix}`, "agentlab", 40);
+  return safeToken(`labinteract-${safeToken(head.slice(0, 8), "head", 8)}-${process.pid}-${suffix}`, "labinteract", 40);
 }
 
 export function transitionDriverState(state, event) {
@@ -585,7 +585,7 @@ export function transitionDriverState(state, event) {
     [DRIVER_STATES.CLOSING]: { closed: DRIVER_STATES.CLOSED },
     [DRIVER_STATES.CLOSED]: {},
   }[state]?.[event];
-  if (!next) throw new AgentLabDriverError("invalidLifecycle", `Cannot ${event} Agent Lab driver from ${state}.`);
+  if (!next) throw new LabInteractDriverError("invalidLifecycle", `Cannot ${event} Lab Interact driver from ${state}.`);
   return next;
 }
 
@@ -595,7 +595,7 @@ export async function withTimeout(promise, timeoutMs, detail = "operation") {
     return await Promise.race([
       promise,
       new Promise((_, reject) => {
-        timer = setTimeout(() => reject(new AgentLabDriverError("timeout", `${detail} timed out after ${timeoutMs}ms.`)), timeoutMs);
+        timer = setTimeout(() => reject(new LabInteractDriverError("timeout", `${detail} timed out after ${timeoutMs}ms.`)), timeoutMs);
       }),
     ]);
   } finally {
@@ -604,7 +604,7 @@ export async function withTimeout(promise, timeoutMs, detail = "operation") {
 }
 
 function createSessionDirectory(workspaceRoot, map) {
-  const root = path.join(workspaceRoot, AGENT_LAB_ROOT, "sessions");
+  const root = path.join(workspaceRoot, LAB_INTERACT_ROOT, "sessions");
   fs.mkdirSync(root, { recursive: true });
   const name = `${safeToken(map, "default", 32)}-${new Date().toISOString().replace(/[:.]/g, "-")}-${process.pid}`;
   const directory = path.join(root, name);
@@ -613,11 +613,11 @@ function createSessionDirectory(workspaceRoot, map) {
 }
 
 async function startOrReusePrivateServer({ workspace, sessionDir, startupTimeoutMs, baseUrl, isOpening }) {
-  if (!isOpening()) throw new AgentLabDriverError("sessionClosed", "Agent Lab driver was closed during server startup.");
+  if (!isOpening()) throw new LabInteractDriverError("sessionClosed", "Lab Interact driver was closed during server startup.");
   if (baseUrl) {
     const normalized = privateLoopbackUrl(baseUrl);
     if (await isHealthy(normalized)) {
-      if (!isOpening()) throw new AgentLabDriverError("sessionClosed", "Agent Lab driver was closed during server startup.");
+      if (!isOpening()) throw new LabInteractDriverError("sessionClosed", "Lab Interact driver was closed during server startup.");
       return {
         baseUrl: normalized,
         reused: true,
@@ -626,20 +626,20 @@ async function startOrReusePrivateServer({ workspace, sessionDir, startupTimeout
         close: async () => {},
       };
     }
-    throw new AgentLabDriverError("unhealthyServer", `Requested private server is not healthy: ${normalized}`);
+    throw new LabInteractDriverError("unhealthyServer", `Requested private server is not healthy: ${normalized}`);
   }
   const port = await allocatePort();
-  if (!isOpening()) throw new AgentLabDriverError("sessionClosed", "Agent Lab driver was closed during server startup.");
-  const targetDir = path.join(workspace.root, AGENT_LAB_ROOT, "cargo");
+  if (!isOpening()) throw new LabInteractDriverError("sessionClosed", "Lab Interact driver was closed during server startup.");
+  const targetDir = path.join(workspace.root, LAB_INTERACT_ROOT, "cargo");
   const binary = path.join(targetDir, "debug", "rts-server");
   // The target directory is only a build cache. Always let Cargo check the selected worktree so
-  // a prior Agent Lab session cannot silently serve an old server binary.
+  // a prior Lab Interact session cannot silently serve an old server binary.
   runOrThrow("cargo", ["build", "--manifest-path", path.join(workspace.root, "server", "Cargo.toml")], {
     cwd: workspace.root,
     env: { ...process.env, CARGO_TARGET_DIR: targetDir },
     stdio: "inherit",
   });
-  if (!fs.existsSync(binary)) throw new AgentLabDriverError("serverBuild", "Agent Lab server binary was not produced.");
+  if (!fs.existsSync(binary)) throw new LabInteractDriverError("serverBuild", "Lab Interact server binary was not produced.");
 
   const logPath = path.join(sessionDir, "server.log");
   const log = fs.openSync(logPath, "w");
@@ -659,15 +659,15 @@ async function startOrReusePrivateServer({ workspace, sessionDir, startupTimeout
   while (Date.now() < deadline) {
     if (!isOpening()) {
       await stopChild(child);
-      throw new AgentLabDriverError("sessionClosed", "Agent Lab driver was closed during server startup.");
+      throw new LabInteractDriverError("sessionClosed", "Lab Interact driver was closed during server startup.");
     }
     if (child.exitCode != null) {
-      throw new AgentLabDriverError("serverExited", `Private server exited during startup; see ${logPath}`);
+      throw new LabInteractDriverError("serverExited", `Private server exited during startup; see ${logPath}`);
     }
     if (await isHealthy(url)) {
       if (!isOpening()) {
         await stopChild(child);
-        throw new AgentLabDriverError("sessionClosed", "Agent Lab driver was closed during server startup.");
+        throw new LabInteractDriverError("sessionClosed", "Lab Interact driver was closed during server startup.");
       }
       return {
         baseUrl: url,
@@ -685,7 +685,7 @@ async function startOrReusePrivateServer({ workspace, sessionDir, startupTimeout
     await sleep(150);
   }
   await stopChild(child);
-  throw new AgentLabDriverError("serverTimeout", `Private server did not become healthy; see ${logPath}`);
+  throw new LabInteractDriverError("serverTimeout", `Private server did not become healthy; see ${logPath}`);
 }
 
 function normalizeViewport(viewport) {
@@ -693,7 +693,7 @@ function normalizeViewport(viewport) {
   const height = Number(viewport?.height);
   const deviceScaleFactor = Number(viewport?.deviceScaleFactor ?? viewport?.dpr ?? 1);
   if (!Number.isInteger(width) || width < 320 || width > 4096 || !Number.isInteger(height) || height < 240 || height > 4096 || !Number.isFinite(deviceScaleFactor) || deviceScaleFactor <= 0 || deviceScaleFactor > 4) {
-    throw new AgentLabDriverError("invalidViewport", "viewport must have bounded width, height, and DPR.");
+    throw new LabInteractDriverError("invalidViewport", "viewport must have bounded width, height, and DPR.");
   }
   return { width, height, deviceScaleFactor };
 }
@@ -701,7 +701,7 @@ function normalizeViewport(viewport) {
 function boundedTimeout(value, label, maximum) {
   const timeoutMs = Number(value);
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > maximum) {
-    throw new AgentLabDriverError("invalidTimeout", `${label} must be an integer from 1 to ${maximum}ms.`);
+    throw new LabInteractDriverError("invalidTimeout", `${label} must be an integer from 1 to ${maximum}ms.`);
   }
   return timeoutMs;
 }
@@ -742,7 +742,7 @@ function findChrome(explicit) {
     which("chromium"),
   ].filter(Boolean);
   const chrome = candidates.find((candidate) => fs.existsSync(candidate));
-  if (!chrome) throw new AgentLabDriverError("chromeUnavailable", "Chrome/Chromium not found; set CHROME=/path/to/chrome.");
+  if (!chrome) throw new LabInteractDriverError("chromeUnavailable", "Chrome/Chromium not found; set CHROME=/path/to/chrome.");
   return chrome;
 }
 
@@ -751,10 +751,10 @@ function privateLoopbackUrl(value) {
   try {
     url = new URL(value);
   } catch {
-    throw new AgentLabDriverError("invalidServerUrl", "baseUrl must be a valid loopback URL.");
+    throw new LabInteractDriverError("invalidServerUrl", "baseUrl must be a valid loopback URL.");
   }
   if (!new Set(["127.0.0.1", "::1", "localhost"]).has(url.hostname) || !["http:", "https:"].includes(url.protocol)) {
-    throw new AgentLabDriverError("invalidServerUrl", "Agent Lab may reuse only a private loopback server.");
+    throw new LabInteractDriverError("invalidServerUrl", "Lab Interact may reuse only a private loopback server.");
   }
   url.pathname = url.pathname.endsWith("/") ? url.pathname : `${url.pathname}/`;
   return url.href;
@@ -788,7 +788,7 @@ async function isHealthy(baseUrl) {
 
 function runOrThrow(command, args, options = {}) {
   const result = spawnSync(command, args, { encoding: "utf8", ...options });
-  if (result.status !== 0) throw new AgentLabDriverError("processFailed", `${command} ${args.join(" ")} failed with exit ${result.status}.`);
+  if (result.status !== 0) throw new LabInteractDriverError("processFailed", `${command} ${args.join(" ")} failed with exit ${result.status}.`);
   return result;
 }
 

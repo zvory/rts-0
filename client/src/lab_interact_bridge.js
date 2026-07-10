@@ -1,4 +1,4 @@
-// Narrow, launch-gated page bridge for the local Agent Lab driver.
+// Narrow, launch-gated page bridge for the local Lab Interact driver.
 // It deliberately exposes typed scene operations only; callers never receive App,
 // Match, transport, renderer, or GameState references.
 
@@ -11,9 +11,9 @@ import {
   labSpawnUnitKindsForFaction,
 } from "./lab_spawn_catalog.js";
 
-export const AGENT_LAB_BRIDGE_KEY = "__rtsAgentLab";
-export const AGENT_LAB_BRIDGE_VERSION = 2;
-export const AGENT_LAB_LIMITS = Object.freeze({
+export const LAB_INTERACT_BRIDGE_KEY = "__rtsLabInteract";
+export const LAB_INTERACT_BRIDGE_VERSION = 2;
+export const LAB_INTERACT_LIMITS = Object.freeze({
   inspectEntities: 100,
   inspectPlayers: 16,
   removeEntities: 100,
@@ -24,32 +24,32 @@ export const AGENT_LAB_LIMITS = Object.freeze({
   captureSubjects: 20,
 });
 
-const AGENT_LAB_DEFAULT_FOCUS_PADDING = 48;
-const AGENT_LAB_SINGLE_SUBJECT_FOCUS_PADDING = 32;
+const LAB_INTERACT_DEFAULT_FOCUS_PADDING = 48;
+const LAB_INTERACT_SINGLE_SUBJECT_FOCUS_PADDING = 32;
 
-export function agentLabLaunchEnabled(locationLike = globalThis.location) {
+export function labInteractLaunchEnabled(locationLike = globalThis.location) {
   try {
     const pathname = locationLike?.pathname || "";
     return (pathname === "/lab" || pathname === "/lab/") &&
-      new URLSearchParams(locationLike?.search || "").get("agentLab") === "1";
+      new URLSearchParams(locationLike?.search || "").get("labInteract") === "1";
   } catch {
     return false;
   }
 }
 
-export class AgentLabBridge {
-  constructor({ app, windowLike = globalThis.window, enabled = agentLabLaunchEnabled(), sleep = delay } = {}) {
+export class LabInteractBridge {
+  constructor({ app, windowLike = globalThis.window, enabled = labInteractLaunchEnabled(), sleep = delay } = {}) {
     this.app = app;
     this.windowLike = windowLike;
     this.enabled = !!enabled;
     this.sleep = sleep;
     this.destroyed = false;
     this.surface = Object.freeze({
-      version: AGENT_LAB_BRIDGE_VERSION,
+      version: LAB_INTERACT_BRIDGE_VERSION,
       status: () => this.status(),
       call: (method, input) => this.call(method, input),
     });
-    if (this.enabled && this.windowLike) this.windowLike[AGENT_LAB_BRIDGE_KEY] = this.surface;
+    if (this.enabled && this.windowLike) this.windowLike[LAB_INTERACT_BRIDGE_KEY] = this.surface;
   }
 
   status() {
@@ -77,7 +77,7 @@ export class AgentLabBridge {
                   ? "waitingForRoomTime"
                   : "ready";
     return {
-      version: AGENT_LAB_BRIDGE_VERSION,
+      version: LAB_INTERACT_BRIDGE_VERSION,
       enabled: this.enabled && !this.destroyed,
       ready: reason === "ready",
       reason,
@@ -99,7 +99,7 @@ export class AgentLabBridge {
         ok: false,
         error: {
           code: error?.code || "bridgeError",
-          message: error?.message || "Agent Lab bridge request failed.",
+          message: error?.message || "Lab Interact bridge request failed.",
         },
       };
     }
@@ -119,19 +119,19 @@ export class AgentLabBridge {
       case "reset": return this.reset();
       case "presentation": return this.presentation(input);
       case "captureReadiness": return this.captureReadiness(input);
-      default: throw bridgeError("unknownMethod", `Unknown Agent Lab bridge method ${JSON.stringify(method)}.`);
+      default: throw bridgeError("unknownMethod", `Unknown Lab Interact bridge method ${JSON.stringify(method)}.`);
     }
   }
 
   session() {
     const status = this.status();
-    if (!status.ready) throw bridgeError(status.reason, `Agent Lab is not ready: ${status.reason}.`);
+    if (!status.ready) throw bridgeError(status.reason, `Lab Interact is not ready: ${status.reason}.`);
     return { match: this.app.match, labClient: this.app.labClient };
   }
 
   catalog() {
     const { match } = this.session();
-    const players = match.state.players.slice(0, AGENT_LAB_LIMITS.inspectPlayers).map(projectPlayer);
+    const players = match.state.players.slice(0, LAB_INTERACT_LIMITS.inspectPlayers).map(projectPlayer);
     const factions = labSpawnFactionOptions().map((faction) => ({
       id: faction.id,
       label: faction.label,
@@ -217,7 +217,7 @@ export class AgentLabBridge {
 
   async remove(input) {
     const { labClient } = this.session();
-    const ids = boundedIds(input?.entityIds, "remove.entityIds", AGENT_LAB_LIMITS.removeEntities);
+    const ids = boundedIds(input?.entityIds, "remove.entityIds", LAB_INTERACT_LIMITS.removeEntities);
     const results = [];
     for (const entityId of ids) {
       const result = await this.mutate(
@@ -260,14 +260,14 @@ export class AgentLabBridge {
       match.net.setRoomTimeSpeed(speed);
       await this.waitFor(() => Number(match.roomTimeControls?.roomTimeState?.speed) === speed, "room time speed");
     } else if (action === "step") {
-      const ticks = boundedPositiveInt(input?.ticks ?? 1, "time.ticks", AGENT_LAB_LIMITS.stepTicks);
+      const ticks = boundedPositiveInt(input?.ticks ?? 1, "time.ticks", LAB_INTERACT_LIMITS.stepTicks);
       for (let index = 0; index < ticks; index += 1) {
         const previous = snapshotSequence(match);
         match.net.stepRoomTime();
         await this.waitFor(() => snapshotSequence(match) > previous, "room time step");
       }
     } else if (action === "seek") {
-      const tick = boundedNonNegativeInt(input?.tick, "time.tick", AGENT_LAB_LIMITS.seekTick);
+      const tick = boundedNonNegativeInt(input?.tick, "time.tick", LAB_INTERACT_LIMITS.seekTick);
       match.net.seekRoomTimeTo(tick);
       // Lab seek rebuilds the authoritative game and intentionally sends a fresh start payload.
       // Follow the app-owned replacement Match instead of retaining the pre-seek instance. The
@@ -297,7 +297,7 @@ export class AgentLabBridge {
       entities,
       truncated: allMatching > entities.length,
       totalMatching: allMatching,
-      players: match.state.players.slice(0, AGENT_LAB_LIMITS.inspectPlayers).map(projectPlayer),
+      players: match.state.players.slice(0, LAB_INTERACT_LIMITS.inspectPlayers).map(projectPlayer),
       room: {
         tick: match.state.tick,
         roomTime: projectRoomTime(match.roomTimeControls?.roomTimeState),
@@ -319,12 +319,12 @@ export class AgentLabBridge {
         centerY: optionalFiniteNumber(input?.centerY),
       });
     } else if (action === "focus") {
-      const ids = boundedIds(input?.entityIds, "camera.entityIds", AGENT_LAB_LIMITS.focusEntities);
+      const ids = boundedIds(input?.entityIds, "camera.entityIds", LAB_INTERACT_LIMITS.focusEntities);
       const entities = ids.map((id) => match.state.entityById(id)).filter(Boolean);
       if (entities.length !== ids.length) throw bridgeError("unknownEntity", "camera.focus contains an entity that is not in the current snapshot.");
       const defaultPadding = entities.length === 1 && isUnit(entities[0].kind)
-        ? AGENT_LAB_SINGLE_SUBJECT_FOCUS_PADDING
-        : AGENT_LAB_DEFAULT_FOCUS_PADDING;
+        ? LAB_INTERACT_SINGLE_SUBJECT_FOCUS_PADDING
+        : LAB_INTERACT_DEFAULT_FOCUS_PADDING;
       const padding = boundedNonNegativeNumber(input?.padding ?? defaultPadding, "camera.padding", 1024);
       const minX = Math.min(...entities.map((entity) => entity.x));
       const maxX = Math.max(...entities.map((entity) => entity.x));
@@ -368,7 +368,7 @@ export class AgentLabBridge {
 
   captureReadiness(input = {}) {
     const { match } = this.session();
-    const subjectIds = optionalBoundedIds(input?.subjectIds, AGENT_LAB_LIMITS.captureSubjects);
+    const subjectIds = optionalBoundedIds(input?.subjectIds, LAB_INTERACT_LIMITS.captureSubjects);
     const subjectEntities = subjectIds.map((id) => match.state.entityById(id)).filter(Boolean);
     if (subjectEntities.length !== subjectIds.length) {
       throw bridgeError("unknownEntity", "captureReadiness contains an entity that is not in the current snapshot.");
@@ -435,7 +435,7 @@ export class AgentLabBridge {
     return row?.steel === steel && row?.oil === oil;
   }
 
-  async waitFor(predicate, detail, timeoutMs = AGENT_LAB_LIMITS.waitMs) {
+  async waitFor(predicate, detail, timeoutMs = LAB_INTERACT_LIMITS.waitMs) {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
       if (predicate()) return;
@@ -447,13 +447,13 @@ export class AgentLabBridge {
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
-    if (this.windowLike?.[AGENT_LAB_BRIDGE_KEY] === this.surface) delete this.windowLike[AGENT_LAB_BRIDGE_KEY];
+    if (this.windowLike?.[LAB_INTERACT_BRIDGE_KEY] === this.surface) delete this.windowLike[LAB_INTERACT_BRIDGE_KEY];
   }
 }
 
 export function normalizeInspectionQuery(query = {}) {
-  const ids = optionalBoundedIds(query.ids, AGENT_LAB_LIMITS.inspectEntities);
-  const owners = optionalBoundedIds(query.owners, AGENT_LAB_LIMITS.inspectPlayers);
+  const ids = optionalBoundedIds(query.ids, LAB_INTERACT_LIMITS.inspectEntities);
+  const owners = optionalBoundedIds(query.owners, LAB_INTERACT_LIMITS.inspectPlayers);
   const kinds = Array.isArray(query.kinds)
     ? [...new Set(query.kinds.filter((kind) => typeof kind === "string" && kind.length > 0 && kind.length <= 64))]
     : [];
@@ -462,7 +462,7 @@ export function normalizeInspectionQuery(query = {}) {
     owners: new Set(owners),
     kinds: new Set(kinds),
     cameraViewport: query.cameraViewport === true,
-    limit: boundedPositiveInt(query.limit ?? 25, "inspect.limit", AGENT_LAB_LIMITS.inspectEntities),
+    limit: boundedPositiveInt(query.limit ?? 25, "inspect.limit", LAB_INTERACT_LIMITS.inspectEntities),
   };
 }
 
