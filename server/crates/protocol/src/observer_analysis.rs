@@ -213,15 +213,21 @@ mod tests {
                 }],
                 resources_lost: ObserverAnalysisResourcesLost { steel: 50, oil: 0 },
                 resources: ObserverAnalysisResources {
-                    lifetime: ObserverAnalysisResourceTotals { steel: 120, oil: 20 },
+                    lifetime: ObserverAnalysisResourceTotals {
+                        steel: 120,
+                        oil: 20,
+                    },
                     last_5s: ObserverAnalysisResourceTotals { steel: 40, oil: 10 },
-                    last_minute: ObserverAnalysisResourceTotals { steel: 120, oil: 20 },
+                    last_minute: ObserverAnalysisResourceTotals {
+                        steel: 120,
+                        oil: 20,
+                    },
                 },
                 ai_diagnostics: Some(ObserverAnalysisAiDiagnostics {
-                    profile_id: "ai_1_2_wave_cohorts".to_string(),
+                    profile_id: "ai_2_1_economy_manager".to_string(),
                     trace_tick: 72,
                     lines: vec![
-                        "profile=ai_1_2_wave_cohorts tick=72".to_string(),
+                        "profile=ai_2_1_economy_manager tick=72".to_string(),
                         "goal=Production status=Selected blockers=- intents=Train:Rifleman"
                             .to_string(),
                     ],
@@ -264,7 +270,7 @@ mod tests {
         assert_eq!(json["players"][0]["resources"]["lastMinute"]["steel"], 120);
         assert_eq!(
             json["players"][0]["aiDiagnostics"]["profileId"],
-            "ai_1_2_wave_cohorts"
+            "ai_2_1_economy_manager"
         );
         assert_eq!(json["players"][0]["aiDiagnostics"]["traceTick"], 72);
         assert_eq!(

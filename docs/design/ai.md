@@ -10,7 +10,7 @@ available spawn-layout player counts.
 AI players are seated after the humans in the lobby player list; their colors come
 from the tail of `PLAYER_PALETTE` so they never collide with human colors. They persist across rematches and are cleared only when the room
 empties of humans.
-Their display names use the selected live profile label (`AI 1.0`, `AI 1.1`, `AI 1.2`);
+Their display names use the sole live profile label (`AI 2.1`);
 multiple seats on the same profile receive deterministic numeric suffixes in lobby order.
 
 **Where it runs.** `rts-ai` owns one `AiController` per AI player, while `Game` remains AI-free.
@@ -35,12 +35,11 @@ instead of reaching into entity stores from the server layer.
 **Strategy.** Each controller, on a staggered cadence
 (`DECISION_INTERVAL` ticks), builds a constrained snapshot-backed `AiObservation` and delegates RTS
 decisions to `rts_ai::ai_core::decision::decide_profile_with_analysis`, which requires the
-AI-owned static map analysis for production callers. Live lobby AIs use the promoted
-AI 1.2 suite by default and keep the resolved concrete profile for the whole match. Hosts can
-select the `ai_1_0`, `ai_1_1`, `ai_1_2`, `ai_2_0`, `ai_2_1`, or `ai_turtle` profile suites per AI seat
-from the lobby before countdown/start; exact concrete profile ids remain accepted for developer
-compatibility.
-Unsupported profile or suite ids are ignored or defaulted to the promoted live default request.
+AI-owned static map analysis for production callers. Every live lobby AI uses the `ai_2_1` suite
+and keeps the resolved `ai_2_1_economy_manager` profile for the whole match. The lobby, launch
+URLs, and server accept only `ai_2_1`, its `ai21` alias, its concrete profile id, and the generic
+`ai`/`default` aliases; all of those resolve to AI 2.1. Other profile ids are rejected for profile
+changes and fall back to AI 2.1 when supplied while adding a seat.
 Team relationships are observation-only safety
 inputs: player summaries carry `teamId`, visible allied entities are classified separately from
 `visible_enemies`, public base targeting ignores allied starts, and live decisions receive the
@@ -107,6 +106,9 @@ a main-base idle worker to the expansion once the main line is saturated instead
 Self-play regression coverage preserves the pre-expansion case where oil is known but outside
 completed-City-Centre mining range, and the post-expansion case where oil assignment begins after the
 expansion City Centre completes.
+
+**Developer-only legacy profiles.** The AI 1.x and AI 2.0 profiles remain available to self-play,
+arena, and regression tooling as comparison fixtures, but cannot be selected in a live game.
 The AI 1.0 profile is `ai_1_0_tech`; it parameterizes worker targets,
 supply buffers, building/tech goals, production priorities, resource timing, expansion timing, and
 attack thresholds without providing its own `think()` function. It opens with
@@ -169,15 +171,15 @@ units that are excluded from outbound wave formation. AI 1.2 also targets a seco
 its bank is above 600 steel and 400 oil, while still using the normal build placement, prerequisite,
 pending-build, expansion-save, and defensive-panic gates.
 
-AI 2.0 is exposed as the `ai_2_0` suite rather than a single inspectable lobby target. The promoted
-suite is currently pinned to `ai_2_0_tank_pressure`, which pivots earlier into faster mixed
+AI 2.0 is retained in developer tooling as the `ai_2_0` suite, pinned to
+`ai_2_0_tank_pressure`, which pivots earlier into faster mixed
 Tank/Rifleman pressure. It expands off the shared two-base economy plan, reserves defensive Machine
 Gunners, unlocks Factory production earlier than AI 1.2, and targets a second Factory once the
 economy can support it. Exact concrete profile ids remain registered for arena pinning, replay
 debugging, and profile-manifest fingerprints. The retired `ai_2_0_agent_rush` and
 `ai_2_0_rifle_tank` profile ids remain rejected.
 
-AI 2.1 is exposed as the `ai_2_1` suite and is currently pinned to
+AI 2.1 is the sole live `ai_2_1` suite and is pinned to
 `ai_2_1_economy_manager`. It intentionally keeps AI 2.0's worker, supply, expansion, oil,
 production, defensive Machine Gunner, frontal-wave, and tech-transition policy values, but routes
 economy decisions through the proposal-based economy manager. The manager consumes the ordinary
@@ -185,19 +187,17 @@ fog-filtered observation, `AiFacts`, active profile policy, expansion plan, and 
 signals such as defensive-panic oil demand or temporary oil holds. It returns economic proposals
 for supply, expansion, worker training, oil assignment/Pump Jacks, and steel assignment; the owner
 decision loop still executes or rejects those proposals through `AiActionContext`, shared budgets,
-worker/resource reservations, placement validation, and ordinary `SimCommand` emission. AI 2.1 is a
-parity refactor target for AI 2.0 rather than an intended balance upgrade until matchup evidence and
-human review say otherwise.
+worker/resource reservations, placement validation, and ordinary `SimCommand` emission.
 
-City Centre construction recovery is shared by the economic decision loop, including direct AI 2.0
-and proposal-manager profiles. It tracks every owned unfinished City Centre independently, so the
+City Centre construction recovery is shared by the economic decision loop across direct and
+proposal-manager profiles. It tracks every owned unfinished City Centre independently, so the
 same rule applies to a second, third, or later expansion: after the site has gone three seconds
 without observed HP loss and has no builder assigned or travelling to it, the AI sends an available
 worker back to its original tile. The resumed ordinary `Build` command uses the simulation's
 existing construction-site path and does not pay the City Centre cost again.
 
-The `ai_turtle` suite is pinned to `ai_turtle_chokes`, a first-pass turtle profile for visual
-matchups and tuning. It uses the proposal-based economy manager with AI 2.0/2.1's worker, supply,
+The developer-only `ai_turtle` suite is pinned to `ai_turtle_chokes`, a first-pass turtle profile
+for visual matchups and tuning. It uses the proposal-based economy manager with AI 2.1's worker, supply,
 oil-timing, and one-Barracks policy values. Its compact two-Rifleman opening starts exactly one Pump
 Jack instead of holding oil entirely, so worker production keeps pace while the Training Centre can
 come online before the first pressure. It targets full main-base worker saturation, opens one
@@ -232,18 +232,12 @@ steel-line screen as a fallback against missed routes. Anti-Tank Guns use the sa
 selection on a line ten tiles behind the averaged choke line on the own-start side, then set up
 facing orthogonally down the enemy approach lane. It does not launch ordinary frontal waves.
 
-The suite aliases `ai_2_1` and `ai21` resolve to the AI 2.1 suite request, `ai_2_0` and `ai20`
-resolve to the AI 2.0 suite request in live and arena-style tooling; `ai_1_2` and `ai12` resolve
-to the AI 1.2 suite request; `ai_1_1` and `ai11` resolve to the AI 1.1 suite request; `ai_1_0` and
-`ai1` resolve to the AI 1.0 suite request; `ai_turtle` and `turtle` resolve to the turtle suite
-request. Exact profile ids such as `ai_1_2_wave_cohorts`, `ai_2_0_tank_pressure`,
-`ai_2_1_economy_manager`, or `ai_turtle_chokes` pin one concrete member. `ai` and `default` resolve
-to the promoted live default request.
-The live lobby AI uses this shared core through `AiController`, which only owns live identity,
-profile id, cadence, persistent decision memory, and its latest bounded decision trace for
-spectator-only observer diagnostics. Unknown live profile ids resolve to the promoted live default,
-currently `ai_1_2`, which resolves to `ai_1_2_wave_cohorts`. The ordinary lobby exposes AI 1.0,
-AI 1.1, AI 1.2, AI 2.0, AI 2.1, and AI Turtle as suite requests. AI 1.2 is the live lobby default.
+Live game selection recognizes only `ai_2_1`, `ai21`, `ai_2_1_economy_manager`, `ai`, and
+`default`; all resolve to the `ai_2_1` suite and then to `ai_2_1_economy_manager`. Legacy suite
+aliases and exact profile ids remain available only to arena-style developer tooling. The live lobby
+AI uses this shared core through `AiController`, which only owns live identity, profile id, cadence,
+persistent decision memory, and its latest bounded decision trace for spectator-only observer
+diagnostics. Unknown live profile ids resolve to AI 2.1. The ordinary lobby exposes AI 2.1 only.
 Panzerfaust is trainable for Kriegsia players after a completed Training Centre. Scout Plane is a
 Command Car world-point ability that launches from an owned completed City Centre, but current AI
 profiles intentionally omit Panzerfaust training and Scout Plane ability usage in the first pass.
@@ -262,7 +256,7 @@ AI-vs-AI profile matchups declare a winner only when a profile destroys the enem
 Centre first; if no starting City Centre winner exists by the default 25,000-tick fixed horizon,
 the matchup is a draw.
 Material, army, building, worker, damage, and survival metrics are diagnostics only, never
-tiebreakers. Compact baseline scenario metadata for AI 1.0 early production,
+tiebreakers. Compact legacy baseline scenario metadata for AI 1.0 early production,
 tech-blocked production, Scout Car unlock, and Tank unlock lives in
 `server/crates/ai/src/selfplay/scenarios.rs` so later AI changes can compare the same authored
 fixtures without rewriting the harness.

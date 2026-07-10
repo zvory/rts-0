@@ -44,20 +44,22 @@ const { ok } = assertions;
   ok(ai && ai.id !== A.playerId, "AI got its own player id");
   ok(ai && ai.factionId === DEFAULT_FACTION_ID, `AI defaults to ${DEFAULT_FACTION_ID}`);
   ok(ai && ai.aiProfileId === DEFAULT_AI_PROFILE_ID, `AI defaults to ${DEFAULT_AI_PROFILE_ID}`);
-  ok(ai && ai.name === "AI 1.2", `AI uses the default profile label as its name (${ai?.name})`);
+  ok(ai && ai.name === "AI 2.1", `AI uses the default profile label as its name (${ai?.name})`);
 
+  const lobbyCountBeforeRetiredSelection = A.msgs.filter((m) => m.t === "lobby").length;
   A.send({ t: "setAiProfile", id: ai.id, aiProfileId: "ai_2_0" });
-  const withAi2 = await A.waitNext(
-    (m) => m.t === "lobby" && m.players.some((p) => p.id === ai.id && p.aiProfileId === "ai_2_0"),
-    3000,
-    "lobby with AI 2.0 selected",
-  );
+  await sleep(400);
+  const withAi2 = A.msgs.filter((m) => m.t === "lobby").at(-1);
   const ai2 = withAi2.players.find((p) => p.id === ai.id);
   ok(
-    ai2 && ai2.aiProfileId === "ai_2_0",
-    "host can select AI 2.0 for an AI seat",
+    ai2 && ai2.aiProfileId === DEFAULT_AI_PROFILE_ID,
+    "host cannot select a retired AI profile for an AI seat",
   );
-  ok(ai2 && ai2.name === "AI 2.0", `AI seat name follows selected suite (${ai2?.name})`);
+  ok(
+    A.msgs.filter((m) => m.t === "lobby").length === lobbyCountBeforeRetiredSelection,
+    "retired AI profile selection does not mutate the lobby",
+  );
+  ok(ai2 && ai2.name === "AI 2.1", `AI seat keeps the AI 2.1 label (${ai2?.name})`);
 
   // Send a hand-built future faction field. Phase 3 keeps addAi team-only, so the server may
   // ignore or reject the unsupported request, but it must never create a non-Kriegsia AI seat.

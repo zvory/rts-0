@@ -25,7 +25,7 @@ fn match_history_persistence_marks_solo_matches_debug_and_allows_human_ai_matche
     );
     human_ai.match_player_count = 2;
     human_ai.match_human_count = 1;
-    human_ai.match_participants = vec!["Player".to_string(), "AI 1.2".to_string()];
+    human_ai.match_participants = vec!["Player".to_string(), "AI 2.1".to_string()];
     assert!(human_ai.should_persist_match_history());
     assert!(!human_ai.match_history_debug_mode());
 }
@@ -41,7 +41,7 @@ fn match_history_persistence_allows_ai_only_but_skips_test_matches() {
     );
     ai_only.match_player_count = 2;
     ai_only.match_human_count = 0;
-    ai_only.match_participants = vec!["AI 1.2 1".to_string(), "AI 1.2 2".to_string()];
+    ai_only.match_participants = vec!["AI 2.1 1".to_string(), "AI 2.1 2".to_string()];
     assert!(ai_only.should_persist_match_history());
     assert!(!ai_only.match_history_debug_mode());
 
@@ -54,7 +54,7 @@ fn match_history_persistence_allows_ai_only_but_skips_test_matches() {
     );
     smoke.match_player_count = 2;
     smoke.match_human_count = 1;
-    smoke.match_participants = vec!["smoke".to_string(), "AI 1.2".to_string()];
+    smoke.match_participants = vec!["smoke".to_string(), "AI 2.1".to_string()];
     assert!(!smoke.should_persist_match_history());
 
     let mut automated_room = RoomTask::new(

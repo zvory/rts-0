@@ -55,14 +55,9 @@ import { textWithin } from "./dom_text.mjs";
   assertDeepEqual(
     AI_PROFILES,
     [
-      { id: "ai_1_0", label: "AI 1.0" },
-      { id: "ai_1_1", label: "AI 1.1" },
-      { id: "ai_1_2", label: "AI 1.2" },
-      { id: "ai_2_0", label: "AI 2.0" },
       { id: "ai_2_1", label: "AI 2.1" },
-      { id: "ai_turtle", label: "AI Turtle" },
     ],
-    "lobby AI profile selector lists supported AI suites",
+    "lobby AI profile selector exposes only AI 2.1",
   );
   assert(
     betaFactionSelectEnabledForLocation({ hostname: "rts-0-zvorygin-beta.fly.dev", pathname: "/" }),
@@ -183,12 +178,12 @@ import { textWithin } from "./dom_text.mjs";
         { id: 1, name: "Host", color: "#0072b2", ready: false, teamId: 1 },
         {
           id: 2,
-          name: "AI 1.1",
+          name: "AI 2.1",
           color: "#d55e00",
           ready: true,
           teamId: 2,
           isAi: true,
-          aiProfileId: "ai_2_0",
+          aiProfileId: "ai_2_1",
         },
       ],
       myId: 1,
@@ -207,27 +202,18 @@ import { textWithin } from "./dom_text.mjs";
       (el) => el.tagName === "SELECT" && el.className === "player-ai-profile-select",
     )[0];
     assert(!!select, "host lobby renders an AI profile selector");
-    assert(select.value === "ai_2_0", "AI 2.0 profile state is selected in the lobby");
+    assert(select.value === "ai_2_1", "AI 2.1 profile state is selected in the lobby");
     assert(
-      select.children.some(
-        (option) => option.value === "ai_2_0" && option.textContent === "AI 2.0",
-      ),
-      "AI profile selector includes the AI 2.0 option",
+      select.children.length === 1 &&
+        select.children[0].value === "ai_2_1" &&
+        select.children[0].textContent === "AI 2.1",
+      "AI profile selector contains only the AI 2.1 option",
     );
-    assert(
-      select.children.some(
-        (option) => option.value === "ai_2_1" && option.textContent === "AI 2.1",
-      ),
-      "AI profile selector includes the AI 2.1 option",
-    );
+    assert(select.disabled, "AI profile selector is fixed when AI 2.1 is the only live choice");
 
-    select.value = "ai_1_2";
+    select.value = "ai_2_1";
     select.listeners.change?.();
-    assertDeepEqual(
-      selectedProfile,
-      { id: 2, profileId: "ai_1_2" },
-      "AI profile selector emits profile changes",
-    );
+    assert(selectedProfile === null, "fixed AI profile selector does not emit a profile change");
 
     const aliasRoot = document.createElement("div");
     const aliasView = new LobbyRosterView(aliasRoot);
@@ -256,8 +242,8 @@ import { textWithin } from "./dom_text.mjs";
       (el) => el.tagName === "SELECT" && el.className === "player-ai-profile-select",
     )[0];
     assert(
-      aliasSelect.value === "ai_2_0",
-      "concrete AI 2.0 profile ids select their suite option",
+      aliasSelect.value === "ai_2_1",
+      "retired concrete profile ids fall back to AI 2.1 in the lobby",
     );
 
     const labelRoot = document.createElement("div");
@@ -282,8 +268,8 @@ import { textWithin } from "./dom_text.mjs";
       maxPlayers: 4,
     });
     assert(
-      textWithin(labelRoot).includes("AI 2.0"),
-      "concrete AI 2.0 profile ids display their suite label",
+      textWithin(labelRoot).includes("AI 2.1"),
+      "retired concrete profile ids display the AI 2.1 fallback label",
     );
 
     const managerAliasRoot = document.createElement("div");
@@ -313,7 +299,7 @@ import { textWithin } from "./dom_text.mjs";
     )[0];
     assert(
       managerAliasSelect.value === "ai_2_1",
-      "concrete AI 2.1 profile ids select their suite option",
+      "concrete AI 2.1 profile ids select the sole live suite option",
     );
   });
 }

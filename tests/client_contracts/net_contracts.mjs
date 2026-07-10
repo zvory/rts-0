@@ -210,23 +210,17 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   assert(msg.setTeamPreset("1v2").preset === "1v2", "team preset builder payload");
   assert(msg.setTeam(7, 2).teamId === 2, "team assignment builder payload");
   assert(msg.setFaction("ekat").factionId === "ekat", "faction selection builder payload");
-  assert(DEFAULT_AI_PROFILE_ID === "ai_1_2", "lobby defaults to the stable live AI suite");
+  assert(DEFAULT_AI_PROFILE_ID === "ai_2_1", "lobby defaults to AI 2.1");
   assert(
-    AI_PROFILES.some((profile) => profile.id === "ai_2_0" && profile.label === "AI 2.0"),
-    "lobby exposes AI 2.0 as a selectable suite",
-  );
-  assert(
-    AI_PROFILES.some((profile) => profile.id === "ai_2_1" && profile.label === "AI 2.1"),
-    "lobby exposes AI 2.1 as a selectable suite",
+    AI_PROFILES.length === 1 &&
+      AI_PROFILES[0].id === "ai_2_1" &&
+      AI_PROFILES[0].label === "AI 2.1",
+    "lobby exposes AI 2.1 as its only selectable suite",
   );
   assert(msg.addAi(2).teamId === 2, "addAi builder can include teamId");
   assert(
     msg.addAi(2, DEFAULT_AI_PROFILE_ID).aiProfileId === DEFAULT_AI_PROFILE_ID,
     "addAi builder can include default aiProfileId",
-  );
-  assert(
-    msg.addAi(2, "ai_2_0").aiProfileId === "ai_2_0",
-    "addAi builder can request AI 2.0 explicitly",
   );
   assert(
     msg.addAi(2, "ai_2_1").aiProfileId === "ai_2_1",

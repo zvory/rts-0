@@ -1025,7 +1025,7 @@ fn automated_match_history_rooms_are_detected() {
 fn automated_match_history_participants_are_detected() {
     assert!(match_history_participants_are_automated(&[
         "smoke".to_string(),
-        "AI 1.2".to_string(),
+        "AI 2.1".to_string(),
     ]));
     assert!(match_history_participants_are_automated(&[
         "Alpha".to_string(),
@@ -1033,7 +1033,7 @@ fn automated_match_history_participants_are_detected() {
     ]));
     assert!(!match_history_participants_are_automated(&[
         "Player".to_string(),
-        "AI 1.2".to_string(),
+        "AI 2.1".to_string(),
     ]));
     assert!(!match_history_participants_are_automated(&[
         "Alpha".to_string(),
