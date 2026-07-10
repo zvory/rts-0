@@ -467,7 +467,7 @@ folded into default targeting.
   one City Centre at the player's start tile, 12 steel patches with 1,250 steel each split into
   two six-wide fields four tiles out on opposite sides of the base + 3 oil patches with 3,333 oil
   each nearby.
-- Supply: City Centre and Zamok each give `+10`; Depots give `+8`; hard cap `200`.
+- Supply: City Centre and Zamok each give `+10`; Depots give `+8`; hard cap `300`.
 - Attached steel mining: gatherers walk to a steel patch, latch onto it, and mine in place.
   Every `HARVEST_TICKS = 40` the base load (`STEEL_LOAD = 2`) is deposited directly into the
   player's economy only if the resource node is within `MINING_CC_RANGE_TILES = 9.0` tiles of a
