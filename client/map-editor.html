@@ -588,10 +588,28 @@
         return selectedSymmetry === "left-right" ? "right" : "bottom";
       }
 
+      function symmetryAuthoringError() {
+        if (!mains().length) return "symmetry needs a main site on the kept side";
+        if (!naturals().length) return "symmetry needs a natural site on the kept side";
+        if (!map.layouts.length) return "symmetry needs a complete spawn slot on the kept side";
+        return "";
+      }
+
       function selectSymmetry(mode) {
         if (mode === selectedSymmetry) return false;
+        const previousMap = cloneMapState();
+        const previousSymmetry = selectedSymmetry;
         selectedSymmetry = mode;
-        if (selectedSymmetry !== "none") clearTargetSideForSymmetry();
+        if (selectedSymmetry !== "none") {
+          clearTargetSideForSymmetry();
+          const error = symmetryAuthoringError();
+          if (error) {
+            map = previousMap;
+            selectedSymmetry = previousSymmetry;
+            setStatus(error, true);
+            return false;
+          }
+        }
         return true;
       }
 

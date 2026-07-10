@@ -66,8 +66,13 @@ function mapEditorRuntime() {
 function blankTerrainMap(size = 40) {
   return {
     terrain: Array.from({ length: size }, () => ".".repeat(size)),
-    sites: [],
-    layouts: [],
+    sites: [
+      { id: "main_source", kind: "main", x: 12, y: 12 },
+      { id: "natural_source", kind: "natural", x: 16, y: 12 },
+    ],
+    layouts: [
+      { id: "one", playerCount: 1, slots: [{ main: "main_source", naturals: ["natural_source"] }] },
+    ],
   };
 }
 
@@ -119,6 +124,32 @@ function blankTerrainMap(size = 40) {
       mode + " symmetry removes spawn slots that referenced target-side bases",
     );
   }
+}
+
+{
+  const editor = mapEditorRuntime();
+  const terrain = Array.from({ length: 40 }, () => ".".repeat(40));
+  editor.setMap({
+    version: 2,
+    name: "source-layout-required",
+    description: "test",
+    _design: "test",
+    terrain,
+    sites: [
+      { id: "main_left", kind: "main", x: 8, y: 12 },
+      { id: "natural_right", kind: "natural", x: 31, y: 12 },
+    ],
+    layouts: [
+      { id: "one", playerCount: 1, slots: [{ main: "main_left", naturals: ["natural_right"] }] },
+    ],
+  });
+
+  assert(!editor.setSymmetry("left-right"), "symmetry rejects a clear that would remove every complete spawn slot");
+  const map = editor.currentMap();
+  assert(
+    map.sites.map((site) => site.id).join(",") === "main_left,natural_right" && map.layouts.length === 1,
+    "rejected symmetry selection leaves the map authorable",
+  );
 }
 
 {
