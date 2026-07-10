@@ -1000,7 +1000,7 @@ mod tests {
         );
         assert_eq!(
             miss_chance_with_entrenchment(EntityKind::AntiTankGun, EntityKind::Rifleman, true),
-            crate::balance::ENTRENCHMENT_DIRECT_MISS_CHANCE
+            miss_chance(EntityKind::AntiTankGun, EntityKind::Rifleman)
         );
         assert_eq!(
             miss_chance_with_entrenchment(EntityKind::Rifleman, EntityKind::Depot, true),
