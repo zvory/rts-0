@@ -91,9 +91,11 @@ src/
 ```
 
 The standalone map editor mirrors new terrain edits left-to-right, top-to-bottom, or by a 180°
-rotation. With symmetry enabled, moving a base site also creates or updates its reflected site and
-the matching slot in the selected spawn layout. A slot has one main and one to three naturals, for
-at most four bases per player.
+rotation. Selecting a symmetry mode clears its target half to grass and removes target-side sites
+and affected spawn slots: Left ↔ Right keeps the left half, while Top ↔ Bottom and Rotate 180°
+keep the top half. With symmetry enabled, moving a base site also creates or updates its reflected
+site and the matching slot in the selected spawn layout. A slot has one main and one to three
+naturals, for at most four bases per player.
 
 ### 4.1 Module export contracts
 

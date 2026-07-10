@@ -55,7 +55,7 @@ function mapEditorRuntime() {
         selectSiteId: (id) => { selectedSiteId = id; },
         setMap: (next) => { map = normalizeMap(next); },
         setSelectedSite,
-        setSymmetry: (mode) => { selectedSymmetry = mode; },
+        setSymmetry: selectSymmetry,
       };
     `,
     context,
@@ -67,7 +67,58 @@ function blankTerrainMap(size = 40) {
   return {
     terrain: Array.from({ length: size }, () => ".".repeat(size)),
     sites: [],
+    layouts: [],
   };
+}
+
+{
+  const editor = mapEditorRuntime();
+  const clearChecks = [
+    ["left-right", { x: 8, y: 12 }, { x: 31, y: 12 }],
+    ["top-bottom", { x: 12, y: 8 }, { x: 12, y: 31 }],
+    ["radial", { x: 8, y: 12 }, { x: 31, y: 27 }],
+  ];
+  for (const [mode, source, target] of clearChecks) {
+    const terrain = Array.from({ length: 40 }, () => ".".repeat(40));
+    terrain[source.y] = terrain[source.y].slice(0, source.x) + "#" + terrain[source.y].slice(source.x + 1);
+    terrain[target.y] = terrain[target.y].slice(0, target.x) + "~" + terrain[target.y].slice(target.x + 1);
+    editor.setMap({
+      version: 2,
+      name: "clear-target-side",
+      description: "test",
+      _design: "test",
+      terrain,
+      sites: [
+        { id: "source_main", kind: "main", x: source.x, y: source.y },
+        { id: "source_natural", kind: "natural", x: source.x + 8, y: source.y },
+        { id: "legacy_main", kind: "main", x: target.x, y: target.y },
+        { id: "legacy_natural", kind: "natural", x: target.x - 8, y: target.y },
+      ],
+      layouts: [
+        {
+          id: "slots",
+          playerCount: 2,
+          slots: [
+            { main: "source_main", naturals: ["source_natural"] },
+            { main: "legacy_main", naturals: ["legacy_natural"] },
+          ],
+        },
+      ],
+    });
+    editor.setSymmetry(mode);
+
+    const map = editor.currentMap();
+    assert(map.terrain[source.y][source.x] === "#", mode + " symmetry keeps terrain on the authored side");
+    assert(map.terrain[target.y][target.x] === ".", mode + " symmetry clears legacy terrain on the target side");
+    assert(
+      map.sites.map((site) => site.id).join(",") === "source_main,source_natural",
+      mode + " symmetry removes legacy target-side bases",
+    );
+    assert(
+      map.layouts.length === 1 && map.layouts[0].playerCount === 1 && map.layouts[0].slots[0].main === "source_main",
+      mode + " symmetry removes spawn slots that referenced target-side bases",
+    );
+  }
 }
 
 {
@@ -105,7 +156,7 @@ function blankTerrainMap(size = 40) {
         { id: "main_left", kind: "main", x: 8, y: 8 },
         { id: "natural_a", kind: "natural", x: 16, y: 8 },
         { id: "natural_b", kind: "natural", x: 16, y: 20 },
-        { id: "natural_c", kind: "natural", x: 16, y: 32 },
+        { id: "natural_c", kind: "natural", x: 16, y: 24 },
       ],
       layouts: [
         { id: "one", playerCount: 1, slots: [{ main: "main_left", naturals: ["natural_a", "natural_b", "natural_c"] }] },
