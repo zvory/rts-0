@@ -31,6 +31,7 @@ src/
   renderer/decals/ # SVG decal atlas manifest, loader, and deterministic stamp selection
   renderer/trenches.js # Authoritative trench terrain pass and deterministic nearby-trench connectors
   renderer/feedback_view_model.js # Builder for renderer feedback's narrow per-frame read model
+  renderer/lab_tool_preview.js # Armed Lab tool cursor ghosts on the renderer placement layer
   renderer/observer_map_analysis.js # Observer-only static AI map-analysis world overlay drawer
   fog.js          # Fog overlay: accumulate explored, compute visible from own entities
   input/          # lifecycle facade plus selection, commands, placement, shared camera navigation, UI input routing
@@ -68,6 +69,7 @@ src/
   lab_scenario_submission_capability.js # HTTP capability probe with transient-failure retry
   lab_scenario_submission_flow.js # LabPanel scenario validation/submission orchestration
   lab_panel.js   # LabPanel: app-owned lab controls/status UI mounted around Match
+  lab_tool_detail.js # Pure armed-tool instruction text for LabPanel status
   lab_panel_window.js # draggable/resizable chrome helper for the app-owned LabPanel
   lab_map_editor_session.js # persistent 25-state authored-map draft and undo/redo history
   lab_map_editor_panel.js # floating live-lab terrain/base/slot editing and map JSON export
@@ -638,7 +640,8 @@ nor a base-layout reset loses the selected editor tool or the bounded 25-state u
 The requesting client consumes the authoritative map/player payload from `labResult` through the
 app-owned `applyLabMapReset` collaborator, replacing static `GameState`, fog, minimap inputs, and the
 cached terrain texture in place instead of tearing down and rebuilding the whole match. The window paints
-square click regions and drag boxes, edits
+one terrain tile at a time by click or drag stroke; its grass, stone, and water controls carry matching
+terrain swatches instead of a brush-size selector. It edits
 main/natural sites and the current player-slot layout, saves a browser-local draft, and exports the
 normal authored map JSON schema. Applying terrain-only drafts updates the authoritative map and
 derived pathing/fog state without resetting the simulation tick or live entities. Changing starts,
@@ -681,20 +684,25 @@ the local viewer id and is not the lab command owner.
 
 Lab setup tools use `ClientIntent.activeLabTool` for browser-local armed tool state. `LabPanel`
 may ask `Match.armLabTool(tool, { onWorldClick, onBoxSelection })` to arm a tool, and normal
-`Input` consumes a completed left world click before selection, command targeting, or placement. A
-left drag normally promotes to box selection and cancels the active lab tool; tools that opt into
-`consumeBoxSelection` receive the selectable ids in the drag box instead. World-click callbacks
-receive the active tool payload, exact world coordinates, and any selectable hit entity id.
-`Match.cancelLabTool(reason)` clears the tool for Esc, right-click, teardown, ordinary box
-selection, or panel-driven cancellation. Window blur releases camera/input transient state but does
-not cancel the active lab tool. `Input` routes those cancellations through the injected lab tool
+`Input` consumes a completed left world click before selection, command targeting, or placement.
+Tools that opt into `paintOnDrag` sample and interpolate each crossed map tile, delivering repeated
+world-click callbacks without disarming the tool or falling through to selection; unit spawning,
+building spawning, and live terrain painting use that path. Other left drags normally promote to box
+selection and cancel the active lab tool, while tools that opt into `consumeBoxSelection` receive the
+selectable ids in the drag box instead. World-click callbacks receive the active tool payload, exact
+world coordinates, and any selectable hit entity id. `ClientIntent.labToolPreview` tracks the armed
+tool at the world cursor for the renderer: unit and building spawn ghosts, the chosen terrain tile,
+and a large removal X make the pending action visible before a click.
+`Match.cancelLabTool(reason)` clears the tool and preview for Esc, right-click, teardown, ordinary
+box selection, or panel-driven cancellation. Window blur releases camera/input transient state but
+does not cancel the active lab tool. `Input` routes those cancellations through the injected lab tool
 controller so `Match` can publish an active/cancelled change back to the app-owned `LabPanel`,
 keeping the panel status and cancel affordance synchronized with keyboard, pointer, world-click,
 box-selection, and teardown paths. Starting ordinary placement, command targeting, or command-card
 build menus cancels the active lab tool so setup tools do not share state with gameplay command
 modes. Unit and building spawning are lab panel palettes backed by the client faction catalog mirror
 and playable faction labels; each palette arms a persistent completed `spawnEntity` lab tool and
-every click sends the clicked world coordinates through `LabClient` until cancelled. The lab does
+clicking or dragging sends the chosen world positions through `LabClient` until cancelled. The lab does
 not expose a secondary advanced spawn fallback; the panel spawn affordance is limited to playable
 faction unit and building palettes. The visible map-editing surface is limited to the remove tool:
 it arms a persistent `removeSelectableUnits` setup tool; clicking deletes the selectable unit or
@@ -817,7 +825,7 @@ export class ClientIntent {
   recordPlannedCommand(command, selectedEntities, result?)
   plannedOrderPlanForEntity(entity), entityWithPlannedOrder(entity)
   reconcilePlannedOrders(entities, options?), clearPlannedOrdersForUnits(ids), clearPlannedOrders()
-  activeLabTool, beginLabTool(tool), cancelLabTool(reason?)
+  activeLabTool, labToolPreview, beginLabTool(tool), updateLabToolPreview(preview), cancelLabTool(reason?)
 }
 ```
 

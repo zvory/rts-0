@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { TERRAIN } from "../../client/src/protocol.js";
 import { Fog } from "../../client/src/fog.js";
 import { GameState } from "../../client/src/state.js";
+import { LabMapEditorPanel } from "../../client/src/lab_map_editor_panel.js";
 import {
   LAB_MAP_HISTORY_LIMIT,
   LabMapEditorSession,
@@ -10,6 +11,8 @@ import {
   placeDraftSite,
   protectDraftBaseTerrain,
 } from "../../client/src/lab_map_editor_session.js";
+import { findFakes, withFakeDocument } from "./fakes.mjs";
+import { textWithin } from "./dom_text.mjs";
 
 function startPayload() {
   const size = 32;
@@ -56,6 +59,51 @@ function startPayload() {
   assert.equal(exported.terrain[8][12], "#");
   assert.equal(exported.name, session.draft.name);
 }
+
+withFakeDocument(() => {
+  const root = document.createElement("div");
+  const session = new LabMapEditorSession({ storage: null });
+  const armed = [];
+  const panel = new LabMapEditorPanel({
+    root,
+    session,
+    labClient: {
+      exportScenario: async () => ({ ok: false }),
+      applyMapDraft: async () => ({ ok: true, outcome: { battleReset: false } }),
+    },
+    match: {
+      armLabTool(tool, callbacks) {
+        armed.push({ tool, callbacks });
+        return tool;
+      },
+    },
+    startPayload: startPayload(),
+    applyLabMapReset: () => true,
+  });
+  const terrainGroup = findFakes(panel.el, (el) => (
+    el.tagName === "FIELDSET" && textWithin(el).includes("Terrain paint")
+  ))[0];
+  const terrainButtons = findFakes(terrainGroup, (el) => el.tagName === "BUTTON" && !!el.dataset.terrain);
+  const terrainIcons = findFakes(terrainGroup, (el) => String(el.className).includes("lab-terrain-icon"));
+  assert.equal(terrainButtons.length, 3);
+  assert.deepEqual(terrainIcons.map((icon) => icon.dataset.terrain).sort(), ["grass", "stone", "water"]);
+  assert.equal(
+    findFakes(terrainGroup, (el) => el.tagName === "SELECT").length,
+    0,
+    "terrain paint does not render a brush-size selector",
+  );
+
+  const water = terrainButtons.find((button) => button.dataset.terrain === "water");
+  water.listeners.click();
+  assert.equal(armed.at(-1).tool.kind, "editMapTerrain");
+  assert.equal(armed.at(-1).tool.payload.terrain, TERRAIN.WATER);
+  assert.equal(armed.at(-1).tool.paintOnDrag, true);
+  assert.equal(armed.at(-1).callbacks.onBoxSelection, undefined);
+
+  panel.paintWorldClick({ x: 4, y: 4, tool: { payload: { terrain: TERRAIN.WATER } } });
+  assert.equal(session.materialized().terrain[0], TERRAIN.WATER, "terrain paint changes exactly the clicked tile");
+  panel.destroy();
+});
 
 {
   const initial = startPayload();

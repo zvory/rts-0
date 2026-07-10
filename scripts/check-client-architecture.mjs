@@ -89,6 +89,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "lab_scenario_submission_capability.js": "ui",
   "lab_scenario_submission_flow.js": "ui",
   "lab_panel.js": "ui",
+  "lab_tool_detail.js": "ui",
   "lab_panel_window.js": "ui",
   "lab_map_editor_panel.js": "ui",
   "lab_map_editor_session.js": "ui",

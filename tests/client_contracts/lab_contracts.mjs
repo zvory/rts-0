@@ -925,6 +925,7 @@ await withFakeDocument(async () => {
   panel.armSpawnPaletteTool(KIND.RIFLEMAN);
   assert(armedTool?.kind === "spawnEntity", "LabPanel unit palette arms the spawn lab tool through Match");
   assert(armedTool?.keepArmedOnWorldClick === true, "LabPanel unit palette keeps the spawn tool armed across world clicks");
+  assert(armedTool?.paintOnDrag === true, "LabPanel unit palette enables persistent drag painting");
   assert(textWithin(root).includes("Armed: Spawn Rifleman"), "LabPanel shows the armed spawn tool state");
   assert(!buttonByText("Cancel tool").disabled, "LabPanel enables tool cancellation while a setup tool is armed");
   assert(
@@ -963,6 +964,7 @@ await withFakeDocument(async () => {
   assert(panel.spawnPalette.kind === KIND.EKAT, "LabPanel faction selection updates the unit palette deterministically");
   panel.armBuildingSpawnPaletteTool(KIND.CITY_CENTRE);
   assert(armedTool?.kind === "spawnEntity", "LabPanel building palette arms the spawn lab tool through Match");
+  assert(armedTool?.paintOnDrag === true, "LabPanel building palette enables persistent drag painting");
   assert(
     armedTool.payload.owner === 2 &&
       armedTool.payload.kind === KIND.CITY_CENTRE &&

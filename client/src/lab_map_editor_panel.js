@@ -20,7 +20,6 @@ export class LabMapEditorPanel {
     this.applyLabMapReset = applyLabMapReset;
     this.destroyed = false;
     this.selectedTerrain = TERRAIN.ROCK;
-    this.brushRadius = 1;
     this.selectedSiteKind = "main";
     this.selectedSiteId = "";
     this.lastStatus = session.lastAction
@@ -106,44 +105,22 @@ export class LabMapEditorPanel {
   }
 
   renderTerrainTools() {
-    const fieldset = group("Terrain region / box");
+    const fieldset = group("Terrain paint");
     const palette = document.createElement("div");
     palette.className = "lab-map-palette";
     for (const [code, label] of [
       [TERRAIN.GRASS, "Grass"],
-      [TERRAIN.ROCK, "Rock"],
+      [TERRAIN.ROCK, "Stone"],
       [TERRAIN.WATER, "Water"],
     ]) {
-      palette.appendChild(button(label, () => {
+      palette.appendChild(terrainPaletteButton(code, label, () => {
         this.selectedTerrain = code;
         this.armTerrainTool();
       }, { active: this.selectedTerrain === code && this.desiredToolKind() === "terrain" }));
     }
-    const radius = document.createElement("label");
-    radius.className = "lab-field";
-    const radiusLabel = document.createElement("span");
-    radiusLabel.textContent = "Click brush";
-    const radiusSelect = document.createElement("select");
-    for (const value of [0, 1, 2, 3]) {
-      const option = document.createElement("option");
-      option.value = String(value);
-      option.textContent = value === 0 ? "1 tile" : `${value * 2 + 1} × ${value * 2 + 1}`;
-      option.selected = value === this.brushRadius;
-      radiusSelect.appendChild(option);
-    }
-    radiusSelect.addEventListener("change", () => {
-      this.brushRadius = Number(radiusSelect.value);
-      if (this.desiredToolKind() === "terrain") this.armTerrainTool();
-    });
-    radius.append(radiusLabel, radiusSelect);
     fieldset.append(
       palette,
-      radius,
-      button("Arm paint tool", () => this.armTerrainTool(), {
-        active: this.desiredToolKind() === "terrain",
-        title: "Click for a region brush, or drag for an exact box",
-      }),
-      readout("Click paints a region. Drag paints the exact box. Protected base circles remain grass."),
+      readout("Click or drag to paint one tile at a time. Protected base circles remain grass."),
     );
     return fieldset;
   }
@@ -241,17 +218,15 @@ export class LabMapEditorPanel {
   }
 
   armTerrainTool() {
-    this.session.setDesiredTool({ kind: "terrain", terrain: this.selectedTerrain, radius: this.brushRadius });
+    this.session.setDesiredTool({ kind: "terrain", terrain: this.selectedTerrain });
     return this.match?.armLabTool?.({
       kind: "editMapTerrain",
-      label: "Paint map terrain",
-      payload: { terrain: this.selectedTerrain, radius: this.brushRadius },
+      label: `Paint ${terrainLabel(this.selectedTerrain)} terrain`,
+      payload: { terrain: this.selectedTerrain },
       keepArmedOnWorldClick: true,
-      consumeBoxSelection: true,
-      keepArmedOnBoxSelection: true,
+      paintOnDrag: true,
     }, {
       onWorldClick: (event) => this.paintWorldClick(event),
-      onBoxSelection: (event) => this.paintWorldBox(event),
     });
   }
 
@@ -270,7 +245,6 @@ export class LabMapEditorPanel {
     if (!desired) return;
     if (desired.kind === "terrain") {
       this.selectedTerrain = desired.terrain;
-      this.brushRadius = desired.radius;
       this.armTerrainTool();
     } else if (desired.kind === "base") {
       this.selectedSiteKind = desired.siteKind;
@@ -285,26 +259,13 @@ export class LabMapEditorPanel {
   paintWorldClick(event) {
     const tile = this.worldTile(event?.x, event?.y);
     if (!tile) return;
-    const radius = Math.max(0, Math.trunc(Number(event?.tool?.payload?.radius)) || 0);
-    this.commitAndApply("Painted terrain region", (draft) => {
+    this.commitAndApply("Painted terrain tile", (draft) => {
       paintDraftRect(draft, {
-        x0: tile.x - radius,
-        y0: tile.y - radius,
-        x1: tile.x + radius,
-        y1: tile.y + radius,
+        x0: tile.x,
+        y0: tile.y,
+        x1: tile.x,
+        y1: tile.y,
       }, event.tool.payload.terrain);
-      protectDraftBaseTerrain(draft);
-    });
-  }
-
-  paintWorldBox(event) {
-    const rect = event?.worldRect;
-    if (!rect) return;
-    const first = this.worldTile(rect.x, rect.y);
-    const last = this.worldTile(rect.x + rect.w, rect.y + rect.h);
-    if (!first || !last) return;
-    this.commitAndApply("Painted terrain box", (draft) => {
-      paintDraftRect(draft, { x0: first.x, y0: first.y, x1: last.x, y1: last.y }, event.tool.payload.terrain);
       protectDraftBaseTerrain(draft);
     });
   }
@@ -485,6 +446,38 @@ function button(label, onClick, { disabled = false, active = false, title = "" }
   if (title) el.title = title;
   el.addEventListener("click", onClick);
   return el;
+}
+
+function terrainPaletteButton(code, label, onClick, { active = false } = {}) {
+  const el = button("", onClick, {
+    active,
+    title: `Paint ${label.toLowerCase()} terrain`,
+  });
+  el.className = "lab-btn lab-map-terrain-option";
+  el.dataset.terrain = terrainName(code);
+  el.setAttribute("aria-label", `Paint ${label.toLowerCase()} terrain`);
+
+  const icon = document.createElement("span");
+  icon.className = "lab-terrain-icon";
+  icon.dataset.terrain = terrainName(code);
+  icon.setAttribute("aria-hidden", "true");
+  const text = document.createElement("span");
+  text.className = "lab-terrain-label";
+  text.textContent = label;
+  el.append(icon, text);
+  return el;
+}
+
+function terrainName(code) {
+  if (code === TERRAIN.ROCK) return "stone";
+  if (code === TERRAIN.WATER) return "water";
+  return "grass";
+}
+
+function terrainLabel(code) {
+  if (code === TERRAIN.ROCK) return "Stone";
+  if (code === TERRAIN.WATER) return "Water";
+  return "Grass";
 }
 
 function textField(labelText, value, onChange) {
