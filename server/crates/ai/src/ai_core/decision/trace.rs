@@ -202,7 +202,7 @@ fn goal_trace(goal: StrategicGoal, input: TraceInput<'_>) -> GoalTrace {
     };
     let selected = match goal {
         StrategicGoal::Supply => has_build_intent(input.intents, EntityKind::Depot),
-        StrategicGoal::Expansion => has_build_intent(input.intents, EntityKind::CityCentre),
+        StrategicGoal::Expansion => has_city_centre_intent(input.intents),
         StrategicGoal::Tech => input.intents.iter().any(|intent| {
             matches!(intent, AiIntent::Build { kind } if input.required_tech_path.contains(kind))
                 || matches!(intent, AiIntent::Research { .. })
@@ -438,6 +438,8 @@ fn intent_matches_goal(goal: StrategicGoal, intent: &AiIntent) -> bool {
                 intent,
                 AiIntent::Build {
                     kind: EntityKind::CityCentre
+                } | AiIntent::ResumeConstruction {
+                    kind: EntityKind::CityCentre
                 }
             )
         }
@@ -458,6 +460,7 @@ fn format_intent(intent: &AiIntent) -> String {
     match intent {
         AiIntent::Move { units } => format!("move:{}", units.len()),
         AiIntent::Build { kind } => format!("build:{kind:?}"),
+        AiIntent::ResumeConstruction { kind } => format!("resume:{kind:?}"),
         AiIntent::Train { kind } => format!("train:{kind:?}"),
         AiIntent::Research { upgrade } => format!("research:{upgrade:?}"),
         AiIntent::Gather {
@@ -473,6 +476,19 @@ fn has_build_intent(intents: &[AiIntent], kind: EntityKind) -> bool {
     intents
         .iter()
         .any(|intent| matches!(intent, AiIntent::Build { kind: built } if *built == kind))
+}
+
+fn has_city_centre_intent(intents: &[AiIntent]) -> bool {
+    intents.iter().any(|intent| {
+        matches!(
+            intent,
+            AiIntent::Build {
+                kind: EntityKind::CityCentre
+            } | AiIntent::ResumeConstruction {
+                kind: EntityKind::CityCentre
+            }
+        )
+    })
 }
 
 fn format_blockers(blockers: &[GoalBlocker]) -> String {

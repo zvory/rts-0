@@ -51,6 +51,7 @@ use self::economy_manager::{
 };
 use self::expansion::{plan_expansion, try_build_expansion_city_centre, ExpansionBlocker};
 use self::frontal::{issue_frontal_wave, plan_frontal_wave};
+use self::geometry::footprint_top_left_for_center;
 #[cfg(test)]
 use self::geometry::tile_center;
 use self::policies::{
@@ -93,6 +94,9 @@ pub(crate) enum AiIntent {
     Build {
         kind: EntityKind,
     },
+    ResumeConstruction {
+        kind: EntityKind,
+    },
     Train {
         kind: EntityKind,
     },
@@ -122,6 +126,14 @@ pub(crate) fn observer_debug_map_layers_for_profile(
     turtle_observer_debug_layers(observation, map_analysis, policy)
 }
 
+const CITY_CENTRE_RESUME_SAFE_TICKS: u32 = config::TICK_HZ * 3;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct IncompleteCityCentreMemory {
+    hp: u32,
+    last_damage_tick: u32,
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct AiDecisionMemory {
     profile_id: Option<&'static str>,
@@ -137,6 +149,7 @@ pub(crate) struct AiDecisionMemory {
     pending_upgrades: BTreeSet<UpgradeKind>,
     launched_frontal_units: BTreeMap<u32, u32>,
     turtle_opening_riflemen_ordered: usize,
+    incomplete_city_centres: BTreeMap<u32, IncompleteCityCentreMemory>,
 }
 
 impl AiDecisionMemory {
@@ -155,6 +168,7 @@ impl AiDecisionMemory {
             pending_upgrades: BTreeSet::new(),
             launched_frontal_units: BTreeMap::new(),
             turtle_opening_riflemen_ordered: 0,
+            incomplete_city_centres: BTreeMap::new(),
         }
     }
 
@@ -220,6 +234,7 @@ impl AiDecisionMemory {
         self.pending_upgrades.clear();
         self.launched_frontal_units.clear();
         self.turtle_opening_riflemen_ordered = 0;
+        self.incomplete_city_centres.clear();
     }
 
     fn ensure_attack_policy(&mut self, profile: &AiProfile, attack: AttackPolicy) {
@@ -319,6 +334,42 @@ impl AiDecisionMemory {
             .min(policy.opening_riflemen);
     }
 
+    fn sync_incomplete_city_centres(&mut self, observation: &AiObservation) {
+        let mut active_sites = BTreeMap::new();
+        for site in observation
+            .owned
+            .iter()
+            .filter(|entity| entity.kind == EntityKind::CityCentre && !entity.is_complete)
+        {
+            active_sites.insert(site.id, site.hp);
+        }
+        self.incomplete_city_centres
+            .retain(|site_id, _| active_sites.contains_key(site_id));
+        for (site_id, hp) in active_sites {
+            self.incomplete_city_centres
+                .entry(site_id)
+                .and_modify(|site| {
+                    if hp < site.hp {
+                        site.last_damage_tick = observation.tick;
+                    }
+                    site.hp = hp;
+                })
+                // A newly observed site may have been damaged before this controller saw it.
+                // Give it the same quiet period before sending another worker.
+                .or_insert(IncompleteCityCentreMemory {
+                    hp,
+                    last_damage_tick: observation.tick,
+                });
+        }
+    }
+
+    fn city_centre_is_safe_to_resume(&self, site_id: u32, tick: u32) -> bool {
+        self.incomplete_city_centres
+            .get(&site_id)
+            .map(|site| tick.saturating_sub(site.last_damage_tick) >= CITY_CENTRE_RESUME_SAFE_TICKS)
+            .unwrap_or(false)
+    }
+
     fn note_turtle_train(&mut self, profile: &AiProfile, unit: EntityKind) {
         let Some(policy) = profile.turtle_defense else {
             return;
@@ -386,6 +437,7 @@ where
     F: FnMut(EntityKind, u32, u32) -> bool,
 {
     memory.ensure_profile(profile);
+    memory.sync_incomplete_city_centres(observation);
     memory
         .pending_upgrades
         .retain(|upgrade| !observation.upgrades.contains(upgrade));
@@ -431,6 +483,21 @@ where
     idle_builders.sort_unstable();
     gathering_builders.sort_unstable();
     let builder_pools = [idle_builders.as_slice(), gathering_builders.as_slice()];
+    if let Some((tile_x, tile_y)) = city_centre_to_resume(observation, memory) {
+        if actions::try_resume_construction_at(
+            &mut actions,
+            &builder_pools,
+            EntityKind::CityCentre,
+            tile_x,
+            tile_y,
+        )
+        .is_some()
+        {
+            intents.push(AiIntent::ResumeConstruction {
+                kind: EntityKind::CityCentre,
+            });
+        }
+    }
     let save_for_required_tech_building =
         should_save_for_required_tech_building(&facts, required_tech_path, production_policy);
     let mut expansion_plan = plan_expansion(
@@ -568,9 +635,6 @@ where
 
     for kind in required_tech_path {
         if proxy_barracks_active && *kind == EntityKind::Barracks {
-            continue;
-        }
-        if turtle_should_delay_tech_for_opening(profile, memory, *kind) {
             continue;
         }
         if turtle_should_delay_tech_for_entrenchment(profile, memory, &facts, *kind) {
@@ -1074,6 +1138,66 @@ fn planned_train_in_intents(intents: &[AiIntent], kind: EntityKind) -> bool {
         .any(|intent| matches!(intent, AiIntent::Train { kind: trained } if *trained == kind))
 }
 
+fn city_centre_to_resume(
+    observation: &AiObservation,
+    memory: &AiDecisionMemory,
+) -> Option<(u32, u32)> {
+    observation
+        .owned
+        .iter()
+        .filter(|site| site.kind == EntityKind::CityCentre && !site.is_complete)
+        .find_map(|site| {
+            if !memory.city_centre_is_safe_to_resume(site.id, observation.tick) {
+                return None;
+            }
+            let (tile_x, tile_y) = city_centre_site_tile(observation, site)?;
+            if city_centre_has_assigned_builder(observation, site.id, tile_x, tile_y) {
+                None
+            } else {
+                Some((tile_x, tile_y))
+            }
+        })
+}
+
+fn city_centre_has_assigned_builder(
+    observation: &AiObservation,
+    site_id: u32,
+    tile_x: u32,
+    tile_y: u32,
+) -> bool {
+    observation.owned.iter().any(|entity| {
+        entity.kind == EntityKind::Worker
+            && entity.state == AiEntityState::Build
+            && entity.target_id == Some(site_id)
+    }) || observation.pending_builds.iter().any(|intent| {
+        intent.kind == EntityKind::CityCentre && intent.tile_x == tile_x && intent.tile_y == tile_y
+    })
+}
+
+fn city_centre_site_tile(
+    observation: &AiObservation,
+    site: &AiEntitySummary,
+) -> Option<(u32, u32)> {
+    let tile_size = observation.map.tile_size as f32;
+    if tile_size <= 0.0
+        || !site.x.is_finite()
+        || !site.y.is_finite()
+        || site.x < 0.0
+        || site.y < 0.0
+    {
+        return None;
+    }
+    let center_tile = (
+        (site.x / tile_size).floor() as u32,
+        (site.y / tile_size).floor() as u32,
+    );
+    let (tile_x, tile_y) = footprint_top_left_for_center(center_tile, EntityKind::CityCentre)?;
+    let stats = config::building_stats(EntityKind::CityCentre)?;
+    (tile_x <= observation.map.width.saturating_sub(stats.foot_w)
+        && tile_y <= observation.map.height.saturating_sub(stats.foot_h))
+    .then_some((tile_x, tile_y))
+}
+
 fn turtle_opening_pending(profile: &AiProfile, memory: &AiDecisionMemory) -> bool {
     profile
         .turtle_defense
@@ -1086,8 +1210,11 @@ fn oil_demand_signal(
     memory: &AiDecisionMemory,
     panic_plan: Option<DefensivePanicPlan>,
 ) -> OilDemandSignal {
+    // Start one Pump Jack while Turtle is still assembling its compact Rifleman
+    // screen. This preserves the screen without diverting the whole early worker
+    // economy into oil before its Training Centre can use the income.
     if turtle_opening_pending(profile, memory) {
-        return OilDemandSignal::HoldCurrent;
+        return OilDemandSignal::ExactWorkers(1);
     }
     panic_plan
         .map(|plan| OilDemandSignal::ExactWorkers(plan.oil_workers))
@@ -1108,14 +1235,6 @@ fn should_build_expansion_from_economy_manager(
     output
         .as_ref()
         .map(|output| output.proposes(EconomyProposal::BuildExpansionCityCentre))
-}
-
-fn turtle_should_delay_tech_for_opening(
-    profile: &AiProfile,
-    memory: &AiDecisionMemory,
-    kind: EntityKind,
-) -> bool {
-    kind != EntityKind::Barracks && turtle_opening_pending(profile, memory)
 }
 
 fn turtle_should_delay_tech_for_entrenchment(

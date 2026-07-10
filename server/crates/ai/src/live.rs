@@ -271,6 +271,7 @@ impl AiController {
                 }
                 crate::ai_core::decision::AiIntent::Move { .. }
                 | crate::ai_core::decision::AiIntent::Build { .. }
+                | crate::ai_core::decision::AiIntent::ResumeConstruction { .. }
                 | crate::ai_core::decision::AiIntent::Train { .. }
                 | crate::ai_core::decision::AiIntent::Research { .. }
                 | crate::ai_core::decision::AiIntent::Gather { .. } => {}

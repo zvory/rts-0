@@ -428,6 +428,31 @@ pub(crate) fn try_build_at(
     })
 }
 
+/// Send a worker back to an existing construction site. The simulation validates that the
+/// matching unfinished building exists, so this does not reserve its original build cost again.
+pub(crate) fn try_resume_construction_at(
+    ctx: &mut AiActionContext<'_>,
+    worker_pools: &[&[u32]],
+    building: EntityKind,
+    tile_x: u32,
+    tile_y: u32,
+) -> Option<BuildAction> {
+    let worker = ctx.reserve_worker_from_pools(worker_pools)?;
+    ctx.emit_command(Command::Build {
+        units: vec![worker],
+        building,
+        tile_x,
+        tile_y,
+        queued: false,
+    });
+    Some(BuildAction {
+        worker,
+        building,
+        tile_x,
+        tile_y,
+    })
+}
+
 pub(crate) struct TrainUnitsRequest<'a> {
     pub(crate) buildings: &'a [ProductionBuildingFact],
     pub(crate) unit_priorities: &'a [EntityKind],

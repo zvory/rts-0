@@ -7,6 +7,158 @@ use crate::ai_core::decision::expansion::ExpansionPlan;
 use crate::ai_core::profiles::{
     AI_2_0_TANK_PRESSURE, AI_2_1_ECONOMY_MANAGER, AI_TURTLE_CHOKES,
 };
+use rts_sim::game::command::SimCommand as Command;
+
+fn abandoned_city_centre(id: u32, tile: (u32, u32), tile_size: u32) -> AiEntitySummary {
+    let (x, y) = building_center(tile, EntityKind::CityCentre, tile_size)
+        .expect("city centre should have a center");
+    let mut city_centre = building_at(id, EntityKind::CityCentre, None, x, y);
+    city_centre.hp = 300;
+    city_centre.is_complete = false;
+    city_centre.state = AiEntityState::Construct;
+    city_centre
+}
+
+fn completed_city_centre(id: u32, tile: (u32, u32), tile_size: u32) -> AiEntitySummary {
+    let (x, y) = building_center(tile, EntityKind::CityCentre, tile_size)
+        .expect("city centre should have a center");
+    building_at(id, EntityKind::CityCentre, None, x, y)
+}
+
+fn abandoned_city_centre_observation(tick: u32) -> AiObservation {
+    let mut observation = observation(
+        AiEconomy {
+            steel: 0,
+            oil: 0,
+            supply_used: 0,
+            supply_cap: 10,
+        },
+        vec![
+            completed_city_centre(1, (8, 8), config::TILE_SIZE),
+            completed_city_centre(2, (20, 20), config::TILE_SIZE),
+            abandoned_city_centre(10, (30, 30), config::TILE_SIZE),
+            worker(20, AiEntityState::Idle),
+        ],
+    );
+    observation.tick = tick;
+    observation
+}
+
+fn has_city_centre_resume(decision: &AiDecision) -> bool {
+    decision.intents.contains(&AiIntent::ResumeConstruction {
+        kind: EntityKind::CityCentre,
+    })
+}
+
+#[test]
+fn direct_and_proposal_economy_profiles_resume_any_quiet_unfinished_city_centre_without_new_resources(
+) {
+    for profile in [
+        &AI_2_0_TANK_PRESSURE,
+        &AI_2_1_ECONOMY_MANAGER,
+        &AI_TURTLE_CHOKES,
+    ] {
+        let mut memory = AiDecisionMemory::for_profile(profile);
+        let mut observation = abandoned_city_centre_observation(100);
+
+        let first = decide(&observation, profile, &mut memory);
+        assert!(
+            !has_city_centre_resume(&first),
+            "{} should wait before resuming a newly observed site",
+            profile.id
+        );
+
+        observation.tick += config::TICK_HZ * 3;
+        let resumed = decide(&observation, profile, &mut memory);
+        assert!(
+            has_city_centre_resume(&resumed),
+            "{} should resume an unfinished city centre after three quiet seconds",
+            profile.id
+        );
+        assert!(matches!(
+            resumed.commands.first(),
+            Some(Command::Build {
+                units,
+                building: EntityKind::CityCentre,
+                tile_x: 30,
+                tile_y: 30,
+                queued: false,
+            }) if units == &[20]
+        ));
+    }
+}
+
+#[test]
+fn city_centre_recovery_restarts_the_quiet_timer_after_damage() {
+    let profile = &AI_2_0_TANK_PRESSURE;
+    let mut memory = AiDecisionMemory::for_profile(profile);
+    let mut observation = abandoned_city_centre_observation(100);
+
+    assert!(!has_city_centre_resume(&decide(
+        &observation,
+        profile,
+        &mut memory,
+    )));
+
+    observation.tick = 130;
+    observation
+        .owned
+        .iter_mut()
+        .find(|entity| entity.id == 10)
+        .expect("unfinished city centre should be present")
+        .hp -= 25;
+    assert!(!has_city_centre_resume(&decide(
+        &observation,
+        profile,
+        &mut memory,
+    )));
+
+    observation.tick = 130 + config::TICK_HZ * 3 - 1;
+    assert!(!has_city_centre_resume(&decide(
+        &observation,
+        profile,
+        &mut memory,
+    )));
+
+    observation.tick += 1;
+    assert!(has_city_centre_resume(&decide(
+        &observation,
+        profile,
+        &mut memory,
+    )));
+}
+
+#[test]
+fn city_centre_recovery_does_not_duplicate_an_assigned_builder() {
+    let profile = &AI_2_0_TANK_PRESSURE;
+    let mut memory = AiDecisionMemory::for_profile(profile);
+    let mut observation = abandoned_city_centre_observation(100);
+    let worker = observation
+        .owned
+        .iter_mut()
+        .find(|entity| entity.id == 20)
+        .expect("worker should be present");
+    worker.state = AiEntityState::Build;
+    worker.target_id = Some(10);
+
+    assert!(!has_city_centre_resume(&decide(
+        &observation,
+        profile,
+        &mut memory,
+    )));
+    observation.tick += config::TICK_HZ * 3;
+    let decision = decide(&observation, profile, &mut memory);
+    assert!(!has_city_centre_resume(&decision));
+    assert!(!decision.commands.iter().any(|command| {
+        matches!(
+            command,
+            Command::Build {
+                building: EntityKind::CityCentre,
+                ..
+            }
+        )
+    }));
+}
 
 #[test]
 fn turtle_profile_routes_economy_through_proposal_manager() {

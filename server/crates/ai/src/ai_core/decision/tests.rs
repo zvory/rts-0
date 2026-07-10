@@ -27,6 +27,7 @@ fn worker(id: u32, state: AiEntityState) -> AiEntitySummary {
         kind: EntityKind::Worker,
         x: id as f32,
         y: 0.0,
+        hp: 100,
         state,
         is_complete: true,
         production_queue_len: None,
@@ -87,6 +88,7 @@ fn building_at(
         kind,
         x,
         y,
+        hp: 100,
         state: queue_len
             .filter(|queue| *queue > 0)
             .map(|_| AiEntityState::Train)
@@ -111,6 +113,7 @@ fn combat_at(id: u32, kind: EntityKind, x: f32, y: f32) -> AiEntitySummary {
         kind,
         x,
         y,
+        hp: 100,
         state: AiEntityState::Idle,
         is_complete: true,
         production_queue_len: None,
@@ -134,6 +137,7 @@ fn enemy(id: u32, kind: EntityKind, x: f32, y: f32) -> AiEntitySummary {
         kind,
         x,
         y,
+        hp: 100,
         state: AiEntityState::Idle,
         is_complete: true,
         production_queue_len: None,
