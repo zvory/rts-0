@@ -275,6 +275,28 @@ await withFakeDocument(async () => {
   );
 });
 
+await withFakeDocument(() => {
+  const root = document.createElement("section");
+  const starts = [];
+  const screen = new LabCatalogScreen({
+    root,
+    initialRoom: "sandbox",
+    onStart: (launch) => starts.push(launch),
+  });
+  screen.setConnected(true);
+  const blankButton = findFakes(
+    root,
+    (el) => el.tagName === "BUTTON" && el.textContent === "Start blank",
+  )[0];
+  blankButton.listeners.click();
+  assert(
+    starts[0]?.room === "sandbox" &&
+      starts[0]?.map === "No Terrain" &&
+      starts[0]?.scenario === "blank",
+    "LabCatalogScreen starts blank labs on the no-terrain map",
+  );
+});
+
 {
   const sent = [];
   const net = new Net("ws://example.test/ws");
