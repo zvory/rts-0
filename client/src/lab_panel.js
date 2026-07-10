@@ -2,6 +2,7 @@ import { PLAYABLE_FACTIONS } from "./lobby_view.js";
 import { DEFAULT_FACTION_ID, KIND, LAB_ROLE, msg } from "./protocol.js";
 import { factionCatalog, PLAYER_PALETTE, STATS, UPGRADES } from "./config.js";
 import { LabPanelWindowChrome } from "./lab_panel_window.js";
+import { LabMapEditorPanel } from "./lab_map_editor_panel.js";
 import { createLabScenarioAuthoringState, slugifyLabScenario } from "./lab_scenario_authoring.js";
 import {
   captureLabScenarioAuthoringFields,
@@ -35,6 +36,8 @@ export class LabPanel {
     launch = null,
     startPayload = null,
     match = null,
+    mapEditorSession = null,
+    applyLabMapReset = null,
     submissionCapability = null,
     openWindow = defaultLabScenarioSubmissionWindow,
   }) {
@@ -43,6 +46,8 @@ export class LabPanel {
     this.launch = launch;
     this.startPayload = startPayload;
     this.match = match;
+    this.mapEditorSession = mapEditorSession;
+    this.applyLabMapReset = applyLabMapReset;
     this.openWindow = openWindow;
     this.destroyed = false;
     this.state = labClient?.state || startPayload?.lab || null;
@@ -93,6 +98,17 @@ export class LabPanel {
       this.lastResult = result;
       this.render();
     });
+    this.mapEditorPanel = mapEditorSession && this.canOperate()
+      ? new LabMapEditorPanel({
+        root,
+        session: mapEditorSession,
+        labClient,
+        match,
+        startPayload,
+        mapName: this.mapName(),
+        applyLabMapReset,
+      })
+      : null;
   }
 
   createPanelElement(id, className, ariaLabel) {
@@ -989,6 +1005,7 @@ export class LabPanel {
       };
     }
     this.render();
+    this.mapEditorPanel?.applyLabToolChange(change);
   }
 
   deleteRemoveToolTargets(event) {
@@ -1268,6 +1285,7 @@ export class LabPanel {
     this.destroyed = true;
     destroyLabScenarioSubmission(this);
     this.match?.cancelLabTool?.("panelDestroy");
+    this.mapEditorPanel?.destroy();
     this.unsubscribeState?.();
     this.unsubscribeResult?.();
     this.removeListeners();

@@ -54,7 +54,9 @@ ranked decision loop (`decision.rs`) that emits ordinary `SimCommand`s through s
 It also owns static map analysis (`map_analysis.rs`) built only from `StartPayload.map`,
 start tiles, and static resource nodes. `AiStaticMapContextCache` is the shared cache used by
 live AI and self-play scripts, keyed by a stable map/start/resource identity, so profile decisions
-do not have to remember to pass optional choke data separately. The analyzer records terrain
+do not have to remember to pass optional choke data separately. The identity includes a hash of the
+full terrain grid, so the next AI think after a live Lab map edit automatically discards and
+regenerates passability, clearance, region, choke, start, and resource analysis. The analyzer records terrain
 passability, centered clearance, passable components, 10-clearance open-region seeds grown to
 5-clearance shoulders, region assignments for starts/resources, and <=4-clearance choke bands split
 into region-pair corridors from contact-front distances. Regions are an internal implementation

@@ -481,6 +481,16 @@ mod tests {
             ai.static_map_context.current().map(|context| context.key()),
             Some(moved_key)
         );
+
+        let mut edited_terrain = moved_start.clone();
+        edited_terrain.map.terrain[0] = terrain::ROCK;
+        let edited_key = ai.static_map_context.get_or_analyze(&edited_terrain).key();
+
+        assert_ne!(edited_key, moved_key);
+        assert_eq!(
+            ai.static_map_context.current().map(|context| context.key()),
+            Some(edited_key)
+        );
     }
 
     #[test]

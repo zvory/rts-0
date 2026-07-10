@@ -50,6 +50,8 @@ import { LabClient } from "./lab_client.js";
 import { LabCatalogScreen } from "./lab_catalog.js";
 import { createDefaultControlPolicy, createLabControlPolicy } from "./lab_control_policy.js";
 import { LabPanel } from "./lab_panel.js";
+import { LabMapEditorSession } from "./lab_map_editor_session.js";
+import { applyLabMapReset } from "./lab_map_reset.js";
 import {
   fetchLabScenarioSubmissionCapability as fetchLabScenarioSubmissionCapabilityRequest,
 } from "./lab_scenario_submission_capability.js";
@@ -122,6 +124,7 @@ export class App {
     this.labCatalog = null;
     this.labClient = null;
     this.labPanel = null;
+    this.labMapEditorSession = null;
     this.labControlPolicy = null;
     /** @type {number|undefined} pending toast hide timer. */
     this.toastTimer = undefined;
@@ -458,6 +461,7 @@ export class App {
 
     const MatchClass = startsReplay ? ReplayViewer : Match;
     if (labMetadata) {
+      this.labMapEditorSession ||= new LabMapEditorSession();
       this.labClient = new LabClient(this.net);
       this.labClient.setInitialState(labMetadata);
       this.labControlPolicy = createLabControlPolicy({
@@ -503,6 +507,8 @@ export class App {
         launch: this.labLaunch,
         startPayload: payload,
         match: this.match,
+        mapEditorSession: this.labMapEditorSession,
+        applyLabMapReset: (outcome) => applyLabMapReset(this.match, outcome),
         submissionCapability: this.fetchLabScenarioSubmissionCapability(),
         openWindow: (url) => window.open(url, "_blank", "noopener,noreferrer"),
       });

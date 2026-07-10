@@ -7,16 +7,17 @@ use serde::{Deserialize, Serialize};
 
 use crate::config;
 use crate::game::entity::{Entity, EntityKind, EntityStore, Order, OrderIntent, NEUTRAL};
-use crate::game::map::Map;
+use crate::game::map::{Map, CURRENT_MAP_VERSION};
 use crate::game::services::occupancy::{footprint_center, footprint_tiles, Occupancy};
 use crate::game::services::{production, standability};
 use crate::game::upgrade::UpgradeKind;
-use crate::protocol::Command;
+use crate::protocol::{terrain, Command, LabMapDraft};
 use crate::rules;
 
 use super::{systems, Game, MapMetadata, PlayerInit};
 
 mod checkpoint_scenario;
+mod terrain_edit;
 
 pub use checkpoint_scenario::{
     LabCheckpointScenarioMap, LabCheckpointScenarioMapData, LabCheckpointScenarioMetadata,
@@ -25,6 +26,8 @@ pub use checkpoint_scenario::{
 
 pub const LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION: u32 =
     checkpoint_scenario::LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION;
+const LAB_MAP_MAIN_PROTECTION_RADIUS_TILES: i32 = 3;
+const LAB_MAP_EXPANSION_PROTECTION_RADIUS_TILES: i32 = 0;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum LabOp {
@@ -35,6 +38,7 @@ pub enum LabOp {
     SetPlayerResources(LabSetPlayerResources),
     SetPlayerGodMode { player_id: u32, enabled: bool },
     SetCompletedResearch(LabSetCompletedResearch),
+    ApplyMapDraft(LabMapDraft),
     RestoreCheckpointScenario(Box<LabCheckpointScenarioV1>),
 }
 
@@ -104,6 +108,11 @@ pub enum LabOpOutcome {
         player_id: u32,
         upgrade: UpgradeKind,
         completed: bool,
+    },
+    MapDraftApplied {
+        name: String,
+        size: u32,
+        battle_reset: bool,
     },
     ScenarioRestored(LabScenarioRestore),
 }
@@ -193,10 +202,150 @@ impl Game {
                 self.lab_set_player_god_mode(player_id, enabled)
             }
             LabOp::SetCompletedResearch(input) => self.lab_set_completed_research(input),
+            LabOp::ApplyMapDraft(draft) => self.lab_apply_map_draft(draft),
             LabOp::RestoreCheckpointScenario(scenario) => {
                 self.restore_lab_checkpoint_scenario_op(*scenario)
             }
         }
+    }
+
+    fn lab_apply_map_draft(&mut self, draft: LabMapDraft) -> Result<LabOpOutcome, LabError> {
+        let name = draft.name.trim();
+        if name.is_empty() || name.len() > 80 {
+            return Err(LabError::InvalidMap {
+                name: draft.name,
+                reason: "name must contain 1 to 80 bytes".to_string(),
+            });
+        }
+        if draft.size != self.state.map.size {
+            return Err(LabError::InvalidMap {
+                name: name.to_string(),
+                reason: format!(
+                    "proof-of-concept map size must remain {}; got {}",
+                    self.state.map.size, draft.size
+                ),
+            });
+        }
+        let tile_count = draft
+            .size
+            .checked_mul(draft.size)
+            .and_then(|count| usize::try_from(count).ok())
+            .ok_or_else(|| LabError::InvalidMap {
+                name: name.to_string(),
+                reason: "terrain dimensions overflow".to_string(),
+            })?;
+        if draft.terrain.len() != tile_count {
+            return Err(LabError::InvalidMap {
+                name: name.to_string(),
+                reason: format!(
+                    "terrain has {} tiles; expected {tile_count}",
+                    draft.terrain.len()
+                ),
+            });
+        }
+        if draft
+            .terrain
+            .iter()
+            .any(|tile| !matches!(*tile, terrain::GRASS | terrain::ROCK | terrain::WATER))
+        {
+            return Err(LabError::InvalidMap {
+                name: name.to_string(),
+                reason: "terrain contains an unknown code".to_string(),
+            });
+        }
+        let players = self.player_inits();
+        if draft.starts.len() != players.len() {
+            return Err(LabError::InvalidMap {
+                name: name.to_string(),
+                reason: format!(
+                    "map has {} starts; this lab needs {}",
+                    draft.starts.len(),
+                    players.len()
+                ),
+            });
+        }
+        if draft.expansion_sites.len() > players.len().saturating_mul(3) {
+            return Err(LabError::InvalidMap {
+                name: name.to_string(),
+                reason: "map has more than three natural sites per player".to_string(),
+            });
+        }
+
+        let starts: Vec<_> = draft.starts.iter().map(|tile| (tile.x, tile.y)).collect();
+        let expansion_sites: Vec<_> = draft
+            .expansion_sites
+            .iter()
+            .map(|tile| (tile.x, tile.y))
+            .collect();
+        let mut occupied_sites = std::collections::HashSet::new();
+        for &(x, y) in &starts {
+            validate_lab_map_site(
+                name,
+                draft.size,
+                &draft.terrain,
+                x,
+                y,
+                LAB_MAP_MAIN_PROTECTION_RADIUS_TILES,
+                &mut occupied_sites,
+            )?;
+        }
+        for &(x, y) in &expansion_sites {
+            validate_lab_map_site(
+                name,
+                draft.size,
+                &draft.terrain,
+                x,
+                y,
+                LAB_MAP_EXPANSION_PROTECTION_RADIUS_TILES,
+                &mut occupied_sites,
+            )?;
+        }
+
+        let map = Map {
+            size: draft.size,
+            terrain: draft.terrain,
+            starts,
+            expansion_sites,
+        };
+        let map_metadata = MapMetadata {
+            name: name.to_string(),
+            schema_version: CURRENT_MAP_VERSION,
+            content_hash: format!("lab-draft-{}", map.materialized_hash()),
+        };
+        let battle_reset = self.state.map.starts != map.starts
+            || self.state.map.expansion_sites != map.expansion_sites;
+        if !battle_reset {
+            let previous_terrain = std::mem::replace(&mut self.state.map.terrain, map.terrain);
+            let previous_metadata = std::mem::replace(&mut self.state.map_metadata, map_metadata);
+            if let Err(error) = terrain_edit::relocate_blocked_units(
+                &self.state.map,
+                &mut self.state.entities,
+                &self.state.map_metadata.name,
+            ) {
+                self.state.map.terrain = previous_terrain;
+                self.state.map_metadata = previous_metadata;
+                return Err(error);
+            }
+            self.repair_lab_state();
+            return Ok(LabOpOutcome::MapDraftApplied {
+                name: name.to_string(),
+                size: draft.size,
+                battle_reset: false,
+            });
+        }
+
+        let seed = self.seed();
+        let god_mode_players = self.lab_god_mode_players();
+        let mut replacement = Self::new_lab(&players, seed, map, map_metadata);
+        for player_id in god_mode_players {
+            replacement.lab_set_player_god_mode(player_id, true)?;
+        }
+        *self = replacement;
+        Ok(LabOpOutcome::MapDraftApplied {
+            name: name.to_string(),
+            size: draft.size,
+            battle_reset: true,
+        })
     }
 
     pub fn issue_lab_command_as(
@@ -254,13 +403,19 @@ impl Game {
         self.validate_owner(input.owner)?;
         let id = if input.kind.is_unit() {
             self.validate_unit_position(&self.state.entities, input.kind, input.x, input.y)?;
-            self.state.entities
+            self.state
+                .entities
                 .spawn_unit(input.owner, input.kind, input.x, input.y)
                 .ok_or_else(|| invalid_kind(input.kind, "spawnEntity"))?
         } else if input.kind.is_building() {
-            let (_, _, x, y) =
-                self.validate_building_position(&self.state.entities, input.kind, input.x, input.y)?;
-            self.state.entities
+            let (_, _, x, y) = self.validate_building_position(
+                &self.state.entities,
+                input.kind,
+                input.x,
+                input.y,
+            )?;
+            self.state
+                .entities
                 .spawn_building(input.owner, input.kind, x, y, input.completed)
                 .ok_or_else(|| invalid_kind(input.kind, "spawnEntity"))?
         } else {
@@ -271,7 +426,8 @@ impl Game {
     }
 
     fn lab_delete_entity(&mut self, entity_id: u32) -> Result<LabOpOutcome, LabError> {
-        self.state.entities
+        self.state
+            .entities
             .remove(entity_id)
             .ok_or(LabError::StaleEntity { entity_id })?;
         self.state.entities.release_miner(entity_id);
@@ -282,7 +438,9 @@ impl Game {
 
     fn lab_move_entity(&mut self, input: LabMoveEntity) -> Result<LabOpOutcome, LabError> {
         let (kind, is_unit, is_building) = {
-            let entity = self.state.entities
+            let entity = self
+                .state
+                .entities
                 .get(input.entity_id)
                 .ok_or(LabError::StaleEntity {
                     entity_id: input.entity_id,
@@ -318,7 +476,9 @@ impl Game {
 
     fn lab_set_entity_owner(&mut self, input: LabSetEntityOwner) -> Result<LabOpOutcome, LabError> {
         self.validate_owner(input.owner)?;
-        let kind = self.state.entities
+        let kind = self
+            .state
+            .entities
             .get(input.entity_id)
             .ok_or(LabError::StaleEntity {
                 entity_id: input.entity_id,
@@ -346,7 +506,9 @@ impl Game {
         &mut self,
         input: LabSetPlayerResources,
     ) -> Result<LabOpOutcome, LabError> {
-        let player = self.state.players
+        let player = self
+            .state
+            .players
             .iter_mut()
             .find(|player| player.id == input.player_id)
             .ok_or(LabError::InvalidPlayer {
@@ -380,7 +542,9 @@ impl Game {
         &mut self,
         input: LabSetCompletedResearch,
     ) -> Result<LabOpOutcome, LabError> {
-        let player = self.state.players
+        let player = self
+            .state
+            .players
             .iter_mut()
             .find(|player| player.id == input.player_id)
             .ok_or(LabError::InvalidPlayer {
@@ -413,7 +577,12 @@ impl Game {
     }
 
     fn validate_player(&self, player_id: u32) -> Result<(), LabError> {
-        if self.state.players.iter().any(|player| player.id == player_id) {
+        if self
+            .state
+            .players
+            .iter()
+            .any(|player| player.id == player_id)
+        {
             Ok(())
         } else {
             Err(LabError::InvalidPlayer { player_id })
@@ -489,8 +658,12 @@ impl Game {
         systems::recompute_supply(&mut self.state.players, &self.state.entities);
         self.reset_derived_state();
         let ids = self.state.player_ids();
-        self.state.fog
-            .recompute_with_smoke(&ids, &self.state.entities, &self.state.map, &self.state.smokes);
+        self.state.fog.recompute_with_smoke(
+            &ids,
+            &self.state.entities,
+            &self.state.map,
+            &self.state.smokes,
+        );
         self.refresh_building_memory(&ids);
         self.refresh_trench_memory(&ids);
         #[cfg(debug_assertions)]
@@ -516,6 +689,67 @@ impl Game {
             }
         }
     }
+}
+
+fn validate_lab_map_site(
+    name: &str,
+    size: u32,
+    terrain_grid: &[u8],
+    x: u32,
+    y: u32,
+    radius: i32,
+    occupied_sites: &mut std::collections::HashSet<(u32, u32)>,
+) -> Result<(), LabError> {
+    if x >= size || y >= size {
+        return Err(LabError::InvalidMap {
+            name: name.to_string(),
+            reason: format!("base site ({x},{y}) is outside the map"),
+        });
+    }
+    if !occupied_sites.insert((x, y)) {
+        return Err(LabError::InvalidMap {
+            name: name.to_string(),
+            reason: format!("more than one base site uses ({x},{y})"),
+        });
+    }
+    for dy in -radius..=radius {
+        for dx in -radius..=radius {
+            let Some(tx) = i32::try_from(x)
+                .ok()
+                .and_then(|value| value.checked_add(dx))
+            else {
+                return Err(LabError::InvalidMap {
+                    name: name.to_string(),
+                    reason: format!("base site ({x},{y}) is too close to the map edge"),
+                });
+            };
+            let Some(ty) = i32::try_from(y)
+                .ok()
+                .and_then(|value| value.checked_add(dy))
+            else {
+                return Err(LabError::InvalidMap {
+                    name: name.to_string(),
+                    reason: format!("base site ({x},{y}) is too close to the map edge"),
+                });
+            };
+            if tx < 0 || ty < 0 || tx >= size as i32 || ty >= size as i32 {
+                return Err(LabError::InvalidMap {
+                    name: name.to_string(),
+                    reason: format!("base site ({x},{y}) is too close to the map edge"),
+                });
+            }
+            let index = ty as usize * size as usize + tx as usize;
+            if terrain_grid.get(index).copied() != Some(terrain::GRASS) {
+                return Err(LabError::InvalidMap {
+                    name: name.to_string(),
+                    reason: format!(
+                        "base site ({x},{y}) needs grass throughout its protected area"
+                    ),
+                });
+            }
+        }
+    }
+    Ok(())
 }
 
 fn command_authority_entities(command: &Command) -> Vec<u32> {
@@ -643,7 +877,7 @@ mod tests {
     use super::*;
     use crate::game::entity::WeaponSetup;
     use crate::game::services::occupancy::footprint_center;
-    use crate::protocol::terrain;
+    use crate::protocol::{terrain, LabMapTile};
 
     fn lab_players() -> [PlayerInit; 2] {
         [
@@ -686,6 +920,141 @@ mod tests {
 
     fn new_game() -> Game {
         Game::new_lab(&lab_players(), 0xABCD, flat_lab_map(), lab_metadata())
+    }
+
+    fn map_draft() -> LabMapDraft {
+        let mut terrain = vec![terrain::GRASS; 64 * 64];
+        terrain[0] = terrain::WATER;
+        LabMapDraft {
+            name: "Edited Lab Map".to_string(),
+            size: 64,
+            terrain,
+            starts: vec![LabMapTile { x: 12, y: 12 }, LabMapTile { x: 51, y: 51 }],
+            expansion_sites: vec![LabMapTile { x: 32, y: 32 }],
+        }
+    }
+
+    #[test]
+    fn lab_map_draft_rebuilds_the_battle_on_authoritative_terrain_and_bases() {
+        let mut game = new_game();
+        for _ in 0..10 {
+            game.tick();
+        }
+
+        let outcome = game
+            .apply_lab_op(LabOp::ApplyMapDraft(map_draft()))
+            .expect("valid lab map draft");
+
+        assert_eq!(
+            outcome,
+            LabOpOutcome::MapDraftApplied {
+                name: "Edited Lab Map".to_string(),
+                size: 64,
+                battle_reset: true,
+            }
+        );
+        assert_eq!(game.tick_count(), 0);
+        assert_eq!(game.state.map.terrain[0], terrain::WATER);
+        assert_eq!(game.state.map.starts, vec![(12, 12), (51, 51)]);
+        assert_eq!(game.state.map.expansion_sites, vec![(32, 32)]);
+        assert_eq!(game.state.map_metadata.name, "Edited Lab Map");
+        assert_eq!(
+            game.start_payload()
+                .players
+                .iter()
+                .map(|player| (player.start_tile_x, player.start_tile_y))
+                .collect::<Vec<_>>(),
+            vec![(12, 12), (51, 51)]
+        );
+    }
+
+    #[test]
+    fn lab_map_draft_rejects_blocked_base_protection_area() {
+        let mut game = new_game();
+        let mut draft = map_draft();
+        draft.terrain[12 * 64 + 12] = terrain::ROCK;
+
+        assert!(matches!(
+            game.apply_lab_op(LabOp::ApplyMapDraft(draft)),
+            Err(LabError::InvalidMap { reason, .. })
+                if reason.contains("protected area")
+        ));
+    }
+
+    #[test]
+    fn lab_map_draft_allows_terrain_immediately_beyond_starting_unit_area() {
+        let mut game = new_game();
+        let mut draft = map_draft();
+        draft.terrain[12 * 64 + 16] = terrain::ROCK;
+
+        game.apply_lab_op(LabOp::ApplyMapDraft(draft))
+            .expect("terrain beyond the starting unit area should remain editable");
+        assert_eq!(game.state.map.terrain[12 * 64 + 16], terrain::ROCK);
+    }
+
+    #[test]
+    fn terrain_only_lab_map_draft_preserves_tick_and_moved_worker() {
+        let mut game = new_game();
+        let worker_id = game
+            .state
+            .entities
+            .iter()
+            .find(|entity| entity.owner == 1 && entity.kind == EntityKind::Worker)
+            .map(|entity| entity.id)
+            .expect("starting worker");
+        let (worker_x, worker_y) = game.state.map.tile_center(30, 30);
+        game.apply_lab_op(LabOp::MoveEntity(LabMoveEntity {
+            entity_id: worker_id,
+            x: worker_x,
+            y: worker_y,
+        }))
+        .expect("move worker to map center");
+        for _ in 0..10 {
+            game.tick();
+        }
+        let tick = game.tick_count();
+        let mut terrain = game.state.map.terrain.clone();
+        for y in 29..=31 {
+            for x in 30..=32 {
+                terrain[y * 64 + x] = terrain::ROCK;
+            }
+        }
+        let draft = LabMapDraft {
+            name: "Terrain-only edit".to_string(),
+            size: 64,
+            terrain,
+            starts: game
+                .state
+                .map
+                .starts
+                .iter()
+                .map(|&(x, y)| LabMapTile { x, y })
+                .collect(),
+            expansion_sites: Vec::new(),
+        };
+
+        let outcome = game
+            .apply_lab_op(LabOp::ApplyMapDraft(draft))
+            .expect("terrain-only edit");
+
+        assert_eq!(
+            outcome,
+            LabOpOutcome::MapDraftApplied {
+                name: "Terrain-only edit".to_string(),
+                size: 64,
+                battle_reset: false,
+            }
+        );
+        assert_eq!(game.tick_count(), tick);
+        assert_eq!(game.state.map.terrain[30 * 64 + 31], terrain::ROCK);
+        let worker = game
+            .state
+            .entities
+            .get(worker_id)
+            .expect("moved worker remains");
+        assert_ne!((worker.pos_x, worker.pos_y), (worker_x, worker_y));
+        assert!(worker.pos_x > 20.0 * config::TILE_SIZE as f32);
+        assert!(worker.pos_y > 20.0 * config::TILE_SIZE as f32);
     }
 
     fn default_map_game() -> Game {
@@ -838,7 +1207,9 @@ mod tests {
             Err(LabError::InvalidPosition { .. })
         ));
 
-        let worker = game.state.entities
+        let worker = game
+            .state
+            .entities
             .iter()
             .find(|entity| entity.owner == 1 && entity.kind == EntityKind::Worker)
             .expect("starting worker")
@@ -854,7 +1225,9 @@ mod tests {
             Err(LabError::OccupiedPosition { .. })
         ));
 
-        let city_centre = game.state.entities
+        let city_centre = game
+            .state
+            .entities
             .iter()
             .find(|entity| entity.owner == 1 && entity.kind == EntityKind::CityCentre)
             .expect("starting city centre")
@@ -898,7 +1271,9 @@ mod tests {
         let moved = game.state.entities.get(entity_id).expect("moved entity");
         assert_eq!((moved.pos_x, moved.pos_y), (move_x, move_y));
 
-        let city_centre = game.state.entities
+        let city_centre = game
+            .state
+            .entities
             .iter()
             .find(|entity| entity.owner == 1 && entity.kind == EntityKind::CityCentre)
             .expect("starting city centre")
@@ -1096,9 +1471,7 @@ mod tests {
             restored_tank.weapon_facing().unwrap_or_default(),
             tank_weapon_facing,
         );
-        let restored_gun = restored.state.entities
-            .get(gun_id)
-            .expect("restored gun");
+        let restored_gun = restored.state.entities.get(gun_id).expect("restored gun");
         assert_eq!(restored_gun.kind, EntityKind::AntiTankGun);
         assert!(matches!(restored_gun.weapon_setup(), WeaponSetup::Deployed));
         assert_angle_close(

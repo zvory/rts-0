@@ -31,7 +31,6 @@ pub use lab_replay::*;
 pub use lab_scenario::*;
 pub use messagepack_frame::MESSAGEPACK_SNAPSHOT_FRAME_MAGIC;
 pub use observer_analysis::*;
-pub use server_message::ServerMessage;
 pub use rts_contract::{
     AbilityCooldownView, AbilityObjectOwnerStateView, AbilityObjectView, ActionCapabilities,
     AttackReveal, CommandCapabilities, DebugPathPoint, DebugPathView, DiagnosticCapabilities,
@@ -42,6 +41,7 @@ pub use rts_contract::{
     ScoutPlaneStateView, SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload, TeamId,
     TrenchView, VisibilityCapabilities, DEFAULT_FACTION_ID,
 };
+pub use server_message::ServerMessage;
 
 fn is_false(value: &bool) -> bool {
     !*value
@@ -335,6 +335,9 @@ pub enum LabClientOp {
         upgrade: String,
         completed: bool,
     },
+    ApplyMapDraft {
+        draft: LabMapDraft,
+    },
     SetVision {
         vision: LabVisionMode,
     },
@@ -344,6 +347,23 @@ pub enum LabClientOp {
         #[serde(default, skip_serializing_if = "is_false")]
         ignore_command_limits: bool,
     },
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LabMapDraft {
+    pub name: String,
+    pub size: u32,
+    pub terrain: Vec<u8>,
+    pub starts: Vec<LabMapTile>,
+    pub expansion_sites: Vec<LabMapTile>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LabMapTile {
+    pub x: u32,
+    pub y: u32,
 }
 
 // Server -> Client

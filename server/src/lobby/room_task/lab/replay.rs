@@ -29,6 +29,7 @@ use crate::protocol::{
 
 pub(super) enum LabReplayRebaseSource {
     Checkpoint(Box<LabCheckpointScenarioV1>),
+    Current { name: String },
 }
 
 pub(super) fn lab_op_to_replay_operation(op: &LabOp) -> Option<LabReplayOperation> {
@@ -68,7 +69,7 @@ pub(super) fn lab_op_to_replay_operation(op: &LabOp) -> Option<LabReplayOperatio
             upgrade: input.upgrade.to_protocol_str().to_string(),
             completed: input.completed,
         }),
-        LabOp::RestoreCheckpointScenario(_) => None,
+        LabOp::ApplyMapDraft(_) | LabOp::RestoreCheckpointScenario(_) => None,
     }
 }
 
@@ -331,6 +332,12 @@ impl RoomTask {
     ) -> Result<LabCheckpointScenarioV1, String> {
         match source {
             LabReplayRebaseSource::Checkpoint(scenario) => Ok(*scenario),
+            LabReplayRebaseSource::Current { name } => {
+                let game = self
+                    .live_game()
+                    .ok_or_else(|| "lab game is not running".to_string())?;
+                self.export_lab_replay_initial_setup(game, name)
+            }
         }
     }
 

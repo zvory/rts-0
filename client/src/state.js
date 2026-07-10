@@ -24,7 +24,7 @@ import {
   terrainAt as queryTerrainAt,
   worldInBounds as queryWorldInBounds,
 } from "./state_queries.js";
-import { VisualEffectBackedState } from "./state_visual_effects.js";
+import { VisualEffectBackedState, VisualEffectBuffers } from "./state_visual_effects.js";
 
 const TWO_PI = Math.PI * 2;
 const PREDICTION_SMOOTH_MS = 120;
@@ -139,6 +139,54 @@ export class GameState extends VisualEffectBackedState {
   /** World pixels per tile. */
   get tileSize() {
     return this.map.tileSize;
+  }
+
+  /** Replace static map/start state after an authoritative Lab battle reset without rebuilding Match. */
+  resetForLabMap({ map, players, tick = 0 }) {
+    if (!this.updateForLabMap({ map, players, tick })) return false;
+
+    this._prev = null;
+    this._cur = null;
+    this._prevRecvTime = 0;
+    this._curRecvTime = 0;
+    this._prevById = new Map();
+    this._curById = new Map();
+    this.resources = { steel: 0, oil: 0, supplyUsed: 0, supplyCap: 0 };
+    this.playerResources = [];
+    this.events = [];
+    this.upgrades = [];
+    this.selection.clear();
+    this.selectionBudgetOverflow = null;
+    this.controlGroups = Array.from({ length: 10 }, () => []);
+    this.smokes = [];
+    this.abilityObjects = [];
+    this.trenches = [];
+    this.rememberedBuildings = [];
+    this.visibleTiles = [];
+    this.groundDecals = new GroundDecalBuffer();
+    this.visualEffects = new VisualEffectBuffers();
+    this.predictedById.clear();
+    this.predictionCorrectionById.clear();
+    this.predictionDiagnostics = null;
+    this.optimisticProduction = [];
+    this.optimisticProductionByBuilding.clear();
+    this.optimisticRallyByBuilding.clear();
+    this.progressExtrapolator = new ProgressExtrapolator({ playerId: this.playerId });
+    return true;
+  }
+
+  /** Replace authoritative static map data while preserving the live entity/snapshot buffers. */
+  updateForLabMap({ map, players, tick = this.tick }) {
+    if (!map || !Array.isArray(map.terrain) || !Array.isArray(players)) return false;
+    this.map = {
+      ...map,
+      resources: (map.resources || []).map((node, index) => normalizeResource(node, index)),
+    };
+    this.players = players.map((player) => normalizePlayer(player));
+    this.startInfo = { ...this.startInfo, tick, map, players };
+    this.resourceById = new Map();
+    for (const node of this.map.resources) this.resourceById.set(node.id, node);
+    return true;
   }
 
   playerById(id) {

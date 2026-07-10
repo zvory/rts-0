@@ -98,6 +98,10 @@ export class LabClient {
     return this.request({ op: "setCompletedResearch", playerId, upgrade, completed: !!completed });
   }
 
+  applyMapDraft(draft) {
+    return this.request({ op: "applyMapDraft", draft });
+  }
+
   request(op, { timeoutMs = this.timeoutMs } = {}) {
     const requestId = this.allocateRequestId();
     const opName = typeof op?.op === "string" ? op.op : "unknown";
