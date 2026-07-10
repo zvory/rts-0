@@ -255,9 +255,6 @@ const EXPECTED_ABILITY_EFFECT_FIELDS_BY_ID = Object.freeze({
   [ABILITY.EKAT_CONSUME_GOLEM]: Object.freeze(["radiusTiles"]),
 });
 const EXPECTED_EXTRA_UNIT_STATS = Object.freeze([KIND.PANZERFAUST]);
-// Tank Traps remain in the shared stats mirror so historical/dev snapshots can render while the
-// playable faction catalog keeps them unavailable for balance.
-const EXPECTED_EXTRA_BUILDING_STATS = Object.freeze([KIND.TANK_TRAP]);
 
 function asClientKinds(kinds) {
   return kinds.map((kind) => {
@@ -631,11 +628,8 @@ for (const [kind, expected] of Object.entries(rustClientConfig.unitStats)) {
 
 assertSortedObjectKeys(
   rustClientConfig.buildingStats,
-  new Set([
-    ...allRustCatalogs.catalogs.flatMap((catalog) => catalog.buildings),
-    ...EXPECTED_EXTRA_BUILDING_STATS,
-  ]),
-  "rules dump buildingStats cover every client-mirrored catalog building plus explicit extra building stats",
+  new Set(allRustCatalogs.catalogs.flatMap((catalog) => catalog.buildings)),
+  "rules dump buildingStats cover every client-mirrored catalog building",
 );
 for (const [kind, expected] of Object.entries(rustClientConfig.buildingStats)) {
   assertSortedObjectKeys(
