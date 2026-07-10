@@ -3,28 +3,14 @@
 
 export const MAX_LOBBY_TEAMS = 4;
 export const AI_PROFILES = Object.freeze([
-  { id: "ai_1_0", label: "AI 1.0" },
-  { id: "ai_1_1", label: "AI 1.1" },
-  { id: "ai_1_2", label: "AI 1.2" },
-  { id: "ai_2_0", label: "AI 2.0" },
   { id: "ai_2_1", label: "AI 2.1" },
-  { id: "ai_turtle", label: "AI Turtle" },
 ]);
 
 const AI_PROFILE_ALIASES = Object.freeze({
-  ai_1_0_tech: "ai_1_0",
-  ai_1_1_tank_mg: "ai_1_1",
-  ai_1_2_wave_cohorts: "ai_1_2",
-  ai_2_0_tank_pressure: "ai_2_0",
   ai_2_1_economy_manager: "ai_2_1",
-  ai_turtle_chokes: "ai_turtle",
 });
 
-const STABLE_DEFAULT_AI_PROFILE_ID = "ai_1_2";
-export const DEFAULT_AI_PROFILE_ID =
-  AI_PROFILES.some((entry) => entry.id === STABLE_DEFAULT_AI_PROFILE_ID)
-    ? STABLE_DEFAULT_AI_PROFILE_ID
-    : AI_PROFILES[0].id;
+export const DEFAULT_AI_PROFILE_ID = "ai_2_1";
 
 export function teamSlotsForLobby(players = [], maxPlayers = MAX_LOBBY_TEAMS) {
   const slotLimit = lobbyTeamSlotLimit(maxPlayers);
@@ -109,7 +95,6 @@ export class LobbyRosterView {
     onSetTeam,
     onSetSpectator,
     onSetFaction,
-    onSetAiProfile,
   }) {
     if (!this.root) return;
     this.root.innerHTML = "";
@@ -138,7 +123,6 @@ export class LobbyRosterView {
           onSetTeam,
           onSetSpectator,
           onSetFaction,
-          onSetAiProfile,
         }));
       }
     }
@@ -172,7 +156,6 @@ export class LobbyRosterView {
     onSetTeam,
     onSetSpectator,
     onSetFaction,
-    onSetAiProfile,
   }) {
     const section = document.createElement("section");
     section.className = "lobby-team-card team-row";
@@ -246,7 +229,6 @@ export class LobbyRosterView {
         betaFactionSelect,
         onRemoveAi,
         onSetFaction,
-        onSetAiProfile,
       }));
     }
     if (players.length === 0) {
@@ -269,7 +251,6 @@ export class LobbyRosterView {
     betaFactionSelect,
     onRemoveAi,
     onSetFaction,
-    onSetAiProfile,
   }) {
     const row = document.createElement("div");
     row.className = "player-row lobby-seat";
@@ -320,15 +301,7 @@ export class LobbyRosterView {
 
     const meta = document.createElement("div");
     meta.className = "lobby-seat-meta";
-    if (player.isAi && isHost) {
-      meta.appendChild(this._buildAiProfileControl({
-        player,
-        countdownActive,
-        onSetAiProfile,
-      }));
-    } else {
-      meta.textContent = player.isAi ? aiProfileLabel(player.aiProfileId) : "Human player";
-    }
+    meta.textContent = player.isAi ? aiProfileLabel(player.aiProfileId) : "Human player";
 
     body.append(nameLine, meta);
 
@@ -361,24 +334,6 @@ export class LobbyRosterView {
     select.disabled = countdownActive || player.id !== myId || player.isSpectator;
     select.addEventListener("change", () => {
       if (!select.disabled) onSetFaction?.(select.value);
-    });
-    return select;
-  }
-
-  _buildAiProfileControl({ player, countdownActive, onSetAiProfile }) {
-    const select = document.createElement("select");
-    select.className = "player-ai-profile-select";
-    select.setAttribute("aria-label", `${player.name || "AI"} profile`);
-    for (const entry of AI_PROFILES) {
-      const option = document.createElement("option");
-      option.value = entry.id;
-      option.textContent = entry.label;
-      select.appendChild(option);
-    }
-    select.value = playableAiProfileId(player.aiProfileId);
-    select.disabled = countdownActive;
-    select.addEventListener("change", () => {
-      if (!select.disabled) onSetAiProfile?.(player.id, select.value);
     });
     return select;
   }

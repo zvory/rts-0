@@ -1526,14 +1526,15 @@ Supported match-launch parameters:
 - `rtsName=<display name>` defaults to `Spectator` or `Commander` from the selected role.
 - `rtsMap=<map display name>` optionally selects a server-advertised lobby map before seating AIs.
 - Repeated `rtsAi=<team>:<profile>` entries seat AI opponents in order, for example
-  `rtsAi=1:ai_1_2&rtsAi=2:ai_2_0`. A profile-only entry such as `rtsAi=ai_2_0` uses the next team
-  slot. If omitted, the launch defaults to two AI 1.2 seats on teams 1 and 2.
+  `rtsAi=1:ai_2_1&rtsAi=2:ai_2_1`. A profile-only entry such as `rtsAi=ai_2_1` uses the next team
+  slot. Retired profile ids normalize to AI 2.1; if omitted, the launch defaults to two AI 2.1
+  seats on teams 1 and 2.
 - `rtsStart=1|0` defaults to `1`. `0` prepares the lobby without pressing Start.
 
 Example spectator self-play URL:
 
 ```text
-/?rtsLaunch=match&rtsRoom=agent-ai-selfplay&rtsRole=spectator&rtsAi=1:ai_1_2&rtsAi=2:ai_2_0&rtsStart=1
+/?rtsLaunch=match&rtsRoom=agent-ai-selfplay&rtsRole=spectator&rtsAi=1:ai_2_1&rtsAi=2:ai_2_1&rtsStart=1
 ```
 
 When that launch produces an all-AI live match, the score screen retains the live `matchRunId`

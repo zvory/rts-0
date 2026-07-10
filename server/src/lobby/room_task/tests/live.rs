@@ -61,7 +61,7 @@ fn live_spectator_receives_observer_analysis_but_active_players_do_not() {
 }
 
 #[test]
-fn selected_lobby_ai_profile_is_used_by_live_controller() {
+fn lobby_ai_slots_resolve_to_ai_2_1() {
     let mut task = RoomTask::new(
         "live-ai-profile-selection-test".to_string(),
         RoomMode::Normal,
@@ -76,14 +76,17 @@ fn selected_lobby_ai_profile_is_used_by_live_controller() {
     task.on_add_ai(host_id, Some(2), Some("ai_2_0".to_string()));
     assert_eq!(
         task.ai_players.first().map(|ai| ai.profile_request_id),
-        Some("ai_2_0")
+        Some("ai_2_1")
     );
-    assert_eq!(ai_slot_names(&task), vec!["AI 2.0"]);
+    assert_eq!(ai_slot_names(&task), vec!["AI 2.1"]);
 
     task.start_match();
 
     assert_eq!(task.ai_controllers.len(), 1);
-    assert_eq!(task.ai_controllers[0].profile_id(), "ai_2_0_tank_pressure");
+    assert_eq!(
+        task.ai_controllers[0].profile_id(),
+        "ai_2_1_economy_manager"
+    );
 }
 
 #[test]
@@ -100,20 +103,23 @@ fn lobby_ai_names_follow_profile_labels_and_duplicate_counts() {
     add_test_room_player(&mut task, host_id, true);
 
     task.on_add_ai(host_id, Some(2), None);
-    assert_eq!(ai_slot_names(&task), vec!["AI 1.2"]);
+    assert_eq!(ai_slot_names(&task), vec!["AI 2.1"]);
 
     let first_ai_id = task.ai_players[0].id;
     task.on_add_ai(host_id, Some(3), None);
-    assert_eq!(ai_slot_names(&task), vec!["AI 1.2 1", "AI 1.2 2"]);
+    assert_eq!(ai_slot_names(&task), vec!["AI 2.1 1", "AI 2.1 2"]);
 
     task.on_set_ai_profile(host_id, first_ai_id, "ai_1_1_tank_mg".to_string());
-    assert_eq!(ai_slot_names(&task), vec!["AI 1.1", "AI 1.2"]);
+    assert_eq!(ai_slot_names(&task), vec!["AI 2.1 1", "AI 2.1 2"]);
 
     task.on_add_ai(host_id, Some(4), Some("ai_1_1".to_string()));
-    assert_eq!(ai_slot_names(&task), vec!["AI 1.1 1", "AI 1.2", "AI 1.1 2"]);
+    assert_eq!(
+        ai_slot_names(&task),
+        vec!["AI 2.1 1", "AI 2.1 2", "AI 2.1 3"]
+    );
 
     task.on_remove_ai(host_id, first_ai_id);
-    assert_eq!(ai_slot_names(&task), vec!["AI 1.2", "AI 1.1"]);
+    assert_eq!(ai_slot_names(&task), vec!["AI 2.1 1", "AI 2.1 2"]);
 }
 
 #[test]
@@ -483,7 +489,7 @@ fn ai_only_live_start_payload_advertises_speed_controls_without_seek() {
         .iter()
         .map(|player| player.name.as_str())
         .collect();
-    assert_eq!(ai_names, vec!["AI 1.2 1", "AI 1.2 2"]);
+    assert_eq!(ai_names, vec!["AI 2.1 1", "AI 2.1 2"]);
 
     let state = messages
         .iter()

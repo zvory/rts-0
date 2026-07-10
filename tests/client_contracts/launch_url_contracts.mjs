@@ -214,7 +214,7 @@ async function testMatchLaunchConfig() {
   } = await import("../../client/src/launch_url.js");
 
   let config = matchLaunchConfig(new URL(
-    "http://localhost/?rtsLaunch=match&rtsRoom=agent-ai-selfplay&rtsRole=spectator&rtsAi=1:ai_1_2&rtsAi=2:ai_2_0&rtsStart=1&rtsMap=No%20Terrain",
+    "http://localhost/?rtsLaunch=match&rtsRoom=agent-ai-selfplay&rtsRole=spectator&rtsAi=1:ai_2_1&rtsAi=2:ai_2_0&rtsStart=1&rtsMap=No%20Terrain",
   ));
   assert(config, "match launch URL should be recognized");
   assert(config.errors.length === 0, `match launch URL should be valid (${config.errors.join(" ")})`);
@@ -225,10 +225,10 @@ async function testMatchLaunchConfig() {
   assert(config.map === "No Terrain", "match launch keeps a safe map display name");
   assert(
     JSON.stringify(config.ai) === JSON.stringify([
-      { teamId: 1, aiProfileId: "ai_1_2" },
-      { teamId: 2, aiProfileId: "ai_2_0" },
+      { teamId: 1, aiProfileId: "ai_2_1" },
+      { teamId: 2, aiProfileId: "ai_2_1" },
     ]),
-    "match launch parses repeated AI team/profile entries",
+    "match launch normalizes every AI seat to AI 2.1",
   );
 
   config = matchLaunchConfig(
@@ -238,18 +238,18 @@ async function testMatchLaunchConfig() {
   assert(config.room === "ai-selfplay-0", "match launch generates a safe room when omitted");
   assert(
     JSON.stringify(config.ai) === JSON.stringify([
-      { teamId: 1, aiProfileId: "ai_1_2" },
-      { teamId: 2, aiProfileId: "ai_1_2" },
+      { teamId: 1, aiProfileId: "ai_2_1" },
+      { teamId: 2, aiProfileId: "ai_2_1" },
     ]),
-    "match launch defaults to a two-team AI 1.2 self-play",
+    "match launch defaults to a two-team AI 2.1 self-play",
   );
 
   config = matchLaunchConfig(new URL(
     "http://localhost/?rtsLaunch=match&rtsRoom=agent-ai-selfplay&rtsAi=ai_2_0",
   ));
   assert(
-    JSON.stringify(config.ai) === JSON.stringify([{ teamId: 1, aiProfileId: "ai_2_0" }]),
-    "profile-only AI entries use the next team slot",
+    JSON.stringify(config.ai) === JSON.stringify([{ teamId: 1, aiProfileId: "ai_2_1" }]),
+    "retired profile-only AI entries fall back to AI 2.1",
   );
 
   config = matchLaunchConfig(new URL("http://localhost/?rtsLaunch=match&rtsRoom=bad%0Aroom"));
@@ -278,7 +278,7 @@ async function testMatchLaunchActions() {
     nextMatchLaunchAction,
   } = await import("../../client/src/launch_url.js");
   const config = matchLaunchConfig(new URL(
-    "http://localhost/?rtsLaunch=match&rtsRoom=agent-ai-selfplay&rtsRole=spectator&rtsAi=1:ai_1_2&rtsAi=2:ai_2_0&rtsStart=1",
+    "http://localhost/?rtsLaunch=match&rtsRoom=agent-ai-selfplay&rtsRole=spectator&rtsAi=1:ai_2_1&rtsAi=2:ai_2_0&rtsStart=1",
   ));
   const spectator = { id: 7, isAi: false, isSpectator: true, ready: false };
 
@@ -291,7 +291,7 @@ async function testMatchLaunchActions() {
     canStart: false,
   }, 7);
   assert(
-    JSON.stringify(action) === JSON.stringify({ type: "addAi", teamId: 1, aiProfileId: "ai_1_2" }),
+    JSON.stringify(action) === JSON.stringify({ type: "addAi", teamId: 1, aiProfileId: "ai_2_1" }),
     "empty spectator-hosted launch lobby adds the first requested AI",
   );
 
@@ -302,12 +302,12 @@ async function testMatchLaunchActions() {
     maps: [{ name: "Default" }],
     players: [
       spectator,
-      { id: 20, isAi: true, isSpectator: false, teamId: 1, aiProfileId: "ai_1_2" },
+      { id: 20, isAi: true, isSpectator: false, teamId: 1, aiProfileId: "ai_2_1" },
     ],
     canStart: false,
   }, 7);
   assert(
-    JSON.stringify(action) === JSON.stringify({ type: "addAi", teamId: 2, aiProfileId: "ai_2_0" }),
+    JSON.stringify(action) === JSON.stringify({ type: "addAi", teamId: 2, aiProfileId: "ai_2_1" }),
     "launch action adds the second requested AI after the first one appears",
   );
 
@@ -318,13 +318,13 @@ async function testMatchLaunchActions() {
     maps: [{ name: "Default" }],
     players: [
       spectator,
-      { id: 20, isAi: true, isSpectator: false, teamId: 1, aiProfileId: "ai_1_2" },
+      { id: 20, isAi: true, isSpectator: false, teamId: 1, aiProfileId: "ai_2_1" },
       { id: 21, isAi: true, isSpectator: false, teamId: 2, aiProfileId: "ai_1_0" },
     ],
     canStart: true,
   }, 7);
   assert(
-    JSON.stringify(action) === JSON.stringify({ type: "setAiProfile", id: 21, aiProfileId: "ai_2_0" }),
+    JSON.stringify(action) === JSON.stringify({ type: "setAiProfile", id: 21, aiProfileId: "ai_2_1" }),
     "launch action corrects existing AI profile mismatches before start",
   );
 
@@ -335,8 +335,8 @@ async function testMatchLaunchActions() {
     maps: [{ name: "Default" }],
     players: [
       spectator,
-      { id: 20, isAi: true, isSpectator: false, teamId: 1, aiProfileId: "ai_1_2" },
-      { id: 21, isAi: true, isSpectator: false, teamId: 2, aiProfileId: "ai_2_0" },
+      { id: 20, isAi: true, isSpectator: false, teamId: 1, aiProfileId: "ai_2_1" },
+      { id: 21, isAi: true, isSpectator: false, teamId: 2, aiProfileId: "ai_2_1" },
     ],
     canStart: true,
   }, 7);

@@ -143,7 +143,7 @@ A row is written when **all** of these are true:
 3. `is_dev_watch()` is false — dev scenario rooms never record.
 4. The room/participants do not match automated smoke/integration/regression test fingerprints:
    `itest-*`, `ai-itest-*`, `client-smoke-*`, `reg-*`, `smoke`, or the `Alpha`/`Bravo`
-   integration pair. AI profile-label participants such as `AI 1.2` are allowed so
+   integration pair. AI profile-label participants such as `AI 2.1` are allowed so
    player-vs-AI matches record.
 5. The server was started with a working DB connection and `RTS_RECORD_MATCHES` is truthy.
 

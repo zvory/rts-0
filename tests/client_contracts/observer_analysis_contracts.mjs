@@ -537,10 +537,10 @@ import { textWithin } from "./dom_text.mjs";
           units: [],
           production: [],
           aiDiagnostics: {
-            profileId: "ai_1_2_wave_cohorts",
+            profileId: "ai_2_1_economy_manager",
             traceTick: 36,
             lines: [
-              "profile=ai_1_2_wave_cohorts tick=36",
+              "profile=ai_2_1_economy_manager tick=36",
               "goal=Production status=Selected blockers=- intents=train:Rifleman",
             ],
           },
@@ -569,7 +569,7 @@ import { textWithin } from "./dom_text.mjs";
         && aiDiagnosticsText.includes("Map analysis")
         && aiDiagnosticsText.includes("Chokes")
         && aiDiagnosticsText.includes("2")
-        && aiDiagnosticsText.includes("ai_1_2_wave_cohorts")
+        && aiDiagnosticsText.includes("ai_2_1_economy_manager")
         && aiDiagnosticsText.includes("tick 36")
         && aiDiagnosticsText.includes("goal")
         && aiDiagnosticsText.includes("Production")
@@ -613,10 +613,10 @@ import { textWithin } from "./dom_text.mjs";
           units: [],
           production: [],
           aiDiagnostics: {
-            profileId: "ai_1_2_wave_cohorts",
+            profileId: "ai_2_1_economy_manager",
             traceTick: 36,
             lines: [
-              "profile=ai_1_2_wave_cohorts tick=36",
+              "profile=ai_2_1_economy_manager tick=36",
               "goal=Production status=Selected blockers=- intents=train:Rifleman",
             ],
           },
@@ -656,10 +656,10 @@ import { textWithin } from "./dom_text.mjs";
           units: [],
           production: [],
           aiDiagnostics: {
-            profileId: "ai_1_2_wave_cohorts",
+            profileId: "ai_2_1_economy_manager",
             traceTick: 37,
             lines: [
-              "profile=ai_1_2_wave_cohorts tick=37",
+              "profile=ai_2_1_economy_manager tick=37",
               "goal=Production status=Selected blockers=- intents=train:Rifleman",
               "queue=Rifleman count=2",
             ],
