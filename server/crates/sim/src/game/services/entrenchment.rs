@@ -12,11 +12,15 @@ use crate::game::entity::{
 use crate::game::map::Map;
 use crate::game::services::geometry::{
     building_rect_for_entity, unit_bodies_intersect, unit_body_for_entity,
-    unit_body_intersects_rect, unit_body_with_facing,
+    unit_body_intersects_rect, unit_body_with_facing, UnitBody,
 };
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::standability;
 use crate::game::trench::{Trench, TrenchStore};
+
+mod spatial;
+
+use spatial::{EntrenchmentEntityIndex, EntrenchmentIndexes, TrenchSpatialIndex};
 
 const STATIONARY_EPS_PX: f32 = 0.05;
 const SLOT_EXTRA_RADIUS_PX: f32 = config::TILE_SIZE as f32;
@@ -46,6 +50,10 @@ pub(crate) fn entrenchment_system(
 ) {
     // Keep single-occupant trench checks cheap while this system mutates occupation state.
     let mut occupied_trench_counts = build_occupied_trench_counts(entities);
+    // Entrenchment runs after collision resolution, so these indexes start from the current
+    // positions rather than a phase-earlier derived spatial index. Keep them in sync below as
+    // units slot and new trenches are dug; subsequent ids must observe those mutations.
+    let mut indexes = EntrenchmentIndexes::build(map, entities, trenches);
     for id in entities.ids() {
         let Some(snapshot) = entities.get(id).cloned() else {
             continue;
@@ -56,13 +64,15 @@ pub(crate) fn entrenchment_system(
             entities,
             pre_collision_position,
             occ,
-            trenches,
+            &indexes,
             &occupied_trench_counts,
             &snapshot,
         ) {
             if let Some(e) = entities.get_mut(id) {
                 if let Some((x, y)) = candidate.slot {
+                    let old_position = (e.pos_x, e.pos_y);
                     e.set_position(x, y);
+                    indexes.entities.relocate(id, old_position, (x, y));
                 }
                 set_active_trench_occupation_tracked(
                     e,
@@ -77,7 +87,7 @@ pub(crate) fn entrenchment_system(
         let can_create = can_create_trench(has_entrenchment, &snapshot);
         let should_dig = can_create
             && stationary_for_digging(pre_collision_position, &snapshot)
-            && !standing_in_trench(trenches.all(), snapshot.pos_x, snapshot.pos_y);
+            && !standing_in_trench(&indexes.trenches, snapshot.pos_x, snapshot.pos_y);
         if should_dig {
             let completed = entities.get_mut(id).is_some_and(|e| {
                 set_active_trench_occupation_tracked(e, &mut occupied_trench_counts, None);
@@ -85,6 +95,11 @@ pub(crate) fn entrenchment_system(
             });
             if completed {
                 let created = trenches.create(map, snapshot.pos_x, snapshot.pos_y);
+                if let (Some(created), Some(trench)) = (created, trenches.all().last().copied()) {
+                    if trench.id == created {
+                        indexes.trenches.insert(trench);
+                    }
+                }
                 if let Some(e) = entities.get_mut(id) {
                     reset_entrenchment_dig(e);
                     set_active_trench_occupation_tracked(e, &mut occupied_trench_counts, created);
@@ -102,7 +117,7 @@ fn occupation_candidate(
     entities: &EntityStore,
     pre_collision_position: &dyn Fn(u32) -> Option<(f32, f32)>,
     occ: &Occupancy<'_>,
-    trenches: &TrenchStore,
+    indexes: &EntrenchmentIndexes,
     occupied_trench_counts: &OccupiedTrenchCounts,
     entity: &Entity,
 ) -> Option<OccupationCandidate> {
@@ -110,7 +125,14 @@ fn occupation_candidate(
     {
         return None;
     }
-    best_occupation_candidate(map, entities, occ, trenches, occupied_trench_counts, entity)
+    best_occupation_candidate(
+        map,
+        entities,
+        occ,
+        indexes,
+        occupied_trench_counts,
+        entity,
+    )
 }
 
 fn can_create_trench(has_entrenchment: &dyn Fn(u32) -> bool, entity: &Entity) -> bool {
@@ -173,19 +195,20 @@ fn best_occupation_candidate(
     map: &Map,
     entities: &EntityStore,
     occ: &Occupancy<'_>,
-    trenches: &TrenchStore,
+    indexes: &EntrenchmentIndexes,
     occupied_trench_counts: &OccupiedTrenchCounts,
     entity: &Entity,
 ) -> Option<OccupationCandidate> {
     let mut best: Option<RankedOccupationCandidate> = None;
-    for trench in trenches.all().iter().copied() {
+    for trench in indexes.trenches.occupation_candidates(entity) {
         if trench_occupied_by_other(occupied_trench_counts, entity, trench.id) {
             continue;
         }
         let Some(dist_sq) = occupation_search_distance_sq(trench, entity) else {
             continue;
         };
-        let Some(slot) = slot_candidate(map, entities, occ, entity, trench) else {
+        let Some(slot) = slot_candidate(map, entities, occ, &indexes.entities, entity, trench)
+        else {
             continue;
         };
         if best
@@ -220,10 +243,9 @@ fn occupation_search_distance_sq(trench: Trench, entity: &Entity) -> Option<f32>
     (dist_sq <= radius * radius).then_some(dist_sq)
 }
 
-fn standing_in_trench(trenches: &[Trench], x: f32, y: f32) -> bool {
+fn standing_in_trench(trenches: &TrenchSpatialIndex, x: f32, y: f32) -> bool {
     trenches
-        .iter()
-        .copied()
+        .containing_candidates(x, y)
         .any(|trench| trench_contains_point(trench, x, y))
 }
 
@@ -231,6 +253,7 @@ fn slot_candidate(
     map: &Map,
     entities: &EntityStore,
     occ: &Occupancy<'_>,
+    entity_index: &EntrenchmentEntityIndex,
     entity: &Entity,
     trench: Trench,
 ) -> Option<Option<(f32, f32)>> {
@@ -239,6 +262,7 @@ fn slot_candidate(
             map,
             entities,
             occ,
+            entity_index,
             entity,
             trench,
             (entity.pos_x, entity.pos_y),
@@ -253,7 +277,7 @@ fn slot_candidate(
             distance((entity.pos_x, entity.pos_y), *candidate) <= SLOT_MAX_CORRECTION_PX
         })
         .filter(|candidate| {
-            slot_position_legal(map, entities, occ, entity, trench, *candidate)
+            slot_position_legal(map, entities, occ, entity_index, entity, trench, *candidate)
         })
         .min_by(|a, b| {
             distance_sq((entity.pos_x, entity.pos_y), *a)
@@ -310,6 +334,7 @@ fn slot_position_legal(
     map: &Map,
     entities: &EntityStore,
     occ: &Occupancy<'_>,
+    entity_index: &EntrenchmentEntityIndex,
     entity: &Entity,
     trench: Trench,
     candidate: (f32, f32),
@@ -338,15 +363,16 @@ fn slot_position_legal(
     {
         return false;
     }
-    if slot_intersects_building(map, entities, entity, candidate) {
+    if slot_intersects_building(map, entities, entity_index, entity, candidate) {
         return false;
     }
-    !slot_overlaps_other_unit(entities, entity, candidate)
+    !slot_overlaps_other_unit(entities, entity_index, entity, candidate)
 }
 
 fn slot_intersects_building(
     map: &Map,
     entities: &EntityStore,
+    entity_index: &EntrenchmentEntityIndex,
     entity: &Entity,
     candidate: (f32, f32),
 ) -> bool {
@@ -355,16 +381,20 @@ fn slot_intersects_building(
     else {
         return true;
     };
-    entities.iter().any(|other| {
-        other.hp > 0
-            && other.is_building()
-            && building_rect_for_entity(map, other)
-                .is_some_and(|rect| unit_body_intersects_rect(candidate_body, rect))
-    })
+    entity_index.ids_near(candidate.0, candidate.1, entity_index.building_query_radius(candidate_body))
+        .any(|other_id| {
+            entities.get(other_id).is_some_and(|other| {
+                other.hp > 0
+                    && other.is_building()
+                    && building_rect_for_entity(map, other)
+                        .is_some_and(|rect| unit_body_intersects_rect(candidate_body, rect))
+            })
+        })
 }
 
 fn slot_overlaps_other_unit(
     entities: &EntityStore,
+    entity_index: &EntrenchmentEntityIndex,
     entity: &Entity,
     candidate: (f32, f32),
 ) -> bool {
@@ -373,20 +403,18 @@ fn slot_overlaps_other_unit(
     else {
         return true;
     };
-    for other in entities.iter() {
-        if other.id == entity.id {
-            continue;
-        }
-        if other.hp == 0 || !other.is_unit() {
-            continue;
-        }
-        if unit_body_for_entity(other)
-            .is_some_and(|other_body| unit_bodies_intersect(candidate_body, other_body))
-        {
-            return true;
-        }
-    }
-    false
+    entity_index
+        .ids_near(candidate.0, candidate.1, entity_index.unit_query_radius(candidate_body))
+        .any(|other_id| {
+            other_id != entity.id
+                && entities.get(other_id).is_some_and(|other| {
+                    other.hp > 0
+                        && other.is_unit()
+                        && unit_body_for_entity(other).is_some_and(|other_body| {
+                            unit_bodies_intersect(candidate_body, other_body)
+                        })
+                })
+        })
 }
 
 fn reset_entrenchment_dig(entity: &mut Entity) {
