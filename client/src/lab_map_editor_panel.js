@@ -8,9 +8,36 @@ import {
 } from "./lab_map_editor_session.js";
 
 const MAP_PANEL_STORAGE_KEY = "rts.labPanel.mapEditor.window.v1";
+const MAP_CATALOG_URL = "/maps/catalog";
+const FALLBACK_MAPS = Object.freeze([
+  {
+    file: "default-handcrafted.json",
+    name: "Default",
+    description: "Four-player three-base map with safer in-base naturals and contested naturals.",
+  },
+  {
+    file: "low-econ.json",
+    name: "Low Econ",
+    description: "Four-player map with one natural expansion per spawn.",
+  },
+  {
+    file: "no-terrain.json",
+    name: "No Terrain",
+    description: "All-grass map with the standard spawn layouts.",
+  },
+]);
 
 export class LabMapEditorPanel {
-  constructor({ root, session, labClient, match, startPayload, mapName = "Lab map", applyLabMapReset = null }) {
+  constructor({
+    root,
+    session,
+    labClient,
+    match,
+    startPayload,
+    mapName = "Lab map",
+    applyLabMapReset = null,
+    fetchImpl = globalThis.fetch?.bind(globalThis),
+  }) {
     this.root = root;
     this.session = session;
     this.labClient = labClient;
@@ -18,6 +45,7 @@ export class LabMapEditorPanel {
     this.startPayload = startPayload;
     this.mapName = mapName;
     this.applyLabMapReset = applyLabMapReset;
+    this.fetchImpl = fetchImpl;
     this.destroyed = false;
     this.selectedTerrain = TERRAIN.ROCK;
     this.selectedSiteKind = "main";
@@ -28,6 +56,12 @@ export class LabMapEditorPanel {
     this.lastStatusError = false;
     this.applyPending = false;
     this.applyQueued = false;
+    this.mapCatalog = FALLBACK_MAPS.slice();
+    this.mapCatalogError = "";
+    this.mapCatalogLoading = false;
+    this.mapCatalogRequest = null;
+    this.mapLoadPending = false;
+    this.selectedMapFile = this.mapCatalog[0]?.file || "";
 
     this.el = document.createElement("aside");
     this.el.className = "lab-panel lab-map-window";
@@ -44,6 +78,7 @@ export class LabMapEditorPanel {
     this.session.initializeFromStart(startPayload, { name: mapName });
     this.hydrateInitialMap();
     this.restoreDesiredTool();
+    void this.loadMapCatalog();
   }
 
   async hydrateInitialMap() {
@@ -67,6 +102,7 @@ export class LabMapEditorPanel {
       body.appendChild(readout("Loading current map…"));
     } else {
       body.append(
+        this.renderMapLoader(),
         this.renderHistory(),
         this.renderMetadata(),
         this.renderTerrainTools(),
@@ -77,6 +113,46 @@ export class LabMapEditorPanel {
       );
     }
     this.el.append(body, this.chrome.renderResizeHandle());
+  }
+
+  renderMapLoader() {
+    const fieldset = group("Load map");
+    const selected = this.mapCatalog.find((entry) => entry.file === this.selectedMapFile)
+      || this.mapCatalog[0]
+      || null;
+    const label = document.createElement("label");
+    label.className = "lab-field";
+    const text = document.createElement("span");
+    text.textContent = "Built-in map";
+    const select = document.createElement("select");
+    for (const entry of this.mapCatalog) {
+      const option = document.createElement("option");
+      option.value = entry.file;
+      option.textContent = entry.name;
+      option.title = entry.description;
+      select.appendChild(option);
+    }
+    select.value = selected?.file || "";
+    select.disabled = this.mapLoadPending;
+    select.addEventListener("change", () => {
+      this.selectedMapFile = select.value;
+      this.render();
+    });
+    label.append(text, select);
+    fieldset.append(
+      label,
+      button("Load selected map", () => {
+        this.selectedMapFile = select.value;
+        void this.loadCatalogMap(select.value);
+      }, { disabled: !selected || this.mapLoadPending || this.applyPending }),
+      button(this.mapCatalogLoading ? "Refreshing maps…" : "Refresh maps", () => {
+        void this.loadMapCatalog();
+      }, { disabled: this.mapCatalogLoading || this.mapLoadPending }),
+      readout(selected?.description || "No built-in maps are available."),
+      readout(`The selected ${this.labPlayerCount()}-player layout replaces this draft and is applied to the battle.`),
+    );
+    if (this.mapCatalogError) fieldset.appendChild(readout(this.mapCatalogError));
+    return fieldset;
   }
 
   renderHistory() {
@@ -162,16 +238,27 @@ export class LabMapEditorPanel {
   renderSlots() {
     const fieldset = group("Player slots");
     const draft = this.session.draft;
+    const playerCount = this.labPlayerCount();
+    const layouts = draft.layouts.filter((layout) => layout.slots.length === playerCount);
+    const layout = layouts.find((candidate) => candidate.id === this.session.selectedLayoutId) || null;
+    if (!layout) {
+      fieldset.appendChild(readout(`No ${playerCount}-player layout is available for this lab.`));
+      return fieldset;
+    }
+    fieldset.append(layoutSelectField("Playtest layout", layouts, layout.id, (layoutId) => {
+      if (this.session.selectLayout(layoutId)) void this.applyDraft();
+    }));
     const mainSites = draft.sites.filter((site) => site.kind === "main");
     const naturalSites = draft.sites.filter((site) => site.kind === "natural");
-    draft.layouts[0].slots.forEach((slot, index) => {
+    layout.slots.forEach((slot, index) => {
       const row = document.createElement("div");
       row.className = "lab-map-slot";
       const title = document.createElement("strong");
       title.textContent = `Player ${index + 1}`;
       const main = selectField("Main", mainSites, slot.main, false, (value) => {
         this.commitAndApply("Changed a player main", (next) => {
-          const slots = next.layouts[0].slots;
+          const slots = layoutSlots(next, layout.id);
+          if (!slots?.[index]) return;
           const previous = slots[index].main;
           const other = slots.findIndex((candidate, candidateIndex) => (
             candidateIndex !== index && candidate.main === value
@@ -182,9 +269,11 @@ export class LabMapEditorPanel {
       });
       const naturals = selectField("Naturals", naturalSites, slot.naturals, true, (values) => {
         this.commitAndApply("Changed player naturals", (next) => {
+          const slots = layoutSlots(next, layout.id);
+          if (!slots?.[index]) return;
           const selected = values.slice(0, 3);
-          next.layouts[0].slots[index].naturals = selected;
-          next.layouts[0].slots.forEach((candidate, candidateIndex) => {
+          slots[index].naturals = selected;
+          slots.forEach((candidate, candidateIndex) => {
             if (candidateIndex !== index) {
               candidate.naturals = candidate.naturals.filter((id) => !selected.includes(id));
             }
@@ -200,7 +289,7 @@ export class LabMapEditorPanel {
   renderSaveActions() {
     const fieldset = group("Save / export");
     fieldset.append(
-      button("Apply to battle", () => this.applyDraft(), { disabled: this.applyPending }),
+      button("Apply to battle", () => this.applyDraft(), { disabled: this.applyPending || this.mapLoadPending }),
       button("Save local draft", () => this.saveLocal()),
       button("Load local draft", () => this.loadLocal()),
       button("Export map JSON", () => this.exportJson()),
@@ -281,7 +370,11 @@ export class LabMapEditorPanel {
     if (!tile) return;
     let placedId = "";
     this.commitAndApply(`Placed ${this.selectedSiteKind} base`, (draft) => {
-      placedId = placeDraftSite(draft, { kind: event.tool.payload.siteKind, ...tile });
+      placedId = placeDraftSite(draft, {
+        kind: event.tool.payload.siteKind,
+        ...tile,
+        layoutId: this.session.selectedLayoutId,
+      });
       protectDraftBaseTerrain(draft);
     });
     this.selectedSiteId = placedId;
@@ -346,6 +439,69 @@ export class LabMapEditorPanel {
     return result;
   }
 
+  loadMapCatalog() {
+    if (this.mapCatalogRequest) return this.mapCatalogRequest;
+    if (!this.fetchImpl) {
+      this.mapCatalogError = "Map catalog unavailable; standard maps are still available.";
+      this.render();
+      return Promise.resolve(false);
+    }
+    this.mapCatalogLoading = true;
+    this.mapCatalogError = "";
+    this.render();
+    this.mapCatalogRequest = (async () => {
+      try {
+        const response = await this.fetchImpl(MAP_CATALOG_URL, { cache: "no-store" });
+        if (!response?.ok) throw new Error(`HTTP ${response?.status || "network"}`);
+        const data = await response.json();
+        const catalog = normalizeMapCatalog(data?.maps);
+        if (catalog.length === 0) throw new Error("no compatible maps");
+        this.mapCatalog = catalog;
+        if (!catalog.some((entry) => entry.file === this.selectedMapFile)) {
+          this.selectedMapFile = catalog[0].file;
+        }
+        return true;
+      } catch (_) {
+        this.mapCatalogError = "Map catalog unavailable; standard maps are still available.";
+        return false;
+      } finally {
+        this.mapCatalogLoading = false;
+        this.mapCatalogRequest = null;
+        this.render();
+      }
+    })();
+    return this.mapCatalogRequest;
+  }
+
+  async loadCatalogMap(file) {
+    if (this.mapLoadPending) return false;
+    const entry = this.mapCatalog.find((candidate) => candidate.file === file);
+    if (!entry || !this.fetchImpl) {
+      this.setStatus("That built-in map is unavailable.", true);
+      return false;
+    }
+    this.mapLoadPending = true;
+    this.setStatus(`Loading ${entry.name}…`);
+    try {
+      const response = await this.fetchImpl(`/maps/${encodeURIComponent(entry.file)}`, { cache: "no-store" });
+      if (!response?.ok) throw new Error(`HTTP ${response?.status || "network"}`);
+      const map = await response.json();
+      this.session.loadAuthoredMap(map, {
+        expectedSize: this.mapSize(),
+        playerCount: this.labPlayerCount(),
+      });
+      this.selectedSiteId = "";
+      const result = await this.applyDraft();
+      return result?.ok === true;
+    } catch (error) {
+      this.setStatus(`Map load failed: ${error.message || String(error)}`, true);
+      return false;
+    } finally {
+      this.mapLoadPending = false;
+      this.render();
+    }
+  }
+
   undo() {
     if (!this.session.undo()) return;
     void this.applyDraft();
@@ -387,6 +543,16 @@ export class LabMapEditorPanel {
 
   mapStorageKey() {
     return this.startPayload?.lab?.room || this.mapName || "default";
+  }
+
+  mapSize() {
+    const size = Number(this.startPayload?.map?.width);
+    return Number.isInteger(size) && size > 0 ? size : null;
+  }
+
+  labPlayerCount() {
+    const players = this.startPayload?.players;
+    return Array.isArray(players) && players.length > 0 ? players.length : 0;
   }
 
   handleKeyDown(event) {
@@ -493,6 +659,25 @@ function textField(labelText, value, onChange) {
   return label;
 }
 
+function layoutSelectField(labelText, layouts, selected, onChange) {
+  const label = document.createElement("label");
+  label.className = "lab-field";
+  const text = document.createElement("span");
+  text.textContent = labelText;
+  const select = document.createElement("select");
+  for (const layout of layouts) {
+    const option = document.createElement("option");
+    option.value = layout.id;
+    option.textContent = `${layout.id} (${layout.slots.length} players)`;
+    option.selected = layout.id === selected;
+    select.appendChild(option);
+  }
+  select.value = selected;
+  select.addEventListener("change", () => onChange(select.value));
+  label.append(text, select);
+  return label;
+}
+
 function selectField(labelText, sites, selected, multiple, onChange) {
   const label = document.createElement("label");
   label.className = "lab-field";
@@ -521,6 +706,27 @@ function selectField(labelText, sites, selected, multiple, onChange) {
   });
   label.append(text, select);
   return label;
+}
+
+function layoutSlots(draft, layoutId) {
+  return draft.layouts?.find((layout) => layout.id === layoutId)?.slots || null;
+}
+
+function normalizeMapCatalog(entries) {
+  if (!Array.isArray(entries)) return [];
+  const files = new Set();
+  return entries.flatMap((entry) => {
+    const file = String(entry?.file || "").trim();
+    if (!safeMapFile(file) || files.has(file)) return [];
+    files.add(file);
+    const name = String(entry?.name || file.replace(/\.json$/i, "")).trim() || file;
+    const description = String(entry?.description || name).trim() || name;
+    return [{ file, name, description }];
+  });
+}
+
+function safeMapFile(file) {
+  return /^[a-z0-9][a-z0-9._-]*\.json$/i.test(file) && !file.includes("..");
 }
 
 function readout(text) {
