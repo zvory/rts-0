@@ -7,9 +7,12 @@ import { GameState } from "../../client/src/state.js";
 import { LabMapEditorPanel } from "../../client/src/lab_map_editor_panel.js";
 import {
   LAB_MAP_HISTORY_LIMIT,
+  LAB_MAP_MAX_NATURALS_PER_PLAYER,
   LabMapEditorSession,
+  addDraftPlayerNatural,
+  moveDraftPlayerNatural,
+  moveDraftPlayerStart,
   paintDraftRect,
-  placeDraftSite,
   protectDraftBaseTerrain,
 } from "../../client/src/lab_map_editor_session.js";
 import { findFakes, withFakeDocument } from "./fakes.mjs";
@@ -66,11 +69,13 @@ const noTerrainMap = JSON.parse(
   const session = new LabMapEditorSession({ storage: null });
   assert.equal(session.initializeFromStart(startPayload(), { name: "POC" }), true);
   assert.equal(session.materialized().starts.length, 2);
+  assert.equal(session.hasUnappliedChanges, false, "the initial Lab map is the current test baseline");
 
   session.mutate("paint", (draft) => {
     paintDraftRect(draft, { x0: 0, y0: 0, x1: 0, y1: 0 }, TERRAIN.WATER);
     protectDraftBaseTerrain(draft);
   });
+  assert.equal(session.hasUnappliedChanges, true, "draft edits do not silently change the current test");
   assert.equal(session.materialized().terrain[0], TERRAIN.WATER);
   assert.equal(session.undo(), true);
   assert.equal(session.materialized().terrain[0], TERRAIN.GRASS);
@@ -90,6 +95,40 @@ const noTerrainMap = JSON.parse(
   const exported = session.exportMap();
   assert.equal(exported.terrain[8][12], "#");
   assert.equal(exported.name, session.draft.name);
+  session.markCurrentDraftAsTested();
+  assert.equal(session.hasUnappliedChanges, false, "only an explicit test restart accepts the draft baseline");
+}
+
+{
+  const session = new LabMapEditorSession({ storage: null });
+  session.initializeFromStart(startPayload());
+  session.mutate("move Player 1", (draft) => {
+    const result = moveDraftPlayerStart(draft, 0, { x: 12, y: 11 });
+    assert.equal(result.ok, true);
+    protectDraftBaseTerrain(draft);
+  });
+  session.mutate("add Player 1 natural", (draft) => {
+    const result = addDraftPlayerNatural(draft, 0, { x: 16, y: 16 });
+    assert.equal(result.ok, true);
+    protectDraftBaseTerrain(draft);
+  });
+  const firstNatural = session.playerSlots()[0].naturals[0];
+  session.mutate("move Player 1 natural", (draft) => {
+    const result = moveDraftPlayerNatural(draft, 0, firstNatural.id, { x: 17, y: 16 });
+    assert.equal(result.ok, true);
+  });
+  const playerOne = session.playerSlots()[0];
+  assert.deepEqual(playerOne.start, { id: "main-1", kind: "main", x: 12, y: 11 });
+  assert.deepEqual(playerOne.naturals, [{ id: firstNatural.id, kind: "natural", x: 17, y: 16 }]);
+  assert.deepEqual(session.mapOverlay(), {
+    players: [
+      { playerIndex: 0, start: { x: 12, y: 11 }, naturals: [{ x: 17, y: 16 }] },
+      { playerIndex: 1, start: { x: 23, y: 23 }, naturals: [] },
+    ],
+  });
+  const overlap = addDraftPlayerNatural(session.draft, 0, { x: 12, y: 11 });
+  assert.equal(overlap.ok, false, "a player cannot accidentally place a natural on a start");
+  assert.equal(session.playerSlots()[0].naturals.length <= LAB_MAP_MAX_NATURALS_PER_PLAYER, true);
 }
 
 {
@@ -118,16 +157,22 @@ const noTerrainMap = JSON.parse(
   );
 }
 
-withFakeDocument(() => {
+await withFakeDocument(async () => {
   const root = document.createElement("div");
   const session = new LabMapEditorSession({ storage: null });
   const armed = [];
+  const overlays = [];
+  const terrainPreviews = [];
+  const appliedDrafts = [];
   const panel = new LabMapEditorPanel({
     root,
     session,
     labClient: {
       exportScenario: async () => ({ ok: false }),
-      applyMapDraft: async () => ({ ok: true, outcome: { battleReset: false } }),
+      applyMapDraft: async (draft) => {
+        appliedDrafts.push(draft);
+        return { ok: true, outcome: { battleReset: true } };
+      },
     },
     match: {
       armLabTool(tool, callbacks) {
@@ -137,6 +182,14 @@ withFakeDocument(() => {
     },
     startPayload: startPayload(),
     applyLabMapReset: () => true,
+    setLabMapDraftOverlay: (overlay) => {
+      overlays.push(overlay);
+      return overlay;
+    },
+    setLabMapDraftTerrainPreview: (draft) => {
+      terrainPreviews.push(draft);
+      return draft;
+    },
     fetchImpl: null,
   });
   const terrainGroup = findFakes(panel.el, (el) => (
@@ -161,7 +214,36 @@ withFakeDocument(() => {
 
   panel.paintWorldClick({ x: 4, y: 4, tool: { payload: { terrain: TERRAIN.WATER } } });
   assert.equal(session.materialized().terrain[0], TERRAIN.WATER, "terrain paint changes exactly the clicked tile");
+  assert.equal(appliedDrafts.length, 0, "painting changes only the draft, not the current Lab test");
+  assert.equal(session.hasUnappliedChanges, true);
+  assert.equal(
+    terrainPreviews.at(-1)?.terrain?.[0],
+    TERRAIN.WATER,
+    "painting redraws a local draft terrain preview without mutating the Lab test",
+  );
+  assert(overlays.some((overlay) => overlay?.players?.length === 2), "the authored player markers are published to the map overlay");
+
+  const playerSetup = findFakes(panel.el, (el) => (
+    el.tagName === "FIELDSET" && textWithin(el).includes("Player starts and natural bases")
+  ))[0];
+  assert(playerSetup, "the editor presents player-owned starts and naturals rather than raw site slots");
+  assert.equal(
+    findFakes(playerSetup, (el) => el.tagName === "SELECT").length,
+    0,
+    "base setup does not ask authors to connect anonymous site ids through select boxes",
+  );
+  const moveStart = findFakes(playerSetup, (el) => el.tagName === "BUTTON" && el.textContent === "Move Player 1 start")[0];
+  moveStart.listeners.click();
+  assert.equal(armed.at(-1).tool.kind, "editMapPlayerStart");
+  armed.at(-1).callbacks.onWorldClick({ x: 12 * 32, y: 11 * 32, tool: armed.at(-1).tool });
+  assert.deepEqual(session.playerSlots()[0].start, { id: "main-1", kind: "main", x: 12, y: 11 });
+  assert.equal(appliedDrafts.length, 0, "moving a start remains draft-only until the explicit test action");
+
+  await panel.restartTestWithDraft();
+  assert.equal(appliedDrafts.length, 1, "Restart test with this draft is the only map-to-test transition");
+  assert.equal(session.hasUnappliedChanges, false);
   panel.destroy();
+  assert.equal(terrainPreviews.at(-1), null, "closing the editor restores authoritative terrain rendering");
 });
 
 await withFakeDocument(async () => {
@@ -212,7 +294,11 @@ await withFakeDocument(async () => {
   assert.equal(session.draft.name, "No Terrain");
   assert.equal(session.selectedLayoutId, "duel");
   assert.equal(session.exportMap().layouts.length, 2, "catalog loads keep non-active authored layouts");
+  assert.equal(applied.length, 0, "loading a built-in map changes only the draft");
+  assert.equal(session.hasUnappliedChanges, true);
+  await panel.restartTestWithDraft();
   assert.deepEqual(applied[0].starts, [{ x: 8, y: 8 }, { x: 23, y: 23 }]);
+  assert.equal(session.hasUnappliedChanges, false);
   panel.destroy();
 });
 
@@ -280,8 +366,8 @@ await withFakeDocument(async () => {
   const session = new LabMapEditorSession({ storage: null });
   session.initializeFromStart(startPayload());
   session.mutate("natural", (draft) => {
-    const id = placeDraftSite(draft, { kind: "natural", x: 16, y: 16 });
-    draft.layouts[0].slots[0].naturals = [id];
+    const result = addDraftPlayerNatural(draft, 0, { x: 16, y: 16 });
+    assert.equal(result.ok, true);
     protectDraftBaseTerrain(draft);
   });
   const materialized = session.materialized();

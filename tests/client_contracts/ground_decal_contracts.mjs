@@ -1,5 +1,5 @@
 // tests/client_contracts/ground_decal_contracts.mjs
-// Ground decal model and renderer contracts for client-only visible deaths.
+// Ground decal model and renderer contracts for client-only visible deaths and impacts.
 
 import { assert, assertApprox } from "./assertions.mjs";
 import { GameState } from "../../client/src/state.js";
@@ -7,6 +7,7 @@ import {
   GROUND_DECAL_CLASS,
   GroundDecalBuffer,
   groundDecalClassForKind,
+  groundDecalClassForImpactEvent,
   normalizeGroundDecalEvent,
 } from "../../client/src/state_ground_decals.js";
 import { stampGroundDecal } from "../../client/src/renderer/decals.js";
@@ -29,6 +30,15 @@ assert(groundDecalClassForKind(KIND.ANTI_TANK_GUN) === GROUND_DECAL_CLASS.SCORCH
 assert(groundDecalClassForKind(KIND.STEEL) === GROUND_DECAL_CLASS.NONE, "resources leave no decals");
 assert(groundDecalClassForKind(KIND.CITY_CENTRE) === GROUND_DECAL_CLASS.BUILDING_SCORCH, "buildings leave footprint scorch decals");
 assert(groundDecalClassForKind(KIND.TANK_TRAP) === GROUND_DECAL_CLASS.BUILDING_SCORCH, "small buildings leave footprint scorch decals");
+assert(
+  groundDecalClassForImpactEvent(EVENT.MORTAR_IMPACT) === GROUND_DECAL_CLASS.MORTAR_BLAST,
+  "mortar impacts use the mortar starburst decal",
+);
+assert(
+  groundDecalClassForImpactEvent(EVENT.ARTILLERY_IMPACT) === GROUND_DECAL_CLASS.ARTILLERY_BLAST,
+  "artillery impacts use the artillery starburst decal",
+);
+assert(groundDecalClassForImpactEvent(EVENT.ATTACK) === GROUND_DECAL_CLASS.NONE, "ordinary attacks leave no blast decal");
 
 {
   const prevById = new Map([
@@ -95,6 +105,30 @@ assert(groundDecalClassForKind(KIND.TANK_TRAP) === GROUND_DECAL_CLASS.BUILDING_S
 }
 
 {
+  const mortar = normalizeGroundDecalEvent(
+    { e: EVENT.MORTAR_IMPACT, x: 160, y: 224, radiusTiles: 1.5 },
+    { tick: 42, eventIndex: 3, tileSize: 40 },
+  );
+  const artillery = normalizeGroundDecalEvent(
+    { e: EVENT.ARTILLERY_IMPACT, x: 288, y: 192, radiusTiles: 3 },
+    { tick: 42, eventIndex: 4, tileSize: 40 },
+  );
+  assert(mortar.decalClass === GROUND_DECAL_CLASS.MORTAR_BLAST, "mortar impact normalizes to a mortar decal");
+  assert(mortar.kind === KIND.MORTAR_TEAM, "mortar impact uses only its public event type for artwork selection");
+  assert(mortar.radiusWorld === 60, "mortar impact converts its authoritative radius with the map tile size");
+  assert(artillery.decalClass === GROUND_DECAL_CLASS.ARTILLERY_BLAST, "artillery impact normalizes to an artillery decal");
+  assert(artillery.kind === KIND.ARTILLERY, "artillery impact uses only its public event type for artwork selection");
+  assert(artillery.radiusWorld === 120, "artillery impact converts its authoritative radius with the map tile size");
+  assert(
+    mortar.seed === normalizeGroundDecalEvent(
+      { e: EVENT.MORTAR_IMPACT, x: 160, y: 224, radiusTiles: 1.5 },
+      { tick: 42, eventIndex: 3, tileSize: 40 },
+    ).seed,
+    "impact seed stays deterministic for the received event",
+  );
+}
+
+{
   const buffer = new GroundDecalBuffer();
   const events = [
     { e: EVENT.DEATH, id: 30, x: 80, y: 80, kind: KIND.WORKER },
@@ -108,6 +142,21 @@ assert(groundDecalClassForKind(KIND.TANK_TRAP) === GROUND_DECAL_CLASS.BUILDING_S
   assert(buffer.consumePending().length === 0, "ground decal buffer consume is one-shot");
   buffer.applySnapshotEvents([events[0]], { players: start.players, tick: 2 });
   assert(buffer.consumePending().length === 0, "painted death ids remain deduped after queue consumption");
+}
+
+{
+  const buffer = new GroundDecalBuffer();
+  const events = [
+    { e: EVENT.MORTAR_IMPACT, x: 128, y: 96, radiusTiles: 1.5 },
+    { e: EVENT.ARTILLERY_IMPACT, x: 256, y: 192, radiusTiles: 3 },
+  ];
+  const queued = buffer.applySnapshotEvents(events, { tick: 77, tileSize: 32 });
+  assert(queued === 2, "ground decal buffer queues both received blast impacts");
+  const decals = buffer.consumePending();
+  assert(decals[0].decalClass === GROUND_DECAL_CLASS.MORTAR_BLAST, "mortar impact preserves its decal type");
+  assert(decals[1].decalClass === GROUND_DECAL_CLASS.ARTILLERY_BLAST, "artillery impact preserves its decal type");
+  buffer.applySnapshotEvents(events, { tick: 77, tileSize: 32 });
+  assert(buffer.consumePending().length === 0, "replayed snapshot impact events do not stamp twice");
 }
 
 {
@@ -170,4 +219,44 @@ assert(groundDecalClassForKind(KIND.TANK_TRAP) === GROUND_DECAL_CLASS.BUILDING_S
   assert(decals.length === 1, "GameState queues received building death decals");
   assert(decals[0].footprintWidth === 96 && decals[0].footprintHeight === 64,
     "GameState supplies the map tile size for building-sized scorch decals");
+}
+
+{
+  const state = new GameState(start);
+  state.applySnapshot({
+    tick: 1,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 0,
+    supplyCap: 10,
+    entities: [],
+    events: [],
+  });
+  const impacts = [
+    { e: EVENT.MORTAR_IMPACT, x: 64, y: 96, radiusTiles: 1.5 },
+    { e: EVENT.ARTILLERY_IMPACT, x: 128, y: 128, radiusTiles: 3 },
+  ];
+  state.applySnapshot({
+    tick: 2,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 0,
+    supplyCap: 10,
+    entities: [],
+    events: impacts,
+  });
+  const decals = state.consumePendingGroundDecals();
+  assert(decals.length === 2, "GameState queues only the fog-filtered impact events it received");
+  assert(decals[0].radiusWorld === 48, "GameState supplies its map tile size to mortar decal normalization");
+  assert(decals[1].radiusWorld === 96, "GameState supplies its map tile size to artillery decal normalization");
+  state.applySnapshot({
+    tick: 2,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 0,
+    supplyCap: 10,
+    entities: [],
+    events: impacts,
+  });
+  assert(state.consumePendingGroundDecals().length === 0, "GameState does not stamp duplicate impact snapshot events twice");
 }

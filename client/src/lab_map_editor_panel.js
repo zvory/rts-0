@@ -1,10 +1,14 @@
+import { PLAYER_PALETTE } from "./config.js";
 import { TERRAIN } from "./protocol.js";
 import { LabPanelWindowChrome } from "./lab_panel_window.js";
 import {
+  LAB_MAP_MAX_NATURALS_PER_PLAYER,
+  addDraftPlayerNatural,
+  moveDraftPlayerNatural,
+  moveDraftPlayerStart,
   paintDraftRect,
-  placeDraftSite,
   protectDraftBaseTerrain,
-  removeDraftSite,
+  removeDraftPlayerNatural,
 } from "./lab_map_editor_session.js";
 
 const MAP_PANEL_STORAGE_KEY = "rts.labPanel.mapEditor.window.v1";
@@ -36,6 +40,8 @@ export class LabMapEditorPanel {
     startPayload,
     mapName = "Lab map",
     applyLabMapReset = null,
+    setLabMapDraftOverlay = null,
+    setLabMapDraftTerrainPreview = null,
     fetchImpl = globalThis.fetch?.bind(globalThis),
   }) {
     this.root = root;
@@ -45,17 +51,18 @@ export class LabMapEditorPanel {
     this.startPayload = startPayload;
     this.mapName = mapName;
     this.applyLabMapReset = applyLabMapReset;
+    this.setLabMapDraftOverlay = setLabMapDraftOverlay;
+    this.setLabMapDraftTerrainPreview = setLabMapDraftTerrainPreview;
     this.fetchImpl = fetchImpl;
     this.destroyed = false;
     this.selectedTerrain = TERRAIN.ROCK;
-    this.selectedSiteKind = "main";
-    this.selectedSiteId = "";
+    this.selectedPlayerIndex = 0;
     this.lastStatus = session.lastAction
-      ? `${session.lastAction} applied to the live map.`
-      : "Edit live terrain or bases; changing the base layout resets the battle.";
+      ? `${session.lastAction}. Restart the test when you are ready to try this draft.`
+      : "Edit a map draft here. The current Lab test will not change until you restart it with this draft.";
     this.lastStatusError = false;
     this.applyPending = false;
-    this.applyQueued = false;
+    this.terrainPreviewSignature = null;
     this.mapCatalog = FALLBACK_MAPS.slice();
     this.mapCatalogError = "";
     this.mapCatalogLoading = false;
@@ -74,8 +81,13 @@ export class LabMapEditorPanel {
 
     this.onKeyDown = (event) => this.handleKeyDown(event);
     globalThis.window?.addEventListener?.("keydown", this.onKeyDown);
-    this.unsubscribe = this.session.subscribe(() => this.render());
+    this.unsubscribe = this.session.subscribe(() => {
+      this.syncDraftOverlay();
+      this.syncDraftTerrainPreview();
+      this.render();
+    });
     this.session.initializeFromStart(startPayload, { name: mapName });
+    this.ensureCompatibleLayout();
     this.hydrateInitialMap();
     this.restoreDesiredTool();
     void this.loadMapCatalog();
@@ -87,7 +99,8 @@ export class LabMapEditorPanel {
     if (this.destroyed || !result?.ok || !result?.outcome?.scenario) return;
     if (this.session.undoStack.length > 0 || this.session.lastAction) return;
     if (this.session.initializeFromScenario(result.outcome.scenario, { force: true })) {
-      this.lastStatus = "Loaded terrain and expansion sites from the live map.";
+      this.ensureCompatibleLayout();
+      this.lastStatus = "Loaded the current Lab map as a draft.";
       this.render();
     }
   }
@@ -106,9 +119,8 @@ export class LabMapEditorPanel {
         this.renderHistory(),
         this.renderMetadata(),
         this.renderTerrainTools(),
-        this.renderBaseTools(),
-        this.renderSlots(),
-        this.renderSaveActions(),
+        this.renderPlayerSetup(),
+        this.renderDraftActions(),
         this.renderStatus(),
       );
     }
@@ -149,7 +161,7 @@ export class LabMapEditorPanel {
         void this.loadMapCatalog();
       }, { disabled: this.mapCatalogLoading || this.mapLoadPending }),
       readout(selected?.description || "No built-in maps are available."),
-      readout(`The selected ${this.labPlayerCount()}-player layout replaces this draft and is applied to the battle.`),
+      readout(`Loading a built-in map replaces only this draft. Its ${this.labPlayerCount()}-player layout will be selected; restart the test to use it.`),
     );
     if (this.mapCatalogError) fieldset.appendChild(readout(this.mapCatalogError));
     return fieldset;
@@ -201,97 +213,95 @@ export class LabMapEditorPanel {
     return fieldset;
   }
 
-  renderBaseTools() {
-    const fieldset = group("Base sites");
-    const palette = document.createElement("div");
-    palette.className = "lab-map-palette";
-    for (const kind of ["main", "natural"]) {
-      palette.appendChild(button(kind === "main" ? "Main" : "Natural", () => {
-        this.selectedSiteKind = kind;
-        this.armBaseTool();
-      }, { active: this.selectedSiteKind === kind && this.desiredToolKind() === "base" }));
+  renderPlayerSetup() {
+    const fieldset = group("Player starts and natural bases");
+    const layouts = this.compatibleLayouts();
+    const layout = layouts.find((candidate) => candidate.id === this.session.selectedLayoutId) || null;
+    if (!layout) {
+      fieldset.appendChild(readout(`No ${this.labPlayerCount()}-player layout is available for this Lab test.`));
+      return fieldset;
     }
-    const sites = document.createElement("div");
-    sites.className = "lab-map-site-list";
-    for (const site of this.session.draft.sites) {
-      const row = document.createElement("button");
-      row.type = "button";
-      row.className = "lab-map-site";
-      row.dataset.active = site.id === this.selectedSiteId ? "true" : "false";
-      row.textContent = `${site.id} · ${site.kind} · ${site.x},${site.y}`;
-      row.addEventListener("click", () => {
-        this.selectedSiteId = site.id;
-        this.selectedSiteKind = site.kind;
-        this.render();
-      });
-      sites.appendChild(row);
+    if (layouts.length > 1) {
+      fieldset.append(layoutSelectField("Test layout", layouts, layout.id, (layoutId) => {
+        if (!this.session.selectLayout(layoutId)) return;
+        this.selectedPlayerIndex = 0;
+        this.setStatus(`Selected ${layoutId} for the draft. The test has not changed.`);
+      }));
+    }
+    const players = this.session.playerSlots();
+    if (!players.length) {
+      fieldset.appendChild(readout("The selected layout does not yet contain player slots."));
+      return fieldset;
+    }
+    this.selectedPlayerIndex = Math.max(0, Math.min(players.length - 1, this.selectedPlayerIndex));
+    const selected = players[this.selectedPlayerIndex];
+    const playerPicker = document.createElement("div");
+    playerPicker.className = "lab-map-player-picker";
+    for (const player of players) {
+      const start = player.start ? `${player.start.x}, ${player.start.y}` : "not placed";
+      const pick = button(
+        `Player ${player.playerIndex + 1} · start ${start} · ${player.naturals.length} natural${player.naturals.length === 1 ? "" : "s"}`,
+        () => {
+          this.selectedPlayerIndex = player.playerIndex;
+          this.render();
+        },
+        { active: player.playerIndex === this.selectedPlayerIndex },
+      );
+      pick.dataset.playerIndex = String(player.playerIndex);
+      pick.style.setProperty(
+        "--lab-map-player-color",
+        PLAYER_PALETTE[player.playerIndex % PLAYER_PALETTE.length] || "#9aa0a8",
+      );
+      playerPicker.appendChild(pick);
+    }
+    const playerNumber = selected.playerIndex + 1;
+    const startText = selected.start
+      ? `Start: ${selected.start.x}, ${selected.start.y}`
+      : "Start: not placed";
+    const naturals = document.createElement("div");
+    naturals.className = "lab-map-natural-list";
+    for (const [index, natural] of selected.naturals.entries()) {
+      const row = document.createElement("div");
+      row.className = "lab-map-natural";
+      const naturalLabel = document.createElement("span");
+      naturalLabel.textContent = `Natural ${index + 1}: ${natural.x}, ${natural.y}`;
+      row.append(
+        naturalLabel,
+        button("Move", () => this.armPlayerNaturalTool(natural.id)),
+        button("Remove", () => this.removePlayerNatural(natural.id)),
+      );
+      naturals.appendChild(row);
     }
     fieldset.append(
-      palette,
-      button("Arm base tool", () => this.armBaseTool(), { active: this.desiredToolKind() === "base" }),
-      button("Remove selected", () => this.removeSelectedSite(), { disabled: !this.selectedSiteId }),
-      sites,
+      playerPicker,
+      readout(`Player ${playerNumber} ${startText}. Click a map tool, then click the map. Coloured markers show this draft on the map.`),
+      button(`Move Player ${playerNumber} start`, () => this.armPlayerStartTool(), {
+        active: this.desiredToolKind() === "start" && this.session.desiredTool?.playerIndex === selected.playerIndex,
+      }),
+      button(`Add natural for Player ${playerNumber}`, () => this.armPlayerNaturalTool(), {
+        active: this.desiredToolKind() === "natural" && this.session.desiredTool?.playerIndex === selected.playerIndex && !this.session.desiredTool?.naturalId,
+        disabled: selected.naturals.length >= LAB_MAP_MAX_NATURALS_PER_PLAYER,
+      }),
+      naturals,
+      readout(`Each player can have up to ${LAB_MAP_MAX_NATURALS_PER_PLAYER} natural bases. Starts and natural bases are part of the draft, not live units.`),
     );
     return fieldset;
   }
 
-  renderSlots() {
-    const fieldset = group("Player slots");
-    const draft = this.session.draft;
-    const playerCount = this.labPlayerCount();
-    const layouts = draft.layouts.filter((layout) => layout.slots.length === playerCount);
-    const layout = layouts.find((candidate) => candidate.id === this.session.selectedLayoutId) || null;
-    if (!layout) {
-      fieldset.appendChild(readout(`No ${playerCount}-player layout is available for this lab.`));
-      return fieldset;
-    }
-    fieldset.append(layoutSelectField("Playtest layout", layouts, layout.id, (layoutId) => {
-      if (this.session.selectLayout(layoutId)) void this.applyDraft();
-    }));
-    const mainSites = draft.sites.filter((site) => site.kind === "main");
-    const naturalSites = draft.sites.filter((site) => site.kind === "natural");
-    layout.slots.forEach((slot, index) => {
-      const row = document.createElement("div");
-      row.className = "lab-map-slot";
-      const title = document.createElement("strong");
-      title.textContent = `Player ${index + 1}`;
-      const main = selectField("Main", mainSites, slot.main, false, (value) => {
-        this.commitAndApply("Changed a player main", (next) => {
-          const slots = layoutSlots(next, layout.id);
-          if (!slots?.[index]) return;
-          const previous = slots[index].main;
-          const other = slots.findIndex((candidate, candidateIndex) => (
-            candidateIndex !== index && candidate.main === value
-          ));
-          slots[index].main = value;
-          if (other >= 0) slots[other].main = previous;
-        });
-      });
-      const naturals = selectField("Naturals", naturalSites, slot.naturals, true, (values) => {
-        this.commitAndApply("Changed player naturals", (next) => {
-          const slots = layoutSlots(next, layout.id);
-          if (!slots?.[index]) return;
-          const selected = values.slice(0, 3);
-          slots[index].naturals = selected;
-          slots.forEach((candidate, candidateIndex) => {
-            if (candidateIndex !== index) {
-              candidate.naturals = candidate.naturals.filter((id) => !selected.includes(id));
-            }
-          });
-        });
-      });
-      row.append(title, main, naturals);
-      fieldset.appendChild(row);
-    });
-    return fieldset;
-  }
-
-  renderSaveActions() {
-    const fieldset = group("Save / export");
+  renderDraftActions() {
+    const fieldset = group("Draft and test");
+    const pending = this.session.hasUnappliedChanges;
     fieldset.append(
-      button("Apply to battle", () => this.applyDraft(), { disabled: this.applyPending || this.mapLoadPending }),
-      button("Save local draft", () => this.saveLocal()),
-      button("Load local draft", () => this.loadLocal()),
+      readout(pending
+        ? "This draft has changes that are not in the current Lab test."
+        : "This draft matches the current Lab test."),
+      button("Restart test with this draft", () => this.restartTestWithDraft(), {
+        disabled: this.applyPending || this.mapLoadPending,
+        title: "Replace the current Lab test with a fresh test using this map draft",
+      }),
+      readout("Restarting the test clears its current units, orders, resources, and elapsed time."),
+      button("Save draft on this device", () => this.saveLocal()),
+      button("Load saved draft", () => this.loadLocal()),
       button("Export map JSON", () => this.exportJson()),
     );
     return fieldset;
@@ -319,14 +329,25 @@ export class LabMapEditorPanel {
     });
   }
 
-  armBaseTool() {
-    this.session.setDesiredTool({ kind: "base", siteKind: this.selectedSiteKind });
+  armPlayerStartTool() {
+    const playerIndex = this.selectedPlayerIndex;
+    this.session.setDesiredTool({ kind: "start", playerIndex });
     return this.match?.armLabTool?.({
-      kind: "editMapBase",
-      label: `Place ${this.selectedSiteKind} base`,
-      payload: { siteKind: this.selectedSiteKind },
-      keepArmedOnWorldClick: true,
-    }, { onWorldClick: (event) => this.placeBase(event) });
+      kind: "editMapPlayerStart",
+      label: `Move Player ${playerIndex + 1} start`,
+      payload: { playerIndex },
+    }, { onWorldClick: (event) => this.placePlayerStart(event) });
+  }
+
+  armPlayerNaturalTool(naturalId = "") {
+    const playerIndex = this.selectedPlayerIndex;
+    this.session.setDesiredTool({ kind: "natural", playerIndex, naturalId });
+    const moving = !!naturalId;
+    return this.match?.armLabTool?.({
+      kind: "editMapPlayerNatural",
+      label: moving ? `Move Player ${playerIndex + 1} natural base` : `Add natural for Player ${playerIndex + 1}`,
+      payload: { playerIndex, naturalId },
+    }, { onWorldClick: (event) => this.placePlayerNatural(event) });
   }
 
   restoreDesiredTool() {
@@ -335,9 +356,12 @@ export class LabMapEditorPanel {
     if (desired.kind === "terrain") {
       this.selectedTerrain = desired.terrain;
       this.armTerrainTool();
-    } else if (desired.kind === "base") {
-      this.selectedSiteKind = desired.siteKind;
-      this.armBaseTool();
+    } else if (desired.kind === "start") {
+      this.selectedPlayerIndex = desired.playerIndex;
+      this.armPlayerStartTool();
+    } else if (desired.kind === "natural") {
+      this.selectedPlayerIndex = desired.playerIndex;
+      this.armPlayerNaturalTool(desired.naturalId);
     }
   }
 
@@ -348,7 +372,7 @@ export class LabMapEditorPanel {
   paintWorldClick(event) {
     const tile = this.worldTile(event?.x, event?.y);
     if (!tile) return;
-    this.commitAndApply("Painted terrain tile", (draft) => {
+    this.commitDraft("Painted terrain tile", (draft) => {
       paintDraftRect(draft, {
         x0: tile.x,
         y0: tile.y,
@@ -359,57 +383,68 @@ export class LabMapEditorPanel {
     });
   }
 
-  placeBase(event) {
-    const clicked = this.worldTile(event?.x, event?.y);
-    const size = this.session.draft?.terrain?.length || 0;
-    const radius = event?.tool?.payload?.siteKind === "natural" ? 0 : 3;
-    const tile = clicked && size > radius * 2 ? {
-      x: Math.max(radius, Math.min(size - radius - 1, clicked.x)),
-      y: Math.max(radius, Math.min(size - radius - 1, clicked.y)),
-    } : null;
+  placePlayerStart(event) {
+    const tile = this.worldTile(event?.x, event?.y, { start: true });
     if (!tile) return;
-    let placedId = "";
-    this.commitAndApply(`Placed ${this.selectedSiteKind} base`, (draft) => {
-      placedId = placeDraftSite(draft, {
-        kind: event.tool.payload.siteKind,
-        ...tile,
-        layoutId: this.session.selectedLayoutId,
-      });
-      protectDraftBaseTerrain(draft);
+    const playerIndex = Number(event?.tool?.payload?.playerIndex);
+    this.commitDraft(`Moved Player ${playerIndex + 1} start`, (draft) => {
+      const result = moveDraftPlayerStart(draft, playerIndex, tile, this.session.selectedLayoutId);
+      if (result.ok) protectDraftBaseTerrain(draft);
+      return result;
     });
-    this.selectedSiteId = placedId;
   }
 
-  removeSelectedSite() {
-    const id = this.selectedSiteId;
-    if (!id) return;
-    this.selectedSiteId = "";
-    this.commitAndApply("Removed base site", (draft) => removeDraftSite(draft, id));
+  placePlayerNatural(event) {
+    const tile = this.worldTile(event?.x, event?.y);
+    if (!tile) return;
+    const playerIndex = Number(event?.tool?.payload?.playerIndex);
+    const naturalId = String(event?.tool?.payload?.naturalId || "");
+    this.commitDraft(
+      naturalId ? `Moved Player ${playerIndex + 1} natural base` : `Added natural for Player ${playerIndex + 1}`,
+      (draft) => {
+        const result = naturalId
+          ? moveDraftPlayerNatural(draft, playerIndex, naturalId, tile, this.session.selectedLayoutId)
+          : addDraftPlayerNatural(draft, playerIndex, tile, this.session.selectedLayoutId);
+        if (result.ok) protectDraftBaseTerrain(draft);
+        return result;
+      },
+    );
   }
 
-  worldTile(x, y) {
+  removePlayerNatural(naturalId) {
+    const playerIndex = this.selectedPlayerIndex;
+    this.commitDraft(`Removed Player ${playerIndex + 1} natural base`, (draft) => (
+      removeDraftPlayerNatural(draft, playerIndex, naturalId, this.session.selectedLayoutId)
+    ));
+  }
+
+  worldTile(x, y, { start = false } = {}) {
     const tileSize = Number(this.startPayload?.map?.tileSize);
     const size = this.session.draft?.terrain?.length || 0;
     if (!Number.isFinite(x) || !Number.isFinite(y) || !tileSize || !size) return null;
+    const radius = start ? 3 : 0;
+    if (size <= radius * 2) return null;
     return {
-      x: Math.max(0, Math.min(size - 1, Math.floor(x / tileSize))),
-      y: Math.max(0, Math.min(size - 1, Math.floor(y / tileSize))),
+      x: Math.max(radius, Math.min(size - radius - 1, Math.floor(x / tileSize))),
+      y: Math.max(radius, Math.min(size - radius - 1, Math.floor(y / tileSize))),
     };
   }
 
-  commitAndApply(label, mutation) {
-    if (!this.session.mutate(label, mutation)) {
-      this.setStatus("No tiles changed. Main-base footprints and natural centers must remain grass.");
-      return Promise.resolve(null);
+  commitDraft(label, mutation) {
+    let result = null;
+    const changed = this.session.mutate(label, (draft) => {
+      result = mutation(draft);
+    });
+    if (!changed) {
+      this.setStatus(result?.error || "No draft tiles changed. Start footprints and natural centers must remain grass.", !!result?.error);
+      return false;
     }
-    return this.applyDraft();
+    this.setStatus(`${label}. Restart the test when you are ready to try this draft.`);
+    return true;
   }
 
-  async applyDraft() {
-    if (this.applyPending) {
-      this.applyQueued = true;
-      return null;
-    }
+  async restartTestWithDraft() {
+    if (this.applyPending) return null;
     let materialized;
     try {
       materialized = this.session.materialized();
@@ -418,24 +453,19 @@ export class LabMapEditorPanel {
       return null;
     }
     this.applyPending = true;
-    this.setStatus("Applying map to the battle…");
+    this.setStatus("Restarting the Lab test with this draft…");
     const result = await this.labClient.applyMapDraft(materialized);
     this.applyPending = false;
     if (!result?.ok) {
-      this.setStatus(result?.error || "Map apply failed.", true);
+      this.setStatus(result?.error || "Map restart failed.", true);
       return result;
     }
     if (!this.applyLabMapReset?.(result.outcome)) {
-      this.setStatus("Map applied, but the local renderer could not refresh in place.", true);
+      this.setStatus("The test restarted, but the local map display could not refresh in place.", true);
       return result;
     }
-    if (this.applyQueued) {
-      this.applyQueued = false;
-      return this.applyDraft();
-    }
-    this.setStatus(result.outcome?.battleReset
-      ? "Base layout applied. The battle was reset on the edited map."
-      : "Terrain applied without resetting the battle.");
+    this.session.markCurrentDraftAsTested();
+    this.setStatus("Test restarted with this map draft. Keep editing the draft without changing the test.");
     return result;
   }
 
@@ -461,7 +491,7 @@ export class LabMapEditorPanel {
           this.selectedMapFile = catalog[0].file;
         }
         return true;
-      } catch (_) {
+      } catch {
         this.mapCatalogError = "Map catalog unavailable; standard maps are still available.";
         return false;
       } finally {
@@ -490,9 +520,9 @@ export class LabMapEditorPanel {
         expectedSize: this.mapSize(),
         playerCount: this.labPlayerCount(),
       });
-      this.selectedSiteId = "";
-      const result = await this.applyDraft();
-      return result?.ok === true;
+      this.selectedPlayerIndex = 0;
+      this.setStatus(`Loaded ${entry.name} as a map draft. Restart the test to use it.`);
+      return true;
     } catch (error) {
       this.setStatus(`Map load failed: ${error.message || String(error)}`, true);
       return false;
@@ -504,23 +534,31 @@ export class LabMapEditorPanel {
 
   undo() {
     if (!this.session.undo()) return;
-    void this.applyDraft();
+    this.setStatus("Undid the last draft edit. The test has not changed.");
   }
 
   redo() {
     if (!this.session.redo()) return;
-    void this.applyDraft();
+    this.setStatus("Redid the draft edit. The test has not changed.");
   }
 
   saveLocal() {
     const ok = this.session.saveLocal(this.mapStorageKey());
-    this.setStatus(ok ? "Saved this draft in the browser." : "Local save is unavailable.", !ok);
+    this.setStatus(ok ? "Saved this map draft on this device." : "Saving a local draft is unavailable.", !ok);
   }
 
   loadLocal() {
     const ok = this.session.loadLocal(this.mapStorageKey());
-    this.setStatus(ok ? "Loaded the browser draft." : "No compatible local draft was found.", !ok);
-    if (ok) void this.applyDraft();
+    if (!ok) {
+      this.setStatus("No compatible saved map draft was found.", true);
+      return;
+    }
+    if (!this.ensureCompatibleLayout()) {
+      this.setStatus(`The saved draft has no ${this.labPlayerCount()}-player layout for this Lab test.`, true);
+      return;
+    }
+    this.selectedPlayerIndex = 0;
+    this.setStatus("Loaded a saved map draft. Restart the test to use it.");
   }
 
   exportJson() {
@@ -555,6 +593,21 @@ export class LabMapEditorPanel {
     return Array.isArray(players) && players.length > 0 ? players.length : 0;
   }
 
+  compatibleLayouts() {
+    const layouts = this.session.draft?.layouts || [];
+    const playerCount = this.labPlayerCount();
+    return playerCount > 0 ? layouts.filter((layout) => layout.slots.length === playerCount) : layouts;
+  }
+
+  ensureCompatibleLayout() {
+    const layouts = this.compatibleLayouts();
+    if (layouts.length === 0) return false;
+    if (!layouts.some((layout) => layout.id === this.session.selectedLayoutId)) {
+      this.session.selectLayout(layouts[0].id);
+    }
+    return true;
+  }
+
   handleKeyDown(event) {
     if (this.destroyed || event.defaultPrevented || isTextEntry(event.target)) return;
     if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
@@ -572,9 +625,28 @@ export class LabMapEditorPanel {
     this.render();
   }
 
+  syncDraftOverlay() {
+    this.setLabMapDraftOverlay?.(this.session.mapOverlay());
+  }
+
+  syncDraftTerrainPreview() {
+    const signature = this.session.draft?.terrain?.join("|") || "";
+    if (signature === this.terrainPreviewSignature) return;
+    this.terrainPreviewSignature = signature;
+    if (!this.session.draft) {
+      this.setLabMapDraftTerrainPreview?.(null);
+      return;
+    }
+    try {
+      this.setLabMapDraftTerrainPreview?.(this.session.materialized());
+    } catch {
+      this.setLabMapDraftTerrainPreview?.(null);
+    }
+  }
+
   applyLabToolChange(change) {
     const kind = change?.tool?.kind || "";
-    if (change?.type === "armed" && kind !== "editMapTerrain" && kind !== "editMapBase") {
+    if (change?.type === "armed" && !["editMapTerrain", "editMapPlayerStart", "editMapPlayerNatural"].includes(kind)) {
       this.session.setDesiredTool(null);
     }
     if (change?.type === "cancelled" && !["panelDestroy", "teardown"].includes(change.reason)) {
@@ -588,6 +660,8 @@ export class LabMapEditorPanel {
     this.destroyed = true;
     globalThis.window?.removeEventListener?.("keydown", this.onKeyDown);
     this.unsubscribe?.();
+    this.setLabMapDraftOverlay?.(null);
+    this.setLabMapDraftTerrainPreview?.(null);
     this.chrome.destroy();
     this.el.remove();
   }
@@ -676,40 +750,6 @@ function layoutSelectField(labelText, layouts, selected, onChange) {
   select.addEventListener("change", () => onChange(select.value));
   label.append(text, select);
   return label;
-}
-
-function selectField(labelText, sites, selected, multiple, onChange) {
-  const label = document.createElement("label");
-  label.className = "lab-field";
-  const text = document.createElement("span");
-  text.textContent = labelText;
-  const select = document.createElement("select");
-  select.multiple = multiple;
-  if (multiple) select.size = Math.min(3, Math.max(2, sites.length));
-  if (!multiple) {
-    const blank = document.createElement("option");
-    blank.value = "";
-    blank.textContent = "Choose…";
-    select.appendChild(blank);
-  }
-  const selectedValues = new Set(Array.isArray(selected) ? selected : [selected]);
-  for (const site of sites) {
-    const option = document.createElement("option");
-    option.value = site.id;
-    option.textContent = `${site.id} (${site.x},${site.y})`;
-    option.selected = selectedValues.has(site.id);
-    select.appendChild(option);
-  }
-  select.addEventListener("change", () => {
-    const values = [...select.selectedOptions].map((option) => option.value).filter(Boolean);
-    onChange(multiple ? values : values[0] || "");
-  });
-  label.append(text, select);
-  return label;
-}
-
-function layoutSlots(draft, layoutId) {
-  return draft.layouts?.find((layout) => layout.id === layoutId)?.slots || null;
 }
 
 function normalizeMapCatalog(entries) {

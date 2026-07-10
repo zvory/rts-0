@@ -14,11 +14,15 @@ const allAssets = [
   ...GROUND_DECAL_ASSET_MANIFEST.infantry,
   ...GROUND_DECAL_ASSET_MANIFEST.vehicleScorch,
   ...GROUND_DECAL_ASSET_MANIFEST.vehiclePaint,
+  ...GROUND_DECAL_ASSET_MANIFEST.mortarBlast,
+  ...GROUND_DECAL_ASSET_MANIFEST.artilleryBlast,
 ];
 
 assert(GROUND_DECAL_ASSET_MANIFEST.infantry.length >= 12, "manifest includes at least twelve infantry decal masks");
 assert(GROUND_DECAL_ASSET_MANIFEST.vehicleScorch.length >= 8, "manifest includes at least eight vehicle scorch masks");
 assert(GROUND_DECAL_ASSET_MANIFEST.vehiclePaint.length >= 8, "manifest includes at least eight vehicle paint masks");
+assert(GROUND_DECAL_ASSET_MANIFEST.mortarBlast.length >= 1, "manifest includes a mortar blast decal mask");
+assert(GROUND_DECAL_ASSET_MANIFEST.artilleryBlast.length >= 1, "manifest includes an artillery blast decal mask");
 
 for (const asset of allAssets) {
   assert(asset.url.startsWith("/assets/decals/"), `decal ${asset.id} is served from the client asset path`);
@@ -87,4 +91,37 @@ for (const asset of allAssets) {
   assert(plan.scorchOpacity >= 0.48 && plan.scorchOpacity <= 0.6, "vehicle scorch opacity is subdued");
   assert(plan.ashOpacity >= 0.06 && plan.ashOpacity <= 0.11, "vehicle inner ash stays neutral and subtle");
   assert(plan.paintOpacity >= 0.13 && plan.paintOpacity <= 0.2, "vehicle paint opacity stays subordinate to scorch");
+}
+
+{
+  const mortar = {
+    id: 99,
+    kind: KIND.MORTAR_TEAM,
+    decalClass: "mortarBlast",
+    radiusWorld: 48,
+    seed: 441122,
+  };
+  const artillery = {
+    id: 100,
+    kind: KIND.ARTILLERY,
+    decalClass: "artilleryBlast",
+    radiusWorld: 96,
+    seed: 882244,
+  };
+  const mortarPlan = createGroundDecalStampPlan(mortar);
+  const artilleryPlan = createGroundDecalStampPlan(artillery);
+  assertDeepEqual(mortarPlan, createGroundDecalStampPlan({ ...mortar }), "mortar blast selection is deterministic");
+  assertDeepEqual(artilleryPlan, createGroundDecalStampPlan({ ...artillery }), "artillery blast selection is deterministic");
+  assert(
+    mortarPlan.variantIndex === mortar.seed % GROUND_DECAL_ASSET_MANIFEST.mortarBlast.length,
+    "mortar blast uses the authored mortar mask",
+  );
+  assert(
+    artilleryPlan.variantIndex === artillery.seed % GROUND_DECAL_ASSET_MANIFEST.artilleryBlast.length,
+    "artillery blast uses the authored artillery mask",
+  );
+  assert(mortarPlan.scale > 0.94 && mortarPlan.scale < 1.06, "mortar blast preserves its 1.5-tile authored footprint");
+  assert(artilleryPlan.scale > 0.94 && artilleryPlan.scale < 1.06, "artillery blast preserves its 3-tile authored footprint");
+  assert(mortarPlan.charScale < 0.83, "mortar blast keeps its smaller air-burst center compact");
+  assert(artilleryPlan.charScale > mortarPlan.charScale, "artillery retains the broader central crater treatment");
 }

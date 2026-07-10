@@ -17,7 +17,6 @@ use crate::rules;
 use super::{systems, Game, MapMetadata, PlayerInit};
 
 mod checkpoint_scenario;
-mod terrain_edit;
 
 pub use checkpoint_scenario::{
     LabCheckpointScenarioMap, LabCheckpointScenarioMapData, LabCheckpointScenarioMetadata,
@@ -312,28 +311,6 @@ impl Game {
             schema_version: CURRENT_MAP_VERSION,
             content_hash: format!("lab-draft-{}", map.materialized_hash()),
         };
-        let battle_reset = self.state.map.starts != map.starts
-            || self.state.map.expansion_sites != map.expansion_sites;
-        if !battle_reset {
-            let previous_terrain = std::mem::replace(&mut self.state.map.terrain, map.terrain);
-            let previous_metadata = std::mem::replace(&mut self.state.map_metadata, map_metadata);
-            if let Err(error) = terrain_edit::relocate_blocked_units(
-                &self.state.map,
-                &mut self.state.entities,
-                &self.state.map_metadata.name,
-            ) {
-                self.state.map.terrain = previous_terrain;
-                self.state.map_metadata = previous_metadata;
-                return Err(error);
-            }
-            self.repair_lab_state();
-            return Ok(LabOpOutcome::MapDraftApplied {
-                name: name.to_string(),
-                size: draft.size,
-                battle_reset: false,
-            });
-        }
-
         let seed = self.seed();
         let god_mode_players = self.lab_god_mode_players();
         let mut replacement = Self::new_lab(&players, seed, map, map_metadata);
@@ -993,7 +970,7 @@ mod tests {
     }
 
     #[test]
-    fn terrain_only_lab_map_draft_preserves_tick_and_moved_worker() {
+    fn terrain_only_lab_map_draft_restarts_a_fresh_test() {
         let mut game = new_game();
         let worker_id = game
             .state
@@ -1012,7 +989,7 @@ mod tests {
         for _ in 0..10 {
             game.tick();
         }
-        let tick = game.tick_count();
+        assert!(game.tick_count() > 0);
         let mut terrain = game.state.map.terrain.clone();
         for y in 29..=31 {
             for x in 30..=32 {
@@ -1042,19 +1019,19 @@ mod tests {
             LabOpOutcome::MapDraftApplied {
                 name: "Terrain-only edit".to_string(),
                 size: 64,
-                battle_reset: false,
+                battle_reset: true,
             }
         );
-        assert_eq!(game.tick_count(), tick);
+        assert_eq!(game.tick_count(), 0);
         assert_eq!(game.state.map.terrain[30 * 64 + 31], terrain::ROCK);
-        let worker = game
-            .state
-            .entities
-            .get(worker_id)
-            .expect("moved worker remains");
-        assert_ne!((worker.pos_x, worker.pos_y), (worker_x, worker_y));
-        assert!(worker.pos_x > 20.0 * config::TILE_SIZE as f32);
-        assert!(worker.pos_y > 20.0 * config::TILE_SIZE as f32);
+        assert!(
+            game.state
+                .entities
+                .iter()
+                .filter(|entity| entity.owner == 1 && entity.kind == EntityKind::Worker)
+                .all(|worker| (worker.pos_x, worker.pos_y) != (worker_x, worker_y)),
+            "a fresh test must not retain the moved worker from the previous run"
+        );
     }
 
     fn default_map_game() -> Game {

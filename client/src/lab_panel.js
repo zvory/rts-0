@@ -39,6 +39,8 @@ export class LabPanel {
     match = null,
     mapEditorSession = null,
     applyLabMapReset = null,
+    setLabMapDraftOverlay = null,
+    setLabMapDraftTerrainPreview = null,
     submissionCapability = null,
     openWindow = defaultLabScenarioSubmissionWindow,
   }) {
@@ -108,6 +110,8 @@ export class LabPanel {
         startPayload,
         mapName: this.mapName(),
         applyLabMapReset,
+        setLabMapDraftOverlay,
+        setLabMapDraftTerrainPreview,
       })
       : null;
   }

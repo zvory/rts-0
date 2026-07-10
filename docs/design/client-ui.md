@@ -20,7 +20,7 @@ src/
   unit_range_settings.js # localStorage-backed selected-unit range overlay toggle
   sim_wasm_adapter.js # optional WASM prediction adapter
   state.js        # GameState: holds prev+current snapshot, selection, control groups, display overlays
-  state_ground_decals.js # client-only death-event decal queue, classification, owner/facing recovery, building-footprint sizing
+  state_ground_decals.js # client-only death/impact decal queue, classification, owner/facing recovery, building-footprint sizing
   client_intent.js # ClientIntent: browser-local placement, command targeting, lab tools, previews, feedback
   command_budget.js # client mirror of command-supply selection admission and outgoing command guard
   progress_extrapolator.js # local display extrapolation for active construction progress
@@ -31,7 +31,7 @@ src/
   renderer/decals/ # SVG decal atlas manifest, loader, and deterministic stamp selection
   renderer/trenches.js # Authoritative trench terrain pass and deterministic nearby-trench connectors
   renderer/feedback_view_model.js # Builder for renderer feedback's narrow per-frame read model
-  renderer/lab_tool_preview.js # Armed Lab tool cursor ghosts on the renderer placement layer
+  renderer/lab_tool_preview.js # Armed Lab tool cursor ghosts plus persistent local map-draft markers
   renderer/observer_map_analysis.js # Observer-only static AI map-analysis world overlay drawer
   fog.js          # Fog overlay: accumulate explored, compute visible from own entities
   input/          # lifecycle facade plus selection, commands, placement, shared camera navigation, UI input routing
@@ -71,8 +71,8 @@ src/
   lab_panel.js   # LabPanel: app-owned lab controls/status UI mounted around Match
   lab_tool_detail.js # Pure armed-tool instruction text for LabPanel status
   lab_panel_window.js # draggable/resizable chrome helper for the app-owned LabPanel
-  lab_map_editor_session.js # persistent 25-state authored-map draft and undo/redo history
-  lab_map_editor_panel.js # floating live-lab built-in map loading, terrain/base/slot editing, and map JSON export
+  lab_map_editor_session.js # persistent 25-state authored-map draft, compatible layouts, player-owned bases, and undo/redo history
+  lab_map_editor_panel.js # floating draft-first Lab map editor, built-in map loading, explicit test restart, and map JSON export
   lab_control_policy.js # Lab control collaborator placeholder injected into Match
   lab_map_reset.js # in-place authoritative Lab map/player/fog/terrain refresh collaborator
   visual_profiles.js # Lab-scoped visual experimentation profile registry and resolver
@@ -332,11 +332,12 @@ export class GroundDecalBuffer {
 }
 export function normalizeGroundDecalEvent(ev, context?)
 export function groundDecalClassForKind(kind)
+export function groundDecalClassForImpactEvent(eventKind)
 ```
-`GameState.applySnapshot` feeds fog-filtered transient death events into this browser-local buffer.
-The buffer dedupes by death id, recovers owner/facing from the prior visible entity snapshot when
-possible, falls back to neutral color/deterministic facing when needed, and never infers hidden
-deaths from missing entities.
+`GameState.applySnapshot` feeds fog-filtered transient death, mortar-impact, and artillery-impact
+events into this browser-local buffer. The buffer dedupes deaths by id and impact events by their
+received snapshot identity, recovers owner/facing from the prior visible entity snapshot only for
+death marks, and never infers a hidden death or impact from missing entities.
 
 `renderer/decals.js`
 ```js
@@ -350,8 +351,8 @@ export class GroundDecalLayer {
 }
 ```
 `GroundDecalLayer` owns one downsampled canvas-backed Pixi texture and one sprite on the `decals`
-world layer. New visible death decals are stamped into that texture in batches from SVG alpha-mask
-assets under `assets/decals/`; historical decals are pixels, not retained display objects or
+world layer. New visible death and impact decals are stamped into that texture in batches from SVG
+alpha-mask assets under `assets/decals/`; historical decals are pixels, not retained display objects or
 per-frame records. `diagnostics()` exposes total stamped decals, queued decals, texture update
 count, texture dimensions/downsample, child count, and asset-load status for stress checks. The
 renderer tears down the decal sprite, texture, canvas, tint scratch canvas, loaded atlas masks, and
@@ -597,7 +598,7 @@ export function labSpawnUnitKindsForFaction(factionId)
 export function labBuildingSpawnFactionOptions()
 export function labSpawnBuildingKindsForFaction(factionId)
 export class LabPanel {
-  constructor({ root, labClient, launch, startPayload, match?, mapEditorSession?, applyLabMapReset?, submissionCapability?, openWindow? })
+  constructor({ root, labClient, launch, startPayload, match?, mapEditorSession?, applyLabMapReset?, setLabMapDraftOverlay?, setLabMapDraftTerrainPreview?, submissionCapability?, openWindow? })
   applyLabToolChange(change)             // syncs active/cancelled tool status from Match callbacks
   armSpawnPaletteTool(kind?)             // arms a Match-owned completed spawnEntity world-click tool
   armBuildingSpawnPaletteTool(kind?)     // arms a Match-owned completed building spawnEntity tool
@@ -613,8 +614,10 @@ export const LAB_MAP_HISTORY_LIMIT       // 25
 export class LabMapEditorSession {
   initializeFromStart(startPayload, options?)
   initializeFromScenario(scenario, options?)
+  loadAuthoredMap(source, options?), selectLayout(layoutId)
   mutate(label, mutation), undo(), redo()
   materialized(), exportMap(), saveLocal(key), loadLocal(key)
+  markCurrentDraftAsTested(), playerSlots(), mapOverlay()
 }
 ```
 `LabPanel` renders separate floating, collapsible Options and Tools windows. Options owns room
@@ -634,23 +637,25 @@ export/import remains the fallback for setup iteration and for deployments with 
 disabled. The lab replay controls are visually separate from setup checkpoint JSON controls; replay
 save/open uses the bounded lab replay artifact path instead of the legacy `exportScenario` and
 `importScenario` lab operations.
-For the live-map-editor proof of concept, `LabPanel` also composes a third floating Map Editor
-window. `App` retains one `LabMapEditorSession` while edits are applied, so neither a terrain update
-nor a base-layout reset loses the selected editor tool or the bounded 25-state undo/redo history.
-The requesting client consumes the authoritative map/player payload from `labResult` through the
-app-owned `applyLabMapReset` collaborator, replacing static `GameState`, fog, minimap inputs, and the
-cached terrain texture in place instead of tearing down and rebuilding the whole match. The window can
-load built-in authored maps from `/maps/catalog` (with the standard maps retained as a fallback) and then
-fetches the selected JSON from `/maps/<file>`. It selects a layout that matches the active Lab's player
-count, rejects maps with a different map size, preserves every authored layout in the draft/export, and
-applies the selected layout to the live battle. The window paints one terrain tile at a time by click or
-drag stroke; its grass, stone, and water controls carry matching terrain swatches instead of a brush-size
-selector. It edits main/natural sites and the selected compatible player-slot layout, saves a
-browser-local draft, and exports the normal authored map JSON schema. Applying terrain-only drafts
-updates the authoritative map and
-derived pathing/fog state without resetting the simulation tick or live entities. Changing starts,
-naturals, or player slots rebuilds the battle so starting bases and resource nodes match the edited
-layout; ordinary lab unit/building palettes remain the playtest setup surface.
+For the Lab map-editor proof of concept, `LabPanel` also composes a third floating Map Editor window.
+It is draft-first: the window can load built-in authored maps from `/maps/catalog` (with standard maps
+as a fallback) and fetch the selected JSON from `/maps/<file>`, but loading, terrain painting, and base
+editing all change only the browser-local `LabMapEditorSession`. A loaded map must match the active Lab
+map size; the editor selects a compatible player-count layout while preserving every authored layout for
+local save and normal map-JSON export. The editor exposes players and their base locations directly
+rather than anonymous main/natural site IDs and slot pickers. A persistent browser-local overlay draws
+each drafted start and natural in that player's colour, and a local terrain preview redraws cached ground
+without touching authoritative `GameState`; the live Lab test remains unchanged. The terrain controls
+paint one tile at a time by click or drag and use matching grass, stone, and water swatches. Local draft
+save/load likewise does not alter the test.
+
+`Restart test with this draft` is the one explicit draft-to-test transition. It creates a fresh Lab test
+at tick zero with the same players and seed, so it deliberately clears the prior test's units, orders,
+resources, and elapsed time even for terrain-only changes. The requesting client consumes the
+authoritative map/player payload from `labResult` through the app-owned `applyLabMapReset` collaborator,
+replacing static `GameState`, fog, minimap inputs, and the cached terrain texture in place instead of
+tearing down and rebuilding the whole match. Ordinary Lab unit/building palettes remain the playtest
+setup surface after that explicit restart.
 `lab_panel_window.js` owns local drag, resize, collapse/expand, reset, keyboard nudge,
 viewport-clamping, and localStorage geometry hints for those app-owned lab windows. It has no
 transport or match authority.
@@ -691,7 +696,7 @@ may ask `Match.armLabTool(tool, { onWorldClick, onBoxSelection })` to arm a tool
 `Input` consumes a completed left world click before selection, command targeting, or placement.
 Tools that opt into `paintOnDrag` sample and interpolate each crossed map tile, delivering repeated
 world-click callbacks without disarming the tool or falling through to selection; unit spawning,
-building spawning, and live terrain painting use that path. Other left drags normally promote to box
+building spawning, and draft terrain painting use that path. Other left drags normally promote to box
 selection and cancel the active lab tool, while tools that opt into `consumeBoxSelection` receive the
 selectable ids in the drag box instead. World-click callbacks receive the active tool payload, exact
 world coordinates, and any selectable hit entity id. `ClientIntent.labToolPreview` tracks the armed
@@ -829,7 +834,8 @@ export class ClientIntent {
   recordPlannedCommand(command, selectedEntities, result?)
   plannedOrderPlanForEntity(entity), entityWithPlannedOrder(entity)
   reconcilePlannedOrders(entities, options?), clearPlannedOrdersForUnits(ids), clearPlannedOrders()
-  activeLabTool, labToolPreview, beginLabTool(tool), updateLabToolPreview(preview), cancelLabTool(reason?)
+  activeLabTool, labToolPreview, labMapDraftOverlay
+  beginLabTool(tool), updateLabToolPreview(preview), setLabMapDraftOverlay(overlay), cancelLabTool(reason?)
 }
 ```
 
@@ -1282,16 +1288,21 @@ overlay container as smoke clouds, below selection rings and HP bars):
 
 Ground decal rendering (`state_ground_decals.js`, `renderer/decals.js`; layer `decals` between
 terrain and resources):
-- Decals are client-only, best-effort visual state derived only from received fog-filtered `death`
-  events. They are not persisted in the protocol, replay artifacts, match history, or server sim.
+- Decals are client-only, best-effort visual state derived only from received fog-filtered `death`,
+  `mortarImpact`, and `artilleryImpact` events. They are not persisted in the protocol, replay
+  artifacts, match history, or server sim.
 - Infantry deaths stamp translucent player-tinted SVG paint masks. Vehicle and support-weapon
   deaths stamp neutral charcoal hull-shaped scorch masks with smaller, subdued player-colored paint
   fragments. Destroyed buildings stamp neutral charcoal rectangles exactly matching their rendered
   `footW` × `footH` footprint at the map's tile size, with a charcoal core eroded by deterministic
   soot, edge bites, and ash breakup rather than straight fade bands, but no player-color fragments.
-- `GameState` queues only unpainted death ids and `Renderer` consumes the pending queue once per
-  frame. A skipped snapshot or reconnect may miss older decals; the client must not infer them.
-- The renderer stamps each new-death batch into one downsampled texture, updates that texture once
+- Mortar impacts stamp a compact, air-burst-style starburst with a small dark center; artillery
+  impacts stamp a larger starburst scaled to their authoritative impact radius. Both are neutral
+  earth/charcoal marks, with no source owner or hidden-source recovery.
+- `GameState` queues only unpainted death ids and received impact records, and `Renderer` consumes
+  the pending queue once per frame. A skipped snapshot or reconnect may miss older decals; the
+  client must not infer them.
+- The renderer stamps each new-decal batch into one downsampled texture, updates that texture once
   per stamped batch, and draws the accumulated marks as one sprite. Old decals are not iterated or
   redrawn during normal frames.
 - `Renderer.groundDecalDiagnostics()` exposes the permanent layer's stamped count, pending count,

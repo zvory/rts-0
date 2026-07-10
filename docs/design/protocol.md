@@ -1142,20 +1142,17 @@ the larger bounded lab command window instead of the ordinary live-player unit-i
 `setPlayerGodMode` is lab-only room state: enabled players' units and buildings ignore incoming
 damage, while resources keep normal damage behavior. The current enabled player ids are mirrored in
 `start.lab.godModePlayers` and `labState.godModePlayers`.
-`applyMapDraft` is the lab map-editor proof-of-concept seam. It accepts only the current room's map
-size, validates terrain codes, one unique grass-protected start per player, at most three unique
-grass-protected natural sites per player. A terrain-only draft mutates the live authoritative map,
-repairs derived pathing and fog state, and preserves the simulation tick and entities. A change to
-starts or natural sites rebuilds the lab battle at tick zero with the same players and seed. The
-successful requester's `labResult.outcome` carries `battleReset`, `tick`, `map`, and `players`,
-allowing that browser to refresh the existing match in place; it does not receive a redundant
-`start`. Other connected Lab viewers still receive `start`, and every viewer receives a fresh
-snapshot. Applying a draft resets the retained lab replay baseline rather than recording a replay
-operation. Lab-draft validation reserves the main base's 7×7 City Centre and starting-unit area and
-each natural's center tile as grass; the broader authored-map safety radii remain a static map
-quality rule rather than making most of the Lab's initial camera view unpaintable. If a live terrain
-stroke covers a unit body elsewhere, the server deterministically nudges that unit to the nearest
-standable tile instead of resetting the battle.
+`applyMapDraft` is the Lab map-editor's explicit test-restart seam. It accepts only the current room's
+map size, validates terrain codes, one unique grass-protected start per player, and at most three unique
+grass-protected natural sites per player. Every accepted draft creates a fresh Lab test at tick zero with
+the same players and seed, including a terrain-only draft; the old test's entities, orders, resources,
+and elapsed time are intentionally discarded. The successful requester's `labResult.outcome` carries
+`battleReset: true`, `tick`, `map`, and `players`, allowing that browser to refresh the existing match in
+place; it does not receive a redundant `start`. Other connected Lab viewers still receive `start`, and
+every viewer receives a fresh snapshot. Applying a draft resets the retained lab replay baseline rather
+than recording a replay operation. Lab-draft validation reserves the main base's 7×7 City Centre and
+starting-unit area and each natural's center tile as grass; the broader authored-map safety radii remain a
+static map quality rule rather than making most of the Lab's initial camera view unpaintable.
 
 `LabScenarioPayload` accepts only the current checkpoint-backed setup container. Setup exports,
 validation previews, submissions, imports, and bundled catalog assets use `LabCheckpointScenarioV1`:

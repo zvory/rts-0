@@ -1,0 +1,26 @@
+<svg id="artillery-blast-01" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 216 216" width="216" height="216">
+  <polygon id="blast.ray.n" points="103,91 113,91 118,21 111,7 106,91" fill="#fff" opacity="0.34"/>
+  <polygon id="blast.ray.nne" points="116,94 122,99 178,35 191,29 123,105" fill="#fff" opacity="0.29"/>
+  <polygon id="blast.ray.ne" points="122,101 126,108 198,76 207,78 127,114" fill="#fff" opacity="0.35"/>
+  <polygon id="blast.ray.e" points="127,104 128,115 205,120 213,115 128,110" fill="#fff" opacity="0.39"/>
+  <polygon id="blast.ray.ese" points="123,119 128,125 184,175 198,181 122,128" fill="#fff" opacity="0.30"/>
+  <polygon id="blast.ray.se" points="118,126 122,132 149,199 157,208 114,130" fill="#fff" opacity="0.35"/>
+  <polygon id="blast.ray.s" points="103,127 114,127 109,204 103,213 100,128" fill="#fff" opacity="0.32"/>
+  <polygon id="blast.ray.ssw" points="96,124 103,130 58,192 46,198 91,122" fill="#fff" opacity="0.28"/>
+  <polygon id="blast.ray.sw" points="91,119 96,126 22,154 9,151 91,114" fill="#fff" opacity="0.35"/>
+  <polygon id="blast.ray.w" points="88,103 89,115 15,110 4,105 89,108" fill="#fff" opacity="0.37"/>
+  <polygon id="blast.ray.wnw" points="91,96 98,102 38,49 25,40 93,91" fill="#fff" opacity="0.28"/>
+  <polygon id="blast.ray.nw" points="98,90 106,94 73,22 65,10 103,91" fill="#fff" opacity="0.32"/>
+  <polygon id="blast.ray.nnw" points="101,94 106,96 92,48 87,35 105,93" fill="#fff" opacity="0.24"/>
+  <polygon id="blast.ray.sse" points="114,124 120,126 134,172 143,184 117,122" fill="#fff" opacity="0.22"/>
+  <polygon id="blast.outer" points="84,98 95,82 116,80 132,93 136,114 123,134 104,140 85,128 78,111" fill="#fff" opacity="0.72"/>
+  <polygon id="blast.core" points="93,97 105,88 121,93 128,107 121,123 107,132 91,122 87,108" fill="#fff" opacity="0.94"/>
+  <circle id="blast.fleck.n" cx="125" cy="55" r="3" fill="#fff" opacity="0.23"/>
+  <circle id="blast.fleck.ne" cx="163" cy="82" r="2.6" fill="#fff" opacity="0.25"/>
+  <circle id="blast.fleck.e" cx="164" cy="126" r="3.2" fill="#fff" opacity="0.22"/>
+  <circle id="blast.fleck.se" cx="139" cy="160" r="2.5" fill="#fff" opacity="0.20"/>
+  <circle id="blast.fleck.s" cx="93" cy="165" r="2.9" fill="#fff" opacity="0.24"/>
+  <circle id="blast.fleck.sw" cx="53" cy="132" r="3.1" fill="#fff" opacity="0.22"/>
+  <circle id="blast.fleck.w" cx="51" cy="89" r="2.4" fill="#fff" opacity="0.23"/>
+  <circle id="blast.fleck.nw" cx="73" cy="62" r="2.7" fill="#fff" opacity="0.20"/>
+</svg>

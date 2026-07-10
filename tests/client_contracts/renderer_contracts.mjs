@@ -369,6 +369,13 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     };
     const renderer = new Renderer(parent);
     renderer.buildStaticMap({ width: 8, height: 8, tileSize: 32, terrain: new Array(64).fill(0) });
+    let decalLayerResets = 0;
+    let trenchLayerResets = 0;
+    renderer._initGroundDecalsForMap = () => { decalLayerResets += 1; };
+    renderer._initTrenchesForMap = () => { trenchLayerResets += 1; };
+    renderer.previewStaticTerrain({ width: 8, height: 8, tileSize: 32, terrain: new Array(64).fill(2) });
+    assert(decalLayerResets === 0 && trenchLayerResets === 0,
+      "local map-draft terrain preview preserves existing ground-decal and trench layers");
     const terrainIndex = renderer.world.children.indexOf(renderer.layers.terrain);
     const decalsIndex = renderer.world.children.indexOf(renderer.layers.decals);
     const trenchesIndex = renderer.world.children.indexOf(renderer.layers.trenches);

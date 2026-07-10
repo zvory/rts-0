@@ -33,7 +33,7 @@ import {
   _drawRallyPoints,
   _drawResourceMiningPreview,
 } from "../../client/src/renderer/feedback.js";
-import { drawLabToolPreview } from "../../client/src/renderer/lab_tool_preview.js";
+import { drawLabMapDraftOverlay, drawLabToolPreview } from "../../client/src/renderer/lab_tool_preview.js";
 import { _drawMissToasts } from "../../client/src/renderer/miss_toasts.js";
 import {
   _drawPanzerfaustImpacts,
@@ -889,16 +889,38 @@ function nearPoint(call, point, epsilon = 0.001) {
     "armed Lab remove tools draw a clear X beneath the cursor",
   );
 
+  const draftOverlay = new RecordingGraphics();
+  drawLabMapDraftOverlay(draftOverlay, {
+    players: [{
+      playerIndex: 0,
+      start: { x: 8, y: 9 },
+      naturals: [{ x: 12, y: 13 }],
+    }],
+  }, 32);
+  assert(
+    draftOverlay.calls.some((call) => call[0] === "drawCircle" && call[1] === 272 && call[2] === 304),
+    "the Lab map draft draws a persistent Player 1 start marker at its authored tile",
+  );
+  assert(
+    draftOverlay.calls.some((call) => call[0] === "drawCircle" && call[1] === 400 && call[2] === 432),
+    "the Lab map draft draws each authored natural base on the map",
+  );
+
   const feedbackView = buildRendererFeedbackView(
     { map: { width: 8, height: 8, tileSize: 32 } },
     {
       clientIntent: {
         labToolPreview: { toolId: "lab-tool-1", kind: "removeSelectableUnits", x: 224, y: 192 },
+        labMapDraftOverlay: { players: [{ playerIndex: 0, start: { x: 8, y: 9 }, naturals: [] }] },
       },
     },
   );
   assert(
     feedbackView.labToolPreview?.kind === "removeSelectableUnits",
     "renderer feedback view carries the active Lab tool preview across the intent boundary",
+  );
+  assert(
+    feedbackView.labMapDraftOverlay?.players?.[0]?.start?.x === 8,
+    "renderer feedback view carries persistent authored map markers across the intent boundary",
   );
 }

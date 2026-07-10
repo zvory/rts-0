@@ -293,7 +293,7 @@ export class GameState extends VisualEffectBackedState {
       curById: this._curById,
       players: this.players,
       tick: msg.tick,
-      tileSize: this.tileSize,
+      tileSize: this.map?.tileSize,
     });
 
     this.resources = {

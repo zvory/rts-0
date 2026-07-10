@@ -32,13 +32,19 @@ export async function loadGroundDecalAtlas({
     infantry: [],
     vehicleScorch: [],
     vehiclePaint: [],
+    mortarBlast: [],
+    artilleryBlast: [],
     destroy() {
       destroyMasks(this.infantry);
       destroyMasks(this.vehicleScorch);
       destroyMasks(this.vehiclePaint);
+      destroyMasks(this.mortarBlast);
+      destroyMasks(this.artilleryBlast);
       this.infantry = [];
       this.vehicleScorch = [];
       this.vehiclePaint = [];
+      this.mortarBlast = [];
+      this.artilleryBlast = [];
     },
   };
 
@@ -46,6 +52,8 @@ export async function loadGroundDecalAtlas({
     atlas.infantry = await loadMaskSet(manifest.infantry, { documentRef, makeImage });
     atlas.vehicleScorch = await loadMaskSet(manifest.vehicleScorch, { documentRef, makeImage });
     atlas.vehiclePaint = await loadMaskSet(manifest.vehiclePaint, { documentRef, makeImage });
+    atlas.mortarBlast = await loadMaskSet(manifest.mortarBlast, { documentRef, makeImage });
+    atlas.artilleryBlast = await loadMaskSet(manifest.artilleryBlast, { documentRef, makeImage });
     return atlas;
   } catch (err) {
     atlas.destroy();

@@ -1,0 +1,18 @@
+<svg id="mortar-blast-01" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 112 112" width="112" height="112">
+  <polygon id="blast.ray.n" points="53,47 59,47 61,17 57,6 54,46" fill="#fff" opacity="0.34"/>
+  <polygon id="blast.ray.ne" points="61,50 64,53 101,33 106,36 65,57" fill="#fff" opacity="0.30"/>
+  <polygon id="blast.ray.e" points="65,53 66,59 103,61 108,57 66,56" fill="#fff" opacity="0.38"/>
+  <polygon id="blast.ray.se" points="62,61 65,64 93,94 99,99 62,66" fill="#fff" opacity="0.34"/>
+  <polygon id="blast.ray.s" points="53,65 59,65 57,105 53,109 51,66" fill="#fff" opacity="0.31"/>
+  <polygon id="blast.ray.sw" points="49,61 52,65 18,88 10,88 47,61" fill="#fff" opacity="0.30"/>
+  <polygon id="blast.ray.w" points="47,52 47,59 10,56 4,53 47,54" fill="#fff" opacity="0.37"/>
+  <polygon id="blast.ray.nw" points="49,49 53,52 25,19 20,13 47,47" fill="#fff" opacity="0.28"/>
+  <polygon id="blast.ray.wnw" points="48,56 49,60 23,71 16,70 47,57" fill="#fff" opacity="0.24"/>
+  <polygon id="blast.outer" points="47,52 52,46 61,47 67,53 65,62 58,67 49,64 45,58" fill="#fff" opacity="0.70"/>
+  <polygon id="blast.core" points="51,52 56,49 62,52 63,58 58,63 51,61 48,57" fill="#fff" opacity="0.92"/>
+  <circle id="blast.fleck.nw" cx="35" cy="35" r="2" fill="#fff" opacity="0.28"/>
+  <circle id="blast.fleck.ne" cx="79" cy="43" r="1.8" fill="#fff" opacity="0.25"/>
+  <circle id="blast.fleck.e" cx="83" cy="65" r="1.7" fill="#fff" opacity="0.22"/>
+  <circle id="blast.fleck.sw" cx="36" cy="73" r="2.1" fill="#fff" opacity="0.24"/>
+  <circle id="blast.fleck.s" cx="61" cy="83" r="1.5" fill="#fff" opacity="0.20"/>
+</svg>

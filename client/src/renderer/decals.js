@@ -17,8 +17,14 @@ export const GROUND_DECAL_TEXTURE_WORLD_SCALE = 4;
 const DECAL_CLASS_INFANTRY = "infantry";
 const DECAL_CLASS_SCORCH = "scorch";
 const DECAL_CLASS_BUILDING_SCORCH = "buildingScorch";
+const DECAL_CLASS_MORTAR_BLAST = "mortarBlast";
+const DECAL_CLASS_ARTILLERY_BLAST = "artilleryBlast";
 const SCORCH_DARK = 0x070706;
 const SCORCH_ASH = 0x181816;
+const BLAST_SOIL = 0x5a4024;
+const BLAST_CHAR = 0x1d170e;
+const MORTAR_BLAST_RADIUS_WORLD = 48;
+const ARTILLERY_BLAST_RADIUS_WORLD = 96;
 const VEHICLE_SCORCH_MASK_LENGTH = 62;
 const VEHICLE_SCORCH_MASK_WIDTH = 38;
 const TANK_SCORCH_SCALE_X = 1.18;
@@ -357,6 +363,10 @@ function stampAuthoredGroundDecal(ctx, decal, atlas, downsample, tintScratch) {
   const x = (decal.x + plan.offsetWorldX) / downsample;
   const y = (decal.y + plan.offsetWorldY) / downsample;
 
+  if (isBlastDecalClass(plan.decalClass)) {
+    return stampAuthoredBlast(ctx, plan, atlas, tintScratch, x, y, downsample);
+  }
+
   if (plan.decalClass === DECAL_CLASS_INFANTRY) {
     const mask = atlas.infantry?.[plan.variantIndex];
     if (!mask) return false;
@@ -416,9 +426,35 @@ function stampAuthoredGroundDecal(ctx, decal, atlas, downsample, tintScratch) {
   return true;
 }
 
+function stampAuthoredBlast(ctx, plan, atlas, tintScratch, x, y, downsample) {
+  const masks = plan.decalClass === DECAL_CLASS_MORTAR_BLAST
+    ? atlas.mortarBlast
+    : atlas.artilleryBlast;
+  const mask = masks?.[plan.variantIndex];
+  if (!mask) return false;
+  const scaleX = plan.scale * plan.flipX;
+  const scaleY = plan.scale * plan.flipY;
+  drawTintedMask(ctx, tintScratch, mask, BLAST_SOIL, x, y, downsample, {
+    rotation: plan.rotation,
+    scaleX,
+    scaleY,
+    opacity: plan.soilOpacity,
+  });
+  return drawTintedMask(ctx, tintScratch, mask, BLAST_CHAR, x, y, downsample, {
+    rotation: plan.rotation,
+    scaleX: scaleX * plan.charScale,
+    scaleY: scaleY * plan.charScale,
+    opacity: plan.charOpacity,
+  });
+}
+
 function stampProceduralGroundDecal(ctx, decal, downsample = GROUND_DECAL_TEXTURE_WORLD_SCALE) {
   if (!ctx || !decal || !Number.isFinite(decal.x) || !Number.isFinite(decal.y)) return false;
-  if (decal.decalClass !== DECAL_CLASS_INFANTRY && decal.decalClass !== DECAL_CLASS_SCORCH) {
+  if (
+    decal.decalClass !== DECAL_CLASS_INFANTRY &&
+    decal.decalClass !== DECAL_CLASS_SCORCH &&
+    !isBlastDecalClass(decal.decalClass)
+  ) {
     return false;
   }
   const rng = mulberry32(decal.seed || decal.id || 1);
@@ -432,8 +468,10 @@ function stampProceduralGroundDecal(ctx, decal, downsample = GROUND_DECAL_TEXTUR
   ctx.scale(variantScale, variantScale);
   if (decal.decalClass === DECAL_CLASS_INFANTRY) {
     stampInfantry(ctx, decal, rng, downsample);
-  } else {
+  } else if (decal.decalClass === DECAL_CLASS_SCORCH) {
     stampScorch(ctx, decal, rng, downsample);
+  } else {
+    stampBlast(ctx, decal, rng, downsample);
   }
   ctx.restore();
   return true;
@@ -482,6 +520,8 @@ function atlasAssetCounts(atlas) {
     infantry: atlas?.infantry?.length || 0,
     vehicleScorch: atlas?.vehicleScorch?.length || 0,
     vehiclePaint: atlas?.vehiclePaint?.length || 0,
+    mortarBlast: atlas?.mortarBlast?.length || 0,
+    artilleryBlast: atlas?.artilleryBlast?.length || 0,
   };
 }
 
@@ -530,6 +570,89 @@ function stampInfantry(ctx, decal, rng, downsample) {
     drawEllipse(ctx, x, y, rx, ry, seededAngle(rng), rgba(color, 0.28 + rng() * 0.18));
   }
   drawEllipse(ctx, 0, 0, 6 / downsample, 3 / downsample, seededAngle(rng), rgba(0x120908, 0.22));
+}
+
+function stampBlast(ctx, decal, rng, downsample) {
+  const artillery = decal.decalClass === DECAL_CLASS_ARTILLERY_BLAST;
+  const defaultRadius = artillery ? ARTILLERY_BLAST_RADIUS_WORLD : MORTAR_BLAST_RADIUS_WORLD;
+  const worldRadius = Number.isFinite(decal.radiusWorld) && decal.radiusWorld > 0
+    ? decal.radiusWorld
+    : defaultRadius;
+  const radius = worldRadius / downsample;
+  const coreRadius = radius * (artillery ? 0.32 : 0.2);
+  const rayCount = artillery ? 14 : 9;
+  const maxRay = radius * (artillery ? 1 : 1.02);
+
+  for (let i = 0; i < rayCount; i += 1) {
+    const angle = (i / rayCount) * Math.PI * 2 + (rng() - 0.5) * 0.26;
+    const length = maxRay * (0.6 + rng() * 0.4);
+    const start = coreRadius * (0.62 + rng() * 0.28);
+    const rootWidth = coreRadius * (0.32 + rng() * 0.22);
+    const tipWidth = Math.max(0.4, rootWidth * (0.16 + rng() * 0.16));
+    const axisX = Math.cos(angle);
+    const axisY = Math.sin(angle);
+    const normalX = -axisY;
+    const normalY = axisX;
+    ctx.fillStyle = rgba(BLAST_SOIL, artillery ? 0.32 : 0.3);
+    fillPolygon(ctx, [
+      [axisX * start + normalX * rootWidth, axisY * start + normalY * rootWidth],
+      [axisX * length + normalX * tipWidth, axisY * length + normalY * tipWidth],
+      [axisX * length * (0.88 + rng() * 0.08), axisY * length * (0.88 + rng() * 0.08)],
+      [axisX * start - normalX * rootWidth, axisY * start - normalY * rootWidth],
+    ]);
+    if (i % 3 !== 1) {
+      const charLength = length * (0.48 + rng() * 0.24);
+      ctx.fillStyle = rgba(BLAST_CHAR, artillery ? 0.5 : 0.46);
+      fillPolygon(ctx, [
+        [axisX * (start * 0.45) + normalX * rootWidth * 0.42, axisY * (start * 0.45) + normalY * rootWidth * 0.42],
+        [axisX * charLength + normalX * tipWidth * 0.45, axisY * charLength + normalY * tipWidth * 0.45],
+        [axisX * charLength - normalX * tipWidth * 0.45, axisY * charLength - normalY * tipWidth * 0.45],
+        [axisX * (start * 0.45) - normalX * rootWidth * 0.42, axisY * (start * 0.45) - normalY * rootWidth * 0.42],
+      ]);
+    }
+  }
+
+  ctx.fillStyle = rgba(BLAST_SOIL, 0.4);
+  fillIrregularBlast(ctx, coreRadius * 1.12, artillery ? 15 : 12, rng, 0.77, 1.11);
+  ctx.fillStyle = rgba(BLAST_CHAR, artillery ? 0.54 : 0.5);
+  fillIrregularBlast(ctx, coreRadius * 0.8, artillery ? 13 : 10, rng, 0.74, 1.08);
+  ctx.fillStyle = rgba(0x0a0a08, 0.42);
+  fillIrregularBlast(ctx, coreRadius * 0.42, artillery ? 10 : 8, rng, 0.73, 1.06);
+
+  const flecks = artillery ? 19 : 11;
+  for (let i = 0; i < flecks; i += 1) {
+    const angle = rng() * Math.PI * 2;
+    const distance = coreRadius * (1.12 + rng() * (artillery ? 1.85 : 1.3));
+    ctx.fillStyle = i % 3 === 0 ? rgba(BLAST_CHAR, 0.46) : rgba(BLAST_SOIL, 0.3);
+    ctx.beginPath();
+    ctx.arc(
+      Math.cos(angle) * distance,
+      Math.sin(angle) * distance,
+      0.25 + rng() * (artillery ? 0.62 : 0.42),
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+  }
+}
+
+function fillIrregularBlast(ctx, radius, points, rng, minScale, maxScale) {
+  const vertices = [];
+  for (let i = 0; i < points; i += 1) {
+    const angle = (i / points) * Math.PI * 2;
+    const distance = radius * (minScale + rng() * (maxScale - minScale));
+    vertices.push([Math.cos(angle) * distance, Math.sin(angle) * distance]);
+  }
+  fillPolygon(ctx, vertices);
+}
+
+function fillPolygon(ctx, points) {
+  if (!Array.isArray(points) || points.length === 0) return;
+  ctx.beginPath();
+  ctx.moveTo(points[0][0], points[0][1]);
+  for (let i = 1; i < points.length; i += 1) ctx.lineTo(points[i][0], points[i][1]);
+  ctx.closePath();
+  ctx.fill();
 }
 
 function stampScorch(ctx, decal, rng, downsample) {
@@ -604,6 +727,10 @@ function drawEllipse(ctx, x, y, rx, ry, rotation, fillStyle) {
 function updateTexture(texture) {
   if (typeof texture?.update === "function") texture.update();
   else texture?.baseTexture?.update?.();
+}
+
+function isBlastDecalClass(decalClass) {
+  return decalClass === DECAL_CLASS_MORTAR_BLAST || decalClass === DECAL_CLASS_ARTILLERY_BLAST;
 }
 
 function seededAngle(rng) {
