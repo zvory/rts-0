@@ -79,7 +79,12 @@ const POSITIONAL_EVENT_SOUNDS = Object.freeze({
 });
 
 export class MatchCombatAudio {
-  constructor({ audio, state, setTimer = globalThis.setTimeout, clearTimer = globalThis.clearTimeout }) {
+  constructor({
+    audio,
+    state,
+    setTimer = globalThis.setTimeout.bind(globalThis),
+    clearTimer = globalThis.clearTimeout.bind(globalThis),
+  }) {
     this.audio = audio;
     this.state = state;
     this.setTimer = setTimer;
