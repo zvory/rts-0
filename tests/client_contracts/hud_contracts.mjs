@@ -569,10 +569,7 @@ function fakeHudRootWithoutResourceSpans() {
   assert(buildCard.slots[3].label === "Training Centre", "worker build menu should include Training Centre");
   assert(!buildCard.slots[3].enabled, "locked build buttons should be disabled");
   assert(buildCard.slots[3].title === "Requires Barracks", "locked build tooltip should explain requirement");
-  assert(buildCard.slots[7].label === "Tank Trap", "worker build menu should include Tank Trap in the next open slot");
-  assert(buildCard.slots[7].hotkey === "X", "Tank Trap build hotkey should use the next open grid key");
-  assert(!buildCard.slots[7].enabled, "Tank Trap build button should respect Training Centre requirements");
-  assert(buildCard.slots[7].title === "Requires Training Centre", "Tank Trap build tooltip should explain requirement");
+  assert(buildCard.slots[7] === null, "worker build menu should hide the temporarily unavailable Tank Trap");
   assert(buildCard.slots[8].intent.type === "closeCommandCardMenu", "worker return button should close submenu");
   assert(buildCard.slots[8].commandId === "worker.return", "worker return should expose stable command identity");
 

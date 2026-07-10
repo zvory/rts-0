@@ -81,7 +81,10 @@ fn command_car_scout_plane_ability_spends_resources_and_uses_nearest_city_centre
         &map,
         &mut entities,
         &mut players,
-        vec![(1, scout_plane_command(vec![command_car], near_x + 16.0, near_y + 16.0))],
+        vec![(
+            1,
+            scout_plane_command(vec![command_car], near_x + 16.0, near_y + 16.0),
+        )],
     );
 
     assert_eq!(players[0].steel, 950);

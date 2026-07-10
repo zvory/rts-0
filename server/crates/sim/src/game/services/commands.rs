@@ -1153,7 +1153,15 @@ fn use_ability(
         return;
     }
     if ability == AbilityKind::ScoutPlane {
-        scout_plane_ability::use_ability(map, entities, players, events, player, &faction_id, request);
+        scout_plane_ability::use_ability(
+            map,
+            entities,
+            players,
+            events,
+            player,
+            &faction_id,
+            request,
+        );
         return;
     }
     if let Some(mode) = artillery_fire_mode_for(ability) {
@@ -1665,7 +1673,12 @@ fn order_build(
     let worker_kind = entities.get(worker).map(|e| e.kind);
     if !matches!(worker_kind, Some(kind) if rules::economy::can_build_for_faction(&faction_id, kind, building))
     {
-        notice(events, player, "Only workers can build");
+        let msg = if worker_kind == Some(EntityKind::Worker) {
+            "Building unavailable"
+        } else {
+            "Only workers can build"
+        };
+        notice(events, player, msg);
         return;
     }
     if is_constructing(entities, worker) {

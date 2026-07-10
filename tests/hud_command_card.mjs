@@ -139,9 +139,7 @@ function buttonSlots(card) {
   assert.equal(buildCard.slots[0].commandId, kriegsiaCommandId("build", KIND.CITY_CENTRE));
   assert.equal(buildCard.slots[0].slotIndex, 0);
   assert.equal(buildCard.slots[0].hotkey, "Q");
-  assert.equal(buildCard.slots[7].commandId, kriegsiaCommandId("build", KIND.TANK_TRAP));
-  assert.equal(buildCard.slots[7].slotIndex, 7);
-  assert.equal(buildCard.slots[7].hotkey, "X");
+  assert.equal(buildCard.slots[7], null, "Tank Trap is hidden from the worker build card");
   assert.equal(buildCard.slots[8].commandId, "worker.return");
   assert.equal(buildCard.slots[8].hotkey, "C");
   assert.deepEqual(commandCardActivationCandidates(workerCard, "worker.buildMenu"), [{
@@ -500,7 +498,6 @@ function buttonSlots(card) {
     KIND.RESEARCH_COMPLEX,
     KIND.FACTORY,
     KIND.STEELWORKS,
-    KIND.TANK_TRAP,
   ]);
   for (const entry of catalog) {
     assert.equal(duplicateCommandIdsForCard(entry.card).length, 0, `${entry.id} has duplicate command ids`);

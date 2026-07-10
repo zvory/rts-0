@@ -525,8 +525,8 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     "Tank Trap dormant metadata mirrors Phase 1 server rules",
   );
   assert(
-    WORKER_BUILDABLE.includes(KIND.TANK_TRAP),
-    "Tank Trap is exposed in the worker build menu in the placement phase",
+    !WORKER_BUILDABLE.includes(KIND.TANK_TRAP),
+    "Tank Trap is temporarily hidden from the worker build menu",
   );
   const playerId = 1;
   const underConstructionTrainingCentre = [

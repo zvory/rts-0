@@ -843,10 +843,10 @@ fallback, and same-ray map clamping when map bounds are available; command feedb
 locked points when the client can compute them while the server still receives and authoritatively
 validates the raw clicked point. Local planned setup/fire stages are reconciled on snapshots using
 the owner-only `orderPlan` and command acknowledgement metadata, and are cleared on deselection,
-Stop/Hold, replacement commands, rejected command receipts, and match teardown. Tank Trap placement
-previews keep normal
-terrain, resource, building, and map-bounds checks, allow infantry overlap, and reject vehicle-body
-units. Tank Trap line dragging treats terrain, building, and map-bounds blockers as skipped sites,
+Stop/Hold, replacement commands, rejected command receipts, and match teardown. If Tank Traps are
+re-enabled, their placement previews keep normal terrain, resource, building, and map-bounds checks,
+allow infantry overlap, and reject vehicle-body units. Their line dragging treats terrain, building,
+and map-bounds blockers as skipped sites,
 omits illegal build commands for those sites, and resumes on the far side; vehicle-body unit blockers
   still break the line. HUD and input should exchange command intent through descriptor/facade
   methods, while gameplay command emission continues to flow through
@@ -969,10 +969,10 @@ optimistic production/rally, control groups, build/gather/train/research/cancel,
 execution remain strict local-owner checks.
 Shift-confirmed build placement keeps placement mode armed while Shift is physically held, allowing
 multiple queued building placements; releasing Shift or losing window focus clears placement mode.
-Tank Trap placement uses the same local placement intent, with optional `lineSites` preview data:
-the first valid sites dispatch as one immediate single-worker build per selected worker, and any
-remaining valid sites dispatch as queued standard build commands against the selected worker set.
-Line placement only offers vehicle-closing Tank Trap steps: exact diagonal adjacency `(1,1)` or
+If re-enabled, Tank Trap placement uses the same local placement intent, with optional `lineSites`
+preview data: the first valid sites dispatch as one immediate single-worker build per selected
+worker, and any remaining valid sites dispatch as queued standard build commands against the
+selected worker set. Line placement only offers vehicle-closing Tank Trap steps: exact diagonal adjacency `(1,1)` or
 one-tile orthogonal gaps `(2,0)` / `(0,2)`. Invalid intermediate sites break the line instead of
 letting dispatch skip ahead across a larger gap. The renderer draws Tank Traps larger than their
 1x1 build footprint so these sparse vehicle-blocking gaps read as closed barrier segments.

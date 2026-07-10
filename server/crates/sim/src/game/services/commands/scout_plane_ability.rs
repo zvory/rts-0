@@ -3,9 +3,7 @@ use std::collections::HashMap;
 use crate::game::ability::{self, AbilityKind, AbilityTargetMode};
 use crate::game::entity::EntityStore;
 use crate::game::map::Map;
-use crate::game::services::ability_orders::{
-    self, caster_can_accept_order, tech_requirement_met,
-};
+use crate::game::services::ability_orders::{self, caster_can_accept_order, tech_requirement_met};
 use crate::game::services::scout_plane::{self, ScoutPlaneLaunchError};
 use crate::game::PlayerState;
 use crate::protocol::{Event, NoticeSeverity};

@@ -383,8 +383,8 @@ mod tests {
             ]
         );
         assert!(
-            can_build_for_faction(DEFAULT_FACTION_ID, EntityKind::Worker, EntityKind::TankTrap),
-            "default workers can build Tank Traps after client build-card exposure"
+            !can_build_for_faction(DEFAULT_FACTION_ID, EntityKind::Worker, EntityKind::TankTrap),
+            "Tank Traps are temporarily unavailable to default workers"
         );
         assert!(
             can_build_for_faction(DEFAULT_FACTION_ID, EntityKind::Worker, EntityKind::PumpJack),

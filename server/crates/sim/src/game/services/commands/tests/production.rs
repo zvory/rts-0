@@ -523,7 +523,12 @@ fn ballistic_tables_research_requires_heavy_guns() {
     ));
 
     players[0].upgrades.insert(UpgradeKind::AntiTankGunUnlock);
-    let events = apply_with_players(&map, &mut entities, &mut players, vec![(1, command.clone())]);
+    let events = apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(1, command.clone())],
+    );
     assert!(entities
         .get(research_complex)
         .expect("research complex")

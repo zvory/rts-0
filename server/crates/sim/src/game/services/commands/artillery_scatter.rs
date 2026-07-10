@@ -11,7 +11,8 @@ pub(super) fn artillery_scattered_point(
     shot_number: u16,
     ballistic_tables_researched: bool,
 ) -> (f32, f32) {
-    let error_tiles = artillery_error_tiles(origin, target, shot_number, ballistic_tables_researched);
+    let error_tiles =
+        artillery_error_tiles(origin, target, shot_number, ballistic_tables_researched);
     let radius_px = error_tiles.max(0.0) * config::TILE_SIZE as f32;
     if radius_px <= f32::EPSILON {
         return target;
@@ -60,8 +61,8 @@ pub(super) fn artillery_error_tiles(
     let (origin_x, origin_y) = origin;
     let (x, y) = target;
     let distance_tiles = dist2(origin_x, origin_y, x, y).sqrt() / config::TILE_SIZE as f32;
-    let range_span = (config::ARTILLERY_MAX_RANGE_TILES - config::ARTILLERY_MIN_RANGE_TILES)
-        .max(1) as f32;
+    let range_span =
+        (config::ARTILLERY_MAX_RANGE_TILES - config::ARTILLERY_MIN_RANGE_TILES).max(1) as f32;
     let range_progress = if distance_tiles.is_finite() {
         ((distance_tiles - config::ARTILLERY_MIN_RANGE_TILES as f32) / range_span).clamp(0.0, 1.0)
     } else {
