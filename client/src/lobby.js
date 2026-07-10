@@ -513,7 +513,6 @@ export class Lobby {
       onSetTeam: (id, teamId) => this.net.setTeam(id, teamId),
       onSetSpectator: (id, spectator) => this.net.setSpectator(spectator, id),
       onSetFaction: (factionId) => this.net.setFaction(factionId),
-      onSetAiProfile: (id, aiProfileId) => this.net.setAiProfile(id, aiProfileId),
     });
   }
 

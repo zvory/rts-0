@@ -172,7 +172,6 @@ import { textWithin } from "./dom_text.mjs";
   withFakeDocument(() => {
     const root = document.createElement("div");
     const view = new LobbyRosterView(root);
-    let selectedProfile = null;
     view.render({
       players: [
         { id: 1, name: "Host", color: "#0072b2", ready: false, teamId: 1 },
@@ -192,28 +191,14 @@ import { textWithin } from "./dom_text.mjs";
       countdownActive: false,
       playerCount: 2,
       maxPlayers: 4,
-      onSetAiProfile: (id, profileId) => {
-        selectedProfile = { id, profileId };
-      },
     });
 
-    const select = findFakes(
+    const profileSelectors = findFakes(
       root,
       (el) => el.tagName === "SELECT" && el.className === "player-ai-profile-select",
-    )[0];
-    assert(!!select, "host lobby renders an AI profile selector");
-    assert(select.value === "ai_2_1", "AI 2.1 profile state is selected in the lobby");
-    assert(
-      select.children.length === 1 &&
-        select.children[0].value === "ai_2_1" &&
-        select.children[0].textContent === "AI 2.1",
-      "AI profile selector contains only the AI 2.1 option",
     );
-    assert(select.disabled, "AI profile selector is fixed when AI 2.1 is the only live choice");
-
-    select.value = "ai_2_1";
-    select.listeners.change?.();
-    assert(selectedProfile === null, "fixed AI profile selector does not emit a profile change");
+    assert(profileSelectors.length === 0, "host lobby omits a profile control with no selectable alternatives");
+    assert(textWithin(root).includes("AI 2.1"), "host lobby labels AI seats as AI 2.1");
 
     const aliasRoot = document.createElement("div");
     const aliasView = new LobbyRosterView(aliasRoot);
@@ -237,13 +222,9 @@ import { textWithin } from "./dom_text.mjs";
       maxPlayers: 4,
     });
 
-    const aliasSelect = findFakes(
-      aliasRoot,
-      (el) => el.tagName === "SELECT" && el.className === "player-ai-profile-select",
-    )[0];
     assert(
-      aliasSelect.value === "ai_2_1",
-      "retired concrete profile ids fall back to AI 2.1 in the lobby",
+      textWithin(aliasRoot).includes("AI 2.1"),
+      "retired concrete profile ids use the AI 2.1 lobby label",
     );
 
     const labelRoot = document.createElement("div");
@@ -293,13 +274,9 @@ import { textWithin } from "./dom_text.mjs";
       playerCount: 1,
       maxPlayers: 4,
     });
-    const managerAliasSelect = findFakes(
-      managerAliasRoot,
-      (el) => el.tagName === "SELECT" && el.className === "player-ai-profile-select",
-    )[0];
     assert(
-      managerAliasSelect.value === "ai_2_1",
-      "concrete AI 2.1 profile ids select the sole live suite option",
+      textWithin(managerAliasRoot).includes("AI 2.1"),
+      "concrete AI 2.1 profile ids use the live suite label",
     );
   });
 }
