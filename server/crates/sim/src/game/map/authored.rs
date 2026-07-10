@@ -6,7 +6,7 @@ mod assignment;
 
 use super::{
     BaseSlot, Map, StartAssignmentPlayer, BASE_PROTECTION_RADIUS_TILES, CURRENT_MAP_VERSION,
-    EXPANSION_PROTECTION_RADIUS_TILES,
+    EXPANSION_PROTECTION_RADIUS_TILES, MAX_NATURALS_PER_SLOT,
 };
 use crate::protocol::terrain;
 
@@ -322,6 +322,11 @@ fn slot_natural_ids(slot: &AuthoredLayoutSlot) -> Result<Vec<&str>, String> {
     }
     if out.is_empty() {
         return Err("at least one natural is required".to_string());
+    }
+    if out.len() > MAX_NATURALS_PER_SLOT {
+        return Err(format!(
+            "at most {MAX_NATURALS_PER_SLOT} naturals are allowed per player slot"
+        ));
     }
 
     let mut seen = HashSet::with_capacity(out.len());

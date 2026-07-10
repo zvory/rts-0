@@ -490,14 +490,15 @@ folded into default targeting.
   actively harvesting that node, so death / re-order / retarget free it automatically.
 - Starting layout: each active main or natural site gets 12 steel patches and 3 oil patches.
   Map schema v2 stores named main/natural `sites` plus explicit spawn `layouts`. Each layout
-  declares a `playerCount` and a list of slots, where each slot pairs one main with one or more
-  naturals (`natural` legacy field or `naturals` array). At match start the seed selects one
-  layout for the active player count, then shuffles that layout's slots so lobby seat order does
-  not pin a human/AI to the same corner. The authored main/naturals grouping inside each slot
-  stays intact, which lets maps define different fair naturals for adjacent, cross, safe-base, or
-  other spawn constellations. Sites not selected by the chosen layout are unused. The Safer
-  Expansions map grants each selected player an in-base natural plus the matching Default-map
-  contested natural, giving each player three active bases including their main.
+  declares a `playerCount` and a list of slots, where each slot pairs one main with one to three
+  naturals (`natural` legacy field or `naturals` array), for at most four bases per player. At
+  match start the seed selects one layout for the active player count, then shuffles that layout's
+  slots so lobby seat order does not pin a human/AI to the same corner. The authored
+  main/naturals grouping inside each slot stays intact, which lets maps define different fair
+  naturals for adjacent, cross, safe-base, or other spawn constellations. Sites not selected by
+  the chosen layout are unused. The Safer Expansions map grants each selected player an in-base
+  natural plus the matching Default-map contested natural, giving each player three active bases
+  including their main.
 
 Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles], cost, supply, buildTicks):
 
