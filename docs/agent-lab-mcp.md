@@ -27,7 +27,10 @@ cache has not been hydrated. Chrome/Chromium remains a local driver requirement;
 3. Use optional short aliases such as `shooter` and `target` in `lab_spawn`; later entity inputs
    accept either those aliases or numeric ids.
 4. Keep the scene to a few entities. Use `lab_order`, `lab_time`, and `lab_inspect` to confirm the
-   authoritative result, then use `lab_camera` to set up a later capture.
+   authoritative result, then use `lab_camera` to set up a later capture. For a one-unit detail
+   capture, use `focus` without an explicit padding: its 32-world-pixel default intentionally frames
+   the unit closely. Multi-subject and non-unit focus keep their 48-world-pixel default; specify
+   padding when the scene needs a different amount of context.
 5. Call `lab_screenshot` with a safe name, normally `presentation: "clean"`, a bounded viewport, and
    optional subject aliases. It hides only DOM chrome, waits for subject assets/fonts/two error-free
    render frames, returns MCP PNG image content, and writes the PNG plus manifest below

@@ -19,7 +19,7 @@ import {
   agentLabLaunchEnabled,
   normalizeInspectionQuery,
 } from "../client/src/agent_lab_bridge.js";
-import { ABILITY, DEFAULT_FACTION_ID, LAB_ROLE } from "../client/src/protocol.js";
+import { ABILITY, DEFAULT_FACTION_ID, KIND, LAB_ROLE } from "../client/src/protocol.js";
 import { labSpawnUnitKindsForFaction } from "../client/src/lab_spawn_catalog.js";
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
@@ -145,6 +145,7 @@ const viewportCamera = {
 const viewportEntities = [
   { id: 1, kind: "rifleman", owner: 1, x: 20, y: 20, hp: 100, maxHp: 100, state: "idle", orderPlan: [] },
   { id: 2, kind: "rifleman", owner: 2, x: 240, y: 240, hp: 100, maxHp: 100, state: "idle", orderPlan: [] },
+  { id: 3, kind: KIND.CITY_CENTRE, owner: 1, x: 400, y: 400, hp: 100, maxHp: 100, state: "idle", orderPlan: [] },
 ];
 const viewportBridge = new AgentLabBridge({
   enabled: true,
@@ -172,6 +173,12 @@ assert.deepEqual(viewportInspection.entities.map((entity) => entity.id), [1], "b
 assert.deepEqual(viewportInspection.camera.worldBounds, { minX: 0, minY: 0, maxX: 100, maxY: 100 }, "bridge inspection reports applied camera world bounds");
 const focused = viewportBridge.camera({ action: "focus", entityIds: [1, 2], padding: 10 });
 assert.ok(focused.camera.zoom > 0 && focused.camera.worldBounds.maxX > focused.camera.worldBounds.minX, "bridge focus applies bounded padding and returns camera bounds");
+const groupFocused = viewportBridge.camera({ action: "focus", entityIds: [1, 2] });
+assert.equal(groupFocused.camera.zoom, 100 / 316, "bridge preserves the 48-world-pixel default for multi-subject framing");
+const buildingFocused = viewportBridge.camera({ action: "focus", entityIds: [3] });
+assert.equal(buildingFocused.camera.zoom, 100 / 96, "bridge preserves the 48-world-pixel default for single-building framing");
+const closeFocused = viewportBridge.camera({ action: "focus", entityIds: [1] });
+assert.equal(closeFocused.camera.zoom, 100 / 64, "bridge focus defaults to a 32-world-pixel close framing for readable single-subject captures");
 viewportBridge.destroy();
 
 console.log("✅ agent_lab_driver_contracts.mjs: all contract assertions passed");
