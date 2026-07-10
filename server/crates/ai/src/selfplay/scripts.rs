@@ -203,6 +203,7 @@ impl ProfileBackedScript {
                 AiIntent::Stage { units } => staging.extend(units.iter().copied()),
                 AiIntent::Move { .. }
                 | AiIntent::Build { .. }
+                | AiIntent::ResumeConstruction { .. }
                 | AiIntent::Train { .. }
                 | AiIntent::Research { .. }
                 | AiIntent::Gather { .. } => {}

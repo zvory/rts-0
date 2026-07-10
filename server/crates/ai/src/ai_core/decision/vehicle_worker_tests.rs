@@ -12,6 +12,7 @@ fn worker(id: u32, state: AiEntityState) -> AiEntitySummary {
         kind: EntityKind::Worker,
         x: id as f32,
         y: 0.0,
+        hp: 100,
         state,
         is_complete: true,
         production_queue_len: None,
@@ -55,6 +56,7 @@ fn building_at(
         kind,
         x,
         y,
+        hp: 100,
         state: queue_len
             .filter(|queue| *queue > 0)
             .map(|_| AiEntityState::Train)

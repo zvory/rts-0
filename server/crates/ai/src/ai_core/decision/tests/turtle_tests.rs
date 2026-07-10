@@ -7,7 +7,7 @@ fn turtle_expansion_ignores_opening_rifleman_losses() {
     let ts = config::TILE_SIZE as f32;
     let observation = with_expansion_resources(observation(
         AiEconomy {
-            steel: 500,
+            steel: 0,
             oil: 0,
             supply_used: 30,
             supply_cap: 60,
@@ -35,12 +35,14 @@ fn turtle_expansion_ignores_opening_rifleman_losses() {
 }
 
 #[test]
-fn turtle_opening_does_not_train_workers_for_held_oil_assignments() {
-    let mut owned = vec![
-        building(10, EntityKind::CityCentre, Some(0)),
-        building(11, EntityKind::Barracks, Some(0)),
+fn turtle_opening_starts_one_pump_jack_without_stalling_worker_training() {
+    let ts = config::TILE_SIZE as f32;
+    let owned = vec![
+        building_at(10, EntityKind::CityCentre, Some(0), 8.5 * ts, 8.5 * ts),
+        building_at(11, EntityKind::Barracks, Some(0), 9.5 * ts, 8.5 * ts),
+        worker_at(20, AiEntityState::Idle, 9.5 * ts, 9.5 * ts),
+        worker_at(21, AiEntityState::Idle, 10.5 * ts, 9.5 * ts),
     ];
-    owned.extend((0..18).map(|i| steel_worker(20 + i, 100 + i)));
     let observation = observation(
         AiEconomy {
             steel: 1_000,
@@ -58,10 +60,27 @@ fn turtle_opening_does_not_train_workers_for_held_oil_assignments() {
     );
 
     assert!(
-        !decision.intents.contains(&AiIntent::Train {
+        decision.intents.contains(&AiIntent::Train {
             kind: EntityKind::Worker
         }),
-        "the Turtle opening should not train workers toward oil while oil assignments are held"
+        "the Turtle opening must keep the City Centre on worker production"
+    );
+    assert_eq!(
+        decision
+            .commands
+            .iter()
+            .filter(|command| {
+                matches!(
+                    command,
+                    Command::Build {
+                        building: EntityKind::PumpJack,
+                        ..
+                    }
+                )
+            })
+            .count(),
+        1,
+        "the opening should fund one Pump Jack, not hold oil entirely or overcommit workers"
     );
 }
 
@@ -79,7 +98,6 @@ fn turtle_rifle_opening_reports_stage_intent_for_steel_line() {
             building(10, EntityKind::CityCentre, Some(0)),
             combat_at(30, EntityKind::Rifleman, 8.5 * ts, 8.5 * ts),
             combat_at(31, EntityKind::Rifleman, 9.0 * ts, 8.5 * ts),
-            combat_at(32, EntityKind::Rifleman, 9.5 * ts, 8.5 * ts),
         ],
     );
 
@@ -92,7 +110,7 @@ fn turtle_rifle_opening_reports_stage_intent_for_steel_line() {
     assert!(decision.intents.iter().any(|intent| {
         matches!(
             intent,
-            AiIntent::Stage { units } if units.as_slice() == [30, 31, 32]
+            AiIntent::Stage { units } if units.as_slice() == [30, 31]
         )
     }));
 }
@@ -104,7 +122,7 @@ fn turtle_machine_gunner_training_stops_at_choke_line_target() {
         building(11, EntityKind::Barracks, Some(0)),
         building(12, EntityKind::TrainingCentre, None),
     ];
-    owned.extend((0..3).map(|i| combat(30 + i, EntityKind::Rifleman)));
+    owned.extend((0..2).map(|i| combat(30 + i, EntityKind::Rifleman)));
     owned.extend((0..8).map(|i| combat(40 + i, EntityKind::MachineGunner)));
     let mut observation = observation(
         AiEconomy {
@@ -144,7 +162,7 @@ fn turtle_machine_gunner_training_stops_at_choke_line_target() {
 }
 
 #[test]
-fn turtle_spends_large_float_on_second_support_producers() {
+fn turtle_spends_large_float_on_second_gun_works_not_a_second_barracks() {
     let mut owned = vec![
         building(10, EntityKind::CityCentre, Some(0)),
         building(11, EntityKind::CityCentre, Some(0)),
@@ -173,18 +191,27 @@ fn turtle_spends_large_float_on_second_support_producers() {
         &mut AiDecisionMemory::for_profile(&AI_TURTLE_CHOKES),
     );
 
-    for kind in [EntityKind::Barracks, EntityKind::Steelworks] {
-        assert!(
-            decision.intents.contains(&AiIntent::Build { kind }),
-            "the Turtle should spend its large float on a second {kind:?}"
-        );
-        assert!(decision.commands.iter().any(|command| {
-            matches!(
-                command,
-                Command::Build { building, .. } if *building == kind
-            )
-        }));
-    }
+    assert!(
+        decision.intents.contains(&AiIntent::Build {
+            kind: EntityKind::Steelworks
+        }),
+        "the Turtle should spend its large float on a second Gun Works"
+    );
+    assert!(decision.commands.iter().any(|command| {
+        matches!(
+            command,
+            Command::Build {
+                building: EntityKind::Steelworks,
+                ..
+            }
+        )
+    }));
+    assert!(
+        !decision.intents.contains(&AiIntent::Build {
+            kind: EntityKind::Barracks
+        }),
+        "the Turtle should keep its single Barracks instead of delaying support tech"
+    );
 }
 
 #[test]

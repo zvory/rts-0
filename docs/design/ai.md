@@ -189,29 +189,30 @@ worker/resource reservations, placement validation, and ordinary `SimCommand` em
 parity refactor target for AI 2.0 rather than an intended balance upgrade until matchup evidence and
 human review say otherwise.
 
+City Centre construction recovery is shared by the economic decision loop, including direct AI 2.0
+and proposal-manager profiles. It tracks every owned unfinished City Centre independently, so the
+same rule applies to a second, third, or later expansion: after the site has gone three seconds
+without observed HP loss and has no builder assigned or travelling to it, the AI sends an available
+worker back to its original tile. The resumed ordinary `Build` command uses the simulation's
+existing construction-site path and does not pay the City Centre cost again.
+
 The `ai_turtle` suite is pinned to `ai_turtle_chokes`, a first-pass turtle profile for visual
-matchups and tuning. It uses the proposal-based economy manager to keep its supply, worker-training,
-resource-assignment, and two-City-Centre expansion behavior aligned with AI 2.0 while preserving
-its three-Rifleman opening oil hold. It targets full main-base worker saturation, opens one Barracks,
-builds Training Centre, then adds a second Barracks once steel exceeds 450 while it accelerates
-Research Complex / Steelworks R&D for Anti-Tank Guns. After its first completed Gun Works, it adds a
-second once the bank exceeds 600 steel and 250 oil. It queues Entrenchment from Training Centre
-before Machine Gunner production,
-starts the R&D chain once Entrenchment is queued, and prioritizes the Anti-Tank Gun unlock before
-downstream construction spend when Research Complex is ready. Its opening combat plan trains exactly
-three Riflemen from the first Barracks and sends them to a compact defensive line in front of the
-main steel cluster, while delaying oil assignment and tech buildings beyond Barracks until those
-opening Riflemen have been ordered. After that opening, it starts oil earlier than ordinary
-full-steel saturation, techs to Training Centre, queues Entrenchment, then can begin Research
-Complex and Steelworks before Entrenchment completes. Its Steelworks uses a city-center-facing
-nine-tile search band (half the ordinary forward production range) and keeps two clear tiles from
-other buildings, because its support weapons are mobile. Its economy-manager two-City-Centre
-expansion flow activates after Training Centre and the normal steel-or-supply trigger are met,
-regardless of opening Rifleman attrition, capping pre-expand steel workers at 18 and lifting the
-post-expand steel target toward 36 so both City Centres can keep producing workers. Its post-opening
-production is pure Machine Gunners from up to two Barracks plus priority Anti-Tank Guns from up to
-two Steelworks;
-Riflemen are not replenished after the three-unit opening. Machine Gunner production pauses once the
+matchups and tuning. It uses the proposal-based economy manager with AI 2.0/2.1's worker, supply,
+oil-timing, and one-Barracks policy values. Its compact two-Rifleman opening starts exactly one Pump
+Jack instead of holding oil entirely, so worker production keeps pace while the Training Centre can
+come online before the first pressure. It targets full main-base worker saturation, opens one
+Barracks, and starts the Training Centre as soon as it can afford it; after the Training Centre is
+complete, it immediately saves for its second City Centre before adding further support production.
+After its first completed Gun Works, it adds a second once the bank exceeds 600 steel and 250 oil.
+It queues Entrenchment from Training Centre before Machine Gunner production, starts the R&D chain
+once Entrenchment is queued, and prioritizes the Anti-Tank Gun unlock before downstream construction
+spend when Research Complex is ready. Its Steelworks uses a city-center-facing nine-tile search band
+(half the ordinary forward production range) and keeps two clear tiles from other buildings, because
+its support weapons are mobile. Its economy-manager two-City-Centre expansion flow is independent of
+opening Rifleman attrition, caps pre-expand steel workers at 18, and lifts the post-expand steel
+target toward 36 so both City Centres can keep producing workers. Its post-opening production is
+pure Machine Gunners from one Barracks plus priority Anti-Tank Guns from up to two Steelworks;
+Riflemen are not replenished after the two-unit opening. Machine Gunner production pauses once the
 first two enemy-facing choke lines each have four staffed Machine Gunners, and resumes if either line
 falls below four; those Machine Gunners use a wider three-tile
 slot spacing around each choke line. When idle and not handling a local visible threat, it selects up

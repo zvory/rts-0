@@ -1,10 +1,10 @@
 use super::*;
 
-const TURTLE_SECOND_BARRACKS_STEEL_THRESHOLD: u32 = 450;
 const TURTLE_SECOND_GUN_WORKS_FLOAT_THRESHOLD: ResourceFloatThreshold = ResourceFloatThreshold {
     steel: 600,
     oil: 250,
 };
+const TURTLE_EXPANSION_STEEL_TRIGGER: u32 = 0;
 const TURTLE_UNITS: [EntityKind; 3] = [
     EntityKind::AntiTankGun,
     EntityKind::MachineGunner,
@@ -23,25 +23,13 @@ const TURTLE_TECH_PATH: [EntityKind; 4] = [
 pub(crate) static AI_TURTLE_CHOKES: AiProfile = AiProfile {
     id: AI_TURTLE_CHOKES_ID,
     economy: EconomyPolicy::ProposalManager,
-    workers: WorkerPolicy {
-        steel_saturation_fraction: Ratio::new(1, 1),
-        steel_worker_cap: None,
-        extra_oil_workers: 6,
-        pressure_worker_cap: None,
-        pressure_until_complete: None,
-    },
-    supply: SupplyPolicy {
-        free_supply_buffer: 10,
-        emergency_depot_threshold: 4,
-    },
+    // Keep Turtle on the AI 2.0/2.1 economy cadence.  Its opening and defensive
+    // production differ, but worker, oil, supply, and first-Barracks spending must
+    // not put it behind the pressure profile before support weapons come online.
+    workers: AI_2_1_ECONOMY_MANAGER.workers,
+    supply: AI_2_1_ECONOMY_MANAGER.supply,
     buildings: BuildingPolicy {
-        barracks_curve: BarracksCurve {
-            before_steel_saturation: 1,
-            after_steel_saturation: 1,
-            banked_steel_threshold: TURTLE_SECOND_BARRACKS_STEEL_THRESHOLD,
-            banked_steel_step: TURTLE_SECOND_BARRACKS_STEEL_THRESHOLD,
-            max: 2,
-        },
+        barracks_curve: AI_2_1_ECONOMY_MANAGER.buildings.barracks_curve,
         factory_target: 0,
         proxy_barracks: None,
         required_tech_path: &TURTLE_TECH_PATH,
@@ -64,11 +52,7 @@ pub(crate) static AI_TURTLE_CHOKES: AiProfile = AiProfile {
         unit_kinds: &TURTLE_UNITS,
         required_unit: None,
     },
-    resources: ResourcePolicy {
-        oil_after_steel_workers: 6,
-        oil_after_full_steel_saturation: false,
-        tank_adaptive: None,
-    },
+    resources: AI_2_1_ECONOMY_MANAGER.resources,
     expansion: Some(ExpansionPolicy {
         target_city_centres: 2,
         required_complete_building: EntityKind::TrainingCentre,
@@ -77,7 +61,10 @@ pub(crate) static AI_TURTLE_CHOKES: AiProfile = AiProfile {
         pre_expansion_steel_worker_cap: 18,
         post_expansion_steel_worker_cap: Some(36),
         search_radius_tiles: 6,
-        trigger_steel: 350,
+        // Turtle cannot rely on the Tank profile's high army spending to bank
+        // the ordinary 350-steel trigger. Once its Training Centre is complete,
+        // reserve for the second City Centre before adding more support units.
+        trigger_steel: TURTLE_EXPANSION_STEEL_TRIGGER,
         trigger_supply_used: 30,
         blocks_tech_path: false,
         oil_before_steel_in_expansion: true,
@@ -87,7 +74,7 @@ pub(crate) static AI_TURTLE_CHOKES: AiProfile = AiProfile {
     turtle_defense: Some(TurtleDefensePolicy {
         max_chokes: 3,
         anti_tank_back_tiles: 10.0,
-        opening_riflemen: 3,
+        opening_riflemen: 2,
         support_barracks_target: 1,
         gun_works_target: 2,
         gun_works_resource_float: TURTLE_SECOND_GUN_WORKS_FLOAT_THRESHOLD,
@@ -108,19 +95,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn turtle_adds_support_producers_only_after_their_float_thresholds() {
-        let barracks = AI_TURTLE_CHOKES.buildings.barracks_curve;
+    fn turtle_keeps_ai_2_economy_cadence_and_defers_only_second_gun_works() {
+        let ai2 = AI_2_1_ECONOMY_MANAGER;
         let turtle = AI_TURTLE_CHOKES.turtle_defense.unwrap();
 
+        assert_eq!(AI_TURTLE_CHOKES.workers, ai2.workers);
+        assert_eq!(AI_TURTLE_CHOKES.supply, ai2.supply);
+        assert_eq!(AI_TURTLE_CHOKES.resources, ai2.resources);
         assert_eq!(
-            barracks.target(TURTLE_SECOND_BARRACKS_STEEL_THRESHOLD, 0, 18),
-            1
+            AI_TURTLE_CHOKES.buildings.barracks_curve,
+            ai2.buildings.barracks_curve
         );
+        assert_eq!(turtle.opening_riflemen, 2);
         assert_eq!(
-            barracks.target(TURTLE_SECOND_BARRACKS_STEEL_THRESHOLD + 1, 0, 18),
-            2
+            AI_TURTLE_CHOKES.expansion.unwrap().trigger_steel,
+            TURTLE_EXPANSION_STEEL_TRIGGER
         );
-        assert_eq!(barracks.max, 2);
         assert_eq!(turtle.gun_works_target, 2);
         assert_eq!(
             turtle.gun_works_resource_float,
