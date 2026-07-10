@@ -274,7 +274,16 @@ export class AgentLabSessionManager {
         throw new AgentLabMcpError("serverClosed", "The Agent Lab MCP server shut down while the session was opening.");
       }
       const sessionId = `lab_${crypto.randomUUID().replaceAll("-", "")}`;
-      const session = { sessionId, driver, aliases: new Map(), lastUsedAt: this.now() };
+      const session = {
+        sessionId,
+        driver,
+        aliases: new Map(),
+        lastUsedAt: this.now(),
+        // The browser driver serializes individual bridge calls, but an MCP operation can make
+        // several of them around alias validation and reconciliation. Keep each session actor-like
+        // so concurrent tool requests cannot observe and then overwrite the same alias state.
+        operationTail: Promise.resolve(),
+      };
       this.sessions.set(sessionId, session);
       this.log("sessionOpened", { sessionId, workspaceRoot });
       return session;
@@ -290,10 +299,24 @@ export class AgentLabSessionManager {
     return session;
   }
 
+  use(sessionId, operation) {
+    const session = this.get(sessionId);
+    const run = session.operationTail.then(
+      () => operation(session),
+      () => operation(session),
+    );
+    // A failed request must not poison the queue for the next request.
+    session.operationTail = run.catch(() => {});
+    return run;
+  }
+
   async close(sessionId, reason = "explicit") {
     const session = this.sessions.get(sessionId);
     if (!session) return false;
     this.sessions.delete(sessionId);
+    // Requests already admitted to this session finish before its browser and server are torn
+    // down. Later requests see an unknown session immediately.
+    await session.operationTail;
     await session.driver.close().catch((error) => this.log("sessionCloseFailed", { sessionId, reason, error: conciseError(error) }));
     this.log("sessionClosed", { sessionId, reason });
     return true;
@@ -368,13 +391,12 @@ export function createAgentLabMcpServer(options = {}) {
     inputSchema: labResetInputSchema,
     outputSchema: resetOutputSchema,
     annotations: mutationAnnotations(true),
-  }, async ({ sessionId }) => {
-    const session = manager.get(sessionId);
+  }, async ({ sessionId }) => manager.use(sessionId, async (session) => {
     const before = await aliasSnapshots(session);
     const result = await session.driver.reset();
     const reconciliation = await reconcileAliasesAfterReset(session, before);
     return { sessionId, result, ...reconciliation };
-  });
+  }));
 
   registerTool(server, "lab_catalog", {
     title: "Inspect Agent Lab Catalog",
@@ -382,10 +404,9 @@ export function createAgentLabMcpServer(options = {}) {
     inputSchema: labCatalogInputSchema,
     outputSchema: catalogOutputSchema,
     annotations: readOnlyAnnotations(),
-  }, async ({ sessionId, categories }) => {
-    const session = manager.get(sessionId);
+  }, async ({ sessionId, categories }) => manager.use(sessionId, async (session) => {
     return { sessionId, ...projectCatalog(await session.driver.catalog(), categories) };
-  });
+  }));
 
   registerTool(server, "lab_spawn", {
     title: "Spawn Agent Lab Entities",
@@ -393,8 +414,7 @@ export function createAgentLabMcpServer(options = {}) {
     inputSchema: labSpawnInputSchema,
     outputSchema: spawnOutputSchema,
     annotations: mutationAnnotations(false),
-  }, async ({ sessionId, spawns }) => {
-    const session = manager.get(sessionId);
+  }, async ({ sessionId, spawns }) => manager.use(sessionId, async (session) => {
     validateSpawnAliases(session, spawns);
     const catalog = await session.driver.catalog();
     const playerIds = new Set((catalog.players || []).map((player) => Number(player.id)));
@@ -412,7 +432,7 @@ export function createAgentLabMcpServer(options = {}) {
       results.push({ alias: spec.alias || null, id, entity: decorateEntity(response.entity, session.aliases), result: response.result });
     }
     return { sessionId, results };
-  });
+  }));
 
   registerTool(server, "lab_update", {
     title: "Update Agent Lab Setup",
@@ -420,8 +440,7 @@ export function createAgentLabMcpServer(options = {}) {
     inputSchema: labUpdateInputSchema,
     outputSchema: mutationOutputSchema,
     annotations: mutationAnnotations(false),
-  }, async ({ sessionId, update }) => {
-    const session = manager.get(sessionId);
+  }, async ({ sessionId, update }) => manager.use(sessionId, async (session) => {
     const catalog = await session.driver.catalog();
     await assertKnownPlayer(catalog, update.playerId ?? update.owner);
     let operation;
@@ -441,7 +460,7 @@ export function createAgentLabMcpServer(options = {}) {
       operation = update;
     }
     return { sessionId, result: await session.driver.update(operation) };
-  });
+  }));
 
   registerTool(server, "lab_remove", {
     title: "Remove Agent Lab Entities",
@@ -449,14 +468,13 @@ export function createAgentLabMcpServer(options = {}) {
     inputSchema: labRemoveInputSchema,
     outputSchema: removeOutputSchema,
     annotations: mutationAnnotations(true),
-  }, async ({ sessionId, refs }) => {
-    const session = manager.get(sessionId);
+  }, async ({ sessionId, refs }) => manager.use(sessionId, async (session) => {
     const resolved = await resolveEntityReferences(session, refs);
     const result = await session.driver.remove(resolved.map((entry) => entry.id));
     const removed = resolved.map((entry) => ({ id: entry.id, alias: aliasForEntity(session.aliases, entry.id) }));
     for (const entry of resolved) clearAliasesForEntity(session.aliases, entry.id);
     return { sessionId, removed, result };
-  });
+  }));
 
   registerTool(server, "lab_order", {
     title: "Issue Agent Lab Order",
@@ -464,15 +482,14 @@ export function createAgentLabMcpServer(options = {}) {
     inputSchema: labOrderInputSchema,
     outputSchema: orderOutputSchema,
     annotations: mutationAnnotations(false),
-  }, async ({ sessionId, playerId, command, ignoreCommandLimits = false }) => {
-    const session = manager.get(sessionId);
+  }, async ({ sessionId, playerId, command, ignoreCommandLimits = false }) => manager.use(sessionId, async (session) => {
     const catalog = await session.driver.catalog();
     await assertKnownPlayer(catalog, playerId);
     validateCommandCatalog(command, catalog);
     const { command: resolvedCommand, resolved } = await resolveCommand(session, command);
     const result = await session.driver.order({ playerId, command: resolvedCommand, ignoreCommandLimits });
     return { sessionId, command: resolvedCommand, resolved, result };
-  });
+  }));
 
   registerTool(server, "lab_time", {
     title: "Control Agent Lab Time",
@@ -480,10 +497,9 @@ export function createAgentLabMcpServer(options = {}) {
     inputSchema: labTimeInputSchema,
     outputSchema: mutationOutputSchema,
     annotations: mutationAnnotations(false),
-  }, async ({ sessionId, control }) => {
-    const session = manager.get(sessionId);
+  }, async ({ sessionId, control }) => manager.use(sessionId, async (session) => {
     return { sessionId, result: await session.driver.time(control) };
-  });
+  }));
 
   registerTool(server, "lab_inspect", {
     title: "Inspect Agent Lab State",
@@ -491,8 +507,7 @@ export function createAgentLabMcpServer(options = {}) {
     inputSchema: labInspectInputSchema,
     outputSchema: inspectOutputSchema,
     annotations: readOnlyAnnotations(),
-  }, async ({ sessionId, refs, kinds, owners, cameraViewport, limit }) => {
-    const session = manager.get(sessionId);
+  }, async ({ sessionId, refs, kinds, owners, cameraViewport, limit }) => manager.use(sessionId, async (session) => {
     const resolved = refs ? await resolveEntityReferences(session, refs) : [];
     const response = await session.driver.inspect({
       ids: resolved.map((entry) => entry.id),
@@ -510,7 +525,7 @@ export function createAgentLabMcpServer(options = {}) {
       truncated: response.truncated === true,
       totalMatching: Number.isInteger(response.totalMatching) ? response.totalMatching : 0,
     };
-  });
+  }));
 
   registerTool(server, "lab_camera", {
     title: "Set Agent Lab Camera",
@@ -518,8 +533,7 @@ export function createAgentLabMcpServer(options = {}) {
     inputSchema: labCameraInputSchema,
     outputSchema: cameraOutputSchema,
     annotations: mutationAnnotations(false),
-  }, async ({ sessionId, camera }) => {
-    const session = manager.get(sessionId);
+  }, async ({ sessionId, camera }) => manager.use(sessionId, async (session) => {
     let command;
     if (camera.action === "focus") {
       const resolved = await resolveEntityReferences(session, camera.refs);
@@ -529,7 +543,7 @@ export function createAgentLabMcpServer(options = {}) {
     }
     const response = await session.driver.camera(command);
     return { sessionId, camera: response.camera || response };
-  });
+  }));
 
   return { server, manager };
 }

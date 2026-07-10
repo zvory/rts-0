@@ -92,6 +92,14 @@ await call("lab_remove", { sessionId, refs: ["target"] });
 const reset = await call("lab_reset", { sessionId });
 assert.deepEqual(reset.clearedAliases, ["shooter"], "reset deliberately clears aliases that cannot be remapped without guessing");
 
+const concurrentAlias = await Promise.all([
+  client.callTool({ name: "lab_spawn", arguments: { sessionId, spawns: [{ owner: 1, kind: "rifleman", x: 960, y: 960, alias: "racer" }] } }),
+  client.callTool({ name: "lab_spawn", arguments: { sessionId, spawns: [{ owner: 1, kind: "rifleman", x: 992, y: 960, alias: "racer" }] } }),
+]);
+assert.equal(concurrentAlias.filter((result) => !result.isError).length, 1, "concurrent same-session spawns admit exactly one alias owner");
+assert.equal(concurrentAlias.filter((result) => result.isError).length, 1, "concurrent same-session spawns reject the competing alias");
+assert.match(concurrentAlias.find((result) => result.isError)?.content?.[0]?.text || "", /duplicateAlias/, "same-session tool operations serialize alias validation with mutation");
+
 const duplicate = await client.callTool({ name: "lab_spawn", arguments: { sessionId, spawns: [
   { owner: 1, kind: "rifleman", x: 960, y: 960, alias: "same" },
   { owner: 1, kind: "rifleman", x: 992, y: 960, alias: "same" },

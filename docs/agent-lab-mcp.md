@@ -61,7 +61,7 @@ the next phase.
 ## Focused verification
 
 ```bash
-cd tests && npm ci --ignore-scripts --no-audit --fund=false
+npm --prefix tests ci --ignore-scripts --no-audit --fund=false
 node tests/agent_lab_mcp_contracts.mjs
 node tests/agent_lab_mcp_smoke.mjs
 ```
