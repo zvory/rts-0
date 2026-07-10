@@ -12,6 +12,7 @@ use crate::selfplay::{
     resolve_profile_request_id_for_match, run_profile_matchup_result, ProfileMatchupEndReason,
     ProfileMatchupOptions, ProfileMatchupResult,
 };
+use crate::DEFAULT_LIVE_PROFILE_REQUEST_ID;
 
 const DEFAULT_TICKS: u32 = 25_000;
 const DEFAULT_SEED: u32 = 0;
@@ -349,10 +350,10 @@ fn print_profiles() {
     }
     println!();
     println!("aliases:");
-    println!("  ai -> ai_1_2");
+    println!("  ai -> {DEFAULT_LIVE_PROFILE_REQUEST_ID}");
     println!("  ai1 -> ai_1_0");
     println!("  ai_1_0 -> ai_1_0");
-    println!("  default -> ai_1_2");
+    println!("  default -> {DEFAULT_LIVE_PROFILE_REQUEST_ID}");
     println!("  ai_1_1 -> ai_1_1");
     println!("  ai11 -> ai_1_1");
     println!("  ai_1_2 -> ai_1_2");
