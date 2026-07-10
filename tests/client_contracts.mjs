@@ -32,6 +32,7 @@ await import("./client_contracts/match_history_contracts.mjs");
 runScoreboardContracts();
 await import("./client_contracts/net_contracts.mjs");
 await import("./client_contracts/lab_contracts.mjs");
+await import("./agent_lab_driver_contracts.mjs");
 await import("./client_contracts/lab_control_group_contracts.mjs");
 await import("./client_contracts/lab_input_ownership_contracts.mjs");
 await import("./client_contracts/lab_tool_input_contracts.mjs");

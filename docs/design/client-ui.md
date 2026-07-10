@@ -64,6 +64,7 @@ src/
   live_pause_overlay.js # live-match pause state overlay and unpause affordance
   branch_staging.js # replay branch staging panel
   lab_catalog.js # LabCatalogScreen: app-owned `/lab` setup/blank selector
+  agent_lab_bridge.js # AgentLabBridge: launch-gated narrow local automation facade
   lab_client.js  # LabClient: lab request ids, pending results, state/result subscriptions
   lab_scenario_authoring.js # pure lab setup metadata defaults, slugging, and local validation
   lab_scenario_submission_capability.js # HTTP capability probe with transient-failure retry
@@ -551,6 +552,24 @@ plus bundled checkpoint setup metadata from `GET /api/lab-scenarios`; clicking a
 hidden `__lab__:<room>:map=<map>:scenario=<id>` join room and lets `App` start the normal lab flow.
 Direct `/lab?scenario=lategame`, `/lab?scenario=blank`, map, and seed URLs still bypass the selector
 and auto-join for compatibility.
+
+`agent_lab_bridge.js`
+```js
+export const AGENT_LAB_BRIDGE_KEY = "__rtsAgentLab"
+export class AgentLabBridge {
+  status()                            // readiness only; no internal references
+  call(method, input)                 // status/catalog/spawn/update/remove/order/time/inspect/camera/reset
+  destroy()
+}
+export function agentLabLaunchEnabled(locationLike?)
+```
+`App` composes this bridge only when the `/lab` URL includes `agentLab=1`. Its global surface is a
+frozen `{version, status, call}` object; it never returns `App`, `Match`, `Net`, `Renderer`, or
+`GameState`. Calls delegate through existing `LabClient`, normal `issueCommandAs`, room-time,
+camera, and `GameState` projection seams. Mutation/order calls wait for a new authoritative snapshot
+and, when room time is paused, request one bounded tick so accepted state is observed before success.
+The local `scripts/agent-lab/driver.mjs` owns the selected-worktree server, headless browser, logs,
+and profile cleanup; MCP transport is intentionally outside this client contract.
 
 `lab_scenario_authoring.js`
 ```js

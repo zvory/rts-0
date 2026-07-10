@@ -37,6 +37,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "visual_profiles.js": "app-shell",
   "camera_view_selection.js": "app-shell",
   "launch_url.js": "app-shell",
+  "agent_lab_bridge.js": "app-shell",
 
   "state.js": "model",
   "state_control_groups.js": "model",
@@ -85,6 +86,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "minimap.js": "ui",
   "branch_staging.js": "ui",
   "lab_catalog.js": "ui",
+  "lab_spawn_catalog.js": "ui",
   "lab_scenario_authoring.js": "ui",
   "lab_scenario_submission_capability.js": "ui",
   "lab_scenario_submission_flow.js": "ui",
