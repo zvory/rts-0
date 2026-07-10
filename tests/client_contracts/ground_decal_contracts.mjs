@@ -9,6 +9,7 @@ import {
   groundDecalClassForKind,
   normalizeGroundDecalEvent,
 } from "../../client/src/state_ground_decals.js";
+import { stampGroundDecal } from "../../client/src/renderer/decals.js";
 import { EVENT, KIND } from "../../client/src/protocol.js";
 
 const start = {
@@ -26,8 +27,8 @@ assert(groundDecalClassForKind(KIND.MORTAR_TEAM) === GROUND_DECAL_CLASS.INFANTRY
 assert(groundDecalClassForKind(KIND.TANK) === GROUND_DECAL_CLASS.SCORCH, "tanks leave scorch decals");
 assert(groundDecalClassForKind(KIND.ANTI_TANK_GUN) === GROUND_DECAL_CLASS.SCORCH, "support guns leave scorch decals");
 assert(groundDecalClassForKind(KIND.STEEL) === GROUND_DECAL_CLASS.NONE, "resources leave no decals");
-assert(groundDecalClassForKind(KIND.CITY_CENTRE) === GROUND_DECAL_CLASS.NONE, "buildings leave no decals");
-assert(groundDecalClassForKind(KIND.TANK_TRAP) === GROUND_DECAL_CLASS.NONE, "tank traps leave no decals");
+assert(groundDecalClassForKind(KIND.CITY_CENTRE) === GROUND_DECAL_CLASS.BUILDING_SCORCH, "buildings leave footprint scorch decals");
+assert(groundDecalClassForKind(KIND.TANK_TRAP) === GROUND_DECAL_CLASS.BUILDING_SCORCH, "small buildings leave footprint scorch decals");
 
 {
   const prevById = new Map([
@@ -49,6 +50,35 @@ assert(groundDecalClassForKind(KIND.TANK_TRAP) === GROUND_DECAL_CLASS.NONE, "tan
   );
   assert(decal.seed === repeat.seed, "normalizer output seed is deterministic for stable death data");
   assert(decal.variant === repeat.variant, "normalizer output variant is deterministic for stable death data");
+}
+
+{
+  const decal = normalizeGroundDecalEvent(
+    { e: EVENT.DEATH, id: 12, x: 160, y: 192, kind: KIND.BARRACKS },
+    { players: start.players, tick: 24, tileSize: 32 },
+  );
+  assert(decal.decalClass === GROUND_DECAL_CLASS.BUILDING_SCORCH, "normalizer classifies building deaths");
+  assert(decal.footprintWidth === 96 && decal.footprintHeight === 64,
+    "building decals use the building's full rectangular footprint dimensions");
+
+  const calls = [];
+  const ctx = {
+    save() { calls.push(["save"]); },
+    restore() { calls.push(["restore"]); },
+    fillRect(x, y, width, height) { calls.push(["fillRect", x, y, width, height]); },
+    ellipse() { calls.push(["ellipse"]); },
+    arc() { calls.push(["arc"]); },
+  };
+  assert(stampGroundDecal(ctx, decal, 4), "renderer stamps a building scorch decal");
+  const scorchRects = calls.filter((call) => call[0] === "fillRect");
+  assert(
+    scorchRects.every((rect) => rect[1] >= 28 && rect[2] >= 40 && rect[1] + rect[3] <= 52 && rect[2] + rect[4] <= 56),
+    "building scorch keeps every soot, burn, and ash mark inside the rectangular building footprint after downsampling",
+  );
+  assert(scorchRects.length >= 32,
+    "building scorch softens its perimeter with scattered soot, edge bites, and ash fragments rather than straight fade bands");
+  assert(!calls.some((call) => call[0] === "ellipse" || call[0] === "arc"),
+    "building scorch decals are rectangular rather than oval");
 }
 
 {
@@ -114,4 +144,30 @@ assert(groundDecalClassForKind(KIND.TANK_TRAP) === GROUND_DECAL_CLASS.NONE, "tan
     events: [{ e: EVENT.DEATH, id: 50, x: 96, y: 96, kind: KIND.SCOUT_CAR }],
   });
   assert(state.consumePendingGroundDecals().length === 0, "GameState dedupes repeated death events by entity id");
+}
+
+{
+  const state = new GameState(start);
+  state.applySnapshot({
+    tick: 1,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 0,
+    supplyCap: 10,
+    entities: [{ id: 60, owner: 2, kind: KIND.BARRACKS, x: 80, y: 80, hp: 10, maxHp: 100 }],
+    events: [],
+  });
+  state.applySnapshot({
+    tick: 2,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 0,
+    supplyCap: 10,
+    entities: [],
+    events: [{ e: EVENT.DEATH, id: 60, x: 80, y: 80, kind: KIND.BARRACKS }],
+  });
+  const decals = state.consumePendingGroundDecals();
+  assert(decals.length === 1, "GameState queues received building death decals");
+  assert(decals[0].footprintWidth === 96 && decals[0].footprintHeight === 64,
+    "GameState supplies the map tile size for building-sized scorch decals");
 }

@@ -16,6 +16,7 @@ export const GROUND_DECAL_TEXTURE_WORLD_SCALE = 4;
 
 const DECAL_CLASS_INFANTRY = "infantry";
 const DECAL_CLASS_SCORCH = "scorch";
+const DECAL_CLASS_BUILDING_SCORCH = "buildingScorch";
 const SCORCH_DARK = 0x070706;
 const SCORCH_ASH = 0x181816;
 const VEHICLE_SCORCH_MASK_LENGTH = 62;
@@ -257,8 +258,94 @@ export function stampGroundDecal(
   downsample = GROUND_DECAL_TEXTURE_WORLD_SCALE,
   { atlas = null, tintScratch = null } = {},
 ) {
+  if (decal?.decalClass === DECAL_CLASS_BUILDING_SCORCH) {
+    return stampBuildingScorch(ctx, decal, downsample);
+  }
   if (atlas && stampAuthoredGroundDecal(ctx, decal, atlas, downsample, tintScratch)) return true;
   return stampProceduralGroundDecal(ctx, decal, downsample);
+}
+
+function stampBuildingScorch(ctx, decal, downsample) {
+  if (!ctx || !Number.isFinite(decal?.x) || !Number.isFinite(decal?.y)) return false;
+  if (!Number.isFinite(decal.footprintWidth) || decal.footprintWidth <= 0) return false;
+  if (!Number.isFinite(decal.footprintHeight) || decal.footprintHeight <= 0) return false;
+
+  const width = decal.footprintWidth / downsample;
+  const height = decal.footprintHeight / downsample;
+  const x = decal.x / downsample - width / 2;
+  const y = decal.y / downsample - height / 2;
+  const rng = mulberry32(decal.seed || decal.id || 1);
+  const edgeX = clamp(width * (0.09 + rng() * 0.04), 1, width * 0.24);
+  const edgeY = clamp(height * (0.09 + rng() * 0.04), 1, height * 0.24);
+  const coreAlpha = 0.48 + rng() * 0.08;
+  ctx.save();
+  stampFeatheredBuildingScorch(ctx, x, y, width, height, edgeX, edgeY, coreAlpha, rng);
+  stampBuildingScorchAsh(ctx, x, y, width, height, edgeX, edgeY, decal, rng);
+  ctx.restore();
+  return true;
+}
+
+function stampFeatheredBuildingScorch(ctx, x, y, width, height, edgeX, edgeY, coreAlpha, rng) {
+  stampBuildingScorchSootEdge(ctx, x, y, width, height, edgeX, edgeY, rng);
+  const coreX = x + edgeX;
+  const coreY = y + edgeY;
+  const coreWidth = width - edgeX * 2;
+  const coreHeight = height - edgeY * 2;
+  ctx.fillStyle = rgba(SCORCH_DARK, coreAlpha * 0.86);
+  ctx.fillRect(coreX, coreY, coreWidth, coreHeight);
+  stampBuildingScorchEdgeBites(ctx, coreX, coreY, coreWidth, coreHeight, rng);
+}
+
+function stampBuildingScorchSootEdge(ctx, x, y, width, height, edgeX, edgeY, rng) {
+  const fragmentCount = 16 + Math.floor(rng() * 7);
+  for (let index = 0; index < fragmentCount; index += 1) {
+    const side = Math.floor(rng() * 4);
+    const fragmentWidth = Math.max(1, width * (0.025 + rng() * 0.065));
+    const fragmentHeight = Math.max(1, height * (0.025 + rng() * 0.065));
+    let fragmentX = x + rng() * Math.max(0, width - fragmentWidth);
+    let fragmentY = y + rng() * Math.max(0, height - fragmentHeight);
+    if (side === 0) fragmentY = y + rng() * edgeY * 1.5;
+    else if (side === 1) fragmentX = x + width - fragmentWidth - rng() * edgeX * 1.5;
+    else if (side === 2) fragmentY = y + height - fragmentHeight - rng() * edgeY * 1.5;
+    else fragmentX = x + rng() * edgeX * 1.5;
+    ctx.fillStyle = rgba(SCORCH_DARK, 0.04 + rng() * 0.1);
+    ctx.fillRect(fragmentX, fragmentY, fragmentWidth, fragmentHeight);
+  }
+}
+
+function stampBuildingScorchEdgeBites(ctx, x, y, width, height, rng) {
+  const biteCount = 8 + Math.floor(rng() * 5);
+  ctx.globalCompositeOperation = "destination-out";
+  for (let index = 0; index < biteCount; index += 1) {
+    const side = Math.floor(rng() * 4);
+    const biteWidth = Math.max(1, width * (0.05 + rng() * 0.08));
+    const biteHeight = Math.max(1, height * (0.05 + rng() * 0.08));
+    let biteX = x + rng() * Math.max(0, width - biteWidth);
+    let biteY = y + rng() * Math.max(0, height - biteHeight);
+    if (side === 0) biteY = y;
+    else if (side === 1) biteX = x + width - biteWidth;
+    else if (side === 2) biteY = y + height - biteHeight;
+    else biteX = x;
+    ctx.fillStyle = rgba(0x000000, 0.16 + rng() * 0.28);
+    ctx.fillRect(biteX, biteY, biteWidth, biteHeight);
+  }
+  ctx.globalCompositeOperation = "source-over";
+}
+
+function stampBuildingScorchAsh(ctx, x, y, width, height, edgeX, edgeY, decal, rng) {
+  const innerX = x + edgeX * (1.45 + rng() * 0.25);
+  const innerY = y + edgeY * (1.45 + rng() * 0.25);
+  const innerWidth = Math.max(1, width - (innerX - x) * 2);
+  const innerHeight = Math.max(1, height - (innerY - y) * 2);
+  const fragmentCount = 7 + ((decal.variant || 0) % 3);
+  for (let index = 0; index < fragmentCount; index += 1) {
+    const fragmentWidth = Math.max(1, innerWidth * (0.1 + rng() * 0.15));
+    const fragmentHeight = Math.max(1, innerHeight * (0.08 + rng() * 0.14));
+    const fragmentX = innerX + rng() * Math.max(0, innerWidth - fragmentWidth);
+    const fragmentY = innerY + rng() * Math.max(0, innerHeight - fragmentHeight);
+    ctx.fillStyle = rgba(index % 3 === 0 ? SCORCH_DARK : SCORCH_ASH, 0.07 + rng() * 0.1);
+    ctx.fillRect(fragmentX, fragmentY, fragmentWidth, fragmentHeight);
+  }
 }
 
 function stampAuthoredGroundDecal(ctx, decal, atlas, downsample, tintScratch) {

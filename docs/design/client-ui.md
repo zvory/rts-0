@@ -20,7 +20,7 @@ src/
   unit_range_settings.js # localStorage-backed selected-unit range overlay toggle
   sim_wasm_adapter.js # optional WASM prediction adapter
   state.js        # GameState: holds prev+current snapshot, selection, control groups, display overlays
-  state_ground_decals.js # client-only death-event decal queue, classification, owner/facing recovery
+  state_ground_decals.js # client-only death-event decal queue, classification, owner/facing recovery, building-footprint sizing
   client_intent.js # ClientIntent: browser-local placement, command targeting, lab tools, previews, feedback
   command_budget.js # client mirror of command-supply selection admission and outgoing command guard
   progress_extrapolator.js # local display extrapolation for active construction progress
@@ -1286,7 +1286,9 @@ terrain and resources):
   events. They are not persisted in the protocol, replay artifacts, match history, or server sim.
 - Infantry deaths stamp translucent player-tinted SVG paint masks. Vehicle and support-weapon
   deaths stamp neutral charcoal hull-shaped scorch masks with smaller, subdued player-colored paint
-  fragments.
+  fragments. Destroyed buildings stamp neutral charcoal rectangles exactly matching their rendered
+  `footW` × `footH` footprint at the map's tile size, with a charcoal core eroded by deterministic
+  soot, edge bites, and ash breakup rather than straight fade bands, but no player-color fragments.
 - `GameState` queues only unpainted death ids and `Renderer` consumes the pending queue once per
   frame. A skipped snapshot or reconnect may miss older decals; the client must not infer them.
 - The renderer stamps each new-death batch into one downsampled texture, updates that texture once

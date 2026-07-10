@@ -1,9 +1,11 @@
-import { EVENT, KIND } from "./protocol.js";
+import { STATS } from "./config.js";
+import { EVENT, KIND, isBuilding } from "./protocol.js";
 
 export const GROUND_DECAL_CLASS = Object.freeze({
   NONE: "none",
   INFANTRY: "infantry",
   SCORCH: "scorch",
+  BUILDING_SCORCH: "buildingScorch",
 });
 
 const INFANTRY_DECAL_KINDS = new Set([
@@ -28,6 +30,7 @@ const NEUTRAL_DECAL_COLOR = "#9aa0a8";
 export function groundDecalClassForKind(kind) {
   if (INFANTRY_DECAL_KINDS.has(kind)) return GROUND_DECAL_CLASS.INFANTRY;
   if (SCORCH_DECAL_KINDS.has(kind)) return GROUND_DECAL_CLASS.SCORCH;
+  if (isBuilding(kind)) return GROUND_DECAL_CLASS.BUILDING_SCORCH;
   return GROUND_DECAL_CLASS.NONE;
 }
 
@@ -74,6 +77,7 @@ export function normalizeGroundDecalEvent(ev, {
   curById = null,
   players = [],
   tick = 0,
+  tileSize = 32,
 } = {}) {
   if (!ev || ev.e !== EVENT.DEATH || typeof ev.id !== "number") return null;
   if (!Number.isFinite(ev.x) || !Number.isFinite(ev.y)) return null;
@@ -94,6 +98,9 @@ export function normalizeGroundDecalEvent(ev, {
   const weaponFacing = normalizeAngle(
     Number.isFinite(source?.weaponFacing) ? source.weaponFacing : facing,
   );
+  const footprint = decalClass === GROUND_DECAL_CLASS.BUILDING_SCORCH
+    ? buildingFootprintPixels(ev.kind, tileSize)
+    : null;
 
   return {
     id: ev.id,
@@ -107,6 +114,7 @@ export function normalizeGroundDecalEvent(ev, {
     weaponFacing,
     seed,
     variant: seed % 4,
+    ...(footprint || {}),
   };
 }
 
@@ -131,6 +139,17 @@ function playerColor(players, owner) {
   const player = Array.isArray(players) ? players.find((p) => p?.id === owner) : null;
   const color = player?.color;
   return /^#[0-9a-fA-F]{6}$/.test(color || "") ? color : NEUTRAL_DECAL_COLOR;
+}
+
+function buildingFootprintPixels(kind, tileSize) {
+  const stat = STATS[kind] || {};
+  const safeTileSize = Number.isFinite(tileSize) && tileSize > 0 ? tileSize : 32;
+  const footW = Number.isFinite(stat.footW) && stat.footW > 0 ? stat.footW : 1;
+  const footH = Number.isFinite(stat.footH) && stat.footH > 0 ? stat.footH : 1;
+  return {
+    footprintWidth: footW * safeTileSize,
+    footprintHeight: footH * safeTileSize,
+  };
 }
 
 function angleFromSeed(seed) {
