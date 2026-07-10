@@ -493,14 +493,15 @@ async function loadPuppeteer(workspaceRoot) {
   return imported.default || imported;
 }
 
-function ensureTestNodeModules(testsDir) {
+export function ensureTestNodeModules(testsDir, requiredPackage = "puppeteer-core") {
   const packageLock = path.join(testsDir, "package-lock.json");
   const localNodeModules = path.join(testsDir, "node_modules");
-  if (fs.existsSync(path.join(localNodeModules, "puppeteer-core"))) return;
+  const packagePath = path.join(...String(requiredPackage).split("/"));
+  if (fs.existsSync(path.join(localNodeModules, packagePath))) return;
   const cacheRoot = process.env.RTS_NODE_DEPS_CACHE_DIR || "/tmp/rts-node-deps";
   const hash = crypto.createHash("sha256").update(fs.readFileSync(packageLock)).digest("hex");
   const cacheNodeModules = path.join(cacheRoot, hash, "node_modules");
-  if (fs.existsSync(path.join(cacheNodeModules, "puppeteer-core"))) {
+  if (fs.existsSync(path.join(cacheNodeModules, packagePath))) {
     if (fs.existsSync(localNodeModules)) fs.rmSync(localNodeModules, { recursive: true, force: true });
     fs.symlinkSync(cacheNodeModules, localNodeModules, "dir");
     return;

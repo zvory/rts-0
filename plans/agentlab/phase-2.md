@@ -1,6 +1,6 @@
 # Phase 2 - Project-Scoped Interactive MCP
 
-Status: planned.
+Status: done.
 
 ## Goal
 

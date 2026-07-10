@@ -2,7 +2,7 @@
 // It deliberately exposes typed scene operations only; callers never receive App,
 // Match, transport, renderer, or GameState references.
 
-import { CMD, LAB_ROLE } from "./protocol.js";
+import { ABILITY, CMD, LAB_ROLE } from "./protocol.js";
 import { factionCatalog } from "./config.js";
 import {
   labBuildingSpawnFactionOptions,
@@ -138,6 +138,7 @@ export class AgentLabBridge {
       players,
       factions,
       supportedCommandKinds: Object.values(CMD),
+      abilities: Object.values(ABILITY),
     };
   }
 
@@ -281,11 +282,11 @@ export class AgentLabBridge {
     const { match } = this.session();
     const normalized = normalizeInspectionQuery(query);
     const entities = match.state.entitiesInterpolated(1, { includePrediction: false })
-      .filter((entity) => inspectionIncludesEntity(entity, normalized))
+      .filter((entity) => inspectionIncludesEntity(entity, normalized, match.camera))
       .slice(0, normalized.limit)
       .map(projectEntity);
     const allMatching = match.state.entitiesInterpolated(1, { includePrediction: false })
-      .filter((entity) => inspectionIncludesEntity(entity, normalized)).length;
+      .filter((entity) => inspectionIncludesEntity(entity, normalized, match.camera)).length;
     return {
       entities,
       truncated: allMatching > entities.length,
@@ -315,8 +316,17 @@ export class AgentLabBridge {
       const ids = boundedIds(input?.entityIds, "camera.entityIds", AGENT_LAB_LIMITS.focusEntities);
       const entities = ids.map((id) => match.state.entityById(id)).filter(Boolean);
       if (entities.length !== ids.length) throw bridgeError("unknownEntity", "camera.focus contains an entity that is not in the current snapshot.");
-      const centerX = entities.reduce((sum, entity) => sum + entity.x, 0) / entities.length;
-      const centerY = entities.reduce((sum, entity) => sum + entity.y, 0) / entities.length;
+      const padding = boundedNonNegativeNumber(input?.padding ?? 48, "camera.padding", 1024);
+      const minX = Math.min(...entities.map((entity) => entity.x));
+      const maxX = Math.max(...entities.map((entity) => entity.x));
+      const minY = Math.min(...entities.map((entity) => entity.y));
+      const maxY = Math.max(...entities.map((entity) => entity.y));
+      const width = Math.max(1, maxX - minX + padding * 2);
+      const height = Math.max(1, maxY - minY + padding * 2);
+      const zoom = Math.min(match.camera.viewW / width, match.camera.viewH / height);
+      if (Number.isFinite(zoom) && zoom > 0) match.camera.setZoom(zoom);
+      const centerX = (minX + maxX) / 2;
+      const centerY = (minY + maxY) / 2;
       match.camera.centerOn(centerX, centerY);
     } else {
       throw bridgeError("invalidCamera", "camera.action must be set or focus.");
@@ -383,15 +393,23 @@ export function normalizeInspectionQuery(query = {}) {
     ids: new Set(ids),
     owners: new Set(owners),
     kinds: new Set(kinds),
+    cameraViewport: query.cameraViewport === true,
     limit: boundedPositiveInt(query.limit ?? 25, "inspect.limit", AGENT_LAB_LIMITS.inspectEntities),
   };
 }
 
-function inspectionIncludesEntity(entity, query) {
+function inspectionIncludesEntity(entity, query, camera) {
   if (query.ids.size > 0 && !query.ids.has(entity.id)) return false;
   if (query.owners.size > 0 && !query.owners.has(entity.owner)) return false;
   if (query.kinds.size > 0 && !query.kinds.has(entity.kind)) return false;
+  if (query.cameraViewport && !entityInCameraViewport(entity, camera)) return false;
   return true;
+}
+
+function entityInCameraViewport(entity, camera) {
+  const screen = camera?.worldToScreen?.(entity.x, entity.y);
+  return Number.isFinite(screen?.x) && Number.isFinite(screen?.y) &&
+    screen.x >= 0 && screen.x <= camera.viewW && screen.y >= 0 && screen.y <= camera.viewH;
 }
 
 function boundedCommand(command) {
@@ -452,7 +470,22 @@ function projectMap(map) {
 }
 
 function projectCamera(camera) {
-  return { x: finiteOrNull(camera?.x), y: finiteOrNull(camera?.y), zoom: finiteOrNull(camera?.zoom) };
+  const topLeft = camera?.screenToWorld?.(0, 0);
+  const bottomRight = camera?.screenToWorld?.(camera?.viewW, camera?.viewH);
+  return {
+    x: finiteOrNull(camera?.x),
+    y: finiteOrNull(camera?.y),
+    zoom: finiteOrNull(camera?.zoom),
+    worldBounds: Number.isFinite(topLeft?.x) && Number.isFinite(topLeft?.y) &&
+      Number.isFinite(bottomRight?.x) && Number.isFinite(bottomRight?.y)
+      ? {
+        minX: Math.min(topLeft.x, bottomRight.x),
+        minY: Math.min(topLeft.y, bottomRight.y),
+        maxX: Math.max(topLeft.x, bottomRight.x),
+        maxY: Math.max(topLeft.y, bottomRight.y),
+      }
+      : null,
+  };
 }
 
 function projectRoomTime(roomTime) {
@@ -533,6 +566,14 @@ function boundedSpeed(value) {
     throw bridgeError("invalidInput", "time.speed must be a number from 0 to 16.");
   }
   return speed;
+}
+
+function boundedNonNegativeNumber(value, label, maximum) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0 || number > maximum) {
+    throw bridgeError("invalidInput", `${label} must be a number from 0 to ${maximum}.`);
+  }
+  return number;
 }
 
 function safeKind(value, label) {
