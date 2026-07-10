@@ -5,7 +5,7 @@ PixiJS is loaded globally from CDN as `PIXI`.
 
 ```
 index.html        # PINNED — CDN + #app + module entry + screens markup
-map-editor.html   # standalone handcrafted-map editor; loads/saves server map JSON
+map-editor.html   # standalone handcrafted-map editor; terrain/base symmetry plus JSON load/save
 styles.css        # HUD, lobby, menus, command card
 assets/decals/    # SVG alpha-mask sources for client-only permanent ground decals
 src/
@@ -89,6 +89,11 @@ src/
   alerts.js       # Notice/toast alert ids and viewport alert behavior constants
   bootstrap.js    # DOM lookup, ws/dev-watch/lab launch config, startup helpers
 ```
+
+The standalone map editor mirrors new terrain edits left-to-right, top-to-bottom, or by a 180°
+rotation. With symmetry enabled, moving a base site also creates or updates its reflected site and
+the matching slot in the selected spawn layout. A slot has one main and one to three naturals, for
+at most four bases per player.
 
 ### 4.1 Module export contracts
 

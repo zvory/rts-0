@@ -374,6 +374,14 @@
         <button type="button" data-mode="box">Box</button>
       </div>
 
+      <h2>Symmetry</h2>
+      <div class="mode-grid" id="symmetry-modes">
+        <button class="active" type="button" data-symmetry="none">Off</button>
+        <button type="button" data-symmetry="left-right" title="Reflect across the vertical center line">Left ↔ Right</button>
+        <button type="button" data-symmetry="top-bottom" title="Reflect across the horizontal center line">Top ↔ Bottom</button>
+        <button type="button" data-symmetry="radial" title="Rotate edits 180 degrees around the map center">Rotate 180°</button>
+      </div>
+
       <h2>Spawn Layout</h2>
       <div class="base-section">
         <div id="pair-list" class="base-list"></div>
@@ -413,10 +421,11 @@
         start: "#d9e18b",
         expansion: "#b7c5d9",
         pairLine: "rgba(231,223,197,0.62)",
+        symmetry: "rgba(231,223,197,0.62)",
       });
       const PROTECTION_RADIUS = 7;
       const EXPANSION_PROTECTION_RADIUS = 4;
-      const NATURALS_PER_SLOT = 2;
+      const NATURALS_PER_SLOT = 3;
       const MIN_SIZE = 24;
       const MAX_SIZE = 160;
       const DEFAULT_MAP_URL = "/maps/default-handcrafted.json";
@@ -441,6 +450,7 @@
       let map = fallbackMap();
       let selectedTool = "grass";
       let selectedMode = "paint";
+      let selectedSymmetry = "none";
       let selectedSiteId = map.sites[0].id;
       let selectedLayoutId = map.layouts[0].id;
       let pointerDown = false;
@@ -461,6 +471,18 @@
           slots: layout.slots.map(function (slot) {
             return { main: slot.main, naturals: slot.naturals.slice() };
           }),
+        };
+      }
+
+      function cloneMapState() {
+        return {
+          version: map.version,
+          name: map.name,
+          description: map.description,
+          _design: map._design,
+          terrain: map.terrain.slice(),
+          sites: map.sites.map(cloneSite),
+          layouts: map.layouts.map(cloneLayout),
         };
       }
 
@@ -523,16 +545,134 @@
         refresh();
       }
 
-      function setSelectedSite(tile) {
-        const site = siteById(selectedSiteId);
-        if (!site) return;
-        site.x = tile.x;
-        site.y = tile.y;
-      }
-
       function normalizeId(value, fallback) {
         const id = String(value || "").trim().toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "");
         return id || fallback;
+      }
+
+      function mirroredTile(tile) {
+        const size = map.terrain.length;
+        if (selectedSymmetry === "left-right") return { x: size - 1 - tile.x, y: tile.y };
+        if (selectedSymmetry === "top-bottom") return { x: tile.x, y: size - 1 - tile.y };
+        if (selectedSymmetry === "radial") return { x: size - 1 - tile.x, y: size - 1 - tile.y };
+        return null;
+      }
+
+      function sameTile(a, b) {
+        return a && b && a.x === b.x && a.y === b.y;
+      }
+
+      function siteAt(tile) {
+        return map.sites.find(function (site) { return site.x === tile.x && site.y === tile.y; }) || null;
+      }
+
+      function uniqueSiteId(base) {
+        const stem = normalizeId(base, "site");
+        let id = stem;
+        let suffix = 2;
+        while (siteById(id)) {
+          id = stem + "_" + suffix;
+          suffix++;
+        }
+        return id;
+      }
+
+      function cloneMirroredSite(site) {
+        const target = mirroredTile(site);
+        if (!target || sameTile(site, target)) return site;
+        const occupant = siteAt(target);
+        if (occupant) return occupant.kind === site.kind ? occupant : null;
+        const mirrored = cloneSite(site);
+        mirrored.id = uniqueSiteId(site.id + "_mirror");
+        mirrored.x = target.x;
+        mirrored.y = target.y;
+        map.sites.push(mirrored);
+        clearProtectedArea(mirrored);
+        return mirrored;
+      }
+
+      function syncMirroredSlot(sourceSlot) {
+        const layout = currentLayout();
+        if (!layout) return true;
+        const sourceMain = siteById(sourceSlot.main);
+        if (!sourceMain) return false;
+        const mirroredMain = cloneMirroredSite(sourceMain);
+        if (!mirroredMain) return false;
+        if (mirroredMain.id === sourceSlot.main) return true;
+
+        const mirroredNaturals = [];
+        for (const naturalId of sourceSlot.naturals) {
+          const natural = siteById(naturalId);
+          const mirroredNatural = natural && cloneMirroredSite(natural);
+          if (!mirroredNatural) return false;
+          mirroredNaturals.push(mirroredNatural.id);
+        }
+
+        const existing = layout.slots.find(function (slot) { return slot.main === mirroredMain.id; });
+        if (existing) {
+          existing.naturals = mirroredNaturals;
+        } else {
+          layout.slots.push({ main: mirroredMain.id, naturals: mirroredNaturals });
+          layout.playerCount = layout.slots.length;
+        }
+        return true;
+      }
+
+      function syncMirroredSlotsForSite(siteId) {
+        const layout = currentLayout();
+        if (!layout) return true;
+        const sourceSlots = layout.slots.filter(function (slot) {
+          return slot.main === siteId || slot.naturals.includes(siteId);
+        });
+        for (const sourceSlot of sourceSlots) {
+          if (!syncMirroredSlot(sourceSlot)) return false;
+        }
+        return true;
+      }
+
+      function syncMirroredSlotAfterLayoutEdit(slot) {
+        return selectedSymmetry === "none" || syncMirroredSlot(slot);
+      }
+
+      function setSelectedSite(tile) {
+        const site = siteById(selectedSiteId);
+        if (!site) return false;
+        const before = cloneMapState();
+        const original = { x: site.x, y: site.y };
+        const mirrorTarget = mirroredTile(tile);
+        const existingMirror = mirrorTarget && !sameTile(original, mirroredTile(original))
+          ? siteAt(mirroredTile(original))
+          : null;
+        const sourceOccupant = siteAt(tile);
+        const mirrorOccupant = mirrorTarget ? siteAt(mirrorTarget) : null;
+        const allowed = new Set([site.id]);
+        if (existingMirror && existingMirror.kind === site.kind) allowed.add(existingMirror.id);
+        if ((sourceOccupant && !allowed.has(sourceOccupant.id)) || (mirrorOccupant && !allowed.has(mirrorOccupant.id))) {
+          setStatus("base sites cannot share a tile", true);
+          return false;
+        }
+
+        site.x = tile.x;
+        site.y = tile.y;
+        clearProtectedArea(site);
+        if (!mirrorTarget || sameTile(site, mirrorTarget)) return true;
+
+        let mirrored = existingMirror && existingMirror.kind === site.kind ? existingMirror : null;
+        if (!mirrored) {
+          mirrored = cloneSite(site);
+          mirrored.id = uniqueSiteId(site.id + "_mirror");
+          map.sites.push(mirrored);
+        }
+        mirrored.x = mirrorTarget.x;
+        mirrored.y = mirrorTarget.y;
+        clearProtectedArea(mirrored);
+
+        if (!syncMirroredSlotsForSite(site.id)) {
+          map = before;
+          setStatus("mirrored base overlaps a different site kind", true);
+          return false;
+        }
+        return true;
       }
 
       function normalizeMap(raw) {
@@ -708,6 +848,26 @@
         }
       }
 
+      function symmetricTiles(tiles) {
+        const unique = new Map();
+        for (const tile of tiles) {
+          unique.set(tile.x + "," + tile.y, tile);
+          const mirrored = mirroredTile(tile);
+          if (mirrored) unique.set(mirrored.x + "," + mirrored.y, mirrored);
+        }
+        return Array.from(unique.values());
+      }
+
+      function applyTerrain(tiles, ch) {
+        const targets = symmetricTiles(tiles);
+        if (ch !== TERRAIN.grass && targets.some(function (tile) { return isProtected(tile.x, tile.y); })) {
+          setStatus("protected base zones must stay grass", true);
+          return false;
+        }
+        for (const tile of targets) setTerrainAt(tile.x, tile.y, ch);
+        return true;
+      }
+
       function validationErrors() {
         const errors = [];
         const size = map.terrain.length;
@@ -783,6 +943,8 @@
           ctx.stroke();
         }
 
+        drawSymmetryGuide();
+
         for (const site of map.sites) {
           const r = siteRadius(site);
           const x = (site.x - r) * cellSize;
@@ -836,11 +998,10 @@
 
         if (pointerDown && selectedMode === "box" && selectedTool !== "base" && dragStartTile && dragPreviewTile) {
           const rect = tileRect(dragStartTile, dragPreviewTile);
-          ctx.fillStyle = "rgba(199,208,122,0.12)";
-          ctx.fillRect(rect.x0 * cellSize, rect.y0 * cellSize, rect.w * cellSize, rect.h * cellSize);
-          ctx.strokeStyle = "#e7dfc5";
-          ctx.lineWidth = 2;
-          ctx.strokeRect(rect.x0 * cellSize + 1, rect.y0 * cellSize + 1, rect.w * cellSize - 2, rect.h * cellSize - 2);
+          drawPreviewRect(rect);
+          const mirroredStart = mirroredTile(dragStartTile);
+          const mirroredEnd = mirroredTile(dragPreviewTile);
+          if (mirroredStart && mirroredEnd) drawPreviewRect(tileRect(mirroredStart, mirroredEnd));
         }
 
       }
@@ -882,17 +1043,28 @@
             }).join("");
             row.innerHTML = '<span><span class="base-name">Slot ' + (i + 1) + '</span><span class="base-kind">' + slot.main + ' -> ' + naturalSummary + '</span></span><span><select aria-label="Main for slot ' + (i + 1) + '">' + mainOptions + '</select>' + naturalSelects + '</span>';
             const selects = row.querySelectorAll("select");
-            selects[0].addEventListener("change", function (event) { slot.main = event.target.value; refresh(); });
+            selects[0].addEventListener("change", function (event) {
+              const before = cloneMapState();
+              slot.main = event.target.value;
+              const synced = syncMirroredSlotAfterLayoutEdit(slot);
+              if (!synced) map = before;
+              refresh();
+              if (!synced) setStatus("mirrored base overlaps a different site kind", true);
+            });
             selects.forEach(function (select, selectIndex) {
               if (selectIndex === 0) return;
               select.addEventListener("change", function (event) {
+                const before = cloneMapState();
                 const next = slot.naturals.slice();
                 const naturalIndex = Number(event.target.dataset.naturalIndex);
                 if (event.target.value) next[naturalIndex] = event.target.value; else next.splice(naturalIndex, 1);
                 slot.naturals = next.filter(function (value, index, values) {
                   return value && values.indexOf(value) === index;
                 });
+                const synced = syncMirroredSlotAfterLayoutEdit(slot);
+                if (!synced) map = before;
                 refresh();
+                if (!synced) setStatus("mirrored base overlaps a different site kind", true);
               });
             });
             pairListEl.appendChild(row);
@@ -931,6 +1103,12 @@
         });
       }
 
+      function syncSymmetryButtons() {
+        document.querySelectorAll("[data-symmetry]").forEach(function (button) {
+          button.classList.toggle("active", button.dataset.symmetry === selectedSymmetry);
+        });
+      }
+
       function canvasTile(event) {
         const rect = canvas.getBoundingClientRect();
         const x = Math.floor((event.clientX - rect.left) / cellSize);
@@ -948,22 +1126,45 @@
         return { x0: x0, y0: y0, x1: x1, y1: y1, w: x1 - x0 + 1, h: y1 - y0 + 1 };
       }
 
+      function drawPreviewRect(rect) {
+        ctx.fillStyle = "rgba(199,208,122,0.12)";
+        ctx.fillRect(rect.x0 * cellSize, rect.y0 * cellSize, rect.w * cellSize, rect.h * cellSize);
+        ctx.strokeStyle = "#e7dfc5";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(rect.x0 * cellSize + 1, rect.y0 * cellSize + 1, rect.w * cellSize - 2, rect.h * cellSize - 2);
+      }
+
+      function drawSymmetryGuide() {
+        if (selectedSymmetry === "none") return;
+        const center = canvas.width / 2;
+        ctx.save();
+        ctx.strokeStyle = COLORS.symmetry;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([5, 4]);
+        if (selectedSymmetry === "left-right" || selectedSymmetry === "radial") {
+          ctx.beginPath();
+          ctx.moveTo(center, 0);
+          ctx.lineTo(center, canvas.height);
+          ctx.stroke();
+        }
+        if (selectedSymmetry === "top-bottom" || selectedSymmetry === "radial") {
+          ctx.beginPath();
+          ctx.moveTo(0, center);
+          ctx.lineTo(canvas.width, center);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
       function applyTool(tile) {
         if (!tile) return;
         if (selectedTool === "base") {
-          setSelectedSite(tile);
-          const site = siteById(selectedSiteId);
-          if (site) clearProtectedArea(site);
-          refresh();
+          if (setSelectedSite(tile)) refresh();
           return;
         }
         const ch = TERRAIN[selectedTool];
         if (!ch) return;
-        if (ch !== TERRAIN.grass && isProtected(tile.x, tile.y)) {
-          setStatus("protected base zones must stay grass", true);
-          return;
-        }
-        setTerrainAt(tile.x, tile.y, ch);
+        if (!applyTerrain([tile], ch)) return;
         draw();
         updateStatus();
       }
@@ -973,15 +1174,15 @@
         const ch = TERRAIN[selectedTool];
         if (!ch) return;
         const rect = tileRect(a, b);
-        let skipped = 0;
+        const tiles = [];
         for (let y = rect.y0; y <= rect.y1; y++) {
           for (let x = rect.x0; x <= rect.x1; x++) {
-            if (ch !== TERRAIN.grass && isProtected(x, y)) { skipped++; continue; }
-            setTerrainAt(x, y, ch);
+            tiles.push({ x: x, y: y });
           }
         }
+        if (!applyTerrain(tiles, ch)) return;
         draw();
-        skipped > 0 ? setStatus("protected base zones must stay grass", true) : updateStatus();
+        updateStatus();
       }
 
       function resizeMap(nextSize) {
@@ -1081,6 +1282,13 @@
         selectedMode = button.dataset.mode;
         syncModeButtons();
       });
+      document.getElementById("symmetry-modes").addEventListener("click", function (event) {
+        const button = event.target.closest("[data-symmetry]");
+        if (!button) return;
+        selectedSymmetry = button.dataset.symmetry;
+        syncSymmetryButtons();
+        draw();
+      });
       canvas.addEventListener("pointerdown", function (event) {
         const tile = canvasTile(event);
         if (!tile) return;
@@ -1133,6 +1341,7 @@
 
       syncToolButtons();
       syncModeButtons();
+      syncSymmetryButtons();
       renderBuiltInMapSelect();
       loadMapCatalog();
       loadDefault();
