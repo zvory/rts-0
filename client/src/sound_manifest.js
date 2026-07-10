@@ -19,6 +19,7 @@ export const SOUND_MANIFEST = Object.freeze([
   { id: "combat_panzerfaust_impact_01", url: "/assets/sound/combat/combat_panzerfaust_impact_01.mp3", category: "combat_other" },
   { id: "combat_mortar_launch_04", url: "/assets/sound/combat/combat_mortar_launch_04.mp3", category: "combat_other" },
   { id: "combat_artillery_fire_05", url: "/assets/sound/combat/combat_artillery_fire_05.mp3", category: "combat_other" },
+  { id: "combat_artillery_landing_01", url: "/assets/sound/combat/combat_artillery_landing_01.mp3", category: "combat_other" },
   { id: "unit_breakthrough_todes_rit_01", url: "/assets/sound/units/units_breakthrough_todes_rit_01.mp3", category: "unit_voice" },
   { id: "unit_breakthrough_koste_es_01", url: "/assets/sound/units/units_breakthrough_koste_es_01.mp3", category: "unit_voice" },
   { id: "countdown_drei", url: "/assets/sound/ui/ui_countdown_drei_01.mp3", category: "ui" },

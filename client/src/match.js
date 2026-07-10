@@ -1211,6 +1211,8 @@ export class Match {
     this.stopMatchPings();
     this.stopNetReports();
     this.stopAllMachineGunSounds();
+    this.combatAudio?.destroy();
+    this.combatAudio = null;
     this.net.off(S.SNAPSHOT, this.onSnapshot);
     this.net.off(S.COMMAND_RECEIPT, this.onCommandReceipt);
     this.net.off(S.ROOM_TIME_STATE, this.onRoomTimeState);
@@ -1251,6 +1253,8 @@ export class Match {
     this.stopMatchPings();
     this.stopNetReports();
     this.stopAllMachineGunSounds();
+    this.combatAudio?.destroy();
+    this.combatAudio = null;
     this.net.off(S.SNAPSHOT, this.onSnapshot);
     this.net.off(S.COMMAND_RECEIPT, this.onCommandReceipt);
     this.net.off(S.ROOM_TIME_STATE, this.onRoomTimeState);
