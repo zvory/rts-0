@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   DEFAULT_IDLE_MS, IPC_VERSION, STARTUP_GRACE_MS, configuredIdleMs, prepareRuntime,
-  processAlive, readStartupLock, reclaimStaleStartupLock,
+  processAlive, readStartupLock, readState, reclaimStaleStartupLock,
   runtimePaths, sleep, startupLockStale,
 } from "../scripts/lab-interact/runtime.mjs";
 
@@ -223,14 +223,14 @@ fs.writeFileSync(paths.state, savedStateText, { mode: 0o600 });
 shutdown(baseEnv);
 await waitFor(() => !fs.existsSync(paths.directory), 2000, "duplicate-start test cleans up");
 
-const inFlightEnv = { ...baseEnv, RTS_LAB_INTERACT_IDLE_MS: "80", RTS_LAB_INTERACT_FAKE_DELAY_MS: "250" };
+const inFlightEnv = { ...baseEnv, RTS_LAB_INTERACT_IDLE_MS: "1000", RTS_LAB_INTERACT_FAKE_DELAY_MS: "1500" };
 const inFlightSession = call("open", {}, inFlightEnv).result.sessionId;
 const delayed = execFileAsync(process.execPath, [cli, "spawn", JSON.stringify({
   sessionId: inFlightSession,
   spawns: [{ owner: 1, kind: "rifleman", x: 960, y: 960, alias: "slow" }],
 })], { cwd: root, env: inFlightEnv });
-await waitFor(() => JSON.parse(fs.readFileSync(paths.state, "utf8")).activeRequests === 1, 1000, "delayed command becomes active");
-await sleep(140);
+await waitFor(() => readState(paths)?.activeRequests === 1, 2000, "delayed command becomes active");
+await sleep(1100);
 assert.equal(fs.existsSync(paths.directory), true, "idle expiry never tears down an in-flight command");
 const shutdownDuringFlight = call("shutdown", {}, inFlightEnv);
 assert.equal(shutdownDuringFlight.result.shuttingDown, true, "shutdown latches while another command is in flight");
