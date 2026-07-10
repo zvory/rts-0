@@ -43,6 +43,23 @@ export class Fog {
     this._nextVisibleGrid = new Uint8Array(mapWidth * mapHeight);
   }
 
+  resetMap(mapWidth, mapHeight, terrain = null) {
+    this.width = mapWidth;
+    this.height = mapHeight;
+    this.terrain = terrain;
+    this.visibleGrid = new Uint8Array(mapWidth * mapHeight);
+    this.exploredGrid = new Uint8Array(mapWidth * mapHeight);
+    this._nextVisibleGrid = new Uint8Array(mapWidth * mapHeight);
+    this.visibleRevision += 1;
+    this.exploredRevision += 1;
+    this.revision += 1;
+  }
+
+  updateTerrain(terrain = null) {
+    this.terrain = terrain;
+    this.revision += 1;
+  }
+
   /**
    * Recompute visibility for this frame from the player's own entities.
    *

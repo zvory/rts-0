@@ -185,6 +185,7 @@ fn lab_op_kind(op: &LabClientOp) -> &'static str {
         LabClientOp::SetPlayerResources { .. } => "setPlayerResources",
         LabClientOp::SetPlayerGodMode { .. } => "setPlayerGodMode",
         LabClientOp::SetCompletedResearch { .. } => "setCompletedResearch",
+        LabClientOp::ApplyMapDraft { .. } => "applyMapDraft",
         LabClientOp::SetVision { .. } => "setVision",
         LabClientOp::IssueCommandAs { .. } => "issueCommandAs",
     }
@@ -245,6 +246,7 @@ fn lab_client_op_to_game_op(op: LabClientOp) -> Result<LabOp, String> {
                 completed,
             }))
         }
+        LabClientOp::ApplyMapDraft { draft } => Ok(LabOp::ApplyMapDraft(draft)),
         LabClientOp::ExportScenario { .. }
         | LabClientOp::ValidateScenario { .. }
         | LabClientOp::SubmitScenario { .. }
@@ -361,6 +363,15 @@ fn lab_outcome_json(outcome: &LabOpOutcome) -> serde_json::Value {
             "playerId": player_id,
             "upgrade": upgrade.to_protocol_str(),
             "completed": completed
+        }),
+        LabOpOutcome::MapDraftApplied {
+            name,
+            size,
+            battle_reset,
+        } => serde_json::json!({
+            "name": name,
+            "size": size,
+            "battleReset": battle_reset
         }),
         LabOpOutcome::ScenarioRestored(restore) => serde_json::to_value(restore)
             .unwrap_or_else(|_| serde_json::json!({ "scenarioRestored": true })),
@@ -657,6 +668,14 @@ impl RoomTask {
     }
 
     fn send_lab_start_payloads_to_all(&self, clear_pending_snapshot: bool) {
+        self.send_lab_start_payloads_except(clear_pending_snapshot, None);
+    }
+
+    fn send_lab_start_payloads_except(
+        &self,
+        clear_pending_snapshot: bool,
+        excluded_player_id: Option<u32>,
+    ) {
         let Phase::InGame(game) = &self.phase else {
             return;
         };
@@ -665,22 +684,26 @@ impl RoomTask {
             .projection_policy()
             .diagnostic_capabilities_for(RecipientRole::Spectator);
         let start_policy = self.session_policy();
-        let recipients = self.order.iter().filter_map(|&id| {
-            self.players.get(&id).map(|player| LaunchRecipient {
-                connection_id: id,
-                payload_player_id: self
-                    .lab_session
-                    .as_ref()
-                    .map(|session| session.view_player_id)
-                    .unwrap_or(LAB_PLAYER_ONE_ID),
-                prediction: LaunchPrediction::Disabled,
-                role: RecipientRole::Spectator,
-                diagnostics,
-                clear_pending_snapshot,
-                lab: self.lab_start_metadata_for(id),
-                msg_tx: player.msg_tx.clone(),
-            })
-        });
+        let recipients = self
+            .order
+            .iter()
+            .filter(|&&id| Some(id) != excluded_player_id)
+            .filter_map(|&id| {
+                self.players.get(&id).map(|player| LaunchRecipient {
+                    connection_id: id,
+                    payload_player_id: self
+                        .lab_session
+                        .as_ref()
+                        .map(|session| session.view_player_id)
+                        .unwrap_or(LAB_PLAYER_ONE_ID),
+                    prediction: LaunchPrediction::Disabled,
+                    role: RecipientRole::Spectator,
+                    diagnostics,
+                    clear_pending_snapshot,
+                    lab: self.lab_start_metadata_for(id),
+                    msg_tx: player.msg_tx.clone(),
+                })
+            });
         let builder = StartPayloadBuilder::simulation(start_policy, &payload);
         super::super::launch::send_start_payloads(&self.room, &builder, recipients);
     }
@@ -770,6 +793,7 @@ impl RoomTask {
 
     pub(super) fn on_lab_request(&mut self, player_id: u32, request_id: u32, op: LabClientOp) {
         let op_kind = lab_op_kind(&op).to_string();
+        let refresh_map_after_result = matches!(op, LabClientOp::ApplyMapDraft { .. });
         if request_id == 0 {
             self.send_lab_result_to(
                 player_id,
@@ -865,7 +889,12 @@ impl RoomTask {
             op => Some(self.apply_lab_mutation(player_id, request_id, op)),
         };
         if let Some(result) = result {
+            let refresh_map = refresh_map_after_result && result.ok;
             self.send_lab_result_to(player_id, result);
+            if refresh_map {
+                self.send_lab_start_payloads_except(true, Some(player_id));
+                self.fanout_current_lab_snapshots();
+            }
         }
     }
 
@@ -1013,6 +1042,9 @@ impl RoomTask {
                     LabReplayRebaseSource::Checkpoint(Box::new(scenario.clone())),
                 ),
             },
+            LabClientOp::ApplyMapDraft { draft } => Some(LabReplayRebaseSource::Current {
+                name: draft.name.clone(),
+            }),
             _ => None,
         };
         let imported_vision = match &op {
@@ -1031,7 +1063,10 @@ impl RoomTask {
             Ok(op) => op,
             Err(err) => return lab_result_error(request_id, op_kind, &err),
         };
-        let resets_timeline = matches!(lab_op, LabOp::RestoreCheckpointScenario(_));
+        let resets_timeline = matches!(
+            lab_op,
+            LabOp::RestoreCheckpointScenario(_) | LabOp::ApplyMapDraft(_)
+        );
         let timeline_op = lab_op.clone();
         let replay_op = if resets_timeline {
             None
@@ -1066,7 +1101,26 @@ impl RoomTask {
             };
             (game.tick_count(), outcome)
         };
-        let outcome_json = lab_outcome_json(&outcome);
+        let outcome_json = match &outcome {
+            LabOpOutcome::MapDraftApplied {
+                name,
+                size,
+                battle_reset,
+            } => {
+                let Some(payload) = self.live_game().map(Game::start_payload) else {
+                    return lab_result_error(request_id, op_kind, "lab game is not running");
+                };
+                serde_json::json!({
+                    "name": name,
+                    "size": size,
+                    "battleReset": battle_reset,
+                    "tick": payload.tick,
+                    "map": payload.map,
+                    "players": payload.players,
+                })
+            }
+            _ => lab_outcome_json(&outcome),
+        };
         let reset_timeline = if resets_timeline {
             let Some(game) = self.live_game().map(Game::clone_for_replay_keyframe) else {
                 return lab_result_error(request_id, op_kind, "lab game is not running");

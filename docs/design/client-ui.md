@@ -69,7 +69,10 @@ src/
   lab_scenario_submission_flow.js # LabPanel scenario validation/submission orchestration
   lab_panel.js   # LabPanel: app-owned lab controls/status UI mounted around Match
   lab_panel_window.js # draggable/resizable chrome helper for the app-owned LabPanel
+  lab_map_editor_session.js # persistent 25-state authored-map draft and undo/redo history
+  lab_map_editor_panel.js # floating live-lab terrain/base/slot editing and map JSON export
   lab_control_policy.js # Lab control collaborator placeholder injected into Match
+  lab_map_reset.js # in-place authoritative Lab map/player/fog/terrain refresh collaborator
   visual_profiles.js # Lab-scoped visual experimentation profile registry and resolver
   settings_container.js # Reusable settings shell: opener, tabs, focus, teardown
   settings_panels.js # Portable settings tab panel descriptors
@@ -592,7 +595,7 @@ export function labSpawnUnitKindsForFaction(factionId)
 export function labBuildingSpawnFactionOptions()
 export function labSpawnBuildingKindsForFaction(factionId)
 export class LabPanel {
-  constructor({ root, labClient, launch, startPayload, match?, submissionCapability?, openWindow? })
+  constructor({ root, labClient, launch, startPayload, match?, mapEditorSession?, applyLabMapReset?, submissionCapability?, openWindow? })
   applyLabToolChange(change)             // syncs active/cancelled tool status from Match callbacks
   armSpawnPaletteTool(kind?)             // arms a Match-owned completed spawnEntity world-click tool
   armBuildingSpawnPaletteTool(kind?)     // arms a Match-owned completed building spawnEntity tool
@@ -600,6 +603,16 @@ export class LabPanel {
   validateScenario(), submitScenario(), exportScenario(), importScenario()
   saveLabReplay(), openLabReplay()        // distinct replay affordances; not legacy scenario ops
   destroy()
+}
+```
+`lab_map_editor_session.js`
+```js
+export const LAB_MAP_HISTORY_LIMIT       // 25
+export class LabMapEditorSession {
+  initializeFromStart(startPayload, options?)
+  initializeFromScenario(scenario, options?)
+  mutate(label, mutation), undo(), redo()
+  materialized(), exportMap(), saveLocal(key), loadLocal(key)
 }
 ```
 `LabPanel` renders separate floating, collapsible Options and Tools windows. Options owns room
@@ -619,6 +632,18 @@ export/import remains the fallback for setup iteration and for deployments with 
 disabled. The lab replay controls are visually separate from setup checkpoint JSON controls; replay
 save/open uses the bounded lab replay artifact path instead of the legacy `exportScenario` and
 `importScenario` lab operations.
+For the live-map-editor proof of concept, `LabPanel` also composes a third floating Map Editor
+window. `App` retains one `LabMapEditorSession` while edits are applied, so neither a terrain update
+nor a base-layout reset loses the selected editor tool or the bounded 25-state undo/redo history.
+The requesting client consumes the authoritative map/player payload from `labResult` through the
+app-owned `applyLabMapReset` collaborator, replacing static `GameState`, fog, minimap inputs, and the
+cached terrain texture in place instead of tearing down and rebuilding the whole match. The window paints
+square click regions and drag boxes, edits
+main/natural sites and the current player-slot layout, saves a browser-local draft, and exports the
+normal authored map JSON schema. Applying terrain-only drafts updates the authoritative map and
+derived pathing/fog state without resetting the simulation tick or live entities. Changing starts,
+naturals, or player slots rebuilds the battle so starting bases and resource nodes match the edited
+layout; ordinary lab unit/building palettes remain the playtest setup surface.
 `lab_panel_window.js` owns local drag, resize, collapse/expand, reset, keyboard nudge,
 viewport-clamping, and localStorage geometry hints for those app-owned lab windows. It has no
 transport or match authority.

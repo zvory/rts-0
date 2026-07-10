@@ -1,19 +1,20 @@
 use rts_protocol::{
     abilities, ability_object_kinds, default_snapshot_codec, encode_snapshot_frame, kinds,
-    protocol_contract, serialize_compact_snapshot, serialize_messagepack_compact_snapshot, states,
-    supported_snapshot_codec, terrain, upgrades, AbilityCooldownView, AbilityObjectOwnerStateView,
+    lab_replay_artifact_from_slice, protocol_contract, serialize_compact_snapshot,
+    serialize_messagepack_compact_snapshot, states, supported_snapshot_codec, terrain, upgrades,
+    validate_lab_replay_artifact, AbilityCooldownView, AbilityObjectOwnerStateView,
     AbilityObjectView, ActionCapabilities, AttackReveal, AvailableMap, BranchStagingOccupant,
     BranchStagingSeat, ClientMessage, ClientNetReport, Command, CommandCapabilities,
     CompactSlotSchemas, DebugPathPoint, DebugPathView, DiagnosticCapabilities, EntityView, Event,
-    InitialCamera, LabClientOp, LabReplayArtifactV1, LabReplayAuthoringMetadata, LabReplayOperation,
+    InitialCamera, LabCheckpointScenarioMap, LabCheckpointScenarioMapData,
+    LabCheckpointScenarioMetadata, LabCheckpointScenarioSource, LabCheckpointScenarioV1,
+    LabClientOp, LabReplayArtifactV1, LabReplayAuthoringMetadata, LabReplayOperation,
     LabReplayOperationEntry, LabReplayTimelineMetadata, LabReplayValidationError, LabResult,
-    LabCheckpointScenarioMap, LabCheckpointScenarioMapData, LabCheckpointScenarioMetadata,
-    LabCheckpointScenarioSource, LabCheckpointScenarioV1, LabScenarioEntityIdRemap,
-    LabScenarioLabMetadata, LabScenarioPayload, LabScenarioTile, LabStartMetadata, LabStartRole,
-    LabState, LabVisionMode, LivePauseState, LobbyPlayer, MapInfo, MatchControlCapabilities,
-    MovementPathDiagnosticScope, NoticeSeverity, ObserverAnalysisAiDiagnostics,
-    ObserverAnalysisKindCount, ObserverAnalysisPayload, ObserverAnalysisPlayer,
-    ObserverAnalysisProduction, ObserverAnalysisResourcesLost,
+    LabScenarioEntityIdRemap, LabScenarioLabMetadata, LabScenarioPayload, LabScenarioTile,
+    LabStartMetadata, LabStartRole, LabState, LabVisionMode, LivePauseState, LobbyPlayer, MapInfo,
+    MatchControlCapabilities, MovementPathDiagnosticScope, NoticeSeverity,
+    ObserverAnalysisAiDiagnostics, ObserverAnalysisKindCount, ObserverAnalysisPayload,
+    ObserverAnalysisPlayer, ObserverAnalysisProduction, ObserverAnalysisResourcesLost,
     OrderPlanMarker, PlayerResourceSnapshot, PlayerScore, PlayerStart, ProtocolCompactCodes,
     ProtocolContract, ProtocolMessageTags, ProtocolVocabularies, RememberedBuildingView,
     ReplayBranchSeat, ReplayStartMetadata, ResourceDelta, ResourceNode, RoomCapabilities,
@@ -26,8 +27,8 @@ use rts_protocol::{
     LAB_REPLAY_TIMELINE_KEYFRAME_INTERVAL_TICKS, MESSAGEPACK_SNAPSHOT_FRAME_MAGIC,
     PREDICTION_PROTOCOL_VERSION, SNAPSHOT_CODEC_COMPACT_JSON, SNAPSHOT_CODEC_MESSAGEPACK_COMPACT,
     SNAPSHOT_CODEC_VERSION, SNAPSHOT_FRAME_KIND_BINARY, SNAPSHOT_FRAME_KIND_TEXT,
-    lab_replay_artifact_from_slice, validate_lab_replay_artifact,
 };
+use rts_protocol::{LabMapDraft, LabMapTile};
 
 fn assert_type<T>() {}
 
@@ -53,6 +54,8 @@ fn stable_rust_public_surface_compiles() {
     assert_type::<Event>();
     assert_type::<InitialCamera>();
     assert_type::<LabClientOp>();
+    assert_type::<LabMapDraft>();
+    assert_type::<LabMapTile>();
     assert_type::<LabReplayArtifactV1>();
     assert_type::<LabReplayAuthoringMetadata>();
     assert_type::<LabReplayOperation>();
@@ -192,16 +195,7 @@ fn stable_rust_public_surface_compiles() {
 
 #[test]
 fn compact_snapshot_encodes_scout_plane_owner_state() {
-    let mut plane = EntityView::new(
-        5,
-        1,
-        kinds::SCOUT_PLANE,
-        160.0,
-        170.0,
-        40,
-        40,
-        states::IDLE,
-    );
+    let mut plane = EntityView::new(5, 1, kinds::SCOUT_PLANE, 160.0, 170.0, 40, 40, states::IDLE);
     plane.scout_plane = Some(ScoutPlaneStateView {
         orbit_center: Some([512.0, 544.0]),
     });
