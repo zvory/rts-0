@@ -32,7 +32,8 @@ Use for tests, CI/hooks, or focused verification.
 - `node scripts/check-wiki.mjs` — wiki route hardening, generated stats, and faction catalog
   parity.
 - `node scripts/client-perf-harness.mjs --render-lag-suite --seconds 10`.
-- Agent Lab: `node tests/agent_lab_driver_smoke.mjs`.
+- Agent Lab: `node tests/agent_lab_driver_smoke.mjs`, `node tests/agent_lab_mcp_contracts.mjs`
+  (schema/stdio), and `node tests/agent_lab_mcp_smoke.mjs` (live).
 - `node scripts/check-source-file-sizes.mjs` — enforce the 1500-line source cap.
 - `node scripts/check-crate-boundaries.mjs` — enforce crate direction.
 - `cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture` —
@@ -42,19 +43,17 @@ Use for tests, CI/hooks, or focused verification.
 - The required PR gate is `./tests/run-all.sh` in `Main test gate`. Split CI covers server build,
   Rust policy/lint plus complementary nextest partitions, live Node, and complementary browser
   smoke/tri-state shards; docs-only still runs cheap policy checks.
-- `tests/run-all.sh` uses nextest for Rust tests and prints timing summaries. Missing nextest is a
-  local gate failure with an install hint.
+- `tests/run-all.sh` uses nextest; missing it fails locally with an install hint.
 - Live Node suites need a running server. Use `tests/run-all.sh` to boot a private one, or start
   `cd server && cargo run` first for individual Node suites.
 - Installed hooks run staged whitespace checks, excluding `playtest_notes.md`, plus docs health.
   They do not run `tests/run-all.sh`; GitHub Actions owns the full-suite gate.
 - `scripts/agent-pr.sh` skips Codex only for pure `.md` diffs; otherwise it formats touched Rust
   with the pinned toolchain before the final push.
-- Browser smoke dependencies are cached under `${RTS_NODE_DEPS_CACHE_DIR:-/tmp/rts-node-deps}`.
+- Browser deps cache under `${RTS_NODE_DEPS_CACHE_DIR:-/tmp/rts-node-deps}`.
 - Local `tests/run-all.sh` uses per-worktree Cargo target dirs under `/tmp/rts-cargo-target/`.
   Override with `CARGO_TARGET_DIR` only when a task needs a specific target location.
-- A suite can be skipped only when `tests/select-suites.mjs` maps the changed files away from that
-  behavior.
+- Skip only when `tests/select-suites.mjs` maps changed files away from the suite.
 
 ## Self-play failure protocol
 If a self-play test fails and the cause is not obvious, start a fresh server on its own port and

@@ -566,10 +566,12 @@ export function agentLabLaunchEnabled(locationLike?)
 `App` composes this bridge only when the `/lab` URL includes `agentLab=1`. Its global surface is a
 frozen `{version, status, call}` object; it never returns `App`, `Match`, `Net`, `Renderer`, or
 `GameState`. Calls delegate through existing `LabClient`, normal `issueCommandAs`, room-time,
-camera, and `GameState` projection seams. Mutation/order calls wait for a new authoritative snapshot
-and, when room time is paused, request one bounded tick so accepted state is observed before success.
+camera, and `GameState` projection seams. Catalog includes the mirrored command and ability ids;
+inspection can restrict results to the current camera viewport, while camera focus accepts bounded
+padding and returns world bounds. Mutation/order calls wait for a new authoritative snapshot and,
+when room time is paused, request one bounded tick so accepted state is observed before success.
 The local `scripts/agent-lab/driver.mjs` owns the selected-worktree server, headless browser, logs,
-and profile cleanup; MCP transport is intentionally outside this client contract.
+and profile cleanup; its project-local MCP adapter owns aliases, schemas, stdio, and session lifetime.
 
 `lab_scenario_authoring.js`
 ```js
