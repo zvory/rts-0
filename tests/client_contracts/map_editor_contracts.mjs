@@ -192,6 +192,77 @@ function blankTerrainMap(size = 40) {
 
 {
   const editor = mapEditorRuntime();
+  const occupiedSites = [];
+  for (let y = 4; y <= 19; y++) {
+    for (let x = 4; x <= 11; x++) {
+      if (x === 7 && y === 7) continue;
+      occupiedSites.push({ id: `occupied_${x}_${y}`, kind: "natural", x, y });
+    }
+  }
+  editor.setMap({
+    version: 2,
+    name: "failed-repair-rollback",
+    description: "test",
+    _design: "test",
+    terrain: Array.from({ length: 24 }, () => ".".repeat(24)),
+    sites: occupiedSites.concat([
+      { id: "target_main", kind: "main", x: 16, y: 7 },
+      { id: "target_natural", kind: "natural", x: 16, y: 16 },
+    ]),
+    layouts: [
+      { id: "one", playerCount: 1, slots: [{ main: "target_main", naturals: ["target_natural"] }] },
+    ],
+  });
+
+  assert(!editor.setSymmetry("left-right"), "symmetry rejects a repair when the kept side has insufficient room");
+  const map = editor.currentMap();
+  assert(
+    map.sites.find((site) => site.id === "target_main")?.x === 16 &&
+      map.sites.find((site) => site.id === "target_natural")?.x === 16,
+    "a rejected multi-site repair rolls back sites moved before the failure",
+  );
+}
+
+{
+  const editor = mapEditorRuntime();
+  const occupiedSites = [];
+  for (let y = 7; y <= 16; y++) {
+    for (let x = 7; x <= 11; x++) {
+      occupiedSites.push({
+        id: `occupied_${x}_${y}`,
+        kind: x === 7 && y === 7 ? "main" : "natural",
+        x,
+        y,
+      });
+    }
+  }
+  editor.setMap({
+    version: 2,
+    name: "alternate-layout-repair",
+    description: "test",
+    _design: "test",
+    terrain: Array.from({ length: 24 }, () => ".".repeat(24)),
+    sites: occupiedSites.concat([
+      { id: "target_main", kind: "main", x: 16, y: 7 },
+      { id: "target_natural", kind: "natural", x: 19, y: 4 },
+    ]),
+    layouts: [
+      { id: "blocked", playerCount: 1, slots: [{ main: "target_main", naturals: ["occupied_7_8"] }] },
+      { id: "repairable", playerCount: 1, slots: [{ main: "occupied_7_7", naturals: ["target_natural"] }] },
+    ],
+  });
+
+  assert(editor.setSymmetry("left-right"), "symmetry tries another split slot when the first cannot be repaired");
+  const map = editor.currentMap();
+  assert(
+    map.layouts.length === 1 && map.layouts[0].id === "repairable" &&
+      map.sites.find((site) => site.id === "target_natural")?.x === 4,
+    "symmetry preserves a feasible alternate spawn slot on the kept side",
+  );
+}
+
+{
+  const editor = mapEditorRuntime();
   const terrainChecks = [
     ["left-right", { x: 4, y: 5 }, { x: 35, y: 5 }],
     ["top-bottom", { x: 4, y: 5 }, { x: 4, y: 34 }],

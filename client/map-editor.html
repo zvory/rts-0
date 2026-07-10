@@ -475,15 +475,15 @@
         };
       }
 
-      function cloneMapState() {
+      function cloneMapState(source = map) {
         return {
-          version: map.version,
-          name: map.name,
-          description: map.description,
-          _design: map._design,
-          terrain: map.terrain.slice(),
-          sites: map.sites.map(cloneSite),
-          layouts: map.layouts.map(cloneLayout),
+          version: source.version,
+          name: source.name,
+          description: source.description,
+          _design: source._design,
+          terrain: source.terrain.slice(),
+          sites: source.sites.map(cloneSite),
+          layouts: source.layouts.map(cloneLayout),
         };
       }
 
@@ -622,30 +622,38 @@
         return best;
       }
 
-      function sourceLayoutToRepair() {
-        let best = null;
+      function sourceLayoutsToRepair() {
+        const repairs = [];
         for (const layout of map.layouts) {
           for (const slot of layout.slots) {
             const sites = [siteById(slot.main)].concat(slot.naturals.map(siteById));
             const targetSites = sites.filter(function (site) { return site && !isSourceSide(site); });
-            if (sites.length !== slot.naturals.length + 1 || targetSites.length === 0) continue;
-            if (!best || targetSites.length < best.targetSites.length) best = { sites: sites, targetSites: targetSites };
+            if (sites.some(function (site) { return !site; }) || targetSites.length === 0) continue;
+            repairs.push(targetSites.map(function (site) { return site.id; }));
           }
         }
-        return best;
+        return repairs.sort(function (a, b) { return a.length - b.length; });
       }
 
       function repairSourceLayoutForSymmetry() {
-        const repair = sourceLayoutToRepair();
-        if (!repair) return 0;
-        for (const site of repair.targetSites) {
-          const placement = sourcePlacement(site, true) || sourcePlacement(site, false);
-          if (!placement) return 0;
-          site.x = placement.x;
-          site.y = placement.y;
+        for (const targetSiteIds of sourceLayoutsToRepair()) {
+          const before = cloneMapState();
+          let repairedSites = 0;
+          for (const siteId of targetSiteIds) {
+            const site = siteById(siteId);
+            const placement = site && (sourcePlacement(site, true) || sourcePlacement(site, false));
+            if (!placement) break;
+            site.x = placement.x;
+            site.y = placement.y;
+            repairedSites++;
+          }
+          if (repairedSites === targetSiteIds.length) {
+            map.sites.forEach(clearProtectedArea);
+            return repairedSites;
+          }
+          map = before;
         }
-        map.sites.forEach(clearProtectedArea);
-        return repair.targetSites.length;
+        return 0;
       }
 
       function selectSymmetry(mode) {
@@ -658,7 +666,7 @@
           clearTargetSideForSymmetry();
           const error = symmetryAuthoringError();
           if (error) {
-            map = previousMap;
+            map = cloneMapState(previousMap);
             const repairedSites = repairSourceLayoutForSymmetry();
             if (repairedSites) {
               clearTargetSideForSymmetry();
