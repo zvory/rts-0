@@ -4,7 +4,7 @@
 // The server is the source of truth. This module never writes; an empty response (no DB
 // configured server-side) renders an empty state.
 
-const DEFAULT_LIMIT = 20;
+const DEFAULT_LIMIT = 300;
 
 export class MatchHistory {
   /**

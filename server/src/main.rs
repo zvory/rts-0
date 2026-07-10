@@ -400,7 +400,9 @@ async fn matches_handler(
     ConnectInfo(remote): ConnectInfo<SocketAddr>,
     Query(params): Query<MatchesQuery>,
 ) -> impl IntoResponse {
-    let limit = params.limit.unwrap_or(20);
+    let limit = params
+        .limit
+        .unwrap_or(rts_server::db::DEFAULT_RECENT_MATCHES_LIMIT);
     let Some(db) = state.db else {
         return Json(Vec::<rts_server::db::MatchSummary>::new()).into_response();
     };

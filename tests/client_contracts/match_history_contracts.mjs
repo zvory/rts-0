@@ -32,6 +32,19 @@ assert(
   "match history winner label falls back for empty rows",
 );
 
+withFakeHudDocument(() => {
+  let requestUrl = null;
+  const history = new MatchHistory(document.createElement("div"), {
+    fetchImpl(url) {
+      requestUrl = url;
+      return new Promise(() => {});
+    },
+  });
+
+  assert(requestUrl === "/api/matches?limit=300", "match history requests the 300-row display cap");
+  history.destroy();
+});
+
 {
   let joinedRoom = "";
   let renderedRows = 0;

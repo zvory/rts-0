@@ -15,6 +15,11 @@ use sqlx::{PgPool, Row};
 
 use rts_sim::game::replay::ReplayArtifactV1;
 
+/// Recent Matches reads return at most this many rows.
+pub const MAX_RECENT_MATCHES_LIMIT: i64 = 300;
+/// Omitted Recent Matches query limits use the display ceiling.
+pub const DEFAULT_RECENT_MATCHES_LIMIT: i64 = MAX_RECENT_MATCHES_LIMIT;
+
 /// One match-history row to insert.
 #[derive(Debug, Clone)]
 pub struct MatchRecord {
@@ -230,13 +235,13 @@ impl Db {
         }
     }
 
-    /// Return the most recent matches in newest-first order. `limit` is clamped to [1, 100].
+    /// Return the most recent matches in newest-first order. `limit` is clamped to [1, 300].
     pub async fn recent_matches(
         &self,
         limit: i64,
         include_local: bool,
     ) -> Result<Vec<MatchSummary>, sqlx::Error> {
-        let limit = limit.clamp(1, 100);
+        let limit = clamp_recent_matches_limit(limit);
         let rows = sqlx::query(
             r#"
             select matches.id as id,
@@ -364,6 +369,10 @@ impl Db {
     }
 }
 
+fn clamp_recent_matches_limit(limit: i64) -> i64 {
+    limit.clamp(1, MAX_RECENT_MATCHES_LIMIT)
+}
+
 fn row_to_summary(row: PgRow) -> MatchSummary {
     let replay_metadata = row
         .try_get::<i32, _>("replay_artifact_schema_version")
@@ -435,7 +444,17 @@ pub async fn try_connect_from_env() -> Option<Arc<Db>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{MatchOutcome, MatchRecord, MatchSummary};
+    use super::{
+        clamp_recent_matches_limit, MatchOutcome, MatchRecord, MatchSummary,
+        MAX_RECENT_MATCHES_LIMIT,
+    };
+
+    #[test]
+    fn recent_match_limit_clamps_to_300_rows() {
+        assert_eq!(clamp_recent_matches_limit(0), 1);
+        assert_eq!(clamp_recent_matches_limit(MAX_RECENT_MATCHES_LIMIT), 300);
+        assert_eq!(clamp_recent_matches_limit(i64::MAX), 300);
+    }
 
     fn record_with_outcome(outcome: MatchOutcome) -> MatchRecord {
         MatchRecord {

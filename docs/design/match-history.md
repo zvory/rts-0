@@ -73,7 +73,7 @@ Migrations are versioned SQL files run by `sqlx::migrate!` at server boot. Never
 ## Wire
 
 - **Read**: `GET /api/matches?limit=N` — JSON array, newest first, `limit` clamped server-side to
-  `[1, 100]`, defaults to 20. Returns `[]` when no DB is configured (so the client never needs
+  `[1, 300]`, defaults to 300. Returns `[]` when no DB is configured (so the client never needs
   to special-case missing-DB). The Recent Matches feed includes only rows with at least one
   human player and `debug_mode = false`, and it explicitly suppresses historical one-human,
   one-participant rows. Solo sandbox rows, AI-only rows, and historical debug rows may be
