@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import crypto from "node:crypto";
 import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
@@ -8,7 +9,8 @@ import { fileURLToPath } from "node:url";
 
 import { LAB_INTERACT_COMMANDS } from "./command_service.mjs";
 import {
-  IPC_VERSION, REQUEST_TIMEOUT_MS, prepareRuntime, processAlive, readState, runtimePaths, sleep,
+  IPC_VERSION, REQUEST_TIMEOUT_MS, prepareRuntime, processAlive, readState,
+  reclaimStaleStartupLock, removeOwnedStartupLock, runtimePaths, sleep,
 } from "./runtime.mjs";
 
 const STARTUP_TIMEOUT_MS = 15_000;
@@ -48,12 +50,13 @@ async function ensureDaemon(paths, env) {
     }
     let lock;
     let spawned = false;
+    const startupNonce = crypto.randomBytes(16).toString("hex");
     try {
       lock = fs.openSync(paths.lock, "wx", 0o600);
-      fs.writeFileSync(lock, `${JSON.stringify({ pid: process.pid, createdAt: Date.now() })}\n`);
+      fs.writeFileSync(lock, `${JSON.stringify({ nonce: startupNonce, role: "cli", pid: process.pid, createdAt: Date.now() })}\n`);
     } catch (error) {
       if (error?.code !== "EEXIST") throw error;
-      if (staleStartup(paths)) fs.rmSync(paths.lock, { force: true });
+      reclaimStaleStartupLock(paths);
       await sleep(25);
       continue;
     }
@@ -70,7 +73,7 @@ async function ensureDaemon(paths, env) {
       // The startup lock is ours and an active probe proved that no process is listening.
       fs.rmSync(paths.socket, { force: true });
       fs.rmSync(paths.state, { force: true });
-      const child = spawn(process.execPath, [path.join(scriptDir, "daemon.mjs"), paths.workspaceRoot], {
+      const child = spawn(process.execPath, [path.join(scriptDir, "daemon.mjs"), paths.workspaceRoot, startupNonce], {
         cwd: paths.workspaceRoot,
         env,
         detached: true,
@@ -80,7 +83,7 @@ async function ensureDaemon(paths, env) {
       spawned = true;
     } finally {
       fs.closeSync(lock);
-      if (!spawned) removeOwnedStartupLock(paths);
+      if (!spawned) removeOwnedStartupLock(paths, startupNonce, process.pid, "cli");
     }
     while (Date.now() < deadline) {
       if (await daemonReady(paths)) return;
@@ -90,21 +93,6 @@ async function ensureDaemon(paths, env) {
     }
   }
   throw cliError("daemonStartup", "Lab Interact daemon did not become ready within 15 seconds.");
-}
-
-function staleStartup(paths) {
-  let lock;
-  try { lock = JSON.parse(fs.readFileSync(paths.lock, "utf8")); } catch {
-    try { return Date.now() - fs.statSync(paths.lock).mtimeMs > STARTUP_TIMEOUT_MS; } catch { return false; }
-  }
-  return !processAlive(lock.pid);
-}
-
-function removeOwnedStartupLock(paths) {
-  try {
-    const lock = JSON.parse(fs.readFileSync(paths.lock, "utf8"));
-    if (lock.pid === process.pid) fs.rmSync(paths.lock, { force: true });
-  } catch {}
 }
 
 function requestCurrent(paths, payload, timeoutMs = REQUEST_TIMEOUT_MS) {
@@ -166,13 +154,14 @@ async function confirmStopped(paths, requestError) {
   if (initialProbe.live) throw requestError || cliError("daemonOccupied", "A live process still owns the Lab Interact socket.");
   prepareRuntime(paths);
   let lock;
+  let startupNonce = "";
   let cleaned = false;
   try {
     lock = fs.openSync(paths.lock, "wx", 0o600);
-    fs.writeFileSync(lock, `${JSON.stringify({ pid: process.pid, createdAt: Date.now() })}\n`);
+    startupNonce = crypto.randomBytes(16).toString("hex");
+    fs.writeFileSync(lock, `${JSON.stringify({ nonce: startupNonce, role: "cli", pid: process.pid, createdAt: Date.now() })}\n`);
   } catch (error) {
-    if (error?.code === "EEXIST" && staleStartup(paths)) {
-      fs.rmSync(paths.lock, { force: true });
+    if (error?.code === "EEXIST" && reclaimStaleStartupLock(paths)) {
       return confirmStopped(paths, requestError);
     }
     if (error?.code === "EEXIST") throw requestError || cliError("daemonStarting", "Lab Interact startup is still in progress.");
@@ -189,7 +178,7 @@ async function confirmStopped(paths, requestError) {
     cleaned = true;
   } finally {
     fs.closeSync(lock);
-    removeOwnedStartupLock(paths);
+    removeOwnedStartupLock(paths, startupNonce, process.pid, "cli");
   }
   if (cleaned) {
     try { fs.rmdirSync(paths.directory); } catch (error) { if (error?.code !== "ENOENT" && error?.code !== "ENOTEMPTY") throw error; }

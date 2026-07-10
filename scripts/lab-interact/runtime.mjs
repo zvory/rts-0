@@ -7,6 +7,7 @@ export const DEFAULT_IDLE_MS = 30 * 60_000;
 export const MAX_REQUEST_BYTES = 1024 * 1024;
 export const IPC_VERSION = 1;
 export const REQUEST_TIMEOUT_MS = 120_000;
+export const STARTUP_GRACE_MS = 15_000;
 
 export function runtimePaths(workspaceRoot, { tmpDir = os.tmpdir() } = {}) {
   const root = fs.realpathSync(workspaceRoot);
@@ -69,6 +70,94 @@ export function processAlive(pid) {
   } catch (error) {
     return error?.code === "EPERM";
   }
+}
+
+export function readStartupLock(paths) {
+  try {
+    return JSON.parse(fs.readFileSync(paths.lock, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+export function startupLockStale(paths, now = Date.now()) {
+  const lock = readStartupLock(paths);
+  let stat;
+  try { stat = fs.statSync(paths.lock); } catch { return false; }
+  const validRecord = /^[a-f0-9]{32}$/.test(lock?.nonce) &&
+    ["cli", "daemon"].includes(lock?.role) && Number.isInteger(lock?.pid) && lock.pid > 0 &&
+    Number.isFinite(lock?.createdAt) && lock.createdAt <= now + 1_000;
+  if (!validRecord) return (stat.mtimeMs > now ? STARTUP_GRACE_MS + 1 : now - stat.mtimeMs) > STARTUP_GRACE_MS;
+  return now - Number(lock.createdAt) > STARTUP_GRACE_MS && !processAlive(lock.pid);
+}
+
+export function claimStartupLock(paths, nonce) {
+  const fd = fs.openSync(paths.lock, "r+");
+  try {
+    const current = JSON.parse(fs.readFileSync(fd, "utf8"));
+    if (current?.nonce !== nonce || current?.role !== "cli") {
+      throw new Error("Lab Interact startup lock nonce no longer belongs to this daemon.");
+    }
+    const claimed = { ...current, role: "daemon", pid: process.pid, claimedAt: Date.now() };
+    fs.ftruncateSync(fd, 0);
+    fs.writeSync(fd, `${JSON.stringify(claimed)}\n`, 0, "utf8");
+    fs.fsyncSync(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
+  if (!startupLockOwned(paths, nonce, process.pid, "daemon")) {
+    throw new Error("Lab Interact startup lock changed while the daemon was claiming it.");
+  }
+}
+
+export function startupLockOwned(paths, nonce, pid, role) {
+  const lock = readStartupLock(paths);
+  return lock?.nonce === nonce && lock?.pid === pid && lock?.role === role;
+}
+
+export function removeOwnedStartupLock(paths, nonce, pid, role) {
+  if (!startupLockOwned(paths, nonce, pid, role)) return false;
+  const moved = `${paths.lock}.release-${process.pid}-${crypto.randomBytes(4).toString("hex")}`;
+  try {
+    fs.renameSync(paths.lock, moved);
+  } catch {
+    return false;
+  }
+  if (startupLockOwned({ ...paths, lock: moved }, nonce, pid, role)) {
+    fs.rmSync(moved, { force: true });
+    return true;
+  }
+  if (!fs.existsSync(paths.lock)) {
+    try { fs.renameSync(moved, paths.lock); } catch {}
+  }
+  return false;
+}
+
+export function reclaimStaleStartupLock(paths) {
+  const expected = readStartupLock(paths);
+  let expectedStat;
+  try { expectedStat = fs.statSync(paths.lock); } catch { return false; }
+  if (!startupLockStale(paths)) return false;
+  const moved = `${paths.lock}.stale-${process.pid}-${crypto.randomBytes(4).toString("hex")}`;
+  try {
+    fs.renameSync(paths.lock, moved);
+  } catch {
+    return false;
+  }
+  const actual = readStartupLock({ ...paths, lock: moved });
+  let actualStat;
+  try { actualStat = fs.statSync(moved); } catch { return false; }
+  const sameRecord = expected
+    ? actual?.nonce === expected.nonce && actual?.pid === expected.pid && actual?.role === expected.role && actual?.createdAt === expected.createdAt
+    : !actual && actualStat.dev === expectedStat.dev && actualStat.ino === expectedStat.ino && actualStat.mtimeMs === expectedStat.mtimeMs && actualStat.size === expectedStat.size;
+  if (sameRecord) {
+    fs.rmSync(moved, { force: true });
+    return true;
+  }
+  if (!fs.existsSync(paths.lock)) {
+    try { fs.renameSync(moved, paths.lock); } catch {}
+  }
+  return false;
 }
 
 export function cleanupRuntime(paths) {

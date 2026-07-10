@@ -2,11 +2,15 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
-import { execFile, spawnSync } from "node:child_process";
+import { execFile, spawn, spawnSync } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 
-import { DEFAULT_IDLE_MS, IPC_VERSION, configuredIdleMs, processAlive, runtimePaths, sleep } from "../scripts/lab-interact/runtime.mjs";
+import {
+  DEFAULT_IDLE_MS, IPC_VERSION, STARTUP_GRACE_MS, configuredIdleMs, prepareRuntime,
+  processAlive, readStartupLock, reclaimStaleStartupLock, removeOwnedStartupLock,
+  runtimePaths, sleep, startupLockStale,
+} from "../scripts/lab-interact/runtime.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -29,6 +33,21 @@ assert.equal(configuredIdleMs({ RTS_LAB_INTERACT_IDLE_MS: "25" }), 25, "tests ma
 assert.throws(() => configuredIdleMs({ RTS_LAB_INTERACT_IDLE_MS: "0" }), /must be an integer/, "invalid idle overrides are rejected");
 
 shutdown(baseEnv);
+fs.rmSync(paths.directory, { recursive: true, force: true });
+
+prepareRuntime(paths);
+const freshDeadLockAt = Date.now();
+fs.writeFileSync(paths.lock, `${JSON.stringify({ nonce: "d".repeat(32), role: "cli", pid: 99999999, createdAt: freshDeadLockAt })}\n`, { mode: 0o600 });
+assert.equal(startupLockStale(paths, freshDeadLockAt), false, "a dead initiating CLI retains a bounded grace for its child to claim the lock");
+assert.equal(startupLockStale(paths, freshDeadLockAt + STARTUP_GRACE_MS + 1), true, "dead-owner startup locks become reclaimable after the startup grace");
+fs.writeFileSync(paths.lock, "{}\n", { mode: 0o600 });
+const staleTime = new Date(Date.now() - STARTUP_GRACE_MS - 1_000);
+fs.utimesSync(paths.lock, staleTime, staleTime);
+assert.equal(reclaimStaleStartupLock(paths), true, "parseable malformed startup locks recover after the file-mtime grace");
+assert.equal(fs.existsSync(paths.lock), false, "malformed lock recovery removes only the verified stale lock");
+fs.writeFileSync(paths.lock, `${JSON.stringify({ nonce: "f".repeat(32), role: "cli", pid: 99999999, createdAt: Date.now() + 86_400_000 })}\n`, { mode: 0o600 });
+fs.utimesSync(paths.lock, staleTime, staleTime);
+assert.equal(reclaimStaleStartupLock(paths), true, "future-dated lock records fall back to bounded file-mtime recovery");
 fs.rmSync(paths.directory, { recursive: true, force: true });
 
 const initial = call("status");
@@ -127,14 +146,38 @@ assert.equal(fs.existsSync(paths.lock), false, "daemon releases startup lock onl
 shutdown(raceEnv);
 await waitFor(() => !fs.existsSync(paths.directory), 2000, "race-started daemon cleans up");
 
+prepareRuntime(paths);
+const lateNonce = "a".repeat(32);
+fs.writeFileSync(paths.lock, `${JSON.stringify({ nonce: lateNonce, role: "cli", pid: process.pid, createdAt: Date.now() })}\n`, { mode: 0o600 });
+const lateChild = spawn(process.execPath, [path.join(root, "scripts/lab-interact/daemon.mjs"), root, lateNonce], {
+  cwd: root,
+  env: { ...baseEnv, RTS_LAB_INTERACT_TEST_PREBIND_DELAY_MS: "250" },
+  stdio: ["ignore", "pipe", "pipe"],
+});
+await waitFor(() => readStartupLock(paths)?.role === "daemon", 1000, "spawned daemon claims the initiating CLI nonce");
+const replacementNonce = "b".repeat(32);
+fs.writeFileSync(paths.lock, `${JSON.stringify({ nonce: replacementNonce, role: "cli", pid: process.pid, createdAt: Date.now() })}\n`, { mode: 0o600 });
+const lateExit = await childExit(lateChild);
+assert.notEqual(lateExit.code, 0, "a late child aborts when its claimed startup nonce is replaced");
+assert.equal(fs.existsSync(paths.socket), false, "a late nonce-losing child aborts before socket bind");
+assert.equal(fs.existsSync(paths.state), false, "a late nonce-losing child never publishes daemon state");
+assert.equal(readStartupLock(paths)?.nonce, replacementNonce, "a late child never removes the replacement startup lock");
+fs.rmSync(paths.directory, { recursive: true, force: true });
+
 call("status");
 const winningState = JSON.parse(fs.readFileSync(paths.state, "utf8"));
-const duplicate = spawnSync(process.execPath, [path.join(root, "scripts/lab-interact/daemon.mjs"), root], {
+const duplicateNonce = "c".repeat(32);
+fs.writeFileSync(paths.lock, `${JSON.stringify({ nonce: duplicateNonce, role: "cli", pid: process.pid, createdAt: Date.now() })}\n`, { mode: 0o600 });
+const duplicate = spawnSync(process.execPath, [path.join(root, "scripts/lab-interact/daemon.mjs"), root, duplicateNonce], {
   cwd: root, env: baseEnv, encoding: "utf8", timeout: 2000,
 });
 assert.notEqual(duplicate.status, 0, "a duplicate daemon cannot bind the owned worktree socket");
 const afterDuplicate = JSON.parse(fs.readFileSync(paths.state, "utf8"));
 assert.equal(afterDuplicate.daemonId, winningState.daemonId, "duplicate startup cannot delete or replace the winner runtime");
+assert.equal(fs.existsSync(paths.socket), true, "duplicate bind failure cannot unlink the winner socket");
+const duplicateLock = readStartupLock(paths);
+assert.equal(duplicateLock?.nonce, duplicateNonce, "duplicate bind loser leaves only its own claimed startup lock");
+assert.equal(removeOwnedStartupLock(paths, duplicateNonce, duplicateLock.pid, "daemon"), true, "test cleanup removes the duplicate loser's lock by nonce ownership");
 assert.equal(call("status").ok, true, "the winning daemon remains reachable after a duplicate startup");
 
 const savedStateText = fs.readFileSync(paths.state, "utf8");
@@ -211,6 +254,7 @@ function shutdown(env) {
 function prepareStaleRuntime() {
   fs.mkdirSync(paths.directory, { recursive: true, mode: 0o700 });
   fs.writeFileSync(paths.state, `${JSON.stringify({ pid: 99999999, workspaceRoot: root })}\n`);
+  fs.writeFileSync(paths.lock, `${JSON.stringify({ nonce: "e".repeat(32), role: "cli", pid: 99999999, createdAt: Date.now() - STARTUP_GRACE_MS - 1 })}\n`);
   fs.writeFileSync(paths.socket, "stale");
 }
 
@@ -232,6 +276,13 @@ function rawRequest(socketPath, request) {
     socket.on("data", (chunk) => { body += chunk; });
     socket.once("error", reject);
     socket.once("end", () => resolve(JSON.parse(body)));
+  });
+}
+
+function childExit(child) {
+  return new Promise((resolve, reject) => {
+    child.once("error", reject);
+    child.once("exit", (code, signal) => resolve({ code, signal }));
   });
 }
 

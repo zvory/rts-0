@@ -5,13 +5,22 @@ import { pathToFileURL } from "node:url";
 
 import { LabInteractService, conciseError, loadDriverFactory, normalizeError, validateCommandInput } from "./command_service.mjs";
 import {
-  IPC_VERSION, MAX_REQUEST_BYTES, REQUEST_TIMEOUT_MS, cleanupOwnedRuntime, configuredIdleMs,
-  prepareRuntime, runtimePaths, writeState,
+  IPC_VERSION, MAX_REQUEST_BYTES, REQUEST_TIMEOUT_MS, claimStartupLock, cleanupOwnedRuntime,
+  configuredIdleMs, prepareRuntime, removeOwnedStartupLock, runtimePaths, startupLockOwned, writeState,
 } from "./runtime.mjs";
 
-export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = configuredIdleMs() } = {}) {
+export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = configuredIdleMs(), startupNonce = "" } = {}) {
   const paths = runtimePaths(workspaceRoot);
   prepareRuntime(paths);
+  if (!/^[a-f0-9]{32}$/.test(startupNonce)) throw new Error("Lab Interact daemon requires a valid startup nonce.");
+  claimStartupLock(paths, startupNonce);
+  const prebindDelayMs = Number(process.env.RTS_LAB_INTERACT_TEST_PREBIND_DELAY_MS || 0);
+  if (Number.isInteger(prebindDelayMs) && prebindDelayMs > 0 && prebindDelayMs <= 2_000) {
+    await new Promise((resolve) => setTimeout(resolve, prebindDelayMs));
+  }
+  if (!startupLockOwned(paths, startupNonce, process.pid, "daemon")) {
+    throw new Error("Lab Interact startup lease was replaced before the daemon could bind.");
+  }
   const driverFactory = await loadDriverFactory(paths.workspaceRoot);
   const service = new LabInteractService({ workspaceRoot: paths.workspaceRoot, driverFactory });
   let activeRequests = 0;
@@ -127,6 +136,10 @@ export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = config
   });
 
   await new Promise((resolve, reject) => {
+    if (!startupLockOwned(paths, startupNonce, process.pid, "daemon")) {
+      reject(new Error("Lab Interact startup lease was replaced before socket bind."));
+      return;
+    }
     server.once("error", reject);
     server.listen(paths.socket, () => {
       server.removeListener("error", reject);
@@ -138,8 +151,14 @@ export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = config
   if (Number.isInteger(startupDelayMs) && startupDelayMs > 0 && startupDelayMs <= 2_000) {
     await new Promise((resolve) => setTimeout(resolve, startupDelayMs));
   }
+  if (!startupLockOwned(paths, startupNonce, process.pid, "daemon")) {
+    for (const socket of sockets) socket.destroy();
+    await new Promise((resolve) => server.close(resolve));
+    await service.shutdown("startupLeaseLost");
+    throw new Error("Lab Interact startup lease was replaced before state publication.");
+  }
   writeState(paths, state());
-  fs.rmSync(paths.lock, { force: true });
+  removeOwnedStartupLock(paths, startupNonce, process.pid, "daemon");
   scheduleIdle();
   for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
     process.once(signal, () => { void shutdown(signal); });
@@ -154,7 +173,8 @@ function errorEnvelope(code, message) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const workspaceRoot = process.argv[2];
-  runDaemon({ workspaceRoot }).catch((error) => {
+  const startupNonce = process.argv[3] || "";
+  runDaemon({ workspaceRoot, startupNonce }).catch((error) => {
     process.stderr.write(`${JSON.stringify(errorEnvelope(error.code || "startupFailed", conciseError(error)))}\n`);
     process.exitCode = 1;
   });
