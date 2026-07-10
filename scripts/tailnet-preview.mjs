@@ -1,0 +1,592 @@
+#!/usr/bin/env node
+import { execFileSync, spawnSync } from "node:child_process";
+import { createHash, randomBytes } from "node:crypto";
+import { createReadStream, copyFileSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import http from "node:http";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const DEFAULT_PORT = 8091;
+const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
+const HEALTH_PATH = "/_tailnet-preview/health";
+const PREVIEW_PATH_PREFIX = "/p/";
+const SERVICE_NAME = "rts-tailnet-preview";
+const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
+const MIME_TYPES = new Map([
+  [".avif", "image/avif"],
+  [".gif", "image/gif"],
+  [".jpeg", "image/jpeg"],
+  [".jpg", "image/jpeg"],
+  [".json", "application/json; charset=utf-8"],
+  [".m4a", "audio/mp4"],
+  [".m4v", "video/x-m4v"],
+  [".mov", "video/quicktime"],
+  [".mp3", "audio/mpeg"],
+  [".mp4", "video/mp4"],
+  [".ogg", "audio/ogg"],
+  [".pdf", "application/pdf"],
+  [".png", "image/png"],
+  [".svg", "image/svg+xml"],
+  [".wav", "audio/wav"],
+  [".webm", "video/webm"],
+  [".webp", "image/webp"],
+]);
+
+export function parseDuration(raw) {
+  const match = /^(\d+)(s|m|h|d)$/.exec(String(raw || "").trim());
+  if (!match) {
+    throw new Error(`invalid TTL "${raw}"; use a positive duration such as 30m, 2h, or 1d`);
+  }
+  const count = Number(match[1]);
+  const multiplier = { s: 1_000, m: 60_000, h: 3_600_000, d: 86_400_000 }[match[2]];
+  const duration = count * multiplier;
+  if (!Number.isSafeInteger(duration) || duration <= 0) {
+    throw new Error(`invalid TTL "${raw}"; duration is out of range`);
+  }
+  return duration;
+}
+
+function parsePort(raw) {
+  const port = Number(raw);
+  if (!Number.isInteger(port) || port < 1 || port > 65_535) {
+    throw new Error(`invalid port "${raw}"; expected an integer from 1 through 65535`);
+  }
+  return port;
+}
+
+export function parseArgs(argv) {
+  const options = {
+    keep: false,
+    port: DEFAULT_PORT,
+    root: path.join(os.tmpdir(), SERVICE_NAME),
+    serve: false,
+    stop: false,
+    ttlMs: DEFAULT_TTL_MS,
+    source: "",
+    host: "",
+  };
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === "--help" || arg === "-h") {
+      options.help = true;
+    } else if (arg === "--keep") {
+      options.keep = true;
+    } else if (arg === "--port") {
+      options.port = parsePort(argv[++index]);
+    } else if (arg === "--root") {
+      options.root = path.resolve(String(argv[++index] || ""));
+    } else if (arg === "--ttl") {
+      options.ttlMs = parseDuration(argv[++index]);
+    } else if (arg === "--serve") {
+      options.serve = true;
+    } else if (arg === "--stop") {
+      options.stop = true;
+    } else if (arg === "--host") {
+      options.host = String(argv[++index] || "").trim();
+    } else if (arg.startsWith("-")) {
+      throw new Error(`unknown argument "${arg}"`);
+    } else if (!options.source) {
+      options.source = path.resolve(arg);
+    } else {
+      throw new Error("tailnet-preview accepts exactly one file");
+    }
+  }
+
+  if (options.help) return options;
+  if (options.keep && options.ttlMs !== DEFAULT_TTL_MS) {
+    throw new Error("--keep cannot be combined with --ttl");
+  }
+  if (options.serve) {
+    if (!options.host) throw new Error("--serve requires --host");
+    if (options.source || options.stop || options.keep) {
+      throw new Error("--serve only accepts --root, --host, and --port");
+    }
+    return options;
+  }
+  if (options.stop) {
+    if (options.source || options.keep || options.ttlMs !== DEFAULT_TTL_MS) {
+      throw new Error("--stop only accepts --port and --root");
+    }
+    return options;
+  }
+  if (!options.source) throw new Error("missing file path");
+  return options;
+}
+
+export function usage() {
+  return `Usage:
+  scripts/tailnet-preview [--ttl 24h | --keep] [--port 8091] <file>
+  scripts/tailnet-preview --stop [--port 8091]
+
+Copies one regular file into a private temporary preview directory, serves it over
+the current machine's Tailscale IPv4 address, and prints its URL. The default TTL
+is 24 hours; --keep retains the file until it is removed manually or the OS clears
+its temporary directory.`;
+}
+
+function isRegularFile(file) {
+  try {
+    return statSync(file).isFile();
+  } catch {
+    return false;
+  }
+}
+
+export function safeFileName(file) {
+  const name = path.basename(file).replace(/[^A-Za-z0-9._-]+/g, "_").replace(/^\.+$/, "");
+  return name || "artifact";
+}
+
+function previewId() {
+  return randomBytes(18).toString("base64url");
+}
+
+function ensureRoot(root) {
+  mkdirSync(root, { recursive: true, mode: 0o700 });
+}
+
+function manifestPath(root, id) {
+  return path.join(root, id, "manifest.json");
+}
+
+function previewPath(root, id, name) {
+  return path.join(root, id, name);
+}
+
+function serverStatePath(root, port) {
+  return path.join(root, `server-${port}.json`);
+}
+
+function validPreviewId(value) {
+  return /^[A-Za-z0-9_-]{16,64}$/.test(value);
+}
+
+function validPreviewName(value) {
+  return /^[A-Za-z0-9._-]{1,255}$/.test(value) && value !== "." && value !== "..";
+}
+
+function readManifest(root, id) {
+  if (!validPreviewId(id)) return null;
+  const file = manifestPath(root, id);
+  try {
+    if (!lstatSync(file).isFile()) return null;
+    const manifest = JSON.parse(readFileSync(file, "utf8"));
+    if (
+      manifest?.version !== 1 ||
+      !validPreviewName(manifest.name) ||
+      (manifest.expiresAt !== null && !Number.isSafeInteger(manifest.expiresAt))
+    ) {
+      return null;
+    }
+    return manifest;
+  } catch {
+    return null;
+  }
+}
+
+export function stagePreview({ root, source, ttlMs = DEFAULT_TTL_MS, keep = false, now = Date.now() }) {
+  if (!isRegularFile(source)) {
+    throw new Error(`preview source must be a regular file: ${source}`);
+  }
+  if (!keep && (!Number.isSafeInteger(ttlMs) || ttlMs <= 0)) {
+    throw new Error("preview TTL must be a positive millisecond duration");
+  }
+
+  ensureRoot(root);
+  const id = previewId();
+  const name = safeFileName(source);
+  const staging = path.join(root, `.${id}.staging`);
+  const destination = path.join(staging, name);
+  const expiresAt = keep ? null : now + ttlMs;
+  const manifest = { version: 1, name, createdAt: now, expiresAt };
+
+  try {
+    mkdirSync(staging, { mode: 0o700 });
+    copyFileSync(source, destination);
+    writeFileSync(path.join(staging, "manifest.json"), `${JSON.stringify(manifest)}\n`, { mode: 0o600 });
+    renameSync(staging, path.join(root, id));
+  } catch (error) {
+    rmSync(staging, { recursive: true, force: true });
+    throw error;
+  }
+
+  return { id, name, expiresAt, path: previewPath(root, id, name) };
+}
+
+export function cleanupExpiredPreviews(root, now = Date.now()) {
+  try {
+    ensureRoot(root);
+  } catch {
+    return 0;
+  }
+
+  let removed = 0;
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    if (!entry.isDirectory() || !validPreviewId(entry.name)) continue;
+    const manifest = readManifest(root, entry.name);
+    if (!manifest || (manifest.expiresAt !== null && manifest.expiresAt <= now)) {
+      rmSync(path.join(root, entry.name), { recursive: true, force: true });
+      removed += 1;
+    }
+  }
+  return removed;
+}
+
+export function parseByteRange(value, size) {
+  if (value == null || value === "") return { start: 0, end: size - 1, partial: false };
+  if (!Number.isSafeInteger(size) || size < 1) return null;
+  const match = /^bytes=(\d*)-(\d*)$/.exec(String(value).trim());
+  if (!match || (!match[1] && !match[2])) return null;
+
+  if (!match[1]) {
+    const suffixLength = Number(match[2]);
+    if (!Number.isSafeInteger(suffixLength) || suffixLength < 1) return null;
+    return { start: Math.max(0, size - suffixLength), end: size - 1, partial: true };
+  }
+
+  const start = Number(match[1]);
+  const requestedEnd = match[2] ? Number(match[2]) : size - 1;
+  if (
+    !Number.isSafeInteger(start) ||
+    !Number.isSafeInteger(requestedEnd) ||
+    start > requestedEnd ||
+    start >= size
+  ) {
+    return null;
+  }
+  return { start, end: Math.min(requestedEnd, size - 1), partial: true };
+}
+
+export function mimeType(file) {
+  return MIME_TYPES.get(path.extname(file).toLowerCase()) || "application/octet-stream";
+}
+
+function sendNotFound(response) {
+  response.writeHead(404, { "Cache-Control": "no-store", "Content-Type": "text/plain; charset=utf-8" });
+  response.end("Not found\n");
+}
+
+function sendHealth(response, root) {
+  const body = JSON.stringify({ service: SERVICE_NAME, rootTag: rootTag(root) });
+  response.writeHead(200, {
+    "Cache-Control": "no-store",
+    "Content-Length": String(Buffer.byteLength(body)),
+    "Content-Type": "application/json; charset=utf-8",
+  });
+  response.end(body);
+}
+
+function rootTag(root) {
+  return createHash("sha256").update(path.resolve(root)).digest("base64url").slice(0, 16);
+}
+
+function readServerState(root, port) {
+  try {
+    const state = JSON.parse(readFileSync(serverStatePath(root, port), "utf8"));
+    if (
+      !Number.isInteger(state?.pid) ||
+      state.pid < 1 ||
+      state.port !== port ||
+      state.rootTag !== rootTag(root) ||
+      typeof state.script !== "string" ||
+      state.script.length === 0
+    ) {
+      return null;
+    }
+    return state;
+  } catch {
+    return null;
+  }
+}
+
+function writeServerState({ root, host, port }) {
+  const state = { host, pid: process.pid, port, rootTag: rootTag(root), script: serverScriptPath() };
+  writeFileSync(serverStatePath(root, port), `${JSON.stringify(state)}\n`, { mode: 0o600 });
+}
+
+function clearServerState({ root, port }) {
+  rmSync(serverStatePath(root, port), { force: true });
+}
+
+function previewRequest(pathname) {
+  if (!pathname.startsWith(PREVIEW_PATH_PREFIX)) return null;
+  const segments = pathname.slice(PREVIEW_PATH_PREFIX.length).split("/");
+  if (segments.length !== 2 || !validPreviewId(segments[0]) || !validPreviewName(segments[1])) return null;
+  return { id: segments[0], name: segments[1] };
+}
+
+function servePreview(root, request, response, preview, now) {
+  const manifest = readManifest(root, preview.id);
+  if (!manifest || manifest.name !== preview.name) {
+    sendNotFound(response);
+    return;
+  }
+  if (manifest.expiresAt !== null && manifest.expiresAt <= now()) {
+    rmSync(path.join(root, preview.id), { recursive: true, force: true });
+    sendNotFound(response);
+    return;
+  }
+
+  const file = previewPath(root, preview.id, preview.name);
+  let size;
+  try {
+    const stat = lstatSync(file);
+    if (!stat.isFile()) {
+      sendNotFound(response);
+      return;
+    }
+    size = stat.size;
+  } catch {
+    sendNotFound(response);
+    return;
+  }
+
+  const range = parseByteRange(request.headers.range, size);
+  if (!range) {
+    response.writeHead(416, { "Content-Range": `bytes */${size}` });
+    response.end();
+    return;
+  }
+
+  const contentLength = size === 0 ? 0 : range.end - range.start + 1;
+  const headers = {
+    "Accept-Ranges": "bytes",
+    "Cache-Control": "private, no-store",
+    "Content-Disposition": `inline; filename="${preview.name}"`,
+    "Content-Length": String(contentLength),
+    "Content-Type": mimeType(preview.name),
+    "X-Content-Type-Options": "nosniff",
+  };
+  if (range.partial) headers["Content-Range"] = `bytes ${range.start}-${range.end}/${size}`;
+  response.writeHead(range.partial ? 206 : 200, headers);
+  if (request.method === "HEAD" || size === 0) {
+    response.end();
+    return;
+  }
+  createReadStream(file, { start: range.start, end: range.end })
+    .on("error", () => response.destroy())
+    .pipe(response);
+}
+
+export function createPreviewServer({ root, now = () => Date.now() }) {
+  ensureRoot(root);
+  const server = http.createServer((request, response) => {
+    const pathname = new URL(request.url || "/", "http://localhost").pathname;
+    if (request.method === "GET" && pathname === HEALTH_PATH) {
+      sendHealth(response, root);
+      return;
+    }
+    if (request.method !== "GET" && request.method !== "HEAD") {
+      response.writeHead(405, { Allow: "GET, HEAD" });
+      response.end();
+      return;
+    }
+    const preview = previewRequest(pathname);
+    if (!preview) {
+      sendNotFound(response);
+      return;
+    }
+    servePreview(root, request, response, preview, now);
+  });
+  const cleanupTimer = setInterval(() => cleanupExpiredPreviews(root, now()), CLEANUP_INTERVAL_MS);
+  cleanupTimer.unref();
+  server.once("close", () => clearInterval(cleanupTimer));
+  return server;
+}
+
+function tailscaleIpv4() {
+  let raw;
+  try {
+    raw = execFileSync("tailscale", ["status", "--json"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  } catch (error) {
+    throw new Error(`could not read Tailscale status: ${error.message}`);
+  }
+  let status;
+  try {
+    status = JSON.parse(raw);
+  } catch {
+    throw new Error("tailscale status did not return valid JSON");
+  }
+  if (status.BackendState !== "Running") {
+    throw new Error(`Tailscale is not running (state: ${status.BackendState || "unknown"})`);
+  }
+  const addresses = status.TailscaleIPs || status.Self?.TailscaleIPs || [];
+  const ipv4 = addresses.find((address) => /^\d{1,3}(?:\.\d{1,3}){3}$/.test(address));
+  if (!ipv4) throw new Error("Tailscale did not report an IPv4 address");
+  return ipv4;
+}
+
+function serverScriptPath() {
+  return fileURLToPath(import.meta.url);
+}
+
+function screenSessionName(port) {
+  return `${SERVICE_NAME.replace(/-/g, "_")}_${port}`;
+}
+
+function serviceHealthy(host, port, root) {
+  return new Promise((resolve) => {
+    const request = http.get({ host, port, path: HEALTH_PATH, timeout: 400 }, (response) => {
+      const chunks = [];
+      response.on("data", (chunk) => chunks.push(chunk));
+      response.on("end", () => {
+        try {
+          const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+          resolve(response.statusCode === 200 && body.service === SERVICE_NAME && body.rootTag === rootTag(root));
+        } catch {
+          resolve(false);
+        }
+      });
+    });
+    request.on("timeout", () => request.destroy());
+    request.on("error", () => resolve(false));
+  });
+}
+
+function stopScreenSession(port) {
+  spawnSync("screen", ["-S", screenSessionName(port), "-X", "quit"], { stdio: "ignore" });
+}
+
+function ownedServerProcess(state) {
+  try {
+    const command = execFileSync("ps", ["-p", String(state.pid), "-o", "command="], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    return command.includes(state.script) && command.includes("--serve") && command.includes(`--port ${state.port}`);
+  } catch {
+    return false;
+  }
+}
+
+function stopServer({ root, port }) {
+  const state = readServerState(root, port);
+  if (state && ownedServerProcess(state)) {
+    try {
+      process.kill(state.pid, "SIGTERM");
+    } catch {
+      // The PID has already exited or does not belong to this user anymore.
+    }
+  }
+  stopScreenSession(port);
+  clearServerState({ root, port });
+}
+
+async function ensureServer({ host, port, root }) {
+  if (await serviceHealthy(host, port, root)) return;
+  stopServer({ root, port });
+  const launch = spawnSync(
+    "screen",
+    [
+      "-dmS",
+      screenSessionName(port),
+      process.execPath,
+      serverScriptPath(),
+      "--serve",
+      "--root",
+      root,
+      "--host",
+      host,
+      "--port",
+      String(port),
+    ],
+    { encoding: "utf8" },
+  );
+  if (launch.error) {
+    throw new Error(`could not start persistent preview server: ${launch.error.message}`);
+  }
+  if (launch.status !== 0) {
+    throw new Error(`could not start persistent preview server: ${launch.stderr.trim() || "screen failed"}`);
+  }
+
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    if (await serviceHealthy(host, port, root)) return;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`preview server did not become healthy on ${host}:${port}; the port may already be in use`);
+}
+
+function serve({ host, port, root }) {
+  const server = createPreviewServer({ root });
+  let stopping = false;
+  const stop = () => {
+    if (stopping) return;
+    stopping = true;
+    clearServerState({ root, port });
+    if (!server.listening) {
+      process.exit(0);
+      return;
+    }
+    server.close(() => process.exit(0));
+    server.closeAllConnections?.();
+  };
+  process.once("SIGINT", stop);
+  process.once("SIGHUP", stop);
+  process.once("SIGTERM", stop);
+  server.once("error", (error) => {
+    clearServerState({ root, port });
+    console.error(`${SERVICE_NAME} failed: ${error.message}`);
+    process.exitCode = 1;
+  });
+  server.listen(port, host, () => {
+    writeServerState({ root, host, port });
+    console.log(`${SERVICE_NAME} listening on http://${host}:${port}`);
+  });
+}
+
+async function runPreview(options) {
+  const host = tailscaleIpv4();
+  ensureRoot(options.root);
+  cleanupExpiredPreviews(options.root);
+  await ensureServer({ host, port: options.port, root: options.root });
+  const preview = stagePreview({
+    root: options.root,
+    source: options.source,
+    ttlMs: options.ttlMs,
+    keep: options.keep,
+  });
+  const url = `http://${host}:${options.port}${PREVIEW_PATH_PREFIX}${preview.id}/${preview.name}`;
+  console.log(`Preview URL: ${url}`);
+  if (preview.expiresAt === null) {
+    console.log("Expires: retained until manually removed or the OS clears its temporary directory");
+  } else {
+    console.log(`Expires: ${new Date(preview.expiresAt).toISOString()}`);
+  }
+}
+
+async function main(argv) {
+  let options;
+  try {
+    options = parseArgs(argv);
+  } catch (error) {
+    console.error(`tailnet-preview: ${error.message}`);
+    console.error(usage());
+    process.exitCode = 2;
+    return;
+  }
+  if (options.help) {
+    console.log(usage());
+    return;
+  }
+  if (options.serve) {
+    serve(options);
+    return;
+  }
+  if (options.stop) {
+    stopServer({ root: options.root, port: options.port });
+    console.log(`Stopped ${SERVICE_NAME} on port ${options.port}.`);
+    return;
+  }
+  await runPreview(options);
+}
+
+const isDirectExecution = process.argv[1] && path.resolve(process.argv[1]) === serverScriptPath();
+if (isDirectExecution) {
+  main(process.argv.slice(2)).catch((error) => {
+    console.error(`tailnet-preview: ${error.message}`);
+    process.exitCode = 1;
+  });
+}

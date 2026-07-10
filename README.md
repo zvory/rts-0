@@ -36,6 +36,24 @@ To change the bind address:
 RTS_ADDR=127.0.0.1:8090 ./runserver
 ```
 
+## Tailnet File Preview
+
+Use `scripts/tailnet-preview` for a standalone local artifact such as an MP4, screenshot, or
+downloadable replay. It copies the file below the operating system's temporary directory, reuses a
+private Tailscale-bound server on port `8091`, and prints a mobile-accessible URL. It never starts,
+stops, or replaces the game server on port `8080`.
+
+```bash
+scripts/tailnet-preview target/demo.mp4
+scripts/tailnet-preview --ttl 2h target/scene.png
+scripts/tailnet-preview --keep target/replay.json
+scripts/tailnet-preview --stop
+```
+
+Previews expire after 24 hours by default and are removed by the running preview server. `--keep`
+disables that application-level expiry, but the OS can still clear temporary files. The server
+supports HTTP byte ranges so mobile browsers can seek video without downloading it first.
+
 ## Starting A Match
 
 Open the game in one or more browser windows.
