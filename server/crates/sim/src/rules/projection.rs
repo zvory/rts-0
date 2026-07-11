@@ -254,8 +254,7 @@ pub fn project_entity(
     }
     if entity.kind == EntityKind::Tank && owner_or_ally {
         if let Some(stats) = config::unit_stats(entity.kind) {
-            view.weapon_range_tiles =
-                Some(tank_weapon_range_tiles(entity, stats.range_tiles as f32));
+            view.weapon_range_tiles = Some(tank_weapon_range_tiles(entity, stats.range_tiles as f32));
         }
     }
     if entity.kind == EntityKind::Panzerfaust {
@@ -263,16 +262,11 @@ pub fn project_entity(
             .combat
             .as_ref()
             .and_then(|combat| combat.panzerfaust)
-            .map(|state| {
-                matches!(
-                    state,
-                    PanzerfaustState::Loaded | PanzerfaustState::Windup { .. }
-                )
-            });
+            .map(|state| matches!(state, PanzerfaustState::Loaded | PanzerfaustState::Windup { .. }));
     }
     let acquired_combat_target = entity.can_attack() && entity.target_id().is_some();
-    let active_combat_target =
-        matches!(entity.order(), Order::Attack(_) | Order::AttackMove(_)) || acquired_combat_target;
+    let active_combat_target = matches!(entity.order(), Order::Attack(_) | Order::AttackMove(_))
+        || acquired_combat_target;
     let target_visible = if let Some(target_id) = entity.target_id() {
         context
             .target
@@ -460,7 +454,8 @@ pub fn project_entity(
     if matches!(
         entity.kind,
         crate::game::entity::EntityKind::Worker | crate::game::entity::EntityKind::Golem
-    ) && entity.gather_phase() == Some(GatherPhase::Harvesting)
+    )
+        && entity.gather_phase() == Some(GatherPhase::Harvesting)
     {
         if let Some(node) = entity.order().gather_node() {
             view.latched_node = Some(node);
@@ -1007,9 +1002,16 @@ mod tests {
             .get(hidden_target_id)
             .expect("hidden target should exist");
 
-        let viewer_view =
-            project_for_test(1, gunner, &fog, true, &entities, Some(hidden_target), false)
-                .expect("viewer should see nearby gunner");
+        let viewer_view = project_for_test(
+            1,
+            gunner,
+            &fog,
+            true,
+            &entities,
+            Some(hidden_target),
+            false,
+        )
+        .expect("viewer should see nearby gunner");
 
         assert_eq!(viewer_view.state, "idle");
         assert_eq!(viewer_view.target_id, None);
@@ -1353,11 +1355,7 @@ mod tests {
 
         assert_eq!(view.build_progress, None);
         assert!(
-            (view
-                .deconstruct_progress
-                .expect("deconstruct progress should project")
-                - 0.5)
-                .abs()
+            (view.deconstruct_progress.expect("deconstruct progress should project") - 0.5).abs()
                 < 0.001,
             "deconstruction progress should be the remaining reverse fraction"
         );
