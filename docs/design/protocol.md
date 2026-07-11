@@ -1164,8 +1164,10 @@ building points are authoritative snapped centers.
 units belong to that player; mixed-owner selections are rejected instead of partitioned. When
 `ignoreCommandLimits` is true, the lab command bypasses the normal command-supply budget and uses
 the larger bounded lab command window instead of the ordinary live-player unit-id window. A
-successful `labResult` carries `outcome: {accepted:true, playerId}` as an enqueue receipt; it does
-not claim that the command has already completed.
+successful `labResult` carries
+`outcome: {accepted:true, admission:"enqueued", playerId, queuedAtTick}` as an authoritative enqueue
+receipt. `queuedAtTick` is the simulation tick at admission; the receipt does not claim that command
+planning produced an effect or that the command has already completed.
 `setPlayerGodMode` is lab-only room state: enabled players' units and buildings ignore incoming
 damage, while resources keep normal damage behavior. The current enabled player ids are mirrored in
 `start.lab.godModePlayers` and `labState.godModePlayers`.

@@ -108,8 +108,10 @@ panels and game UI. Inspect the PNG once with the local image viewer.
 
 Private servers use the production 30 Hz simulation clock by default; an explicitly inherited
 `RTS_TEST_TICK_MS` remains available to tests. Successful `order` results include an authoritative
-receipt outcome `{accepted:true, playerId}`. Inspected entities keep `state` and `orderPlan` for
-explicit simulation orders, while `activity: "engaging"`, `targetId`, and `weaponFacing` expose a
+enqueue receipt outcome `{accepted:true, admission:"enqueued", playerId, queuedAtTick}`. This
+confirms validated queue admission, not a completed or non-no-op gameplay effect. Inspected entities
+keep `state` and `orderPlan` for explicit simulation orders, while `activity: "engaging"`,
+`targetId`, and `weaponFacing` expose a
 visible acquired combat target without mislabeling autonomous fire as an explicit order.
 Paused setup mutations fan out their accepted authoritative state without advancing combat. A
 paused `order` still advances one bounded tick so the queued command can be consumed; use explicit
