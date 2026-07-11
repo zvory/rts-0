@@ -96,7 +96,8 @@ absorbing the long-tail Pixi catalog. Preserve default Pixi and role-appropriate
 In controlled Lab, verify placement/order/tactical/marquee/Lab-observer paths and the real attack
 effect at fixed offsets. Then explicitly launch one live player, replay, and spectator Babylon
 route, confirm role policy and fog, force pre-join and post-`START` failures, and leave/re-enter;
-default Pixi must remain unchanged and Babylon-free.
+default Pixi must remain unchanged and Babylon-free. If useful, share a Tailscale preview for a
+quick phone check of panning and pinch zoom without treating mobile UI polish as part of the phase.
 
 ## Handoff Expectations
 
