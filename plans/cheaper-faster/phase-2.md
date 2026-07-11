@@ -11,6 +11,8 @@ Apply the beta-proven setup to mainline and confirm the ordinary friends-game wo
 ## Preconditions
 
 - Phase 1 is merged.
+- `bewegungskrieg.net` and `www.bewegungskrieg.net` reach the launcher, while the two channel
+  hostnames reach their respective game apps.
 - The agent successfully used the launcher to cold-start beta twice, connected to a lobby, played
   or spectated briefly, and observed beta stop after leaving.
 - No beta problem makes the workflow meaningfully worse than leaving the server always on.
@@ -22,8 +24,9 @@ Apply the beta-proven setup to mainline and confirm the ordinary friends-game wo
 - Configure mainline as `performance-1x`/2 GB with autostart, clean autostop, and zero minimum
   running Machines.
 - Preserve separate beta/mainline configs, releases, hostnames, secrets, and direct URLs.
-- Make the launcher the normal documented entry point while keeping direct game URLs as recovery
-  paths.
+- Keep the launcher at the canonical domain as the normal documented entry point. Keep
+  `mainline.bewegungskrieg.net`, `beta.bewegungskrieg.net`, and both raw Fly origins available for
+  direct access and recovery.
 - Update the short operator documentation and mark the plan complete.
 
 ## Verification Before Deployment
@@ -39,7 +42,9 @@ No new reliability framework or observation tooling is required.
 After explicit approval for the paid mainline change:
 
 1. Confirm mainline has no active room, then deploy the merged phase.
-2. Stop mainline and enter it through the launcher without manually refreshing.
+2. Stop mainline and enter it through `bewegungskrieg.net` without manually refreshing. Confirm
+   the launcher remains visible while mainline starts and then redirects to
+   `mainline.bewegungskrieg.net`.
 3. Play one short match or equivalent normal session.
 4. Confirm beta still reports its own build and remains independent.
 5. Close all browser connections and confirm mainline eventually stops.
