@@ -485,8 +485,13 @@ export class LabInteractDriver {
   }
 
   recordStop(metadata = {}) {
-    const recording = this.recording;
+    const admittedRecording = this.recording;
     return this.enqueue(() => {
+      // A start already ahead of this stop in the driver queue may not have
+      // installed its recording yet. Resolve that case at execution time while
+      // still binding an admitted active recording so a watchdog cannot make
+      // this stop drift onto a later recording.
+      const recording = admittedRecording || this.recording;
       if (!recording) {
         throw new LabInteractDriverError(
           "recordingInactive",

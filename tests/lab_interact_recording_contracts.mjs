@@ -140,6 +140,18 @@ assert.equal(queuedStopResult.stoppedBy, "watchdog", "a queued stop observes wat
 assert.deepEqual(await queuedStopDriver.recordWait(), queuedStopResult, "queued stop and wait retain one completion result");
 fs.rmSync(path.dirname(queuedStopResult.videoPath), { recursive: true, force: true });
 
+const queuedStartStopDriver = fixtureRecordingDriver(root, tools);
+const queuedStartBlocker = queuedStartStopDriver.enqueue(() => new Promise((resolve) => setTimeout(resolve, 20)));
+const queuedStart = queuedStartStopDriver.recordStart({
+  sessionId: `lab_${"9".repeat(32)}`, name: "queued-start-stop", maxDurationMs: 5_000,
+});
+const stopAfterQueuedStart = queuedStartStopDriver.recordStop();
+await queuedStartBlocker;
+await queuedStart;
+const queuedStartStopResult = await withDeadline(stopAfterQueuedStart, 5_000);
+assert.equal(queuedStartStopResult.stoppedBy, "explicit", "a stop queued after start targets the recording established ahead of it");
+fs.rmSync(path.dirname(queuedStartStopResult.videoPath), { recursive: true, force: true });
+
 const closeDriver = fixtureRecordingDriver(root, tools);
 await closeDriver.recordStart({ sessionId: `lab_${"c".repeat(32)}`, name: "close", maxDurationMs: 5_000 });
 await assert.rejects(
