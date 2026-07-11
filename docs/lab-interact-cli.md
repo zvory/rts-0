@@ -114,8 +114,9 @@ viewport or in-viewport crop, and scale from 0.25 through 1. A second start retu
 `record-stop` converts Chromium's temporary screencast stream into a mobile-compatible H.264 MP4
 with `yuv420p`, an `avc1` tag, and fast-start metadata; the temporary WebM is deleted. Finalization
 normalizes the MP4 to the measured wall duration at 30 FPS so sparse Chromium frame delivery does
-not produce shortened or accelerated playback. Odd output dimensions are padded by at most one
-pixel for H.264 compatibility. It extracts at most six representative PNGs,
+not produce shortened or accelerated playback. Odd dimensions are normalized to even values for
+H.264 compatibility; Chromium's temporary stream may trim or pad a single edge pixel. It extracts
+at most six representative PNGs,
 creates a 3×2 contact sheet, probes the media, and returns confined absolute paths plus bounded
 codec/frame diagnostics.
 The adjacent manifest records authoritative start/end ticks and room time, accepted CLI operations,

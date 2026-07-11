@@ -49,6 +49,15 @@ try {
     "-an", "-c:v", "libvpx-vp9", "-b:v", "0", webmPath,
   ], { encoding: "utf8", timeout: 15_000 });
   assert.equal(generated.status, 0, `VP9 fixture generation succeeds: ${generated.stderr}`);
+  const sourceDimensionsResult = spawnSync(tools.ffprobe, [
+    "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "json", webmPath,
+  ], { encoding: "utf8", timeout: 10_000 });
+  assert.equal(sourceDimensionsResult.status, 0, `VP9 fixture dimension probe succeeds: ${sourceDimensionsResult.stderr}`);
+  const sourceStream = JSON.parse(sourceDimensionsResult.stdout).streams?.[0] || {};
+  const expectedOutputDimensions = {
+    width: Math.ceil(Number(sourceStream.width) / 2) * 2,
+    height: Math.ceil(Number(sourceStream.height) / 2) * 2,
+  };
   const media = finalizeMedia({
     webmPath,
     mp4Path: path.join(mediaTmp, "fixture.mp4"),
@@ -63,7 +72,11 @@ try {
     { codecTag: "avc1", pixelFormat: "yuv420p", container: "mov,mp4,m4a,3gp,3g2,mj2" },
     "final media probe confirms the mobile MP4 compatibility surface",
   );
-  assert.deepEqual({ width: media.probe.width, height: media.probe.height }, { width: 640, height: 480 }, "final MP4 pads odd source dimensions for H.264 compatibility");
+  assert.deepEqual(
+    { width: media.probe.width, height: media.probe.height },
+    expectedOutputDimensions,
+    "final MP4 normalizes the actual WebM dimensions for H.264 compatibility",
+  );
   assert.ok(media.probe.durationSeconds >= 0.45 && media.probe.durationSeconds <= 0.55, "final MP4 timeline is normalized to wall duration");
   assert.equal(media.probe.frameRate, "30/1", "final MP4 uses the documented 30 FPS timeline");
   assert.deepEqual(
