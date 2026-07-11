@@ -12,17 +12,20 @@ or statistically proven reliability.
 
 ## Intended Result
 
-- Beta and mainline remain separate Fly apps and releases.
+- Beta and mainline remain separate Fly apps and releases named `bewegungskrieg-beta` and
+  `bewegungskrieg-mainline`.
 - Each game app uses one `performance-1x`/2 GB Machine with autostart and clean autostop.
 - One cheap always-on launcher owns `https://bewegungskrieg.net` and
   `https://www.bewegungskrieg.net`, offers fixed beta and mainline choices, shows
   `Starting server...`, and redirects when the chosen game server responds.
-- Mainline is served directly at `https://mainline.bewegungskrieg.net` and beta at
-  `https://beta.bewegungskrieg.net`. Their raw Fly hostnames remain recovery paths.
+- Mainline is served directly at `https://bewegungskrieg-mainline.fly.dev` and beta at
+  `https://bewegungskrieg-beta.fly.dev`.
 - The client retries its initial WebSocket connection for a short bounded period so a normal cold
   start does not require a manual refresh.
 - Existing `bewegungskrieg.net` deep links continue to work: the launcher treats an unqualified
   game deep link as mainline, preserves its path and query, wakes mainline, and redirects there.
+- Existing Squarespace DNS and Fly certificates remain untouched. The current canonical-domain
+  Fly app is repurposed as the launcher after both newly named game apps are verified.
 
 ## Constraints
 
@@ -34,10 +37,12 @@ or statistically proven reliability.
 - The launcher is a separate Fly app, not a process behind the mainline Machine. It must remain
   available while both game Machines are stopped and must redirect rather than proxy live game or
   WebSocket traffic.
+- Do not require Squarespace DNS changes. Use the two new apps' raw Fly hostnames as fixed game
+  destinations and keep the existing canonical-domain app name for the launcher.
 - Headless AI rooms without a connected browser may not prevent Fly autostop. That is acceptable
   for this project and should be documented plainly.
-- Keep the existing shutdown/drain behavior and a simple rollback to the current always-on shared
-  Machine configuration.
+- Keep the existing shutdown/drain behavior. Preserve the old beta app and the temporary launcher
+  app in a stopped state until acceptance completes so rollback does not depend on DNS changes.
 - Recheck Fly pricing before remote changes. Creating the launcher app, resizing a Machine,
   moving certificates or DNS, or changing a paid remote configuration requires explicit user
   approval immediately beforehand.
@@ -65,18 +70,17 @@ back. Do not build a measurement program around it.
 
 ### [Phase 1 - Build and Try It on Beta](phase-1.md)
 
-Add the small launcher, initial WebSocket retry, and separate beta/mainline Fly configuration, then
-move the canonical domain to the launcher and only beta to performance-autostop. Run existing
-selected CI plus a small security test for the launcher's fixed destinations. After deployment,
-the agent uses the real stopped-beta workflow twice, plays or spectates briefly, confirms idle
-stop, and either approves the experience or rolls it back.
+Add the small launcher, initial WebSocket retry, and separate beta/mainline Fly configuration. Run
+existing selected CI plus a small security test for the launcher's fixed destinations. The
+implementation merged, and the beta performance/autostop config was proven deployable before the
+user chose the no-DNS app-role swap completed in Phase 2.
 
 ### [Phase 2 - Roll It Out to Mainline](phase-2.md)
 
-If beta feels good, apply the same performance-autostop configuration to mainline while preserving
-release isolation and direct recovery URLs. The agent then uses the launcher to cold-start mainline,
-plays one short match, closes it, and confirms the Machine stops. Record the resulting setup and
-rollback commands, then finish the plan.
+Create the newly named beta and mainline game apps, deploy both with performance-autostop, and then
+repurpose the existing canonical-domain app as the always-on launcher without changing Squarespace
+DNS. The agent cold-starts and exercises both destinations through the launcher, confirms idle
+stop and release isolation, records rollback commands, and finishes the plan.
 
 ## Testing Philosophy
 
