@@ -13,11 +13,19 @@ tools, and external test drivers without adding a second privileged control path
 
 **Command log replay.** `Game` records every command at the authoritative apply tick, after callers
 have enqueued human, scripted, or AI commands and before systems apply the pending queue.
-`game/replay.rs` translates that wire-compatible log into `SimCommand`s, feeds them into a fresh
-`Game` with AI thinking disabled, and compares the resulting event stream and final per-player
-snapshots. Replay and live play use the same typed command application path, so a replay proves both
-the recorded command artifact and the deterministic simulation ordering. Entity iteration and A*
-tie-breaking must remain stable; avoid hash-order-dependent simulation behavior.
+`game/replay.rs` translates that wire-compatible log into `SimCommand`s, restores a fresh `Game`
+from the replay artifact's checkpoint-backed start composition with AI thinking disabled, and
+compares the resulting event stream and final per-player snapshots. Replay and live play use the
+same typed command application path, so a replay proves both the recorded command artifact and the
+deterministic simulation ordering. Preserved schema 2 incident replay files are historical evidence,
+not supported replay fixtures; current replay workloads use schema 3 captures. Entity iteration and
+A* tie-breaking must remain stable; avoid hash-order-dependent simulation behavior.
+
+**Derived-state rebuild coverage.** The test-only `Game` rebuild seam clears the persistent
+`PathingService` cache and rebuilds the final spatial index from authoritative entities at a tick
+boundary. The paired-game derived-state test warms pathing, rebuilds derived state in one copy, and
+then compares semantic authoritative state plus player, full, and spectator snapshots while both
+games continue ticking and repathing.
 
 **Fast/full AI split.** Plain `cargo nextest run --config-file .config/nextest.toml --manifest-path
 server/Cargo.toml --profile default` keeps the self-play harness in the default gate, but only runs
@@ -27,6 +35,10 @@ orchestrator.
 `RTS_SELFPLAY_FULL=1` remains accepted as an alias for manual self-play runs. Use full AI coverage
 when touching AI strategy, profile-backed self-play, replay determinism, or balance behavior that
 depends on long matches.
+
+AI arena runs that end with no winner because of elimination remain unresolved elimination draws;
+they are not scored using the tick-cap army-value tiebreak. An arena run is rejected when distinct
+candidate and baseline requests resolve to the same concrete profile for a seed.
 
 **Profile-backed coverage.** The long profile-backed tests spawn AI-profile players through the
 self-play adapter and run matches headlessly under `RTS_FULL_AI_TESTS=1 cargo nextest run
@@ -179,6 +191,20 @@ usually be narrower and selected by the changed files or contracts. Use
 `node tests/select-suites.mjs --from=<base-ref>` or pass changed paths directly to see the expected
 suites.
 
+Lab coverage derives the expected lategame research set from the Kriegsia catalog and requires every
+bundled preview scenario to grant that full set. Client fixtures treat completed research arrays as
+unordered state. The lab client contract suite requires pasted JSON with the retired `labScenario`
+envelope to fail locally with an explicit lab result instead of falling through to generic server
+message parsing. The agent lab driver exposes its page bridge only on Lab routes, rebuilds the
+server for the selected worktree, cancels interrupted startup deterministically, and transfers
+daemon startup to the child through a random nonce lease before socket bind. Detached daemon startup
+errors surface immediately, partial startup ownership and runtime resources are cleaned up, and idle
+expiry uses monotonic time. Dead-parent locks are preserved for a bounded grace period, only verified
+stale records are reclaimed, and lock release requires nonce ownership. Malformed bridge inspection
+filters fail closed so invalid bounds cannot broaden a query. The driver evaluates capture fallback and render errors against the
+current frame so transient startup work does not block a later clean capture, and clamps seeks to
+the supported range.
+
 - Phase runner plan/path handling: run `node tests/phase_runner_agents.mjs` when changing
   `scripts/phase-runner*.mjs` or phased plan path handling, including slash-separated nested plan
   names, sanitized worktree/log slugs, executor model inheritance, and generated `codex exec`
@@ -196,12 +222,23 @@ suites.
   status, and recording a docs-only skip report in the PR body. Include
   `bash -n scripts/agent-pr.sh tests/run-all.sh && node --check scripts/adversarial-quality-pass.mjs`
   for shell and JS syntax coverage.
+- Net-report incident packaging: run `node tests/net_report_log_parser.mjs` when changing
+  `scripts/parse-net-report-logs.mjs` or `scripts/net-report-incident-package.mjs`. Run
+  `node tests/net_report_incident_capture.mjs` when changing `scripts/capture-net-incident.mjs`.
+  Capture coverage must verify that `--force` replaces generated capture-package directories and
+  refuses to recursively remove directories that do not look like generated capture packages.
+  Parser coverage must preserve numeric per-match fixture labels, prefer `match_run_id` labels for
+  nonnumeric combined log artifacts, and limit per-match coverage rows to the matching run id when
+  one source log contains multiple matches.
 - `rts-contract` or `rts-protocol`: run Rust contract/protocol tests, compact snapshot tests, JS
   protocol mirror/decode tests, and Node integration when a top-level message or compact shape
   changed.
 - `rts-rules`: run rules tests plus sim tests that consume stats/formulas. If visible balance
   values changed, run client config/protocol mirror checks and include factual player-facing patch
   notes.
+- Client match-shell combat audio: synthetic self-target `Attack` events used for fog-safe artillery
+  firing reveals update visual reveal and recoil state without playing attack audio. Normal
+  point-fire artillery attacks still play combat audio.
 - Faction guardrails: run `node scripts/check-faction-assumptions.mjs` for faction docs, lifecycle
   policy, lobby admission, protocol/config vocabulary, or checker changes. Run
   `node scripts/check-faction-catalog-parity.mjs` when faction catalog facts, the Rust catalog dump,
@@ -294,7 +331,10 @@ in one runner. The server-build job uploads generated sim-WASM browser assets, a
 shards download them into `client/vendor/sim-wasm` before client smoke runs from its clean checkout. Local
 `tests/run-all.sh` runs keep client smoke in the default browser gate but skip the latency-sensitive
 tri-state browser scenarios unless `--with-tri-state-browser` or `RTS_RUN_TRI_STATE_BROWSER=1` is
-set. WASM-backed tri-state groups also stay opt-in unless `RTS_RUN_WASM_TRI_STATE=1` is set.
+set. WASM-backed tri-state groups also stay opt-in unless `RTS_RUN_WASM_TRI_STATE=1` is set. When
+the generated prediction WASM glue is absent, the server serves a JavaScript fallback module that
+disables prediction without a 404; generated WASM files take precedence, and other missing assets
+still return 404. Client smoke reports failing response URLs with browser console resource errors.
 Changed-file detection classifies PRs and `main` pushes as `docs_only`, `client_only`, or `full`
 from the PR base/head range or the push before/after range. `docs_only` keeps the same check
 contexts green but exits before expensive suites. `client_only` is limited to conservative

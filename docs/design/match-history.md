@@ -86,7 +86,8 @@ Migrations are versioned SQL files run by `sqlx::migrate!` at server boot. Never
 - **Replay launch**: `POST /api/matches/{id}/replay` — read-only launch request. The server loads
   the persisted artifact only if the match is visible to the request scope, validates it against
   the running map metadata and the shared replay faction/loadout validator used by replay rooms,
-  creates a spectator-only replay staging lobby, and returns `{ "room": "..." }`. Once the first
+  and runs embedded checkpoint restore and timeline validation before creating a spectator-only
+  replay staging lobby and returning `{ "room": "..." }`. Once the first
   viewer joins, that room appears in `/api/lobbies` with `kind: "replay"` and safe room metadata
   only; the stored artifact JSON is never exposed through the lobby browser. The host starts
   playback with the normal WebSocket `start` message, without ready/team/map/AI setup checks.

@@ -67,8 +67,8 @@ impl Game {
     /// assignment, preferring lower teammate spread, higher nearest enemy-team distance, lower
     /// exposure imbalance, and finally a deterministic seed-influenced tie break. Each selected
     /// slot keeps its authored main/naturals grouping, so maps can define different fair naturals
-    /// for adjacent, cross, safe-base, or other spawn layouts and can grant more than one neutral
-    /// expansion per player. Generated oil clusters place each oil patch on a unique passable tile
+    /// for adjacent, cross, safe-base, or other spawn layouts. Each slot supports one main plus up
+    /// to three natural expansions; the authored-map loader rejects slots with more than four bases. Generated oil clusters place each oil patch on a unique passable tile
     /// center near the intended layout, keep one tile between oil patches, and reject sites whose
     /// Pump Jack footprint would collide with non-oil resources while preserving City Centre
     /// resource-distance bounds. Lab-restored oil nodes are normalized to passable tile centers and
@@ -258,7 +258,7 @@ architecture failures.
 | Field | Category | Checkpoint policy | Evidence and notes |
 | --- | --- | --- | --- |
 | `map` | `authoritative/serialized` | Internal cold checkpoints serialize the full live `Map` value. Public `GameCheckpointV1` payloads do not embed a map body; they carry `mapBinding` facts and import only with the exact container-supplied `Map`. See §3.1.3. | `Game::new_inner_with_map` stores the generated or supplied map; `systems::run_tick`, pathing, fog, placement, resource setup, and `start_payload` all read it. Runtime ownership and external artifact composition are intentionally separate contracts. |
-| `entities` | `authoritative/serialized` | Serialize the full `EntityStore`, including stable entity ids, allocator/high-water state, HP, orders, queues, movement state, selected waypoints, path goals, cooldowns, combat state, production/build progress, rally plans, Scout Plane orbit/return runtime state, resource reservations, body/weapon/setup facing, and entity flags. | `systems::run_tick` mutates the store every tick; snapshots, score, survival, command validation, replay determinism tests, and the Phase 0.5 comparator all treat entity state as semantic authority. Chosen movement paths and aerial orbit state live on entities, not in `pathing`. |
+| `entities` | `authoritative/serialized` | Serialize the full `EntityStore`, including stable entity ids, allocator/high-water state, HP, orders, queues, movement state, selected waypoints, path goals, cooldowns, combat state, production/build progress, rally plans, Scout Plane orbit/return runtime state, resource reservations, body/weapon/setup facing, and entity flags. | `systems::run_tick` mutates the store every tick; snapshots, score, survival, command validation, replay determinism tests, and the Phase 0.5 comparator all treat entity state as semantic authority. Chosen movement paths and aerial orbit state live on entities, not in `pathing`. Scout Plane entities are excluded from standard fog sight stamping; dedicated aerial vision is not active. |
 | `fog` | `authoritative/serialized` | Serialize current live visibility grids for now. A later phase may reclassify live fog as rebuildable only after proving an exact deterministic rebuild before every command, combat, and snapshot surface. | `systems::run_tick` receives `&self.state.fog` for command/combat visibility decisions, snapshots project through current team fog, and Phase 0.5 compares per-player visible tiles as semantic state. |
 | `building_memory` | `authoritative/serialized` | Serialize remembered enemy-building entries per player. | `BuildingMemory::refresh` records last-seen enemy building state and only removes hidden destroyed entries after the footprint is scouted again; spectator/player snapshots project remembered buildings while fogged. |
 | `players` | `authoritative/serialized` | Serialize all `PlayerState` rows, including id/team/faction/name/color/start tile, current Steel/Oil, supply, AI flag, score counters, mined-resource lifetime totals, rolling mined-resource income history, and completed upgrades. | Economy, command authority, team relations, alive checks, scores, observer-analysis resource income, faction-specific tech, and snapshot resource rows are all read from `players`. |
@@ -310,7 +310,7 @@ Durable state owners belong under `GameState`; rebuildable cache/index/search ow
 `DerivedState`. Services may own invariants and narrow mutation/query APIs, but long-lived state
 that changes future authoritative behavior must be stored in the explicit tree. Room/session
 exceptions stay documented in §3.2 and `server/src/lobby/`: sockets, room identity/lifecycle,
-replay session cursors/keyframes, replay branch seeds, lab timeline history, selected vision,
+replay session cursors/keyframes, replay branch seeds, lab timeline keyframes and durable replay baselines/operation entries, selected vision,
 participant capabilities, AI controller memory, persisted match-history writes, and test fixtures
 are outside the cold checkpoint contract unless a future plan promotes them into authoritative
 recorded actions.
@@ -318,15 +318,16 @@ recorded actions.
 Private checkpoint export/import remains internal test machinery. `GameCheckpointV1` payload helpers
 under `rts-sim::game` are used by the semantic comparator and validation tests; they do not define a
 public route, command, replay artifact format, lab setup format, UI affordance, or lobby/server
-call path by themselves.
+call path by themselves. Lab world mutations reset the full `DerivedState` shell before rebuilding
+spatial state, so pathing cache and search state are cleared at the same rebuildable boundary.
 
 Phase 7 release audit for the ownership sequence:
 
 - Public `Game` API signatures remain the §3.1 seam. Lobby, replay, lab, AI, server, and snapshot
-  callers still go through public `Game` methods rather than reading internal state owners. Normal
-  match starts and blank lab starts build a private direct setup value only as the canonical setup
-  compiler, then immediately restore the authoritative start through `GameCheckpointV1`; the
-  `new_direct_start_for_test` oracle is retained only for setup parity tests.
+  callers still go through public `Game` methods rather than reading internal state owners. Normal,
+  replay-compatible, lab, and dev-scenario setup composes a map plus `GameCheckpointV1`, then
+  validates checkpoint import before the authoritative start becomes live. The private
+  `new_direct_start_for_test` path is retained only as a setup parity oracle.
 - Wire protocol mirrors, protocol DTOs, compact snapshots, start payloads, and
   `client/src/protocol.js` are not changed by the private checkpoint path.
 - Replay artifact schema 3 captures the replay start state as a launch-time
@@ -411,9 +412,15 @@ alive.
 `GameCheckpointV1` is the first public checkpoint payload contract. It is a versioned UTF-8 JSON
 text payload that can be embedded inside a replay artifact, lab setup container, match-start
 artifact, or debug document. It is not a standalone product file format, network command, route, UI
-option, replay schema change, or lab schema change by itself. The internal implementation exports
+option, replay schema change, or lab schema change by itself. Schema 3 replay artifacts may embed a
+checkpoint at a nonzero start tick; replay start capture rejects games with pending commands so
+playback cannot duplicate pending intent. Their top-level command log retains only commands after
+that tick, and their top-level seed, player, and starting-loadout metadata must agree with the
+checkpoint start state or artifact validation rejects them. The internal implementation exports
 `Game + supplied map binding` through explicit DTOs to JSON text bytes, imports only with the exact
-container-supplied `Map`, and rebuilds derived state before returning a live `Game`.
+container-supplied `Map`, and rebuilds derived state before returning a live `Game`. Export sorts
+entity DTOs by id so normalized payload text does not depend on entity-store iteration order, and
+rejects payloads above the same v1 byte limit enforced by import.
 
 The payload schema is named `rts.gameCheckpoint` and starts at version `1`. Field names are
 camelCase. DTOs must be explicit Rust types with serde support; do not serialize private
@@ -586,23 +593,31 @@ remain on their current schemas until their phases introduce containers around t
 
 ### 3.2 Concurrency model
 - One tokio task per **room** owns its `Game` and runs the tick loop (`tokio::time::interval`). Room registry handles carry per-room identity tokens; registry disposal removes only the matching identity and signals that room task to shut down.
-- Each **connection** is a task with an `mpsc::Sender<ServerMessage>` to push to its socket.
+- Each **connection** is a task with an `mpsc::Sender<ServerMessage>` for reliable server messages and a dedicated latest-only slot for observer-analysis payloads sent to its socket.
 - Connection→room communication uses an `mpsc` channel of internal `RoomEvent`
   (`Join`, `Leave`, `Ready`, `StartRequest`, `AddAi`, `RemoveAi`, `SetSpectator`, `SetFaction`,
   `Command`, `GiveUp`, `PauseGame`, `UnpauseGame`, `SetRoomTimeSpeed`, `StepRoomTime`,
   `SeekRoomTime`, `SeekRoomTimeTo`, `SetVisionSelection`, `Lab`). The room task is the single writer
   of game state — no locks around `Game`. Replay vision selection and successful replay seeks immediately send affected
-  viewers fresh fog-scoped snapshots instead of waiting for the next replay tick.
+  viewers fresh fog-scoped snapshots instead of waiting for the next replay tick. Lobby-owned
+  connection handling records the command room-enqueue milestone after reserving room-channel
+  capacity, so time spent waiting on a saturated room queue remains visible in lifecycle
+  diagnostics. When lifecycle samples overflow the bucket table, reported p95 uses the observed
+  maximum sample.
 - Room-mode, phase, and match-composition dependent lobby checks use a lobby-local `SessionPolicy`
   descriptor for the current room mode and phase matrix, including dev-watch, replay-room,
   branch-staging, speed-only live-game room-time controls, countdown, speed-source, and match-history
-  decisions. Live-match handlers live in `room_task/live.rs`,
+  decisions. Authored map minimum and maximum player counts are exposed in the lobby map catalog.
+  The selected map's minimum and maximum bound match start eligibility, while its maximum limits
+  joins, AI seats, spectator returns, and lobby browser slots. Selecting a lower-capacity map removes overflow AI seats first, then
+  moves overflow humans to spectators. Live-match handlers live in `room_task/live.rs`,
   replay-branch handlers live in `room_task/branch.rs`, lab request handling lives in
   `room_task/lab.rs`, dev-watch scenario handling lives in `room_task/dev.rs`, and room lifecycle
   bookkeeping lives in `room_task/lifecycle.rs`; `RoomTask` remains the owner of mutation and tick
-  authority. Plain `/lab` is a client-side catalog selector. Direct lab URLs keep compatibility:
-  `scenario=lategame` requests the bundled catalog setup, `scenario=blank` keeps blank lab
-  startup, and custom map or seed lab URLs stay blank unless they set an explicit setup. Bundled
+  authority. Plain `/lab` is a client-side catalog selector. Its Blank Lab entry launches blank startup on
+  the No Terrain map, while catalog setups retain their selected maps. Direct lab URLs keep
+  compatibility: `scenario=lategame` requests the bundled catalog setup, `scenario=blank` keeps
+  blank lab startup, and custom map or seed lab URLs stay blank unless they set an explicit setup. Bundled
   lab setup ids are safe tokens listed in `server/assets/lab-scenarios/manifest.json`; the
   loader in `server/src/lab_scenarios.rs` validates manifest metadata, safe filenames, duplicate
   ids, JSON parseability, map/player-count consistency, and restore compatibility through the
@@ -611,7 +626,8 @@ remain on their current schemas until their phases introduce containers around t
   timeline keyframe. Lab god mode is lab-only state: `setPlayerGodMode` marks that player's units
   and buildings
   invulnerable, applies across lab mutations, owner changes, spawned assets, and timeline replay
-  state, and is mirrored in start/labState metadata.
+  state, and is mirrored in start/labState metadata. Bundled scenario launch and manual JSON import
+  restore exported god-mode player ids through the public lab `Game` API.
 - The public lobby browser asks room tasks for bounded summaries over `RoomEvent::Summary` instead
   of reading room internals. Normal lobby/countdown/live-match rooms and persisted match-history
   replay staging lobbies are summarized; dev, replay-artifact, replay playback, replay-branch, and
@@ -846,16 +862,25 @@ protocol id, adding the faction catalog entry, updating the client mirror/parity
 adding only the effect-specific code that the registry cannot express.
 
 `AbilityDefinition` also carries a sim-local `AbilityEffectHook` discriminator for the reusable
-effect shapes that actually exist today: legacy no-op (`charge` compatibility), owned area
-status (`breakthrough`), delayed world effects (`smoke`, `mortarFire`), dash return, line
-projectile, Magic Anchor placement, Golem consumption, and the intentionally one-off artillery
-point-fire path. The hook receives the owning player's faction id at execution time through the
+effect shapes that actually exist today: legacy no-op (`charge` compatibility), reserved no-op
+(`blanketFire`), owned area status (`breakthrough`), delayed world effects (`smoke`,
+`mortarFire`), Scout Plane dispatch, dash return, line projectile, Magic Anchor placement, Golem
+consumption, and the intentionally one-off artillery point-fire path. Panzerfaust damage resolves against the locked live Tank when it is enemy-owned or owned by the
+firing player; allied teammate and neutral targets remain non-damageable. Deliberate same-owner
+hits do not emit under-attack notices or receive enemy kill attribution. Impact feedback uses the
+stored launch endpoint when a damageable target has moved outside the firing team's current
+visibility; enemy victim under-attack notices use the victim's actual position.
+Dead Panzerfaust entities do not advance pending loaded-shot windup or recovery state, so they
+cannot launch or convert a shot before normal death cleanup. The reserved Blanket Fire hook returns before
+command planning, so commands do not spend resources, start cooldowns, or replace artillery
+orders. The hook receives the owning player's faction id at execution time through the
 normal command/order helpers, so wrong-faction ability use fails before effects, resource spending,
-cooldowns, or events are applied. Artillery point fire locks each raw click to the issuing gun's
-valid 25-to-55 tile range band, stores that effective point, and owns any needed in-place setup or
-redeploy before the first shot. It records temporary live-fog firing reveal sources for enemy
+cooldowns, or events are applied. Artillery point fire derives the target direction from the raw click with `atan2`, locks even very
+large finite click coordinates to the issuing gun's valid 25-to-55 tile range band, stores that
+effective point, and owns any needed in-place setup or redeploy before the first shot. It records temporary live-fog firing reveal sources for enemy
 players when a shell launches, using the firing-cycle-plus-half-second lifetime and smoke
-suppression used by other actionable firing reveals. The hook is deliberately not a generic script engine. Phase 11 signature abilities
+suppression used by other actionable firing reveals. Non-targetable Scout Planes are excluded from splash damage, projectile impacts, and Magic Anchor effects.
+The hook is deliberately not a generic script engine. Phase 11 signature abilities
 should first use one of the existing shapes; if they cannot, add either a narrow explicit hook or a
 named one-off path with faction validation, cost validation, and fog-safe event tests rather than
 widening the hook into generic scripting.
@@ -1067,9 +1092,20 @@ spatial indexes across later mutations.
 
 ### 3.5 Command planning and queued order semantics
 
+Entrenchment research takes 30 seconds.
+
+Deployed anti-tank guns rank in-field automatic target candidates ahead of out-of-arc candidates. If no in-field candidate exists, acquisition retains the out-of-arc target so the weapon clamps toward the fixed field edge without firing.
+
+Aggressive automatic acquisition applies the existing priority ranking to currently fireable enemy candidates first and considers enemy chase candidates only when no candidate can be fired on immediately. Explicit Attack orders may target the issuing player's own units or buildings, but not allied teammate entities, and retain their commanded target while it remains legal and visible. Opportunistic moving-fire acquisition considers only fireable enemy candidates. Chasing units refresh paths whose goals are materially wrong, including direct attacks and attack-moves without moving fire.
+
+Command Cars activate Scout Plane on the C grid slot for 50 Steel and 50 Oil. Activation launches immediately from the owned completed City Centre nearest the target, permits one active Scout Plane per player, and starts a 30-second player-global cooldown. Activation does not replace or clear the selected Command Car's active or queued orders. The plane flies to the target, orbits for 10 seconds after arrival, then returns to its launch City Centre or despawns if that anchor is gone. Scout Planes have no fuel reserve, Oil upkeep, selected-plane retargeting, or dismissal commands.
+
+Group move formation assignment checks cached reachability components before issuing per-unit goals, avoiding command-time A* probes outside the move coordinator pathing budget. When a preserved offset is locally passable but unreachable, the affected unit searches inward toward the formation center for a reachable replacement; if no useful route exists, its old goal is preserved so normal path processing can report `PathFailed`.
+
 The authoritative command model is: clients compose intent; the server validates and plans it.
-Keyboard latching, double-tap quick-cast, Shift lifetime, and cursor previews are client UX. The
-simulation contract begins when a `SimCommand` reaches `services::commands`: the command service
+Keyboard latching, double-tap quick-cast, Shift lifetime, cursor previews, and rejecting
+pointer-captured touch releases outside their originating controls are client UX. The simulation
+contract begins when a `SimCommand` reaches `services::commands`: the command service
 dedupes and caps unit-id lists, rejects over-budget human unit-list commands, builds issue-time
 facts for the referenced units/targets, and must produce unit-local actions that match the policy
 below. The budget scalars live in the sim-owned `command_budget` helper so parity checks can dump
@@ -1081,6 +1117,10 @@ AI-owned players are exempt from this budget because live AI
 still issues ordinary `SimCommand`s through
 `Game::enqueue`. Lab `issueCommandAs` can also opt into a lab-only admission mode that bypasses
 the command-supply budget and uses a larger bounded unit-id window for scenario-scale commands.
+Lab scenario export and restore preserve stable active and queued order intent, including artillery
+point-fire and blanket-fire commands. Restore also hydrates the runtime state required for active
+movement, build, deconstruct, and artillery point-fire orders to resume execution.
+When construction completes, every worker targeting that scaffold clears its active Build order.
 `services::order_planner` is the pure
 reference implementation of this planning policy. The planner has no `EntityStore`, fog, pathing,
 economy, or cooldown mutation dependency; it accepts plain facts and emits one of three effects:
@@ -1092,13 +1132,33 @@ economy, or cooldown mutation dependency; it accepts plain facts and emits one o
 
 `services::order_execution` is the shared narrow mutation helper for order-state transitions that
 are needed by both issue-time command application and queued promotion, such as support-weapon
-setup, artillery point-fire targeting, and artillery teardown before movement. It should not grow
+setup, artillery point-fire targeting, and artillery teardown before movement. Queued artillery
+Point Fire remains accepted while a deployed gun is tearing down for an active move, preserving
+the locked future target for move-then-fire execution. It should not grow
 new validation policy or tick orchestration; those responsibilities remain with command admission,
 queued promotion, or the owning tick system.
+
+Live pathfinding and dev scenarios share a 32,768-node expansion budget per path miss. Requests
+that exhaust the budget return a best-effort path. Pump Jack standability permits a Pump Jack to
+coexist with its oil node, and simulation invariant checks use that same Pump Jack policy.
+
+Eligible infantry move and attack-move formation slots bias toward nearby known, unoccupied trench
+terrain within a two-tile footprint band around the normal formation goal. A trench occupant counts
+as occupied only when visible to the issuing player through the fog and smoke projection used for
+snapshots; selected units still free their own occupied trenches for group moves. The visibility check uses
+contributors derived from `Game::alive_players()`, matching the living-team visibility boundary used
+for snapshots; leftover units owned by defeated teammates do not reveal trench candidates. Hidden
+trenches, blocked trench points, occupied trenches outside the command, far trenches, and
+non-eligible units use ordinary formation spreading.
 
 Tank weapon range is dynamic in the simulation: tanks keep their base 5-tile range while moving,
 then linearly ramp to 14 tiles after three stationary seconds. Path-driven translation or hull
 rotation resets the ramp to base range; turret aiming and external pushes do not.
+
+Team-current visibility, including an ally's lingering death vision, permits explicit immediate and
+queued attack targeting, but death-vision-only targets remain ineligible for general combat
+auto-acquisition. A consumed direct Panzerfaust attack completes when the unit converts into a
+Rifleman, allowing queued movement to promote instead of remaining behind the one-shot target.
 
 Combat weapon cooldowns and firing-reveal response delays are keyed by
 `rules::combat::WeaponKind` inside `CombatState`. The legacy `Entity::attack_cd()`,

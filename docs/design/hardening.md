@@ -1,7 +1,10 @@
 ## 7. Hardening (input is untrusted)
-The server treats every client as potentially hostile. Limits live next to the code:
-- **WebSocket frame cap** (`main.rs`): `max_message_size`/`max_frame_size` = 256 KiB. Oversized
-  frames are rejected and the connection closed before they reach serde.
+The server treats every client as potentially hostile. Scout Planes are exposed through normal fog-safe projection and omitted when hidden from that player. Their private fuel and orbit state is sent only to the owner or full-world projections. Authoritative aerial fog stamping grants owner/team vision through terrain and building blockers while still respecting smoke. After the first active Scout Plane for an owner, duplicate planes do not stamp additional vision. Limits live next to the code:
+- **Net-report diagnostic cap** (`server/crates/protocol/src/lib.rs`): client-supplied command lifecycle exemplars are capped during deserialization to the logged top-N contract.
+- **WebSocket and lab scenario import caps** (`main.rs`, `lab_scenarios.rs`): WebSocket text-frame
+  limits accommodate valid checkpoint-backed scenario round trips, while lab scenario import JSON
+  has a separate explicit cap. Oversized frames are rejected before serde, and oversized scenario
+  imports are rejected before checkpoint restore.
 - **Command unit cap and budget** (`services/commands.rs`, with mirrored budget scalars in
   `command_budget.rs`): ordinary unit-list commands inspect at most
   `MAX_UNITS_PER_COMMAND = 256` submitted ids, dedupe that bounded window, and reject

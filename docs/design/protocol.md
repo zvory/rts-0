@@ -454,7 +454,7 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
     dirty: bool,
     operationCount: u32
   },
-  tick: u32,                     // starting tick (usually 0)
+  tick: u32,                     // starting tick (0 for normal starts; restored checkpoint tick for checkpoint replays)
   map: {
     width: u32, height: u32,     // in tiles
     tileSize: u32,               // world px per tile
@@ -721,7 +721,9 @@ Compact numeric codes:
 #### 2.4.1 Boundary inventory
 
 This inventory records the current source-of-truth map after the protocol mirror split. It does not
-change the wire shape or compact snapshot version.
+change the wire shape or compact snapshot version. Public lab catalog, import, export, and authoring
+validation errors use checkpoint setup terminology; legacy `LabScenario` wire and type names remain
+compatibility internals.
 
 | Value/path | Rust owner | JS mirror path | Category | Current checker | Proposed future checker | Client-only exclusion reason | Compact version impact |
 |------------|------------|----------------|----------|-----------------|-------------------------|------------------------------|------------------------|
@@ -1050,8 +1052,10 @@ mode/event policy if the new data does not fit an existing row.
 `roomTimeState` is a reliable server message that carries the shared room-controlled time
 cursor/state. Replay rooms send it for playback cursor changes; dev scenario watch rooms and lab
 rooms also send it after pause/resume and one-tick step controls so clients can confirm the
-authoritative room-time speed and tick. Lab rooms also send it after timeline baseline resets and
-new timeline keyframes, accepted seeks, and future-history truncation:
+authoritative room-time speed and tick. Clients keep a pending room-time command across stale
+authoritative frames and clear or recover its timeout notice when a later state confirms the
+command. Lab rooms also send it after timeline baseline resets and new timeline keyframes, accepted
+seeks, and future-history truncation:
 ```
 {
   t: "roomTimeState",
@@ -1067,6 +1071,8 @@ new timeline keyframes, accepted seeks, and future-history truncation:
 `keyframeTicks` lists the replay or lab keyframes the server has recorded so far. Replay and lab
 clients may display them as seek marks, but a seek target is not limited to these ticks; the server
 restores the nearest recorded keyframe at or before the requested tick and fast-forwards from there.
+For schema 3 replay artifacts that begin from a checkpoint, the restored checkpoint tick is the
+minimum playback tick; earlier seek targets are clamped to that tick.
 Lab rooms expose recorded baseline and periodic keyframe ticks through the same field, with
 `durationTicks` set to the current maximum retained lab tick. Lab history is bounded by retained
 room-local keyframes and recorded entries; seek requests outside retained history are rejected with
