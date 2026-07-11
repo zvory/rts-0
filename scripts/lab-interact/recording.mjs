@@ -142,14 +142,36 @@ function probeMedia(file, ffprobe) {
   try { parsed = JSON.parse(result.stdout); } catch { throw new LabInteractRecordingError("mediaProbeFailed", "ffprobe returned invalid JSON."); }
   const stream = parsed.streams?.[0] || {};
   if (stream.codec_name !== "vp9") throw new LabInteractRecordingError("mediaProbeFailed", `Expected VP9 WebM, received ${stream.codec_name || "an unknown codec"}.`);
+  const packetTimeline = parsed.format?.duration && stream.nb_frames
+    ? null
+    : probePacketTimeline(file, ffprobe);
   return {
     codec: stream.codec_name,
     width: Number(stream.width) || null,
     height: Number(stream.height) || null,
     frameRate: stream.r_frame_rate || null,
-    frameCount: /^\d+$/.test(stream.nb_frames || "") ? Number(stream.nb_frames) : null,
-    durationSeconds: Number(parsed.format?.duration) || null,
+    frameCount: /^\d+$/.test(stream.nb_frames || "") ? Number(stream.nb_frames) : packetTimeline?.frameCount || null,
+    durationSeconds: Number(parsed.format?.duration) || packetTimeline?.durationSeconds || null,
     probedBytes: Number(parsed.format?.size) || null,
+  };
+}
+
+function probePacketTimeline(file, ffprobe) {
+  const result = spawnSync(ffprobe, [
+    "-v", "error", "-select_streams", "v:0",
+    "-show_entries", "packet=pts_time,duration_time", "-of", "csv=p=0", file,
+  ], { encoding: "utf8", timeout: 10_000, maxBuffer: 1024 * 1024 });
+  if (result.status !== 0) return null;
+  const packets = result.stdout.trim().split("\n").map((line) => {
+    const [pts, duration] = line.split(",").map(Number);
+    return Number.isFinite(pts) ? { pts, duration: Number.isFinite(duration) ? duration : 0 } : null;
+  }).filter(Boolean);
+  if (packets.length === 0) return null;
+  const firstPts = packets[0].pts;
+  const last = packets[packets.length - 1];
+  return {
+    frameCount: packets.length,
+    durationSeconds: Math.max(0, last.pts + last.duration - firstPts),
   };
 }
 
