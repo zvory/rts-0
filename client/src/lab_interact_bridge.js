@@ -187,12 +187,11 @@ export class LabInteractBridge {
     }));
     const result = await this.mutate(
       () => labClient.spawnEntities(spawns),
-      (outcome) => batchOutcomes(outcome).every((item) => this.entityPresent(item?.outcome?.entityId)),
+      (outcome) => batchOutcomes(outcome).length === spawns.length,
     );
     const entities = batchOutcomes(result.outcome)
       .map((item) => this.app.match.state.entityById(item?.outcome?.entityId))
-      .filter(Boolean)
-      .map(projectEntity);
+      .map((entity) => entity ? projectEntity(entity) : null);
     return { result: projectLabResult(result), entities };
   }
 
@@ -231,6 +230,7 @@ export class LabInteractBridge {
         ignoreCommandLimits: input?.ignoreCommandLimits === true,
       }),
       () => true,
+      { advancePaused: true },
     );
     return { result: projectLabResult(result) };
   }
@@ -422,7 +422,7 @@ export class LabInteractBridge {
     };
   }
 
-  async mutate(send, observed) {
+  async mutate(send, observed, { advancePaused = false } = {}) {
     const { match } = this.session();
     const before = snapshotSequence(match);
     const result = await send();
@@ -432,18 +432,14 @@ export class LabInteractBridge {
         ...(result?.details || {}),
       });
     }
-    // Paused rooms do not naturally produce a new snapshot. Advance one authoritative
-    // tick after an accepted setup/command operation so success always carries observed state.
-    if (isPaused(match)) match.net.stepRoomTime();
+    // Successful setup mutations fan out their current authoritative state without advancing
+    // paused simulation. Commands still need one tick so the queued order can be consumed.
+    if (advancePaused && isPaused(match)) match.net.stepRoomTime();
     await this.waitFor(
       () => snapshotSequence(match) > before && observed(result.outcome || null),
       `authoritative snapshot for ${result.op || "lab operation"}`,
     );
     return { ...result, snapshotTick: match.state.tick };
-  }
-
-  entityPresent(entityId) {
-    return Number.isInteger(entityId) && !!this.app.match.state.entityById(entityId);
   }
 
   entityAt(entityId, x, y) {

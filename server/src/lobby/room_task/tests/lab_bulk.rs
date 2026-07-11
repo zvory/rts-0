@@ -13,9 +13,14 @@ fn lab_plural_mutation_is_one_logged_operation_with_structured_failure_details()
     let (ack, _ack_rx) = tokio::sync::oneshot::channel();
     task.on_join(99, "Operator".to_string(), true, false, msg_tx, ack);
     while writer.reliable_rx.try_recv().is_ok() {}
+    let _ = writer.snapshots.take();
 
     let first = lab_tile_center(&task, 30, 30);
     let second = lab_tile_center(&task, 34, 30);
+    let tick_before_spawn = match &task.phase {
+        Phase::InGame(game) => game.tick_count(),
+        _ => panic!("lab game should be running"),
+    };
     task.on_lab_request(
         99,
         70,
@@ -50,6 +55,35 @@ fn lab_plural_mutation_is_one_logged_operation_with_structured_failure_details()
             .map(Vec::len),
         Some(2)
     );
+    let spawned_ids: Vec<u32> = result
+        .outcome
+        .as_ref()
+        .and_then(|outcome| outcome.get("items"))
+        .and_then(serde_json::Value::as_array)
+        .expect("plural spawn outcomes")
+        .iter()
+        .filter_map(|item| item.get("outcome"))
+        .filter_map(|outcome| outcome.get("entityId"))
+        .filter_map(serde_json::Value::as_u64)
+        .filter_map(|id| u32::try_from(id).ok())
+        .collect();
+    assert_eq!(spawned_ids.len(), 2);
+    assert_eq!(
+        match &task.phase {
+            Phase::InGame(game) => game.tick_count(),
+            _ => panic!("lab game should be running"),
+        },
+        tick_before_spawn,
+        "paused setup mutation must not advance live combat"
+    );
+    let snapshot = writer
+        .snapshots
+        .take()
+        .expect("accepted setup mutation snapshot");
+    assert_eq!(snapshot.tick, tick_before_spawn);
+    assert!(spawned_ids
+        .iter()
+        .all(|id| snapshot.entities.iter().any(|entity| entity.id == *id)));
     assert_eq!(task.lab_session.as_ref().unwrap().operation_log.len(), 1);
     assert!(matches!(
         task.lab_timeline

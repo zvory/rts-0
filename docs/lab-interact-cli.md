@@ -106,6 +106,9 @@ Private servers use the production 30 Hz simulation clock by default; an explici
 receipt outcome `{accepted:true, playerId}`. Inspected entities keep `state` and `orderPlan` for
 explicit simulation orders, while `activity: "engaging"`, `targetId`, and `weaponFacing` expose a
 visible acquired combat target without mislabeling autonomous fire as an explicit order.
+Paused setup mutations fan out their accepted authoritative state without advancing combat. A
+paused `order` still advances one bounded tick so the queued command can be consumed; use explicit
+`time step` for any additional simulation progress.
 
 Artifacts are confined to `target/lab-interact/<session-id>/captures/` and ignored by Git. For a
 single-unit detail capture, camera `focus` defaults to close 32-world-pixel padding. Multi-subject
