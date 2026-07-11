@@ -7,7 +7,6 @@ import {
   labSpawnFactionOptions,
   labSpawnUnitKindsForFaction,
 } from "./lab_spawn_catalog.js";
-import { LabMapEditorPanel } from "./lab_map_editor_panel.js";
 import { labToolDetailText } from "./lab_tool_detail.js";
 import { createLabScenarioAuthoringState, slugifyLabScenario } from "./lab_scenario_authoring.js";
 import {
@@ -39,10 +38,7 @@ export class LabPanel {
     launch = null,
     startPayload = null,
     match = null,
-    mapEditorSession = null,
-    applyLabMapReset = null,
-    setLabMapDraftOverlay = null,
-    setLabMapDraftTerrainPreview = null,
+    onEditMap = null,
     submissionCapability = null,
     openWindow = defaultLabScenarioSubmissionWindow,
   }) {
@@ -51,8 +47,8 @@ export class LabPanel {
     this.launch = launch;
     this.startPayload = startPayload;
     this.match = match;
-    this.mapEditorSession = mapEditorSession;
-    this.applyLabMapReset = applyLabMapReset;
+    this.onEditMap = onEditMap;
+    this.editMapPending = false;
     this.openWindow = openWindow;
     this.destroyed = false;
     this.state = labClient?.state || startPayload?.lab || null;
@@ -103,19 +99,6 @@ export class LabPanel {
       this.lastResult = result;
       this.render();
     });
-    this.mapEditorPanel = mapEditorSession && this.canOperate()
-      ? new LabMapEditorPanel({
-        root,
-        session: mapEditorSession,
-        labClient,
-        match,
-        startPayload,
-        mapName: this.mapName(),
-        applyLabMapReset,
-        setLabMapDraftOverlay,
-        setLabMapDraftTerrainPreview,
-      })
-      : null;
   }
 
   createPanelElement(id, className, ariaLabel) {
@@ -225,11 +208,34 @@ export class LabPanel {
 
     if (!this.canOperate()) return root;
 
+    root.appendChild(this.button(
+      this.editMapPending ? "Opening Map Editor…" : "Edit map",
+      () => void this.openMapEditor(),
+      { disabled: this.editMapPending },
+    ));
+
     root.appendChild(this.renderCommandOptions());
 
     for (const section of this.renderScenarioOptions()) root.appendChild(section);
 
     return root;
+  }
+
+  async openMapEditor() {
+    if (this.editMapPending || !this.onEditMap) return;
+    this.editMapPending = true;
+    this.render();
+    try {
+      await this.onEditMap();
+    } catch (error) {
+      this.editMapPending = false;
+      this.lastResult = {
+        ok: false,
+        op: "editMap",
+        error: error.message || String(error),
+      };
+      this.render();
+    }
   }
 
   renderVisionOptions() {
@@ -1293,7 +1299,6 @@ export class LabPanel {
     this.destroyed = true;
     destroyLabScenarioSubmission(this);
     this.match?.cancelLabTool?.("panelDestroy");
-    this.mapEditorPanel?.destroy();
     this.unsubscribeState?.();
     this.unsubscribeResult?.();
     this.removeListeners();

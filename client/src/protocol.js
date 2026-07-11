@@ -200,11 +200,6 @@ export const msg = Object.freeze({
     requestId,
     op: { op: "spawnEntities", spawns },
   }),
-  labApplyMapDraft: (requestId, draft) => ({
-    t: C.LAB,
-    requestId,
-    op: { op: "applyMapDraft", draft },
-  }),
   labDeleteEntity: (requestId, entityId) => ({
     t: C.LAB,
     requestId,

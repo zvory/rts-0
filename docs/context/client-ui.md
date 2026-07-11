@@ -17,8 +17,8 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
   `command_composer.js`, `progress_extrapolator.js`, prediction adapters, display state.
 - `transport`: `net.js`, `protocol.js`, `lab_client.js`.
 - `rules-mirror`: `config.js` facade + `config/`.
-- `ui`: HUD, command cards, hotkeys, lobby views, match history, minimap, branch staging, lab
-  catalog/panel/map-editor proof of concept, scoreboard/status/resource icons, and settings.
+- `ui`: HUD, command cards, hotkeys, lobby views, match history, minimap, branch staging, Lab
+  catalog/panel, dedicated Map Editor panel/session, scoreboard/status/resource icons, and settings.
 - `input`: `input/` plus `replay_camera_input.js`; shared command-free camera gestures live in
   `input/camera_navigation.js`.
 - `renderer`: `renderer/` facade, layers, terrain/decals, entities, fog, feedback, art helpers,
@@ -42,6 +42,8 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 - **Setup authoring flow.** `/lab` opens catalog or blank setups; the app-owned panel validates
   authoritative state before draft-PR submission, with setup JSON export/import as the disabled
   fallback.
+- **Map Editor boundary.** `/map-editor` owns Pixi/camera/session state without `Net`, `Match`,
+  `GameState`, or a simulation room. One-use two-minute Lab handoffs carry only map data.
 - **Room affordances are metadata-driven.** `room_capabilities.js` parses `startPayload.capabilities`
   and `startPayload.diagnostics`; shared controls must not be inferred from replay/dev/lab identity.
 - **Client intent is explicit.** `Match` owns `ClientIntent` and injects it into HUD, input,
@@ -57,12 +59,6 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 - **Programmatic coverage.** UI refactors need contract coverage where practical: descriptor/DOM
   coverage for command cards, targeted checks for rendering changes, and client smoke for rendered
   behavior.
-
-## Future client change checklist
-See [docs/design/client-ui.md](../design/client-ui.md) §4.3 for the full checklist. In short:
-cover teardown for new listeners/resources, prefer dependency injection for cross-area wiring, add
-command-card/rendering coverage for visible behavior, and update protocol/config mirrors with the
-owning server docs when those files change.
 
 ## Suite selection
 - `client/src/` changes select `client-architecture`, `js-protocol-contracts`,

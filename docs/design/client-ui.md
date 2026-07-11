@@ -5,7 +5,6 @@ PixiJS is loaded globally from CDN as `PIXI`.
 
 ```
 index.html        # PINNED — CDN + #app + module entry + screens markup
-map-editor.html   # standalone handcrafted-map editor; terrain/base symmetry plus JSON load/save; rejects symmetry clears that would leave no complete source-side spawn layout
 styles.css        # HUD, lobby, menus, command card
 assets/decals/    # SVG alpha-mask sources for client-only permanent ground decals
 src/
@@ -31,7 +30,7 @@ src/
   renderer/decals/ # SVG decal atlas manifest, loader, and deterministic stamp selection
   renderer/trenches.js # Authoritative trench terrain pass and deterministic nearby-trench connectors
   renderer/feedback_view_model.js # Builder for renderer feedback's narrow per-frame read model
-  renderer/lab_tool_preview.js # Armed Lab tool cursor ghosts plus persistent local map-draft markers
+  renderer/lab_tool_preview.js # Armed Lab unit/remove-tool cursor ghosts
   renderer/observer_map_analysis.js # Observer-only static AI map-analysis world overlay drawer
   fog.js          # Fog overlay: accumulate explored, compute visible from own entities
   input/          # lifecycle facade plus selection, commands, placement, shared camera navigation, UI input routing
@@ -73,16 +72,19 @@ src/
   lab_panel.js   # LabPanel: app-owned lab controls/status UI mounted around Match
   lab_tool_detail.js # Pure armed-tool instruction text for LabPanel status
   lab_panel_window.js # draggable/resizable chrome helper for the app-owned LabPanel
-  lab_map_editor_session.js # persistent 25-state authored-map draft, compatible layouts, player-owned bases, and undo/redo history
-  lab_map_editor_panel.js # floating draft-first Lab map editor, built-in map loading, explicit test restart, and map JSON export
   lab_control_policy.js # Lab control collaborator placeholder injected into Match
-  lab_map_reset.js # in-place authoritative Lab map/player/fog/terrain refresh collaborator
   visual_profiles.js # Lab-scoped visual experimentation profile registry and resolver
   settings_container.js # Reusable settings shell: opener, tabs, focus, teardown
   settings_panels.js # Portable settings tab panel descriptors
   main.js         # Entry point: starts App
   app.js          # Lobby/app shell lifecycle and persistent Net/Audio ownership
   launch_url.js   # Namespaced rtsLaunch URL parsing and pure lobby automation decisions
+  map_editor_app.js # Dedicated `/map-editor` lifecycle; never constructs Net, Match, or GameState
+  map_editor_launch.js # Bounded editor route/handoff/workspace query parsing
+  map_editor_handoff.js # Short-lived HTTP map handoff create/consume client
+  map_editor_session.js # Authored-map state, layouts, local storage, undo/redo, stroke transactions
+  map_editor_panel.js # Dedicated editor controls for maps, terrain, bases, layouts, save/export, and Lab launch
+  map_editor_viewport.js # Pixi renderer/camera composition plus editor-only pointer/keyboard input
   match.js        # Match lifecycle, module dependency wiring, render loop, transient events
   match_combat_audio.js # Match-owned combat sound routing and machine-gunner sound cleanup
   match_live_pause.js # live pause state actions and prediction visual suspension
@@ -98,13 +100,11 @@ src/
   bootstrap.js    # DOM lookup, ws/dev-watch/lab launch config, startup helpers
 ```
 
-The standalone map editor mirrors new terrain edits left-to-right, top-to-bottom, or by a 180°
-rotation. Selecting a symmetry mode clears its target half to grass and removes target-side sites
-and affected spawn slots: Left ↔ Right keeps the left half, while Top ↔ Bottom and Rotate 180°
-keep the top half. If that would remove every complete source-side spawn layout, the editor moves
-the required sites to free tiles on the kept side before clearing. With symmetry enabled, moving a
-base site also creates or updates its reflected site and the matching slot in the selected spawn
-layout. A slot has one main and one to three naturals, for at most four bases per player.
+`/map-editor` is a separate frozen client session. `main.js` constructs `MapEditorApp` for that route,
+so it never opens a WebSocket or constructs `App`, `Match`, `GameState`, Lab controls, fog, resources,
+orders, replay controls, or a simulation clock. It reuses the normal Pixi `Renderer`, terrain cache,
+`Camera`, map schema, and player palette through an editor-owned viewport and panel. The removed
+`map-editor.html` implementation and Lab-embedded editor are not compatibility routes.
 
 ### 4.1 Module export contracts
 
@@ -527,6 +527,7 @@ export class LabClient {
   subscribeResult(handler)               // returns unsubscribe
   setVision(vision)                      // sends {op:"setVision", vision} for this operator only
   setPlayerGodMode(playerId, enabled)    // sends {op:"setPlayerGodMode", playerId, enabled}
+  exportMap()                            // authoritative map-only editor transition payload
   exportScenario(name?)                  // compatibility wire name for checkpoint setup export
   importScenario(scenario)               // compatibility wire name for checkpoint/legacy setup import
   validateScenario(metadata)             // sends {op:"validateScenario", metadata}
@@ -641,7 +642,7 @@ export function labSpawnUnitKindsForFaction(factionId)
 export function labBuildingSpawnFactionOptions()
 export function labSpawnBuildingKindsForFaction(factionId)
 export class LabPanel {
-  constructor({ root, labClient, launch, startPayload, match?, mapEditorSession?, applyLabMapReset?, setLabMapDraftOverlay?, setLabMapDraftTerrainPreview?, submissionCapability?, openWindow? })
+  constructor({ root, labClient, launch, startPayload, match?, onEditMap?, submissionCapability?, openWindow? })
   applyLabToolChange(change)             // syncs active/cancelled tool status from Match callbacks
   armSpawnPaletteTool(kind?)             // arms a Match-owned completed spawnEntity world-click tool
   armBuildingSpawnPaletteTool(kind?)     // arms a Match-owned completed building spawnEntity tool
@@ -651,16 +652,18 @@ export class LabPanel {
   destroy()
 }
 ```
-`lab_map_editor_session.js`
+`map_editor_session.js`
 ```js
-export const LAB_MAP_HISTORY_LIMIT       // 25
-export class LabMapEditorSession {
-  initializeFromStart(startPayload, options?)
+export const MAP_EDITOR_HISTORY_LIMIT    // 25
+export class MapEditorSession {
+  initializeBlank(options?)
   initializeFromScenario(scenario, options?)
   loadAuthoredMap(source, options?), selectLayout(layoutId)
   mutate(label, mutation), undo(), redo()
+  beginTerrainStroke(label?), paintTerrainTiles(tiles, terrain), commitTerrainStroke()
+  addLayout(playerCount), removeSelectedLayout()
   materialized(), exportMap(), saveLocal(key), loadLocal(key)
-  markCurrentDraftAsTested(), playerSlots(), mapOverlay()
+  playerSlots(), mapOverlay()
 }
 ```
 `LabPanel` renders separate floating, collapsible Options and Tools windows. Options owns room
@@ -679,28 +682,24 @@ JSON, target paths, branch names, credentials, or commit text for PR submission;
 export/import remains the fallback for setup iteration and for deployments with submission
 disabled. The lab replay controls are visually separate from setup checkpoint JSON controls; replay
 save/open uses the bounded lab replay artifact path instead of the legacy `exportScenario` and
-`importScenario` lab operations.
-For the Lab map-editor proof of concept, `LabPanel` also composes a third floating Map Editor window.
-It is draft-first: the window can load built-in authored maps from `/maps/catalog` (with standard maps
-as a fallback) and fetch the selected JSON from `/maps/<file>`, but loading, terrain painting, and base
-editing all change only the browser-local `LabMapEditorSession`. A loaded map must match the active Lab
-map size; the editor selects a compatible player-count layout while preserving every authored layout for
-local save and normal map-JSON export. The editor exposes players and their base locations directly
-rather than anonymous main/natural site IDs and slot pickers. A persistent browser-local overlay draws
-each drafted start and natural in that player's colour, and a local terrain preview redraws cached ground
-without touching authoritative `GameState`; the live Lab test remains unchanged. The terrain controls
-paint one tile at a time by click or drag and use matching grass, stone, and water swatches. Local draft
-save/load likewise does not alter the test. While the draft differs from the current test, both the
-Pixi world terrain and minimap terrain preview the draft; the minimap suppresses the current test's
-resource patches because the draft's patches are not materialized until the authoritative restart.
+`importScenario` lab operations. Lab now exposes one `Edit map` action. It requests the current
+authoritative map-only payload, creates a server-validated editor handoff, and navigates away; no Lab
+entity, resource, order, timeline, or replay state crosses that boundary.
 
-`Restart test with this draft` is the one explicit draft-to-test transition. It creates a fresh Lab test
-at tick zero with the same players and seed, so it deliberately clears the prior test's units, orders,
-resources, and elapsed time even for terrain-only changes. The requesting client consumes the
-authoritative map/player payload from `labResult` through the app-owned `applyLabMapReset` collaborator,
-replacing static `GameState`, fog, minimap inputs, and the cached terrain texture in place instead of
-tearing down and rebuilding the whole match. Ordinary Lab unit/building palettes remain the playtest
-setup surface after that explicit restart.
+`MapEditorApp` owns the dedicated editor. The panel loads bundled JSON from `/maps/catalog` and
+`/maps/<file>`, creates the fixed-size blank map, edits name/description/layouts/player starts/naturals,
+and provides undo/redo, local save/load, and JSON export. The viewport draws player-owned base markers
+over the shared Pixi terrain and owns editor-only pan/zoom/paint/site input. A terrain pointer stroke
+clones once for undo, mutates rows in place, records dirty tiles, and commits once. The renderer patches
+those tiles plus their edge-sharing neighbours into the existing canvas texture and calls
+`baseTexture.update()`; it does not recreate the canvas, fingerprint/serialize the map, or replace a Pixi
+texture per tile.
+
+`Open in Lab` posts the authored map plus the active materialized layout to `/api/map-handoffs`.
+The bounded server record expires after two minutes and is consumed once. Lab consumption creates a
+private Lab whose first `start` payload already contains the edited map at tick zero; returning through
+`Edit map` transfers only an authoritative exported map. A bounded `workspace` id keeps the editor's
+local full-layout workspace available across the round trip when browser storage is available.
 `lab_panel_window.js` owns local drag, resize, collapse/expand, reset, keyboard nudge,
 viewport-clamping, and localStorage geometry hints for those app-owned lab windows. It has no
 transport or match authority.
@@ -879,8 +878,8 @@ export class ClientIntent {
   recordPlannedCommand(command, selectedEntities, result?)
   plannedOrderPlanForEntity(entity), entityWithPlannedOrder(entity)
   reconcilePlannedOrders(entities, options?), clearPlannedOrdersForUnits(ids), clearPlannedOrders()
-  activeLabTool, labToolPreview, labMapDraftOverlay
-  beginLabTool(tool), updateLabToolPreview(preview), setLabMapDraftOverlay(overlay), cancelLabTool(reason?)
+  activeLabTool, labToolPreview
+  beginLabTool(tool), updateLabToolPreview(preview), cancelLabTool(reason?)
 }
 ```
 
@@ -1206,7 +1205,6 @@ Internally, `config.js` is a facade over `config/timing.js`, `config/presentatio
 export class Minimap {
   constructor(canvasEl, state, camera, fog, commandIssuer, inputRouter?, {clientIntent?, commandsEnabled?})
   render(frameViews?)                    // draw terrain + fog + entity blips + viewport rect
-  setMapPreview(map?)                    // browser-local Lab draft terrain/resource preview
   markArtilleryFiring(event)             // transient global artillery icon from artilleryFiring events
   inputZone()                            // router zone for locked/unlocked minimap interaction
   // click/drag -> camera.centerOn or issue move command (right-click)

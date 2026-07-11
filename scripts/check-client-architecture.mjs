@@ -34,13 +34,14 @@ const AREA_BY_FILE = new Map(Object.entries({
   "room_time_panel.js": "app-shell",
   "replay_viewer.js": "app-shell",
   "lab_control_policy.js": "app-shell",
-  "lab_map_reset.js": "app-shell",
   "room_capabilities.js": "app-shell",
   "visual_profiles.js": "app-shell",
   "camera_view_selection.js": "app-shell",
   "launch_url.js": "app-shell",
   "lab_interact_bridge.js": "app-shell",
   "clean_presentation.js": "app-shell",
+  "map_editor_app.js": "app-shell",
+  "map_editor_viewport.js": "app-shell",
 
   "state.js": "model",
   "state_control_groups.js": "model",
@@ -65,6 +66,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "protocol_snapshot_events.js": "transport",
   "protocol_snapshot_trenches.js": "transport",
   "lab_client.js": "transport",
+  "map_editor_handoff.js": "transport",
   "report_window_aggregate.js": "platform",
 
   "config.js": "rules-mirror",
@@ -96,8 +98,8 @@ const AREA_BY_FILE = new Map(Object.entries({
   "lab_panel.js": "ui",
   "lab_tool_detail.js": "ui",
   "lab_panel_window.js": "ui",
-  "lab_map_editor_panel.js": "ui",
-  "lab_map_editor_session.js": "ui",
+  "map_editor_panel.js": "ui",
+  "map_editor_session.js": "ui",
   "panel_touch_activation.js": "ui",
   "settings_container.js": "ui",
   "settings_panels.js": "ui",
@@ -112,6 +114,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "alerts.js": "platform",
   "fog.js": "platform",
   "camera.js": "platform",
+  "map_editor_launch.js": "platform",
 }));
 
 const AREA_PREFIXES = [

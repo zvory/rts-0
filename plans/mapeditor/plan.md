@@ -1,5 +1,9 @@
 # Dedicated Map Editor Room Plan
 
+**Status:** Implemented in the dedicated `/map-editor` client session and one-use server handoff
+boundary. The frozen editor does not create a simulation room; the fresh Lab created from a
+validated handoff is the only authoritative `Game` in the workflow.
+
 ## Outcome
 
 Replace both the legacy standalone HTML editor and the Lab-embedded draft workflow with one real

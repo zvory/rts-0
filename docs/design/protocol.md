@@ -727,7 +727,7 @@ compatibility internals.
 
 | Value/path | Rust owner | JS mirror path | Category | Current checker | Proposed future checker | Client-only exclusion reason | Compact version impact |
 |------------|------------|----------------|----------|-----------------|-------------------------|------------------------------|------------------------|
-| `ClientMessage`, `ServerMessage`, `Command`, HTTP lobby browser/create endpoints, HTTP lab setup catalog endpoint, lobby/replay/branch message tags and fields | `server/crates/protocol/src/lib.rs`; lobby/lab catalog HTTP route handlers in `server/src/main.rs`; lab catalog source of truth in `server/src/lab_scenarios.rs`; room-task summaries in `server/src/lobby/**` | `client/src/protocol.js` `C`, `S`, `CMD`, `msg.*`, `decodeServerMessage`; `client/src/lab_catalog.js` consumes the HTTP lab catalog; future internal `client/src/protocol_*.js` or `client/src/protocol/**` files must re-export through `client/src/protocol.js` | wire/HTTP DTO | `tests/protocol_parity.mjs` compares the structured Rust protocol contract dump to JS tags/builders/decoder and asserts stable JS public exports; serde compile/tests plus `rts-protocol` public-surface integration coverage guard Rust export names; focused server tests cover lobby summary, create-lobby behavior, and lab catalog loading | Remaining source-text checks for DTO/lobby assertions outside the current dump scope | Lab catalog rows are HTTP metadata, not mirrored through `protocol.js`; they are consumed by the app-owned catalog selector | No compact bump unless a compact snapshot slot/code changes; normal JSON message changes still require Rust, JS, and docs together |
+| `ClientMessage`, `ServerMessage`, `Command`, HTTP lobby browser/create endpoints, HTTP lab setup catalog endpoint, HTTP map handoff endpoints, lobby/replay/branch message tags and fields | `server/crates/protocol/src/lib.rs`; lobby/lab catalog/map-handoff HTTP route handlers in `server/src/main.rs` and `server/src/map_handoffs.rs`; lab catalog source of truth in `server/src/lab_scenarios.rs`; room-task summaries in `server/src/lobby/**` | `client/src/protocol.js` `C`, `S`, `CMD`, `msg.*`, `decodeServerMessage`; `client/src/lab_catalog.js` consumes the HTTP lab catalog; `client/src/map_editor_handoff.js` consumes the map handoff API; future internal `client/src/protocol_*.js` or `client/src/protocol/**` files must re-export through `client/src/protocol.js` | wire/HTTP DTO | `tests/protocol_parity.mjs` compares the structured Rust protocol contract dump to JS tags/builders/decoder and asserts stable JS public exports; serde compile/tests plus `rts-protocol` public-surface integration coverage guard Rust export names; focused server tests cover lobby summary, create-lobby behavior, lab catalog loading, and map handoff binding | Remaining source-text checks for DTO/lobby assertions outside the current dump scope | Lab catalog rows and map handoff records are HTTP metadata, not mirrored through `protocol.js`; their app-owned clients validate response shapes | No compact bump unless a compact snapshot slot/code changes; normal JSON message changes still require Rust, JS, and docs together |
 | Semantic start/snapshot/replay/analysis DTOs | `server/crates/contract/src/lib.rs`, re-exported by `server/crates/protocol/src/lib.rs` | `client/src/protocol.js` decoder output consumed by client modules | wire DTO | `tests/protocol_parity.mjs` fixture decodes selected compact fields; Rust serde tests cover local serialization | Structured contract/schema dump for semantic DTO fields plus compact round-trip fixtures | None; JS is a protocol mirror | Compact bump only when the live compact representation changes |
 | `terrain` codes | `server/crates/protocol/src/contract_metadata.rs` `terrain`, re-exported by `lib.rs`; adapter test checks rules terrain constants | `client/src/protocol_constants.js` `TERRAIN` and `PASSABLE`, re-exported by `client/src/protocol.js` | wire DTO / compact transport code | `tests/protocol_parity.mjs` extracts Rust terrain codes | Structured protocol constants dump | None | No compact snapshot bump today; terrain is in the `start.map.terrain` payload, not the compact snapshot frame |
 | `kinds` strings, `KIND`, `UNIT_KINDS`, `BUILDING_KINDS`, `RESOURCE_KINDS` | `server/crates/protocol/src/contract_metadata.rs` `kinds`, re-exported by `lib.rs`; domain identity is `rts-rules::EntityKind::stable_id()` | `client/src/protocol_constants.js` `KIND`, `UNIT_KINDS`, `BUILDING_KINDS`, `RESOURCE_KINDS`, re-exported by `client/src/protocol.js` | wire DTO plus domain adapter grouping | `tests/protocol_parity.mjs` checks kind code mapping; adapter tests round-trip every `EntityKind`; catalog parity checks many kind references | Structured protocol constants dump plus catalog export that classifies unit/building/resource groups | None | Bump only if compact kind codes or compact slots change; append-only codes otherwise |
@@ -1117,6 +1117,7 @@ event unions follow the same selected real player ids as the snapshot body.
 
 `LabClientOp` is tagged by `op`:
 ```
+{ op: "exportMap" }
 { op: "spawnEntities", spawns: [{ owner: u32, kind: string, x: f32, y: f32, completed?: bool }] }
 { op: "applyUpdates", updates: [
   { operation: "move", entityId: u32, x: f32, y: f32 } |
@@ -1134,7 +1135,6 @@ event unions follow the same selected real player ids as the snapshot body.
 { op: "setPlayerResources", playerId: u32, steel: u32, oil: u32 }
 { op: "setPlayerGodMode", playerId: u32, enabled: bool }
 { op: "setCompletedResearch", playerId: u32, upgrade: string, completed: bool }
-{ op: "applyMapDraft", draft: { name: string, size: u32, terrain: u8[], starts: [{x:u32,y:u32}], expansionSites: [{x:u32,y:u32}] } }
 { op: "setVision", vision: LabVisionMode }
 { op: "issueCommandAs", playerId: u32, cmd: Command, ignoreCommandLimits?: bool }
 { op: "exportScenario", name?: string }
@@ -1169,17 +1169,32 @@ not claim that the command has already completed.
 `setPlayerGodMode` is lab-only room state: enabled players' units and buildings ignore incoming
 damage, while resources keep normal damage behavior. The current enabled player ids are mirrored in
 `start.lab.godModePlayers` and `labState.godModePlayers`.
-`applyMapDraft` is the Lab map-editor's explicit test-restart seam. It accepts only the current room's
-map size, validates terrain codes, one unique grass-protected start per player, and at most three unique
-grass-protected natural sites per player. Every accepted draft creates a fresh Lab test at tick zero with
-the same players and seed, including a terrain-only draft; the old test's entities, orders, resources,
-and elapsed time are intentionally discarded. The successful requester's `labResult.outcome` carries
-`battleReset: true`, `tick`, `map`, and `players`, allowing that browser to refresh the existing match in
-place; it does not receive a redundant `start`. Other connected Lab viewers still receive `start`, and
-every viewer receives a fresh snapshot. Applying a draft resets the retained lab replay baseline rather
-than recording a replay operation. Lab-draft validation reserves the main base's 7×7 City Centre and
-starting-unit area and each natural's center tile as grass; the broader authored-map safety radii remain a
-static map quality rule rather than making most of the Lab's initial camera view unpaintable.
+`exportMap` returns `outcome.map: LabMapDraft` from the authoritative Lab map and deliberately
+excludes entities, orders, player resources, fog, room time, operation history, and replay state.
+It is the only Lab-to-Map-Editor transition payload.
+Map mutation is not a `LabClientOp`; `exportMap` is read-only. The dedicated editor uses a bounded HTTP handoff contract:
+```
+POST /api/map-handoffs
+{
+  destination: "lab" | "editor",
+  authoredMap: AuthoredMapV2,
+  materializedMap: { name: string, size: u32, terrain: u8[], starts: LabMapTile[], expansionSites: LabMapTile[] },
+  selectedLayoutId: string
+}
+-> { handoffId: 32-lowercase-hex, expiresInMs: 120000 }
+
+GET /api/map-handoffs/{handoffId}
+-> { destination: "lab", room: privateLabRoom, selectedLayoutId: string }
+ | { destination: "editor", authoredMap: AuthoredMapV2, selectedLayoutId: string }
+```
+Creation validates the complete authored-map schema and binds the selected layout's terrain, starts,
+and natural sites to `materializedMap` before storing it. Records are capped at 64, expire after two
+minutes, and are removed on the first consume; unknown, expired, or already-used ids return HTTP 410.
+The map body never appears in a URL. Consuming a Lab-directed record creates a private Lab from the
+validated materialized layout before the browser joins; an unjoined room has a short empty-room lease
+and its reserved name cannot recreate a fallback room after disposal. Its only initial `start` is tick
+zero on the edited map. Editor-directed records return only the map; simulation entities, orders, resources, fog,
+timeline state, and replay history are not part of the contract.
 
 `LabScenarioPayload` accepts only the current checkpoint-backed setup container. Setup exports,
 validation previews, submissions, imports, and bundled catalog assets use `LabCheckpointScenarioV1`:

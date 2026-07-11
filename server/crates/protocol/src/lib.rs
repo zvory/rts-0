@@ -288,6 +288,7 @@ pub enum VisionSelectionRequest {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(tag = "op", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum LabClientOp {
+    ExportMap,
     ExportScenario {
         #[serde(default)]
         name: Option<String>,
@@ -343,9 +344,6 @@ pub enum LabClientOp {
         player_id: u32,
         upgrade: String,
         completed: bool,
-    },
-    ApplyMapDraft {
-        draft: LabMapDraft,
     },
     SetVision {
         vision: LabVisionMode,

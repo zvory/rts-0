@@ -29,54 +29,72 @@ function fillImpassableEdge(ctx, map, tx, ty, code, ts) {
   if (!isImpassableAt(map, tx + 1, ty)) ctx.fillRect(x + ts - edge, y, edge, ts);
 }
 
+function drawTerrainTile(ctx, map, tx, ty, textureTileSize) {
+  if (tx < 0 || ty < 0 || tx >= map.width || ty >= map.height) return;
+  const code = map.terrain[ty * map.width + tx];
+  const x = tx * textureTileSize;
+  const y = ty * textureTileSize;
+  const color = terrainColor(code, tx, ty);
+  ctx.fillStyle = colorCss(color);
+  ctx.fillRect(x, y, textureTileSize, textureTileSize);
+
+  const blocks = textureTileSize >= 4 ? 4 : 2;
+  const block = textureTileSize / blocks;
+  for (let by = 0; by < blocks; by++) {
+    for (let bx = 0; bx < blocks; bx++) {
+      const n = hash2(tx * 17 + bx, ty * 17 + by);
+      if (n < 0.42) continue;
+      const overlay = terrainOverlayColor(code, n);
+      ctx.fillStyle = colorCss(overlay, code === 2 ? 0.22 : 0.16);
+      ctx.fillRect(x + bx * block, y + by * block, Math.ceil(block), Math.ceil(block));
+    }
+  }
+  fillImpassableEdge(ctx, map, tx, ty, code, textureTileSize);
+}
+
 export function buildStaticMap(map, { preserveMapLayers = false } = {}) {
-  this._map = { width: map.width, height: map.height, tileSize: map.tileSize, terrain: map.terrain };
+  this._map = {
+    width: map.width,
+    height: map.height,
+    tileSize: map.tileSize,
+    terrain: Array.from(map.terrain || []),
+  };
   const ts = map.tileSize;
   const textureTileSize = Math.max(1, Math.round(ts / TERRAIN_TEXTURE_DOWNSAMPLE));
-  const canvas = document.createElement("canvas");
+  const reusable = this._terrainCanvas
+    && this._terrainCanvas.width === map.width * textureTileSize
+    && this._terrainCanvas.height === map.height * textureTileSize
+    && this._terrainSprite;
+  const canvas = reusable ? this._terrainCanvas : document.createElement("canvas");
   canvas.width = map.width * textureTileSize;
   canvas.height = map.height * textureTileSize;
   const ctx = canvas.getContext("2d", { alpha: false });
   if (!ctx) return;
   ctx.imageSmoothingEnabled = false;
+  this._terrainCanvas = canvas;
+  this._terrainContext = ctx;
+  this._terrainTextureTileSize = textureTileSize;
 
   for (let ty = 0; ty < map.height; ty++) {
     for (let tx = 0; tx < map.width; tx++) {
-      const code = map.terrain[ty * map.width + tx];
-      const x = tx * textureTileSize;
-      const y = ty * textureTileSize;
-      const color = terrainColor(code, tx, ty);
-      ctx.fillStyle = colorCss(color);
-      ctx.fillRect(x, y, textureTileSize, textureTileSize);
-
-      // Coarse texture blocks keep the ground readable while selling the
-      // low-resolution PS1 look. No symbols or national markings are used.
-      const blocks = textureTileSize >= 4 ? 4 : 2;
-      const block = textureTileSize / blocks;
-      for (let by = 0; by < blocks; by++) {
-        for (let bx = 0; bx < blocks; bx++) {
-          const n = hash2(tx * 17 + bx, ty * 17 + by);
-          if (n < 0.42) continue;
-          const overlay = terrainOverlayColor(code, n);
-          ctx.fillStyle = colorCss(overlay, code === 2 ? 0.22 : 0.16);
-          ctx.fillRect(x + bx * block, y + by * block, Math.ceil(block), Math.ceil(block));
-        }
-      }
-
-      fillImpassableEdge(ctx, map, tx, ty, code, textureTileSize);
+      drawTerrainTile(ctx, this._map, tx, ty, textureTileSize);
     }
   }
 
   const layer = this.layers.terrain;
-  if (this._terrainSprite) {
-    this._terrainSprite.destroy(true);
-    layer.removeChildren();
+  if (reusable) {
+    this._terrainSprite.texture.baseTexture.update();
+    this._terrainSprite.scale.set(ts / textureTileSize);
+  } else {
+    if (this._terrainSprite) {
+      this._terrainSprite.destroy(true);
+      layer.removeChildren();
+    }
+    const tex = PIXI.Texture.from(canvas, { scaleMode: PIXI.SCALE_MODES.NEAREST });
+    this._terrainSprite = new PIXI.Sprite(tex);
+    this._terrainSprite.scale.set(ts / textureTileSize);
+    layer.addChild(this._terrainSprite);
   }
-  const tex = PIXI.Texture.from(canvas, { scaleMode: PIXI.SCALE_MODES.NEAREST });
-  this._terrainSprite = new PIXI.Sprite(tex);
-  const scale = ts / textureTileSize;
-  this._terrainSprite.scale.set(scale);
-  layer.addChild(this._terrainSprite);
   if (!preserveMapLayers) {
     this._initGroundDecalsForMap?.(map);
     this._initTrenchesForMap?.(map);
@@ -86,4 +104,31 @@ export function buildStaticMap(map, { preserveMapLayers = false } = {}) {
 /** Replace only the cached terrain pixels for a browser-local map-editor preview. */
 export function previewStaticTerrain(map) {
   return buildStaticMap.call(this, map, { preserveMapLayers: true });
+}
+
+/** Patch changed terrain tiles plus adjacent edge tiles into the existing canvas/texture. */
+export function updateStaticTerrainTiles(changes) {
+  const map = this._map;
+  const ctx = this._terrainContext;
+  const textureTileSize = this._terrainTextureTileSize;
+  if (!map || !ctx || !textureTileSize || !this._terrainSprite || !Array.isArray(changes)) return 0;
+  const dirty = new Set();
+  for (const change of changes) {
+    const x = Math.trunc(Number(change?.x));
+    const y = Math.trunc(Number(change?.y));
+    const code = Number(change?.code);
+    if (x < 0 || y < 0 || x >= map.width || y >= map.height || !Number.isInteger(code)) continue;
+    map.terrain[y * map.width + x] = code;
+    dirty.add(`${x},${y}`);
+    dirty.add(`${x - 1},${y}`);
+    dirty.add(`${x + 1},${y}`);
+    dirty.add(`${x},${y - 1}`);
+    dirty.add(`${x},${y + 1}`);
+  }
+  for (const key of dirty) {
+    const [x, y] = key.split(",").map(Number);
+    drawTerrainTile(ctx, map, x, y, textureTileSize);
+  }
+  if (dirty.size) this._terrainSprite.texture.baseTexture.update();
+  return dirty.size;
 }

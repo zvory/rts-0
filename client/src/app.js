@@ -19,6 +19,7 @@ import { TOAST_MS } from "./alerts.js";
 import {
   buildLabLaunchConfig,
   labCatalogRouteConfig,
+  labHandoffLaunchConfig,
   devWatchConfig,
   diagnostics,
   dom,
@@ -50,8 +51,8 @@ import { LabClient } from "./lab_client.js";
 import { LabCatalogScreen } from "./lab_catalog.js";
 import { createDefaultControlPolicy, createLabControlPolicy } from "./lab_control_policy.js";
 import { LabPanel } from "./lab_panel.js";
-import { LabMapEditorSession } from "./lab_map_editor_session.js";
-import { applyLabMapReset, previewLabMapDraftTerrain } from "./lab_map_reset.js";
+import { MapEditorSession, authoredMapFromMaterialized } from "./map_editor_session.js";
+import { createMapHandoff, consumeMapHandoff } from "./map_editor_handoff.js";
 import {
   fetchLabScenarioSubmissionCapability as fetchLabScenarioSubmissionCapabilityRequest,
 } from "./lab_scenario_submission_capability.js";
@@ -95,6 +96,7 @@ export class App {
     this.net = new Net(wsUrl(), diagnostics);
     this.devWatch = devWatchConfig();
     this.labCatalogLaunch = labCatalogRouteConfig();
+    this.labHandoffLaunch = labHandoffLaunchConfig();
     this.labLaunch = labLaunchConfig();
     this.labVisualProfileState = resolveVisualProfileLaunch(this.labLaunch || this.labCatalogLaunch);
     this.replayLaunch = replayLaunchConfig();
@@ -126,7 +128,6 @@ export class App {
     this.labCatalog = null;
     this.labClient = null;
     this.labPanel = null;
-    this.labMapEditorSession = null;
     this.labControlPolicy = null;
     this.cleanPresentation = new CleanPresentation({ root: dom.app });
     this.labInteractBridge = labInteractLaunchEnabled() ? new LabInteractBridge({ app: this }) : null;
@@ -193,6 +194,7 @@ export class App {
     this.applyDevBanner();
     try {
       await this.net.connect();
+      if (this.labHandoffLaunch) await this.prepareLabHandoff();
       if (this.replayLaunch) this.maybeAutoJoinReplay();
       else if (this.labLaunch) this.maybeAutoJoinLab();
       else if (this.labCatalogLaunch) this.labCatalog?.setConnected(true);
@@ -202,6 +204,31 @@ export class App {
       this.showConnectionWarning(
         "Unable to connect after several attempts. Refresh to try again.",
       );
+    }
+  }
+
+  async prepareLabHandoff() {
+    if (this.labHandoffLaunch?.error) {
+      this.showConnectionWarning(this.labHandoffLaunch.error);
+      return false;
+    }
+    try {
+      const handoff = await consumeMapHandoff(this.labHandoffLaunch.handoffId);
+      if (handoff?.destination !== "lab" || !handoff?.room) {
+        throw new Error("Map handoff was not addressed to Lab.");
+      }
+      this.labLaunch = {
+        room: handoff.room,
+        publicRoom: "map-editor",
+        map: "Map Editor handoff",
+        scenario: "",
+        workspaceId: this.labHandoffLaunch.workspaceId,
+        banner: "lab from Map Editor",
+      };
+      return true;
+    } catch (error) {
+      this.showConnectionWarning(error.message || String(error));
+      return false;
     }
   }
 
@@ -472,7 +499,6 @@ export class App {
 
     const MatchClass = startsReplay ? ReplayViewer : Match;
     if (labMetadata) {
-      this.labMapEditorSession ||= new LabMapEditorSession();
       this.labClient = new LabClient(this.net);
       this.labClient.setInitialState(labMetadata);
       this.labControlPolicy = createLabControlPolicy({
@@ -518,15 +544,34 @@ export class App {
         launch: this.labLaunch,
         startPayload: payload,
         match: this.match,
-        mapEditorSession: this.labMapEditorSession,
-        applyLabMapReset: (outcome) => applyLabMapReset(this.match, outcome),
-        setLabMapDraftOverlay: (overlay) => this.match?.clientIntent?.setLabMapDraftOverlay?.(overlay),
-        setLabMapDraftTerrainPreview: (draft) => previewLabMapDraftTerrain(this.match, draft),
+        onEditMap: () => this.openCurrentLabMapInEditor(),
         submissionCapability: this.fetchLabScenarioSubmissionCapability(),
         openWindow: (url) => window.open(url, "_blank", "noopener,noreferrer"),
       });
     }
     diagnostics.mark("app.onStart.end");
+  }
+
+  async openCurrentLabMapInEditor() {
+    const result = await this.labClient?.exportMap();
+    const map = result?.outcome?.map;
+    if (!result?.ok || !map) throw new Error(result?.error || "The current Lab map could not be exported.");
+    const session = new MapEditorSession({ storage: null });
+    session.loadAuthoredMap(authoredMapFromMaterialized({
+      ...map,
+      description: "Map imported from Lab.",
+    }));
+    const handoff = await createMapHandoff({
+      destination: "editor",
+      authoredMap: session.exportMap(),
+      materializedMap: session.materialized(),
+      selectedLayoutId: session.selectedLayoutId,
+    });
+    const url = new URL("/map-editor", window.location.href);
+    url.searchParams.set("handoff", handoff.handoffId);
+    url.searchParams.set("workspace", this.labLaunch?.workspaceId || "default");
+    this.allowUnloadWithoutWarning = true;
+    window.location.assign(url.toString());
   }
 
   async fetchLabScenarioSubmissionCapability() {

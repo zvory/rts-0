@@ -160,6 +160,7 @@ pub(super) fn lab_config() -> LabRoomConfig {
         map_name: "Default".to_string(),
         seed: Some(0x1A2B_3C4D),
         scenario: None,
+        map_draft: None,
     }
 }
 

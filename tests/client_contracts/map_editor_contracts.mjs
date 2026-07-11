@@ -1,326 +1,135 @@
-// tests/client_contracts/map_editor_contracts.mjs
-// Domain contract assertions imported by ../client_contracts.mjs.
-
+import assert from "node:assert/strict";
 import fs from "node:fs";
-import vm from "node:vm";
-import { assert } from "./assertions.mjs";
+
+import { TERRAIN } from "../../client/src/protocol.js";
+import { createMapHandoff, consumeMapHandoff } from "../../client/src/map_editor_handoff.js";
+import { mapEditorLaunchConfig } from "../../client/src/map_editor_launch.js";
+import {
+  MapEditorSession,
+  authoredMapFromMaterialized,
+} from "../../client/src/map_editor_session.js";
+
+const repoRoot = new URL("../../", import.meta.url);
+const noTerrainMap = JSON.parse(fs.readFileSync(new URL("server/assets/maps/no-terrain.json", repoRoot), "utf8"));
 
 {
-  const editorHtml = fs.readFileSync(new URL("../../client/map-editor.html", import.meta.url), "utf8");
-  assert(!editorHtml.includes('data-view="atlas"'), "map editor does not expose an Atlas tab");
-  assert(!editorHtml.includes('MAP_ATLAS_URL'), "map editor does not request atlas diagnostics");
-  assert(!editorHtml.includes("atlas-readout"), "map editor does not include atlas controls");
-  assert(editorHtml.includes('data-symmetry="left-right"'), "map editor exposes left-right symmetry");
-  assert(editorHtml.includes('data-symmetry="top-bottom"'), "map editor exposes top-bottom symmetry");
-  assert(editorHtml.includes('data-symmetry="radial"'), "map editor exposes 180-degree rotational symmetry");
-  assert(editorHtml.includes('const NATURALS_PER_SLOT = 3'), "map editor allows a main plus three naturals per player slot");
-  assert(editorHtml.includes("function applyTerrain(tiles, ch)"), "map editor mirrors terrain changes through one terrain application path");
-  assert(editorHtml.includes("function syncMirroredSlotsForSite(siteId)"), "map editor keeps mirrored base slots in sync");
+  const session = new MapEditorSession({ storage: null });
+  session.loadAuthoredMap(noTerrainMap);
+  session.selectLayout("2p_cross_nw_se");
+  const materialized = session.materialized();
+  assert.equal(materialized.size, 126);
+  assert.equal(materialized.starts.length, 2);
+  assert.equal(materialized.expansionSites.length, 2, "legacy singular natural entries normalize into the active layout");
+  assert.equal(session.exportMap().layouts[0].slots[0].natural, undefined, "exports use the canonical naturals array");
 }
 
-function mapEditorRuntime() {
-  const editorHtml = fs.readFileSync(new URL("../../client/map-editor.html", import.meta.url), "utf8");
-  const script = editorHtml.match(/<script>\s*([\s\S]*?)<\/script>/)?.[1] || "";
-  const eventWiring = script.indexOf('      document.getElementById("tools").addEventListener');
-  assert(eventWiring > 0, "map editor script has a testable pre-event initialization section");
-
-  const elements = new Map();
-  const context = vm.createContext({
-    document: {
-      getElementById(id) {
-        if (!elements.has(id)) {
-          elements.set(id, {
-            addEventListener() {},
-            appendChild() {},
-            classList: { toggle() {} },
-            getContext() {
-              return new Proxy({}, { get: () => () => {} });
-            },
-            replaceChildren() {},
-          });
-        }
-        return elements.get(id);
-      },
-      querySelectorAll() {
-        return [];
-      },
-    },
+{
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 32, playerCount: 2 });
+  let notifications = 0;
+  const unsubscribe = session.subscribe((snapshot) => {
+    if (snapshot.reason) notifications += 1;
   });
-  vm.runInContext(
-    script.slice(0, eventWiring) + `
-      globalThis.__mapEditor = {
-        applyTerrain,
-        currentMap: () => map,
-        replaceMap: (next) => { map = next; },
-        selectSiteId: (id) => { selectedSiteId = id; },
-        setMap: (next) => { map = normalizeMap(next); },
-        setSelectedSite,
-        setSymmetry: selectSymmetry,
-      };
-    `,
-    context,
-  );
-  return context.__mapEditor;
+  const beforeUndo = session.undoStack.length;
+  session.beginTerrainStroke();
+  const first = session.paintTerrainTiles([{ x: 0, y: 0 }], TERRAIN.WATER);
+  const second = session.paintTerrainTiles([{ x: 1, y: 0 }, { x: 2, y: 0 }], TERRAIN.ROCK);
+  assert.equal(notifications, 0, "painting does not serialize/notify the whole map per tile");
+  assert.equal(first.length, 1);
+  assert.equal(second.length, 2, "each paint step returns only newly dirty tiles");
+  assert.equal(session.commitTerrainStroke(), true);
+  assert.equal(notifications, 1, "one pointer stroke publishes one state transaction");
+  assert.equal(session.undoStack.length, beforeUndo + 1, "one pointer stroke creates one undo state");
+  session.undo();
+  assert.equal(session.materialized().terrain[0], TERRAIN.GRASS);
+  unsubscribe();
 }
 
-function blankTerrainMap(size = 40) {
-  return {
-    terrain: Array.from({ length: size }, () => ".".repeat(size)),
-    sites: [
-      { id: "main_source", kind: "main", x: 12, y: 12 },
-      { id: "natural_source", kind: "natural", x: 16, y: 12 },
-    ],
-    layouts: [
-      { id: "one", playerCount: 1, slots: [{ main: "main_source", naturals: ["natural_source"] }] },
-    ],
+{
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 32, playerCount: 2 });
+  const start = session.playerSlots()[0].start;
+  session.beginTerrainStroke();
+  assert.deepEqual(
+    session.paintTerrainTiles([{ x: start.x, y: start.y }], TERRAIN.WATER),
+    [],
+    "base centers remain protected grass",
+  );
+  assert.equal(session.commitTerrainStroke(), false);
+}
+
+{
+  const authored = authoredMapFromMaterialized({
+    name: "Returned Lab map",
+    description: "",
+    size: 32,
+    terrain: Array(32 * 32).fill(TERRAIN.GRASS),
+    starts: [{ x: 8, y: 8 }, { x: 23, y: 23 }],
+    expansionSites: [{ x: 12, y: 8 }, { x: 19, y: 23 }],
+  });
+  assert.equal(authored.layouts[0].slots.length, 2);
+  assert.deepEqual(authored.layouts[0].slots.map((slot) => slot.naturals.length), [1, 1]);
+}
+
+{
+  const values = new Map();
+  const storage = {
+    setItem: (key, value) => values.set(key, value),
+    getItem: (key) => values.get(key) || null,
   };
+  const session = new MapEditorSession({ storage });
+  session.loadAuthoredMap(noTerrainMap);
+  session.selectLayout("2p_cross_nw_se");
+  assert.equal(session.saveLocal("roundtrip"), true);
+  const restored = new MapEditorSession({ storage });
+  assert.equal(restored.loadLocal("roundtrip"), true);
+  assert.equal(restored.selectedLayoutId, "2p_cross_nw_se");
+  assert.equal(restored.draft.layouts.length, noTerrainMap.layouts.length);
 }
 
 {
-  const editor = mapEditorRuntime();
-  const clearChecks = [
-    ["left-right", { x: 8, y: 12 }, { x: 31, y: 12 }],
-    ["top-bottom", { x: 12, y: 8 }, { x: 12, y: 31 }],
-    ["radial", { x: 8, y: 12 }, { x: 31, y: 27 }],
-  ];
-  for (const [mode, source, target] of clearChecks) {
-    const terrain = Array.from({ length: 40 }, () => ".".repeat(40));
-    terrain[source.y] = terrain[source.y].slice(0, source.x) + "#" + terrain[source.y].slice(source.x + 1);
-    terrain[target.y] = terrain[target.y].slice(0, target.x) + "~" + terrain[target.y].slice(target.x + 1);
-    editor.setMap({
-      version: 2,
-      name: "clear-target-side",
-      description: "test",
-      _design: "test",
-      terrain,
-      sites: [
-        { id: "source_main", kind: "main", x: source.x, y: source.y },
-        { id: "source_natural", kind: "natural", x: source.x + 8, y: source.y },
-        { id: "legacy_main", kind: "main", x: target.x, y: target.y },
-        { id: "legacy_natural", kind: "natural", x: target.x - 8, y: target.y },
-      ],
-      layouts: [
-        {
-          id: "slots",
-          playerCount: 2,
-          slots: [
-            { main: "source_main", naturals: ["source_natural"] },
-            { main: "legacy_main", naturals: ["legacy_natural"] },
-          ],
-        },
-      ],
-    });
-    editor.setSymmetry(mode);
-
-    const map = editor.currentMap();
-    assert(map.terrain[source.y][source.x] === "#", mode + " symmetry keeps terrain on the authored side");
-    assert(map.terrain[target.y][target.x] === ".", mode + " symmetry clears legacy terrain on the target side");
-    assert(
-      map.sites.map((site) => site.id).join(",") === "source_main,source_natural",
-      mode + " symmetry removes legacy target-side bases",
-    );
-    assert(
-      map.layouts.length === 1 && map.layouts[0].playerCount === 1 && map.layouts[0].slots[0].main === "source_main",
-      mode + " symmetry removes spawn slots that referenced target-side bases",
-    );
-  }
-}
-
-{
-  const editor = mapEditorRuntime();
-  editor.setMap({
-    version: 2,
-    name: "source-layout-repair",
-    description: "test",
-    _design: "test",
-    terrain: Array.from({ length: 40 }, () => ".".repeat(40)),
-    sites: [
-      { id: "main_left", kind: "main", x: 8, y: 12 },
-      { id: "natural_right", kind: "natural", x: 31, y: 12 },
-    ],
-    layouts: [
-      { id: "one", playerCount: 1, slots: [{ main: "main_left", naturals: ["natural_right"] }] },
-    ],
-  });
-
-  assert(editor.setSymmetry("left-right"), "symmetry repairs a split spawn layout instead of rejecting the selection");
-  const map = editor.currentMap();
-  const main = map.sites.find((site) => site.id === "main_left");
-  const natural = map.sites.find((site) => site.id === "natural_right");
-  assert(main?.x === 8 && main.y === 12, "symmetry keeps an existing source-side main in place");
-  assert(
-    natural && natural.x < 20 && (natural.x !== main.x || natural.y !== main.y),
-    "symmetry scoots a target-side natural to a free source-side tile",
-  );
-  assert(
-    map.layouts.length === 1 && map.layouts[0].playerCount === 1 && map.layouts[0].slots[0].naturals[0] === "natural_right",
-    "the repaired natural stays associated with its main slot",
-  );
-}
-
-{
-  const editor = mapEditorRuntime();
-  editor.setMap({
-    version: 2,
-    name: "target-layout-repair",
-    description: "test",
-    _design: "test",
-    terrain: Array.from({ length: 40 }, () => ".".repeat(40)),
-    sites: [
-      { id: "main_right", kind: "main", x: 31, y: 12 },
-      { id: "natural_right", kind: "natural", x: 31, y: 27 },
-    ],
-    layouts: [
-      { id: "one", playerCount: 1, slots: [{ main: "main_right", naturals: ["natural_right"] }] },
-    ],
-  });
-
-  assert(editor.setSymmetry("left-right"), "symmetry repairs a spawn layout that starts entirely on the target side");
-  const map = editor.currentMap();
-  const main = map.sites.find((site) => site.id === "main_right");
-  const natural = map.sites.find((site) => site.id === "natural_right");
-  assert(main && natural && main.x < 20 && natural.x < 20, "symmetry moves every required target-side base to the kept side");
-  assert(
-    main.x !== natural.x || main.y !== natural.y,
-    "automatic spawn repair keeps moved bases on separate tiles",
-  );
-  assert(
-    map.layouts.length === 1 && map.layouts[0].slots[0].main === "main_right",
-    "the fully repaired spawn layout remains available after symmetry clears the target side",
-  );
-}
-
-{
-  const editor = mapEditorRuntime();
-  const occupiedSites = [];
-  for (let y = 4; y <= 19; y++) {
-    for (let x = 4; x <= 11; x++) {
-      if (x === 7 && y === 7) continue;
-      occupiedSites.push({ id: `occupied_${x}_${y}`, kind: "natural", x, y });
+  let posted = null;
+  const fetchImpl = async (url, options = {}) => {
+    if (options.method === "POST") {
+      posted = { url, body: JSON.parse(options.body) };
+      return { ok: true, status: 200, json: async () => ({ handoffId: "a".repeat(32), expiresInMs: 120000 }) };
     }
-  }
-  editor.setMap({
-    version: 2,
-    name: "failed-repair-rollback",
-    description: "test",
-    _design: "test",
-    terrain: Array.from({ length: 24 }, () => ".".repeat(24)),
-    sites: occupiedSites.concat([
-      { id: "target_main", kind: "main", x: 16, y: 7 },
-      { id: "target_natural", kind: "natural", x: 16, y: 16 },
-    ]),
-    layouts: [
-      { id: "one", playerCount: 1, slots: [{ main: "target_main", naturals: ["target_natural"] }] },
-    ],
+    return { ok: true, status: 200, json: async () => ({ destination: "editor", authoredMap: noTerrainMap }) };
+  };
+  const session = new MapEditorSession({ storage: null });
+  session.loadAuthoredMap(noTerrainMap);
+  const created = await createMapHandoff({
+    destination: "editor",
+    authoredMap: session.exportMap(),
+    materializedMap: session.materialized(),
+    selectedLayoutId: session.selectedLayoutId,
+    fetchImpl,
   });
+  assert.equal(created.handoffId.length, 32);
+  assert.equal(posted.url, "/api/map-handoffs");
+  assert.equal(posted.body.destination, "editor");
+  assert(!posted.url.includes("terrain"), "full map JSON never enters a transition URL");
+  assert.equal((await consumeMapHandoff("b".repeat(32), { fetchImpl })).destination, "editor");
+}
 
-  assert(!editor.setSymmetry("left-right"), "symmetry rejects a repair when the kept side has insufficient room");
-  const map = editor.currentMap();
-  assert(
-    map.sites.find((site) => site.id === "target_main")?.x === 16 &&
-      map.sites.find((site) => site.id === "target_natural")?.x === 16,
-    "a rejected multi-site repair rolls back sites moved before the failure",
+{
+  assert.deepEqual(
+    mapEditorLaunchConfig({ pathname: "/map-editor", search: `?handoff=${"c".repeat(32)}&workspace=roundtrip` }),
+    { handoffId: "c".repeat(32), workspaceId: "roundtrip", error: "" },
   );
+  assert.equal(mapEditorLaunchConfig({ pathname: "/", search: "" }), null);
 }
 
 {
-  const editor = mapEditorRuntime();
-  const occupiedSites = [];
-  for (let y = 7; y <= 16; y++) {
-    for (let x = 7; x <= 11; x++) {
-      occupiedSites.push({
-        id: `occupied_${x}_${y}`,
-        kind: x === 7 && y === 7 ? "main" : "natural",
-        x,
-        y,
-      });
-    }
-  }
-  editor.setMap({
-    version: 2,
-    name: "alternate-layout-repair",
-    description: "test",
-    _design: "test",
-    terrain: Array.from({ length: 24 }, () => ".".repeat(24)),
-    sites: occupiedSites.concat([
-      { id: "target_main", kind: "main", x: 16, y: 7 },
-      { id: "target_natural", kind: "natural", x: 19, y: 4 },
-    ]),
-    layouts: [
-      { id: "blocked", playerCount: 1, slots: [{ main: "target_main", naturals: ["occupied_7_8"] }] },
-      { id: "repairable", playerCount: 1, slots: [{ main: "occupied_7_7", naturals: ["target_natural"] }] },
-    ],
-  });
-
-  assert(editor.setSymmetry("left-right"), "symmetry tries another split slot when the first cannot be repaired");
-  const map = editor.currentMap();
-  assert(
-    map.layouts.length === 1 && map.layouts[0].id === "repairable" &&
-      map.sites.find((site) => site.id === "target_natural")?.x === 4,
-    "symmetry preserves a feasible alternate spawn slot on the kept side",
-  );
-}
-
-{
-  const editor = mapEditorRuntime();
-  const terrainChecks = [
-    ["left-right", { x: 4, y: 5 }, { x: 35, y: 5 }],
-    ["top-bottom", { x: 4, y: 5 }, { x: 4, y: 34 }],
-    ["radial", { x: 4, y: 5 }, { x: 35, y: 34 }],
-  ];
-  for (const [mode, source, mirrored] of terrainChecks) {
-    editor.replaceMap(blankTerrainMap());
-    editor.setSymmetry(mode);
-    assert(editor.applyTerrain([source], "#"), mode + " symmetry accepts an unprotected terrain edit");
-    const map = editor.currentMap();
-    assert(map.terrain[source.y][source.x] === "#", mode + " symmetry keeps the drawn terrain tile");
-    assert(map.terrain[mirrored.y][mirrored.x] === "#", mode + " symmetry writes the reflected terrain tile");
-  }
-}
-
-{
-  const editor = mapEditorRuntime();
-  const baseModes = [
-    ["left-right", { x: 7, y: 8 }, { x: 48, y: 8 }],
-    ["top-bottom", { x: 8, y: 7 }, { x: 8, y: 48 }],
-    ["radial", { x: 7, y: 8 }, { x: 48, y: 47 }],
-  ];
-  for (const [mode, destination, mirroredDestination] of baseModes) {
-    editor.setMap({
-      version: 2,
-      name: "symmetric-slot",
-      description: "test",
-      _design: "test",
-      terrain: Array.from({ length: 56 }, () => ".".repeat(56)),
-      sites: [
-        { id: "main_left", kind: "main", x: 8, y: 8 },
-        { id: "natural_a", kind: "natural", x: 16, y: 8 },
-        { id: "natural_b", kind: "natural", x: 16, y: 20 },
-        { id: "natural_c", kind: "natural", x: 16, y: 24 },
-      ],
-      layouts: [
-        { id: "one", playerCount: 1, slots: [{ main: "main_left", naturals: ["natural_a", "natural_b", "natural_c"] }] },
-      ],
-    });
-    editor.setSymmetry(mode);
-    editor.selectSiteId("main_left");
-    assert(editor.setSelectedSite(destination), mode + " symmetric base placement succeeds");
-
-    const map = editor.currentMap();
-    const mirrorMain = map.sites.find((site) => site.id === "main_left_mirror");
-    const layout = map.layouts[0];
-    assert(
-      mirrorMain?.x === mirroredDestination.x && mirrorMain.y === mirroredDestination.y,
-      mode + " symmetric base placement creates the reflected main",
-    );
-    assert(layout.playerCount === 2 && layout.slots.length === 2, mode + " symmetric base placement creates the matching player slot");
-    assert(
-      layout.slots.some((slot) => (
-        slot.main === "main_left_mirror" &&
-        slot.naturals.length === 3 &&
-        slot.naturals.join(",") === "natural_a_mirror,natural_b_mirror,natural_c_mirror"
-      )),
-      mode + " matching player slot keeps all four mirrored bases together",
-    );
-  }
+  const main = fs.readFileSync(new URL("client/src/main.js", repoRoot), "utf8");
+  const rendererTerrain = fs.readFileSync(new URL("client/src/renderer/terrain.js", repoRoot), "utf8");
+  const serverMain = fs.readFileSync(new URL("server/src/main.rs", repoRoot), "utf8");
+  assert.match(main, /mapEditorLaunchConfig\(\) \? new MapEditorApp\(\) : new App\(\)/);
+  const editorApp = fs.readFileSync(new URL("client/src/map_editor_app.js", repoRoot), "utf8");
+  assert.match(editorApp, /simulation:\s*false/);
+  assert.match(editorApp, /gameplayCommands:\s*false/);
+  assert.match(rendererTerrain, /updateStaticTerrainTiles/);
+  assert.match(rendererTerrain, /baseTexture\.update\(\)/, "dirty painting updates one persistent texture");
+  assert.match(serverMain, /\/map-editor/);
+  assert.equal(fs.existsSync(new URL("client/map-editor.html", repoRoot)), false, "legacy standalone editor is retired");
 }
