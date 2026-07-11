@@ -146,7 +146,18 @@ try {
   call("order", { sessionId, playerId: 1, command: { c: "move", units: ["shooter"], x: 1088, y: 1088 } });
   const recordingWait = invokeAsync("record-wait", { sessionId });
   await sleep(250);
-  call("camera", { sessionId, camera: { action: "set", centerX: 900, centerY: 1_200, zoom: 0.8 } });
+  call("camera", {
+    sessionId,
+    camera: {
+      action: "set",
+      snapshot: {
+        version: 1,
+        focus: { x: 900, y: 1_200 },
+        framingScale: 0.8,
+        boundsPolicy: "mapOverscroll",
+      },
+    },
+  });
   const recordingWaitResult = await recordingWait;
   assert.equal(recordingWaitResult.status, 0, `record-wait succeeds while camera remains interactive: ${recordingWaitResult.stderr}`);
   const recordingWaitResponse = JSON.parse(recordingWaitResult.stdout);

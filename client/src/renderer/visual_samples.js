@@ -213,11 +213,12 @@ export class VisualSampleLayer {
   drawLabel(sample, camera) {
     const label = this.slotLabel(sample.id);
     if (!label) return;
+    const labelY = sample.y - sample.radius - sample.labelOffsetY;
     label.text = sample.label;
     label.visible = true;
     label.alpha = 0.95;
-    label.position?.set?.(sample.x, sample.y - sample.radius - sample.labelOffsetY);
-    label.scale?.set?.(labelScaleForCamera(camera));
+    label.position?.set?.(sample.x, labelY);
+    label.scale?.set?.(labelScaleForCamera(camera, sample.x, labelY));
   }
 
   slotGraphics(id) {
@@ -384,9 +385,10 @@ function normalizeLabel(value, fallback) {
   return label.slice(0, LABEL_MAX_LENGTH);
 }
 
-function labelScaleForCamera(camera) {
-  const zoom = finiteNumber(camera?.zoom) && camera.zoom > 0 ? camera.zoom : 1;
-  return clamp(1 / zoom, 0.5, 1.6);
+function labelScaleForCamera(camera, x, y) {
+  const extent = camera?.projectedExtent?.({ x, y, heightPx: 0 }, 1, 1);
+  const scale = finiteNumber(extent?.scaleX) && extent.scaleX > 0 ? extent.scaleX : 1;
+  return clamp(1 / scale, 0.5, 1.6);
 }
 
 function drawFacets(g, radius, variant, rng) {

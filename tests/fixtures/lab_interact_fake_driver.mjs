@@ -34,25 +34,29 @@ export async function openLabInteractDriver(options) {
   let lastRecordingCompletion = null;
   let fixedCapture = null;
   const camera = {
-    x: 0,
-    y: 0,
-    zoom: 1,
-    worldBounds: { minX: 0, minY: 0, maxX: 2048, maxY: 2048 },
+    version: 1,
+    focus: { x: 0, y: 0 },
+    framingScale: 1,
+    boundsPolicy: "mapOverscroll",
   };
+  const cameraWorldBounds = { minX: 0, minY: 0, maxX: 2048, maxY: 2048 };
+  const cameraViewportCss = { widthCssPx: 1440, heightCssPx: 900 };
   const project = (entity) => ({ ...entity, orderPlan: entity.orderPlan.map((stage) => ({ ...stage })) });
   const inspect = ({ ids = [], kinds = [], owners = [], cameraViewport = false, limit = 25 } = {}) => {
     let rows = entities;
     if (ids.length) rows = rows.filter((entity) => ids.includes(entity.id));
     if (kinds.length) rows = rows.filter((entity) => kinds.includes(entity.kind));
     if (owners.length) rows = rows.filter((entity) => owners.includes(entity.owner));
-    if (cameraViewport) rows = rows.filter((entity) => entity.x >= camera.worldBounds.minX && entity.x <= camera.worldBounds.maxX && entity.y >= camera.worldBounds.minY && entity.y <= camera.worldBounds.maxY);
+    if (cameraViewport) rows = rows.filter((entity) => entity.x >= cameraWorldBounds.minX && entity.x <= cameraWorldBounds.maxX && entity.y >= cameraWorldBounds.minY && entity.y <= cameraWorldBounds.maxY);
     return {
       entities: rows.slice(0, limit).map(project),
       truncated: rows.length > limit,
       totalMatching: rows.length,
       players: CATALOG.players.map((player) => ({ ...player })),
       room: { tick, roomTime: { currentTick: tick, speed: 0, paused: true }, map: CATALOG.maps[0] },
-      camera: { ...camera },
+      camera: structuredClone(camera),
+      cameraViewport: { ...cameraViewportCss },
+      cameraWorldBounds: { ...cameraWorldBounds },
     };
   };
   const finishRecording = (reason, { aliases = [] } = {}) => {
@@ -146,16 +150,18 @@ export async function openLabInteractDriver(options) {
     },
     async camera(command) {
       if (command.action === "set") {
-        if (command.centerX != null) camera.x = command.centerX;
-        if (command.centerY != null) camera.y = command.centerY;
-        if (command.zoom != null) camera.zoom = command.zoom;
+        Object.assign(camera, structuredClone(command.snapshot));
       }
       if (command.action === "focus") {
         const rows = entities.filter((entity) => command.entityIds.includes(entity.id));
-        camera.x = rows.reduce((sum, entity) => sum + entity.x, 0) / rows.length;
-        camera.y = rows.reduce((sum, entity) => sum + entity.y, 0) / rows.length;
+        camera.focus.x = rows.reduce((sum, entity) => sum + entity.x, 0) / rows.length;
+        camera.focus.y = rows.reduce((sum, entity) => sum + entity.y, 0) / rows.length;
       }
-      return { camera: { ...camera } };
+      return {
+        camera: structuredClone(camera),
+        cameraViewport: { ...cameraViewportCss },
+        cameraWorldBounds: { ...cameraWorldBounds },
+      };
     },
     async screenshot({ sessionId, name, presentation, viewport, subjectSummaries, request }) {
       const width = viewport?.width || 1;

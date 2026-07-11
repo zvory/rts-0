@@ -462,7 +462,12 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     },
     pulseBorder() {},
   };
-  noticeAudioMatch.camera = { x: 0, y: 0, viewW: 100, viewH: 100, zoom: 1 };
+  noticeAudioMatch.camera = {
+    containsProjected(point, margin = 0) {
+      return point.x >= -margin && point.x <= 100 + margin &&
+        point.y >= -margin && point.y <= 100 + margin;
+    },
+  };
   noticeAudioMatch.state = { spectator: false };
   noticeAudioMatch.replayViewer = true;
   noticeAudioMatch.handleNotice({

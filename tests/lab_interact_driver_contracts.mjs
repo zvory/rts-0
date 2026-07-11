@@ -17,11 +17,13 @@ import {
 } from "../scripts/lab-interact/driver.mjs";
 import {
   LAB_INTERACT_BRIDGE_KEY,
+  LAB_INTERACT_BRIDGE_VERSION,
   LAB_INTERACT_LIMITS,
   LabInteractBridge,
   labInteractLaunchEnabled,
   normalizeInspectionQuery,
 } from "../client/src/lab_interact_bridge.js";
+import { Camera } from "../client/src/camera.js";
 import { ABILITY, DEFAULT_FACTION_ID, KIND, LAB_ROLE } from "../client/src/protocol.js";
 import { labSpawnUnitKindsForFaction } from "../client/src/lab_spawn_catalog.js";
 
@@ -109,6 +111,7 @@ assert.equal(inspection.kinds.size, 2, "inspection kind filters are bounded and 
 assert.equal(inspection.limit, 400, "inspection result limits support the large-scene operational bound");
 assert.equal(LAB_INTERACT_LIMITS.focusEntities, 400, "bridge camera focus shares the 400-reference bound");
 assert.equal(LAB_INTERACT_LIMITS.captureSubjects, 400, "bridge readiness checks share the 400-subject bound");
+assert.equal(LAB_INTERACT_BRIDGE_VERSION, 3, "semantic camera tooling shape increments the bridge version");
 assert.equal(inspection.cameraViewport, false, "inspection viewport filtering is opt-in");
 assert.equal(normalizeInspectionQuery({ cameraViewport: true }).cameraViewport, true, "inspection accepts the bounded camera viewport filter");
 
@@ -163,17 +166,8 @@ const seek = await seekBridge.time({ action: "seek", tick: 999 });
 assert.equal(seek.snapshotTick, 3, "bridge returns the server-observed tick when a seek is clamped to retained history");
 seekBridge.destroy();
 
-const viewportCamera = {
-  x: 0,
-  y: 0,
-  zoom: 1,
-  viewW: 100,
-  viewH: 100,
-  worldToScreen(x, y) { return { x: (x - this.x) * this.zoom, y: (y - this.y) * this.zoom }; },
-  screenToWorld(x, y) { return { x: this.x + x / this.zoom, y: this.y + y / this.zoom }; },
-  setZoom(zoom) { this.zoom = zoom; },
-  centerOn(x, y) { this.x = x - this.viewW / (2 * this.zoom); this.y = y - this.viewH / (2 * this.zoom); },
-};
+const viewportCamera = new Camera(100, 100, { minZoom: 0.01, maxZoom: 16 });
+viewportCamera.setMapBounds(1_000, 1_000);
 const viewportEntities = [
   {
     id: 1, kind: "rifleman", owner: 1, x: 20, y: 20, hp: 100, maxHp: 100,
@@ -216,15 +210,16 @@ assert.deepEqual(
   { state: "idle", activity: "engaging", targetId: 2, weaponFacing: 0.25, setupState: "deployed" },
   "bridge inspection distinguishes autonomous combat activity from explicit order state",
 );
-assert.deepEqual(viewportInspection.camera.worldBounds, { minX: 0, minY: 0, maxX: 100, maxY: 100 }, "bridge inspection reports applied camera world bounds");
+assert.equal(viewportInspection.camera.version, 1, "bridge inspection reports CameraSnapshotV1");
+assert.deepEqual(viewportInspection.cameraWorldBounds, { minX: 0, minY: 0, maxX: 100, maxY: 100 }, "bridge inspection reports semantic camera world bounds");
 const focused = viewportBridge.camera({ action: "focus", entityIds: [1, 2], padding: 10 });
-assert.ok(focused.camera.zoom > 0 && focused.camera.worldBounds.maxX > focused.camera.worldBounds.minX, "bridge focus applies bounded padding and returns camera bounds");
+assert.ok(focused.camera.framingScale > 0 && focused.cameraWorldBounds.maxX > focused.cameraWorldBounds.minX, "bridge focus applies bounded padding and returns semantic camera data");
 const groupFocused = viewportBridge.camera({ action: "focus", entityIds: [1, 2] });
-assert.equal(groupFocused.camera.zoom, 100 / 316, "bridge preserves the 48-world-pixel default for multi-subject framing");
+assert.equal(groupFocused.camera.framingScale, 100 / 316, "bridge preserves the 48-world-pixel default for multi-subject framing");
 const buildingFocused = viewportBridge.camera({ action: "focus", entityIds: [3] });
-assert.equal(buildingFocused.camera.zoom, 100 / 96, "bridge preserves the 48-world-pixel default for single-building framing");
+assert.equal(buildingFocused.camera.framingScale, 100 / 96, "bridge preserves the 48-world-pixel default for single-building framing");
 const closeFocused = viewportBridge.camera({ action: "focus", entityIds: [1] });
-assert.equal(closeFocused.camera.zoom, 100 / 64, "bridge focus defaults to a 32-world-pixel close framing for readable single-subject captures");
+assert.equal(closeFocused.camera.framingScale, 100 / 64, "bridge focus defaults to a 32-world-pixel close framing for readable single-subject captures");
 viewportBridge.destroy();
 
 console.log("✅ lab_interact_driver_contracts.mjs: all contract assertions passed");

@@ -403,10 +403,11 @@ async function testVisualProfileRegistry() {
       "trench profile includes several checked-in static sample candidates",
     );
     assert(
-      Number.isFinite(resolved.profile.initialCamera?.x) &&
-        Number.isFinite(resolved.profile.initialCamera?.y) &&
-        Number.isFinite(resolved.profile.initialCamera?.zoom),
-      "trench profile can provide an initial camera view",
+      resolved.profile.initialCamera?.version === 1 &&
+        Number.isFinite(resolved.profile.initialCamera?.focus?.x) &&
+        Number.isFinite(resolved.profile.initialCamera?.focus?.y) &&
+        Number.isFinite(resolved.profile.initialCamera?.framingScale),
+      "trench profile provides a versioned semantic initial camera view",
     );
     assert(
       getVisualProfile("trench-variants-1") === resolved.profile,

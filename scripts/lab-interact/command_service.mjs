@@ -401,6 +401,8 @@ async function inspect(session, { refs, kinds, owners, cameraViewport, limit }) 
     sessionId: session.sessionId,
     entities: (response.entities || []).map((entity) => decorateEntity(entity, session.aliases)),
     players: response.players || [], room: response.room || null, camera: response.camera || null,
+    cameraViewport: response.cameraViewport || null,
+    cameraWorldBounds: response.cameraWorldBounds || null,
     truncated: response.truncated === true,
     totalMatching: Number.isInteger(response.totalMatching) ? response.totalMatching : 0,
   };
@@ -413,7 +415,12 @@ async function camera(session, value) {
     command = { action: "focus", entityIds: resolved.map((entry) => entry.id), padding: value.padding };
   }
   const response = await session.driver.camera(command);
-  return { sessionId: session.sessionId, camera: response.camera || response };
+  return {
+    sessionId: session.sessionId,
+    camera: response.camera || response,
+    cameraViewport: response.cameraViewport || null,
+    cameraWorldBounds: response.cameraWorldBounds || null,
+  };
 }
 
 async function screenshot(session, { name = "scene", presentation = "clean", viewport, subjects }) {
@@ -830,11 +837,18 @@ function validateCamera(value) {
     exact(value, ["action", "refs", "padding"], "camera"); refs(value.refs, "camera.refs", 1, LAB_INTERACT_LIMITS.maxFocusRefs);
     if (value.padding != null) boundedNumber(value.padding, "camera.padding", 0, 1024);
   } else if (value.action === "set") {
-    exact(value, ["action", "centerX", "centerY", "zoom"], "camera");
-    if ((value.centerX == null) !== (value.centerY == null)) invalid("camera", "centerX and centerY must be provided together");
-    if (value.centerX == null && value.zoom == null) invalid("camera", "requires zoom or a center");
-    if (value.centerX != null) { finite(value.centerX, "camera.centerX"); finite(value.centerY, "camera.centerY"); }
-    if (value.zoom != null) boundedNumber(value.zoom, "camera.zoom", Number.MIN_VALUE, 16);
+    exact(value, ["action", "snapshot"], "camera");
+    record(value.snapshot, "camera.snapshot");
+    exact(value.snapshot, ["version", "focus", "framingScale", "boundsPolicy"], "camera.snapshot");
+    if (value.snapshot.version !== 1) invalid("camera.snapshot.version", "must be 1");
+    record(value.snapshot.focus, "camera.snapshot.focus");
+    exact(value.snapshot.focus, ["x", "y"], "camera.snapshot.focus");
+    finite(value.snapshot.focus.x, "camera.snapshot.focus.x");
+    finite(value.snapshot.focus.y, "camera.snapshot.focus.y");
+    boundedNumber(value.snapshot.framingScale, "camera.snapshot.framingScale", Number.MIN_VALUE, 16);
+    if (value.snapshot.boundsPolicy !== "mapOverscroll") {
+      invalid("camera.snapshot.boundsPolicy", "must be mapOverscroll");
+    }
   } else invalid("camera.action", "is unsupported");
 }
 

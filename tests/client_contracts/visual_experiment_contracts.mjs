@@ -170,7 +170,7 @@ const PANZERFAUST_MANIFEST_URL = new URL(
 {
   const profile = getVisualProfile("scout-car-png-1");
   assert(profile, "scout car PNG visual profile is registered");
-  assert(profile.initialCamera?.zoom > 2, "scout car PNG profile opens zoomed in on the render-preview scout cars");
+  assert(profile.initialCamera?.framingScale > 2, "scout car PNG profile opens zoomed in on the render-preview scout cars");
   assert(
     !profile.unitOverrides && !profile.frameStripOverrides && !profile.staticSamples,
     "scout car PNG profile is camera-only because the atlas is the normal Scout Car art path",
@@ -230,7 +230,7 @@ const PANZERFAUST_MANIFEST_URL = new URL(
 {
   const profile = getVisualProfile("mortar-png-1");
   assert(profile, "mortar PNG visual profile is registered");
-  assert(profile.initialCamera?.zoom > 2, "mortar PNG profile opens zoomed in on the render-preview mortars");
+  assert(profile.initialCamera?.framingScale > 2, "mortar PNG profile opens zoomed in on the render-preview mortars");
   assert(
     !profile.unitOverrides && !profile.frameStripOverrides && !profile.staticSamples,
     "mortar PNG profile is camera-only because the atlas is the normal Mortar Team art path",
@@ -545,7 +545,18 @@ const PANZERFAUST_MANIFEST_URL = new URL(
       ],
     };
 
-    renderer.render(state, { x: 0, y: 0, zoom: 2 }, null, 1, { visualSamples: samples });
+    renderer.render(state, {
+      x: 0,
+      y: 0,
+      zoom: 2,
+      projectedExtent: (point) => ({
+        width: 2,
+        height: 2,
+        scaleX: point.y < 100 ? 2 : 0.8,
+        scaleY: point.y < 100 ? 2 : 0.8,
+        visible: true,
+      }),
+    }, null, 1, { visualSamples: samples });
 
     const diagnostics = renderer.visualSampleDiagnostics();
     const sampleDisplay = renderer.layers.visualSamples.children[0];
@@ -564,7 +575,7 @@ const PANZERFAUST_MANIFEST_URL = new URL(
     assert(labelDisplay.text === "Valid", "static sample labels identify each candidate");
     assertApprox(labelDisplay.x, 100, 0.001, "static sample labels stay anchored to world x");
     assertApprox(labelDisplay.y, 96, 0.001, "static sample labels stay anchored above the sample");
-    assertApprox(labelDisplay.scaleX, 0.5, 0.001, "static sample labels compensate for camera zoom");
+    assertApprox(labelDisplay.scaleX, 0.5, 0.001, "static sample labels compensate at their projected anchor");
     assert(Object.keys(state).sort().join(",") === beforeKeys, "static sample rendering does not add GameState fields");
     assert(state.selection === beforeSelection && state.selection.size === 0,
       "static sample rendering does not touch selection");

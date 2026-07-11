@@ -109,8 +109,28 @@ assert.ok(JSON.stringify(largeSpawn).length < 2_000, "the maximum default spawn 
 const largeAliases = Array.from({ length: 400 }, (_, index) => `large_${index}`);
 const largeInspection = await service.execute("inspect", { sessionId, refs: largeAliases, limit: 400 });
 assert.equal(largeInspection.entities.length, 400, "inspection accepts and returns the full 400-reference operational bound");
+assert.deepEqual(
+  largeInspection.cameraViewport,
+  { widthCssPx: 1440, heightCssPx: 900 },
+  "inspection preserves the semantic camera viewport returned by the bridge",
+);
+assert.deepEqual(
+  largeInspection.cameraWorldBounds,
+  { minX: 0, minY: 0, maxX: 2048, maxY: 2048 },
+  "inspection preserves semantic camera ground bounds returned by the bridge",
+);
 const largeIds = largeInspection.entities.map((entry) => entry.id);
-await service.execute("camera", { sessionId, camera: { action: "focus", refs: largeAliases } });
+const focusedCamera = await service.execute("camera", { sessionId, camera: { action: "focus", refs: largeAliases } });
+assert.deepEqual(
+  focusedCamera.cameraViewport,
+  { widthCssPx: 1440, heightCssPx: 900 },
+  "camera focus preserves the semantic camera viewport returned by the bridge",
+);
+assert.deepEqual(
+  focusedCamera.cameraWorldBounds,
+  { minX: 0, minY: 0, maxX: 2048, maxY: 2048 },
+  "camera focus preserves semantic camera ground bounds returned by the bridge",
+);
 const largeCapture = await service.execute("screenshot", {
   sessionId, name: "large-contract", subjects: largeAliases,
 });

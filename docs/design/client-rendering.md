@@ -163,12 +163,12 @@ contain no live `Camera`, Babylon/Pixi, DOM, backing-store, DPR, or matrix objec
 frozen frame use the last successfully presented projection snapshot, never a newer camera pose
 awaiting presentation.
 
-Through Phase 1.75, `camera.js` exposes the raw `x`, `y`, `zoom`, `viewW`, `viewH`,
-`worldToScreen`, `screenToWorld`, `centerOn`, `setZoom`, `setBounds`, and `setView` compatibility
-edge for existing Pixi and shared consumers. Phase 1.5 migrates navigation and minimap; Phase 1.75
-migrates every other shared consumer and leaves raw reads only in `camera.js` and the named Pixi
-adapter. The `{x,y,zoom}` legacy restore read remains accepted at the App/camera restore edge for
-the foundations plan but is always re-emitted as `CameraSnapshotV1`.
+After Phase 1.75, raw `x`, `y`, `zoom`, `viewW`, `viewH`, `worldToScreen`, `screenToWorld`,
+`centerOn`, `setZoom`, `setBounds`, and `setView` compatibility is private to `camera.js`, the named
+Pixi world adapter in `renderer/index.js`, and the separately owned Pixi Map Editor adapter.
+Application, input, UI, Lab, audio, replay, observer, capture, and diagnostic consumers use only
+semantic operations. The `{x,y,zoom}` legacy restore read remains accepted only by `Camera.restore`
+for the foundations plan and is always re-emitted as `CameraSnapshotV1`.
 
 Phase 1.5 migrates live/replay wheel, pinch, touch drag, middle/Space drag, and fallback drag to
 semantic `dollyBy`/`panByScreenDelta` operations. Gesture points and deltas are viewport-local CSS
@@ -394,28 +394,23 @@ shared dependencies and are not destroyed by adjusted-texture teardown.
 | Surface | Current dependency | Owner phase |
 | --- | --- | --- |
 | `camera.js` and Pixi world transform in `renderer/index.js` | private `x/y/zoom/viewW/viewH`, orthographic transforms | Phase 1 compatibility; stays backend-private |
-| `frame_recovery.js` and spatial `audio.setListener` | raw center, zoom, viewport width | Phase 1.75 listener model |
+| `frame_recovery.js` and spatial `audio.setListener` | semantic `AudioListenerV1`; exact focus-plane reference distance | Phase 1.75 complete |
 | navigation/camera controls/replay input | semantic CSS-pixel pan/dolly; no raw camera read | Phase 1.5 complete |
 | `input/index.js`, `selection.js`, placement/commands/Lab tools | non-null `screenToWorld`, world rectangle | Phase 2 ground hit/proxies |
-| `input/control_groups.js` | raw visible rectangle and center | Phase 1.75 projection/fit |
+| `input/control_groups.js` | semantic viewport ground bounds, snapshot focus, and focus operation | Phase 1.75 complete |
 | `minimap.js` | semantic ground polygon and focus | Phase 1.5 complete |
-| `match.js` | bounds/resize/home focus, viewport alert AABB | Phase 1 core then Phase 1.75 shared closure |
-| App/replay carryover and `camera_view_selection.js` | legacy view objects | Phase 1.75 versioned snapshot |
-| `lab_interact_bridge.js` and Lab capture manifests | raw set/focus, world bounds, viewport tests | Phase 1.75 semantic tooling snapshot |
-| `visual_profiles.js` and scenario initial cameras | `{x,y,zoom}` literals | Phase 1.75 normalize profiles |
-| observer map analysis and visual samples | nominal zoom for screen sizing | Phase 1.75 projected extent |
-| `frame_profiler.js`, capture/readiness/status | raw viewport/zoom diagnostics | Phase 1.75 semantic snapshot |
+| `match.js` | semantic map/viewport resize, focus, projected alert containment, and ground bounds | Phase 1.75 complete |
+| App/replay carryover and `camera_view_selection.js` | `CameraSnapshotV1`; server Lab center normalizes immediately | Phase 1.75 complete |
+| `lab_interact_bridge.js` and Lab capture manifests | `CameraSnapshotV1`, semantic viewport/bounds, projected containment, semantic fit | Phase 1.75 complete |
+| `visual_profiles.js` and scenario initial cameras | checked-in `CameraSnapshotV1`; server center normalized on admission | Phase 1.75 complete |
+| observer map analysis and visual samples | point-local `projectedExtent` scale | Phase 1.75 complete |
+| `frame_profiler.js`, capture/readiness/status | semantic snapshot and CSS viewport | Phase 1.75 complete |
 
-Backend-private orthographic math is allowed only in `camera.js` and the named Pixi adapter.
-Application, UI, input, minimap, audio, Lab, replay, observer, capture, and diagnostics reads must
-be removed by Phase 1.75; Phase 2 then replaces selection's semantic assumptions.
-
-The Phase 1.5 architecture ratchet has no navigation or minimap exception. Its exact temporary
-Phase 1.75 raw-representation allowlist is `frame_recovery.js`, `frame_profiler.js`, `hud.js`,
-`input/control_groups.js`, `lab_interact_bridge.js`, `match.js`,
-`renderer/observer_map_analysis.js`, and `renderer/visual_samples.js`. `camera.js`,
-`camera_projection.js`, `renderer/index.js`, and the separately owned Pixi Map Editor viewport are
-private adapters, not shared-consumer exceptions; stale temporary entries fail the ratchet.
+Backend-private orthographic math is allowed only in `camera.js`, `camera_projection.js`, the named
+Pixi adapter `renderer/index.js`, and the separately owned Pixi Map Editor viewport. The Phase 1.75
+architecture ratchet has no shared-consumer allowlist: any raw representation read in application,
+UI, input, minimap, audio, Lab, replay, observer, capture, or diagnostics fails. Phase 2 replaces
+selection's remaining orthographic interaction assumptions without reopening this representation.
 
 ### 8.2 Current Pixi presentation catalog
 

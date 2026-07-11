@@ -1,5 +1,6 @@
 import { Audio, noticeSoundId } from "./audio.js";
 import { Camera } from "./camera.js";
+import { restoreInitialCameraView } from "./camera_view_selection.js";
 import {
   createSnapshotProcessingReport,
   recordSnapshotProcessing,
@@ -273,7 +274,7 @@ export class Match {
     // Size the camera to the map and the current viewport, then restore a carried view or center on home.
     this._timeInit("match.bounds", () => {
       this.applyBounds();
-      if (options.initialCamera) this.camera.setView(options.initialCamera);
+      if (options.initialCamera) restoreInitialCameraView(this.camera, options.initialCamera);
       else this.centerOnHome();
     });
 
@@ -999,12 +1000,8 @@ export class Match {
   /** Compute world/viewport sizes and push them into the camera. */
   applyBounds() {
     const { width, height, tileSize } = this.state.map;
-    this.camera.setBounds(
-      width * tileSize,
-      height * tileSize,
-      dom.viewport.clientWidth,
-      dom.viewport.clientHeight,
-    );
+    this.camera.setMapBounds(width * tileSize, height * tileSize);
+    this.camera.resize(dom.viewport.clientWidth, dom.viewport.clientHeight);
   }
 
   /** Center the camera on this player's own starting tile (City Centre location). */
@@ -1013,13 +1010,13 @@ export class Match {
     const ts = this.state.map.tileSize;
     if (me) {
       // +0.5 so we center on the middle of the start tile, not its corner.
-      this.camera.centerOn((me.startTileX + 0.5) * ts, (me.startTileY + 0.5) * ts);
+      this.camera.focusAt({ x: (me.startTileX + 0.5) * ts, y: (me.startTileY + 0.5) * ts });
     } else {
       // Defensive fallback: center on the map if our player isn't listed.
-      this.camera.centerOn(
-        (this.state.map.width * ts) / 2,
-        (this.state.map.height * ts) / 2,
-      );
+      this.camera.focusAt({
+        x: (this.state.map.width * ts) / 2,
+        y: (this.state.map.height * ts) / 2,
+      });
     }
   }
 
@@ -1033,20 +1030,17 @@ export class Match {
   }
 
   cameraView() {
-    return {
-      x: this.camera?.x,
-      y: this.camera?.y,
-      zoom: this.camera?.zoom,
-    };
+    return this.camera?.snapshot?.() || null;
   }
 
   cameraWorldBounds() {
-    const zoom = this.camera?.zoom || 1;
+    const bounds = this.camera?.viewportGroundBounds?.();
+    if (!bounds) return null;
     return {
-      x: this.camera?.x || 0,
-      y: this.camera?.y || 0,
-      width: (this.camera?.viewW || 0) / zoom,
-      height: (this.camera?.viewH || 0) / zoom,
+      x: bounds.minX,
+      y: bounds.minY,
+      width: bounds.maxX - bounds.minX,
+      height: bounds.maxY - bounds.minY,
     };
   }
 
@@ -1150,13 +1144,11 @@ export class Match {
   }
 
   pointInViewport(x, y, marginPx = 0) {
-    const zoom = this.camera.zoom || 1;
-    const margin = marginPx / zoom;
-    const left = this.camera.x - margin;
-    const top = this.camera.y - margin;
-    const right = this.camera.x + this.camera.viewW / zoom + margin;
-    const bottom = this.camera.y + this.camera.viewH / zoom + margin;
-    return x >= left && x <= right && y >= top && y <= bottom;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    return this.camera.containsProjected(
+      { x, y, heightPx: 0 },
+      Number.isFinite(marginPx) && marginPx >= 0 ? marginPx : 0,
+    );
   }
 
   playAttackSound(ev) {

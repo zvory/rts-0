@@ -78,6 +78,8 @@ try {
   assert.deepEqual({ width: capture.image.width, height: capture.image.height }, { width: 1000, height: 700 }, "capture matches the requested viewport dimensions");
   assert.ok(fs.existsSync(capture.pngPath) && fs.existsSync(capture.manifestPath), "capture writes bounded PNG and manifest artifacts");
   const manifest = JSON.parse(fs.readFileSync(capture.manifestPath, "utf8"));
+  assert.equal(manifest.schemaVersion, 2, "screenshot manifest versions the semantic camera shape");
+  assert.equal(manifest.camera?.version, 1, "screenshot manifest records CameraSnapshotV1");
   assert.equal(manifest.authoritative.tick, capture.readiness.snapshotTick, "manifest records authoritative capture tick");
   assert.deepEqual(manifest.errors.page, [], "manifest records no uncaught page errors");
   assert.deepEqual(manifest.errors.frame, [], "manifest records no frame-loop errors");
@@ -99,7 +101,11 @@ try {
   assert.equal(afterOrder.entities[0]?.id, secondId, "normal issueCommandAs order leaves the unit observable");
 
   const camera = await driver.camera({ action: "focus", entityIds: [firstId, secondId] });
-  assert.ok(Number.isFinite(camera.camera.x) && Number.isFinite(camera.camera.zoom), "camera focus returns bounded camera state");
+  assert.ok(
+    camera.camera.version === 1 && Number.isFinite(camera.camera.focus?.x) &&
+      Number.isFinite(camera.camera.framingScale),
+    "camera focus returns bounded CameraSnapshotV1 state",
+  );
   const twoEntityCapture = await driver.screenshot({
     sessionId: `lab_${"a".repeat(32)}`,
     name: "driver-smoke-pair",

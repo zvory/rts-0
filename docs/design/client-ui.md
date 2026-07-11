@@ -569,10 +569,13 @@ export function labInteractLaunchEnabled(locationLike?)
 `App` composes this bridge only when the `/lab` URL includes `labInteract=1`. Its global surface is a
 frozen `{version, status, call}` object; it never returns `App`, `Match`, `Net`, `Renderer`, or
 `GameState`. Calls delegate through existing `LabClient`, normal `issueCommandAs`, room-time,
-camera, and `GameState` projection seams. Catalog includes the mirrored command and ability ids;
+semantic camera, and `GameState` projection seams. Catalog includes the mirrored command and ability ids;
 inspection can restrict results to the current camera viewport, while camera focus accepts bounded
 padding, defaults to a close 32-world-pixel frame for readable single-unit captures (and retains
-48 world pixels for multi-subject and non-unit framing), and returns world bounds. Setup mutations
+48 world pixels for multi-subject and non-unit framing), and returns `CameraSnapshotV1` plus
+semantic CSS viewport and ground bounds. Camera set accepts only `CameraSnapshotV1`; status,
+readiness, screenshot manifest v2, recording manifest v2, and fixed-capture manifest v2 carry the
+same versioned shape. The bridge surface version is 3. Setup mutations
 wait for the server's immediate authoritative snapshot without advancing paused simulation. Order
 calls also wait for a new snapshot and request one bounded tick when paused so the queued command is
 consumed before success.
@@ -1016,7 +1019,7 @@ export class Camera {
   snapshot(), restore(snapshotOrLegacy), projectionSnapshot()
   audioListener(), subscribe(listener) -> unsubscribe
 
-  // Temporary orthographic compatibility edge through camera migration.
+  // Private orthographic compatibility used only by Camera and named Pixi adapters.
   x, y, zoom                             // world coords of viewport top-left, framing scale
   update(dt, input)                      // apply pan (keys/edge/virtual pointer-lock cursor) & clamp
   worldToScreen(wx, wy) -> {x,y}
@@ -1179,7 +1182,7 @@ export class Audio {
                                            // x/y present -> StereoPanner + lowpass + distance gain
   playUI(id, opts)                        // non-spatial ui category convenience
   stopByKey(key) -> number                // stop tagged active voices, for sustained/abortable cues
-  setListener(x, y, zoom, viewW?)          // camera center in world px; derives screen-width refDist
+  setListener({x,y,referenceDistancePx})   // consumes semantic AudioListenerV1
   pickVariant(ids) -> id|null             // seeded RNG variant choice
   setMasterVolume(v), getMasterVolume()
   setCategoryVolume(cat, v), getCategoryVolume(cat)

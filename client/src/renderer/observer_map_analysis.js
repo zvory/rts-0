@@ -188,7 +188,7 @@ function drawLabel(renderer, id, text, x, y, color, camera, seen) {
   label.visible = true;
   label.alpha = 0.96;
   label.position?.set?.(x, y);
-  label.scale?.set?.(labelScaleForCamera(camera));
+  label.scale?.set?.(labelScaleForCamera(camera, x, y));
   seen.add(id);
 }
 
@@ -217,7 +217,11 @@ function drawHitArea(renderer, id, primitive, tileSize, lineWidth, camera, seen)
   hit._observerTooltipX = tooltipX(primitive, tileSize);
   hit._observerTooltipY = tooltipY(primitive, tileSize);
   hit._observerTooltipColor = primitive.color || primitive.stroke || primitive.fill || "#e7dfc5";
-  hit._observerTooltipScale = labelScaleForCamera(camera);
+  hit._observerTooltipScale = labelScaleForCamera(
+    camera,
+    hit._observerTooltipX,
+    hit._observerTooltipY,
+  );
 
   const color = hexToInt(hit._observerTooltipColor, DEFAULT_MARKER_COLOR);
   if (primitive.kind === "tileRect") {
@@ -259,7 +263,9 @@ function hideTooltip(renderer) {
 
 function rescaleTooltip(renderer, camera) {
   const tooltip = renderer?._observerMapAnalysisTooltip;
-  if (tooltip?.visible) tooltip.scale?.set?.(labelScaleForCamera(camera));
+  if (tooltip?.visible) {
+    tooltip.scale?.set?.(labelScaleForCamera(camera, tooltip.position?.x, tooltip.position?.y));
+  }
 }
 
 function sweepLabels(pool, layer, seen) {
@@ -440,11 +446,16 @@ function clamp(value, min, max) {
 }
 
 function lineWidthForCamera(camera) {
-  const zoom = finiteNumber(camera?.zoom) && camera.zoom > 0 ? camera.zoom : 1;
-  return clamp(2 / zoom, 0.75, 3);
+  const focus = camera?.snapshot?.()?.focus;
+  return clamp(2 / projectionScaleAt(camera, focus?.x, focus?.y), 0.75, 3);
 }
 
-function labelScaleForCamera(camera) {
-  const zoom = finiteNumber(camera?.zoom) && camera.zoom > 0 ? camera.zoom : 1;
-  return clamp(1 / zoom, 0.5, 1.5);
+function labelScaleForCamera(camera, x, y) {
+  return clamp(1 / projectionScaleAt(camera, x, y), 0.5, 1.5);
+}
+
+function projectionScaleAt(camera, x, y) {
+  if (!finiteNumber(x) || !finiteNumber(y)) return 1;
+  const extent = camera?.projectedExtent?.({ x, y, heightPx: 0 }, 1, 1);
+  return finiteNumber(extent?.scaleX) && extent.scaleX > 0 ? extent.scaleX : 1;
 }

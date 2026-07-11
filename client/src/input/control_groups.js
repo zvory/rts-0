@@ -76,11 +76,23 @@ function controlGroupsEnabled(state) {
 export function _jumpToControlGroupCluster(slot) {
   const entities = this.state.controlGroupEntities(slot);
   if (entities.length === 0) return false;
-  const viewW = this.camera.viewW / this.camera.zoom;
-  const viewH = this.camera.viewH / this.camera.zoom;
+  const projection = this.camera.projectionSnapshot?.();
+  const cameraSnapshot = projection?.camera;
+  const viewport = projection?.viewport;
+  const focus = cameraSnapshot?.focus;
+  const projectedPixel = projection?.projectedExtent?.(
+    { x: focus?.x, y: focus?.y, heightPx: 0 },
+    1,
+    1,
+  );
+  const viewW = viewport?.widthCssPx / projectedPixel?.scaleX;
+  const viewH = viewport?.heightCssPx / projectedPixel?.scaleY;
   if (!Number.isFinite(viewW) || !Number.isFinite(viewH) || viewW <= 0 || viewH <= 0) {
     return false;
   }
+  const currentX = focus?.x;
+  const currentY = focus?.y;
+  if (!Number.isFinite(currentX) || !Number.isFinite(currentY)) return false;
 
   const lefts = [];
   const tops = [];
@@ -102,8 +114,8 @@ export function _jumpToControlGroupCluster(slot) {
         contained,
         left + viewW / 2,
         top + viewH / 2,
-        this.camera.x + viewW / 2,
-        this.camera.y + viewH / 2,
+        currentX,
+        currentY,
       );
       if (!best || _controlGroupScoreBeats(score, best.score)) {
         best = { left, top, score };
@@ -112,7 +124,7 @@ export function _jumpToControlGroupCluster(slot) {
   }
 
   if (!best) return false;
-  this.camera.centerOn(best.left + viewW / 2, best.top + viewH / 2);
+  this.camera.focusAt({ x: best.left + viewW / 2, y: best.top + viewH / 2 });
   return true;
 }
 

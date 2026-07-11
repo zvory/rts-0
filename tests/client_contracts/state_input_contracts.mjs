@@ -1369,26 +1369,6 @@ function buttonByLabel(card, label) {
   assert(menuClosed === 1, "Esc closes the worker build submenu first");
   assert(selectionCleared === 0, "Esc returning to worker commands does not clear selection");
 
-  const clusterInput = Object.create(Input.prototype);
-  let centered = null;
-  clusterInput.camera = {
-    viewW: 100,
-    viewH: 100,
-    zoom: 1,
-    x: 0,
-    y: 0,
-    centerOn(x, y) { centered = { x, y }; },
-  };
-  clusterInput.state = {
-    controlGroupEntities: () => [
-      { id: 1, x: 0, y: 0 },
-      { id: 2, x: 20, y: 0 },
-      { id: 3, x: 500, y: 500 },
-    ],
-  };
-  assert(clusterInput._jumpToControlGroupCluster(0) === true, "control-group double-tap jumps to a cluster");
-  assert(centered.x < 100 && centered.y < 100, "control-group jump chooses the dense cluster, not the all-entity centroid");
-
   const ownBuilding = {
     id: 31,
     owner: 1,

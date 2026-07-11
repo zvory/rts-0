@@ -608,7 +608,9 @@ export class App {
   takeMatchCameraView() {
     if (!this.match || typeof this.match.cameraView !== "function") return null;
     const view = this.match.cameraView();
-    return Number.isFinite(view?.x) && Number.isFinite(view?.y) && Number.isFinite(view?.zoom)
+    return view?.version === 1 && view?.boundsPolicy === "mapOverscroll" &&
+      Number.isFinite(view?.focus?.x) && Number.isFinite(view?.focus?.y) &&
+      Number.isFinite(view?.framingScale) && view.framingScale > 0
       ? view
       : null;
   }

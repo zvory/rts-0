@@ -138,8 +138,8 @@ assert(
   assertHasMethod(audio, "preload", "Audio");
   assertHasMethod(audio, "setListener", "Audio");
   assertHasMethod(audio, "pickVariant", "Audio");
-  audio.setListener(100, 100, 2, 800);
-  assertApprox(audio.listener.refDist, 400, 0.001, "Audio listener refDist derives from zoom");
+  audio.setListener({ x: 100, y: 100, referenceDistancePx: 400 });
+  assertApprox(audio.listener.refDist, 400, 0.001, "Audio listener consumes semantic reference distance");
 
   const near = audio._computeSpatial(300, 100);
   assert(near !== null, "Audio spatial near emitter should play");

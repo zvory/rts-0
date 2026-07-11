@@ -6,6 +6,15 @@ const VISUAL_PROFILE_ERROR_MESSAGES = Object.freeze({
   unknown: "Unknown visualProfile.",
 });
 
+function cameraSnapshot(focusX, focusY, framingScale) {
+  return Object.freeze({
+    version: 1,
+    focus: Object.freeze({ x: focusX, y: focusY }),
+    framingScale,
+    boundsPolicy: "mapOverscroll",
+  });
+}
+
 const TRENCH_VARIANTS_1_STATIC_SAMPLES = Object.freeze([
   Object.freeze({
     id: "trench-a-basin",
@@ -178,47 +187,47 @@ const VISUAL_PROFILE_ENTRIES = Object.freeze([
     id: "trench-variants-1",
     label: "Trench variants 1",
     description: "Checked-in profile for comparing empty and occupied entrenchment visuals.",
-    initialCamera: Object.freeze({ x: 960, y: 690, zoom: 0.9 }),
+    initialCamera: cameraSnapshot(960, 690, 0.9),
     staticSamples: TRENCH_VARIANTS_1_STATIC_SAMPLES,
   }),
   Object.freeze({
     id: "unit-rig-overrides-1",
     label: "Unit rig overrides 1",
     description: "Local checked-in profile for comparing real Tank rig candidates in the render-preview lab scenario.",
-    initialCamera: Object.freeze({ x: 2040, y: 1950, zoom: 0.9 }),
+    initialCamera: cameraSnapshot(2040, 1950, 0.9),
     unitOverrides: UNIT_RIG_OVERRIDES_1,
   }),
   Object.freeze({
     id: "rifleman-recoil-strip-1",
     label: "Rifleman recoil strip 1",
     description: "Local checked-in profile for previewing Rifleman firing recoil frames in the render-preview lab scenario.",
-    initialCamera: Object.freeze({ x: 2050, y: 1930, zoom: 2.1 }),
+    initialCamera: cameraSnapshot(2050, 1930, 2.1),
     frameStripOverrides: RIFLEMAN_RECOIL_FRAME_STRIP_OVERRIDES_1,
   }),
   Object.freeze({
     id: "panzerfaust-long-preview-1",
     label: "Panzerfaust long preview 1",
     description: "Local checked-in profile for previewing the generated long Panzerfaust carrier in the render-preview lab scenario.",
-    initialCamera: Object.freeze({ x: 2060, y: 2225, zoom: 2.25 }),
+    initialCamera: cameraSnapshot(2060, 2225, 2.25),
     frameStripOverrides: PANZERFAUST_LONG_FRAME_STRIP_OVERRIDES_1,
   }),
   Object.freeze({
     id: "scout-car-png-1",
     label: "Scout car PNG 1",
     description: "Local checked-in profile for previewing the Scout Car PNG body and rear machine gun in the render-preview lab scenario.",
-    initialCamera: Object.freeze({ x: 2052, y: 1874, zoom: 2.4 }),
+    initialCamera: cameraSnapshot(2052, 1874, 2.4),
   }),
   Object.freeze({
     id: "mortar-png-1",
     label: "Mortar PNG 1",
     description: "Local checked-in profile for previewing the wheeled Mortar Team PNG carriage/tube atlas in the render-preview lab scenario.",
-    initialCamera: Object.freeze({ x: 2052, y: 1952, zoom: 2.5 }),
+    initialCamera: cameraSnapshot(2052, 1952, 2.5),
   }),
   Object.freeze({
     id: "scout-plane-fw189-pass-01",
     label: "Scout Plane Fw 189 pass 01",
     description: "Local profile for previewing the generated detailed Fw 189 Scout Plane PNG with team tint in the render-preview lab scenario.",
-    initialCamera: Object.freeze({ x: 2050, y: 1730, zoom: 2.8 }),
+    initialCamera: cameraSnapshot(2050, 1730, 2.8),
     frameStripOverrides: SCOUT_PLANE_FW189_FRAME_STRIP_OVERRIDES_1,
   }),
 ]);

@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Depends On
 
@@ -61,11 +61,11 @@ selection semantics change.
 
 ## Implementation Checklist
 
-- [ ] Migrate audio, viewport alerts, and control groups.
-- [ ] Migrate app/replay/profile/carryover and Lab manifests/focus.
-- [ ] Migrate observer/visual-sample/profiler/diagnostic consumers.
-- [ ] Close the raw-read ratchet with no shared consumer exception.
-- [ ] Update durable docs/ledger and mark this phase done.
+- [x] Migrate audio, viewport alerts, and control groups.
+- [x] Migrate app/replay/profile/carryover and Lab manifests/focus.
+- [x] Migrate observer/visual-sample/profiler/diagnostic consumers.
+- [x] Close the raw-read ratchet with no shared consumer exception.
+- [x] Update durable docs/ledger and mark this phase done.
 
 ## Verification
 

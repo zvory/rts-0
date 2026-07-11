@@ -1,0 +1,53 @@
+// Semantic camera contracts for control-group double-tap framing.
+
+import { _jumpToControlGroupCluster } from "../../client/src/input/control_groups.js";
+import { assert, assertApprox } from "./assertions.mjs";
+
+function createHarness(entities, { focus = { x: 50, y: 50 }, clippedBounds = null } = {}) {
+  let centered = null;
+  const input = {
+    camera: {
+      projectionSnapshot: () => ({
+        camera: { version: 1, focus, framingScale: 1, boundsPolicy: "mapOverscroll" },
+        viewport: { widthCssPx: 100, heightCssPx: 100 },
+        projectedExtent: () => ({ width: 1, height: 1, scaleX: 1, scaleY: 1, visible: true }),
+      }),
+      viewportGroundBounds: () => clippedBounds,
+      focusAt(point) { centered = point; },
+    },
+    state: { controlGroupEntities: () => entities },
+  };
+  return { input, centered: () => centered };
+}
+
+{
+  const harness = createHarness([
+    { id: 1, x: 0, y: 0 },
+    { id: 2, x: 20, y: 0 },
+    { id: 3, x: 500, y: 500 },
+  ]);
+  assert(_jumpToControlGroupCluster.call(harness.input, 0), "control-group double-tap jumps to a cluster");
+  assert(
+    harness.centered().x < 100 && harness.centered().y < 100,
+    "control-group jump chooses the dense cluster, not the all-entity centroid",
+  );
+}
+
+{
+  const harness = createHarness([
+    { id: 1, x: 1, y: 1 },
+    { id: 2, x: 99, y: 1 },
+  ], {
+    focus: { x: 25, y: 25 },
+    clippedBounds: { minX: 0, minY: 0, maxX: 75, maxY: 75 },
+  });
+  assert(_jumpToControlGroupCluster.call(harness.input, 0), "control-group framing works during camera overscroll");
+  assertApprox(
+    harness.centered().x,
+    49,
+    0.001,
+    "control-group framing uses the full projected viewport, not clipped map bounds",
+  );
+}
+
+console.log("✅ control_group_camera_contracts.mjs: semantic control-group framing passed");

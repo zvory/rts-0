@@ -7,7 +7,10 @@ import {
   assertHasMethod,
 } from "./assertions.mjs";
 import { Camera } from "../../client/src/camera.js";
-import { selectInitialCameraView } from "../../client/src/camera_view_selection.js";
+import {
+  restoreInitialCameraView,
+  selectInitialCameraView,
+} from "../../client/src/camera_view_selection.js";
 import { CAMERA } from "../../client/src/config.js";
 import { Fog } from "../../client/src/fog.js";
 import { KIND, TERRAIN } from "../../client/src/protocol.js";
@@ -73,10 +76,16 @@ import { KIND, TERRAIN } from "../../client/src/protocol.js";
 }
 
 {
-  const currentView = { x: 1, y: 2, zoom: 1 };
-  const pendingView = { x: 3, y: 4, zoom: 1 };
-  const visualProfileView = { x: 5, y: 6, zoom: 0.9 };
-  const scenarioView = { centerX: 7, centerY: 8 };
+  const snapshot = (x, y, framingScale = 1) => ({
+    version: 1,
+    focus: { x, y },
+    framingScale,
+    boundsPolicy: "mapOverscroll",
+  });
+  const currentView = snapshot(1, 2);
+  const pendingView = snapshot(3, 4);
+  const visualProfileView = snapshot(5, 6, 0.9);
+  const scenarioView = { centerX: 70, centerY: 80 };
   assert(
     selectInitialCameraView({
       currentView,
@@ -97,6 +106,28 @@ import { KIND, TERRAIN } from "../../client/src/protocol.js";
   assert(
     selectInitialCameraView({ scenarioView }) === scenarioView,
     "scenario camera is used as the lab launch default",
+  );
+
+  const camera = new Camera(100, 80, { minZoom: 0.01, maxZoom: 16 });
+  camera.setMapBounds(1_000, 1_000);
+  assert(
+    restoreInitialCameraView(camera, scenarioView),
+    "server-owned scenario camera center normalizes through the semantic snapshot edge",
+  );
+  assertApprox(camera.snapshot().focus.x, 70, 0.001, "scenario center restores semantic focus x");
+  assertApprox(camera.snapshot().focus.y, 80, 0.001, "scenario center restores semantic focus y");
+
+  assert(
+    restoreInitialCameraView(camera, { centerX: 400, centerY: 500, zoom: 2 }),
+    "legacy centered launch views still restore through the semantic camera edge",
+  );
+  assertApprox(camera.snapshot().focus.x, 400, 0.001, "legacy center restores semantic focus x");
+  assertApprox(camera.snapshot().focus.y, 500, 0.001, "legacy center restores semantic focus y");
+  assertApprox(camera.snapshot().framingScale, 2, 0.001, "legacy center preserves its requested zoom");
+
+  assert(
+    !restoreInitialCameraView(camera, { centerX: null, centerY: null }),
+    "non-numeric centers do not coerce to a valid semantic launch view",
   );
 }
 
