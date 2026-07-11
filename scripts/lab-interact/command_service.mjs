@@ -897,8 +897,12 @@ async function resolveEntityReferences(session, references) {
     entries.push({ input: reference, id, alias: reference }); requestedIds.push(id);
   }
   if (new Set(requestedIds).size !== requestedIds.length) throw new LabInteractError("duplicateReference", "A command may not resolve the same entity twice.");
-  const existing = await session.driver.inspect({ ids: [...new Set(requestedIds)], limit: requestedIds.length });
-  const found = new Set((existing.entities || []).map((entity) => entity.id));
+  const found = new Set();
+  for (let offset = 0; offset < requestedIds.length; offset += LAB_INTERACT_LIMITS.maxInspectRefs) {
+    const ids = requestedIds.slice(offset, offset + LAB_INTERACT_LIMITS.maxInspectRefs);
+    const existing = await session.driver.inspect({ ids, limit: ids.length });
+    for (const entity of existing.entities || []) found.add(entity.id);
+  }
   for (const entry of entries) {
     if (found.has(entry.id)) continue;
     if (entry.alias) session.aliases.delete(entry.alias);

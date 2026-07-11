@@ -11,18 +11,23 @@ import { LabInteractDriverError } from "../scripts/lab-interact/driver.mjs";
 import { openLabInteractDriver } from "./fixtures/lab_interact_fake_driver.mjs";
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-const calls = { spawn: 0, update: 0, remove: 0 };
+const calls = { spawn: 0, update: 0, remove: 0, inspectSizes: [] };
 const service = new LabInteractService({
   workspaceRoot: root,
   driverFactory: async (options) => {
     const driver = await openLabInteractDriver(options);
-    for (const method of Object.keys(calls)) {
+    for (const method of ["spawn", "update", "remove"]) {
       const original = driver[method].bind(driver);
       driver[method] = async (...args) => {
         calls[method] += 1;
         return original(...args);
       };
     }
+    const inspect = driver.inspect.bind(driver);
+    driver.inspect = async (query) => {
+      calls.inspectSizes.push(query?.ids?.length || 0);
+      return inspect(query);
+    };
     return driver;
   },
 });
@@ -60,6 +65,31 @@ assert.equal(calls.update, 2, "legacy singular update normalizes to one plural d
 
 await service.execute("remove", { sessionId, refs: spawned.results.map((entry) => entry.id) });
 assert.equal(calls.remove, 1, "command service dispatches a bulk remove once");
+
+const largeSpawn = await service.execute("spawn", {
+  sessionId,
+  spawns: Array.from({ length: 400 }, (_, index) => ({
+    owner: index % 2 + 1,
+    kind: "rifleman",
+    x: 100 + index * 32,
+    y: 300,
+  })),
+});
+const largeIds = largeSpawn.results.map((entry) => entry.id);
+await service.execute("update", {
+  sessionId,
+  updates: largeIds.map((id, index) => ({
+    operation: "move",
+    entity: id,
+    x: 200 + index * 32,
+    y: 400,
+  })),
+});
+await service.execute("remove", { sessionId, refs: largeIds });
+assert.equal(calls.update, 3, "a 400-item update still dispatches one mutation request");
+assert.equal(calls.remove, 2, "a 400-item remove still dispatches one mutation request");
+assert.ok(Math.max(...calls.inspectSizes) <= LAB_INTERACT_LIMITS.maxInspectRefs,
+  "bulk reference resolution respects the bridge inspect bound");
 
 assert.equal(LAB_INTERACT_LIMITS.maxMutationBatch, 400, "mutation batch authority is 400");
 assert.doesNotThrow(() => validateCommandInput("spawn", {
