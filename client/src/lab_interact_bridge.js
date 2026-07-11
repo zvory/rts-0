@@ -203,7 +203,7 @@ export class LabInteractBridge {
     const updates = input.updates.map((value, index) => normalizeBridgeUpdate(value, index));
     const result = await this.mutate(
       () => labClient.applyUpdates(updates),
-      (outcome) => batchOutcomes(outcome).every((item) => this.outcomeObserved(item?.outcome)),
+      (outcome) => batchOutcomes(outcome).every((item) => this.outcomeMatchesProjection(item?.outcome)),
     );
     return { result: projectLabResult(result) };
   }
@@ -442,25 +442,18 @@ export class LabInteractBridge {
     return { ...result, snapshotTick: match.state.tick };
   }
 
-  entityAt(entityId, x, y) {
-    const entity = this.app.match.state.entityById(entityId);
-    return !!entity && Math.abs(entity.x - x) < 0.01 && Math.abs(entity.y - y) < 0.01;
-  }
-
-  playerResourcesMatch(playerId, steel, oil) {
-    const row = this.app.match.state.playerResources.find((player) => Number(player?.id) === playerId);
-    return row?.steel === steel && row?.oil === oil;
-  }
-
-  outcomeObserved(outcome) {
+  outcomeMatchesProjection(outcome) {
     if (Number.isInteger(outcome?.entityId) && Number.isFinite(outcome?.x) && Number.isFinite(outcome?.y)) {
-      return this.entityAt(outcome.entityId, outcome.x, outcome.y);
+      const entity = this.app.match.state.entityById(outcome.entityId);
+      return !entity || (Math.abs(entity.x - outcome.x) < 0.01 && Math.abs(entity.y - outcome.y) < 0.01);
     }
     if (Number.isInteger(outcome?.entityId) && Number.isInteger(outcome?.owner)) {
-      return this.app.match.state.entityById(outcome.entityId)?.owner === outcome.owner;
+      const entity = this.app.match.state.entityById(outcome.entityId);
+      return !entity || entity.owner === outcome.owner;
     }
     if (Number.isInteger(outcome?.playerId) && Number.isInteger(outcome?.steel) && Number.isInteger(outcome?.oil)) {
-      return this.playerResourcesMatch(outcome.playerId, outcome.steel, outcome.oil);
+      const row = this.app.match.state.playerResources.find((player) => Number(player?.id) === outcome.playerId);
+      return !row || (row.steel === outcome.steel && row.oil === outcome.oil);
     }
     if (Number.isInteger(outcome?.playerId) && typeof outcome?.enabled === "boolean") {
       return this.app.labClient.state?.godModePlayers?.includes(outcome.playerId) === outcome.enabled;

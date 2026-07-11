@@ -58,7 +58,9 @@ const labClient = {
   async applyUpdates(updates) {
     calls.push({ op: "applyUpdates", updates });
     for (const update of updates) {
-      if (update.operation === "move") Object.assign(entities.get(update.entityId), { x: update.x, y: update.y });
+      if (update.operation === "move" && entities.has(update.entityId)) {
+        Object.assign(entities.get(update.entityId), { x: update.x, y: update.y });
+      }
     }
     state.currRecvTime += 1;
     return {
@@ -131,11 +133,22 @@ entities.delete(3);
 
 await bridge.update({
   updates: [
+    { operation: "move", entityId: 99, x: 800, y: 800 },
+  ],
+});
+assert.equal(
+  calls.filter((call) => call.op === "applyUpdates").length,
+  1,
+  "authoritative updates hidden by the active fog projection do not time out",
+);
+
+await bridge.update({
+  updates: [
     { operation: "move", entityId: 1, x: 200, y: 100 },
     { operation: "move", entityId: 2, x: 100, y: 100 },
   ],
 });
-assert.equal(calls.filter((call) => call.op === "applyUpdates").length, 1, "bridge sends one plural update request");
+assert.equal(calls.filter((call) => call.op === "applyUpdates").length, 2, "bridge sends one browser request per plural update");
 assert.equal(entities.get(1).x, 200, "bridge waits for the whole observed update batch");
 
 await bridge.remove({ entityIds: [1, 2] });
