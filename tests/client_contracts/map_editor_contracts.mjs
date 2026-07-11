@@ -175,6 +175,25 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
 
 {
   const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 125, playerCount: 2 });
+  const layoutId = session.selectedLayoutId;
+  const before = session.exportMap();
+  let result = null;
+  assert.equal(session.mutate("Rejected centre collision", (draft) => {
+    result = moveSymmetricDraftBase(draft, {
+      kind: "main",
+      playerIndex: 0,
+      tile: { x: 62, y: 62 },
+      layoutId,
+      symmetry: MAP_EDITOR_SYMMETRY.RADIAL,
+    });
+  }), false, "a symmetric move rejects duplicate destination tiles without corrupting the draft");
+  assert.match(result.error, /multiple bases on the same tile/);
+  assert.deepEqual(session.exportMap(), before, "a rejected symmetric move leaves every base unchanged");
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
   session.initializeBlank({ size: 32, playerCount: 2 });
   const start = session.playerSlots()[0].start;
   session.beginTerrainStroke();
