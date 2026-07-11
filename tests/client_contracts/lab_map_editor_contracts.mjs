@@ -315,6 +315,52 @@ await withFakeDocument(async () => {
   panel.destroy();
 });
 
+await withFakeDocument(async () => {
+  const root = document.createElement("div");
+  const session = new LabMapEditorSession({ storage: null });
+  const submittedDrafts = [];
+  const terrainPreviews = [];
+  let finishRestart;
+  const restartResult = new Promise((resolve) => { finishRestart = resolve; });
+  const panel = new LabMapEditorPanel({
+    root,
+    session,
+    labClient: {
+      exportScenario: async () => ({ ok: false }),
+      applyMapDraft: async (draft) => {
+        submittedDrafts.push(draft);
+        return restartResult;
+      },
+    },
+    match: { armLabTool() {} },
+    startPayload: startPayload(),
+    applyLabMapReset: () => true,
+    setLabMapDraftTerrainPreview: (draft) => terrainPreviews.push(draft),
+    fetchImpl: null,
+  });
+
+  session.mutate("submitted paint", (draft) => {
+    paintDraftRect(draft, { x0: 0, y0: 0, x1: 0, y1: 0 }, TERRAIN.WATER);
+  });
+  const pendingRestart = panel.restartTestWithDraft();
+  session.mutate("newer paint", (draft) => {
+    paintDraftRect(draft, { x0: 1, y0: 0, x1: 1, y1: 0 }, TERRAIN.ROCK);
+  });
+  const previewsBeforeRestartFinished = terrainPreviews.length;
+  finishRestart({ ok: true, outcome: { battleReset: true } });
+  await pendingRestart;
+
+  assert.equal(submittedDrafts[0].terrain[1], TERRAIN.GRASS, "the restart submits the pre-edit draft");
+  assert.equal(session.materialized().terrain[1], TERRAIN.ROCK, "the in-flight edit remains in the draft");
+  assert.equal(session.hasUnappliedChanges, true, "an in-flight edit is not marked as tested");
+  assert(
+    terrainPreviews.length > previewsBeforeRestartFinished,
+    "the newer preview is republished after the authoritative renderer reset",
+  );
+  assert.equal(terrainPreviews.at(-1).terrain[1], TERRAIN.ROCK);
+  panel.destroy();
+});
+
 {
   const liveMap = {
     width: 32,

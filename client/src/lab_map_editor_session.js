@@ -185,10 +185,14 @@ export class LabMapEditorSession {
     return !!this.draft && draftFingerprint(this.draft, this.selectedLayoutId) !== this.testedDraftFingerprint;
   }
 
-  /** Mark the current authored draft and selected layout as the map currently under test. */
-  markCurrentDraftAsTested({ notify = true } = {}) {
-    if (!this.draft) return false;
-    this.testedDraftFingerprint = draftFingerprint(this.draft, this.selectedLayoutId);
+  /** Mark an authored draft and selected layout as the map currently under test. */
+  markCurrentDraftAsTested({
+    notify = true,
+    draft = this.draft,
+    selectedLayoutId = this.selectedLayoutId,
+  } = {}) {
+    if (!draft) return false;
+    this.testedDraftFingerprint = draftFingerprint(draft, selectedLayoutId);
     if (notify) this.notify("tested");
     return true;
   }
