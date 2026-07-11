@@ -1,4 +1,4 @@
-# Phase 1 - Beta Performance-Autostop Canary
+# Phase 1 - Build and Try It on Beta
 
 ## Phase Status
 
@@ -6,114 +6,52 @@
 
 ## Objective
 
-Prove that beta can use a stopped `performance-1x` Machine economically and reliably before any
-launcher or mainline work depends on that assumption. This phase owns channel-specific Fly config,
-beta-only resource/autostop configuration, a repeatable cold-start measurement path, and preserved
-canary evidence. Mainline must remain on its current configuration throughout this phase.
-
-## Preconditions and Approval Gate
-
-- Recheck current `ewr` pricing for `performance-1x`/2 GB and stopped rootfs.
-- Confirm the beta app has no active human, spectator, replay, lab, or headless AI room before any
-  deploy, stop, or resize.
-- Obtain explicit user approval immediately before applying the cost-bearing beta Machine change.
-- Record the beta and mainline `/version` values before the canary so channel isolation can be
-  verified afterward.
+Implement the complete simple workflow and try it on beta before touching mainline.
 
 ## Work
 
-- Introduce channel-specific Fly configuration selected explicitly by `deploy.sh`:
-  - beta: `performance-1x`, 2 GB, `auto_stop_machines = "stop"`, autostart enabled, minimum `0`
-  - mainline: preserve its current remote size and always-on lifecycle in this phase
-- Keep shared environment settings in one source where practical, but make the channel distinction
-  reviewable in Git. A beta deploy must not silently rewrite mainline lifecycle policy, and vice
-  versa.
-- Preserve `kill_signal = "SIGINT"` and the bounded shutdown timeout.
-- Add a narrow readiness endpoint only if `/version` plus a WebSocket-open probe cannot distinguish
-  process start from actual readiness. Do not expose secrets, database state, room contents, or
-  privileged diagnostics.
-- Add a bounded operator harness that:
-  - verifies beta is stopped before each sample
-  - requests the beta readiness URL and records request-to-ready time
-  - opens a real WebSocket and records request-to-WS-open time
-  - records build id, Machine id/state transition, region, and failure reason
-  - repeats at least ten clean samples without an unbounded stream
-  - writes ignored artifacts under `target/` rather than committing volatile results
-- Measure server boot components when the result exceeds the target, especially image availability,
-  process start, database/migration connection, readiness, and proxy recognition.
-- Run an active-connection soak for at least 30 minutes and confirm the single Machine remains
-  started throughout.
-- Close all clients and confirm the Machine stops after Fly's idle evaluation. Verify the no-room
-  shutdown path finalizes quickly instead of consuming most of the 295-second timeout.
-- Verify a stopped beta restarts from direct lobby, match-launch, replay, spectator, and lab entry
-  URLs without losing their query parameters.
-- Preserve a compact canary summary under `docs/` only when it is stable operational evidence;
-  raw samples stay ignored.
-- Update deployment documentation with beta canary commands, rollback, pricing observation, and
-  the headless-AI caveat.
+- Add explicit beta and mainline Fly configs. Leave mainline's deployed lifecycle unchanged during
+  this phase; configure beta as `performance-1x`/2 GB with autostart, clean autostop, and zero
+  minimum running Machines.
+- Update `deploy.sh` so each channel always selects its own config and cannot silently apply the
+  other channel's size or lifecycle.
+- Add a tiny always-on launcher with fixed beta and mainline buttons and plain startup status. It
+  may contact only the two hard-coded game origins and must preserve the destination path and query.
+- Redirect when the selected server is responsive. Do not invent detailed readiness states or make
+  startup-time promises.
+- Add a short bounded initial WebSocket retry in the game client. Keep one active socket and avoid
+  duplicate automatic joins or leaked retry timers.
+- Keep direct game URLs working.
+- Document the launcher, beta lifecycle, headless-AI limitation, and exact rollback commands.
 
-## Expected Touch Points
+Expected touch points include the Fly configs, `deploy.sh`, a small launcher directory, the client
+connection/bootstrap code, focused contract tests, deploy-asset checks, and deployment docs.
 
-- `fly.toml` and/or new channel-specific Fly config files
-- `deploy.sh`
-- `Dockerfile` only if readiness or startup size requires a justified change
-- `server/src/main.rs` only if a readiness route is necessary
-- a focused script under `scripts/` for bounded cold-start measurement
-- `scripts/check-deploy-assets.mjs`
-- `docs/context/deployment.md`
-- `docs/design/hardening.md` only when the deployment/lifecycle source of truth changes
-- focused deploy-script and route tests
-- `plans/cheaper-faster/phase-1.md` status update in the implementation commit
+## Verification Before Deployment
 
-## Explicit Exclusions
+- Run `node tests/select-suites.mjs --from=<base>` and the selected focused checks.
+- Test only that the launcher rejects arbitrary upstream targets.
+- Validate both Fly configs and run `node scripts/check-deploy-assets.mjs`.
+- Run the normal owned-PR workflow and wait for the PR to merge.
 
-- No launcher app.
-- No mainline resize, autostop, DNS, or URL change.
-- No `suspend` canary.
-- No shared reservation purchase.
-- No external-provider deployment.
-- No promise or UI copy that startup is under five seconds.
+Do not create a broad launcher matrix or cold-start statistics suite.
 
-## Implementation Checklist
+## Deployed Acceptance
 
-- [ ] Record current pricing, versions, Machine specs, and lifecycle policy.
-- [ ] Add reviewable channel-specific deploy configuration.
-- [ ] Add or reuse a truthful readiness signal.
-- [ ] Add bounded cold-start/WS-open measurement tooling.
-- [ ] Pass repository checks before remote mutation.
-- [ ] Obtain explicit approval and deploy beta only.
-- [ ] Capture at least ten stopped-to-ready samples.
-- [ ] Complete active-WebSocket and idle-stop checks.
-- [ ] Confirm direct deep-link behavior and channel isolation.
-- [ ] Document rollback to beta `shared-cpu-4x`/1 GB always-on.
-- [ ] Mark this phase done in the implementation commit.
+After explicit approval for the paid remote changes:
 
-## Verification
+1. Confirm beta has no active room, deploy the merged phase, and stop beta.
+2. Use the launcher as a normal user. Confirm the starting message appears and the beta lobby opens
+   without a manual refresh.
+3. Play or spectate one short match and confirm beta remains running while connected.
+4. Close all browser connections and confirm beta eventually stops.
+5. Repeat the stopped-to-lobby workflow once, using one real room or spectator deep link.
 
-Run the relevant subset selected by the diff, including:
+If it works and feels reasonable, Phase 1 passes. If it is broken or irritating, make one obvious
+small correction or restore beta's previous shared always-on configuration.
 
-```bash
-flyctl config validate --strict --app rts-0-zvorygin-beta --config <beta-config>
-flyctl config validate --strict --app rts-0-zvorygin --config <mainline-config>
-node scripts/check-deploy-assets.mjs
-node scripts/check-docs-health.mjs
-node tests/select-suites.mjs --verify
-git diff --check
-```
+## Handoff
 
-If a server route changes, add its focused Rust/Node coverage and verify missing assets still return
-404 rather than the SPA shell.
-
-## Manual Test Focus
-
-With beta confirmed stopped, open the ordinary beta URL and one deep link from a desktop browser and
-a phone. Confirm the Machine wakes, the intended page eventually opens, the WebSocket remains
-connected, and a 30-minute lobby or match is not stopped. Close every client, verify beta stops, and
-repeat enough times to recognize inconsistent or failed cold starts.
-
-## Handoff Expectations
-
-Report the exact beta config and deployed build, the ten-sample cold-start and WS-open distribution,
-all failures, active-soak result, idle-stop timing, no-room drain timing, and observed cost rate.
-State whether the beta canary passed every gate needed by Phase 2, identify any copy that the
-measurements support, and give the next agent the exact rollback command and launcher assumptions.
+Report the deployed build and config, what the agent saw in both cold starts, whether the short
+match and idle stop worked, any rough startup times noticed, and the exact rollback command. Mark
+this phase done in its implementation commit.
