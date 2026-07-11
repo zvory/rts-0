@@ -1469,7 +1469,8 @@ selection rings):
   status uses the shared HP bar layer.
 - Units: SVG-authored rig parts rendered into Pixi containers, with fully covered routes optionally
   rendered from a PNG atlas. Rifleman and Machine Gunner PNG movement frames advance only when
-  their snapshot/render position changes; stationary units hold idle art while firing recoil frames
+  a fresh authoritative movement sample arrives or their rendered position changes; a held snapshot
+  is consumed once so paused or otherwise stationary units return to idle art while firing recoil frames
   remain active. The Anti-Tank Gun uses a composed white-base PNG atlas for its
   carriage, barrel assembly, and deployed trail legs while retaining the SVG rig as its animation
   anchor source. It uses toned-down team tinting, with most firing recoil on the barrel assembly
