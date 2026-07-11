@@ -447,7 +447,7 @@ try {
   const editorUrl = new URL(BASE_URL);
   editorUrl.pathname = "/map-editor";
   editorUrl.search = "";
-  await editorPage.goto(editorUrl.href, { waitUntil: "networkidle2", timeout: 15000 });
+  await editorPage.goto(editorUrl.href, { waitUntil: "domcontentloaded", timeout: 15000 });
   await editorPage.waitForFunction(() => document.querySelectorAll(".map-editor-terrain-icon").length === 3, { timeout: 5000 });
   const editorUi = await editorPage.evaluate(() => {
     const panel = document.querySelector(".map-editor-panel-body");
