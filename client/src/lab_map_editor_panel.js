@@ -446,8 +446,12 @@ export class LabMapEditorPanel {
   async restartTestWithDraft() {
     if (this.applyPending) return null;
     let materialized;
+    let submittedDraft;
+    let submittedLayoutId;
     try {
       materialized = this.session.materialized();
+      submittedDraft = this.session.exportMap();
+      submittedLayoutId = this.session.selectedLayoutId;
     } catch (error) {
       this.setStatus(error.message || String(error), true);
       return null;
@@ -464,7 +468,14 @@ export class LabMapEditorPanel {
       this.setStatus("The test restarted, but the local map display could not refresh in place.", true);
       return result;
     }
-    this.session.markCurrentDraftAsTested();
+    // The author may keep editing while the authoritative restart is in flight. Record the
+    // submitted draft as the tested baseline, then republish any newer local preview because
+    // applyLabMapReset just rebuilt the world terrain from the server result.
+    this.terrainPreviewSignature = null;
+    this.session.markCurrentDraftAsTested({
+      draft: submittedDraft,
+      selectedLayoutId: submittedLayoutId,
+    });
     this.setStatus("Test restarted with this map draft. Keep editing the draft without changing the test.");
     return result;
   }
@@ -630,10 +641,13 @@ export class LabMapEditorPanel {
   }
 
   syncDraftTerrainPreview() {
-    const signature = this.session.draft?.terrain?.join("|") || "";
+    const previewing = !!this.session.draft && this.session.hasUnappliedChanges;
+    const signature = previewing
+      ? `draft:${this.session.draft.terrain.join("|")}`
+      : "authoritative";
     if (signature === this.terrainPreviewSignature) return;
     this.terrainPreviewSignature = signature;
-    if (!this.session.draft) {
+    if (!previewing) {
       this.setLabMapDraftTerrainPreview?.(null);
       return;
     }

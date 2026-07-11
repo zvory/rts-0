@@ -51,7 +51,7 @@ import { LabCatalogScreen } from "./lab_catalog.js";
 import { createDefaultControlPolicy, createLabControlPolicy } from "./lab_control_policy.js";
 import { LabPanel } from "./lab_panel.js";
 import { LabMapEditorSession } from "./lab_map_editor_session.js";
-import { applyLabMapReset } from "./lab_map_reset.js";
+import { applyLabMapReset, previewLabMapDraftTerrain } from "./lab_map_reset.js";
 import {
   fetchLabScenarioSubmissionCapability as fetchLabScenarioSubmissionCapabilityRequest,
 } from "./lab_scenario_submission_capability.js";
@@ -521,7 +521,7 @@ export class App {
         mapEditorSession: this.labMapEditorSession,
         applyLabMapReset: (outcome) => applyLabMapReset(this.match, outcome),
         setLabMapDraftOverlay: (overlay) => this.match?.clientIntent?.setLabMapDraftOverlay?.(overlay),
-        setLabMapDraftTerrainPreview: (draft) => this.previewLabMapDraftTerrain(draft),
+        setLabMapDraftTerrainPreview: (draft) => previewLabMapDraftTerrain(this.match, draft),
         submissionCapability: this.fetchLabScenarioSubmissionCapability(),
         openWindow: (url) => window.open(url, "_blank", "noopener,noreferrer"),
       });
@@ -531,29 +531,6 @@ export class App {
 
   async fetchLabScenarioSubmissionCapability() {
     return fetchLabScenarioSubmissionCapabilityRequest();
-  }
-
-  previewLabMapDraftTerrain(draft) {
-    const renderer = this.match?.renderer;
-    const liveMap = this.match?.state?.map;
-    if (!renderer || !liveMap) return false;
-    try {
-      if (!draft) {
-        if (typeof renderer.buildStaticMap !== "function") return false;
-        renderer.buildStaticMap(liveMap);
-        return true;
-      }
-      if (typeof renderer.previewStaticTerrain !== "function") return false;
-      renderer.previewStaticTerrain({
-        ...liveMap,
-        width: draft.size,
-        height: draft.size,
-        terrain: draft.terrain,
-      });
-      return true;
-    } catch {
-      return false;
-    }
   }
 
   onBranchFromTickCreated(m) {

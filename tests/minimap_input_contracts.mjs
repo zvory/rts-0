@@ -846,6 +846,49 @@ function pointerEvent(canvas, clientX, clientY, {
     "resource depletion invalidates resource cache",
   );
 
+  const terrainFillsBeforePreview = countCalls(terrainLayer.context, "fillRect");
+  const previewCallStart = canvas.context.calls.length;
+  minimap.setMapPreview({
+    ...state.map,
+    terrain: Array(4).fill(2),
+    resources: [],
+  });
+  minimap.render({
+    currentEntities: [
+      { id: 11, owner: 0, kind: "oil", x: 1.5, y: 1.5 },
+      { id: 12, owner: 1, kind: "rifleman", x: 1, y: 1 },
+    ],
+  });
+  assert(
+    countCalls(terrainLayer.context, "fillRect") > terrainFillsBeforePreview,
+    "a Lab map draft preview rebuilds cached minimap terrain",
+  );
+  assert(
+    !canvas.context.calls.slice(previewCallStart).some((call) => (
+      call.op === "drawImage" && call.source === resourceLayer.canvas.label
+    )),
+    "a Lab map draft preview does not draw the running test's static resources",
+  );
+  assert(
+    minimap._minimapEntities({
+      currentEntities: [
+        { id: 11, owner: 0, kind: "oil", x: 1.5, y: 1.5 },
+        { id: 12, owner: 1, kind: "rifleman", x: 1, y: 1 },
+      ],
+    }).length === 1,
+    "a Lab map draft preview filters the running test's resource entity blips",
+  );
+
+  minimap.setMapPreview(null);
+  const restoreCallStart = canvas.context.calls.length;
+  minimap.render();
+  assert(
+    canvas.context.calls.slice(restoreCallStart).some((call) => (
+      call.op === "drawImage" && call.source === resourceLayer.canvas.label
+    )),
+    "clearing the Lab map draft preview restores authoritative minimap resources",
+  );
+
   rect.width = 20;
   rect.height = 20;
   minimap.render();

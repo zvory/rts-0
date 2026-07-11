@@ -690,7 +690,9 @@ rather than anonymous main/natural site IDs and slot pickers. A persistent brows
 each drafted start and natural in that player's colour, and a local terrain preview redraws cached ground
 without touching authoritative `GameState`; the live Lab test remains unchanged. The terrain controls
 paint one tile at a time by click or drag and use matching grass, stone, and water swatches. Local draft
-save/load likewise does not alter the test.
+save/load likewise does not alter the test. While the draft differs from the current test, both the
+Pixi world terrain and minimap terrain preview the draft; the minimap suppresses the current test's
+resource patches because the draft's patches are not materialized until the authoritative restart.
 
 `Restart test with this draft` is the one explicit draft-to-test transition. It creates a fresh Lab test
 at tick zero with the same players and seed, so it deliberately clears the prior test's units, orders,
@@ -1204,6 +1206,7 @@ Internally, `config.js` is a facade over `config/timing.js`, `config/presentatio
 export class Minimap {
   constructor(canvasEl, state, camera, fog, commandIssuer, inputRouter?, {clientIntent?, commandsEnabled?})
   render(frameViews?)                    // draw terrain + fog + entity blips + viewport rect
+  setMapPreview(map?)                    // browser-local Lab draft terrain/resource preview
   markArtilleryFiring(event)             // transient global artillery icon from artilleryFiring events
   inputZone()                            // router zone for locked/unlocked minimap interaction
   // click/drag -> camera.centerOn or issue move command (right-click)
