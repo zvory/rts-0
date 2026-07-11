@@ -2,9 +2,9 @@
 
 set -euo pipefail
 
-MAINLINE_APP="${FLY_MAINLINE_APP:-rts-0-zvorygin}"
-BETA_APP="${FLY_BETA_APP:-rts-0-zvorygin-beta}"
-LAUNCHER_APP="${FLY_LAUNCHER_APP:-rts-0-zvorygin-launcher}"
+MAINLINE_APP="${FLY_MAINLINE_APP:-bewegungskrieg-mainline}"
+BETA_APP="${FLY_BETA_APP:-bewegungskrieg-beta}"
+LAUNCHER_APP="${FLY_LAUNCHER_APP:-rts-0-zvorygin}"
 
 usage() {
   cat <<'EOF'
@@ -18,9 +18,9 @@ Deploys to Fly.io. With no commit, deploys the current checkout. With a
 commit, deploys that exact git commit from a temporary detached worktree.
 
 Channels:
-  mainline, main, production, prod, release  -> FLY_MAINLINE_APP or rts-0-zvorygin
-  beta                                      -> FLY_BETA_APP or rts-0-zvorygin-beta
-  launcher                                  -> FLY_LAUNCHER_APP or rts-0-zvorygin-launcher
+  mainline, main, production, prod, release  -> FLY_MAINLINE_APP or bewegungskrieg-mainline
+  beta                                      -> FLY_BETA_APP or bewegungskrieg-beta
+  launcher                                  -> FLY_LAUNCHER_APP or rts-0-zvorygin
 
 Options:
   --app <name>       Override the Fly app name.

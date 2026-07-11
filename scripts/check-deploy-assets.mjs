@@ -102,14 +102,20 @@ assertIncludes(
 assertIncludes(deployScript, 'config_file="fly.mainline.toml"', "mainline deploys must select the mainline config");
 assertIncludes(deployScript, 'config_file="fly.beta.toml"', "beta deploys must select the beta config");
 assertIncludes(deployScript, 'config_file="fly.launcher.toml"', "launcher deploys must select the launcher config");
-assertMatches(mainlineFlyConfig, /auto_stop_machines\s*=\s*"off"/, "mainline lifecycle must remain always-on in phase 1");
-assertMatches(mainlineFlyConfig, /min_machines_running\s*=\s*1/, "mainline must retain one running Machine");
-assertMatches(mainlineFlyConfig, /cpu_kind\s*=\s*"shared"/, "mainline must retain its shared CPU kind");
-assertMatches(mainlineFlyConfig, /cpus\s*=\s*4/, "mainline must retain its shared-cpu-4x size");
+assertMatches(mainlineFlyConfig, /^app\s*=\s*"bewegungskrieg-mainline"/m, "mainline must target its named game app");
+assertMatches(betaFlyConfig, /^app\s*=\s*"bewegungskrieg-beta"/m, "beta must target its named game app");
+assertMatches(launcherFlyConfig, /^app\s*=\s*"rts-0-zvorygin"/m, "launcher must target the canonical-domain app");
+assertMatches(mainlineFlyConfig, /auto_stop_machines\s*=\s*"stop"/, "mainline must stop rather than suspend when idle");
+assertMatches(mainlineFlyConfig, /min_machines_running\s*=\s*0/, "mainline must allow zero running Machines");
+assertMatches(mainlineFlyConfig, /cpu_kind\s*=\s*"performance"/, "mainline must use performance CPU kind");
+assertMatches(mainlineFlyConfig, /cpus\s*=\s*1/, "mainline must use one performance CPU");
+assertMatches(mainlineFlyConfig, /memory\s*=\s*"2gb"/, "mainline must use 2 GB memory");
 assertMatches(betaFlyConfig, /auto_stop_machines\s*=\s*"stop"/, "beta must stop rather than suspend when idle");
 assertMatches(betaFlyConfig, /min_machines_running\s*=\s*0/, "beta must allow zero running Machines");
 assertMatches(betaFlyConfig, /cpu_kind\s*=\s*"performance"/, "beta must use performance CPU kind");
+assertMatches(betaFlyConfig, /cpus\s*=\s*1/, "beta must use one performance CPU");
 assertMatches(betaFlyConfig, /memory\s*=\s*"2gb"/, "beta must use 2 GB memory");
+assertMatches(launcherFlyConfig, /auto_stop_machines\s*=\s*"off"/, "launcher must remain always-on");
 assertMatches(launcherFlyConfig, /min_machines_running\s*=\s*1/, "launcher must remain available while game apps stop");
 
 console.log("deploy asset contract: ok");

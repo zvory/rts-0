@@ -91,10 +91,10 @@ fi
 
 case "$channel" in
   mainline|main|prod|production)
-    app="${FLY_MAINLINE_APP:-rts-0-zvorygin}"
+    app="${FLY_MAINLINE_APP:-bewegungskrieg-mainline}"
     ;;
   beta)
-    app="${FLY_BETA_APP:-rts-0-zvorygin-beta}"
+    app="${FLY_BETA_APP:-bewegungskrieg-beta}"
     ;;
   *)
     app="$channel"

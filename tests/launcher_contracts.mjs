@@ -9,13 +9,15 @@ import {
 
 assert.equal(gameOrigin("mainline"), GAME_ORIGINS.mainline);
 assert.equal(gameOrigin("beta"), GAME_ORIGINS.beta);
+assert.equal(GAME_ORIGINS.mainline, "https://bewegungskrieg-mainline.fly.dev");
+assert.equal(GAME_ORIGINS.beta, "https://bewegungskrieg-beta.fly.dev");
 assert.equal(gameOrigin("https://attacker.invalid"), null);
 assert.equal(gameProbeUrl("https://attacker.invalid"), null);
 assert.equal(gameProbeUrl("beta"), `${GAME_ORIGINS.beta}/version`);
 assert.equal(gameProbeUrl("mainline"), `${GAME_ORIGINS.mainline}/version`);
 
 const indexHtml = await readFile(new URL("../launcher/index.html", import.meta.url), "utf8");
-assert.doesNotMatch(indexHtml, /https:\/\/(?:mainline|beta)\.bewegungskrieg\.net/,
+assert.doesNotMatch(indexHtml, /https:\/\/(?:bewegungskrieg-(?:mainline|beta)\.fly\.dev|(?:mainline|beta)\.bewegungskrieg\.net)/,
   "the browser must use the server-authoritative redirect origin");
 
 let probedUrl = null;

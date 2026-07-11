@@ -1,4 +1,4 @@
-app = "rts-0-zvorygin"
+app = "bewegungskrieg-mainline"
 primary_region = "ewr"
 kill_signal = "SIGINT"
 kill_timeout = 300
@@ -15,12 +15,12 @@ kill_timeout = 300
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = "off"
+  auto_stop_machines = "stop"
   auto_start_machines = true
-  min_machines_running = 1
+  min_machines_running = 0
   processes = ["app"]
 
 [[vm]]
-  cpu_kind = "shared"
-  cpus = 4
-  memory = "1gb"
+  cpu_kind = "performance"
+  cpus = 1
+  memory = "2gb"
