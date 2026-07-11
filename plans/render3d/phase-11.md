@@ -1,4 +1,4 @@
-# Phase 11 - Batching, Pools, and Benchmark Harness
+# Phase 11 - Benchmark Harness and Counter Semantics
 
 ## Phase Status
 
@@ -6,105 +6,103 @@
 
 ## Depends On
 
-- Phase 10 merged with instance-compatible generic entities, one finite effect, and core overlay paths.
+- Phase 10.5 merged with generic entities, representative overlays/effect, and experimental routes.
 
 ## Objective
 
-Measure and bound the production backend before adding vegetation, shadows, or representative art.
-Create named reproducible scenarios and a stable JSON report, then implement shared mesh/material/
-instance policies and capacity-bounded effect pooling. Establish provisional structural and same-
-device regression budgets with correctly reset current-frame counters.
+Make performance evidence reproducible before changing batching or pool policy. Create the stable
+scenarios, launcher, committed schema, current-frame counter semantics, comparison command, and
+teardown checks. Record unoptimized current-main baselines without turning them into permanent
+budgets.
 
 ## Work
 
-- Add stable scenario ids using authoritative Lab/dev setup where applicable:
-  `quiet`, `dense-placeholders`, `active-effects`, `fog-overlays`, and `lifecycle`. Record map/seed,
-  entity/effect counts, camera view, visibility perspective, and required quality flags.
-- Add the stable command:
+- Materialize the exact Phase 0 scenario contracts as `quiet`, `dense-placeholders`,
+  `active-effects`, `fog-overlays`, and `lifecycle`, including authoritative setup/map/seed, counts,
+  camera, perspective, viewport/DPR, quality flags, and expected readiness assertions.
+- Add the stable launcher:
 
-      node scripts/rendering-benchmark.mjs --backend babylon --scenario <id> \
-        --output target/rendering-benchmarks/<id>.json
+      node scripts/rendering-benchmark.mjs --backend babylon --scenario <id|all> \
+        --repeat 3 --output target/rendering-benchmarks/<run>.json
 
-  The launcher owns warmup/sample duration, private server/browser setup, metadata collection, and
-  teardown; generated JSON remains under `target/` and is not committed.
-- Define `target/rendering-benchmarks/schema-v1.json` output fields in committed code/docs: commit,
-  scenario/map/seed, browser/version, GPU/backend, viewport/DPR, quality, warmup/samples, median/p95
-  total frame and `scene.render`, current-frame draw calls, meshes, hardware/thin instances,
-  triangles, materials, textures/estimated memory, active/pooled particles, and registry live/
-  pending counts.
-- Explicitly reset/advance Babylon internal counters once per authoritative Match frame. Test that a
-  static scene reports stable per-frame draws instead of accumulation and label cumulative counters
-  separately if retained.
-- Classify content routes: unique hierarchy, hardware instance, thin instance, merged static mesh,
-  or pool. Enforce shared source mesh/material/texture keys and category-level diagnostics; convert
-  generic dense fallbacks to the appropriate route without changing selection ids/proxies.
-- Implement bounded effect pool capacity, overflow fallback/drop policy, complete state reset, and
-  active/pooled diagnostics using Phase 8 ownership. Repeated pooled events cannot retain previous
-  pose, owner, visibility, clock, callback, or seed.
-- Calibrate provisional scenario budgets from same-device repeated comparisons. CI gates structural
-  invariants and relative toggles, not absolute FPS/wall-clock values from shared runners.
-- Add a bounded repeated lifecycle benchmark and verify canvas/rAF/listener/context/registry/pending
-  load counts return to baseline. Phase 13 owns the final longer ten-cycle gate.
-- Use `lab-interact` with explicit `RTS_CLIENT_DIR` to capture the dense-placeholder/active-effect
-  scene once and inspect the artifact, confirming batching/pooling preserves truthful presentation.
-- Update durable performance methodology in `docs/design/client-rendering.md` and budget/status
-  evidence in `docs/design/rendering-parity.md`.
+  It owns a private server/browser, warmup/sample policy frozen in Phase 0, metadata, schema
+  validation, teardown, and nonzero failure when Chrome/Babylon/readiness is unavailable.
+- Commit the report schema at `scripts/rendering-benchmark.schema-v1.json`. Reports cite its id and
+  version and live only under ignored `target/rendering-benchmarks/`; add the specific ignore rule.
+- Report commit, scenario/map/seed, browser/version, GPU/backend/runtime, viewport/DPR, quality,
+  warmup/sample/repetition, median/p95 total frame and `scene.render`, current-frame draws, meshes,
+  hardware/thin instances, triangles, materials, textures/estimated memory, particles, and registry
+  live/pending counts.
+- Reset/advance Babylon internal instrumentation exactly once per authoritative Match frame. Test a
+  static scene across multiple frames so current-frame draws remain stable while explicitly named
+  cumulative counters increase.
+- Add `scripts/compare-rendering-benchmarks.mjs --baseline <report> --candidate <report>` that
+  rejects schema/environment/scenario mismatches and emits structural/timing deltas. Timing
+  comparisons are evidence only and never a shared-runner absolute gate.
+- Record SHA-256 plus summarized counters for every ignored report in the handoff/PR body so review
+  evidence survives worktree cleanup.
+- Add an automated same-page lifecycle scenario covering repeated Match construct/destroy and exact
+  canvas/rAF/listener/context/registry/pending-load baselines; Phase 13.5 extends it to ten cycles.
+- Use `lab-interact` to capture the unoptimized dense/effect scene once and inspect the artifact.
+- Update durable methodology and ledger with counter definitions and unoptimized baselines.
 
 ## Expected Touch Points
 
-- `scripts/rendering-benchmark.mjs` and committed report schema/metadata helpers
+- `scripts/rendering-benchmark.mjs`
+- `scripts/compare-rendering-benchmarks.mjs`
+- `scripts/rendering-benchmark.schema-v1.json`
 - authoritative benchmark scenario definitions
-- Babylon instance/material/template and effect-pool modules
-- frame profiler/backend diagnostics
-- `tests/client_contracts/babylon_performance_contracts.mjs`
-- `tests/client_contracts/rendering_benchmark_contracts.mjs`
+- Babylon frame profiler/backend diagnostics
+- `.gitignore`
+- `tests/client_contracts/babylon_performance_contracts.mjs` (create it in this phase)
+- `tests/client_contracts/rendering_benchmark_contracts.mjs` (create it in this phase)
+- dedicated Babylon browser benchmark/lifecycle coverage wired into `tests/run-all.sh`/CI
 - durable rendering docs/parity ledger
 - `plans/render3d/phase-11.md` status update in the implementation commit
 
-## Budget Requirements
+## Measurement Requirements
 
-- PoC counts are historical observations, never target/baseline.
-- Every number includes scenario, tier, viewport/DPR, counter definition, warmup/sample method, and environment.
-- Structural budgets cover draws/materials/shared resources/instances/pool capacity where deterministic.
-- Frame timing is same-device evidence until target-device rollout creates a later release gate.
-- New content must report category deltas and cannot silently create per-entity materials/textures/draw paths.
+- PoC counts are historical leads, never a target or baseline.
+- Every number includes scenario, tier, viewport/DPR, counter definition, warmup/sample/repetition,
+  environment, and schema version.
+- Optional additive schema fields remain v1; renamed, removed, type-changed, or newly required
+  fields require v2 and an explicit reader compatibility policy.
+- Generated reports never enter Git, but hashes/summaries enter the durable handoff.
+- Browser/backend unavailability is a failed required check, not a successful skip.
 
 ## Explicit Exclusions
 
-- No vegetation, shadows, shadow counters, representative GLB, faction content, or default switch.
-- No universal FPS promise and no committed generated reports/screenshots.
+- No batching/content-route rewrite, effect-pool tuning, or provisional optimized budget; Phase 11.5 owns them.
+- No vegetation, shadows, representative GLB, faction content, default switch, or universal FPS promise.
 
 ## Implementation Checklist
 
-- [ ] Add five stable scenarios, benchmark command, schema, metadata, and teardown.
-- [ ] Reset/test current-frame Babylon counters.
-- [ ] Define/implement shared unique/instance/thin/merged routing for generic content.
-- [ ] Add bounded effect pool capacity/overflow/reset diagnostics.
-- [ ] Calibrate provisional structural/same-device budgets and lifecycle baseline.
-- [ ] Inspect one dense-placeholder/active-effect Lab Interact artifact.
+- [ ] Add five exact scenarios, all/repeat launcher, committed schema, metadata, and teardown.
+- [ ] Reset/test current-frame versus cumulative Babylon counters.
+- [ ] Add comparable-report validation and delta output.
+- [ ] Run three repetitions, hash/summarize reports, and record unoptimized baselines.
+- [ ] Automate repeated same-page lifecycle baselines and inspect one Lab PNG.
 - [ ] Update durable docs/ledger and mark this phase done in the implementation commit.
 
 ## Verification
 
     node tests/client_contracts/babylon_performance_contracts.mjs
     node tests/client_contracts/rendering_benchmark_contracts.mjs
-    node scripts/rendering-benchmark.mjs --backend babylon --scenario quiet --output target/rendering-benchmarks/quiet.json
-    node scripts/rendering-benchmark.mjs --backend babylon --scenario dense-placeholders --output target/rendering-benchmarks/dense-placeholders.json
+    node scripts/rendering-benchmark.mjs --backend babylon --scenario all --repeat 3 --output target/rendering-benchmarks/phase-11.json
+    node scripts/compare-rendering-benchmarks.mjs --baseline target/rendering-benchmarks/phase-11.json --candidate target/rendering-benchmarks/phase-11.json
     node scripts/check-client-architecture.mjs
     tests/run-all.sh --only-browser-scenarios=smoke
     git diff --check
 
 ## Manual Test Focus
 
-Run all five scenarios twice on the same device, compare metadata/counters, and inspect dense
-fallback selection/readability plus repeated pooled effects. Confirm static draws do not accumulate,
-pool reset is complete, shared keys stay bounded, and lifecycle counts return to baseline; report
-the exact preview command/URL and inspected artifact path.
+Inspect the dense/effect capture for truthful presentation and review report metadata/counter names,
+not aesthetic parity. Confirm static current-frame draws do not accumulate and automated lifecycle
+counts return to baseline; batching/pool changes remain Phase 11.5.
 
 ## Handoff Expectations
 
-Report scenario ids/commands, schema version, environment, provisional budgets, per-category routing,
-pool policy, current-frame reset proof, lifecycle counts, generated report paths, exact preview
-command/URL, and inspected artifact path. Name Phase 12 as next and identify
-instanced shader world matrices/shared time, vegetation tier density, shadow caster/proxy admission,
-quality toggles, camera fitting, and benchmark integration.
+Report scenario definitions, commands/schema, environment, report paths/hashes/summaries,
+current-frame reset proof, comparison output, lifecycle counts, exact preview command/URL, and
+inspected PNG. Name Phase 11.5 as next and identify content routes, shared keys, pool capacity/reset,
+optimized deltas, and provisional budget formula.

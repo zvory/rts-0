@@ -6,7 +6,7 @@
 
 ## Depends On
 
-- Phase 3 merged with the least-privilege renderer frame and borrowed-frame lifetime.
+- Phase 3.5 merged with the least-privilege renderer frame, Pixi cutover, and immutable grid policy.
 
 ## Objective
 
@@ -23,15 +23,19 @@ Pixi event visuals while preparing safe bounded retention for Phase 5.
   stream does not duplicate smoke/ability objects already represented as current state.
 - Create a plain `PresentationEvent` contract with stable diagnostic identity, kind, deterministic
   seed where randomness is visual, received/source timeline data, visual start, finite lifetime,
-  semantic layer/fog policy, ownership/team presentation, and already-authorized payload.
+  plan-locked semantic layer/fog policy, ownership/team presentation, and already-authorized payload.
 - Make every retained-capable spatial event self-contained at receipt/reconciliation time. Capture
   the authorized world position, facing, muzzle/impact/attachment pose, dimensions, and other
   renderer inputs then; an event may retain a source id for diagnostics but later rendering or
   replay must never look that id up in a newer frame where it moved, disappeared, or became hidden.
-- Derive missing identity deterministically from shared snapshot/replay context such as match/run
-  generation, authoritative tick, event index/kind, and safe source discriminator. Do not add a
-  protocol field unless current evidence proves a collision cannot be solved client-side; stop and
-  request scope before any wire change.
+- Derive missing identity exactly as
+  `timelineGeneration:authoritativeTick:eventIndex:kind:authorizedPayloadHash`, where
+  `authorizedPayloadHash` is a stable canonical hash of the normalized received payload and
+  `eventIndex` is its ordinal in the ordered tick event array. Identical same-tick events remain
+  distinct by ordinal, retransmitted/reconstructed snapshots dedupe to the same keys, and replay
+  seek reconstruction is stable; a same-key/different-payload collision is dropped with a bounded
+  diagnostic rather than silently merged. Do not add a protocol field; block if current evidence
+  proves this client-only identity cannot be made collision-safe.
 - Reconcile and deduplicate once in shared client code before `RendererFrame` is finalized. Pixi
   and future Babylon receive the same active event records and cannot consume, start, seed, expire,
   or mutate a shared queue independently.
@@ -67,6 +71,8 @@ Pixi event visuals while preparing safe bounded retention for Phase 5.
 
 - Retained-capable events are spatially self-contained and immutable after admission.
 - Event identity is stable within a match/replay generation and cannot collide silently.
+- Multiple identical same-tick events, duplicate tick delivery, and replay seek reconstruction have
+  explicit identity/deduplication contracts.
 - Visual randomness uses an explicit deterministic seed; renderer-global random state is not part
   of parity or capture semantics.
 - Expiration is sampled from the injected visual clock and finite lifetime, not renderer frame count.
@@ -112,5 +118,5 @@ only where the existing semantics require it.
 
 Report event sources/classification, identity derivation, receipt-time spatial fields, seed/lifetime/
 layer policy, reset generation, deduplication diagnostics, and remaining Pixi-local debt. Name Phase
-5 as next and provide the chosen real short event kind, safe retention descriptor, proposed history
-bound, monotonic capture offsets, and reset/error cases it must prove.
+5 as next and confirm the locked attack/muzzle event, safe retention descriptor, 256-event/10-second
+history, `0/80/160/240` offsets, and reset/error cases it must prove.

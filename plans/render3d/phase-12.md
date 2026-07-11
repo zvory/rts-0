@@ -1,4 +1,4 @@
-# Phase 12 - Vegetation, Shadows, and Quality Tiers
+# Phase 12 - Instanced Vegetation
 
 ## Phase Status
 
@@ -6,97 +6,91 @@
 
 ## Depends On
 
-- Phase 11 merged with stable benchmark scenarios, per-frame counters, instance policy, and budgets.
+- Phase 11.5 merged with stable benchmarks, instance policy, pools, and provisional budgets.
 
 ## Objective
 
-Add the two highest-value/highest-risk scene systems only after measurement and ownership exist.
-Implement instanced shader-driven vegetation and a bounded directional-shadow manager with
-deliberate quality degradation. Integrate both into the stable benchmark harness and prove visual
-stability, instance correctness, resource cleanup, and expected relative counter changes.
+Add deterministic vegetation through the measured instance path before shadows complicate the
+scene. Drive wind from one scene-owned visual-clock uniform with correct instance world matrices
+and no per-plant JavaScript animation. Measure the locked tier densities, fog policy, capture, and
+cleanup in a stable scenario.
 
 ## Work
 
-- Add stable benchmark scenario `vegetation-shadows` with fixed vegetation/caster counts, camera
-  path/view, map/seed, fog/core overlays, and quality-tier toggles. Extend schema v1 compatibly or
-  version it if new fields cannot be optional.
-- Implement shared source mesh/material vegetation through hardware/thin instances according to
-  Phase 11 policy. Wind uses one renderer/scene-owned time uniform sampled from the injected visual
-  clock, never one JavaScript update per plant.
-- Make vertex shaders explicitly apply instance world matrices before wind/world transforms. Add
-  contracts with non-identity translation/rotation/scale so a shader that animates only the source
-  mesh cannot pass.
-- Implement quality-tier vegetation density, wind enable/complexity, shadow participation, and
-  disablement. Deterministic placement does not change gameplay/fog authority and resets cleanly.
-- Add a directional shadow manager owning light/shadow resources through Phase 8. Define map
-  resolution, caster admission/limit, proxy preference, material/alpha policy, camera-fit bounds,
-  update cadence, and diagnostics.
-- Gate caster admission on received/visible presentation policy so a hidden entity cannot cast or
-  enter diagnostic bounds. Shadow proxies remain visual only and never affect picking.
-- Define named quality tiers with deliberate reductions in shadow resolution/casters/update work
-  and vegetation density/wind/shadows. Team identity, selection/HP, fog secrecy, and command
-  readability cannot be disabled.
-- Measure shadows off/on and vegetation tier deltas with per-frame draws, instances, triangles,
-  materials/textures, caster/proxy counts, map size/updates, timings, and registry resources.
-- Start with a measured camera-fitted directional strategy. Do not add cascades unless results show
-  the simpler policy fails and the user approves the scope expansion.
-- Exercise camera pan/dolly, resize/DPR, fixed capture, fog edge, reset, rematch, and destruction.
-  Use `lab-interact` to capture normal-distance tier/shadow evidence and inspect one PNG once.
+- Add stable benchmark scenario `vegetation` with Phase 0 map/seed/count/camera/fog/viewport/DPR and
+  `off|low|medium|high` tier toggles. Extend schema v1 only with optional additive fields; otherwise
+  create v2 under the Phase 11 schema policy.
+- Implement shared source mesh/material vegetation through the Phase 11.5 hardware/thin instance
+  route. Deterministic placement is presentation-only and cannot change gameplay, fog, selection,
+  pathing, or command authority.
+- Sample one renderer/scene-owned time uniform from the injected visual clock. No plant owns a
+  timer, listener, callback, or per-frame JavaScript animation update.
+- Apply instance world matrices before wind/world transforms in vertex code. Add non-identity
+  translation, rotation, and scale contracts that fail if only the source mesh animates correctly.
+- Apply locked density factors `off=0`, `low=.30`, `medium=.60`, `high=1.00`; record deterministic
+  admitted counts and shared resource keys by tier. Shadow participation remains disabled until
+  Phase 12.5.
+- Define vegetation fog policy explicitly from Phase 9 categories. Placement may be static, but it
+  cannot create a hidden-entity-derived marker, diagnostic, or fitted bound.
+- Measure tier deltas for draws, instances, triangles, materials/textures, timing, and registry
+  resources, and compare against Phase 11.5 reports using the stable comparison command.
+- Exercise camera pan/dolly, resize/DPR, fixed/event capture, fog edge, view generation, reset,
+  rematch, and destroy with automated resource baselines.
+- Use `lab-interact` to capture normal-distance high-tier vegetation in the exact scenario and
+  inspect one PNG once.
 
 ## Expected Touch Points
 
 - Babylon vegetation instance/material/shader modules
-- Babylon directional light/shadow manager and quality settings
-- Phase 11 benchmark scenarios/schema/diagnostics
-- fog visibility/caster admission integration through established presentation data
-- `tests/client_contracts/babylon_vegetation_contracts.mjs`
-- `tests/client_contracts/babylon_shadow_contracts.mjs`
+- Phase 11 benchmark scenario/schema/diagnostics
+- `tests/client_contracts/babylon_vegetation_contracts.mjs` (create it in this phase)
+- dedicated Babylon browser vegetation/lifecycle coverage wired into the authoritative runner
+- `tests/browser_babylon_vegetation.mjs`
 - durable rendering docs/parity/budget ledger
 - `plans/render3d/phase-12.md` status update in the implementation commit
 
 ## Quality Requirements
 
 - Vegetation has zero per-instance JavaScript animation updates.
-- Shader tests prove instance world matrices participate in final position.
-- Shadow caster/proxy limits and update work are bounded and observable by tier.
-- Hidden entities cannot cast, affect fitted bounds, or appear in shadow diagnostics.
-- Tiers trade optional detail/performance only; core tactical readability and secrecy remain.
+- Shader tests prove non-identity instance world matrices participate in final position.
+- Tier counts follow the locked deterministic factors and shared keys remain bounded.
+- View/fog generation changes cannot leave hidden-derived vegetation diagnostics or stale resources.
 
 ## Explicit Exclusions
 
-- No cascades without separately approved evidence, no final target-device matrix, no WebGPU-only path.
-- No finished environment art, broad terrain conversion, representative unit GLB, or faction work.
-- No universal FPS gate or default switch.
+- No shadow light/map/caster/proxy work; Phase 12.5 owns it.
+- No finished environment art, representative unit GLB, faction work, WebGPU-only path, default
+  switch, or universal FPS gate.
 
 ## Implementation Checklist
 
-- [ ] Add stable vegetation/shadow benchmark scenario and schema fields.
-- [ ] Implement instanced vegetation with one shared visual-clock uniform and world-matrix correctness.
-- [ ] Add bounded shadow manager, caster/proxy policy, camera fit, tiers, and diagnostics.
-- [ ] Prove hidden-caster secrecy and expected relative tier/counter changes.
-- [ ] Exercise lifecycle/fixed capture and inspect one Lab Interact PNG.
-- [ ] Update durable docs/ledger/budgets and mark this phase done in the implementation commit.
+- [ ] Add the stable vegetation scenario and compatible schema fields.
+- [ ] Implement instanced vegetation with one shared visual-clock uniform and matrix correctness.
+- [ ] Apply locked tier densities and fog/view-generation policy.
+- [ ] Measure/compare tier deltas and automated lifecycle baselines.
+- [ ] Inspect one Lab Interact PNG and update durable docs/ledger/budgets.
+- [ ] Mark this phase done in the implementation commit.
 
 ## Verification
 
     node tests/client_contracts/babylon_vegetation_contracts.mjs
-    node tests/client_contracts/babylon_shadow_contracts.mjs
     node tests/client_contracts/babylon_performance_contracts.mjs
-    node scripts/rendering-benchmark.mjs --backend babylon --scenario vegetation-shadows --output target/rendering-benchmarks/vegetation-shadows.json
+    node scripts/rendering-benchmark.mjs --backend babylon --scenario vegetation --repeat 3 --output target/rendering-benchmarks/phase-12.json
+    node scripts/compare-rendering-benchmarks.mjs --baseline target/rendering-benchmarks/phase-11.5.json --candidate target/rendering-benchmarks/phase-12.json
+    node tests/browser_babylon_vegetation.mjs
     node scripts/check-client-architecture.mjs
     tests/run-all.sh --only-browser-scenarios=smoke
     git diff --check
 
 ## Manual Test Focus
 
-At normal gameplay distance, compare tiers while panning/dollying and resizing. Inspect wind across
-translated/rotated/scaled instances, shadow stability/proxy alignment, fog-edge caster secrecy,
-selection/readability, fixed capture, reset, rematch, and correct registry cleanup. Confirm reported
-relative density/caster/map work follows tier settings.
+At normal gameplay distance, compare locked vegetation tiers while panning/dollying and resizing.
+Inspect wind across translated/rotated/scaled instances, fog-edge behavior, deterministic capture,
+and readability; rely on automated counters and lifecycle assertions for correctness.
 
 ## Handoff Expectations
 
-Report scenario command/report, shader instance-matrix evidence, tier table, caster/proxy/camera-fit
-policy, off/on deltas, secrecy/lifecycle results, exact preview URL/command, and inspected artifact.
-Name Phase 13 as next and identify the sole representative GLB, full pipeline/budget delta, ten-cycle
-lifecycle, all scenario runs, ledger audit, and go/revise/stop recommendation.
+Report scenario/report hash, shader matrix evidence, tier counts/deltas, fog policy, resource/lifecycle
+results, preview URL/command, and inspected PNG. Name Phase 12.5 as next and identify locked shadow
+starting caps, caster/proxy admission, camera fit, stale-map clearing, tier degradation, and benchmark
+integration.

@@ -6,7 +6,7 @@
 
 ## Depends On
 
-- Phase 1 merged with the semantic camera/projection contract and raw-consumer ratchet.
+- Phase 1.75 merged with the semantic camera/projection contract and closed raw-consumer ratchet.
 
 ## Objective
 
@@ -22,10 +22,18 @@ placeholder art must never become selection authority.
   attack-ground/ability targets, placement, hover previews, Lab paint/spawn tools, and other
   commands that land on the authoritative plane. A missed/behind-camera/horizon result must cancel
   or leave the interaction armed according to existing intent semantics without emitting invalid
-  coordinates.
+  coordinates. Use the projection snapshot in the last presented SelectionScene, not a newer
+  camera transform awaiting presentation.
 - Define plain-data selection proxies from entity kind, authoritative footprint/size, facing,
   setup state where relevant, and interpolated presentation position. The proxy may include ground
   polygons, elevated anchor points, or screen-radius policy, but cannot depend on render meshes.
+- Introduce a detached fog-filtered `SelectionScene` containing candidate ids/proxies and the
+  semantic camera projection snapshot from the last successfully presented frame. Publish it only
+  after that frame renders; input keeps the previous scene across a render failure.
+- Make every click, hover, entity-target, ctrl-in-viewport, control-group admission, and marquee
+  calculation read the last presented `SelectionScene`. Do not query fresh
+  `entitiesInterpolated(1)`, current mutable state, or a camera transform newer than the pixels the
+  player is targeting.
 - Route every entity-targeting interaction through the same projected proxy picker: ordinary click
   selection, right-click attack/gather/repair classification, hover and command previews, armed
   entity-target abilities, and Lab entity-click tools. Reserve `groundAtScreen()` for commands and
@@ -55,7 +63,8 @@ placeholder art must never become selection authority.
 - Add pure tests using both the real orthographic adapter and a deliberately skewed fake
   perspective adapter. Include cases where the two-ground-hit rectangle would select the wrong
   entity, partially intersected large/oriented proxies, near/far candidates, clipped points, and
-  nullable ground hits.
+  nullable ground hits. Add a moving entity and camera-between-frames case proving picking follows
+  the last presented proxy/camera rather than fresh state.
 - Update the durable rendering contract and parity ledger with the implemented selection proxy and
   evidence.
 
@@ -68,6 +77,7 @@ placeholder art must never become selection authority.
 - `client/src/input/lab_tools.js`
 - `client/src/input/control_groups.js`
 - a pure selection projection/proxy helper in the input or presentation area
+- a detached last-presented `SelectionScene` owner in `Match`/frame orchestration
 - a backend-neutral screen overlay/marquee collaborator
 - `client/src/renderer/index.js` only for Pixi compatibility extraction
 - input/state/Lab/client smoke contracts
@@ -83,6 +93,8 @@ placeholder art must never become selection authority.
   the camera cannot be selected.
 - Selection candidates still come only from the client's fog-filtered authoritative/interpolated
   views. Projection must not reconstruct hidden candidates.
+- Picking uses the last successfully presented `SelectionScene`; moving entities and a camera input
+  awaiting the next frame cannot be targeted at an unseen future pose.
 - Ground commands remain authoritative world pixels and cannot emit NaN, infinity, or an old cached
   hit after a miss.
 - Orthographic Pixi behavior must remain materially equivalent, including pointer lock and touch
@@ -99,6 +111,7 @@ placeholder art must never become selection authority.
 
 - [ ] Add nullable ground-interaction handling to every world-command/tool path.
 - [ ] Define and project plain-data selection proxies.
+- [ ] Publish and consume the last-presented detached SelectionScene.
 - [ ] Convert click, marquee, ctrl-in-viewport, and Lab box selection.
 - [ ] Decouple the screen marquee from the Pixi renderer type.
 - [ ] Preserve ownership, fog, preference, budgeting, and stable ordering semantics.
@@ -126,7 +139,8 @@ demo is required before the Babylon adapter exists.
 
 ## Handoff Expectations
 
-Describe the final proxy representation, ground-miss behavior, marquee owner/lifecycle, and any
-conservative prefilter. State that selection is independent of asset geometry and name Phase 3 as
-next, with borrowed-frame lifetime, least-privilege renderer data, fog update ordering, and Pixi
+Describe the final proxy representation, SelectionScene publication/lifetime, ground-miss behavior,
+marquee owner/lifecycle, and any conservative prefilter. State that selection is independent of
+asset geometry and name Phase 3 as
+next, with immutable revisioned grids, least-privilege renderer data, fog update ordering, and Pixi
 compatibility as its focus.

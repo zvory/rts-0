@@ -1,4 +1,4 @@
-# Phase 6 - Lazy Backend Loading and Lifecycle Kernel
+# Phase 6 - Lazy Backend Loading
 
 ## Phase Status
 
@@ -6,105 +6,97 @@
 
 ## Depends On
 
-- Phase 5 merged with renderer-neutral presentation, projection, marquee, event, and capture contracts.
+- Phase 5 merged with renderer-neutral presentation, projection, event, and capture contracts.
 
 ## Objective
 
-Introduce the production backend seam and smallest honest Babylon kernel without expanding graphics
-coverage. Preload the explicitly selected experimental factory/dependencies before room join so
-`START` stays synchronous and no snapshot/event/control message is lost behind async construction.
-Keep normal Pixi startup Babylon-free and keep `Match` as the sole frame/capture owner.
+Introduce the backend selection/loading seam without constructing a Babylon engine. Resolve the
+exact `rtsRenderer` choice and any experimental runtime dependencies before the app opens a socket
+or auto-joins, keeping `START` handling synchronous once networking begins. Preserve a
+Babylon-free default static graph and browser resource path.
 
 ## Work
 
-- Add an app-owned backend resolver selected through namespaced launch configuration. For Babylon
-  mode, finish loading the backend module and runtime manifest before sending join/start or enabling
-  an auto-launch; after `START`, construct the presentation bundle and install listeners
-  synchronously as today. Do not introduce a partial message queue that can lose transient events,
-  command receipts, room-time/pause state, or observer diagnostics.
-- Tokenize/cancel preload across route change, disconnect, lobby return, repeated join, or destroy.
-  Load failure prevents the experimental join and shows a bounded actionable error; stale
-  completion cannot start a room or attach a canvas.
-- Keep Pixi as the default factory through the same bundle contract. Remove static renderer-class
-  imports from `Match` while proving a normal route's static module graph and browser resource
-  timeline contain no Babylon renderer/runtime request.
-- Pin and self-host every runtime file already known to be needed through the GLB foundation: Babylon
-  core plus its glTF loader, their licenses, versions, checksums, served paths, and update procedure.
-  Do not include optional decoder assets unless Phase 7 deliberately uses the matching format;
-  optional future modules must extend this same manifest/loader rather than add an ad hoc path.
-- Load asynchronously without `document.write`, cross-site parser blocking, or default-route
-  preload. Record a clear WebGL 2 capability baseline and unsupported/failure presentation.
-- Define a presentation bundle covering semantic camera, static map build/reset, resize,
-  `render(frame)`, screen marquee, fixed capture/readiness, diagnostics, freeze, and idempotent
-  destroy. Engine-specific objects never leave the backend.
-- Create one Babylon engine/scene/canvas and fixed elevated perspective adapter satisfying Phase 1.
-  Until Phase 9 fog/secrecy merges, enable the runtime backend only in an explicit controlled
-  foundation Lab/no-fog scene and admit only ordinary currently visible renderables. Omit
-  remembered buildings, `visionOnly` intel, shot/event reveals, effects, and every category whose
-  semantics depend on fog layering; do not render them as undifferentiated generic markers.
-- Call only `scene.render()` when `Match` invokes an ordinary/fixed frame. Prohibit and test
-  `runRenderLoop`, engine-owned rAF, tickers, and secondary clocks.
-- Handle dependency/capability/engine initialization failure, partial construction, context loss
-  where practical, reset, resize, freeze, capture, destroy, and late completion with bounded
-  diagnostics and soft failure. Test replay/vision lifecycle hooks in isolation, but reject normal
-  live/replay Babylon launch until Phase 9 explicitly removes that gate.
-- Report backend/version, runtime files, canvas/context count, frame/render timing, viewport/DPR,
-  basic mesh/instance counts, capture state, and bounded errors. Reset/advance internal per-frame
-  counters explicitly rather than labeling cumulative counts as current-frame.
-- Prove at least two complete enter/leave cycles. Use `lab-interact` with explicit
-  `RTS_CLIENT_DIR=<worktree>/client`, capture the placeholder kernel, and inspect one PNG once.
+- Parse exactly `rtsRenderer=pixi|babylon` at bootstrap. Missing selects Pixi, invalid values fail
+  visibly before app/network startup, and the choice is not persisted.
+- Add a bootstrap-owned backend resolver. For Pixi it returns synchronously from checked-in code;
+  for Babylon it completes module/runtime manifest loading before constructing/starting `App`, so
+  no server message queue or async `onStart` path is introduced.
+- Tokenize/cancel Babylon preparation across route invalidation or page teardown where applicable.
+  A stale completion cannot construct `App`, open a socket, join a room, or attach a canvas.
+- Remove the direct renderer-class construction dependency from `Match` and inject a backend
+  factory/bundle descriptor. In this phase both normal execution and tests still instantiate Pixi;
+  the Babylon factory remains a not-ready descriptor for Phase 6.5.
+- Make `App.onStart` construction transactional. Catch factory/module failures locally instead of
+  relying on `Net` handler behavior, destroy every partially created match/backend/Lab shell/module/
+  listener, restore a bounded lobby/error state, and ensure later messages do not reach a partial
+  match. Inject/forward the factory through both `Match` and `ReplayViewer`.
+- Add fake-factory failure tests at each construction stage, including replay and Lab composition,
+  and assert exactly-once rollback plus visible bounded error reporting.
+- Pin and self-host official Babylon core and glTF-loader distributions under one versioned vendor
+  directory using the plan-locked highest-stable-patch rule. Vendor/load the minified UMD core then
+  minified UMD loader sequentially; record official package/source URL, exact version, package
+  integrity, file SHA-256, license/copyright text, served paths, update command/procedure, and
+  optional-decoder policy in a machine-readable manifest; do not vendor decoders or unrelated modules.
+- Load the experimental runtime asynchronously without `document.write`, cross-site requests, or a
+  default-route preload. Extend deploy/static-asset checks so missing or mismatched runtime files
+  fail an experimental launch with a bounded error, not a half-started match.
+- Prove default absence twice: a static import-graph rule rejects Babylon imports from the default
+  bootstrap graph, and a normal Pixi browser resource-timeline test observes no Babylon module,
+  vendor file, prefetch, or preload request.
+- Add loading contracts for invalid selector, dependency failure, integrity/manifest mismatch,
+  cancellation, stale completion, repeated preparation, and the rule that network start occurs
+  only after successful experimental resolution.
+- Update the durable rendering contract and parity ledger with exact selector, bootstrap order,
+  manifest path/version, and default-absence evidence.
 
 ## Expected Touch Points
 
-- `client/src/app.js`
-- `client/src/match.js`
-- `client/src/bootstrap.js` and/or `client/src/launch_url.js`
-- presentation backend factory/contract modules
-- Pixi factory/adapter
-- isolated `client/src/renderer_babylon/` kernel
-- self-hosted Babylon core/glTF loader and license/version/checksum manifest
-- static asset serving/deployment docs as needed
-- `tests/client_contracts/renderer_backend_contracts.mjs`
-- `tests/client_contracts/renderer_loading_contracts.mjs`
-- `tests/browser_renderer_loading.mjs`
+- `client/src/main.js` and a focused bootstrap/backend resolver
+- `client/src/launch_url.js` or a renderer-selection parser
+- `client/src/app.js` startup injection
+- `client/src/match.js`, `client/src/replay_viewer.js`, and Pixi backend factory/adapter
+- `client/vendor/babylon/` runtime, license, and manifest files
+- deployment/static-asset checks and docs
+- `tests/client_contracts/renderer_loading_contracts.mjs` (create it in this phase)
+- `tests/browser_renderer_loading.mjs` (create it in this phase)
 - durable rendering/client docs and parity ledger
 - `plans/render3d/phase-6.md` status update in the implementation commit
 
-## Lifecycle Requirements
+## Loading Requirements
 
-- Experimental runtime preload completes before room join/start; `START` remains synchronous and no
-  server message class waits in an incomplete backend queue.
-- One presentation bundle, canvas, engine/scene, camera adapter, and active world backend per match.
-- Runtime Babylon access is namespaced to the controlled Lab/no-fog foundation scene until Phase 9;
-  unsupported live/replay routes fail before join and never receive fog-layered presentation data.
-- One rAF owner: `Match`; Babylon owns no ticker/rAF/`runRenderLoop`.
-- Reset/resize/freeze/capture/destroy are safe before readiness and after partial failure.
-- Destroy invalidates late async completion and is idempotent.
-- Default absence has two proofs: static import-graph policy and normal Pixi browser resource timing.
+- No socket connect, join, auto-launch, or `START` subscription becomes active before selected
+  experimental dependencies resolve.
+- After app/network start, `START` construction remains synchronous and no message class waits in a
+  backend queue.
+- Synchronous `START` construction is transactional; every partial failure rolls back exactly once
+  and is surfaced before a later message can observe a partial match.
+- The default Pixi static graph and browser network path contain no Babylon code or bytes.
+- Experimental load failure leaves no app, socket, canvas, listener, or late completion.
+- WebGL 2 is required and tested before join; there is no WebGL 1, WebGPU, or mid-launch Pixi fallback.
+- Runtime provenance, integrity, license, and update procedure are reproducible from committed data.
 
 ## Explicit Exclusions
 
-- No GLB loading/validation despite vendoring the loader; Phase 7 owns use.
-- No resource registry beyond minimal kernel root cleanup; Phase 8 owns shared/child scopes.
-- No fog, remembered building, particle, shadow, vegetation, batching, or broad overlay work.
-- No simultaneous Pixi/Babylon world rendering, default switch, or Pixi removal.
+- No Babylon engine, scene, canvas, camera, render call, GLB load, or Lab screenshot.
+- No resource registry, fog, effects, shadows, vegetation, batching, or route unlock.
+- No simultaneous renderers, default switch, Pixi removal, or CDN fallback.
 
 ## Implementation Checklist
 
-- [ ] Preload/cancel the selected experimental factory/runtime before join while keeping `START` synchronous.
-- [ ] Prove default static graph and browser timeline load no Babylon code/bytes.
-- [ ] Pin/self-host core and glTF loader with license/version/checksum/update metadata.
-- [ ] Inject Pixi/Babylon presentation bundles; keep Match as sole rAF/capture owner.
-- [ ] Implement bounded Babylon kernel, failure paths, diagnostics, and idempotent lifecycle.
-- [ ] Complete two enter/leave cycles and inspect one Lab Interact PNG.
+- [ ] Add exact selector and pre-network backend resolution/cancellation.
+- [ ] Inject the Pixi factory and remove direct renderer construction from `Match`.
+- [ ] Add transactional live/replay/Lab `START` construction and staged rollback tests.
+- [ ] Pin/self-host Babylon core/glTF loader with integrity/license/update metadata.
+- [ ] Prove default static-graph and browser-timeline absence.
+- [ ] Cover failure/stale/repeated loading and synchronous post-start behavior.
 - [ ] Update durable docs/ledger and mark this phase done in the implementation commit.
 
 ## Verification
 
-    node tests/client_contracts/renderer_backend_contracts.mjs
     node tests/client_contracts/renderer_loading_contracts.mjs
     node tests/browser_renderer_loading.mjs
-    node tests/lab_interact_fixed_capture_contracts.mjs
+    node scripts/check-deploy-assets.mjs
     node scripts/check-client-architecture.mjs
     node tests/select-suites.mjs --verify
     tests/run-all.sh --only-browser-scenarios=smoke
@@ -112,17 +104,14 @@ Keep normal Pixi startup Babylon-free and keep `Match` as the sole frame/capture
 
 ## Manual Test Focus
 
-Verify ordinary Pixi launch/network loading first. Then launch Babylon with
-`RTS_CLIENT_DIR=<worktree>/client RTS_ADDR=0.0.0.0:<port> cargo run --release`, test pre-join load
-failure/cancel, pan/dolly, shared selection/ground commands, resize, fixed capture, Lab reset,
-freeze/back-to-lobby, and two enter/leave cycles in the controlled foundation Lab scene. Confirm
-ordinary live/replay Babylon routes are rejected before join and no extra canvas, loop, listener,
-context, queued message, or late scene remains.
+Verify an ordinary Pixi route starts normally and requests no Babylon resource. Then test an
+explicit Babylon selector with successful preparation, missing runtime, integrity/manifest failure,
+invalid selector, and navigation/cancel before completion; no experimental match is expected to
+render until Phase 6.5.
 
 ## Handoff Expectations
 
-Report preload timing relative to join/`START`, runtime manifest/version/checksums, static and browser
-default-absence evidence, failure behavior, lifecycle counts, exact preview command/URL, and
-inspected artifact. Name Phase 7 as next and identify coordinate/facing round trips, CSS/render
-scale boundaries, manifest validation, loader fixtures, and the prohibition on asset-authored
-gameplay selection geometry.
+Report exact bootstrap order, selector parser, runtime version/paths/integrity/license, default-
+absence evidence, failure/cancellation behavior, and remaining not-ready Babylon descriptor. Name
+Phase 6.5 as next and identify engine/scene/canvas ownership, controlled-Lab gate, one-rAF rendering,
+partial construction, resize/reset/capture/freeze/destroy, and repeated lifecycle evidence.
