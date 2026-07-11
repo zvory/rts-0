@@ -144,10 +144,9 @@ try {
   });
   assert.equal(recordingStarted.recorder.active, true, "live CLI starts one persistent-page recorder");
   call("order", { sessionId, playerId: 1, command: { c: "move", units: ["shooter"], x: 1088, y: 1088 } });
-  call("time", { sessionId, control: { action: "resume", speed: 1 } });
   const recordingWait = invokeAsync("record-wait", { sessionId });
   await sleep(250);
-  call("camera", { sessionId, camera: { action: "focus", refs: authoredSubjects, padding: 64 } });
+  call("camera", { sessionId, camera: { action: "set", centerX: 900, centerY: 1_200, zoom: 0.8 } });
   const recordingWaitResult = await recordingWait;
   assert.equal(recordingWaitResult.status, 0, `record-wait succeeds while camera remains interactive: ${recordingWaitResult.stderr}`);
   const recordingWaitResponse = JSON.parse(recordingWaitResult.stdout);
