@@ -42,7 +42,7 @@ struct StartAssignmentPlayer {
 pub const BASE_PROTECTION_RADIUS_TILES: i32 = 7;
 /// Radius around a permanent base site that does not host a player at launch.
 /// Smaller than the start radius because it has no City Centre or worker ring.
-pub const EXPANSION_PROTECTION_RADIUS_TILES: i32 = 4;
+pub const BASE_SITE_PROTECTION_RADIUS_TILES: i32 = 4;
 
 /// The terrain grid, selected player starts, and every authored permanent base site.
 #[derive(Debug, Clone)]

@@ -28,7 +28,7 @@ pub use checkpoint_scenario::{
 pub const LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION: u32 =
     checkpoint_scenario::LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION;
 const LAB_MAP_MAIN_PROTECTION_RADIUS_TILES: i32 = 3;
-const LAB_MAP_EXPANSION_PROTECTION_RADIUS_TILES: i32 = 0;
+const LAB_MAP_BASE_SITE_PROTECTION_RADIUS_TILES: i32 = 0;
 const LAB_MAP_MAX_BASE_SITES: usize = 32;
 const LAB_MAX_MUTATION_BATCH: usize = 400;
 const LAB_PLACEMENT_SUGGESTION_LIMIT: usize = 8;
@@ -593,7 +593,7 @@ impl Game {
                 &draft.terrain,
                 x,
                 y,
-                LAB_MAP_EXPANSION_PROTECTION_RADIUS_TILES,
+                LAB_MAP_BASE_SITE_PROTECTION_RADIUS_TILES,
                 &mut occupied_sites,
             )?;
         }

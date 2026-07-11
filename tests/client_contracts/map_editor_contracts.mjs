@@ -12,9 +12,9 @@ import {
 import {
   addSymmetricDraftLocations,
   authoredMapFromMaterialized,
+  MAP_EDITOR_BASE_SITE_CLEARANCE_TILES,
   MAP_EDITOR_MAIN_CLEARANCE_TILES,
   MAP_EDITOR_MAX_BASE_SITES,
-  MAP_EDITOR_NATURAL_CLEARANCE_TILES,
   MAP_EDITOR_SYMMETRY,
   MapEditorSession,
   mapEditorRectTiles,
@@ -30,9 +30,9 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
 
 {
   const serverMainRadius = Number(serverMapSource.match(/BASE_PROTECTION_RADIUS_TILES:\s*i32\s*=\s*(\d+)/)?.[1]);
-  const serverBaseRadius = Number(serverMapSource.match(/EXPANSION_PROTECTION_RADIUS_TILES:\s*i32\s*=\s*(\d+)/)?.[1]);
+  const serverBaseRadius = Number(serverMapSource.match(/BASE_SITE_PROTECTION_RADIUS_TILES:\s*i32\s*=\s*(\d+)/)?.[1]);
   assert.equal(MAP_EDITOR_MAIN_CLEARANCE_TILES, serverMainRadius);
-  assert.equal(MAP_EDITOR_NATURAL_CLEARANCE_TILES, serverBaseRadius);
+  assert.equal(MAP_EDITOR_BASE_SITE_CLEARANCE_TILES, serverBaseRadius);
 }
 
 {
@@ -44,6 +44,11 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
   assert.equal(materialized.starts.length, 4);
   assert.equal(materialized.baseSites.length, 8, "every authored base is materialized without choosing a player layout");
   assert(materialized.baseSites.some((site) => site.x === 25 && site.y === 25), "start locations are permanent base sites");
+  assert.deepEqual(
+    session.mapOverlay().bases.map((site) => site.index),
+    [4, 5, 6, 7],
+    "neutral base marker labels retain their authored base indices",
+  );
 }
 
 {

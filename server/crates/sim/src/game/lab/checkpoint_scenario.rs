@@ -171,7 +171,7 @@ impl LabCheckpointScenarioMap {
         if self.data.base_sites.len() > MAX_LAB_CHECKPOINT_MAP_BASE_SITES {
             return Err(LabError::InvalidMap {
                 name: self.name.clone(),
-                reason: "checkpoint scenario map expansion site count is invalid".to_string(),
+                reason: "checkpoint scenario map base site count is invalid".to_string(),
             });
         }
         for tile in self

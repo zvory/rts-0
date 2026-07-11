@@ -252,10 +252,10 @@ fn lab_checkpoint_scenario_restore_bounds_map_site_lists() {
     }
     assert_restore_invalid_map(too_many_starts, "start site count");
 
-    let mut too_many_expansions = checkpoint;
-    let expansion = too_many_expansions.map.data.starts[0];
-    while too_many_expansions.map.data.base_sites.len() <= 64 {
-        too_many_expansions.map.data.base_sites.push(expansion);
+    let mut too_many_base_sites = checkpoint;
+    let base_site = too_many_base_sites.map.data.starts[0];
+    while too_many_base_sites.map.data.base_sites.len() <= 64 {
+        too_many_base_sites.map.data.base_sites.push(base_site);
     }
-    assert_restore_invalid_map(too_many_expansions, "expansion site count");
+    assert_restore_invalid_map(too_many_base_sites, "base site count");
 }

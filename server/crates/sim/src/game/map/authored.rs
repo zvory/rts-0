@@ -5,8 +5,8 @@ use serde::Deserialize;
 mod assignment;
 
 use super::{
-    Map, StartAssignmentPlayer, BASE_PROTECTION_RADIUS_TILES, CURRENT_MAP_VERSION,
-    EXPANSION_PROTECTION_RADIUS_TILES,
+    Map, StartAssignmentPlayer, BASE_PROTECTION_RADIUS_TILES, BASE_SITE_PROTECTION_RADIUS_TILES,
+    CURRENT_MAP_VERSION,
 };
 use crate::protocol::terrain;
 
@@ -210,7 +210,7 @@ fn validate_base_clearance(
         let radius = if starts.contains(&(sx, sy)) {
             BASE_PROTECTION_RADIUS_TILES
         } else {
-            EXPANSION_PROTECTION_RADIUS_TILES
+            BASE_SITE_PROTECTION_RADIUS_TILES
         };
         for dy in -radius..=radius {
             for dx in -radius..=radius {

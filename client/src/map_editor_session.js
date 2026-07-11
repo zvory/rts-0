@@ -5,7 +5,7 @@ export const MAP_EDITOR_MAX_START_LOCATIONS = 4;
 export const MAP_EDITOR_MAX_BASE_SITES = 32;
 // Mirror the authored-map clearance contract enforced by the simulation.
 export const MAP_EDITOR_MAIN_CLEARANCE_TILES = 7;
-export const MAP_EDITOR_NATURAL_CLEARANCE_TILES = 4;
+export const MAP_EDITOR_BASE_SITE_CLEARANCE_TILES = 4;
 export const MAP_EDITOR_SYMMETRY = Object.freeze({
   NONE: "none",
   HORIZONTAL: "horizontal",
@@ -250,7 +250,10 @@ export class MapEditorSession {
     if (!this.draft) return null;
     const starts = this.draft.startLocations.map((location, index) => ({ ...location, index }));
     const startKeys = new Set(starts.map(locationKey));
-    return { starts, bases: this.draft.baseSites.filter((site) => !startKeys.has(locationKey(site))) };
+    const bases = this.draft.baseSites
+      .map((location, index) => ({ ...location, index }))
+      .filter((site) => !startKeys.has(locationKey(site)));
+    return { starts, bases };
   }
 
   saveLocal(key) {
@@ -444,7 +447,7 @@ export function protectDraftBaseTerrain(draft) {
   if (!Array.isArray(draft?.terrain)) return;
   const starts = new Set((draft.startLocations || []).map(locationKey));
   for (const site of draft.baseSites || []) {
-    const radius = starts.has(locationKey(site)) ? MAP_EDITOR_MAIN_CLEARANCE_TILES : MAP_EDITOR_NATURAL_CLEARANCE_TILES;
+    const radius = starts.has(locationKey(site)) ? MAP_EDITOR_MAIN_CLEARANCE_TILES : MAP_EDITOR_BASE_SITE_CLEARANCE_TILES;
     paintDraftRect(draft, { x0: site.x - radius, y0: site.y - radius, x1: site.x + radius, y1: site.y + radius }, TERRAIN.GRASS);
   }
 }
@@ -517,11 +520,11 @@ function migrateLegacyDraft(source) {
 }
 
 function locationCollection(draft, kind) { return kind === "start" ? draft?.startLocations : draft?.baseSites; }
-function locationRadius(kind) { return kind === "start" ? MAP_EDITOR_MAIN_CLEARANCE_TILES : MAP_EDITOR_NATURAL_CLEARANCE_TILES; }
+function locationRadius(kind) { return kind === "start" ? MAP_EDITOR_MAIN_CLEARANCE_TILES : MAP_EDITOR_BASE_SITE_CLEARANCE_TILES; }
 function protectedTerrainTile(draft, x, y) {
   const starts = new Set((draft.startLocations || []).map(locationKey));
   return (draft.baseSites || []).some((site) => {
-    const radius = starts.has(locationKey(site)) ? MAP_EDITOR_MAIN_CLEARANCE_TILES : MAP_EDITOR_NATURAL_CLEARANCE_TILES;
+    const radius = starts.has(locationKey(site)) ? MAP_EDITOR_MAIN_CLEARANCE_TILES : MAP_EDITOR_BASE_SITE_CLEARANCE_TILES;
     return Math.abs(site.x - x) <= radius && Math.abs(site.y - y) <= radius;
   });
 }

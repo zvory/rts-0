@@ -5,8 +5,8 @@ import { createTerrainPreviewCanvas } from "./renderer/terrain.js";
 import {
   addSymmetricDraftLocations,
   mapEditorRectTiles,
+  MAP_EDITOR_BASE_SITE_CLEARANCE_TILES,
   MAP_EDITOR_MAIN_CLEARANCE_TILES,
-  MAP_EDITOR_NATURAL_CLEARANCE_TILES,
   MAP_EDITOR_SYMMETRY,
   moveSymmetricDraftLocation,
   protectDraftBaseTerrain,
@@ -156,7 +156,7 @@ export class MapEditorViewport {
     }
     const locations = this.session.mapOverlay();
     for (const start of locations?.starts || []) this.drawSite(start, 0x4ec9ff, 11, `S${start.index + 1}`);
-    for (const [index, base] of (locations?.bases || []).entries()) this.drawSite(base, 0xf4c542, 7, `B${index + 1}`);
+    for (const base of locations?.bases || []) this.drawSite(base, 0xf4c542, 7, `B${base.index + 1}`);
     this.drawPaintPreview();
   }
 
@@ -304,7 +304,7 @@ export class MapEditorViewport {
     const rect = this.renderer.app.view.getBoundingClientRect();
     const world = this.camera.screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
     const size = this.session.draft?.terrain?.length || 0;
-    const radius = kind === "start" ? MAP_EDITOR_MAIN_CLEARANCE_TILES : kind === "base" ? MAP_EDITOR_NATURAL_CLEARANCE_TILES : 0;
+    const radius = kind === "start" ? MAP_EDITOR_MAIN_CLEARANCE_TILES : kind === "base" ? MAP_EDITOR_BASE_SITE_CLEARANCE_TILES : 0;
     if (!size || size <= radius * 2) return null;
     return {
       x: Math.max(radius, Math.min(size - radius - 1, Math.floor(world.x / TILE_SIZE))),
@@ -402,10 +402,6 @@ function terrainPreviewColor(code) {
   if (code === TERRAIN.ROCK) return 0xa69a82;
   if (code === TERRAIN.WATER) return 0x4b9bd0;
   return 0x6d9f58;
-}
-
-function hexColor(value) {
-  return Number.parseInt(String(value || "#ffffff").replace("#", ""), 16) || 0xffffff;
 }
 
 function isTextEntry(target) {
