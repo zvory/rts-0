@@ -15,12 +15,13 @@ import {
   angleDelta,
   clamp01,
   isVehicleBodyKind,
+  rendererVisualNow,
   smoothstep01,
   tankBodyVisual,
 } from "./shared.js";
 
 export function _deployedWeaponSetupVisual(e) {
-  const now = performance.now();
+  const now = rendererVisualNow(this);
   const setupState = e.setupState || SETUP.PACKED;
   const prev = this._setupVisuals.get(e.id);
   if (!prev || prev.state !== setupState) {
@@ -265,6 +266,7 @@ export function _rigRenderContextFor(e, colorByOwner, state) {
     selected: state.selection?.has?.(e.id) ?? false,
     map: this._map,
     occupiedTrench: hasOccupiedTrench(e),
+    now: rendererVisualNow(this),
   });
   return context;
 }
@@ -299,7 +301,7 @@ function finite(value, fallback) {
 }
 
 export function _drawShotRevealUnit(e, colorByOwner, state, pools = {}) {
-  const now = performance.now();
+  const now = rendererVisualNow(this);
   const age = Math.max(0, now - (e.shotRevealCreatedAt || now));
   const ttl = Math.max(1, (e.shotRevealExpiresAt || now + 1) - (e.shotRevealCreatedAt || now));
   const t = clamp01(age / ttl);

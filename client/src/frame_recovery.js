@@ -19,7 +19,12 @@ export function runMatchFrameSafely(match, now) {
   }
 }
 
-function runMatchFrame(match, now) {
+export function runMatchCaptureFrame(match, now) {
+  if (!match.running) return;
+  runMatchFrame(match, now, { capture: true });
+}
+
+function runMatchFrame(match, now, { capture = false } = {}) {
   const frameStartedAt = match.frameProfiler?.now?.() ?? now;
   const dt = (now - match.lastFrame) / 1000;
   const frameGapMs = now - match.lastFrame;
@@ -27,15 +32,15 @@ function runMatchFrame(match, now) {
   const time = (label, fn) => match.frameProfiler ? match.frameProfiler.time(label, fn) : fn();
   match.lastFrame = now;
   try {
-    if (Number.isFinite(frameGapMs) && frameGapMs >= 0) {
+    if (!capture && Number.isFinite(frameGapMs) && frameGapMs >= 0) {
       time("match.healthFrameGap", () => match.health.noteFrameGap(frameGapMs, now));
     }
-    time("match.latencyRefresh", () => match.health.refreshLatency());
+    if (!capture) time("match.latencyRefresh", () => match.health.refreshLatency());
 
-    const alpha = time("match.alpha", () => match.computeAlpha());
+    const alpha = capture ? 1 : time("match.alpha", () => match.computeAlpha());
 
     time("match.camera", () => {
-      match.camera.update(dt, match.input);
+      if (!capture) match.camera.update(dt, match.input);
       if (match.audio) {
         match.audio.setListener(
           match.camera.x + match.camera.viewW / (2 * match.camera.zoom),
@@ -45,7 +50,7 @@ function runMatchFrame(match, now) {
         );
       }
     });
-    time("match.input", () => match.input.update(dt));
+    if (!capture) time("match.input", () => match.input.update(dt));
     time("match.minimapIntent", () => match.minimap.updateCommandTargetPreview?.());
     time("match.predictionVisual", () => match.advancePredictionVisual());
     const frameViews = time(
@@ -82,12 +87,14 @@ function runMatchFrame(match, now) {
     time("match.hud", () => match.hud.update(frameViews, { profiler: match.frameProfiler }));
     time("match.minimap", () => match.minimap.render(frameViews, { profiler: match.frameProfiler }));
     time("match.observerAnalysis", () => match.observerDiagnostics?.update(frameViews, { profiler: match.frameProfiler }));
-    time("match.healthPublish", () => match.health.publish());
+    if (!capture) time("match.healthPublish", () => match.health.publish());
   } finally {
     const frameSummary = match.frameProfiler?.endFrame({ context: collectMatchFrameContext(match) });
-    match.health?.noteFrameSummary?.(frameSummary, {
-      predictedSnapshotPresent: (match.state?.predictedById?.size || 0) > 0,
-    });
+    if (!capture) {
+      match.health?.noteFrameSummary?.(frameSummary, {
+        predictedSnapshotPresent: (match.state?.predictedById?.size || 0) > 0,
+      });
+    }
   }
 }
 

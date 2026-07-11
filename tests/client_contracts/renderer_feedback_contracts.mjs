@@ -650,9 +650,10 @@ function nearPoint(call, point, epsilon = 0.001) {
   const mainMuzzle = { x: tank.x + 24.875, y: tank.y };
   const coaxMuzzle = { x: tank.x + 12.775, y: tank.y - 5.55 };
 
-  performance.now = () => fixedNow;
+  performance.now = () => fixedNow - 100;
   try {
     _drawMuzzleFlashes.call({
+      visualNow: () => fixedNow,
       _feedbackGfx: feedbackGfx,
       _map: { tileSize: 32 },
       _liveRigDefinitionsByKind: createLiveRigDefinitions(),

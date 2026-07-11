@@ -122,8 +122,28 @@ export class LabInteractBridge {
       case "importSetup": return this.importSetup(input);
       case "presentation": return this.presentation(input);
       case "captureReadiness": return this.captureReadiness(input);
+      case "captureFixedEnter": return this.captureFixedEnter();
+      case "captureFixedFrame": return this.captureFixedFrame(input);
+      case "captureFixedExit": return this.captureFixedExit();
       default: throw bridgeError("unknownMethod", `Unknown Lab Interact bridge method ${JSON.stringify(method)}.`);
     }
+  }
+
+  captureFixedEnter() {
+    const { match } = this.session();
+    if (!isPaused(match)) throw bridgeError("roomTimeNotPaused", "Fixed capture requires paused authoritative room time.");
+    return match.enterFixedCapture();
+  }
+
+  captureFixedFrame(input) {
+    const { match } = this.session();
+    const visualTimeMs = finiteNumber(input?.visualTimeMs, "captureFixedFrame.visualTimeMs");
+    return match.renderFixedCaptureFrame(visualTimeMs);
+  }
+
+  captureFixedExit() {
+    const match = this.app?.match;
+    return match?.exitFixedCapture?.() || { resumed: false };
   }
 
   session() {

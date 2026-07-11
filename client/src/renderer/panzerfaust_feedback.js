@@ -2,13 +2,14 @@ import {
   clamp01,
   drawFreeRotatedRect,
   hash2,
+  rendererVisualNow,
   smoothstep01,
 } from "./shared.js";
 
 export function _drawPanzerfaustShots(state) {
   const g = this._feedbackGfx;
   if (!state || typeof state.livePanzerfaustShots !== "function") return;
-  const now = performance.now();
+  const now = rendererVisualNow(this);
   const shots = state.livePanzerfaustShots(now);
   if (!shots.length) return;
 
@@ -66,7 +67,7 @@ export function _drawPanzerfaustShots(state) {
 export function _drawPanzerfaustImpacts(state) {
   const g = this._feedbackGfx;
   if (!state || typeof state.livePanzerfaustImpacts !== "function") return;
-  const now = performance.now();
+  const now = rendererVisualNow(this);
   const impacts = state.livePanzerfaustImpacts(now);
   if (!impacts.length) return;
 

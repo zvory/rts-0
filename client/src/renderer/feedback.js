@@ -66,6 +66,7 @@ import {
   polar,
   recoilVector,
   rectEdgePointTowardCenter,
+  rendererVisualNow,
   smoothstep01,
   tankBodyVisual,
   weaponRecoilOffset,
@@ -152,7 +153,7 @@ export function _drawCommandFeedback(view) {
   g.clear();
   if (!view || typeof view.liveCommandFeedback !== "function") return;
 
-  const now = performance.now();
+  const now = rendererVisualNow(this);
   for (const f of view.liveCommandFeedback(now)) {
     if (f.ownerId != null && typeof view.isFeedbackOwner === "function" && !view.isFeedbackOwner(f.ownerId)) {
       continue;
@@ -694,7 +695,7 @@ export function _drawSmokes(state) {
   const g = this._smokeGfx;
   if (!g) return;
   const ts = (this._map && this._map.tileSize) || 32;
-  const now = performance.now();
+  const now = rendererVisualNow(this);
   g.lineStyle(0, 0x000000, 0);
   for (const smoke of smokes) {
     if (!finiteNumber(smoke.x) || !finiteNumber(smoke.y)) continue;
@@ -744,7 +745,7 @@ export function _drawSmokes(state) {
 export function _drawSmokeCanisters(state) {
   const g = this._feedbackGfx;
   if (!state || typeof state.liveSmokeCanisters !== "function") return;
-  const now = performance.now();
+  const now = rendererVisualNow(this);
   const canisters = state.liveSmokeCanisters(now);
   if (!canisters.length) return;
 
@@ -781,7 +782,7 @@ export function _drawSmokeCanisters(state) {
 export function _drawMortarLaunches(state) {
   const g = this._feedbackGfx;
   if (!state || typeof state.liveMortarLaunches !== "function") return;
-  const now = performance.now();
+  const now = rendererVisualNow(this);
   const launches = state.liveMortarLaunches(now);
   if (!launches.length) return;
 
@@ -841,7 +842,7 @@ export function _drawMortarLaunches(state) {
 export function _drawMortarTargets(state) {
   const g = this._feedbackGfx;
   if (!state || typeof state.liveMortarTargets !== "function") return;
-  const now = performance.now();
+  const now = rendererVisualNow(this);
   const targets = state.liveMortarTargets(now);
   if (!targets.length) return;
   const ts = (this._map && this._map.tileSize) || 32;
@@ -873,7 +874,7 @@ export function _drawMortarTargets(state) {
 export function _drawMortarShells(state) {
   const g = this._feedbackGfx;
   if (!state || typeof state.liveMortarShells !== "function") return;
-  const now = performance.now();
+  const now = rendererVisualNow(this);
   const shells = state.liveMortarShells(now);
   if (!shells.length) return;
 
@@ -916,7 +917,7 @@ export function _drawMortarShells(state) {
 export function _drawMortarImpacts(state) {
   const g = this._feedbackGfx;
   if (!state || typeof state.liveMortarImpacts !== "function") return;
-  const now = performance.now();
+  const now = rendererVisualNow(this);
   const impacts = state.liveMortarImpacts(now);
   if (!impacts.length) return;
   const ts = (this._map && this._map.tileSize) || 32;
@@ -960,7 +961,7 @@ export function _drawMortarImpacts(state) {
 export function _drawArtilleryTargets(state) {
   const g = this._feedbackGfx;
   if (!state || typeof state.liveArtilleryTargets !== "function") return;
-  const now = performance.now();
+  const now = rendererVisualNow(this);
   const targets = state.liveArtilleryTargets(now);
   if (!targets.length) return;
   const ts = (this._map && this._map.tileSize) || 32;
@@ -998,7 +999,7 @@ export function _drawArtilleryTargets(state) {
 export function _drawArtilleryLaunches(state) {
   const g = this._feedbackGfx;
   if (!state || typeof state.liveArtilleryLaunches !== "function") return;
-  const now = performance.now();
+  const now = rendererVisualNow(this);
   const launches = state.liveArtilleryLaunches(now);
   if (!launches.length) return;
 
@@ -1034,7 +1035,7 @@ export function _drawArtilleryLaunches(state) {
 export function _drawArtilleryImpacts(state) {
   const g = this._feedbackGfx;
   if (!state || typeof state.liveArtilleryImpacts !== "function") return;
-  const now = performance.now();
+  const now = rendererVisualNow(this);
   const impacts = state.liveArtilleryImpacts(now);
   if (!impacts.length) return;
   const ts = (this._map && this._map.tileSize) || 32;
@@ -1245,7 +1246,7 @@ export function _drawResourceMiningPreview(view) {
 export function _drawMuzzleFlashes(state) {
   const g = this._feedbackGfx;
   if (!state || typeof state.liveMuzzleFlashes !== "function") return;
-  const now = performance.now();
+  const now = rendererVisualNow(this);
   const flashes = state.liveMuzzleFlashes(now);
   if (!flashes.length) return;
 

@@ -183,6 +183,12 @@ assert.equal(callFailure("record-stop", { sessionId }).error.code, "recordingIna
 assert.equal(callFailure("record-start", { sessionId, maxDurationMs: 30_001 }).error.code, "invalidInput", "recording duration remains hard bounded");
 assert.equal(callFailure("record-start", { sessionId, crop: { x: 0, y: 0, width: 1, height: 10 } }).error.code, "invalidInput", "recording crop dimensions remain bounded");
 
+const fixed = call("capture-fixed", { sessionId, name: "cli-fixed", fps: 60, frameCount: 3 });
+assert.equal(fixed.result.framePaths.length, 3, "capture-fixed returns one confined PNG path per requested frame");
+assert.deepEqual(fixed.result.authoritative, { startTick: 6, endTick: 7 }, "capture-fixed reports its authoritative tick range");
+assert.match(fixed.result.videoPath, /target\/lab-interact\//, "fixed video remains beneath the artifact root");
+assert.equal(callFailure("capture-fixed", { sessionId, fps: 61, frameCount: 1 }).error.code, "invalidInput", "fixed capture FPS remains bounded");
+
 const setupExport = call("export", { sessionId, kind: "setup", name: "Aliased fixture", reproduction: true });
 assert.match(setupExport.result.artifactId, /^artifact_[a-f0-9]{32}$/, "setup export returns an opaque artifact id");
 assert.equal("checkpointPayload" in setupExport.result, false, "setup export never prints checkpoint bytes");

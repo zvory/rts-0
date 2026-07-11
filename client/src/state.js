@@ -258,7 +258,7 @@ export class GameState extends VisualEffectBackedState {
    * events and the id->entity index are refreshed from the latest snapshot.
    * @param {object} msg a §2.4 snapshot payload.
    */
-  applySnapshot(msg) {
+  applySnapshot(msg, visualNow = performance.now()) {
     // Snapshots can arrive batched in a single event-loop turn (a throttled or
     // backgrounded tab drains its socket buffer at once) and performance.now()
     // is clamped to a coarse resolution, so two consecutive snapshots could
@@ -266,7 +266,7 @@ export class GameState extends VisualEffectBackedState {
     // so the interpolation window (curr - prev) is always positive and never
     // collapses to a degenerate, alpha-pinned-to-1 span. Real time reasserts
     // itself via Math.max as soon as performance.now() passes the floor.
-    const now = Math.max(performance.now(), this._curRecvTime + 1);
+    const now = Math.max(visualNow, this._curRecvTime + 1);
 
     this._prev = this._cur;
     this._prevRecvTime = this._curRecvTime;

@@ -21,6 +21,8 @@ const AREA_BY_FILE = new Map(Object.entries({
   "match_health.js": "app-shell",
   "frame_profiler.js": "app-shell",
   "frame_recovery.js": "app-shell",
+  "match_fixed_capture.js": "app-shell",
+  "visual_clock.js": "app-shell",
   "frame_entity_views.js": "app-shell",
   "ai_diagnostics_panel.js": "app-shell",
   "observer_analysis_overlay.js": "app-shell",
@@ -149,7 +151,9 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   // Lab MVP2 Phase 5 routes lab setup-tool cancellation through the input controller.
   "input/index.js": 40927,
   // Visual Experimentation Phase 1 injects local lab visual profile state for renderer-only samples.
-  "match.js": 47478,
+  // Lab Interact Phase 6 adds only the public fixed-capture lifecycle seam; its state machine lives
+  // in match_fixed_capture.js so Match retains renderer/rAF ownership without absorbing the logic.
+  "match.js": 48050,
   // Artillery minimap markers add a compact visual-only firing event.
   "protocol.js": 45366,
   // Protocol cleanup split compact snapshot decoding behind protocol.js.
@@ -157,7 +161,9 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   "protocol_snapshot.js": 24192,
   // Lab MVP Phase 5 lets command descriptors ask the injected policy which owner is controllable.
   "hud_command_card.js": 29498,
-  "renderer/shared.js": 28113,
+  // Lab Interact Phase 6 centralizes renderer visual-clock fallback so extracted draw modules
+  // share the injected clock without each growing its own compatibility expression.
+  "renderer/shared.js": 28217,
   // Render Lag Phase 3 lets the observer Army Value tab consume frame-local entity views.
   "observer_analysis_overlay.js": 28009,
   "audio.js": 27339,

@@ -2,6 +2,10 @@ import { COLORS, TANK_BODY } from "../config.js";
 import { KIND } from "../protocol.js";
 import { WEAPON_RECOIL_PX, ZERO_OFFSET } from "./palette.js";
 
+export function rendererVisualNow(renderer) {
+  return renderer?.visualNow?.() ?? performance.now();
+}
+
 // Shared pure renderer helpers.
 
 /** Per-attacker muzzle-flash radius in world px. 0 means no flash for this kind. */

@@ -14,6 +14,7 @@ import {
   checkMediaCapabilities, finalizeMedia, LabInteractRecordingError, RECORDING_LIMITS,
   removePartialRecording, stopRecorderWithin, waitForMediaFile,
 } from "./recording.mjs";
+import { encodeFixedCapture, fixedFrameTick, hashFrame } from "./fixed_capture.mjs";
 
 const DEFAULT_VIEWPORT = Object.freeze({ width: 1440, height: 900, deviceScaleFactor: 1 });
 const DEFAULT_TIMEOUT_MS = 15_000;
@@ -93,6 +94,8 @@ export class LabInteractDriver {
     this.closePromise = null;
     this.recording = null;
     this.lastRecording = null;
+    this.fixedCapture = null;
+    this.lastFixedCapture = null;
     this.signalHandlers = [];
     this.openStarted = false;
     const configuredArtifactCapability = process.env.RTS_LAB_INTERACT_ARTIFACT_CAPABILITY || "";
@@ -360,6 +363,98 @@ export class LabInteractDriver {
         throw error;
       }
     });
+  }
+
+  async captureFixed({ sessionId, name = "fixed", fps = 30, frameCount = 30, viewport = null, sceneIdentity = null, sceneRevision = 0, aliases = [] } = {}) {
+    return this.enqueue(async () => {
+      if (this.recording) throw new LabInteractDriverError("recordingActive", "Fixed capture is unavailable while real-time recording is active.");
+      const normalizedSessionId = safeCaptureSessionId(sessionId);
+      const artifactName = safeArtifactName(name, "fixed");
+      const originalViewport = this.page.viewport?.() || null;
+      const normalizedViewport = viewport ? normalizeCaptureViewport(viewport) : null;
+      let captureDir = "";
+      let captureEntered = false;
+      try {
+        const status = await this.callBridge("status", {});
+        if (!status.roomTime?.paused) throw new LabInteractDriverError("roomTimeNotPaused", "capture-fixed requires paused authoritative room time.");
+        if (normalizedViewport) await this.page.setViewport(normalizedViewport);
+        await this.callBridge("presentation", { mode: "clean" });
+        await this.page.evaluate(() => document.fonts?.ready || Promise.resolve());
+        await this.waitForCaptureReadiness([]);
+        const clip = await this.page.evaluate(() => {
+          const rect = document.getElementById("viewport")?.getBoundingClientRect?.();
+          return rect ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height } : null;
+        });
+        if (!validClip(clip)) throw new LabInteractDriverError("viewportUnavailable", "The Pixi viewport is not available for fixed capture.");
+        this.fixedCapture = { active: true, cancelled: false, name: artifactName, fps, frameCount, frameIndex: 0, startStatus: status };
+        const suffix = new Date().toISOString().replace(/[:.]/g, "-");
+        captureDir = path.join(this.workspace.root, LAB_INTERACT_ROOT, normalizedSessionId, "fixed", `${artifactName}-${suffix}`);
+        const framesDir = path.join(captureDir, "frames");
+        fs.mkdirSync(framesDir, { recursive: true });
+        const entered = await this.callBridge("captureFixedEnter", {});
+        captureEntered = true;
+        const startTick = status.snapshotTick;
+        let currentTick = startTick;
+        const frames = [];
+        for (let index = 0; index < frameCount; index += 1) {
+          if (this.fixedCapture?.cancelled) throw new LabInteractDriverError("captureCancelled", "Fixed capture was cancelled and its partial artifacts were removed.");
+          this.fixedCapture.frameIndex = index;
+          const tick = fixedFrameTick(startTick, index, fps);
+          const ticks = tick - currentTick;
+          if (ticks > 0) {
+            await this.callBridge("time", { action: "step", ticks });
+            currentTick = tick;
+          }
+          const visualTimeMs = entered.visualStartMs + index * (1000 / fps);
+          const rendered = await this.callBridge("captureFixedFrame", { visualTimeMs });
+          const framePath = path.join(framesDir, `frame-${String(index).padStart(4, "0")}.png`);
+          await this.page.screenshot({ type: "png", clip, path: framePath });
+          frames.push({ index, tick, visualTimeMs, rendererFrame: rendered.rendererFrame, path: framePath, sha256: hashFrame(framePath) });
+        }
+        const videoPath = path.join(captureDir, `${artifactName}.webm`);
+        const contactSheetPath = path.join(captureDir, `${artifactName}-contact-sheet.png`);
+        const media = encodeFixedCapture({ framesDir, outputPath: videoPath, contactSheetPath, fps, frameCount });
+        const endStatus = await this.callBridge("status", {});
+        const diagnostics = this.diagnostics();
+        const manifestPath = path.join(captureDir, `${artifactName}.json`);
+        const manifest = {
+          schemaVersion: 1, kind: "labInteractFixedCapture", deterministicEnvironmentOnly: true,
+          workspace: this.workspace, serverBuild: this.server?.build || null,
+          scene: { identity: sceneIdentity || { source: "launch", scenario: this.options.scenario, seed: this.options.seed || null, map: this.options.map }, revision: sceneRevision, aliases: aliases.slice(0, 100) },
+          mapping: { simulationHz: 30, outputFps: fps, rule: "frame i uses startTick + floor(i * 30 / outputFps); repeated ticks do not interpolate world state" },
+          authoritative: { startTick, endTick: endStatus.snapshotTick },
+          capture: { frameCount, clip, viewport: normalizedViewport, visualStartMs: entered.visualStartMs },
+          frames, media: { videoPath, contactSheetPath, bytes: media.bytes, tools: media.tools, probe: media.probe, contactSheet: media.contactSheet },
+          runtime: { node: process.version, platform: process.platform, architecture: process.arch, browser: this.browserVersion || null },
+          errors: { pageConsole: diagnostics.pageConsoleErrors, page: diagnostics.pageErrors, requestFailures: diagnostics.requestFailures },
+        };
+        fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o600 });
+        const result = { videoPath, contactSheetPath, manifestPath, framePaths: frames.map((frame) => frame.path), frameHashes: frames.map((frame) => frame.sha256), authoritative: manifest.authoritative, mapping: manifest.mapping, probe: media.probe };
+        this.lastFixedCapture = result;
+        return result;
+      } catch (error) {
+        removePartialRecording([captureDir]);
+        if (error instanceof LabInteractRecordingError) throw new LabInteractDriverError(error.code, error.message);
+        throw error;
+      } finally {
+        if (captureEntered) await this.callBridge("captureFixedExit", {}).catch(() => {});
+        await this.callBridge("presentation", { mode: "default" }).catch(() => {});
+        if (originalViewport) await this.page?.setViewport(originalViewport).catch(() => {});
+        this.fixedCapture = null;
+      }
+    });
+  }
+
+  fixedCaptureStatus() {
+    if (!this.fixedCapture) return { active: false, last: this.lastFixedCapture };
+    const { cancelled, name, fps, frameCount, frameIndex } = this.fixedCapture;
+    return { active: true, cancelled, name, fps, frameCount, frameIndex };
+  }
+
+  cancelFixedCapture() {
+    if (!this.fixedCapture) throw new LabInteractDriverError("captureInactive", "No fixed capture is active.");
+    this.fixedCapture.cancelled = true;
+    return { cancelling: true };
   }
 
   recordAcceptedOperation(operation, aliases = []) {

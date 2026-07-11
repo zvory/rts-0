@@ -104,8 +104,9 @@ export class Renderer {
   /**
    * @param {HTMLElement} canvasParent element the Pixi canvas is appended to
    */
-  constructor(canvasParent) {
+  constructor(canvasParent, { renderClock = null } = {}) {
     this._parent = canvasParent;
+    this._renderClock = renderClock;
 
     /** The PIXI.Application. Exposed for the render loop / ticker. */
     this.app = new PIXI.Application({
@@ -282,6 +283,15 @@ export class Renderer {
     this._map = null;
   }
 
+  setRenderClock(renderClock) {
+    if (!renderClock || typeof renderClock.now !== "function") throw new TypeError("Renderer requires a render clock.");
+    this._renderClock = renderClock;
+  }
+
+  visualNow() {
+    return this._renderClock?.now?.() ?? performance.now();
+  }
+
   _loadLivePngRigAtlases() {
     for (const [kind, atlas] of this._livePngRigAtlasesByKind || []) {
       this._trackVisualAsset(`live-png:${kind}`, loadPngRigAtlasTexture(PIXI, atlas)
@@ -456,6 +466,7 @@ export class Renderer {
         clientIntent,
         entities,
         selectedEntities: frameViews?.selectedEntities,
+        now: this.visualNow(),
       }),
     );
     time("renderer.groundDecals", () => {

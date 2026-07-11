@@ -24,6 +24,20 @@ const start = {
 {
   const state = new GameState(start);
   state.applySnapshot({
+    tick: 1, steel: 0, oil: 0, supplyUsed: 0, supplyCap: 10,
+    entities: [
+      { id: 1, owner: 1, kind: KIND.TANK, x: 100, y: 100, hp: 180, maxHp: 180, state: STATE.ATTACK },
+      { id: 2, owner: 2, kind: KIND.TANK, x: 160, y: 100, hp: 180, maxHp: 180, state: STATE.IDLE },
+    ],
+    events: [{ e: EVENT.ATTACK, from: 1, to: 2, weaponKind: WEAPON_KIND.TANK_CANNON }],
+  }, 500);
+  assert(state.liveMuzzleFlashes(550).length === 1, "snapshot visual events use the injected render-clock timestamp");
+  assert(state.weaponRecoil(1, KIND.TANK, 550) > 0, "recoil phase samples deterministically from injected visual time");
+}
+
+{
+  const state = new GameState(start);
+  state.applySnapshot({
     tick: 1,
     steel: 0,
     oil: 0,
