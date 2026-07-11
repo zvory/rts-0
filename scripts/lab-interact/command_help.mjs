@@ -27,8 +27,9 @@ export const LAB_INTERACT_COMMAND_HELP = Object.freeze({
     defaults: ["categories=all categories"], bounds: ["0-8 unique requested categories"],
     example: { sessionId: "<lab-session-id>", categories: ["players", "units", "commands"] },
   }),
-  spawn: descriptor("Atomically spawn one bounded batch and optionally assign aliases.", "{sessionId:string,spawns:[{owner:u32,kind:token,x:number,y:number,completed?:boolean,alias?:alias}]} ", {
-    defaults: ["completed=true", "alias=none"], bounds: ["1-400 spawns", "400 aliases per session", "alias [A-Za-z][A-Za-z0-9_-]{0,31}"],
+  spawn: descriptor("Atomically spawn one bounded batch and optionally assign aliases.", "{sessionId:string,spawns:[{owner:u32,kind:token,x:number,y:number,completed?:boolean,alias?:alias}],details?:boolean}", {
+    variants: ["details=false returns counts and at most 12 alias/id rows", "details=true returns every decorated entity and raw authoritative outcome"],
+    defaults: ["completed=true", "alias=none", "details=false"], bounds: ["1-400 spawns", "400 aliases per session", "alias [A-Za-z][A-Za-z0-9_-]{0,31}", "12 default response details"],
     example: { sessionId: "<lab-session-id>", spawns: [{ owner: 1, kind: "rifleman", x: 960, y: 960, alias: "subject" }] },
   }),
   update: descriptor("Atomically apply a bounded batch of Lab scene updates.", "{sessionId:string,updates:update[]} or {sessionId:string,update:update}", {
@@ -40,7 +41,7 @@ export const LAB_INTERACT_COMMAND_HELP = Object.freeze({
     bounds: ["1-400 unique resolved references"], example: { sessionId: "<lab-session-id>", refs: ["subject"] },
   }),
   order: descriptor("Issue one normal authoritative game command as a selected player.", "{sessionId:string,playerId:u32,command:game-command,ignoreCommandLimits?:boolean}", {
-    variants: ["move|attackMove|attack|deconstruct|setupAntiTankGuns|tearDownAntiTankGuns|charge|useAbility|recastAbility|setAutocast|gather|build|train|research|cancel|stop|holdPosition|setRally"],
+    variants: ["move|attackMove|attack|deconstruct|setupAntiTankGuns|tearDownAntiTankGuns|charge|useAbility|recastAbility|setAutocast|gather|build|train|research|cancel|stop|holdPosition|setRally", "success reports authoritative enqueue admission and queuedAtTick, not effect completion"],
     defaults: ["ignoreCommandLimits=false", "queued omitted unless supplied by the command variant"], bounds: ["1-100 unit references", "command bridge JSON <=16 KiB"],
     example: { sessionId: "<lab-session-id>", playerId: 1, command: { c: "move", units: ["subject"], x: 1100, y: 960 } },
   }),
@@ -74,17 +75,18 @@ export const LAB_INTERACT_COMMAND_HELP = Object.freeze({
     defaults: ["name=empty", "reproduction=false"], bounds: ["setup name <=80 UTF-8 bytes", "replay name <=120 UTF-8 bytes", "artifact <=8 MiB", "alias sidecar <=64 KiB and 400 aliases"],
     example: { sessionId: "<lab-session-id>", kind: "setup", name: "two-unit-scene", reproduction: true },
   }),
-  import: descriptor("Destructively replace the ephemeral session from one confined artifact.", "{sessionId:string,kind:\"setup\"|\"replay\",artifactId?:string,path?:string}", {
-    variants: ["provide exactly one of artifactId or path"], bounds: ["path <=1024 characters and beneath target/lab-interact", "artifact <=8 MiB", "at most 400 sidecar aliases"],
+  import: descriptor("Destructively replace the ephemeral session from one confined artifact.", "{sessionId:string,kind:\"setup\"|\"replay\",artifactId?:string,path?:string,details?:boolean}", {
+    variants: ["provide exactly one of artifactId or path", "details=false summarizes restored/stale aliases", "details=true returns every alias row and the raw import result"], defaults: ["details=false"], bounds: ["path <=1024 characters and beneath target/lab-interact", "artifact <=8 MiB", "at most 400 sidecar aliases", "12 default details per alias category"],
     example: { sessionId: "<lab-session-id>", kind: "setup", artifactId: "artifact_<32-hex>" },
   }),
   "artifact-inspect": descriptor("Inspect bounded metadata for one confined setup or replay artifact.", "{sessionId:string,kind?:\"setup\"|\"replay\",artifactId?:string,path?:string}", {
     variants: ["provide exactly one of artifactId or path", "kind may be omitted when artifactId/path identifies it"], bounds: ["artifact <=8 MiB", "at most 400 sidecar aliases"],
     example: { sessionId: "<lab-session-id>", artifactId: "artifact_<32-hex>" },
   }),
-  "record-start": descriptor("Start one real-time clean-presentation H.264 recording.", "{sessionId:string,name?:token,maxDurationMs?:int,viewport?:viewport,crop?:{x,y,width,height},scale?:number}", {
-    defaults: ["name=recording", "maxDurationMs=10000", "viewport=current", "crop=game viewport", "scale=1"], bounds: ["duration 1000-60000 ms", "viewport/crop <=2048", "scale 0.25-1", "one active recorder", "64 MiB output"],
-    example: { sessionId: "<lab-session-id>", name: "motion", maxDurationMs: 10000 },
+  "record-start": descriptor("Start one real-time clean-presentation H.264 recording.", "{sessionId:string,name?:token,maxDurationMs?:int,viewport?:viewport,crop?:{x,y,width,height},scale?:number,resumeSpeed?:number}", {
+    variants: ["resumeSpeed atomically resumes authoritative time after the recorder has its initial frame"],
+    defaults: ["name=recording", "maxDurationMs=10000", "viewport=current", "crop=game viewport", "scale=1", "resumeSpeed=omitted"], bounds: ["duration 1000-60000 ms", "viewport/crop <=2048", "scale 0.25-1", "resumeSpeed 0.01-16", "one active recorder", "64 MiB output"],
+    example: { sessionId: "<lab-session-id>", name: "motion", maxDurationMs: 10000, resumeSpeed: 1 },
   }),
   "record-stop": descriptor("Finalize the active real-time recording and return confined artifact paths.", "{sessionId:string}", {
     bounds: ["one active recorder", "six representative frame paths", "40 detailed aliases in the manifest"], example: { sessionId: "<lab-session-id>" },
@@ -95,7 +97,7 @@ export const LAB_INTERACT_COMMAND_HELP = Object.freeze({
     example: { sessionId: "<lab-session-id>" },
   }),
   "capture-fixed": descriptor("Capture a deterministic-environment fixed-step H.264 sequence.", "{sessionId:string,name?:token,fps?:int,frameCount?:int,viewport?:viewport}", {
-    defaults: ["name=fixed", "fps=30", "frameCount=30", "viewport=current"], bounds: ["paused room required", "fps 10-60", "1-180 frames", "40 detailed aliases in the manifest"],
+    defaults: ["name=fixed", "fps=30", "frameCount=30", "viewport=current"], bounds: ["paused room required", "fps 10-60", "1-1800 frames", "six retained representative PNGs", "per-frame details in the manifest", "40 detailed aliases in the manifest"],
     example: { sessionId: "<lab-session-id>", name: "motion-fixed", fps: 30, frameCount: 60 },
   }),
   "capture-cancel": descriptor("Request cancellation of the active fixed-step capture.", "{sessionId:string}", {

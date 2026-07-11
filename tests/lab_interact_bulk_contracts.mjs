@@ -43,11 +43,23 @@ const spawns = Array.from({ length: 100 }, (_, index) => ({
 }));
 const spawned = await service.execute("spawn", { sessionId, spawns });
 assert.equal(calls.spawn, 1, "command service dispatches a bulk spawn once");
-assert.equal(spawned.results.length, 100, "command service preserves bulk spawn result ordering");
+assert.deepEqual(
+  { count: spawned.spawned.count, detailed: spawned.spawned.details.length, truncated: spawned.spawned.truncated },
+  { count: 100, detailed: LAB_INTERACT_LIMITS.maxResponseDetails, truncated: true },
+  "default bulk spawn output reports the full count with bounded ordered detail",
+);
+assert.deepEqual(
+  spawned.spawned.details.map((entry) => entry.alias),
+  spawns.slice(0, LAB_INTERACT_LIMITS.maxResponseDetails).map((entry) => entry.alias),
+  "default bulk spawn detail preserves input ordering",
+);
+assert.equal("results" in spawned, false, "default bulk spawn omits decorated entity rows");
+assert.equal("result" in spawned, false, "default bulk spawn omits the duplicate raw outcome");
+assert.ok(Number.isInteger(spawned.snapshotTick), "default bulk spawn retains the authoritative snapshot tick");
 
 const updated = await service.execute("update", {
   sessionId,
-  updates: spawned.results.map((entry, index) => ({
+  updates: spawns.map((entry, index) => ({
     operation: "move",
     entity: entry.alias,
     x: 200 + index * 32,
@@ -59,12 +71,24 @@ assert.equal(updated.result.result.op, "applyUpdates", "command service uses the
 
 await service.execute("update", {
   sessionId,
-  update: { operation: "move", entity: spawned.results[0].id, x: 300, y: 300 },
+  update: { operation: "move", entity: spawns[0].alias, x: 300, y: 300 },
 });
 assert.equal(calls.update, 2, "legacy singular update normalizes to one plural driver request");
 
-await service.execute("remove", { sessionId, refs: spawned.results.map((entry) => entry.id) });
+await service.execute("remove", { sessionId, refs: spawns.map((entry) => entry.alias) });
 assert.equal(calls.remove, 1, "command service dispatches a bulk remove once");
+
+const detailedSpawn = await service.execute("spawn", {
+  sessionId,
+  details: true,
+  spawns: [
+    { owner: 1, kind: "rifleman", x: 100, y: 250, alias: "detailed_0" },
+    { owner: 2, kind: "rifleman", x: 132, y: 250, alias: "detailed_1" },
+  ],
+});
+assert.equal(detailedSpawn.results.length, 2, "details=true returns every decorated spawn row");
+assert.equal(detailedSpawn.result.outcome.items.length, 2, "details=true preserves the raw authoritative outcome");
+await service.execute("remove", { sessionId, refs: ["detailed_0", "detailed_1"] });
 
 const largeSpawn = await service.execute("spawn", {
   sessionId,
@@ -76,10 +100,16 @@ const largeSpawn = await service.execute("spawn", {
     alias: `large_${index}`,
   })),
 });
-const largeIds = largeSpawn.results.map((entry) => entry.id);
-const largeAliases = largeSpawn.results.map((entry) => entry.alias);
+assert.deepEqual(
+  { count: largeSpawn.spawned.count, detailed: largeSpawn.spawned.details.length, truncated: largeSpawn.spawned.truncated },
+  { count: 400, detailed: LAB_INTERACT_LIMITS.maxResponseDetails, truncated: true },
+  "the maximum spawn batch still has a bounded default response",
+);
+assert.ok(JSON.stringify(largeSpawn).length < 2_000, "the maximum default spawn response stays compact");
+const largeAliases = Array.from({ length: 400 }, (_, index) => `large_${index}`);
 const largeInspection = await service.execute("inspect", { sessionId, refs: largeAliases, limit: 400 });
 assert.equal(largeInspection.entities.length, 400, "inspection accepts and returns the full 400-reference operational bound");
+const largeIds = largeInspection.entities.map((entry) => entry.id);
 await service.execute("camera", { sessionId, camera: { action: "focus", refs: largeAliases } });
 const largeCapture = await service.execute("screenshot", {
   sessionId, name: "large-contract", subjects: largeAliases,
@@ -100,7 +130,7 @@ await service.execute("update", {
 });
 await service.execute("remove", { sessionId, refs: largeIds });
 assert.equal(calls.update, 3, "a 400-item update still dispatches one mutation request");
-assert.equal(calls.remove, 2, "a 400-item remove still dispatches one mutation request");
+assert.equal(calls.remove, 3, "a 400-item remove still dispatches one mutation request");
 assert.ok(Math.max(...calls.inspectSizes) <= LAB_INTERACT_LIMITS.maxInspectRefs,
   "bulk reference resolution respects the bridge inspect bound");
 
@@ -118,8 +148,14 @@ for (const [command, input] of [
 }
 assert.doesNotThrow(() => validateCommandInput("spawn", {
   sessionId,
+  details: true,
   spawns: Array.from({ length: 400 }, () => ({ owner: 1, kind: "rifleman", x: 1, y: 1 })),
 }));
+assert.throws(() => validateCommandInput("spawn", {
+  sessionId,
+  details: "yes",
+  spawns: [{ owner: 1, kind: "rifleman", x: 1, y: 1 }],
+}), /boolean/);
 assert.throws(() => validateCommandInput("spawn", {
   sessionId,
   spawns: Array.from({ length: 401 }, () => ({ owner: 1, kind: "rifleman", x: 1, y: 1 })),

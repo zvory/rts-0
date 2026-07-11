@@ -11,11 +11,11 @@ import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 
 import {
-  checkMediaCapabilities, finalizeMedia, LabInteractRecordingError, RECORDING_LIMITS,
-  recordingStopTimeoutMs, removePartialRecording, stopRecorderWithin, waitForMediaFile,
+  checkMediaCapabilities, createWallClockRecorder, finalizeMp4Artifacts, LabInteractRecordingError,
+  RECORDING_LIMITS, removePartialRecording,
 } from "./recording.mjs";
 import {
-  encodeFixedCapture, FIXED_CAPTURE_LIMITS, fixedFrameTick, hashFrame,
+  createFixedCaptureEncoder, FIXED_CAPTURE_LIMITS, fixedFrameTick, fixedRepresentativeIndices, hashFrame,
 } from "./fixed_capture.mjs";
 import { boundedSummary, LAB_INTERACT_SUMMARY_LIMITS } from "./manifest_summary.mjs";
 
@@ -24,7 +24,8 @@ const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_STARTUP_TIMEOUT_MS = 60_000;
 const MAX_TIMEOUT_MS = 60_000;
 const MAX_STARTUP_TIMEOUT_MS = 120_000;
-const LOG_TAIL_LINES = 80;
+const LOG_TAIL_LINES = 12;
+const LOG_TAIL_LINE_CHARS = 512;
 const MAX_PAGE_ERRORS = 80;
 const MAX_CAPTURE_BYTES = 16 * 1024 * 1024;
 const MAX_CAPTURE_VIEWPORT = 2048;
@@ -313,7 +314,15 @@ export class LabInteractDriver {
     };
   }
 
-  async recordStart({ sessionId, name = "recording", maxDurationMs = RECORDING_LIMITS.defaultDurationMs, viewport = null, crop = null, scale = 1 } = {}) {
+  async recordStart({
+    sessionId,
+    name = "recording",
+    maxDurationMs = RECORDING_LIMITS.defaultDurationMs,
+    viewport = null,
+    crop = null,
+    scale = 1,
+    resumeSpeed = null,
+  } = {}) {
     return this.enqueue(async () => {
       if (this.recording) throw new LabInteractDriverError("recordingActive", "A recording is already active for this session. Stop it before starting another.");
       const tools = checkMediaCapabilities();
@@ -337,17 +346,24 @@ export class LabInteractDriver {
         const suffix = new Date().toISOString().replace(/[:.]/g, "-");
         recordingDir = path.join(this.workspace.root, LAB_INTERACT_ROOT, normalizedSessionId, "recordings", `${artifactName}-${suffix}`);
         fs.mkdirSync(recordingDir, { recursive: true });
-        const webmPath = path.join(recordingDir, `${artifactName}.webm`);
         const mp4Path = path.join(recordingDir, `${artifactName}.mp4`);
-        recorder = await this.page.screencast({ path: webmPath, crop: clip, scale, ffmpegPath: tools.ffmpeg });
-        const startedMs = Date.now();
         const startStatus = await this.callBridge("status", {});
+        recorder = await createWallClockRecorder({
+          page: this.page, outputPath: mp4Path, clip, scale, tools, maxDurationMs,
+          timeoutMs: this.options.timeoutMs,
+        });
+        let resumeResult = null;
+        if (resumeSpeed != null) {
+          resumeResult = await this.callBridge("time", { action: "resume", speed: resumeSpeed });
+        }
+        recorder.start();
+        const startedMs = Date.now();
         const completion = recordingCompletion();
         const recording = {
-          name: artifactName, recorder, tools, recordingDir, webmPath, mp4Path,
+          name: artifactName, recorder, tools, recordingDir, mp4Path,
           framesDir: path.join(recordingDir, "frames"), contactSheetPath: path.join(recordingDir, `${artifactName}-contact-sheet.png`),
           manifestPath: path.join(recordingDir, `${artifactName}.json`), startedMs, startedAt: new Date(startedMs).toISOString(),
-          startStatus, clip, scale, viewport: normalizedViewport, originalViewport,
+          startStatus, resumeResult, resumeSpeed, clip, scale, viewport: normalizedViewport, originalViewport,
           maxDurationMs, finalizing: null, stoppedBy: null, operations: [], operationCount: 0,
           operationsTruncated: false, aliases: [], completion,
         };
@@ -358,13 +374,18 @@ export class LabInteractDriver {
         recording.watchdog.unref?.();
         recording.sizeWatchdog = setInterval(() => {
           let size = 0;
-          try { size = fs.statSync(recording.webmPath).size; } catch {}
+          try { size = fs.statSync(recording.mp4Path).size; } catch {}
           if (size > RECORDING_LIMITS.maxBytes) void this.finishRecording("sizeLimit").catch(() => {});
         }, 250);
         recording.sizeWatchdog.unref?.();
-        return { ...this.recordingStatus(), clip, scale, authoritativeStartTick: startStatus.snapshotTick ?? null };
+        return {
+          ...this.recordingStatus(), clip, scale,
+          authoritativeStartTick: startStatus.snapshotTick ?? null,
+          authoritativeResumed: resumeSpeed != null,
+          resumeSpeed,
+        };
       } catch (error) {
-        if (recorder) await stopRecorderWithin(recorder).catch(() => {});
+        if (recorder) await recorder.abort().catch(() => {});
         removePartialRecording([recordingDir]);
         if (originalViewport) await this.page.setViewport(originalViewport).catch(() => {});
         await this.callBridge("presentation", { mode: "default" }).catch(() => {});
@@ -382,6 +403,7 @@ export class LabInteractDriver {
       const normalizedViewport = viewport ? normalizeCaptureViewport(viewport) : null;
       let captureDir = "";
       let captureEntered = false;
+      let encoder = null;
       try {
         const status = await this.callBridge("status", {});
         if (!status.roomTime?.paused) throw new LabInteractDriverError("roomTimeNotPaused", "capture-fixed requires paused authoritative room time.");
@@ -399,11 +421,15 @@ export class LabInteractDriver {
         captureDir = path.join(this.workspace.root, LAB_INTERACT_ROOT, normalizedSessionId, "fixed", `${artifactName}-${suffix}`);
         const framesDir = path.join(captureDir, "frames");
         fs.mkdirSync(framesDir, { recursive: true });
+        const videoPath = path.join(captureDir, `${artifactName}.mp4`);
+        const contactSheetPath = path.join(captureDir, `${artifactName}-contact-sheet.png`);
+        encoder = createFixedCaptureEncoder({ outputPath: videoPath, contactSheetPath, fps, frameCount });
+        const representativeIndices = fixedRepresentativeIndices(frameCount);
         const entered = await this.callBridge("captureFixedEnter", {});
         captureEntered = true;
         const startTick = status.snapshotTick;
         let currentTick = startTick;
-        let sequenceBytes = 0;
+        let processedPngBytes = 0;
         const frames = [];
         for (let index = 0; index < frameCount; index += 1) {
           if (this.fixedCapture?.cancelled) throw new LabInteractDriverError("captureCancelled", "Fixed capture was cancelled and its partial artifacts were removed.");
@@ -416,18 +442,20 @@ export class LabInteractDriver {
           }
           const visualTimeMs = entered.visualStartMs + index * (1000 / fps);
           const rendered = await this.callBridge("captureFixedFrame", { visualTimeMs });
-          const framePath = path.join(framesDir, `frame-${String(index).padStart(4, "0")}.png`);
-          const screenshot = Buffer.from(await this.page.screenshot({ type: "png", clip, path: framePath }) || []);
+          const screenshot = Buffer.from(await this.page.screenshot({ type: "png", clip }) || []);
           if (screenshot.length === 0) throw new LabInteractDriverError("captureEmpty", "Chrome returned an empty fixed-capture frame.");
-          sequenceBytes += screenshot.length;
-          if (screenshot.length > FIXED_CAPTURE_LIMITS.maxFrameBytes || sequenceBytes > FIXED_CAPTURE_LIMITS.maxSequenceBytes) {
-            throw new LabInteractDriverError("captureTooLarge", "Fixed-capture PNG sequence exceeded its bounded disk budget.");
+          processedPngBytes += screenshot.length;
+          if (screenshot.length > FIXED_CAPTURE_LIMITS.maxFrameBytes) throw new LabInteractDriverError("captureTooLarge", "One fixed-capture PNG exceeded its bounded frame budget.");
+          await encoder.write(screenshot);
+          let representativePath = null;
+          if (representativeIndices.has(index)) {
+            representativePath = path.join(framesDir, `frame-${String(index).padStart(4, "0")}.png`);
+            fs.writeFileSync(representativePath, screenshot, { mode: 0o600 });
           }
-          frames.push({ index, tick, visualTimeMs, rendererFrame: rendered.rendererFrame, path: framePath, sha256: hashFrame(framePath) });
+          frames.push({ index, tick, visualTimeMs, rendererFrame: rendered.rendererFrame, sha256: hashFrame(screenshot), representativePath });
         }
-        const videoPath = path.join(captureDir, `${artifactName}.mp4`);
-        const contactSheetPath = path.join(captureDir, `${artifactName}-contact-sheet.png`);
-        const media = encodeFixedCapture({ framesDir, outputPath: videoPath, contactSheetPath, fps, frameCount });
+        const media = await encoder.finish();
+        encoder = null;
         const endStatus = await this.callBridge("status", {});
         const diagnostics = this.diagnostics();
         const manifestPath = path.join(captureDir, `${artifactName}.json`);
@@ -441,16 +469,29 @@ export class LabInteractDriver {
           },
           mapping: { simulationHz: 30, outputFps: fps, rule: "frame i uses startTick + floor(i * 30 / outputFps); repeated ticks do not interpolate world state" },
           authoritative: { startTick, endTick: endStatus.snapshotTick },
-          capture: { frameCount, clip, viewport: normalizedViewport, visualStartMs: entered.visualStartMs, sequenceBytes },
+          capture: {
+            frameCount, clip, viewport: normalizedViewport, visualStartMs: entered.visualStartMs,
+            streaming: true, retainedPngFrames: representativeIndices.size, processedPngBytes,
+          },
           frames, media: { videoPath, contactSheetPath, bytes: media.bytes, tools: media.tools, probe: media.probe, contactSheet: media.contactSheet },
           runtime: { node: process.version, platform: process.platform, architecture: process.arch, browser: this.browserVersion || null },
           errors: { pageConsole: diagnostics.pageConsoleErrors, page: diagnostics.pageErrors, requestFailures: diagnostics.requestFailures },
         };
         fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o600 });
-        const result = { videoPath, contactSheetPath, manifestPath, framePaths: frames.map((frame) => frame.path), frameHashes: frames.map((frame) => frame.sha256), authoritative: manifest.authoritative, mapping: manifest.mapping, probe: media.probe };
+        const result = {
+          videoPath, contactSheetPath, manifestPath,
+          frameSummary: {
+            count: frames.length,
+            uniqueHashes: new Set(frames.map((frame) => frame.sha256)).size,
+            representativeFramePaths: frames.map((frame) => frame.representativePath).filter(Boolean),
+            detailsInManifest: true,
+          },
+          authoritative: manifest.authoritative, mapping: manifest.mapping, probe: media.probe,
+        };
         this.lastFixedCapture = result;
         return result;
       } catch (error) {
+        if (encoder) await encoder.abort().catch(() => {});
         removePartialRecording([captureDir]);
         if (error instanceof LabInteractRecordingError) throw new LabInteractDriverError(error.code, error.message);
         throw error;
@@ -532,17 +573,14 @@ export class LabInteractDriver {
       clearInterval(recording.sizeWatchdog);
       try {
         const endStatus = await this.callBridge("status", {}).catch(() => null);
-        // An immediate stop is valid; retain a minimally positive timeline even when
-        // start and stop land in the same millisecond.
-        const stoppedMs = reason === "watchdog"
-          ? recording.startedMs + recording.maxDurationMs
-          : Math.max(Date.now(), recording.startedMs + 1);
-        await stopRecorderWithin(recording.recorder, recordingStopTimeoutMs(recording.maxDurationMs));
-        await waitForMediaFile(recording.webmPath);
-        const wallDurationMs = Math.max(1, stoppedMs - recording.startedMs);
-        const media = finalizeMedia({
-          webmPath: recording.webmPath, mp4Path: recording.mp4Path, framesDir: recording.framesDir,
-          contactSheetPath: recording.contactSheetPath, targetDurationMs: wallDurationMs, tools: recording.tools,
+        // The recorder owns the monotonic clock used to assign frame slots.
+        // Reuse that exact duration for probing and the manifest so wall-clock
+        // rounding cannot disagree with the encoded frame count.
+        const { wallDurationMs, diagnostics: frameDiagnostics } = await recording.recorder.stop();
+        const media = finalizeMp4Artifacts({
+          mp4Path: recording.mp4Path, framesDir: recording.framesDir,
+          contactSheetPath: recording.contactSheetPath, targetDurationMs: wallDurationMs,
+          tools: recording.tools, frameDiagnostics,
         });
         const diagnostics = this.diagnostics();
         const manifest = {
@@ -563,7 +601,12 @@ export class LabInteractDriver {
             startRoomTime: recording.startStatus?.roomTime ?? null,
             endRoomTime: endStatus?.roomTime ?? null,
           },
-          capture: { fps: 30, audio: false, clip: recording.clip, scale: recording.scale, viewport: recording.viewport, wallDurationMs, maxDurationMs: recording.maxDurationMs },
+          capture: {
+            fps: RECORDING_LIMITS.fps, audio: false, timingAuthority: "monotonicWallClockFrameSlots",
+            clip: recording.clip, scale: recording.scale, viewport: recording.viewport,
+            wallDurationMs, maxDurationMs: recording.maxDurationMs,
+            atomicResume: recording.resumeSpeed == null ? null : { speed: recording.resumeSpeed, result: recording.resumeResult },
+          },
           aliases: boundedSummary(
             Array.isArray(metadata.aliases) ? metadata.aliases.slice(0, RECORDING_LIMITS.maxAliases) : recording.aliases,
             RECORDING_LIMITS.maxDetailedAliases,
@@ -1281,14 +1324,30 @@ async function stopChild(child) {
 
 function readTail(file, maxLines) {
   try {
-    return fs.readFileSync(file, "utf8").trimEnd().split("\n").slice(-maxLines);
+    return fs.readFileSync(file, "utf8")
+      .trimEnd()
+      .split("\n")
+      .slice(-maxLines)
+      .map((line) => boundLogLine(line));
   } catch {
     return [];
   }
 }
 
+export function boundLogLine(value, maxChars = LOG_TAIL_LINE_CHARS) {
+  const line = String(value ?? "");
+  const marker = " …<truncated>… ";
+  const limit = Number.isInteger(maxChars) ? Math.max(0, maxChars) : LOG_TAIL_LINE_CHARS;
+  if (line.length <= limit) return line;
+  if (limit <= marker.length) return marker.slice(0, limit);
+  const available = limit - marker.length;
+  const leading = Math.ceil(available / 2);
+  const trailing = Math.floor(available / 2);
+  return `${line.slice(0, leading)}${marker}${trailing > 0 ? line.slice(-trailing) : ""}`;
+}
+
 function appendBounded(values, value) {
-  values.push(String(value));
+  values.push(boundLogLine(value));
   if (values.length > MAX_PAGE_ERRORS) values.splice(0, values.length - MAX_PAGE_ERRORS);
 }
 

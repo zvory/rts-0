@@ -215,13 +215,13 @@ export async function openLabInteractDriver(options) {
     },
     async captureFixed({ sessionId, name = "fixed", fps = 30, frameCount = 30, sceneIdentity = null, sceneRevision = 0, aliases = [] }) {
       const startTick = tick;
-      const framePaths = Array.from({ length: frameCount }, (_, index) => `${options.workspaceRoot}/target/lab-interact/${sessionId}/fixed/${name}/frames/frame-${String(index).padStart(4, "0")}.png`);
+      const representativeFramePaths = Array.from({ length: Math.min(frameCount, 6) }, (_, index) => `${options.workspaceRoot}/target/lab-interact/${sessionId}/fixed/${name}/frames/frame-${String(index).padStart(4, "0")}.png`);
       tick = startTick + Math.floor((frameCount - 1) * 30 / fps);
       return {
         videoPath: `${options.workspaceRoot}/target/lab-interact/${sessionId}/fixed/${name}/${name}.mp4`,
         contactSheetPath: `${options.workspaceRoot}/target/lab-interact/${sessionId}/fixed/${name}/${name}-contact-sheet.png`,
         manifestPath: `${options.workspaceRoot}/target/lab-interact/${sessionId}/fixed/${name}/${name}.json`,
-        framePaths, frameHashes: framePaths.map((_, index) => String(index).padStart(64, "0")),
+        frameSummary: { count: frameCount, uniqueHashes: frameCount, representativeFramePaths, detailsInManifest: true },
         authoritative: { startTick, endTick: tick },
         mapping: { simulationHz: 30, outputFps: fps }, fixtureMetadata: { sceneIdentity, sceneRevision, aliases },
       };

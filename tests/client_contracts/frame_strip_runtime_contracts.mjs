@@ -174,13 +174,51 @@ assert(
   "renderer keeps frame-strip movement active for predicted render-position changes",
 );
 
-function frameStripMovementFor(entity, previous, current, motion = new Map()) {
+const heldMovementSnapshot = {
+  previous: { ...stationaryMoveEntity, x: 38 },
+  current: stationaryMoveEntity,
+  motion: new Map(),
+  tick: 120,
+};
+assert(
+  frameStripMovementFor(
+    stationaryMoveEntity,
+    heldMovementSnapshot.previous,
+    heldMovementSnapshot.current,
+    heldMovementSnapshot.motion,
+    heldMovementSnapshot.tick,
+  ).moving === true,
+  "renderer admits a fresh authoritative movement sample",
+);
+assert(
+  frameStripMovementFor(
+    stationaryMoveEntity,
+    heldMovementSnapshot.previous,
+    heldMovementSnapshot.current,
+    heldMovementSnapshot.motion,
+    heldMovementSnapshot.tick,
+  ).moving === false,
+  "renderer stops frame-strip movement when a movement snapshot is held and screen position is stationary",
+);
+assert(
+  frameStripMovementFor(
+    stationaryMoveEntity,
+    heldMovementSnapshot.previous,
+    heldMovementSnapshot.current,
+    heldMovementSnapshot.motion,
+    heldMovementSnapshot.tick,
+  ).moving === false,
+  "renderer keeps a paused stale movement snapshot idle across later render frames",
+);
+
+function frameStripMovementFor(entity, previous, current, motion = new Map(), tick = null) {
   return _frameStripMovementVisual.call(
     { _frameStripMotion: motion },
     entity,
     {
       _prevById: new Map([[entity.id, previous]]),
       _curById: new Map([[entity.id, current]]),
+      tick,
     },
   );
 }

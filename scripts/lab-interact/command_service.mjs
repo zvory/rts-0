@@ -21,6 +21,7 @@ export const LAB_INTERACT_LIMITS = Object.freeze({
   maxScreenshotSubjects: 400,
   maxArtifactBytes: 8 * 1024 * 1024,
   maxAliasSidecarBytes: 64 * 1024,
+  maxResponseDetails: 12,
   maxRecordingOperations: RECORDING_LIMITS.maxOperations,
   defaultRecordingDurationMs: RECORDING_LIMITS.defaultDurationMs,
   maxRecordingDurationMs: RECORDING_LIMITS.maxDurationMs,
@@ -271,7 +272,7 @@ export class LabInteractService {
     if (command === "catalog") {
       return { sessionId, ...projectCatalog(await session.driver.catalog(), input.categories) };
     }
-    if (command === "spawn") return spawn(session, input.spawns);
+    if (command === "spawn") return spawn(session, input.spawns, input.details === true);
     if (command === "update") return update(session, input.updates || [input.update]);
     if (command === "remove") {
       const resolved = await resolveEntityReferences(session, input.refs);
@@ -316,7 +317,7 @@ export function validateCommandInput(command, input) {
   return validateInput(command, input);
 }
 
-async function spawn(session, spawns) {
+async function spawn(session, spawns, includeDetails = false) {
   validateSpawnAliases(session, spawns);
   const catalog = await session.driver.catalog();
   const playerIds = new Set((catalog.players || []).map((player) => Number(player.id)));
@@ -337,12 +338,23 @@ async function spawn(session, spawns) {
     staged.push({ spec, id, entity });
   }
   for (const { spec, id } of staged) if (spec.alias) session.aliases.set(spec.alias, id);
+  const summary = boundedResponseSummary(staged.map(({ spec, id }, index) => ({
+    index,
+    alias: spec.alias || null,
+    id,
+  })));
+  const compact = {
+    sessionId: session.sessionId,
+    spawned: summary,
+    snapshotTick: findSnapshotTick(response),
+  };
+  if (!includeDetails) return compact;
   const results = staged.map(({ spec, id, entity }) => ({
     alias: spec.alias || null,
     id,
     entity: decorateEntity(entity, session.aliases),
   }));
-  return { sessionId: session.sessionId, results, result: response.result };
+  return { ...compact, results, result: response.result };
 }
 
 async function update(session, values) {
@@ -457,7 +469,8 @@ function validateInput(command, value) {
       if (!ALL_CATALOG_CATEGORIES.includes(entry)) invalid("catalog.categories", "contains an unknown category");
     });
   } else if (command === "spawn") {
-    exact(value, ["sessionId", "spawns"], command);
+    exact(value, ["sessionId", "spawns", "details"], command);
+    optionalBoolean(value.details, "spawn.details");
     array(value.spawns, "spawn.spawns", 1, LAB_INTERACT_LIMITS.maxSpawnBatch, (spec, index) => {
       record(spec, `spawn.spawns[${index}]`); exact(spec, ["owner", "kind", "x", "y", "completed", "alias"], "spawn spec");
       u32(spec.owner, "spawn.owner"); token(spec.kind, "spawn.kind"); finite(spec.x, "spawn.x"); finite(spec.y, "spawn.y");
@@ -497,20 +510,22 @@ function validateInput(command, value) {
     if (value.name != null && (typeof value.name !== "string" || Buffer.byteLength(value.name) > maxNameBytes)) invalid("export.name", `must be at most ${maxNameBytes} UTF-8 bytes`);
     optionalBoolean(value.reproduction, "export.reproduction");
   } else if (command === "import") {
-    exact(value, ["sessionId", "kind", "artifactId", "path"], command);
+    exact(value, ["sessionId", "kind", "artifactId", "path", "details"], command);
     artifactKind(value.kind, "import.kind");
     artifactSelector(value, "import");
+    optionalBoolean(value.details, "import.details");
   } else if (command === "artifact-inspect") {
     exact(value, ["sessionId", "kind", "artifactId", "path"], command);
     if (value.kind != null) artifactKind(value.kind, "artifact-inspect.kind");
     artifactSelector(value, "artifact-inspect");
   } else if (command === "record-start") {
-    exact(value, ["sessionId", "name", "maxDurationMs", "viewport", "crop", "scale"], command);
+    exact(value, ["sessionId", "name", "maxDurationMs", "viewport", "crop", "scale", "resumeSpeed"], command);
     if (value.name != null && !/^[A-Za-z0-9_-]{1,48}$/.test(value.name)) invalid("record-start.name", "must be a safe artifact token");
     if (value.maxDurationMs != null) integer(value.maxDurationMs, "record-start.maxDurationMs", 1_000, LAB_INTERACT_LIMITS.maxRecordingDurationMs);
     if (value.viewport != null) viewport(value.viewport, 2048, "record-start.viewport");
     if (value.crop != null) recordingCrop(value.crop);
     if (value.scale != null) boundedNumber(value.scale, "record-start.scale", 0.25, 1);
+    if (value.resumeSpeed != null) boundedNumber(value.resumeSpeed, "record-start.resumeSpeed", 0.01, 16);
   } else if (command === "record-stop" || command === "record-wait") {
     exact(value, ["sessionId"], command);
   } else if (command === "capture-fixed") {
@@ -577,17 +592,22 @@ async function importArtifact(workspaceRoot, session, selector) {
   }
   session.sceneIdentity = { source: "artifact", artifactId: selected.artifactId, kind: selected.kind, path: selected.path };
   session.sceneRevision = 0;
-  return {
+  const compact = {
     sessionId: session.sessionId,
     artifactId: selected.artifactId,
     kind: selected.kind,
     path: selected.path,
     imported: true,
     tick: (await session.driver.status()).snapshotTick ?? null,
-    aliases: reconciliation,
+    aliases: {
+      restored: boundedResponseSummary(reconciliation.restored),
+      stale: boundedResponseSummary(reconciliation.stale),
+    },
     validation: { ok: true, authority: selected.kind === "setup" ? "checkpoint import" : "replay room rebuild" },
-    result: importResult,
   };
+  return selector.details === true
+    ? { ...compact, aliases: reconciliation, result: importResult }
+    : compact;
 }
 
 async function inspectArtifact(workspaceRoot, session, selector) {
@@ -756,6 +776,15 @@ function reproductionSummary(kind, artifactId, aliases) {
   const refs = aliases.slice(0, 12).map((entry) => entry.alias).join(", ");
   const input = JSON.stringify({ sessionId: "<current-session-id>", kind, artifactId });
   return `node scripts/lab-interact/cli.mjs import '${input}'; aliases: ${refs || "none"}`;
+}
+
+function boundedResponseSummary(values) {
+  const source = Array.isArray(values) ? values : [];
+  return {
+    count: source.length,
+    details: source.slice(0, LAB_INTERACT_LIMITS.maxResponseDetails),
+    truncated: source.length > LAB_INTERACT_LIMITS.maxResponseDetails,
+  };
 }
 
 function artifactKind(value, label) { if (!["setup", "replay"].includes(value)) invalid(label, "must be setup or replay"); }
