@@ -17,9 +17,13 @@
 import { CAMERA } from "./config.js";
 import {
   boundsForGroundPolygon,
-  classifyProjectedPoint,
-  clipGroundPolygonToBounds,
   createCameraSnapshot,
+  createOrthographicProjectionSnapshot,
+  containsProjectedOrthographic,
+  groundAtScreenOrthographic,
+  projectedExtentOrthographic,
+  projectOrthographic,
+  viewportGroundPolygonOrthographic,
 } from "./camera_projection.js";
 
 function resolveMinZoom(value) {
@@ -229,14 +233,7 @@ export class Camera {
    * @returns {{x:number,y:number,depth:number,clip:string,visible:boolean}}
    */
   project(point) {
-    const x = requireFinite(point?.x, "presented point x");
-    const y = requireFinite(point?.y, "presented point y");
-    requireFinite(point?.heightPx, "presented point heightPx");
-    const screen = this.worldToScreen(x, y);
-    return classifyProjectedPoint(
-      { ...screen, depth: 1 },
-      { widthCssPx: this.viewW, heightCssPx: this.viewH },
-    );
+    return projectOrthographic(this, point);
   }
 
   /**
@@ -246,11 +243,7 @@ export class Camera {
    * @returns {{x:number,y:number}|null}
    */
   groundAtScreen(screen) {
-    const x = finiteNumber(screen?.x);
-    const y = finiteNumber(screen?.y);
-    if (x == null || y == null) return null;
-    const ground = this.screenToWorld(x, y);
-    return Object.freeze({ x: ground.x, y: ground.y });
+    return groundAtScreenOrthographic(this, screen);
   }
 
   /**
@@ -260,43 +253,12 @@ export class Camera {
    * @param {number} worldHeightPx
    */
   projectedExtent(point, worldWidthPx, worldHeightPx) {
-    const projected = this.project(point);
-    const width = requireNonNegative(worldWidthPx, "world extent width") * this.zoom;
-    const height = requireNonNegative(worldHeightPx, "world extent height") * this.zoom;
-    const depthVisible = projected.depth > 0 && projected.clip !== "outsideDepth";
-    const visible = this.viewW > 0
-      && this.viewH > 0
-      && depthVisible
-      && projected.x + width / 2 >= 0
-      && projected.x - width / 2 <= this.viewW
-      && projected.y + height / 2 >= 0
-      && projected.y - height / 2 <= this.viewH;
-    return Object.freeze({
-      width,
-      height,
-      scaleX: this.zoom,
-      scaleY: this.zoom,
-      visible,
-    });
+    return projectedExtentOrthographic(this, point, worldWidthPx, worldHeightPx);
   }
 
   /** Return the bounded visible ground polygon in stable clockwise world winding. */
   viewportGroundPolygon() {
-    if (this.viewW <= 0 || this.viewH <= 0 || this.worldW <= 0 || this.worldH <= 0) {
-      return Object.freeze([]);
-    }
-    const corners = [
-      this.screenToWorld(0, 0),
-      this.screenToWorld(this.viewW, 0),
-      this.screenToWorld(this.viewW, this.viewH),
-      this.screenToWorld(0, this.viewH),
-    ];
-    return clipGroundPolygonToBounds(corners, {
-      minX: 0,
-      minY: 0,
-      maxX: this.worldW,
-      maxY: this.worldH,
-    });
+    return viewportGroundPolygonOrthographic(this);
   }
 
   /** Return the conservative AABB of the visible ground polygon, or null when it is empty. */
@@ -310,16 +272,7 @@ export class Camera {
    * @param {number} [marginCssPx]
    */
   containsProjected(point, marginCssPx = 0) {
-    const margin = requireNonNegative(marginCssPx, "projection margin");
-    const projected = this.project(point);
-    return this.viewW > 0
-      && this.viewH > 0
-      && projected.depth > 0
-      && projected.clip !== "outsideDepth"
-      && projected.x >= -margin
-      && projected.x <= this.viewW + margin
-      && projected.y >= -margin
-      && projected.y <= this.viewH + margin;
+    return containsProjectedOrthographic(this, point, marginCssPx);
   }
 
   /**
@@ -464,94 +417,10 @@ export class Camera {
    * The result contains no live Camera, Pixi, DOM, or mutable matrix reference.
    */
   projectionSnapshot() {
-    const originX = this.x;
-    const originY = this.y;
-    const scale = this.zoom;
-    const width = this.viewW;
-    const height = this.viewH;
-    const worldWidth = this.worldW;
-    const worldHeight = this.worldH;
-    const camera = this.snapshot();
-    const viewport = Object.freeze({ widthCssPx: width, heightCssPx: height });
-    const mapBounds = worldWidth > 0 && worldHeight > 0
-      ? Object.freeze({ minX: 0, minY: 0, maxX: worldWidth, maxY: worldHeight })
-      : null;
-    const project = (point) => {
-      const x = requireFinite(point?.x, "presented point x");
-      const y = requireFinite(point?.y, "presented point y");
-      requireFinite(point?.heightPx, "presented point heightPx");
-      return classifyProjectedPoint(
-        { x: (x - originX) * scale, y: (y - originY) * scale, depth: 1 },
-        { widthCssPx: width, heightCssPx: height },
-      );
-    };
-    const groundAtScreen = (screen) => {
-      const x = finiteNumber(screen?.x);
-      const y = finiteNumber(screen?.y);
-      if (x == null || y == null) return null;
-      return Object.freeze({ x: originX + x / scale, y: originY + y / scale });
-    };
-    const viewportGroundPolygon = () => {
-      if (!mapBounds || width <= 0 || height <= 0) return Object.freeze([]);
-      return clipGroundPolygonToBounds([
-        { x: originX, y: originY },
-        { x: originX + width / scale, y: originY },
-        { x: originX + width / scale, y: originY + height / scale },
-        { x: originX, y: originY + height / scale },
-      ], mapBounds);
-    };
-    const projectedExtent = (point, worldWidthPx, worldHeightPx) => {
-      const projected = project(point);
-      const projectedWidth = requireNonNegative(worldWidthPx, "world extent width") * scale;
-      const projectedHeight = requireNonNegative(worldHeightPx, "world extent height") * scale;
-      return Object.freeze({
-        width: projectedWidth,
-        height: projectedHeight,
-        scaleX: scale,
-        scaleY: scale,
-        visible: width > 0
-          && height > 0
-          && projected.depth > 0
-          && projected.clip !== "outsideDepth"
-          && projected.x + projectedWidth / 2 >= 0
-          && projected.x - projectedWidth / 2 <= width
-          && projected.y + projectedHeight / 2 >= 0
-          && projected.y - projectedHeight / 2 <= height,
-      });
-    };
-    const containsProjected = (point, marginCssPx = 0) => {
-      const margin = requireNonNegative(marginCssPx, "projection margin");
-      const projected = project(point);
-      return width > 0
-        && height > 0
-        && projected.depth > 0
-        && projected.clip !== "outsideDepth"
-        && projected.x >= -margin
-        && projected.x <= width + margin
-        && projected.y >= -margin
-        && projected.y <= height + margin;
-    };
-    const referenceDistancePx = Number.isFinite(width / scale) && width / scale > 0
-      ? width / scale
-      : this._lastAudioReferenceDistancePx;
-    return Object.freeze({
-      version: 1,
-      camera,
-      viewport,
-      mapBounds,
-      project,
-      groundAtScreen,
-      projectedExtent,
-      viewportGroundPolygon,
-      viewportGroundBounds: () => boundsForGroundPolygon(viewportGroundPolygon()),
-      containsProjected,
-      snapshot: () => camera,
-      audioListener: () => Object.freeze({
-        x: camera.focus.x,
-        y: camera.focus.y,
-        referenceDistancePx,
-      }),
-    });
+    return createOrthographicProjectionSnapshot(
+      this,
+      this._lastAudioReferenceDistancePx,
+    );
   }
 
   /**
@@ -610,12 +479,13 @@ export class Camera {
   /** Subscribe to detached CameraSnapshotV1 values after successful view mutations. */
   subscribe(listener) {
     if (typeof listener !== "function") throw new TypeError("camera listener must be a function");
-    this._listeners.add(listener);
+    const subscription = (snapshot) => listener(snapshot);
+    this._listeners.add(subscription);
     let active = true;
     return () => {
       if (!active) return;
       active = false;
-      this._listeners.delete(listener);
+      this._listeners.delete(subscription);
     };
   }
 

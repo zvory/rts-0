@@ -265,6 +265,17 @@ class FakePerspectiveProjection {
   unsubscribe();
   camera.focusAt({ x: 2200, y: 1800 });
   assert(notifications.length === 3, "camera unsubscribe is idempotent and stops delivery");
+
+  let duplicateCalls = 0;
+  const duplicateListener = () => { duplicateCalls += 1; };
+  const unsubscribeFirst = camera.subscribe(duplicateListener);
+  const unsubscribeSecond = camera.subscribe(duplicateListener);
+  camera.focusAt({ x: 2300, y: 1900 });
+  assert(duplicateCalls === 2, "duplicate callbacks create independent subscriptions");
+  unsubscribeFirst();
+  camera.focusAt({ x: 2400, y: 2000 });
+  assert(duplicateCalls === 3, "unsubscribing one duplicate preserves the other subscription");
+  unsubscribeSecond();
 }
 
 // Versioned snapshot/legacy restore, listener data, and detached projection snapshots.
@@ -330,6 +341,27 @@ class FakePerspectiveProjection {
   assertThrows(() => camera.setMapBounds(-1, 100), "map bounds reject negative extent");
   assertThrows(() => camera.containsProjected({ x: 1, y: 1, heightPx: 0 }, -1), "containment rejects negative CSS margin");
   assertDeepEqual(rawView(camera), before, "rejected semantic inputs never mutate camera state");
+
+  camera.setZoom(camera.maxZoom);
+  const overflowSnapshot = camera.projectionSnapshot();
+  const point = { x: 1000, y: 800, heightPx: 0 };
+  assertThrows(
+    () => camera.projectedExtent(point, Number.MAX_VALUE, 1),
+    "projected extent rejects derived overflow instead of returning infinity",
+  );
+  assertThrows(
+    () => overflowSnapshot.projectedExtent(point, Number.MAX_VALUE, 1),
+    "detached projected extent shares finite-output rejection",
+  );
+  camera.setZoom(camera.minZoom);
+  assert(
+    camera.groundAtScreen({ x: Number.MAX_VALUE, y: 0 }) === null,
+    "ground hit returns null when finite screen input would overflow world coordinates",
+  );
+  assert(
+    camera.projectionSnapshot().groundAtScreen({ x: Number.MAX_VALUE, y: 0 }) === null,
+    "detached ground hit shares overflow-safe nullability",
+  );
 }
 
 console.log("✅ camera_projection_contracts.mjs: semantic camera/projection contracts passed");

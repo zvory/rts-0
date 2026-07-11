@@ -27,6 +27,10 @@ function immutablePoint(x, y) {
   return Object.freeze({ x, y });
 }
 
+function finitePointOrNull(x, y) {
+  return Number.isFinite(x) && Number.isFinite(y) ? immutablePoint(x, y) : null;
+}
+
 export function classifyProjectedPoint(
   point,
   { widthCssPx, heightCssPx, nearDepth = 0, farDepth = Number.POSITIVE_INFINITY },
@@ -175,5 +179,149 @@ export function createCameraSnapshot(focusX, focusY, framingScale) {
     ),
     framingScale: scale,
     boundsPolicy: "mapOverscroll",
+  });
+}
+
+/**
+ * Project with the raw coefficients of the orthographic compatibility adapter.
+ * Keeping these queries pure lets the live Camera and detached frame snapshots
+ * share exactly one implementation without retaining a live Camera reference.
+ */
+export function projectOrthographic(state, point) {
+  const x = requireFinite(point?.x, "presented point x");
+  const y = requireFinite(point?.y, "presented point y");
+  requireFinite(point?.heightPx, "presented point heightPx");
+  return classifyProjectedPoint({
+    x: (x - state.x) * state.zoom,
+    y: (y - state.y) * state.zoom,
+    depth: 1,
+  }, {
+    widthCssPx: state.viewW,
+    heightCssPx: state.viewH,
+  });
+}
+
+export function groundAtScreenOrthographic(state, screen) {
+  if (!Number.isFinite(screen?.x) || !Number.isFinite(screen?.y)) return null;
+  return finitePointOrNull(
+    state.x + screen.x / state.zoom,
+    state.y + screen.y / state.zoom,
+  );
+}
+
+export function projectedExtentOrthographic(state, point, worldWidthPx, worldHeightPx) {
+  const projected = projectOrthographic(state, point);
+  const width = requireFinite(
+    requireNonNegative(worldWidthPx, "world extent width") * state.zoom,
+    "projected extent width",
+  );
+  const height = requireFinite(
+    requireNonNegative(worldHeightPx, "world extent height") * state.zoom,
+    "projected extent height",
+  );
+  return Object.freeze({
+    width,
+    height,
+    scaleX: state.zoom,
+    scaleY: state.zoom,
+    visible: state.viewW > 0
+      && state.viewH > 0
+      && projected.depth > 0
+      && projected.clip !== PROJECTION_CLIP.OUTSIDE_DEPTH
+      && projected.x + width / 2 >= 0
+      && projected.x - width / 2 <= state.viewW
+      && projected.y + height / 2 >= 0
+      && projected.y - height / 2 <= state.viewH,
+  });
+}
+
+export function viewportGroundPolygonOrthographic(state) {
+  if (state.viewW <= 0 || state.viewH <= 0 || state.worldW <= 0 || state.worldH <= 0) {
+    return Object.freeze([]);
+  }
+  const maxX = state.x + state.viewW / state.zoom;
+  const maxY = state.y + state.viewH / state.zoom;
+  if (!Number.isFinite(maxX) || !Number.isFinite(maxY)) return Object.freeze([]);
+  return clipGroundPolygonToBounds([
+    { x: state.x, y: state.y },
+    { x: maxX, y: state.y },
+    { x: maxX, y: maxY },
+    { x: state.x, y: maxY },
+  ], {
+    minX: 0,
+    minY: 0,
+    maxX: state.worldW,
+    maxY: state.worldH,
+  });
+}
+
+export function containsProjectedOrthographic(state, point, marginCssPx = 0) {
+  const margin = requireNonNegative(marginCssPx, "projection margin");
+  const projected = projectOrthographic(state, point);
+  return state.viewW > 0
+    && state.viewH > 0
+    && projected.depth > 0
+    && projected.clip !== PROJECTION_CLIP.OUTSIDE_DEPTH
+    && projected.x >= -margin
+    && projected.x <= state.viewW + margin
+    && projected.y >= -margin
+    && projected.y <= state.viewH + margin;
+}
+
+/** Create an immutable, renderer-neutral query surface pinned to one presented frame. */
+export function createOrthographicProjectionSnapshot(rawState, fallbackReferenceDistancePx) {
+  const state = Object.freeze({
+    x: requireFinite(rawState?.x, "camera origin x"),
+    y: requireFinite(rawState?.y, "camera origin y"),
+    zoom: requireFinite(rawState?.zoom, "camera framing scale"),
+    worldW: requireNonNegative(rawState?.worldW, "map width"),
+    worldH: requireNonNegative(rawState?.worldH, "map height"),
+    viewW: requireNonNegative(rawState?.viewW, "viewport width"),
+    viewH: requireNonNegative(rawState?.viewH, "viewport height"),
+  });
+  if (state.zoom <= 0) throw new RangeError("camera framing scale must be positive");
+
+  const camera = createCameraSnapshot(
+    state.x + state.viewW / (2 * state.zoom),
+    state.y + state.viewH / (2 * state.zoom),
+    state.zoom,
+  );
+
+  const viewport = Object.freeze({
+    widthCssPx: state.viewW,
+    heightCssPx: state.viewH,
+  });
+  const mapBounds = state.worldW > 0 && state.worldH > 0
+    ? Object.freeze({ minX: 0, minY: 0, maxX: state.worldW, maxY: state.worldH })
+    : null;
+  const candidateReferenceDistancePx = state.viewW / state.zoom;
+  const referenceDistancePx = Number.isFinite(candidateReferenceDistancePx)
+    && candidateReferenceDistancePx > 0
+    ? candidateReferenceDistancePx
+    : requireFinite(fallbackReferenceDistancePx, "audio reference distance");
+  if (referenceDistancePx <= 0) throw new RangeError("audio reference distance must be positive");
+  const viewportGroundPolygon = () => viewportGroundPolygonOrthographic(state);
+
+  return Object.freeze({
+    version: 1,
+    camera,
+    viewport,
+    mapBounds,
+    project: (point) => projectOrthographic(state, point),
+    groundAtScreen: (screen) => groundAtScreenOrthographic(state, screen),
+    projectedExtent: (point, worldWidthPx, worldHeightPx) => (
+      projectedExtentOrthographic(state, point, worldWidthPx, worldHeightPx)
+    ),
+    viewportGroundPolygon,
+    viewportGroundBounds: () => boundsForGroundPolygon(viewportGroundPolygon()),
+    containsProjected: (point, marginCssPx = 0) => (
+      containsProjectedOrthographic(state, point, marginCssPx)
+    ),
+    snapshot: () => camera,
+    audioListener: () => Object.freeze({
+      x: camera.focus.x,
+      y: camera.focus.y,
+      referenceDistancePx,
+    }),
   });
 }
