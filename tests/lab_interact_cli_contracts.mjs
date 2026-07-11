@@ -51,6 +51,11 @@ for (const helpCommand of ["--help", "-h", "help"]) {
   assert.ok(helpEnvelope.result.commands.includes("shutdown"), `${helpCommand} lists shutdown`);
 }
 assert.deepEqual(Object.keys(LAB_INTERACT_COMMAND_HELP).sort(), [...LAB_INTERACT_COMMANDS].sort(), "help descriptor coverage equals the public command catalog");
+assert.deepEqual(
+  LAB_INTERACT_COMMAND_HELP.screenshot.variants,
+  ["presentation=clean hides UI chrome", "presentation=normal retains visible Lab panels and game UI"],
+  "screenshot help explains both presentation modes",
+);
 for (const command of LAB_INTERACT_COMMANDS) {
   for (const args of [["help", command], [command, "--help"]]) {
     const help = spawnSync(process.execPath, [cli, ...args], {

@@ -24,8 +24,9 @@ uncertain; command help never starts or inspects the daemon.
    that no engagement occurred.
 3. Use `time` to pause or step authoritative state. Position the view with `camera`. Single-unit
    focus without padding uses the intentionally close 32-world-pixel default.
-4. Run `screenshot` with a safe name, normally `presentation: "clean"`, a bounded viewport such as
-   1000×700 at DPR 1, and any subject aliases.
+4. Run `screenshot` with a safe name, a bounded viewport such as 1000×700 at DPR 1, and any subject
+   aliases. Use `presentation: "clean"` to hide UI chrome or `presentation: "normal"` to retain
+   visible Lab panels and game UI.
 5. Open the returned `pngPath` once with the local image viewer. Share that path and a concise scene
    result; the adjacent JSON manifest contains reproduction facts.
 6. Run `close` when the session is complete. Use `shutdown` for immediate daemon teardown; otherwise
