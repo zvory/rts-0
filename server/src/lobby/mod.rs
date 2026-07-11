@@ -461,7 +461,7 @@ pub enum RoomEvent {
     /// Local-development-only replay artifact import. Validation and destructive replacement run
     /// on the room's single-owner task, never in an HTTP or daemon task.
     LabReplayImport {
-        artifact: LabReplayArtifactV1,
+        artifact: Box<LabReplayArtifactV1>,
         reply: tokio::sync::oneshot::Sender<Result<(), String>>,
     },
     /// A replay viewer requested a frozen practice branch seed from the current replay tick.
@@ -818,7 +818,10 @@ impl Lobby {
         let (reply, response) = tokio::sync::oneshot::channel();
         handle
             .event_tx
-            .send(RoomEvent::LabReplayImport { artifact, reply })
+            .send(RoomEvent::LabReplayImport {
+                artifact: Box::new(artifact),
+                reply,
+            })
             .await
             .map_err(|_| "lab room is unavailable".to_string())?;
         tokio::time::timeout(Duration::from_secs(5), response)

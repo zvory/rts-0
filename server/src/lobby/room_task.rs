@@ -437,7 +437,7 @@ impl RoomTask {
                     .as_ref()
                     .map(|session| session.operator_id)
                     .ok_or_else(|| "lab session is not running".to_string())
-                    .and_then(|operator_id| self.load_lab_replay_artifact(operator_id, artifact));
+                    .and_then(|operator_id| self.load_lab_replay_artifact(operator_id, *artifact));
                 if result.is_ok() {
                     self.broadcast_lab_state();
                 }
