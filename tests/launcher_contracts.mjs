@@ -19,6 +19,11 @@ assert.equal(gameProbeUrl("mainline"), `${GAME_ORIGINS.mainline}/version`);
 const indexHtml = await readFile(new URL("../launcher/index.html", import.meta.url), "utf8");
 assert.doesNotMatch(indexHtml, /https:\/\/(?:bewegungskrieg-(?:mainline|beta)\.fly\.dev|(?:mainline|beta)\.bewegungskrieg\.net)/,
   "the browser must use the server-authoritative redirect origin");
+assert.match(indexHtml, />Choose a game server\.<\/p>/);
+assert.match(indexHtml, /data-channel="mainline">Main<\/button>/);
+assert.match(indexHtml, /data-channel="beta">Experimental<\/button>/);
+assert.match(indexHtml, /status\.textContent = "Loading\.\.\."/);
+assert.doesNotMatch(indexHtml, /Starting server|A stopped server may need a moment|>Mainline<|>Beta</);
 
 let probedUrl = null;
 const probe = async (url) => {

@@ -692,6 +692,8 @@ if [ "$RUN_STATIC_JS" = "1" ]; then
     node "$SCRIPT_DIR/protocol_parity.mjs"
   run_suite_bg "JS client contracts" \
     node "$SCRIPT_DIR/client_contracts.mjs"
+  run_suite_bg "JS launcher contracts" \
+    node "$SCRIPT_DIR/launcher_contracts.mjs"
   run_suite_bg "JS prediction controller" \
     node "$SCRIPT_DIR/prediction_controller.mjs"
   run_suite_bg "JS tri-state harness self-test" \

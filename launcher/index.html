@@ -20,10 +20,10 @@
 <body>
   <main>
     <h1>Bewegungskrieg</h1>
-    <p>Choose a game server. A stopped server may need a moment to start.</p>
+    <p>Choose a game server.</p>
     <div class="choices">
-      <button type="button" data-channel="mainline">Mainline</button>
-      <button type="button" data-channel="beta">Beta</button>
+      <button type="button" data-channel="mainline">Main</button>
+      <button type="button" data-channel="beta">Experimental</button>
     </div>
     <p id="status" role="status" aria-live="polite"></p>
   </main>
@@ -39,7 +39,7 @@
       if (launching) return;
       launching = true;
       buttons.forEach((button) => { button.disabled = true; });
-      status.textContent = "Starting server...";
+      status.textContent = "Loading...";
       const deadline = Date.now() + 30000;
       while (Date.now() < deadline) {
         try {
