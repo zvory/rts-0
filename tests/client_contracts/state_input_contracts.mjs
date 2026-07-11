@@ -1373,12 +1373,8 @@ function buttonByLabel(card, label) {
   let centered = null;
   clusterInput.camera = {
     viewportGroundBounds: () => ({ minX: 0, minY: 0, maxX: 100, maxY: 100 }),
-    snapshot: () => ({
-      version: 1,
-      focus: { x: 50, y: 50 },
-      framingScale: 1,
-      boundsPolicy: "mapOverscroll",
-    }),
+    snapshot: () => ({ version: 1, focus: { x: 50, y: 50 },
+      framingScale: 1, boundsPolicy: "mapOverscroll" }),
     focusAt(point) { centered = point; },
   };
   clusterInput.state = {
