@@ -153,40 +153,45 @@ export async function createWallClockRecorder({ page, outputPath, clip, scale, t
       stopping = true;
       client.off("Page.screencastFrame", onFrame);
       try {
-        await client.send("Page.stopScreencast");
-      } finally {
-        await client.detach?.().catch(() => {});
+        try {
+          await client.send("Page.stopScreencast");
+        } finally {
+          await client.detach?.().catch(() => {});
+        }
+        const encodedFrames = Math.max(1, Math.ceil(targetDurationMs * fps / 1000));
+        while (slotsQueued < encodedFrames) {
+          encoder.write(currentFrame);
+          sourceFramesUsed.add(currentFrameId);
+          slotsQueued += 1;
+        }
+        const extra = slotsQueued - encodedFrames;
+        if (extra > 0) {
+          throw new LabInteractRecordingError("recordingClockDrift", `Recorder queued ${extra} frame slots beyond its measured wall duration.`);
+        }
+        await encoder.finish(recordingStopTimeoutMs(targetDurationMs));
+        const used = sourceFramesUsed.size;
+        const sourceCoverage = used / encodedFrames;
+        const deficient = sourceCoverage < RECORDING_LIMITS.minimumSourceCoverage;
+        return {
+          expectedAt30Fps: encodedFrames,
+          encoded: encodedFrames,
+          rawScreencastEvents: rawEvents,
+          rawEventsDuringRecording: recordingEvents,
+          sourceFramesUsed: used,
+          reusedSourceFrameSlots: encodedFrames - used,
+          sourceCoverage,
+          deficient,
+          minimumSourceCoverage: RECORDING_LIMITS.minimumSourceCoverage,
+          chromeTimestampSpanSeconds: firstChromeTimestamp == null || lastChromeTimestamp == null ? null : lastChromeTimestamp - firstChromeTimestamp,
+          largestChromeTimestampGapMs: largestChromeGapMs,
+          warning: deficient
+            ? `Source capture covered only ${(sourceCoverage * 100).toFixed(1)}% of output frame slots; use capture-fixed for reliable dense-scene video.`
+            : null,
+        };
+      } catch (error) {
+        await encoder.abort().catch(() => {});
+        throw error;
       }
-      const encodedFrames = Math.max(1, Math.ceil(targetDurationMs * fps / 1000));
-      while (slotsQueued < encodedFrames) {
-        encoder.write(currentFrame);
-        sourceFramesUsed.add(currentFrameId);
-        slotsQueued += 1;
-      }
-      const extra = slotsQueued - encodedFrames;
-      if (extra > 0) {
-        throw new LabInteractRecordingError("recordingClockDrift", `Recorder queued ${extra} frame slots beyond its measured wall duration.`);
-      }
-      await encoder.finish(recordingStopTimeoutMs(targetDurationMs));
-      const used = sourceFramesUsed.size;
-      const sourceCoverage = used / encodedFrames;
-      const deficient = sourceCoverage < RECORDING_LIMITS.minimumSourceCoverage;
-      return {
-        expectedAt30Fps: encodedFrames,
-        encoded: encodedFrames,
-        rawScreencastEvents: rawEvents,
-        rawEventsDuringRecording: recordingEvents,
-        sourceFramesUsed: used,
-        reusedSourceFrameSlots: encodedFrames - used,
-        sourceCoverage,
-        deficient,
-        minimumSourceCoverage: RECORDING_LIMITS.minimumSourceCoverage,
-        chromeTimestampSpanSeconds: firstChromeTimestamp == null || lastChromeTimestamp == null ? null : lastChromeTimestamp - firstChromeTimestamp,
-        largestChromeTimestampGapMs: largestChromeGapMs,
-        warning: deficient
-          ? `Source capture covered only ${(sourceCoverage * 100).toFixed(1)}% of output frame slots; use capture-fixed for reliable dense-scene video.`
-          : null,
-      };
     },
     async abort() {
       clearInterval(interval);
@@ -229,9 +234,10 @@ export function createPngMp4Encoder({ outputPath, fps, crop = null, scale = 1, t
     },
     async abort() {
       child.stdin.destroy();
-      if (child.exitCode == null) {
+      if (child.exitCode == null && child.signalCode == null) {
+        const closed = once(child, "close");
         child.kill("SIGKILL");
-        await once(child, "close").catch(() => {});
+        await closed.catch(() => {});
       }
       fs.rmSync(outputPath, { force: true });
     },
