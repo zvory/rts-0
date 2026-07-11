@@ -11,8 +11,12 @@ edit source files.
 
 1. Run `open`, retain `result.sessionId`, then run `catalog` before choosing players or kinds.
    `open` is safe to repeat: it returns the active session. Run `close` first only when a fresh
-   session or different launch options are needed.
-2. Keep the scene small. Use short aliases in `spawn` and confirm changes with `inspect`.
+   session or different launch options are needed. A cold build may take tens of seconds and emits
+   its one JSON result only after readiness; keep the process attached, or use concurrent `status`
+   to confirm `opening: true`.
+2. Keep the scene small. Use short aliases in `spawn` and confirm changes with `inspect`. During
+   autonomous combat, use `activity`, `targetId`, and HP changes rather than treating `state: "idle"`
+   or an empty explicit `orderPlan` as proof that no engagement occurred.
 3. Use `time` to pause or step authoritative state. Position the view with `camera`. Single-unit
    focus without padding uses the intentionally close 32-world-pixel default.
 4. Run `screenshot` with a safe name, normally `presentation: "clean"`, a bounded viewport such as

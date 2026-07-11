@@ -508,6 +508,8 @@ function factionUpgrades(factionId) {
 
 function projectEntity(entity) {
   if (!entity) return null;
+  const targetId = Number.isInteger(entity.targetId) ? entity.targetId : null;
+  const state = typeof entity.state === "string" ? entity.state : "";
   return {
     id: entity.id,
     kind: entity.kind,
@@ -516,7 +518,11 @@ function projectEntity(entity) {
     y: finiteOrNull(entity.y),
     hp: finiteOrNull(entity.hp),
     maxHp: finiteOrNull(entity.maxHp),
-    state: typeof entity.state === "string" ? entity.state : "",
+    state,
+    activity: targetId != null ? "engaging" : state,
+    targetId,
+    weaponFacing: finiteOrNull(entity.weaponFacing),
+    setupState: typeof entity.setupState === "string" ? entity.setupState : null,
     orderPlan: Array.isArray(entity.orderPlan) ? entity.orderPlan.slice(0, 8).map(projectOrderStage) : [],
   };
 }

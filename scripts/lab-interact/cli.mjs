@@ -17,6 +17,16 @@ const STARTUP_TIMEOUT_MS = 15_000;
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 
 export async function runCli(argv = process.argv.slice(2), { cwd = process.cwd(), env = process.env } = {}) {
+  if (argv.length === 1 && ["--help", "-h", "help"].includes(argv[0])) {
+    return {
+      ok: true,
+      result: {
+        usage: "node scripts/lab-interact/cli.mjs <command> [JSON-object]",
+        commands: [...LAB_INTERACT_COMMANDS],
+        documentation: "docs/lab-interact-cli.md",
+      },
+    };
+  }
   if (argv.length < 1 || argv.length > 2) throw cliError("usage", "Usage: node scripts/lab-interact/cli.mjs <command> [JSON-object]");
   const [command, rawInput = "{}"] = argv;
   if (!LAB_INTERACT_COMMANDS.includes(command)) throw cliError("unknownCommand", `Unknown command ${JSON.stringify(command)}.`);

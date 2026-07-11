@@ -153,7 +153,10 @@ const viewportCamera = {
   centerOn(x, y) { this.x = x - this.viewW / (2 * this.zoom); this.y = y - this.viewH / (2 * this.zoom); },
 };
 const viewportEntities = [
-  { id: 1, kind: "rifleman", owner: 1, x: 20, y: 20, hp: 100, maxHp: 100, state: "idle", orderPlan: [] },
+  {
+    id: 1, kind: "rifleman", owner: 1, x: 20, y: 20, hp: 100, maxHp: 100,
+    state: "idle", targetId: 2, weaponFacing: 0.25, setupState: "deployed", orderPlan: [],
+  },
   { id: 2, kind: "rifleman", owner: 2, x: 240, y: 240, hp: 100, maxHp: 100, state: "idle", orderPlan: [] },
   { id: 3, kind: KIND.CITY_CENTRE, owner: 1, x: 400, y: 400, hp: 100, maxHp: 100, state: "idle", orderPlan: [] },
 ];
@@ -180,6 +183,17 @@ const viewportBridge = new LabInteractBridge({
 });
 const viewportInspection = await viewportBridge.inspect({ cameraViewport: true, limit: 10 });
 assert.deepEqual(viewportInspection.entities.map((entity) => entity.id), [1], "bridge inspection can filter to the current camera viewport");
+assert.deepEqual(
+  {
+    state: viewportInspection.entities[0].state,
+    activity: viewportInspection.entities[0].activity,
+    targetId: viewportInspection.entities[0].targetId,
+    weaponFacing: viewportInspection.entities[0].weaponFacing,
+    setupState: viewportInspection.entities[0].setupState,
+  },
+  { state: "idle", activity: "engaging", targetId: 2, weaponFacing: 0.25, setupState: "deployed" },
+  "bridge inspection distinguishes autonomous combat activity from explicit order state",
+);
 assert.deepEqual(viewportInspection.camera.worldBounds, { minX: 0, minY: 0, maxX: 100, maxY: 100 }, "bridge inspection reports applied camera world bounds");
 const focused = viewportBridge.camera({ action: "focus", entityIds: [1, 2], padding: 10 });
 assert.ok(focused.camera.zoom > 0 && focused.camera.worldBounds.maxX > focused.camera.worldBounds.minX, "bridge focus applies bounded padding and returns camera bounds");

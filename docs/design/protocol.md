@@ -619,9 +619,11 @@ visibility. Allied non-resource entities visible through team current fog expose
 inspection details: hp/state/facing/setup state, production or research kind/progress/queue length,
 legacy Scout Plane queue presence, construction progress, gatherer latched node, active Breakthrough
 status, and safe combat tracers.
-Combat `targetId` and `weaponFacing` for allied units are sent only when the target is visible in
-the recipient's team-current actionable fog, so allied units attacking hidden enemies do not reveal
-hidden target ids or target directions. `steel`, `oil`, supply, `upgrades`, rallies, order plans,
+Combat `targetId` and `weaponFacing` for allied units are sent whenever an attack-capable entity has
+a visible acquired target, including autonomous acquisition while its explicit order state remains
+idle. They are omitted when the target is not visible in the recipient's team-current actionable
+fog, so allied units attacking hidden enemies do not reveal hidden target ids or target directions.
+`steel`, `oil`, supply, `upgrades`, rallies, order plans,
 construction activity hints, ability controls/autocast toggles, debug paths, and command authority
 remain exact-owner-only in normal active-player and selected-player/team observer projections.
 Full-world diagnostic projections are the explicit exception: they may project those per-entity
@@ -1138,7 +1140,9 @@ real players.
 `issueCommandAs` queues a normal gameplay command as the selected player only when all selected
 units belong to that player; mixed-owner selections are rejected instead of partitioned. When
 `ignoreCommandLimits` is true, the lab command bypasses the normal command-supply budget and uses
-the larger bounded lab command window instead of the ordinary live-player unit-id window.
+the larger bounded lab command window instead of the ordinary live-player unit-id window. A
+successful `labResult` carries `outcome: {accepted:true, playerId}` as an enqueue receipt; it does
+not claim that the command has already completed.
 `setPlayerGodMode` is lab-only room state: enabled players' units and buildings ignore incoming
 damage, while resources keep normal damage behavior. The current enabled player ids are mirrored in
 `start.lab.godModePlayers` and `labState.godModePlayers`.

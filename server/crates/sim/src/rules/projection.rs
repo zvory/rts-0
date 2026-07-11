@@ -254,7 +254,8 @@ pub fn project_entity(
     }
     if entity.kind == EntityKind::Tank && owner_or_ally {
         if let Some(stats) = config::unit_stats(entity.kind) {
-            view.weapon_range_tiles = Some(tank_weapon_range_tiles(entity, stats.range_tiles as f32));
+            view.weapon_range_tiles =
+                Some(tank_weapon_range_tiles(entity, stats.range_tiles as f32));
         }
     }
     if entity.kind == EntityKind::Panzerfaust {
@@ -262,11 +263,16 @@ pub fn project_entity(
             .combat
             .as_ref()
             .and_then(|combat| combat.panzerfaust)
-            .map(|state| matches!(state, PanzerfaustState::Loaded | PanzerfaustState::Windup { .. }));
+            .map(|state| {
+                matches!(
+                    state,
+                    PanzerfaustState::Loaded | PanzerfaustState::Windup { .. }
+                )
+            });
     }
-    let active_combat_target = matches!(entity.order(), Order::Attack(_) | Order::AttackMove(_))
-        || (fires_while_moving(entity.kind) && entity.target_id().is_some())
-        || (entity.is_building() && entity.can_attack());
+    let acquired_combat_target = entity.can_attack() && entity.target_id().is_some();
+    let active_combat_target =
+        matches!(entity.order(), Order::Attack(_) | Order::AttackMove(_)) || acquired_combat_target;
     let target_visible = if let Some(target_id) = entity.target_id() {
         context
             .target
@@ -285,7 +291,9 @@ pub fn project_entity(
     } else {
         false
     };
-    let weapon_facing_useful = fires_while_moving(entity.kind) || active_combat_target;
+    let weapon_facing_useful = fires_while_moving(entity.kind)
+        || active_combat_target
+        || (entity.is_building() && entity.can_attack());
     if weapon_facing_useful {
         if let Some(weapon_facing) = entity.weapon_facing() {
             let weapon_facing_is_safe = exact_owner
@@ -452,8 +460,7 @@ pub fn project_entity(
     if matches!(
         entity.kind,
         crate::game::entity::EntityKind::Worker | crate::game::entity::EntityKind::Golem
-    )
-        && entity.gather_phase() == Some(GatherPhase::Harvesting)
+    ) && entity.gather_phase() == Some(GatherPhase::Harvesting)
     {
         if let Some(node) = entity.order().gather_node() {
             view.latched_node = Some(node);
@@ -935,6 +942,81 @@ mod tests {
     }
 
     #[test]
+    fn idle_combat_unit_projects_visible_acquired_target() {
+        let mut entities = EntityStore::new();
+        entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("viewer spotter should spawn");
+        let gunner_id = entities
+            .spawn_unit(2, EntityKind::MachineGunner, 120.0, 100.0)
+            .expect("machine gunner should spawn");
+        let target_id = entities
+            .spawn_unit(3, EntityKind::Rifleman, 140.0, 100.0)
+            .expect("target should spawn");
+        {
+            let gunner = entities.get_mut(gunner_id).expect("gunner should exist");
+            gunner.set_target_id(Some(target_id));
+            gunner.set_weapon_facing(0.0);
+        }
+        let map = Map {
+            size: 16,
+            terrain: vec![terrain::GRASS; 16 * 16],
+            starts: vec![(1, 1)],
+            expansion_sites: Vec::new(),
+        };
+        let mut fog = Fog::new(map.size);
+        fog.recompute(&[1, 2, 3], &entities, &map);
+        let gunner = entities.get(gunner_id).expect("gunner should exist");
+        let target = entities.get(target_id).expect("target should exist");
+
+        let viewer_view = project_for_test(1, gunner, &fog, true, &entities, Some(target), false)
+            .expect("viewer should see gunner");
+
+        assert_eq!(viewer_view.state, "idle");
+        assert_eq!(viewer_view.target_id, Some(target_id));
+        assert_eq!(viewer_view.weapon_facing, Some(0.0));
+    }
+
+    #[test]
+    fn idle_combat_unit_omits_hidden_acquired_target() {
+        let mut entities = EntityStore::new();
+        entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("viewer spotter should spawn");
+        let gunner_id = entities
+            .spawn_unit(2, EntityKind::MachineGunner, 120.0, 100.0)
+            .expect("machine gunner should spawn");
+        let hidden_target_id = entities
+            .spawn_unit(3, EntityKind::Rifleman, 700.0, 700.0)
+            .expect("hidden target should spawn");
+        {
+            let gunner = entities.get_mut(gunner_id).expect("gunner should exist");
+            gunner.set_target_id(Some(hidden_target_id));
+            gunner.set_weapon_facing(1.2);
+        }
+        let map = Map {
+            size: 64,
+            terrain: vec![terrain::GRASS; 64 * 64],
+            starts: vec![(1, 1)],
+            expansion_sites: Vec::new(),
+        };
+        let mut fog = Fog::new(map.size);
+        fog.recompute(&[1, 2, 3], &entities, &map);
+        let gunner = entities.get(gunner_id).expect("gunner should exist");
+        let hidden_target = entities
+            .get(hidden_target_id)
+            .expect("hidden target should exist");
+
+        let viewer_view =
+            project_for_test(1, gunner, &fog, true, &entities, Some(hidden_target), false)
+                .expect("viewer should see nearby gunner");
+
+        assert_eq!(viewer_view.state, "idle");
+        assert_eq!(viewer_view.target_id, None);
+        assert_eq!(viewer_view.weapon_facing, None);
+    }
+
+    #[test]
     fn tank_projects_lifetime_oil_used() {
         let mut entities = EntityStore::new();
         let tank_id = entities
@@ -1271,7 +1353,11 @@ mod tests {
 
         assert_eq!(view.build_progress, None);
         assert!(
-            (view.deconstruct_progress.expect("deconstruct progress should project") - 0.5).abs()
+            (view
+                .deconstruct_progress
+                .expect("deconstruct progress should project")
+                - 0.5)
+                .abs()
                 < 0.001,
             "deconstruction progress should be the remaining reverse fraction"
         );

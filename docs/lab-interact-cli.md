@@ -17,6 +17,7 @@ node scripts/lab-interact/cli.mjs camera '{"sessionId":"<id>","camera":{"action"
 node scripts/lab-interact/cli.mjs screenshot '{"sessionId":"<id>","name":"subject","presentation":"clean","subjects":["subject"]}'
 node scripts/lab-interact/cli.mjs close '{"sessionId":"<id>"}'
 node scripts/lab-interact/cli.mjs shutdown
+node scripts/lab-interact/cli.mjs --help
 ```
 
 The complete surface is `open`, `close`, `reset`, `catalog`, `spawn`, `update`, `remove`, `order`,
@@ -31,6 +32,12 @@ before `open` when a fresh session or different launch options are required. Opt
 `[A-Za-z][A-Za-z0-9_-]{0,31}` and remain private to that session. Unknown, duplicate, stale, or
 cross-session aliases are rejected rather than guessed. Only one authoritative session may be open
 per worktree.
+
+A cold first `open` may spend tens of seconds building the selected worktree's Rust server before
+it writes its single JSON response. Keep that CLI process attached until it exits. A concurrent
+`status` reports `opening: true` while startup is still in progress, and an idempotent `open` retry
+recovers the same completed session if the original caller was interrupted. `--help`, `-h`, and
+`help` return the bounded command catalog without requiring a Git worktree or starting a daemon.
 
 ## Automatic daemon lifecycle
 
@@ -53,6 +60,12 @@ small, confirm mutations with `inspect`, control authoritative time with `time`,
 `camera`. `screenshot` waits for fonts, relevant assets, two error-free render frames, and
 authoritative state. It returns the absolute PNG and adjacent manifest paths plus bounded metadata;
 it never sends image bytes through the CLI. Inspect the PNG once with the local image viewer.
+
+Private servers use the production 30 Hz simulation clock by default; an explicitly inherited
+`RTS_TEST_TICK_MS` remains available to tests. Successful `order` results include an authoritative
+receipt outcome `{accepted:true, playerId}`. Inspected entities keep `state` and `orderPlan` for
+explicit simulation orders, while `activity: "engaging"`, `targetId`, and `weaponFacing` expose a
+visible acquired combat target without mislabeling autonomous fire as an explicit order.
 
 Artifacts are confined to `target/lab-interact/<session-id>/captures/` and ignored by Git. For a
 single-unit detail capture, camera `focus` defaults to close 32-world-pixel padding. Multi-subject

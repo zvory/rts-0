@@ -24,7 +24,7 @@ const baseEnv = {
   ...process.env,
   RTS_LAB_INTERACT_DRIVER_FACTORY_MODULE: "tests/fixtures/lab_interact_fake_driver.mjs",
   RTS_LAB_INTERACT_IDLE_MS: "5000",
-  RTS_LAB_INTERACT_FAKE_OPEN_DELAY_MS: "75",
+  RTS_LAB_INTERACT_FAKE_OPEN_DELAY_MS: "250",
 };
 
 assert.equal(configuredIdleMs({}), DEFAULT_IDLE_MS, "the production idle default is exactly 30 minutes");
@@ -34,6 +34,28 @@ assert.throws(() => configuredIdleMs({ RTS_LAB_INTERACT_IDLE_MS: "0" }), /must b
 
 shutdown(baseEnv);
 fs.rmSync(paths.directory, { recursive: true, force: true });
+
+for (const helpCommand of ["--help", "-h", "help"]) {
+  const help = spawnSync(process.execPath, [cli, helpCommand], {
+    cwd: path.dirname(root),
+    env: baseEnv,
+    encoding: "utf8",
+  });
+  assert.equal(help.status, 0, `${helpCommand} succeeds without a Git workspace`);
+  assert.equal(help.stderr, "", `${helpCommand} keeps machine-readable help on stdout`);
+  const helpEnvelope = JSON.parse(help.stdout);
+  assert.equal(helpEnvelope.ok, true, `${helpCommand} returns a successful envelope`);
+  assert.ok(helpEnvelope.result.commands.includes("open"), `${helpCommand} lists open`);
+  assert.ok(helpEnvelope.result.commands.includes("shutdown"), `${helpCommand} lists shutdown`);
+}
+assert.equal(fs.existsSync(paths.directory), false, "help does not start a daemon or create runtime state");
+
+const coldOpen = call("open");
+assert.match(coldOpen.result.sessionId, /^lab_[a-f0-9]{32}$/, "a cold first open returns one complete JSON envelope");
+assert.equal(call("status").result.opening, false, "completed cold open clears the opening status");
+call("close", { sessionId: coldOpen.result.sessionId });
+call("shutdown");
+await waitFor(() => !fs.existsSync(paths.directory), 2000, "cold-first-open daemon shuts down cleanly");
 
 const invalidConfiguration = spawnSync(process.execPath, [cli, "status", "{}"], {
   cwd: root,
@@ -72,6 +94,8 @@ fs.rmSync(paths.directory, { recursive: true, force: true });
 
 const initial = call("status");
 assert.equal(initial.ok, true, "the first CLI command automatically starts the daemon");
+assert.equal(initial.result.opening, false, "idle status reports no session opening in progress");
+assert.equal(initial.result.closing, false, "idle status reports no session closing in progress");
 const daemonState = JSON.parse(fs.readFileSync(paths.state, "utf8"));
 assert.equal(daemonState.workspaceRoot, fs.realpathSync(root), "runtime is pinned to the real worktree path");
 assert.equal(daemonState.idleMs, 5000, "the daemon records its configured idle bound");
@@ -91,7 +115,21 @@ const invalidEnvelope = await rawRequest(paths.socket, {
 assert.equal(invalidEnvelope.error.code, "invalidRequest", "a wrong capability is rejected by the handshake");
 assert.equal(JSON.parse(fs.readFileSync(paths.state, "utf8")).lastInteractionAt, interactionBeforeInvalid, "invalid envelopes do not extend idle lifetime");
 
-const opened = call("open");
+const opening = execFileAsync(process.execPath, [cli, "open", "{}"], { cwd: root, env: baseEnv });
+await waitFor(
+  async () => (await rawRequest(paths.socket, {
+    protocolVersion: IPC_VERSION,
+    daemonId: daemonState.daemonId,
+    capability: daemonState.capability,
+    command: "status",
+    input: {},
+  })).result?.opening === true,
+  1000,
+  "status exposes an in-flight session open",
+);
+const { stdout: openingStdout, stderr: openingStderr } = await opening;
+assert.equal(openingStderr, "", "opening a session writes no stderr");
+const opened = JSON.parse(openingStdout);
 const firstSessionId = opened.result.sessionId;
 assert.match(firstSessionId, /^lab_[a-f0-9]{32}$/, "open returns a bounded opaque session id");
 const repeatedOpen = call("open");
@@ -279,7 +317,7 @@ function prepareStaleRuntime() {
 async function waitFor(predicate, timeoutMs, message) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (predicate()) return;
+    if (await predicate()) return;
     await sleep(20);
   }
   assert.fail(message);

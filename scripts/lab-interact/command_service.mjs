@@ -185,6 +185,8 @@ export class LabInteractService {
     }
     return {
       workspaceRoot: this.workspaceRoot,
+      opening: this.openPromise != null,
+      closing: this.closePromise != null,
       sessions: [...this.sessions.values()].map((session) => ({
         sessionId: session.sessionId,
         aliases: session.aliases.size,
