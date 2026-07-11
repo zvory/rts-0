@@ -4,6 +4,7 @@ import fs from "node:fs";
 import { TERRAIN } from "../../client/src/protocol.js";
 import { createMapHandoff, consumeMapHandoff } from "../../client/src/map_editor_handoff.js";
 import { mapEditorLaunchConfig } from "../../client/src/map_editor_launch.js";
+import { MapEditorViewport } from "../../client/src/map_editor_viewport.js";
 import {
   addDraftPlayerNatural,
   addSymmetricDraftNaturals,
@@ -186,6 +187,34 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
     "the full authored start clearance remains protected grass",
   );
   assert.equal(session.commitTerrainStroke(), false);
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 32, playerCount: 2 });
+  session.beginTerrainStroke();
+  session.paintTerrainTiles([{ x: 0, y: 0 }], TERRAIN.WATER);
+  const statuses = [];
+  const viewport = {
+    paintPointerId: 7,
+    panPointerId: null,
+    tool: { kind: "terrain", shape: "box" },
+    paintStartTile: { x: 4, y: 4 },
+    lastPaintTile: { x: 12, y: 12 },
+    session,
+    eventTile() { throw new Error("cancelled paint must not resolve a release tile"); },
+    paintBox() { throw new Error("cancelled paint must not fill a box"); },
+    drawOverlay() {},
+    onStatus: (message, error) => statuses.push({ message, error }),
+  };
+  MapEditorViewport.prototype.handlePointerUp.call(viewport, {
+    type: "pointercancel",
+    pointerId: 7,
+    currentTarget: { releasePointerCapture() {} },
+  });
+  assert.equal(session.materialized().terrain[0], TERRAIN.GRASS, "pointer cancellation restores already-painted brush tiles");
+  assert.deepEqual(statuses, [{ message: "Terrain paint cancelled.", error: false }]);
+  assert.equal(viewport.paintStartTile, null, "pointer cancellation clears the pending box preview");
 }
 
 {

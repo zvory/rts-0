@@ -188,17 +188,25 @@ export class MapEditorViewport {
       this.lastPointer = null;
     }
     if (event.pointerId === this.paintPointerId) {
-      const tile = this.eventTile(event);
-      if (tile) this.lastPaintTile = tile;
-      if (this.tool?.kind === "terrain" && this.tool.shape === "box" && this.paintStartTile && this.lastPaintTile) {
-        this.paintBox(this.paintStartTile, this.lastPaintTile);
+      const cancelled = event.type === "pointercancel";
+      if (!cancelled) {
+        const tile = this.eventTile(event);
+        if (tile) this.lastPaintTile = tile;
+        if (this.tool?.kind === "terrain" && this.tool.shape === "box" && this.paintStartTile && this.lastPaintTile) {
+          this.paintBox(this.paintStartTile, this.lastPaintTile);
+        }
       }
       this.paintPointerId = null;
       this.lastPaintTile = null;
       this.paintStartTile = null;
-      const changed = this.session.commitTerrainStroke();
+      let changed = false;
+      if (cancelled) this.session.cancelTerrainStroke();
+      else changed = this.session.commitTerrainStroke();
       this.drawOverlay();
-      this.onStatus(changed ? "Terrain paint committed." : "Protected bases remain grass.", !changed);
+      this.onStatus(
+        cancelled ? "Terrain paint cancelled." : changed ? "Terrain paint committed." : "Protected bases remain grass.",
+        !cancelled && !changed,
+      );
     }
     event.currentTarget.releasePointerCapture?.(event.pointerId);
   }
