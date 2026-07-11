@@ -274,6 +274,7 @@ export class Renderer {
     for (const key of Object.keys(this._liveRigPools)) this._seen[key] = new Set();
 
     this._renderErrors = new Map();
+    this._fogRenderFog = null;
     this._fogRenderKey = null;
     this._fogRenderMap = null;
 
@@ -1007,6 +1008,7 @@ export class Renderer {
       this._missToastPool.clear();
     }
     this._unseen.clear();
+    this._fogRenderFog = null;
     this._fogRenderKey = null;
     this._fogRenderMap = null;
     this._setupVisuals.clear();

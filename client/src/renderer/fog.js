@@ -50,7 +50,11 @@ import {
 export function _drawFog(fog) {
   const g = this._fogGfx;
   const renderKey = fogGeometryKey.call(this, fog);
-  if (this._fogRenderMap === this._map && this._fogRenderKey === renderKey) {
+  if (
+    this._fogRenderFog === fog
+    && this._fogRenderMap === this._map
+    && this._fogRenderKey === renderKey
+  ) {
     this._recordRenderDiagnostic?.("renderer.cache.hit.fog");
     return;
   }
@@ -58,6 +62,7 @@ export function _drawFog(fog) {
   this._recordRenderDiagnostic?.("renderer.graphics.clear.fog");
   g.clear();
   if (!fog || !this._map) {
+    this._fogRenderFog = fog;
     this._fogRenderMap = this._map;
     this._fogRenderKey = renderKey;
     return;
@@ -89,6 +94,7 @@ export function _drawFog(fog) {
       }
     }
   }
+  this._fogRenderFog = fog;
   this._fogRenderMap = this._map;
   this._fogRenderKey = renderKey;
 }

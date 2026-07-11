@@ -1185,6 +1185,19 @@ function polygonAxisValues(points, offset) {
     fog.visibleRevision += 1;
     renderer._drawFog(fog);
     assert(renderer._fogGfx.calls.length > fogCalls, "fog visibility revision invalidates cached geometry");
+
+    const replacementFog = {
+      ...fog,
+      isVisible: () => false,
+      isExplored: () => false,
+    };
+    const preReplacementFogCalls = renderer._fogGfx.calls.length;
+    renderer._drawFog(replacementFog);
+    assert(
+      renderer._fogGfx.calls.length > preReplacementFogCalls,
+      "replacing the fog model invalidates geometry even when its revision is unchanged",
+    );
+    renderer._drawFog(fog);
     delete fog.revision;
     const fallbackFogCalls = renderer._fogGfx.calls.length;
     renderer._drawFog(fog);
@@ -1205,6 +1218,7 @@ function polygonAxisValues(points, offset) {
       exploredRevision: 99,
     };
     const priorFogKey = renderer._fogRenderKey;
+    const priorFog = renderer._fogRenderFog;
     const priorFogMap = renderer._fogRenderMap;
     const retryFogDrawRect = renderer._fogGfx.drawRect.bind(renderer._fogGfx);
     let throwFogOnce = true;
@@ -1223,8 +1237,10 @@ function polygonAxisValues(points, offset) {
     }
     assert(fogFailed, "fog test exercises a transient tessellation failure");
     assert(
-      renderer._fogRenderKey === priorFogKey && renderer._fogRenderMap === priorFogMap,
-      "failed fog tessellation does not commit its map or render key",
+      renderer._fogRenderFog === priorFog
+        && renderer._fogRenderKey === priorFogKey
+        && renderer._fogRenderMap === priorFogMap,
+      "failed fog tessellation does not commit its fog, map, or render key",
     );
     const failedFogCalls = renderer._fogGfx.calls.length;
     renderer._drawFog(retryFog);
@@ -1241,8 +1257,8 @@ function polygonAxisValues(points, offset) {
     assert(!renderer._pools.resources.has(resource.id), "resource cache state is evicted with its Graphics slot");
     renderer.destroy();
     assert(
-      renderer._fogRenderKey === null,
-      "renderer destroy clears static Graphics and fog render keys",
+      renderer._fogRenderFog === null && renderer._fogRenderKey === null,
+      "renderer destroy clears static Graphics and fog cache identity",
     );
   } finally {
     restorePixi();
