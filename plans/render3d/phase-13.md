@@ -18,10 +18,10 @@ foundation gate to Phase 13.5.
 ## Work
 
 - Add `scripts/art/generate-render3d-foundation-glb.mjs`, which deterministically emits one neutral
-  tracked vehicle with hull, turret, independently articulated barrel, team-color material slot,
-  muzzle/selection/HP anchors, visible bounds, and shadow proxy. Use repository-authored primitive
-  geometry/material data only: no network, AI generation, third-party model, remote/data URI,
-  compressed extension, or decoder.
+  tracked vehicle with the locked 50.4-by-28.8-world-px semantic hull, turret, independently
+  articulated barrel, team-color material slot, muzzle/selection/HP anchors, visible bounds, and
+  shadow proxy. Use repository-authored primitive geometry/material data only: no network, AI
+  generation, third-party model, remote/data URI, compressed extension, or decoder.
 - Check in the generator, human-readable source parameters, provenance/license record, manifest,
   and generated GLB. Regeneration into a temporary path must byte-match the checked-in GLB and its
   manifest checksum.

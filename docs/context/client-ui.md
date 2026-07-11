@@ -4,10 +4,9 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 
 ## Read first
 - [docs/design/architecture.md](../design/architecture.md) — just the client paragraph
-- [docs/design/client-ui.md](../design/client-ui.md) — modules and current Pixi behavior
-- [client-rendering.md](../design/client-rendering.md) — rendering contracts/ledger
-- §4.1 Module export contracts
-- §4.2 Rendering and look
+- [docs/design/client-ui.md](../design/client-ui.md) — module contracts in §4.1 and current Pixi
+  behavior in §4.2
+- [client-rendering.md](../design/client-rendering.md) — renderer-neutral contracts and parity ledger
 
 ## Code map
 - `app-shell`: `main.js`, `app.js`, `lab_interact_bridge.js`, `launch_url.js`, `match.js`, `match_*.js`, diagnostics, observer analysis,

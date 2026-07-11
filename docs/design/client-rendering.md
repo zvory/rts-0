@@ -3,7 +3,8 @@
 This document is the durable contract for renderer-neutral camera, selection, presentation,
 capture, backend lifecycle, asset, ownership, and performance work. The existing Pixi module
 catalog and current look remain authoritative in [client-ui.md](client-ui.md); this document owns
-the boundary that allows another world renderer without duplicating gameplay authority.
+the boundary that allows another world renderer without duplicating gameplay authority. Backend
+status and gate evidence live in the active [rendering parity ledger](rendering-parity.md).
 
 ## 1. Scope and non-negotiable boundary
 
@@ -62,7 +63,12 @@ AudioListenerV1  = { x, y, referenceDistancePx }
 anchors/proxies and never changes the underlying `(x,y)`. `ProjectedPoint.depth` is signed adapter
 view depth: positive is in front, zero is the camera plane, negative is behind. `clip` is exactly
 `inside`, `outsideViewport`, `outsideDepth`, or `behindCamera`; `visible` is true only for finite,
-positive-depth points inside viewport and depth limits.
+positive-depth points inside viewport and depth limits. Clip classification uses this priority:
+non-positive depth is `behindCamera`, positive depth outside the adapter's near/far limits is
+`outsideDepth`, and an otherwise valid point outside the CSS viewport is `outsideViewport`.
+The Pixi orthographic adapter intentionally projects positive `heightPx` at the same screen point
+and depth as its ground anchor because the current top-down renderer has no elevation axis; a
+perspective adapter projects it along its renderer-private vertical scene axis.
 
 `framingScale` is measured at the focus ground point. It equals legacy Pixi `zoom`, but perspective
 adapters may implement it by bounded dolly/height while keeping fixed reviewed pitch, yaw, and FOV.
@@ -123,12 +129,14 @@ attenuation and gives perspective a deterministic focus-plane equivalent.
 
 New carryover, profile, replay, Lab, capture, and diagnostics data stores only
 `CameraSnapshotV1`. `restore` accepts version 1 and rejects unknown versions. The one named legacy
-edge may also accept `{x,y,zoom}` and immediately normalize it using the current viewport:
+edge may also accept finite `{x,y,zoom}` and immediately normalize it using the current viewport
+and the adapter's ordinary framing-scale bounds:
 
 ```text
-focus.x = x + viewportWidthCssPx / (2 * zoom)
-focus.y = y + viewportHeightCssPx / (2 * zoom)
-framingScale = zoom
+normalizedZoom = clamp(zoom, minFramingScale, maxFramingScale)
+focus.x = x + viewportWidthCssPx / (2 * normalizedZoom)
+focus.y = y + viewportHeightCssPx / (2 * normalizedZoom)
+framingScale = normalizedZoom
 ```
 
 Legacy values are never re-emitted. This read compatibility remains at the App/camera restore edge
@@ -144,9 +152,10 @@ successfully presented snapshot, never a newer camera pose awaiting presentation
 
 ## 3. Renderer-neutral selection
 
-The presentation assembler owns `SelectionSceneV1`; input consumes it only after `Match` publishes
-a successfully rendered frame. A render failure leaves the previous scene active. Candidates come
-only from already fog-filtered interpolated views.
+The presentation assembler owns `SelectionSceneV1` as an application-side sibling of the backend
+frame; it is never a field of `PresentationFrameV1`. Input consumes it only after `Match` publishes
+the scene for a successfully rendered frame. A render failure leaves the previous scene active.
+Candidates come only from already fog-filtered interpolated views.
 
 ```text
 SelectionProxyV1 = {
@@ -180,11 +189,13 @@ uses mesh picking, GPU ids, asset bounds, shadow proxies, or fresh mutable state
 
 ### 4.1 Static versus per-frame ownership
 
-Static map data is submitted on backend creation and whenever the map/view generation changes:
-map dimensions, tile size, terrain snapshot, and immutable resource-site descriptors. Per-rAF data
-is assembled once by `Match`: projection, already-filtered interpolated entities, remembered
-buildings, fog grids, selection, client feedback, normalized events, Lab/observer overlays, and
-screen overlays. A backend receives no `GameState`, `ClientIntent`, or mutable typed-array view.
+Static map data is submitted on backend creation and whenever the static-map revision changes. It
+does not ride the per-rAF frame. Per-rAF data is assembled once by `Match`: projection,
+already-filtered interpolated entities, remembered buildings, fog grids, visual selection state,
+client feedback, normalized events, Lab/observer overlays, and screen overlays. The app-side
+`SelectionSceneV1` is assembled from the same frame context but is published only after successful
+presentation and is not sent to a backend. A backend receives no `GameState`, `ClientIntent`,
+selection proxies, or mutable typed-array view.
 
 `GridSnapshotV1` is frozen and exact:
 
@@ -200,18 +211,41 @@ snapshot while source revision is unchanged and creates a new detached copy only
 change. Each backend owns its staging buffers. Fixed capture pins the snapshot object/revision.
 
 ```text
+StaticMapPresentationV1 = {
+  version: 1, generation, revision,
+  widthPx, heightPx, tileSizePx,
+  terrain: GridSnapshotV1,
+  resourceSites: readonly detached records[]
+}
+
+LayerRecordsV1 = {
+  staticGround: readonly detached records[],
+  persistentGroundMark: readonly detached records[],
+  fogGatedWorld: readonly detached records[],
+  rememberedWorld: readonly detached records[],
+  belowFogIntel: readonly detached records[],
+  currentFog: readonly detached records[],
+  aboveFogReveal: readonly detached records[],
+  tacticalFeedback: readonly detached records[],
+  screenOverlay: readonly detached records[]
+}
+
 PresentationFrameV1 = {
   version: 1, generation, frameId, visualTimeMs,
-  projection, mapRevision,
-  terrain: GridSnapshotV1, visible: GridSnapshotV1, explored: GridSnapshotV1,
-  layers: ReadonlyMap<layerId, readonly detached records[]>,
-  selectionScene: SelectionSceneV1,
+  projection, staticMapRevision,
+  visible: GridSnapshotV1, explored: GridSnapshotV1,
+  layers: LayerRecordsV1,
   diagnosticsContext
 }
 ```
 
-All arrays, maps, and records crossing this seam are detached/frozen ordinary data. Backend
-diagnostics may report counts and failures but cannot attach engine objects to the frame.
+The static-map object, layer object, arrays, and records crossing this seam are detached and frozen.
+`LayerRecordsV1` is a frozen plain object with exactly the locked layer keys, not a JavaScript
+`Map`: `Object.freeze()` does not prevent `Map.prototype.set()`, and this client has no type system
+that could make a `ReadonlyMap` enforceable at runtime. A backend may report counts and failures
+but cannot attach engine objects to either object. `staticGround` per-frame records are normally
+empty because terrain and resource sites live in `StaticMapPresentationV1`; the key remains present
+so the semantic layer shape and backend traversal order are total.
 
 ### 4.2 Locked semantic layers
 
@@ -244,20 +278,24 @@ PresentationEventV1 = {
 }
 ```
 
-`id` is `${generation}:${receiptSequence}` unless a received stable id exists; duplicates retain
-one identity. `seed` is unsigned FNV-1a over `id|kind|owner` and never uses `Math.random`.
-Admission copies every authorized pose/anchor/payload needed later; retained events never resolve
-an old entity id against future state. Lifetimes are finite and kind-owned. The required short
-fixture is normalized `attack`/muzzle feedback with exactly `240 ms` duration and fixed-capture
-offsets `0/80/160/240 ms` (240 is the expired boundary).
+`id` uses a received stable id when one exists. Otherwise it is exactly
+`${timelineGeneration}:${authoritativeTick}:${eventIndex}:${kind}:${authorizedPayloadHash}`, where
+`eventIndex` is the event's ordinal in the ordered tick event array and `authorizedPayloadHash` is
+a stable canonical hash of the normalized received payload. Identical delivery/reconstruction of
+the same event deduplicates; identical same-tick events remain distinct by ordinal; a same-id,
+different-payload collision is dropped with a bounded diagnostic. `seed` is unsigned FNV-1a over
+`id|kind|owner` and never uses `Math.random`. Admission copies every authorized pose/anchor/payload
+needed later; retained events never resolve an old entity id against future state. Lifetimes are
+finite and kind-owned. The required short fixture is normalized `attack`/muzzle feedback with
+exactly `240 ms` duration and fixed-capture offsets `0/80/160/240 ms` (240 is the expired boundary).
 
 The bounded history contains at most 256 actually received events and at most the trailing 10,000
 ms of live visual time; oldest entries are removed until both constraints hold. Reset, seek,
 rematch, or view-generation change clears history. A fixed capture freezes one complete
-`PresentationFrameV1`, its projection/grid revisions, and a detached selection of retained events.
-Synthetic time is applied only to that detached playback. Live admission always uses the live
-visual clock; network, input, audio, health, timeouts, and server ticks remain real. Capture never
-patches `performance.now()` or starts another rAF.
+`StaticMapPresentationV1` and `PresentationFrameV1`, their projection/grid/static revisions, and a
+detached selection of retained events. Synthetic time is applied only to that detached playback.
+Live admission always uses the live visual clock; network, input, audio, health, timeouts, and
+server ticks remain real. Capture never patches `performance.now()` or starts another rAF.
 
 ## 6. Backend selection and lifecycle
 
@@ -401,13 +439,18 @@ generated deterministically by `scripts/art/generate-render3d-foundation-glb.mjs
 hull, turret, independently articulated barrel, team-color material slot, named muzzle/selection/HP
 anchors, visible bounds, and a shadow proxy. Primitive source parameters, provenance/repository
 license, manifest, and GLB are checked in; regeneration is byte-identical and network-free. It is
-contract-complexity evidence, not final art. No third-party or AI-generated art may substitute.
+contract-complexity evidence, not final art. Its semantic hull is exactly `50.4` world px long and
+`28.8` world px wide, matching the mirrored tracked-vehicle envelope already used by the client;
+decorative parts and the shadow proxy must stay within declared visual bounds but never alter that
+semantic size. No third-party or AI-generated art may substitute.
 
-Phase 7 owns the numeric world-to-scene scale using this deterministic rule: choose the largest
-power-of-two reciprocal world-pixel scale that keeps the full largest supported map extent below
-4096 scene units while keeping the tracked fixture hull at least 0.5 scene units long. If no value
-satisfies both, Phase 7 records the failed bounds and blocks rather than inventing an arbitrary
-scale. Phase 13 owns fixture generation and final manifest values.
+Phase 7 owns the numeric world-to-scene scale and derives it once per static-map generation from the
+actual map received by the client; it is not a build-time constant or a scan of the server's
+possibly overridden map directory. Choose the largest value in `{1, 1/2, 1/4, ...}` that keeps
+`max(widthPx,heightPx) * scale < 4096` while keeping the locked `50.4 * scale >= 0.5`. If no value
+satisfies both, that map is an actionable bounded backend incompatibility rather than a silent
+clamp or Pixi fallback. Phase 13 owns fixture generation and final manifest values, not the scale
+input dimensions.
 
 ## 10. Reproducible benchmark contracts
 
@@ -422,8 +465,8 @@ frames.
 
 | Id | Exact setup and expected workload |
 | --- | --- |
-| `quiet` | 12 entities: kinds `[worker,rifleman,machine_gunner,anti_tank_gun,scout_car,tank]`; owner-1 kind `i` is at `(1792+32*i,1984)` and owner-2 kind `i` at `(2304-32*i,2112)`. No active effects; fog reveal-all for benchmark presentation only. |
-| `dense-placeholders` | 240 entities in a 20x12 grid, 32 world px spacing, origin `(1728,1856)`, alternating owners by cell and kinds `[rifleman,machine_gunner,scout_car,tank]` by row. No effects; reveal-all. Maximum visible generic entity count is 240. |
+| `quiet` | 12 entities: kinds `[worker,rifleman,machine_gunner,anti_tank_gun,scout_car,tank]`; owner-1 kind `i` is at `(1664+64*i,1984)` and owner-2 kind `i` at `(2432-64*i,2112)`. No active effects; fog reveal-all for benchmark presentation only. |
+| `dense-placeholders` | 240 entities in a 20x12 grid, 56 world px x-spacing and 40 world px y-spacing, origin `(1516,1828)`, alternating owners by cell and kinds `[rifleman,machine_gunner,scout_car,tank]` by row. This scenario alone uses `framingScale:0.8`, keeping all 240 collision-safe generic entities visible in the fixed viewport. No effects; reveal-all. Maximum visible generic entity count is 240. |
 | `active-effects` | 64 riflemen, 32 per owner in opposing 8x4 grids at origins `(1792,1904)` and `(2208,2096)`, 24 px spacing. Admit exactly 64 simultaneous normalized 240 ms attack events at capture offset 80 ms; this declared maximum sets the Phase 11.5 pool capacity. |
 | `fog-overlays` | 24 entities. Per owner: rifle `i=0..7` is a 4x2 grid with `(x,y)=(1856+32*(i%4),1920+32*floor(i/4))` for owner 1 and its point reflection through `(2048,2048)` for owner 2; tanks are `(1888,2016),(1952,2016)` and reflected; barracks are `(1792,2112)` and `(2304,1984)`; workers are `(1952,2112)` and `(2144,1984)`. Ordinary player-1 fog; one remembered enemy barracks, one below-fog intel proxy, one shot reveal, one selection/range/HP set, one move line/destination/entity marker, one valid and one invalid placement footprint, one Lab area preview, one marquee, and one 240 ms attack event. |
 | `lifecycle` | Construct, present `quiet` for 60 frames, destroy, and return to the same-page baseline three times in Phase 11 and ten times in Phase 13.5. Each cycle asserts canvas/context/rAF/listener/registry/pool/pending-load counts. |

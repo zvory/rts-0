@@ -9,8 +9,9 @@ The only status values are `shared external`, `Pixi complete`, `Babylon complete
 `representative`, `placeholder`, `missing`, and `deferred`.
 
 - `shared external` means the surface is intentionally outside both world backends.
-- `complete` means the named backend implements the contract with focused automated evidence and,
-  when visible, one inspected artifact.
+- `complete` means the named backend implements the whole capability named by the row. Any phase
+  transition to `complete` requires focused automated evidence and, when visible, one inspected
+  artifact.
 - `representative` proves the bounded foundation case, not catalog-wide parity.
 - `placeholder` is truthful generic coverage and never counts as parity.
 - `missing` has no implementation. `deferred` is intentionally outside this foundations plan.
@@ -27,15 +28,18 @@ A row passes a gate only when its required backend/status and automated evidence
 
 ## Active ledger
 
-`P0-docs` means Phase 0 documentation/inventory only; it does not claim Babylon runtime evidence.
+`P0-docs` means Phase 0 documentation/inventory only; it is not an evidence update and cannot make
+a row pass either gate. A backend column is `complete` only when that backend already implements
+the whole capability named by the row; an existing visual or partial legacy path is `placeholder`
+when the new shared contract is not yet implemented.
 
 | Capability | Pixi | Babylon | Content gate | Default gate | Evidence / current fact |
 | --- | --- | --- | --- | --- | --- |
 | One Match-owned rAF/visual clock | Pixi complete | missing | required | required | P0-docs; current `frame_recovery.js` owns scheduling; Babylon assertion Phase 6.5 |
-| Exact selector and Babylon-free default loading | Pixi complete | missing | required | required | P0-docs; loader/static-network assertions Phase 6 |
-| Semantic camera/projection and CSS-pixel contract | Pixi complete | missing | required | required | P0-docs; orthographic/fake tests Phase 1, Babylon adapter Phase 6.5 |
+| Exact selector and Babylon-free default loading | placeholder | missing | required | required | Current default is Babylon-free but the exact selector/preflight does not exist; Phase 6 owns evidence |
+| Semantic camera/projection and CSS-pixel contract | placeholder | missing | required | required | Current Pixi camera supplies the legacy orthographic behavior, not the semantic API; Phase 1 owns evidence |
 | Navigation, resize, minimap footprint/recenter | Pixi complete | missing | required | required | P0-docs; semantic migration Phases 1.5/1.75 |
-| Audio, alerts, control groups, carryover, Lab/diagnostics camera consumers | Pixi complete | missing | required | required | P0-docs; raw-read ratchet Phase 1.75 |
+| Audio, alerts, control groups, carryover, Lab/diagnostics camera consumers | placeholder | missing | required | required | Current behavior still reads raw orthographic state; migration and ratchet Phase 1.75 |
 | Perspective-safe picking/selection/marquee | placeholder | missing | required | required | Current Pixi is orthographic-only; Phase 2 owns proxies/SelectionScene |
 | Detached least-privilege presentation frame | missing | missing | required | required | Current renderer reads mutable state/intent/fog; Phases 3/3.5 |
 | Immutable terrain/fog grids and revision pinning | missing | missing | required | required | Contract frozen; implementation Phase 3 |
@@ -50,13 +54,13 @@ A row passes a gate only when its required backend/status and automated evidence
 | Semantic layer order and occlusion | Pixi complete | missing | required | required | Descriptor frame Phase 3; Babylon Phases 9/9.5 |
 | Selection/range/HP tactical readability | Pixi complete | missing | required | required | Representative Babylon coverage Phase 10.5; long-tail default review remains |
 | Placement, command, entity marker, Lab area, marquee | Pixi complete | missing | required | required | Exact representative set Phase 10.5 |
-| Normalized attack/muzzle finite event | Pixi complete | missing | required | required | 240 ms fixture; Phases 4/5/10.5/13 |
+| Normalized attack/muzzle finite event | placeholder | missing | required | required | Current Pixi has attack feedback but not the shared normalized identity/history contract; Phases 4/5/10.5/13 |
 | Long-tail abilities/smoke/projectiles/impacts/toasts | Pixi complete | deferred | not required | required | Not content-expansion blocking; default parity work |
 | Observer/Lab world diagnostics | Pixi complete | missing | not required | required | Fog-safe representative overlays before route unlock |
 | HUD, minimap, lobby, panels, scoreboard, audio | shared external | shared external | required | required | Deliberately shared DOM/canvas/audio surfaces |
-| Deterministic fixed/event capture | Pixi complete | missing | required | required | Current Pixi fixed capture; detached retained-event path Phase 5, Babylon evidence later |
+| Deterministic fixed/event capture | placeholder | missing | required | required | Current Pixi has fixed capture, not detached retained-event capture; Phase 5 owns Pixi completion |
 | Capture readiness/soft error/fallback diagnostics | Pixi complete | missing | required | required | Backend-neutral readiness Phase 5; Babylon failure paths Phases 6.5-8 |
-| Transactional create/reset/resize/destroy and late loads | Pixi complete | missing | required | required | Ownership contract frozen; automated Babylon lifecycle Phase 6.5 onward |
+| Transactional create/reset/resize/destroy and late loads | placeholder | missing | required | required | Current Pixi has resize/destroy paths but Match construction is not transactional; shared lifecycle evidence starts in Phases 3.5/5 and Babylon Phase 6.5 |
 | Shared resource registry and child-safe disposal | placeholder | missing | required | required | Current Pixi has local pools/caches; explicit registry Phase 8 |
 | Repeated same-page rematch/context cleanup | Pixi complete | missing | required | required | Three-cycle benchmark Phase 11; ten-cycle foundation gate Phase 13.5 |
 | Counter reset and benchmark metadata/schema | missing | missing | required | required | Exact scenarios frozen; harness and current-frame semantics Phase 11 |
