@@ -90,7 +90,7 @@ export const LAB_INTERACT_COMMAND_HELP = Object.freeze({
   }),
   "record-wait": descriptor("Wait for the current recording to finalize without blocking other session commands.", "{sessionId:string}", {
     variants: ["active and finalizing recordings share one completion", "a completed current recording returns its last result"],
-    bounds: ["a recording must have been started in the current session", "recording-only IPC timeout is capped at 300 seconds"],
+    bounds: ["a recording must have been started in the current session", "recording-only IPC timeout is capped at 420 seconds"],
     example: { sessionId: "<lab-session-id>" },
   }),
   "capture-fixed": descriptor("Capture a deterministic-environment fixed-step H.264 sequence.", "{sessionId:string,name?:token,fps?:int,frameCount?:int,viewport?:viewport}", {

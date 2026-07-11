@@ -572,9 +572,12 @@ export class LabInteractDriver {
       } catch (error) {
         removePartialRecording([recording.recordingDir]);
         const failure = error instanceof LabInteractRecordingError
-          ? new LabInteractDriverError(error.code, error.message)
+          ? new LabInteractDriverError(error.code, error.message, error.details)
           : error;
-        throw failure;
+        // finishRecording is also called outside enqueue() by watchdog and
+        // lifecycle settlement. Decorate here so every observer of the shared
+        // completion receives the same normalized failure object.
+        throw this.decorateError(failure);
       } finally {
         if (recording.originalViewport) await this.page?.setViewport(recording.originalViewport).catch(() => {});
         await this.callBridge("presentation", { mode: "default" }).catch(() => {});

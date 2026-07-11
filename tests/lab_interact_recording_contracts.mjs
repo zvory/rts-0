@@ -45,6 +45,12 @@ assert.equal(mediaAuxiliaryTimeoutMs(60_000), RECORDING_LIMITS.maxMediaAuxiliary
 assert.equal(requestTimeoutMs("status"), REQUEST_TIMEOUT_MS, "ordinary daemon commands keep their existing IPC deadline");
 assert.equal(requestTimeoutMs("record-wait"), RECORDING_REQUEST_TIMEOUT_MS, "record-wait gets bounded recording-specific IPC headroom");
 assert.ok(RECORDING_REQUEST_TIMEOUT_MS > REQUEST_TIMEOUT_MS, "recording IPC headroom exceeds the ordinary command deadline");
+const boundedMediaBudgetMs = RECORDING_LIMITS.maxDurationMs + RECORDING_LIMITS.maxStopTimeoutMs +
+  RECORDING_LIMITS.maxMediaStageTimeoutMs + 3 * RECORDING_LIMITS.maxMediaAuxiliaryTimeoutMs + 22_000;
+assert.ok(
+  RECORDING_REQUEST_TIMEOUT_MS >= boundedMediaBudgetMs + 60_000,
+  "recording IPC deadline covers the bounded wait, media stages, probes, flush, and browser cleanup headroom",
+);
 
 const tools = checkMediaCapabilities();
 const mediaTmp = fs.mkdtempSync(path.join(os.tmpdir(), "rts-li-recording-contract-"));
@@ -179,12 +185,19 @@ const failedFinalizeDriver = fixtureRecordingDriver(root, tools, { failRecorderS
 const failedFinalizeSessionId = `lab_${"a".repeat(32)}`;
 await failedFinalizeDriver.recordStart({ sessionId: failedFinalizeSessionId, name: "finalize-failure", maxDurationMs: 5_000 });
 const failedFinalizeWait = failedFinalizeDriver.recordWait();
+let failedStopError;
 await assert.rejects(
-  failedFinalizeDriver.recordStop(),
+  failedFinalizeDriver.recordStop().catch((error) => { failedStopError = error; throw error; }),
   /fixture recorder stop failure/,
   "explicit finalization reports recorder failure",
 );
-await assert.rejects(failedFinalizeWait, /fixture recorder stop failure/, "the shared waiter rejects with the same finalization failure");
+let failedWaitError;
+await assert.rejects(
+  failedFinalizeWait.catch((error) => { failedWaitError = error; throw error; }),
+  /fixture recorder stop failure/,
+  "the shared waiter rejects with the same finalization failure",
+);
+assert.strictEqual(failedWaitError, failedStopError, "stop and wait observe the identical normalized finalization failure");
 assert.equal(failedFinalizeDriver.fixtureRecorderStops, 1, "failed finalization settles the recorder exactly once");
 const failedFinalizeRoot = path.join(root, "target", "lab-interact", failedFinalizeSessionId, "recordings");
 const failedFinalizeEntries = fs.existsSync(failedFinalizeRoot)

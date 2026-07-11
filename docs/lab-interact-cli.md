@@ -166,7 +166,7 @@ started a recording returns `recordingInactive`.
 
 Recorder flush, MP4 transcode, and auxiliary FFmpeg stages derive bounded timeouts from the target
 duration, capped at 45, 75, and 30 seconds respectively. `record-stop`, `record-wait`, `close`, and
-`shutdown` use a dedicated 300-second IPC deadline; ordinary commands retain their existing
+`shutdown` use a dedicated 420-second IPC deadline; ordinary commands retain their existing
 120-second deadline. Close, shutdown, and idle cleanup initiate recorder settlement before draining
 queued session work, so an outstanding waiter cannot prevent the lifecycle action that resolves it.
 
