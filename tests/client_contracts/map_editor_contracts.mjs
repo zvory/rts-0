@@ -367,6 +367,7 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
 
 {
   const main = fs.readFileSync(new URL("client/src/main.js", repoRoot), "utf8");
+  const editorPanel = fs.readFileSync(new URL("client/src/map_editor_panel.js", repoRoot), "utf8");
   const rendererTerrain = fs.readFileSync(new URL("client/src/renderer/terrain.js", repoRoot), "utf8");
   const serverMain = fs.readFileSync(new URL("server/src/main.rs", repoRoot), "utf8");
   assert.match(main, /mapEditorLaunchConfig\(\) \? new MapEditorApp\(\) : new App\(\)/);
@@ -375,6 +376,10 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
   assert.match(editorApp, /gameplayCommands:\s*false/);
   assert.match(rendererTerrain, /updateStaticTerrainTiles/);
   assert.match(rendererTerrain, /baseTexture\.update\(\)/, "dirty painting updates one persistent texture");
+  assert.match(rendererTerrain, /createTerrainPreviewCanvas/, "terrain controls use the renderer's tile painter for their previews");
+  assert.match(editorPanel, /createTerrainPreview/, "terrain controls request a terrain preview from the editor viewport");
+  assert.match(editorPanel, /scrollTop = scroll\.top/, "sidebar refreshes restore the previous vertical scroll position");
+  assert.doesNotMatch(editorPanel, /Frozen room · no simulation/i, "the editor header omits frozen-room implementation copy");
   assert.match(serverMain, /\/map-editor/);
   assert.equal(fs.existsSync(new URL("client/map-editor.html", repoRoot)), false, "legacy standalone editor is retired");
 }

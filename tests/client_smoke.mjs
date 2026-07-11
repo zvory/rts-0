@@ -435,8 +435,51 @@ try {
      `CAMERA: Space+drag pans the viewport (${beforePan.x.toFixed(1)},${beforePan.y.toFixed(1)} -> ${afterPan.x.toFixed(1)},${afterPan.y.toFixed(1)})`);
   ok(afterPan.selected === beforePan.selected, "CAMERA: Space+drag does not change selection");
 
+  const editorPage = await browser.newPage();
+  editorPage.on("console", (m) => { if (m.type() === "error") consoleErrors.push(m.text()); });
+  editorPage.on("pageerror", (e) => pageErrors.push(e.message));
+  editorPage.on("requestfailed", (r) => { if (!r.url().includes("favicon")) consoleErrors.push("requestfailed: " + r.url()); });
+  editorPage.on("response", (response) => {
+    const status = response.status();
+    if (status >= 400 && !response.url().includes("favicon")) responseErrors.push(`${status}: ${response.url()}`);
+  });
+  await editorPage.setViewport({ width: 1280, height: 600 });
+  const editorUrl = new URL(BASE_URL);
+  editorUrl.pathname = "/map-editor";
+  editorUrl.search = "";
+  await editorPage.goto(editorUrl.href, { waitUntil: "domcontentloaded", timeout: 15000 });
+  await editorPage.waitForFunction(() => document.querySelectorAll(".map-editor-terrain-icon").length === 3, { timeout: 5000 });
+  const editorUi = await editorPage.evaluate(() => {
+    const panel = document.querySelector(".map-editor-panel-body");
+    const water = document.querySelector(".map-editor-terrain-button[data-terrain=water]");
+    water?.scrollIntoView({ block: "center" });
+    const beforeScrollTop = panel?.scrollTop ?? -1;
+    water?.click();
+    const refreshedPanel = document.querySelector(".map-editor-panel-body");
+    return {
+      beforeScrollTop,
+      afterScrollTop: refreshedPanel?.scrollTop ?? -1,
+      maxScroll: (refreshedPanel?.scrollHeight ?? 0) - (refreshedPanel?.clientHeight ?? 0),
+      terrainPreviews: [...document.querySelectorAll(".map-editor-terrain-icon")]
+        .map((icon) => ({ width: icon.width, height: icon.height })),
+      header: document.querySelector(".map-editor-header")?.textContent?.trim() || "",
+    };
+  });
+  ok(
+    editorUi.header === "Map Editor" &&
+      editorUi.terrainPreviews.length === 3 &&
+      editorUi.terrainPreviews.every((preview) => preview.width > 0 && preview.height > 0),
+    `MAP EDITOR: terrain buttons show three rendered terrain previews (header=${editorUi.header}, previews=${editorUi.terrainPreviews.length})`,
+  );
+  ok(
+    editorUi.maxScroll > 0 && editorUi.beforeScrollTop > 0 && editorUi.beforeScrollTop === editorUi.afterScrollTop,
+    `MAP EDITOR: selecting terrain keeps sidebar scroll position (${editorUi.beforeScrollTop} -> ${editorUi.afterScrollTop})`,
+  );
+  await editorPage.close();
+
   ok(pageErrors.length === 0, `no uncaught page errors (${pageErrors.length})`);
   ok(consoleErrors.length === 0, `no console errors (${consoleErrors.length})`);
+  ok(responseErrors.length === 0, `no HTTP error responses (${responseErrors.length})`);
   if (pageErrors.length) console.log("  -- pageErrors:\n" + pageErrors.map((e) => "     " + e).join("\n"));
   if (consoleErrors.length) console.log("  -- consoleErrors:\n" + consoleErrors.slice(0, 12).map((e) => "     " + e).join("\n"));
   if (responseErrors.length) console.log("  -- responseErrors:\n" + responseErrors.slice(0, 12).map((e) => "     " + e).join("\n"));

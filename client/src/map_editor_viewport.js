@@ -2,6 +2,7 @@ import { Camera } from "./camera.js";
 import { PLAYER_PALETTE } from "./config.js";
 import { TERRAIN } from "./protocol.js";
 import { Renderer } from "./renderer/index.js";
+import { createTerrainPreviewCanvas } from "./renderer/terrain.js";
 import {
   addSymmetricDraftNaturals,
   mapEditorRectTiles,
@@ -63,6 +64,10 @@ export class MapEditorViewport {
     this.tool = tool ? structuredCloneSafe(tool) : null;
     this.drawOverlay();
     return this.tool;
+  }
+
+  createTerrainPreview(terrain) {
+    return createTerrainPreviewCanvas(terrain);
   }
 
   applySessionSnapshot(snapshot) {

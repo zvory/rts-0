@@ -5252,18 +5252,10 @@ input[type="text"]:focus {
 }
 
 .map-editor-header h1 {
-  margin: 0 0 4px;
+  margin: 0;
   font-family: var(--display);
   font-size: 22px;
   letter-spacing: 0.04em;
-}
-
-.map-editor-frozen {
-  color: #b9aa86;
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .map-editor-panel-body {
@@ -5368,6 +5360,22 @@ input[type="text"]:focus {
 .map-editor-palette .map-editor-button,
 .map-editor-player-picker .map-editor-button {
   flex: 1;
+}
+
+.map-editor-terrain-button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  text-align: left;
+}
+
+.map-editor-terrain-icon {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(0, 0, 0, 0.45);
+  border-radius: 2px;
+  image-rendering: pixelated;
 }
 
 .map-editor-player-picker .map-editor-button::before {
