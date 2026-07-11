@@ -98,7 +98,9 @@ Launch the controlled Babylon Lab route with
 `RTS_CLIENT_DIR=<worktree>/client RTS_ADDR=0.0.0.0:<port> cargo run --release`. Test pan/dolly,
 resize, fixed capture, Lab reset, freeze/back-to-lobby, partial failure, and two enter/leave cycles;
 confirm normal live/replay/spectator routes reject before join and no extra canvas, loop, listener,
-context, queued message, or late scene remains.
+context, queued message, or late scene remains. When convenient, open the same scene through
+Tailscale on a phone and sanity-check the existing basic touch pan and pinch-dolly behavior; this is
+an informal debug check, not a blocking mobile-support gate.
 
 ## Handoff Expectations
 

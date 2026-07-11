@@ -187,6 +187,10 @@ clocks, pool reset, counter reset, budgets, and teardown are automated blocking 
 - Graphics phases must use the project-local `lab-interact` skill for a small authoritative scene,
   inspect the returned PNG once, and report its absolute path. Captures stay under
   `target/lab-interact/` and are never committed.
+- Lab Interact remains the agent's scene setup/capture tool, not a mobile interface. When useful for
+  informal review, a graphics handoff may also expose the same local scene through a verified
+  Tailscale URL so the user can pan and pinch-zoom from a phone; this convenience is not acceptance
+  evidence and Tailscale unavailability does not block a phase.
 - Worktree preview commands must set `RTS_CLIENT_DIR=<phase-worktree>/client`; a reused release
   binary otherwise may serve the main checkout. Do not replace an existing listener merely to
   create a preview.
@@ -489,7 +493,8 @@ should be manually tested, what evidence was collected, and any exact blocker or
 Manual testing notes should cover the phase's core behavior rather than attempt an exhaustive
 matrix. Graphics-phase handoffs also include the inspected Lab Interact PNG path and the exact
 `RTS_CLIENT_DIR` preview command or URL used, plus capture manifest SHA-256 and a reproduction
-sequence suitable for rerunning after worktree cleanup.
+sequence suitable for rerunning after worktree cleanup. When an interactive remote check is useful,
+include the verified Tailscale preview URL as an optional convenience.
 
 Phase 13.5 is evidence-complete only when every mandatory gate passes. A failed gate is a structured
 `blocked` result and the phase status remains not started; this prevents automatic archival from
