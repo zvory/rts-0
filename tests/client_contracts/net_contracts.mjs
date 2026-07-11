@@ -9,6 +9,9 @@ import {
   assertThrows,
 } from "./assertions.mjs";
 import {
+  INITIAL_CONNECT_ATTEMPTS,
+  INITIAL_CONNECT_RETRY_MS,
+  INITIAL_CONNECT_TIMEOUT_MS,
   Net,
   SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES,
 } from "../../client/src/net.js";
@@ -28,6 +31,57 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
 
 // Net
 // ---------------------------------------------------------------------------
+{
+  assert(INITIAL_CONNECT_ATTEMPTS > 1, "initial Net connection retries are bounded and enabled");
+  assert(INITIAL_CONNECT_RETRY_MS > 0, "initial Net retry delay is nonzero");
+  assert(INITIAL_CONNECT_TIMEOUT_MS > 0, "each initial Net attempt has a finite timeout");
+  const NativeWebSocket = globalThis.WebSocket;
+  const sockets = [];
+  class StartupWebSocket {
+    static OPEN = 1;
+    static CLOSED = 3;
+
+    constructor() {
+      this.listeners = new Map();
+      this.readyState = 0;
+      sockets.push(this);
+      queueMicrotask(() => {
+        if (sockets.length === 1) this.emit("error", {});
+        else {
+          this.readyState = StartupWebSocket.OPEN;
+          this.emit("open", {});
+        }
+      });
+    }
+
+    addEventListener(type, handler) {
+      this.listeners.set(type, handler);
+    }
+
+    emit(type, event) {
+      this.listeners.get(type)?.(event);
+    }
+
+    close() {
+      this.readyState = StartupWebSocket.CLOSED;
+      queueMicrotask(() => this.emit("close", {}));
+    }
+  }
+
+  globalThis.WebSocket = StartupWebSocket;
+  try {
+    const retryNet = new Net("ws://example.test/ws");
+    let waits = 0;
+    await retryNet.connect({ attempts: 2, retryMs: 1, wait: async () => { waits += 1; } });
+    assert(sockets.length === 2, "Net retries one failed initial WebSocket connection");
+    assert(waits === 1, "Net waits once between sequential connection attempts");
+    assert(sockets[0].readyState === StartupWebSocket.CLOSED, "failed socket closes before retry starts");
+    assert(retryNet.ws === sockets[1], "Net retains only the successful retry socket");
+  } finally {
+    globalThis.WebSocket = NativeWebSocket;
+  }
+}
+
 {
   const net = new Net("ws://example.test/ws");
   assert(net instanceof Net, "Net constructor should return an instance");

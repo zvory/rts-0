@@ -199,7 +199,9 @@ export class App {
       else if (this.matchLaunch) this.maybeAutoJoinMatchLaunch();
       else this.maybeAutoJoinDevWatch();
     } catch (err) {
-      this.showConnectionWarning();
+      this.showConnectionWarning(
+        "Unable to connect after several attempts. Refresh to try again.",
+      );
     }
   }
 

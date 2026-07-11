@@ -1,0 +1,26 @@
+app = "rts-0-zvorygin-beta"
+primary_region = "ewr"
+kill_signal = "SIGINT"
+kill_timeout = 300
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  RTS_ADDR = "0.0.0.0:8080"
+  RUST_LOG = "info"
+  RTS_PERF = "spikes"
+  RTS_PERF_SLOW_TICK_MS = "40"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[vm]]
+  cpu_kind = "performance"
+  cpus = 1
+  memory = "2gb"

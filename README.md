@@ -180,10 +180,13 @@ scripts/cleanup-worktrees.sh
 
 ## Deploy
 
-The app is configured for Fly.io through [fly.toml](fly.toml):
+Mainline, beta, and the launcher have separate Fly configs. Deploy through the channel-aware
+wrapper so one channel cannot inherit another channel's lifecycle or Machine size:
 
 ```bash
-flyctl deploy --ha=false
+./deploy.sh mainline
+./deploy.sh beta
+./deploy.sh launcher
 ```
 
 First-time setup and operational notes live in [docs/fly.md](docs/fly.md).
