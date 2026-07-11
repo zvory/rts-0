@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Depends On
 
@@ -72,11 +72,11 @@ bounded to the camera, pure helpers, contracts, and durable documentation.
 
 ## Implementation Checklist
 
-- [ ] Implement the semantic camera/projection core with orthographic equivalence.
-- [ ] Define CSS-pixel, nullability, clipping, polygon, fit/focus, snapshot, and listener semantics.
-- [ ] Preserve and document the temporary raw orthographic compatibility edge.
-- [ ] Add real-orthographic and fake-perspective pure contracts.
-- [ ] Update durable docs/ledger and mark this phase done in the implementation commit.
+- [x] Implement the semantic camera/projection core with orthographic equivalence.
+- [x] Define CSS-pixel, nullability, clipping, polygon, fit/focus, snapshot, and listener semantics.
+- [x] Preserve and document the temporary raw orthographic compatibility edge.
+- [x] Add real-orthographic and fake-perspective pure contracts.
+- [x] Update durable docs/ledger and mark this phase done in the implementation commit.
 
 ## Verification
 

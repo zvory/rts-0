@@ -95,6 +95,7 @@ snapshot() -> CameraSnapshotV1
 restore(snapshotOrLegacy) -> boolean
 audioListener() -> AudioListenerV1
 subscribe(listener) -> unsubscribe
+projectionSnapshot() -> ProjectionSnapshotV1
 ```
 
 `groundAtScreen` is nullable even though the orthographic adapter normally hits. It rejects points
@@ -112,6 +113,13 @@ policy. `dollyBy(factor)` multiplies framing scale (`factor>1` makes content lar
 world point under a valid anchor fixed; omitted anchor means viewport center. `fitWorldPoints`
 returns false and leaves the view unchanged for no finite points. `subscribe` emits one detached
 `CameraSnapshotV1` after a successful semantic mutation, never raw adapter state.
+
+Phase 1 implements this surface on `Camera` as the production Pixi orthographic adapter. Query
+inputs and mutation values are finite numbers; invalid query values throw except
+`groundAtScreen`, whose contract-safe failure is `null`, while invalid mutations leave the view
+unchanged. World sizes, map sizes, viewport sizes, padding, and margins must be non-negative.
+`panByScreenDelta` accepts the semantic `{x,y}` CSS-pixel record and temporarily retains the legacy
+numeric `(dx,dy)` call shape for Phase 1.5 migration.
 
 The audio listener is the ground focus. Its perspective-safe formula is exact:
 
@@ -145,10 +153,21 @@ through the foundations plan; removing it requires a separate migration decision
 compatibility only inside `camera.js` and the named Pixi adapter. Phase 1.75 closes every shared
 consumer read.
 
-A detached projection snapshot contains `CameraSnapshotV1`, viewport CSS size, map bounds, and the
-adapter's immutable projection coefficients. It implements the same query operations without
-mutation and contains no Babylon/Pixi objects. Selection and a frozen frame use the last
-successfully presented snapshot, never a newer camera pose awaiting presentation.
+`projectionSnapshot()` returns detached `ProjectionSnapshotV1`: `{version:1, camera, viewport,
+mapBounds}` plus `project`, `groundAtScreen`, `projectedExtent`, `viewportGroundPolygon`,
+`viewportGroundBounds`, `containsProjected`, `snapshot`, and `audioListener` query functions.
+`viewport` is exactly `{widthCssPx,heightCssPx}` and `mapBounds` is a world-pixel AABB or `null`
+before positive map dimensions exist. Its closures pin immutable orthographic coefficients and
+contain no live `Camera`, Babylon/Pixi, DOM, backing-store, DPR, or matrix objects. Selection and a
+frozen frame use the last successfully presented projection snapshot, never a newer camera pose
+awaiting presentation.
+
+Through Phase 1.75, `camera.js` exposes the raw `x`, `y`, `zoom`, `viewW`, `viewH`,
+`worldToScreen`, `screenToWorld`, `centerOn`, `setZoom`, `setBounds`, and `setView` compatibility
+edge for existing Pixi and shared consumers. Phase 1.5 migrates navigation and minimap; Phase 1.75
+migrates every other shared consumer and leaves raw reads only in `camera.js` and the named Pixi
+adapter. The `{x,y,zoom}` legacy restore read remains accepted at the App/camera restore edge for
+the foundations plan but is always re-emitted as `CameraSnapshotV1`.
 
 ## 3. Renderer-neutral selection
 

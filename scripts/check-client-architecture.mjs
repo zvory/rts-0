@@ -114,6 +114,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "alerts.js": "platform",
   "fog.js": "platform",
   "camera.js": "platform",
+  "camera_projection.js": "platform",
   "map_editor_launch.js": "platform",
 }));
 

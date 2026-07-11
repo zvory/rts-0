@@ -1000,12 +1000,26 @@ omits illegal build commands for those sites, and resumes on the far side; vehic
 `camera.js`
 ```js
 export class Camera {
-  x, y, zoom                             // world coords of viewport top-left, zoom factor
+  // Semantic renderer-neutral API; all screen values are viewport-local CSS px.
+  project(point) -> {x,y,depth,clip,visible}
+  groundAtScreen(screen) -> {x,y}|null
+  projectedExtent(point, worldW, worldH) -> {width,height,scaleX,scaleY,visible}
+  viewportGroundPolygon() -> [{x,y}, ...]
+  viewportGroundBounds() -> {minX,minY,maxX,maxY}|null
+  containsProjected(point, marginCssPx?) -> boolean
+  focusAt(point), fitWorldPoints(points, options?)
+  panByScreenDelta(delta), dollyBy(factor, anchorScreen?)
+  resize(viewW, viewH), setMapBounds(worldW, worldH)
+  snapshot(), restore(snapshotOrLegacy), projectionSnapshot()
+  audioListener(), subscribe(listener) -> unsubscribe
+
+  // Temporary orthographic compatibility edge through camera migration.
+  x, y, zoom                             // world coords of viewport top-left, framing scale
   update(dt, input)                      // apply pan (keys/edge/virtual pointer-lock cursor) & clamp
   worldToScreen(wx, wy) -> {x,y}
   screenToWorld(sx, sy) -> {x,y}
   centerOn(wx, wy)
-  setBounds(worldW, worldH, viewW, viewH)
+  setZoom(zoom, anchorSx?, anchorSy?), setBounds(worldW, worldH, viewW, viewH), setView(view)
 }
 ```
 
