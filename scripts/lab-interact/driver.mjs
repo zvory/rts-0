@@ -24,7 +24,8 @@ const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_STARTUP_TIMEOUT_MS = 60_000;
 const MAX_TIMEOUT_MS = 60_000;
 const MAX_STARTUP_TIMEOUT_MS = 120_000;
-const LOG_TAIL_LINES = 80;
+const LOG_TAIL_LINES = 12;
+const LOG_TAIL_LINE_CHARS = 512;
 const MAX_PAGE_ERRORS = 80;
 const MAX_CAPTURE_BYTES = 16 * 1024 * 1024;
 const MAX_CAPTURE_VIEWPORT = 2048;
@@ -1326,10 +1327,24 @@ async function stopChild(child) {
 
 function readTail(file, maxLines) {
   try {
-    return fs.readFileSync(file, "utf8").trimEnd().split("\n").slice(-maxLines);
+    return fs.readFileSync(file, "utf8")
+      .trimEnd()
+      .split("\n")
+      .slice(-maxLines)
+      .map((line) => boundLogLine(line));
   } catch {
     return [];
   }
+}
+
+export function boundLogLine(value, maxChars = LOG_TAIL_LINE_CHARS) {
+  const line = String(value ?? "");
+  if (line.length <= maxChars) return line;
+  const marker = " …<truncated>… ";
+  const available = Math.max(0, maxChars - marker.length);
+  const leading = Math.ceil(available / 2);
+  const trailing = Math.floor(available / 2);
+  return `${line.slice(0, leading)}${marker}${trailing > 0 ? line.slice(-trailing) : ""}`;
 }
 
 function appendBounded(values, value) {
