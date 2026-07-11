@@ -479,6 +479,7 @@ try {
 
   ok(pageErrors.length === 0, `no uncaught page errors (${pageErrors.length})`);
   ok(consoleErrors.length === 0, `no console errors (${consoleErrors.length})`);
+  ok(responseErrors.length === 0, `no HTTP error responses (${responseErrors.length})`);
   if (pageErrors.length) console.log("  -- pageErrors:\n" + pageErrors.map((e) => "     " + e).join("\n"));
   if (consoleErrors.length) console.log("  -- consoleErrors:\n" + consoleErrors.slice(0, 12).map((e) => "     " + e).join("\n"));
   if (responseErrors.length) console.log("  -- responseErrors:\n" + responseErrors.slice(0, 12).map((e) => "     " + e).join("\n"));
