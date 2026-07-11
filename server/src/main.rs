@@ -635,7 +635,7 @@ fn replay_build_warning(server_build_sha: &str, replay_build_sha: &str) -> Strin
 async fn beta_redirect_handler() -> impl IntoResponse {
     (
         StatusCode::MOVED_PERMANENTLY,
-        [(header::LOCATION, "https://rts-0-zvorygin-beta.fly.dev/")],
+        [(header::LOCATION, "https://bewegungskrieg-beta.fly.dev/")],
     )
 }
 
@@ -1006,6 +1006,17 @@ mod tests {
                 "{path} should stay eligible for SPA fallback"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn beta_redirect_targets_current_beta_app() {
+        let response = beta_redirect_handler().await.into_response();
+
+        assert_eq!(response.status(), StatusCode::MOVED_PERMANENTLY);
+        assert_eq!(
+            response.headers().get(header::LOCATION).unwrap(),
+            "https://bewegungskrieg-beta.fly.dev/"
+        );
     }
 
     #[test]

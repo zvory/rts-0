@@ -29,6 +29,8 @@ const deployScript = read("deploy.sh");
 const mainlineFlyConfig = read("fly.mainline.toml");
 const betaFlyConfig = read("fly.beta.toml");
 const launcherFlyConfig = read("fly.launcher.toml");
+const launcherServer = read("launcher/server.mjs");
+const serverMain = read("server/src/main.rs");
 const wasmBindgenLockVersion = cargoLock.match(
   /\[\[package\]\]\nname = "wasm-bindgen"\nversion = "([^"]+)"/,
 )?.[1];
@@ -117,5 +119,20 @@ assertMatches(betaFlyConfig, /cpus\s*=\s*1/, "beta must use one performance CPU"
 assertMatches(betaFlyConfig, /memory\s*=\s*"2gb"/, "beta must use 2 GB memory");
 assertMatches(launcherFlyConfig, /auto_stop_machines\s*=\s*"off"/, "launcher must remain always-on");
 assertMatches(launcherFlyConfig, /min_machines_running\s*=\s*1/, "launcher must remain available while game apps stop");
+assertIncludes(
+  launcherServer,
+  'mainline: "https://bewegungskrieg-mainline.fly.dev"',
+  "launcher mainline origin must match the named mainline app",
+);
+assertIncludes(
+  launcherServer,
+  'beta: "https://bewegungskrieg-beta.fly.dev"',
+  "launcher beta origin must match the named beta app",
+);
+assertIncludes(
+  serverMain,
+  '[(header::LOCATION, "https://bewegungskrieg-beta.fly.dev/")]',
+  "the game server beta shortcut must target the named beta app",
+);
 
 console.log("deploy asset contract: ok");
