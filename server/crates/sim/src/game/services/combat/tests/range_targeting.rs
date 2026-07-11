@@ -49,8 +49,7 @@ fn aggressive_auto_acquisition_prefers_fireable_targets_before_chase_targets() {
             "{:?} fixture needs a visible target outside weapon range",
             case.attacker
         );
-        let fireable_target =
-            spawn_target(&mut entities, case.fireable_target, fireable_x, 100.0);
+        let fireable_target = spawn_target(&mut entities, case.fireable_target, fireable_x, 100.0);
         let chase_target = spawn_target(&mut entities, case.chase_target, chase_x, 100.0);
 
         let target = resolve_test_target(
@@ -127,7 +126,9 @@ fn chasing_units_refresh_paths_that_point_at_the_wrong_goal() {
         );
         assert_eq!(
             attacker.path_goal(),
-            entities.get(target_id).map(|target| (target.pos_x, target.pos_y)),
+            entities
+                .get(target_id)
+                .map(|target| (target.pos_x, target.pos_y)),
             "{kind:?} should chase the current target position"
         );
     }

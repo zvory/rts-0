@@ -143,7 +143,11 @@ fn exposure_imbalance(distances: &[u64]) -> u64 {
     max.saturating_sub(min)
 }
 
-fn assignment_tie_break(start_order: &[usize], players: &[StartAssignmentPlayer], seed: u32) -> u64 {
+fn assignment_tie_break(
+    start_order: &[usize],
+    players: &[StartAssignmentPlayer],
+    seed: u32,
+) -> u64 {
     let mut hash = 0xcbf2_9ce4_8422_2325u64;
     for byte in seed.to_le_bytes() {
         hash = fnv_step(hash, byte);

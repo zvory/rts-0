@@ -22,9 +22,8 @@ pub(crate) fn predicted_mortar_impact(
     } else {
         config::MORTAR_BLIND_MEDIAN_SCATTER_TILES
     };
-    let max_radius = median_tiles.max(0.0)
-        * MEDIAN_TO_MAX_SCATTER_RADIUS
-        * config::TILE_SIZE as f32;
+    let max_radius =
+        median_tiles.max(0.0) * MEDIAN_TO_MAX_SCATTER_RADIUS * config::TILE_SIZE as f32;
     if max_radius <= f32::EPSILON || !max_radius.is_finite() {
         return (x, y);
     }
@@ -91,10 +90,8 @@ mod tests {
         let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
         let target = (160.0, 160.0);
 
-        let visible_impact =
-            predicted_mortar_impact(&fog, &teams, 1, 99, target.0, target.1, 10);
-        let visible_offset =
-            dist2(target.0, target.1, visible_impact.0, visible_impact.1).sqrt();
+        let visible_impact = predicted_mortar_impact(&fog, &teams, 1, 99, target.0, target.1, 10);
+        let visible_offset = dist2(target.0, target.1, visible_impact.0, visible_impact.1).sqrt();
         assert!(
             visible_offset
                 <= config::MORTAR_VISIBLE_MEDIAN_SCATTER_TILES
@@ -107,8 +104,13 @@ mod tests {
         let blind_target = (640.0, 640.0);
         let blind_impact =
             predicted_mortar_impact(&fog, &teams, 1, 99, blind_target.0, blind_target.1, 10);
-        let blind_offset =
-            dist2(blind_target.0, blind_target.1, blind_impact.0, blind_impact.1).sqrt();
+        let blind_offset = dist2(
+            blind_target.0,
+            blind_target.1,
+            blind_impact.0,
+            blind_impact.1,
+        )
+        .sqrt();
         assert!(
             blind_offset
                 <= config::MORTAR_BLIND_MEDIAN_SCATTER_TILES

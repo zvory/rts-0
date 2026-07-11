@@ -79,10 +79,7 @@ fn assert_restore_invalid_scenario(
     }
 }
 
-fn assert_restore_invalid_map(
-    scenario: crate::game::lab::LabCheckpointScenarioV1,
-    expected: &str,
-) {
+fn assert_restore_invalid_map(scenario: crate::game::lab::LabCheckpointScenarioV1, expected: &str) {
     match Game::restore_lab_checkpoint_scenario(scenario) {
         Ok(_) => panic!("checkpoint lab scenario restore should reject {expected}"),
         Err(LabError::InvalidMap { reason, .. }) => {
@@ -157,7 +154,11 @@ fn checkpoint_lab_scenario_export_matches_direct_state() {
 
     let mut restored = Game::restore_lab_checkpoint_scenario(checkpoint)
         .expect("checkpoint scenario restore should succeed");
-    assert_equivalent_games(&authored, &restored, "checkpoint-backed lab scenario restore");
+    assert_equivalent_games(
+        &authored,
+        &restored,
+        "checkpoint-backed lab scenario restore",
+    );
     let mut direct = authored;
     tick_pair_for(
         &mut direct,
@@ -205,7 +206,10 @@ fn lab_checkpoint_scenario_export_preserves_god_mode_and_rejects_map_mismatches(
     match Game::restore_lab_checkpoint_scenario(wrong_map_data) {
         Ok(_) => panic!("checkpoint lab scenario restore should reject wrong materialized map"),
         Err(LabError::InvalidMap { reason, .. }) => {
-            assert!(reason.contains("materialized hash"), "unexpected error: {reason}");
+            assert!(
+                reason.contains("materialized hash"),
+                "unexpected error: {reason}"
+            );
         }
         Err(err) => panic!("unexpected error for wrong materialized map: {err:?}"),
     }

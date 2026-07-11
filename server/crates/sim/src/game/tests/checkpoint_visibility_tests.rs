@@ -176,7 +176,11 @@ fn visibility_combat_checkpoint_preserves_fog_memory_trenches_and_reveals() {
     let baseline_trench = baseline
         .state
         .trenches
-        .create(&baseline.state.map, future_trench_pos.0, future_trench_pos.1)
+        .create(
+            &baseline.state.map,
+            future_trench_pos.0,
+            future_trench_pos.1,
+        )
         .expect("baseline post-restore trench should allocate");
     let restored_trench = restored
         .state
@@ -265,10 +269,13 @@ fn visibility_combat_checkpoint_preserves_smoke_ability_shells_and_combat_state(
         baseline.tick_count(),
         true,
     );
-    baseline
-        .state
-        .artillery_shells
-        .schedule(1, artillery, target.pos_x, target.pos_y, baseline.tick_count());
+    baseline.state.artillery_shells.schedule(
+        1,
+        artillery,
+        target.pos_x,
+        target.pos_y,
+        baseline.tick_count(),
+    );
     repair_after_authoritative_test_spawn(&mut baseline);
 
     assert!(
@@ -287,8 +294,10 @@ fn visibility_combat_checkpoint_preserves_smoke_ability_shells_and_combat_state(
         "seeded finite smoke uses should be part of entity-local ability state"
     );
 
-    let mut restored =
-        restore_checkpoint_and_assert_equivalent(&baseline, "smoke/ability/shell checkpoint import");
+    let mut restored = restore_checkpoint_and_assert_equivalent(
+        &baseline,
+        "smoke/ability/shell checkpoint import",
+    );
     let mut saw_mortar_privacy = false;
     let mut saw_artillery_privacy = false;
     for tick in 0..=config::ARTILLERY_SHELL_DELAY_TICKS + 2 {
@@ -322,8 +331,14 @@ fn visibility_combat_checkpoint_preserves_smoke_ability_shells_and_combat_state(
             saw_artillery_privacy = true;
         }
     }
-    assert!(saw_mortar_privacy, "mortar shell should impact after restore");
-    assert!(saw_artillery_privacy, "artillery shell should impact after restore");
+    assert!(
+        saw_mortar_privacy,
+        "mortar shell should impact after restore"
+    );
+    assert!(
+        saw_artillery_privacy,
+        "artillery shell should impact after restore"
+    );
     let baseline_object = spawn_runtime_return_marker_for_id_check(&mut baseline, hero);
     let restored_object = spawn_runtime_return_marker_for_id_check(&mut restored, hero);
     assert_eq!(
@@ -384,7 +399,12 @@ fn projection_privacy_checkpoint_filters_hidden_targets_and_ability_payloads() {
 
 #[test]
 fn visibility_combat_checkpoint_preserves_lab_god_mode_and_observer_analysis() {
-    let mut baseline = Game::new_lab(&phase6_players()[..2], 0x5150_0606, flat_lab_map(), lab_metadata());
+    let mut baseline = Game::new_lab(
+        &phase6_players()[..2],
+        0x5150_0606,
+        flat_lab_map(),
+        lab_metadata(),
+    );
     let unit_pos = baseline.state.map.tile_center(20, 20);
     let LabOpOutcome::Spawned { entity_id: unit } = baseline
         .apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
@@ -522,7 +542,11 @@ fn seed_combat_state(
     target: u32,
 ) {
     {
-        let tank = game.state.entities.get_mut(tank).expect("tank should exist");
+        let tank = game
+            .state
+            .entities
+            .get_mut(tank)
+            .expect("tank should exist");
         tank.set_order(Order::attack(target));
         tank.set_target_id(Some(target));
         tank.set_attack_cd(5);
@@ -649,7 +673,10 @@ fn memory_contains(game: &Game, player: u32, building: u32) -> bool {
 }
 
 fn snapshot_entity(snapshot: &Snapshot, entity_id: u32) -> Option<&EntityView> {
-    snapshot.entities.iter().find(|entity| entity.id == entity_id)
+    snapshot
+        .entities
+        .iter()
+        .find(|entity| entity.id == entity_id)
 }
 
 fn spawn_unit_at_tile(game: &mut Game, owner: u32, kind: EntityKind, tx: u32, ty: u32) -> u32 {

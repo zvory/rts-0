@@ -160,10 +160,7 @@ fn replay_reconstruction_preserves_team_aware_start_assignment() {
     );
 
     assert_eq!(replay.state.map.starts, live.state.map.starts);
-    assert_eq!(
-        replay.state.map.base_sites,
-        live.state.map.base_sites
-    );
+    assert_eq!(replay.state.map.base_sites, live.state.map.base_sites);
 }
 
 fn start_players(players: &[(u32, u32)]) -> Vec<(u32, u32)> {

@@ -174,12 +174,7 @@ impl LabCheckpointScenarioMap {
                 reason: "checkpoint scenario map base site count is invalid".to_string(),
             });
         }
-        for tile in self
-            .data
-            .starts
-            .iter()
-            .chain(self.data.base_sites.iter())
-        {
+        for tile in self.data.starts.iter().chain(self.data.base_sites.iter()) {
             if tile.x >= size || tile.y >= size {
                 return Err(LabError::InvalidMap {
                     name: self.name.clone(),

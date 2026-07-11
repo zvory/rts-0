@@ -25,7 +25,6 @@ use crate::game::entity::{
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::pathfinding;
-use crate::game::smoke::SmokeCloudStore;
 use crate::game::services::geometry::{
     building_rect_for_entity, unit_bodies_intersect, unit_body, unit_body_for_entity,
     unit_body_with_facing, RectBody, UnitBody,
@@ -39,6 +38,7 @@ use crate::game::services::pathing::{
     PathingService, RouteShape,
 };
 use crate::game::services::standability;
+use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
 use crate::game::trench::TrenchStore;
 use crate::perf::{PathingPassDiagnostics, PathingRequestSample, PathingRequestSource};
@@ -264,8 +264,7 @@ impl<'a> MoveCoordinator<'a> {
         }
         let known_trenches = self.known_trenches_for_player(player).to_vec();
         let relation = StaticPathingRelation::for_player(player, &self.teams);
-        let mut reachability =
-            formation::FormationReachability::new(self.map, self.occ, relation);
+        let mut reachability = formation::FormationReachability::new(self.map, self.occ, relation);
         let goals = formation::formation_goals_with_known_trenches_and_reachability(
             self.map,
             self.occ,

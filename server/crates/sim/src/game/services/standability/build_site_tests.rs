@@ -41,14 +41,7 @@ fn build_site_status_classifies_building_and_scaffold_blockers() {
         .spawn_building(1, EntityKind::Depot, x, y, true)
         .expect("depot should spawn");
     assert_eq!(
-        building_site_status_for_build_intent(
-            &map,
-            &finished,
-            EntityKind::Depot,
-            4,
-            4,
-            u32::MAX,
-        ),
+        building_site_status_for_build_intent(&map, &finished, EntityKind::Depot, 4, 4, u32::MAX,),
         BuildSiteStatus::BlockedByBuilding
     );
 
@@ -57,14 +50,7 @@ fn build_site_status_classifies_building_and_scaffold_blockers() {
         .spawn_building(1, EntityKind::Depot, x, y, false)
         .expect("depot scaffold should spawn");
     assert_eq!(
-        building_site_status_for_build_intent(
-            &map,
-            &scaffold,
-            EntityKind::Depot,
-            4,
-            4,
-            u32::MAX,
-        ),
+        building_site_status_for_build_intent(&map, &scaffold, EntityKind::Depot, 4, 4, u32::MAX,),
         BuildSiteStatus::BlockedByBuilding
     );
 }
@@ -91,14 +77,7 @@ fn pump_jack_build_site_requires_live_oil_patch() {
 
     let empty = EntityStore::new();
     assert_eq!(
-        building_site_status_for_build_intent(
-            &map,
-            &empty,
-            EntityKind::PumpJack,
-            4,
-            4,
-            u32::MAX,
-        ),
+        building_site_status_for_build_intent(&map, &empty, EntityKind::PumpJack, 4, 4, u32::MAX,),
         BuildSiteStatus::InvalidFootprint
     );
 
@@ -107,14 +86,7 @@ fn pump_jack_build_site_requires_live_oil_patch() {
         .spawn_node(EntityKind::Steel, x, y)
         .expect("steel node should spawn");
     assert_eq!(
-        building_site_status_for_build_intent(
-            &map,
-            &steel,
-            EntityKind::PumpJack,
-            4,
-            4,
-            u32::MAX,
-        ),
+        building_site_status_for_build_intent(&map, &steel, EntityKind::PumpJack, 4, 4, u32::MAX,),
         BuildSiteStatus::InvalidFootprint
     );
 
@@ -123,28 +95,14 @@ fn pump_jack_build_site_requires_live_oil_patch() {
         .spawn_node(EntityKind::Oil, x, y)
         .expect("oil node should spawn");
     assert_eq!(
-        building_site_status_for_build_intent(
-            &map,
-            &oil,
-            EntityKind::PumpJack,
-            4,
-            4,
-            u32::MAX,
-        ),
+        building_site_status_for_build_intent(&map, &oil, EntityKind::PumpJack, 4, 4, u32::MAX,),
         BuildSiteStatus::Clear
     );
 
     oil.spawn_building(1, EntityKind::PumpJack, x, y, false)
         .expect("pump jack scaffold should spawn");
     assert_eq!(
-        building_site_status_for_build_intent(
-            &map,
-            &oil,
-            EntityKind::PumpJack,
-            4,
-            4,
-            u32::MAX,
-        ),
+        building_site_status_for_build_intent(&map, &oil, EntityKind::PumpJack, 4, 4, u32::MAX,),
         BuildSiteStatus::BlockedByBuilding
     );
 
@@ -152,14 +110,7 @@ fn pump_jack_build_site_requires_live_oil_patch() {
         .expect("oil node should exist")
         .harvest_resources(u32::MAX);
     assert_eq!(
-        building_site_status_for_build_intent(
-            &map,
-            &oil,
-            EntityKind::PumpJack,
-            4,
-            4,
-            u32::MAX,
-        ),
+        building_site_status_for_build_intent(&map, &oil, EntityKind::PumpJack, 4, 4, u32::MAX,),
         BuildSiteStatus::InvalidFootprint
     );
 }
@@ -257,14 +208,7 @@ fn build_site_status_preserves_tank_trap_unit_policy() {
         .expect("tank should spawn");
 
     assert_eq!(
-        building_site_status_for_build_intent(
-            &map,
-            &vehicle,
-            EntityKind::TankTrap,
-            4,
-            4,
-            u32::MAX,
-        ),
+        building_site_status_for_build_intent(&map, &vehicle, EntityKind::TankTrap, 4, 4, u32::MAX,),
         BuildSiteStatus::BlockedByUnit
     );
 }

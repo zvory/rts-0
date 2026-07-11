@@ -214,7 +214,9 @@ pub(crate) fn construction_system(
 fn builders_for_site(entities: &EntityStore, site: u32) -> Vec<u32> {
     entities
         .iter()
-        .filter(|entity| entity.hp > 0 && entity.is_unit() && entity.order().build_site() == Some(site))
+        .filter(|entity| {
+            entity.hp > 0 && entity.is_unit() && entity.order().build_site() == Some(site)
+        })
         .map(|entity| entity.id)
         .collect()
 }
@@ -276,10 +278,7 @@ fn build_wait_unit_blocked_ticks(entities: &EntityStore, worker: u32) -> u32 {
 /// Advance Tank Trap deconstruction orders. A worker must first reach the target trap, then spends
 /// half of the trap's normal build time dismantling it. Completion refunds the trap cost to the
 /// worker's owner and leaves removal/event fanout to the ordinary death system.
-pub(crate) fn deconstruction_system(
-    entities: &mut EntityStore,
-    players: &mut [PlayerState],
-) {
+pub(crate) fn deconstruction_system(entities: &mut EntityStore, players: &mut [PlayerState]) {
     let arrivals: Vec<(u32, Option<u32>)> = entities
         .iter()
         .filter_map(|e| {
@@ -503,12 +502,9 @@ mod tests {
     fn construction_waits_on_other_unit_body_intersecting_footprint() {
         let map = flat_map(16);
         let mut entities = EntityStore::new();
-        let rect = crate::game::services::geometry::building_rect_for_footprint(
-            EntityKind::Depot,
-            4,
-            4,
-        )
-        .expect("depot rect");
+        let rect =
+            crate::game::services::geometry::building_rect_for_footprint(EntityKind::Depot, 4, 4)
+                .expect("depot rect");
         let radius = config::unit_stats(EntityKind::Tank)
             .expect("tank stats")
             .radius;
@@ -883,7 +879,9 @@ mod tests {
         let mut players = vec![player_state(1), player_state(2)];
         let steel_before = players[0].steel;
         let enemy_steel_before = players[1].steel;
-        let build_ticks = config::building_stats(EntityKind::TankTrap).unwrap().build_ticks;
+        let build_ticks = config::building_stats(EntityKind::TankTrap)
+            .unwrap()
+            .build_ticks;
         let required_ticks = tank_trap_deconstruction_ticks();
         assert_eq!(required_ticks * 2, build_ticks);
 
@@ -904,7 +902,10 @@ mod tests {
             "original owner should not receive the refund"
         );
         assert_eq!(
-            entities.get(trap).expect("trap should exist until death runs").hp,
+            entities
+                .get(trap)
+                .expect("trap should exist until death runs")
+                .hp,
             0,
             "completed deconstruction should mark the Tank Trap for normal death cleanup"
         );

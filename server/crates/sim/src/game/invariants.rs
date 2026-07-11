@@ -152,7 +152,9 @@ impl Game {
             }
         }
 
-        let building_rects: Vec<_> = self.state.entities
+        let building_rects: Vec<_> = self
+            .state
+            .entities
             .iter()
             .filter_map(|e| {
                 if e.is_building() {
@@ -404,8 +406,8 @@ impl Game {
                 // If a target_id is exposed, the target must be visible too.
                 if let Some(tid) = v.target_id {
                     if let Some(t) = self.state.entities.get(tid) {
-                        let visible =
-                            v.owner == pid || self.state.fog.is_visible_world(pid, t.pos_x, t.pos_y);
+                        let visible = v.owner == pid
+                            || self.state.fog.is_visible_world(pid, t.pos_x, t.pos_y);
                         assert!(
                             visible,
                             "invariant: tick {} snapshot for player {} exposes hidden target_id {}; target={}",
@@ -777,14 +779,16 @@ mod tests {
         }
 
         let (bx, by) = footprint_center(&game.state.map, EntityKind::Depot, 20, 20);
-        game.state.entities
+        game.state
+            .entities
             .spawn_building(99, EntityKind::Depot, bx, by, true)
             .expect("building spawn");
         let rect = building_rect_for_footprint(EntityKind::Depot, 20, 20).expect("depot rect");
         let radius = config::unit_stats(EntityKind::Tank)
             .expect("tank stats")
             .radius;
-        game.state.entities
+        game.state
+            .entities
             .spawn_unit(
                 99,
                 EntityKind::Tank,
@@ -853,11 +857,13 @@ mod tests {
         }
 
         let (bx, by) = footprint_center(&game.state.map, EntityKind::Depot, 20, 20);
-        game.state.entities
+        game.state
+            .entities
             .spawn_building(99, EntityKind::Depot, bx, by, true)
             .expect("building spawn");
         let rect = building_rect_for_footprint(EntityKind::Depot, 20, 20).expect("depot rect");
-        game.state.entities
+        game.state
+            .entities
             .spawn_node(
                 EntityKind::Steel,
                 rect.max_x + config::TILE_SIZE as f32 * 0.25,
@@ -892,10 +898,12 @@ mod tests {
 
         let (x, y) = footprint_center(&game.state.map, EntityKind::PumpJack, 20, 20);
         let oil_kind = EntityKind::from_str("oil").expect("oil kind");
-        game.state.entities
+        game.state
+            .entities
             .spawn_node(oil_kind, x, y)
             .expect("oil spawn");
-        game.state.entities
+        game.state
+            .entities
             .spawn_building(1, EntityKind::PumpJack, x, y, true)
             .expect("pump jack spawn");
 

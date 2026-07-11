@@ -48,5 +48,8 @@ fn authored_map_rejects_more_than_bounded_base_sites() {
 
     let err = Map::from_authored_json(1, &json, 0).expect_err("bounded base count must fail");
 
-    assert!(err.contains("baseSites must contain 1 to 32"), "error was: {err}");
+    assert!(
+        err.contains("baseSites must contain 1 to 32"),
+        "error was: {err}"
+    );
 }

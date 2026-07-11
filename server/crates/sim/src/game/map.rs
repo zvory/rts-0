@@ -475,15 +475,28 @@ mod tests {
     #[test]
     fn every_authored_base_is_present_for_every_player_count() {
         let expected: HashSet<_> = [
-            (13, 12), (112, 113), (112, 12), (13, 113), (40, 11), (85, 114),
-            (114, 40), (11, 85), (63, 38), (63, 87), (87, 63), (38, 63),
+            (13, 12),
+            (112, 113),
+            (112, 12),
+            (13, 113),
+            (40, 11),
+            (85, 114),
+            (114, 40),
+            (11, 85),
+            (63, 38),
+            (63, 87),
+            (87, 63),
+            (38, 63),
         ]
         .into_iter()
         .collect();
         for seed in 0..16u32 {
             for player_count in 1..=4 {
                 let map = Map::generate(player_count, seed);
-                assert_eq!(map.base_sites.iter().copied().collect::<HashSet<_>>(), expected);
+                assert_eq!(
+                    map.base_sites.iter().copied().collect::<HashSet<_>>(),
+                    expected
+                );
             }
         }
     }

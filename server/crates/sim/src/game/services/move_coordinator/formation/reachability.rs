@@ -82,14 +82,8 @@ impl ReachabilityGrid {
         for ty in 0..map.size {
             for tx in 0..map.size {
                 let idx = map.index(tx, ty);
-                passable[idx] = reachability_tile_passable(
-                    map,
-                    occ,
-                    relation,
-                    kind,
-                    tx as i32,
-                    ty as i32,
-                );
+                passable[idx] =
+                    reachability_tile_passable(map, occ, relation, kind, tx as i32, ty as i32);
             }
         }
 
