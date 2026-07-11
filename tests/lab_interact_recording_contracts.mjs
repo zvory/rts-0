@@ -113,6 +113,20 @@ try {
   fs.rmSync(mediaTmp, { recursive: true, force: true });
 }
 
+const failedEncoderPath = path.join(os.tmpdir(), `rts-li-failed-encoder-${process.pid}.mp4`);
+const failedEncoder = createPngMp4Encoder({
+  outputPath: failedEncoderPath,
+  fps: RECORDING_LIMITS.fps,
+  tools: { ffmpeg: process.execPath },
+});
+void failedEncoder.write(Buffer.from("not-a-png")).catch(() => {});
+await assert.rejects(
+  withDeadline(failedEncoder.finish(1_000), 2_000),
+  (error) => error?.code === "mediaProcessingFailed",
+  "an encoder that exits while writes are backpressured fails promptly instead of hanging on drain",
+);
+await failedEncoder.abort();
+
 const watchdogDriver = fixtureRecordingDriver(root, tools);
 await assert.rejects(
   watchdogDriver.recordWait(),

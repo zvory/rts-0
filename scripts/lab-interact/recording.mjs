@@ -127,12 +127,14 @@ export async function createWallClockRecorder({ page, outputPath, clip, scale, t
     throw error;
   }
 
-  const queueElapsedSlots = () => {
+  const queueElapsedSlots = (nowNs = process.hrtime.bigint()) => {
     if (startedNs == null || stopping || !currentFrame) return;
-    const elapsedMs = Number(process.hrtime.bigint() - startedNs) / 1e6;
+    const elapsedMs = Math.min(maxDurationMs, Number(nowNs - startedNs) / 1e6);
     const due = Math.min(maximumSlots, Math.max(1, Math.ceil(elapsedMs * fps / 1000)));
     while (slotsQueued < due) {
-      encoder.write(currentFrame);
+      // The interval cannot await backpressure, but it must still observe a
+      // failed encoder immediately enough to avoid an unhandled rejection.
+      void encoder.write(currentFrame).catch(() => {});
       sourceFramesUsed.add(currentFrameId);
       slotsQueued += 1;
     }
@@ -146,10 +148,15 @@ export async function createWallClockRecorder({ page, outputPath, clip, scale, t
       interval = setInterval(queueElapsedSlots, 5);
       interval.unref?.();
     },
-    async stop(targetDurationMs) {
+    async stop() {
       if (startedNs == null) this.start();
       clearInterval(interval);
-      queueElapsedSlots();
+      const stoppedNs = process.hrtime.bigint();
+      const wallDurationMs = Math.min(
+        maxDurationMs,
+        Math.max(1, Number(stoppedNs - startedNs) / 1e6),
+      );
+      queueElapsedSlots(stoppedNs);
       stopping = true;
       client.off("Page.screencastFrame", onFrame);
       try {
@@ -158,9 +165,9 @@ export async function createWallClockRecorder({ page, outputPath, clip, scale, t
         } finally {
           await client.detach?.().catch(() => {});
         }
-        const encodedFrames = Math.max(1, Math.ceil(targetDurationMs * fps / 1000));
+        const encodedFrames = Math.max(1, Math.ceil(wallDurationMs * fps / 1000));
         while (slotsQueued < encodedFrames) {
-          encoder.write(currentFrame);
+          void encoder.write(currentFrame).catch(() => {});
           sourceFramesUsed.add(currentFrameId);
           slotsQueued += 1;
         }
@@ -168,25 +175,28 @@ export async function createWallClockRecorder({ page, outputPath, clip, scale, t
         if (extra > 0) {
           throw new LabInteractRecordingError("recordingClockDrift", `Recorder queued ${extra} frame slots beyond its measured wall duration.`);
         }
-        await encoder.finish(recordingStopTimeoutMs(targetDurationMs));
+        await encoder.finish(recordingStopTimeoutMs(wallDurationMs));
         const used = sourceFramesUsed.size;
         const sourceCoverage = used / encodedFrames;
         const deficient = sourceCoverage < RECORDING_LIMITS.minimumSourceCoverage;
         return {
-          expectedAt30Fps: encodedFrames,
-          encoded: encodedFrames,
-          rawScreencastEvents: rawEvents,
-          rawEventsDuringRecording: recordingEvents,
-          sourceFramesUsed: used,
-          reusedSourceFrameSlots: encodedFrames - used,
-          sourceCoverage,
-          deficient,
-          minimumSourceCoverage: RECORDING_LIMITS.minimumSourceCoverage,
-          chromeTimestampSpanSeconds: firstChromeTimestamp == null || lastChromeTimestamp == null ? null : lastChromeTimestamp - firstChromeTimestamp,
-          largestChromeTimestampGapMs: largestChromeGapMs,
-          warning: deficient
-            ? `Source capture covered only ${(sourceCoverage * 100).toFixed(1)}% of output frame slots; use capture-fixed for reliable dense-scene video.`
-            : null,
+          wallDurationMs,
+          diagnostics: {
+            expectedAt30Fps: encodedFrames,
+            encoded: encodedFrames,
+            rawScreencastEvents: rawEvents,
+            rawEventsDuringRecording: recordingEvents,
+            sourceFramesUsed: used,
+            reusedSourceFrameSlots: encodedFrames - used,
+            sourceCoverage,
+            deficient,
+            minimumSourceCoverage: RECORDING_LIMITS.minimumSourceCoverage,
+            chromeTimestampSpanSeconds: firstChromeTimestamp == null || lastChromeTimestamp == null ? null : lastChromeTimestamp - firstChromeTimestamp,
+            largestChromeTimestampGapMs: largestChromeGapMs,
+            warning: deficient
+              ? `Source capture covered only ${(sourceCoverage * 100).toFixed(1)}% of output frame slots; use capture-fixed for reliable dense-scene video.`
+              : null,
+          },
         };
       } catch (error) {
         await encoder.abort().catch(() => {});
@@ -223,12 +233,20 @@ export function createPngMp4Encoder({ outputPath, fps, crop = null, scale = 1, t
     write(buffer) {
       tail = tail.then(async () => {
         if (writeFailure) throw writeFailure;
-        if (!child.stdin.write(buffer)) await once(child.stdin, "drain");
+        if (child.exitCode != null || child.signalCode != null) {
+          throw encoderExitError(child.exitCode, child.signalCode, stderr);
+        }
+        if (!child.stdin.write(buffer)) {
+          await waitForEncoderDrain(child, () => stderr);
+        }
       });
       return tail;
     },
     async finish(timeoutMs = 45_000) {
       await tail;
+      if (child.exitCode != null || child.signalCode != null) {
+        throw encoderExitError(child.exitCode, child.signalCode, stderr);
+      }
       child.stdin.end();
       await waitForChild(child, timeoutMs, stderrFailure);
     },
@@ -322,7 +340,36 @@ function runTool(command, args, label, timeoutMs = RECORDING_LIMITS.mediaStageTi
   if (result.status !== 0) throw new LabInteractRecordingError("mediaProcessingFailed", conciseToolFailure(`${label} failed`, result));
 }
 
+function waitForEncoderDrain(child, stderr) {
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      child.stdin.off("drain", onDrain);
+      child.stdin.off("error", onError);
+      child.off("close", onClose);
+    };
+    const onDrain = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = (error) => {
+      cleanup();
+      reject(error);
+    };
+    const onClose = (code, signal) => {
+      cleanup();
+      reject(encoderExitError(code, signal, stderr()));
+    };
+    child.stdin.once("drain", onDrain);
+    child.stdin.once("error", onError);
+    child.once("close", onClose);
+  });
+}
+
 async function waitForChild(child, timeoutMs, stderr) {
+  if (child.exitCode != null || child.signalCode != null) {
+    if (child.exitCode !== 0) throw encoderExitError(child.exitCode, child.signalCode, stderr());
+    return;
+  }
   let timer;
   try {
     const [code, signal] = await Promise.race([
@@ -339,6 +386,13 @@ async function waitForChild(child, timeoutMs, stderr) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+function encoderExitError(code, signal, stderr) {
+  return new LabInteractRecordingError(
+    "mediaProcessingFailed",
+    `H.264 encoder failed${signal ? ` (${signal})` : code == null ? "" : ` with exit ${code}`}: ${String(stderr || "unknown failure").trim().slice(-800)}`,
+  );
 }
 
 function derivedTimeout(targetDurationMs, minimumMs, maximumMs, durationScale) {

@@ -573,13 +573,10 @@ export class LabInteractDriver {
       clearInterval(recording.sizeWatchdog);
       try {
         const endStatus = await this.callBridge("status", {}).catch(() => null);
-        // An immediate stop is valid; retain a minimally positive timeline even when
-        // start and stop land in the same millisecond.
-        const stoppedMs = reason === "watchdog"
-          ? recording.startedMs + recording.maxDurationMs
-          : Math.max(Date.now(), recording.startedMs + 1);
-        const wallDurationMs = Math.max(1, stoppedMs - recording.startedMs);
-        const frameDiagnostics = await recording.recorder.stop(wallDurationMs);
+        // The recorder owns the monotonic clock used to assign frame slots.
+        // Reuse that exact duration for probing and the manifest so wall-clock
+        // rounding cannot disagree with the encoded frame count.
+        const { wallDurationMs, diagnostics: frameDiagnostics } = await recording.recorder.stop();
         const media = finalizeMp4Artifacts({
           mp4Path: recording.mp4Path, framesDir: recording.framesDir,
           contactSheetPath: recording.contactSheetPath, targetDurationMs: wallDurationMs,
