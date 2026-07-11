@@ -242,13 +242,16 @@ fn lab_checkpoint_scenario_rejects_player_starts_that_disagree_with_its_map() {
     };
     let materialized_hash = map.materialized_hash();
     checkpoint.map.materialized_hash = materialized_hash.clone();
-    let mut payload: serde_json::Value =
-        serde_json::from_str(&checkpoint.checkpoint_payload).expect("checkpoint payload should be JSON");
+    let mut payload: serde_json::Value = serde_json::from_str(&checkpoint.checkpoint_payload)
+        .expect("checkpoint payload should be JSON");
     payload["mapBinding"]["materializedMapHash"] = serde_json::Value::String(materialized_hash);
     checkpoint.checkpoint_payload =
         serde_json::to_string(&payload).expect("checkpoint payload should serialize");
 
-    assert_restore_invalid_scenario(checkpoint, "player start tiles do not match scenario map starts");
+    assert_restore_invalid_scenario(
+        checkpoint,
+        "player start tiles do not match scenario map starts",
+    );
 }
 
 #[test]

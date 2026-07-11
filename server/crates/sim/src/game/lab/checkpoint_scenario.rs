@@ -293,7 +293,8 @@ impl Game {
             .eq(game.state.map.starts.iter().copied())
         {
             return Err(LabError::InvalidScenario {
-                reason: "checkpoint player start tiles do not match scenario map starts".to_string(),
+                reason: "checkpoint player start tiles do not match scenario map starts"
+                    .to_string(),
             });
         }
         if game.seed() != seed {
