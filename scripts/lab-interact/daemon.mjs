@@ -122,7 +122,7 @@ export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = config
       socket.end(`${JSON.stringify({ ok: true, result })}\n`);
     } catch (error) {
       const normalized = normalizeError(error);
-      socket.end(`${JSON.stringify(errorEnvelope(normalized.code, normalized.message))}\n`);
+      socket.end(`${JSON.stringify(errorEnvelope(normalized.code, normalized.message, normalized.details))}\n`);
     } finally {
       if (admitted) activeRequests -= 1;
       if (admitted) recordInteraction();
@@ -179,8 +179,15 @@ export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = config
   return { server, service, paths, shutdown };
 }
 
-function errorEnvelope(code, message) {
-  return { ok: false, error: { code: code || "commandFailed", message: String(message).slice(0, 1000) } };
+function errorEnvelope(code, message, details = undefined) {
+  return {
+    ok: false,
+    error: {
+      code: code || "commandFailed",
+      message: String(message).slice(0, 1000),
+      ...(details && typeof details === "object" && Object.keys(details).length ? { details } : {}),
+    },
+  };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

@@ -18,6 +18,7 @@ export const LAB_INTERACT_LIMITS = Object.freeze({
   inspectPlayers: 16,
   inspectKinds: 32,
   removeEntities: 100,
+  mutationEntities: 400,
   focusEntities: 20,
   stepTicks: 100,
   seekTick: 1_000_000,
@@ -101,6 +102,7 @@ export class LabInteractBridge {
         error: {
           code: error?.code || "bridgeError",
           message: error?.message || "Lab Interact bridge request failed.",
+          details: error?.details && typeof error.details === "object" ? error.details : undefined,
         },
       };
     }
@@ -171,85 +173,50 @@ export class LabInteractBridge {
     };
   }
 
-  async spawn(spec) {
+  async spawn(input) {
     const { labClient } = this.session();
-    const owner = positiveInt(spec?.owner, "spawn.owner");
-    const kind = safeKind(spec?.kind, "spawn.kind");
-    const x = finiteNumber(spec?.x, "spawn.x");
-    const y = finiteNumber(spec?.y, "spawn.y");
+    if (!Array.isArray(input?.spawns) || input.spawns.length < 1 || input.spawns.length > LAB_INTERACT_LIMITS.mutationEntities) {
+      throw bridgeError("invalidInput", "spawn.spawns must contain 1-400 items.");
+    }
+    const spawns = input.spawns.map((spec, index) => ({
+      owner: positiveInt(spec?.owner, `spawn.spawns[${index}].owner`),
+      kind: safeKind(spec?.kind, `spawn.spawns[${index}].kind`),
+      x: finiteNumber(spec?.x, `spawn.spawns[${index}].x`),
+      y: finiteNumber(spec?.y, `spawn.spawns[${index}].y`),
+      completed: spec?.completed !== false,
+    }));
     const result = await this.mutate(
-      () => labClient.spawnEntity({ owner, kind, x, y, completed: spec?.completed !== false }),
-      (outcome) => this.entityPresent(outcome?.entityId),
+      () => labClient.spawnEntities(spawns),
+      (outcome) => batchOutcomes(outcome).every((item) => this.entityPresent(item?.outcome?.entityId)),
     );
-    return { result: projectLabResult(result), entity: projectEntity(this.app.match.state.entityById(result.outcome.entityId)) };
+    const entities = batchOutcomes(result.outcome)
+      .map((item) => this.app.match.state.entityById(item?.outcome?.entityId))
+      .filter(Boolean)
+      .map(projectEntity);
+    return { result: projectLabResult(result), entities };
   }
 
   async update(input) {
     const { labClient } = this.session();
-    const operation = String(input?.operation || "");
-    if (operation === "move") {
-      const entityId = positiveInt(input?.entityId, "update.entityId");
-      const x = finiteNumber(input?.x, "update.x");
-      const y = finiteNumber(input?.y, "update.y");
-      const result = await this.mutate(
-        () => labClient.moveEntity(entityId, x, y),
-        () => this.entityAt(entityId, x, y),
-      );
-      return { result: projectLabResult(result) };
+    if (!Array.isArray(input?.updates) || input.updates.length < 1 || input.updates.length > LAB_INTERACT_LIMITS.mutationEntities) {
+      throw bridgeError("invalidInput", "update.updates must contain 1-400 items.");
     }
-    if (operation === "reassign") {
-      const entityId = positiveInt(input?.entityId, "update.entityId");
-      const owner = positiveInt(input?.owner, "update.owner");
-      const result = await this.mutate(
-        () => labClient.setEntityOwner(entityId, owner),
-        () => this.app.match.state.entityById(entityId)?.owner === owner,
-      );
-      return { result: projectLabResult(result) };
-    }
-    if (operation === "resources") {
-      const playerId = positiveInt(input?.playerId, "update.playerId");
-      const steel = nonNegativeInt(input?.steel, "update.steel");
-      const oil = nonNegativeInt(input?.oil, "update.oil");
-      const result = await this.mutate(
-        () => labClient.setPlayerResources(playerId, steel, oil),
-        () => this.playerResourcesMatch(playerId, steel, oil),
-      );
-      return { result: projectLabResult(result) };
-    }
-    if (operation === "research") {
-      const playerId = positiveInt(input?.playerId, "update.playerId");
-      const upgrade = safeKind(input?.upgrade, "update.upgrade");
-      const completed = input?.completed !== false;
-      const result = await this.mutate(
-        () => labClient.setCompletedResearch(playerId, upgrade, completed),
-        () => true,
-      );
-      return { result: projectLabResult(result) };
-    }
-    if (operation === "godMode") {
-      const playerId = positiveInt(input?.playerId, "update.playerId");
-      const enabled = input?.enabled !== false;
-      const result = await this.mutate(
-        () => labClient.setPlayerGodMode(playerId, enabled),
-        () => this.app.labClient.state?.godModePlayers?.includes(playerId) === enabled,
-      );
-      return { result: projectLabResult(result) };
-    }
-    throw bridgeError("invalidUpdate", "update.operation must be move, reassign, resources, research, or godMode.");
+    const updates = input.updates.map((value, index) => normalizeBridgeUpdate(value, index));
+    const result = await this.mutate(
+      () => labClient.applyUpdates(updates),
+      (outcome) => batchOutcomes(outcome).every((item) => this.outcomeObserved(item?.outcome)),
+    );
+    return { result: projectLabResult(result) };
   }
 
   async remove(input) {
     const { labClient } = this.session();
-    const ids = boundedIds(input?.entityIds, "remove.entityIds", LAB_INTERACT_LIMITS.removeEntities);
-    const results = [];
-    for (const entityId of ids) {
-      const result = await this.mutate(
-        () => labClient.deleteEntity(entityId),
-        () => !this.app.match.state.entityById(entityId),
-      );
-      results.push(projectLabResult(result));
-    }
-    return { results };
+    const ids = boundedIds(input?.entityIds, "remove.entityIds", LAB_INTERACT_LIMITS.mutationEntities);
+    const result = await this.mutate(
+      () => labClient.deleteEntities(ids),
+      () => ids.every((entityId) => !this.app.match.state.entityById(entityId)),
+    );
+    return { result: projectLabResult(result) };
   }
 
   async order(input) {
@@ -459,7 +426,12 @@ export class LabInteractBridge {
     const { match } = this.session();
     const before = snapshotSequence(match);
     const result = await send();
-    if (!result?.ok) throw bridgeError("labRejected", result?.error || "The server rejected the lab operation.");
+    if (!result?.ok) {
+      throw bridgeError("labRejected", result?.error || "The server rejected the lab operation.", {
+        failedIndex: result?.failedIndex ?? null,
+        ...(result?.details || {}),
+      });
+    }
     // Paused rooms do not naturally produce a new snapshot. Advance one authoritative
     // tick after an accepted setup/command operation so success always carries observed state.
     if (isPaused(match)) match.net.stepRoomTime();
@@ -482,6 +454,22 @@ export class LabInteractBridge {
   playerResourcesMatch(playerId, steel, oil) {
     const row = this.app.match.state.playerResources.find((player) => Number(player?.id) === playerId);
     return row?.steel === steel && row?.oil === oil;
+  }
+
+  outcomeObserved(outcome) {
+    if (Number.isInteger(outcome?.entityId) && Number.isFinite(outcome?.x) && Number.isFinite(outcome?.y)) {
+      return this.entityAt(outcome.entityId, outcome.x, outcome.y);
+    }
+    if (Number.isInteger(outcome?.entityId) && Number.isInteger(outcome?.owner)) {
+      return this.app.match.state.entityById(outcome.entityId)?.owner === outcome.owner;
+    }
+    if (Number.isInteger(outcome?.playerId) && Number.isInteger(outcome?.steel) && Number.isInteger(outcome?.oil)) {
+      return this.playerResourcesMatch(outcome.playerId, outcome.steel, outcome.oil);
+    }
+    if (Number.isInteger(outcome?.playerId) && typeof outcome?.enabled === "boolean") {
+      return this.app.labClient.state?.godModePlayers?.includes(outcome.playerId) === outcome.enabled;
+    }
+    return true;
   }
 
   async waitFor(predicate, detail, timeoutMs = LAB_INTERACT_LIMITS.waitMs) {
@@ -653,8 +641,48 @@ function projectLabResult(result) {
   return {
     op: result.op || "",
     outcome: result.outcome || null,
+    failedIndex: Number.isInteger(result.failedIndex) ? result.failedIndex : null,
+    details: result.details || null,
     snapshotTick: finiteOrNull(result.snapshotTick),
   };
+}
+
+function batchOutcomes(outcome) {
+  return Array.isArray(outcome?.items) ? outcome.items : [];
+}
+
+function normalizeBridgeUpdate(value, index) {
+  const operation = String(value?.operation || "");
+  const label = `update.updates[${index}]`;
+  if (operation === "move") return {
+    operation,
+    entityId: positiveInt(value?.entityId, `${label}.entityId`),
+    x: finiteNumber(value?.x, `${label}.x`),
+    y: finiteNumber(value?.y, `${label}.y`),
+  };
+  if (operation === "reassign") return {
+    operation,
+    entityId: positiveInt(value?.entityId, `${label}.entityId`),
+    owner: positiveInt(value?.owner, `${label}.owner`),
+  };
+  if (operation === "resources") return {
+    operation,
+    playerId: positiveInt(value?.playerId, `${label}.playerId`),
+    steel: nonNegativeInt(value?.steel, `${label}.steel`),
+    oil: nonNegativeInt(value?.oil, `${label}.oil`),
+  };
+  if (operation === "research") return {
+    operation,
+    playerId: positiveInt(value?.playerId, `${label}.playerId`),
+    upgrade: safeKind(value?.upgrade, `${label}.upgrade`),
+    completed: value?.completed !== false,
+  };
+  if (operation === "godMode") return {
+    operation,
+    playerId: positiveInt(value?.playerId, `${label}.playerId`),
+    enabled: value?.enabled !== false,
+  };
+  throw bridgeError("invalidUpdate", `${label}.operation is unsupported.`);
 }
 
 function snapshotSequence(match) {
@@ -752,9 +780,10 @@ function finiteOrNull(value) {
   return Number.isFinite(value) ? value : null;
 }
 
-function bridgeError(code, message) {
+function bridgeError(code, message, details = undefined) {
   const error = new Error(message);
   error.code = code;
+  if (details) error.details = details;
   return error;
 }
 

@@ -31,11 +31,35 @@ try {
     elapsedTicks >= 10 && elapsedTicks <= 80,
     `speed 1 keeps the private Lab server near its production tick rate; observed ${elapsedTicks} ticks in 900ms`,
   );
-  const first = await driver.spawn({ owner: 1, kind: "tank", x: 960, y: 960 });
-  const second = await driver.spawn({ owner: 2, kind: "rifleman", x: 1248, y: 960 });
-  const firstId = first.entity?.id;
-  const secondId = second.entity?.id;
-  assert.ok(Number.isInteger(firstId) && Number.isInteger(secondId), "paused spawns return observed authoritative entity ids");
+  const spawned = await driver.spawn([
+    { owner: 1, kind: "tank", x: 960, y: 960 },
+    { owner: 2, kind: "rifleman", x: 1248, y: 960 },
+  ]);
+  const firstId = spawned.entities?.[0]?.id;
+  const secondId = spawned.entities?.[1]?.id;
+  assert.ok(Number.isInteger(firstId) && Number.isInteger(secondId), "one paused bulk spawn returns all observed authoritative entity ids");
+
+  await driver.update([
+    { operation: "move", entityId: firstId, x: 1248, y: 960 },
+    { operation: "move", entityId: secondId, x: 960, y: 960 },
+  ]);
+  await driver.update([
+    { operation: "move", entityId: firstId, x: 960, y: 960 },
+    { operation: "move", entityId: secondId, x: 1248, y: 960 },
+  ]);
+
+  let placementError;
+  try {
+    await driver.spawn([{ owner: 1, kind: "rifleman", x: 960, y: 960 }]);
+  } catch (error) {
+    placementError = error;
+  }
+  assert.equal(placementError?.details?.failedIndex, 0, "blocked bulk spawn reports its failed input index");
+  assert.ok(placementError?.details?.suggestions?.length > 0, "blocked bulk spawn returns authoritative legal suggestions");
+  const suggestion = placementError.details.suggestions[0];
+  const corrected = await driver.spawn([{ owner: 1, kind: "rifleman", x: suggestion.x, y: suggestion.y }]);
+  const correctedId = corrected.entities?.[0]?.id;
+  assert.ok(Number.isInteger(correctedId), "the first returned placement suggestion succeeds without coordinate guessing");
 
   const afterSpawn = await driver.inspect({ ids: [firstId, secondId], limit: 2 });
   assert.equal(afterSpawn.entities.length, 2, "inspection sees both spawned entities from an authoritative snapshot");
@@ -90,6 +114,7 @@ try {
   const diagnostics = driver.diagnostics();
   assert.deepEqual(diagnostics.pageConsoleErrors, [], "Lab Interact page has no console errors");
   assert.deepEqual(diagnostics.pageErrors, [], "Lab Interact page has no frame errors");
+  await driver.remove([firstId, secondId, correctedId]);
   console.log("✅ lab_interact_driver_smoke.mjs: private server, bridge, mutation, order, time, camera, two captures, and cleanup passed");
 } finally {
   await driver?.close();

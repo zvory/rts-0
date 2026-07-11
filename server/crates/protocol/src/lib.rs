@@ -309,13 +309,22 @@ pub enum LabClientOp {
         #[serde(default)]
         completed: bool,
     },
+    SpawnEntities {
+        spawns: Vec<LabSpawnEntitySpec>,
+    },
     DeleteEntity {
         entity_id: u32,
+    },
+    DeleteEntities {
+        entity_ids: Vec<u32>,
     },
     MoveEntity {
         entity_id: u32,
         x: f32,
         y: f32,
+    },
+    ApplyUpdates {
+        updates: Vec<LabUpdateSpec>,
     },
     SetEntityOwner {
         entity_id: u32,
@@ -347,6 +356,56 @@ pub enum LabClientOp {
         #[serde(default, skip_serializing_if = "is_false")]
         ignore_command_limits: bool,
     },
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LabSpawnEntitySpec {
+    pub owner: u32,
+    pub kind: String,
+    pub x: f32,
+    pub y: f32,
+    #[serde(default)]
+    pub completed: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(
+    tag = "operation",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub enum LabUpdateSpec {
+    Move {
+        entity_id: u32,
+        x: f32,
+        y: f32,
+    },
+    Reassign {
+        entity_id: u32,
+        owner: u32,
+    },
+    Resources {
+        player_id: u32,
+        steel: u32,
+        oil: u32,
+    },
+    Research {
+        player_id: u32,
+        upgrade: String,
+        #[serde(default = "default_true")]
+        completed: bool,
+    },
+    GodMode {
+        player_id: u32,
+        #[serde(default = "default_true")]
+        enabled: bool,
+    },
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -457,6 +516,10 @@ pub struct LabResult {
     pub op: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub failed_index: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub outcome: Option<serde_json::Value>,
 }

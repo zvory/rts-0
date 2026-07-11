@@ -195,6 +195,11 @@ export const msg = Object.freeze({
     requestId,
     op: { op: "spawnEntity", owner, kind, x, y, completed: !!completed },
   }),
+  labSpawnEntities: (requestId, spawns) => ({
+    t: C.LAB,
+    requestId,
+    op: { op: "spawnEntities", spawns },
+  }),
   labApplyMapDraft: (requestId, draft) => ({
     t: C.LAB,
     requestId,
@@ -205,10 +210,20 @@ export const msg = Object.freeze({
     requestId,
     op: { op: "deleteEntity", entityId },
   }),
+  labDeleteEntities: (requestId, entityIds) => ({
+    t: C.LAB,
+    requestId,
+    op: { op: "deleteEntities", entityIds },
+  }),
   labMoveEntity: (requestId, entityId, x, y) => ({
     t: C.LAB,
     requestId,
     op: { op: "moveEntity", entityId, x, y },
+  }),
+  labApplyUpdates: (requestId, updates) => ({
+    t: C.LAB,
+    requestId,
+    op: { op: "applyUpdates", updates },
   }),
   labSetEntityOwner: (requestId, entityId, owner) => ({
     t: C.LAB,

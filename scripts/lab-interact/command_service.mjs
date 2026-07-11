@@ -11,7 +11,8 @@ import { FIXED_CAPTURE_LIMITS } from "./fixed_capture.mjs";
 
 export const LAB_INTERACT_LIMITS = Object.freeze({
   maxSessions: 1,
-  maxSpawnBatch: 10,
+  maxSpawnBatch: 400,
+  maxMutationBatch: 400,
   maxAliases: 100,
   maxCommandUnits: 100,
   maxInspectRefs: 100,
@@ -253,7 +254,7 @@ export class LabInteractService {
       return { sessionId, ...projectCatalog(await session.driver.catalog(), input.categories) };
     }
     if (command === "spawn") return spawn(session, input.spawns);
-    if (command === "update") return update(session, input.update);
+    if (command === "update") return update(session, input.updates || [input.update]);
     if (command === "remove") {
       const resolved = await resolveEntityReferences(session, input.refs);
       const result = await session.driver.remove(resolved.map((entry) => entry.id));
@@ -306,31 +307,49 @@ async function spawn(session, spawns) {
     if (!playerIds.has(spec.owner)) throw new LabInteractError("unknownPlayer", `Player ${spec.owner} is not available.`);
     if (!spawnableKinds.has(spec.kind)) throw new LabInteractError("invalidKind", `${spec.kind} is not spawnable.`);
   }
-  const results = [];
-  for (const spec of spawns) {
-    const response = await session.driver.spawn(spec);
-    const id = response?.entity?.id ?? response?.result?.outcome?.entityId;
+  const response = await session.driver.spawn(spawns.map(({ alias: _alias, ...spec }) => spec));
+  const entities = Array.isArray(response?.entities) ? response.entities : [];
+  const outcomes = Array.isArray(response?.result?.outcome?.items) ? response.result.outcome.items : [];
+  const staged = [];
+  for (let index = 0; index < spawns.length; index += 1) {
+    const spec = spawns[index];
+    const entity = entities[index] || null;
+    const id = entity?.id ?? outcomes[index]?.outcome?.entityId;
     if (!Number.isInteger(id) || id <= 0) throw new LabInteractError("missingEntityId", "Spawn did not return an entity id.");
-    if (spec.alias) session.aliases.set(spec.alias, id);
-    results.push({ alias: spec.alias || null, id, entity: decorateEntity(response.entity, session.aliases), result: response.result });
+    staged.push({ spec, id, entity });
   }
-  return { sessionId: session.sessionId, results };
+  for (const { spec, id } of staged) if (spec.alias) session.aliases.set(spec.alias, id);
+  const results = staged.map(({ spec, id, entity }) => ({
+    alias: spec.alias || null,
+    id,
+    entity: decorateEntity(entity, session.aliases),
+  }));
+  return { sessionId: session.sessionId, results, result: response.result };
 }
 
-async function update(session, value) {
+async function update(session, values) {
   const catalog = await session.driver.catalog();
-  assertKnownPlayer(catalog, value.playerId ?? value.owner);
-  let operation = value;
-  if (value.operation === "move") {
-    const entity = await resolveEntityReference(session, value.entity);
-    operation = { operation: "move", entityId: entity.id, x: value.x, y: value.y };
-  } else if (value.operation === "owner") {
-    const entity = await resolveEntityReference(session, value.entity);
-    operation = { operation: "reassign", entityId: entity.id, owner: value.owner };
-  } else if (value.operation === "research" && !flattenFactions(catalog.factions, "upgrades").includes(value.upgrade)) {
-    throw new LabInteractError("invalidUpgrade", `${value.upgrade} is not an available lab upgrade.`);
+  const entityValues = values.filter((value) => ["move", "owner"].includes(value.operation));
+  const resolvedEntities = entityValues.length
+    ? await resolveEntityReferences(session, entityValues.map((value) => value.entity))
+    : [];
+  let resolvedIndex = 0;
+  const operations = [];
+  for (const value of values) {
+    assertKnownPlayer(catalog, value.playerId ?? value.owner);
+    let operation = value;
+    if (value.operation === "move") {
+      const entity = resolvedEntities[resolvedIndex++];
+      operation = { operation: "move", entityId: entity.id, x: value.x, y: value.y };
+    } else if (value.operation === "owner") {
+      const entity = resolvedEntities[resolvedIndex++];
+      operation = { operation: "reassign", entityId: entity.id, owner: value.owner };
+    } else if (value.operation === "research" && !flattenFactions(catalog.factions, "upgrades").includes(value.upgrade)) {
+      throw new LabInteractError("invalidUpgrade", `${value.upgrade} is not an available lab upgrade.`);
+    }
+    operations.push(operation);
   }
-  return { sessionId: session.sessionId, result: await session.driver.update(operation) };
+  return { sessionId: session.sessionId, result: await session.driver.update(operations) };
 }
 
 async function order(session, { playerId, command, ignoreCommandLimits = false }) {
@@ -427,9 +446,12 @@ function validateInput(command, value) {
       optionalBoolean(spec.completed, "spawn.completed"); if (spec.alias != null) alias(spec.alias);
     });
   } else if (command === "update") {
-    exact(value, ["sessionId", "update"], command); validateUpdate(value.update);
+    exact(value, ["sessionId", "update", "updates"], command);
+    if ((value.update == null) === (value.updates == null)) invalid("update", "requires exactly one of update or updates");
+    if (value.update != null) validateUpdate(value.update);
+    if (value.updates != null) array(value.updates, "update.updates", 1, LAB_INTERACT_LIMITS.maxMutationBatch, validateUpdate);
   } else if (command === "remove") {
-    exact(value, ["sessionId", "refs"], command); refs(value.refs, "remove.refs", 1, LAB_INTERACT_LIMITS.maxInspectRefs);
+    exact(value, ["sessionId", "refs"], command); refs(value.refs, "remove.refs", 1, LAB_INTERACT_LIMITS.maxMutationBatch);
   } else if (command === "order") {
     exact(value, ["sessionId", "playerId", "command", "ignoreCommandLimits"], command);
     u32(value.playerId, "order.playerId"); optionalBoolean(value.ignoreCommandLimits, "order.ignoreCommandLimits"); validateCommand(value.command);
@@ -929,7 +951,7 @@ function resolveRequestedWorkspace(requested, allowed) { const candidate = realW
 
 export function normalizeError(error) {
   if (error instanceof LabInteractError) return error;
-  if (error instanceof LabInteractDriverError) return new LabInteractError(error.code || "driverError", conciseError(error));
+  if (error instanceof LabInteractDriverError) return new LabInteractError(error.code || "driverError", conciseError(error), error.details || {});
   return new LabInteractError(error?.code || "commandFailed", conciseError(error));
 }
 export function conciseError(error) { return String(error?.message || "Lab Interact command failed.").split("\nServer log tail:")[0].slice(0, 1000); }

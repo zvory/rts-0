@@ -187,12 +187,12 @@ export class LabInteractDriver {
     return this.call("catalog", query);
   }
 
-  async spawn(spec) {
-    return this.call("spawn", spec);
+  async spawn(spawns) {
+    return this.call("spawn", { spawns });
   }
 
-  async update(operation) {
-    return this.call("update", operation);
+  async update(updates) {
+    return this.call("update", { updates });
   }
 
   async remove(entityIds) {
@@ -582,7 +582,7 @@ export class LabInteractDriver {
       throw new LabInteractDriverError(
         result?.error?.code || "bridgeError",
         result?.error?.message || `Lab Interact ${method} failed.`,
-        { method },
+        { method, ...(result?.error?.details || {}) },
       );
     }
     return result.value;

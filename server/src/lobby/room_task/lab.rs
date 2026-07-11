@@ -5,7 +5,7 @@ use std::time::{Duration, Instant as StdInstant};
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::lab::{
     LabCommandOptions, LabError, LabMoveEntity, LabOp, LabOpOutcome, LabSetCompletedResearch,
-    LabSetEntityOwner, LabSetPlayerResources, LabSpawnEntity,
+    LabSetEntityOwner, LabSetPlayerResources, LabSpawnEntity, LabUpdate,
 };
 use rts_sim::game::map::Map;
 use rts_sim::game::upgrade::UpgradeKind;
@@ -28,7 +28,7 @@ use crate::lab_scenarios::{
 };
 use crate::protocol::{
     Event, InitialCamera, LabClientOp, LabResult, LabScenarioLabMetadata, LabScenarioPayload,
-    LabStartMetadata, LabStartRole, LabState, LabVisionMode, ServerMessage, TeamId,
+    LabStartMetadata, LabStartRole, LabState, LabUpdateSpec, LabVisionMode, ServerMessage, TeamId,
     DEFAULT_FACTION_ID,
 };
 use crate::structured_log::{self, MatchStartedLog};
@@ -179,8 +179,11 @@ fn lab_op_kind(op: &LabClientOp) -> &'static str {
         LabClientOp::ValidateScenario { .. } => "validateScenario",
         LabClientOp::SubmitScenario { .. } => "submitScenario",
         LabClientOp::SpawnEntity { .. } => "spawnEntity",
+        LabClientOp::SpawnEntities { .. } => "spawnEntities",
         LabClientOp::DeleteEntity { .. } => "deleteEntity",
+        LabClientOp::DeleteEntities { .. } => "deleteEntities",
         LabClientOp::MoveEntity { .. } => "moveEntity",
+        LabClientOp::ApplyUpdates { .. } => "applyUpdates",
         LabClientOp::SetEntityOwner { .. } => "setEntityOwner",
         LabClientOp::SetPlayerResources { .. } => "setPlayerResources",
         LabClientOp::SetPlayerGodMode { .. } => "setPlayerGodMode",
@@ -191,9 +194,11 @@ fn lab_op_kind(op: &LabClientOp) -> &'static str {
     }
 }
 
-fn lab_client_op_to_game_op(op: LabClientOp) -> Result<LabOp, String> {
+fn lab_client_op_to_game_op(op: LabClientOp) -> Result<LabOp, (String, Option<u32>)> {
     match op {
-        LabClientOp::ImportScenario { scenario } => lab_scenario_payload_to_lab_op(*scenario),
+        LabClientOp::ImportScenario { scenario } => {
+            lab_scenario_payload_to_lab_op(*scenario).map_err(|error| (error, None))
+        }
         LabClientOp::SpawnEntity {
             owner,
             kind,
@@ -201,8 +206,8 @@ fn lab_client_op_to_game_op(op: LabClientOp) -> Result<LabOp, String> {
             y,
             completed,
         } => {
-            let kind =
-                EntityKind::from_str(&kind).map_err(|_| "unknown entity kind".to_string())?;
+            let kind = EntityKind::from_str(&kind)
+                .map_err(|_| ("unknown entity kind".to_string(), None))?;
             Ok(LabOp::SpawnEntity(LabSpawnEntity {
                 owner,
                 kind,
@@ -211,10 +216,72 @@ fn lab_client_op_to_game_op(op: LabClientOp) -> Result<LabOp, String> {
                 completed,
             }))
         }
+        LabClientOp::SpawnEntities { spawns } => Ok(LabOp::SpawnEntities(
+            spawns
+                .into_iter()
+                .enumerate()
+                .map(|(index, spawn)| {
+                    let kind = EntityKind::from_str(&spawn.kind).map_err(|_| {
+                        ("unknown entity kind".to_string(), u32::try_from(index).ok())
+                    })?;
+                    Ok(LabSpawnEntity {
+                        owner: spawn.owner,
+                        kind,
+                        x: spawn.x,
+                        y: spawn.y,
+                        completed: spawn.completed,
+                    })
+                })
+                .collect::<Result<Vec<_>, (String, Option<u32>)>>()?,
+        )),
         LabClientOp::DeleteEntity { entity_id } => Ok(LabOp::DeleteEntity { entity_id }),
+        LabClientOp::DeleteEntities { entity_ids } => Ok(LabOp::DeleteEntities(entity_ids)),
         LabClientOp::MoveEntity { entity_id, x, y } => {
             Ok(LabOp::MoveEntity(LabMoveEntity { entity_id, x, y }))
         }
+        LabClientOp::ApplyUpdates { updates } => Ok(LabOp::ApplyUpdates(
+            updates
+                .into_iter()
+                .enumerate()
+                .map(|(index, update)| match update {
+                    LabUpdateSpec::Move { entity_id, x, y } => {
+                        Ok(LabUpdate::Move(LabMoveEntity { entity_id, x, y }))
+                    }
+                    LabUpdateSpec::Reassign { entity_id, owner } => {
+                        Ok(LabUpdate::SetEntityOwner(LabSetEntityOwner {
+                            entity_id,
+                            owner,
+                        }))
+                    }
+                    LabUpdateSpec::Resources {
+                        player_id,
+                        steel,
+                        oil,
+                    } => Ok(LabUpdate::SetPlayerResources(LabSetPlayerResources {
+                        player_id,
+                        steel,
+                        oil,
+                    })),
+                    LabUpdateSpec::Research {
+                        player_id,
+                        upgrade,
+                        completed,
+                    } => {
+                        let upgrade = UpgradeKind::from_str(&upgrade).map_err(|_| {
+                            ("unknown research id".to_string(), u32::try_from(index).ok())
+                        })?;
+                        Ok(LabUpdate::SetCompletedResearch(LabSetCompletedResearch {
+                            player_id,
+                            upgrade,
+                            completed,
+                        }))
+                    }
+                    LabUpdateSpec::GodMode { player_id, enabled } => {
+                        Ok(LabUpdate::SetPlayerGodMode { player_id, enabled })
+                    }
+                })
+                .collect::<Result<Vec<_>, (String, Option<u32>)>>()?,
+        )),
         LabClientOp::SetEntityOwner { entity_id, owner } => {
             Ok(LabOp::SetEntityOwner(LabSetEntityOwner {
                 entity_id,
@@ -238,8 +305,8 @@ fn lab_client_op_to_game_op(op: LabClientOp) -> Result<LabOp, String> {
             upgrade,
             completed,
         } => {
-            let upgrade =
-                UpgradeKind::from_str(&upgrade).map_err(|_| "unknown research id".to_string())?;
+            let upgrade = UpgradeKind::from_str(&upgrade)
+                .map_err(|_| ("unknown research id".to_string(), None))?;
             Ok(LabOp::SetCompletedResearch(LabSetCompletedResearch {
                 player_id,
                 upgrade,
@@ -251,7 +318,7 @@ fn lab_client_op_to_game_op(op: LabClientOp) -> Result<LabOp, String> {
         | LabClientOp::ValidateScenario { .. }
         | LabClientOp::SubmitScenario { .. }
         | LabClientOp::SetVision { .. }
-        | LabClientOp::IssueCommandAs { .. } => Err("not a lab mutation".to_string()),
+        | LabClientOp::IssueCommandAs { .. } => Err(("not a lab mutation".to_string(), None)),
     }
 }
 
@@ -301,6 +368,40 @@ fn lab_result_error(request_id: u32, op: String, error: &str) -> LabResult {
         ok: false,
         op,
         error: Some(error.to_string()),
+        failed_index: None,
+        details: None,
+        outcome: None,
+    }
+}
+
+fn lab_result_from_lab_error(request_id: u32, op: String, error: &LabError) -> LabResult {
+    let (failed_index, leaf) = match error {
+        LabError::BatchFailed {
+            failed_index,
+            error,
+        } => (u32::try_from(*failed_index).ok(), error.as_ref()),
+        error => (None, error),
+    };
+    let details = match leaf {
+        LabError::Placement {
+            x,
+            y,
+            blockers,
+            suggestions,
+        } => Some(serde_json::json!({
+            "attempted": { "x": x, "y": y },
+            "blockers": blockers,
+            "suggestions": suggestions.iter().map(|(x, y)| serde_json::json!({ "x": x, "y": y })).collect::<Vec<_>>(),
+        })),
+        _ => None,
+    };
+    LabResult {
+        request_id,
+        ok: false,
+        op,
+        error: Some(lab_error_text(error)),
+        failed_index,
+        details,
         outcome: None,
     }
 }
@@ -317,6 +418,20 @@ fn lab_error_text(err: &LabError) -> String {
             format!("invalid position ({x}, {y}): {reason}")
         }
         LabError::OccupiedPosition { x, y } => format!("occupied position ({x}, {y})"),
+        LabError::Placement { x, y, .. } => {
+            format!("blocked placement ({x}, {y})")
+        }
+        LabError::BatchSize { count, maximum } => {
+            format!("batch contains {count} items; expected 1 to {maximum}")
+        }
+        LabError::DuplicateMutation { reason } => reason.clone(),
+        LabError::BatchFailed {
+            failed_index,
+            error,
+        } => format!(
+            "batch item {failed_index} failed: {}",
+            lab_error_text(error)
+        ),
         LabError::InvalidResearch { player_id, upgrade } => {
             format!("invalid research {upgrade:?} for player {player_id}")
         }
@@ -339,6 +454,12 @@ fn lab_setup_error_text(reason: &str) -> String {
 
 fn lab_outcome_json(outcome: &LabOpOutcome) -> serde_json::Value {
     match outcome {
+        LabOpOutcome::Batch(outcomes) => serde_json::json!({
+            "items": outcomes.iter().enumerate().map(|(index, outcome)| serde_json::json!({
+                "index": index,
+                "outcome": lab_outcome_json(outcome),
+            })).collect::<Vec<_>>()
+        }),
         LabOpOutcome::Spawned { entity_id } => serde_json::json!({ "entityId": entity_id }),
         LabOpOutcome::Deleted { entity_id } => serde_json::json!({ "entityId": entity_id }),
         LabOpOutcome::Moved { entity_id, x, y } => {
@@ -802,6 +923,8 @@ impl RoomTask {
                     ok: false,
                     op: op_kind,
                     error: Some("requestId must be nonzero".to_string()),
+                    failed_index: None,
+                    details: None,
                     outcome: None,
                 },
             );
@@ -816,6 +939,8 @@ impl RoomTask {
                     ok: false,
                     op: op_kind,
                     error: Some("lab requests are only valid in lab rooms".to_string()),
+                    failed_index: None,
+                    details: None,
                     outcome: None,
                 },
             );
@@ -836,6 +961,8 @@ impl RoomTask {
                     ok: false,
                     op: op_kind,
                     error: Some("lab setup import/export is not enabled in this room".to_string()),
+                    failed_index: None,
+                    details: None,
                     outcome: None,
                 },
             );
@@ -854,6 +981,8 @@ impl RoomTask {
                     ok: false,
                     op: op_kind,
                     error: Some("only lab operators can send lab requests".to_string()),
+                    failed_index: None,
+                    details: None,
                     outcome: None,
                 },
             );
@@ -931,6 +1060,8 @@ impl RoomTask {
             ok: true,
             op,
             error: None,
+            failed_index: None,
+            details: None,
             outcome: None,
         }
     }
@@ -956,6 +1087,8 @@ impl RoomTask {
             ok: true,
             op,
             error: None,
+            failed_index: None,
+            details: None,
             outcome: Some(serde_json::json!({ "scenario": scenario })),
         }
     }
@@ -993,6 +1126,8 @@ impl RoomTask {
             ok: true,
             op,
             error: None,
+            failed_index: None,
+            details: None,
             outcome: Some(serde_json::json!({
                 "summary": preview.summary,
                 "preview": preview,
@@ -1061,7 +1196,11 @@ impl RoomTask {
         };
         let lab_op = match lab_client_op_to_game_op(op) {
             Ok(op) => op,
-            Err(err) => return lab_result_error(request_id, op_kind, &err),
+            Err((err, failed_index)) => {
+                let mut result = lab_result_error(request_id, op_kind, &err);
+                result.failed_index = failed_index;
+                return result;
+            }
         };
         let resets_timeline = matches!(
             lab_op,
@@ -1097,7 +1236,7 @@ impl RoomTask {
             };
             let outcome = match game.apply_lab_op(lab_op) {
                 Ok(outcome) => outcome,
-                Err(err) => return lab_result_error(request_id, op_kind, &lab_error_text(&err)),
+                Err(err) => return lab_result_from_lab_error(request_id, op_kind, &err),
             };
             (game.tick_count(), outcome)
         };
@@ -1194,6 +1333,8 @@ impl RoomTask {
             ok: true,
             op: op_kind,
             error: None,
+            failed_index: None,
+            details: None,
             outcome: Some(outcome_json),
         }
     }

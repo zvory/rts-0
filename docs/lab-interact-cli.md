@@ -12,6 +12,8 @@ Run commands from the worktree root. The optional second argument must be one JS
 node scripts/lab-interact/cli.mjs open '{"viewport":{"width":1000,"height":700,"deviceScaleFactor":1}}'
 node scripts/lab-interact/cli.mjs catalog '{"sessionId":"<id>","categories":["players","units","commands"]}'
 node scripts/lab-interact/cli.mjs spawn '{"sessionId":"<id>","spawns":[{"owner":1,"kind":"rifleman","x":960,"y":960,"alias":"subject"}]}'
+node scripts/lab-interact/cli.mjs update '{"sessionId":"<id>","updates":[{"operation":"move","entity":"subject","x":1100,"y":960}]}'
+node scripts/lab-interact/cli.mjs remove '{"sessionId":"<id>","refs":["subject"]}'
 node scripts/lab-interact/cli.mjs inspect '{"sessionId":"<id>","refs":["subject"]}'
 node scripts/lab-interact/cli.mjs camera '{"sessionId":"<id>","camera":{"action":"focus","refs":["subject"]}}'
 node scripts/lab-interact/cli.mjs screenshot '{"sessionId":"<id>","name":"subject","presentation":"clean","subjects":["subject"]}'
@@ -41,6 +43,14 @@ before `open` when a fresh session or different launch options are required. Opt
 `[A-Za-z][A-Za-z0-9_-]{0,31}` and remain private to that session. Unknown, duplicate, stale, or
 cross-session aliases are rejected rather than guessed. Only one authoritative session may be open
 per worktree.
+
+`spawn`, `update`, and `remove` accept 1–400 items and each command reaches the authoritative game
+as one atomic plural operation. `update` accepts `updates:[...]`; the legacy singular `update:{...}`
+shape remains accepted and is normalized to a one-item `applyUpdates` request. Alias changes occur
+only after a complete accepted batch. A rejection leaves the scene and aliases unchanged and
+includes `error.details.failedIndex`; placement failures additionally preserve `attempted`, typed
+`blockers`, and at most eight authoritative `suggestions`. Retrying the original batch with a
+returned suggestion therefore uses the same placement rules rather than a client-side guess.
 
 A cold first `open` may spend tens of seconds building the selected worktree's Rust server before
 it writes its single JSON response. Keep that CLI process attached until it exits. A concurrent
@@ -180,6 +190,7 @@ fixed visual-time contract.
 ```bash
 node tests/lab_interact_cli_contracts.mjs
 node tests/lab_interact_driver_contracts.mjs
+node tests/lab_interact_bulk_contracts.mjs
 node tests/lab_interact_recording_contracts.mjs
 node tests/lab_interact_cli_smoke.mjs
 node tests/lab_interact_driver_smoke.mjs

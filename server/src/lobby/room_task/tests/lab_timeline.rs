@@ -77,11 +77,12 @@ fn lab_timeline_records_mutations_and_issue_as_commands() {
     assert_eq!(timeline.replay_entries()[0].sequence, 0);
     assert!(matches!(
         &timeline.replay_entries()[0].op,
-        crate::protocol::LabReplayOperation::SetPlayerResources {
-            player_id: LAB_PLAYER_ONE_ID,
-            steel: 456,
-            oil: 78
-        }
+        crate::protocol::LabReplayOperation::ApplyUpdates { updates }
+            if matches!(updates.as_slice(), [crate::protocol::LabUpdateSpec::Resources {
+                player_id: LAB_PLAYER_ONE_ID,
+                steel: 456,
+                oil: 78,
+            }])
     ));
     assert_eq!(timeline.replay_entries()[1].sequence, 1);
     assert!(matches!(
