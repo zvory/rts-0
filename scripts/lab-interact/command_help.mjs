@@ -50,11 +50,11 @@ export const LAB_INTERACT_COMMAND_HELP = Object.freeze({
     defaults: ["resume.speed=1", "step.ticks=1"], bounds: ["speed 0-16 (resume >0)", "step 1-100 ticks", "seek tick 0-1000000"],
     example: { sessionId: "<lab-session-id>", control: { action: "step", ticks: 3 } },
   }),
-  inspect: descriptor("Inspect bounded authoritative entity, player, room, and camera facts.", "{sessionId:string,refs?:(alias|u32)[],kinds?:token[],owners?:u32[],cameraViewport?:boolean,limit?:int}", {
+  inspect: descriptor("Inspect bounded authoritative entity, player, room, and semantic camera/viewport/bounds facts.", "{sessionId:string,refs?:(alias|u32)[],kinds?:token[],owners?:u32[],cameraViewport?:boolean,limit?:int}", {
     defaults: ["refs/kinds/owners=unfiltered", "cameraViewport=false", "limit=25"], bounds: ["0-400 refs", "0-32 kinds", "0-16 owners", "limit 1-400"],
     example: { sessionId: "<lab-session-id>", refs: ["subject"], limit: 1 },
   }),
-  camera: descriptor("Set the camera or focus a bounded referenced subject set.", "{sessionId:string,camera:camera-command}", {
+  camera: descriptor("Set the camera or focus a bounded referenced subject set; returns semantic camera/viewport/bounds facts.", "{sessionId:string,camera:camera-command}", {
     variants: ["focus {action,refs,padding?}", "set {action,snapshot:CameraSnapshotV1}"], defaults: ["focus.padding=32 for one unit, otherwise 48"],
     bounds: ["focus 1-400 refs", "padding 0-1024", "snapshot framingScale >0 and <=16"],
     example: { sessionId: "<lab-session-id>", camera: { action: "focus", refs: ["subject"] } },

@@ -401,6 +401,8 @@ async function inspect(session, { refs, kinds, owners, cameraViewport, limit }) 
     sessionId: session.sessionId,
     entities: (response.entities || []).map((entity) => decorateEntity(entity, session.aliases)),
     players: response.players || [], room: response.room || null, camera: response.camera || null,
+    cameraViewport: response.cameraViewport || null,
+    cameraWorldBounds: response.cameraWorldBounds || null,
     truncated: response.truncated === true,
     totalMatching: Number.isInteger(response.totalMatching) ? response.totalMatching : 0,
   };
@@ -413,7 +415,12 @@ async function camera(session, value) {
     command = { action: "focus", entityIds: resolved.map((entry) => entry.id), padding: value.padding };
   }
   const response = await session.driver.camera(command);
-  return { sessionId: session.sessionId, camera: response.camera || response };
+  return {
+    sessionId: session.sessionId,
+    camera: response.camera || response,
+    cameraViewport: response.cameraViewport || null,
+    cameraWorldBounds: response.cameraWorldBounds || null,
+  };
 }
 
 async function screenshot(session, { name = "scene", presentation = "clean", viewport, subjects }) {

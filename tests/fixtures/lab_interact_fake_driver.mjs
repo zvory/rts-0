@@ -40,6 +40,7 @@ export async function openLabInteractDriver(options) {
     boundsPolicy: "mapOverscroll",
   };
   const cameraWorldBounds = { minX: 0, minY: 0, maxX: 2048, maxY: 2048 };
+  const cameraViewportCss = { widthCssPx: 1440, heightCssPx: 900 };
   const project = (entity) => ({ ...entity, orderPlan: entity.orderPlan.map((stage) => ({ ...stage })) });
   const inspect = ({ ids = [], kinds = [], owners = [], cameraViewport = false, limit = 25 } = {}) => {
     let rows = entities;
@@ -54,6 +55,7 @@ export async function openLabInteractDriver(options) {
       players: CATALOG.players.map((player) => ({ ...player })),
       room: { tick, roomTime: { currentTick: tick, speed: 0, paused: true }, map: CATALOG.maps[0] },
       camera: structuredClone(camera),
+      cameraViewport: { ...cameraViewportCss },
       cameraWorldBounds: { ...cameraWorldBounds },
     };
   };
@@ -155,7 +157,11 @@ export async function openLabInteractDriver(options) {
         camera.focus.x = rows.reduce((sum, entity) => sum + entity.x, 0) / rows.length;
         camera.focus.y = rows.reduce((sum, entity) => sum + entity.y, 0) / rows.length;
       }
-      return { camera: structuredClone(camera), cameraWorldBounds: { ...cameraWorldBounds } };
+      return {
+        camera: structuredClone(camera),
+        cameraViewport: { ...cameraViewportCss },
+        cameraWorldBounds: { ...cameraWorldBounds },
+      };
     },
     async screenshot({ sessionId, name, presentation, viewport, subjectSummaries, request }) {
       const width = viewport?.width || 1;
