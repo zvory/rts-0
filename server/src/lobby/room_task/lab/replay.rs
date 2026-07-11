@@ -1,4 +1,5 @@
 use std::str::FromStr;
+use std::time::Instant;
 
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::lab::{
@@ -546,11 +547,29 @@ impl RoomTask {
         operator_id: u32,
         artifact: LabReplayArtifactV1,
     ) -> Result<(), String> {
+        self.load_lab_replay_artifact_with_deadline(operator_id, artifact, None)
+    }
+
+    pub(in crate::lobby::room_task) fn load_lab_replay_artifact_before(
+        &mut self,
+        operator_id: u32,
+        artifact: LabReplayArtifactV1,
+        deadline: Instant,
+    ) -> Result<(), String> {
+        self.load_lab_replay_artifact_with_deadline(operator_id, artifact, Some(deadline))
+    }
+
+    fn load_lab_replay_artifact_with_deadline(
+        &mut self,
+        operator_id: u32,
+        artifact: LabReplayArtifactV1,
+        deadline: Option<Instant>,
+    ) -> Result<(), String> {
         let bytes = serde_json::to_vec(&artifact)
             .map_err(|err| format!("lab replay artifact could not be serialized: {err}"))?;
         let artifact = lab_replay_artifact_from_slice(&bytes)
             .map_err(|err| format!("lab replay artifact rejected: {err}"))?;
-        let (game, timeline) = Self::rebuild_lab_replay_artifact(&artifact)?;
+        let (game, timeline) = Self::rebuild_lab_replay_artifact(&artifact, deadline)?;
         self.phase = Phase::InGame(Box::new(game));
         self.lab_timeline = Some(timeline);
         if let Some(session) = &mut self.lab_session {
@@ -565,7 +584,9 @@ impl RoomTask {
     #[cfg_attr(not(test), allow(dead_code))]
     fn rebuild_lab_replay_artifact(
         artifact: &LabReplayArtifactV1,
+        deadline: Option<Instant>,
     ) -> Result<(Game, LabTimeline), String> {
+        ensure_rebuild_before(deadline)?;
         let lab_op = lab_scenario_payload_to_lab_op(LabScenarioPayload::Checkpoint(
             artifact.initial_setup.clone(),
         ))?;
@@ -578,6 +599,7 @@ impl RoomTask {
             Game::restore_lab_checkpoint_scenario(*scenario).map_err(|err| lab_error_text(&err))?;
         let mut timeline = LabTimeline::new(&game, artifact.initial_setup.clone());
         for replay_entry in &artifact.operations {
+            ensure_rebuild_before(deadline)?;
             if replay_entry.tick < game.tick_count() {
                 return Err(format!(
                     "Lab replay operation {} is out of order: tick {} before {}.",
@@ -587,6 +609,7 @@ impl RoomTask {
                 ));
             }
             while game.tick_count() < replay_entry.tick {
+                ensure_rebuild_before(deadline)?;
                 game.tick();
                 timeline.record_keyframe_if_due(&game);
             }
@@ -594,9 +617,17 @@ impl RoomTask {
             timeline.record_replayed_entry(replay_entry.clone(), entry_kind)?;
         }
         while game.tick_count() < artifact.timeline.duration_ticks {
+            ensure_rebuild_before(deadline)?;
             game.tick();
             timeline.record_keyframe_if_due(&game);
         }
         Ok((game, timeline))
     }
+}
+
+fn ensure_rebuild_before(deadline: Option<Instant>) -> Result<(), String> {
+    if deadline.is_some_and(|deadline| Instant::now() >= deadline) {
+        return Err("Lab replay import timed out before changing the room.".to_string());
+    }
+    Ok(())
 }

@@ -44,7 +44,7 @@ const roomTaskChildLineBudgets = new Map(Object.entries({
 }));
 // Lab map-draft validation, replay rebasing, peer refresh, and the Phase 4 local artifact handoff
 // are intentionally room-owned; keep the aggregate ratchet at the resulting footprint.
-const roomTaskTotalLineBudget = 6382;
+const roomTaskTotalLineBudget = 6419;
 
 const lobbyRustFiles = listRustFiles(lobbySrc);
 

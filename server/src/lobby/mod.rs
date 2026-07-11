@@ -462,6 +462,7 @@ pub enum RoomEvent {
     /// on the room's single-owner task, never in an HTTP or daemon task.
     LabReplayImport {
         artifact: Box<LabReplayArtifactV1>,
+        deadline: std::time::Instant,
         reply: tokio::sync::oneshot::Sender<Result<(), String>>,
     },
     /// A replay viewer requested a frozen practice branch seed from the current replay tick.
@@ -820,6 +821,10 @@ impl Lobby {
             .event_tx
             .send(RoomEvent::LabReplayImport {
                 artifact: Box::new(artifact),
+                // Leave time for the room reply to traverse the channel before the outer
+                // request timeout. Rebuild uses temporary state, so expiry can reject the
+                // import without partially replacing the live room.
+                deadline: std::time::Instant::now() + Duration::from_secs(4),
                 reply,
             })
             .await

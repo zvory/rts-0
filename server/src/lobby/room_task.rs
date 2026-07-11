@@ -431,13 +431,19 @@ impl RoomTask {
                     });
                 let _ = reply.send(result);
             }
-            RoomEvent::LabReplayImport { artifact, reply } => {
+            RoomEvent::LabReplayImport {
+                artifact,
+                deadline,
+                reply,
+            } => {
                 let result = self
                     .lab_session
                     .as_ref()
                     .map(|session| session.operator_id)
                     .ok_or_else(|| "lab session is not running".to_string())
-                    .and_then(|operator_id| self.load_lab_replay_artifact(operator_id, *artifact));
+                    .and_then(|operator_id| {
+                        self.load_lab_replay_artifact_before(operator_id, *artifact, deadline)
+                    });
                 if result.is_ok() {
                     self.broadcast_lab_state();
                 }
