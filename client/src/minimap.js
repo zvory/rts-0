@@ -30,6 +30,7 @@ const IMPASSABLE_FOG_SCALE = 0.56;
 const ARTILLERY_MINIMAP_MARKER_MS = 2200;
 const ARTILLERY_MINIMAP_ICON_W = 30;
 const ARTILLERY_MINIMAP_ICON_H = 24;
+const MINIMAP_TAP_SLOP_PX = 8;
 const MINIMAP_BLIP_SCALE = 1.6;
 const MINIMAP_OWNED_ENTITY_BLIP_RADIUS = 1.6 * MINIMAP_BLIP_SCALE;
 const MINIMAP_STATIC_ENTITY_BLIP_RADIUS = 2.2;
@@ -190,6 +191,7 @@ export class Minimap {
     this._playerBlipMaskLayerCtx = null;
 
     this._dragging = false;
+    this._activePointerGesture = null;
     this._pings = [];
     this._artilleryMarkers = [];
     this._borderPulseUntil = 0;
@@ -206,9 +208,11 @@ export class Minimap {
       ev.preventDefault();
       ev.stopPropagation();
     };
-    this._onCanvasMouseDown = this._handleCanvasMouseDown.bind(this);
-    this._onWinMouseMove = this._handleWinMouseMove.bind(this);
-    this._onWinMouseUp = this._handleWinMouseUp.bind(this);
+    this._onCanvasPointerDown = this._handleCanvasPointerDown.bind(this);
+    this._onCanvasPointerMove = this._handleCanvasPointerMove.bind(this);
+    this._onCanvasPointerUp = this._handleCanvasPointerUp.bind(this);
+    this._onCanvasPointerCancel = this._handleCanvasPointerCancel.bind(this);
+    this._onWindowBlur = this._handleWindowBlur.bind(this);
 
     this._installInput();
   }
@@ -876,7 +880,7 @@ export class Minimap {
 
   // --- Input -----------------------------------------------------------------
 
-  /** Install pointer/context listeners for recenter (left) and commands (right). */
+  /** Install native Pointer Events for recenter (primary) and commands (right). */
   _installInput() {
     const c = this.canvas;
     if (this.inputRouter) {
@@ -884,10 +888,11 @@ export class Minimap {
     }
     // Suppress the browser context menu so right-click can mean "move here".
     c.addEventListener("contextmenu", this._onContextMenu, CONTEXT_MENU_EVENT_OPTIONS);
-    c.addEventListener("mousedown", this._onCanvasMouseDown);
-    // Move/up on window so a drag that leaves the canvas still tracks & releases.
-    window.addEventListener("mousemove", this._onWinMouseMove);
-    window.addEventListener("mouseup", this._onWinMouseUp);
+    c.addEventListener("pointerdown", this._onCanvasPointerDown);
+    c.addEventListener("pointermove", this._onCanvasPointerMove);
+    c.addEventListener("pointerup", this._onCanvasPointerUp);
+    c.addEventListener("pointercancel", this._onCanvasPointerCancel);
+    window.addEventListener("blur", this._onWindowBlur);
   }
 
   /**
@@ -896,14 +901,17 @@ export class Minimap {
    */
   destroy() {
     const c = this.canvas;
+    this._cancelActivePointerGesture();
     if (this._unregisterInputZone) {
       this._unregisterInputZone();
       this._unregisterInputZone = null;
     }
     c.removeEventListener("contextmenu", this._onContextMenu, CONTEXT_MENU_EVENT_OPTIONS);
-    c.removeEventListener("mousedown", this._onCanvasMouseDown);
-    window.removeEventListener("mousemove", this._onWinMouseMove);
-    window.removeEventListener("mouseup", this._onWinMouseUp);
+    c.removeEventListener("pointerdown", this._onCanvasPointerDown);
+    c.removeEventListener("pointermove", this._onCanvasPointerMove);
+    c.removeEventListener("pointerup", this._onCanvasPointerUp);
+    c.removeEventListener("pointercancel", this._onCanvasPointerCancel);
+    window.removeEventListener("blur", this._onWindowBlur);
     this._clearMinimapSetupPreview();
     this._terrainLayer = null;
     this._terrainLayerCtx = null;
@@ -987,15 +995,39 @@ export class Minimap {
     return this.commandsEnabled !== false;
   }
 
-  _handleCanvasMouseDown(ev) {
-    if (this.inputRouter) {
-      if (this.inputRouter.pointerDown(this._routerEvent(ev, "dom"))) {
-        ev.preventDefault();
-        if (ev.button === 2) ev.stopPropagation();
-        return;
-      }
+  _handleCanvasPointerDown(ev) {
+    if (this._activePointerGesture) {
+      // A second contact is a pinch or multi-touch inspection, never a target tap.
+      if (this._activePointerGesture.pointerId !== ev.pointerId) this._cancelActivePointerGesture();
+      return;
     }
-    this._handlePointerDown(this._routerEvent(ev, "dom"));
+    if (ev.button === 2) {
+      this._handlePointerDown(this._routerEvent(ev, "dom"));
+      return;
+    }
+    if (!this._isPrimaryPointerGesture(ev) || !this._ensureTransform()) return;
+
+    const point = this._eventToCanvas(ev);
+    const world = this._canvasToWorld(point.x, point.y);
+    this._activePointerGesture = {
+      pointerId: ev.pointerId,
+      startClientX: ev.clientX,
+      startClientY: ev.clientY,
+      moved: false,
+      commandTarget: this._intent()?.commandTarget || null,
+      shiftKey: !!ev.shiftKey,
+      ctrlKey: !!ev.ctrlKey,
+      metaKey: !!ev.metaKey,
+      altKey: !!ev.altKey,
+    };
+    this._capturePointer(ev.pointerId);
+    // Unarmed primary presses retain the desktop recenter-on-press behavior.
+    // Armed targets wait for an unambiguous release so an inspection drag cannot fire them.
+    if (!this._activePointerGesture.commandTarget) {
+      this._dragging = true;
+      this.camera.centerOn(world.x, world.y);
+    }
+    ev.preventDefault();
   }
 
   _handlePointerDown(ev) {
@@ -1013,14 +1045,7 @@ export class Minimap {
       ev.originalEvent?.preventDefault();
       // Left-click while a command target is armed: issue the command instead of panning.
       if (this._intent()?.commandTarget) {
-        this._issueOrder(w.x, w.y, !!ev.shiftKey);
-        const issued = typeof this._intent()?.issueCommandTarget === "function"
-          ? this._intent().issueCommandTarget(ev)
-          : { keepArmed: false };
-        if (!issued.keepArmed) {
-          this._intent()?.endCommandTarget?.();
-        }
-        return true;
+        return this._issuePrimaryTarget(w, ev);
       }
       // Default: recenter the camera (and start a drag).
       this._dragging = true;
@@ -1030,14 +1055,24 @@ export class Minimap {
     return false;
   }
 
-  _handleWinMouseMove(ev) {
-    if (this.inputRouter) {
-      if (this.inputRouter.pointerMove(this._routerEvent(ev, "dom"))) {
-        ev.preventDefault();
-        return;
-      }
+  _issuePrimaryTarget(world, ev) {
+    this._issueOrder(world.x, world.y, !!ev.shiftKey);
+    const issued = typeof this._intent()?.issueCommandTarget === "function"
+      ? this._intent().issueCommandTarget(ev)
+      : { keepArmed: false };
+    if (!issued.keepArmed) this._intent()?.endCommandTarget?.();
+    return true;
+  }
+
+  _handleCanvasPointerMove(ev) {
+    const gesture = this._activePointerGesture;
+    if (!gesture || gesture.pointerId !== ev.pointerId) return;
+    if (!gesture.moved && this._gestureMovedBeyondTapSlop(gesture, ev)) {
+      gesture.moved = true;
+      this._dragging = true;
     }
     this._handlePointerMove(this._routerEvent(ev, "dom"));
+    ev.preventDefault();
   }
 
   _handlePointerMove(ev) {
@@ -1050,17 +1085,70 @@ export class Minimap {
     return true;
   }
 
-  _handleWinMouseUp() {
-    if (this.inputRouter) {
-      this.inputRouter.pointerUp({ button: 0, source: "dom" });
-      return;
+  _handleCanvasPointerUp(ev) {
+    const gesture = this._activePointerGesture;
+    if (!gesture || gesture.pointerId !== ev.pointerId) return;
+    this._releasePointer(ev.pointerId);
+    this._activePointerGesture = null;
+    this._dragging = false;
+    if (!gesture.moved && gesture.commandTarget && this._intent()?.commandTarget === gesture.commandTarget) {
+      const actionEvent = this._routerEvent(ev, "dom");
+      actionEvent.shiftKey = gesture.shiftKey;
+      actionEvent.ctrlKey = gesture.ctrlKey;
+      actionEvent.metaKey = gesture.metaKey;
+      actionEvent.altKey = gesture.altKey;
+      if (this._ensureTransform() && this._containsClientPoint(ev.clientX, ev.clientY)) {
+        const point = this._eventToCanvas(ev);
+        this._issuePrimaryTarget(this._canvasToWorld(point.x, point.y), actionEvent);
+      }
     }
-    this._handlePointerUp();
+    ev.preventDefault();
   }
 
   _handlePointerUp() {
     this._dragging = false;
     return true;
+  }
+
+  _handleCanvasPointerCancel(ev) {
+    if (!this._activePointerGesture || this._activePointerGesture.pointerId !== ev.pointerId) return;
+    this._cancelActivePointerGesture();
+    ev.preventDefault();
+  }
+
+  _handleWindowBlur() {
+    this._cancelActivePointerGesture();
+  }
+
+  _isPrimaryPointerGesture(ev) {
+    return ev.button === 0 && ev.isPrimary !== false && Number.isFinite(ev.pointerId);
+  }
+
+  _gestureMovedBeyondTapSlop(gesture, ev) {
+    const dx = ev.clientX - gesture.startClientX;
+    const dy = ev.clientY - gesture.startClientY;
+    return dx * dx + dy * dy >= MINIMAP_TAP_SLOP_PX * MINIMAP_TAP_SLOP_PX;
+  }
+
+  _capturePointer(pointerId) {
+    try {
+      this.canvas.setPointerCapture?.(pointerId);
+    } catch {}
+  }
+
+  _releasePointer(pointerId) {
+    try {
+      this.canvas.releasePointerCapture?.(pointerId);
+    } catch {}
+  }
+
+  _cancelActivePointerGesture() {
+    const gesture = this._activePointerGesture;
+    if (gesture) this._releasePointer(gesture.pointerId);
+    this._activePointerGesture = null;
+    this._dragging = false;
+    this._hoverWorld = null;
+    this._clearMinimapSetupPreview();
   }
 
   _updateHoverFromEvent(ev) {

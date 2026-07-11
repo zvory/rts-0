@@ -2922,6 +2922,7 @@ input[type="text"]:focus {
   background: var(--void);
   cursor: pointer;
   image-rendering: pixelated;
+  touch-action: none;
 }
 
 /* --- Bottom-center selected panel --- */

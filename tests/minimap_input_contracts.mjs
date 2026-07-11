@@ -22,10 +22,11 @@ function assertApprox(actual, expected, epsilon, msg) {
 
 function installWindowStub() {
   const listeners = [];
-  globalThis.window = {
+  const windowRef = {
     devicePixelRatio: 1,
     innerWidth: 800,
     innerHeight: 600,
+    listeners,
     addEventListener(type, handler) {
       listeners.push(["add", type, handler]);
     },
@@ -33,15 +34,20 @@ function installWindowStub() {
       listeners.push(["remove", type, handler]);
     },
   };
-  return listeners;
+  globalThis.window = windowRef;
+  return windowRef;
 }
 
 function fakeCanvas(rect = { left: 100, top: 200, width: 242, height: 242 }) {
   const listeners = [];
+  const capturedPointers = [];
+  const releasedPointers = [];
   return {
-    width: rect.width,
-    height: rect.height,
+    width: rect.backingWidth ?? rect.width,
+    height: rect.backingHeight ?? rect.height,
     listeners,
+    capturedPointers,
+    releasedPointers,
     getContext() {
       return null;
     },
@@ -60,6 +66,12 @@ function fakeCanvas(rect = { left: 100, top: 200, width: 242, height: 242 }) {
     },
     removeEventListener(type, handler) {
       listeners.push(["remove", type, handler]);
+    },
+    setPointerCapture(pointerId) {
+      capturedPointers.push(pointerId);
+    },
+    releasePointerCapture(pointerId) {
+      releasedPointers.push(pointerId);
     },
   };
 }
@@ -211,15 +223,16 @@ function minimapHarness({
   upgrades = [],
   legacySender = false,
   explicitClientIntent = true,
+  rect = undefined,
 } = {}) {
-  installWindowStub();
+  const windowRef = installWindowStub();
   const viewport = {
     getBoundingClientRect() {
       return { left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600 };
     },
   };
   const router = new MatchInputRouter(viewport);
-  const canvas = fakeCanvas();
+  const canvas = fakeCanvas(rect);
   const centers = [];
   const clientIntent = explicitClientIntent ? new ClientIntent() : null;
   const state = {
@@ -267,6 +280,7 @@ function minimapHarness({
   return {
     router,
     canvas,
+    window: windowRef,
     state,
     camera,
     net: commandIssuer,
@@ -279,6 +293,44 @@ function minimapHarness({
 
 function lockedEvent(clientX, clientY, button = 0, extra = {}) {
   return { clientX, clientY, button, source: "locked", ...extra };
+}
+
+function listenerFor(target, type, operation = "add") {
+  return target.listeners.find(([entryOperation, entryType]) => entryOperation === operation && entryType === type)?.[2];
+}
+
+function pointerEvent(canvas, clientX, clientY, {
+  pointerId = 1,
+  pointerType = "touch",
+  isPrimary = true,
+  button = 0,
+  shiftKey = false,
+  ctrlKey = false,
+  metaKey = false,
+  altKey = false,
+} = {}) {
+  return {
+    target: canvas,
+    currentTarget: canvas,
+    clientX,
+    clientY,
+    pointerId,
+    pointerType,
+    isPrimary,
+    button,
+    shiftKey,
+    ctrlKey,
+    metaKey,
+    altKey,
+    defaultPrevented: false,
+    propagationStopped: false,
+    preventDefault() {
+      this.defaultPrevented = true;
+    },
+    stopPropagation() {
+      this.propagationStopped = true;
+    },
+  };
 }
 
 // Left-click on minimap jumps the camera through the locked-cursor router.
@@ -302,6 +354,113 @@ function lockedEvent(clientX, clientY, button = 0, extra = {}) {
   assert(h.router.pointerUp(lockedEvent(500, 500, 0)), "minimap drag release is consumed");
   assert(!h.router.pointerMove(lockedEvent(500, 500, 0)), "minimap drag capture releases after pointerUp");
   h.minimap.destroy();
+}
+
+// Native minimap input uses Pointer Events, preserves CSS-scaled coordinates, and captures drags.
+{
+  const h = minimapHarness({
+    rect: { left: 100, top: 200, width: 121, height: 121, backingWidth: 242, backingHeight: 242 },
+  });
+  const down = listenerFor(h.canvas, "pointerdown");
+  const move = listenerFor(h.canvas, "pointermove");
+  const up = listenerFor(h.canvas, "pointerup");
+  assert(down && move && up && listenerFor(h.canvas, "pointercancel"), "minimap installs the native Pointer Events lifecycle");
+  assert(!listenerFor(h.canvas, "mousedown"), "minimap no longer relies on compatibility mouse down events");
+  assert(!listenerFor(h.window, "mousemove"), "minimap no longer relies on window mousemove events");
+
+  const press = pointerEvent(h.canvas, 160.5, 260.5, { pointerId: 11, pointerType: "pen" });
+  down(press);
+  assert(press.defaultPrevented, "primary minimap pointer press prevents browser gesture handling");
+  assert(h.canvas.capturedPointers.includes(11), "primary minimap pointer press captures its pointer");
+  assert(h.centers.length === 1, "primary minimap pointer press recenters the camera");
+  assertApprox(h.centers[0].x, 121, 0.001, "CSS-scaled minimap pointer press resolves world x");
+  assertApprox(h.centers[0].y, 121, 0.001, "CSS-scaled minimap pointer press resolves world y");
+
+  const drag = pointerEvent(h.canvas, 500, 500, { pointerId: 11, pointerType: "pen" });
+  move(drag);
+  assert(drag.defaultPrevented, "captured minimap pointer moves prevent browser gesture handling");
+  assert(h.centers.length === 2, "captured minimap drag recenters outside the canvas");
+  assertApprox(h.centers[1].x, 241, 0.001, "captured minimap drag clamps world x at map edge");
+  assertApprox(h.centers[1].y, 241, 0.001, "captured minimap drag clamps world y at map edge");
+  up(pointerEvent(h.canvas, 500, 500, { pointerId: 11, pointerType: "pen" }));
+  assert(h.canvas.releasedPointers.includes(11), "primary minimap pointer release drops capture");
+  h.minimap.destroy();
+}
+
+// An armed target only fires after a clean touch/pen tap, never after a drag, cancellation, or pinch.
+{
+  const selected = [{ id: 9, owner: 1, kind: KIND.RIFLEMAN }];
+  const h = minimapHarness({ selected, commandTarget: "attack" });
+  const down = listenerFor(h.canvas, "pointerdown");
+  const move = listenerFor(h.canvas, "pointermove");
+  const up = listenerFor(h.canvas, "pointerup");
+  const cancel = listenerFor(h.canvas, "pointercancel");
+
+  down(pointerEvent(h.canvas, 150, 250, { pointerId: 21 }));
+  assert(h.net.sent.length === 0, "armed touch target waits for clean pointer release");
+  up(pointerEvent(h.canvas, 150, 250, { pointerId: 21 }));
+  assert(h.net.sent.length === 1 && h.net.sent[0].c === "attackMove", "clean touch target issues the existing command");
+  assert(h.clientIntent.commandTarget === null, "clean touch target exits target mode");
+
+  h.clientIntent.beginCommandTarget("attack");
+  down(pointerEvent(h.canvas, 150, 250, { pointerId: 22 }));
+  move(pointerEvent(h.canvas, 170, 270, { pointerId: 22 }));
+  up(pointerEvent(h.canvas, 170, 270, { pointerId: 22 }));
+  assert(h.net.sent.length === 1, "dragging an armed touch target does not issue a command");
+  assert(h.clientIntent.commandTarget === "attack", "dragging an armed touch target keeps the target armed");
+
+  down(pointerEvent(h.canvas, 150, 250, { pointerId: 23 }));
+  cancel(pointerEvent(h.canvas, 150, 250, { pointerId: 23 }));
+  assert(h.canvas.releasedPointers.includes(23), "pointer cancellation releases minimap capture");
+  assert(h.net.sent.length === 1, "cancelling an armed touch target does not issue a command");
+
+  down(pointerEvent(h.canvas, 150, 250, { pointerId: 24 }));
+  down(pointerEvent(h.canvas, 160, 260, { pointerId: 25, isPrimary: false }));
+  up(pointerEvent(h.canvas, 150, 250, { pointerId: 24 }));
+  assert(h.net.sent.length === 1, "a pinch never resolves as an armed minimap target tap");
+  h.minimap.destroy();
+}
+
+// Desktop Pointer Events keep right-click and Shift queueing semantics without a mouse fallback.
+{
+  const selected = [{ id: 7, owner: 1, kind: KIND.RIFLEMAN }];
+  const h = minimapHarness({ selected });
+  const down = listenerFor(h.canvas, "pointerdown");
+  const rightClick = pointerEvent(h.canvas, 180, 280, {
+    pointerId: 31,
+    pointerType: "mouse",
+    button: 2,
+    shiftKey: true,
+  });
+  down(rightClick);
+  assert(rightClick.defaultPrevented && rightClick.propagationStopped, "desktop minimap right-click still suppresses the browser menu");
+  assert(h.net.sent.length === 1 && h.net.sent[0].c === "move", "desktop minimap right-click still issues move");
+  assert(h.net.sent[0].queued === true, "desktop Shift-right-click still queues move");
+  h.minimap.destroy();
+
+  const replay = minimapHarness({ selected, commandsEnabled: false });
+  const replayDown = listenerFor(replay.canvas, "pointerdown");
+  replayDown(pointerEvent(replay.canvas, 180, 280, { pointerId: 32, pointerType: "mouse", button: 2 }));
+  assert(replay.net.sent.length === 0, "replay minimap Pointer Events remain read-only");
+  replayDown(pointerEvent(replay.canvas, 221, 321, { pointerId: 33, pointerType: "mouse" }));
+  assert(replay.centers.length === 1, "replay minimap Pointer Events retain local camera inspection");
+  replay.minimap.destroy();
+}
+
+// Window blur and teardown cancel an in-flight primary gesture and release capture.
+{
+  const h = minimapHarness();
+  const down = listenerFor(h.canvas, "pointerdown");
+  down(pointerEvent(h.canvas, 150, 250, { pointerId: 41 }));
+  const blur = listenerFor(h.window, "blur");
+  assert(blur, "minimap installs a blur cleanup handler");
+  blur();
+  assert(h.canvas.releasedPointers.includes(41), "window blur releases captured minimap pointers");
+  down(pointerEvent(h.canvas, 150, 250, { pointerId: 42 }));
+  h.minimap.destroy();
+  assert(h.canvas.releasedPointers.includes(42), "minimap teardown releases captured minimap pointers");
+  assert(listenerFor(h.canvas, "pointerdown", "remove"), "minimap teardown removes its Pointer Events listeners");
+  assert(listenerFor(h.window, "blur", "remove"), "minimap teardown removes its blur cleanup listener");
 }
 
 // Shift-right-click on minimap with a selected unit issues a queued move order through the locked path.

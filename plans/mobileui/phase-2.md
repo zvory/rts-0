@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done. Physical-device and desktop manual validation remain required before release.
 
 ## Objective
 
@@ -41,12 +41,12 @@ Give the existing minimap a first-class, predictable Pointer Events path for mob
 
 ## Implementation Checklist
 
-- [ ] Capture the existing desktop minimap behavior and coordinate baseline.
-- [ ] Implement pointer capture/cancel-safe minimap gestures without compatibility-mouse reliance.
-- [ ] Define and test clean-tap versus drag/cancel semantics for touch and pen.
-- [ ] Preserve and test desktop left/right/Shift-right minimap behavior, replay behavior, and router behavior.
+- [x] Capture the existing desktop minimap behavior and coordinate baseline.
+- [x] Implement pointer capture/cancel-safe minimap gestures without compatibility-mouse reliance.
+- [x] Define and test clean-tap versus drag/cancel semantics for touch and pen.
+- [x] Preserve and test desktop left/right/Shift-right minimap behavior, replay behavior, and router behavior.
 - [ ] Complete real-phone portrait and landscape minimap verification over Tailscale.
-- [ ] Mark this phase done in this file in the implementation commit.
+- [x] Mark this phase done in this file in the implementation commit.
 
 ## Verification
 
