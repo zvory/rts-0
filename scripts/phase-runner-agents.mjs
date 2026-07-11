@@ -8,9 +8,9 @@ const DEFAULT_WORKTREE_ROOT = "/tmp/rts-worktrees";
 const DEFAULT_BASE_BRANCH = "main";
 const DEFAULT_GH_BIN = "gh";
 const DONE_MARKERS = {
-  singleLineStatus: /^Status:\s*Done\.?\s*$/im,
-  headingStatus: /^##\s+Status\s*\n+\s*Done\.?\s*$/im,
-  checklistStatus: /^##\s+Phase Status\s*\n+(?:[ \t]*\n)*\s*-\s*\[x\]\s*Done\.?\s*$/im,
+  singleLineStatus: /^Status:\s*Done\b[^\n]*$/im,
+  headingStatus: /^##\s+Status\s*\n+\s*Done\b[^\n]*$/im,
+  checklistStatus: /^##\s+Phase Status\s*\n+(?:[ \t]*\n)*\s*-\s*\[x\]\s*Done\b[^\n]*$/im,
 };
 
 export function usage() {

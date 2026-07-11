@@ -6,6 +6,8 @@ The normal agent lifecycle is:
 2. Run focused local verification for the files or contracts changed.
 3. Commit with the normal hook.
 4. Open or update the owned PR with `scripts/agent-pr.sh --verification "..."`.
+   Before the quality pass, the helper archives any plan newly completed by the branch and commits
+   that move, so the archive lands in the final phase PR rather than as a post-merge local change.
    The helper first classifies the branch diff against `origin/main`. If every changed file ends in
    `.md`, it skips Codex adversarial review, pushes the branch, posts a successful
    `adversarial-quality-pass` status with a docs-only skip description, and writes the skip report
