@@ -1,4 +1,4 @@
-import { clamp01, finiteNumber, smoothstep01 } from "./shared.js";
+import { clamp01, finiteNumber, rendererVisualNow, smoothstep01 } from "./shared.js";
 
 const MISS_TOAST_TEXT = "Miss!";
 const MISS_TOAST_TTL_MS = 760;
@@ -11,7 +11,7 @@ const MISS_TOAST_FLOAT_Y = 5;
 export function _drawMissToasts(state) {
   if (!state || typeof state.liveMissToasts !== "function") return;
   if (!this._missToastPool) this._missToastPool = new Map();
-  const now = performance.now();
+  const now = rendererVisualNow(this);
   const toasts = state.liveMissToasts(now);
   const live = new Set();
 

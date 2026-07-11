@@ -31,6 +31,7 @@ export async function openLabInteractDriver(options) {
   let entities = [];
   let recording = null;
   let lastRecording = null;
+  let fixedCapture = null;
   const camera = {
     x: 0,
     y: 0,
@@ -174,6 +175,25 @@ export async function openLabInteractDriver(options) {
       };
       recording = null;
       return lastRecording;
+    },
+    async captureFixed({ sessionId, name = "fixed", fps = 30, frameCount = 30, sceneIdentity = null, sceneRevision = 0, aliases = [] }) {
+      const startTick = tick;
+      const framePaths = Array.from({ length: frameCount }, (_, index) => `${options.workspaceRoot}/target/lab-interact/${sessionId}/fixed/${name}/frames/frame-${String(index).padStart(4, "0")}.png`);
+      tick = startTick + Math.floor((frameCount - 1) * 30 / fps);
+      return {
+        videoPath: `${options.workspaceRoot}/target/lab-interact/${sessionId}/fixed/${name}/${name}.webm`,
+        contactSheetPath: `${options.workspaceRoot}/target/lab-interact/${sessionId}/fixed/${name}/${name}-contact-sheet.png`,
+        manifestPath: `${options.workspaceRoot}/target/lab-interact/${sessionId}/fixed/${name}/${name}.json`,
+        framePaths, frameHashes: framePaths.map((_, index) => String(index).padStart(64, "0")),
+        authoritative: { startTick, endTick: tick },
+        mapping: { simulationHz: 30, outputFps: fps }, fixtureMetadata: { sceneIdentity, sceneRevision, aliases },
+      };
+    },
+    fixedCaptureStatus() { return fixedCapture || { active: false }; },
+    cancelFixedCapture() {
+      if (!fixedCapture) throw Object.assign(new Error("No fixed capture is active."), { code: "captureInactive" });
+      fixedCapture.cancelled = true;
+      return { cancelling: true };
     },
     async reset() {
       entities = [];

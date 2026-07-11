@@ -7,6 +7,7 @@ import { pathToFileURL } from "node:url";
 
 import { LabInteractDriver, LabInteractDriverError } from "./driver.mjs";
 import { RECORDING_LIMITS } from "./recording.mjs";
+import { FIXED_CAPTURE_LIMITS } from "./fixed_capture.mjs";
 
 export const LAB_INTERACT_LIMITS = Object.freeze({
   maxSessions: 1,
@@ -22,6 +23,7 @@ export const LAB_INTERACT_LIMITS = Object.freeze({
   maxRecordingOperations: RECORDING_LIMITS.maxOperations,
   defaultRecordingDurationMs: RECORDING_LIMITS.defaultDurationMs,
   maxRecordingDurationMs: RECORDING_LIMITS.maxDurationMs,
+  maxFixedCaptureFrames: FIXED_CAPTURE_LIMITS.maxFrames,
 });
 
 export const LAB_INTERACT_COMMANDS = Object.freeze([
@@ -29,6 +31,8 @@ export const LAB_INTERACT_COMMANDS = Object.freeze([
   "time", "inspect", "camera", "screenshot", "status", "shutdown",
   "export", "import", "artifact-inspect",
   "record-start", "record-stop",
+  "capture-fixed",
+  "capture-cancel",
 ]);
 
 const ALL_CATALOG_CATEGORIES = Object.freeze([
@@ -93,8 +97,13 @@ export class LabInteractService {
     if (command === "status") return this.status(input);
     if (command === "open") return this.open(input);
     if (command === "close") return { sessionId: input.sessionId, closed: await this.close(input.sessionId) };
+    if (command === "capture-cancel") {
+      const session = this.get(input.sessionId);
+      return { sessionId: input.sessionId, ...session.driver.cancelFixedCapture() };
+    }
     return this.use(input.sessionId, async (session) => {
       const result = await this.executeSession(command, session, input);
+      if (["reset", "spawn", "update", "remove", "order", "time"].includes(command)) session.sceneRevision += 1;
       if (!command.startsWith("record-")) {
         const recorder = session.driver.recordingStatus?.();
         if (recorder?.active) {
@@ -132,7 +141,10 @@ export class LabInteractService {
         throw new LabInteractError("serviceClosed", "Lab Interact shut down while the session was opening.");
       }
       const sessionId = `lab_${crypto.randomUUID().replaceAll("-", "")}`;
-      const session = { sessionId, driver, aliases: new Map(), operationTail: Promise.resolve() };
+      const session = {
+        sessionId, driver, aliases: new Map(), operationTail: Promise.resolve(), sceneRevision: 0,
+        sceneIdentity: { source: "launch", scenario: input.scenario || "blank", map: input.map || "Default", seed: input.seed ?? null },
+      };
       this.sessions.set(sessionId, session);
       try {
         return await this.describeSession(session);
@@ -177,6 +189,7 @@ export class LabInteractService {
     const session = this.sessions.get(sessionId);
     if (!session) return false;
     this.sessions.delete(sessionId);
+    if (session.driver.fixedCaptureStatus?.().active) session.driver.cancelFixedCapture?.();
     const closing = (async () => {
       await session.operationTail;
       await session.driver.close().catch((error) => this.log("sessionCloseFailed", {
@@ -198,11 +211,23 @@ export class LabInteractService {
 
   async status({ sessionId } = {}) {
     if (sessionId) {
+      const session = this.get(sessionId);
+      const fixedCapture = session.driver.fixedCaptureStatus?.() || { active: false };
+      if (fixedCapture.active) {
+        return {
+          sessionId,
+          status: session.driver.fixedCapture?.startStatus || { ready: true },
+          aliases: [...session.aliases].map(([alias, id]) => ({ alias, id })),
+          recorder: session.driver.recordingStatus?.() || { active: false },
+          fixedCapture,
+        };
+      }
       return this.use(sessionId, async (session) => ({
         sessionId,
         status: await session.driver.status(),
         aliases: [...session.aliases].map(([alias, id]) => ({ alias, id })),
         recorder: session.driver.recordingStatus?.() || { active: false },
+        fixedCapture,
       }));
     }
     return {
@@ -250,6 +275,13 @@ export class LabInteractService {
     }
     if (command === "record-stop") {
       const result = await session.driver.recordStop({
+        aliases: [...session.aliases].map(([alias, id]) => ({ alias, id })),
+      });
+      return { sessionId, ...result };
+    }
+    if (command === "capture-fixed") {
+      const result = await session.driver.captureFixed({
+        ...input, sessionId, sceneIdentity: session.sceneIdentity, sceneRevision: session.sceneRevision,
         aliases: [...session.aliases].map(([alias, id]) => ({ alias, id })),
       });
       return { sessionId, ...result };
@@ -441,6 +473,14 @@ function validateInput(command, value) {
     if (value.scale != null) boundedNumber(value.scale, "record-start.scale", 0.25, 1);
   } else if (command === "record-stop") {
     exact(value, ["sessionId"], command);
+  } else if (command === "capture-fixed") {
+    exact(value, ["sessionId", "name", "fps", "frameCount", "viewport"], command);
+    if (value.name != null && !/^[A-Za-z0-9_-]{1,48}$/.test(value.name)) invalid("capture-fixed.name", "must be a safe artifact token");
+    if (value.fps != null) integer(value.fps, "capture-fixed.fps", FIXED_CAPTURE_LIMITS.minFps, FIXED_CAPTURE_LIMITS.maxFps);
+    if (value.frameCount != null) integer(value.frameCount, "capture-fixed.frameCount", 1, FIXED_CAPTURE_LIMITS.maxFrames);
+    if (value.viewport != null) viewport(value.viewport, 2048, "capture-fixed.viewport");
+  } else if (command === "capture-cancel") {
+    exact(value, ["sessionId"], command);
   }
   return value;
 }
@@ -495,6 +535,8 @@ async function importArtifact(workspaceRoot, session, selector) {
     importResult = await session.driver.importReplay(selected.bytes);
     reconciliation = await validateImportedAliases(session, selected.aliases);
   }
+  session.sceneIdentity = { source: "artifact", artifactId: selected.artifactId, kind: selected.kind, path: selected.path };
+  session.sceneRevision = 0;
   return {
     sessionId: session.sessionId,
     artifactId: selected.artifactId,

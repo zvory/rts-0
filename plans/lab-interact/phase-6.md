@@ -1,6 +1,6 @@
 # Phase 6 - Deterministic Frame-Time Capture
 
-Status: planned.
+Status: done.
 
 ## Prerequisite
 

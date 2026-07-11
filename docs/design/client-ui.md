@@ -89,6 +89,7 @@ src/
   match_net_reporter.js # Match ping cadence and client net-report upload collaborator
   match_settings_context.js # Match settings action/tab context builder
   frame_recovery.js # Frame-loop soft-failure logging and rescheduling diagnostics
+  visual_clock.js # Render-only normal/capture clocks; never used for networking, health, input, or timeouts
   frame_entity_views.js # One-RAF entity view builder shared by render, fog, HUD, minimap, analysis
   replay_controls.js # Capability-driven RoomTimeControls plus replay-only vision/branch controls
   room_time_panel.js # Floating, draggable chrome around shared room-time controls
@@ -1281,6 +1282,22 @@ remains the command authority. Spectators still receive notice toasts and minima
 `match.js` suppresses notice alert audio so observers do not hear player alert callouts.
 `artilleryFiring` events are forwarded directly to `Minimap.markArtilleryFiring`; the minimap draws
 the artillery rig icon above fog for every recipient without using it as entity visibility.
+
+`Match` composes a render-only clock and injects it into `Renderer`. Normal play reads monotonic
+`performance.now()` with the prior semantics. Lab Interact fixed capture may explicitly suspend
+the ordinary rAF loop, replace only that render clock with a monotonically advanced capture clock,
+render with interpolation disabled, and then restore the normal clock and rAF ownership. Renderer
+rig sampling, deployed-weapon transitions, frame strips, recoil, command feedback, smoke,
+projectiles, impacts, muzzle flashes, and miss toasts use this clock. Snapshot receipt stamps,
+network latency, frame health/profiling, input deadlines, audio, daemon idle, and browser/server
+timeouts deliberately remain on real monotonic time; fixed capture never patches
+`performance.now()` globally.
+
+The initial fixed-capture inventory intentionally excludes minimap pings/artillery markers,
+pointer/selection debounce feedback, HUD wall-clock labels, and audio. Those surfaces continue to
+use real time and are hidden or out of scope for the clean Pixi viewport artifact. Any future
+fixed capture of them must extend the injected seam explicitly rather than changing their clocks
+as a side effect.
 
 ### 4.1a Targeted ability mode (Smoke, Mortar Fire, Point Fire, Blanket Fire)
 

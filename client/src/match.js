@@ -23,6 +23,7 @@ import { createRoomCapabilities } from "./room_capabilities.js";
 import { predictionBlockedReason, predictionCompatibility } from "./prediction_compatibility.js";
 import { SimWasmPredictionAdapter } from "./sim_wasm_adapter.js";
 import { GameState } from "./state.js";
+import { createMatchRenderClock, enterFixedCapture, exitFixedCapture, renderFixedCaptureFrame } from "./match_fixed_capture.js";
 import { ClientIntent } from "./client_intent.js";
 import { INTERP_DELAY_MS, SNAPSHOT_MS } from "./config.js";
 import { EVENT, NOTICE_SEVERITY, S } from "./protocol.js";
@@ -106,6 +107,8 @@ export class Match {
     this.labControlPolicy = options.labControlPolicy || null;
     this.visualProfile = options.visualProfile || null;
     this.visualProfileError = options.visualProfileError || null;
+    Object.assign(this, createMatchRenderClock());
+    if (options.renderClock) this.renderClock = options.renderClock;
     if (typeof window !== "undefined") {
       window.__rtsVisualProfile = this.visualProfile || this.visualProfileError
         ? { profile: this.visualProfile, error: this.visualProfileError }
@@ -194,7 +197,7 @@ export class Match {
     this.onDesktopCursorAutoLockSignal = this.handleDesktopCursorAutoLockSignal.bind(this);
 
     // --- Build the module graph. ---
-    this.state = this._timeInit("match.state", () => new GameState(payload));
+    this.state = this._timeInit("match.state", () => new GameState(payload, { renderClock: this.renderClock }));
     applyInitialUnitRanges(this.state, options.unitRangesEnabled);
     this.state.controlPolicy = this.labControlPolicy;
     this.combatAudio = this._timeInit(
@@ -205,7 +208,7 @@ export class Match {
     this.camera = this._timeInit("match.camera", () => new Camera(0, 0, {
       maxZoom: options.cameraMaxZoom,
     }));
-    this.renderer = this._timeInit("match.renderer", () => new Renderer(dom.viewport));
+    this.renderer = this._timeInit("match.renderer", () => new Renderer(dom.viewport, { renderClock: this.renderClock }));
     this.fog = this._timeInit(
       "match.fog",
       () => new Fog(this.state.map.width, this.state.map.height, this.state.map.terrain),
@@ -1064,6 +1067,18 @@ export class Match {
     return a < 0 ? 0 : a > 1 ? 1 : a;
   }
 
+  enterFixedCapture() {
+    return enterFixedCapture(this);
+  }
+
+  renderFixedCaptureFrame(visualTimeMs) {
+    return renderFixedCaptureFrame(this, visualTimeMs);
+  }
+
+  exitFixedCapture() {
+    return exitFixedCapture(this);
+  }
+
   /**
    * Read the two latest snapshot receive timestamps stamped by GameState.
    * GameState owns the buffer; we only need its two recv times for timing.
@@ -1189,6 +1204,7 @@ export class Match {
 
   /** Pause the loop (used while the game-over overlay is up). Idempotent. */
   stop() {
+    this.captureRafWasRunning = false;
     this.running = false;
     this.closeMenus();
     if (this.rafId !== undefined) {

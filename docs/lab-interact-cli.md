@@ -18,6 +18,8 @@ node scripts/lab-interact/cli.mjs screenshot '{"sessionId":"<id>","name":"subjec
 node scripts/lab-interact/cli.mjs record-start '{"sessionId":"<id>","name":"motion","maxDurationMs":10000}'
 node scripts/lab-interact/cli.mjs order '{"sessionId":"<id>","playerId":1,"command":{"c":"move","units":["subject"],"x":1100,"y":960}}'
 node scripts/lab-interact/cli.mjs record-stop '{"sessionId":"<id>"}'
+node scripts/lab-interact/cli.mjs capture-fixed '{"sessionId":"<id>","name":"motion-fixed","fps":30,"frameCount":60}'
+node scripts/lab-interact/cli.mjs capture-cancel '{"sessionId":"<id>"}'
 node scripts/lab-interact/cli.mjs export '{"sessionId":"<id>","kind":"setup","name":"two-unit-scene","reproduction":true}'
 node scripts/lab-interact/cli.mjs artifact-inspect '{"sessionId":"<id>","artifactId":"<artifact-id>"}'
 node scripts/lab-interact/cli.mjs import '{"sessionId":"<id>","kind":"setup","artifactId":"<artifact-id>"}'
@@ -28,7 +30,7 @@ node scripts/lab-interact/cli.mjs --help
 
 The complete surface is `open`, `close`, `reset`, `catalog`, `spawn`, `update`, `remove`, `order`,
 `time`, `inspect`, `camera`, `screenshot`, `record-start`, `record-stop`, `export`, `import`,
-`artifact-inspect`, `status`, and `shutdown`. Success writes exactly one JSON
+`artifact-inspect`, `capture-fixed`, `capture-cancel`, `status`, and `shutdown`. Success writes exactly one JSON
 envelope to stdout. Failure writes a concise JSON error to stderr and exits nonzero. Every command
 has an exact, bounded input shape; arbitrary state patches, protocol messages, browser evaluation,
 and caller-selected artifact paths are not accepted.
@@ -122,6 +124,31 @@ daemon `shutdown`, and idle teardown attempt bounded finalization and remove a p
 finalization fails; they do not leave FFmpeg owned by the session. Recording checks require
 `ffmpeg`, `ffprobe`, and the `libvpx-vp9` encoder on `PATH`, or explicit
 `RTS_LAB_INTERACT_FFMPEG`/`RTS_LAB_INTERACT_FFPROBE` paths.
+
+## Fixed-step capture
+
+`capture-fixed` requires an open session whose authoritative room time is paused. Arrange the
+scene, issue a normal `order` if movement or direct fire is wanted, and then request 1–180 frames
+at an integer 10–60 FPS. The command temporarily suspends the ordinary rAF loop, advances room
+time only through the existing 30 Hz `time step` operation, advances the client render clock to
+exact fractional milliseconds, and writes one PNG per frame plus a VP9 WebM, contact sheet, and
+manifest under `target/lab-interact/<session-id>/fixed/`.
+
+Frame `i` uses `startTick + floor(i * 30 / outputFps)`. Thus 60 FPS intentionally renders each
+authoritative state twice at two visual timestamps, while 15 FPS advances two ticks per frame;
+fixed capture never mixes live rAF interpolation into either case. The manifest records the
+scenario/seed, branch/head/build/runtime identity, tick and visual timestamp for every frame,
+SHA-256 frame hashes, and media paths. Hash repeatability is evidence only within the pinned local
+browser/GPU environment, not a cross-browser, cross-GPU, or cross-OS golden-image promise.
+
+The command is serialized with other session mutation, rejects an active real-time recorder, and
+is treated as one in-flight daemon interaction so idle teardown cannot interrupt it. While it runs,
+`status` returns bounded frame progress without touching the page and `capture-cancel` requests
+cleanup at the next frame boundary. On failure or cancellation,
+partial fixed media is removed and the normal render clock, rAF loop, viewport, and presentation
+are restored. The initial supported review cases are idle/frame-strip animation, authoritative
+movement, and direct-fire/recoil; audio and other wall-clock-only UI are intentionally outside the
+fixed visual-time contract.
 
 ## Recovery
 
