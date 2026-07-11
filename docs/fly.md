@@ -250,7 +250,7 @@ https://bewegungskrieg-beta.fly.dev          beta game server
 ```
 
 The launcher offers only those two fixed game origins. It polls the selected origin's `/version`
-route to wake it, shows `Starting server...`, and redirects rather than proxying HTTP or WebSocket
+route to wake it, shows `Loading...`, and redirects rather than proxying HTTP or WebSocket
 traffic. Requests cannot supply an upstream origin. Paths, queries, and fragments are preserved;
 a non-root canonical URL defaults to mainline.
 
