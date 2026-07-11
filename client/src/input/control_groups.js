@@ -76,15 +76,22 @@ function controlGroupsEnabled(state) {
 export function _jumpToControlGroupCluster(slot) {
   const entities = this.state.controlGroupEntities(slot);
   if (entities.length === 0) return false;
-  const viewportBounds = this.camera.viewportGroundBounds?.();
-  const cameraSnapshot = this.camera.snapshot?.();
-  const viewW = viewportBounds ? viewportBounds.maxX - viewportBounds.minX : 0;
-  const viewH = viewportBounds ? viewportBounds.maxY - viewportBounds.minY : 0;
+  const projection = this.camera.projectionSnapshot?.();
+  const cameraSnapshot = projection?.camera;
+  const viewport = projection?.viewport;
+  const focus = cameraSnapshot?.focus;
+  const projectedPixel = projection?.projectedExtent?.(
+    { x: focus?.x, y: focus?.y, heightPx: 0 },
+    1,
+    1,
+  );
+  const viewW = viewport?.widthCssPx / projectedPixel?.scaleX;
+  const viewH = viewport?.heightCssPx / projectedPixel?.scaleY;
   if (!Number.isFinite(viewW) || !Number.isFinite(viewH) || viewW <= 0 || viewH <= 0) {
     return false;
   }
-  const currentX = cameraSnapshot?.focus?.x;
-  const currentY = cameraSnapshot?.focus?.y;
+  const currentX = focus?.x;
+  const currentY = focus?.y;
   if (!Number.isFinite(currentX) || !Number.isFinite(currentY)) return false;
 
   const lefts = [];

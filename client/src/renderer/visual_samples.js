@@ -213,11 +213,12 @@ export class VisualSampleLayer {
   drawLabel(sample, camera) {
     const label = this.slotLabel(sample.id);
     if (!label) return;
+    const labelY = sample.y - sample.radius - sample.labelOffsetY;
     label.text = sample.label;
     label.visible = true;
     label.alpha = 0.95;
-    label.position?.set?.(sample.x, sample.y - sample.radius - sample.labelOffsetY);
-    label.scale?.set?.(labelScaleForCamera(camera, sample.x, sample.y));
+    label.position?.set?.(sample.x, labelY);
+    label.scale?.set?.(labelScaleForCamera(camera, sample.x, labelY));
   }
 
   slotGraphics(id) {

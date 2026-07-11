@@ -1372,9 +1372,11 @@ function buttonByLabel(card, label) {
   const clusterInput = Object.create(Input.prototype);
   let centered = null;
   clusterInput.camera = {
-    viewportGroundBounds: () => ({ minX: 0, minY: 0, maxX: 100, maxY: 100 }),
-    snapshot: () => ({ version: 1, focus: { x: 50, y: 50 },
-      framingScale: 1, boundsPolicy: "mapOverscroll" }),
+    projectionSnapshot: () => ({
+      camera: { version: 1, focus: { x: 50, y: 50 }, framingScale: 1, boundsPolicy: "mapOverscroll" },
+      viewport: { widthCssPx: 100, heightCssPx: 100 },
+      projectedExtent: () => ({ width: 1, height: 1, scaleX: 1, scaleY: 1, visible: true }),
+    }),
     focusAt(point) { centered = point; },
   };
   clusterInput.state = {
@@ -1386,6 +1388,20 @@ function buttonByLabel(card, label) {
   };
   assert(clusterInput._jumpToControlGroupCluster(0) === true, "control-group double-tap jumps to a cluster");
   assert(centered.x < 100 && centered.y < 100, "control-group jump chooses the dense cluster, not the all-entity centroid");
+
+  centered = null;
+  clusterInput.camera = {
+    projectionSnapshot: () => ({
+      camera: { version: 1, focus: { x: 25, y: 25 }, framingScale: 1, boundsPolicy: "mapOverscroll" },
+      viewport: { widthCssPx: 100, heightCssPx: 100 },
+      projectedExtent: () => ({ width: 1, height: 1, scaleX: 1, scaleY: 1, visible: true }),
+    }),
+    viewportGroundBounds: () => ({ minX: 0, minY: 0, maxX: 75, maxY: 75 }),
+    focusAt(point) { centered = point; },
+  };
+  clusterInput.state.controlGroupEntities = () => [{ id: 1, x: 1, y: 1 }, { id: 2, x: 99, y: 1 }];
+  assert(clusterInput._jumpToControlGroupCluster(0), "control-group framing works during camera overscroll");
+  assertApprox(centered.x, 49, 0.001, "control-group framing uses the full projected viewport, not clipped map bounds");
 
   const ownBuilding = {
     id: 31,
