@@ -637,7 +637,7 @@ export class GameState extends VisualEffectBackedState {
    */
   addToControlGroup(slot, ids, options = {}) {
     if (!this._validControlGroupSlot(slot)) return [];
-    this._pruneControlGroup(slot);
+    this._pruneControlGroup(slot, { entityById: options.entityById });
     const admitted = this._admitControlGroupIds(ids, { ...options, baseIds: this.controlGroups[slot] || [] });
     this.controlGroups[slot] = admitted.ids;
     this._recordSelectionBudgetOverflow(admitted);
@@ -679,18 +679,18 @@ export class GameState extends VisualEffectBackedState {
     return Number.isInteger(slot) && slot >= 0 && slot < this.controlGroups.length;
   }
 
-  _admitControlGroupIds(ids, { baseIds = [] } = {}) {
-    return admitControlGroupIds(this, ids, { baseIds });
+  _admitControlGroupIds(ids, { baseIds = [], entityById = null } = {}) {
+    return admitControlGroupIds(this, ids, { baseIds, entityById });
   }
 
   _pruneControlGroups() {
     for (let i = 0; i < this.controlGroups.length; i++) this._pruneControlGroup(i);
   }
 
-  _pruneControlGroup(slot) {
+  _pruneControlGroup(slot, options = {}) {
     const group = this.controlGroups[slot];
     if (!group || group.length === 0) return null;
-    const admitted = this._admitControlGroupIds(group);
+    const admitted = this._admitControlGroupIds(group, options);
     if (admitted.ids.length !== group.length || admitted.ids.some((id, index) => id !== group[index])) {
       this.controlGroups[slot] = admitted.ids;
     }

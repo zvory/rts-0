@@ -2,7 +2,6 @@ import {
   ABILITY,
   ABILITY_OBJECT_KIND,
   cmd,
-  PASSABLE,
   isUnit,
   isBuilding,
   isResource,
@@ -10,8 +9,8 @@ import {
   ORDER_STAGE,
   UPGRADE,
 } from "../protocol.js";
-import { ABILITIES, MINING_CC_RANGE_TILES, STATS, TANK_BODY, isProducerBuilding } from "../config.js";
-import { DEFAULT_HIT_RADIUS, DEFAULT_TILE_SIZE, HIT_PAD_PX, OWN_HIT_BONUS, ZOOM_STEP } from "./constants.js";
+import { ABILITIES, MINING_CC_RANGE_TILES, STATS, isProducerBuilding } from "../config.js";
+import { DEFAULT_TILE_SIZE } from "./constants.js";
 import {
   buildArtilleryTargetLocks,
   isArtilleryFireAbility,

@@ -5,17 +5,21 @@ import { assert, assertApprox } from "./assertions.mjs";
 
 function createHarness(entities, { focus = { x: 50, y: 50 }, clippedBounds = null } = {}) {
   let centered = null;
+  const projection = {
+    camera: { version: 1, focus, framingScale: 1, boundsPolicy: "mapOverscroll" },
+    viewport: { widthCssPx: 100, heightCssPx: 100 },
+    projectedExtent: () => ({ width: 1, height: 1, scaleX: 1, scaleY: 1, visible: true }),
+  };
   const input = {
     camera: {
-      projectionSnapshot: () => ({
-        camera: { version: 1, focus, framingScale: 1, boundsPolicy: "mapOverscroll" },
-        viewport: { widthCssPx: 100, heightCssPx: 100 },
-        projectedExtent: () => ({ width: 1, height: 1, scaleX: 1, scaleY: 1, visible: true }),
-      }),
+      projectionSnapshot: () => projection,
       viewportGroundBounds: () => clippedBounds,
       focusAt(point) { centered = point; },
     },
-    state: { controlGroupEntities: () => entities },
+    selectionScene: { projection, proxies: entities.map((entity) => ({ id: entity.id })) },
+    state: { controlGroups: [entities.map((entity) => entity.id)] },
+    _visibleSelectionIds: (ids) => Array.from(ids),
+    _selectionEntities: () => entities,
   };
   return { input, centered: () => centered };
 }
