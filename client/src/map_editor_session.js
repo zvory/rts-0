@@ -7,6 +7,13 @@ export const MAP_EDITOR_MAX_NATURALS_PER_PLAYER = 3;
 // footprint is not sufficient for a map that must pass authored-map validation.
 export const MAP_EDITOR_MAIN_CLEARANCE_TILES = 7;
 export const MAP_EDITOR_NATURAL_CLEARANCE_TILES = 4;
+export const MAP_EDITOR_SYMMETRY = Object.freeze({
+  NONE: "none",
+  HORIZONTAL: "horizontal",
+  VERTICAL: "vertical",
+  RADIAL: "radial",
+  DIAGONAL: "diagonal",
+});
 
 const TERRAIN_TO_CHAR = Object.freeze({
   [TERRAIN.GRASS]: ".",
@@ -18,6 +25,14 @@ const CHAR_TO_TERRAIN = Object.freeze({
   ".": TERRAIN.GRASS,
   "#": TERRAIN.ROCK,
   "~": TERRAIN.WATER,
+});
+
+const SYMMETRY_TRANSFORMS = Object.freeze({
+  [MAP_EDITOR_SYMMETRY.NONE]: ["identity"],
+  [MAP_EDITOR_SYMMETRY.HORIZONTAL]: ["identity", "horizontal"],
+  [MAP_EDITOR_SYMMETRY.VERTICAL]: ["identity", "vertical"],
+  [MAP_EDITOR_SYMMETRY.RADIAL]: ["identity", "radial"],
+  [MAP_EDITOR_SYMMETRY.DIAGONAL]: ["identity", "diagonalMain", "diagonalAnti", "radial"],
 });
 
 export class MapEditorSession {
@@ -422,6 +437,148 @@ export class MapEditorSession {
   }
 }
 
+/** Expand tile positions through a map-wide symmetry group, with stable de-duplication. */
+export function symmetricMapTiles(size, tiles, symmetry = MAP_EDITOR_SYMMETRY.NONE) {
+  const mapSize = positiveInteger(size);
+  if (!mapSize || !Array.isArray(tiles)) return [];
+  const transforms = SYMMETRY_TRANSFORMS[normalizeMapEditorSymmetry(symmetry)];
+  const seen = new Set();
+  const expanded = [];
+  for (const tile of tiles) {
+    const source = validMapTile(tile, mapSize);
+    if (!source) continue;
+    for (const transform of transforms) {
+      const transformed = transformMapTile(source, mapSize, transform);
+      if (!transformed) continue;
+      const key = `${transformed.x},${transformed.y}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      expanded.push(transformed);
+    }
+  }
+  return expanded;
+}
+
+/** Return every inclusive tile in a drag rectangle, bounded to the square authored map. */
+export function mapEditorRectTiles(first, last, size) {
+  const mapSize = positiveInteger(size);
+  const start = validMapTile(first, mapSize);
+  const end = validMapTile(last, mapSize);
+  if (!start || !end) return [];
+  const x0 = Math.min(start.x, end.x);
+  const x1 = Math.max(start.x, end.x);
+  const y0 = Math.min(start.y, end.y);
+  const y1 = Math.max(start.y, end.y);
+  const tiles = [];
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) tiles.push({ x, y });
+  }
+  return tiles;
+}
+
+/**
+ * Move an authored start or natural and every already-matching counterpart in
+ * the selected layout. The move is atomic, including a swap of counterpart tiles.
+ */
+export function moveSymmetricDraftBase(draft, {
+  kind,
+  playerIndex,
+  naturalId = "",
+  tile,
+  layoutId = "",
+  symmetry = MAP_EDITOR_SYMMETRY.NONE,
+} = {}) {
+  const expectedKind = kind === "natural" ? "natural" : "main";
+  const radius = expectedKind === "main"
+    ? MAP_EDITOR_MAIN_CLEARANCE_TILES
+    : MAP_EDITOR_NATURAL_CLEARANCE_TILES;
+  const target = normalizedDraftTile(draft, tile, radius);
+  const layout = layoutById(draft, layoutId);
+  const source = draftBaseBinding(draft, layout, expectedKind, playerIndex, naturalId);
+  if (!target || !source) return draftEditError("Choose a valid base and map tile.");
+
+  const mapSize = draft.terrain.length;
+  const bindings = draftBaseBindings(draft, layout, expectedKind);
+  const plans = [];
+  const seenSiteIds = new Set();
+  for (const transform of SYMMETRY_TRANSFORMS[normalizeMapEditorSymmetry(symmetry)]) {
+    const from = transformMapTile(source.site, mapSize, transform);
+    const mirroredTarget = transformMapTile(target, mapSize, transform);
+    const binding = bindings.find((candidate) => (
+      candidate.site.x === from?.x && candidate.site.y === from?.y
+    ));
+    if (!binding || !mirroredTarget || seenSiteIds.has(binding.site.id)) continue;
+    seenSiteIds.add(binding.site.id);
+    if (binding.site.x === mirroredTarget.x && binding.site.y === mirroredTarget.y) continue;
+    plans.push({ binding, target: mirroredTarget });
+  }
+  if (plans.length === 0) return { ok: true, count: 0 };
+
+  const plannedSiteIds = new Set(plans.map(({ binding }) => binding.site.id));
+  for (const plan of plans) {
+    const occupied = siteAt(draft, plan.target.x, plan.target.y);
+    if (occupied && !plannedSiteIds.has(occupied.id)) {
+      return draftEditError("A start or natural base already uses that tile.");
+    }
+    if (occupied && draftSiteReferenceCount(draft, occupied.id) > 1) {
+      return draftEditError("A shared base from another layout already uses that tile.");
+    }
+  }
+
+  for (const plan of plans) {
+    const site = detachDraftBaseBinding(draft, layout, plan.binding);
+    if (!site) return draftEditError("That base is no longer part of this layout.");
+    site.x = plan.target.x;
+    site.y = plan.target.y;
+  }
+  return { ok: true, count: plans.length };
+}
+
+/** Add a natural for the selected player and any already-matching symmetric players. */
+export function addSymmetricDraftNaturals(draft, {
+  playerIndex,
+  tile,
+  layoutId = "",
+  symmetry = MAP_EDITOR_SYMMETRY.NONE,
+} = {}) {
+  const layout = layoutById(draft, layoutId);
+  const target = normalizedDraftTile(draft, tile, MAP_EDITOR_NATURAL_CLEARANCE_TILES);
+  const source = draftBaseBinding(draft, layout, "main", playerIndex);
+  if (!target || !source) return draftEditError("Choose a valid player and map tile.");
+
+  const mapSize = draft.terrain.length;
+  const plans = [];
+  const seenPlayers = new Set();
+  for (const transform of SYMMETRY_TRANSFORMS[normalizeMapEditorSymmetry(symmetry)]) {
+    const from = transformMapTile(source.site, mapSize, transform);
+    const mirroredTarget = transformMapTile(target, mapSize, transform);
+    const counterpart = draftBaseBindings(draft, layout, "main")
+      .find((candidate) => candidate.site.x === from?.x && candidate.site.y === from?.y);
+    if (!counterpart || !mirroredTarget || seenPlayers.has(counterpart.playerIndex)) continue;
+    seenPlayers.add(counterpart.playerIndex);
+    plans.push({ playerIndex: counterpart.playerIndex, target: mirroredTarget });
+  }
+  if (plans.length === 0) return draftEditError("That player is no longer part of this layout.");
+
+  const targetKeys = new Set();
+  for (const plan of plans) {
+    const slot = layout.slots[plan.playerIndex];
+    const key = `${plan.target.x},${plan.target.y}`;
+    if (slot.naturals.length >= MAP_EDITOR_MAX_NATURALS_PER_PLAYER) {
+      return draftEditError(`Player ${plan.playerIndex + 1} already has ${MAP_EDITOR_MAX_NATURALS_PER_PLAYER} natural bases.`);
+    }
+    if (targetKeys.has(key) || siteAt(draft, plan.target.x, plan.target.y)) {
+      return draftEditError("A start or natural base already uses that tile.");
+    }
+    targetKeys.add(key);
+  }
+  for (const plan of plans) {
+    const result = addDraftPlayerNatural(draft, plan.playerIndex, plan.target, layout.id);
+    if (!result.ok) return result;
+  }
+  return { ok: true, count: plans.length };
+}
+
 export function paintDraftRect(draft, rect, terrainCode) {
   const ch = TERRAIN_TO_CHAR[terrainCode];
   if (!ch || !Array.isArray(draft?.terrain) || draft.terrain.length === 0) return;
@@ -702,6 +859,70 @@ function distanceSq(a, b) {
   const dx = a.x - b.x;
   const dy = a.y - b.y;
   return dx * dx + dy * dy;
+}
+
+function normalizeMapEditorSymmetry(symmetry) {
+  return Object.hasOwn(SYMMETRY_TRANSFORMS, symmetry)
+    ? symmetry
+    : MAP_EDITOR_SYMMETRY.NONE;
+}
+
+function validMapTile(tile, size) {
+  const x = Math.trunc(Number(tile?.x));
+  const y = Math.trunc(Number(tile?.y));
+  return Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < size && y < size
+    ? { x, y }
+    : null;
+}
+
+function transformMapTile(tile, size, transform) {
+  const source = validMapTile(tile, size);
+  if (!source) return null;
+  if (transform === "horizontal") return { x: source.x, y: size - 1 - source.y };
+  if (transform === "vertical") return { x: size - 1 - source.x, y: source.y };
+  if (transform === "diagonalMain") return { x: source.y, y: source.x };
+  if (transform === "diagonalAnti") return { x: size - 1 - source.y, y: size - 1 - source.x };
+  if (transform === "radial") return { x: size - 1 - source.x, y: size - 1 - source.y };
+  return source;
+}
+
+function draftBaseBindings(draft, layout, kind) {
+  if (!layout?.slots) return [];
+  const bindings = [];
+  for (const [playerIndex, slot] of layout.slots.entries()) {
+    const ids = kind === "main" ? [slot.main] : slot.naturals || [];
+    for (const siteId of ids) {
+      const site = siteById(draft, siteId);
+      if (site?.kind === kind) bindings.push({ kind, playerIndex, siteId, site });
+    }
+  }
+  return bindings;
+}
+
+function draftBaseBinding(draft, layout, kind, playerIndex, naturalId = "") {
+  const index = Number(playerIndex);
+  const slot = layout?.slots?.[index];
+  if (!slot) return null;
+  const siteId = kind === "main" ? slot.main : naturalId;
+  if (kind === "natural" && !slot.naturals?.includes(siteId)) return null;
+  const site = siteById(draft, siteId);
+  return site?.kind === kind ? { kind, playerIndex: index, siteId, site } : null;
+}
+
+function detachDraftBaseBinding(draft, layout, binding) {
+  const site = siteById(draft, binding.siteId);
+  const slot = layout?.slots?.[binding.playerIndex];
+  if (!site || !slot) return null;
+  if (draftSiteReferenceCount(draft, site.id) <= 1) return site;
+  const id = uniqueDraftSiteId(draft, binding.kind);
+  const detached = { id, kind: binding.kind, x: site.x, y: site.y };
+  draft.sites.push(detached);
+  if (binding.kind === "main") {
+    slot.main = id;
+  } else {
+    slot.naturals = slot.naturals.map((candidate) => candidate === site.id ? id : candidate);
+  }
+  return detached;
 }
 
 function clampTile(value, size) {
