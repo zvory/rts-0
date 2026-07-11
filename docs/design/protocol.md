@@ -1117,6 +1117,16 @@ event unions follow the same selected real player ids as the snapshot body.
 
 `LabClientOp` is tagged by `op`:
 ```
+{ op: "spawnEntities", spawns: [{ owner: u32, kind: string, x: f32, y: f32, completed?: bool }] }
+{ op: "applyUpdates", updates: [
+  { operation: "move", entityId: u32, x: f32, y: f32 } |
+  { operation: "reassign", entityId: u32, owner: u32 } |
+  { operation: "resources", playerId: u32, steel: u32, oil: u32 } |
+  { operation: "research", playerId: u32, upgrade: string, completed?: bool } |
+  { operation: "godMode", playerId: u32, enabled?: bool }
+] }
+{ op: "deleteEntities", entityIds: u32[] }
+// Existing singular browser/UI operations remain accepted for compatibility.
 { op: "spawnEntity", owner: u32, kind: string, x: f32, y: f32, completed?: bool }
 { op: "deleteEntity", entityId: u32 }
 { op: "moveEntity", entityId: u32, x: f32, y: f32 }
@@ -1143,6 +1153,13 @@ details for all projected entities, plus the union of event buckets for all acti
 while team and teams lab vision receive spectator-style snapshot bodies, event unions, remembered
 building memory, and `playerResources` rows for only the selected
 real players.
+Plural mutation arrays contain 1–400 items and commit atomically. Success returns
+`outcome.items: [{index, outcome}]` in input order, with each nested `outcome` retaining the
+corresponding singular shape. Rejection returns `failedIndex`; placement rejection also returns
+`details: {attempted:{x,y}, blockers:[...], suggestions:[...]}`. Blocker records use `kind` values
+`entity`, `feature`, `terrain`, or `boundary`; features distinguish `building` and `resource` and
+carry the blocking entity id/kind. Suggestions contain no more than eight deterministic points and
+building points are authoritative snapped centers.
 `issueCommandAs` queues a normal gameplay command as the selected player only when all selected
 units belong to that player; mixed-owner selections are rejected instead of partitioned. When
 `ignoreCommandLimits` is true, the lab command bypasses the normal command-supply budget and uses
@@ -1272,6 +1289,10 @@ move into the browser or daemon.
 
 `LabReplayOperation` deliberately promotes only replayable lab state changes:
 ```
+{ op: "spawnEntities", spawns: [{ owner: u32, kind: string, x: f32, y: f32, completed?: bool }] }
+{ op: "applyUpdates", updates: [LabUpdateSpec] }
+{ op: "deleteEntities", entityIds: u32[] }
+// Reader-only compatibility for artifacts written before plural operations:
 { op: "spawnEntity", owner: u32, kind: string, x: f32, y: f32, completed?: bool }
 { op: "deleteEntity", entityId: u32 }
 { op: "moveEntity", entityId: u32, x: f32, y: f32 }
@@ -1281,6 +1302,9 @@ move into the browser or daemon.
 { op: "setCompletedResearch", playerId: u32, upgrade: string, completed: bool }
 { op: "issueCommandAs", playerId: u32, cmd: Command, ignoreCommandLimits?: bool }
 ```
+New Lab Interact writes use the plural replay vocabulary even for one-item requests. Existing
+schema-version-1 artifacts containing singular spawn/delete/move/owner/player operations remain
+readable.
 `setVision` is excluded because it is per-operator projection metadata; reopening a lab replay
 starts from `initialSetup.metadata.lab.vision` and connected viewers may choose their own current
 lab vision afterward. `exportScenario`, `validateScenario`, and `submitScenario` are checkpoint

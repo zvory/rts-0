@@ -74,12 +74,24 @@ export class LabClient {
     return this.request({ op: "spawnEntity", owner, kind, x, y, completed: !!completed });
   }
 
+  spawnEntities(spawns) {
+    return this.request({ op: "spawnEntities", spawns });
+  }
+
   deleteEntity(entityId) {
     return this.request({ op: "deleteEntity", entityId });
   }
 
+  deleteEntities(entityIds) {
+    return this.request({ op: "deleteEntities", entityIds });
+  }
+
   moveEntity(entityId, x, y) {
     return this.request({ op: "moveEntity", entityId, x, y });
+  }
+
+  applyUpdates(updates) {
+    return this.request({ op: "applyUpdates", updates });
   }
 
   setEntityOwner(entityId, owner) {
@@ -169,6 +181,8 @@ export class LabClient {
       ok: !!message?.ok,
       op: message?.op || "",
       error: message?.error || "",
+      failedIndex: Number.isInteger(message?.failedIndex) ? message.failedIndex : null,
+      details: message?.details && typeof message.details === "object" ? message.details : null,
       outcome: message?.outcome || null,
     };
     this.lastError = this.lastResult.ok ? "" : this.lastResult.error;

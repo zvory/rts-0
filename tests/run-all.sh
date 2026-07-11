@@ -700,6 +700,8 @@ if [ "$RUN_STATIC_JS" = "1" ]; then
     node "$SCRIPT_DIR/minimap_input_contracts.mjs"
   run_suite_bg "Lab Interact artifact contracts" \
     node "$SCRIPT_DIR/lab_interact_artifact_contracts.mjs"
+  run_suite_bg "Lab Interact bulk contracts" \
+    node "$SCRIPT_DIR/lab_interact_bulk_contracts.mjs"
   run_suite_bg "Lab Interact recording contracts" \
     node "$SCRIPT_DIR/lab_interact_recording_contracts.mjs"
     node "$SCRIPT_DIR/lab_interact_fixed_capture_contracts.mjs"

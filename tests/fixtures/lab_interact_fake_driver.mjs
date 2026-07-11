@@ -62,33 +62,38 @@ export async function openLabInteractDriver(options) {
     async catalog() {
       return structuredClone(CATALOG);
     },
-    async spawn(spec) {
+    async spawn(spawns) {
       const delayMs = Number(process.env.RTS_LAB_INTERACT_FAKE_DELAY_MS || 0);
       if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
-      const entity = { id: nextId++, kind: spec.kind, owner: spec.owner, x: spec.x, y: spec.y, hp: 100, maxHp: 100, state: "idle", orderPlan: [] };
-      entities.push(entity);
+      const added = spawns.map((spec) => ({ id: nextId++, kind: spec.kind, owner: spec.owner, x: spec.x, y: spec.y, hp: 100, maxHp: 100, state: "idle", orderPlan: [] }));
+      entities.push(...added);
       tick += 1;
-      return { result: { op: "spawnEntity", outcome: { entityId: entity.id }, snapshotTick: tick }, entity: project(entity) };
+      return {
+        result: { op: "spawnEntities", outcome: { items: added.map((entity, index) => ({ index, outcome: { entityId: entity.id } })) }, snapshotTick: tick },
+        entities: added.map(project),
+      };
     },
-    async update(operation) {
-      if (operation.operation === "move") {
+    async update(operations) {
+      for (const operation of operations) {
+        if (operation.operation === "move") {
         const entity = entities.find((row) => row.id === operation.entityId);
         if (!entity) throw Object.assign(new Error("unknown entity"), { code: "unknownEntity" });
         entity.x = operation.x;
         entity.y = operation.y;
-      }
-      if (operation.operation === "reassign") {
+        }
+        if (operation.operation === "reassign") {
         const entity = entities.find((row) => row.id === operation.entityId);
         if (!entity) throw Object.assign(new Error("unknown entity"), { code: "unknownEntity" });
         entity.owner = operation.owner;
+        }
       }
       tick += 1;
-      return { result: { op: operation.operation, snapshotTick: tick } };
+      return { result: { op: "applyUpdates", snapshotTick: tick } };
     },
     async remove(ids) {
       entities = entities.filter((entity) => !ids.includes(entity.id));
       tick += 1;
-      return { results: ids.map((id) => ({ op: "deleteEntity", outcome: { entityId: id }, snapshotTick: tick })) };
+      return { result: { op: "deleteEntities", outcome: { items: ids.map((id, index) => ({ index, outcome: { entityId: id } })) }, snapshotTick: tick } };
     },
     async order({ command }) {
       for (const id of command.units || []) {

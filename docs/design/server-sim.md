@@ -104,9 +104,7 @@ impl Game {
     pub fn new_lab(players: &[PlayerInit], seed: u32, map: Map, map_metadata: MapMetadata) -> Game;
 
     /// Apply one typed, validated lab mutation and repair derived sim state before returning.
-    /// Accepted operations can spawn, delete, move, reassign, set resources, set completed
-    /// research, or restore a versioned lab setup. Bad lab input returns `LabError`; room code
-    /// must not mutate entity stores or player state directly.
+    /// Plural LabOp variants validate and commit atomically through this same seam.
     pub fn apply_lab_op(&mut self, op: lab::LabOp) -> Result<lab::LabOpOutcome, lab::LabError>;
 
     /// Export authoritative lab setup data as a checkpoint-backed setup container. The JSON-friendly
@@ -216,9 +214,15 @@ them through this API before ticking — see §8.
 
 Lab mutation types live under `game::lab`. `LabOp` is intentionally narrow rather than a debug
 backdoor: entity mutations validate known unit/building kinds, real players, finite in-map
-positions, placement/collision legality, and stale ids before changing the world. Accepted lab
-mutations clear stale orders and reservations where needed, then rebuild supply, spatial index,
-fog, and building memory before returning. Lab setup import/export uses checkpoint-backed
+positions, placement/collision legality, and stale ids before changing the world. Plural spawn,
+update, and delete requests accept 1–400 items, run against a cloned scratch `Game`, preserve input
+ordering, and replace live state only after the whole request succeeds. Non-move updates apply to
+scratch state in order; every moved entity is then removed from scratch occupancy before
+destinations are validated, so swaps and translations are simultaneous while destination conflicts
+remain illegal. Accepted batches clear stale orders and reservations where needed and repair supply,
+derived state, fog, and building memory once. Placement errors carry the attempted point, typed
+entity/feature/terrain/boundary blockers, and up to eight deterministic suggestions produced by the
+same standability predicate against the transactional prefix. Lab setup import/export uses checkpoint-backed
 `LabCheckpointScenarioV1` containers: materialized map data and binding live beside an embedded
 `GameCheckpointV1` payload, and small lab metadata carries setup name, exported tick, selected
 vision, god-mode players, and optional source entity-id remap rows. Restore validates map binding,

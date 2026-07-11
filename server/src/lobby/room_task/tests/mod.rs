@@ -3,6 +3,7 @@ mod support;
 mod branch;
 mod dev;
 mod lab;
+mod lab_bulk;
 mod lab_timeline;
 mod lifecycle;
 mod live;

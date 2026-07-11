@@ -12,6 +12,8 @@ fn lab_submission_result_error(request_id: u32, error: LabScenarioSubmissionErro
         ok: false,
         op: "submitScenario".to_string(),
         error: Some(error.message.clone()),
+        failed_index: None,
+        details: None,
         outcome: Some(serde_json::json!({
             "code": error.code.as_str(),
             "message": error.message,
@@ -28,6 +30,8 @@ fn lab_submission_result_success(
         ok: true,
         op: "submitScenario".to_string(),
         error: None,
+        failed_index: None,
+        details: None,
         outcome: Some(serde_json::json!({
             "status": "submitted",
             "prUrl": success.pr_url,

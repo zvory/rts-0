@@ -1,16 +1,11 @@
-use std::str::FromStr;
 use std::time::Instant;
 
-use rts_sim::game::entity::EntityKind;
-use rts_sim::game::lab::{
-    LabCommandOptions, LabMoveEntity, LabOp, LabOpOutcome, LabSetCompletedResearch,
-    LabSetEntityOwner, LabSetPlayerResources, LabSpawnEntity,
-};
-use rts_sim::game::upgrade::UpgradeKind;
+use rts_sim::game::lab::{LabCommandOptions, LabOp, LabOpOutcome};
 use rts_sim::game::Game;
 
 use super::super::super::connection::send_or_log;
 use super::super::super::current_unix_ms;
+use super::super::super::lab_replay_operations::lab_replay_operation_to_entry_kind;
 use super::super::super::lab_timeline::{LabTimeline, LabTimelineEntry, LabTimelineEntryKind};
 use super::super::super::session_policy::RoomTimeSource;
 use super::super::types::{LabSeekTarget, Phase};
@@ -21,171 +16,15 @@ use crate::lab_scenarios::{
 };
 use crate::protocol::{
     lab_replay_artifact_from_slice, Command, LabCheckpointScenarioV1, LabReplayArtifactV1,
-    LabReplayAuthoringMetadata, LabReplayOperation, LabReplayOperationEntry,
-    LabReplayTimelineMetadata, LabResult, LabScenarioLabMetadata, LabScenarioPayload,
-    LabVisionMode, RoomTimeState, ServerMessage, LAB_REPLAY_ARTIFACT_KIND,
-    LAB_REPLAY_ARTIFACT_SCHEMA, LAB_REPLAY_ARTIFACT_SCHEMA_VERSION,
+    LabReplayAuthoringMetadata, LabReplayOperationEntry, LabReplayTimelineMetadata, LabResult,
+    LabScenarioLabMetadata, LabScenarioPayload, LabVisionMode, RoomTimeState, ServerMessage,
+    LAB_REPLAY_ARTIFACT_KIND, LAB_REPLAY_ARTIFACT_SCHEMA, LAB_REPLAY_ARTIFACT_SCHEMA_VERSION,
     LAB_REPLAY_MAX_AUTHORING_NAME_BYTES, LAB_REPLAY_TIMELINE_KEYFRAME_INTERVAL_TICKS,
 };
 
 pub(super) enum LabReplayRebaseSource {
     Checkpoint(Box<LabCheckpointScenarioV1>),
     Current { name: String },
-}
-
-pub(super) fn lab_op_to_replay_operation(op: &LabOp) -> Option<LabReplayOperation> {
-    match op {
-        LabOp::SpawnEntity(input) => Some(LabReplayOperation::SpawnEntity {
-            owner: input.owner,
-            kind: input.kind.stable_id().to_string(),
-            x: input.x,
-            y: input.y,
-            completed: input.completed,
-        }),
-        LabOp::DeleteEntity { entity_id } => Some(LabReplayOperation::DeleteEntity {
-            entity_id: *entity_id,
-        }),
-        LabOp::MoveEntity(input) => Some(LabReplayOperation::MoveEntity {
-            entity_id: input.entity_id,
-            x: input.x,
-            y: input.y,
-        }),
-        LabOp::SetEntityOwner(input) => Some(LabReplayOperation::SetEntityOwner {
-            entity_id: input.entity_id,
-            owner: input.owner,
-        }),
-        LabOp::SetPlayerResources(input) => Some(LabReplayOperation::SetPlayerResources {
-            player_id: input.player_id,
-            steel: input.steel,
-            oil: input.oil,
-        }),
-        LabOp::SetPlayerGodMode { player_id, enabled } => {
-            Some(LabReplayOperation::SetPlayerGodMode {
-                player_id: *player_id,
-                enabled: *enabled,
-            })
-        }
-        LabOp::SetCompletedResearch(input) => Some(LabReplayOperation::SetCompletedResearch {
-            player_id: input.player_id,
-            upgrade: input.upgrade.to_protocol_str().to_string(),
-            completed: input.completed,
-        }),
-        LabOp::ApplyMapDraft(_) | LabOp::RestoreCheckpointScenario(_) => None,
-    }
-}
-
-#[cfg_attr(not(test), allow(dead_code))]
-fn lab_replay_operation_kind(op: &LabReplayOperation) -> &'static str {
-    match op {
-        LabReplayOperation::SpawnEntity { .. } => "spawnEntity",
-        LabReplayOperation::DeleteEntity { .. } => "deleteEntity",
-        LabReplayOperation::MoveEntity { .. } => "moveEntity",
-        LabReplayOperation::SetEntityOwner { .. } => "setEntityOwner",
-        LabReplayOperation::SetPlayerResources { .. } => "setPlayerResources",
-        LabReplayOperation::SetPlayerGodMode { .. } => "setPlayerGodMode",
-        LabReplayOperation::SetCompletedResearch { .. } => "setCompletedResearch",
-        LabReplayOperation::IssueCommandAs { .. } => "issueCommandAs",
-    }
-}
-
-#[cfg_attr(not(test), allow(dead_code))]
-fn lab_replay_operation_to_entry_kind(
-    replay_op: &LabReplayOperation,
-) -> Result<LabTimelineEntryKind, String> {
-    match replay_op {
-        LabReplayOperation::SpawnEntity {
-            owner,
-            kind,
-            x,
-            y,
-            completed,
-        } => {
-            let kind = EntityKind::from_str(kind).map_err(|_| "unknown entity kind".to_string())?;
-            Ok(LabTimelineEntryKind::LabOperation {
-                op_kind: lab_replay_operation_kind(replay_op).to_string(),
-                op: LabOp::SpawnEntity(LabSpawnEntity {
-                    owner: *owner,
-                    kind,
-                    x: *x,
-                    y: *y,
-                    completed: *completed,
-                }),
-            })
-        }
-        LabReplayOperation::DeleteEntity { entity_id } => Ok(LabTimelineEntryKind::LabOperation {
-            op_kind: lab_replay_operation_kind(replay_op).to_string(),
-            op: LabOp::DeleteEntity {
-                entity_id: *entity_id,
-            },
-        }),
-        LabReplayOperation::MoveEntity { entity_id, x, y } => {
-            Ok(LabTimelineEntryKind::LabOperation {
-                op_kind: lab_replay_operation_kind(replay_op).to_string(),
-                op: LabOp::MoveEntity(LabMoveEntity {
-                    entity_id: *entity_id,
-                    x: *x,
-                    y: *y,
-                }),
-            })
-        }
-        LabReplayOperation::SetEntityOwner { entity_id, owner } => {
-            Ok(LabTimelineEntryKind::LabOperation {
-                op_kind: lab_replay_operation_kind(replay_op).to_string(),
-                op: LabOp::SetEntityOwner(LabSetEntityOwner {
-                    entity_id: *entity_id,
-                    owner: *owner,
-                }),
-            })
-        }
-        LabReplayOperation::SetPlayerResources {
-            player_id,
-            steel,
-            oil,
-        } => Ok(LabTimelineEntryKind::LabOperation {
-            op_kind: lab_replay_operation_kind(replay_op).to_string(),
-            op: LabOp::SetPlayerResources(LabSetPlayerResources {
-                player_id: *player_id,
-                steel: *steel,
-                oil: *oil,
-            }),
-        }),
-        LabReplayOperation::SetPlayerGodMode { player_id, enabled } => {
-            Ok(LabTimelineEntryKind::LabOperation {
-                op_kind: lab_replay_operation_kind(replay_op).to_string(),
-                op: LabOp::SetPlayerGodMode {
-                    player_id: *player_id,
-                    enabled: *enabled,
-                },
-            })
-        }
-        LabReplayOperation::SetCompletedResearch {
-            player_id,
-            upgrade,
-            completed,
-        } => {
-            let upgrade =
-                UpgradeKind::from_str(upgrade).map_err(|_| "unknown research id".to_string())?;
-            Ok(LabTimelineEntryKind::LabOperation {
-                op_kind: lab_replay_operation_kind(replay_op).to_string(),
-                op: LabOp::SetCompletedResearch(LabSetCompletedResearch {
-                    player_id: *player_id,
-                    upgrade,
-                    completed: *completed,
-                }),
-            })
-        }
-        LabReplayOperation::IssueCommandAs {
-            player_id,
-            cmd,
-            ignore_command_limits,
-        } => Ok(LabTimelineEntryKind::IssueCommandAs {
-            player_id: *player_id,
-            command: cmd.clone(),
-            options: LabCommandOptions {
-                ignore_command_limits: *ignore_command_limits,
-            },
-        }),
-    }
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
@@ -296,6 +135,8 @@ impl RoomTask {
             ok: true,
             op,
             error: None,
+            failed_index: None,
+            details: None,
             outcome: Some(serde_json::json!({
                 "accepted": true,
                 "playerId": command_player_id,

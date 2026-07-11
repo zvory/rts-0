@@ -243,7 +243,7 @@ export async function main() {
     stream.write(`${JSON.stringify(response)}\n`);
     if (!response.ok) process.exitCode = 1;
   } catch (error) {
-    process.stderr.write(`${JSON.stringify({ ok: false, error: { code: error.code || "cliFailed", message: String(error.message).slice(0, 1000) } })}\n`);
+    process.stderr.write(`${JSON.stringify({ ok: false, error: { code: error.code || "cliFailed", message: String(error.message).slice(0, 1000), ...(error.details ? { details: error.details } : {}) } })}\n`);
     process.exitCode = 1;
   }
 }

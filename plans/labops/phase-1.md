@@ -1,6 +1,6 @@
 # Phase 1 - Atomic Bulk Mutation And Placement Diagnostics
 
-Status: pending.
+Status: done.
 
 ## Objective
 

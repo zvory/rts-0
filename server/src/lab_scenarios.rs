@@ -699,6 +699,20 @@ fn lab_error_text(err: &LabError) -> String {
             format!("invalid position ({x}, {y}): {reason}")
         }
         LabError::OccupiedPosition { x, y } => format!("occupied position ({x}, {y})"),
+        LabError::Placement { x, y, .. } => {
+            format!("blocked placement ({x}, {y})")
+        }
+        LabError::BatchSize { count, maximum } => {
+            format!("batch contains {count} items; expected 1 to {maximum}")
+        }
+        LabError::DuplicateMutation { reason } => reason.clone(),
+        LabError::BatchFailed {
+            failed_index,
+            error,
+        } => format!(
+            "batch item {failed_index} failed: {}",
+            lab_error_text(error)
+        ),
         LabError::InvalidResearch { player_id, upgrade } => {
             format!("invalid research {upgrade:?} for player {player_id}")
         }

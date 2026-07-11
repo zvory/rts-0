@@ -3,6 +3,8 @@
 //! Lab callers get typed operations with validation at the `Game` seam. This module owns the repair
 //! pass so room/client code never reaches into stores, fog, spatial indexes, or economy state.
 
+use std::collections::HashSet;
+
 use serde::{Deserialize, Serialize};
 
 use crate::config;
@@ -27,9 +29,16 @@ pub const LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION: u32 =
     checkpoint_scenario::LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION;
 const LAB_MAP_MAIN_PROTECTION_RADIUS_TILES: i32 = 3;
 const LAB_MAP_EXPANSION_PROTECTION_RADIUS_TILES: i32 = 0;
+const LAB_MAX_MUTATION_BATCH: usize = 400;
+const LAB_PLACEMENT_SUGGESTION_LIMIT: usize = 8;
+const LAB_PLACEMENT_SEARCH_RADIUS_TILES: i32 = 8;
+const LAB_PLACEMENT_SEARCH_WORK_LIMIT: usize = 256;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum LabOp {
+    SpawnEntities(Vec<LabSpawnEntity>),
+    ApplyUpdates(Vec<LabUpdate>),
+    DeleteEntities(Vec<u32>),
     SpawnEntity(LabSpawnEntity),
     DeleteEntity { entity_id: u32 },
     MoveEntity(LabMoveEntity),
@@ -77,8 +86,24 @@ pub struct LabSetCompletedResearch {
     pub completed: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum LabUpdate {
+    Move(LabMoveEntity),
+    SetEntityOwner(LabSetEntityOwner),
+    SetPlayerResources(LabSetPlayerResources),
+    SetPlayerGodMode { player_id: u32, enabled: bool },
+    SetCompletedResearch(LabSetCompletedResearch),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct LabBatchError {
+    failed_index: usize,
+    error: LabError,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum LabOpOutcome {
+    Batch(Vec<LabOpOutcome>),
     Spawned {
         entity_id: u32,
     },
@@ -153,6 +178,23 @@ pub enum LabError {
         x: f32,
         y: f32,
     },
+    Placement {
+        x: f32,
+        y: f32,
+        blockers: Vec<LabPlacementBlocker>,
+        suggestions: Vec<(f32, f32)>,
+    },
+    BatchSize {
+        count: usize,
+        maximum: usize,
+    },
+    DuplicateMutation {
+        reason: String,
+    },
+    BatchFailed {
+        failed_index: usize,
+        error: Box<LabError>,
+    },
     InvalidResearch {
         player_id: u32,
         upgrade: String,
@@ -169,6 +211,32 @@ pub enum LabError {
     },
     InvalidCommand {
         reason: String,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub enum LabPlacementBlocker {
+    Entity {
+        entity_id: u32,
+        entity_kind: String,
+    },
+    Terrain {
+        tile_x: i32,
+        tile_y: i32,
+        terrain: String,
+    },
+    Feature {
+        feature: String,
+        entity_id: u32,
+        entity_kind: String,
+    },
+    Boundary {
+        world_size: u32,
     },
 }
 
@@ -192,6 +260,33 @@ impl Game {
 
     pub fn apply_lab_op(&mut self, op: LabOp) -> Result<LabOpOutcome, LabError> {
         match op {
+            LabOp::SpawnEntities(spawns) => self
+                .lab_spawn_entities(spawns)
+                .map(LabOpOutcome::Batch)
+                .map_err(batch_error),
+            LabOp::ApplyUpdates(updates) => self
+                .lab_apply_updates(updates)
+                .map(LabOpOutcome::Batch)
+                .map_err(batch_error),
+            LabOp::DeleteEntities(entity_ids) => self
+                .lab_delete_entities(entity_ids)
+                .map(LabOpOutcome::Batch)
+                .map_err(batch_error),
+            op => {
+                let outcome = self.apply_lab_op_without_repair(op)?;
+                self.repair_lab_state();
+                Ok(outcome)
+            }
+        }
+    }
+
+    fn apply_lab_op_without_repair(&mut self, op: LabOp) -> Result<LabOpOutcome, LabError> {
+        match op {
+            LabOp::SpawnEntities(_) | LabOp::ApplyUpdates(_) | LabOp::DeleteEntities(_) => {
+                Err(LabError::InvalidCommand {
+                    reason: "nested lab mutation batch is not supported".to_string(),
+                })
+            }
             LabOp::SpawnEntity(input) => self.lab_spawn_entity(input),
             LabOp::DeleteEntity { entity_id } => self.lab_delete_entity(entity_id),
             LabOp::MoveEntity(input) => self.lab_move_entity(input),
@@ -206,6 +301,181 @@ impl Game {
                 self.restore_lab_checkpoint_scenario_op(*scenario)
             }
         }
+    }
+
+    fn lab_spawn_entities(
+        &mut self,
+        spawns: Vec<LabSpawnEntity>,
+    ) -> Result<Vec<LabOpOutcome>, LabBatchError> {
+        validate_batch_size(spawns.len()).map_err(|error| LabBatchError {
+            failed_index: spawns.len().saturating_sub(1),
+            error,
+        })?;
+        let mut scratch = self.clone();
+        let mut items = Vec::with_capacity(spawns.len());
+        for (index, spawn) in spawns.into_iter().enumerate() {
+            let outcome = scratch
+                .apply_lab_op_without_repair(LabOp::SpawnEntity(spawn))
+                .map_err(|error| LabBatchError {
+                    failed_index: index,
+                    error,
+                })?;
+            items.push(outcome);
+        }
+        scratch.repair_lab_state();
+        *self = scratch;
+        Ok(items)
+    }
+
+    fn lab_delete_entities(
+        &mut self,
+        entity_ids: Vec<u32>,
+    ) -> Result<Vec<LabOpOutcome>, LabBatchError> {
+        validate_batch_size(entity_ids.len()).map_err(|error| LabBatchError {
+            failed_index: entity_ids.len().saturating_sub(1),
+            error,
+        })?;
+        let mut seen = HashSet::new();
+        for (index, entity_id) in entity_ids.iter().copied().enumerate() {
+            if !seen.insert(entity_id) {
+                return Err(LabBatchError {
+                    failed_index: index,
+                    error: LabError::DuplicateMutation {
+                        reason: format!("entity {entity_id} is listed more than once"),
+                    },
+                });
+            }
+        }
+        let mut scratch = self.clone();
+        let mut items = Vec::with_capacity(entity_ids.len());
+        for (index, entity_id) in entity_ids.into_iter().enumerate() {
+            let outcome = scratch
+                .apply_lab_op_without_repair(LabOp::DeleteEntity { entity_id })
+                .map_err(|error| LabBatchError {
+                    failed_index: index,
+                    error,
+                })?;
+            items.push(outcome);
+        }
+        scratch.repair_lab_state();
+        *self = scratch;
+        Ok(items)
+    }
+
+    fn lab_apply_updates(
+        &mut self,
+        updates: Vec<LabUpdate>,
+    ) -> Result<Vec<LabOpOutcome>, LabBatchError> {
+        validate_batch_size(updates.len()).map_err(|error| LabBatchError {
+            failed_index: updates.len().saturating_sub(1),
+            error,
+        })?;
+        validate_update_duplicates(&updates)?;
+
+        let mut scratch = self.clone();
+        let mut outcomes = vec![None; updates.len()];
+        for (index, update) in updates.iter().copied().enumerate() {
+            let op = match update {
+                LabUpdate::Move(_) => continue,
+                LabUpdate::SetEntityOwner(input) => LabOp::SetEntityOwner(input),
+                LabUpdate::SetPlayerResources(input) => LabOp::SetPlayerResources(input),
+                LabUpdate::SetPlayerGodMode { player_id, enabled } => {
+                    LabOp::SetPlayerGodMode { player_id, enabled }
+                }
+                LabUpdate::SetCompletedResearch(input) => LabOp::SetCompletedResearch(input),
+            };
+            outcomes[index] =
+                Some(
+                    scratch
+                        .apply_lab_op_without_repair(op)
+                        .map_err(|error| LabBatchError {
+                            failed_index: index,
+                            error,
+                        })?,
+                );
+        }
+
+        let moved_ids: HashSet<u32> = updates
+            .iter()
+            .filter_map(|update| match update {
+                LabUpdate::Move(input) => Some(input.entity_id),
+                _ => None,
+            })
+            .collect();
+        let validation_next_id = scratch.state.entities.checkpoint_next_id();
+        let base_entities: Vec<Entity> = scratch
+            .state
+            .entities
+            .iter()
+            .filter(|entity| !moved_ids.contains(&entity.id))
+            .cloned()
+            .collect();
+        let mut reserved = Vec::new();
+        for (index, update) in updates.iter().copied().enumerate() {
+            let LabUpdate::Move(input) = update else {
+                continue;
+            };
+            let entity =
+                scratch
+                    .state
+                    .entities
+                    .get(input.entity_id)
+                    .cloned()
+                    .ok_or(LabBatchError {
+                        failed_index: index,
+                        error: LabError::StaleEntity {
+                            entity_id: input.entity_id,
+                        },
+                    })?;
+            let validation_entities = EntityStore::from_checkpoint_entities(
+                validation_next_id,
+                base_entities
+                    .iter()
+                    .chain(reserved.iter())
+                    .cloned()
+                    .collect(),
+            );
+            let (x, y) = if entity.is_unit() {
+                scratch
+                    .validate_unit_position(&validation_entities, entity.kind, input.x, input.y)
+                    .map_err(|error| LabBatchError {
+                        failed_index: index,
+                        error,
+                    })?;
+                (input.x, input.y)
+            } else if entity.is_building() {
+                let (_, _, x, y) = scratch
+                    .validate_building_position(&validation_entities, entity.kind, input.x, input.y)
+                    .map_err(|error| LabBatchError {
+                        failed_index: index,
+                        error,
+                    })?;
+                (x, y)
+            } else {
+                return Err(LabBatchError {
+                    failed_index: index,
+                    error: invalid_kind(entity.kind, "applyUpdates"),
+                });
+            };
+            let mut reservation = entity;
+            reservation.set_position(x, y);
+            reserved.push(reservation);
+            if let Some(entity) = scratch.state.entities.get_mut(input.entity_id) {
+                entity.set_position(x, y);
+                entity.clear_orders();
+                entity.replace_active_order(Order::Idle);
+            }
+            scratch.state.entities.release_miner(input.entity_id);
+            outcomes[index] = Some(LabOpOutcome::Moved {
+                entity_id: input.entity_id,
+                x,
+                y,
+            });
+        }
+
+        scratch.repair_lab_state();
+        *self = scratch;
+        Ok(outcomes.into_iter().flatten().collect())
     }
 
     fn lab_apply_map_draft(&mut self, draft: LabMapDraft) -> Result<LabOpOutcome, LabError> {
@@ -398,7 +668,6 @@ impl Game {
         } else {
             return Err(invalid_kind(input.kind, "spawnEntity"));
         };
-        self.repair_lab_state();
         Ok(LabOpOutcome::Spawned { entity_id: id })
     }
 
@@ -409,7 +678,6 @@ impl Game {
             .ok_or(LabError::StaleEntity { entity_id })?;
         self.state.entities.release_miner(entity_id);
         self.cleanup_entity_references(entity_id);
-        self.repair_lab_state();
         Ok(LabOpOutcome::Deleted { entity_id })
     }
 
@@ -443,7 +711,6 @@ impl Game {
             entity.replace_active_order(Order::Idle);
         }
         self.state.entities.release_miner(input.entity_id);
-        self.repair_lab_state();
         Ok(LabOpOutcome::Moved {
             entity_id: input.entity_id,
             x,
@@ -472,7 +739,6 @@ impl Game {
         }
         self.state.entities.release_miner(input.entity_id);
         self.cleanup_entity_references(input.entity_id);
-        self.repair_lab_state();
         Ok(LabOpOutcome::OwnerSet {
             entity_id: input.entity_id,
             owner: input.owner,
@@ -573,12 +839,17 @@ impl Game {
         x: f32,
         y: f32,
     ) -> Result<(), LabError> {
-        validate_world_position(&self.state.map, x, y)?;
-        let occ = Occupancy::build(&self.state.map, entities);
-        if !standability::unit_spawn_standable(&self.state.map, &occ, entities, kind, x, y) {
-            return Err(LabError::OccupiedPosition { x, y });
+        if unit_position_valid(&self.state.map, entities, kind, x, y) {
+            return Ok(());
         }
-        Ok(())
+        Err(placement_error(
+            &self.state.map,
+            entities,
+            kind,
+            x,
+            y,
+            false,
+        ))
     }
 
     fn validate_building_position(
@@ -588,24 +859,10 @@ impl Game {
         x: f32,
         y: f32,
     ) -> Result<(u32, u32, f32, f32), LabError> {
-        validate_world_position(&self.state.map, x, y)?;
-        let (tile_x, tile_y, center_x, center_y) =
-            building_top_left_for_center(&self.state.map, kind, x, y)?;
-        for (tx, ty) in footprint_tiles(kind, tile_x, tile_y) {
-            if !self.state.map.in_bounds(tx as i32, ty as i32)
-                || !self.state.map.is_passable(tx as i32, ty as i32)
-            {
-                return Err(LabError::InvalidPosition {
-                    x,
-                    y,
-                    reason: "building footprint is out of bounds or on blocked terrain",
-                });
-            }
+        if let Some(result) = building_position_if_valid(&self.state.map, entities, kind, x, y) {
+            return Ok(result);
         }
-        if !standability::building_site_clear(&self.state.map, entities, kind, tile_x, tile_y) {
-            return Err(LabError::OccupiedPosition { x, y });
-        }
-        Ok((tile_x, tile_y, center_x, center_y))
+        Err(placement_error(&self.state.map, entities, kind, x, y, true))
     }
 
     fn cleanup_entity_references(&mut self, entity_id: u32) {
@@ -665,6 +922,285 @@ impl Game {
                 entity.set_invulnerable(is_player_asset && enabled_players.contains(&entity.owner));
             }
         }
+    }
+}
+
+fn validate_batch_size(count: usize) -> Result<(), LabError> {
+    if (1..=LAB_MAX_MUTATION_BATCH).contains(&count) {
+        Ok(())
+    } else {
+        Err(LabError::BatchSize {
+            count,
+            maximum: LAB_MAX_MUTATION_BATCH,
+        })
+    }
+}
+
+fn batch_error(error: LabBatchError) -> LabError {
+    LabError::BatchFailed {
+        failed_index: error.failed_index,
+        error: Box::new(error.error),
+    }
+}
+
+fn validate_update_duplicates(updates: &[LabUpdate]) -> Result<(), LabBatchError> {
+    let mut entities = HashSet::new();
+    let mut player_fields = HashSet::new();
+    for (index, update) in updates.iter().enumerate() {
+        let duplicate = match update {
+            LabUpdate::Move(input) => !entities.insert(input.entity_id),
+            LabUpdate::SetEntityOwner(input) => !entities.insert(input.entity_id),
+            LabUpdate::SetPlayerResources(input) => {
+                !player_fields.insert((input.player_id, "resources".to_string()))
+            }
+            LabUpdate::SetPlayerGodMode { player_id, .. } => {
+                !player_fields.insert((*player_id, "godMode".to_string()))
+            }
+            LabUpdate::SetCompletedResearch(input) => !player_fields.insert((
+                input.player_id,
+                format!("research:{}", input.upgrade.to_protocol_str()),
+            )),
+        };
+        if duplicate {
+            return Err(LabBatchError {
+                failed_index: index,
+                error: LabError::DuplicateMutation {
+                    reason:
+                        "batch contains more than one update for the same entity or player field"
+                            .to_string(),
+                },
+            });
+        }
+    }
+    Ok(())
+}
+
+fn unit_position_valid(
+    map: &Map,
+    entities: &EntityStore,
+    kind: EntityKind,
+    x: f32,
+    y: f32,
+) -> bool {
+    if validate_world_position(map, x, y).is_err() {
+        return false;
+    }
+    let occ = Occupancy::build(map, entities);
+    standability::unit_spawn_standable(map, &occ, entities, kind, x, y)
+}
+
+fn building_position_if_valid(
+    map: &Map,
+    entities: &EntityStore,
+    kind: EntityKind,
+    x: f32,
+    y: f32,
+) -> Option<(u32, u32, f32, f32)> {
+    validate_world_position(map, x, y).ok()?;
+    let (tile_x, tile_y, center_x, center_y) =
+        building_top_left_for_center(map, kind, x, y).ok()?;
+    if footprint_tiles(kind, tile_x, tile_y)
+        .into_iter()
+        .any(|(tx, ty)| {
+            !map.in_bounds(tx as i32, ty as i32) || !map.is_passable(tx as i32, ty as i32)
+        })
+    {
+        return None;
+    }
+    standability::building_site_clear(map, entities, kind, tile_x, tile_y)
+        .then_some((tile_x, tile_y, center_x, center_y))
+}
+
+fn placement_error(
+    map: &Map,
+    entities: &EntityStore,
+    kind: EntityKind,
+    x: f32,
+    y: f32,
+    building: bool,
+) -> LabError {
+    let blockers = placement_blockers(map, entities, kind, x, y, building);
+    let suggestions = placement_suggestions(map, entities, kind, x, y, building);
+    LabError::Placement {
+        x,
+        y,
+        blockers,
+        suggestions,
+    }
+}
+
+fn placement_blockers(
+    map: &Map,
+    entities: &EntityStore,
+    kind: EntityKind,
+    x: f32,
+    y: f32,
+    building: bool,
+) -> Vec<LabPlacementBlocker> {
+    let mut blockers = Vec::new();
+    let world_size = map.size.saturating_mul(config::TILE_SIZE);
+    if !x.is_finite()
+        || !y.is_finite()
+        || x < 0.0
+        || y < 0.0
+        || x >= world_size as f32
+        || y >= world_size as f32
+    {
+        blockers.push(LabPlacementBlocker::Boundary { world_size });
+    }
+
+    let tile_size = config::TILE_SIZE as f32;
+    let (min_tx, max_tx, min_ty, max_ty) = if building {
+        match building_top_left_for_center(map, kind, x, y) {
+            Ok((tile_x, tile_y, _, _)) => {
+                let tiles = footprint_tiles(kind, tile_x, tile_y);
+                let max_x = tiles
+                    .iter()
+                    .map(|(tx, _)| *tx as i32)
+                    .max()
+                    .unwrap_or(tile_x as i32);
+                let max_y = tiles
+                    .iter()
+                    .map(|(_, ty)| *ty as i32)
+                    .max()
+                    .unwrap_or(tile_y as i32);
+                (tile_x as i32, max_x, tile_y as i32, max_y)
+            }
+            Err(_) => {
+                let tx = (x / tile_size).floor() as i32;
+                let ty = (y / tile_size).floor() as i32;
+                (tx, tx, ty, ty)
+            }
+        }
+    } else {
+        let radius = config::unit_stats(kind)
+            .map(|stats| stats.radius)
+            .unwrap_or(tile_size / 2.0);
+        (
+            ((x - radius) / tile_size).floor() as i32,
+            ((x + radius) / tile_size).floor() as i32,
+            ((y - radius) / tile_size).floor() as i32,
+            ((y + radius) / tile_size).floor() as i32,
+        )
+    };
+    for ty in min_ty..=max_ty {
+        for tx in min_tx..=max_tx {
+            if !map.in_bounds(tx, ty) {
+                if !blockers
+                    .iter()
+                    .any(|blocker| matches!(blocker, LabPlacementBlocker::Boundary { .. }))
+                {
+                    blockers.push(LabPlacementBlocker::Boundary { world_size });
+                }
+            } else if !map.is_passable(tx, ty) {
+                let terrain = map
+                    .terrain
+                    .get(ty as usize * map.size as usize + tx as usize)
+                    .copied()
+                    .map(terrain_name)
+                    .unwrap_or("unknown")
+                    .to_string();
+                blockers.push(LabPlacementBlocker::Terrain {
+                    tile_x: tx,
+                    tile_y: ty,
+                    terrain,
+                });
+            }
+        }
+    }
+
+    let candidate_radius = if building {
+        config::building_stats(kind)
+            .map(|stats| stats.foot_w.max(stats.foot_h) as f32 * tile_size * 0.5)
+            .unwrap_or(tile_size)
+    } else {
+        config::unit_stats(kind)
+            .map(|stats| stats.radius)
+            .unwrap_or(tile_size / 2.0)
+    };
+    for entity in entities.iter().filter(|entity| entity.hp > 0) {
+        let dx = entity.pos_x - x;
+        let dy = entity.pos_y - y;
+        if dx * dx + dy * dy >= (candidate_radius + entity.radius()).powi(2) {
+            continue;
+        }
+        let blocker = if entity.is_building() || entity.is_node() {
+            LabPlacementBlocker::Feature {
+                feature: if entity.is_node() {
+                    "resource"
+                } else {
+                    "building"
+                }
+                .to_string(),
+                entity_id: entity.id,
+                entity_kind: entity.kind.to_string(),
+            }
+        } else {
+            LabPlacementBlocker::Entity {
+                entity_id: entity.id,
+                entity_kind: entity.kind.to_string(),
+            }
+        };
+        blockers.push(blocker);
+    }
+    blockers.truncate(32);
+    blockers
+}
+
+fn placement_suggestions(
+    map: &Map,
+    entities: &EntityStore,
+    kind: EntityKind,
+    x: f32,
+    y: f32,
+    building: bool,
+) -> Vec<(f32, f32)> {
+    let tile_size = config::TILE_SIZE as f32;
+    let mut suggestions = Vec::new();
+    let mut work = 0usize;
+    for radius in 1..=LAB_PLACEMENT_SEARCH_RADIUS_TILES {
+        for dy in -radius..=radius {
+            for dx in -radius..=radius {
+                if dx.abs() != radius && dy.abs() != radius {
+                    continue;
+                }
+                work += 1;
+                if work > LAB_PLACEMENT_SEARCH_WORK_LIMIT {
+                    return suggestions;
+                }
+                let candidate_x = x + dx as f32 * tile_size;
+                let candidate_y = y + dy as f32 * tile_size;
+                let point = if building {
+                    let Some((_, _, snapped_x, snapped_y)) =
+                        building_position_if_valid(map, entities, kind, candidate_x, candidate_y)
+                    else {
+                        continue;
+                    };
+                    (snapped_x, snapped_y)
+                } else {
+                    if !unit_position_valid(map, entities, kind, candidate_x, candidate_y) {
+                        continue;
+                    }
+                    (candidate_x, candidate_y)
+                };
+                if !suggestions.contains(&point) {
+                    suggestions.push(point);
+                }
+                if suggestions.len() == LAB_PLACEMENT_SUGGESTION_LIMIT {
+                    return suggestions;
+                }
+            }
+        }
+    }
+    suggestions
+}
+
+fn terrain_name(tile: u8) -> &'static str {
+    match tile {
+        terrain::GRASS => "grass",
+        terrain::ROCK => "rock",
+        terrain::WATER => "water",
+        _ => "unknown",
     }
 }
 
@@ -850,615 +1386,4 @@ fn validate_upgrade_for_player(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::game::entity::WeaponSetup;
-    use crate::game::services::occupancy::footprint_center;
-    use crate::protocol::{terrain, LabMapTile};
-
-    fn lab_players() -> [PlayerInit; 2] {
-        [
-            PlayerInit {
-                id: 1,
-                team_id: 1,
-                faction_id: "kriegsia".to_string(),
-                name: "Alpha".to_string(),
-                color: "#4878c8".to_string(),
-                is_ai: false,
-            },
-            PlayerInit {
-                id: 2,
-                team_id: 2,
-                faction_id: "kriegsia".to_string(),
-                name: "Bravo".to_string(),
-                color: "#c84848".to_string(),
-                is_ai: false,
-            },
-        ]
-    }
-
-    fn lab_metadata() -> MapMetadata {
-        MapMetadata {
-            name: "Default".to_string(),
-            schema_version: crate::game::map::CURRENT_MAP_VERSION,
-            content_hash: "test-map".to_string(),
-        }
-    }
-
-    fn flat_lab_map() -> Map {
-        const SIZE: u32 = 64;
-        Map {
-            size: SIZE,
-            terrain: vec![terrain::GRASS; (SIZE * SIZE) as usize],
-            starts: vec![(16, 16), (48, 48)],
-            expansion_sites: Vec::new(),
-        }
-    }
-
-    fn new_game() -> Game {
-        Game::new_lab(&lab_players(), 0xABCD, flat_lab_map(), lab_metadata())
-    }
-
-    fn map_draft() -> LabMapDraft {
-        let mut terrain = vec![terrain::GRASS; 64 * 64];
-        terrain[0] = terrain::WATER;
-        LabMapDraft {
-            name: "Edited Lab Map".to_string(),
-            size: 64,
-            terrain,
-            starts: vec![LabMapTile { x: 12, y: 12 }, LabMapTile { x: 51, y: 51 }],
-            expansion_sites: vec![LabMapTile { x: 32, y: 32 }],
-        }
-    }
-
-    #[test]
-    fn lab_map_draft_rebuilds_the_battle_on_authoritative_terrain_and_bases() {
-        let mut game = new_game();
-        for _ in 0..10 {
-            game.tick();
-        }
-
-        let outcome = game
-            .apply_lab_op(LabOp::ApplyMapDraft(map_draft()))
-            .expect("valid lab map draft");
-
-        assert_eq!(
-            outcome,
-            LabOpOutcome::MapDraftApplied {
-                name: "Edited Lab Map".to_string(),
-                size: 64,
-                battle_reset: true,
-            }
-        );
-        assert_eq!(game.tick_count(), 0);
-        assert_eq!(game.state.map.terrain[0], terrain::WATER);
-        assert_eq!(game.state.map.starts, vec![(12, 12), (51, 51)]);
-        assert_eq!(game.state.map.expansion_sites, vec![(32, 32)]);
-        assert_eq!(game.state.map_metadata.name, "Edited Lab Map");
-        assert_eq!(
-            game.start_payload()
-                .players
-                .iter()
-                .map(|player| (player.start_tile_x, player.start_tile_y))
-                .collect::<Vec<_>>(),
-            vec![(12, 12), (51, 51)]
-        );
-    }
-
-    #[test]
-    fn lab_map_draft_rejects_blocked_base_protection_area() {
-        let mut game = new_game();
-        let mut draft = map_draft();
-        draft.terrain[12 * 64 + 12] = terrain::ROCK;
-
-        assert!(matches!(
-            game.apply_lab_op(LabOp::ApplyMapDraft(draft)),
-            Err(LabError::InvalidMap { reason, .. })
-                if reason.contains("protected area")
-        ));
-    }
-
-    #[test]
-    fn lab_map_draft_allows_terrain_immediately_beyond_starting_unit_area() {
-        let mut game = new_game();
-        let mut draft = map_draft();
-        draft.terrain[12 * 64 + 16] = terrain::ROCK;
-
-        game.apply_lab_op(LabOp::ApplyMapDraft(draft))
-            .expect("terrain beyond the starting unit area should remain editable");
-        assert_eq!(game.state.map.terrain[12 * 64 + 16], terrain::ROCK);
-    }
-
-    #[test]
-    fn terrain_only_lab_map_draft_restarts_a_fresh_test() {
-        let mut game = new_game();
-        let worker_id = game
-            .state
-            .entities
-            .iter()
-            .find(|entity| entity.owner == 1 && entity.kind == EntityKind::Worker)
-            .map(|entity| entity.id)
-            .expect("starting worker");
-        let (worker_x, worker_y) = game.state.map.tile_center(30, 30);
-        game.apply_lab_op(LabOp::MoveEntity(LabMoveEntity {
-            entity_id: worker_id,
-            x: worker_x,
-            y: worker_y,
-        }))
-        .expect("move worker to map center");
-        for _ in 0..10 {
-            game.tick();
-        }
-        assert!(game.tick_count() > 0);
-        let mut terrain = game.state.map.terrain.clone();
-        for y in 29..=31 {
-            for x in 30..=32 {
-                terrain[y * 64 + x] = terrain::ROCK;
-            }
-        }
-        let draft = LabMapDraft {
-            name: "Terrain-only edit".to_string(),
-            size: 64,
-            terrain,
-            starts: game
-                .state
-                .map
-                .starts
-                .iter()
-                .map(|&(x, y)| LabMapTile { x, y })
-                .collect(),
-            expansion_sites: Vec::new(),
-        };
-
-        let outcome = game
-            .apply_lab_op(LabOp::ApplyMapDraft(draft))
-            .expect("terrain-only edit");
-
-        assert_eq!(
-            outcome,
-            LabOpOutcome::MapDraftApplied {
-                name: "Terrain-only edit".to_string(),
-                size: 64,
-                battle_reset: true,
-            }
-        );
-        assert_eq!(game.tick_count(), 0);
-        assert_eq!(game.state.map.terrain[30 * 64 + 31], terrain::ROCK);
-        assert!(
-            game.state
-                .entities
-                .iter()
-                .filter(|entity| entity.owner == 1 && entity.kind == EntityKind::Worker)
-                .all(|worker| (worker.pos_x, worker.pos_y) != (worker_x, worker_y)),
-            "a fresh test must not retain the moved worker from the previous run"
-        );
-    }
-
-    fn default_map_game() -> Game {
-        let players = lab_players();
-        let start_players: Vec<_> = players
-            .iter()
-            .map(|player| (player.id, player.team_id))
-            .collect();
-        let map =
-            Map::load_for_players("Default", &start_players, 0xABCD).expect("default lab map");
-        let metadata = Map::metadata_for_name("Default").expect("default map metadata");
-        Game::new_lab(&players, 0xABCD, map, metadata)
-    }
-
-    fn tile_center(game: &Game, x: u32, y: u32) -> (f32, f32) {
-        game.state.map.tile_center(x, y)
-    }
-
-    fn assert_angle_close(actual: f32, expected: f32) {
-        assert!(
-            (actual - expected).abs() < 0.001,
-            "expected angle {expected:.4}, got {actual:.4}"
-        );
-    }
-
-    fn free_unit_position(game: &Game, kind: EntityKind) -> (f32, f32) {
-        for ty in 8..game.state.map.size.saturating_sub(8) {
-            for tx in 8..game.state.map.size.saturating_sub(8) {
-                let (x, y) = game.state.map.tile_center(tx, ty);
-                if game
-                    .validate_unit_position(&game.state.entities, kind, x, y)
-                    .is_ok()
-                {
-                    return (x, y);
-                }
-            }
-        }
-        panic!("no free position found for {kind:?}");
-    }
-
-    #[test]
-    fn lab_spawn_unit_repairs_supply_and_snapshot_fog() {
-        let mut game = new_game();
-        let before_supply = game.snapshot_for(1).supply_used;
-        let (enemy_x, enemy_y) = tile_center(&game, 35, 35);
-        let enemy = game
-            .apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
-                owner: 2,
-                kind: EntityKind::Depot,
-                x: enemy_x,
-                y: enemy_y,
-                completed: true,
-            }))
-            .expect("enemy building should spawn");
-        let LabOpOutcome::Spawned {
-            entity_id: enemy_id,
-        } = enemy
-        else {
-            panic!("unexpected outcome");
-        };
-
-        assert!(
-            !game
-                .snapshot_for(1)
-                .entities
-                .iter()
-                .any(|entity| entity.id == enemy_id),
-            "enemy building should start outside player 1 fog"
-        );
-
-        let (scout_x, scout_y) = tile_center(&game, 30, 35);
-        let spawned = game
-            .apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
-                owner: 1,
-                kind: EntityKind::ScoutCar,
-                x: scout_x,
-                y: scout_y,
-                completed: true,
-            }))
-            .expect("scout should spawn");
-        let LabOpOutcome::Spawned { entity_id } = spawned else {
-            panic!("unexpected outcome");
-        };
-        let snapshot = game.snapshot_for(1);
-        assert!(snapshot
-            .entities
-            .iter()
-            .any(|entity| entity.id == entity_id));
-        assert!(snapshot.entities.iter().any(|entity| entity.id == enemy_id));
-        assert_eq!(
-            snapshot.supply_used,
-            before_supply + rules::economy::supply_cost(EntityKind::ScoutCar)
-        );
-    }
-
-    #[test]
-    fn lab_spawn_building_repairs_supply_cap() {
-        let mut game = new_game();
-        let before_cap = game.snapshot_for(1).supply_cap;
-        let (x, y) = footprint_center(&game.state.map, EntityKind::Depot, 28, 28);
-
-        game.apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
-            owner: 1,
-            kind: EntityKind::Depot,
-            x,
-            y,
-            completed: true,
-        }))
-        .expect("depot should spawn");
-
-        assert_eq!(
-            game.snapshot_for(1).supply_cap,
-            before_cap + rules::economy::supply_provided(EntityKind::Depot)
-        );
-    }
-
-    #[test]
-    fn lab_spawn_rejects_nodes_invalid_owners_bad_positions_and_occupied_sites() {
-        let mut game = new_game();
-        let (x, y) = tile_center(&game, 30, 30);
-
-        assert!(matches!(
-            game.apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
-                owner: 1,
-                kind: EntityKind::Steel,
-                x,
-                y,
-                completed: true,
-            })),
-            Err(LabError::InvalidKind { .. })
-        ));
-        assert!(matches!(
-            game.apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
-                owner: 999,
-                kind: EntityKind::Worker,
-                x,
-                y,
-                completed: true,
-            })),
-            Err(LabError::InvalidOwner { owner: 999 })
-        ));
-        assert!(matches!(
-            game.apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
-                owner: 1,
-                kind: EntityKind::Worker,
-                x: f32::NAN,
-                y,
-                completed: true,
-            })),
-            Err(LabError::InvalidPosition { .. })
-        ));
-
-        let worker = game
-            .state
-            .entities
-            .iter()
-            .find(|entity| entity.owner == 1 && entity.kind == EntityKind::Worker)
-            .expect("starting worker")
-            .clone();
-        assert!(matches!(
-            game.apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
-                owner: 1,
-                kind: EntityKind::Rifleman,
-                x: worker.pos_x,
-                y: worker.pos_y,
-                completed: true,
-            })),
-            Err(LabError::OccupiedPosition { .. })
-        ));
-
-        let city_centre = game
-            .state
-            .entities
-            .iter()
-            .find(|entity| entity.owner == 1 && entity.kind == EntityKind::CityCentre)
-            .expect("starting city centre")
-            .clone();
-        assert!(matches!(
-            game.apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
-                owner: 1,
-                kind: EntityKind::Depot,
-                x: city_centre.pos_x,
-                y: city_centre.pos_y,
-                completed: true,
-            })),
-            Err(LabError::OccupiedPosition { .. })
-        ));
-    }
-
-    #[test]
-    fn lab_move_entity_validates_collision_and_repairs_position() {
-        let mut game = new_game();
-        let (x, y) = tile_center(&game, 30, 30);
-        let LabOpOutcome::Spawned { entity_id } = game
-            .apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
-                owner: 1,
-                kind: EntityKind::Rifleman,
-                x,
-                y,
-                completed: true,
-            }))
-            .expect("rifleman should spawn")
-        else {
-            panic!("unexpected outcome");
-        };
-
-        let (move_x, move_y) = tile_center(&game, 31, 30);
-        game.apply_lab_op(LabOp::MoveEntity(LabMoveEntity {
-            entity_id,
-            x: move_x,
-            y: move_y,
-        }))
-        .expect("move should be accepted");
-        let moved = game.state.entities.get(entity_id).expect("moved entity");
-        assert_eq!((moved.pos_x, moved.pos_y), (move_x, move_y));
-
-        let city_centre = game
-            .state
-            .entities
-            .iter()
-            .find(|entity| entity.owner == 1 && entity.kind == EntityKind::CityCentre)
-            .expect("starting city centre")
-            .clone();
-        assert!(matches!(
-            game.apply_lab_op(LabOp::MoveEntity(LabMoveEntity {
-                entity_id,
-                x: city_centre.pos_x,
-                y: city_centre.pos_y,
-            })),
-            Err(LabError::OccupiedPosition { .. })
-        ));
-    }
-
-    #[test]
-    fn lab_set_owner_and_delete_repair_supply_and_references() {
-        let mut game = new_game();
-        let (x, y) = tile_center(&game, 30, 30);
-        let LabOpOutcome::Spawned { entity_id } = game
-            .apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
-                owner: 1,
-                kind: EntityKind::Tank,
-                x,
-                y,
-                completed: true,
-            }))
-            .expect("tank should spawn")
-        else {
-            panic!("unexpected outcome");
-        };
-
-        game.apply_lab_op(LabOp::SetEntityOwner(LabSetEntityOwner {
-            entity_id,
-            owner: 2,
-        }))
-        .expect("owner change should be accepted");
-        assert_eq!(game.state.entities.get(entity_id).expect("tank").owner, 2);
-        assert_eq!(
-            game.snapshot_for(1).supply_used,
-            rules::economy::supply_cost(EntityKind::Worker) * config::STARTING_WORKERS
-        );
-        assert!(game.snapshot_for(2).supply_used >= rules::economy::supply_cost(EntityKind::Tank));
-
-        game.apply_lab_op(LabOp::DeleteEntity { entity_id })
-            .expect("delete should be accepted");
-        assert!(game.state.entities.get(entity_id).is_none());
-        assert!(matches!(
-            game.apply_lab_op(LabOp::DeleteEntity { entity_id }),
-            Err(LabError::StaleEntity { .. })
-        ));
-    }
-
-    #[test]
-    fn lab_resources_and_research_validate_players_and_factions() {
-        let mut game = new_game();
-        game.apply_lab_op(LabOp::SetPlayerResources(LabSetPlayerResources {
-            player_id: 1,
-            steel: 1234,
-            oil: 567,
-        }))
-        .expect("resources should be accepted");
-        let snapshot = game.snapshot_for(1);
-        assert_eq!((snapshot.steel, snapshot.oil), (1234, 567));
-
-        game.apply_lab_op(LabOp::SetCompletedResearch(LabSetCompletedResearch {
-            player_id: 1,
-            upgrade: UpgradeKind::TankUnlock,
-            completed: true,
-        }))
-        .expect("research should be accepted");
-        assert!(game
-            .snapshot_for(1)
-            .upgrades
-            .contains(&UpgradeKind::TankUnlock.to_protocol_str().to_string()));
-        game.apply_lab_op(LabOp::SetCompletedResearch(LabSetCompletedResearch {
-            player_id: 1,
-            upgrade: UpgradeKind::TankUnlock,
-            completed: false,
-        }))
-        .expect("research removal should be accepted");
-        assert!(!game
-            .snapshot_for(1)
-            .upgrades
-            .contains(&UpgradeKind::TankUnlock.to_protocol_str().to_string()));
-
-        assert!(matches!(
-            game.apply_lab_op(LabOp::SetPlayerResources(LabSetPlayerResources {
-                player_id: 999,
-                steel: 1,
-                oil: 1,
-            })),
-            Err(LabError::InvalidPlayer { player_id: 999 })
-        ));
-    }
-
-    #[test]
-    fn lab_rejects_research_not_in_player_faction_catalog() {
-        let players = [PlayerInit {
-            id: 7,
-            team_id: 7,
-            faction_id: "ekat".to_string(),
-            name: "Ekat".to_string(),
-            color: "#fff".to_string(),
-            is_ai: false,
-        }];
-        let map = Map {
-            size: 32,
-            terrain: vec![terrain::GRASS; 32 * 32],
-            starts: vec![(8, 8)],
-            expansion_sites: Vec::new(),
-        };
-        let mut game = Game::new_lab(&players, 1, map, lab_metadata());
-
-        assert!(matches!(
-            game.apply_lab_op(LabOp::SetCompletedResearch(LabSetCompletedResearch {
-                player_id: 7,
-                upgrade: UpgradeKind::TankUnlock,
-                completed: true,
-            })),
-            Err(LabError::InvalidResearch { player_id: 7, .. })
-        ));
-    }
-
-    #[test]
-    fn lab_checkpoint_setup_round_trips_exact_state_with_id_map() {
-        let mut game = default_map_game();
-        let tank_facing = -1.25;
-        let tank_weapon_facing = 0.75;
-        let (x, y) = free_unit_position(&game, EntityKind::Tank);
-        let LabOpOutcome::Spawned { entity_id: tank_id } = game
-            .apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
-                owner: 1,
-                kind: EntityKind::Tank,
-                x,
-                y,
-                completed: true,
-            }))
-            .expect("tank should spawn")
-        else {
-            panic!("unexpected outcome");
-        };
-        {
-            let tank = game.state.entities.get_mut(tank_id).expect("spawned tank");
-            tank.set_facing(tank_facing);
-            tank.set_weapon_facing(tank_weapon_facing);
-            tank.set_desired_weapon_facing(tank_weapon_facing);
-        }
-        let (x, y) = free_unit_position(&game, EntityKind::AntiTankGun);
-        let LabOpOutcome::Spawned { entity_id: gun_id } = game
-            .apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
-                owner: 1,
-                kind: EntityKind::AntiTankGun,
-                x,
-                y,
-                completed: true,
-            }))
-            .expect("anti-tank gun should spawn")
-        else {
-            panic!("unexpected outcome");
-        };
-        let setup_target = tile_center(&game, 40, 32);
-        let setup_facing = (setup_target.1 - y).atan2(setup_target.0 - x);
-        let gun_weapon_facing = setup_facing + 0.125;
-        {
-            let gun = game.state.entities.get_mut(gun_id).expect("spawned gun");
-            gun.set_weapon_setup(WeaponSetup::Deployed);
-            gun.set_emplacement_facing(Some(setup_facing));
-            gun.set_weapon_facing(gun_weapon_facing);
-            gun.set_desired_weapon_facing(gun_weapon_facing);
-        }
-
-        let scenario = game
-            .export_lab_checkpoint_scenario("Checkpoint setup".to_string(), "test-build")
-            .expect("checkpoint setup should export");
-        assert_eq!(scenario.metadata.source_scenario, None);
-        assert!(scenario
-            .metadata
-            .source_entity_id_map
-            .iter()
-            .any(|entry| entry.old_id == tank_id && entry.new_id == tank_id));
-        assert!(scenario
-            .metadata
-            .source_entity_id_map
-            .iter()
-            .any(|entry| entry.old_id == gun_id && entry.new_id == gun_id));
-
-        let mut restored = Game::restore_lab_checkpoint_scenario(scenario.clone())
-            .expect("checkpoint setup should restore");
-        let restored_tank = restored.state.entities.get(tank_id).expect("restored tank");
-        assert_eq!(restored_tank.kind, EntityKind::Tank);
-        assert_eq!(restored_tank.owner, 1);
-        assert!(matches!(restored_tank.weapon_setup(), WeaponSetup::Packed));
-        assert_angle_close(restored_tank.facing(), tank_facing);
-        assert_angle_close(
-            restored_tank.weapon_facing().unwrap_or_default(),
-            tank_weapon_facing,
-        );
-        let restored_gun = restored.state.entities.get(gun_id).expect("restored gun");
-        assert_eq!(restored_gun.kind, EntityKind::AntiTankGun);
-        assert!(matches!(restored_gun.weapon_setup(), WeaponSetup::Deployed));
-        assert_angle_close(
-            restored_gun.emplacement_facing().unwrap_or_default(),
-            setup_facing,
-        );
-        assert_angle_close(
-            restored_gun.weapon_facing().unwrap_or_default(),
-            gun_weapon_facing,
-        );
-        restored.tick();
-    }
-}
+mod tests;

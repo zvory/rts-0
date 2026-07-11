@@ -37,6 +37,7 @@ await import("./client_contracts/lab_contracts.mjs");
 await import("./lab_interact_driver_contracts.mjs");
 await import("./lab_interact_cli_contracts.mjs");
 await import("./client_contracts/lab_interact_capture_contracts.mjs");
+await import("./client_contracts/lab_interact_bulk_contracts.mjs");
 await import("./client_contracts/lab_control_group_contracts.mjs");
 await import("./client_contracts/lab_input_ownership_contracts.mjs");
 await import("./client_contracts/lab_tool_input_contracts.mjs");

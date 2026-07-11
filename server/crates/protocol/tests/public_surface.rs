@@ -11,15 +11,15 @@ use rts_protocol::{
     LabClientOp, LabReplayArtifactV1, LabReplayAuthoringMetadata, LabReplayOperation,
     LabReplayOperationEntry, LabReplayTimelineMetadata, LabReplayValidationError, LabResult,
     LabScenarioEntityIdRemap, LabScenarioLabMetadata, LabScenarioPayload, LabScenarioTile,
-    LabStartMetadata, LabStartRole, LabState, LabVisionMode, LivePauseState, LobbyPlayer, MapInfo,
-    MatchControlCapabilities, MovementPathDiagnosticScope, NoticeSeverity,
-    ObserverAnalysisAiDiagnostics, ObserverAnalysisKindCount, ObserverAnalysisPayload,
-    ObserverAnalysisPlayer, ObserverAnalysisProduction, ObserverAnalysisResourcesLost,
-    OrderPlanMarker, PlayerResourceSnapshot, PlayerScore, PlayerStart, ProtocolCompactCodes,
-    ProtocolContract, ProtocolMessageTags, ProtocolVocabularies, RememberedBuildingView,
-    ReplayBranchSeat, ReplayStartMetadata, ResourceDelta, ResourceNode, RoomCapabilities,
-    RoomTimeCapabilities, RoomTimeState, ScoutPlaneStateView, ServerMessage, SlotField,
-    SmokeCloudView, Snapshot, SnapshotCodec, SnapshotCodecContract, SnapshotEncodeError,
+    LabSpawnEntitySpec, LabStartMetadata, LabStartRole, LabState, LabUpdateSpec, LabVisionMode,
+    LivePauseState, LobbyPlayer, MapInfo, MatchControlCapabilities, MovementPathDiagnosticScope,
+    NoticeSeverity, ObserverAnalysisAiDiagnostics, ObserverAnalysisKindCount,
+    ObserverAnalysisPayload, ObserverAnalysisPlayer, ObserverAnalysisProduction,
+    ObserverAnalysisResourcesLost, OrderPlanMarker, PlayerResourceSnapshot, PlayerScore,
+    PlayerStart, ProtocolCompactCodes, ProtocolContract, ProtocolMessageTags, ProtocolVocabularies,
+    RememberedBuildingView, ReplayBranchSeat, ReplayStartMetadata, ResourceDelta, ResourceNode,
+    RoomCapabilities, RoomTimeCapabilities, RoomTimeState, ScoutPlaneStateView, ServerMessage,
+    SlotField, SmokeCloudView, Snapshot, SnapshotCodec, SnapshotCodecContract, SnapshotEncodeError,
     SnapshotFrame, SnapshotNetStatus, StartPayload, TeamId, TrenchView, VisibilityCapabilities,
     VisionSelectionRequest, COMPACT_SNAPSHOT_VERSION, COMPACT_UNKNOWN_CODE, DEFAULT_FACTION_ID,
     LAB_REPLAY_ARTIFACT_KIND, LAB_REPLAY_ARTIFACT_SCHEMA, LAB_REPLAY_ARTIFACT_SCHEMA_VERSION,
@@ -63,6 +63,8 @@ fn stable_rust_public_surface_compiles() {
     assert_type::<LabReplayTimelineMetadata>();
     assert_type::<LabReplayValidationError>();
     assert_type::<LabResult>();
+    assert_type::<LabSpawnEntitySpec>();
+    assert_type::<LabUpdateSpec>();
     assert_type::<LabCheckpointScenarioMap>();
     assert_type::<LabCheckpointScenarioMapData>();
     assert_type::<LabCheckpointScenarioMetadata>();
