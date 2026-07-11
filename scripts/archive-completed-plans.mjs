@@ -3,16 +3,9 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { phaseMarkedDoneText } from "./plan-phase-status.mjs";
 
-const DONE_MARKERS = [
-  /^Status:\s*Done\b[^\n]*$/im,
-  /^##\s+Status\s*\n+\s*Done\b[^\n]*$/im,
-  /^##\s+Phase Status\s*\n+(?:[ \t]*\n)*\s*-\s*\[x\]\s*Done\b[^\n]*$/im,
-];
-
-export function phaseMarkedDoneText(text) {
-  return DONE_MARKERS.some((marker) => marker.test(text));
-}
+export { phaseMarkedDoneText };
 
 export function planNameFromActivePhasePath(file) {
   const normalized = file.split(path.sep).join("/");

@@ -65,6 +65,8 @@ assert.equal(phaseMarkedDoneText("## Status\n\nDone.\n"), true);
 assert.equal(phaseMarkedDoneText("## Phase Status\n\n- [x] Done.\n"), true);
 assert.equal(phaseMarkedDoneText("## Phase Status\n\n- [x] Done. Manual QA remains.\n"), true);
 assert.equal(phaseMarkedDoneText("## Status\n\nDraft.\n"), false);
+assert.equal(phaseMarkedDoneText("Status: Done-ish.\n"), false);
+assert.equal(phaseMarkedDoneText("Status: Done? No.\n"), false);
 assert.equal(phaseBaseRefForRun({ dryRun: true, baseBranch: "main", baseBranchAvailable: true }), "main");
 assert.equal(phaseBaseRefForRun({ dryRun: true, baseBranch: "main", baseBranchAvailable: false }), "HEAD");
 assert.equal(phaseBaseRefForRun({ dryRun: false, baseBranch: "main", baseBranchAvailable: false }), "main");

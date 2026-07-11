@@ -29,6 +29,8 @@ assert.equal(phaseMarkedDoneText("## Status\n\nDone.\n"), true);
 assert.equal(phaseMarkedDoneText("## Phase Status\n\n- [x] Done.\n"), true);
 assert.equal(phaseMarkedDoneText("## Phase Status\n\n- [x] Done. Manual QA remains.\n"), true);
 assert.equal(phaseMarkedDoneText("Status: in progress.\n"), false);
+assert.equal(phaseMarkedDoneText("Status: Done-ish.\n"), false);
+assert.equal(phaseMarkedDoneText("Status: Done? No.\n"), false);
 assert.equal(planNameFromActivePhasePath("plans/example/phase-2.md"), "example");
 assert.equal(planNameFromActivePhasePath("plans/lab/room/phase-2.5-bakeoff.md"), "lab/room");
 assert.equal(planNameFromActivePhasePath("plans/archive/example/phase-2.md"), "");

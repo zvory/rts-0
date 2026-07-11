@@ -110,6 +110,7 @@ function isPhaseRunnerWorkflowPath(pathname) {
   return (
     pathname === "scripts/phase-runner.sh" ||
     pathname === "scripts/phase-runner-agents.mjs" ||
+    pathname === "scripts/plan-phase-status.mjs" ||
     pathname === "scripts/phase-runner-result.schema.json" ||
     pathname === "tests/phase_runner_agents.mjs" ||
     pathname === "tests/run-all.sh"
@@ -122,6 +123,7 @@ function isQualityPassWorkflowPath(pathname) {
     pathname === "scripts/adversarial-quality-pass.schema.json" ||
     pathname === "scripts/agent-pr.sh" ||
     pathname === "scripts/archive-completed-plans.mjs" ||
+    pathname === "scripts/plan-phase-status.mjs" ||
     pathname === "scripts/format-touched-rust.sh" ||
     pathname === "tests/archive_completed_plans.mjs" ||
     pathname === "tests/adversarial_quality_pass.mjs" ||
@@ -462,6 +464,7 @@ function verify() {
     [["scripts/adversarial-quality-pass.schema.json"], ["agent-workflow-quality-pass"]],
     [["scripts/agent-pr.sh"], ["agent-workflow-quality-pass"]],
     [["scripts/archive-completed-plans.mjs"], ["agent-workflow-quality-pass"]],
+    [["scripts/plan-phase-status.mjs"], ["agent-workflow-phase-runner", "agent-workflow-quality-pass"]],
     [["scripts/format-touched-rust.sh"], ["agent-workflow-quality-pass"]],
     [["tests/run-all.sh"], ["agent-workflow-phase-runner", "agent-workflow-quality-pass"]],
     [["server/crates/rules/src/faction.rs"], ["nextest-rules", "nextest-sim", "faction-assumptions", "faction-catalog-parity"]],

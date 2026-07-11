@@ -188,6 +188,7 @@ function copyWorkflowScripts(targetRepo) {
   for (const script of [
     "agent-pr.sh",
     "archive-completed-plans.mjs",
+    "plan-phase-status.mjs",
     "adversarial-quality-pass.mjs",
     "adversarial-quality-pass.schema.json",
     "format-touched-rust.sh",

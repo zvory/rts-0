@@ -3,15 +3,13 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { phaseMarkedDoneText } from "./plan-phase-status.mjs";
+
+export { phaseMarkedDoneText };
 
 const DEFAULT_WORKTREE_ROOT = "/tmp/rts-worktrees";
 const DEFAULT_BASE_BRANCH = "main";
 const DEFAULT_GH_BIN = "gh";
-const DONE_MARKERS = {
-  singleLineStatus: /^Status:\s*Done\b[^\n]*$/im,
-  headingStatus: /^##\s+Status\s*\n+\s*Done\b[^\n]*$/im,
-  checklistStatus: /^##\s+Phase Status\s*\n+(?:[ \t]*\n)*\s*-\s*\[x\]\s*Done\b[^\n]*$/im,
-};
 
 export function usage() {
   return `Usage:
@@ -208,14 +206,6 @@ export function discoverPhases(planDir, from, to) {
     throw usageError(`no phase files discovered after ${from} through ${to}`);
   }
   return phases;
-}
-
-export function phaseMarkedDoneText(text) {
-  return (
-    DONE_MARKERS.singleLineStatus.test(text) ||
-    DONE_MARKERS.headingStatus.test(text) ||
-    DONE_MARKERS.checklistStatus.test(text)
-  );
 }
 
 export function phaseMarkedDone(phaseFile) {
