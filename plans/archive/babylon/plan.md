@@ -1,5 +1,10 @@
 # Babylon.js perspective-renderer proof of concept
 
+> **Archived historical plan.** The proof-of-concept implementation branch was deleted after its
+> findings were recorded. Do not restore, reuse, or treat that implementation as a production
+> starting point; current work is governed by `plans/render3d/` and must be derived from current
+> `main` plus the durable contracts created there.
+
 ## Purpose
 
 Build one deliberately small, integrated proof of concept to decide whether Babylon.js should

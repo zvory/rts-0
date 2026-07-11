@@ -9,10 +9,11 @@ performance contracts, then proves them with a bounded opt-in Babylon path. When
 future work should be able to add one capability or content slice at a time without rediscovering
 the migration architecture or requiring gameplay logic to be implemented twice.
 
-This plan uses the checked-in client and the findings recorded in the PoC handoff as evidence. Do
-not inspect, merge, copy wholesale from, or treat the disposable PoC branch as production source;
-an implementation may independently recreate a small technique only after the relevant production
-contract owns it.
+The proof-of-concept implementation branch was deleted intentionally and is not an available
+dependency, reference implementation, or recovery source. This plan uses only the current
+checked-in client plus the high-level findings recorded in the PoC handoff as evidence. Every
+technique must be re-derived and implemented against current `main` and the durable production
+contracts created by this plan; do not attempt to restore, locate, or reuse PoC code or assets.
 
 ## Outcome
 
@@ -54,6 +55,9 @@ selection, lifecycle, capture, shadows, and batching, not with a converted facti
   scope decision before adding a wire field or moving gameplay authority into a renderer.
 - Keep Pixi as the default and release-required path throughout this plan. A normal match must not
   download, import, parse, initialize, or retain Babylon or experimental renderer modules.
+- Treat the deleted PoC implementation as nonexistent. No phase may recover it from Git history,
+  reflogs, caches, old worktrees, pull-request patches, artifacts, or another clone; similar code is
+  acceptable only when independently justified by the current phase contract and current code.
 - Run exactly one world renderer per match. Do not build a long-lived Pixi/Babylon compositor;
   the DOM HUD and existing minimap remain shared external presentation surfaces.
 - Keep `Match` as the sole animation-loop owner. Babylon renders only when the authoritative frame

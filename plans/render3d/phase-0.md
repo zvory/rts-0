@@ -7,7 +7,8 @@
 ## Objective
 
 Create the durable source of truth and evidence ledger that later executor phases can follow
-without reading the disposable PoC branch or reconstructing decisions from chat. Record the
+without recovering the intentionally deleted PoC implementation or reconstructing decisions from
+chat. Record the
 production rendering boundary, camera/projection semantics, presentation-frame policy, ownership
 model, coordinate and asset expectations, parity categories, benchmark scenarios, and separate
 content-expansion/default-cutover gates. This is a documentation-only, runtime-neutral architecture
@@ -47,8 +48,10 @@ phase: it must not add Babylon runtime code or change current Pixi behavior.
   quiet representative view, dense generic army, instanced vegetation, active finite effects,
   fog/core overlays, and repeated rematch. Record required metadata and counters, but defer actual
   Babylon budgets until Phases 11 and 12 measure the production backend.
-- Treat the user-supplied PoC metrics and defects as non-binding findings. Do not fetch the PoC
-  branch, copy its modules, or present its one-machine counts as current-main baselines.
+- Treat the user-supplied PoC metrics and defects as non-binding findings. The implementation branch
+  was deleted intentionally: do not recover it from history, reflogs, caches, old worktrees, PR
+  patches, artifacts, or another clone, and do not present its one-machine counts as current-main
+  baselines.
 
 ## Expected Touch Points
 
@@ -77,7 +80,7 @@ phase: it must not add Babylon runtime code or change current Pixi behavior.
 
 - No production or experimental renderer code.
 - No dependency download, vendor asset, GLB, shader, particle, fog, or camera behavior change.
-- No PoC branch inspection or code archaeology.
+- No PoC implementation recovery, code archaeology, or asset reuse.
 - No performance target invented from the PoC count or a single unrecorded local run.
 - No claim that the initial inventory is permanent; later phases update the durable document when
   implementation evidence improves it.
@@ -89,7 +92,7 @@ phase: it must not add Babylon runtime code or change current Pixi behavior.
 - [ ] Create the parity/evidence ledger with both migration gates.
 - [ ] Inventory raw camera consumers, Pixi presentation capabilities, and lifecycle resources.
 - [ ] Define reproducible scenario contracts and required diagnostics.
-- [ ] Record supplied PoC findings as non-binding evidence without inspecting its branch.
+- [ ] Record supplied PoC findings as non-binding evidence without recovering its implementation.
 - [ ] Run docs validation and mark this phase done in the implementation commit.
 
 ## Verification
