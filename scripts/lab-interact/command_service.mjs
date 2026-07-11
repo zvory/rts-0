@@ -17,6 +17,7 @@ export const LAB_INTERACT_LIMITS = Object.freeze({
   maxFocusRefs: 20,
   maxScreenshotSubjects: 20,
   maxArtifactBytes: 8 * 1024 * 1024,
+  maxAliasSidecarBytes: 64 * 1024,
 });
 
 export const LAB_INTERACT_COMMANDS = Object.freeze([
@@ -517,8 +518,7 @@ function readArtifact(workspaceRoot, { kind = null, artifactId = null, path: req
   if (!match) throw new LabInteractError("invalidArtifactPath", "Artifact filename is not a Lab Interact artifact.");
   const resolvedKind = match[2];
   if (kind && kind !== resolvedKind) throw new LabInteractError("artifactKindMismatch", "Requested artifact kind does not match the file.");
-  const bytes = fs.readFileSync(realPath);
-  if (bytes.length > LAB_INTERACT_LIMITS.maxArtifactBytes) throw new LabInteractError("artifactTooLarge", "Artifact exceeds 8 MiB.");
+  const bytes = readBoundedFile(realPath, LAB_INTERACT_LIMITS.maxArtifactBytes, "artifactTooLarge", "Artifact exceeds 8 MiB.");
   let artifact;
   try { artifact = JSON.parse(bytes); } catch { throw new LabInteractError("invalidArtifact", "Artifact is not valid JSON."); }
   validateArtifactShape(resolvedKind, artifact);
@@ -541,7 +541,18 @@ function validateArtifactShape(kind, artifact) {
 function readAliasSidecar(sidecarPath, artifactId, kind) {
   if (!fs.existsSync(sidecarPath)) return [];
   let sidecar;
-  try { sidecar = JSON.parse(fs.readFileSync(sidecarPath, "utf8")); } catch { throw new LabInteractError("invalidAliasSidecar", "Alias sidecar is invalid JSON."); }
+  try {
+    const bytes = readBoundedFile(
+      sidecarPath,
+      LAB_INTERACT_LIMITS.maxAliasSidecarBytes,
+      "invalidAliasSidecar",
+      "Alias sidecar exceeds 64 KiB.",
+    );
+    sidecar = JSON.parse(bytes);
+  } catch (error) {
+    if (error instanceof LabInteractError) throw error;
+    throw new LabInteractError("invalidAliasSidecar", "Alias sidecar is invalid JSON.");
+  }
   if (sidecar?.schemaVersion !== 1 || sidecar.artifactId !== artifactId || sidecar.kind !== kind || !Array.isArray(sidecar.aliases) || sidecar.aliases.length > LAB_INTERACT_LIMITS.maxAliases) {
     throw new LabInteractError("invalidAliasSidecar", "Alias sidecar identity or bounds are invalid.");
   }
@@ -551,6 +562,15 @@ function readAliasSidecar(sidecarPath, artifactId, kind) {
     seen.add(entry.alias);
     return { alias: entry.alias, id: entry.id };
   });
+}
+
+function readBoundedFile(filePath, maxBytes, code, message) {
+  let size;
+  try { size = fs.statSync(filePath).size; } catch { throw new LabInteractError("artifactNotFound", "Artifact path does not exist."); }
+  if (size > maxBytes) throw new LabInteractError(code, message);
+  const bytes = fs.readFileSync(filePath);
+  if (bytes.length > maxBytes) throw new LabInteractError(code, message);
+  return bytes;
 }
 
 async function reconcileImportedAliases(session, aliases, entityIdMap) {

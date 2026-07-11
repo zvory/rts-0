@@ -219,7 +219,10 @@ export class LabInteractDriver {
     const room = (await this.status()).room;
     const transfer = await this.artifactRequest("export", { room, name }, "json");
     const response = await fetch(new URL(`dev/lab-interact/artifacts/${transfer.artifactId}`, this.server.baseUrl), {
-      headers: { [ARTIFACT_CAPABILITY_HEADER]: this.artifactCapability },
+      headers: {
+        [ARTIFACT_CAPABILITY_HEADER]: this.artifactCapability,
+        "x-lab-interact-room": room,
+      },
       signal: AbortSignal.timeout(this.options.timeoutMs),
     });
     if (!response.ok) throw await artifactHttpError(response, "replay download failed");

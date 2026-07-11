@@ -121,7 +121,7 @@ impl LabInteractArtifactBridge {
         })
     }
 
-    fn get(&self, artifact_id: &str) -> Result<Vec<u8>, String> {
+    fn get(&self, artifact_id: &str, room: &str) -> Result<Vec<u8>, String> {
         if !valid_artifact_id(artifact_id) {
             return Err("invalid artifact id".to_string());
         }
@@ -130,10 +130,13 @@ impl LabInteractArtifactBridge {
             .lock()
             .map_err(|_| "artifact transfer store is unavailable".to_string())?;
         transfers.retain(|_, transfer| transfer.expires_at > Instant::now());
-        transfers
+        let transfer = transfers
             .get(artifact_id)
-            .map(|transfer| transfer.bytes.clone())
-            .ok_or_else(|| "artifact id is unknown or expired".to_string())
+            .ok_or_else(|| "artifact id is unknown or expired".to_string())?;
+        if transfer.room.as_deref() != Some(room) {
+            return Err("artifact id does not belong to this Lab room".to_string());
+        }
+        Ok(transfer.bytes.clone())
     }
 
     fn remove_for_room(&self, room: &str) -> usize {
@@ -215,7 +218,14 @@ pub(super) async fn download_handler(
     if let Err(status) = state.lab_interact_artifacts.authorize(peer, &headers) {
         return status.into_response();
     }
-    match state.lab_interact_artifacts.get(&artifact_id) {
+    let room = headers
+        .get(ROOM_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .filter(|value| valid_room(value));
+    let Some(room) = room else {
+        return error(StatusCode::BAD_REQUEST, "valid Lab room header is required");
+    };
+    match state.lab_interact_artifacts.get(&artifact_id, room) {
         Ok(bytes) => ([("content-type", "application/json")], bytes).into_response(),
         Err(message) => error(StatusCode::NOT_FOUND, &message),
     }
@@ -235,7 +245,7 @@ pub(super) async fn import_handler(
     }
     let artifact: LabReplayArtifactV1 = match state
         .lab_interact_artifacts
-        .get(&request.artifact_id)
+        .get(&request.artifact_id, &request.room)
         .and_then(|bytes| lab_replay_artifact_from_slice(&bytes).map_err(|err| err.to_string()))
     {
         Ok(artifact) => artifact,
@@ -336,8 +346,14 @@ mod tests {
             .unwrap()
             .expires_at = Instant::now() - Duration::from_secs(1);
         assert!(bridge
-            .get(&transfer.artifact_id)
+            .get(&transfer.artifact_id, "room")
             .unwrap_err()
             .contains("expired"));
+
+        let transfer = bridge
+            .insert(b"{}".to_vec(), Some("room".to_string()))
+            .unwrap();
+        assert!(bridge.get(&transfer.artifact_id, "other").is_err());
+        assert_eq!(bridge.get(&transfer.artifact_id, "room").unwrap(), b"{}");
     }
 }

@@ -27,6 +27,20 @@ const inspected = await service.execute("artifact-inspect", { sessionId, artifac
 assert.equal(inspected.kind, "setup");
 assert.equal(inspected.validation.ok, true);
 
+fs.writeFileSync(setup.sidecarPath, Buffer.alloc(64 * 1024 + 1, 0x20));
+await assert.rejects(
+  service.execute("artifact-inspect", { sessionId, artifactId: setup.artifactId }),
+  (error) => error.code === "invalidAliasSidecar" && /64 KiB/.test(error.message),
+);
+fs.writeFileSync(setup.sidecarPath, `${JSON.stringify({
+  schemaVersion: 1,
+  artifactId: setup.artifactId,
+  kind: "setup",
+  artifactFile: path.basename(setup.path),
+  aliases: [{ alias: "shooter", id: 100 }, { alias: "target", id: 101 }],
+  reproduction: null,
+}, null, 2)}\n`);
+
 const imported = await service.execute("import", { sessionId, kind: "setup", artifactId: setup.artifactId });
 assert.deepEqual(imported.aliases.stale, []);
 const entities = await service.execute("inspect", { sessionId, refs: ["shooter", "target"] });
