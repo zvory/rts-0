@@ -13,9 +13,10 @@ usage() {
   cat <<'EOF'
 Usage: scripts/wait-pr.sh <pr> [options]
 
-Waits for GitHub to report a PR merged, then verifies the PR head SHA is
-reachable from origin/main. Exits non-zero when checks fail, checks cancel, the
-PR closes unmerged, or the wait times out.
+Waits for GitHub to report a PR merged, verifies the PR head SHA is reachable
+from origin/main, fast-forwards the local main checkout, and runs merged-worktree
+cleanup. Exits non-zero when checks fail, checks cancel, the PR closes unmerged,
+the local main update cannot fast-forward, or the wait times out.
 
 Options:
   --interval SECONDS         Sleep between polls, default: 300.
@@ -29,6 +30,41 @@ Test fixtures:
   RTS_WAIT_PR_CHECKS_JSON    JSON returned instead of `gh pr checks`.
   RTS_WAIT_PR_SKIP_FETCH=1   Skip `git fetch origin main` before ancestry check.
 EOF
+}
+
+main_worktree_path() {
+  local worktree_path=""
+  local line
+
+  while IFS= read -r line; do
+    case "$line" in
+      "worktree "*) worktree_path="${line#worktree }" ;;
+      "branch refs/heads/main")
+        printf '%s\n' "$worktree_path"
+        return 0
+        ;;
+    esac
+  done < <(git worktree list --porcelain)
+
+  return 1
+}
+
+refresh_main_checkout() {
+  local main_worktree
+  main_worktree="$(main_worktree_path || true)"
+  if [ -z "$main_worktree" ] || [ ! -d "$main_worktree" ]; then
+    echo "wait-pr: merged PR verified, but no local main worktree was found to refresh" >&2
+    return 1
+  fi
+
+  echo "wait-pr: refreshing local main checkout at $main_worktree"
+  git -C "$main_worktree" pull --ff-only origin main
+
+  # A fast-forward pull normally invokes post-merge. Run cleanup explicitly too,
+  # because an already-current checkout does not invoke that hook.
+  if ! (cd "$main_worktree" && scripts/cleanup-worktrees.sh --auto); then
+    echo "wait-pr: local main is current, but opportunistic worktree cleanup failed" >&2
+  fi
 }
 
 while [ "$#" -gt 0 ]; do
@@ -126,7 +162,8 @@ while true; do
       git fetch --quiet origin main
     fi
     if git merge-base --is-ancestor "$head_sha" "$MAIN_REF"; then
-      echo "wait-pr: PR #$number merged and $head_sha is reachable from $MAIN_REF"
+      refresh_main_checkout
+      echo "wait-pr: PR #$number merged, $head_sha is reachable from $MAIN_REF, and local main is current"
       exit 0
     fi
     echo "wait-pr: PR #$number is merged, but $head_sha is not reachable from $MAIN_REF" >&2
