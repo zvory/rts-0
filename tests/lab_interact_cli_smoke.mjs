@@ -66,7 +66,7 @@ function spawnBulkUsingPlacementSuggestions(sessionId, spawns) {
   const corrected = spawns.map((spawn) => ({ ...spawn }));
   let previousFailedIndex = -1;
   for (let attempt = 0; attempt <= corrected.length; attempt += 1) {
-    const result = invoke("spawn", { sessionId, spawns: corrected });
+    const result = invoke("spawn", { sessionId, spawns: corrected, details: true });
     if (result.status === 0) {
       const response = JSON.parse(result.stdout);
       assert.equal(response.ok, true, "corrected bulk spawn returns success");

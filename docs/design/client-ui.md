@@ -591,6 +591,10 @@ Operational aliases, inspection, camera focus, screenshot subjects, and correspo
 entity-id inputs accept at most 400 references. Screenshot readiness validates the complete
 requested subject set, but returned and persisted subject detail is capped at 24 rows with total and
 `truncated` metadata; recording and fixed-capture alias detail is similarly capped at 40 rows.
+Successful bulk spawn and artifact-import responses default to counts, a `truncated` flag, and at
+most 12 ordered detail rows. Callers may explicitly request `details: true` when they need every
+spawned entity/raw outcome or every restored and stale alias row; rejection details remain complete
+and actionable regardless of that success-response option.
 The daemon publishes its startup checkout commit as optional IPC v1 state/probe metadata. The CLI
 refreshes a mismatched daemon only through an atomic idle-only shutdown request; active scenes are
 preserved behind `daemonCheckoutMismatch`, while `status` and `shutdown` remain usable.

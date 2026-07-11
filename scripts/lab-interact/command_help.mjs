@@ -27,8 +27,9 @@ export const LAB_INTERACT_COMMAND_HELP = Object.freeze({
     defaults: ["categories=all categories"], bounds: ["0-8 unique requested categories"],
     example: { sessionId: "<lab-session-id>", categories: ["players", "units", "commands"] },
   }),
-  spawn: descriptor("Atomically spawn one bounded batch and optionally assign aliases.", "{sessionId:string,spawns:[{owner:u32,kind:token,x:number,y:number,completed?:boolean,alias?:alias}]} ", {
-    defaults: ["completed=true", "alias=none"], bounds: ["1-400 spawns", "400 aliases per session", "alias [A-Za-z][A-Za-z0-9_-]{0,31}"],
+  spawn: descriptor("Atomically spawn one bounded batch and optionally assign aliases.", "{sessionId:string,spawns:[{owner:u32,kind:token,x:number,y:number,completed?:boolean,alias?:alias}],details?:boolean}", {
+    variants: ["details=false returns counts and at most 12 alias/id rows", "details=true returns every decorated entity and raw authoritative outcome"],
+    defaults: ["completed=true", "alias=none", "details=false"], bounds: ["1-400 spawns", "400 aliases per session", "alias [A-Za-z][A-Za-z0-9_-]{0,31}", "12 default response details"],
     example: { sessionId: "<lab-session-id>", spawns: [{ owner: 1, kind: "rifleman", x: 960, y: 960, alias: "subject" }] },
   }),
   update: descriptor("Atomically apply a bounded batch of Lab scene updates.", "{sessionId:string,updates:update[]} or {sessionId:string,update:update}", {
@@ -74,8 +75,8 @@ export const LAB_INTERACT_COMMAND_HELP = Object.freeze({
     defaults: ["name=empty", "reproduction=false"], bounds: ["setup name <=80 UTF-8 bytes", "replay name <=120 UTF-8 bytes", "artifact <=8 MiB", "alias sidecar <=64 KiB and 400 aliases"],
     example: { sessionId: "<lab-session-id>", kind: "setup", name: "two-unit-scene", reproduction: true },
   }),
-  import: descriptor("Destructively replace the ephemeral session from one confined artifact.", "{sessionId:string,kind:\"setup\"|\"replay\",artifactId?:string,path?:string}", {
-    variants: ["provide exactly one of artifactId or path"], bounds: ["path <=1024 characters and beneath target/lab-interact", "artifact <=8 MiB", "at most 400 sidecar aliases"],
+  import: descriptor("Destructively replace the ephemeral session from one confined artifact.", "{sessionId:string,kind:\"setup\"|\"replay\",artifactId?:string,path?:string,details?:boolean}", {
+    variants: ["provide exactly one of artifactId or path", "details=false summarizes restored/stale aliases", "details=true returns every alias row and the raw import result"], defaults: ["details=false"], bounds: ["path <=1024 characters and beneath target/lab-interact", "artifact <=8 MiB", "at most 400 sidecar aliases", "12 default details per alias category"],
     example: { sessionId: "<lab-session-id>", kind: "setup", artifactId: "artifact_<32-hex>" },
   }),
   "artifact-inspect": descriptor("Inspect bounded metadata for one confined setup or replay artifact.", "{sessionId:string,kind?:\"setup\"|\"replay\",artifactId?:string,path?:string}", {

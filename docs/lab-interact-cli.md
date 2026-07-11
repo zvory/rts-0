@@ -58,6 +58,10 @@ only after a complete accepted batch. A rejection leaves the scene and aliases u
 includes `error.details.failedIndex`; placement failures additionally preserve `attempted`, typed
 `blockers`, and at most eight authoritative `suggestions`. Retrying the original batch with a
 returned suggestion therefore uses the same placement rules rather than a client-side guess.
+Successful `spawn` output is compact by default: `spawned` reports the count, whether its ordered
+sample is truncated, and at most 12 `{index,alias,id}` rows, plus the authoritative snapshot tick.
+Use `details:true` only when the caller needs every decorated entity and the raw authoritative
+outcome. This does not reduce or truncate rejection diagnostics.
 
 A cold first `open` may spend tens of seconds building the selected worktree's Rust server before
 it writes its single JSON response. Keep that CLI process attached until it exits. A concurrent
@@ -123,6 +127,8 @@ map/tick/build metadata, and optional concise reproduction text; it never prints
 checkpoint or replay operation stream. An adjacent `.aliases.json` sidecar keeps aliases outside
 protocol schemas. Setup imports reconcile ids through the server-returned `sourceEntityIdMap`;
 replay imports restore aliases that still exist and report stale entries.
+Import responses summarize restored and stale aliases independently with counts, truncation state,
+and at most 12 rows each. `details:true` opts into every reconciliation row and the raw import result.
 
 `import` destructively replaces only the current ephemeral Lab session. Select an artifact by its
 opaque id or by a path already confined beneath this worktree's `target/lab-interact/`; URLs and
