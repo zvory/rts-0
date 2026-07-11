@@ -45,7 +45,7 @@ try {
   assert.equal(fs.existsSync(oversizedPath), false, "oversized recording bytes are deleted");
   const webmPath = path.join(mediaTmp, "fixture.webm");
   const generated = spawnSync(tools.ffmpeg, [
-    "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "color=c=navy:s=640x480:r=30:d=1",
+    "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "color=c=navy:s=640x480:r=30:d=0.12",
     "-an", "-c:v", "libvpx-vp9", "-b:v", "0", webmPath,
   ], { encoding: "utf8", timeout: 15_000 });
   assert.equal(generated.status, 0, `VP9 fixture generation succeeds: ${generated.stderr}`);
@@ -57,8 +57,13 @@ try {
   });
   assert.equal(media.probe.codec, "vp9", "final media probe confirms VP9");
   assert.deepEqual({ width: media.probe.width, height: media.probe.height }, { width: 640, height: 480 }, "final media probe confirms dimensions");
-  assert.ok(media.probe.durationSeconds >= 0.9 && media.probe.durationSeconds <= 1.1, "final media probe confirms bounded duration");
+  assert.ok(media.probe.durationSeconds >= 0.1 && media.probe.durationSeconds <= 0.2, "final media probe confirms bounded duration");
   assert.ok(media.framePaths.length >= 2 && media.framePaths.length <= RECORDING_LIMITS.maxFrames, "representative sampling remains bounded");
+  assert.deepEqual(
+    media.framePaths.map((framePath) => path.basename(framePath)),
+    media.framePaths.map((_, index) => `frame-${String(index + 1).padStart(2, "0")}.png`),
+    "representative frames remain contiguous so contact-sheet input includes the final frame",
+  );
   assert.ok(media.contactSheet.width > 0 && media.contactSheet.height > 0, "contact sheet is a readable PNG");
 } finally {
   fs.rmSync(mediaTmp, { recursive: true, force: true });
@@ -73,6 +78,11 @@ fs.rmSync(path.dirname(watchdogDriver.recordingStatus().last.webmPath), { recurs
 
 const closeDriver = fixtureRecordingDriver(root, tools);
 await closeDriver.recordStart({ sessionId: `lab_${"c".repeat(32)}`, name: "close", maxDurationMs: 5_000 });
+await assert.rejects(
+  closeDriver.screenshot({ sessionId: `lab_${"c".repeat(32)}`, name: "conflicting-capture" }),
+  (error) => error?.code === "recordingActive",
+  "screenshots cannot change presentation or viewport while a recording is active",
+);
 await closeDriver.close();
 assert.equal(closeDriver.state, DRIVER_STATES.CLOSED, "driver close reaches the closed state while recording");
 assert.equal(closeDriver.recordingStatus().last.stoppedBy, "sessionClose", "driver close boundedly finalizes its recorder");

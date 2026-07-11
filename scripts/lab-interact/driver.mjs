@@ -482,6 +482,12 @@ export class LabInteractDriver {
   }
 
   async captureScreenshot({ sessionId, name, presentation, viewport, subjectIds, subjectSummaries, request }) {
+    if (this.recording) {
+      throw new LabInteractDriverError(
+        "recordingActive",
+        "Screenshot capture is unavailable while recording because it can change the active viewport or presentation. Stop the recording first.",
+      );
+    }
     if (presentation !== "clean" && presentation !== "normal") {
       throw new LabInteractDriverError("invalidPresentation", "presentation must be clean or normal.");
     }

@@ -86,12 +86,13 @@ export function finalizeMedia({ webmPath, framesDir, contactSheetPath, tools }) 
     "-vf", `fps=1/${interval}`, "-frames:v", String(activityFrameLimit),
     path.join(framesDir, "frame-%02d.png"),
   ], "representative frame extraction");
+  const activityFrameCount = representativeFrameNames(framesDir).length;
+  const finalFrameNumber = Math.min(activityFrameCount + 1, RECORDING_LIMITS.maxFrames);
   runTool(tools.ffmpeg, [
     "-hide_banner", "-loglevel", "error", "-y", "-sseof", "-0.001", "-i", webmPath,
-    "-frames:v", "1", path.join(framesDir, `frame-${String(RECORDING_LIMITS.maxFrames).padStart(2, "0")}.png`),
+    "-frames:v", "1", path.join(framesDir, `frame-${String(finalFrameNumber).padStart(2, "0")}.png`),
   ], "final frame extraction");
-  const framePaths = fs.readdirSync(framesDir)
-    .filter((name) => /^frame-\d+\.png$/.test(name)).sort().slice(0, RECORDING_LIMITS.maxFrames)
+  const framePaths = representativeFrameNames(framesDir)
     .map((name) => path.join(framesDir, name));
   if (framePaths.length === 0) throw new LabInteractRecordingError("frameExtractionFailed", "FFmpeg produced no representative PNG frames.");
   runTool(tools.ffmpeg, [
@@ -115,6 +116,13 @@ export function finalizeMedia({ webmPath, framesDir, contactSheetPath, tools }) 
       caveat: "Estimates compare encoded frames with wall duration at 30 FPS; Chrome composition timing is nondeterministic.",
     },
   };
+}
+
+function representativeFrameNames(framesDir) {
+  return fs.readdirSync(framesDir)
+    .filter((name) => /^frame-\d+\.png$/.test(name))
+    .sort()
+    .slice(0, RECORDING_LIMITS.maxFrames);
 }
 
 export function removePartialRecording(paths) {
