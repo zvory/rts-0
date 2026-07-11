@@ -34,6 +34,16 @@ export function mediaAuxiliaryTimeoutMs(targetDurationMs) {
   return derivedTimeout(targetDurationMs, RECORDING_LIMITS.mediaStageTimeoutMs, RECORDING_LIMITS.maxMediaAuxiliaryTimeoutMs, 0.25);
 }
 
+export function representativeFrameIndices(frameCount, limit = RECORDING_LIMITS.maxFrames) {
+  const total = Math.max(1, Math.trunc(frameCount));
+  const count = Math.min(total, Math.max(1, Math.trunc(limit)));
+  if (count === 1) return new Set([0]);
+  return new Set(Array.from(
+    { length: count },
+    (_, index) => Math.round(index * (total - 1) / (count - 1)),
+  ));
+}
+
 export class LabInteractRecordingError extends Error {
   constructor(code, message, details = {}) {
     super(message);
@@ -227,28 +237,36 @@ export function createPngMp4Encoder({ outputPath, fps, crop = null, scale = 1, t
   let stderr = "";
   child.stderr.on("data", (chunk) => { stderr = `${stderr}${chunk}`.slice(-4000); });
   let tail = Promise.resolve();
+  let spawnFailure = null;
   let writeFailure = null;
+  // ChildProcess emits `error` (rather than a normal non-zero close) when the
+  // executable cannot be started. Always observe it so a post-capability-check
+  // launch failure rejects this recording instead of crashing the daemon.
+  child.on("error", (error) => { spawnFailure = error; });
   child.stdin.on("error", (error) => { writeFailure = error; });
   return {
     write(buffer) {
       tail = tail.then(async () => {
-        if (writeFailure) throw writeFailure;
+        if (spawnFailure) throw encoderSpawnError(spawnFailure);
+        if (writeFailure) throw encoderInputError(writeFailure);
         if (child.exitCode != null || child.signalCode != null) {
           throw encoderExitError(child.exitCode, child.signalCode, stderr);
         }
         if (!child.stdin.write(buffer)) {
-          await waitForEncoderDrain(child, () => stderr);
+          await waitForEncoderDrain(child, () => stderr, () => spawnFailure);
         }
       });
       return tail;
     },
     async finish(timeoutMs = 45_000) {
       await tail;
+      if (spawnFailure) throw encoderSpawnError(spawnFailure);
+      if (writeFailure) throw encoderInputError(writeFailure);
       if (child.exitCode != null || child.signalCode != null) {
         throw encoderExitError(child.exitCode, child.signalCode, stderr);
       }
       child.stdin.end();
-      await waitForChild(child, timeoutMs, stderrFailure);
+      await waitForChild(child, timeoutMs, stderrFailure, spawnError);
     },
     async abort() {
       child.stdin.destroy();
@@ -261,6 +279,7 @@ export function createPngMp4Encoder({ outputPath, fps, crop = null, scale = 1, t
     },
   };
   function stderrFailure() { return stderr; }
+  function spawnError() { return spawnFailure; }
 }
 
 export function finalizeMp4Artifacts({ mp4Path, framesDir, contactSheetPath, targetDurationMs, tools, frameDiagnostics }) {
@@ -279,10 +298,12 @@ export function finalizeMp4Artifacts({ mp4Path, framesDir, contactSheetPath, tar
   const expected = Math.max(1, Math.ceil(targetDurationMs * RECORDING_LIMITS.fps / 1000));
   if (probe.frameCount !== expected) throw new LabInteractRecordingError("mediaProbeFailed", `Final MP4 contains ${probe.frameCount ?? "an unknown number of"} frames; expected ${expected} from the wall clock.`);
   fs.mkdirSync(framesDir, { recursive: true });
-  const interval = Math.max((Number(probe.durationSeconds) || 0.001) / RECORDING_LIMITS.maxFrames, 0.05);
+  const representativeIndices = representativeFrameIndices(probe.frameCount);
+  const selection = [...representativeIndices].map((index) => `eq(n\\,${index})`).join("+");
   runTool(tools.ffmpeg, [
     "-hide_banner", "-loglevel", "error", "-y", "-i", mp4Path,
-    "-vf", `fps=1/${interval}`, "-frames:v", String(RECORDING_LIMITS.maxFrames), path.join(framesDir, "frame-%02d.png"),
+    "-vf", `select='${selection}'`, "-fps_mode", "vfr",
+    "-frames:v", String(representativeIndices.size), path.join(framesDir, "frame-%02d.png"),
   ], "representative frame extraction", mediaAuxiliaryTimeoutMs(targetDurationMs));
   const framePaths = representativeFrameNames(framesDir).map((name) => path.join(framesDir, name));
   if (framePaths.length === 0) throw new LabInteractRecordingError("frameExtractionFailed", "FFmpeg produced no representative PNG frames.");
@@ -340,7 +361,7 @@ function runTool(command, args, label, timeoutMs = RECORDING_LIMITS.mediaStageTi
   if (result.status !== 0) throw new LabInteractRecordingError("mediaProcessingFailed", conciseToolFailure(`${label} failed`, result));
 }
 
-function waitForEncoderDrain(child, stderr) {
+function waitForEncoderDrain(child, stderr, spawnFailure) {
   return new Promise((resolve, reject) => {
     const cleanup = () => {
       child.stdin.off("drain", onDrain);
@@ -353,11 +374,11 @@ function waitForEncoderDrain(child, stderr) {
     };
     const onError = (error) => {
       cleanup();
-      reject(error);
+      reject(spawnFailure() ? encoderSpawnError(spawnFailure()) : encoderInputError(error));
     };
     const onClose = (code, signal) => {
       cleanup();
-      reject(encoderExitError(code, signal, stderr()));
+      reject(spawnFailure() ? encoderSpawnError(spawnFailure()) : encoderExitError(code, signal, stderr()));
     };
     child.stdin.once("drain", onDrain);
     child.stdin.once("error", onError);
@@ -365,7 +386,8 @@ function waitForEncoderDrain(child, stderr) {
   });
 }
 
-async function waitForChild(child, timeoutMs, stderr) {
+async function waitForChild(child, timeoutMs, stderr, spawnFailure) {
+  if (spawnFailure()) throw encoderSpawnError(spawnFailure());
   if (child.exitCode != null || child.signalCode != null) {
     if (child.exitCode !== 0) throw encoderExitError(child.exitCode, child.signalCode, stderr());
     return;
@@ -382,10 +404,25 @@ async function waitForChild(child, timeoutMs, stderr) {
         timer.unref?.();
       }),
     ]);
+    if (spawnFailure()) throw encoderSpawnError(spawnFailure());
     if (code !== 0) throw new LabInteractRecordingError("mediaProcessingFailed", `H.264 encoder failed${signal ? ` (${signal})` : ""}: ${String(stderr() || "unknown failure").trim().slice(-800)}`);
   } finally {
     clearTimeout(timer);
   }
+}
+
+function encoderSpawnError(error) {
+  return new LabInteractRecordingError(
+    "mediaProcessingFailed",
+    `H.264 encoder could not start: ${String(error?.message || error || "unknown failure").trim().slice(-800)}`,
+  );
+}
+
+function encoderInputError(error) {
+  return new LabInteractRecordingError(
+    "mediaProcessingFailed",
+    `H.264 encoder input failed: ${String(error?.message || error || "unknown failure").trim().slice(-800)}`,
+  );
 }
 
 function encoderExitError(code, signal, stderr) {

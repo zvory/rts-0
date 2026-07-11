@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 
 import {
   checkMediaCapabilities, createPngMp4Encoder, LabInteractRecordingError,
+  representativeFrameIndices,
 } from "./recording.mjs";
 
 export const FIXED_CAPTURE_LIMITS = Object.freeze({
@@ -20,9 +21,7 @@ export function fixedFrameTick(startTick, frameIndex, fps) {
 }
 
 export function fixedRepresentativeIndices(frameCount, limit = FIXED_CAPTURE_LIMITS.representativeFrames) {
-  const count = Math.min(frameCount, limit);
-  if (count <= 1) return new Set([0]);
-  return new Set(Array.from({ length: count }, (_, index) => Math.round(index * (frameCount - 1) / (count - 1))));
+  return representativeFrameIndices(frameCount, limit);
 }
 
 export function createFixedCaptureEncoder({ outputPath, contactSheetPath, fps, frameCount }) {
@@ -33,9 +32,12 @@ export function createFixedCaptureEncoder({ outputPath, contactSheetPath, fps, f
     async abort() { await encoder.abort(); },
     async finish() {
       await encoder.finish(75_000);
+      const selection = [...fixedRepresentativeIndices(frameCount)]
+        .map((index) => `eq(n\\,${index})`)
+        .join("+");
       run(tools.ffmpeg, [
         "-hide_banner", "-loglevel", "error", "-y", "-i", outputPath,
-        "-vf", `select='not(mod(n\\,${Math.max(1, Math.floor(frameCount / FIXED_CAPTURE_LIMITS.representativeFrames))}))',scale=480:300:force_original_aspect_ratio=decrease,pad=480:300:(ow-iw)/2:(oh-ih)/2:black,tile=3x2:padding=4:margin=4`,
+        "-vf", `select='${selection}',scale=480:300:force_original_aspect_ratio=decrease,pad=480:300:(ow-iw)/2:(oh-ih)/2:black,tile=3x2:padding=4:margin=4`,
         "-frames:v", "1", contactSheetPath,
       ], "fixed capture contact sheet");
       const stat = fs.statSync(outputPath);

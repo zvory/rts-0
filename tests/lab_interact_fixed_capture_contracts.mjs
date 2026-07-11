@@ -5,7 +5,9 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { LabInteractService, validateCommandInput } from "../scripts/lab-interact/command_service.mjs";
-import { createFixedCaptureEncoder, FIXED_CAPTURE_LIMITS, fixedFrameTick } from "../scripts/lab-interact/fixed_capture.mjs";
+import {
+  createFixedCaptureEncoder, FIXED_CAPTURE_LIMITS, fixedFrameTick, fixedRepresentativeIndices,
+} from "../scripts/lab-interact/fixed_capture.mjs";
 import { checkMediaCapabilities } from "../scripts/lab-interact/recording.mjs";
 import { openLabInteractDriver } from "./fixtures/lab_interact_fake_driver.mjs";
 import { boundedSummary, LAB_INTERACT_SUMMARY_LIMITS } from "../scripts/lab-interact/manifest_summary.mjs";
@@ -21,6 +23,11 @@ assert.throws(() => validateCommandInput("capture-fixed", { sessionId, fps: 61 }
 assert.throws(() => validateCommandInput("capture-fixed", { sessionId, frameCount: FIXED_CAPTURE_LIMITS.maxFrames + 1 }), (error) => error?.code === "invalidInput");
 assert.equal(FIXED_CAPTURE_LIMITS.maxFrames, 1_800, "fixed capture supports one minute at 30 FPS");
 assert.deepEqual([0, 1, 2, 3].map((index) => fixedFrameTick(9, index, 60)), [9, 9, 10, 10]);
+assert.deepEqual(
+  [...fixedRepresentativeIndices(1_800)],
+  [0, 360, 720, 1079, 1439, 1799],
+  "minute-scale fixed capture summaries include the first and final frames",
+);
 assert.deepEqual(
   boundedSummary(Array.from({ length: 400 }, (_, index) => index), LAB_INTERACT_SUMMARY_LIMITS.detailedAliases),
   { count: 400, details: Array.from({ length: 40 }, (_, index) => index), truncated: true },

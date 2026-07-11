@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -45,6 +46,17 @@ assert.ok(boundedLogLine.length <= 512, "driver bounds each diagnostic server-lo
 assert.ok(boundedLogLine.startsWith("2026-07-11 INFO"), "bounded diagnostic log lines retain event identity");
 assert.ok(boundedLogLine.endsWith("final-marker"), "bounded diagnostic log lines retain the newest detail tail");
 assert.match(boundedLogLine, /<truncated>/, "bounded diagnostic log lines disclose truncation");
+assert.equal(boundLogLine(oversizedLogLine, 8).length, 8, "explicit diagnostic bounds are always honored");
+
+const diagnosticDriver = new LabInteractDriver({ workspaceRoot: root });
+diagnosticDriver.page = new EventEmitter();
+diagnosticDriver.attachPageDiagnostics();
+diagnosticDriver.page.emit("console", { type: () => "error", text: () => oversizedLogLine });
+assert.equal(
+  diagnosticDriver.pageConsoleErrors[0],
+  boundedLogLine,
+  "captured browser diagnostics apply the same per-entry size bound as server-log tails",
+);
 
 assert.equal(transitionDriverState(DRIVER_STATES.OPENING, "opened"), DRIVER_STATES.OPEN, "driver opens once");
 assert.equal(transitionDriverState(DRIVER_STATES.OPEN, "closing"), DRIVER_STATES.CLOSING, "driver closes from open");

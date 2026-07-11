@@ -12,6 +12,7 @@ import {
 import {
   checkMediaCapabilities, createPngMp4Encoder, finalizeMp4Artifacts, LabInteractRecordingError,
   mediaAuxiliaryTimeoutMs, mediaStageTimeoutMs, recordingStopTimeoutMs, RECORDING_LIMITS,
+  representativeFrameIndices,
 } from "../scripts/lab-interact/recording.mjs";
 import {
   RECORDING_REQUEST_TIMEOUT_MS, REQUEST_TIMEOUT_MS, requestTimeoutMs,
@@ -30,6 +31,11 @@ assert.equal(RECORDING_LIMITS.maxDurationMs, 60_000, "recordings support a hard 
 assert.equal(RECORDING_LIMITS.maxBytes, 64 * 1024 * 1024, "recordings retain a hard 64 MiB file ceiling");
 assert.equal(LAB_INTERACT_LIMITS.maxRecordingOperations, 200, "recording action manifests remain bounded");
 assert.equal(RECORDING_LIMITS.maxOperations, LAB_INTERACT_LIMITS.maxRecordingOperations, "service and driver share the operation bound");
+assert.deepEqual(
+  [...representativeFrameIndices(15)],
+  [0, 3, 6, 8, 11, 14],
+  "representative sampling is evenly spaced and includes both recording endpoints",
+);
 
 assert.throws(
   () => validateCommandInput("record-start", { sessionId, maxDurationMs: 60_001 }),
@@ -102,7 +108,7 @@ try {
     "timeline normalization emits the expected wall-duration frame count",
   );
   assert.strictEqual(media.frameDiagnostics, diagnostics, "final media preserves measured source diagnostics without estimating them again");
-  assert.ok(media.framePaths.length >= 2 && media.framePaths.length <= RECORDING_LIMITS.maxFrames, "representative sampling remains bounded");
+  assert.equal(media.framePaths.length, RECORDING_LIMITS.maxFrames, "representative sampling fills its bound when enough frames exist");
   assert.deepEqual(
     media.framePaths.map((framePath) => path.basename(framePath)),
     media.framePaths.map((_, index) => `frame-${String(index + 1).padStart(2, "0")}.png`),
@@ -126,6 +132,20 @@ await assert.rejects(
   "an encoder that exits while writes are backpressured fails promptly instead of hanging on drain",
 );
 await failedEncoder.abort();
+
+const missingEncoderPath = path.join(os.tmpdir(), `rts-li-missing-encoder-${process.pid}.mp4`);
+const missingEncoder = createPngMp4Encoder({
+  outputPath: missingEncoderPath,
+  fps: RECORDING_LIMITS.fps,
+  tools: { ffmpeg: "/definitely/missing/ffmpeg" },
+});
+void missingEncoder.write(Buffer.from("not-a-png")).catch(() => {});
+await assert.rejects(
+  withDeadline(missingEncoder.finish(1_000), 2_000),
+  (error) => error?.code === "mediaProcessingFailed" && /could not start/.test(error.message),
+  "an encoder launch failure rejects normally instead of becoming an unhandled ChildProcess error",
+);
+await missingEncoder.abort();
 
 const watchdogDriver = fixtureRecordingDriver(root, tools);
 await assert.rejects(

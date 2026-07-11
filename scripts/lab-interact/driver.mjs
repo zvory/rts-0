@@ -1336,16 +1336,18 @@ function readTail(file, maxLines) {
 
 export function boundLogLine(value, maxChars = LOG_TAIL_LINE_CHARS) {
   const line = String(value ?? "");
-  if (line.length <= maxChars) return line;
   const marker = " …<truncated>… ";
-  const available = Math.max(0, maxChars - marker.length);
+  const limit = Number.isInteger(maxChars) ? Math.max(0, maxChars) : LOG_TAIL_LINE_CHARS;
+  if (line.length <= limit) return line;
+  if (limit <= marker.length) return marker.slice(0, limit);
+  const available = limit - marker.length;
   const leading = Math.ceil(available / 2);
   const trailing = Math.floor(available / 2);
   return `${line.slice(0, leading)}${marker}${trailing > 0 ? line.slice(-trailing) : ""}`;
 }
 
 function appendBounded(values, value) {
-  values.push(String(value));
+  values.push(boundLogLine(value));
   if (values.length > MAX_PAGE_ERRORS) values.splice(0, values.length - MAX_PAGE_ERRORS);
 }
 
