@@ -14,7 +14,7 @@ const MAX_LAB_CHECKPOINT_SCENARIO_NAME_LEN: usize = 80;
 const MAX_LAB_CHECKPOINT_PLAYERS: usize = 8;
 const MAX_LAB_CHECKPOINT_MAP_TILES: usize = 1_000_000;
 const MAX_LAB_CHECKPOINT_MAP_STARTS: usize = MAX_LAB_CHECKPOINT_PLAYERS;
-const MAX_LAB_CHECKPOINT_MAP_EXPANSION_SITES: usize = MAX_LAB_CHECKPOINT_PLAYERS * 8;
+const MAX_LAB_CHECKPOINT_MAP_BASE_SITES: usize = MAX_LAB_CHECKPOINT_PLAYERS * 8;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -44,7 +44,8 @@ pub struct LabCheckpointScenarioMapData {
     pub size: u32,
     pub terrain: Vec<u8>,
     pub starts: Vec<LabScenarioTile>,
-    pub expansion_sites: Vec<LabScenarioTile>,
+    #[serde(rename = "baseSites", alias = "expansionSites")]
+    pub base_sites: Vec<LabScenarioTile>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -86,8 +87,8 @@ impl LabCheckpointScenarioMap {
                     .iter()
                     .map(|&(x, y)| LabScenarioTile { x, y })
                     .collect(),
-                expansion_sites: map
-                    .expansion_sites
+                base_sites: map
+                    .base_sites
                     .iter()
                     .map(|&(x, y)| LabScenarioTile { x, y })
                     .collect(),
@@ -106,8 +107,8 @@ impl LabCheckpointScenarioMap {
                 .into_iter()
                 .map(|tile| (tile.x, tile.y))
                 .collect(),
-            expansion_sites: data
-                .expansion_sites
+            base_sites: data
+                .base_sites
                 .into_iter()
                 .map(|tile| (tile.x, tile.y))
                 .collect(),
@@ -167,18 +168,13 @@ impl LabCheckpointScenarioMap {
                 reason: "checkpoint scenario map start site count is invalid".to_string(),
             });
         }
-        if self.data.expansion_sites.len() > MAX_LAB_CHECKPOINT_MAP_EXPANSION_SITES {
+        if self.data.base_sites.len() > MAX_LAB_CHECKPOINT_MAP_BASE_SITES {
             return Err(LabError::InvalidMap {
                 name: self.name.clone(),
-                reason: "checkpoint scenario map expansion site count is invalid".to_string(),
+                reason: "checkpoint scenario map base site count is invalid".to_string(),
             });
         }
-        for tile in self
-            .data
-            .starts
-            .iter()
-            .chain(self.data.expansion_sites.iter())
-        {
+        for tile in self.data.starts.iter().chain(self.data.base_sites.iter()) {
             if tile.x >= size || tile.y >= size {
                 return Err(LabError::InvalidMap {
                     name: self.name.clone(),
@@ -289,6 +285,18 @@ impl Game {
                 .map_err(|err| LabError::InvalidScenario {
                     reason: format!("checkpoint scenario payload is invalid: {err}"),
                 })?;
+        if !game
+            .state
+            .players
+            .iter()
+            .map(|player| player.start_tile)
+            .eq(game.state.map.starts.iter().copied())
+        {
+            return Err(LabError::InvalidScenario {
+                reason: "checkpoint player start tiles do not match scenario map starts"
+                    .to_string(),
+            });
+        }
         if game.seed() != seed {
             return Err(LabError::InvalidScenario {
                 reason: "checkpoint scenario seed does not match payload seed".to_string(),

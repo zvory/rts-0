@@ -9,7 +9,10 @@ const ATTACK_RANGE_SLACK_PX: f32 = 4.0;
 pub(super) fn panzerfaust_attack_cycle_active(attacker: &Entity) -> bool {
     attacker.kind == EntityKind::Panzerfaust
         && matches!(
-            attacker.combat.as_ref().and_then(|combat| combat.panzerfaust),
+            attacker
+                .combat
+                .as_ref()
+                .and_then(|combat| combat.panzerfaust),
             Some(
                 PanzerfaustState::Windup { .. }
                     | PanzerfaustState::InFlight { .. }

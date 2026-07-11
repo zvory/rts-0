@@ -58,7 +58,10 @@ fn attack_move_machine_gunner_tears_down_after_no_target_grace() {
         WeaponSetup::TearingDown { .. }
     ));
     assert!(
-        !entities.get(mg_id).expect("mg should exist").path_is_empty(),
+        !entities
+            .get(mg_id)
+            .expect("mg should exist")
+            .path_is_empty(),
         "attack-move destination should be re-requested while teardown is pending"
     );
 

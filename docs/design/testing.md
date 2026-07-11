@@ -273,8 +273,8 @@ the supported range.
   when SVG rig runtime/schema behavior, rig importer fixtures, or transparent unit pixel comparisons
   change. The harness compares Worker and Tank part and composition samples.
 - Team-aware authored start assignment is covered by `cargo nextest run map` for deterministic
-  FFA compatibility, current authored map proximity, 1v2/1v3 team layouts, synthetic larger layouts,
-  start payload team ids, and replay reconstruction. Run `node tests/team_integration.mjs` for the
+  FFA compatibility, fixed-start proximity, 1v2/1v3 team assignment, unconditional base-site
+  materialization, start payload team ids, and replay reconstruction. Run `node tests/team_integration.mjs` for the
   live lobby/start contract.
 - `tests/team_integration.mjs` is the canonical live multi-client team suite. It requires a running
   server and covers default singleton FFA, solo sandbox starts, scripted `1v2`/`1v3`/`2v2` setup,

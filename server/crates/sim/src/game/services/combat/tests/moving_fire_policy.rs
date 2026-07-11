@@ -87,11 +87,7 @@ fn meth_rifleman_movement_orders_do_not_chase_targets_outside_weapon_range() {
         let map = open_map(20);
         let mut meth_player = player_state(1, false);
         meth_player.upgrades.insert(UpgradeKind::Methamphetamines);
-        run_combat_tick_on_map(
-            &mut entities,
-            &[meth_player, player_state(2, false)],
-            &map,
-        );
+        run_combat_tick_on_map(&mut entities, &[meth_player, player_state(2, false)], &map);
 
         let rifleman = entities.get(rifleman_id).expect("rifleman should exist");
         assert_eq!(
@@ -114,9 +110,7 @@ fn meth_rifleman_chase_goal_uses_target_center_without_vehicle_standoff() {
         .spawn_unit(2, EntityKind::Rifleman, 288.0, 100.0)
         .expect("enemy should spawn");
     let map = open_map(20);
-    let rifleman = entities
-        .get(rifleman_id)
-        .expect("rifleman should exist");
+    let rifleman = entities.get(rifleman_id).expect("rifleman should exist");
     let enemy = entities.get(enemy_id).expect("enemy should exist");
     let profile = combat_rules::attack_profile(EntityKind::Rifleman);
     let range_px =
@@ -256,7 +250,10 @@ fn stationary_tank_range_linearly_ramps_to_fourteen_tiles() {
     for _ in 0..(TANK_STATIONARY_RANGE_RAMP_TICKS / 2) {
         run_combat_tick(&mut entities);
     }
-    assert_range_near(tank_range_tiles(&entities, tank_id), (base_range + 14.0) * 0.5);
+    assert_range_near(
+        tank_range_tiles(&entities, tank_id),
+        (base_range + 14.0) * 0.5,
+    );
 
     for _ in 0..(TANK_STATIONARY_RANGE_RAMP_TICKS / 2) {
         run_combat_tick(&mut entities);

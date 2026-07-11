@@ -48,7 +48,7 @@ fn expansion_center(game: &Game, player_id: u32) -> (f32, f32) {
     let expansion_tile = game
         .state
         .map
-        .expansion_sites
+        .base_sites
         .iter()
         .copied()
         .find(|tile| *tile != start_tile)

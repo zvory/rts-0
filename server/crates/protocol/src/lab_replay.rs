@@ -23,7 +23,7 @@ pub const LAB_REPLAY_MAX_AUTHORING_TAGS: usize = 16;
 pub const LAB_REPLAY_MAX_AUTHORING_TAG_BYTES: usize = 32;
 pub const LAB_REPLAY_MAX_MAP_TILES: usize = 1_000_000;
 pub const LAB_REPLAY_MAX_MAP_STARTS: usize = 8;
-pub const LAB_REPLAY_MAX_MAP_EXPANSION_SITES: usize = 64;
+pub const LAB_REPLAY_MAX_MAP_BASE_SITES: usize = 64;
 pub const LAB_REPLAY_MAX_UNITS_PER_COMMAND: usize = 256;
 pub const LAB_REPLAY_LAB_MAX_UNITS_PER_COMMAND: usize = 4_096;
 pub const LAB_REPLAY_MAX_MUTATION_BATCH: usize = 400;
@@ -679,9 +679,9 @@ fn validate_map_container(
     {
         return Err(invalid(format!("{label}.map.data.starts count is invalid")));
     }
-    if scenario.map.data.expansion_sites.len() > LAB_REPLAY_MAX_MAP_EXPANSION_SITES {
+    if scenario.map.data.base_sites.len() > LAB_REPLAY_MAX_MAP_BASE_SITES {
         return Err(invalid(format!(
-            "{label}.map.data.expansionSites count is invalid"
+            "{label}.map.data.baseSites count is invalid"
         )));
     }
     for site in scenario
@@ -689,7 +689,7 @@ fn validate_map_container(
         .data
         .starts
         .iter()
-        .chain(scenario.map.data.expansion_sites.iter())
+        .chain(scenario.map.data.base_sites.iter())
     {
         if site.x >= size || site.y >= size {
             return Err(invalid(format!(

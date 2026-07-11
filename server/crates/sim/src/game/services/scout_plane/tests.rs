@@ -14,16 +14,11 @@ fn test_map(size: u32) -> Map {
         size,
         terrain: vec![terrain::GRASS; (size * size) as usize],
         starts: vec![(4, 4), (size.saturating_sub(5), size.saturating_sub(5))],
-        expansion_sites: Vec::new(),
+        base_sites: Vec::new(),
     }
 }
 
-fn spawn_city_centre(
-    entities: &mut EntityStore,
-    owner: u32,
-    x: f32,
-    y: f32,
-) -> u32 {
+fn spawn_city_centre(entities: &mut EntityStore, owner: u32, x: f32, y: f32) -> u32 {
     entities
         .spawn_building(owner, EntityKind::CityCentre, x, y, true)
         .expect("city centre should spawn")
@@ -47,7 +42,9 @@ fn plane_state(entities: &EntityStore, id: u32) -> ScoutPlaneState {
 fn scout_plane_requirement_numbers_and_non_combat_contract_are_stable() {
     let def = defs::unit_def(EntityKind::ScoutPlane).expect("Scout Plane def");
     assert_eq!(def.trained_at, None);
-    assert!(matches!(def.train_requirement, TechRequirement::All(requirements) if requirements.is_empty()));
+    assert!(
+        matches!(def.train_requirement, TechRequirement::All(requirements) if requirements.is_empty())
+    );
     assert_eq!(def.weapon, WeaponClass::None);
     assert_eq!(combat::default_weapon_kind(EntityKind::ScoutPlane), None);
     assert_eq!(def.stats.hp, 40);

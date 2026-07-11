@@ -353,7 +353,7 @@ block readiness, or count toward win/loss.
 
 `AvailableMap`: `{ name: string, description: string, minPlayers: u32, maxPlayers: u32 }`.
 `name` is the stable value sent back in `selectMap`; `description` is display text for the lobby
-selector; `minPlayers` and `maxPlayers` are derived from the authored spawn-layout player counts
+selector; `minPlayers` is one and `maxPlayers` is derived from the authored `startLocations` count
 for that map. Lobby `map` is the current selected map name and is distinct from replay start
 metadata `mapName`.
 
@@ -1179,22 +1179,23 @@ Map mutation is not a `LabClientOp`; `exportMap` is read-only. The dedicated edi
 POST /api/map-handoffs
 {
   destination: "lab" | "editor",
-  authoredMap: AuthoredMapV2,
-  materializedMap: { name: string, size: u32, terrain: u8[], starts: LabMapTile[], expansionSites: LabMapTile[] },
-  selectedLayoutId: string
+  authoredMap: AuthoredMapV3,
+  materializedMap: { name: string, size: u32, terrain: u8[], starts: LabMapTile[], baseSites: LabMapTile[] }
 }
 -> { handoffId: 32-lowercase-hex, expiresInMs: 120000 }
 
 POST /api/map-handoffs/{handoffId}
--> { destination: "lab", room: privateLabRoom, selectedLayoutId: string }
- | { destination: "editor", authoredMap: AuthoredMapV2, selectedLayoutId: string }
+-> { destination: "lab", room: privateLabRoom }
+ | { destination: "editor", authoredMap: AuthoredMapV3 }
 ```
-Creation validates the complete authored-map schema and binds the selected layout's terrain, starts,
-and natural sites to `materializedMap` before storing it. Records are capped at 64, expire after two
+`AuthoredMapV3` has flat `startLocations` and `baseSites` arrays. Start locations determine the
+supported player count; every base site is a permanent resource location, including unoccupied
+start locations. Creation validates the complete authored-map schema and binds its terrain and flat
+locations to `materializedMap` before storing it. Records are capped at 64, expire after two
 minutes, and are removed on the first consume; unknown, expired, or already-used ids return HTTP 410.
 The map body never appears in a URL. Consumption uses POST so browser or intermediary prefetching
 cannot burn the one-use record. Consuming a Lab-directed record creates a private Lab from the
-validated materialized layout before the browser joins; an unjoined room has a short empty-room lease
+validated materialized map before the browser joins; an unjoined room has a short empty-room lease
 and its reserved name cannot recreate a fallback room after disposal. Its only initial `start` is tick
 zero on the edited map. Editor-directed records return only the map; simulation entities, orders, resources, fog,
 timeline state, and replay history are not part of the contract.
@@ -1216,7 +1217,7 @@ validation previews, submissions, imports, and bundled catalog assets use `LabCh
       size: u32,
       terrain: u8[],
       starts: [{ x: u32, y: u32 }],
-      expansionSites: [{ x: u32, y: u32 }]
+      baseSites: [{ x: u32, y: u32 }]
     }
   },
   metadata: {

@@ -1,10 +1,10 @@
-import { PLAYER_PALETTE } from "./config.js";
 import { TERRAIN } from "./protocol.js";
 import {
   MAP_EDITOR_HISTORY_LIMIT,
-  MAP_EDITOR_MAX_NATURALS_PER_PLAYER,
+  MAP_EDITOR_MAX_BASE_SITES,
+  MAP_EDITOR_MAX_START_LOCATIONS,
   MAP_EDITOR_SYMMETRY,
-  removeDraftPlayerNatural,
+  removeDraftLocation,
 } from "./map_editor_session.js";
 
 const MAP_CATALOG_URL = "/maps/catalog";
@@ -27,11 +27,11 @@ export class MapEditorPanel {
     this.catalog = [];
     this.catalogError = "";
     this.selectedMapFile = "";
-    this.selectedPlayerIndex = 0;
+    this.selectedStartIndex = 0;
+    this.selectedBaseIndex = 0;
     this.selectedTerrain = TERRAIN.ROCK;
     this.paintShape = "brush";
     this.symmetry = MAP_EDITOR_SYMMETRY.NONE;
-    this.newLayoutPlayers = 2;
     this.pending = false;
     this.status = "Ready to edit the map.";
     this.statusError = false;
@@ -69,8 +69,7 @@ export class MapEditorPanel {
         this.renderHistory(),
         this.renderDetails(),
         this.renderTerrain(),
-        this.renderLayouts(),
-        this.renderPlayers(),
+        this.renderLocations(),
         this.renderActions(),
         this.renderStatus(),
       );
@@ -183,85 +182,50 @@ export class MapEditorPanel {
     return section;
   }
 
-  renderLayouts() {
-    const section = group("Spawn layouts");
-    const layouts = this.session.draft.layouts || [];
-    const select = document.createElement("select");
-    for (const layout of layouts) {
-      const option = document.createElement("option");
-      option.value = layout.id;
-      option.textContent = `${layout.id} · ${layout.slots.length} players`;
-      select.appendChild(option);
-    }
-    select.value = this.session.selectedLayoutId;
-    select.addEventListener("change", () => {
-      this.session.selectLayout(select.value);
-      this.selectedPlayerIndex = 0;
-    });
-    const count = document.createElement("select");
-    for (let players = 1; players <= 4; players++) {
-      const option = document.createElement("option");
-      option.value = String(players);
-      option.textContent = `${players} player${players === 1 ? "" : "s"}`;
-      count.appendChild(option);
-    }
-    count.value = String(this.newLayoutPlayers);
-    count.addEventListener("change", () => { this.newLayoutPlayers = Number(count.value); });
-    section.append(
-      field("Active layout", select),
-      field("New layout", count),
-      button("Add layout", () => {
-        this.session.addLayout(this.newLayoutPlayers);
-        this.selectedPlayerIndex = 0;
-      }),
-      button("Remove active layout", () => this.session.removeSelectedLayout(), { disabled: layouts.length <= 1 }),
-      readout("Bases need grass clearance."),
-    );
-    return section;
-  }
-
-  renderPlayers() {
-    const section = group("Player starts and natural bases");
-    const players = this.session.playerSlots();
-    if (!players.length) {
-      section.appendChild(readout("Add or select a spawn layout first.", true));
-      return section;
-    }
-    this.selectedPlayerIndex = Math.max(0, Math.min(players.length - 1, this.selectedPlayerIndex));
-    const picker = document.createElement("div");
-    picker.className = "map-editor-player-picker";
-    for (const player of players) {
-      const control = button(`P${player.playerIndex + 1}`, () => {
-        this.selectedPlayerIndex = player.playerIndex;
+  renderLocations() {
+    const section = group("Start and base locations");
+    const starts = this.session.draft.startLocations;
+    const bases = this.session.mapOverlay()?.bases || [];
+    this.selectedStartIndex = Math.max(0, Math.min(starts.length - 1, this.selectedStartIndex));
+    this.selectedBaseIndex = Math.max(0, Math.min(bases.length - 1, this.selectedBaseIndex));
+    const startPicker = document.createElement("div");
+    startPicker.className = "map-editor-player-picker";
+    for (const [index, start] of starts.entries()) {
+      startPicker.appendChild(button(`S${index + 1}`, () => {
+        this.selectedStartIndex = index;
         this.render();
-      }, { active: player.playerIndex === this.selectedPlayerIndex });
-      control.style.setProperty("--map-player-color", PLAYER_PALETTE[player.playerIndex % PLAYER_PALETTE.length]);
-      picker.appendChild(control);
+      }, { active: index === this.selectedStartIndex, title: `${start.x}, ${start.y}` }));
     }
-    const selected = players[this.selectedPlayerIndex];
-    const list = document.createElement("div");
-    list.className = "map-editor-natural-list";
-    for (const [index, natural] of selected.naturals.entries()) {
-      const row = document.createElement("div");
-      row.append(
-        document.createTextNode(`Natural ${index + 1}: ${natural.x}, ${natural.y}`),
-        button("Move", () => this.armNatural(natural.id)),
-        button("Remove", () => this.removeNatural(natural.id)),
-      );
-      list.appendChild(row);
+    const basePicker = document.createElement("div");
+    basePicker.className = "map-editor-player-picker";
+    for (const [index, base] of bases.entries()) {
+      basePicker.appendChild(button(`B${index + 1}`, () => {
+        this.selectedBaseIndex = index;
+        this.render();
+      }, { active: index === this.selectedBaseIndex, title: `${base.x}, ${base.y}` }));
     }
-    const start = selected.start ? `${selected.start.x}, ${selected.start.y}` : "not placed";
+    const start = starts[this.selectedStartIndex];
+    const base = bases[this.selectedBaseIndex];
     section.append(
-      picker,
-      readout(`Player ${selected.playerIndex + 1} start: ${start}`),
-      button("Move start", () => {
-        this.viewport.armTool({ kind: "start", playerIndex: selected.playerIndex, symmetry: this.symmetry });
-        this.setStatus(`Click the map to place Player ${selected.playerIndex + 1}'s start.`);
-      }, { active: this.viewport.tool?.kind === "start" && this.viewport.tool?.playerIndex === selected.playerIndex }),
-      button("Add natural", () => this.armNatural(""), {
-        disabled: selected.naturals.length >= MAP_EDITOR_MAX_NATURALS_PER_PLAYER,
+      readout(`Start locations set player capacity (${starts.length}/${MAP_EDITOR_MAX_START_LOCATIONS}). Every base site always spawns resources.`),
+      startPicker,
+      readout(`Start ${this.selectedStartIndex + 1}: ${start.x}, ${start.y}`),
+      button("Move start", () => this.armLocation("start", this.selectedStartIndex), {
+        active: this.viewport.tool?.kind === "start" && this.viewport.tool?.locationIndex === this.selectedStartIndex,
       }),
-      list,
+      button("Add start", () => this.armLocation("start", null, true), { disabled: starts.length >= MAP_EDITOR_MAX_START_LOCATIONS }),
+      button("Remove start", () => this.removeLocation("start", this.selectedStartIndex), { disabled: starts.length <= 1 }),
+      basePicker,
+      readout(base ? `Base ${this.selectedBaseIndex + 1}: ${base.x}, ${base.y}` : "No neutral base sites yet."),
+      button("Move base", () => this.armLocation("base", base?.index), {
+        disabled: !base,
+        active: this.viewport.tool?.kind === "base" && !this.viewport.tool?.add && this.viewport.tool?.locationIndex === base?.index,
+      }),
+      button("Add base", () => this.armLocation("base", null, true), {
+        disabled: this.session.draft.baseSites.length >= MAP_EDITOR_MAX_BASE_SITES,
+      }),
+      button("Remove base", () => this.removeLocation("base", base?.index), { disabled: !base }),
+      readout("Bases and starts reserve a passable grass area."),
     );
     return section;
   }
@@ -290,22 +254,17 @@ export class MapEditorPanel {
     return status;
   }
 
-  armNatural(naturalId) {
-    this.viewport.armTool({
-      kind: "natural",
-      playerIndex: this.selectedPlayerIndex,
-      naturalId,
-      symmetry: this.symmetry,
-    });
-    this.setStatus(`Click the map to ${naturalId ? "move" : "add"} Player ${this.selectedPlayerIndex + 1}'s natural base.`);
+  armLocation(kind, locationIndex, add = false) {
+    this.viewport.armTool({ kind, locationIndex, add, symmetry: this.symmetry });
+    this.setStatus(`Click the map to ${add ? "add" : "move"} this ${kind === "start" ? "start location" : "base site"}.`);
   }
 
-  removeNatural(naturalId) {
-    const player = this.selectedPlayerIndex;
-    const changed = this.session.mutate(`Removed Player ${player + 1} natural`, (draft) => {
-      removeDraftPlayerNatural(draft, player, naturalId, this.session.selectedLayoutId);
+  removeLocation(kind, locationIndex) {
+    let result = null;
+    const changed = this.session.mutate(`Removed ${kind === "start" ? "start location" : "base site"}`, (draft) => {
+      result = removeDraftLocation(draft, { kind, locationIndex });
     });
-    this.setStatus(changed ? "Natural base removed." : "Natural base was already absent.", !changed);
+    this.setStatus(changed ? "Map location removed." : result?.error || "Map location was already absent.", !changed);
   }
 
   armTerrain() {
@@ -334,7 +293,8 @@ export class MapEditorPanel {
 
   newBlankMap() {
     this.session.initializeBlank({ size: 126, playerCount: 2 });
-    this.selectedPlayerIndex = 0;
+    this.selectedStartIndex = 0;
+    this.selectedBaseIndex = 0;
     this.viewport.armTool(null);
     this.setStatus("Created a blank two-player map.");
   }
@@ -362,7 +322,8 @@ export class MapEditorPanel {
       const response = await this.fetchImpl(`/maps/${encodeURIComponent(this.selectedMapFile)}`, { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       this.session.loadAuthoredMap(await response.json());
-      this.selectedPlayerIndex = 0;
+      this.selectedStartIndex = 0;
+      this.selectedBaseIndex = 0;
       this.viewport.armTool(null);
       this.setStatus("Bundled map loaded.");
     } catch (error) {
@@ -417,7 +378,6 @@ export class MapEditorPanel {
       await this.onOpenLab?.({
         authoredMap: this.session.exportMap(),
         materializedMap: this.session.materialized(),
-        selectedLayoutId: this.session.selectedLayoutId,
         workspaceId: this.workspaceId,
       });
     } catch (error) {

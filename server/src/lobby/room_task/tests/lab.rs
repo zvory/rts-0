@@ -126,7 +126,7 @@ fn map_editor_handoff_materializes_before_the_first_lab_start_payload() {
                 y: size - 17,
             },
         ],
-        expansion_sites: vec![crate::protocol::LabMapTile {
+        base_sites: vec![crate::protocol::LabMapTile {
             x: size / 2,
             y: size / 2,
         }],

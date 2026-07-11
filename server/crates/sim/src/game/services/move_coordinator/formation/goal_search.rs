@@ -33,22 +33,14 @@ where
         assigned,
         formation_center,
     };
-    if let Some(tile) = find_unique_tile_near_with_spacing(
-        &context,
-        anchor,
-        is_goal_reachable,
-        true,
-    ) {
+    if let Some(tile) =
+        find_unique_tile_near_with_spacing(&context, anchor, is_goal_reachable, true)
+    {
         return Some(tile);
     }
-    find_unique_tile_near_with_spacing(
-        &context,
-        anchor,
-        is_goal_reachable,
-        false,
-    )
-    .or_else(|| find_free_goal_near_with_spacing(map, occ, unit, anchor, assigned, true))
-    .or_else(|| find_free_goal_near_with_spacing(map, occ, unit, anchor, assigned, false))
+    find_unique_tile_near_with_spacing(&context, anchor, is_goal_reachable, false)
+        .or_else(|| find_free_goal_near_with_spacing(map, occ, unit, anchor, assigned, true))
+        .or_else(|| find_free_goal_near_with_spacing(map, occ, unit, anchor, assigned, false))
 }
 
 fn find_unique_tile_near_with_spacing<F>(
@@ -82,12 +74,7 @@ where
         }
     }
     if let Some(tile) = find_tile_near(anchor, false, |tile| {
-        is_reachable_free_goal(
-            context,
-            tile,
-            require_preferred_spacing,
-            is_goal_reachable,
-        )
+        is_reachable_free_goal(context, tile, require_preferred_spacing, is_goal_reachable)
     }) {
         return Some(tile);
     }
@@ -153,14 +140,12 @@ where
             fallback_anchor,
             context.formation_center,
             original_dist_sq,
-        )
-            && is_reachable_free_goal(
-                context,
-                fallback_anchor,
-                require_preferred_spacing,
-                is_goal_reachable,
-            )
-        {
+        ) && is_reachable_free_goal(
+            context,
+            fallback_anchor,
+            require_preferred_spacing,
+            is_goal_reachable,
+        ) {
             return Some(fallback_anchor);
         }
     }
@@ -209,12 +194,7 @@ where
 {
     find_tile_near(anchor, true, |tile| {
         accept_tile(tile)
-            && is_reachable_free_goal(
-                context,
-                tile,
-                require_preferred_spacing,
-                is_goal_reachable,
-            )
+            && is_reachable_free_goal(context, tile, require_preferred_spacing, is_goal_reachable)
     })
 }
 

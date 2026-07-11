@@ -1,8 +1,8 @@
 {
-  "version": 2,
+  "version": 3,
   "name": "1v1 No Terrain",
-  "description": "Two-player no-terrain map scaffold for 1v1 terrain editing.",
-  "_design": "1v1 map scaffold with all-grass terrain and exactly two opposing base slots. The 1p layouts retain either slot for solo testing; the sole 2p layout always places players northwest and southeast.",
+  "description": "Two-start, four-base no-terrain map for 1v1 terrain editing.",
+  "_design": "Flat map locations: startLocations choose player starts; every baseSites entry always spawns its resource cluster.",
   "terrain": [
     "..............................................................................................................................",
     "..............................................................................................................................",
@@ -131,66 +131,32 @@
     "..............................................................................................................................",
     ".............................................................................................................................."
   ],
-  "sites": [
+  "startLocations": [
     {
-      "id": "main_nw",
-      "kind": "main",
       "x": 25,
       "y": 25
     },
     {
-      "id": "main_se",
-      "kind": "main",
+      "x": 100,
+      "y": 100
+    }
+  ],
+  "baseSites": [
+    {
+      "x": 25,
+      "y": 25
+    },
+    {
       "x": 100,
       "y": 100
     },
     {
-      "id": "nat_top",
-      "kind": "natural",
       "x": 63,
       "y": 38
     },
     {
-      "id": "nat_bottom",
-      "kind": "natural",
       "x": 63,
       "y": 88
-    }
-  ],
-  "layouts": [
-    {
-      "id": "1p_nw",
-      "playerCount": 1,
-      "slots": [
-        {
-          "main": "main_nw",
-          "natural": "nat_top"
-        }
-      ]
-    },
-    {
-      "id": "1p_se",
-      "playerCount": 1,
-      "slots": [
-        {
-          "main": "main_se",
-          "natural": "nat_bottom"
-        }
-      ]
-    },
-    {
-      "id": "2p_cross_nw_se",
-      "playerCount": 2,
-      "slots": [
-        {
-          "main": "main_nw",
-          "natural": "nat_top"
-        },
-        {
-          "main": "main_se",
-          "natural": "nat_bottom"
-        }
-      ]
     }
   ]
 }

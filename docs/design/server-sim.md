@@ -60,15 +60,13 @@ pub struct Game { /* private */ }
 
 impl Game {
     /// Create a match for the given players (ids + colors + names already assigned by lobby).
-    /// Loads the hardcoded handcrafted map and assigns authored spawn slots to the ordered
-    /// `PlayerInit` list. Singleton-team FFA matches keep the legacy behavior: select one matching
-    /// authored layout by `seed`, shuffle that layout's complete main/naturals slots, then assign
-    /// them in player order. Team matches evaluate every matching authored layout and slot
-    /// assignment, preferring lower teammate spread, higher nearest enemy-team distance, lower
-    /// exposure imbalance, and finally a deterministic seed-influenced tie break. Each selected
-    /// slot keeps its authored main/naturals grouping, so maps can define different fair naturals
-    /// for adjacent, cross, safe-base, or other spawn layouts. Each slot supports one main plus up
-    /// to three natural expansions; the authored-map loader rejects slots with more than four bases. Generated oil clusters place each oil patch on a unique passable tile
+    /// Loads the hardcoded handcrafted map and assigns ordered players to fixed authored start
+    /// locations. A map owns flat `startLocations` and `baseSites`: start locations determine its
+    /// capacity, while every base site always receives its resource cluster. Singleton-team FFA
+    /// matches shuffle fixed start locations by `seed`; team matches choose ordered starts from the
+    /// same fixed set, preferring lower teammate spread, higher nearest enemy-team distance, lower
+    /// exposure imbalance, and finally a deterministic seed-influenced tie break. No player-count
+    /// layouts or player-owned natural groups exist in authored maps. Generated oil clusters place each oil patch on a unique passable tile
     /// center near the intended layout, keep one tile between oil patches, and reject sites whose
     /// Pump Jack footprint would collide with non-oil resources while preserving City Centre
     /// resource-distance bounds. Lab-restored oil nodes are normalized to passable tile centers and
@@ -505,10 +503,10 @@ store a separate authoritative command stream, but they must not infer live stat
 
 Map policy:
 
-- `GameState.map` remains authoritative runtime state because systems read terrain, starts, and
-  expansion sites on every tick. Internal cold checkpoints may still clone the full `Map` while
+- `GameState.map` remains authoritative runtime state because systems read terrain, selected starts,
+  and permanent base sites on every tick. Internal cold checkpoints may still clone the full `Map` while
   they are private test machinery.
-- `GameCheckpointV1` never embeds map JSON, terrain bytes, starts, or expansion-site bodies. It
+- `GameCheckpointV1` never embeds map JSON, terrain bytes, starts, or base-site bodies. It
   embeds `mapBinding` only.
 - The containing artifact supplies the exact map data. A replay artifact stores or references the
   launch-time map composition beside the checkpoint; a lab setup container embeds or references
@@ -519,7 +517,7 @@ Map policy:
   a live `Game`, it validates `mapBinding.name`, `schemaVersion`, authored `contentHash`, `size`,
   `playerCount`, and `materializedMapHash` against the supplied map. `materializedMapHash` is a
   stable hash over the live `Map` fields that affect simulation (`size`, row-major terrain,
-  selected starts, and expansion sites). If any binding fact differs, the importer rejects the
+  selected starts, and base sites). If any binding fact differs, the importer rejects the
   payload; it must not fall back to regenerating a map from seed or silently accepting a nearby map.
 
 Field map for Phase 2 DTO conversion:

@@ -8,7 +8,7 @@ fn open_map(size: u32) -> Map {
         size,
         terrain: vec![terrain::GRASS; (size * size) as usize],
         starts: vec![(1, 1)],
-        expansion_sites: Vec::new(),
+        base_sites: Vec::new(),
     }
 }
 

@@ -174,9 +174,9 @@ fn waiting_build_cancels_when_building_claims_footprint() {
         entities.get(worker).expect("worker should survive").order(),
         Order::Idle
     ));
-    assert!(events.get(&1).is_some_and(|events| events.iter().any(
-        |event| matches!(event, Event::Notice { msg, .. } if msg == "Cannot build there")
-    )));
+    assert!(events.get(&1).is_some_and(|events| events
+        .iter()
+        .any(|event| matches!(event, Event::Notice { msg, .. } if msg == "Cannot build there"))));
 }
 
 #[test]

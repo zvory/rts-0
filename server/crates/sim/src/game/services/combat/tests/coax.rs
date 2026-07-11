@@ -35,7 +35,10 @@ fn tank_coax_profile_is_live_without_replacing_tank_cannon() {
     assert_eq!(coax.range_tiles, 6);
     assert_eq!(coax.dmg, 4);
     assert_eq!(coax.cooldown, 6);
-    assert_eq!(coax.weapon_class, crate::rules::defs::WeaponClass::SmallArms);
+    assert_eq!(
+        coax.weapon_class,
+        crate::rules::defs::WeaponClass::SmallArms
+    );
     assert_eq!(
         combat_rules::default_weapon_profile(EntityKind::Tank)
             .expect("Tank default weapon should exist")
@@ -150,11 +153,7 @@ fn tank_coax_fallback_vehicle_damage_stays_small_arms() {
     );
 
     assert_eq!(
-        hp_before
-            - entities
-                .get(enemy_tank)
-                .expect("target should exist")
-                .hp,
+        hp_before - entities.get(enemy_tank).expect("target should exist").hp,
         1,
         "coax fallback shots against armor should use small-arms reduction, not AP damage"
     );
@@ -188,11 +187,7 @@ fn tank_coax_overpenetration_uses_small_arms_profile_without_extra_attack_event(
         4
     );
     assert_eq!(
-        secondary_before
-            - entities
-                .get(secondary)
-                .expect("secondary should exist")
-                .hp,
+        secondary_before - entities.get(secondary).expect("secondary should exist").hp,
         2,
         "coax overpenetration should use the small-arms coax profile, not Tank cannon damage"
     );
@@ -240,10 +235,7 @@ fn tank_coax_prioritizes_infantry_over_nearer_fallback_targets() {
         "infantry-priority targets should beat nearer fallback vehicles"
     );
     assert_eq!(
-        entities
-            .get(nearer_tank)
-            .expect("tank should exist")
-            .hp,
+        entities.get(nearer_tank).expect("tank should exist").hp,
         tank_hp_before,
         "nearer fallback target should not be hit while an infantry-priority target is legal"
     );

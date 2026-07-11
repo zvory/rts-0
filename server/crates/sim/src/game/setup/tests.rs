@@ -4,7 +4,8 @@ use crate::game::entity::Order;
 use crate::rules::faction::EMPTY_FIXTURE_FACTION_ID;
 
 fn owned_kind_count(game: &Game, owner: u32, kind: EntityKind) -> usize {
-    game.state.entities
+    game.state
+        .entities
         .iter()
         .filter(|e| e.owner == owner && e.kind == kind)
         .count()
@@ -57,7 +58,12 @@ fn fixture_faction_start_uses_catalog_loadout_and_shared_resources() {
     assert_eq!(loadout.starting_steel, 125);
     assert_eq!(loadout.starting_oil, 25);
 
-    let resource_nodes = game.state.entities.iter().filter(|e| e.kind.is_node()).count();
+    let resource_nodes = game
+        .state
+        .entities
+        .iter()
+        .filter(|e| e.kind.is_node())
+        .count();
     assert!(
         resource_nodes > 0,
         "fixture starts still use universal Steel/Oil nodes"
@@ -78,6 +84,17 @@ fn unknown_faction_start_and_commands_fail_closed() {
     game.assert_invariants();
 
     assert_eq!(
+        game.state
+            .entities
+            .iter()
+            .filter(|entity| entity.kind.is_node())
+            .count(),
+        game.state.map.base_sites.len()
+            * (config::STEEL_PATCHES_PER_BASE as usize + config::OIL_PATCHES_PER_BASE as usize),
+        "an invalid faction must not leave its permanent start/base site without resources"
+    );
+
+    assert_eq!(
         (
             game.state.players[0].steel,
             game.state.players[0].oil,
@@ -92,19 +109,29 @@ fn unknown_faction_start_and_commands_fail_closed() {
     assert_eq!((loadout.starting_steel, loadout.starting_oil), (0, 0));
 
     let (x, y) = game.state.map.tile_center(4, 4);
-    let worker = game.state.entities
+    let worker = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::Worker, x, y)
         .unwrap();
-    let city_centre = game.state.entities
+    let city_centre = game
+        .state
+        .entities
         .spawn_building(1, EntityKind::CityCentre, x + 96.0, y, true)
         .unwrap();
-    let research_complex = game.state.entities
+    let research_complex = game
+        .state
+        .entities
         .spawn_building(1, EntityKind::ResearchComplex, x + 192.0, y, true)
         .unwrap();
-    let artillery = game.state.entities
+    let artillery = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::Artillery, x, y + 96.0)
         .unwrap();
-    let node = game.state.entities
+    let node = game
+        .state
+        .entities
         .spawn_node(EntityKind::Steel, x + 320.0, y + 320.0)
         .unwrap();
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
@@ -163,12 +190,16 @@ fn unknown_faction_start_and_commands_fail_closed() {
         game.state.entities.get(worker).expect("worker").order(),
         Order::Build(_) | Order::Gather(_)
     ));
-    assert!(game.state.entities
+    assert!(game
+        .state
+        .entities
         .get(city_centre)
         .expect("city centre")
         .prod_queue()
         .is_empty());
-    assert!(game.state.entities
+    assert!(game
+        .state
+        .entities
         .get(research_complex)
         .expect("research complex")
         .research_queue()
@@ -227,10 +258,14 @@ fn standard_starting_loadout_matches_phase0_inventory() {
         );
     }
 
-    assert!(game.state.entities
+    assert!(game
+        .state
+        .entities
         .iter()
         .any(|e| e.owner == 0 && e.kind == EntityKind::Steel));
-    assert!(game.state.entities
+    assert!(game
+        .state
+        .entities
         .iter()
         .any(|e| e.owner == 0 && e.kind == EntityKind::Oil));
 
@@ -248,14 +283,45 @@ fn standard_starting_loadout_matches_phase0_inventory() {
 fn spawned_resource_sites(map: &Map) -> EntityStore {
     let mut entities = EntityStore::new();
     for &start in &map.starts {
-        spawn_base_resources(&mut entities, &map, start);
+        spawn_base_resources(&mut entities, map, start);
     }
-    for &site in &map.expansion_sites {
+    for &site in &map.base_sites {
         if !map.starts.contains(&site) {
-            spawn_base_resources(&mut entities, &map, site);
+            spawn_base_resources(&mut entities, map, site);
         }
     }
     entities
+}
+
+#[test]
+fn default_spawns_resources_for_every_base_site_with_one_player() {
+    let players = [PlayerInit {
+        id: 1,
+        team_id: 1,
+        faction_id: DEFAULT_FACTION_ID.to_string(),
+        name: "Solo".to_string(),
+        color: "#cc1111".to_string(),
+        is_ai: false,
+    }];
+    let game = Game::new(&players, 0x1020_3040);
+    let base_count = game.state.map.base_sites.len();
+
+    assert_eq!(
+        game.state
+            .entities
+            .iter()
+            .filter(|entity| entity.kind == EntityKind::Steel)
+            .count(),
+        base_count * config::STEEL_PATCHES_PER_BASE as usize,
+    );
+    assert_eq!(
+        game.state
+            .entities
+            .iter()
+            .filter(|entity| entity.kind == EntityKind::Oil)
+            .count(),
+        base_count * config::OIL_PATCHES_PER_BASE as usize,
+    );
 }
 
 #[test]
@@ -301,15 +367,13 @@ fn bundled_oil_patches_have_buildable_pump_jack_sites() {
     for available_map in Map::list_available() {
         for player_count in available_map.min_players..=available_map.max_players {
             for seed in 0..32 {
-                let map =
-                    Map::load(&available_map.name, player_count as usize, seed).unwrap_or_else(
-                        |err| {
-                            panic!(
-                                "map {} should load for player_count={player_count} seed={seed}: {err}",
-                                available_map.name
-                            )
-                        },
-                    );
+                let map = Map::load(&available_map.name, player_count as usize, seed)
+                    .unwrap_or_else(|err| {
+                        panic!(
+                            "map {} should load for player_count={player_count} seed={seed}: {err}",
+                            available_map.name
+                        )
+                    });
                 let entities = spawned_resource_sites(&map);
 
                 for oil in entities

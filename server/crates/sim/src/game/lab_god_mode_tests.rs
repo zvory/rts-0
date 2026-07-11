@@ -40,7 +40,7 @@ fn flat_lab_map() -> Map {
         size: SIZE,
         terrain: vec![terrain::GRASS; (SIZE * SIZE) as usize],
         starts: vec![(16, 16), (48, 48)],
-        expansion_sites: Vec::new(),
+        base_sites: Vec::new(),
     }
 }
 
@@ -55,14 +55,18 @@ fn tile_center(game: &Game, x: u32, y: u32) -> (f32, f32) {
 #[test]
 fn lab_god_mode_makes_player_units_and_buildings_ignore_damage() {
     let mut game = new_game();
-    let worker_id = game.state.entities
+    let worker_id = game
+        .state
+        .entities
         .iter()
         .find(|entity| entity.owner == 1 && entity.kind == EntityKind::Worker)
         .expect("starting worker")
         .id;
     let worker_hp = game.state.entities.get(worker_id).expect("worker").hp;
     let (node_x, node_y) = tile_center(&game, 42, 42);
-    let node_id = game.state.entities
+    let node_id = game
+        .state
+        .entities
         .spawn_node(EntityKind::Steel, node_x, node_y)
         .expect("steel node should spawn");
 
@@ -90,7 +94,12 @@ fn lab_god_mode_makes_player_units_and_buildings_ignore_damage() {
     else {
         panic!("unexpected outcome");
     };
-    assert!(game.state.entities.get(unit_id).expect("rifleman").invulnerable());
+    assert!(game
+        .state
+        .entities
+        .get(unit_id)
+        .expect("rifleman")
+        .invulnerable());
 
     let (building_x, building_y) = footprint_center(&game.state.map, EntityKind::Depot, 34, 34);
     let LabOpOutcome::Spawned {
@@ -154,14 +163,24 @@ fn lab_god_mode_follows_unit_owner_changes() {
     else {
         panic!("unexpected outcome");
     };
-    assert!(!game.state.entities.get(entity_id).expect("tank").invulnerable());
+    assert!(!game
+        .state
+        .entities
+        .get(entity_id)
+        .expect("tank")
+        .invulnerable());
 
     game.apply_lab_op(LabOp::SetEntityOwner(LabSetEntityOwner {
         entity_id,
         owner: 2,
     }))
     .expect("owner should change");
-    assert!(game.state.entities.get(entity_id).expect("tank").invulnerable());
+    assert!(game
+        .state
+        .entities
+        .get(entity_id)
+        .expect("tank")
+        .invulnerable());
 
     assert!(matches!(
         game.apply_lab_op(LabOp::SetPlayerGodMode {

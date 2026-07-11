@@ -188,9 +188,14 @@ where
         );
         let anchor = map.tile_of(desired.0, desired.1);
         let context = inputs.with_assigned(&assigned);
-        if let Some(formation_goal) =
-            assign_formation_goal(&context, unit, anchor, desired, goal, &mut is_goal_reachable)
-        {
+        if let Some(formation_goal) = assign_formation_goal(
+            &context,
+            unit,
+            anchor,
+            desired,
+            goal,
+            &mut is_goal_reachable,
+        ) {
             assigned.push(FormationAssignment {
                 kind: unit.kind,
                 tile: formation_goal.tile,
@@ -248,12 +253,7 @@ fn assign_formation_goal<F>(
 where
     F: FnMut(&FormationUnit, (u32, u32)) -> bool,
 {
-    if let Some(goal) = find_preferred_trench_goal(
-        context,
-        unit,
-        desired,
-        is_goal_reachable,
-    ) {
+    if let Some(goal) = find_preferred_trench_goal(context, unit, desired, is_goal_reachable) {
         return Some(goal);
     }
     goal_search::find_unique_tile_near(

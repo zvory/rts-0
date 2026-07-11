@@ -38,7 +38,7 @@ fn flat_lab_map() -> Map {
         size: SIZE,
         terrain: vec![terrain::GRASS; (SIZE * SIZE) as usize],
         starts: vec![(16, 16), (48, 48)],
-        expansion_sites: Vec::new(),
+        base_sites: Vec::new(),
     }
 }
 
@@ -54,7 +54,7 @@ fn map_draft() -> LabMapDraft {
         size: 64,
         terrain,
         starts: vec![LabMapTile { x: 12, y: 12 }, LabMapTile { x: 51, y: 51 }],
-        expansion_sites: vec![LabMapTile { x: 32, y: 32 }],
+        base_sites: vec![LabMapTile { x: 32, y: 32 }],
     }
 }
 
@@ -80,7 +80,7 @@ fn lab_map_draft_rebuilds_the_battle_on_authoritative_terrain_and_bases() {
     assert_eq!(game.tick_count(), 0);
     assert_eq!(game.state.map.terrain[0], terrain::WATER);
     assert_eq!(game.state.map.starts, vec![(12, 12), (51, 51)]);
-    assert_eq!(game.state.map.expansion_sites, vec![(32, 32)]);
+    assert_eq!(game.state.map.base_sites, vec![(32, 32)]);
     assert_eq!(game.state.map_metadata.name, "Edited Lab Map");
     assert_eq!(
         game.start_payload()
@@ -154,7 +154,7 @@ fn terrain_only_lab_map_draft_restarts_a_fresh_test() {
             .iter()
             .map(|&(x, y)| LabMapTile { x, y })
             .collect(),
-        expansion_sites: Vec::new(),
+        base_sites: Vec::new(),
     };
 
     let outcome = game
@@ -736,7 +736,7 @@ fn lab_rejects_research_not_in_player_faction_catalog() {
         size: 32,
         terrain: vec![terrain::GRASS; 32 * 32],
         starts: vec![(8, 8)],
-        expansion_sites: Vec::new(),
+        base_sites: Vec::new(),
     };
     let mut game = Game::new_lab(&players, 1, map, lab_metadata());
 

@@ -79,10 +79,7 @@ fn assert_restore_invalid_scenario(
     }
 }
 
-fn assert_restore_invalid_map(
-    scenario: crate::game::lab::LabCheckpointScenarioV1,
-    expected: &str,
-) {
+fn assert_restore_invalid_map(scenario: crate::game::lab::LabCheckpointScenarioV1, expected: &str) {
     match Game::restore_lab_checkpoint_scenario(scenario) {
         Ok(_) => panic!("checkpoint lab scenario restore should reject {expected}"),
         Err(LabError::InvalidMap { reason, .. }) => {
@@ -157,7 +154,11 @@ fn checkpoint_lab_scenario_export_matches_direct_state() {
 
     let mut restored = Game::restore_lab_checkpoint_scenario(checkpoint)
         .expect("checkpoint scenario restore should succeed");
-    assert_equivalent_games(&authored, &restored, "checkpoint-backed lab scenario restore");
+    assert_equivalent_games(
+        &authored,
+        &restored,
+        "checkpoint-backed lab scenario restore",
+    );
     let mut direct = authored;
     tick_pair_for(
         &mut direct,
@@ -205,10 +206,52 @@ fn lab_checkpoint_scenario_export_preserves_god_mode_and_rejects_map_mismatches(
     match Game::restore_lab_checkpoint_scenario(wrong_map_data) {
         Ok(_) => panic!("checkpoint lab scenario restore should reject wrong materialized map"),
         Err(LabError::InvalidMap { reason, .. }) => {
-            assert!(reason.contains("materialized hash"), "unexpected error: {reason}");
+            assert!(
+                reason.contains("materialized hash"),
+                "unexpected error: {reason}"
+            );
         }
         Err(err) => panic!("unexpected error for wrong materialized map: {err:?}"),
     }
+}
+
+#[test]
+fn lab_checkpoint_scenario_rejects_player_starts_that_disagree_with_its_map() {
+    let game = default_lab_game(0x5150_5006);
+    let mut checkpoint = game
+        .export_lab_checkpoint_scenario("Untitled lab scenario".to_string(), TEST_BUILD_SHA)
+        .expect("live lab checkpoint scenario should export");
+    checkpoint.map.data.starts.swap(0, 1);
+    let map = Map {
+        size: checkpoint.map.data.size,
+        terrain: checkpoint.map.data.terrain.clone(),
+        starts: checkpoint
+            .map
+            .data
+            .starts
+            .iter()
+            .map(|tile| (tile.x, tile.y))
+            .collect(),
+        base_sites: checkpoint
+            .map
+            .data
+            .base_sites
+            .iter()
+            .map(|tile| (tile.x, tile.y))
+            .collect(),
+    };
+    let materialized_hash = map.materialized_hash();
+    checkpoint.map.materialized_hash = materialized_hash.clone();
+    let mut payload: serde_json::Value = serde_json::from_str(&checkpoint.checkpoint_payload)
+        .expect("checkpoint payload should be JSON");
+    payload["mapBinding"]["materializedMapHash"] = serde_json::Value::String(materialized_hash);
+    checkpoint.checkpoint_payload =
+        serde_json::to_string(&payload).expect("checkpoint payload should serialize");
+
+    assert_restore_invalid_scenario(
+        checkpoint,
+        "player start tiles do not match scenario map starts",
+    );
 }
 
 #[test]
@@ -252,10 +295,10 @@ fn lab_checkpoint_scenario_restore_bounds_map_site_lists() {
     }
     assert_restore_invalid_map(too_many_starts, "start site count");
 
-    let mut too_many_expansions = checkpoint;
-    let expansion = too_many_expansions.map.data.starts[0];
-    while too_many_expansions.map.data.expansion_sites.len() <= 64 {
-        too_many_expansions.map.data.expansion_sites.push(expansion);
+    let mut too_many_base_sites = checkpoint;
+    let base_site = too_many_base_sites.map.data.starts[0];
+    while too_many_base_sites.map.data.base_sites.len() <= 64 {
+        too_many_base_sites.map.data.base_sites.push(base_site);
     }
-    assert_restore_invalid_map(too_many_expansions, "expansion site count");
+    assert_restore_invalid_map(too_many_base_sites, "base site count");
 }

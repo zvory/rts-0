@@ -82,8 +82,8 @@ src/
   map_editor_app.js # Dedicated `/map-editor` lifecycle; never constructs Net, Match, or GameState
   map_editor_launch.js # Bounded editor route/handoff/workspace query parsing
   map_editor_handoff.js # Short-lived HTTP map handoff create/consume client
-  map_editor_session.js # Authored-map state, layouts, local storage, undo/redo, stroke transactions
-  map_editor_panel.js # Dedicated editor controls for maps, terrain, bases, layouts, save/export, and Lab launch
+  map_editor_session.js # Flat authored-map state, local storage, undo/redo, stroke transactions
+  map_editor_panel.js # Dedicated editor controls for maps, terrain, start/base locations, save/export, and Lab launch
   map_editor_viewport.js # Pixi renderer/camera composition plus editor-only pointer/keyboard input
   match.js        # Match lifecycle, module dependency wiring, render loop, transient events
   match_combat_audio.js # Match-owned combat sound routing and machine-gunner sound cleanup
@@ -476,7 +476,6 @@ ratcheted frame-local compatibility facade, copies static/fog grids into Pixi-ow
 does not expose its adapter to another backend. The sidecar contains no mutable state/intent,
 selection proxy, mutable typed array, Pixi object, or transport record. Static terrain/resource
 locations are separately revisioned; visible/explored grids reuse opaque snapshots by revision.
-
 `settings_container.js`
 ```js
 export class SettingsContainer {
@@ -692,12 +691,11 @@ export const MAP_EDITOR_HISTORY_LIMIT    // 25
 export class MapEditorSession {
   initializeBlank(options?)
   initializeFromScenario(scenario, options?)
-  loadAuthoredMap(source, options?), selectLayout(layoutId)
+  loadAuthoredMap(source, options?)
   mutate(label, mutation), undo(), redo()
   beginTerrainStroke(label?), paintTerrainTiles(tiles, terrain), commitTerrainStroke()
-  addLayout(playerCount), removeSelectedLayout()
   materialized(), exportMap(), saveLocal(key), loadLocal(key)
-  playerSlots(), mapOverlay()
+  mapOverlay()
 }
 ```
 `LabPanel` renders separate floating, collapsible Options and Tools windows. Options owns room
@@ -721,24 +719,26 @@ authoritative map-only payload, creates a server-validated editor handoff, and n
 entity, resource, order, timeline, or replay state crosses that boundary.
 
 `MapEditorApp` owns the dedicated editor. The panel loads bundled JSON from `/maps/catalog` and
-`/maps/<file>`, creates the fixed-size blank map, edits name/description/layouts/player starts/naturals,
-and provides undo/redo, local save/load, and JSON export. The viewport draws player-owned base markers
-over the shared Pixi terrain and owns editor-only pan/zoom/paint/site input. Terrain tools support brush
+`/maps/<file>`, creates the fixed-size blank map, edits name/description plus flat start and base
+locations, and provides undo/redo, local save/load, and JSON export. Start locations set map player
+capacity; every base location is permanent and its resources spawn even when no player starts there.
+There is no active layout, player slot, or per-player natural assignment. The viewport draws blue start
+markers and neutral base markers over the shared Pixi terrain and owns editor-only pan/zoom/paint/site input. Terrain tools support brush
 and inclusive drag-box fills, plus none, horizontal, vertical, half-turn, four-way radial, or either
 single-diagonal symmetry; grass is the erase material. Symmetry expands every terrain tile before it is
-painted, and moves/adds only the already matching start/natural bases in the active layout. The viewport
-draws the selected centre axis, a centre marker for half-turn symmetry, a cross for radial symmetry, or
-the selected diagonal. A terrain pointer stroke clones once for undo,
+painted, moves matching flat locations, and adds all symmetric locations. The viewport draws the selected
+centre axis, a centre marker for half-turn symmetry, a cross for radial symmetry, or the selected diagonal.
+A terrain pointer stroke clones once for undo,
 mutates rows in place, records dirty tiles, and commits once. The renderer patches those tiles plus their
 edge-sharing neighbours into the existing canvas texture and calls
 `baseTexture.update()`; it does not recreate the canvas, fingerprint/serialize the map, or replace a Pixi
 texture per tile.
 
-`Open in Lab` posts the authored map plus the active materialized layout to `/api/map-handoffs`.
+`Open in Lab` posts the authored map plus its flat materialized locations to `/api/map-handoffs`.
 The bounded server record expires after two minutes and is consumed once. Lab consumption creates a
 private Lab whose first `start` payload already contains the edited map at tick zero; returning through
 `Edit map` transfers only an authoritative exported map. A bounded `workspace` id keeps the editor's
-local full-layout workspace available across the round trip when browser storage is available.
+local map workspace available across the round trip when browser storage is available.
 `lab_panel_window.js` owns local drag, resize, collapse/expand, reset, keyboard nudge,
 viewport-clamping, and localStorage geometry hints for those app-owned lab windows. It has no
 transport or match authority.

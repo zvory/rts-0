@@ -30,7 +30,6 @@ struct MapHandoff {
     destination: HandoffDestination,
     authored_map: serde_json::Value,
     materialized_map: LabMapDraft,
-    selected_layout_id: String,
     expires_at: Instant,
 }
 
@@ -47,7 +46,6 @@ pub(crate) struct CreateMapHandoffRequest {
     destination: HandoffDestination,
     authored_map: serde_json::Value,
     materialized_map: LabMapDraft,
-    selected_layout_id: String,
 }
 
 #[derive(Serialize)]
@@ -65,7 +63,6 @@ struct ConsumeMapHandoffResponse {
     room: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     authored_map: Option<serde_json::Value>,
-    selected_layout_id: String,
 }
 
 #[derive(Serialize)]
@@ -103,7 +100,6 @@ pub(crate) async fn create_handler(
             destination: request.destination,
             authored_map: request.authored_map,
             materialized_map: request.materialized_map,
-            selected_layout_id: request.selected_layout_id,
             expires_at: now + HANDOFF_TTL,
         },
     );
@@ -158,7 +154,6 @@ pub(crate) async fn consume_handler(
                 destination: HandoffDestination::Lab,
                 room: Some(room),
                 authored_map: None,
-                selected_layout_id: handoff.selected_layout_id,
             })
             .into_response()
         }
@@ -166,7 +161,6 @@ pub(crate) async fn consume_handler(
             destination: HandoffDestination::Editor,
             room: None,
             authored_map: Some(handoff.authored_map),
-            selected_layout_id: handoff.selected_layout_id,
         })
         .into_response(),
     }
@@ -177,9 +171,6 @@ fn validate_request(request: &CreateMapHandoffRequest) -> Result<(), String> {
         .map_err(|error| format!("Map JSON could not be encoded: {error}"))?;
     if authored_json.len() > MAX_AUTHORED_MAP_BYTES {
         return Err("Map JSON is too large.".to_string());
-    }
-    if request.selected_layout_id.is_empty() || request.selected_layout_id.len() > 80 {
-        return Err("A bounded selected layout id is required.".to_string());
     }
     let player_count = request.materialized_map.starts.len();
     if !(1..=4).contains(&player_count) {
@@ -209,7 +200,7 @@ fn validate_materialized_map(draft: &LabMapDraft, player_count: usize) -> Result
         .map_err(|error| format!("Could not prepare map metadata: {error}"))?;
     let mut game = Game::new_lab(&players, 0, map, metadata);
     game.apply_lab_op(LabOp::ApplyMapDraft(draft.clone()))
-        .map_err(|error| format!("Selected map layout is invalid: {error:?}"))?;
+        .map_err(|error| format!("Map locations are invalid: {error:?}"))?;
     Ok(())
 }
 
@@ -242,82 +233,45 @@ fn validate_materialized_binding(request: &CreateMapHandoffRequest) -> Result<()
         return Err("Authored and materialized terrain do not match.".to_string());
     }
 
-    let sites = map
-        .get("sites")
-        .and_then(|value| value.as_array())
-        .ok_or_else(|| "Authored map sites are missing.".to_string())?;
-    let by_id: HashMap<_, _> = sites
-        .iter()
-        .filter_map(|site| Some((site.get("id")?.as_str()?, site)))
-        .collect();
-    let layouts = map
-        .get("layouts")
-        .and_then(|value| value.as_array())
-        .ok_or_else(|| "Authored map layouts are missing.".to_string())?;
-    let layout = layouts
-        .iter()
-        .find(|layout| {
-            layout.get("id").and_then(|value| value.as_str()) == Some(&request.selected_layout_id)
-        })
-        .ok_or_else(|| "Selected layout does not exist in the authored map.".to_string())?;
-    let slots = layout
-        .get("slots")
-        .and_then(|value| value.as_array())
-        .ok_or_else(|| "Selected layout slots are missing.".to_string())?;
-
-    let mut starts = Vec::with_capacity(slots.len());
-    let mut naturals = Vec::new();
-    let mut seen_naturals = std::collections::HashSet::new();
-    for slot in slots {
-        let main_id = slot
-            .get("main")
-            .and_then(|value| value.as_str())
-            .ok_or_else(|| "Selected layout has a missing main site.".to_string())?;
-        starts.push(site_tile(&by_id, main_id, "main")?);
-        let legacy = slot.get("natural").and_then(|value| value.as_str());
-        let ids = legacy.into_iter().chain(
-            slot.get("naturals")
-                .and_then(|value| value.as_array())
-                .into_iter()
-                .flatten()
-                .filter_map(|value| value.as_str()),
-        );
-        for id in ids {
-            if seen_naturals.insert(id) {
-                naturals.push(site_tile(&by_id, id, "natural")?);
-            }
-        }
-    }
+    let starts = authored_locations(map, "startLocations")?;
+    let base_sites = authored_locations(map, "baseSites")?;
     if starts != request.materialized_map.starts
-        || naturals != request.materialized_map.expansion_sites
+        || base_sites != request.materialized_map.base_sites
     {
-        return Err("Selected layout does not match the materialized start/base list.".to_string());
+        return Err("Authored map locations do not match the materialized map.".to_string());
     }
     Ok(())
 }
 
-fn site_tile(
-    sites: &HashMap<&str, &serde_json::Value>,
-    id: &str,
-    expected_kind: &str,
-) -> Result<rts_server::protocol::LabMapTile, String> {
-    let site = sites
-        .get(id)
-        .ok_or_else(|| format!("Selected layout references missing site {id:?}."))?;
-    if site.get("kind").and_then(|value| value.as_str()) != Some(expected_kind) {
-        return Err(format!("Selected layout site {id:?} has the wrong kind."));
-    }
-    let x = site
-        .get("x")
-        .and_then(|value| value.as_u64())
-        .and_then(|value| u32::try_from(value).ok())
-        .ok_or_else(|| format!("Selected layout site {id:?} has an invalid x coordinate."))?;
-    let y = site
-        .get("y")
-        .and_then(|value| value.as_u64())
-        .and_then(|value| u32::try_from(value).ok())
-        .ok_or_else(|| format!("Selected layout site {id:?} has an invalid y coordinate."))?;
-    Ok(rts_server::protocol::LabMapTile { x, y })
+fn authored_locations(
+    map: &serde_json::Map<String, serde_json::Value>,
+    field: &str,
+) -> Result<Vec<rts_server::protocol::LabMapTile>, String> {
+    let values = map
+        .get(field)
+        .and_then(|value| value.as_array())
+        .ok_or_else(|| format!("Authored map {field} are missing."))?;
+    values
+        .iter()
+        .enumerate()
+        .map(|(index, value)| {
+            let x = value
+                .get("x")
+                .and_then(|value| value.as_u64())
+                .and_then(|value| u32::try_from(value).ok())
+                .ok_or_else(|| {
+                    format!("Authored map {field}[{index}] has an invalid x coordinate.")
+                })?;
+            let y = value
+                .get("y")
+                .and_then(|value| value.as_u64())
+                .and_then(|value| u32::try_from(value).ok())
+                .ok_or_else(|| {
+                    format!("Authored map {field}[{index}] has an invalid y coordinate.")
+                })?;
+            Ok(rts_server::protocol::LabMapTile { x, y })
+        })
+        .collect()
 }
 
 fn safe_handoff_id(value: &str) -> bool {
@@ -337,36 +291,21 @@ mod tests {
         let authored_map: serde_json::Value =
             serde_json::from_str(include_str!("../assets/maps/no-terrain.json"))
                 .expect("map fixture");
-        let sites = authored_map["sites"]
-            .as_array()
-            .expect("sites")
-            .iter()
-            .filter_map(|site| Some((site["id"].as_str()?.to_string(), site)))
-            .collect::<HashMap<_, _>>();
-        let layout = authored_map["layouts"]
-            .as_array()
-            .expect("layouts")
-            .iter()
-            .find(|layout| layout["id"] == "2p_cross_nw_se")
-            .expect("duel layout");
-        let tile = |id: &str| {
-            let site = sites.get(id).expect("site");
-            LabMapTile {
-                x: site["x"].as_u64().expect("x") as u32,
-                y: site["y"].as_u64().expect("y") as u32,
-            }
+        let tile = |value: &serde_json::Value| LabMapTile {
+            x: value["x"].as_u64().expect("x") as u32,
+            y: value["y"].as_u64().expect("y") as u32,
         };
-        let starts = layout["slots"]
+        let starts = authored_map["startLocations"]
             .as_array()
-            .expect("slots")
+            .expect("start locations")
             .iter()
-            .map(|slot| tile(slot["main"].as_str().expect("main")))
+            .map(tile)
             .collect();
-        let expansion_sites = layout["slots"]
+        let base_sites = authored_map["baseSites"]
             .as_array()
-            .expect("slots")
+            .expect("base sites")
             .iter()
-            .map(|slot| tile(slot["natural"].as_str().expect("natural")))
+            .map(tile)
             .collect();
         CreateMapHandoffRequest {
             destination: HandoffDestination::Lab,
@@ -376,14 +315,13 @@ mod tests {
                 size: 126,
                 terrain: vec![0; 126 * 126],
                 starts,
-                expansion_sites,
+                base_sites,
             },
-            selected_layout_id: "2p_cross_nw_se".to_string(),
         }
     }
 
     #[test]
-    fn handoff_validation_binds_the_selected_layout_to_materialized_map() {
+    fn handoff_validation_binds_flat_locations_to_materialized_map() {
         let valid = valid_request();
         assert!(
             validate_request(&valid).is_ok(),
@@ -394,7 +332,7 @@ mod tests {
         request.materialized_map.starts[0].x += 1;
         assert!(validate_request(&request)
             .expect_err("mismatched materialization must fail")
-            .contains("does not match"));
+            .contains("do not match"));
     }
 
     #[test]

@@ -560,7 +560,7 @@ async fn unused_map_editor_lab_rooms_expire_and_cannot_be_recreated_by_name() {
                     y: size - 17,
                 },
             ],
-            expansion_sites: Vec::new(),
+            base_sites: Vec::new(),
         })
         .await
         .expect("room should be created");
@@ -583,7 +583,7 @@ async fn draining_rejects_new_map_editor_lab_rooms() {
             size,
             terrain: vec![crate::protocol::terrain::GRASS; (size * size) as usize],
             starts: vec![crate::protocol::LabMapTile { x: 16, y: 16 }],
-            expansion_sites: Vec::new(),
+            base_sites: Vec::new(),
         })
         .await;
 

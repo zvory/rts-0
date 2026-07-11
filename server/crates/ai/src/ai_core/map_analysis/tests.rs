@@ -176,7 +176,7 @@ fn bundled_fixture_counts_are_deterministic() {
             passable_tiles: 14_634,
             blocked_tiles: 1_242,
             largest_component_tiles: 14_476,
-            resource_clusters: 6,
+            resource_clusters: 12,
         },
         ExpectedFixture {
             name: "Low Econ",
@@ -184,7 +184,7 @@ fn bundled_fixture_counts_are_deterministic() {
             passable_tiles: 14_615,
             blocked_tiles: 1_261,
             largest_component_tiles: 14_451,
-            resource_clusters: 4,
+            resource_clusters: 8,
         },
         ExpectedFixture {
             name: "No Terrain",
@@ -192,7 +192,7 @@ fn bundled_fixture_counts_are_deterministic() {
             passable_tiles: 126 * 126,
             blocked_tiles: 0,
             largest_component_tiles: 126 * 126,
-            resource_clusters: 4,
+            resource_clusters: 8,
         },
     ];
 

@@ -1,14 +1,19 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use serde::Deserialize;
 
 mod assignment;
 
 use super::{
-    BaseSlot, Map, StartAssignmentPlayer, BASE_PROTECTION_RADIUS_TILES, CURRENT_MAP_VERSION,
-    EXPANSION_PROTECTION_RADIUS_TILES, MAX_NATURALS_PER_SLOT,
+    Map, StartAssignmentPlayer, BASE_PROTECTION_RADIUS_TILES, BASE_SITE_PROTECTION_RADIUS_TILES,
+    CURRENT_MAP_VERSION,
 };
 use crate::protocol::terrain;
+
+/// Bound authored locations before any game entities are allocated from them. The game currently
+/// supports four active players, while a map can contain many more permanent resource bases.
+const MAX_START_LOCATIONS: usize = 4;
+const MAX_BASE_SITES: usize = 32;
 
 pub(super) fn schema_version(json: &str) -> Result<u32, String> {
     let authored: AuthoredMap =
@@ -25,20 +30,13 @@ pub(super) fn player_count_bounds(json: &str) -> Result<(u32, u32), String> {
             authored.version
         ));
     }
-
-    let mut min_players = u32::MAX;
-    let mut max_players = 0;
-    for layout in &authored.layouts {
-        if layout.player_count == 0 {
-            continue;
-        }
-        min_players = min_players.min(layout.player_count);
-        max_players = max_players.max(layout.player_count);
+    let starts = authored.start_locations.len();
+    if starts == 0 || starts > MAX_START_LOCATIONS {
+        return Err(format!(
+            "startLocations must contain 1 to {MAX_START_LOCATIONS} locations"
+        ));
     }
-    if max_players == 0 {
-        return Err("layouts must contain at least one positive playerCount".to_string());
-    }
-    Ok((min_players, max_players))
+    Ok((1, starts as u32))
 }
 
 pub(super) fn load(player_count: usize, json: &str, seed: u32) -> Result<Map, String> {
@@ -65,97 +63,71 @@ pub(super) fn load_for_players(
         ));
     }
     let (size, terrain) = parse_terrain(&authored.terrain)?;
-    let sites = parse_sites(size, &authored.sites)?;
+    let start_locations = parse_locations(size, &authored.start_locations, "startLocations")?;
+    let base_sites = parse_locations(size, &authored.base_sites, "baseSites")?;
 
     if players.is_empty() {
         return Err("player_count must be at least 1".to_string());
     }
-    let player_count = players.len();
-
-    validate_base_clearance(size, &terrain, &sites)?;
-    if authored.layouts.is_empty() {
-        return Err("layouts must contain at least one spawn layout".to_string());
-    }
-    for layout in &authored.layouts {
-        parse_layout_pairs(layout, &sites)?;
-    }
-
-    let matching_layouts: Vec<_> = authored
-        .layouts
-        .iter()
-        .filter(|layout| layout.player_count as usize == player_count)
-        .collect();
-    if matching_layouts.is_empty() {
+    if start_locations.is_empty() || start_locations.len() > MAX_START_LOCATIONS {
         return Err(format!(
-            "map has no spawn layout for {player_count} players"
+            "startLocations must contain 1 to {MAX_START_LOCATIONS} locations"
+        ));
+    }
+    if base_sites.is_empty() || base_sites.len() > MAX_BASE_SITES {
+        return Err(format!(
+            "baseSites must contain 1 to {MAX_BASE_SITES} locations"
+        ));
+    }
+    if players.len() > start_locations.len() {
+        return Err(format!(
+            "map has {} start locations but needs {} players",
+            start_locations.len(),
+            players.len()
         ));
     }
 
-    let slots = assignment::assign_layout_slots(&matching_layouts, &sites, players, seed)?;
-    let starts: Vec<_> = slots.iter().map(|(start, _)| *start).collect();
-    let expansion_sites = slots
-        .iter()
-        .flat_map(|(_, expansions)| expansions.iter().copied())
-        .collect();
+    let base_set: HashSet<_> = base_sites.iter().copied().collect();
+    for start in &start_locations {
+        if !base_set.contains(start) {
+            return Err(format!(
+                "start location ({},{}) is not also a permanent base site",
+                start.0, start.1
+            ));
+        }
+    }
+    validate_base_clearance(size, &terrain, &start_locations, &base_sites)?;
+    let starts = assignment::assign_start_locations(&start_locations, players, seed)?;
 
     Ok(Map {
         size,
         terrain,
         starts,
-        expansion_sites,
+        base_sites,
     })
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct AuthoredMap {
     version: u32,
     #[allow(dead_code)]
     name: String,
-    /// Human-readable text shown in the lobby map selector.
     #[allow(dead_code)]
     description: String,
-    /// Private invariants memo used by agents when porting a map to a new schema version.
     #[allow(dead_code)]
     #[serde(rename = "_design")]
     design: String,
     terrain: Vec<String>,
-    sites: Vec<AuthoredSite>,
-    layouts: Vec<AuthoredLayout>,
+    start_locations: Vec<AuthoredLocation>,
+    base_sites: Vec<AuthoredLocation>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct AuthoredSite {
-    id: String,
-    kind: AuthoredSiteKind,
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AuthoredLocation {
     x: u32,
     y: u32,
-}
-
-#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-enum AuthoredSiteKind {
-    Main,
-    Natural,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct AuthoredLayout {
-    id: String,
-    player_count: u32,
-    slots: Vec<AuthoredLayoutSlot>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct AuthoredLayoutSlot {
-    main: String,
-    #[serde(default)]
-    natural: Option<String>,
-    #[serde(default)]
-    naturals: Vec<String>,
 }
 
 fn parse_terrain(rows: &[String]) -> Result<(u32, Vec<u8>), String> {
@@ -202,153 +174,43 @@ fn parse_terrain(rows: &[String]) -> Result<(u32, Vec<u8>), String> {
     Ok((size_u32, out))
 }
 
-fn parse_sites(
+fn parse_locations(
     size: u32,
-    authored: &[AuthoredSite],
-) -> Result<HashMap<String, AuthoredSite>, String> {
-    if authored.is_empty() {
-        return Err("sites must contain at least one site".to_string());
-    }
-
-    let mut out = HashMap::with_capacity(authored.len());
-    let mut seen_coords = HashSet::with_capacity(authored.len());
-    for (i, site) in authored.iter().enumerate() {
-        if site.id.trim().is_empty() {
-            return Err(format!("sites[{i}] has an empty id"));
-        }
-        if site.x >= size || site.y >= size {
+    authored: &[AuthoredLocation],
+    field: &str,
+) -> Result<Vec<(u32, u32)>, String> {
+    let mut locations = Vec::with_capacity(authored.len());
+    let mut seen = HashSet::with_capacity(authored.len());
+    for (index, location) in authored.iter().enumerate() {
+        if location.x >= size || location.y >= size {
             return Err(format!(
-                "sites[{i}] = ({},{}) is outside the {size}x{size} map",
-                site.x, site.y
+                "{field}[{index}] = ({},{}) is outside the {size}x{size} map",
+                location.x, location.y
             ));
         }
-        if !seen_coords.insert((site.x, site.y)) {
+        if !seen.insert((location.x, location.y)) {
             return Err(format!(
-                "sites[{i}] duplicates an earlier site at ({},{})",
-                site.x, site.y
+                "{field}[{index}] duplicates an earlier location at ({},{})",
+                location.x, location.y
             ));
         }
-        if out.insert(site.id.clone(), site.clone()).is_some() {
-            return Err(format!("sites[{i}] duplicates an earlier id {:?}", site.id));
-        }
+        locations.push((location.x, location.y));
     }
-    Ok(out)
-}
-
-fn parse_layout_pairs(
-    layout: &AuthoredLayout,
-    sites: &HashMap<String, AuthoredSite>,
-) -> Result<Vec<BaseSlot>, String> {
-    if layout.player_count == 0 {
-        return Err(format!("layout {:?} has playerCount 0", layout.id));
-    }
-    if layout.slots.len() != layout.player_count as usize {
-        return Err(format!(
-            "layout {:?} has {} slots but playerCount is {}",
-            layout.id,
-            layout.slots.len(),
-            layout.player_count
-        ));
-    }
-
-    let mut seen_mains = HashSet::with_capacity(layout.slots.len());
-    let mut seen_naturals = HashSet::with_capacity(layout.slots.len());
-    let mut slots = Vec::with_capacity(layout.slots.len());
-    for (i, slot) in layout.slots.iter().enumerate() {
-        let main = sites.get(&slot.main).ok_or_else(|| {
-            format!(
-                "layout {:?} slot {i} references missing main {:?}",
-                layout.id, slot.main
-            )
-        })?;
-        if main.kind != AuthoredSiteKind::Main {
-            return Err(format!(
-                "layout {:?} slot {i} main {:?} is not a main site",
-                layout.id, slot.main
-            ));
-        }
-
-        if !seen_mains.insert(slot.main.as_str()) {
-            return Err(format!(
-                "layout {:?} assigns main {:?} more than once",
-                layout.id, slot.main
-            ));
-        }
-
-        let natural_ids = slot_natural_ids(slot).map_err(|err| {
-            format!(
-                "layout {:?} slot {i} has invalid naturals: {err}",
-                layout.id
-            )
-        })?;
-        let mut expansions = Vec::with_capacity(natural_ids.len());
-        for natural_id in natural_ids {
-            let natural = sites.get(natural_id).ok_or_else(|| {
-                format!(
-                    "layout {:?} slot {i} references missing natural {:?}",
-                    layout.id, natural_id
-                )
-            })?;
-            if natural.kind != AuthoredSiteKind::Natural {
-                return Err(format!(
-                    "layout {:?} slot {i} natural {:?} is not a natural site",
-                    layout.id, natural_id
-                ));
-            }
-            if !seen_naturals.insert(natural_id) {
-                return Err(format!(
-                    "layout {:?} assigns natural {:?} more than once",
-                    layout.id, natural_id
-                ));
-            }
-            expansions.push((natural.x, natural.y));
-        }
-        slots.push(((main.x, main.y), expansions));
-    }
-    Ok(slots)
-}
-
-fn slot_natural_ids(slot: &AuthoredLayoutSlot) -> Result<Vec<&str>, String> {
-    let mut out = Vec::new();
-    if let Some(natural) = slot.natural.as_deref() {
-        if !natural.trim().is_empty() {
-            out.push(natural);
-        }
-    }
-    for natural in &slot.naturals {
-        if !natural.trim().is_empty() {
-            out.push(natural.as_str());
-        }
-    }
-    if out.is_empty() {
-        return Err("at least one natural is required".to_string());
-    }
-    if out.len() > MAX_NATURALS_PER_SLOT {
-        return Err(format!(
-            "at most {MAX_NATURALS_PER_SLOT} naturals are allowed per player slot"
-        ));
-    }
-
-    let mut seen = HashSet::with_capacity(out.len());
-    for natural in &out {
-        if !seen.insert(*natural) {
-            return Err(format!("natural {natural:?} is listed more than once"));
-        }
-    }
-    Ok(out)
+    Ok(locations)
 }
 
 fn validate_base_clearance(
     size: u32,
     terrain_grid: &[u8],
-    sites: &HashMap<String, AuthoredSite>,
+    start_locations: &[(u32, u32)],
+    base_sites: &[(u32, u32)],
 ) -> Result<(), String> {
-    for site in sites.values() {
-        let (sx, sy) = (site.x, site.y);
-        let radius = if site.kind == AuthoredSiteKind::Main {
+    let starts: HashSet<_> = start_locations.iter().copied().collect();
+    for &(sx, sy) in base_sites {
+        let radius = if starts.contains(&(sx, sy)) {
             BASE_PROTECTION_RADIUS_TILES
         } else {
-            EXPANSION_PROTECTION_RADIUS_TILES
+            BASE_SITE_PROTECTION_RADIUS_TILES
         };
         for dy in -radius..=radius {
             for dx in -radius..=radius {
@@ -356,15 +218,13 @@ fn validate_base_clearance(
                 let ty = sy as i32 + dy;
                 if tx < 0 || ty < 0 || tx >= size as i32 || ty >= size as i32 {
                     return Err(format!(
-                        "site {:?} at ({sx},{sy}) is too close to the map edge",
-                        site.id
+                        "base site ({sx},{sy}) is too close to the map edge"
                     ));
                 }
                 let idx = (ty as u32 * size + tx as u32) as usize;
                 if terrain_grid[idx] != terrain::GRASS {
                     return Err(format!(
-                        "site {:?} at ({sx},{sy}) has impassable terrain in its protected area at ({tx},{ty})",
-                        site.id
+                        "base site ({sx},{sy}) has impassable terrain in its protected area at ({tx},{ty})"
                     ));
                 }
             }

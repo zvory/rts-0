@@ -17,12 +17,7 @@ fn formation_unit(id: u32, map: &Map, tile: (u32, u32)) -> FormationUnit {
     formation_unit_kind(id, EntityKind::Rifleman, map, tile)
 }
 
-fn formation_unit_kind(
-    id: u32,
-    kind: EntityKind,
-    map: &Map,
-    tile: (u32, u32),
-) -> FormationUnit {
+fn formation_unit_kind(id: u32, kind: EntityKind, map: &Map, tile: (u32, u32)) -> FormationUnit {
     FormationUnit {
         id,
         kind,
@@ -65,7 +60,7 @@ fn flat_map(size: u32) -> Map {
         size,
         terrain: vec![terrain::GRASS; (size * size) as usize],
         starts: vec![],
-        expansion_sites: vec![],
+        base_sites: vec![],
     }
 }
 
@@ -384,7 +379,8 @@ fn unreachable_formation_slot_collapses_toward_center() {
         dx * dx + dy * dy
     };
     assert!(
-        dist_sq(left_goal, click) < dist_sq(map.tile_center(isolated_tile.0, isolated_tile.1), click),
+        dist_sq(left_goal, click)
+            < dist_sq(map.tile_center(isolated_tile.0, isolated_tile.1), click),
         "fallback goal should be closer to the formation center"
     );
 }
@@ -396,12 +392,8 @@ fn formation_goal_accepts_side_on_tank_tile_center_near_building() {
         *tile = crate::protocol::terrain::GRASS;
     }
     let mut entities = EntityStore::new();
-    let (bx, by) = crate::game::services::occupancy::footprint_center(
-        &map,
-        EntityKind::Depot,
-        10,
-        10,
-    );
+    let (bx, by) =
+        crate::game::services::occupancy::footprint_center(&map, EntityKind::Depot, 10, 10);
     entities
         .spawn_building(1, EntityKind::Depot, bx, by, true)
         .expect("depot should spawn");

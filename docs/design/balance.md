@@ -464,8 +464,8 @@ folded into default targeting.
   `server/assets/maps/default-handcrafted.json` (126×126 today), served for tooling at
   `/maps/default-handcrafted.json`. The current asset is the original 96×96 handcrafted map
   padded with 15 passable grass tiles on every edge.
-  Its JSON uses row strings (`.` grass, `#` rock, `~` water), named `sites`, and authored
-  player-count-specific spawn `layouts`.
+  Its JSON uses row strings (`.` grass, `#` rock, `~` water), flat `startLocations`, and flat
+  `baseSites`.
 - Start: `STARTING_STEEL = 75`, `STARTING_OIL = 0`, `STARTING_WORKERS = 4`,
   one City Centre at the player's start tile, 12 steel patches with 1,250 steel each split into
   two six-wide fields four tiles out on opposite sides of the base + 3 oil patches with 3,333 oil
@@ -492,17 +492,14 @@ folded into default targeting.
   does not reserve it. Extra gatherers that arrive while the slot is taken go idle. The slot
   is advisory and self-heals — it's only honored while the recorded gatherer is alive and
   actively harvesting that node, so death / re-order / retarget free it automatically.
-- Starting layout: each active main or natural site gets 12 steel patches and 3 oil patches.
-  Map schema v2 stores named main/natural `sites` plus explicit spawn `layouts`. Each layout
-  declares a `playerCount` and a list of slots, where each slot pairs one main with one to three
-  naturals (`natural` legacy field or `naturals` array), for at most four bases per player. At
-  match start the seed selects one layout for the active player count, then shuffles that layout's
-  slots so lobby seat order does not pin a human/AI to the same corner. The authored
-  main/naturals grouping inside each slot stays intact, which lets maps define different fair
-  naturals for adjacent, cross, safe-base, or other spawn constellations. Sites not selected by
-  the chosen layout are unused. The Safer Expansions map grants each selected player an in-base
-  natural plus the matching Default-map contested natural, giving each player three active bases
-  including their main.
+- Starting and expansion resources: every authored base site gets 12 steel patches and 3 oil
+  patches. Map schema v3 stores flat `startLocations` and `baseSites`: the number of start
+  locations limits player count, while every base site remains present in every match. A player
+  receives a City Centre, workers, and the normal resource cluster at an assigned start; unclaimed
+  starts and all other base sites keep their resource clusters as neutral expansion locations.
+  The seed only determines player-to-start assignment, never which base sites exist. This lets a
+  map have any safe bounded number of base locations without assigning natural sites to players or
+  maintaining multiple player-count layouts.
 
 Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles], cost, supply, buildTicks):
 
