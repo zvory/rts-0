@@ -166,6 +166,23 @@ assert.equal(screenshot.result.image.mimeType, "image/png", "screenshot returns 
 assert.equal("data" in screenshot.result.image, false, "CLI screenshot responses never embed image bytes");
 assert.match(screenshot.result.pngPath, /target\/lab-interact\//, "new captures use only the renamed artifact root");
 
+const recordingStarted = call("record-start", {
+  sessionId, name: "cli-contract-motion", maxDurationMs: 5_000,
+  viewport: { width: 800, height: 600, deviceScaleFactor: 1 }, scale: 0.5,
+});
+assert.equal(recordingStarted.result.recorder.active, true, "record-start exposes one active session recorder");
+assert.equal(call("status", { sessionId }).result.recorder.active, true, "session status exposes active recorder state");
+assert.equal(callFailure("record-start", { sessionId, name: "duplicate" }).error.code, "recordingActive", "duplicate recording starts are correctable errors");
+call("order", { sessionId, playerId: 1, command: { c: "move", units: ["shooter"], x: 1100, y: 1000 } });
+call("time", { sessionId, control: { action: "step", ticks: 3 } });
+const recordingStopped = call("record-stop", { sessionId });
+assert.equal(recordingStopped.result.probe.codec, "vp9", "record-stop returns bounded VP9 probe metadata");
+assert.equal(recordingStopped.result.framePaths.length, 2, "record-stop returns representative frame paths");
+assert.match(recordingStopped.result.contactSheetPath, /target\/lab-interact\//, "contact sheets stay beneath the artifact root");
+assert.equal(callFailure("record-stop", { sessionId }).error.code, "recordingInactive", "duplicate recording stops are correctable errors");
+assert.equal(callFailure("record-start", { sessionId, maxDurationMs: 30_001 }).error.code, "invalidInput", "recording duration remains hard bounded");
+assert.equal(callFailure("record-start", { sessionId, crop: { x: 0, y: 0, width: 1, height: 10 } }).error.code, "invalidInput", "recording crop dimensions remain bounded");
+
 const setupExport = call("export", { sessionId, kind: "setup", name: "Aliased fixture", reproduction: true });
 assert.match(setupExport.result.artifactId, /^artifact_[a-f0-9]{32}$/, "setup export returns an opaque artifact id");
 assert.equal("checkpointPayload" in setupExport.result, false, "setup export never prints checkpoint bytes");

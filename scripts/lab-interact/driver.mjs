@@ -10,6 +10,11 @@ import { spawn, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 
+import {
+  checkMediaCapabilities, finalizeMedia, LabInteractRecordingError, RECORDING_LIMITS,
+  removePartialRecording, stopRecorderWithin, waitForMediaFile,
+} from "./recording.mjs";
+
 const DEFAULT_VIEWPORT = Object.freeze({ width: 1440, height: 900, deviceScaleFactor: 1 });
 const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_STARTUP_TIMEOUT_MS = 60_000;
@@ -86,6 +91,8 @@ export class LabInteractDriver {
     this.requestFailures = [];
     this.operationTail = Promise.resolve();
     this.closePromise = null;
+    this.recording = null;
+    this.lastRecording = null;
     this.signalHandlers = [];
     this.openStarted = false;
     const configuredArtifactCapability = process.env.RTS_LAB_INTERACT_ARTIFACT_CAPABILITY || "";
@@ -285,6 +292,157 @@ export class LabInteractDriver {
     }));
   }
 
+  recordingStatus() {
+    const recording = this.recording;
+    if (!recording) return { active: false, last: this.lastRecording };
+    return {
+      active: true,
+      name: recording.name,
+      startedAt: recording.startedAt,
+      elapsedMs: Date.now() - recording.startedMs,
+      maxDurationMs: recording.maxDurationMs,
+      webmPath: recording.webmPath,
+      finalizing: recording.finalizing != null,
+    };
+  }
+
+  async recordStart({ sessionId, name = "recording", maxDurationMs = RECORDING_LIMITS.defaultDurationMs, viewport = null, crop = null, scale = 1 } = {}) {
+    return this.enqueue(async () => {
+      if (this.recording) throw new LabInteractDriverError("recordingActive", "A recording is already active for this session. Stop it before starting another.");
+      const tools = checkMediaCapabilities();
+      const normalizedSessionId = safeCaptureSessionId(sessionId);
+      const normalizedViewport = viewport ? normalizeCaptureViewport(viewport) : null;
+      const originalViewport = this.page.viewport?.() || null;
+      let recordingDir = "";
+      try {
+        if (normalizedViewport) await this.page.setViewport(normalizedViewport);
+        await this.callBridge("presentation", { mode: "clean" });
+        await this.page.evaluate(() => document.fonts?.ready || Promise.resolve());
+        await this.waitForCaptureReadiness([]);
+        const viewportClip = await this.page.evaluate(() => {
+          const rect = document.getElementById("viewport")?.getBoundingClientRect?.();
+          return rect ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height } : null;
+        });
+        if (!validClip(viewportClip)) throw new LabInteractDriverError("viewportUnavailable", "The Pixi viewport is not available for recording.");
+        const clip = crop ? normalizeRecordingCrop(crop, viewportClip) : viewportClip;
+        const artifactName = safeArtifactName(name, "recording");
+        const suffix = new Date().toISOString().replace(/[:.]/g, "-");
+        recordingDir = path.join(this.workspace.root, LAB_INTERACT_ROOT, normalizedSessionId, "recordings", `${artifactName}-${suffix}`);
+        fs.mkdirSync(recordingDir, { recursive: true });
+        const webmPath = path.join(recordingDir, `${artifactName}.webm`);
+        const recorder = await this.page.screencast({ path: webmPath, crop: clip, scale, ffmpegPath: tools.ffmpeg });
+        const startedMs = Date.now();
+        const startStatus = await this.callBridge("status", {});
+        const recording = {
+          name: artifactName, recorder, tools, recordingDir, webmPath,
+          framesDir: path.join(recordingDir, "frames"), contactSheetPath: path.join(recordingDir, `${artifactName}-contact-sheet.png`),
+          manifestPath: path.join(recordingDir, `${artifactName}.json`), startedMs, startedAt: new Date(startedMs).toISOString(),
+          startStatus, clip, scale, viewport: normalizedViewport, originalViewport,
+          maxDurationMs, finalizing: null, stoppedBy: null, operations: [], operationCount: 0,
+          operationsTruncated: false, aliases: [],
+        };
+        this.recording = recording;
+        recording.watchdog = setTimeout(() => { void this.finishRecording("watchdog").catch(() => {}); }, maxDurationMs);
+        recording.watchdog.unref?.();
+        recording.sizeWatchdog = setInterval(() => {
+          let size = 0;
+          try { size = fs.statSync(recording.webmPath).size; } catch {}
+          if (size > RECORDING_LIMITS.maxBytes) void this.finishRecording("sizeLimit").catch(() => {});
+        }, 250);
+        recording.sizeWatchdog.unref?.();
+        return { ...this.recordingStatus(), clip, scale, authoritativeStartTick: startStatus.snapshotTick ?? null };
+      } catch (error) {
+        removePartialRecording([recordingDir]);
+        if (originalViewport) await this.page.setViewport(originalViewport).catch(() => {});
+        await this.callBridge("presentation", { mode: "default" }).catch(() => {});
+        throw error;
+      }
+    });
+  }
+
+  recordAcceptedOperation(operation, aliases = []) {
+    if (!this.recording || this.recording.finalizing) return false;
+    this.recording.operationCount += 1;
+    if (this.recording.operations.length < 200) this.recording.operations.push(operation);
+    else this.recording.operationsTruncated = true;
+    this.recording.aliases = Array.isArray(aliases) ? aliases.slice(0, 100) : [];
+    return true;
+  }
+
+  async recordStop(metadata = {}) {
+    return this.enqueue(() => this.finishRecording("explicit", metadata));
+  }
+
+  async finishRecording(reason, metadata = {}) {
+    const recording = this.recording;
+    if (!recording) throw new LabInteractDriverError("recordingInactive", "No recording is active for this session. Start one before stopping.");
+    if (recording.finalizing) return recording.finalizing;
+    recording.stoppedBy = reason;
+    recording.finalizing = (async () => {
+      clearTimeout(recording.watchdog);
+      clearInterval(recording.sizeWatchdog);
+      try {
+        await stopRecorderWithin(recording.recorder);
+        await waitForMediaFile(recording.webmPath);
+        const endedMs = Date.now();
+        const endStatus = await this.callBridge("status", {}).catch(() => null);
+        const media = finalizeMedia({
+          webmPath: recording.webmPath, framesDir: recording.framesDir,
+          contactSheetPath: recording.contactSheetPath, tools: recording.tools,
+        });
+        const diagnostics = this.diagnostics();
+        const manifest = {
+          schemaVersion: 1,
+          kind: "labInteractRealTimeRecording",
+          createdAt: recording.startedAt,
+          finalizedAt: new Date(endedMs).toISOString(),
+          stoppedBy: reason,
+          nondeterministic: true,
+          workspace: this.workspace,
+          serverBuild: this.server?.build || null,
+          runtime: { node: process.version, platform: process.platform, architecture: process.arch },
+          browser: { chrome: this.browserVersion || null, userAgent: await this.page.evaluate(() => navigator.userAgent).catch(() => null) },
+          mediaTools: recording.tools,
+          authoritative: {
+            startTick: recording.startStatus?.snapshotTick ?? null,
+            endTick: endStatus?.snapshotTick ?? null,
+            startRoomTime: recording.startStatus?.roomTime ?? null,
+            endRoomTime: endStatus?.roomTime ?? null,
+          },
+          capture: { fps: 30, audio: false, clip: recording.clip, scale: recording.scale, viewport: recording.viewport, wallDurationMs: endedMs - recording.startedMs, maxDurationMs: recording.maxDurationMs },
+          aliases: Array.isArray(metadata.aliases) ? metadata.aliases.slice(0, 100) : recording.aliases,
+          operations: Array.isArray(metadata.operations) ? metadata.operations.slice(0, 200) : recording.operations,
+          operationDiagnostics: {
+            accepted: recording.operationCount,
+            captured: recording.operations.length,
+            truncated: recording.operationsTruncated,
+          },
+          media,
+          errors: { pageConsole: diagnostics.pageConsoleErrors, page: diagnostics.pageErrors, requestFailures: diagnostics.requestFailures },
+        };
+        fs.writeFileSync(recording.manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o600 });
+        const result = {
+          active: false, stoppedBy: reason, webmPath: recording.webmPath,
+          framePaths: media.framePaths, contactSheetPath: recording.contactSheetPath,
+          manifestPath: recording.manifestPath, probe: media.probe,
+          frameDiagnostics: media.frameDiagnostics,
+          authoritative: manifest.authoritative,
+        };
+        this.lastRecording = result;
+        return result;
+      } catch (error) {
+        removePartialRecording([recording.recordingDir]);
+        if (error instanceof LabInteractRecordingError) throw new LabInteractDriverError(error.code, error.message);
+        throw error;
+      } finally {
+        if (recording.originalViewport) await this.page?.setViewport(recording.originalViewport).catch(() => {});
+        await this.callBridge("presentation", { mode: "default" }).catch(() => {});
+        if (this.recording === recording) this.recording = null;
+      }
+    })();
+    return recording.finalizing;
+  }
+
   diagnostics() {
     return {
       sessionDir: this.sessionDir,
@@ -463,6 +621,9 @@ export class LabInteractDriver {
         appendBounded(this.requestFailures, `${request.failure()?.errorText || "request failed"} ${request.url()}`);
       }
     });
+    this.page.on("close", () => {
+      if (this.recording) void this.finishRecording("pageClosed").catch(() => {});
+    });
   }
 
   installCleanupHandlers() {
@@ -492,6 +653,12 @@ export class LabInteractDriver {
     this.closePromise = (async () => {
       if (this.state === DRIVER_STATES.CLOSED) return;
       this.removeCleanupHandlers();
+      if (this.recording) {
+        await this.finishRecording("sessionClose").catch(() => {
+          removePartialRecording([this.recording?.recordingDir]);
+          this.recording = null;
+        });
+      }
       if (this.page && this.server) {
         const room = await this.callBridge("status", {}).then((status) => status.room).catch(() => "");
         if (room) await this.artifactRequest("cleanup", { room }).catch(() => {});
@@ -595,6 +762,18 @@ function normalizeCaptureViewport(viewport) {
     throw new LabInteractDriverError("invalidViewport", `capture viewport width and height must be at most ${MAX_CAPTURE_VIEWPORT}.`);
   }
   return normalized;
+}
+
+function normalizeRecordingCrop(crop, viewportClip) {
+  const normalized = { x: Number(crop.x), y: Number(crop.y), width: Number(crop.width), height: Number(crop.height) };
+  if (!Object.values(normalized).every(Number.isFinite) || normalized.x < 0 || normalized.y < 0 || normalized.width < 2 || normalized.height < 2) {
+    throw new LabInteractDriverError("invalidCrop", "recording crop must contain finite non-negative x/y and width/height of at least 2.");
+  }
+  const absolute = { x: viewportClip.x + normalized.x, y: viewportClip.y + normalized.y, width: normalized.width, height: normalized.height };
+  if (absolute.x + absolute.width > viewportClip.x + viewportClip.width || absolute.y + absolute.height > viewportClip.y + viewportClip.height) {
+    throw new LabInteractDriverError("invalidCrop", "recording crop must stay inside the game viewport.");
+  }
+  return absolute;
 }
 
 function boundedEntityIds(values) {

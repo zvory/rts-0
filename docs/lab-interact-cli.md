@@ -15,6 +15,9 @@ node scripts/lab-interact/cli.mjs spawn '{"sessionId":"<id>","spawns":[{"owner":
 node scripts/lab-interact/cli.mjs inspect '{"sessionId":"<id>","refs":["subject"]}'
 node scripts/lab-interact/cli.mjs camera '{"sessionId":"<id>","camera":{"action":"focus","refs":["subject"]}}'
 node scripts/lab-interact/cli.mjs screenshot '{"sessionId":"<id>","name":"subject","presentation":"clean","subjects":["subject"]}'
+node scripts/lab-interact/cli.mjs record-start '{"sessionId":"<id>","name":"motion","maxDurationMs":10000}'
+node scripts/lab-interact/cli.mjs order '{"sessionId":"<id>","playerId":1,"command":{"c":"move","units":["subject"],"x":1100,"y":960}}'
+node scripts/lab-interact/cli.mjs record-stop '{"sessionId":"<id>"}'
 node scripts/lab-interact/cli.mjs export '{"sessionId":"<id>","kind":"setup","name":"two-unit-scene","reproduction":true}'
 node scripts/lab-interact/cli.mjs artifact-inspect '{"sessionId":"<id>","artifactId":"<artifact-id>"}'
 node scripts/lab-interact/cli.mjs import '{"sessionId":"<id>","kind":"setup","artifactId":"<artifact-id>"}'
@@ -24,8 +27,8 @@ node scripts/lab-interact/cli.mjs --help
 ```
 
 The complete surface is `open`, `close`, `reset`, `catalog`, `spawn`, `update`, `remove`, `order`,
-`time`, `inspect`, `camera`, `screenshot`, `export`, `import`, `artifact-inspect`, `status`, and
-`shutdown`. Success writes exactly one JSON
+`time`, `inspect`, `camera`, `screenshot`, `record-start`, `record-stop`, `export`, `import`,
+`artifact-inspect`, `status`, and `shutdown`. Success writes exactly one JSON
 envelope to stdout. Failure writes a concise JSON error to stderr and exits nonzero. Every command
 has an exact, bounded input shape; arbitrary state patches, protocol messages, browser evaluation,
 and caller-selected artifact paths are not accepted.
@@ -97,6 +100,29 @@ teardown clears the full in-memory store. The room task remains authoritative fo
 operation ordering, validation, future-history truncation, and destructive replay rebuild.
 Production startup has no bridge capability and returns 404 for these routes.
 
+## Real-time recording
+
+`record-start` begins one 30 FPS, audio-free VP9 WebM from the persistent headless page. It keeps
+clean presentation active and crops to the game viewport, so ordinary `order`, `time`, mutation,
+inspection, and `camera` commands can continue through the same session while recording. Inputs
+accept only a safe name, a 1–30 second maximum duration (10 seconds by default), an optional
+viewport or in-viewport crop, and scale from 0.25 through 1. A second start returns
+`recordingActive`; `status` with the current session id reports recorder state.
+
+`record-stop` finalizes the WebM, extracts at most six representative PNGs, creates a 3×2 contact
+sheet, probes the media, and returns confined absolute paths plus bounded codec/frame diagnostics.
+The adjacent manifest records authoritative start/end ticks and room time, accepted CLI operations,
+camera/time changes, aliases, workspace/build/browser/tool versions, probe results, and estimated
+dropped or duplicated frames. Those frame counts are diagnostics, not deterministic evidence:
+Chrome composition, screencast delivery, wall scheduling, and VP9 encoding all vary between runs.
+
+Recordings live under `target/lab-interact/<session-id>/recordings/`, are capped at 64 MiB, and are
+never printed through the CLI. The duration watchdog finalizes automatically. Session `close`,
+daemon `shutdown`, and idle teardown attempt bounded finalization and remove a partial directory if
+finalization fails; they do not leave FFmpeg owned by the session. Recording checks require
+`ffmpeg`, `ffprobe`, and the `libvpx-vp9` encoder on `PATH`, or explicit
+`RTS_LAB_INTERACT_FFMPEG`/`RTS_LAB_INTERACT_FFPROBE` paths.
+
 ## Recovery
 
 | Error | Correction |
@@ -107,12 +133,15 @@ Production startup has no bridge capability and returns 404 for these routes.
 | `chromeUnavailable` | Install Chrome/Chromium or set `CHROME` before `open`. |
 | `daemonStateUnavailable` / `daemonUnreachable` | Do not remove the socket; restore its owned state or stop the recorded daemon, then retry. |
 | `assetLoadFailed`, `captureRenderError`, or `captureTimeout` | Fix the reported source/render problem; do not accept a fallback capture. |
+| `ffmpegUnavailable`, `ffprobeUnavailable`, or `vp9Unavailable` | Install a VP9-capable FFmpeg toolchain or set the explicit tool paths, then retry. |
+| `recordingActive` / `recordingInactive` | Check session `status`, then stop the active recorder or start a new one. |
 
 ## Focused verification
 
 ```bash
 node tests/lab_interact_cli_contracts.mjs
 node tests/lab_interact_driver_contracts.mjs
+node tests/lab_interact_recording_contracts.mjs
 node tests/lab_interact_cli_smoke.mjs
 node tests/lab_interact_driver_smoke.mjs
 ```

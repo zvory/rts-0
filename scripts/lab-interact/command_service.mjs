@@ -18,12 +18,16 @@ export const LAB_INTERACT_LIMITS = Object.freeze({
   maxScreenshotSubjects: 20,
   maxArtifactBytes: 8 * 1024 * 1024,
   maxAliasSidecarBytes: 64 * 1024,
+  maxRecordingOperations: 200,
+  defaultRecordingDurationMs: 10_000,
+  maxRecordingDurationMs: 30_000,
 });
 
 export const LAB_INTERACT_COMMANDS = Object.freeze([
   "open", "close", "reset", "catalog", "spawn", "update", "remove", "order",
   "time", "inspect", "camera", "screenshot", "status", "shutdown",
   "export", "import", "artifact-inspect",
+  "record-start", "record-stop",
 ]);
 
 const ALL_CATALOG_CATEGORIES = Object.freeze([
@@ -88,7 +92,25 @@ export class LabInteractService {
     if (command === "status") return this.status(input);
     if (command === "open") return this.open(input);
     if (command === "close") return { sessionId: input.sessionId, closed: await this.close(input.sessionId) };
-    return this.use(input.sessionId, (session) => this.executeSession(command, session, input));
+    return this.use(input.sessionId, async (session) => {
+      const result = await this.executeSession(command, session, input);
+      if (!command.startsWith("record-") && session.recordingOperations) {
+        const recorder = session.driver.recordingStatus?.();
+        if (recorder?.active) {
+          const operation = recordingOperation(command, input, result);
+          if (session.recordingOperations.length < LAB_INTERACT_LIMITS.maxRecordingOperations) {
+            session.recordingOperations.push(operation);
+          }
+          session.driver.recordAcceptedOperation?.(
+            operation,
+            [...session.aliases].map(([alias, id]) => ({ alias, id })),
+          );
+        } else if (!recorder?.active) {
+          session.recordingOperations = null;
+        }
+      }
+      return result;
+    });
   }
 
   async open(input) {
@@ -114,7 +136,7 @@ export class LabInteractService {
         throw new LabInteractError("serviceClosed", "Lab Interact shut down while the session was opening.");
       }
       const sessionId = `lab_${crypto.randomUUID().replaceAll("-", "")}`;
-      const session = { sessionId, driver, aliases: new Map(), operationTail: Promise.resolve() };
+      const session = { sessionId, driver, aliases: new Map(), operationTail: Promise.resolve(), recordingOperations: null };
       this.sessions.set(sessionId, session);
       try {
         return await this.describeSession(session);
@@ -184,6 +206,7 @@ export class LabInteractService {
         sessionId,
         status: await session.driver.status(),
         aliases: [...session.aliases].map(([alias, id]) => ({ alias, id })),
+        recorder: session.driver.recordingStatus?.() || { active: false },
       }));
     }
     return {
@@ -225,6 +248,22 @@ export class LabInteractService {
     if (command === "export") return exportArtifact(this.workspaceRoot, session, input);
     if (command === "import") return importArtifact(this.workspaceRoot, session, input);
     if (command === "artifact-inspect") return inspectArtifact(this.workspaceRoot, session, input);
+    if (command === "record-start") {
+      const result = await session.driver.recordStart({ ...input, sessionId });
+      session.recordingOperations = [];
+      return { sessionId, recorder: result };
+    }
+    if (command === "record-stop") {
+      try {
+        const result = await session.driver.recordStop({
+          operations: session.recordingOperations || [],
+          aliases: [...session.aliases].map(([alias, id]) => ({ alias, id })),
+        });
+        return { sessionId, ...result };
+      } finally {
+        session.recordingOperations = null;
+      }
+    }
     throw new LabInteractError("unknownCommand", `Unknown session command ${command}.`);
   }
 }
@@ -403,6 +442,15 @@ function validateInput(command, value) {
     exact(value, ["sessionId", "kind", "artifactId", "path"], command);
     if (value.kind != null) artifactKind(value.kind, "artifact-inspect.kind");
     artifactSelector(value, "artifact-inspect");
+  } else if (command === "record-start") {
+    exact(value, ["sessionId", "name", "maxDurationMs", "viewport", "crop", "scale"], command);
+    if (value.name != null && !/^[A-Za-z0-9_-]{1,48}$/.test(value.name)) invalid("record-start.name", "must be a safe artifact token");
+    if (value.maxDurationMs != null) integer(value.maxDurationMs, "record-start.maxDurationMs", 1_000, LAB_INTERACT_LIMITS.maxRecordingDurationMs);
+    if (value.viewport != null) viewport(value.viewport, 2048, "record-start.viewport");
+    if (value.crop != null) recordingCrop(value.crop);
+    if (value.scale != null) boundedNumber(value.scale, "record-start.scale", 0.25, 1);
+  } else if (command === "record-stop") {
+    exact(value, ["sessionId"], command);
   }
   return value;
 }
@@ -687,6 +735,34 @@ function validateCamera(value) {
     if (value.centerX != null) { finite(value.centerX, "camera.centerX"); finite(value.centerY, "camera.centerY"); }
     if (value.zoom != null) boundedNumber(value.zoom, "camera.zoom", Number.MIN_VALUE, 16);
   } else invalid("camera.action", "is unsupported");
+}
+
+function recordingCrop(value) {
+  record(value, "record-start.crop");
+  exact(value, ["x", "y", "width", "height"], "record-start.crop");
+  boundedNumber(value.x, "record-start.crop.x", 0, 2048);
+  boundedNumber(value.y, "record-start.crop.y", 0, 2048);
+  boundedNumber(value.width, "record-start.crop.width", 2, 2048);
+  boundedNumber(value.height, "record-start.crop.height", 2, 2048);
+}
+
+function recordingOperation(command, input, result) {
+  return {
+    command,
+    acceptedAt: new Date().toISOString(),
+    input: JSON.parse(JSON.stringify(input, (key, value) => key === "sessionId" ? undefined : value)),
+    authoritativeTick: findSnapshotTick(result),
+  };
+}
+
+function findSnapshotTick(value, depth = 0) {
+  if (!value || typeof value !== "object" || depth > 5) return null;
+  if (Number.isInteger(value.snapshotTick)) return value.snapshotTick;
+  for (const child of Object.values(value)) {
+    const tick = findSnapshotTick(child, depth + 1);
+    if (tick != null) return tick;
+  }
+  return null;
 }
 
 function validateCommand(value) {
