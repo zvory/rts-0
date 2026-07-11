@@ -134,6 +134,24 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
 }
 
 {
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 126, playerCount: 1 });
+  let result;
+  for (let x = 20; x < 51; x++) {
+    assert.equal(session.mutate("Added base", (draft) => {
+      result = addSymmetricDraftLocations(draft, { kind: "base", tile: { x, y: 40 } });
+    }), true);
+  }
+  assert.equal(session.draft.baseSites.length, MAP_EDITOR_MAX_BASE_SITES);
+  const before = session.materialized();
+  assert.equal(session.mutate("Cannot add start beyond base capacity", (draft) => {
+    result = addSymmetricDraftLocations(draft, { kind: "start", tile: { x: 80, y: 80 } });
+  }), false);
+  assert.match(result.error, /at most 32 base sites/);
+  assert.deepEqual(session.materialized(), before, "adding a start must not discard an existing base site");
+}
+
+{
   assert.deepEqual(symmetricMapTiles(8, [{ x: 1, y: 2 }], MAP_EDITOR_SYMMETRY.HORIZONTAL), [{ x: 1, y: 2 }, { x: 1, y: 5 }]);
   assert.deepEqual(symmetricMapTiles(8, [{ x: 1, y: 2 }], MAP_EDITOR_SYMMETRY.HALF_TURN), [{ x: 1, y: 2 }, { x: 6, y: 5 }]);
   assert.deepEqual(symmetricMapTiles(8, [{ x: 1, y: 2 }], MAP_EDITOR_SYMMETRY.RADIAL), [{ x: 1, y: 2 }, { x: 5, y: 1 }, { x: 6, y: 5 }, { x: 2, y: 6 }]);

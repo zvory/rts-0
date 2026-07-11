@@ -266,6 +266,7 @@ impl Game {
 
         let mut player_states = Vec::with_capacity(players.len() + 1);
         let mut resolved_starting_loadouts = Vec::with_capacity(players.len());
+        let mut starts_with_resources = Vec::with_capacity(players.len());
         for (i, p) in players.iter().enumerate() {
             let start = map.starts.get(i).copied().unwrap_or((0, 0));
             let faction_id = if p.faction_id.is_empty() {
@@ -302,6 +303,7 @@ impl Game {
             };
             if let Some(loadout) = loadout {
                 spawn_player_start(&mut entities, &map, &mut ps, start, loadout);
+                starts_with_resources.push(start);
             }
             if let Some(loadout) = loadout {
                 for &upgrade in loadout.opening_upgrades {
@@ -328,7 +330,7 @@ impl Game {
         // Every authored base site receives resources. Claimed sites already received theirs
         // alongside the player's City Centre; every other site remains an available expansion.
         for site in &map.base_sites {
-            if !map.starts.contains(site) {
+            if !starts_with_resources.contains(site) {
                 spawn_base_resources(&mut entities, &map, *site);
             }
         }

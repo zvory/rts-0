@@ -84,6 +84,17 @@ fn unknown_faction_start_and_commands_fail_closed() {
     game.assert_invariants();
 
     assert_eq!(
+        game.state
+            .entities
+            .iter()
+            .filter(|entity| entity.kind.is_node())
+            .count(),
+        game.state.map.base_sites.len()
+            * (config::STEEL_PATCHES_PER_BASE as usize + config::OIL_PATCHES_PER_BASE as usize),
+        "an invalid faction must not leave its permanent start/base site without resources"
+    );
+
+    assert_eq!(
         (
             game.state.players[0].steel,
             game.state.players[0].oil,

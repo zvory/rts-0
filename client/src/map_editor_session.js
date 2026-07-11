@@ -405,6 +405,9 @@ export function addSymmetricDraftLocations(draft, {
   const limit = kind === "start" ? MAP_EDITOR_MAX_START_LOCATIONS : MAP_EDITOR_MAX_BASE_SITES;
   const current = kind === "start" ? draft.startLocations.length : draft.baseSites.length;
   if (current + locations.length > limit) return draftEditError(`A map supports at most ${limit} ${kind === "start" ? "start locations" : "base sites"}.`);
+  if (kind === "start" && draft.baseSites.length + locations.length > MAP_EDITOR_MAX_BASE_SITES) {
+    return draftEditError(`A map supports at most ${MAP_EDITOR_MAX_BASE_SITES} base sites.`);
+  }
   if (locations.some((location) => draft.baseSites.some((site) => sameLocation(site, location)))) {
     return draftEditError("A base already uses that tile.");
   }
