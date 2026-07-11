@@ -1185,14 +1185,15 @@ POST /api/map-handoffs
 }
 -> { handoffId: 32-lowercase-hex, expiresInMs: 120000 }
 
-GET /api/map-handoffs/{handoffId}
+POST /api/map-handoffs/{handoffId}
 -> { destination: "lab", room: privateLabRoom, selectedLayoutId: string }
  | { destination: "editor", authoredMap: AuthoredMapV2, selectedLayoutId: string }
 ```
 Creation validates the complete authored-map schema and binds the selected layout's terrain, starts,
 and natural sites to `materializedMap` before storing it. Records are capped at 64, expire after two
 minutes, and are removed on the first consume; unknown, expired, or already-used ids return HTTP 410.
-The map body never appears in a URL. Consuming a Lab-directed record creates a private Lab from the
+The map body never appears in a URL. Consumption uses POST so browser or intermediary prefetching
+cannot burn the one-use record. Consuming a Lab-directed record creates a private Lab from the
 validated materialized layout before the browser joins; an unjoined room has a short empty-room lease
 and its reserved name cannot recreate a fallback room after disposal. Its only initial `start` is tick
 zero on the edited map. Editor-directed records return only the map; simulation entities, orders, resources, fog,
