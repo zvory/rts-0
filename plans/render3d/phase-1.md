@@ -1,4 +1,4 @@
-# Phase 1 - Semantic Camera and Projection Contract
+# Phase 1 - Semantic Camera and Projection Core
 
 ## Phase Status
 
@@ -10,128 +10,90 @@
 
 ## Objective
 
-Replace shared-client dependence on an orthographic state representation with renderer-neutral
-camera meanings while leaving the Pixi view and controls behaviorally unchanged. The contract must
-support a later fixed-perspective implementation without exposing Babylon objects or asking
-consumers to infer geometry from `x`, `y`, `zoom`, `viewW`, or `viewH`. Complete this migration
-before the backend factory or production Babylon camera is introduced.
+Implement the renderer-neutral camera/projection core without migrating the application-wide
+consumer set yet. Preserve current Pixi camera behavior and legacy view restore while defining the
+plain-data semantics a fixed elevated perspective adapter will later implement. Keep this phase
+bounded to the camera, pure helpers, contracts, and durable documentation.
 
 ## Work
 
-- Implement the Phase 0 semantic contract with plain data and operations for:
-  - nullable screen-to-ground projection;
-  - world-point projection including screen position, depth, and clip/visibility state;
-  - projected world-extent/screen-scale queries for constant-screen-size labels and overlays;
-  - viewport ground polygon and derived conservative world bounds;
-  - projected containment, point-cluster evaluation, and fit/focus operations;
-  - update, center/focus, screen-delta pan, and anchor-aware zoom/dolly-by-factor;
-  - map/viewport bounds and resize;
-  - semantic snapshot/restore and diagnostics; and
-  - an audio listener model containing world focus and reference distance without exposing zoom.
-- Preserve the current world-pixel focus and zoom setting as the orthographic implementation's
-  private state. Legacy persisted `{x,y,zoom}` input may be accepted at a compatibility edge, but
-  new shared consumers and diagnostics use the semantic snapshot.
-- Migrate `CameraNavigationInput` and camera controls away from read-modify-write access to raw
-  zoom. Wheel, pinch, edge scroll, keyboard, middle/space drag, pointer lock, and minimap focus
-  must call semantic navigation operations.
-- Make the minimap render the camera's ground polygon rather than constructing an axis-aligned
-  rectangle from top-left and zoom. Its click/drag recenter and command behavior remain unchanged.
-- Change the frame/audio seam so audio receives the camera's listener model and never derives
-  spatial reference distance from a nominal perspective zoom.
-- Move match viewport alerts, control-group cluster framing, Lab camera focus/inspection,
-  replay/camera carryover, observer overlays, visual samples, and profiler/diagnostic surfaces to
-  semantic bounds, projection, snapshot, or listener operations as appropriate.
-- Make control-group framing a semantic camera operation that can evaluate and focus a set of world
-  points using the current view. Phase 2 may change which projected candidates count as currently
-  visible, but it must not reimplement camera-size or focus math.
-- Define every public screen coordinate and extent in viewport-local CSS pixels. Device-pixel ratio,
-  canvas backing dimensions, Babylon hardware scaling, DOM bounds, and render-buffer conversion stay
-  inside adapters so input, minimap, Lab, and overlays use one unit at non-1 DPR and after resize.
-- Keep raw orthographic transform reads private to the current camera implementation and a clearly
-  named Pixi compatibility edge. Add an architecture or focused contract ratchet preventing new
-  shared input/UI/app-shell consumers from reintroducing raw representation reads.
-- Update the durable design contract and parity ledger with actual method names, compatibility
-  boundaries, and evidence.
+- Implement the Phase 0 semantic contract with plain `{x,y,heightPx}` presentation points and
+  operations for nullable screen-to-ground projection, world-point projection with depth/clip
+  state, projected extent/screen scale,
+  viewport ground polygon and conservative world bounds, projected containment, fit/focus, pan,
+  anchor-aware zoom/dolly, resize/map bounds, semantic snapshot/restore, and audio listener data.
+- Preserve current world-pixel focus and zoom as private orthographic state. Existing consumers may
+  remain temporarily on the named compatibility edge, and legacy persisted `{x,y,zoom}` may be
+  accepted there, but no new raw consumer is allowed.
+- Define every public screen coordinate and extent in viewport-local CSS pixels. DPR, canvas
+  backing dimensions, DOM offsets, and future hardware scaling remain adapter-private.
+- Make perspective ground/frustum intersection semantics explicit: clip to map bounds, return
+  deduplicated stable clockwise world-`(x,y)` winding, return an empty polygon when no bounded
+  ground is visible, and return no conservative bounds for an empty polygon.
+- Define semantic snapshot/restore in player-intent terms—world focus, framing scale, and bounded
+  view policy—without serializing matrices or backend nodes. Keep pitch, yaw, height, and FOV as
+  future adapter configuration, not player orbit state.
+- Add pure fake adapters and orthographic equivalence tests covering round trips, finite-value
+  rejection, clipping, partial misses, empty ground views, polygon/bounds, anchored zoom, pan,
+  clamping, fit/focus, snapshot, resize, and listener data.
+- Update `docs/design/client-rendering.md` and `docs/design/rendering-parity.md` with final method
+  names, units, nullability, compatibility lifetime, and Phase 1 evidence.
 
 ## Expected Touch Points
 
-- `client/src/camera.js` and small focused projection/view helpers
-- `client/src/input/camera_navigation.js`
-- `client/src/input/camera_controls.js`
-- `client/src/input/control_groups.js`
-- `client/src/frame_recovery.js`
-- `client/src/audio.js`
-- `client/src/minimap.js`
-- `client/src/match.js`
-- `client/src/camera_view_selection.js`
-- `client/src/lab_interact_bridge.js`
-- `client/src/frame_profiler.js`
-- `client/src/renderer/observer_map_analysis.js`
-- `client/src/renderer/visual_samples.js`
-- focused camera, audio, minimap, Lab, and architecture contracts
+- `client/src/camera.js`
+- small focused projection/view helpers next to the camera
+- `client/src/camera_view_selection.js` only for semantic snapshot/fit primitives
+- `tests/client_contracts/camera_projection_contracts.mjs` (create it in this phase)
+- existing camera/fog contracts
 - durable rendering/client design docs and parity ledger
 - `plans/render3d/phase-1.md` status update in the implementation commit
 
 ## Contract Requirements
 
-- `groundAtScreen` or its final equivalent may return no hit; even though the orthographic adapter
-  always hits, callers must not encode that assumption.
-- World projection reports depth/clip visibility. A bare `{x,y}` result is insufficient for later
-  perspective selection and overlays.
-- `viewportGroundPolygon` remains a polygon in public semantics. Consumers may use its conservative
-  AABB only when false-positive inclusion is explicitly acceptable.
-- The perspective contract clips the ground/frustum intersection to map bounds, returns deduplicated
-  points in stable clockwise world-`(x,y)` winding, returns an empty polygon when no bounded ground
-  is visible, and returns no conservative bounds for an empty polygon. Partial corner-ray misses do
-  not become fabricated far-away points.
-- Constant-screen-size labels and selection/HP presentation use the projected-extent/overlay-sizing
-  operation or a screen projection layer; they never derive size from nominal zoom.
-- Snapshot/restore describes player intent in world terms and remains stable across backends; it
-  does not serialize Babylon matrices or engine nodes.
-- Perspective pitch, yaw, height, and FOV may be configuration in a later adapter, but are not
-  player-orbit controls in this plan.
-- The Pixi renderer may consume a private orthographic transform descriptor temporarily; no other
-  shared feature may use that descriptor.
+- `groundAtScreen` or its final equivalent may return no hit; the orthographic adapter happens to
+  hit, but the public contract never promises that.
+- World projection reports viewport-local CSS position, positive/negative depth, and clip/visibility
+  state. A bare `{x,y}` result is insufficient.
+- Positive `heightPx` projects a presentation-only elevated anchor; ground commands always use
+  `heightPx=0` and return authoritative world `(x,y)` only.
+- `viewportGroundPolygon` is public polygon semantics. Its conservative AABB is used only where
+  false-positive inclusion is explicitly acceptable.
+- Projected extent/overlay sizing is independent of nominal zoom and supports constant-screen-size
+  labels and selection/HP presentation.
+- Raw orthographic transform state remains temporarily available only through the documented camera
+  compatibility edge consumed by Phase 1.5 and Pixi.
 
 ## Explicit Exclusions
 
+- No application-wide consumer migration; Phase 1.5 owns it.
 - No Babylon dependency, backend, scene, engine, ray class, or matrix object.
-- No perspective visual change and no free orbit.
-- No selection behavior rewrite; Phase 2 owns entity picking and marquee semantics.
-- No protocol or replay-format change. Stop if semantic camera carryover truly requires a wire
-  change rather than a client-only compatibility adapter.
+- No perspective visual change, selection rewrite, protocol change, or replay-format change.
 
 ## Implementation Checklist
 
-- [ ] Implement the semantic camera/projection interface with orthographic equivalence.
-- [ ] Migrate navigation, minimap, audio, viewport, control-group, Lab, carryover, and diagnostics consumers.
-- [ ] Confine raw orthographic state to the camera/Pixi compatibility edge.
-- [ ] Add round-trip, clipping, polygon/bounds, pan, clamp, zoom-anchor, fit, snapshot, and listener tests.
-- [ ] Add a ratchet against new raw camera-representation consumers.
+- [ ] Implement the semantic camera/projection core with orthographic equivalence.
+- [ ] Define CSS-pixel, nullability, clipping, polygon, fit/focus, snapshot, and listener semantics.
+- [ ] Preserve and document the temporary raw orthographic compatibility edge.
+- [ ] Add real-orthographic and fake-perspective pure contracts.
 - [ ] Update durable docs/ledger and mark this phase done in the implementation commit.
 
 ## Verification
 
     node tests/client_contracts/camera_fog_contracts.mjs
     node tests/client_contracts/camera_projection_contracts.mjs
-    node tests/minimap_input_contracts.mjs
-    node tests/lab_interact_driver_contracts.mjs
     node scripts/check-client-architecture.mjs
-    node tests/select-suites.mjs --verify
-    tests/run-all.sh --only-browser-scenarios=smoke
     git diff --check
 
 ## Manual Test Focus
 
-In a normal Pixi match, exercise keyboard/edge/middle/space/touch pan, wheel/pinch zoom, pointer
-lock, minimap recenter/drag, resize, and camera carryover across replay/rematch. Double-tap a control
-group, jump through the minimap while spatial sounds are active, verify viewport alert suppression,
-and use Lab single/multi-entity focus plus camera inspection. Confirm the viewport polygon renders
-as the same rectangle under Pixi and no visible camera behavior changed.
+Run a normal Pixi match and exercise basic pan, zoom, resize, and camera restore to confirm the core
+adapter did not change visible behavior. Review the fake-perspective contract output for nullable
+ground hits, clipped/behind-camera points, partial ground views, and stable polygon winding; broad
+consumer behavior remains Phase 1.5.
 
 ## Handoff Expectations
 
-List the final semantic method names, the remaining private Pixi compatibility reads, the ratchet
-coverage, and any legacy restore edge. Name Phase 2 as next and call out near/far perspective
-selection, empty ground-ray hits, marquee edges, control-group selection, and Lab box tools as its
-manual test focus.
+List final semantic method names, units, nullability, fake-adapter coverage, snapshot shape, and the
+temporary compatibility reads. Name Phase 1.5 as next and identify the exact raw camera consumers
+it must migrate without changing behavior.

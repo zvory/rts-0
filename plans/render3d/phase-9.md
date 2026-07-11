@@ -1,4 +1,4 @@
-# Phase 9 - Authoritative Fog and Reveal Secrecy
+# Phase 9 - Visibility and Fog Core
 
 ## Phase Status
 
@@ -10,101 +10,78 @@
 
 ## Objective
 
-Prove the highest-risk gameplay invariant before interaction overlays or content: Babylon cannot
-reveal an entity, position, target, event, memory update, or diagnostic the recipient was not
-authorized to receive. Implement the semantic terrain/fog/remembered/reveal layer spine using
-registry-owned resources. Validate live, replay, spectator, and Lab timelines with programmatic
-no-leak assertions and one deterministic fog-edge capture.
+Implement the locked terrain/current-visibility/client-explored fog core with registry-owned
+resources and explicit view-generation resets. Prove revisioned uploads, layer ordering, and
+lifecycle before memory/reveal secrecy is added. Keep the controlled-Lab route gate closed.
 
 ## Work
 
-- Define semantic layer categories in `RendererFrame`: static ground, persistent ground marks,
-  ordinary fog-gated world presentation, authoritative current fog, explored/remembered
-  presentation, explicit below/above-fog intel/reveals, tactical feedback, and screen overlays.
-  Do not copy Pixi container names as the cross-backend contract.
-- Render map/terrain boundary and current visible/explored fog from Phase 3 grids/revisions using
-  Phase 8 shared textures/materials. Bound uploads/allocations by revision and make resource
-  ownership/readiness visible.
-- Render remembered buildings only from the explicit received memory model. They are visually
-  distinct and contain no current hidden HP, queue, target, animation, effect, or movement data;
-  reconciliation/expiry follows current client semantics.
-- Preserve explicit reveal policies: `visionOnly`/legacy intel remains at its documented fog layer,
-  while shot/event reveals appear above fog only when the recipient's `RendererFrame` includes the
-  explicit reveal and only for its normalized lifetime. Never resolve a hidden source id.
-- Gate every backend surface, not just mesh visibility: geometry, selection candidates, diagnostics,
-  capture metadata, labels, particles, lights, future shadow admission, bounds, and resource keys.
-- Add contrasting recipient/timeline fixtures and programmatic assertions that hidden ids/positions
-  never enter Babylon renderer inputs or diagnostic output. Prefer real server-projected fixtures
-  where existing test infrastructure permits.
-- Cover replay seek/vision perspective, spectator union view, Lab vision/reset, resize, detached
-  fixed capture, freeze, rematch, and resource teardown. A generation change cannot retain old fog
-  texture/event/memory state.
-- Remove Phase 6's controlled-Lab-only runtime gate only after the no-leak contracts pass. Enable
-  namespaced experimental live/replay/spectator routes deliberately and keep failure before join if
-  fog initialization/readiness cannot provide the required semantics.
-- Use `lab-interact` to arrange visible, explored, unseen, remembered, below-fog intel, and explicit
-  reveal cases at a fog edge. Capture deterministically and inspect one PNG once.
-- Update `docs/design/client-rendering.md` and `docs/design/rendering-parity.md` with the layer/fog
-  contract, evidence, and remaining overlay work.
+- Implement the plan-locked semantic layer ids/order; do not redefine the cross-backend contract or
+  copy Pixi container names into it.
+- Render map/terrain boundary, authoritative current visibility, and client-accumulated explored
+  state derived only from received visibility from Phase 3 snapshots. Bound uploads/allocations by
+  revision and expose readiness/resource diagnostics.
+- Introduce `viewGeneration`, advancing whenever replay/Lab/observer recipient perspective changes
+  even at the same tick. Before the next render, clear/rebuild explored fog, SelectionScene, current
+  fog GPU resources, and recipient-derived diagnostics; Phase 9.5 extends the reset set to memory,
+  events/history, decals, and reveals.
+- Gate all implemented surfaces—terrain/fog geometry, picking admission, diagnostics, capture
+  metadata, resource keys, and future caster hooks—against received presentation only.
+- Cover replay perspective hooks, spectator union view, Lab reset, resize, fixed/event capture,
+  freeze, rematch, and resource teardown in controlled contracts without enabling normal routes.
+- Add authoritative Lab scenario `render3d-fog-core` with fixed seed/team vision and deterministic
+  current/explored/unseen regions. Capture through `lab-interact` and inspect one PNG once.
+- Update durable rendering/parity docs with visibility/explored semantics, view generation, upload
+  policy, and remaining memory/reveal work.
 
 ## Expected Touch Points
 
-- Phase 3 frame/layer descriptors
+- Phase 3 frame/layer/grid descriptors
 - `client/src/renderer_babylon/terrain.js`
 - `client/src/renderer_babylon/fog.js`
-- remembered/reveal presentation modules and resource diagnostics
-- replay/Lab reset and capture-readiness hooks
-- `tests/client_contracts/babylon_fog_contracts.mjs`
-- `tests/client_contracts/babylon_visibility_contracts.mjs`
-- browser fog/capture smoke coverage
+- view-generation/reset and capture-readiness hooks
+- `tests/client_contracts/babylon_fog_contracts.mjs` (create it in this phase)
+- `tests/browser_babylon_fog.mjs` core cases wired into the authoritative runner
 - durable rendering docs/parity ledger
 - `plans/render3d/phase-9.md` status update in the implementation commit
 
 ## Security Requirements
 
-- Babylon receives only least-privilege renderer data; no `GameState`, transport, full snapshot, or
-  authoritative fog-source subview reaches the module.
-- Invisible objects cannot cast, pick, label, light, emit, diagnose, or retain a hidden position.
-- Remembered presentation is historical received data, never a live hidden entity view.
-- Above-fog presentation requires an explicit normalized reveal semantic.
-- No-leak failures block the phase regardless of visual quality.
+- Babylon receives only least-privilege snapshots, never GameState/transport/full snapshots/fog-source subviews.
+- Explored state accumulates only received authoritative visibility and resets on view generation.
+- No previous-generation fog texture, SelectionScene, resource key, or diagnostic renders after advance.
 
 ## Explicit Exclusions
 
-- No generic all-kind entities, selection/HP, placement/order overlays, or real Babylon effect;
-  Phase 10 owns interaction presentation.
-- No batching/benchmark optimization, shadows, vegetation, representative GLB, or full Pixi parity.
-- No renderer-local visibility stamping or protocol change.
+- No remembered buildings, below-fog intel, above-fog reveals, event/history/decal generation reset,
+  or real two-recipient gate; Phase 9.5 owns them.
+- No generic entities, overlays/effect, batching, shadows, vegetation, representative GLB, or normal route enablement.
 
 ## Implementation Checklist
 
-- [ ] Define semantic layers and implement revisioned terrain/current/explored fog.
-- [ ] Implement remembered buildings and explicit below/above-fog reveal policies.
-- [ ] Gate diagnostics/capture/picking/future caster/effect surfaces against hidden data.
-- [ ] Add contrasting recipient/timeline no-leak contracts.
-- [ ] Cover replay/spectator/Lab/reset/capture/rematch resources and inspect one fog-edge PNG.
-- [ ] Update durable docs/ledger and mark this phase done in the implementation commit.
+- [ ] Implement locked layers and revisioned terrain/current/client-explored fog.
+- [ ] Add view-generation clearing for core fog/input/resource surfaces.
+- [ ] Cover replay/spectator/Lab/reset/capture/rematch lifecycle.
+- [ ] Capture/inspect `render3d-fog-core` and update durable docs/ledger.
+- [ ] Mark this phase done.
 
 ## Verification
 
     node tests/client_contracts/babylon_fog_contracts.mjs
-    node tests/client_contracts/babylon_visibility_contracts.mjs
     node tests/client_contracts/presentation_frame_contracts.mjs
-    node tests/lab_interact_fixed_capture_contracts.mjs
+    node tests/browser_babylon_fog.mjs --scenario core
     node scripts/check-client-architecture.mjs
     tests/run-all.sh --only-browser-scenarios=smoke
     git diff --check
 
 ## Manual Test Focus
 
-Inspect fog edges while a received entity/reveal enters and leaves vision, a remembered building,
-legacy intel, replay/spectator perspectives, Lab reset, resize, fixed capture, freeze, and rematch.
-Look specifically for hidden geometry, labels, picking hits, resource keys, diagnostics, capture
-metadata, or stale memory, not only visible silhouettes.
+Inspect current/explored/unseen boundaries, revision updates, perspective reset, resize, capture,
+freeze, and rematch in controlled Lab. Look for stale textures/resource keys and generation mixing;
+memory/reveals remain intentionally absent.
 
 ## Handoff Expectations
 
-Report semantic layer order, fog update/upload policy, remembered/reveal semantics, no-leak fixtures
-and results, resource baselines, exact preview command/URL, and inspected artifact. Name Phase 10 as
-next and identify instance-compatible generic fallbacks, entity targeting, selection/HP,
-placement/order/tactical overlays, real finite effect, Lab/observer overlay, and perspective input.
+Report layer implementation, visibility/explored policy, upload revisions, view-generation clears,
+resource baselines, preview command/URL, and inspected PNG. Name Phase 9.5 as next and identify
+remembered/visionOnly/reveal categories, full reset set, real two-recipient sentinels, and fog-edge capture.

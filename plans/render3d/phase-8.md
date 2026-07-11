@@ -38,7 +38,7 @@ particle-texture failure mode and return live diagnostics to baseline across rep
   texture/material. Configure disposal so stopping/removing the first effect cannot destroy the
   shared dependency; create later effects repeatedly and verify their visuals/diagnostics.
 - Distinguish pool return from disposal and reset emitter, transform, visibility, callbacks, event
-  data, clock state, and diagnostics on return. Pool capacity/overflow optimization remains Phase 11.
+  data, clock state, and diagnostics on return. Pool capacity/overflow optimization remains Phase 11.5.
 - Exercise missing/malformed assets, failed loads, destroy during load, reset, entity replacement,
   effect completion, double destroy, and rematch. Use fake-disposable pure tests plus browser cycles.
 - Use `lab-interact` with explicit `RTS_CLIENT_DIR` to inspect repeated effect/entity creation and
@@ -65,8 +65,8 @@ particle-texture failure mode and return live diagnostics to baseline across rep
 
 ## Explicit Exclusions
 
-- No fog/remembered/reveal resources; Phase 9 owns them.
-- No production overlay/effect library; Phase 10 owns one real event effect.
+- No fog/remembered/reveal resources; Phases 9 and 9.5 own them.
+- No production overlay/effect library; Phase 10.5 owns one real event effect.
 - No capacity-tuned pooling/batching, vegetation, shadows, quality tiers, or representative GLB.
 - No faction conversion or default switch.
 
@@ -98,5 +98,5 @@ pending-load counts reach their documented baselines.
 
 Report the scope table/destroy order, handles/leases, generation policy, before/after registry
 counts, shared-effect survival, exact preview command/URL, and inspected artifact. Name Phase 9 as
-next and identify fog texture ownership, semantic layers, remembered state, explicit reveal paths,
-diagnostic/picking secrecy, replay/spectator/Lab resets, and fog-edge capture.
+next and identify fog texture ownership, locked semantic layers, current/client-explored state,
+view generation, replay/spectator/Lab resets, and controlled core-fog capture.

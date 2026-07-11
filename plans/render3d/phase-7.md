@@ -6,7 +6,7 @@
 
 ## Depends On
 
-- Phase 6 merged with the lazy production kernel and pinned self-hosted glTF loader.
+- Phase 6.5 merged with the controlled lifecycle kernel and pinned self-hosted glTF loader.
 
 ## Objective
 
@@ -18,7 +18,8 @@ selection remains Phase 2 plain rules/presentation data and the representative a
 ## Work
 
 - Add the only server-world-to-Babylon coordinate module, owning world `(x,y)` pixels to scene
-  ground `(x,0,z)`, inverse ground conversion, scale, height, handedness, hull/weapon facing,
+  ground `(x,0,z)`, inverse ground conversion, Phase 1 `heightPx` presentation height, scale,
+  handedness, hull/weapon facing,
   direction vectors, attachment transforms, and angle wrapping.
 - Keep public projection/picking in viewport-local CSS pixels; the Babylon adapter alone handles DPR,
   canvas backing dimensions, engine hardware scaling, and render-buffer projection.
@@ -37,6 +38,10 @@ selection remains Phase 2 plain rules/presentation data and the representative a
   valid/malformed fixtures for missing visual anchors, axes/pivot, material slots, parts/clips,
   undeclared textures, provenance, and budgets; fixtures need not be attractive or articulated
   gameplay models.
+- Validate before Babylon load: manifest/GLB/external byte ceilings, texture dimensions/formats,
+  chunk/accessor/buffer ranges, finite transforms, checksum match, and declared resource paths.
+  Reject remote/data/traversal URIs, undeclared external resources, unsupported extensions,
+  compression/decoders, and any file escaping the approved asset directory.
 - Load only the validator fixture through the production loader to prove served paths/checksum/
   plugin configuration and fallback diagnostics. Do not create a faction or representative unit.
 - Use `lab-interact` with explicit `RTS_CLIENT_DIR` to capture the minimal valid fixture at canonical
@@ -63,6 +68,8 @@ selection remains Phase 2 plain rules/presentation data and the representative a
 - Asset metadata cannot participate in gameplay selection or authority.
 - Required versus optional visual anchors/nodes are explicit; malformed required data falls back
   with bounded diagnostics rather than terminating the frame.
+- Oversized, out-of-range, checksum-mismatched, remote, traversal, undeclared, or unsupported input
+  is rejected before reaching the Babylon loader.
 - Core and glTF runtime files continue through Phase 6's pinned loader/manifest; no second loader path.
 
 ## Explicit Exclusions

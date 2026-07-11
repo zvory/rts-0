@@ -8,8 +8,7 @@
 
 Create the durable source of truth and evidence ledger that later executor phases can follow
 without recovering the intentionally deleted PoC implementation or reconstructing decisions from
-chat. Record the
-production rendering boundary, camera/projection semantics, presentation-frame policy, ownership
+chat. Record the production rendering boundary, camera/projection semantics, presentation-frame policy, ownership
 model, coordinate and asset expectations, parity categories, benchmark scenarios, and separate
 content-expansion/default-cutover gates. This is a documentation-only, runtime-neutral architecture
 phase: it must not add Babylon runtime code or change current Pixi behavior.
@@ -25,7 +24,7 @@ phase: it must not add Babylon runtime code or change current Pixi behavior.
 - Inventory raw camera-representation consumers using current `main`, including match/frame logic,
   minimap, audio, input/control groups, Lab Interact, diagnostics, observer overlays, visual
   samples, capture, resize, replay, and carryover. Distinguish backend-private orthographic math
-  from application/UI/input reads that Phase 1 must remove.
+  from application/UI/input reads that Phases 1, 1.5, and 1.75 must remove.
 - Inventory the complete current Pixi presentation catalog from the documented layer order and
   implementation: terrain, decals, trenches, resources, remembered buildings, entities, rigs,
   shadows, fog, shot reveals, selection/HP, ability/smoke/effects, command and placement feedback,
@@ -47,10 +46,11 @@ phase: it must not add Babylon runtime code or change current Pixi behavior.
 - Define named benchmark scenario contracts using existing authoritative Lab/dev setup mechanisms:
   quiet representative view, dense generic army, instanced vegetation, active finite effects,
   fog/core overlays, and repeated rematch. Record required metadata and counters, but defer actual
-  Babylon budgets until Phases 11 and 12 measure the production backend.
-- Treat the user-supplied PoC metrics and defects as non-binding findings. The implementation branch
-  was deleted intentionally: do not recover it from history, reflogs, caches, old worktrees, PR
-  patches, artifacts, or another clone, and do not present its one-machine counts as current-main
+  Babylon budgets until Phases 11/11.5 and 12/12.5 measure the production backend.
+- Treat the unverified PoC observations copied into `plan.md` as non-binding leads. The
+  implementation branch was deleted intentionally: do not recover it from history, reflogs,
+  caches, old worktrees, PR patches, artifacts, or another clone, and do not present its
+  one-machine counts as current-main
   baselines.
 
 ## Expected Touch Points
@@ -63,18 +63,33 @@ phase: it must not add Babylon runtime code or change current Pixi behavior.
 - `docs/design/rendering-parity.md`
 - `plans/render3d/phase-0.md` status update in the implementation commit
 
-## Required Contract Decisions
+## Decision Freeze Exit Gate
 
-- Public semantic camera/projection operations and the legacy view-restore compatibility policy.
-- Plain-data selection proxy ownership and screen-space marquee semantics.
-- Static map presentation versus per-rAF presentation frame ownership.
-- Event identity/seed/lifetime and fixed-capture replay rules.
-- Backend factory lifecycle, failure, late-load, freeze, resize, reset, and destroy semantics.
-- World/scene scale, axis, handedness, and facing convention ownership, leaving numeric choices to
-  the validated Phase 7 implementation if current evidence is insufficient.
+Phase 0 may not be marked done while a later executor still needs an unspecified product/design
+choice. Freeze the following in `docs/design/client-rendering.md` and the ledger:
+
+- Exact semantic camera/projection API names/shapes, including `{x,y,heightPx}`, CSS-pixel units,
+  nullability, snapshot/restore/versioning, the perspective audio reference-distance formula, and
+  the legacy view-restore compatibility policy.
+- Plain-data selection proxy ownership, presentation-height sources, deterministic hit ordering,
+  and screen-marquee semantics.
+- Static map versus per-rAF ownership and the revisioned immutable `GridSnapshot` accessor/copy
+  mechanism; do not leave a borrowed-array policy for Phase 3 to invent.
+- The locked semantic layer ids/order from `plan.md` and the exact descriptor fields later phases
+  may extend compatibly.
+- Event identity/seed/lifetime, the 240 ms attack/muzzle fixture, 256-event/10-second history, and
+  frozen-presentation capture rules.
+- Backend factory lifecycle, `rtsRenderer` selector, pre-join versus post-`START` failure, late-load,
+  freeze, resize, reset, and destroy semantics.
 - Resource scope hierarchy and the rule that a child never disposes a shared dependency.
-- Parity status definitions, evidence fields, content-expansion gate, and default-cutover gate.
-- Scenario metadata and diagnostic fields required before a performance claim is accepted.
+- Exact parity status/evidence fields, content-expansion gate, and default-cutover gate.
+- Exact benchmark scenario ids plus authoritative setup/map/seed, entity/effect counts, camera,
+  viewport/DPR, tier, warmup/sample/repetition policy, counter definitions, and budget formula.
+- The locked deterministic repository-authored tracked-vehicle fixture specification from `plan.md`.
+
+An intentionally deferred numeric implementation value such as Phase 7 scene scale must name the
+owning later phase and a deterministic decision rule. Otherwise Phase 0 returns `blocked` and does
+not mark its status done.
 
 ## Explicit Exclusions
 
@@ -92,7 +107,7 @@ phase: it must not add Babylon runtime code or change current Pixi behavior.
 - [ ] Create the parity/evidence ledger with both migration gates.
 - [ ] Inventory raw camera consumers, Pixi presentation capabilities, and lifecycle resources.
 - [ ] Define reproducible scenario contracts and required diagnostics.
-- [ ] Record supplied PoC findings as non-binding evidence without recovering its implementation.
+- [ ] Record the plan-copied PoC leads as unverified/non-binding without recovering implementation.
 - [ ] Run docs validation and mark this phase done in the implementation commit.
 
 ## Verification
@@ -112,7 +127,7 @@ consumers; do not collect new Babylon screenshots in this phase.
 
 ## Handoff Expectations
 
-Name the exact durable design and ledger paths, summarize unresolved contract choices, and identify
-the raw camera consumers Phase 1 must migrate. State that runtime code was unchanged and name Phase
-1 as the next work, with Pixi camera/navigation/minimap/audio/Lab behavior as its core manual test
+Name the exact durable design and ledger paths, confirm the decision-freeze gate has no unresolved
+later-phase choice, and identify the raw camera consumers owned by Phases 1/1.5/1.75. State that
+runtime code was unchanged and name Phase 1 as next, with the semantic core/fake adapters as its
 focus.
