@@ -651,25 +651,6 @@ function buttonByLabel(card, label) {
   cgState.setControlGroup(1, [100, 101]);
   cgState.addToControlGroup(1, [101, 102, 103]);
   assert(cgState.controlGroups[1].join(",") === "100,101,102,103", "adding to a control group dedupes existing ids");
-  const presentedOnlyWorker = { id: 199, owner: 1, kind: KIND.WORKER, x: 0, y: 0, state: STATE.IDLE };
-  const secondPresentedOnlyWorker = { id: 198, owner: 1, kind: KIND.WORKER, x: 1, y: 0, state: STATE.IDLE };
-  const presentedEntityById = (id) => {
-    if (id === presentedOnlyWorker.id) return presentedOnlyWorker;
-    if (id === secondPresentedOnlyWorker.id) return secondPresentedOnlyWorker;
-    return null;
-  };
-  cgState.setControlGroup(5, [presentedOnlyWorker.id], {
-    entityById: presentedEntityById,
-  });
-  assert(
-    cgState.controlGroups[5].join(",") === String(presentedOnlyWorker.id),
-    "control-group admission uses the supplied presented-scene resolver instead of mutable snapshot state",
-  );
-  cgState.addToControlGroup(5, [secondPresentedOnlyWorker.id], { entityById: presentedEntityById });
-  assert(
-    cgState.controlGroups[5].join(",") === `${presentedOnlyWorker.id},${secondPresentedOnlyWorker.id}`,
-    "control-group adds preserve prior presented-scene members before admitting new ones",
-  );
   cgState.selectControlGroup(1);
   assert(Array.from(cgState.selection).join(",") === "100,101,102,103", "selectControlGroup recalls live group ids");
   cgState.applySnapshot({

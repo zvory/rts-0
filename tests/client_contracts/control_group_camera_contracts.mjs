@@ -1,6 +1,8 @@
 // Semantic camera contracts for control-group double-tap framing.
 
 import { _jumpToControlGroupCluster } from "../../client/src/input/control_groups.js";
+import { GameState } from "../../client/src/state.js";
+import { KIND, STATE } from "../../client/src/protocol.js";
 import { assert, assertApprox } from "./assertions.mjs";
 
 function createHarness(entities, { focus = { x: 50, y: 50 }, clippedBounds = null } = {}) {
@@ -22,6 +24,25 @@ function createHarness(entities, { focus = { x: 50, y: 50 }, clippedBounds = nul
     _selectionEntities: () => entities,
   };
   return { input, centered: () => centered };
+}
+
+{
+  const state = new GameState({
+    playerId: 1,
+    players: [{ id: 1, teamId: 1, name: "A", color: "#f00", startTileX: 0, startTileY: 0 }],
+    map: { width: 4, height: 4, tileSize: 32, tiles: Array(16).fill(0), resources: [] },
+  });
+  const workers = [
+    { id: 199, owner: 1, kind: KIND.WORKER, x: 0, y: 0, state: STATE.IDLE },
+    { id: 198, owner: 1, kind: KIND.WORKER, x: 1, y: 0, state: STATE.IDLE },
+  ];
+  const entityById = (id) => workers.find((entity) => entity.id === id) || null;
+  state.setControlGroup(5, [workers[0].id], { entityById });
+  state.addToControlGroup(5, [workers[1].id], { entityById });
+  assert(
+    state.controlGroups[5].join(",") === "199,198",
+    "control-group save/add preserves last-presented entities absent from mutable snapshot state",
+  );
 }
 
 {
