@@ -80,13 +80,11 @@ import {
     },
   };
   const camera = {
-    zoom: 1,
-    panByScreenDelta(dx, dy) {
-      pans.push({ dx, dy });
+    panByScreenDelta(delta) {
+      pans.push({ dx: delta.x, dy: delta.y });
     },
-    setZoom(zoom, x, y) {
-      this.zoom = zoom;
-      zooms.push({ zoom, x, y });
+    dollyBy(factor, anchor) {
+      zooms.push({ factor, x: anchor.x, y: anchor.y });
     },
   };
   const nav = new CameraNavigationInput(dom, camera);
@@ -124,13 +122,11 @@ import {
     },
   };
   const camera = {
-    zoom: 2,
-    panByScreenDelta(dx, dy) {
-      pans.push({ dx, dy });
+    panByScreenDelta(delta) {
+      pans.push({ dx: delta.x, dy: delta.y });
     },
-    setZoom(zoom, x, y) {
-      this.zoom = zoom;
-      zooms.push({ zoom, x, y });
+    dollyBy(factor, anchor) {
+      zooms.push({ factor, x: anchor.x, y: anchor.y });
     },
   };
   const nav = new CameraNavigationInput(dom, camera);
@@ -149,8 +145,8 @@ import {
   assert(pans.length === 1, "pinch movement pans by the midpoint delta");
   assertApprox(pans[0].dx, 50, 0.001, "pinch midpoint pan dx");
   assertApprox(pans[0].dy, 20, 0.001, "pinch midpoint pan dy");
-  assert(zooms.length === 1, "pinch movement zooms the camera");
-  assertApprox(zooms[0].zoom, 3.2, 0.001, "pinch zoom factor uses distance ratio");
+  assert(zooms.length === 1, "pinch movement dollies the camera");
+  assertApprox(zooms[0].factor, 1.6, 0.001, "pinch dolly factor uses distance ratio");
   assertApprox(zooms[0].x, 150, 0.001, "pinch zoom anchors at midpoint x");
   assertApprox(zooms[0].y, 70, 0.001, "pinch zoom anchors at midpoint y");
 }
@@ -171,13 +167,11 @@ import {
     },
   };
   const camera = {
-    zoom: 1,
-    panByScreenDelta(dx, dy) {
-      pans.push({ dx, dy });
+    panByScreenDelta(delta) {
+      pans.push({ dx: delta.x, dy: delta.y });
     },
-    setZoom(zoom, x, y) {
-      this.zoom = zoom;
-      zooms.push({ zoom, x, y });
+    dollyBy(factor, anchor) {
+      zooms.push({ factor, x: anchor.x, y: anchor.y });
     },
   };
   const nav = new CameraNavigationInput(dom, camera);
@@ -1028,8 +1022,8 @@ import {
     },
   };
   nativeMiddleInput.cameraNavigation = new CameraNavigationInput(nativeMiddleInput.dom, {
-    panByScreenDelta(dx, dy) {
-      pans.push({ dx, dy });
+    panByScreenDelta(delta) {
+      pans.push({ dx: delta.x, dy: delta.y });
     },
   });
   nativeMiddleInput.inputRouter = null;

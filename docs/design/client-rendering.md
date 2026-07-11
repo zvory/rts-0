@@ -119,7 +119,8 @@ inputs and mutation values are finite numbers; invalid query values throw except
 `groundAtScreen`, whose contract-safe failure is `null`, while invalid mutations leave the view
 unchanged. World sizes, map sizes, viewport sizes, padding, and margins must be non-negative.
 `panByScreenDelta` accepts the semantic `{x,y}` CSS-pixel record and temporarily retains the legacy
-numeric `(dx,dy)` call shape for Phase 1.5 migration.
+numeric `(dx,dy)` call shape only at the camera compatibility edge. Live/replay navigation passes
+the semantic record and uses `dollyBy` for all wheel and pinch framing changes.
 
 The audio listener is the ground focus. Its perspective-safe formula is exact:
 
@@ -168,6 +169,12 @@ edge for existing Pixi and shared consumers. Phase 1.5 migrates navigation and m
 migrates every other shared consumer and leaves raw reads only in `camera.js` and the named Pixi
 adapter. The `{x,y,zoom}` legacy restore read remains accepted at the App/camera restore edge for
 the foundations plan but is always re-emitted as `CameraSnapshotV1`.
+
+Phase 1.5 migrates live/replay wheel, pinch, touch drag, middle/Space drag, and fallback drag to
+semantic `dollyBy`/`panByScreenDelta` operations. Gesture points and deltas are viewport-local CSS
+pixels regardless of backing-store size or DPR. The minimap uses `viewportGroundPolygon()` for its
+footprint and `focusAt()` for recenter/drag; empty or malformed polygons draw nothing, and a valid
+partial polygon is never expanded into an AABB.
 
 ## 3. Renderer-neutral selection
 
@@ -388,10 +395,10 @@ shared dependencies and are not destroyed by adjusted-texture teardown.
 | --- | --- | --- |
 | `camera.js` and Pixi world transform in `renderer/index.js` | private `x/y/zoom/viewW/viewH`, orthographic transforms | Phase 1 compatibility; stays backend-private |
 | `frame_recovery.js` and spatial `audio.setListener` | raw center, zoom, viewport width | Phase 1.75 listener model |
-| navigation/camera controls/replay input | zoom read-modify-write, screen drag | Phase 1.5 semantic pan/dolly |
+| navigation/camera controls/replay input | semantic CSS-pixel pan/dolly; no raw camera read | Phase 1.5 complete |
 | `input/index.js`, `selection.js`, placement/commands/Lab tools | non-null `screenToWorld`, world rectangle | Phase 2 ground hit/proxies |
 | `input/control_groups.js` | raw visible rectangle and center | Phase 1.75 projection/fit |
-| `minimap.js` | raw rectangle and `centerOn` | Phase 1.5 ground polygon/focus |
+| `minimap.js` | semantic ground polygon and focus | Phase 1.5 complete |
 | `match.js` | bounds/resize/home focus, viewport alert AABB | Phase 1 core then Phase 1.75 shared closure |
 | App/replay carryover and `camera_view_selection.js` | legacy view objects | Phase 1.75 versioned snapshot |
 | `lab_interact_bridge.js` and Lab capture manifests | raw set/focus, world bounds, viewport tests | Phase 1.75 semantic tooling snapshot |
@@ -402,6 +409,13 @@ shared dependencies and are not destroyed by adjusted-texture teardown.
 Backend-private orthographic math is allowed only in `camera.js` and the named Pixi adapter.
 Application, UI, input, minimap, audio, Lab, replay, observer, capture, and diagnostics reads must
 be removed by Phase 1.75; Phase 2 then replaces selection's semantic assumptions.
+
+The Phase 1.5 architecture ratchet has no navigation or minimap exception. Its exact temporary
+Phase 1.75 raw-representation allowlist is `frame_recovery.js`, `frame_profiler.js`, `hud.js`,
+`input/control_groups.js`, `lab_interact_bridge.js`, `match.js`,
+`renderer/observer_map_analysis.js`, and `renderer/visual_samples.js`. `camera.js`,
+`camera_projection.js`, `renderer/index.js`, and the separately owned Pixi Map Editor viewport are
+private adapters, not shared-consumer exceptions; stale temporary entries fail the ratchet.
 
 ### 8.2 Current Pixi presentation catalog
 

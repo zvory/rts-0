@@ -112,7 +112,10 @@ export class CameraNavigationInput {
     if (this.shouldSuppressMouseEvent(ev)) return true;
     this.trackMouse(point);
     if (!this.panDrag) return false;
-    this.camera?.panByScreenDelta?.(point.x - this.panDrag.x, point.y - this.panDrag.y);
+    this.camera?.panByScreenDelta?.({
+      x: point.x - this.panDrag.x,
+      y: point.y - this.panDrag.y,
+    });
     this.panDrag.x = point.x;
     this.panDrag.y = point.y;
     ev.preventDefault?.();
@@ -133,12 +136,12 @@ export class CameraNavigationInput {
 
   handleWheel(ev) {
     if (this.shouldSuppressMouseEvent(ev)) return true;
-    if (!this.camera || typeof this.camera.setZoom !== "function") return false;
+    if (!this.camera || typeof this.camera.dollyBy !== "function") return false;
     ev.preventDefault?.();
     const point = this.screenPos(ev);
     this.trackMouse(point);
     const factor = ev.deltaY < 0 ? 1 + ZOOM_STEP : 1 / (1 + ZOOM_STEP);
-    this.camera.setZoom(this.camera.zoom * factor, point.x, point.y);
+    this.camera.dollyBy(factor, point);
     return true;
   }
 
@@ -271,7 +274,10 @@ export class CameraNavigationInput {
       this.startTouchGesture([point]);
       return;
     }
-    this.camera?.panByScreenDelta?.(point.x - this.touchGesture.x, point.y - this.touchGesture.y);
+    this.camera?.panByScreenDelta?.({
+      x: point.x - this.touchGesture.x,
+      y: point.y - this.touchGesture.y,
+    });
     this.touchGesture = { mode: "pan", x: point.x, y: point.y };
   }
 
@@ -282,18 +288,18 @@ export class CameraNavigationInput {
     }
     const center = midpoint(a, b);
     const nextDistance = distance(a, b);
-    this.camera?.panByScreenDelta?.(
-      center.x - this.touchGesture.centerX,
-      center.y - this.touchGesture.centerY,
-    );
+    this.camera?.panByScreenDelta?.({
+      x: center.x - this.touchGesture.centerX,
+      y: center.y - this.touchGesture.centerY,
+    });
     if (
       nextDistance > 0 &&
       this.touchGesture.distance > 0 &&
-      typeof this.camera?.setZoom === "function"
+      typeof this.camera?.dollyBy === "function"
     ) {
       const factor = nextDistance / this.touchGesture.distance;
       if (Number.isFinite(factor) && factor > 0) {
-        this.camera.setZoom(this.camera.zoom * factor, center.x, center.y);
+        this.camera.dollyBy(factor, center);
       }
     }
     this.touchGesture = {

@@ -1,6 +1,6 @@
 // Minimap — the bottom-left overview canvas (`#minimap`, 220×220). Draws the terrain,
-// the fog overlay, entity blips colored by owner, and the current camera viewport
-// rectangle. Left-click/drag recenters the camera; right-click issues a context-sensitive
+// the fog overlay, entity blips colored by owner, and the current camera ground
+// footprint. Left-click/drag recenters the camera; right-click issues a context-sensitive
 // order for the current own-unit selection. See docs/design/client-ui.md §4.1 (Minimap) and §4.2 (look).
 //
 // The minimap is a plain 2D canvas (not Pixi). World↔canvas conversion is a uniform
@@ -151,7 +151,7 @@ export class Minimap {
   /**
    * @param {HTMLCanvasElement} canvasEl the `#minimap` canvas.
    * @param {import("./state.js").GameState} state shared game state.
-   * @param {import("./camera.js").Camera} camera the game camera (for the viewport rect + recenter).
+   * @param {import("./camera.js").Camera} camera semantic camera (for viewport footprint + focus).
    * @param {import("./fog.js").Fog} fog the local fog overlay grids.
    * @param {{issueCommand(command: object): object|boolean}} commandIssuer gameplay command seam.
    * @param {import("./client_intent.js").ClientIntent} [options.clientIntent] browser-local command/placement intent facade.
@@ -774,18 +774,24 @@ export class Minimap {
     return players.find((p) => p.id === id) || null;
   }
 
-  /** Draw the current camera viewport as a thin rectangle. */
+  /** Draw the semantic camera ground footprint without fabricating bounds for partial views. */
   _drawViewport() {
-    const view = this._viewportWorldRect();
-    if (!view) return;
-    const tl = this._worldToCanvas(view.x, view.y);
-    const w = view.w * this._scale;
-    const h = view.h * this._scale;
+    const polygon = this._viewportGroundPolygon();
+    if (polygon.length < 2) return;
     const ctx = this.ctx;
     ctx.save();
     ctx.strokeStyle = "rgba(255,255,255,0.85)";
     ctx.lineWidth = 1;
-    ctx.strokeRect(Math.round(tl.x) + 0.5, Math.round(tl.y) + 0.5, Math.round(w), Math.round(h));
+    ctx.beginPath();
+    polygon.forEach((point, index) => {
+      const canvasPoint = this._worldToCanvas(point.x, point.y);
+      const x = Math.round(canvasPoint.x) + 0.5;
+      const y = Math.round(canvasPoint.y) + 0.5;
+      if (index === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    if (polygon.length >= 3) ctx.closePath();
+    ctx.stroke();
     ctx.restore();
   }
 
@@ -874,19 +880,16 @@ export class Minimap {
     ctx.fill();
   }
 
-  /**
-   * The camera's current viewport as a world-space rect {x,y,w,h}. The camera exposes
-   * top-left world coords (`x`,`y`) and `zoom`; the visible world size is the on-screen
-   * viewport size divided by zoom. We read the viewport size the camera was given via
-   * `setBounds` (`viewW`/`viewH`) and fall back to the live window size if absent.
-   */
-  _viewportWorldRect() {
-    const cam = this.camera;
-    if (!cam) return null;
-    const zoom = cam.zoom || 1;
-    const viewW = cam.viewW != null ? cam.viewW : window.innerWidth;
-    const viewH = cam.viewH != null ? cam.viewH : window.innerHeight;
-    return { x: cam.x || 0, y: cam.y || 0, w: viewW / zoom, h: viewH / zoom };
+  _viewportGroundPolygon() {
+    const polygon = this.camera?.viewportGroundPolygon?.();
+    if (!Array.isArray(polygon)) return [];
+    if (polygon.some((point) => !Number.isFinite(point?.x) || !Number.isFinite(point?.y))) return [];
+    return polygon;
+  }
+
+  _focusCamera(world) {
+    if (!Number.isFinite(world?.x) || !Number.isFinite(world?.y)) return;
+    this.camera?.focusAt?.({ x: world.x, y: world.y });
   }
 
   // --- Input -----------------------------------------------------------------
@@ -1036,7 +1039,7 @@ export class Minimap {
     // Armed targets wait for an unambiguous release so an inspection drag cannot fire them.
     if (!this._activePointerGesture.commandTarget) {
       this._dragging = true;
-      this.camera.centerOn(world.x, world.y);
+      this._focusCamera(world);
     }
     ev.preventDefault();
   }
@@ -1060,7 +1063,7 @@ export class Minimap {
       }
       // Default: recenter the camera (and start a drag).
       this._dragging = true;
-      this.camera.centerOn(w.x, w.y);
+      this._focusCamera(w);
       return true;
     }
     return false;
@@ -1091,7 +1094,7 @@ export class Minimap {
     if (!this._dragging) return hovering;
     const cp = this._eventToCanvas(ev);
     const w = this._canvasToWorld(cp.x, cp.y);
-    this.camera.centerOn(w.x, w.y);
+    this._focusCamera(w);
     ev.originalEvent?.preventDefault();
     return true;
   }

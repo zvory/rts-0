@@ -873,7 +873,10 @@ export class Input {
 
   _handleCameraPanMouseMoveFallback(ev, p) {
     if (!this._panDrag) return false;
-    this.camera.panByScreenDelta(p.x - this._panDrag.x, p.y - this._panDrag.y);
+    this.camera.panByScreenDelta({
+      x: p.x - this._panDrag.x,
+      y: p.y - this._panDrag.y,
+    });
     this._panDrag.x = p.x;
     this._panDrag.y = p.y;
     ev.preventDefault();

@@ -38,7 +38,7 @@ when the new shared contract is not yet implemented.
 | One Match-owned rAF/visual clock | Pixi complete | missing | required | required | P0-docs; current `frame_recovery.js` owns scheduling; Babylon assertion Phase 6.5 |
 | Exact selector and Babylon-free default loading | placeholder | missing | required | required | Current default is Babylon-free but the exact selector/preflight does not exist; Phase 6 owns evidence |
 | Semantic camera/projection and CSS-pixel contract | Pixi complete | missing | required | required | `P1-camera`; orthographic adapter implements the semantic API and immutable projection snapshot; perspective backend remains Phase 6.5 |
-| Navigation, resize, minimap footprint/recenter | Pixi complete | missing | required | required | P0-docs; semantic migration Phases 1.5/1.75 |
+| Navigation, resize, minimap footprint/recenter | Pixi complete | missing | required | required | `P1.5-navigation-minimap`; gestures use semantic CSS-pixel pan/dolly and minimap uses ground polygon/focus; remaining resize/app-shell consumers are Phase 1.75 |
 | Audio, alerts, control groups, carryover, Lab/diagnostics camera consumers | placeholder | missing | required | required | Current behavior still reads raw orthographic state; migration and ratchet Phase 1.75 |
 | Perspective-safe picking/selection/marquee | placeholder | missing | required | required | Current Pixi is orthographic-only; Phase 2 owns proxies/SelectionScene |
 | Detached least-privilege presentation frame | missing | missing | required | required | Current renderer reads mutable state/intent/fog; Phases 3/3.5 |
@@ -85,6 +85,22 @@ when the new shared contract is not yet implemented.
 - `inspected`: n/a.
 - `notes`: This completes the Pixi semantic core only. Navigation/minimap consumers migrate in
   Phase 1.5, remaining shared consumers in Phase 1.75, and Babylon perspective evidence later.
+
+### `P1.5-navigation-minimap`
+
+- `phase`: Phase 1.5.
+- `commit`: Phase 1.5 implementation commit containing this evidence.
+- `automated`: `node tests/minimap_input_contracts.mjs && node tests/client_contracts/match_replay_contracts.mjs && node scripts/check-client-architecture.mjs`.
+- `assertion`: Live/replay wheel and pinch use anchored semantic dolly; mouse, touch, middle/Space,
+  pointer-lock, and fallback drags use semantic CSS-pixel pan deltas; CSS-scaled/non-1-DPR minimap
+  input uses semantic focus; orthographic, empty, partial, and malformed semantic ground footprints
+  draw without raw camera reads or invented bounds; the remaining raw-read allowlist is exact and
+  stale-entry checked.
+- `artifact`: none.
+- `inspected`: n/a.
+- `notes`: Pixi behavior remains equivalent. Phase 1.75 owns audio, alerts/control groups,
+  app/replay carryover, profiles, Lab, observer/diagnostics, resize, and final shared-consumer ratchet
+  closure.
 
 ## Gate interpretation
 

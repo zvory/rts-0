@@ -202,6 +202,28 @@ const FORBIDDEN_GAMESTATE_INTENT_SHIMS = [
   "updateAbilityTargetPreview",
 ];
 
+// Render3D Phase 1.5 raw-camera ratchet. Orthographic representation stays private to the
+// camera/adapters; these exact shared consumers are temporary and belong to Phase 1.75.
+const PRIVATE_RAW_CAMERA_ADAPTERS = new Set([
+  "camera.js",
+  "camera_projection.js",
+  "map_editor_viewport.js",
+  "renderer/index.js",
+]);
+
+const PHASE_1_75_RAW_CAMERA_ALLOWLIST = new Map(Object.entries({
+  "frame_recovery.js": "audio listener derivation",
+  "frame_profiler.js": "camera diagnostics",
+  "hud.js": "selected-entity focus",
+  "input/control_groups.js": "control-group framing and focus",
+  "lab_interact_bridge.js": "Lab camera manifests, focus, and viewport queries",
+  "match.js": "bounds/resize/home focus, alerts, and app/replay carryover",
+  "renderer/observer_map_analysis.js": "observer projected label sizing",
+  "renderer/visual_samples.js": "Lab visual-sample projected label sizing",
+}));
+
+const rawCameraRepresentationRe = /\b(?:(?:this|match)\.)?(?:camera|cam)(?:\?\.|\.)(?:x|y|zoom|viewW|viewH|worldW|worldH|centerOn|setZoom|setView|setBounds)\b/g;
+
 const importRe = /\bimport\s+(?:[\s\S]*?\s+from\s+)?["']([^"']+)["']/g;
 const prototypeGraftRe = /\bObject\.assign\s*\(\s*([A-Za-z_$][\w$]*)\.prototype\s*,/g;
 
@@ -229,6 +251,7 @@ for (const file of files) {
   });
   checkLargeFileBaseline(file, source);
   checkForbiddenGameStateIntentShims(file, source);
+  checkRawCameraRepresentation(file, source);
   checkRoomCapabilityParser(file, source);
   checkRigOnlyUnitVisuals(file, source);
 }
@@ -329,6 +352,21 @@ function checkForbiddenGameStateIntentShims(file, source) {
       failures.push(`${file}: forbidden GameState intent shim reference ${name}; use injected ClientIntent or a narrow view model`);
     }
   }
+}
+
+function checkRawCameraRepresentation(file, source) {
+  const references = [...source.matchAll(rawCameraRepresentationRe)].map((match) => match[0]);
+  const temporaryReason = PHASE_1_75_RAW_CAMERA_ALLOWLIST.get(file);
+  if (references.length === 0) {
+    if (temporaryReason) {
+      failures.push(`${file}: stale Phase 1.75 raw-camera allowlist entry (${temporaryReason})`);
+    }
+    return;
+  }
+  if (PRIVATE_RAW_CAMERA_ADAPTERS.has(file) || temporaryReason) return;
+  failures.push(
+    `${file}: raw camera representation ${[...new Set(references)].join(", ")}; use semantic camera operations or add the exact owning phase consumer`,
+  );
 }
 
 function checkRoomCapabilityParser(file, source) {

@@ -1104,10 +1104,13 @@ Live `Input` composes `CameraNavigationInput` for camera gestures, then layers p
 selection, placement, command-card targeting, command hotkeys, minimap routing, and gameplay command
 issuance on top. Replay viewers use the same helper through `ReplayCameraInput`, with replay WASD
 pan-key aliases and no gameplay command issuer API. Replay middle-drag and Space+left-drag pan
-through `Camera.panByScreenDelta`; touch drag/pinch pan and zoom the camera without emitting
-gameplay commands. Mouse-wheel zoom, keyboard pan state, edge scroll state, and blur release are
-shared observer navigation behavior. Live spectators still use the live `Input` path so read-only
-selection inspection remains available while command emission stays gated by local-owner checks.
+through semantic `Camera.panByScreenDelta({x,y})`; touch drag/pinch pan and dolly without emitting
+gameplay commands. Wheel/pinch anchors and every drag delta are viewport-local CSS pixels, including
+under non-1 DPR. Mouse-wheel dolly, keyboard pan state, edge scroll state, and blur release are shared
+observer navigation behavior. The minimap draws `Camera.viewportGroundPolygon()` and recenters with
+`Camera.focusAt()`, so perspective ground footprints may be partial or empty without invented bounds.
+Live spectators still use the live `Input` path so read-only selection inspection remains available
+while command emission stays gated by local-owner checks.
 
 Shift-right-click appends queued orders only for selected units: move, attack-move, attack,
 gather, build/resume, Tank Trap deconstruct, and placement build commands set `queued: true` and

@@ -135,7 +135,7 @@ export function _handleWheel(ev) {
   ev.preventDefault();
   const p = this._screenPos(ev);
   const factor = ev.deltaY < 0 ? 1 + ZOOM_STEP : 1 / (1 + ZOOM_STEP);
-  this.camera.setZoom(this.camera.zoom * factor, p.x, p.y);
+  this.camera?.dollyBy?.(factor, p);
 }
 
 function setPanKey(keys, code, down) {

@@ -232,15 +232,13 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
       },
     };
     const camera = {
-      zoom: 1,
       calls: [],
       pans: [],
-      setZoom(zoom, x, y) {
-        this.calls.push({ zoom, x, y });
-        this.zoom = zoom;
+      dollyBy(factor, anchor) {
+        this.calls.push({ factor, anchor });
       },
-      panByScreenDelta(dx, dy) {
-        this.pans.push({ dx, dy });
+      panByScreenDelta(delta) {
+        this.pans.push({ dx: delta.x, dy: delta.y });
       },
     };
     globalThis.window = {
@@ -263,8 +261,11 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
           prevented += 1;
         },
       });
-      assertApprox(camera.zoom, 1.12, 0.000001, "Replay mouse wheel zooms in");
-      assert(camera.calls[0].x === 200 && camera.calls[0].y === 150, "Replay wheel zoom anchors on cursor");
+      assertApprox(camera.calls[0].factor, 1.12, 0.000001, "Replay mouse wheel dollies in");
+      assert(
+        camera.calls[0].anchor.x === 200 && camera.calls[0].anchor.y === 150,
+        "Replay wheel dolly anchors on cursor-local CSS pixels",
+      );
       listeners.get("wheel")({
         deltaY: 100,
         clientX: 220,
@@ -273,8 +274,8 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
           prevented += 1;
         },
       });
-      assertApprox(camera.zoom, 1, 0.000001, "Replay mouse wheel zooms out");
-      assert(prevented === 2, "Replay wheel zoom prevents page scroll");
+      assertApprox(camera.calls[1].factor, 1 / 1.12, 0.000001, "Replay mouse wheel dollies out");
+      assert(prevented === 2, "Replay wheel dolly prevents page scroll");
       let dragPrevented = 0;
       listeners.get("mousedown")({
         button: 1,
@@ -353,7 +354,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
         if (listeners.get(`window:${type}`) === handler) listeners.delete(`window:${type}`);
       },
     };
-    const helper = new CameraNavigationInput(viewport, { zoom: 1 }, {
+    const helper = new CameraNavigationInput(viewport, {}, {
       installListeners: true,
       windowRef,
       panKeyCodes: CameraNavigationInput.replayPanKeyCodes(),
