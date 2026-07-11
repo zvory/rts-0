@@ -156,7 +156,7 @@ export class MapEditorViewport {
     }
     const locations = this.session.mapOverlay();
     for (const start of locations?.starts || []) this.drawSite(start, 0x4ec9ff, 11, `S${start.index + 1}`);
-    for (const base of locations?.bases || []) this.drawSite(base, 0xf4c542, 7, `B${base.index + 1}`);
+    for (const [index, base] of (locations?.bases || []).entries()) this.drawSite(base, 0xf4c542, 7, `B${index + 1}`);
     this.drawPaintPreview();
   }
 

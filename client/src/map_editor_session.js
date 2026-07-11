@@ -88,11 +88,15 @@ export class MapEditorSession {
   initializeBlank({ size = 126, playerCount = 2, name = "Untitled map" } = {}) {
     const mapSize = Math.max(16, Math.min(126, Math.trunc(Number(size)) || 126));
     const count = Math.max(1, Math.min(MAP_EDITOR_MAX_START_LOCATIONS, Math.trunc(Number(playerCount)) || 2));
+    const startTile = (fraction) => Math.max(
+      MAP_EDITOR_MAIN_CLEARANCE_TILES,
+      Math.min(mapSize - MAP_EDITOR_MAIN_CLEARANCE_TILES - 1, Math.floor(mapSize * fraction)),
+    );
     const starts = [
-      { x: Math.floor(mapSize * 0.25), y: Math.floor(mapSize * 0.25) },
-      { x: Math.floor(mapSize * 0.75), y: Math.floor(mapSize * 0.75) },
-      { x: Math.floor(mapSize * 0.75), y: Math.floor(mapSize * 0.25) },
-      { x: Math.floor(mapSize * 0.25), y: Math.floor(mapSize * 0.75) },
+      { x: startTile(0.25), y: startTile(0.25) },
+      { x: startTile(0.75), y: startTile(0.75) },
+      { x: startTile(0.75), y: startTile(0.25) },
+      { x: startTile(0.25), y: startTile(0.75) },
     ].slice(0, count);
     this.draft = authoredMapFromMaterialized({
       name,
@@ -268,7 +272,7 @@ export class MapEditorSession {
     if (!this.storage?.getItem) return false;
     let parsed;
     try {
-      const text = this.storage.getItem(storageKey(key));
+      const text = this.storage.getItem(storageKey(key)) || this.storage.getItem(legacyStorageKey(key));
       if (!text) return false;
       parsed = JSON.parse(text);
       if (parsed?.draft) parsed = parsed.draft;
@@ -576,4 +580,5 @@ function positiveInteger(value) { const number = Math.trunc(Number(value)); retu
 function clampTile(value, size) { return Math.max(0, Math.min(size - 1, Math.trunc(value))); }
 function draftEditError(error) { return { ok: false, error }; }
 function storageKey(key) { return `rts.map-editor.v3.${String(key || "default")}`; }
+function legacyStorageKey(key) { return `rts.mapEditor.${String(key || "default")}.v2`; }
 function defaultStorage() { try { return globalThis.localStorage || null; } catch { return null; } }

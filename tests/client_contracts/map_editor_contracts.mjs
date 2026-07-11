@@ -47,7 +47,7 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
   assert.deepEqual(
     session.mapOverlay().bases.map((site) => site.index),
     [4, 5, 6, 7],
-    "neutral base marker labels retain their authored base indices",
+    "neutral base controls retain their backing authored base indices",
   );
 }
 
@@ -79,6 +79,30 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
 }
 
 {
+  const legacyWorkspace = {
+    version: 2,
+    name: "Saved legacy map",
+    terrain: Array.from({ length: 32 }, () => ".".repeat(32)),
+    sites: [
+      { id: "main", kind: "main", x: 8, y: 8 },
+      { id: "natural", kind: "natural", x: 22, y: 22 },
+    ],
+    layouts: [{ id: "one", playerCount: 1, slots: [{ main: "main", naturals: ["natural"] }] }],
+  };
+  const values = new Map([
+    ["rts.mapEditor.legacy-workspace.v2", JSON.stringify({ schemaVersion: 2, draft: legacyWorkspace })],
+  ]);
+  const storage = {
+    getItem(key) { return values.get(key) || null; },
+    setItem(key, value) { values.set(key, value); },
+  };
+  const session = new MapEditorSession({ storage });
+  assert.equal(session.loadLocal("legacy-workspace"), true, "v3 sessions recover saved v2 workspaces");
+  assert.equal(session.exportMap().version, 3);
+  assert.equal(session.materialized().baseSites.length, 2);
+}
+
+{
   const session = new MapEditorSession({ storage: null });
   session.initializeBlank({ size: 32, playerCount: 2 });
   session.beginTerrainStroke();
@@ -90,7 +114,17 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
 }
 
 {
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 16, playerCount: 4 });
+  for (const start of session.draft.startLocations) {
+    assert(start.x >= MAP_EDITOR_MAIN_CLEARANCE_TILES && start.x < 16 - MAP_EDITOR_MAIN_CLEARANCE_TILES);
+    assert(start.y >= MAP_EDITOR_MAIN_CLEARANCE_TILES && start.y < 16 - MAP_EDITOR_MAIN_CLEARANCE_TILES);
+  }
+}
+
+{
   assert.deepEqual(symmetricMapTiles(8, [{ x: 1, y: 2 }], MAP_EDITOR_SYMMETRY.HORIZONTAL), [{ x: 1, y: 2 }, { x: 1, y: 5 }]);
+  assert.deepEqual(symmetricMapTiles(8, [{ x: 1, y: 2 }], MAP_EDITOR_SYMMETRY.HALF_TURN), [{ x: 1, y: 2 }, { x: 6, y: 5 }]);
   assert.deepEqual(symmetricMapTiles(8, [{ x: 1, y: 2 }], MAP_EDITOR_SYMMETRY.RADIAL), [{ x: 1, y: 2 }, { x: 5, y: 1 }, { x: 6, y: 5 }, { x: 2, y: 6 }]);
   assert.deepEqual(mapEditorSymmetryGuideLines(8, MAP_EDITOR_SYMMETRY.RADIAL), [
     { x0: 0, y0: 128, x1: 256, y1: 128 }, { x0: 128, y0: 0, x1: 128, y1: 256 },
@@ -118,6 +152,20 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
     result = removeDraftLocation(draft, { kind: "base", locationIndex: 0 });
   }), false);
   assert.match(result.error, /Remove the matching start/);
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 126, playerCount: 2 });
+  let result;
+  assert.equal(session.mutate("Moved half-turn starts", (draft) => {
+    result = moveSymmetricDraftLocation(draft, {
+      kind: "start", locationIndex: 0, tile: { x: 40, y: 46 }, symmetry: MAP_EDITOR_SYMMETRY.HALF_TURN,
+    });
+  }), true);
+  assert.equal(result.count, 2, "half-turn moves the opposing start and its matching base site");
+  assert.deepEqual(session.draft.startLocations, [{ x: 40, y: 46 }, { x: 85, y: 79 }]);
+  assert.deepEqual(session.draft.baseSites, session.draft.startLocations);
 }
 
 {

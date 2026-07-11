@@ -93,6 +93,7 @@ src/
   frame_recovery.js # Frame-loop soft-failure logging and rescheduling diagnostics
   visual_clock.js # Render-only normal/capture clocks; never used for networking, health, input, or timeouts
   frame_entity_views.js # One-RAF entity view builder shared by render, fog, HUD, minimap, analysis
+  presentation/    # Frozen semantic layers, opaque GridSnapshot accessors, static map, and frame assembly
   replay_controls.js # Capability-driven RoomTimeControls plus replay-only vision/branch controls
   room_time_panel.js # Floating, draggable chrome around shared room-time controls
   room_capabilities.js # Client-side room capability parser for controls/diagnostics affordances
@@ -446,7 +447,7 @@ entity pools, minimap blips, local fog sources, or game state.
 
 `frame_entity_views.js`
 ```js
-buildFrameEntityViews(state, { alpha }) // frame-local interpolated/current/authoritative/selected entity arrays
+buildFrameEntityViews(state, { alpha }) // frozen SharedFrameContextV1 outer record with frame-local entity arrays
 ```
 `frame_recovery.js` builds this object once per requestAnimationFrame after prediction display has
 advanced and before fog, renderer, HUD, minimap, and observer analysis run. The object is not
@@ -723,10 +724,11 @@ locations, and provides undo/redo, local save/load, and JSON export. Start locat
 capacity; every base location is permanent and its resources spawn even when no player starts there.
 There is no active layout, player slot, or per-player natural assignment. The viewport draws blue start
 markers and neutral base markers over the shared Pixi terrain and owns editor-only pan/zoom/paint/site input. Terrain tools support brush
-and inclusive drag-box fills, plus none, horizontal, vertical, four-way radial, or either single-diagonal
-symmetry; grass is the erase material. Symmetry expands every terrain tile before it is painted, and
-moves/adds only the already matching flat locations. The viewport draws the selected centre axis, a centre marker for
-half-turn symmetry, a cross for radial symmetry, or the selected diagonal. A terrain pointer stroke clones once for undo,
+and inclusive drag-box fills, plus none, horizontal, vertical, half-turn, four-way radial, or either
+single-diagonal symmetry; grass is the erase material. Symmetry expands every terrain tile before it is
+painted, moves matching flat locations, and adds all symmetric locations. The viewport draws the selected
+centre axis, a centre marker for half-turn symmetry, a cross for radial symmetry, or the selected diagonal.
+A terrain pointer stroke clones once for undo,
 mutates rows in place, records dirty tiles, and commits once. The renderer patches those tiles plus their
 edge-sharing neighbours into the existing canvas texture and calls
 `baseTexture.update()`; it does not recreate the canvas, fingerprint/serialize the map, or replace a Pixi
