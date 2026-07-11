@@ -699,9 +699,12 @@ entity, resource, order, timeline, or replay state crosses that boundary.
 `MapEditorApp` owns the dedicated editor. The panel loads bundled JSON from `/maps/catalog` and
 `/maps/<file>`, creates the fixed-size blank map, edits name/description/layouts/player starts/naturals,
 and provides undo/redo, local save/load, and JSON export. The viewport draws player-owned base markers
-over the shared Pixi terrain and owns editor-only pan/zoom/paint/site input. A terrain pointer stroke
-clones once for undo, mutates rows in place, records dirty tiles, and commits once. The renderer patches
-those tiles plus their edge-sharing neighbours into the existing canvas texture and calls
+over the shared Pixi terrain and owns editor-only pan/zoom/paint/site input. Terrain tools support brush
+and inclusive drag-box fills, plus none, horizontal, vertical, radial, or both-diagonal symmetry; grass
+is the erase material. Symmetry expands every terrain tile before it is painted, and moves/adds only the
+already matching start/natural bases in the active layout. A terrain pointer stroke clones once for undo,
+mutates rows in place, records dirty tiles, and commits once. The renderer patches those tiles plus their
+edge-sharing neighbours into the existing canvas texture and calls
 `baseTexture.update()`; it does not recreate the canvas, fingerprint/serialize the map, or replace a Pixi
 texture per tile.
 

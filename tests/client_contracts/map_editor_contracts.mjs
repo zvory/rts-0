@@ -6,14 +6,19 @@ import { createMapHandoff, consumeMapHandoff } from "../../client/src/map_editor
 import { mapEditorLaunchConfig } from "../../client/src/map_editor_launch.js";
 import {
   addDraftPlayerNatural,
+  addSymmetricDraftNaturals,
+  mapEditorRectTiles,
   MAP_EDITOR_MAIN_CLEARANCE_TILES,
   MAP_EDITOR_NATURAL_CLEARANCE_TILES,
+  MAP_EDITOR_SYMMETRY,
   MapEditorSession,
+  moveSymmetricDraftBase,
   authoredMapFromMaterialized,
   materializedMapsEqual,
   moveDraftPlayerNatural,
   moveDraftPlayerStart,
   removeDraftPlayerNatural,
+  symmetricMapTiles,
 } from "../../client/src/map_editor_session.js";
 
 const repoRoot = new URL("../../", import.meta.url);
@@ -87,6 +92,85 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
   session.undo();
   assert.equal(session.materialized().terrain[0], TERRAIN.GRASS);
   unsubscribe();
+}
+
+{
+  assert.deepEqual(
+    symmetricMapTiles(8, [{ x: 1, y: 2 }], MAP_EDITOR_SYMMETRY.HORIZONTAL),
+    [{ x: 1, y: 2 }, { x: 1, y: 5 }],
+    "horizontal symmetry reflects across the map's horizontal centre line",
+  );
+  assert.deepEqual(
+    symmetricMapTiles(8, [{ x: 1, y: 2 }], MAP_EDITOR_SYMMETRY.VERTICAL),
+    [{ x: 1, y: 2 }, { x: 6, y: 2 }],
+    "vertical symmetry reflects across the map's vertical centre line",
+  );
+  assert.deepEqual(
+    symmetricMapTiles(8, [{ x: 1, y: 2 }], MAP_EDITOR_SYMMETRY.RADIAL),
+    [{ x: 1, y: 2 }, { x: 6, y: 5 }],
+    "radial symmetry rotates through 180 degrees",
+  );
+  assert.deepEqual(
+    symmetricMapTiles(8, [{ x: 1, y: 2 }], MAP_EDITOR_SYMMETRY.DIAGONAL),
+    [{ x: 1, y: 2 }, { x: 2, y: 1 }, { x: 5, y: 6 }, { x: 6, y: 5 }],
+    "diagonal symmetry mirrors through both map diagonals",
+  );
+  assert.deepEqual(
+    mapEditorRectTiles({ x: 1, y: 1 }, { x: 2, y: 3 }, 8),
+    [
+      { x: 1, y: 1 }, { x: 2, y: 1 },
+      { x: 1, y: 2 }, { x: 2, y: 2 },
+      { x: 1, y: 3 }, { x: 2, y: 3 },
+    ],
+    "box painting expands an inclusive drag rectangle",
+  );
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 126, playerCount: 2 });
+  const layoutId = session.selectedLayoutId;
+  let result = null;
+  assert.equal(session.mutate("Moved radial starts", (draft) => {
+    result = moveSymmetricDraftBase(draft, {
+      kind: "main",
+      playerIndex: 0,
+      tile: { x: 40, y: 46 },
+      layoutId,
+      symmetry: MAP_EDITOR_SYMMETRY.RADIAL,
+    });
+  }), true);
+  assert.equal(result.count, 2, "a matched opposing start moves with its selected counterpart");
+  assert.deepEqual(session.playerSlots().map((player) => player.start && ({ x: player.start.x, y: player.start.y })), [
+    { x: 40, y: 46 },
+    { x: 85, y: 79 },
+  ]);
+
+  assert.equal(session.mutate("Added radial naturals", (draft) => {
+    result = addSymmetricDraftNaturals(draft, {
+      playerIndex: 0,
+      tile: { x: 47, y: 43 },
+      layoutId,
+      symmetry: MAP_EDITOR_SYMMETRY.RADIAL,
+    });
+  }), true);
+  assert.equal(result.count, 2, "adding a natural follows the selected player-start symmetry");
+  const firstNatural = session.playerSlots()[0].naturals[0];
+  assert.equal(session.mutate("Moved radial naturals", (draft) => {
+    result = moveSymmetricDraftBase(draft, {
+      kind: "natural",
+      playerIndex: 0,
+      naturalId: firstNatural.id,
+      tile: { x: 49, y: 45 },
+      layoutId,
+      symmetry: MAP_EDITOR_SYMMETRY.RADIAL,
+    });
+  }), true);
+  assert.equal(result.count, 2, "moving a natural also moves its matched counterpart");
+  assert.deepEqual(session.playerSlots().map((player) => player.naturals[0] && ({ x: player.naturals[0].x, y: player.naturals[0].y })), [
+    { x: 49, y: 45 },
+    { x: 76, y: 80 },
+  ]);
 }
 
 {
