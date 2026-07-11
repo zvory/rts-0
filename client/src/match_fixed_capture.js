@@ -12,7 +12,8 @@ export function enterFixedCapture(match) {
   match.rafId = undefined;
   match.captureClock = new CaptureRenderClock(match.renderClock.now());
   match.renderClock = match.captureClock;
-  match.renderer.setRenderClock(match.captureClock);
+  match.state.setRenderClock(match.captureClock);
+  match.renderer.enterFixedCapture(match.captureClock);
   match.lastFrame = match.captureClock.now();
   return { visualStartMs: match.captureClock.now() };
 }
@@ -21,14 +22,16 @@ export function renderFixedCaptureFrame(match, visualTimeMs) {
   if (!match.captureClock) throw new Error("Fixed capture is not active.");
   match.captureClock.advanceTo(visualTimeMs);
   runMatchCaptureFrame(match, visualTimeMs);
+  match.renderer.presentFixedCaptureFrame();
   return { visualTimeMs, tick: match.state.tick, rendererFrame: match.renderer._renderFrameCount };
 }
 
 export function exitFixedCapture(match) {
   if (!match.captureClock) return { resumed: false };
   const resumed = match.captureRafWasRunning && match.running;
-  match.renderClock = new RenderClock();
-  match.renderer.setRenderClock(match.renderClock);
+  match.renderClock = new RenderClock(match.captureClock.now());
+  match.state.setRenderClock(match.renderClock);
+  match.renderer.exitFixedCapture(match.renderClock);
   match.captureClock = null;
   match.lastFrame = match.renderClock.now();
   match.captureRafWasRunning = false;

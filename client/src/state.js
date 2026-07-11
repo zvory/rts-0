@@ -48,8 +48,9 @@ export class GameState extends VisualEffectBackedState {
   /**
    * @param {object} startInfo the §2.3 `start` payload.
    */
-  constructor(startInfo) {
+  constructor(startInfo, { renderClock = null } = {}) {
     super();
+    this.renderClock = renderClock;
     /** @type {number} our player id (repeat of welcome, for convenience). */
     this.playerId = startInfo.playerId;
     /** @type {boolean} true when this client is observing instead of playing. */
@@ -258,7 +259,7 @@ export class GameState extends VisualEffectBackedState {
    * events and the id->entity index are refreshed from the latest snapshot.
    * @param {object} msg a §2.4 snapshot payload.
    */
-  applySnapshot(msg, visualNow = performance.now()) {
+  applySnapshot(msg, visualNow = this.visualNow()) {
     // Snapshots can arrive batched in a single event-loop turn (a throttled or
     // backgrounded tab drains its socket buffer at once) and performance.now()
     // is clamped to a coarse resolution, so two consecutive snapshots could
@@ -266,7 +267,7 @@ export class GameState extends VisualEffectBackedState {
     // so the interpolation window (curr - prev) is always positive and never
     // collapses to a degenerate, alpha-pinned-to-1 span. Real time reasserts
     // itself via Math.max as soon as performance.now() passes the floor.
-    const now = Math.max(visualNow, this._curRecvTime + 1);
+    const receivedAt = Math.max(performance.now(), this._curRecvTime + 1);
 
     this._prev = this._cur;
     this._prevRecvTime = this._curRecvTime;
@@ -276,15 +277,15 @@ export class GameState extends VisualEffectBackedState {
     this._applyResourceDeltas(msg.resourceDeltas || []);
     this._applyResourceDeaths(events);
     const wireEntities = (msg.entities || []).filter((e) => !isResource(e.kind));
-    this.visualEffects.applyAttackReveals(events, now);
+    this.visualEffects.applyAttackReveals(events, visualNow);
     const visibleIds = new Set(wireEntities.map((e) => e.id));
     const entities = wireEntities
       .concat(this._resourceEntityViews())
-      .concat(this.visualEffects.shotRevealEntityViews(now, visibleIds));
-    this.progressExtrapolator.updateFromSnapshot(entities, now);
+      .concat(this.visualEffects.shotRevealEntityViews(visualNow, visibleIds));
+    this.progressExtrapolator.updateFromSnapshot(entities, visualNow);
 
     this._cur = { ...msg, entities };
-    this._curRecvTime = now;
+    this._curRecvTime = receivedAt;
     this._curById = new Map();
     for (const e of entities) this._curById.set(e.id, e);
     this.visualEffects.pruneRecoilForSnapshot(this._curById);
@@ -317,7 +318,7 @@ export class GameState extends VisualEffectBackedState {
     this._pruneSelection();
     this._pruneControlGroups();
 
-    this.visualEffects.applySnapshotEvents(this.events, now, (id) => this.entityById(id));
+    this.visualEffects.applySnapshotEvents(this.events, visualNow, (id) => this.entityById(id));
   }
 
   consumePendingGroundDecals() {
@@ -335,7 +336,7 @@ export class GameState extends VisualEffectBackedState {
   entitiesInterpolated(alpha, { includePrediction = true } = {}) {
     if (!this._cur) return [];
     const t = alpha < 0 ? 0 : alpha > 1 ? 1 : alpha;
-    const now = performance.now();
+    const now = this.visualNow();
     const out = [];
     for (const e of this._cur.entities || []) {
       const prior = this._prevById.get(e.id);
@@ -369,7 +370,7 @@ export class GameState extends VisualEffectBackedState {
    */
   entityById(id) {
     const entity = this.predictedById.get(id) || this._curById.get(id);
-    return entity ? this._applyDisplayEntity({ ...entity }, performance.now()) : entity;
+    return entity ? this._applyDisplayEntity({ ...entity }, this.visualNow()) : entity;
   }
 
   progressPredictionDebug() {
@@ -430,7 +431,7 @@ export class GameState extends VisualEffectBackedState {
       if (entity?.owner !== this.playerId || !isUnit(entity.kind)) continue;
       predicted.set(entity.id, { ...entity, predicted: true });
     }
-    const now = performance.now();
+    const now = this.visualNow();
     const corrections = new Map();
     if (smoothCorrections) {
       for (const [id, next] of predicted) {
@@ -488,6 +489,15 @@ export class GameState extends VisualEffectBackedState {
     return this._applyOptimisticEntity(this.progressExtrapolator.apply(entity, now));
   }
 
+  setRenderClock(renderClock) {
+    if (!renderClock || typeof renderClock.now !== "function") throw new TypeError("GameState requires a render clock.");
+    this.renderClock = renderClock;
+  }
+
+  visualNow() {
+    return this.renderClock?.now?.() ?? performance.now();
+  }
+
   _applyOptimisticEntity(entity) {
     if (!entity || entity.owner !== this.playerId || !isBuilding(entity.kind)) return entity;
     const out = { ...entity };
@@ -539,7 +549,7 @@ export class GameState extends VisualEffectBackedState {
     const out = [];
     for (const id of this.selection) {
       const e = this._curById.get(id);
-      if (e && !e.shotReveal && !e.visionOnly) out.push(this._applyDisplayEntity(e, performance.now()));
+      if (e && !e.shotReveal && !e.visionOnly) out.push(this._applyDisplayEntity(e, this.visualNow()));
     }
     return out;
   }

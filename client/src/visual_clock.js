@@ -1,8 +1,14 @@
 // Render-only time. Network, health, input, and timeout clocks deliberately do not use this seam.
 
 export class RenderClock {
+  constructor(resumeAtMs = null) {
+    this.resumeAtMs = Number.isFinite(resumeAtMs) ? resumeAtMs : null;
+    this.resumePerformanceMs = this.resumeAtMs == null ? null : performance.now();
+  }
+
   now() {
-    return performance.now();
+    const now = performance.now();
+    return this.resumeAtMs == null ? now : this.resumeAtMs + (now - this.resumePerformanceMs);
   }
 }
 

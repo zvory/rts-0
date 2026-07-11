@@ -395,6 +395,7 @@ export class LabInteractDriver {
         captureEntered = true;
         const startTick = status.snapshotTick;
         let currentTick = startTick;
+        let sequenceBytes = 0;
         const frames = [];
         for (let index = 0; index < frameCount; index += 1) {
           if (this.fixedCapture?.cancelled) throw new LabInteractDriverError("captureCancelled", "Fixed capture was cancelled and its partial artifacts were removed.");
@@ -408,7 +409,12 @@ export class LabInteractDriver {
           const visualTimeMs = entered.visualStartMs + index * (1000 / fps);
           const rendered = await this.callBridge("captureFixedFrame", { visualTimeMs });
           const framePath = path.join(framesDir, `frame-${String(index).padStart(4, "0")}.png`);
-          await this.page.screenshot({ type: "png", clip, path: framePath });
+          const screenshot = Buffer.from(await this.page.screenshot({ type: "png", clip, path: framePath }) || []);
+          if (screenshot.length === 0) throw new LabInteractDriverError("captureEmpty", "Chrome returned an empty fixed-capture frame.");
+          sequenceBytes += screenshot.length;
+          if (screenshot.length > FIXED_CAPTURE_LIMITS.maxFrameBytes || sequenceBytes > FIXED_CAPTURE_LIMITS.maxSequenceBytes) {
+            throw new LabInteractDriverError("captureTooLarge", "Fixed-capture PNG sequence exceeded its bounded disk budget.");
+          }
           frames.push({ index, tick, visualTimeMs, rendererFrame: rendered.rendererFrame, path: framePath, sha256: hashFrame(framePath) });
         }
         const videoPath = path.join(captureDir, `${artifactName}.webm`);
@@ -423,7 +429,7 @@ export class LabInteractDriver {
           scene: { identity: sceneIdentity || { source: "launch", scenario: this.options.scenario, seed: this.options.seed || null, map: this.options.map }, revision: sceneRevision, aliases: aliases.slice(0, 100) },
           mapping: { simulationHz: 30, outputFps: fps, rule: "frame i uses startTick + floor(i * 30 / outputFps); repeated ticks do not interpolate world state" },
           authoritative: { startTick, endTick: endStatus.snapshotTick },
-          capture: { frameCount, clip, viewport: normalizedViewport, visualStartMs: entered.visualStartMs },
+          capture: { frameCount, clip, viewport: normalizedViewport, visualStartMs: entered.visualStartMs, sequenceBytes },
           frames, media: { videoPath, contactSheetPath, bytes: media.bytes, tools: media.tools, probe: media.probe, contactSheet: media.contactSheet },
           runtime: { node: process.version, platform: process.platform, architecture: process.arch, browser: this.browserVersion || null },
           errors: { pageConsole: diagnostics.pageConsoleErrors, page: diagnostics.pageErrors, requestFailures: diagnostics.requestFailures },

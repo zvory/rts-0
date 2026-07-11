@@ -12,6 +12,7 @@ import { openLabInteractDriver } from "./fixtures/lab_interact_fake_driver.mjs";
 const sessionId = `lab_${"a".repeat(32)}`;
 assert.throws(() => validateCommandInput("capture-fixed", { sessionId, fps: 61 }), (error) => error?.code === "invalidInput");
 assert.throws(() => validateCommandInput("capture-fixed", { sessionId, frameCount: FIXED_CAPTURE_LIMITS.maxFrames + 1 }), (error) => error?.code === "invalidInput");
+assert.ok(FIXED_CAPTURE_LIMITS.maxSequenceBytes >= FIXED_CAPTURE_LIMITS.maxFrameBytes, "fixed PNG sequences have explicit per-frame and aggregate disk bounds");
 assert.deepEqual([0, 1, 2, 3].map((index) => fixedFrameTick(9, index, 60)), [9, 9, 10, 10]);
 
 const service = new LabInteractService({ workspaceRoot: process.cwd(), driverFactory: openLabInteractDriver });

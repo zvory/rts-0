@@ -5,7 +5,14 @@ import { spawnSync } from "node:child_process";
 
 import { checkMediaCapabilities, LabInteractRecordingError } from "./recording.mjs";
 
-export const FIXED_CAPTURE_LIMITS = Object.freeze({ minFps: 10, maxFps: 60, maxFrames: 180, maxBytes: 64 * 1024 * 1024 });
+export const FIXED_CAPTURE_LIMITS = Object.freeze({
+  minFps: 10,
+  maxFps: 60,
+  maxFrames: 180,
+  maxFrameBytes: 16 * 1024 * 1024,
+  maxSequenceBytes: 256 * 1024 * 1024,
+  maxBytes: 64 * 1024 * 1024,
+});
 
 export function fixedFrameTick(startTick, frameIndex, fps) {
   return startTick + Math.floor(frameIndex * 30 / fps);

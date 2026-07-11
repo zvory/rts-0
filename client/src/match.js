@@ -197,7 +197,7 @@ export class Match {
     this.onDesktopCursorAutoLockSignal = this.handleDesktopCursorAutoLockSignal.bind(this);
 
     // --- Build the module graph. ---
-    this.state = this._timeInit("match.state", () => new GameState(payload));
+    this.state = this._timeInit("match.state", () => new GameState(payload, { renderClock: this.renderClock }));
     applyInitialUnitRanges(this.state, options.unitRangesEnabled);
     this.state.controlPolicy = this.labControlPolicy;
     this.combatAudio = this._timeInit(
@@ -294,7 +294,7 @@ export class Match {
       recordSnapshotProcessing(
         this.snapshotProcessingReport,
         () => this.prediction.applyAuthoritativeSnapshot(m),
-        () => this.state.applySnapshot(m, this.renderClock.now()),
+        () => this.state.applySnapshot(m),
         () => {
           notePredictionAuthoritativeSnapshot(this);
           this.applyPredictionDisplayOverlay(this.prediction.predictionDisplayOverlay());

@@ -153,7 +153,7 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   // Visual Experimentation Phase 1 injects local lab visual profile state for renderer-only samples.
   // Lab Interact Phase 6 adds only the public fixed-capture lifecycle seam; its state machine lives
   // in match_fixed_capture.js so Match retains renderer/rAF ownership without absorbing the logic.
-  "match.js": 48050,
+  "match.js": 48061,
   // Artillery minimap markers add a compact visual-only firing event.
   "protocol.js": 45366,
   // Protocol cleanup split compact snapshot decoding behind protocol.js.

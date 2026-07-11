@@ -288,6 +288,23 @@ export class Renderer {
     this._renderClock = renderClock;
   }
 
+  enterFixedCapture(renderClock) {
+    this.setRenderClock(renderClock);
+    this._captureTickerWasRunning = this.app?.ticker?.started === true;
+    this.app?.ticker?.stop?.();
+  }
+
+  presentFixedCaptureFrame() {
+    this.app?.render?.();
+  }
+
+  exitFixedCapture(renderClock) {
+    this.setRenderClock(renderClock);
+    const resumeTicker = this._captureTickerWasRunning === true;
+    this._captureTickerWasRunning = false;
+    if (resumeTicker) this.app?.ticker?.start?.();
+  }
+
   visualNow() {
     return this._renderClock?.now?.() ?? performance.now();
   }
