@@ -187,6 +187,8 @@ function copyWorkflowScripts(targetRepo) {
   fs.mkdirSync(targetTests, { recursive: true });
   for (const script of [
     "agent-pr.sh",
+    "archive-completed-plans.mjs",
+    "plan-phase-status.mjs",
     "adversarial-quality-pass.mjs",
     "adversarial-quality-pass.schema.json",
     "format-touched-rust.sh",
@@ -195,6 +197,7 @@ function copyWorkflowScripts(targetRepo) {
   }
   fs.copyFileSync(path.join(repoRoot, "tests", "select-suites.mjs"), path.join(targetTests, "select-suites.mjs"));
   fs.chmodSync(path.join(targetScripts, "agent-pr.sh"), 0o755);
+  fs.chmodSync(path.join(targetScripts, "archive-completed-plans.mjs"), 0o755);
   fs.chmodSync(path.join(targetScripts, "adversarial-quality-pass.mjs"), 0o755);
   fs.chmodSync(path.join(targetScripts, "format-touched-rust.sh"), 0o755);
 }
@@ -309,6 +312,9 @@ done
   run("git", ["config", "user.name", "Quality Pass Test"], { cwd: workPath });
   copyWorkflowScripts(workPath);
   fs.writeFileSync(path.join(workPath, "README.md"), "initial\n");
+  fs.mkdirSync(path.join(workPath, "plans", "fixture"), { recursive: true });
+  fs.writeFileSync(path.join(workPath, "plans", "fixture", "plan.md"), "# Fixture plan\n");
+  fs.writeFileSync(path.join(workPath, "plans", "fixture", "phase-1.md"), "Status: Not started.\n");
   run("git", ["add", "-A"], { cwd: workPath });
   run("git", ["commit", "-m", "Initial"], { cwd: workPath });
   run("git", ["remote", "add", "origin", originPath], { cwd: workPath });
@@ -346,7 +352,8 @@ done
   run("git", ["checkout", "main"], { cwd: workPath });
   run("git", ["checkout", "-b", "zvorygin/docs-only-quality-skip"], { cwd: workPath });
   fs.appendFileSync(path.join(workPath, "README.md"), "docs-only branch change\n");
-  run("git", ["add", "README.md"], { cwd: workPath });
+  fs.writeFileSync(path.join(workPath, "plans", "fixture", "phase-1.md"), "Status: Done. Manual QA remains.\n");
+  run("git", ["add", "README.md", "plans/fixture/phase-1.md"], { cwd: workPath });
   run("git", ["commit", "-m", "Document branch"], { cwd: workPath });
 
   const docsOnlyHeadMismatch = spawnSync(
@@ -390,6 +397,9 @@ done
   const docsOnlyStatus = fs.readFileSync(docsOnlyStatusCapture, "utf8");
   assert.match(docsOnlyStatus, /statuses\//);
   assert.match(docsOnlyStatus, /description=skipped for docs-only changes/);
+  assert.equal(fs.existsSync(path.join(workPath, "plans", "fixture")), false);
+  assert.equal(fs.existsSync(path.join(workPath, "plans", "archive", "fixture", "phase-1.md")), true);
+  assert.match(run("git", ["log", "-1", "--format=%s"], { cwd: workPath }).stdout, /Archive completed plan: fixture/);
 } finally {
   fs.rmSync(tempRoot, { recursive: true, force: true });
 }

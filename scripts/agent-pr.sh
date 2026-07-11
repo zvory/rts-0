@@ -35,9 +35,9 @@ usage() {
   cat <<'EOF'
 Usage: scripts/agent-pr.sh [options]
 
-Runs the adversarial quality pass, opens or updates the PR for the current
-agent branch, writes predictable ownership metadata into the body, applies
-agent labels, and arms auto-merge.
+Archives any plan newly completed by this branch, runs the adversarial quality
+pass, opens or updates the PR for the current agent branch, writes predictable
+ownership metadata into the body, applies agent labels, and arms auto-merge.
 
 Options:
   --base BRANCH              Base branch, default: main.
@@ -196,6 +196,28 @@ post_docs_only_status() {
     -f "description=skipped for docs-only changes"
 }
 
+archive_completed_plans() {
+  if [ "$DRY_RUN" = "1" ]; then
+    if git rev-parse --verify "origin/$BASE_BRANCH" >/dev/null 2>&1; then
+      node scripts/archive-completed-plans.mjs --base "origin/$BASE_BRANCH" --dry-run
+    else
+      echo "agent-pr: would check for plans completed relative to origin/$BASE_BRANCH"
+    fi
+    return
+  fi
+
+  local status
+  status="$(git status --porcelain=v1)"
+  if [ -n "$status" ]; then
+    echo "agent-pr: completed-plan archival requires a clean worktree before starting:" >&2
+    printf '%s\n' "$status" >&2
+    exit 1
+  fi
+
+  git fetch origin "+refs/heads/$BASE_BRANCH:refs/remotes/origin/$BASE_BRANCH"
+  node scripts/archive-completed-plans.mjs --base "origin/$BASE_BRANCH" --commit
+}
+
 run_quality_pass() {
   if [ "$DRY_RUN" = "1" ]; then
     if git rev-parse --verify "origin/$BASE_BRANCH" >/dev/null 2>&1 && is_docs_only_change; then
@@ -214,7 +236,6 @@ run_quality_pass() {
     exit 1
   fi
 
-  git fetch origin "+refs/heads/$BASE_BRANCH:refs/remotes/origin/$BASE_BRANCH"
   if is_docs_only_change; then
     echo "agent-pr: skipping adversarial quality pass for docs-only branch $HEAD_BRANCH"
     write_docs_only_quality_report
@@ -240,6 +261,7 @@ run_quality_pass() {
   fi
 }
 
+archive_completed_plans
 run_quality_pass
 
 needs_human="false"
