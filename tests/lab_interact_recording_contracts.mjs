@@ -63,7 +63,7 @@ const tools = checkMediaCapabilities();
 const mediaTmp = fs.mkdtempSync(path.join(os.tmpdir(), "rts-li-recording-contract-"));
 try {
   const png = spawnSync(tools.ffmpeg, [
-    "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=navy:s=639x479",
+    "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=navy:s=639x479,format=rgb24",
     "-frames:v", "1", "-f", "image2pipe", "-c:v", "png", "pipe:1",
   ], { encoding: null, timeout: 15_000 });
   assert.equal(png.status, 0, `PNG fixture generation succeeds: ${String(png.stderr)}`);
