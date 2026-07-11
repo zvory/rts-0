@@ -13,8 +13,11 @@ The normal agent lifecycle is:
    allowing a fresh Codex CLI pass to improve or rewrite the branch, commit the final state, push
    the final head, post the `adversarial-quality-pass` status, and write the full quality-pass
    report into the PR body.
-5. Run `scripts/wait-pr.sh <pr>` and do not claim completion until it reports the PR merged and the
-   head SHA reachable from `origin/main`.
+5. Run `scripts/wait-pr.sh <pr>` and do not claim completion until it reports the PR merged, the
+   head SHA reachable from `origin/main`, and the local `main` checkout fast-forwarded with an
+   ordinary `git pull --ff-only origin main`. The final refresh also runs the existing automatic
+   merged-worktree cleanup, including when `main` was already current and Git's `post-merge` hook
+   therefore did not fire.
 
 GitHub Actions owns the full-suite merge gate through the aggregate `./tests/run-all.sh` check in
 the `Main test gate` workflow. The workflow runs split coverage jobs for server build, Rust
@@ -86,7 +89,10 @@ scripts/cleanup-worktrees.sh
 
 The installed hooks run `scripts/cleanup-worktrees.sh --auto` after commits and
 merges on local `main`. Auto mode skips cleanup from other branches and removes
-only a bounded number of stale Cargo target directories per run.
+only a bounded number of stale Cargo target directories per run. `scripts/wait-pr.sh`
+also invokes auto cleanup explicitly after refreshing the local `main` checkout so
+post-PR cleanup does not depend on whether the pull advanced `main` enough to fire
+the `post-merge` hook.
 
 ## Rollout canaries
 

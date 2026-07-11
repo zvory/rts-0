@@ -82,7 +82,9 @@ Auto cleanup removes only clean `zvorygin/*` worktrees whose branch head is reac
 `main` or `origin/main`, their matching target dirs, and a small bounded number of old target dirs
 that do not map to any active worktree. It tolerates GitHub auto-deleting merged remote branches and
 keeps dirty worktrees or unmerged heads. Use `scripts/cleanup-worktrees.sh --dry-run` to inspect
-what would be removed.
+what would be removed. `node tests/wait_pr.mjs` verifies that the PR waiter fast-forwards the real
+local `main` worktree, preserves unrelated working-tree files, invokes cleanup, and refuses a
+divergent update.
 
 We tested `sccache` as the cross-worktree Rust reuse layer and do not enable it automatically.
 It cached Rust outputs when rebuilding the same target directory path, but produced 0% Rust cache
