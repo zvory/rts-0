@@ -21,6 +21,7 @@ function assertMatches(text, pattern, message) {
 }
 
 const dockerfile = read("Dockerfile");
+const dockerignore = read(".dockerignore");
 const cargoLock = read("server/Cargo.lock");
 const mainTestWorkflow = read(".github/workflows/main-tests.yml");
 const wasmBuildScript = read("scripts/build-sim-wasm.sh");
@@ -35,6 +36,18 @@ const wasmBindgenLockVersion = cargoLock.match(
   /\[\[package\]\]\nname = "wasm-bindgen"\nversion = "([^"]+)"/,
 )?.[1];
 const wasmBindgenDockerVersion = dockerfile.match(/ARG WASM_BINDGEN_CLI_VERSION=([^\s]+)/)?.[1];
+const dockerignoreEntries = new Set(
+  dockerignore
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#")),
+);
+
+for (const localOnlyPath of [".git", ".docdrift", "desktop"]) {
+  if (!dockerignoreEntries.has(localOnlyPath)) {
+    throw new Error(`.dockerignore must exclude local-only ${localOnlyPath} from Fly build contexts`);
+  }
+}
 
 if (!wasmBindgenLockVersion) {
   throw new Error("server/Cargo.lock must include a wasm-bindgen package entry");

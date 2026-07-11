@@ -17,7 +17,7 @@ node scripts/lab-interact/cli.mjs remove '{"sessionId":"<id>","refs":["subject"]
 node scripts/lab-interact/cli.mjs inspect '{"sessionId":"<id>","refs":["subject"]}'
 node scripts/lab-interact/cli.mjs camera '{"sessionId":"<id>","camera":{"action":"focus","refs":["subject"]}}'
 node scripts/lab-interact/cli.mjs screenshot '{"sessionId":"<id>","name":"subject","presentation":"clean","subjects":["subject"]}'
-node scripts/lab-interact/cli.mjs record-start '{"sessionId":"<id>","name":"motion","maxDurationMs":10000}'
+node scripts/lab-interact/cli.mjs record-start '{"sessionId":"<id>","name":"motion","maxDurationMs":10000,"resumeSpeed":1}'
 node scripts/lab-interact/cli.mjs order '{"sessionId":"<id>","playerId":1,"command":{"c":"move","units":["subject"],"x":1100,"y":960}}'
 node scripts/lab-interact/cli.mjs record-wait '{"sessionId":"<id>"}'
 node scripts/lab-interact/cli.mjs capture-fixed '{"sessionId":"<id>","name":"motion-fixed","fps":30,"frameCount":60}'
@@ -58,6 +58,10 @@ only after a complete accepted batch. A rejection leaves the scene and aliases u
 includes `error.details.failedIndex`; placement failures additionally preserve `attempted`, typed
 `blockers`, and at most eight authoritative `suggestions`. Retrying the original batch with a
 returned suggestion therefore uses the same placement rules rather than a client-side guess.
+Successful `spawn` output is compact by default: `spawned` reports the count, whether its ordered
+sample is truncated, and at most 12 `{index,alias,id}` rows, plus the authoritative snapshot tick.
+Use `details:true` only when the caller needs every decorated entity and the raw authoritative
+outcome. This does not reduce or truncate rejection diagnostics.
 
 A cold first `open` may spend tens of seconds building the selected worktree's Rust server before
 it writes its single JSON response. Keep that CLI process attached until it exits. A concurrent
@@ -104,8 +108,10 @@ panels and game UI. Inspect the PNG once with the local image viewer.
 
 Private servers use the production 30 Hz simulation clock by default; an explicitly inherited
 `RTS_TEST_TICK_MS` remains available to tests. Successful `order` results include an authoritative
-receipt outcome `{accepted:true, playerId}`. Inspected entities keep `state` and `orderPlan` for
-explicit simulation orders, while `activity: "engaging"`, `targetId`, and `weaponFacing` expose a
+enqueue receipt outcome `{accepted:true, admission:"enqueued", playerId, queuedAtTick}`. This
+confirms validated queue admission, not a completed or non-no-op gameplay effect. Inspected entities
+keep `state` and `orderPlan` for explicit simulation orders, while `activity: "engaging"`,
+`targetId`, and `weaponFacing` expose a
 visible acquired combat target without mislabeling autonomous fire as an explicit order.
 Paused setup mutations fan out their accepted authoritative state without advancing combat. A
 paused `order` still advances one bounded tick so the queued command can be consumed; use explicit
@@ -123,6 +129,8 @@ map/tick/build metadata, and optional concise reproduction text; it never prints
 checkpoint or replay operation stream. An adjacent `.aliases.json` sidecar keeps aliases outside
 protocol schemas. Setup imports reconcile ids through the server-returned `sourceEntityIdMap`;
 replay imports restore aliases that still exist and report stale entries.
+Import responses summarize restored and stale aliases independently with counts, truncation state,
+and at most 12 rows each. `details:true` opts into every reconciliation row and the raw import result.
 
 `import` destructively replaces only the current ephemeral Lab session. Select an artifact by its
 opaque id or by a path already confined beneath this worktree's `target/lab-interact/`; URLs and
@@ -144,22 +152,27 @@ It keeps clean presentation active and crops to the game viewport, so ordinary `
 mutation, inspection, and `camera` commands can continue through the same session while recording. Inputs
 accept only a safe name, a 1–60 second maximum duration (10 seconds by default), an optional
 viewport or in-viewport crop, and scale from 0.25 through 1. A second start returns
-`recordingActive`; `status` with the current session id reports recorder state.
+`recordingActive`; `status` with the current session id reports recorder state. Optional
+`resumeSpeed` from 0.01 through 16 resumes authoritative time only after Chrome has delivered the
+initial capture frame, within the same serialized command. This avoids paused dead air between
+separate `record-start` and `time resume` calls.
 
-`record-stop` converts Chromium's temporary screencast stream into a mobile-compatible H.264 MP4
-with `yuv420p`, an `avc1` tag, and fast-start metadata; the temporary WebM is deleted. Finalization
-normalizes the MP4 to the measured wall duration at 30 FPS so sparse Chromium frame delivery does
-not produce shortened or accelerated playback. Odd dimensions are normalized to even values for
-H.264 compatibility; Chromium's temporary stream may trim or pad a single edge pixel. It extracts
+Lab Interact acknowledges raw Chrome DevTools screencast frames and streams them directly to a
+mobile-compatible H.264 MP4 with `yuv420p`, an `avc1` tag, and fast-start metadata. One timing
+authority maps cumulative monotonic wall time to 30 FPS output slots; each slot receives the newest
+raw frame. There is no intermediate WebM timeline and no second timestamp redistribution pass.
+Odd dimensions are normalized to even values for H.264 compatibility. Finalization extracts
 at most six representative PNGs,
 creates a 3×2 contact sheet, probes the media, and returns confined absolute paths plus bounded
 codec/frame diagnostics.
 The adjacent manifest records authoritative start/end ticks and room time, accepted CLI operations,
-camera/time changes, aliases, workspace/build/browser/tool versions, probe results, and estimated
-dropped or duplicated frames. Alias summary metadata records the total and `truncated` state with
-at most 40 detailed rows. Duplicated output frames preserve the real-time timeline when Chrome
-delivers fewer than 30 unique frames per second. Those counts are diagnostics, not deterministic
-evidence: Chrome composition, screencast delivery, and wall scheduling vary between runs.
+camera/time changes, aliases, workspace/build/browser/tool versions, and probe results. Frame
+diagnostics report raw screencast events, raw Chrome timestamp span and largest gap, source frames
+actually used, exact output-slot reuse, and source coverage. Coverage below 80% is marked
+`deficient` and carries a warning to use `capture-fixed`; it is never described as an estimated
+capture count. Alias summary metadata records the total and `truncated` state with at most 40
+detailed rows. These diagnostics remain nondeterministic because Chrome composition, screencast
+delivery, and wall scheduling vary between runs.
 
 `record-wait` observes the current recorder outside the session mutation queue. An active or
 finalizing recording awaits the same completion used by its watchdog and `record-stop`; an already
@@ -178,28 +191,29 @@ Recordings live under `target/lab-interact/<session-id>/recordings/`, are capped
 never printed through the CLI. The duration watchdog finalizes automatically. Session `close`,
 daemon `shutdown`, and idle teardown attempt bounded finalization and remove a partial directory if
 finalization fails; they do not leave FFmpeg owned by the session. Recording checks require
-`ffmpeg`, `ffprobe`, and both the `libvpx-vp9` and `libx264` encoders on `PATH`, or explicit
+`ffmpeg`, `ffprobe`, and the `libx264` encoder on `PATH`, or explicit
 `RTS_LAB_INTERACT_FFMPEG`/`RTS_LAB_INTERACT_FFPROBE` paths.
-Fixed-step capture only requires `libx264`; real-time recording also requires `libvpx-vp9` for
-Chromium's temporary screencast stream.
 
-Real-time recordings are silent. Puppeteer's screencast API does not expose the page's WebAudio
+Real-time recordings are silent. Chrome's screencast API does not expose the page's WebAudio
 graph, and Lab Interact does not depend on macOS system-audio routing.
 
 ## Fixed-step capture
 
 `capture-fixed` requires an open session whose authoritative room time is paused. Arrange the
-scene, issue a normal `order` if movement or direct fire is wanted, and then request 1–180 frames
-at an integer 10–60 FPS. The command temporarily suspends the ordinary rAF loop, advances room
+scene, issue a normal `order` if movement or direct fire is wanted, and then request 1–1,800 frames
+at an integer 10–60 FPS (one minute at 30 FPS). The command temporarily suspends the ordinary rAF loop, advances room
 time only through the existing 30 Hz `time step` operation, advances the client render clock to
-exact fractional milliseconds, and writes one PNG per frame plus an H.264 MP4, contact sheet, and
+exact fractional milliseconds, and streams each PNG directly into FFmpeg instead of retaining the
+full sequence. It keeps at most six representative PNGs plus an H.264 MP4, contact sheet, and
 manifest under `target/lab-interact/<session-id>/fixed/`.
 
 Frame `i` uses `startTick + floor(i * 30 / outputFps)`. Thus 60 FPS intentionally renders each
 authoritative state twice at two visual timestamps, while 15 FPS advances two ticks per frame;
 fixed capture never mixes live rAF interpolation into either case. The manifest records the
 scenario/seed, branch/head/build/runtime identity, tick and visual timestamp for every frame,
-SHA-256 frame hashes, and media paths. Hash repeatability is evidence only within the pinned local
+SHA-256 frame hashes, optional representative paths, and media paths. The bounded CLI response
+returns only frame count, unique-hash count, and representative paths; full rows remain in the
+manifest. Hash repeatability is evidence only within the pinned local
 browser/GPU environment, not a cross-browser, cross-GPU, or cross-OS golden-image promise.
 Fixed-capture scene alias metadata uses the same 40-row detailed-summary cap.
 
@@ -223,7 +237,7 @@ fixed visual-time contract.
 | `daemonStateUnavailable` / `daemonUnreachable` | Do not remove the socket; restore its owned state or stop the recorded daemon, then retry. |
 | `daemonCheckoutMismatch` | Run `status` to inspect the preserved scene. When it is safe to discard, run the returned `shutdown` recovery command and retry from the current checkout. |
 | `assetLoadFailed`, `captureRenderError`, or `captureTimeout` | Fix the reported source/render problem; do not accept a fallback capture. |
-| `ffmpegUnavailable`, `ffprobeUnavailable`, `vp9Unavailable`, or `h264Unavailable` | Install an FFmpeg toolchain with `libvpx-vp9` and `libx264`, or set the explicit tool paths, then retry. |
+| `ffmpegUnavailable`, `ffprobeUnavailable`, or `h264Unavailable` | Install an FFmpeg toolchain with `libx264`, or set the explicit tool paths, then retry. |
 | `recordingActive` / `recordingInactive` | Check session `status`, then stop/wait for the active recorder or start a new one. A wait before any start is inactive. |
 
 ## Focused verification

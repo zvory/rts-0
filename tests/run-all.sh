@@ -662,6 +662,8 @@ run_rust_suites_bg() {
       node "$SCRIPT_DIR/phase_runner_agents.mjs"
     run_suite_bg "Agent workflow: quality pass helper" \
       node "$SCRIPT_DIR/adversarial_quality_pass.mjs"
+    run_suite_bg "Agent workflow: completed plan archival" \
+      node "$SCRIPT_DIR/archive_completed_plans.mjs"
     run_suite_bg "Agent workflow: post-merge main refresh" \
       node "$SCRIPT_DIR/wait_pr.mjs"
     run_suite_bg "Rust lint (cargo clippy)" \

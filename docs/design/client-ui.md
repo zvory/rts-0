@@ -592,9 +592,19 @@ Operational aliases, inspection, camera focus, screenshot subjects, and correspo
 entity-id inputs accept at most 400 references. Screenshot readiness validates the complete
 requested subject set, but returned and persisted subject detail is capped at 24 rows with total and
 `truncated` metadata; recording and fixed-capture alias detail is similarly capped at 40 rows.
+Successful bulk spawn and artifact-import responses default to counts, a `truncated` flag, and at
+most 12 ordered detail rows. Callers may explicitly request `details: true` when they need every
+spawned entity/raw outcome or every restored and stale alias row; rejection details remain complete
+and actionable regardless of that success-response option.
 The daemon publishes its startup checkout commit as optional IPC v1 state/probe metadata. The CLI
 refreshes a mismatched daemon only through an atomic idle-only shutdown request; active scenes are
 preserved behind `daemonCheckoutMismatch`, while `status` and `shutdown` remain usable.
+Real-time recording consumes raw Chrome DevTools screencast frames and assigns them to cumulative
+30 FPS monotonic-wall-clock slots before streaming H.264. Its manifest records raw event/timestamp
+gaps and exact source-frame reuse; it warns below 80% source-slot coverage. `record-start` can also
+resume authoritative time atomically after the initial frame through its bounded `resumeSpeed`.
+Fixed capture likewise streams up to 1,800 rendered PNG buffers into H.264, retains at most six
+representative PNGs, and keeps per-frame ticks/hashes in the manifest instead of the CLI response.
 
 `lab_scenario_authoring.js`
 ```js
@@ -1470,7 +1480,8 @@ selection rings):
   status uses the shared HP bar layer.
 - Units: SVG-authored rig parts rendered into Pixi containers, with fully covered routes optionally
   rendered from a PNG atlas. Rifleman and Machine Gunner PNG movement frames advance only when
-  their snapshot/render position changes; stationary units hold idle art while firing recoil frames
+  a fresh authoritative movement sample arrives or their rendered position changes; a held snapshot
+  is consumed once so paused or otherwise stationary units return to idle art while firing recoil frames
   remain active. The Anti-Tank Gun uses a composed white-base PNG atlas for its
   carriage, barrel assembly, and deployed trail legs while retaining the SVG rig as its animation
   anchor source. It uses toned-down team tinting, with most firing recoil on the barrel assembly

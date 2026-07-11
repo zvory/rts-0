@@ -1299,13 +1299,11 @@ fn lab_collaborators_can_mutate_issue_commands_and_log_requester() {
         .pop()
         .expect("issueCommandAs result");
     assert!(command_result.ok);
-    assert_eq!(
-        command_result.outcome,
-        Some(serde_json::json!({
-            "accepted": true,
-            "playerId": LAB_PLAYER_ONE_ID,
-        }))
-    );
+    let command_outcome = command_result.outcome.expect("issueCommandAs outcome");
+    assert_eq!(command_outcome["accepted"], true);
+    assert_eq!(command_outcome["admission"], "enqueued");
+    assert_eq!(command_outcome["playerId"], LAB_PLAYER_ONE_ID);
+    assert!(command_outcome["queuedAtTick"].as_u64().is_some());
 
     let session = task.lab_session.as_ref().unwrap();
     assert_eq!(session.role_for(99), LabStartRole::Operator);

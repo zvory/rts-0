@@ -1,3 +1,6 @@
+.git
+.docdrift
+desktop
 .gitignore
 target
 server/target

@@ -27,6 +27,9 @@ evidence supports implementation work.
   next phase.
 - When a phase is complete, mark that phase document as done in the implementation commit for that
   phase.
+- When that update makes every phase in the plan done, `scripts/agent-pr.sh` moves the plan under
+  `plans/archive/` in a follow-up commit before opening or updating the final phase PR. The helper
+  archives only plans completed by the current branch; it does not sweep older completed plans.
 - For executor-only automation, `scripts/phase-runner.sh --pr` can run existing phase files in
   isolated worktrees, push owned PRs, and arm auto-merge. The script is the stable operator path and
   launches the maintained Node runner in `scripts/phase-runner-agents.mjs`. Use `--pr --wait`

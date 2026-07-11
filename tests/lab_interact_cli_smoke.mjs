@@ -66,7 +66,7 @@ function spawnBulkUsingPlacementSuggestions(sessionId, spawns) {
   const corrected = spawns.map((spawn) => ({ ...spawn }));
   let previousFailedIndex = -1;
   for (let attempt = 0; attempt <= corrected.length; attempt += 1) {
-    const result = invoke("spawn", { sessionId, spawns: corrected });
+    const result = invoke("spawn", { sessionId, spawns: corrected, details: true });
     if (result.status === 0) {
       const response = JSON.parse(result.stdout);
       assert.equal(response.ok, true, "corrected bulk spawn returns success");
@@ -162,7 +162,7 @@ try {
     "live MP4 retains the mobile codec surface",
   );
   assert.ok(fs.existsSync(recording.videoPath) && fs.existsSync(recording.contactSheetPath), "live recording writes MP4 and contact sheet artifacts");
-  assert.equal(fs.existsSync(recording.videoPath.replace(/\.mp4$/, ".webm")), false, "live recording removes its temporary WebM");
+  assert.equal(fs.existsSync(recording.videoPath.replace(/\.mp4$/, ".webm")), false, "live recording does not create an intermediate WebM");
   const recordingManifest = JSON.parse(fs.readFileSync(recording.manifestPath, "utf8"));
   assert.ok(recordingManifest.media.bytes < 64 * 1024 * 1024, "live recording stays beneath the 64 MiB cap");
   assert.ok(recordingManifest.authoritative.endTick >= recordingManifest.authoritative.startTick, "recording manifest tracks authoritative tick bounds");

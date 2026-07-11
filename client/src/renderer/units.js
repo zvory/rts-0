@@ -106,12 +106,23 @@ export function _tankMotionVisual(e, facing, state, body) {
 }
 
 export function _frameStripMovementVisual(e, state) {
-  const snapshotMoving = snapshotMovementChanged(e, state);
+  const previousMotion = this._frameStripMotion?.get?.(e.id);
+  const snapshotMotion = snapshotMovementSample(e, state);
   const renderMoving = renderedPositionChanged(e, this._frameStripMotion);
   if (this._frameStripMotion) {
-    this._frameStripMotion.set(e.id, { x: finite(e.x, 0), y: finite(e.y, 0) });
+    this._frameStripMotion.set(e.id, {
+      x: finite(e.x, 0),
+      y: finite(e.y, 0),
+      snapshotTick: snapshotMotion?.tick ?? null,
+      snapshotX: snapshotMotion?.x ?? null,
+      snapshotY: snapshotMotion?.y ?? null,
+    });
   }
-  const moving = snapshotMoving === false && renderMoving ? true : snapshotMoving;
+  const freshSnapshotMovement = snapshotMotion?.moving === true &&
+    authoritativeSampleChanged(snapshotMotion, previousMotion);
+  const moving = snapshotMotion == null
+    ? null
+    : renderMoving || freshSnapshotMovement;
   const active = moving == null ? e?.state === STATE.MOVE : moving;
   return {
     moving: Boolean(active),
@@ -276,13 +287,26 @@ function hasOccupiedTrench(entity) {
   return Number.isInteger(id) && id > 0;
 }
 
-function snapshotMovementChanged(entity, state) {
+function snapshotMovementSample(entity, state) {
   const current = state?._curById?.get?.(entity?.id);
   const previous = state?._prevById?.get?.(entity?.id);
   if (!current || !previous) return null;
   if (!Number.isFinite(current.x) || !Number.isFinite(current.y)) return null;
   if (!Number.isFinite(previous.x) || !Number.isFinite(previous.y)) return null;
-  return distanceSq(current.x - previous.x, current.y - previous.y) > 0.0025;
+  return {
+    moving: distanceSq(current.x - previous.x, current.y - previous.y) > 0.0025,
+    tick: Number.isFinite(state?.tick) ? state.tick : null,
+    x: current.x,
+    y: current.y,
+  };
+}
+
+function authoritativeSampleChanged(sample, previousMotion) {
+  if (!previousMotion) return true;
+  if (sample.tick != null && previousMotion.snapshotTick != null) {
+    return sample.tick !== previousMotion.snapshotTick;
+  }
+  return sample.x !== previousMotion.snapshotX || sample.y !== previousMotion.snapshotY;
 }
 
 function renderedPositionChanged(entity, motion) {

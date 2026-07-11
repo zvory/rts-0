@@ -90,9 +90,10 @@ try {
   assert.equal(order.result?.op, "issueCommandAs", "normal issueCommandAs returns the accepted command receipt");
   assert.deepEqual(
     order.result?.outcome,
-    { accepted: true, playerId: 2 },
-    "normal issueCommandAs identifies the authoritative player that accepted the command",
+    { accepted: true, admission: "enqueued", playerId: 2, queuedAtTick: order.result?.outcome?.queuedAtTick },
+    "normal issueCommandAs identifies authoritative enqueue admission without claiming effect completion",
   );
+  assert.ok(Number.isInteger(order.result?.outcome?.queuedAtTick), "normal issueCommandAs records its authoritative enqueue tick");
   await driver.time({ action: "step", ticks: 3 });
   const afterOrder = await driver.inspect({ ids: [secondId], limit: 1 });
   assert.equal(afterOrder.entities[0]?.id, secondId, "normal issueCommandAs order leaves the unit observable");

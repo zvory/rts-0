@@ -273,7 +273,11 @@ call("record-stop", { sessionId });
 assert.equal(callFailure("record-start", { sessionId, crop: { x: 0, y: 0, width: 1, height: 10 } }).error.code, "invalidInput", "recording crop dimensions remain bounded");
 
 const fixed = call("capture-fixed", { sessionId, name: "cli-fixed", fps: 60, frameCount: 3 });
-assert.equal(fixed.result.framePaths.length, 3, "capture-fixed returns one confined PNG path per requested frame");
+assert.deepEqual(
+  { count: fixed.result.frameSummary.count, representatives: fixed.result.frameSummary.representativeFramePaths.length },
+  { count: 3, representatives: 3 },
+  "capture-fixed summarizes frames and returns only bounded representative PNG paths",
+);
 assert.match(fixed.result.videoPath, /\.mp4$/, "capture-fixed returns a mobile MP4 path");
 assert.deepEqual(
   fixed.result.authoritative,
@@ -291,7 +295,8 @@ const setupInspect = call("artifact-inspect", { sessionId, artifactId: setupExpo
 assert.equal(setupInspect.result.kind, "setup", "artifact inspection derives the stored kind");
 assert.equal(setupInspect.result.aliasCount, 2, "artifact inspection reports bounded alias metadata");
 const setupImport = call("import", { sessionId, kind: "setup", artifactId: setupExport.result.artifactId });
-assert.deepEqual(setupImport.result.aliases.stale, [], "setup import reconciles aliases through the authoritative id map");
+assert.deepEqual(setupImport.result.aliases.stale, { count: 0, details: [], truncated: false }, "setup import reconciles aliases through the authoritative id map");
+assert.equal(setupImport.result.aliases.restored.count, 2, "setup import reports the restored alias total");
 assert.deepEqual(call("inspect", { sessionId, refs: ["shooter", "target"] }).result.entities.map((entity) => entity.id).sort(), [1100, 1101], "remapped aliases resolve after setup import");
 const unsafeImport = callFailure("import", { sessionId, kind: "setup", path: "/etc/passwd" });
 assert.equal(unsafeImport.error.code, "unsafeArtifactPath", "imports reject paths outside target/lab-interact");

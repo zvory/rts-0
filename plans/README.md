@@ -38,6 +38,12 @@ allowlists, lifecycle matrices, or checker budgets. If an archived rule is still
 the current plan or relevant `docs/design/*` source-of-truth file and point automation at that
 active file instead.
 
+`scripts/agent-pr.sh` automatically moves a newly completed plan to `plans/archive/<name>/` and
+commits the move before opening or updating the final phase PR. The guard is intentionally
+transition-based: at least one phase must change from incomplete on `origin/main` to done on the
+branch, and every phase file anywhere under that active plan must be done. Already-completed active
+plans are not swept into the archive merely because an unrelated PR runs the helper.
+
 ## Executor runner
 
 For unattended executor passes, use `scripts/phase-runner.sh` from a clean checkout. That stable

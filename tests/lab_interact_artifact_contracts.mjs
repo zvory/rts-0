@@ -57,6 +57,19 @@ assert.equal(LAB_INTERACT_LIMITS.maxAliases, 400, "portable artifacts share the 
 assert.ok(Buffer.byteLength(maximumSidecar) < LAB_INTERACT_LIMITS.maxAliasSidecarBytes, "64 KiB safely admits 400 maximum-length aliases and u32 ids");
 fs.writeFileSync(setup.sidecarPath, maximumSidecar);
 assert.equal((await service.execute("artifact-inspect", { sessionId, artifactId: setup.artifactId })).aliasCount, 400, "artifact inspection accepts the full bounded sidecar");
+const maximumAliasImport = await service.execute("import", { sessionId, kind: "setup", artifactId: setup.artifactId });
+assert.deepEqual(
+  {
+    count: maximumAliasImport.aliases.stale.count,
+    detailed: maximumAliasImport.aliases.stale.details.length,
+    truncated: maximumAliasImport.aliases.stale.truncated,
+  },
+  { count: 400, detailed: LAB_INTERACT_LIMITS.maxResponseDetails, truncated: true },
+  "default import output summarizes a maximum-size stale alias reconciliation",
+);
+assert.deepEqual(maximumAliasImport.aliases.restored, { count: 0, details: [], truncated: false });
+assert.equal("result" in maximumAliasImport, false, "default import output omits the raw import result");
+assert.ok(JSON.stringify(maximumAliasImport).length < 2_500, "maximum default alias reconciliation stays compact");
 fs.writeFileSync(setup.sidecarPath, `${JSON.stringify({
   schemaVersion: 1,
   artifactId: setup.artifactId,
@@ -67,9 +80,15 @@ fs.writeFileSync(setup.sidecarPath, `${JSON.stringify({
 }, null, 2)}\n`);
 
 const imported = await service.execute("import", { sessionId, kind: "setup", artifactId: setup.artifactId });
-assert.deepEqual(imported.aliases.stale, []);
+assert.deepEqual(imported.aliases.stale, { count: 0, details: [], truncated: false });
+assert.equal(imported.aliases.restored.count, 2);
 const entities = await service.execute("inspect", { sessionId, refs: ["shooter", "target"] });
 assert.deepEqual(entities.entities.map((entity) => entity.id).sort(), [1100, 1101]);
+
+const detailedImport = await service.execute("import", { sessionId, kind: "setup", artifactId: setup.artifactId, details: true });
+assert.deepEqual(detailedImport.aliases.stale, [], "details=true returns every stale alias row");
+assert.equal(detailedImport.aliases.restored.length, 2, "details=true returns every restored alias row");
+assert.equal(detailedImport.result.entityIdMap.length, 2, "details=true preserves the raw authoritative import result");
 
 const replay = await service.execute("export", { sessionId, kind: "replay", name: "Portable replay" });
 assert.equal(replay.operationCount, 0);
@@ -78,6 +97,10 @@ assert.equal((await service.execute("import", { sessionId, kind: "replay", artif
 assert.throws(
   () => validateCommandInput("import", { sessionId, kind: "setup", artifactId: setup.artifactId, path: setup.path }),
   /exactly one/,
+);
+assert.throws(
+  () => validateCommandInput("import", { sessionId, kind: "setup", artifactId: setup.artifactId, details: "yes" }),
+  /boolean/,
 );
 await assert.rejects(
   service.execute("import", { sessionId, kind: "setup", path: "/etc/passwd" }),

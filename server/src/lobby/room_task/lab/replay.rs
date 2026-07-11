@@ -138,7 +138,9 @@ impl RoomTask {
             details: None,
             outcome: Some(serde_json::json!({
                 "accepted": true,
+                "admission": "enqueued",
                 "playerId": command_player_id,
+                "queuedAtTick": tick,
             })),
         }
     }
