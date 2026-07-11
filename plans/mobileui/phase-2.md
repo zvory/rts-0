@@ -2,7 +2,9 @@
 
 ## Phase Status
 
-- [x] Done. Physical-device and desktop manual validation remain required before release.
+- [x] Done.
+
+Physical-device and desktop manual validation remain required before release.
 
 ## Objective
 
