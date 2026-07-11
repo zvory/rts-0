@@ -9,7 +9,8 @@ const ROOM_TIME_PANEL_KEY_STEP_LARGE = 72;
 const ROOM_TIME_PANEL_DEFAULT_WIDTH = 420;
 const ROOM_TIME_PANEL_DEFAULT_HEIGHT = 120;
 const ROOM_TIME_PANEL_STORAGE_SCHEMA_VERSION = 1;
-const ROOM_TIME_PANEL_MOBILE_MAX_WIDTH = 720;
+const MOBILE_DEBUG_MAX_VIEWPORT_WIDTH = 1024;
+const MOBILE_DEBUG_MAX_VIEWPORT_HEIGHT = 1024;
 
 export class FloatingRoomTimePanel {
   constructor({ root, label }) {
@@ -235,7 +236,7 @@ export class FloatingRoomTimePanel {
   restorePosition() {
     const saved = this.readPosition();
     this.setCollapsed(saved?.collapsed === true, { save: false });
-    if (isMobilePanelViewport()) {
+    if (isMobileDebugPanelViewport()) {
       this.clearPositionStyles();
       return;
     }
@@ -251,7 +252,7 @@ export class FloatingRoomTimePanel {
 
   constrainToViewport() {
     if (!this.root || this.root.hidden) return;
-    if (isMobilePanelViewport()) {
+    if (isMobileDebugPanelViewport()) {
       this.clearPositionStyles();
       return;
     }
@@ -337,7 +338,7 @@ export class FloatingRoomTimePanel {
 
   savePosition(position) {
     try {
-      if (isMobilePanelViewport()) {
+      if (isMobileDebugPanelViewport()) {
         this.saveCollapsedState();
         return;
       }
@@ -387,8 +388,19 @@ function panelViewport() {
   };
 }
 
-function isMobilePanelViewport() {
-  return panelViewport().width <= ROOM_TIME_PANEL_MOBILE_MAX_WIDTH;
+export function isMobileDebugPanelViewport() {
+  const viewport = panelViewport();
+  return hasCoarsePrimaryPointer()
+    && viewport.width <= MOBILE_DEBUG_MAX_VIEWPORT_WIDTH
+    && viewport.height <= MOBILE_DEBUG_MAX_VIEWPORT_HEIGHT;
+}
+
+function hasCoarsePrimaryPointer() {
+  try {
+    return globalThis.window?.matchMedia?.("(pointer: coarse)")?.matches === true;
+  } catch {
+    return false;
+  }
 }
 
 function storedPanelPosition(saved) {

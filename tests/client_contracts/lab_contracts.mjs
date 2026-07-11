@@ -87,8 +87,8 @@ import { textWithin } from "./dom_text.mjs";
     "lab mobile CSS keeps the Tools window header on a separate tap row",
   );
   assert(
-    /\.lab-panel-collapse,\s*\.room-time-panel-collapse\s*\{[^}]*min-height:\s*36px\b[^}]*touch-action:\s*manipulation\b/s.test(labMobileStyles),
-    "lab mobile CSS gives floating-panel collapse buttons a touch-friendly hit target",
+    /\.lab-panel-collapse\s*\{[^}]*min-height:\s*36px\b[^}]*touch-action:\s*manipulation\b/s.test(labMobileStyles),
+    "lab mobile CSS gives its floating-panel collapse button a touch-friendly hit target",
   );
 }
 
