@@ -10,6 +10,12 @@ import { checkMediaCapabilities } from "../scripts/lab-interact/recording.mjs";
 import { openLabInteractDriver } from "./fixtures/lab_interact_fake_driver.mjs";
 
 const sessionId = `lab_${"a".repeat(32)}`;
+const driverSource = fs.readFileSync(new URL("../scripts/lab-interact/driver.mjs", import.meta.url), "utf8");
+assert.match(
+  driverSource,
+  /import\s*\{[^}]*FIXED_CAPTURE_LIMITS[^}]*\}\s*from\s*"\.\/fixed_capture\.mjs"/s,
+  "the real fixed-capture driver imports the limits it enforces at runtime",
+);
 assert.throws(() => validateCommandInput("capture-fixed", { sessionId, fps: 61 }), (error) => error?.code === "invalidInput");
 assert.throws(() => validateCommandInput("capture-fixed", { sessionId, frameCount: FIXED_CAPTURE_LIMITS.maxFrames + 1 }), (error) => error?.code === "invalidInput");
 assert.ok(FIXED_CAPTURE_LIMITS.maxSequenceBytes >= FIXED_CAPTURE_LIMITS.maxFrameBytes, "fixed PNG sequences have explicit per-frame and aggregate disk bounds");

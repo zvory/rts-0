@@ -14,7 +14,9 @@ import {
   checkMediaCapabilities, finalizeMedia, LabInteractRecordingError, RECORDING_LIMITS,
   removePartialRecording, stopRecorderWithin, waitForMediaFile,
 } from "./recording.mjs";
-import { encodeFixedCapture, fixedFrameTick, hashFrame } from "./fixed_capture.mjs";
+import {
+  encodeFixedCapture, FIXED_CAPTURE_LIMITS, fixedFrameTick, hashFrame,
+} from "./fixed_capture.mjs";
 
 const DEFAULT_VIEWPORT = Object.freeze({ width: 1440, height: 900, deviceScaleFactor: 1 });
 const DEFAULT_TIMEOUT_MS = 15_000;
