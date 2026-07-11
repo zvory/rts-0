@@ -14,6 +14,13 @@ export class ScreenOverlay {
     this.setMarquee(null);
   }
 
+  snapshot() {
+    return Object.freeze({
+      version: 1,
+      marquee: this._marquee ? Object.freeze({ ...this._marquee }) : null,
+    });
+  }
+
   destroy() {
     this.clearMarquee();
     this._drawMarquee = () => {};

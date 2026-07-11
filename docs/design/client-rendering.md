@@ -294,6 +294,32 @@ but cannot attach engine objects to either object. `staticGround` per-frame reco
 empty because terrain and resource sites live in `StaticMapPresentationV1`; the key remains present
 so the semantic layer shape and backend traversal order are total.
 
+Phase 3 implements this boundary in `presentation/frame.js`. `frame_entity_views.js` returns a
+frozen outer `SharedFrameContextV1` containing the interpolated, current, authoritative,
+fog-source, and selected arrays needed by shared client consumers. Only its already-filtered
+interpolated array is admitted to `PresentationFrameV1`: authoritative and fog-source variants
+remain app-side inputs for fog, HUD, minimap, analysis, and selection assembly. `frame_recovery.js`
+samples one projection and visual time, updates fog, builds renderer feedback once, then assembles
+one final frame and passes that immutable sidecar beside the legacy Pixi arguments. Phase 3.5 owns
+removing those legacy arguments and making `render(frame)` the backend seam.
+
+The assembler explicitly admits received entity presentation fields rather than cloning snapshot
+records wholesale. It resolves selected state, `own`/`ally`/`enemy`/`neutral`/`observed`
+relationship, team color, and ground/selection/HP anchors before the boundary. `visionOnly`,
+remembered-building, and shot-reveal inputs become distinct `belowFogIntel`, `rememberedWorld`,
+and `aboveFogReveal` records; selection proxies and their `interaction` records never enter the
+frame. Current feedback is detached into typed layer records but intentionally has no normalized
+event identity or retained lifetime yet; Phase 4 owns that event contract.
+
+Terrain, visible, and explored grids use `GridSnapshotV1` closures over private `Uint8Array`
+copies. The cache key is revision plus dimensions, so an unchanged revision returns the same
+snapshot and a changed revision copies once. Ordinary records reject typed arrays, `Map`, `Set`,
+cycles, non-plain objects, and non-finite numbers; malformed individual records are dropped while
+bounded category counts are recorded in `diagnosticsContext`. A static-map replacement increments
+the presentation generation and resets frame/grid caches; replay seek/rematch replacement creates
+a new Match/assembler, while fixed capture receives the immutable frame and exact grid objects
+created for that capture frame.
+
 ### 4.2 Locked semantic layers
 
 Back-to-front ids are exact and permanent:
@@ -313,6 +339,11 @@ Every descriptor has exactly `{id, order, space, visibilityPolicy, depthPolicy}`
 `fogMask`, `reveal`, or `local`; `depthPolicy` is `ground`, `world`, `overlay`, or `screen`.
 Later phases may add optional, namespaced metadata but may not rename/reorder ids or weaken their
 visibility policy. Event kinds are assigned to one descriptor in Phase 4.
+
+The descriptors are exported from `presentation/layers.js` as frozen records with exactly the five
+fields above. `scripts/check-client-architecture.mjs` classifies the presentation area separately,
+forbids imports from transport, UI, or renderer internals, and rejects engine, socket, mutable
+state, or mutable intent runtime references in that area.
 
 ## 5. Presentation events and deterministic capture
 

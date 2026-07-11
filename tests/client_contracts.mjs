@@ -9,6 +9,7 @@ await import("./client_contracts/settings_contracts.mjs");
 await import("./client_contracts/hud_contracts.mjs");
 runFrameProfilerContracts();
 await import("./client_contracts/frame_entity_contracts.mjs");
+await import("./client_contracts/presentation_frame_contracts.mjs");
 await import("./client_contracts/frame_strip_runtime_contracts.mjs");
 await import("./client_contracts/rifleman_png_strip_contracts.mjs");
 await import("./client_contracts/launch_url_contracts.mjs");

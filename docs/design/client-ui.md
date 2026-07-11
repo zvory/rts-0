@@ -93,6 +93,7 @@ src/
   frame_recovery.js # Frame-loop soft-failure logging and rescheduling diagnostics
   visual_clock.js # Render-only normal/capture clocks; never used for networking, health, input, or timeouts
   frame_entity_views.js # One-RAF entity view builder shared by render, fog, HUD, minimap, analysis
+  presentation/    # Frozen semantic layers, opaque GridSnapshot accessors, static map, and frame assembly
   replay_controls.js # Capability-driven RoomTimeControls plus replay-only vision/branch controls
   room_time_panel.js # Floating, draggable chrome around shared room-time controls
   room_capabilities.js # Client-side room capability parser for controls/diagnostics affordances
@@ -444,7 +445,7 @@ entity pools, minimap blips, local fog sources, or game state.
 
 `frame_entity_views.js`
 ```js
-buildFrameEntityViews(state, { alpha }) // frame-local interpolated/current/authoritative/selected entity arrays
+buildFrameEntityViews(state, { alpha }) // frozen SharedFrameContextV1 outer record with frame-local entity arrays
 ```
 `frame_recovery.js` builds this object once per requestAnimationFrame after prediction display has
 advanced and before fog, renderer, HUD, minimap, and observer analysis run. The object is not
@@ -455,6 +456,23 @@ authoritative state and must not be retained after the frame; it exists only to 
 checks, `authoritativeEntities` uses latest no-prediction positions for local fog-source filtering
 and observer Army Value rows, and `fogSourceEntities` removes shot-reveal/vision-only entries plus
 non-vision neutral resources.
+
+`presentation/layers.js`, `presentation/grid_snapshot.js`, and `presentation/frame.js`
+```js
+PRESENTATION_LAYER_DESCRIPTORS       // exact frozen back-to-front semantic descriptors
+createGridSnapshot(input)            // opaque immutable revisioned grid accessor
+new PresentationFrameAssembler({map, generation?, entityStats?})
+assembler.staticMap                  // StaticMapPresentationV1, rebuilt only on map revision/reset
+assembler.assemble(inputs)           // one detached frozen PresentationFrameV1
+assembler.reset({map, generation?})  // replay/Lab/rematch generation reset seam
+```
+`frame_recovery.js` updates authoritative fog before it assembles this sidecar. It samples one
+projection, one visual time, one renderer feedback view, and one observer/screen-overlay model for
+the frame; the same projection drives `SelectionSceneV1`, and the same feedback view is passed to
+the existing Pixi renderer. Pixi still reads its legacy state/camera/fog arguments through Phase
+3.5, but the sidecar contains no mutable state/intent, selection proxy, mutable typed array, Pixi
+object, or transport record. Static terrain/resource locations are separately revisioned;
+visible/explored grids reuse opaque snapshots by revision and copy only into backend-owned staging.
 
 `settings_container.js`
 ```js

@@ -436,6 +436,9 @@ export class Renderer {
     visualUnitOverrides = null,
     visualFrameStripOverrides = null,
     observerMapAnalysis = null,
+    feedbackView: preparedFeedbackView = null,
+    presentationFrame = null,
+    staticMapPresentation = null,
   } = {}) {
     this._beginRenderFrame();
     this._profiler = profiler || null;
@@ -477,7 +480,7 @@ export class Renderer {
       this._recordRenderDiagnostic("renderer.entities.regular", regularEntities.length);
       this._recordRenderDiagnostic("renderer.entities.shotReveal", shotReveals.length);
     });
-    const feedbackView = time(
+    const feedbackView = preparedFeedbackView || time(
       "renderer.feedbackView",
       () => buildRendererFeedbackView(state, {
         clientIntent,
