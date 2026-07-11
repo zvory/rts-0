@@ -54,6 +54,7 @@ await import("./client_contracts/scout_plane_input_contracts.mjs");
 await import("./client_contracts/weapon_feedback_contracts.mjs");
 await import("./client_contracts/command_composer_contracts.mjs");
 await import("./client_contracts/camera_fog_contracts.mjs");
+await import("./client_contracts/camera_projection_contracts.mjs");
 await import("./client_contracts/audio_contracts.mjs");
 await import("./client_contracts/observer_analysis_contracts.mjs");
 await import("./client_contracts/map_editor_contracts.mjs");

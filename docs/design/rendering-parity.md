@@ -37,7 +37,7 @@ when the new shared contract is not yet implemented.
 | --- | --- | --- | --- | --- | --- |
 | One Match-owned rAF/visual clock | Pixi complete | missing | required | required | P0-docs; current `frame_recovery.js` owns scheduling; Babylon assertion Phase 6.5 |
 | Exact selector and Babylon-free default loading | placeholder | missing | required | required | Current default is Babylon-free but the exact selector/preflight does not exist; Phase 6 owns evidence |
-| Semantic camera/projection and CSS-pixel contract | placeholder | missing | required | required | Current Pixi camera supplies the legacy orthographic behavior, not the semantic API; Phase 1 owns evidence |
+| Semantic camera/projection and CSS-pixel contract | Pixi complete | missing | required | required | `P1-camera`; orthographic adapter implements the semantic API and immutable projection snapshot; perspective backend remains Phase 6.5 |
 | Navigation, resize, minimap footprint/recenter | Pixi complete | missing | required | required | P0-docs; semantic migration Phases 1.5/1.75 |
 | Audio, alerts, control groups, carryover, Lab/diagnostics camera consumers | placeholder | missing | required | required | Current behavior still reads raw orthographic state; migration and ratchet Phase 1.75 |
 | Perspective-safe picking/selection/marquee | placeholder | missing | required | required | Current Pixi is orthographic-only; Phase 2 owns proxies/SelectionScene |
@@ -69,6 +69,22 @@ when the new shared contract is not yet implemented.
 | Shadows/caster secrecy/quality degradation | missing | missing | required | required | Representative structural path Phase 12.5 |
 | Browser/device rollout matrix and accessibility/perf sign-off | Pixi complete | deferred | not required | required | Separate default-cutover plan; no universal one-machine gate |
 | Babylon as default / Pixi removal | Pixi complete | deferred | not required | required | Explicit reviewed decision after full default gate; Pixi remains default |
+
+## Phase evidence
+
+### `P1-camera`
+
+- `phase`: Phase 1.
+- `commit`: Phase 1 implementation commit containing this evidence.
+- `automated`: `node tests/client_contracts/camera_projection_contracts.mjs`.
+- `assertion`: Pixi orthographic equivalence; finite rejection; CSS-pixel projection and extent;
+  depth/clip priority; nullable fake-perspective ground hits; bounded deduplicated clockwise ground
+  polygons and empty views; anchored dolly, pan, clamp, fit/focus, resize/map bounds; versioned and
+  legacy restore; immutable projection snapshots; semantic listener and audio data.
+- `artifact`: none.
+- `inspected`: n/a.
+- `notes`: This completes the Pixi semantic core only. Navigation/minimap consumers migrate in
+  Phase 1.5, remaining shared consumers in Phase 1.75, and Babylon perspective evidence later.
 
 ## Gate interpretation
 
