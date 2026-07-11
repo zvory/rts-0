@@ -55,8 +55,8 @@ export const LAB_INTERACT_COMMAND_HELP = Object.freeze({
     example: { sessionId: "<lab-session-id>", refs: ["subject"], limit: 1 },
   }),
   camera: descriptor("Set the camera or focus a bounded referenced subject set.", "{sessionId:string,camera:camera-command}", {
-    variants: ["focus {action,refs,padding?}", "set {action,centerX?,centerY?,zoom?}"], defaults: ["focus.padding=32 for one unit, otherwise 48"],
-    bounds: ["focus 1-400 refs", "padding 0-1024", "zoom >0 and <=16", "centerX and centerY supplied together"],
+    variants: ["focus {action,refs,padding?}", "set {action,snapshot:CameraSnapshotV1}"], defaults: ["focus.padding=32 for one unit, otherwise 48"],
+    bounds: ["focus 1-400 refs", "padding 0-1024", "snapshot framingScale >0 and <=16"],
     example: { sessionId: "<lab-session-id>", camera: { action: "focus", refs: ["subject"] } },
   }),
   screenshot: descriptor("Capture a readiness-checked Pixi PNG and bounded adjacent manifest.", "{sessionId:string,name?:token,presentation?:\"clean\"|\"normal\",viewport?:viewport,subjects?:(alias|u32)[]}", {

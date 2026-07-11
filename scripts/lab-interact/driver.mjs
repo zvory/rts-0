@@ -469,6 +469,12 @@ export class LabInteractDriver {
           },
           mapping: { simulationHz: 30, outputFps: fps, rule: "frame i uses startTick + floor(i * 30 / outputFps); repeated ticks do not interpolate world state" },
           authoritative: { startTick, endTick: endStatus.snapshotTick },
+          camera: {
+            start: status.camera || null,
+            end: endStatus.camera || null,
+            viewport: endStatus.cameraViewport || null,
+            worldBounds: endStatus.cameraWorldBounds || null,
+          },
           capture: {
             frameCount, clip, viewport: normalizedViewport, visualStartMs: entered.visualStartMs,
             streaming: true, retainedPngFrames: representativeIndices.size, processedPngBytes,
@@ -600,6 +606,12 @@ export class LabInteractDriver {
             endTick: endStatus?.snapshotTick ?? null,
             startRoomTime: recording.startStatus?.roomTime ?? null,
             endRoomTime: endStatus?.roomTime ?? null,
+          },
+          camera: {
+            start: recording.startStatus?.camera ?? null,
+            end: endStatus?.camera ?? null,
+            viewport: endStatus?.cameraViewport ?? null,
+            worldBounds: endStatus?.cameraWorldBounds ?? null,
           },
           capture: {
             fps: RECORDING_LIMITS.fps, audio: false, timingAuthority: "monotonicWallClockFrameSlots",
@@ -735,7 +747,7 @@ export class LabInteractDriver {
       const subjectSummary = boundedSummary(subjectSummaries, LAB_INTERACT_SUMMARY_LIMITS.detailedSubjects);
       const readinessSummary = summarizeCaptureReadiness(readiness);
       const manifest = {
-        schemaVersion: 1,
+        schemaVersion: 2,
         createdAt: new Date().toISOString(),
         workspace: this.workspace,
         serverBuild: this.server?.build || { reused: true, baseUrl: this.server?.baseUrl || null },
@@ -753,6 +765,8 @@ export class LabInteractDriver {
           output: dimensions,
         },
         camera: readiness.camera,
+        cameraViewport: readiness.cameraViewport,
+        cameraWorldBounds: readiness.cameraWorldBounds,
         subjects: subjectSummary,
         visualProfileId: readiness.visualProfileId || null,
         assetReadiness: readiness.assets,

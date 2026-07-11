@@ -10,7 +10,7 @@
 //   - Voice pool is capped (VOICE_CAP); eviction is priority-based, not FIFO.
 //   - Pitch variance uses a seeded RNG so audio is reproducible for replays.
 //   - Spatial play (opts.x/y present) goes through StereoPanner + lowpass per-voice.
-//     `setListener()` must be called each frame from main.js to keep distance math
+//     `setListener()` must be called each frame from Match to keep distance math
 //     in sync with the camera.
 //   - Callers can tag voices with `key` and stop them early for sustained cues
 //     whose authoritative game state has ended.
@@ -380,20 +380,18 @@ export class Audio {
   }
 
   /**
-   * Update the listener pose. `zoom` is screen px per world px; `viewW` lets us
-   * derive "1 screen-width worth of world pixels" for the flat full-volume zone.
-   * @param {number} x world pixels
-   * @param {number} y world pixels
-   * @param {number} zoom screen px per world px
-   * @param {number} [viewW] viewport width in screen px
+   * Update the renderer-neutral listener pose and focus-plane reference distance.
+   * @param {{x:number,y:number,referenceDistancePx:number}} listener
    */
-  setListener(x, y, zoom, viewW) {
-    if (!isFinite(x) || !isFinite(y)) return;
+  setListener(listener) {
+    const x = Number(listener?.x);
+    const y = Number(listener?.y);
+    const referenceDistancePx = Number(listener?.referenceDistancePx);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
     this.listener.x = x;
     this.listener.y = y;
-    if (isFinite(zoom) && zoom > 0) {
-      const w = isFinite(viewW) && viewW > 0 ? viewW : DEFAULT_REF_DIST;
-      this.listener.refDist = Math.max(1, w / zoom);
+    if (Number.isFinite(referenceDistancePx) && referenceDistancePx > 0) {
+      this.listener.refDist = Math.max(1, referenceDistancePx);
     }
     this._refreshSpatialVoices();
   }

@@ -703,7 +703,7 @@ export class HUD {
     if (!entity) return;
     this.state?.setSelection?.([id]);
     if (Number.isFinite(entity.x) && Number.isFinite(entity.y)) {
-      this.camera?.centerOn?.(entity.x, entity.y);
+      this.camera?.focusAt?.({ x: entity.x, y: entity.y });
     }
   }
 

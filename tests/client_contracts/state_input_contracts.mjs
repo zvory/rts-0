@@ -1372,12 +1372,14 @@ function buttonByLabel(card, label) {
   const clusterInput = Object.create(Input.prototype);
   let centered = null;
   clusterInput.camera = {
-    viewW: 100,
-    viewH: 100,
-    zoom: 1,
-    x: 0,
-    y: 0,
-    centerOn(x, y) { centered = { x, y }; },
+    viewportGroundBounds: () => ({ minX: 0, minY: 0, maxX: 100, maxY: 100 }),
+    snapshot: () => ({
+      version: 1,
+      focus: { x: 50, y: 50 },
+      framingScale: 1,
+      boundsPolicy: "mapOverscroll",
+    }),
+    focusAt(point) { centered = point; },
   };
   clusterInput.state = {
     controlGroupEntities: () => [

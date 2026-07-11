@@ -446,6 +446,8 @@ class CounterAggregate {
 export function collectMatchFrameContext(match) {
   const state = match?.state || {};
   const camera = match?.camera || {};
+  const projection = camera.projectionSnapshot?.() || null;
+  const cameraSnapshot = projection?.camera || camera.snapshot?.() || null;
   const renderer = match?.renderer?.app?.renderer || {};
   const canvas = match?.renderer?.app?.view || {};
   const prediction = match?.prediction?.debugSummary?.() || {};
@@ -465,9 +467,9 @@ export function collectMatchFrameContext(match) {
     rememberedBuildingCount: Array.isArray(state.rememberedBuildings) ? state.rememberedBuildings.length : 0,
     visibleTileCount: countVisibleTiles(state.visibleTiles),
     predictedEntityCount: sizeOf(state.predictedById),
-    viewportWidth: finiteOrNull(camera.viewW),
-    viewportHeight: finiteOrNull(camera.viewH),
-    cameraZoom: finiteOrNull(camera.zoom),
+    viewportWidth: finiteOrNull(projection?.viewport?.widthCssPx),
+    viewportHeight: finiteOrNull(projection?.viewport?.heightCssPx),
+    cameraZoom: finiteOrNull(cameraSnapshot?.framingScale),
     canvasWidth: finiteOrNull(canvas.width ?? renderer.width),
     canvasHeight: finiteOrNull(canvas.height ?? renderer.height),
     devicePixelRatio: finiteOrNull(globalThis.window?.devicePixelRatio),

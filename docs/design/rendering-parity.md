@@ -38,8 +38,8 @@ when the new shared contract is not yet implemented.
 | One Match-owned rAF/visual clock | Pixi complete | missing | required | required | P0-docs; current `frame_recovery.js` owns scheduling; Babylon assertion Phase 6.5 |
 | Exact selector and Babylon-free default loading | placeholder | missing | required | required | Current default is Babylon-free but the exact selector/preflight does not exist; Phase 6 owns evidence |
 | Semantic camera/projection and CSS-pixel contract | Pixi complete | missing | required | required | `P1-camera`; orthographic adapter implements the semantic API and immutable projection snapshot; perspective backend remains Phase 6.5 |
-| Navigation, resize, minimap footprint/recenter | Pixi complete | missing | required | required | `P1.5-navigation-minimap`; gestures use semantic CSS-pixel pan/dolly and minimap uses ground polygon/focus; remaining resize/app-shell consumers are Phase 1.75 |
-| Audio, alerts, control groups, carryover, Lab/diagnostics camera consumers | placeholder | missing | required | required | Current behavior still reads raw orthographic state; migration and ratchet Phase 1.75 |
+| Navigation, resize, minimap footprint/recenter | Pixi complete | missing | required | required | `P1.5-navigation-minimap` plus `P1.75-shared-camera`; gestures, resize, and minimap use semantic operations |
+| Audio, alerts, control groups, carryover, Lab/diagnostics camera consumers | Pixi complete | missing | required | required | `P1.75-shared-camera`; all shared consumers use semantic listener/projection/bounds/fit/snapshot data and the raw-read allowlist is closed |
 | Perspective-safe picking/selection/marquee | placeholder | missing | required | required | Current Pixi is orthographic-only; Phase 2 owns proxies/SelectionScene |
 | Detached least-privilege presentation frame | missing | missing | required | required | Current renderer reads mutable state/intent/fog; Phases 3/3.5 |
 | Immutable terrain/fog grids and revision pinning | missing | missing | required | required | Contract frozen; implementation Phase 3 |
@@ -101,6 +101,21 @@ when the new shared contract is not yet implemented.
 - `notes`: Pixi behavior remains equivalent. Phase 1.75 owns audio, alerts/control groups,
   app/replay carryover, profiles, Lab, observer/diagnostics, resize, and final shared-consumer ratchet
   closure.
+
+### `P1.75-shared-camera`
+
+- `phase`: Phase 1.75.
+- `commit`: Phase 1.75 implementation commit containing this evidence.
+- `automated`: `node tests/client_contracts/camera_projection_contracts.mjs && node tests/client_contracts/audio_contracts.mjs && node tests/client_contracts/match_replay_contracts.mjs && node tests/minimap_input_contracts.mjs && node tests/lab_interact_driver_contracts.mjs && node scripts/check-client-architecture.mjs`.
+- `assertion`: Audio consumes `AudioListenerV1`; alerts use projected containment; control groups
+  use semantic bounds/focus; carryover, profiles, Lab status/inspection/focus/readiness/manifests,
+  observer labels, visual samples, and profiler diagnostics use versioned snapshots or semantic
+  projection data; no shared raw camera read remains.
+- `artifact`: none.
+- `inspected`: n/a.
+- `notes`: Pixi behavior remains materially equivalent. Private raw reads remain only in
+  `camera.js`, `camera_projection.js`, `renderer/index.js`, and the separately owned Map Editor
+  Pixi adapter. Phase 2 owns last-presented selection scenes and perspective-safe picking.
 
 ## Gate interpretation
 

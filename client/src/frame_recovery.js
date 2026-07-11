@@ -42,12 +42,8 @@ function runMatchFrame(match, now, { capture = false } = {}) {
     time("match.camera", () => {
       if (!capture) match.camera.update(dt, match.input);
       if (match.audio) {
-        match.audio.setListener(
-          match.camera.x + match.camera.viewW / (2 * match.camera.zoom),
-          match.camera.y + match.camera.viewH / (2 * match.camera.zoom),
-          match.camera.zoom,
-          match.camera.viewW,
-        );
+        const listener = match.camera.audioListener?.();
+        if (listener) match.audio.setListener(listener);
       }
     });
     if (!capture) time("match.input", () => match.input.update(dt));

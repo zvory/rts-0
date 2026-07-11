@@ -76,11 +76,16 @@ function controlGroupsEnabled(state) {
 export function _jumpToControlGroupCluster(slot) {
   const entities = this.state.controlGroupEntities(slot);
   if (entities.length === 0) return false;
-  const viewW = this.camera.viewW / this.camera.zoom;
-  const viewH = this.camera.viewH / this.camera.zoom;
+  const viewportBounds = this.camera.viewportGroundBounds?.();
+  const cameraSnapshot = this.camera.snapshot?.();
+  const viewW = viewportBounds ? viewportBounds.maxX - viewportBounds.minX : 0;
+  const viewH = viewportBounds ? viewportBounds.maxY - viewportBounds.minY : 0;
   if (!Number.isFinite(viewW) || !Number.isFinite(viewH) || viewW <= 0 || viewH <= 0) {
     return false;
   }
+  const currentX = cameraSnapshot?.focus?.x;
+  const currentY = cameraSnapshot?.focus?.y;
+  if (!Number.isFinite(currentX) || !Number.isFinite(currentY)) return false;
 
   const lefts = [];
   const tops = [];
@@ -102,8 +107,8 @@ export function _jumpToControlGroupCluster(slot) {
         contained,
         left + viewW / 2,
         top + viewH / 2,
-        this.camera.x + viewW / 2,
-        this.camera.y + viewH / 2,
+        currentX,
+        currentY,
       );
       if (!best || _controlGroupScoreBeats(score, best.score)) {
         best = { left, top, score };
@@ -112,7 +117,7 @@ export function _jumpToControlGroupCluster(slot) {
   }
 
   if (!best) return false;
-  this.camera.centerOn(best.left + viewW / 2, best.top + viewH / 2);
+  this.camera.focusAt({ x: best.left + viewW / 2, y: best.top + viewH / 2 });
   return true;
 }
 

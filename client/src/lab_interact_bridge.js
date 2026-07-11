@@ -12,7 +12,7 @@ import {
 } from "./lab_spawn_catalog.js";
 
 export const LAB_INTERACT_BRIDGE_KEY = "__rtsLabInteract";
-export const LAB_INTERACT_BRIDGE_VERSION = 2;
+export const LAB_INTERACT_BRIDGE_VERSION = 3;
 export const LAB_INTERACT_LIMITS = Object.freeze({
   inspectEntities: 400,
   inspectPlayers: 16,
@@ -89,6 +89,9 @@ export class LabInteractBridge {
       room: labClient?.state?.room || "",
       snapshotTick: snapshotApplied ? match.state.tick : null,
       roomTime: projectRoomTime(roomTime),
+      camera: projectCamera(match?.camera),
+      cameraViewport: projectCameraViewport(match?.camera),
+      cameraWorldBounds: projectCameraWorldBounds(match?.camera),
     };
   }
 
@@ -294,6 +297,8 @@ export class LabInteractBridge {
         map: projectMap(match.state.map),
       },
       camera: projectCamera(match.camera),
+      cameraViewport: projectCameraViewport(match.camera),
+      cameraWorldBounds: projectCameraWorldBounds(match.camera),
     };
   }
 
@@ -301,13 +306,9 @@ export class LabInteractBridge {
     const { match } = this.session();
     const action = String(input?.action || "");
     if (action === "set") {
-      match.camera.setView({
-        x: optionalFiniteNumber(input?.x),
-        y: optionalFiniteNumber(input?.y),
-        zoom: optionalFiniteNumber(input?.zoom),
-        centerX: optionalFiniteNumber(input?.centerX),
-        centerY: optionalFiniteNumber(input?.centerY),
-      });
+      if (!match.camera.restore(input?.snapshot)) {
+        throw bridgeError("invalidCamera", "camera.snapshot must be a valid CameraSnapshotV1.");
+      }
     } else if (action === "focus") {
       const ids = boundedIds(input?.entityIds, "camera.entityIds", LAB_INTERACT_LIMITS.focusEntities);
       const entities = ids.map((id) => match.state.entityById(id)).filter(Boolean);
@@ -320,17 +321,18 @@ export class LabInteractBridge {
       const maxX = Math.max(...entities.map((entity) => entity.x));
       const minY = Math.min(...entities.map((entity) => entity.y));
       const maxY = Math.max(...entities.map((entity) => entity.y));
-      const width = Math.max(1, maxX - minX + padding * 2);
-      const height = Math.max(1, maxY - minY + padding * 2);
-      const zoom = Math.min(match.camera.viewW / width, match.camera.viewH / height);
-      if (Number.isFinite(zoom) && zoom > 0) match.camera.setZoom(zoom);
-      const centerX = (minX + maxX) / 2;
-      const centerY = (minY + maxY) / 2;
-      match.camera.centerOn(centerX, centerY);
+      match.camera.fitWorldPoints([
+        { x: minX - padding, y: minY - padding },
+        { x: maxX + padding, y: maxY + padding },
+      ]);
     } else {
       throw bridgeError("invalidCamera", "camera.action must be set or focus.");
     }
-    return { camera: projectCamera(match.camera) };
+    return {
+      camera: projectCamera(match.camera),
+      cameraViewport: projectCameraViewport(match.camera),
+      cameraWorldBounds: projectCameraWorldBounds(match.camera),
+    };
   }
 
   reset() {
@@ -375,6 +377,8 @@ export class LabInteractBridge {
       mode,
       viewport: projectViewport(),
       camera: projectCamera(match.camera),
+      cameraViewport: projectCameraViewport(match.camera),
+      cameraWorldBounds: projectCameraWorldBounds(match.camera),
     };
   }
 
@@ -415,6 +419,8 @@ export class LabInteractBridge {
       roomTime: projectRoomTime(match.roomTimeControls?.roomTimeState),
       viewport: projectViewport(),
       camera: projectCamera(match.camera),
+      cameraViewport: projectCameraViewport(match.camera),
+      cameraWorldBounds: projectCameraWorldBounds(match.camera),
       visualProfileId: match.visualProfile?.id || null,
       subjects: subjectEntities.map(projectEntity),
       fonts,
@@ -508,9 +514,7 @@ function inspectionIncludesEntity(entity, query, camera) {
 }
 
 function entityInCameraViewport(entity, camera) {
-  const screen = camera?.worldToScreen?.(entity.x, entity.y);
-  return Number.isFinite(screen?.x) && Number.isFinite(screen?.y) &&
-    screen.x >= 0 && screen.x <= camera.viewW && screen.y >= 0 && screen.y <= camera.viewH;
+  return camera?.containsProjected?.({ x: entity.x, y: entity.y, heightPx: 0 }) === true;
 }
 
 function boundedCommand(command) {
@@ -577,22 +581,23 @@ function projectMap(map) {
 }
 
 function projectCamera(camera) {
-  const topLeft = camera?.screenToWorld?.(0, 0);
-  const bottomRight = camera?.screenToWorld?.(camera?.viewW, camera?.viewH);
-  return {
-    x: finiteOrNull(camera?.x),
-    y: finiteOrNull(camera?.y),
-    zoom: finiteOrNull(camera?.zoom),
-    worldBounds: Number.isFinite(topLeft?.x) && Number.isFinite(topLeft?.y) &&
-      Number.isFinite(bottomRight?.x) && Number.isFinite(bottomRight?.y)
-      ? {
-        minX: Math.min(topLeft.x, bottomRight.x),
-        minY: Math.min(topLeft.y, bottomRight.y),
-        maxX: Math.max(topLeft.x, bottomRight.x),
-        maxY: Math.max(topLeft.y, bottomRight.y),
-      }
-      : null,
-  };
+  const snapshot = camera?.snapshot?.();
+  return snapshot?.version === 1 ? snapshot : null;
+}
+
+function projectCameraViewport(camera) {
+  const viewport = camera?.projectionSnapshot?.()?.viewport;
+  return Number.isFinite(viewport?.widthCssPx) && Number.isFinite(viewport?.heightCssPx)
+    ? viewport
+    : null;
+}
+
+function projectCameraWorldBounds(camera) {
+  const bounds = camera?.viewportGroundBounds?.();
+  return Number.isFinite(bounds?.minX) && Number.isFinite(bounds?.minY) &&
+    Number.isFinite(bounds?.maxX) && Number.isFinite(bounds?.maxY)
+    ? bounds
+    : null;
 }
 
 function projectRoomTime(roomTime) {
@@ -758,11 +763,6 @@ function finiteNumber(value, label) {
   const number = Number(value);
   if (!Number.isFinite(number)) throw bridgeError("invalidInput", `${label} must be finite.`);
   return number;
-}
-
-function optionalFiniteNumber(value) {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : undefined;
 }
 
 function finiteOrNull(value) {

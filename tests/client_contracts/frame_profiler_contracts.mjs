@@ -323,7 +323,12 @@ export function runFrameProfilerContracts() {
           rememberedBuildings: [{ id: 9 }],
           visibleTiles: Uint8Array.from([1, 0, 1, 1]),
         },
-        camera: { viewW: 800, viewH: 600, zoom: 1.5 },
+        camera: {
+          projectionSnapshot: () => ({
+            camera: { version: 1, focus: { x: 400, y: 300 }, framingScale: 1.5, boundsPolicy: "mapOverscroll" },
+            viewport: { widthCssPx: 800, heightCssPx: 600 },
+          }),
+        },
         renderer: { app: { view: { width: 1600, height: 1200 }, renderer: {} } },
         prediction: { debugSummary: () => ({ mode: "predicting" }) },
       });
