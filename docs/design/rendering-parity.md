@@ -41,8 +41,8 @@ when the new shared contract is not yet implemented.
 | Navigation, resize, minimap footprint/recenter | Pixi complete | missing | required | required | `P1.5-navigation-minimap` plus `P1.75-shared-camera`; gestures, resize, and minimap use semantic operations |
 | Audio, alerts, control groups, carryover, Lab/diagnostics camera consumers | Pixi complete | missing | required | required | `P1.75-shared-camera`; all shared consumers use semantic listener/projection/bounds/fit/snapshot data and the raw-read allowlist is closed |
 | Perspective-safe picking/selection/marquee | Pixi complete | missing | required | required | `P2-perspective-selection`; detached last-presented proxies drive clicks, targeting, viewport admission, and real screen marquees |
-| Detached least-privilege presentation frame | placeholder | missing | required | required | `P3-presentation-frame`; shared sidecar is complete, while Pixi legacy reads remain until Phase 3.5 |
-| Immutable terrain/fog grids and revision pinning | placeholder | missing | required | required | `P3-presentation-frame`; immutable revision-cached accessors exist, backend staging/cutover remains Phase 3.5 |
+| Detached least-privilege presentation frame | Pixi complete | missing | required | required | `P3.5-pixi-cutover`; Match has one `render(frame)` seam and Pixi's adapter is exact/ratcheted |
+| Immutable terrain/fog grids and revision pinning | Pixi complete | missing | required | required | `P3.5-pixi-cutover`; Pixi copies immutable revisions into backend-owned staging and reuses unchanged frames |
 | Static terrain | Pixi complete | missing | required | required | Current cached Pixi terrain; Babylon Phase 7 |
 | Permanent ground decals/trenches | Pixi complete | missing | not required | required | Long-tail Babylon presentation after foundations |
 | Generic visible entities/buildings/resources | Pixi complete | missing | required | required | Babylon truthful placeholders Phases 7/10 |
@@ -153,6 +153,26 @@ when the new shared contract is not yet implemented.
 - `notes`: Pixi intentionally remains on its legacy arguments, so the two new frame/grid rows are
   placeholders rather than backend-complete. Phase 3.5 makes `render(frame)` the only backend seam,
   reconciles destructive ground-decal reads, and proves runtime/capture/rematch equivalence.
+
+### `P3.5-pixi-cutover`
+
+- `phase`: Phase 3.5.
+- `commit`: Phase 3.5 implementation commit containing this evidence.
+- `automated`: `node tests/client_contracts/presentation_frame_contracts.mjs && node tests/client_contracts/pixi_presentation_adapter_contracts.mjs && node tests/client_contracts/renderer_feedback_contracts.mjs && node tests/client_contracts/lab_interact_capture_contracts.mjs && node scripts/check-client-architecture.mjs && tests/run-all.sh --only-browser-scenarios=smoke`.
+- `assertion`: One post-fog `render(frame)` call; exact private Pixi legacy-read allowlist; one
+  compatibility snapshot per immutable frame; backend-owned static/fog copies; shared pre-assembly
+  decal reconciliation with no duplicate stamp on repeated render; frame-derived entities,
+  feedback, observer overlay, marquee, ownership, selection, and animation state; successful-frame
+  selection publication; bounded render failure and later recovery; fixed-capture delegation;
+  static revision/rematch teardown; normal and Lab browser smoke.
+- `artifact`: `target/lab-interact/lab_52ab02691bd74994a58bd8400ce15c95/captures/render3d-p3-5-2026-07-11T23-08-34-834Z.png`
+  (ignored local evidence; SHA-256
+  `e722fbe7d9aa0b573288847111ce491740a1784c1039e0b6a1311bb7d70cb31a`; adjacent manifest records
+  seed 3303, 1000x700/DPR 1, clean Pixi presentation, two subjects, ready assets, and no page/frame/render errors).
+- `inspected`: yes.
+- `notes`: Pixi presentation is materially equivalent while Match no longer passes mutable legacy
+  arguments. Phase 4 next owns normalized transient event identity/history, retained received poses,
+  deduplication inputs, recoil/pose compatibility-read removal, and reset/seek/rematch event semantics.
 
 ## Gate interpretation
 

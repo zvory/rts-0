@@ -88,6 +88,10 @@ export class GroundDecalBuffer {
     return out;
   }
 
+  reconcilePending() {
+    return this.consumePending();
+  }
+
   peekPending() {
     return this._pending.slice();
   }

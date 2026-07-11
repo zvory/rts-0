@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Depends On
 
@@ -62,11 +62,11 @@ normalization begins.
 
 ## Implementation Checklist
 
-- [ ] Add/quarantine the Pixi compatibility adapter and exact legacy-read ratchet.
-- [ ] Cut Match over to one assembled `render(frame)` call.
-- [ ] Move non-event one-shot/destructive consumption before assembly.
-- [ ] Prove Pixi runtime/capture/replay/Lab/rematch equivalence and soft errors.
-- [ ] Update durable docs/ledger and mark this phase done.
+- [x] Add/quarantine the Pixi compatibility adapter and exact legacy-read ratchet.
+- [x] Cut Match over to one assembled `render(frame)` call.
+- [x] Move non-event one-shot/destructive consumption before assembly.
+- [x] Prove Pixi runtime/capture/replay/Lab/rematch equivalence and soft errors.
+- [x] Update durable docs/ledger and mark this phase done.
 
 ## Verification
 

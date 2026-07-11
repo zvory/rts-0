@@ -195,13 +195,15 @@ assertThrows(() => detachedRecord({ value: new Uint8Array([1]) }), "ordinary rec
 assertThrows(() => createGridSnapshot({ revision: 0, width: 2, height: 2, source: [1] }), "grid snapshots reject short sources");
 
 // Frame-loop integration: fog updates before the final frame, one projection/feedback/assembly
-// is shared with the legacy Pixi call, and successful presentation publishes the matching scene.
+// reaches the backend through render(frame), and successful presentation publishes its scene.
 {
   let fogUpdated = false;
   let projectionReads = 0;
   let rendererCalls = 0;
   let published = null;
   let entityReads = 0;
+  let decalReconciliations = 0;
+  let presented = true;
   const integrationMap = { width: 1, height: 1, tileSize: 32, terrain: [0], resources: [] };
   const match = {
     running: true,
@@ -230,7 +232,10 @@ assertThrows(() => createGridSnapshot({ revision: 0, width: 2, height: 2, source
       visibleTiles: [1],
       rememberedBuildings: [],
       trenches: [],
-      groundDecals: { peekPending: () => [] },
+      reconcilePendingGroundDecals() {
+        decalReconciliations += 1;
+        return decalReconciliations === 1 ? [{ id: 12, kind: "rifleman", x: 10, y: 10 }] : [];
+      },
       tick: 9,
       entitiesInterpolated(alpha, options = {}) {
         entityReads += 1;
@@ -254,11 +259,12 @@ assertThrows(() => createGridSnapshot({ revision: 0, width: 2, height: 2, source
     clientIntent: null,
     renderClock: { now: () => 700 },
     renderer: {
-      render(_state, _camera, _fog, _alpha, options) {
+      render(frame) {
         rendererCalls += 1;
-        assert(fogUpdated, "legacy backend runs only after fog and final frame assembly");
-        assert(options.presentationFrame.visible.get(0) === 1, "legacy call receives the post-fog sidecar frame");
-        assert(options.feedbackView != null, "legacy Pixi path reuses the one shared feedback view");
+        assert(fogUpdated, "backend runs only after fog and final frame assembly");
+        assert(frame.visible.get(0) === 1, "backend receives the post-fog presentation frame");
+        assert(frame.layers.persistentGroundMark.length === (rendererCalls === 1 ? 1 : 0), "decal reconciliation runs before final assembly");
+        return { presented };
       },
     },
     observerDiagnostics: null,
@@ -267,8 +273,13 @@ assertThrows(() => createGridSnapshot({ revision: 0, width: 2, height: 2, source
   assert(rendererCalls === 1, "one backend call occurs for one capture frame");
   assert(projectionReads === 1, "one projection snapshot is shared by frame and SelectionScene");
   assert(entityReads === 2, "alpha-1 capture builds predicted and authoritative views without backend re-query");
+  assert(decalReconciliations === 1, "one shared decal reconciliation occurs for the frame");
   assert(match.presentationFrame.diagnosticsContext.assemblyOrdinal === 1, "one presentation assembly occurs for the frame");
   assert(published?.frameId === match.presentationFrame.frameId, "published selection scene matches the presented frame id");
+  presented = false;
+  published = null;
+  runMatchCaptureFrame(match, 716);
+  assert(published === null, "a failed backend frame does not publish a new selection scene");
 }
 
 function fakeProjection() {

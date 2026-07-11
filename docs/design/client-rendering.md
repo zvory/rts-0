@@ -299,9 +299,18 @@ frozen outer `SharedFrameContextV1` containing the interpolated, current, author
 fog-source, and selected arrays needed by shared client consumers. Only its already-filtered
 interpolated array is admitted to `PresentationFrameV1`: authoritative and fog-source variants
 remain app-side inputs for fog, HUD, minimap, analysis, and selection assembly. `frame_recovery.js`
-samples one projection and visual time, updates fog, builds renderer feedback once, then assembles
-one final frame and passes that immutable sidecar beside the legacy Pixi arguments. Phase 3.5 owns
-removing those legacy arguments and making `render(frame)` the backend seam.
+samples one projection and visual time, updates fog, builds renderer feedback once, reconciles
+pending ground decals, then assembles one final frame. Phase 3.5 makes
+`match.renderer.render(presentationFrame)` the sole per-frame backend call. The named
+`PixiPresentationAdapter` materializes Pixi-owned terrain/fog staging and frame-local compatibility
+facades from that immutable frame; the underlying Pixi engine no longer receives mutable
+`GameState`, `Camera`, `Fog`, or `ClientIntent` from Match.
+
+Calling Pixi repeatedly with the same frame reuses its compatibility snapshot, performs no new
+legacy query, and cannot stamp the frame's ground-decal batch twice. Screen marquee state is drawn
+from `screenOverlay` during `render(frame)`, not through a separate Match-to-renderer callback.
+Backend-wide failure returns `{presented:false}`, leaves the previous selection scene published,
+records a bounded render diagnostic, and does not stop HUD/minimap work or later Match frames.
 
 The assembler explicitly admits received entity presentation fields rather than cloning snapshot
 records wholesale. It resolves selected state, `own`/`ally`/`enemy`/`neutral`/`observed`
@@ -492,7 +501,8 @@ soft render diagnostics, resize, reset, and teardown. Placeholder coverage is no
 
 ### 8.3 Current lifecycle and capture dependencies
 
-`Match` constructs `GameState`, `ClientIntent`, `Camera`, Pixi `Renderer`, `Fog`, HUD, input router,
+`Match` constructs `GameState`, `ClientIntent`, `Camera`, the Pixi presentation adapter/renderer,
+`Fog`, HUD, input router,
 minimap, input/replay input, audio routing, diagnostics, and room-time surfaces. It installs network,
 window, document, and DOM listeners, interval/timer collaborators, then owns/reschedules rAF through
 `frame_recovery.js`. `Match.destroy()` is the parent cleanup point. Renderer teardown must cover
@@ -500,6 +510,24 @@ Pixi Application/canvas, display pools, rigs, textures it created, decals, selec
 graphics, and pending asset loads. Minimap owns canvas/window pointer listeners and cached canvases;
 input/replay input own pointer/keyboard/lock listeners; audio is App-owned and persists between
 matches but its match voices/listener pose are reset.
+
+The Pixi adapter is imported only by `match.js`; Babylon and other backends cannot import or
+receive it. Its temporary legacy-source allowlist is exact and sampled at most once per new frame:
+
+| Temporary Pixi read | Reason | Removal owner |
+| --- | --- | --- |
+| `state.resources.oil` | Preserve current low-oil/fuel rig cue. | Post-foundations Pixi DTO closure. |
+| `state._curById`, `state._prevById` | Preserve snapshot-motion admission for frame strips. | Phase 4 pose/event normalization. |
+| `state.weaponRecoil`, `state.weaponRecoilPhase` | Preserve received attack recoil sampling. | Phase 4 attack-event normalization. |
+| `match.renderClock` | Preserve the injected Pixi visual/capture clock. | Phase 5 capture lifecycle. |
+| `match.frameProfiler` | Keep existing Pixi sub-phase/counter reporting. | Phase 11 backend metrics. |
+| `match.visualProfile.unitOverrides`, `match.visualProfile.frameStripOverrides` | Preserve Lab-only visual experiments. | Phase 10 representative visuals. |
+| `match.presentationAssembler.staticMap` | Copy a matching immutable static revision into Pixi-owned staging. | Phase 6 backend lifecycle. |
+
+Ground decals are the only non-event destructive queue present at cutover. `frame_recovery.js`
+calls the shared `reconcilePendingGroundDecals()` before final assembly; Pixi receives the detached
+`persistentGroundMark` records and never consumes the shared queue. Phase 4 owns transient event
+identity/history, received pose retention, and removal of the recoil/pose compatibility reads.
 
 Fixed capture currently suspends/restores Match rAF, swaps the injected render clock, renders with
 alpha 1, and explicitly presents the Pixi frame. Capture-time rig/effect/smoke/projectile/recoil/

@@ -330,6 +330,7 @@ export function buildRendererFeedbackView(state, options?)
 ```js
 export class GroundDecalBuffer {
   applySnapshotEvents(events, context)
+  reconcilePending()                    // shared pre-assembly drain used by Match
   consumePending()
   get pendingCount()
   clear()
@@ -468,11 +469,12 @@ assembler.reset({map, generation?})  // replay/Lab/rematch generation reset seam
 ```
 `frame_recovery.js` updates authoritative fog before it assembles this sidecar. It samples one
 projection, one visual time, one renderer feedback view, and one observer/screen-overlay model for
-the frame; the same projection drives `SelectionSceneV1`, and the same feedback view is passed to
-the existing Pixi renderer. Pixi still reads its legacy state/camera/fog arguments through Phase
-3.5, but the sidecar contains no mutable state/intent, selection proxy, mutable typed array, Pixi
-object, or transport record. Static terrain/resource locations are separately revisioned;
-visible/explored grids reuse opaque snapshots by revision and copy only into backend-owned staging.
+the frame; the same projection drives `SelectionSceneV1`. Match then makes exactly one
+`renderer.render(presentationFrame)` call. `PixiPresentationAdapter` reconstructs only its
+ratcheted frame-local compatibility facade, copies static/fog grids into Pixi-owned staging, and
+does not expose its adapter to another backend. The sidecar contains no mutable state/intent,
+selection proxy, mutable typed array, Pixi object, or transport record. Static terrain/resource
+locations are separately revisioned; visible/explored grids reuse opaque snapshots by revision.
 
 `settings_container.js`
 ```js
@@ -1057,13 +1059,26 @@ export class Renderer {
   constructor(canvasParent)              // creates PIXI.Application, layers
   resize(w,h)
   buildStaticMap(map)                    // draw terrain once into a cached layer
-  render(state, camera, fog, alpha, options?) // per-frame; draws entities, fog, selection, placement, Tank Traps
+  render(stateFacade, cameraFacade, fogFacade, alpha, options?) // Pixi-private engine seam
   captureReadiness({subjectIds?, subjectKinds?}) // bounded visual asset/error state for Lab Interact capture
   app                                    // the PIXI.Application (for ticker/stage if needed)
-  // Pixi implementation of the backend screen-overlay operation; Input receives only a callback:
+  // Pixi implementation used by PixiPresentationAdapter's screenOverlay reconciliation:
   drawSelectionBox(rectOrNull)
 }
 ```
+
+`renderer/pixi_compatibility_adapter.js`
+```js
+export const PIXI_LEGACY_READ_ALLOWLIST // frozen ids plus removal owners
+export class PixiPresentationAdapter {
+  constructor(canvasParent, {renderClock,state,profiler,visualProfile,staticMap})
+  render(presentationFrame) -> {presented:boolean}
+  resize(w,h), enterFixedCapture(clock), presentFixedCaptureFrame(), exitFixedCapture(clock)
+  captureReadiness(query), destroy()
+}
+```
+Normal Match rendering uses this adapter. The direct `Renderer` surface remains Pixi-private and
+is also owned separately by Map Editor, which has no Match or simulation frame.
 
 `fog.js`
 ```js
@@ -1454,9 +1469,10 @@ terrain and resources):
 - Mortar impacts stamp a compact, air-burst-style starburst with a small dark center; artillery
   impacts stamp a larger starburst scaled to their authoritative impact radius. Both are neutral
   earth/charcoal marks, with no source owner or hidden-source recovery.
-- `GameState` queues only unpainted death ids and received impact records, and `Renderer` consumes
-  the pending queue once per frame. A skipped snapshot or reconnect may miss older decals; the
-  client must not infer them.
+- `GameState` queues only unpainted death ids and received impact records. Match reconciles the
+  pending batch once before presentation assembly; Pixi stamps the detached frame records and never
+  consumes the shared queue. A skipped snapshot or reconnect may miss older decals; the client must
+  not infer them.
 - The renderer stamps each new-decal batch into one downsampled texture, updates that texture once
   per stamped batch, and draws the accumulated marks as one sprite. Old decals are not iterated or
   redrawn during normal frames.
