@@ -239,6 +239,7 @@ const screenshot = call("screenshot", {
 assert.equal(screenshot.result.image.mimeType, "image/png", "screenshot returns bounded PNG metadata");
 assert.equal("data" in screenshot.result.image, false, "CLI screenshot responses never embed image bytes");
 assert.match(screenshot.result.pngPath, /target\/lab-interact\//, "new captures use only the renamed artifact root");
+assert.equal(callFailure("record-wait", { sessionId }).error.code, "recordingInactive", "a never-started CLI wait fails clearly");
 
 const recordingStarted = call("record-start", {
   sessionId, name: "cli-contract-motion", maxDurationMs: 5_000,
@@ -247,15 +248,23 @@ const recordingStarted = call("record-start", {
 assert.equal(recordingStarted.result.recorder.active, true, "record-start exposes one active session recorder");
 assert.equal(call("status", { sessionId }).result.recorder.active, true, "session status exposes active recorder state");
 assert.equal(callFailure("record-start", { sessionId, name: "duplicate" }).error.code, "recordingActive", "duplicate recording starts are correctable errors");
+const recordingWaitProcess = execFileAsync(process.execPath, [cli, "record-wait", JSON.stringify({ sessionId })], { cwd: root, env: baseEnv });
+await waitFor(() => readState(paths)?.activeRequests === 1, 1_000, "record-wait is admitted outside the session mutation queue");
 call("order", { sessionId, playerId: 1, command: { c: "move", units: ["shooter"], x: 1100, y: 1000 } });
 const stepped = call("time", { sessionId, control: { action: "step", ticks: 3 } });
 const recordingStopped = call("record-stop", { sessionId });
+const { stdout: recordingWaitStdout, stderr: recordingWaitStderr } = await recordingWaitProcess;
+assert.equal(recordingWaitStderr, "", "successful record-wait keeps stderr empty");
+assert.deepEqual(JSON.parse(recordingWaitStdout).result, recordingStopped.result, "concurrent record-wait returns the same finalized artifact as record-stop");
 assert.equal(recordingStopped.result.probe.codec, "h264", "record-stop returns bounded H.264 MP4 probe metadata");
 assert.match(recordingStopped.result.videoPath, /\.mp4$/, "record-stop returns a mobile MP4 path");
 assert.equal(recordingStopped.result.framePaths.length, 2, "record-stop returns representative frame paths");
 assert.match(recordingStopped.result.contactSheetPath, /target\/lab-interact\//, "contact sheets stay beneath the artifact root");
+assert.deepEqual(call("record-wait", { sessionId }).result, recordingStopped.result, "completed record-wait remains idempotent");
 assert.equal(callFailure("record-stop", { sessionId }).error.code, "recordingInactive", "duplicate recording stops are correctable errors");
-assert.equal(callFailure("record-start", { sessionId, maxDurationMs: 30_001 }).error.code, "invalidInput", "recording duration remains hard bounded");
+assert.equal(callFailure("record-start", { sessionId, maxDurationMs: 60_001 }).error.code, "invalidInput", "recording duration remains hard bounded");
+assert.equal(call("record-start", { sessionId, name: "one-minute-bound", maxDurationMs: 60_000 }).result.recorder.maxDurationMs, 60_000, "CLI accepts the exact one-minute recording bound");
+call("record-stop", { sessionId });
 assert.equal(callFailure("record-start", { sessionId, crop: { x: 0, y: 0, width: 1, height: 10 } }).error.code, "invalidInput", "recording crop dimensions remain bounded");
 
 const fixed = call("capture-fixed", { sessionId, name: "cli-fixed", fps: 60, frameCount: 3 });

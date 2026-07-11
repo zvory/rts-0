@@ -12,7 +12,7 @@ import { pathToFileURL } from "node:url";
 
 import {
   checkMediaCapabilities, finalizeMedia, LabInteractRecordingError, RECORDING_LIMITS,
-  removePartialRecording, stopRecorderWithin, waitForMediaFile,
+  recordingStopTimeoutMs, removePartialRecording, stopRecorderWithin, waitForMediaFile,
 } from "./recording.mjs";
 import {
   encodeFixedCapture, FIXED_CAPTURE_LIMITS, fixedFrameTick, hashFrame,
@@ -97,6 +97,7 @@ export class LabInteractDriver {
     this.closePromise = null;
     this.recording = null;
     this.lastRecording = null;
+    this.lastRecordingCompletion = null;
     this.fixedCapture = null;
     this.lastFixedCapture = null;
     this.signalHandlers = [];
@@ -341,14 +342,17 @@ export class LabInteractDriver {
         recorder = await this.page.screencast({ path: webmPath, crop: clip, scale, ffmpegPath: tools.ffmpeg });
         const startedMs = Date.now();
         const startStatus = await this.callBridge("status", {});
+        const completion = recordingCompletion();
         const recording = {
           name: artifactName, recorder, tools, recordingDir, webmPath, mp4Path,
           framesDir: path.join(recordingDir, "frames"), contactSheetPath: path.join(recordingDir, `${artifactName}-contact-sheet.png`),
           manifestPath: path.join(recordingDir, `${artifactName}.json`), startedMs, startedAt: new Date(startedMs).toISOString(),
           startStatus, clip, scale, viewport: normalizedViewport, originalViewport,
           maxDurationMs, finalizing: null, stoppedBy: null, operations: [], operationCount: 0,
-          operationsTruncated: false, aliases: [],
+          operationsTruncated: false, aliases: [], completion,
         };
+        this.lastRecording = null;
+        this.lastRecordingCompletion = completion;
         this.recording = recording;
         recording.watchdog = setTimeout(() => { void this.finishRecording("watchdog").catch(() => {}); }, maxDurationMs);
         recording.watchdog.unref?.();
@@ -480,8 +484,42 @@ export class LabInteractDriver {
     return true;
   }
 
-  async recordStop(metadata = {}) {
-    return this.enqueue(() => this.finishRecording("explicit", metadata));
+  recordStop(metadata = {}) {
+    const admittedRecording = this.recording;
+    return this.enqueue(() => {
+      // A start already ahead of this stop in the driver queue may not have
+      // installed its recording yet. Resolve that case at execution time while
+      // still binding an admitted active recording so a watchdog cannot make
+      // this stop drift onto a later recording.
+      const recording = admittedRecording || this.recording;
+      if (!recording) {
+        throw new LabInteractDriverError(
+          "recordingInactive",
+          "No recording is active for this session. Start one before stopping.",
+        );
+      }
+      // The watchdog and lifecycle cleanup intentionally finalize outside the
+      // driver queue. If either wins while this stop is queued, observe that
+      // recording's shared completion instead of failing or targeting a newer one.
+      if (this.recording !== recording) return recording.completion.promise;
+      return this.finishRecording("explicit", metadata);
+    });
+  }
+
+  recordWait() {
+    const completion = this.recording?.completion || this.lastRecordingCompletion;
+    if (!completion) {
+      return Promise.reject(new LabInteractDriverError(
+        "recordingInactive",
+        "No recording has been started for this session. Start one before waiting.",
+      ));
+    }
+    return completion.promise;
+  }
+
+  settleRecording(reason, metadata = {}) {
+    if (!this.recording) return null;
+    return this.finishRecording(reason, metadata);
   }
 
   async finishRecording(reason, metadata = {}) {
@@ -496,8 +534,10 @@ export class LabInteractDriver {
         const endStatus = await this.callBridge("status", {}).catch(() => null);
         // An immediate stop is valid; retain a minimally positive timeline even when
         // start and stop land in the same millisecond.
-        const stoppedMs = Math.max(Date.now(), recording.startedMs + 1);
-        await stopRecorderWithin(recording.recorder);
+        const stoppedMs = reason === "watchdog"
+          ? recording.startedMs + recording.maxDurationMs
+          : Math.max(Date.now(), recording.startedMs + 1);
+        await stopRecorderWithin(recording.recorder, recordingStopTimeoutMs(recording.maxDurationMs));
         await waitForMediaFile(recording.webmPath);
         const wallDurationMs = Math.max(1, stoppedMs - recording.startedMs);
         const media = finalizeMedia({
@@ -549,14 +589,23 @@ export class LabInteractDriver {
         return result;
       } catch (error) {
         removePartialRecording([recording.recordingDir]);
-        if (error instanceof LabInteractRecordingError) throw new LabInteractDriverError(error.code, error.message);
-        throw error;
+        const failure = error instanceof LabInteractRecordingError
+          ? new LabInteractDriverError(error.code, error.message, error.details)
+          : error;
+        // finishRecording is also called outside enqueue() by watchdog and
+        // lifecycle settlement. Decorate here so every observer of the shared
+        // completion receives the same normalized failure object.
+        throw this.decorateError(failure);
       } finally {
         if (recording.originalViewport) await this.page?.setViewport(recording.originalViewport).catch(() => {});
         await this.callBridge("presentation", { mode: "default" }).catch(() => {});
         if (this.recording === recording) this.recording = null;
       }
     })();
+    void recording.finalizing.then(
+      (result) => recording.completion.resolve(result),
+      (error) => recording.completion.reject(error),
+    );
     return recording.finalizing;
   }
 
@@ -781,7 +830,7 @@ export class LabInteractDriver {
       if (this.state === DRIVER_STATES.CLOSED) return;
       this.removeCleanupHandlers();
       if (this.recording) {
-        await this.finishRecording("sessionClose").catch(() => {
+        await this.settleRecording("sessionClose")?.catch(() => {
           removePartialRecording([this.recording?.recordingDir]);
           this.recording = null;
         });
@@ -838,6 +887,34 @@ export class LabInteractDriver {
       diagnostics: { ...diagnostics, serverTail },
     });
   }
+}
+
+function recordingCompletion() {
+  let resolvePromise;
+  let rejectPromise;
+  let settled = false;
+  const promise = new Promise((resolve, reject) => {
+    resolvePromise = resolve;
+    rejectPromise = reject;
+  });
+  // A watchdog or lifecycle close may settle before a caller starts waiting.
+  // Register a rejection observer without changing the promise shared by waiters.
+  void promise.catch(() => {});
+  return {
+    promise,
+    resolve(value) {
+      if (settled) return false;
+      settled = true;
+      resolvePromise(value);
+      return true;
+    },
+    reject(error) {
+      if (settled) return false;
+      settled = true;
+      rejectPromise(error);
+      return true;
+    },
+  };
 }
 
 export function validateWorkspaceRoot(workspaceRoot) {

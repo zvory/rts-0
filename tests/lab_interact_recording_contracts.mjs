@@ -9,8 +9,12 @@ import {
   LAB_INTERACT_LIMITS, LabInteractService, validateCommandInput,
 } from "../scripts/lab-interact/command_service.mjs";
 import {
-  checkMediaCapabilities, finalizeMedia, LabInteractRecordingError, RECORDING_LIMITS,
+  checkMediaCapabilities, finalizeMedia, LabInteractRecordingError, mediaAuxiliaryTimeoutMs, mediaStageTimeoutMs,
+  recordingStopTimeoutMs, RECORDING_LIMITS,
 } from "../scripts/lab-interact/recording.mjs";
+import {
+  RECORDING_REQUEST_TIMEOUT_MS, REQUEST_TIMEOUT_MS, requestTimeoutMs,
+} from "../scripts/lab-interact/runtime.mjs";
 import { DRIVER_STATES, LabInteractDriver } from "../scripts/lab-interact/driver.mjs";
 import { LAB_INTERACT_SUMMARY_LIMITS } from "../scripts/lab-interact/manifest_summary.mjs";
 import { openLabInteractDriver } from "./fixtures/lab_interact_fake_driver.mjs";
@@ -21,15 +25,31 @@ const opened = await service.execute("open", {});
 const sessionId = opened.sessionId;
 
 assert.equal(RECORDING_LIMITS.defaultDurationMs, 10_000, "recordings default to a short review clip");
-assert.equal(RECORDING_LIMITS.maxDurationMs, 30_000, "recordings retain a hard 30-second duration ceiling");
+assert.equal(RECORDING_LIMITS.maxDurationMs, 60_000, "recordings support a hard one-minute duration ceiling");
 assert.equal(RECORDING_LIMITS.maxBytes, 64 * 1024 * 1024, "recordings retain a hard 64 MiB file ceiling");
 assert.equal(LAB_INTERACT_LIMITS.maxRecordingOperations, 200, "recording action manifests remain bounded");
 assert.equal(RECORDING_LIMITS.maxOperations, LAB_INTERACT_LIMITS.maxRecordingOperations, "service and driver share the operation bound");
 
 assert.throws(
-  () => validateCommandInput("record-start", { sessionId, maxDurationMs: 30_001 }),
+  () => validateCommandInput("record-start", { sessionId, maxDurationMs: 60_001 }),
   (error) => error?.code === "invalidInput",
   "record-start rejects durations over the hard bound",
+);
+assert.doesNotThrow(
+  () => validateCommandInput("record-start", { sessionId, maxDurationMs: 60_000 }),
+  "record-start accepts exactly one minute",
+);
+assert.equal(recordingStopTimeoutMs(60_000), RECORDING_LIMITS.maxStopTimeoutMs, "one-minute recorder flush gets capped duration-derived headroom");
+assert.equal(mediaStageTimeoutMs(60_000), RECORDING_LIMITS.maxMediaStageTimeoutMs, "one-minute FFmpeg stages get capped duration-derived headroom");
+assert.equal(mediaAuxiliaryTimeoutMs(60_000), RECORDING_LIMITS.maxMediaAuxiliaryTimeoutMs, "one-minute auxiliary media stages stay separately capped");
+assert.equal(requestTimeoutMs("status"), REQUEST_TIMEOUT_MS, "ordinary daemon commands keep their existing IPC deadline");
+assert.equal(requestTimeoutMs("record-wait"), RECORDING_REQUEST_TIMEOUT_MS, "record-wait gets bounded recording-specific IPC headroom");
+assert.ok(RECORDING_REQUEST_TIMEOUT_MS > REQUEST_TIMEOUT_MS, "recording IPC headroom exceeds the ordinary command deadline");
+const boundedMediaBudgetMs = RECORDING_LIMITS.maxDurationMs + RECORDING_LIMITS.maxStopTimeoutMs +
+  RECORDING_LIMITS.maxMediaStageTimeoutMs + 3 * RECORDING_LIMITS.maxMediaAuxiliaryTimeoutMs + 22_000;
+assert.ok(
+  RECORDING_REQUEST_TIMEOUT_MS >= boundedMediaBudgetMs + 60_000,
+  "recording IPC deadline covers the bounded wait, media stages, probes, flush, and browser cleanup headroom",
 );
 
 const tools = checkMediaCapabilities();
@@ -69,8 +89,8 @@ try {
   });
   assert.equal(media.probe.codec, "h264", "final media probe confirms H.264");
   assert.deepEqual(
-    { codecTag: media.probe.codecTag, pixelFormat: media.probe.pixelFormat, container: media.probe.container },
-    { codecTag: "avc1", pixelFormat: "yuv420p", container: "mov,mp4,m4a,3gp,3g2,mj2" },
+    { codecTag: media.probe.codecTag, pixelFormat: media.probe.pixelFormat, container: media.probe.container, fastStart: media.probe.fastStart },
+    { codecTag: "avc1", pixelFormat: "yuv420p", container: "mov,mp4,m4a,3gp,3g2,mj2", fastStart: true },
     "final media probe confirms the mobile MP4 compatibility surface",
   );
   assert.deepEqual(
@@ -98,11 +118,39 @@ try {
 }
 
 const watchdogDriver = fixtureRecordingDriver(root, tools);
+await assert.rejects(
+  watchdogDriver.recordWait(),
+  (error) => error?.code === "recordingInactive",
+  "a never-started recording wait is actionable",
+);
 await watchdogDriver.recordStart({ sessionId: `lab_${"b".repeat(32)}`, name: "watchdog", maxDurationMs: 25 });
-await waitFor(() => watchdogDriver.recordingStatus().active === false, 5_000);
+const watchdogResult = await withDeadline(watchdogDriver.recordWait(), 5_000);
 assert.equal(watchdogDriver.recordingStatus().last.stoppedBy, "watchdog", "duration watchdog finalizes an active recorder");
+assert.deepEqual(await watchdogDriver.recordWait(), watchdogResult, "a completed recording wait returns the same finalized result again");
 assert.ok(fs.existsSync(watchdogDriver.recordingStatus().last.contactSheetPath), "watchdog finalization retains a completed contact sheet");
 fs.rmSync(path.dirname(watchdogDriver.recordingStatus().last.videoPath), { recursive: true, force: true });
+
+const queuedStopDriver = fixtureRecordingDriver(root, tools);
+await queuedStopDriver.recordStart({ sessionId: `lab_${"e".repeat(32)}`, name: "queued-stop", maxDurationMs: 25 });
+const blockingOperation = queuedStopDriver.enqueue(() => new Promise((resolve) => setTimeout(resolve, 80)));
+const queuedStop = queuedStopDriver.recordStop();
+await blockingOperation;
+const queuedStopResult = await withDeadline(queuedStop, 5_000);
+assert.equal(queuedStopResult.stoppedBy, "watchdog", "a queued stop observes watchdog finalization of the recording it targeted");
+assert.deepEqual(await queuedStopDriver.recordWait(), queuedStopResult, "queued stop and wait retain one completion result");
+fs.rmSync(path.dirname(queuedStopResult.videoPath), { recursive: true, force: true });
+
+const queuedStartStopDriver = fixtureRecordingDriver(root, tools);
+const queuedStartBlocker = queuedStartStopDriver.enqueue(() => new Promise((resolve) => setTimeout(resolve, 20)));
+const queuedStart = queuedStartStopDriver.recordStart({
+  sessionId: `lab_${"9".repeat(32)}`, name: "queued-start-stop", maxDurationMs: 5_000,
+});
+const stopAfterQueuedStart = queuedStartStopDriver.recordStop();
+await queuedStartBlocker;
+await queuedStart;
+const queuedStartStopResult = await withDeadline(stopAfterQueuedStart, 5_000);
+assert.equal(queuedStartStopResult.stoppedBy, "explicit", "a stop queued after start targets the recording established ahead of it");
+fs.rmSync(path.dirname(queuedStartStopResult.videoPath), { recursive: true, force: true });
 
 const closeDriver = fixtureRecordingDriver(root, tools);
 await closeDriver.recordStart({ sessionId: `lab_${"c".repeat(32)}`, name: "close", maxDurationMs: 5_000 });
@@ -120,7 +168,10 @@ const delayedStopDriver = fixtureRecordingDriver(root, tools, { recorderStopDela
 await delayedStopDriver.recordStart({ sessionId: `lab_${"f".repeat(32)}`, name: "delayed-stop", maxDurationMs: 5_000 });
 await new Promise((resolve) => setTimeout(resolve, 60));
 const manifestAliases = Array.from({ length: 400 }, (_, index) => ({ alias: `subject_${index}`, id: index + 1 }));
-const delayedStop = await delayedStopDriver.recordStop({ aliases: manifestAliases });
+const delayedStopPromise = delayedStopDriver.recordStop({ aliases: manifestAliases });
+const delayedWaitPromise = delayedStopDriver.recordWait();
+const [delayedStop, delayedWait] = await Promise.all([delayedStopPromise, delayedWaitPromise]);
+assert.deepEqual(delayedWait, delayedStop, "finalizing stop and wait share one result shape");
 const delayedManifest = JSON.parse(fs.readFileSync(delayedStop.manifestPath, "utf8"));
 assert.ok(delayedManifest.capture.wallDurationMs < 200, "capture duration excludes recorder finalization latency");
 assert.ok(delayedStop.probe.durationSeconds < 0.2, "MP4 timeline excludes recorder finalization latency");
@@ -152,6 +203,29 @@ assert.equal(failedStatusDriver.fixtureRecorderStops, 1, "post-screencast startu
 const failedStatusRoot = path.join(root, "target", "lab-interact", failedStatusSessionId, "recordings");
 const failedStatusEntries = fs.existsSync(failedStatusRoot) ? fs.readdirSync(failedStatusRoot).filter((name) => name.startsWith("status-failure-")) : [];
 assert.deepEqual(failedStatusEntries, [], "post-screencast startup failure removes its partial recording directory");
+const failedFinalizeDriver = fixtureRecordingDriver(root, tools, { failRecorderStop: true });
+const failedFinalizeSessionId = `lab_${"a".repeat(32)}`;
+await failedFinalizeDriver.recordStart({ sessionId: failedFinalizeSessionId, name: "finalize-failure", maxDurationMs: 5_000 });
+const failedFinalizeWait = failedFinalizeDriver.recordWait();
+let failedStopError;
+await assert.rejects(
+  failedFinalizeDriver.recordStop().catch((error) => { failedStopError = error; throw error; }),
+  /fixture recorder stop failure/,
+  "explicit finalization reports recorder failure",
+);
+let failedWaitError;
+await assert.rejects(
+  failedFinalizeWait.catch((error) => { failedWaitError = error; throw error; }),
+  /fixture recorder stop failure/,
+  "the shared waiter rejects with the same finalization failure",
+);
+assert.strictEqual(failedWaitError, failedStopError, "stop and wait observe the identical normalized finalization failure");
+assert.equal(failedFinalizeDriver.fixtureRecorderStops, 1, "failed finalization settles the recorder exactly once");
+const failedFinalizeRoot = path.join(root, "target", "lab-interact", failedFinalizeSessionId, "recordings");
+const failedFinalizeEntries = fs.existsSync(failedFinalizeRoot)
+  ? fs.readdirSync(failedFinalizeRoot).filter((name) => name.startsWith("finalize-failure-"))
+  : [];
+assert.deepEqual(failedFinalizeEntries, [], "failed finalization removes partial artifacts");
 assert.throws(
   () => validateCommandInput("record-start", { sessionId, crop: { x: 0, y: 0, width: 1, height: 100 } }),
   (error) => error?.code === "invalidInput",
@@ -175,14 +249,18 @@ await assert.rejects(
   (error) => error?.code === "recordingActive",
   "duplicate starts do not replace the active recorder",
 );
+const activeWait = service.execute("record-wait", { sessionId });
 await service.execute("order", { sessionId, playerId: 1, command: { c: "move", units: ["subject"], x: 900, y: 900 } });
 await service.execute("camera", { sessionId, camera: { action: "focus", refs: ["subject"] } });
 await service.execute("time", { sessionId, control: { action: "step", ticks: 3 } });
 const stopped = await service.execute("record-stop", { sessionId });
+const waited = await activeWait;
+assert.deepEqual(waited, stopped, "service record-wait observes the same artifact returned by record-stop");
 assert.equal(stopped.probe.codec, "h264", "record-stop returns H.264 codec probe metadata");
 assert.equal(stopped.framePaths.length, 2, "record-stop returns representative PNG paths");
 assert.equal(stopped.fixtureMetadata.operations.length, 3, "accepted order, camera, and time operations are retained");
 assert.deepEqual(stopped.fixtureMetadata.aliases, [{ alias: "subject", id: 100 }], "stop records the final bounded alias map");
+assert.deepEqual(await service.execute("record-wait", { sessionId }), stopped, "service wait returns the already completed current recording");
 await assert.rejects(
   service.execute("record-stop", { sessionId }),
   (error) => error?.code === "recordingInactive",
@@ -190,13 +268,22 @@ await assert.rejects(
 );
 
 await service.execute("record-start", { sessionId, name: "close-cleanup" });
+const closeWait = service.execute("record-wait", { sessionId });
 assert.equal(await service.close(sessionId, "contractClose"), true, "session close succeeds while a recorder is active");
+assert.equal((await closeWait).stoppedBy, "sessionClose", "session close settles active recording waiters before draining work");
 assert.equal((await service.status()).sessions.length, 0, "close removes the recording session");
 await service.shutdown();
 
+const shutdownService = new LabInteractService({ workspaceRoot: root, driverFactory: openLabInteractDriver });
+const shutdownSession = await shutdownService.execute("open", {});
+await shutdownService.execute("record-start", { sessionId: shutdownSession.sessionId, name: "shutdown-cleanup" });
+const shutdownWait = shutdownService.execute("record-wait", { sessionId: shutdownSession.sessionId });
+assert.deepEqual(await shutdownService.execute("shutdown", {}), { shuttingDown: true }, "service shutdown waits for recorder settlement");
+assert.equal((await shutdownWait).stoppedBy, "sessionClose", "shutdown settles active recording waiters exactly once");
+
 console.log("✅ lab_interact_recording_contracts.mjs: bounds, state, operation metadata, errors, and close cleanup passed");
 
-function fixtureRecordingDriver(workspaceRoot, mediaTools, { failScreencast = false, failStartStatus = false, recorderStopDelayMs = 0 } = {}) {
+function fixtureRecordingDriver(workspaceRoot, mediaTools, { failScreencast = false, failStartStatus = false, failRecorderStop = false, recorderStopDelayMs = 0 } = {}) {
   const driver = new LabInteractDriver({ workspaceRoot, viewport: { width: 640, height: 480, deviceScaleFactor: 1 } });
   driver.workspace = { root: workspaceRoot, branch: "fixture", head: "a".repeat(40) };
   driver.state = DRIVER_STATES.OPEN;
@@ -235,6 +322,7 @@ function fixtureRecordingDriver(workspaceRoot, mediaTools, { failScreencast = fa
       assert.equal(generated.status, 0, `fixture screencast succeeds: ${generated.stderr}`);
       return { stop: async () => {
         recorderStops += 1;
+        if (failRecorderStop) throw new Error("fixture recorder stop failure");
         if (recorderStopDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, recorderStopDelayMs));
       } };
     },
@@ -243,11 +331,14 @@ function fixtureRecordingDriver(workspaceRoot, mediaTools, { failScreencast = fa
   return driver;
 }
 
-async function waitFor(predicate, timeoutMs) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (predicate()) return;
-    await new Promise((resolve) => setTimeout(resolve, 20));
+async function withDeadline(promise, timeoutMs) {
+  let timer;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("recording wait timed out")), timeoutMs); }),
+    ]);
+  } finally {
+    clearTimeout(timer);
   }
-  assert.fail("timed out waiting for recording lifecycle");
 }

@@ -31,6 +31,7 @@ export async function openLabInteractDriver(options) {
   let entities = [];
   let recording = null;
   let lastRecording = null;
+  let lastRecordingCompletion = null;
   let fixedCapture = null;
   const camera = {
     x: 0,
@@ -53,6 +54,35 @@ export async function openLabInteractDriver(options) {
       room: { tick, roomTime: { currentTick: tick, speed: 0, paused: true }, map: CATALOG.maps[0] },
       camera: { ...camera },
     };
+  };
+  const finishRecording = (reason, { aliases = [] } = {}) => {
+    if (!recording) throw Object.assign(new Error("No recording is active."), { code: "recordingInactive" });
+    if (recording.finalizing) return recording.finalizing;
+    const current = recording;
+    current.finalizing = (async () => {
+      const finalizeDelayMs = Number(process.env.RTS_LAB_INTERACT_FAKE_RECORD_FINALIZE_DELAY_MS || 0);
+      if (finalizeDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, finalizeDelayMs));
+      const directory = `${options.workspaceRoot}/target/lab-interact/${current.sessionId}/recordings/${current.name}-fixture`;
+      const result = {
+        active: false,
+        stoppedBy: reason,
+        videoPath: `${directory}/${current.name}.mp4`,
+        framePaths: [`${directory}/frames/frame-01.png`, `${directory}/frames/frame-02.png`],
+        contactSheetPath: `${directory}/${current.name}-contact-sheet.png`,
+        manifestPath: `${directory}/${current.name}.json`,
+        probe: { codec: "h264", width: 640, height: 480, frameRate: "30/1", durationSeconds: 1 },
+        frameDiagnostics: { expectedAt30Fps: 30, captured: 30, encoded: 30, droppedEstimate: 0, duplicatedEstimate: 0 },
+        authoritative: { startTick: current.startTick, endTick: tick },
+        fixtureMetadata: { operations: current.operations, aliases },
+      };
+      lastRecording = result;
+      return result;
+    })().finally(() => {
+      clearTimeout(current.watchdog);
+      if (recording === current) recording = null;
+    });
+    void current.finalizing.then(current.completion.resolve, current.completion.reject);
+    return current.finalizing;
   };
   return {
     workspace: { root: options.workspaceRoot, branch: "fixture", head: "a".repeat(40) },
@@ -159,7 +189,12 @@ export async function openLabInteractDriver(options) {
     },
     async recordStart({ sessionId, name = "recording", maxDurationMs = 10_000, viewport = null, crop = null, scale = 1 }) {
       if (recording) throw Object.assign(new Error("A recording is already active."), { code: "recordingActive" });
-      recording = { sessionId, name, maxDurationMs, viewport, crop, scale, startTick: tick, operations: [] };
+      const completion = deferred();
+      lastRecording = null;
+      lastRecordingCompletion = completion;
+      recording = { sessionId, name, maxDurationMs, viewport, crop, scale, startTick: tick, operations: [], completion, finalizing: null };
+      recording.watchdog = setTimeout(() => { void finishRecording("watchdog").catch(() => {}); }, maxDurationMs);
+      recording.watchdog.unref?.();
       return { active: true, name, maxDurationMs, authoritativeStartTick: tick };
     },
     recordAcceptedOperation(operation) {
@@ -168,22 +203,15 @@ export async function openLabInteractDriver(options) {
       return true;
     },
     async recordStop({ aliases = [] } = {}) {
-      if (!recording) throw Object.assign(new Error("No recording is active."), { code: "recordingInactive" });
-      const directory = `${options.workspaceRoot}/target/lab-interact/${recording.sessionId}/recordings/${recording.name}-fixture`;
-      lastRecording = {
-        active: false,
-        stoppedBy: "explicit",
-        videoPath: `${directory}/${recording.name}.mp4`,
-        framePaths: [`${directory}/frames/frame-01.png`, `${directory}/frames/frame-02.png`],
-        contactSheetPath: `${directory}/${recording.name}-contact-sheet.png`,
-        manifestPath: `${directory}/${recording.name}.json`,
-        probe: { codec: "h264", width: 640, height: 480, frameRate: "30/1", durationSeconds: 1 },
-        frameDiagnostics: { expectedAt30Fps: 30, captured: 30, encoded: 30, droppedEstimate: 0, duplicatedEstimate: 0 },
-        authoritative: { startTick: recording.startTick, endTick: tick },
-        fixtureMetadata: { operations: recording.operations, aliases },
-      };
-      recording = null;
-      return lastRecording;
+      return finishRecording("explicit", { aliases });
+    },
+    recordWait() {
+      const completion = recording?.completion || lastRecordingCompletion;
+      if (!completion) return Promise.reject(Object.assign(new Error("No recording has been started."), { code: "recordingInactive" }));
+      return completion.promise;
+    },
+    settleRecording(reason, metadata = {}) {
+      return recording ? finishRecording(reason, metadata) : null;
     },
     async captureFixed({ sessionId, name = "fixed", fps = 30, frameCount = 30, sceneIdentity = null, sceneRevision = 0, aliases = [] }) {
       const startTick = tick;
@@ -234,10 +262,21 @@ export async function openLabInteractDriver(options) {
       return { imported: true };
     },
     async close() {
-      recording = null;
+      if (recording) await finishRecording("sessionClose").catch(() => {});
       closed = true;
     },
   };
+}
+
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((onResolve, onReject) => {
+    resolve = onResolve;
+    reject = onReject;
+  });
+  void promise.catch(() => {});
+  return { promise, resolve, reject };
 }
 
 function checkpointScenario(name, tick, entities) {

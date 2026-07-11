@@ -8,7 +8,17 @@ export const DEFAULT_IDLE_MS = 30 * 60_000;
 export const MAX_REQUEST_BYTES = 1024 * 1024;
 export const IPC_VERSION = 1;
 export const REQUEST_TIMEOUT_MS = 120_000;
+// A one-minute wait can be followed by recorder flush, transcode, three auxiliary
+// FFmpeg stages, probes, and browser cleanup. Keep the client deadline beyond the
+// sum of those independently bounded stages so successful cleanup can reply.
+export const RECORDING_REQUEST_TIMEOUT_MS = 420_000;
 export const STARTUP_GRACE_MS = 15_000;
+
+export function requestTimeoutMs(command) {
+  return ["record-stop", "record-wait", "close", "shutdown"].includes(command)
+    ? RECORDING_REQUEST_TIMEOUT_MS
+    : REQUEST_TIMEOUT_MS;
+}
 
 export function checkoutCommit(workspaceRoot) {
   const result = spawnSync("git", ["rev-parse", "HEAD"], { cwd: workspaceRoot, encoding: "utf8" });

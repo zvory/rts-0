@@ -32,7 +32,8 @@ Use for tests, CI/hooks, or focused verification.
 - `node scripts/check-wiki.mjs` — wiki route hardening, generated stats, and faction catalog
   parity.
 - `node scripts/client-perf-harness.mjs --render-lag-suite --seconds 10`.
-- Lab Interact media contracts/smokes need FFmpeg/ffprobe with VP9 and H.264 encoders.
+- Lab Interact media contracts/smokes need FFmpeg/ffprobe with VP9 and H.264 encoders; recording
+  smoke uses `record-wait` rather than polling.
 - `node scripts/check-source-file-sizes.mjs` — enforce the 1500-line source cap.
 - `node scripts/check-crate-boundaries.mjs` — enforce crate direction.
 - `cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture` —

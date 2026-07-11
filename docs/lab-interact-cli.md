@@ -19,7 +19,7 @@ node scripts/lab-interact/cli.mjs camera '{"sessionId":"<id>","camera":{"action"
 node scripts/lab-interact/cli.mjs screenshot '{"sessionId":"<id>","name":"subject","presentation":"clean","subjects":["subject"]}'
 node scripts/lab-interact/cli.mjs record-start '{"sessionId":"<id>","name":"motion","maxDurationMs":10000}'
 node scripts/lab-interact/cli.mjs order '{"sessionId":"<id>","playerId":1,"command":{"c":"move","units":["subject"],"x":1100,"y":960}}'
-node scripts/lab-interact/cli.mjs record-stop '{"sessionId":"<id>"}'
+node scripts/lab-interact/cli.mjs record-wait '{"sessionId":"<id>"}'
 node scripts/lab-interact/cli.mjs capture-fixed '{"sessionId":"<id>","name":"motion-fixed","fps":30,"frameCount":60}'
 node scripts/lab-interact/cli.mjs capture-cancel '{"sessionId":"<id>"}'
 node scripts/lab-interact/cli.mjs export '{"sessionId":"<id>","kind":"setup","name":"two-unit-scene","reproduction":true}'
@@ -33,11 +33,11 @@ node scripts/lab-interact/cli.mjs screenshot --help
 ```
 
 The complete surface is `open`, `close`, `reset`, `catalog`, `spawn`, `update`, `remove`, `order`,
-`time`, `inspect`, `camera`, `screenshot`, `record-start`, `record-stop`, `export`, `import`,
-`artifact-inspect`, `capture-fixed`, `capture-cancel`, `status`, and `shutdown`. Success writes exactly one JSON
-envelope to stdout. Failure writes a concise JSON error to stderr and exits nonzero. Every command
-has an exact, bounded input shape; arbitrary state patches, protocol messages, browser evaluation,
-and caller-selected artifact paths are not accepted.
+`time`, `inspect`, `camera`, `screenshot`, `record-start`, `record-stop`, `record-wait`, `export`,
+`import`, `artifact-inspect`, `capture-fixed`, `capture-cancel`, `status`, and `shutdown`. Success
+writes exactly one JSON envelope to stdout. Failure writes a concise JSON error to stderr and exits
+nonzero. Every command has an exact, bounded input shape; arbitrary state patches, protocol
+messages, browser evaluation, and caller-selected artifact paths are not accepted.
 
 Global help returns the command catalog. `help <command>` and `<command> --help` return that
 command's exact accepted shape and variants, defaults, bounds, and one JSON example. All help
@@ -138,7 +138,7 @@ Production startup has no bridge capability and returns 404 for these routes.
 `record-start` begins one 30 FPS, audio-free H.264 MP4 recording from the persistent headless page.
 It keeps clean presentation active and crops to the game viewport, so ordinary `order`, `time`,
 mutation, inspection, and `camera` commands can continue through the same session while recording. Inputs
-accept only a safe name, a 1–30 second maximum duration (10 seconds by default), an optional
+accept only a safe name, a 1–60 second maximum duration (10 seconds by default), an optional
 viewport or in-viewport crop, and scale from 0.25 through 1. A second start returns
 `recordingActive`; `status` with the current session id reports recorder state.
 
@@ -156,6 +156,19 @@ dropped or duplicated frames. Alias summary metadata records the total and `trun
 at most 40 detailed rows. Duplicated output frames preserve the real-time timeline when Chrome
 delivers fewer than 30 unique frames per second. Those counts are diagnostics, not deterministic
 evidence: Chrome composition, screencast delivery, and wall scheduling vary between runs.
+
+`record-wait` observes the current recorder outside the session mutation queue. An active or
+finalizing recording awaits the same completion used by its watchdog and `record-stop`; an already
+completed current recording returns the same result again. This lets callers start a recording,
+continue issuing authoritative mutations, orders, time controls, inspections, and camera changes,
+then receive the finalized artifact without sleeps or status polling. A session that has never
+started a recording returns `recordingInactive`.
+
+Recorder flush, MP4 transcode, and auxiliary FFmpeg stages derive bounded timeouts from the target
+duration, capped at 45, 75, and 30 seconds respectively. `record-stop`, `record-wait`, `close`, and
+`shutdown` use a dedicated 420-second IPC deadline; ordinary commands retain their existing
+120-second deadline. Close, shutdown, and idle cleanup initiate recorder settlement before draining
+queued session work, so an outstanding waiter cannot prevent the lifecycle action that resolves it.
 
 Recordings live under `target/lab-interact/<session-id>/recordings/`, are capped at 64 MiB, and are
 never printed through the CLI. The duration watchdog finalizes automatically. Session `close`,
@@ -207,7 +220,7 @@ fixed visual-time contract.
 | `daemonCheckoutMismatch` | Run `status` to inspect the preserved scene. When it is safe to discard, run the returned `shutdown` recovery command and retry from the current checkout. |
 | `assetLoadFailed`, `captureRenderError`, or `captureTimeout` | Fix the reported source/render problem; do not accept a fallback capture. |
 | `ffmpegUnavailable`, `ffprobeUnavailable`, `vp9Unavailable`, or `h264Unavailable` | Install an FFmpeg toolchain with `libvpx-vp9` and `libx264`, or set the explicit tool paths, then retry. |
-| `recordingActive` / `recordingInactive` | Check session `status`, then stop the active recorder or start a new one. |
+| `recordingActive` / `recordingInactive` | Check session `status`, then stop/wait for the active recorder or start a new one. A wait before any start is inactive. |
 
 ## Focused verification
 
@@ -217,5 +230,6 @@ node tests/lab_interact_driver_contracts.mjs
 node tests/lab_interact_bulk_contracts.mjs
 node tests/lab_interact_recording_contracts.mjs
 node tests/lab_interact_cli_smoke.mjs
+RTS_LAB_INTERACT_RECORDING_CANARY_MS=60000 node tests/lab_interact_cli_smoke.mjs
 node tests/lab_interact_driver_smoke.mjs
 ```
