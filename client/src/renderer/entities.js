@@ -82,6 +82,36 @@ export function _slot(poolName, id) {
   return g;
 }
 
+export function _staticSlot(poolName, id, renderKey) {
+  const pool = this._pools[poolName];
+  const keys = this._graphicsRenderKeys?.[poolName];
+  let g = pool.get(id);
+  if (!g) {
+    g = new PIXI.Graphics();
+    pool.set(id, g);
+    this.layers[poolName].addChild(g);
+    this._recordRenderDiagnostic?.(`renderer.pixi.displayObject.created.${poolName}`);
+  }
+  this._seen[poolName].add(id);
+  g.visible = true;
+  g.alpha = 1;
+
+  const redraw = !keys || keys.get(id) !== renderKey;
+  if (redraw) {
+    keys?.delete(id);
+    this._recordRenderDiagnostic?.(`renderer.cache.miss.${poolName}`);
+    this._recordRenderDiagnostic?.(`renderer.graphics.clear.${poolName}`);
+    g.clear();
+  } else {
+    this._recordRenderDiagnostic?.(`renderer.cache.hit.${poolName}`);
+  }
+  return {
+    g,
+    redraw,
+    commit: redraw ? () => keys?.set(id, renderKey) : () => {},
+  };
+}
+
 export function _shadow(g, cx, cy, radius) {
   g.beginFill(COLORS.shadow, 0.28);
   g.drawEllipse(cx, cy + radius * 0.35, radius, radius * 0.6);

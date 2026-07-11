@@ -65,6 +65,7 @@ export function _sweep() {
         this.layers[key].removeChild(g);
         g.destroy();
         pool.delete(id);
+        this._graphicsRenderKeys?.[key]?.delete?.(id);
         this._recordRenderDiagnostic?.(`renderer.pixi.displayObject.destroyed.${key}`);
       } else {
         g.visible = false;

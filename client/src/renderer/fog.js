@@ -49,9 +49,19 @@ import {
 
 export function _drawFog(fog) {
   const g = this._fogGfx;
+  const renderKey = fogGeometryKey.call(this, fog);
+  if (this._fogRenderMap === this._map && this._fogRenderKey === renderKey) {
+    this._recordRenderDiagnostic?.("renderer.cache.hit.fog");
+    return;
+  }
+  this._recordRenderDiagnostic?.("renderer.cache.miss.fog");
   this._recordRenderDiagnostic?.("renderer.graphics.clear.fog");
   g.clear();
-  if (!fog || !this._map) return;
+  if (!fog || !this._map) {
+    this._fogRenderMap = this._map;
+    this._fogRenderKey = renderKey;
+    return;
+  }
   const ts = this._map.tileSize;
   const w = fog.width;
   const h = fog.height;
@@ -79,6 +89,25 @@ export function _drawFog(fog) {
       }
     }
   }
+  this._fogRenderMap = this._map;
+  this._fogRenderKey = renderKey;
+}
+
+function fogGeometryKey(fog) {
+  if (!fog || !this._map) return "empty";
+  const prefix = `${fog.width}|${fog.height}|${this._map.tileSize}|${fog.revealAll ? 1 : 0}`;
+  if (Number.isFinite(fog.revision)) {
+    return `${prefix}|r:${fog.revision}|v:${fog.visibleRevision ?? ""}|e:${fog.exploredRevision ?? ""}`;
+  }
+
+  let hash = 2166136261;
+  for (let ty = 0; ty < fog.height; ty += 1) {
+    for (let tx = 0; tx < fog.width; tx += 1) {
+      hash ^= this._fogLevel(fog, tx, ty);
+      hash = Math.imul(hash, 16777619) >>> 0;
+    }
+  }
+  return `${prefix}|h:${hash >>> 0}`;
 }
 
 export function _fogLevel(fog, tx, ty) {

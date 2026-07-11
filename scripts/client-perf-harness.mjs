@@ -43,6 +43,9 @@ export const RENDER_FRAME_BUDGET_TARGETS = Object.freeze([
 export const RECURRING_PHASE_WARN_MS = 1;
 export const RECURRING_PHASE_HIGH_WARN_MS = 2;
 const MAX_RECURRING_WARNINGS = 8;
+const INCIDENT_REPLAY_SOURCE = process.env.RTS_CLIENT_PERF_INCIDENT_REPLAY
+  ? path.resolve(process.env.RTS_CLIENT_PERF_INCIDENT_REPLAY)
+  : null;
 const WORKLOADS = Object.freeze([
   {
     id: "vehicle-wall-stress",
@@ -60,6 +63,24 @@ const WORKLOADS = Object.freeze([
       minSelectedCount: 1,
     },
   },
+  ...(INCIDENT_REPLAY_SOURCE ? [{
+    id: "incident-120-commander-endgame",
+    description: "Paused Commander-perspective replay at the 244-entity late-game render incident.",
+    kind: "replayArtifact",
+    source: INCIDENT_REPLAY_SOURCE,
+    replayName: "incident-120-commander-endgame",
+    url: "/?replayArtifact=incident-120-commander-endgame",
+    setup: {
+      visionSelectionPlayerId: 8,
+      setRoomTimeSpeed: 8,
+      waitRoomTimeTo: 29643,
+      roomTimeWaitTimeoutMs: 90000,
+      setRoomTimeSpeedAfterWait: 0,
+      waitForMinEntities: 240,
+      entityWaitTimeoutMs: 30000,
+      resetPerfAfterSetup: true,
+    },
+  }] : []),
 ]);
 const RENDER_LAG_WORKLOAD_IDS = Object.freeze(WORKLOADS.map((workload) => workload.id));
 
@@ -242,6 +263,9 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
     );
     await page.waitForSelector("#viewport canvas", { timeout: scaledTimeoutMs(5000, timeoutScale) });
     workloadSetup = await applyWorkloadSetup(page, workload);
+    if (workload.setup?.resetPerfAfterSetup) {
+      await page.evaluate(() => window.__rtsPerf?.reset?.());
+    }
     await page.waitForFunction(
       () => (window.__rtsPerf?.summary?.()?.frameCount || 0) >= 30,
       { timeout: scaledTimeoutMs(Math.max(args.durationMs, 1000) + 10000, timeoutScale) },
@@ -1279,6 +1303,7 @@ async function applyWorkloadSetup(page, workload) {
     if (action.error) result.error = action.error;
   }
 
+  const speed = Number(setup.setRoomTimeSpeed);
   const seekTick = Number(setup.seekRoomTimeTo);
   if (Number.isInteger(seekTick) && seekTick >= 0) {
     const action = await page.evaluate((tick) => {
@@ -1305,16 +1330,8 @@ async function applyWorkloadSetup(page, workload) {
     }
   }
 
-  const speed = Number(setup.setRoomTimeSpeed);
   if (Number.isFinite(speed) && speed >= 0) {
-    const action = await page.evaluate((roomTimeSpeed) => {
-      const match = window.__rts?.match;
-      if (typeof match?.net?.setRoomTimeSpeed !== "function") {
-        return { action: "setRoomTimeSpeed", speed: roomTimeSpeed, error: "room-time speed control unavailable" };
-      }
-      match.net.setRoomTimeSpeed(roomTimeSpeed);
-      return { action: "setRoomTimeSpeed", speed: roomTimeSpeed };
-    }, speed);
+    const action = await setWorkloadRoomTimeSpeed(page, speed);
     result.actions.push(action);
     if (action.error && !result.error) result.error = action.error;
   }
@@ -1325,7 +1342,7 @@ async function applyWorkloadSetup(page, workload) {
       await page.waitForFunction(
         (tick) => {
           const match = window.__rts?.match;
-          const roomTick = Number(match?.replayControls?.roomTimeState?.currentTick);
+          const roomTick = Number(match?.roomTimeControls?.roomTimeState?.currentTick);
           const snapshotTick = Number(match?.lastSnapshotTick);
           return Math.max(
             Number.isFinite(roomTick) ? roomTick : 0,
@@ -1341,6 +1358,13 @@ async function applyWorkloadSetup(page, workload) {
       result.actions.push({ action: "waitRoomTimeTo", targetTick: waitTick, error: message });
       if (!result.error) result.error = message;
     }
+  }
+
+  const speedAfterWait = Number(setup.setRoomTimeSpeedAfterWait);
+  if (Number.isFinite(speedAfterWait) && speedAfterWait >= 0) {
+    const action = await setWorkloadRoomTimeSpeed(page, speedAfterWait);
+    result.actions.push({ ...action, action: "setRoomTimeSpeedAfterWait" });
+    if (action.error && !result.error) result.error = action.error;
   }
 
   const minEntities = Number(setup.waitForMinEntities);
@@ -1450,13 +1474,23 @@ async function applyWorkloadSetup(page, workload) {
   return result;
 }
 
+async function setWorkloadRoomTimeSpeed(page, speed) {
+  return page.evaluate((roomTimeSpeed) => {
+    const match = window.__rts?.match;
+    if (typeof match?.net?.setRoomTimeSpeed !== "function") {
+      return { action: "setRoomTimeSpeed", speed: roomTimeSpeed, error: "room-time speed control unavailable" };
+    }
+    match.net.setRoomTimeSpeed(roomTimeSpeed);
+    return { action: "setRoomTimeSpeed", speed: roomTimeSpeed };
+  }, speed);
+}
+
 function workloadSetupErrors(workload, setupResult) {
   const minSelected = Number(workload.setup?.minSelectedCount || 0);
-  if (!minSelected) return [];
-  if (!setupResult) return [`${workload.id} setup did not run`];
+  if (!setupResult) return workload.setup ? [`${workload.id} setup did not run`] : [];
   const errors = [];
   if (setupResult.error) errors.push(`${workload.id} setup failed: ${setupResult.error}`);
-  if ((setupResult.selectedCount || 0) < minSelected) {
+  if (minSelected && (setupResult.selectedCount || 0) < minSelected) {
     errors.push(`${workload.id} selected ${setupResult.selectedCount || 0}; expected at least ${minSelected}`);
   }
   return errors;
