@@ -130,6 +130,7 @@ export async function openLabInteractDriver(options) {
     async screenshot({ sessionId, name, presentation, viewport, subjectSummaries, request }) {
       const width = viewport?.width || 1;
       const height = viewport?.height || 1;
+      const subjects = Array.isArray(subjectSummaries) ? subjectSummaries : [];
       return {
         pngPath: `${options.workspaceRoot}/target/lab-interact/${sessionId}/captures/${name}.png`,
         manifestPath: `${options.workspaceRoot}/target/lab-interact/${sessionId}/captures/${name}.json`,
@@ -145,7 +146,10 @@ export async function openLabInteractDriver(options) {
           ready: true,
           frame: 2,
           snapshotTick: tick,
-          subjects: subjectSummaries || [],
+          subjects: { count: subjects.length, details: subjects.slice(0, 24), truncated: subjects.length > 24 },
+          missingTextureSubjectIds: [],
+          missingTextureSubjectCount: 0,
+          missingTextureSubjectsTruncated: false,
           request,
         },
       };

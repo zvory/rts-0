@@ -28,6 +28,8 @@ node scripts/lab-interact/cli.mjs import '{"sessionId":"<id>","kind":"setup","ar
 node scripts/lab-interact/cli.mjs close '{"sessionId":"<id>"}'
 node scripts/lab-interact/cli.mjs shutdown
 node scripts/lab-interact/cli.mjs --help
+node scripts/lab-interact/cli.mjs help screenshot
+node scripts/lab-interact/cli.mjs screenshot --help
 ```
 
 The complete surface is `open`, `close`, `reset`, `catalog`, `spawn`, `update`, `remove`, `order`,
@@ -37,12 +39,17 @@ envelope to stdout. Failure writes a concise JSON error to stderr and exits nonz
 has an exact, bounded input shape; arbitrary state patches, protocol messages, browser evaluation,
 and caller-selected artifact paths are not accepted.
 
+Global help returns the command catalog. `help <command>` and `<command> --help` return that
+command's exact accepted shape and variants, defaults, bounds, and one JSON example. All help
+forms work outside a Git checkout and never inspect or start a daemon; descriptor coverage is
+checked against the public command catalog.
+
 `open` returns the `sessionId` required by session commands. It is idempotent: repeated or
 concurrent calls return the one active session instead of starting another browser. Run `close`
 before `open` when a fresh session or different launch options are required. Optional aliases match
 `[A-Za-z][A-Za-z0-9_-]{0,31}` and remain private to that session. Unknown, duplicate, stale, or
-cross-session aliases are rejected rather than guessed. Only one authoritative session may be open
-per worktree.
+cross-session aliases are rejected rather than guessed. A session may retain up to 400 aliases.
+Only one authoritative session may be open per worktree.
 
 `spawn`, `update`, and `remove` accept 1–400 items and each command reaches the authoritative game
 as one atomic plural operation. `update` accepts `updates:[...]`; the legacy singular `update:{...}`
@@ -72,13 +79,27 @@ cannot expire. Idle expiry or `shutdown` closes the driver, browser, and Rust se
 socket/state/runtime files, and exits. `RTS_LAB_INTERACT_IDLE_MS` is a bounded test-only override;
 normal use should leave it unset.
 
+The daemon state and compatible probe publish the checkout commit captured at daemon startup. The
+CLI compares it with the selected worktree's current `HEAD` before dispatch. `status` remains
+available and reports both commits and whether they match; `shutdown` also remains available. An
+idle mismatched daemon with no session, opening/closing lifecycle, or other active request is
+atomically shut down and refreshed. An active mismatch returns `daemonCheckoutMismatch`, preserves
+the scene, and includes `node scripts/lab-interact/cli.mjs shutdown` as the explicit recovery
+command. A pre-feature daemon with no checkout field is treated the same as any other mismatch.
+Because it may predate the atomic refresh handshake, it is preserved for explicit `status` and
+`shutdown` rather than automatically restarted. Checkout metadata is optional IPC v1 probe/state
+data and is not part of daemon authentication.
+
 ## Capture workflow
 
-Query `catalog` before selecting owners, entity kinds, upgrades, abilities, or commands. Keep scenes
-small, confirm mutations with `inspect`, control authoritative time with `time`, and compose with
-`camera`. `screenshot` waits for fonts, relevant assets, two error-free render frames, and
+Query `catalog` before selecting owners, entity kinds, upgrades, abilities, or commands. Confirm
+mutations with `inspect`, control authoritative time with `time`, and compose with `camera`.
+Aliases, inspection, camera focus, and screenshot subjects accept up to 400 entity references.
+`screenshot` waits for fonts, relevant assets, two error-free render frames, and
 authoritative state. It returns the absolute PNG and adjacent manifest paths plus bounded metadata;
-it never sends image bytes through the CLI. Inspect the PNG once with the local image viewer.
+it never sends image bytes through the CLI. Readiness checks cover every requested subject, while
+the response and manifest record the subject count, `truncated` state, and at most 24 detailed
+subject rows. Inspect the PNG once with the local image viewer.
 
 Private servers use the production 30 Hz simulation clock by default; an explicitly inherited
 `RTS_TEST_TICK_MS` remains available to tests. Successful `order` results include an authoritative
@@ -103,7 +124,7 @@ replay imports restore aliases that still exist and report stale entries.
 opaque id or by a path already confined beneath this worktree's `target/lab-interact/`; URLs and
 external paths are rejected. `artifact-inspect` reports schema, authoring, map, tick/duration,
 entity/operation, build, and alias metadata without returning full artifact bytes. Files are capped
-at 8 MiB and aliases retain the CLI's 100-entry cap.
+at 8 MiB. Alias sidecars accept 400 maximum-length aliases within the retained 64 KiB byte cap.
 
 Large replays move through a loopback-only, environment-gated bridge between the driver and its
 private Rust server. Every request needs the driver's random capability and uses a temporary opaque
@@ -131,7 +152,8 @@ creates a 3×2 contact sheet, probes the media, and returns confined absolute pa
 codec/frame diagnostics.
 The adjacent manifest records authoritative start/end ticks and room time, accepted CLI operations,
 camera/time changes, aliases, workspace/build/browser/tool versions, probe results, and estimated
-dropped or duplicated frames. Duplicated output frames preserve the real-time timeline when Chrome
+dropped or duplicated frames. Alias summary metadata records the total and `truncated` state with
+at most 40 detailed rows. Duplicated output frames preserve the real-time timeline when Chrome
 delivers fewer than 30 unique frames per second. Those counts are diagnostics, not deterministic
 evidence: Chrome composition, screencast delivery, and wall scheduling vary between runs.
 
@@ -162,6 +184,7 @@ fixed capture never mixes live rAF interpolation into either case. The manifest 
 scenario/seed, branch/head/build/runtime identity, tick and visual timestamp for every frame,
 SHA-256 frame hashes, and media paths. Hash repeatability is evidence only within the pinned local
 browser/GPU environment, not a cross-browser, cross-GPU, or cross-OS golden-image promise.
+Fixed-capture scene alias metadata uses the same 40-row detailed-summary cap.
 
 The command is serialized with other session mutation, rejects an active real-time recorder, and
 is treated as one in-flight daemon interaction so idle teardown cannot interrupt it. While it runs,
@@ -181,6 +204,7 @@ fixed visual-time contract.
 | `invalidKind`, `invalidUpgrade`, or `invalidAbility` | Query `catalog` and use an exposed id. |
 | `chromeUnavailable` | Install Chrome/Chromium or set `CHROME` before `open`. |
 | `daemonStateUnavailable` / `daemonUnreachable` | Do not remove the socket; restore its owned state or stop the recorded daemon, then retry. |
+| `daemonCheckoutMismatch` | Run `status` to inspect the preserved scene. When it is safe to discard, run the returned `shutdown` recovery command and retry from the current checkout. |
 | `assetLoadFailed`, `captureRenderError`, or `captureTimeout` | Fix the reported source/render problem; do not accept a fallback capture. |
 | `ffmpegUnavailable`, `ffprobeUnavailable`, `vp9Unavailable`, or `h264Unavailable` | Install an FFmpeg toolchain with `libvpx-vp9` and `libx264`, or set the explicit tool paths, then retry. |
 | `recordingActive` / `recordingInactive` | Check session `status`, then stop the active recorder or start a new one. |

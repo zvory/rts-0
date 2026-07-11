@@ -11,6 +11,8 @@ import {
   processAlive, readStartupLock, readState, reclaimStaleStartupLock,
   runtimePaths, sleep, startupLockStale,
 } from "../scripts/lab-interact/runtime.mjs";
+import { LAB_INTERACT_COMMANDS } from "../scripts/lab-interact/command_service.mjs";
+import { LAB_INTERACT_COMMAND_HELP } from "../scripts/lab-interact/command_help.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -48,14 +50,84 @@ for (const helpCommand of ["--help", "-h", "help"]) {
   assert.ok(helpEnvelope.result.commands.includes("open"), `${helpCommand} lists open`);
   assert.ok(helpEnvelope.result.commands.includes("shutdown"), `${helpCommand} lists shutdown`);
 }
+assert.deepEqual(Object.keys(LAB_INTERACT_COMMAND_HELP).sort(), [...LAB_INTERACT_COMMANDS].sort(), "help descriptor coverage equals the public command catalog");
+for (const command of LAB_INTERACT_COMMANDS) {
+  for (const args of [["help", command], [command, "--help"]]) {
+    const help = spawnSync(process.execPath, [cli, ...args], {
+      cwd: path.dirname(root), env: baseEnv, encoding: "utf8",
+    });
+    assert.equal(help.status, 0, `${args.join(" ")} succeeds outside a Git checkout`);
+    const descriptor = JSON.parse(help.stdout).result;
+    assert.equal(descriptor.command, command, `${command} help identifies its command`);
+    assert.equal(typeof descriptor.summary, "string", `${command} help has a summary`);
+    assert.equal(typeof descriptor.acceptedShape, "string", `${command} help has an exact accepted shape`);
+    assert.ok(Array.isArray(descriptor.variants), `${command} help lists variants`);
+    assert.ok(Array.isArray(descriptor.defaults), `${command} help lists defaults`);
+    assert.ok(Array.isArray(descriptor.bounds), `${command} help lists bounds`);
+    assert.ok(descriptor.example && typeof descriptor.example === "object", `${command} help has one JSON example`);
+  }
+}
+const unknownHelp = spawnSync(process.execPath, [cli, "help", "not-a-command"], {
+  cwd: path.dirname(root), env: baseEnv, encoding: "utf8",
+});
+assert.notEqual(unknownHelp.status, 0, "unknown per-command help remains a concise failure");
+assert.equal(JSON.parse(unknownHelp.stderr).error.code, "unknownCommand", "unknown help reports unknownCommand without Git or daemon access");
 assert.equal(fs.existsSync(paths.directory), false, "help does not start a daemon or create runtime state");
 
 const coldOpen = call("open");
 assert.match(coldOpen.result.sessionId, /^lab_[a-f0-9]{32}$/, "a cold first open returns one complete JSON envelope");
+assert.equal(call("status").result.daemonCheckout.matches, true, "matching checkout status is explicit");
+const currentCheckoutCommit = readState(paths).checkoutCommit;
 assert.equal(call("status").result.opening, false, "completed cold open clears the opening status");
 call("close", { sessionId: coldOpen.result.sessionId });
 call("shutdown");
 await waitFor(() => !fs.existsSync(paths.directory), 2000, "cold-first-open daemon shuts down cleanly");
+
+const mismatchEnv = { ...baseEnv, RTS_LAB_INTERACT_TEST_CHECKOUT_COMMIT: "b".repeat(40) };
+const mismatchSession = call("open", {}, mismatchEnv).result.sessionId;
+const matchingState = readState(paths);
+assert.match(matchingState.checkoutCommit, /^[a-f0-9]{40}$/, "daemon state publishes its startup checkout commit");
+const activeMismatchStatus = call("status");
+assert.deepEqual(
+  activeMismatchStatus.result.daemonCheckout,
+  { daemonCommit: "b".repeat(40), checkoutCommit: currentCheckoutCommit, matches: false },
+  "status remains available and reports both checkout commits across mismatch",
+);
+const protectedMismatch = callFailure("inspect", { sessionId: mismatchSession });
+assert.equal(protectedMismatch.error.code, "daemonCheckoutMismatch", "an active mismatched scene is protected from automatic refresh");
+assert.equal(protectedMismatch.error.details.recoveryCommand, "node scripts/lab-interact/cli.mjs shutdown", "active mismatch reports the explicit recovery command");
+assert.equal(processAlive(matchingState.pid), true, "active mismatch leaves the daemon and scene alive");
+assert.equal(call("shutdown").result.shuttingDown, true, "shutdown remains available across checkout mismatch");
+await waitFor(() => !fs.existsSync(paths.directory), 2000, "explicit mismatched shutdown completes");
+
+const afterExplicitRefresh = call("open").result;
+assert.notEqual(afterExplicitRefresh.sessionId, mismatchSession, "a deliberate refresh creates a new session id");
+assert.equal(callFailure("inspect", { sessionId: mismatchSession }).error.code, "unknownSession", "pre-refresh session ids become stale");
+call("close", { sessionId: afterExplicitRefresh.sessionId });
+call("shutdown");
+await waitFor(() => !fs.existsSync(paths.directory), 2000, "current daemon stops before pre-feature fixture startup");
+const preFeatureEnv = { ...baseEnv, RTS_LAB_INTERACT_TEST_OMIT_CHECKOUT: "1" };
+call("status", {}, preFeatureEnv);
+const preFeatureState = readState(paths);
+assert.deepEqual(
+  call("status").result.daemonCheckout,
+  { daemonCommit: null, checkoutCommit: currentCheckoutCommit, matches: false },
+  "a pre-feature daemon missing checkout metadata remains inspectable as a mismatch",
+);
+assert.equal(callFailure("open").error.code, "daemonCheckoutMismatch", "metadata-missing daemons are preserved instead of assuming they implement atomic refresh");
+assert.equal(processAlive(preFeatureState.pid), true, "metadata-missing mismatch leaves the old daemon running");
+call("shutdown");
+await waitFor(() => !fs.existsSync(paths.directory), 2000, "metadata-missing daemon remains explicitly shut down-able");
+
+call("status", {}, mismatchEnv);
+const idleMismatchState = readState(paths);
+const idleRefreshed = call("open").result;
+const idleRefreshedState = readState(paths);
+assert.notEqual(idleRefreshedState.pid, idleMismatchState.pid, "an idle known-mismatch daemon refreshes automatically");
+assert.equal(idleRefreshedState.checkoutCommit, currentCheckoutCommit, "idle refresh publishes the current checkout commit");
+call("close", { sessionId: idleRefreshed.sessionId });
+call("shutdown");
+await waitFor(() => !fs.existsSync(paths.directory), 2000, "freshness contract daemon shuts down cleanly");
 
 const invalidConfiguration = spawnSync(process.execPath, [cli, "status", "{}"], {
   cwd: root,
@@ -100,6 +172,8 @@ const daemonState = JSON.parse(fs.readFileSync(paths.state, "utf8"));
 assert.equal(daemonState.workspaceRoot, fs.realpathSync(root), "runtime is pinned to the real worktree path");
 assert.equal(daemonState.idleMs, 5000, "the daemon records its configured idle bound");
 assert.ok(processAlive(daemonState.pid), "the daemon stays alive between CLI processes");
+const daemonProbe = await rawRequest(paths.socket, { protocolVersion: IPC_VERSION, probe: "lab-interact" });
+assert.equal(daemonProbe.probe.checkoutCommit, daemonState.checkoutCommit, "compatible probes publish optional checkout metadata without changing IPC v1 identity");
 assert.equal(fs.statSync(paths.parent).mode & 0o777, 0o700, "runtime parent is private to the current uid");
 assert.equal(fs.statSync(paths.directory).mode & 0o777, 0o700, "worktree runtime directory is mode 0700");
 assert.equal(fs.statSync(paths.state).mode & 0o777, 0o600, "capability state is mode 0600");

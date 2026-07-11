@@ -4,10 +4,13 @@ import net from "node:net";
 import { performance } from "node:perf_hooks";
 import { pathToFileURL } from "node:url";
 
-import { LabInteractService, conciseError, loadDriverFactory, normalizeError, validateCommandInput } from "./command_service.mjs";
+import {
+  LabInteractError, LabInteractService, conciseError, loadDriverFactory, normalizeError,
+  validateCommandInput,
+} from "./command_service.mjs";
 import {
   IPC_VERSION, MAX_REQUEST_BYTES, REQUEST_TIMEOUT_MS, claimStartupLock, cleanupOwnedRuntime,
-  configuredIdleMs, prepareRuntime, removeOwnedStartupLock, runtimePaths, startupLockOwned, writeState,
+  checkoutCommit, configuredIdleMs, prepareRuntime, removeOwnedStartupLock, runtimePaths, startupLockOwned, writeState,
   writeStartupError,
 } from "./runtime.mjs";
 
@@ -34,6 +37,12 @@ export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = config
   const sockets = new Set();
   const daemonId = crypto.randomUUID();
   const capability = crypto.randomBytes(32).toString("hex");
+  const configuredCheckoutCommit = process.env.RTS_LAB_INTERACT_TEST_CHECKOUT_COMMIT || "";
+  if (configuredCheckoutCommit && !/^[a-f0-9]{40}$/.test(configuredCheckoutCommit)) {
+    throw new Error("RTS_LAB_INTERACT_TEST_CHECKOUT_COMMIT must be a lowercase 40-character Git SHA.");
+  }
+  const daemonCheckoutCommit = configuredCheckoutCommit || checkoutCommit(paths.workspaceRoot);
+  const omitCheckoutMetadata = process.env.RTS_LAB_INTERACT_TEST_OMIT_CHECKOUT === "1";
 
   const state = () => ({
     pid: process.pid,
@@ -46,6 +55,8 @@ export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = config
     startedAt: startedAt,
     lastInteractionAt,
     activeRequests,
+    activeSessions: service.sessions.size,
+    ...(!omitCheckoutMetadata ? { checkoutCommit: daemonCheckoutCommit } : {}),
   });
   const startedAt = new Date().toISOString();
 
@@ -99,11 +110,17 @@ export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = config
       const request = JSON.parse(line);
       if (!request || typeof request !== "object" || Array.isArray(request)) throw Object.assign(new Error("Request must be a JSON object."), { code: "invalidRequest" });
       if (Object.keys(request).length === 2 && request.protocolVersion === IPC_VERSION && request.probe === "lab-interact") {
-        socket.end(`${JSON.stringify({ ok: true, probe: { protocolVersion: IPC_VERSION, daemonId, pid: process.pid, workspaceRoot: paths.workspaceRoot } })}\n`);
+        socket.end(`${JSON.stringify({ ok: true, probe: {
+          protocolVersion: IPC_VERSION,
+          daemonId,
+          pid: process.pid,
+          workspaceRoot: paths.workspaceRoot,
+          ...(!omitCheckoutMetadata ? { checkoutCommit: daemonCheckoutCommit } : {}),
+        } })}\n`);
         return;
       }
       const keys = Object.keys(request);
-      if (keys.some((key) => !["protocolVersion", "daemonId", "capability", "command", "input"].includes(key)) ||
+      if (keys.some((key) => !["protocolVersion", "daemonId", "capability", "command", "input", "refreshCheckout"].includes(key)) ||
           request.protocolVersion !== IPC_VERSION || request.daemonId !== daemonId || request.capability !== capability ||
           typeof request.command !== "string" || !request.input || typeof request.input !== "object" || Array.isArray(request.input)) {
         throw Object.assign(new Error("Request identity, version, or command envelope is invalid."), { code: "invalidRequest" });
@@ -111,6 +128,23 @@ export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = config
       command = request.command;
       validateCommandInput(command, request.input);
       if (shutdownRequested) throw Object.assign(new Error("Lab Interact is already shutting down."), { code: "serviceClosed" });
+      if (request.refreshCheckout != null) {
+        const requestedCommit = String(request.refreshCheckout || "").toLowerCase();
+        if (command !== "shutdown" || !/^[a-f0-9]{40}$/.test(requestedCommit)) {
+          throw Object.assign(new Error("Checkout refresh request is invalid."), { code: "invalidRequest" });
+        }
+        if (activeRequests !== 0 || !service.canRefreshCheckout()) {
+          throw new LabInteractError(
+            "daemonCheckoutMismatch",
+            "The Lab Interact daemon belongs to another checkout commit and has active work. The scene was preserved; inspect status, then explicitly shut down when it is safe to discard.",
+            {
+              daemonCommit: daemonCheckoutCommit,
+              checkoutCommit: requestedCommit,
+              recoveryCommand: "node scripts/lab-interact/cli.mjs shutdown",
+            },
+          );
+        }
+      }
       if (command === "shutdown") shutdownRequested = true;
       socket.setTimeout(REQUEST_TIMEOUT_MS + 5_000, () => socket.destroy());
       activeRequests += 1;

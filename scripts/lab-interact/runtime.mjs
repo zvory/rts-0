@@ -2,12 +2,22 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 
 export const DEFAULT_IDLE_MS = 30 * 60_000;
 export const MAX_REQUEST_BYTES = 1024 * 1024;
 export const IPC_VERSION = 1;
 export const REQUEST_TIMEOUT_MS = 120_000;
 export const STARTUP_GRACE_MS = 15_000;
+
+export function checkoutCommit(workspaceRoot) {
+  const result = spawnSync("git", ["rev-parse", "HEAD"], { cwd: workspaceRoot, encoding: "utf8" });
+  const commit = String(result.stdout || "").trim().toLowerCase();
+  if (result.status !== 0 || !/^[a-f0-9]{40}$/.test(commit)) {
+    throw new Error("Lab Interact could not read the checkout commit.");
+  }
+  return commit;
+}
 
 export function runtimePaths(workspaceRoot, { tmpDir = os.tmpdir() } = {}) {
   const root = fs.realpathSync(workspaceRoot);

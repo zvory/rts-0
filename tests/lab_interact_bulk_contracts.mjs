@@ -73,9 +73,22 @@ const largeSpawn = await service.execute("spawn", {
     kind: "rifleman",
     x: 100 + index * 32,
     y: 300,
+    alias: `large_${index}`,
   })),
 });
 const largeIds = largeSpawn.results.map((entry) => entry.id);
+const largeAliases = largeSpawn.results.map((entry) => entry.alias);
+const largeInspection = await service.execute("inspect", { sessionId, refs: largeAliases, limit: 400 });
+assert.equal(largeInspection.entities.length, 400, "inspection accepts and returns the full 400-reference operational bound");
+await service.execute("camera", { sessionId, camera: { action: "focus", refs: largeAliases } });
+const largeCapture = await service.execute("screenshot", {
+  sessionId, name: "large-contract", subjects: largeAliases,
+});
+assert.deepEqual(
+  { count: largeCapture.readiness.subjects.count, detailed: largeCapture.readiness.subjects.details.length, truncated: largeCapture.readiness.subjects.truncated },
+  { count: 400, detailed: 24, truncated: true },
+  "a 400-subject capture checks every subject while returning a bounded detailed summary",
+);
 await service.execute("update", {
   sessionId,
   updates: largeIds.map((id, index) => ({
@@ -92,6 +105,17 @@ assert.ok(Math.max(...calls.inspectSizes) <= LAB_INTERACT_LIMITS.maxInspectRefs,
   "bulk reference resolution respects the bridge inspect bound");
 
 assert.equal(LAB_INTERACT_LIMITS.maxMutationBatch, 400, "mutation batch authority is 400");
+assert.equal(LAB_INTERACT_LIMITS.maxAliases, 400, "large scenes may retain 400 operational aliases");
+assert.equal(LAB_INTERACT_LIMITS.maxInspectResults, 400, "large-scene inspection may return 400 entities");
+assert.doesNotThrow(() => validateCommandInput("camera", { sessionId, camera: { action: "focus", refs: Array.from({ length: 400 }, (_, index) => index + 1) } }));
+assert.doesNotThrow(() => validateCommandInput("screenshot", { sessionId, subjects: Array.from({ length: 400 }, (_, index) => index + 1) }));
+for (const [command, input] of [
+  ["inspect", { sessionId, refs: Array.from({ length: 401 }, (_, index) => index + 1) }],
+  ["camera", { sessionId, camera: { action: "focus", refs: Array.from({ length: 401 }, (_, index) => index + 1) } }],
+  ["screenshot", { sessionId, subjects: Array.from({ length: 401 }, (_, index) => index + 1) }],
+]) {
+  assert.throws(() => validateCommandInput(command, input), /0-400|1-400/, `${command} rejects 401 references before the bridge`);
+}
 assert.doesNotThrow(() => validateCommandInput("spawn", {
   sessionId,
   spawns: Array.from({ length: 400 }, () => ({ owner: 1, kind: "rifleman", x: 1, y: 1 })),

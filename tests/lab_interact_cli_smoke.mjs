@@ -39,6 +39,40 @@ function callFailure(command, input = {}) {
   return JSON.parse(result.stderr).error;
 }
 
+function spawnBulkUsingPlacementSuggestions(sessionId, spawns) {
+  const corrected = spawns.map((spawn) => ({ ...spawn }));
+  let previousFailedIndex = -1;
+  for (let attempt = 0; attempt <= corrected.length; attempt += 1) {
+    const result = invoke("spawn", { sessionId, spawns: corrected });
+    if (result.status === 0) {
+      const response = JSON.parse(result.stdout);
+      assert.equal(response.ok, true, "corrected bulk spawn returns success");
+      assert.equal(response.result.results.length, corrected.length, "one successful bulk spawn returns every authored unit");
+      assert.equal(new Set(response.result.results.map((entry) => entry.id)).size, corrected.length, "bulk spawn returns one distinct entity id per input");
+      return response.result;
+    }
+
+    assert.equal(result.stdout, "", "rejected atomic bulk spawn keeps stdout empty");
+    const error = JSON.parse(result.stderr).error;
+    assert.equal(error.code, "labRejected", "terrain-blocked bulk spawn is an authoritative Lab rejection");
+    const failedIndex = error.details?.failedIndex;
+    assert.ok(
+      Number.isInteger(failedIndex) && failedIndex > previousFailedIndex && failedIndex < corrected.length,
+      "each authoritative correction advances to a later batch input",
+    );
+    assert.deepEqual(
+      error.details.attempted,
+      { x: corrected[failedIndex].x, y: corrected[failedIndex].y },
+      "placement diagnostics identify the attempted batch position",
+    );
+    const suggestion = error.details.suggestions?.[0];
+    assert.ok(Number.isFinite(suggestion?.x) && Number.isFinite(suggestion?.y), "blocked placement supplies a legal authoritative suggestion");
+    corrected[failedIndex] = { ...corrected[failedIndex], x: suggestion.x, y: suggestion.y };
+    previousFailedIndex = failedIndex;
+  }
+  assert.fail("authoritative placement suggestions did not produce a legal bulk arrangement");
+}
+
 try {
   assert.equal(call("shutdown").alreadyStopped, true, "isolated smoke starts without touching any developer daemon");
   const opened = call("open", { viewport: { width: 1000, height: 700, deviceScaleFactor: 1 } });
@@ -53,18 +87,34 @@ try {
     { owner: 1, kind: "rifleman", x: 960, y: 960, alias: "shooter" },
     { owner: 2, kind: "rifleman", x: 1248, y: 960, alias: "target" },
   ] });
-  call("camera", { sessionId, camera: { action: "focus", refs: ["shooter", "target"], padding: 64 } });
+  const largeSceneAliases = Array.from({ length: 36 }, (_, index) => `scene_${index}`);
+  spawnBulkUsingPlacementSuggestions(sessionId, largeSceneAliases.map((alias, index) => ({
+    owner: index % 2 + 1,
+    kind: "rifleman",
+    x: 480 + (index % 6) * 80,
+    y: 1200 + Math.floor(index / 6) * 80,
+    alias,
+  })));
+  const authoredSubjects = ["shooter", "target", ...largeSceneAliases];
+  call("camera", { sessionId, camera: { action: "focus", refs: authoredSubjects, padding: 64 } });
   const screenshot = call("screenshot", {
     sessionId,
     name: "cli-smoke",
     presentation: "clean",
     viewport: { width: 1000, height: 700, deviceScaleFactor: 1 },
-    subjects: ["shooter", "target"],
+    subjects: authoredSubjects,
   });
   assert.equal(screenshot.image.mimeType, "image/png", "screenshot identifies PNG metadata without embedding bytes");
   assert.ok(fs.statSync(screenshot.pngPath).size > 4096, "CLI writes a nontrivial PNG artifact");
   const manifest = JSON.parse(fs.readFileSync(screenshot.manifestPath, "utf8"));
   assert.deepEqual(manifest.errors.render, [], "capture manifest reports no render errors");
+  assert.deepEqual(
+    { count: manifest.subjects.count, detailed: manifest.subjects.details.length, truncated: manifest.subjects.truncated },
+    { count: authoredSubjects.length, detailed: 24, truncated: true },
+    "large-scene canary checks every focused subject while bounding detailed manifest rows",
+  );
+  assert.equal(screenshot.readiness.subjects.count, authoredSubjects.length, "readiness covers the full authored subject set");
+  assert.deepEqual(screenshot.readiness.missingTextureSubjectIds, [], "large-scene readiness rejects texture fallback for every subject");
   const recordingStarted = call("record-start", {
     sessionId, name: "cli-smoke-motion", maxDurationMs: 5_000,
     viewport: { width: 1000, height: 700, deviceScaleFactor: 1 },

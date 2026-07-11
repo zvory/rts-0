@@ -8,8 +8,9 @@ import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { LAB_INTERACT_COMMANDS } from "./command_service.mjs";
+import { commandHelp, helpCatalog } from "./command_help.mjs";
 import {
-  IPC_VERSION, REQUEST_TIMEOUT_MS, configuredIdleMs, prepareRuntime, processAlive,
+  IPC_VERSION, REQUEST_TIMEOUT_MS, checkoutCommit, configuredIdleMs, prepareRuntime, processAlive,
   readStartupError, readState, reclaimStaleStartupLock, removeOwnedStartupLock, runtimePaths, sleep,
 } from "./runtime.mjs";
 
@@ -23,6 +24,25 @@ export async function runCli(argv = process.argv.slice(2), { cwd = process.cwd()
       result: {
         usage: "node scripts/lab-interact/cli.mjs <command> [JSON-object]",
         commands: [...LAB_INTERACT_COMMANDS],
+        catalog: helpCatalog(),
+        documentation: "docs/lab-interact-cli.md",
+      },
+    };
+  }
+  const helpCommand = argv.length === 2 && argv[0] === "help"
+    ? argv[1]
+    : argv.length === 2 && ["--help", "-h"].includes(argv[1])
+      ? argv[0]
+      : null;
+  if (helpCommand != null) {
+    if (!LAB_INTERACT_COMMANDS.includes(helpCommand)) {
+      throw cliError("unknownCommand", `Unknown command ${JSON.stringify(helpCommand)}.`);
+    }
+    return {
+      ok: true,
+      result: {
+        command: helpCommand,
+        ...commandHelp(helpCommand),
         documentation: "docs/lab-interact-cli.md",
       },
     };
@@ -34,19 +54,85 @@ export async function runCli(argv = process.argv.slice(2), { cwd = process.cwd()
   try { input = JSON.parse(rawInput); } catch { throw cliError("invalidJson", "Input must be one valid JSON object argument."); }
   if (!input || typeof input !== "object" || Array.isArray(input)) throw cliError("invalidJson", "Input must be a JSON object.");
   const workspaceRoot = gitRoot(cwd);
+  const currentCheckoutCommit = checkoutCommit(workspaceRoot);
   const paths = runtimePaths(workspaceRoot);
   let response = null;
   let requestError = null;
-  try { response = await requestCurrent(paths, { command, input }); } catch (error) { requestError = error; }
+  try {
+    response = await requestForCheckout(paths, { command, input }, currentCheckoutCommit, env);
+  } catch (error) {
+    requestError = error;
+  }
   if (!response) {
     if (command === "shutdown") {
       await confirmStopped(paths, requestError);
       return { ok: true, result: { shuttingDown: false, alreadyStopped: true } };
     }
     await ensureDaemon(paths, env);
-    response = await requestCurrent(paths, { command, input });
+    response = await requestForCheckout(paths, { command, input }, currentCheckoutCommit, env);
   }
   return response;
+}
+
+async function requestForCheckout(paths, payload, currentCheckoutCommit, env) {
+  const state = readState(paths);
+  if (!validIdentity(paths, state)) {
+    throw cliError("daemonIdentity", "No compatible Lab Interact daemon is ready.");
+  }
+  const daemonCommit = typeof state.checkoutCommit === "string" && /^[a-f0-9]{40}$/.test(state.checkoutCommit)
+    ? state.checkoutCommit
+    : null;
+  const checkoutMatches = daemonCommit === currentCheckoutCommit;
+  if (payload.command === "status") {
+    const response = await requestCurrent(paths, payload);
+    if (response?.ok) {
+      response.result.daemonCheckout = {
+        daemonCommit,
+        checkoutCommit: currentCheckoutCommit,
+        matches: checkoutMatches,
+      };
+    }
+    return response;
+  }
+  if (payload.command === "shutdown" || checkoutMatches) {
+    return requestCurrent(paths, payload);
+  }
+  if (daemonCommit == null) {
+    return checkoutMismatchEnvelope(null, currentCheckoutCommit);
+  }
+  const refresh = await requestCurrent(paths, {
+    command: "shutdown",
+    input: {},
+    refreshCheckout: currentCheckoutCommit,
+  });
+  if (!refresh?.ok) return refresh;
+  await waitForDaemonExit(paths, state.pid);
+  await ensureDaemon(paths, env);
+  return requestCurrent(paths, payload);
+}
+
+function checkoutMismatchEnvelope(daemonCommit, currentCheckoutCommit) {
+  return {
+    ok: false,
+    error: {
+      code: "daemonCheckoutMismatch",
+      message: "The Lab Interact daemon has no checkout metadata and may predate safe idle refresh. It was preserved; inspect status, then explicitly shut down when it is safe to discard.",
+      details: {
+        daemonCommit,
+        checkoutCommit: currentCheckoutCommit,
+        recoveryCommand: "node scripts/lab-interact/cli.mjs shutdown",
+      },
+    },
+  };
+}
+
+async function waitForDaemonExit(paths, pid) {
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    if (!processAlive(pid) && !fs.existsSync(paths.directory)) return;
+    await sleep(25);
+  }
+  throw cliError("daemonRefreshTimeout", "The idle mismatched daemon did not finish shutting down within 5 seconds.");
 }
 
 async function ensureDaemon(paths, env) {

@@ -8,6 +8,7 @@ import { LabInteractService, validateCommandInput } from "../scripts/lab-interac
 import { encodeFixedCapture, FIXED_CAPTURE_LIMITS, fixedFrameTick } from "../scripts/lab-interact/fixed_capture.mjs";
 import { checkMediaCapabilities } from "../scripts/lab-interact/recording.mjs";
 import { openLabInteractDriver } from "./fixtures/lab_interact_fake_driver.mjs";
+import { boundedSummary, LAB_INTERACT_SUMMARY_LIMITS } from "../scripts/lab-interact/manifest_summary.mjs";
 
 const sessionId = `lab_${"a".repeat(32)}`;
 const driverSource = fs.readFileSync(new URL("../scripts/lab-interact/driver.mjs", import.meta.url), "utf8");
@@ -20,6 +21,11 @@ assert.throws(() => validateCommandInput("capture-fixed", { sessionId, fps: 61 }
 assert.throws(() => validateCommandInput("capture-fixed", { sessionId, frameCount: FIXED_CAPTURE_LIMITS.maxFrames + 1 }), (error) => error?.code === "invalidInput");
 assert.ok(FIXED_CAPTURE_LIMITS.maxSequenceBytes >= FIXED_CAPTURE_LIMITS.maxFrameBytes, "fixed PNG sequences have explicit per-frame and aggregate disk bounds");
 assert.deepEqual([0, 1, 2, 3].map((index) => fixedFrameTick(9, index, 60)), [9, 9, 10, 10]);
+assert.deepEqual(
+  boundedSummary(Array.from({ length: 400 }, (_, index) => index), LAB_INTERACT_SUMMARY_LIMITS.detailedAliases),
+  { count: 400, details: Array.from({ length: 40 }, (_, index) => index), truncated: true },
+  "fixed-capture manifest summaries preserve total/truncated metadata without 400 detailed rows",
+);
 
 const service = new LabInteractService({ workspaceRoot: process.cwd(), driverFactory: openLabInteractDriver });
 const opened = await service.execute("open", {});

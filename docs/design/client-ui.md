@@ -586,6 +586,13 @@ without embedding image content. Portable setup export/import uses the bridge's 
 `exportSetup`/`importSetup` methods and keeps checkpoint bytes out of CLI results. Replay bytes bypass
 the browser and normal WebSocket result through the capability-gated private-server handoff; the
 daemon writes only bounded artifacts and alias sidecars under `target/lab-interact/`.
+Operational aliases, inspection, camera focus, screenshot subjects, and corresponding bridge
+entity-id inputs accept at most 400 references. Screenshot readiness validates the complete
+requested subject set, but returned and persisted subject detail is capped at 24 rows with total and
+`truncated` metadata; recording and fixed-capture alias detail is similarly capped at 40 rows.
+The daemon publishes its startup checkout commit as optional IPC v1 state/probe metadata. The CLI
+refreshes a mismatched daemon only through an atomic idle-only shutdown request; active scenes are
+preserved behind `daemonCheckoutMismatch`, while `status` and `shutdown` remain usable.
 
 `lab_scenario_authoring.js`
 ```js

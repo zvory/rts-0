@@ -15,6 +15,7 @@ import {
 } from "../scripts/lab-interact/driver.mjs";
 import {
   LAB_INTERACT_BRIDGE_KEY,
+  LAB_INTERACT_LIMITS,
   LabInteractBridge,
   labInteractLaunchEnabled,
   normalizeInspectionQuery,
@@ -68,7 +69,7 @@ assert.deepEqual(
 );
 
 assert.throws(
-  () => normalizeInspectionQuery({ ids: Array.from({ length: 150 }, (_, index) => index + 1) }),
+  () => normalizeInspectionQuery({ ids: Array.from({ length: 401 }, (_, index) => index + 1) }),
   (error) => error?.code === "invalidInput",
   "oversized entity filters are rejected rather than broadening inspection",
 );
@@ -81,12 +82,14 @@ const inspection = normalizeInspectionQuery({
   ids: [1, 1, 3],
   owners: [1, 1, 2],
   kinds: ["rifleman", "rifleman", "tank"],
-  limit: 100,
+  limit: 400,
 });
 assert.deepEqual([...inspection.ids], [1, 3], "inspection entity filters are deduplicated");
 assert.deepEqual([...inspection.owners], [1, 2], "inspection owner filters are deduplicated");
 assert.equal(inspection.kinds.size, 2, "inspection kind filters are bounded and deduplicated");
-assert.equal(inspection.limit, 100, "inspection result limits remain bounded");
+assert.equal(inspection.limit, 400, "inspection result limits support the large-scene operational bound");
+assert.equal(LAB_INTERACT_LIMITS.focusEntities, 400, "bridge camera focus shares the 400-reference bound");
+assert.equal(LAB_INTERACT_LIMITS.captureSubjects, 400, "bridge readiness checks share the 400-subject bound");
 assert.equal(inspection.cameraViewport, false, "inspection viewport filtering is opt-in");
 assert.equal(normalizeInspectionQuery({ cameraViewport: true }).cameraViewport, true, "inspection accepts the bounded camera viewport filter");
 
