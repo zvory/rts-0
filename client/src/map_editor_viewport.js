@@ -34,6 +34,13 @@ export function mapEditorSymmetryGuideLines(size, symmetry) {
   return [];
 }
 
+export function mapEditorSymmetryGuideCentre(size, symmetry) {
+  if (symmetry !== MAP_EDITOR_SYMMETRY.HALF_TURN) return null;
+  const mapSize = Math.max(0, Math.trunc(Number(size)) || 0);
+  const centre = mapSize * TILE_SIZE / 2;
+  return { x: centre, y: centre };
+}
+
 export class MapEditorViewport {
   constructor({ root, session, onStatus = () => {} }) {
     this.root = root;
@@ -142,6 +149,11 @@ export class MapEditorViewport {
       for (const guide of guides) {
         this.overlay.moveTo(guide.x0, guide.y0).lineTo(guide.x1, guide.y1);
       }
+    }
+    const guideCentre = mapEditorSymmetryGuideCentre(size, this.symmetry);
+    if (guideCentre) {
+      this.overlay.lineStyle(2, 0xffd878, 0.82);
+      this.overlay.beginFill(0xffd878, 0.82).drawCircle(guideCentre.x, guideCentre.y, 5).endFill();
     }
     for (const player of this.session.playerSlots()) {
       const color = hexColor(PLAYER_PALETTE[player.playerIndex % PLAYER_PALETTE.length]);

@@ -483,6 +483,7 @@ try {
   );
   ok(
     editorUi.symmetryTitle === "Symmetry applies to terrain and base moves." &&
+      editorUi.symmetryOptions.includes("Half-turn (180°)") &&
       editorUi.symmetryOptions.includes("Radial (4-way)") &&
       editorUi.symmetryOptions.includes("Diagonal ↘ (top-left ↔ bottom-right)") &&
       editorUi.symmetryOptions.includes("Diagonal ↙ (top-right ↔ bottom-left)") &&
