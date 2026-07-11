@@ -10,6 +10,7 @@ const priorWindow = globalThis.window;
 const priorDocument = globalThis.document;
 const windowListeners = new Map();
 const localStorageValues = new Map();
+let coarsePointer = false;
 const fallbackElement = {
   contains() { return true; },
   addEventListener() {},
@@ -41,6 +42,9 @@ globalThis.window = {
   },
   removeEventListener(type, handler) {
     if (windowListeners.get(type) === handler) windowListeners.delete(type);
+  },
+  matchMedia(query) {
+    return { matches: query === "(pointer: coarse)" && coarsePointer };
   },
 };
 globalThis.document = {
@@ -479,6 +483,8 @@ localStorageValues.set("rts.roomTimeControls.panel.v1", JSON.stringify({
   collapsed: true,
 }));
 globalThis.window.innerWidth = 390;
+globalThis.window.innerHeight = 844;
+coarsePointer = true;
 const mobileRoomTimeControls = fakeEl("div");
 const mobileSpeed = fakeEl("button");
 mobileSpeed.className = "spd-btn";
@@ -497,7 +503,7 @@ const mobileRoomTimeUi = new RoomTimeControls({
   }),
 });
 assert(!mobileRoomTimeControls.style.left && !mobileRoomTimeControls.style.top,
-  "room-time controls ignore saved desktop panel position on mobile widths");
+  "room-time controls ignore saved desktop panel position in mobile-debug presentation");
 assert(
   mobileRoomTimeControls.dataset.collapsed === "true" &&
     mobileRoomTimeControls.querySelector(".room-time-panel-body").hidden === true,
@@ -512,6 +518,7 @@ assert(
   "room-time controls preserve saved desktop position when collapse is toggled on mobile",
 );
 globalThis.window.innerWidth = 1000;
+coarsePointer = false;
 windowListeners.get("resize")();
 assert(
   mobileRoomTimeControls.style.left === "260px" &&

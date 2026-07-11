@@ -1,4 +1,5 @@
-import { FloatingRoomTimePanel } from "../../client/src/room_time_panel.js";
+import { readFileSync } from "node:fs";
+import { FloatingRoomTimePanel, isMobileDebugPanelViewport } from "../../client/src/room_time_panel.js";
 import { createImmediateTouchButtonActivation } from "../../client/src/panel_touch_activation.js";
 import { assert } from "./assertions.mjs";
 
@@ -6,6 +7,7 @@ const priorDocument = globalThis.document;
 const priorWindow = globalThis.window;
 const localStorageValues = new Map();
 const windowListeners = new Map();
+let coarsePointer = false;
 
 globalThis.document = {
   documentElement: { clientWidth: 1000, clientHeight: 800 },
@@ -33,9 +35,31 @@ globalThis.window = {
   removeEventListener(type, handler) {
     if (windowListeners.get(type) === handler) windowListeners.delete(type);
   },
+  matchMedia(query) {
+    return { matches: query === "(pointer: coarse)" && coarsePointer };
+  },
 };
 
 try {
+  globalThis.window.innerWidth = 390;
+  globalThis.window.innerHeight = 844;
+  assert(!isMobileDebugPanelViewport(), "room-time panel keeps a narrow mouse desktop on its desktop layout");
+  coarsePointer = true;
+  assert(isMobileDebugPanelViewport(), "room-time panel enables mobile presentation for a coarse-pointer phone viewport");
+  globalThis.window.innerWidth = 1280;
+  assert(!isMobileDebugPanelViewport(), "room-time panel keeps a wide coarse-pointer display on its desktop layout");
+  globalThis.window.innerWidth = 1000;
+
+  const styles = readFileSync(new URL("../../client/styles.css", import.meta.url), "utf8");
+  assert(
+    /@media \(pointer: coarse\) and \(max-width: 1024px\) and \(max-height: 1024px\)\s*\{[\s\S]*?safe-area-inset-top[\s\S]*?#room-time-controls/s.test(styles),
+    "mobile-debug CSS is coarse-pointer-gated and safe-area-aware before moving room-time controls",
+  );
+  assert(
+    /@media \(pointer: coarse\) and \(max-width: 1024px\) and \(max-height: 1024px\)\s*\{[\s\S]*?#game-menu,[\s\S]*?z-index:\s*40\b/s.test(styles),
+    "mobile-debug settings menu layers above room-time and diagnostic overlays",
+  );
+
   const root = fakeEl("div");
   const speed = fakeEl("button");
   speed.className = "spd-btn";
