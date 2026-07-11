@@ -4,6 +4,8 @@ import { TERRAIN } from "./protocol.js";
 import { Renderer } from "./renderer/index.js";
 import {
   addDraftPlayerNatural,
+  MAP_EDITOR_MAIN_CLEARANCE_TILES,
+  MAP_EDITOR_NATURAL_CLEARANCE_TILES,
   moveDraftPlayerNatural,
   moveDraftPlayerStart,
   protectDraftBaseTerrain,
@@ -17,7 +19,10 @@ export class MapEditorViewport {
     this.session = session;
     this.onStatus = onStatus;
     this.renderer = new Renderer(root);
-    this.camera = new Camera(root.clientWidth, root.clientHeight, { maxZoom: 4 });
+    this.camera = new Camera(root.clientWidth, root.clientHeight, {
+      minZoom: 0.05,
+      maxZoom: 4,
+    });
     this.tool = null;
     this.paintPointerId = null;
     this.panPointerId = null;
@@ -133,7 +138,7 @@ export class MapEditorViewport {
       return;
     }
     if (event.button !== 0 || !this.tool) return;
-    const tile = this.eventTile(event, { start: this.tool.kind === "start" });
+    const tile = this.eventTile(event, { kind: this.tool.kind });
     if (!tile) return;
     if (this.tool.kind === "terrain") {
       this.paintPointerId = event.pointerId;
@@ -199,11 +204,15 @@ export class MapEditorViewport {
     this.onStatus(changed ? `${label}.` : result?.error || "No map change.", !changed);
   }
 
-  eventTile(event, { start = false } = {}) {
+  eventTile(event, { kind = this.tool?.kind } = {}) {
     const rect = this.renderer.app.view.getBoundingClientRect();
     const world = this.camera.screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
     const size = this.session.draft?.terrain?.length || 0;
-    const radius = start ? 3 : 0;
+    const radius = kind === "start"
+      ? MAP_EDITOR_MAIN_CLEARANCE_TILES
+      : kind === "natural"
+        ? MAP_EDITOR_NATURAL_CLEARANCE_TILES
+        : 0;
     if (!size || size <= radius * 2) return null;
     return {
       x: Math.max(radius, Math.min(size - radius - 1, Math.floor(world.x / TILE_SIZE))),

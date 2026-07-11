@@ -135,7 +135,7 @@ export class MapEditorPanel {
       control.dataset.terrain = terrainName(code);
       palette.appendChild(control);
     }
-    section.append(palette, readout("Each drag is one render and undo transaction. Start footprints and base centers stay grass."));
+    section.append(palette, readout("Each drag is one render and undo transaction. Authored start and natural clearances stay grass."));
     return section;
   }
 

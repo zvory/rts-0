@@ -16,21 +16,27 @@
 
 import { CAMERA } from "./config.js";
 
-function resolveMaxZoom(value) {
+function resolveMinZoom(value) {
   const zoom = Number(value);
-  if (!Number.isFinite(zoom) || zoom <= 0) return CAMERA.maxZoom;
-  return Math.max(CAMERA.minZoom, zoom);
+  if (!Number.isFinite(zoom) || zoom <= 0) return CAMERA.minZoom;
+  return zoom;
 }
 
-function clampZoom(value, maxZoom) {
-  return Math.max(CAMERA.minZoom, Math.min(maxZoom, value));
+function resolveMaxZoom(value, minZoom) {
+  const zoom = Number(value);
+  const resolved = Number.isFinite(zoom) && zoom > 0 ? zoom : CAMERA.maxZoom;
+  return Math.max(minZoom, resolved);
+}
+
+function clampZoom(value, minZoom, maxZoom) {
+  return Math.max(minZoom, Math.min(maxZoom, value));
 }
 
 export class Camera {
   /**
    * @param {number} [viewW] initial viewport width in screen px
    * @param {number} [viewH] initial viewport height in screen px
-   * @param {{maxZoom?:number}} [options] optional per-session zoom limits
+   * @param {{minZoom?:number,maxZoom?:number}} [options] optional per-session zoom limits
    */
   constructor(viewW = 0, viewH = 0, options = {}) {
     /** World x of the viewport's top-left corner. */
@@ -39,8 +45,9 @@ export class Camera {
     this.y = 0;
     /** Zoom factor: screen px per world px. */
     this.zoom = 1;
-    /** Maximum zoom for this session. Defaults to the live-match cap. */
-    this.maxZoom = resolveMaxZoom(options?.maxZoom);
+    /** Zoom limits for this session. Defaults to the live-match range. */
+    this.minZoom = resolveMinZoom(options?.minZoom);
+    this.maxZoom = resolveMaxZoom(options?.maxZoom, this.minZoom);
 
     /** Map extent in world px. Set via {@link Camera#setBounds}. */
     this.worldW = 0;
@@ -75,7 +82,7 @@ export class Camera {
     if (!view) return;
     const zoom = Number(view.zoom);
     if (Number.isFinite(zoom)) {
-      this.zoom = clampZoom(zoom, this.maxZoom);
+      this.zoom = clampZoom(zoom, this.minZoom, this.maxZoom);
     }
     const centerX = Number(view.centerX);
     const centerY = Number(view.centerY);
@@ -195,7 +202,7 @@ export class Camera {
     const ay = anchorSy == null ? this.viewH / 2 : anchorSy;
     // World point currently under the anchor; we keep it pinned after zooming.
     const before = this.screenToWorld(ax, ay);
-    this.zoom = clampZoom(zoom, this.maxZoom);
+    this.zoom = clampZoom(zoom, this.minZoom, this.maxZoom);
     const after = this.screenToWorld(ax, ay);
     this.x += before.x - after.x;
     this.y += before.y - after.y;

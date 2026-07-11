@@ -2,6 +2,11 @@ import { TERRAIN } from "./protocol.js";
 
 export const MAP_EDITOR_HISTORY_LIMIT = 25;
 export const MAP_EDITOR_MAX_NATURALS_PER_PLAYER = 3;
+// Mirror the authored-map clearance contract enforced by
+// server/crates/sim/src/game/map.rs. The Lab runtime's smaller spawn-reset
+// footprint is not sufficient for a map that must pass authored-map validation.
+export const MAP_EDITOR_MAIN_CLEARANCE_TILES = 7;
+export const MAP_EDITOR_NATURAL_CLEARANCE_TILES = 4;
 
 const TERRAIN_TO_CHAR = Object.freeze({
   [TERRAIN.GRASS]: ".",
@@ -16,7 +21,7 @@ const CHAR_TO_TERRAIN = Object.freeze({
 });
 
 export class MapEditorSession {
-  constructor({ storage = globalThis.localStorage, historyLimit = MAP_EDITOR_HISTORY_LIMIT } = {}) {
+  constructor({ storage = defaultStorage(), historyLimit = MAP_EDITOR_HISTORY_LIMIT } = {}) {
     this.storage = storage;
     this.historyLimit = Math.max(1, Math.trunc(historyLimit) || MAP_EDITOR_HISTORY_LIMIT);
     this.draft = null;
@@ -301,6 +306,7 @@ export class MapEditorSession {
     const selected = this.selectedLayoutId;
     return this.mutate(`Removed ${selected} layout`, (draft) => {
       draft.layouts = draft.layouts.filter((layout) => layout.id !== selected);
+      removeUnreferencedDraftSites(draft);
     });
   }
 
@@ -323,11 +329,15 @@ export class MapEditorSession {
 
   saveLocal(key) {
     if (!this.draft || !this.storage?.setItem) return false;
-    this.storage.setItem(storageKey(key), JSON.stringify({
-      schemaVersion: 2,
-      draft: this.draft,
-      selectedLayoutId: this.selectedLayoutId,
-    }));
+    try {
+      this.storage.setItem(storageKey(key), JSON.stringify({
+        schemaVersion: 2,
+        draft: this.draft,
+        selectedLayoutId: this.selectedLayoutId,
+      }));
+    } catch {
+      return false;
+    }
     this.lastAction = "Saved local map";
     this.markSaved();
     return true;
@@ -335,7 +345,12 @@ export class MapEditorSession {
 
   loadLocal(key) {
     if (!this.storage?.getItem) return false;
-    const text = this.storage.getItem(storageKey(key));
+    let text;
+    try {
+      text = this.storage.getItem(storageKey(key));
+    } catch {
+      return false;
+    }
     if (!text) return false;
     let parsed;
     let selectedLayoutId = "";
@@ -358,10 +373,10 @@ export class MapEditorSession {
       this.notify("loaded");
       return true;
     }
-    const changed = this.mutate("Loaded local map", (draft) => replaceObject(draft, parsed));
+    this.mutate("Loaded local map", (draft) => replaceObject(draft, parsed));
     if (selectedLayoutId) this.selectLayout(selectedLayoutId);
     this.markSaved({ notify: false });
-    return changed;
+    return true;
   }
 
   materialized() {
@@ -425,7 +440,7 @@ export function paintDraftRect(draft, rect, terrainCode) {
 export function protectDraftBaseTerrain(draft) {
   if (!Array.isArray(draft?.terrain)) return;
   for (const site of draft.sites || []) {
-    const radius = site.kind === "natural" ? 0 : 3;
+    const radius = siteClearanceRadius(site.kind);
     paintDraftRect(draft, {
       x0: site.x - radius,
       y0: site.y - radius,
@@ -452,7 +467,7 @@ export function placeDraftSite(draft, { kind, x, y, layoutId = "" }) {
 /** Move one player's start instead of exposing an anonymous "main" site. */
 export function moveDraftPlayerStart(draft, playerIndex, tile, layoutId = "") {
   const slot = draftSlotAt(draft, playerIndex, layoutId);
-  const target = normalizedDraftTile(draft, tile);
+  const target = normalizedDraftTile(draft, tile, MAP_EDITOR_MAIN_CLEARANCE_TILES);
   if (!slot || !target) return draftEditError("Choose a valid player and map tile.");
   const current = siteById(draft, slot.main);
   const occupied = siteAt(draft, target.x, target.y);
@@ -482,7 +497,7 @@ export function moveDraftPlayerStart(draft, playerIndex, tile, layoutId = "") {
 /** Add a natural directly to one player's setup, capped at three per player. */
 export function addDraftPlayerNatural(draft, playerIndex, tile, layoutId = "") {
   const slot = draftSlotAt(draft, playerIndex, layoutId);
-  const target = normalizedDraftTile(draft, tile);
+  const target = normalizedDraftTile(draft, tile, MAP_EDITOR_NATURAL_CLEARANCE_TILES);
   if (!slot || !target) return draftEditError("Choose a valid player and map tile.");
   if (slot.naturals.length >= MAP_EDITOR_MAX_NATURALS_PER_PLAYER) {
     return draftEditError(`Player ${playerIndex + 1} already has ${MAP_EDITOR_MAX_NATURALS_PER_PLAYER} natural bases.`);
@@ -500,7 +515,7 @@ export function addDraftPlayerNatural(draft, playerIndex, tile, layoutId = "") {
 /** Move a named natural that already belongs to the selected player. */
 export function moveDraftPlayerNatural(draft, playerIndex, naturalId, tile, layoutId = "") {
   const slot = draftSlotAt(draft, playerIndex, layoutId);
-  const target = normalizedDraftTile(draft, tile);
+  const target = normalizedDraftTile(draft, tile, MAP_EDITOR_NATURAL_CLEARANCE_TILES);
   const natural = siteById(draft, naturalId);
   if (!slot || !target || natural?.kind !== "natural" || !slot.naturals.includes(naturalId)) {
     return draftEditError("That natural base is no longer part of this player's setup.");
@@ -716,10 +731,15 @@ function draftSlotAt(draft, playerIndex, layoutId) {
   return Number.isInteger(index) && index >= 0 && Array.isArray(slots) ? slots[index] || null : null;
 }
 
-function normalizedDraftTile(draft, tile) {
+function normalizedDraftTile(draft, tile, radius = 0) {
   const size = Array.isArray(draft?.terrain) ? draft.terrain.length : 0;
-  if (!size || !Number.isFinite(Number(tile?.x)) || !Number.isFinite(Number(tile?.y))) return null;
-  return { x: clampTile(tile.x, size), y: clampTile(tile.y, size) };
+  if (size <= radius * 2 || !Number.isFinite(Number(tile?.x)) || !Number.isFinite(Number(tile?.y))) {
+    return null;
+  }
+  return {
+    x: clampTileToRadius(tile.x, size, radius),
+    y: clampTileToRadius(tile.y, size, radius),
+  };
 }
 
 function siteById(draft, id) {
@@ -739,6 +759,17 @@ function draftSiteReferenceCount(draft, siteId) {
     }
   }
   return count;
+}
+
+function removeUnreferencedDraftSites(draft) {
+  const referenced = new Set();
+  for (const layout of draft?.layouts || []) {
+    for (const slot of layout.slots || []) {
+      if (slot.main) referenced.add(slot.main);
+      for (const id of slot.naturals || []) referenced.add(id);
+    }
+  }
+  draft.sites = (draft?.sites || []).filter((site) => referenced.has(site.id));
 }
 
 function uniqueDraftSiteId(draft, prefix) {
@@ -770,11 +801,29 @@ function storageKey(key) {
   return `rts.mapEditor.${String(key || "default")}.v2`;
 }
 
+function defaultStorage() {
+  try {
+    return globalThis.localStorage;
+  } catch {
+    return null;
+  }
+}
+
 function protectedTerrainTile(draft, x, y) {
   return (draft?.sites || []).some((site) => {
-    const radius = site.kind === "natural" ? 0 : 3;
+    const radius = siteClearanceRadius(site.kind);
     return Math.abs(site.x - x) <= radius && Math.abs(site.y - y) <= radius;
   });
+}
+
+function siteClearanceRadius(kind) {
+  return kind === "natural"
+    ? MAP_EDITOR_NATURAL_CLEARANCE_TILES
+    : MAP_EDITOR_MAIN_CLEARANCE_TILES;
+}
+
+function clampTileToRadius(value, size, radius) {
+  return Math.max(radius, Math.min(size - radius - 1, Math.trunc(Number(value)) || 0));
 }
 
 function replaceObject(target, source) {

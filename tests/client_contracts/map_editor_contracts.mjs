@@ -6,6 +6,8 @@ import { createMapHandoff, consumeMapHandoff } from "../../client/src/map_editor
 import { mapEditorLaunchConfig } from "../../client/src/map_editor_launch.js";
 import {
   addDraftPlayerNatural,
+  MAP_EDITOR_MAIN_CLEARANCE_TILES,
+  MAP_EDITOR_NATURAL_CLEARANCE_TILES,
   MapEditorSession,
   authoredMapFromMaterialized,
   materializedMapsEqual,
@@ -16,6 +18,14 @@ import {
 
 const repoRoot = new URL("../../", import.meta.url);
 const noTerrainMap = JSON.parse(fs.readFileSync(new URL("server/assets/maps/no-terrain.json", repoRoot), "utf8"));
+const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.rs", repoRoot), "utf8");
+
+{
+  const serverMainRadius = Number(serverMapSource.match(/BASE_PROTECTION_RADIUS_TILES:\s*i32\s*=\s*(\d+)/)?.[1]);
+  const serverNaturalRadius = Number(serverMapSource.match(/EXPANSION_PROTECTION_RADIUS_TILES:\s*i32\s*=\s*(\d+)/)?.[1]);
+  assert.equal(MAP_EDITOR_MAIN_CLEARANCE_TILES, serverMainRadius, "editor start clearance mirrors authored-map validation");
+  assert.equal(MAP_EDITOR_NATURAL_CLEARANCE_TILES, serverNaturalRadius, "editor natural clearance mirrors authored-map validation");
+}
 
 {
   const session = new MapEditorSession({ storage: null });
@@ -85,11 +95,45 @@ const noTerrainMap = JSON.parse(fs.readFileSync(new URL("server/assets/maps/no-t
   const start = session.playerSlots()[0].start;
   session.beginTerrainStroke();
   assert.deepEqual(
-    session.paintTerrainTiles([{ x: start.x, y: start.y }], TERRAIN.WATER),
+    session.paintTerrainTiles([
+      { x: start.x + MAP_EDITOR_MAIN_CLEARANCE_TILES, y: start.y },
+    ], TERRAIN.WATER),
     [],
-    "base centers remain protected grass",
+    "the full authored start clearance remains protected grass",
   );
   assert.equal(session.commitTerrainStroke(), false);
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 32, playerCount: 2 });
+  const layoutId = session.selectedLayoutId;
+  session.mutate("Added natural", (draft) => {
+    addDraftPlayerNatural(draft, 0, { x: 16, y: 16 }, layoutId);
+  });
+  const natural = session.playerSlots()[0].naturals[0];
+  session.beginTerrainStroke();
+  assert.deepEqual(
+    session.paintTerrainTiles([
+      { x: natural.x + MAP_EDITOR_NATURAL_CLEARANCE_TILES, y: natural.y },
+    ], TERRAIN.ROCK),
+    [],
+    "the full authored natural clearance remains protected grass",
+  );
+  assert.equal(session.commitTerrainStroke(), false);
+
+  session.mutate("Moved sites from edge", (draft) => {
+    moveDraftPlayerStart(draft, 0, { x: 0, y: 0 }, layoutId);
+    moveDraftPlayerNatural(draft, 0, natural.id, { x: 31, y: 31 }, layoutId);
+  });
+  assert.deepEqual(session.playerSlots()[0].start, {
+    id: session.playerSlots()[0].start.id,
+    kind: "main",
+    x: MAP_EDITOR_MAIN_CLEARANCE_TILES,
+    y: MAP_EDITOR_MAIN_CLEARANCE_TILES,
+  });
+  assert.equal(session.playerSlots()[0].naturals[0].x, 31 - MAP_EDITOR_NATURAL_CLEARANCE_TILES);
+  assert.equal(session.playerSlots()[0].naturals[0].y, 31 - MAP_EDITOR_NATURAL_CLEARANCE_TILES);
 }
 
 {
@@ -118,11 +162,19 @@ const noTerrainMap = JSON.parse(fs.readFileSync(new URL("server/assets/maps/no-t
 
   const original = session.draft.layouts.find((layout) => layout.id === originalLayoutId);
   const edited = session.draft.layouts.find((layout) => layout.id === editedLayoutId);
+  const editedMainId = edited.slots[0].main;
   assert.equal(original.slots[0].main, sharedMainId, "moving a start detaches it from other layouts");
   assert.equal(original.slots[0].naturals[0], sharedNaturalId, "moving/removing a natural preserves other layouts");
   assert.notEqual(edited.slots[0].main, sharedMainId);
   assert.deepEqual(edited.slots[0].naturals, []);
   assert(session.draft.sites.some((site) => site.id === sharedNaturalId), "shared natural site remains authored");
+  session.removeSelectedLayout();
+  assert(
+    !session.draft.sites.some((site) => site.id === editedMainId),
+    "removing a layout also removes its unreferenced protected sites",
+  );
+  session.undo();
+  assert(session.draft.sites.some((site) => site.id === editedMainId), "layout removal remains fully undoable");
 }
 
 {
@@ -152,6 +204,18 @@ const noTerrainMap = JSON.parse(fs.readFileSync(new URL("server/assets/maps/no-t
   assert.equal(restored.loadLocal("roundtrip"), true);
   assert.equal(restored.selectedLayoutId, "2p_cross_nw_se");
   assert.equal(restored.draft.layouts.length, noTerrainMap.layouts.length);
+  assert.equal(restored.loadLocal("roundtrip"), true, "an unchanged saved workspace still loads successfully");
+}
+
+{
+  const unavailableStorage = {
+    getItem() { throw new Error("storage disabled"); },
+    setItem() { throw new Error("storage disabled"); },
+  };
+  const session = new MapEditorSession({ storage: unavailableStorage });
+  session.initializeBlank({ size: 32, playerCount: 2 });
+  assert.equal(session.saveLocal("disabled"), false, "disabled local storage does not abort the editor");
+  assert.equal(session.loadLocal("disabled"), false, "disabled local storage reports an unavailable workspace");
 }
 
 {
