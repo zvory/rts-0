@@ -370,7 +370,8 @@ Interpretation:
   MessagePack full-snapshot baselines and later fog-safe delta measurements, not compressed-wire
   claims, unless the measurement source is explicitly labeled.
 
-The Fly production deploy enables the low-noise spike mode in `fly.toml`:
+The Fly game-server deploys enable the low-noise spike mode in `fly.mainline.toml` and
+`fly.beta.toml`:
 
 ```toml
 RTS_PERF = "spikes"

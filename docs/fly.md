@@ -3,9 +3,10 @@
 This app runs as one Rust process that serves the static client and upgrades `/ws` to a WebSocket.
 Fly proxies HTTPS and WSS traffic to the container on port 8080.
 
-`fly.toml` enables basic production performance tracing with `RTS_PERF=spikes` and
-`RTS_PERF_SLOW_TICK_MS=40`. Fly logs will include a `performance tick summary` row only when a
-server tick takes at least 40 ms.
+`fly.mainline.toml` and `fly.beta.toml` enable basic production performance tracing with
+`RTS_PERF=spikes` and `RTS_PERF_SLOW_TICK_MS=40`. Fly logs will include a `performance tick
+summary` row only when a server tick takes at least 40 ms. `fly.launcher.toml` is deliberately
+separate and cannot serve game traffic.
 
 ## First deploy
 
@@ -60,10 +61,16 @@ or:
 Run one machine only. Game rooms live in server memory, so multiple machines can split players
 between different lobbies.
 
-Beta deploys set the machine size to `shared-cpu-4x@1024MB`, matching the mainline app. If you
-override the app name for a different beta app, `./deploy.sh beta` still applies that VM size.
+Phase 1 leaves mainline always-on with its existing lifecycle. Beta uses one `performance-1x`
+Machine with 2 GB of memory, `auto_stop_machines = "stop"`, autostart enabled, and zero minimum
+running Machines. `deploy.sh` always selects the channel's explicit config, including when `--app`
+overrides the normal app name.
+
+Fly's HTTP activity keeps a game Machine running while browsers are connected. A headless AI room
+without a connected browser may not prevent autostop; durable unattended AI games are not a goal
+of this setup.
 Deploy shutdown is configured with Fly's top-level `kill_signal = "SIGINT"` and
-`kill_timeout = 300`, the maximum graceful-stop window for shared-CPU Machines. The server drains
+`kill_timeout = 300`, the configured graceful-stop window for game Machines. The server drains
 active matches inside a 295 second application budget after the deploy signal, then closes
 connections and exits before Fly's final stop signal. That budget is split into 260 seconds for
 matches to end naturally, 10 seconds for forced shutdown finalization of any still-active tracked
@@ -217,8 +224,8 @@ flyctl scale count 1 -a rts-0-zvorygin
 flyctl scale count 1 -a rts-0-zvorygin-beta
 ```
 
-The `-a rts-0-zvorygin` flag makes these commands work from any directory. If you are already in
-the repo directory with `fly.toml`, the `-a` flag is optional.
+Always include `-a` for manual scaling commands; the repository intentionally has multiple Fly
+configs.
 
 ## Redeploy after changes
 
@@ -252,21 +259,72 @@ artifacts.
 
 ## Custom domains
 
-Raw Fly URLs work without extra setup:
+The stable destinations are:
+
+```text
+https://bewegungskrieg.net                 launcher
+https://www.bewegungskrieg.net             launcher
+https://mainline.bewegungskrieg.net        mainline game server
+https://beta.bewegungskrieg.net            beta game server
+```
+
+The raw Fly hostnames remain recovery paths even if custom DNS or the launcher is unavailable:
 
 ```text
 https://rts-0-zvorygin.fly.dev
 https://rts-0-zvorygin-beta.fly.dev
+https://rts-0-zvorygin-launcher.fly.dev
 ```
 
-For `beta.bewegungskrieg.net`, add the hostname to the beta app and then create the DNS record that
-Fly prints:
+The launcher offers only fixed mainline and beta choices. It polls a fixed `/version` URL to wake
+the chosen game app, shows `Starting server...`, and redirects rather than proxying HTTP or
+WebSocket traffic. Requests cannot supply an upstream origin. Paths, queries, and fragments are
+preserved; a non-root canonical URL defaults to mainline.
+
+Remote setup changes paid Machine sizing and hostname routing, so capture `PRE_PHASE_SHA` and the
+current DNS values and obtain explicit approval immediately before running these commands:
 
 ```bash
+flyctl apps create rts-0-zvorygin-launcher
+./deploy.sh launcher
+./deploy.sh beta
+
+flyctl certs add mainline.bewegungskrieg.net -a rts-0-zvorygin
 flyctl certs add beta.bewegungskrieg.net -a rts-0-zvorygin-beta
+flyctl certs add bewegungskrieg.net -a rts-0-zvorygin-launcher
+flyctl certs add www.bewegungskrieg.net -a rts-0-zvorygin-launcher
+flyctl certs show mainline.bewegungskrieg.net -a rts-0-zvorygin
 flyctl certs show beta.bewegungskrieg.net -a rts-0-zvorygin-beta
+flyctl certs show bewegungskrieg.net -a rts-0-zvorygin-launcher
+flyctl certs show www.bewegungskrieg.net -a rts-0-zvorygin-launcher
 ```
 
-Serving beta at `https://bewegungskrieg.net/beta` would require an HTTP reverse proxy or redirect
-layer in front of the apps because Fly app routing is hostname-based, not path-based. Prefer
-`beta.bewegungskrieg.net` unless a path URL is required.
+Apply the A/AAAA/CNAME records printed by those `certs show` commands only after both channel
+hostnames work. Save the old canonical A/AAAA/CNAME values before replacing them.
+
+### Phase 1 rollback
+
+To restore beta's pre-phase image, shared CPU size, and always-on lifecycle, run the old deployment
+wrapper from the captured commit:
+
+```bash
+git worktree add --detach /tmp/rts-hosting-rollback "$PRE_PHASE_SHA"
+/tmp/rts-hosting-rollback/deploy.sh beta
+git worktree remove /tmp/rts-hosting-rollback
+```
+
+To return the canonical certificates to mainline, first restore the saved canonical DNS records,
+then run:
+
+```bash
+flyctl certs add bewegungskrieg.net -a rts-0-zvorygin
+flyctl certs add www.bewegungskrieg.net -a rts-0-zvorygin
+flyctl certs remove bewegungskrieg.net -a rts-0-zvorygin-launcher
+flyctl certs remove www.bewegungskrieg.net -a rts-0-zvorygin-launcher
+flyctl certs show bewegungskrieg.net -a rts-0-zvorygin
+flyctl certs show www.bewegungskrieg.net -a rts-0-zvorygin
+```
+
+The DNS provider is intentionally not automated by this repository, so the exact saved record
+values are part of the rollout record. After rollback, the launcher app can be left idle for
+inspection or removed with `flyctl apps destroy rts-0-zvorygin-launcher` after explicit approval.

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bewegungskrieg</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #171914; color: #f2ead2; }
+    body { min-height: 100vh; margin: 0; display: grid; place-items: center; }
+    main { width: min(32rem, calc(100% - 2rem)); text-align: center; }
+    h1 { letter-spacing: .08em; text-transform: uppercase; }
+    p { color: #c8c0a8; }
+    .choices { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin: 2rem 0; }
+    button { padding: .9rem 1rem; border: 1px solid #9d8f62; border-radius: .25rem; background: #292c23; color: inherit; font: inherit; cursor: pointer; }
+    button:hover, button:focus-visible { background: #3a3f31; }
+    button:disabled { cursor: wait; opacity: .65; }
+    #status { min-height: 1.5rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Bewegungskrieg</h1>
+    <p>Choose a game server. A stopped server may need a moment to start.</p>
+    <div class="choices">
+      <button type="button" data-channel="mainline">Mainline</button>
+      <button type="button" data-channel="beta">Beta</button>
+    </div>
+    <p id="status" role="status" aria-live="polite"></p>
+  </main>
+  <script>
+    const origins = Object.freeze({
+      mainline: "https://mainline.bewegungskrieg.net",
+      beta: "https://beta.bewegungskrieg.net",
+    });
+    const status = document.querySelector("#status");
+    const buttons = [...document.querySelectorAll("[data-channel]")];
+    let launching = false;
+
+    const destination = (channel) =>
+      origins[channel] + window.location.pathname + window.location.search + window.location.hash;
+
+    async function launch(channel) {
+      if (launching || !origins[channel]) return;
+      launching = true;
+      buttons.forEach((button) => { button.disabled = true; });
+      status.textContent = "Starting server...";
+      const deadline = Date.now() + 30000;
+      while (Date.now() < deadline) {
+        try {
+          const response = await fetch(`/wake?channel=${encodeURIComponent(channel)}`, { cache: "no-store" });
+          if (response.ok) {
+            window.location.replace(destination(channel));
+            return;
+          }
+        } catch (_) {
+          // The launcher stays available; keep the status simple and retry briefly.
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+      status.textContent = "The server did not start. Try again.";
+      buttons.forEach((button) => { button.disabled = false; });
+      launching = false;
+    }
+
+    buttons.forEach((button) => button.addEventListener("click", () => launch(button.dataset.channel)));
+
+    const isDeepLink = window.location.pathname !== "/" || window.location.search.length > 0 || window.location.hash.length > 0;
+    if (isDeepLink) launch("mainline");
+  </script>
+</body>
+</html>

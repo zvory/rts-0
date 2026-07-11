@@ -25,6 +25,10 @@ const cargoLock = read("server/Cargo.lock");
 const mainTestWorkflow = read(".github/workflows/main-tests.yml");
 const wasmBuildScript = read("scripts/build-sim-wasm.sh");
 const wasmGitignore = read("client/vendor/sim-wasm/.gitignore");
+const deployScript = read("deploy.sh");
+const mainlineFlyConfig = read("fly.mainline.toml");
+const betaFlyConfig = read("fly.beta.toml");
+const launcherFlyConfig = read("fly.launcher.toml");
 const wasmBindgenLockVersion = cargoLock.match(
   /\[\[package\]\]\nname = "wasm-bindgen"\nversion = "([^"]+)"/,
 )?.[1];
@@ -94,5 +98,18 @@ assertIncludes(
   "path: client/vendor/sim-wasm",
   "browser job must download prediction WASM assets into the served client tree",
 );
+
+assertIncludes(deployScript, 'config_file="fly.mainline.toml"', "mainline deploys must select the mainline config");
+assertIncludes(deployScript, 'config_file="fly.beta.toml"', "beta deploys must select the beta config");
+assertIncludes(deployScript, 'config_file="fly.launcher.toml"', "launcher deploys must select the launcher config");
+assertMatches(mainlineFlyConfig, /auto_stop_machines\s*=\s*"off"/, "mainline lifecycle must remain always-on in phase 1");
+assertMatches(mainlineFlyConfig, /min_machines_running\s*=\s*1/, "mainline must retain one running Machine");
+assertMatches(mainlineFlyConfig, /cpu_kind\s*=\s*"shared"/, "mainline must retain its shared CPU kind");
+assertMatches(mainlineFlyConfig, /cpus\s*=\s*4/, "mainline must retain its shared-cpu-4x size");
+assertMatches(betaFlyConfig, /auto_stop_machines\s*=\s*"stop"/, "beta must stop rather than suspend when idle");
+assertMatches(betaFlyConfig, /min_machines_running\s*=\s*0/, "beta must allow zero running Machines");
+assertMatches(betaFlyConfig, /cpu_kind\s*=\s*"performance"/, "beta must use performance CPU kind");
+assertMatches(betaFlyConfig, /memory\s*=\s*"2gb"/, "beta must use 2 GB memory");
+assertMatches(launcherFlyConfig, /min_machines_running\s*=\s*1/, "launcher must remain available while game apps stop");
 
 console.log("deploy asset contract: ok");

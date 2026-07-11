@@ -15,6 +15,9 @@ import {
 import { ReportWindowAggregate } from "./report_window_aggregate.js";
 
 export const SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES = 1280;
+export const INITIAL_CONNECT_ATTEMPTS = 8;
+export const INITIAL_CONNECT_RETRY_MS = 1000;
+export const INITIAL_CONNECT_TIMEOUT_MS = 3000;
 const SNAPSHOT_BYTE_SOURCE = "messagepack-application-payload";
 const WEBSOCKET_COMPRESSION_NONE = "none";
 const WEBSOCKET_COMPRESSION_PERMESSAGE_DEFLATE = "permessage-deflate";
@@ -86,15 +89,53 @@ export class Net {
    * @returns {Promise<void>} resolves once the socket is open, rejects on a
    *   connection error that occurs before it opens.
    */
-  connect() {
+  async connect({
+    attempts = INITIAL_CONNECT_ATTEMPTS,
+    retryMs = INITIAL_CONNECT_RETRY_MS,
+    attemptTimeoutMs = INITIAL_CONNECT_TIMEOUT_MS,
+    wait = (delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs)),
+  } = {}) {
+    const boundedAttempts = Math.max(1, Math.floor(attempts));
+    let lastError = new Error("WebSocket connection failed");
+    for (let attempt = 1; attempt <= boundedAttempts; attempt += 1) {
+      try {
+        await this._connectOnce(attemptTimeoutMs);
+        return;
+      } catch (err) {
+        lastError = err;
+        if (attempt < boundedAttempts) {
+          this.diagnostics?.mark("ws.connect.retry", { attempt, attempts: boundedAttempts });
+          await wait(retryMs);
+        }
+      }
+    }
+    throw lastError;
+  }
+
+  _connectOnce(timeoutMs) {
     return new Promise((resolve, reject) => {
       let settled = false;
+      let opened = false;
       this.diagnostics?.mark("ws.connect.start", { url: this.url });
       const ws = new WebSocket(this.url);
       ws.binaryType = "arraybuffer";
       this.ws = ws;
+      const timeoutId = setTimeout(() => {
+        if (settled) return;
+        this.diagnostics?.mark("ws.connect.timeout", { timeoutMs });
+        try {
+          ws.close();
+        } catch {
+          settled = true;
+          if (this.ws === ws) this.ws = null;
+          reject(new Error("WebSocket connection timed out"));
+        }
+      }, Math.max(1, timeoutMs));
 
       ws.addEventListener("open", () => {
+        if (this.ws !== ws) return;
+        clearTimeout(timeoutId);
+        opened = true;
         settled = true;
         this.diagnostics?.mark("ws.open");
         this._emit("open");
@@ -105,15 +146,27 @@ export class Net {
         // An error before open means the connection never came up: reject the
         // connect() promise. Errors after open are surfaced via "close".
         if (!settled) {
-          settled = true;
           this.diagnostics?.mark("ws.error.before_open");
-          reject(new Error("WebSocket connection failed"));
+          try {
+            ws.close();
+          } catch {
+            clearTimeout(timeoutId);
+            settled = true;
+            if (this.ws === ws) this.ws = null;
+            reject(new Error("WebSocket connection failed"));
+          }
         }
       });
 
       ws.addEventListener("close", () => {
+        clearTimeout(timeoutId);
+        if (this.ws === ws) this.ws = null;
         this.diagnostics?.mark("ws.close");
-        this._emit("close");
+        if (opened) this._emit("close");
+        if (!settled) {
+          settled = true;
+          reject(new Error("WebSocket connection failed"));
+        }
       });
 
       ws.addEventListener("message", (ev) => this._onMessage(ev));

@@ -4,13 +4,15 @@ set -euo pipefail
 
 MAINLINE_APP="${FLY_MAINLINE_APP:-rts-0-zvorygin}"
 BETA_APP="${FLY_BETA_APP:-rts-0-zvorygin-beta}"
+LAUNCHER_APP="${FLY_LAUNCHER_APP:-rts-0-zvorygin-launcher}"
 
 usage() {
   cat <<'EOF'
 Usage:
-  ./deploy.sh [mainline|beta] [commit]
+  ./deploy.sh [mainline|beta|launcher] [commit]
   ./deploy.sh --channel mainline --commit <commit>
   ./deploy.sh --channel beta --commit <commit>
+  ./deploy.sh --channel launcher --commit <commit>
 
 Deploys to Fly.io. With no commit, deploys the current checkout. With a
 commit, deploys that exact git commit from a temporary detached worktree.
@@ -18,6 +20,7 @@ commit, deploys that exact git commit from a temporary detached worktree.
 Channels:
   mainline, main, production, prod, release  -> FLY_MAINLINE_APP or rts-0-zvorygin
   beta                                      -> FLY_BETA_APP or rts-0-zvorygin-beta
+  launcher                                  -> FLY_LAUNCHER_APP or rts-0-zvorygin-launcher
 
 Options:
   --app <name>       Override the Fly app name.
@@ -61,7 +64,7 @@ while [[ $# -gt 0 ]]; do
       fi
       shift 2
       ;;
-    mainline|main|production|prod|release|beta)
+    mainline|main|production|prod|release|beta|launcher)
       channel="$1"
       shift
       ;;
@@ -81,11 +84,15 @@ done
 case "$channel" in
   mainline|main|production|prod|release)
     app="$MAINLINE_APP"
-    vm_flags=()
+    config_file="fly.mainline.toml"
     ;;
   beta)
     app="$BETA_APP"
-    vm_flags=(--vm-size shared-cpu-4x --vm-memory 1024)
+    config_file="fly.beta.toml"
+    ;;
+  launcher)
+    app="$LAUNCHER_APP"
+    config_file="fly.launcher.toml"
     ;;
   *)
     echo "error: unknown channel: $channel" >&2
@@ -123,23 +130,21 @@ fi
 
 echo "Deploying $short_commit to Fly app '$app' from $deploy_dir"
 
+config_path="$deploy_dir/$config_file"
+
 flyctl config validate \
   --app "$app" \
-  --config "$deploy_dir/fly.toml" \
+  --config "$config_path" \
   --strict
 
 deploy_cmd=(
   flyctl deploy
   --app "$app"
-  --config "$deploy_dir/fly.toml"
+  --config "$config_path"
   --build-arg "COMMIT_HASH=$short_commit"
   --ha=false
   --now
 )
-
-if [[ ${#vm_flags[@]} -gt 0 ]]; then
-  deploy_cmd+=("${vm_flags[@]}")
-fi
 
 deploy_cmd+=("$deploy_dir")
 
