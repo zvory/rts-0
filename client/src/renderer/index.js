@@ -437,8 +437,7 @@ export class Renderer {
     visualFrameStripOverrides = null,
     observerMapAnalysis = null,
     feedbackView: preparedFeedbackView = null,
-    presentationFrame = null,
-    staticMapPresentation = null,
+    reconciledGroundDecals = null,
   } = {}) {
     this._beginRenderFrame();
     this._profiler = profiler || null;
@@ -490,7 +489,10 @@ export class Renderer {
       }),
     );
     time("renderer.groundDecals", () => {
-      this._drawSafely("groundDecals", () => this._drawGroundDecals(state));
+      this._drawSafely(
+        "groundDecals",
+        () => this._drawGroundDecals(Array.isArray(reconciledGroundDecals) ? reconciledGroundDecals : state),
+      );
     });
     time("renderer.trenches", () => {
       this._drawSafely("trenches", () => this._drawTrenches(state));

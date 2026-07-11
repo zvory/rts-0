@@ -143,6 +143,7 @@ const FORBIDDEN_MATCH_LAB_IMPORTS = new Set([
 ]);
 
 const FORBIDDEN_PRESENTATION_IMPORT_AREAS = new Set(["transport", "ui", "renderer"]);
+const PIXI_COMPATIBILITY_ADAPTER = "renderer/pixi_compatibility_adapter.js";
 const forbiddenPresentationRuntimeRe = /\b(?:PIXI|BABYLON|WebSocket|GameState|ClientIntent)\b/;
 
 // Phase 6 client-boundary ratchet: these are the cleanup-phase byte counts for
@@ -248,6 +249,7 @@ for (const file of files) {
   checkRoomCapabilityParser(file, source);
   checkRigOnlyUnitVisuals(file, source);
   checkPresentationBoundary(file, source);
+  checkMatchRendererSeam(file, source);
 }
 
 for (const mod of modules.values()) {
@@ -420,6 +422,23 @@ function checkPresentationBoundary(file, source) {
   }
 }
 
+function checkMatchRendererSeam(file, source) {
+  if (file === "frame_recovery.js") {
+    const calls = source.match(/match\.renderer\.render\([^\n]*/g) || [];
+    if (calls.length !== 1 || calls[0] !== "match.renderer.render(presentationFrame));") {
+      failures.push(`${file}: Match frame orchestration must have exactly one backend render(presentationFrame) seam`);
+    }
+    if (source.includes("consumePendingGroundDecals")) {
+      failures.push(`${file}: frame orchestration must reconcile decal queues before assembly, not use the legacy renderer consumer`);
+    }
+  }
+  if (file === "match.js") {
+    for (const forbidden of ["this.renderer.drawSelectionBox", "this.renderer.buildStaticMap"]) {
+      if (source.includes(forbidden)) failures.push(`${file}: backend operation ${forbidden} bypasses render(frame)`);
+    }
+  }
+}
+
 function resolveImport(fromFile, specifier) {
   const fromDir = path.dirname(fromFile);
   let resolved = path.normalize(path.join(fromDir, specifier)).split(path.sep).join("/");
@@ -431,6 +450,10 @@ function resolveImport(fromFile, specifier) {
 function checkImport(fromFile, toFile) {
   if (fromFile === "match.js" && FORBIDDEN_MATCH_LAB_IMPORTS.has(toFile)) {
     failures.push(`${fromFile} -> ${toFile}: Match must receive lab UI/services through app-shell dependency injection`);
+    return;
+  }
+  if (toFile === PIXI_COMPATIBILITY_ADAPTER && fromFile !== "match.js") {
+    failures.push(`${fromFile} -> ${toFile}: Pixi compatibility adapter is private to Match and unavailable to other backends`);
     return;
   }
 

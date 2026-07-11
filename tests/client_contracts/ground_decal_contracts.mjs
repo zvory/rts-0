@@ -146,6 +146,19 @@ assert(groundDecalClassForImpactEvent(EVENT.ATTACK) === GROUND_DECAL_CLASS.NONE,
 
 {
   const buffer = new GroundDecalBuffer();
+  buffer.applySnapshotEvents([
+    { e: EVENT.DEATH, id: 32, x: 112, y: 80, kind: KIND.WORKER },
+  ], { players: start.players, tick: 1 });
+  const reconciled = buffer.reconcilePending();
+  assert(reconciled.length === 1, "reconciliation exposes the pending decal batch to frame assembly");
+  assert(buffer.reconcilePending() === reconciled, "a failed frame reuses its unacknowledged decal batch");
+  assert(buffer.pendingCount === 1, "an unacknowledged batch remains accounted for as pending");
+  assert(buffer.acknowledgeReconciled() === 1, "a successful backend frame acknowledges the reconciled batch");
+  assert(buffer.pendingCount === 0, "acknowledgement releases the reconciled decal batch");
+}
+
+{
+  const buffer = new GroundDecalBuffer();
   const events = [
     { e: EVENT.MORTAR_IMPACT, x: 128, y: 96, radiusTiles: 1.5 },
     { e: EVENT.ARTILLERY_IMPACT, x: 256, y: 192, radiusTiles: 3 },

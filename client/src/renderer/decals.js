@@ -249,10 +249,14 @@ export function _initGroundDecalsForMap(map) {
   this._groundDecals?.resetForMap(map);
 }
 
-export function _drawGroundDecals(state) {
-  if (!this._groundDecals || typeof state?.consumePendingGroundDecals !== "function") return 0;
+export function _drawGroundDecals(source) {
+  if (!this._groundDecals) return 0;
   if (!this._groundDecals.ctx) return 0;
-  const decals = state.consumePendingGroundDecals();
+  const decals = Array.isArray(source)
+    ? source
+    : typeof source?.consumePendingGroundDecals === "function"
+      ? source.consumePendingGroundDecals()
+      : [];
   return this._groundDecals.stampBatch(decals, {
     onError: (label, err) => this._recordRenderError?.(label, err),
   });

@@ -14,7 +14,7 @@ import { DomClickInputZone, MatchInputRouter } from "./input/router.js";
 import { Minimap } from "./minimap.js";
 import { MatchHealth } from "./match_health.js";
 import { PredictionController } from "./prediction_controller.js";
-import { Renderer } from "./renderer/index.js";
+import { PixiPresentationAdapter } from "./renderer/pixi_compatibility_adapter.js";
 import { ARTILLERY_RIG_SVG } from "./renderer/rigs/support_svg.js";
 import { LivePauseOverlay } from "./live_pause_overlay.js";
 import { MatchObserverDiagnostics } from "./match_observer_diagnostics.js";
@@ -209,7 +209,13 @@ export class Match {
     this.camera = this._timeInit("match.camera", () => new Camera(0, 0, {
       maxZoom: options.cameraMaxZoom,
     }));
-    this.renderer = this._timeInit("match.renderer", () => new Renderer(dom.viewport, { renderClock: this.renderClock }));
+    this.renderer = this._timeInit("match.renderer", () => new PixiPresentationAdapter(dom.viewport, {
+      renderClock: this.renderClock,
+      state: () => this.state,
+      profiler: () => this.frameProfiler,
+      visualProfile: () => this.visualProfile,
+      staticMap: () => this.presentationAssembler?.staticMap,
+    }));
     this.fog = this._timeInit(
       "match.fog",
       () => new Fog(this.state.map.width, this.state.map.height, this.state.map.terrain),
@@ -254,7 +260,7 @@ export class Match {
           this.camera,
           this.state,
           this.commandIssuer,
-          (rect) => this.renderer.drawSelectionBox(rect),
+          () => {},
           this.fog,
           this.audio,
           this.inputRouter,
@@ -267,9 +273,6 @@ export class Match {
           },
         ),
     );
-
-    // Draw the static terrain once into the renderer's cached layer.
-    this._timeInit("match.staticMap", () => this.renderer.buildStaticMap(this.state.map));
 
     // Size the camera to the map and the current viewport, then restore a carried view or center on home.
     this._timeInit("match.bounds", () => {

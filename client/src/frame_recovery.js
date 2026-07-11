@@ -92,6 +92,10 @@ function runMatchFrame(match, now, { capture = false } = {}) {
       entityStats: STATS,
     });
     match.presentationAssembler = presentationAssembler;
+    const groundDecals = time(
+      "match.groundDecalReconciliation",
+      () => match.state.reconcilePendingGroundDecals?.() || [],
+    );
     const presentationFrame = time("match.presentationFrame", () => presentationAssembler.assemble({
       map: match.state.map,
       frameContext: frameViews,
@@ -100,7 +104,7 @@ function runMatchFrame(match, now, { capture = false } = {}) {
       feedback: feedbackView,
       rememberedBuildings: match.state.rememberedBuildings,
       trenches: match.state.trenches,
-      groundDecals: match.state.groundDecals?.peekPending?.() || [],
+      groundDecals,
       selectionIds: match.state.selection,
       players: match.state.players,
       playerId: match.state.playerId,
@@ -113,7 +117,6 @@ function runMatchFrame(match, now, { capture = false } = {}) {
       sourceTick: match.state.tick,
     }));
     match.presentationFrame = presentationFrame;
-    match.staticMapPresentation = presentationAssembler.staticMap;
     match.frameProfiler?.recordDiagnosticCounter?.("presentation.frames.assembled", 1);
     match.frameProfiler?.recordDiagnosticCounter?.(
       "presentation.records.dropped",
@@ -128,21 +131,11 @@ function runMatchFrame(match, now, { capture = false } = {}) {
       frameId: presentationFrame.frameId,
     }));
 
-    time("match.renderer", () => {
-      match.renderer.render(match.state, match.camera, match.fog, alpha, {
-        clientIntent: match.clientIntent,
-        frameViews,
-        profiler: match.frameProfiler,
-        visualSamples,
-        visualUnitOverrides: match.visualProfile?.unitOverrides || null,
-        visualFrameStripOverrides: match.visualProfile?.frameStripOverrides || null,
-        observerMapAnalysis,
-        feedbackView,
-        presentationFrame,
-        staticMapPresentation: presentationAssembler.staticMap,
-      });
-    });
-    match.input?.publishSelectionScene?.(selectionScene);
+    const renderResult = time("match.renderer", () => match.renderer.render(presentationFrame));
+    if (renderResult?.presented !== false) {
+      match.state.acknowledgeReconciledGroundDecals?.();
+      match.input?.publishSelectionScene?.(selectionScene);
+    }
     time("match.hud", () => match.hud.update(frameViews, { profiler: match.frameProfiler }));
     time("match.minimap", () => match.minimap.render(frameViews, { profiler: match.frameProfiler }));
     time("match.observerAnalysis", () => match.observerDiagnostics?.update(frameViews, { profiler: match.frameProfiler }));
