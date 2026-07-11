@@ -990,8 +990,10 @@ impl RoomTask {
             return;
         }
 
+        let mut refresh_snapshot_after_result = false;
         let result = match op {
             LabClientOp::SetVision { vision } => {
+                refresh_snapshot_after_result = true;
                 Some(self.apply_lab_vision(player_id, request_id, vision))
             }
             LabClientOp::ExportScenario { name } => {
@@ -1016,13 +1018,19 @@ impl RoomTask {
                     ignore_command_limits,
                 },
             )),
-            op => Some(self.apply_lab_mutation(player_id, request_id, op)),
+            op => {
+                refresh_snapshot_after_result = true;
+                Some(self.apply_lab_mutation(player_id, request_id, op))
+            }
         };
         if let Some(result) = result {
             let refresh_map = refresh_map_after_result && result.ok;
+            let refresh_snapshot = refresh_snapshot_after_result && result.ok;
             self.send_lab_result_to(player_id, result);
             if refresh_map {
                 self.send_lab_start_payloads_except(true, Some(player_id));
+                self.fanout_current_lab_snapshots();
+            } else if refresh_snapshot {
                 self.fanout_current_lab_snapshots();
             }
         }

@@ -58,7 +58,9 @@ const labClient = {
   async applyUpdates(updates) {
     calls.push({ op: "applyUpdates", updates });
     for (const update of updates) {
-      if (update.operation === "move") Object.assign(entities.get(update.entityId), { x: update.x, y: update.y });
+      if (update.operation === "move" && entities.has(update.entityId)) {
+        Object.assign(entities.get(update.entityId), { x: update.x, y: update.y });
+      }
     }
     state.currRecvTime += 1;
     return {
@@ -77,10 +79,14 @@ const labClient = {
       outcome: { items: entityIds.map((entityId, index) => ({ index, outcome: { entityId } })) },
     };
   },
+  async request(message) {
+    calls.push({ op: message.op });
+    return { ok: true, op: message.op, outcome: { accepted: true } };
+  },
 };
 const match = {
   state,
-  net: { stepRoomTime: () => calls.push({ op: "stepRoomTime" }) },
+  net: { stepRoomTime: () => { calls.push({ op: "stepRoomTime" }); state.currRecvTime += 1; } },
   capabilities: { roomTime: { available: true } },
   roomTimeControls: { roomTimeState: { currentTick: 10, speed: 0, paused: true } },
 };
@@ -98,8 +104,43 @@ const spawned = await bridge.spawn({
   ],
 });
 assert.equal(calls.filter((call) => call.op === "spawnEntities").length, 1, "bridge sends one browser request for a bulk spawn");
-assert.equal(calls.filter((call) => call.op === "stepRoomTime").length, 1, "paused bulk spawn advances authoritative time once");
+assert.equal(calls.filter((call) => call.op === "stepRoomTime").length, 0, "paused bulk spawn observes server fanout without advancing combat");
 assert.equal(spawned.entities.length, 2, "bridge observes the complete authoritative spawn batch");
+
+await bridge.order({ playerId: 1, command: { c: "move", units: [1], x: 120, y: 120 } });
+assert.equal(calls.filter((call) => call.op === "stepRoomTime").length, 1, "paused orders retain one authoritative consumption tick");
+
+labClient.spawnEntities = async (spawns) => {
+  calls.push({ op: "spawnEntities", spawns });
+  entities.set(3, { id: 3, ...spawns[0] });
+  state.currRecvTime += 1;
+  return {
+    ok: true,
+    op: "spawnEntities",
+    outcome: { items: spawns.map((_, index) => ({ index, outcome: { entityId: index + 3 } })) },
+  };
+};
+const fogFilteredSpawn = await bridge.spawn({
+  spawns: [
+    { owner: 1, kind: "rifleman", x: 300, y: 100, completed: true },
+    { owner: 2, kind: "anti_tank_gun", x: 900, y: 900, completed: true },
+  ],
+});
+assert.equal(fogFilteredSpawn.entities.length, 2, "fog-filtered spawn projections preserve batch result positions");
+assert.equal(fogFilteredSpawn.entities[0].id, 3, "visible spawn result remains projected at its input index");
+assert.equal(fogFilteredSpawn.entities[1], null, "authoritative hidden spawn result remains a positional null instead of timing out");
+entities.delete(3);
+
+await bridge.update({
+  updates: [
+    { operation: "move", entityId: 99, x: 800, y: 800 },
+  ],
+});
+assert.equal(
+  calls.filter((call) => call.op === "applyUpdates").length,
+  1,
+  "authoritative updates hidden by the active fog projection do not time out",
+);
 
 await bridge.update({
   updates: [
@@ -107,7 +148,7 @@ await bridge.update({
     { operation: "move", entityId: 2, x: 100, y: 100 },
   ],
 });
-assert.equal(calls.filter((call) => call.op === "applyUpdates").length, 1, "bridge sends one plural update request");
+assert.equal(calls.filter((call) => call.op === "applyUpdates").length, 2, "bridge sends one browser request per plural update");
 assert.equal(entities.get(1).x, 200, "bridge waits for the whole observed update batch");
 
 await bridge.remove({ entityIds: [1, 2] });

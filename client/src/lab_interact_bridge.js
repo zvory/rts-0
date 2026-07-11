@@ -187,12 +187,11 @@ export class LabInteractBridge {
     }));
     const result = await this.mutate(
       () => labClient.spawnEntities(spawns),
-      (outcome) => batchOutcomes(outcome).every((item) => this.entityPresent(item?.outcome?.entityId)),
+      (outcome) => batchOutcomes(outcome).length === spawns.length,
     );
     const entities = batchOutcomes(result.outcome)
       .map((item) => this.app.match.state.entityById(item?.outcome?.entityId))
-      .filter(Boolean)
-      .map(projectEntity);
+      .map((entity) => entity ? projectEntity(entity) : null);
     return { result: projectLabResult(result), entities };
   }
 
@@ -204,7 +203,7 @@ export class LabInteractBridge {
     const updates = input.updates.map((value, index) => normalizeBridgeUpdate(value, index));
     const result = await this.mutate(
       () => labClient.applyUpdates(updates),
-      (outcome) => batchOutcomes(outcome).every((item) => this.outcomeObserved(item?.outcome)),
+      (outcome) => batchOutcomes(outcome).every((item) => this.outcomeMatchesProjection(item?.outcome)),
     );
     return { result: projectLabResult(result) };
   }
@@ -231,6 +230,7 @@ export class LabInteractBridge {
         ignoreCommandLimits: input?.ignoreCommandLimits === true,
       }),
       () => true,
+      { advancePaused: true },
     );
     return { result: projectLabResult(result) };
   }
@@ -422,7 +422,7 @@ export class LabInteractBridge {
     };
   }
 
-  async mutate(send, observed) {
+  async mutate(send, observed, { advancePaused = false } = {}) {
     const { match } = this.session();
     const before = snapshotSequence(match);
     const result = await send();
@@ -432,9 +432,9 @@ export class LabInteractBridge {
         ...(result?.details || {}),
       });
     }
-    // Paused rooms do not naturally produce a new snapshot. Advance one authoritative
-    // tick after an accepted setup/command operation so success always carries observed state.
-    if (isPaused(match)) match.net.stepRoomTime();
+    // Successful setup mutations fan out their current authoritative state without advancing
+    // paused simulation. Commands still need one tick so the queued order can be consumed.
+    if (advancePaused && isPaused(match)) match.net.stepRoomTime();
     await this.waitFor(
       () => snapshotSequence(match) > before && observed(result.outcome || null),
       `authoritative snapshot for ${result.op || "lab operation"}`,
@@ -442,29 +442,18 @@ export class LabInteractBridge {
     return { ...result, snapshotTick: match.state.tick };
   }
 
-  entityPresent(entityId) {
-    return Number.isInteger(entityId) && !!this.app.match.state.entityById(entityId);
-  }
-
-  entityAt(entityId, x, y) {
-    const entity = this.app.match.state.entityById(entityId);
-    return !!entity && Math.abs(entity.x - x) < 0.01 && Math.abs(entity.y - y) < 0.01;
-  }
-
-  playerResourcesMatch(playerId, steel, oil) {
-    const row = this.app.match.state.playerResources.find((player) => Number(player?.id) === playerId);
-    return row?.steel === steel && row?.oil === oil;
-  }
-
-  outcomeObserved(outcome) {
+  outcomeMatchesProjection(outcome) {
     if (Number.isInteger(outcome?.entityId) && Number.isFinite(outcome?.x) && Number.isFinite(outcome?.y)) {
-      return this.entityAt(outcome.entityId, outcome.x, outcome.y);
+      const entity = this.app.match.state.entityById(outcome.entityId);
+      return !entity || (Math.abs(entity.x - outcome.x) < 0.01 && Math.abs(entity.y - outcome.y) < 0.01);
     }
     if (Number.isInteger(outcome?.entityId) && Number.isInteger(outcome?.owner)) {
-      return this.app.match.state.entityById(outcome.entityId)?.owner === outcome.owner;
+      const entity = this.app.match.state.entityById(outcome.entityId);
+      return !entity || entity.owner === outcome.owner;
     }
     if (Number.isInteger(outcome?.playerId) && Number.isInteger(outcome?.steel) && Number.isInteger(outcome?.oil)) {
-      return this.playerResourcesMatch(outcome.playerId, outcome.steel, outcome.oil);
+      const row = this.app.match.state.playerResources.find((player) => Number(player?.id) === outcome.playerId);
+      return !row || (row.steel === outcome.steel && row.oil === outcome.oil);
     }
     if (Number.isInteger(outcome?.playerId) && typeof outcome?.enabled === "boolean") {
       return this.app.labClient.state?.godModePlayers?.includes(outcome.playerId) === outcome.enabled;

@@ -571,9 +571,10 @@ frozen `{version, status, call}` object; it never returns `App`, `Match`, `Net`,
 camera, and `GameState` projection seams. Catalog includes the mirrored command and ability ids;
 inspection can restrict results to the current camera viewport, while camera focus accepts bounded
 padding, defaults to a close 32-world-pixel frame for readable single-unit captures (and retains
-48 world pixels for multi-subject and non-unit framing), and returns world bounds. Mutation/order calls wait for a
-new authoritative snapshot and,
-when room time is paused, request one bounded tick so accepted state is observed before success.
+48 world pixels for multi-subject and non-unit framing), and returns world bounds. Setup mutations
+wait for the server's immediate authoritative snapshot without advancing paused simulation. Order
+calls also wait for a new snapshot and request one bounded tick when paused so the queued command is
+consumed before success.
 `presentation` calls the app-owned `CleanPresentation` helper, which hides only DOM chrome and never
 hides Pixi world layers; it is removed on capture completion, rematch, and app teardown. `captureReadiness`
 reports bounded live PNG/frame-strip/profile/decal asset status, font status, render frames, frame-loop
