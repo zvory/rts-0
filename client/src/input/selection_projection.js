@@ -103,9 +103,12 @@ export function projectSelectionProxy(proxy, projection) {
     try {
       projected = projection.project({ x: point.x, y: point.y, heightPx: 0 });
     } catch {
-      continue;
+      return null;
     }
-    if (!projectedDepthAdmitted(projected)) continue;
+    // Do not stitch a selection polygon across a near/far-plane gap.  The
+    // surviving vertices are not a clipped version of the footprint, so
+    // connecting them can create a false screen-space hit region.
+    if (!projectedDepthAdmitted(projected)) return null;
     screenPolygon.push(Object.freeze({ x: projected.x, y: projected.y, depth: projected.depth }));
   }
   if (screenPolygon.length < 3) return null;

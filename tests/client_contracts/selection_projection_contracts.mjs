@@ -116,6 +116,14 @@ function scene(entities, projection = orthographic(), options = {}) {
   ], depthProjection);
   assert(pickSelectionProxy(depthScene, { x: 100, y: 99.1 }).id === 32, "overlapping clicks choose nearest positive visible depth before id");
   assert(projectSelectionProxy(depthScene.proxies.find((proxy) => proxy.id === 30), depthProjection) === null, "behind-camera proxies are rejected");
+
+  const partiallyDepthClipped = scene([
+    { id: 33, owner: 1, kind: KIND.RIFLEMAN, x: 100, y: -175 },
+  ], fakePerspective());
+  assert(
+    projectSelectionProxy(partiallyDepthClipped.proxies[0], partiallyDepthClipped.projection) === null,
+    "a depth-clipped footprint is rejected instead of joining its surviving vertices into a false hit polygon",
+  );
 }
 
 {
