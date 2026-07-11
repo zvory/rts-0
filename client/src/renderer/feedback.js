@@ -43,7 +43,7 @@ import {
   attackFeedbackOriginForWeapon,
 } from "./attack_feedback_origin.js";
 import { muzzleFeedbackStyle } from "./weapon_feedback_style.js";
-import { drawLabMapDraftOverlay, drawLabToolPreview } from "./lab_tool_preview.js";
+import { drawLabToolPreview } from "./lab_tool_preview.js";
 import {
   angleDelta,
   clamp01,
@@ -86,7 +86,6 @@ export function _drawPlacement(view, fog) {
   const ts = (this._map && this._map.tileSize) || 32;
   const p = view?.placement;
   if (p) drawBuildPlacementPreview(g, view, p, ts);
-  drawLabMapDraftOverlay(g, view?.labMapDraftOverlay, ts);
   drawLabToolPreview(g, view?.labToolPreview, ts);
   void fog;
 }

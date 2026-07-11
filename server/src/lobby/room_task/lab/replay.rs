@@ -24,7 +24,6 @@ use crate::protocol::{
 
 pub(super) enum LabReplayRebaseSource {
     Checkpoint(Box<LabCheckpointScenarioV1>),
-    Current { name: String },
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
@@ -179,12 +178,6 @@ impl RoomTask {
     ) -> Result<LabCheckpointScenarioV1, String> {
         match source {
             LabReplayRebaseSource::Checkpoint(scenario) => Ok(*scenario),
-            LabReplayRebaseSource::Current { name } => {
-                let game = self
-                    .live_game()
-                    .ok_or_else(|| "lab game is not running".to_string())?;
-                self.export_lab_replay_initial_setup(game, name)
-            }
         }
     }
 

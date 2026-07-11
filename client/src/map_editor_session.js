@@ -1,7 +1,12 @@
 import { TERRAIN } from "./protocol.js";
 
-export const LAB_MAP_HISTORY_LIMIT = 25;
-export const LAB_MAP_MAX_NATURALS_PER_PLAYER = 3;
+export const MAP_EDITOR_HISTORY_LIMIT = 25;
+export const MAP_EDITOR_MAX_NATURALS_PER_PLAYER = 3;
+// Mirror the authored-map clearance contract enforced by
+// server/crates/sim/src/game/map.rs. The Lab runtime's smaller spawn-reset
+// footprint is not sufficient for a map that must pass authored-map validation.
+export const MAP_EDITOR_MAIN_CLEARANCE_TILES = 7;
+export const MAP_EDITOR_NATURAL_CLEARANCE_TILES = 4;
 
 const TERRAIN_TO_CHAR = Object.freeze({
   [TERRAIN.GRASS]: ".",
@@ -15,10 +20,10 @@ const CHAR_TO_TERRAIN = Object.freeze({
   "~": TERRAIN.WATER,
 });
 
-export class LabMapEditorSession {
-  constructor({ storage = globalThis.localStorage, historyLimit = LAB_MAP_HISTORY_LIMIT } = {}) {
+export class MapEditorSession {
+  constructor({ storage = defaultStorage(), historyLimit = MAP_EDITOR_HISTORY_LIMIT } = {}) {
     this.storage = storage;
-    this.historyLimit = Math.max(1, Math.trunc(historyLimit) || LAB_MAP_HISTORY_LIMIT);
+    this.historyLimit = Math.max(1, Math.trunc(historyLimit) || MAP_EDITOR_HISTORY_LIMIT);
     this.draft = null;
     this.undoStack = [];
     this.redoStack = [];
@@ -26,7 +31,8 @@ export class LabMapEditorSession {
     this.desiredTool = null;
     this.selectedLayoutId = "";
     this.lastAction = "";
-    this.testedDraftFingerprint = "";
+    this.savedFingerprint = "";
+    this.terrainStroke = null;
   }
 
   get initialized() {
@@ -37,7 +43,7 @@ export class LabMapEditorSession {
     return layoutById(this.draft, this.selectedLayoutId);
   }
 
-  initializeFromStart(startPayload, { name = "Lab map" } = {}) {
+  initializeFromStart(startPayload, { name = "Map" } = {}) {
     if (this.draft) return false;
     const map = startPayload?.map || {};
     const size = Number(map.width);
@@ -46,16 +52,16 @@ export class LabMapEditorSession {
       x: Number(player.startTileX),
       y: Number(player.startTileY),
     }));
-    this.draft = draftFromMaterializedMap({
+    this.draft = authoredMapFromMaterialized({
       name,
-      description: "Map drafted in the live lab editor.",
+      description: "Map imported from an authoritative session.",
       size,
       terrain: map.terrain,
       starts,
       expansionSites: [],
     });
     this.ensureSelectedLayout();
-    this.markCurrentDraftAsTested({ notify: false });
+    this.markSaved({ notify: false });
     this.notify("initialized");
     return true;
   }
@@ -64,9 +70,9 @@ export class LabMapEditorSession {
     if (this.draft && !force) return false;
     const data = scenario?.map?.data;
     if (!data) return false;
-    this.draft = draftFromMaterializedMap({
-      name: scenario?.map?.name || scenario?.name || "Lab map",
-      description: "Map drafted in the live lab editor.",
+    this.draft = authoredMapFromMaterialized({
+      name: scenario?.map?.name || scenario?.name || "Map",
+      description: "Map imported from Lab.",
       size: data.size,
       terrain: data.terrain,
       starts: data.starts,
@@ -75,8 +81,34 @@ export class LabMapEditorSession {
     this.ensureSelectedLayout();
     this.undoStack = [];
     this.redoStack = [];
-    this.markCurrentDraftAsTested({ notify: false });
+    this.markSaved({ notify: false });
     this.notify("initialized");
+    return true;
+  }
+
+  initializeBlank({ size = 126, playerCount = 2, name = "Untitled map" } = {}) {
+    const mapSize = Math.max(16, Math.min(126, Math.trunc(Number(size)) || 126));
+    const count = Math.max(1, Math.min(4, Math.trunc(Number(playerCount)) || 2));
+    const corners = [
+      { x: Math.floor(mapSize * 0.25), y: Math.floor(mapSize * 0.25) },
+      { x: Math.floor(mapSize * 0.75), y: Math.floor(mapSize * 0.75) },
+      { x: Math.floor(mapSize * 0.75), y: Math.floor(mapSize * 0.25) },
+      { x: Math.floor(mapSize * 0.25), y: Math.floor(mapSize * 0.75) },
+    ].slice(0, count);
+    this.draft = authoredMapFromMaterialized({
+      name,
+      description: "",
+      size: mapSize,
+      terrain: Array(mapSize * mapSize).fill(TERRAIN.GRASS),
+      starts: corners,
+      expansionSites: [],
+    });
+    this.undoStack = [];
+    this.redoStack = [];
+    this.ensureSelectedLayout();
+    this.markSaved({ notify: false });
+    this.lastAction = "Created blank map";
+    this.notify("loaded");
     return true;
   }
 
@@ -86,7 +118,7 @@ export class LabMapEditorSession {
     const requiredSize = positiveInteger(expectedSize);
     if (requiredSize && draft.terrain.length !== requiredSize) {
       throw new Error(
-        `This lab uses a ${requiredSize} × ${requiredSize} map; ${draft.name} is ${draft.terrain.length} × ${draft.terrain.length}.`,
+        `This session uses a ${requiredSize} × ${requiredSize} map; ${draft.name} is ${draft.terrain.length} × ${draft.terrain.length}.`,
       );
     }
     const requiredPlayers = positiveInteger(playerCount);
@@ -94,7 +126,7 @@ export class LabMapEditorSession {
       ? draft.layouts.filter((layout) => layout.slots.length === requiredPlayers)
       : draft.layouts;
     if (compatibleLayouts.length === 0) {
-      throw new Error(`${draft.name} has no ${requiredPlayers}-player layout for this lab.`);
+      throw new Error(`${draft.name} has no ${requiredPlayers}-player layout.`);
     }
 
     this.draft = draft;
@@ -131,7 +163,7 @@ export class LabMapEditorSession {
       desiredTool: this.desiredTool,
       selectedLayoutId: this.selectedLayoutId,
       lastAction: this.lastAction,
-      hasUnappliedChanges: this.hasUnappliedChanges,
+      hasUnsavedChanges: this.hasUnsavedChanges,
     };
   }
 
@@ -181,20 +213,101 @@ export class LabMapEditorSession {
     this.notify("tool");
   }
 
-  get hasUnappliedChanges() {
-    return !!this.draft && draftFingerprint(this.draft, this.selectedLayoutId) !== this.testedDraftFingerprint;
+  get hasUnsavedChanges() {
+    return !!this.draft && draftFingerprint(this.draft, this.selectedLayoutId) !== this.savedFingerprint;
   }
 
-  /** Mark an authored draft and selected layout as the map currently under test. */
-  markCurrentDraftAsTested({
+  markSaved({
     notify = true,
     draft = this.draft,
     selectedLayoutId = this.selectedLayoutId,
   } = {}) {
     if (!draft) return false;
-    this.testedDraftFingerprint = draftFingerprint(draft, selectedLayoutId);
-    if (notify) this.notify("tested");
+    this.savedFingerprint = draftFingerprint(draft, selectedLayoutId);
+    if (notify) this.notify("saved");
     return true;
+  }
+
+  beginTerrainStroke(label = "Painted terrain") {
+    if (!this.draft || this.terrainStroke) return false;
+    this.terrainStroke = {
+      label,
+      before: clone(this.draft),
+      dirty: new Map(),
+    };
+    return true;
+  }
+
+  paintTerrainTiles(tiles, terrainCode) {
+    const ch = TERRAIN_TO_CHAR[terrainCode];
+    if (!this.draft || !this.terrainStroke || !ch || !Array.isArray(tiles)) return [];
+    const size = this.draft.terrain.length;
+    const byRow = new Map();
+    const changed = [];
+    for (const tile of tiles) {
+      const x = Math.trunc(Number(tile?.x));
+      const y = Math.trunc(Number(tile?.y));
+      if (x < 0 || y < 0 || x >= size || y >= size || protectedTerrainTile(this.draft, x, y)) continue;
+      const row = byRow.get(y) || [...this.draft.terrain[y]];
+      if (row[x] === ch) continue;
+      row[x] = ch;
+      byRow.set(y, row);
+      const change = { x, y, code: terrainCode };
+      this.terrainStroke.dirty.set(`${x},${y}`, change);
+      changed.push(change);
+    }
+    for (const [y, row] of byRow) this.draft.terrain[y] = row.join("");
+    return changed;
+  }
+
+  commitTerrainStroke() {
+    const stroke = this.terrainStroke;
+    this.terrainStroke = null;
+    if (!stroke || stroke.dirty.size === 0) return false;
+    normalizeDraft(this.draft);
+    this.undoStack.push(stroke.before);
+    if (this.undoStack.length > this.historyLimit) this.undoStack.shift();
+    this.redoStack = [];
+    this.lastAction = stroke.label;
+    this.notify("terrainStroke", { dirtyTiles: [...stroke.dirty.values()] });
+    return true;
+  }
+
+  cancelTerrainStroke() {
+    const stroke = this.terrainStroke;
+    this.terrainStroke = null;
+    if (!stroke) return false;
+    this.draft = stroke.before;
+    this.notify("changed");
+    return true;
+  }
+
+  addLayout(playerCount = 2) {
+    if (!this.draft) return false;
+    const count = Math.max(1, Math.min(4, Math.trunc(Number(playerCount)) || 2));
+    const source = this.activeLayout?.slots || [];
+    const idBase = `${count}p`;
+    let suffix = 1;
+    let id = idBase;
+    const ids = new Set(this.draft.layouts.map((layout) => layout.id));
+    while (ids.has(id)) id = `${idBase}-${++suffix}`;
+    return this.mutate(`Added ${count}-player layout`, (draft) => {
+      const slots = Array.from({ length: count }, (_, index) => ({
+        main: source[index]?.main || "",
+        naturals: [...(source[index]?.naturals || [])],
+      }));
+      draft.layouts.push({ id, playerCount: count, slots });
+      this.selectedLayoutId = id;
+    });
+  }
+
+  removeSelectedLayout() {
+    if (!this.draft || this.draft.layouts.length <= 1) return false;
+    const selected = this.selectedLayoutId;
+    return this.mutate(`Removed ${selected} layout`, (draft) => {
+      draft.layouts = draft.layouts.filter((layout) => layout.id !== selected);
+      removeUnreferencedDraftSites(draft);
+    });
   }
 
   /** A player-centred read model for the active authored layout and map overlay. */
@@ -216,39 +329,62 @@ export class LabMapEditorSession {
 
   saveLocal(key) {
     if (!this.draft || !this.storage?.setItem) return false;
-    this.storage.setItem(storageKey(key), JSON.stringify(this.draft));
-    this.lastAction = "Saved local draft";
-    this.notify("saved");
+    try {
+      this.storage.setItem(storageKey(key), JSON.stringify({
+        schemaVersion: 2,
+        draft: this.draft,
+        selectedLayoutId: this.selectedLayoutId,
+      }));
+    } catch {
+      return false;
+    }
+    this.lastAction = "Saved local map";
+    this.markSaved();
     return true;
   }
 
   loadLocal(key) {
     if (!this.storage?.getItem) return false;
-    const text = this.storage.getItem(storageKey(key));
+    let text;
+    try {
+      text = this.storage.getItem(storageKey(key));
+    } catch {
+      return false;
+    }
     if (!text) return false;
     let parsed;
+    let selectedLayoutId = "";
     try {
       parsed = JSON.parse(text);
+      if (parsed?.schemaVersion === 2 && parsed?.draft) {
+        selectedLayoutId = String(parsed.selectedLayoutId || "");
+        parsed = parsed.draft;
+      }
       normalizeDraft(parsed);
     } catch {
       return false;
     }
     if (!this.draft) {
       this.draft = parsed;
+      this.selectedLayoutId = selectedLayoutId;
       this.ensureSelectedLayout();
-      this.lastAction = "Loaded local draft";
+      this.lastAction = "Loaded local map";
+      this.markSaved({ notify: false });
       this.notify("loaded");
       return true;
     }
-    return this.mutate("Loaded local draft", (draft) => replaceObject(draft, parsed));
+    this.mutate("Loaded local map", (draft) => replaceObject(draft, parsed));
+    if (selectedLayoutId) this.selectLayout(selectedLayoutId);
+    this.markSaved({ notify: false });
+    return true;
   }
 
   materialized() {
-    if (!this.draft) throw new Error("Map draft is not initialized.");
+    if (!this.draft) throw new Error("Map is not initialized.");
     const draft = clone(this.draft);
     normalizeDraft(draft);
     const layout = layoutById(draft, this.selectedLayoutId);
-    if (!layout) throw new Error("Map draft needs a player layout.");
+    if (!layout) throw new Error("Map needs a player layout.");
     const byId = new Map(draft.sites.map((site) => [site.id, site]));
     const starts = layout.slots.map((slot) => tileForSite(byId, slot.main, "main"));
     const expansionSites = [];
@@ -270,14 +406,14 @@ export class LabMapEditorSession {
   }
 
   exportMap() {
-    if (!this.draft) throw new Error("Map draft is not initialized.");
+    if (!this.draft) throw new Error("Map is not initialized.");
     const draft = clone(this.draft);
     normalizeDraft(draft);
     return draft;
   }
 
-  notify(reason) {
-    const snapshot = { ...this.snapshot(), reason };
+  notify(reason, detail = {}) {
+    const snapshot = { ...this.snapshot(), reason, ...detail };
     for (const handler of this.subscribers) handler(snapshot);
   }
 
@@ -304,7 +440,7 @@ export function paintDraftRect(draft, rect, terrainCode) {
 export function protectDraftBaseTerrain(draft) {
   if (!Array.isArray(draft?.terrain)) return;
   for (const site of draft.sites || []) {
-    const radius = site.kind === "natural" ? 0 : 3;
+    const radius = siteClearanceRadius(site.kind);
     paintDraftRect(draft, {
       x0: site.x - radius,
       y0: site.y - radius,
@@ -331,12 +467,21 @@ export function placeDraftSite(draft, { kind, x, y, layoutId = "" }) {
 /** Move one player's start instead of exposing an anonymous "main" site. */
 export function moveDraftPlayerStart(draft, playerIndex, tile, layoutId = "") {
   const slot = draftSlotAt(draft, playerIndex, layoutId);
-  const target = normalizedDraftTile(draft, tile);
+  const target = normalizedDraftTile(draft, tile, MAP_EDITOR_MAIN_CLEARANCE_TILES);
   if (!slot || !target) return draftEditError("Choose a valid player and map tile.");
   const current = siteById(draft, slot.main);
   const occupied = siteAt(draft, target.x, target.y);
   if (occupied && occupied.id !== current?.id) {
     return draftEditError("A start or natural base already uses that tile.");
+  }
+  if (current?.kind === "main" && current.x === target.x && current.y === target.y) {
+    return { ok: true, id: current.id };
+  }
+  if (current?.kind === "main" && draftSiteReferenceCount(draft, current.id) > 1) {
+    const id = uniqueDraftSiteId(draft, "main");
+    draft.sites.push({ id, kind: "main", x: target.x, y: target.y });
+    slot.main = id;
+    return { ok: true, id };
   }
   if (current?.kind === "main") {
     current.x = target.x;
@@ -352,10 +497,10 @@ export function moveDraftPlayerStart(draft, playerIndex, tile, layoutId = "") {
 /** Add a natural directly to one player's setup, capped at three per player. */
 export function addDraftPlayerNatural(draft, playerIndex, tile, layoutId = "") {
   const slot = draftSlotAt(draft, playerIndex, layoutId);
-  const target = normalizedDraftTile(draft, tile);
+  const target = normalizedDraftTile(draft, tile, MAP_EDITOR_NATURAL_CLEARANCE_TILES);
   if (!slot || !target) return draftEditError("Choose a valid player and map tile.");
-  if (slot.naturals.length >= LAB_MAP_MAX_NATURALS_PER_PLAYER) {
-    return draftEditError(`Player ${playerIndex + 1} already has ${LAB_MAP_MAX_NATURALS_PER_PLAYER} natural bases.`);
+  if (slot.naturals.length >= MAP_EDITOR_MAX_NATURALS_PER_PLAYER) {
+    return draftEditError(`Player ${playerIndex + 1} already has ${MAP_EDITOR_MAX_NATURALS_PER_PLAYER} natural bases.`);
   }
   const occupied = siteAt(draft, target.x, target.y);
   if (occupied) {
@@ -370,7 +515,7 @@ export function addDraftPlayerNatural(draft, playerIndex, tile, layoutId = "") {
 /** Move a named natural that already belongs to the selected player. */
 export function moveDraftPlayerNatural(draft, playerIndex, naturalId, tile, layoutId = "") {
   const slot = draftSlotAt(draft, playerIndex, layoutId);
-  const target = normalizedDraftTile(draft, tile);
+  const target = normalizedDraftTile(draft, tile, MAP_EDITOR_NATURAL_CLEARANCE_TILES);
   const natural = siteById(draft, naturalId);
   if (!slot || !target || natural?.kind !== "natural" || !slot.naturals.includes(naturalId)) {
     return draftEditError("That natural base is no longer part of this player's setup.");
@@ -378,6 +523,15 @@ export function moveDraftPlayerNatural(draft, playerIndex, naturalId, tile, layo
   const occupied = siteAt(draft, target.x, target.y);
   if (occupied && occupied.id !== natural.id) {
     return draftEditError("A start or natural base already uses that tile.");
+  }
+  if (natural.x === target.x && natural.y === target.y) {
+    return { ok: true, id: natural.id };
+  }
+  if (draftSiteReferenceCount(draft, natural.id) > 1) {
+    const id = uniqueDraftSiteId(draft, "natural");
+    draft.sites.push({ id, kind: "natural", x: target.x, y: target.y });
+    slot.naturals = slot.naturals.map((candidate) => candidate === natural.id ? id : candidate);
+    return { ok: true, id };
   }
   natural.x = target.x;
   natural.y = target.y;
@@ -391,7 +545,10 @@ export function removeDraftPlayerNatural(draft, playerIndex, naturalId, layoutId
   if (!slot || natural?.kind !== "natural" || !slot.naturals.includes(naturalId)) {
     return draftEditError("That natural base is no longer part of this player's setup.");
   }
-  removeDraftSite(draft, naturalId);
+  slot.naturals = slot.naturals.filter((id) => id !== naturalId);
+  if (draftSiteReferenceCount(draft, naturalId) === 0) {
+    draft.sites = draft.sites.filter((site) => site.id !== naturalId);
+  }
   return { ok: true, id: naturalId };
 }
 
@@ -405,7 +562,7 @@ export function removeDraftSite(draft, siteId) {
   }
 }
 
-function draftFromMaterializedMap({ name, description, size, terrain, starts, expansionSites }) {
+export function authoredMapFromMaterialized({ name, description, size, terrain, starts, expansionSites }) {
   const mapSize = Math.max(1, Math.trunc(Number(size)) || 1);
   const codes = Array.from(terrain || []);
   const rows = Array.from({ length: mapSize }, (_, y) => (
@@ -427,15 +584,15 @@ function draftFromMaterializedMap({ name, description, size, terrain, starts, ex
   for (const natural of naturalSites) {
     const candidates = slots
       .map((slot, index) => ({ slot, index, main: mainSites[index] }))
-      .filter(({ slot }) => slot.naturals.length < LAB_MAP_MAX_NATURALS_PER_PLAYER)
+      .filter(({ slot }) => slot.naturals.length < MAP_EDITOR_MAX_NATURALS_PER_PLAYER)
       .sort((a, b) => distanceSq(natural, a.main) - distanceSq(natural, b.main));
     candidates[0]?.slot.naturals.push(natural.id);
   }
   const draft = {
     version: 2,
-    name: String(name || "Lab map").trim() || "Lab map",
+    name: String(name || "Map").trim() || "Map",
     description: String(description || ""),
-    _design: "Proof-of-concept map authored in the live lab editor.",
+    _design: "Authored in the dedicated Map Editor.",
     terrain: rows,
     sites: [...mainSites, ...naturalSites],
     layouts: [{ id: `lab-${Math.max(1, slots.length)}p`, playerCount: slots.length, slots }],
@@ -444,12 +601,20 @@ function draftFromMaterializedMap({ name, description, size, terrain, starts, ex
   return draft;
 }
 
+/** Compare a Lab round trip while treating expansion-site order as non-semantic editor metadata. */
+export function materializedMapsEqual(left, right) {
+  if (!left || !right || left.name !== right.name || left.size !== right.size) return false;
+  if (!sameFlatArray(left.terrain, right.terrain)) return false;
+  if (!sameOrderedTiles(left.starts, right.starts)) return false;
+  return sameTileMultiset(left.expansionSites, right.expansionSites);
+}
+
 function normalizeDraft(draft) {
-  if (!draft || typeof draft !== "object") throw new Error("Map draft must be an object.");
+  if (!draft || typeof draft !== "object") throw new Error("Map must be an object.");
   draft.version = 2;
-  draft.name = String(draft.name || "Lab map").trim().slice(0, 80) || "Lab map";
+  draft.name = String(draft.name || "Map").trim().slice(0, 80) || "Map";
   draft.description = String(draft.description || "").slice(0, 500);
-  draft._design = String(draft._design || "Proof-of-concept map authored in the live lab editor.");
+  draft._design = String(draft._design || "Authored in the dedicated Map Editor.");
   if (!Array.isArray(draft.terrain) || draft.terrain.length === 0) throw new Error("Map terrain is empty.");
   const size = draft.terrain.length;
   draft.terrain = draft.terrain.map((row) => {
@@ -474,7 +639,7 @@ function normalizeDraft(draft) {
     coords.add(coord);
   }
   if (!Array.isArray(draft.layouts) || draft.layouts.length === 0) {
-    throw new Error("Map draft needs a player layout.");
+    throw new Error("Map needs a player layout.");
   }
   const layoutIds = new Set();
   draft.layouts = draft.layouts.map((layout, index) => {
@@ -486,8 +651,13 @@ function normalizeDraft(draft) {
     layout.playerCount = layout.slots.length;
     for (const slot of layout.slots) {
       slot.main = String(slot.main || "");
-      slot.naturals = Array.from(new Set(Array.isArray(slot.naturals) ? slot.naturals.map(String) : []))
-        .slice(0, LAB_MAP_MAX_NATURALS_PER_PLAYER);
+      const legacyNatural = slot.natural == null ? [] : [String(slot.natural)];
+      slot.naturals = Array.from(new Set([
+        ...legacyNatural,
+        ...(Array.isArray(slot.naturals) ? slot.naturals.map(String) : []),
+      ]))
+        .slice(0, MAP_EDITOR_MAX_NATURALS_PER_PLAYER);
+      delete slot.natural;
     }
     return layout;
   });
@@ -506,6 +676,26 @@ function normalizeTiles(tiles) {
     ? tiles.filter((tile) => Number.isFinite(Number(tile?.x)) && Number.isFinite(Number(tile?.y)))
       .map((tile) => ({ x: Math.trunc(Number(tile.x)), y: Math.trunc(Number(tile.y)) }))
     : [];
+}
+
+function sameFlatArray(left, right) {
+  return Array.isArray(left)
+    && Array.isArray(right)
+    && left.length === right.length
+    && left.every((value, index) => value === right[index]);
+}
+
+function sameOrderedTiles(left, right) {
+  return Array.isArray(left)
+    && Array.isArray(right)
+    && left.length === right.length
+    && left.every((tile, index) => tile?.x === right[index]?.x && tile?.y === right[index]?.y);
+}
+
+function sameTileMultiset(left, right) {
+  if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+  const keys = (tiles) => tiles.map((tile) => `${tile?.x},${tile?.y}`).sort();
+  return sameFlatArray(keys(left), keys(right));
 }
 
 function distanceSq(a, b) {
@@ -541,10 +731,15 @@ function draftSlotAt(draft, playerIndex, layoutId) {
   return Number.isInteger(index) && index >= 0 && Array.isArray(slots) ? slots[index] || null : null;
 }
 
-function normalizedDraftTile(draft, tile) {
+function normalizedDraftTile(draft, tile, radius = 0) {
   const size = Array.isArray(draft?.terrain) ? draft.terrain.length : 0;
-  if (!size || !Number.isFinite(Number(tile?.x)) || !Number.isFinite(Number(tile?.y))) return null;
-  return { x: clampTile(tile.x, size), y: clampTile(tile.y, size) };
+  if (size <= radius * 2 || !Number.isFinite(Number(tile?.x)) || !Number.isFinite(Number(tile?.y))) {
+    return null;
+  }
+  return {
+    x: clampTileToRadius(tile.x, size, radius),
+    y: clampTileToRadius(tile.y, size, radius),
+  };
 }
 
 function siteById(draft, id) {
@@ -553,6 +748,28 @@ function siteById(draft, id) {
 
 function siteAt(draft, x, y) {
   return draft?.sites?.find((site) => site.x === x && site.y === y) || null;
+}
+
+function draftSiteReferenceCount(draft, siteId) {
+  let count = 0;
+  for (const layout of draft?.layouts || []) {
+    for (const slot of layout.slots || []) {
+      if (slot.main === siteId) count += 1;
+      count += (slot.naturals || []).filter((id) => id === siteId).length;
+    }
+  }
+  return count;
+}
+
+function removeUnreferencedDraftSites(draft) {
+  const referenced = new Set();
+  for (const layout of draft?.layouts || []) {
+    for (const slot of layout.slots || []) {
+      if (slot.main) referenced.add(slot.main);
+      for (const id of slot.naturals || []) referenced.add(id);
+    }
+  }
+  draft.sites = (draft?.sites || []).filter((site) => referenced.has(site.id));
 }
 
 function uniqueDraftSiteId(draft, prefix) {
@@ -581,7 +798,32 @@ function layoutById(draft, layoutId) {
 }
 
 function storageKey(key) {
-  return `rts.labMapDraft.${String(key || "default")}.v1`;
+  return `rts.mapEditor.${String(key || "default")}.v2`;
+}
+
+function defaultStorage() {
+  try {
+    return globalThis.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+function protectedTerrainTile(draft, x, y) {
+  return (draft?.sites || []).some((site) => {
+    const radius = siteClearanceRadius(site.kind);
+    return Math.abs(site.x - x) <= radius && Math.abs(site.y - y) <= radius;
+  });
+}
+
+function siteClearanceRadius(kind) {
+  return kind === "natural"
+    ? MAP_EDITOR_NATURAL_CLEARANCE_TILES
+    : MAP_EDITOR_MAIN_CLEARANCE_TILES;
+}
+
+function clampTileToRadius(value, size, radius) {
+  return Math.max(radius, Math.min(size - radius - 1, Math.trunc(Number(value)) || 0));
 }
 
 function replaceObject(target, source) {

@@ -5214,3 +5214,209 @@ input[type="text"]:focus {
   border-radius: 2px;
   vertical-align: middle;
 }
+
+/* Dedicated Map Editor --------------------------------------------------- */
+.map-editor-mode #app > :not(#game-screen):not(#version) {
+  display: none !important;
+}
+
+.map-editor-mode #game-screen > :not(#viewport):not(.map-editor-panel) {
+  display: none !important;
+}
+
+.map-editor-mode #viewport,
+.map-editor-mode #viewport canvas {
+  cursor: crosshair;
+}
+
+.map-editor-panel {
+  position: absolute;
+  z-index: 30;
+  inset: 12px auto 12px 12px;
+  width: min(370px, calc(100vw - 24px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(208, 184, 132, 0.38);
+  border-radius: 8px;
+  background: rgba(16, 20, 24, 0.96);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.48);
+  color: var(--ink);
+  font-family: var(--sans);
+}
+
+.map-editor-header {
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid rgba(208, 184, 132, 0.22);
+  background: linear-gradient(180deg, rgba(71, 62, 45, 0.72), rgba(26, 29, 30, 0.82));
+}
+
+.map-editor-header h1 {
+  margin: 0 0 4px;
+  font-family: var(--display);
+  font-size: 22px;
+  letter-spacing: 0.04em;
+}
+
+.map-editor-frozen {
+  color: #b9aa86;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.map-editor-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  padding: 12px;
+  overflow: auto;
+}
+
+.map-editor-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid rgba(208, 184, 132, 0.2);
+  border-radius: 5px;
+}
+
+.map-editor-group legend {
+  padding: 0 5px;
+  color: #d8c79f;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.map-editor-field,
+.map-editor-readout,
+.map-editor-natural-list,
+.map-editor-player-picker,
+.map-editor-palette {
+  grid-column: 1 / -1;
+}
+
+.map-editor-field {
+  display: grid;
+  gap: 4px;
+  color: #aaa28f;
+  font-size: 11px;
+}
+
+.map-editor-field input,
+.map-editor-field textarea,
+.map-editor-field select,
+.map-editor-group select {
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid rgba(208, 184, 132, 0.28);
+  border-radius: 4px;
+  padding: 7px 8px;
+  background: #111619;
+  color: #eee6d4;
+}
+
+.map-editor-button {
+  min-height: 32px;
+  border: 1px solid rgba(208, 184, 132, 0.3);
+  border-radius: 4px;
+  padding: 6px 9px;
+  background: #252b2d;
+  color: #e7dfce;
+  cursor: pointer;
+  font: 600 11px var(--sans);
+}
+
+.map-editor-button:hover:not(:disabled),
+.map-editor-button[data-active="true"] {
+  border-color: #c9aa67;
+  background: #4a402e;
+}
+
+.map-editor-button:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
+.map-editor-primary {
+  grid-column: 1 / -1;
+  background: #6d5730;
+  color: #fff4d9;
+}
+
+.map-editor-history,
+.map-editor-palette,
+.map-editor-player-picker {
+  display: flex;
+  gap: 7px;
+}
+
+.map-editor-history {
+  align-items: center;
+}
+
+.map-editor-history .map-editor-readout {
+  margin-left: auto;
+}
+
+.map-editor-palette .map-editor-button,
+.map-editor-player-picker .map-editor-button {
+  flex: 1;
+}
+
+.map-editor-player-picker .map-editor-button::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: var(--map-player-color, #aaa);
+}
+
+.map-editor-natural-list {
+  display: grid;
+  gap: 5px;
+}
+
+.map-editor-natural-list > div {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 5px;
+  color: #bdb5a4;
+  font-size: 11px;
+}
+
+.map-editor-readout,
+.map-editor-status {
+  margin: 0;
+  color: #aaa28f;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.map-editor-readout[data-state="error"],
+.map-editor-status[data-state="error"] {
+  color: #e28278;
+}
+
+.map-editor-status {
+  padding: 9px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+@media (max-width: 650px) {
+  .map-editor-panel {
+    inset: auto 8px 8px;
+    width: auto;
+    max-height: 48vh;
+  }
+}

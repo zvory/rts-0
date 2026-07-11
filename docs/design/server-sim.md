@@ -107,6 +107,9 @@ impl Game {
     /// Plural LabOp variants validate and commit atomically through this same seam.
     pub fn apply_lab_op(&mut self, op: lab::LabOp) -> Result<lab::LabOpOutcome, lab::LabError>;
 
+    /// Export map-only Lab state for the dedicated editor boundary; excludes all simulation state.
+    pub fn export_lab_map(&self) -> protocol::LabMapDraft;
+
     /// Export authoritative lab setup data as a checkpoint-backed setup container. The JSON-friendly
     /// transport name is still `LabScenarioPayload`, but the payload is `LabCheckpointScenarioV1`.
     pub fn export_lab_checkpoint_scenario(
@@ -676,6 +679,11 @@ remain on their current schemas until their phases introduce containers around t
   drain, but a lab that has not launched yet rejects the first join instead of creating a new
   authoritative session. Direct lab joiners currently receive the operator role; the original
   joiner remains in `operatorId` metadata for compatibility, not as the only mutation authority.
+  A Map Editor handoff is validated and consumed through the bounded HTTP store before the private
+  Lab room is created. Its `LabRoomConfig.map_draft` is applied through `Game::apply_lab_op` during
+  launch construction, before the first `start` payload, so the room begins once at tick zero on
+  the edited map. The `/map-editor` browser itself does not create a room task or `Game`; that is the
+  frozen-session guarantee, and stale/used handoff ids cannot address rooms or files.
   They use the shared launch helper with `StartPayload.lab` metadata and prediction disabled. Lab
   setup mutations call `Game::apply_lab_op`; issue-as commands call `Game::issue_lab_command_as`,
   which rejects mixed-owner selections before queuing a normal command. Lab state, dirty flags,

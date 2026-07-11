@@ -10,7 +10,7 @@ use super::super::replay_branch::BranchStagingState;
 use super::super::replay_session::ReplaySession;
 use super::super::session_policy::SessionPolicy;
 use super::super::ReplayBranchSeed;
-use crate::protocol::{DiagnosticCapabilities, TeamId};
+use crate::protocol::{DiagnosticCapabilities, LabMapDraft, TeamId};
 
 /// A connected player as tracked inside a room.
 pub(in crate::lobby) struct RoomPlayer {
@@ -89,6 +89,7 @@ pub(in crate::lobby) struct LabRoomConfig {
     pub(in crate::lobby) map_name: String,
     pub(in crate::lobby) seed: Option<u32>,
     pub(in crate::lobby) scenario: Option<String>,
+    pub(in crate::lobby) map_draft: Option<LabMapDraft>,
 }
 
 #[derive(Clone)]

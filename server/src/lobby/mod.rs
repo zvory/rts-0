@@ -35,8 +35,8 @@ use crate::config;
 use crate::db::Db;
 use crate::lab_scenario_submission::LabScenarioSubmissionService;
 use crate::protocol::{
-    Event, LabClientOp, LabReplayArtifactV1, LobbyKind, ReplayBranchSeat, ReplayStartMetadata,
-    ResourceDelta, ServerMessage, Snapshot, TeamId, VisionSelectionRequest,
+    Event, LabClientOp, LabMapDraft, LabReplayArtifactV1, LobbyKind, ReplayBranchSeat,
+    ReplayStartMetadata, ResourceDelta, ServerMessage, Snapshot, TeamId, VisionSelectionRequest,
 };
 use rts_ai::selfplay::is_safe_artifact_name;
 use rts_sim::game::command::SimCommand;
@@ -114,6 +114,7 @@ const REPLAY_ARTIFACT_ROOM_PREFIX: &str = "__replay_artifact__:";
 const MATCH_REPLAY_ROOM_PREFIX: &str = "__match_replay__";
 const REPLAY_BRANCH_ROOM_PREFIX: &str = "__replay_branch__";
 const LAB_ROOM_PREFIX: &str = "__lab__:";
+const MAP_EDITOR_LAB_ROOM_PREFIX: &str = "__lab__:map-editor-";
 const MATCH_SEED_ENV: &str = "RTS_MATCH_SEED";
 
 /// Monotonic source of globally-unique player ids (ids are never reused within a process run).
@@ -693,6 +694,12 @@ pub enum CreateLobbyError {
     Draining(DrainNotice),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum JoinTargetError {
+    Draining(DrainNotice),
+    MissingPrivateRoom,
+}
+
 impl CreateLobbyError {
     pub fn message(&self) -> &'static str {
         match self {
@@ -838,16 +845,24 @@ impl Lobby {
 
     /// Resolve a join target. During deploy drain, existing rooms stay joinable but new rooms are
     /// rejected so fresh lobbies cannot be created while the process is waiting to exit.
-    pub async fn get_or_create_join_target(&self, room: &str) -> Result<RoomHandle, DrainNotice> {
+    pub async fn get_or_create_join_target(
+        &self,
+        room: &str,
+    ) -> Result<RoomHandle, JoinTargetError> {
         let mut rooms = self.rooms.lock().await;
         if let Some(handle) = rooms.get(room) {
             return Ok(handle.clone());
         }
+        if room.starts_with(MAP_EDITOR_LAB_ROOM_PREFIX) {
+            return Err(JoinTargetError::MissingPrivateRoom);
+        }
         if self.drain.is_draining() {
-            return Err(self.drain.notice().unwrap_or(DrainNotice {
-                deadline_unix_ms: 0,
-                seconds_remaining: 0,
-            }));
+            return Err(JoinTargetError::Draining(self.drain.notice().unwrap_or(
+                DrainNotice {
+                    deadline_unix_ms: 0,
+                    seconds_remaining: 0,
+                },
+            )));
         }
         Ok(self.create_room_locked(room, &mut rooms))
     }
@@ -993,6 +1008,41 @@ impl Lobby {
                 RoomMode::ReplayBranch { seed: seed.clone() },
             );
             return room;
+        }
+    }
+
+    /// Create a private Lab whose first authoritative start payload is materialized from a
+    /// validated Map Editor handoff. The room is registered before its opaque name is returned.
+    pub async fn create_map_editor_lab_room(
+        &self,
+        draft: LabMapDraft,
+    ) -> Result<String, DrainNotice> {
+        let mut rooms = self.rooms.lock().await;
+        if self.drain.is_draining() {
+            return Err(self.drain.notice().unwrap_or(DrainNotice {
+                deadline_unix_ms: 0,
+                seconds_remaining: 0,
+            }));
+        }
+        loop {
+            let token = rand::random::<u128>();
+            let room = format!("__lab__:map-editor-{token:032x}:map=Default");
+            if rooms.contains_key(&room) {
+                continue;
+            }
+            let handle = self.create_room_locked_with_mode(
+                &room,
+                &mut rooms,
+                RoomMode::Lab(room_task::LabRoomConfig {
+                    public_id: format!("map-editor-{token:032x}"),
+                    map_name: "Default".to_string(),
+                    seed: None,
+                    scenario: None,
+                    map_draft: Some(draft),
+                }),
+            );
+            schedule_pending_create_disposal_probe(handle.event_tx.clone());
+            return Ok(room);
         }
     }
 

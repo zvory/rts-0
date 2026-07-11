@@ -27,6 +27,7 @@ mod dev_scenario_pages;
 mod lab_interact_artifacts;
 #[cfg(test)]
 mod main_replay_tests;
+mod map_handoffs;
 mod wiki;
 
 use rts_server::db::Db;
@@ -114,6 +115,7 @@ struct AppState {
     db: Option<Arc<Db>>,
     lab_scenario_submission: LabScenarioSubmissionService,
     lab_interact_artifacts: lab_interact_artifacts::LabInteractArtifactBridge,
+    map_handoffs: map_handoffs::MapHandoffStore,
 }
 
 #[tokio::main]
@@ -171,6 +173,7 @@ async fn main() {
         db,
         lab_scenario_submission,
         lab_interact_artifacts: lab_interact_artifacts::LabInteractArtifactBridge::from_env(),
+        map_handoffs: map_handoffs::MapHandoffStore::default(),
     };
     let shutdown_lobby = state.lobby.clone();
     // Static files for everything except `/ws`; unknown app routes fall back to `index.html` so the
@@ -184,6 +187,8 @@ async fn main() {
         .route("/beta/", get(beta_redirect_handler))
         .route("/lab", get(index_handler))
         .route("/lab/", get(index_handler))
+        .route("/map-editor", get(index_handler))
+        .route("/map-editor/", get(index_handler))
         .route("/version", get(version_handler))
         .route("/wiki", get(wiki::wiki_index_handler))
         .route("/wiki/", get(wiki::wiki_index_handler))
@@ -225,6 +230,14 @@ async fn main() {
             get(dev_scenario_pages::dev_scenario_handler),
         )
         .route("/api/lab-scenarios", get(lab_scenarios_handler))
+        .route(
+            "/api/map-handoffs",
+            post(map_handoffs::create_handler).layer(DefaultBodyLimit::max(512 * 1024)),
+        )
+        .route(
+            "/api/map-handoffs/{handoff_id}",
+            post(map_handoffs::consume_handler),
+        )
         .route(
             SCENARIO_SUBMISSION_CAPABILITY_PATH,
             get(lab_scenario_submission_capability_handler),
@@ -1229,7 +1242,7 @@ async fn handle_client_message(
             let name = sanitize_name(name);
             let handle = match lobby.get_or_create_join_target(&room_name).await {
                 Ok(handle) => handle,
-                Err(notice) => {
+                Err(lobby::JoinTargetError::Draining(notice)) => {
                     let _ = conn_tx.try_send_reliable(ServerMessage::ShutdownWarning {
                         deadline_unix_ms: notice.deadline_unix_ms,
                         seconds_remaining: notice.seconds_remaining,
@@ -1238,6 +1251,14 @@ async fn handle_client_message(
                         msg: "Server is draining for deploy; new rooms are disabled.".to_string(),
                     });
                     rts_server::log_debug!(player_id, room = %room_name, "rejecting new room while server is draining");
+                    return;
+                }
+                Err(lobby::JoinTargetError::MissingPrivateRoom) => {
+                    let _ = conn_tx.try_send_reliable(ServerMessage::Error {
+                        msg: "This Map Editor Lab handoff expired or is no longer available."
+                            .to_string(),
+                    });
+                    rts_server::log_debug!(player_id, room = %room_name, "rejecting missing private Map Editor Lab room");
                     return;
                 }
             };

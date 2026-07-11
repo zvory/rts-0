@@ -537,11 +537,57 @@ async fn draining_rejects_new_rooms_but_keeps_existing_rooms_joinable() {
     let rejected = lobby.get_or_create_join_target("new-room").await;
     assert!(matches!(
         rejected,
-        Err(DrainNotice {
+        Err(JoinTargetError::Draining(DrainNotice {
             seconds_remaining: 295,
             ..
-        })
+        }))
     ));
+}
+
+#[tokio::test]
+async fn unused_map_editor_lab_rooms_expire_and_cannot_be_recreated_by_name() {
+    let lobby = Lobby::new();
+    let size = 126;
+    let room = lobby
+        .create_map_editor_lab_room(LabMapDraft {
+            name: "Private editor map".to_string(),
+            size,
+            terrain: vec![crate::protocol::terrain::GRASS; (size * size) as usize],
+            starts: vec![
+                crate::protocol::LabMapTile { x: 16, y: 16 },
+                crate::protocol::LabMapTile {
+                    x: size - 17,
+                    y: size - 17,
+                },
+            ],
+            expansion_sites: Vec::new(),
+        })
+        .await
+        .expect("room should be created");
+    wait_for_lobby_room_count(&lobby, 0).await;
+    assert!(matches!(
+        lobby.get_or_create_join_target(&room).await,
+        Err(JoinTargetError::MissingPrivateRoom)
+    ));
+}
+
+#[tokio::test]
+async fn draining_rejects_new_map_editor_lab_rooms() {
+    let lobby = Lobby::new();
+    lobby.begin_draining(Duration::from_secs(295)).await;
+
+    let size = 126;
+    let result = lobby
+        .create_map_editor_lab_room(LabMapDraft {
+            name: "Private editor map".to_string(),
+            size,
+            terrain: vec![crate::protocol::terrain::GRASS; (size * size) as usize],
+            starts: vec![crate::protocol::LabMapTile { x: 16, y: 16 }],
+            expansion_sites: Vec::new(),
+        })
+        .await;
+
+    assert!(matches!(result, Err(DrainNotice { .. })));
 }
 
 #[tokio::test]

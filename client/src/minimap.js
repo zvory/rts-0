@@ -193,7 +193,6 @@ export class Minimap {
     this._fogLayer = null;
     this._fogLayerCtx = null;
     this._fogLayerSignature = null;
-    this._mapPreview = null;
     this._playerBlipMaskLayer = null;
     this._playerBlipMaskLayerCtx = null;
 
@@ -226,16 +225,8 @@ export class Minimap {
 
   // --- Transform -------------------------------------------------------------
 
-  /** Preview a browser-local Lab map draft without mutating authoritative GameState. */
-  setMapPreview(map = null) {
-    this._mapPreview = map || null;
-    this._mapW = 0;
-    this._mapH = 0;
-    this._invalidateStaticLayers();
-  }
-
   _renderMap() {
-    return this._mapPreview || this.state.map;
+    return this.state.map;
   }
 
   /** (Re)compute the world→canvas scale/offset from the current map dimensions. */
@@ -668,9 +659,7 @@ export class Minimap {
     const entities = Array.isArray(frameViews?.currentEntities)
       ? frameViews.currentEntities
       : this.state.entitiesInterpolated(1);
-    const visibleEntities = this._mapPreview
-      ? entities.filter((entity) => !isResource(entity?.kind))
-      : entities;
+    const visibleEntities = entities;
     this._recordMinimapDiagnostic("minimap.entities.blips", visibleEntities.length);
     return visibleEntities;
   }
@@ -944,7 +933,6 @@ export class Minimap {
     this._fogLayer = null;
     this._fogLayerCtx = null;
     this._fogLayerSignature = null;
-    this._mapPreview = null;
   }
 
   _issueCommand(command) {

@@ -19,8 +19,8 @@ use super::super::live_tick::LabSnapshotProjection;
 use super::super::projection::RecipientRole;
 use super::super::session_policy::{RoomTimeSource, SessionPhase, SessionPolicy};
 use super::super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
-use super::super::{normalize_start_team_id, PLAYER_PALETTE};
-use super::helpers::{DRAINING_NEW_MATCHES_DISABLED_MSG, LAB_PLAYER_ONE_ID, LAB_PLAYER_TWO_ID};
+use super::super::{normalize_start_team_id, MAX_PLAYERS, PLAYER_PALETTE};
+use super::helpers::{DRAINING_NEW_MATCHES_DISABLED_MSG, LAB_PLAYER_ONE_ID};
 use super::types::{LabRoomConfig, Phase, RoomMode, RoomPlayer};
 use super::RoomTask;
 use crate::lab_scenarios::{
@@ -175,6 +175,7 @@ fn players_on_teams(game: &Game, team_ids: impl IntoIterator<Item = TeamId>) -> 
 
 fn lab_op_kind(op: &LabClientOp) -> &'static str {
     match op {
+        LabClientOp::ExportMap => "exportMap",
         LabClientOp::ExportScenario { .. } => "exportScenario",
         LabClientOp::ImportScenario { .. } => "importScenario",
         LabClientOp::ValidateScenario { .. } => "validateScenario",
@@ -189,7 +190,6 @@ fn lab_op_kind(op: &LabClientOp) -> &'static str {
         LabClientOp::SetPlayerResources { .. } => "setPlayerResources",
         LabClientOp::SetPlayerGodMode { .. } => "setPlayerGodMode",
         LabClientOp::SetCompletedResearch { .. } => "setCompletedResearch",
-        LabClientOp::ApplyMapDraft { .. } => "applyMapDraft",
         LabClientOp::SetVision { .. } => "setVision",
         LabClientOp::IssueCommandAs { .. } => "issueCommandAs",
     }
@@ -314,8 +314,8 @@ fn lab_client_op_to_game_op(op: LabClientOp) -> Result<LabOp, (String, Option<u3
                 completed,
             }))
         }
-        LabClientOp::ApplyMapDraft { draft } => Ok(LabOp::ApplyMapDraft(draft)),
-        LabClientOp::ExportScenario { .. }
+        LabClientOp::ExportMap
+        | LabClientOp::ExportScenario { .. }
         | LabClientOp::ValidateScenario { .. }
         | LabClientOp::SubmitScenario { .. }
         | LabClientOp::SetVision { .. }
@@ -372,6 +372,18 @@ fn lab_result_error(request_id: u32, op: String, error: &str) -> LabResult {
         failed_index: None,
         details: None,
         outcome: None,
+    }
+}
+
+fn lab_result_ok(request_id: u32, op: String, outcome: Option<serde_json::Value>) -> LabResult {
+    LabResult {
+        request_id,
+        ok: true,
+        op,
+        error: None,
+        failed_index: None,
+        details: None,
+        outcome,
     }
 }
 
@@ -702,7 +714,14 @@ impl RoomTask {
 
     fn build_blank_lab_launch(&self, config: &LabRoomConfig) -> Result<LabLaunch, String> {
         let seed = config.seed.unwrap_or_else(match_seed);
-        let inits = self.default_lab_player_template();
+        let draft = config.map_draft.as_ref();
+        let player_count = draft.map_or(2, |draft| draft.starts.len());
+        if !(1..=MAX_PLAYERS).contains(&player_count) {
+            return Err(format!(
+                "Expected 1-{MAX_PLAYERS} Map Editor starts; got {player_count}"
+            ));
+        }
+        let inits = Self::default_lab_player_template(player_count);
         let start_players: Vec<_> = inits
             .iter()
             .map(|player| {
@@ -716,12 +735,23 @@ impl RoomTask {
             .map_err(|err| format!("Cannot load lab map \"{}\": {err}", config.map_name))?;
         let map = Map::load_for_players(&config.map_name, &start_players, seed)
             .map_err(|err| format!("Cannot load lab map \"{}\": {err}", config.map_name))?;
-        let game =
+        let mut game =
             Game::new_with_random_ai_profiles_and_map_metadata(&inits, seed, map, map_metadata);
+        let mut map_name = config.map_name.clone();
+        if let Some(draft) = draft {
+            map_name.clone_from(&draft.name);
+            game.apply_lab_op(LabOp::ApplyMapDraft(draft.clone()))
+                .map_err(|err| {
+                    format!(
+                        "Cannot materialize Map Editor handoff: {}",
+                        lab_error_text(&err)
+                    )
+                })?;
+        }
         Ok(LabLaunch {
             game,
             seed,
-            map_name: config.map_name.clone(),
+            map_name,
             player_count: inits.len(),
             participants: inits.iter().map(|player| player.name.clone()).collect(),
             default_vision: None,
@@ -730,25 +760,18 @@ impl RoomTask {
         })
     }
 
-    fn default_lab_player_template(&self) -> Vec<PlayerInit> {
-        vec![
-            PlayerInit {
-                id: LAB_PLAYER_ONE_ID,
-                team_id: 1,
+    fn default_lab_player_template(player_count: usize) -> Vec<PlayerInit> {
+        const NAMES: [&str; MAX_PLAYERS] = ["Alpha", "Bravo", "Charlie", "Delta"];
+        (0..player_count)
+            .map(|index| PlayerInit {
+                id: index as u32 + 1,
+                team_id: index as u32 + 1,
                 faction_id: DEFAULT_FACTION_ID.to_string(),
-                name: "Lab Alpha".to_string(),
-                color: PLAYER_PALETTE[0].to_string(),
+                name: format!("Lab {}", NAMES[index]),
+                color: PLAYER_PALETTE[index].to_string(),
                 is_ai: false,
-            },
-            PlayerInit {
-                id: LAB_PLAYER_TWO_ID,
-                team_id: 2,
-                faction_id: DEFAULT_FACTION_ID.to_string(),
-                name: "Lab Bravo".to_string(),
-                color: PLAYER_PALETTE[1].to_string(),
-                is_ai: false,
-            },
-        ]
+            })
+            .collect()
     }
 
     fn send_lab_error(&self, msg: String) {
@@ -915,7 +938,6 @@ impl RoomTask {
 
     pub(super) fn on_lab_request(&mut self, player_id: u32, request_id: u32, op: LabClientOp) {
         let op_kind = lab_op_kind(&op).to_string();
-        let refresh_map_after_result = matches!(op, LabClientOp::ApplyMapDraft { .. });
         if request_id == 0 {
             self.send_lab_result_to(
                 player_id,
@@ -996,6 +1018,7 @@ impl RoomTask {
                 refresh_snapshot_after_result = true;
                 Some(self.apply_lab_vision(player_id, request_id, vision))
             }
+            LabClientOp::ExportMap => Some(self.export_lab_map(request_id)),
             LabClientOp::ExportScenario { name } => {
                 Some(self.export_lab_scenario(player_id, request_id, name))
             }
@@ -1024,13 +1047,9 @@ impl RoomTask {
             }
         };
         if let Some(result) = result {
-            let refresh_map = refresh_map_after_result && result.ok;
             let refresh_snapshot = refresh_snapshot_after_result && result.ok;
             self.send_lab_result_to(player_id, result);
-            if refresh_map {
-                self.send_lab_start_payloads_except(true, Some(player_id));
-                self.fanout_current_lab_snapshots();
-            } else if refresh_snapshot {
+            if refresh_snapshot {
                 self.fanout_current_lab_snapshots();
             }
         }
@@ -1064,15 +1083,7 @@ impl RoomTask {
             }
         }
         self.broadcast_lab_state();
-        LabResult {
-            request_id,
-            ok: true,
-            op,
-            error: None,
-            failed_index: None,
-            details: None,
-            outcome: None,
-        }
+        lab_result_ok(request_id, op, None)
     }
 
     fn export_lab_scenario(
@@ -1087,19 +1098,25 @@ impl RoomTask {
         }
         let scenario = match self.export_lab_scenario_value(operator_id, name.as_deref()) {
             Ok(value) => value,
-            Err(err) => {
-                return lab_result_error(request_id, op, &err);
-            }
+            Err(err) => return lab_result_error(request_id, op, &err),
         };
-        LabResult {
+        lab_result_ok(
             request_id,
-            ok: true,
             op,
-            error: None,
-            failed_index: None,
-            details: None,
-            outcome: Some(serde_json::json!({ "scenario": scenario })),
-        }
+            Some(serde_json::json!({ "scenario": scenario })),
+        )
+    }
+
+    fn export_lab_map(&self, request_id: u32) -> LabResult {
+        let op = "exportMap".to_string();
+        let Some(game) = self.live_game() else {
+            return lab_result_error(request_id, op, "lab game is not running");
+        };
+        lab_result_ok(
+            request_id,
+            op,
+            Some(serde_json::json!({ "map": game.export_lab_map() })),
+        )
     }
 
     fn validate_lab_scenario(
@@ -1130,18 +1147,14 @@ impl RoomTask {
             Ok(preview) => preview,
             Err(err) => return lab_result_error(request_id, op, &err),
         };
-        LabResult {
+        lab_result_ok(
             request_id,
-            ok: true,
             op,
-            error: None,
-            failed_index: None,
-            details: None,
-            outcome: Some(serde_json::json!({
+            Some(serde_json::json!({
                 "summary": preview.summary,
                 "preview": preview,
             })),
-        }
+        )
     }
 
     fn export_lab_scenario_value(
@@ -1186,9 +1199,6 @@ impl RoomTask {
                     LabReplayRebaseSource::Checkpoint(Box::new(scenario.clone())),
                 ),
             },
-            LabClientOp::ApplyMapDraft { draft } => Some(LabReplayRebaseSource::Current {
-                name: draft.name.clone(),
-            }),
             _ => None,
         };
         let imported_vision = match &op {
@@ -1337,15 +1347,7 @@ impl RoomTask {
         if reset_timeline.is_some() || timeline_capacity_reset.is_some() || timeline_truncated {
             self.broadcast_lab_room_time_state();
         }
-        LabResult {
-            request_id,
-            ok: true,
-            op: op_kind,
-            error: None,
-            failed_index: None,
-            details: None,
-            outcome: Some(outcome_json),
-        }
+        lab_result_ok(request_id, op_kind, Some(outcome_json))
     }
 
     fn live_game(&self) -> Option<&Game> {

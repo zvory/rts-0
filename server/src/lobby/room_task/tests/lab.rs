@@ -104,26 +104,11 @@ fn lab_start_payload_initial_operator_uses_policy_metadata() {
 }
 
 #[test]
-fn lab_map_draft_returns_in_place_reset_payload_without_requester_start_resend() {
-    let mut task = RoomTask::new(
-        "__lab__:map-editor:map=Default".to_string(),
-        RoomMode::Lab(lab_config()),
-        None,
-        false,
-        DrainHandle::default(),
-    );
-    let (msg_tx, mut writer) = ConnectionSink::new();
-    let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
-    task.on_join(99, "Operator".to_string(), true, false, msg_tx, ack);
-    assert_eq!(ack_rx.try_recv(), Ok(true));
-    drain_reliable_messages(&mut writer);
-
-    let Phase::InGame(game) = &task.phase else {
-        panic!("lab should be live");
-    };
-    let size = game.start_payload().map.width;
-    let draft = crate::protocol::LabMapDraft {
-        name: "Room map POC".to_string(),
+fn map_editor_handoff_materializes_before_the_first_lab_start_payload() {
+    let size = 126;
+    let mut config = lab_config();
+    config.map_draft = Some(crate::protocol::LabMapDraft {
+        name: "Room map".to_string(),
         size,
         terrain: vec![crate::protocol::terrain::GRASS; (size * size) as usize],
         starts: vec![
@@ -132,37 +117,51 @@ fn lab_map_draft_returns_in_place_reset_payload_without_requester_start_resend()
                 x: size - 17,
                 y: size - 17,
             },
+            crate::protocol::LabMapTile {
+                x: size - 17,
+                y: 16,
+            },
+            crate::protocol::LabMapTile {
+                x: 16,
+                y: size - 17,
+            },
         ],
         expansion_sites: vec![crate::protocol::LabMapTile {
             x: size / 2,
             y: size / 2,
         }],
-    };
-
-    task.on_lab_request(99, 700, LabClientOp::ApplyMapDraft { draft });
-
-    let messages: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
-    let result = messages
-        .iter()
-        .find_map(|message| {
-            let ServerMessage::LabResult(result) = message else {
-                return None;
-            };
-            (result.request_id == 700 && result.ok && result.op == "applyMapDraft")
-                .then_some(result)
-        })
-        .expect("successful map result");
-    assert!(!messages
-        .iter()
-        .any(|message| matches!(message, ServerMessage::Start(_))));
-    let outcome = result.outcome.as_ref().expect("map reset outcome");
-    assert_eq!(
-        outcome["map"]["terrain"].as_array().unwrap().len(),
-        (size * size) as usize
+    });
+    let mut task = RoomTask::new(
+        "__lab__:map-editor:map=Default".to_string(),
+        RoomMode::Lab(config),
+        None,
+        false,
+        DrainHandle::default(),
     );
-    assert_eq!(outcome["players"][0]["startTileX"], 16);
-    assert_eq!(outcome["tick"], 0);
-    assert_eq!(outcome["battleReset"], true);
+    let (msg_tx, mut writer) = ConnectionSink::new();
+    let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
+    task.on_join(99, "Operator".to_string(), true, false, msg_tx, ack);
+    assert_eq!(ack_rx.try_recv(), Ok(true));
+    let starts = start_payloads(&mut writer);
+    assert_eq!(starts.len(), 1);
+    assert_eq!(starts[0].tick, 0);
+    assert_eq!(starts[0].map.width, size);
+    assert_eq!(starts[0].players.len(), 4);
+    assert_eq!(starts[0].players[0].start_tile_x, 16);
+    assert_eq!(starts[0].players[3].name, "Lab Delta");
+
+    task.on_lab_request(99, 701, LabClientOp::ExportMap);
+    let exported = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok())
+        .find_map(|message| match message {
+            ServerMessage::LabResult(result) if result.request_id == 701 => Some(result),
+            _ => None,
+        })
+        .expect("map-only Lab export result");
+    assert!(exported.ok);
+    let map = &exported.outcome.as_ref().expect("export outcome")["map"];
+    assert_eq!(map["name"], "Room map");
+    assert_eq!(map["starts"].as_array().map(Vec::len), Some(4));
+    assert!(map.get("entities").is_none());
 }
 
 #[test]

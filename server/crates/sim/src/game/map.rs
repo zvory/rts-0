@@ -145,6 +145,12 @@ impl Map {
         Self::from_authored_json_with_name_for_players(players, &name, &json, seed)
     }
 
+    /// Validate an untrusted authored-map document against the same parser and layout rules used
+    /// by bundled maps. HTTP/session callers use this before accepting Map Editor handoffs.
+    pub fn validate_authored_json(json: &str, player_count: usize) -> Result<(), String> {
+        authored::load(player_count, json, 0).map(|_| ())
+    }
+
     pub fn metadata_for_name(map_name: &str) -> Result<MapMetadata, String> {
         let (name, json) = Self::authored_json_for_name(map_name)?;
         Ok(MapMetadata {

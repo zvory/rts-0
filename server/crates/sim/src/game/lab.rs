@@ -280,6 +280,30 @@ impl Game {
         }
     }
 
+    /// Export only the authoritative map fields needed by the dedicated Map Editor boundary.
+    /// Simulation entities, orders, resources, fog, and timeline state are intentionally absent.
+    pub fn export_lab_map(&self) -> LabMapDraft {
+        LabMapDraft {
+            name: self.map_metadata().name.clone(),
+            size: self.state.map.size,
+            terrain: self.state.map.terrain.clone(),
+            starts: self
+                .state
+                .map
+                .starts
+                .iter()
+                .map(|&(x, y)| crate::protocol::LabMapTile { x, y })
+                .collect(),
+            expansion_sites: self
+                .state
+                .map
+                .expansion_sites
+                .iter()
+                .map(|&(x, y)| crate::protocol::LabMapTile { x, y })
+                .collect(),
+        }
+    }
+
     fn apply_lab_op_without_repair(&mut self, op: LabOp) -> Result<LabOpOutcome, LabError> {
         match op {
             LabOp::SpawnEntities(_) | LabOp::ApplyUpdates(_) | LabOp::DeleteEntities(_) => {

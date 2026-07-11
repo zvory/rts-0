@@ -71,6 +71,7 @@ fn parse_lab_room(raw: &str) -> Option<LabRoomConfig> {
         map_name,
         seed,
         scenario,
+        map_draft: None,
     })
 }
 

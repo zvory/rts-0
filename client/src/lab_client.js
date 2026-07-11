@@ -44,6 +44,10 @@ export class LabClient {
     return this.request({ op: "setVision", vision });
   }
 
+  exportMap() {
+    return this.request({ op: "exportMap" });
+  }
+
   // Wire compatibility names for checkpoint setup import/export. Product UI should label these
   // as setup checkpoint actions; lab replay save/open must use a separate replay-artifact path.
   exportScenario(name = "") {
@@ -108,10 +112,6 @@ export class LabClient {
 
   setCompletedResearch(playerId, upgrade, completed) {
     return this.request({ op: "setCompletedResearch", playerId, upgrade, completed: !!completed });
-  }
-
-  applyMapDraft(draft) {
-    return this.request({ op: "applyMapDraft", draft });
   }
 
   request(op, { timeoutMs = this.timeoutMs } = {}) {

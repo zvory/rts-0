@@ -27,8 +27,6 @@ export class ClientIntent {
     this.activeLabTool = null;
     /** @type {null | {toolId:string,kind:string,payload?:object,x:number,y:number}} */
     this.labToolPreview = null;
-    /** @type {null | {players:Array<{playerIndex:number,start:{x:number,y:number}|null,naturals:Array<{x:number,y:number}>}>}} */
-    this.labMapDraftOverlay = null;
     this._nextLabToolId = 1;
     /** @type {null | {quickCast:boolean,target:string|object,queued:boolean}} */
     this.lastCommandTargetArm = null;
@@ -424,14 +422,6 @@ export class ClientIntent {
     return next;
   }
 
-  /** Set persistent, browser-local markers for the Lab map-editor draft. */
-  setLabMapDraftOverlay(overlay) {
-    const players = Array.isArray(overlay?.players)
-      ? overlay.players.map(normalizeLabMapDraftPlayer).filter(Boolean)
-      : [];
-    this.labMapDraftOverlay = players.length > 0 ? { players } : null;
-    return this.labMapDraftOverlay;
-  }
 
   /** Clear the active lab setup tool, if any. */
   cancelLabTool(reason = "cancelled") {
@@ -560,25 +550,6 @@ function normalizeClientSeq(clientSeq) {
 
 function isPromiseLike(value) {
   return !!value && typeof value === "object" && typeof value.then === "function";
-}
-
-function normalizeLabMapDraftPlayer(player, fallbackIndex) {
-  const candidateIndex = Number(player?.playerIndex);
-  const playerIndex = Number.isInteger(candidateIndex) && candidateIndex >= 0
-    ? candidateIndex
-    : fallbackIndex;
-  if (!Number.isInteger(playerIndex) || playerIndex < 0) return null;
-  const start = normalizeLabMapDraftTile(player?.start);
-  const naturals = Array.isArray(player?.naturals)
-    ? player.naturals.map(normalizeLabMapDraftTile).filter(Boolean)
-    : [];
-  return { playerIndex, start, naturals };
-}
-
-function normalizeLabMapDraftTile(tile) {
-  const x = Number(tile?.x);
-  const y = Number(tile?.y);
-  return Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 ? { x, y } : null;
 }
 
 function defaultNow() {

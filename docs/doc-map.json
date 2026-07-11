@@ -8,7 +8,9 @@
         "server/crates/contract/src/lib.rs",
         "server/crates/sim/src/protocol.rs",
         "server/src/protocol.rs",
+        "server/src/map_handoffs.rs",
         "client/src/protocol.js",
+        "client/src/map_editor_handoff.js",
         "tests/protocol_parity.mjs"
       ],
       "docs": [
@@ -21,10 +23,10 @@
     {
       "source": [
         "client/index.html",
-        "client/map-editor.html",
         "client/src/app.js",
         "client/src/bootstrap.js",
         "client/src/main.js",
+        "client/src/map_editor_*.js",
         "client/src/match.js",
         "client/src/net.js",
         "client/src/state.js",

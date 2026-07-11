@@ -57,6 +57,12 @@ import { KIND, TERRAIN } from "../../client/src/protocol.js";
   labCam.setView({ x: 0, y: 0, zoom: 99 });
   assertApprox(labCam.zoom, CAMERA.labMaxZoom, 0.001, "Camera.setView respects the higher lab zoom limit");
 
+  const editorCam = new Camera(800, 600, { minZoom: 0.05, maxZoom: 4 });
+  editorCam.setZoom(0.1, 400, 300);
+  assertApprox(editorCam.zoom, 0.1, 0.001, "Camera accepts a lower Map Editor zoom limit");
+  editorCam.setView({ x: 0, y: 0, zoom: 0.001 });
+  assertApprox(editorCam.zoom, 0.05, 0.001, "Camera.setView respects the per-session minimum zoom");
+
   const invalidLimitCam = new Camera(800, 600, { maxZoom: "invalid" });
   invalidLimitCam.setZoom(99, 400, 300);
   assertApprox(invalidLimitCam.zoom, CAMERA.maxZoom, 0.001, "Camera falls back to the live-match cap for invalid limits");

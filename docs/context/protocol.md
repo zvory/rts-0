@@ -24,6 +24,8 @@ Use when adding, removing, or changing any field on a client↔server message, s
 - `server/src/protocol.rs` — server-shell adapter for typed kind conversion and legacy imports
 - `server/crates/sim/src/protocol.rs` — sim-facing adapter for typed kind conversion
 - `client/src/protocol.js` — mirror; must agree on every tag, field name, and shape
+- `server/src/map_handoffs.rs` + `client/src/map_editor_handoff.js` — one-use HTTP Map Editor ↔
+  Lab map-transfer DTO; map bodies never enter URLs
 - `server/src/lobby/mod.rs` + `client/src/config.js` — `PLAYER_PALETTE` cross-surface mirror,
   guarded by `node tests/protocol_parity.mjs`
 
@@ -47,15 +49,12 @@ Use when adding, removing, or changing any field on a client↔server message, s
   countdown skipping for rooms with one or zero active humans is not a debug preset.
 - `LobbyPlayer` carries `teamId`, `factionId`, `aiProfileId?` (canonical AI profile id), and
   `isSpectator`; spectators are lobby members but not active match players.
-- Lab setup import/export uses the compatibility-named `LabScenarioPayload`; the only accepted
-  payload is a checkpoint-backed `LabCheckpointScenarioV1` container. Legacy `kind:"labScenario"`
-  JSON is rejected before it can mutate a lab room. Setup
-  authoring has `validateScenario` for dry-run previews and `submitScenario` for the
-  disabled-by-default draft PR service. `submitScenario` returns one async `labResult` and never
-  accepts client-supplied setup JSON, branch names, paths, or credentials. Validation and submission
-  recheck catalog duplicates, id-matched filenames, entity/payload caps, map binding, and the
-  setup-plus-manifest path allowlist before any GitHub side effect. Checkpoint setup metadata can
-  include `metadata.lab.initialCamera` as a world-pixel center for the browser's first Lab view.
+- Lab setup import/export accepts only checkpoint-backed `LabCheckpointScenarioV1`; legacy setup
+  JSON is rejected. `validateScenario` previews and disabled-by-default `submitScenario` recheck
+  catalog/path/payload/map bounds without accepting client paths, branches, or credentials.
+  `metadata.lab.initialCamera` may set the first Lab world-pixel center.
+- `/api/map-handoffs` validates authored/selected map data, caps records at 64, expires them after
+  two minutes, and consumes each id once. Lab `exportMap` returns only `LabMapDraft` in reverse.
 
 ## Invariants
 - **Mirror.** Every protocol change touches both files **and**

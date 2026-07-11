@@ -192,7 +192,7 @@ export function buildLabLaunchConfig({ room, map, seed = "", scenario = "", visu
 export function labCatalogRouteConfig() {
   if (!isLabPath(window.location.pathname)) return null;
   const params = new URLSearchParams(window.location.search);
-  if (params.has("scenario") || params.has("map") || params.has("seed")) return null;
+  if (params.has("scenario") || params.has("map") || params.has("seed") || params.has("handoff")) return null;
   const visualProfileResult = safeLabVisualProfile(params.get("visualProfile"));
   return {
     room: safeLabToken(params.get("room"), "default", 40),
@@ -203,6 +203,7 @@ export function labCatalogRouteConfig() {
 
 export function labLaunchConfig() {
   if (!isLabPath(window.location.pathname)) return null;
+  if (new URLSearchParams(window.location.search).has("handoff")) return null;
   if (labCatalogRouteConfig()) return null;
   const params = new URLSearchParams(window.location.search);
   return buildLabLaunchConfig({
@@ -212,6 +213,19 @@ export function labLaunchConfig() {
     scenario: params.get("scenario"),
     visualProfile: params.get("visualProfile"),
   });
+}
+
+export function labHandoffLaunchConfig() {
+  if (!isLabPath(window.location.pathname)) return null;
+  const params = new URLSearchParams(window.location.search);
+  const raw = String(params.get("handoff") || "").trim().toLowerCase();
+  if (!raw) return null;
+  const workspace = String(params.get("workspace") || "default").trim();
+  return {
+    handoffId: /^[a-f0-9]{32}$/.test(raw) ? raw : "",
+    workspaceId: /^[A-Za-z0-9_-]{1,48}$/.test(workspace) ? workspace : "default",
+    error: /^[a-f0-9]{32}$/.test(raw) ? "" : "Invalid Map Editor handoff id.",
+  };
 }
 
 export function replayLaunchConfig() {
