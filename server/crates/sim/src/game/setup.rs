@@ -325,10 +325,9 @@ impl Game {
             player_states.push(ps);
         }
 
-        // Always spawn resources on the neutral expansion sites. Claimed sites get a full start;
-        // unclaimed sites still get their resource clusters so every player has somewhere to
-        // expand.
-        for site in &map.expansion_sites {
+        // Every authored base site receives resources. Claimed sites already received theirs
+        // alongside the player's City Centre; every other site remains an available expansion.
+        for site in &map.base_sites {
             if !map.starts.contains(site) {
                 spawn_base_resources(&mut entities, &map, *site);
             }

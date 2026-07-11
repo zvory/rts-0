@@ -1,397 +1,8 @@
 {
-  "_design": "Default competitive terrain with symmetric in-base natural expansions plus standardized contested naturals. Each selected slot keeps one safe natural and one default natural, giving every active player three bases including the main.",
-  "description": "4-player three-base map with safer in-base naturals plus a standardized contested natural for each spawn.",
-  "layouts": [
-    {
-      "id": "1p_nw",
-      "playerCount": 1,
-      "slots": [
-        {
-          "main": "main_nw",
-          "naturals": [
-            "nat_nw",
-            "nat_default_top"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "1p_se",
-      "playerCount": 1,
-      "slots": [
-        {
-          "main": "main_se",
-          "naturals": [
-            "nat_se",
-            "nat_default_bottom"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "1p_ne",
-      "playerCount": 1,
-      "slots": [
-        {
-          "main": "main_ne",
-          "naturals": [
-            "nat_ne",
-            "nat_default_right"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "1p_sw",
-      "playerCount": 1,
-      "slots": [
-        {
-          "main": "main_sw",
-          "naturals": [
-            "nat_sw",
-            "nat_default_left"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "2p_nw_se",
-      "playerCount": 2,
-      "slots": [
-        {
-          "main": "main_nw",
-          "naturals": [
-            "nat_nw",
-            "nat_default_top"
-          ]
-        },
-        {
-          "main": "main_se",
-          "naturals": [
-            "nat_se",
-            "nat_default_bottom"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "2p_nw_ne",
-      "playerCount": 2,
-      "slots": [
-        {
-          "main": "main_nw",
-          "naturals": [
-            "nat_nw",
-            "nat_default_left"
-          ]
-        },
-        {
-          "main": "main_ne",
-          "naturals": [
-            "nat_ne",
-            "nat_default_right"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "2p_nw_sw",
-      "playerCount": 2,
-      "slots": [
-        {
-          "main": "main_nw",
-          "naturals": [
-            "nat_nw",
-            "nat_default_top"
-          ]
-        },
-        {
-          "main": "main_sw",
-          "naturals": [
-            "nat_sw",
-            "nat_default_bottom"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "2p_se_ne",
-      "playerCount": 2,
-      "slots": [
-        {
-          "main": "main_se",
-          "naturals": [
-            "nat_se",
-            "nat_default_bottom"
-          ]
-        },
-        {
-          "main": "main_ne",
-          "naturals": [
-            "nat_ne",
-            "nat_default_top"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "2p_se_sw",
-      "playerCount": 2,
-      "slots": [
-        {
-          "main": "main_se",
-          "naturals": [
-            "nat_se",
-            "nat_default_right"
-          ]
-        },
-        {
-          "main": "main_sw",
-          "naturals": [
-            "nat_sw",
-            "nat_default_left"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "2p_ne_sw",
-      "playerCount": 2,
-      "slots": [
-        {
-          "main": "main_ne",
-          "naturals": [
-            "nat_ne",
-            "nat_default_right"
-          ]
-        },
-        {
-          "main": "main_sw",
-          "naturals": [
-            "nat_sw",
-            "nat_default_left"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "3p_nw_se_ne",
-      "playerCount": 3,
-      "slots": [
-        {
-          "main": "main_nw",
-          "naturals": [
-            "nat_nw",
-            "nat_default_top"
-          ]
-        },
-        {
-          "main": "main_se",
-          "naturals": [
-            "nat_se",
-            "nat_default_bottom"
-          ]
-        },
-        {
-          "main": "main_ne",
-          "naturals": [
-            "nat_ne",
-            "nat_default_right"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "3p_nw_se_sw",
-      "playerCount": 3,
-      "slots": [
-        {
-          "main": "main_nw",
-          "naturals": [
-            "nat_nw",
-            "nat_default_top"
-          ]
-        },
-        {
-          "main": "main_se",
-          "naturals": [
-            "nat_se",
-            "nat_default_bottom"
-          ]
-        },
-        {
-          "main": "main_sw",
-          "naturals": [
-            "nat_sw",
-            "nat_default_left"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "3p_nw_ne_sw",
-      "playerCount": 3,
-      "slots": [
-        {
-          "main": "main_nw",
-          "naturals": [
-            "nat_nw",
-            "nat_default_top"
-          ]
-        },
-        {
-          "main": "main_ne",
-          "naturals": [
-            "nat_ne",
-            "nat_default_right"
-          ]
-        },
-        {
-          "main": "main_sw",
-          "naturals": [
-            "nat_sw",
-            "nat_default_left"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "3p_se_ne_sw",
-      "playerCount": 3,
-      "slots": [
-        {
-          "main": "main_se",
-          "naturals": [
-            "nat_se",
-            "nat_default_bottom"
-          ]
-        },
-        {
-          "main": "main_ne",
-          "naturals": [
-            "nat_ne",
-            "nat_default_right"
-          ]
-        },
-        {
-          "main": "main_sw",
-          "naturals": [
-            "nat_sw",
-            "nat_default_left"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "4p_all",
-      "playerCount": 4,
-      "slots": [
-        {
-          "main": "main_nw",
-          "naturals": [
-            "nat_nw",
-            "nat_default_top"
-          ]
-        },
-        {
-          "main": "main_se",
-          "naturals": [
-            "nat_se",
-            "nat_default_bottom"
-          ]
-        },
-        {
-          "main": "main_ne",
-          "naturals": [
-            "nat_ne",
-            "nat_default_right"
-          ]
-        },
-        {
-          "main": "main_sw",
-          "naturals": [
-            "nat_sw",
-            "nat_default_left"
-          ]
-        }
-      ]
-    }
-  ],
+  "version": 3,
   "name": "Default",
-  "sites": [
-    {
-      "id": "main_nw",
-      "kind": "main",
-      "x": 13,
-      "y": 12
-    },
-    {
-      "id": "main_se",
-      "kind": "main",
-      "x": 112,
-      "y": 113
-    },
-    {
-      "id": "main_ne",
-      "kind": "main",
-      "x": 112,
-      "y": 12
-    },
-    {
-      "id": "main_sw",
-      "kind": "main",
-      "x": 13,
-      "y": 113
-    },
-    {
-      "id": "nat_nw",
-      "kind": "natural",
-      "x": 40,
-      "y": 11
-    },
-    {
-      "id": "nat_se",
-      "kind": "natural",
-      "x": 85,
-      "y": 114
-    },
-    {
-      "id": "nat_ne",
-      "kind": "natural",
-      "x": 114,
-      "y": 40
-    },
-    {
-      "id": "nat_sw",
-      "kind": "natural",
-      "x": 11,
-      "y": 85
-    },
-    {
-      "id": "nat_default_top",
-      "kind": "natural",
-      "x": 63,
-      "y": 38
-    },
-    {
-      "id": "nat_default_bottom",
-      "kind": "natural",
-      "x": 63,
-      "y": 87
-    },
-    {
-      "id": "nat_default_right",
-      "kind": "natural",
-      "x": 87,
-      "y": 63
-    },
-    {
-      "id": "nat_default_left",
-      "kind": "natural",
-      "x": 38,
-      "y": 63
-    }
-  ],
+  "description": "Four-start map with twelve permanent resource base locations.",
+  "_design": "Flat map locations: startLocations choose player starts; every baseSites entry always spawns its resource cluster.",
   "terrain": [
     "........................................................~~~~~~~~~~~~~~~~~~~~~.................................................",
     "........................................................~~~~~~~~~~~~~~~~~~~~~.................................................",
@@ -520,5 +131,72 @@
     "......................................................~....~~~~~~~~.~~~~~~....................................................",
     "......................................................~....~......~~~~...~...................................................."
   ],
-  "version": 2
+  "startLocations": [
+    {
+      "x": 13,
+      "y": 12
+    },
+    {
+      "x": 112,
+      "y": 113
+    },
+    {
+      "x": 112,
+      "y": 12
+    },
+    {
+      "x": 13,
+      "y": 113
+    }
+  ],
+  "baseSites": [
+    {
+      "x": 13,
+      "y": 12
+    },
+    {
+      "x": 112,
+      "y": 113
+    },
+    {
+      "x": 112,
+      "y": 12
+    },
+    {
+      "x": 13,
+      "y": 113
+    },
+    {
+      "x": 40,
+      "y": 11
+    },
+    {
+      "x": 85,
+      "y": 114
+    },
+    {
+      "x": 114,
+      "y": 40
+    },
+    {
+      "x": 11,
+      "y": 85
+    },
+    {
+      "x": 63,
+      "y": 38
+    },
+    {
+      "x": 63,
+      "y": 87
+    },
+    {
+      "x": 87,
+      "y": 63
+    },
+    {
+      "x": 38,
+      "y": 63
+    }
+  ]
 }

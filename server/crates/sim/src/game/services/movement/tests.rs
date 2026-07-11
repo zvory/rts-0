@@ -414,7 +414,7 @@ fn two_tile_wide_horizontal_corridor_map() -> Map {
         size: size as u32,
         terrain,
         starts: vec![],
-        expansion_sites: vec![],
+        base_sites: vec![],
     }
 }
 

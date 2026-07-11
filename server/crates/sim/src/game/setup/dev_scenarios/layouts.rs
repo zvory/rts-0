@@ -11,7 +11,7 @@ pub(super) fn flat_dev_map(player_count: usize) -> Map {
     for terrain in &mut map.terrain {
         *terrain = crate::protocol::terrain::GRASS;
     }
-    map.expansion_sites.clear();
+    map.base_sites.clear();
     map
 }
 

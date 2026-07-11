@@ -565,7 +565,6 @@ export class App {
       destination: "editor",
       authoredMap: session.exportMap(),
       materializedMap: session.materialized(),
-      selectedLayoutId: session.selectedLayoutId,
     });
     const url = new URL("/map-editor", window.location.href);
     url.searchParams.set("handoff", handoff.handoffId);

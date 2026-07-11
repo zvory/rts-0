@@ -248,14 +248,45 @@ fn standard_starting_loadout_matches_phase0_inventory() {
 fn spawned_resource_sites(map: &Map) -> EntityStore {
     let mut entities = EntityStore::new();
     for &start in &map.starts {
-        spawn_base_resources(&mut entities, &map, start);
+        spawn_base_resources(&mut entities, map, start);
     }
-    for &site in &map.expansion_sites {
+    for &site in &map.base_sites {
         if !map.starts.contains(&site) {
-            spawn_base_resources(&mut entities, &map, site);
+            spawn_base_resources(&mut entities, map, site);
         }
     }
     entities
+}
+
+#[test]
+fn default_spawns_resources_for_every_base_site_with_one_player() {
+    let players = [PlayerInit {
+        id: 1,
+        team_id: 1,
+        faction_id: DEFAULT_FACTION_ID.to_string(),
+        name: "Solo".to_string(),
+        color: "#cc1111".to_string(),
+        is_ai: false,
+    }];
+    let game = Game::new(&players, 0x1020_3040);
+    let base_count = game.state.map.base_sites.len();
+
+    assert_eq!(
+        game.state
+            .entities
+            .iter()
+            .filter(|entity| entity.kind == EntityKind::Steel)
+            .count(),
+        base_count * config::STEEL_PATCHES_PER_BASE as usize,
+    );
+    assert_eq!(
+        game.state
+            .entities
+            .iter()
+            .filter(|entity| entity.kind == EntityKind::Oil)
+            .count(),
+        base_count * config::OIL_PATCHES_PER_BASE as usize,
+    );
 }
 
 #[test]

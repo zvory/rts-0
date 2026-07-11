@@ -2,8 +2,8 @@
 //! `docs/design/server-sim.md` (`map.rs`).
 //!
 //! The live game loads authored maps from the server asset bundle. Map files define terrain,
-//! named base sites, and spawn layouts; the simulation still derives player starts, expansion
-//! sites, starting buildings, workers, and resource clusters from those sites.
+//! flat start locations and permanent base sites. The simulation assigns players to start
+//! locations, while every base site receives its resource cluster in every match.
 //!
 //! Terrain passability here is purely about *terrain* — building footprints are tracked
 //! dynamically by the simulation (a separate occupancy grid in `systems`/`pathfinding`),
@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 pub use rts_protocol::AvailableMap;
 
 /// The only map schema version this server accepts. Bump when the schema changes incompatibly.
-pub const CURRENT_MAP_VERSION: u32 = 2;
+pub const CURRENT_MAP_VERSION: u32 = 3;
 
 const DEFAULT_MAP_JSON: &str = include_str!("../../../../assets/maps/default-handcrafted.json");
 const MAPS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/maps");
@@ -31,25 +31,20 @@ const FNV_OFFSET_BASIS: u64 = 0xcbf2_9ce4_8422_2325;
 const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
 
 type Tile = (u32, u32);
-type BaseSlot = (Tile, Vec<Tile>);
-
-/// Ordered player/team data used internally to assign authored start slots.
+/// Ordered player/team data used internally to assign authored start locations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct StartAssignmentPlayer {
     id: u32,
     team_id: u32,
 }
 
-/// Radius around a player start site (even index) that must remain passable.
+/// Radius around a player start location that must remain passable.
 pub const BASE_PROTECTION_RADIUS_TILES: i32 = 7;
-/// Radius around a natural expansion site (odd index) that must remain passable.
-/// Smaller than the start radius because naturals have no City Centre or worker ring.
+/// Radius around a permanent base site that does not host a player at launch.
+/// Smaller than the start radius because it has no City Centre or worker ring.
 pub const EXPANSION_PROTECTION_RADIUS_TILES: i32 = 4;
-/// An authored player slot contains one main and at most three neutral expansions.
-const MAX_BASES_PER_PLAYER: usize = 4;
-const MAX_NATURALS_PER_SLOT: usize = MAX_BASES_PER_PLAYER - 1;
 
-/// The terrain grid plus the selected start and expansion tiles.
+/// The terrain grid, selected player starts, and every authored permanent base site.
 #[derive(Debug, Clone)]
 pub struct Map {
     /// Side length in tiles (square map).
@@ -58,8 +53,9 @@ pub struct Map {
     pub terrain: Vec<u8>,
     /// One start tile `(tile_x, tile_y)` per player, in player-index order.
     pub starts: Vec<(u32, u32)>,
-    /// Neutral expansion sites. These receive resource clusters but no starting buildings.
-    pub expansion_sites: Vec<(u32, u32)>,
+    /// Every authored base location. These always receive resource clusters; selected starts
+    /// additionally receive a player's starting buildings and workers.
+    pub base_sites: Vec<(u32, u32)>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -73,8 +69,8 @@ pub struct MapMetadata {
 impl Map {
     /// Load the deterministic handcrafted map for `player_count` players.
     ///
-    /// The `seed` selects an authored layout for the player count and shuffles its slots, so the
-    /// human/AI seating in the lobby does not pin them to the same corner every match.
+    /// The `seed` selects and shuffles from fixed authored start locations, so the human/AI
+    /// seating in the lobby does not pin them to the same corner every match.
     pub fn generate(player_count: usize, seed: u32) -> Map {
         Self::from_authored_json_with_name(player_count, DEFAULT_MAP_NAME, DEFAULT_MAP_JSON, seed)
             .unwrap_or_else(|err| panic!("invalid hardcoded map asset: {err}"))
@@ -145,7 +141,7 @@ impl Map {
         Self::from_authored_json_with_name_for_players(players, &name, &json, seed)
     }
 
-    /// Validate an untrusted authored-map document against the same parser and layout rules used
+    /// Validate an untrusted authored-map document against the same parser and location rules used
     /// by bundled maps. HTTP/session callers use this before accepting Map Editor handoffs.
     pub fn validate_authored_json(json: &str, player_count: usize) -> Result<(), String> {
         authored::load(player_count, json, 0).map(|_| ())
@@ -169,8 +165,8 @@ impl Map {
             hash = fnv_bytes(hash, &x.to_le_bytes());
             hash = fnv_bytes(hash, &y.to_le_bytes());
         }
-        hash = fnv_usize(hash, self.expansion_sites.len());
-        for &(x, y) in &self.expansion_sites {
+        hash = fnv_usize(hash, self.base_sites.len());
+        for &(x, y) in &self.base_sites {
             hash = fnv_bytes(hash, &x.to_le_bytes());
             hash = fnv_bytes(hash, &y.to_le_bytes());
         }
@@ -216,15 +212,6 @@ impl Map {
     #[cfg(test)]
     fn from_authored_json(player_count: usize, json: &str, seed: u32) -> Result<Map, String> {
         Self::from_authored_json_with_name(player_count, DEFAULT_MAP_NAME, json, seed)
-    }
-
-    #[cfg(test)]
-    fn from_authored_json_for_players(
-        players: &[(u32, u32)],
-        json: &str,
-        seed: u32,
-    ) -> Result<Map, String> {
-        Self::from_authored_json_with_name_for_players(players, DEFAULT_MAP_NAME, json, seed)
     }
 
     fn from_authored_json_with_name(
@@ -388,12 +375,12 @@ mod tests {
             assert_eq!(map.size, 126);
             assert_eq!(map.terrain.len(), (map.size * map.size) as usize);
             assert_eq!(map.starts.len(), player_count);
-            assert!(!map.expansion_sites.is_empty());
+            assert!(!map.base_sites.is_empty());
 
             for start in &map.starts {
                 assert!(map.is_passable(start.0 as i32, start.1 as i32));
             }
-            for expansion in &map.expansion_sites {
+            for expansion in &map.base_sites {
                 assert!(map.is_passable(expansion.0 as i32, expansion.1 as i32));
             }
         }
@@ -444,7 +431,7 @@ mod tests {
         );
         assert!(
             Map::load("1v1 No Terrain", 3, 0x1234_5678).is_err(),
-            "1v1 No Terrain should not expose a three-player layout"
+            "1v1 No Terrain should not expose a third start location"
         );
 
         for seed in 0..32 {
@@ -455,116 +442,49 @@ mod tests {
             assert_eq!(
                 starts,
                 vec![(25, 25), (100, 100)],
-                "1v1 No Terrain must only use its two opposing spawn slots for seed {seed}"
+                "1v1 No Terrain must only use its two opposing start locations for seed {seed}"
             );
         }
     }
 
     #[test]
-    fn same_seed_produces_identical_layout() {
+    fn same_seed_produces_identical_start_assignment() {
         let a = Map::generate(4, 0xdead_beef);
         let b = Map::generate(4, 0xdead_beef);
 
         assert_eq!(a.size, b.size);
         assert_eq!(a.terrain, b.terrain);
         assert_eq!(a.starts, b.starts);
-        assert_eq!(a.expansion_sites, b.expansion_sites);
+        assert_eq!(a.base_sites, b.base_sites);
     }
 
     #[test]
     fn different_seeds_produce_different_start_orderings() {
-        // With 4 authored pairs and at least one differing 2-player ordering, scanning a handful of
-        // seeds must yield more than one distinct starts vector. If shuffling silently breaks this
+        // With four fixed start locations, scanning a handful of seeds must yield more than one
+        // two-player ordering. If shuffling silently breaks this
         // catches it.
-        let layouts: HashSet<Vec<(u32, u32)>> = (0..32u32)
+        let assignments: HashSet<Vec<(u32, u32)>> = (0..32u32)
             .map(|seed| Map::generate(2, seed).starts)
             .collect();
         assert!(
-            layouts.len() > 1,
-            "expected at least two distinct start orderings across seeds, got {layouts:?}"
+            assignments.len() > 1,
+            "expected at least two distinct start orderings across seeds, got {assignments:?}"
         );
     }
 
     #[test]
-    fn shuffled_starts_get_expansions_from_authored_pool() {
-        // All authored expansions from default-handcrafted.json.
-        let authored_expansions: &[(u32, u32)] = &[
-            (40, 11),
-            (85, 114),
-            (114, 40),
-            (11, 85),
-            (63, 38),
-            (63, 87),
-            (87, 63),
-            (38, 63),
-        ];
+    fn every_authored_base_is_present_for_every_player_count() {
+        let expected: HashSet<_> = [
+            (13, 12), (112, 113), (112, 12), (13, 113), (40, 11), (85, 114),
+            (114, 40), (11, 85), (63, 38), (63, 87), (87, 63), (38, 63),
+        ]
+        .into_iter()
+        .collect();
         for seed in 0..16u32 {
-            let map = Map::generate(4, seed);
-            // Every assigned expansion must come from the authored pool.
-            for expansion in &map.expansion_sites {
-                assert!(
-                    authored_expansions.contains(expansion),
-                    "expansion {expansion:?} is not from the authored pool (seed {seed})"
-                );
+            for player_count in 1..=4 {
+                let map = Map::generate(player_count, seed);
+                assert_eq!(map.base_sites.iter().copied().collect::<HashSet<_>>(), expected);
             }
-            // No two players share the same expansion.
-            let unique: HashSet<_> = map.expansion_sites.iter().collect();
-            assert_eq!(
-                unique.len(),
-                map.expansion_sites.len(),
-                "duplicate expansion assigned (seed {seed})"
-            );
-            assert_eq!(map.expansion_sites.len(), map.starts.len() * 2);
-        }
-    }
-
-    #[test]
-    fn selected_layout_keeps_its_paired_natural_expansions() {
-        let authored_slots: HashSet<_> = default_authored_slots().into_iter().collect();
-
-        for seed in 0..16u32 {
-            let map = Map::generate(4, seed);
-            for slot in map
-                .starts
-                .iter()
-                .copied()
-                .zip(map.expansion_sites.chunks_exact(2))
-                .map(|(start, expansions)| (start, expansions.to_vec()))
-            {
-                assert!(
-                    authored_slots.contains(&slot),
-                    "start/expansion slot {slot:?} is not an authored natural pairing (seed {seed})"
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn adjacent_two_player_layout_assigns_naturals_away_from_opponent() {
-        // For two-player Low Econ, seed % 6 selects the authored 2p layout. Seed 2 is the
-        // top-adjacent NW-vs-NE layout; its naturals are left/right, not the shared top natural.
-        let map = Map::load("Low Econ", 2, 2).expect("low econ map should load");
-        let pairs: HashSet<_> = map
-            .starts
-            .iter()
-            .copied()
-            .zip(map.expansion_sites.iter().copied())
-            .collect();
-
-        assert_eq!(map.starts.len(), 2);
-        assert_eq!(map.expansion_sites.len(), 2);
-        assert!(pairs.contains(&((25, 25), (38, 62))), "got: {pairs:?}");
-        assert!(pairs.contains(&((100, 25), (88, 62))), "got: {pairs:?}");
-    }
-
-    #[test]
-    fn default_grants_two_naturals_per_player() {
-        for player_count in 1..=4 {
-            let map = Map::load("Default", player_count, 0x1234_5678)
-                .expect("default map should load from bundled assets");
-
-            assert_eq!(map.starts.len(), player_count);
-            assert_eq!(map.expansion_sites.len(), player_count * 2);
         }
     }
 
@@ -578,8 +498,8 @@ mod tests {
               "description": "a future map",
               "_design": "n/a",
               "terrain": [".."],
-              "sites": [],
-              "layouts": []
+              "startLocations": [{"x": 0, "y": 0}],
+              "baseSites": [{"x": 0, "y": 0}]
             }"#,
             0,
         )
@@ -593,13 +513,13 @@ mod tests {
         let err = Map::from_authored_json(
             1,
             r#"{
-              "version": 2,
+              "version": 3,
               "name": "bad",
               "description": "bad map",
               "_design": "n/a",
               "terrain": ["..", ".x"],
-              "sites": [],
-              "layouts": []
+              "startLocations": [{"x": 0, "y": 0}],
+              "baseSites": [{"x": 0, "y": 0}]
             }"#,
             0,
         )
@@ -611,23 +531,17 @@ mod tests {
     #[test]
     fn authored_map_rejects_impassable_base_protection_area() {
         // 32×32 map; rock at (8,8) sits inside the protection area of the first base site.
-        // A valid second site at (24,24) satisfies the 2-sites-per-player requirement.
         let mut rows = vec![".".repeat(32); 32];
         rows[8].replace_range(8..9, "#");
         let json = format!(
             r#"{{
-              "version": 2,
+              "version": 3,
               "name": "bad-base",
               "description": "bad base map",
               "_design": "n/a",
               "terrain": {},
-              "sites": [
-                {{"id": "main_a", "kind": "main", "x": 8, "y": 8}},
-                {{"id": "nat_a", "kind": "natural", "x": 24, "y": 24}}
-              ],
-              "layouts": [
-                {{"id": "one", "playerCount": 1, "slots": [{{"main": "main_a", "natural": "nat_a"}}]}}
-              ]
+              "startLocations": [{{"x": 8, "y": 8}}],
+              "baseSites": [{{"x": 8, "y": 8}}, {{"x": 24, "y": 24}}]
             }}"#,
             serde_json::to_string(&rows).unwrap()
         );
@@ -636,14 +550,5 @@ mod tests {
             .expect_err("blocked base protection area should be rejected");
 
         assert!(err.contains("impassable terrain"));
-    }
-
-    fn default_authored_slots() -> [BaseSlot; 4] {
-        [
-            ((13, 12), vec![(40, 11), (63, 38)]),
-            ((112, 113), vec![(85, 114), (63, 87)]),
-            ((112, 12), vec![(114, 40), (87, 63)]),
-            ((13, 113), vec![(11, 85), (38, 63)]),
-        ]
     }
 }

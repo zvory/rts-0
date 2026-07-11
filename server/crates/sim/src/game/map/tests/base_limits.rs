@@ -1,59 +1,52 @@
 use super::super::Map;
 
 #[test]
-fn authored_map_supports_four_bases_per_player() {
-    let rows = vec![".".repeat(56); 56];
+fn authored_map_supports_many_unconditional_base_sites() {
+    let rows = vec![".".repeat(80); 80];
+    let base_sites: Vec<_> = (0..12)
+        .map(|index| format!(r#"{{"x": {}, "y": {}}}"#, 8 + index * 5, 24))
+        .collect();
     let json = format!(
         r#"{{
-          "version": 2,
-          "name": "four-base",
-          "description": "four-base map",
+          "version": 3,
+          "name": "many-bases",
+          "description": "many permanent bases",
           "_design": "n/a",
           "terrain": {},
-          "sites": [
-            {{"id": "main_a", "kind": "main", "x": 8, "y": 8}},
-            {{"id": "nat_a", "kind": "natural", "x": 24, "y": 8}},
-            {{"id": "nat_b", "kind": "natural", "x": 24, "y": 24}},
-            {{"id": "nat_c", "kind": "natural", "x": 40, "y": 24}}
-          ],
-          "layouts": [
-            {{"id": "one", "playerCount": 1, "slots": [{{"main": "main_a", "naturals": ["nat_a", "nat_b", "nat_c"]}}]}}
-          ]
+          "startLocations": [{{"x": 8, "y": 24}}],
+          "baseSites": [{}]
         }}"#,
-        serde_json::to_string(&rows).unwrap()
+        serde_json::to_string(&rows).unwrap(),
+        base_sites.join(",")
     );
 
-    let map = Map::from_authored_json(1, &json, 0).expect("four-base map should load");
+    let map = Map::from_authored_json(1, &json, 0).expect("map should load");
 
-    assert_eq!(map.starts, vec![(8, 8)]);
-    assert_eq!(map.expansion_sites, vec![(24, 8), (24, 24), (40, 24)]);
+    assert_eq!(map.starts.len(), 1);
+    assert_eq!(map.base_sites.len(), 12);
 }
 
 #[test]
-fn authored_map_rejects_more_than_four_bases_per_player() {
-    let rows = vec![".".repeat(64); 64];
+fn authored_map_rejects_more_than_bounded_base_sites() {
+    let rows = vec![".".repeat(200); 200];
+    let base_sites: Vec<_> = (0..33)
+        .map(|index| format!(r#"{{"x": {}, "y": 100}}"#, 8 + index * 5))
+        .collect();
     let json = format!(
         r#"{{
-          "version": 2,
-          "name": "five-base",
-          "description": "five-base map",
+          "version": 3,
+          "name": "too-many-bases",
+          "description": "too many bases",
           "_design": "n/a",
           "terrain": {},
-          "sites": [
-            {{"id": "main_a", "kind": "main", "x": 8, "y": 8}},
-            {{"id": "nat_a", "kind": "natural", "x": 24, "y": 8}},
-            {{"id": "nat_b", "kind": "natural", "x": 24, "y": 24}},
-            {{"id": "nat_c", "kind": "natural", "x": 40, "y": 24}},
-            {{"id": "nat_d", "kind": "natural", "x": 40, "y": 40}}
-          ],
-          "layouts": [
-            {{"id": "one", "playerCount": 1, "slots": [{{"main": "main_a", "naturals": ["nat_a", "nat_b", "nat_c", "nat_d"]}}]}}
-          ]
+          "startLocations": [{{"x": 8, "y": 100}}],
+          "baseSites": [{}]
         }}"#,
-        serde_json::to_string(&rows).unwrap()
+        serde_json::to_string(&rows).unwrap(),
+        base_sites.join(",")
     );
 
-    let err = Map::from_authored_json(1, &json, 0).expect_err("five-base map should be rejected");
+    let err = Map::from_authored_json(1, &json, 0).expect_err("bounded base count must fail");
 
-    assert!(err.contains("at most 3 naturals"), "error was: {err}");
+    assert!(err.contains("baseSites must contain 1 to 32"), "error was: {err}");
 }

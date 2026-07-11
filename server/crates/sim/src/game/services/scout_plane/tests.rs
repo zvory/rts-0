@@ -14,7 +14,7 @@ fn test_map(size: u32) -> Map {
         size,
         terrain: vec![terrain::GRASS; (size * size) as usize],
         starts: vec![(4, 4), (size.saturating_sub(5), size.saturating_sub(5))],
-        expansion_sites: Vec::new(),
+        base_sites: Vec::new(),
     }
 }
 

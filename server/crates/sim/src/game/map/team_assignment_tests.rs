@@ -15,7 +15,7 @@ fn singleton_team_assignment_matches_legacy_ffa_shuffle() {
                 "player_count={player_count} seed={seed}"
             );
             assert_eq!(
-                assigned.expansion_sites, legacy.expansion_sites,
+                assigned.base_sites, legacy.base_sites,
                 "player_count={player_count} seed={seed}"
             );
         }
@@ -45,7 +45,7 @@ fn two_vs_two_team_starts_are_adjacent_on_default_map() {
 }
 
 #[test]
-fn one_vs_two_keeps_larger_team_together_when_layout_supports_it() {
+fn one_vs_two_keeps_larger_team_together_when_map_supports_it() {
     let players = start_players(&[(1, 1), (2, 2), (3, 2)]);
     let map =
         Map::load_for_players("Default", &players, 0x5566_7788).expect("default map should load");
@@ -70,29 +70,7 @@ fn one_vs_three_is_deterministic_on_four_start_map() {
         Map::load_for_players("Default", &players, 0xfeed_cafe).expect("default map should load");
 
     assert_eq!(a.starts, b.starts);
-    assert_eq!(a.expansion_sites, b.expansion_sites);
-}
-
-#[test]
-fn synthetic_six_start_map_assigns_arbitrary_team_sizes() {
-    let json = synthetic_six_start_map_json();
-    let players = start_players(&[(1, 1), (2, 1), (3, 1), (4, 2), (5, 2), (6, 3)]);
-    let map = Map::from_authored_json_for_players(&players, &json, 0x1234_abcd)
-        .expect("synthetic map should load");
-
-    let team_one_spread = tile_distance_sq(map.starts[0], map.starts[1])
-        + tile_distance_sq(map.starts[0], map.starts[2])
-        + tile_distance_sq(map.starts[1], map.starts[2]);
-    let split_cluster_baseline =
-        tile_distance_sq((16, 16), (84, 84)) + tile_distance_sq((16, 36), (36, 16));
-
-    assert_eq!(map.starts.len(), 6);
-    assert_eq!(map.expansion_sites.len(), 6);
-    assert!(
-        team_one_spread < split_cluster_baseline,
-        "team-aware assignment should not split the 3-player team across clusters: {:?}",
-        map.starts
-    );
+    assert_eq!(a.base_sites, b.base_sites);
 }
 
 #[test]
@@ -183,8 +161,8 @@ fn replay_reconstruction_preserves_team_aware_start_assignment() {
 
     assert_eq!(replay.state.map.starts, live.state.map.starts);
     assert_eq!(
-        replay.state.map.expansion_sites,
-        live.state.map.expansion_sites
+        replay.state.map.base_sites,
+        live.state.map.base_sites
     );
 }
 
@@ -196,46 +174,4 @@ fn tile_distance_sq(a: Tile, b: Tile) -> u64 {
     let dx = i64::from(a.0) - i64::from(b.0);
     let dy = i64::from(a.1) - i64::from(b.1);
     (dx * dx + dy * dy) as u64
-}
-
-fn synthetic_six_start_map_json() -> String {
-    let rows = vec![".".repeat(100); 100];
-    format!(
-        r#"{{
-          "version": 2,
-          "name": "six-start",
-          "description": "synthetic six start map",
-          "_design": "test-only six-start authored layout",
-          "terrain": {},
-          "sites": [
-            {{"id": "main_a", "kind": "main", "x": 16, "y": 16}},
-            {{"id": "nat_a", "kind": "natural", "x": 16, "y": 28}},
-            {{"id": "main_b", "kind": "main", "x": 16, "y": 36}},
-            {{"id": "nat_b", "kind": "natural", "x": 16, "y": 48}},
-            {{"id": "main_c", "kind": "main", "x": 36, "y": 16}},
-            {{"id": "nat_c", "kind": "natural", "x": 48, "y": 16}},
-            {{"id": "main_d", "kind": "main", "x": 84, "y": 84}},
-            {{"id": "nat_d", "kind": "natural", "x": 84, "y": 72}},
-            {{"id": "main_e", "kind": "main", "x": 84, "y": 64}},
-            {{"id": "nat_e", "kind": "natural", "x": 84, "y": 52}},
-            {{"id": "main_f", "kind": "main", "x": 64, "y": 84}},
-            {{"id": "nat_f", "kind": "natural", "x": 52, "y": 84}}
-          ],
-          "layouts": [
-            {{
-              "id": "six",
-              "playerCount": 6,
-              "slots": [
-                {{"main": "main_a", "natural": "nat_a"}},
-                {{"main": "main_b", "natural": "nat_b"}},
-                {{"main": "main_c", "natural": "nat_c"}},
-                {{"main": "main_d", "natural": "nat_d"}},
-                {{"main": "main_e", "natural": "nat_e"}},
-                {{"main": "main_f", "natural": "nat_f"}}
-              ]
-            }}
-          ]
-        }}"#,
-        serde_json::to_string(&rows).unwrap()
-    )
 }

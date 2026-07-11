@@ -1281,7 +1281,7 @@ mod tests {
             size,
             terrain: vec![terrain::GRASS; (size * size) as usize],
             starts: vec![],
-            expansion_sites: vec![],
+            base_sites: vec![],
         }
     }
 
@@ -1290,7 +1290,7 @@ mod tests {
             size,
             terrain: vec![terrain::WATER; (size * size) as usize],
             starts: vec![],
-            expansion_sites: vec![],
+            base_sites: vec![],
         }
     }
 
@@ -1797,7 +1797,7 @@ mod tests {
             size: 40,
             terrain: vec![crate::protocol::terrain::GRASS; 40 * 40],
             starts: vec![],
-            expansion_sites: vec![],
+            base_sites: vec![],
         };
         for kind in [
             EntityKind::ScoutCar,
@@ -1848,7 +1848,7 @@ mod tests {
             size: 40,
             terrain: vec![crate::protocol::terrain::GRASS; 40 * 40],
             starts: vec![],
-            expansion_sites: vec![],
+            base_sites: vec![],
         };
         let mut entities = EntityStore::new();
         let start = map.tile_center(10, 10);

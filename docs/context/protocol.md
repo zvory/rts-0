@@ -53,7 +53,7 @@ Use when adding, removing, or changing any field on a client↔server message, s
   JSON is rejected. `validateScenario` previews and disabled-by-default `submitScenario` recheck
   catalog/path/payload/map bounds without accepting client paths, branches, or credentials.
   `metadata.lab.initialCamera` may set the first Lab world-pixel center.
-- `/api/map-handoffs` validates authored/selected map data, caps records at 64, expires them after
+- `/api/map-handoffs` validates authored and materialized flat map data, caps records at 64, expires them after
   two minutes, and consumes each id once. Lab `exportMap` returns only `LabMapDraft` in reverse.
 
 ## Invariants

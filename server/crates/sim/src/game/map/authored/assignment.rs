@@ -1,43 +1,40 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
 
-use super::{parse_layout_pairs, AuthoredLayout, AuthoredSite};
-use crate::game::map::{BaseSlot, StartAssignmentPlayer, Tile};
+use crate::game::map::{StartAssignmentPlayer, Tile};
 
-pub(super) fn assign_layout_slots(
-    matching_layouts: &[&AuthoredLayout],
-    sites: &HashMap<String, AuthoredSite>,
+pub(super) fn assign_start_locations(
+    locations: &[Tile],
     players: &[StartAssignmentPlayer],
     seed: u32,
-) -> Result<Vec<BaseSlot>, String> {
+) -> Result<Vec<Tile>, String> {
+    if locations.len() < players.len() {
+        return Err("map has no assignable start locations".to_string());
+    }
     if all_singleton_teams(players) {
-        let layout = matching_layouts[(seed as usize) % matching_layouts.len()];
-        let mut slots = parse_layout_pairs(layout, sites)?;
+        let mut shuffled = locations.to_vec();
         let mut rng = SmallRng::seed_from_u64(seed as u64);
-        slots.shuffle(&mut rng);
-        return Ok(slots);
+        shuffled.shuffle(&mut rng);
+        shuffled.truncate(players.len());
+        return Ok(shuffled);
     }
 
-    let mut best: Option<(AssignmentScore, Vec<BaseSlot>)> = None;
-    for (layout_index, layout) in matching_layouts.iter().enumerate() {
-        let slots = parse_layout_pairs(layout, sites)?;
-        let mut slot_order: Vec<usize> = (0..slots.len()).collect();
-        evaluate_slot_orders(
-            &mut slot_order,
-            0,
-            &slots,
-            players,
-            seed,
-            layout_index,
-            &mut best,
-        );
-    }
-
-    best.map(|(_, slots)| slots)
-        .ok_or_else(|| "map has no assignable spawn layout".to_string())
+    let mut best: Option<(AssignmentScore, Vec<Tile>)> = None;
+    let mut selected = Vec::with_capacity(players.len());
+    let mut used = vec![false; locations.len()];
+    evaluate_start_orders(
+        locations,
+        players,
+        seed,
+        &mut selected,
+        &mut used,
+        &mut best,
+    );
+    best.map(|(_, starts)| starts)
+        .ok_or_else(|| "map has no assignable start locations".to_string())
 }
 
 fn all_singleton_teams(players: &[StartAssignmentPlayer]) -> bool {
@@ -47,43 +44,37 @@ fn all_singleton_teams(players: &[StartAssignmentPlayer]) -> bool {
         .all(|player| player.team_id != 0 && seen.insert(player.team_id))
 }
 
-fn evaluate_slot_orders(
-    slot_order: &mut [usize],
-    fixed: usize,
-    slots: &[BaseSlot],
+fn evaluate_start_orders(
+    locations: &[Tile],
     players: &[StartAssignmentPlayer],
     seed: u32,
-    layout_index: usize,
-    best: &mut Option<(AssignmentScore, Vec<BaseSlot>)>,
+    selected: &mut Vec<usize>,
+    used: &mut [bool],
+    best: &mut Option<(AssignmentScore, Vec<Tile>)>,
 ) {
-    if fixed == slot_order.len() {
-        let score = score_assignment(slot_order, slots, players, seed, layout_index);
-        let should_replace = best
+    if selected.len() == players.len() {
+        let score = score_assignment(selected, locations, players, seed);
+        if best
             .as_ref()
             .map(|(current, _)| score < *current)
-            .unwrap_or(true);
-        if should_replace {
-            let assigned = slot_order
-                .iter()
-                .map(|&index| slots[index].clone())
-                .collect();
-            *best = Some((score, assigned));
+            .unwrap_or(true)
+        {
+            *best = Some((
+                score,
+                selected.iter().map(|&index| locations[index]).collect(),
+            ));
         }
         return;
     }
-
-    for index in fixed..slot_order.len() {
-        slot_order.swap(fixed, index);
-        evaluate_slot_orders(
-            slot_order,
-            fixed + 1,
-            slots,
-            players,
-            seed,
-            layout_index,
-            best,
-        );
-        slot_order.swap(fixed, index);
+    for index in 0..locations.len() {
+        if used[index] {
+            continue;
+        }
+        used[index] = true;
+        selected.push(index);
+        evaluate_start_orders(locations, players, seed, selected, used, best);
+        selected.pop();
+        used[index] = false;
     }
 }
 
@@ -96,11 +87,10 @@ struct AssignmentScore {
 }
 
 fn score_assignment(
-    slot_order: &[usize],
-    slots: &[BaseSlot],
+    start_order: &[usize],
+    locations: &[Tile],
     players: &[StartAssignmentPlayer],
     seed: u32,
-    layout_index: usize,
 ) -> AssignmentScore {
     let mut teammate_spread = 0u64;
     let mut nearest_enemy_distance_sq = u64::MAX;
@@ -112,7 +102,7 @@ fn score_assignment(
             if i == j {
                 continue;
             }
-            let dist = distance_sq(slots[slot_order[i]].0, slots[slot_order[j]].0);
+            let dist = distance_sq(locations[start_order[i]], locations[start_order[j]]);
             if same_team(players[i], players[j]) {
                 teammate_spread = teammate_spread.saturating_add(dist);
             } else {
@@ -129,7 +119,7 @@ fn score_assignment(
         teammate_spread,
         nearest_enemy_distance: -(nearest_enemy_distance_sq.min(i64::MAX as u64) as i64),
         exposure_imbalance: exposure_imbalance(&player_nearest_enemies),
-        tie_break: assignment_tie_break(slot_order, players, seed, layout_index),
+        tie_break: assignment_tie_break(start_order, players, seed),
     }
 }
 
@@ -153,27 +143,19 @@ fn exposure_imbalance(distances: &[u64]) -> u64 {
     max.saturating_sub(min)
 }
 
-fn assignment_tie_break(
-    slot_order: &[usize],
-    players: &[StartAssignmentPlayer],
-    seed: u32,
-    layout_index: usize,
-) -> u64 {
+fn assignment_tie_break(start_order: &[usize], players: &[StartAssignmentPlayer], seed: u32) -> u64 {
     let mut hash = 0xcbf2_9ce4_8422_2325u64;
     for byte in seed.to_le_bytes() {
         hash = fnv_step(hash, byte);
     }
-    for byte in (layout_index as u64).to_le_bytes() {
-        hash = fnv_step(hash, byte);
-    }
-    for (player, slot) in players.iter().zip(slot_order.iter()) {
+    for (player, start) in players.iter().zip(start_order.iter()) {
         for byte in player.id.to_le_bytes() {
             hash = fnv_step(hash, byte);
         }
         for byte in player.team_id.to_le_bytes() {
             hash = fnv_step(hash, byte);
         }
-        for byte in (*slot as u64).to_le_bytes() {
+        for byte in (*start as u64).to_le_bytes() {
             hash = fnv_step(hash, byte);
         }
     }

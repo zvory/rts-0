@@ -351,7 +351,7 @@ fn flat_map(size: u32) -> Map {
         size,
         terrain: vec![crate::protocol::terrain::GRASS; (size * size) as usize],
         starts: vec![],
-        expansion_sites: vec![],
+        base_sites: vec![],
     }
 }
 

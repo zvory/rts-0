@@ -413,7 +413,7 @@ pub struct LabMapDraft {
     pub size: u32,
     pub terrain: Vec<u8>,
     pub starts: Vec<LabMapTile>,
-    pub expansion_sites: Vec<LabMapTile>,
+    pub base_sites: Vec<LabMapTile>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, Hash)]

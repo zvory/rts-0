@@ -50,11 +50,9 @@ export class MapEditorApp {
         }
         const returned = new MapEditorSession({ storage: null });
         returned.loadAuthoredMap(handoff.authoredMap);
-        if (handoff.selectedLayoutId) returned.selectLayout(handoff.selectedLayoutId);
         const restoredWorkspace = this.session.loadLocal(this.launch.workspaceId);
         if (!restoredWorkspace || !sessionsHaveSameMap(this.session, returned)) {
           this.session.loadAuthoredMap(handoff.authoredMap);
-          if (handoff.selectedLayoutId) this.session.selectLayout(handoff.selectedLayoutId);
         }
       } catch (error) {
         this.session.initializeBlank();
@@ -82,13 +80,12 @@ export class MapEditorApp {
     globalThis.__mapEditor = this;
   }
 
-  async openInLab({ authoredMap, materializedMap, selectedLayoutId, workspaceId }) {
+  async openInLab({ authoredMap, materializedMap, workspaceId }) {
     this.session.saveLocal(workspaceId);
     const handoff = await createMapHandoff({
       destination: "lab",
       authoredMap,
       materializedMap,
-      selectedLayoutId,
     });
     const url = new URL("/lab", this.locationObj.href);
     url.searchParams.set("handoff", handoff.handoffId);

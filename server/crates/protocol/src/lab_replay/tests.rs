@@ -61,7 +61,7 @@ fn checkpoint_scenario(entity_ids: &[u32], next_id: u32) -> LabCheckpointScenari
                     LabScenarioTile { x: 0, y: 0 },
                     LabScenarioTile { x: 1, y: 1 },
                 ],
-                expansion_sites: Vec::new(),
+                base_sites: Vec::new(),
             },
         },
         metadata: LabCheckpointScenarioMetadata {

@@ -40,7 +40,7 @@ fn flat_lab_map() -> Map {
         size: SIZE,
         terrain: vec![terrain::GRASS; (SIZE * SIZE) as usize],
         starts: vec![(16, 16), (48, 48)],
-        expansion_sites: Vec::new(),
+        base_sites: Vec::new(),
     }
 }
 

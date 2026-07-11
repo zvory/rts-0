@@ -29,6 +29,7 @@ pub const LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION: u32 =
     checkpoint_scenario::LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION;
 const LAB_MAP_MAIN_PROTECTION_RADIUS_TILES: i32 = 3;
 const LAB_MAP_EXPANSION_PROTECTION_RADIUS_TILES: i32 = 0;
+const LAB_MAP_MAX_BASE_SITES: usize = 32;
 const LAB_MAX_MUTATION_BATCH: usize = 400;
 const LAB_PLACEMENT_SUGGESTION_LIMIT: usize = 8;
 const LAB_PLACEMENT_SEARCH_RADIUS_TILES: i32 = 8;
@@ -294,10 +295,10 @@ impl Game {
                 .iter()
                 .map(|&(x, y)| crate::protocol::LabMapTile { x, y })
                 .collect(),
-            expansion_sites: self
+            base_sites: self
                 .state
                 .map
-                .expansion_sites
+                .base_sites
                 .iter()
                 .map(|&(x, y)| crate::protocol::LabMapTile { x, y })
                 .collect(),
@@ -557,16 +558,16 @@ impl Game {
                 ),
             });
         }
-        if draft.expansion_sites.len() > players.len().saturating_mul(3) {
+        if draft.base_sites.len() > LAB_MAP_MAX_BASE_SITES {
             return Err(LabError::InvalidMap {
                 name: name.to_string(),
-                reason: "map has more than three natural sites per player".to_string(),
+                reason: format!("map has more than {LAB_MAP_MAX_BASE_SITES} base sites"),
             });
         }
 
         let starts: Vec<_> = draft.starts.iter().map(|tile| (tile.x, tile.y)).collect();
-        let expansion_sites: Vec<_> = draft
-            .expansion_sites
+        let base_sites: Vec<_> = draft
+            .base_sites
             .iter()
             .map(|tile| (tile.x, tile.y))
             .collect();
@@ -582,7 +583,10 @@ impl Game {
                 &mut occupied_sites,
             )?;
         }
-        for &(x, y) in &expansion_sites {
+        for &(x, y) in &base_sites {
+            if starts.contains(&(x, y)) {
+                continue;
+            }
             validate_lab_map_site(
                 name,
                 draft.size,
@@ -598,7 +602,7 @@ impl Game {
             size: draft.size,
             terrain: draft.terrain,
             starts,
-            expansion_sites,
+            base_sites,
         };
         let map_metadata = MapMetadata {
             name: name.to_string(),

@@ -1,15 +1,14 @@
 import { Camera } from "./camera.js";
-import { PLAYER_PALETTE } from "./config.js";
 import { TERRAIN } from "./protocol.js";
 import { Renderer } from "./renderer/index.js";
 import { createTerrainPreviewCanvas } from "./renderer/terrain.js";
 import {
-  addSymmetricDraftNaturals,
+  addSymmetricDraftLocations,
   mapEditorRectTiles,
   MAP_EDITOR_MAIN_CLEARANCE_TILES,
   MAP_EDITOR_NATURAL_CLEARANCE_TILES,
   MAP_EDITOR_SYMMETRY,
-  moveSymmetricDraftBase,
+  moveSymmetricDraftLocation,
   protectDraftBaseTerrain,
   symmetricMapTiles,
 } from "./map_editor_session.js";
@@ -155,13 +154,9 @@ export class MapEditorViewport {
       this.overlay.lineStyle(2, 0xffd878, 0.82);
       this.overlay.beginFill(0xffd878, 0.82).drawCircle(guideCentre.x, guideCentre.y, 5).endFill();
     }
-    for (const player of this.session.playerSlots()) {
-      const color = hexColor(PLAYER_PALETTE[player.playerIndex % PLAYER_PALETTE.length]);
-      if (player.start) this.drawSite(player.start, color, 11, `P${player.playerIndex + 1}`);
-      for (const [index, natural] of player.naturals.entries()) {
-        this.drawSite(natural, color, 7, `N${index + 1}`);
-      }
-    }
+    const locations = this.session.mapOverlay();
+    for (const start of locations?.starts || []) this.drawSite(start, 0x4ec9ff, 11, `S${start.index + 1}`);
+    for (const [index, base] of (locations?.bases || []).entries()) this.drawSite(base, 0xf4c542, 7, `B${index + 1}`);
     this.drawPaintPreview();
   }
 
@@ -284,41 +279,23 @@ export class MapEditorViewport {
   applySiteTool(tile) {
     const tool = this.tool;
     let result = null;
-    const player = Number(tool.playerIndex);
-    const label = tool.kind === "start"
-      ? `Moved Player ${player + 1} start`
-      : tool.naturalId
-        ? `Moved Player ${player + 1} natural`
-        : `Added Player ${player + 1} natural`;
+    const label = tool.add
+      ? `Added ${tool.kind === "start" ? "start location" : "base site"}`
+      : `Moved ${tool.kind === "start" ? "start location" : "base site"}`;
     const changed = this.session.mutate(label, (draft) => {
-      result = tool.kind === "start"
-        ? moveSymmetricDraftBase(draft, {
-          kind: "main",
-          playerIndex: player,
+      result = tool.add
+        ? addSymmetricDraftLocations(draft, { kind: tool.kind, tile, symmetry: tool.symmetry })
+        : moveSymmetricDraftLocation(draft, {
+          kind: tool.kind,
+          locationIndex: tool.locationIndex,
           tile,
-          layoutId: this.session.selectedLayoutId,
           symmetry: tool.symmetry,
-        })
-        : tool.naturalId
-          ? moveSymmetricDraftBase(draft, {
-            kind: "natural",
-            playerIndex: player,
-            naturalId: tool.naturalId,
-            tile,
-            layoutId: this.session.selectedLayoutId,
-            symmetry: tool.symmetry,
-          })
-          : addSymmetricDraftNaturals(draft, {
-            playerIndex: player,
-            tile,
-            layoutId: this.session.selectedLayoutId,
-            symmetry: tool.symmetry,
-          });
+        });
       if (result?.ok) protectDraftBaseTerrain(draft);
     });
     const extra = Math.max(0, Number(result?.count || 1) - 1);
     this.onStatus(
-      changed ? `${label}${extra ? ` and ${extra} symmetric base${extra === 1 ? "" : "s"}` : ""}.` : result?.error || "No map change.",
+      changed ? `${label}${extra ? ` and ${extra} symmetric location${extra === 1 ? "" : "s"}` : ""}.` : result?.error || "No map change.",
       !changed,
     );
   }
@@ -327,11 +304,7 @@ export class MapEditorViewport {
     const rect = this.renderer.app.view.getBoundingClientRect();
     const world = this.camera.screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
     const size = this.session.draft?.terrain?.length || 0;
-    const radius = kind === "start"
-      ? MAP_EDITOR_MAIN_CLEARANCE_TILES
-      : kind === "natural"
-        ? MAP_EDITOR_NATURAL_CLEARANCE_TILES
-        : 0;
+    const radius = kind === "start" ? MAP_EDITOR_MAIN_CLEARANCE_TILES : kind === "base" ? MAP_EDITOR_NATURAL_CLEARANCE_TILES : 0;
     if (!size || size <= radius * 2) return null;
     return {
       x: Math.max(radius, Math.min(size - radius - 1, Math.floor(world.x / TILE_SIZE))),

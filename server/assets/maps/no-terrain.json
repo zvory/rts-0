@@ -1,8 +1,8 @@
 {
-  "version": 2,
+  "version": 3,
   "name": "No Terrain",
-  "description": "name",
-  "_design": "All tiles are grass. Same v2 spawn layout coverage as default-handcrafted. No terrain features; all unit interaction is unimpeded.",
+  "description": "All-grass four-start map with eight permanent resource base locations.",
+  "_design": "Flat map locations: startLocations choose player starts; every baseSites entry always spawns its resource cluster.",
   "terrain": [
     "..............................................................................................................................",
     "..............................................................................................................................",
@@ -131,274 +131,56 @@
     "..............................................................................................................................",
     ".............................................................................................................................."
   ],
-  "sites": [
+  "startLocations": [
     {
-      "id": "main_nw",
-      "kind": "main",
       "x": 25,
       "y": 25
     },
     {
-      "id": "main_se",
-      "kind": "main",
       "x": 100,
       "y": 100
     },
     {
-      "id": "main_ne",
-      "kind": "main",
       "x": 100,
       "y": 25
     },
     {
-      "id": "main_sw",
-      "kind": "main",
+      "x": 25,
+      "y": 100
+    }
+  ],
+  "baseSites": [
+    {
+      "x": 25,
+      "y": 25
+    },
+    {
+      "x": 100,
+      "y": 100
+    },
+    {
+      "x": 100,
+      "y": 25
+    },
+    {
       "x": 25,
       "y": 100
     },
     {
-      "id": "nat_top",
-      "kind": "natural",
       "x": 63,
       "y": 38
     },
     {
-      "id": "nat_bottom",
-      "kind": "natural",
       "x": 63,
       "y": 88
     },
     {
-      "id": "nat_right",
-      "kind": "natural",
       "x": 88,
       "y": 62
     },
     {
-      "id": "nat_left",
-      "kind": "natural",
       "x": 38,
       "y": 62
-    }
-  ],
-  "layouts": [
-    {
-      "id": "1p_nw",
-      "playerCount": 1,
-      "slots": [
-        {
-          "main": "main_nw",
-          "natural": "nat_top"
-        }
-      ]
-    },
-    {
-      "id": "1p_se",
-      "playerCount": 1,
-      "slots": [
-        {
-          "main": "main_se",
-          "natural": "nat_bottom"
-        }
-      ]
-    },
-    {
-      "id": "1p_ne",
-      "playerCount": 1,
-      "slots": [
-        {
-          "main": "main_ne",
-          "natural": "nat_right"
-        }
-      ]
-    },
-    {
-      "id": "1p_sw",
-      "playerCount": 1,
-      "slots": [
-        {
-          "main": "main_sw",
-          "natural": "nat_left"
-        }
-      ]
-    },
-    {
-      "id": "2p_cross_nw_se",
-      "playerCount": 2,
-      "slots": [
-        {
-          "main": "main_nw",
-          "natural": "nat_top"
-        },
-        {
-          "main": "main_se",
-          "natural": "nat_bottom"
-        }
-      ]
-    },
-    {
-      "id": "2p_cross_ne_sw",
-      "playerCount": 2,
-      "slots": [
-        {
-          "main": "main_ne",
-          "natural": "nat_right"
-        },
-        {
-          "main": "main_sw",
-          "natural": "nat_left"
-        }
-      ]
-    },
-    {
-      "id": "2p_adjacent_top",
-      "playerCount": 2,
-      "slots": [
-        {
-          "main": "main_nw",
-          "natural": "nat_left"
-        },
-        {
-          "main": "main_ne",
-          "natural": "nat_right"
-        }
-      ]
-    },
-    {
-      "id": "2p_adjacent_bottom",
-      "playerCount": 2,
-      "slots": [
-        {
-          "main": "main_sw",
-          "natural": "nat_left"
-        },
-        {
-          "main": "main_se",
-          "natural": "nat_right"
-        }
-      ]
-    },
-    {
-      "id": "2p_adjacent_left",
-      "playerCount": 2,
-      "slots": [
-        {
-          "main": "main_nw",
-          "natural": "nat_top"
-        },
-        {
-          "main": "main_sw",
-          "natural": "nat_bottom"
-        }
-      ]
-    },
-    {
-      "id": "2p_adjacent_right",
-      "playerCount": 2,
-      "slots": [
-        {
-          "main": "main_ne",
-          "natural": "nat_top"
-        },
-        {
-          "main": "main_se",
-          "natural": "nat_bottom"
-        }
-      ]
-    },
-    {
-      "id": "3p_nw_se_ne",
-      "playerCount": 3,
-      "slots": [
-        {
-          "main": "main_nw",
-          "natural": "nat_top"
-        },
-        {
-          "main": "main_se",
-          "natural": "nat_bottom"
-        },
-        {
-          "main": "main_ne",
-          "natural": "nat_right"
-        }
-      ]
-    },
-    {
-      "id": "3p_nw_se_sw",
-      "playerCount": 3,
-      "slots": [
-        {
-          "main": "main_nw",
-          "natural": "nat_top"
-        },
-        {
-          "main": "main_se",
-          "natural": "nat_bottom"
-        },
-        {
-          "main": "main_sw",
-          "natural": "nat_left"
-        }
-      ]
-    },
-    {
-      "id": "3p_nw_ne_sw",
-      "playerCount": 3,
-      "slots": [
-        {
-          "main": "main_nw",
-          "natural": "nat_top"
-        },
-        {
-          "main": "main_ne",
-          "natural": "nat_right"
-        },
-        {
-          "main": "main_sw",
-          "natural": "nat_left"
-        }
-      ]
-    },
-    {
-      "id": "3p_se_ne_sw",
-      "playerCount": 3,
-      "slots": [
-        {
-          "main": "main_se",
-          "natural": "nat_bottom"
-        },
-        {
-          "main": "main_ne",
-          "natural": "nat_right"
-        },
-        {
-          "main": "main_sw",
-          "natural": "nat_left"
-        }
-      ]
-    },
-    {
-      "id": "4p_all",
-      "playerCount": 4,
-      "slots": [
-        {
-          "main": "main_nw",
-          "natural": "nat_top"
-        },
-        {
-          "main": "main_se",
-          "natural": "nat_bottom"
-        },
-        {
-          "main": "main_ne",
-          "natural": "nat_right"
-        },
-        {
-          "main": "main_sw",
-          "natural": "nat_left"
-        }
-      ]
     }
   ]
 }

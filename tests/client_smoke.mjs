@@ -467,7 +467,7 @@ try {
       symmetryOptions: [...document.querySelector("select[aria-label=Symmetry]")?.options || []]
         .map((option) => option.textContent),
       clearanceSection: [...document.querySelectorAll(".map-editor-readout")]
-        .find((node) => node.textContent === "Bases need grass clearance.")
+        .find((node) => node.textContent === "Bases and starts reserve a passable grass area.")
         ?.closest("fieldset")?.querySelector("legend")?.textContent || "",
     };
   });
@@ -487,7 +487,7 @@ try {
       editorUi.symmetryOptions.includes("Radial (4-way)") &&
       editorUi.symmetryOptions.includes("Diagonal ↘ (top-left ↔ bottom-right)") &&
       editorUi.symmetryOptions.includes("Diagonal ↙ (top-right ↔ bottom-left)") &&
-      editorUi.clearanceSection === "Spawn layouts",
+      editorUi.clearanceSection === "Start and base locations",
     "MAP EDITOR: symmetry help, modes, and grass-clearance guidance are presented in the right controls",
   );
   await editorPage.close();
