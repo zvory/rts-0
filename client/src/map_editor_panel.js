@@ -3,6 +3,7 @@ import { TERRAIN } from "./protocol.js";
 import {
   MAP_EDITOR_HISTORY_LIMIT,
   MAP_EDITOR_MAX_NATURALS_PER_PLAYER,
+  MAP_EDITOR_SYMMETRY,
   removeDraftPlayerNatural,
 } from "./map_editor_session.js";
 
@@ -28,6 +29,8 @@ export class MapEditorPanel {
     this.selectedMapFile = "";
     this.selectedPlayerIndex = 0;
     this.selectedTerrain = TERRAIN.ROCK;
+    this.paintShape = "brush";
+    this.symmetry = MAP_EDITOR_SYMMETRY.NONE;
     this.newLayoutPlayers = 2;
     this.pending = false;
     this.status = "Map Editor is frozen: only the authored map changes here.";
@@ -123,19 +126,46 @@ export class MapEditorPanel {
     const palette = document.createElement("div");
     palette.className = "map-editor-palette";
     for (const [code, label] of [
-      [TERRAIN.GRASS, "Grass"],
+      [TERRAIN.GRASS, "Grass / erase"],
       [TERRAIN.ROCK, "Stone"],
       [TERRAIN.WATER, "Water"],
     ]) {
       const control = button(label, () => {
         this.selectedTerrain = code;
-        this.viewport.armTool({ kind: "terrain", terrain: code });
-        this.setStatus(`Painting ${label.toLowerCase()}. Drag across the map to make one undoable stroke.`);
+        this.armTerrain();
+        this.setStatus(`${this.paintShape === "box" ? "Drag to fill a box with" : "Painting"} ${terrainName(code)}.`);
       }, { active: this.viewport.tool?.kind === "terrain" && this.selectedTerrain === code });
       control.dataset.terrain = terrainName(code);
       palette.appendChild(control);
     }
-    section.append(palette, readout("Each drag is one render and undo transaction. Authored start and natural clearances stay grass."));
+    const shapes = document.createElement("div");
+    shapes.className = "map-editor-palette";
+    for (const [value, label] of [["brush", "Brush"], ["box", "Box fill"]]) {
+      shapes.appendChild(button(label, () => this.setPaintShape(value), { active: this.paintShape === value }));
+    }
+    const symmetry = document.createElement("select");
+    symmetry.setAttribute("aria-label", "Symmetry");
+    for (const [value, label] of [
+      [MAP_EDITOR_SYMMETRY.NONE, "None"],
+      [MAP_EDITOR_SYMMETRY.HORIZONTAL, "Horizontal"],
+      [MAP_EDITOR_SYMMETRY.VERTICAL, "Vertical"],
+      [MAP_EDITOR_SYMMETRY.RADIAL, "Radial (180°)"],
+      [MAP_EDITOR_SYMMETRY.DIAGONAL, "Diagonal (both axes)"],
+    ]) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      symmetry.appendChild(option);
+    }
+    symmetry.value = this.symmetry;
+    symmetry.addEventListener("change", () => this.setSymmetry(symmetry.value));
+    section.append(
+      palette,
+      field("Paint shape", shapes),
+      field("Symmetry", symmetry),
+      readout("Symmetry applies to terrain and base moves. Diagonal mirrors through both map diagonals; each drag remains one render and undo transaction."),
+      readout("Authored start and natural clearances stay grass."),
+    );
     return section;
   }
 
@@ -210,7 +240,7 @@ export class MapEditorPanel {
       picker,
       readout(`Player ${selected.playerIndex + 1} start: ${start}`),
       button("Move start", () => {
-        this.viewport.armTool({ kind: "start", playerIndex: selected.playerIndex });
+        this.viewport.armTool({ kind: "start", playerIndex: selected.playerIndex, symmetry: this.symmetry });
         this.setStatus(`Click the map to place Player ${selected.playerIndex + 1}'s start.`);
       }, { active: this.viewport.tool?.kind === "start" && this.viewport.tool?.playerIndex === selected.playerIndex }),
       button("Add natural", () => this.armNatural(""), {
@@ -250,6 +280,7 @@ export class MapEditorPanel {
       kind: "natural",
       playerIndex: this.selectedPlayerIndex,
       naturalId,
+      symmetry: this.symmetry,
     });
     this.setStatus(`Click the map to ${naturalId ? "move" : "add"} Player ${this.selectedPlayerIndex + 1}'s natural base.`);
   }
@@ -260,6 +291,29 @@ export class MapEditorPanel {
       removeDraftPlayerNatural(draft, player, naturalId, this.session.selectedLayoutId);
     });
     this.setStatus(changed ? "Natural base removed." : "Natural base was already absent.", !changed);
+  }
+
+  armTerrain() {
+    this.viewport.armTool({
+      kind: "terrain",
+      terrain: this.selectedTerrain,
+      shape: this.paintShape,
+      symmetry: this.symmetry,
+    });
+  }
+
+  setPaintShape(shape) {
+    this.paintShape = shape === "box" ? "box" : "brush";
+    if (this.viewport.tool?.kind === "terrain") this.armTerrain();
+    this.render();
+  }
+
+  setSymmetry(symmetry) {
+    this.symmetry = Object.values(MAP_EDITOR_SYMMETRY).includes(symmetry)
+      ? symmetry
+      : MAP_EDITOR_SYMMETRY.NONE;
+    if (this.viewport.tool) this.viewport.armTool({ ...this.viewport.tool, symmetry: this.symmetry });
+    this.render();
   }
 
   newBlankMap() {

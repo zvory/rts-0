@@ -3,12 +3,13 @@ import { PLAYER_PALETTE } from "./config.js";
 import { TERRAIN } from "./protocol.js";
 import { Renderer } from "./renderer/index.js";
 import {
-  addDraftPlayerNatural,
+  addSymmetricDraftNaturals,
+  mapEditorRectTiles,
   MAP_EDITOR_MAIN_CLEARANCE_TILES,
   MAP_EDITOR_NATURAL_CLEARANCE_TILES,
-  moveDraftPlayerNatural,
-  moveDraftPlayerStart,
+  moveSymmetricDraftBase,
   protectDraftBaseTerrain,
+  symmetricMapTiles,
 } from "./map_editor_session.js";
 
 const TILE_SIZE = 32;
@@ -28,6 +29,7 @@ export class MapEditorViewport {
     this.panPointerId = null;
     this.lastPointer = null;
     this.lastPaintTile = null;
+    this.paintStartTile = null;
     this.keys = { up: false, down: false, left: false, right: false };
     this.destroyed = false;
     this.overlay = new PIXI.Graphics();
@@ -108,6 +110,17 @@ export class MapEditorViewport {
         this.drawSite(natural, color, 7, `N${index + 1}`);
       }
     }
+    this.drawPaintPreview();
+  }
+
+  drawPaintPreview() {
+    if (this.tool?.kind !== "terrain" || this.tool.shape !== "box" || !this.paintStartTile || !this.lastPaintTile) return;
+    const x0 = Math.min(this.paintStartTile.x, this.lastPaintTile.x) * TILE_SIZE;
+    const y0 = Math.min(this.paintStartTile.y, this.lastPaintTile.y) * TILE_SIZE;
+    const width = (Math.abs(this.lastPaintTile.x - this.paintStartTile.x) + 1) * TILE_SIZE;
+    const height = (Math.abs(this.lastPaintTile.y - this.paintStartTile.y) + 1) * TILE_SIZE;
+    this.overlay.lineStyle(2, terrainPreviewColor(this.tool.terrain), 0.9);
+    this.overlay.beginFill(terrainPreviewColor(this.tool.terrain), 0.16).drawRect(x0, y0, width, height).endFill();
   }
 
   drawSite(site, color, radius, labelText) {
@@ -142,9 +155,12 @@ export class MapEditorViewport {
     if (!tile) return;
     if (this.tool.kind === "terrain") {
       this.paintPointerId = event.pointerId;
+      this.paintStartTile = tile;
       this.lastPaintTile = tile;
-      this.session.beginTerrainStroke(`Painted ${terrainLabel(this.tool.terrain)} terrain`);
-      this.paintLine(tile, tile);
+      const action = this.tool.shape === "box" ? "Filled" : "Painted";
+      this.session.beginTerrainStroke(`${action} ${terrainLabel(this.tool.terrain)} terrain`);
+      if (this.tool.shape === "box") this.drawOverlay();
+      else this.paintLine(tile, tile);
       event.currentTarget.setPointerCapture?.(event.pointerId);
     } else {
       this.applySiteTool(tile);
@@ -161,8 +177,9 @@ export class MapEditorViewport {
     if (event.pointerId !== this.paintPointerId || this.tool?.kind !== "terrain") return;
     const tile = this.eventTile(event);
     if (!tile || !this.lastPaintTile) return;
-    this.paintLine(this.lastPaintTile, tile);
+    if (this.tool.shape !== "box") this.paintLine(this.lastPaintTile, tile);
     this.lastPaintTile = tile;
+    if (this.tool.shape === "box") this.drawOverlay();
   }
 
   handlePointerUp(event) {
@@ -171,16 +188,36 @@ export class MapEditorViewport {
       this.lastPointer = null;
     }
     if (event.pointerId === this.paintPointerId) {
+      const tile = this.eventTile(event);
+      if (tile) this.lastPaintTile = tile;
+      if (this.tool?.kind === "terrain" && this.tool.shape === "box" && this.paintStartTile && this.lastPaintTile) {
+        this.paintBox(this.paintStartTile, this.lastPaintTile);
+      }
       this.paintPointerId = null;
       this.lastPaintTile = null;
+      this.paintStartTile = null;
       const changed = this.session.commitTerrainStroke();
-      this.onStatus(changed ? "Terrain stroke committed." : "Protected bases remain grass.", !changed);
+      this.drawOverlay();
+      this.onStatus(changed ? "Terrain paint committed." : "Protected bases remain grass.", !changed);
     }
     event.currentTarget.releasePointerCapture?.(event.pointerId);
   }
 
   paintLine(from, to) {
-    const changes = this.session.paintTerrainTiles(lineTiles(from, to), this.tool.terrain);
+    this.paintTiles(lineTiles(from, to));
+  }
+
+  paintBox(from, to) {
+    const size = this.session.draft?.terrain?.length || 0;
+    this.paintTiles(mapEditorRectTiles(from, to, size));
+  }
+
+  paintTiles(tiles) {
+    const size = this.session.draft?.terrain?.length || 0;
+    const changes = this.session.paintTerrainTiles(
+      symmetricMapTiles(size, tiles, this.tool?.symmetry),
+      this.tool.terrain,
+    );
     this.renderer.updateStaticTerrainTiles(changes);
   }
 
@@ -195,13 +232,35 @@ export class MapEditorViewport {
         : `Added Player ${player + 1} natural`;
     const changed = this.session.mutate(label, (draft) => {
       result = tool.kind === "start"
-        ? moveDraftPlayerStart(draft, player, tile, this.session.selectedLayoutId)
+        ? moveSymmetricDraftBase(draft, {
+          kind: "main",
+          playerIndex: player,
+          tile,
+          layoutId: this.session.selectedLayoutId,
+          symmetry: tool.symmetry,
+        })
         : tool.naturalId
-          ? moveDraftPlayerNatural(draft, player, tool.naturalId, tile, this.session.selectedLayoutId)
-          : addDraftPlayerNatural(draft, player, tile, this.session.selectedLayoutId);
+          ? moveSymmetricDraftBase(draft, {
+            kind: "natural",
+            playerIndex: player,
+            naturalId: tool.naturalId,
+            tile,
+            layoutId: this.session.selectedLayoutId,
+            symmetry: tool.symmetry,
+          })
+          : addSymmetricDraftNaturals(draft, {
+            playerIndex: player,
+            tile,
+            layoutId: this.session.selectedLayoutId,
+            symmetry: tool.symmetry,
+          });
       if (result?.ok) protectDraftBaseTerrain(draft);
     });
-    this.onStatus(changed ? `${label}.` : result?.error || "No map change.", !changed);
+    const extra = Math.max(0, Number(result?.count || 1) - 1);
+    this.onStatus(
+      changed ? `${label}${extra ? ` and ${extra} symmetric base${extra === 1 ? "" : "s"}` : ""}.` : result?.error || "No map change.",
+      !changed,
+    );
   }
 
   eventTile(event, { kind = this.tool?.kind } = {}) {
@@ -304,6 +363,12 @@ function terrainLabel(code) {
   if (code === TERRAIN.ROCK) return "stone";
   if (code === TERRAIN.WATER) return "water";
   return "grass";
+}
+
+function terrainPreviewColor(code) {
+  if (code === TERRAIN.ROCK) return 0xa69a82;
+  if (code === TERRAIN.WATER) return 0x4b9bd0;
+  return 0x6d9f58;
 }
 
 function hexColor(value) {
