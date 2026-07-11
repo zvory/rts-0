@@ -216,6 +216,42 @@ fn lab_checkpoint_scenario_export_preserves_god_mode_and_rejects_map_mismatches(
 }
 
 #[test]
+fn lab_checkpoint_scenario_rejects_player_starts_that_disagree_with_its_map() {
+    let game = default_lab_game(0x5150_5006);
+    let mut checkpoint = game
+        .export_lab_checkpoint_scenario("Untitled lab scenario".to_string(), TEST_BUILD_SHA)
+        .expect("live lab checkpoint scenario should export");
+    checkpoint.map.data.starts.swap(0, 1);
+    let map = Map {
+        size: checkpoint.map.data.size,
+        terrain: checkpoint.map.data.terrain.clone(),
+        starts: checkpoint
+            .map
+            .data
+            .starts
+            .iter()
+            .map(|tile| (tile.x, tile.y))
+            .collect(),
+        base_sites: checkpoint
+            .map
+            .data
+            .base_sites
+            .iter()
+            .map(|tile| (tile.x, tile.y))
+            .collect(),
+    };
+    let materialized_hash = map.materialized_hash();
+    checkpoint.map.materialized_hash = materialized_hash.clone();
+    let mut payload: serde_json::Value =
+        serde_json::from_str(&checkpoint.checkpoint_payload).expect("checkpoint payload should be JSON");
+    payload["mapBinding"]["materializedMapHash"] = serde_json::Value::String(materialized_hash);
+    checkpoint.checkpoint_payload =
+        serde_json::to_string(&payload).expect("checkpoint payload should serialize");
+
+    assert_restore_invalid_scenario(checkpoint, "player start tiles do not match scenario map starts");
+}
+
+#[test]
 fn lab_checkpoint_scenario_restore_rejects_untrusted_source_entity_id_maps() {
     let game = default_lab_game(0x5150_5005);
     let checkpoint = game

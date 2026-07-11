@@ -285,6 +285,17 @@ impl Game {
                 .map_err(|err| LabError::InvalidScenario {
                     reason: format!("checkpoint scenario payload is invalid: {err}"),
                 })?;
+        if !game
+            .state
+            .players
+            .iter()
+            .map(|player| player.start_tile)
+            .eq(game.state.map.starts.iter().copied())
+        {
+            return Err(LabError::InvalidScenario {
+                reason: "checkpoint player start tiles do not match scenario map starts".to_string(),
+            });
+        }
         if game.seed() != seed {
             return Err(LabError::InvalidScenario {
                 reason: "checkpoint scenario seed does not match payload seed".to_string(),
