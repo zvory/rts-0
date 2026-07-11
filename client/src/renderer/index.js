@@ -219,12 +219,6 @@ export class Renderer {
       shotRevealShadows: new Map(),
       shotReveals: new Map(),
     };
-    this._graphicsRenderKeys = {
-      resources: new Map(),
-      buildingShadows: new Map(),
-      buildings: new Map(),
-      buildingOverlays: new Map(),
-    };
     // Ids touched this frame, per pool, so we can hide stale entries afterwards.
     this._seen = {};
     for (const key of Object.keys(this._pools)) this._seen[key] = new Set();
@@ -628,7 +622,6 @@ export class Renderer {
       this._recordRenderDiagnostic(`renderer.redraw.failed.${safeLabel}`);
       this._recordRenderError(`${label}:${entity?.kind || "unknown"}`, err);
       try {
-        this._graphicsRenderKeys?.[fallbackPool]?.delete?.(entity?.id);
         this._drawMissingTexture(entity, fallbackPool);
       } catch (fallbackErr) {
         this._recordRenderError(`${label}:missingTexture`, fallbackErr);
@@ -1014,7 +1007,6 @@ export class Renderer {
       this._missToastPool.clear();
     }
     this._unseen.clear();
-    for (const keys of Object.values(this._graphicsRenderKeys || {})) keys.clear();
     this._fogRenderKey = null;
     this._fogRenderMap = null;
     this._setupVisuals.clear();

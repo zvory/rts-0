@@ -1032,7 +1032,7 @@ function polygonAxisValues(points, offset) {
     const retryResource = { id: 603, kind: KIND.OIL, x: 112, y: 48, remaining: 800 };
     renderer._drawResource(retryResource, { isVisible: () => true });
     const retryGfx = renderer._pools.resources.get(retryResource.id);
-    const warmResourceKey = renderer._graphicsRenderKeys.resources.get(retryResource.id);
+    const warmResourceKey = retryGfx.rtsStaticRenderKey;
     const warmResourceCalls = retryGfx.calls.length;
     retryResource.remaining = 400;
     const retryDrawRect = retryGfx.drawRect.bind(retryGfx);
@@ -1055,7 +1055,7 @@ function polygonAxisValues(points, offset) {
       console.error = priorConsoleError;
     }
     assert(
-      !renderer._graphicsRenderKeys.resources.has(retryResource.id),
+      retryGfx.rtsStaticRenderKey === undefined,
       "failed warm-cache redraw discards the old resource key before fallback geometry",
     );
     const fallbackCalls = retryGfx.calls.length;
@@ -1064,7 +1064,7 @@ function polygonAxisValues(points, offset) {
     });
     assert(retryDraw === true, "resource geometry retries successfully on the next frame");
     assert(
-      renderer._graphicsRenderKeys.resources.has(retryResource.id) && retryGfx.calls.length > fallbackCalls,
+      retryGfx.rtsStaticRenderKey !== undefined && retryGfx.calls.length > fallbackCalls,
       "successful resource retry replaces fallback geometry and commits its key",
     );
     const successfulRetryCalls = retryGfx.calls.length;
@@ -1073,7 +1073,7 @@ function polygonAxisValues(points, offset) {
     retryResource.remaining = 800;
     renderer._drawResource(retryResource, { isVisible: () => true });
     assert(
-      renderer._graphicsRenderKeys.resources.get(retryResource.id) === warmResourceKey
+      retryGfx.rtsStaticRenderKey === warmResourceKey
         && retryGfx.calls.length > successfulRetryCalls
         && successfulRetryCalls > warmResourceCalls,
       "resource state reversion redraws and recommits the original warm-cache key",
@@ -1131,7 +1131,8 @@ function polygonAxisValues(points, offset) {
       prodQueue: 0,
     };
     renderer._drawBuilding(rigBuilding, new Map([[2, 0xc85050]]), buildingState);
-    assert(renderer._graphicsRenderKeys.buildings.has(rigBuilding.id), "building rig starts from a warm static wrapper cache");
+    const rigWrapper = renderer._pools.buildings.get(rigBuilding.id);
+    assert(rigWrapper.rtsStaticRenderKey !== undefined, "building rig starts from a warm static wrapper cache");
     const rigInstance = renderer._liveRigPools.buildingRigs.get(rigBuilding.id);
     const rigUpdate = rigInstance.update.bind(rigInstance);
     rigInstance.update = () => { throw new Error("transient building rig failure"); };
@@ -1147,14 +1148,14 @@ function polygonAxisValues(points, offset) {
       rigInstance.update = rigUpdate;
     }
     assert(
-      !renderer._graphicsRenderKeys.buildings.has(rigBuilding.id),
+      rigWrapper.rtsStaticRenderKey === undefined,
       "building fallback invalidates an existing static wrapper key",
     );
     const rigRetry = renderer._drawEntitySafely("building", rigBuilding, "buildings", () => {
       renderer._drawBuilding(rigBuilding, new Map([[2, 0xc85050]]), buildingState);
     });
     assert(
-      rigRetry === true && renderer._graphicsRenderKeys.buildings.has(rigBuilding.id),
+      rigRetry === true && rigWrapper.rtsStaticRenderKey !== undefined,
       "building rig retry clears fallback geometry and recommits its static wrapper key",
     );
 
@@ -1237,10 +1238,10 @@ function polygonAxisValues(points, offset) {
 
     renderer._seen.resources.clear();
     for (let frame = 0; frame < 120; frame += 1) renderer._sweep();
-    assert(!renderer._graphicsRenderKeys.resources.has(resource.id), "resource cache key is evicted with its Graphics slot");
+    assert(!renderer._pools.resources.has(resource.id), "resource cache state is evicted with its Graphics slot");
     renderer.destroy();
     assert(
-      Object.values(renderer._graphicsRenderKeys).every((keys) => keys.size === 0) && renderer._fogRenderKey === null,
+      renderer._fogRenderKey === null,
       "renderer destroy clears static Graphics and fog render keys",
     );
   } finally {

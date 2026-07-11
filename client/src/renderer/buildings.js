@@ -66,18 +66,18 @@ export function _drawBuilding(e, colorByOwner, state) {
     : buildingRigDefinitionFor(this._buildingRigDefinitions, e.kind);
 
   // Shadow (slightly offset, under buildings).
-  const shadowSlot = this._staticSlot?.(
+  const shadowKey = `${e.x}|${e.y}|${w}|${h}`;
+  const sh = this._staticSlot?.(
     "buildingShadows",
     e.id,
-    `${e.x}|${e.y}|${w}|${h}`,
-  ) || { g: this._slot("buildingShadows", e.id), redraw: true, commit: () => {} };
-  const sh = shadowSlot.g;
+    shadowKey,
+  ) || this._slot("buildingShadows", e.id);
   sh.position.set(0, 0);
-  if (shadowSlot.redraw) {
+  if (sh.rtsStaticRedraw !== false) {
     sh.beginFill(COLORS.shadow, 0.3);
     sh.drawRect(x0 + 4, y0 + 6, w, h);
     sh.endFill();
-    shadowSlot.commit();
+    sh.rtsStaticRenderKey = shadowKey;
   }
 
   const tint = e.kind !== KIND.TANK_TRAP && !definition
@@ -88,14 +88,13 @@ export function _drawBuilding(e, colorByOwner, state) {
     : definition
       ? `rig|${e.kind}`
       : `fallback|${e.kind}|${e.x}|${e.y}|${w}|${h}|${bodyAlpha}|${tint}`;
-  const bodySlot = this._staticSlot?.("buildings", e.id, bodyKey)
-    || { g: this._slot("buildings", e.id), redraw: true, commit: () => {} };
-  const g = bodySlot.g;
+  const g = this._staticSlot?.("buildings", e.id, bodyKey)
+    || this._slot("buildings", e.id);
   g.position.set(0, 0);
   if (e.kind === KIND.TANK_TRAP) {
-    if (bodySlot.redraw) {
+    if (g.rtsStaticRedraw !== false) {
       drawTankTrap(g, e.x, e.y, ts, e.id, bodyAlpha);
-      bodySlot.commit();
+      g.rtsStaticRenderKey = bodyKey;
     }
   } else {
     // SVG rig body — look up the compiled definition and route it through the
@@ -106,8 +105,8 @@ export function _drawBuilding(e, colorByOwner, state) {
         routes: [{ poolName: "buildingRigs", layerName: "buildings" }],
         alpha: bodyAlpha,
       });
-      if (bodySlot.redraw) bodySlot.commit();
-    } else if (bodySlot.redraw) {
+      if (g.rtsStaticRedraw !== false) g.rtsStaticRenderKey = bodyKey;
+    } else if (g.rtsStaticRedraw !== false) {
       g.lineStyle(2, 0x1a1712, underConstruction ? 0.55 : 0.95);
       g.beginFill(0x2b2a23, bodyAlpha);
       g.drawRect(x0, y0, w, h);
@@ -136,7 +135,7 @@ export function _drawBuilding(e, colorByOwner, state) {
         g.drawRect(x0 + w * 0.22, y0 + h * 0.5, w * 0.56, h * 0.12);
       }
       g.endFill();
-      bodySlot.commit();
+      g.rtsStaticRenderKey = bodyKey;
     }
 
     // Stencil label — pooled Text reused per building id (see _icon).
@@ -144,14 +143,14 @@ export function _drawBuilding(e, colorByOwner, state) {
   }
 
   if (typeof e.prodProgress === "number" && e.prodProgress > 0) {
-    const overlaySlot = this._staticSlot?.(
+    const overlayKey = `${e.x}|${y0}|${w}|${e.prodProgress}`;
+    const overlay = this._staticSlot?.(
       "buildingOverlays",
       e.id,
-      `${e.x}|${y0}|${w}|${e.prodProgress}`,
-    ) || { g: this._slot("buildingOverlays", e.id), redraw: true, commit: () => {} };
-    const overlay = overlaySlot.g;
+      overlayKey,
+    ) || this._slot("buildingOverlays", e.id);
     overlay.position.set(0, 0);
-    if (overlaySlot.redraw) {
+    if (overlay.rtsStaticRedraw !== false) {
       // Unit production progress bar along the roof line.
       const bw = w * 0.78;
       const bx = e.x - bw / 2;
@@ -162,7 +161,7 @@ export function _drawBuilding(e, colorByOwner, state) {
       overlay.beginFill(COLORS.hpGood);
       overlay.drawRect(bx, by, bw * clamp01(e.prodProgress), 5);
       overlay.endFill();
-      overlaySlot.commit();
+      overlay.rtsStaticRenderKey = overlayKey;
     }
   }
 

@@ -77,6 +77,8 @@ export function _slot(poolName, id) {
   this._seen[poolName].add(id);
   g.visible = true;
   g.alpha = 1;
+  g.rtsStaticRedraw = true;
+  delete g.rtsStaticRenderKey;
   this._recordRenderDiagnostic?.(`renderer.graphics.clear.${poolName}`);
   g.clear();
   return g;
@@ -84,7 +86,6 @@ export function _slot(poolName, id) {
 
 export function _staticSlot(poolName, id, renderKey) {
   const pool = this._pools[poolName];
-  const keys = this._graphicsRenderKeys?.[poolName];
   let g = pool.get(id);
   if (!g) {
     g = new PIXI.Graphics();
@@ -96,20 +97,16 @@ export function _staticSlot(poolName, id, renderKey) {
   g.visible = true;
   g.alpha = 1;
 
-  const redraw = !keys || keys.get(id) !== renderKey;
-  if (redraw) {
-    keys?.delete(id);
+  g.rtsStaticRedraw = g.rtsStaticRenderKey !== renderKey;
+  if (g.rtsStaticRedraw) {
+    delete g.rtsStaticRenderKey;
     this._recordRenderDiagnostic?.(`renderer.cache.miss.${poolName}`);
     this._recordRenderDiagnostic?.(`renderer.graphics.clear.${poolName}`);
     g.clear();
   } else {
     this._recordRenderDiagnostic?.(`renderer.cache.hit.${poolName}`);
   }
-  return {
-    g,
-    redraw,
-    commit: redraw ? () => keys?.set(id, renderKey) : () => {},
-  };
+  return g;
 }
 
 export function _shadow(g, cx, cy, radius) {

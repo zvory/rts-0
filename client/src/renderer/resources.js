@@ -61,14 +61,15 @@ export function _drawResource(e, fog) {
 
   const mined = !!(this._miningNodes && this._miningNodes.has(e.id));
   const remainingKey = Number.isFinite(e.remaining) ? e.remaining : "full";
-  const { g, redraw, commit } = this._staticSlot?.(
+  const renderKey = `${e.kind}|${remainingKey}|${mined ? 1 : 0}`;
+  const g = this._staticSlot?.(
     "resources",
     e.id,
-    `${e.kind}|${remainingKey}|${mined ? 1 : 0}`,
-  ) || { g: this._slot("resources", e.id), redraw: true, commit: () => {} };
+    renderKey,
+  ) || this._slot("resources", e.id);
   g.position.set(e.x, e.y);
   g.alpha = alpha;
-  if (!redraw) return;
+  if (g.rtsStaticRedraw === false) return;
 
   if (e.kind === KIND.OIL) {
     // Fuel drums: utilitarian but faction-neutral.
@@ -121,5 +122,5 @@ export function _drawResource(e, fog) {
     g.moveTo(xr, -xr);
     g.lineTo(-xr, xr);
   }
-  commit();
+  g.rtsStaticRenderKey = renderKey;
 }
