@@ -29,6 +29,8 @@ export async function openLabInteractDriver(options) {
   let tick = 0;
   let closed = false;
   let entities = [];
+  let recording = null;
+  let lastRecording = null;
   const camera = {
     x: 0,
     y: 0,
@@ -142,6 +144,37 @@ export async function openLabInteractDriver(options) {
         },
       };
     },
+    recordingStatus() {
+      return recording ? { active: true, name: recording.name, maxDurationMs: recording.maxDurationMs } : { active: false, last: lastRecording };
+    },
+    async recordStart({ sessionId, name = "recording", maxDurationMs = 10_000, viewport = null, crop = null, scale = 1 }) {
+      if (recording) throw Object.assign(new Error("A recording is already active."), { code: "recordingActive" });
+      recording = { sessionId, name, maxDurationMs, viewport, crop, scale, startTick: tick, operations: [] };
+      return { active: true, name, maxDurationMs, authoritativeStartTick: tick };
+    },
+    recordAcceptedOperation(operation) {
+      if (!recording) return false;
+      recording.operations.push(operation);
+      return true;
+    },
+    async recordStop({ aliases = [] } = {}) {
+      if (!recording) throw Object.assign(new Error("No recording is active."), { code: "recordingInactive" });
+      const directory = `${options.workspaceRoot}/target/lab-interact/${recording.sessionId}/recordings/${recording.name}-fixture`;
+      lastRecording = {
+        active: false,
+        stoppedBy: "explicit",
+        webmPath: `${directory}/${recording.name}.webm`,
+        framePaths: [`${directory}/frames/frame-01.png`, `${directory}/frames/frame-02.png`],
+        contactSheetPath: `${directory}/${recording.name}-contact-sheet.png`,
+        manifestPath: `${directory}/${recording.name}.json`,
+        probe: { codec: "vp9", width: 640, height: 480, frameRate: "30/1", durationSeconds: 1 },
+        frameDiagnostics: { expectedAt30Fps: 30, encoded: 30, droppedEstimate: 0, duplicatedEstimate: 0 },
+        authoritative: { startTick: recording.startTick, endTick: tick },
+        fixtureMetadata: { operations: recording.operations, aliases },
+      };
+      recording = null;
+      return lastRecording;
+    },
     async reset() {
       entities = [];
       tick = 0;
@@ -172,6 +205,7 @@ export async function openLabInteractDriver(options) {
       return { imported: true };
     },
     async close() {
+      recording = null;
       closed = true;
     },
   };

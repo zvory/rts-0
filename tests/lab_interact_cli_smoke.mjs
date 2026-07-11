@@ -65,8 +65,24 @@ try {
   assert.ok(fs.statSync(screenshot.pngPath).size > 4096, "CLI writes a nontrivial PNG artifact");
   const manifest = JSON.parse(fs.readFileSync(screenshot.manifestPath, "utf8"));
   assert.deepEqual(manifest.errors.render, [], "capture manifest reports no render errors");
+  const recordingStarted = call("record-start", {
+    sessionId, name: "cli-smoke-motion", maxDurationMs: 5_000,
+    viewport: { width: 1000, height: 700, deviceScaleFactor: 1 },
+  });
+  assert.equal(recordingStarted.recorder.active, true, "live CLI starts one persistent-page recorder");
   call("order", { sessionId, playerId: 1, command: { c: "move", units: ["shooter"], x: 1088, y: 1088 } });
-  call("time", { sessionId, control: { action: "step", ticks: 3 } });
+  call("time", { sessionId, control: { action: "resume", speed: 1 } });
+  await sleep(1_200);
+  call("time", { sessionId, control: { action: "pause" } });
+  const recording = call("record-stop", { sessionId });
+  assert.equal(recording.probe.codec, "vp9", "live recording probes as VP9");
+  assert.deepEqual({ width: recording.probe.width, height: recording.probe.height }, { width: 1000, height: 700 }, "live WebM records the clean viewport crop");
+  assert.ok(recording.probe.durationSeconds > 0 && recording.probe.durationSeconds <= 6, "live WebM duration stays within the requested bound");
+  assert.ok(fs.existsSync(recording.webmPath) && fs.existsSync(recording.contactSheetPath), "live recording writes WebM and contact sheet artifacts");
+  const recordingManifest = JSON.parse(fs.readFileSync(recording.manifestPath, "utf8"));
+  assert.ok(recordingManifest.authoritative.endTick >= recordingManifest.authoritative.startTick, "recording manifest tracks authoritative tick bounds");
+  assert.ok(recordingManifest.operations.some((entry) => entry.command === "order"), "recording manifest records accepted scene operations");
+  assert.deepEqual(recordingManifest.errors.page, [], "recording manifest reports zero page errors");
   assert.equal(call("inspect", { sessionId, refs: ["shooter", "target"], limit: 2 }).entities.length, 2, "inspection returns authoritative spawned entities");
 
   const closedSessionId = sessionId;
@@ -92,7 +108,7 @@ try {
   fs.rmSync(isolatedTmp, { recursive: true, force: true });
 }
 
-console.log("✅ lab_interact_cli_smoke.mjs: live CLI lifecycle, session reuse/reopen, capture, reset, and cleanup passed");
+console.log("✅ lab_interact_cli_smoke.mjs: live CLI lifecycle, recording/contact sheet, capture, reset, and cleanup passed");
 
 async function waitFor(predicate, timeoutMs, message) {
   const deadline = Date.now() + timeoutMs;
