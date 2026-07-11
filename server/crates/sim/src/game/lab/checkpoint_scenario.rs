@@ -44,7 +44,7 @@ pub struct LabCheckpointScenarioMapData {
     pub size: u32,
     pub terrain: Vec<u8>,
     pub starts: Vec<LabScenarioTile>,
-    #[serde(rename = "expansionSites", alias = "baseSites")]
+    #[serde(rename = "baseSites", alias = "expansionSites")]
     pub base_sites: Vec<LabScenarioTile>,
 }
 
