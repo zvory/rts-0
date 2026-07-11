@@ -65,18 +65,20 @@ impl<'a> OccupancyPhaseCache<'a> {
 
     pub(super) fn snapshot(&mut self, entities: &EntityStore) -> Occupancy<'a> {
         let topology = OccupancyTopology::capture(entities);
-        if self.topology.as_ref() != Some(&topology) || self.occupancy.is_none() {
-            self.occupancy = Some(Occupancy::build(self.map, entities));
-            self.topology = Some(topology);
-            #[cfg(test)]
-            {
-                self.rebuild_count += 1;
+        if self.topology.as_ref() == Some(&topology) {
+            if let Some(occupancy) = &self.occupancy {
+                return occupancy.clone();
             }
         }
-        self.occupancy
-            .as_ref()
-            .cloned()
-            .unwrap_or_else(|| Occupancy::build(self.map, entities))
+
+        let occupancy = Occupancy::build(self.map, entities);
+        self.topology = Some(topology);
+        self.occupancy = Some(occupancy.clone());
+        #[cfg(test)]
+        {
+            self.rebuild_count += 1;
+        }
+        occupancy
     }
 
     #[cfg(test)]
