@@ -267,7 +267,8 @@ import {
   attackHoverInput.clientIntent = new ClientIntent();
   attackHoverInput.mouse = { x: 180, y: 180 };
   attackHoverInput._drag = null;
-  attackHoverInput._worldAt = (x, y) => ({ x, y });
+  attackHoverInput._groundAtScreen = (x, y) => ({ x, y });
+  attackHoverInput._entityAtScreen = () => enemyUnit;
   attackHoverInput.state = {
     playerId: 1,
     map: { tileSize: 32 },
@@ -283,6 +284,7 @@ import {
   );
 
   attackHoverInput.state.entitiesInterpolated = () => [moveUnit];
+  attackHoverInput._entityAtScreen = () => null;
   attackHoverInput._refreshAttackTargetPreview();
   assert(attackHoverInput.clientIntent.attackTargetPreview === null, "attack target preview clears when right-click would move");
 
@@ -295,6 +297,7 @@ import {
     entitiesInterpolated: () => [deconstructWorker, enemyTankTrap],
     selectedEntities: () => [deconstructWorker],
   };
+  attackHoverInput._entityAtScreen = () => enemyTankTrap;
   attackHoverInput._refreshAttackTargetPreview();
   assert(
     attackHoverInput.clientIntent.attackTargetPreview === null,
@@ -674,8 +677,8 @@ import {
   const canvas = { requestPointerLock() {} };
   const canvasInput = Object.create(Input.prototype);
   canvasInput.dom = viewport;
-  canvasInput.renderer = { app: { view: canvas } };
-  assert(canvasInput._pointerLockTarget() === canvas, "Pointer Lock prefers the Pixi canvas target");
+  canvasInput.renderElement = canvas;
+  assert(canvasInput._pointerLockTarget() === canvas, "Pointer Lock prefers the injected render canvas target");
 }
 
 {
@@ -981,10 +984,11 @@ import {
   nativeDragInput._panDrag = null;
   nativeDragInput._drag = null;
   nativeDragInput._postQuickCastSelectionGuard = null;
-  nativeDragInput.renderer = {
-    drawSelectionBox(box) {
+  nativeDragInput.screenOverlay = {
+    setMarquee(box) {
       boxes.push(box);
     },
+    clearMarquee() { boxes.push(null); },
   };
   nativeDragInput._placement = () => null;
   nativeDragInput._commandTarget = () => null;

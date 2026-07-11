@@ -18,7 +18,7 @@ import { ABILITY } from "../../client/src/protocol.js";
   input._drag = null;
   input._dragging = false;
   input._placementDrag = null;
-  input.renderer = { drawSelectionBox() {} };
+  input.screenOverlay = { setMarquee() {}, clearMarquee() {} };
   input._handleControlGroupHotkey = () => false;
   input._issueTargetedCommand = (p, ev) => {
     issuedTargets.push({ issuedAt: p, queued: !!ev.shiftKey });

@@ -42,9 +42,12 @@ import {
   Input,
   footprintValidAgainstEntities,
 } from "../../client/src/input/index.js";
+import { buildSelectionScene } from "../../client/src/input/selection_projection.js";
+import { createOrthographicProjectionSnapshot } from "../../client/src/camera_projection.js";
 import {
   footprintPlacementBlocker,
   movementBodyClass,
+  pointHitsOrientedVehicle,
   placementPolicyForBuilding,
 } from "../../client/src/input/placement.js";
 import {
@@ -64,6 +67,30 @@ import {
 } from "../../client/src/renderer/feedback.js";
 
 import { RecordingGraphics } from "./pixi_fakes.mjs";
+
+function publishSelectionTestScene(input, entities = input.state?.entitiesInterpolated?.(1) || []) {
+  const sourceMap = input.state?.map || {};
+  const map = {
+    width: Number.isFinite(sourceMap.width) ? sourceMap.width : 64,
+    height: Number.isFinite(sourceMap.height) ? sourceMap.height : 64,
+    tileSize: Number.isFinite(sourceMap.tileSize) ? sourceMap.tileSize : 32,
+  };
+  const width = input.dom?.clientWidth || 640;
+  const height = input.dom?.clientHeight || 480;
+  input.selectionScene = buildSelectionScene({
+    entities,
+    tileSize: map.tileSize,
+    projection: createOrthographicProjectionSnapshot({
+      x: 0,
+      y: 0,
+      zoom: 1,
+      worldW: map.width * map.tileSize,
+      worldH: map.height * map.tileSize,
+      viewW: width,
+      viewH: height,
+    }, 1920),
+  });
+}
 
 function commandCardCtx({
   selection = [],
@@ -660,17 +687,8 @@ function buttonByLabel(card, label) {
   });
   const selectionInput = Object.create(Input.prototype);
   selectionInput.state = teamSelectionState;
-  selectionInput.camera = { screenToWorld: (x, y) => ({ x, y }) };
   selectionInput.dom = { clientWidth: 400, clientHeight: 300 };
-  selectionInput._worldAt = Input.prototype._worldAt;
-  selectionInput._entityAtWorld = Input.prototype._entityAtWorld;
-  selectionInput._worldPointHitsEntity = Input.prototype._worldPointHitsEntity;
-  selectionInput._entityIntersectsRect = Input.prototype._entityIntersectsRect;
-  selectionInput._closestIdsToPoint = Input.prototype._closestIdsToPoint;
-  selectionInput._commitClickSelection = Input.prototype._commitClickSelection;
-  selectionInput._commitBoxSelection = Input.prototype._commitBoxSelection;
-  selectionInput._ownBuildingsOfKindInViewport = Input.prototype._ownBuildingsOfKindInViewport;
-  selectionInput._closestOwnUnitKindInViewport = Input.prototype._closestOwnUnitKindInViewport;
+  publishSelectionTestScene(selectionInput);
   selectionInput._commitClickSelection({ x: allyWorker.x, y: allyWorker.y }, false, false);
   assert(
     Array.from(teamSelectionState.selection).join(",") === String(allyWorker.id),
@@ -763,17 +781,8 @@ function buttonByLabel(card, label) {
   });
   const budgetSelectionInput = Object.create(Input.prototype);
   budgetSelectionInput.state = budgetInputState;
-  budgetSelectionInput.camera = selectionInput.camera;
   budgetSelectionInput.dom = selectionInput.dom;
-  budgetSelectionInput._worldAt = Input.prototype._worldAt;
-  budgetSelectionInput._entityAtWorld = Input.prototype._entityAtWorld;
-  budgetSelectionInput._worldPointHitsEntity = Input.prototype._worldPointHitsEntity;
-  budgetSelectionInput._entityIntersectsRect = Input.prototype._entityIntersectsRect;
-  budgetSelectionInput._closestIdsToPoint = Input.prototype._closestIdsToPoint;
-  budgetSelectionInput._commitClickSelection = Input.prototype._commitClickSelection;
-  budgetSelectionInput._commitBoxSelection = Input.prototype._commitBoxSelection;
-  budgetSelectionInput._ownBuildingsOfKindInViewport = Input.prototype._ownBuildingsOfKindInViewport;
-  budgetSelectionInput._closestOwnUnitKindInViewport = Input.prototype._closestOwnUnitKindInViewport;
+  publishSelectionTestScene(budgetSelectionInput);
   budgetSelectionInput._commitBoxSelection({ x0: 0, y0: 124, x1: 140, y1: 156 }, false);
   assert(
     Array.from(budgetInputState.selection).length === BASE_COMMAND_SUPPLY_CAP,
@@ -793,11 +802,8 @@ function buttonByLabel(card, label) {
   const alliedRightClickCommands = [];
   const rightClickInput = Object.create(Input.prototype);
   rightClickInput.state = teamSelectionState;
-  rightClickInput.camera = selectionInput.camera;
-  rightClickInput._worldAt = Input.prototype._worldAt;
-  rightClickInput._entityAtWorld = Input.prototype._entityAtWorld;
-  rightClickInput._worldPointHitsEntity = Input.prototype._worldPointHitsEntity;
-  rightClickInput._resourceAtWorld = Input.prototype._resourceAtWorld;
+  rightClickInput.dom = selectionInput.dom;
+  publishSelectionTestScene(rightClickInput);
   rightClickInput._selectedOwnUnitIds = Input.prototype._selectedOwnUnitIds;
   rightClickInput._selectedGathererIds = Input.prototype._selectedGathererIds;
   rightClickInput._selectedWorkerIds = Input.prototype._selectedWorkerIds;
@@ -923,6 +929,7 @@ function buttonByLabel(card, label) {
   input.state = {
     entitiesInterpolated: () => [worker, other],
   };
+  input._selectionEntities = () => input.state.entitiesInterpolated();
   input._selectedWorkerIds = () => [7, 8];
   assert(
     input._footprintValid(1, 1, 2, 2, map) === false,
@@ -1121,20 +1128,20 @@ function buttonByLabel(card, label) {
 
   const clickableTank = { id: 10, owner: 1, kind: KIND.TANK, x: 0, y: 0, facing: 0 };
   assert(
-    input._worldPointHitsEntity(clickableTank, 25.2, 0, 32) === true,
+    pointHitsOrientedVehicle(clickableTank, 25.2, 0, 3) === true,
     "tank hit testing should reach the long hull axis",
   );
   assert(
-    input._worldPointHitsEntity(clickableTank, 0, 20, 32) === false,
+    pointHitsOrientedVehicle(clickableTank, 0, 20, 3) === false,
     "tank hit testing should not use a stale circular side radius",
   );
   const clickableAntiTankGun = { id: 11, owner: 1, kind: KIND.ANTI_TANK_GUN, x: 0, y: 0, facing: 0 };
   assert(
-    input._worldPointHitsEntity(clickableAntiTankGun, 22, 0, 32) === true,
+    pointHitsOrientedVehicle(clickableAntiTankGun, 22, 0, 0) === true,
     "anti-tank gun hit testing should reach the wheeled body axis",
   );
   assert(
-    input._worldPointHitsEntity(clickableAntiTankGun, 0, 18, 32) === false,
+    pointHitsOrientedVehicle(clickableAntiTankGun, 0, 18, 0) === false,
     "anti-tank gun hit testing should not use the old circular radius",
   );
 
@@ -1149,7 +1156,8 @@ function buttonByLabel(card, label) {
   };
   const rightClickCommands = [];
   input.commandIssuer = { issueCommand(command) { rightClickCommands.push(command); } };
-  input._worldAt = (x, y) => ({ x, y });
+  input._groundAtScreen = (x, y) => ({ x, y });
+  publishSelectionTestScene(input);
   input._onRightClick({ x: 100, y: 100 });
   assert(
     rightClickCommands.length === 1 &&
@@ -1166,6 +1174,7 @@ function buttonByLabel(card, label) {
     selectedEntities: () => [overlappingWorker],
     addCommandFeedback() {},
   };
+  publishSelectionTestScene(input);
   rightClickCommands.length = 0;
   input._onRightClick({ x: 112, y: 112 }, { shiftKey: true });
   assert(
@@ -1186,6 +1195,7 @@ function buttonByLabel(card, label) {
     selectedEntities: () => [moveUnit],
     addCommandFeedback() {},
   };
+  publishSelectionTestScene(input);
   rightClickCommands.length = 0;
   input._onRightClick({ x: 180, y: 180 }, { shiftKey: true });
   assert(
@@ -1197,6 +1207,7 @@ function buttonByLabel(card, label) {
 
   const enemyUnit = { id: 41, owner: 2, kind: KIND.RIFLEMAN, x: 180, y: 180 };
   input.state.entitiesInterpolated = () => [moveUnit, enemyUnit];
+  publishSelectionTestScene(input);
   rightClickCommands.length = 0;
   input._onRightClick({ x: 180, y: 180 }, { shiftKey: true });
   assert(
@@ -1214,6 +1225,7 @@ function buttonByLabel(card, label) {
     selectedEntities: () => [deconstructWorker],
     addCommandFeedback() {},
   };
+  publishSelectionTestScene(input);
   rightClickCommands.length = 0;
   input._onRightClick({ x: 180, y: 180 }, { shiftKey: true });
   assert(
@@ -1254,6 +1266,7 @@ function buttonByLabel(card, label) {
     playerId: 1,
     entitiesInterpolated: () => [deployedAntiTankGun, otherDeployedAntiTankGun, packedAntiTankGun],
   };
+  publishSelectionTestScene(input);
   assert(
     input
       ._closestOwnUnitKindInViewport(
@@ -1287,19 +1300,23 @@ function buttonByLabel(card, label) {
   hotkeyInput.state = {
     spectator: false,
     selection: new Set([1, 2]),
+    controlGroups: Array.from({ length: 10 }, () => []),
     setControlGroup(slot, ids) {
-      hotkeyCalls.push({ type: "set", slot, ids: Array.from(ids) });
-      return Array.from(ids);
+      const values = Array.from(ids);
+      this.controlGroups[slot] = values;
+      hotkeyCalls.push({ type: "set", slot, ids: values });
+      return values;
     },
     addToControlGroup(slot, ids) {
       hotkeyCalls.push({ type: "add", slot, ids: Array.from(ids) });
       return Array.from(ids);
     },
-    selectControlGroup(slot) {
-      hotkeyCalls.push({ type: "select", slot });
-      return [1, 2];
+    setSelection(ids) {
+      this.selection = new Set(ids);
+      hotkeyCalls.push({ type: "select" });
     },
   };
+  hotkeyInput._visibleSelectionIds = (ids) => Array.from(ids);
   hotkeyInput._lastControlGroupTap = null;
   hotkeyInput._jumpToControlGroupCluster = (slot) => hotkeyCalls.push({ type: "jump", slot });
   const keyEvent = (code, mods = {}) => ({
@@ -1389,10 +1406,10 @@ function buttonByLabel(card, label) {
     playerId: 1,
   };
   targetedInput.clientIntent = targetedIntent;
-  targetedInput.renderer = { drawSelectionBox() {} };
+  targetedInput.screenOverlay = { setMarquee() {}, clearMarquee() {} };
   targetedInput.commandIssuer = { issueCommand: (command) => sentCommands.push(command) };
-  targetedInput._worldAt = (x, y) => ({ x, y });
-  targetedInput._entityAtWorld = () => ownBuilding;
+  targetedInput._groundAtScreen = (x, y) => ({ x, y });
+  targetedInput._entityAtScreen = () => ownBuilding;
   targetedInput._selectedOwnUnitIds = () => [7];
   targetedInput._commitClickSelection = (p) => selectionClicks.push(p);
   targetedInput._screenPos = (ev) => ({ x: ev.clientX, y: ev.clientY });
@@ -1417,7 +1434,7 @@ function buttonByLabel(card, label) {
 
   targetedInput.clientIntent.endCommandTarget();
   targetedInput._drag = null;
-  targetedInput._entityAtWorld = () => null;
+  targetedInput._entityAtScreen = () => null;
   targetedInput._onLeftDown({ x: 240, y: 240 }, {});
   targetedInput._handleMouseUp({
     button: 0,
@@ -1437,14 +1454,14 @@ function buttonByLabel(card, label) {
   assert(lastSent.queued === true, "Shift move targeting should queue movement");
 
   targetedInput.clientIntent.beginCommandTarget("attack");
-  targetedInput._entityAtWorld = () => null;
+  targetedInput._entityAtScreen = () => null;
   targetedInput._onLeftDown({ x: 280, y: 280 }, { shiftKey: true });
   lastSent = sentCommands[sentCommands.length - 1];
   assert(lastSent.c === "attackMove", "attack targeting terrain should attack-move");
   assert(lastSent.queued === true, "Shift attack-move targeting should queue attack-move");
 
   targetedInput.clientIntent.beginCommandTarget("attack");
-  targetedInput._entityAtWorld = () => ({ id: 99, owner: 2, kind: KIND.RIFLEMAN, x: 300, y: 300 });
+  targetedInput._entityAtScreen = () => ({ id: 99, owner: 2, kind: KIND.RIFLEMAN, x: 300, y: 300 });
   targetedInput._onLeftDown({ x: 300, y: 300 }, { shiftKey: true });
   lastSent = sentCommands[sentCommands.length - 1];
   assert(lastSent.c === "attack", "attack targeting an enemy should issue attack");
@@ -1455,7 +1472,7 @@ function buttonByLabel(card, label) {
 
   targetedInput.clientIntent.beginCommandTarget("attack");
   targetedInput.clientIntent.holdCommandTarget("attack", "KeyA", true);
-  targetedInput._entityAtWorld = () => null;
+  targetedInput._entityAtScreen = () => null;
   targetedInput._onLeftDown({ x: 320, y: 320 }, { shiftKey: true });
   assert(
     targetedInput.clientIntent.commandTarget === "attack",
@@ -1493,7 +1510,7 @@ function buttonByLabel(card, label) {
   hotkeyTargetedInput._drag = null;
   hotkeyTargetedInput._dragging = false;
   hotkeyTargetedInput._placementDrag = null;
-  hotkeyTargetedInput.renderer = { drawSelectionBox() {} };
+  hotkeyTargetedInput.screenOverlay = { setMarquee() {}, clearMarquee() {} };
   hotkeyTargetedInput._handleControlGroupHotkey = () => false;
   hotkeyTargetedInput._quickCastCommandTarget = (ev) => {
     hotkeyIssues.push({ shiftKey: !!ev.shiftKey, mouse: hotkeyTargetedInput.mouse });
@@ -1752,7 +1769,7 @@ function buttonByLabel(card, label) {
   };
   ekatInput.clientIntent = new ClientIntent();
   ekatInput.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.EKAT_LINE_SHOT });
-  ekatInput._worldAt = (x, y) => ({ x, y });
+  ekatInput._groundAtScreen = (x, y) => ({ x, y });
   ekatInput._refreshAbilityTargetPreview();
   assert(ekatInput.clientIntent.abilityTargetPreview?.pathOrigins.length === 2, "Ekat line preview includes caster plus owned anchor origin");
   assert(
@@ -1791,7 +1808,7 @@ function buttonByLabel(card, label) {
   };
   returnInput.clientIntent = new ClientIntent();
   returnInput.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.EKAT_TELEPORT });
-  returnInput._worldAt = (x, y) => ({ x, y });
+  returnInput._groundAtScreen = (x, y) => ({ x, y });
   returnInput._refreshAbilityTargetPreview();
   assert(returnInput.clientIntent.abilityTargetPreview?.returnMarkers[0]?.id === 903, "Ekat dash preview exposes owned return marker preview");
 

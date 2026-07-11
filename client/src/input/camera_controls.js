@@ -115,7 +115,7 @@ export function _handleBlur() {
   if (this._drag) {
     this._drag = null;
     this._dragging = false;
-    this.renderer.drawSelectionBox(null);
+    this.screenOverlay?.clearMarquee?.();
   }
 }
 

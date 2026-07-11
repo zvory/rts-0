@@ -1,21 +1,60 @@
-import { isUnit, isBuilding, isResource, KIND, SETUP } from "../protocol.js";
-import { STATS } from "../config.js";
-import { DEFAULT_HIT_RADIUS, DEFAULT_TILE_SIZE, HIT_PAD_PX, OWN_HIT_BONUS } from "./constants.js";
+import { isBuilding, isResource, isUnit, KIND, SETUP } from "../protocol.js";
 import {
-  hasOrientedSelectionBody,
-  pointHitsOrientedVehicle,
-  selectionEntityIntersectsRect,
-} from "./placement.js";
+  groundCoverageForScreenRect,
+  pickSelectionProxy,
+  proxyIntersectsViewport,
+  selectionProxiesInScreenRect,
+} from "./selection_projection.js";
+
+export function publishSelectionScene(scene) {
+  if (!scene || scene.version !== 1 || !Array.isArray(scene.proxies) || !scene.projection) return false;
+  this.selectionScene = scene;
+  return true;
+}
+
+export function _groundAtScreen(sx, sy) {
+  const groundAtScreen = this.selectionScene?.projection?.groundAtScreen;
+  if (typeof groundAtScreen !== "function") return null;
+  let point;
+  try {
+    point = groundAtScreen({ x: sx, y: sy });
+  } catch {
+    return null;
+  }
+  return finiteClampedGroundPoint(this, point);
+}
+
+export function _entityAtScreen(screen, ownPreferred = false, eligible = () => true) {
+  const proxy = pickSelectionProxy(this.selectionScene, screen, {
+    eligible: (candidate) => eligible(entityForProxy(candidate), candidate),
+    preference: (candidate) => ownPreferred && ownOwner(this.state, candidate.owner) ? 1 : 0,
+  });
+  return entityForProxy(proxy);
+}
+
+export function _resourceAtScreen(screen) {
+  return this._entityAtScreen(screen, false, (entity) => isResource(entity?.kind) && entity.remaining !== 0);
+}
+
+export function _selectionEntityById(id) {
+  const proxy = (this.selectionScene?.proxies || []).find((candidate) => candidate.id === id);
+  return entityForProxy(proxy);
+}
+
+export function _selectionEntities() {
+  return (this.selectionScene?.proxies || []).map(entityForProxy).filter(Boolean);
+}
 
 export function _commitClickSelection(p, additive, ctrl) {
-  const world = this._worldAt(p.x, p.y);
-  const hit = this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ true);
-  if (!hit || (hit.kind === KIND.SCOUT_PLANE && !scoutPlaneInspectable(this.state))) {
+  const hit = this._entityAtScreen(p, true, (entity) => (
+    entity?.kind !== KIND.SCOUT_PLANE || scoutPlaneInspectable(this.state)
+  ));
+  if (!hit) {
     if (!additive) clearSelection(this);
     return;
   }
   if (ctrl && isUnit(hit.kind) && ownOwner(this.state, hit.owner)) {
-    const ids = this._closestOwnUnitKindInViewport(hit.kind, hit.x, hit.y, hit);
+    const ids = this._closestOwnUnitKindInViewport(hit);
     if (additive) addToSelection(this, ids);
     else setSelection(this, ids);
     return;
@@ -31,78 +70,58 @@ export function _commitClickSelection(p, additive, ctrl) {
     else addToSelection(this, [hit.id]);
     return;
   }
-  else setSelection(this, [hit.id]);
+  setSelection(this, [hit.id]);
 }
 
 export function _ownBuildingsOfKindInViewport(kind) {
-  const el = this.dom;
-  const w = el.clientWidth;
-  const h = el.clientHeight;
-  const topLeft = this.camera.screenToWorld(0, 0);
-  const botRight = this.camera.screenToWorld(w, h);
-  const minX = Math.min(topLeft.x, botRight.x);
-  const maxX = Math.max(topLeft.x, botRight.x);
-  const minY = Math.min(topLeft.y, botRight.y);
-  const maxY = Math.max(topLeft.y, botRight.y);
-  return this.state
-    .entitiesInterpolated(1)
-    .filter(
-      (e) =>
-        ownOwner(this.state, e.owner) &&
-        e.kind === kind &&
-        e.x >= minX && e.x <= maxX &&
-        e.y >= minY && e.y <= maxY,
-    )
+  return (this.selectionScene?.proxies || [])
+    .filter((proxy) => ownOwner(this.state, proxy.owner) && proxy.kind === kind)
+    .filter((proxy) => proxyIntersectsViewport(this.selectionScene, proxy))
     .sort((a, b) => a.id - b.id)
-    .map((e) => e.id);
+    .map((proxy) => proxy.id);
 }
 
-export function _unitSelectionGroup(e) {
-  if (!e) return "";
-  if (e.kind !== KIND.ANTI_TANK_GUN) return e.kind;
-  return `${e.kind}:${e.setupState || SETUP.PACKED}`;
+export function _unitSelectionGroup(entity) {
+  if (!entity) return "";
+  if (entity.kind !== KIND.ANTI_TANK_GUN) return entity.kind;
+  return `${entity.kind}:${entity.setupState || SETUP.PACKED}`;
 }
 
-export function _closestOwnUnitKindInViewport(kind, anchorX, anchorY, anchor = null) {
-  const el = this.dom;
-  const w = el.clientWidth;
-  const h = el.clientHeight;
-  const topLeft = this.camera.screenToWorld(0, 0);
-  const botRight = this.camera.screenToWorld(w, h);
-  const minX = Math.min(topLeft.x, botRight.x);
-  const maxX = Math.max(topLeft.x, botRight.x);
-  const minY = Math.min(topLeft.y, botRight.y);
-  const maxY = Math.max(topLeft.y, botRight.y);
+export function _closestOwnUnitKindInViewport(anchorOrKind, anchorX, anchorY, explicitAnchor = null) {
+  const anchor = explicitAnchor || (typeof anchorOrKind === "object" ? anchorOrKind : null);
+  const kind = anchor?.kind || anchorOrKind;
   const anchorGroup = anchor ? _unitSelectionGroup(anchor) : kind;
-  return this.state
-    .entitiesInterpolated(1)
-    .filter(
-      (e) =>
-        ownOwner(this.state, e.owner) &&
-        (anchor ? _unitSelectionGroup(e) === anchorGroup : e.kind === kind) &&
-        e.x >= minX && e.x <= maxX &&
-        e.y >= minY && e.y <= maxY,
-    )
-    .sort((a, b) => {
-      const da = Math.hypot(a.x - anchorX, a.y - anchorY);
-      const db = Math.hypot(b.x - anchorX, b.y - anchorY);
-      return da - db || a.id - b.id;
+  const anchorProxy = anchor
+    ? (this.selectionScene?.proxies || []).find((proxy) => proxy.id === anchor.id)
+    : null;
+  const projectedAnchor = this.selectionScene?.projection?.project?.({
+    x: anchor?.x ?? anchorX,
+    y: anchor?.y ?? anchorY,
+    heightPx: anchorProxy?.anchor?.heightPx || 0,
+  });
+  return (this.selectionScene?.proxies || [])
+    .filter((proxy) => ownOwner(this.state, proxy.owner) && (
+      anchor ? _unitSelectionGroup(entityForProxy(proxy)) === anchorGroup : proxy.kind === kind
+    ))
+    .filter((proxy) => proxyIntersectsViewport(this.selectionScene, proxy))
+    .map((proxy) => {
+      const projected = this.selectionScene.projection.project(proxy.anchor);
+      return {
+        id: proxy.id,
+        distance: Number.isFinite(projectedAnchor?.x) && Number.isFinite(projectedAnchor?.y)
+          ? Math.hypot(projected.x - projectedAnchor.x, projected.y - projectedAnchor.y)
+          : 0,
+      };
     })
-    .map((e) => e.id);
+    .sort((a, b) => a.distance - b.distance || a.id - b.id)
+    .map(({ id }) => id);
 }
 
 export function _commitBoxSelection(drag, additive) {
-  const entities = _selectableEntitiesInDragRect.call(this, drag);
-  const units = [];
-  const buildings = [];
-  for (const e of entities) {
-    if (isUnit(e.kind)) units.push(e.id);
-    else if (isBuilding(e.kind)) buildings.push(e.id);
-  }
-
-  const picked = units.length > 0
-    ? this._closestIdsToPoint(units, drag.x0, drag.y0)
-    : buildings;
+  const proxies = _selectableProxiesInDragRect.call(this, drag);
+  const units = proxies.filter((proxy) => isUnit(proxy.kind)).map((proxy) => proxy.id);
+  const buildings = proxies.filter((proxy) => isBuilding(proxy.kind)).map((proxy) => proxy.id);
+  const picked = units.length > 0 ? units : buildings;
   if (picked.length === 0) {
     if (!additive) clearSelection(this);
     return;
@@ -111,72 +130,38 @@ export function _commitBoxSelection(drag, additive) {
   else setSelection(this, picked);
 }
 
-export function _dragWorldRect(drag) {
-  const a = this._worldAt(Math.min(drag.x0, drag.x1), Math.min(drag.y0, drag.y1));
-  const b = this._worldAt(Math.max(drag.x0, drag.x1), Math.max(drag.y0, drag.y1));
-  return {
-    minX: Math.min(a.x, b.x),
-    maxX: Math.max(a.x, b.x),
-    minY: Math.min(a.y, b.y),
-    maxY: Math.max(a.y, b.y),
-  };
-}
-
-export function _selectableEntitiesInDragRect(drag, options = {}) {
-  const { minX, minY, maxX, maxY } = _dragWorldRect.call(this, drag);
-  const entities = this.state.entitiesInterpolated(1);
-  const spectator = !!this.state.spectator;
-  const unitsOnly = !!options.unitsOnly;
-  const buildingsOnly = !!options.buildingsOnly;
-
-  return entities.filter((e) => {
-    if (e.shotReveal || e.visionOnly) return false;
-    if (unitsOnly && !isUnit(e.kind)) return false;
-    if (buildingsOnly && !isBuilding(e.kind)) return false;
-    if (!selectableEntity(this.state, e, spectator)) return false;
-    return this._entityIntersectsRect(e, minX, minY, maxX, maxY);
+export function _selectableProxiesInDragRect(drag, options = {}) {
+  const spectator = !!this.state?.spectator;
+  return selectionProxiesInScreenRect(this.selectionScene, drag, {
+    anchor: { x: drag.x0, y: drag.y0 },
+    eligible: (proxy) => {
+      const entity = entityForProxy(proxy);
+      if (options.unitsOnly && !isUnit(proxy.kind)) return false;
+      if (options.buildingsOnly && !isBuilding(proxy.kind)) return false;
+      return selectableEntity(this.state, entity, spectator);
+    },
   });
 }
 
 export function _selectableEntityIdsInDragRect(drag, options = {}) {
-  const ids = _selectableEntitiesInDragRect.call(this, drag, options).map((entity) => entity.id);
-  return options.sortByAnchor === false ? ids : this._closestIdsToPoint(ids, drag.x0, drag.y0);
+  const ids = _selectableProxiesInDragRect.call(this, drag, options).map((proxy) => proxy.id);
+  return options.sortByAnchor === false ? ids.slice().sort((a, b) => a - b) : ids;
 }
 
-export function _closestIdsToPoint(ids, screenX, screenY) {
-  const anchor = this._worldAt(screenX, screenY);
-  return this.state
-    .entitiesInterpolated(1)
-    .filter((e) => ids.includes(e.id))
-    .sort((a, b) => {
-      const da = Math.hypot(a.x - anchor.x, a.y - anchor.y);
-      const db = Math.hypot(b.x - anchor.x, b.y - anchor.y);
-      return da - db || a.id - b.id;
-    })
-    .map((e) => e.id);
+export function _dragGroundCoverage(drag) {
+  return groundCoverageForScreenRect(this.selectionScene, drag);
 }
 
-export function _entityAtWorld(wx, wy, ownPreferred) {
-  const entities = this.state.entitiesInterpolated(1);
-  const tileSize = this.state.map ? this.state.map.tileSize : DEFAULT_TILE_SIZE;
-
-  let best = null;
-  let bestScore = Infinity; // lower is better (distance, with ownership tiebreak)
-  for (const e of entities) {
-    if (e.shotReveal || e.visionOnly) continue;
-    if (!this._worldPointHitsEntity(e, wx, wy, tileSize)) continue;
-    const dx = wx - e.x;
-    const dy = wy - e.y;
-    const dist = Math.hypot(dx, dy);
-    // Bias toward own entities when requested by subtracting a large bonus.
-    const ownBonus = ownPreferred && ownOwner(this.state, e.owner) ? OWN_HIT_BONUS : 0;
-    const score = dist - ownBonus;
-    if (score < bestScore) {
-      bestScore = score;
-      best = e;
-    }
+export function _visibleSelectionIds(ids) {
+  const presented = new Set((this.selectionScene?.proxies || []).map((proxy) => proxy.id));
+  const out = [];
+  const seen = new Set();
+  for (const id of ids || []) {
+    if (!presented.has(id) || seen.has(id)) continue;
+    out.push(id);
+    seen.add(id);
   }
-  return best;
+  return out;
 }
 
 function ownOwner(state, owner) {
@@ -189,8 +174,9 @@ function ownOwner(state, owner) {
 }
 
 export function selectableEntity(state, entity, spectator) {
+  if (!entity || entity.shotReveal || entity.visionOnly) return false;
   if (state?.controlPolicy?.kind === "lab") return state.controlPolicy.canSelectEntity(entity, state);
-  if (entity?.kind === KIND.SCOUT_PLANE) return scoutPlaneInspectable(state);
+  if (entity.kind === KIND.SCOUT_PLANE) return scoutPlaneInspectable(state);
   if (!spectator) return ownOwner(state, entity.owner);
   return entity.owner !== 0;
 }
@@ -199,19 +185,46 @@ function scoutPlaneInspectable(state) {
   return state?.controlPolicy?.kind === "lab" || !!state?.spectator;
 }
 
+function finiteClampedGroundPoint(input, point) {
+  if (!Number.isFinite(point?.x) || !Number.isFinite(point?.y)) return null;
+  let x = point.x;
+  let y = point.y;
+  const map = input.state?.map;
+  if (map) {
+    const maxX = Number(map.width) * Number(map.tileSize);
+    const maxY = Number(map.height) * Number(map.tileSize);
+    if (Number.isFinite(maxX) && maxX > 0) x = Math.max(0, Math.min(maxX - 1, x));
+    if (Number.isFinite(maxY) && maxY > 0) y = Math.max(0, Math.min(maxY - 1, y));
+  }
+  return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+}
+
+function entityForProxy(proxy) {
+  if (!proxy) return null;
+  return proxy.interaction || {
+    id: proxy.id,
+    kind: proxy.kind,
+    owner: proxy.owner,
+    facing: proxy.facing,
+    setupState: proxy.setupState,
+    x: proxy.anchor?.x,
+    y: proxy.anchor?.y,
+  };
+}
+
 function closeCommandCardMenu(input) {
   input?.clientIntent?.closeCommandCardMenu?.();
 }
 
 function setSelection(input, ids) {
   closeCommandCardMenu(input);
-  input.state.setSelection(ids);
+  input.state.setSelection(ids, { entityById: (id) => input._selectionEntityById(id) });
   reconcileLocalPlannedOrders(input);
 }
 
 function addToSelection(input, ids) {
   closeCommandCardMenu(input);
-  input.state.addToSelection(ids);
+  input.state.addToSelection(ids, { entityById: (id) => input._selectionEntityById(id) });
   reconcileLocalPlannedOrders(input);
 }
 
@@ -229,52 +242,4 @@ function clearSelection(input) {
 
 function reconcileLocalPlannedOrders(input) {
   input?.clientIntent?.clearPlannedOrdersOutsideSelection?.(input.state?.selection || []);
-}
-
-export function _resourceAtWorld(wx, wy) {
-  const entities = this.state.entitiesInterpolated(1);
-  const tileSize = this.state.map ? this.state.map.tileSize : DEFAULT_TILE_SIZE;
-
-  let best = null;
-  let bestDist = Infinity;
-  for (const e of entities) {
-    if (e.shotReveal || e.visionOnly) continue;
-    if (!isResource(e.kind) || e.remaining === 0) continue;
-    if (!this._worldPointHitsEntity(e, wx, wy, tileSize)) continue;
-    const dist = Math.hypot(wx - e.x, wy - e.y);
-    if (dist < bestDist || (dist === bestDist && e.id < best.id)) {
-      bestDist = dist;
-      best = e;
-    }
-  }
-  return best;
-}
-
-export function _worldPointHitsEntity(e, wx, wy, tileSize) {
-  const stat = STATS[e.kind];
-  if (isBuilding(e.kind)) {
-    const halfW = ((stat && stat.footW ? stat.footW : 1) * tileSize) / 2;
-    const halfH = ((stat && stat.footH ? stat.footH : 1) * tileSize) / 2;
-    return (
-      wx >= e.x - halfW - HIT_PAD_PX &&
-      wx <= e.x + halfW + HIT_PAD_PX &&
-      wy >= e.y - halfH - HIT_PAD_PX &&
-      wy <= e.y + halfH + HIT_PAD_PX
-    );
-  }
-  if (e.kind === KIND.ANTI_TANK_GUN) return pointHitsOrientedVehicle(e, wx, wy, 0);
-  if (hasOrientedSelectionBody(e.kind)) return pointHitsOrientedVehicle(e, wx, wy, HIT_PAD_PX);
-  const radius = (stat && stat.size ? stat.size : DEFAULT_HIT_RADIUS) + HIT_PAD_PX;
-  return Math.hypot(wx - e.x, wy - e.y) <= radius;
-}
-
-export function _entityIntersectsRect(e, minX, minY, maxX, maxY) {
-  return selectionEntityIntersectsRect(
-    e,
-    minX,
-    minY,
-    maxX,
-    maxY,
-    this.state.map ? this.state.map.tileSize : DEFAULT_TILE_SIZE,
-  );
 }

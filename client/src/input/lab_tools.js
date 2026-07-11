@@ -1,7 +1,7 @@
 import { clearPostQuickCastSelectionGuard } from "./quick_cast_selection_guard.js";
 import { isUnit } from "../protocol.js";
 import {
-  _dragWorldRect,
+  _dragGroundCoverage,
   _selectableEntityIdsInDragRect,
   selectableEntity,
 } from "./selection.js";
@@ -43,8 +43,11 @@ export function _consumeLabToolWorldClick(p, ev) {
   const intent = this._intent();
   const tool = intent?.activeLabTool || null;
   if (!tool) return false;
-  const world = this._worldAt(p.x, p.y);
-  return consumeLabToolWorldPoint.call(this, tool, world, p, ev);
+  const ground = this._groundAtScreen(p.x, p.y);
+  const entity = _labToolEntityAtScreen.call(this, p, tool);
+  const world = ground || (entity && labToolTargetsEntities(tool) ? { x: entity.x, y: entity.y } : null);
+  if (!world) return false;
+  return consumeLabToolWorldPoint.call(this, tool, world, p, ev, entity);
 }
 
 /**
@@ -57,8 +60,8 @@ export function _paintLabToolStroke(drag, p, ev) {
   if (!tool || tool.id !== drag?.labToolId || !drag?.labToolPaintsOnDrag) return false;
 
   const fromScreen = drag.labToolLastPaintScreen || { x: drag.x0, y: drag.y0 };
-  const from = this._worldAt(fromScreen.x, fromScreen.y);
-  const to = this._worldAt(p.x, p.y);
+  const from = this._groundAtScreen(fromScreen.x, fromScreen.y);
+  const to = this._groundAtScreen(p.x, p.y);
   if (!finitePoint(from) || !finitePoint(to)) return false;
 
   const tileSize = labToolPaintTileSize(this);
@@ -80,7 +83,7 @@ export function _paintLabToolStroke(drag, p, ev) {
       x: (tileX + 0.5) * tileSize,
       y: (tileY + 0.5) * tileSize,
     };
-    if (!consumeLabToolWorldPoint.call(this, tool, center, p, ev)) break;
+    if (!consumeLabToolWorldPoint.call(this, tool, center, p, ev, null)) break;
     if (this._labTool()?.id !== tool.id) break;
   }
   drag.labToolLastPaintScreen = { x: p.x, y: p.y };
@@ -100,14 +103,21 @@ export function _refreshLabToolPreview() {
     intent?.updateLabToolPreview?.(null);
     return null;
   }
-  const world = this._worldAt(screen.x, screen.y);
-  return intent?.updateLabToolPreview?.({ toolId: tool.id, x: world?.x, y: world?.y }) || null;
+  const entity = _labToolEntityAtScreen.call(this, screen, tool);
+  const world = this._groundAtScreen(screen.x, screen.y) || (
+    entity && labToolTargetsEntities(tool) ? { x: entity.x, y: entity.y } : null
+  );
+  if (!world) {
+    intent?.updateLabToolPreview?.(null);
+    return null;
+  }
+  return intent?.updateLabToolPreview?.({ toolId: tool.id, x: world.x, y: world.y }) || null;
 }
 
-function consumeLabToolWorldPoint(tool, world, screen, ev) {
+function consumeLabToolWorldPoint(tool, world, screen, ev, pickedEntity = undefined) {
   const intent = this._intent();
   if (!tool || intent?.activeLabTool?.id !== tool.id || !finitePoint(world)) return false;
-  const entity = _labToolEntityAtWorld.call(this, world, tool);
+  const entity = pickedEntity === undefined ? _labToolEntityAtScreen.call(this, screen, tool) : pickedEntity;
   const event = {
     tool,
     x: world.x,
@@ -132,12 +142,13 @@ function consumeLabToolWorldPoint(tool, world, screen, ev) {
 export function _finishLabToolBoxSelection(drag, ev) {
   const tool = this._labTool();
   if (!tool || tool.id !== drag.labToolId || !labToolConsumesBoxSelection(tool)) return false;
-  const worldRect = _dragWorldRect.call(this, drag);
+  const coverage = _dragGroundCoverage.call(this, drag);
   const event = {
     tool,
     entityIds: _labToolEntityIdsInDragRect.call(this, drag, tool),
     screenRect: dragScreenRect(drag),
-    worldRect,
+    groundPolygon: coverage.groundPolygon,
+    groundBounds: coverage.groundBounds,
     originalEvent: ev,
   };
   try {
@@ -157,15 +168,14 @@ export function _finishLabToolClick(drag, p, ev) {
   }
 }
 
-function _labToolEntityAtWorld(world, tool) {
-  if (!this.state || typeof this.state.entitiesInterpolated !== "function") return null;
-  if (typeof this._entityAtWorld !== "function") return null;
-  const entity = this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ true);
+function _labToolEntityAtScreen(screen, tool) {
+  if (!this.state || typeof this._entityAtScreen !== "function") return null;
+  const entity = this._entityAtScreen(screen, /*ownPreferred=*/ true);
   return _labToolEntitySelectable.call(this, entity, tool) ? entity : null;
 }
 
 function _labToolEntityIdsInDragRect(drag, tool) {
-  if (!this.state || typeof this.state.entitiesInterpolated !== "function") return [];
+  if (!this.state || !this.selectionScene) return [];
   return _selectableEntityIdsInDragRect.call(this, drag, {
     unitsOnly: labToolTargetsUnitsOnly(tool),
   });
@@ -205,6 +215,10 @@ function finitePoint(point) {
 
 function labToolTargetsUnitsOnly(tool) {
   return !!tool?.payload?.unitsOnly;
+}
+
+function labToolTargetsEntities(tool) {
+  return tool?.kind === "removeSelectableUnits";
 }
 
 function dragScreenRect(drag) {

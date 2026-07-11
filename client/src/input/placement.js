@@ -1,6 +1,5 @@
 import { cmd, PASSABLE, isUnit, isBuilding, isResource, KIND } from "../protocol.js";
-import { MINING_CC_RANGE_TILES, STATS, TANK_BODY, isProducerBuilding } from "../config.js";
-import { DEFAULT_HIT_RADIUS, DEFAULT_TILE_SIZE, HIT_PAD_PX, OWN_HIT_BONUS, ZOOM_STEP } from "./constants.js";
+import { STATS, TANK_BODY } from "../config.js";
 import { buildTankTrapLineSites, tankTrapBuildCommands } from "./tank_trap_line.js";
 
 const POINT_IN_RECT_EPS_PX = 0.001;
@@ -140,7 +139,11 @@ export function _refreshPlacement() {
   if (!map) return;
   if (!this.mouse) return;
 
-  const world = this._worldAt(this.mouse.x, this.mouse.y);
+  const world = this._groundAtScreen(this.mouse.x, this.mouse.y);
+  if (!world) {
+    intent?.updatePlacement?.(place.tileX, place.tileY, false);
+    return;
+  }
   const stat = STATS[place.building];
   const footW = stat && stat.footW ? stat.footW : 1;
   const footH = stat && stat.footH ? stat.footH : 1;
@@ -177,7 +180,7 @@ function inputFootprintPlacementBlocker(input, tileX, tileY, footW, footH, map, 
   const chosenWorker = input._selectedWorkerIds()[0];
   const allowed = chosenWorker === undefined ? new Set() : new Set([chosenWorker]);
   return footprintPlacementBlocker(
-    input.state.entitiesInterpolated(1),
+    input._selectionEntities(),
     allowed,
     tileX,
     tileY,

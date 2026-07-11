@@ -4,6 +4,18 @@ import { assert } from "./assertions.mjs";
 import { ClientIntent } from "../../client/src/client_intent.js";
 import { Input } from "../../client/src/input/index.js";
 import { KIND, STATE } from "../../client/src/protocol.js";
+import { buildSelectionScene } from "../../client/src/input/selection_projection.js";
+import { createOrthographicProjectionSnapshot } from "../../client/src/camera_projection.js";
+
+function publishScene(input, entities) {
+  input.selectionScene = buildSelectionScene({
+    entities,
+    tileSize: 32,
+    projection: createOrthographicProjectionSnapshot({
+      x: 0, y: 0, zoom: 1, worldW: 256, worldH: 256, viewW: 256, viewH: 256,
+    }, 256),
+  });
+}
 
 {
   const input = Object.create(Input.prototype);
@@ -27,8 +39,8 @@ import { KIND, STATE } from "../../client/src/protocol.js";
   };
   input.pointerLocked = false;
   input.cameraNavigation = null;
-  input.renderer = { drawSelectionBox() {} };
-  input._worldAt = (x, y) => ({ x: x + 100, y: y + 200 });
+  input.screenOverlay = { setMarquee() {}, clearMarquee() {} };
+  input._groundAtScreen = (x, y) => ({ x: x + 100, y: y + 200 });
   input._commitClickSelection = (point) => selections.push(point);
   input._eventScreenPos = () => ({ x: 12, y: 24 });
   input._trackMouse = () => {};
@@ -72,12 +84,12 @@ import { KIND, STATE } from "../../client/src/protocol.js";
   };
   input.pointerLocked = false;
   input.cameraNavigation = null;
-  input.renderer = { drawSelectionBox(box) { boxes.push(box); } };
+  input.screenOverlay = { setMarquee(box) { boxes.push(box); }, clearMarquee() { boxes.push(null); } };
   input.state = { map: { width: 8, height: 8, tileSize: 32 } };
   let pointer = { x: 12, y: 24 };
   input._screenPos = () => pointer;
   input._eventScreenPos = () => pointer;
-  input._worldAt = (x, y) => ({ x, y });
+  input._groundAtScreen = (x, y) => ({ x, y });
   input._trackMouse = () => {};
   input._routeLockedPointerMove = () => false;
   input._routeLockedPointerUp = () => false;
@@ -140,20 +152,15 @@ import { KIND, STATE } from "../../client/src/protocol.js";
       return removable;
     },
   };
-  input.camera = { screenToWorld: (x, y) => ({ x, y }) };
   input.pointerLocked = false;
   input.cameraNavigation = null;
-  input.renderer = { drawSelectionBox(box) { boxes.push(box); } };
+  input.screenOverlay = { setMarquee(box) { boxes.push(box); }, clearMarquee() { boxes.push(null); } };
   input._trackMouse = () => {};
   input._routeLockedPointerMove = () => false;
   input._routeLockedPointerUp = () => false;
   input._finishTankTrapPlacementDrag = () => false;
   input._commitBoxSelection = (drag) => selections.push(drag);
-  input._worldAt = Input.prototype._worldAt;
-  input._entityAtWorld = Input.prototype._entityAtWorld;
-  input._worldPointHitsEntity = Input.prototype._worldPointHitsEntity;
-  input._entityIntersectsRect = Input.prototype._entityIntersectsRect;
-  input._closestIdsToPoint = Input.prototype._closestIdsToPoint;
+  publishScene(input, removable);
   input._eventScreenPos = () => ({ x: 104, y: 64 });
   input._onLeftDown({ x: 104, y: 64 }, {});
   input._handleMouseUp({ button: 0, shiftKey: false });

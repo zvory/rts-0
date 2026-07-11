@@ -83,6 +83,7 @@ const start = {
       return [];
     },
   };
+  input.selectionScene = { proxies: [{ id: 301 }, { id: 302 }] };
   input._lastControlGroupTap = null;
   const ev = {
     code: "Digit4",

@@ -8,7 +8,7 @@ export function _browserPointerLockSupported() {
 }
 
 export function _pointerLockTarget() {
-  const view = this.renderer?.app?.view;
+  const view = this.renderElement;
   return view && typeof view.requestPointerLock === "function" ? view : this.dom;
 }
 

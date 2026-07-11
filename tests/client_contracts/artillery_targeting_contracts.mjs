@@ -49,7 +49,7 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
     artilleryFeedback.push({ kind, x, y, queued, radiusTiles });
   };
   pointFireInput.commandIssuer = { issueCommand: (command) => artilleryCommands.push(command) };
-  pointFireInput._worldAt = (x, y) => ({ x, y });
+  pointFireInput._groundAtScreen = (x, y) => ({ x, y });
   pointFireInput._selectedOwnUnitIds = () => [selectedArtillery.id];
   const closeRawPoint = {
     x: selectedArtillery.x + ARTILLERY_MIN_RANGE_TILES * 32 - 8,

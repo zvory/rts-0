@@ -1,5 +1,6 @@
 import { collectMatchFrameContext } from "./frame_profiler.js";
 import { buildFrameEntityViews } from "./frame_entity_views.js";
+import { buildSelectionScene } from "./input/selection_projection.js";
 
 const FRAME_ERROR_LOG_INTERVAL_MS = 5000;
 
@@ -69,6 +70,14 @@ function runMatchFrame(match, now, { capture = false } = {}) {
       match.fog.update(frameViews.fogSourceEntities, match.state.map.tileSize, match.state.visibleTiles);
     });
 
+    const selectionScene = time("match.selectionScene", () => buildSelectionScene({
+      entities: frameViews.interpolatedEntities,
+      projection: match.camera.projectionSnapshot(),
+      tileSize: match.state.map?.tileSize,
+      generation: 1,
+      frameId: (match.input?.selectionScene?.frameId || 0) + 1,
+    }));
+
     time("match.renderer", () => {
       match.renderer.render(match.state, match.camera, match.fog, alpha, {
         clientIntent: match.clientIntent,
@@ -80,6 +89,7 @@ function runMatchFrame(match, now, { capture = false } = {}) {
         observerMapAnalysis: match.observerDiagnostics?.mapOverlayModel?.() || null,
       });
     });
+    match.input?.publishSelectionScene?.(selectionScene);
     time("match.hud", () => match.hud.update(frameViews, { profiler: match.frameProfiler }));
     time("match.minimap", () => match.minimap.render(frameViews, { profiler: match.frameProfiler }));
     time("match.observerAnalysis", () => match.observerDiagnostics?.update(frameViews, { profiler: match.frameProfiler }));
