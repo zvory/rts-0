@@ -123,6 +123,17 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
 }
 
 {
+  const starts = [{ x: 8, y: 8 }, { x: 117, y: 117 }, { x: 117, y: 8 }, { x: 8, y: 117 }];
+  const baseSites = Array.from({ length: 32 }, (_, index) => ({ x: 20 + index, y: 20 }));
+  const draft = authoredMapFromMaterialized({
+    name: "Capped bases", description: "", size: 126,
+    terrain: Array(126 * 126).fill(TERRAIN.GRASS), starts, baseSites,
+  });
+  assert.equal(draft.baseSites.length, MAP_EDITOR_MAX_BASE_SITES);
+  for (const start of starts) assert(draft.baseSites.some((site) => site.x === start.x && site.y === start.y));
+}
+
+{
   assert.deepEqual(symmetricMapTiles(8, [{ x: 1, y: 2 }], MAP_EDITOR_SYMMETRY.HORIZONTAL), [{ x: 1, y: 2 }, { x: 1, y: 5 }]);
   assert.deepEqual(symmetricMapTiles(8, [{ x: 1, y: 2 }], MAP_EDITOR_SYMMETRY.HALF_TURN), [{ x: 1, y: 2 }, { x: 6, y: 5 }]);
   assert.deepEqual(symmetricMapTiles(8, [{ x: 1, y: 2 }], MAP_EDITOR_SYMMETRY.RADIAL), [{ x: 1, y: 2 }, { x: 5, y: 1 }, { x: 6, y: 5 }, { x: 2, y: 6 }]);

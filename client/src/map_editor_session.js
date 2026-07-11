@@ -497,8 +497,7 @@ function normalizeDraft(draft) {
   draft._design = String(draft._design || "Flat map locations.");
   draft.terrain = draft.terrain.map((row) => [...row].map((ch) => CHAR_TO_TERRAIN[ch] === undefined ? "." : ch).join(""));
   draft.startLocations = normalizeLocations(draft.startLocations, size).slice(0, MAP_EDITOR_MAX_START_LOCATIONS);
-  draft.baseSites = normalizeLocations(draft.baseSites, size).slice(0, MAP_EDITOR_MAX_BASE_SITES);
-  for (const start of draft.startLocations) if (!draft.baseSites.some((site) => sameLocation(site, start))) draft.baseSites.push(copyLocation(start));
+  draft.baseSites = normalizeBaseSites(draft.baseSites, draft.startLocations, size);
   if (!draft.startLocations.length) throw new Error("Map needs at least one start location.");
   protectDraftBaseTerrain(draft);
 }
@@ -540,6 +539,22 @@ function normalizeLocations(locations, size) {
     if (valid && !seen.has(locationKey(valid))) { seen.add(locationKey(valid)); out.push(valid); }
   }
   return out;
+}
+function normalizeBaseSites(baseSites, startLocations, size) {
+  const normalized = normalizeLocations(baseSites, size);
+  const startKeys = new Set(startLocations.map(locationKey));
+  if (
+    normalized.length <= MAP_EDITOR_MAX_BASE_SITES
+    && startLocations.every((start) => normalized.some((site) => sameLocation(site, start)))
+  ) return normalized;
+
+  const retainedStarts = normalized.filter((site) => startKeys.has(locationKey(site)));
+  const missingStarts = startLocations.filter((start) => !normalized.some((site) => sameLocation(site, start)));
+  const availableBaseSlots = MAP_EDITOR_MAX_BASE_SITES - retainedStarts.length - missingStarts.length;
+  const retainedBases = normalized
+    .filter((site) => !startKeys.has(locationKey(site)))
+    .slice(0, Math.max(0, availableBaseSlots));
+  return [...retainedStarts, ...retainedBases, ...missingStarts.map(copyLocation)];
 }
 function normalizedDraftTile(draft, tile, radius) {
   const size = draft?.terrain?.length || 0;
