@@ -6,14 +6,45 @@ import { spawnSync } from "node:child_process";
 
 export const RECORDING_LIMITS = Object.freeze({
   defaultDurationMs: 10_000,
-  maxDurationMs: 30_000,
+  maxDurationMs: 60_000,
   maxBytes: 64 * 1024 * 1024,
   maxFrames: 6,
   maxOperations: 200,
   maxAliases: 400,
   maxDetailedAliases: 40,
   stopTimeoutMs: 15_000,
+  maxStopTimeoutMs: 45_000,
+  mediaStageTimeoutMs: 15_000,
+  maxMediaStageTimeoutMs: 75_000,
+  maxMediaAuxiliaryTimeoutMs: 30_000,
 });
+
+export function recordingStopTimeoutMs(targetDurationMs) {
+  return derivedTimeout(
+    targetDurationMs,
+    RECORDING_LIMITS.stopTimeoutMs,
+    RECORDING_LIMITS.maxStopTimeoutMs,
+    0.5,
+  );
+}
+
+export function mediaStageTimeoutMs(targetDurationMs) {
+  return derivedTimeout(
+    targetDurationMs,
+    RECORDING_LIMITS.mediaStageTimeoutMs,
+    RECORDING_LIMITS.maxMediaStageTimeoutMs,
+    1,
+  );
+}
+
+export function mediaAuxiliaryTimeoutMs(targetDurationMs) {
+  return derivedTimeout(
+    targetDurationMs,
+    RECORDING_LIMITS.mediaStageTimeoutMs,
+    RECORDING_LIMITS.maxMediaAuxiliaryTimeoutMs,
+    0.25,
+  );
+}
 
 export class LabInteractRecordingError extends Error {
   constructor(code, message, details = {}) {
@@ -83,6 +114,8 @@ export function finalizeMedia({ webmPath, mp4Path, framesDir, contactSheetPath, 
   if (!Number.isFinite(targetDurationMs) || targetDurationMs <= 0) throw new LabInteractRecordingError("recordingDurationInvalid", "Recording wall duration was unavailable during finalization.");
   const sourceProbe = probeMedia(webmPath, tools.ffprobe, "vp9", "source WebM");
   const targetDurationSeconds = Math.max(targetDurationMs / 1000, 1 / 30);
+  const stageTimeoutMs = mediaStageTimeoutMs(targetDurationMs);
+  const auxiliaryTimeoutMs = mediaAuxiliaryTimeoutMs(targetDurationMs);
   const capturedFrames = Math.max(1, Number(sourceProbe.frameCount) || Math.round((sourceProbe.durationSeconds || 0) * 30) || 1);
   const capturedFrameInterval = targetDurationSeconds / capturedFrames;
   runTool(tools.ffmpeg, [
@@ -91,7 +124,7 @@ export function finalizeMedia({ webmPath, mp4Path, framesDir, contactSheetPath, 
     "-t", targetDurationSeconds.toFixed(6), "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
     "-profile:v", "main", "-pix_fmt", "yuv420p", "-tag:v", "avc1",
     "-movflags", "+faststart", mp4Path,
-  ], "mobile MP4 transcode");
+  ], "mobile MP4 transcode", stageTimeoutMs);
   const mp4Stat = safeStat(mp4Path);
   if (!mp4Stat || mp4Stat.size === 0) throw new LabInteractRecordingError("recordingEmpty", "FFmpeg produced no MP4 recording bytes.");
   if (mp4Stat.size > RECORDING_LIMITS.maxBytes) {
@@ -100,9 +133,11 @@ export function finalizeMedia({ webmPath, mp4Path, framesDir, contactSheetPath, 
     throw new LabInteractRecordingError("recordingTooLarge", `Final MP4 exceeded the ${RECORDING_LIMITS.maxBytes} byte limit and was deleted.`);
   }
   const probe = probeMedia(mp4Path, tools.ffprobe, "h264", "final MP4");
-  if (probe.container !== "mov,mp4,m4a,3gp,3g2,mj2" || probe.pixelFormat !== "yuv420p" || probe.codecTag !== "avc1" || !hasFastStart(mp4Path)) {
+  const fastStart = hasFastStart(mp4Path);
+  if (probe.container !== "mov,mp4,m4a,3gp,3g2,mj2" || probe.pixelFormat !== "yuv420p" || probe.codecTag !== "avc1" || !fastStart) {
     throw new LabInteractRecordingError("mediaProbeFailed", "Final MP4 is missing its mobile-compatible container, yuv420p/avc1 video, or fast-start metadata.");
   }
+  probe.fastStart = fastStart;
   fs.rmSync(webmPath, { force: true });
   fs.mkdirSync(framesDir, { recursive: true });
   const duration = Math.max(Number(probe.durationSeconds) || 0.001, 0.001);
@@ -112,13 +147,13 @@ export function finalizeMedia({ webmPath, mp4Path, framesDir, contactSheetPath, 
     "-hide_banner", "-loglevel", "error", "-y", "-i", mp4Path,
     "-vf", `fps=1/${interval}`, "-frames:v", String(activityFrameLimit),
     path.join(framesDir, "frame-%02d.png"),
-  ], "representative frame extraction");
+  ], "representative frame extraction", auxiliaryTimeoutMs);
   const activityFrameCount = representativeFrameNames(framesDir).length;
   const finalFrameNumber = Math.min(activityFrameCount + 1, RECORDING_LIMITS.maxFrames);
   runTool(tools.ffmpeg, [
     "-hide_banner", "-loglevel", "error", "-y", "-sseof", "-0.001", "-i", mp4Path,
     "-frames:v", "1", path.join(framesDir, `frame-${String(finalFrameNumber).padStart(2, "0")}.png`),
-  ], "final frame extraction");
+  ], "final frame extraction", auxiliaryTimeoutMs);
   const framePaths = representativeFrameNames(framesDir)
     .map((name) => path.join(framesDir, name));
   if (framePaths.length === 0) throw new LabInteractRecordingError("frameExtractionFailed", "FFmpeg produced no representative PNG frames.");
@@ -126,7 +161,7 @@ export function finalizeMedia({ webmPath, mp4Path, framesDir, contactSheetPath, 
     "-hide_banner", "-loglevel", "error", "-y", "-framerate", "1", "-i", path.join(framesDir, "frame-%02d.png"),
     "-vf", "scale=480:300:force_original_aspect_ratio=decrease,pad=480:300:(ow-iw)/2:(oh-ih)/2:black,tile=3x2:padding=4:margin=4",
     "-frames:v", "1", contactSheetPath,
-  ], "contact sheet generation");
+  ], "contact sheet generation", auxiliaryTimeoutMs);
   const contact = readPngDimensions(fs.readFileSync(contactSheetPath));
   const expectedFrames = Math.max(1, Math.round(targetDurationSeconds * 30));
   const encodedFrames = Number.isInteger(probe.frameCount) ? probe.frameCount : null;
@@ -209,9 +244,14 @@ function probePacketTimeline(file, ffprobe) {
   };
 }
 
-function runTool(command, args, label) {
-  const result = spawnSync(command, args, { encoding: "utf8", timeout: 15_000 });
+function runTool(command, args, label, timeoutMs = RECORDING_LIMITS.mediaStageTimeoutMs) {
+  const result = spawnSync(command, args, { encoding: "utf8", timeout: timeoutMs });
   if (result.status !== 0) throw new LabInteractRecordingError("mediaProcessingFailed", conciseToolFailure(`${label} failed`, result));
+}
+
+function derivedTimeout(targetDurationMs, minimumMs, maximumMs, durationScale) {
+  const duration = Number.isFinite(targetDurationMs) && targetDurationMs > 0 ? targetDurationMs : 0;
+  return Math.min(maximumMs, Math.max(minimumMs, Math.ceil(minimumMs + duration * durationScale)));
 }
 
 function conciseToolFailure(prefix, result) {

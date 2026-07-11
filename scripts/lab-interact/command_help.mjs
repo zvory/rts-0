@@ -82,11 +82,16 @@ export const LAB_INTERACT_COMMAND_HELP = Object.freeze({
     example: { sessionId: "<lab-session-id>", artifactId: "artifact_<32-hex>" },
   }),
   "record-start": descriptor("Start one real-time clean-presentation H.264 recording.", "{sessionId:string,name?:token,maxDurationMs?:int,viewport?:viewport,crop?:{x,y,width,height},scale?:number}", {
-    defaults: ["name=recording", "maxDurationMs=10000", "viewport=current", "crop=game viewport", "scale=1"], bounds: ["duration 1000-30000 ms", "viewport/crop <=2048", "scale 0.25-1", "one active recorder", "64 MiB output"],
+    defaults: ["name=recording", "maxDurationMs=10000", "viewport=current", "crop=game viewport", "scale=1"], bounds: ["duration 1000-60000 ms", "viewport/crop <=2048", "scale 0.25-1", "one active recorder", "64 MiB output"],
     example: { sessionId: "<lab-session-id>", name: "motion", maxDurationMs: 10000 },
   }),
   "record-stop": descriptor("Finalize the active real-time recording and return confined artifact paths.", "{sessionId:string}", {
     bounds: ["one active recorder", "six representative frame paths", "40 detailed aliases in the manifest"], example: { sessionId: "<lab-session-id>" },
+  }),
+  "record-wait": descriptor("Wait for the current recording to finalize without blocking other session commands.", "{sessionId:string}", {
+    variants: ["active and finalizing recordings share one completion", "a completed current recording returns its last result"],
+    bounds: ["a recording must have been started in the current session", "recording-only IPC timeout is capped at 300 seconds"],
+    example: { sessionId: "<lab-session-id>" },
   }),
   "capture-fixed": descriptor("Capture a deterministic-environment fixed-step H.264 sequence.", "{sessionId:string,name?:token,fps?:int,frameCount?:int,viewport?:viewport}", {
     defaults: ["name=fixed", "fps=30", "frameCount=30", "viewport=current"], bounds: ["paused room required", "fps 10-60", "1-180 frames", "40 detailed aliases in the manifest"],

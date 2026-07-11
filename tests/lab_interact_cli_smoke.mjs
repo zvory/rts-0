@@ -11,6 +11,11 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const cli = path.join(root, "scripts/lab-interact/cli.mjs");
 const isolatedTmp = fs.mkdtempSync(path.join("/tmp", "rts-li-smoke-"));
 const env = { ...process.env, TMPDIR: isolatedTmp };
+const recordingDurationMs = Number(env.RTS_LAB_INTERACT_RECORDING_CANARY_MS || 2_000);
+assert.ok(
+  Number.isInteger(recordingDurationMs) && recordingDurationMs >= 2_000 && recordingDurationMs <= 60_000,
+  "recording canary duration must stay between 2 and 60 seconds",
+);
 const paths = runtimePaths(root, { tmpDir: isolatedTmp });
 let sessionId = null;
 let daemonPid = null;
@@ -116,24 +121,32 @@ try {
   assert.equal(screenshot.readiness.subjects.count, authoredSubjects.length, "readiness covers the full authored subject set");
   assert.deepEqual(screenshot.readiness.missingTextureSubjectIds, [], "large-scene readiness rejects texture fallback for every subject");
   const recordingStarted = call("record-start", {
-    sessionId, name: "cli-smoke-motion", maxDurationMs: 5_000,
-    viewport: { width: 1000, height: 700, deviceScaleFactor: 1 },
+    sessionId, name: "cli-smoke-motion", maxDurationMs: recordingDurationMs,
+    viewport: { width: 1200, height: 800, deviceScaleFactor: 1 },
   });
   assert.equal(recordingStarted.recorder.active, true, "live CLI starts one persistent-page recorder");
   call("order", { sessionId, playerId: 1, command: { c: "move", units: ["shooter"], x: 1088, y: 1088 } });
   call("time", { sessionId, control: { action: "resume", speed: 1 } });
-  await sleep(1_200);
-  call("time", { sessionId, control: { action: "pause" } });
-  const recording = call("record-stop", { sessionId });
+  call("camera", { sessionId, camera: { action: "focus", refs: authoredSubjects, padding: 64 } });
+  const recording = call("record-wait", { sessionId });
   assert.equal(recording.probe.codec, "h264", "live recording probes as H.264");
-  assert.deepEqual({ width: recording.probe.width, height: recording.probe.height }, { width: 1000, height: 700 }, "live MP4 records the clean viewport crop");
-  assert.ok(recording.probe.durationSeconds > 0 && recording.probe.durationSeconds <= 6, "live MP4 duration stays within the requested bound");
+  assert.deepEqual({ width: recording.probe.width, height: recording.probe.height }, { width: 1200, height: 800 }, "live MP4 records the clean 1200x800 viewport crop");
+  assert.equal(recording.probe.durationSeconds, recordingDurationMs / 1_000, "watchdog recording finalizes at the exact requested wall duration");
+  assert.equal(recording.probe.frameCount, recordingDurationMs * 30 / 1_000, "watchdog recording normalizes to exactly 30 FPS");
+  assert.deepEqual(
+    { codecTag: recording.probe.codecTag, pixelFormat: recording.probe.pixelFormat, frameRate: recording.probe.frameRate, fastStart: recording.probe.fastStart },
+    { codecTag: "avc1", pixelFormat: "yuv420p", frameRate: "30/1", fastStart: true },
+    "live MP4 retains the mobile codec surface",
+  );
   assert.ok(fs.existsSync(recording.videoPath) && fs.existsSync(recording.contactSheetPath), "live recording writes MP4 and contact sheet artifacts");
   assert.equal(fs.existsSync(recording.videoPath.replace(/\.mp4$/, ".webm")), false, "live recording removes its temporary WebM");
   const recordingManifest = JSON.parse(fs.readFileSync(recording.manifestPath, "utf8"));
+  assert.ok(recordingManifest.media.bytes < 64 * 1024 * 1024, "live recording stays beneath the 64 MiB cap");
   assert.ok(recordingManifest.authoritative.endTick >= recordingManifest.authoritative.startTick, "recording manifest tracks authoritative tick bounds");
   assert.ok(recordingManifest.operations.some((entry) => entry.command === "order"), "recording manifest records accepted scene operations");
+  assert.ok(recordingManifest.operations.some((entry) => entry.command === "camera"), "recording wait leaves camera interaction available during capture");
   assert.deepEqual(recordingManifest.errors.page, [], "recording manifest reports zero page errors");
+  assert.deepEqual(call("record-wait", { sessionId }), recording, "completed live recording wait returns the same artifact without polling");
   assert.equal(call("inspect", { sessionId, refs: ["shooter", "target"], limit: 2 }).entities.length, 2, "inspection returns authoritative spawned entities");
 
   const closedSessionId = sessionId;

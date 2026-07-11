@@ -10,8 +10,9 @@ import { fileURLToPath } from "node:url";
 import { LAB_INTERACT_COMMANDS } from "./command_service.mjs";
 import { commandHelp, helpCatalog } from "./command_help.mjs";
 import {
-  IPC_VERSION, REQUEST_TIMEOUT_MS, checkoutCommit, configuredIdleMs, prepareRuntime, processAlive,
-  readStartupError, readState, reclaimStaleStartupLock, removeOwnedStartupLock, runtimePaths, sleep,
+  IPC_VERSION, checkoutCommit, configuredIdleMs, prepareRuntime, processAlive,
+  readStartupError, readState, reclaimStaleStartupLock, removeOwnedStartupLock, requestTimeoutMs,
+  runtimePaths, sleep,
 } from "./runtime.mjs";
 
 const STARTUP_TIMEOUT_MS = 15_000;
@@ -217,7 +218,7 @@ async function ensureDaemon(paths, env) {
   throw cliError("daemonStartup", "Lab Interact daemon did not become ready within 15 seconds.");
 }
 
-function requestCurrent(paths, payload, timeoutMs = REQUEST_TIMEOUT_MS) {
+function requestCurrent(paths, payload, timeoutMs = null) {
   const state = readState(paths);
   if (!validIdentity(paths, state)) return Promise.reject(cliError("daemonIdentity", "No compatible Lab Interact daemon is ready."));
   return request(paths.socket, {
@@ -225,7 +226,7 @@ function requestCurrent(paths, payload, timeoutMs = REQUEST_TIMEOUT_MS) {
     daemonId: state.daemonId,
     capability: state.capability,
     ...payload,
-  }, timeoutMs);
+  }, timeoutMs ?? requestTimeoutMs(payload.command));
 }
 
 function request(socketPath, payload, timeoutMs) {

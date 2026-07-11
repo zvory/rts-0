@@ -9,9 +9,9 @@ import {
   validateCommandInput,
 } from "./command_service.mjs";
 import {
-  IPC_VERSION, MAX_REQUEST_BYTES, REQUEST_TIMEOUT_MS, claimStartupLock, cleanupOwnedRuntime,
+  IPC_VERSION, MAX_REQUEST_BYTES, claimStartupLock, cleanupOwnedRuntime,
   checkoutCommit, configuredIdleMs, prepareRuntime, removeOwnedStartupLock, runtimePaths, startupLockOwned, writeState,
-  writeStartupError,
+  requestTimeoutMs, writeStartupError,
 } from "./runtime.mjs";
 
 export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = configuredIdleMs(), startupNonce = "" } = {}) {
@@ -146,7 +146,7 @@ export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = config
         }
       }
       if (command === "shutdown") shutdownRequested = true;
-      socket.setTimeout(REQUEST_TIMEOUT_MS + 5_000, () => socket.destroy());
+      socket.setTimeout(requestTimeoutMs(command) + 5_000, () => socket.destroy());
       activeRequests += 1;
       admitted = true;
       recordInteraction();

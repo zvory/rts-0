@@ -1,6 +1,6 @@
 # Phase 3 - One-Minute Recording And Wait Workflow
 
-Status: pending.
+Status: done.
 
 ## Objective
 

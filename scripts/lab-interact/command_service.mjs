@@ -31,7 +31,7 @@ export const LAB_INTERACT_COMMANDS = Object.freeze([
   "open", "close", "reset", "catalog", "spawn", "update", "remove", "order",
   "time", "inspect", "camera", "screenshot", "status", "shutdown",
   "export", "import", "artifact-inspect",
-  "record-start", "record-stop",
+  "record-start", "record-stop", "record-wait",
   "capture-fixed",
   "capture-cancel",
 ]);
@@ -94,13 +94,21 @@ export class LabInteractService {
       throw new LabInteractError("unknownCommand", `Unknown command ${JSON.stringify(command)}.`);
     }
     const input = validateInput(command, rawInput);
-    if (command === "shutdown") return { shuttingDown: true };
+    if (command === "shutdown") {
+      await this.shutdown("explicit");
+      return { shuttingDown: true };
+    }
     if (command === "status") return this.status(input);
     if (command === "open") return this.open(input);
     if (command === "close") return { sessionId: input.sessionId, closed: await this.close(input.sessionId) };
     if (command === "capture-cancel") {
       const session = this.get(input.sessionId);
       return { sessionId: input.sessionId, ...session.driver.cancelFixedCapture() };
+    }
+    if (command === "record-wait") {
+      const session = this.get(input.sessionId);
+      const result = await session.driver.recordWait();
+      return { sessionId: input.sessionId, ...result };
     }
     return this.use(input.sessionId, async (session) => {
       const result = await this.executeSession(command, session, input);
@@ -192,6 +200,12 @@ export class LabInteractService {
     this.sessions.delete(sessionId);
     if (session.driver.fixedCaptureStatus?.().active) session.driver.cancelFixedCapture?.();
     const closing = (async () => {
+      const recorderSettlement = session.driver.settleRecording?.("sessionClose", {
+        aliases: [...session.aliases].map(([alias, id]) => ({ alias, id })),
+      });
+      await recorderSettlement?.catch((error) => this.log("recordingSettlementFailed", {
+        sessionId, reason, error: conciseError(error),
+      }));
       await session.operationTail;
       await session.driver.close().catch((error) => this.log("sessionCloseFailed", {
         sessionId, reason, error: conciseError(error),
@@ -497,7 +511,7 @@ function validateInput(command, value) {
     if (value.viewport != null) viewport(value.viewport, 2048, "record-start.viewport");
     if (value.crop != null) recordingCrop(value.crop);
     if (value.scale != null) boundedNumber(value.scale, "record-start.scale", 0.25, 1);
-  } else if (command === "record-stop") {
+  } else if (command === "record-stop" || command === "record-wait") {
     exact(value, ["sessionId"], command);
   } else if (command === "capture-fixed") {
     exact(value, ["sessionId", "name", "fps", "frameCount", "viewport"], command);
