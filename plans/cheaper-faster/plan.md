@@ -14,11 +14,15 @@ or statistically proven reliability.
 
 - Beta and mainline remain separate Fly apps and releases.
 - Each game app uses one `performance-1x`/2 GB Machine with autostart and clean autostop.
-- One cheap always-on launcher offers fixed beta and mainline choices, shows `Starting server...`,
-  and redirects when the chosen game server responds.
+- One cheap always-on launcher owns `https://bewegungskrieg.net` and
+  `https://www.bewegungskrieg.net`, offers fixed beta and mainline choices, shows
+  `Starting server...`, and redirects when the chosen game server responds.
+- Mainline is served directly at `https://mainline.bewegungskrieg.net` and beta at
+  `https://beta.bewegungskrieg.net`. Their raw Fly hostnames remain recovery paths.
 - The client retries its initial WebSocket connection for a short bounded period so a normal cold
   start does not require a manual refresh.
-- Direct beta and mainline URLs remain available as recovery paths.
+- Existing `bewegungskrieg.net` deep links continue to work: the launcher treats an unqualified
+  game deep link as mainline, preserves its path and query, wakes mainline, and redirects there.
 
 ## Constraints
 
@@ -27,12 +31,16 @@ or statistically proven reliability.
 - Do not intentionally stop or resize a Machine with an active room.
 - The launcher may wake only hard-coded beta and mainline origins; it must not accept an arbitrary
   upstream URL.
+- The launcher is a separate Fly app, not a process behind the mainline Machine. It must remain
+  available while both game Machines are stopped and must redirect rather than proxy live game or
+  WebSocket traffic.
 - Headless AI rooms without a connected browser may not prevent Fly autostop. That is acceptable
   for this project and should be documented plainly.
 - Keep the existing shutdown/drain behavior and a simple rollback to the current always-on shared
   Machine configuration.
-- Recheck Fly pricing before remote changes. Creating the launcher app, resizing a Machine, or
-  changing a paid remote configuration requires explicit user approval immediately beforehand.
+- Recheck Fly pricing before remote changes. Creating the launcher app, resizing a Machine,
+  moving certificates or DNS, or changing a paid remote configuration requires explicit user
+  approval immediately beforehand.
 - Each phase gets its own branch and owned PR. Wait for it to merge before starting the next phase.
 - After each phase, report what changed, what the agent actually tried, whether it worked, and the
   rollback command.
@@ -41,6 +49,8 @@ or statistically proven reliability.
 
 - From a stopped beta Machine, the agent can use the launcher, see a starting state, reach the
   requested game page, and connect without manually refreshing.
+- Opening `https://bewegungskrieg.net` always reaches the launcher even when both game Machines are
+  stopped; an existing canonical mainline deep link survives the wake-and-redirect flow.
 - The agent can enter a lobby and play or spectate a short match without the Machine stopping.
 - After all browser connections close, the Machine eventually stops.
 - Repeating the cold-start workflow once does not expose an obvious intermittent failure.
@@ -56,10 +66,10 @@ back. Do not build a measurement program around it.
 ### [Phase 1 - Build and Try It on Beta](phase-1.md)
 
 Add the small launcher, initial WebSocket retry, and separate beta/mainline Fly configuration, then
-move only beta to performance-autostop. Run existing selected CI plus a small security test for the
-launcher's fixed destinations. After deployment, the agent uses the real stopped-beta workflow
-twice, plays or spectates briefly, confirms idle stop, and either approves the experience or rolls
-it back.
+move the canonical domain to the launcher and only beta to performance-autostop. Run existing
+selected CI plus a small security test for the launcher's fixed destinations. After deployment,
+the agent uses the real stopped-beta workflow twice, plays or spectates briefly, confirms idle
+stop, and either approves the experience or rolls it back.
 
 ### [Phase 2 - Roll It Out to Mainline](phase-2.md)
 
@@ -85,7 +95,6 @@ test.
 - Statistical cold-start or reliability analysis.
 - A CDN, general reverse proxy, multi-Machine routing, or durable headless rooms.
 - Provider migration or a long-term hosting study.
-- A separate cost/reliability observation phase.
 
 ## Executor Commands
 
