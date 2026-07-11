@@ -24,7 +24,7 @@ const baseEnv = {
   ...process.env,
   RTS_LAB_INTERACT_DRIVER_FACTORY_MODULE: "tests/fixtures/lab_interact_fake_driver.mjs",
   RTS_LAB_INTERACT_IDLE_MS: "5000",
-  RTS_LAB_INTERACT_FAKE_OPEN_DELAY_MS: "75",
+  RTS_LAB_INTERACT_FAKE_OPEN_DELAY_MS: "250",
 };
 
 assert.equal(configuredIdleMs({}), DEFAULT_IDLE_MS, "the production idle default is exactly 30 minutes");
@@ -115,7 +115,21 @@ const invalidEnvelope = await rawRequest(paths.socket, {
 assert.equal(invalidEnvelope.error.code, "invalidRequest", "a wrong capability is rejected by the handshake");
 assert.equal(JSON.parse(fs.readFileSync(paths.state, "utf8")).lastInteractionAt, interactionBeforeInvalid, "invalid envelopes do not extend idle lifetime");
 
-const opened = call("open");
+const opening = execFileAsync(process.execPath, [cli, "open", "{}"], { cwd: root, env: baseEnv });
+await waitFor(
+  async () => (await rawRequest(paths.socket, {
+    protocolVersion: IPC_VERSION,
+    daemonId: daemonState.daemonId,
+    capability: daemonState.capability,
+    command: "status",
+    input: {},
+  })).result?.opening === true,
+  1000,
+  "status exposes an in-flight session open",
+);
+const { stdout: openingStdout, stderr: openingStderr } = await opening;
+assert.equal(openingStderr, "", "opening a session writes no stderr");
+const opened = JSON.parse(openingStdout);
 const firstSessionId = opened.result.sessionId;
 assert.match(firstSessionId, /^lab_[a-f0-9]{32}$/, "open returns a bounded opaque session id");
 const repeatedOpen = call("open");
@@ -303,7 +317,7 @@ function prepareStaleRuntime() {
 async function waitFor(predicate, timeoutMs, message) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (predicate()) return;
+    if (await predicate()) return;
     await sleep(20);
   }
   assert.fail(message);
