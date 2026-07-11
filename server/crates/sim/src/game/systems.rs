@@ -1,11 +1,11 @@
 //! Per-tick simulation systems orchestrator. See `docs/design/server-sim.md`.
 //!
 //! [`run_tick`] delegates to the internal services through explicit derived-state boundaries:
-//!   1. rebuild pre-command occupancy/spatial indexes
+//!   1. refresh pre-command occupancy/spatial indexes
 //!   2. drain + apply queued commands
 //!   3. movement
 //!   4. promote queued orders made ready by movement or previous-tick active-order cleanup
-//!   5. rebuild post-movement occupancy/spatial indexes
+//!   5. refresh post-movement occupancy/spatial indexes
 //!   6. combat
 //!   7. gather progression
 //!   8. production progression + spawning
@@ -14,14 +14,19 @@
 //!   11. deconstruction progression
 //!   12. ability projectile/runtime progression
 //!   13. deaths
-//!   14. rebuild pre-collision occupancy/spatial indexes
+//!   14. refresh pre-collision occupancy/spatial indexes
 //!   15. unit-unit collision resolution (hard non-stacking; runs after spawning so newly
 //!       produced units that land on the same spawn point are unstacked in the same tick)
 //!   16. trench occupation, slotting, and dig-in progress
 //!   17. recompute supply cap
 //!   18. rebuild final spatial index for snapshot interest filtering
+//!
+//! The three occupancy boundaries compare the exact static-building topology and share immutable
+//! clearance data when it is unchanged. Spatial indexes still rebuild at every named boundary.
 
 use std::collections::{BTreeSet, HashMap};
+
+mod occupancy_phase_cache;
 
 use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::artillery::ArtilleryShellStore;
@@ -43,6 +48,8 @@ use crate::game::PlayerState;
 use crate::protocol::Event;
 use rand::Rng;
 
+use occupancy_phase_cache::OccupancyPhaseCache;
+
 /// Derived state valid before commands mutate orders or units move.
 ///
 /// This state is intentionally phase-specific: adding a system after movement should require
@@ -53,9 +60,13 @@ struct PreCommandDerivedState<'a> {
 }
 
 impl<'a> PreCommandDerivedState<'a> {
-    fn rebuild(map: &'a Map, entities: &EntityStore) -> Self {
+    fn rebuild(
+        map: &'a Map,
+        entities: &EntityStore,
+        occupancy_cache: &mut OccupancyPhaseCache<'a>,
+    ) -> Self {
         PreCommandDerivedState {
-            occupancy: Occupancy::build(map, entities),
+            occupancy: occupancy_cache.snapshot(entities),
             spatial: SpatialIndex::build(entities, map.size),
         }
     }
@@ -68,9 +79,13 @@ struct PostMovementDerivedState<'a> {
 }
 
 impl<'a> PostMovementDerivedState<'a> {
-    fn rebuild(map: &'a Map, entities: &EntityStore) -> Self {
+    fn rebuild(
+        map: &'a Map,
+        entities: &EntityStore,
+        occupancy_cache: &mut OccupancyPhaseCache<'a>,
+    ) -> Self {
         PostMovementDerivedState {
-            occupancy: Occupancy::build(map, entities),
+            occupancy: occupancy_cache.snapshot(entities),
             spatial: SpatialIndex::build(entities, map.size),
         }
     }
@@ -84,9 +99,13 @@ struct PreCollisionDerivedState<'a> {
 }
 
 impl<'a> PreCollisionDerivedState<'a> {
-    fn rebuild(map: &'a Map, entities: &EntityStore) -> Self {
+    fn rebuild(
+        map: &'a Map,
+        entities: &EntityStore,
+        occupancy_cache: &mut OccupancyPhaseCache<'a>,
+    ) -> Self {
         PreCollisionDerivedState {
-            occupancy: Occupancy::build(map, entities),
+            occupancy: occupancy_cache.snapshot(entities),
             spatial: SpatialIndex::build(entities, map.size),
         }
     }
@@ -134,8 +153,9 @@ pub(crate) fn run_tick(
     tick: u32,
     mut perf: Option<&mut crate::perf::TickPerf>,
 ) -> SpatialIndex {
+    let mut occupancy_cache = OccupancyPhaseCache::new(map);
     let pre_command = crate::perf::timed(perf.as_deref_mut(), "pre_command_derived", || {
-        PreCommandDerivedState::rebuild(map, entities)
+        PreCommandDerivedState::rebuild(map, entities, &mut occupancy_cache)
     });
     let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
     let mut coordinator = crate::perf::timed(perf.as_deref_mut(), "move_coordinator_new", || {
@@ -244,7 +264,7 @@ pub(crate) fn run_tick(
     }
 
     let post_movement = crate::perf::timed(perf.as_deref_mut(), "post_movement_derived", || {
-        PostMovementDerivedState::rebuild(map, entities)
+        PostMovementDerivedState::rebuild(map, entities, &mut occupancy_cache)
     });
 
     crate::perf::timed(perf.as_deref_mut(), "combat", || {
@@ -352,7 +372,7 @@ pub(crate) fn run_tick(
     });
 
     let pre_collision = crate::perf::timed(perf.as_deref_mut(), "pre_collision_derived", || {
-        PreCollisionDerivedState::rebuild(map, entities)
+        PreCollisionDerivedState::rebuild(map, entities, &mut occupancy_cache)
     });
     let pre_collision_positions =
         crate::perf::timed(perf.as_deref_mut(), "pre_collision_positions", || {

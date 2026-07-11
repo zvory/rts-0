@@ -1061,7 +1061,12 @@ and building line-of-sight blockers while still using active smoke clouds as blo
 It rebuilds named phase state at explicit boundaries: pre-command state for command validation,
 pathing, and movement; post-movement state for combat and economy queries; pre-collision state
 after production/construction/death mutations; collision-displacement snapshots for entrenchment;
-and final state for snapshot interest filtering.
+and final state for snapshot interest filtering. The three phase occupancy snapshots compare an
+exact id/owner/kind/position-bit vector for every building and share immutable blocker/clearance
+data within the tick when that topology is unchanged. A construction placement, building removal,
+owner change, or relocation rebuilds occupancy at the next boundary; spatial indexes continue to
+rebuild at every boundary. This preserves the named phase semantics without repeating the two
+full-map clearance-field builds after unit-only movement.
 Systems should consume the derived-state object for their phase instead of carrying occupancy or
 spatial indexes across later mutations.
 
