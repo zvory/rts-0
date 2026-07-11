@@ -4,7 +4,11 @@ import fs from "node:fs";
 import { TERRAIN } from "../../client/src/protocol.js";
 import { createMapHandoff, consumeMapHandoff } from "../../client/src/map_editor_handoff.js";
 import { mapEditorLaunchConfig } from "../../client/src/map_editor_launch.js";
-import { mapEditorSymmetryGuideLines, MapEditorViewport } from "../../client/src/map_editor_viewport.js";
+import {
+  mapEditorSymmetryGuideCentre,
+  mapEditorSymmetryGuideLines,
+  MapEditorViewport,
+} from "../../client/src/map_editor_viewport.js";
 import {
   addDraftPlayerNatural,
   addSymmetricDraftNaturals,
@@ -107,6 +111,11 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
     "vertical symmetry reflects across the map's vertical centre line",
   );
   assert.deepEqual(
+    symmetricMapTiles(8, [{ x: 1, y: 2 }], MAP_EDITOR_SYMMETRY.HALF_TURN),
+    [{ x: 1, y: 2 }, { x: 6, y: 5 }],
+    "half-turn symmetry rotates paint 180 degrees through the map centre",
+  );
+  assert.deepEqual(
     symmetricMapTiles(8, [{ x: 1, y: 2 }], MAP_EDITOR_SYMMETRY.RADIAL),
     [{ x: 1, y: 2 }, { x: 5, y: 1 }, { x: 6, y: 5 }, { x: 2, y: 6 }],
     "radial symmetry rotates paint through every quadrant",
@@ -130,6 +139,11 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
     mapEditorSymmetryGuideLines(8, MAP_EDITOR_SYMMETRY.VERTICAL),
     [{ x0: 128, y0: 0, x1: 128, y1: 256 }],
     "vertical symmetry shows its vertical centre axis",
+  );
+  assert.deepEqual(
+    mapEditorSymmetryGuideCentre(8, MAP_EDITOR_SYMMETRY.HALF_TURN),
+    { x: 128, y: 128 },
+    "half-turn symmetry marks its rotation centre",
   );
   assert.deepEqual(
     mapEditorSymmetryGuideLines(8, MAP_EDITOR_SYMMETRY.RADIAL),
@@ -158,6 +172,27 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
     ],
     "box painting expands an inclusive drag rectangle",
   );
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 126, playerCount: 2 });
+  const layoutId = session.selectedLayoutId;
+  let result = null;
+  assert.equal(session.mutate("Moved half-turn starts", (draft) => {
+    result = moveSymmetricDraftBase(draft, {
+      kind: "main",
+      playerIndex: 0,
+      tile: { x: 40, y: 46 },
+      layoutId,
+      symmetry: MAP_EDITOR_SYMMETRY.HALF_TURN,
+    });
+  }), true);
+  assert.equal(result.count, 2, "a half-turn start move reaches the opposing counterpart");
+  assert.deepEqual(session.playerSlots().map((player) => player.start && ({ x: player.start.x, y: player.start.y })), [
+    { x: 40, y: 46 },
+    { x: 85, y: 79 },
+  ]);
 }
 
 {
@@ -436,6 +471,7 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
   assert.match(editorPanel, /createTerrainPreview/, "terrain controls request a terrain preview from the editor viewport");
   assert.match(editorPanel, /symmetry\.title = "Symmetry applies to terrain and base moves\."/, "symmetry help is available on hover");
   assert.match(editorPanel, /readout\("Bases need grass clearance\."\)/, "spawn layout controls explain the grass-clearance requirement");
+  assert.match(editorPanel, /Half-turn \(180°\)/, "the 180-degree rotation is independently selectable");
   assert.doesNotMatch(editorPanel, /Radial \(180°\)|Diagonal \(both axes\)/, "symmetry labels describe the current transforms");
   assert.match(editorPanel, /scrollTop = scroll\.top/, "sidebar refreshes restore the previous vertical scroll position");
   assert.doesNotMatch(editorPanel, /Frozen room · no simulation/i, "the editor header omits frozen-room implementation copy");

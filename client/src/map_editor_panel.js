@@ -163,6 +163,7 @@ export class MapEditorPanel {
       [MAP_EDITOR_SYMMETRY.NONE, "None"],
       [MAP_EDITOR_SYMMETRY.HORIZONTAL, "Horizontal"],
       [MAP_EDITOR_SYMMETRY.VERTICAL, "Vertical"],
+      [MAP_EDITOR_SYMMETRY.HALF_TURN, "Half-turn (180°)"],
       [MAP_EDITOR_SYMMETRY.RADIAL, "Radial (4-way)"],
       [MAP_EDITOR_SYMMETRY.DIAGONAL_MAIN, "Diagonal ↘ (top-left ↔ bottom-right)"],
       [MAP_EDITOR_SYMMETRY.DIAGONAL_ANTI, "Diagonal ↙ (top-right ↔ bottom-left)"],
