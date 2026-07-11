@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -102,13 +102,13 @@ not mark its status done.
 
 ## Implementation Checklist
 
-- [ ] Add and route the durable rendering design document.
-- [ ] Record all cross-phase invariants and semantic contracts needed by Phase 1.
-- [ ] Create the parity/evidence ledger with both migration gates.
-- [ ] Inventory raw camera consumers, Pixi presentation capabilities, and lifecycle resources.
-- [ ] Define reproducible scenario contracts and required diagnostics.
-- [ ] Record the plan-copied PoC leads as unverified/non-binding without recovering implementation.
-- [ ] Run docs validation and mark this phase done in the implementation commit.
+- [x] Add and route the durable rendering design document.
+- [x] Record all cross-phase invariants and semantic contracts needed by Phase 1.
+- [x] Create the parity/evidence ledger with both migration gates.
+- [x] Inventory raw camera consumers, Pixi presentation capabilities, and lifecycle resources.
+- [x] Define reproducible scenario contracts and required diagnostics.
+- [x] Record the plan-copied PoC leads as unverified/non-binding without recovering implementation.
+- [x] Run docs validation and mark this phase done in the implementation commit.
 
 ## Verification
 

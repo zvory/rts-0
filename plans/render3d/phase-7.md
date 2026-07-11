@@ -18,14 +18,15 @@ selection remains Phase 2 plain rules/presentation data and the representative a
 ## Work
 
 - Add the only server-world-to-Babylon coordinate module, owning world `(x,y)` pixels to scene
-  ground `(x,0,z)`, inverse ground conversion, Phase 1 `heightPx` presentation height, scale,
-  handedness, hull/weapon facing,
+  ground `(x,0,z)`, inverse ground conversion, Phase 1 `heightPx` presentation height, the durable
+  contract's deterministic per-static-map scale, handedness, hull/weapon facing,
   direction vectors, attachment transforms, and angle wrapping.
 - Keep public projection/picking in viewport-local CSS pixels; the Babylon adapter alone handles DPR,
   canvas backing dimensions, engine hardware scaling, and render-buffer projection.
 - Cover canonical points/directions, arbitrary facing, round trips, map corners, negative
-  intermediates, attachments, and tolerances. Entity, terrain, effect, input, asset, and shadow
-  modules import this conversion; add a ratchet against local swaps/signs/scale constants.
+  intermediates, attachments, scale selection/bounded map incompatibility, and tolerances. Entity,
+  terrain, effect, input, asset, and shadow modules import this conversion; add a ratchet against
+  local swaps/signs/scale constants.
 - Define a manifest/schema covering asset id/version, source/license/provenance, authoring/runtime
   scale, up/forward axes, handedness, ground pivot, visible bounds, visual selection/HP/turret/
   muzzle/exhaust/effect anchors, articulated parts, visible/shadow/LOD node roles, team material

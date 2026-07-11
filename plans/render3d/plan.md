@@ -76,8 +76,9 @@ selection, lifecycle, capture, shadows, and batching, not with a converted facti
 - The final representative GLB is a repository-authored neutral tracked-vehicle fixture generated
   by a checked-in deterministic script. It has a hull, turret, independently articulated barrel,
   team-color slot, muzzle/selection/HP anchors, visible bounds, and shadow proxy; it is
-  production-representative in contract complexity and budget shape, not a claim of final art.
-  Executors must not search for, download, or generate third-party/AI art for this gate.
+  production-representative in contract complexity and budget shape, not a claim of final art. Its
+  semantic hull is exactly 50.4 world px long by 28.8 world px wide. Executors must not search for,
+  download, or generate third-party/AI art for this gate.
 - Experimental quality tier ids are exactly `off`, `low`, `medium`, and `high`. Vegetation density
   factors are `0`, `0.30`, `0.60`, and `1.00`; Phase 12.5 starts shadows at map/caster/update values
   `0/0/never`, `512/32/every 4th frame`, `1024/64/every 2nd frame`, and `2048/128/every frame` and

@@ -4,10 +4,9 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 
 ## Read first
 - [docs/design/architecture.md](../design/architecture.md) — just the client paragraph
-- [docs/design/client-ui.md](../design/client-ui.md) — JS client modules and exported APIs
-- §4.1 Module export contracts
-- §4.2 Rendering and look
-- §4.3 Client architecture workflow
+- [docs/design/client-ui.md](../design/client-ui.md) — module contracts in §4.1 and current Pixi
+  behavior in §4.2
+- [client-rendering.md](../design/client-rendering.md) — renderer-neutral contracts and parity ledger
 
 ## Code map
 - `app-shell`: `main.js`, `app.js`, `lab_interact_bridge.js`, `launch_url.js`, `match.js`, `match_*.js`, diagnostics, observer analysis,
@@ -21,16 +20,14 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
   catalog/panel, dedicated Map Editor panel/session, scoreboard/status/resource icons, and settings.
 - `input`: `input/` plus `replay_camera_input.js`; shared command-free camera gestures live in
   `input/camera_navigation.js`.
-- `renderer`: `renderer/` facade, layers, terrain/decals, entities, fog, feedback, art helpers,
-  rigs, and palettes.
+- `renderer`: `renderer/` facade, layers, terrain/decals, entities, fog, feedback, rigs, palettes.
 - `platform`: `bootstrap.js`, `audio.js`, `sound_manifest.js`, `combat_audio.js`, `alerts.js`,
   `fog.js`, `camera.js`, `prediction_settings.js`, `report_window_aggregate.js`.
 
 ## Invariants
 - **No framework, no JS build step.** Plain ES2020 modules. PixiJS v7 is the global `PIXI`; do not
   import it.
-- **Client architecture check.** Run `node scripts/check-client-architecture.mjs` for client module
-  or architecture-policy changes.
+- **Client architecture check.** Run `node scripts/check-client-architecture.mjs` for client changes.
 - **Cross-area imports are constrained.** `protocol.js` and `config.js` are shared mirrors,
   same-area imports are allowed, and `app-shell` may compose other areas. Non-shell cross-area
   imports should use DI through `Match`/`App`, or be documented in

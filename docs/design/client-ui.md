@@ -1449,6 +1449,12 @@ selection rings):
   the next snapshot.
 
 ### 4.2 Rendering & look (PixiJS, SVG rigs — neutral PS1 field-command style)
+
+This section owns the current Pixi look and module behavior. Renderer-neutral camera,
+presentation, ownership, capture, backend, parity-gate, and benchmark contracts live in
+[client-rendering.md](client-rendering.md) and its active
+[rendering parity ledger](rendering-parity.md).
+
 - Minimap player-owned unit and building blips render at 1.6× their original size above resource blips, with a merged one-pixel white outline mask for clustered-icon readability; resource blips retain their original size. Legacy vision-only intel remains scaled but renders below the fog overlay and does not use the foreground outline/resource-overlap pass.
 - Layers (back→front): terrain → ground decals → trench terrain → local visual samples → resource nodes → building shadows → buildings →
   building overlays → unit shadows → occupied-trench shadows → occupied-trench lips → units → smoke/ability ground effects → selection rings →
