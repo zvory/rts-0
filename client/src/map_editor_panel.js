@@ -30,7 +30,7 @@ export class MapEditorPanel {
     this.selectedTerrain = TERRAIN.ROCK;
     this.newLayoutPlayers = 2;
     this.pending = false;
-    this.status = "Map Editor is frozen: only the authored map changes here.";
+    this.status = "Ready to edit the map.";
     this.statusError = false;
     this.destroyed = false;
     this.el = document.createElement("aside");
@@ -45,15 +45,17 @@ export class MapEditorPanel {
 
   render() {
     if (this.destroyed) return;
+    const previousBody = this.el.querySelector(".map-editor-panel-body");
+    const scroll = previousBody && {
+      left: previousBody.scrollLeft,
+      top: previousBody.scrollTop,
+    };
     this.el.replaceChildren();
     const header = document.createElement("header");
     header.className = "map-editor-header";
     const title = document.createElement("h1");
     title.textContent = "Map Editor";
-    const frozen = document.createElement("span");
-    frozen.className = "map-editor-frozen";
-    frozen.textContent = "Frozen room · no simulation";
-    header.append(title, frozen);
+    header.appendChild(title);
     const body = document.createElement("div");
     body.className = "map-editor-panel-body";
     if (!this.session.draft) {
@@ -71,6 +73,10 @@ export class MapEditorPanel {
       );
     }
     this.el.append(header, body);
+    if (scroll) {
+      body.scrollLeft = scroll.left;
+      body.scrollTop = scroll.top;
+    }
   }
 
   renderMapSource() {
@@ -133,6 +139,13 @@ export class MapEditorPanel {
         this.setStatus(`Painting ${label.toLowerCase()}. Drag across the map to make one undoable stroke.`);
       }, { active: this.viewport.tool?.kind === "terrain" && this.selectedTerrain === code });
       control.dataset.terrain = terrainName(code);
+      control.classList.add("map-editor-terrain-button");
+      const preview = this.viewport.createTerrainPreview?.(code);
+      if (preview) {
+        preview.className = "map-editor-terrain-icon";
+        preview.setAttribute("aria-hidden", "true");
+        control.prepend(preview);
+      }
       palette.appendChild(control);
     }
     section.append(palette, readout("Each drag is one render and undo transaction. Authored start and natural clearances stay grass."));

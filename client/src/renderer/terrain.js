@@ -52,6 +52,29 @@ function drawTerrainTile(ctx, map, tx, ty, textureTileSize) {
   fillImpassableEdge(ctx, map, tx, ty, code, textureTileSize);
 }
 
+/** Create a small DOM canvas using the same tile painter as the game map. */
+export function createTerrainPreviewCanvas(code) {
+  const tiles = 3;
+  const textureTileSize = 4;
+  const canvas = document.createElement("canvas");
+  canvas.width = tiles * textureTileSize;
+  canvas.height = tiles * textureTileSize;
+  const ctx = canvas.getContext("2d", { alpha: false });
+  if (!ctx) return null;
+  ctx.imageSmoothingEnabled = false;
+  const map = {
+    width: tiles,
+    height: tiles,
+    terrain: Array(tiles * tiles).fill(code),
+  };
+  for (let ty = 0; ty < tiles; ty++) {
+    for (let tx = 0; tx < tiles; tx++) {
+      drawTerrainTile(ctx, map, tx, ty, textureTileSize);
+    }
+  }
+  return canvas;
+}
+
 export function buildStaticMap(map, { preserveMapLayers = false } = {}) {
   this._map = {
     width: map.width,
