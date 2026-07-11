@@ -11,6 +11,7 @@ import {
   formatBakeoffMarkdown,
   runSnapshotCodecBakeoff,
 } from "./snapshot-codec-bakeoff.mjs";
+import { buildClientPerfWorkloads } from "./client-perf/workloads.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "..");
@@ -43,45 +44,7 @@ export const RENDER_FRAME_BUDGET_TARGETS = Object.freeze([
 export const RECURRING_PHASE_WARN_MS = 1;
 export const RECURRING_PHASE_HIGH_WARN_MS = 2;
 const MAX_RECURRING_WARNINGS = 8;
-const INCIDENT_REPLAY_SOURCE = process.env.RTS_CLIENT_PERF_INCIDENT_REPLAY
-  ? path.resolve(process.env.RTS_CLIENT_PERF_INCIDENT_REPLAY)
-  : null;
-const WORKLOADS = Object.freeze([
-  {
-    id: "vehicle-wall-stress",
-    description: "No-fog dev scenario with 15 tanks moving through a wall chokepoint.",
-    kind: "devScenario",
-    url: "/dev/scenarios?id=scout_car_wall_chokepoint&unit=tank&count=15",
-  },
-  {
-    id: "selected-unit-hud-stress",
-    description: "No-fog dev scenario with four selected tanks to exercise HUD and selection overlays.",
-    kind: "devScenario",
-    url: "/dev/scenarios?id=scout_car_snaking_corridor&unit=tank&count=4",
-    setup: {
-      selectFirstEntities: 4,
-      minSelectedCount: 1,
-    },
-  },
-  ...(INCIDENT_REPLAY_SOURCE ? [{
-    id: "incident-120-commander-endgame",
-    description: "Paused Commander-perspective replay at the 244-entity late-game render incident.",
-    kind: "replayArtifact",
-    source: INCIDENT_REPLAY_SOURCE,
-    replayName: "incident-120-commander-endgame",
-    url: "/?replayArtifact=incident-120-commander-endgame",
-    setup: {
-      visionSelectionPlayerId: 8,
-      setRoomTimeSpeed: 8,
-      waitRoomTimeTo: 29643,
-      roomTimeWaitTimeoutMs: 90000,
-      setRoomTimeSpeedAfterWait: 0,
-      waitForMinEntities: 240,
-      entityWaitTimeoutMs: 30000,
-      resetPerfAfterSetup: true,
-    },
-  }] : []),
-]);
+const WORKLOADS = buildClientPerfWorkloads();
 const RENDER_LAG_WORKLOAD_IDS = Object.freeze(WORKLOADS.map((workload) => workload.id));
 
 async function main() {
