@@ -488,10 +488,10 @@ export class LabInteractDriver {
       clearTimeout(recording.watchdog);
       clearInterval(recording.sizeWatchdog);
       try {
+        const endStatus = await this.callBridge("status", {}).catch(() => null);
         // An immediate stop is valid; retain a minimally positive timeline even when
         // start and stop land in the same millisecond.
         const stoppedMs = Math.max(Date.now(), recording.startedMs + 1);
-        const endStatus = await this.callBridge("status", {}).catch(() => null);
         await stopRecorderWithin(recording.recorder);
         await waitForMediaFile(recording.webmPath);
         const wallDurationMs = Math.max(1, stoppedMs - recording.startedMs);
