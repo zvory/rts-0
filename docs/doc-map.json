@@ -71,6 +71,8 @@
       "docs": [
         "docs/context/client-ui.md",
         "docs/design/client-ui.md",
+        "docs/design/client-rendering.md",
+        "docs/design/rendering-parity.md",
         "docs/context/balance.md",
         "docs/design/balance.md"
       ],
