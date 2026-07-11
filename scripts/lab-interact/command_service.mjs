@@ -6,6 +6,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { LabInteractDriver, LabInteractDriverError } from "./driver.mjs";
+import { RECORDING_LIMITS } from "./recording.mjs";
 
 export const LAB_INTERACT_LIMITS = Object.freeze({
   maxSessions: 1,
@@ -18,9 +19,9 @@ export const LAB_INTERACT_LIMITS = Object.freeze({
   maxScreenshotSubjects: 20,
   maxArtifactBytes: 8 * 1024 * 1024,
   maxAliasSidecarBytes: 64 * 1024,
-  maxRecordingOperations: 200,
-  defaultRecordingDurationMs: 10_000,
-  maxRecordingDurationMs: 30_000,
+  maxRecordingOperations: RECORDING_LIMITS.maxOperations,
+  defaultRecordingDurationMs: RECORDING_LIMITS.defaultDurationMs,
+  maxRecordingDurationMs: RECORDING_LIMITS.maxDurationMs,
 });
 
 export const LAB_INTERACT_COMMANDS = Object.freeze([
@@ -94,19 +95,14 @@ export class LabInteractService {
     if (command === "close") return { sessionId: input.sessionId, closed: await this.close(input.sessionId) };
     return this.use(input.sessionId, async (session) => {
       const result = await this.executeSession(command, session, input);
-      if (!command.startsWith("record-") && session.recordingOperations) {
+      if (!command.startsWith("record-")) {
         const recorder = session.driver.recordingStatus?.();
         if (recorder?.active) {
           const operation = recordingOperation(command, input, result);
-          if (session.recordingOperations.length < LAB_INTERACT_LIMITS.maxRecordingOperations) {
-            session.recordingOperations.push(operation);
-          }
           session.driver.recordAcceptedOperation?.(
             operation,
             [...session.aliases].map(([alias, id]) => ({ alias, id })),
           );
-        } else if (!recorder?.active) {
-          session.recordingOperations = null;
         }
       }
       return result;
@@ -136,7 +132,7 @@ export class LabInteractService {
         throw new LabInteractError("serviceClosed", "Lab Interact shut down while the session was opening.");
       }
       const sessionId = `lab_${crypto.randomUUID().replaceAll("-", "")}`;
-      const session = { sessionId, driver, aliases: new Map(), operationTail: Promise.resolve(), recordingOperations: null };
+      const session = { sessionId, driver, aliases: new Map(), operationTail: Promise.resolve() };
       this.sessions.set(sessionId, session);
       try {
         return await this.describeSession(session);
@@ -250,19 +246,13 @@ export class LabInteractService {
     if (command === "artifact-inspect") return inspectArtifact(this.workspaceRoot, session, input);
     if (command === "record-start") {
       const result = await session.driver.recordStart({ ...input, sessionId });
-      session.recordingOperations = [];
       return { sessionId, recorder: result };
     }
     if (command === "record-stop") {
-      try {
-        const result = await session.driver.recordStop({
-          operations: session.recordingOperations || [],
-          aliases: [...session.aliases].map(([alias, id]) => ({ alias, id })),
-        });
-        return { sessionId, ...result };
-      } finally {
-        session.recordingOperations = null;
-      }
+      const result = await session.driver.recordStop({
+        aliases: [...session.aliases].map(([alias, id]) => ({ alias, id })),
+      });
+      return { sessionId, ...result };
     }
     throw new LabInteractError("unknownCommand", `Unknown session command ${command}.`);
   }

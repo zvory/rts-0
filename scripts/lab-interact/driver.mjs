@@ -314,6 +314,7 @@ export class LabInteractDriver {
       const normalizedViewport = viewport ? normalizeCaptureViewport(viewport) : null;
       const originalViewport = this.page.viewport?.() || null;
       let recordingDir = "";
+      let recorder = null;
       try {
         if (normalizedViewport) await this.page.setViewport(normalizedViewport);
         await this.callBridge("presentation", { mode: "clean" });
@@ -330,7 +331,7 @@ export class LabInteractDriver {
         recordingDir = path.join(this.workspace.root, LAB_INTERACT_ROOT, normalizedSessionId, "recordings", `${artifactName}-${suffix}`);
         fs.mkdirSync(recordingDir, { recursive: true });
         const webmPath = path.join(recordingDir, `${artifactName}.webm`);
-        const recorder = await this.page.screencast({ path: webmPath, crop: clip, scale, ffmpegPath: tools.ffmpeg });
+        recorder = await this.page.screencast({ path: webmPath, crop: clip, scale, ffmpegPath: tools.ffmpeg });
         const startedMs = Date.now();
         const startStatus = await this.callBridge("status", {});
         const recording = {
@@ -352,6 +353,7 @@ export class LabInteractDriver {
         recording.sizeWatchdog.unref?.();
         return { ...this.recordingStatus(), clip, scale, authoritativeStartTick: startStatus.snapshotTick ?? null };
       } catch (error) {
+        if (recorder) await stopRecorderWithin(recorder).catch(() => {});
         removePartialRecording([recordingDir]);
         if (originalViewport) await this.page.setViewport(originalViewport).catch(() => {});
         await this.callBridge("presentation", { mode: "default" }).catch(() => {});
@@ -363,9 +365,9 @@ export class LabInteractDriver {
   recordAcceptedOperation(operation, aliases = []) {
     if (!this.recording || this.recording.finalizing) return false;
     this.recording.operationCount += 1;
-    if (this.recording.operations.length < 200) this.recording.operations.push(operation);
+    if (this.recording.operations.length < RECORDING_LIMITS.maxOperations) this.recording.operations.push(operation);
     else this.recording.operationsTruncated = true;
-    this.recording.aliases = Array.isArray(aliases) ? aliases.slice(0, 100) : [];
+    this.recording.aliases = Array.isArray(aliases) ? aliases.slice(0, RECORDING_LIMITS.maxAliases) : [];
     return true;
   }
 
@@ -410,8 +412,8 @@ export class LabInteractDriver {
             endRoomTime: endStatus?.roomTime ?? null,
           },
           capture: { fps: 30, audio: false, clip: recording.clip, scale: recording.scale, viewport: recording.viewport, wallDurationMs: endedMs - recording.startedMs, maxDurationMs: recording.maxDurationMs },
-          aliases: Array.isArray(metadata.aliases) ? metadata.aliases.slice(0, 100) : recording.aliases,
-          operations: Array.isArray(metadata.operations) ? metadata.operations.slice(0, 200) : recording.operations,
+          aliases: Array.isArray(metadata.aliases) ? metadata.aliases.slice(0, RECORDING_LIMITS.maxAliases) : recording.aliases,
+          operations: recording.operations,
           operationDiagnostics: {
             accepted: recording.operationCount,
             captured: recording.operations.length,

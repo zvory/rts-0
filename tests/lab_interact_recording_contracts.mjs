@@ -23,6 +23,7 @@ assert.equal(RECORDING_LIMITS.defaultDurationMs, 10_000, "recordings default to 
 assert.equal(RECORDING_LIMITS.maxDurationMs, 30_000, "recordings retain a hard 30-second duration ceiling");
 assert.equal(RECORDING_LIMITS.maxBytes, 64 * 1024 * 1024, "recordings retain a hard 64 MiB file ceiling");
 assert.equal(LAB_INTERACT_LIMITS.maxRecordingOperations, 200, "recording action manifests remain bounded");
+assert.equal(RECORDING_LIMITS.maxOperations, LAB_INTERACT_LIMITS.maxRecordingOperations, "service and driver share the operation bound");
 
 assert.throws(
   () => validateCommandInput("record-start", { sessionId, maxDurationMs: 30_001 }),
@@ -87,6 +88,17 @@ await assert.rejects(
 const failedRoot = path.join(root, "target", "lab-interact", failedSessionId, "recordings");
 const failedEntries = fs.existsSync(failedRoot) ? fs.readdirSync(failedRoot).filter((name) => name.startsWith("page-failure-")) : [];
 assert.deepEqual(failedEntries, [], "page failure removes its partial recording directory");
+const failedStatusDriver = fixtureRecordingDriver(root, tools, { failStartStatus: true });
+const failedStatusSessionId = `lab_${"e".repeat(32)}`;
+await assert.rejects(
+  failedStatusDriver.recordStart({ sessionId: failedStatusSessionId, name: "status-failure", maxDurationMs: 5_000 }),
+  /fixture status failure/,
+  "status failure rejects recording startup",
+);
+assert.equal(failedStatusDriver.fixtureRecorderStops, 1, "post-screencast startup failure stops the owned recorder");
+const failedStatusRoot = path.join(root, "target", "lab-interact", failedStatusSessionId, "recordings");
+const failedStatusEntries = fs.existsSync(failedStatusRoot) ? fs.readdirSync(failedStatusRoot).filter((name) => name.startsWith("status-failure-")) : [];
+assert.deepEqual(failedStatusEntries, [], "post-screencast startup failure removes its partial recording directory");
 assert.throws(
   () => validateCommandInput("record-start", { sessionId, crop: { x: 0, y: 0, width: 1, height: 100 } }),
   (error) => error?.code === "invalidInput",
@@ -131,12 +143,13 @@ await service.shutdown();
 
 console.log("✅ lab_interact_recording_contracts.mjs: bounds, state, operation metadata, errors, and close cleanup passed");
 
-function fixtureRecordingDriver(workspaceRoot, mediaTools, { failScreencast = false } = {}) {
+function fixtureRecordingDriver(workspaceRoot, mediaTools, { failScreencast = false, failStartStatus = false } = {}) {
   const driver = new LabInteractDriver({ workspaceRoot, viewport: { width: 640, height: 480, deviceScaleFactor: 1 } });
   driver.workspace = { root: workspaceRoot, branch: "fixture", head: "a".repeat(40) };
   driver.state = DRIVER_STATES.OPEN;
   driver.browserVersion = "fixture-chrome";
   let frame = 0;
+  let recorderStops = 0;
   let viewport = { width: 640, height: 480, deviceScaleFactor: 1 };
   driver.page = {
     viewport: () => viewport,
@@ -147,7 +160,10 @@ function fixtureRecordingDriver(workspaceRoot, mediaTools, { failScreencast = fa
         frame += 1;
         return { ok: true, value: { ready: true, frame, snapshotTick: 10, assets: {}, frameErrors: [], renderErrors: [], missingTextureSubjectIds: [] } };
       }
-      if (bridgeCall?.method === "status") return { ok: true, value: { ready: true, snapshotTick: 10, roomTime: { currentTick: 10, paused: true, speed: 0 } } };
+      if (bridgeCall?.method === "status") {
+        if (failStartStatus) throw new Error("fixture status failure");
+        return { ok: true, value: { ready: true, snapshotTick: 10, roomTime: { currentTick: 10, paused: true, speed: 0 } } };
+      }
       if (bridgeCall?.method === "presentation") return { ok: true, value: { mode: bridgeCall.input.mode } };
       const source = String(fn);
       if (source.includes("getElementById")) return { x: 0, y: 0, width: viewport.width, height: viewport.height };
@@ -164,9 +180,10 @@ function fixtureRecordingDriver(workspaceRoot, mediaTools, { failScreencast = fa
         "-an", "-c:v", "libvpx-vp9", "-b:v", "0", outputPath,
       ], { encoding: "utf8", timeout: 15_000 });
       assert.equal(generated.status, 0, `fixture screencast succeeds: ${generated.stderr}`);
-      return { stop: async () => {} };
+      return { stop: async () => { recorderStops += 1; } };
     },
   };
+  Object.defineProperty(driver, "fixtureRecorderStops", { get: () => recorderStops });
   return driver;
 }
 

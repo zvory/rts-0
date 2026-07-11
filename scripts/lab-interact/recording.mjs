@@ -9,6 +9,8 @@ export const RECORDING_LIMITS = Object.freeze({
   maxDurationMs: 30_000,
   maxBytes: 64 * 1024 * 1024,
   maxFrames: 6,
+  maxOperations: 200,
+  maxAliases: 100,
   stopTimeoutMs: 15_000,
 });
 

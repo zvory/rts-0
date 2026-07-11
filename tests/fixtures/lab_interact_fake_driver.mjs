@@ -149,10 +149,15 @@ export async function openLabInteractDriver(options) {
     },
     async recordStart({ sessionId, name = "recording", maxDurationMs = 10_000, viewport = null, crop = null, scale = 1 }) {
       if (recording) throw Object.assign(new Error("A recording is already active."), { code: "recordingActive" });
-      recording = { sessionId, name, maxDurationMs, viewport, crop, scale, startTick: tick };
+      recording = { sessionId, name, maxDurationMs, viewport, crop, scale, startTick: tick, operations: [] };
       return { active: true, name, maxDurationMs, authoritativeStartTick: tick };
     },
-    async recordStop({ operations = [], aliases = [] } = {}) {
+    recordAcceptedOperation(operation) {
+      if (!recording) return false;
+      recording.operations.push(operation);
+      return true;
+    },
+    async recordStop({ aliases = [] } = {}) {
       if (!recording) throw Object.assign(new Error("No recording is active."), { code: "recordingInactive" });
       const directory = `${options.workspaceRoot}/target/lab-interact/${recording.sessionId}/recordings/${recording.name}-fixture`;
       lastRecording = {
@@ -165,7 +170,7 @@ export async function openLabInteractDriver(options) {
         probe: { codec: "vp9", width: 640, height: 480, frameRate: "30/1", durationSeconds: 1 },
         frameDiagnostics: { expectedAt30Fps: 30, encoded: 30, droppedEstimate: 0, duplicatedEstimate: 0 },
         authoritative: { startTick: recording.startTick, endTick: tick },
-        fixtureMetadata: { operations, aliases },
+        fixtureMetadata: { operations: recording.operations, aliases },
       };
       recording = null;
       return lastRecording;
