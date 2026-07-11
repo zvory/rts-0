@@ -260,28 +260,22 @@ impl Game {
 
     pub fn apply_lab_op(&mut self, op: LabOp) -> Result<LabOpOutcome, LabError> {
         match op {
-            LabOp::SpawnEntities(spawns) => {
-                return self
-                    .lab_spawn_entities(spawns)
-                    .map(LabOpOutcome::Batch)
-                    .map_err(batch_error)
-            }
-            LabOp::ApplyUpdates(updates) => {
-                return self
-                    .lab_apply_updates(updates)
-                    .map(LabOpOutcome::Batch)
-                    .map_err(batch_error)
-            }
-            LabOp::DeleteEntities(entity_ids) => {
-                return self
-                    .lab_delete_entities(entity_ids)
-                    .map(LabOpOutcome::Batch)
-                    .map_err(batch_error)
-            }
+            LabOp::SpawnEntities(spawns) => self
+                .lab_spawn_entities(spawns)
+                .map(LabOpOutcome::Batch)
+                .map_err(batch_error),
+            LabOp::ApplyUpdates(updates) => self
+                .lab_apply_updates(updates)
+                .map(LabOpOutcome::Batch)
+                .map_err(batch_error),
+            LabOp::DeleteEntities(entity_ids) => self
+                .lab_delete_entities(entity_ids)
+                .map(LabOpOutcome::Batch)
+                .map_err(batch_error),
             op => {
                 let outcome = self.apply_lab_op_without_repair(op)?;
                 self.repair_lab_state();
-                return Ok(outcome);
+                Ok(outcome)
             }
         }
     }
