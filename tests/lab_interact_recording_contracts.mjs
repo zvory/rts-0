@@ -51,13 +51,27 @@ try {
   assert.equal(generated.status, 0, `VP9 fixture generation succeeds: ${generated.stderr}`);
   const media = finalizeMedia({
     webmPath,
+    mp4Path: path.join(mediaTmp, "fixture.mp4"),
     framesDir: path.join(mediaTmp, "frames"),
     contactSheetPath: path.join(mediaTmp, "contact.png"),
+    targetDurationMs: 500,
     tools,
   });
-  assert.equal(media.probe.codec, "vp9", "final media probe confirms VP9");
+  assert.equal(media.probe.codec, "h264", "final media probe confirms H.264");
+  assert.deepEqual(
+    { codecTag: media.probe.codecTag, pixelFormat: media.probe.pixelFormat, container: media.probe.container },
+    { codecTag: "avc1", pixelFormat: "yuv420p", container: "mov,mp4,m4a,3gp,3g2,mj2" },
+    "final media probe confirms the mobile MP4 compatibility surface",
+  );
   assert.deepEqual({ width: media.probe.width, height: media.probe.height }, { width: 640, height: 480 }, "final media probe confirms dimensions");
-  assert.ok(media.probe.durationSeconds >= 0.1 && media.probe.durationSeconds <= 0.2, "final media probe confirms bounded duration");
+  assert.ok(media.probe.durationSeconds >= 0.45 && media.probe.durationSeconds <= 0.55, "final MP4 timeline is normalized to wall duration");
+  assert.equal(media.probe.frameRate, "30/1", "final MP4 uses the documented 30 FPS timeline");
+  assert.deepEqual(
+    { expected: media.frameDiagnostics.expectedAt30Fps, encoded: media.frameDiagnostics.encoded },
+    { expected: 15, encoded: 15 },
+    "timeline normalization emits the expected wall-duration frame count",
+  );
+  assert.equal(fs.existsSync(webmPath), false, "temporary WebM source is removed after MP4 finalization");
   assert.ok(media.framePaths.length >= 2 && media.framePaths.length <= RECORDING_LIMITS.maxFrames, "representative sampling remains bounded");
   assert.deepEqual(
     media.framePaths.map((framePath) => path.basename(framePath)),
@@ -74,7 +88,7 @@ await watchdogDriver.recordStart({ sessionId: `lab_${"b".repeat(32)}`, name: "wa
 await waitFor(() => watchdogDriver.recordingStatus().active === false, 5_000);
 assert.equal(watchdogDriver.recordingStatus().last.stoppedBy, "watchdog", "duration watchdog finalizes an active recorder");
 assert.ok(fs.existsSync(watchdogDriver.recordingStatus().last.contactSheetPath), "watchdog finalization retains a completed contact sheet");
-fs.rmSync(path.dirname(watchdogDriver.recordingStatus().last.webmPath), { recursive: true, force: true });
+fs.rmSync(path.dirname(watchdogDriver.recordingStatus().last.videoPath), { recursive: true, force: true });
 
 const closeDriver = fixtureRecordingDriver(root, tools);
 await closeDriver.recordStart({ sessionId: `lab_${"c".repeat(32)}`, name: "close", maxDurationMs: 5_000 });
@@ -86,7 +100,7 @@ await assert.rejects(
 await closeDriver.close();
 assert.equal(closeDriver.state, DRIVER_STATES.CLOSED, "driver close reaches the closed state while recording");
 assert.equal(closeDriver.recordingStatus().last.stoppedBy, "sessionClose", "driver close boundedly finalizes its recorder");
-fs.rmSync(path.dirname(closeDriver.recordingStatus().last.webmPath), { recursive: true, force: true });
+fs.rmSync(path.dirname(closeDriver.recordingStatus().last.videoPath), { recursive: true, force: true });
 
 const failedDriver = fixtureRecordingDriver(root, tools, { failScreencast: true });
 const failedSessionId = `lab_${"d".repeat(32)}`;
@@ -136,7 +150,7 @@ await service.execute("order", { sessionId, playerId: 1, command: { c: "move", u
 await service.execute("camera", { sessionId, camera: { action: "focus", refs: ["subject"] } });
 await service.execute("time", { sessionId, control: { action: "step", ticks: 3 } });
 const stopped = await service.execute("record-stop", { sessionId });
-assert.equal(stopped.probe.codec, "vp9", "record-stop returns codec probe metadata");
+assert.equal(stopped.probe.codec, "h264", "record-stop returns H.264 codec probe metadata");
 assert.equal(stopped.framePaths.length, 2, "record-stop returns representative PNG paths");
 assert.equal(stopped.fixtureMetadata.operations.length, 3, "accepted order, camera, and time operations are retained");
 assert.deepEqual(stopped.fixtureMetadata.aliases, [{ alias: "subject", id: 100 }], "stop records the final bounded alias map");

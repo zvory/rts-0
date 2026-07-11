@@ -176,7 +176,8 @@ assert.equal(callFailure("record-start", { sessionId, name: "duplicate" }).error
 call("order", { sessionId, playerId: 1, command: { c: "move", units: ["shooter"], x: 1100, y: 1000 } });
 call("time", { sessionId, control: { action: "step", ticks: 3 } });
 const recordingStopped = call("record-stop", { sessionId });
-assert.equal(recordingStopped.result.probe.codec, "vp9", "record-stop returns bounded VP9 probe metadata");
+assert.equal(recordingStopped.result.probe.codec, "h264", "record-stop returns bounded H.264 MP4 probe metadata");
+assert.match(recordingStopped.result.videoPath, /\.mp4$/, "record-stop returns a mobile MP4 path");
 assert.equal(recordingStopped.result.framePaths.length, 2, "record-stop returns representative frame paths");
 assert.match(recordingStopped.result.contactSheetPath, /target\/lab-interact\//, "contact sheets stay beneath the artifact root");
 assert.equal(callFailure("record-stop", { sessionId }).error.code, "recordingInactive", "duplicate recording stops are correctable errors");
@@ -185,6 +186,7 @@ assert.equal(callFailure("record-start", { sessionId, crop: { x: 0, y: 0, width:
 
 const fixed = call("capture-fixed", { sessionId, name: "cli-fixed", fps: 60, frameCount: 3 });
 assert.equal(fixed.result.framePaths.length, 3, "capture-fixed returns one confined PNG path per requested frame");
+assert.match(fixed.result.videoPath, /\.mp4$/, "capture-fixed returns a mobile MP4 path");
 assert.deepEqual(fixed.result.authoritative, { startTick: 6, endTick: 7 }, "capture-fixed reports its authoritative tick range");
 assert.match(fixed.result.videoPath, /target\/lab-interact\//, "fixed video remains beneath the artifact root");
 assert.equal(callFailure("capture-fixed", { sessionId, fps: 61, frameCount: 1 }).error.code, "invalidInput", "fixed capture FPS remains bounded");

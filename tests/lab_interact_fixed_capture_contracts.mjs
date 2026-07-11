@@ -42,11 +42,16 @@ try {
   // FFmpeg numbers image sequences from one; normalize to the capture command's zero-based names.
   for (let index = 1; index <= 3; index += 1) fs.renameSync(path.join(framesDir, `frame-${String(index).padStart(4, "0")}.png`), path.join(framesDir, `tmp-${String(index - 1).padStart(4, "0")}.png`));
   for (let index = 0; index < 3; index += 1) fs.renameSync(path.join(framesDir, `tmp-${String(index).padStart(4, "0")}.png`), path.join(framesDir, `frame-${String(index).padStart(4, "0")}.png`));
-  const outputPath = path.join(tmp, "fixed.webm");
+  const outputPath = path.join(tmp, "fixed.mp4");
   const contactSheetPath = path.join(tmp, "contact.png");
   const media = encodeFixedCapture({ framesDir, outputPath, contactSheetPath, fps: 30, frameCount: 3 });
-  assert.ok(media.bytes > 0, "fixed frame sequence encodes to non-empty VP9 media");
-  assert.deepEqual({ codec: media.probe.codec, frames: media.probe.frameCount, fps: media.probe.frameRate }, { codec: "vp9", frames: 3, fps: "30/1" }, "ffprobe confirms fixed codec, frame count, and FPS");
+  assert.ok(media.bytes > 0, "fixed frame sequence encodes to non-empty H.264 MP4 media");
+  assert.deepEqual({ codec: media.probe.codec, frames: media.probe.frameCount, fps: media.probe.frameRate }, { codec: "h264", frames: 3, fps: "30/1" }, "ffprobe confirms fixed codec, frame count, and FPS");
+  assert.deepEqual(
+    { codecTag: media.probe.codecTag, pixelFormat: media.probe.pixelFormat, container: media.probe.container },
+    { codecTag: "avc1", pixelFormat: "yuv420p", container: "mov,mp4,m4a,3gp,3g2,mj2" },
+    "fixed capture preserves the mobile MP4 compatibility surface",
+  );
   assert.deepEqual(media.contactSheet, { width: 1456, height: 612 }, "contact-sheet PNG dimensions remain bounded and readable");
   assert.ok(fs.statSync(contactSheetPath).size > 0, "fixed capture creates a contact sheet");
 } finally {

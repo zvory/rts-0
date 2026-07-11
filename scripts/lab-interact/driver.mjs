@@ -306,7 +306,7 @@ export class LabInteractDriver {
       startedAt: recording.startedAt,
       elapsedMs: Date.now() - recording.startedMs,
       maxDurationMs: recording.maxDurationMs,
-      webmPath: recording.webmPath,
+      videoPath: recording.mp4Path,
       finalizing: recording.finalizing != null,
     };
   }
@@ -336,11 +336,12 @@ export class LabInteractDriver {
         recordingDir = path.join(this.workspace.root, LAB_INTERACT_ROOT, normalizedSessionId, "recordings", `${artifactName}-${suffix}`);
         fs.mkdirSync(recordingDir, { recursive: true });
         const webmPath = path.join(recordingDir, `${artifactName}.webm`);
+        const mp4Path = path.join(recordingDir, `${artifactName}.mp4`);
         recorder = await this.page.screencast({ path: webmPath, crop: clip, scale, ffmpegPath: tools.ffmpeg });
         const startedMs = Date.now();
         const startStatus = await this.callBridge("status", {});
         const recording = {
-          name: artifactName, recorder, tools, recordingDir, webmPath,
+          name: artifactName, recorder, tools, recordingDir, webmPath, mp4Path,
           framesDir: path.join(recordingDir, "frames"), contactSheetPath: path.join(recordingDir, `${artifactName}-contact-sheet.png`),
           manifestPath: path.join(recordingDir, `${artifactName}.json`), startedMs, startedAt: new Date(startedMs).toISOString(),
           startStatus, clip, scale, viewport: normalizedViewport, originalViewport,
@@ -419,14 +420,14 @@ export class LabInteractDriver {
           }
           frames.push({ index, tick, visualTimeMs, rendererFrame: rendered.rendererFrame, path: framePath, sha256: hashFrame(framePath) });
         }
-        const videoPath = path.join(captureDir, `${artifactName}.webm`);
+        const videoPath = path.join(captureDir, `${artifactName}.mp4`);
         const contactSheetPath = path.join(captureDir, `${artifactName}-contact-sheet.png`);
         const media = encodeFixedCapture({ framesDir, outputPath: videoPath, contactSheetPath, fps, frameCount });
         const endStatus = await this.callBridge("status", {});
         const diagnostics = this.diagnostics();
         const manifestPath = path.join(captureDir, `${artifactName}.json`);
         const manifest = {
-          schemaVersion: 1, kind: "labInteractFixedCapture", deterministicEnvironmentOnly: true,
+          schemaVersion: 2, kind: "labInteractFixedCapture", deterministicEnvironmentOnly: true,
           workspace: this.workspace, serverBuild: this.server?.build || null,
           scene: { identity: sceneIdentity || { source: "launch", scenario: this.options.scenario, seed: this.options.seed || null, map: this.options.map }, revision: sceneRevision, aliases: aliases.slice(0, 100) },
           mapping: { simulationHz: 30, outputFps: fps, rule: "frame i uses startTick + floor(i * 30 / outputFps); repeated ticks do not interpolate world state" },
@@ -490,14 +491,15 @@ export class LabInteractDriver {
         await stopRecorderWithin(recording.recorder);
         await waitForMediaFile(recording.webmPath);
         const endedMs = Date.now();
+        const wallDurationMs = endedMs - recording.startedMs;
         const endStatus = await this.callBridge("status", {}).catch(() => null);
         const media = finalizeMedia({
-          webmPath: recording.webmPath, framesDir: recording.framesDir,
-          contactSheetPath: recording.contactSheetPath, tools: recording.tools,
+          webmPath: recording.webmPath, mp4Path: recording.mp4Path, framesDir: recording.framesDir,
+          contactSheetPath: recording.contactSheetPath, targetDurationMs: wallDurationMs, tools: recording.tools,
         });
         const diagnostics = this.diagnostics();
         const manifest = {
-          schemaVersion: 1,
+          schemaVersion: 2,
           kind: "labInteractRealTimeRecording",
           createdAt: recording.startedAt,
           finalizedAt: new Date(endedMs).toISOString(),
@@ -514,7 +516,7 @@ export class LabInteractDriver {
             startRoomTime: recording.startStatus?.roomTime ?? null,
             endRoomTime: endStatus?.roomTime ?? null,
           },
-          capture: { fps: 30, audio: false, clip: recording.clip, scale: recording.scale, viewport: recording.viewport, wallDurationMs: endedMs - recording.startedMs, maxDurationMs: recording.maxDurationMs },
+          capture: { fps: 30, audio: false, clip: recording.clip, scale: recording.scale, viewport: recording.viewport, wallDurationMs, maxDurationMs: recording.maxDurationMs },
           aliases: Array.isArray(metadata.aliases) ? metadata.aliases.slice(0, RECORDING_LIMITS.maxAliases) : recording.aliases,
           operations: recording.operations,
           operationDiagnostics: {
@@ -527,7 +529,7 @@ export class LabInteractDriver {
         };
         fs.writeFileSync(recording.manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o600 });
         const result = {
-          active: false, stoppedBy: reason, webmPath: recording.webmPath,
+          active: false, stoppedBy: reason, videoPath: recording.mp4Path,
           framePaths: media.framePaths, contactSheetPath: recording.contactSheetPath,
           manifestPath: recording.manifestPath, probe: media.probe,
           frameDiagnostics: media.frameDiagnostics,
