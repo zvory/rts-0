@@ -105,8 +105,8 @@ mod tests {
         let map = flat_map(24);
         let mut entities = EntityStore::new();
         let unit = entities
-            .spawn_unit(1, EntityKind::Rifleman, 96.0, 96.0)
-            .expect("rifleman should spawn");
+            .spawn_unit(1, EntityKind::Panzerfaust, 96.0, 96.0)
+            .expect("infantry should spawn");
         let mut cache = OccupancyPhaseCache::new(&map);
 
         cache.snapshot(&entities);
@@ -133,16 +133,16 @@ mod tests {
         let mut cache = OccupancyPhaseCache::new(&map);
 
         cache.snapshot(&entities);
-        let (x, y) = footprint_center(&map, EntityKind::Depot, 6, 6);
-        let depot = entities
-            .spawn_building(1, EntityKind::Depot, x, y, false)
-            .expect("depot scaffold should spawn");
+        let (x, y) = footprint_center(&map, EntityKind::TankTrap, 6, 6);
+        let building = entities
+            .spawn_building(1, EntityKind::TankTrap, x, y, false)
+            .expect("building scaffold should spawn");
         let after_construction = cache.snapshot(&entities);
 
         assert!(after_construction.building_blocked_at_tile(6, 6));
         assert_eq!(cache.rebuild_count(), 2);
 
-        entities.remove(depot);
+        entities.remove(building);
         let after_death = cache.snapshot(&entities);
 
         assert!(!after_death.building_blocked_at_tile(6, 6));
