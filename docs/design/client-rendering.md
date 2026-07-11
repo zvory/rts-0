@@ -189,7 +189,8 @@ SelectionProxyV1 = {
   anchor: PresentedPoint,
   footprint: { kind: "circle", radiusPx } |
              { kind: "polygon", points: WorldPoint[] },
-  minScreenRadiusCssPx: 6
+  minScreenRadiusCssPx: 6,
+  interaction: DetachedEntityView
 }
 SelectionSceneV1 = { version: 1, generation, frameId, projection, proxies[] }
 ```
@@ -210,6 +211,26 @@ actual CSS-pixel screen rectangle; proxy intersection, not a ground polygon/AABB
 
 The screen marquee is `screenOverlay` presentation with backend-neutral lifecycle. Selection never
 uses mesh picking, GPU ids, asset bounds, shadow proxies, or fresh mutable state.
+
+Phase 2 implements this contract in `input/selection_projection.js`. The producer deep-detaches and
+freezes the fog-filtered interpolated entity view as `interaction`; this app-only metadata lets
+right-click, hover, ability, Lab, and control-group classification use the presented entity record
+without a fresh `GameState` lookup and is never passed to a renderer backend. Circle footprints are
+projected as a bounded semantic polygon, while mirrored vehicle bodies and rotated building tile
+footprints are explicit world polygons. Click admission uses the footprint plus the elevated
+semantic anchor radius; marquee admission uses polygon/rectangle intersection, including partial
+coverage at viewport edges. Selection and control-group budget admission receive an explicit
+scene-backed entity resolver, so their existing ownership, Command Car priority, and command-supply
+rules do not reopen a mutable-state candidate query. There is no world-space candidate prefilter in Phase 2.
+
+`frame_recovery.js` assembles a candidate `SelectionSceneV1` from the same `frameEntityViews` and
+projection snapshot used for a frame, calls the renderer, and only then publishes the scene to
+`Input`. An exception before renderer completion leaves the previous scene object active. All
+ground-point interactions query that scene's nullable `groundAtScreen`; a miss clears hover/ghost
+feedback or leaves an armed click waiting and never emits non-finite or cached coordinates. Lab box
+diagnostics expose `screenRect` plus optional `groundPolygon`/conservative `groundBounds`, never a
+two-corner world rectangle presented as the selection region. Pixi's drag graphic is reached only
+through the backend-neutral `ScreenOverlay` operation owned by input lifecycle.
 
 ## 4. Presentation frame and layers
 
@@ -396,7 +417,7 @@ shared dependencies and are not destroyed by adjusted-texture teardown.
 | `camera.js` and Pixi world transform in `renderer/index.js` | private `x/y/zoom/viewW/viewH`, orthographic transforms | Phase 1 compatibility; stays backend-private |
 | `frame_recovery.js` and spatial `audio.setListener` | semantic `AudioListenerV1`; exact focus-plane reference distance | Phase 1.75 complete |
 | navigation/camera controls/replay input | semantic CSS-pixel pan/dolly; no raw camera read | Phase 1.5 complete |
-| `input/index.js`, `selection.js`, placement/commands/Lab tools | non-null `screenToWorld`, world rectangle | Phase 2 ground hit/proxies |
+| `input/index.js`, `selection.js`, placement/commands/Lab tools | last-presented `SelectionSceneV1`, projected proxies, nullable ground hit | Phase 2 complete |
 | `input/control_groups.js` | semantic viewport ground bounds, snapshot focus, and focus operation | Phase 1.75 complete |
 | `minimap.js` | semantic ground polygon and focus | Phase 1.5 complete |
 | `match.js` | semantic map/viewport resize, focus, projected alert containment, and ground bounds | Phase 1.75 complete |

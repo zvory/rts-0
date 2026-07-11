@@ -758,8 +758,10 @@ Tools that opt into `paintOnDrag` sample and interpolate each crossed map tile, 
 world-click callbacks without disarming the tool or falling through to selection; unit spawning,
 building spawning, and draft terrain painting use that path. Other left drags normally promote to box
 selection and cancel the active lab tool, while tools that opt into `consumeBoxSelection` receive the
-selectable ids in the drag box instead. World-click callbacks receive the active tool payload, exact
-world coordinates, and any selectable hit entity id. `ClientIntent.labToolPreview` tracks the armed
+selectable ids intersecting the real screen drag box instead. Box callbacks also receive the screen
+rectangle and, for diagnostics only, any available ground polygon plus conservative bounds.
+World-click callbacks receive the active tool payload, an exact nullable-ground world position (or
+the selected proxy anchor for an entity-only hit), and any selectable hit entity id. `ClientIntent.labToolPreview` tracks the armed
 tool at the world cursor for the renderer: unit and building spawn ghosts, the chosen terrain tile,
 and a large removal X make the pending action visible before a click.
 `Match.cancelLabTool(reason)` clears the tool and preview for Esc, right-click, teardown, ordinary
@@ -1038,7 +1040,7 @@ export class Renderer {
   render(state, camera, fog, alpha, options?) // per-frame; draws entities, fog, selection, placement, Tank Traps
   captureReadiness({subjectIds?, subjectKinds?}) // bounded visual asset/error state for Lab Interact capture
   app                                    // the PIXI.Application (for ticker/stage if needed)
-  // exposes screen->world hit info if helpful; selection box drawing lives here too:
+  // Pixi implementation of the backend screen-overlay operation; Input receives only a callback:
   drawSelectionBox(rectOrNull)
 }
 ```
@@ -1074,7 +1076,7 @@ the budget are blocked before `Net.command`.
 `input/index.js`
 ```js
 export class Input {
-  constructor(domElement, camera, state, commandIssuer, renderer, fog, audio?, inputRouter?, hotkeyProfiles?, clientIntent?, labToolController?, desktopCursor?)
+  constructor(domElement, camera, state, commandIssuer, drawMarquee, fog, audio?, inputRouter?, hotkeyProfiles?, clientIntent?, labToolController?, desktopCursor?)
   // installs listeners; translates gestures into selection + protocol commands.
   // number keys recall control groups; double-tap jumps the camera to the largest
   // local cluster. Alt/Ctrl/Cmd+number replaces a group, Shift+number adds to it.
@@ -1089,6 +1091,7 @@ export class Input {
   // painted directly from the native event handler and diagnostics expose backend,
   // native/JS event counts, dropped events, and delivery latency.
   update(dt)                             // continuous handling (edge scroll handled by camera)
+  publishSelectionScene(scene)           // after a successful presented frame only
   // emits nothing to return; mutates state.selection / clientIntent and calls commandIssuer.issueCommand
 }
 ```
@@ -1123,7 +1126,10 @@ gather, build/resume, Tank Trap deconstruct, and placement build commands set `q
 rely on the server snapshot's owner-only `orderPlan` for accepted markers. Production-building-only right-clicks set
 or append building rally stages and rely on owner-only `rallyPlan` for accepted markers. Attack
 targeting with only production buildings selected creates `attackMove` rally stages.
-Selection and targeting use `GameState` relationship helpers where the distinction is own/ally/enemy:
+Selection, hover, and entity targeting use the last successfully presented detached
+`SelectionSceneV1`; move/ground abilities/placement use its nullable ground query. Screen clicks and
+marquees project plain mirrored proxies rather than reading current state or renderer geometry.
+Selection and targeting still use `GameState` relationship helpers where the distinction is own/ally/enemy:
 single-click may select an allied entity for read-only inspection, box selection and same-kind
 selection stay own-only, and right-clicking own or allied entities with own units selected falls
 through to ordinary move-to-point behavior instead of attack. Command emission, prediction,

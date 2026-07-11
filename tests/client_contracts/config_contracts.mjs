@@ -1242,8 +1242,8 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     setupInput.clientIntent.beginCommandTarget("setupAntiTankGuns");
     setupInput.clientIntent.addCommandFeedback = () => {};
     setupInput.commandIssuer = { issueCommand: (command) => setupCommands.push(command) };
-    setupInput._worldAt = (x, y) => ({ x, y });
-    setupInput._entityAtWorld = () => null;
+    setupInput._groundAtScreen = (x, y) => ({ x, y });
+    setupInput._entityAtScreen = () => null;
     setupInput._selectedOwnUnitIds = () => [selectedAntiTankGun.id, selectedArtillery.id];
     setupInput._issueTargetedCommand({ x: 160, y: 192 }, { shiftKey: true });
     assert(
@@ -1286,7 +1286,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     };
     previewInput.clientIntent = new ClientIntent();
     previewInput.clientIntent.beginCommandTarget("setupAntiTankGuns");
-    previewInput._worldAt = (x, y) => ({ x, y });
+    previewInput._groundAtScreen = (x, y) => ({ x, y });
     previewInput._refreshAntiTankGunSetupPreview();
     const unqueuedPreviewGuns = previewInput.clientIntent.antiTankGunSetupPreview?.guns || [];
     assert(

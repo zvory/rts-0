@@ -27,10 +27,9 @@ import { KIND, LAB_ROLE, STATE } from "../../client/src/protocol.js";
       return [p2Unit, p1Target, p2Target];
     },
   };
-  input._worldAt = (x, y) => ({ x, y });
-  input._entityAtWorld = Input.prototype._entityAtWorld;
-  input._worldPointHitsEntity = Input.prototype._worldPointHitsEntity;
-  input._resourceAtWorld = Input.prototype._resourceAtWorld;
+  input._groundAtScreen = (x, y) => ({ x, y });
+  input._entityAtScreen = (point) => point.x < 112 ? p1Target : p2Target;
+  input._resourceAtScreen = () => null;
   input._selectedOwnUnitIds = Input.prototype._selectedOwnUnitIds;
   input._selectedWorkerIds = Input.prototype._selectedWorkerIds;
   input._selectedProducerBuildingIds = Input.prototype._selectedProducerBuildingIds;

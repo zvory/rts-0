@@ -34,7 +34,7 @@ import { Input } from "../../client/src/input/index.js";
   };
   smokeInput.clientIntent = new ClientIntent();
   smokeInput.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.SMOKE });
-  smokeInput._worldAt = (x, y) => ({ x, y });
+  smokeInput._groundAtScreen = (x, y) => ({ x, y });
   smokeInput._refreshAbilityTargetPreview();
   const upgradedRadiusTiles = ABILITIES[ABILITY.SMOKE].upgradedRadiusTiles;
   assert(

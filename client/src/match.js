@@ -254,7 +254,7 @@ export class Match {
           this.camera,
           this.state,
           this.commandIssuer,
-          this.renderer,
+          (rect) => this.renderer.drawSelectionBox(rect),
           this.fog,
           this.audio,
           this.inputRouter,

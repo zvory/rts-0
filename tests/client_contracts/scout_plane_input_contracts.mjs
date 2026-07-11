@@ -8,6 +8,9 @@ import { createLabControlPolicy } from "../../client/src/lab_control_policy.js";
 import { Minimap } from "../../client/src/minimap.js";
 import { KIND, LAB_ROLE, STATE } from "../../client/src/protocol.js";
 import { GameState } from "../../client/src/state.js";
+import { buildSelectionScene } from "../../client/src/input/selection_projection.js";
+import { createOrthographicProjectionSnapshot } from "../../client/src/camera_projection.js";
+import { pointHitsOrientedVehicle } from "../../client/src/input/placement.js";
 
 function startInfo() {
   return {
@@ -30,8 +33,14 @@ function startInfo() {
 function inputForState(state) {
   const input = Object.create(Input.prototype);
   input.state = state;
-  input.camera = { screenToWorld: (x, y) => ({ x, y }) };
   input.dom = { clientWidth: 400, clientHeight: 300 };
+  input.selectionScene = buildSelectionScene({
+    entities: state.entitiesInterpolated(1),
+    tileSize: state.map.tileSize,
+    projection: createOrthographicProjectionSnapshot({
+      x: 0, y: 0, zoom: 1, worldW: 192, worldH: 192, viewW: 400, viewH: 300,
+    }, 400),
+  });
   return input;
 }
 
@@ -50,7 +59,9 @@ function commandInput(selected, entities) {
       return true;
     },
   };
-  input._worldAt = (x, y) => ({ x, y });
+  input._groundAtScreen = (x, y) => ({ x, y });
+  input._entityAtScreen = (point) => entities.find((entity) => Math.hypot(entity.x - point.x, entity.y - point.y) <= 24) || null;
+  input._resourceAtScreen = () => null;
   input._addCommandFeedback = () => {};
   return { input, commands };
 }
@@ -78,7 +89,7 @@ function commandInput(selected, entities) {
   });
   const selectionInput = inputForState(selectionState);
   assert(
-    selectionInput._worldPointHitsEntity(scoutPlane, 122, 96, 32),
+    pointHitsOrientedVehicle(scoutPlane, 122, 96, 3),
     "Scout Plane still has a mirrored render hit body",
   );
   selectionInput._commitClickSelection({ x: 96, y: 96 }, false, false);
@@ -180,8 +191,8 @@ function commandInput(selected, entities) {
   };
   input.clientIntent = new ClientIntent();
   input.commandIssuer = { issueCommand: (command) => commands.push(command) };
-  input._worldAt = (x, y) => ({ x, y });
-  input._entityAtWorld = () => enemy;
+  input._groundAtScreen = (x, y) => ({ x, y });
+  input._entityAtScreen = () => enemy;
   input._addCommandFeedback = () => {};
   input.clientIntent.beginCommandTarget("attack");
   input._issueTargetedCommand({ x: enemy.x, y: enemy.y }, { shiftKey: true });

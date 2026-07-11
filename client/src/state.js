@@ -558,8 +558,8 @@ export class GameState extends VisualEffectBackedState {
    * Replace the selection with the given ids.
    * @param {Iterable<number>} ids
    */
-  setSelection(ids) {
-    const admitted = admitSelectionIds(this, ids);
+  setSelection(ids, options = {}) {
+    const admitted = admitSelectionIds(this, ids, options);
     this.selection = new Set(admitted.ids);
     this._recordSelectionBudgetOverflow(admitted);
   }
@@ -568,9 +568,9 @@ export class GameState extends VisualEffectBackedState {
    * Add ids to the existing selection.
    * @param {Iterable<number>} ids
    */
-  addToSelection(ids) {
+  addToSelection(ids, options = {}) {
     this._pruneSelection();
-    const admitted = admitSelectionIds(this, ids, { baseIds: this.selection });
+    const admitted = admitSelectionIds(this, ids, { ...options, baseIds: this.selection });
     this.selection = new Set(admitted.ids);
     this._recordSelectionBudgetOverflow(admitted);
   }
@@ -621,9 +621,9 @@ export class GameState extends VisualEffectBackedState {
    * @param {Iterable<number>} ids selected ids to store.
    * @returns {Array<number>} stored ids.
    */
-  setControlGroup(slot, ids) {
+  setControlGroup(slot, ids, options = {}) {
     if (!this._validControlGroupSlot(slot)) return [];
-    const admitted = this._admitControlGroupIds(ids);
+    const admitted = this._admitControlGroupIds(ids, options);
     this.controlGroups[slot] = admitted.ids;
     this._recordSelectionBudgetOverflow(admitted);
     return admitted.ids.slice();
@@ -635,10 +635,10 @@ export class GameState extends VisualEffectBackedState {
    * @param {Iterable<number>} ids selected ids to add.
    * @returns {Array<number>} stored ids after the add.
    */
-  addToControlGroup(slot, ids) {
+  addToControlGroup(slot, ids, options = {}) {
     if (!this._validControlGroupSlot(slot)) return [];
     this._pruneControlGroup(slot);
-    const admitted = this._admitControlGroupIds(ids, { baseIds: this.controlGroups[slot] || [] });
+    const admitted = this._admitControlGroupIds(ids, { ...options, baseIds: this.controlGroups[slot] || [] });
     this.controlGroups[slot] = admitted.ids;
     this._recordSelectionBudgetOverflow(admitted);
     return admitted.ids.slice();

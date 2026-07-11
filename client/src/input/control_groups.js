@@ -39,12 +39,16 @@ export function _handleControlGroupHotkey(ev) {
   if (typeof ev.stopPropagation === "function") ev.stopPropagation();
 
   if (save) {
-    this.state.setControlGroup(slot, this.state.selection);
+    this.state.setControlGroup(slot, this._visibleSelectionIds(this.state.selection), {
+      entityById: (id) => this._selectionEntityById(id),
+    });
     this._lastControlGroupTap = null;
     return true;
   }
   if (add) {
-    this.state.addToControlGroup(slot, this.state.selection);
+    this.state.addToControlGroup(slot, this._visibleSelectionIds(this.state.selection), {
+      entityById: (id) => this._selectionEntityById(id),
+    });
     this._lastControlGroupTap = null;
     return true;
   }
@@ -52,7 +56,8 @@ export function _handleControlGroupHotkey(ev) {
   const now = performance.now();
   const last = this._lastControlGroupTap;
   const doubleTap = last && last.slot === slot && now - last.t <= CONTROL_GROUP_DOUBLE_TAP_MS;
-  const ids = this.state.selectControlGroup(slot);
+  const ids = this._visibleSelectionIds(this.state.controlGroups?.[slot] || []);
+  this.state.setSelection(ids, { entityById: (id) => this._selectionEntityById(id) });
   if (ids.length === 0) {
     this._lastControlGroupTap = null;
     return true;
@@ -74,9 +79,10 @@ function controlGroupsEnabled(state) {
 }
 
 export function _jumpToControlGroupCluster(slot) {
-  const entities = this.state.controlGroupEntities(slot);
+  const ids = new Set(this._visibleSelectionIds(this.state.controlGroups?.[slot] || []));
+  const entities = this._selectionEntities().filter((entity) => ids.has(entity.id));
   if (entities.length === 0) return false;
-  const projection = this.camera.projectionSnapshot?.();
+  const projection = this.selectionScene?.projection;
   const cameraSnapshot = projection?.camera;
   const viewport = projection?.viewport;
   const focus = cameraSnapshot?.focus;

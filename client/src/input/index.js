@@ -26,8 +26,8 @@
 //   - Optional pointer-lock mode traps the browser cursor and drives a visible
 //     virtual cursor so multi-monitor players can still edge-pan and click.
 //
-// All world hit-testing goes through camera.screenToWorld. Entities are hit-tested
-// against the interpolated positions from state so clicks line up with what is drawn.
+// Ground interaction and entity picking consume the last successfully presented
+// SelectionScene so input always targets the pixels the player can actually see.
 
 import { DRAG_THRESHOLD_PX } from "./constants.js";
 import { isBuilding, isUnit } from "../protocol.js";
@@ -71,6 +71,7 @@ import {
 } from "./commands.js";
 import { _handleBlur, _handleKeyDown, _handleKeyUp, _handleWheel } from "./camera_controls.js";
 import { CameraNavigationInput } from "./camera_navigation.js";
+import { ScreenOverlay } from "./screen_overlay.js";
 import {
   _confirmPlacement,
   _beginTankTrapPlacementDrag,
@@ -117,15 +118,18 @@ import {
   nativeDesktopCursorBridge,
 } from "./cursor_lock.js";
 import {
-  _closestIdsToPoint,
   _closestOwnUnitKindInViewport,
   _commitBoxSelection,
   _commitClickSelection,
-  _entityAtWorld,
-  _entityIntersectsRect,
-  _resourceAtWorld,
+  _dragGroundCoverage,
+  _entityAtScreen,
+  _groundAtScreen,
   _ownBuildingsOfKindInViewport,
-  _worldPointHitsEntity,
+  _resourceAtScreen,
+  _selectionEntities,
+  _selectionEntityById,
+  _visibleSelectionIds,
+  publishSelectionScene,
 } from "./selection.js";
 
 export { footprintValidAgainstEntities };
@@ -151,7 +155,7 @@ export class Input {
    * @param {import("../camera.js").Camera} camera world<->screen transforms & zoom
    * @param {import("../state.js").GameState} state selection + entities
    * @param {{issueCommand(command: object): object|boolean}} commandIssuer gameplay command seam
-   * @param {import("../renderer/index.js").Renderer} renderer for drawSelectionBox
+   * @param {(rect:object|null)=>void} drawMarquee backend screen-overlay operation
    * @param {import("../fog.js").Fog} fog kept for parity / future hit-test filtering
    * @param {import("../audio.js").Audio} [audio] optional audio engine for local cues
    * @param {import("./router.js").MatchInputRouter} [inputRouter] optional UI input router
@@ -165,7 +169,7 @@ export class Input {
     camera,
     state,
     commandIssuer,
-    renderer,
+    drawMarquee,
     fog,
     audio,
     inputRouter = null,
@@ -175,10 +179,11 @@ export class Input {
     desktopCursor = null,
   ) {
     this.dom = domElement;
+    this.renderElement = domElement.querySelector?.("canvas") || null;
     this.camera = camera;
     this.state = state;
     this.commandIssuer = commandIssuer;
-    this.renderer = renderer;
+    this.screenOverlay = new ScreenOverlay(drawMarquee);
     this.fog = fog;
     this.audio = audio || null;
     this.inputRouter = inputRouter;
@@ -289,6 +294,7 @@ export class Input {
   /** Remove all installed listeners (e.g. on game teardown / screen change). */
   destroy() {
     this.exitPointerLock();
+    this.screenOverlay?.destroy?.();
     this.clientIntent?.clearPlannedOrders?.();
     const el = this.dom;
     el.removeEventListener("mousedown", this._onMouseDown);
@@ -600,24 +606,11 @@ export class Input {
       if (this._drag) {
         this._drag = null;
         this._dragging = false;
-        this.renderer.drawSelectionBox(null);
+        this.screenOverlay?.clearMarquee?.();
       }
       this._placementDrag = null;
     }
     if (this.onPointerLockChange) this.onPointerLockChange(locked);
-  }
-
-  /** World point under the current screen cursor, clamped to map bounds. */
-  _worldAt(sx, sy) {
-    const w = this.camera.screenToWorld(sx, sy);
-    const map = this.state.map;
-    if (map) {
-      const maxX = map.width * map.tileSize;
-      const maxY = map.height * map.tileSize;
-      w.x = Math.max(0, Math.min(maxX - 1, w.x));
-      w.y = Math.max(0, Math.min(maxY - 1, w.y));
-    }
-    return w;
   }
 
   // --- Mouse: press / move / release --------------------------------------
@@ -700,7 +693,7 @@ export class Input {
         if (this._drag.labToolPaintsOnDrag) {
           this._paintLabToolStroke(this._drag, p, ev);
         } else {
-          this.renderer.drawSelectionBox(this._normalizedDragRect());
+          this.screenOverlay?.setMarquee?.(this._normalizedDragRect());
         }
       }
     }
@@ -733,7 +726,7 @@ export class Input {
     const drag = this._drag;
     this._drag = null;
     this._dragging = false;
-    this.renderer.drawSelectionBox(null);
+    this.screenOverlay?.clearMarquee?.();
 
     if (wasDragging) {
       this._lastClick = null;
@@ -804,7 +797,7 @@ export class Input {
     if (this._drag) {
       this._drag = null;
       this._dragging = false;
-      this.renderer.drawSelectionBox(null);
+      this.screenOverlay?.clearMarquee?.();
     }
     this._placementDrag = null;
   }
@@ -827,7 +820,7 @@ export class Input {
     // Command-card targeting: the next left-click issues the armed command.
     if (this._commandTarget()) {
       clearPostQuickCastSelectionGuard(this);
-      this._issueTargetedCommand(p, ev);
+      if (this._issueTargetedCommand(p, ev) === false) return;
       const issued = typeof this._intent()?.issueCommandTarget === "function"
         ? this._intent().issueCommandTarget(ev)
         : { keepArmed: false };
@@ -847,8 +840,7 @@ export class Input {
     if (!ev.ctrlKey || ev.metaKey || !isMacPlatform()) return false;
     if (this._placement() || this._commandTarget() || this._labTool()) return false;
 
-    const world = this._worldAt(p.x, p.y);
-    const hit = this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ true);
+    const hit = this._entityAtScreen(p, /*ownPreferred=*/ true);
     if (!hit) return false;
     const own = controllableOwner(this.state, hit.owner);
     if (!own) return false;
@@ -999,7 +991,14 @@ Object.assign(Input.prototype, {
   _ownBuildingsOfKindInViewport,
   _closestOwnUnitKindInViewport,
   _commitBoxSelection,
-  _closestIdsToPoint,
+  publishSelectionScene,
+  _groundAtScreen,
+  _entityAtScreen,
+  _resourceAtScreen,
+  _selectionEntityById,
+  _selectionEntities,
+  _dragGroundCoverage,
+  _visibleSelectionIds,
   _onRightClick,
   _issueTargetedCommand,
   _quickCastCommandTarget,
@@ -1014,10 +1013,6 @@ Object.assign(Input.prototype, {
   _refreshAbilityTargetPreview,
   _refreshResourceMiningPreview,
   _nearestOwnCompletedCityCentre,
-  _entityAtWorld,
-  _resourceAtWorld,
-  _worldPointHitsEntity,
-  _entityIntersectsRect,
   _refreshPlacement,
   _footprintValid,
   _confirmPlacement,

@@ -48,6 +48,7 @@ await import("./client_contracts/replay_branch_contracts.mjs");
 await import("./client_contracts/config_contracts.mjs");
 await import("./client_contracts/state_trench_contracts.mjs");
 await import("./client_contracts/miss_toast_contracts.mjs");
+await import("./client_contracts/selection_projection_contracts.mjs");
 await import("./client_contracts/state_input_contracts.mjs");
 await import("./client_contracts/control_group_camera_contracts.mjs");
 await import("./client_contracts/smoke_plus_preview_contracts.mjs");

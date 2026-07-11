@@ -19,9 +19,10 @@ export function commandBudgetForEntities(entities) {
   return { used, cap, over: used > cap };
 }
 
-export function admitSelectionIds(state, ids, { baseIds = [] } = {}) {
-  const base = uniqueLiveSelectionEntities(state, baseIds);
-  const candidates = uniqueLiveSelectionEntities(state, ids, new Set(base.map((entity) => entity.id)));
+export function admitSelectionIds(state, ids, { baseIds = [], entityById = null } = {}) {
+  const resolveEntity = typeof entityById === "function" ? entityById : (id) => state?.entityById?.(id);
+  const base = uniqueLiveSelectionEntities(state, baseIds, new Set(), resolveEntity);
+  const candidates = uniqueLiveSelectionEntities(state, ids, new Set(base.map((entity) => entity.id)), resolveEntity);
 
   if (!shouldBudgetSelection(state, base, candidates)) {
     return {
@@ -97,11 +98,11 @@ function selectableCountsForCommandBudget(entity) {
   return !!entity && (isUnit(entity.kind) || isBuilding(entity.kind));
 }
 
-function uniqueLiveSelectionEntities(state, ids, seen = new Set()) {
+function uniqueLiveSelectionEntities(state, ids, seen = new Set(), resolveEntity = (id) => state?.entityById?.(id)) {
   const out = [];
   for (const id of ids || []) {
     if (!Number.isInteger(id) || seen.has(id)) continue;
-    const entity = typeof state?.entityById === "function" ? state.entityById(id) : null;
+    const entity = resolveEntity(id);
     if (!entity || entity.shotReveal || entity.visionOnly) continue;
     if (entity.kind === KIND.SCOUT_PLANE && !allowsScoutPlaneInspection(state)) continue;
     seen.add(id);

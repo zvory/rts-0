@@ -40,7 +40,7 @@ when the new shared contract is not yet implemented.
 | Semantic camera/projection and CSS-pixel contract | Pixi complete | missing | required | required | `P1-camera`; orthographic adapter implements the semantic API and immutable projection snapshot; perspective backend remains Phase 6.5 |
 | Navigation, resize, minimap footprint/recenter | Pixi complete | missing | required | required | `P1.5-navigation-minimap` plus `P1.75-shared-camera`; gestures, resize, and minimap use semantic operations |
 | Audio, alerts, control groups, carryover, Lab/diagnostics camera consumers | Pixi complete | missing | required | required | `P1.75-shared-camera`; all shared consumers use semantic listener/projection/bounds/fit/snapshot data and the raw-read allowlist is closed |
-| Perspective-safe picking/selection/marquee | placeholder | missing | required | required | Current Pixi is orthographic-only; Phase 2 owns proxies/SelectionScene |
+| Perspective-safe picking/selection/marquee | Pixi complete | missing | required | required | `P2-perspective-selection`; detached last-presented proxies drive clicks, targeting, viewport admission, and real screen marquees |
 | Detached least-privilege presentation frame | missing | missing | required | required | Current renderer reads mutable state/intent/fog; Phases 3/3.5 |
 | Immutable terrain/fog grids and revision pinning | missing | missing | required | required | Contract frozen; implementation Phase 3 |
 | Static terrain | Pixi complete | missing | required | required | Current cached Pixi terrain; Babylon Phase 7 |
@@ -116,6 +116,23 @@ when the new shared contract is not yet implemented.
 - `notes`: Pixi behavior remains materially equivalent. Private raw reads remain only in
   `camera.js`, `camera_projection.js`, `renderer/index.js`, and the separately owned Map Editor
   Pixi adapter. Phase 2 owns last-presented selection scenes and perspective-safe picking.
+
+### `P2-perspective-selection`
+
+- `phase`: Phase 2.
+- `commit`: Phase 2 implementation commit containing this evidence.
+- `automated`: `node tests/client_contracts/selection_projection_contracts.mjs && node tests/client_contracts/state_input_contracts.mjs && node tests/minimap_input_contracts.mjs && node tests/lab_interact_driver_contracts.mjs && node scripts/check-client-architecture.mjs`.
+- `assertion`: Fog-filtered detached proxy shape and immutability; orthographic regression and
+  skewed fake-perspective clicks/marquees; elevated anchors; oriented/partially intersected bodies;
+  eligibility, depth, clip, id, and drag ordering; nullable non-cached ground hits; projected
+  viewport admission; successful-frame publication and render-failure retention; moving entity and
+  camera between-frame pinning; backend-neutral marquee teardown; existing selection budget,
+  ownership, Lab, pointer-lock, touch/minimap, and control-group behavior.
+- `artifact`: `target/lab-interact/lab_51a1d91e41a74fca866bd024ae9d884e/captures/cli-smoke-2026-07-11T21-33-29-930Z.png` (ignored local evidence; adjacent manifest records the scene).
+- `inspected`: yes.
+- `notes`: Selection authority is independent of Pixi/Babylon meshes and asset geometry. The
+  Babylon column remains missing until its semantic camera/backend phases consume the shared
+  contract; Phase 3 next adds immutable revisioned grids and least-privilege presentation frames.
 
 ## Gate interpretation
 
