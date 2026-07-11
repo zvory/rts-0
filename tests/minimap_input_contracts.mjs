@@ -256,8 +256,11 @@ function minimapHarness({
   if (controlPolicy) state.controlPolicy = controlPolicy;
   if (commandTarget && clientIntent) clientIntent.beginCommandTarget(commandTarget);
   const camera = {
-    centerOn(x, y) {
-      centers.push({ x, y });
+    focusAt(point) {
+      centers.push({ x: point.x, y: point.y });
+    },
+    viewportGroundPolygon() {
+      return [];
     },
   };
   const commandIssuer = legacySender
@@ -361,6 +364,7 @@ function pointerEvent(canvas, clientX, clientY, {
   const h = minimapHarness({
     rect: { left: 100, top: 200, width: 121, height: 121, backingWidth: 242, backingHeight: 242 },
   });
+  h.window.devicePixelRatio = 2;
   const down = listenerFor(h.canvas, "pointerdown");
   const move = listenerFor(h.canvas, "pointermove");
   const up = listenerFor(h.canvas, "pointerup");
@@ -385,6 +389,52 @@ function pointerEvent(canvas, clientX, clientY, {
   up(pointerEvent(h.canvas, 500, 500, { pointerId: 11, pointerType: "pen" }));
   assert(h.canvas.releasedPointers.includes(11), "primary minimap pointer release drops capture");
   h.minimap.destroy();
+}
+
+// The viewport footprint is the semantic ground polygon; empty/partial views stay bounded.
+{
+  installWindowStub().devicePixelRatio = 2;
+  const canvas = fakeRenderableCanvas({ width: 200, height: 200 });
+  const polygon = [
+    { x: 10, y: 5 },
+    { x: 30, y: 5 },
+    { x: 30, y: 20 },
+    { x: 10, y: 20 },
+  ];
+  const camera = {
+    viewportGroundPolygon() {
+      return polygon;
+    },
+    focusAt() {},
+  };
+  const state = {
+    map: { width: 100, height: 100, tileSize: 1 },
+    players: [],
+  };
+  const minimap = new Minimap(canvas, state, camera, null, { issueCommand() {} });
+  assert(minimap._ensureTransform(), "minimap establishes its map transform for viewport drawing");
+  minimap._drawViewport();
+  assert(
+    hasCallWithApproxArgs(canvas.context, "moveTo", [20.5, 10.5]) &&
+      hasCallWithApproxArgs(canvas.context, "lineTo", [60.5, 40.5]),
+    "orthographic semantic viewport polygon matches the legacy minimap rectangle",
+  );
+  assert(countCalls(canvas.context, "closePath") === 1, "bounded viewport polygon closes its own footprint");
+
+  const strokes = countCalls(canvas.context, "stroke");
+  polygon.splice(0, polygon.length);
+  minimap._drawViewport();
+  assert(countCalls(canvas.context, "stroke") === strokes, "empty ground footprint draws no invented bounds");
+
+  polygon.push({ x: 10, y: 5 }, { x: 30, y: 5 });
+  minimap._drawViewport();
+  assert(countCalls(canvas.context, "stroke") === strokes + 1, "partial two-point ground footprint draws safely");
+  assert(countCalls(canvas.context, "closePath") === 1, "partial footprint is not closed into fabricated bounds");
+
+  polygon.push({ x: Number.NaN, y: 20 });
+  minimap._drawViewport();
+  assert(countCalls(canvas.context, "stroke") === strokes + 1, "malformed footprint is rejected as a whole");
+  minimap.destroy();
 }
 
 // An armed target only fires after a clean touch/pen tap, never after a drag, cancellation, or pinch.

@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Depends On
 
@@ -50,10 +50,10 @@ owned by Phase 1.75.
 
 ## Implementation Checklist
 
-- [ ] Migrate live/replay navigation and camera controls.
-- [ ] Migrate minimap footprint/recenter to semantic polygon/focus.
-- [ ] Add focused equivalence/resize/DPR tests and bounded temporary allowlist.
-- [ ] Update durable docs/ledger and mark this phase done.
+- [x] Migrate live/replay navigation and camera controls.
+- [x] Migrate minimap footprint/recenter to semantic polygon/focus.
+- [x] Add focused equivalence/resize/DPR tests and bounded temporary allowlist.
+- [x] Update durable docs/ledger and mark this phase done.
 
 ## Verification
 
