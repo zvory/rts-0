@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { processAlive, runtimePaths, sleep } from "../scripts/lab-interact/runtime.mjs";
@@ -11,7 +11,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const cli = path.join(root, "scripts/lab-interact/cli.mjs");
 const isolatedTmp = fs.mkdtempSync(path.join("/tmp", "rts-li-smoke-"));
 const env = { ...process.env, TMPDIR: isolatedTmp };
-const recordingDurationMs = Number(env.RTS_LAB_INTERACT_RECORDING_CANARY_MS || 2_000);
+const recordingDurationMs = Number(env.RTS_LAB_INTERACT_RECORDING_CANARY_MS || 5_000);
 assert.ok(
   Number.isInteger(recordingDurationMs) && recordingDurationMs >= 2_000 && recordingDurationMs <= 60_000,
   "recording canary duration must stay between 2 and 60 seconds",
@@ -42,6 +42,24 @@ function callFailure(command, input = {}) {
   assert.notEqual(result.status, 0, `${command} rejects stale or invalid input`);
   assert.equal(result.stdout, "", `${command} failure keeps stdout empty`);
   return JSON.parse(result.stderr).error;
+}
+
+function invokeAsync(command, input = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [cli, command, JSON.stringify(input)], {
+      cwd: root,
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.once("error", reject);
+    child.once("close", (status, signal) => resolve({ status, signal, stdout, stderr }));
+  });
 }
 
 function spawnBulkUsingPlacementSuggestions(sessionId, spawns) {
@@ -127,8 +145,14 @@ try {
   assert.equal(recordingStarted.recorder.active, true, "live CLI starts one persistent-page recorder");
   call("order", { sessionId, playerId: 1, command: { c: "move", units: ["shooter"], x: 1088, y: 1088 } });
   call("time", { sessionId, control: { action: "resume", speed: 1 } });
+  const recordingWait = invokeAsync("record-wait", { sessionId });
+  await sleep(250);
   call("camera", { sessionId, camera: { action: "focus", refs: authoredSubjects, padding: 64 } });
-  const recording = call("record-wait", { sessionId });
+  const recordingWaitResult = await recordingWait;
+  assert.equal(recordingWaitResult.status, 0, `record-wait succeeds while camera remains interactive: ${recordingWaitResult.stderr}`);
+  const recordingWaitResponse = JSON.parse(recordingWaitResult.stdout);
+  assert.equal(recordingWaitResponse.ok, true, "concurrent record-wait returns success");
+  const recording = recordingWaitResponse.result;
   assert.equal(recording.probe.codec, "h264", "live recording probes as H.264");
   assert.deepEqual({ width: recording.probe.width, height: recording.probe.height }, { width: 1200, height: 800 }, "live MP4 records the clean 1200x800 viewport crop");
   assert.equal(recording.probe.durationSeconds, recordingDurationMs / 1_000, "watchdog recording finalizes at the exact requested wall duration");
