@@ -28,19 +28,15 @@
     <p id="status" role="status" aria-live="polite"></p>
   </main>
   <script>
-    const origins = Object.freeze({
-      mainline: "https://mainline.bewegungskrieg.net",
-      beta: "https://beta.bewegungskrieg.net",
-    });
     const status = document.querySelector("#status");
     const buttons = [...document.querySelectorAll("[data-channel]")];
     let launching = false;
 
-    const destination = (channel) =>
-      origins[channel] + window.location.pathname + window.location.search + window.location.hash;
+    const destination = (origin) =>
+      origin + window.location.pathname + window.location.search + window.location.hash;
 
     async function launch(channel) {
-      if (launching || !origins[channel]) return;
+      if (launching) return;
       launching = true;
       buttons.forEach((button) => { button.disabled = true; });
       status.textContent = "Starting server...";
@@ -49,7 +45,8 @@
         try {
           const response = await fetch(`/wake?channel=${encodeURIComponent(channel)}`, { cache: "no-store" });
           if (response.ok) {
-            window.location.replace(destination(channel));
+            const { origin } = await response.json();
+            window.location.replace(destination(origin));
             return;
           }
         } catch (_) {

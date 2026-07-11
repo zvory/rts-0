@@ -19,6 +19,26 @@ export function gameProbeUrl(channel) {
   return origin ? `${origin}/version` : null;
 }
 
+export async function wakeChannel(channel, { probe = fetch } = {}) {
+  const origin = gameOrigin(channel);
+  const probeUrl = gameProbeUrl(channel);
+  if (!origin || !probeUrl) {
+    return { status: 400, body: { error: "channel must be beta or mainline" } };
+  }
+  try {
+    const upstream = await probe(probeUrl, {
+      cache: "no-store",
+      redirect: "manual",
+      signal: AbortSignal.timeout(4000),
+    });
+    return upstream.ok
+      ? { status: 200, body: { origin } }
+      : { status: 503, body: null };
+  } catch {
+    return { status: 503, body: null };
+  }
+}
+
 export function createLauncherServer({ probe = fetch } = {}) {
   return http.createServer(async (request, response) => {
     const requestUrl = new URL(request.url || "/", "http://launcher.invalid");
@@ -28,21 +48,16 @@ export function createLauncherServer({ probe = fetch } = {}) {
     }
 
     if (requestUrl.pathname === "/wake") {
-      const probeUrl = gameProbeUrl(requestUrl.searchParams.get("channel") || "");
-      if (!probeUrl) {
-        response.writeHead(400, { "content-type": "application/json" });
-        response.end(JSON.stringify({ error: "channel must be beta or mainline" }));
-        return;
-      }
-      try {
-        const upstream = await probe(probeUrl, {
-          cache: "no-store",
-          redirect: "manual",
-          signal: AbortSignal.timeout(4000),
+      const channel = requestUrl.searchParams.get("channel") || "";
+      const result = await wakeChannel(channel, { probe });
+      if (result.body) {
+        response.writeHead(result.status, {
+          "content-type": "application/json",
+          "cache-control": "no-store",
         });
-        response.writeHead(upstream.ok ? 204 : 503, { "cache-control": "no-store" }).end();
-      } catch {
-        response.writeHead(503, { "cache-control": "no-store" }).end();
+        response.end(JSON.stringify(result.body));
+      } else {
+        response.writeHead(result.status, { "cache-control": "no-store" }).end();
       }
       return;
     }
