@@ -59,6 +59,7 @@ export const LAB_INTERACT_COMMAND_HELP = Object.freeze({
     example: { sessionId: "<lab-session-id>", camera: { action: "focus", refs: ["subject"] } },
   }),
   screenshot: descriptor("Capture a readiness-checked Pixi PNG and bounded adjacent manifest.", "{sessionId:string,name?:token,presentation?:\"clean\"|\"normal\",viewport?:viewport,subjects?:(alias|u32)[]}", {
+    variants: ["presentation=clean hides UI chrome", "presentation=normal retains visible Lab panels and game UI"],
     defaults: ["name=scene", "presentation=clean", "viewport=current viewport", "subjects=[]"], bounds: ["0-400 subjects", "name 1-48 safe-token characters", "capture viewport 320-2048 x 240-2048", "24 detailed subject summaries"],
     example: { sessionId: "<lab-session-id>", name: "subject", presentation: "clean", subjects: ["subject"] },
   }),

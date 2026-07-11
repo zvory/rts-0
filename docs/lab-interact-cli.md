@@ -99,7 +99,8 @@ Aliases, inspection, camera focus, and screenshot subjects accept up to 400 enti
 authoritative state. It returns the absolute PNG and adjacent manifest paths plus bounded metadata;
 it never sends image bytes through the CLI. Readiness checks cover every requested subject, while
 the response and manifest record the subject count, `truncated` state, and at most 24 detailed
-subject rows. Inspect the PNG once with the local image viewer.
+subject rows. `presentation: "clean"` hides UI chrome; `presentation: "normal"` retains visible Lab
+panels and game UI. Inspect the PNG once with the local image viewer.
 
 Private servers use the production 30 Hz simulation clock by default; an explicitly inherited
 `RTS_TEST_TICK_MS` remains available to tests. Successful `order` results include an authoritative
