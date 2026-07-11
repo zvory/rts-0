@@ -20,3 +20,52 @@ export function applyLabMapReset(match, outcome) {
   match.roomTimeControls?.noteSnapshotTick?.(match.lastSnapshotTick);
   return true;
 }
+
+/** Keep the renderer and minimap on the same browser-local Lab map draft preview. */
+export function previewLabMapDraftTerrain(match, draft) {
+  const renderer = match?.renderer;
+  const minimap = match?.minimap;
+  const liveMap = match?.state?.map;
+  if (!liveMap) return false;
+
+  if (!draft) {
+    let applied = false;
+    if (typeof renderer?.buildStaticMap === "function") {
+      try {
+        renderer.buildStaticMap(liveMap);
+        applied = true;
+      } catch {}
+    }
+    if (typeof minimap?.setMapPreview === "function") {
+      try {
+        minimap.setMapPreview(null);
+        applied = true;
+      } catch {}
+    }
+    return applied;
+  }
+
+  const previewMap = {
+    ...liveMap,
+    width: draft.size,
+    height: draft.size,
+    terrain: draft.terrain,
+    // Resource patches are materialized authoritatively only when the test restarts.
+    // Do not leave the running test's old patches on the draft minimap preview.
+    resources: [],
+  };
+  let applied = false;
+  if (typeof renderer?.previewStaticTerrain === "function") {
+    try {
+      renderer.previewStaticTerrain(previewMap);
+      applied = true;
+    } catch {}
+  }
+  if (typeof minimap?.setMapPreview === "function") {
+    try {
+      minimap.setMapPreview(previewMap);
+      applied = true;
+    } catch {}
+  }
+  return applied;
+}

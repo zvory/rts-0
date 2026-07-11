@@ -630,10 +630,13 @@ export class LabMapEditorPanel {
   }
 
   syncDraftTerrainPreview() {
-    const signature = this.session.draft?.terrain?.join("|") || "";
+    const previewing = !!this.session.draft && this.session.hasUnappliedChanges;
+    const signature = previewing
+      ? `draft:${this.session.draft.terrain.join("|")}`
+      : "authoritative";
     if (signature === this.terrainPreviewSignature) return;
     this.terrainPreviewSignature = signature;
-    if (!this.session.draft) {
+    if (!previewing) {
       this.setLabMapDraftTerrainPreview?.(null);
       return;
     }

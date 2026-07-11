@@ -5,6 +5,7 @@ import { TERRAIN } from "../../client/src/protocol.js";
 import { Fog } from "../../client/src/fog.js";
 import { GameState } from "../../client/src/state.js";
 import { LabMapEditorPanel } from "../../client/src/lab_map_editor_panel.js";
+import { previewLabMapDraftTerrain } from "../../client/src/lab_map_reset.js";
 import {
   LAB_MAP_HISTORY_LIMIT,
   LAB_MAP_MAX_NATURALS_PER_PLAYER,
@@ -242,6 +243,11 @@ await withFakeDocument(async () => {
   await panel.restartTestWithDraft();
   assert.equal(appliedDrafts.length, 1, "Restart test with this draft is the only map-to-test transition");
   assert.equal(session.hasUnappliedChanges, false);
+  assert.equal(
+    terrainPreviews.at(-1),
+    null,
+    "restarting with the draft clears the local preview so authoritative resources return",
+  );
   panel.destroy();
   assert.equal(terrainPreviews.at(-1), null, "closing the editor restores authoritative terrain rendering");
 });
@@ -251,6 +257,7 @@ await withFakeDocument(async () => {
   const session = new LabMapEditorSession({ storage: null });
   const requests = [];
   const applied = [];
+  const terrainPreviews = [];
   const panel = new LabMapEditorPanel({
     root,
     session,
@@ -264,6 +271,7 @@ await withFakeDocument(async () => {
     match: { armLabTool() {} },
     startPayload: startPayload(),
     applyLabMapReset: () => true,
+    setLabMapDraftTerrainPreview: (draft) => terrainPreviews.push(draft),
     fetchImpl: async (url) => {
       requests.push(url);
       if (url === "/maps/catalog") {
@@ -296,11 +304,51 @@ await withFakeDocument(async () => {
   assert.equal(session.exportMap().layouts.length, 2, "catalog loads keep non-active authored layouts");
   assert.equal(applied.length, 0, "loading a built-in map changes only the draft");
   assert.equal(session.hasUnappliedChanges, true);
+  assert.equal(
+    terrainPreviews.at(-1)?.terrain?.length,
+    32 * 32,
+    "loading a selected map publishes its terrain to the shared world/minimap preview",
+  );
   await panel.restartTestWithDraft();
   assert.deepEqual(applied[0].starts, [{ x: 8, y: 8 }, { x: 23, y: 23 }]);
   assert.equal(session.hasUnappliedChanges, false);
   panel.destroy();
 });
+
+{
+  const liveMap = {
+    width: 32,
+    height: 32,
+    tileSize: 32,
+    terrain: Array(32 * 32).fill(TERRAIN.ROCK),
+    resources: [{ id: 7, kind: "steel", x: 128, y: 128 }],
+  };
+  const rendererCalls = [];
+  const minimapCalls = [];
+  const match = {
+    state: { map: liveMap },
+    renderer: {
+      previewStaticTerrain(map) { rendererCalls.push(["preview", map]); },
+      buildStaticMap(map) { rendererCalls.push(["live", map]); },
+    },
+    minimap: {
+      setMapPreview(map) { minimapCalls.push(map); },
+    },
+  };
+  const draft = {
+    size: 32,
+    terrain: Array(32 * 32).fill(TERRAIN.WATER),
+  };
+  assert.equal(previewLabMapDraftTerrain(match, draft), true);
+  const previewMap = rendererCalls.at(-1)[1];
+  assert.equal(previewMap.terrain, draft.terrain, "the world preview receives draft terrain");
+  assert.deepEqual(previewMap.resources, [], "the draft preview excludes live resource patches");
+  assert.equal(minimapCalls.at(-1), previewMap, "the minimap receives the same map preview as the world");
+
+  assert.equal(previewLabMapDraftTerrain(match, null), true);
+  assert.deepEqual(rendererCalls.at(-1), ["live", liveMap]);
+  assert.equal(minimapCalls.at(-1), null, "clearing the draft restores the authoritative minimap");
+}
 
 {
   const initial = startPayload();

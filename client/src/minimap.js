@@ -193,6 +193,7 @@ export class Minimap {
     this._fogLayer = null;
     this._fogLayerCtx = null;
     this._fogLayerSignature = null;
+    this._mapPreview = null;
     this._playerBlipMaskLayer = null;
     this._playerBlipMaskLayerCtx = null;
 
@@ -225,10 +226,22 @@ export class Minimap {
 
   // --- Transform -------------------------------------------------------------
 
+  /** Preview a browser-local Lab map draft without mutating authoritative GameState. */
+  setMapPreview(map = null) {
+    this._mapPreview = map || null;
+    this._mapW = 0;
+    this._mapH = 0;
+    this._invalidateStaticLayers();
+  }
+
+  _renderMap() {
+    return this._mapPreview || this.state.map;
+  }
+
   /** (Re)compute the world→canvas scale/offset from the current map dimensions. */
   _ensureTransform() {
     this._syncCanvasSize();
-    const map = this.state.map;
+    const map = this._renderMap();
     if (!map) return false;
     const worldW = map.width * map.tileSize;
     const worldH = map.height * map.tileSize;
@@ -352,7 +365,7 @@ export class Minimap {
 
   /** Fill one minimap cell per tile with its terrain color. */
   _drawTerrain() {
-    this._paintTerrain(this.ctx, this.state.map);
+    this._paintTerrain(this.ctx, this._renderMap());
   }
 
   _paintTerrain(ctx, map) {
@@ -371,7 +384,7 @@ export class Minimap {
   }
 
   _drawTerrainLayer() {
-    const map = this.state.map;
+    const map = this._renderMap();
     const layer = this._ensureStaticLayer("terrain");
     if (!layer) {
       this._drawTerrain();
@@ -392,7 +405,7 @@ export class Minimap {
 
   /** Draw non-depleted static resource blips after fog so they are always visible. */
   _drawResources() {
-    this._paintResources(this.ctx, this.state.map);
+    this._paintResources(this.ctx, this._renderMap());
   }
 
   _paintResources(ctx, map) {
@@ -414,7 +427,7 @@ export class Minimap {
   }
 
   _drawResourceLayer() {
-    const map = this.state.map;
+    const map = this._renderMap();
     const resources = map.resources || [];
     if (resources.length === 0) return;
     const layer = this._ensureStaticLayer("resource");
@@ -530,7 +543,7 @@ export class Minimap {
    * when Fog.revision or presentation inputs change; resource marks still draw above it.
    */
   _drawFog() {
-    const map = this.state.map;
+    const map = this._renderMap();
     const fog = this.fog;
     if (!fog) return;
     const signature = this._fogLayerStaticSignature(map, fog);
@@ -655,8 +668,11 @@ export class Minimap {
     const entities = Array.isArray(frameViews?.currentEntities)
       ? frameViews.currentEntities
       : this.state.entitiesInterpolated(1);
-    this._recordMinimapDiagnostic("minimap.entities.blips", entities.length);
-    return entities;
+    const visibleEntities = this._mapPreview
+      ? entities.filter((entity) => !isResource(entity?.kind))
+      : entities;
+    this._recordMinimapDiagnostic("minimap.entities.blips", visibleEntities.length);
+    return visibleEntities;
   }
 
   /** Draw colored blips for visible entities. Foreground player blips draw last over resources. */
@@ -928,6 +944,7 @@ export class Minimap {
     this._fogLayer = null;
     this._fogLayerCtx = null;
     this._fogLayerSignature = null;
+    this._mapPreview = null;
   }
 
   _issueCommand(command) {
