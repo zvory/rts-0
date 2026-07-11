@@ -12,7 +12,8 @@ export const MAP_EDITOR_SYMMETRY = Object.freeze({
   HORIZONTAL: "horizontal",
   VERTICAL: "vertical",
   RADIAL: "radial",
-  DIAGONAL: "diagonal",
+  DIAGONAL_MAIN: "diagonalMain",
+  DIAGONAL_ANTI: "diagonalAnti",
 });
 
 const TERRAIN_TO_CHAR = Object.freeze({
@@ -31,8 +32,9 @@ const SYMMETRY_TRANSFORMS = Object.freeze({
   [MAP_EDITOR_SYMMETRY.NONE]: ["identity"],
   [MAP_EDITOR_SYMMETRY.HORIZONTAL]: ["identity", "horizontal"],
   [MAP_EDITOR_SYMMETRY.VERTICAL]: ["identity", "vertical"],
-  [MAP_EDITOR_SYMMETRY.RADIAL]: ["identity", "radial"],
-  [MAP_EDITOR_SYMMETRY.DIAGONAL]: ["identity", "diagonalMain", "diagonalAnti", "radial"],
+  [MAP_EDITOR_SYMMETRY.RADIAL]: ["identity", "rotate90", "radial", "rotate270"],
+  [MAP_EDITOR_SYMMETRY.DIAGONAL_MAIN]: ["identity", "diagonalMain"],
+  [MAP_EDITOR_SYMMETRY.DIAGONAL_ANTI]: ["identity", "diagonalAnti"],
 });
 
 export class MapEditorSession {
@@ -888,7 +890,9 @@ function transformMapTile(tile, size, transform) {
   if (transform === "vertical") return { x: size - 1 - source.x, y: source.y };
   if (transform === "diagonalMain") return { x: source.y, y: source.x };
   if (transform === "diagonalAnti") return { x: size - 1 - source.y, y: size - 1 - source.x };
+  if (transform === "rotate90") return { x: size - 1 - source.y, y: source.x };
   if (transform === "radial") return { x: size - 1 - source.x, y: size - 1 - source.y };
+  if (transform === "rotate270") return { x: source.y, y: size - 1 - source.x };
   return source;
 }
 
