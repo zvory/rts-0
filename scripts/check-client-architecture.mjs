@@ -121,6 +121,7 @@ const AREA_BY_FILE = new Map(Object.entries({
 const AREA_PREFIXES = [
   ["config/", "rules-mirror"],
   ["config_", "rules-mirror"],
+  ["presentation/", "presentation"],
   ["renderer/", "renderer"],
   ["input/", "input"],
 ];
@@ -140,6 +141,9 @@ const FORBIDDEN_MATCH_LAB_IMPORTS = new Set([
   "lab_client.js",
   "lab_panel.js",
 ]);
+
+const FORBIDDEN_PRESENTATION_IMPORT_AREAS = new Set(["transport", "ui", "renderer"]);
+const forbiddenPresentationRuntimeRe = /\b(?:PIXI|BABYLON|WebSocket|GameState|ClientIntent)\b/;
 
 // Phase 6 client-boundary ratchet: these are the cleanup-phase byte counts for
 // the largest modules. Future growth should either extract a focused helper or
@@ -243,6 +247,7 @@ for (const file of files) {
   checkRawCameraRepresentation(file, source);
   checkRoomCapabilityParser(file, source);
   checkRigOnlyUnitVisuals(file, source);
+  checkPresentationBoundary(file, source);
 }
 
 for (const mod of modules.values()) {
@@ -407,6 +412,14 @@ function checkRigOnlyUnitVisuals(file, source) {
   }
 }
 
+function checkPresentationBoundary(file, source) {
+  if (!file.startsWith("presentation/")) return;
+  const match = source.match(forbiddenPresentationRuntimeRe);
+  if (match) {
+    failures.push(`${file}: presentation boundary must not reference mutable/runtime internal ${match[0]}`);
+  }
+}
+
 function resolveImport(fromFile, specifier) {
   const fromDir = path.dirname(fromFile);
   let resolved = path.normalize(path.join(fromDir, specifier)).split(path.sep).join("/");
@@ -424,6 +437,10 @@ function checkImport(fromFile, toFile) {
   const from = modules.get(fromFile);
   const to = modules.get(toFile);
   if (!from?.area || !to?.area) return;
+  if (from.area === "presentation" && FORBIDDEN_PRESENTATION_IMPORT_AREAS.has(to.area)) {
+    failures.push(`${fromFile} -> ${toFile}: presentation may not import ${to.area} internals`);
+    return;
+  }
   if (toFile === "protocol.js" || toFile === "config.js") return;
   if (from.area === "app-shell") return;
   if (from.area === to.area) return;

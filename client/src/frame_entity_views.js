@@ -32,18 +32,19 @@ export function buildFrameEntityViews(state, { alpha = 1 } = {}) {
     calls,
   );
   const selectedEntities = selectedEntitiesForFrame(state, calls);
-  return {
+  return Object.freeze({
+    version: 1,
     alpha: frameAlpha,
     interpolatedEntities,
     currentEntities,
     authoritativeEntities,
     fogSourceEntities: fogSourceEntitiesForState(state, authoritativeEntities),
     selectedEntities,
-    debug: {
+    debug: Object.freeze({
       entitiesInterpolatedCalls: calls.entitiesInterpolated,
       selectedEntitiesCalls: calls.selectedEntities,
-    },
-  };
+    }),
+  });
 }
 
 function entitiesInterpolated(state, alpha, options, calls) {

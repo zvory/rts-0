@@ -41,8 +41,8 @@ when the new shared contract is not yet implemented.
 | Navigation, resize, minimap footprint/recenter | Pixi complete | missing | required | required | `P1.5-navigation-minimap` plus `P1.75-shared-camera`; gestures, resize, and minimap use semantic operations |
 | Audio, alerts, control groups, carryover, Lab/diagnostics camera consumers | Pixi complete | missing | required | required | `P1.75-shared-camera`; all shared consumers use semantic listener/projection/bounds/fit/snapshot data and the raw-read allowlist is closed |
 | Perspective-safe picking/selection/marquee | Pixi complete | missing | required | required | `P2-perspective-selection`; detached last-presented proxies drive clicks, targeting, viewport admission, and real screen marquees |
-| Detached least-privilege presentation frame | missing | missing | required | required | Current renderer reads mutable state/intent/fog; Phases 3/3.5 |
-| Immutable terrain/fog grids and revision pinning | missing | missing | required | required | Contract frozen; implementation Phase 3 |
+| Detached least-privilege presentation frame | placeholder | missing | required | required | `P3-presentation-frame`; shared sidecar is complete, while Pixi legacy reads remain until Phase 3.5 |
+| Immutable terrain/fog grids and revision pinning | placeholder | missing | required | required | `P3-presentation-frame`; immutable revision-cached accessors exist, backend staging/cutover remains Phase 3.5 |
 | Static terrain | Pixi complete | missing | required | required | Current cached Pixi terrain; Babylon Phase 7 |
 | Permanent ground decals/trenches | Pixi complete | missing | not required | required | Long-tail Babylon presentation after foundations |
 | Generic visible entities/buildings/resources | Pixi complete | missing | required | required | Babylon truthful placeholders Phases 7/10 |
@@ -51,7 +51,7 @@ when the new shared contract is not yet implemented.
 | Remembered buildings | Pixi complete | missing | required | required | Presentation category Phase 9.5 |
 | Fog secrecy and current/explored mask | Pixi complete | missing | required | required | Server-filtered inputs; Babylon implementation/assertions Phase 9 |
 | Below-fog intel and above-fog reveal separation | Pixi complete | missing | required | required | Category/order/secrecy Phases 9/9.5 |
-| Semantic layer order and occlusion | Pixi complete | missing | required | required | Descriptor frame Phase 3; Babylon Phases 9/9.5 |
+| Semantic layer order and occlusion | Pixi complete | missing | required | required | `P3-presentation-frame`; descriptors and shared record categories are frozen; Babylon occlusion Phases 9/9.5 |
 | Selection/range/HP tactical readability | Pixi complete | missing | required | required | Representative Babylon coverage Phase 10.5; long-tail default review remains |
 | Placement, command, entity marker, Lab area, marquee | Pixi complete | missing | required | required | Exact representative set Phase 10.5 |
 | Normalized attack/muzzle finite event | placeholder | missing | required | required | Current Pixi has attack feedback but not the shared normalized identity/history contract; Phases 4/5/10.5/13 |
@@ -133,6 +133,26 @@ when the new shared contract is not yet implemented.
 - `notes`: Selection authority is independent of Pixi/Babylon meshes and asset geometry. The
   Babylon column remains missing until its semantic camera/backend phases consume the shared
   contract; Phase 3 next adds immutable revisioned grids and least-privilege presentation frames.
+
+### `P3-presentation-frame`
+
+- `phase`: Phase 3.
+- `commit`: Phase 3 implementation commit containing this evidence.
+- `automated`: `node tests/client_contracts/presentation_frame_contracts.mjs && node tests/client_contracts/frame_entity_contracts.mjs && node tests/client_contracts/renderer_feedback_contracts.mjs && node scripts/check-client-architecture.mjs`.
+- `assertion`: One post-fog assembly per ordinary/fixed frame; exact frozen layer descriptors;
+  explicit visible/intel/memory/reveal categorization; detached least-privilege entity, ownership,
+  selection, feedback, overlay, and diagnostic records; no authoritative/fog-source/picking
+  variants or mutable collections; revision-reused immutable terrain/visible/explored accessors;
+  malformed-record continuation; static/fog revisions; Lab/replay reset, fixed-capture, and rematch
+  generation behavior; shared projection/feedback reuse by the existing Pixi call.
+- `artifact`: `target/lab-interact/lab_66c19aa38b8a4e6bbaf7381da5fbf30c/captures/render3d-p3-2026-07-11T22-36-57-511Z.png`
+  (ignored local evidence; SHA-256
+  `efd8a6ff8129a42001c4c20ab7caf4d20e82e4e5a8afb151841c96d9dd14a59b`; adjacent manifest records
+  the readiness-clean scene).
+- `inspected`: yes.
+- `notes`: Pixi intentionally remains on its legacy arguments, so the two new frame/grid rows are
+  placeholders rather than backend-complete. Phase 3.5 makes `render(frame)` the only backend seam,
+  reconciles destructive ground-decal reads, and proves runtime/capture/rematch equivalence.
 
 ## Gate interpretation
 

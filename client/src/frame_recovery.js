@@ -1,6 +1,9 @@
 import { collectMatchFrameContext } from "./frame_profiler.js";
 import { buildFrameEntityViews } from "./frame_entity_views.js";
 import { buildSelectionScene } from "./input/selection_projection.js";
+import { buildRendererFeedbackView } from "./renderer/feedback_view_model.js";
+import { PresentationFrameAssembler } from "./presentation/frame.js";
+import { STATS } from "./config.js";
 
 const FRAME_ERROR_LOG_INTERVAL_MS = 5000;
 
@@ -70,12 +73,59 @@ function runMatchFrame(match, now, { capture = false } = {}) {
       match.fog.update(frameViews.fogSourceEntities, match.state.map.tileSize, match.state.visibleTiles);
     });
 
+    const projection = match.camera.projectionSnapshot();
+    const visualTimeMs = match.renderClock?.now?.() ?? now;
+    const visualSamples = match.visualProfile?.staticSamples || [];
+    const observerMapAnalysis = match.observerDiagnostics?.mapOverlayModel?.() || null;
+    const screenOverlay = match.input?.screenOverlay?.snapshot?.() || null;
+    const feedbackView = time(
+      "match.rendererFeedbackView",
+      () => buildRendererFeedbackView(match.state, {
+        clientIntent: match.clientIntent,
+        entities: frameViews.interpolatedEntities,
+        selectedEntities: frameViews.selectedEntities,
+        now: visualTimeMs,
+      }),
+    );
+    const presentationAssembler = match.presentationAssembler || new PresentationFrameAssembler({
+      map: match.state.map,
+      entityStats: STATS,
+    });
+    match.presentationAssembler = presentationAssembler;
+    const presentationFrame = time("match.presentationFrame", () => presentationAssembler.assemble({
+      map: match.state.map,
+      frameContext: frameViews,
+      projection,
+      fog: match.fog,
+      feedback: feedbackView,
+      rememberedBuildings: match.state.rememberedBuildings,
+      trenches: match.state.trenches,
+      groundDecals: match.state.groundDecals?.peekPending?.() || [],
+      selectionIds: match.state.selection,
+      players: match.state.players,
+      playerId: match.state.playerId,
+      spectator: match.state.spectator,
+      visualSamples,
+      observerMapAnalysis,
+      screenOverlay,
+      visualTimeMs,
+      mode: capture ? "fixedCapture" : "live",
+      sourceTick: match.state.tick,
+    }));
+    match.presentationFrame = presentationFrame;
+    match.staticMapPresentation = presentationAssembler.staticMap;
+    match.frameProfiler?.recordDiagnosticCounter?.("presentation.frames.assembled", 1);
+    match.frameProfiler?.recordDiagnosticCounter?.(
+      "presentation.records.dropped",
+      presentationFrame.diagnosticsContext.droppedRecords,
+    );
+
     const selectionScene = time("match.selectionScene", () => buildSelectionScene({
       entities: frameViews.interpolatedEntities,
-      projection: match.camera.projectionSnapshot(),
+      projection,
       tileSize: match.state.map?.tileSize,
-      generation: 1,
-      frameId: (match.input?.selectionScene?.frameId || 0) + 1,
+      generation: presentationFrame.generation,
+      frameId: presentationFrame.frameId,
     }));
 
     time("match.renderer", () => {
@@ -83,10 +133,13 @@ function runMatchFrame(match, now, { capture = false } = {}) {
         clientIntent: match.clientIntent,
         frameViews,
         profiler: match.frameProfiler,
-        visualSamples: match.visualProfile?.staticSamples || null,
+        visualSamples,
         visualUnitOverrides: match.visualProfile?.unitOverrides || null,
         visualFrameStripOverrides: match.visualProfile?.frameStripOverrides || null,
-        observerMapAnalysis: match.observerDiagnostics?.mapOverlayModel?.() || null,
+        observerMapAnalysis,
+        feedbackView,
+        presentationFrame,
+        staticMapPresentation: presentationAssembler.staticMap,
       });
     });
     match.input?.publishSelectionScene?.(selectionScene);
