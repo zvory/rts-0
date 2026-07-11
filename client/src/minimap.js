@@ -67,6 +67,12 @@ const resourceLayoutSignature = (resources) => {
   return signature;
 };
 
+const commandTargetsMatch = (left, right) => {
+  if (left === right) return true;
+  if (!left || !right || typeof left !== "object" || typeof right !== "object") return false;
+  return left.kind === right.kind && left.ability === right.ability;
+};
+
 const minimapArtillerySvg = (svgText) => {
   if (typeof svgText !== "string") return "";
   const style = [
@@ -1091,7 +1097,11 @@ export class Minimap {
     this._releasePointer(ev.pointerId);
     this._activePointerGesture = null;
     this._dragging = false;
-    if (!gesture.moved && gesture.commandTarget && this._intent()?.commandTarget === gesture.commandTarget) {
+    if (
+      !gesture.moved &&
+      gesture.commandTarget &&
+      commandTargetsMatch(this._intent()?.commandTarget, gesture.commandTarget)
+    ) {
       const actionEvent = this._routerEvent(ev, "dom");
       actionEvent.shiftKey = gesture.shiftKey;
       actionEvent.ctrlKey = gesture.ctrlKey;

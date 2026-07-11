@@ -419,6 +419,23 @@ function pointerEvent(canvas, clientX, clientY, {
   up(pointerEvent(h.canvas, 150, 250, { pointerId: 24 }));
   assert(h.net.sent.length === 1, "a pinch never resolves as an armed minimap target tap");
   h.minimap.destroy();
+
+  const ability = minimapHarness({
+    selected: [{ id: 10, owner: 1, kind: KIND.SCOUT_CAR }],
+    commandTarget: { kind: "ability", ability: ABILITY.SMOKE },
+  });
+  const abilityDown = listenerFor(ability.canvas, "pointerdown");
+  const abilityUp = listenerFor(ability.canvas, "pointerup");
+  abilityDown(pointerEvent(ability.canvas, 150, 250, { pointerId: 26 }));
+  abilityUp(pointerEvent(ability.canvas, 150, 250, { pointerId: 26 }));
+  assert(
+    ability.net.sent.length === 1 &&
+      ability.net.sent[0].c === "useAbility" &&
+      ability.net.sent[0].ability === ABILITY.SMOKE,
+    "clean touch target issues object-valued ability commands",
+  );
+  assert(ability.clientIntent.commandTarget === null, "clean ability target tap exits target mode");
+  ability.minimap.destroy();
 }
 
 // Desktop Pointer Events keep right-click and Shift queueing semantics without a mouse fallback.
