@@ -15,13 +15,17 @@ node scripts/lab-interact/cli.mjs spawn '{"sessionId":"<id>","spawns":[{"owner":
 node scripts/lab-interact/cli.mjs inspect '{"sessionId":"<id>","refs":["subject"]}'
 node scripts/lab-interact/cli.mjs camera '{"sessionId":"<id>","camera":{"action":"focus","refs":["subject"]}}'
 node scripts/lab-interact/cli.mjs screenshot '{"sessionId":"<id>","name":"subject","presentation":"clean","subjects":["subject"]}'
+node scripts/lab-interact/cli.mjs export '{"sessionId":"<id>","kind":"setup","name":"two-unit-scene","reproduction":true}'
+node scripts/lab-interact/cli.mjs artifact-inspect '{"sessionId":"<id>","artifactId":"<artifact-id>"}'
+node scripts/lab-interact/cli.mjs import '{"sessionId":"<id>","kind":"setup","artifactId":"<artifact-id>"}'
 node scripts/lab-interact/cli.mjs close '{"sessionId":"<id>"}'
 node scripts/lab-interact/cli.mjs shutdown
 node scripts/lab-interact/cli.mjs --help
 ```
 
 The complete surface is `open`, `close`, `reset`, `catalog`, `spawn`, `update`, `remove`, `order`,
-`time`, `inspect`, `camera`, `screenshot`, `status`, and `shutdown`. Success writes exactly one JSON
+`time`, `inspect`, `camera`, `screenshot`, `export`, `import`, `artifact-inspect`, `status`, and
+`shutdown`. Success writes exactly one JSON
 envelope to stdout. Failure writes a concise JSON error to stderr and exits nonzero. Every command
 has an exact, bounded input shape; arbitrary state patches, protocol messages, browser evaluation,
 and caller-selected artifact paths are not accepted.
@@ -70,6 +74,28 @@ visible acquired combat target without mislabeling autonomous fire as an explici
 Artifacts are confined to `target/lab-interact/<session-id>/captures/` and ignored by Git. For a
 single-unit detail capture, camera `focus` defaults to close 32-world-pixel padding. Multi-subject
 and non-unit focus defaults to 48 world pixels.
+
+## Portable artifacts
+
+`export` writes either a checkpoint-backed `setup` or an authoritative `replay` under
+`target/lab-interact/artifacts/`. It returns an opaque `artifactId`, safe absolute paths, counts,
+map/tick/build metadata, and optional concise reproduction text; it never prints the embedded
+checkpoint or replay operation stream. An adjacent `.aliases.json` sidecar keeps aliases outside
+protocol schemas. Setup imports reconcile ids through the server-returned `sourceEntityIdMap`;
+replay imports restore aliases that still exist and report stale entries.
+
+`import` destructively replaces only the current ephemeral Lab session. Select an artifact by its
+opaque id or by a path already confined beneath this worktree's `target/lab-interact/`; URLs and
+external paths are rejected. `artifact-inspect` reports schema, authoring, map, tick/duration,
+entity/operation, build, and alias metadata without returning full artifact bytes. Files are capped
+at 8 MiB and aliases retain the CLI's 100-entry cap.
+
+Large replays move through a loopback-only, environment-gated bridge between the driver and its
+private Rust server. Every request needs the driver's random capability and uses a temporary opaque
+transfer id. Transfers expire after ten minutes and are cleared for the room on `close`; server
+teardown clears the full in-memory store. The room task remains authoritative for accepted ticks,
+operation ordering, validation, future-history truncation, and destructive replay rebuild.
+Production startup has no bridge capability and returns 404 for these routes.
 
 ## Recovery
 

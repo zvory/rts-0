@@ -118,6 +118,8 @@ export class LabInteractBridge {
       case "inspect": return this.inspect(input);
       case "camera": return this.camera(input);
       case "reset": return this.reset();
+      case "exportSetup": return this.exportSetup(input);
+      case "importSetup": return this.importSetup(input);
       case "presentation": return this.presentation(input);
       case "captureReadiness": return this.captureReadiness(input);
       default: throw bridgeError("unknownMethod", `Unknown Lab Interact bridge method ${JSON.stringify(method)}.`);
@@ -346,6 +348,28 @@ export class LabInteractBridge {
 
   reset() {
     return this.time({ action: "seek", tick: 0 });
+  }
+
+  async exportSetup(input = {}) {
+    const { labClient } = this.session();
+    const name = typeof input.name === "string" ? input.name.slice(0, 80) : "";
+    const result = await labClient.exportScenario(name);
+    if (!result?.ok || !result?.outcome?.scenario) {
+      throw bridgeError("setupExportRejected", result?.error || "The server rejected setup export.");
+    }
+    return { scenario: result.outcome.scenario, result: projectLabResult(result) };
+  }
+
+  async importSetup(input = {}) {
+    const { labClient } = this.session();
+    if (!input.scenario || typeof input.scenario !== "object" || Array.isArray(input.scenario)) {
+      throw bridgeError("invalidSetup", "importSetup.scenario must be a checkpoint setup object.");
+    }
+    const result = await this.mutate(
+      () => labClient.importScenario(input.scenario),
+      () => true,
+    );
+    return { result: projectLabResult(result), entityIdMap: result.outcome?.entityIdMap || [] };
   }
 
   async presentation(input = {}) {

@@ -698,6 +698,8 @@ if [ "$RUN_STATIC_JS" = "1" ]; then
     node "$SCRIPT_DIR/tri_state/self_test.mjs"
   run_suite_bg "JS minimap input contracts" \
     node "$SCRIPT_DIR/minimap_input_contracts.mjs"
+  run_suite_bg "Lab Interact artifact contracts" \
+    node "$SCRIPT_DIR/lab_interact_artifact_contracts.mjs"
   run_suite_bg "JS HUD command card" \
     node "$SCRIPT_DIR/hud_command_card.mjs"
 else

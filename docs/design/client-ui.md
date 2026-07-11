@@ -581,7 +581,10 @@ The local `scripts/lab-interact/driver.mjs` owns the selected-worktree server, h
 clean viewport clipping, readiness wait, PNG/JSON artifacts, and profile cleanup. The bounded command
 service owns aliases and exact input contracts. Its per-worktree daemon preserves that state across
 machine-readable CLI calls, expires after 30 idle minutes, and returns screenshot paths and metadata
-without embedding image content.
+without embedding image content. Portable setup export/import uses the bridge's narrow
+`exportSetup`/`importSetup` methods and keeps checkpoint bytes out of CLI results. Replay bytes bypass
+the browser and normal WebSocket result through the capability-gated private-server handoff; the
+daemon writes only bounded artifacts and alias sidecars under `target/lab-interact/`.
 
 `lab_scenario_authoring.js`
 ```js

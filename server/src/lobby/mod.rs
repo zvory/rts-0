@@ -35,8 +35,8 @@ use crate::config;
 use crate::db::Db;
 use crate::lab_scenario_submission::LabScenarioSubmissionService;
 use crate::protocol::{
-    Event, LabClientOp, LobbyKind, ReplayBranchSeat, ReplayStartMetadata, ResourceDelta,
-    ServerMessage, Snapshot, TeamId, VisionSelectionRequest,
+    Event, LabClientOp, LabReplayArtifactV1, LobbyKind, ReplayBranchSeat, ReplayStartMetadata,
+    ResourceDelta, ServerMessage, Snapshot, TeamId, VisionSelectionRequest,
 };
 use rts_ai::selfplay::is_safe_artifact_name;
 use rts_sim::game::command::SimCommand;
@@ -452,6 +452,18 @@ pub enum RoomEvent {
         request_id: u32,
         op: LabClientOp,
     },
+    /// Local-development-only replay artifact export. The room remains the authority for the
+    /// accepted operation stream and serializes it on its single-owner task.
+    LabReplayExport {
+        name: Option<String>,
+        reply: tokio::sync::oneshot::Sender<Result<LabReplayArtifactV1, String>>,
+    },
+    /// Local-development-only replay artifact import. Validation and destructive replacement run
+    /// on the room's single-owner task, never in an HTTP or daemon task.
+    LabReplayImport {
+        artifact: LabReplayArtifactV1,
+        reply: tokio::sync::oneshot::Sender<Result<(), String>>,
+    },
     /// A replay viewer requested a frozen practice branch seed from the current replay tick.
     RequestBranchFromTick {
         player_id: u32,
@@ -763,6 +775,56 @@ impl Lobby {
             return handle.clone();
         }
         self.create_room_locked(room, &mut rooms)
+    }
+
+    /// Export a replay from an existing Lab room for the environment-gated local artifact bridge.
+    pub async fn export_lab_replay_artifact(
+        &self,
+        room: &str,
+        name: Option<String>,
+    ) -> Result<LabReplayArtifactV1, String> {
+        let handle = self
+            .rooms
+            .lock()
+            .await
+            .get(room)
+            .cloned()
+            .ok_or_else(|| "lab room is not running".to_string())?;
+        let (reply, response) = tokio::sync::oneshot::channel();
+        handle
+            .event_tx
+            .send(RoomEvent::LabReplayExport { name, reply })
+            .await
+            .map_err(|_| "lab room is unavailable".to_string())?;
+        tokio::time::timeout(Duration::from_secs(5), response)
+            .await
+            .map_err(|_| "lab replay export timed out".to_string())?
+            .map_err(|_| "lab room closed during replay export".to_string())?
+    }
+
+    /// Import a validated replay into an existing Lab room through its single-owner task.
+    pub async fn import_lab_replay_artifact(
+        &self,
+        room: &str,
+        artifact: LabReplayArtifactV1,
+    ) -> Result<(), String> {
+        let handle = self
+            .rooms
+            .lock()
+            .await
+            .get(room)
+            .cloned()
+            .ok_or_else(|| "lab room is not running".to_string())?;
+        let (reply, response) = tokio::sync::oneshot::channel();
+        handle
+            .event_tx
+            .send(RoomEvent::LabReplayImport { artifact, reply })
+            .await
+            .map_err(|_| "lab room is unavailable".to_string())?;
+        tokio::time::timeout(Duration::from_secs(5), response)
+            .await
+            .map_err(|_| "lab replay import timed out".to_string())?
+            .map_err(|_| "lab room closed during replay import".to_string())?
     }
 
     /// Resolve a join target. During deploy drain, existing rooms stay joinable but new rooms are

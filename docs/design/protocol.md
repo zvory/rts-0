@@ -1255,9 +1255,14 @@ It is not sim-private `LabOp`, not `LabSession.operationLog`, and not the room-l
 ```
 Whole artifacts are capped at 8 MiB. The operation stream is capped at 50,000 entries, each
 non-setup operation payload is capped at 64 KiB, and embedded `GameCheckpointV1` text payloads in
-the initial setup are capped at 4 MiB. A lab replay may be saved/opened by a bounded local-file or
-future HTTP/dev-artifact path; it is not carried through the current WebSocket `lab` request
-envelope because long lab sessions can exceed that control frame budget.
+the initial setup are capped at 4 MiB. A lab replay may be saved/opened by Lab Interact's bounded
+local artifact path; it is not carried through the current WebSocket `lab` request envelope because
+long lab sessions can exceed that control frame budget. The daemon-started private server enables
+a loopback-only handoff only when `RTS_LAB_INTERACT_ARTIFACT_CAPABILITY` contains the driver's
+random 256-bit capability. Requests echo that capability and address artifacts by expiring opaque
+transfer id. Production startup leaves the seam unavailable. Export/import still execute on the
+single-owner room task, so accepted ticks, operation order, truncation, and rebuild validation never
+move into the browser or daemon.
 
 `LabReplayOperation` deliberately promotes only replayable lab state changes:
 ```

@@ -10,7 +10,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::extract::{ConnectInfo, Path, Query, State};
+use axum::extract::{ConnectInfo, DefaultBodyLimit, Path, Query, State};
 use axum::http::{header, StatusCode, Uri};
 use axum::response::{IntoResponse, Redirect};
 use axum::routing::{get, post};
@@ -24,6 +24,7 @@ mod client_optional_assets;
 mod connection_writer;
 mod dev_replay_pages;
 mod dev_scenario_pages;
+mod lab_interact_artifacts;
 #[cfg(test)]
 mod main_replay_tests;
 mod wiki;
@@ -112,6 +113,7 @@ struct AppState {
     /// failed; the front-page `/api/matches` endpoint returns an empty list in that case.
     db: Option<Arc<Db>>,
     lab_scenario_submission: LabScenarioSubmissionService,
+    lab_interact_artifacts: lab_interact_artifacts::LabInteractArtifactBridge,
 }
 
 #[tokio::main]
@@ -168,6 +170,7 @@ async fn main() {
         maps_dir: maps_dir.clone(),
         db,
         lab_scenario_submission,
+        lab_interact_artifacts: lab_interact_artifacts::LabInteractArtifactBridge::from_env(),
     };
     let shutdown_lobby = state.lobby.clone();
     // Static files for everything except `/ws`; unknown app routes fall back to `index.html` so the
@@ -186,6 +189,28 @@ async fn main() {
         .route("/wiki/", get(wiki::wiki_index_handler))
         .route("/wiki/{*path}", get(wiki::wiki_page_handler))
         .route("/ws", get(ws_handler))
+        .route(
+            "/dev/lab-interact/artifacts/export",
+            post(lab_interact_artifacts::export_handler),
+        )
+        .route(
+            "/dev/lab-interact/artifacts/upload",
+            post(lab_interact_artifacts::upload_handler).layer(DefaultBodyLimit::max(
+                lab_interact_artifacts::MAX_ARTIFACT_BYTES,
+            )),
+        )
+        .route(
+            "/dev/lab-interact/artifacts/import",
+            post(lab_interact_artifacts::import_handler),
+        )
+        .route(
+            "/dev/lab-interact/artifacts/cleanup",
+            post(lab_interact_artifacts::cleanup_handler),
+        )
+        .route(
+            "/dev/lab-interact/artifacts/{artifact_id}",
+            get(lab_interact_artifacts::download_handler),
+        )
         .route("/dev/replay-artifact", get(dev_replay_artifact_handler))
         .route(
             "/dev/replay-lobby",

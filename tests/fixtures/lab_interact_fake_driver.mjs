@@ -54,7 +54,7 @@ export async function openLabInteractDriver(options) {
   return {
     workspace: { root: options.workspaceRoot, branch: "fixture", head: "a".repeat(40) },
     async status() {
-      return { ready: !closed, reason: closed ? "closed" : "ready", snapshotTick: tick };
+      return { ready: !closed, reason: closed ? "closed" : "ready", snapshotTick: tick, room: "labinteract-fixture" };
     },
     async catalog() {
       return structuredClone(CATALOG);
@@ -147,8 +147,41 @@ export async function openLabInteractDriver(options) {
       tick = 0;
       return { roomTime: { currentTick: tick, speed: 0, paused: true }, snapshotTick: tick };
     },
+    async exportSetup(name = "") {
+      return { scenario: checkpointScenario(name, tick, entities) };
+    },
+    async importSetup(scenario) {
+      const restored = JSON.parse(scenario.checkpointPayload).entities || [];
+      const entityIdMap = restored.map((entity) => ({ oldId: entity.id, newId: entity.id + 1000 }));
+      entities = restored.map((entity) => ({ ...entity, id: entity.id + 1000, orderPlan: entity.orderPlan || [] }));
+      tick = scenario.metadata.exportedTick;
+      return { entityIdMap, result: { op: "importScenario", snapshotTick: tick } };
+    },
+    async exportReplay(name = "") {
+      const artifact = {
+        schema: "rts.labReplay", schemaVersion: 1, kind: "labReplay", serverBuildSha: "a".repeat(40),
+        authoring: { name }, initialSetup: checkpointScenario(name, 0, entities),
+        timeline: { initialTick: 0, durationTicks: tick, keyframeIntervalTicks: 2000 }, operations: [],
+      };
+      return { bytes: Buffer.from(JSON.stringify(artifact)), transfer: { artifactId: "transfer_fixture" } };
+    },
+    async importReplay(bytes) {
+      const artifact = JSON.parse(bytes);
+      entities = (JSON.parse(artifact.initialSetup.checkpointPayload).entities || []).map((entity) => ({ ...entity, orderPlan: entity.orderPlan || [] }));
+      tick = artifact.timeline.durationTicks;
+      return { imported: true };
+    },
     async close() {
       closed = true;
     },
+  };
+}
+
+function checkpointScenario(name, tick, entities) {
+  return {
+    schemaVersion: 1, kind: "labCheckpointScenario", name: name || "Fixture setup", seed: 1,
+    map: { name: "Default", schemaVersion: 1, contentHash: "content", materializedHash: "materialized", data: { size: 64, terrain: [], starts: [], expansionSites: [] } },
+    metadata: { exportedTick: tick, lab: { vision: { mode: "fullWorld" } }, sourceEntityIdMap: entities.map((entity) => ({ oldId: entity.id, newId: entity.id })) },
+    checkpointPayload: JSON.stringify({ entities }),
   };
 }
