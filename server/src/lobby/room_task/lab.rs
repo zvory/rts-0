@@ -1224,7 +1224,7 @@ impl RoomTask {
         );
     }
 
-    fn broadcast_lab_state(&self) {
+    pub(in crate::lobby::room_task) fn broadcast_lab_state(&self) {
         let Some(session) = &self.lab_session else {
             return;
         };

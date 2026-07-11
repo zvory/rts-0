@@ -16,11 +16,14 @@ export const LAB_INTERACT_LIMITS = Object.freeze({
   maxInspectResults: 100,
   maxFocusRefs: 20,
   maxScreenshotSubjects: 20,
+  maxArtifactBytes: 8 * 1024 * 1024,
+  maxAliasSidecarBytes: 64 * 1024,
 });
 
 export const LAB_INTERACT_COMMANDS = Object.freeze([
   "open", "close", "reset", "catalog", "spawn", "update", "remove", "order",
   "time", "inspect", "camera", "screenshot", "status", "shutdown",
+  "export", "import", "artifact-inspect",
 ]);
 
 const ALL_CATALOG_CATEGORIES = Object.freeze([
@@ -219,6 +222,9 @@ export class LabInteractService {
     if (command === "inspect") return inspect(session, input);
     if (command === "camera") return camera(session, input.camera);
     if (command === "screenshot") return screenshot(session, input);
+    if (command === "export") return exportArtifact(this.workspaceRoot, session, input);
+    if (command === "import") return importArtifact(this.workspaceRoot, session, input);
+    if (command === "artifact-inspect") return inspectArtifact(this.workspaceRoot, session, input);
     throw new LabInteractError("unknownCommand", `Unknown session command ${command}.`);
   }
 }
@@ -383,8 +389,261 @@ function validateInput(command, value) {
     if (value.presentation != null && !["clean", "normal"].includes(value.presentation)) invalid("screenshot.presentation", "must be clean or normal");
     if (value.viewport != null) viewport(value.viewport, 2048, "screenshot.viewport");
     if (value.subjects != null) refs(value.subjects, "screenshot.subjects", 0, LAB_INTERACT_LIMITS.maxScreenshotSubjects);
+  } else if (command === "export") {
+    exact(value, ["sessionId", "kind", "name", "reproduction"], command);
+    artifactKind(value.kind, "export.kind");
+    const maxNameBytes = value.kind === "setup" ? 80 : 120;
+    if (value.name != null && (typeof value.name !== "string" || Buffer.byteLength(value.name) > maxNameBytes)) invalid("export.name", `must be at most ${maxNameBytes} UTF-8 bytes`);
+    optionalBoolean(value.reproduction, "export.reproduction");
+  } else if (command === "import") {
+    exact(value, ["sessionId", "kind", "artifactId", "path"], command);
+    artifactKind(value.kind, "import.kind");
+    artifactSelector(value, "import");
+  } else if (command === "artifact-inspect") {
+    exact(value, ["sessionId", "kind", "artifactId", "path"], command);
+    if (value.kind != null) artifactKind(value.kind, "artifact-inspect.kind");
+    artifactSelector(value, "artifact-inspect");
   }
   return value;
+}
+
+async function exportArtifact(workspaceRoot, session, { kind, name = "", reproduction = false }) {
+  const artifactId = `artifact_${crypto.randomUUID().replaceAll("-", "")}`;
+  const directory = artifactDirectory(workspaceRoot);
+  fs.mkdirSync(directory, { recursive: true });
+  let artifact;
+  if (kind === "setup") {
+    artifact = (await session.driver.exportSetup(name)).scenario;
+  } else {
+    artifact = JSON.parse((await session.driver.exportReplay(name)).bytes.toString("utf8"));
+  }
+  const bytes = Buffer.from(`${JSON.stringify(artifact, null, 2)}\n`);
+  if (bytes.length > LAB_INTERACT_LIMITS.maxArtifactBytes) {
+    throw new LabInteractError("artifactTooLarge", "Artifact exceeds the 8 MiB local file bound.");
+  }
+  const artifactPath = path.join(directory, `${artifactId}.${kind}.json`);
+  const sidecarPath = path.join(directory, `${artifactId}.aliases.json`);
+  const aliases = [...session.aliases].map(([alias, id]) => ({ alias, id }));
+  const sidecar = {
+    schemaVersion: 1,
+    artifactId,
+    kind,
+    artifactFile: path.basename(artifactPath),
+    aliases,
+    reproduction: reproduction ? reproductionSummary(kind, artifactId, aliases) : null,
+  };
+  fs.writeFileSync(artifactPath, bytes, { mode: 0o600 });
+  fs.writeFileSync(sidecarPath, `${JSON.stringify(sidecar, null, 2)}\n`, { mode: 0o600 });
+  return {
+    sessionId: session.sessionId,
+    artifactId,
+    kind,
+    path: artifactPath,
+    sidecarPath,
+    bytes: bytes.length,
+    ...artifactSummary(kind, artifact, aliases),
+    reproduction: sidecar.reproduction,
+  };
+}
+
+async function importArtifact(workspaceRoot, session, selector) {
+  const selected = readArtifact(workspaceRoot, selector);
+  let importResult;
+  let reconciliation;
+  if (selected.kind === "setup") {
+    importResult = await session.driver.importSetup(selected.artifact);
+    reconciliation = await reconcileImportedAliases(session, selected.aliases, importResult.entityIdMap || []);
+  } else {
+    importResult = await session.driver.importReplay(selected.bytes);
+    reconciliation = await validateImportedAliases(session, selected.aliases);
+  }
+  return {
+    sessionId: session.sessionId,
+    artifactId: selected.artifactId,
+    kind: selected.kind,
+    path: selected.path,
+    imported: true,
+    tick: (await session.driver.status()).snapshotTick ?? null,
+    aliases: reconciliation,
+    validation: { ok: true, authority: selected.kind === "setup" ? "checkpoint import" : "replay room rebuild" },
+    result: importResult,
+  };
+}
+
+async function inspectArtifact(workspaceRoot, session, selector) {
+  const selected = readArtifact(workspaceRoot, selector);
+  const aliasValidation = await validateAliasesAgainstArtifact(session, selected.kind, selected.artifact, selected.aliases);
+  return {
+    sessionId: session.sessionId,
+    artifactId: selected.artifactId,
+    kind: selected.kind,
+    path: selected.path,
+    sidecarPath: selected.sidecarPath,
+    bytes: selected.bytes.length,
+    ...artifactSummary(selected.kind, selected.artifact, selected.aliases),
+    aliases: aliasValidation,
+    validation: {
+      ok: true,
+      schema: selected.kind === "setup" ? "LabCheckpointScenarioV1" : "LabReplayArtifactV1",
+      scope: "boundedLocalShape",
+      authoritative: false,
+      authoritativeValidationOnImport: true,
+    },
+  };
+}
+
+function artifactDirectory(workspaceRoot) {
+  return path.join(workspaceRoot, "target", "lab-interact", "artifacts");
+}
+
+function readArtifact(workspaceRoot, { kind = null, artifactId = null, path: requestedPath = null }) {
+  const directory = artifactDirectory(workspaceRoot);
+  let artifactPath;
+  if (artifactId) {
+    if (!/^artifact_[a-f0-9]{32}$/.test(artifactId)) throw new LabInteractError("invalidArtifactId", "artifactId is invalid.");
+    const candidates = kind
+      ? [path.join(directory, `${artifactId}.${kind}.json`)]
+      : ["setup", "replay"].map((candidateKind) => path.join(directory, `${artifactId}.${candidateKind}.json`));
+    artifactPath = candidates.find((candidate) => fs.existsSync(candidate));
+    if (!artifactPath) throw new LabInteractError("artifactNotFound", "Artifact id does not exist in this worktree.");
+  } else {
+    if (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(requestedPath)) throw new LabInteractError("unsafeArtifactPath", "Artifact URLs are not accepted.");
+    artifactPath = path.resolve(workspaceRoot, requestedPath);
+  }
+  const rootPrefix = `${fs.realpathSync(path.join(workspaceRoot, "target", "lab-interact"))}${path.sep}`;
+  let realPath;
+  try { realPath = fs.realpathSync(artifactPath); } catch { throw new LabInteractError("artifactNotFound", "Artifact path does not exist."); }
+  if (!realPath.startsWith(rootPrefix)) throw new LabInteractError("unsafeArtifactPath", "Artifact path must stay beneath target/lab-interact/.");
+  const match = path.basename(realPath).match(/^(artifact_[a-f0-9]{32})\.(setup|replay)\.json$/);
+  if (!match) throw new LabInteractError("invalidArtifactPath", "Artifact filename is not a Lab Interact artifact.");
+  const resolvedKind = match[2];
+  if (kind && kind !== resolvedKind) throw new LabInteractError("artifactKindMismatch", "Requested artifact kind does not match the file.");
+  const bytes = readBoundedFile(realPath, LAB_INTERACT_LIMITS.maxArtifactBytes, "artifactTooLarge", "Artifact exceeds 8 MiB.");
+  let artifact;
+  try { artifact = JSON.parse(bytes); } catch { throw new LabInteractError("invalidArtifact", "Artifact is not valid JSON."); }
+  validateArtifactShape(resolvedKind, artifact);
+  const sidecarPath = path.join(path.dirname(realPath), `${match[1]}.aliases.json`);
+  const aliases = readAliasSidecar(sidecarPath, match[1], resolvedKind);
+  return { artifactId: match[1], kind: resolvedKind, path: realPath, sidecarPath, bytes, artifact, aliases };
+}
+
+function validateArtifactShape(kind, artifact) {
+  if (!artifact || typeof artifact !== "object" || Array.isArray(artifact)) throw new LabInteractError("invalidArtifact", "Artifact must be an object.");
+  if (kind === "setup") {
+    if (artifact.schemaVersion !== 1 || artifact.kind !== "labCheckpointScenario" || typeof artifact.checkpointPayload !== "string") {
+      throw new LabInteractError("incompatibleArtifact", "Only LabCheckpointScenarioV1 setup artifacts are accepted.");
+    }
+  } else if (artifact.schema !== "rts.labReplay" || artifact.schemaVersion !== 1 || artifact.kind !== "labReplay" || !Array.isArray(artifact.operations)) {
+    throw new LabInteractError("incompatibleArtifact", "Only LabReplayArtifactV1 replay artifacts are accepted.");
+  }
+}
+
+function readAliasSidecar(sidecarPath, artifactId, kind) {
+  if (!fs.existsSync(sidecarPath)) return [];
+  let sidecar;
+  try {
+    const bytes = readBoundedFile(
+      sidecarPath,
+      LAB_INTERACT_LIMITS.maxAliasSidecarBytes,
+      "invalidAliasSidecar",
+      "Alias sidecar exceeds 64 KiB.",
+    );
+    sidecar = JSON.parse(bytes);
+  } catch (error) {
+    if (error instanceof LabInteractError) throw error;
+    throw new LabInteractError("invalidAliasSidecar", "Alias sidecar is invalid JSON.");
+  }
+  if (sidecar?.schemaVersion !== 1 || sidecar.artifactId !== artifactId || sidecar.kind !== kind || !Array.isArray(sidecar.aliases) || sidecar.aliases.length > LAB_INTERACT_LIMITS.maxAliases) {
+    throw new LabInteractError("invalidAliasSidecar", "Alias sidecar identity or bounds are invalid.");
+  }
+  const seen = new Set();
+  return sidecar.aliases.map((entry) => {
+    if (!entry || !ALIAS_RE.test(entry.alias) || !Number.isInteger(entry.id) || entry.id <= 0 || seen.has(entry.alias)) throw new LabInteractError("invalidAliasSidecar", "Alias sidecar contains an invalid or duplicate entry.");
+    seen.add(entry.alias);
+    return { alias: entry.alias, id: entry.id };
+  });
+}
+
+function readBoundedFile(filePath, maxBytes, code, message) {
+  let size;
+  try { size = fs.statSync(filePath).size; } catch { throw new LabInteractError("artifactNotFound", "Artifact path does not exist."); }
+  if (size > maxBytes) throw new LabInteractError(code, message);
+  const bytes = fs.readFileSync(filePath);
+  if (bytes.length > maxBytes) throw new LabInteractError(code, message);
+  return bytes;
+}
+
+async function reconcileImportedAliases(session, aliases, entityIdMap) {
+  const remaps = new Map(entityIdMap.map((entry) => [Number(entry.oldId), Number(entry.newId)]));
+  session.aliases.clear();
+  const candidates = aliases.map((entry) => ({ ...entry, id: remaps.get(entry.id) || entry.id }));
+  const inspected = candidates.length ? await session.driver.inspect({ ids: candidates.map((entry) => entry.id), limit: candidates.length }) : { entities: [] };
+  const existing = new Set((inspected.entities || []).map((entity) => entity.id));
+  const restored = [];
+  const stale = [];
+  for (const entry of candidates) {
+    if (existing.has(entry.id)) { session.aliases.set(entry.alias, entry.id); restored.push({ alias: entry.alias, oldId: aliases.find((source) => source.alias === entry.alias)?.id, id: entry.id }); }
+    else stale.push({ alias: entry.alias, id: entry.id });
+  }
+  return { restored, stale };
+}
+
+async function validateImportedAliases(session, aliases) {
+  session.aliases.clear();
+  const inspected = aliases.length ? await session.driver.inspect({ ids: aliases.map((entry) => entry.id), limit: aliases.length }) : { entities: [] };
+  const ids = new Set((inspected.entities || []).map((entity) => entity.id));
+  const restored = [], stale = [];
+  for (const entry of aliases) {
+    if (ids.has(entry.id)) { session.aliases.set(entry.alias, entry.id); restored.push(entry); } else stale.push(entry);
+  }
+  return { restored, stale };
+}
+
+async function validateAliasesAgainstArtifact(_session, kind, artifact, aliases) {
+  const setup = kind === "setup" ? artifact : artifact.initialSetup;
+  const idMap = setup?.metadata?.sourceEntityIdMap || [];
+  const known = new Set([...artifactEntityIds(setup), ...idMap.flatMap((entry) => [entry.oldId, entry.newId])]);
+  return { entries: aliases, stale: aliases.filter((entry) => !known.has(entry.id)), status: "sidecarValidated" };
+}
+
+function artifactSummary(kind, artifact, aliases) {
+  const setup = kind === "setup" ? artifact : artifact.initialSetup;
+  let entityCount = null;
+  try {
+    entityCount = artifactEntityIds(setup).length;
+  } catch {}
+  return {
+    authoring: kind === "setup" ? { name: artifact.name || "" } : artifact.authoring || {},
+    map: setup?.map ? { name: setup.map.name, contentHash: setup.map.contentHash, materializedHash: setup.map.materializedHash } : null,
+    tick: kind === "setup" ? setup?.metadata?.exportedTick ?? null : artifact.timeline?.initialTick ?? null,
+    durationTicks: kind === "replay" ? artifact.timeline?.durationTicks ?? null : 0,
+    entityCount,
+    operationCount: kind === "replay" ? artifact.operations.length : 0,
+    serverBuildSha: kind === "replay" ? artifact.serverBuildSha || null : null,
+    aliasCount: aliases.length,
+  };
+}
+
+function artifactEntityIds(setup) {
+  try {
+    const entities = JSON.parse(setup?.checkpointPayload || "")?.entities;
+    const rows = Array.isArray(entities) ? entities : entities?.entities;
+    return Array.isArray(rows) ? rows.map((entity) => entity?.id).filter((id) => Number.isInteger(id) && id > 0) : [];
+  } catch { return []; }
+}
+
+function reproductionSummary(kind, artifactId, aliases) {
+  const refs = aliases.slice(0, 12).map((entry) => entry.alias).join(", ");
+  const input = JSON.stringify({ sessionId: "<current-session-id>", kind, artifactId });
+  return `node scripts/lab-interact/cli.mjs import '${input}'; aliases: ${refs || "none"}`;
+}
+
+function artifactKind(value, label) { if (!["setup", "replay"].includes(value)) invalid(label, "must be setup or replay"); }
+function artifactSelector(value, label) {
+  const count = Number(value.artifactId != null) + Number(value.path != null);
+  if (count !== 1) invalid(label, "must provide exactly one of artifactId or path");
+  if (value.artifactId != null && (typeof value.artifactId !== "string" || !/^artifact_[a-f0-9]{32}$/.test(value.artifactId))) invalid(`${label}.artifactId`, "is invalid");
+  if (value.path != null && (typeof value.path !== "string" || !value.path || value.path.length > 1024)) invalid(`${label}.path`, "must be a bounded path string");
 }
 
 function validateUpdate(value) {

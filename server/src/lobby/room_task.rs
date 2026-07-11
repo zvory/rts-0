@@ -420,6 +420,35 @@ impl RoomTask {
                 request_id,
                 op,
             } => self.on_lab_request(player_id, request_id, op),
+            RoomEvent::LabReplayExport { name, reply } => {
+                let result = self
+                    .lab_session
+                    .as_ref()
+                    .map(|session| session.operator_id)
+                    .ok_or_else(|| "lab session is not running".to_string())
+                    .and_then(|operator_id| {
+                        self.export_lab_replay_artifact(operator_id, name.as_deref())
+                    });
+                let _ = reply.send(result);
+            }
+            RoomEvent::LabReplayImport {
+                artifact,
+                deadline,
+                reply,
+            } => {
+                let result = self
+                    .lab_session
+                    .as_ref()
+                    .map(|session| session.operator_id)
+                    .ok_or_else(|| "lab session is not running".to_string())
+                    .and_then(|operator_id| {
+                        self.load_lab_replay_artifact_before(operator_id, *artifact, deadline)
+                    });
+                if result.is_ok() {
+                    self.broadcast_lab_state();
+                }
+                let _ = reply.send(result);
+            }
             RoomEvent::RequestBranchFromTick { player_id, reply } => {
                 let _ = reply.send(self.on_request_branch_from_tick(player_id));
             }

@@ -414,6 +414,15 @@ fn lab_replay_export_reopens_process_cold_from_serialized_artifact() {
         reopened_ack,
     );
     while reopened_writer.reliable_rx.try_recv().is_ok() {}
+    let resources_before_timed_out_import = lab_player_resources(&reopened, LAB_PLAYER_ONE_ID);
+    let timed_out = reopened
+        .load_lab_replay_artifact_before(99, reopened_artifact.clone(), std::time::Instant::now())
+        .expect_err("expired import must stop before replacing room state");
+    assert!(timed_out.contains("timed out before changing the room"));
+    assert_eq!(
+        lab_player_resources(&reopened, LAB_PLAYER_ONE_ID),
+        resources_before_timed_out_import
+    );
     reopened
         .load_lab_replay_artifact(99, reopened_artifact)
         .expect("lab replay open");

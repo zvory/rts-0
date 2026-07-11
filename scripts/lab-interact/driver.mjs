@@ -20,6 +20,7 @@ const MAX_PAGE_ERRORS = 80;
 const MAX_CAPTURE_BYTES = 16 * 1024 * 1024;
 const MAX_CAPTURE_VIEWPORT = 2048;
 const LAB_INTERACT_ROOT = path.join("target", "lab-interact");
+const ARTIFACT_CAPABILITY_HEADER = "x-lab-interact-capability";
 
 export const DRIVER_STATES = Object.freeze({
   OPENING: "opening",
@@ -87,6 +88,10 @@ export class LabInteractDriver {
     this.closePromise = null;
     this.signalHandlers = [];
     this.openStarted = false;
+    const configuredArtifactCapability = process.env.RTS_LAB_INTERACT_ARTIFACT_CAPABILITY || "";
+    this.artifactCapability = /^[a-f0-9]{64}$/.test(configuredArtifactCapability)
+      ? configuredArtifactCapability
+      : crypto.randomBytes(32).toString("hex");
   }
 
   async open() {
@@ -104,6 +109,7 @@ export class LabInteractDriver {
       startupTimeoutMs: this.options.startupTimeoutMs,
       baseUrl: this.options.baseUrl,
       isOpening: () => this.state === DRIVER_STATES.OPENING,
+      artifactCapability: this.artifactCapability,
     });
     this.serverLogPath = this.server.logPath || "";
 
@@ -199,6 +205,64 @@ export class LabInteractDriver {
 
   async reset() {
     return this.call("reset", {});
+  }
+
+  async exportSetup(name = "") {
+    return this.call("exportSetup", { name });
+  }
+
+  async importSetup(scenario) {
+    return this.call("importSetup", { scenario });
+  }
+
+  async exportReplay(name = "") {
+    const room = (await this.status()).room;
+    const transfer = await this.artifactRequest("export", { room, name }, "json");
+    const response = await fetch(new URL(`dev/lab-interact/artifacts/${transfer.artifactId}`, this.server.baseUrl), {
+      headers: {
+        [ARTIFACT_CAPABILITY_HEADER]: this.artifactCapability,
+        "x-lab-interact-room": room,
+      },
+      signal: AbortSignal.timeout(this.options.timeoutMs),
+    });
+    if (!response.ok) throw await artifactHttpError(response, "replay download failed");
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (bytes.length > 8 * 1024 * 1024) throw new LabInteractDriverError("artifactTooLarge", "Replay artifact exceeds 8 MiB.");
+    return { bytes, transfer };
+  }
+
+  async importReplay(bytes) {
+    if (!Buffer.isBuffer(bytes) || bytes.length > 8 * 1024 * 1024) {
+      throw new LabInteractDriverError("artifactTooLarge", "Replay artifact must be a buffer no larger than 8 MiB.");
+    }
+    const room = (await this.status()).room;
+    const uploadUrl = new URL("dev/lab-interact/artifacts/upload", this.server.baseUrl);
+    const uploadedResponse = await fetch(uploadUrl, {
+      method: "POST",
+      headers: {
+        [ARTIFACT_CAPABILITY_HEADER]: this.artifactCapability,
+        "x-lab-interact-room": room,
+        "content-type": "application/json",
+      },
+      body: bytes,
+      signal: AbortSignal.timeout(this.options.timeoutMs),
+    });
+    if (!uploadedResponse.ok) throw await artifactHttpError(uploadedResponse, "replay upload failed");
+    const uploaded = await uploadedResponse.json();
+    const imported = await this.artifactRequest("import", { room, artifactId: uploaded.artifactId }, "json");
+    await this.callBridge("status", {});
+    return { uploaded, imported };
+  }
+
+  async artifactRequest(action, body) {
+    const response = await fetch(new URL(`dev/lab-interact/artifacts/${action}`, this.server.baseUrl), {
+      method: "POST",
+      headers: { [ARTIFACT_CAPABILITY_HEADER]: this.artifactCapability, "content-type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(this.options.timeoutMs),
+    });
+    if (!response.ok) throw await artifactHttpError(response, `replay ${action} failed`);
+    return response.json();
   }
 
   async screenshot({
@@ -427,8 +491,12 @@ export class LabInteractDriver {
     if (this.closePromise) return this.closePromise;
     this.closePromise = (async () => {
       if (this.state === DRIVER_STATES.CLOSED) return;
-      if (this.state !== DRIVER_STATES.CLOSING) this.transition("closing");
       this.removeCleanupHandlers();
+      if (this.page && this.server) {
+        const room = await this.callBridge("status", {}).then((status) => status.room).catch(() => "");
+        if (room) await this.artifactRequest("cleanup", { room }).catch(() => {});
+      }
+      if (this.state !== DRIVER_STATES.CLOSING) this.transition("closing");
       await this.page?.close().catch(() => {});
       await this.browser?.close().catch(() => {});
       await this.server?.close?.().catch(() => {});
@@ -612,7 +680,7 @@ function createSessionDirectory(workspaceRoot, map) {
   return directory;
 }
 
-async function startOrReusePrivateServer({ workspace, sessionDir, startupTimeoutMs, baseUrl, isOpening }) {
+async function startOrReusePrivateServer({ workspace, sessionDir, startupTimeoutMs, baseUrl, isOpening, artifactCapability }) {
   if (!isOpening()) throw new LabInteractDriverError("sessionClosed", "Lab Interact driver was closed during server startup.");
   if (baseUrl) {
     const normalized = privateLoopbackUrl(baseUrl);
@@ -649,6 +717,7 @@ async function startOrReusePrivateServer({ workspace, sessionDir, startupTimeout
       ...process.env,
       RTS_ADDR: `127.0.0.1:${port}`,
       RTS_MATCH_SEED: process.env.RTS_MATCH_SEED || "1",
+      RTS_LAB_INTERACT_ARTIFACT_CAPABILITY: artifactCapability,
     },
     stdio: ["ignore", log, log],
   });
@@ -685,6 +754,12 @@ async function startOrReusePrivateServer({ workspace, sessionDir, startupTimeout
   }
   await stopChild(child);
   throw new LabInteractDriverError("serverTimeout", `Private server did not become healthy; see ${logPath}`);
+}
+
+async function artifactHttpError(response, fallback) {
+  let message = fallback;
+  try { message = (await response.json())?.error || message; } catch {}
+  return new LabInteractDriverError("artifactTransferFailed", message);
 }
 
 function normalizeViewport(viewport) {

@@ -1,6 +1,6 @@
 # Phase 4 - Portable Setup And Replay Artifacts
 
-Status: planned.
+Status: done.
 
 ## Prerequisite
 

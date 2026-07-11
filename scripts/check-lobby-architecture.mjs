@@ -42,9 +42,9 @@ const roomTaskChildLineBudgets = new Map(Object.entries({
   "room_task/replay.rs": 720,
   "room_task/types.rs": 220,
 }));
-// Lab map-draft validation, replay rebasing, and peer refresh are intentionally centralized in
-// room_task/lab.rs; keep the aggregate ratchet at the resulting proof-of-concept footprint.
-const roomTaskTotalLineBudget = 6360;
+// Lab map-draft validation, replay rebasing, peer refresh, and the Phase 4 local artifact handoff
+// are intentionally room-owned; keep the aggregate ratchet at the resulting footprint.
+const roomTaskTotalLineBudget = 6419;
 
 const lobbyRustFiles = listRustFiles(lobbySrc);
 

@@ -166,6 +166,23 @@ assert.equal(screenshot.result.image.mimeType, "image/png", "screenshot returns 
 assert.equal("data" in screenshot.result.image, false, "CLI screenshot responses never embed image bytes");
 assert.match(screenshot.result.pngPath, /target\/lab-interact\//, "new captures use only the renamed artifact root");
 
+const setupExport = call("export", { sessionId, kind: "setup", name: "Aliased fixture", reproduction: true });
+assert.match(setupExport.result.artifactId, /^artifact_[a-f0-9]{32}$/, "setup export returns an opaque artifact id");
+assert.equal("checkpointPayload" in setupExport.result, false, "setup export never prints checkpoint bytes");
+assert.match(setupExport.result.path, /target\/lab-interact\/artifacts\//, "portable artifacts stay under the worktree target root");
+const setupInspect = call("artifact-inspect", { sessionId, artifactId: setupExport.result.artifactId });
+assert.equal(setupInspect.result.kind, "setup", "artifact inspection derives the stored kind");
+assert.equal(setupInspect.result.aliasCount, 2, "artifact inspection reports bounded alias metadata");
+const setupImport = call("import", { sessionId, kind: "setup", artifactId: setupExport.result.artifactId });
+assert.deepEqual(setupImport.result.aliases.stale, [], "setup import reconciles aliases through the authoritative id map");
+assert.deepEqual(call("inspect", { sessionId, refs: ["shooter", "target"] }).result.entities.map((entity) => entity.id).sort(), [1100, 1101], "remapped aliases resolve after setup import");
+const unsafeImport = callFailure("import", { sessionId, kind: "setup", path: "/etc/passwd" });
+assert.equal(unsafeImport.error.code, "unsafeArtifactPath", "imports reject paths outside target/lab-interact");
+
+const replayExport = call("export", { sessionId, kind: "replay", name: "Fixture replay" });
+assert.equal(replayExport.result.operationCount, 0, "replay export reports operation count without embedding operations");
+assert.equal(call("import", { sessionId, kind: "replay", artifactId: replayExport.result.artifactId }).result.validation.ok, true, "replay import reports authoritative rebuild validation");
+
 const unexpected = callFailure("inspect", { sessionId, unexpected: true });
 assert.equal(unexpected.error.code, "invalidInput", "exact input shapes reject unknown fields");
 const unsafeName = callFailure("screenshot", { sessionId, name: "../escape" });
