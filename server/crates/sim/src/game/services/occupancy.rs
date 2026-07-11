@@ -1,4 +1,5 @@
 use std::collections::{HashSet, VecDeque};
+use std::sync::Arc;
 
 use crate::config;
 use crate::game::entity::{
@@ -17,8 +18,13 @@ const TANK_TRAP_PINCH_ROUTE_RADIUS_TILES: f32 = 0.45;
 
 /// A snapshot of which tiles are blocked by buildings this tick, layered over terrain. Units
 /// never block (soft overlap is allowed), so only static structures appear here.
+#[derive(Clone)]
 pub(crate) struct Occupancy<'a> {
     map: &'a Map,
+    data: Arc<OccupancyData>,
+}
+
+struct OccupancyData {
     all_ground_blocked: Vec<bool>,
     vehicle_body_blocked: Vec<bool>,
     tank_trap_owner_by_tile: Vec<Option<u32>>,
@@ -31,6 +37,15 @@ pub(crate) struct Occupancy<'a> {
 
 impl<'a> Occupancy<'a> {
     pub(crate) fn build(map: &'a Map, entities: &EntityStore) -> Self {
+        Occupancy {
+            map,
+            data: Arc::new(OccupancyData::build(map, entities)),
+        }
+    }
+}
+
+impl OccupancyData {
+    fn build(map: &Map, entities: &EntityStore) -> Self {
         let size = map.size;
         let mut all_ground_blocked = vec![false; (size * size) as usize];
         let mut vehicle_body_blocked = vec![false; (size * size) as usize];
@@ -75,8 +90,7 @@ impl<'a> Occupancy<'a> {
         let vehicle_body_static_fingerprint =
             static_blocked_fingerprint(size, &vehicle_body_static_blocked);
 
-        Occupancy {
-            map,
+        OccupancyData {
             all_ground_blocked,
             vehicle_body_blocked,
             tank_trap_owner_by_tile,
@@ -87,7 +101,9 @@ impl<'a> Occupancy<'a> {
             vehicle_body_static_fingerprint,
         }
     }
+}
 
+impl Occupancy<'_> {
     /// Tile clearance from the nearest static blocker, in whole tiles. Blocked and out-of-bounds
     /// tiles report zero. Map edges count as static bounds, so edge-adjacent tiles have low
     /// clearance even on otherwise empty maps.
@@ -106,8 +122,8 @@ impl<'a> Occupancy<'a> {
         }
         let idx = (ty as u32 * self.map.size + tx as u32) as usize;
         match movement_body_class {
-            MovementBodyClass::InfantryLike => self.all_ground_clearance_tiles[idx],
-            MovementBodyClass::VehicleBody => self.vehicle_body_clearance_tiles[idx],
+            MovementBodyClass::InfantryLike => self.data.all_ground_clearance_tiles[idx],
+            MovementBodyClass::VehicleBody => self.data.vehicle_body_clearance_tiles[idx],
         }
     }
 
@@ -174,7 +190,7 @@ impl<'a> Occupancy<'a> {
     ) -> u64 {
         let movement_body_class = movement_body_class(kind);
         if movement_body_class == MovementBodyClass::InfantryLike {
-            return self.all_ground_static_fingerprint;
+            return self.data.all_ground_static_fingerprint;
         }
 
         let mut hash = FNV_OFFSET_BASIS;
@@ -196,8 +212,8 @@ impl<'a> Occupancy<'a> {
         movement_body_class: MovementBodyClass,
     ) -> u64 {
         match movement_body_class {
-            MovementBodyClass::InfantryLike => self.all_ground_static_fingerprint,
-            MovementBodyClass::VehicleBody => self.vehicle_body_static_fingerprint,
+            MovementBodyClass::InfantryLike => self.data.all_ground_static_fingerprint,
+            MovementBodyClass::VehicleBody => self.data.vehicle_body_static_fingerprint,
         }
     }
 
@@ -207,7 +223,7 @@ impl<'a> Occupancy<'a> {
             return false;
         }
         let idx = (ty * self.map.size as i32 + tx) as usize;
-        self.all_ground_blocked[idx] || self.vehicle_body_blocked[idx]
+        self.data.all_ground_blocked[idx] || self.data.vehicle_body_blocked[idx]
     }
 
     pub(super) fn tank_trap_obstructs_vehicle_route(
@@ -324,12 +340,12 @@ impl<'a> Occupancy<'a> {
             return false;
         }
         let idx = (ty * self.map.size as i32 + tx) as usize;
-        if self.all_ground_blocked[idx] {
+        if self.data.all_ground_blocked[idx] {
             return false;
         }
         match movement_body_class {
             MovementBodyClass::InfantryLike => true,
-            MovementBodyClass::VehicleBody => !self.vehicle_body_blocked[idx],
+            MovementBodyClass::VehicleBody => !self.data.vehicle_body_blocked[idx],
         }
     }
 
@@ -345,7 +361,7 @@ impl<'a> Occupancy<'a> {
             return false;
         }
         let idx = (ty * self.map.size as i32 + tx) as usize;
-        if self.all_ground_blocked[idx] {
+        if self.data.all_ground_blocked[idx] {
             return false;
         }
         match movement_body_class {
@@ -367,7 +383,7 @@ impl<'a> Occupancy<'a> {
             return true;
         }
         let idx = (ty as u32 * self.map.size + tx as u32) as usize;
-        if !self.map.is_passable(tx, ty) || self.all_ground_blocked[idx] {
+        if !self.map.is_passable(tx, ty) || self.data.all_ground_blocked[idx] {
             return true;
         }
         movement_body_class == MovementBodyClass::VehicleBody
@@ -407,7 +423,7 @@ impl<'a> Occupancy<'a> {
             return None;
         }
         let idx = (ty as u32 * self.map.size + tx as u32) as usize;
-        self.tank_trap_owner_by_tile[idx]
+        self.data.tank_trap_owner_by_tile[idx]
     }
 
     fn tank_trap_pinches_route(
