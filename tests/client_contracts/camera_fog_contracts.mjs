@@ -116,6 +116,19 @@ import { KIND, TERRAIN } from "../../client/src/protocol.js";
   );
   assertApprox(camera.snapshot().focus.x, 70, 0.001, "scenario center restores semantic focus x");
   assertApprox(camera.snapshot().focus.y, 80, 0.001, "scenario center restores semantic focus y");
+
+  assert(
+    restoreInitialCameraView(camera, { centerX: 400, centerY: 500, zoom: 2 }),
+    "legacy centered launch views still restore through the semantic camera edge",
+  );
+  assertApprox(camera.snapshot().focus.x, 400, 0.001, "legacy center restores semantic focus x");
+  assertApprox(camera.snapshot().focus.y, 500, 0.001, "legacy center restores semantic focus y");
+  assertApprox(camera.snapshot().framingScale, 2, 0.001, "legacy center preserves its requested zoom");
+
+  assert(
+    !restoreInitialCameraView(camera, { centerX: null, centerY: null }),
+    "non-numeric centers do not coerce to a valid semantic launch view",
+  );
 }
 
 // ---------------------------------------------------------------------------
