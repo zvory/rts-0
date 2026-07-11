@@ -309,6 +309,10 @@ jobs:
           name: rts-server-debug
           path: .ci-server
 
+      - name: Install Lab Interact media tools
+        if: needs.changed-files.outputs.run_live_node == 'true'
+        run: sudo apt-get update && sudo apt-get install --yes ffmpeg
+
       - name: Run live Node suites
         if: needs.changed-files.outputs.run_live_node == 'true'
         env:
@@ -365,6 +369,10 @@ jobs:
         with:
           name: rts-sim-wasm-assets
           path: client/vendor/sim-wasm
+
+      - name: Install Lab Interact media tools
+        if: needs.changed-files.outputs.run_browser == 'true' && matrix.label == 'smoke + phase 0.5'
+        run: sudo apt-get update && sudo apt-get install --yes ffmpeg
 
       - name: Run browser shard
         if: needs.changed-files.outputs.run_browser == 'true'
