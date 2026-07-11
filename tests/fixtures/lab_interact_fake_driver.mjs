@@ -164,12 +164,12 @@ export async function openLabInteractDriver(options) {
       lastRecording = {
         active: false,
         stoppedBy: "explicit",
-        webmPath: `${directory}/${recording.name}.webm`,
+        videoPath: `${directory}/${recording.name}.mp4`,
         framePaths: [`${directory}/frames/frame-01.png`, `${directory}/frames/frame-02.png`],
         contactSheetPath: `${directory}/${recording.name}-contact-sheet.png`,
         manifestPath: `${directory}/${recording.name}.json`,
-        probe: { codec: "vp9", width: 640, height: 480, frameRate: "30/1", durationSeconds: 1 },
-        frameDiagnostics: { expectedAt30Fps: 30, encoded: 30, droppedEstimate: 0, duplicatedEstimate: 0 },
+        probe: { codec: "h264", width: 640, height: 480, frameRate: "30/1", durationSeconds: 1 },
+        frameDiagnostics: { expectedAt30Fps: 30, captured: 30, encoded: 30, droppedEstimate: 0, duplicatedEstimate: 0 },
         authoritative: { startTick: recording.startTick, endTick: tick },
         fixtureMetadata: { operations: recording.operations, aliases },
       };
@@ -181,7 +181,7 @@ export async function openLabInteractDriver(options) {
       const framePaths = Array.from({ length: frameCount }, (_, index) => `${options.workspaceRoot}/target/lab-interact/${sessionId}/fixed/${name}/frames/frame-${String(index).padStart(4, "0")}.png`);
       tick = startTick + Math.floor((frameCount - 1) * 30 / fps);
       return {
-        videoPath: `${options.workspaceRoot}/target/lab-interact/${sessionId}/fixed/${name}/${name}.webm`,
+        videoPath: `${options.workspaceRoot}/target/lab-interact/${sessionId}/fixed/${name}/${name}.mp4`,
         contactSheetPath: `${options.workspaceRoot}/target/lab-interact/${sessionId}/fixed/${name}/${name}-contact-sheet.png`,
         manifestPath: `${options.workspaceRoot}/target/lab-interact/${sessionId}/fixed/${name}/${name}.json`,
         framePaths, frameHashes: framePaths.map((_, index) => String(index).padStart(64, "0")),

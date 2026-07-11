@@ -75,10 +75,11 @@ try {
   await sleep(1_200);
   call("time", { sessionId, control: { action: "pause" } });
   const recording = call("record-stop", { sessionId });
-  assert.equal(recording.probe.codec, "vp9", "live recording probes as VP9");
-  assert.deepEqual({ width: recording.probe.width, height: recording.probe.height }, { width: 1000, height: 700 }, "live WebM records the clean viewport crop");
-  assert.ok(recording.probe.durationSeconds > 0 && recording.probe.durationSeconds <= 6, "live WebM duration stays within the requested bound");
-  assert.ok(fs.existsSync(recording.webmPath) && fs.existsSync(recording.contactSheetPath), "live recording writes WebM and contact sheet artifacts");
+  assert.equal(recording.probe.codec, "h264", "live recording probes as H.264");
+  assert.deepEqual({ width: recording.probe.width, height: recording.probe.height }, { width: 1000, height: 700 }, "live MP4 records the clean viewport crop");
+  assert.ok(recording.probe.durationSeconds > 0 && recording.probe.durationSeconds <= 6, "live MP4 duration stays within the requested bound");
+  assert.ok(fs.existsSync(recording.videoPath) && fs.existsSync(recording.contactSheetPath), "live recording writes MP4 and contact sheet artifacts");
+  assert.equal(fs.existsSync(recording.videoPath.replace(/\.mp4$/, ".webm")), false, "live recording removes its temporary WebM");
   const recordingManifest = JSON.parse(fs.readFileSync(recording.manifestPath, "utf8"));
   assert.ok(recordingManifest.authoritative.endTick >= recordingManifest.authoritative.startTick, "recording manifest tracks authoritative tick bounds");
   assert.ok(recordingManifest.operations.some((entry) => entry.command === "order"), "recording manifest records accepted scene operations");

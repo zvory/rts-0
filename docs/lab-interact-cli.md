@@ -104,26 +104,38 @@ Production startup has no bridge capability and returns 404 for these routes.
 
 ## Real-time recording
 
-`record-start` begins one 30 FPS, audio-free VP9 WebM from the persistent headless page. It keeps
-clean presentation active and crops to the game viewport, so ordinary `order`, `time`, mutation,
-inspection, and `camera` commands can continue through the same session while recording. Inputs
+`record-start` begins one 30 FPS, audio-free H.264 MP4 recording from the persistent headless page.
+It keeps clean presentation active and crops to the game viewport, so ordinary `order`, `time`,
+mutation, inspection, and `camera` commands can continue through the same session while recording. Inputs
 accept only a safe name, a 1–30 second maximum duration (10 seconds by default), an optional
 viewport or in-viewport crop, and scale from 0.25 through 1. A second start returns
 `recordingActive`; `status` with the current session id reports recorder state.
 
-`record-stop` finalizes the WebM, extracts at most six representative PNGs, creates a 3×2 contact
-sheet, probes the media, and returns confined absolute paths plus bounded codec/frame diagnostics.
+`record-stop` converts Chromium's temporary screencast stream into a mobile-compatible H.264 MP4
+with `yuv420p`, an `avc1` tag, and fast-start metadata; the temporary WebM is deleted. Finalization
+normalizes the MP4 to the measured wall duration at 30 FPS so sparse Chromium frame delivery does
+not produce shortened or accelerated playback. Odd dimensions are normalized to even values for
+H.264 compatibility; Chromium's temporary stream may trim or pad a single edge pixel. It extracts
+at most six representative PNGs,
+creates a 3×2 contact sheet, probes the media, and returns confined absolute paths plus bounded
+codec/frame diagnostics.
 The adjacent manifest records authoritative start/end ticks and room time, accepted CLI operations,
 camera/time changes, aliases, workspace/build/browser/tool versions, probe results, and estimated
-dropped or duplicated frames. Those frame counts are diagnostics, not deterministic evidence:
-Chrome composition, screencast delivery, wall scheduling, and VP9 encoding all vary between runs.
+dropped or duplicated frames. Duplicated output frames preserve the real-time timeline when Chrome
+delivers fewer than 30 unique frames per second. Those counts are diagnostics, not deterministic
+evidence: Chrome composition, screencast delivery, and wall scheduling vary between runs.
 
 Recordings live under `target/lab-interact/<session-id>/recordings/`, are capped at 64 MiB, and are
 never printed through the CLI. The duration watchdog finalizes automatically. Session `close`,
 daemon `shutdown`, and idle teardown attempt bounded finalization and remove a partial directory if
 finalization fails; they do not leave FFmpeg owned by the session. Recording checks require
-`ffmpeg`, `ffprobe`, and the `libvpx-vp9` encoder on `PATH`, or explicit
+`ffmpeg`, `ffprobe`, and both the `libvpx-vp9` and `libx264` encoders on `PATH`, or explicit
 `RTS_LAB_INTERACT_FFMPEG`/`RTS_LAB_INTERACT_FFPROBE` paths.
+Fixed-step capture only requires `libx264`; real-time recording also requires `libvpx-vp9` for
+Chromium's temporary screencast stream.
+
+Real-time recordings are silent. Puppeteer's screencast API does not expose the page's WebAudio
+graph, and Lab Interact does not depend on macOS system-audio routing.
 
 ## Fixed-step capture
 
@@ -131,7 +143,7 @@ finalization fails; they do not leave FFmpeg owned by the session. Recording che
 scene, issue a normal `order` if movement or direct fire is wanted, and then request 1–180 frames
 at an integer 10–60 FPS. The command temporarily suspends the ordinary rAF loop, advances room
 time only through the existing 30 Hz `time step` operation, advances the client render clock to
-exact fractional milliseconds, and writes one PNG per frame plus a VP9 WebM, contact sheet, and
+exact fractional milliseconds, and writes one PNG per frame plus an H.264 MP4, contact sheet, and
 manifest under `target/lab-interact/<session-id>/fixed/`.
 
 Frame `i` uses `startTick + floor(i * 30 / outputFps)`. Thus 60 FPS intentionally renders each
@@ -160,7 +172,7 @@ fixed visual-time contract.
 | `chromeUnavailable` | Install Chrome/Chromium or set `CHROME` before `open`. |
 | `daemonStateUnavailable` / `daemonUnreachable` | Do not remove the socket; restore its owned state or stop the recorded daemon, then retry. |
 | `assetLoadFailed`, `captureRenderError`, or `captureTimeout` | Fix the reported source/render problem; do not accept a fallback capture. |
-| `ffmpegUnavailable`, `ffprobeUnavailable`, or `vp9Unavailable` | Install a VP9-capable FFmpeg toolchain or set the explicit tool paths, then retry. |
+| `ffmpegUnavailable`, `ffprobeUnavailable`, `vp9Unavailable`, or `h264Unavailable` | Install an FFmpeg toolchain with `libvpx-vp9` and `libx264`, or set the explicit tool paths, then retry. |
 | `recordingActive` / `recordingInactive` | Check session `status`, then stop the active recorder or start a new one. |
 
 ## Focused verification

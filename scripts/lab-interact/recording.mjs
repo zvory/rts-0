@@ -26,11 +26,14 @@ export class LabInteractRecordingError extends Error {
 export function checkMediaCapabilities({
   ffmpeg = process.env.RTS_LAB_INTERACT_FFMPEG || "ffmpeg",
   ffprobe = process.env.RTS_LAB_INTERACT_FFPROBE || "ffprobe",
+  requireVp9 = true,
+  requireH264 = true,
 } = {}) {
   const encoderCheck = spawnSync(ffmpeg, ["-hide_banner", "-encoders"], { encoding: "utf8", timeout: 5_000 });
   if (encoderCheck.error?.code === "ENOENT") throw new LabInteractRecordingError("ffmpegUnavailable", `FFmpeg was not found at ${JSON.stringify(ffmpeg)}. Install FFmpeg or set RTS_LAB_INTERACT_FFMPEG.`);
   if (encoderCheck.status !== 0) throw new LabInteractRecordingError("ffmpegUnavailable", conciseToolFailure("FFmpeg capability check failed", encoderCheck));
-  if (!/\blibvpx-vp9\b/.test(encoderCheck.stdout || "")) throw new LabInteractRecordingError("vp9Unavailable", "FFmpeg does not provide the libvpx-vp9 encoder required by Puppeteer WebM recording.");
+  if (requireVp9 && !/\blibvpx-vp9\b/.test(encoderCheck.stdout || "")) throw new LabInteractRecordingError("vp9Unavailable", "FFmpeg does not provide the libvpx-vp9 encoder required by Puppeteer WebM recording.");
+  if (requireH264 && !/\blibx264\b/.test(encoderCheck.stdout || "")) throw new LabInteractRecordingError("h264Unavailable", "FFmpeg does not provide the libx264 encoder required for mobile-compatible MP4 output.");
   const probeCheck = spawnSync(ffprobe, ["-version"], { encoding: "utf8", timeout: 5_000 });
   if (probeCheck.error?.code === "ENOENT") throw new LabInteractRecordingError("ffprobeUnavailable", `ffprobe was not found at ${JSON.stringify(ffprobe)}. Install FFmpeg or set RTS_LAB_INTERACT_FFPROBE.`);
   if (probeCheck.status !== 0) throw new LabInteractRecordingError("ffprobeUnavailable", conciseToolFailure("ffprobe capability check failed", probeCheck));
@@ -69,27 +72,50 @@ export async function waitForMediaFile(file, timeoutMs = 2_000) {
   throw new LabInteractRecordingError("recordingEmpty", "Finalized recording bytes were not available within the bounded flush wait.");
 }
 
-export function finalizeMedia({ webmPath, framesDir, contactSheetPath, tools }) {
-  const stat = safeStat(webmPath);
-  if (!stat || stat.size === 0) throw new LabInteractRecordingError("recordingEmpty", "Chrome produced no recording bytes.");
-  if (stat.size > RECORDING_LIMITS.maxBytes) {
+export function finalizeMedia({ webmPath, mp4Path, framesDir, contactSheetPath, targetDurationMs, tools }) {
+  const sourceStat = safeStat(webmPath);
+  if (!sourceStat || sourceStat.size === 0) throw new LabInteractRecordingError("recordingEmpty", "Chrome produced no recording bytes.");
+  if (sourceStat.size > RECORDING_LIMITS.maxBytes) {
     fs.rmSync(webmPath, { force: true });
     throw new LabInteractRecordingError("recordingTooLarge", `Recording exceeded the ${RECORDING_LIMITS.maxBytes} byte limit and was deleted.`);
   }
-  const probe = probeMedia(webmPath, tools.ffprobe);
+  if (!Number.isFinite(targetDurationMs) || targetDurationMs <= 0) throw new LabInteractRecordingError("recordingDurationInvalid", "Recording wall duration was unavailable during finalization.");
+  const sourceProbe = probeMedia(webmPath, tools.ffprobe, "vp9", "source WebM");
+  const targetDurationSeconds = Math.max(targetDurationMs / 1000, 1 / 30);
+  const capturedFrames = Math.max(1, Number(sourceProbe.frameCount) || Math.round((sourceProbe.durationSeconds || 0) * 30) || 1);
+  const capturedFrameInterval = targetDurationSeconds / capturedFrames;
+  runTool(tools.ffmpeg, [
+    "-hide_banner", "-loglevel", "error", "-y", "-i", webmPath,
+    "-an", "-vf", `setpts=N*${capturedFrameInterval.toFixed(12)}/TB,fps=30,tpad=stop_mode=clone:stop_duration=${targetDurationSeconds.toFixed(6)},pad=ceil(iw/2)*2:ceil(ih/2)*2`,
+    "-t", targetDurationSeconds.toFixed(6), "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+    "-profile:v", "main", "-pix_fmt", "yuv420p", "-tag:v", "avc1",
+    "-movflags", "+faststart", mp4Path,
+  ], "mobile MP4 transcode");
+  const mp4Stat = safeStat(mp4Path);
+  if (!mp4Stat || mp4Stat.size === 0) throw new LabInteractRecordingError("recordingEmpty", "FFmpeg produced no MP4 recording bytes.");
+  if (mp4Stat.size > RECORDING_LIMITS.maxBytes) {
+    fs.rmSync(mp4Path, { force: true });
+    fs.rmSync(webmPath, { force: true });
+    throw new LabInteractRecordingError("recordingTooLarge", `Final MP4 exceeded the ${RECORDING_LIMITS.maxBytes} byte limit and was deleted.`);
+  }
+  const probe = probeMedia(mp4Path, tools.ffprobe, "h264", "final MP4");
+  if (probe.container !== "mov,mp4,m4a,3gp,3g2,mj2" || probe.pixelFormat !== "yuv420p" || probe.codecTag !== "avc1" || !hasFastStart(mp4Path)) {
+    throw new LabInteractRecordingError("mediaProbeFailed", "Final MP4 is missing its mobile-compatible container, yuv420p/avc1 video, or fast-start metadata.");
+  }
+  fs.rmSync(webmPath, { force: true });
   fs.mkdirSync(framesDir, { recursive: true });
   const duration = Math.max(Number(probe.durationSeconds) || 0.001, 0.001);
   const activityFrameLimit = RECORDING_LIMITS.maxFrames - 1;
   const interval = Math.max(duration / Math.max(activityFrameLimit, 1), 0.05);
   runTool(tools.ffmpeg, [
-    "-hide_banner", "-loglevel", "error", "-y", "-i", webmPath,
+    "-hide_banner", "-loglevel", "error", "-y", "-i", mp4Path,
     "-vf", `fps=1/${interval}`, "-frames:v", String(activityFrameLimit),
     path.join(framesDir, "frame-%02d.png"),
   ], "representative frame extraction");
   const activityFrameCount = representativeFrameNames(framesDir).length;
   const finalFrameNumber = Math.min(activityFrameCount + 1, RECORDING_LIMITS.maxFrames);
   runTool(tools.ffmpeg, [
-    "-hide_banner", "-loglevel", "error", "-y", "-sseof", "-0.001", "-i", webmPath,
+    "-hide_banner", "-loglevel", "error", "-y", "-sseof", "-0.001", "-i", mp4Path,
     "-frames:v", "1", path.join(framesDir, `frame-${String(finalFrameNumber).padStart(2, "0")}.png`),
   ], "final frame extraction");
   const framePaths = representativeFrameNames(framesDir)
@@ -101,19 +127,23 @@ export function finalizeMedia({ webmPath, framesDir, contactSheetPath, tools }) 
     "-frames:v", "1", contactSheetPath,
   ], "contact sheet generation");
   const contact = readPngDimensions(fs.readFileSync(contactSheetPath));
-  const expectedFrames = Math.max(1, Math.round(duration * 30));
+  const expectedFrames = Math.max(1, Math.round(targetDurationSeconds * 30));
   const encodedFrames = Number.isInteger(probe.frameCount) ? probe.frameCount : null;
   return {
-    bytes: stat.size,
+    bytes: mp4Stat.size,
+    videoPath: mp4Path,
     probe,
     framePaths,
     contactSheet: { path: contactSheetPath, width: contact.width, height: contact.height },
     frameDiagnostics: {
       expectedAt30Fps: expectedFrames,
+      captured: capturedFrames,
       encoded: encodedFrames,
-      droppedEstimate: encodedFrames == null ? null : Math.max(0, expectedFrames - encodedFrames),
-      duplicatedEstimate: encodedFrames == null ? null : Math.max(0, encodedFrames - expectedFrames),
-      caveat: "Estimates compare encoded frames with wall duration at 30 FPS; Chrome composition timing is nondeterministic.",
+      droppedEstimate: Math.max(0, expectedFrames - capturedFrames),
+      duplicatedEstimate: encodedFrames == null ? null : Math.max(0, encodedFrames - capturedFrames),
+      sourceDurationSeconds: sourceProbe.durationSeconds,
+      wallDurationSeconds: targetDurationSeconds,
+      caveat: "The MP4 timeline is normalized to measured wall duration at 30 FPS; duplicated frames compensate for nondeterministic Chrome screencast delivery.",
     },
   };
 }
@@ -131,22 +161,25 @@ export function removePartialRecording(paths) {
   }
 }
 
-function probeMedia(file, ffprobe) {
+function probeMedia(file, ffprobe, expectedCodec, label) {
   const result = spawnSync(ffprobe, [
     "-v", "error", "-select_streams", "v:0",
-    "-show_entries", "stream=codec_name,width,height,r_frame_rate,nb_frames:format=duration,size",
+    "-show_entries", "stream=codec_name,codec_tag_string,pix_fmt,width,height,r_frame_rate,nb_frames:format=format_name,duration,size",
     "-of", "json", file,
   ], { encoding: "utf8", timeout: 10_000 });
-  if (result.status !== 0) throw new LabInteractRecordingError("mediaProbeFailed", conciseToolFailure("ffprobe rejected the finalized WebM", result));
+  if (result.status !== 0) throw new LabInteractRecordingError("mediaProbeFailed", conciseToolFailure(`ffprobe rejected the ${label}`, result));
   let parsed;
   try { parsed = JSON.parse(result.stdout); } catch { throw new LabInteractRecordingError("mediaProbeFailed", "ffprobe returned invalid JSON."); }
   const stream = parsed.streams?.[0] || {};
-  if (stream.codec_name !== "vp9") throw new LabInteractRecordingError("mediaProbeFailed", `Expected VP9 WebM, received ${stream.codec_name || "an unknown codec"}.`);
+  if (stream.codec_name !== expectedCodec) throw new LabInteractRecordingError("mediaProbeFailed", `Expected ${expectedCodec} ${label}, received ${stream.codec_name || "an unknown codec"}.`);
   const packetTimeline = parsed.format?.duration && stream.nb_frames
     ? null
     : probePacketTimeline(file, ffprobe);
   return {
     codec: stream.codec_name,
+    codecTag: stream.codec_tag_string || null,
+    pixelFormat: stream.pix_fmt || null,
+    container: parsed.format?.format_name || null,
     width: Number(stream.width) || null,
     height: Number(stream.height) || null,
     frameRate: stream.r_frame_rate || null,
@@ -186,6 +219,12 @@ function conciseToolFailure(prefix, result) {
 }
 function firstLine(value) { return String(value || "").split("\n").find(Boolean) || ""; }
 function safeStat(file) { try { return fs.statSync(file); } catch { return null; } }
+function hasFastStart(file) {
+  const bytes = fs.readFileSync(file);
+  const moov = bytes.indexOf(Buffer.from("moov"));
+  const mdat = bytes.indexOf(Buffer.from("mdat"));
+  return moov >= 0 && mdat >= 0 && moov < mdat;
+}
 function readPngDimensions(buffer) {
   if (!Buffer.isBuffer(buffer) || buffer.length < 24 || buffer.toString("ascii", 1, 4) !== "PNG") throw new LabInteractRecordingError("contactSheetInvalid", "Contact sheet is not a valid PNG.");
   return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
