@@ -598,6 +598,10 @@ and actionable regardless of that success-response option.
 The daemon publishes its startup checkout commit as optional IPC v1 state/probe metadata. The CLI
 refreshes a mismatched daemon only through an atomic idle-only shutdown request; active scenes are
 preserved behind `daemonCheckoutMismatch`, while `status` and `shutdown` remain usable.
+Real-time recording consumes raw Chrome DevTools screencast frames and assigns them to cumulative
+30 FPS monotonic-wall-clock slots before streaming H.264. Its manifest records raw event/timestamp
+gaps and exact source-frame reuse; it warns below 80% source-slot coverage. `record-start` can also
+resume authoritative time atomically after the initial frame through its bounded `resumeSpeed`.
 
 `lab_scenario_authoring.js`
 ```js

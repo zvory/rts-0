@@ -11,8 +11,8 @@ import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 
 import {
-  checkMediaCapabilities, finalizeMedia, LabInteractRecordingError, RECORDING_LIMITS,
-  recordingStopTimeoutMs, removePartialRecording, stopRecorderWithin, waitForMediaFile,
+  checkMediaCapabilities, createWallClockRecorder, finalizeMp4Artifacts, LabInteractRecordingError,
+  RECORDING_LIMITS, removePartialRecording,
 } from "./recording.mjs";
 import {
   encodeFixedCapture, FIXED_CAPTURE_LIMITS, fixedFrameTick, hashFrame,
@@ -313,7 +313,15 @@ export class LabInteractDriver {
     };
   }
 
-  async recordStart({ sessionId, name = "recording", maxDurationMs = RECORDING_LIMITS.defaultDurationMs, viewport = null, crop = null, scale = 1 } = {}) {
+  async recordStart({
+    sessionId,
+    name = "recording",
+    maxDurationMs = RECORDING_LIMITS.defaultDurationMs,
+    viewport = null,
+    crop = null,
+    scale = 1,
+    resumeSpeed = null,
+  } = {}) {
     return this.enqueue(async () => {
       if (this.recording) throw new LabInteractDriverError("recordingActive", "A recording is already active for this session. Stop it before starting another.");
       const tools = checkMediaCapabilities();
@@ -337,17 +345,23 @@ export class LabInteractDriver {
         const suffix = new Date().toISOString().replace(/[:.]/g, "-");
         recordingDir = path.join(this.workspace.root, LAB_INTERACT_ROOT, normalizedSessionId, "recordings", `${artifactName}-${suffix}`);
         fs.mkdirSync(recordingDir, { recursive: true });
-        const webmPath = path.join(recordingDir, `${artifactName}.webm`);
         const mp4Path = path.join(recordingDir, `${artifactName}.mp4`);
-        recorder = await this.page.screencast({ path: webmPath, crop: clip, scale, ffmpegPath: tools.ffmpeg });
-        const startedMs = Date.now();
         const startStatus = await this.callBridge("status", {});
+        recorder = await createWallClockRecorder({
+          page: this.page, outputPath: mp4Path, clip, scale, tools, timeoutMs: this.options.timeoutMs,
+        });
+        let resumeResult = null;
+        if (resumeSpeed != null) {
+          resumeResult = await this.callBridge("time", { action: "resume", speed: resumeSpeed });
+        }
+        recorder.start();
+        const startedMs = Date.now();
         const completion = recordingCompletion();
         const recording = {
-          name: artifactName, recorder, tools, recordingDir, webmPath, mp4Path,
+          name: artifactName, recorder, tools, recordingDir, mp4Path,
           framesDir: path.join(recordingDir, "frames"), contactSheetPath: path.join(recordingDir, `${artifactName}-contact-sheet.png`),
           manifestPath: path.join(recordingDir, `${artifactName}.json`), startedMs, startedAt: new Date(startedMs).toISOString(),
-          startStatus, clip, scale, viewport: normalizedViewport, originalViewport,
+          startStatus, resumeResult, resumeSpeed, clip, scale, viewport: normalizedViewport, originalViewport,
           maxDurationMs, finalizing: null, stoppedBy: null, operations: [], operationCount: 0,
           operationsTruncated: false, aliases: [], completion,
         };
@@ -358,13 +372,18 @@ export class LabInteractDriver {
         recording.watchdog.unref?.();
         recording.sizeWatchdog = setInterval(() => {
           let size = 0;
-          try { size = fs.statSync(recording.webmPath).size; } catch {}
+          try { size = fs.statSync(recording.mp4Path).size; } catch {}
           if (size > RECORDING_LIMITS.maxBytes) void this.finishRecording("sizeLimit").catch(() => {});
         }, 250);
         recording.sizeWatchdog.unref?.();
-        return { ...this.recordingStatus(), clip, scale, authoritativeStartTick: startStatus.snapshotTick ?? null };
+        return {
+          ...this.recordingStatus(), clip, scale,
+          authoritativeStartTick: startStatus.snapshotTick ?? null,
+          authoritativeResumed: resumeSpeed != null,
+          resumeSpeed,
+        };
       } catch (error) {
-        if (recorder) await stopRecorderWithin(recorder).catch(() => {});
+        if (recorder) await recorder.abort().catch(() => {});
         removePartialRecording([recordingDir]);
         if (originalViewport) await this.page.setViewport(originalViewport).catch(() => {});
         await this.callBridge("presentation", { mode: "default" }).catch(() => {});
@@ -537,12 +556,12 @@ export class LabInteractDriver {
         const stoppedMs = reason === "watchdog"
           ? recording.startedMs + recording.maxDurationMs
           : Math.max(Date.now(), recording.startedMs + 1);
-        await stopRecorderWithin(recording.recorder, recordingStopTimeoutMs(recording.maxDurationMs));
-        await waitForMediaFile(recording.webmPath);
         const wallDurationMs = Math.max(1, stoppedMs - recording.startedMs);
-        const media = finalizeMedia({
-          webmPath: recording.webmPath, mp4Path: recording.mp4Path, framesDir: recording.framesDir,
-          contactSheetPath: recording.contactSheetPath, targetDurationMs: wallDurationMs, tools: recording.tools,
+        const frameDiagnostics = await recording.recorder.stop(wallDurationMs);
+        const media = finalizeMp4Artifacts({
+          mp4Path: recording.mp4Path, framesDir: recording.framesDir,
+          contactSheetPath: recording.contactSheetPath, targetDurationMs: wallDurationMs,
+          tools: recording.tools, frameDiagnostics,
         });
         const diagnostics = this.diagnostics();
         const manifest = {
@@ -563,7 +582,12 @@ export class LabInteractDriver {
             startRoomTime: recording.startStatus?.roomTime ?? null,
             endRoomTime: endStatus?.roomTime ?? null,
           },
-          capture: { fps: 30, audio: false, clip: recording.clip, scale: recording.scale, viewport: recording.viewport, wallDurationMs, maxDurationMs: recording.maxDurationMs },
+          capture: {
+            fps: RECORDING_LIMITS.fps, audio: false, timingAuthority: "monotonicWallClockFrameSlots",
+            clip: recording.clip, scale: recording.scale, viewport: recording.viewport,
+            wallDurationMs, maxDurationMs: recording.maxDurationMs,
+            atomicResume: recording.resumeSpeed == null ? null : { speed: recording.resumeSpeed, result: recording.resumeResult },
+          },
           aliases: boundedSummary(
             Array.isArray(metadata.aliases) ? metadata.aliases.slice(0, RECORDING_LIMITS.maxAliases) : recording.aliases,
             RECORDING_LIMITS.maxDetailedAliases,

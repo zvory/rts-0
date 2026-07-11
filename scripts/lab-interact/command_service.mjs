@@ -519,12 +519,13 @@ function validateInput(command, value) {
     if (value.kind != null) artifactKind(value.kind, "artifact-inspect.kind");
     artifactSelector(value, "artifact-inspect");
   } else if (command === "record-start") {
-    exact(value, ["sessionId", "name", "maxDurationMs", "viewport", "crop", "scale"], command);
+    exact(value, ["sessionId", "name", "maxDurationMs", "viewport", "crop", "scale", "resumeSpeed"], command);
     if (value.name != null && !/^[A-Za-z0-9_-]{1,48}$/.test(value.name)) invalid("record-start.name", "must be a safe artifact token");
     if (value.maxDurationMs != null) integer(value.maxDurationMs, "record-start.maxDurationMs", 1_000, LAB_INTERACT_LIMITS.maxRecordingDurationMs);
     if (value.viewport != null) viewport(value.viewport, 2048, "record-start.viewport");
     if (value.crop != null) recordingCrop(value.crop);
     if (value.scale != null) boundedNumber(value.scale, "record-start.scale", 0.25, 1);
+    if (value.resumeSpeed != null) boundedNumber(value.resumeSpeed, "record-start.resumeSpeed", 0.01, 16);
   } else if (command === "record-stop" || command === "record-wait") {
     exact(value, ["sessionId"], command);
   } else if (command === "capture-fixed") {

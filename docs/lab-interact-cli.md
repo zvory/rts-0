@@ -17,7 +17,7 @@ node scripts/lab-interact/cli.mjs remove '{"sessionId":"<id>","refs":["subject"]
 node scripts/lab-interact/cli.mjs inspect '{"sessionId":"<id>","refs":["subject"]}'
 node scripts/lab-interact/cli.mjs camera '{"sessionId":"<id>","camera":{"action":"focus","refs":["subject"]}}'
 node scripts/lab-interact/cli.mjs screenshot '{"sessionId":"<id>","name":"subject","presentation":"clean","subjects":["subject"]}'
-node scripts/lab-interact/cli.mjs record-start '{"sessionId":"<id>","name":"motion","maxDurationMs":10000}'
+node scripts/lab-interact/cli.mjs record-start '{"sessionId":"<id>","name":"motion","maxDurationMs":10000,"resumeSpeed":1}'
 node scripts/lab-interact/cli.mjs order '{"sessionId":"<id>","playerId":1,"command":{"c":"move","units":["subject"],"x":1100,"y":960}}'
 node scripts/lab-interact/cli.mjs record-wait '{"sessionId":"<id>"}'
 node scripts/lab-interact/cli.mjs capture-fixed '{"sessionId":"<id>","name":"motion-fixed","fps":30,"frameCount":60}'
@@ -150,22 +150,27 @@ It keeps clean presentation active and crops to the game viewport, so ordinary `
 mutation, inspection, and `camera` commands can continue through the same session while recording. Inputs
 accept only a safe name, a 1–60 second maximum duration (10 seconds by default), an optional
 viewport or in-viewport crop, and scale from 0.25 through 1. A second start returns
-`recordingActive`; `status` with the current session id reports recorder state.
+`recordingActive`; `status` with the current session id reports recorder state. Optional
+`resumeSpeed` from 0.01 through 16 resumes authoritative time only after Chrome has delivered the
+initial capture frame, within the same serialized command. This avoids paused dead air between
+separate `record-start` and `time resume` calls.
 
-`record-stop` converts Chromium's temporary screencast stream into a mobile-compatible H.264 MP4
-with `yuv420p`, an `avc1` tag, and fast-start metadata; the temporary WebM is deleted. Finalization
-normalizes the MP4 to the measured wall duration at 30 FPS so sparse Chromium frame delivery does
-not produce shortened or accelerated playback. Odd dimensions are normalized to even values for
-H.264 compatibility; Chromium's temporary stream may trim or pad a single edge pixel. It extracts
+Lab Interact acknowledges raw Chrome DevTools screencast frames and streams them directly to a
+mobile-compatible H.264 MP4 with `yuv420p`, an `avc1` tag, and fast-start metadata. One timing
+authority maps cumulative monotonic wall time to 30 FPS output slots; each slot receives the newest
+raw frame. There is no intermediate WebM timeline and no second timestamp redistribution pass.
+Odd dimensions are normalized to even values for H.264 compatibility. Finalization extracts
 at most six representative PNGs,
 creates a 3×2 contact sheet, probes the media, and returns confined absolute paths plus bounded
 codec/frame diagnostics.
 The adjacent manifest records authoritative start/end ticks and room time, accepted CLI operations,
-camera/time changes, aliases, workspace/build/browser/tool versions, probe results, and estimated
-dropped or duplicated frames. Alias summary metadata records the total and `truncated` state with
-at most 40 detailed rows. Duplicated output frames preserve the real-time timeline when Chrome
-delivers fewer than 30 unique frames per second. Those counts are diagnostics, not deterministic
-evidence: Chrome composition, screencast delivery, and wall scheduling vary between runs.
+camera/time changes, aliases, workspace/build/browser/tool versions, and probe results. Frame
+diagnostics report raw screencast events, raw Chrome timestamp span and largest gap, source frames
+actually used, exact output-slot reuse, and source coverage. Coverage below 80% is marked
+`deficient` and carries a warning to use `capture-fixed`; it is never described as an estimated
+capture count. Alias summary metadata records the total and `truncated` state with at most 40
+detailed rows. These diagnostics remain nondeterministic because Chrome composition, screencast
+delivery, and wall scheduling vary between runs.
 
 `record-wait` observes the current recorder outside the session mutation queue. An active or
 finalizing recording awaits the same completion used by its watchdog and `record-stop`; an already
@@ -184,12 +189,10 @@ Recordings live under `target/lab-interact/<session-id>/recordings/`, are capped
 never printed through the CLI. The duration watchdog finalizes automatically. Session `close`,
 daemon `shutdown`, and idle teardown attempt bounded finalization and remove a partial directory if
 finalization fails; they do not leave FFmpeg owned by the session. Recording checks require
-`ffmpeg`, `ffprobe`, and both the `libvpx-vp9` and `libx264` encoders on `PATH`, or explicit
+`ffmpeg`, `ffprobe`, and the `libx264` encoder on `PATH`, or explicit
 `RTS_LAB_INTERACT_FFMPEG`/`RTS_LAB_INTERACT_FFPROBE` paths.
-Fixed-step capture only requires `libx264`; real-time recording also requires `libvpx-vp9` for
-Chromium's temporary screencast stream.
 
-Real-time recordings are silent. Puppeteer's screencast API does not expose the page's WebAudio
+Real-time recordings are silent. Chrome's screencast API does not expose the page's WebAudio
 graph, and Lab Interact does not depend on macOS system-audio routing.
 
 ## Fixed-step capture

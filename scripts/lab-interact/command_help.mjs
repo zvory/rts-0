@@ -83,9 +83,10 @@ export const LAB_INTERACT_COMMAND_HELP = Object.freeze({
     variants: ["provide exactly one of artifactId or path", "kind may be omitted when artifactId/path identifies it"], bounds: ["artifact <=8 MiB", "at most 400 sidecar aliases"],
     example: { sessionId: "<lab-session-id>", artifactId: "artifact_<32-hex>" },
   }),
-  "record-start": descriptor("Start one real-time clean-presentation H.264 recording.", "{sessionId:string,name?:token,maxDurationMs?:int,viewport?:viewport,crop?:{x,y,width,height},scale?:number}", {
-    defaults: ["name=recording", "maxDurationMs=10000", "viewport=current", "crop=game viewport", "scale=1"], bounds: ["duration 1000-60000 ms", "viewport/crop <=2048", "scale 0.25-1", "one active recorder", "64 MiB output"],
-    example: { sessionId: "<lab-session-id>", name: "motion", maxDurationMs: 10000 },
+  "record-start": descriptor("Start one real-time clean-presentation H.264 recording.", "{sessionId:string,name?:token,maxDurationMs?:int,viewport?:viewport,crop?:{x,y,width,height},scale?:number,resumeSpeed?:number}", {
+    variants: ["resumeSpeed atomically resumes authoritative time after the recorder has its initial frame"],
+    defaults: ["name=recording", "maxDurationMs=10000", "viewport=current", "crop=game viewport", "scale=1", "resumeSpeed=omitted"], bounds: ["duration 1000-60000 ms", "viewport/crop <=2048", "scale 0.25-1", "resumeSpeed 0.01-16", "one active recorder", "64 MiB output"],
+    example: { sessionId: "<lab-session-id>", name: "motion", maxDurationMs: 10000, resumeSpeed: 1 },
   }),
   "record-stop": descriptor("Finalize the active real-time recording and return confined artifact paths.", "{sessionId:string}", {
     bounds: ["one active recorder", "six representative frame paths", "40 detailed aliases in the manifest"], example: { sessionId: "<lab-session-id>" },

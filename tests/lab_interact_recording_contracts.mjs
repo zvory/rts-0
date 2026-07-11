@@ -3,14 +3,15 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { EventEmitter } from "node:events";
 import { fileURLToPath } from "node:url";
 
 import {
   LAB_INTERACT_LIMITS, LabInteractService, validateCommandInput,
 } from "../scripts/lab-interact/command_service.mjs";
 import {
-  checkMediaCapabilities, finalizeMedia, LabInteractRecordingError, mediaAuxiliaryTimeoutMs, mediaStageTimeoutMs,
-  recordingStopTimeoutMs, RECORDING_LIMITS,
+  checkMediaCapabilities, createPngMp4Encoder, finalizeMp4Artifacts, LabInteractRecordingError,
+  mediaAuxiliaryTimeoutMs, mediaStageTimeoutMs, recordingStopTimeoutMs, RECORDING_LIMITS,
 } from "../scripts/lab-interact/recording.mjs";
 import {
   RECORDING_REQUEST_TIMEOUT_MS, REQUEST_TIMEOUT_MS, requestTimeoutMs,
@@ -36,8 +37,13 @@ assert.throws(
   "record-start rejects durations over the hard bound",
 );
 assert.doesNotThrow(
-  () => validateCommandInput("record-start", { sessionId, maxDurationMs: 60_000 }),
-  "record-start accepts exactly one minute",
+  () => validateCommandInput("record-start", { sessionId, maxDurationMs: 60_000, resumeSpeed: 1 }),
+  "record-start accepts exactly one minute with atomic authoritative resume",
+);
+assert.throws(
+  () => validateCommandInput("record-start", { sessionId, resumeSpeed: 0 }),
+  (error) => error?.code === "invalidInput",
+  "record-start rejects an invalid atomic resume speed",
 );
 assert.equal(recordingStopTimeoutMs(60_000), RECORDING_LIMITS.maxStopTimeoutMs, "one-minute recorder flush gets capped duration-derived headroom");
 assert.equal(mediaStageTimeoutMs(60_000), RECORDING_LIMITS.maxMediaStageTimeoutMs, "one-minute FFmpeg stages get capped duration-derived headroom");
@@ -55,37 +61,26 @@ assert.ok(
 const tools = checkMediaCapabilities();
 const mediaTmp = fs.mkdtempSync(path.join(os.tmpdir(), "rts-li-recording-contract-"));
 try {
-  const oversizedPath = path.join(mediaTmp, "oversized.webm");
-  fs.writeFileSync(oversizedPath, "x");
-  fs.truncateSync(oversizedPath, RECORDING_LIMITS.maxBytes + 1);
-  assert.throws(
-    () => finalizeMedia({ webmPath: oversizedPath, framesDir: path.join(mediaTmp, "oversized-frames"), contactSheetPath: path.join(mediaTmp, "oversized.png"), tools }),
-    (error) => error?.code === "recordingTooLarge",
-    "oversized recordings are rejected before media processing",
-  );
-  assert.equal(fs.existsSync(oversizedPath), false, "oversized recording bytes are deleted");
-  const webmPath = path.join(mediaTmp, "fixture.webm");
-  const generated = spawnSync(tools.ffmpeg, [
-    "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "color=c=navy:s=639x479:r=30:d=0.12",
-    "-an", "-c:v", "libvpx-vp9", "-b:v", "0", webmPath,
-  ], { encoding: "utf8", timeout: 15_000 });
-  assert.equal(generated.status, 0, `VP9 fixture generation succeeds: ${generated.stderr}`);
-  const sourceDimensionsResult = spawnSync(tools.ffprobe, [
-    "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "json", webmPath,
-  ], { encoding: "utf8", timeout: 10_000 });
-  assert.equal(sourceDimensionsResult.status, 0, `VP9 fixture dimension probe succeeds: ${sourceDimensionsResult.stderr}`);
-  const sourceStream = JSON.parse(sourceDimensionsResult.stdout).streams?.[0] || {};
-  const expectedOutputDimensions = {
-    width: Math.ceil(Number(sourceStream.width) / 2) * 2,
-    height: Math.ceil(Number(sourceStream.height) / 2) * 2,
+  const png = spawnSync(tools.ffmpeg, [
+    "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=navy:s=639x479",
+    "-frames:v", "1", "-f", "image2pipe", "-c:v", "png", "pipe:1",
+  ], { encoding: null, timeout: 15_000 });
+  assert.equal(png.status, 0, `PNG fixture generation succeeds: ${String(png.stderr)}`);
+  const mp4Path = path.join(mediaTmp, "fixture.mp4");
+  const encoder = createPngMp4Encoder({ outputPath: mp4Path, fps: 30, tools });
+  for (let index = 0; index < 15; index += 1) encoder.write(png.stdout);
+  await encoder.finish();
+  const diagnostics = {
+    expectedAt30Fps: 15, encoded: 15, rawScreencastEvents: 5,
+    sourceFramesUsed: 5, duplicated: 10, sourceCoverage: 1 / 3, deficient: true,
   };
-  const media = finalizeMedia({
-    webmPath,
-    mp4Path: path.join(mediaTmp, "fixture.mp4"),
+  const media = finalizeMp4Artifacts({
+    mp4Path,
     framesDir: path.join(mediaTmp, "frames"),
     contactSheetPath: path.join(mediaTmp, "contact.png"),
     targetDurationMs: 500,
     tools,
+    frameDiagnostics: diagnostics,
   });
   assert.equal(media.probe.codec, "h264", "final media probe confirms H.264");
   assert.deepEqual(
@@ -95,8 +90,8 @@ try {
   );
   assert.deepEqual(
     { width: media.probe.width, height: media.probe.height },
-    expectedOutputDimensions,
-    "final MP4 normalizes the actual WebM dimensions for H.264 compatibility",
+    { width: 640, height: 480 },
+    "final MP4 normalizes odd source dimensions for H.264 compatibility",
   );
   assert.ok(media.probe.durationSeconds >= 0.45 && media.probe.durationSeconds <= 0.55, "final MP4 timeline is normalized to wall duration");
   assert.equal(media.probe.frameRate, "30/1", "final MP4 uses the documented 30 FPS timeline");
@@ -105,7 +100,7 @@ try {
     { expected: 15, encoded: 15 },
     "timeline normalization emits the expected wall-duration frame count",
   );
-  assert.equal(fs.existsSync(webmPath), false, "temporary WebM source is removed after MP4 finalization");
+  assert.strictEqual(media.frameDiagnostics, diagnostics, "final media preserves measured source diagnostics without estimating them again");
   assert.ok(media.framePaths.length >= 2 && media.framePaths.length <= RECORDING_LIMITS.maxFrames, "representative sampling remains bounded");
   assert.deepEqual(
     media.framePaths.map((framePath) => path.basename(framePath)),
@@ -199,7 +194,7 @@ await assert.rejects(
   /fixture status failure/,
   "status failure rejects recording startup",
 );
-assert.equal(failedStatusDriver.fixtureRecorderStops, 1, "post-screencast startup failure stops the owned recorder");
+assert.equal(failedStatusDriver.fixtureRecorderStops, 0, "status is verified before the CDP recorder is acquired");
 const failedStatusRoot = path.join(root, "target", "lab-interact", failedStatusSessionId, "recordings");
 const failedStatusEntries = fs.existsSync(failedStatusRoot) ? fs.readdirSync(failedStatusRoot).filter((name) => name.startsWith("status-failure-")) : [];
 assert.deepEqual(failedStatusEntries, [], "post-screencast startup failure removes its partial recording directory");
@@ -291,6 +286,11 @@ function fixtureRecordingDriver(workspaceRoot, mediaTools, { failScreencast = fa
   let frame = 0;
   let recorderStops = 0;
   let viewport = { width: 640, height: 480, deviceScaleFactor: 1 };
+  const png = spawnSync(mediaTools.ffmpeg, [
+    "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=black:s=640x480",
+    "-frames:v", "1", "-f", "image2pipe", "-c:v", "png", "pipe:1",
+  ], { encoding: null, timeout: 15_000 });
+  assert.equal(png.status, 0, `fixture PNG succeeds: ${String(png.stderr)}`);
   driver.page = {
     viewport: () => viewport,
     setViewport: async (next) => { viewport = next; },
@@ -310,21 +310,29 @@ function fixtureRecordingDriver(workspaceRoot, mediaTools, { failScreencast = fa
       if (source.includes("navigator.userAgent")) return "fixture-agent";
       return undefined;
     },
-    screencast: async ({ path: outputPath }) => {
-      if (failScreencast) {
-        fs.writeFileSync(outputPath, "partial");
-        throw new Error("fixture page failure");
-      }
-      const generated = spawnSync(mediaTools.ffmpeg, [
-        "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "color=c=black:s=640x480:r=30:d=0.2",
-        "-an", "-c:v", "libvpx-vp9", "-b:v", "0", outputPath,
-      ], { encoding: "utf8", timeout: 15_000 });
-      assert.equal(generated.status, 0, `fixture screencast succeeds: ${generated.stderr}`);
-      return { stop: async () => {
-        recorderStops += 1;
-        if (failRecorderStop) throw new Error("fixture recorder stop failure");
-        if (recorderStopDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, recorderStopDelayMs));
-      } };
+    createCDPSession: async () => {
+      if (failScreencast) throw new Error("fixture page failure");
+      const client = new EventEmitter();
+      let timer = null;
+      let session = 0;
+      client.send = async (method) => {
+        if (method === "Page.startScreencast") {
+          const emit = () => client.emit("Page.screencastFrame", {
+            data: png.stdout.toString("base64"), metadata: { timestamp: session / 200 }, sessionId: ++session,
+          });
+          queueMicrotask(emit);
+          timer = setInterval(emit, 5);
+          timer.unref?.();
+        }
+        if (method === "Page.stopScreencast") {
+          recorderStops += 1;
+          clearInterval(timer);
+          if (failRecorderStop) throw new Error("fixture recorder stop failure");
+          if (recorderStopDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, recorderStopDelayMs));
+        }
+      };
+      client.detach = async () => {};
+      return client;
     },
   };
   Object.defineProperty(driver, "fixtureRecorderStops", { get: () => recorderStops });
