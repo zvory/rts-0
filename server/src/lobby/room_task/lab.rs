@@ -12,6 +12,7 @@ use rts_sim::game::upgrade::UpgradeKind;
 
 use super::super::connection::{send_or_log, ConnectionSink};
 use super::super::dev_replay::match_seed;
+use super::super::lab_replay_operations::lab_op_to_replay_operation;
 use super::super::lab_timeline::LabTimeline;
 use super::super::launch::{LaunchPrediction, LaunchRecipient, StartPayloadBuilder};
 use super::super::live_tick::LabSnapshotProjection;
@@ -34,7 +35,7 @@ use crate::protocol::{
 use crate::structured_log::{self, MatchStartedLog};
 use rts_sim::game::{Game, PlayerInit};
 
-use replay::{lab_op_to_replay_operation, LabReplayRebaseSource};
+use replay::LabReplayRebaseSource;
 
 mod replay;
 mod submission;

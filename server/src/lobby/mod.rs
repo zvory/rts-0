@@ -47,6 +47,7 @@ mod connection;
 mod crash_replay;
 mod dev_replay;
 mod faction_validation;
+mod lab_replay_operations;
 mod lab_timeline;
 mod launch;
 mod live_tick;
