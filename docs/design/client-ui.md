@@ -602,6 +602,8 @@ Real-time recording consumes raw Chrome DevTools screencast frames and assigns t
 30 FPS monotonic-wall-clock slots before streaming H.264. Its manifest records raw event/timestamp
 gaps and exact source-frame reuse; it warns below 80% source-slot coverage. `record-start` can also
 resume authoritative time atomically after the initial frame through its bounded `resumeSpeed`.
+Fixed capture likewise streams up to 1,800 rendered PNG buffers into H.264, retains at most six
+representative PNGs, and keeps per-frame ticks/hashes in the manifest instead of the CLI response.
 
 `lab_scenario_authoring.js`
 ```js

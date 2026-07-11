@@ -198,17 +198,20 @@ graph, and Lab Interact does not depend on macOS system-audio routing.
 ## Fixed-step capture
 
 `capture-fixed` requires an open session whose authoritative room time is paused. Arrange the
-scene, issue a normal `order` if movement or direct fire is wanted, and then request 1–180 frames
-at an integer 10–60 FPS. The command temporarily suspends the ordinary rAF loop, advances room
+scene, issue a normal `order` if movement or direct fire is wanted, and then request 1–1,800 frames
+at an integer 10–60 FPS (one minute at 30 FPS). The command temporarily suspends the ordinary rAF loop, advances room
 time only through the existing 30 Hz `time step` operation, advances the client render clock to
-exact fractional milliseconds, and writes one PNG per frame plus an H.264 MP4, contact sheet, and
+exact fractional milliseconds, and streams each PNG directly into FFmpeg instead of retaining the
+full sequence. It keeps at most six representative PNGs plus an H.264 MP4, contact sheet, and
 manifest under `target/lab-interact/<session-id>/fixed/`.
 
 Frame `i` uses `startTick + floor(i * 30 / outputFps)`. Thus 60 FPS intentionally renders each
 authoritative state twice at two visual timestamps, while 15 FPS advances two ticks per frame;
 fixed capture never mixes live rAF interpolation into either case. The manifest records the
 scenario/seed, branch/head/build/runtime identity, tick and visual timestamp for every frame,
-SHA-256 frame hashes, and media paths. Hash repeatability is evidence only within the pinned local
+SHA-256 frame hashes, optional representative paths, and media paths. The bounded CLI response
+returns only frame count, unique-hash count, and representative paths; full rows remain in the
+manifest. Hash repeatability is evidence only within the pinned local
 browser/GPU environment, not a cross-browser, cross-GPU, or cross-OS golden-image promise.
 Fixed-capture scene alias metadata uses the same 40-row detailed-summary cap.
 
@@ -232,7 +235,7 @@ fixed visual-time contract.
 | `daemonStateUnavailable` / `daemonUnreachable` | Do not remove the socket; restore its owned state or stop the recorded daemon, then retry. |
 | `daemonCheckoutMismatch` | Run `status` to inspect the preserved scene. When it is safe to discard, run the returned `shutdown` recovery command and retry from the current checkout. |
 | `assetLoadFailed`, `captureRenderError`, or `captureTimeout` | Fix the reported source/render problem; do not accept a fallback capture. |
-| `ffmpegUnavailable`, `ffprobeUnavailable`, `vp9Unavailable`, or `h264Unavailable` | Install an FFmpeg toolchain with `libvpx-vp9` and `libx264`, or set the explicit tool paths, then retry. |
+| `ffmpegUnavailable`, `ffprobeUnavailable`, or `h264Unavailable` | Install an FFmpeg toolchain with `libx264`, or set the explicit tool paths, then retry. |
 | `recordingActive` / `recordingInactive` | Check session `status`, then stop/wait for the active recorder or start a new one. A wait before any start is inactive. |
 
 ## Focused verification

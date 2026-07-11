@@ -50,6 +50,7 @@ assert.equal(mediaStageTimeoutMs(60_000), RECORDING_LIMITS.maxMediaStageTimeoutM
 assert.equal(mediaAuxiliaryTimeoutMs(60_000), RECORDING_LIMITS.maxMediaAuxiliaryTimeoutMs, "one-minute auxiliary media stages stay separately capped");
 assert.equal(requestTimeoutMs("status"), REQUEST_TIMEOUT_MS, "ordinary daemon commands keep their existing IPC deadline");
 assert.equal(requestTimeoutMs("record-wait"), RECORDING_REQUEST_TIMEOUT_MS, "record-wait gets bounded recording-specific IPC headroom");
+assert.equal(requestTimeoutMs("capture-fixed"), RECORDING_REQUEST_TIMEOUT_MS, "minute-scale fixed capture gets bounded media IPC headroom");
 assert.ok(RECORDING_REQUEST_TIMEOUT_MS > REQUEST_TIMEOUT_MS, "recording IPC headroom exceeds the ordinary command deadline");
 const boundedMediaBudgetMs = RECORDING_LIMITS.maxDurationMs + RECORDING_LIMITS.maxStopTimeoutMs +
   RECORDING_LIMITS.maxMediaStageTimeoutMs + 3 * RECORDING_LIMITS.maxMediaAuxiliaryTimeoutMs + 22_000;
@@ -72,7 +73,7 @@ try {
   await encoder.finish();
   const diagnostics = {
     expectedAt30Fps: 15, encoded: 15, rawScreencastEvents: 5,
-    sourceFramesUsed: 5, duplicated: 10, sourceCoverage: 1 / 3, deficient: true,
+    sourceFramesUsed: 5, reusedSourceFrameSlots: 10, sourceCoverage: 1 / 3, deficient: true,
   };
   const media = finalizeMp4Artifacts({
     mp4Path,
@@ -124,6 +125,18 @@ assert.equal(watchdogDriver.recordingStatus().last.stoppedBy, "watchdog", "durat
 assert.deepEqual(await watchdogDriver.recordWait(), watchdogResult, "a completed recording wait returns the same finalized result again");
 assert.ok(fs.existsSync(watchdogDriver.recordingStatus().last.contactSheetPath), "watchdog finalization retains a completed contact sheet");
 fs.rmSync(path.dirname(watchdogDriver.recordingStatus().last.videoPath), { recursive: true, force: true });
+
+const lateWatchdogDriver = fixtureRecordingDriver(root, tools);
+await lateWatchdogDriver.recordStart({ sessionId: `lab_${"7".repeat(32)}`, name: "late-watchdog", maxDurationMs: 25 });
+const blockedUntil = Date.now() + 90;
+while (Date.now() < blockedUntil) { /* exercise a delayed event-loop watchdog */ }
+const lateWatchdogResult = await withDeadline(lateWatchdogDriver.recordWait(), 5_000);
+assert.deepEqual(
+  { expected: lateWatchdogResult.frameDiagnostics.expectedAt30Fps, encoded: lateWatchdogResult.frameDiagnostics.encoded },
+  { expected: 1, encoded: 1 },
+  "a late watchdog caps cumulative wall slots at the requested duration instead of drifting past it",
+);
+fs.rmSync(path.dirname(lateWatchdogResult.videoPath), { recursive: true, force: true });
 
 const queuedStopDriver = fixtureRecordingDriver(root, tools);
 await queuedStopDriver.recordStart({ sessionId: `lab_${"e".repeat(32)}`, name: "queued-stop", maxDurationMs: 25 });

@@ -15,7 +15,7 @@ import {
   RECORDING_LIMITS, removePartialRecording,
 } from "./recording.mjs";
 import {
-  encodeFixedCapture, FIXED_CAPTURE_LIMITS, fixedFrameTick, hashFrame,
+  createFixedCaptureEncoder, FIXED_CAPTURE_LIMITS, fixedFrameTick, fixedRepresentativeIndices, hashFrame,
 } from "./fixed_capture.mjs";
 import { boundedSummary, LAB_INTERACT_SUMMARY_LIMITS } from "./manifest_summary.mjs";
 
@@ -348,7 +348,8 @@ export class LabInteractDriver {
         const mp4Path = path.join(recordingDir, `${artifactName}.mp4`);
         const startStatus = await this.callBridge("status", {});
         recorder = await createWallClockRecorder({
-          page: this.page, outputPath: mp4Path, clip, scale, tools, timeoutMs: this.options.timeoutMs,
+          page: this.page, outputPath: mp4Path, clip, scale, tools, maxDurationMs,
+          timeoutMs: this.options.timeoutMs,
         });
         let resumeResult = null;
         if (resumeSpeed != null) {
@@ -401,6 +402,7 @@ export class LabInteractDriver {
       const normalizedViewport = viewport ? normalizeCaptureViewport(viewport) : null;
       let captureDir = "";
       let captureEntered = false;
+      let encoder = null;
       try {
         const status = await this.callBridge("status", {});
         if (!status.roomTime?.paused) throw new LabInteractDriverError("roomTimeNotPaused", "capture-fixed requires paused authoritative room time.");
@@ -418,11 +420,15 @@ export class LabInteractDriver {
         captureDir = path.join(this.workspace.root, LAB_INTERACT_ROOT, normalizedSessionId, "fixed", `${artifactName}-${suffix}`);
         const framesDir = path.join(captureDir, "frames");
         fs.mkdirSync(framesDir, { recursive: true });
+        const videoPath = path.join(captureDir, `${artifactName}.mp4`);
+        const contactSheetPath = path.join(captureDir, `${artifactName}-contact-sheet.png`);
+        encoder = createFixedCaptureEncoder({ outputPath: videoPath, contactSheetPath, fps, frameCount });
+        const representativeIndices = fixedRepresentativeIndices(frameCount);
         const entered = await this.callBridge("captureFixedEnter", {});
         captureEntered = true;
         const startTick = status.snapshotTick;
         let currentTick = startTick;
-        let sequenceBytes = 0;
+        let processedPngBytes = 0;
         const frames = [];
         for (let index = 0; index < frameCount; index += 1) {
           if (this.fixedCapture?.cancelled) throw new LabInteractDriverError("captureCancelled", "Fixed capture was cancelled and its partial artifacts were removed.");
@@ -435,18 +441,20 @@ export class LabInteractDriver {
           }
           const visualTimeMs = entered.visualStartMs + index * (1000 / fps);
           const rendered = await this.callBridge("captureFixedFrame", { visualTimeMs });
-          const framePath = path.join(framesDir, `frame-${String(index).padStart(4, "0")}.png`);
-          const screenshot = Buffer.from(await this.page.screenshot({ type: "png", clip, path: framePath }) || []);
+          const screenshot = Buffer.from(await this.page.screenshot({ type: "png", clip }) || []);
           if (screenshot.length === 0) throw new LabInteractDriverError("captureEmpty", "Chrome returned an empty fixed-capture frame.");
-          sequenceBytes += screenshot.length;
-          if (screenshot.length > FIXED_CAPTURE_LIMITS.maxFrameBytes || sequenceBytes > FIXED_CAPTURE_LIMITS.maxSequenceBytes) {
-            throw new LabInteractDriverError("captureTooLarge", "Fixed-capture PNG sequence exceeded its bounded disk budget.");
+          processedPngBytes += screenshot.length;
+          if (screenshot.length > FIXED_CAPTURE_LIMITS.maxFrameBytes) throw new LabInteractDriverError("captureTooLarge", "One fixed-capture PNG exceeded its bounded frame budget.");
+          await encoder.write(screenshot);
+          let representativePath = null;
+          if (representativeIndices.has(index)) {
+            representativePath = path.join(framesDir, `frame-${String(index).padStart(4, "0")}.png`);
+            fs.writeFileSync(representativePath, screenshot, { mode: 0o600 });
           }
-          frames.push({ index, tick, visualTimeMs, rendererFrame: rendered.rendererFrame, path: framePath, sha256: hashFrame(framePath) });
+          frames.push({ index, tick, visualTimeMs, rendererFrame: rendered.rendererFrame, sha256: hashFrame(screenshot), representativePath });
         }
-        const videoPath = path.join(captureDir, `${artifactName}.mp4`);
-        const contactSheetPath = path.join(captureDir, `${artifactName}-contact-sheet.png`);
-        const media = encodeFixedCapture({ framesDir, outputPath: videoPath, contactSheetPath, fps, frameCount });
+        const media = await encoder.finish();
+        encoder = null;
         const endStatus = await this.callBridge("status", {});
         const diagnostics = this.diagnostics();
         const manifestPath = path.join(captureDir, `${artifactName}.json`);
@@ -460,16 +468,29 @@ export class LabInteractDriver {
           },
           mapping: { simulationHz: 30, outputFps: fps, rule: "frame i uses startTick + floor(i * 30 / outputFps); repeated ticks do not interpolate world state" },
           authoritative: { startTick, endTick: endStatus.snapshotTick },
-          capture: { frameCount, clip, viewport: normalizedViewport, visualStartMs: entered.visualStartMs, sequenceBytes },
+          capture: {
+            frameCount, clip, viewport: normalizedViewport, visualStartMs: entered.visualStartMs,
+            streaming: true, retainedPngFrames: representativeIndices.size, processedPngBytes,
+          },
           frames, media: { videoPath, contactSheetPath, bytes: media.bytes, tools: media.tools, probe: media.probe, contactSheet: media.contactSheet },
           runtime: { node: process.version, platform: process.platform, architecture: process.arch, browser: this.browserVersion || null },
           errors: { pageConsole: diagnostics.pageConsoleErrors, page: diagnostics.pageErrors, requestFailures: diagnostics.requestFailures },
         };
         fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o600 });
-        const result = { videoPath, contactSheetPath, manifestPath, framePaths: frames.map((frame) => frame.path), frameHashes: frames.map((frame) => frame.sha256), authoritative: manifest.authoritative, mapping: manifest.mapping, probe: media.probe };
+        const result = {
+          videoPath, contactSheetPath, manifestPath,
+          frameSummary: {
+            count: frames.length,
+            uniqueHashes: new Set(frames.map((frame) => frame.sha256)).size,
+            representativeFramePaths: frames.map((frame) => frame.representativePath).filter(Boolean),
+            detailsInManifest: true,
+          },
+          authoritative: manifest.authoritative, mapping: manifest.mapping, probe: media.probe,
+        };
         this.lastFixedCapture = result;
         return result;
       } catch (error) {
+        if (encoder) await encoder.abort().catch(() => {});
         removePartialRecording([captureDir]);
         if (error instanceof LabInteractRecordingError) throw new LabInteractDriverError(error.code, error.message);
         throw error;

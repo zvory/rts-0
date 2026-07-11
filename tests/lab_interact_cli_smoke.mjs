@@ -162,7 +162,7 @@ try {
     "live MP4 retains the mobile codec surface",
   );
   assert.ok(fs.existsSync(recording.videoPath) && fs.existsSync(recording.contactSheetPath), "live recording writes MP4 and contact sheet artifacts");
-  assert.equal(fs.existsSync(recording.videoPath.replace(/\.mp4$/, ".webm")), false, "live recording removes its temporary WebM");
+  assert.equal(fs.existsSync(recording.videoPath.replace(/\.mp4$/, ".webm")), false, "live recording does not create an intermediate WebM");
   const recordingManifest = JSON.parse(fs.readFileSync(recording.manifestPath, "utf8"));
   assert.ok(recordingManifest.media.bytes < 64 * 1024 * 1024, "live recording stays beneath the 64 MiB cap");
   assert.ok(recordingManifest.authoritative.endTick >= recordingManifest.authoritative.startTick, "recording manifest tracks authoritative tick bounds");

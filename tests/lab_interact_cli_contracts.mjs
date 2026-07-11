@@ -273,7 +273,11 @@ call("record-stop", { sessionId });
 assert.equal(callFailure("record-start", { sessionId, crop: { x: 0, y: 0, width: 1, height: 10 } }).error.code, "invalidInput", "recording crop dimensions remain bounded");
 
 const fixed = call("capture-fixed", { sessionId, name: "cli-fixed", fps: 60, frameCount: 3 });
-assert.equal(fixed.result.framePaths.length, 3, "capture-fixed returns one confined PNG path per requested frame");
+assert.deepEqual(
+  { count: fixed.result.frameSummary.count, representatives: fixed.result.frameSummary.representativeFramePaths.length },
+  { count: 3, representatives: 3 },
+  "capture-fixed summarizes frames and returns only bounded representative PNG paths",
+);
 assert.match(fixed.result.videoPath, /\.mp4$/, "capture-fixed returns a mobile MP4 path");
 assert.deepEqual(
   fixed.result.authoritative,

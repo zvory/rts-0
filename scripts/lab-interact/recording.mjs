@@ -66,7 +66,7 @@ export function checkMediaCapabilities({
 // Chrome's screencast timestamps describe compositor events, not a complete video timeline.
 // This recorder deliberately uses one authority: cumulative elapsed monotonic wall time mapped
 // to 30 FPS slots. Each slot receives the newest acknowledged CDP frame, and any reuse is counted.
-export async function createWallClockRecorder({ page, outputPath, clip, scale, tools, timeoutMs = 15_000 }) {
+export async function createWallClockRecorder({ page, outputPath, clip, scale, tools, maxDurationMs, timeoutMs = 15_000 }) {
   const fps = RECORDING_LIMITS.fps;
   const client = await page.createCDPSession();
   const viewport = page.viewport?.() || { deviceScaleFactor: 1 };
@@ -90,6 +90,7 @@ export async function createWallClockRecorder({ page, outputPath, clip, scale, t
   let stopping = false;
   let slotsQueued = 0;
   const sourceFramesUsed = new Set();
+  const maximumSlots = Math.max(1, Math.ceil(maxDurationMs * fps / 1000));
   let firstFrameResolve;
   let firstFrameReject;
   const firstFrame = new Promise((resolve, reject) => { firstFrameResolve = resolve; firstFrameReject = reject; });
@@ -129,7 +130,7 @@ export async function createWallClockRecorder({ page, outputPath, clip, scale, t
   const queueElapsedSlots = () => {
     if (startedNs == null || stopping || !currentFrame) return;
     const elapsedMs = Number(process.hrtime.bigint() - startedNs) / 1e6;
-    const due = Math.max(1, Math.ceil(elapsedMs * fps / 1000));
+    const due = Math.min(maximumSlots, Math.max(1, Math.ceil(elapsedMs * fps / 1000)));
     while (slotsQueued < due) {
       encoder.write(currentFrame);
       sourceFramesUsed.add(currentFrameId);
@@ -176,7 +177,7 @@ export async function createWallClockRecorder({ page, outputPath, clip, scale, t
         rawScreencastEvents: rawEvents,
         rawEventsDuringRecording: recordingEvents,
         sourceFramesUsed: used,
-        duplicated: encodedFrames - used,
+        reusedSourceFrameSlots: encodedFrames - used,
         sourceCoverage,
         deficient,
         minimumSourceCoverage: RECORDING_LIMITS.minimumSourceCoverage,
@@ -228,8 +229,10 @@ export function createPngMp4Encoder({ outputPath, fps, crop = null, scale = 1, t
     },
     async abort() {
       child.stdin.destroy();
-      if (child.exitCode == null) child.kill("SIGKILL");
-      await once(child, "close").catch(() => {});
+      if (child.exitCode == null) {
+        child.kill("SIGKILL");
+        await once(child, "close").catch(() => {});
+      }
       fs.rmSync(outputPath, { force: true });
     },
   };

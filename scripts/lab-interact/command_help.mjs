@@ -97,7 +97,7 @@ export const LAB_INTERACT_COMMAND_HELP = Object.freeze({
     example: { sessionId: "<lab-session-id>" },
   }),
   "capture-fixed": descriptor("Capture a deterministic-environment fixed-step H.264 sequence.", "{sessionId:string,name?:token,fps?:int,frameCount?:int,viewport?:viewport}", {
-    defaults: ["name=fixed", "fps=30", "frameCount=30", "viewport=current"], bounds: ["paused room required", "fps 10-60", "1-180 frames", "40 detailed aliases in the manifest"],
+    defaults: ["name=fixed", "fps=30", "frameCount=30", "viewport=current"], bounds: ["paused room required", "fps 10-60", "1-1800 frames", "six retained representative PNGs", "per-frame details in the manifest", "40 detailed aliases in the manifest"],
     example: { sessionId: "<lab-session-id>", name: "motion-fixed", fps: 30, frameCount: 60 },
   }),
   "capture-cancel": descriptor("Request cancellation of the active fixed-step capture.", "{sessionId:string}", {
