@@ -2,7 +2,9 @@
 
 ## Phase Status
 
-- [x] Completed. Focused automated contracts passed; desktop and real-device visual QA remain required in PR review because the executor sandbox cannot bind a local server or attach a browser.
+- [x] Done.
+
+Focused automated contracts passed; desktop and real-device visual QA remain required in PR review because the executor sandbox cannot bind a local server or attach a browser.
 
 ## Objective
 
