@@ -4825,6 +4825,10 @@ input[type="text"]:focus {
     top: var(--mobile-debug-top);
     right: var(--mobile-debug-right);
     bottom: auto;
+    /* The fixed, full-height menu must cover room-time and diagnostic panels
+       while it is open; otherwise their higher desktop stacking layers block
+       settings controls in the shared top region. */
+    z-index: 40;
   }
 
   #settings-button {

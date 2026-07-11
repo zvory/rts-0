@@ -55,6 +55,10 @@ try {
     /@media \(pointer: coarse\) and \(max-width: 1024px\) and \(max-height: 1024px\)\s*\{[\s\S]*?safe-area-inset-top[\s\S]*?#room-time-controls/s.test(styles),
     "mobile-debug CSS is coarse-pointer-gated and safe-area-aware before moving room-time controls",
   );
+  assert(
+    /@media \(pointer: coarse\) and \(max-width: 1024px\) and \(max-height: 1024px\)\s*\{[\s\S]*?#game-menu,[\s\S]*?z-index:\s*40\b/s.test(styles),
+    "mobile-debug settings menu layers above room-time and diagnostic overlays",
+  );
 
   const root = fakeEl("div");
   const speed = fakeEl("button");
