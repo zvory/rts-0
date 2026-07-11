@@ -4,7 +4,7 @@ import fs from "node:fs";
 import { TERRAIN } from "../../client/src/protocol.js";
 import { createMapHandoff, consumeMapHandoff } from "../../client/src/map_editor_handoff.js";
 import { mapEditorLaunchConfig } from "../../client/src/map_editor_launch.js";
-import { MapEditorViewport } from "../../client/src/map_editor_viewport.js";
+import { mapEditorSymmetryGuideLines, MapEditorViewport } from "../../client/src/map_editor_viewport.js";
 import {
   addDraftPlayerNatural,
   addSymmetricDraftNaturals,
@@ -108,13 +108,46 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
   );
   assert.deepEqual(
     symmetricMapTiles(8, [{ x: 1, y: 2 }], MAP_EDITOR_SYMMETRY.RADIAL),
-    [{ x: 1, y: 2 }, { x: 6, y: 5 }],
-    "radial symmetry rotates through 180 degrees",
+    [{ x: 1, y: 2 }, { x: 5, y: 1 }, { x: 6, y: 5 }, { x: 2, y: 6 }],
+    "radial symmetry rotates paint through every quadrant",
   );
   assert.deepEqual(
-    symmetricMapTiles(8, [{ x: 1, y: 2 }], MAP_EDITOR_SYMMETRY.DIAGONAL),
-    [{ x: 1, y: 2 }, { x: 2, y: 1 }, { x: 5, y: 6 }, { x: 6, y: 5 }],
-    "diagonal symmetry mirrors through both map diagonals",
+    symmetricMapTiles(8, [{ x: 1, y: 2 }], MAP_EDITOR_SYMMETRY.DIAGONAL_MAIN),
+    [{ x: 1, y: 2 }, { x: 2, y: 1 }],
+    "main-diagonal symmetry mirrors only through the top-left to bottom-right axis",
+  );
+  assert.deepEqual(
+    symmetricMapTiles(8, [{ x: 1, y: 2 }], MAP_EDITOR_SYMMETRY.DIAGONAL_ANTI),
+    [{ x: 1, y: 2 }, { x: 5, y: 6 }],
+    "anti-diagonal symmetry mirrors only through the top-right to bottom-left axis",
+  );
+  assert.deepEqual(
+    mapEditorSymmetryGuideLines(8, MAP_EDITOR_SYMMETRY.HORIZONTAL),
+    [{ x0: 0, y0: 128, x1: 256, y1: 128 }],
+    "horizontal symmetry shows its horizontal centre axis",
+  );
+  assert.deepEqual(
+    mapEditorSymmetryGuideLines(8, MAP_EDITOR_SYMMETRY.VERTICAL),
+    [{ x0: 128, y0: 0, x1: 128, y1: 256 }],
+    "vertical symmetry shows its vertical centre axis",
+  );
+  assert.deepEqual(
+    mapEditorSymmetryGuideLines(8, MAP_EDITOR_SYMMETRY.RADIAL),
+    [
+      { x0: 0, y0: 128, x1: 256, y1: 128 },
+      { x0: 128, y0: 0, x1: 128, y1: 256 },
+    ],
+    "radial symmetry shows a cross through the map origin",
+  );
+  assert.deepEqual(
+    mapEditorSymmetryGuideLines(8, MAP_EDITOR_SYMMETRY.DIAGONAL_MAIN),
+    [{ x0: 0, y0: 0, x1: 256, y1: 256 }],
+    "main-diagonal symmetry shows its selected axis",
+  );
+  assert.deepEqual(
+    mapEditorSymmetryGuideLines(8, MAP_EDITOR_SYMMETRY.DIAGONAL_ANTI),
+    [{ x0: 0, y0: 256, x1: 256, y1: 0 }],
+    "anti-diagonal symmetry shows its selected axis",
   );
   assert.deepEqual(
     mapEditorRectTiles({ x: 1, y: 1 }, { x: 2, y: 3 }, 8),
@@ -129,7 +162,7 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
 
 {
   const session = new MapEditorSession({ storage: null });
-  session.initializeBlank({ size: 126, playerCount: 2 });
+  session.initializeBlank({ size: 126, playerCount: 4 });
   const layoutId = session.selectedLayoutId;
   let result = null;
   assert.equal(session.mutate("Moved radial starts", (draft) => {
@@ -141,10 +174,12 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
       symmetry: MAP_EDITOR_SYMMETRY.RADIAL,
     });
   }), true);
-  assert.equal(result.count, 2, "a matched opposing start moves with its selected counterpart");
+  assert.equal(result.count, 4, "a four-way radial start move reaches every matched quadrant");
   assert.deepEqual(session.playerSlots().map((player) => player.start && ({ x: player.start.x, y: player.start.y })), [
     { x: 40, y: 46 },
     { x: 85, y: 79 },
+    { x: 79, y: 40 },
+    { x: 46, y: 85 },
   ]);
 
   assert.equal(session.mutate("Added radial naturals", (draft) => {
@@ -155,7 +190,7 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
       symmetry: MAP_EDITOR_SYMMETRY.RADIAL,
     });
   }), true);
-  assert.equal(result.count, 2, "adding a natural follows the selected player-start symmetry");
+  assert.equal(result.count, 4, "adding a natural follows every matching radial player start");
   const firstNatural = session.playerSlots()[0].naturals[0];
   assert.equal(session.mutate("Moved radial naturals", (draft) => {
     result = moveSymmetricDraftBase(draft, {
@@ -167,10 +202,12 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
       symmetry: MAP_EDITOR_SYMMETRY.RADIAL,
     });
   }), true);
-  assert.equal(result.count, 2, "moving a natural also moves its matched counterpart");
+  assert.equal(result.count, 4, "moving a natural also reaches every matched radial counterpart");
   assert.deepEqual(session.playerSlots().map((player) => player.naturals[0] && ({ x: player.naturals[0].x, y: player.naturals[0].y })), [
     { x: 49, y: 45 },
     { x: 76, y: 80 },
+    { x: 80, y: 49 },
+    { x: 45, y: 76 },
   ]);
 }
 
@@ -397,6 +434,9 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
   assert.match(rendererTerrain, /baseTexture\.update\(\)/, "dirty painting updates one persistent texture");
   assert.match(rendererTerrain, /createTerrainPreviewCanvas/, "terrain controls use the renderer's tile painter for their previews");
   assert.match(editorPanel, /createTerrainPreview/, "terrain controls request a terrain preview from the editor viewport");
+  assert.match(editorPanel, /symmetry\.title = "Symmetry applies to terrain and base moves\."/, "symmetry help is available on hover");
+  assert.match(editorPanel, /readout\("Bases need grass clearance\."\)/, "spawn layout controls explain the grass-clearance requirement");
+  assert.doesNotMatch(editorPanel, /Radial \(180°\)|Diagonal \(both axes\)/, "symmetry labels describe the current transforms");
   assert.match(editorPanel, /scrollTop = scroll\.top/, "sidebar refreshes restore the previous vertical scroll position");
   assert.doesNotMatch(editorPanel, /Frozen room · no simulation/i, "the editor header omits frozen-room implementation copy");
   assert.match(serverMain, /\/map-editor/);

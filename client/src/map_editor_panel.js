@@ -158,12 +158,14 @@ export class MapEditorPanel {
     }
     const symmetry = document.createElement("select");
     symmetry.setAttribute("aria-label", "Symmetry");
+    symmetry.title = "Symmetry applies to terrain and base moves.";
     for (const [value, label] of [
       [MAP_EDITOR_SYMMETRY.NONE, "None"],
       [MAP_EDITOR_SYMMETRY.HORIZONTAL, "Horizontal"],
       [MAP_EDITOR_SYMMETRY.VERTICAL, "Vertical"],
-      [MAP_EDITOR_SYMMETRY.RADIAL, "Radial (180°)"],
-      [MAP_EDITOR_SYMMETRY.DIAGONAL, "Diagonal (both axes)"],
+      [MAP_EDITOR_SYMMETRY.RADIAL, "Radial (4-way)"],
+      [MAP_EDITOR_SYMMETRY.DIAGONAL_MAIN, "Diagonal ↘ (top-left ↔ bottom-right)"],
+      [MAP_EDITOR_SYMMETRY.DIAGONAL_ANTI, "Diagonal ↙ (top-right ↔ bottom-left)"],
     ]) {
       const option = document.createElement("option");
       option.value = value;
@@ -176,8 +178,6 @@ export class MapEditorPanel {
       palette,
       field("Paint shape", shapes),
       field("Symmetry", symmetry),
-      readout("Symmetry applies to terrain and base moves. Diagonal mirrors through both map diagonals; each drag remains one render and undo transaction."),
-      readout("Authored start and natural clearances stay grass."),
     );
     return section;
   }
@@ -214,6 +214,7 @@ export class MapEditorPanel {
         this.selectedPlayerIndex = 0;
       }),
       button("Remove active layout", () => this.session.removeSelectedLayout(), { disabled: layouts.length <= 1 }),
+      readout("Bases need grass clearance."),
     );
     return section;
   }
@@ -325,6 +326,7 @@ export class MapEditorPanel {
     this.symmetry = Object.values(MAP_EDITOR_SYMMETRY).includes(symmetry)
       ? symmetry
       : MAP_EDITOR_SYMMETRY.NONE;
+    this.viewport.setSymmetry(this.symmetry);
     if (this.viewport.tool) this.viewport.armTool({ ...this.viewport.tool, symmetry: this.symmetry });
     this.render();
   }

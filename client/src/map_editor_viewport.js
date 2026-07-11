@@ -8,12 +8,31 @@ import {
   mapEditorRectTiles,
   MAP_EDITOR_MAIN_CLEARANCE_TILES,
   MAP_EDITOR_NATURAL_CLEARANCE_TILES,
+  MAP_EDITOR_SYMMETRY,
   moveSymmetricDraftBase,
   protectDraftBaseTerrain,
   symmetricMapTiles,
 } from "./map_editor_session.js";
 
 const TILE_SIZE = 32;
+
+export function mapEditorSymmetryGuideLines(size, symmetry) {
+  const mapSize = Math.max(0, Math.trunc(Number(size)) || 0);
+  const worldSize = mapSize * TILE_SIZE;
+  const centre = worldSize / 2;
+  const horizontal = { x0: 0, y0: centre, x1: worldSize, y1: centre };
+  const vertical = { x0: centre, y0: 0, x1: centre, y1: worldSize };
+  if (symmetry === MAP_EDITOR_SYMMETRY.HORIZONTAL) return [horizontal];
+  if (symmetry === MAP_EDITOR_SYMMETRY.VERTICAL) return [vertical];
+  if (symmetry === MAP_EDITOR_SYMMETRY.RADIAL) return [horizontal, vertical];
+  if (symmetry === MAP_EDITOR_SYMMETRY.DIAGONAL_MAIN) {
+    return [{ x0: 0, y0: 0, x1: worldSize, y1: worldSize }];
+  }
+  if (symmetry === MAP_EDITOR_SYMMETRY.DIAGONAL_ANTI) {
+    return [{ x0: 0, y0: worldSize, x1: worldSize, y1: 0 }];
+  }
+  return [];
+}
 
 export class MapEditorViewport {
   constructor({ root, session, onStatus = () => {} }) {
@@ -26,6 +45,7 @@ export class MapEditorViewport {
       maxZoom: 4,
     });
     this.tool = null;
+    this.symmetry = MAP_EDITOR_SYMMETRY.NONE;
     this.paintPointerId = null;
     this.panPointerId = null;
     this.lastPointer = null;
@@ -62,8 +82,16 @@ export class MapEditorViewport {
 
   armTool(tool) {
     this.tool = tool ? structuredCloneSafe(tool) : null;
+    if (this.tool?.symmetry) this.symmetry = this.tool.symmetry;
     this.drawOverlay();
     return this.tool;
+  }
+
+  setSymmetry(symmetry) {
+    this.symmetry = Object.values(MAP_EDITOR_SYMMETRY).includes(symmetry)
+      ? symmetry
+      : MAP_EDITOR_SYMMETRY.NONE;
+    this.drawOverlay();
   }
 
   createTerrainPreview(terrain) {
@@ -107,6 +135,13 @@ export class MapEditorViewport {
       const p = tile * TILE_SIZE;
       this.overlay.moveTo(p, 0).lineTo(p, size * TILE_SIZE);
       this.overlay.moveTo(0, p).lineTo(size * TILE_SIZE, p);
+    }
+    const guides = mapEditorSymmetryGuideLines(size, this.symmetry);
+    if (guides.length) {
+      this.overlay.lineStyle(2, 0xffd878, 0.82);
+      for (const guide of guides) {
+        this.overlay.moveTo(guide.x0, guide.y0).lineTo(guide.x1, guide.y1);
+      }
     }
     for (const player of this.session.playerSlots()) {
       const color = hexColor(PLAYER_PALETTE[player.playerIndex % PLAYER_PALETTE.length]);

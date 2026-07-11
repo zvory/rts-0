@@ -463,6 +463,12 @@ try {
       terrainPreviews: [...document.querySelectorAll(".map-editor-terrain-icon")]
         .map((icon) => ({ width: icon.width, height: icon.height })),
       header: document.querySelector(".map-editor-header")?.textContent?.trim() || "",
+      symmetryTitle: document.querySelector("select[aria-label=Symmetry]")?.title || "",
+      symmetryOptions: [...document.querySelector("select[aria-label=Symmetry]")?.options || []]
+        .map((option) => option.textContent),
+      clearanceSection: [...document.querySelectorAll(".map-editor-readout")]
+        .find((node) => node.textContent === "Bases need grass clearance.")
+        ?.closest("fieldset")?.querySelector("legend")?.textContent || "",
     };
   });
   ok(
@@ -474,6 +480,14 @@ try {
   ok(
     editorUi.maxScroll > 0 && editorUi.beforeScrollTop > 0 && editorUi.beforeScrollTop === editorUi.afterScrollTop,
     `MAP EDITOR: selecting terrain keeps sidebar scroll position (${editorUi.beforeScrollTop} -> ${editorUi.afterScrollTop})`,
+  );
+  ok(
+    editorUi.symmetryTitle === "Symmetry applies to terrain and base moves." &&
+      editorUi.symmetryOptions.includes("Radial (4-way)") &&
+      editorUi.symmetryOptions.includes("Diagonal ↘ (top-left ↔ bottom-right)") &&
+      editorUi.symmetryOptions.includes("Diagonal ↙ (top-right ↔ bottom-left)") &&
+      editorUi.clearanceSection === "Spawn layouts",
+    "MAP EDITOR: symmetry help, modes, and grass-clearance guidance are presented in the right controls",
   );
   await editorPage.close();
 
