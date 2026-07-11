@@ -117,7 +117,6 @@ function runMatchFrame(match, now, { capture = false } = {}) {
       sourceTick: match.state.tick,
     }));
     match.presentationFrame = presentationFrame;
-    match.staticMapPresentation = presentationAssembler.staticMap;
     match.frameProfiler?.recordDiagnosticCounter?.("presentation.frames.assembled", 1);
     match.frameProfiler?.recordDiagnosticCounter?.(
       "presentation.records.dropped",
@@ -133,7 +132,10 @@ function runMatchFrame(match, now, { capture = false } = {}) {
     }));
 
     const renderResult = time("match.renderer", () => match.renderer.render(presentationFrame));
-    if (renderResult?.presented !== false) match.input?.publishSelectionScene?.(selectionScene);
+    if (renderResult?.presented !== false) {
+      match.state.acknowledgeReconciledGroundDecals?.();
+      match.input?.publishSelectionScene?.(selectionScene);
+    }
     time("match.hud", () => match.hud.update(frameViews, { profiler: match.frameProfiler }));
     time("match.minimap", () => match.minimap.render(frameViews, { profiler: match.frameProfiler }));
     time("match.observerAnalysis", () => match.observerDiagnostics?.update(frameViews, { profiler: match.frameProfiler }));

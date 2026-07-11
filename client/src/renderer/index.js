@@ -437,8 +437,6 @@ export class Renderer {
     visualFrameStripOverrides = null,
     observerMapAnalysis = null,
     feedbackView: preparedFeedbackView = null,
-    presentationFrame = null,
-    staticMapPresentation = null,
     reconciledGroundDecals = null,
   } = {}) {
     this._beginRenderFrame();

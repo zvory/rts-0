@@ -52,7 +52,6 @@ export class PixiPresentationAdapter {
     this._lastFrame = null;
     this._lastView = null;
     this._staticMapRevision = null;
-    this._staticMapPresentation = null;
     this._decalFrameKey = null;
     this._destroyed = false;
   }
@@ -86,8 +85,6 @@ export class PixiPresentationAdapter {
         visualFrameStripOverrides: view.visualFrameStripOverrides,
         observerMapAnalysis: view.observerMapAnalysis,
         feedbackView: view.feedback,
-        presentationFrame: frame,
-        staticMapPresentation: view.staticMapPresentation,
         reconciledGroundDecals: groundDecals,
       });
       this._renderer.drawSelectionBox(view.marquee);
@@ -151,7 +148,6 @@ export class PixiPresentationAdapter {
     }
     this._renderer.buildStaticMap(materializeStaticMap(staticMap));
     this._staticMapRevision = staticMap.revision;
-    this._staticMapPresentation = staticMap;
   }
 
   _buildView(frame) {
@@ -196,7 +192,6 @@ export class PixiPresentationAdapter {
       feedback,
       marquee: marqueeForFrame(layers.screenOverlay),
       groundDecals,
-      staticMapPresentation: this._staticMapPresentation,
     };
   }
 }

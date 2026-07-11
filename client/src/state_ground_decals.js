@@ -50,6 +50,7 @@ export class GroundDecalBuffer {
     this.paintedImpactKeys = new Set();
     this._paintedImpactKeyOrder = [];
     this._pending = [];
+    this._reconciled = null;
   }
 
   applySnapshotEvents(events, context = {}) {
@@ -82,22 +83,34 @@ export class GroundDecalBuffer {
   }
 
   consumePending() {
-    if (this._pending.length === 0) return [];
-    const out = this._pending;
+    const reconciled = this._reconciled || [];
+    if (reconciled.length === 0 && this._pending.length === 0) return [];
+    const out = reconciled.concat(this._pending);
+    this._reconciled = null;
     this._pending = [];
     return out;
   }
 
   reconcilePending() {
-    return this.consumePending();
+    if (this._reconciled === null || (this._reconciled.length === 0 && this._pending.length > 0)) {
+      this._reconciled = this._pending;
+      this._pending = [];
+    }
+    return this._reconciled;
+  }
+
+  acknowledgeReconciled() {
+    const count = this._reconciled?.length || 0;
+    this._reconciled = null;
+    return count;
   }
 
   peekPending() {
-    return this._pending.slice();
+    return [...(this._reconciled || []), ...this._pending];
   }
 
   get pendingCount() {
-    return this._pending.length;
+    return this._pending.length + (this._reconciled?.length || 0);
   }
 
   clear() {
@@ -105,6 +118,7 @@ export class GroundDecalBuffer {
     this.paintedImpactKeys.clear();
     this._paintedImpactKeyOrder = [];
     this._pending = [];
+    this._reconciled = null;
   }
 
   _markImpactPainted(key) {

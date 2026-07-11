@@ -330,7 +330,8 @@ export function buildRendererFeedbackView(state, options?)
 ```js
 export class GroundDecalBuffer {
   applySnapshotEvents(events, context)
-  reconcilePending()                    // shared pre-assembly drain used by Match
+  reconcilePending()                    // stage shared pre-assembly batch used by Match
+  acknowledgeReconciled()               // release it after a successful backend frame
   consumePending()
   get pendingCount()
   clear()
@@ -1469,10 +1470,10 @@ terrain and resources):
 - Mortar impacts stamp a compact, air-burst-style starburst with a small dark center; artillery
   impacts stamp a larger starburst scaled to their authoritative impact radius. Both are neutral
   earth/charcoal marks, with no source owner or hidden-source recovery.
-- `GameState` queues only unpainted death ids and received impact records. Match reconciles the
-  pending batch once before presentation assembly; Pixi stamps the detached frame records and never
-  consumes the shared queue. A skipped snapshot or reconnect may miss older decals; the client must
-  not infer them.
+- `GameState` queues only unpainted death ids and received impact records. Match stages the pending
+  batch before presentation assembly and releases it only after a successful backend presentation;
+  Pixi stamps detached frame records and never consumes the shared queue. A skipped snapshot or
+  reconnect may miss older decals; the client must not infer them.
 - The renderer stamps each new-decal batch into one downsampled texture, updates that texture once
   per stamped batch, and draws the accumulated marks as one sprite. Old decals are not iterated or
   redrawn during normal frames.

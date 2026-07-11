@@ -329,6 +329,10 @@ export class GameState extends VisualEffectBackedState {
     return this.groundDecals.reconcilePending();
   }
 
+  acknowledgeReconciledGroundDecals() {
+    return this.groundDecals.acknowledgeReconciled();
+  }
+
   /**
    * Entities of the current snapshot with x,y linearly interpolated toward
    * their current positions from where they were in the previous snapshot.

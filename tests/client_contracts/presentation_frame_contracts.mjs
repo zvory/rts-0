@@ -203,7 +203,8 @@ assertThrows(() => createGridSnapshot({ revision: 0, width: 2, height: 2, source
   let published = null;
   let entityReads = 0;
   let decalReconciliations = 0;
-  let presented = true;
+  let decalAcknowledgements = 0;
+  let presented = false;
   const integrationMap = { width: 1, height: 1, tileSize: 32, terrain: [0], resources: [] };
   const match = {
     running: true,
@@ -234,7 +235,10 @@ assertThrows(() => createGridSnapshot({ revision: 0, width: 2, height: 2, source
       trenches: [],
       reconcilePendingGroundDecals() {
         decalReconciliations += 1;
-        return decalReconciliations === 1 ? [{ id: 12, kind: "rifleman", x: 10, y: 10 }] : [];
+        return decalAcknowledgements === 0 ? [{ id: 12, kind: "rifleman", x: 10, y: 10 }] : [];
+      },
+      acknowledgeReconciledGroundDecals() {
+        decalAcknowledgements += 1;
       },
       tick: 9,
       entitiesInterpolated(alpha, options = {}) {
@@ -263,7 +267,7 @@ assertThrows(() => createGridSnapshot({ revision: 0, width: 2, height: 2, source
         rendererCalls += 1;
         assert(fogUpdated, "backend runs only after fog and final frame assembly");
         assert(frame.visible.get(0) === 1, "backend receives the post-fog presentation frame");
-        assert(frame.layers.persistentGroundMark.length === (rendererCalls === 1 ? 1 : 0), "decal reconciliation runs before final assembly");
+        assert(frame.layers.persistentGroundMark.length === (decalAcknowledgements === 0 ? 1 : 0), "decal reconciliation runs before final assembly");
         return { presented };
       },
     },
@@ -274,12 +278,14 @@ assertThrows(() => createGridSnapshot({ revision: 0, width: 2, height: 2, source
   assert(projectionReads === 1, "one projection snapshot is shared by frame and SelectionScene");
   assert(entityReads === 2, "alpha-1 capture builds predicted and authoritative views without backend re-query");
   assert(decalReconciliations === 1, "one shared decal reconciliation occurs for the frame");
+  assert(decalAcknowledgements === 0, "a failed backend frame retains its reconciled decal batch for retry");
   assert(match.presentationFrame.diagnosticsContext.assemblyOrdinal === 1, "one presentation assembly occurs for the frame");
-  assert(published?.frameId === match.presentationFrame.frameId, "published selection scene matches the presented frame id");
-  presented = false;
-  published = null;
-  runMatchCaptureFrame(match, 716);
   assert(published === null, "a failed backend frame does not publish a new selection scene");
+  presented = true;
+  runMatchCaptureFrame(match, 716);
+  assert(decalReconciliations === 2, "the next frame reconciles the retained decal batch again");
+  assert(decalAcknowledgements === 1, "a successful backend frame acknowledges its reconciled decal batch");
+  assert(published?.frameId === match.presentationFrame.frameId, "published selection scene matches the presented frame id");
 }
 
 function fakeProjection() {

@@ -525,9 +525,10 @@ receive it. Its temporary legacy-source allowlist is exact and sampled at most o
 | `match.presentationAssembler.staticMap` | Copy a matching immutable static revision into Pixi-owned staging. | Phase 6 backend lifecycle. |
 
 Ground decals are the only non-event destructive queue present at cutover. `frame_recovery.js`
-calls the shared `reconcilePendingGroundDecals()` before final assembly; Pixi receives the detached
-`persistentGroundMark` records and never consumes the shared queue. Phase 4 owns transient event
-identity/history, received pose retention, and removal of the recoil/pose compatibility reads.
+calls the shared `reconcilePendingGroundDecals()` before final assembly and acknowledges that staged
+batch only after successful presentation; Pixi receives detached `persistentGroundMark` records and
+never consumes the shared queue. Phase 4 owns transient event identity/history, received pose
+retention, and removal of the recoil/pose compatibility reads.
 
 Fixed capture currently suspends/restores Match rAF, swaps the injected render clock, renders with
 alpha 1, and explicitly presents the Pixi frame. Capture-time rig/effect/smoke/projectile/recoil/
