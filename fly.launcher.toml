@@ -1,4 +1,4 @@
-app = "rts-0-zvorygin-launcher"
+app = "rts-0-zvorygin"
 primary_region = "ewr"
 
 [build]

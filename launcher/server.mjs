@@ -3,8 +3,8 @@ import http from "node:http";
 import { fileURLToPath } from "node:url";
 
 export const GAME_ORIGINS = Object.freeze({
-  mainline: "https://mainline.bewegungskrieg.net",
-  beta: "https://beta.bewegungskrieg.net",
+  mainline: "https://bewegungskrieg-mainline.fly.dev",
+  beta: "https://bewegungskrieg-beta.fly.dev",
 });
 
 const indexPath = fileURLToPath(new URL("./index.html", import.meta.url));

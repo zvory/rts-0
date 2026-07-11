@@ -61,7 +61,7 @@ import { textWithin } from "./dom_text.mjs";
     "lobby AI profile selector exposes the two supported profiles",
   );
   assert(
-    betaFactionSelectEnabledForLocation({ hostname: "rts-0-zvorygin-beta.fly.dev", pathname: "/" }),
+    betaFactionSelectEnabledForLocation({ hostname: "bewegungskrieg-beta.fly.dev", pathname: "/" }),
     "lobby faction select shows on beta host",
   );
   assert(
@@ -77,7 +77,7 @@ import { textWithin } from "./dom_text.mjs";
     "lobby faction select shows on wildcard bind host",
   );
   assert(
-    !betaFactionSelectEnabledForLocation({ hostname: "rts-0-zvorygin.fly.dev", pathname: "/" }),
+    !betaFactionSelectEnabledForLocation({ hostname: "bewegungskrieg-mainline.fly.dev", pathname: "/" }),
     "lobby faction select stays hidden on mainline host",
   );
   const slots = teamSlotsForLobby([

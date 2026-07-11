@@ -43,7 +43,7 @@ jobs:
             echo "RTS_SCENARIO_PR_REPO=zvory/rts-0"
             echo "RTS_SCENARIO_PR_BASE_BRANCH=main"
             printf 'RTS_SCENARIO_PR_GITHUB_TOKEN=%s\n' "$RTS_SCENARIO_PR_GITHUB_TOKEN"
-          } | flyctl secrets import --app "${FLY_BETA_APP:-rts-0-zvorygin-beta}" --stage
+          } | flyctl secrets import --app "${FLY_BETA_APP:-bewegungskrieg-beta}" --stage
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_BETA_API_TOKEN }}
           RTS_SCENARIO_PR_GITHUB_TOKEN: ${{ secrets.RTS_SCENARIO_PR_GITHUB_TOKEN }}

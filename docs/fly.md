@@ -8,63 +8,43 @@ Fly proxies HTTPS and WSS traffic to the container on port 8080.
 summary` row only when a server tick takes at least 40 ms. `fly.launcher.toml` is deliberately
 separate and cannot serve game traffic.
 
-## First deploy
+## App roles and first deploy
 
 ```bash
 flyctl auth login
-flyctl apps create rts-0-zvorygin
+flyctl apps create bewegungskrieg-mainline
+flyctl apps create bewegungskrieg-beta
 ./deploy.sh mainline
-```
-
-If the app name is already taken, choose another globally unique name and pass it with
-`./deploy.sh mainline --app <your-app>`.
-
-After deploy, open:
-
-```text
-https://rts-0-zvorygin.fly.dev
-```
-
-## Release channels
-
-The production/mainline channel uses the existing Fly app:
-
-```text
-rts-0-zvorygin
-```
-
-The beta channel is a second Fly app. Create it once before the first beta deploy:
-
-```bash
-flyctl apps create rts-0-zvorygin-beta
 ./deploy.sh beta
 ```
 
-After deploy, open:
+The three release channels have deliberately separate app identities and configs:
 
 ```text
-https://rts-0-zvorygin-beta.fly.dev
+bewegungskrieg-mainline  fly.mainline.toml  stopped when idle
+bewegungskrieg-beta      fly.beta.toml      stopped when idle
+rts-0-zvorygin           fly.launcher.toml  always-on canonical launcher
 ```
 
-If the beta app name is taken, choose another globally unique name and deploy with:
+The existing `rts-0-zvorygin` app retains the `bewegungskrieg.net` and
+`www.bewegungskrieg.net` certificates and Squarespace DNS. Deploy the launcher there only after
+both named game apps work directly. If a game app name is unavailable, choose another globally
+unique name and use `--app`; also update the launcher allowlist before cutover.
 
-```bash
-FLY_BETA_APP=<your-beta-app> ./deploy.sh beta
-```
+The raw game origins are the direct access and recovery paths:
 
-or:
-
-```bash
-./deploy.sh beta --app <your-beta-app>
+```text
+https://bewegungskrieg-mainline.fly.dev
+https://bewegungskrieg-beta.fly.dev
 ```
 
 Run one machine only. Game rooms live in server memory, so multiple machines can split players
 between different lobbies.
 
-Phase 1 leaves mainline always-on with its existing lifecycle. Beta uses one `performance-1x`
-Machine with 2 GB of memory, `auto_stop_machines = "stop"`, autostart enabled, and zero minimum
-running Machines. `deploy.sh` always selects the channel's explicit config, including when `--app`
-overrides the normal app name.
+Both game channels use one `performance-1x` Machine with 2 GB of memory,
+`auto_stop_machines = "stop"`, autostart enabled, and zero minimum running Machines. The launcher
+uses one always-on `shared-cpu-1x`/256 MB Machine. `deploy.sh` always selects the channel's explicit
+config, including when `--app` overrides the normal app name.
 
 Fly's HTTP activity keeps a game Machine running while browsers are connected. A headless AI room
 without a connected browser may not prevent autostop; durable unattended AI games are not a goal
@@ -90,9 +70,9 @@ The workflow checks out the exact commit that passed the gate and runs:
 ./deploy.sh beta <tested-commit>
 ```
 
-Set a repository Actions secret named `FLY_BETA_API_TOKEN` before relying on the workflow. Prefer
-an app-scoped Fly deploy token for `rts-0-zvorygin-beta` so the CI secret cannot deploy unrelated
-apps if it leaks.
+Set a repository Actions secret named `FLY_BETA_API_TOKEN` before relying on the workflow. Replace
+the legacy beta token during cutover with an app-scoped deploy token for `bewegungskrieg-beta` so
+the workflow can reach the new app without gaining access to unrelated apps.
 
 The beta deploy workflow uses the `beta-deploy` concurrency group with `cancel-in-progress: false`.
 GitHub keeps one deploy running and, by default, only one pending replacement in the same group.
@@ -112,12 +92,12 @@ Set these once per Fly app (replace the URL with the rotated password):
 flyctl secrets set \
   DATABASE_URL='postgres://postgres:NEW_PASSWORD@db.umerhlzpdtbxndptnhui.supabase.co:5432/postgres?sslmode=require' \
   RTS_RECORD_MATCHES=1 \
-  -a rts-0-zvorygin-beta
+  -a bewegungskrieg-beta
 
 flyctl secrets set \
   DATABASE_URL='postgres://postgres:NEW_PASSWORD@db.umerhlzpdtbxndptnhui.supabase.co:5432/postgres?sslmode=require' \
   RTS_RECORD_MATCHES=1 \
-  -a rts-0-zvorygin
+  -a bewegungskrieg-mainline
 ```
 
 Setting a secret restarts the machines. The first restart runs `sqlx::migrate!` to create the
@@ -126,7 +106,7 @@ Setting a secret restarts the machines. The first restart runs `sqlx::migrate!` 
 Verify a deploy is recording:
 
 ```bash
-curl https://rts-0-zvorygin-beta.fly.dev/api/matches | head -c 500
+curl https://bewegungskrieg-beta.fly.dev/api/matches | head -c 500
 scripts/fly-logs.sh beta recent | rg 'database connected|match recorded|RTS_RECORD_MATCHES'
 ```
 
@@ -203,25 +183,26 @@ For live tailing, bound the command when an agent runs it so it does not stream 
 timeout 30 scripts/fly-logs.sh beta tail
 ```
 
-The wrapper maps `beta` to `rts-0-zvorygin-beta` and `mainline` to `rts-0-zvorygin`, unless
+The wrapper maps `beta` to `bewegungskrieg-beta` and `mainline` to
+`bewegungskrieg-mainline`, unless
 `FLY_BETA_APP` or `FLY_MAINLINE_APP` override those names. It also accepts a raw app name:
 
 ```bash
-scripts/fly-logs.sh rts-0-zvorygin-beta recent --region ewr
+scripts/fly-logs.sh bewegungskrieg-beta recent --region ewr
 ```
 
 ## Stop spending after game night
 
 ```bash
-flyctl scale count 0 -a rts-0-zvorygin
-flyctl scale count 0 -a rts-0-zvorygin-beta
+flyctl scale count 0 -a bewegungskrieg-mainline
+flyctl scale count 0 -a bewegungskrieg-beta
 ```
 
 To bring it back:
 
 ```bash
-flyctl scale count 1 -a rts-0-zvorygin
-flyctl scale count 1 -a rts-0-zvorygin-beta
+flyctl scale count 1 -a bewegungskrieg-mainline
+flyctl scale count 1 -a bewegungskrieg-beta
 ```
 
 Always include `-a` for manual scaling commands; the repository intentionally has multiple Fly
@@ -257,74 +238,127 @@ The deployed commit is written into the runtime image as `COMMIT_HASH`, so `/ver
 asset cache-busting reflect the selected revision without baking the SHA into Rust compile
 artifacts.
 
-## Custom domains
+## Canonical launcher and no-DNS cutover
 
 The stable destinations are:
 
 ```text
-https://bewegungskrieg.net                 launcher
-https://www.bewegungskrieg.net             launcher
-https://mainline.bewegungskrieg.net        mainline game server
-https://beta.bewegungskrieg.net            beta game server
+https://bewegungskrieg.net                   launcher on rts-0-zvorygin
+https://www.bewegungskrieg.net               launcher on rts-0-zvorygin
+https://bewegungskrieg-mainline.fly.dev      mainline game server
+https://bewegungskrieg-beta.fly.dev          beta game server
 ```
 
-The raw Fly hostnames remain recovery paths even if custom DNS or the launcher is unavailable:
+The launcher offers only those two fixed game origins. It polls the selected origin's `/version`
+route to wake it, shows `Starting server...`, and redirects rather than proxying HTTP or WebSocket
+traffic. Requests cannot supply an upstream origin. Paths, queries, and fragments are preserved;
+a non-root canonical URL defaults to mainline.
 
-```text
-https://rts-0-zvorygin.fly.dev
-https://rts-0-zvorygin-beta.fly.dev
-https://rts-0-zvorygin-launcher.fly.dev
-```
+### Cost check
 
-The launcher offers only fixed mainline and beta choices. It polls a fixed `/version` URL to wake
-the chosen game app, shows `Starting server...`, and redirects rather than proxying HTTP or
-WebSocket traffic. Requests cannot supply an upstream origin. Paths, queries, and fragments are
-preserved; a non-root canonical URL defaults to mainline.
+Rechecked against Fly's EWR resource pricing on 2026-07-11. The always-on
+`shared-cpu-1x`/256 MB launcher is about $1.94 per 30 days. Each running
+`performance-1x`/2 GB game Machine is $0.0431/hour; stopped Machines incur only rootfs storage at
+$0.15/GB per 30 days. At the planning assumption of eight total game-server hours per month, base
+compute is about $2.28/month (`$1.94 + 8 * $0.0431`), plus stopped-rootfs storage and small egress;
+retaining the two legacy stopped Machines also adds their rootfs storage. This remains below the
+roughly $7.78/month EWR compute price of the legacy always-on shared-cpu-4x/1 GB mainline before
+counting beta. Recheck [Fly resource pricing](https://fly.io/docs/about/pricing/) and the account's
+Cost Explorer immediately before cutover.
 
-Remote setup changes paid Machine sizing and hostname routing, so capture `PRE_PHASE_SHA` and the
-current DNS values and obtain explicit approval immediately before running these commands:
+### Capture the legacy state
+
+Immediately before any remote mutation, obtain explicit approval and capture both legacy game
+apps. Keep the output local because it contains operational metadata; secret values cannot be read
+back from Fly, so source them from the existing password manager or CI secret store and compare the
+captured names before setting the new apps.
 
 ```bash
-flyctl apps create rts-0-zvorygin-launcher
-./deploy.sh launcher
-./deploy.sh beta
-
-flyctl certs add mainline.bewegungskrieg.net -a rts-0-zvorygin
-flyctl certs add beta.bewegungskrieg.net -a rts-0-zvorygin-beta
-flyctl certs add bewegungskrieg.net -a rts-0-zvorygin-launcher
-flyctl certs add www.bewegungskrieg.net -a rts-0-zvorygin-launcher
-flyctl certs show mainline.bewegungskrieg.net -a rts-0-zvorygin
-flyctl certs show beta.bewegungskrieg.net -a rts-0-zvorygin-beta
-flyctl certs show bewegungskrieg.net -a rts-0-zvorygin-launcher
-flyctl certs show www.bewegungskrieg.net -a rts-0-zvorygin-launcher
+export ROLLOUT_DIR="/tmp/rts-hosting-rollout-$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$ROLLOUT_DIR"
+git rev-parse HEAD > "$ROLLOUT_DIR/phase-sha.txt"
+for app in rts-0-zvorygin rts-0-zvorygin-beta; do
+  flyctl status --json -a "$app" > "$ROLLOUT_DIR/$app-status.json"
+  flyctl machine list --json -a "$app" > "$ROLLOUT_DIR/$app-machines.json"
+  flyctl config show -a "$app" --toml > "$ROLLOUT_DIR/$app-config.toml"
+  flyctl releases --json --image -a "$app" > "$ROLLOUT_DIR/$app-releases.json"
+  flyctl secrets list --json -a "$app" > "$ROLLOUT_DIR/$app-secret-names.json"
+done
+curl --fail https://bewegungskrieg.net/version > "$ROLLOUT_DIR/legacy-mainline-version.json"
+curl --fail https://rts-0-zvorygin-beta.fly.dev/version \
+  > "$ROLLOUT_DIR/legacy-beta-version.json"
+flyctl certs show bewegungskrieg.net -a rts-0-zvorygin \
+  > "$ROLLOUT_DIR/canonical-cert.txt"
+flyctl certs show www.bewegungskrieg.net -a rts-0-zvorygin \
+  > "$ROLLOUT_DIR/www-cert.txt"
 ```
 
-Apply the A/AAAA/CNAME records printed by those `certs show` commands only after both channel
-hostnames work. Save the old canonical A/AAAA/CNAME values before replacing them.
+The known game secrets include `DATABASE_URL` and `RTS_RECORD_MATCHES`; beta may also have the
+`RTS_SCENARIO_PR_*` secrets staged by CI. Treat the captured inventory as authoritative and do not
+omit an unfamiliar channel-specific name.
 
-### Phase 1 rollback
+### Cutover order
 
-To restore beta's pre-phase image, shared CPU size, and always-on lifecycle, run the old deployment
-wrapper from the captured commit:
+Create and verify the game apps before replacing the canonical app. These commands create paid
+resources and change remote service roles; run them only after the phase commit is merged and the
+user has approved the current price and cutover. Never change Squarespace DNS or move/remove the
+canonical certificates.
 
 ```bash
-git worktree add --detach /tmp/rts-hosting-rollback "$PRE_PHASE_SHA"
-/tmp/rts-hosting-rollback/deploy.sh beta
+export ROLLOUT_SHA=<merged-phase-2-sha>
+flyctl apps create bewegungskrieg-mainline
+flyctl apps create bewegungskrieg-beta
+
+# Set every name captured for the corresponding legacy channel from the secret source of truth.
+flyctl secrets set DATABASE_URL="$MAINLINE_DATABASE_URL" RTS_RECORD_MATCHES=1 \
+  -a bewegungskrieg-mainline
+flyctl secrets set DATABASE_URL="$BETA_DATABASE_URL" RTS_RECORD_MATCHES=1 \
+  -a bewegungskrieg-beta
+
+flyctl config validate --strict --app bewegungskrieg-mainline --config fly.mainline.toml
+flyctl config validate --strict --app bewegungskrieg-beta --config fly.beta.toml
+flyctl config validate --strict --app rts-0-zvorygin --config fly.launcher.toml
+node scripts/check-deploy-assets.mjs
+./deploy.sh mainline "$ROLLOUT_SHA"
+./deploy.sh beta "$ROLLOUT_SHA"
+curl --fail https://bewegungskrieg-mainline.fly.dev/version
+curl --fail https://bewegungskrieg-beta.fly.dev/version
+```
+
+Confirm both raw origins report `ROLLOUT_SHA`, have no active room, and can each cold-start directly
+once. Then confirm `rts-0-zvorygin` has no active room and replace it last:
+
+```bash
+./deploy.sh launcher "$ROLLOUT_SHA"
+curl --fail https://bewegungskrieg.net/healthz
+```
+
+Retain the two legacy apps until acceptance is complete. Do not destroy either one. Verify
+the launcher cold-starts beta twice and mainline once, preserves a canonical deep link, keeps each
+server running during a browser session, and lets each stop after all browsers disconnect. After
+those checks pass, stop the superseded apps without destroying them:
+
+```bash
+flyctl scale count 0 -a rts-0-zvorygin-beta
+flyctl scale count 0 -a rts-0-zvorygin-launcher
+```
+
+### No-DNS rollback
+
+Rollback restores the captured mainline game release to the canonical app and restarts legacy
+beta. Use the pre-cutover game commit from the captured release record as
+`LEGACY_MAINLINE_SHA`; the old mainline config is selected explicitly because the current launcher
+default also targets `rts-0-zvorygin`.
+
+```bash
+export LEGACY_MAINLINE_SHA=<captured-pre-cutover-mainline-git-sha>
+git worktree add --detach /tmp/rts-hosting-rollback "$LEGACY_MAINLINE_SHA"
+/tmp/rts-hosting-rollback/deploy.sh mainline --app rts-0-zvorygin
 git worktree remove /tmp/rts-hosting-rollback
+flyctl scale count 1 -a rts-0-zvorygin-beta
+flyctl scale count 0 -a bewegungskrieg-mainline
+flyctl scale count 0 -a bewegungskrieg-beta
 ```
 
-To return the canonical certificates to mainline, first restore the saved canonical DNS records,
-then run:
-
-```bash
-flyctl certs add bewegungskrieg.net -a rts-0-zvorygin
-flyctl certs add www.bewegungskrieg.net -a rts-0-zvorygin
-flyctl certs remove bewegungskrieg.net -a rts-0-zvorygin-launcher
-flyctl certs remove www.bewegungskrieg.net -a rts-0-zvorygin-launcher
-flyctl certs show bewegungskrieg.net -a rts-0-zvorygin
-flyctl certs show www.bewegungskrieg.net -a rts-0-zvorygin
-```
-
-The DNS provider is intentionally not automated by this repository, so the exact saved record
-values are part of the rollout record. After rollback, the launcher app can be left idle for
-inspection or removed with `flyctl apps destroy rts-0-zvorygin-launcher` after explicit approval.
+Verify `https://bewegungskrieg.net/version` reports the captured mainline build and the legacy beta
+origin responds. DNS and certificates remain unchanged throughout either direction of the swap.

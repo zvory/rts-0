@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Pending.
+- [x] Done.
 
 ## Objective
 
