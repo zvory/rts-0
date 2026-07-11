@@ -7,16 +7,21 @@ description: Arrange and inspect small authoritative Bewegungskrieg scenes, then
 
 Use `node scripts/lab-interact/cli.mjs <command> '<JSON-object>'` from the task worktree. The first
 command starts that worktree's private daemon automatically. Lab mutations are ephemeral and never
-edit source files.
+edit source files. Use `node scripts/lab-interact/cli.mjs help <command>` or
+`node scripts/lab-interact/cli.mjs <command> --help` when an exact input shape, default, or bound is
+uncertain; command help never starts or inspects the daemon.
 
 1. Run `open`, retain `result.sessionId`, then run `catalog` before choosing players or kinds.
    `open` is safe to repeat: it returns the active session. Run `close` first only when a fresh
    session or different launch options are needed. A cold build may take tens of seconds and emits
    its one JSON result only after readiness; keep the process attached, or use concurrent `status`
    to confirm `opening: true`.
-2. Keep the scene small. Use short aliases in `spawn` and confirm changes with `inspect`. During
-   autonomous combat, use `activity`, `targetId`, and HP changes rather than treating `state: "idle"`
-   or an empty explicit `orderPlan` as proof that no engagement occurred.
+2. Keep the scene purposeful. Use one bulk `spawn`, `update`, or `remove` request for related
+   changes, with short aliases where useful, and confirm the coherent result with `inspect`. These
+   operations accept up to 400 inputs/references; aliases, inspection, focus, and screenshot
+   subjects use the same large-scene bound. During autonomous combat, use `activity`, `targetId`,
+   and HP changes rather than treating `state: "idle"` or an empty explicit `orderPlan` as proof
+   that no engagement occurred.
 3. Use `time` to pause or step authoritative state. Position the view with `camera`. Single-unit
    focus without padding uses the intentionally close 32-world-pixel default.
 4. Run `screenshot` with a safe name, normally `presentation: "clean"`, a bounded viewport such as
@@ -34,6 +39,10 @@ not request arbitrary paths, add image bytes to Git, or use Lab Interact to play
 - `chromeUnavailable`: install Chrome/Chromium or set `CHROME` before `open`.
 - `assetLoadFailed`, `captureRenderError`, or `captureTimeout`: fix the source asset/render issue;
   do not accept a fallback capture.
-- `occupied`/`labRejected`: choose a clear spawn location and confirm it with `inspect`.
+- `occupied`/`labRejected`: inspect the structured blocker and bounded authoritative suggestions;
+  retry the corrected batch with one returned legal position when appropriate.
+- `daemonCheckoutMismatch`: run `status` to inspect the preserved scene. When it is safe to discard,
+  run the returned `shutdown` recovery command and retry from the current checkout; never silently
+  replace an active mismatched daemon.
 - interrupted work: run `open` to recover the active session id, or `status` to inspect it. Run
   `close` followed by `open` only when the existing scene should be discarded.

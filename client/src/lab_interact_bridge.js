@@ -14,16 +14,16 @@ import {
 export const LAB_INTERACT_BRIDGE_KEY = "__rtsLabInteract";
 export const LAB_INTERACT_BRIDGE_VERSION = 2;
 export const LAB_INTERACT_LIMITS = Object.freeze({
-  inspectEntities: 100,
+  inspectEntities: 400,
   inspectPlayers: 16,
   inspectKinds: 32,
-  removeEntities: 100,
+  removeEntities: 400,
   mutationEntities: 400,
-  focusEntities: 20,
+  focusEntities: 400,
   stepTicks: 100,
   seekTick: 1_000_000,
   waitMs: 8_000,
-  captureSubjects: 20,
+  captureSubjects: 400,
 });
 
 const LAB_INTERACT_DEFAULT_FOCUS_PADDING = 48;

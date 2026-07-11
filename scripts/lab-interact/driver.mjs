@@ -17,6 +17,7 @@ import {
 import {
   encodeFixedCapture, FIXED_CAPTURE_LIMITS, fixedFrameTick, hashFrame,
 } from "./fixed_capture.mjs";
+import { boundedSummary, LAB_INTERACT_SUMMARY_LIMITS } from "./manifest_summary.mjs";
 
 const DEFAULT_VIEWPORT = Object.freeze({ width: 1440, height: 900, deviceScaleFactor: 1 });
 const DEFAULT_TIMEOUT_MS = 15_000;
@@ -429,7 +430,11 @@ export class LabInteractDriver {
         const manifest = {
           schemaVersion: 2, kind: "labInteractFixedCapture", deterministicEnvironmentOnly: true,
           workspace: this.workspace, serverBuild: this.server?.build || null,
-          scene: { identity: sceneIdentity || { source: "launch", scenario: this.options.scenario, seed: this.options.seed || null, map: this.options.map }, revision: sceneRevision, aliases: aliases.slice(0, 100) },
+          scene: {
+            identity: sceneIdentity || { source: "launch", scenario: this.options.scenario, seed: this.options.seed || null, map: this.options.map },
+            revision: sceneRevision,
+            aliases: boundedSummary(aliases, LAB_INTERACT_SUMMARY_LIMITS.detailedAliases),
+          },
           mapping: { simulationHz: 30, outputFps: fps, rule: "frame i uses startTick + floor(i * 30 / outputFps); repeated ticks do not interpolate world state" },
           authoritative: { startTick, endTick: endStatus.snapshotTick },
           capture: { frameCount, clip, viewport: normalizedViewport, visualStartMs: entered.visualStartMs, sequenceBytes },
@@ -519,7 +524,10 @@ export class LabInteractDriver {
             endRoomTime: endStatus?.roomTime ?? null,
           },
           capture: { fps: 30, audio: false, clip: recording.clip, scale: recording.scale, viewport: recording.viewport, wallDurationMs, maxDurationMs: recording.maxDurationMs },
-          aliases: Array.isArray(metadata.aliases) ? metadata.aliases.slice(0, RECORDING_LIMITS.maxAliases) : recording.aliases,
+          aliases: boundedSummary(
+            Array.isArray(metadata.aliases) ? metadata.aliases.slice(0, RECORDING_LIMITS.maxAliases) : recording.aliases,
+            RECORDING_LIMITS.maxDetailedAliases,
+          ),
           operations: recording.operations,
           operationDiagnostics: {
             accepted: recording.operationCount,
@@ -632,6 +640,8 @@ export class LabInteractDriver {
       }
       const dimensions = readPngDimensions(png);
       const diagnostics = this.diagnostics();
+      const subjectSummary = boundedSummary(subjectSummaries, LAB_INTERACT_SUMMARY_LIMITS.detailedSubjects);
+      const readinessSummary = summarizeCaptureReadiness(readiness);
       const manifest = {
         schemaVersion: 1,
         createdAt: new Date().toISOString(),
@@ -651,7 +661,7 @@ export class LabInteractDriver {
           output: dimensions,
         },
         camera: readiness.camera,
-        subjects: Array.isArray(subjectSummaries) ? subjectSummaries.slice(0, 20) : [],
+        subjects: subjectSummary,
         visualProfileId: readiness.visualProfileId || null,
         assetReadiness: readiness.assets,
         errors: {
@@ -660,7 +670,9 @@ export class LabInteractDriver {
           requestFailures: diagnostics.requestFailures,
           frame: readiness.frameErrors,
           render: readiness.renderErrors,
-          missingTextureSubjectIds: readiness.missingTextureSubjectIds,
+          missingTextureSubjectIds: readinessSummary.missingTextureSubjectIds,
+          missingTextureSubjectCount: readinessSummary.missingTextureSubjectCount,
+          missingTextureSubjectsTruncated: readinessSummary.missingTextureSubjectsTruncated,
         },
         presentation,
         request: boundedRequestMetadata(request),
@@ -681,7 +693,7 @@ export class LabInteractDriver {
           height: dimensions.height,
         },
         presentation,
-        readiness,
+        readiness: readinessSummary,
       };
     } finally {
       if (originalViewport) await this.page.setViewport(originalViewport).catch(() => {});
@@ -892,14 +904,29 @@ function normalizeRecordingCrop(crop, viewportClip) {
 }
 
 function boundedEntityIds(values) {
-  if (!Array.isArray(values) || values.length > 20) {
-    throw new LabInteractDriverError("invalidSubjects", "subjectIds must contain at most 20 positive entity ids.");
+  if (!Array.isArray(values) || values.length > 400) {
+    throw new LabInteractDriverError("invalidSubjects", "subjectIds must contain at most 400 positive entity ids.");
   }
   const ids = [...new Set(values.map(Number))];
   if (!ids.every((id) => Number.isInteger(id) && id > 0)) {
     throw new LabInteractDriverError("invalidSubjects", "subjectIds must contain positive integer entity ids.");
   }
   return ids;
+}
+
+function summarizeCaptureReadiness(readiness) {
+  const subjects = boundedSummary(readiness?.subjects, LAB_INTERACT_SUMMARY_LIMITS.detailedSubjects);
+  const missingTextures = boundedSummary(
+    readiness?.missingTextureSubjectIds,
+    LAB_INTERACT_SUMMARY_LIMITS.detailedSubjects,
+  );
+  return {
+    ...(readiness || {}),
+    subjects,
+    missingTextureSubjectIds: missingTextures.details,
+    missingTextureSubjectCount: missingTextures.count,
+    missingTextureSubjectsTruncated: missingTextures.truncated,
+  };
 }
 
 function validClip(clip) {

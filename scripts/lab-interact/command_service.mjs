@@ -13,12 +13,12 @@ export const LAB_INTERACT_LIMITS = Object.freeze({
   maxSessions: 1,
   maxSpawnBatch: 400,
   maxMutationBatch: 400,
-  maxAliases: 100,
+  maxAliases: 400,
   maxCommandUnits: 100,
-  maxInspectRefs: 100,
-  maxInspectResults: 100,
-  maxFocusRefs: 20,
-  maxScreenshotSubjects: 20,
+  maxInspectRefs: 400,
+  maxInspectResults: 400,
+  maxFocusRefs: 400,
+  maxScreenshotSubjects: 400,
   maxArtifactBytes: 8 * 1024 * 1024,
   maxAliasSidecarBytes: 64 * 1024,
   maxRecordingOperations: RECORDING_LIMITS.maxOperations,
@@ -208,6 +208,10 @@ export class LabInteractService {
     await this.openPromise?.catch(() => {});
     await this.closePromise?.catch(() => {});
     await Promise.all([...this.sessions.keys()].map((sessionId) => this.close(sessionId, reason)));
+  }
+
+  canRefreshCheckout() {
+    return !this.closed && this.openPromise == null && this.closePromise == null && this.sessions.size === 0;
   }
 
   async status({ sessionId } = {}) {

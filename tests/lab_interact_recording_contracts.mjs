@@ -12,6 +12,7 @@ import {
   checkMediaCapabilities, finalizeMedia, LabInteractRecordingError, RECORDING_LIMITS,
 } from "../scripts/lab-interact/recording.mjs";
 import { DRIVER_STATES, LabInteractDriver } from "../scripts/lab-interact/driver.mjs";
+import { LAB_INTERACT_SUMMARY_LIMITS } from "../scripts/lab-interact/manifest_summary.mjs";
 import { openLabInteractDriver } from "./fixtures/lab_interact_fake_driver.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -118,10 +119,16 @@ fs.rmSync(path.dirname(closeDriver.recordingStatus().last.videoPath), { recursiv
 const delayedStopDriver = fixtureRecordingDriver(root, tools, { recorderStopDelayMs: 250 });
 await delayedStopDriver.recordStart({ sessionId: `lab_${"f".repeat(32)}`, name: "delayed-stop", maxDurationMs: 5_000 });
 await new Promise((resolve) => setTimeout(resolve, 60));
-const delayedStop = await delayedStopDriver.recordStop();
+const manifestAliases = Array.from({ length: 400 }, (_, index) => ({ alias: `subject_${index}`, id: index + 1 }));
+const delayedStop = await delayedStopDriver.recordStop({ aliases: manifestAliases });
 const delayedManifest = JSON.parse(fs.readFileSync(delayedStop.manifestPath, "utf8"));
 assert.ok(delayedManifest.capture.wallDurationMs < 200, "capture duration excludes recorder finalization latency");
 assert.ok(delayedStop.probe.durationSeconds < 0.2, "MP4 timeline excludes recorder finalization latency");
+assert.deepEqual(
+  { count: delayedManifest.aliases.count, detailed: delayedManifest.aliases.details.length, truncated: delayedManifest.aliases.truncated },
+  { count: 400, detailed: LAB_INTERACT_SUMMARY_LIMITS.detailedAliases, truncated: true },
+  "recording manifests count all aliases while bounding detailed alias rows",
+);
 fs.rmSync(path.dirname(delayedStop.videoPath), { recursive: true, force: true });
 
 const failedDriver = fixtureRecordingDriver(root, tools, { failScreencast: true });

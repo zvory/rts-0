@@ -1,6 +1,6 @@
 # Phase 2 - Discoverability, Large-Scene Bounds, And Daemon Freshness
 
-Status: pending.
+Status: done.
 
 ## Objective
 

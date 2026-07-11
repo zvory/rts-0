@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { LabInteractService, validateCommandInput } from "../scripts/lab-interact/command_service.mjs";
+import { LAB_INTERACT_LIMITS, LabInteractService, validateCommandInput } from "../scripts/lab-interact/command_service.mjs";
 import { openLabInteractDriver } from "./fixtures/lab_interact_fake_driver.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -32,6 +32,31 @@ await assert.rejects(
   service.execute("artifact-inspect", { sessionId, artifactId: setup.artifactId }),
   (error) => error.code === "invalidAliasSidecar" && /64 KiB/.test(error.message),
 );
+fs.writeFileSync(setup.sidecarPath, `${JSON.stringify({
+  schemaVersion: 1,
+  artifactId: setup.artifactId,
+  kind: "setup",
+  artifactFile: path.basename(setup.path),
+  aliases: [{ alias: "shooter", id: 100 }, { alias: "target", id: 101 }],
+  reproduction: null,
+}, null, 2)}\n`);
+
+const maximumAliases = Array.from({ length: 400 }, (_, index) => ({
+  alias: `A${String(index).padStart(3, "0")}${"x".repeat(28)}`,
+  id: 0xffff_ffff - index,
+}));
+const maximumSidecar = `${JSON.stringify({
+  schemaVersion: 1,
+  artifactId: setup.artifactId,
+  kind: "setup",
+  artifactFile: path.basename(setup.path),
+  aliases: maximumAliases,
+  reproduction: null,
+}, null, 2)}\n`;
+assert.equal(LAB_INTERACT_LIMITS.maxAliases, 400, "portable artifacts share the operational alias bound");
+assert.ok(Buffer.byteLength(maximumSidecar) < LAB_INTERACT_LIMITS.maxAliasSidecarBytes, "64 KiB safely admits 400 maximum-length aliases and u32 ids");
+fs.writeFileSync(setup.sidecarPath, maximumSidecar);
+assert.equal((await service.execute("artifact-inspect", { sessionId, artifactId: setup.artifactId })).aliasCount, 400, "artifact inspection accepts the full bounded sidecar");
 fs.writeFileSync(setup.sidecarPath, `${JSON.stringify({
   schemaVersion: 1,
   artifactId: setup.artifactId,
