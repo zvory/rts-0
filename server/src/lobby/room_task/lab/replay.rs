@@ -295,7 +295,10 @@ impl RoomTask {
             ok: true,
             op,
             error: None,
-            outcome: None,
+            outcome: Some(serde_json::json!({
+                "accepted": true,
+                "playerId": command_player_id,
+            })),
         }
     }
 

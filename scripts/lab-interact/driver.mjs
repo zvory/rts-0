@@ -648,7 +648,6 @@ async function startOrReusePrivateServer({ workspace, sessionDir, startupTimeout
     env: {
       ...process.env,
       RTS_ADDR: `127.0.0.1:${port}`,
-      RTS_TEST_TICK_MS: process.env.RTS_TEST_TICK_MS || "5",
       RTS_MATCH_SEED: process.env.RTS_MATCH_SEED || "1",
     },
     stdio: ["ignore", log, log],

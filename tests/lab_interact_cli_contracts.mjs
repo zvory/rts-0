@@ -35,6 +35,28 @@ assert.throws(() => configuredIdleMs({ RTS_LAB_INTERACT_IDLE_MS: "0" }), /must b
 shutdown(baseEnv);
 fs.rmSync(paths.directory, { recursive: true, force: true });
 
+for (const helpCommand of ["--help", "-h", "help"]) {
+  const help = spawnSync(process.execPath, [cli, helpCommand], {
+    cwd: path.dirname(root),
+    env: baseEnv,
+    encoding: "utf8",
+  });
+  assert.equal(help.status, 0, `${helpCommand} succeeds without a Git workspace`);
+  assert.equal(help.stderr, "", `${helpCommand} keeps machine-readable help on stdout`);
+  const helpEnvelope = JSON.parse(help.stdout);
+  assert.equal(helpEnvelope.ok, true, `${helpCommand} returns a successful envelope`);
+  assert.ok(helpEnvelope.result.commands.includes("open"), `${helpCommand} lists open`);
+  assert.ok(helpEnvelope.result.commands.includes("shutdown"), `${helpCommand} lists shutdown`);
+}
+assert.equal(fs.existsSync(paths.directory), false, "help does not start a daemon or create runtime state");
+
+const coldOpen = call("open");
+assert.match(coldOpen.result.sessionId, /^lab_[a-f0-9]{32}$/, "a cold first open returns one complete JSON envelope");
+assert.equal(call("status").result.opening, false, "completed cold open clears the opening status");
+call("close", { sessionId: coldOpen.result.sessionId });
+call("shutdown");
+await waitFor(() => !fs.existsSync(paths.directory), 2000, "cold-first-open daemon shuts down cleanly");
+
 const invalidConfiguration = spawnSync(process.execPath, [cli, "status", "{}"], {
   cwd: root,
   env: { ...baseEnv, RTS_LAB_INTERACT_IDLE_MS: "0" },
@@ -72,6 +94,8 @@ fs.rmSync(paths.directory, { recursive: true, force: true });
 
 const initial = call("status");
 assert.equal(initial.ok, true, "the first CLI command automatically starts the daemon");
+assert.equal(initial.result.opening, false, "idle status reports no session opening in progress");
+assert.equal(initial.result.closing, false, "idle status reports no session closing in progress");
 const daemonState = JSON.parse(fs.readFileSync(paths.state, "utf8"));
 assert.equal(daemonState.workspaceRoot, fs.realpathSync(root), "runtime is pinned to the real worktree path");
 assert.equal(daemonState.idleMs, 5000, "the daemon records its configured idle bound");

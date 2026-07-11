@@ -1306,7 +1306,17 @@ fn lab_collaborators_can_mutate_issue_commands_and_log_requester() {
             ignore_command_limits: false,
         },
     );
-    assert!(lab_results(&mut collab_writer)[0].ok);
+    let command_result = lab_results(&mut collab_writer)
+        .pop()
+        .expect("issueCommandAs result");
+    assert!(command_result.ok);
+    assert_eq!(
+        command_result.outcome,
+        Some(serde_json::json!({
+            "accepted": true,
+            "playerId": LAB_PLAYER_ONE_ID,
+        }))
+    );
 
     let session = task.lab_session.as_ref().unwrap();
     assert_eq!(session.role_for(99), LabStartRole::Operator);

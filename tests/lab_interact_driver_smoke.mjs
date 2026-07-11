@@ -21,7 +21,16 @@ try {
   assert.ok(catalog.players.length >= 2, "catalog lists authoritative lab players");
   assert.ok(catalog.factions.some((faction) => faction.units.includes("rifleman")), "catalog exposes human-lab spawn kinds");
 
-  await driver.time({ action: "pause" });
+  const paused = await driver.time({ action: "pause" });
+  const timingStart = paused.snapshotTick;
+  await driver.time({ action: "resume", speed: 1 });
+  await new Promise((resolve) => setTimeout(resolve, 900));
+  const timingEnd = (await driver.time({ action: "pause" })).snapshotTick;
+  const elapsedTicks = timingEnd - timingStart;
+  assert.ok(
+    elapsedTicks >= 10 && elapsedTicks <= 80,
+    `speed 1 keeps the private Lab server near its production tick rate; observed ${elapsedTicks} ticks in 900ms`,
+  );
   const first = await driver.spawn({ owner: 1, kind: "tank", x: 960, y: 960 });
   const second = await driver.spawn({ owner: 2, kind: "rifleman", x: 1248, y: 960 });
   const firstId = first.entity?.id;
@@ -55,6 +64,11 @@ try {
     command: { c: "move", units: [secondId], x: 1376, y: 960 },
   });
   assert.equal(order.result?.op, "issueCommandAs", "normal issueCommandAs returns the accepted command receipt");
+  assert.deepEqual(
+    order.result?.outcome,
+    { accepted: true, playerId: 2 },
+    "normal issueCommandAs identifies the authoritative player that accepted the command",
+  );
   await driver.time({ action: "step", ticks: 3 });
   const afterOrder = await driver.inspect({ ids: [secondId], limit: 1 });
   assert.equal(afterOrder.entities[0]?.id, secondId, "normal issueCommandAs order leaves the unit observable");
