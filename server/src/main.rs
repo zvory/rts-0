@@ -236,7 +236,7 @@ async fn main() {
         )
         .route(
             "/api/map-handoffs/{handoff_id}",
-            get(map_handoffs::consume_handler),
+            post(map_handoffs::consume_handler),
         )
         .route(
             SCENARIO_SUBMISSION_CAPABILITY_PATH,

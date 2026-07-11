@@ -117,6 +117,14 @@ fn map_editor_handoff_materializes_before_the_first_lab_start_payload() {
                 x: size - 17,
                 y: size - 17,
             },
+            crate::protocol::LabMapTile {
+                x: size - 17,
+                y: 16,
+            },
+            crate::protocol::LabMapTile {
+                x: 16,
+                y: size - 17,
+            },
         ],
         expansion_sites: vec![crate::protocol::LabMapTile {
             x: size / 2,
@@ -138,7 +146,9 @@ fn map_editor_handoff_materializes_before_the_first_lab_start_payload() {
     assert_eq!(starts.len(), 1);
     assert_eq!(starts[0].tick, 0);
     assert_eq!(starts[0].map.width, size);
+    assert_eq!(starts[0].players.len(), 4);
     assert_eq!(starts[0].players[0].start_tile_x, 16);
+    assert_eq!(starts[0].players[3].name, "Lab Delta");
 
     task.on_lab_request(99, 701, LabClientOp::ExportMap);
     let exported = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok())
@@ -150,7 +160,7 @@ fn map_editor_handoff_materializes_before_the_first_lab_start_payload() {
     assert!(exported.ok);
     let map = &exported.outcome.as_ref().expect("export outcome")["map"];
     assert_eq!(map["name"], "Room map");
-    assert_eq!(map["starts"].as_array().map(Vec::len), Some(2));
+    assert_eq!(map["starts"].as_array().map(Vec::len), Some(4));
     assert!(map.get("entities").is_none());
 }
 

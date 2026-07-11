@@ -1013,15 +1013,24 @@ impl Lobby {
 
     /// Create a private Lab whose first authoritative start payload is materialized from a
     /// validated Map Editor handoff. The room is registered before its opaque name is returned.
-    pub async fn create_map_editor_lab_room(&self, draft: LabMapDraft) -> String {
+    pub async fn create_map_editor_lab_room(
+        &self,
+        draft: LabMapDraft,
+    ) -> Result<String, DrainNotice> {
         let mut rooms = self.rooms.lock().await;
+        if self.drain.is_draining() {
+            return Err(self.drain.notice().unwrap_or(DrainNotice {
+                deadline_unix_ms: 0,
+                seconds_remaining: 0,
+            }));
+        }
         loop {
             let token = rand::random::<u128>();
             let room = format!("__lab__:map-editor-{token:032x}:map=Default");
             if rooms.contains_key(&room) {
                 continue;
             }
-            self.create_room_locked_with_mode(
+            let handle = self.create_room_locked_with_mode(
                 &room,
                 &mut rooms,
                 RoomMode::Lab(room_task::LabRoomConfig {
@@ -1032,14 +1041,8 @@ impl Lobby {
                     map_draft: Some(draft),
                 }),
             );
-            schedule_pending_create_disposal_probe(
-                rooms
-                    .get(&room)
-                    .expect("map editor lab room was inserted")
-                    .event_tx
-                    .clone(),
-            );
-            return room;
+            schedule_pending_create_disposal_probe(handle.event_tx.clone());
+            return Ok(room);
         }
     }
 

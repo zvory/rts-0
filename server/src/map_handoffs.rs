@@ -141,10 +141,19 @@ pub(crate) async fn consume_handler(
 
     match handoff.destination {
         HandoffDestination::Lab => {
-            let room = state
+            let room = match state
                 .lobby
                 .create_map_editor_lab_room(handoff.materialized_map)
-                .await;
+                .await
+            {
+                Ok(room) => room,
+                Err(_) => {
+                    return error_response(
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        "Server is draining for deploy; new Labs are disabled.".to_string(),
+                    );
+                }
+            };
             Json(ConsumeMapHandoffResponse {
                 destination: HandoffDestination::Lab,
                 room: Some(room),

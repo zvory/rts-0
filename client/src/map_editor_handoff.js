@@ -27,6 +27,7 @@ export async function consumeMapHandoff(handoffId, {
   if (!fetchImpl) throw new Error("Map handoffs require fetch support.");
   if (!/^[a-f0-9]{32}$/.test(handoffId || "")) throw new Error("Invalid map handoff id.");
   const response = await fetchImpl(`${HANDOFF_COLLECTION_URL}/${handoffId}`, {
+    method: "POST",
     cache: "no-store",
   });
   const payload = await response.json().catch(() => ({}));

@@ -5,8 +5,13 @@ import { TERRAIN } from "../../client/src/protocol.js";
 import { createMapHandoff, consumeMapHandoff } from "../../client/src/map_editor_handoff.js";
 import { mapEditorLaunchConfig } from "../../client/src/map_editor_launch.js";
 import {
+  addDraftPlayerNatural,
   MapEditorSession,
   authoredMapFromMaterialized,
+  materializedMapsEqual,
+  moveDraftPlayerNatural,
+  moveDraftPlayerStart,
+  removeDraftPlayerNatural,
 } from "../../client/src/map_editor_session.js";
 
 const repoRoot = new URL("../../", import.meta.url);
@@ -21,6 +26,35 @@ const noTerrainMap = JSON.parse(fs.readFileSync(new URL("server/assets/maps/no-t
   assert.equal(materialized.starts.length, 2);
   assert.equal(materialized.expansionSites.length, 2, "legacy singular natural entries normalize into the active layout");
   assert.equal(session.exportMap().layouts[0].slots[0].natural, undefined, "exports use the canonical naturals array");
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 32, playerCount: 2 });
+  const layoutId = session.selectedLayoutId;
+  session.mutate("Added crossed naturals", (draft) => {
+    addDraftPlayerNatural(draft, 0, { x: 20, y: 20 }, layoutId);
+    addDraftPlayerNatural(draft, 1, { x: 12, y: 12 }, layoutId);
+  });
+  const local = session.materialized();
+  const reconstructed = new MapEditorSession({ storage: null });
+  reconstructed.loadAuthoredMap(authoredMapFromMaterialized({
+    ...local,
+    description: "Returned from Lab",
+  }));
+  const returned = reconstructed.materialized();
+  assert.notDeepEqual(
+    local.expansionSites,
+    returned.expansionSites,
+    "map-only Lab reconstruction may group natural sites differently",
+  );
+  assert.equal(
+    materializedMapsEqual(local, returned),
+    true,
+    "global natural-site ordering does not discard richer local layout metadata",
+  );
+  returned.terrain[0] = TERRAIN.WATER;
+  assert.equal(materializedMapsEqual(local, returned), false);
 }
 
 {
@@ -59,6 +93,39 @@ const noTerrainMap = JSON.parse(fs.readFileSync(new URL("server/assets/maps/no-t
 }
 
 {
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 32, playerCount: 2 });
+  const originalLayoutId = session.selectedLayoutId;
+  let addedNatural = null;
+  session.mutate("Added shared natural", (draft) => {
+    addedNatural = addDraftPlayerNatural(draft, 0, { x: 12, y: 8 }, originalLayoutId);
+  });
+  assert.equal(addedNatural.ok, true);
+  const sharedMainId = session.activeLayout.slots[0].main;
+  const sharedNaturalId = addedNatural.id;
+  session.addLayout(2);
+  const editedLayoutId = session.selectedLayoutId;
+
+  session.mutate("Moved start in one layout", (draft) => {
+    moveDraftPlayerStart(draft, 0, { x: 10, y: 10 }, editedLayoutId);
+  });
+  session.mutate("Moved natural in one layout", (draft) => {
+    moveDraftPlayerNatural(draft, 0, sharedNaturalId, { x: 14, y: 10 }, editedLayoutId);
+  });
+  session.mutate("Removed natural in one layout", (draft) => {
+    removeDraftPlayerNatural(draft, 0, session.activeLayout.slots[0].naturals[0], editedLayoutId);
+  });
+
+  const original = session.draft.layouts.find((layout) => layout.id === originalLayoutId);
+  const edited = session.draft.layouts.find((layout) => layout.id === editedLayoutId);
+  assert.equal(original.slots[0].main, sharedMainId, "moving a start detaches it from other layouts");
+  assert.equal(original.slots[0].naturals[0], sharedNaturalId, "moving/removing a natural preserves other layouts");
+  assert.notEqual(edited.slots[0].main, sharedMainId);
+  assert.deepEqual(edited.slots[0].naturals, []);
+  assert(session.draft.sites.some((site) => site.id === sharedNaturalId), "shared natural site remains authored");
+}
+
+{
   const authored = authoredMapFromMaterialized({
     name: "Returned Lab map",
     description: "",
@@ -90,10 +157,11 @@ const noTerrainMap = JSON.parse(fs.readFileSync(new URL("server/assets/maps/no-t
 {
   let posted = null;
   const fetchImpl = async (url, options = {}) => {
-    if (options.method === "POST") {
+    if (url === "/api/map-handoffs" && options.method === "POST") {
       posted = { url, body: JSON.parse(options.body) };
       return { ok: true, status: 200, json: async () => ({ handoffId: "a".repeat(32), expiresInMs: 120000 }) };
     }
+    assert.equal(options.method, "POST", "one-use handoffs are consumed with non-prefetchable POST");
     return { ok: true, status: 200, json: async () => ({ destination: "editor", authoredMap: noTerrainMap }) };
   };
   const session = new MapEditorSession({ storage: null });

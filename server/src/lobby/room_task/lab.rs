@@ -19,8 +19,8 @@ use super::super::live_tick::LabSnapshotProjection;
 use super::super::projection::RecipientRole;
 use super::super::session_policy::{RoomTimeSource, SessionPhase, SessionPolicy};
 use super::super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
-use super::super::{normalize_start_team_id, PLAYER_PALETTE};
-use super::helpers::{DRAINING_NEW_MATCHES_DISABLED_MSG, LAB_PLAYER_ONE_ID, LAB_PLAYER_TWO_ID};
+use super::super::{normalize_start_team_id, MAX_PLAYERS, PLAYER_PALETTE};
+use super::helpers::{DRAINING_NEW_MATCHES_DISABLED_MSG, LAB_PLAYER_ONE_ID};
 use super::types::{LabRoomConfig, Phase, RoomMode, RoomPlayer};
 use super::RoomTask;
 use crate::lab_scenarios::{
@@ -702,7 +702,17 @@ impl RoomTask {
 
     fn build_blank_lab_launch(&self, config: &LabRoomConfig) -> Result<LabLaunch, String> {
         let seed = config.seed.unwrap_or_else(match_seed);
-        let inits = self.default_lab_player_template();
+        let player_count = config
+            .map_draft
+            .as_ref()
+            .map(|draft| draft.starts.len())
+            .unwrap_or(2);
+        if !(1..=MAX_PLAYERS).contains(&player_count) {
+            return Err(format!(
+                "Map Editor handoff needs one to {MAX_PLAYERS} player starts; got {player_count}"
+            ));
+        }
+        let inits = Self::default_lab_player_template(player_count);
         let start_players: Vec<_> = inits
             .iter()
             .map(|player| {
@@ -744,25 +754,18 @@ impl RoomTask {
         })
     }
 
-    fn default_lab_player_template(&self) -> Vec<PlayerInit> {
-        vec![
-            PlayerInit {
-                id: LAB_PLAYER_ONE_ID,
-                team_id: 1,
+    fn default_lab_player_template(player_count: usize) -> Vec<PlayerInit> {
+        const NAMES: [&str; MAX_PLAYERS] = ["Alpha", "Bravo", "Charlie", "Delta"];
+        (0..player_count)
+            .map(|index| PlayerInit {
+                id: index as u32 + 1,
+                team_id: index as u32 + 1,
                 faction_id: DEFAULT_FACTION_ID.to_string(),
-                name: "Lab Alpha".to_string(),
-                color: PLAYER_PALETTE[0].to_string(),
+                name: format!("Lab {}", NAMES[index]),
+                color: PLAYER_PALETTE[index].to_string(),
                 is_ai: false,
-            },
-            PlayerInit {
-                id: LAB_PLAYER_TWO_ID,
-                team_id: 2,
-                faction_id: DEFAULT_FACTION_ID.to_string(),
-                name: "Lab Bravo".to_string(),
-                color: PLAYER_PALETTE[1].to_string(),
-                is_ai: false,
-            },
-        ]
+            })
+            .collect()
     }
 
     fn send_lab_error(&self, msg: String) {

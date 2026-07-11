@@ -459,6 +459,15 @@ export function moveDraftPlayerStart(draft, playerIndex, tile, layoutId = "") {
   if (occupied && occupied.id !== current?.id) {
     return draftEditError("A start or natural base already uses that tile.");
   }
+  if (current?.kind === "main" && current.x === target.x && current.y === target.y) {
+    return { ok: true, id: current.id };
+  }
+  if (current?.kind === "main" && draftSiteReferenceCount(draft, current.id) > 1) {
+    const id = uniqueDraftSiteId(draft, "main");
+    draft.sites.push({ id, kind: "main", x: target.x, y: target.y });
+    slot.main = id;
+    return { ok: true, id };
+  }
   if (current?.kind === "main") {
     current.x = target.x;
     current.y = target.y;
@@ -500,6 +509,15 @@ export function moveDraftPlayerNatural(draft, playerIndex, naturalId, tile, layo
   if (occupied && occupied.id !== natural.id) {
     return draftEditError("A start or natural base already uses that tile.");
   }
+  if (natural.x === target.x && natural.y === target.y) {
+    return { ok: true, id: natural.id };
+  }
+  if (draftSiteReferenceCount(draft, natural.id) > 1) {
+    const id = uniqueDraftSiteId(draft, "natural");
+    draft.sites.push({ id, kind: "natural", x: target.x, y: target.y });
+    slot.naturals = slot.naturals.map((candidate) => candidate === natural.id ? id : candidate);
+    return { ok: true, id };
+  }
   natural.x = target.x;
   natural.y = target.y;
   return { ok: true, id: natural.id };
@@ -512,7 +530,10 @@ export function removeDraftPlayerNatural(draft, playerIndex, naturalId, layoutId
   if (!slot || natural?.kind !== "natural" || !slot.naturals.includes(naturalId)) {
     return draftEditError("That natural base is no longer part of this player's setup.");
   }
-  removeDraftSite(draft, naturalId);
+  slot.naturals = slot.naturals.filter((id) => id !== naturalId);
+  if (draftSiteReferenceCount(draft, naturalId) === 0) {
+    draft.sites = draft.sites.filter((site) => site.id !== naturalId);
+  }
   return { ok: true, id: naturalId };
 }
 
@@ -563,6 +584,14 @@ export function authoredMapFromMaterialized({ name, description, size, terrain, 
   };
   normalizeDraft(draft);
   return draft;
+}
+
+/** Compare a Lab round trip while treating expansion-site order as non-semantic editor metadata. */
+export function materializedMapsEqual(left, right) {
+  if (!left || !right || left.name !== right.name || left.size !== right.size) return false;
+  if (!sameFlatArray(left.terrain, right.terrain)) return false;
+  if (!sameOrderedTiles(left.starts, right.starts)) return false;
+  return sameTileMultiset(left.expansionSites, right.expansionSites);
 }
 
 function normalizeDraft(draft) {
@@ -634,6 +663,26 @@ function normalizeTiles(tiles) {
     : [];
 }
 
+function sameFlatArray(left, right) {
+  return Array.isArray(left)
+    && Array.isArray(right)
+    && left.length === right.length
+    && left.every((value, index) => value === right[index]);
+}
+
+function sameOrderedTiles(left, right) {
+  return Array.isArray(left)
+    && Array.isArray(right)
+    && left.length === right.length
+    && left.every((tile, index) => tile?.x === right[index]?.x && tile?.y === right[index]?.y);
+}
+
+function sameTileMultiset(left, right) {
+  if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+  const keys = (tiles) => tiles.map((tile) => `${tile?.x},${tile?.y}`).sort();
+  return sameFlatArray(keys(left), keys(right));
+}
+
 function distanceSq(a, b) {
   const dx = a.x - b.x;
   const dy = a.y - b.y;
@@ -679,6 +728,17 @@ function siteById(draft, id) {
 
 function siteAt(draft, x, y) {
   return draft?.sites?.find((site) => site.x === x && site.y === y) || null;
+}
+
+function draftSiteReferenceCount(draft, siteId) {
+  let count = 0;
+  for (const layout of draft?.layouts || []) {
+    for (const slot of layout.slots || []) {
+      if (slot.main === siteId) count += 1;
+      count += (slot.naturals || []).filter((id) => id === siteId).length;
+    }
+  }
+  return count;
 }
 
 function uniqueDraftSiteId(draft, prefix) {

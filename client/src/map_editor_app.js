@@ -2,7 +2,7 @@ import { dom } from "./bootstrap.js";
 import { createMapHandoff, consumeMapHandoff } from "./map_editor_handoff.js";
 import { mapEditorLaunchConfig } from "./map_editor_launch.js";
 import { MapEditorPanel } from "./map_editor_panel.js";
-import { MapEditorSession } from "./map_editor_session.js";
+import { MapEditorSession, materializedMapsEqual } from "./map_editor_session.js";
 import { MapEditorViewport } from "./map_editor_viewport.js";
 
 export class MapEditorApp {
@@ -52,7 +52,7 @@ export class MapEditorApp {
         returned.loadAuthoredMap(handoff.authoredMap);
         if (handoff.selectedLayoutId) returned.selectLayout(handoff.selectedLayoutId);
         const restoredWorkspace = this.session.loadLocal(this.launch.workspaceId);
-        if (!restoredWorkspace || !sameMaterializedMap(this.session, returned)) {
+        if (!restoredWorkspace || !sessionsHaveSameMap(this.session, returned)) {
           this.session.loadAuthoredMap(handoff.authoredMap);
           if (handoff.selectedLayoutId) this.session.selectLayout(handoff.selectedLayoutId);
         }
@@ -105,9 +105,9 @@ export class MapEditorApp {
   }
 }
 
-function sameMaterializedMap(leftSession, rightSession) {
+function sessionsHaveSameMap(left, right) {
   try {
-    return JSON.stringify(leftSession.materialized()) === JSON.stringify(rightSession.materialized());
+    return materializedMapsEqual(left.materialized(), right.materialized());
   } catch {
     return false;
   }
