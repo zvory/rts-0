@@ -484,8 +484,21 @@ export class LabInteractDriver {
     return true;
   }
 
-  async recordStop(metadata = {}) {
-    return this.enqueue(() => this.finishRecording("explicit", metadata));
+  recordStop(metadata = {}) {
+    const recording = this.recording;
+    return this.enqueue(() => {
+      if (!recording) {
+        throw new LabInteractDriverError(
+          "recordingInactive",
+          "No recording is active for this session. Start one before stopping.",
+        );
+      }
+      // The watchdog and lifecycle cleanup intentionally finalize outside the
+      // driver queue. If either wins while this stop is queued, observe that
+      // recording's shared completion instead of failing or targeting a newer one.
+      if (this.recording !== recording) return recording.completion.promise;
+      return this.finishRecording("explicit", metadata);
+    });
   }
 
   recordWait() {

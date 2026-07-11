@@ -130,6 +130,16 @@ assert.deepEqual(await watchdogDriver.recordWait(), watchdogResult, "a completed
 assert.ok(fs.existsSync(watchdogDriver.recordingStatus().last.contactSheetPath), "watchdog finalization retains a completed contact sheet");
 fs.rmSync(path.dirname(watchdogDriver.recordingStatus().last.videoPath), { recursive: true, force: true });
 
+const queuedStopDriver = fixtureRecordingDriver(root, tools);
+await queuedStopDriver.recordStart({ sessionId: `lab_${"e".repeat(32)}`, name: "queued-stop", maxDurationMs: 25 });
+const blockingOperation = queuedStopDriver.enqueue(() => new Promise((resolve) => setTimeout(resolve, 80)));
+const queuedStop = queuedStopDriver.recordStop();
+await blockingOperation;
+const queuedStopResult = await withDeadline(queuedStop, 5_000);
+assert.equal(queuedStopResult.stoppedBy, "watchdog", "a queued stop observes watchdog finalization of the recording it targeted");
+assert.deepEqual(await queuedStopDriver.recordWait(), queuedStopResult, "queued stop and wait retain one completion result");
+fs.rmSync(path.dirname(queuedStopResult.videoPath), { recursive: true, force: true });
+
 const closeDriver = fixtureRecordingDriver(root, tools);
 await closeDriver.recordStart({ sessionId: `lab_${"c".repeat(32)}`, name: "close", maxDurationMs: 5_000 });
 await assert.rejects(
