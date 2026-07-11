@@ -5,7 +5,7 @@ PixiJS is loaded globally from CDN as `PIXI`.
 
 ```
 index.html        # PINNED — CDN + #app + module entry + screens markup
-map-editor.html   # standalone handcrafted-map editor; terrain/base symmetry plus JSON load/save
+map-editor.html   # standalone handcrafted-map editor; terrain/base symmetry plus JSON load/save; rejects symmetry clears that would leave no complete source-side spawn layout
 styles.css        # HUD, lobby, menus, command card
 assets/decals/    # SVG alpha-mask sources for client-only permanent ground decals
 src/
@@ -144,7 +144,7 @@ export class Net {
   claimBranchSeat(playerId)
   releaseBranchSeat(playerId)
   startBranch()
-  selectMap(map)
+  selectMap(map)                         // host map selection; capacity limits Add AI, spectator return, and the optional empty team target while preserving reassignment for same-team two-player lobbies
   get playerId()
   get bufferedAmount()
 }
@@ -875,7 +875,22 @@ export class ClientIntent {
 `Match` remains the app-shell composer and owner of cross-area dependency injection. It constructs
 `GameState` for authoritative snapshot display data and constructs `ClientIntent` for browser-local
 cursor/command intent, then injects the intent facade into HUD, input, minimap, and renderer
-feedback. Runtime modules should not gain direct imports across the model, input, UI, minimap,
+feedback. Map-editor symmetry repair rolls back partial site relocation when no complete spawn slot
+can be preserved and tries alternate split slots before rejecting symmetry selection. The app shell owns DOM-presentation resize handling. Renderer teardown destroys renderer-owned
+adjusted canvas textures and clears its texture maps without destroying raw Pixi asset-cache
+textures; raster loads completing after teardown are not cached or displayed. Artillery landing audio is scheduled from the authoritative impact delay,
+and match teardown cancels pending landing timers. Mobile camera pan and pinch gestures track only touch identifiers whose touches begin on
+the viewport; HUD and off-viewport touches do not join those gestures. Minimap gestures use native
+Pointer Events with capture; touch and pen activate targets only on clean taps so inspection does
+not issue accidental commands, while desktop right-click and queued-order behavior is preserved.
+Camera instances own a
+per-session maximum zoom with fallback handling for invalid options. Lab live and replay sessions
+use an 8x maximum zoom, while non-Lab sessions retain the 2x cap; Lab initial-camera views are
+restored under that limit during normal match initialization. Room-time controls de-duplicate matching touch and pen activation while preserving unrelated click
+sources, retain server-confirmed state while requests are pending, and confirm time movement against
+the authoritative baseline and controller identity. Blocked, failed, or unconfirmed sends are
+exposed instead of applying optimistic selection. Read-only Lab viewers keep these
+controls inactive with an authorization-specific status. Coarse-pointer layouts arrange existing mobile debug chrome around safe areas, keep low-priority detail scrollable, and keep controls reachable; room-time panel placement uses the same coarse-pointer gate. Desktop layout is unchanged, and no touch world-command behavior is added. Runtime modules should not gain direct imports across the model, input, UI, minimap,
 renderer, and prediction areas except for pinned mirrors such as `protocol.js` and `config.js`, or
 for explicitly documented architecture-check exceptions.
 
@@ -883,9 +898,25 @@ for explicitly documented architecture-check exceptions.
 control groups, relationship helpers, fog-facing visibility data, and display overlays derived from
 authoritative snapshots. `ClientIntent` owns placement intent, command-card submenu state,
 command-target arming, hover previews, command feedback, ability previews, and the short-lived local
-planned-order stages used only for previews while the server echo is pending. Contextual oil
+planned-order stages used only for previews while the server echo is pending. Smoke Plus world and
+minimap targeting feedback uses the mirrored cloud radius and duration effect fields. An unqueued local order
+replaces the stale authoritative plan when composing subsequent queued previews, and asynchronous
+Lab command results are not recorded as durable local plans. Contextual oil
 right-clicks compose a Pump Jack build intent on the clicked oil patch rather than a gather
-command. `GameState` must not grow compatibility accessors for those intent fields; HUD, input,
+command. Advisory building placement ignores unit types whose client configuration marks them as
+non-ground placement blockers. The Scout Plane stays out of the shared ground vehicle-body
+classifier, so its body does not block build previews. Normal gameplay selection and control-group
+commands exclude it, while Lab and spectator inspection paths allow selecting and grouping it. Its generated Fw 189-style top-down PNG frame-strip rig is scaled to the mirrored aircraft body so
+the art, hit testing, and selection ring remain aligned. It uses the existing team-light tint
+pipeline with a darker, desaturated color target and has a render-preview visual profile for lab
+comparison. Normal contextual right-click hover
+refreshes `ClientIntent.attackTargetPreview` from the same rules used to compose orders. Visible
+Scout Planes are not classified as attackable client targets, so contextual right-click and explicit
+attack targeting route through valid move or attack-move commands instead of target attacks. Scout
+Plane command cards expose only retarget and dismiss, including the hidden dismiss ability; mixed
+selections keep land-unit commands scoped to land units. Renderer feedback draws a red ring around an enemy when the
+selected units would attack it; gather, build, deconstruct, and targeted-command modes suppress the
+preview. `GameState` must not grow compatibility accessors for those intent fields; HUD, input,
 minimap, and renderer feedback use the injected facade or a narrow read model. Lab Unit Spawn and
 Building Spawn panels expose the target player's color through DOM data/style hooks before map
 placement. In Lab, visual and audio
@@ -903,8 +934,10 @@ queries only for direct module tests or event handlers outside the frame. Static
 no remaining resources are omitted from frame-local entity views and minimap blips. Minimap
 artillery firing indicators render as 30x24 SVG rig images without an extra surrounding ring.
 Selected worker units do not draw weapon range indicators, even when their frame-local view exposes
-weapon range metadata. Frame-local entity views may carry bounded render diagnostics for local
-profiling consumers without changing the authoritative snapshot model. Visible unit death events are normalized by `GameState`
+weapon range metadata. Entrenched units render as smaller, trench-tinted rig instances without a
+separate occupied-infantry trench ring in the selection layer. Trench ground decals render at half
+the authoritative trench radius; snapshot data and the gameplay radius remain unchanged. Frame-local entity views may carry
+bounded render diagnostics for local profiling consumers without changing the authoritative snapshot model. Visible unit death events are normalized by `GameState`
 into deduped, browser-local pending ground decal stamps and rendered below resources and fog as
 visual-only decals. Death decals use SVG-authored mask assets from the client asset path when they
 load, queue stamps while the atlas is loading, and fall back to procedural masks when SVG loading is
@@ -1253,8 +1286,10 @@ abilities. When the HUD command card calls `ClientIntent.beginCommandTarget({ ki
 the input module enters targeted cursor mode:
 - Pointer moves call `_refreshAbilityTargetPreview`: compute which selected units are eligible
   carriers (`ABILITIES[ability].carriers`), test whether any carrier is within range of the cursor
-  or can lock the raw cursor into the Artillery range band from the authoritative or locally planned
-  origin, update `ClientIntent.abilityTargetPreview` for renderer feedback.
+  or can lock the raw cursor into the Artillery range band from the authoritative origin or the
+  origin projected from queued movement and setup stages, update `ClientIntent.abilityTargetPreview`
+  for renderer feedback. The Smoke preview radius uses the active command owner's completed
+  upgrades, including during Lab control, so Smoke Plus previews the server-created 4-tile cloud.
 - Left-click: build a `useAbility` command with the ability name, filtered carrier ids, world
   coords, and the `queued` flag (from Shift). Artillery Point Fire and Blanket Fire still send the
   raw clicked world coords; the server owns effective target locking. The local feedback marker uses
@@ -1375,11 +1410,18 @@ selection rings):
   the next snapshot.
 
 ### 4.2 Rendering & look (PixiJS, SVG rigs — neutral PS1 field-command style)
+- Minimap player-owned unit and building blips render at 1.6× their original size above resource blips, with a merged one-pixel white outline mask for clustered-icon readability; resource blips retain their original size. Legacy vision-only intel remains scaled but renders below the fog overlay and does not use the foreground outline/resource-overlap pass.
 - Layers (back→front): terrain → ground decals → trench terrain → local visual samples → resource nodes → building shadows → buildings →
   building overlays → unit shadows → occupied-trench shadows → occupied-trench lips → units → smoke/ability ground effects → selection rings →
   health bars → fog overlay → local visual-sample labels → shot-revealed units → observer map-analysis diagnostics → command/hover feedback and miss toasts → placement ghost →
-  selection drag-box → (HUD is DOM, not Pixi). Selected unit range rings, minimum-range rings, and
-  support-weapon field-of-fire overlays use higher-opacity rendering for readability.
+  selection drag-box → (HUD is DOM, not Pixi). Occupied-trench shadows and lips render only when the
+  snapshot's `occupiedTrenchId` matches authoritative trench terrain; orphaned ids do not synthesize
+  client-only trench geometry. The below-unit occupied-trench berm cue uses stroked irregular
+  outlines, while the foreground lip uses a filled front-half arc so the berm does not cover unit
+  bodies. Miss toasts use reduced text and stroke sizing, a smaller horizontal offset, and less
+  upward drift so they remain closer to the receiving unit. Selected unit range rings,
+  minimum-range rings, and support-weapon field-of-fire overlays use higher-opacity rendering for
+  readability.
 - Spatial combat audio keeps full volume for nearby emitters, uses stronger attenuation after the
   listener reference distance for distant emitters, and keeps the same hard drop distance.
   Panzerfaust launch and impact events use dedicated low-gain spatial cues with coarse cooldown
@@ -1387,14 +1429,36 @@ selection rings):
   events stay silent so the weapon does not reuse Tank/Rifleman/artillery sounds or spam clustered
   fights.
   Tank coax `weaponKind` feedback uses machine-gun burst audio instead of Tank cannon audio, and it
-  does not register as a sustained Machine Gunner loop.
+  does not register as a sustained Machine Gunner loop. Tank coax tracers use a bright machine-gun
+  line with a hot core, smaller muzzle flash, and tail styling. The coax barrel is a short separated
+  stub. Artillery `weaponKind` feedback uses the artillery firing sound instead of the generic rifle
+  fallback, and the optional weapon hint is forwarded to recoil timing. Authored main-cannon and
+  coax muzzle anchors use sampled rig-part transforms so feedback origins follow the visible barrel
+  tip during recoil scale and kick.
 - Buildings: SVG-authored rig definitions are compiled at Renderer startup and rendered on the
   buildings layer; shadows remain imperative draws, production progress bars, queue labels, and
   icons remain imperative draws on the building overlays layer, and construction/deconstruction
   status uses the shared HP bar layer.
-- Units: SVG-authored rig parts rendered into Pixi containers, with low-detail hard-edged
-  silhouettes tinted by player color, a dark drop shadow, dark outline, HP bar above when
-  damaged/selected, and glowing selection ring when selected. When the in-match Game settings
+- Units: SVG-authored rig parts rendered into Pixi containers, with fully covered routes optionally
+  rendered from a PNG atlas. Rifleman and Machine Gunner PNG movement frames advance only when
+  their snapshot/render position changes; stationary units hold idle art while firing recoil frames
+  remain active. The Anti-Tank Gun uses a composed white-base PNG atlas for its
+  carriage, barrel assembly, and deployed trail legs while retaining the SVG rig as its animation
+  anchor source. It uses toned-down team tinting, with most firing recoil on the barrel assembly
+  and only subtle kick on the frame and legs. Adjusted frame-strip color texture loading falls back to the raw Pixi
+  asset path when image, canvas, pixel-read, or texture creation fails. When browser image
+  dimensions are unavailable, full strip dimensions come from frame metadata. Deployed Machine Gunners use `firingFrames` during active recoil, with the visual-effect buffer's linear recoil phase advancing the clip through rest, recoil, and reset frames. Setup and deployed frame-strip poses take priority over movement frames
+  while support weapons are deployed or tearing down. When a setup/deployed Machine Gunner snapshot
+  lacks `weaponFacing`, the frame-strip setup forward-angle offset is applied to the unit body facing. When an enabled atlas is rendering, routes omitted from a partial PNG
+  atlas continue through the SVG runtime; otherwise the normal SVG route remains intact. If visual
+  override registry or selector resolution throws, the renderer records diagnostics, publishes
+  local visual-profile errors, and renders the normal unit art for that frame. SVG fallback entries
+  are removed when an entity id no longer needs them. Both runtimes share one
+  sampled render context per entity draw so renderer-local motion state advances once. Units use low-detail hard-edged silhouettes tinted by player color, a dark
+  drop shadow, dark outline, HP bar above when damaged/selected, and glowing selection ring when
+  entrenched units retain their player-color tint while scaling down. Occupied trenches add shadow
+  and lip overlays around live units; empty trenches retain only the base decal.
+  selected. When the in-match Game settings
   tab enables unit ranges, selected ordinary units draw dotted firing-range circles, deployed
   Anti-Tank Guns and artillery draw field-of-fire wedges, and their packed states do not draw
   field-of-fire overlays. In Lab scenario authoring, deployed Anti-Tank Gun and artillery
@@ -1402,8 +1466,8 @@ selection rings):
   range overlay is off.
   Distinct silhouette per kind (engineer: compact block; rifleman: enabled PNG frame-strip
   experiment with frame 0 idle, frames 1-4 moving, and frame 5 standing recoil; machine gunner: enabled PNG frame-strip
-  experiment with carried movement frames and setup/deployed frames; Panzerfaust: shared SVG
-  infantry body with a launcher tube whose warhead is hidden while reloading; Anti-Tank Gun: wheeled gun; mortar team: crewless
+  experiment with carried movement frames and setup/deployed frames; Panzerfaust: distinct loaded infantry
+  rig; Anti-Tank Gun: wheeled gun; mortar team: crewless
   M1938-inspired small wheeled mortar that travels low and deploys upright; scout car: boxy
   WW2-style truck silhouette with enclosed wheels and a rear-top machine gun; tank: chunky
   flat-shaded armor with movement-facing tracks, hull, nose, and shadow plus weapon-facing turret,
@@ -1506,7 +1570,8 @@ Current areas:
 - `app-shell`: `main.js`, `app.js`, `match.js`, `match_combat_audio.js`,
   `match_net_reporter.js`, `match_observer_diagnostics.js`, `match_settings_context.js`, `match_settings_toggles.js`, `client_perf_report.js`, `match_health.js`,
   `frame_profiler.js`, `frame_recovery.js`, `frame_entity_views.js`, `live_pause_overlay.js`,
-  `ai_diagnostics_panel.js`, `observer_analysis_overlay.js`, `observer_analysis_signatures.js`, `replay_controls.js`,
+  `ai_diagnostics_panel.js`, `observer_analysis_overlay.js`, `observer_analysis_ai.js`,
+  `observer_analysis_rows.js`, `observer_analysis_signatures.js`, `replay_controls.js`,
   `room_time_panel.js`, `replay_viewer.js`, `lab_control_policy.js`, `room_capabilities.js`,
   `visual_profiles.js`. App's browser leave confirmation is scoped to active running live-player matches; spectator, Lab, replay, and resolved/stopped sessions leave without the prompt.
 - `model`: `state.js`, `state_queries.js`, `state_visual_effects.js`, `client_intent.js`,
@@ -1517,7 +1582,7 @@ Current areas:
   `config/rules_mirror.js`, and `config/factions.js`.
 - `ui`: HUD, command card descriptors/selection panels, hotkey profiles/editor, lobby
   controller/browser/roster views, match history, minimap, resource icons, scoreboard, status badge, branch
-  staging, lab panel, lab setup authoring/submission helpers, settings. Command-card tooltips render optional unit descriptions when descriptor metadata provides them. Lab research controls render direct per-upgrade toggle buttons for the selected Lab target player; completed upgrades render as pressed buttons with a check-mark background. The Lab panel window toggle button shows Collapse when expanded and Expand when collapsed. The settings panel uses the in-match header action slot for Give Up
+  staging, lab panel, lab setup authoring/submission helpers, settings. Command-card tooltips render optional unit descriptions when descriptor metadata provides them. Command discovery includes the completed-Medium-Guns command-card context so the direct-hotkey and settings catalogs include Heavy Guns after it replaces Medium Guns in the Q slot. Wait-until-ready ability descriptors remain available for queue-admissible carriers, including Mortar Fire while it is cooling down. Lab research controls render direct per-upgrade toggle buttons for the selected Lab target player; completed upgrades render as pressed buttons with a check-mark background. The Lab panel window toggle button shows Collapse when expanded and Expand when collapsed. Lab and room-time panel collapse controls activate immediately on touch release, suppress the follow-up synthesized click, cancel pending activation when the pointer leaves or cancels, and reset activation state on teardown or re-render. On narrow viewports, the default Lab Options and Tools headers sit below the expanded room-time controls, and their collapse buttons remain touch-friendly. Mobile restore ignores saved desktop coordinates for both Lab windows and room-time controls while preserving saved collapsed state. The settings panel uses the in-match header action slot for Give Up
   in live matches and Back to Lobby in Lab/replay sessions. After a finished match, App resets the
   Lobby controller to the root browser before showing the lobby screen again. Lobby AI creation is
   exposed from the roster's team context, not as a duplicate global sidebar action. The in-match

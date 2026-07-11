@@ -15,8 +15,8 @@ There are exactly two supported AI profile IDs:
 - ai_2_1 — AI 2.1, the default pressure profile.
 - ai_turtle — AI Turtle, the defensive choke-holding profile.
 
-Those IDs are the stored lobby identity, controller identity, diagnostic identity, self-play
-identity, and arena artifact identity. There is no separate suite or concrete-profile layer.
+Those IDs are concrete match profile IDs used by controllers and diagnostics. Live AI selection
+also accepts suite request IDs, such as ai_2_0, which resolve to concrete profiles for a match.
 The convenience inputs ai and default resolve to ai_2_1. The lobby exposes both canonical
 profiles; unsupported profile IDs are ignored when changing a seat and fall back to AI 2.1 when
 adding a seat.
@@ -50,11 +50,22 @@ commands through the shared action helpers. A local per-think budget prevents re
 overcommitment.
 
 The core also owns static map analysis derived only from StartPayload map terrain, start tiles, and
-static resource nodes. AiStaticMapContextCache keys that analysis by stable terrain, start, and
-resource identity, so a Lab map edit naturally causes the next think to rebuild passability,
-clearance, regions, chokepoints, starts, and resource analysis. The published observer layers show
-generated choke lines, base markers, resource-cluster markers, and labels; the raw tile evidence
-and regions remain internal.
+static resource nodes. When nearby steel is split into fields around the City Centre, defensive
+staging and Rifleman raid readiness use the field on the map-center side, falling back to the full
+steel cluster for degenerate layouts. Start and resource-cluster mappings prefer candidates in the same reachable
+terrain component when component identity is known, with distance as the fallback for unknown
+components. AiStaticMapContextCache keys that analysis by stable terrain, start, and resource
+identity, so a Lab map edit naturally causes the next think to rebuild passability, clearance,
+regions, chokepoints, starts, and resource analysis. Gameplay-choke detection uses local minimum vertex cuts between high-clearance basins for broad
+middle passages and split-validated linear cuts across bounded passable runs for base mouths.
+Ranked graph-cut candidates are scanned until the target count is filled, skipping candidates that
+cannot be mapped. Region pairs come from region-bearing passable sides of the local split, with
+basin metadata as a fallback only for basin-backed candidates. Default and Low Econ each expose
+twelve gameplay chokes. The published observer layers show
+generated choke lines, base markers, resource-cluster markers, and labels; regions remain internal.
+The offline ai-map-analysis-debug tool loads bundled maps through the simulation map loader, runs
+the same static analysis, and renders the observer layers over terrain as SVG. Its choke overlay
+renders the exact detected choke tiles rather than choke bounding rectangles.
 
 The economy model is also observation-owned. A resource node is mineable only when it has
 resources remaining, is in range of a completed owned City Centre, is unoccupied by a latched
@@ -64,10 +75,16 @@ planning can still see known-but-not-yet-mineable resources without assigning wo
 
 Decision traces record the selected profile ID, tick, budget and reservation deltas, strategic
 goals for economy, supply, expansion, tech, production, local defense, and frontal attack, plus
-bounded command and blocker labels. These traces and map-analysis layers are spectator-only
-diagnostics.
+bounded command and blocker labels. Each live AI controller exposes its latest decision trace to
+spectators, with the reliable-channel snapshot bounded at the AI adapter boundary. These traces
+and map-analysis layers are spectator-only diagnostics.
 
 ### Profile behavior
+
+AI 2.0 resolves only to the `ai_2_0_tank_pressure` profile. The retired
+`ai_2_0_rifle_tank` profile is not registered or accepted as an exact selectable profile. Defensive
+panic does not override an already-active tech transition, so tank pressure continues its Factory
+path during pressure.
 
 AI 2.1 is the promoted pressure profile. It fully saturates steel, adds up to twelve oil workers,
 keeps an eight-supply buffer, opens one Barracks, expands to two City Centres, and reserves four
@@ -77,13 +94,18 @@ adds a second Factory. Frontal waves stage in cohorts so newly produced units do
 join an already-launched wave.
 
 AI Turtle shares AI 2.1 worker, oil, supply, and first-Barracks cadence, but uses a two-Rifleman
-opening and does not launch frontal waves. It prioritizes a Training Centre, an early second City
+opening and does not launch frontal waves. During its opening oil hold, it does not train workers
+toward suppressed oil assignments. It prioritizes a Training Centre, an early second City
 Centre, Entrenchment, support technology, Machine Gunners, and Anti-Tank Guns. It identifies up
-to three own-base chokepoints from the static map analysis, staffs the active enemy-facing lines
-with Machine Gunners, and places Anti-Tank Guns on an own-side backline. The profile prioritizes
+to three own-base chokepoints from the static map analysis, caps Machine Gunner production by
+planned choke-line staffing, staffs the active enemy-facing lines with Machine Gunners, and places
+Anti-Tank Guns on an own-side backline. Its staged intents include the two-Rifleman opening. The profile prioritizes
 the main choke first, can defend a second close-spawn choke, and reinforces under-staffed lines.
+Staged defenders emit HoldPosition once after reaching their defensive slot rather than repeating
+the command on every think.
 
-Both profiles are self-contained policy records in the same registry. Neither inherits behavior
+Both profiles are self-contained policy records in the same registry. Each profile selects whether
+to use the proposal economy manager; AI 2.1 and AI Turtle enable it. Neither inherits behavior
 from a retired version or resolves through a second profile name.
 
 ### Self-play and arena tools
@@ -111,7 +133,8 @@ decision traces are diagnostic output only.
 
 ### Live match horizon and elimination
 
-A normal room with at least two AI seats and no active humans is an AI observation session. It
+A normal room with at least two AI seats and no active humans is an AI observation session. Rooms
+with one or zero active humans skip the pre-match countdown and start immediately. The session
 remains interactive for spectators and follows the normal replay flow, but resolves no later than
 tick 25,000. A primary-base elimination on that tick takes precedence; otherwise the result is a
 draw.

@@ -12,8 +12,10 @@ Default attack range, damage, cooldown, weapon class, and weapon-policy metadata
 `server/crates/rules/src/combat.rs` weapon profiles; current profile values mirror the defs records
 so legacy `attack_profile(kind)` and `weapon_class(kind)` callers remain behavior-compatible.
 Direct-fire damage, miss policy, tank-facing modifiers, and over-penetration policy consume the
-selected weapon profile instead of inferring those behaviors only from the firing entity kind. Tanks
-also have a live secondary `tank_coax` profile owned by combat rules: 6-tile range, 4 small-arms
+selected weapon profile instead of inferring those behaviors only from the firing entity kind.
+Panzerfaust has no default weapon profile or repeat-fire attack, but its loaded tank-only shot remains
+an anti-armor, armor-piercing threat that deals the full 60 damage without tank-facing modifiers.
+Tanks also have a live secondary `tank_coax` profile owned by combat rules: 6-tile range, 4 small-arms
 damage, 6-tick cooldown, no Tank armor-facing multiplier, and direct-fire overpenetration.
 `client/src/config.js` is the stable public facade for the subset the UI/render/fog needs (costs,
 supply, sight, sizes, colors, and command-card descriptors). Its internal
@@ -63,7 +65,7 @@ cards while preserving the historical public import path. Rust-owned mirrored va
 `client/src/config/factions.js`; they include gameplay-visible costs, supply, sight, footprints,
 body dimensions, client-visible timing/range/duration constants, faction legality, upgrade
 metadata, ability descriptors exported by the Rust faction catalog, ability effect fields exported
-in the rules dump, and resource starting amounts. Client-owned values live in
+in the rules dump—including Smoke Plus cloud radius and duration—and resource starting amounts. Client-owned values live in
 `client/src/config/presentation.js` and include render colors, camera defaults, fog overlay alpha,
 command-card layout hints, local presentation labels/icons that are not exported by Rust, and
 resource render labels/sizes.
@@ -165,7 +167,8 @@ or regime-specific iconography.
 
 MVP scope:
 - No combat air forces. `scout_plane` is non-combat reconnaissance launched by the Command Car
-  Scout Plane ability after its fog, UI, and rendering contracts are in place.
+  Scout Plane ability. It consumes player oil through a hidden fuel reserve, refills that reserve
+  rapidly when oil is available, and is dismissed manually or automatically when fuel is exhausted.
 - Late-game Artillery is implemented as the Superior Firepower capstone; Mortar Teams remain the
   early delayed-area fire tool.
 - No mines, morale, logistics, suppression-depth model, or detailed tank armor model yet. Tanks
@@ -231,7 +234,7 @@ weapon range while moving. After a tank has spent three seconds (90 ticks) witho
 translation or hull rotation, its range has linearly expanded to 14 tiles; any later path-driven
 movement or hull rotation resets it to the base range. Riflemen upgraded with Methamphetamines gain
 permanent moving fire, keep advancing while firing with normal accuracy, and move at tank speed.
-Panzerfausts upgraded with Methamphetamines also move at tank speed. Machine Gunners upgraded with
+Panzerfausts upgraded with Methamphetamines also move at tank speed and receive the Panzerfaust windup/recovery boost. Machine Gunners upgraded with
 Methamphetamines move at unupgraded Rifleman speed and use half-length setup/teardown timers; other
 mobile combat units still hold position once a target is in weapon range. Scout cars also fire while
 moving using an independent rear machine-gun facing. They are unarmored light vehicles and do not
