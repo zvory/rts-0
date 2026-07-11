@@ -515,7 +515,13 @@ export function moveSymmetricDraftBase(draft, {
   if (plans.length === 0) return { ok: true, count: 0 };
 
   const plannedSiteIds = new Set(plans.map(({ binding }) => binding.site.id));
+  const plannedTargets = new Set();
   for (const plan of plans) {
+    const targetKey = `${plan.target.x},${plan.target.y}`;
+    if (plannedTargets.has(targetKey)) {
+      return draftEditError("That symmetric move would place multiple bases on the same tile.");
+    }
+    plannedTargets.add(targetKey);
     const occupied = siteAt(draft, plan.target.x, plan.target.y);
     if (occupied && !plannedSiteIds.has(occupied.id)) {
       return draftEditError("A start or natural base already uses that tile.");
