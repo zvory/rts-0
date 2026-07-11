@@ -988,6 +988,284 @@ function polygonAxisValues(points, offset) {
 }
 
 {
+  const restorePixi = installFakePixi();
+  const parent = {
+    clientWidth: 640,
+    clientHeight: 480,
+    appendChild(view) { view.parentNode = this; },
+    removeChild(view) { view.parentNode = null; },
+  };
+  try {
+    const renderer = new Renderer(parent);
+    renderer._map = { width: 4, height: 4, tileSize: 32, terrain: new Array(16).fill(0) };
+    const diagnostics = [];
+    renderer._profiler = {
+      recordDiagnosticCounter(label, amount = 1) { diagnostics.push([label, amount]); },
+    };
+
+    const resource = { id: 601, kind: KIND.OIL, x: 48, y: 48, remaining: 1000 };
+    renderer._miningNodes = new Set();
+    renderer._drawResource(resource, { isVisible: () => false });
+    const resourceGfx = renderer._pools.resources.get(resource.id);
+    const resourceCalls = resourceGfx.calls.length;
+    const resourceChildren = renderer.layers.resources.children.length;
+    diagnostics.length = 0;
+
+    resource.x = 80;
+    renderer._drawResource(resource, { isVisible: () => true });
+    assert(resourceGfx.calls.length === resourceCalls, "unchanged resource geometry is not cleared or redrawn");
+    assert(resourceGfx.x === 80 && resourceGfx.alpha === 1, "cached resource position and fog alpha remain live");
+    assert(renderer.layers.resources.children.length === resourceChildren, "cached resource render creates no display-object churn");
+    assert(
+      !diagnostics.some(([label]) => label === "renderer.graphics.clear.resources" || label === "renderer.pixi.displayObject.created.resources"),
+      "cached resource render records neither a clear nor object creation",
+    );
+
+    resource.remaining = 500;
+    renderer._drawResource(resource, { isVisible: () => true });
+    assert(resourceGfx.calls.length > resourceCalls, "resource remaining amount invalidates cached geometry");
+    const afterRemaining = resourceGfx.calls.length;
+    renderer._miningNodes.add(resource.id);
+    renderer._drawResource(resource, { isVisible: () => true });
+    assert(resourceGfx.calls.length > afterRemaining, "resource mining marker invalidates cached geometry");
+
+    const retryResource = { id: 603, kind: KIND.OIL, x: 112, y: 48, remaining: 800 };
+    renderer._drawResource(retryResource, { isVisible: () => true });
+    const retryGfx = renderer._pools.resources.get(retryResource.id);
+    const warmResourceKey = retryGfx.rtsStaticRenderKey;
+    const warmResourceCalls = retryGfx.calls.length;
+    retryResource.remaining = 400;
+    const retryDrawRect = retryGfx.drawRect.bind(retryGfx);
+    let throwResourceOnce = true;
+    retryGfx.drawRect = (...args) => {
+      if (throwResourceOnce) {
+        throwResourceOnce = false;
+        throw new Error("transient resource draw failure");
+      }
+      return retryDrawRect(...args);
+    };
+    const priorConsoleError = console.error;
+    console.error = () => {};
+    try {
+      const changedDraw = renderer._drawEntitySafely("resource", retryResource, "resources", () => {
+        renderer._drawResource(retryResource, { isVisible: () => true });
+      });
+      assert(changedDraw === false, "resource safe draw catches a transient warm-cache redraw failure");
+    } finally {
+      console.error = priorConsoleError;
+    }
+    assert(
+      retryGfx.rtsStaticRenderKey === undefined,
+      "failed warm-cache redraw discards the old resource key before fallback geometry",
+    );
+    const fallbackCalls = retryGfx.calls.length;
+    const retryDraw = renderer._drawEntitySafely("resource", retryResource, "resources", () => {
+      renderer._drawResource(retryResource, { isVisible: () => true });
+    });
+    assert(retryDraw === true, "resource geometry retries successfully on the next frame");
+    assert(
+      retryGfx.rtsStaticRenderKey !== undefined && retryGfx.calls.length > fallbackCalls,
+      "successful resource retry replaces fallback geometry and commits its key",
+    );
+    const successfulRetryCalls = retryGfx.calls.length;
+    renderer._drawResource(retryResource, { isVisible: () => true });
+    assert(retryGfx.calls.length === successfulRetryCalls, "successful resource retry restores the normal cache fast path");
+    retryResource.remaining = 800;
+    renderer._drawResource(retryResource, { isVisible: () => true });
+    assert(
+      retryGfx.rtsStaticRenderKey === warmResourceKey
+        && retryGfx.calls.length > successfulRetryCalls
+        && successfulRetryCalls > warmResourceCalls,
+      "resource state reversion redraws and recommits the original warm-cache key",
+    );
+
+    const building = {
+      id: 602,
+      owner: 2,
+      kind: KIND.TANK_TRAP,
+      x: 160,
+      y: 160,
+      hp: 120,
+      maxHp: 120,
+      state: "idle",
+      prodProgress: 0.25,
+      prodQueue: 0,
+    };
+    const buildingState = { playerId: 99, players: [{ id: 2, color: "#c85050" }], spectator: true };
+    renderer._drawBuilding(building, new Map([[2, 0xc85050]]), buildingState);
+    const buildingGfx = renderer._pools.buildings.get(building.id);
+    const shadowGfx = renderer._pools.buildingShadows.get(building.id);
+    const overlayGfx = renderer._pools.buildingOverlays.get(building.id);
+    const buildingCalls = buildingGfx.calls.length;
+    const shadowCalls = shadowGfx.calls.length;
+    const overlayCalls = overlayGfx.calls.length;
+    const buildingChildren = renderer.layers.buildings.children.length;
+    diagnostics.length = 0;
+
+    renderer._drawBuilding(building, new Map([[2, 0xc85050]]), buildingState);
+    assert(buildingGfx.calls.length === buildingCalls, "unchanged building body is not cleared or redrawn");
+    assert(shadowGfx.calls.length === shadowCalls, "unchanged building shadow is not cleared or redrawn");
+    assert(overlayGfx.calls.length === overlayCalls, "unchanged building progress is not cleared or redrawn");
+    assert(renderer.layers.buildings.children.length === buildingChildren, "cached building render creates no display-object churn");
+    assert(
+      !diagnostics.some(([label]) => label.startsWith("renderer.graphics.clear.building") || label.startsWith("renderer.pixi.displayObject.created.building")),
+      "cached building render records neither target clears nor object creation",
+    );
+
+    building.x += 32;
+    building.prodProgress = 0.5;
+    renderer._drawBuilding(building, new Map([[2, 0xc85050]]), buildingState);
+    assert(buildingGfx.calls.length > buildingCalls, "building position invalidates absolute body geometry");
+    assert(shadowGfx.calls.length > shadowCalls, "building position invalidates shadow geometry");
+    assert(overlayGfx.calls.length > overlayCalls, "building progress invalidates progress geometry");
+
+    const rigBuilding = {
+      id: 604,
+      owner: 2,
+      kind: KIND.BARRACKS,
+      x: 256,
+      y: 160,
+      hp: 400,
+      maxHp: 400,
+      state: "idle",
+      prodQueue: 0,
+    };
+    renderer._drawBuilding(rigBuilding, new Map([[2, 0xc85050]]), buildingState);
+    const rigWrapper = renderer._pools.buildings.get(rigBuilding.id);
+    assert(rigWrapper.rtsStaticRenderKey !== undefined, "building rig starts from a warm static wrapper cache");
+    const rigInstance = renderer._liveRigPools.buildingRigs.get(rigBuilding.id);
+    const rigUpdate = rigInstance.update.bind(rigInstance);
+    rigInstance.update = () => { throw new Error("transient building rig failure"); };
+    const priorRigConsoleError = console.error;
+    console.error = () => {};
+    try {
+      const failedRigDraw = renderer._drawEntitySafely("building", rigBuilding, "buildings", () => {
+        renderer._drawBuilding(rigBuilding, new Map([[2, 0xc85050]]), buildingState);
+      });
+      assert(failedRigDraw === false, "building safe draw catches a cached rig failure");
+    } finally {
+      console.error = priorRigConsoleError;
+      rigInstance.update = rigUpdate;
+    }
+    assert(
+      rigWrapper.rtsStaticRenderKey === undefined,
+      "building fallback invalidates an existing static wrapper key",
+    );
+    const rigRetry = renderer._drawEntitySafely("building", rigBuilding, "buildings", () => {
+      renderer._drawBuilding(rigBuilding, new Map([[2, 0xc85050]]), buildingState);
+    });
+    assert(
+      rigRetry === true && rigWrapper.rtsStaticRenderKey !== undefined,
+      "building rig retry clears fallback geometry and recommits its static wrapper key",
+    );
+
+    const visible = [1, 0, 0, 0];
+    const explored = [1, 1, 0, 0];
+    const fog = {
+      width: 2,
+      height: 2,
+      revision: 1,
+      visibleRevision: 1,
+      exploredRevision: 1,
+      revealAll: false,
+      isVisible: (tx, ty) => visible[ty * 2 + tx] === 1,
+      isExplored: (tx, ty) => explored[ty * 2 + tx] === 1,
+    };
+    renderer._drawFog(fog);
+    const fogCalls = renderer._fogGfx.calls.length;
+    diagnostics.length = 0;
+    renderer._drawFog(fog);
+    assert(renderer._fogGfx.calls.length === fogCalls, "unchanged fog revision does not clear or retessellate geometry");
+    assert(
+      !diagnostics.some(([label]) => label === "renderer.graphics.clear.fog"),
+      "unchanged fog revision records no Graphics clear",
+    );
+    visible[1] = 1;
+    fog.revision += 1;
+    fog.visibleRevision += 1;
+    renderer._drawFog(fog);
+    assert(renderer._fogGfx.calls.length > fogCalls, "fog visibility revision invalidates cached geometry");
+
+    const replacementFog = {
+      ...fog,
+      isVisible: () => false,
+      isExplored: () => false,
+    };
+    const preReplacementFogCalls = renderer._fogGfx.calls.length;
+    renderer._drawFog(replacementFog);
+    assert(
+      renderer._fogGfx.calls.length > preReplacementFogCalls,
+      "replacing the fog model invalidates geometry even when its revision is unchanged",
+    );
+    renderer._drawFog(fog);
+    delete fog.revision;
+    const fallbackFogCalls = renderer._fogGfx.calls.length;
+    renderer._drawFog(fog);
+    const firstFallbackFogCalls = renderer._fogGfx.calls.length;
+    renderer._drawFog(fog);
+    assert(
+      renderer._fogGfx.calls.length === firstFallbackFogCalls && firstFallbackFogCalls > fallbackFogCalls,
+      "revisionless fog uses a stable content key",
+    );
+    explored[3] = 1;
+    renderer._drawFog(fog);
+    assert(renderer._fogGfx.calls.length > firstFallbackFogCalls, "revisionless fog content changes invalidate geometry");
+
+    const retryFog = {
+      ...fog,
+      revision: 99,
+      visibleRevision: 99,
+      exploredRevision: 99,
+    };
+    const priorFogKey = renderer._fogRenderKey;
+    const priorFog = renderer._fogRenderFog;
+    const priorFogMap = renderer._fogRenderMap;
+    const retryFogDrawRect = renderer._fogGfx.drawRect.bind(renderer._fogGfx);
+    let throwFogOnce = true;
+    renderer._fogGfx.drawRect = (...args) => {
+      if (throwFogOnce) {
+        throwFogOnce = false;
+        throw new Error("transient fog draw failure");
+      }
+      return retryFogDrawRect(...args);
+    };
+    let fogFailed = false;
+    try {
+      renderer._drawFog(retryFog);
+    } catch {
+      fogFailed = true;
+    }
+    assert(fogFailed, "fog test exercises a transient tessellation failure");
+    assert(
+      renderer._fogRenderFog === priorFog
+        && renderer._fogRenderKey === priorFogKey
+        && renderer._fogRenderMap === priorFogMap,
+      "failed fog tessellation does not commit its fog, map, or render key",
+    );
+    const failedFogCalls = renderer._fogGfx.calls.length;
+    renderer._drawFog(retryFog);
+    assert(
+      renderer._fogRenderKey !== priorFogKey && renderer._fogGfx.calls.length > failedFogCalls,
+      "fog tessellation retries and commits only after success",
+    );
+    const successfulFogRetryCalls = renderer._fogGfx.calls.length;
+    renderer._drawFog(retryFog);
+    assert(renderer._fogGfx.calls.length === successfulFogRetryCalls, "successful fog retry restores the cache fast path");
+
+    renderer._seen.resources.clear();
+    for (let frame = 0; frame < 120; frame += 1) renderer._sweep();
+    assert(!renderer._pools.resources.has(resource.id), "resource cache state is evicted with its Graphics slot");
+    renderer.destroy();
+    assert(
+      renderer._fogRenderFog === null && renderer._fogRenderKey === null,
+      "renderer destroy clears static Graphics and fog cache identity",
+    );
+  } finally {
+    restorePixi();
+  }
+}
+
+{
   const priorWindow = globalThis.window;
   const priorDocument = globalThis.document;
   const priorRequestAnimationFrame = globalThis.requestAnimationFrame;

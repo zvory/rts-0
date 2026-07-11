@@ -77,8 +77,35 @@ export function _slot(poolName, id) {
   this._seen[poolName].add(id);
   g.visible = true;
   g.alpha = 1;
+  g.rtsStaticRedraw = true;
+  delete g.rtsStaticRenderKey;
   this._recordRenderDiagnostic?.(`renderer.graphics.clear.${poolName}`);
   g.clear();
+  return g;
+}
+
+export function _staticSlot(poolName, id, renderKey) {
+  const pool = this._pools[poolName];
+  let g = pool.get(id);
+  if (!g) {
+    g = new PIXI.Graphics();
+    pool.set(id, g);
+    this.layers[poolName].addChild(g);
+    this._recordRenderDiagnostic?.(`renderer.pixi.displayObject.created.${poolName}`);
+  }
+  this._seen[poolName].add(id);
+  g.visible = true;
+  g.alpha = 1;
+
+  g.rtsStaticRedraw = g.rtsStaticRenderKey !== renderKey;
+  if (g.rtsStaticRedraw) {
+    delete g.rtsStaticRenderKey;
+    this._recordRenderDiagnostic?.(`renderer.cache.miss.${poolName}`);
+    this._recordRenderDiagnostic?.(`renderer.graphics.clear.${poolName}`);
+    g.clear();
+  } else {
+    this._recordRenderDiagnostic?.(`renderer.cache.hit.${poolName}`);
+  }
   return g;
 }
 

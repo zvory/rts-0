@@ -59,9 +59,17 @@ export function _drawResource(e, fog) {
   const visible = !fog || fog.isVisible(Math.floor(e.x / ts), Math.floor(e.y / ts));
   const alpha = visible ? 1 : 0.7;
 
-  const g = this._slot("resources", e.id);
+  const mined = !!(this._miningNodes && this._miningNodes.has(e.id));
+  const remainingKey = Number.isFinite(e.remaining) ? e.remaining : "full";
+  const renderKey = `${e.kind}|${remainingKey}|${mined ? 1 : 0}`;
+  const g = this._staticSlot?.(
+    "resources",
+    e.id,
+    renderKey,
+  ) || this._slot("resources", e.id);
   g.position.set(e.x, e.y);
   g.alpha = alpha;
+  if (g.rtsStaticRedraw === false) return;
 
   if (e.kind === KIND.OIL) {
     // Fuel drums: utilitarian but faction-neutral.
@@ -105,7 +113,7 @@ export function _drawResource(e, fog) {
   }
 
   // X marker over a node that a worker is actively mining.
-  if (this._miningNodes && this._miningNodes.has(e.id)) {
+  if (mined) {
     const xr = r * 0.45;
     const xColor = e.kind === KIND.OIL ? 0xffffff : 0x1a1712;
     g.lineStyle(2.5, xColor, 0.95);
@@ -114,4 +122,5 @@ export function _drawResource(e, fog) {
     g.moveTo(xr, -xr);
     g.lineTo(-xr, xr);
   }
+  g.rtsStaticRenderKey = renderKey;
 }

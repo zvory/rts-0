@@ -29,6 +29,7 @@ import {
   _ringRadius,
   _shadow,
   _slot,
+  _staticSlot,
   _tintFor,
   _vehicleShadow,
 } from "./entities.js";
@@ -273,6 +274,9 @@ export class Renderer {
     for (const key of Object.keys(this._liveRigPools)) this._seen[key] = new Set();
 
     this._renderErrors = new Map();
+    this._fogRenderFog = null;
+    this._fogRenderKey = null;
+    this._fogRenderMap = null;
 
     /** Map metadata captured by buildStaticMap (tileSize, width, height in tiles). */
     this._map = null;
@@ -1004,6 +1008,9 @@ export class Renderer {
       this._missToastPool.clear();
     }
     this._unseen.clear();
+    this._fogRenderFog = null;
+    this._fogRenderKey = null;
+    this._fogRenderMap = null;
     this._setupVisuals.clear();
     this._assetReadiness?.clear?.();
     this._missingTextureEntityIds?.clear?.();
@@ -1081,6 +1088,7 @@ Object.assign(Renderer.prototype, {
   _tintFor,
   _deployedWeaponSetupVisual,
   _slot,
+  _staticSlot,
   _shadow,
   _vehicleShadow,
   _sweepFrameStripMotion,

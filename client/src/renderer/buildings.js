@@ -61,30 +61,52 @@ export function _drawBuilding(e, colorByOwner, state) {
 
   const underConstruction = isConstructionScaffold(e);
   const bodyAlpha = underConstruction ? 0.45 : 1;
+  const definition = e.kind === KIND.TANK_TRAP
+    ? null
+    : buildingRigDefinitionFor(this._buildingRigDefinitions, e.kind);
 
   // Shadow (slightly offset, under buildings).
-  const sh = this._slot("buildingShadows", e.id);
+  const shadowKey = `${e.x}|${e.y}|${w}|${h}`;
+  const sh = this._staticSlot?.(
+    "buildingShadows",
+    e.id,
+    shadowKey,
+  ) || this._slot("buildingShadows", e.id);
   sh.position.set(0, 0);
-  sh.beginFill(COLORS.shadow, 0.3);
-  sh.drawRect(x0 + 4, y0 + 6, w, h);
-  sh.endFill();
+  if (sh.rtsStaticRedraw !== false) {
+    sh.beginFill(COLORS.shadow, 0.3);
+    sh.drawRect(x0 + 4, y0 + 6, w, h);
+    sh.endFill();
+    sh.rtsStaticRenderKey = shadowKey;
+  }
 
-  const g = this._slot("buildings", e.id);
+  const tint = e.kind !== KIND.TANK_TRAP && !definition
+    ? this._tintFor(e.owner, colorByOwner)
+    : null;
+  const bodyKey = e.kind === KIND.TANK_TRAP
+    ? `tankTrap|${e.x}|${e.y}|${ts}|${e.id}|${bodyAlpha}`
+    : definition
+      ? `rig|${e.kind}`
+      : `fallback|${e.kind}|${e.x}|${e.y}|${w}|${h}|${bodyAlpha}|${tint}`;
+  const g = this._staticSlot?.("buildings", e.id, bodyKey)
+    || this._slot("buildings", e.id);
   g.position.set(0, 0);
   if (e.kind === KIND.TANK_TRAP) {
-    drawTankTrap(g, e.x, e.y, ts, e.id, bodyAlpha);
+    if (g.rtsStaticRedraw !== false) {
+      drawTankTrap(g, e.x, e.y, ts, e.id, bodyAlpha);
+      g.rtsStaticRenderKey = bodyKey;
+    }
   } else {
     // SVG rig body — look up the compiled definition and route it through the
     // buildingRigs pool into the buildings layer. Falls back to imperative
     // rect drawing if no definition is loaded (e.g. compile error on startup).
-    const definition = buildingRigDefinitionFor(this._buildingRigDefinitions, e.kind);
     if (definition) {
       renderLiveUnitRig(this, e, colorByOwner, state, definition, {
         routes: [{ poolName: "buildingRigs", layerName: "buildings" }],
         alpha: bodyAlpha,
       });
-    } else {
-      const tint = this._tintFor(e.owner, colorByOwner);
+      if (g.rtsStaticRedraw !== false) g.rtsStaticRenderKey = bodyKey;
+    } else if (g.rtsStaticRedraw !== false) {
       g.lineStyle(2, 0x1a1712, underConstruction ? 0.55 : 0.95);
       g.beginFill(0x2b2a23, bodyAlpha);
       g.drawRect(x0, y0, w, h);
@@ -113,6 +135,7 @@ export function _drawBuilding(e, colorByOwner, state) {
         g.drawRect(x0 + w * 0.22, y0 + h * 0.5, w * 0.56, h * 0.12);
       }
       g.endFill();
+      g.rtsStaticRenderKey = bodyKey;
     }
 
     // Stencil label — pooled Text reused per building id (see _icon).
@@ -120,18 +143,26 @@ export function _drawBuilding(e, colorByOwner, state) {
   }
 
   if (typeof e.prodProgress === "number" && e.prodProgress > 0) {
-    const overlay = this._slot("buildingOverlays", e.id);
+    const overlayKey = `${e.x}|${y0}|${w}|${e.prodProgress}`;
+    const overlay = this._staticSlot?.(
+      "buildingOverlays",
+      e.id,
+      overlayKey,
+    ) || this._slot("buildingOverlays", e.id);
     overlay.position.set(0, 0);
-    // Unit production progress bar along the roof line.
-    const bw = w * 0.78;
-    const bx = e.x - bw / 2;
-    const by = y0 + 6;
-    overlay.beginFill(COLORS.hpBack, 0.9);
-    overlay.drawRect(bx, by, bw, 5);
-    overlay.endFill();
-    overlay.beginFill(COLORS.hpGood);
-    overlay.drawRect(bx, by, bw * clamp01(e.prodProgress), 5);
-    overlay.endFill();
+    if (overlay.rtsStaticRedraw !== false) {
+      // Unit production progress bar along the roof line.
+      const bw = w * 0.78;
+      const bx = e.x - bw / 2;
+      const by = y0 + 6;
+      overlay.beginFill(COLORS.hpBack, 0.9);
+      overlay.drawRect(bx, by, bw, 5);
+      overlay.endFill();
+      overlay.beginFill(COLORS.hpGood);
+      overlay.drawRect(bx, by, bw * clamp01(e.prodProgress), 5);
+      overlay.endFill();
+      overlay.rtsStaticRenderKey = overlayKey;
+    }
   }
 
   // Queue depth label: show items waiting behind the active production slot.
