@@ -45,7 +45,7 @@ try {
   assert.equal(fs.existsSync(oversizedPath), false, "oversized recording bytes are deleted");
   const webmPath = path.join(mediaTmp, "fixture.webm");
   const generated = spawnSync(tools.ffmpeg, [
-    "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "color=c=navy:s=640x480:r=30:d=0.12",
+    "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "color=c=navy:s=639x479:r=30:d=0.12",
     "-an", "-c:v", "libvpx-vp9", "-b:v", "0", webmPath,
   ], { encoding: "utf8", timeout: 15_000 });
   assert.equal(generated.status, 0, `VP9 fixture generation succeeds: ${generated.stderr}`);
@@ -63,7 +63,7 @@ try {
     { codecTag: "avc1", pixelFormat: "yuv420p", container: "mov,mp4,m4a,3gp,3g2,mj2" },
     "final media probe confirms the mobile MP4 compatibility surface",
   );
-  assert.deepEqual({ width: media.probe.width, height: media.probe.height }, { width: 640, height: 480 }, "final media probe confirms dimensions");
+  assert.deepEqual({ width: media.probe.width, height: media.probe.height }, { width: 640, height: 480 }, "final MP4 pads odd source dimensions for H.264 compatibility");
   assert.ok(media.probe.durationSeconds >= 0.45 && media.probe.durationSeconds <= 0.55, "final MP4 timeline is normalized to wall duration");
   assert.equal(media.probe.frameRate, "30/1", "final MP4 uses the documented 30 FPS timeline");
   assert.deepEqual(
@@ -101,6 +101,15 @@ await closeDriver.close();
 assert.equal(closeDriver.state, DRIVER_STATES.CLOSED, "driver close reaches the closed state while recording");
 assert.equal(closeDriver.recordingStatus().last.stoppedBy, "sessionClose", "driver close boundedly finalizes its recorder");
 fs.rmSync(path.dirname(closeDriver.recordingStatus().last.videoPath), { recursive: true, force: true });
+
+const delayedStopDriver = fixtureRecordingDriver(root, tools, { recorderStopDelayMs: 250 });
+await delayedStopDriver.recordStart({ sessionId: `lab_${"f".repeat(32)}`, name: "delayed-stop", maxDurationMs: 5_000 });
+await new Promise((resolve) => setTimeout(resolve, 60));
+const delayedStop = await delayedStopDriver.recordStop();
+const delayedManifest = JSON.parse(fs.readFileSync(delayedStop.manifestPath, "utf8"));
+assert.ok(delayedManifest.capture.wallDurationMs < 200, "capture duration excludes recorder finalization latency");
+assert.ok(delayedStop.probe.durationSeconds < 0.2, "MP4 timeline excludes recorder finalization latency");
+fs.rmSync(path.dirname(delayedStop.videoPath), { recursive: true, force: true });
 
 const failedDriver = fixtureRecordingDriver(root, tools, { failScreencast: true });
 const failedSessionId = `lab_${"d".repeat(32)}`;
@@ -167,7 +176,7 @@ await service.shutdown();
 
 console.log("✅ lab_interact_recording_contracts.mjs: bounds, state, operation metadata, errors, and close cleanup passed");
 
-function fixtureRecordingDriver(workspaceRoot, mediaTools, { failScreencast = false, failStartStatus = false } = {}) {
+function fixtureRecordingDriver(workspaceRoot, mediaTools, { failScreencast = false, failStartStatus = false, recorderStopDelayMs = 0 } = {}) {
   const driver = new LabInteractDriver({ workspaceRoot, viewport: { width: 640, height: 480, deviceScaleFactor: 1 } });
   driver.workspace = { root: workspaceRoot, branch: "fixture", head: "a".repeat(40) };
   driver.state = DRIVER_STATES.OPEN;
@@ -204,7 +213,10 @@ function fixtureRecordingDriver(workspaceRoot, mediaTools, { failScreencast = fa
         "-an", "-c:v", "libvpx-vp9", "-b:v", "0", outputPath,
       ], { encoding: "utf8", timeout: 15_000 });
       assert.equal(generated.status, 0, `fixture screencast succeeds: ${generated.stderr}`);
-      return { stop: async () => { recorderStops += 1; } };
+      return { stop: async () => {
+        recorderStops += 1;
+        if (recorderStopDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, recorderStopDelayMs));
+      } };
     },
   };
   Object.defineProperty(driver, "fixtureRecorderStops", { get: () => recorderStops });

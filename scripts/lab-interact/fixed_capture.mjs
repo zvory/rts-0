@@ -19,10 +19,10 @@ export function fixedFrameTick(startTick, frameIndex, fps) {
 }
 
 export function encodeFixedCapture({ framesDir, outputPath, contactSheetPath, fps, frameCount }) {
-  const tools = checkMediaCapabilities();
+  const tools = checkMediaCapabilities({ requireVp9: false });
   run(tools.ffmpeg, [
     "-hide_banner", "-loglevel", "error", "-y", "-framerate", String(fps),
-    "-i", path.join(framesDir, "frame-%04d.png"), "-an", "-c:v", "libx264",
+    "-i", path.join(framesDir, "frame-%04d.png"), "-an", "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2", "-c:v", "libx264",
     "-preset", "veryfast", "-crf", "23", "-profile:v", "main",
     "-pix_fmt", "yuv420p", "-tag:v", "avc1", "-movflags", "+faststart", outputPath,
   ], "fixed capture encode");

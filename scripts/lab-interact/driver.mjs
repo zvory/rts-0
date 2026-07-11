@@ -488,11 +488,13 @@ export class LabInteractDriver {
       clearTimeout(recording.watchdog);
       clearInterval(recording.sizeWatchdog);
       try {
+        // An immediate stop is valid; retain a minimally positive timeline even when
+        // start and stop land in the same millisecond.
+        const stoppedMs = Math.max(Date.now(), recording.startedMs + 1);
+        const endStatus = await this.callBridge("status", {}).catch(() => null);
         await stopRecorderWithin(recording.recorder);
         await waitForMediaFile(recording.webmPath);
-        const endedMs = Date.now();
-        const wallDurationMs = endedMs - recording.startedMs;
-        const endStatus = await this.callBridge("status", {}).catch(() => null);
+        const wallDurationMs = Math.max(1, stoppedMs - recording.startedMs);
         const media = finalizeMedia({
           webmPath: recording.webmPath, mp4Path: recording.mp4Path, framesDir: recording.framesDir,
           contactSheetPath: recording.contactSheetPath, targetDurationMs: wallDurationMs, tools: recording.tools,
@@ -502,7 +504,7 @@ export class LabInteractDriver {
           schemaVersion: 2,
           kind: "labInteractRealTimeRecording",
           createdAt: recording.startedAt,
-          finalizedAt: new Date(endedMs).toISOString(),
+          finalizedAt: new Date().toISOString(),
           stoppedBy: reason,
           nondeterministic: true,
           workspace: this.workspace,

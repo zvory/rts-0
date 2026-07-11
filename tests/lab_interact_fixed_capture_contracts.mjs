@@ -37,7 +37,7 @@ try {
   const framesDir = path.join(tmp, "frames");
   fs.mkdirSync(framesDir);
   const tools = checkMediaCapabilities();
-  const generated = spawnSync(tools.ffmpeg, ["-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=size=64x64:rate=30:duration=0.1", "-frames:v", "3", path.join(framesDir, "frame-%04d.png")], { encoding: "utf8", timeout: 15_000 });
+  const generated = spawnSync(tools.ffmpeg, ["-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=size=63x63:rate=30:duration=0.1", "-frames:v", "3", path.join(framesDir, "frame-%04d.png")], { encoding: "utf8", timeout: 15_000 });
   assert.equal(generated.status, 0, generated.stderr);
   // FFmpeg numbers image sequences from one; normalize to the capture command's zero-based names.
   for (let index = 1; index <= 3; index += 1) fs.renameSync(path.join(framesDir, `frame-${String(index).padStart(4, "0")}.png`), path.join(framesDir, `tmp-${String(index - 1).padStart(4, "0")}.png`));
@@ -47,6 +47,7 @@ try {
   const media = encodeFixedCapture({ framesDir, outputPath, contactSheetPath, fps: 30, frameCount: 3 });
   assert.ok(media.bytes > 0, "fixed frame sequence encodes to non-empty H.264 MP4 media");
   assert.deepEqual({ codec: media.probe.codec, frames: media.probe.frameCount, fps: media.probe.frameRate }, { codec: "h264", frames: 3, fps: "30/1" }, "ffprobe confirms fixed codec, frame count, and FPS");
+  assert.deepEqual({ width: media.probe.width, height: media.probe.height }, { width: 64, height: 64 }, "fixed capture pads odd dimensions for H.264 compatibility");
   assert.deepEqual(
     { codecTag: media.probe.codecTag, pixelFormat: media.probe.pixelFormat, container: media.probe.container },
     { codecTag: "avc1", pixelFormat: "yuv420p", container: "mov,mp4,m4a,3gp,3g2,mj2" },

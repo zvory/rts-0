@@ -114,7 +114,8 @@ viewport or in-viewport crop, and scale from 0.25 through 1. A second start retu
 `record-stop` converts Chromium's temporary screencast stream into a mobile-compatible H.264 MP4
 with `yuv420p`, an `avc1` tag, and fast-start metadata; the temporary WebM is deleted. Finalization
 normalizes the MP4 to the measured wall duration at 30 FPS so sparse Chromium frame delivery does
-not produce shortened or accelerated playback. It extracts at most six representative PNGs,
+not produce shortened or accelerated playback. Odd output dimensions are padded by at most one
+pixel for H.264 compatibility. It extracts at most six representative PNGs,
 creates a 3×2 contact sheet, probes the media, and returns confined absolute paths plus bounded
 codec/frame diagnostics.
 The adjacent manifest records authoritative start/end ticks and room time, accepted CLI operations,
@@ -129,6 +130,8 @@ daemon `shutdown`, and idle teardown attempt bounded finalization and remove a p
 finalization fails; they do not leave FFmpeg owned by the session. Recording checks require
 `ffmpeg`, `ffprobe`, and both the `libvpx-vp9` and `libx264` encoders on `PATH`, or explicit
 `RTS_LAB_INTERACT_FFMPEG`/`RTS_LAB_INTERACT_FFPROBE` paths.
+Fixed-step capture only requires `libx264`; real-time recording also requires `libvpx-vp9` for
+Chromium's temporary screencast stream.
 
 Real-time recordings are silent. Puppeteer's screencast API does not expose the page's WebAudio
 graph, and Lab Interact does not depend on macOS system-audio routing.

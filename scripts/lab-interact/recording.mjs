@@ -26,12 +26,14 @@ export class LabInteractRecordingError extends Error {
 export function checkMediaCapabilities({
   ffmpeg = process.env.RTS_LAB_INTERACT_FFMPEG || "ffmpeg",
   ffprobe = process.env.RTS_LAB_INTERACT_FFPROBE || "ffprobe",
+  requireVp9 = true,
+  requireH264 = true,
 } = {}) {
   const encoderCheck = spawnSync(ffmpeg, ["-hide_banner", "-encoders"], { encoding: "utf8", timeout: 5_000 });
   if (encoderCheck.error?.code === "ENOENT") throw new LabInteractRecordingError("ffmpegUnavailable", `FFmpeg was not found at ${JSON.stringify(ffmpeg)}. Install FFmpeg or set RTS_LAB_INTERACT_FFMPEG.`);
   if (encoderCheck.status !== 0) throw new LabInteractRecordingError("ffmpegUnavailable", conciseToolFailure("FFmpeg capability check failed", encoderCheck));
-  if (!/\blibvpx-vp9\b/.test(encoderCheck.stdout || "")) throw new LabInteractRecordingError("vp9Unavailable", "FFmpeg does not provide the libvpx-vp9 encoder required by Puppeteer WebM recording.");
-  if (!/\blibx264\b/.test(encoderCheck.stdout || "")) throw new LabInteractRecordingError("h264Unavailable", "FFmpeg does not provide the libx264 encoder required for mobile-compatible MP4 output.");
+  if (requireVp9 && !/\blibvpx-vp9\b/.test(encoderCheck.stdout || "")) throw new LabInteractRecordingError("vp9Unavailable", "FFmpeg does not provide the libvpx-vp9 encoder required by Puppeteer WebM recording.");
+  if (requireH264 && !/\blibx264\b/.test(encoderCheck.stdout || "")) throw new LabInteractRecordingError("h264Unavailable", "FFmpeg does not provide the libx264 encoder required for mobile-compatible MP4 output.");
   const probeCheck = spawnSync(ffprobe, ["-version"], { encoding: "utf8", timeout: 5_000 });
   if (probeCheck.error?.code === "ENOENT") throw new LabInteractRecordingError("ffprobeUnavailable", `ffprobe was not found at ${JSON.stringify(ffprobe)}. Install FFmpeg or set RTS_LAB_INTERACT_FFPROBE.`);
   if (probeCheck.status !== 0) throw new LabInteractRecordingError("ffprobeUnavailable", conciseToolFailure("ffprobe capability check failed", probeCheck));
@@ -80,11 +82,11 @@ export function finalizeMedia({ webmPath, mp4Path, framesDir, contactSheetPath, 
   if (!Number.isFinite(targetDurationMs) || targetDurationMs <= 0) throw new LabInteractRecordingError("recordingDurationInvalid", "Recording wall duration was unavailable during finalization.");
   const sourceProbe = probeMedia(webmPath, tools.ffprobe, "vp9", "source WebM");
   const targetDurationSeconds = Math.max(targetDurationMs / 1000, 1 / 30);
-  const capturedFrames = Math.max(1, Number(sourceProbe.frameCount) || Math.round((sourceProbe.durationSeconds || 0) * 25) || 1);
+  const capturedFrames = Math.max(1, Number(sourceProbe.frameCount) || Math.round((sourceProbe.durationSeconds || 0) * 30) || 1);
   const capturedFrameInterval = targetDurationSeconds / capturedFrames;
   runTool(tools.ffmpeg, [
     "-hide_banner", "-loglevel", "error", "-y", "-i", webmPath,
-    "-an", "-vf", `setpts=N*${capturedFrameInterval.toFixed(12)}/TB,fps=30,tpad=stop_mode=clone:stop_duration=${targetDurationSeconds.toFixed(6)}`,
+    "-an", "-vf", `setpts=N*${capturedFrameInterval.toFixed(12)}/TB,fps=30,tpad=stop_mode=clone:stop_duration=${targetDurationSeconds.toFixed(6)},pad=ceil(iw/2)*2:ceil(ih/2)*2`,
     "-t", targetDurationSeconds.toFixed(6), "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
     "-profile:v", "main", "-pix_fmt", "yuv420p", "-tag:v", "avc1",
     "-movflags", "+faststart", mp4Path,
