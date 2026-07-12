@@ -23,13 +23,8 @@ assert(
   "Pixi compatibility reads are an exact ratcheted allowlist",
 );
 assert(
-  PIXI_LEGACY_READ_ALLOWLIST.every((entry) => (
-    Object.isFrozen(entry)
-    && typeof entry.reviewTrigger === "string"
-    && entry.reviewTrigger.length > 0
-    && !Object.hasOwn(entry, "removalOwner")
-  )),
-  "every temporary Pixi compatibility read names a concrete re-evaluation trigger",
+  PIXI_LEGACY_READ_ALLOWLIST.every((entry) => Object.isFrozen(entry) && entry.removalOwner),
+  "every temporary Pixi compatibility read names a removal owner",
 );
 
 const map = {

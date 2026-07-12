@@ -30,7 +30,7 @@ normalization begins.
 - Share existing frame subviews with HUD, minimap, fog diagnostics, and observer analysis only where
   it removes duplicate state queries without expanding scope.
 - Add a compatibility ratchet that fails on new Pixi legacy reads and records each remaining read/
-  re-evaluation trigger in the active ledger.
+  removal owner in the active ledger.
 - Exercise normal/replay/live pause/Lab reset/fixed capture/rematch Pixi paths and compare ordering,
   decals, smoke/ability state, selection, placement, fog memory, and overlays.
 - Update durable docs/ledger with the runtime seam, reconciliation ownership, allowlist, and evidence.

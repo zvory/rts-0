@@ -21,10 +21,8 @@ selection, marquee, and basic movement feedback—then stop for a real playtest.
 - Render the frame's authoritative current/explored fog. Remembered buildings, below-fog intel,
   reveals, particles, shadows, and long-tail overlays remain absent unless one is required by this
   narrow slice.
-- Use the selected Babylon semantic camera's perspective projection and `SelectionSceneV1` for
-  click, marquee, and ground move interaction. Do not reuse Pixi's orthographic projection when
-  Babylon perspective is visible. Babylon meshes neither choose targets nor alter command
-  coordinates.
+- Use the existing semantic projection and `SelectionSceneV1` for click, marquee, and ground move
+  interaction. Babylon meshes neither choose targets nor alter command coordinates.
 - Add only the feedback needed to understand basic selection and a move order. Reuse the shared
   HUD/minimap/audio surfaces; do not reproduce their Pixi world decorations.
 - Add one focused real two-recipient test with a never-authorized entity/position sentinel. It must

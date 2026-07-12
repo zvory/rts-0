@@ -2,16 +2,16 @@ import { isResource } from "../protocol.js";
 import { Renderer } from "./index.js";
 
 export const PIXI_LEGACY_READ_ALLOWLIST = Object.freeze([
-  Object.freeze({ id: "state.resources.oil", reviewTrigger: "a Pixi DTO closure needs the low-oil cue" }),
-  Object.freeze({ id: "state._curById", reviewTrigger: "a pose DTO or effect needs normalized current poses" }),
-  Object.freeze({ id: "state._prevById", reviewTrigger: "a pose DTO or effect needs normalized previous poses" }),
-  Object.freeze({ id: "state.weaponRecoil", reviewTrigger: "an effect needs normalized recoil data" }),
-  Object.freeze({ id: "state.weaponRecoilPhase", reviewTrigger: "an effect needs normalized recoil data" }),
-  Object.freeze({ id: "match.renderClock", reviewTrigger: "the existing Pixi capture path changes" }),
-  Object.freeze({ id: "match.frameProfiler", reviewTrigger: "a measurement needs backend-neutral metrics" }),
-  Object.freeze({ id: "match.visualProfile.unitOverrides", reviewTrigger: "a playtest needs representative visuals" }),
-  Object.freeze({ id: "match.visualProfile.frameStripOverrides", reviewTrigger: "a playtest needs representative visuals" }),
-  Object.freeze({ id: "match.presentationAssembler.staticMap", reviewTrigger: "Babylon staging reveals a shared static-map DTO need" }),
+  Object.freeze({ id: "state.resources.oil", removalOwner: "post-foundations Pixi DTO closure" }),
+  Object.freeze({ id: "state._curById", removalOwner: "Phase 4 pose/event normalization" }),
+  Object.freeze({ id: "state._prevById", removalOwner: "Phase 4 pose/event normalization" }),
+  Object.freeze({ id: "state.weaponRecoil", removalOwner: "Phase 4 attack-event normalization" }),
+  Object.freeze({ id: "state.weaponRecoilPhase", removalOwner: "Phase 4 attack-event normalization" }),
+  Object.freeze({ id: "match.renderClock", removalOwner: "Phase 5 capture lifecycle" }),
+  Object.freeze({ id: "match.frameProfiler", removalOwner: "Phase 11 backend metrics" }),
+  Object.freeze({ id: "match.visualProfile.unitOverrides", removalOwner: "Phase 10 representative visuals" }),
+  Object.freeze({ id: "match.visualProfile.frameStripOverrides", removalOwner: "Phase 10 representative visuals" }),
+  Object.freeze({ id: "match.presentationAssembler.staticMap", removalOwner: "Phase 6 backend lifecycle" }),
 ]);
 
 const FEEDBACK_ARRAY_TYPES = Object.freeze({

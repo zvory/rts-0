@@ -11,7 +11,7 @@ without duplicating gameplay authority. Actual backend status lives in the activ
 The active work is the two-phase opt-in experiment in
 [`plans/render3d/`](../../plans/render3d/plan.md): a small Babylon kernel followed by a playable
 fogged vertical slice and a user playtest. The binding contracts for that work are the boundary in
-Sections 1 through 5 plus its focused phase files. Do not require event capture, asset pipelines,
+Sections 1 through 4 plus its focused phase files. Do not require event capture, asset pipelines,
 registries, benchmark programs, vegetation, shadows, exhaustive parity, or default-cutover
 evidence before that experiment.
 
@@ -368,41 +368,17 @@ fields above. `scripts/check-client-architecture.mjs` classifies the presentatio
 forbids imports from transport, UI, or renderer internals, and rejects engine, socket, mutable
 state, or mutable intent runtime references in that area.
 
-### 4.3 Pixi compatibility reads
-
-The Pixi adapter is the only implementation allowed to bridge the established Pixi helpers from a
-`PresentationFrameV1`. Its exact frozen compatibility allowlist uses `{id, reviewTrigger}` records:
-the trigger records the concrete change that could justify removing a private read, not a promised
-phase or a standing cleanup commitment. New reads fail its contract; a trigger does not authorize a
-new backend to receive the source.
-
-| Private Pixi read | Current use | Re-evaluate when |
-| --- | --- | --- |
-| `state.resources.oil` | Existing low-oil/fuel rig cue. | A Pixi DTO closure needs that cue. |
-| `state._curById`, `state._prevById` | Frame-strip motion sampling. | A pose DTO or effect needs normalized poses. |
-| `state.weaponRecoil`, `state.weaponRecoilPhase` | Received attack recoil sampling. | An effect needs normalized recoil data. |
-| `match.renderClock` | Existing Pixi visual/capture clock. | The Pixi capture path changes. |
-| `match.frameProfiler` | Existing Pixi sub-phase/counter reporting. | Measurement needs backend-neutral metrics. |
-| `match.visualProfile.unitOverrides`, `match.visualProfile.frameStripOverrides` | Lab-only visual experiments. | A playtest needs representative visuals. |
-| `match.presentationAssembler.staticMap` | Copy a matching immutable static revision into Pixi-owned staging. | Babylon staging reveals a shared static-map DTO need. |
-
 ## 5. Pre-alpha Babylon path
 
-Phase 4 adds an explicit Babylon selector and a small selected-backend bundle at Match construction.
-The bundle creates a semantic camera implementation and a renderer independently: `Match` gives the
-renderer only the detached frame, whose projection was produced by that camera. Babylon's fixed
-perspective camera is engine-free projection math that returns the ordinary `ProjectionSnapshotV1`;
-the scene consumes that snapshot, and input/selection consumes the same snapshot. A focused pure
-check must prove world points and ground hits agree between the snapshot and scene conversion before
-the live route exists. It may render static ground and generic primitives in Lab; it does not need a
-GLB pipeline, generalized resource registry, or deterministic effect capture.
+Phase 4 adds only an explicit Babylon selector, one renderer-owned scene/canvas, a fixed
+perspective adapter fed by `PresentationFrameV1`, and a single world-to-scene helper. It may render
+static ground and generic primitives in Lab; it does not need a GLB pipeline, generalized resource
+registry, or deterministic effect capture.
 
 Phase 5 adds only authoritative current/explored fog, generic visible entities, semantic
-selection/marquee/ground move, basic feedback, and one real two-recipient no-leak assertion. It
-uses the selected Babylon camera's perspective projection for both `SelectionSceneV1` and the scene;
-it must never use Pixi's orthographic projection while presenting Babylon perspective. An explicit
-live/Lab Babylon route then earns a user playtest. Pixi remains default; replay, spectator, effect,
-asset, and performance work wait for a concrete observed need.
+selection/marquee/ground move, basic feedback, and one real two-recipient no-leak assertion. An
+explicit live/Lab Babylon route then earns a user playtest. Pixi remains default; replay,
+spectator, effect, asset, and performance work wait for a concrete observed need.
 
 The minimal backend rule is simple: the backend owns one canvas/engine/scene, renders only when
 `Match` calls it, and destroys those resources idempotently. An entity may not dispose a shared
@@ -560,12 +536,42 @@ reveals, smoke, abilities, attacks/projectiles/impacts/muzzle flashes, Panzerfau
 feedback, command/placement feedback, observer/Lab diagnostics, visual samples, capture readiness,
 soft render diagnostics, resize, reset, and teardown. Placeholder coverage is not parity.
 
-#### A.4.3 Superseded lifecycle and capture follow-ons
+#### A.4.3 Current lifecycle and capture dependencies
 
-The retired proposal assigned the Pixi compatibility reads, capture changes, and more elaborate
-lifecycle work to later numbered phases. Those ownership assignments are superseded: the active
-allowlist and its re-evaluation triggers are Section 4.3, while the two-phase experiment's only
-lifecycle requirement is Section 5's one backend-owned canvas/engine/scene and idempotent teardown.
+`Match` constructs `GameState`, `ClientIntent`, `Camera`, the Pixi presentation adapter/renderer,
+`Fog`, HUD, input router,
+minimap, input/replay input, audio routing, diagnostics, and room-time surfaces. It installs network,
+window, document, and DOM listeners, interval/timer collaborators, then owns/reschedules rAF through
+`frame_recovery.js`. `Match.destroy()` is the parent cleanup point. Renderer teardown must cover
+Pixi Application/canvas, display pools, rigs, textures it created, decals, selection/placement/fog
+graphics, and pending asset loads. Minimap owns canvas/window pointer listeners and cached canvases;
+input/replay input own pointer/keyboard/lock listeners; audio is App-owned and persists between
+matches but its match voices/listener pose are reset.
+
+The Pixi adapter is imported only by `match.js`; Babylon and other backends cannot import or
+receive it. Its temporary legacy-source allowlist is exact and sampled at most once per new frame:
+
+| Temporary Pixi read | Reason | Removal owner |
+| --- | --- | --- |
+| `state.resources.oil` | Preserve current low-oil/fuel rig cue. | Post-foundations Pixi DTO closure. |
+| `state._curById`, `state._prevById` | Preserve snapshot-motion admission for frame strips. | Phase 4 pose/event normalization. |
+| `state.weaponRecoil`, `state.weaponRecoilPhase` | Preserve received attack recoil sampling. | Phase 4 attack-event normalization. |
+| `match.renderClock` | Preserve the injected Pixi visual/capture clock. | Phase 5 capture lifecycle. |
+| `match.frameProfiler` | Keep existing Pixi sub-phase/counter reporting. | Phase 11 backend metrics. |
+| `match.visualProfile.unitOverrides`, `match.visualProfile.frameStripOverrides` | Preserve Lab-only visual experiments. | Phase 10 representative visuals. |
+| `match.presentationAssembler.staticMap` | Copy a matching immutable static revision into Pixi-owned staging. | Phase 6 backend lifecycle. |
+
+Ground decals are the only non-event destructive queue present at cutover. `frame_recovery.js`
+calls the shared `reconcilePendingGroundDecals()` before final assembly and acknowledges that staged
+batch only after successful presentation; Pixi receives detached `persistentGroundMark` records and
+never consumes the shared queue. Phase 4 owns transient event identity/history, received pose
+retention, and removal of the recoil/pose compatibility reads.
+
+Fixed capture currently suspends/restores Match rAF, swaps the injected render clock, renders with
+alpha 1, and explicitly presents the Pixi frame. Capture-time rig/effect/smoke/projectile/recoil/
+toast sampling uses the visual clock; snapshots, health, profiler admission, input, audio, and
+timeouts remain real. Phase 5 must stop synthetic capture time from entering live state, pin frame
+and grid revisions, retain authorized real events, and add no-tick-step event capture.
 
 ### A.5 Asset and representative-fixture policy
 

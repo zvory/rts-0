@@ -26,8 +26,8 @@ semantic camera/selection behavior with Pixi.
 | Capability | Pixi | Babylon | Next evidence or decision |
 | --- | --- | --- | --- |
 | One Match-owned rAF and visual clock | Pixi complete | missing | Phase 4 proves `scene.render()` is Match-called only. |
-| Semantic camera/projection and CSS-pixel contract | Pixi complete | missing | Phase 4 installs a Babylon semantic perspective camera and pure projection snapshot. |
-| Perspective-safe selection, marquee, and ground commands | Pixi complete | missing | Phase 5 uses `SelectionSceneV1` with that same perspective snapshot, never mesh picking. |
+| Semantic camera/projection and CSS-pixel contract | Pixi complete | missing | Phase 4 consumes it with a fixed perspective adapter. |
+| Perspective-safe selection, marquee, and ground commands | Pixi complete | missing | Phase 5 uses the established `SelectionSceneV1`, never mesh picking. |
 | Detached fog-filtered presentation frame | Pixi complete | missing | Phase 4 backend consumes `PresentationFrameV1` only. |
 | Default Pixi and explicit Babylon selector | Pixi complete | missing | Phase 4 adds explicit opt-in Babylon loading; Pixi remains default. |
 | Static ground and simple generic scene | Pixi complete | missing | Phase 4 Lab kernel. |
