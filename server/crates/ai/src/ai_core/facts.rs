@@ -46,9 +46,6 @@ pub(crate) struct AiFacts {
     pub(crate) build_capable_workers: Vec<u32>,
     pub(crate) target_steel_workers: usize,
     pub(crate) free_supply: u32,
-    pub(crate) supply_blocked_or_near_blocked: bool,
-    pub(crate) supply_capped: bool,
-    pub(crate) depot_in_progress: bool,
     pub(crate) committed_steel: u32,
     pub(crate) nearest_public_enemy_base: Option<EnemyBaseFact>,
     building_counts: BTreeMap<EntityKind, BuildingCounts>,
@@ -147,12 +144,6 @@ impl AiFacts {
             .economy
             .supply_cap
             .saturating_sub(observation.economy.supply_used);
-        let supply_capped = observation.economy.supply_cap >= config::SUPPLY_CAP_MAX;
-        let depot_counts = building_counts
-            .get(&EntityKind::Depot)
-            .copied()
-            .unwrap_or_default();
-        let depot_in_progress = depot_counts.incomplete + depot_counts.intended > 0;
         let committed_steel = observation
             .pending_builds
             .iter()
@@ -173,9 +164,6 @@ impl AiFacts {
                 observation.resources.iter().copied(),
             ),
             free_supply,
-            supply_blocked_or_near_blocked: free_supply <= 2 && !supply_capped,
-            supply_capped,
-            depot_in_progress,
             committed_steel,
             nearest_public_enemy_base,
             building_counts,
@@ -470,7 +458,6 @@ mod tests {
         assert_eq!(facts.complete_building_count(EntityKind::Depot), 0);
         assert_eq!(counts.existing, 0);
         assert_eq!(counts.intended, 1);
-        assert!(facts.depot_in_progress);
         assert_eq!(
             facts.committed_steel,
             rts_rules::economy::cost(EntityKind::Depot).0

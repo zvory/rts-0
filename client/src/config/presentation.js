@@ -1,5 +1,7 @@
 // Client-owned presentation constants: rendering palette, local fog opacity,
-// fallback player colors, and camera defaults.
+// fallback player colors, camera defaults, and command-card layout.
+
+import { KIND } from "../protocol.js";
 
 export const COLORS = Object.freeze({
   bgVoid: 0x11110f, // outside the map
@@ -48,3 +50,15 @@ export const CAMERA = Object.freeze({
   panSpeed: 900, // world px / sec at zoom 1
   edgeScrollPx: 14, // screen-edge band that triggers panning
 });
+
+// Keep the former Supply Depot W slot visibly empty during the depot-free supply experiment.
+export const WORKER_BUILD_CARD_SLOTS = Object.freeze([
+  KIND.CITY_CENTRE,
+  null,
+  KIND.BARRACKS,
+  KIND.TRAINING_CENTRE,
+  KIND.RESEARCH_COMPLEX,
+  KIND.FACTORY,
+  KIND.STEELWORKS,
+  KIND.TANK_TRAP,
+]);

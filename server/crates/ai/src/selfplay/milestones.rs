@@ -284,7 +284,6 @@ pub(super) struct PlayerMilestoneGoal {
     pub(super) require_gathering: bool,
     pub(super) require_oil: bool,
     pub(super) require_oil_extractor_assignment: bool,
-    pub(super) require_depot_supply: bool,
     pub(super) require_barracks_complete: bool,
     pub(super) require_rifleman: bool,
     pub(super) require_tank: bool,
@@ -302,7 +301,6 @@ impl PlayerMilestoneGoal {
         PlayerMilestoneGoal {
             require_gathering: true,
             require_oil: true,
-            require_depot_supply: true,
             require_barracks_complete: true,
             require_rifleman: true,
             require_tank: true,
@@ -357,7 +355,6 @@ pub(super) struct PlayerMilestones {
     saw_gathering: bool,
     oil_gathered: bool,
     pub(super) oil_extractor_started: bool,
-    depot_started: bool,
     barracks_started: bool,
     barracks_complete: bool,
     rifleman_trained: bool,
@@ -413,7 +410,6 @@ impl PlayerMilestones {
                 EntityKind::Rifleman => riflemen += 1,
                 EntityKind::Tank => tanks += 1,
                 EntityKind::PumpJack => self.oil_extractor_started = true,
-                EntityKind::Depot => self.depot_started = true,
                 EntityKind::Barracks => {
                     self.barracks_started = true;
                     if is_complete(e) {
@@ -516,11 +512,6 @@ impl PlayerMilestones {
         }
         if goal.require_oil_extractor_assignment && !self.oil_extractor_started {
             out.push("oil-extractor".to_string());
-        }
-        if goal.require_depot_supply
-            && (!self.depot_started || self.max_supply_cap <= config::CITY_CENTRE_SUPPLY)
-        {
-            out.push("depot-supply".to_string());
         }
         if goal.require_barracks_complete && !self.barracks_complete {
             out.push("barracks".to_string());

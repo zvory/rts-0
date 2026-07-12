@@ -468,7 +468,6 @@ export const RESOURCE_AMOUNTS = Object.freeze({
 // What a worker can build (command card when a worker is selected).
 export const WORKER_BUILDABLE = Object.freeze([
   KIND.CITY_CENTRE,
-  KIND.DEPOT,
   KIND.BARRACKS,
   KIND.TRAINING_CENTRE,
   KIND.RESEARCH_COMPLEX,

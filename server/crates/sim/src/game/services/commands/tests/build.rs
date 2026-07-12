@@ -4,7 +4,7 @@ use super::*;
 fn build_order_can_start_when_worker_inside_intent_but_stages_outside() {
     let map = flat_map(16);
     let mut entities = EntityStore::new();
-    let (wx, wy) = footprint_center(&map, EntityKind::Depot, 4, 4);
+    let (wx, wy) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
     let worker = entities
         .spawn_unit(1, EntityKind::Worker, wx, wy)
         .expect("worker should spawn");
@@ -42,7 +42,7 @@ fn build_order_can_start_when_worker_inside_intent_but_stages_outside() {
             1,
             SimCommand::Build {
                 units: vec![worker],
-                building: EntityKind::Depot,
+                building: EntityKind::CityCentre,
                 tile_x: 4,
                 tile_y: 4,
                 queued: false,
@@ -62,7 +62,7 @@ fn build_order_can_start_when_worker_inside_intent_but_stages_outside() {
         .expect("build order should set a staging goal");
     let goal_tile = map.tile_of(goal.0, goal.1);
     assert!(
-        !footprint_tiles(EntityKind::Depot, 4, 4).contains(&goal_tile),
+        !footprint_tiles(EntityKind::CityCentre, 4, 4).contains(&goal_tile),
         "build-over-self order should stage outside the requested footprint"
     );
     assert!(
@@ -75,15 +75,15 @@ fn build_order_can_start_when_worker_inside_intent_but_stages_outside() {
 fn build_order_does_not_pull_worker_off_active_construction() {
     let map = flat_map(16);
     let mut entities = EntityStore::new();
-    let (site_x, site_y) = footprint_center(&map, EntityKind::Depot, 4, 4);
+    let (site_x, site_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
     let worker = entities
         .spawn_unit(1, EntityKind::Worker, site_x, site_y)
         .expect("worker should spawn");
     let site = entities
-        .spawn_building(1, EntityKind::Depot, site_x, site_y, false)
+        .spawn_building(1, EntityKind::CityCentre, site_x, site_y, false)
         .expect("scaffold should spawn");
     let worker_entity = entities.get_mut(worker).expect("worker should exist");
-    worker_entity.set_order(Order::build(EntityKind::Depot, 4, 4));
+    worker_entity.set_order(Order::build(EntityKind::CityCentre, 4, 4));
     worker_entity.mark_build_phase(BuildPhase::Constructing { site });
     worker_entity.set_target_id(Some(site));
 
@@ -139,7 +139,7 @@ fn build_order_does_not_pull_worker_off_active_construction() {
     );
     assert_eq!(
         worker.order().build_intent_tile(),
-        Some((EntityKind::Depot, 4, 4)),
+        Some((EntityKind::CityCentre, 4, 4)),
         "second build order must not replace the active construction intent"
     );
     assert_eq!(
@@ -157,12 +157,12 @@ fn build_order_does_not_pull_worker_off_active_construction() {
 fn build_order_accepts_resuming_owned_scaffold() {
     let map = flat_map(16);
     let mut entities = EntityStore::new();
-    let (site_x, site_y) = footprint_center(&map, EntityKind::Depot, 4, 4);
+    let (site_x, site_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
     let worker = entities
         .spawn_unit(1, EntityKind::Worker, 64.0, 64.0)
         .expect("worker should spawn");
     let scaffold = entities
-        .spawn_building(1, EntityKind::Depot, site_x, site_y, false)
+        .spawn_building(1, EntityKind::CityCentre, site_x, site_y, false)
         .expect("scaffold should spawn");
     let spatial = SpatialIndex::build(&entities, map.size);
     let occ = Occupancy::build(&map, &entities);
@@ -195,7 +195,7 @@ fn build_order_accepts_resuming_owned_scaffold() {
             1,
             SimCommand::Build {
                 units: vec![worker],
-                building: EntityKind::Depot,
+                building: EntityKind::CityCentre,
                 tile_x: 4,
                 tile_y: 4,
                 queued: false,
@@ -212,7 +212,7 @@ fn build_order_accepts_resuming_owned_scaffold() {
     );
     assert_eq!(
         worker.order().build_intent_tile(),
-        Some((EntityKind::Depot, 4, 4)),
+        Some((EntityKind::CityCentre, 4, 4)),
         "resume order should keep the scaffold footprint intent"
     );
     assert_ne!(
@@ -237,12 +237,12 @@ fn build_order_accepts_resuming_owned_scaffold() {
 fn build_order_accepts_resuming_owned_scaffold_without_resources() {
     let map = flat_map(16);
     let mut entities = EntityStore::new();
-    let (site_x, site_y) = footprint_center(&map, EntityKind::Depot, 4, 4);
+    let (site_x, site_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
     let worker = entities
         .spawn_unit(1, EntityKind::Worker, 64.0, 64.0)
         .expect("worker should spawn");
     entities
-        .spawn_building(1, EntityKind::Depot, site_x, site_y, false)
+        .spawn_building(1, EntityKind::CityCentre, site_x, site_y, false)
         .expect("scaffold should spawn");
     let spatial = SpatialIndex::build(&entities, map.size);
     let occ = Occupancy::build(&map, &entities);
@@ -276,7 +276,7 @@ fn build_order_accepts_resuming_owned_scaffold_without_resources() {
             1,
             SimCommand::Build {
                 units: vec![worker],
-                building: EntityKind::Depot,
+                building: EntityKind::CityCentre,
                 tile_x: 4,
                 tile_y: 4,
                 queued: false,
@@ -293,7 +293,7 @@ fn build_order_accepts_resuming_owned_scaffold_without_resources() {
     );
     assert_eq!(
         worker.order().build_intent_tile(),
-        Some((EntityKind::Depot, 4, 4))
+        Some((EntityKind::CityCentre, 4, 4))
     );
     assert_eq!(players[0].steel, 0, "resume order should not charge steel");
     assert_eq!(players[0].oil, 0, "resume order should not charge oil");
@@ -321,7 +321,7 @@ fn build_order_accepts_new_build_without_current_resources() {
             1,
             SimCommand::Build {
                 units: vec![worker],
-                building: EntityKind::Depot,
+                building: EntityKind::CityCentre,
                 tile_x: 4,
                 tile_y: 4,
                 queued: false,
@@ -341,13 +341,51 @@ fn build_order_accepts_new_build_without_current_resources() {
     assert!(
         entities
             .iter()
-            .all(|entity| entity.kind != EntityKind::Depot),
+            .all(|entity| entity.kind != EntityKind::CityCentre),
         "build command admission must not spawn a scaffold"
     );
     assert!(
         events.get(&1).is_none_or(Vec::is_empty),
         "resource shortage should be reported on arrival, not at command issue"
     );
+}
+
+#[test]
+fn build_order_rejects_disabled_supply_depot() {
+    let map = flat_map(16);
+    let mut entities = EntityStore::new();
+    let worker = entities
+        .spawn_unit(1, EntityKind::Worker, 64.0, 64.0)
+        .expect("worker should spawn");
+    let mut players = vec![player_state(1)];
+
+    let events = apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(
+            1,
+            SimCommand::Build {
+                units: vec![worker],
+                building: EntityKind::Depot,
+                tile_x: 4,
+                tile_y: 4,
+                queued: false,
+            },
+        )],
+    );
+
+    assert!(
+        !matches!(
+            entities
+                .get(worker)
+                .expect("worker should remain alive")
+                .order(),
+            Order::Build(_)
+        ),
+        "disabled Supply Depot build commands must not issue an order"
+    );
+    assert_notice(&events, 1, "Building unavailable");
 }
 
 #[test]
@@ -471,9 +509,9 @@ fn build_with_multiple_selected_workers_uses_idle_closest_worker() {
             1,
             SimCommand::Build {
                 units: vec![busy_close, idle_far, idle_close],
-                building: EntityKind::Depot,
-                tile_x: 15,
-                tile_y: 15,
+                building: EntityKind::CityCentre,
+                tile_x: 12,
+                tile_y: 12,
                 queued: false,
             },
         )],
@@ -517,7 +555,7 @@ fn queued_builds_distribute_across_selected_workers_by_queue_length() {
                     1,
                     SimCommand::Build {
                         units: vec![first, second],
-                        building: EntityKind::Depot,
+                        building: EntityKind::CityCentre,
                         tile_x: 10 + i,
                         tile_y: 10,
                         queued: true,
@@ -548,7 +586,7 @@ fn queued_build_prefers_idle_worker_over_closer_active_builder() {
     entities
         .get_mut(west)
         .expect("west worker should exist")
-        .set_order(Order::build(EntityKind::Depot, 8, 16));
+        .set_order(Order::build(EntityKind::CityCentre, 8, 16));
 
     apply(
         &map,
@@ -557,7 +595,7 @@ fn queued_build_prefers_idle_worker_over_closer_active_builder() {
             1,
             SimCommand::Build {
                 units: vec![west, east],
-                building: EntityKind::Depot,
+                building: EntityKind::CityCentre,
                 tile_x: 9,
                 tile_y: 16,
                 queued: true,
@@ -571,7 +609,7 @@ fn queued_build_prefers_idle_worker_over_closer_active_builder() {
     );
     assert_eq!(
         entities.get(east).unwrap().queued_orders(),
-        &[OrderIntent::build(EntityKind::Depot, 9, 16)],
+        &[OrderIntent::build(EntityKind::CityCentre, 9, 16)],
         "idle worker should receive the next queued build"
     );
 }
@@ -589,7 +627,7 @@ fn repeated_invalid_queued_builds_stay_bounded() {
                 1,
                 SimCommand::Build {
                     units: vec![worker],
-                    building: EntityKind::Depot,
+                    building: EntityKind::CityCentre,
                     tile_x: u32::MAX,
                     tile_y: u32::MAX,
                     queued: true,

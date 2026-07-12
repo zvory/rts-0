@@ -125,6 +125,7 @@ const DEFAULT_UNITS: &[EntityKind] = &[
 
 const DEFAULT_BUILDINGS: &[EntityKind] = &[
     EntityKind::CityCentre,
+    // Retained for replay and fixture compatibility, but unavailable in the current build catalog.
     EntityKind::Depot,
     EntityKind::Barracks,
     EntityKind::TrainingCentre,
@@ -137,7 +138,6 @@ const DEFAULT_BUILDINGS: &[EntityKind] = &[
 
 const DEFAULT_WORKER_BUILDABLES: &[EntityKind] = &[
     EntityKind::CityCentre,
-    EntityKind::Depot,
     EntityKind::Barracks,
     EntityKind::TrainingCentre,
     EntityKind::ResearchComplex,

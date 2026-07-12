@@ -11,7 +11,6 @@ use super::AiIntent;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum StrategicGoal {
     Economy,
-    Supply,
     Expansion,
     Tech,
     Production,
@@ -152,7 +151,6 @@ pub(super) struct TraceInput<'a> {
     pub(super) start_budget: SpendBudget,
     pub(super) end_budget: SpendBudget,
     pub(super) reservations: ReservationCounts,
-    pub(super) wants_depot: bool,
     pub(super) save_for_expansion: bool,
     pub(super) expansion_blockers: &'a [ExpansionBlocker],
     pub(super) expansion_blocks_tech_path: bool,
@@ -171,7 +169,6 @@ pub(super) struct TraceInput<'a> {
 pub(super) fn build_manager_trace(input: TraceInput<'_>) -> ManagerOutputTrace {
     let mut goals = vec![
         goal_trace(StrategicGoal::Economy, input),
-        goal_trace(StrategicGoal::Supply, input),
         goal_trace(StrategicGoal::Expansion, input),
         goal_trace(StrategicGoal::Tech, input),
         goal_trace(StrategicGoal::Production, input),
@@ -195,7 +192,6 @@ fn goal_trace(goal: StrategicGoal, input: TraceInput<'_>) -> GoalTrace {
         _ => intents_for_goal(goal, input.intents),
     };
     let selected = match goal {
-        StrategicGoal::Supply => has_build_intent(input.intents, EntityKind::Depot),
         StrategicGoal::Expansion => has_city_centre_intent(input.intents),
         StrategicGoal::Tech => input.intents.iter().any(|intent| {
             matches!(intent, AiIntent::Build { kind } if input.required_tech_path.contains(kind))
@@ -266,18 +262,6 @@ fn blockers_for_goal(
     }
     let mut blockers = Vec::new();
     match goal {
-        StrategicGoal::Supply => {
-            if !input.wants_depot {
-                blockers.push(GoalBlocker::MissingPrerequisite("supply_not_needed"));
-            } else if input.save_for_required_tech_building {
-                blockers.push(GoalBlocker::DeferredForTech);
-            } else {
-                push_budget_blockers(&mut blockers, input.end_budget, EntityKind::Depot);
-                if input.facts.available_builder_count() == 0 {
-                    blockers.push(GoalBlocker::NoBuilder);
-                }
-            }
-        }
         StrategicGoal::Expansion => {
             if !input.expansion_blockers.is_empty() {
                 blockers.extend(input.expansion_blockers.iter().map(expansion_blocker_trace));
@@ -395,12 +379,6 @@ fn intent_matches_goal(goal: StrategicGoal, intent: &AiIntent) -> bool {
             AiIntent::Train {
                 kind: EntityKind::Worker
             } | AiIntent::Gather { .. }
-        ),
-        StrategicGoal::Supply => matches!(
-            intent,
-            AiIntent::Build {
-                kind: EntityKind::Depot
-            }
         ),
         StrategicGoal::Expansion => {
             matches!(

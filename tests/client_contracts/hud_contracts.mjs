@@ -566,6 +566,7 @@ function fakeHudRootWithoutResourceSpans() {
   assert(buildCard.slots[0].label === "City Centre", "worker build first slot should stay City Centre");
   assert(buildCard.slots[0].hotkey === "Q", "worker build hotkey Q should be preserved");
   assert(buildCard.slots[0].unaffordable, "unaffordable build buttons stay clickable for feedback");
+  assert(buildCard.slots[1] == null, "worker build menu keeps the former Supply Depot W slot empty");
   assert(buildCard.slots[3].label === "Training Centre", "worker build menu should include Training Centre");
   assert(!buildCard.slots[3].enabled, "locked build buttons should be disabled");
   assert(buildCard.slots[3].title === "Requires Barracks", "locked build tooltip should explain requirement");

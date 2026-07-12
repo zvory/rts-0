@@ -526,9 +526,9 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 
 | kind                       | player-facing name | hp  | sight | cost | foot | buildTicks | notes |
 |----------------------------|--------------------|-----|-------|-----|------|-----------|-------|
-| city_centre                | City Centre        | 600 | 1     | 225 | 3x3  | 550       | trains workers; +10 supply; players start with one free; completed owned City Centres are Scout Plane launch anchors |
-| zamok                      | Zamok              | 600 | 1     | 0   | 3x3  | 0         | Ekat start building; +10 supply; trains Golem; no research in first playable slice |
-| depot                      | Supply Depot       | 110 | 1     | 100 | 2x2  | 300       | +8 supply |
+| city_centre                | City Centre        | 600 | 1     | 225 | 3x3  | 550       | trains workers; +50 supply; players start with one free; completed owned City Centres are Scout Plane launch anchors |
+| zamok                      | Zamok              | 600 | 1     | 0   | 3x3  | 0         | Ekat start building; +50 supply; trains Golem; no research in first playable slice |
+| depot                      | Supply Depot       | 110 | 1     | 100 | 2x2  | 300       | disabled in the current experiment (not buildable and no command-card button); retained for replay and fixture compatibility; +8 supply if present |
 | barracks                   | Barracks           | 165 | 1     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, and panzerfaust; Panzerfaust and Machine Gunner require completed Training Centre; requires a City Centre |
 | training_centre            | Training Centre    | 300 | 1     | 100 steel + 50 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner and panzerfaust training at barracks and researches Methamphetamines and Entrenchment; requires a City Centre and Barracks |
 | research_complex           | R&D Complex        | 165 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Medium Guns, Heavy Guns, Artillery Fire Control, Tank Production, Command Car, Mortar Autocast, and Smoke Plus; requires a City Centre and Training Centre |

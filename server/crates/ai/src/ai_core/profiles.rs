@@ -23,7 +23,6 @@ const AI_2_1_SECOND_FACTORY_FLOAT_THRESHOLD: ResourceFloatThreshold = ResourceFl
 pub(crate) struct AiProfile {
     pub(crate) id: &'static str,
     pub(crate) workers: WorkerPolicy,
-    pub(crate) supply: SupplyPolicy,
     pub(crate) buildings: BuildingPolicy,
     pub(crate) extra_factories: Option<ExtraFactoryPolicy>,
     pub(crate) production: ProductionPolicy,
@@ -79,12 +78,6 @@ impl Ratio {
             .saturating_add(self.denominator - 1)
             / self.denominator
     }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct SupplyPolicy {
-    pub(crate) free_supply_buffer: u32,
-    pub(crate) emergency_depot_threshold: u32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -249,10 +242,6 @@ pub(crate) static AI_2_1: AiProfile = AiProfile {
         steel_saturation_fraction: Ratio::new(1, 1),
         steel_worker_cap: None,
         extra_oil_workers: 12,
-    },
-    supply: SupplyPolicy {
-        free_supply_buffer: 8,
-        emergency_depot_threshold: 3,
     },
     buildings: BuildingPolicy {
         barracks_curve: BarracksCurve {

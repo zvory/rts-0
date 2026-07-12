@@ -56,7 +56,6 @@ use self::production::{
     production_building_order, production_uses_building, should_build_extra_factory,
     should_build_extra_turtle_gun_works, should_save_for_first_tech_unit,
     should_save_for_required_tech_building, try_build_kind, unit_counts_for_priorities,
-    wants_depot,
 };
 use self::trace::{build_manager_trace, ManagerOutputTrace, TraceInput};
 use self::turtle::{
@@ -462,29 +461,9 @@ where
         expansion_plan: &expansion_plan,
         signals: EconomyManagerSignals {
             oil_demand: oil_demand_signal(profile, memory, panic_plan),
-            defer_supply_for_tech: save_for_required_tech_building,
-            emergency_supply: facts.free_supply <= profile.supply.emergency_depot_threshold,
             defer_worker_training_for_tech: defensive_panic.active,
         },
     });
-
-    if should_build_depot_from_economy_manager(&economy_manager_output)
-        && try_build_kind(
-            observation,
-            &facts,
-            &mut actions,
-            &builder_pools,
-            profile,
-            EntityKind::Depot,
-            build_search,
-            &mut placeable,
-        )
-        .is_some()
-    {
-        intents.push(AiIntent::Build {
-            kind: EntityKind::Depot,
-        });
-    }
 
     if should_build_expansion_from_economy_manager(&economy_manager_output) {
         if try_build_expansion_city_centre(
@@ -926,7 +905,6 @@ where
         start_budget,
         end_budget: *actions.budget(),
         reservations: actions.reservations().counts(),
-        wants_depot: wants_depot(&facts, profile),
         save_for_expansion,
         expansion_blockers: &expansion_plan.blockers,
         expansion_blocks_tech_path,
@@ -1044,10 +1022,6 @@ fn oil_demand_signal(
     panic_plan
         .map(|plan| OilDemandSignal::ExactWorkers(plan.oil_workers))
         .unwrap_or(OilDemandSignal::ProfileDefault)
-}
-
-fn should_build_depot_from_economy_manager(output: &EconomyManagerOutput) -> bool {
-    output.proposes(EconomyProposal::BuildSupplyDepot)
 }
 
 fn should_build_expansion_from_economy_manager(output: &EconomyManagerOutput) -> bool {

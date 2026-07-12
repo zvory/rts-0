@@ -2,6 +2,7 @@ import { ABILITY, DEFAULT_FACTION_ID, KIND, SETUP, UPGRADE, isBuilding, isUnit }
 import {
   STATS,
   UPGRADES,
+  WORKER_BUILD_CARD_SLOTS,
   commandCardAbilitiesForFaction,
   researchableUpgradesForFaction,
   trainableUnitsForFaction,
@@ -236,7 +237,12 @@ export function buildWorkerBuildCard(ctx) {
   const factionId = commandFactionId(ctx);
   const slots = [];
   const sigParts = [];
-  for (const kind of workerBuildablesForFaction(factionId)) {
+  const buildables = new Set(workerBuildablesForFaction(factionId));
+  for (const kind of WORKER_BUILD_CARD_SLOTS) {
+    if (!kind || !buildables.has(kind)) {
+      slots.push(null);
+      continue;
+    }
     const st = STATS[kind];
     if (!st) continue;
     const availability = buildAvailability(ctx, kind, resources);
