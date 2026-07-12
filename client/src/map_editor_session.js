@@ -421,19 +421,34 @@ export function addSymmetricDraftLocations(draft, {
   const target = normalizedDraftTile(draft, tile, radius);
   if (!target) return draftEditError("Choose a valid map tile.");
   const locations = symmetricMapTiles(draft.terrain.length, [target], symmetry);
-  const limit = kind === "start" ? MAP_EDITOR_MAX_START_LOCATIONS : MAP_EDITOR_MAX_BASE_SITES;
-  const current = kind === "start" ? draft.startLocations.length : draft.baseSites.length;
-  if (current + locations.length > limit) return draftEditError(`A map supports at most ${limit} ${kind === "start" ? "start locations" : "base sites"}.`);
-  if (kind === "start" && draft.baseSites.length + locations.length > MAP_EDITOR_MAX_BASE_SITES) {
+  if (kind === "start") {
+    const additions = locations.filter((location) => (
+      !draft.startLocations.some((start) => sameLocation(start, location))
+    ));
+    if (draft.startLocations.length + additions.length > MAP_EDITOR_MAX_START_LOCATIONS) {
+      return draftEditError(`A map supports at most ${MAP_EDITOR_MAX_START_LOCATIONS} start locations.`);
+    }
+    const missingBases = additions.filter((location) => (
+      !draft.baseSites.some((site) => sameLocation(site, location))
+    ));
+    if (draft.baseSites.length + missingBases.length > MAP_EDITOR_MAX_BASE_SITES) {
+      return draftEditError(`A map supports at most ${MAP_EDITOR_MAX_BASE_SITES} base sites.`);
+    }
+    for (const location of additions) {
+      if (!draft.baseSites.some((site) => sameLocation(site, location))) {
+        draft.baseSites.push(copyLocation(location));
+      }
+      draft.startLocations.push(copyLocation(location));
+    }
+    return { ok: true, count: additions.length };
+  }
+  if (draft.baseSites.length + locations.length > MAP_EDITOR_MAX_BASE_SITES) {
     return draftEditError(`A map supports at most ${MAP_EDITOR_MAX_BASE_SITES} base sites.`);
   }
   if (locations.some((location) => draft.baseSites.some((site) => sameLocation(site, location)))) {
     return draftEditError("A base already uses that tile.");
   }
-  for (const location of locations) {
-    draft.baseSites.push(copyLocation(location));
-    if (kind === "start") draft.startLocations.push(copyLocation(location));
-  }
+  for (const location of locations) draft.baseSites.push(copyLocation(location));
   return { ok: true, count: locations.length };
 }
 
@@ -443,7 +458,6 @@ export function removeDraftLocation(draft, { kind = "base", locationIndex = 0 } 
   const location = collection?.[index];
   if (!location) return draftEditError("That map location is no longer present.");
   if (kind === "start") {
-    if (draft.startLocations.length <= 1) return draftEditError("A map needs at least one start location.");
     draft.startLocations.splice(index, 1);
     return { ok: true };
   }
@@ -520,7 +534,6 @@ function normalizeDraft(draft) {
   draft.terrain = draft.terrain.map((row) => [...row].map((ch) => CHAR_TO_TERRAIN[ch] === undefined ? "." : ch).join(""));
   draft.startLocations = normalizeLocations(draft.startLocations, size).slice(0, MAP_EDITOR_MAX_START_LOCATIONS);
   draft.baseSites = normalizeBaseSites(draft.baseSites, draft.startLocations, size);
-  if (!draft.startLocations.length) throw new Error("Map needs at least one start location.");
   protectDraftBaseTerrain(draft);
 }
 

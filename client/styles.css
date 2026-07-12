@@ -5431,9 +5431,17 @@ input[type="text"]:focus {
 }
 
 .map-editor-status {
-  padding: 9px;
-  border-radius: 4px;
+  flex: 0 0 auto;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(208, 184, 132, 0.2);
   background: rgba(255, 255, 255, 0.045);
+}
+
+.map-editor-status[data-state="error"] {
+  border-bottom-color: rgba(226, 130, 120, 0.72);
+  background: rgba(126, 38, 32, 0.72);
+  color: #ffd7d2;
+  font-weight: 700;
 }
 
 @media (max-width: 650px) {

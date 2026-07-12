@@ -71,10 +71,9 @@ export class MapEditorPanel {
         this.renderTerrain(),
         this.renderLocations(),
         this.renderActions(),
-        this.renderStatus(),
       );
     }
-    this.el.append(header, body);
+    this.el.append(header, this.renderStatus(), body);
     if (scroll) {
       body.scrollLeft = scroll.left;
       body.scrollTop = scroll.top;
@@ -211,14 +210,15 @@ export class MapEditorPanel {
     const base = bases[this.selectedBaseIndex];
     this.viewport.setSelectedBase(base?.index ?? null);
     section.append(
-      readout(`Start locations set player capacity (${starts.length}/${MAP_EDITOR_MAX_START_LOCATIONS}). Every base site always spawns resources.`),
+      readout(`Start locations set player capacity (${starts.length}/${MAP_EDITOR_MAX_START_LOCATIONS}). Drafts may temporarily have none. Every base site always spawns resources.`),
       startPicker,
-      readout(`Start ${this.selectedStartIndex + 1}: ${start.x}, ${start.y}`),
+      readout(start ? `Start ${this.selectedStartIndex + 1}: ${start.x}, ${start.y}` : "No start locations yet. Choose Add start, then click the map."),
       button("Move start", () => this.armLocation("start", this.selectedStartIndex), {
+        disabled: !start,
         active: this.viewport.tool?.kind === "start" && this.viewport.tool?.locationIndex === this.selectedStartIndex,
       }),
       button("Add start", () => this.armLocation("start", null, true), { disabled: starts.length >= MAP_EDITOR_MAX_START_LOCATIONS }),
-      button("Remove start", () => this.removeLocation("start", this.selectedStartIndex), { disabled: starts.length <= 1 }),
+      button("Remove start", () => this.removeLocation("start", this.selectedStartIndex), { disabled: !start }),
       basePicker,
       readout(base ? `Base ${this.selectedBaseIndex + 1}: ${base.x}, ${base.y}` : "No neutral base sites yet."),
       button("Move base", () => this.armLocation("base", base?.index), {
@@ -253,8 +253,9 @@ export class MapEditorPanel {
     const status = document.createElement("p");
     status.className = "map-editor-status";
     status.dataset.state = this.statusError ? "error" : "ok";
-    status.setAttribute("aria-live", "polite");
-    status.textContent = this.status;
+    status.setAttribute("role", this.statusError ? "alert" : "status");
+    status.setAttribute("aria-live", this.statusError ? "assertive" : "polite");
+    status.textContent = this.statusError ? `Error: ${this.status}` : this.status;
     return status;
   }
 
