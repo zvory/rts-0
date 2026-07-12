@@ -507,6 +507,7 @@ pub fn protocol_contract() -> ProtocolContract {
             ("GATHER", "gather"),
             ("BUILD", "build"),
             ("TRAIN", "train"),
+            ("SET_PRODUCTION_REPEAT", "setProductionRepeat"),
             ("RESEARCH", "research"),
             ("CANCEL", "cancel"),
             ("STOP", "stop"),
@@ -805,6 +806,7 @@ fn compact_slot_schemas() -> CompactSlotSchemas {
             optional_field(33, "scoutPlane"),
             optional_field(34, "prodScoutPlaneQueued"),
             optional_field(35, "panzerfaustLoaded"),
+            optional_code_field(36, "prodRepeatKind", "kind"),
         ],
         event: event_slot_schemas(),
         trench: vec![

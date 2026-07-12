@@ -1,9 +1,11 @@
-use crate::game::entity::{EntityStore, OrderIntent, RallyIntent, RallyKind};
+use crate::config;
+use crate::game::entity::{EntityStore, OrderIntent, ProdItem, RallyIntent, RallyKind};
 use crate::game::map::Map;
 use crate::game::services::move_coordinator::MoveCoordinator;
-use crate::game::upgrade::UpgradeKind;
+use crate::game::upgrade::{self, UpgradeKind};
 use crate::game::PlayerState;
 use crate::game::{ability::AbilityKind, entity::EntityKind};
+use crate::rules;
 
 /// Advance each building's front production item; on completion spawn the unit adjacent to the
 /// building and remove the item from the queue. If every spawn point is blocked, keep the complete
@@ -16,7 +18,84 @@ pub(crate) fn production_system(
     coordinator: &mut MoveCoordinator<'_>,
     _events: &mut std::collections::HashMap<u32, Vec<crate::protocol::Event>>,
 ) {
+    let mut completed_buildings_by_owner = None;
     for id in entities.ids() {
+        let repeat_request = entities.get(id).and_then(|producer| {
+            (producer.hp > 0
+                && producer.is_building()
+                && !producer.under_construction()
+                && producer.prod_queue().is_empty())
+            .then(|| (producer.owner, producer.kind, producer.repeat_production()))
+            .and_then(|(owner, producer_kind, unit)| unit.map(|unit| (owner, producer_kind, unit)))
+        });
+        if let Some((owner, producer_kind, unit)) = repeat_request {
+            // Standing production failures are intentionally silent. The intent stays armed and
+            // retries on later ticks when resources, supply, or requirements permit it.
+            let faction_id = players
+                .iter()
+                .find(|player| player.id == owner)
+                .map(|player| player.faction_id.clone())
+                .unwrap_or_else(|| rules::faction::DEFAULT_FACTION_ID.to_string());
+            // Multiple idle repeat producers commonly retry on the same tick while supply- or
+            // resource-blocked. Build the prerequisite index only when repeat production is
+            // active, then share its single world scan across every retry this tick.
+            let completed_buildings_by_owner =
+                completed_buildings_by_owner.get_or_insert_with(|| {
+                    let mut by_owner = std::collections::HashMap::<u32, Vec<EntityKind>>::new();
+                    for entity in entities.iter().filter(|entity| {
+                        entity.is_building() && !entity.under_construction()
+                    }) {
+                        by_owner.entry(entity.owner).or_default().push(entity.kind);
+                    }
+                    by_owner
+                });
+            let owned_complete = completed_buildings_by_owner
+                .get(&owner)
+                .map(Vec::as_slice)
+                .unwrap_or_default();
+            let requirements_met = rules::economy::train_requirement_met_for_faction(
+                &faction_id,
+                unit,
+                owned_complete,
+            );
+            let producer_compatible =
+                rules::economy::trainable_units_for_faction(&faction_id, producer_kind)
+                    .contains(&unit);
+            let stats = config::unit_stats(unit);
+            if let (true, true, Some(stats), Some(player)) = (
+                producer_compatible,
+                requirements_met,
+                stats,
+                players.iter_mut().find(|player| player.id == owner),
+            ) {
+                let upgrade_met = upgrade::required_for_unit(unit)
+                    .is_none_or(|required| player.upgrades.contains(&required));
+                let cost = rules::economy::resource_cost(unit);
+                let supply = rules::economy::supply_cost(unit);
+                let supply_available = player
+                    .supply_used
+                    .checked_add(supply)
+                    .is_some_and(|used| used <= player.supply_cap);
+                if upgrade_met && supply_available && player.spend_cost(cost) {
+                    if player.reserve_supply(supply) {
+                        let queued = entities.get_mut(id).is_some_and(|producer| {
+                            producer.push_production(ProdItem {
+                                unit,
+                                progress: 0,
+                                total: stats.build_ticks,
+                            })
+                        });
+                        if !queued {
+                            player.refund_cost(cost);
+                            player.release_supply(supply);
+                        }
+                    } else {
+                        player.refund_cost(cost);
+                    }
+                }
+            }
+        }
+
         let completed_research = {
             match entities.get_mut(id) {
                 Some(b)

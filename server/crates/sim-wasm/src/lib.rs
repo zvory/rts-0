@@ -384,6 +384,7 @@ impl CorePredictor {
             | Command::SetAutocast { .. }
             | Command::Gather { .. }
             | Command::Train { .. }
+            | Command::SetProductionRepeat { .. }
             | Command::Research { .. }
             | Command::Cancel { .. }
             | Command::SetRally { .. } => {
@@ -723,6 +724,7 @@ fn command_kind(command: &Command) -> &'static str {
         Command::Gather { .. } => "gather",
         Command::Build { .. } => "build",
         Command::Train { .. } => "train",
+        Command::SetProductionRepeat { .. } => "setProductionRepeat",
         Command::Research { .. } => "research",
         Command::Cancel { .. } => "cancel",
         Command::Stop { .. } => "stop",
@@ -893,6 +895,28 @@ mod tests {
         assert!(diagnostics
             .unsupported_fields
             .contains(&"combat".to_string()));
+    }
+
+    #[test]
+    fn repeat_production_command_is_tracked_as_authoritative_only() {
+        let mut predictor = predictor_from_start_payload(start_payload(), 1);
+        predictor.enqueue_command(
+            8,
+            Command::SetProductionRepeat {
+                buildings: vec![301],
+                unit: "rifleman".to_string(),
+                enabled: true,
+            },
+        );
+
+        let diagnostics = predictor.diagnostics();
+        assert_eq!(
+            diagnostics.pending_command_kinds,
+            vec!["setProductionRepeat"]
+        );
+        assert!(diagnostics
+            .disabled_reasons
+            .contains(&"commandUnsupported".to_string()));
     }
 
     #[test]

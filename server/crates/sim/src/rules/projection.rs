@@ -349,6 +349,11 @@ pub fn project_entity(
             view.prod_queue = Some(entity.research_queue().len() as u32);
         }
     }
+    if owner_or_ally {
+        view.prod_repeat_kind = entity
+            .repeat_production()
+            .map(|unit| protocol::kind_to_wire(unit).to_string());
+    }
 
     // Rally/order/ability details are private in normal projections. Full-world diagnostic
     // projections intentionally inspect each entity through its real owner instead of a fake viewer.

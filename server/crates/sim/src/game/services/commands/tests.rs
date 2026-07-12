@@ -2,8 +2,8 @@ use super::*;
 use std::collections::BTreeSet;
 
 use crate::game::entity::{
-    BuildPhase, EntityKind, EntityStore, GatherPhase, Order, OrderIntent, RallyKind, WeaponSetup,
-    MAX_QUEUED_ORDERS,
+    BuildPhase, EntityKind, EntityStore, GatherPhase, Order, OrderIntent, ProdItem, RallyKind,
+    WeaponSetup, MAX_QUEUED_ORDERS,
 };
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::occupancy::{footprint_center, footprint_tiles, Occupancy};

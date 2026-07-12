@@ -628,6 +628,9 @@ impl Serialize for CompactEntity<'_> {
         if entity.panzerfaust_loaded.is_some() {
             len = 36;
         }
+        if entity.prod_repeat_kind.is_some() {
+            len = 37;
+        }
 
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&entity.id)?;
@@ -739,6 +742,9 @@ impl Serialize for CompactEntity<'_> {
         }
         if len > 35 {
             seq.serialize_element(&entity.panzerfaust_loaded)?;
+        }
+        if len > 36 {
+            seq.serialize_element(&entity.prod_repeat_kind.as_deref().map(kind_code))?;
         }
         seq.end()
     }

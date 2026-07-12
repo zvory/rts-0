@@ -3311,11 +3311,11 @@ input[type="text"]:focus {
   padding: 0;
   transition: border-color 0.1s ease, box-shadow 0.1s ease, transform 0.04s ease;
 }
-.cmd-btn:hover:not(:disabled) {
+.cmd-btn:hover:not(:disabled):not(.primary-disabled) {
   border-color: var(--accent);
   box-shadow: inset 0 0 0 1px var(--panel-glow);
 }
-.cmd-btn.active:not(:disabled) {
+.cmd-btn.active:not(:disabled):not(.primary-disabled) {
   border-color: var(--accent);
   box-shadow: inset 0 0 0 2px var(--accent), 0 0 10px var(--panel-glow);
 }
@@ -3335,7 +3335,7 @@ input[type="text"]:focus {
   opacity: 0.82;
   animation: cmd-autocast-swirl 1.25s linear infinite;
 }
-.cmd-btn:active:not(:disabled) {
+.cmd-btn:active:not(:disabled):not(.primary-disabled) {
   transform: translateY(1px);
 }
 .cmd-btn:disabled {
@@ -3344,7 +3344,11 @@ input[type="text"]:focus {
 .cmd-btn:disabled .cmd-icon,
 .cmd-btn:disabled .cmd-label,
 .cmd-btn:disabled .cmd-hotkey,
-.cmd-btn:disabled .cmd-cost {
+.cmd-btn:disabled .cmd-cost,
+.cmd-btn.primary-disabled .cmd-icon,
+.cmd-btn.primary-disabled .cmd-label,
+.cmd-btn.primary-disabled .cmd-hotkey,
+.cmd-btn.primary-disabled .cmd-cost {
   opacity: 0.38;
 }
 .cmd-btn.unaffordable:not(:disabled) .cmd-icon,

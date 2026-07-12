@@ -48,6 +48,7 @@ export function syncCooldownClockElement(button, cooldownClocks) {
  * @param {() => void} [opts.onMouseEnter] hover handler.
  * @param {() => void} [opts.onMouseLeave] hover-exit handler.
  * @param {() => void} [opts.onUnavailable] click handler for unaffordable buttons.
+ * @param {(ev: MouseEvent) => void} [opts.onAltClick] Alt-click handler.
  * @param {(ev: MouseEvent) => void} [opts.onContextMenu] right-click handler.
  * @param {(ev: MouseEvent) => void} opts.onClick click handler (skipped when disabled).
  * @returns {HTMLButtonElement}
@@ -55,11 +56,18 @@ export function syncCooldownClockElement(button, cooldownClocks) {
 export function createCommandButton(opts) {
   const btn = document.createElement("button");
   btn.type = "button";
+  const hasSecondaryAction =
+    typeof opts.onAltClick === "function" || typeof opts.onContextMenu === "function";
+  const primaryDisabled = !opts.enabled && !opts.unaffordable;
   const classes = ["cmd-btn"];
   if (opts.cls) classes.push(opts.cls);
   if (opts.unaffordable) classes.push("unaffordable");
+  if (primaryDisabled && hasSecondaryAction) classes.push("primary-disabled");
   btn.className = classes.join(" ");
-  btn.disabled = !opts.enabled && !opts.unaffordable;
+  // A native-disabled button cannot receive Alt-click or context-menu pointer events. Keep
+  // secondary-action buttons interactive while the primary action is unavailable; the click
+  // dispatcher below still suppresses an ordinary primary click.
+  btn.disabled = primaryDisabled && !hasSecondaryAction;
   if (opts.title) btn.title = opts.title;
   if (opts.hotkey) {
     btn.dataset.hotkey = opts.hotkey;
@@ -111,15 +119,20 @@ export function createCommandButton(opts) {
     costHtml +
     (opts.tooltipHtml ? `<span class="cmd-tooltip" role="tooltip">${opts.tooltipHtml}</span>` : "");
 
-  if (opts.enabled && typeof opts.onClick === "function") {
+  if (
+    typeof opts.onAltClick === "function" ||
+    (opts.enabled && typeof opts.onClick === "function") ||
+    (opts.unaffordable && typeof opts.onUnavailable === "function")
+  ) {
     btn.addEventListener("click", (ev) => {
       ev.preventDefault();
-      opts.onClick(ev);
-    });
-  } else if (opts.unaffordable && typeof opts.onUnavailable === "function") {
-    btn.addEventListener("click", (ev) => {
-      ev.preventDefault();
-      opts.onUnavailable(ev);
+      if (ev.altKey && typeof opts.onAltClick === "function") {
+        opts.onAltClick(ev);
+      } else if (opts.enabled && typeof opts.onClick === "function") {
+        opts.onClick(ev);
+      } else if (opts.unaffordable && typeof opts.onUnavailable === "function") {
+        opts.onUnavailable(ev);
+      }
     });
   }
   return btn;

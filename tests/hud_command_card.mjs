@@ -254,6 +254,12 @@ function buttonSlots(card) {
     groupCooldownClocks: () => [],
   });
   const panzerfaustCommandId = kriegsiaCommandId("train", KIND.PANZERFAUST);
+  assert.deepEqual(panzerfaustCard.slots[0].contextIntent, {
+    type: "setProductionRepeat",
+    buildingIds: [barracks.id],
+    unit: KIND.RIFLEMAN,
+    enabled: true,
+  });
   assert.deepEqual(buttonSlots(panzerfaustCard).slice(0, 3), [
     { commandId: kriegsiaCommandId("train", KIND.RIFLEMAN), slotIndex: 0, hotkey: "Q" },
     { commandId: kriegsiaCommandId("train", KIND.MACHINE_GUNNER), slotIndex: 1, hotkey: "W" },

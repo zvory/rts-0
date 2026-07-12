@@ -91,6 +91,7 @@ export const CMD = Object.freeze({
   GATHER: "gather",
   BUILD: "build",
   TRAIN: "train",
+  SET_PRODUCTION_REPEAT: "setProductionRepeat",
   RESEARCH: "research",
   CANCEL: "cancel",
   STOP: "stop",

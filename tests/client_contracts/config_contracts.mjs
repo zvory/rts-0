@@ -1028,7 +1028,10 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     assert(scoutCarButton?.dataset.hotkey === "Q", "Scout Car training should keep the Q slot");
     assert(tankButton?.dataset.hotkey === "W", "Tank training should occupy the top-middle W slot");
     assert(commandCarButton?.dataset.hotkey === "E", "Command Car training should occupy the top-right E slot");
-    assert(commandCarButton?.disabled, "Command Car training should be disabled before its R&D unlock");
+    assert(
+      commandCarButton && !commandCarButton.disabled && commandCarButton.className.includes("primary-disabled"),
+      "Command Car training should keep its primary action disabled while allowing the repeat toggle before unlock",
+    );
     assert(!tankResearchButton, "Tank Production research should move out of Vehicle Works");
 
     renderedButtons.length = 0;
