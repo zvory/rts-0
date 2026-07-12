@@ -21,7 +21,7 @@ objects. Build it beside the existing Pixi call path; Phase 3.5 owns renderer cu
   authoritative fog-source subview, then assemble the final renderer frame with the updated fog
   revisions. A backend cannot run between those stages or trigger another state/fog query.
 - Grow the existing frame-local entity cache into a documented shared frame context plus a narrow
-  `RendererFrame`. Keep static map presentation separately versioned so terrain does not need to be
+  `PresentationFrameV1`. Keep static map presentation separately versioned so terrain does not need to be
   recopied every frame.
 - Keep authoritative/current/fog-source variants in shared-client subviews used by fog, HUD,
   minimap, and diagnostics only. The renderer submodel includes only renderable received entities,
@@ -40,7 +40,7 @@ objects. Build it beside the existing Pixi call path; Phase 3.5 owns renderer cu
   - observer/Lab map overlays and visual sample inputs; and
   - bounded diagnostics/context needed to explain fallbacks and frame cost.
 - Build renderer feedback and ownership/relationship decisions once in the shared presentation
-  assembly for every field admitted to RendererFrame. Do not place Babylon/Pixi nodes, textures, materials, matrices,
+  assembly for every field admitted to PresentationFrameV1. Do not place Babylon/Pixi nodes, textures, materials, matrices,
   cameras, mutable `GameState`, mutable `ClientIntent`, or transport objects in the frame.
 - Define frame lifetime precisely. Ordinary scalar/object/array records are detached and frozen in
   development/contracts; large fog/terrain data uses the Phase 0 revisioned immutable
@@ -68,7 +68,7 @@ objects. Build it beside the existing Pixi call path; Phase 3.5 owns renderer cu
   own visual instance state and retain immutable grid snapshots by revision, but not a mutable
   shared model reference after render.
 - Static map revisions and fog revisions are explicit so backends can cache safely.
-- Hidden authoritative/current/fog-source variants never enter `RendererFrame` or backend
+- Hidden authoritative/current/fog-source variants never enter `PresentationFrameV1` or backend
   diagnostics. Explicit received reveals and remembered views are separate typed categories.
 - Phase 2 `SelectionScene` remains a shared input model outside the backend frame. A backend receives
   only visual selected state/anchors and never becomes picking authority.
@@ -78,7 +78,8 @@ objects. Build it beside the existing Pixi call path; Phase 3.5 owns renderer cu
 
 - No Babylon dependency or backend.
 - No Pixi `render(frame)` cutover or destructive-read reconciliation; Phase 3.5 owns them.
-- No transient event normalization/history; Phase 4 owns it.
+- No transient event normalization/history; Phase 6 adds the first real event shape only after the
+  Phase 5 playtest confirms it is needed.
 - No protocol change and no client-side hidden-state reconstruction.
 - No visual redesign, faction asset work, batching, or shadows.
 

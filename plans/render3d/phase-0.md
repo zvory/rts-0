@@ -87,9 +87,9 @@ choice. Freeze the following in `docs/design/client-rendering.md` and the ledger
   viewport/DPR, tier, warmup/sample/repetition policy, counter definitions, and budget formula.
 - The locked deterministic repository-authored tracked-vehicle fixture specification from `plan.md`.
 
-An intentionally deferred numeric implementation value such as Phase 7 scene scale must name the
-owning later phase and a deterministic decision rule. Otherwise Phase 0 returns `blocked` and does
-not mark its status done.
+An intentionally deferred numeric implementation value such as the representative asset's scene
+scale belongs to Phase 6 and must have a deterministic decision rule. Otherwise Phase 0 returns
+`blocked` and does not mark its status done.
 
 ## Explicit Exclusions
 

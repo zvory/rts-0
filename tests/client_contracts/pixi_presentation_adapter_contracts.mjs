@@ -25,11 +25,11 @@ assert(
 assert(
   PIXI_LEGACY_READ_ALLOWLIST.every((entry) => (
     Object.isFrozen(entry)
-    && typeof entry.removalOwner === "string"
-    && entry.removalOwner.trim().length > 0
-    && !Object.hasOwn(entry, "reviewTrigger")
+    && typeof entry.reviewTrigger === "string"
+    && entry.reviewTrigger.trim().length > 0
+    && !Object.hasOwn(entry, "removalOwner")
   )),
-  "every temporary Pixi compatibility read names a removal owner",
+  "every temporary Pixi compatibility read names a concrete review trigger",
 );
 
 const map = {
