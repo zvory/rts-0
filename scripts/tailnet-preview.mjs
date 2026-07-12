@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
-import { createReadStream, copyFileSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, createReadStream, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import http from "node:http";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,6 +14,8 @@ const HEALTH_PATH = "/_tailnet-preview/health";
 const PREVIEW_PATH_PREFIX = "/p/";
 const SERVICE_NAME = "rts-tailnet-preview";
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
+const SERVER_STARTUP_TIMEOUT_MS = 5_000;
+const SERVER_STOP_TIMEOUT_MS = 2_000;
 const MIME_TYPES = new Map([
   [".avif", "image/avif"],
   [".gif", "image/gif"],
@@ -66,6 +69,7 @@ export function parseArgs(argv) {
     source: "",
     host: "",
   };
+  const specified = new Set();
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -76,15 +80,20 @@ export function parseArgs(argv) {
     } else if (arg === "--port") {
       options.port = parsePort(argv[++index]);
     } else if (arg === "--root") {
-      options.root = path.resolve(String(argv[++index] || ""));
+      const root = argv[++index];
+      if (!root) throw new Error("--root requires a directory");
+      options.root = path.resolve(root);
     } else if (arg === "--ttl") {
+      specified.add(arg);
       options.ttlMs = parseDuration(argv[++index]);
     } else if (arg === "--serve") {
       options.serve = true;
     } else if (arg === "--stop") {
       options.stop = true;
     } else if (arg === "--host") {
+      specified.add(arg);
       options.host = String(argv[++index] || "").trim();
+      if (!options.host) throw new Error("--host requires an address");
     } else if (arg.startsWith("-")) {
       throw new Error(`unknown argument "${arg}"`);
     } else if (!options.source) {
@@ -95,18 +104,19 @@ export function parseArgs(argv) {
   }
 
   if (options.help) return options;
-  if (options.keep && options.ttlMs !== DEFAULT_TTL_MS) {
+  if (options.keep && specified.has("--ttl")) {
     throw new Error("--keep cannot be combined with --ttl");
   }
   if (options.serve) {
     if (!options.host) throw new Error("--serve requires --host");
-    if (options.source || options.stop || options.keep) {
+    if (options.source || options.stop || options.keep || specified.has("--ttl")) {
       throw new Error("--serve only accepts --root, --host, and --port");
     }
     return options;
   }
+  if (specified.has("--host")) throw new Error("--host is only valid with --serve");
   if (options.stop) {
-    if (options.source || options.keep || options.ttlMs !== DEFAULT_TTL_MS) {
+    if (options.source || options.keep || specified.has("--ttl")) {
       throw new Error("--stop only accepts --port and --root");
     }
     return options;
@@ -145,14 +155,23 @@ function previewId() {
 
 function ensureRoot(root) {
   mkdirSync(root, { recursive: true, mode: 0o700 });
+  const stat = lstatSync(root);
+  if (!stat.isDirectory()) {
+    throw new Error(`preview root must be a directory and not a symlink: ${root}`);
+  }
+  chmodSync(root, 0o700);
+}
+
+function previewDirectory(root, id) {
+  return path.join(root, id);
 }
 
 function manifestPath(root, id) {
-  return path.join(root, id, "manifest.json");
+  return path.join(previewDirectory(root, id), "manifest.json");
 }
 
 function previewPath(root, id, name) {
-  return path.join(root, id, name);
+  return path.join(previewDirectory(root, id), name);
 }
 
 function serverStatePath(root, port) {
@@ -169,6 +188,11 @@ function validPreviewName(value) {
 
 function readManifest(root, id) {
   if (!validPreviewId(id)) return null;
+  try {
+    if (!lstatSync(previewDirectory(root, id)).isDirectory()) return null;
+  } catch {
+    return null;
+  }
   const file = manifestPath(root, id);
   try {
     if (!lstatSync(file).isFile()) return null;
@@ -222,21 +246,33 @@ export function cleanupExpiredPreviews(root, now = Date.now()) {
     return 0;
   }
 
+  let entries;
+  try {
+    entries = readdirSync(root, { withFileTypes: true });
+  } catch {
+    return 0;
+  }
+
   let removed = 0;
-  for (const entry of readdirSync(root, { withFileTypes: true })) {
+  for (const entry of entries) {
     if (!entry.isDirectory() || !validPreviewId(entry.name)) continue;
     const manifest = readManifest(root, entry.name);
     if (!manifest || (manifest.expiresAt !== null && manifest.expiresAt <= now)) {
-      rmSync(path.join(root, entry.name), { recursive: true, force: true });
-      removed += 1;
+      try {
+        rmSync(previewDirectory(root, entry.name), { recursive: true, force: true });
+        removed += 1;
+      } catch {
+        // A concurrent request or manual cleanup may have already removed the preview.
+      }
     }
   }
   return removed;
 }
 
 export function parseByteRange(value, size) {
+  if (!Number.isSafeInteger(size) || size < 0) return null;
   if (value == null || value === "") return { start: 0, end: size - 1, partial: false };
-  if (!Number.isSafeInteger(size) || size < 1) return null;
+  if (size < 1) return null;
   const match = /^bytes=(\d*)-(\d*)$/.exec(String(value).trim());
   if (!match || (!match[1] && !match[2])) return null;
 
@@ -290,8 +326,9 @@ function readServerState(root, port) {
       state.pid < 1 ||
       state.port !== port ||
       state.rootTag !== rootTag(root) ||
+      !isTailnetIpv4(state.host) ||
       typeof state.script !== "string" ||
-      state.script.length === 0
+      !path.isAbsolute(state.script)
     ) {
       return null;
     }
@@ -324,7 +361,11 @@ function servePreview(root, request, response, preview, now) {
     return;
   }
   if (manifest.expiresAt !== null && manifest.expiresAt <= now()) {
-    rmSync(path.join(root, preview.id), { recursive: true, force: true });
+    try {
+      rmSync(previewDirectory(root, preview.id), { recursive: true, force: true });
+    } catch {
+      // A concurrent cleanup may have removed the directory already.
+    }
     sendNotFound(response);
     return;
   }
@@ -357,6 +398,8 @@ function servePreview(root, request, response, preview, now) {
     "Content-Disposition": `inline; filename="${preview.name}"`,
     "Content-Length": String(contentLength),
     "Content-Type": mimeType(preview.name),
+    "Content-Security-Policy": "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'",
+    "Referrer-Policy": "no-referrer",
     "X-Content-Type-Options": "nosniff",
   };
   if (range.partial) headers["Content-Range"] = `bytes ${range.start}-${range.end}/${size}`;
@@ -365,9 +408,10 @@ function servePreview(root, request, response, preview, now) {
     response.end();
     return;
   }
-  createReadStream(file, { start: range.start, end: range.end })
-    .on("error", () => response.destroy())
-    .pipe(response);
+  const stream = createReadStream(file, { start: range.start, end: range.end });
+  response.once("close", () => stream.destroy());
+  stream.once("error", () => response.destroy());
+  stream.pipe(response);
 }
 
 export function createPreviewServer({ root, now = () => Date.now() }) {
@@ -396,10 +440,30 @@ export function createPreviewServer({ root, now = () => Date.now() }) {
   return server;
 }
 
+export function isTailnetIpv4(value) {
+  if (typeof value !== "string") return false;
+  if (net.isIP(value) !== 4) return false;
+  const [first, second] = value.split(".").map(Number);
+  return first === 100 && second >= 64 && second <= 127;
+}
+
+export function tailnetIpv4FromStatus(status) {
+  const addresses = [
+    ...(Array.isArray(status?.TailscaleIPs) ? status.TailscaleIPs : []),
+    ...(Array.isArray(status?.Self?.TailscaleIPs) ? status.Self.TailscaleIPs : []),
+  ];
+  return addresses.find(isTailnetIpv4) || null;
+}
+
 function tailscaleIpv4() {
   let raw;
   try {
-    raw = execFileSync("tailscale", ["status", "--json"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    raw = execFileSync("tailscale", ["status", "--json"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: 2_000,
+      maxBuffer: 1_024 * 1_024,
+    });
   } catch (error) {
     throw new Error(`could not read Tailscale status: ${error.message}`);
   }
@@ -412,9 +476,8 @@ function tailscaleIpv4() {
   if (status.BackendState !== "Running") {
     throw new Error(`Tailscale is not running (state: ${status.BackendState || "unknown"})`);
   }
-  const addresses = status.TailscaleIPs || status.Self?.TailscaleIPs || [];
-  const ipv4 = addresses.find((address) => /^\d{1,3}(?:\.\d{1,3}){3}$/.test(address));
-  if (!ipv4) throw new Error("Tailscale did not report an IPv4 address");
+  const ipv4 = tailnetIpv4FromStatus(status);
+  if (!ipv4) throw new Error("Tailscale did not report a Tailnet IPv4 address");
   return ipv4;
 }
 
@@ -422,86 +485,114 @@ function serverScriptPath() {
   return fileURLToPath(import.meta.url);
 }
 
-function screenSessionName(port) {
-  return `${SERVICE_NAME.replace(/-/g, "_")}_${port}`;
-}
-
 function serviceHealthy(host, port, root) {
   return new Promise((resolve) => {
+    let settled = false;
+    let timeout;
+    const finish = (healthy) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      resolve(healthy);
+    };
     const request = http.get({ host, port, path: HEALTH_PATH, timeout: 400 }, (response) => {
       const chunks = [];
       response.on("data", (chunk) => chunks.push(chunk));
       response.on("end", () => {
         try {
           const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-          resolve(response.statusCode === 200 && body.service === SERVICE_NAME && body.rootTag === rootTag(root));
+          finish(response.statusCode === 200 && body.service === SERVICE_NAME && body.rootTag === rootTag(root));
         } catch {
-          resolve(false);
+          finish(false);
         }
       });
+      response.on("error", () => finish(false));
     });
+    timeout = setTimeout(() => {
+      request.destroy();
+      finish(false);
+    }, 500);
+    timeout.unref();
     request.on("timeout", () => request.destroy());
-    request.on("error", () => resolve(false));
+    request.on("error", () => finish(false));
   });
 }
 
-function stopScreenSession(port) {
-  spawnSync("screen", ["-S", screenSessionName(port), "-X", "quit"], { stdio: "ignore" });
-}
-
-function ownedServerProcess(state) {
+function ownedServerProcess({ root, state }) {
   try {
-    const command = execFileSync("ps", ["-p", String(state.pid), "-o", "command="], {
+    const command = execFileSync("ps", ["-ww", "-p", String(state.pid), "-o", "command="], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     });
-    return command.includes(state.script) && command.includes("--serve") && command.includes(`--port ${state.port}`);
+    return (
+      command.includes(state.script) &&
+      command.includes("--serve") &&
+      command.includes(root) &&
+      command.includes(`--host ${state.host}`) &&
+      command.includes(`--port ${state.port}`)
+    );
   } catch {
     return false;
   }
 }
 
-function stopServer({ root, port }) {
+async function waitForProcessExit(pid) {
+  const deadline = Date.now() + SERVER_STOP_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    try {
+      process.kill(pid, 0);
+    } catch (error) {
+      if (error?.code === "ESRCH") return;
+      throw new Error(`could not inspect preview server process ${pid}: ${error.message}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`preview server process ${pid} did not stop after ${SERVER_STOP_TIMEOUT_MS / 1_000}s`);
+}
+
+async function stopServer({ root, port }) {
   const state = readServerState(root, port);
-  if (state && ownedServerProcess(state)) {
+  if (state && ownedServerProcess({ root, state })) {
     try {
       process.kill(state.pid, "SIGTERM");
-    } catch {
-      // The PID has already exited or does not belong to this user anymore.
+      await waitForProcessExit(state.pid);
+    } catch (error) {
+      if (error?.code !== "ESRCH") throw error;
     }
   }
-  stopScreenSession(port);
   clearServerState({ root, port });
+}
+
+function launchServer({ host, port, root }) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(
+      process.execPath,
+      [
+        serverScriptPath(),
+        "--serve",
+        "--root",
+        root,
+        "--host",
+        host,
+        "--port",
+        String(port),
+      ],
+      { detached: true, stdio: "ignore" },
+    );
+    child.once("error", (error) => reject(new Error(`could not start persistent preview server: ${error.message}`)));
+    child.once("spawn", () => {
+      child.unref();
+      resolve();
+    });
+  });
 }
 
 async function ensureServer({ host, port, root }) {
   if (await serviceHealthy(host, port, root)) return;
-  stopServer({ root, port });
-  const launch = spawnSync(
-    "screen",
-    [
-      "-dmS",
-      screenSessionName(port),
-      process.execPath,
-      serverScriptPath(),
-      "--serve",
-      "--root",
-      root,
-      "--host",
-      host,
-      "--port",
-      String(port),
-    ],
-    { encoding: "utf8" },
-  );
-  if (launch.error) {
-    throw new Error(`could not start persistent preview server: ${launch.error.message}`);
-  }
-  if (launch.status !== 0) {
-    throw new Error(`could not start persistent preview server: ${launch.stderr.trim() || "screen failed"}`);
-  }
+  await stopServer({ root, port });
+  await launchServer({ host, port, root });
 
-  const deadline = Date.now() + 5_000;
+  const deadline = Date.now() + SERVER_STARTUP_TIMEOUT_MS;
   while (Date.now() < deadline) {
     if (await serviceHealthy(host, port, root)) return;
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -510,6 +601,9 @@ async function ensureServer({ host, port, root }) {
 }
 
 function serve({ host, port, root }) {
+  if (!isTailnetIpv4(host)) {
+    throw new Error("preview server must bind to a Tailscale IPv4 address");
+  }
   const server = createPreviewServer({ root });
   let stopping = false;
   const stop = () => {
@@ -538,16 +632,28 @@ function serve({ host, port, root }) {
 }
 
 async function runPreview(options) {
+  if (!isRegularFile(options.source)) {
+    throw new Error(`preview source must be a regular file: ${options.source}`);
+  }
   const host = tailscaleIpv4();
   ensureRoot(options.root);
   cleanupExpiredPreviews(options.root);
-  await ensureServer({ host, port: options.port, root: options.root });
   const preview = stagePreview({
     root: options.root,
     source: options.source,
     ttlMs: options.ttlMs,
     keep: options.keep,
   });
+  try {
+    await ensureServer({ host, port: options.port, root: options.root });
+  } catch (error) {
+    try {
+      rmSync(previewDirectory(options.root, preview.id), { recursive: true, force: true });
+    } catch {
+      // Preserve the startup failure; a later invocation will clean the TTL-bound preview.
+    }
+    throw error;
+  }
   const url = `http://${host}:${options.port}${PREVIEW_PATH_PREFIX}${preview.id}/${preview.name}`;
   console.log(`Preview URL: ${url}`);
   if (preview.expiresAt === null) {
@@ -576,7 +682,7 @@ async function main(argv) {
     return;
   }
   if (options.stop) {
-    stopServer({ root: options.root, port: options.port });
+    await stopServer({ root: options.root, port: options.port });
     console.log(`Stopped ${SERVICE_NAME} on port ${options.port}.`);
     return;
   }

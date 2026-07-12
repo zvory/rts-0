@@ -8,11 +8,13 @@ import path from "node:path";
 import {
   cleanupExpiredPreviews,
   createPreviewServer,
+  isTailnetIpv4,
   parseArgs,
   parseByteRange,
   parseDuration,
   safeFileName,
   stagePreview,
+  tailnetIpv4FromStatus,
 } from "../scripts/tailnet-preview.mjs";
 
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "rts-tailnet-preview-test-"));
@@ -31,6 +33,7 @@ try {
   assert.deepEqual(parseByteRange("bytes=-2", 5), { start: 3, end: 4, partial: true });
   assert.equal(parseByteRange("bytes=5-6", 5), null);
   assert.equal(parseByteRange("bytes=0-1,3-4", 5), null);
+  assert.equal(parseByteRange(null, -1), null);
   assert.equal(safeFileName("/tmp/My clip (final).mp4"), "My_clip_final_.mp4");
 
   const parsed = parseArgs(["--ttl", "2h", "--port", "9000", "My clip.mp4"]);
@@ -40,6 +43,19 @@ try {
   const defaultTtl = parseArgs(["clip.mp4"]);
   assert.equal(defaultTtl.ttlMs, 86_400_000, "previews default to 24 hours");
   assert.throws(() => parseArgs(["--keep", "--ttl", "1h", "clip.mp4"]), /cannot be combined/);
+  assert.throws(() => parseArgs(["--keep", "--ttl", "24h", "clip.mp4"]), /cannot be combined/);
+  assert.throws(() => parseArgs(["--serve", "--host", "100.64.0.1", "--ttl", "24h"]), /only accepts/);
+  assert.throws(() => parseArgs(["--host", "100.64.0.1", "clip.mp4"]), /only valid with --serve/);
+  assert.throws(() => parseArgs(["--root", ""]), /requires a directory/);
+
+  assert.equal(isTailnetIpv4("100.64.0.1"), true);
+  assert.equal(isTailnetIpv4("100.127.255.255"), true);
+  assert.equal(isTailnetIpv4("100.128.0.1"), false);
+  assert.equal(isTailnetIpv4("192.168.1.1"), false);
+  assert.equal(tailnetIpv4FromStatus({
+    TailscaleIPs: ["fd7a::1"],
+    Self: { TailscaleIPs: ["100.119.17.21"] },
+  }), "100.119.17.21");
 
   const source = path.join(tempRoot, "My clip (final).mp4");
   fs.writeFileSync(source, "0123456789");
@@ -67,6 +83,8 @@ try {
   assert.equal(full.statusCode, 200);
   assert.equal(full.headers["content-type"], "video/mp4");
   assert.equal(full.headers["accept-ranges"], "bytes");
+  assert.equal(full.headers["content-security-policy"], "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'");
+  assert.equal(full.headers["referrer-policy"], "no-referrer");
   assert.equal(full.body, "0123456789");
 
   const partial = await request({
