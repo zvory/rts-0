@@ -79,9 +79,11 @@ helper, never final selection admission. `dollyBy` preserves a valid anchor poin
 camera data uses `CameraSnapshotV1`; finite legacy `{x,y,zoom}` is accepted only at the private
 restore compatibility edge and immediately normalized.
 
-`projectionSnapshot()` returns detached `{version:1,camera,viewport,mapBounds}` plus pinned query
-functions. It contains no live camera, engine, DOM, DPR, or matrix object. The selected backend's
-scene and `SelectionSceneV1` must use the same snapshot for a presented frame.
+`projectionSnapshot()` returns detached `{version:1,camera,viewport,mapBounds,perspective?}` plus
+pinned query functions. Fixed perspective snapshots include only finite plain coefficients
+(`fovYRad`, `pitchRad`, focal length, camera distance, and near/far world depths), never an engine
+matrix. The snapshot contains no live camera, engine, DOM, DPR, or mutable matrix object. The
+selected backend's scene and `SelectionSceneV1` must use the same snapshot for a presented frame.
 
 The audio listener is the ground focus, with reference distance equal to one viewport width at the
 focus plane. Navigation, minimap, audio, alerts, control groups, carryover, Lab, observer, capture,

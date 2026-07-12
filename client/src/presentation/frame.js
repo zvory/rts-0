@@ -366,6 +366,7 @@ function projectionRecord(projection) {
     viewport: detachedRecord(projection.viewport),
     mapBounds: projection.mapBounds == null ? null : detachedRecord(projection.mapBounds),
   };
+  if (projection.perspective != null) out.perspective = detachedRecord(projection.perspective);
   for (const name of queryNames) {
     if (typeof projection[name] !== "function") throw new TypeError(`ProjectionSnapshotV1 is missing ${name}.`);
     out[name] = projection[name];

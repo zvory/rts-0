@@ -1,5 +1,4 @@
 import { Audio, noticeSoundId } from "./audio.js";
-import { Camera } from "./camera.js";
 import { restoreInitialCameraView } from "./camera_view_selection.js";
 import {
   createSnapshotProcessingReport,
@@ -14,7 +13,7 @@ import { DomClickInputZone, MatchInputRouter } from "./input/router.js";
 import { Minimap } from "./minimap.js";
 import { MatchHealth } from "./match_health.js";
 import { PredictionController } from "./prediction_controller.js";
-import { PixiPresentationAdapter } from "./renderer/pixi_compatibility_adapter.js";
+import { createPixiBackendBundle } from "./renderer/backend_bundle.js";
 import { ARTILLERY_RIG_SVG } from "./renderer/rigs/support_svg.js";
 import { LivePauseOverlay } from "./live_pause_overlay.js";
 import { MatchObserverDiagnostics } from "./match_observer_diagnostics.js";
@@ -206,10 +205,11 @@ export class Match {
       () => new MatchCombatAudio({ audio: this.audio, state: this.state }),
     );
     this.clientIntent = this._timeInit("match.clientIntent", () => new ClientIntent());
-    this.camera = this._timeInit("match.camera", () => new Camera(0, 0, {
+    this.rendererBackendBundle = options.rendererBackendBundle || createPixiBackendBundle();
+    this.camera = this._timeInit("match.camera", () => this.rendererBackendBundle.createCamera({
       maxZoom: options.cameraMaxZoom,
     }));
-    this.renderer = this._timeInit("match.renderer", () => new PixiPresentationAdapter(dom.viewport, {
+    this.renderer = this._timeInit("match.renderer", () => this.rendererBackendBundle.createRenderer(dom.viewport, {
       renderClock: this.renderClock,
       state: () => this.state,
       profiler: () => this.frameProfiler,

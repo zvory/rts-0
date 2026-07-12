@@ -91,7 +91,7 @@ export function shouldWarnBeforeUnload({
  * same Net connection.
  */
 export class App {
-  constructor() {
+  constructor({ rendererBackendBundle = null } = {}) {
     /** @type {Net} persistent connection across lobby + matches. */
     this.net = new Net(wsUrl(), diagnostics);
     this.devWatch = devWatchConfig();
@@ -101,6 +101,7 @@ export class App {
     this.labVisualProfileState = resolveVisualProfileLaunch(this.labLaunch || this.labCatalogLaunch);
     this.replayLaunch = replayLaunchConfig();
     this.matchLaunch = matchLaunchConfig();
+    this.rendererBackendBundle = rendererBackendBundle;
     /**
      * Audio engine. Long-lived across matches: the AudioContext is unlocked
      * by the user's first gesture (anywhere in the page), and we want that
@@ -534,6 +535,7 @@ export class App {
         labControlPolicy: this.labControlPolicy,
         visualProfile,
         visualProfileError,
+        rendererBackendBundle: this.rendererBackendBundle,
         onLabToolChange: (change) => this.labPanel?.applyLabToolChange?.(change),
       },
     );

@@ -143,6 +143,7 @@ export class LabInteractService {
         map: input.map || "Default",
         seed: input.seed == null ? "" : String(input.seed),
         scenario: input.scenario || "blank",
+        renderer: input.renderer || "pixi",
         viewport: input.viewport,
         baseUrl: process.env.RTS_LAB_INTERACT_BASE_URL || "",
       });
@@ -153,7 +154,10 @@ export class LabInteractService {
       const sessionId = `lab_${crypto.randomUUID().replaceAll("-", "")}`;
       const session = {
         sessionId, driver, aliases: new Map(), operationTail: Promise.resolve(), sceneRevision: 0,
-        sceneIdentity: { source: "launch", scenario: input.scenario || "blank", map: input.map || "Default", seed: input.seed ?? null },
+        sceneIdentity: {
+          source: "launch", scenario: input.scenario || "blank", map: input.map || "Default",
+          seed: input.seed ?? null, renderer: input.renderer || "pixi",
+        },
       };
       this.sessions.set(sessionId, session);
       try {
@@ -460,10 +464,11 @@ function validateInput(command, value) {
     return value;
   }
   if (command === "open") {
-    exact(value, ["workspaceRoot", "map", "seed", "scenario", "viewport"], "open");
+    exact(value, ["workspaceRoot", "map", "seed", "scenario", "renderer", "viewport"], "open");
     if (value.workspaceRoot != null && (typeof value.workspaceRoot !== "string" || !value.workspaceRoot)) invalid("open.workspaceRoot", "must be a non-empty string");
     if (value.map != null) token(value.map, "open.map", 48);
     if (value.scenario != null) token(value.scenario, "open.scenario", 48);
+    if (value.renderer != null && !["pixi", "babylon"].includes(value.renderer)) invalid("open.renderer", "must be pixi or babylon");
     if (value.seed != null && !((typeof value.seed === "string" && value.seed.length <= 64) || isInteger(value.seed, 0, U32_MAX))) invalid("open.seed", "must be a bounded string or unsigned integer");
     if (value.viewport != null) viewport(value.viewport, 4096, "open.viewport");
     return value;

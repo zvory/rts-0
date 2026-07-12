@@ -65,6 +65,7 @@ export class LabInteractDriver {
     map = "Default",
     seed = "",
     scenario = "blank",
+    renderer = "pixi",
     viewport = DEFAULT_VIEWPORT,
     timeoutMs = DEFAULT_TIMEOUT_MS,
     startupTimeoutMs = DEFAULT_STARTUP_TIMEOUT_MS,
@@ -76,6 +77,7 @@ export class LabInteractDriver {
       map,
       seed,
       scenario,
+      renderer,
       viewport,
       timeoutMs: boundedTimeout(timeoutMs, "timeoutMs", MAX_TIMEOUT_MS),
       startupTimeoutMs: boundedTimeout(startupTimeoutMs, "startupTimeoutMs", MAX_STARTUP_TIMEOUT_MS),
@@ -839,6 +841,7 @@ export class LabInteractDriver {
     url.searchParams.set("map", safeToken(this.options.map, "Default", 48));
     if (this.options.seed !== "" && this.options.seed != null) url.searchParams.set("seed", String(this.options.seed));
     if (this.options.scenario) url.searchParams.set("scenario", safeToken(this.options.scenario, "blank", 48));
+    if (this.options.renderer === "babylon") url.searchParams.set("rtsRenderer", "babylon");
     url.searchParams.set("labInteract", "1");
     url.searchParams.set("rtsNoAutoPointerLock", "1");
     return url.href;
