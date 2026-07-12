@@ -26,9 +26,7 @@ fn manual_fire_fixture() -> (Game, u32, (f32, f32)) {
     let mut game = empty_flat_game(&players);
     let mortar_pos = game.state.map.tile_center(8, 8);
     let target_pos = game.state.map.tile_center(12, 8);
-    let mortar = game
-        .state
-        .entities
+    let mortar = game.state.entities
         .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
         .expect("mortar should spawn");
     if let Some(mortar_entity) = game.state.entities.get_mut(mortar) {
@@ -39,9 +37,7 @@ fn manual_fire_fixture() -> (Game, u32, (f32, f32)) {
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
-    game.state
-        .fog
-        .recompute(&ids, &game.state.entities, &game.state.map);
+    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
     (game, mortar, target_pos)
 }
 
@@ -114,14 +110,11 @@ fn expected_mortar_impact(
     target_pos: (f32, f32),
     tick: u32,
 ) -> (f32, f32) {
-    let owner = game
-        .state
-        .entities
+    let owner = game.state.entities
         .get(mortar)
         .expect("mortar should exist")
         .owner;
-    let teams =
-        TeamRelations::from_player_teams(game.state.players.iter().map(|p| (p.id, p.team_id)));
+    let teams = TeamRelations::from_player_teams(game.state.players.iter().map(|p| (p.id, p.team_id)));
     predicted_mortar_impact(
         &game.state.fog,
         &teams,
@@ -143,8 +136,7 @@ fn manual_mortar_fire_with_autocast_enabled_only_launches_once() {
     if let Some(mortar_entity) = game.state.entities.get_mut(mortar) {
         mortar_entity.set_autocast_enabled(ability::AbilityKind::MortarFire, true);
     }
-    game.state
-        .entities
+    game.state.entities
         .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
         .expect("target should spawn");
     game.state.players[0]
@@ -152,9 +144,7 @@ fn manual_mortar_fire_with_autocast_enabled_only_launches_once() {
         .insert(upgrade::UpgradeKind::MortarAutocast);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
-    game.state
-        .fog
-        .recompute(&ids, &game.state.entities, &game.state.map);
+    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
 
     enqueue_manual_mortar_fire(&mut game, mortar, target_pos);
     let events = game.tick();
@@ -165,8 +155,7 @@ fn manual_mortar_fire_with_autocast_enabled_only_launches_once() {
         "manual mortar fire should consume the weapon cycle so same-tick autocast cannot double launch"
     );
     assert!(
-        game.state
-            .entities
+        game.state.entities
             .get(mortar)
             .expect("mortar should exist")
             .attack_cd()
@@ -192,8 +181,7 @@ fn manual_mortar_fire_waits_for_weapon_cooldown() {
     );
     assert!(
         matches!(
-            game.state
-                .entities
+            game.state.entities
                 .get(mortar)
                 .expect("mortar should exist")
                 .order(),
@@ -235,9 +223,7 @@ fn manual_mortar_fire_turns_while_waiting_for_weapon_cooldown() {
         0,
         "manual mortar fire should wait while the weapon cycle is still cooling down"
     );
-    let facing_after_first_wait = game
-        .state
-        .entities
+    let facing_after_first_wait = game.state.entities
         .get(mortar)
         .expect("mortar should exist")
         .weapon_facing()
@@ -283,11 +269,7 @@ fn queued_manual_mortar_fire_promotes_to_wait_for_weapon_cooldown() {
         0,
         "queued manual mortar fire should not launch while the weapon cycle is still cooling down"
     );
-    let mortar_entity = game
-        .state
-        .entities
-        .get(mortar)
-        .expect("mortar should exist");
+    let mortar_entity = game.state.entities.get(mortar).expect("mortar should exist");
     assert!(
         matches!(mortar_entity.order(), Order::Ability(_)),
         "queued manual mortar fire should become the active waiting order instead of being skipped"
@@ -319,8 +301,7 @@ fn queued_manual_mortar_fire_commands_fire_finite_shots_across_reload_cycles() {
     if let Some(mortar_entity) = game.state.entities.get_mut(mortar) {
         mortar_entity.set_autocast_enabled(ability::AbilityKind::MortarFire, true);
     }
-    game.state
-        .entities
+    game.state.entities
         .spawn_unit(2, EntityKind::Rifleman, enemy_pos.0, enemy_pos.1)
         .expect("enemy should spawn");
     game.state.players[0]
@@ -328,9 +309,7 @@ fn queued_manual_mortar_fire_commands_fire_finite_shots_across_reload_cycles() {
         .insert(upgrade::UpgradeKind::MortarAutocast);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
-    game.state
-        .fog
-        .recompute(&ids, &game.state.entities, &game.state.map);
+    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
 
     for _ in 0..3 {
         enqueue_queued_manual_mortar_fire(&mut game, mortar, target_pos);
