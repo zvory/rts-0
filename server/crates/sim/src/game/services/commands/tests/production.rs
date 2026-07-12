@@ -743,3 +743,40 @@ fn manual_training_appends_behind_repeated_unit_and_cancel_clears_repeat() {
     assert_eq!(producer.prod_queue().len(), 1);
     assert_eq!(producer.prod_queue()[0].unit, EntityKind::Rifleman);
 }
+
+#[test]
+fn repeat_toggle_can_clear_stale_incompatible_intent() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let (bx, by) = footprint_center(&map, EntityKind::Barracks, 6, 6);
+    let barracks = entities
+        .spawn_building(1, EntityKind::Barracks, bx, by, true)
+        .expect("barracks should spawn");
+    entities
+        .get_mut(barracks)
+        .expect("barracks")
+        .set_repeat_production(Some(EntityKind::Tank));
+    let mut players = vec![player_state(1), player_state(2)];
+
+    apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(
+            1,
+            SimCommand::SetProductionRepeat {
+                buildings: vec![barracks],
+                unit: EntityKind::Tank,
+                enabled: false,
+            },
+        )],
+    );
+
+    assert_eq!(
+        entities
+            .get(barracks)
+            .expect("barracks")
+            .repeat_production(),
+        None
+    );
+}

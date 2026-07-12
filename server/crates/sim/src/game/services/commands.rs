@@ -471,16 +471,17 @@ pub(in crate::game) fn apply_commands(
             } => {
                 for building in dedupe_cap_units(buildings, command_admission.max_units_per_command)
                 {
-                    let compatible = matches!(entities.get(building), Some(producer)
+                    let eligible = matches!(entities.get(building), Some(producer)
                         if producer.owner == player
                             && producer.is_building()
                             && !producer.under_construction()
-                            && rules::economy::trainable_units_for_faction(
-                                &faction_id,
-                                producer.kind,
-                            )
-                            .contains(&unit));
-                    if !compatible {
+                            && (!enabled
+                                || rules::economy::trainable_units_for_faction(
+                                    &faction_id,
+                                    producer.kind,
+                                )
+                                .contains(&unit)));
+                    if !eligible {
                         continue;
                     }
                     if let Some(producer) = entities.get_mut(building) {

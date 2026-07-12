@@ -56,11 +56,18 @@ export function syncCooldownClockElement(button, cooldownClocks) {
 export function createCommandButton(opts) {
   const btn = document.createElement("button");
   btn.type = "button";
+  const hasSecondaryAction =
+    typeof opts.onAltClick === "function" || typeof opts.onContextMenu === "function";
+  const primaryDisabled = !opts.enabled && !opts.unaffordable;
   const classes = ["cmd-btn"];
   if (opts.cls) classes.push(opts.cls);
   if (opts.unaffordable) classes.push("unaffordable");
+  if (primaryDisabled && hasSecondaryAction) classes.push("primary-disabled");
   btn.className = classes.join(" ");
-  btn.disabled = !opts.enabled && !opts.unaffordable;
+  // A native-disabled button cannot receive Alt-click or context-menu pointer events. Keep
+  // secondary-action buttons interactive while the primary action is unavailable; the click
+  // dispatcher below still suppresses an ordinary primary click.
+  btn.disabled = primaryDisabled && !hasSecondaryAction;
   if (opts.title) btn.title = opts.title;
   if (opts.hotkey) {
     btn.dataset.hotkey = opts.hotkey;

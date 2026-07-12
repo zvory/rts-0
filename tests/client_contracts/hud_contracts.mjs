@@ -960,4 +960,27 @@ function fakeHudRootWithoutResourceSpans() {
     button.listeners.click({ preventDefault() {} });
     assert(unavailable, "unaffordable command click should dispatch unavailable handler");
   });
+
+  withFakeDocument(() => {
+    let primaryClicks = 0;
+    let repeatToggles = 0;
+    const button = HUD.prototype._cmdButton({
+      icon: "TK",
+      label: "Tank",
+      hotkey: "W",
+      enabled: false,
+      title: "Requires Heavy Guns",
+      onAltClick: () => { repeatToggles += 1; },
+      onClick: () => { primaryClicks += 1; },
+    });
+    assert(!button.disabled, "locked commands with a secondary action should accept pointer input");
+    assert(
+      button.className.includes("primary-disabled"),
+      "secondary-only commands should retain disabled primary-action styling",
+    );
+    button.listeners.click({ altKey: false, preventDefault() {} });
+    assert(primaryClicks === 0 && repeatToggles === 0, "ordinary clicks should not invoke a locked primary action");
+    button.listeners.click({ altKey: true, preventDefault() {} });
+    assert(primaryClicks === 0 && repeatToggles === 1, "Alt-click should invoke a locked command's secondary action");
+  });
 }
