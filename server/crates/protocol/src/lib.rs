@@ -247,6 +247,11 @@ pub enum Command {
         building: u32,
         unit: String,
     },
+    SetProductionRepeat {
+        buildings: Vec<u32>,
+        unit: String,
+        enabled: bool,
+    },
     Research {
         building: u32,
         upgrade: String,

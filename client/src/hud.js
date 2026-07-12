@@ -447,7 +447,8 @@ export class HUD {
       countBadge: descriptor.countBadge,
       cooldownClocks: descriptor.cooldownClocks,
       repeatable: descriptor.repeatable,
-      autocastToggle: descriptor.contextIntent?.type === "setAutocast",
+      autocastToggle: descriptor.contextIntent?.type === "setAutocast" ||
+        descriptor.contextIntent?.type === "setProductionRepeat",
       onMouseEnter: descriptor.intent?.type === "ability"
         ? () => this._showAbilityHoverPreview(descriptor.intent.ability, descriptor.intent.readyIds || [])
         : null,
@@ -458,6 +459,9 @@ export class HUD {
         ? () => this._dispatchCommandIntent(descriptor.onUnavailableIntent)
         : null,
       onContextMenu: descriptor.contextIntent
+        ? () => this._dispatchCommandIntent(descriptor.contextIntent)
+        : null,
+      onAltClick: descriptor.contextIntent?.type === "setProductionRepeat"
         ? () => this._dispatchCommandIntent(descriptor.contextIntent)
         : null,
       onClick: (ev) => this._dispatchCommandIntent(descriptor.intent, ev),
@@ -502,6 +506,13 @@ export class HUD {
       case "setAutocast":
         this._issueCommand(cmd.setAutocast(intent.ability, intent.unitIds || [], !!intent.enabled));
         this._intent()?.endCommandTarget?.();
+        return;
+      case "setProductionRepeat":
+        this._issueCommand(cmd.setProductionRepeat(
+          intent.buildingIds || [],
+          intent.unit,
+          !!intent.enabled,
+        ));
         return;
       case "playNotEnough":
         this._playNotEnoughForCost(intent.cost, intent.supply);

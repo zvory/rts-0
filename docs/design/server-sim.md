@@ -860,6 +860,14 @@ policy is centralized instead of scattered through services.
 - `rules::projection` — fog-gated `EntityView` construction, legacy/special `visionOnly`
   projection support, and event visibility predicates.
 
+Production buildings may carry one server-authoritative `repeat_unit` fallback. The production
+system silently retries the fallback only while the unit queue is empty, using the same economy,
+supply, tech, and producer predicates as direct training. Once admitted, a repeated unit is an
+ordinary FIFO entry, so later manual train commands append behind it.
+Enabling another unit replaces the fallback, while any production cancel clears it before removing
+the latest queued item. The fallback is durable entity state, so checkpoints, replay branches, and
+Lab rewinds preserve it without recording synthetic train commands on every retry.
+
 ### 3.4 Ability system (`game/ability.rs`, `game/services/ability_orders.rs`)
 
 `rules::faction` owns the faction-aware ability registry. Each `AbilityCatalogEntry` records the

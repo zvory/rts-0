@@ -301,6 +301,12 @@ export const cmd = Object.freeze({
   build: (units, building, tileX, tileY, queued = false) =>
     withQueued({ c: CMD.BUILD, units, building, tileX, tileY }, queued),
   train: (building, unit) => ({ c: CMD.TRAIN, building, unit }),
+  setProductionRepeat: (buildings, unit, enabled) => ({
+    c: CMD.SET_PRODUCTION_REPEAT,
+    buildings,
+    unit,
+    enabled,
+  }),
   research: (building, upgrade) => ({ c: CMD.RESEARCH, building, upgrade }),
   cancel: (building) => ({ c: CMD.CANCEL, building }),
   stop: (units) => ({ c: CMD.STOP, units }),

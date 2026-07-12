@@ -464,6 +464,34 @@ pub(in crate::game) fn apply_commands(
             SimCommand::Train { building, unit } => {
                 order_train(entities, players, player, building, unit, events);
             }
+            SimCommand::SetProductionRepeat {
+                buildings,
+                unit,
+                enabled,
+            } => {
+                for building in dedupe_cap_units(buildings, command_admission.max_units_per_command)
+                {
+                    let compatible = matches!(entities.get(building), Some(producer)
+                        if producer.owner == player
+                            && producer.is_building()
+                            && !producer.under_construction()
+                            && rules::economy::trainable_units_for_faction(
+                                &faction_id,
+                                producer.kind,
+                            )
+                            .contains(&unit));
+                    if !compatible {
+                        continue;
+                    }
+                    if let Some(producer) = entities.get_mut(building) {
+                        if enabled {
+                            producer.set_repeat_production(Some(unit));
+                        } else if producer.repeat_production() == Some(unit) {
+                            producer.set_repeat_production(None);
+                        }
+                    }
+                }
+            }
             SimCommand::Research { building, upgrade } => {
                 let definition = upgrade::definition(upgrade);
                 let Some(building_kind) = entities.get(building).map(|b| b.kind) else {
@@ -1856,15 +1884,10 @@ fn order_cancel(
 
     let cancelled = {
         let b = match entities.get_mut(building) {
-            Some(b)
-                if b.owner == player
-                    && b.is_building()
-                    && (!b.prod_queue().is_empty() || !b.research_queue().is_empty()) =>
-            {
-                b
-            }
+            Some(b) if b.owner == player && b.is_building() => b,
             _ => return,
         };
+        b.set_repeat_production(None);
         if let Some(item) = b.pop_last_research() {
             Cancelled::Upgrade(item.upgrade)
         } else if let Some(item) = b.pop_last_production() {

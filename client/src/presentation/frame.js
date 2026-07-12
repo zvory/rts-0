@@ -7,7 +7,7 @@ export const STATIC_MAP_PRESENTATION_VERSION = 1;
 const ENTITY_FIELDS = Object.freeze([
   "id", "kind", "owner", "x", "y", "facing", "weaponFacing", "state",
   "hp", "maxHp", "remaining", "latchedNode", "occupiedTrenchId",
-  "buildProgress", "deconstructProgress", "prodProgress", "prodQueue",
+  "buildProgress", "deconstructProgress", "prodProgress", "prodQueue", "prodRepeatKind",
   "setupState", "setupFacing", "recoilPhase", "recoilProgress",
   "panzerfaustLoaded", "breakthroughTicks", "abilities",
   "orderPlan", "rally", "rallyPlan", "optimisticRally", "debugPath",

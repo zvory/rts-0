@@ -48,6 +48,7 @@ export function syncCooldownClockElement(button, cooldownClocks) {
  * @param {() => void} [opts.onMouseEnter] hover handler.
  * @param {() => void} [opts.onMouseLeave] hover-exit handler.
  * @param {() => void} [opts.onUnavailable] click handler for unaffordable buttons.
+ * @param {(ev: MouseEvent) => void} [opts.onAltClick] Alt-click handler.
  * @param {(ev: MouseEvent) => void} [opts.onContextMenu] right-click handler.
  * @param {(ev: MouseEvent) => void} opts.onClick click handler (skipped when disabled).
  * @returns {HTMLButtonElement}
@@ -111,15 +112,20 @@ export function createCommandButton(opts) {
     costHtml +
     (opts.tooltipHtml ? `<span class="cmd-tooltip" role="tooltip">${opts.tooltipHtml}</span>` : "");
 
-  if (opts.enabled && typeof opts.onClick === "function") {
+  if (
+    typeof opts.onAltClick === "function" ||
+    (opts.enabled && typeof opts.onClick === "function") ||
+    (opts.unaffordable && typeof opts.onUnavailable === "function")
+  ) {
     btn.addEventListener("click", (ev) => {
       ev.preventDefault();
-      opts.onClick(ev);
-    });
-  } else if (opts.unaffordable && typeof opts.onUnavailable === "function") {
-    btn.addEventListener("click", (ev) => {
-      ev.preventDefault();
-      opts.onUnavailable(ev);
+      if (ev.altKey && typeof opts.onAltClick === "function") {
+        opts.onAltClick(ev);
+      } else if (opts.enabled && typeof opts.onClick === "function") {
+        opts.onClick(ev);
+      } else if (opts.unaffordable && typeof opts.onUnavailable === "function") {
+        opts.onUnavailable(ev);
+      }
     });
   }
   return btn;

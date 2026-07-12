@@ -1029,6 +1029,18 @@ impl Entity {
         true
     }
 
+    pub fn repeat_production(&self) -> Option<EntityKind> {
+        self.production.as_ref()?.repeat_unit
+    }
+
+    pub fn set_repeat_production(&mut self, unit: Option<EntityKind>) -> bool {
+        let Some(production) = self.production.as_mut() else {
+            return false;
+        };
+        production.repeat_unit = unit;
+        true
+    }
+
     pub fn pop_last_production(&mut self) -> Option<ProdItem> {
         self.production.as_mut()?.queue.pop()
     }

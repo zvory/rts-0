@@ -641,6 +641,13 @@ function fakeHudRootWithoutResourceSpans() {
   assert(trainCard.slots[0].slotIndex === 0, "train button should expose rendered slot index");
   assert(trainCard.slots[0].repeatable, "train hotkeys should remain repeatable");
   assert(trainCard.slots[0].intent.type === "train", "train button should carry train intent");
+  assert(
+    trainCard.slots[0].contextIntent.type === "setProductionRepeat" &&
+      trainCard.slots[0].contextIntent.buildingIds.join(",") === "20,21" &&
+      trainCard.slots[0].contextIntent.unit === KIND.RIFLEMAN &&
+      trainCard.slots[0].contextIntent.enabled,
+    "train buttons should enable repeat production across selected compatible producers",
+  );
   assert(trainCard.slots[8].label === "Cancel", "production cancel should stay in C slot");
   assert(trainCard.slots[8].hotkey === "C", "cancel hotkey should stay C");
   assert(trainCard.slots[8].repeatable, "cancel hotkey should remain repeatable");
@@ -653,6 +660,19 @@ function fakeHudRootWithoutResourceSpans() {
   assert(trainCard.slots[2].hotkey === "E", "Panzerfaust train button should use E in the third Barracks slot");
   assert(!trainCard.slots[2].enabled, "Panzerfaust train button should be locked before Training Centre");
   assert(trainCard.slots[2].title === "Requires Training Centre", "Panzerfaust locked tooltip should name Training Centre");
+
+  producingBarracks.prodRepeatKind = KIND.RIFLEMAN;
+  const repeatingTrainCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [barracks, producingBarracks],
+    entities: [cityCentre, barracks, producingBarracks],
+    resources: { steel: 60, oil: 0 },
+  }));
+  assert(
+    repeatingTrainCard.slots[0].cls.includes("autocast-enabled") &&
+      !repeatingTrainCard.slots[0].contextIntent.enabled,
+    "authoritative repeat production should show the swirl and make the next toggle disable it",
+  );
+  delete producingBarracks.prodRepeatKind;
 
   const completedTrainingCentre = { id: 22, owner: 1, kind: KIND.TRAINING_CENTRE, buildProgress: null };
   const unlockedPanzerfaustCard = buildCommandCardDescriptors(commandCardCtx({
