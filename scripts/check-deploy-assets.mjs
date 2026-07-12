@@ -28,6 +28,7 @@ const betaDeployWorkflow = read(".github/workflows/deploy-beta.yml");
 const wasmBuildScript = read("scripts/build-sim-wasm.sh");
 const wasmGitignore = read("client/vendor/sim-wasm/.gitignore");
 const deployScript = read("deploy.sh");
+const clientIndex = read("client/index.html");
 const mainlineFlyConfig = read("fly.mainline.toml");
 const betaFlyConfig = read("fly.beta.toml");
 const serverMain = read("server/src/main.rs");
@@ -132,6 +133,11 @@ assertMatches(betaFlyConfig, /min_machines_running\s*=\s*0/, "beta must allow ze
 assertMatches(betaFlyConfig, /cpu_kind\s*=\s*"performance"/, "beta must use performance CPU kind");
 assertMatches(betaFlyConfig, /cpus\s*=\s*1/, "beta must use one performance CPU");
 assertMatches(betaFlyConfig, /memory\s*=\s*"2gb"/, "beta must use 2 GB memory");
+assertIncludes(
+  clientIndex,
+  'href="https://rts-0-zvorygin-beta.fly.dev/"',
+  "the game client beta shortcut must target the beta app",
+);
 assertIncludes(
   serverMain,
   '[(header::LOCATION, "https://rts-0-zvorygin-beta.fly.dev/")]',
