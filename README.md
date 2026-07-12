@@ -180,13 +180,12 @@ scripts/cleanup-worktrees.sh
 
 ## Deploy
 
-Mainline, beta, and the launcher have separate Fly configs. Deploy through the channel-aware
+Mainline and beta have separate Fly configs. Deploy through the channel-aware
 wrapper so one channel cannot inherit another channel's lifecycle or Machine size:
 
 ```bash
 ./deploy.sh mainline
 ./deploy.sh beta
-./deploy.sh launcher
 ```
 
 First-time setup and operational notes live in [docs/fly.md](docs/fly.md).

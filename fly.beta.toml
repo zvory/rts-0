@@ -1,4 +1,4 @@
-app = "bewegungskrieg-beta"
+app = "rts-0-zvorygin-beta"
 primary_region = "ewr"
 kill_signal = "SIGINT"
 kill_timeout = 300

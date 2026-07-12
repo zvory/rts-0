@@ -1,4 +1,4 @@
-app = "bewegungskrieg-mainline"
+app = "rts-0-zvorygin"
 primary_region = "ewr"
 kill_signal = "SIGINT"
 kill_timeout = 300
