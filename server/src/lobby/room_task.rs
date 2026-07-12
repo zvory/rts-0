@@ -140,7 +140,7 @@ impl RoomTask {
             ai_players: Vec::new(),
             human_team_assignments: HashMap::new(),
             human_faction_assignments: HashMap::new(),
-            selected_map: "Default".to_string(),
+            selected_map: "1v1".to_string(),
             host_id: None,
             phase: Phase::Lobby,
             match_player_count: 0,

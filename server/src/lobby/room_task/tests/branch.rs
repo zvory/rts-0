@@ -393,7 +393,7 @@ fn branch_staging_rejects_normal_lobby_only_controls() {
     task.on_start_request(100);
 
     assert!(task.ai_players.is_empty());
-    assert_eq!(task.selected_map, "Default");
+    assert_eq!(task.selected_map, "1v1");
     assert!(matches!(task.phase, Phase::BranchStaging(_)));
     assert!(!std::iter::from_fn(|| writer.reliable_rx.try_recv().ok())
         .any(|msg| matches!(msg, ServerMessage::Lobby { .. } | ServerMessage::Start(_))));

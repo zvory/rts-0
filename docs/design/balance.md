@@ -460,12 +460,13 @@ folded into default targeting.
   effects do not stack; a shorter refresh cannot reduce an active buff. Enemies see the status only
   when the affected unit is otherwise visible through authoritative fog. Fake Army and allied-unit
   support are deferred.
-- Map: `TILE_SIZE = 32` px. The live map is the hardcoded handcrafted asset at
-  `server/assets/maps/default-handcrafted.json` (126×126 today), served for tooling at
-  `/maps/default-handcrafted.json`. The current asset is the original 96×96 handcrafted map
-  padded with 15 passable grass tiles on every edge.
-  Its JSON uses row strings (`.` grass, `#` rock, `~` water), flat `startLocations`, and flat
-  `baseSites`.
+- Map: `TILE_SIZE = 32` px. New normal lobbies default to the imported 126×126 two-player map
+  at `server/assets/maps/1v1.json` (eight permanent resource base locations), served for tooling
+  at `/maps/1v1.json`. The four-start `Default` map remains the hardcoded asset at
+  `server/assets/maps/default-handcrafted.json` for generic simulation setup, Labs, and replay
+  compatibility; it is the original 96×96 handcrafted map padded with 15 passable grass tiles on
+  every edge. Both map JSON assets use row strings (`.` grass, `#` rock, `~` water), flat
+  `startLocations`, and flat `baseSites`.
 - Start: `STARTING_STEEL = 75`, `STARTING_OIL = 0`, `STARTING_WORKERS = 4`,
   one City Centre at the player's start tile, 12 steel patches with 1,250 steel each split into
   two six-wide fields four tiles out on opposite sides of the base + 3 oil patches with 3,333 oil

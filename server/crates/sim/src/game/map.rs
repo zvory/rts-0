@@ -395,6 +395,7 @@ mod tests {
         );
         let names: Vec<&str> = available.iter().map(|e| e.name.as_str()).collect();
         assert!(names.contains(&"Default"), "got: {names:?}");
+        assert!(names.contains(&"1v1"), "got: {names:?}");
         assert!(names.contains(&"Low Econ"), "got: {names:?}");
         assert!(names.contains(&"No Terrain"), "got: {names:?}");
         assert!(names.contains(&"1v1 No Terrain"), "got: {names:?}");
@@ -418,6 +419,32 @@ mod tests {
             .expect("default handcrafted map should load from bundled assets");
         assert_eq!(map.size, 126);
         assert_eq!(map.starts.len(), 2);
+
+        let one_v_one_authored = available
+            .iter()
+            .find(|entry| entry.name == "1v1")
+            .expect("imported 1v1 map should be listed");
+        assert_eq!(one_v_one_authored.min_players, 1);
+        assert_eq!(one_v_one_authored.max_players, 2);
+        assert!(
+            Map::load("1v1", 2, 0x1234_5678).is_ok(),
+            "1v1 should load for two active players"
+        );
+        assert!(
+            Map::load("1v1", 3, 0x1234_5678).is_err(),
+            "1v1 should not expose a third start location"
+        );
+        for seed in 0..32 {
+            let mut starts = Map::load("1v1", 2, seed)
+                .expect("1v1 should load for two active players")
+                .starts;
+            starts.sort_unstable();
+            assert_eq!(
+                starts,
+                vec![(9, 9), (116, 116)],
+                "1v1 must only use its two authored start locations for seed {seed}"
+            );
+        }
 
         let one_v_one = available
             .iter()

@@ -11,10 +11,10 @@ fn lobby_summary_reports_open_waiting_room_state() {
     assert_eq!(summary.room, "open-summary");
     assert_eq!(summary.kind, crate::protocol::LobbyKind::Normal);
     assert_eq!(summary.host_name.as_deref(), Some("Player 1"));
-    assert_eq!(summary.map, "Default");
+    assert_eq!(summary.map, "1v1");
     assert_eq!(summary.created_at_unix_ms, 123_456);
     assert_eq!(summary.occupied_slots, 1);
-    assert_eq!(summary.max_slots, MAX_PLAYERS);
+    assert_eq!(summary.max_slots, 2);
     assert_eq!(summary.spectator_count, 0);
     assert_eq!(summary.phase, LobbySummaryPhase::Lobby);
     assert_eq!(summary.join_state, LobbyJoinState::Open);
@@ -23,18 +23,17 @@ fn lobby_summary_reports_open_waiting_room_state() {
 #[test]
 fn lobby_summary_marks_full_waiting_rooms_spectator_joinable() {
     let mut task = summary_task("full-summary");
-    for id in 2..=4 {
-        add_test_room_player(&mut task, id, false);
-        task.assign_missing_team_for(id);
-        task.assign_missing_faction_for(id);
-    }
+    add_test_room_player(&mut task, 2, false);
+    task.assign_missing_team_for(2);
+    task.assign_missing_faction_for(2);
     add_test_room_spectator(&mut task, 99);
 
     let summary = task
         .lobby_summary()
         .expect("full waiting lobby should remain visible");
 
-    assert_eq!(summary.occupied_slots, MAX_PLAYERS);
+    assert_eq!(summary.occupied_slots, 2);
+    assert_eq!(summary.max_slots, 2);
     assert_eq!(summary.spectator_count, 1);
     assert_eq!(summary.phase, LobbySummaryPhase::Lobby);
     assert_eq!(summary.join_state, LobbyJoinState::FullSpectatorOnly);
@@ -377,6 +376,7 @@ fn default_ai_team_appends_after_occupied_teams_when_possible() {
 #[test]
 fn selecting_two_player_map_trims_excess_active_seats() {
     let mut task = summary_task("two-player-map-cap");
+    task.on_select_map(1, "Default".to_string());
     for id in 2..=3 {
         add_test_room_player(&mut task, id, true);
         task.assign_missing_team_for(id);

@@ -98,6 +98,7 @@ fn lobby_ai_names_follow_profile_labels_and_duplicate_counts() {
     let host_id = next_player_id();
     task.host_id = Some(host_id);
     add_test_room_player(&mut task, host_id, true);
+    task.on_select_map(host_id, "Default".to_string());
 
     task.on_add_ai(host_id, Some(2), None);
     assert_eq!(ai_slot_names(&task), vec!["AI 2.1"]);
@@ -450,6 +451,7 @@ fn ai_only_live_start_payload_advertises_speed_controls_without_seek() {
     );
     let mut writer = add_test_room_spectator(&mut task, 1);
     task.host_id = Some(1);
+    task.on_select_map(1, "Default".to_string());
     task.on_add_ai(1, Some(1), None);
     task.on_add_ai(1, Some(2), None);
     while writer.reliable_rx.try_recv().is_ok() {}
@@ -514,6 +516,7 @@ fn ai_only_live_spectator_observer_analysis_includes_ai_decision_diagnostics() {
     );
     let mut writer = add_test_room_spectator(&mut task, 1);
     task.host_id = Some(1);
+    task.on_select_map(1, "Default".to_string());
     task.on_add_ai(1, Some(1), None);
     task.on_add_ai(1, Some(2), None);
     while writer.reliable_rx.try_recv().is_ok() {}
