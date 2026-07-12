@@ -197,6 +197,9 @@ export class LabInteractTailnetPreview {
       return;
     }
     const stream = fs.createReadStream(entry.realPath, { start: range.start, end: range.end });
+    // `pipe()` only unpipes when a client disconnects. Destroy the source too so an
+    // abandoned range request cannot leave its file descriptor paused until process teardown.
+    response.once("close", () => stream.destroy());
     stream.once("error", () => {
       if (!response.headersSent) response.writeHead(404, { "cache-control": "no-store" });
       response.end();

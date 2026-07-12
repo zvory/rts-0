@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import { once } from "node:events";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { Writable } from "node:stream";
 
 import {
   LabInteractTailnetPreview,
@@ -11,6 +13,8 @@ import {
   resolveTailnetHost,
   tailnetHostFromStatus,
 } from "../scripts/lab-interact/tailnet_preview.mjs";
+
+await assertAbandonedReadClosesSource();
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "rts-li-tailnet-preview-"));
 const artifactRoot = path.join(root, "target", "lab-interact", "lab_test", "captures");
@@ -91,3 +95,57 @@ assert.throws(
 assert.equal(MAX_TAILNET_PREVIEW_ARTIFACT_BYTES, 64 * 1024 * 1024, "Tailnet preview matches Lab's recording size cap");
 
 console.log("✅ lab_interact_tailnet_preview_contracts.mjs: opaque Tailnet artifact delivery passed");
+
+async function assertAbandonedReadClosesSource() {
+  const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "rts-li-preview-abort-"));
+  const captureDirectory = path.join(workspaceRoot, "target", "lab-interact", "lab_test", "captures");
+  fs.mkdirSync(captureDirectory, { recursive: true });
+  const filePath = path.join(captureDirectory, "scene.png");
+  fs.writeFileSync(filePath, Buffer.alloc(128 * 1024, 7));
+  const preview = new LabInteractTailnetPreview({ workspaceRoot });
+  const realPath = fs.realpathSync(filePath);
+  const stat = fs.statSync(realPath);
+  const token = "b".repeat(64);
+  preview.artifacts.set(token, {
+    token,
+    mimeType: "image/png",
+    realPath,
+    size: stat.size,
+    fingerprint: `${realPath}\u0000${stat.dev}:${stat.ino}:${stat.size}:${stat.mtimeMs}`,
+  });
+
+  let source = null;
+  const originalCreateReadStream = fs.createReadStream;
+  fs.createReadStream = (...args) => {
+    source = originalCreateReadStream(...args);
+    return source;
+  };
+  class AbortingResponse extends Writable {
+    constructor() {
+      super();
+      this.headersSent = false;
+    }
+
+    writeHead() {
+      this.headersSent = true;
+      return this;
+    }
+
+    _write(_chunk, _encoding, callback) {
+      callback();
+      this.destroy();
+    }
+  }
+
+  try {
+    const response = new AbortingResponse();
+    preview.handle({ method: "GET", url: `${LAB_INTERACT_PREVIEW_ROUTE}${token}`, headers: {} }, response);
+    await once(response, "close");
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(source?.destroyed, true, "a disconnected preview client closes the source artifact stream");
+  } finally {
+    fs.createReadStream = originalCreateReadStream;
+    await preview.close();
+    fs.rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+}
