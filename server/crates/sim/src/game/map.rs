@@ -399,6 +399,7 @@ mod tests {
         assert!(names.contains(&"Low Econ"), "got: {names:?}");
         assert!(names.contains(&"No Terrain"), "got: {names:?}");
         assert!(names.contains(&"1v1 No Terrain"), "got: {names:?}");
+        assert!(names.contains(&"4 Player Map"), "got: {names:?}");
         // Every entry must have a non-empty description.
         for entry in &available {
             assert!(
@@ -474,6 +475,19 @@ mod tests {
                 vec![(25, 25), (100, 100)],
                 "1v1 No Terrain must only use its two opposing start locations for seed {seed}"
             );
+        }
+
+        let four_player = available
+            .iter()
+            .find(|entry| entry.name == "4 Player Map")
+            .expect("four-player map should be listed");
+        assert_eq!(four_player.min_players, 1);
+        assert_eq!(four_player.max_players, 4);
+        for player_count in 1..=4 {
+            let map = Map::load("4 Player Map", player_count, 0x1234_5678)
+                .expect("four-player map should load for every supported player count");
+            assert_eq!(map.starts.len(), player_count);
+            assert_eq!(map.base_sites.len(), 16);
         }
     }
 
