@@ -78,7 +78,8 @@ objects. Build it beside the existing Pixi call path; Phase 3.5 owns renderer cu
 
 - No Babylon dependency or backend.
 - No Pixi `render(frame)` cutover or destructive-read reconciliation; Phase 3.5 owns them.
-- No transient event normalization/history; Phase 4 owns it.
+- No transient event normalization/history; Phase 6 adds the first real event shape only after the
+  Phase 5 playtest confirms it is needed.
 - No protocol change and no client-side hidden-state reconstruction.
 - No visual redesign, faction asset work, batching, or shadows.
 
