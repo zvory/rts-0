@@ -73,15 +73,51 @@ pub(super) fn is_constructing(entities: &EntityStore, id: u32) -> bool {
 
 pub(super) fn rally_intent_for_map(
     map: &Map,
+    entities: &EntityStore,
     kind: RallyKind,
     x: f32,
     y: f32,
+    requested_node: Option<u32>,
 ) -> Option<RallyIntent> {
     if !x.is_finite() || !y.is_finite() {
         return None;
     }
     let max = (map.world_size_px() - 1.0).max(0.0);
-    Some(RallyIntent::new(kind, x.clamp(0.0, max), y.clamp(0.0, max)))
+    let x = x.clamp(0.0, max);
+    let y = y.clamp(0.0, max);
+    let resource = match requested_node {
+        Some(node) => entities.get(node),
+        None => resource_node_at_point(entities, x, y),
+    };
+    match (requested_node, resource) {
+        (Some(_), None) => None,
+        (_, Some(node)) if node.kind == EntityKind::Oil => None,
+        (_, Some(node)) if node.kind == EntityKind::Steel && node.remaining().unwrap_or(0) > 0 => {
+            Some(RallyIntent::to_resource(
+                kind, node.id, node.pos_x, node.pos_y,
+            ))
+        }
+        (Some(_), Some(_)) => None,
+        (None, _) => Some(RallyIntent::new(kind, x, y)),
+    }
+}
+
+fn resource_node_at_point(
+    entities: &EntityStore,
+    x: f32,
+    y: f32,
+) -> Option<&crate::game::entity::Entity> {
+    entities
+        .iter()
+        .filter(|entity| entity.is_node() && entity.remaining().unwrap_or(0) > 0)
+        .filter_map(|entity| {
+            let dx = entity.pos_x - x;
+            let dy = entity.pos_y - y;
+            let dist2 = dx * dx + dy * dy;
+            (dist2 <= entity.radius() * entity.radius()).then_some((entity, dist2))
+        })
+        .min_by(|(a, a_dist), (b, b_dist)| a_dist.total_cmp(b_dist).then_with(|| a.id.cmp(&b.id)))
+        .map(|(entity, _)| entity)
 }
 
 fn command_weight(kind: EntityKind) -> u32 {

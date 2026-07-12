@@ -617,6 +617,28 @@ function pointerEvent(canvas, clientX, clientY, {
   h.minimap.destroy();
 }
 
+// Production rallies identify steel nodes and ignore oil nodes on the minimap too.
+{
+  const cityCentre = { id: 12, owner: 1, kind: KIND.CITY_CENTRE };
+  const h = minimapHarness({ selected: [cityCentre] });
+  const steel = { id: 80, owner: 0, kind: KIND.STEEL, x: 120, y: 130, remaining: 1000 };
+  const oil = { id: 81, owner: 0, kind: KIND.OIL, x: 150, y: 160, remaining: 1000 };
+  h.state.map.resources = [steel, oil];
+
+  h.minimap._issueOrder(steel.x, steel.y, false);
+  assert(
+    h.net.sent[0]?.c === "setRally" &&
+      h.net.sent[0].building === cityCentre.id &&
+      h.net.sent[0].node === steel.id &&
+      h.net.sent[0].x === steel.x &&
+      h.net.sent[0].y === steel.y,
+    "minimap steel rally identifies and canonicalizes the resource node",
+  );
+  h.minimap._issueOrder(oil.x, oil.y, false);
+  assert(h.net.sent.length === 1, "minimap oil rally sends no command");
+  h.minimap.destroy();
+}
+
 // Artillery abilities issued through the minimap keep raw commands but show locked local feedback.
 {
   const artillery = {

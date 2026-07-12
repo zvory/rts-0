@@ -1436,7 +1436,11 @@ replaces the whole plan; queued `setRally` appends a `move` or `attackMove` stag
 or establishes the first stage when the plan is empty. Newly produced units receive the first rally
 stage as their active order and any later stages as queued unit-local intents, so every trained unit
 follows the same accepted building rally chain. The first stage also drives spawn-exit and vehicle
-facing preference.
+facing preference. A live steel patch may be retained as the authoritative target of a rally stage:
+newly produced Workers and Golems receive a gather order for that node, while non-gatherers still use
+the stage's point and move/attack-move behavior. Oil-patch rally targets are rejected. The optional
+node id supplied by current clients and coordinate-only resource hits from older clients/minimap
+commands are both validated against authoritative entity state.
 
 `game::smoke::SmokeCloudStore` owns active neutral smoke clouds as world effects, not entities:
 clouds have stable ids, center points, radius, spawn tick, and expiry tick, and they do not

@@ -49,17 +49,21 @@ export function _issueTargetedCommand(p, ev = {}) {
   const pickedTarget = commandTarget === "attack"
     ? this._entityAtScreen(p, /*ownPreferred=*/ false)
     : null;
+  const resource = this._resourceAtScreen(p);
   const world = this._groundAtScreen(p.x, p.y);
   if (!world && !explicitAttackCommandTarget(this.state, pickedTarget)) return false;
   if (ownUnits.length === 0) {
     if (producers.length === 0 || !world) return true;
     const queued = !!ev.shiftKey;
     if (commandTarget === "move" || commandTarget === "attack") {
+      if (resource?.kind === KIND.OIL) return true;
       const kind = commandTarget === "attack" ? ORDER_STAGE.ATTACK_MOVE : ORDER_STAGE.MOVE;
+      const rallyPoint = resource?.kind === KIND.STEEL ? resource : world;
+      const node = resource?.kind === KIND.STEEL ? resource.id : null;
       for (const building of producers) {
-        this._issueCommand(cmd.setRally(building, world.x, world.y, queued, kind));
+        this._issueCommand(cmd.setRally(building, rallyPoint.x, rallyPoint.y, queued, kind, node));
       }
-      this._addCommandFeedback(kind === ORDER_STAGE.ATTACK_MOVE ? "attack" : "move", world.x, world.y, queued);
+      this._addCommandFeedback(kind === ORDER_STAGE.ATTACK_MOVE ? "attack" : "move", rallyPoint.x, rallyPoint.y, queued);
     }
     return true;
   }
@@ -154,13 +158,16 @@ function normalRightClickAction(input, p) {
     // mixed selection always moves the units.
     const producers = input._selectedProducerBuildingIds();
     if (producers.length === 0 || !world) return null;
+    if (resource?.kind === KIND.OIL) return null;
+    const rallyPoint = resource?.kind === KIND.STEEL ? resource : world;
     return {
       kind: "setRally",
       producers,
-      x: world.x,
-      y: world.y,
+      x: rallyPoint.x,
+      y: rallyPoint.y,
+      node: resource?.kind === KIND.STEEL ? resource.id : null,
       stage: ORDER_STAGE.MOVE,
-      feedback: rightClickFeedback("move", world.x, world.y),
+      feedback: rightClickFeedback("move", rallyPoint.x, rallyPoint.y),
     };
   }
 
@@ -243,7 +250,7 @@ function issueNormalRightClickAction(input, action, queued) {
   switch (action.kind) {
     case "setRally":
       for (const building of action.producers) {
-        input._issueCommand(cmd.setRally(building, action.x, action.y, queued, action.stage));
+        input._issueCommand(cmd.setRally(building, action.x, action.y, queued, action.stage, action.node));
       }
       break;
     case "build":

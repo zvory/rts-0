@@ -111,13 +111,17 @@ pub(crate) fn production_system(
                 // Send the new unit through the building's rally plan. Plain rally stages default
                 // to attack-move for combat units, but worker-like gatherers keep move rally behavior.
                 if let Some(first) = rally_plan.first().copied() {
-                    coordinator.order_group_move(
-                        entities,
-                        owner,
-                        &[spawned],
-                        (first.point.x, first.point.y),
-                        rally_stage_attacks(unit, first),
-                    );
+                    if let Some(node) = gather_rally_target(unit, first) {
+                        coordinator.order_gather(entities, spawned, node);
+                    } else {
+                        coordinator.order_group_move(
+                            entities,
+                            owner,
+                            &[spawned],
+                            (first.point.x, first.point.y),
+                            rally_stage_attacks(unit, first),
+                        );
+                    }
                     if let Some(e) = entities.get_mut(spawned) {
                         for stage in rally_plan.iter().skip(1).copied() {
                             e.append_queued_order(rally_order_intent(unit, stage));
@@ -138,11 +142,19 @@ fn is_worker_like_gatherer(unit: EntityKind) -> bool {
 }
 
 fn rally_order_intent(unit: EntityKind, rally: RallyIntent) -> OrderIntent {
-    if rally_stage_attacks(unit, rally) {
+    if let Some(node) = gather_rally_target(unit, rally) {
+        OrderIntent::gather(node)
+    } else if rally_stage_attacks(unit, rally) {
         OrderIntent::attack_move_to(rally.point.x, rally.point.y)
     } else {
         OrderIntent::move_to(rally.point.x, rally.point.y)
     }
+}
+
+fn gather_rally_target(unit: EntityKind, rally: RallyIntent) -> Option<u32> {
+    is_worker_like_gatherer(unit)
+        .then_some(rally.resource_node)
+        .flatten()
 }
 
 fn set_owned_mortar_autocast(entities: &mut EntityStore, owner: u32, enabled: bool) {
@@ -493,6 +505,46 @@ mod tests {
             matches!(worker.order(), Order::Move(_)),
             "spawned workers should keep plain move rallies instead of attack-moving"
         );
+    }
+
+    #[test]
+    fn steel_rally_starts_spawned_worker_on_gather_order() {
+        let map = flat_map(32);
+        let mut entities = EntityStore::new();
+        let city_centre = spawn_building_training(
+            &map,
+            &mut entities,
+            10,
+            10,
+            EntityKind::CityCentre,
+            EntityKind::Worker,
+        );
+        let rally = map.tile_center(18, 10);
+        let steel = entities
+            .spawn_node(EntityKind::Steel, rally.0, rally.1)
+            .expect("steel should spawn");
+        entities
+            .get_mut(city_centre)
+            .expect("city centre")
+            .set_rally_point(Some(RallyIntent::to_resource(
+                RallyKind::Move,
+                steel,
+                rally.0,
+                rally.1,
+            )));
+        let mut players = vec![player(1)];
+
+        tick_production(&map, &mut entities, &mut players);
+
+        let worker = entities
+            .iter()
+            .find(|e| e.owner == 1 && e.kind == EntityKind::Worker && e.hp > 0)
+            .expect("worker should spawn");
+        assert!(matches!(
+            worker.order(),
+            Order::Gather(order) if order.intent.node == steel
+        ));
+        assert_eq!(worker.target_id(), Some(steel));
     }
 
     #[test]

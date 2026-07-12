@@ -305,6 +305,9 @@ export const cmd = Object.freeze({
   cancel: (building) => ({ c: CMD.CANCEL, building }),
   stop: (units) => ({ c: CMD.STOP, units }),
   holdPosition: (units) => ({ c: CMD.HOLD_POSITION, units }),
-  setRally: (building, x, y, queued = false, kind = ORDER_STAGE.MOVE) =>
-    withQueued({ c: CMD.SET_RALLY, building, x, y, kind }, queued),
+  setRally: (building, x, y, queued = false, kind = ORDER_STAGE.MOVE, node = null) => {
+    const command = { c: CMD.SET_RALLY, building, x, y, kind };
+    if (Number.isInteger(node)) command.node = node;
+    return withQueued(command, queued);
+  },
 });

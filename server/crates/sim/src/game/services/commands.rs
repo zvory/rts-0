@@ -575,10 +575,11 @@ pub(in crate::game) fn apply_commands(
                 building,
                 x,
                 y,
+                node,
                 kind,
                 queued,
             } => {
-                let Some(rally) = rally_intent_for_map(map, kind, x, y) else {
+                let Some(rally) = rally_intent_for_map(map, entities, kind, x, y, node) else {
                     continue;
                 };
                 order_set_rally(entities, &faction_id, player, building, rally, queued);

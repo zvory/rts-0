@@ -408,6 +408,7 @@ fn lab_replay_artifact_rejects_nonfinite_set_rally_coordinates() {
             building: 1,
             x: f32::NAN,
             y: 10.0,
+            node: None,
             kind: Some("move".to_string()),
             queued: false,
         },

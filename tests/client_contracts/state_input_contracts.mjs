@@ -1187,6 +1187,40 @@ function buttonByLabel(card, label) {
     "worker shift-right-click on oil should queue a Pump Jack build instead of direct gather",
   );
 
+  const rallyCityCentre = {
+    id: 33,
+    owner: 1,
+    kind: KIND.CITY_CENTRE,
+    x: 64,
+    y: 64,
+    buildProgress: null,
+  };
+  input.state = {
+    playerId: 1,
+    map: { tileSize: 32 },
+    entitiesInterpolated: () => [rallyCityCentre, overlappingSteel, overlappingOil],
+    selectedEntities: () => [rallyCityCentre],
+    addCommandFeedback() {},
+  };
+  publishSelectionTestScene(input);
+  rightClickCommands.length = 0;
+  input._onRightClick({ x: overlappingSteel.x, y: overlappingSteel.y });
+  assert(
+    rightClickCommands.length === 1 &&
+      rightClickCommands[0].c === "setRally" &&
+      rightClickCommands[0].building === rallyCityCentre.id &&
+      rightClickCommands[0].node === overlappingSteel.id &&
+      rightClickCommands[0].x === overlappingSteel.x &&
+      rightClickCommands[0].y === overlappingSteel.y,
+    "production-building right-click on steel should identify the node for a gather rally",
+  );
+  rightClickCommands.length = 0;
+  input._onRightClick({ x: overlappingOil.x, y: overlappingOil.y });
+  assert(
+    rightClickCommands.length === 0,
+    "production-building right-click on oil should not issue a rally command",
+  );
+
   const moveUnit = { id: 40, owner: 1, kind: KIND.RIFLEMAN, x: 120, y: 120 };
   input.state = {
     playerId: 1,

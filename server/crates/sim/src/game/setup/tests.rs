@@ -211,6 +211,7 @@ fn unknown_faction_start_and_commands_fail_closed() {
 
 #[test]
 fn standard_starting_loadout_matches_phase0_inventory() {
+    assert_eq!(config::STARTING_WORKERS, 6);
     let players = [
         PlayerInit {
             id: 1,

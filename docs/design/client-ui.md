@@ -1168,7 +1168,10 @@ while command emission stays gated by local-owner checks.
 Shift-right-click appends queued orders only for selected units: move, attack-move, attack,
 gather, build/resume, Tank Trap deconstruct, and placement build commands set `queued: true` and
 rely on the server snapshot's owner-only `orderPlan` for accepted markers. Production-building-only right-clicks set
-or append building rally stages and rely on owner-only `rallyPlan` for accepted markers. Attack
+or append building rally stages and rely on owner-only `rallyPlan` for accepted markers. A live
+steel patch is sent with its resource id and authoritative center so newly produced gatherers mine
+it; an oil patch suppresses rally command emission. The minimap applies the same resource-target
+classification against known live map resources. Attack
 targeting with only production buildings selected creates `attackMove` rally stages.
 Selection, hover, and entity targeting use the last successfully presented detached
 `SelectionSceneV1`; move/ground abilities/placement use its nullable ground query. Screen clicks and

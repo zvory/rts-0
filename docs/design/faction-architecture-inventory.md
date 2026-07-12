@@ -77,7 +77,7 @@ Ekat, or fixture special cases casually.
 Steel, Oil, and Supply are the only player resources in snapshots, compact snapshots, replay
 analysis, match history replay artifacts, and the HUD. Start-map resources are still only Steel and
 Oil nodes. Current Kriegsia starting values are `STARTING_STEEL = 75`, `STARTING_OIL = 0`, and
-`STARTING_WORKERS = 4`.
+`STARTING_WORKERS = 6`.
 
 Compact snapshots encode resources as fixed scalar slots: tick, Steel, Oil, Supply used, and Supply
 cap. Spectator/replay `player_resources` use the same Steel/Oil/Supply fields. Later generic
@@ -90,7 +90,7 @@ through catalog-aware cost/loadout helpers or update that approved inventory del
 
 The standard Kriegsia match start is defined by the `kriegsia.standard` faction loadout in
 `server/crates/rules/src/faction.rs` and assembled by `server/crates/sim/src/game/setup.rs`: each
-player gets one completed City Centre, four Workers in a ring, nearby Steel/Oil resource clusters,
+player gets one completed City Centre, six Workers in a ring, nearby Steel/Oil resource clusters,
 starting Steel and Oil, and supply from the City Centre. Unknown non-empty faction ids receive no
 catalog loadout, starting entities, starting Steel/Oil, or Kriegsia supply credit; lifecycle owners
 must validate before building a `Game`.

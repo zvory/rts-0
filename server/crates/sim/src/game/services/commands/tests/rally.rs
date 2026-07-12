@@ -27,6 +27,7 @@ fn set_rally_stores_point_on_producer_and_rejects_others() {
                     building: barracks,
                     x: 100.0,
                     y: 200.0,
+                    node: None,
                     kind: RallyKind::Move,
                     queued: false,
                 },
@@ -38,6 +39,7 @@ fn set_rally_stores_point_on_producer_and_rejects_others() {
                     building: depot,
                     x: 50.0,
                     y: 50.0,
+                    node: None,
                     kind: RallyKind::Move,
                     queued: false,
                 },
@@ -49,6 +51,7 @@ fn set_rally_stores_point_on_producer_and_rejects_others() {
                     building: enemy_barracks,
                     x: 10.0,
                     y: 10.0,
+                    node: None,
                     kind: RallyKind::Move,
                     queued: false,
                 },
@@ -91,6 +94,7 @@ fn set_rally_clamps_out_of_bounds_point() {
                 building: barracks,
                 x: 1.0e9,
                 y: -50.0,
+                node: None,
                 kind: RallyKind::Move,
                 queued: false,
             },
@@ -124,6 +128,7 @@ fn queued_rally_appends_until_four_stages_and_normal_rally_clears_queue() {
                     building: barracks,
                     x: 100.0,
                     y: 100.0,
+                    node: None,
                     kind: RallyKind::Move,
                     queued: true,
                 },
@@ -134,6 +139,7 @@ fn queued_rally_appends_until_four_stages_and_normal_rally_clears_queue() {
                     building: barracks,
                     x: 200.0,
                     y: 200.0,
+                    node: None,
                     kind: RallyKind::AttackMove,
                     queued: true,
                 },
@@ -144,6 +150,7 @@ fn queued_rally_appends_until_four_stages_and_normal_rally_clears_queue() {
                     building: barracks,
                     x: 300.0,
                     y: 300.0,
+                    node: None,
                     kind: RallyKind::Move,
                     queued: true,
                 },
@@ -154,6 +161,7 @@ fn queued_rally_appends_until_four_stages_and_normal_rally_clears_queue() {
                     building: barracks,
                     x: 400.0,
                     y: 400.0,
+                    node: None,
                     kind: RallyKind::AttackMove,
                     queued: true,
                 },
@@ -164,6 +172,7 @@ fn queued_rally_appends_until_four_stages_and_normal_rally_clears_queue() {
                     building: barracks,
                     x: 500.0,
                     y: 500.0,
+                    node: None,
                     kind: RallyKind::Move,
                     queued: true,
                 },
@@ -195,6 +204,7 @@ fn queued_rally_appends_until_four_stages_and_normal_rally_clears_queue() {
                 building: barracks,
                 x: 600.0,
                 y: 600.0,
+                node: None,
                 kind: RallyKind::Move,
                 queued: false,
             },
@@ -204,4 +214,118 @@ fn queued_rally_appends_until_four_stages_and_normal_rally_clears_queue() {
     let barracks = entities.get(barracks).expect("barracks should exist");
     assert!(barracks.rally_stages().is_empty());
     assert_eq!(barracks.rally_point(), Some((600.0, 600.0)));
+}
+
+#[test]
+fn steel_rally_targets_the_authoritative_node_and_oil_rally_is_rejected() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let (cx, cy) = footprint_center(&map, EntityKind::CityCentre, 6, 6);
+    let city_centre = entities
+        .spawn_building(1, EntityKind::CityCentre, cx, cy, true)
+        .expect("city centre should spawn");
+    let steel = entities
+        .spawn_node(EntityKind::Steel, 320.0, 256.0)
+        .expect("steel should spawn");
+    let oil = entities
+        .spawn_node(EntityKind::Oil, 384.0, 256.0)
+        .expect("oil should spawn");
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::SetRally {
+                building: city_centre,
+                x: 999.0,
+                y: 999.0,
+                node: Some(steel),
+                kind: RallyKind::Move,
+                queued: false,
+            },
+        )],
+    );
+
+    let rally = entities.get(city_centre).expect("city centre").rally_plan()[0];
+    assert_eq!(rally.resource_node, Some(steel));
+    assert_eq!((rally.point.x, rally.point.y), (320.0, 256.0));
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::SetRally {
+                building: city_centre,
+                x: 384.0,
+                y: 256.0,
+                node: Some(oil),
+                kind: RallyKind::Move,
+                queued: false,
+            },
+        )],
+    );
+
+    assert_eq!(
+        entities.get(city_centre).expect("city centre").rally_plan()[0].resource_node,
+        Some(steel),
+        "an oil target must not replace the accepted steel rally"
+    );
+}
+
+#[test]
+fn coordinate_only_resource_rallies_detect_steel_and_reject_oil() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let (cx, cy) = footprint_center(&map, EntityKind::CityCentre, 6, 6);
+    let city_centre = entities
+        .spawn_building(1, EntityKind::CityCentre, cx, cy, true)
+        .expect("city centre should spawn");
+    let steel = entities
+        .spawn_node(EntityKind::Steel, 320.0, 256.0)
+        .expect("steel should spawn");
+    entities
+        .spawn_node(EntityKind::Oil, 384.0, 256.0)
+        .expect("oil should spawn");
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::SetRally {
+                building: city_centre,
+                x: 320.0,
+                y: 256.0,
+                node: None,
+                kind: RallyKind::Move,
+                queued: false,
+            },
+        )],
+    );
+    assert_eq!(
+        entities.get(city_centre).expect("city centre").rally_plan()[0].resource_node,
+        Some(steel)
+    );
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::SetRally {
+                building: city_centre,
+                x: 384.0,
+                y: 256.0,
+                node: None,
+                kind: RallyKind::Move,
+                queued: false,
+            },
+        )],
+    );
+    assert_eq!(
+        entities.get(city_centre).expect("city centre").rally_plan()[0].resource_node,
+        Some(steel)
+    );
 }
