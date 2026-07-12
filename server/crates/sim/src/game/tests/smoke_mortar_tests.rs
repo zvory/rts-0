@@ -553,7 +553,14 @@ fn hidden_mortar_launch_is_not_sent_but_impact_reveals_attacker_to_victim() {
     ];
     let mut game = empty_flat_game(&players);
     let mortar_pos = game.state.map.tile_center(8, 8);
-    let target_pos = game.state.map.tile_center(17, 8);
+    let rifleman_sight = config::unit_stats(EntityKind::Rifleman)
+        .expect("rifleman should have stats")
+        .sight_tiles;
+    let tank_sight = config::unit_stats(EntityKind::Tank)
+        .expect("tank should have stats")
+        .sight_tiles;
+    let target_tile = 8 + rifleman_sight.max(tank_sight) + 1;
+    let target_pos = game.state.map.tile_center(target_tile, 8);
     let mortar = game.state.entities
         .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
         .expect("mortar should spawn");

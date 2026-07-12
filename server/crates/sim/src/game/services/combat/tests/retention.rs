@@ -52,8 +52,19 @@ fn shoot_while_moving_units_reacquire_when_retained_target_is_friendly() {
 #[test]
 fn shoot_while_moving_units_reacquire_when_retained_target_is_hidden() {
     let map = open_map(24);
-    let (entities, tank, retained, fallback) =
-        tank_with_retained_target(&map, (100.0, 100.0), 2, (356.0, 100.0), (130.0, 100.0));
+    let tank_sight = config::unit_stats(EntityKind::Tank)
+        .expect("tank should have stats")
+        .sight_tiles;
+    let (entities, tank, retained, fallback) = tank_with_retained_target(
+        &map,
+        (100.0, 100.0),
+        2,
+        (
+            100.0 + (tank_sight + 1) as f32 * config::TILE_SIZE as f32,
+            100.0,
+        ),
+        (130.0, 100.0),
+    );
     let los = LineOfSight::new(&map);
     let spatial = SpatialIndex::build(&entities, map.size);
     let mut fog = Fog::new(map.size);

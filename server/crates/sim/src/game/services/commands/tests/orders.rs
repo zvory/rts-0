@@ -697,11 +697,19 @@ fn queued_attack_and_gather_reject_dead_or_depleted_targets_before_appending() {
 fn attack_command_rejects_hidden_targets() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
+    let rifleman_sight = config::unit_stats(EntityKind::Rifleman)
+        .expect("rifleman should have stats")
+        .sight_tiles;
     let rifle = entities
         .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
         .expect("rifleman should spawn");
     let hidden_target = entities
-        .spawn_unit(2, EntityKind::Tank, 420.0, 100.0)
+        .spawn_unit(
+            2,
+            EntityKind::Tank,
+            100.0 + (rifleman_sight + 1) as f32 * config::TILE_SIZE as f32,
+            100.0,
+        )
         .expect("hidden target should spawn");
 
     apply(

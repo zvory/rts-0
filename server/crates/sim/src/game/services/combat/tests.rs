@@ -1884,11 +1884,19 @@ fn deployed_anti_tank_gun_fires_at_long_range() {
 fn deployed_anti_tank_gun_does_not_auto_acquire_targets_hidden_by_fog() {
     let map = open_map(24);
     let mut entities = EntityStore::new();
+    let anti_tank_sight = config::unit_stats(EntityKind::AntiTankGun)
+        .expect("anti-tank gun should have stats")
+        .sight_tiles;
     let at_id = entities
         .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
         .expect("anti-tank gun should spawn");
     let tank_id = entities
-        .spawn_unit(2, EntityKind::Tank, 356.0, 100.0)
+        .spawn_unit(
+            2,
+            EntityKind::Tank,
+            100.0 + (anti_tank_sight + 1) as f32 * config::TILE_SIZE as f32,
+            100.0,
+        )
         .expect("enemy tank should spawn");
     if let Some(at) = entities.get_mut(at_id) {
         at.set_weapon_setup(WeaponSetup::Deployed);
