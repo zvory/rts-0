@@ -5,6 +5,7 @@ import { installFakePixi } from "./pixi_fakes.mjs";
 import { TERRAIN } from "../../client/src/protocol.js";
 import { createMapHandoff } from "../../client/src/map_editor_handoff.js";
 import { mapEditorLaunchConfig } from "../../client/src/map_editor_launch.js";
+import { MapEditorPanel } from "../../client/src/map_editor_panel.js";
 import {
   mapEditorSymmetryGuideCentre,
   mapEditorSymmetryGuideLines,
@@ -61,6 +62,64 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
     } },
   });
   assert.equal(session.materialized().baseSites.length, 2, "checkpoint scenario expansion sites migrate into flat base sites");
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 32, playerCount: 1 });
+  let result;
+  assert.equal(session.mutate("Removed final start", (draft) => {
+    result = removeDraftLocation(draft, { kind: "start", locationIndex: 0 });
+  }), true);
+  assert.equal(result.ok, true);
+  assert.equal(session.draft.startLocations.length, 0, "an editor draft may temporarily have no start locations");
+  assert.deepEqual(session.draft.baseSites, [{ x: 8, y: 8 }], "removing a start keeps its resource site as a neutral base");
+  assert.deepEqual(session.materialized().starts, [], "zero-start editor drafts remain materializable");
+
+  assert.equal(session.mutate("Rebuilt radial starts", (draft) => {
+    result = addSymmetricDraftLocations(draft, {
+      kind: "start", tile: { x: 8, y: 8 }, symmetry: MAP_EDITOR_SYMMETRY.RADIAL,
+    });
+  }), true);
+  assert.equal(result.count, 4);
+  assert.deepEqual(session.draft.startLocations, [
+    { x: 8, y: 8 }, { x: 23, y: 8 }, { x: 23, y: 23 }, { x: 8, y: 23 },
+  ]);
+  assert.deepEqual(session.draft.baseSites, session.draft.startLocations,
+    "symmetric start placement reuses an existing base and creates only the missing resource sites");
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 32, playerCount: 1 });
+  const viewport = {
+    tool: { kind: "start", locationIndex: 0, add: false },
+    armTool(tool) { this.tool = tool; },
+  };
+  const statuses = [];
+  const panel = {
+    session,
+    viewport,
+    setStatus(message, error) { statuses.push({ message, error }); },
+  };
+  MapEditorPanel.prototype.removeLocation.call(panel, "start", 0);
+  assert.equal(viewport.tool, null,
+    "removing the final start clears its now-invalid armed move tool before the author clicks the map again");
+  assert.deepEqual(statuses, [{ message: "Map location removed.", error: false }]);
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 32, playerCount: 1 });
+  let result;
+  assert.equal(session.mutate("Completed radial starts", (draft) => {
+    result = addSymmetricDraftLocations(draft, {
+      kind: "start", tile: { x: 8, y: 8 }, symmetry: MAP_EDITOR_SYMMETRY.RADIAL,
+    });
+  }), true);
+  assert.equal(result.count, 3, "symmetric placement fills only the missing counterparts of an existing start");
+  assert.equal(session.draft.startLocations.length, 4);
+  assert.equal(session.draft.baseSites.length, 4);
 }
 
 {

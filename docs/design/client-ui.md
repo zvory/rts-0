@@ -725,13 +725,16 @@ entity, resource, order, timeline, or replay state crosses that boundary.
 `/maps/<file>`, creates the fixed-size blank map, edits name/description plus flat start and base
 locations, and provides undo/redo, local save/load, and JSON export. Start locations set map player
 capacity; every base location is permanent and its resources spawn even when no player starts there.
-There is no active layout, player slot, or per-player natural assignment. The viewport draws blue start
+Editor drafts may temporarily contain zero start locations so authors can clear and rebuild the player
+layout. Adding symmetric starts reuses any base sites already present at the target locations. There is no
+active layout, player slot, or per-player natural assignment. The viewport draws blue start
 markers and neutral base markers over the shared Pixi terrain and owns editor-only pan/zoom/paint/site input. Terrain tools support brush
 and inclusive drag-box fills, plus none, horizontal, vertical, half-turn, four-way radial, or either
 single-diagonal symmetry; grass is the erase material. Symmetry expands every terrain tile before it is
 painted, moves matching start locations, removes matching neutral base locations when moving a selected base,
 and adds all symmetric locations. The selected neutral base has a pale map ring. The viewport draws the selected
 centre axis, a centre marker for half-turn symmetry, a cross for radial symmetry, or the selected diagonal.
+Editor status stays above the scrolling controls; failures use a high-contrast alert treatment.
 A terrain pointer stroke clones once for undo,
 mutates rows in place, records dirty tiles, and commits once. The renderer patches those tiles plus their
 edge-sharing neighbours into the existing canvas texture and calls
