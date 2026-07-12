@@ -159,6 +159,52 @@ fn observation(economy: AiEconomy, owned: Vec<AiEntitySummary>) -> AiObservation
     }
 }
 
+#[test]
+fn canonical_profiles_never_schedule_disabled_supply_depots() {
+    let observation = observation(
+        AiEconomy {
+            steel: 1_000,
+            oil: 1_000,
+            supply_used: 48,
+            supply_cap: 50,
+        },
+        vec![
+            building(1, EntityKind::CityCentre, Some(0)),
+            building(2, EntityKind::Barracks, Some(0)),
+            worker(3, AiEntityState::Idle),
+        ],
+    );
+
+    for profile in crate::ai_core::profiles::required_profiles() {
+        let decision = decide(
+            &observation,
+            profile,
+            &mut AiDecisionMemory::for_profile(profile),
+        );
+        assert!(
+            !decision.intents.iter().any(|intent| matches!(
+                intent,
+                AiIntent::Build {
+                    kind: EntityKind::Depot
+                }
+            )),
+            "{} must not plan a disabled Supply Depot",
+            profile.id,
+        );
+        assert!(
+            !decision.commands.iter().any(|command| matches!(
+                command,
+                Command::Build {
+                    building: EntityKind::Depot,
+                    ..
+                }
+            )),
+            "{} must not issue a disabled Supply Depot build command",
+            profile.id,
+        );
+    }
+}
+
 fn with_expansion_resources(mut observation: AiObservation) -> AiObservation {
     let ts = observation.map.tile_size as f32;
     for i in 0..18 {

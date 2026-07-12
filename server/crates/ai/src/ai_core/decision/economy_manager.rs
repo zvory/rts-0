@@ -1,5 +1,4 @@
 use super::expansion::ExpansionPlan;
-use super::production::wants_depot;
 use super::resources::{plan_economy, EconomyPlan};
 use super::*;
 
@@ -13,8 +12,6 @@ pub(super) enum OilDemandSignal {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct EconomyManagerSignals {
     pub(super) oil_demand: OilDemandSignal,
-    pub(super) defer_supply_for_tech: bool,
-    pub(super) emergency_supply: bool,
     pub(super) defer_worker_training_for_tech: bool,
 }
 
@@ -28,7 +25,6 @@ pub(super) struct EconomyManagerInput<'a> {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum EconomyProposal {
-    BuildSupplyDepot,
     BuildExpansionCityCentre,
     TrainWorker,
     AssignOilWorkers,
@@ -64,11 +60,6 @@ pub(super) fn propose_economy(input: EconomyManagerInput<'_>) -> EconomyManagerO
         .saturating_add(plan.desired_oil_workers);
 
     let mut proposals = Vec::new();
-    if wants_depot(input.facts, input.profile)
-        && (!input.signals.defer_supply_for_tech || input.signals.emergency_supply)
-    {
-        proposals.push(EconomyProposal::BuildSupplyDepot);
-    }
     if input.expansion_plan.should_save {
         proposals.push(EconomyProposal::BuildExpansionCityCentre);
     }

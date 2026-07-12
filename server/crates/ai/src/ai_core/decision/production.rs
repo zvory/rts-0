@@ -7,14 +7,6 @@ pub(super) const PRODUCTION_BUILDINGS: [EntityKind; 4] = [
     EntityKind::CityCentre,
 ];
 
-pub(super) fn wants_depot(facts: &AiFacts, profile: &AiProfile) -> bool {
-    !facts.supply_capped
-        && !facts.depot_in_progress
-        && facts.free_supply <= profile.supply.free_supply_buffer
-        && (facts.free_supply <= profile.supply.emergency_depot_threshold
-            || !facts.production_buildings(EntityKind::Barracks).is_empty())
-}
-
 pub(super) fn should_build_extra_factory(
     observation: &AiObservation,
     facts: &AiFacts,

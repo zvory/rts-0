@@ -1,7 +1,7 @@
 // Headless client smoke test. Drives the real client in headless Chrome and asserts it
 // loads, renders the PixiJS scene, and that the full UI command loop works end-to-end:
-// lobby -> ready -> start -> render -> box-select -> mine enough steel -> build placement
-// (round-trips through the server and the depot appears) -> train-card rendering.
+// lobby -> ready -> start -> render -> box-select -> worker build card (with the former Depot
+// slot empty) -> train-card rendering.
 // Fails on ANY console/page error.
 //
 // Requires a local Chrome. `tests/run-all.sh` hydrates puppeteer-core through the shared

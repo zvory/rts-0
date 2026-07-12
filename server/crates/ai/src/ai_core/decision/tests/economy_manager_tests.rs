@@ -146,8 +146,6 @@ fn economy_manager_outputs_action_proposals() {
         expansion_plan: &expansion_plan,
         signals: EconomyManagerSignals {
             oil_demand: OilDemandSignal::ExactWorkers(1),
-            defer_supply_for_tech: false,
-            emergency_supply: false,
             defer_worker_training_for_tech: false,
         },
     });
@@ -192,8 +190,6 @@ fn economy_manager_can_hold_oil_at_current_assignment() {
         expansion_plan: &expansion_plan,
         signals: EconomyManagerSignals {
             oil_demand: OilDemandSignal::HoldCurrent,
-            defer_supply_for_tech: false,
-            emergency_supply: false,
             defer_worker_training_for_tech: false,
         },
     });

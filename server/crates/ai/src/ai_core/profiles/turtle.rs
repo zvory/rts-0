@@ -23,10 +23,9 @@ const TURTLE_TECH_PATH: [EntityKind; 4] = [
 pub(crate) static AI_TURTLE: AiProfile = AiProfile {
     id: AI_TURTLE_ID,
     // Keep Turtle on the AI 2.1 economy cadence. Its opening and defensive
-    // production differ, but worker, oil, supply, and first-Barracks spending must
+    // production differ, but worker, oil, and first-Barracks spending must
     // not put it behind the pressure profile before support weapons come online.
     workers: AI_2_1.workers,
-    supply: AI_2_1.supply,
     buildings: BuildingPolicy {
         barracks_curve: AI_2_1.buildings.barracks_curve,
         factory_target: 0,
@@ -97,7 +96,6 @@ mod tests {
         let turtle = AI_TURTLE.turtle_defense.unwrap();
 
         assert_eq!(AI_TURTLE.workers, ai2.workers);
-        assert_eq!(AI_TURTLE.supply, ai2.supply);
         assert_eq!(AI_TURTLE.resources, ai2.resources);
         assert_eq!(
             AI_TURTLE.buildings.barracks_curve,
