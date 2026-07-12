@@ -11,16 +11,12 @@ fn gather_command_ignores_nodes_without_nearby_completed_cc() {
         is_ai: false,
     }];
     let mut game = Game::new_for_replay(&players, 0x1234_5678);
-    let worker = game
-        .state
-        .entities
+    let worker = game.state.entities
         .iter()
         .find(|e| e.owner == 1 && e.kind == EntityKind::Worker)
         .map(|e| e.id)
         .expect("starting worker");
-    let cc = game
-        .state
-        .entities
+    let cc = game.state.entities
         .iter()
         .find(|e| e.owner == 1 && e.kind == EntityKind::CityCentre)
         .expect("starting City Centre");
@@ -35,9 +31,7 @@ fn gather_command_ignores_nodes_without_nearby_completed_cc() {
     } else {
         config::TILE_SIZE as f32 * 0.5
     };
-    let far_node = game
-        .state
-        .entities
+    let far_node = game.state.entities
         .spawn_node(EntityKind::Steel, far_x, far_y)
         .expect("far resource node");
 
@@ -51,12 +45,7 @@ fn gather_command_ignores_nodes_without_nearby_completed_cc() {
     );
     game.tick();
 
-    let worker_order = game
-        .state
-        .entities
-        .get(worker)
-        .expect("worker survives")
-        .order();
+    let worker_order = game.state.entities.get(worker).expect("worker survives").order();
     assert!(
         !matches!(worker_order, Order::Gather(_)),
         "worker should ignore gather commands for patches outside City Centre mining range"
@@ -74,9 +63,7 @@ fn gather_command_to_occupied_patch_redirects_without_stealing_slot() {
         is_ai: false,
     }];
     let mut game = Game::new_for_replay(&players, 0x1234_5678);
-    let mut workers: Vec<u32> = game
-        .state
-        .entities
+    let mut workers: Vec<u32> = game.state.entities
         .iter()
         .filter(|e| e.owner == 1 && e.kind == EntityKind::Worker)
         .map(|e| e.id)
@@ -84,16 +71,12 @@ fn gather_command_to_occupied_patch_redirects_without_stealing_slot() {
     workers.sort_unstable();
     let holder = workers[0];
     let ordered = workers[1];
-    let node = game
-        .state
-        .entities
+    let node = game.state.entities
         .iter()
         .find(|e| e.is_node())
         .map(|e| e.id)
         .expect("starting resource node");
-    let (node_x, node_y) = game
-        .state
-        .entities
+    let (node_x, node_y) = game.state.entities
         .get(node)
         .map(|e| (e.pos_x, e.pos_y))
         .expect("node position");
@@ -107,11 +90,7 @@ fn gather_command_to_occupied_patch_redirects_without_stealing_slot() {
     }
     assert!(game.state.entities.claim_miner(node, holder));
     {
-        let ordered_entity = game
-            .state
-            .entities
-            .get_mut(ordered)
-            .expect("ordered worker");
+        let ordered_entity = game.state.entities.get_mut(ordered).expect("ordered worker");
         ordered_entity.pos_x = node_x + 4.0;
         ordered_entity.pos_y = node_y;
     }
@@ -150,23 +129,17 @@ fn worker_already_touching_resource_body_starts_harvesting() {
         is_ai: false,
     }];
     let mut game = Game::new_for_replay(&players, 0x1234_5678);
-    let worker = game
-        .state
-        .entities
+    let worker = game.state.entities
         .iter()
         .find(|e| e.owner == 1 && e.kind == EntityKind::Worker)
         .map(|e| e.id)
         .expect("starting worker");
-    let node = game
-        .state
-        .entities
+    let node = game.state.entities
         .iter()
         .find(|e| e.is_node())
         .map(|e| e.id)
         .expect("starting resource node");
-    let (node_x, node_y) = game
-        .state
-        .entities
+    let (node_x, node_y) = game.state.entities
         .get(node)
         .map(|e| (e.pos_x, e.pos_y))
         .expect("node position");
@@ -189,10 +162,7 @@ fn worker_already_touching_resource_body_starts_harvesting() {
     game.tick();
 
     assert_eq!(
-        game.state
-            .entities
-            .get(worker)
-            .and_then(|e| e.gather_phase()),
+        game.state.entities.get(worker).and_then(|e| e.gather_phase()),
         Some(GatherPhase::Harvesting),
         "worker already touching the resource body should not need to reach the exact node center"
     );
@@ -209,22 +179,16 @@ fn active_mining_stops_when_nearby_cc_is_removed() {
         is_ai: false,
     }];
     let mut game = Game::new_for_replay(&players, 0x1234_5678);
-    let worker = game
-        .state
-        .entities
+    let worker = game.state.entities
         .iter()
         .find(|e| e.owner == 1 && e.kind == EntityKind::Worker)
         .map(|e| e.id)
         .expect("starting worker");
-    let (worker_x, worker_y) = game
-        .state
-        .entities
+    let (worker_x, worker_y) = game.state.entities
         .get(worker)
         .map(|e| (e.pos_x, e.pos_y))
         .expect("worker position");
-    let node = game
-        .state
-        .entities
+    let node = game.state.entities
         .iter()
         .filter(|e| e.is_node())
         .min_by(|a, b| {
@@ -246,27 +210,19 @@ fn active_mining_stops_when_nearby_cc_is_removed() {
     for _ in 0..600 {
         game.tick();
         if matches!(
-            game.state
-                .entities
-                .get(worker)
-                .and_then(|e| e.gather_phase()),
+            game.state.entities.get(worker).and_then(|e| e.gather_phase()),
             Some(GatherPhase::Harvesting)
         ) {
             break;
         }
     }
     assert_eq!(
-        game.state
-            .entities
-            .get(worker)
-            .and_then(|e| e.gather_phase()),
+        game.state.entities.get(worker).and_then(|e| e.gather_phase()),
         Some(GatherPhase::Harvesting),
         "worker should reach and latch the starting patch before the City Centre is removed"
     );
 
-    let cc = game
-        .state
-        .entities
+    let cc = game.state.entities
         .iter()
         .find(|e| e.owner == 1 && e.kind == EntityKind::CityCentre)
         .map(|e| e.id)
@@ -355,9 +311,7 @@ fn spawn_resource_distances_are_fair_and_symmetric() {
 
         let mut all_player_dists: Vec<Vec<(EntityKind, f32)>> = Vec::new();
         for p in &game.state.players {
-            let cc = game
-                .state
-                .entities
+            let cc = game.state.entities
                 .iter()
                 .find(|e| e.owner == p.id && e.kind == EntityKind::CityCentre)
                 .expect("City Centre exists for every player");
@@ -445,12 +399,7 @@ fn generated_oil_nodes_spawn_at_tile_centers() {
             let game = Game::new_for_replay(&players, seed);
             let mut oil_count = 0;
             let mut oil_tiles = Vec::new();
-            for oil in game
-                .state
-                .entities
-                .iter()
-                .filter(|entity| entity.kind == EntityKind::Oil)
-            {
+            for oil in game.state.entities.iter().filter(|entity| entity.kind == EntityKind::Oil) {
                 oil_count += 1;
                 let (tile_x, tile_y) = game.state.map.tile_of(oil.pos_x, oil.pos_y);
                 let (center_x, center_y) = game.state.map.tile_center(tile_x, tile_y);

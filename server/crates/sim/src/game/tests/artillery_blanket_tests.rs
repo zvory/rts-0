@@ -7,9 +7,7 @@ fn artillery_blanket_fire_queue_is_terminal() {
     let mut game = empty_flat_game(&players);
     let pos = game.state.map.tile_center(10, 10);
     let target = game.state.map.tile_center(38, 10);
-    let artillery = game
-        .state
-        .entities
+    let artillery = game.state.entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
         .expect("artillery should spawn");
     deploy_artillery_toward(&mut game, artillery, target);
@@ -35,11 +33,7 @@ fn artillery_blanket_fire_queue_is_terminal() {
     );
     game.tick();
 
-    let entity = game
-        .state
-        .entities
-        .get(artillery)
-        .expect("artillery exists");
+    let entity = game.state.entities.get(artillery).expect("artillery exists");
     assert!(matches!(entity.order(), Order::ArtilleryBlanketFire(_)));
     assert!(
         entity.queued_orders().is_empty(),
@@ -54,9 +48,7 @@ fn packed_artillery_blanket_fire_auto_sets_up_and_samples_inside_radius() {
     let initial_steel = game.state.players[0].steel;
     let pos = game.state.map.tile_center(10, 10);
     let target = game.state.map.tile_center(38, 10);
-    let artillery = game
-        .state
-        .entities
+    let artillery = game.state.entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
         .expect("artillery should spawn");
 
@@ -72,11 +64,7 @@ fn packed_artillery_blanket_fire_auto_sets_up_and_samples_inside_radius() {
     );
     let events = game.tick();
 
-    let entity = game
-        .state
-        .entities
-        .get(artillery)
-        .expect("artillery exists");
+    let entity = game.state.entities.get(artillery).expect("artillery exists");
     assert!(matches!(
         entity.weapon_setup(),
         WeaponSetup::Packed | WeaponSetup::SettingUp { .. }
@@ -148,19 +136,13 @@ fn queued_blanket_fire_mixed_selection_locks_each_artillery_and_keeps_rifle_queu
     let second_pos = game.state.map.tile_center(10, 12);
     let raw_click = (first_pos.0 + min_px - 8.0, first_pos.1);
     let move_target = game.state.map.tile_center(18, 18);
-    let first_artillery = game
-        .state
-        .entities
+    let first_artillery = game.state.entities
         .spawn_unit(1, EntityKind::Artillery, first_pos.0, first_pos.1)
         .expect("first artillery should spawn");
-    let second_artillery = game
-        .state
-        .entities
+    let second_artillery = game.state.entities
         .spawn_unit(1, EntityKind::Artillery, second_pos.0, second_pos.1)
         .expect("second artillery should spawn");
-    let rifle = game
-        .state
-        .entities
+    let rifle = game.state.entities
         .spawn_unit(1, EntityKind::Rifleman, first_pos.0, first_pos.1 + 192.0)
         .expect("rifleman should spawn");
     deploy_artillery_toward(&mut game, first_artillery, raw_click);
@@ -187,14 +169,10 @@ fn queued_blanket_fire_mixed_selection_locks_each_artillery_and_keeps_rifle_queu
     );
     game.tick();
 
-    let first_entity = game
-        .state
-        .entities
+    let first_entity = game.state.entities
         .get(first_artillery)
         .expect("first artillery should exist");
-    let second_entity = game
-        .state
-        .entities
+    let second_entity = game.state.entities
         .get(second_artillery)
         .expect("second artillery should exist");
     let Order::ArtilleryBlanketFire(first_order) = first_entity.order() else {
@@ -224,11 +202,7 @@ fn queued_blanket_fire_mixed_selection_locks_each_artillery_and_keeps_rifle_queu
         "inside-minimum mixed Blanket Fire clicks should lock each gun to its own range floor"
     );
 
-    let rifle_entity = game
-        .state
-        .entities
-        .get(rifle)
-        .expect("rifleman should exist");
+    let rifle_entity = game.state.entities.get(rifle).expect("rifleman should exist");
     assert!(
         matches!(rifle_entity.order(), Order::Move(_)),
         "non-artillery in the mixed selection should still accept the later queued move"
@@ -245,9 +219,7 @@ fn collect_blanket_fire_targets(ballistic_tables: bool) -> Vec<(u32, u32)> {
     }
     let pos = game.state.map.tile_center(10, 10);
     let target = game.state.map.tile_center(38, 10);
-    let artillery = game
-        .state
-        .entities
+    let artillery = game.state.entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
         .expect("artillery should spawn");
     deploy_artillery_toward(&mut game, artillery, target);
@@ -284,9 +256,7 @@ fn collect_blanket_fire_targets(ballistic_tables: bool) -> Vec<(u32, u32)> {
 }
 
 fn deploy_artillery_toward(game: &mut Game, artillery: u32, target: (f32, f32)) {
-    let entity = game
-        .state
-        .entities
+    let entity = game.state.entities
         .get_mut(artillery)
         .expect("artillery should exist");
     let facing = (target.1 - entity.pos_y).atan2(target.0 - entity.pos_x);
