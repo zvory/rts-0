@@ -206,6 +206,7 @@ export class MapEditorPanel {
     }
     const start = starts[this.selectedStartIndex];
     const base = bases[this.selectedBaseIndex];
+    this.viewport.setSelectedBase(base?.index ?? null);
     section.append(
       readout(`Start locations set player capacity (${starts.length}/${MAP_EDITOR_MAX_START_LOCATIONS}). Every base site always spawns resources.`),
       startPicker,
