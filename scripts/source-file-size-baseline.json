@@ -25,8 +25,8 @@
     },
     {
       "path": "server/crates/protocol/src/lib.rs",
-      "lines": 1709,
-      "reason": "Observer analysis contract coverage moved beside its DTOs, lowering the existing oversized protocol module; keep ratcheting until remaining protocol DTO groups are split."
+      "lines": 1712,
+      "reason": "Repeat production adds its authoritative command DTO and compact-slot regression coverage to the existing oversized protocol module; keep ratcheting until remaining protocol DTO groups are split."
     },
     {
       "path": "server/crates/sim/src/game/services/combat/tests.rs",
@@ -35,8 +35,8 @@
     },
     {
       "path": "server/crates/sim/src/game/services/commands.rs",
-      "lines": 1926,
-      "reason": "Artillery UX Phase 3 adds server-authoritative Blanket Fire command routing and shared Point/Blanket firing execution to the existing oversized command service; keep ratcheting until artillery command runtime is extracted."
+      "lines": 1933,
+      "reason": "Repeat production adds one dispatch arm while its validation and mutation live in a dedicated command submodule; keep ratcheting until more command families are extracted."
     },
     {
       "path": "server/crates/sim/src/game/services/move_coordinator.rs",
