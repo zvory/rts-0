@@ -518,15 +518,15 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       STATS[KIND.TANK_TRAP].footW === 1 &&
       STATS[KIND.TANK_TRAP].footH === 1 &&
       STATS[KIND.TANK_TRAP].sight === 0 &&
-      STATS[KIND.TANK_TRAP].cost.steel === 15 &&
+      STATS[KIND.TANK_TRAP].cost.steel === 30 &&
       STATS[KIND.TANK_TRAP].cost.oil === 0 &&
       STATS[KIND.TANK_TRAP].buildTicks === TICK_HZ * 10 &&
       STATS[KIND.TANK_TRAP].requires === KIND.TRAINING_CENTRE,
-    "Tank Trap dormant metadata mirrors Phase 1 server rules",
+    "Tank Trap active metadata mirrors server rules",
   );
   assert(
-    !WORKER_BUILDABLE.includes(KIND.TANK_TRAP),
-    "Tank Trap is temporarily hidden from the worker build menu",
+    WORKER_BUILDABLE.includes(KIND.TANK_TRAP),
+    "Tank Trap is available in the worker build menu",
   );
   const playerId = 1;
   const underConstructionTrainingCentre = [

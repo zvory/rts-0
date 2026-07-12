@@ -1180,7 +1180,7 @@ optimistic production/rally, control groups, build/gather/train/research/cancel,
 execution remain strict local-owner checks.
 Shift-confirmed build placement keeps placement mode armed while Shift is physically held, allowing
 multiple queued building placements; releasing Shift or losing window focus clears placement mode.
-If re-enabled, Tank Trap placement uses the same local placement intent, with optional `lineSites`
+Tank Trap placement uses the same local placement intent, with optional `lineSites`
 preview data: the first valid sites dispatch as one immediate single-worker build per selected
 worker, and any remaining valid sites dispatch as queued standard build commands against the
 selected worker set. Line placement only offers vehicle-closing Tank Trap steps: exact diagonal adjacency `(1,1)` or
