@@ -314,6 +314,7 @@ pub(super) fn replay_transition_test_snapshot(tick: u32) -> Snapshot {
         events: Vec::new(),
         upgrades: Vec::new(),
         player_resources: Vec::new(),
+        production_queue: Vec::new(),
         net_status: SnapshotNetStatus::default(),
     }
 }

@@ -572,9 +572,12 @@ fn command_stats_by_player(commands: &[CommandLogEntry]) -> BTreeMap<u32, Comman
             | WireCommand::SetAutocast { .. }
             | WireCommand::Gather { .. }
             | WireCommand::Build { .. }
+            | WireCommand::QueueBuild { .. }
             | WireCommand::Deconstruct { .. }
             | WireCommand::Train { .. }
             | WireCommand::Research { .. }
+            | WireCommand::QueueTrain { .. }
+            | WireCommand::QueueResearch { .. }
             | WireCommand::Cancel { .. }
             | WireCommand::Stop { .. }
             | WireCommand::HoldPosition { .. }
@@ -729,9 +732,12 @@ fn command_units(command: &rts_sim::game::command::SimCommand) -> Option<&[u32]>
         | rts_sim::game::command::SimCommand::Stop { units }
         | rts_sim::game::command::SimCommand::HoldPosition { units } => Some(units),
         rts_sim::game::command::SimCommand::Build { units, .. }
+        | rts_sim::game::command::SimCommand::QueueBuild { units, .. }
         | rts_sim::game::command::SimCommand::Deconstruct { units, .. } => Some(units),
         rts_sim::game::command::SimCommand::Train { .. }
         | rts_sim::game::command::SimCommand::Research { .. }
+        | rts_sim::game::command::SimCommand::QueueTrain { .. }
+        | rts_sim::game::command::SimCommand::QueueResearch { .. }
         | rts_sim::game::command::SimCommand::Cancel { .. }
         | rts_sim::game::command::SimCommand::SetRally { .. }
         | rts_sim::game::command::SimCommand::Rejected { .. } => None,
@@ -1154,6 +1160,7 @@ mod tests {
             events: Vec::new(),
             upgrades: Vec::new(),
             player_resources: Vec::new(),
+            production_queue: Vec::new(),
             net_status: SnapshotNetStatus::default(),
         }
     }

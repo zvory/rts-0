@@ -456,6 +456,7 @@ mod tests {
             score: crate::game::ScoreState::default(),
             upgrades: Default::default(),
             ability_cooldowns: Default::default(),
+            production_requests: Default::default(),
         }
     }
 

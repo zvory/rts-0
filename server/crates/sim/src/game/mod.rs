@@ -32,6 +32,7 @@ mod mortar_scatter;
 mod panzerfaust_shot;
 mod pathfinding;
 mod player_state;
+mod production_request;
 pub mod replay;
 mod replay_artifact;
 mod resource_placement;
@@ -149,6 +150,9 @@ pub(crate) struct PlayerState {
     pub(crate) upgrades: BTreeSet<upgrade::UpgradeKind>,
     #[serde(default)]
     pub(crate) ability_cooldowns: BTreeMap<ability::AbilityKind, u16>,
+    #[serde(default)]
+    pub(crate) production_requests:
+        std::collections::VecDeque<production_request::ProductionRequest>,
 }
 
 /// Per-player score-screen counters. Values are accumulated from authoritative entity lifecycle
@@ -396,10 +400,7 @@ impl Game {
     }
 
     fn primary_base_alive_for(&self, player_id: u32, start_tile: (u32, u32)) -> bool {
-        let (start_x, start_y) = self
-            .state
-            .map
-            .tile_center(start_tile.0, start_tile.1);
+        let (start_x, start_y) = self.state.map.tile_center(start_tile.0, start_tile.1);
         let max_dist = config::TILE_SIZE as f32 * 0.5;
         let max_dist_sq = max_dist * max_dist;
         services::world_query::owned_buildings(&self.state.entities, player_id).any(|entity| {

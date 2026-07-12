@@ -436,7 +436,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   );
   const buildCommand = cmd.build([7, 8], KIND.DEPOT, 12, 14, true);
   assert(
-    buildCommand.c === "build" &&
+    buildCommand.c === "queueBuild" &&
       buildCommand.units.join(",") === "7,8" &&
       buildCommand.building === KIND.DEPOT &&
       buildCommand.tileX === 12 &&

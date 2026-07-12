@@ -11,6 +11,7 @@ import {
   MAX_COMPACT_EVENTS,
   MAX_COMPACT_ORDER_PLAN,
   MAX_COMPACT_REMEMBERED_BUILDINGS,
+  MAX_COMPACT_PRODUCTION_REQUESTS,
   MAX_COMPACT_RESOURCE_DELTAS,
   MAX_COMPACT_SMOKES,
   MAX_COMPACT_VISIBLE_TILES,
@@ -64,7 +65,30 @@ export function decodeCompactSnapshot(raw) {
     upgrades: readOptionalArray(raw.u, "upgrades", 32).map((code, index) =>
       readCode(code, UPGRADE_BY_CODE, `upgrade.${index}`),
     ),
+    productionQueue: readOptionalArray(
+      raw.q,
+      "productionQueue",
+      MAX_COMPACT_PRODUCTION_REQUESTS,
+    ).map(decodeCompactProductionRequest),
     netStatus: decodeCompactNetStatus(raw.n),
+  };
+}
+
+function decodeCompactProductionRequest(record, index) {
+  const fields = readArray(record, `production request ${index}`, 3);
+  if (fields.length !== 3) throw new Error(`production request ${index} field count mismatch`);
+  const requestKind = fields[0];
+  const item = fields[1];
+  if (!["unit", "building", "research"].includes(requestKind)) {
+    throw new Error(`production request ${index} has invalid kind`);
+  }
+  if (typeof item !== "string" || item.length === 0 || item.length > 64) {
+    throw new Error(`production request ${index} has invalid item`);
+  }
+  return {
+    requestKind,
+    item,
+    remaining: fields[2] == null ? null : readU32(fields[2], `production request ${index}.remaining`),
   };
 }
 

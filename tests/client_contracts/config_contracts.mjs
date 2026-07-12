@@ -743,7 +743,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     researchButton.click({ shiftKey: true });
     assert(
       sent.length === 1 &&
-        sent[0].c === "research" &&
+        sent[0].c === "queueResearch" &&
         sent[0].building === 77 &&
         sent[0].upgrade === UPGRADE.METHAMPHETAMINES,
       "Clicking Methamphetamines should send a research command",
@@ -751,7 +751,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     entrenchmentButton.click({ shiftKey: false });
     assert(
       sent.length === 2 &&
-        sent[1].c === "research" &&
+        sent[1].c === "queueResearch" &&
         sent[1].building === 77 &&
         sent[1].upgrade === UPGRADE.ENTRENCHMENT,
       "Clicking Entrenchment should send a research command",
@@ -994,7 +994,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     assert(hotkeyResult?.handled === true, "Methamphetamines hotkey should activate the command-card button");
     const hotkeyCommand = sent[sent.length - 1];
     assert(
-      hotkeyCommand?.c === "research" &&
+      hotkeyCommand?.c === "queueResearch" &&
         hotkeyCommand.building === 77 &&
         hotkeyCommand.upgrade === UPGRADE.METHAMPHETAMINES,
       "Methamphetamines hotkey should send a research command",
@@ -1179,11 +1179,8 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     assert(factoryButton?.disabled, "tech-locked build button stays hard-disabled");
 
     barracksButton.click();
-    assert(placements === 0, "clicking an unaffordable build button should not enter placement");
-    assert(
-      playedNotices[0] === "notice_steel",
-      "clicking an unaffordable build button plays the missing-steel voice line",
-    );
+    assert(shortResourceHud.clientIntent.placement?.building === KIND.BARRACKS, "unaffordable build enters placement for deferred construction");
+    assert(playedNotices.length === 0, "queueable unaffordable build does not play a shortage rejection");
 
     globalThis.document.getElementById = (id) => {
       assert(id === "command-card", "unaffordable build hotkey should query the command card");
@@ -1201,8 +1198,8 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       repeat: false,
       preventDefault() {},
     });
-    assert(placements === 0, "unaffordable build hotkey should not enter placement");
-    assert(playedNotices[1] === "notice_steel", "unaffordable build hotkey plays the missing-steel voice line");
+    assert(shortResourceHud.clientIntent.placement?.building === KIND.BARRACKS, "unaffordable build hotkey keeps deferred placement active");
+    assert(playedNotices.length === 0, "unaffordable build hotkey does not play a shortage rejection");
 
     assert(
       shortResourceHud._missingResourceSoundId(

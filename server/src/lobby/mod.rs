@@ -151,8 +151,10 @@ impl CommandLifecycleFamily {
         match cmd {
             crate::protocol::Command::Move { .. } => Self::Move,
             crate::protocol::Command::AttackMove { .. } => Self::AttackMove,
-            crate::protocol::Command::Build { .. } => Self::Build,
-            crate::protocol::Command::Train { .. } => Self::Train,
+            crate::protocol::Command::Build { .. }
+            | crate::protocol::Command::QueueBuild { .. } => Self::Build,
+            crate::protocol::Command::Train { .. }
+            | crate::protocol::Command::QueueTrain { .. } => Self::Train,
             _ => Self::Other,
         }
     }

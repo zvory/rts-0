@@ -406,10 +406,13 @@ fn validate_command_units(command: &SimCommand) -> Result<(), CheckpointPayloadE
         | SimCommand::SetAutocast { units, .. }
         | SimCommand::Gather { units, .. }
         | SimCommand::Build { units, .. }
+        | SimCommand::QueueBuild { units, .. }
         | SimCommand::Stop { units }
         | SimCommand::HoldPosition { units } => Some(units),
         SimCommand::Train { .. }
         | SimCommand::Research { .. }
+        | SimCommand::QueueTrain { .. }
+        | SimCommand::QueueResearch { .. }
         | SimCommand::Cancel { .. }
         | SimCommand::SetRally { .. }
         | SimCommand::Rejected { .. } => None,

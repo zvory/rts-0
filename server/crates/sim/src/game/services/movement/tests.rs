@@ -94,6 +94,7 @@ fn player_with_oil(id: u32, oil: u32) -> PlayerState {
         score: ScoreState::default(),
         upgrades: Default::default(),
         ability_cooldowns: Default::default(),
+        production_requests: Default::default(),
     }
 }
 #[derive(Debug, Clone, Copy)]

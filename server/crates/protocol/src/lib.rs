@@ -36,10 +36,11 @@ pub use rts_contract::{
     AttackReveal, CommandCapabilities, DebugPathPoint, DebugPathView, DiagnosticCapabilities,
     EntityView, Event, InitialCamera, LabStartMetadata, LabStartRole, LabVisionMode, MapInfo,
     MatchControlCapabilities, MovementPathDiagnosticScope, NoticeSeverity, OrderPlanMarker,
-    PlayerResourceSnapshot, PlayerScore, PlayerStart, RememberedBuildingView, ReplayStartMetadata,
-    ResourceDelta, ResourceNode, RoomCapabilities, RoomTimeCapabilities, RoomTimeState,
-    ScoutPlaneStateView, SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload, TeamId,
-    TrenchView, VisibilityCapabilities, DEFAULT_FACTION_ID,
+    PlayerResourceSnapshot, PlayerScore, PlayerStart, ProductionQueueRequestView,
+    RememberedBuildingView, ReplayStartMetadata, ResourceDelta, ResourceNode, RoomCapabilities,
+    RoomTimeCapabilities, RoomTimeState, ScoutPlaneStateView, SmokeCloudView, Snapshot,
+    SnapshotNetStatus, StartPayload, TeamId, TrenchView, VisibilityCapabilities,
+    DEFAULT_FACTION_ID,
 };
 pub use server_message::ServerMessage;
 
@@ -248,6 +249,25 @@ pub enum Command {
         unit: String,
     },
     Research {
+        building: u32,
+        upgrade: String,
+    },
+    QueueBuild {
+        units: Vec<u32>,
+        building: String,
+        tile_x: u32,
+        tile_y: u32,
+        #[serde(default)]
+        queued: bool,
+    },
+    QueueTrain {
+        building: u32,
+        unit: String,
+        quantity: u32,
+        #[serde(default)]
+        automatic: bool,
+    },
+    QueueResearch {
         building: u32,
         upgrade: String,
     },
@@ -1431,6 +1451,11 @@ mod tests {
             ],
             upgrades: vec![upgrades::ARTILLERY_UNLOCK.to_string()],
             player_resources: Vec::new(),
+            production_queue: vec![ProductionQueueRequestView {
+                request_kind: "unit".to_string(),
+                item: kinds::RIFLEMAN.to_string(),
+                remaining: None,
+            }],
             net_status: SnapshotNetStatus {
                 server_lag_ms: 4,
                 tick_ms: 17,
@@ -1692,6 +1717,7 @@ mod tests {
             events: Vec::new(),
             upgrades: Vec::new(),
             player_resources: Vec::new(),
+            production_queue: Vec::new(),
             net_status: SnapshotNetStatus::default(),
         };
 

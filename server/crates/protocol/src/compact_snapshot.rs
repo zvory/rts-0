@@ -165,6 +165,22 @@ impl Serialize for CompactSnapshot<'_> {
                     .collect::<Vec<_>>(),
             )?;
         }
+        if !snapshot.production_queue.is_empty() {
+            map.serialize_entry(
+                "q",
+                &snapshot
+                    .production_queue
+                    .iter()
+                    .map(|request| {
+                        (
+                            request.request_kind.as_str(),
+                            request.item.as_str(),
+                            request.remaining,
+                        )
+                    })
+                    .collect::<Vec<_>>(),
+            )?;
+        }
         map.serialize_entry("n", &CompactNetStatus(&snapshot.net_status))?;
         map.end()
     }
@@ -293,7 +309,8 @@ fn section_counts(snapshot: &Snapshot) -> BTreeMap<&'static str, u32> {
         SECTION_PLAYER_STATUS,
         1usize
             .saturating_add(snapshot.player_resources.len())
-            .saturating_add(snapshot.upgrades.len()),
+            .saturating_add(snapshot.upgrades.len())
+            .saturating_add(snapshot.production_queue.len()),
     );
     counts.insert(SECTION_NET_STATUS, 1);
     counts
@@ -320,7 +337,7 @@ fn section_for_compact_key(key: &str) -> &'static str {
         "sm" => SECTION_SMOKES,
         "ao" => SECTION_ABILITY_OBJECTS,
         "tr" => SECTION_TRENCHES,
-        "s" | "pr" | "u" => SECTION_PLAYER_STATUS,
+        "s" | "pr" | "u" | "q" => SECTION_PLAYER_STATUS,
         "n" => SECTION_NET_STATUS,
         _ => SECTION_OTHER,
     }

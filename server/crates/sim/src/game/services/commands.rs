@@ -536,6 +536,35 @@ pub(in crate::game) fn apply_commands(
                     ps.refund_cost(cost);
                 }
             }
+            SimCommand::QueueBuild {
+                units,
+                building,
+                tile_x,
+                tile_y,
+                queued,
+            } => {
+                let Some(units) =
+                    validate_command_units(entities, events, player, units, command_admission)
+                else {
+                    continue;
+                };
+                super::production_queue::enqueue_building(
+                    map, entities, players, player, units, building, tile_x, tile_y, queued, events,
+                );
+            }
+            SimCommand::QueueTrain {
+                building,
+                unit,
+                quantity,
+                automatic,
+            } => super::production_queue::enqueue_unit(
+                entities, players, player, building, unit, quantity, automatic, events,
+            ),
+            SimCommand::QueueResearch { building, upgrade } => {
+                super::production_queue::enqueue_research(
+                    entities, players, player, building, upgrade, events,
+                );
+            }
             SimCommand::Cancel { building } => {
                 order_cancel(entities, players, player, building);
             }
@@ -588,6 +617,7 @@ pub(in crate::game) fn apply_commands(
             }
         }
     }
+    super::production_queue::run_scheduler(map, entities, players, coordinator);
 }
 
 fn validate_command_units(

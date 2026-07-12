@@ -328,8 +328,20 @@ pub struct Snapshot {
     /// Per-player resources for the projected observer players.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub player_resources: Vec<PlayerResourceSnapshot>,
+    /// Recipient-owned production requests in scheduler order. `remaining: None` is automatic.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub production_queue: Vec<ProductionQueueRequestView>,
     /// Per-recipient server/network diagnostics for the current match.
     pub net_status: SnapshotNetStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ProductionQueueRequestView {
+    pub request_kind: String,
+    pub item: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub remaining: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use serde::{Deserialize, Serialize};
 
@@ -20,6 +20,8 @@ pub(super) struct PlayerStateV1 {
     pub(super) upgrades: BTreeSet<super::super::upgrade::UpgradeKind>,
     #[serde(default)]
     pub(super) ability_cooldowns: BTreeMap<super::super::ability::AbilityKind, u16>,
+    #[serde(default)]
+    pub(super) production_requests: VecDeque<super::super::production_request::ProductionRequest>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -78,7 +78,9 @@ impl Game {
         visible_players: &[u32],
         options: SnapshotOptions,
     ) -> Snapshot {
-        let actionable_fog = self.state.fog
+        let actionable_fog = self
+            .state
+            .fog
             .union_for(Self::SPECTATOR_VIEWER_ID, visible_players);
         self.snapshot_for_mode(
             SnapshotMode {
@@ -119,7 +121,9 @@ impl Game {
                 Some(e) => e,
                 None => continue,
             };
-            let target = e.target_id().and_then(|target| self.state.entities.get(target));
+            let target = e
+                .target_id()
+                .and_then(|target| self.state.entities.get(target));
             if e.is_node() && (!fogged || fog.is_visible_world(player, e.pos_x, e.pos_y)) {
                 if let Some(remaining) = e.remaining() {
                     resource_deltas.push(ResourceDelta {
@@ -162,11 +166,17 @@ impl Game {
         };
         let mut smokes =
             if fogged && matches!(player_resource_projection, PlayerResourceProjection::None) {
-                self.state.smokes
+                self.state
+                    .smokes
                     .iter()
                     .filter(|cloud| {
-                        self.state.smokes
-                            .visible_to_player(cloud, player, fog, &self.state.entities, &teams)
+                        self.state.smokes.visible_to_player(
+                            cloud,
+                            player,
+                            fog,
+                            &self.state.entities,
+                            &teams,
+                        )
                     })
                     .map(|cloud| crate::protocol::SmokeCloudView {
                         id: cloud.id,
@@ -177,7 +187,8 @@ impl Game {
                     })
                     .collect::<Vec<_>>()
             } else {
-                self.state.smokes
+                self.state
+                    .smokes
                     .iter()
                     .map(|cloud| crate::protocol::SmokeCloudView {
                         id: cloud.id,
@@ -197,7 +208,10 @@ impl Game {
             !matches!(player_resource_projection, PlayerResourceProjection::None),
         );
         ability_objects.sort_by_key(|object| object.id);
-        let trenches = self.state.trenches.views_for(player, fog, fogged, memory_players);
+        let trenches = self
+            .state
+            .trenches
+            .views_for(player, fog, fogged, memory_players);
 
         let player_resources = self.player_resource_snapshots(player_resource_projection);
 
@@ -229,6 +243,35 @@ impl Game {
                 })
                 .unwrap_or_default(),
             player_resources,
+            production_queue: ps
+                .map(|player| {
+                    player
+                        .production_requests
+                        .iter()
+                        .map(|request| {
+                            let (request_kind, item) = match request.item {
+                                super::production_request::ProductionRequestItem::Unit {
+                                    unit,
+                                    ..
+                                } => ("unit", crate::protocol::kind_to_wire(unit)),
+                                super::production_request::ProductionRequestItem::Building {
+                                    building,
+                                    ..
+                                } => ("building", crate::protocol::kind_to_wire(building)),
+                                super::production_request::ProductionRequestItem::Research {
+                                    upgrade,
+                                    ..
+                                } => ("research", upgrade.to_protocol_str()),
+                            };
+                            crate::protocol::ProductionQueueRequestView {
+                                request_kind: request_kind.to_string(),
+                                item: item.to_string(),
+                                remaining: request.remaining,
+                            }
+                        })
+                        .collect()
+                })
+                .unwrap_or_default(),
             net_status: crate::protocol::SnapshotNetStatus::default(),
         }
     }
@@ -311,7 +354,8 @@ impl Game {
         &self,
         projection: PlayerResourceProjection<'_>,
     ) -> Vec<PlayerResourceSnapshot> {
-        self.state.players
+        self.state
+            .players
             .iter()
             .filter(|player| match projection {
                 PlayerResourceProjection::None => false,

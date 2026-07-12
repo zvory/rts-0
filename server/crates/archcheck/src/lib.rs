@@ -45,6 +45,7 @@ const SERVICE_ROLES: &[(&str, ServiceRole)] = &[
     ("order_queue", ServiceRole::CommandAdapter),
     ("pathing", ServiceRole::QueryIndex),
     ("production", ServiceRole::TickSystem),
+    ("production_queue", ServiceRole::TickSystem),
     ("scout_plane", ServiceRole::MutationHelper),
     ("spatial", ServiceRole::QueryIndex),
     ("standability", ServiceRole::QueryIndex),
@@ -64,6 +65,7 @@ const ROLE_EDGE_ALLOWLIST: &[(&str, &str)] = &[
     // broad adapter dependency requires a named exception instead of inheriting a blanket bypass.
     ("commands", "construction"),
     ("commands", "movement"),
+    ("commands", "production_queue"),
     ("order_queue", "construction"),
     ("order_queue", "movement"),
 ];
@@ -113,6 +115,7 @@ const ALLOWED_SERVICE_IMPORTS: &[(&str, &[&str])] = &[
             "movement",
             "order_execution",
             "order_planner",
+            "production_queue",
             "scout_plane",
             "spatial",
             "standability",
@@ -165,6 +168,7 @@ const ALLOWED_SERVICE_IMPORTS: &[(&str, &[&str])] = &[
     ),
     ("pathing", &["occupancy", "standability"]),
     ("production", &["move_coordinator", "occupancy", "pathing", "scout_plane", "standability"]),
+    ("production_queue", &["move_coordinator", "standability", "world_query"]),
     ("standability", &["geometry", "occupancy", "spatial"]),
     ("world_query", &["spatial"]),
 ];

@@ -411,6 +411,7 @@ mod tests {
             events: Vec::new(),
             upgrades: Vec::new(),
             player_resources: Vec::new(),
+            production_queue: Vec::new(),
             net_status: rts_sim::protocol::SnapshotNetStatus::default(),
         };
         let start = StartPayload {

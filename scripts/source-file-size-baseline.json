@@ -20,23 +20,23 @@
     },
     {
       "path": "server/crates/archcheck/src/lib.rs",
-      "lines": 2459,
-      "reason": "Checkpoint Phase 7 expands the existing oversized architecture checker with state-owner checkpoint policy/evidence enforcement; keep ratcheting until archcheck scanners and tests are split into modules."
+      "lines": 2463,
+      "reason": "Production-request scheduling classifies one focused tick service and its three query/helper edges in the existing oversized architecture checker; keep ratcheting until archcheck scanners and tests are split into modules."
     },
     {
       "path": "server/crates/protocol/src/lib.rs",
-      "lines": 1709,
-      "reason": "Observer analysis contract coverage moved beside its DTOs, lowering the existing oversized protocol module; keep ratcheting until remaining protocol DTO groups are split."
+      "lines": 1731,
+      "reason": "The production-request PoC adds three bounded wire commands and representative compact-queue coverage beside the existing protocol DTOs; keep ratcheting until remaining protocol DTO groups are split."
     },
     {
       "path": "server/crates/sim/src/game/services/combat/tests.rs",
-      "lines": 3722,
-      "reason": "Panzerfaust shot persistence adds detached shot-store plumbing to the existing oversized sim combat test harness; keep ratcheting until combat tests are split."
+      "lines": 3723,
+      "reason": "The production-request PlayerState field requires one fixture default in the existing oversized combat test harness; keep ratcheting until combat tests are split."
     },
     {
       "path": "server/crates/sim/src/game/services/commands.rs",
-      "lines": 1926,
-      "reason": "Artillery UX Phase 3 adds server-authoritative Blanket Fire command routing and shared Point/Blanket firing execution to the existing oversized command service; keep ratcheting until artillery command runtime is extracted."
+      "lines": 1952,
+      "reason": "The production-request PoC routes three queue command variants into the extracted production_queue service; keep ratcheting until more command-family routing is split."
     },
     {
       "path": "server/crates/sim/src/game/services/move_coordinator.rs",
@@ -45,13 +45,13 @@
     },
     {
       "path": "server/crates/sim/src/game/services/movement/tests.rs",
-      "lines": 5176,
-      "reason": "Existing oversized movement test module before repo-wide source-size gate."
+      "lines": 5177,
+      "reason": "The production-request PlayerState field requires one fixture default in the existing oversized movement test module; keep ratcheting until movement tests are split."
     },
     {
       "path": "server/crates/sim/src/game/services/order_queue.rs",
-      "lines": 1529,
-      "reason": "Panzerfaust reload extracted queued attack promotion helpers from the existing oversized order adapter; keep ratcheting until queue validation is fully split."
+      "lines": 1531,
+      "reason": "The production-request PlayerState field requires two fixture defaults in the existing oversized unit-order adapter tests; keep ratcheting until queue validation is fully split."
     },
     {
       "path": "server/crates/sim/src/game/services/pathing.rs",

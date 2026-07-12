@@ -1307,10 +1307,13 @@ fn command_authority_entities(command: &Command) -> Vec<u32> {
         | Command::Gather { units, .. }
         | Command::Deconstruct { units, .. }
         | Command::Build { units, .. }
+        | Command::QueueBuild { units, .. }
         | Command::Stop { units }
         | Command::HoldPosition { units } => units.clone(),
         Command::Train { building, .. }
         | Command::Research { building, .. }
+        | Command::QueueTrain { building, .. }
+        | Command::QueueResearch { building, .. }
         | Command::Cancel { building }
         | Command::SetRally { building, .. } => vec![*building],
     }

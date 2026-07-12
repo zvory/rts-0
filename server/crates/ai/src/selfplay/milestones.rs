@@ -476,9 +476,12 @@ impl PlayerMilestones {
             | Command::SetAutocast { .. }
             | Command::Gather { .. }
             | Command::Build { .. }
+            | Command::QueueBuild { .. }
             | Command::Deconstruct { .. }
             | Command::Train { .. }
             | Command::Research { .. }
+            | Command::QueueTrain { .. }
+            | Command::QueueResearch { .. }
             | Command::Cancel { .. }
             | Command::Stop { .. }
             | Command::HoldPosition { .. }

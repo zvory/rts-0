@@ -1286,6 +1286,7 @@ mod tests {
                 events: Vec::new(),
                 upgrades: Vec::new(),
                 player_resources: Vec::new(),
+                production_queue: Vec::new(),
                 net_status: crate::protocol::SnapshotNetStatus::default(),
             }),
             SnapshotSendStatus::Stored

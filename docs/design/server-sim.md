@@ -266,7 +266,7 @@ architecture failures.
 | `entities` | `authoritative/serialized` | Serialize the full `EntityStore`, including stable entity ids, allocator/high-water state, HP, orders, queues, movement state, selected waypoints, path goals, cooldowns, combat state, production/build progress, rally plans, Scout Plane orbit/return runtime state, resource reservations, body/weapon/setup facing, and entity flags. | `systems::run_tick` mutates the store every tick; snapshots, score, survival, command validation, replay determinism tests, and the Phase 0.5 comparator all treat entity state as semantic authority. Chosen movement paths and aerial orbit state live on entities, not in `pathing`. Scout Plane entities are excluded from standard fog sight stamping; dedicated aerial vision is not active. |
 | `fog` | `authoritative/serialized` | Serialize current live visibility grids for now. A later phase may reclassify live fog as rebuildable only after proving an exact deterministic rebuild before every command, combat, and snapshot surface. | `systems::run_tick` receives `&self.state.fog` for command/combat visibility decisions, snapshots project through current team fog, and Phase 0.5 compares per-player visible tiles as semantic state. |
 | `building_memory` | `authoritative/serialized` | Serialize remembered enemy-building entries per player. | `BuildingMemory::refresh` records last-seen enemy building state and only removes hidden destroyed entries after the footprint is scouted again; spectator/player snapshots project remembered buildings while fogged. |
-| `players` | `authoritative/serialized` | Serialize all `PlayerState` rows, including id/team/faction/name/color/start tile, current Steel/Oil, supply, AI flag, score counters, mined-resource lifetime totals, rolling mined-resource income history, and completed upgrades. | Economy, command authority, team relations, alive checks, scores, observer-analysis resource income, faction-specific tech, and snapshot resource rows are all read from `players`. |
+| `players` | `authoritative/serialized` | Serialize all `PlayerState` rows, including id/team/faction/name/color/start tile, current Steel/Oil, supply, AI flag, score counters, mined-resource lifetime totals, rolling mined-resource income history, completed upgrades, and player production requests. | Economy, command authority, team relations, alive checks, scores, observer-analysis resource income, faction-specific tech, production scheduling, and snapshot resource/queue rows are all read from `players`. |
 | `pending` | `authoritative/serialized` | Serialize unapplied pending commands unless a future checkpoint caller explicitly proves it captures only immediately after command drain with `pending` empty. | `Game::enqueue` appends commands between ticks; `tick_inner` drains `pending`, records them in `command_log`, and applies them. Dropping a non-empty queue would skip authoritative player/AI intent. |
 | `command_log` | `compatibility metadata` | Serialize command history for replay/crash/API continuity; do not replay it during normal checkpoint import unless building a replay artifact. | `Game::command_log` is public, schema 3 replay artifacts finalize the stored launch-time `ReplayStartComposition` with this log, and tick logic only appends/applies new pending commands instead of reading old log entries. |
 | `tick` | `authoritative/serialized` | Serialize the exact tick count. | `tick_inner` increments it before systems, logs commands with it, drives expirations/cooldowns, passes it to projection/runtime stores, and advances `PathingService` to the same tick. |
@@ -528,7 +528,7 @@ Field map for Phase 2 DTO conversion:
 | `entities` | `EntityStoreV1` with allocator/high-water state and explicit entity DTOs. Entity DTOs must cover stable ids, owners, kind, HP, flags, construction/production/resource state, combat cooldowns and targets, body/weapon/setup facing, entity-local active orders, queued order intents, selected movement paths, selected waypoints, path goals, rally plans, Scout Plane orbit/return runtime state, reservations, occupants/transport-like references if added later, and all entity-local timers. |
 | `fog` | `FogStateV1` live visibility grids per player/team. It is serialized for version 1; a later rebuild-only policy needs a proof before changing this row. |
 | `building_memory` | `BuildingMemoryV1` remembered enemy-building entries per player, including last-seen state and footprint facts needed for projection after restore. |
-| `players` | `PlayerStateV1` rows with id, team id, faction id, name, color, start tile, resources, supply, AI slot flag, score counters, mined-resource lifetime totals, rolling mined-resource income history, and completed upgrades. |
+| `players` | `PlayerStateV1` rows with id, team id, faction id, name, color, start tile, resources, supply, AI slot flag, score counters, mined-resource lifetime totals, rolling mined-resource income history, completed upgrades, and player production requests. |
 | `pending` | `pendingCommands` entries with issuer, command DTO, admission/lab context, and original order. Import preserves them so the first post-restore tick drains them exactly once. |
 | `command_log` | `commandLog` plus `commandLogMetadata`. It is compatibility metadata, installed but not replayed by normal import. |
 | `tick` | Top-level `tick`, serialized exactly. Timers and expiry ticks remain absolute tick values. |
@@ -1106,6 +1106,17 @@ Systems should consume the derived-state object for their phase instead of carry
 spatial indexes across later mutations.
 
 ### 3.5 Command planning and queued order semantics
+
+The production-request PoC adds a player-level scheduler alongside entity-local order queues.
+Tech and producer compatibility are validated when a request is queued, while Steel, Oil, supply,
+producer idleness, and other execution requirements are checked when an item starts. Unpaid
+requests reserve neither resources nor supply. After one unit starts, a finite request decrements
+and returns to the back if quantity remains; an automatic request always returns to the back.
+The scheduler may pass an unaffordable earlier request only when spending on the later request does
+not increase that earlier request's Steel or Oil deficit. Supply is excluded from this deficit
+comparison, and requests blocked for non-resource reasons do not protect a resource deficit. The
+PoC starts at most one request per player per tick. Construction requests enter the normal
+reserve-on-arrival build flow, so their resources are still charged only when construction begins.
 
 Entrenchment research takes 30 seconds.
 

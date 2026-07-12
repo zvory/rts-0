@@ -1848,6 +1848,7 @@ input[type="text"]:focus {
 /* HUD overlays do not eat pointer events by default; only interactive
    sub-panels opt back in via pointer-events:auto. */
 #hud,
+#production-request-queue,
 #minimap-wrap,
 #selection-area,
 #game-menu,
@@ -1856,6 +1857,51 @@ input[type="text"]:focus {
 #toast {
   position: absolute;
   z-index: var(--hud-z);
+}
+
+/* Minimal global production queue: intentionally no panel chrome and no hit target. */
+#production-request-queue {
+  top: 34%;
+  left: 12px;
+  width: min(190px, 34vw);
+  pointer-events: none;
+  color: rgba(237, 230, 207, 0.86);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.25;
+  text-shadow: 0 1px 2px #000, 1px 1px 0 #000;
+}
+.production-request-title {
+  margin-bottom: 4px;
+  color: rgba(237, 230, 207, 0.52);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+.production-request-row {
+  display: flex;
+  min-width: 0;
+  gap: 6px;
+  padding: 1px 0;
+}
+.production-request-index {
+  flex: 0 0 14px;
+  color: rgba(237, 230, 207, 0.4);
+  text-align: right;
+}
+.production-request-label {
+  overflow: hidden;
+  flex: 1 1 auto;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.production-request-quantity {
+  flex: 0 0 auto;
+  color: rgba(237, 230, 207, 0.58);
+}
+.production-request-empty,
+.production-request-more {
+  color: rgba(237, 230, 207, 0.35);
 }
 
 /* Shared frosted-panel look for HUD chrome. */

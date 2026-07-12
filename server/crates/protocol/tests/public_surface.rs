@@ -218,6 +218,7 @@ fn compact_snapshot_encodes_scout_plane_owner_state() {
         events: Vec::new(),
         upgrades: Vec::new(),
         player_resources: Vec::new(),
+        production_queue: Vec::new(),
         net_status: SnapshotNetStatus {
             server_lag_ms: 0,
             tick_ms: 33,

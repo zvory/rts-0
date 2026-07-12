@@ -1,5 +1,5 @@
 {
-  "reason": "Map base-site migration reformatted simulation tests and moved existing construction player-state signatures",
+  "reason": "player production-request scheduler owns queue admission, resource policy, and execution",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -47,15 +47,15 @@
     },
     {
       "path": "checkpoint/player_dto.rs",
-      "lines": 52
+      "lines": 54
     },
     {
       "path": "checkpoint/validation.rs",
-      "lines": 429
+      "lines": 432
     },
     {
       "path": "command.rs",
-      "lines": 668
+      "lines": 755
     },
     {
       "path": "commands.rs",
@@ -119,11 +119,11 @@
     },
     {
       "path": "lab.rs",
-      "lines": 1417
+      "lines": 1420
     },
     {
       "path": "lab/checkpoint_scenario.rs",
-      "lines": 332
+      "lines": 344
     },
     {
       "path": "lab/tests.rs",
@@ -135,7 +135,7 @@
     },
     {
       "path": "map.rs",
-      "lines": 567
+      "lines": 611
     },
     {
       "path": "map/authored.rs",
@@ -155,7 +155,7 @@
     },
     {
       "path": "mod.rs",
-      "lines": 638
+      "lines": 639
     },
     {
       "path": "mortar.rs",
@@ -187,7 +187,11 @@
     },
     {
       "path": "player_state.rs",
-      "lines": 160
+      "lines": 161
+    },
+    {
+      "path": "production_request.rs",
+      "lines": 49
     },
     {
       "path": "replay.rs",
@@ -267,7 +271,7 @@
     },
     {
       "path": "services/combat/tests.rs",
-      "lines": 3722
+      "lines": 3723
     },
     {
       "path": "services/combat/tests/anti_tank_acquisition.rs",
@@ -327,7 +331,7 @@
     },
     {
       "path": "services/commands.rs",
-      "lines": 1922
+      "lines": 1952
     },
     {
       "path": "services/commands/artillery_scatter.rs",
@@ -347,7 +351,7 @@
     },
     {
       "path": "services/commands/tests.rs",
-      "lines": 161
+      "lines": 162
     },
     {
       "path": "services/commands/tests/abilities.rs",
@@ -359,7 +363,7 @@
     },
     {
       "path": "services/commands/tests/build.rs",
-      "lines": 612
+      "lines": 650
     },
     {
       "path": "services/commands/tests/command_budget.rs",
@@ -387,11 +391,11 @@
     },
     {
       "path": "services/commands/tests/tank_traps.rs",
-      "lines": 168
+      "lines": 192
     },
     {
       "path": "services/construction.rs",
-      "lines": 987
+      "lines": 988
     },
     {
       "path": "services/construction/build_wait_tests.rs",
@@ -435,7 +439,7 @@
     },
     {
       "path": "services/mod.rs",
-      "lines": 50
+      "lines": 51
     },
     {
       "path": "services/move_coordinator.rs",
@@ -483,7 +487,7 @@
     },
     {
       "path": "services/movement/tests.rs",
-      "lines": 5176
+      "lines": 5177
     },
     {
       "path": "services/movement/waypoints.rs",
@@ -511,7 +515,7 @@
     },
     {
       "path": "services/order_queue.rs",
-      "lines": 1529
+      "lines": 1531
     },
     {
       "path": "services/order_queue/attack.rs",
@@ -531,7 +535,11 @@
     },
     {
       "path": "services/production.rs",
-      "lines": 793
+      "lines": 794
+    },
+    {
+      "path": "services/production_queue.rs",
+      "lines": 468
     },
     {
       "path": "services/scout_plane.rs",
@@ -571,7 +579,7 @@
     },
     {
       "path": "setup.rs",
-      "lines": 588
+      "lines": 591
     },
     {
       "path": "setup/checkpoint_start.rs",
@@ -603,7 +611,7 @@
     },
     {
       "path": "setup/tests.rs",
-      "lines": 389
+      "lines": 400
     },
     {
       "path": "smoke.rs",
@@ -611,7 +619,7 @@
     },
     {
       "path": "snapshot.rs",
-      "lines": 338
+      "lines": 382
     },
     {
       "path": "snapshot_memory_tests.rs",
@@ -623,7 +631,7 @@
     },
     {
       "path": "systems.rs",
-      "lines": 543
+      "lines": 544
     },
     {
       "path": "systems/occupancy_phase_cache.rs",
@@ -659,7 +667,7 @@
     },
     {
       "path": "tests/build_wait_tests.rs",
-      "lines": 266
+      "lines": 321
     },
     {
       "path": "tests/checkpoint_helpers.rs",
@@ -667,7 +675,7 @@
     },
     {
       "path": "tests/checkpoint_lab_tests.rs",
-      "lines": 265
+      "lines": 304
     },
     {
       "path": "tests/checkpoint_payload_tests.rs",
@@ -683,7 +691,7 @@
     },
     {
       "path": "tests/derived_state_tests.rs",
-      "lines": 940
+      "lines": 945
     },
     {
       "path": "tests/determinism_tests.rs",
@@ -711,7 +719,7 @@
     },
     {
       "path": "tests/movement_replay_tests.rs",
-      "lines": 1017
+      "lines": 1068
     },
     {
       "path": "tests/panzerfaust_death_tests.rs",
@@ -1208,6 +1216,24 @@
       "line": 3
     },
     {
+      "source": "production_queue",
+      "target": "move_coordinator",
+      "path": "services/production_queue.rs",
+      "line": 9
+    },
+    {
+      "source": "production_queue",
+      "target": "standability",
+      "path": "services/production_queue.rs",
+      "line": 10
+    },
+    {
+      "source": "production_queue",
+      "target": "world_query",
+      "path": "services/production_queue.rs",
+      "line": 10
+    },
+    {
       "source": "standability",
       "target": "geometry",
       "path": "services/standability.rs",
@@ -1250,27 +1276,27 @@
     },
     {
       "path": "services/commands.rs",
-      "line": 1483,
+      "line": 1513,
       "name": "artillery_point_fire_system"
     },
     {
       "path": "services/commands.rs",
-      "line": 1286,
+      "line": 1316,
       "name": "order_artillery_point_fire"
     },
     {
       "path": "services/commands.rs",
-      "line": 1846,
+      "line": 1876,
       "name": "order_cancel"
     },
     {
       "path": "services/commands.rs",
-      "line": 1731,
+      "line": 1761,
       "name": "order_train"
     },
     {
       "path": "services/commands.rs",
-      "line": 1337,
+      "line": 1367,
       "name": "try_fire_artillery"
     },
     {
@@ -1339,6 +1365,16 @@
       "name": "production_system"
     },
     {
+      "path": "services/production_queue.rs",
+      "line": 211,
+      "name": "run_scheduler"
+    },
+    {
+      "path": "services/production_queue.rs",
+      "line": 343,
+      "name": "start_request"
+    },
+    {
       "path": "systems.rs",
       "line": 134,
       "name": "run_tick"
@@ -1347,12 +1383,12 @@
   "player_state_usages": [
     {
       "path": "lab.rs",
-      "line": 1400,
+      "line": 1403,
       "code": "player: &super::PlayerState,"
     },
     {
       "path": "mod.rs",
-      "line": 134,
+      "line": 135,
       "code": "pub(crate) struct PlayerState {"
     },
     {
@@ -1397,22 +1433,22 @@
     },
     {
       "path": "services/combat/tests.rs",
-      "line": 157,
+      "line": 158,
       "code": "players: &[PlayerState],"
     },
     {
       "path": "services/combat/tests.rs",
-      "line": 165,
+      "line": 166,
       "code": "players: &[PlayerState],"
     },
     {
       "path": "services/combat/tests.rs",
-      "line": 173,
+      "line": 174,
       "code": "players: &[PlayerState],"
     },
     {
       "path": "services/combat/tests.rs",
-      "line": 183,
+      "line": 184,
       "code": "players: &[PlayerState],"
     },
     {
@@ -1422,12 +1458,12 @@
     },
     {
       "path": "services/commands.rs",
-      "line": 1051,
+      "line": 1081,
       "code": "players: &[PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1656,
+      "line": 1686,
       "code": "players: &[PlayerState],"
     },
     {
@@ -1437,37 +1473,37 @@
     },
     {
       "path": "services/commands.rs",
-      "line": 654,
+      "line": 684,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1130,
+      "line": 1160,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1289,
+      "line": 1319,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1339,
+      "line": 1369,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1486,
+      "line": 1516,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1733,
+      "line": 1763,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1848,
+      "line": 1878,
       "code": "players: &mut [PlayerState],"
     },
     {
@@ -1636,6 +1672,56 @@
       "code": "use crate::game::PlayerState;"
     },
     {
+      "path": "services/production_queue.rs",
+      "line": 320,
+      "code": "fn affordability(player: &PlayerState, cost: ResourceCost) -> Assessment {"
+    },
+    {
+      "path": "services/production_queue.rs",
+      "line": 423,
+      "code": "fn rotate_after_start(player: &mut PlayerState, index: usize) {"
+    },
+    {
+      "path": "services/production_queue.rs",
+      "line": 255,
+      "code": "player: &PlayerState,"
+    },
+    {
+      "path": "services/production_queue.rs",
+      "line": 18,
+      "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/production_queue.rs",
+      "line": 70,
+      "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/production_queue.rs",
+      "line": 127,
+      "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/production_queue.rs",
+      "line": 188,
+      "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/production_queue.rs",
+      "line": 214,
+      "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/production_queue.rs",
+      "line": 346,
+      "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/production_queue.rs",
+      "line": 12,
+      "code": "use crate::game::PlayerState;"
+    },
+    {
       "path": "services/supply.rs",
       "line": 7,
       "code": "pub(crate) fn recompute_supply(players: &mut [PlayerState], entities: &EntityStore) {"
@@ -1647,17 +1733,17 @@
     },
     {
       "path": "setup.rs",
-      "line": 287,
+      "line": 288,
       "code": "let mut ps = PlayerState {"
     },
     {
       "path": "setup.rs",
-      "line": 548,
+      "line": 551,
       "code": "player: &mut PlayerState,"
     },
     {
       "path": "snapshot.rs",
-      "line": 236,
+      "line": 279,
       "code": "fn player(&self, id: u32) -> Option<&PlayerState> {"
     },
     {
@@ -1701,7 +1787,7 @@
     },
     {
       "path": "services/movement/tests.rs",
-      "line": 2615,
+      "line": 2616,
       "field": "oil",
       "code": "players[0].oil = 1;"
     }
@@ -1715,7 +1801,7 @@
     },
     {
       "path": "services/combat/tests.rs",
-      "line": 1404,
+      "line": 1405,
       "field": "hp",
       "code": "dead_target.hp = 0;"
     },
@@ -1757,7 +1843,7 @@
     },
     {
       "path": "services/movement/tests.rs",
-      "line": 3981,
+      "line": 3982,
       "field": "pos_x",
       "code": "e.pos_x = sx + 0.0001;"
     },
@@ -1958,6 +2044,10 @@
       "count": 14
     },
     {
+      "path": "production_request.rs",
+      "count": 6
+    },
+    {
       "path": "replay.rs",
       "count": 8
     },
@@ -2007,7 +2097,7 @@
     },
     {
       "path": "services/mod.rs",
-      "count": 23
+      "count": 24
     },
     {
       "path": "services/move_coordinator.rs",
@@ -2056,6 +2146,10 @@
     {
       "path": "services/production.rs",
       "count": 2
+    },
+    {
+      "path": "services/production_queue.rs",
+      "count": 4
     },
     {
       "path": "services/scout_plane.rs",

@@ -121,7 +121,7 @@ pub mod weapons {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 35;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 36;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -508,6 +508,9 @@ pub fn protocol_contract() -> ProtocolContract {
             ("BUILD", "build"),
             ("TRAIN", "train"),
             ("RESEARCH", "research"),
+            ("QUEUE_BUILD", "queueBuild"),
+            ("QUEUE_TRAIN", "queueTrain"),
+            ("QUEUE_RESEARCH", "queueResearch"),
             ("CANCEL", "cancel"),
             ("STOP", "stop"),
             ("HOLD_POSITION", "holdPosition"),

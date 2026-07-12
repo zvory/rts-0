@@ -48,6 +48,14 @@ const BREAKTHROUGH_VOICE_IDS = Object.freeze([
   "unit_breakthrough_koste_es_01",
 ]);
 
+function escapeQueueText(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
 /** True if `playerId` owns at least one completed entity of `kind` in `entities`. */
 export function playerHasCompletedKind(entities, playerId, kind) {
   for (const e of entities || []) {
@@ -160,6 +168,7 @@ export class HUD {
     this.elOil = rootEl.querySelector("#res-oil");
     this.elSupply = rootEl.querySelector("#res-supply");
     this.elGameTimer = rootEl.querySelector("#game-timer");
+    this.elProductionQueue = rootEl.querySelector("#production-request-queue");
     // Rebuild the static shell once so the top bar, replay rows, and command-card
     // hovers all use the shared resource icon definitions.
     if (this.elHud) {
@@ -185,6 +194,7 @@ export class HUD {
     // Signature for the inert control-group tabs.
     this._controlGroupSig = null;
     this._gameTimerSig = null;
+    this._productionQueueSig = null;
     this._renderGameTimer();
   }
 
@@ -195,6 +205,7 @@ export class HUD {
   update(frameViews = null, { profiler = null } = {}) {
     this._profiler = profiler || null;
     this._renderGameTimer();
+    this._renderProductionQueue();
     this._renderResources();
     this._renderControlGroupTabs(frameViews);
     this._renderSelectedPanel(frameViews);
@@ -220,6 +231,8 @@ export class HUD {
     this._resSig = null;
     this._controlGroupSig = null;
     this._gameTimerSig = null;
+    this._productionQueueSig = null;
+    if (this.elProductionQueue) this.elProductionQueue.innerHTML = "";
   }
 
   _issueCommand(command, options = {}) {
@@ -242,6 +255,33 @@ export class HUD {
     this.elGameTimer.textContent = text;
     this.elGameTimer.title = `Game time ${text}`;
     this._gameTimerSig = text;
+  }
+
+  _renderProductionQueue() {
+    const root = this.elProductionQueue;
+    if (!root) return;
+    const queue = Array.isArray(this.state?.productionQueue) ? this.state.productionQueue : [];
+    const signature = queue
+      .map((request) => `${request.requestKind}:${request.item}:${request.remaining ?? "auto"}`)
+      .join("|");
+    if (signature === this._productionQueueSig) return;
+    this._productionQueueSig = signature;
+    const rows = queue.slice(0, 6).map((request, index) => {
+      const label = request.requestKind === "research"
+        ? UPGRADES[request.item]?.label || request.item
+        : STATS[request.item]?.label || request.item;
+      const quantity = request.remaining == null ? "∞" : `×${request.remaining}`;
+      return `<div class="production-request-row">` +
+        `<span class="production-request-index">${index + 1}</span>` +
+        `<span class="production-request-label">${escapeQueueText(label)}</span>` +
+        `<span class="production-request-quantity">${quantity}</span>` +
+        `</div>`;
+    }).join("");
+    const more = queue.length > 6
+      ? `<div class="production-request-more">+${queue.length - 6} more</div>`
+      : "";
+    root.innerHTML = `<div class="production-request-title">QUEUE</div>` +
+      (rows || `<div class="production-request-empty">—</div>`) + more;
   }
 
   // --- Resource / supply bar -------------------------------------------------
@@ -488,7 +528,10 @@ export class HUD {
         this._intent()?.endCommandTarget?.();
         return;
       case "train":
-        this._issueTrain(intent.unit);
+        this._issueTrain(intent.unit, {
+          quantity: intent.automatic ? 1 : (ev.shiftKey ? 5 : 1),
+          automatic: !!intent.automatic,
+        });
         return;
       case "cancelProduction":
         this._issueCancelProduction(intent.buildingKind);
@@ -681,18 +724,10 @@ export class HUD {
   }
 
   /** Queue `unit` at the next selected compatible production building. */
-  _issueTrain(unit) {
+  _issueTrain(unit, { quantity = 1, automatic = false } = {}) {
     const building = this._nextProducerBuildingForUnit(unit);
     if (!building) return;
-    this._issueCommand(cmd.train(building.id, unit), {
-      optimism: {
-        family: "train",
-        building: building.id,
-        unit,
-        prodQueue: building.prodQueue ?? 0,
-        prodKind: building.prodKind || null,
-      },
-    });
+    this._issueCommand(cmd.train(building.id, unit, quantity, automatic));
   }
 
   _selectAndPanToEntity(entityId) {

@@ -81,6 +81,23 @@ pub enum SimCommand {
         building: u32,
         upgrade: UpgradeKind,
     },
+    QueueBuild {
+        units: Vec<u32>,
+        building: EntityKind,
+        tile_x: u32,
+        tile_y: u32,
+        queued: bool,
+    },
+    QueueTrain {
+        building: u32,
+        unit: EntityKind,
+        quantity: u32,
+        automatic: bool,
+    },
+    QueueResearch {
+        building: u32,
+        upgrade: UpgradeKind,
+    },
     Cancel {
         building: u32,
     },
@@ -274,6 +291,48 @@ impl SimCommand {
                     },
                 }
             }
+            protocol::Command::QueueBuild {
+                units,
+                building,
+                tile_x,
+                tile_y,
+                queued,
+            } => match building.parse::<EntityKind>() {
+                Ok(building) if building.is_building() => SimCommand::QueueBuild {
+                    units,
+                    building,
+                    tile_x,
+                    tile_y,
+                    queued,
+                },
+                _ => SimCommand::Rejected {
+                    reason: CommandRejection::Building,
+                },
+            },
+            protocol::Command::QueueTrain {
+                building,
+                unit,
+                quantity,
+                automatic,
+            } => match unit.parse::<EntityKind>() {
+                Ok(unit) if unit.is_unit() => SimCommand::QueueTrain {
+                    building,
+                    unit,
+                    quantity,
+                    automatic,
+                },
+                _ => SimCommand::Rejected {
+                    reason: CommandRejection::Unit,
+                },
+            },
+            protocol::Command::QueueResearch { building, upgrade } => {
+                match upgrade.parse::<UpgradeKind>() {
+                    Ok(upgrade) => SimCommand::QueueResearch { building, upgrade },
+                    _ => SimCommand::Rejected {
+                        reason: CommandRejection::Upgrade,
+                    },
+                }
+            }
             protocol::Command::Cancel { building } => SimCommand::Cancel { building },
             protocol::Command::Stop { units } => SimCommand::Stop { units },
             protocol::Command::HoldPosition { units } => SimCommand::HoldPosition { units },
@@ -414,6 +473,34 @@ impl SimCommand {
                 unit: protocol::kind_to_wire(*unit).to_string(),
             },
             SimCommand::Research { building, upgrade } => protocol::Command::Research {
+                building: *building,
+                upgrade: upgrade.to_protocol_str().to_string(),
+            },
+            SimCommand::QueueBuild {
+                units,
+                building,
+                tile_x,
+                tile_y,
+                queued,
+            } => protocol::Command::QueueBuild {
+                units: units.clone(),
+                building: protocol::kind_to_wire(*building).to_string(),
+                tile_x: *tile_x,
+                tile_y: *tile_y,
+                queued: *queued,
+            },
+            SimCommand::QueueTrain {
+                building,
+                unit,
+                quantity,
+                automatic,
+            } => protocol::Command::QueueTrain {
+                building: *building,
+                unit: protocol::kind_to_wire(*unit).to_string(),
+                quantity: *quantity,
+                automatic: *automatic,
+            },
+            SimCommand::QueueResearch { building, upgrade } => protocol::Command::QueueResearch {
                 building: *building,
                 upgrade: upgrade.to_protocol_str().to_string(),
             },

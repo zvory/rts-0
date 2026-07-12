@@ -760,6 +760,7 @@ mod tests {
             score: ScoreState::default(),
             upgrades: Default::default(),
             ability_cooldowns: Default::default(),
+            production_requests: Default::default(),
         }
     }
 
@@ -792,6 +793,7 @@ mod tests {
                 score: p.score.clone(),
                 upgrades: p.upgrades.clone(),
                 ability_cooldowns: p.ability_cooldowns.clone(),
+                production_requests: p.production_requests.clone(),
             })
             .collect();
         let occ = Occupancy::build(map, entities);

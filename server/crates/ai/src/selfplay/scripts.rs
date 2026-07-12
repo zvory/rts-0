@@ -163,9 +163,12 @@ pub(super) fn is_combat_command(command: &Command, combat_intent_units: &BTreeSe
         | Command::SetAutocast { .. }
         | Command::Gather { .. }
         | Command::Build { .. }
+        | Command::QueueBuild { .. }
         | Command::Deconstruct { .. }
         | Command::Train { .. }
         | Command::Research { .. }
+        | Command::QueueTrain { .. }
+        | Command::QueueResearch { .. }
         | Command::Cancel { .. }
         | Command::Stop { .. }
         | Command::HoldPosition { .. }

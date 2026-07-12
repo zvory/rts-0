@@ -256,11 +256,12 @@ export function buildWorkerBuildCard(ctx) {
       icon: st.icon,
       label: st.label,
       cost: st.cost,
-      enabled: availability === "ready",
+      enabled: availability === "ready" || availability === "unaffordable",
       unaffordable: availability === "unaffordable",
-      title: buildDisabledReason(ctx, kind, resources),
+      title: availability === "unaffordable"
+        ? "Place now; construction waits for resources"
+        : buildDisabledReason(ctx, kind, resources),
       tooltipKind: kind,
-      onUnavailableIntent: { type: "playNotEnough", cost: st.cost },
     });
   }
   while (slots.length < 8) slots.push(null);
@@ -448,12 +449,16 @@ export function buildTrainCard(ctx, building) {
       icon: st.icon,
       label: st.label,
       cost: st.cost,
-      enabled: availability === "ready" || availability === "active",
+      enabled: availability === "ready" || availability === "active" || availability === "unaffordable",
       unaffordable: availability === "unaffordable",
-      title: trainDisabledReason(ctx, unit, resources, isOwn),
+      title: availability === "unaffordable"
+        ? "Queue now; production starts when resources and supply are available"
+        : availability === "ready" || availability === "active"
+          ? "Click: queue 1 · Shift-click: queue 5 · Right-click: automatic"
+          : trainDisabledReason(ctx, unit, resources, isOwn),
       tooltipKind: unit,
       repeatable: availability === "ready",
-      onUnavailableIntent: { type: "playNotEnough", cost: st.cost, supply: st.supply },
+      contextIntent: { type: "train", unit, automatic: true },
     };
   }
   for (const upgrade of researches) {
@@ -473,12 +478,13 @@ export function buildTrainCard(ctx, building) {
       icon: def.icon,
       label: def.label,
       cost: def.cost,
-      enabled: availability === "ready",
+      enabled: availability === "ready" || availability === "unaffordable",
       unaffordable: availability === "unaffordable",
-      title: researchDisabledReason(ctx, upgrade, resources, isOwn),
+      title: availability === "unaffordable"
+        ? "Queue now; research starts when resources are available"
+        : researchDisabledReason(ctx, upgrade, resources, isOwn),
       tooltipUpgrade: upgrade,
       repeatable: false,
-      onUnavailableIntent: { type: "playNotEnough", cost: def.cost },
     };
   }
 
@@ -636,22 +642,12 @@ function resourcesOf(ctx) {
 
 function trainResourcesOf(ctx) {
   const base = resourcesOf(ctx);
-  const resources = {
+  return {
     steel: base.steel ?? 0,
     oil: base.oil ?? 0,
     supplyUsed: Number.isFinite(base.supplyUsed) ? base.supplyUsed : 0,
     supplyCap: Number.isFinite(base.supplyCap) ? base.supplyCap : null,
   };
-  for (const entry of ctx.optimisticProduction || []) {
-    const st = STATS[entry?.unit];
-    if (!st) continue;
-    const cost = st.cost || {};
-    resources.steel -= cost.steel ?? 0;
-    resources.oil -= cost.oil ?? 0;
-    const supply = st.supply ?? 0;
-    if (Number.isFinite(supply) && supply > 0) resources.supplyUsed += supply;
-  }
-  return resources;
 }
 
 function commandFactionId(ctx) {

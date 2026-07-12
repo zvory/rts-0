@@ -93,6 +93,8 @@ export class GameState extends VisualEffectBackedState {
     this.events = [];
     /** @type {string[]} upgrades completed for this player. */
     this.upgrades = [];
+    /** @type {Array<{requestKind:string,item:string,remaining:number|null}>} */
+    this.productionQueue = [];
 
     // --- selection (client-only) ---
     /** @type {Set<number>} */
@@ -156,6 +158,7 @@ export class GameState extends VisualEffectBackedState {
     this.playerResources = [];
     this.events = [];
     this.upgrades = [];
+    this.productionQueue = [];
     this.selection.clear();
     this.selectionBudgetOverflow = null;
     this.controlGroups = Array.from({ length: 10 }, () => []);
@@ -305,6 +308,7 @@ export class GameState extends VisualEffectBackedState {
     };
     this.playerResources = msg.playerResources || [];
     this.upgrades = Array.isArray(msg.upgrades) ? msg.upgrades : [];
+    this.productionQueue = Array.isArray(msg.productionQueue) ? msg.productionQueue : [];
     this.smokes = Array.isArray(msg.smokes) ? msg.smokes : [];
     this.abilityObjects = Array.isArray(msg.abilityObjects) ? msg.abilityObjects : [];
     this.trenches = Array.isArray(msg.trenches) ? msg.trenches : [];

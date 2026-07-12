@@ -663,27 +663,24 @@ function fakeHudRootWithoutResourceSpans() {
   assert(unlockedPanzerfaustCard.slots[2].enabled, "completed Training Centre should unlock Panzerfaust training");
   assert(unlockedPanzerfaustCard.slots[2].cost.steel === 60, "Panzerfaust train button should show 60 steel");
   assert(unlockedPanzerfaustCard.slots[2].cost.oil === 15, "Panzerfaust train button should show 15 oil");
-  assert(
-    unlockedPanzerfaustCard.slots[2].onUnavailableIntent.supply === STATS[KIND.PANZERFAUST].supply,
-    "Panzerfaust train button should carry supply for unavailable feedback",
-  );
+  assert(unlockedPanzerfaustCard.slots[2].contextIntent.automatic, "train button should expose automatic production on right-click");
 
   const oilBlockedPanzerfaustCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [barracks],
     entities: [cityCentre, barracks, completedTrainingCentre],
     resources: { steel: 60, oil: 14, supplyUsed: 0, supplyCap: 10 },
   }));
-  assert(!oilBlockedPanzerfaustCard.slots[2].enabled, "Panzerfaust train should disable when oil is short");
-  assert(oilBlockedPanzerfaustCard.slots[2].unaffordable, "resource-blocked Panzerfaust should stay clickable for feedback");
-  assert(oilBlockedPanzerfaustCard.slots[2].title === "Not enough resources", "Panzerfaust resource-blocked tooltip should name resources");
+  assert(oilBlockedPanzerfaustCard.slots[2].enabled, "Panzerfaust train should remain queueable when oil is short");
+  assert(oilBlockedPanzerfaustCard.slots[2].unaffordable, "resource-blocked Panzerfaust should retain its visual warning");
+  assert(oilBlockedPanzerfaustCard.slots[2].title.includes("Queue now"), "resource-blocked tooltip should explain deferred funding");
 
   const supplyBlockedPanzerfaustCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [barracks],
     entities: [cityCentre, barracks, completedTrainingCentre],
     resources: { steel: 60, oil: 15, supplyUsed: 10, supplyCap: 10 },
   }));
-  assert(!supplyBlockedPanzerfaustCard.slots[2].enabled, "Panzerfaust train should disable when supply is capped");
-  assert(supplyBlockedPanzerfaustCard.slots[2].title === "Not enough supply", "Panzerfaust supply-blocked tooltip should name supply");
+  assert(supplyBlockedPanzerfaustCard.slots[2].enabled, "Panzerfaust train should remain queueable when supply is capped");
+  assert(supplyBlockedPanzerfaustCard.slots[2].title.includes("Queue now"), "supply-blocked tooltip should explain deferred execution");
 
   const supplyReservedTrainCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [cityCentre],
@@ -691,13 +688,8 @@ function fakeHudRootWithoutResourceSpans() {
     resources: { steel: 100, oil: 0, supplyUsed: 9, supplyCap: 10 },
     optimisticProduction: [{ building: cityCentre.id, unit: KIND.WORKER, optimisticQueue: 1 }],
   }));
-  assert(!supplyReservedTrainCard.slots[0].enabled, "pending train optimism should reserve supply for train buttons");
-  assert(supplyReservedTrainCard.slots[0].unaffordable, "supply-blocked train button should stay clickable for feedback");
-  assert(supplyReservedTrainCard.slots[0].title === "Not enough supply", "supply-blocked train tooltip should name supply");
-  assert(
-    supplyReservedTrainCard.slots[0].onUnavailableIntent.supply === STATS[KIND.WORKER].supply,
-    "supply-blocked train button should carry supply for unavailable feedback",
-  );
+  assert(supplyReservedTrainCard.slots[0].enabled, "unpaid requests should not disable a supply-blocked train button");
+  assert(!supplyReservedTrainCard.slots[0].unaffordable, "unpaid requests should not reserve supply in train affordances");
 
   const steelReservedTrainCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [cityCentre],
@@ -705,8 +697,7 @@ function fakeHudRootWithoutResourceSpans() {
     resources: { steel: 75, oil: 0, supplyUsed: 4, supplyCap: 10 },
     optimisticProduction: [{ building: cityCentre.id, unit: KIND.WORKER, optimisticQueue: 1 }],
   }));
-  assert(!steelReservedTrainCard.slots[0].enabled, "pending train optimism should reserve steel for train buttons");
-  assert(steelReservedTrainCard.slots[0].title === "Not enough resources", "resource-blocked train tooltip should name resources");
+  assert(steelReservedTrainCard.slots[0].enabled, "unpaid requests should not reserve steel in train affordances");
 
   const scoutPlaneCityCentre = { id: 70, owner: 1, kind: KIND.CITY_CENTRE, buildProgress: null };
   const cityCentreScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({

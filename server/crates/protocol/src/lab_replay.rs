@@ -565,6 +565,12 @@ fn validate_command(
             tile_x,
             tile_y,
             ..
+        }
+        | Command::QueueBuild {
+            units,
+            tile_x,
+            tile_y,
+            ..
         } => {
             validate_unit_list(units, unit_cap, "command.units", state)?;
             if *tile_x == u32::MAX || *tile_y == u32::MAX {
@@ -573,8 +579,17 @@ fn validate_command(
         }
         Command::Train { building, .. }
         | Command::Research { building, .. }
+        | Command::QueueResearch { building, .. }
         | Command::Cancel { building } => {
             validate_entity_id(*building, "command.building", state)?;
+        }
+        Command::QueueTrain {
+            building, quantity, ..
+        } => {
+            validate_entity_id(*building, "command.building", state)?;
+            if *quantity == 0 || *quantity > 1_000 {
+                return Err(invalid("command queue quantity is out of range"));
+            }
         }
         Command::SetRally { building, x, y, .. } => {
             validate_entity_id(*building, "command.building", state)?;

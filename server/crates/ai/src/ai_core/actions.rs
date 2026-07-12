@@ -275,6 +275,19 @@ fn command_trace_label(command: &Command) -> String {
         Command::Research { building, upgrade } => {
             format!("research building={} upgrade={:?}", building, upgrade)
         }
+        Command::QueueBuild { building, .. } => format!("queue_build building={:?}", building),
+        Command::QueueTrain {
+            building,
+            unit,
+            quantity,
+            automatic,
+        } => format!(
+            "queue_train building={} unit={:?} quantity={} automatic={}",
+            building, unit, quantity, automatic
+        ),
+        Command::QueueResearch { building, upgrade } => {
+            format!("queue_research building={} upgrade={:?}", building, upgrade)
+        }
         Command::Cancel { building } => format!("cancel building={}", building),
         Command::Stop { units } => format!("stop units={}", id_list(units)),
         Command::HoldPosition { units } => format!("hold_position units={}", id_list(units)),

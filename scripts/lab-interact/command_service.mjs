@@ -57,8 +57,11 @@ const COMMAND_FIELDS = Object.freeze({
   setAutocast: ["c", "ability", "units", "enabled"],
   gather: ["c", "units", "node", "queued"],
   build: ["c", "units", "building", "tileX", "tileY", "queued"],
+  queueBuild: ["c", "units", "building", "tileX", "tileY", "queued"],
   train: ["c", "building", "unit"],
+  queueTrain: ["c", "building", "unit", "quantity", "automatic"],
   research: ["c", "building", "upgrade"],
+  queueResearch: ["c", "building", "upgrade"],
   cancel: ["c", "building"],
   stop: ["c", "units"],
   holdPosition: ["c", "units"],
@@ -892,12 +895,14 @@ function validateCommand(value) {
   for (const field of ["x", "y"]) {
     if (allowed.includes(field) && (value.c !== "useAbility" || value[field] != null)) finite(value[field], `order.command.${field}`);
   }
-  for (const field of ["target", "node", "building"]) if (allowed.includes(field) && !(field === "building" && value.c === "build")) entityRef(value[field], `order.command.${field}`);
+  for (const field of ["target", "node", "building"]) if (allowed.includes(field) && !(field === "building" && ["build", "queueBuild"].includes(value.c))) entityRef(value[field], `order.command.${field}`);
   for (const field of ["ability", "unit", "upgrade"]) if (allowed.includes(field)) token(value[field], `order.command.${field}`);
-  if (value.c === "build") { token(value.building, "order.command.building"); integer(value.tileX, "order.command.tileX", 0, U32_MAX); integer(value.tileY, "order.command.tileY", 0, U32_MAX); }
+  if (["build", "queueBuild"].includes(value.c)) { token(value.building, "order.command.building"); integer(value.tileX, "order.command.tileX", 0, U32_MAX); integer(value.tileY, "order.command.tileY", 0, U32_MAX); }
+  if (value.c === "queueTrain") integer(value.quantity, "order.command.quantity", 1, 1000);
   if (value.targetObjectId != null) u32(value.targetObjectId, "order.command.targetObjectId");
   if (value.kind != null && !["move", "attackMove", "attack", "gather", "build"].includes(value.kind)) invalid("order.command.kind", "is unsupported");
   optionalBoolean(value.queued, "order.command.queued");
+  optionalBoolean(value.automatic, "order.command.automatic");
   if (allowed.includes("enabled")) optionalBoolean(value.enabled, "order.command.enabled", false);
 }
 
@@ -938,7 +943,7 @@ function validateCommandCatalog(command, catalog) {
   const validateFrom = (field, values, code, label) => {
     if (command[field] != null && !new Set(values).has(command[field])) throw new LabInteractError(code, `${command[field]} is not an available ${label}.`);
   };
-  if (command.c === "build") validateFrom("building", flattenFactions(catalog.factions, "buildings"), "invalidKind", "building");
+  if (["build", "queueBuild"].includes(command.c)) validateFrom("building", flattenFactions(catalog.factions, "buildings"), "invalidKind", "building");
   validateFrom("unit", flattenFactions(catalog.factions, "units"), "invalidKind", "unit");
   validateFrom("upgrade", flattenFactions(catalog.factions, "upgrades"), "invalidUpgrade", "upgrade");
   validateFrom("ability", catalog.abilities, "invalidAbility", "ability");
@@ -948,7 +953,7 @@ async function resolveCommand(session, command) {
   const wire = { ...command }; const resolved = {};
   if (Array.isArray(command.units)) { const units = await resolveEntityReferences(session, command.units); wire.units = units.map((entry) => entry.id); resolved.units = units; }
   for (const field of ["target", "node", "building"]) {
-    if (command[field] == null || (field === "building" && command.c === "build")) continue;
+    if (command[field] == null || (field === "building" && ["build", "queueBuild"].includes(command.c))) continue;
     const entry = await resolveEntityReference(session, command[field]); wire[field] = entry.id; resolved[field] = entry;
   }
   return { command: wire, resolved };

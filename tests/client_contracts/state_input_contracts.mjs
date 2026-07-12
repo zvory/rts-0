@@ -1179,7 +1179,7 @@ function buttonByLabel(card, label) {
   input._onRightClick({ x: 112, y: 112 }, { shiftKey: true });
   assert(
     rightClickCommands.length === 1 &&
-      rightClickCommands[0].c === "build" &&
+      rightClickCommands[0].c === "queueBuild" &&
       rightClickCommands[0].building === KIND.PUMP_JACK &&
       rightClickCommands[0].tileX === 3 &&
       rightClickCommands[0].tileY === 3 &&
@@ -1695,7 +1695,7 @@ function buttonByLabel(card, label) {
   placementConfirmInput._confirmPlacement();
   assert(
     placementCommands.length === 1 &&
-      placementCommands[0].c === "build" &&
+      placementCommands[0].c === "queueBuild" &&
       placementCommands[0].building === KIND.DEPOT &&
       placementCommands[0].tileX === 4 &&
       placementCommands[0].tileY === 5,

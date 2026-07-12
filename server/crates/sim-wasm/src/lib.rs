@@ -302,6 +302,7 @@ impl CorePredictor {
             events: Vec::new(),
             upgrades: Vec::new(),
             player_resources: Vec::new(),
+            production_queue: Vec::new(),
             net_status: SnapshotNetStatus::default(),
         }
     }
@@ -372,7 +373,7 @@ impl CorePredictor {
                     }
                 }
             }
-            Command::Build { .. } | Command::Deconstruct { .. } => {
+            Command::Build { .. } | Command::QueueBuild { .. } | Command::Deconstruct { .. } => {
                 self.note_disabled("buildPredictionUnsupported");
             }
             Command::Attack { .. }
@@ -385,6 +386,8 @@ impl CorePredictor {
             | Command::Gather { .. }
             | Command::Train { .. }
             | Command::Research { .. }
+            | Command::QueueTrain { .. }
+            | Command::QueueResearch { .. }
             | Command::Cancel { .. }
             | Command::SetRally { .. } => {
                 self.note_disabled("commandUnsupported");
@@ -724,6 +727,9 @@ fn command_kind(command: &Command) -> &'static str {
         Command::Build { .. } => "build",
         Command::Train { .. } => "train",
         Command::Research { .. } => "research",
+        Command::QueueBuild { .. } => "queueBuild",
+        Command::QueueTrain { .. } => "queueTrain",
+        Command::QueueResearch { .. } => "queueResearch",
         Command::Cancel { .. } => "cancel",
         Command::Stop { .. } => "stop",
         Command::HoldPosition { .. } => "holdPosition",
@@ -819,6 +825,7 @@ mod tests {
             events: Vec::new(),
             upgrades: Vec::new(),
             player_resources: vec![],
+            production_queue: vec![],
             net_status: SnapshotNetStatus::default(),
         }
     }

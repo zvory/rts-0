@@ -300,6 +300,7 @@ impl Game {
                 score: ScoreState::default(),
                 upgrades: Default::default(),
                 ability_cooldowns: Default::default(),
+                production_requests: Default::default(),
             };
             if let Some(loadout) = loadout {
                 spawn_player_start(&mut entities, &map, &mut ps, start, loadout);
