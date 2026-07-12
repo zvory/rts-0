@@ -648,7 +648,7 @@ fn replay_build_warning(server_build_sha: &str, replay_build_sha: &str) -> Strin
 async fn beta_redirect_handler() -> impl IntoResponse {
     (
         StatusCode::MOVED_PERMANENTLY,
-        [(header::LOCATION, "https://bewegungskrieg-beta.fly.dev/")],
+        [(header::LOCATION, "https://rts-0-zvorygin-beta.fly.dev/")],
     )
 }
 
@@ -1028,7 +1028,7 @@ mod tests {
         assert_eq!(response.status(), StatusCode::MOVED_PERMANENTLY);
         assert_eq!(
             response.headers().get(header::LOCATION).unwrap(),
-            "https://bewegungskrieg-beta.fly.dev/"
+            "https://rts-0-zvorygin-beta.fly.dev/"
         );
     }
 

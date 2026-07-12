@@ -2,25 +2,22 @@
 
 set -euo pipefail
 
-MAINLINE_APP="${FLY_MAINLINE_APP:-bewegungskrieg-mainline}"
-BETA_APP="${FLY_BETA_APP:-bewegungskrieg-beta}"
-LAUNCHER_APP="${FLY_LAUNCHER_APP:-rts-0-zvorygin}"
+MAINLINE_APP="${FLY_MAINLINE_APP:-rts-0-zvorygin}"
+BETA_APP="${FLY_BETA_APP:-rts-0-zvorygin-beta}"
 
 usage() {
   cat <<'EOF'
 Usage:
-  ./deploy.sh [mainline|beta|launcher] [commit]
+  ./deploy.sh [mainline|beta] [commit]
   ./deploy.sh --channel mainline --commit <commit>
   ./deploy.sh --channel beta --commit <commit>
-  ./deploy.sh --channel launcher --commit <commit>
 
 Deploys to Fly.io. With no commit, deploys the current checkout. With a
 commit, deploys that exact git commit from a temporary detached worktree.
 
 Channels:
-  mainline, main, production, prod, release  -> FLY_MAINLINE_APP or bewegungskrieg-mainline
-  beta                                      -> FLY_BETA_APP or bewegungskrieg-beta
-  launcher                                  -> FLY_LAUNCHER_APP or rts-0-zvorygin
+  mainline, main, production, prod, release  -> FLY_MAINLINE_APP or rts-0-zvorygin
+  beta                                      -> FLY_BETA_APP or rts-0-zvorygin-beta
 
 Options:
   --app <name>       Override the Fly app name.
@@ -64,7 +61,7 @@ while [[ $# -gt 0 ]]; do
       fi
       shift 2
       ;;
-    mainline|main|production|prod|release|beta|launcher)
+    mainline|main|production|prod|release|beta)
       channel="$1"
       shift
       ;;
@@ -89,10 +86,6 @@ case "$channel" in
   beta)
     app="$BETA_APP"
     config_file="fly.beta.toml"
-    ;;
-  launcher)
-    app="$LAUNCHER_APP"
-    config_file="fly.launcher.toml"
     ;;
   *)
     echo "error: unknown channel: $channel" >&2

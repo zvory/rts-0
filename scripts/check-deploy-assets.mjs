@@ -24,13 +24,13 @@ const dockerfile = read("Dockerfile");
 const dockerignore = read(".dockerignore");
 const cargoLock = read("server/Cargo.lock");
 const mainTestWorkflow = read(".github/workflows/main-tests.yml");
+const betaDeployWorkflow = read(".github/workflows/deploy-beta.yml");
 const wasmBuildScript = read("scripts/build-sim-wasm.sh");
 const wasmGitignore = read("client/vendor/sim-wasm/.gitignore");
 const deployScript = read("deploy.sh");
+const clientIndex = read("client/index.html");
 const mainlineFlyConfig = read("fly.mainline.toml");
 const betaFlyConfig = read("fly.beta.toml");
-const launcherFlyConfig = read("fly.launcher.toml");
-const launcherServer = read("launcher/server.mjs");
 const serverMain = read("server/src/main.rs");
 const wasmBindgenLockVersion = cargoLock.match(
   /\[\[package\]\]\nname = "wasm-bindgen"\nversion = "([^"]+)"/,
@@ -116,10 +116,13 @@ assertIncludes(
 
 assertIncludes(deployScript, 'config_file="fly.mainline.toml"', "mainline deploys must select the mainline config");
 assertIncludes(deployScript, 'config_file="fly.beta.toml"', "beta deploys must select the beta config");
-assertIncludes(deployScript, 'config_file="fly.launcher.toml"', "launcher deploys must select the launcher config");
-assertMatches(mainlineFlyConfig, /^app\s*=\s*"bewegungskrieg-mainline"/m, "mainline must target its named game app");
-assertMatches(betaFlyConfig, /^app\s*=\s*"bewegungskrieg-beta"/m, "beta must target its named game app");
-assertMatches(launcherFlyConfig, /^app\s*=\s*"rts-0-zvorygin"/m, "launcher must target the canonical-domain app");
+assertIncludes(
+  betaDeployWorkflow,
+  'FLY_BETA_APP:-rts-0-zvorygin-beta',
+  "beta secret staging must target the beta app by default",
+);
+assertMatches(mainlineFlyConfig, /^app\s*=\s*"rts-0-zvorygin"/m, "mainline must target the canonical-domain app");
+assertMatches(betaFlyConfig, /^app\s*=\s*"rts-0-zvorygin-beta"/m, "beta must target the beta app");
 assertMatches(mainlineFlyConfig, /auto_stop_machines\s*=\s*"stop"/, "mainline must stop rather than suspend when idle");
 assertMatches(mainlineFlyConfig, /min_machines_running\s*=\s*0/, "mainline must allow zero running Machines");
 assertMatches(mainlineFlyConfig, /cpu_kind\s*=\s*"performance"/, "mainline must use performance CPU kind");
@@ -130,22 +133,15 @@ assertMatches(betaFlyConfig, /min_machines_running\s*=\s*0/, "beta must allow ze
 assertMatches(betaFlyConfig, /cpu_kind\s*=\s*"performance"/, "beta must use performance CPU kind");
 assertMatches(betaFlyConfig, /cpus\s*=\s*1/, "beta must use one performance CPU");
 assertMatches(betaFlyConfig, /memory\s*=\s*"2gb"/, "beta must use 2 GB memory");
-assertMatches(launcherFlyConfig, /auto_stop_machines\s*=\s*"off"/, "launcher must remain always-on");
-assertMatches(launcherFlyConfig, /min_machines_running\s*=\s*1/, "launcher must remain available while game apps stop");
 assertIncludes(
-  launcherServer,
-  'mainline: "https://bewegungskrieg-mainline.fly.dev"',
-  "launcher mainline origin must match the named mainline app",
-);
-assertIncludes(
-  launcherServer,
-  'beta: "https://bewegungskrieg-beta.fly.dev"',
-  "launcher beta origin must match the named beta app",
+  clientIndex,
+  'href="https://rts-0-zvorygin-beta.fly.dev/"',
+  "the game client beta shortcut must target the beta app",
 );
 assertIncludes(
   serverMain,
-  '[(header::LOCATION, "https://bewegungskrieg-beta.fly.dev/")]',
-  "the game server beta shortcut must target the named beta app",
+  '[(header::LOCATION, "https://rts-0-zvorygin-beta.fly.dev/")]',
+  "the game server beta shortcut must target the beta app",
 );
 
 console.log("deploy asset contract: ok");
