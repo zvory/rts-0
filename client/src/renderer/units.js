@@ -1,4 +1,4 @@
-import { STATS } from "../config.js";
+import { SNAPSHOT_MS, STATS } from "../config.js";
 import { KIND, SETUP, STATE } from "../protocol.js";
 import { liveRigDefinitionFor, liveRigRoutesFor } from "./rigs/live_routing.js";
 import { liveFrameStripFor } from "./rigs/frame_strip_routing.js";
@@ -19,6 +19,8 @@ import {
   smoothstep01,
   tankBodyVisual,
 } from "./shared.js";
+
+const FRAME_STRIP_MOVEMENT_HOLD_MS = SNAPSHOT_MS * 3;
 
 export function _deployedWeaponSetupVisual(e) {
   const now = rendererVisualNow(this);
@@ -106,9 +108,22 @@ export function _tankMotionVisual(e, facing, state, body) {
 }
 
 export function _frameStripMovementVisual(e, state) {
+  const now = rendererVisualNow(this);
   const previousMotion = this._frameStripMotion?.get?.(e.id);
   const snapshotMotion = snapshotMovementSample(e, state);
   const renderMoving = renderedPositionChanged(e, this._frameStripMotion);
+  const moveState = e?.state === STATE.MOVE;
+  const freshSnapshot = snapshotMotion != null &&
+    authoritativeSampleChanged(snapshotMotion, previousMotion);
+  const observedMovement = moveState && (
+    renderMoving ||
+    (freshSnapshot && snapshotMotion.moving) ||
+    (snapshotMotion == null && previousMotion == null)
+  );
+  let lastMovementAt = null;
+  if (moveState) {
+    lastMovementAt = observedMovement ? now : previousMotion?.lastMovementAt ?? null;
+  }
   if (this._frameStripMotion) {
     this._frameStripMotion.set(e.id, {
       x: finite(e.x, 0),
@@ -116,14 +131,11 @@ export function _frameStripMovementVisual(e, state) {
       snapshotTick: snapshotMotion?.tick ?? null,
       snapshotX: snapshotMotion?.x ?? null,
       snapshotY: snapshotMotion?.y ?? null,
+      lastMovementAt,
     });
   }
-  const freshSnapshotMovement = snapshotMotion?.moving === true &&
-    authoritativeSampleChanged(snapshotMotion, previousMotion);
-  const moving = snapshotMotion == null
-    ? null
-    : renderMoving || freshSnapshotMovement;
-  const active = moving == null ? e?.state === STATE.MOVE : moving;
+  const active = lastMovementAt != null &&
+    now - lastMovementAt <= FRAME_STRIP_MOVEMENT_HOLD_MS;
   return {
     moving: Boolean(active),
     activity: active ? 1 : 0,
