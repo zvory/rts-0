@@ -912,12 +912,7 @@ fn expanded_body(body: UnitBody, extra_px: f32) -> UnitBody {
     }
 }
 
-fn body_hits_static_blocker(
-    map: &Map,
-    occ: &Occupancy,
-    kind: EntityKind,
-    body: UnitBody,
-) -> bool {
+fn body_hits_static_blocker(map: &Map, occ: &Occupancy, kind: EntityKind, body: UnitBody) -> bool {
     let aabb = body.aabb();
     let world_size = map.world_size_px();
     if aabb.min_x < 0.0 || aabb.min_y < 0.0 || aabb.max_x > world_size || aabb.max_y > world_size {

@@ -88,38 +88,36 @@ fn rank_candidate(
     if !policy.allows_candidate(candidate.facts) {
         return None;
     }
-    let (priority_bucket, target_group_order, weapon_fit_order) =
-        if let Some(order) = policy.immediate_threat_order(
+    let (priority_bucket, target_group_order, weapon_fit_order) = if let Some(order) = policy
+        .immediate_threat_order(
             candidate.facts,
             candidate.in_weapon_range,
             candidate.tank_trap_obstructs_vehicle_route,
         ) {
-            (0, order, 0)
-        } else if let Some(order) = policy.vehicle_route_obstruction_order(
-            candidate.facts,
-            candidate.tank_trap_obstructs_vehicle_route,
-        ) {
-            (0, order, 0)
-        } else {
-            (
-                1,
-                policy.target_group_order(context.attacker_is_unit, candidate.facts),
-                policy.weapon_fit_order(
-                    context.attacker_weapon_class,
-                    candidate.facts,
-                    candidate.in_weapon_range,
-                ),
-            )
-        };
+        (0, order, 0)
+    } else if let Some(order) = policy.vehicle_route_obstruction_order(
+        candidate.facts,
+        candidate.tank_trap_obstructs_vehicle_route,
+    ) {
+        (0, order, 0)
+    } else {
+        (
+            1,
+            policy.target_group_order(context.attacker_is_unit, candidate.facts),
+            policy.weapon_fit_order(
+                context.attacker_weapon_class,
+                candidate.facts,
+                candidate.in_weapon_range,
+            ),
+        )
+    };
 
     Some(TargetRank {
         priority_bucket,
         target_group_order,
         weapon_fit_order,
-        retention_order: policy.retention_order(
-            context.can_retain_moving_target,
-            candidate.retained_target,
-        ),
+        retention_order: policy
+            .retention_order(context.can_retain_moving_target, candidate.retained_target),
         distance_sq: candidate.distance_sq,
         id: candidate.id,
     })

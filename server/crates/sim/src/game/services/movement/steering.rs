@@ -216,8 +216,8 @@ fn tank_trap_steering_bias(
         } else {
             -1.0
         };
-        let proximity = ((TANK_TRAP_STEERING_RADIUS_PX - d) / TANK_TRAP_STEERING_RADIUS_PX)
-            .clamp(0.0, 1.0);
+        let proximity =
+            ((TANK_TRAP_STEERING_RADIUS_PX - d) / TANK_TRAP_STEERING_RADIUS_PX).clamp(0.0, 1.0);
         let weight = proximity * proximity * forward;
         bias_x += perp.0 * side * weight;
         bias_y += perp.1 * side * weight;

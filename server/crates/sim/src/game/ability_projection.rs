@@ -9,15 +9,20 @@ pub(in crate::game) fn ability_object_views_for(
     fogged: bool,
     include_player_resources: bool,
 ) -> Vec<crate::protocol::AbilityObjectView> {
-    game.state.ability_runtime
+    game.state
+        .ability_runtime
         .world_objects()
         .filter(|object| !fogged || fog.is_visible_world(player, object.x, object.y))
         .map(|object| {
             let owner_visible = object.owner == player || include_player_resources || !fogged;
             let source_caster_id = if owner_visible
-                || game.state.entities.get(object.caster_id).is_some_and(|caster| {
-                    !fogged || fog.is_visible_world(player, caster.pos_x, caster.pos_y)
-                }) {
+                || game
+                    .state
+                    .entities
+                    .get(object.caster_id)
+                    .is_some_and(|caster| {
+                        !fogged || fog.is_visible_world(player, caster.pos_x, caster.pos_y)
+                    }) {
                 Some(object.caster_id)
             } else {
                 None
@@ -61,10 +66,12 @@ fn ability_object_owner_state_to_protocol(
             earliest_return_tick: Some(earliest_return_tick),
             ..Default::default()
         },
-        AbilityObjectPayload::MagicAnchor { radius } => crate::protocol::AbilityObjectOwnerStateView {
-            radius: Some(radius),
-            ..Default::default()
-        },
+        AbilityObjectPayload::MagicAnchor { radius } => {
+            crate::protocol::AbilityObjectOwnerStateView {
+                radius: Some(radius),
+                ..Default::default()
+            }
+        }
         AbilityObjectPayload::LineProjectile {
             distance_traveled,
             ticks_out,

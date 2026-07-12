@@ -277,7 +277,9 @@ pub(super) fn effective_attack_profile(e: &Entity) -> EffectiveAttackProfile {
             profile.dmg = ((profile.dmg as f32) * config::ANTI_TANK_GUN_PACKED_DAMAGE_MULTIPLIER)
                 .round() as u32;
         }
-        WeaponSetup::Deployed => profile.range_tiles = config::ANTI_TANK_GUN_DEPLOYED_RANGE_TILES as f32,
+        WeaponSetup::Deployed => {
+            profile.range_tiles = config::ANTI_TANK_GUN_DEPLOYED_RANGE_TILES as f32
+        }
         WeaponSetup::SettingUp { .. }
         | WeaponSetup::TearingDown { .. }
         | WeaponSetup::TearingDownToRedeploy { .. } => {
@@ -323,18 +325,24 @@ pub(super) fn choose_target_preferring_anti_tank_field(
     filter: impl Fn(&TargetCandidate) -> bool,
 ) -> Option<u32> {
     if attacker.kind == EntityKind::AntiTankGun {
-        let in_field = priority::choose_target(context, candidates.iter().filter(|candidate| {
-            filter(candidate)
-                && anti_tank_gun_target_inside_field_of_fire(
-                    attacker,
-                    (candidate.pos_y - py).atan2(candidate.pos_x - px),
-                )
-        }));
+        let in_field = priority::choose_target(
+            context,
+            candidates.iter().filter(|candidate| {
+                filter(candidate)
+                    && anti_tank_gun_target_inside_field_of_fire(
+                        attacker,
+                        (candidate.pos_y - py).atan2(candidate.pos_x - px),
+                    )
+            }),
+        );
         if in_field.is_some() {
             return in_field;
         }
     }
-    priority::choose_target(context, candidates.iter().filter(|candidate| filter(candidate)))
+    priority::choose_target(
+        context,
+        candidates.iter().filter(|candidate| filter(candidate)),
+    )
 }
 
 fn anti_tank_gun_field_center(e: &Entity) -> Option<f32> {
@@ -370,7 +378,12 @@ fn maybe_begin_anti_tank_gun_setup_after_alignment(e: &mut Entity) {
     {
         return;
     }
-    if !e.path_is_empty() || !matches!(e.order(), Order::Idle | Order::ArtilleryPointFire(_) | Order::ArtilleryBlanketFire(_)) {
+    if !e.path_is_empty()
+        || !matches!(
+            e.order(),
+            Order::Idle | Order::ArtilleryPointFire(_) | Order::ArtilleryBlanketFire(_)
+        )
+    {
         return;
     }
     let Some(target) = e.emplacement_facing().filter(|facing| facing.is_finite()) else {

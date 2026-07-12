@@ -71,10 +71,7 @@ pub(super) fn emit_attack_event(
 
 pub(super) fn emit_miss_event(events: &mut HashMap<u32, Vec<Event>>, recipients: &[u32], to: u32) {
     for pid in recipients {
-        events
-            .entry(*pid)
-            .or_default()
-            .push(Event::Miss { to });
+        events.entry(*pid).or_default().push(Event::Miss { to });
     }
 }
 

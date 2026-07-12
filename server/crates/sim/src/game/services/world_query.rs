@@ -166,7 +166,8 @@ pub(crate) fn is_explicit_attack_targetable(
 ) -> bool {
     candidate.id != attacker_id
         && candidate.owner != NEUTRAL
-        && (candidate.owner == attacker_owner || teams.is_enemy_owner(attacker_owner, candidate.owner))
+        && (candidate.owner == attacker_owner
+            || teams.is_enemy_owner(attacker_owner, candidate.owner))
         && candidate.is_targetable()
         && candidate.hp > 0
 }

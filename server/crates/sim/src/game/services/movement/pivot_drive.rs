@@ -192,7 +192,9 @@ fn traffic_body_half_width(ego_kind: EntityKind, neighbor_kind: EntityKind) -> O
 pub(super) fn vehicle_body_turn_rate(kind: EntityKind) -> f32 {
     match kind {
         EntityKind::MortarTeam => std::f32::consts::TAU,
-        EntityKind::AntiTankGun | EntityKind::Artillery => ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK,
+        EntityKind::AntiTankGun | EntityKind::Artillery => {
+            ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK
+        }
         _ => TANK_BODY_TURN_RATE_RAD_PER_TICK,
     }
 }

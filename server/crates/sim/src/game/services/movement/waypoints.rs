@@ -75,21 +75,20 @@ pub(super) fn advance_moving_units(
             let has_meth = players
                 .iter()
                 .any(|p| p.id == e.owner && p.has_upgrade(UpgradeKind::Methamphetamines));
-            let speed_multiplier = if matches!(e.kind, EntityKind::Rifleman | EntityKind::Panzerfaust)
-                && has_meth
-            {
-                config::METHAMPHETAMINES_SPEED_MULTIPLIER
-            } else if e.breakthrough_ticks() > 0 {
-                if e.recent_smoke_ticks() > 0 {
-                    config::BREAKTHROUGH_SMOKE_SPEED_MULTIPLIER
+            let speed_multiplier =
+                if matches!(e.kind, EntityKind::Rifleman | EntityKind::Panzerfaust) && has_meth {
+                    config::METHAMPHETAMINES_SPEED_MULTIPLIER
+                } else if e.breakthrough_ticks() > 0 {
+                    if e.recent_smoke_ticks() > 0 {
+                        config::BREAKTHROUGH_SMOKE_SPEED_MULTIPLIER
+                    } else {
+                        config::BREAKTHROUGH_BASE_SPEED_MULTIPLIER
+                    }
+                } else if e.kind == EntityKind::MachineGunner && has_meth {
+                    config::METHAMPHETAMINES_SPEED_MULTIPLIER
                 } else {
-                    config::BREAKTHROUGH_BASE_SPEED_MULTIPLIER
-                }
-            } else if e.kind == EntityKind::MachineGunner && has_meth {
-                config::METHAMPHETAMINES_SPEED_MULTIPLIER
-            } else {
-                1.0
-            };
+                    1.0
+                };
             let speed = config::unit_stats(e.kind)
                 .map(|s| s.speed * speed_multiplier)
                 .unwrap_or(0.0);

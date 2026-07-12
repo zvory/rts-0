@@ -187,9 +187,11 @@ fn resolve(
             .get(shot.attacker)
             .map(|attacker| (attacker.pos_x, attacker.pos_y))
             .unwrap_or((shot.source_x, shot.source_y));
-        let attribution = teams
-            .is_enemy_owner(shot.owner, victim_owner)
-            .then_some((shot.owner, attacker_pos, tick));
+        let attribution = teams.is_enemy_owner(shot.owner, victim_owner).then_some((
+            shot.owner,
+            attacker_pos,
+            tick,
+        ));
         let damaged = entities
             .get_mut(shot.target)
             .is_some_and(|target| target.apply_damage(damage, attribution));

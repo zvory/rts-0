@@ -12,10 +12,14 @@ fn replay_keyframe_clone_preserves_ability_runtime_state() {
         is_ai: false,
     }];
     let mut game = empty_flat_game(&players);
-    let caster = game.state.entities
+    let caster = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::Rifleman, 128.0, 128.0)
         .expect("caster should spawn");
-    let object_id = game.state.ability_runtime
+    let object_id = game
+        .state
+        .ability_runtime
         .spawn_world_object(ability_runtime::AbilityWorldObjectSpec {
             owner: 1,
             caster_id: caster,
@@ -31,7 +35,9 @@ fn replay_keyframe_clone_preserves_ability_runtime_state() {
         })
         .expect("ability object should spawn");
 
-    let projectile_id = game.state.ability_runtime
+    let projectile_id = game
+        .state
+        .ability_runtime
         .spawn_projectile(ability_projectile::AbilityProjectileSpec {
             owner: 1,
             caster_id: caster,
@@ -54,14 +60,18 @@ fn replay_keyframe_clone_preserves_ability_runtime_state() {
     let mut clone = game.clone_for_replay_keyframe();
 
     assert_eq!(
-        clone.state.ability_runtime
+        clone
+            .state
+            .ability_runtime
             .world_objects()
             .map(|object| object.id.get())
             .collect::<Vec<_>>(),
         vec![object_id, projectile_id]
     );
     assert_eq!(
-        clone.state.ability_runtime
+        clone
+            .state
+            .ability_runtime
             .projectiles()
             .map(|projectile| projectile.id.get())
             .collect::<Vec<_>>(),
@@ -70,7 +80,9 @@ fn replay_keyframe_clone_preserves_ability_runtime_state() {
 
     clone.tick();
 
-    let projectile_object = clone.state.ability_runtime
+    let projectile_object = clone
+        .state
+        .ability_runtime
         .world_objects()
         .find(|object| object.id.get() == projectile_id)
         .expect("cloned projectile visual should still exist after ticking");
@@ -91,10 +103,13 @@ fn game_tick_cleans_up_expired_ability_runtime_state() {
         is_ai: false,
     }];
     let mut game = empty_flat_game(&players);
-    let caster = game.state.entities
+    let caster = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::Rifleman, 128.0, 128.0)
         .expect("caster should spawn");
-    game.state.ability_runtime
+    game.state
+        .ability_runtime
         .spawn_world_object(ability_runtime::AbilityWorldObjectSpec {
             owner: 1,
             caster_id: caster,
@@ -125,11 +140,15 @@ fn snapshot_projects_abilities_from_owner_faction_catalog() {
     }];
     let mut game = empty_flat_game(&players);
     let pos = game.state.map.tile_center(10, 10);
-    let scout = game.state.entities
+    let scout = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::ScoutCar, pos.0, pos.1)
         .expect("scout should spawn");
     game.rebuild_final_spatial();
-    game.state.fog.recompute(&[1], &game.state.entities, &game.state.map);
+    game.state
+        .fog
+        .recompute(&[1], &game.state.entities, &game.state.map);
 
     let snapshot = game.snapshot_for(1);
     let scout_view = snapshot
@@ -158,10 +177,14 @@ fn ekat_start_projects_hero_zamok_and_abilities() {
 
     assert_eq!(game.state.players[0].steel, 0);
     assert_eq!(game.state.players[0].oil, 0);
-    assert!(game.state.entities
+    assert!(game
+        .state
+        .entities
         .iter()
         .any(|entity| entity.owner == 1 && entity.kind == EntityKind::Zamok));
-    let hero = game.state.entities
+    let hero = game
+        .state
+        .entities
         .iter()
         .find(|entity| entity.owner == 1 && entity.kind == EntityKind::Ekat)
         .expect("Ekat should start with her hero");
@@ -201,10 +224,13 @@ fn ekat_does_not_passively_regenerate() {
     }];
     let mut game = empty_flat_game(&players);
     let pos = game.state.map.tile_center(10, 10);
-    let hero = game.state.entities
+    let hero = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
         .expect("hero should spawn");
-    game.state.entities
+    game.state
+        .entities
         .get_mut(hero)
         .expect("hero exists")
         .apply_damage(50, None);

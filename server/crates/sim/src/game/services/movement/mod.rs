@@ -9,8 +9,8 @@ use std::collections::HashMap;
 
 use crate::config;
 use crate::game::ability_runtime::AbilityRuntime;
-use crate::game::entity::{EntityKind, WeaponSetup};
 use crate::game::entity::EntityStore;
+use crate::game::entity::{EntityKind, WeaponSetup};
 use crate::game::map::Map;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::scout_plane;
@@ -141,11 +141,9 @@ fn clamp_meth_machine_gunner_setup(entities: &mut EntityStore, id: u32) {
     };
     let boosted_ticks = config::METHAMPHETAMINES_MACHINE_GUNNER_SETUP_TICKS;
     let boosted_setup = match e.weapon_setup() {
-        WeaponSetup::SettingUp { ticks } if ticks > boosted_ticks => {
-            Some(WeaponSetup::SettingUp {
-                ticks: boosted_ticks,
-            })
-        }
+        WeaponSetup::SettingUp { ticks } if ticks > boosted_ticks => Some(WeaponSetup::SettingUp {
+            ticks: boosted_ticks,
+        }),
         WeaponSetup::TearingDown { ticks } if ticks > boosted_ticks => {
             Some(WeaponSetup::TearingDown {
                 ticks: boosted_ticks,
