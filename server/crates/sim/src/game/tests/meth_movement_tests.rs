@@ -20,17 +20,13 @@ fn meth_unit_fixture(kind: EntityKind, enqueue_move: bool) -> (Game, u32, (f32, 
 
     let start = game.state.map.tile_center(20, 20);
     let goal = (start.0 + 500.0, start.1);
-    let unit = game
-        .state
-        .entities
+    let unit = game.state.entities
         .spawn_unit(1, kind, start.0, start.1)
         .expect("unit should spawn");
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
-    game.state
-        .fog
-        .recompute(&ids, &game.state.entities, &game.state.map);
+    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
     game.assert_invariants();
 
     if enqueue_move {
@@ -154,8 +150,7 @@ fn methamphetamines_halves_machine_gunner_setup_and_teardown() {
     game.tick();
     assert!(
         matches!(
-            game.state
-                .entities
+            game.state.entities
                 .get(mg)
                 .expect("mg should exist")
                 .weapon_setup(),
@@ -176,8 +171,7 @@ fn methamphetamines_halves_machine_gunner_setup_and_teardown() {
     );
     game.tick();
     assert_eq!(
-        game.state
-            .entities
+        game.state.entities
             .get(mg)
             .expect("mg should exist")
             .weapon_setup(),
@@ -202,8 +196,7 @@ fn methamphetamines_halves_machine_gunner_setup_and_teardown() {
     );
     assert!(
         matches!(
-            game.state
-                .entities
+            game.state.entities
                 .get(mg)
                 .expect("mg should exist")
                 .weapon_setup(),
@@ -216,8 +209,7 @@ fn methamphetamines_halves_machine_gunner_setup_and_teardown() {
         game.tick();
     }
     assert_eq!(
-        game.state
-            .entities
+        game.state.entities
             .get(mg)
             .expect("mg should exist")
             .weapon_setup(),

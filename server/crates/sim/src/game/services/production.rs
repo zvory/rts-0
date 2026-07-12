@@ -42,10 +42,9 @@ pub(crate) fn production_system(
             let completed_buildings_by_owner =
                 completed_buildings_by_owner.get_or_insert_with(|| {
                     let mut by_owner = std::collections::HashMap::<u32, Vec<EntityKind>>::new();
-                    for entity in entities
-                        .iter()
-                        .filter(|entity| entity.is_building() && !entity.under_construction())
-                    {
+                    for entity in entities.iter().filter(|entity| {
+                        entity.is_building() && !entity.under_construction()
+                    }) {
                         by_owner.entry(entity.owner).or_default().push(entity.kind);
                     }
                     by_owner
