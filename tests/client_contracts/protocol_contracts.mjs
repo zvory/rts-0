@@ -207,6 +207,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
     ],
     tr: [[80, 448, 480, 0.375]],
     u: [1, UPGRADE_CODE[UPGRADE.ARTILLERY_UNLOCK]],
+    q: [["unit", KIND.RIFLEMAN, 17, 5], ["research", UPGRADE.TANK_UNLOCK, 23, null]],
     fg: [1, 2, 3, 1],
     ev: [
       [EVENT_CODE[EVENT.ATTACK], 1, 7],
@@ -229,6 +230,9 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   assert(decoded.t === "snapshot", "compact snapshot keeps the semantic tag");
   assert(decoded.upgrades[0] === UPGRADE.METHAMPHETAMINES, "compact upgrades decode");
   assert(decoded.upgrades[1] === UPGRADE.ARTILLERY_UNLOCK, "compact artillery upgrade decodes");
+  assert(decoded.productionQueue[0].producerId === 17, "production request producer decodes");
+  assert(decoded.productionQueue[0].remaining === 5, "finite production quantity decodes");
+  assert(decoded.productionQueue[1].remaining === null, "automatic production quantity decodes");
   assert(decoded.tick === 42 && decoded.steel === 100 && decoded.supplyCap === 10, "compact scalars decode");
   assert(decoded.netStatus.predictionVersion === PREDICTION_PROTOCOL_VERSION, "compact prediction version decodes");
   assert(decoded.netStatus.lastSimConsumedClientSeq === 7, "compact consumed client sequence decodes");

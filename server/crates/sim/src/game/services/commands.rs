@@ -436,6 +436,13 @@ pub(in crate::game) fn apply_commands(
                 tile_x,
                 tile_y,
                 queued,
+            }
+            | SimCommand::QueueBuild {
+                units,
+                building,
+                tile_x,
+                tile_y,
+                queued,
             } => {
                 let Some(units) =
                     validate_command_units(entities, events, player, units, command_admission)
@@ -536,32 +543,25 @@ pub(in crate::game) fn apply_commands(
                     ps.refund_cost(cost);
                 }
             }
-            SimCommand::QueueBuild {
-                units,
-                building,
-                tile_x,
-                tile_y,
-                queued,
-            } => {
-                let Some(units) =
-                    validate_command_units(entities, events, player, units, command_admission)
-                else {
-                    continue;
-                };
-                super::production_queue::enqueue_building(
-                    map, entities, players, player, units, building, tile_x, tile_y, queued, events,
-                );
-            }
             SimCommand::QueueTrain {
                 building,
                 unit,
                 quantity,
                 automatic,
-            } => super::production_queue::enqueue_unit(
-                entities, players, player, building, unit, quantity, automatic, events,
+            } => super::production_requests::enqueue_unit(
+                entities,
+                players,
+                super::production_requests::UnitRequest {
+                    player,
+                    building,
+                    unit,
+                    quantity,
+                    automatic,
+                },
+                events,
             ),
             SimCommand::QueueResearch { building, upgrade } => {
-                super::production_queue::enqueue_research(
+                super::production_requests::enqueue_research(
                     entities, players, player, building, upgrade, events,
                 );
             }
@@ -617,7 +617,6 @@ pub(in crate::game) fn apply_commands(
             }
         }
     }
-    super::production_queue::run_scheduler(map, entities, players, coordinator);
 }
 
 fn validate_command_units(
@@ -1884,26 +1883,26 @@ fn order_cancel(
         Upgrade(UpgradeKind),
     }
 
-    let cancelled = {
-        let b = match entities.get_mut(building) {
-            Some(b)
-                if b.owner == player
-                    && b.is_building()
-                    && (!b.prod_queue().is_empty() || !b.research_queue().is_empty()) =>
-            {
-                b
-            }
-            _ => return,
-        };
-        if let Some(item) = b.pop_last_research() {
-            Cancelled::Upgrade(item.upgrade)
-        } else if let Some(item) = b.pop_last_production() {
-            Cancelled::Unit(item.unit)
-        } else {
-            return;
-        }
+    let Some(ps) = players.iter_mut().find(|p| p.id == player) else {
+        return;
     };
-    if let Some(ps) = players.iter_mut().find(|p| p.id == player) {
+    if super::production_queue::cancel_latest_for_producer(ps, building) {
+        return;
+    }
+
+    let cancelled = entities.get_mut(building).and_then(|building| {
+        if building.owner != player || !building.is_building() {
+            return None;
+        }
+        if let Some(item) = building.pop_last_research() {
+            Some(Cancelled::Upgrade(item.upgrade))
+        } else {
+            building
+                .pop_last_production()
+                .map(|item| Cancelled::Unit(item.unit))
+        }
+    });
+    if let Some(cancelled) = cancelled {
         match cancelled {
             Cancelled::Unit(unit) if config::unit_stats(unit).is_some() => {
                 ps.refund_cost(rules::economy::resource_cost(unit));

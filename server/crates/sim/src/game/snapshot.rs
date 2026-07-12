@@ -254,10 +254,6 @@ impl Game {
                                     unit,
                                     ..
                                 } => ("unit", crate::protocol::kind_to_wire(unit)),
-                                super::production_request::ProductionRequestItem::Building {
-                                    building,
-                                    ..
-                                } => ("building", crate::protocol::kind_to_wire(building)),
                                 super::production_request::ProductionRequestItem::Research {
                                     upgrade,
                                     ..
@@ -266,6 +262,7 @@ impl Game {
                             crate::protocol::ProductionQueueRequestView {
                                 request_kind: request_kind.to_string(),
                                 item: item.to_string(),
+                                producer_id: request.item.producer_id(),
                                 remaining: request.remaining,
                             }
                         })

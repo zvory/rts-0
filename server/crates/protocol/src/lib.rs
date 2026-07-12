@@ -1454,6 +1454,7 @@ mod tests {
             production_queue: vec![ProductionQueueRequestView {
                 request_kind: "unit".to_string(),
                 item: kinds::RIFLEMAN.to_string(),
+                producer_id: 17,
                 remaining: None,
             }],
             net_status: SnapshotNetStatus {
@@ -1561,6 +1562,10 @@ mod tests {
             serde_json::json!([[99, 2, 7, 640.0, 672.0, [[20, 21], [21, 21]], 39]])
         );
         assert_eq!(value["u"], serde_json::json!([4]));
+        assert_eq!(
+            value["q"],
+            serde_json::json!([["unit", kinds::RIFLEMAN, 17, null]])
+        );
         assert_eq!(value["ev"].as_array().unwrap().len(), 12);
         assert_eq!(
             value["n"],
@@ -1663,7 +1668,7 @@ mod tests {
         assert_eq!(section("smokes").count, 1);
         assert_eq!(section("abilityObjects").count, 1);
         assert_eq!(section("trenches").count, 1);
-        assert_eq!(section("playerStatus").count, 2);
+        assert_eq!(section("playerStatus").count, 3);
         assert_eq!(section("netStatus").count, 1);
         assert!(section("other").bytes > 0);
 

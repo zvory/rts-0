@@ -3,23 +3,24 @@
 //! [`run_tick`] delegates to the internal services through explicit derived-state boundaries:
 //!   1. refresh pre-command occupancy/spatial indexes
 //!   2. drain + apply queued commands
-//!   3. movement
-//!   4. promote queued orders made ready by movement or previous-tick active-order cleanup
-//!   5. refresh post-movement occupancy/spatial indexes
-//!   6. combat
-//!   7. gather progression
-//!   8. production progression + spawning
-//!   9. player-global ability cooldown progression
-//!   10. construction progression
-//!   11. deconstruction progression
-//!   12. ability projectile/runtime progression
-//!   13. deaths
-//!   14. refresh pre-collision occupancy/spatial indexes
-//!   15. unit-unit collision resolution (hard non-stacking; runs after spawning so newly
+//!   3. start ready deferred production requests
+//!   4. movement
+//!   5. promote queued orders made ready by movement or previous-tick active-order cleanup
+//!   6. refresh post-movement occupancy/spatial indexes
+//!   7. combat
+//!   8. gather progression
+//!   9. production progression + spawning
+//!   10. player-global ability cooldown progression
+//!   11. construction progression
+//!   12. deconstruction progression
+//!   13. ability projectile/runtime progression
+//!   14. deaths
+//!   15. refresh pre-collision occupancy/spatial indexes
+//!   16. unit-unit collision resolution (hard non-stacking; runs after spawning so newly
 //!       produced units that land on the same spawn point are unstacked in the same tick)
-//!   16. trench occupation, slotting, and dig-in progress
-//!   17. recompute supply cap
-//!   18. rebuild final spatial index for snapshot interest filtering
+//!   17. trench occupation, slotting, and dig-in progress
+//!   18. recompute supply cap
+//!   19. rebuild final spatial index for snapshot interest filtering
 //!
 //! The three occupancy boundaries compare the exact static-building topology and share immutable
 //! clearance data when it is unchanged. Spatial indexes still rebuild at every named boundary.
@@ -196,6 +197,9 @@ pub(crate) fn run_tick(
             events,
             tick,
         );
+    });
+    crate::perf::timed(perf.as_deref_mut(), "production_queue", || {
+        services::production_queue::run_scheduler(entities, players);
     });
     crate::perf::timed(
         perf.as_deref_mut(),

@@ -5,7 +5,7 @@
   "exceptions": [
     {
       "path": "scripts/client-perf-harness.mjs",
-      "lines": 1916,
+      "lines": 1913,
       "reason": "Replay workload cleanup lowered the existing oversized harness; keep ratcheting until browser harness reporting is split."
     },
     {
@@ -14,19 +14,14 @@
       "reason": "Docs sweep core remains over the cap after renderer extraction; keep ratcheting as follow-up pieces split out."
     },
     {
-      "path": "server/crates/ai/src/ai_core/decision/tests.rs",
-      "lines": 4308,
-      "reason": "Existing oversized AI decision test module before repo-wide source-size gate."
-    },
-    {
       "path": "server/crates/archcheck/src/lib.rs",
-      "lines": 2463,
-      "reason": "Production-request scheduling classifies one focused tick service and its three query/helper edges in the existing oversized architecture checker; keep ratcheting until archcheck scanners and tests are split into modules."
+      "lines": 2475,
+      "reason": "Deferred-production review classifies separate admission and scheduler services in the existing oversized architecture checker; keep ratcheting until archcheck scanners and tests are split into modules."
     },
     {
       "path": "server/crates/protocol/src/lib.rs",
-      "lines": 1731,
-      "reason": "The production-request PoC adds three bounded wire commands and representative compact-queue coverage beside the existing protocol DTOs; keep ratcheting until remaining protocol DTO groups are split."
+      "lines": 1736,
+      "reason": "The production-request PoC adds bounded wire commands and producer-aware compact-queue coverage beside the existing protocol DTOs; keep ratcheting until remaining protocol DTO groups are split."
     },
     {
       "path": "server/crates/sim/src/game/services/combat/tests.rs",
@@ -35,12 +30,12 @@
     },
     {
       "path": "server/crates/sim/src/game/services/commands.rs",
-      "lines": 1952,
-      "reason": "The production-request PoC routes three queue command variants into the extracted production_queue service; keep ratcheting until more command-family routing is split."
+      "lines": 1951,
+      "reason": "Deferred production admission was extracted from command routing, lowering the existing oversized command service; keep ratcheting until more command-family routing is split."
     },
     {
       "path": "server/crates/sim/src/game/services/move_coordinator.rs",
-      "lines": 2231,
+      "lines": 1884,
       "reason": "Formation extraction lowered the existing oversized movement coordinator; keep ratcheting until coordinator policy is split."
     },
     {
@@ -60,12 +55,12 @@
     },
     {
       "path": "server/src/main.rs",
-      "lines": 1845,
+      "lines": 1781,
       "reason": "Snapshot lifecycle diagnostics added writer serialization/send timing to the existing oversized server shell; keep ratcheting until connection writer handling is split."
     },
     {
       "path": "tests/client_contracts/state_input_contracts.mjs",
-      "lines": 1890,
+      "lines": 1887,
       "reason": "Lab tool pointer contracts were extracted beside their setup-tool behavior; keep ratcheting until remaining state/input fixtures are split."
     }
   ]

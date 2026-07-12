@@ -7,6 +7,9 @@ use crate::game::firing_reveal::FiringRevealSource;
 use crate::game::fog::LingeringSightSource;
 use crate::game::map::Map;
 use crate::game::panzerfaust_shot::PanzerfaustShotStore;
+use crate::game::production_request::{
+    ProductionRequestItem, MAX_PRODUCTION_REQUESTS, MAX_REQUEST_QUANTITY,
+};
 use crate::game::replay::CommandLogEntry;
 use crate::game::SimCommand;
 use crate::rules;
@@ -62,6 +65,21 @@ pub(super) fn validate_players(
             player.upgrades.len(),
             MAX_COMPLETED_UPGRADES_PER_PLAYER,
         )?;
+        validate_count(
+            "players.productionRequests",
+            player.production_requests.len(),
+            MAX_PRODUCTION_REQUESTS,
+        )?;
+        for request in &player.production_requests {
+            if request
+                .remaining
+                .is_some_and(|remaining| remaining == 0 || remaining > MAX_REQUEST_QUANTITY)
+            {
+                return Err(CheckpointPayloadError::InvalidValue {
+                    field: "players.productionRequests.remaining",
+                });
+            }
+        }
         if player.supply_cap > config::SUPPLY_CAP_MAX {
             return Err(CheckpointPayloadError::InvalidValue {
                 field: "players.supplyCap",
@@ -88,6 +106,30 @@ pub(super) fn validate_players(
         }
     }
     Ok(ids)
+}
+
+pub(super) fn validate_production_request_references(
+    players: &[PlayerStateV1],
+    entities: &EntityStoreV1,
+) -> Result<(), CheckpointPayloadError> {
+    for player in players {
+        for request in &player.production_requests {
+            let building = match request.item {
+                ProductionRequestItem::Unit { building, .. }
+                | ProductionRequestItem::Research { building, .. } => building,
+            };
+            let valid = entities.entities.iter().any(|entity| {
+                entity.id == building && entity.owner == player.id && entity.is_building()
+            });
+            if !valid {
+                return Err(CheckpointPayloadError::InvalidReference {
+                    field: "players.productionRequests.building",
+                    id: building,
+                });
+            }
+        }
+    }
+    Ok(())
 }
 
 pub(super) fn validate_entities(

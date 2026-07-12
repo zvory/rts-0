@@ -340,6 +340,7 @@ pub struct Snapshot {
 pub struct ProductionQueueRequestView {
     pub request_kind: String,
     pub item: String,
+    pub producer_id: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub remaining: Option<u32>,
 }

@@ -75,11 +75,11 @@ export function decodeCompactSnapshot(raw) {
 }
 
 function decodeCompactProductionRequest(record, index) {
-  const fields = readArray(record, `production request ${index}`, 3);
-  if (fields.length !== 3) throw new Error(`production request ${index} field count mismatch`);
+  const fields = readArray(record, `production request ${index}`, 4);
+  if (fields.length !== 4) throw new Error(`production request ${index} field count mismatch`);
   const requestKind = fields[0];
   const item = fields[1];
-  if (!["unit", "building", "research"].includes(requestKind)) {
+  if (!["unit", "research"].includes(requestKind)) {
     throw new Error(`production request ${index} has invalid kind`);
   }
   if (typeof item !== "string" || item.length === 0 || item.length > 64) {
@@ -88,7 +88,8 @@ function decodeCompactProductionRequest(record, index) {
   return {
     requestKind,
     item,
-    remaining: fields[2] == null ? null : readU32(fields[2], `production request ${index}.remaining`),
+    producerId: readU32(fields[2], `production request ${index}.producerId`),
+    remaining: fields[3] == null ? null : readU32(fields[3], `production request ${index}.remaining`),
   };
 }
 

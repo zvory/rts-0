@@ -6,6 +6,7 @@ use super::fixtures::human_vs_ai_players;
 use super::panzerfaust_tests::{enqueue_attack, panzerfaust_fixture, player_events};
 use super::*;
 use crate::game::checkpoint::CheckpointPayloadError;
+use crate::game::production_request::{ProductionRequest, ProductionRequestItem};
 
 #[test]
 fn checkpoint_payload_round_trips_through_text_and_normalizes_output() {
@@ -19,6 +20,75 @@ fn checkpoint_payload_round_trips_through_text_and_normalizes_output() {
         &mut restored,
         "basic payload continuation after text import",
     );
+}
+
+#[test]
+fn checkpoint_payload_validates_deferred_production_requests() {
+    let mut game = Game::new_for_replay(&human_vs_ai_players(), 0x5150_2010);
+    let producer = game
+        .state
+        .entities
+        .iter()
+        .find(|entity| entity.owner == 1 && entity.kind == EntityKind::CityCentre)
+        .map(|entity| entity.id)
+        .expect("player one city centre should exist");
+    game.state.players[0]
+        .production_requests
+        .push_back(ProductionRequest::finite(
+            ProductionRequestItem::Unit {
+                building: producer,
+                unit: EntityKind::Worker,
+            },
+            1,
+        ));
+    let text = checkpoint_payload_text_for(&game, "production request validation fixture");
+
+    let zero_remaining = mutate_payload(&text, |value| {
+        value["players"][0]["productionRequests"][0]["remaining"] = serde_json::json!(0);
+    });
+    assert!(matches!(
+        Game::restore_checkpoint_payload_text_for_test(
+            &zero_remaining,
+            game.state.map.clone(),
+            game.map_metadata().clone(),
+        ),
+        Err(CheckpointPayloadError::InvalidValue {
+            field: "players.productionRequests.remaining",
+        })
+    ));
+
+    let stale_producer = mutate_payload(&text, |value| {
+        value["players"][0]["productionRequests"][0]["item"]["Unit"]["building"] =
+            serde_json::json!(999);
+    });
+    assert!(matches!(
+        Game::restore_checkpoint_payload_text_for_test(
+            &stale_producer,
+            game.state.map.clone(),
+            game.map_metadata().clone(),
+        ),
+        Err(CheckpointPayloadError::InvalidReference {
+            field: "players.productionRequests.building",
+            id: 999,
+        })
+    ));
+
+    let oversized_queue = mutate_payload(&text, |value| {
+        let request = value["players"][0]["productionRequests"][0].clone();
+        value["players"][0]["productionRequests"] = serde_json::Value::Array(vec![request; 129]);
+    });
+    assert!(matches!(
+        Game::restore_checkpoint_payload_text_for_test(
+            &oversized_queue,
+            game.state.map.clone(),
+            game.map_metadata().clone(),
+        ),
+        Err(CheckpointPayloadError::CountCapExceeded {
+            field: "players.productionRequests",
+            count: 129,
+            max: 128,
+        })
+    ));
 }
 
 #[test]

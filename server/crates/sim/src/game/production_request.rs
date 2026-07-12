@@ -15,21 +15,16 @@ pub(crate) struct ProductionRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) enum ProductionRequestItem {
-    Unit {
-        building: u32,
-        unit: EntityKind,
-    },
-    Building {
-        units: Vec<u32>,
-        building: EntityKind,
-        tile_x: u32,
-        tile_y: u32,
-        queued: bool,
-    },
-    Research {
-        building: u32,
-        upgrade: UpgradeKind,
-    },
+    Unit { building: u32, unit: EntityKind },
+    Research { building: u32, upgrade: UpgradeKind },
+}
+
+impl ProductionRequestItem {
+    pub(crate) fn producer_id(&self) -> u32 {
+        match *self {
+            Self::Unit { building, .. } | Self::Research { building, .. } => building,
+        }
+    }
 }
 
 impl ProductionRequest {

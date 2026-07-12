@@ -1107,7 +1107,8 @@ spatial indexes across later mutations.
 
 ### 3.5 Command planning and queued order semantics
 
-The production-request PoC adds a player-level scheduler alongside entity-local order queues.
+The production-request PoC adds a player-level unit/research scheduler alongside entity-local order
+queues. Construction continues to use the existing reserve-on-arrival build planner directly.
 Tech and producer compatibility are validated when a request is queued, while Steel, Oil, supply,
 producer idleness, and other execution requirements are checked when an item starts. Unpaid
 requests reserve neither resources nor supply. After one unit starts, a finite request decrements
@@ -1115,8 +1116,9 @@ and returns to the back if quantity remains; an automatic request always returns
 The scheduler may pass an unaffordable earlier request only when spending on the later request does
 not increase that earlier request's Steel or Oil deficit. Supply is excluded from this deficit
 comparison, and requests blocked for non-resource reasons do not protect a resource deficit. The
-PoC starts at most one request per player per tick. Construction requests enter the normal
-reserve-on-arrival build flow, so their resources are still charged only when construction begins.
+PoC starts at most one request per player per tick. Cancel first removes the latest unpaid request
+for that producer, then removes paid entity-local production when no request remains. Requests whose producer no
+longer exists or is no longer valid are discarded.
 
 Entrenchment research takes 30 seconds.
 

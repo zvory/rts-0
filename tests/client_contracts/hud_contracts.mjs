@@ -46,6 +46,7 @@ function commandCardCtx({
   entities = selection,
   resources = { steel: 1000, oil: 1000 },
   optimisticProduction = [],
+  productionQueue = [],
   upgrades = [],
   playerId = 1,
   commandCardMode = null,
@@ -65,6 +66,7 @@ function commandCardCtx({
     state,
     resources,
     optimisticProduction,
+    productionQueue,
     upgrades,
     commandCardMode,
     commandTarget,
@@ -665,6 +667,16 @@ function fakeHudRootWithoutResourceSpans() {
   assert(unlockedPanzerfaustCard.slots[2].cost.oil === 15, "Panzerfaust train button should show 15 oil");
   assert(unlockedPanzerfaustCard.slots[2].contextIntent.automatic, "train button should expose automatic production on right-click");
 
+  const deferredCancelCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [barracks],
+    entities: [cityCentre, barracks, completedTrainingCentre],
+    productionQueue: [{ requestKind: "unit", item: KIND.RIFLEMAN, producerId: barracks.id, remaining: 5 }],
+  }));
+  assert(
+    deferredCancelCard.slots[8]?.intent?.type === "cancelProduction",
+    "a selected producer with an unpaid request should expose cancellation",
+  );
+
   const oilBlockedPanzerfaustCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [barracks],
     entities: [cityCentre, barracks, completedTrainingCentre],
@@ -862,6 +874,24 @@ function fakeHudRootWithoutResourceSpans() {
   assert(mediumGuns && mediumGuns.enabled, "available affordable upgrade should be enabled");
   assert(mediumGuns.commandId === defaultFactionCommandId("research", UPGRADE.ANTI_TANK_GUN_UNLOCK), "research button should expose stable research identity");
   assert(mediumGuns.intent.type === "research", "upgrade button should carry research intent");
+  const queuedResearchCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [researchComplex],
+    entities: [
+      { id: 51, owner: 1, kind: KIND.CITY_CENTRE },
+      { id: 52, owner: 1, kind: KIND.TRAINING_CENTRE },
+      researchComplex,
+    ],
+    resources: { steel: 200, oil: 200 },
+    productionQueue: [{
+      requestKind: "research",
+      item: UPGRADE.ANTI_TANK_GUN_UNLOCK,
+      producerId: researchComplex.id,
+      remaining: 1,
+    }],
+  }));
+  const queuedMediumGuns = buttonByLabel(queuedResearchCard, "Medium Guns");
+  assert(queuedMediumGuns && !queuedMediumGuns.enabled, "pending research should not remain queueable");
+  assert(queuedMediumGuns.title === "Queued", "pending research should identify its queued state");
   assert(!buttonByLabel(researchCard, "Heavy Guns"), "R&D should hide Heavy Guns until Medium Guns is researched");
   assert(!buttonByLabel(researchCard, "Unlock Artillery"), "R&D should not expose a separate Artillery unlock");
 

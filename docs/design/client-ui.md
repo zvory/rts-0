@@ -1256,7 +1256,8 @@ multi-building selection spreads requests across its producers. Normal click req
 Shift-click requests five, and right-click creates an automatic infinite request. Tech-valid
 commands remain clickable without current resources or supply. A compact, background-free,
 pointer-transparent queue readout is always present at the upper-left and renders up to six
-recipient-owned requests from `GameState.productionQueue`. Train and production-cancel
+recipient-owned requests from `GameState.productionQueue`. Selecting a producer with an unpaid
+request exposes the normal Cancel command. Train and production-cancel
 hotkeys honor native keyboard repeat: after the OS repeat delay, repeated `keydown` events activate
 only those repeatable command-card buttons. Research buttons that unlock production appear directly
 below the production button they unlock and disappear once complete. Cancel walks selected producing

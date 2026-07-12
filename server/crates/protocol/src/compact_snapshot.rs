@@ -175,6 +175,7 @@ impl Serialize for CompactSnapshot<'_> {
                         (
                             request.request_kind.as_str(),
                             request.item.as_str(),
+                            request.producer_id,
                             request.remaining,
                         )
                     })

@@ -77,6 +77,7 @@ fn apply_with_players_and_smokes(
         &mut events,
         1,
     );
+    crate::game::services::production_queue::run_scheduler(entities, players);
     events
 }
 

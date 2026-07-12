@@ -46,6 +46,7 @@ const SERVICE_ROLES: &[(&str, ServiceRole)] = &[
     ("pathing", ServiceRole::QueryIndex),
     ("production", ServiceRole::TickSystem),
     ("production_queue", ServiceRole::TickSystem),
+    ("production_requests", ServiceRole::MutationHelper),
     ("scout_plane", ServiceRole::MutationHelper),
     ("spatial", ServiceRole::QueryIndex),
     ("standability", ServiceRole::QueryIndex),
@@ -65,7 +66,6 @@ const ROLE_EDGE_ALLOWLIST: &[(&str, &str)] = &[
     // broad adapter dependency requires a named exception instead of inheriting a blanket bypass.
     ("commands", "construction"),
     ("commands", "movement"),
-    ("commands", "production_queue"),
     ("order_queue", "construction"),
     ("order_queue", "movement"),
 ];
@@ -93,7 +93,10 @@ const PLAYER_STATE_FIELD_WRITE_APPROVED_PATHS: &[&str] = &["player_state.rs"];
 const PLAYER_STATE_FIELDS: &[&str] = &["steel", "oil", "supply_used", "supply_cap", "score"];
 
 const ALLOWED_SERVICE_IMPORTS: &[(&str, &[&str])] = &[
-    ("ability_orders", &["commands", "move_coordinator", "world_query"]),
+    (
+        "ability_orders",
+        &["commands", "move_coordinator", "world_query"],
+    ),
     (
         "combat",
         &[
@@ -115,7 +118,7 @@ const ALLOWED_SERVICE_IMPORTS: &[(&str, &[&str])] = &[
             "movement",
             "order_execution",
             "order_planner",
-            "production_queue",
+            "production_requests",
             "scout_plane",
             "spatial",
             "standability",
@@ -167,8 +170,17 @@ const ALLOWED_SERVICE_IMPORTS: &[(&str, &[&str])] = &[
         ],
     ),
     ("pathing", &["occupancy", "standability"]),
-    ("production", &["move_coordinator", "occupancy", "pathing", "scout_plane", "standability"]),
-    ("production_queue", &["move_coordinator", "standability", "world_query"]),
+    (
+        "production",
+        &[
+            "move_coordinator",
+            "occupancy",
+            "pathing",
+            "scout_plane",
+            "standability",
+        ],
+    ),
+    ("production_requests", &["world_query"]),
     ("standability", &["geometry", "occupancy", "spatial"]),
     ("world_query", &["spatial"]),
 ];

@@ -12,13 +12,16 @@ export function selectedProducerBuildingsForUnit(ctx, unit, isOwn, factionTrains
 }
 
 export function selectedProducingBuildingsForKind(ctx, kind, isOwn) {
+  const queuedProducerIds = new Set(
+    (ctx.productionQueue || []).map((request) => request?.producerId),
+  );
   return (ctx.selection || []).filter(
     (e) =>
       isOwn(ctx, e) &&
       e.kind === kind &&
       isBuilding(e.kind) &&
       e.buildProgress == null &&
-      ((e.prodQueue ?? 0) > 0 || e.state === STATE.TRAIN),
+      ((e.prodQueue ?? 0) > 0 || e.state === STATE.TRAIN || queuedProducerIds.has(e.id)),
   );
 }
 
@@ -55,6 +58,7 @@ export function researchAvailability(ctx, upgrade, resources, isOwn) {
   if (!def) return "locked";
   if (def.replacesUpgrade && !(ctx.upgrades || []).includes(def.replacesUpgrade)) return "locked";
   if ((ctx.upgrades || []).includes(upgrade)) return "locked";
+  if (hasQueuedResearch(ctx, upgrade)) return "locked";
   if (selectedProducingBuildingsForKind(ctx, def.researchedAt, isOwn)
     .some((e) => e.prodUpgrade === upgrade)) return "locked";
   if (def.requiresUpgrade && !(ctx.upgrades || []).includes(def.requiresUpgrade)) return "locked";
@@ -68,6 +72,7 @@ export function researchDisabledReason(ctx, upgrade, resources, isOwn) {
     return def.requiresText || `Requires ${UPGRADES[def.replacesUpgrade]?.label || def.replacesUpgrade}`;
   }
   if ((ctx.upgrades || []).includes(upgrade)) return "Researched";
+  if (hasQueuedResearch(ctx, upgrade)) return "Queued";
   if (selectedProducingBuildingsForKind(ctx, def.researchedAt, isOwn)
     .some((e) => e.prodUpgrade === upgrade)) return "Researching";
   if (def.requiresUpgrade && !(ctx.upgrades || []).includes(def.requiresUpgrade)) {
@@ -75,6 +80,12 @@ export function researchDisabledReason(ctx, upgrade, resources, isOwn) {
   }
   if (!affordable(def.cost, resources)) return "Not enough resources";
   return "";
+}
+
+function hasQueuedResearch(ctx, upgrade) {
+  return (ctx.productionQueue || []).some(
+    (request) => request?.requestKind === "research" && request.item === upgrade,
+  );
 }
 
 export function trainLimitSignature(ctx, unit, isOwn) {

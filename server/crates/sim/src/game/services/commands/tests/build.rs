@@ -40,7 +40,7 @@ fn build_order_can_start_when_worker_inside_intent_but_stages_outside() {
         &mut firing_reveals,
         normal_pending(vec![(
             1,
-            SimCommand::Build {
+            SimCommand::QueueBuild {
                 units: vec![worker],
                 building: EntityKind::CityCentre,
                 tile_x: 4,
@@ -593,7 +593,7 @@ fn queued_build_prefers_idle_worker_over_closer_active_builder() {
         &mut entities,
         vec![(
             1,
-            SimCommand::Build {
+            SimCommand::QueueBuild {
                 units: vec![west, east],
                 building: EntityKind::CityCentre,
                 tile_x: 9,

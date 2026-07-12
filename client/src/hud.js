@@ -262,7 +262,7 @@ export class HUD {
     if (!root) return;
     const queue = Array.isArray(this.state?.productionQueue) ? this.state.productionQueue : [];
     const signature = queue
-      .map((request) => `${request.requestKind}:${request.item}:${request.remaining ?? "auto"}`)
+      .map((request) => `${request.requestKind}:${request.item}:${request.producerId}:${request.remaining ?? "auto"}`)
       .join("|");
     if (signature === this._productionQueueSig) return;
     this._productionQueueSig = signature;
@@ -438,6 +438,7 @@ export class HUD {
       resources: this._commandResources(commandOwner),
       optimisticProduction: this.state.optimisticProduction || [],
       upgrades: this._commandUpgrades(commandOwner),
+      productionQueue: this.state.productionQueue || [],
       commandCardMode: this._intent()?.commandCardMode,
       commandTarget: this._intent()?.commandTarget,
       controlPolicy: this.controlPolicy,
@@ -694,7 +695,8 @@ export class HUD {
         e.kind === kind &&
         isBuilding(e.kind) &&
         e.buildProgress == null &&
-        ((e.prodQueue ?? 0) > 0 || e.state === STATE.TRAIN),
+        ((e.prodQueue ?? 0) > 0 || e.state === STATE.TRAIN ||
+          (this.state.productionQueue || []).some((request) => request.producerId === e.id)),
     );
   }
 

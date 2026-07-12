@@ -1,5 +1,169 @@
 use super::*;
 
+fn completed_producer(map: &Map, entities: &mut EntityStore, kind: EntityKind, tile_x: u32) -> u32 {
+    let (x, y) = footprint_center(map, kind, tile_x, 6);
+    entities
+        .spawn_building(1, kind, x, y, true)
+        .expect("producer should spawn")
+}
+
+#[test]
+fn deferred_unit_request_starts_once_and_rotates_remaining_quantity() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    completed_producer(&map, &mut entities, EntityKind::CityCentre, 4);
+    let barracks = completed_producer(&map, &mut entities, EntityKind::Barracks, 10);
+    let mut players = vec![player_state(1), player_state(2)];
+
+    apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(
+            1,
+            SimCommand::QueueTrain {
+                building: barracks,
+                unit: EntityKind::Rifleman,
+                quantity: 2,
+                automatic: false,
+            },
+        )],
+    );
+
+    assert_eq!(entities.get(barracks).unwrap().prod_queue().len(), 1);
+    assert_eq!(players[0].production_requests.len(), 1);
+    assert_eq!(players[0].production_requests[0].remaining, Some(1));
+}
+
+#[test]
+fn cancel_removes_an_unpaid_request_for_the_selected_producer() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    completed_producer(&map, &mut entities, EntityKind::CityCentre, 4);
+    let barracks = completed_producer(&map, &mut entities, EntityKind::Barracks, 10);
+    let mut players = vec![player_state(1), player_state(2)];
+    players[0].set_resources(0, 1_000);
+
+    apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(
+            1,
+            SimCommand::QueueTrain {
+                building: barracks,
+                unit: EntityKind::Rifleman,
+                quantity: 5,
+                automatic: false,
+            },
+        )],
+    );
+    assert_eq!(players[0].production_requests.len(), 1);
+
+    apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(1, SimCommand::Cancel { building: barracks })],
+    );
+    assert!(players[0].production_requests.is_empty());
+}
+
+#[test]
+fn cancel_stops_automatic_request_without_scheduler_restarting_it() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    completed_producer(&map, &mut entities, EntityKind::CityCentre, 4);
+    let barracks = completed_producer(&map, &mut entities, EntityKind::Barracks, 10);
+    let mut players = vec![player_state(1), player_state(2)];
+
+    apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(
+            1,
+            SimCommand::QueueTrain {
+                building: barracks,
+                unit: EntityKind::Rifleman,
+                quantity: 1,
+                automatic: true,
+            },
+        )],
+    );
+    assert_eq!(entities.get(barracks).unwrap().prod_queue().len(), 1);
+    assert_eq!(players[0].production_requests.len(), 1);
+
+    apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(1, SimCommand::Cancel { building: barracks })],
+    );
+
+    assert!(players[0].production_requests.is_empty());
+    assert_eq!(
+        entities.get(barracks).unwrap().prod_queue().len(),
+        1,
+        "canceling automatic mode should leave the already-paid unit in production"
+    );
+}
+
+#[test]
+fn destroyed_producer_drops_its_deferred_requests() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    completed_producer(&map, &mut entities, EntityKind::CityCentre, 4);
+    let barracks = completed_producer(&map, &mut entities, EntityKind::Barracks, 10);
+    let mut players = vec![player_state(1), player_state(2)];
+    players[0].set_resources(0, 1_000);
+
+    apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(
+            1,
+            SimCommand::QueueTrain {
+                building: barracks,
+                unit: EntityKind::Rifleman,
+                quantity: 1,
+                automatic: false,
+            },
+        )],
+    );
+    entities.remove(barracks);
+    apply_with_players(&map, &mut entities, &mut players, Vec::new());
+
+    assert!(players[0].production_requests.is_empty());
+}
+
+#[test]
+fn duplicate_automatic_request_is_rejected() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    completed_producer(&map, &mut entities, EntityKind::CityCentre, 4);
+    let barracks = completed_producer(&map, &mut entities, EntityKind::Barracks, 10);
+    let mut players = vec![player_state(1), player_state(2)];
+    players[0].set_resources(0, 1_000);
+    let automatic = SimCommand::QueueTrain {
+        building: barracks,
+        unit: EntityKind::Rifleman,
+        quantity: 1,
+        automatic: true,
+    };
+
+    let events = apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(1, automatic.clone()), (1, automatic)],
+    );
+
+    assert_eq!(players[0].production_requests.len(), 1);
+    assert_notice(&events, 1, "Already queued automatically");
+}
+
 #[test]
 fn support_weapon_and_tank_training_require_finished_unlock_upgrades() {
     let map = flat_map(24);

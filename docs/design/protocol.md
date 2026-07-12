@@ -115,10 +115,10 @@ the transport envelope only and is intentionally absent from replay/simulation c
 | `build`      | `units: u32[]`, `building: string`, `tileX: u32`, `tileY: u32`, `queued?: bool` | Selected workers construct a building at a tile. The server allocates one compatible worker per build click, first walks that worker to a nearby point outside the requested footprint, then starts construction once it is in range. `building` ∈ building kinds. `pump_jack` is a contextual worker build that is valid only when its footprint overlaps a live oil node. When `queued` is true, store future build intent instead of replacing the active order. |
 | `train`      | `building: u32`, `unit: string` | Queue a unit at a production building. |
 | `research`   | `building: u32`, `upgrade: string` | Queue a permanent player upgrade at a tech building. Current Kriegsia upgrade ids: `methamphetamines` and `entrenchment` at the Training Centre; `anti_tank_gun_unlock` (Medium Guns), `ballistic_tables`, `tank_unlock`, `command_car_unlock`, `mortar_autocast`, `smoke_plus`, and `artillery_unlock` (Heavy Guns) at the R&D Complex (`research_complex`). `anti_tank_gun_unlock` unlocks Anti-Tank Gun training; `artillery_unlock` requires completed `anti_tank_gun_unlock` and unlocks Artillery training. `ballistic_tables` requires completed `artillery_unlock`; `command_car_unlock` requires completed `tank_unlock`. `smoke_plus` doubles Scout Car Smoke radius and duration. |
-| `queueBuild` | `units: u32[]`, `building: string`, `tileX: u32`, `tileY: u32`, `queued?: bool` | Add one tech-valid construction request to the player scheduler. Construction remains unpaid until the worker reaches the site and construction can begin. |
+| `queueBuild` | `units: u32[]`, `building: string`, `tileX: u32`, `tileY: u32`, `queued?: bool` | Deferred-cost build command used by the production-request UI. It follows the normal build planner, including worker allocation and Shift-queued order semantics; construction remains unpaid until a worker reaches the site. |
 | `queueTrain` | `building: u32`, `unit: string`, `quantity: u32`, `automatic?: bool` | Add a tech-valid unit request. Quantity is clamped to 1–1000; `automatic` makes it infinite. Missing resources or supply do not reject the request. |
 | `queueResearch` | `building: u32`, `upgrade: string` | Add one tech-valid research request without reserving resources. Duplicate, completed, or prerequisite-locked research is rejected. |
-| `cancel`     | `building: u32` | Cancel the latest item in a building's production queue. |
+| `cancel`     | `building: u32` | Cancel the latest unpaid player request for a producer, or the latest paid item in that building's production queue when no request remains. |
 | `stop`       | `units: u32[]` | Clear orders and return selected units to ordinary idle behavior. |
 | `holdPosition` | `units: u32[]` | Clear active and queued unit orders, then stand ground. Held units do not chase or path to auto-acquire enemies; they still fire at enemies already in weapon range and can still be pushed by collision resolution. |
 | `setRally`   | `building: u32`, `x: f32`, `y: f32`, `kind?: "move"|"attackMove"`, `queued?: bool` | Set or append a unit-producing building rally stage. `kind` defaults to `"move"` on the wire. Freshly produced units receive the building's rally plan as active + queued orders; plain move rally stages become attack-move orders for ordinary combat units, while worker-like gatherers keep plain move orders. The building prefers the spawn exit nearest the first stage. Ignored for buildings the player doesn't own, non-producers (depot, training centre, research_complex), or buildings still under construction. Points are clamped into map bounds. When `queued` is true, append until the four-stage building rally cap is reached; otherwise replace the whole rally plan. |
@@ -592,7 +592,7 @@ transport decode:
   events: Event[],               // transient things to surface (see 2.5)
   upgrades?: string[],           // completed permanent upgrades for this recipient
   playerResources?: {id, steel, oil, supplyUsed, supplyCap}[], // projected players; observer modes only
-  productionQueue?: {requestKind:"unit"|"building"|"research", item:string, remaining?:u32}[], // recipient-owned requests; missing remaining means automatic
+  productionQueue?: {requestKind:"unit"|"research", item:string, producerId:u32, remaining?:u32}[], // recipient-owned requests; missing remaining means automatic
   netStatus: {                // per-recipient server-side health for the current match
     serverLagMs: u16,         // how late this room started the tick vs its scheduled time
     tickMs: u16,              // elapsed room-tick work so far when this snapshot was built
@@ -702,7 +702,7 @@ adds an explicit application compression envelope.
   "mb": [[id, owner, kind, x, y, [[tileX, tileY], ...], observedTick]], // rememberedBuildings; omitted when empty
   "ev": [EventRecord],            // omitted when empty
   "pr": [[id, steel, oil, supplyUsed, supplyCap]], // projected observer playerResources; omitted when empty
-  "q": [[requestKind, item, remainingOrNull]], // recipient-owned production requests; omitted when empty
+  "q": [[requestKind, item, producerId, remainingOrNull]], // recipient-owned production requests; omitted when empty
   "n": [serverLagMs, tickMs, flags, slowTickCount, headOfLineCount,
         predictionVersion?, lastSimConsumedClientSeq?, lastSimConsumedClientTick?]
 }

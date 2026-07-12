@@ -24,6 +24,7 @@ pub mod order_queue;
 pub mod pathing;
 pub mod production;
 pub mod production_queue;
+pub mod production_requests;
 pub(in crate::game) mod scout_plane;
 pub mod spatial;
 pub mod standability;
