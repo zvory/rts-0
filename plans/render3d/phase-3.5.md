@@ -6,7 +6,7 @@
 
 ## Depends On
 
-- Phase 3 merged with the least-privilege RendererFrame, immutable grids, and layer descriptors.
+- Phase 3 merged with the least-privilege PresentationFrameV1, immutable grids, and layer descriptors.
 
 ## Objective
 
@@ -17,7 +17,7 @@ normalization begins.
 
 ## Work
 
-- Provide a narrow named Pixi compatibility adapter that consumes `RendererFrame` and may expose
+- Provide a narrow named Pixi compatibility adapter that consumes `PresentationFrameV1` and may expose
   only an exact allowlist of temporary legacy reads frozen in Phase 0. Babylon code can never import
   or receive this adapter.
 - Change `Match`/frame orchestration to assemble once, then call only `backend.render(frame)`.
