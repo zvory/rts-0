@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
+import { installFakePixi } from "./pixi_fakes.mjs";
 import { TERRAIN } from "../../client/src/protocol.js";
 import { createMapHandoff } from "../../client/src/map_editor_handoff.js";
 import { mapEditorLaunchConfig } from "../../client/src/map_editor_launch.js";
@@ -60,6 +61,86 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
     } },
   });
   assert.equal(session.materialized().baseSites.length, 2, "checkpoint scenario expansion sites migrate into flat base sites");
+}
+
+{
+  const draft = authoredMapFromMaterialized({
+    name: "Moved symmetric base", description: "", size: 32,
+    terrain: Array(32 * 32).fill(TERRAIN.GRASS),
+    starts: [{ x: 8, y: 8 }],
+    baseSites: [{ x: 8, y: 8 }, { x: 8, y: 12 }, { x: 8, y: 19 }],
+  });
+  const result = moveSymmetricDraftLocation(draft, {
+    kind: "base", locationIndex: 1, tile: { x: 10, y: 12 }, symmetry: MAP_EDITOR_SYMMETRY.HORIZONTAL,
+  });
+  assert.deepEqual(result, { ok: true, count: 1, removed: 1 });
+  assert.deepEqual(draft.baseSites, [{ x: 8, y: 8 }, { x: 10, y: 12 }],
+    "a symmetric base move removes its matching neutral base instead of relocating it");
+}
+
+{
+  const draft = authoredMapFromMaterialized({
+    name: "Unmoved symmetric base", description: "", size: 32,
+    terrain: Array(32 * 32).fill(TERRAIN.GRASS),
+    starts: [{ x: 8, y: 8 }],
+    baseSites: [{ x: 8, y: 8 }, { x: 8, y: 12 }, { x: 8, y: 19 }],
+  });
+  const before = structuredClone(draft);
+  const result = moveSymmetricDraftLocation(draft, {
+    kind: "base", locationIndex: 1, tile: { x: 8, y: 12 }, symmetry: MAP_EDITOR_SYMMETRY.HORIZONTAL,
+  });
+  assert.deepEqual(result, { ok: true, count: 0 });
+  assert.deepEqual(draft, before, "an unchanged base move never removes its symmetric counterpart");
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
+  session.loadAuthoredMap(authoredMapFromMaterialized({
+    name: "Reselected symmetric base", description: "", size: 32,
+    terrain: Array(32 * 32).fill(TERRAIN.GRASS),
+    starts: [{ x: 8, y: 8 }],
+    baseSites: [{ x: 8, y: 8 }, { x: 8, y: 12 }, { x: 8, y: 19 }, { x: 14, y: 14 }],
+  }));
+  const viewport = {
+    session,
+    tool: { kind: "base", locationIndex: 2, add: false, symmetry: MAP_EDITOR_SYMMETRY.HORIZONTAL },
+    selectedBaseIndex: 2,
+    setSelectedBase(index) { this.selectedBaseIndex = index; },
+    onStatus() {},
+  };
+  MapEditorViewport.prototype.applySiteTool.call(viewport, { x: 10, y: 19 });
+  assert.equal(viewport.selectedBaseIndex, 1,
+    "removing an earlier symmetric base keeps the moved base selected by its new backing index");
+}
+
+{
+  const viewport = {
+    selectedBaseIndex: null,
+    redraws: 0,
+    drawOverlay() { this.redraws += 1; },
+  };
+  MapEditorViewport.prototype.setSelectedBase.call(viewport, 7);
+  MapEditorViewport.prototype.setSelectedBase.call(viewport, 7);
+  MapEditorViewport.prototype.setSelectedBase.call(viewport, null);
+  assert.equal(viewport.redraws, 2, "base selection redraws the editor overlay only when it changes");
+
+  const restorePixi = installFakePixi();
+  try {
+    const overlay = {
+      calls: [],
+      lineStyle(...args) { this.calls.push(["lineStyle", ...args]); return this; },
+      drawCircle(...args) { this.calls.push(["drawCircle", ...args]); return this; },
+      beginFill(...args) { this.calls.push(["beginFill", ...args]); return this; },
+      endFill(...args) { this.calls.push(["endFill", ...args]); return this; },
+    };
+    const feedback = new PIXI.Container();
+    const siteViewport = { overlay, labels: [], renderer: { layers: { feedback } } };
+    MapEditorViewport.prototype.drawSite.call(siteViewport, { x: 10, y: 12 }, 0xf4c542, 7, "B1", true);
+    assert(overlay.calls.some((call) => call[0] === "drawCircle" && call[3] === 13),
+      "the selected base gets a larger map highlight ring");
+  } finally {
+    restorePixi();
+  }
 }
 
 {

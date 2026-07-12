@@ -372,6 +372,25 @@ export function moveSymmetricDraftLocation(draft, {
     });
   }
   if (!plans.length) return { ok: true, count: 0 };
+  if (kind === "base") {
+    const selected = plans[0];
+    if (sameLocation(selected.from, selected.to)) return { ok: true, count: 0 };
+    const corresponding = plans.slice(1);
+    if (corresponding.some((plan) => plan.startIndex >= 0)) {
+      return draftEditError("A matching start location cannot be removed.");
+    }
+    const removedIndexes = new Set(corresponding.map((plan) => plan.index));
+    const occupied = draft.baseSites.find((candidate, index) => (
+      index !== selected.index
+      && !removedIndexes.has(index)
+      && sameLocation(candidate, selected.to)
+    ));
+    if (occupied) return draftEditError("A base already uses that tile.");
+    draft.baseSites[selected.index] = copyLocation(selected.to);
+    if (selected.startIndex >= 0) draft.startLocations[selected.startIndex] = copyLocation(selected.to);
+    for (const index of [...removedIndexes].sort((a, b) => b - a)) draft.baseSites.splice(index, 1);
+    return { ok: true, count: 1, removed: corresponding.length };
+  }
   const plannedCoordinates = new Set(plans.map((plan) => locationKey(plan.from)));
   const targets = new Set();
   for (const plan of plans) {

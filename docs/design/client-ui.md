@@ -726,7 +726,8 @@ There is no active layout, player slot, or per-player natural assignment. The vi
 markers and neutral base markers over the shared Pixi terrain and owns editor-only pan/zoom/paint/site input. Terrain tools support brush
 and inclusive drag-box fills, plus none, horizontal, vertical, half-turn, four-way radial, or either
 single-diagonal symmetry; grass is the erase material. Symmetry expands every terrain tile before it is
-painted, moves matching flat locations, and adds all symmetric locations. The viewport draws the selected
+painted, moves matching start locations, removes matching neutral base locations when moving a selected base,
+and adds all symmetric locations. The selected neutral base has a pale map ring. The viewport draws the selected
 centre axis, a centre marker for half-turn symmetry, a cross for radial symmetry, or the selected diagonal.
 A terrain pointer stroke clones once for undo,
 mutates rows in place, records dirty tiles, and commits once. The renderer patches those tiles plus their

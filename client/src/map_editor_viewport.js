@@ -52,6 +52,7 @@ export class MapEditorViewport {
     });
     this.tool = null;
     this.symmetry = MAP_EDITOR_SYMMETRY.NONE;
+    this.selectedBaseIndex = null;
     this.paintPointerId = null;
     this.panPointerId = null;
     this.lastPointer = null;
@@ -97,6 +98,13 @@ export class MapEditorViewport {
     this.symmetry = Object.values(MAP_EDITOR_SYMMETRY).includes(symmetry)
       ? symmetry
       : MAP_EDITOR_SYMMETRY.NONE;
+    this.drawOverlay();
+  }
+
+  setSelectedBase(locationIndex) {
+    const index = Number.isInteger(locationIndex) && locationIndex >= 0 ? locationIndex : null;
+    if (this.selectedBaseIndex === index) return;
+    this.selectedBaseIndex = index;
     this.drawOverlay();
   }
 
@@ -156,7 +164,9 @@ export class MapEditorViewport {
     }
     const locations = this.session.mapOverlay();
     for (const start of locations?.starts || []) this.drawSite(start, 0x4ec9ff, 11, `S${start.index + 1}`);
-    for (const [index, base] of (locations?.bases || []).entries()) this.drawSite(base, 0xf4c542, 7, `B${index + 1}`);
+    for (const [index, base] of (locations?.bases || []).entries()) {
+      this.drawSite(base, 0xf4c542, 7, `B${index + 1}`, base.index === this.selectedBaseIndex);
+    }
     this.drawPaintPreview();
   }
 
@@ -170,9 +180,13 @@ export class MapEditorViewport {
     this.overlay.beginFill(terrainPreviewColor(this.tool.terrain), 0.16).drawRect(x0, y0, width, height).endFill();
   }
 
-  drawSite(site, color, radius, labelText) {
+  drawSite(site, color, radius, labelText, selected = false) {
     const x = (site.x + 0.5) * TILE_SIZE;
     const y = (site.y + 0.5) * TILE_SIZE;
+    if (selected) {
+      this.overlay.lineStyle(2, 0xfff4ba, 0.96);
+      this.overlay.drawCircle(x, y, radius + 6);
+    }
     this.overlay.lineStyle(3, 0x101418, 0.9);
     this.overlay.beginFill(color, 0.82).drawCircle(x, y, radius).endFill();
     const label = new PIXI.Text(labelText, {
@@ -293,9 +307,14 @@ export class MapEditorViewport {
         });
       if (result?.ok) protectDraftBaseTerrain(draft);
     });
+    if (changed && tool.kind === "base" && !tool.add) {
+      const selectedBase = this.session.mapOverlay()?.bases.find((base) => base.x === tile.x && base.y === tile.y);
+      this.setSelectedBase(selectedBase?.index ?? null);
+    }
     const extra = Math.max(0, Number(result?.count || 1) - 1);
+    const removed = Math.max(0, Number(result?.removed || 0));
     this.onStatus(
-      changed ? `${label}${extra ? ` and ${extra} symmetric location${extra === 1 ? "" : "s"}` : ""}.` : result?.error || "No map change.",
+      changed ? `${label}${extra ? ` and ${extra} symmetric location${extra === 1 ? "" : "s"}` : ""}${removed ? ` and removed ${removed} corresponding base${removed === 1 ? "" : "s"}` : ""}.` : result?.error || "No map change.",
       !changed,
     );
   }
