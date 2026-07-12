@@ -1,10 +1,23 @@
 # Client rendering architecture
 
-This document is the durable contract for renderer-neutral camera, selection, presentation,
-capture, backend lifecycle, asset, ownership, and performance work. The existing Pixi module
-catalog and current look remain authoritative in [client-ui.md](client-ui.md); this document owns
-the boundary that allows another world renderer without duplicating gameplay authority. Backend
-status and gate evidence live in the active [rendering parity ledger](rendering-parity.md).
+This document is the durable contract for renderer-neutral camera, selection, and presentation
+boundaries. The existing Pixi module catalog and current look remain authoritative in
+[client-ui.md](client-ui.md); this document owns the boundary that allows another world renderer
+without duplicating gameplay authority. Actual backend status lives in the active
+[rendering parity ledger](rendering-parity.md).
+
+## Pre-alpha delivery override
+
+The active work is the two-phase opt-in experiment in
+[`plans/render3d/`](../../plans/render3d/plan.md): a small Babylon kernel followed by a playable
+fogged vertical slice and a user playtest. The binding contracts for that work are the boundary in
+Sections 1 through 4 plus its focused phase files. Do not require event capture, asset pipelines,
+registries, benchmark programs, vegetation, shadows, exhaustive parity, or default-cutover
+evidence before that experiment.
+
+Appendix A records the retired production-migration proposal so existing compatibility names can
+be understood. It is historical context only: it creates no phase, acceptance gate, or implementation
+requirement, and it must not be used by a phase runner to infer future work.
 
 ## 1. Scope and non-negotiable boundary
 
@@ -318,7 +331,8 @@ relationship, team color, and ground/selection/HP anchors before the boundary. `
 remembered-building, and shot-reveal inputs become distinct `belowFogIntel`, `rememberedWorld`,
 and `aboveFogReveal` records; selection proxies and their `interaction` records never enter the
 frame. Current feedback is detached into typed layer records but intentionally has no normalized
-event identity or retained lifetime yet; Phase 4 owns that event contract.
+event identity or retained lifetime. Add a small event contract only if an implemented effect or
+capture need requires it.
 
 Terrain, visible, and explored grids use `GridSnapshotV1` closures over private `Uint8Array`
 copies. The cache key is revision plus dimensions, so an unchanged revision returns the same
@@ -346,15 +360,38 @@ Back-to-front ids are exact and permanent:
 Every descriptor has exactly `{id, order, space, visibilityPolicy, depthPolicy}`. `space` is
 `world` or `screen`; `visibilityPolicy` is `static`, `alreadyFiltered`, `remembered`, `intel`,
 `fogMask`, `reveal`, or `local`; `depthPolicy` is `ground`, `world`, `overlay`, or `screen`.
-Later phases may add optional, namespaced metadata but may not rename/reorder ids or weaken their
-visibility policy. Event kinds are assigned to one descriptor in Phase 4.
+Later work may add optional, namespaced metadata but may not rename/reorder ids or weaken their
+visibility policy. An event kind is assigned to one descriptor only when that event is implemented.
 
 The descriptors are exported from `presentation/layers.js` as frozen records with exactly the five
 fields above. `scripts/check-client-architecture.mjs` classifies the presentation area separately,
 forbids imports from transport, UI, or renderer internals, and rejects engine, socket, mutable
 state, or mutable intent runtime references in that area.
 
-## 5. Presentation events and deterministic capture
+## 5. Pre-alpha Babylon path
+
+Phase 4 adds only an explicit Babylon selector, one renderer-owned scene/canvas, a fixed
+perspective adapter fed by `PresentationFrameV1`, and a single world-to-scene helper. It may render
+static ground and generic primitives in Lab; it does not need a GLB pipeline, generalized resource
+registry, or deterministic effect capture.
+
+Phase 5 adds only authoritative current/explored fog, generic visible entities, semantic
+selection/marquee/ground move, basic feedback, and one real two-recipient no-leak assertion. An
+explicit live/Lab Babylon route then earns a user playtest. Pixi remains default; replay,
+spectator, effect, asset, and performance work wait for a concrete observed need.
+
+The minimal backend rule is simple: the backend owns one canvas/engine/scene, renders only when
+`Match` calls it, and destroys those resources idempotently. An entity may not dispose a shared
+backend resource. Add cancellation, pooling, shared-asset accounting, or more elaborate lifecycle
+machinery only with an actual asynchronous/shared-resource failure to solve.
+
+## Appendix A. Retired production-migration details
+
+The material below was part of a superseded 16-phase production-foundations proposal. It remains
+only as historical explanation for names already present in the Pixi compatibility adapter. It is
+non-normative and must not delay or expand the pre-alpha path above.
+
+### A.1 Presentation events and deterministic capture
 
 Normalized events are detached records:
 
@@ -384,7 +421,7 @@ detached selection of retained events. Synthetic time is applied only to that de
 Live admission always uses the live visual clock; network, input, audio, health, timeouts, and
 server ticks remain real. Capture never patches `performance.now()` or starts another rAF.
 
-## 6. Backend selection and lifecycle
+### A.2 Backend selection and lifecycle
 
 The selector is exactly `rtsRenderer=pixi|babylon`. Missing means `pixi`; any other value is an
 actionable pre-join error. It is not persisted. Babylon requires WebGL 2 and is prepared before an
@@ -423,7 +460,7 @@ data only. Late asset/effect completions check backend generation and destructio
 stale completions release only what they created. Destroy during load/capture invalidates tokens,
 restores/suppresses rAF as appropriate, and leaves no canvas/context/listener.
 
-## 7. Resource ownership and teardown
+### A.3 Resource ownership and teardown
 
 The parent scope is the only default disposer. Children release references/instances upward and
 never call disposal on a shared dependency.
@@ -448,9 +485,9 @@ instances, decal canvas/texture, cached adjusted textures, atlas/frame-strip loa
 selection and placement graphics, and the screen drag graphic. Raw Pixi asset-cache textures are
 shared dependencies and are not destroyed by adjusted-texture teardown.
 
-## 8. Current-main inventory and migration ownership
+### A.4 Current-main inventory and migration ownership
 
-### 8.1 Raw camera representation consumers
+#### A.4.1 Raw camera representation consumers
 
 | Surface | Current dependency | Owner phase |
 | --- | --- | --- |
@@ -473,7 +510,7 @@ architecture ratchet has no shared-consumer allowlist: any raw representation re
 UI, input, minimap, audio, Lab, replay, observer, capture, or diagnostics fails. Phase 2 replaces
 selection's remaining orthographic interaction assumptions without reopening this representation.
 
-### 8.2 Current Pixi presentation catalog
+#### A.4.2 Current Pixi presentation catalog
 
 The implementation order in `renderer/layers.js` maps to the semantic contract as follows:
 
@@ -499,7 +536,7 @@ reveals, smoke, abilities, attacks/projectiles/impacts/muzzle flashes, Panzerfau
 feedback, command/placement feedback, observer/Lab diagnostics, visual samples, capture readiness,
 soft render diagnostics, resize, reset, and teardown. Placeholder coverage is not parity.
 
-### 8.3 Current lifecycle and capture dependencies
+#### A.4.3 Current lifecycle and capture dependencies
 
 `Match` constructs `GameState`, `ClientIntent`, `Camera`, the Pixi presentation adapter/renderer,
 `Fog`, HUD, input router,
@@ -536,7 +573,7 @@ toast sampling uses the visual clock; snapshots, health, profiler admission, inp
 timeouts remain real. Phase 5 must stop synthetic capture time from entering live state, pin frame
 and grid revisions, retain authorized real events, and add no-tick-step event capture.
 
-## 9. Asset and representative-fixture policy
+### A.5 Asset and representative-fixture policy
 
 Assets are same-origin, manifest-declared, checksum-validated, and bounded before GPU creation.
 Malformed/missing assets use an explicit generic placeholder and diagnostic; they cannot change
@@ -561,7 +598,7 @@ satisfies both, that map is an actionable bounded backend incompatibility rather
 clamp or Pixi fallback. Phase 13 owns fixture generation and final manifest values, not the scale
 input dimensions.
 
-## 10. Reproducible benchmark contracts
+### A.6 Reproducible benchmark contracts
 
 The committed schema will live at `scripts/rendering-benchmark.schema-v1.json`; generated reports
 live only under `target/rendering-benchmarks/`. Every scenario uses authoritative Lab Interact
@@ -608,7 +645,7 @@ are `0/.30/.60/1.00`; shadow starting caps are `0/0/never`, `512/32/every 4th fr
 `1024/64/every 2nd frame`, and `2048/128/every frame`. Later measurement may only reduce optional
 work without a reviewed plan.
 
-## 11. Historical PoC leads
+### A.7 Historical PoC leads
 
 The deleted proof-of-concept implementation is intentionally unavailable and must not be recovered
 from Git history, reflogs, caches, old worktrees, PR patches, artifacts, or another clone. Its only
