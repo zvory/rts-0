@@ -2,9 +2,10 @@
 
 `client/` (ES modules, no bundler; `index.html` imports `src/main.js` as a module).
 PixiJS is loaded globally from CDN as `PIXI`. The default backend bundle creates the existing
-orthographic semantic camera and Pixi presentation adapter. The explicit Lab-only
+orthographic semantic camera and Pixi presentation adapter. The explicit live-player/Lab
 `rtsRenderer=babylon` selector lazily loads the pinned Babylon dependency and creates the fixed
-perspective camera before its renderer; `Match` still owns the only animation-frame loop.
+perspective camera before its renderer; ordinary spectators and replays remain on Pixi, and
+`Match` still owns the only animation-frame loop.
 
 ```
 index.html        # PINNED — CDN + #app + module entry + screens markup

@@ -61,6 +61,7 @@ import { buildSettingsTabs } from "./settings_panels.js";
 import { resolveVisualProfileLaunch } from "./visual_profiles.js";
 import { LabInteractBridge, labInteractLaunchEnabled } from "./lab_interact_bridge.js";
 import { CleanPresentation } from "./clean_presentation.js";
+import { rendererBackendBundleForMatch } from "./renderer/backend_selection.js";
 
 /**
  * App-level heartbeat interval (ms). The server drops connections idle for 40s,
@@ -535,7 +536,13 @@ export class App {
         labControlPolicy: this.labControlPolicy,
         visualProfile,
         visualProfileError,
-        rendererBackendBundle: this.rendererBackendBundle,
+        // ReplayViewer always constructs Pixi, and ordinary spectators remain on Pixi even when
+        // this page explicitly selected the experimental Babylon live-player renderer.
+        rendererBackendBundle: rendererBackendBundleForMatch(this.rendererBackendBundle, {
+          spectator: payload?.spectator,
+          replay: startsReplay,
+          lab: !!labMetadata,
+        }),
         onLabToolChange: (change) => this.labPanel?.applyLabToolChange?.(change),
       },
     );

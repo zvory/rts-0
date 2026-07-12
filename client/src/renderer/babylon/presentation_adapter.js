@@ -1,11 +1,11 @@
 import {
   projectionSceneCamera,
-  worldFacingToSceneYaw,
   worldPointToScene,
   worldScaleToScene,
 } from "./coordinates.js";
-
-const MAX_KERNEL_ENTITIES = 96;
+import { BabylonFeedbackLayer } from "./feedback_layer.js";
+import { BabylonFogLayer } from "./fog_layer.js";
+import { BabylonGenericEntities } from "./generic_entities.js";
 
 export class BabylonPresentationAdapter {
   constructor(canvasParent, { Babylon }) {
@@ -15,14 +15,15 @@ export class BabylonPresentationAdapter {
     this._destroyed = false;
     this._renderFrameCount = 0;
     this._lastError = null;
-    this._entities = new Map();
-    this._materials = new Map();
     this._canvas = null;
     this._engine = null;
     this._scene = null;
     this._camera = null;
     this._ground = null;
     this._groundMaterial = null;
+    this._fogLayer = null;
+    this._genericEntities = null;
+    this._feedbackLayer = null;
     this._errorNode = null;
     try {
       this._createScene();
@@ -42,7 +43,9 @@ export class BabylonPresentationAdapter {
       if (!frame || frame.version !== 1) throw new TypeError("Babylon requires PresentationFrameV1.");
       this._syncCamera(frame.projection);
       this._syncGround(frame.projection?.mapBounds);
-      this._syncEntities(frame.layers?.fogGatedWorld || []);
+      this._genericEntities.sync(frame);
+      this._fogLayer.sync(frame);
+      this._feedbackLayer.sync(frame);
       this._scene.render();
       this._renderFrameCount += 1;
       this._lastError = null;
@@ -73,6 +76,17 @@ export class BabylonPresentationAdapter {
     };
   }
 
+  sceneDiagnostics() {
+    return Object.freeze({
+      renderer: "babylon",
+      frame: this._renderFrameCount,
+      fog: this._fogLayer?.diagnostics?.() || null,
+      genericEntities: this._genericEntities?.diagnostics?.() || null,
+      feedback: this._feedbackLayer?.diagnostics?.() || null,
+      error: this._lastError ? Object.freeze({ ...this._lastError }) : null,
+    });
+  }
+
   enterFixedCapture() {}
   presentFixedCaptureFrame() { this._scene?.render(); }
   exitFixedCapture() {}
@@ -80,10 +94,12 @@ export class BabylonPresentationAdapter {
   destroy() {
     if (this._destroyed) return;
     this._destroyed = true;
-    for (const mesh of this._entities.values()) mesh.dispose();
-    this._entities.clear();
-    for (const material of this._materials.values()) material.dispose();
-    this._materials.clear();
+    this._feedbackLayer?.destroy();
+    this._feedbackLayer = null;
+    this._fogLayer?.destroy();
+    this._fogLayer = null;
+    this._genericEntities?.destroy();
+    this._genericEntities = null;
     this._ground?.dispose();
     this._ground = null;
     this._groundMaterial?.dispose();
@@ -113,6 +129,9 @@ export class BabylonPresentationAdapter {
     this._camera.inputs.clear();
     const light = new B.HemisphericLight("kernel-light", new B.Vector3(-0.3, 1, -0.2), this._scene);
     light.intensity = 0.9;
+    this._genericEntities = new BabylonGenericEntities(this._scene, { Babylon: B });
+    this._fogLayer = new BabylonFogLayer(this._scene, { Babylon: B });
+    this._feedbackLayer = new BabylonFeedbackLayer(this._scene, this._parent, { Babylon: B });
   }
 
   _syncCamera(projection) {
@@ -155,55 +174,6 @@ export class BabylonPresentationAdapter {
     ground.edgesColor = new B.Color4(0.68, 0.73, 0.62, 1);
     ground.metadata = { signature };
     this._ground = ground;
-  }
-
-  _syncEntities(records) {
-    const visible = records.filter((record) => record?.type === "entity").slice(0, MAX_KERNEL_ENTITIES);
-    const retained = new Set();
-    for (const record of visible) {
-      const key = String(record.id);
-      retained.add(key);
-      let mesh = this._entities.get(key);
-      if (!mesh) {
-        mesh = this._createEntityMesh(record);
-        this._entities.set(key, mesh);
-      }
-      const point = worldPointToScene({ x: record.x, y: record.y, heightPx: 0 });
-      mesh.position.x = point.x;
-      mesh.position.z = point.z;
-      mesh.rotation.y = worldFacingToSceneYaw(Number.isFinite(record.facing) ? record.facing : 0);
-      mesh.material = this._material(record.teamColor);
-    }
-    for (const [key, mesh] of this._entities) {
-      if (retained.has(key)) continue;
-      mesh.dispose();
-      this._entities.delete(key);
-    }
-  }
-
-  _createEntityMesh(record) {
-    const B = this._Babylon;
-    const height = worldScaleToScene(record.anchors?.hp?.heightPx || 18);
-    const mesh = B.MeshBuilder.CreateBox(`visible-${record.id}`, {
-      width: Math.max(0.35, height * 0.7),
-      depth: Math.max(0.5, height),
-      height: Math.max(0.35, height * 0.55),
-    }, this._scene);
-    mesh.position.y = Math.max(0.175, height * 0.275);
-    mesh.isPickable = false;
-    return mesh;
-  }
-
-  _material(color) {
-    const key = /^#[0-9a-fA-F]{6}$/.test(color || "") ? color.toLowerCase() : "#9aa0a8";
-    let material = this._materials.get(key);
-    if (material) return material;
-    const B = this._Babylon;
-    material = new B.StandardMaterial(`team-${key.slice(1)}`, this._scene);
-    material.diffuseColor = B.Color3.FromHexString(key);
-    material.specularColor = new B.Color3(0.08, 0.08, 0.08);
-    this._materials.set(key, material);
-    return material;
   }
 
   _recordError(label, error) {

@@ -16,8 +16,8 @@ export function parseRendererSelection(locationLike = globalThis.location) {
     throw new RendererSelectionError("invalidRenderer", "rtsRenderer must be either pixi or babylon.");
   }
   const pathname = locationLike?.pathname || "/";
-  if (pathname !== "/lab" && pathname !== "/lab/") {
-    throw new RendererSelectionError("unsupportedRendererRoute", "The Babylon renderer is currently available only in Lab.");
+  if (pathname !== "/" && pathname !== "/lab" && pathname !== "/lab/") {
+    throw new RendererSelectionError("unsupportedRendererRoute", "The Babylon renderer is available only in live matches and Lab.");
   }
   return Object.freeze({ id: "babylon" });
 }
@@ -63,6 +63,11 @@ export async function createSelectedBackendBundle(options = {}) {
   const Babylon = await loadBabylonDependency(options);
   const { createBabylonBackendBundle } = await import("./babylon/backend_bundle.js");
   return createBabylonBackendBundle({ Babylon });
+}
+
+export function rendererBackendBundleForMatch(selectedBundle, { spectator = false, replay = false, lab = false } = {}) {
+  if (replay || (spectator && !lab)) return null;
+  return selectedBundle || null;
 }
 
 export function showRendererBootstrapError(error, documentLike = globalThis.document) {

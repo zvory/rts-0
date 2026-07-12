@@ -8,6 +8,7 @@ import {
   createSelectedBackendBundle,
   loadBabylonDependency,
   parseRendererSelection,
+  rendererBackendBundleForMatch,
   showRendererBootstrapError,
 } from "../../client/src/renderer/backend_selection.js";
 import { createBabylonBackendBundle } from "../../client/src/renderer/babylon/backend_bundle.js";
@@ -28,12 +29,18 @@ const approx = (actual, expected, epsilon = 1e-6) => {
 
 assert.deepEqual(parseRendererSelection({ pathname: "/", search: "" }), { id: "pixi" });
 assert.deepEqual(parseRendererSelection({ pathname: "/", search: "?rtsRenderer=pixi" }), { id: "pixi" });
+assert.deepEqual(parseRendererSelection({ pathname: "/", search: "?rtsRenderer=babylon" }), { id: "babylon" });
 assert.deepEqual(parseRendererSelection({ pathname: "/lab", search: "?rtsRenderer=babylon" }), { id: "babylon" });
 assert.throws(
-  () => parseRendererSelection({ pathname: "/", search: "?rtsRenderer=babylon" }),
+  () => parseRendererSelection({ pathname: "/dev/scenarios", search: "?rtsRenderer=babylon" }),
   (error) => error instanceof RendererSelectionError && error.code === "unsupportedRendererRoute",
-  "Babylon remains Lab-only in Phase 4",
+  "Babylon remains unavailable on replay/dev spectator routes",
 );
+const selectedBabylon = Object.freeze({ id: "babylon" });
+assert.equal(rendererBackendBundleForMatch(selectedBabylon, { spectator: false }), selectedBabylon);
+assert.equal(rendererBackendBundleForMatch(selectedBabylon, { lab: true, spectator: true }), selectedBabylon);
+assert.equal(rendererBackendBundleForMatch(selectedBabylon, { spectator: true }), null, "ordinary spectators stay on Pixi");
+assert.equal(rendererBackendBundleForMatch(selectedBabylon, { replay: true }), null, "replays stay on Pixi");
 assert.equal(
   (await createSelectedBackendBundle({
     locationLike: { pathname: "/", search: "" },
@@ -148,21 +155,67 @@ assert.ok(Object.isFrozen(projection.perspective), "engine-independent perspecti
     semanticCamera.setMapBounds(2000, 1400);
     semanticCamera.focusAt({ x: 1000, y: 700 });
     const map = { width: 2, height: 2, tileSize: 1000, terrain: [0, 0, 0, 0], resources: [] };
-    const assembler = new PresentationFrameAssembler({ map, entityStats: { tank: { size: 24 } } });
+    const assembler = new PresentationFrameAssembler({
+      map,
+      entityStats: { tank: { size: 24 }, rifleman: { size: 10 }, barracks: { footW: 2, footH: 2 } },
+    });
     const frame = assembler.assemble({
       map,
       projection: semanticCamera.projectionSnapshot(),
-      frameContext: { alpha: 1, interpolatedEntities: [{
-        id: 7, kind: "tank", owner: 1, x: 1000, y: 700, facing: 0.5, hp: 80, maxHp: 100,
-      }] },
-      fog: { visibleGrid: [1, 1, 1, 1], exploredGrid: [1, 1, 1, 1] },
-      players: [{ id: 1, teamId: 1, color: "#336699" }],
+      frameContext: { alpha: 1, interpolatedEntities: [
+        { id: 7, kind: "tank", owner: 1, x: 1000, y: 700, facing: 0.5, hp: 80, maxHp: 100,
+          orderPlan: [{ kind: "move", x: 1200, y: 760 }] },
+        { id: 8, kind: "barracks", owner: 2, x: 1500, y: 900, hp: 240, maxHp: 300, visionOnly: true },
+        { id: 9, kind: "rifleman", owner: 2, x: 1300, y: 820, hp: 20, maxHp: 40, shotReveal: true },
+      ] },
+      fog: {
+        visibleGrid: [1, 0, 0, 0], exploredGrid: [1, 1, 0, 0],
+        visibleRevision: 4, exploredRevision: 7,
+      },
+      rememberedBuildings: [{ id: 10, kind: "barracks", owner: 2, x: 1600, y: 1000, hp: 200, maxHp: 300 }],
+      feedback: {
+        commandFeedback: [{ kind: "move", x: 1200, y: 760 }],
+        attackTargetPreview: { x: 1300, y: 820 },
+        placement: { building: "barracks", tileX: 1, tileY: 0, valid: true },
+      },
+      screenOverlay: { marquee: { x0: 20, y0: 30, x1: 140, y1: 110 } },
+      selectionIds: new Set([7]),
+      players: [
+        { id: 1, teamId: 1, color: "#336699" },
+        { id: 2, teamId: 2, color: "#993333" },
+      ],
       playerId: 1,
     });
     assert.ok(Object.isFrozen(frame.projection.perspective), "presentation frame retains detached scene coefficients");
     assert.equal(renderer.render(frame).presented, true);
     assert.equal(renderer._scene.renderCount, 1, "Match-driven render calls scene.render exactly once");
     assert.equal(renderer._engine.runRenderLoopCalls, 0, "Babylon never owns an engine render loop");
+    const sceneDiagnostics = renderer.sceneDiagnostics();
+    assert.deepEqual(
+      sceneDiagnostics.genericEntities.categories,
+      { current: 1, remembered: 1, intel: 1, reveal: 1 },
+      "Babylon consumes each already-separated visibility category without hidden lookups",
+    );
+    assert.equal(sceneDiagnostics.genericEntities.selected, 1, "generic placeholders preserve selection state");
+    assert.equal(sceneDiagnostics.genericEntities.hpBars, 4, "generic placeholders preserve received HP data");
+    assert.deepEqual(
+      sceneDiagnostics.fog,
+      { visibleRevision: 4, exploredRevision: 7, visibleTiles: 1, exploredTiles: 1, unknownTiles: 2 },
+      "revisioned current/explored grids drive authoritative fog categories",
+    );
+    assert.ok(sceneDiagnostics.feedback.worldMarkers >= 4, "basic move, target, path, and placement feedback reaches Babylon");
+    assert.equal(sceneDiagnostics.feedback.marquee, true, "the screen-space marquee is presented by Babylon");
+    assert.equal(
+      renderer._scene.meshes.find((mesh) => mesh.name === "placeholder-reveal:9")?.renderingGroupId,
+      3,
+      "shot reveals render above the current-fog group",
+    );
+    assert.ok(
+      renderer._scene.meshes
+        .filter((mesh) => mesh.name?.startsWith("feedback-"))
+        .every((mesh) => mesh.renderingGroupId === 4),
+      "tactical feedback remains above shot reveals",
+    );
     renderer.resize(640, 480);
     assert.equal(renderer._canvas.style.width, "640px");
     assert.equal(renderer.captureReadiness().ready, true);
@@ -172,7 +225,11 @@ assert.ok(Object.isFrozen(projection.perspective), "engine-independent perspecti
     assert.equal(renderer._scene, null, "teardown releases the one owned scene");
     const reentered = bundle.createRenderer(dom.parent);
     assert.equal(reentered.render(frame).presented, true, "one normal leave/re-enter creates a fresh scene");
-    assert.equal(dom.parent.children.length, 1, "re-entry still owns exactly one canvas");
+    assert.equal(
+      dom.parent.children.filter((child) => child.tag === "canvas").length,
+      1,
+      "re-entry still owns exactly one canvas",
+    );
     reentered.destroy();
     assert.equal(dom.parent.children.length, 0, "re-enter cleanup leaves no canvas behind");
   } finally {
@@ -222,7 +279,7 @@ function fakeBabylon() {
     dispose() { this.disposed = true; }
   }
   class Scene {
-    constructor(engine) { this.engine = engine; this.renderCount = 0; this.disposed = false; }
+    constructor(engine) { this.engine = engine; this.renderCount = 0; this.disposed = false; this.meshes = []; }
     render() { this.renderCount += 1; }
     dispose() { this.disposed = true; }
   }
@@ -242,17 +299,37 @@ function fakeBabylon() {
     constructor() { this.disposed = false; }
     dispose() { this.disposed = true; }
   }
+  class DynamicTexture {
+    constructor(_name, size) {
+      this.size = size;
+      this.context = {
+        createImageData: (width, height) => ({ data: new Uint8ClampedArray(width * height * 4) }),
+        putImageData: (image) => { this.image = image; },
+      };
+    }
+    getContext() { return this.context; }
+    update() { this.updateCount = (this.updateCount || 0) + 1; }
+    dispose() { this.disposed = true; }
+  }
   class HemisphericLight { constructor() { this.intensity = 0; } }
-  const mesh = () => ({
+  const mesh = (name = "mesh", _options = {}, scene = null) => {
+    const value = {
+    name,
     position: new Vector3(0, 0, 0),
+    scaling: new Vector3(1, 1, 1),
     rotation: { y: 0 },
     metadata: null,
     dispose() { this.disposed = true; },
     enableEdgesRendering() {},
-  });
+    createInstance(instanceName) { return mesh(instanceName, {}, scene); },
+    };
+    scene?.meshes?.push(value);
+    return value;
+  };
   return {
-    Engine, Scene, FreeCamera, Vector3, Color3, Color4, StandardMaterial, HemisphericLight,
-    MeshBuilder: { CreateGround: mesh, CreateBox: mesh },
+    Engine, Scene, FreeCamera, Vector3, Color3, Color4, StandardMaterial, DynamicTexture, HemisphericLight,
+    Texture: { NEAREST_SAMPLINGMODE: 1, CLAMP_ADDRESSMODE: 0 },
+    MeshBuilder: { CreateGround: mesh, CreateBox: mesh, CreateTorus: mesh, CreateLines: mesh },
   };
 }
 

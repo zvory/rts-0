@@ -152,7 +152,9 @@ export class PresentationFrameAssembler {
     for (const [field, type] of FEEDBACK_SINGLETONS) {
       if (feedback?.[field] != null) {
         safePush(layers, "tacticalFeedback", type, diagnostics, () =>
-          detachedRecord({ type, ...feedback[field] }));
+          field === "placement"
+            ? placementRecord(feedback[field], this._entityStats, this._staticMap.tileSizePx)
+            : detachedRecord({ type, ...feedback[field] }));
       }
     }
     if (feedback) {
@@ -293,12 +295,40 @@ function entityRecord(entity, {
   record.relationship = relationshipForOwner(owner, context);
   record.teamColor = context.colors[owner] || "#9aa0a8";
   record.selected = !!selected;
+  record.visualBounds = entityVisualBounds(stat, tileSizePx);
   record.anchors = {
     ground: { x, y, heightPx: 0 },
     selection: { x, y, heightPx: 0 },
     hp: { x, y, heightPx: semanticHeight },
   };
   return detachedRecord(record);
+}
+
+function entityVisualBounds(stat, tileSizePx) {
+  const building = Number.isFinite(stat?.footW) && Number.isFinite(stat?.footH);
+  const widthPx = building
+    ? Math.max(8, stat.footW * tileSizePx)
+    : Math.max(8, Number.isFinite(stat?.size) ? stat.size * 2 : 16);
+  const depthPx = building
+    ? Math.max(8, stat.footH * tileSizePx)
+    : widthPx;
+  return {
+    class: building ? "building" : "unit",
+    widthPx,
+    depthPx,
+    heightPx: entitySemanticHeight(stat, tileSizePx),
+  };
+}
+
+function placementRecord(placement, entityStats, tileSizePx) {
+  const stat = entityStats?.[placement?.building] || null;
+  const footW = Number.isFinite(stat?.footW) ? Math.max(1, stat.footW) : 1;
+  const footH = Number.isFinite(stat?.footH) ? Math.max(1, stat.footH) : 1;
+  return detachedRecord({
+    type: "placement",
+    ...placement,
+    footprint: { footW, footH, tileSizePx },
+  });
 }
 
 function entitySemanticHeight(stat, tileSizePx) {
