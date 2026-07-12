@@ -36,6 +36,10 @@ Pixi need makes that work worthwhile; they are not a scheduled production-cleanu
 - Babylon consumes the existing detached presentation frame and semantic camera/selection APIs.
   It must not query `GameState`, `ClientIntent`, transport data, raw fog data, or engine-derived
   ownership/visibility.
+- The selected backend bundle creates the semantic camera before `Match` starts and the world
+  renderer separately. The renderer receives only the detached frame; its scene and
+  `SelectionSceneV1` must use the same camera-produced `ProjectionSnapshotV1`. Babylon perspective
+  must never be paired with Pixi's orthographic projection for picking, marquee, or ground commands.
 - World coordinates, commands, fog authority, and simulation remain two-dimensional and
   server-owned. Babylon scene conversion lives in one small renderer-private helper; meshes and
   assets never control picking or commands.
