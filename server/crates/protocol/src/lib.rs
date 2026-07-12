@@ -1516,7 +1516,10 @@ mod tests {
             serde_json::json!([[1, 256.0, 512.0], [2, 320.0, 544.0]])
         );
         assert_eq!(value["e"][2][34], serde_json::json!(true));
-        assert_eq!(value["e"][2][36], serde_json::json!(kind_code(kinds::WORKER)));
+        assert_eq!(
+            value["e"][2][36],
+            serde_json::json!(kind_code(kinds::WORKER))
+        );
         assert_eq!(value["r"], serde_json::json!([[200, 1498]]));
         assert_eq!(
             value["sm"],
