@@ -35,6 +35,7 @@ import {
   TICK_HZ,
   UPGRADES,
   WORKER_BUILDABLE,
+  WORKER_BUILD_CARD_SLOTS,
   SMOKE_PLUS_RESEARCH_TICKS,
 } from "../../client/src/config.js";
 import {
@@ -152,6 +153,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "TICK_HZ",
   "UPGRADES",
   "WORKER_BUILDABLE",
+  "WORKER_BUILD_CARD_SLOTS",
   "commandCardAbilitiesForFaction",
   "factionCatalog",
   "isProducerBuilding",
@@ -527,6 +529,12 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   assert(
     WORKER_BUILDABLE.includes(KIND.TANK_TRAP),
     "Tank Trap is available in the worker build menu",
+  );
+  assert(
+    !WORKER_BUILDABLE.includes(KIND.DEPOT) &&
+      WORKER_BUILD_CARD_SLOTS[1] == null &&
+      WORKER_BUILD_CARD_SLOTS.filter(Boolean).join(",") === WORKER_BUILDABLE.join(","),
+    "Supply Depot is unavailable while its worker-card W slot remains empty",
   );
   const playerId = 1;
   const underConstructionTrainingCentre = [

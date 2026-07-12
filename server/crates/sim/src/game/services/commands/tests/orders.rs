@@ -218,7 +218,7 @@ fn planner_backed_existing_command_families_preserve_active_and_queued_state() {
             1,
             SimCommand::Build {
                 units: vec![worker],
-                building: EntityKind::Depot,
+                building: EntityKind::CityCentre,
                 tile_x: 10,
                 tile_y: 10,
                 queued: true,
@@ -381,7 +381,7 @@ fn planner_backed_valid_queued_commands_emit_queue_full_notices() {
                 1,
                 SimCommand::Build {
                     units: vec![builder],
-                    building: EntityKind::Depot,
+                    building: EntityKind::CityCentre,
                     tile_x: 10,
                     tile_y: 10,
                     queued: true,

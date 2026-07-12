@@ -439,17 +439,17 @@ fn movement_economy_checkpoint_preserves_construction_and_deconstruction_progres
         .entities
         .spawn_building(2, EntityKind::CityCentre, enemy_cc.0, enemy_cc.1, true)
         .expect("enemy city centre should spawn");
-    let (depot_tile_x, depot_tile_y) = (12, 8);
-    let depot_site = footprint_center(
+    let (city_centre_tile_x, city_centre_tile_y) = (12, 8);
+    let city_centre_site = footprint_center(
         &baseline.state.map,
-        EntityKind::Depot,
-        depot_tile_x,
-        depot_tile_y,
+        EntityKind::CityCentre,
+        city_centre_tile_x,
+        city_centre_tile_y,
     );
     let build_worker = baseline
         .state
         .entities
-        .spawn_unit(1, EntityKind::Worker, depot_site.0, depot_site.1)
+        .spawn_unit(1, EntityKind::Worker, city_centre_site.0, city_centre_site.1)
         .expect("build worker should spawn");
     let trap_pos = footprint_center(&baseline.state.map, EntityKind::TankTrap, 20, 8);
     let trap = baseline
@@ -475,9 +475,9 @@ fn movement_economy_checkpoint_preserves_construction_and_deconstruction_progres
         1,
         Command::Build {
             units: vec![build_worker],
-            building: EntityKind::Depot,
-            tile_x: depot_tile_x,
-            tile_y: depot_tile_y,
+            building: EntityKind::CityCentre,
+            tile_x: city_centre_tile_x,
+            tile_y: city_centre_tile_y,
             queued: false,
         },
     );
@@ -504,7 +504,7 @@ fn movement_economy_checkpoint_preserves_construction_and_deconstruction_progres
         .state
         .entities
         .iter()
-        .find(|entity| entity.kind == EntityKind::Depot && entity.under_construction())
+        .find(|entity| entity.kind == EntityKind::CityCentre && entity.under_construction())
         .map(|entity| entity.id)
         .expect("build command should spawn a scaffold before checkpoint");
     assert!(baseline.state.active_construction_sites.contains(&scaffold));
@@ -529,8 +529,8 @@ fn movement_economy_checkpoint_preserves_construction_and_deconstruction_progres
         &baseline,
         "construction/deconstruction checkpoint import",
     );
-    let finish_ticks = config::building_stats(EntityKind::Depot)
-        .expect("depot stats")
+    let finish_ticks = config::building_stats(EntityKind::CityCentre)
+        .expect("city centre stats")
         .build_ticks
         .max(crate::game::entity::tank_trap_deconstruction_ticks())
         + 4;

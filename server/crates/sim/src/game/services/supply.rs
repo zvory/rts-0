@@ -2,8 +2,8 @@ use crate::game::entity::EntityStore;
 use crate::game::PlayerState;
 use crate::rules;
 
-/// Recompute each player's supply cap (from completed City Centres and Depots) and supply used (living
-/// units + units still in production queues). Cap is clamped to `SUPPLY_CAP_MAX`.
+/// Recompute each player's supply cap from completed, faction-allowed supply buildings and supply
+/// used from living units plus units still in production queues. Cap is clamped to `SUPPLY_CAP_MAX`.
 pub(crate) fn recompute_supply(players: &mut [PlayerState], entities: &EntityStore) {
     for ps in players.iter_mut() {
         let catalog = rules::faction::catalog_for(&ps.faction_id);

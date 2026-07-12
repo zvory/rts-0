@@ -534,7 +534,7 @@ fn mixed_queued_command_log_replays_deterministically() {
         1,
         Command::Build {
             units: vec![worker_builder],
-            building: EntityKind::Depot,
+            building: EntityKind::CityCentre,
             tile_x: 12,
             tile_y: 12,
             queued: true,

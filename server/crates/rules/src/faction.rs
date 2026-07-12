@@ -125,6 +125,7 @@ const DEFAULT_UNITS: &[EntityKind] = &[
 
 const DEFAULT_BUILDINGS: &[EntityKind] = &[
     EntityKind::CityCentre,
+    // Retained for replay and fixture compatibility, but unavailable in the current build catalog.
     EntityKind::Depot,
     EntityKind::Barracks,
     EntityKind::TrainingCentre,
@@ -137,7 +138,6 @@ const DEFAULT_BUILDINGS: &[EntityKind] = &[
 
 const DEFAULT_WORKER_BUILDABLES: &[EntityKind] = &[
     EntityKind::CityCentre,
-    EntityKind::Depot,
     EntityKind::Barracks,
     EntityKind::TrainingCentre,
     EntityKind::ResearchComplex,
@@ -755,6 +755,11 @@ mod tests {
         assert!(!catalog.allows_research(TANK_UNLOCK_UPGRADE, EntityKind::TrainingCentre));
         assert!(catalog.allows_building(EntityKind::TankTrap));
         assert!(catalog.can_build(EntityKind::Worker, EntityKind::TankTrap));
+        assert!(catalog.allows_building(EntityKind::Depot));
+        assert!(
+            !catalog.can_build(EntityKind::Worker, EntityKind::Depot),
+            "Supply Depots remain compatible entity kinds but are unavailable to workers"
+        );
         assert!(catalog.allows_building(EntityKind::PumpJack));
         assert!(
             !catalog.can_build(EntityKind::Worker, EntityKind::PumpJack),

@@ -387,6 +387,10 @@ mod tests {
             "default workers can build Tank Traps"
         );
         assert!(
+            !can_build_for_faction(DEFAULT_FACTION_ID, EntityKind::Worker, EntityKind::Depot),
+            "default workers cannot build disabled Supply Depots"
+        );
+        assert!(
             can_build_for_faction(DEFAULT_FACTION_ID, EntityKind::Worker, EntityKind::PumpJack),
             "default workers can build contextual Pump Jacks on oil nodes"
         );

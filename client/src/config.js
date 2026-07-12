@@ -14,6 +14,7 @@ export {
   FOG_EXPLORED_ALPHA,
   FOG_UNEXPLORED_ALPHA,
   PLAYER_PALETTE,
+  WORKER_BUILD_CARD_SLOTS,
 } from "./config/presentation.js";
 
 export {
