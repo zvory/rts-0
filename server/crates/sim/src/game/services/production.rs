@@ -24,10 +24,10 @@ pub(crate) fn production_system(
                 && producer.is_building()
                 && !producer.under_construction()
                 && producer.prod_queue().is_empty())
-            .then(|| (producer.owner, producer.repeat_production()))
-            .and_then(|(owner, unit)| unit.map(|unit| (owner, unit)))
+            .then(|| (producer.owner, producer.kind, producer.repeat_production()))
+            .and_then(|(owner, producer_kind, unit)| unit.map(|unit| (owner, producer_kind, unit)))
         });
-        if let Some((owner, unit)) = repeat_request {
+        if let Some((owner, producer_kind, unit)) = repeat_request {
             // Standing production failures are intentionally silent. The intent stays armed and
             // retries on later ticks when resources, supply, or requirements permit it.
             let faction_id = players
@@ -47,8 +47,12 @@ pub(crate) fn production_system(
                 unit,
                 &owned_complete,
             );
+            let producer_compatible =
+                rules::economy::trainable_units_for_faction(&faction_id, producer_kind)
+                    .contains(&unit);
             let stats = config::unit_stats(unit);
-            if let (true, Some(stats), Some(player)) = (
+            if let (true, true, Some(stats), Some(player)) = (
+                producer_compatible,
                 requirements_met,
                 stats,
                 players.iter_mut().find(|player| player.id == owner),
