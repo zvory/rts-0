@@ -106,6 +106,20 @@ assert.ok(projection.viewportGroundPolygon().length >= 3, "perspective viewport 
 assert.ok(Object.isFrozen(projection.perspective), "engine-independent perspective coefficients are detached");
 
 {
+  const fitCamera = new FixedPerspectiveCamera(1920, 1080, { minZoom: 0.1, maxZoom: 4 });
+  fitCamera.setMapBounds(4096, 4096);
+  const fitPoints = [{ x: 1000, y: 1000 }, { x: 3000, y: 3000 }];
+  assert.equal(fitCamera.fitWorldPoints(fitPoints, { paddingCssPx: 64 }), true);
+  for (const point of fitPoints) {
+    const fitted = fitCamera.project({ ...point, heightPx: 0 });
+    assert.ok(
+      fitted.x >= 64 && fitted.x <= 1856 && fitted.y >= 64 && fitted.y <= 1016,
+      "perspective fitting honors CSS viewport padding through the actual projection",
+    );
+  }
+}
+
+{
   const world = { x: 1234, y: 876, heightPx: 37 };
   const scene = worldPointToScene(world);
   const roundTrip = sceneGroundToWorld(scene);

@@ -98,6 +98,34 @@ function groundHit(state, coeff, screen) {
   return Number.isFinite(point.x) && Number.isFinite(point.y) ? Object.freeze(point) : null;
 }
 
+function pointsFitViewport(state, points, paddingCssPx) {
+  const coeff = coefficients(state);
+  const maxX = state.viewportWidthCssPx - paddingCssPx;
+  const maxY = state.viewportHeightCssPx - paddingCssPx;
+  return points.every((point) => {
+    const projected = projectPoint(state, coeff, { ...point, heightPx: 0 });
+    return projected.depth >= coeff.nearDepthWorldPx
+      && projected.depth <= coeff.farDepthWorldPx
+      && projected.x >= paddingCssPx
+      && projected.x <= maxX
+      && projected.y >= paddingCssPx
+      && projected.y <= maxY;
+  });
+}
+
+function clampedFocus(state) {
+  if (state.mapWidthPx <= 0 || state.mapHeightPx <= 0) {
+    return { focusX: state.focusX, focusY: state.focusY };
+  }
+  const visibleWidth = state.viewportWidthCssPx / state.framingScale;
+  const visibleHeight = state.viewportHeightCssPx
+    / (state.framingScale * Math.sin(FIXED_PERSPECTIVE.pitchRad));
+  return {
+    focusX: Math.max(-visibleWidth / 4, Math.min(state.mapWidthPx + visibleWidth / 4, state.focusX)),
+    focusY: Math.max(-visibleHeight / 4, Math.min(state.mapHeightPx + visibleHeight / 4, state.focusY)),
+  };
+}
+
 function projectionSnapshot(rawState) {
   const state = Object.freeze({
     focusX: required(rawState.focusX, "camera focus x"),
@@ -242,14 +270,35 @@ export class FixedPerspectiveCamera {
     if (availableWidth <= 0 || availableHeight <= 0) return false;
     const xs = accepted.map((point) => point.x);
     const ys = accepted.map((point) => point.y);
-    const width = Math.max(...xs) - Math.min(...xs);
-    const height = Math.max(...ys) - Math.min(...ys);
-    const scaleX = width > 0 ? availableWidth / width : this.maxZoom;
-    const scaleY = height > 0 ? availableHeight / (height * Math.sin(FIXED_PERSPECTIVE.pitchRad)) : this.maxZoom;
+    const focusX = (Math.min(...xs) + Math.max(...xs)) / 2;
+    const focusY = (Math.min(...ys) + Math.max(...ys)) / 2;
+    const candidateState = (framingScale) => {
+      const candidate = {
+        focusX,
+        focusY,
+        framingScale,
+        viewportWidthCssPx: this.viewportWidthCssPx,
+        viewportHeightCssPx: this.viewportHeightCssPx,
+        mapWidthPx: this.mapWidthPx,
+        mapHeightPx: this.mapHeightPx,
+      };
+      return { ...candidate, ...clampedFocus(candidate) };
+    };
+    let fittedScale = this.minZoom;
+    if (pointsFitViewport(candidateState(this.minZoom), accepted, padding)) {
+      let lower = this.minZoom;
+      let upper = this.maxZoom;
+      for (let iteration = 0; iteration < 40; iteration += 1) {
+        const midpoint = (lower + upper) / 2;
+        if (pointsFitViewport(candidateState(midpoint), accepted, padding)) lower = midpoint;
+        else upper = midpoint;
+      }
+      fittedScale = lower;
+    }
     this._mutate(() => {
-      this.framingScale = this._clampScale(Math.min(scaleX, scaleY));
-      this.focusX = (Math.min(...xs) + Math.max(...xs)) / 2;
-      this.focusY = (Math.min(...ys) + Math.max(...ys)) / 2;
+      this.framingScale = fittedScale;
+      this.focusX = focusX;
+      this.focusY = focusY;
     });
     return true;
   }
@@ -316,11 +365,9 @@ export class FixedPerspectiveCamera {
   _clampScale(value) { return Math.max(this.minZoom, Math.min(this.maxZoom, value)); }
 
   _clampFocus() {
-    if (this.mapWidthPx <= 0 || this.mapHeightPx <= 0) return;
-    const visibleWidth = this.viewportWidthCssPx / this.framingScale;
-    const visibleHeight = this.viewportHeightCssPx / (this.framingScale * Math.sin(FIXED_PERSPECTIVE.pitchRad));
-    this.focusX = Math.max(-visibleWidth / 4, Math.min(this.mapWidthPx + visibleWidth / 4, this.focusX));
-    this.focusY = Math.max(-visibleHeight / 4, Math.min(this.mapHeightPx + visibleHeight / 4, this.focusY));
+    const focus = clampedFocus(this);
+    this.focusX = focus.focusX;
+    this.focusY = focus.focusY;
   }
 
   _mutate(change) {
