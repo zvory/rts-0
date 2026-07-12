@@ -461,7 +461,7 @@ folded into default targeting.
   when the affected unit is otherwise visible through authoritative fog. Fake Army and allied-unit
   support are deferred.
 - Map: `TILE_SIZE = 32` px. New normal lobbies default to the imported 126×126 two-player map
-  at `server/assets/maps/1v1.json` (eight permanent resource base locations), served for tooling
+  at `server/assets/maps/1v1.json` (ten permanent resource base locations), served for tooling
   at `/maps/1v1.json`. The four-start `Default` map remains the hardcoded asset at
   `server/assets/maps/default-handcrafted.json` for generic simulation setup, Labs, and replay
   compatibility; it is the original 96×96 handcrafted map padded with 15 passable grass tiles on
