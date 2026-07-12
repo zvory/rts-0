@@ -846,9 +846,12 @@ fn manual_mortar_fire_turns_briefly_before_launching() {
         mortar_entity.facing()
     );
 
+    let mut impact_pos = None;
     for _ in 0..2 {
-        game.tick();
+        let events = game.tick();
+        impact_pos = impact_pos.or_else(|| mortar_launch_impact(&events, 1, mortar));
     }
+    let impact_pos = impact_pos.expect("owner should receive mortar launch impact");
     let mortar_entity = game.state.entities.get(mortar).expect("mortar should exist");
     assert!(
         mortar_entity.ability_cooldown_ticks(ability::AbilityKind::MortarFire) > 0,
@@ -864,6 +867,10 @@ fn manual_mortar_fire_turns_briefly_before_launching() {
         .get(target)
         .expect("target should still exist")
         .hp;
+    game.state.entities
+        .get_mut(target)
+        .expect("target should still exist")
+        .set_position(impact_pos.0, impact_pos.1);
 
     for _ in 0..config::MORTAR_SHELL_DELAY_TICKS {
         game.tick();
