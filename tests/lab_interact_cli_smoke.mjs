@@ -10,7 +10,11 @@ import { processAlive, runtimePaths, sleep } from "../scripts/lab-interact/runti
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const cli = path.join(root, "scripts/lab-interact/cli.mjs");
 const isolatedTmp = fs.mkdtempSync(path.join("/tmp", "rts-li-smoke-"));
-const env = { ...process.env, TMPDIR: isolatedTmp };
+const env = {
+  ...process.env,
+  TMPDIR: isolatedTmp,
+  RTS_LAB_INTERACT_TEST_TAILNET_PREVIEW_HOST: "127.0.0.1",
+};
 const renderer = env.RTS_LAB_INTERACT_RENDERER || "pixi";
 assert.ok(["pixi", "babylon"].includes(renderer), "Lab Interact smoke renderer must be pixi or babylon");
 const recordingDurationMs = Number(env.RTS_LAB_INTERACT_RECORDING_CANARY_MS || 5_000);
@@ -130,8 +134,12 @@ try {
     subjects: authoredSubjects,
   });
   assert.equal(screenshot.image.mimeType, "image/png", "screenshot identifies PNG metadata without embedding bytes");
-  assert.ok(fs.statSync(screenshot.pngPath).size > 4096, "CLI writes a nontrivial PNG artifact");
-  const manifest = JSON.parse(fs.readFileSync(screenshot.manifestPath, "utf8"));
+  assert.equal("pngPath" in screenshot, false, "CLI withholds screenshot filesystem paths");
+  assert.equal(screenshot.preview.available, true, "CLI returns a Tailnet screenshot preview");
+  const screenshotPreview = await fetch(screenshot.preview.url);
+  assert.equal(screenshotPreview.headers.get("content-type"), "image/png", "Tailnet screenshot preview preserves PNG media type");
+  assert.ok((await screenshotPreview.arrayBuffer()).byteLength > 4096, "Tailnet screenshot preview serves a nontrivial PNG artifact");
+  const manifest = JSON.parse(fs.readFileSync(labArtifactPath(sessionId, "captures", ".json"), "utf8"));
   assert.deepEqual(manifest.errors.render, [], "capture manifest reports no render errors");
   assert.deepEqual(
     { count: manifest.subjects.count, detailed: manifest.subjects.details.length, truncated: manifest.subjects.truncated },
@@ -174,9 +182,17 @@ try {
     { codecTag: "avc1", pixelFormat: "yuv420p", frameRate: "30/1", fastStart: true },
     "live MP4 retains the mobile codec surface",
   );
-  assert.ok(fs.existsSync(recording.videoPath) && fs.existsSync(recording.contactSheetPath), "live recording writes MP4 and contact sheet artifacts");
-  assert.equal(fs.existsSync(recording.videoPath.replace(/\.mp4$/, ".webm")), false, "live recording does not create an intermediate WebM");
-  const recordingManifest = JSON.parse(fs.readFileSync(recording.manifestPath, "utf8"));
+  assert.equal("videoPath" in recording, false, "CLI withholds recording filesystem paths");
+  assert.equal(recording.preview.available, true, "live recording returns a Tailnet MP4 preview");
+  assert.equal(recording.preview.poster.available, true, "live recording returns a Tailnet contact-sheet preview");
+  const recordingPreview = await fetch(recording.preview.url, { headers: { Range: "bytes=0-1023" } });
+  assert.equal(recordingPreview.status, 206, "Tailnet MP4 preview supports byte ranges");
+  assert.equal(recordingPreview.headers.get("content-type"), "video/mp4", "Tailnet recording preview preserves MP4 media type");
+  const recordingDirectory = labArtifactPath(sessionId, "recordings", "", "cli-smoke-motion-");
+  const videoPath = path.join(recordingDirectory, "cli-smoke-motion.mp4");
+  assert.ok(fs.existsSync(videoPath) && fs.existsSync(path.join(recordingDirectory, "cli-smoke-motion-contact-sheet.png")), "live recording retains MP4 and contact-sheet artifacts internally");
+  assert.equal(fs.existsSync(videoPath.replace(/\.mp4$/, ".webm")), false, "live recording does not create an intermediate WebM");
+  const recordingManifest = JSON.parse(fs.readFileSync(path.join(recordingDirectory, "cli-smoke-motion.json"), "utf8"));
   assert.ok(recordingManifest.media.bytes < 64 * 1024 * 1024, "live recording stays beneath the 64 MiB cap");
   assert.ok(recordingManifest.authoritative.endTick >= recordingManifest.authoritative.startTick, "recording manifest tracks authoritative tick bounds");
   assert.ok(recordingManifest.operations.some((entry) => entry.command === "order"), "recording manifest records accepted scene operations");
@@ -208,7 +224,14 @@ try {
   fs.rmSync(isolatedTmp, { recursive: true, force: true });
 }
 
-console.log("✅ lab_interact_cli_smoke.mjs: live CLI lifecycle, recording/contact sheet, capture, reset, and cleanup passed");
+console.log("✅ lab_interact_cli_smoke.mjs: live CLI lifecycle, Tailnet previews, recording/contact sheet, capture, reset, and cleanup passed");
+
+function labArtifactPath(sessionId, category, suffix, directoryPrefix = "") {
+  const directory = path.join(root, "target", "lab-interact", sessionId, category);
+  const names = fs.readdirSync(directory).filter((name) => name.startsWith(directoryPrefix) && name.endsWith(suffix));
+  assert.equal(names.length, 1, `one internal Lab ${category} artifact matches ${directoryPrefix || suffix}`);
+  return path.join(directory, names[0]);
+}
 
 async function waitFor(predicate, timeoutMs, message) {
   const deadline = Date.now() + timeoutMs;

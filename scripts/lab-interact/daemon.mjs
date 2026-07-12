@@ -13,6 +13,7 @@ import {
   checkoutCommit, configuredIdleMs, prepareRuntime, removeOwnedStartupLock, runtimePaths, startupLockOwned, writeState,
   requestTimeoutMs, writeStartupError,
 } from "./runtime.mjs";
+import { LabInteractTailnetPreview } from "./tailnet_preview.mjs";
 
 export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = configuredIdleMs(), startupNonce = "" } = {}) {
   const paths = runtimePaths(workspaceRoot);
@@ -27,7 +28,7 @@ export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = config
     throw new Error("Lab Interact startup lease was replaced before the daemon could bind.");
   }
   const driverFactory = await loadDriverFactory(paths.workspaceRoot);
-  const service = new LabInteractService({ workspaceRoot: paths.workspaceRoot, driverFactory });
+  let artifactPreview = null;
   let activeRequests = 0;
   let lastInteractionAt = Date.now();
   let lastInteractionMark = performance.now();
@@ -65,6 +66,20 @@ export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = config
     lastInteractionAt = Date.now();
     lastInteractionMark = performance.now();
   };
+  artifactPreview = new LabInteractTailnetPreview({
+    workspaceRoot: paths.workspaceRoot,
+    onAccess: () => {
+      if (stopping || shutdownRequested) return;
+      recordInteraction();
+      writeState(paths, state());
+      scheduleIdle();
+    },
+  });
+  const service = new LabInteractService({
+    workspaceRoot: paths.workspaceRoot,
+    driverFactory,
+    artifactPreview,
+  });
   const shutdown = async (reason) => {
     if (stopping) return;
     stopping = true;
@@ -73,6 +88,7 @@ export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = config
     server.closeAllConnections?.();
     await new Promise((resolve) => server.close(resolve));
     await service.shutdown(reason);
+    await artifactPreview.close();
     cleanup();
   };
   const scheduleIdle = () => {

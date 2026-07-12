@@ -27,6 +27,7 @@ const baseEnv = {
   RTS_LAB_INTERACT_DRIVER_FACTORY_MODULE: "tests/fixtures/lab_interact_fake_driver.mjs",
   RTS_LAB_INTERACT_IDLE_MS: "5000",
   RTS_LAB_INTERACT_FAKE_OPEN_DELAY_MS: "250",
+  RTS_LAB_INTERACT_TEST_TAILNET_PREVIEW_HOST: "127.0.0.1",
 };
 
 assert.equal(configuredIdleMs({}), DEFAULT_IDLE_MS, "the production idle default is exactly 30 minutes");
@@ -53,8 +54,8 @@ for (const helpCommand of ["--help", "-h", "help"]) {
 assert.deepEqual(Object.keys(LAB_INTERACT_COMMAND_HELP).sort(), [...LAB_INTERACT_COMMANDS].sort(), "help descriptor coverage equals the public command catalog");
 assert.deepEqual(
   LAB_INTERACT_COMMAND_HELP.screenshot.variants,
-  ["presentation=clean hides UI chrome", "presentation=normal retains visible Lab panels and game UI"],
-  "screenshot help explains both presentation modes",
+  ["presentation=clean hides UI chrome", "presentation=normal retains visible Lab panels and game UI", "response.preview.url is the user-delivery URL; local capture paths are withheld"],
+  "screenshot help explains presentation modes and the required Tailnet delivery URL",
 );
 for (const command of LAB_INTERACT_COMMANDS) {
   for (const args of [["help", command], [command, "--help"]]) {
@@ -243,7 +244,16 @@ const screenshot = call("screenshot", {
 });
 assert.equal(screenshot.result.image.mimeType, "image/png", "screenshot returns bounded PNG metadata");
 assert.equal("data" in screenshot.result.image, false, "CLI screenshot responses never embed image bytes");
-assert.match(screenshot.result.pngPath, /target\/lab-interact\//, "new captures use only the renamed artifact root");
+assert.equal("pngPath" in screenshot.result, false, "CLI withholds raw screenshot paths in favor of the delivery URL");
+assert.equal("manifestPath" in screenshot.result, false, "CLI withholds raw screenshot manifest paths");
+assert.equal(screenshot.result.preview.available, true, "screenshot creates a Tailnet preview");
+assert.match(screenshot.result.preview.url, /^http:\/\/127\.0\.0\.1:\d+\/lab-interact-preview\/[a-f0-9]{64}$/, "screenshot emits an opaque Tailnet preview URL");
+assert.match(screenshot.result.preview.instruction, /Share this Tailnet URL/, "screenshot tells the caller to share the Tailnet preview");
+assert.equal(screenshot.result.preview.url.includes("target/lab-interact"), false, "preview URLs never reveal filesystem paths");
+const screenshotPreview = await fetch(screenshot.result.preview.url);
+assert.equal(screenshotPreview.status, 200, "screenshot Tailnet preview serves the capture");
+assert.equal(screenshotPreview.headers.get("content-type"), "image/png", "screenshot Tailnet preview preserves the image type");
+assert.ok((await screenshotPreview.arrayBuffer()).byteLength > 0, "screenshot Tailnet preview has image bytes");
 assert.equal(callFailure("record-wait", { sessionId }).error.code, "recordingInactive", "a never-started CLI wait fails clearly");
 
 const recordingStarted = call("record-start", {
@@ -262,9 +272,16 @@ const { stdout: recordingWaitStdout, stderr: recordingWaitStderr } = await recor
 assert.equal(recordingWaitStderr, "", "successful record-wait keeps stderr empty");
 assert.deepEqual(JSON.parse(recordingWaitStdout).result, recordingStopped.result, "concurrent record-wait returns the same finalized artifact as record-stop");
 assert.equal(recordingStopped.result.probe.codec, "h264", "record-stop returns bounded H.264 MP4 probe metadata");
-assert.match(recordingStopped.result.videoPath, /\.mp4$/, "record-stop returns a mobile MP4 path");
-assert.equal(recordingStopped.result.framePaths.length, 2, "record-stop returns representative frame paths");
-assert.match(recordingStopped.result.contactSheetPath, /target\/lab-interact\//, "contact sheets stay beneath the artifact root");
+assert.equal("videoPath" in recordingStopped.result, false, "record-stop withholds raw video paths");
+assert.equal("framePaths" in recordingStopped.result, false, "record-stop withholds raw frame paths");
+assert.equal("contactSheetPath" in recordingStopped.result, false, "record-stop withholds raw contact-sheet paths");
+assert.equal(recordingStopped.result.preview.available, true, "record-stop emits a Tailnet video preview");
+assert.equal(recordingStopped.result.preview.mimeType, "video/mp4", "record-stop preview identifies mobile MP4 media");
+assert.equal(recordingStopped.result.preview.poster.available, true, "record-stop emits a Tailnet poster preview");
+assert.equal(recordingStopped.result.frames.count, 2, "record-stop keeps a bounded representative-frame count");
+const recordingRange = await fetch(recordingStopped.result.preview.url, { headers: { Range: "bytes=0-3" } });
+assert.equal(recordingRange.status, 206, "video previews support byte ranges for mobile playback");
+assert.equal(recordingRange.headers.get("content-type"), "video/mp4", "video range response preserves the media type");
 assert.deepEqual(call("record-wait", { sessionId }).result, recordingStopped.result, "completed record-wait remains idempotent");
 assert.equal(callFailure("record-stop", { sessionId }).error.code, "recordingInactive", "duplicate recording stops are correctable errors");
 assert.equal(callFailure("record-start", { sessionId, maxDurationMs: 60_001 }).error.code, "invalidInput", "recording duration remains hard bounded");
@@ -274,17 +291,19 @@ assert.equal(callFailure("record-start", { sessionId, crop: { x: 0, y: 0, width:
 
 const fixed = call("capture-fixed", { sessionId, name: "cli-fixed", fps: 60, frameCount: 3 });
 assert.deepEqual(
-  { count: fixed.result.frameSummary.count, representatives: fixed.result.frameSummary.representativeFramePaths.length },
+  { count: fixed.result.frameSummary.count, representatives: fixed.result.frameSummary.representativeFrames },
   { count: 3, representatives: 3 },
-  "capture-fixed summarizes frames and returns only bounded representative PNG paths",
+  "capture-fixed summarizes frames without exposing local representative PNG paths",
 );
-assert.match(fixed.result.videoPath, /\.mp4$/, "capture-fixed returns a mobile MP4 path");
+assert.equal("videoPath" in fixed.result, false, "capture-fixed withholds its raw video path");
+assert.equal(fixed.result.preview.available, true, "capture-fixed emits a Tailnet video preview");
+assert.equal(fixed.result.preview.poster.available, true, "capture-fixed emits a Tailnet contact-sheet preview");
 assert.deepEqual(
   fixed.result.authoritative,
   { startTick: stepped.result.result.snapshotTick, endTick: stepped.result.result.snapshotTick + 1 },
   "capture-fixed reports its authoritative tick range",
 );
-assert.match(fixed.result.videoPath, /target\/lab-interact\//, "fixed video remains beneath the artifact root");
+assert.equal("representativeFramePaths" in fixed.result.frameSummary, false, "fixed capture omits raw representative frame paths");
 assert.equal(callFailure("capture-fixed", { sessionId, fps: 61, frameCount: 1 }).error.code, "invalidInput", "fixed capture FPS remains bounded");
 
 const setupExport = call("export", { sessionId, kind: "setup", name: "Aliased fixture", reproduction: true });
@@ -318,6 +337,15 @@ call("close", { sessionId });
 const explicit = call("shutdown");
 assert.equal(explicit.result.shuttingDown, true, "shutdown acknowledges immediate teardown");
 await waitFor(() => !fs.existsSync(paths.directory), 2000, "shutdown removes socket, state, and runtime files");
+
+const unavailablePreviewEnv = { ...baseEnv, RTS_LAB_INTERACT_TEST_TAILNET_PREVIEW_HOST: "not-a-loopback-host" };
+const unavailableSession = call("open", {}, unavailablePreviewEnv).result.sessionId;
+const unavailablePreview = call("screenshot", { sessionId: unavailableSession, name: "no-tailnet" }, unavailablePreviewEnv).result;
+assert.equal(unavailablePreview.preview.available, false, "a missing Tailnet listener leaves the visual capture successful but undeliverable");
+assert.equal("pngPath" in unavailablePreview, false, "an unavailable preview still withholds the raw local screenshot path");
+assert.match(unavailablePreview.preview.instruction, /Do not share a local file path/, "an unavailable preview prevents fallback local-file delivery");
+call("shutdown", {}, unavailablePreviewEnv);
+await waitFor(() => !fs.existsSync(paths.directory), 2000, "unavailable-preview daemon still shuts down cleanly");
 
 prepareStaleRuntime();
 const alreadyStopped = call("shutdown");
