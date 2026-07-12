@@ -20,12 +20,18 @@ production asset, capture, loading, or performance architecture.
 - Add the explicit `rtsRenderer=babylon` opt-in path while preserving Pixi for an unset selector.
   Keep Babylon out of the default launch path; record the chosen Babylon version and license in a
   short vendor/readme note, without building an integrity or update pipeline.
-- Adapt the existing Pixi-only construction site to choose a backend. The Babylon backend accepts
-  only the existing `PresentationFrameV1` and semantic camera data; it never receives `GameState`,
-  `ClientIntent`, raw fog grids, or Pixi objects.
-- Create one renderer-owned canvas, engine, scene, and fixed elevated camera. Render static ground
-  and a few simple generic primitives from the frame in `/lab?rtsRenderer=babylon`; primitives are
-  sufficient and no GLB contract is required.
+- Adapt the existing Pixi-only construction site to choose a small backend bundle before `Match`
+  constructs its collaborators. The bundle creates the semantic camera and the renderer separately;
+  the renderer accepts only `PresentationFrameV1`, never `GameState`, `ClientIntent`, raw fog grids,
+  Pixi objects, or a mutable camera.
+- Give Babylon an engine-free fixed-perspective semantic camera implementation with the same public
+  camera API. Its detached `ProjectionSnapshotV1` feeds both `SelectionSceneV1` and the frame the
+  scene renders. Add a focused pure projection/scene-conversion check for representative world
+  points and ground hits now, even though Lab interaction is deferred, so Phase 5 cannot pair
+  perspective visuals with Pixi's orthographic picking.
+- Create one renderer-owned canvas, engine, and scene. Render static ground and a few simple generic
+  primitives from the frame in `/lab?rtsRenderer=babylon`; primitives are sufficient and no GLB
+  contract is required.
 - Put world-pixel-to-scene point, facing, and height conversion in one small Babylon-private module.
   Public picking and commands continue to use the existing semantic projection/selection path.
 - Call `scene.render()` only from the `Match` frame/capture hook. Do not use Babylon's engine loop,
@@ -45,6 +51,8 @@ production asset, capture, loading, or performance architecture.
 ## Acceptance
 
 - An explicit Lab Babylon launch renders the controlled scene through the shared frame seam.
+- Babylon's scene conversion and the selected semantic projection agree at representative points and
+  ground hits; the renderer receives the projection only inside the detached frame.
 - The normal Pixi launch remains Babylon-free and unchanged.
 - `Match` remains the only rAF owner, and one leave/rematch returns to one world canvas and no
   orphaned Babylon scene.
