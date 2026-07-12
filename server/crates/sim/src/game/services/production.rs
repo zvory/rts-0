@@ -18,6 +18,7 @@ pub(crate) fn production_system(
     coordinator: &mut MoveCoordinator<'_>,
     _events: &mut std::collections::HashMap<u32, Vec<crate::protocol::Event>>,
 ) {
+    let mut completed_buildings_by_owner = None;
     for id in entities.ids() {
         let repeat_request = entities.get(id).and_then(|producer| {
             (producer.hp > 0
@@ -35,17 +36,27 @@ pub(crate) fn production_system(
                 .find(|player| player.id == owner)
                 .map(|player| player.faction_id.clone())
                 .unwrap_or_else(|| rules::faction::DEFAULT_FACTION_ID.to_string());
-            let owned_complete: Vec<_> = entities
-                .iter()
-                .filter(|entity| {
-                    entity.owner == owner && entity.is_building() && !entity.under_construction()
-                })
-                .map(|entity| entity.kind)
-                .collect();
+            // Multiple idle repeat producers commonly retry on the same tick while supply- or
+            // resource-blocked. Build the prerequisite index only when repeat production is
+            // active, then share its single world scan across every retry this tick.
+            let completed_buildings_by_owner =
+                completed_buildings_by_owner.get_or_insert_with(|| {
+                    let mut by_owner = std::collections::HashMap::<u32, Vec<EntityKind>>::new();
+                    for entity in entities.iter().filter(|entity| {
+                        entity.is_building() && !entity.under_construction()
+                    }) {
+                        by_owner.entry(entity.owner).or_default().push(entity.kind);
+                    }
+                    by_owner
+                });
+            let owned_complete = completed_buildings_by_owner
+                .get(&owner)
+                .map(Vec::as_slice)
+                .unwrap_or_default();
             let requirements_met = rules::economy::train_requirement_met_for_faction(
                 &faction_id,
                 unit,
-                &owned_complete,
+                owned_complete,
             );
             let producer_compatible =
                 rules::economy::trainable_units_for_faction(&faction_id, producer_kind)
