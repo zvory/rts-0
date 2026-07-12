@@ -96,7 +96,15 @@ pub(super) fn direct_fire_target_legal(
         return false;
     }
     if legality.requires_intended_target {
-        shot_hits_intended_target(map, entities, teams, attacker, attacker_owner, target, start)
+        shot_hits_intended_target(
+            map,
+            entities,
+            teams,
+            attacker,
+            attacker_owner,
+            target,
+            start,
+        )
     } else {
         !friendly_hard_blocker_between(map, entities, attacker, attacker_owner, start, end)
     }
@@ -186,7 +194,8 @@ pub(super) fn resolve_target(
         policy_id: combat_rules::default_target_priority_policy(attacker.kind),
         can_retain_moving_target: attacker_can_fire_while_moving,
     };
-    let attacker_is_vehicle_body = movement_body_class(attacker.kind) == MovementBodyClass::VehicleBody;
+    let attacker_is_vehicle_body =
+        movement_body_class(attacker.kind) == MovementBodyClass::VehicleBody;
     let weapon_range_px = weapon_range_px(attacker);
     let candidates = legal_target_candidates(
         map,
@@ -226,14 +235,9 @@ pub(super) fn resolve_target(
             return fireable_target;
         }
     }
-    choose_target_preferring_anti_tank_field(
-        &context,
-        attacker,
-        px,
-        py,
-        &candidates,
-        |candidate| target_filter(candidate.id),
-    )
+    choose_target_preferring_anti_tank_field(&context, attacker, px, py, &candidates, |candidate| {
+        target_filter(candidate.id)
+    })
 }
 
 fn mode_requires_currently_fireable_targets(mode: CombatMode) -> bool {

@@ -338,7 +338,8 @@ pub(in crate::game) fn combat_system(
             Some(t) => (t.pos_x, t.pos_y, t.owner),
             None => continue,
         };
-        if !(teams.is_enemy_owner(owner, t_owner) || mode == CombatMode::Ordered && t_owner == owner)
+        if !(teams.is_enemy_owner(owner, t_owner)
+            || mode == CombatMode::Ordered && t_owner == owner)
         {
             continue; // auto-acquisition stays hostile-only; explicit self-attacks are ordered.
         }
