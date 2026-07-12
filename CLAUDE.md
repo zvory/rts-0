@@ -4,6 +4,16 @@ This is a server-authoritative Bewegungskrieg game. The Rust server in `server/`
 simulation and serves the plain JavaScript/PixiJS client in `client/`. Clients send commands; the
 server sends per-player, fog-filtered snapshots.
 
+## Development stage
+
+This game is pre-alpha, not a live production service. Build strong foundations for architecture,
+authority, security, and maintainability, but do not preserve compatibility for its own sake.
+Breaking gameplay, old behavior, protocols, APIs, replays, or local data is acceptable when it
+produces a cleaner foundation. Prefer coordinated clean breaks that update all affected code,
+docs, and tests over compatibility shims, dual paths, deprecation periods, or elaborate migrations.
+Move quickly and do not spend excessive time protecting old versions or transient development
+state unless the user explicitly requests compatibility or identifies persistent data that matters.
+
 ## Start with relevant context
 
 Read the smallest relevant capsule in `docs/context/` before exploring broadly. The index covers
