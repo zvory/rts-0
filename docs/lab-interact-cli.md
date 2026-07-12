@@ -2,7 +2,8 @@
 
 Lab Interact is a project-local command-line tool for arranging and inspecting small authoritative
 Lab scenes through a machine-readable local interface. It starts this worktree's normal Rust
-server and a headless Pixi client. Mutations are ephemeral and never edit source files.
+server and a headless client using Pixi by default. Mutations are ephemeral and never edit source
+files; `open` accepts `renderer:"babylon"` for the explicit Babylon Lab route.
 
 ## Commands
 
@@ -10,6 +11,7 @@ Run commands from the worktree root. The optional second argument must be one JS
 
 ```bash
 node scripts/lab-interact/cli.mjs open '{"viewport":{"width":1000,"height":700,"deviceScaleFactor":1}}'
+node scripts/lab-interact/cli.mjs open '{"renderer":"babylon","viewport":{"width":1000,"height":700,"deviceScaleFactor":1}}'
 node scripts/lab-interact/cli.mjs catalog '{"sessionId":"<id>","categories":["players","units","commands"]}'
 node scripts/lab-interact/cli.mjs spawn '{"sessionId":"<id>","spawns":[{"owner":1,"kind":"rifleman","x":960,"y":960,"alias":"subject"}]}'
 node scripts/lab-interact/cli.mjs update '{"sessionId":"<id>","updates":[{"operation":"move","entity":"subject","x":1100,"y":960}]}'

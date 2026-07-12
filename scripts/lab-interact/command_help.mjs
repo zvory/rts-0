@@ -9,11 +9,11 @@ function descriptor(summary, acceptedShape, {
 export const LAB_INTERACT_COMMAND_HELP = Object.freeze({
   open: descriptor(
     "Open or recover the one authoritative Lab Interact session for this worktree.",
-    "{workspaceRoot?:string,map?:token,seed?:string|u32,scenario?:token,viewport?:{width:int,height:int,deviceScaleFactor?:number}}",
+    "{workspaceRoot?:string,map?:token,seed?:string|u32,scenario?:token,renderer?:\"pixi\"|\"babylon\",viewport?:{width:int,height:int,deviceScaleFactor?:number}}",
     {
-      defaults: ["workspaceRoot=current worktree", "map=Default", "scenario=blank", "seed=empty", "viewport=1440x900 at DPR 1"],
+      defaults: ["workspaceRoot=current worktree", "map=Default", "scenario=blank", "renderer=pixi", "seed=empty", "viewport=1440x900 at DPR 1"],
       bounds: ["one session", "map/scenario <=48 safe-token characters", "viewport 320-4096 x 240-4096", "DPR >0 and <=4"],
-      example: { viewport: { width: 1000, height: 700, deviceScaleFactor: 1 } },
+      example: { renderer: "babylon", viewport: { width: 1000, height: 700, deviceScaleFactor: 1 } },
     },
   ),
   close: descriptor("Close the active browser/server session without stopping the daemon.", "{sessionId:string}", {
@@ -59,7 +59,7 @@ export const LAB_INTERACT_COMMAND_HELP = Object.freeze({
     bounds: ["focus 1-400 refs", "padding 0-1024", "snapshot framingScale >0 and <=16"],
     example: { sessionId: "<lab-session-id>", camera: { action: "focus", refs: ["subject"] } },
   }),
-  screenshot: descriptor("Capture a readiness-checked Pixi PNG and bounded adjacent manifest.", "{sessionId:string,name?:token,presentation?:\"clean\"|\"normal\",viewport?:viewport,subjects?:(alias|u32)[]}", {
+  screenshot: descriptor("Capture a readiness-checked selected-renderer PNG and bounded adjacent manifest.", "{sessionId:string,name?:token,presentation?:\"clean\"|\"normal\",viewport?:viewport,subjects?:(alias|u32)[]}", {
     variants: ["presentation=clean hides UI chrome", "presentation=normal retains visible Lab panels and game UI"],
     defaults: ["name=scene", "presentation=clean", "viewport=current viewport", "subjects=[]"], bounds: ["0-400 subjects", "name 1-48 safe-token characters", "capture viewport 320-2048 x 240-2048", "24 detailed subject summaries"],
     example: { sessionId: "<lab-session-id>", name: "subject", presentation: "clean", subjects: ["subject"] },

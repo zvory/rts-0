@@ -16,12 +16,12 @@ Babylon to reproduce every Pixi feature before pre-alpha play.
 
 | Capability | Pixi | Babylon | Evidence / owner |
 | --- | --- | --- | --- |
-| One Match-owned rAF and visual clock | complete | missing | Babylon Phase 4. |
-| Semantic camera/projection | complete | missing | Shared contract complete; Babylon perspective Phase 4. |
-| Perspective-safe selection/marquee/ground hits | complete | missing | Shared `SelectionSceneV1`; Babylon projection use Phases 4–5. |
-| Detached fog-filtered presentation frame | complete | missing | Shared/Pixi complete; Babylon consumption Phase 4. |
-| Default Pixi and explicit lazy Babylon selector | complete | missing | Phase 4. |
-| Static ground and generic scene | complete | missing | Phase 4 Lab kernel. |
+| One Match-owned rAF and visual clock | complete | complete | Babylon calls `scene.render()` only from the Match frame seam. |
+| Semantic camera/projection | complete | complete | Fixed perspective and scene-camera coefficients share one snapshot. |
+| Perspective-safe selection/marquee/ground hits | complete | complete | Shared `SelectionSceneV1` receives the selected camera projection. |
+| Detached fog-filtered presentation frame | complete | complete | Babylon reads only `PresentationFrameV1`. |
+| Default Pixi and explicit lazy Babylon selector | complete | complete | `rtsRenderer=babylon` is Lab-only and lazy. |
+| Static ground and generic scene | complete | representative | Phase 4 authoritative Lab kernel capture. |
 | Current/explored fog, memory, intel, and reveals | complete | missing | Phase 5 plus two-recipient secrecy check. |
 | Generic entities, selection/HP, basic command feedback | complete | missing | Phase 5 playable slice. |
 | HUD, minimap, lobby, panels, audio, control groups | shared external | shared external | Existing shared surfaces. |
@@ -56,6 +56,14 @@ Presentation-frame, Pixi-adapter, renderer-feedback, Lab capture, architecture, 
 contracts prove one detached frame assembly, exact layers/grids, one `render(frame)` call, private
 Pixi compatibility reads, non-destructive decal reconciliation, bounded render failure, and
 successful-frame selection publication.
+
+### `P4-babylon-kernel`
+
+Selector, fixed-perspective, coordinate, backend lifecycle, client architecture, and Lab browser
+contracts prove lazy opt-in loading, shared scene/selection projection, centralized world/scene
+conversion, Match-owned presentation, resize, bounded failure, and idempotent cleanup. Babylon
+currently draws only the authoritative map bounds and bounded visible generic primitives; fog and
+playable feedback remain Phase 5 work.
 
 ## Evidence policy
 

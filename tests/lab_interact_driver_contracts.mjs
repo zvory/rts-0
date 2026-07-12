@@ -60,6 +60,11 @@ assert.equal(
   "captured browser diagnostics apply the same per-entry size bound as server-log tails",
 );
 
+const babylonDriver = new LabInteractDriver({ workspaceRoot: root, renderer: "babylon" });
+babylonDriver.server = { baseUrl: "http://127.0.0.1:8081/" };
+babylonDriver.workspace = workspace;
+assert.equal(new URL(babylonDriver.launchUrl()).searchParams.get("rtsRenderer"), "babylon", "Lab Interact can launch the explicit Babylon route");
+
 assert.equal(transitionDriverState(DRIVER_STATES.OPENING, "opened"), DRIVER_STATES.OPEN, "driver opens once");
 assert.equal(transitionDriverState(DRIVER_STATES.OPEN, "closing"), DRIVER_STATES.CLOSING, "driver closes from open");
 assert.equal(transitionDriverState(DRIVER_STATES.CLOSING, "closed"), DRIVER_STATES.CLOSED, "driver reaches closed state");

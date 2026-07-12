@@ -115,6 +115,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "fog.js": "platform",
   "camera.js": "platform",
   "camera_projection.js": "platform",
+  "fixed_perspective_camera.js": "platform",
   "map_editor_launch.js": "platform",
 }));
 
@@ -130,6 +131,8 @@ const ALLOWED_CROSS_AREA_IMPORTS = new Map(Object.entries({
   "net.js -> report_window_aggregate.js": "Net Report Phase 1 shares bounded report-window aggregation with client perf and command diagnostics.",
   "prediction_controller.js -> report_window_aggregate.js": "Net Report Phase 2 reuses the bounded report-window helper for command milestone diagnostics.",
   "minimap.js -> input/artillery_targeting.js": "Minimap command targeting shares the pure artillery target-lock predictor with viewport input so local feedback matches server locking.",
+  "renderer/backend_bundle.js -> camera.js": "The selected Pixi bundle owns construction of its orthographic semantic camera.",
+  "renderer/babylon/backend_bundle.js -> fixed_perspective_camera.js": "The selected Babylon bundle owns construction of its engine-independent semantic camera.",
 }));
 
 const ALLOWED_PROTOTYPE_GRAFTS = new Set([
@@ -162,7 +165,8 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   // Visual Experimentation Phase 1 injects local lab visual profile state for renderer-only samples.
   // Lab Interact Phase 6 adds only the public fixed-capture lifecycle seam; its state machine lives
   // in match_fixed_capture.js so Match retains renderer/rAF ownership without absorbing the logic.
-  "match.js": 48061,
+  // Render3D Phase 4 replaces direct Pixi construction with one injected selected-backend bundle.
+  "match.js": 48131,
   // Artillery minimap markers add a compact visual-only firing event.
   "protocol.js": 45366,
   // Protocol cleanup split compact snapshot decoding behind protocol.js.
@@ -423,6 +427,13 @@ function checkPresentationBoundary(file, source) {
 }
 
 function checkMatchRendererSeam(file, source) {
+  if (file.startsWith("renderer/babylon/")) {
+    for (const forbidden of ["requestAnimationFrame", "runRenderLoop", "PixiPresentationAdapter", "GameState", "ClientIntent"]) {
+      if (source.includes(forbidden)) {
+        failures.push(`${file}: Babylon backend must not reference ${forbidden}; Match owns timing and detached presentation`);
+      }
+    }
+  }
   if (file === "frame_recovery.js") {
     const calls = source.match(/match\.renderer\.render\([^\n]*/g) || [];
     if (calls.length !== 1 || calls[0] !== "match.renderer.render(presentationFrame));") {
@@ -452,8 +463,8 @@ function checkImport(fromFile, toFile) {
     failures.push(`${fromFile} -> ${toFile}: Match must receive lab UI/services through app-shell dependency injection`);
     return;
   }
-  if (toFile === PIXI_COMPATIBILITY_ADAPTER && fromFile !== "match.js") {
-    failures.push(`${fromFile} -> ${toFile}: Pixi compatibility adapter is private to Match and unavailable to other backends`);
+  if (toFile === PIXI_COMPATIBILITY_ADAPTER && fromFile !== "renderer/backend_bundle.js") {
+    failures.push(`${fromFile} -> ${toFile}: Pixi compatibility adapter is private to the Pixi backend bundle and unavailable to other backends`);
     return;
   }
 

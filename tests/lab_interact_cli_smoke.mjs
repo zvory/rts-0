@@ -11,6 +11,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const cli = path.join(root, "scripts/lab-interact/cli.mjs");
 const isolatedTmp = fs.mkdtempSync(path.join("/tmp", "rts-li-smoke-"));
 const env = { ...process.env, TMPDIR: isolatedTmp };
+const renderer = env.RTS_LAB_INTERACT_RENDERER || "pixi";
+assert.ok(["pixi", "babylon"].includes(renderer), "Lab Interact smoke renderer must be pixi or babylon");
 const recordingDurationMs = Number(env.RTS_LAB_INTERACT_RECORDING_CANARY_MS || 5_000);
 assert.ok(
   Number.isInteger(recordingDurationMs) && recordingDurationMs >= 2_000 && recordingDurationMs <= 60_000,
@@ -98,7 +100,7 @@ function spawnBulkUsingPlacementSuggestions(sessionId, spawns) {
 
 try {
   assert.equal(call("shutdown").alreadyStopped, true, "isolated smoke starts without touching any developer daemon");
-  const opened = call("open", { viewport: { width: 1000, height: 700, deviceScaleFactor: 1 } });
+  const opened = call("open", { renderer, viewport: { width: 1000, height: 700, deviceScaleFactor: 1 } });
   sessionId = opened.sessionId;
   daemonPid = JSON.parse(fs.readFileSync(paths.state, "utf8")).pid;
   assert.equal(opened.workspace.root, fs.realpathSync(root), "CLI daemon serves the selected worktree");
@@ -122,7 +124,7 @@ try {
   call("camera", { sessionId, camera: { action: "focus", refs: authoredSubjects, padding: 64 } });
   const screenshot = call("screenshot", {
     sessionId,
-    name: "cli-smoke",
+    name: renderer === "babylon" ? "babylon-kernel" : "cli-smoke",
     presentation: "clean",
     viewport: { width: 1000, height: 700, deviceScaleFactor: 1 },
     subjects: authoredSubjects,
@@ -186,7 +188,7 @@ try {
   const closedSessionId = sessionId;
   call("close", { sessionId });
   sessionId = null;
-  const reopened = call("open");
+  const reopened = call("open", { renderer });
   sessionId = reopened.sessionId;
   assert.notEqual(sessionId, closedSessionId, "close followed by live open creates a fresh session id");
   assert.equal(callFailure("inspect", { sessionId: closedSessionId }).code, "unknownSession", "closed live session ids are rejected as stale");
