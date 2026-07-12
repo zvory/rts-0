@@ -430,8 +430,8 @@ mod tests {
             Map::load("1v1", 2, 0x1234_5678).expect("1v1 should load for two active players");
         assert_eq!(
             one_v_one_map.base_sites.len(),
-            8,
-            "1v1 must retain all eight permanent resource bases"
+            10,
+            "1v1 must retain all ten permanent resource bases"
         );
         assert!(
             Map::load("1v1", 3, 0x1234_5678).is_err(),
