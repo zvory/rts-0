@@ -421,6 +421,29 @@ fn lab_replay_artifact_rejects_nonfinite_set_rally_coordinates() {
 }
 
 #[test]
+fn lab_replay_artifact_rejects_stale_set_rally_node() {
+    let mut artifact = valid_artifact();
+    artifact.operations[0].op = LabReplayOperation::IssueCommandAs {
+        player_id: 1,
+        cmd: Command::SetRally {
+            building: 1,
+            x: 10.0,
+            y: 10.0,
+            node: Some(u32::MAX),
+            kind: Some("move".to_string()),
+            queued: false,
+        },
+        ignore_command_limits: false,
+    };
+
+    let err = validate_lab_replay_artifact(&artifact).expect_err("stale rally node should fail");
+
+    assert!(err
+        .to_string()
+        .contains("command.node references stale entity id"));
+}
+
+#[test]
 fn lab_replay_artifact_rejects_unsupported_vision_metadata_operation() {
     let mut value = serde_json::to_value(valid_artifact()).unwrap();
     value["operations"][0]["op"] = json!({

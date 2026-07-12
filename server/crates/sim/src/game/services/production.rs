@@ -1,6 +1,7 @@
 use crate::game::entity::{EntityStore, OrderIntent, RallyIntent, RallyKind};
 use crate::game::map::Map;
 use crate::game::services::move_coordinator::MoveCoordinator;
+use crate::game::services::world_query;
 use crate::game::upgrade::UpgradeKind;
 use crate::game::PlayerState;
 use crate::game::{ability::AbilityKind, entity::EntityKind};
@@ -78,6 +79,10 @@ pub(crate) fn production_system(
         };
 
         if let Some((owner, unit)) = ready {
+            let unit_can_gather = players.iter().any(|player| {
+                player.id == owner
+                    && crate::rules::economy::can_gather_for_faction(&player.faction_id, unit)
+            });
             // Prefer the spawn exit closest to the first rally stage (if any), so units leave from
             // the side of the building facing the rally plan.
             let rally_plan = entities.get(id).map(|b| b.rally_plan()).unwrap_or_default();
@@ -109,9 +114,10 @@ pub(crate) fn production_system(
                     player.record_entity_created(unit);
                 }
                 // Send the new unit through the building's rally plan. Plain rally stages default
-                // to attack-move for combat units, but worker-like gatherers keep move rally behavior.
+                // to attack-move for combat units, but faction gatherers keep move rally behavior.
                 if let Some(first) = rally_plan.first().copied() {
-                    if let Some(node) = gather_rally_target(unit, first) {
+                    if let Some(node) = gather_rally_target(entities, owner, unit_can_gather, first)
+                    {
                         coordinator.order_gather(entities, spawned, node);
                     } else {
                         coordinator.order_group_move(
@@ -119,12 +125,12 @@ pub(crate) fn production_system(
                             owner,
                             &[spawned],
                             (first.point.x, first.point.y),
-                            rally_stage_attacks(unit, first),
+                            rally_stage_attacks(unit_can_gather, first),
                         );
                     }
                     if let Some(e) = entities.get_mut(spawned) {
                         for stage in rally_plan.iter().skip(1).copied() {
-                            e.append_queued_order(rally_order_intent(unit, stage));
+                            e.append_queued_order(rally_order_intent(unit_can_gather, stage));
                         }
                     }
                 }
@@ -133,28 +139,28 @@ pub(crate) fn production_system(
     }
 }
 
-fn rally_stage_attacks(unit: EntityKind, rally: RallyIntent) -> bool {
-    matches!(rally.kind, RallyKind::AttackMove) || !is_worker_like_gatherer(unit)
+fn rally_stage_attacks(unit_can_gather: bool, rally: RallyIntent) -> bool {
+    matches!(rally.kind, RallyKind::AttackMove) || !unit_can_gather
 }
 
-fn is_worker_like_gatherer(unit: EntityKind) -> bool {
-    matches!(unit, EntityKind::Worker | EntityKind::Golem)
-}
-
-fn rally_order_intent(unit: EntityKind, rally: RallyIntent) -> OrderIntent {
-    if let Some(node) = gather_rally_target(unit, rally) {
+fn rally_order_intent(unit_can_gather: bool, rally: RallyIntent) -> OrderIntent {
+    if let Some(node) = unit_can_gather.then_some(rally.resource_node).flatten() {
         OrderIntent::gather(node)
-    } else if rally_stage_attacks(unit, rally) {
+    } else if rally_stage_attacks(unit_can_gather, rally) {
         OrderIntent::attack_move_to(rally.point.x, rally.point.y)
     } else {
         OrderIntent::move_to(rally.point.x, rally.point.y)
     }
 }
 
-fn gather_rally_target(unit: EntityKind, rally: RallyIntent) -> Option<u32> {
-    is_worker_like_gatherer(unit)
-        .then_some(rally.resource_node)
-        .flatten()
+fn gather_rally_target(
+    entities: &EntityStore,
+    owner: u32,
+    unit_can_gather: bool,
+    rally: RallyIntent,
+) -> Option<u32> {
+    let node = unit_can_gather.then_some(rally.resource_node).flatten()?;
+    world_query::steel_node_is_mineable_by_player(entities, owner, node).then_some(node)
 }
 
 fn set_owned_mortar_autocast(entities: &mut EntityStore, owner: u32, enabled: bool) {
@@ -545,6 +551,25 @@ mod tests {
             Order::Gather(order) if order.intent.node == steel
         ));
         assert_eq!(worker.target_id(), Some(steel));
+
+        let first_worker = worker.id;
+        entities.remove(steel);
+        entities
+            .get_mut(city_centre)
+            .expect("city centre")
+            .push_production(ProdItem {
+                unit: EntityKind::Worker,
+                progress: 1,
+                total: 1,
+            });
+        tick_production(&map, &mut entities, &mut players);
+
+        let replacement = entities
+            .iter()
+            .find(|e| e.owner == 1 && e.kind == EntityKind::Worker && e.id != first_worker)
+            .expect("replacement worker should spawn");
+        assert!(matches!(replacement.order(), Order::Move(_)));
+        assert_eq!(replacement.path_goal(), Some(rally));
     }
 
     #[test]

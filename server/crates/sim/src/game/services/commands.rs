@@ -1043,8 +1043,7 @@ fn deconstruct_unit_can_target(
 }
 
 fn gather_node_valid(entities: &EntityStore, player: u32, node: u32) -> bool {
-    matches!(entities.get(node), Some(n) if n.is_node() && n.kind != EntityKind::Oil && n.remaining().unwrap_or(0) > 0)
-        && world_query::resource_has_completed_mining_cc(entities, player, node)
+    world_query::steel_node_is_mineable_by_player(entities, player, node)
 }
 
 fn gather_unit_can_use_node(

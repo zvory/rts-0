@@ -164,7 +164,17 @@ const ALLOWED_SERVICE_IMPORTS: &[(&str, &[&str])] = &[
         ],
     ),
     ("pathing", &["occupancy", "standability"]),
-    ("production", &["move_coordinator", "occupancy", "pathing", "scout_plane", "standability"]),
+    (
+        "production",
+        &[
+            "move_coordinator",
+            "occupancy",
+            "pathing",
+            "scout_plane",
+            "standability",
+            "world_query",
+        ],
+    ),
     ("standability", &["geometry", "occupancy", "spatial"]),
     ("world_query", &["spatial"]),
 ];

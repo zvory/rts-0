@@ -275,14 +275,14 @@ fn steel_rally_targets_the_authoritative_node_and_oil_rally_is_rejected() {
 }
 
 #[test]
-fn coordinate_only_resource_rallies_detect_steel_and_reject_oil() {
+fn coordinate_only_resource_rallies_remain_plain_ground_points() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
     let (cx, cy) = footprint_center(&map, EntityKind::CityCentre, 6, 6);
     let city_centre = entities
         .spawn_building(1, EntityKind::CityCentre, cx, cy, true)
         .expect("city centre should spawn");
-    let steel = entities
+    entities
         .spawn_node(EntityKind::Steel, 320.0, 256.0)
         .expect("steel should spawn");
     entities
@@ -304,10 +304,9 @@ fn coordinate_only_resource_rallies_detect_steel_and_reject_oil() {
             },
         )],
     );
-    assert_eq!(
-        entities.get(city_centre).expect("city centre").rally_plan()[0].resource_node,
-        Some(steel)
-    );
+    let rally = entities.get(city_centre).expect("city centre").rally_plan()[0];
+    assert_eq!(rally.resource_node, None);
+    assert_eq!((rally.point.x, rally.point.y), (320.0, 256.0));
 
     apply(
         &map,
@@ -324,8 +323,7 @@ fn coordinate_only_resource_rallies_detect_steel_and_reject_oil() {
             },
         )],
     );
-    assert_eq!(
-        entities.get(city_centre).expect("city centre").rally_plan()[0].resource_node,
-        Some(steel)
-    );
+    let rally = entities.get(city_centre).expect("city centre").rally_plan()[0];
+    assert_eq!(rally.resource_node, None);
+    assert_eq!((rally.point.x, rally.point.y), (384.0, 256.0));
 }

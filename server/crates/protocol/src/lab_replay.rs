@@ -576,8 +576,17 @@ fn validate_command(
         | Command::Cancel { building } => {
             validate_entity_id(*building, "command.building", state)?;
         }
-        Command::SetRally { building, x, y, .. } => {
+        Command::SetRally {
+            building,
+            x,
+            y,
+            node,
+            ..
+        } => {
             validate_entity_id(*building, "command.building", state)?;
+            if let Some(node) = node {
+                validate_entity_id(*node, "command.node", state)?;
+            }
             validate_finite_point(*x, *y, "command.setRally")?;
         }
     }

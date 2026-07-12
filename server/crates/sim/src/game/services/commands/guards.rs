@@ -85,39 +85,19 @@ pub(super) fn rally_intent_for_map(
     let max = (map.world_size_px() - 1.0).max(0.0);
     let x = x.clamp(0.0, max);
     let y = y.clamp(0.0, max);
-    let resource = match requested_node {
-        Some(node) => entities.get(node),
-        None => resource_node_at_point(entities, x, y),
+    let Some(node) = requested_node else {
+        return Some(RallyIntent::new(kind, x, y));
     };
-    match (requested_node, resource) {
-        (Some(_), None) => None,
-        (_, Some(node)) if node.kind == EntityKind::Oil => None,
-        (_, Some(node)) if node.kind == EntityKind::Steel && node.remaining().unwrap_or(0) > 0 => {
-            Some(RallyIntent::to_resource(
-                kind, node.id, node.pos_x, node.pos_y,
-            ))
-        }
-        (Some(_), Some(_)) => None,
-        (None, _) => Some(RallyIntent::new(kind, x, y)),
+    let resource = entities.get(node)?;
+    if resource.kind != EntityKind::Steel || resource.remaining().unwrap_or(0) == 0 {
+        return None;
     }
-}
-
-fn resource_node_at_point(
-    entities: &EntityStore,
-    x: f32,
-    y: f32,
-) -> Option<&crate::game::entity::Entity> {
-    entities
-        .iter()
-        .filter(|entity| entity.is_node() && entity.remaining().unwrap_or(0) > 0)
-        .filter_map(|entity| {
-            let dx = entity.pos_x - x;
-            let dy = entity.pos_y - y;
-            let dist2 = dx * dx + dy * dy;
-            (dist2 <= entity.radius() * entity.radius()).then_some((entity, dist2))
-        })
-        .min_by(|(a, a_dist), (b, b_dist)| a_dist.total_cmp(b_dist).then_with(|| a.id.cmp(&b.id)))
-        .map(|(entity, _)| entity)
+    Some(RallyIntent::to_resource(
+        kind,
+        resource.id,
+        resource.pos_x,
+        resource.pos_y,
+    ))
 }
 
 fn command_weight(kind: EntityKind) -> u32 {

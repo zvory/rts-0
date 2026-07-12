@@ -20,8 +20,8 @@
     },
     {
       "path": "server/crates/archcheck/src/lib.rs",
-      "lines": 2459,
-      "reason": "Checkpoint Phase 7 expands the existing oversized architecture checker with state-owner checkpoint policy/evidence enforcement; keep ratcheting until archcheck scanners and tests are split into modules."
+      "lines": 2469,
+      "reason": "Steel rally production reuses the authoritative mining query through an explicit architecture edge; keep ratcheting until archcheck scanners and tests are split into modules."
     },
     {
       "path": "server/crates/protocol/src/lib.rs",
@@ -65,8 +65,8 @@
     },
     {
       "path": "tests/client_contracts/state_input_contracts.mjs",
-      "lines": 1890,
-      "reason": "Lab tool pointer contracts were extracted beside their setup-tool behavior; keep ratcheting until remaining state/input fixtures are split."
+      "lines": 1921,
+      "reason": "Steel rally input coverage extends the existing oversized state/input fixture; keep ratcheting until remaining state/input fixtures are split."
     }
   ]
 }

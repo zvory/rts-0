@@ -1,5 +1,5 @@
 {
-  "reason": "Map base-site migration reformatted simulation tests and moved existing construction player-state signatures",
+  "reason": "steel rallies add validated resource-target state and shared production-time mining eligibility",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -55,7 +55,7 @@
     },
     {
       "path": "command.rs",
-      "lines": 668
+      "lines": 705
     },
     {
       "path": "commands.rs",
@@ -79,7 +79,7 @@
     },
     {
       "path": "entity/order.rs",
-      "lines": 508
+      "lines": 521
     },
     {
       "path": "entity/state.rs",
@@ -123,7 +123,7 @@
     },
     {
       "path": "lab/checkpoint_scenario.rs",
-      "lines": 332
+      "lines": 344
     },
     {
       "path": "lab/tests.rs",
@@ -135,7 +135,7 @@
     },
     {
       "path": "map.rs",
-      "lines": 567
+      "lines": 611
     },
     {
       "path": "map/authored.rs",
@@ -335,7 +335,7 @@
     },
     {
       "path": "services/commands/guards.rs",
-      "lines": 89
+      "lines": 107
     },
     {
       "path": "services/commands/planner_facts.rs",
@@ -359,7 +359,7 @@
     },
     {
       "path": "services/commands/tests/build.rs",
-      "lines": 612
+      "lines": 650
     },
     {
       "path": "services/commands/tests/command_budget.rs",
@@ -375,7 +375,7 @@
     },
     {
       "path": "services/commands/tests/rally.rs",
-      "lines": 207
+      "lines": 329
     },
     {
       "path": "services/commands/tests/scout_plane_production.rs",
@@ -387,7 +387,7 @@
     },
     {
       "path": "services/commands/tests/tank_traps.rs",
-      "lines": 168
+      "lines": 192
     },
     {
       "path": "services/construction.rs",
@@ -511,7 +511,7 @@
     },
     {
       "path": "services/order_queue.rs",
-      "lines": 1529
+      "lines": 1524
     },
     {
       "path": "services/order_queue/attack.rs",
@@ -531,7 +531,7 @@
     },
     {
       "path": "services/production.rs",
-      "lines": 793
+      "lines": 862
     },
     {
       "path": "services/scout_plane.rs",
@@ -567,11 +567,11 @@
     },
     {
       "path": "services/world_query.rs",
-      "lines": 468
+      "lines": 481
     },
     {
       "path": "setup.rs",
-      "lines": 588
+      "lines": 590
     },
     {
       "path": "setup/checkpoint_start.rs",
@@ -603,7 +603,7 @@
     },
     {
       "path": "setup/tests.rs",
-      "lines": 389
+      "lines": 401
     },
     {
       "path": "smoke.rs",
@@ -659,7 +659,7 @@
     },
     {
       "path": "tests/build_wait_tests.rs",
-      "lines": 266
+      "lines": 321
     },
     {
       "path": "tests/checkpoint_helpers.rs",
@@ -667,7 +667,7 @@
     },
     {
       "path": "tests/checkpoint_lab_tests.rs",
-      "lines": 265
+      "lines": 304
     },
     {
       "path": "tests/checkpoint_payload_tests.rs",
@@ -683,7 +683,7 @@
     },
     {
       "path": "tests/derived_state_tests.rs",
-      "lines": 940
+      "lines": 947
     },
     {
       "path": "tests/determinism_tests.rs",
@@ -711,7 +711,7 @@
     },
     {
       "path": "tests/movement_replay_tests.rs",
-      "lines": 1017
+      "lines": 1068
     },
     {
       "path": "tests/panzerfaust_death_tests.rs",
@@ -1208,6 +1208,12 @@
       "line": 3
     },
     {
+      "source": "production",
+      "target": "world_query",
+      "path": "services/production.rs",
+      "line": 4
+    },
+    {
       "source": "standability",
       "target": "geometry",
       "path": "services/standability.rs",
@@ -1335,7 +1341,7 @@
     },
     {
       "path": "services/production.rs",
-      "line": 12,
+      "line": 13,
       "name": "production_system"
     },
     {
@@ -1437,7 +1443,7 @@
     },
     {
       "path": "services/commands.rs",
-      "line": 654,
+      "line": 655,
       "code": "players: &mut [PlayerState],"
     },
     {
@@ -1612,7 +1618,7 @@
     },
     {
       "path": "services/order_queue.rs",
-      "line": 672,
+      "line": 667,
       "code": "players: &[PlayerState],"
     },
     {
@@ -1627,12 +1633,12 @@
     },
     {
       "path": "services/production.rs",
-      "line": 15,
+      "line": 16,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/production.rs",
-      "line": 5,
+      "line": 6,
       "code": "use crate::game::PlayerState;"
     },
     {
@@ -1647,12 +1653,12 @@
     },
     {
       "path": "setup.rs",
-      "line": 287,
+      "line": 288,
       "code": "let mut ps = PlayerState {"
     },
     {
       "path": "setup.rs",
-      "line": 548,
+      "line": 550,
       "code": "player: &mut PlayerState,"
     },
     {
@@ -1895,7 +1901,7 @@
     },
     {
       "path": "entity/order.rs",
-      "count": 59
+      "count": 60
     },
     {
       "path": "entity/state.rs",
@@ -2075,7 +2081,7 @@
     },
     {
       "path": "services/world_query.rs",
-      "count": 15
+      "count": 16
     },
     {
       "path": "setup.rs",
