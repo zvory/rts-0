@@ -20,7 +20,7 @@
     },
     {
       "path": "server/crates/archcheck/src/lib.rs",
-      "lines": 2469,
+      "lines": 2472,
       "reason": "Steel rally production reuses the authoritative mining query through an explicit architecture edge; keep ratcheting until archcheck scanners and tests are split into modules."
     },
     {
