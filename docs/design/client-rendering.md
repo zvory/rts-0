@@ -143,6 +143,11 @@ PresentationFrameV1 = {
 }
 ```
 
+Presented entity records include backend-neutral `visualBounds` (`class`, `widthPx`, `depthPx`,
+`heightPx`) derived from the mirrored entity stats. Placement feedback includes a detached
+tile-footprint descriptor. These are presentation hints only: `SelectionSceneV1` remains the sole
+entity/ground interaction authority.
+
 The backend owns any mutable staging buffers. Frame objects, arrays, and ordinary records are
 detached and frozen. Malformed individual records are dropped with bounded category diagnostics;
 they do not abort the whole frame.
@@ -197,7 +202,8 @@ selection, and diagnostics before the live route is enabled.
 
 Generic entities share simple source geometry/materials and remain truthful placeholders. They
 preserve team, facing, construction, selection, and HP data received in the frame. Shared HUD,
-minimap, audio, and control-group surfaces are reused.
+minimap, audio, and control-group surfaces are reused. Babylon is opt-in for ordinary live players
+and Lab; replay and ordinary spectator matches explicitly fall back to Pixi.
 
 ### 5.4 Trusted assets and events
 

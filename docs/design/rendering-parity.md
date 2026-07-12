@@ -20,10 +20,10 @@ Babylon to reproduce every Pixi feature before pre-alpha play.
 | Semantic camera/projection | complete | complete | Fixed perspective and scene-camera coefficients share one snapshot. |
 | Perspective-safe selection/marquee/ground hits | complete | complete | Shared `SelectionSceneV1` receives the selected camera projection. |
 | Detached fog-filtered presentation frame | complete | complete | Babylon reads only `PresentationFrameV1`. |
-| Default Pixi and explicit lazy Babylon selector | complete | complete | `rtsRenderer=babylon` is Lab-only and lazy. |
+| Default Pixi and explicit lazy Babylon selector | complete | complete | `rtsRenderer=babylon` is live-player/Lab-only and lazy; replay/spectator matches stay Pixi. |
 | Static ground and generic scene | complete | representative | Phase 4 authoritative Lab kernel capture. |
-| Current/explored fog, memory, intel, and reveals | complete | missing | Phase 5 plus two-recipient secrecy check. |
-| Generic entities, selection/HP, basic command feedback | complete | missing | Phase 5 playable slice. |
+| Current/explored fog, memory, intel, and reveals | complete | complete | Revisioned grids, separated presentation layers, and two-recipient secrecy check. |
+| Generic entities, selection/HP, basic command feedback | complete | placeholder | Shared generic geometry/materials plus selection, bars, marquee, move/target, and placement cues. |
 | HUD, minimap, lobby, panels, audio, control groups | shared external | shared external | Existing shared surfaces. |
 | One representative trusted asset | complete | missing | Phase 6 representative, not catalog parity. |
 | One normalized finite attack effect | placeholder | missing | Phase 6 representative event spine. |
@@ -62,8 +62,16 @@ successful-frame selection publication.
 Selector, fixed-perspective, coordinate, backend lifecycle, client architecture, and Lab browser
 contracts prove lazy opt-in loading, shared scene/selection projection, centralized world/scene
 conversion, Match-owned presentation, resize, bounded failure, and idempotent cleanup. Babylon
-currently draws only the authoritative map bounds and bounded visible generic primitives; fog and
-playable feedback remain Phase 5 work.
+at that checkpoint drew only the authoritative map bounds and bounded visible generic primitives;
+fog and playable feedback were intentionally left to Phase 5.
+
+### `P5-playable-fog-interaction`
+
+Babylon kernel and real two-recipient contracts prove revisioned current/explored fog, explicit
+memory/intel/reveal categories, aggregate-only diagnostics, generic entity state, minimal command
+feedback, and absence of a never-authorized sentinel from the presentation frame, scene, selection
+candidates, and diagnostics. Shared perspective selection remains mesh-independent; live-player
+and Lab routes are explicit while Pixi stays the default and owns replay/spectator rendering.
 
 ## Evidence policy
 
