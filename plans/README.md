@@ -30,6 +30,17 @@ Each phase document should describe its scope, expected code or documentation to
 verification, manual testing focus, and handoff expectations. When a phase is complete, mark that
 phase document as done in the implementation commit for that phase.
 
+## Pre-alpha experiments
+
+For a pre-alpha/prototype/experiment plan, put a playable opt-in result within at most two
+implementation phases. Keep only authority, secrecy, data integrity, one-loop/lifecycle, and
+bounded-failure checks as blockers for that result; do not turn speculative assets, performance,
+parity, device rollout, or certification work into an execution chain. End the plan at a user
+playtest or measured observation, then create any follow-up as a new small plan with that evidence.
+
+The phase runner executes existing approved phase files only. It must never extend a pre-alpha plan
+with inferred hardening phases or treat a superseded phase document as runnable work.
+
 ## Archive policy
 
 Archived plans under `plans/archive/` are historical evidence only. Active scripts, tests, and
