@@ -52,7 +52,7 @@ use damage::apply_damage;
 use weapons::{
     anti_tank_gun_can_chase, begin_idle_deployed_weapon_setup, can_fire_while_moving,
     deployed_weapon_ready_to_fire, deployed_weapon_ready_to_move, effective_attack_profile,
-    mirror_weapon_to_body, moving_fire_miss_chance, moving_fire_movement_order_holds_path,
+    mirror_weapon_to_body, moving_fire_miss_chance, moving_fire_move_order_holds_path,
     relax_vehicle_weapon_toward_body, rotate_anti_tank_gun_for_combat,
     rotate_vehicle_weapon_for_combat, tick_deployed_weapon_setup,
     update_attack_move_no_target_teardown, uses_stationary_weapon_aggro,
@@ -338,7 +338,8 @@ pub(in crate::game) fn combat_system(
             Some(t) => (t.pos_x, t.pos_y, t.owner),
             None => continue,
         };
-        if !(teams.is_enemy_owner(owner, t_owner) || mode == CombatMode::Ordered && t_owner == owner)
+        if !(teams.is_enemy_owner(owner, t_owner)
+            || mode == CombatMode::Ordered && t_owner == owner)
         {
             continue; // auto-acquisition stays hostile-only; explicit self-attacks are ordered.
         }
@@ -346,7 +347,7 @@ pub(in crate::game) fn combat_system(
         let target_angle = (ty - py).atan2(tx - px);
         let holds_commanded_movement_path = entities
             .get(id)
-            .map(|e| moving_fire_movement_order_holds_path(e, can_move_fire))
+            .map(|e| moving_fire_move_order_holds_path(e, can_move_fire))
             .unwrap_or(false);
         let clear_shot = if is_mortar_team {
             true
@@ -396,8 +397,8 @@ pub(in crate::game) fn combat_system(
                 }
                 e.set_target_id(Some(tid));
                 e.mark_attack_phase(AttackPhase::Firing);
-                // Most units hold position while firing. Moving-fire units keep their ordered path.
-                if !can_move_fire {
+                // Plain Move keeps advancing while firing. Attack Move stops to engage.
+                if !holds_commanded_movement_path {
                     e.clear_path();
                 }
             }
