@@ -48,18 +48,25 @@ fn smoke_projection_fixture() -> (Game, u32, u32, u32, (f32, f32)) {
     let observer_pos = game.state.map.tile_center(4, 4);
     let smoke_pos = game.state.map.tile_center(7, 4);
     let friendly_pos = game.state.map.tile_center(8, 4);
-    let observer = game.state.entities
+    let observer = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::Worker, observer_pos.0, observer_pos.1)
         .expect("observer should spawn");
-    let friendly = game.state.entities
+    let friendly = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::Rifleman, friendly_pos.0, friendly_pos.1)
         .expect("friendly should spawn");
-    let enemy = game.state.entities
+    let enemy = game
+        .state
+        .entities
         .spawn_unit(2, EntityKind::Rifleman, smoke_pos.0, smoke_pos.1)
         .expect("enemy should spawn");
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
-    game.state.smokes
+    game.state
+        .smokes
         .spawn(
             smoke_pos.0,
             smoke_pos.1,
@@ -69,8 +76,12 @@ fn smoke_projection_fixture() -> (Game, u32, u32, u32, (f32, f32)) {
         )
         .expect("smoke should spawn");
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
-    game.state.fog
-        .recompute_with_smoke(&ids, &game.state.entities, &game.state.map, &game.state.smokes);
+    game.state.fog.recompute_with_smoke(
+        &ids,
+        &game.state.entities,
+        &game.state.map,
+        &game.state.smokes,
+    );
     (game, observer, friendly, enemy, smoke_pos)
 }
 
@@ -105,26 +116,35 @@ fn team_fog_fixture() -> (Game, u32, u32, u32, (f32, f32)) {
     let p1_base = game.state.map.tile_center(2, 2);
     let p2_base = game.state.map.tile_center(5, 2);
     let p3_base = game.state.map.tile_center(55, 55);
-    game.state.entities
+    game.state
+        .entities
         .spawn_building(1, EntityKind::CityCentre, p1_base.0, p1_base.1, true)
         .expect("p1 city centre should spawn");
-    game.state.entities
+    game.state
+        .entities
         .spawn_building(2, EntityKind::CityCentre, p2_base.0, p2_base.1, true)
         .expect("p2 city centre should spawn");
-    game.state.entities
+    game.state
+        .entities
         .spawn_building(3, EntityKind::CityCentre, p3_base.0, p3_base.1, true)
         .expect("p3 city centre should spawn");
 
     let spotter_pos = game.state.map.tile_center(28, 30);
     let enemy_pos = game.state.map.tile_center(30, 30);
     let hidden_enemy_pos = game.state.map.tile_center(55, 50);
-    let spotter = game.state.entities
+    let spotter = game
+        .state
+        .entities
         .spawn_unit(2, EntityKind::Worker, spotter_pos.0, spotter_pos.1)
         .expect("ally spotter should spawn");
-    let visible_enemy = game.state.entities
+    let visible_enemy = game
+        .state
+        .entities
         .spawn_unit(3, EntityKind::Rifleman, enemy_pos.0, enemy_pos.1)
         .expect("visible enemy should spawn");
-    let hidden_enemy = game.state.entities
+    let hidden_enemy = game
+        .state
+        .entities
         .spawn_unit(
             3,
             EntityKind::Rifleman,
@@ -135,8 +155,12 @@ fn team_fog_fixture() -> (Game, u32, u32, u32, (f32, f32)) {
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
-    game.state.fog
-        .recompute_with_smoke(&ids, &game.state.entities, &game.state.map, &game.state.smokes);
+    game.state.fog.recompute_with_smoke(
+        &ids,
+        &game.state.entities,
+        &game.state.map,
+        &game.state.smokes,
+    );
     (game, spotter, visible_enemy, hidden_enemy, enemy_pos)
 }
 
@@ -168,7 +192,8 @@ fn snapshot_shares_living_teammate_current_vision() {
             .all(|entity| entity.id != hidden_enemy),
         "enemies outside every living teammate's current sight should stay hidden"
     );
-    let visible_index = ((enemy_pos.1 / config::TILE_SIZE as f32).floor() as u32 * game.state.map.size
+    let visible_index = ((enemy_pos.1 / config::TILE_SIZE as f32).floor() as u32
+        * game.state.map.size
         + (enemy_pos.0 / config::TILE_SIZE as f32).floor() as u32) as usize;
     assert_eq!(
         snapshot.visible_tiles[visible_index], 1,
@@ -177,7 +202,9 @@ fn snapshot_shares_living_teammate_current_vision() {
     assert_eq!(snapshot.player_resources.len(), 0);
     assert!(
         snapshot.steel
-            == game.state.players
+            == game
+                .state
+                .players
                 .iter()
                 .find(|player| player.id == 1)
                 .expect("player 1 should exist")
@@ -248,25 +275,32 @@ fn team_current_vision_keeps_smoke_blocking() {
     let p1_base = game.state.map.tile_center(2, 2);
     let p2_base = game.state.map.tile_center(4, 2);
     let p3_base = game.state.map.tile_center(50, 50);
-    game.state.entities
+    game.state
+        .entities
         .spawn_building(1, EntityKind::CityCentre, p1_base.0, p1_base.1, true)
         .expect("p1 city centre should spawn");
-    game.state.entities
+    game.state
+        .entities
         .spawn_building(2, EntityKind::CityCentre, p2_base.0, p2_base.1, true)
         .expect("p2 city centre should spawn");
-    game.state.entities
+    game.state
+        .entities
         .spawn_building(3, EntityKind::CityCentre, p3_base.0, p3_base.1, true)
         .expect("p3 city centre should spawn");
     let spotter_pos = game.state.map.tile_center(4, 4);
     let smoke_pos = game.state.map.tile_center(7, 4);
     let enemy_pos = game.state.map.tile_center(7, 4);
-    game.state.entities
+    game.state
+        .entities
         .spawn_unit(2, EntityKind::Worker, spotter_pos.0, spotter_pos.1)
         .expect("ally spotter should spawn");
-    let enemy = game.state.entities
+    let enemy = game
+        .state
+        .entities
         .spawn_unit(3, EntityKind::Rifleman, enemy_pos.0, enemy_pos.1)
         .expect("enemy should spawn");
-    game.state.smokes
+    game.state
+        .smokes
         .spawn(
             smoke_pos.0,
             smoke_pos.1,
@@ -278,8 +312,12 @@ fn team_current_vision_keeps_smoke_blocking() {
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
-    game.state.fog
-        .recompute_with_smoke(&ids, &game.state.entities, &game.state.map, &game.state.smokes);
+    game.state.fog.recompute_with_smoke(
+        &ids,
+        &game.state.entities,
+        &game.state.map,
+        &game.state.smokes,
+    );
 
     let snapshot = game.snapshot_for(1);
 
@@ -312,20 +350,27 @@ fn manual_mortar_fire_impacts_without_toast_notice() {
     let mut game = empty_flat_game(&players);
     let mortar_pos = game.state.map.tile_center(8, 8);
     let target_pos = game.state.map.tile_center(12, 8);
-    let mortar = game.state.entities
+    let mortar = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
         .expect("mortar should spawn");
-    game.state.entities
+    game.state
+        .entities
         .get_mut(mortar)
         .expect("mortar should exist")
         .set_weapon_setup(WeaponSetup::Deployed);
-    let target = game.state.entities
+    let target = game
+        .state
+        .entities
         .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
         .expect("target should spawn");
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
-    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
+    game.state
+        .fog
+        .recompute(&ids, &game.state.entities, &game.state.map);
 
     game.enqueue(
         1,
@@ -373,11 +418,14 @@ fn manual_mortar_fire_impacts_without_toast_notice() {
             .all(|event| !matches!(event, Event::Notice { msg, .. } if msg == "Mortar fire")),
         "accepted mortar command should use impact feedback instead of a toast notice: {owner_events:?}"
     );
-    game.state.entities
+    game.state
+        .entities
         .get_mut(target)
         .expect("target should still exist")
         .set_position(impact_pos.0, impact_pos.1);
-    let hp_before_impact = game.state.entities
+    let hp_before_impact = game
+        .state
+        .entities
         .get(target)
         .expect("target should still exist")
         .hp;
@@ -388,7 +436,8 @@ fn manual_mortar_fire_impacts_without_toast_notice() {
     }
 
     assert!(
-        game.state.entities
+        game.state
+            .entities
             .get(target)
             .is_none_or(|target_after| target_after.hp < hp_before_impact),
         "manual mortar fire should damage or kill units at the targeted impact point"
@@ -429,12 +478,15 @@ fn set_autocast_command_enables_mortar_autocast_from_default_off() {
     ];
     let mut game = empty_flat_game(&players);
     let mortar_pos = game.state.map.tile_center(8, 8);
-    let mortar = game.state.entities
+    let mortar = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
         .expect("mortar should spawn");
 
     assert_eq!(
-        game.state.entities
+        game.state
+            .entities
             .get(mortar)
             .expect("mortar should exist")
             .autocast_enabled(ability::AbilityKind::MortarFire),
@@ -458,7 +510,8 @@ fn set_autocast_command_enables_mortar_autocast_from_default_off() {
     }
 
     assert_eq!(
-        game.state.entities
+        game.state
+            .entities
             .get(mortar)
             .expect("mortar should exist")
             .autocast_enabled(ability::AbilityKind::MortarFire),
@@ -490,15 +543,22 @@ fn visible_autocast_mortar_launch_is_sent_to_enemy() {
     let mut game = empty_flat_game(&players);
     let mortar_pos = game.state.map.tile_center(8, 8);
     let target_pos = game.state.map.tile_center(12, 8);
-    let mortar = game.state.entities
+    let mortar = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
         .expect("mortar should spawn");
     {
-        let mortar_entity = game.state.entities.get_mut(mortar).expect("mortar should exist");
+        let mortar_entity = game
+            .state
+            .entities
+            .get_mut(mortar)
+            .expect("mortar should exist");
         mortar_entity.set_weapon_setup(WeaponSetup::Deployed);
         mortar_entity.set_autocast_enabled(ability::AbilityKind::MortarFire, true);
     }
-    game.state.entities
+    game.state
+        .entities
         .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
         .expect("target should spawn");
     game.state.players[0]
@@ -507,9 +567,13 @@ fn visible_autocast_mortar_launch_is_sent_to_enemy() {
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
-    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
+    game.state
+        .fog
+        .recompute(&ids, &game.state.entities, &game.state.map);
     assert!(
-        game.state.fog.is_visible_world(2, mortar_pos.0, mortar_pos.1),
+        game.state
+            .fog
+            .is_visible_world(2, mortar_pos.0, mortar_pos.1),
         "test setup requires the enemy to see the autocasting mortar"
     );
 
@@ -554,17 +618,24 @@ fn hidden_mortar_launch_is_not_sent_but_impact_reveals_attacker_to_victim() {
     let mut game = empty_flat_game(&players);
     let mortar_pos = game.state.map.tile_center(8, 8);
     let target_pos = game.state.map.tile_center(17, 8);
-    let mortar = game.state.entities
+    let mortar = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
         .expect("mortar should spawn");
-    game.state.entities
+    game.state
+        .entities
         .get_mut(mortar)
         .expect("mortar should exist")
         .set_weapon_setup(WeaponSetup::Deployed);
-    let target = game.state.entities
+    let target = game
+        .state
+        .entities
         .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
         .expect("target should spawn");
-    let counter = game.state.entities
+    let counter = game
+        .state
+        .entities
         .spawn_unit(
             2,
             EntityKind::Tank,
@@ -575,9 +646,14 @@ fn hidden_mortar_launch_is_not_sent_but_impact_reveals_attacker_to_victim() {
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
-    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
+    game.state
+        .fog
+        .recompute(&ids, &game.state.entities, &game.state.map);
     assert!(
-        !game.state.fog.is_visible_world(2, mortar_pos.0, mortar_pos.1),
+        !game
+            .state
+            .fog
+            .is_visible_world(2, mortar_pos.0, mortar_pos.1),
         "test setup requires the mortar to be hidden before it fires"
     );
 
@@ -606,11 +682,14 @@ fn hidden_mortar_launch_is_not_sent_but_impact_reveals_attacker_to_victim() {
         "hidden mortar launch should not leak dust/recoil/shell data: {enemy_events:?}"
     );
 
-    game.state.entities
+    game.state
+        .entities
         .get_mut(target)
         .expect("target should still exist")
         .set_position(impact_pos.0, impact_pos.1);
-    let hp_before_impact = game.state.entities
+    let hp_before_impact = game
+        .state
+        .entities
         .get(target)
         .expect("target should still exist")
         .hp;
@@ -619,7 +698,8 @@ fn hidden_mortar_launch_is_not_sent_but_impact_reveals_attacker_to_victim() {
         impact_events = game.tick();
     }
     assert!(
-        game.state.entities
+        game.state
+            .entities
             .get(target)
             .is_none_or(|target_after| target_after.hp < hp_before_impact),
         "test setup requires the mortar impact to damage the victim"
@@ -667,7 +747,8 @@ fn hidden_mortar_launch_is_not_sent_but_impact_reveals_attacker_to_victim() {
     game.tick();
 
     assert_eq!(
-        game.state.entities
+        game.state
+            .entities
             .get(counter)
             .expect("counter tank should exist")
             .order()
@@ -700,20 +781,27 @@ fn manual_mortar_fire_impacts_after_shooter_dies_before_impact() {
     let mut game = empty_flat_game(&players);
     let mortar_pos = game.state.map.tile_center(8, 8);
     let target_pos = game.state.map.tile_center(12, 8);
-    let mortar = game.state.entities
+    let mortar = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
         .expect("mortar should spawn");
-    game.state.entities
+    game.state
+        .entities
         .get_mut(mortar)
         .expect("mortar should exist")
         .set_weapon_setup(WeaponSetup::Deployed);
-    let target = game.state.entities
+    let target = game
+        .state
+        .entities
         .spawn_unit(2, EntityKind::Tank, target_pos.0, target_pos.1)
         .expect("target should spawn");
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
-    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
+    game.state
+        .fog
+        .recompute(&ids, &game.state.entities, &game.state.map);
 
     game.enqueue(
         1,
@@ -738,15 +826,19 @@ fn manual_mortar_fire_impacts_after_shooter_dies_before_impact() {
         "accepted mortar command should emit a launch before shooter death: {launch_events:?}"
     );
 
-    game.state.entities
+    game.state
+        .entities
         .get_mut(target)
         .expect("target should still exist")
         .set_position(impact_pos.0, impact_pos.1);
-    let hp_before_impact = game.state.entities
+    let hp_before_impact = game
+        .state
+        .entities
         .get(target)
         .expect("target should still exist")
         .hp;
-    game.state.entities
+    game.state
+        .entities
         .get_mut(mortar)
         .expect("mortar should still exist after launch")
         .apply_damage(u32::MAX, None);
@@ -772,7 +864,12 @@ fn manual_mortar_fire_impacts_after_shooter_dies_before_impact() {
         });
     }
 
-    let hp_after_impact = game.state.entities.get(target).expect("tank should survive").hp;
+    let hp_after_impact = game
+        .state
+        .entities
+        .get(target)
+        .expect("tank should survive")
+        .hp;
     assert!(
         hp_after_impact < hp_before_impact,
         "mortar shell should still damage after shooter death, before={hp_before_impact}, after={hp_after_impact}"
@@ -806,7 +903,9 @@ fn manual_mortar_fire_turns_briefly_before_launching() {
     let mut game = empty_flat_game(&players);
     let mortar_pos = game.state.map.tile_center(8, 8);
     let target_pos = game.state.map.tile_center(8, 4);
-    let mortar = game.state.entities
+    let mortar = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
         .expect("mortar should spawn");
     if let Some(mortar_entity) = game.state.entities.get_mut(mortar) {
@@ -814,17 +913,22 @@ fn manual_mortar_fire_turns_briefly_before_launching() {
         mortar_entity.set_weapon_facing(0.0);
         mortar_entity.set_weapon_setup(WeaponSetup::Deployed);
     }
-    let target = game.state.entities
+    let target = game
+        .state
+        .entities
         .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
         .expect("target should spawn");
-    game.state.entities
+    game.state
+        .entities
         .get_mut(target)
         .expect("target should exist")
         .hold_position();
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
-    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
+    game.state
+        .fog
+        .recompute(&ids, &game.state.entities, &game.state.map);
 
     game.enqueue(
         1,
@@ -838,7 +942,11 @@ fn manual_mortar_fire_turns_briefly_before_launching() {
     );
 
     game.tick();
-    let mortar_entity = game.state.entities.get(mortar).expect("mortar should exist");
+    let mortar_entity = game
+        .state
+        .entities
+        .get(mortar)
+        .expect("mortar should exist");
     assert_eq!(
         mortar_entity.ability_cooldown_ticks(ability::AbilityKind::MortarFire),
         0,
@@ -856,7 +964,11 @@ fn manual_mortar_fire_turns_briefly_before_launching() {
         impact_pos = impact_pos.or_else(|| mortar_launch_impact(&events, 1, mortar));
     }
     let impact_pos = impact_pos.expect("owner should receive mortar launch impact");
-    let mortar_entity = game.state.entities.get(mortar).expect("mortar should exist");
+    let mortar_entity = game
+        .state
+        .entities
+        .get(mortar)
+        .expect("mortar should exist");
     assert!(
         mortar_entity.ability_cooldown_ticks(ability::AbilityKind::MortarFire) > 0,
         "manual mortar fire should launch once the fast facing slew completes"
@@ -867,11 +979,14 @@ fn manual_mortar_fire_turns_briefly_before_launching() {
         "mortar should finish facing the manual target, got {:.4}",
         mortar_entity.facing()
     );
-    let hp_before_impact = game.state.entities
+    let hp_before_impact = game
+        .state
+        .entities
         .get(target)
         .expect("target should still exist")
         .hp;
-    game.state.entities
+    game.state
+        .entities
         .get_mut(target)
         .expect("target should still exist")
         .set_position(impact_pos.0, impact_pos.1);
@@ -881,7 +996,8 @@ fn manual_mortar_fire_turns_briefly_before_launching() {
     }
 
     assert!(
-        game.state.entities
+        game.state
+            .entities
             .get(target)
             .is_none_or(|target_after| target_after.hp < hp_before_impact),
         "manual mortar fire should damage or kill units after the delayed impact"
@@ -911,22 +1027,30 @@ fn manual_mortar_fire_damages_friendly_units_at_enemy_rate() {
     let mut game = empty_flat_game(&players);
     let mortar_pos = game.state.map.tile_center(8, 8);
     let target_pos = game.state.map.tile_center(12, 8);
-    let mortar = game.state.entities
+    let mortar = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
         .expect("mortar should spawn");
     if let Some(mortar_entity) = game.state.entities.get_mut(mortar) {
         mortar_entity.set_weapon_setup(WeaponSetup::Deployed);
     }
-    let friendly = game.state.entities
+    let friendly = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::MachineGunner, target_pos.0, target_pos.1)
         .expect("friendly should spawn");
-    let enemy = game.state.entities
+    let enemy = game
+        .state
+        .entities
         .spawn_unit(2, EntityKind::MachineGunner, target_pos.0, target_pos.1)
         .expect("enemy should spawn");
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
-    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
+    game.state
+        .fog
+        .recompute(&ids, &game.state.entities, &game.state.map);
 
     game.enqueue(
         1,
@@ -941,11 +1065,13 @@ fn manual_mortar_fire_damages_friendly_units_at_enemy_rate() {
     let launch_events = game.tick();
     let impact_pos = mortar_launch_impact(&launch_events, 1, mortar)
         .expect("owner should receive mortar launch impact");
-    game.state.entities
+    game.state
+        .entities
         .get_mut(friendly)
         .expect("friendly should still exist")
         .set_position(impact_pos.0, impact_pos.1);
-    game.state.entities
+    game.state
+        .entities
         .get_mut(enemy)
         .expect("enemy should still exist")
         .set_position(impact_pos.0, impact_pos.1);
@@ -987,34 +1113,47 @@ fn manual_mortar_fire_inner_splash_pierces_armor_and_outer_splash_hits_for_outer
     let mortar_pos = game.state.map.tile_center(8, 8);
     let target_pos = game.state.map.tile_center(12, 8);
     let outer_pos = game.state.map.tile_center(13, 8);
-    let mortar = game.state.entities
+    let mortar = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
         .expect("mortar should spawn");
     if let Some(mortar_entity) = game.state.entities.get_mut(mortar) {
         mortar_entity.set_weapon_setup(WeaponSetup::Deployed);
     }
-    let armored_inner = game.state.entities
+    let armored_inner = game
+        .state
+        .entities
         .spawn_building(2, EntityKind::TankTrap, target_pos.0, target_pos.1, true)
         .expect("armored target should spawn");
-    let outer_target = game.state.entities
+    let outer_target = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::MachineGunner, outer_pos.0, outer_pos.1)
         .expect("outer target should spawn");
-    game.state.entities
+    game.state
+        .entities
         .get_mut(outer_target)
         .expect("outer target should exist")
         .hold_position();
-    let armored_hp_before = game.state.entities
+    let armored_hp_before = game
+        .state
+        .entities
         .get(armored_inner)
         .expect("armored target exists")
         .hp;
-    let outer_hp_before = game.state.entities
+    let outer_hp_before = game
+        .state
+        .entities
         .get(outer_target)
         .expect("outer target exists")
         .hp;
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
-    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
+    game.state
+        .fog
+        .recompute(&ids, &game.state.entities, &game.state.map);
 
     game.enqueue(
         1,
@@ -1029,26 +1168,29 @@ fn manual_mortar_fire_inner_splash_pierces_armor_and_outer_splash_hits_for_outer
     let launch_events = game.tick();
     let impact_pos = mortar_launch_impact(&launch_events, 1, mortar)
         .expect("owner should receive mortar launch impact");
-    game.state.entities
+    game.state
+        .entities
         .get_mut(armored_inner)
         .expect("armored target should exist")
         .set_position(impact_pos.0, impact_pos.1);
-    game.state.entities
+    game.state
+        .entities
         .get_mut(outer_target)
         .expect("outer target should exist")
-        .set_position(
-            impact_pos.0,
-            impact_pos.1 + config::TILE_SIZE as f32 * 1.25,
-        );
+        .set_position(impact_pos.0, impact_pos.1 + config::TILE_SIZE as f32 * 1.25);
     for _ in 0..config::MORTAR_SHELL_DELAY_TICKS {
         game.tick();
     }
 
-    let armored_hp_after = game.state.entities
+    let armored_hp_after = game
+        .state
+        .entities
         .get(armored_inner)
         .expect("armored target should survive")
         .hp;
-    let outer_hp_after = game.state.entities
+    let outer_hp_after = game
+        .state
+        .entities
         .get(outer_target)
         .expect("outer target should survive")
         .hp;
@@ -1095,23 +1237,30 @@ fn manual_mortar_fire_damages_allied_units_without_kill_credit() {
     let mut game = empty_flat_game(&players);
     let mortar_pos = game.state.map.tile_center(8, 8);
     let target_pos = game.state.map.tile_center(12, 8);
-    let mortar = game.state.entities
+    let mortar = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
         .expect("mortar should spawn");
     if let Some(mortar_entity) = game.state.entities.get_mut(mortar) {
         mortar_entity.set_weapon_setup(WeaponSetup::Deployed);
     }
-    let ally = game.state.entities
+    let ally = game
+        .state
+        .entities
         .spawn_unit(2, EntityKind::MachineGunner, target_pos.0, target_pos.1)
         .expect("ally should spawn");
-    game.state.entities
+    game.state
+        .entities
         .get_mut(ally)
         .expect("ally should exist")
         .set_last_damage_owner(Some(3));
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
-    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
+    game.state
+        .fog
+        .recompute(&ids, &game.state.entities, &game.state.map);
 
     game.enqueue(
         1,
@@ -1126,7 +1275,8 @@ fn manual_mortar_fire_damages_allied_units_without_kill_credit() {
     let launch_events = game.tick();
     let impact_pos = mortar_launch_impact(&launch_events, 1, mortar)
         .expect("owner should receive mortar launch impact");
-    game.state.entities
+    game.state
+        .entities
         .get_mut(ally)
         .expect("ally should still exist")
         .set_position(impact_pos.0, impact_pos.1);
@@ -1176,20 +1326,26 @@ fn manual_mortar_fire_damages_friendly_buildings() {
     let mut game = empty_flat_game(&players);
     let mortar_pos = game.state.map.tile_center(8, 8);
     let target_pos = game.state.map.tile_center(12, 8);
-    let mortar = game.state.entities
+    let mortar = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
         .expect("mortar should spawn");
     if let Some(mortar_entity) = game.state.entities.get_mut(mortar) {
         mortar_entity.set_weapon_setup(WeaponSetup::Deployed);
     }
-    let depot = game.state.entities
+    let depot = game
+        .state
+        .entities
         .spawn_building(1, EntityKind::Depot, target_pos.0, target_pos.1, true)
         .expect("depot should spawn");
     let hp_before = game.state.entities.get(depot).expect("depot exists").hp;
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
-    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
+    game.state
+        .fog
+        .recompute(&ids, &game.state.entities, &game.state.map);
 
     game.enqueue(
         1,
@@ -1263,8 +1419,12 @@ fn snapshot_keeps_smoke_visible_to_owner_with_unit_inside() {
     }
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
-    game.state.fog
-        .recompute_with_smoke(&ids, &game.state.entities, &game.state.map, &game.state.smokes);
+    game.state.fog.recompute_with_smoke(
+        &ids,
+        &game.state.entities,
+        &game.state.map,
+        &game.state.smokes,
+    );
 
     let snapshot = game.snapshot_for(1);
 
