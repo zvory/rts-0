@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn tank_trap_build_order_is_rejected_while_disabled() {
+fn tank_trap_build_order_is_accepted_after_training_centre_requirement() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
     let worker = entities
@@ -29,16 +29,10 @@ fn tank_trap_build_order_is_rejected_while_disabled() {
         )],
     );
 
-    assert!(
-        matches!(
-            events.get(&1).and_then(|events| events.first()),
-            Some(Event::Notice { msg, .. }) if msg == "Building unavailable"
-        ),
-        "Tank Trap build commands remain rejected after the former Training Centre requirement"
-    );
+    assert!(events.get(&1).is_none_or(Vec::is_empty));
     assert!(matches!(
         entities.get(worker).map(|entity| entity.order()),
-        Some(Order::Idle)
+        Some(Order::Build(_))
     ));
 }
 
@@ -77,7 +71,7 @@ fn tank_trap_construction_charges_on_arrival_and_uses_spec_build_time() {
         &mut active_sites,
     );
 
-    assert_eq!(players[0].steel, steel_before - 15);
+    assert_eq!(players[0].steel, steel_before - 30);
     let site = entities
         .iter()
         .find(|entity| entity.kind == EntityKind::TankTrap)

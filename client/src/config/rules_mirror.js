@@ -186,7 +186,7 @@ export const STATS = Object.freeze({
     trains: [KIND.MORTAR_TEAM, KIND.ANTI_TANK_GUN, KIND.ARTILLERY],
     requires: [KIND.CITY_CENTRE, KIND.TRAINING_CENTRE] },
   [KIND.TANK_TRAP]: { label: "Tank Trap", icon: "TT", footW: 1, footH: 1, sight: 0,
-    cost: { steel: 15, oil: 0 }, buildTicks: TICK_HZ * 10, trains: [],
+    cost: { steel: 30, oil: 0 }, buildTicks: TICK_HZ * 10, trains: [],
     requires: KIND.TRAINING_CENTRE,
     requiresText: "Requires Training Centre" },
   [KIND.PUMP_JACK]: { label: "Pump Jack", icon: "PJ", footW: 1, footH: 1, sight: 1,
@@ -474,6 +474,7 @@ export const WORKER_BUILDABLE = Object.freeze([
   KIND.RESEARCH_COMPLEX,
   KIND.FACTORY,
   KIND.STEELWORKS,
+  KIND.TANK_TRAP,
 ]);
 
 export const FIXTURE_FACTION_ID = "phase2_empty_fixture";
