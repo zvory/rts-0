@@ -29,24 +29,36 @@ fn scores_count_starting_entities() {
 fn scores_record_kills_and_losses_on_death() {
     let players = human_vs_ai_players();
     let mut game = Game::new(&players, 0x515C_0DE);
-    let victim_unit = game.state.entities
+    let victim_unit = game
+        .state
+        .entities
         .iter()
         .find(|e| e.owner == 2 && e.kind == EntityKind::Worker)
         .map(|e| e.id)
         .expect("victim unit should exist");
-    let victim_building = game.state.entities
+    let victim_building = game
+        .state
+        .entities
         .iter()
         .find(|e| e.owner == 2 && e.kind == EntityKind::CityCentre)
         .map(|e| e.id)
         .expect("victim building should exist");
     for id in [victim_unit, victim_building] {
-        let entity = game.state.entities.get_mut(id).expect("victim should exist");
+        let entity = game
+            .state
+            .entities
+            .get_mut(id)
+            .expect("victim should exist");
         entity.hp = 0;
         entity.set_last_damage_owner(Some(1));
     }
 
-    let mut events: HashMap<u32, Vec<Event>> =
-        game.state.players.iter().map(|p| (p.id, Vec::new())).collect();
+    let mut events: HashMap<u32, Vec<Event>> = game
+        .state
+        .players
+        .iter()
+        .map(|p| (p.id, Vec::new()))
+        .collect();
     let mut lingering_sight = Vec::new();
     let tick = game.tick_count();
     let teams = game.team_relations();
@@ -82,7 +94,9 @@ fn observer_analysis_reports_authoritative_inventory_production_and_losses() {
     let players = human_vs_ai_players();
     let mut game =
         Game::new_for_replay_with_starting_resources(&players, 5_000, 5_000, 0xA11A_0001);
-    let city_centre = game.state.entities
+    let city_centre = game
+        .state
+        .entities
         .iter()
         .find(|e| e.owner == 1 && e.kind == EntityKind::CityCentre)
         .map(|e| e.id)
@@ -108,18 +122,26 @@ fn observer_analysis_reports_authoritative_inventory_production_and_losses() {
         player.add_gathered_resources(EntityKind::Oil, 30, current_tick - config::TICK_HZ * 10);
     }
 
-    let victim_unit = game.state.entities
+    let victim_unit = game
+        .state
+        .entities
         .iter()
         .find(|e| e.owner == 2 && e.kind == EntityKind::Worker)
         .map(|e| e.id)
         .expect("victim unit should exist");
-    let entity = game.state.entities
+    let entity = game
+        .state
+        .entities
         .get_mut(victim_unit)
         .expect("victim unit should still exist");
     entity.hp = 0;
     entity.set_last_damage_owner(Some(1));
-    let mut events: HashMap<u32, Vec<Event>> =
-        game.state.players.iter().map(|p| (p.id, Vec::new())).collect();
+    let mut events: HashMap<u32, Vec<Event>> = game
+        .state
+        .players
+        .iter()
+        .map(|p| (p.id, Vec::new()))
+        .collect();
     let mut lingering_sight = Vec::new();
     let tick = game.tick_count();
     let teams = game.team_relations();
@@ -182,12 +204,18 @@ fn observer_analysis_reports_authoritative_inventory_production_and_losses() {
 fn phase4_projection_matches_legacy_snapshot_entities() {
     let players = human_vs_ai_players();
     let mut game = Game::new(&players, 0xCAFE_BABE);
-    let (sx, sy) = game.state.map
-        .tile_center(game.state.players[0].start_tile.0, game.state.players[0].start_tile.1);
-    let attacker = game.state.entities
+    let (sx, sy) = game.state.map.tile_center(
+        game.state.players[0].start_tile.0,
+        game.state.players[0].start_tile.1,
+    );
+    let attacker = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::Rifleman, sx + 64.0, sy)
         .expect("attacker should spawn");
-    let target = game.state.entities
+    let target = game
+        .state
+        .entities
         .spawn_unit(2, EntityKind::Rifleman, sx + 96.0, sy)
         .expect("target should spawn");
     if let Some(e) = game.state.entities.get_mut(attacker) {
@@ -196,7 +224,9 @@ fn phase4_projection_matches_legacy_snapshot_entities() {
     }
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
-    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
+    game.state
+        .fog
+        .recompute(&ids, &game.state.entities, &game.state.map);
 
     assert_eq!(
         game.snapshot_for(1).entities,
@@ -213,7 +243,8 @@ fn spectator_snapshot_uses_union_fog_not_full_world() {
     let players = human_vs_ai_players();
     let mut game = Game::new(&players, 0xCAFE_BABE);
     let active_players = [1, 2];
-    game.state.fog
+    game.state
+        .fog
         .recompute(&active_players, &game.state.entities, &game.state.map);
 
     let hidden_pos = (0..game.state.map.size)
@@ -226,11 +257,14 @@ fn spectator_snapshot_uses_union_fog_not_full_world() {
             hidden_from_all.then_some((x, y))
         })
         .expect("map should contain a tile outside both players' opening fog");
-    let hidden = game.state.entities
+    let hidden = game
+        .state
+        .entities
         .spawn_unit(99, EntityKind::Rifleman, hidden_pos.0, hidden_pos.1)
         .expect("hidden unit should spawn");
     game.rebuild_final_spatial();
-    game.state.fog
+    game.state
+        .fog
         .recompute(&active_players, &game.state.entities, &game.state.map);
 
     let snapshot = game.snapshot_for_spectator(&active_players);
@@ -287,11 +321,15 @@ fn death_vision_lingers_as_normal_vision_for_five_seconds() {
     }
 
     let rifle_pos = game.state.map.tile_center(2, 2);
-    let rifle = game.state.entities
+    let rifle = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::Rifleman, rifle_pos.0, rifle_pos.1)
         .expect("rifleman should spawn");
     let second_rifle_pos = game.state.map.tile_center(2, 3);
-    let second_rifle = game.state.entities
+    let second_rifle = game
+        .state
+        .entities
         .spawn_unit(
             1,
             EntityKind::Rifleman,
@@ -300,15 +338,21 @@ fn death_vision_lingers_as_normal_vision_for_five_seconds() {
         )
         .expect("second rifleman should spawn");
     let spotter_pos = game.state.map.tile_center(20, 20);
-    let spotter = game.state.entities
+    let spotter = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::Worker, spotter_pos.0, spotter_pos.1)
         .expect("spotter should spawn");
     let enemy_pos = game.state.map.tile_center(22, 20);
-    let enemy = game.state.entities
+    let enemy = game
+        .state
+        .entities
         .spawn_unit(2, EntityKind::Rifleman, enemy_pos.0, enemy_pos.1)
         .expect("enemy should spawn");
     let enemy_depot_pos = game.state.map.tile_center(24, 21);
-    let enemy_depot = game.state.entities
+    let enemy_depot = game
+        .state
+        .entities
         .spawn_building(
             2,
             EntityKind::Depot,
@@ -320,10 +364,13 @@ fn death_vision_lingers_as_normal_vision_for_five_seconds() {
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
-    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
+    game.state
+        .fog
+        .recompute(&ids, &game.state.entities, &game.state.map);
     assert!(game.state.fog.is_visible_world(1, enemy_pos.0, enemy_pos.1));
 
-    game.state.entities
+    game.state
+        .entities
         .get_mut(spotter)
         .expect("spotter should exist")
         .hp = 0;
@@ -377,13 +424,19 @@ fn death_vision_lingers_as_normal_vision_for_five_seconds() {
     );
     game.tick();
 
-    let rifle_entity = game.state.entities.get(rifle).expect("rifle should remain alive");
+    let rifle_entity = game
+        .state
+        .entities
+        .get(rifle)
+        .expect("rifle should remain alive");
     assert_eq!(
         rifle_entity.order().attack_target(),
         Some(enemy),
         "death-vision enemy units should be accepted as direct attack targets"
     );
-    let second_rifle_entity = game.state.entities
+    let second_rifle_entity = game
+        .state
+        .entities
         .get(second_rifle)
         .expect("second rifle should remain alive");
     assert_eq!(
@@ -391,7 +444,11 @@ fn death_vision_lingers_as_normal_vision_for_five_seconds() {
         Some(enemy_depot),
         "queued death-vision enemy buildings should promote as direct attack targets"
     );
-    let moved_enemy = game.state.entities.get(enemy).expect("enemy should remain alive");
+    let moved_enemy = game
+        .state
+        .entities
+        .get(enemy)
+        .expect("enemy should remain alive");
     let moving_linger = game
         .snapshot_for(1)
         .entities
@@ -456,7 +513,8 @@ fn allied_death_vision_allows_teammate_attacks_and_auto_acquisition() {
     }
 
     let player_one_base = game.state.map.tile_center(2, 8);
-    game.state.entities
+    game.state
+        .entities
         .spawn_building(
             1,
             EntityKind::CityCentre,
@@ -466,7 +524,8 @@ fn allied_death_vision_allows_teammate_attacks_and_auto_acquisition() {
         )
         .expect("player one base should spawn");
     let player_two_base = game.state.map.tile_center(2, 25);
-    game.state.entities
+    game.state
+        .entities
         .spawn_building(
             2,
             EntityKind::CityCentre,
@@ -476,16 +535,21 @@ fn allied_death_vision_allows_teammate_attacks_and_auto_acquisition() {
         )
         .expect("player two base should spawn");
     let enemy_base = game.state.map.tile_center(28, 28);
-    game.state.entities
+    game.state
+        .entities
         .spawn_building(3, EntityKind::CityCentre, enemy_base.0, enemy_base.1, true)
         .expect("enemy base should spawn");
 
     let rifle_pos = game.state.map.tile_center(2, 2);
-    let rifle = game.state.entities
+    let rifle = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::Rifleman, rifle_pos.0, rifle_pos.1)
         .expect("rifleman should spawn");
     let second_rifle_pos = game.state.map.tile_center(3, 2);
-    let second_rifle = game.state.entities
+    let second_rifle = game
+        .state
+        .entities
         .spawn_unit(
             1,
             EntityKind::Rifleman,
@@ -494,25 +558,34 @@ fn allied_death_vision_allows_teammate_attacks_and_auto_acquisition() {
         )
         .expect("second rifleman should spawn");
     let mortar_pos = game.state.map.tile_center(4, 2);
-    let mortar = game.state.entities
+    let mortar = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
         .expect("mortar should spawn");
     let spotter_pos = game.state.map.tile_center(15, 2);
-    let spotter = game.state.entities
+    let spotter = game
+        .state
+        .entities
         .spawn_unit(2, EntityKind::Worker, spotter_pos.0, spotter_pos.1)
         .expect("allied spotter should spawn");
     let enemy_pos = game.state.map.tile_center(16, 2);
-    let enemy = game.state.entities
+    let enemy = game
+        .state
+        .entities
         .spawn_unit(3, EntityKind::Tank, enemy_pos.0, enemy_pos.1)
         .expect("enemy should spawn");
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
-    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
+    game.state
+        .fog
+        .recompute(&ids, &game.state.entities, &game.state.map);
     assert!(!game.state.fog.is_visible_world(1, enemy_pos.0, enemy_pos.1));
     assert!(game.state.fog.is_visible_world(2, enemy_pos.0, enemy_pos.1));
 
-    game.state.entities
+    game.state
+        .entities
         .get_mut(spotter)
         .expect("spotter should exist")
         .hp = 0;
@@ -548,13 +621,19 @@ fn allied_death_vision_allows_teammate_attacks_and_auto_acquisition() {
     );
     game.tick();
 
-    let rifle_entity = game.state.entities.get(rifle).expect("rifle should remain alive");
+    let rifle_entity = game
+        .state
+        .entities
+        .get(rifle)
+        .expect("rifle should remain alive");
     assert_eq!(
         rifle_entity.order().attack_target(),
         Some(enemy),
         "direct attack should validate against team-shared death vision"
     );
-    let second_rifle_entity = game.state.entities
+    let second_rifle_entity = game
+        .state
+        .entities
         .get(second_rifle)
         .expect("second rifle should remain alive");
     assert_eq!(
@@ -562,7 +641,9 @@ fn allied_death_vision_allows_teammate_attacks_and_auto_acquisition() {
         Some(enemy),
         "queued attack promotion should validate against team-shared death vision"
     );
-    let mortar_entity = game.state.entities
+    let mortar_entity = game
+        .state
+        .entities
         .get(mortar)
         .expect("mortar should remain alive");
     assert_eq!(
