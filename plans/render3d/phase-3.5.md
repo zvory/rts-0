@@ -30,7 +30,7 @@ normalization begins.
 - Share existing frame subviews with HUD, minimap, fog diagnostics, and observer analysis only where
   it removes duplicate state queries without expanding scope.
 - Add a compatibility ratchet that fails on new Pixi legacy reads and records each remaining read/
-  re-evaluation trigger in the active ledger.
+  removal owner in the active ledger.
 - Exercise normal/replay/live pause/Lab reset/fixed capture/rematch Pixi paths and compare ordering,
   decals, smoke/ability state, selection, placement, fog memory, and overlays.
 - Update durable docs/ledger with the runtime seam, reconciliation ownership, allowlist, and evidence.
@@ -57,8 +57,7 @@ normalization begins.
 ## Explicit Exclusions
 
 - No Babylon dependency/backend and no broad Pixi DTO rewrite.
-- No transient event identity/history; add it later only if a concrete Babylon effect or capture
-  need requires it.
+- No transient event identity/history; Phase 4 owns it.
 - No protocol, visual redesign, batching, shadows, or faction work.
 
 ## Implementation Checklist
@@ -87,5 +86,5 @@ stale, duplicate, or differently timed presentation.
 ## Handoff Expectations
 
 Report the final runtime seam, Pixi adapter/allowlist, destructive reconciliation, shared UI views,
-soft-error behavior, and equivalence evidence. Name the Babylon opt-in kernel as next; it should
-consume the seam directly rather than expanding a speculative event/capture program.
+soft-error behavior, and equivalence evidence. Name Phase 4 as next and identify event sources,
+pose lookups, deduplication inputs, renderer-local derivation debt, and reset semantics.

@@ -9,19 +9,6 @@ architectural group tracking, and before/after cleanup comparisons, use
 [docs/hotspot-analysis.md](../hotspot-analysis.md), then create a phased plan only when the current
 evidence supports implementation work.
 
-## Pre-alpha experiment guardrail
-
-When a user describes work as pre-alpha, prototype, experiment, or a learning-oriented vertical
-slice, plan for a playable opt-in result within at most two implementation phases. Do not convert
-unknown future risks into a long production-migration chain: name only the next one or two
-evidence-backed phases, then stop for a user playtest or measured observation before planning more.
-
-Only player authority, secrecy, data integrity, one-loop/lifecycle correctness, and bounded failure
-may block that first experiment. Asset pipelines, exhaustive parity, performance certification,
-device matrices, generalized registries, and polished content are follow-up work when an observed
-need justifies them. A phase runner must execute only those approved near-term phase files; it must
-not infer or generate a larger roadmap from a prototype plan.
-
 ## Required shape
 
 - Create `plans/<one-word-name>/plan.md` as the entry point.

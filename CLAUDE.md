@@ -137,11 +137,6 @@ is loaded from the CDN, and `cargo run` from `server/` serves the client.
   path. Keep captures under `target/lab-interact/`; do not use Browser/Computer Use, commit image bytes,
   or accept a missing-texture fallback as review evidence.
 - Planned implementation phases: use the `phase-runner` skill only for an existing phase file.
-- Pre-alpha/prototype plans: use `docs/context/planning.md`'s pre-alpha experiment guardrail. A
-  playable opt-in result belongs within at most two phases; only authority, secrecy, data integrity,
-  one-loop/lifecycle, and bounded failure block it. Do not have the phase runner infer a production
-  migration, certification, asset pipeline, performance program, or content roadmap before a user
-  playtest identifies a concrete need.
 - Testing and self-play: follow `docs/context/testing.md`, including its replay-inspection workflow.
   For a user-requested live AI-vs-AI demo, run the matchup setup and local server with `--release`
   so debug-only simulation invariants do not interrupt play; use a replay only when requested or
