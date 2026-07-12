@@ -28,7 +28,8 @@ fn replay_games_preserve_ai_identity_without_controllers() {
     let game = Game::new_without_ai_controllers(&players, 0x1234_5678);
 
     assert!(
-        game.state.players
+        game.state
+            .players
             .iter()
             .any(|player| player.id == 1 && player.is_ai),
         "replays must preserve AI identity for deterministic simulation rules"
