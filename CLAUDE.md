@@ -158,7 +158,10 @@ is loaded from the CDN, and `cargo run` from `server/` serves the client.
   This starts an ordinary authoritative AI-vs-AI room. Prefer a Tailscale Serve HTTPS URL only when
   `tailscale serve status` already reports a working endpoint; do not block a preview on the one-time
   tailnet Serve enablement. Never enable Tailscale Funnel or another public tunnel unless the user
-  explicitly requests public sharing. For deterministic, seekable review, run `cargo run --release
+  explicitly requests public sharing. For a standalone artifact such as an MP4 or screenshot, use
+  `scripts/tailnet-preview [--ttl <duration>|--keep] <file>`; it copies the artifact into the OS
+  temporary directory, prints a Tailnet URL on port 8091, enforces a 24-hour default TTL, and never
+  changes the game listener on port 8080. For deterministic, seekable review, run `cargo run --release
   --bin ai-matchup -- ai_2_1 ai_turtle --seed <n> --save-replay <name>` from `server/`, then share
   `/?replayArtifact=<name>` through the same local server. Do not kill or replace an existing
   listener merely to create a preview link.

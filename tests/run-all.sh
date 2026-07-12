@@ -711,6 +711,8 @@ if [ "$RUN_STATIC_JS" = "1" ]; then
     node "$SCRIPT_DIR/lab_interact_fixed_capture_contracts.mjs"
   run_suite_bg "JS HUD command card" \
     node "$SCRIPT_DIR/hud_command_card.mjs"
+  run_suite_bg "Utility: tailnet preview" \
+    node "$SCRIPT_DIR/tailnet_preview.mjs"
 else
   SKIPPED+=("JS contract suites")
 fi
