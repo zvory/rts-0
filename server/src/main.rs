@@ -38,7 +38,7 @@ use rts_server::lab_scenarios::catalog_handler as lab_scenarios_handler;
 use rts_server::lobby::{self, Lobby, RoomEvent};
 use rts_server::protocol::{ClientMessage, ServerMessage};
 use rts_server::structured_log;
-use rts_sim::game::map::Map;
+use rts_sim::game::map::{Map, CURRENT_MAP_VERSION};
 use rts_sim::game::replay::{self, ReplayArtifactV1};
 use rts_sim::perf;
 
@@ -1057,6 +1057,19 @@ mod tests {
     }
 
     #[test]
+    fn map_editor_catalog_accepts_the_current_one_v_one_asset() {
+        let entry = map_catalog_entry(
+            "1v1.json".to_string(),
+            include_str!("../assets/maps/1v1.json"),
+        )
+        .expect("current-schema 1v1 map should be listed for the editor");
+
+        assert_eq!(entry.file, "1v1.json");
+        assert_eq!(entry.name, "1v1");
+        assert_eq!(entry.description, "1v1 map");
+    }
+
+    #[test]
     fn local_match_history_allowed_for_loopback_remotes() {
         for remote in ["127.0.0.1:50000", "[::1]:50000"] {
             let remote: SocketAddr = remote.parse().unwrap();
@@ -1664,6 +1677,29 @@ struct MapCatalogResponse {
     maps: Vec<MapCatalogEntry>,
 }
 
+fn map_catalog_entry(file: String, json: &str) -> Option<MapCatalogEntry> {
+    let value = serde_json::from_str::<serde_json::Value>(json).ok()?;
+    if value.get("version").and_then(|v| v.as_u64()) != Some(u64::from(CURRENT_MAP_VERSION)) {
+        return None;
+    }
+    let stem = file.trim_end_matches(".json");
+    let name = value
+        .get("name")
+        .and_then(|v| v.as_str())
+        .unwrap_or(stem)
+        .to_string();
+    let description = value
+        .get("description")
+        .and_then(|v| v.as_str())
+        .unwrap_or(&name)
+        .to_string();
+    Some(MapCatalogEntry {
+        file,
+        name,
+        description,
+    })
+}
+
 /// GET /maps/catalog — list built-in authored map JSON files for editor selection.
 async fn map_catalog_handler(State(state): State<AppState>) -> impl IntoResponse {
     let mut entries = match tokio::fs::read_dir(&state.maps_dir).await {
@@ -1693,28 +1729,9 @@ async fn map_catalog_handler(State(state): State<AppState>) -> impl IntoResponse
         let Ok(json) = tokio::fs::read_to_string(&path).await else {
             continue;
         };
-        let Ok(value) = serde_json::from_str::<serde_json::Value>(&json) else {
-            continue;
-        };
-        if value.get("version").and_then(|v| v.as_u64()) != Some(2) {
-            continue;
+        if let Some(entry) = map_catalog_entry(file, &json) {
+            maps.push(entry);
         }
-        let stem = file.trim_end_matches(".json");
-        let name = value
-            .get("name")
-            .and_then(|v| v.as_str())
-            .unwrap_or(stem)
-            .to_string();
-        let description = value
-            .get("description")
-            .and_then(|v| v.as_str())
-            .unwrap_or(&name)
-            .to_string();
-        maps.push(MapCatalogEntry {
-            file,
-            name,
-            description,
-        });
     }
     maps.sort_by(|a, b| a.name.cmp(&b.name).then_with(|| a.file.cmp(&b.file)));
     Json(MapCatalogResponse { maps }).into_response()

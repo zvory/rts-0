@@ -48,6 +48,15 @@ async function joinNamed(tag, room, name = tag, opts = {}) {
   return client;
 }
 
+async function selectFourPlayerMap(client, label) {
+  client.send({ t: "selectMap", map: "Default" });
+  await client.waitFor(
+    (msg) => msg.t === "lobby" && msg.map === "Default",
+    3000,
+    `${label} four-player map selection`,
+  );
+}
+
 async function defaultLobbyAssignsEmptyTeams() {
   const room = uniqueRoom("team-empty");
   const A = await joinNamed("ffa-A", room, "Alpha");
@@ -77,6 +86,7 @@ async function soloStartsWithoutForcedAi() {
 async function twoVsTwoStartsWithHumanAndAis() {
   const room = uniqueRoom("team-2v2");
   const A = await joinNamed("2v2-A", room, "Alpha");
+  await selectFourPlayerMap(A, "2v2");
   const B = await joinNamed("2v2-B", room, "Bravo");
   await A.waitFor((msg) => msg.t === "lobby" && msg.players.length === 2, 3000, "2v2 human lobby");
   await setTeam(A, B.playerId, 1);
@@ -99,6 +109,7 @@ async function twoVsTwoStartsWithHumanAndAis() {
 async function alliedSnapshotUsesSharedVisionWithoutSharedControl() {
   const room = uniqueRoom("team-shared-vision");
   const A = await joinNamed("vision-A", room, "Alpha");
+  await selectFourPlayerMap(A, "shared vision");
   const B = await joinNamed("vision-B", room, "Bravo");
   await A.waitFor((msg) => msg.t === "lobby" && msg.players.length === 2, 3000, "vision human lobby");
   await setTeam(A, B.playerId, 1);
@@ -139,6 +150,7 @@ async function alliedSnapshotUsesSharedVisionWithoutSharedControl() {
 async function alliedAttackTargetCommandIsIgnored() {
   const room = uniqueRoom("team-target");
   const A = await joinNamed("target-A", room, "Alpha");
+  await selectFourPlayerMap(A, "allied attack");
   const B = await joinNamed("target-B", room, "Bravo");
   await A.waitFor((msg) => msg.t === "lobby" && msg.players.length === 2, 3000, "target human lobby");
   await setTeam(A, B.playerId, 1);
@@ -170,6 +182,7 @@ async function alliedAttackTargetCommandIsIgnored() {
 async function twoVsTwoResolvesByTeam() {
   const room = uniqueRoom("team-victory");
   const A = await joinNamed("victory-A", room, "Alpha");
+  await selectFourPlayerMap(A, "team victory");
   const B = await joinNamed("victory-B", room, "Bravo");
   const C = await joinNamed("victory-C", room, "Charlie");
   const D = await joinNamed("victory-D", room, "Delta");

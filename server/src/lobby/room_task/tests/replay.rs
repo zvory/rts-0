@@ -677,7 +677,7 @@ fn persisted_replay_lobby_ignores_active_seat_controls() {
     assert!(task.ai_players.is_empty());
     assert!(!task.human_team_assignments.contains_key(&99));
     assert!(!task.human_faction_assignments.contains_key(&99));
-    assert_eq!(task.selected_map, "Default");
+    assert_eq!(task.selected_map, "1v1");
     assert!(matches!(task.phase, Phase::Lobby));
 }
 
