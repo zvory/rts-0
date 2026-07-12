@@ -5,10 +5,10 @@ import {
 } from "./coordinates.js";
 
 const CATEGORY_SPECS = Object.freeze({
-  current: Object.freeze({ layer: "fogGatedWorld", type: "entity", alpha: 1, emissive: false }),
-  remembered: Object.freeze({ layer: "rememberedWorld", type: "rememberedBuilding", alpha: 0.42, emissive: false }),
-  intel: Object.freeze({ layer: "belowFogIntel", type: "intelEntity", alpha: 0.56, emissive: false }),
-  reveal: Object.freeze({ layer: "aboveFogReveal", type: "shotRevealEntity", alpha: 0.9, emissive: true }),
+  current: Object.freeze({ layer: "fogGatedWorld", type: "entity", alpha: 1, emissive: false, renderingGroupId: 0 }),
+  remembered: Object.freeze({ layer: "rememberedWorld", type: "rememberedBuilding", alpha: 0.42, emissive: false, renderingGroupId: 0 }),
+  intel: Object.freeze({ layer: "belowFogIntel", type: "intelEntity", alpha: 0.56, emissive: false, renderingGroupId: 0 }),
+  reveal: Object.freeze({ layer: "aboveFogReveal", type: "shotRevealEntity", alpha: 0.9, emissive: true, renderingGroupId: 3 }),
 });
 
 export class BabylonGenericEntities {
@@ -108,6 +108,7 @@ export class BabylonGenericEntities {
     visual.body.position.copyFrom(new B.Vector3(point.x, height / 2, point.z));
     visual.body.rotation.y = worldFacingToSceneYaw(Number.isFinite(record.facing) ? record.facing : 0);
     visual.body.scaling.copyFrom(new B.Vector3(width, height, depth));
+    visual.body.renderingGroupId = CATEGORY_SPECS[category].renderingGroupId;
     visual.body.isVisible = true;
 
     visual.selection.position.copyFrom(new B.Vector3(point.x, worldScaleToScene(1), point.z));

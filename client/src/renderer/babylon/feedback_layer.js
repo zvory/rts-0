@@ -100,7 +100,8 @@ export class BabylonFeedbackLayer {
     mesh.color = B.Color3.FromHexString(color);
     mesh.alpha = 0.95;
     mesh.isPickable = false;
-    mesh.renderingGroupId = 3;
+    // `aboveFogReveal` occupies group 3; tactical feedback must remain above it.
+    mesh.renderingGroupId = 4;
     this._meshes.push(mesh);
   }
 

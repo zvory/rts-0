@@ -205,6 +205,17 @@ assert.ok(Object.isFrozen(projection.perspective), "engine-independent perspecti
     );
     assert.ok(sceneDiagnostics.feedback.worldMarkers >= 4, "basic move, target, path, and placement feedback reaches Babylon");
     assert.equal(sceneDiagnostics.feedback.marquee, true, "the screen-space marquee is presented by Babylon");
+    assert.equal(
+      renderer._scene.meshes.find((mesh) => mesh.name === "placeholder-reveal:9")?.renderingGroupId,
+      3,
+      "shot reveals render above the current-fog group",
+    );
+    assert.ok(
+      renderer._scene.meshes
+        .filter((mesh) => mesh.name?.startsWith("feedback-"))
+        .every((mesh) => mesh.renderingGroupId === 4),
+      "tactical feedback remains above shot reveals",
+    );
     renderer.resize(640, 480);
     assert.equal(renderer._canvas.style.width, "640px");
     assert.equal(renderer.captureReadiness().ready, true);
