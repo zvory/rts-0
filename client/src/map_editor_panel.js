@@ -269,6 +269,7 @@ export class MapEditorPanel {
     const changed = this.session.mutate(`Removed ${kind === "start" ? "start location" : "base site"}`, (draft) => {
       result = removeDraftLocation(draft, { kind, locationIndex });
     });
+    if (changed) this.viewport.armTool(null);
     this.setStatus(changed ? "Map location removed." : result?.error || "Map location was already absent.", !changed);
   }
 

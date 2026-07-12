@@ -5,6 +5,7 @@ import { installFakePixi } from "./pixi_fakes.mjs";
 import { TERRAIN } from "../../client/src/protocol.js";
 import { createMapHandoff } from "../../client/src/map_editor_handoff.js";
 import { mapEditorLaunchConfig } from "../../client/src/map_editor_launch.js";
+import { MapEditorPanel } from "../../client/src/map_editor_panel.js";
 import {
   mapEditorSymmetryGuideCentre,
   mapEditorSymmetryGuideLines,
@@ -86,6 +87,25 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
   ]);
   assert.deepEqual(session.draft.baseSites, session.draft.startLocations,
     "symmetric start placement reuses an existing base and creates only the missing resource sites");
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 32, playerCount: 1 });
+  const viewport = {
+    tool: { kind: "start", locationIndex: 0, add: false },
+    armTool(tool) { this.tool = tool; },
+  };
+  const statuses = [];
+  const panel = {
+    session,
+    viewport,
+    setStatus(message, error) { statuses.push({ message, error }); },
+  };
+  MapEditorPanel.prototype.removeLocation.call(panel, "start", 0);
+  assert.equal(viewport.tool, null,
+    "removing the final start clears its now-invalid armed move tool before the author clicks the map again");
+  assert.deepEqual(statuses, [{ message: "Map location removed.", error: false }]);
 }
 
 {
