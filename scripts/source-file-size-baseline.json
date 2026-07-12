@@ -50,7 +50,7 @@
     },
     {
       "path": "server/crates/sim/src/game/services/order_queue.rs",
-      "lines": 1529,
+      "lines": 1524,
       "reason": "Panzerfaust reload extracted queued attack promotion helpers from the existing oversized order adapter; keep ratcheting until queue validation is fully split."
     },
     {

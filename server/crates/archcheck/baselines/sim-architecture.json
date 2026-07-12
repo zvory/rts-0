@@ -335,7 +335,7 @@
     },
     {
       "path": "services/commands/guards.rs",
-      "lines": 107
+      "lines": 105
     },
     {
       "path": "services/commands/planner_facts.rs",

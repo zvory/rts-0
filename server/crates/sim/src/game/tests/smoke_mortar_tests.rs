@@ -817,6 +817,10 @@ fn manual_mortar_fire_turns_briefly_before_launching() {
     let target = game.state.entities
         .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
         .expect("target should spawn");
+    game.state.entities
+        .get_mut(target)
+        .expect("target should exist")
+        .hold_position();
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
