@@ -1070,7 +1070,7 @@ export class Renderer {
 
 `renderer/pixi_compatibility_adapter.js`
 ```js
-export const PIXI_LEGACY_READ_ALLOWLIST // frozen ids plus removal owners
+export const PIXI_LEGACY_READ_ALLOWLIST // frozen ids plus concrete review triggers
 export class PixiPresentationAdapter {
   constructor(canvasParent, {renderClock,state,profiler,visualProfile,staticMap})
   render(presentationFrame) -> {presented:boolean}

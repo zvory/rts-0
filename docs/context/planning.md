@@ -9,6 +9,20 @@ architectural group tracking, and before/after cleanup comparisons, use
 [docs/hotspot-analysis.md](../hotspot-analysis.md), then create a phased plan only when the current
 evidence supports implementation work.
 
+## Pre-alpha and experimental work
+
+For a pre-alpha feature, renderer, prototype, or learning-oriented vertical slice, distinguish
+architecture that is expensive to reverse from hardening that can follow evidence. Authority,
+secrecy, shared data boundaries, coordinate/projection semantics, loop ownership, basic teardown,
+and bounded failure may block the first playable slice. Exhaustive parity, deterministic capture
+tooling, generalized registries, performance certification, device matrices, and polished content
+normally do not.
+
+Name no more than three executable phases before a user playtest or measured checkpoint. Preserve
+useful later ideas in a concise deferred-backlog section instead of writing speculative phase files
+that the runner will treat as approved work. After the checkpoint, revise, stop, or create a new
+small plan from the observed need; do not automatically expand the original chain.
+
 ## Required shape
 
 - Create `plans/<one-word-name>/plan.md` as the entry point.

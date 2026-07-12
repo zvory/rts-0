@@ -1,4 +1,4 @@
-# Phase 4 - Authoritative Presentation Event Contract
+# Phase 4 - Backend Kernel and Projection Seam
 
 ## Phase Status
 
@@ -6,117 +6,60 @@
 
 ## Depends On
 
-- Phase 3.5 merged with the least-privilege renderer frame, Pixi cutover, and immutable grid policy.
+- Phase 3.5 merged with the `render(frame)` seam, semantic camera API, perspective-safe selection,
+  and detached presentation frame.
 
 ## Objective
 
-Normalize real already-received fog-filtered presentation events before any renderer consumes them.
-Give both backends one event identity, spatial pose, seed, lifetime, layering, deduplication, and
-reset policy so a renderer cannot resolve old ids against future or hidden state. Preserve current
-Pixi event visuals while preparing safe bounded retention for Phase 5.
+Render the first authoritative Babylon Lab scene through the existing shared boundaries. Establish
+the backend/camera ownership and coordinate decisions that would be expensive to reverse later,
+without building fog parity, an asset pipeline, or production lifecycle machinery.
 
 ## Work
 
-- Inventory every current transient presentation source, including snapshot events, shot reveals,
-  state visual-effect queues, decals, notices that carry world positions, and any renderer-local
-  derivation. Classify persistent state separately from one-shot/finite events so the normalized
-  stream does not duplicate smoke/ability objects already represented as current state.
-- Create a plain `PresentationEvent` contract with stable diagnostic identity, kind, deterministic
-  seed where randomness is visual, received/source timeline data, visual start, finite lifetime,
-  plan-locked semantic layer/fog policy, ownership/team presentation, and already-authorized payload.
-- Make every retained-capable spatial event self-contained at receipt/reconciliation time. Capture
-  the authorized world position, facing, muzzle/impact/attachment pose, dimensions, and other
-  renderer inputs then; an event may retain a source id for diagnostics but later rendering or
-  replay must never look that id up in a newer frame where it moved, disappeared, or became hidden.
-- Derive missing identity exactly as
-  `timelineGeneration:authoritativeTick:eventIndex:kind:authorizedPayloadHash`, where
-  `authorizedPayloadHash` is a stable canonical hash of the normalized received payload and
-  `eventIndex` is its ordinal in the ordered tick event array. Identical same-tick events remain
-  distinct by ordinal, retransmitted/reconstructed snapshots dedupe to the same keys, and replay
-  seek reconstruction is stable; a same-key/different-payload collision is dropped with a bounded
-  diagnostic rather than silently merged. Do not add a protocol field; block if current evidence
-  proves this client-only identity cannot be made collision-safe.
-- Reconcile and deduplicate once in shared client code before `RendererFrame` is finalized. Pixi
-  and future Babylon receive the same active event records and cannot consume, start, seed, expire,
-  or mutate a shared queue independently.
-- Define pause and prediction behavior explicitly. Gameplay pause may freeze the visual clock as
-  already designed, while receipt/network time remains real; optimistic presentation cannot create
-  an event that later leaks or double-fires when authority arrives.
-- Define replay seek/branch, vision perspective change, Lab reset, live reset, rematch, and destroy
-  semantics. Old-timeline events and ids cannot survive into a new generation; same-tick replay
-  reconstruction remains deterministic.
-- Preserve visibility authority. Only received fog-filtered data and safe derived presentation
-  values enter an event; no normalizer queries hidden/full-world state, and diagnostics omit data
-  the recipient did not receive.
-- Feed normalized active events through the Phase 3 least-privilege renderer submodel and the named
-  Pixi compatibility adapter. Record any remaining renderer-local event derivation as explicit
-  ledger debt rather than allowing Babylon access to it.
-- Add bounded diagnostics for admitted/deduped/expired/reset/dropped-invalid events by kind, without
-  logging positions or ids that are not part of the recipient's presentation data.
+- Parse `rtsRenderer=pixi|babylon`; missing selects Pixi and invalid values show a bounded error.
+  Load a pinned Babylon version only for the explicit Babylon path and record its version/license in
+  a short vendor note.
+- Replace the direct Pixi construction site with a small selected-backend bundle. The bundle creates
+  the semantic camera first and the world renderer separately; the renderer receives only the
+  detached frame produced with that camera's projection.
+- Implement an engine-independent fixed-perspective semantic camera. Its
+  `ProjectionSnapshotV1` drives both the scene and `SelectionSceneV1`.
+- Put all world-pixel-to-scene point, facing, height, and scale conversion in one Babylon-private
+  helper. Add pure representative-point and ground-hit tests proving scene/projection agreement.
+- Create one Babylon-owned canvas, engine, and scene. Render map ground/bounds plus a few truthful
+  generic visible primitives from `PresentationFrameV1` in an explicit Lab route.
+- Call only `scene.render()` when Match invokes the backend. Support resize and idempotent destroy;
+  show a bounded capability/creation error and perform one leave/re-enter cleanup check.
+- Use `lab-interact` to capture and inspect one authoritative kernel PNG.
 
-## Expected Touch Points
+## Keep Small
 
-- a focused presentation-event normalizer/store module
-- `client/src/state_visual_effects.js`
-- `client/src/state_ground_decals.js` only where an event starts a persistent mark
-- `client/src/match.js` snapshot/event handling
-- `client/src/frame_recovery.js` and Phase 3 frame assembly
-- Pixi feedback/effect compatibility adapter
-- replay seek, Lab reset, pause, prediction, and rematch collaborators
-- `tests/client_contracts/presentation_event_contracts.mjs`
-- durable rendering/client design docs and parity ledger
-- `plans/render3d/phase-4.md` status update in the implementation commit
+- No live player, replay, or spectator route.
+- No GLB asset, asset schema/validator, event normalization, deterministic effect capture,
+  generalized resource registry, context-loss program, benchmark harness, vegetation, or shadows.
+- No protocol, server, simulation, command, or Pixi-default change.
 
-## Event Contract Requirements
+## Acceptance
 
-- Retained-capable events are spatially self-contained and immutable after admission.
-- Event identity is stable within a match/replay generation and cannot collide silently.
-- Multiple identical same-tick events, duplicate tick delivery, and replay seek reconstruction have
-  explicit identity/deduplication contracts.
-- Visual randomness uses an explicit deterministic seed; renderer-global random state is not part
-  of parity or capture semantics.
-- Expiration is sampled from the injected visual clock and finite lifetime, not renderer frame count.
-- Renderer failure or an extra capture render cannot consume or restart an event.
-- Reset/seek/rematch changes generation and clears/rebuilds events exactly once.
-- Semantic layering/fog policy is explicit; Babylon/Pixi do not decide visibility from effect kind
-  or source mesh availability.
-
-## Explicit Exclusions
-
-- No retained history or replay API; Phase 5 owns it.
-- No Babylon backend, particle system, showcase timer, or new visual effect.
-- No artificial lifetime extension and no global time patch.
-- No protocol/server visibility change.
-
-## Implementation Checklist
-
-- [ ] Inventory and classify transient versus persistent presentation sources.
-- [ ] Implement immutable normalized event identity, pose, seed, timing, layer, and payload.
-- [ ] Capture authorized spatial anchors at receipt; remove future-state id lookups for retained events.
-- [ ] Reconcile/deduplicate/expire/reset once before renderer consumption.
-- [ ] Preserve Pixi behavior through the compatibility adapter and ledger remaining derivation debt.
-- [ ] Add pause/prediction/replay/Lab/rematch/no-leak contracts and diagnostics.
-- [ ] Update durable docs/ledger and mark this phase done in the implementation commit.
+- Explicit Babylon Lab renders through `PresentationFrameV1`; normal Pixi remains unchanged and
+  does not load Babylon.
+- Babylon scene projection and semantic interaction projection agree for representative points and
+  ground hits.
+- Match remains the sole rAF owner, and one leave/re-enter leaves no extra canvas or active scene.
+- The inspected capture shows the kernel is ready for fog/entities, not visual parity.
 
 ## Verification
 
-    node tests/client_contracts/presentation_event_contracts.mjs
-    node tests/client_contracts/presentation_frame_contracts.mjs
-    node tests/client_contracts/renderer_feedback_contracts.mjs
+Run focused selector, projection, coordinate, and backend-lifecycle contracts added by the phase,
+then:
+
     node scripts/check-client-architecture.mjs
     tests/run-all.sh --only-browser-scenarios=smoke
     git diff --check
 
-## Manual Test Focus
+## Manual Test and Handoff
 
-Run real Pixi combat events through live play, pause/unpause, replay seek backward/forward, vision
-changes, Lab reset, and rematch. Confirm effects neither duplicate nor follow a later source pose,
-expire at their current lifetimes, preserve recipient visibility, and leave persistent decals/state
-only where the existing semantics require it.
-
-## Handoff Expectations
-
-Report event sources/classification, identity derivation, receipt-time spatial fields, seed/lifetime/
-layer policy, reset generation, deduplication diagnostics, and remaining Pixi-local debt. Name Phase
-5 as next and confirm the locked attack/muzzle event, safe retention descriptor, 256-event/10-second
-history, `0/80/160/240` offsets, and reset/error cases it must prove.
+Open the explicit Babylon Lab route, pan/dolly, resize, leave, and re-enter once. Report the selected
+bundle shape, projection/conversion conventions, dependency/version note, single-loop evidence,
+capture path, focused checks, and any limitation that Phase 5 must address.
