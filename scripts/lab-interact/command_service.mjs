@@ -78,10 +78,12 @@ export class LabInteractService {
   constructor({
     workspaceRoot = process.cwd(),
     driverFactory = (options) => LabInteractDriver.open(options),
+    artifactPreview = null,
     log = () => {},
   } = {}) {
     this.workspaceRoot = realWorkspaceRoot(workspaceRoot);
     this.driverFactory = driverFactory;
+    this.artifactPreview = artifactPreview;
     this.maxSessions = LAB_INTERACT_LIMITS.maxSessions;
     this.log = log;
     this.sessions = new Map();
@@ -109,7 +111,7 @@ export class LabInteractService {
     if (command === "record-wait") {
       const session = this.get(input.sessionId);
       const result = await session.driver.recordWait();
-      return { sessionId: input.sessionId, ...result };
+      return presentRecordingResult({ sessionId: input.sessionId, ...result }, this.artifactPreview);
     }
     return this.use(input.sessionId, async (session) => {
       const result = await this.executeSession(command, session, input);
@@ -242,7 +244,7 @@ export class LabInteractService {
           sessionId,
           status: session.driver.fixedCapture?.startStatus || { ready: true },
           aliases: [...session.aliases].map(([alias, id]) => ({ alias, id })),
-          recorder: session.driver.recordingStatus?.() || { active: false },
+          recorder: presentRecorderStatus(session.driver.recordingStatus?.() || { active: false }, this.artifactPreview),
           fixedCapture,
         };
       }
@@ -250,7 +252,7 @@ export class LabInteractService {
         sessionId,
         status: await session.driver.status(),
         aliases: [...session.aliases].map(([alias, id]) => ({ alias, id })),
-        recorder: session.driver.recordingStatus?.() || { active: false },
+        recorder: presentRecorderStatus(session.driver.recordingStatus?.() || { active: false }, this.artifactPreview),
         fixedCapture,
       }));
     }
@@ -289,26 +291,26 @@ export class LabInteractService {
     if (command === "time") return { sessionId, result: await session.driver.time(input.control) };
     if (command === "inspect") return inspect(session, input);
     if (command === "camera") return camera(session, input.camera);
-    if (command === "screenshot") return screenshot(session, input);
+    if (command === "screenshot") return screenshot(session, input, this.artifactPreview);
     if (command === "export") return exportArtifact(this.workspaceRoot, session, input);
     if (command === "import") return importArtifact(this.workspaceRoot, session, input);
     if (command === "artifact-inspect") return inspectArtifact(this.workspaceRoot, session, input);
     if (command === "record-start") {
       const result = await session.driver.recordStart({ ...input, sessionId });
-      return { sessionId, recorder: result };
+      return { sessionId, recorder: presentRecorderStatus(result, this.artifactPreview) };
     }
     if (command === "record-stop") {
       const result = await session.driver.recordStop({
         aliases: [...session.aliases].map(([alias, id]) => ({ alias, id })),
       });
-      return { sessionId, ...result };
+      return presentRecordingResult({ sessionId, ...result }, this.artifactPreview);
     }
     if (command === "capture-fixed") {
       const result = await session.driver.captureFixed({
         ...input, sessionId, sceneIdentity: session.sceneIdentity, sceneRevision: session.sceneRevision,
         aliases: [...session.aliases].map(([alias, id]) => ({ alias, id })),
       });
-      return { sessionId, ...result };
+      return presentFixedCaptureResult({ sessionId, ...result }, this.artifactPreview);
     }
     throw new LabInteractError("unknownCommand", `Unknown session command ${command}.`);
   }
@@ -427,7 +429,7 @@ async function camera(session, value) {
   };
 }
 
-async function screenshot(session, { name = "scene", presentation = "clean", viewport, subjects }) {
+async function screenshot(session, { name = "scene", presentation = "clean", viewport, subjects }, artifactPreview) {
   const resolved = subjects ? await resolveEntityReferences(session, subjects) : [];
   const inspected = resolved.length
     ? await session.driver.inspect({ ids: resolved.map((entry) => entry.id), limit: resolved.length })
@@ -439,7 +441,7 @@ async function screenshot(session, { name = "scene", presentation = "clean", vie
     subjectIds: resolved.map((entry) => entry.id), subjectSummaries,
     request: { command: "screenshot", sessionId: session.sessionId, name, presentation, viewport, subjects: resolved },
   });
-  return {
+  const result = {
     sessionId: session.sessionId,
     pngPath: capture.pngPath,
     manifestPath: capture.manifestPath,
@@ -452,6 +454,85 @@ async function screenshot(session, { name = "scene", presentation = "clean", vie
     },
     readiness: capture.readiness,
   };
+  return presentScreenshotResult(result, artifactPreview);
+}
+
+const TAILNET_DELIVERY_INSTRUCTION = "Share this Tailnet URL with the user to preview the Lab artifact. Do not share a local file path.";
+
+async function presentScreenshotResult(result, artifactPreview) {
+  if (!artifactPreview) return result;
+  const { pngPath, manifestPath, ...visible } = result;
+  return {
+    ...visible,
+    preview: await publishPreview(artifactPreview, pngPath, "image/png"),
+    manifest: { available: true, localPathWithheld: true },
+  };
+}
+
+async function presentRecordingResult(result, artifactPreview) {
+  if (!artifactPreview) return result;
+  const { videoPath, framePaths, contactSheetPath, manifestPath, ...visible } = result;
+  const [preview, poster] = await Promise.all([
+    publishPreview(artifactPreview, videoPath, "video/mp4"),
+    publishPreview(artifactPreview, contactSheetPath, "image/png"),
+  ]);
+  return {
+    ...visible,
+    preview: { ...preview, poster },
+    frames: { count: Array.isArray(framePaths) ? framePaths.length : 0, localPathsWithheld: true },
+    manifest: { available: true, localPathWithheld: true },
+  };
+}
+
+async function presentFixedCaptureResult(result, artifactPreview) {
+  if (!artifactPreview) return result;
+  const { videoPath, contactSheetPath, manifestPath, frameSummary, ...visible } = result;
+  const [preview, poster] = await Promise.all([
+    publishPreview(artifactPreview, videoPath, "video/mp4"),
+    publishPreview(artifactPreview, contactSheetPath, "image/png"),
+  ]);
+  const { representativeFramePaths, ...summary } = frameSummary || {};
+  return {
+    ...visible,
+    preview: { ...preview, poster },
+    frameSummary: {
+      ...summary,
+      representativeFrames: Array.isArray(representativeFramePaths) ? representativeFramePaths.length : 0,
+      localPathsWithheld: true,
+    },
+    manifest: { available: true, localPathWithheld: true },
+  };
+}
+
+function presentRecorderStatus(value, artifactPreview) {
+  if (!artifactPreview || !value || typeof value !== "object") return value;
+  const { videoPath, last, ...status } = value;
+  if (!last || typeof last !== "object") return videoPath == null ? status : { ...status, localPathWithheld: true };
+  const { videoPath: lastVideoPath, framePaths, contactSheetPath, manifestPath, ...lastStatus } = last;
+  return {
+    ...status,
+    ...(videoPath == null ? {} : { localPathWithheld: true }),
+    last: {
+      ...lastStatus,
+      ...(lastVideoPath == null && !Array.isArray(framePaths) && contactSheetPath == null && manifestPath == null
+        ? {}
+        : { localPathsWithheld: true }),
+    },
+  };
+}
+
+async function publishPreview(artifactPreview, filePath, mimeType) {
+  try {
+    const preview = await artifactPreview.publish({ filePath, mimeType });
+    return { available: true, ...preview, instruction: TAILNET_DELIVERY_INSTRUCTION };
+  } catch (error) {
+    return {
+      available: false,
+      code: String(error?.code || "tailnetPreviewUnavailable").slice(0, 80),
+      message: conciseError(error),
+      instruction: "Do not share a local file path. Restore Tailnet preview availability, then capture again.",
+    };
+  }
 }
 
 function validateInput(command, value) {

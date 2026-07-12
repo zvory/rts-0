@@ -59,8 +59,8 @@ export const LAB_INTERACT_COMMAND_HELP = Object.freeze({
     bounds: ["focus 1-400 refs", "padding 0-1024", "snapshot framingScale >0 and <=16"],
     example: { sessionId: "<lab-session-id>", camera: { action: "focus", refs: ["subject"] } },
   }),
-  screenshot: descriptor("Capture a readiness-checked selected-renderer PNG and bounded adjacent manifest.", "{sessionId:string,name?:token,presentation?:\"clean\"|\"normal\",viewport?:viewport,subjects?:(alias|u32)[]}", {
-    variants: ["presentation=clean hides UI chrome", "presentation=normal retains visible Lab panels and game UI"],
+  screenshot: descriptor("Capture a readiness-checked selected-renderer PNG and return its shareable Tailnet Preview URL.", "{sessionId:string,name?:token,presentation?:\"clean\"|\"normal\",viewport?:viewport,subjects?:(alias|u32)[]}", {
+    variants: ["presentation=clean hides UI chrome", "presentation=normal retains visible Lab panels and game UI", "response.preview.url is the user-delivery URL; local capture paths are withheld"],
     defaults: ["name=scene", "presentation=clean", "viewport=current viewport", "subjects=[]"], bounds: ["0-400 subjects", "name 1-48 safe-token characters", "capture viewport 320-2048 x 240-2048", "24 detailed subject summaries"],
     example: { sessionId: "<lab-session-id>", name: "subject", presentation: "clean", subjects: ["subject"] },
   }),
@@ -88,16 +88,16 @@ export const LAB_INTERACT_COMMAND_HELP = Object.freeze({
     defaults: ["name=recording", "maxDurationMs=10000", "viewport=current", "crop=game viewport", "scale=1", "resumeSpeed=omitted"], bounds: ["duration 1000-60000 ms", "viewport/crop <=2048", "scale 0.25-1", "resumeSpeed 0.01-16", "one active recorder", "64 MiB output"],
     example: { sessionId: "<lab-session-id>", name: "motion", maxDurationMs: 10000, resumeSpeed: 1 },
   }),
-  "record-stop": descriptor("Finalize the active real-time recording and return confined artifact paths.", "{sessionId:string}", {
-    bounds: ["one active recorder", "six representative frame paths", "40 detailed aliases in the manifest"], example: { sessionId: "<lab-session-id>" },
+  "record-stop": descriptor("Finalize the active real-time recording and return shareable Tailnet video/contact-sheet previews.", "{sessionId:string}", {
+    bounds: ["one active recorder", "six retained representative frames", "local artifact paths are withheld", "40 detailed aliases in the manifest"], example: { sessionId: "<lab-session-id>" },
   }),
   "record-wait": descriptor("Wait for the current recording to finalize without blocking other session commands.", "{sessionId:string}", {
-    variants: ["active and finalizing recordings share one completion", "a completed current recording returns its last result"],
+    variants: ["active and finalizing recordings share one completion", "a completed current recording returns its last result", "completion includes the same Tailnet preview URLs as record-stop"],
     bounds: ["a recording must have been started in the current session", "recording-only IPC timeout is capped at 420 seconds"],
     example: { sessionId: "<lab-session-id>" },
   }),
-  "capture-fixed": descriptor("Capture a deterministic-environment fixed-step H.264 sequence.", "{sessionId:string,name?:token,fps?:int,frameCount?:int,viewport?:viewport}", {
-    defaults: ["name=fixed", "fps=30", "frameCount=30", "viewport=current"], bounds: ["paused room required", "fps 10-60", "1-1800 frames", "six retained representative PNGs", "per-frame details in the manifest", "40 detailed aliases in the manifest"],
+  "capture-fixed": descriptor("Capture a deterministic-environment fixed-step H.264 sequence and return a Tailnet video preview.", "{sessionId:string,name?:token,fps?:int,frameCount?:int,viewport?:viewport}", {
+    defaults: ["name=fixed", "fps=30", "frameCount=30", "viewport=current"], bounds: ["paused room required", "fps 10-60", "1-1800 frames", "six retained representative PNGs", "Tailnet video/contact-sheet preview", "per-frame details in the manifest", "40 detailed aliases in the manifest"],
     example: { sessionId: "<lab-session-id>", name: "motion-fixed", fps: 30, frameCount: 60 },
   }),
   "capture-cancel": descriptor("Request cancellation of the active fixed-step capture.", "{sessionId:string}", {

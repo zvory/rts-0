@@ -27,13 +27,16 @@ uncertain; command help never starts or inspects the daemon.
 4. Run `screenshot` with a safe name, a bounded viewport such as 1000×700 at DPR 1, and any subject
    aliases. Use `presentation: "clean"` to hide UI chrome or `presentation: "normal"` to retain
    visible Lab panels and game UI.
-5. Open the returned `pngPath` once with the local image viewer. Share that path and a concise scene
-   result; the adjacent JSON manifest contains reproduction facts.
+5. Inspect the returned capture once during local QA. The CLI returns `result.preview.url` for every
+   visual artifact: share that Tailnet URL and a concise scene result with the user. Never share a
+   raw `target/lab-interact` path; the adjacent JSON manifest remains local reproduction evidence.
 6. Run `close` when the session is complete. Use `shutdown` for immediate daemon teardown; otherwise
    it closes itself after 30 minutes without an accepted interaction.
 
 Capture files are confined to `target/lab-interact/<session-id>/captures/` and ignored by Git. Do
-not request arbitrary paths, add image bytes to Git, or use Lab Interact to play a full match.
+not request arbitrary paths, add image bytes to Git, or use Lab Interact to play a full match. A
+Tailnet Preview URL remains available while the Lab daemon is running; `close` preserves it, while
+`shutdown` or daemon idle teardown removes it.
 
 ## Recovery
 

@@ -133,8 +133,9 @@ is loaded from the CDN, and `cargo run` from `server/` serves the client.
 - Deployed behavior: use the `fly-logs` skill early for beta/mainline differences, WebSocket or lobby
   failures, match history, crashes, restarts, and performance spikes.
 - Graphics or rendering changes: use the project-local `lab-interact` skill to arrange one small
-  authoritative scene, capture a clean Pixi PNG, inspect that returned artifact once, and share its
-  path. Keep captures under `target/lab-interact/`; do not use Browser/Computer Use, commit image bytes,
+  authoritative scene, capture a clean Pixi PNG, inspect that returned artifact once, and share only
+  its returned Tailnet Preview URL. Keep captures under `target/lab-interact/`; do not use
+  Browser/Computer Use, commit image bytes,
   or accept a missing-texture fallback as review evidence.
 - Planned implementation phases: use the `phase-runner` skill only for an existing phase file.
 - Pre-alpha/prototype plans: follow `docs/context/planning.md`. Keep expensive-to-reverse
@@ -147,8 +148,10 @@ is loaded from the CDN, and `cargo run` from `server/` serves the client.
   when the release match cannot run.
 - Local visual inspection through Tailscale: Tailscale links are the default delivery channel
   whenever the user needs to view a locally served game, browser result, replay, or other visual
-  artifact. Do not infer the user's device: they may be on a phone or desktop. Verify Tailscale
-  state with `tailscale status --json`, start the server with `RTS_ADDR=0.0.0.0:8080 cargo run
+  artifact. Lab Interact screenshots and videos already return an opaque Tailnet Preview URL: share
+  that URL directly, never offer the raw `target/lab-interact` path, and do not start a separate
+  game server for that artifact. Do not infer the user's device: they may be on a phone or desktop.
+  Verify Tailscale state with `tailscale status --json`, start the server with `RTS_ADDR=0.0.0.0:8080 cargo run
   --release` if port 8080 is not already served, then provide an `http://<Tailscale-IP>:8080/...`
   link rather than requiring a beta deployment. For a live spectator AI matchup, use the existing
   launch convention with a fresh room name, for example `/?rtsLaunch=match&rtsRoom=mobile-ai-<unique>&rtsRole=spectator&rtsAi=1:ai_2_1&rtsAi=2:ai_turtle&rtsStart=1`.

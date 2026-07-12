@@ -102,11 +102,24 @@ Query `catalog` before selecting owners, entity kinds, upgrades, abilities, or c
 mutations with `inspect`, control authoritative time with `time`, and compose with `camera`.
 Aliases, inspection, camera focus, and screenshot subjects accept up to 400 entity references.
 `screenshot` waits for fonts, relevant assets, two error-free render frames, and
-authoritative state. It returns the absolute PNG and adjacent manifest paths plus bounded metadata;
-it never sends image bytes through the CLI. Readiness checks cover every requested subject, while
+authoritative state. The CLI returns an opaque Tailnet Preview URL plus bounded metadata; it
+deliberately withholds local PNG and manifest paths so callers share the Tailnet URL rather than a
+raw file. Readiness checks cover every requested subject, while
 the response and manifest record the subject count, `truncated` state, and at most 24 detailed
 subject rows. `presentation: "clean"` hides UI chrome; `presentation: "normal"` retains visible Lab
-panels and game UI. Inspect the PNG once with the local image viewer.
+panels and game UI. Inspect the Tailnet preview once before delivery.
+
+Successful visual responses include this delivery-shaped field (the URL is opaque and host-specific):
+
+```json
+{
+  "preview": {
+    "available": true,
+    "url": "http://100.x.y.z:port/lab-interact-preview/<opaque-token>",
+    "instruction": "Share this Tailnet URL with the user to preview the Lab artifact. Do not share a local file path."
+  }
+}
+```
 
 Private servers use the production 30 Hz simulation clock by default; an explicitly inherited
 `RTS_TEST_TICK_MS` remains available to tests. Successful `order` results include an authoritative
@@ -119,9 +132,14 @@ Paused setup mutations fan out their accepted authoritative state without advanc
 paused `order` still advances one bounded tick so the queued command can be consumed; use explicit
 `time step` for any additional simulation progress.
 
-Artifacts are confined to `target/lab-interact/<session-id>/captures/` and ignored by Git. For a
-single-unit detail capture, camera `focus` defaults to close 32-world-pixel padding. Multi-subject
-and non-unit focus defaults to 48 world pixels.
+Artifacts are confined to `target/lab-interact/<session-id>/captures/` and ignored by Git. The
+daemon starts an artifact-only HTTP listener on this machine's Tailnet IP on first visual capture.
+Each URL has an unguessable per-artifact token, serves only its registered PNG or MP4 with no
+directory route, and remains available until daemon shutdown or idle teardown. It never exposes the
+private Lab game server or local filesystem paths. If Tailscale is unavailable, the visual capture
+still completes and its response reports an actionable unavailable preview instead of a raw path.
+For a single-unit detail capture, camera `focus` defaults to close 32-world-pixel padding.
+Multi-subject and non-unit focus defaults to 48 world pixels.
 
 ## Portable artifacts
 
@@ -165,8 +183,9 @@ authority maps cumulative monotonic wall time to 30 FPS output slots; each slot 
 raw frame. There is no intermediate WebM timeline and no second timestamp redistribution pass.
 Odd dimensions are normalized to even values for H.264 compatibility. Finalization extracts
 at most six representative PNGs,
-creates a 3×2 contact sheet, probes the media, and returns confined absolute paths plus bounded
-codec/frame diagnostics.
+creates a 3×2 contact sheet, probes the media, and returns a Tailnet MP4 preview plus a Tailnet
+contact-sheet preview with bounded codec/frame diagnostics. Local video, frame, contact-sheet, and
+manifest paths are deliberately withheld from CLI output.
 The adjacent manifest records authoritative start/end ticks and room time, accepted CLI operations,
 camera/time changes, aliases, workspace/build/browser/tool versions, and probe results. Frame
 diagnostics report raw screencast events, raw Chrome timestamp span and largest gap, source frames
@@ -214,9 +233,10 @@ authoritative state twice at two visual timestamps, while 15 FPS advances two ti
 fixed capture never mixes live rAF interpolation into either case. The manifest records the
 scenario/seed, branch/head/build/runtime identity, tick and visual timestamp for every frame,
 SHA-256 frame hashes, optional representative paths, and media paths. The bounded CLI response
-returns only frame count, unique-hash count, and representative paths; full rows remain in the
-manifest. Hash repeatability is evidence only within the pinned local
-browser/GPU environment, not a cross-browser, cross-GPU, or cross-OS golden-image promise.
+returns only frame count, unique-hash count, and a Tailnet MP4/contact-sheet preview; full rows
+remain in the manifest. Representative local paths are deliberately withheld. Hash repeatability is
+evidence only within the pinned local browser/GPU environment, not a cross-browser, cross-GPU, or
+cross-OS golden-image promise.
 Fixed-capture scene alias metadata uses the same 40-row detailed-summary cap.
 
 The command is serialized with other session mutation, rejects an active real-time recorder, and
@@ -240,12 +260,14 @@ fixed visual-time contract.
 | `daemonCheckoutMismatch` | Run `status` to inspect the preserved scene. When it is safe to discard, run the returned `shutdown` recovery command and retry from the current checkout. |
 | `assetLoadFailed`, `captureRenderError`, or `captureTimeout` | Fix the reported source/render problem; do not accept a fallback capture. |
 | `ffmpegUnavailable`, `ffprobeUnavailable`, or `h264Unavailable` | Install an FFmpeg toolchain with `libx264`, or set the explicit tool paths, then retry. |
+| `tailnetUnavailable` / `tailnetPreviewBindFailed` | Start Tailscale and capture again; share the returned Tailnet URL rather than a local path. |
 | `recordingActive` / `recordingInactive` | Check session `status`, then stop/wait for the active recorder or start a new one. A wait before any start is inactive. |
 
 ## Focused verification
 
 ```bash
 node tests/lab_interact_cli_contracts.mjs
+node tests/lab_interact_tailnet_preview_contracts.mjs
 node tests/lab_interact_driver_contracts.mjs
 node tests/lab_interact_bulk_contracts.mjs
 node tests/lab_interact_recording_contracts.mjs

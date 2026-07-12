@@ -1,5 +1,8 @@
 // Test-only deterministic driver for the CLI and daemon contract harness.
 
+import fs from "node:fs";
+import path from "node:path";
+
 const CATALOG = Object.freeze({
   maps: [{ name: "Default", width: 64, height: 64, tileSize: 32 }],
   players: [
@@ -67,6 +70,7 @@ export async function openLabInteractDriver(options) {
       const finalizeDelayMs = Number(process.env.RTS_LAB_INTERACT_FAKE_RECORD_FINALIZE_DELAY_MS || 0);
       if (finalizeDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, finalizeDelayMs));
       const directory = `${options.workspaceRoot}/target/lab-interact/${current.sessionId}/recordings/${current.name}-fixture`;
+      writeFixtureRecording(directory, current.name);
       const result = {
         active: false,
         stoppedBy: reason,
@@ -167,9 +171,13 @@ export async function openLabInteractDriver(options) {
       const width = viewport?.width || 1;
       const height = viewport?.height || 1;
       const subjects = Array.isArray(subjectSummaries) ? subjectSummaries : [];
+      const captureDirectory = `${options.workspaceRoot}/target/lab-interact/${sessionId}/captures`;
+      fs.mkdirSync(captureDirectory, { recursive: true });
+      fs.writeFileSync(path.join(captureDirectory, `${name}.png`), Buffer.from(ONE_PIXEL_PNG, "base64"));
+      fs.writeFileSync(path.join(captureDirectory, `${name}.json`), "{}\n");
       return {
-        pngPath: `${options.workspaceRoot}/target/lab-interact/${sessionId}/captures/${name}.png`,
-        manifestPath: `${options.workspaceRoot}/target/lab-interact/${sessionId}/captures/${name}.json`,
+        pngPath: path.join(captureDirectory, `${name}.png`),
+        manifestPath: path.join(captureDirectory, `${name}.json`),
         image: {
           mimeType: "image/png",
           data: ONE_PIXEL_PNG,
@@ -221,12 +229,22 @@ export async function openLabInteractDriver(options) {
     },
     async captureFixed({ sessionId, name = "fixed", fps = 30, frameCount = 30, sceneIdentity = null, sceneRevision = 0, aliases = [] }) {
       const startTick = tick;
-      const representativeFramePaths = Array.from({ length: Math.min(frameCount, 6) }, (_, index) => `${options.workspaceRoot}/target/lab-interact/${sessionId}/fixed/${name}/frames/frame-${String(index).padStart(4, "0")}.png`);
+      const directory = `${options.workspaceRoot}/target/lab-interact/${sessionId}/fixed/${name}`;
+      const framesDirectory = path.join(directory, "frames");
+      fs.mkdirSync(framesDirectory, { recursive: true });
+      const representativeFramePaths = Array.from({ length: Math.min(frameCount, 6) }, (_, index) => {
+        const framePath = path.join(framesDirectory, `frame-${String(index).padStart(4, "0")}.png`);
+        fs.writeFileSync(framePath, Buffer.from(ONE_PIXEL_PNG, "base64"));
+        return framePath;
+      });
+      fs.writeFileSync(path.join(directory, `${name}.mp4`), "fixture-mp4\n");
+      fs.writeFileSync(path.join(directory, `${name}-contact-sheet.png`), Buffer.from(ONE_PIXEL_PNG, "base64"));
+      fs.writeFileSync(path.join(directory, `${name}.json`), "{}\n");
       tick = startTick + Math.floor((frameCount - 1) * 30 / fps);
       return {
-        videoPath: `${options.workspaceRoot}/target/lab-interact/${sessionId}/fixed/${name}/${name}.mp4`,
-        contactSheetPath: `${options.workspaceRoot}/target/lab-interact/${sessionId}/fixed/${name}/${name}-contact-sheet.png`,
-        manifestPath: `${options.workspaceRoot}/target/lab-interact/${sessionId}/fixed/${name}/${name}.json`,
+        videoPath: path.join(directory, `${name}.mp4`),
+        contactSheetPath: path.join(directory, `${name}-contact-sheet.png`),
+        manifestPath: path.join(directory, `${name}.json`),
         frameSummary: { count: frameCount, uniqueHashes: frameCount, representativeFramePaths, detailsInManifest: true },
         authoritative: { startTick, endTick: tick },
         mapping: { simulationHz: 30, outputFps: fps }, fixtureMetadata: { sceneIdentity, sceneRevision, aliases },
@@ -272,6 +290,17 @@ export async function openLabInteractDriver(options) {
       closed = true;
     },
   };
+}
+
+function writeFixtureRecording(directory, name) {
+  const framesDirectory = path.join(directory, "frames");
+  fs.mkdirSync(framesDirectory, { recursive: true });
+  fs.writeFileSync(path.join(directory, `${name}.mp4`), "fixture-mp4\n");
+  fs.writeFileSync(path.join(directory, `${name}-contact-sheet.png`), Buffer.from(ONE_PIXEL_PNG, "base64"));
+  fs.writeFileSync(path.join(directory, `${name}.json`), "{}\n");
+  for (const frame of ["frame-01.png", "frame-02.png"]) {
+    fs.writeFileSync(path.join(framesDirectory, frame), Buffer.from(ONE_PIXEL_PNG, "base64"));
+  }
 }
 
 function deferred() {
