@@ -449,7 +449,12 @@ fn movement_economy_checkpoint_preserves_construction_and_deconstruction_progres
     let build_worker = baseline
         .state
         .entities
-        .spawn_unit(1, EntityKind::Worker, city_centre_site.0, city_centre_site.1)
+        .spawn_unit(
+            1,
+            EntityKind::Worker,
+            city_centre_site.0,
+            city_centre_site.1,
+        )
         .expect("build worker should spawn");
     let trap_pos = footprint_center(&baseline.state.map, EntityKind::TankTrap, 20, 8);
     let trap = baseline
