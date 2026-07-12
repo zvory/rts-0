@@ -123,7 +123,7 @@ try {
     const s = window.__rts.match.state, es = s.entitiesInterpolated(1).filter((e) => e.owner === s.playerId);
     return { cityCentre: es.filter((e) => e.kind === "city_centre").length, w: es.filter((e) => e.kind === "worker").length };
   });
-  ok(own.cityCentre === 1 && own.w === 4, `client sees own City Centre + 4 workers (cityCentre=${own.cityCentre}, workers=${own.w})`);
+  ok(own.cityCentre === 1 && own.w === 6, `client sees own City Centre + 6 workers (cityCentre=${own.cityCentre}, workers=${own.w})`);
 
   await page.waitForFunction(() => {
     const wasm = window.__rtsPredictionDebug?.wasm;

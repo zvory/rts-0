@@ -988,6 +988,10 @@ fn manual_mortar_fire_inner_splash_pierces_armor_and_outer_splash_hits_for_outer
     let outer_target = game.state.entities
         .spawn_unit(1, EntityKind::MachineGunner, outer_pos.0, outer_pos.1)
         .expect("outer target should spawn");
+    game.state.entities
+        .get_mut(outer_target)
+        .expect("outer target should exist")
+        .hold_position();
     let armored_hp_before = game.state.entities
         .get(armored_inner)
         .expect("armored target exists")
@@ -1021,7 +1025,10 @@ fn manual_mortar_fire_inner_splash_pierces_armor_and_outer_splash_hits_for_outer
     game.state.entities
         .get_mut(outer_target)
         .expect("outer target should exist")
-        .set_position(impact_pos.0 + config::TILE_SIZE as f32, impact_pos.1);
+        .set_position(
+            impact_pos.0,
+            impact_pos.1 + config::TILE_SIZE as f32 * 1.25,
+        );
     for _ in 0..config::MORTAR_SHELL_DELAY_TICKS {
         game.tick();
     }
