@@ -13,6 +13,8 @@ const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
 const HEALTH_PATH = "/_tailnet-preview/health";
 const PREVIEW_PATH_PREFIX = "/p/";
 const SERVICE_NAME = "rts-tailnet-preview";
+const ARTIFACT_FILE_NAME = "artifact";
+const MANIFEST_FILE_NAME = "manifest.json";
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 const SERVER_STARTUP_TIMEOUT_MS = 5_000;
 const SERVER_STOP_TIMEOUT_MS = 2_000;
@@ -167,11 +169,11 @@ function previewDirectory(root, id) {
 }
 
 function manifestPath(root, id) {
-  return path.join(previewDirectory(root, id), "manifest.json");
+  return path.join(previewDirectory(root, id), MANIFEST_FILE_NAME);
 }
 
-function previewPath(root, id, name) {
-  return path.join(previewDirectory(root, id), name);
+function artifactPath(root, id) {
+  return path.join(previewDirectory(root, id), ARTIFACT_FILE_NAME);
 }
 
 function serverStatePath(root, port) {
@@ -217,26 +219,32 @@ export function stagePreview({ root, source, ttlMs = DEFAULT_TTL_MS, keep = fals
   if (!keep && (!Number.isSafeInteger(ttlMs) || ttlMs <= 0)) {
     throw new Error("preview TTL must be a positive millisecond duration");
   }
+  if (!Number.isSafeInteger(now) || now < 0) {
+    throw new Error("preview clock must be a non-negative safe millisecond timestamp");
+  }
+  const expiresAt = keep ? null : now + ttlMs;
+  if (expiresAt !== null && !Number.isSafeInteger(expiresAt)) {
+    throw new Error("preview expiration is out of range");
+  }
 
   ensureRoot(root);
   const id = previewId();
   const name = safeFileName(source);
   const staging = path.join(root, `.${id}.staging`);
-  const destination = path.join(staging, name);
-  const expiresAt = keep ? null : now + ttlMs;
+  const destination = path.join(staging, ARTIFACT_FILE_NAME);
   const manifest = { version: 1, name, createdAt: now, expiresAt };
 
   try {
     mkdirSync(staging, { mode: 0o700 });
     copyFileSync(source, destination);
-    writeFileSync(path.join(staging, "manifest.json"), `${JSON.stringify(manifest)}\n`, { mode: 0o600 });
+    writeFileSync(path.join(staging, MANIFEST_FILE_NAME), `${JSON.stringify(manifest)}\n`, { mode: 0o600 });
     renameSync(staging, path.join(root, id));
   } catch (error) {
     rmSync(staging, { recursive: true, force: true });
     throw error;
   }
 
-  return { id, name, expiresAt, path: previewPath(root, id, name) };
+  return { id, name, expiresAt, path: artifactPath(root, id) };
 }
 
 export function cleanupExpiredPreviews(root, now = Date.now()) {
@@ -338,13 +346,26 @@ function readServerState(root, port) {
   }
 }
 
-function writeServerState({ root, host, port }) {
+export function writeServerState({ root, host, port }) {
   const state = { host, pid: process.pid, port, rootTag: rootTag(root), script: serverScriptPath() };
-  writeFileSync(serverStatePath(root, port), `${JSON.stringify(state)}\n`, { mode: 0o600 });
+  const destination = serverStatePath(root, port);
+  const staging = `${destination}.${process.pid}.${randomBytes(6).toString("hex")}.staging`;
+  try {
+    writeFileSync(staging, `${JSON.stringify(state)}\n`, { mode: 0o600 });
+    renameSync(staging, destination);
+  } catch (error) {
+    rmSync(staging, { force: true });
+    throw error;
+  }
 }
 
-function clearServerState({ root, port }) {
+export function clearServerState({ root, port, ownerPid }) {
+  if (ownerPid !== undefined) {
+    const state = readServerState(root, port);
+    if (!state || state.pid !== ownerPid) return false;
+  }
   rmSync(serverStatePath(root, port), { force: true });
+  return true;
 }
 
 function previewRequest(pathname) {
@@ -370,7 +391,7 @@ function servePreview(root, request, response, preview, now) {
     return;
   }
 
-  const file = previewPath(root, preview.id, preview.name);
+  const file = artifactPath(root, preview.id);
   let size;
   try {
     const stat = lstatSync(file);
@@ -417,7 +438,13 @@ function servePreview(root, request, response, preview, now) {
 export function createPreviewServer({ root, now = () => Date.now() }) {
   ensureRoot(root);
   const server = http.createServer((request, response) => {
-    const pathname = new URL(request.url || "/", "http://localhost").pathname;
+    let pathname;
+    try {
+      pathname = new URL(request.url || "/", "http://localhost").pathname;
+    } catch {
+      sendNotFound(response);
+      return;
+    }
     if (request.method === "GET" && pathname === HEALTH_PATH) {
       sendHealth(response, root);
       return;
@@ -609,7 +636,7 @@ function serve({ host, port, root }) {
   const stop = () => {
     if (stopping) return;
     stopping = true;
-    clearServerState({ root, port });
+    clearServerState({ root, port, ownerPid: process.pid });
     if (!server.listening) {
       process.exit(0);
       return;
@@ -621,7 +648,7 @@ function serve({ host, port, root }) {
   process.once("SIGHUP", stop);
   process.once("SIGTERM", stop);
   server.once("error", (error) => {
-    clearServerState({ root, port });
+    clearServerState({ root, port, ownerPid: process.pid });
     console.error(`${SERVICE_NAME} failed: ${error.message}`);
     process.exitCode = 1;
   });

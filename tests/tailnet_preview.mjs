@@ -7,6 +7,7 @@ import path from "node:path";
 
 import {
   cleanupExpiredPreviews,
+  clearServerState,
   createPreviewServer,
   isTailnetIpv4,
   parseArgs,
@@ -15,6 +16,7 @@ import {
   safeFileName,
   stagePreview,
   tailnetIpv4FromStatus,
+  writeServerState,
 } from "../scripts/tailnet-preview.mjs";
 
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "rts-tailnet-preview-test-"));
@@ -57,15 +59,43 @@ try {
     Self: { TailscaleIPs: ["100.119.17.21"] },
   }), "100.119.17.21");
 
+  const malformedRequestServer = createPreviewServer({ root: previewRoot });
+  const malformedResponse = responseCapture();
+  malformedRequestServer.emit("request", { method: "GET", url: "http://[", headers: {} }, malformedResponse);
+  assert.equal(malformedResponse.statusCode, 404, "malformed request targets do not crash the preview server");
+  malformedRequestServer.emit("close");
+
   const source = path.join(tempRoot, "My clip (final).mp4");
   fs.writeFileSync(source, "0123456789");
   const createdAt = 1_000_000;
+  assert.throws(
+    () => stagePreview({ root: previewRoot, source, ttlMs: Number.MAX_SAFE_INTEGER, now: createdAt }),
+    /expiration is out of range/,
+  );
+  assert.throws(
+    () => stagePreview({ root: previewRoot, source, now: Number.NaN }),
+    /clock must be a non-negative safe millisecond timestamp/,
+  );
   const preview = stagePreview({ root: previewRoot, source, ttlMs: 10_000, now: createdAt });
   assert.equal(preview.name, "My_clip_final_.mp4");
   assert.equal(fs.readFileSync(preview.path, "utf8"), "0123456789");
 
   const defaultPreview = stagePreview({ root: previewRoot, source, now: createdAt });
   assert.equal(defaultPreview.expiresAt, createdAt + 86_400_000, "staged previews default to 24 hours");
+
+  const manifestNamedSource = path.join(tempRoot, "manifest.json");
+  fs.writeFileSync(manifestNamedSource, "source named like the metadata file");
+  const manifestNamedPreview = stagePreview({ root: previewRoot, source: manifestNamedSource, ttlMs: 10_000, now: createdAt });
+  assert.equal(manifestNamedPreview.name, "manifest.json");
+  assert.equal(fs.readFileSync(manifestNamedPreview.path, "utf8"), "source named like the metadata file");
+
+  const statePort = 9_000;
+  const statePath = path.join(previewRoot, `server-${statePort}.json`);
+  writeServerState({ root: previewRoot, host: "100.64.0.1", port: statePort });
+  assert.equal(clearServerState({ root: previewRoot, port: statePort, ownerPid: process.pid + 1 }), false);
+  assert.equal(fs.existsSync(statePath), true, "a competing daemon cannot remove another daemon's state");
+  assert.equal(clearServerState({ root: previewRoot, port: statePort, ownerPid: process.pid }), true);
+  assert.equal(fs.existsSync(statePath), false);
 
   let clock = createdAt + 1;
   server = createPreviewServer({ root: previewRoot, now: () => clock });
@@ -86,6 +116,10 @@ try {
   assert.equal(full.headers["content-security-policy"], "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'");
   assert.equal(full.headers["referrer-policy"], "no-referrer");
   assert.equal(full.body, "0123456789");
+
+  const manifestNamed = await request({ port, pathname: `/p/${manifestNamedPreview.id}/${manifestNamedPreview.name}` });
+  assert.equal(manifestNamed.statusCode, 200);
+  assert.equal(manifestNamed.body, "source named like the metadata file");
 
   const partial = await request({
     port,
@@ -156,6 +190,16 @@ function listen(server) {
 
 function close(server) {
   return new Promise((resolve) => server.close(resolve));
+}
+
+function responseCapture() {
+  return {
+    statusCode: null,
+    writeHead(statusCode) {
+      this.statusCode = statusCode;
+    },
+    end() {},
+  };
 }
 
 function request({ port, pathname, method = "GET", headers = {} }) {
