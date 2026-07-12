@@ -359,17 +359,14 @@ fn joining_after_earlier_player_leaves_reuses_open_color() {
 
     join_test_player(&mut task, 1);
     join_test_player(&mut task, 2);
-    join_test_player(&mut task, 3);
     task.on_leave(1);
-    join_test_player(&mut task, 4);
+    join_test_player(&mut task, 3);
 
     let color_2 = &task.players.get(&2).unwrap().color;
     let color_3 = &task.players.get(&3).unwrap().color;
-    let color_4 = &task.players.get(&4).unwrap().color;
 
-    assert_eq!(color_4, PLAYER_PALETTE[0]);
-    assert_ne!(color_4, color_2);
-    assert_ne!(color_4, color_3);
+    assert_eq!(color_3, PLAYER_PALETTE[0]);
+    assert_ne!(color_3, color_2);
 }
 
 #[test]
@@ -671,7 +668,7 @@ async fn deploy_drain_records_aborted_replay_backed_match_before_connection_shut
     let replay = record
         .replay
         .expect("aborted match should include a replay row");
-    assert_eq!(replay.map_name, "Default");
+    assert_eq!(replay.map_name, "1v1");
     assert!(replay.artifact_schema_version > 0);
     assert!(replay.artifact_json["winnerId"].is_null());
     assert!(replay.artifact_json["winnerTeamId"].is_null());

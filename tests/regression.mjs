@@ -236,14 +236,19 @@ async function soloStart(room) {
   {
     const room = "reg-fog-events-" + Math.floor(performance.now());
     const clients = [new Client(), new Client(), new Client(), new Client()];
-    for (const c of clients) {
+    const host = clients[0];
+    await host.open();
+    await host.waitFor((m) => m.t === "welcome", 3000, "fog host welcome");
+    host.send({ t: "join", name: "Fog" + host.playerId, room });
+    await host.waitFor((m) => m.t === "lobby", 4000, "fog host lobby");
+    host.send({ t: "selectMap", map: "No Terrain" });
+    await host.waitFor((m) => m.t === "lobby" && m.map === "No Terrain", 4000, "fog map selection");
+    for (const c of clients.slice(1)) {
       await c.open();
       await c.waitFor((m) => m.t === "welcome", 3000, "fog welcome");
       c.send({ t: "join", name: "Fog" + c.playerId, room });
     }
     await clients[0].waitFor((m) => m.t === "lobby" && m.players.length === 4, 4000, "fog lobby(4)");
-    clients[0].send({ t: "selectMap", map: "No Terrain" });
-    await clients[0].waitFor((m) => m.t === "lobby" && m.map === "No Terrain", 4000, "fog map selection");
     for (const c of clients) c.send({ t: "ready", ready: true });
     await clients[0].waitFor((m) => m.t === "lobby" && m.canStart, 4000, "fog canStart");
     clients[0].send({ t: "start" });
