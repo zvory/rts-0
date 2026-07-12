@@ -327,6 +327,9 @@ async function main() {
   ok(lobbyA.players.find((player) => player.id === A.playerId)?.isSpectator === false,
     "browser open-row join enters as an active player");
 
+  A.send({ t: "selectMap", map: "Default" });
+  await A.waitFor((msg) => msg.t === "lobby" && msg.map === "Default", 3000, "browser four-seat map selection");
+
   await waitForLobbyRow(
     room,
     (row) => row.joinState === "open" && row.occupiedSlots === 1,
