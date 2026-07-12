@@ -426,8 +426,8 @@ mod tests {
             .expect("imported 1v1 map should be listed");
         assert_eq!(one_v_one_authored.min_players, 1);
         assert_eq!(one_v_one_authored.max_players, 2);
-        let one_v_one_map = Map::load("1v1", 2, 0x1234_5678)
-            .expect("1v1 should load for two active players");
+        let one_v_one_map =
+            Map::load("1v1", 2, 0x1234_5678).expect("1v1 should load for two active players");
         assert_eq!(
             one_v_one_map.base_sites.len(),
             8,
