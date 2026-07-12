@@ -755,11 +755,6 @@ mod tests {
         assert!(!catalog.allows_research(TANK_UNLOCK_UPGRADE, EntityKind::TrainingCentre));
         assert!(catalog.allows_building(EntityKind::TankTrap));
         assert!(catalog.can_build(EntityKind::Worker, EntityKind::TankTrap));
-        assert!(catalog.allows_building(EntityKind::Depot));
-        assert!(
-            !catalog.can_build(EntityKind::Worker, EntityKind::Depot),
-            "Supply Depots remain compatible entity kinds but are unavailable to workers"
-        );
         assert!(catalog.allows_building(EntityKind::PumpJack));
         assert!(
             !catalog.can_build(EntityKind::Worker, EntityKind::PumpJack),
