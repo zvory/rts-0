@@ -18,7 +18,7 @@ use super::priority::{AttackPriorityContext, TargetCandidate};
 use super::projection::{friendly_hard_blocker_between, shot_hits_intended_target};
 use super::weapons::{
     choose_target_preferring_anti_tank_field, effective_attack_profile,
-    moving_fire_movement_order_holds_path,
+    moving_fire_move_order_holds_path,
 };
 
 #[derive(Copy, Clone, PartialEq)]
@@ -107,11 +107,10 @@ pub(super) fn combat_mode_with_moving_fire(e: &Entity, can_fire_while_moving: bo
         Order::Attack(_) => CombatMode::Ordered,
         Order::HoldPosition => CombatMode::Opportunistic,
         Order::Idle if entrenchment_combat::is_actively_entrenched(e) => CombatMode::Opportunistic,
-        Order::AttackMove(_) if moving_fire_movement_order_holds_path(e, can_fire_while_moving) => {
+        Order::AttackMove(_) => CombatMode::Aggressive,
+        Order::Move(_) if moving_fire_move_order_holds_path(e, can_fire_while_moving) => {
             CombatMode::Opportunistic
         }
-        Order::AttackMove(_) => CombatMode::Aggressive,
-        Order::Move(_) if can_fire_while_moving => CombatMode::Opportunistic,
         Order::Idle if e.is_building() => CombatMode::Aggressive,
         Order::Idle if e.is_unit() && !is_passive_idle_unit(e.kind) => CombatMode::Aggressive,
         _ => CombatMode::Passive,

@@ -1255,8 +1255,8 @@ fn attack_move_resumes_original_destination_after_target_is_gone() {
 fn attack_move_resumes_after_firing_cleared_path_before_arrival() {
     let mut entities = EntityStore::new();
     let attacker_id = entities
-        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
-        .expect("attacker should spawn");
+        .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+        .expect("tank should spawn");
     if let Some(attacker) = entities.get_mut(attacker_id) {
         attacker.set_order(Order::attack_move_to(300.0, 100.0));
         attacker.set_path_goal(Some((300.0, 100.0)));
@@ -1277,7 +1277,7 @@ fn attack_move_resumes_after_firing_cleared_path_before_arrival() {
 }
 
 #[test]
-fn tank_keeps_moving_path_while_firing() {
+fn tank_attack_move_stops_when_it_reaches_an_enemy() {
     let mut entities = EntityStore::new();
     let tank_id = entities
         .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
@@ -1298,10 +1298,9 @@ fn tank_keeps_moving_path_while_firing() {
     let tank = entities.get(tank_id).expect("tank should exist");
     assert_eq!(tank.target_id(), Some(enemy_id));
     assert!(
-        !tank.path_is_empty(),
-        "tank should keep its movement path while firing"
+        tank.path_is_empty(),
+        "attack-moving tank should stop to engage the enemy"
     );
-    assert_eq!(tank.next_waypoint(), Some((300.0, 100.0)));
 }
 
 #[test]
@@ -1496,7 +1495,7 @@ fn meth_rifleman_move_order_keeps_path_while_firing_without_charge_state() {
 }
 
 #[test]
-fn meth_rifleman_attack_move_order_keeps_path_while_firing() {
+fn meth_rifleman_attack_move_stops_when_it_reaches_an_enemy() {
     let mut entities = EntityStore::new();
     let rifleman_id = entities
         .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
@@ -1518,14 +1517,14 @@ fn meth_rifleman_attack_move_order_keeps_path_while_firing() {
     let rifleman = entities.get(rifleman_id).expect("rifleman should exist");
     assert_eq!(rifleman.target_id(), Some(enemy_id));
     assert!(
-        !rifleman.path_is_empty(),
-        "meth riflemen should keep their attack-move path while firing"
+        rifleman.path_is_empty(),
+        "attack-moving meth riflemen should stop to engage the enemy"
     );
 
     assert_eq!(
         entities.get(enemy_id).expect("enemy should exist").hp,
         enemy_hp.saturating_sub(5),
-        "moving meth riflemen should fire with normal accuracy"
+        "meth riflemen should fire with normal accuracy after stopping"
     );
 }
 

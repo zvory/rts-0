@@ -220,12 +220,12 @@ pub(super) fn uses_vehicle_weapon_policy(e: &Entity) -> bool {
     crate::game::entity::fires_while_moving(e.kind)
 }
 
-pub(super) fn moving_fire_movement_order_holds_path(
+pub(super) fn moving_fire_move_order_holds_path(
     e: &Entity,
     can_fire_while_moving: bool,
 ) -> bool {
     can_fire_while_moving
-        && matches!(e.order(), Order::Move(_) | Order::AttackMove(_))
+        && matches!(e.order(), Order::Move(_))
         && !matches!(e.move_phase(), Some(MovePhase::Arrived))
 }
 
