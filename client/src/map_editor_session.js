@@ -374,6 +374,7 @@ export function moveSymmetricDraftLocation(draft, {
   if (!plans.length) return { ok: true, count: 0 };
   if (kind === "base") {
     const selected = plans[0];
+    if (sameLocation(selected.from, selected.to)) return { ok: true, count: 0 };
     const corresponding = plans.slice(1);
     if (corresponding.some((plan) => plan.startIndex >= 0)) {
       return draftEditError("A matching start location cannot be removed.");

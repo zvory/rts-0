@@ -307,6 +307,10 @@ export class MapEditorViewport {
         });
       if (result?.ok) protectDraftBaseTerrain(draft);
     });
+    if (changed && tool.kind === "base" && !tool.add) {
+      const selectedBase = this.session.mapOverlay()?.bases.find((base) => base.x === tile.x && base.y === tile.y);
+      this.setSelectedBase(selectedBase?.index ?? null);
+    }
     const extra = Math.max(0, Number(result?.count || 1) - 1);
     const removed = Math.max(0, Number(result?.removed || 0));
     this.onStatus(

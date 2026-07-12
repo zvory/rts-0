@@ -187,6 +187,8 @@ export class MapEditorPanel {
     const starts = this.session.draft.startLocations;
     const bases = this.session.mapOverlay()?.bases || [];
     this.selectedStartIndex = Math.max(0, Math.min(starts.length - 1, this.selectedStartIndex));
+    const selectedBaseIndex = bases.findIndex((base) => base.index === this.viewport.selectedBaseIndex);
+    if (selectedBaseIndex >= 0) this.selectedBaseIndex = selectedBaseIndex;
     this.selectedBaseIndex = Math.max(0, Math.min(bases.length - 1, this.selectedBaseIndex));
     const startPicker = document.createElement("div");
     startPicker.className = "map-editor-player-picker";
@@ -201,6 +203,7 @@ export class MapEditorPanel {
     for (const [index, base] of bases.entries()) {
       basePicker.appendChild(button(`B${index + 1}`, () => {
         this.selectedBaseIndex = index;
+        this.viewport.setSelectedBase(base.index);
         this.render();
       }, { active: index === this.selectedBaseIndex, title: `${base.x}, ${base.y}` }));
     }

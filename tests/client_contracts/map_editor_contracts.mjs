@@ -79,6 +79,41 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
 }
 
 {
+  const draft = authoredMapFromMaterialized({
+    name: "Unmoved symmetric base", description: "", size: 32,
+    terrain: Array(32 * 32).fill(TERRAIN.GRASS),
+    starts: [{ x: 8, y: 8 }],
+    baseSites: [{ x: 8, y: 8 }, { x: 8, y: 12 }, { x: 8, y: 19 }],
+  });
+  const before = structuredClone(draft);
+  const result = moveSymmetricDraftLocation(draft, {
+    kind: "base", locationIndex: 1, tile: { x: 8, y: 12 }, symmetry: MAP_EDITOR_SYMMETRY.HORIZONTAL,
+  });
+  assert.deepEqual(result, { ok: true, count: 0 });
+  assert.deepEqual(draft, before, "an unchanged base move never removes its symmetric counterpart");
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
+  session.loadAuthoredMap(authoredMapFromMaterialized({
+    name: "Reselected symmetric base", description: "", size: 32,
+    terrain: Array(32 * 32).fill(TERRAIN.GRASS),
+    starts: [{ x: 8, y: 8 }],
+    baseSites: [{ x: 8, y: 8 }, { x: 8, y: 12 }, { x: 8, y: 19 }, { x: 14, y: 14 }],
+  }));
+  const viewport = {
+    session,
+    tool: { kind: "base", locationIndex: 2, add: false, symmetry: MAP_EDITOR_SYMMETRY.HORIZONTAL },
+    selectedBaseIndex: 2,
+    setSelectedBase(index) { this.selectedBaseIndex = index; },
+    onStatus() {},
+  };
+  MapEditorViewport.prototype.applySiteTool.call(viewport, { x: 10, y: 19 });
+  assert.equal(viewport.selectedBaseIndex, 1,
+    "removing an earlier symmetric base keeps the moved base selected by its new backing index");
+}
+
+{
   const viewport = {
     selectedBaseIndex: null,
     redraws: 0,
