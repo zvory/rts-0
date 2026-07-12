@@ -83,7 +83,6 @@ export const ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS = TICK_HZ * 10;
 export const ARTILLERY_UNLOCK_RESEARCH_TICKS = TICK_HZ * 25;
 export const BALLISTIC_TABLES_RESEARCH_TICKS = TICK_HZ * 40;
 export const TANK_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
-export const COMMAND_CAR_UNLOCK_RESEARCH_TICKS = TICK_HZ * 30;
 export const MORTAR_AUTOCAST_RESEARCH_TICKS = TICK_HZ * 20;
 export const SMOKE_PLUS_RESEARCH_TICKS = TICK_HZ * 20;
 export const BREAKTHROUGH_RADIUS_TILES = 9;
@@ -148,8 +147,8 @@ export const STATS = Object.freeze({
     upgradeRequiresText: "Requires research in R&D Complex" },
   [KIND.COMMAND_CAR]: { label: "Command Car", icon: "CAR", size: 12.6, sight: 10, body: COMMAND_CAR_BODY,
     rangeTiles: 0, cost: { steel: 150, oil: 75 }, supply: 4, buildTicks: TICK_HZ * 15,
-    requires: KIND.FACTORY, upgradeRequires: UPGRADE.COMMAND_CAR_UNLOCK,
-    upgradeRequiresText: "Requires research in R&D Complex" },
+    requires: KIND.FACTORY, upgradeRequires: UPGRADE.TANK_UNLOCK,
+    upgradeRequiresText: "Requires Tank Production" },
   [KIND.EKAT]: { label: "Ekat", icon: "EK", size: 10, sight: 9,
     rangeTiles: 0, cost: { steel: 0, oil: 0 }, supply: 0, buildTicks: 0 },
 
@@ -171,7 +170,6 @@ export const STATS = Object.freeze({
       UPGRADE.ANTI_TANK_GUN_UNLOCK,
       UPGRADE.BALLISTIC_TABLES,
       UPGRADE.TANK_UNLOCK,
-      UPGRADE.COMMAND_CAR_UNLOCK,
       UPGRADE.MORTAR_AUTOCAST,
       UPGRADE.SMOKE_PLUS,
       UPGRADE.ARTILLERY_UNLOCK,
@@ -424,17 +422,6 @@ export const UPGRADES = Object.freeze({
     researchedAt: KIND.RESEARCH_COMPLEX,
     requiresUpgrade: UPGRADE.ARTILLERY_UNLOCK,
     requiresText: "Requires Heavy Guns",
-  }),
-  [UPGRADE.COMMAND_CAR_UNLOCK]: Object.freeze({
-    upgrade: UPGRADE.COMMAND_CAR_UNLOCK,
-    label: "Command Car",
-    icon: "CC+",
-    cost: Object.freeze({ steel: 150, oil: 150 }),
-    researchTicks: COMMAND_CAR_UNLOCK_RESEARCH_TICKS,
-    description: "Unlocks production of Command Cars",
-    researchedAt: KIND.RESEARCH_COMPLEX,
-    requiresUpgrade: UPGRADE.TANK_UNLOCK,
-    requiresText: "Requires Tank Production",
   }),
   [UPGRADE.MORTAR_AUTOCAST]: Object.freeze({
     upgrade: UPGRADE.MORTAR_AUTOCAST,

@@ -86,7 +86,6 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "COLORS",
   "COMMAND_CAR_BODY",
   "COMMAND_CAR_SUPPLY_CAP_BONUS",
-  "COMMAND_CAR_UNLOCK_RESEARCH_TICKS",
   "EKAT_CONSUME_GOLEM_RANGE_TILES",
   "EKAT_FACTION_ID",
   "EKAT_LINE_SHOT_COOLDOWN_TICKS",
@@ -275,7 +274,6 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   assert(EVENT_CODE[EVENT.PANZERFAUST_CONVERSION] === 14, "Panzerfaust conversion compact event code should be reserved");
   assert(EVENT_CODE[EVENT.MISS] === 15, "Miss compact event code should be reserved");
   assert(UPGRADE_CODE[UPGRADE.MORTAR_AUTOCAST] === 5, "Mortar Autocast compact upgrade code should be reserved");
-  assert(UPGRADE_CODE[UPGRADE.COMMAND_CAR_UNLOCK] === 6, "Command Car unlock compact upgrade code should be reserved");
   assert(UPGRADE_CODE[UPGRADE.BALLISTIC_TABLES] === 7, "Artillery Fire Control compact upgrade code should be reserved");
   assert(UPGRADE_CODE[UPGRADE.ENTRENCHMENT] === 8, "Entrenchment compact upgrade code should be reserved");
   assert(UPGRADE_CODE[UPGRADE.SMOKE_PLUS] === 9, "Smoke Plus compact upgrade code should be reserved");
@@ -412,12 +410,11 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       UPGRADE.ANTI_TANK_GUN_UNLOCK,
       UPGRADE.BALLISTIC_TABLES,
       UPGRADE.TANK_UNLOCK,
-      UPGRADE.COMMAND_CAR_UNLOCK,
       UPGRADE.MORTAR_AUTOCAST,
       UPGRADE.SMOKE_PLUS,
       UPGRADE.ARTILLERY_UNLOCK,
     ],
-    "R&D Complex should expose Medium Guns, Artillery Fire Control, Tank, Command Car, Mortar Autocast, Smoke Plus, and Heavy Guns research",
+    "R&D Complex should expose Medium Guns, Artillery Fire Control, Tank, Mortar Autocast, Smoke Plus, and Heavy Guns research",
   );
   assert(!ABILITIES[ABILITY.CHARGE], "client no longer exposes Rifleman Charge as a command-card ability");
   assert(
@@ -1042,6 +1039,11 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       !renderedButtons.some((button) => button.innerHTML.includes("TK+")),
       "completed Tank Production research should disappear from the command card",
     );
+    const unlockedCommandCarButton = renderedButtons.find((button) => button.innerHTML.includes("Command Car"));
+    assert(
+      unlockedCommandCarButton && !unlockedCommandCarButton.disabled,
+      "Tank Production should enable Command Car training",
+    );
 
     renderedButtons.length = 0;
     const selectedGunWorks = {
@@ -1105,18 +1107,15 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     const rdArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
     const rdArtilleryFireControlButton = renderedButtons.find((button) => button.innerHTML.includes("AFC"));
     const rdTankResearchButton = renderedButtons.find((button) => button.innerHTML.includes("TK+"));
-    const rdCommandCarResearchButton = renderedButtons.find((button) => button.innerHTML.includes("CC+"));
     const rdMortarAutocastButton = renderedButtons.find((button) => button.innerHTML.includes("MT+"));
     const rdSmokePlusButton = renderedButtons.find((button) => button.innerHTML.includes("SMK+"));
     assert(rdArtilleryFireControlButton?.dataset.hotkey === "W", "Artillery Fire Control research should appear in R&D Complex");
     assert(rdMediumGunsResearchButton?.dataset.hotkey === "Q", "Medium Guns research should appear in R&D Complex");
     assert(!rdHeavyGunsResearchButton, "Heavy Guns research should be hidden before Medium Guns");
     assert(rdTankResearchButton?.dataset.hotkey === "E", "Tank Production research should appear in R&D Complex");
-    assert(rdCommandCarResearchButton?.dataset.hotkey === "A", "Command Car research should appear in R&D Complex");
-    assert(rdMortarAutocastButton?.dataset.hotkey === "S", "Mortar Autocast research should appear in R&D Complex");
-    assert(rdSmokePlusButton?.dataset.hotkey === "D", "Smoke Plus research should appear in R&D Complex");
-    assert(rdCommandCarResearchButton?.disabled, "Command Car research should be disabled before Tank Production");
-    assert(rdCommandCarResearchButton?.title === "Requires Tank Production", "Command Car research should name Tank prerequisite");
+    assert(rdMortarAutocastButton?.dataset.hotkey === "A", "Mortar Autocast research should appear in R&D Complex");
+    assert(rdSmokePlusButton?.dataset.hotkey === "S", "Smoke Plus research should appear in R&D Complex");
+    assert(!renderedButtons.some((button) => button.innerHTML.includes("CC+")), "R&D Complex should not expose Command Car research");
     assert(rdArtilleryFireControlButton?.disabled, "Artillery Fire Control research should be disabled before Heavy Guns");
     assert(rdArtilleryFireControlButton?.title === "Requires Heavy Guns", "Artillery Fire Control research should name Heavy Guns prerequisite");
     assert(!rdArtilleryResearchButton, "R&D Complex should not expose separate Artillery research");
@@ -1137,13 +1136,6 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     renderCommandCard(rdHud);
     const unlockedArtilleryFireControlButton = renderedButtons.find((button) => button.innerHTML.includes("AFC"));
     assert(unlockedArtilleryFireControlButton && !unlockedArtilleryFireControlButton.disabled, "Artillery Fire Control should enable after Heavy Guns");
-
-    renderedButtons.length = 0;
-    rdHud.state.upgrades = [UPGRADE.TANK_UNLOCK];
-    rdHud._cardSig = null;
-    renderCommandCard(rdHud);
-    const unlockedCommandCarResearchButton = renderedButtons.find((button) => button.innerHTML.includes("CC+"));
-    assert(unlockedCommandCarResearchButton && !unlockedCommandCarResearchButton.disabled, "Command Car research should enable after Tank Production");
 
     renderedButtons.length = 0;
     const playedNotices = [];

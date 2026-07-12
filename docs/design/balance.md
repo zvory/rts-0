@@ -397,10 +397,8 @@ folded into default targeting.
   range-scaled starting error down to three tiles over the existing five-shot accuracy period.
 - **Tank Production** (R&D Complex research, protocol id `tank_unlock`): costs 150 steel /
   100 oil and takes 600 ticks (~20s). Once complete, that player can train Tanks from Vehicle
-  Works. Scout Cars remain immediately trainable from Vehicle Works.
-- **Command Car** (R&D Complex research, protocol id `command_car_unlock`): costs 150 steel /
-  150 oil and takes 900 ticks (~30s). It requires completed Tank Production research. Once
-  complete, that player can train Command Cars from Vehicle Works.
+  Works and Command Cars from Vehicle Works. Scout Cars remain immediately trainable from Vehicle
+  Works.
 - **Mortar Autocast** (R&D Complex research, protocol id `mortar_autocast`): costs 150 steel /
   150 oil and takes 600 ticks (~20s). Mortar Team autocast is unavailable before completion. Once
   complete, all current and future Mortar Teams for that player start with autocast enabled; players
@@ -517,7 +515,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | scout_car       | 100 | 6   | 5     | 6  | 2.35  | 14    | 125 | 50  | 3   | 480 (~16s) |
 | scout_plane     | 40  | 0   | 0     | 0  | 2.0   | 12    | 50  | 50  | 0   | 0; launched instantly by Command Car ability from the nearest owned completed City Centre; one active per player; non-combat recon with 4-tile orbit radius, 10-second orbit after arrival, 30-second global cooldown, no ground collision reservation, and 48x34 px client render body |
 | tank            | 292 | 60 cannon; 4 coax | 5 moving / 14 fully stationary cannon; 6 coax | 72 cannon; 6 coax | 2.0   | 6     | 425 | 150 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex; coax is a secondary small-arms weapon that fires through the current turret arc |
-| command_car     | 225 | 0   | 0     | 0  | 2.35  | 10    | 150 | 75  | 4   | 450 (~15s); requires Vehicle Works (`factory` kind) and Command Car (`command_car_unlock`) researched in R&D Complex; no weapon; Scout Car-style movement with a smaller jeep-sized body |
+| command_car     | 225 | 0   | 0     | 0  | 2.35  | 10    | 150 | 75  | 4   | 450 (~15s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex; no weapon; Scout Car-style movement with a smaller jeep-sized body |
 | ekat       | 150 | 0   | 0     | 0  | 1.6   | 9     | 0   | 0   | 0   | 0; Ekat faction hero; no default attack; no passive regeneration; consumes nearby Golems for recovery |
 
 Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra). Building sight is measured
@@ -531,8 +529,8 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 | depot                      | Supply Depot       | 110 | 1     | 100 | 2x2  | 300       | disabled in the current experiment (not buildable and no command-card button); retained for replay and fixture compatibility; +8 supply if present |
 | barracks                   | Barracks           | 165 | 1     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, and panzerfaust; Panzerfaust and Machine Gunner require completed Training Centre; requires a City Centre |
 | training_centre            | Training Centre    | 300 | 1     | 100 steel + 50 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner and panzerfaust training at barracks and researches Methamphetamines and Entrenchment; requires a City Centre and Barracks |
-| research_complex           | R&D Complex        | 165 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Medium Guns, Heavy Guns, Artillery Fire Control, Tank Production, Command Car, Mortar Autocast, and Smoke Plus; requires a City Centre and Training Centre |
-| factory                    | Vehicle Works      | 360 | 1     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, trains tank after Tank Production research, and trains command_car after Command Car research; requires a City Centre and Training Centre |
+| research_complex           | R&D Complex        | 165 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Medium Guns, Heavy Guns, Artillery Fire Control, Tank Production, Mortar Autocast, and Smoke Plus; requires a City Centre and Training Centre |
+| factory                    | Vehicle Works      | 360 | 1     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, then tank and command_car after Tank Production research; requires a City Centre and Training Centre |
 | steelworks                 | Gun Works          | 300 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately, Anti-Tank Guns after Medium Guns, and Artillery after Heavy Guns; requires a City Centre and Training Centre |
 | tank_trap                  | Tank Trap          | 120 | 0     | 30 steel + 0 oil | 1x1  | 300       | engineer-built vehicle obstacle available from the worker build card after a completed Training Centre; workers deconstruct completed traps in 150 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building |
 | pump_jack                  | Pump Jack          | 50  | 1     | 50 steel + 0 oil | 1x1  | 600       | contextual oil extractor built by workers on live oil patches; mines 2 oil per 40 ticks; unarmored, immobile, no trains, no supply, no weapon, and does not block shots or line of sight; no tech requirement |

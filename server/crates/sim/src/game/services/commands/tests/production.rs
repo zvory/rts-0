@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn support_weapon_and_tank_training_require_finished_unlock_upgrades() {
+fn support_weapon_and_vehicle_training_require_finished_unlock_upgrades() {
     let map = flat_map(24);
     for (producer, unit, upgrade, setup_extra) in [
         (
@@ -19,6 +19,12 @@ fn support_weapon_and_tank_training_require_finished_unlock_upgrades() {
         (
             EntityKind::Factory,
             EntityKind::Tank,
+            UpgradeKind::TankUnlock,
+            None,
+        ),
+        (
+            EntityKind::Factory,
+            EntityKind::CommandCar,
             UpgradeKind::TankUnlock,
             None,
         ),

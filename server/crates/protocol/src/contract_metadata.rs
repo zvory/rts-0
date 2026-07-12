@@ -95,7 +95,6 @@ pub mod upgrades {
     pub const TANK_UNLOCK: &str = "tank_unlock";
     pub const ARTILLERY_UNLOCK: &str = "artillery_unlock";
     pub const BALLISTIC_TABLES: &str = "ballistic_tables";
-    pub const COMMAND_CAR_UNLOCK: &str = "command_car_unlock";
     pub const MORTAR_AUTOCAST: &str = "mortar_autocast";
     pub const SMOKE_PLUS: &str = "smoke_plus";
 }
@@ -121,7 +120,7 @@ pub mod weapons {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 35;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 36;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -396,7 +395,6 @@ const UPGRADE_CODES: &[(&str, u8)] = &[
     (upgrades::TANK_UNLOCK, 3),
     (upgrades::ARTILLERY_UNLOCK, 4),
     (upgrades::MORTAR_AUTOCAST, 5),
-    (upgrades::COMMAND_CAR_UNLOCK, 6),
     (upgrades::BALLISTIC_TABLES, 7),
     (upgrades::ENTRENCHMENT, 8),
     (upgrades::SMOKE_PLUS, 9),
@@ -666,7 +664,6 @@ fn upgrade_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("TANK_UNLOCK", upgrades::TANK_UNLOCK),
         ("ARTILLERY_UNLOCK", upgrades::ARTILLERY_UNLOCK),
         ("BALLISTIC_TABLES", upgrades::BALLISTIC_TABLES),
-        ("COMMAND_CAR_UNLOCK", upgrades::COMMAND_CAR_UNLOCK),
         ("MORTAR_AUTOCAST", upgrades::MORTAR_AUTOCAST),
         ("SMOKE_PLUS", upgrades::SMOKE_PLUS),
     ])

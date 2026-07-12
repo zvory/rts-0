@@ -264,7 +264,7 @@ export const MOVEMENT_PATH_DIAGNOSTICS = Object.freeze({
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";
-export const COMPACT_SNAPSHOT_VERSION = 35;
+export const COMPACT_SNAPSHOT_VERSION = 36;
 export const SNAPSHOT_CODEC_VERSION = 1;
 export const SNAPSHOT_CODEC = Object.freeze({
   COMPACT_JSON: "compact-json",
@@ -328,7 +328,6 @@ export const UPGRADE = Object.freeze({
   TANK_UNLOCK: "tank_unlock",
   ARTILLERY_UNLOCK: "artillery_unlock",
   BALLISTIC_TABLES: "ballistic_tables",
-  COMMAND_CAR_UNLOCK: "command_car_unlock",
   MORTAR_AUTOCAST: "mortar_autocast",
   SMOKE_PLUS: "smoke_plus",
 });
@@ -339,7 +338,6 @@ export const UPGRADE_CODE = Object.freeze({
   [UPGRADE.TANK_UNLOCK]: 3,
   [UPGRADE.ARTILLERY_UNLOCK]: 4,
   [UPGRADE.MORTAR_AUTOCAST]: 5,
-  [UPGRADE.COMMAND_CAR_UNLOCK]: 6,
   [UPGRADE.BALLISTIC_TABLES]: 7,
   [UPGRADE.ENTRENCHMENT]: 8,
   [UPGRADE.SMOKE_PLUS]: 9,
