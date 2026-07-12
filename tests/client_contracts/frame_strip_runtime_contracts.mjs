@@ -225,6 +225,44 @@ assert(
   "renderer settles a paused or stalled held movement snapshot back to idle after the movement hold",
 );
 
+const interruptedMovement = {
+  motion: new Map(),
+  tick: 200,
+};
+assert(
+  frameStripMovementFor(
+    stationaryMoveEntity,
+    { ...stationaryMoveEntity, x: 38 },
+    stationaryMoveEntity,
+    interruptedMovement.motion,
+    interruptedMovement.tick,
+    0,
+  ).moving === true,
+  "renderer latches observed movement while the unit is in move state",
+);
+assert(
+  frameStripMovementFor(
+    { ...stationaryMoveEntity, state: STATE.ATTACK },
+    stationaryMoveEntity,
+    stationaryMoveEntity,
+    interruptedMovement.motion,
+    interruptedMovement.tick + 1,
+    25,
+  ).moving === false,
+  "renderer clears latched movement when the unit leaves move state",
+);
+assert(
+  frameStripMovementFor(
+    stationaryMoveEntity,
+    stationaryMoveEntity,
+    stationaryMoveEntity,
+    interruptedMovement.motion,
+    interruptedMovement.tick + 2,
+    50,
+  ).moving === false,
+  "renderer does not resurrect stale movement after the unit returns to move state",
+);
+
 function frameStripMovementFor(entity, previous, current, motion = new Map(), tick = null, now = 0) {
   return _frameStripMovementVisual.call(
     { _frameStripMotion: motion, visualNow: () => now },

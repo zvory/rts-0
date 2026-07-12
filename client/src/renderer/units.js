@@ -1,4 +1,4 @@
-import { STATS } from "../config.js";
+import { SNAPSHOT_MS, STATS } from "../config.js";
 import { KIND, SETUP, STATE } from "../protocol.js";
 import { liveRigDefinitionFor, liveRigRoutesFor } from "./rigs/live_routing.js";
 import { liveFrameStripFor } from "./rigs/frame_strip_routing.js";
@@ -20,7 +20,7 @@ import {
   tankBodyVisual,
 } from "./shared.js";
 
-const FRAME_STRIP_MOVEMENT_HOLD_MS = 100;
+const FRAME_STRIP_MOVEMENT_HOLD_MS = SNAPSHOT_MS * 3;
 
 export function _deployedWeaponSetupVisual(e) {
   const now = rendererVisualNow(this);
@@ -112,14 +112,18 @@ export function _frameStripMovementVisual(e, state) {
   const previousMotion = this._frameStripMotion?.get?.(e.id);
   const snapshotMotion = snapshotMovementSample(e, state);
   const renderMoving = renderedPositionChanged(e, this._frameStripMotion);
+  const moveState = e?.state === STATE.MOVE;
   const freshSnapshot = snapshotMotion != null &&
     authoritativeSampleChanged(snapshotMotion, previousMotion);
-  const observedMovement = renderMoving ||
+  const observedMovement = moveState && (
+    renderMoving ||
     (freshSnapshot && snapshotMotion.moving) ||
-    (snapshotMotion == null && previousMotion == null && e?.state === STATE.MOVE);
-  const lastMovementAt = observedMovement
-    ? now
-    : previousMotion?.lastMovementAt ?? null;
+    (snapshotMotion == null && previousMotion == null)
+  );
+  let lastMovementAt = null;
+  if (moveState) {
+    lastMovementAt = observedMovement ? now : previousMotion?.lastMovementAt ?? null;
+  }
   if (this._frameStripMotion) {
     this._frameStripMotion.set(e.id, {
       x: finite(e.x, 0),
@@ -130,8 +134,7 @@ export function _frameStripMovementVisual(e, state) {
       lastMovementAt,
     });
   }
-  const active = e?.state === STATE.MOVE &&
-    lastMovementAt != null &&
+  const active = lastMovementAt != null &&
     now - lastMovementAt <= FRAME_STRIP_MOVEMENT_HOLD_MS;
   return {
     moving: Boolean(active),
