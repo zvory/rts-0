@@ -396,7 +396,7 @@ try {
   editorUrl.pathname = "/map-editor";
   editorUrl.search = "";
   await editorPage.goto(editorUrl.href, { waitUntil: "domcontentloaded", timeout: 15000 });
-  await editorPage.waitForFunction(() => document.querySelectorAll(".map-editor-terrain-icon").length === 3, { timeout: 5000 });
+  await editorPage.waitForFunction(() => document.querySelectorAll(".map-editor-terrain-icon").length === 8, { timeout: 5000 });
   const editorUi = await editorPage.evaluate(() => {
     const panel = document.querySelector(".map-editor-panel-body");
     const water = document.querySelector(".map-editor-terrain-button[data-terrain=water]");
@@ -421,9 +421,9 @@ try {
   });
   ok(
     editorUi.header === "Map Editor" &&
-      editorUi.terrainPreviews.length === 3 &&
+      editorUi.terrainPreviews.length === 8 &&
       editorUi.terrainPreviews.every((preview) => preview.width > 0 && preview.height > 0),
-    `MAP EDITOR: terrain buttons show three rendered terrain previews (header=${editorUi.header}, previews=${editorUi.terrainPreviews.length})`,
+    `MAP EDITOR: terrain buttons show eight rendered terrain previews (header=${editorUi.header}, previews=${editorUi.terrainPreviews.length})`,
   );
   ok(
     editorUi.maxScroll > 0 && editorUi.beforeScrollTop > 0 && editorUi.beforeScrollTop === editorUi.afterScrollTop,
