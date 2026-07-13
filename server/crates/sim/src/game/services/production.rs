@@ -9,8 +9,7 @@ use crate::rules;
 
 /// Advance each building's front production item; on completion spawn the unit adjacent to the
 /// building and remove the item from the queue. If every spawn point is blocked, keep the complete
-/// item queued and retry next tick. Supply was already reserved on enqueue, so spawning does not
-/// re-charge it. Cost was charged at enqueue too.
+/// item queued and retry next tick. Supply and cost were already reserved on enqueue.
 pub(crate) fn production_system(
     _map: &Map,
     entities: &mut EntityStore,
@@ -96,7 +95,6 @@ pub(crate) fn production_system(
                 }
             }
         }
-
         let completed_research = {
             match entities.get_mut(id) {
                 Some(b)
@@ -195,10 +193,10 @@ pub(crate) fn production_system(
                 // Send the new unit through the building's rally plan. Plain rally stages default
                 // to attack-move for combat units, but faction gatherers keep move rally behavior.
                 if let Some(first) = rally_plan.first().copied() {
-                    coordinator.order_group_move(
+                    coordinator.order_rally_move(
                         entities,
                         owner,
-                        &[spawned],
+                        spawned,
                         (first.point.x, first.point.y),
                         rally_stage_attacks(unit_can_gather, first),
                     );
@@ -251,12 +249,13 @@ pub(crate) fn sync_owned_autocast_from_upgrades(
 mod tests {
     use super::*;
     use crate::game::entity::{EntityKind, Order, ProdItem, RallyIntent, RallyKind, ResearchItem};
-    use crate::game::map::Map;
     use crate::game::services::occupancy::{footprint_center, Occupancy};
     use crate::game::services::pathing::PathingService;
     use crate::game::services::standability;
-    use crate::game::ScoreState;
+    use crate::game::{map::Map, ScoreState};
     use crate::protocol::terrain;
+
+    mod rally;
     use std::collections::HashMap;
 
     #[test]
